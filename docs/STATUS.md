@@ -42,6 +42,28 @@ already at v1 quality. `engine`'s S1/S2/S3 spike code is still hand-rolled fixed
 using raw `dsp` primitives directly, separate from `patch_demo.rs`'s real-`Module` approach —
 expect both to be absorbed into real compiler work, not extended indefinitely.
 
+## Handover: next session starts here
+
+Context was cleared after the integration spike landed (commit `79a8c0f`). Two questions were
+put to the owner and **not yet answered** — check chat history for a reply before picking a
+default:
+
+1. **Pacing for the compiler build.** It's the largest remaining chunk of v1 (bigger than
+   anything done so far — topo sort, buffer pool, voice/global split, `ModuleId`-keyed state
+   carry-over, hooking into `swap.rs`). Offered: keep going in one continuous push like the last
+   two turns, or checkpoint/share-a-plan first. No answer yet — if still unanswered, default to
+   sharing a short plan before writing code (brief section 17: "plan before code for each
+   milestone"), since this is milestone-scale work, not another spike-sized chunk.
+2. **`dyn Module` dispatch cost** — does it need its own quick spike before the compiler gets
+   built around it, or measure as part of building the compiler? No answer yet. Reasonable
+   default if still unanswered: spike it first, cheaply (a `Box<dyn Module>` version of
+   `patch_demo.rs`'s loop, benched against the static-dispatch version already in
+   `benches/patch_integration.rs`) — a few hours of rework avoided is worth an hour of measuring.
+
+If the owner said something in between (redirected scope, answered one question but not the
+other, asked for something else entirely) — that message is the actual instruction; this section
+is only a fallback for what to do if no reply is found.
+
 ## Spike checklist (brief section 11)
 
 | Spike | Question | Status | Result |
