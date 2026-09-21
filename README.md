@@ -4,12 +4,18 @@ A legible modular synthesizer, written in Rust. Cables are instruments, patches 
 themselves, modules can be built like guitar pedals.
 
 Project brief and architecture: see the agent brief this repo was built from (owner-held, not
-checked in here). Working documents:
+checked in here).
 
-- `docs/decisions.md` — every non-trivial choice and the alternative rejected.
+**Start here: [`docs/STATUS.md`](docs/STATUS.md)** — current state, what's real vs. stub, what's
+next. Kept up to date on every commit; read it before the code if you're picking this up cold
+(human or agent).
+
+Other working documents:
+
+- `docs/decisions.md` — every non-trivial choice and the alternative rejected, append-only.
 - `docs/proposals.md` — out-of-scope ideas, parked.
 - `docs/confusions.md` — beginner confusions, lesson source material.
-- `docs/benchmarks.md` — measured performance history.
+- `docs/benchmarks.md` — measured performance history, append-only.
 
 ## Workspace
 
@@ -28,13 +34,16 @@ crates/
 
 ## Status
 
-v1 (Engine) milestone in progress. Spike S1 (graph swap with state carry-over and no audible
-click) passed — see `docs/decisions.md`.
+See [`docs/STATUS.md`](docs/STATUS.md) for the current, detailed answer. Short version:
+spikes S1 and S2 passed; nothing playable exists yet.
 
 ## Building
 
 ```
+cargo build --workspace
 cargo test --workspace
+cargo clippy --workspace --all-targets
+cargo fmt --all -- --check
 ```
 
 `core` has zero audio dependencies and can be built/tested standalone. `engine`'s tests enforce
