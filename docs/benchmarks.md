@@ -102,6 +102,28 @@ within 1s of release. WAV sent to the owner.
 need. See decisions.md's "Real open item" for why that matters before trusting this number as
 predictive of the real compiler's cost.
 
+## `dyn Module` dispatch cost — static vs. `Box<dyn Module>`
+
+See `docs/decisions.md` 2026-09-21 "Spike: `dyn Module` dispatch cost" entry. Same topology as
+`patch_demo.rs` (4 voices x 5 modules + mixer + out, 22 instances), only difference is
+`Box<dyn Module>` fields instead of concrete typed fields.
+
+`cargo bench -p kabl-engine --bench dyn_dispatch_spike`, `taskset -c 0`, 3 runs:
+
+| Run | static (µs/block) | dyn (µs/block) | ratio |
+|---|---|---|---|
+| 1 | 5.221 | 6.056 | 1.16x |
+| 2 | 5.194 | 6.113 | 1.18x |
+| 3 | 5.147 | 6.070 | 1.18x |
+
+Correctness (`cargo test -p kabl-engine --test dyn_dispatch_spike`): bit-exact agreement over 200
+blocks — dispatch mechanism doesn't change the signal.
+
+**Note:** this run's static-dispatch number (~5.15-5.22µs) doesn't match the `patch_integration`
+entry above (3.1-3.6µs) for the same `Patch::process_block` — re-ran `patch_integration` in the
+same session and it now also reads ~5.15-5.18µs, confirming a container-baseline shift between
+sessions (not a code regression). Trust the ratio, not either absolute number across sessions.
+
 ## Not yet measured
 
 v1 milestone, needs the real compiler/module registry, not spike-scoped hand-rolled graphs:

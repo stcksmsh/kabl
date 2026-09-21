@@ -461,3 +461,51 @@ was added for this (scope discipline, section 2).
   partial replay (brief section 6, "replay starts from nearest checkpoint") is deferred until a
   real patch's log is long enough for full replay to be measurably slow. Correct-but-unoptimized
   now; measure before optimizing (brief section 17).
+
+## 2026-09-21 — Spike: `dyn Module` dispatch cost, measured before the compiler
+
+STATUS.md's handover left this open: does `dyn Module` dispatch need its own spike before the
+real compiler is built around it, or is measuring-as-you-go for the compiler enough? Chose the
+spike — cheap to answer, and the compiler's central data structure (a heterogeneous collection of
+module instances, arbitrary kind mix per patch) has no static-dispatch alternative, so this isn't
+a design choice to revisit, just a cost to know up front.
+
+**Method** (`crates/engine/src/dyn_dispatch_spike.rs`): `DynPatch`/`DynVoice` are a byte-for-byte
+copy of `patch_demo.rs`'s `Patch`/`Voice` topology and wiring (same 5-module voice chain, same
+params, same `ProcessIo` calls) — the *only* change is `Voice`'s concrete typed fields (`MidiIn`,
+`OscVa`, ...) become `[Box<dyn Module>; 5]`. Correctness gate first, same reasoning as S3 (a
+dispatch-mechanism change should reproduce the original exactly, not approximate it):
+`tests/dyn_dispatch_spike.rs` runs both patches for 200 blocks and asserts bit-exact equality —
+passed first try, as expected (identical arithmetic, only the call mechanism differs).
+
+**Numbers** (`benches/dyn_dispatch_spike.rs`, `taskset -c 0`, 3 runs each; also cross-checked
+against a fresh `patch_integration` re-run for consistency):
+
+| Run | static (µs/block) | dyn (µs/block) |
+|---|---|---|
+| 1 | 5.221 | 6.056 |
+| 2 | 5.194 | 6.113 |
+| 3 | 5.147 | 6.070 |
+
+Ratio: dyn dispatch costs **~17-19% more** than static dispatch for this 22-module-instance patch
+(mean ~1.176x). Tight across all 3 runs (range 1.16x-1.19x) — much less noisy than S2/S3's numbers,
+plausibly because this measures a fixed, purely-CPU-bound code-shape difference rather than a
+scheduler-classification win that depends on signal content.
+
+**Cross-check note:** this run's static-dispatch number (~5.15-5.22µs) is noticeably higher than
+the `patch_integration` entry logged earlier this session (3.1-3.6µs) for the *identical*
+`Patch::process_block`. Re-ran `patch_integration`'s own bench just now to check: it now reports
+~5.15-5.18µs too — i.e. the container's baseline shifted between sessions (shared cloud VM, same
+noise caveat as S2/S3), not a regression in `patch_demo.rs`. The internal comparison (static vs.
+dyn, same run, same container state) is what's trustworthy here, not either absolute number in
+isolation.
+
+**What this means for the compiler:** `Box<dyn Module>` is the only viable representation for a
+patch with an arbitrary mix of module kinds — this was never going to change the plan. The number
+says the real compiler's ns/block will run ~15-20% higher than `patch_demo.rs`'s static-dispatch
+figure predicted, not a different order of magnitude. Not a blocker, not a reason to look for an
+alternative (an enum-of-module-kinds dispatch table was considered and rejected: it would need a
+match arm added by hand for every new module kind including pedals/composites in v4, defeating
+brief section 4.1's "one module interface for built-in, composite, and code modules" — trading a
+~17% ns/block cost for permanently coupling the compiler to a closed module-kind list is the wrong
+trade). Proceeding with `Box<dyn Module>` in the compiler design.

@@ -26,3 +26,7 @@ harness = false
 [[bench]]
 name = "patch_integration"
 harness = false
+
+[[bench]]
+name = "dyn_dispatch_spike"
+harness = false

@@ -5,7 +5,7 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-21, after the first patch built from real `Module` trait objects.
+Last updated: 2026-09-21, after the `dyn Module` dispatch spike (compiler plan still to write).
 
 ## Workflow (changed 2026-09-21)
 
@@ -44,25 +44,24 @@ expect both to be absorbed into real compiler work, not extended indefinitely.
 
 ## Handover: next session starts here
 
-Context was cleared after the integration spike landed (commit `79a8c0f`). Two questions were
-put to the owner and **not yet answered** — check chat history for a reply before picking a
-default:
+Owner answered both open questions from the last handover: spike `dyn Module` dispatch cost
+first, then share the compiler plan (not write code yet). First half done this session — see
+"Spike: `dyn Module` dispatch cost" in decisions.md and benchmarks.md: ~17-19% overhead vs. static
+dispatch, bit-exact correctness, not a blocker. `Box<dyn Module>` confirmed as the compiler's
+module-storage representation.
 
-1. **Pacing for the compiler build.** It's the largest remaining chunk of v1 (bigger than
-   anything done so far — topo sort, buffer pool, voice/global split, `ModuleId`-keyed state
-   carry-over, hooking into `swap.rs`). Offered: keep going in one continuous push like the last
-   two turns, or checkpoint/share-a-plan first. No answer yet — if still unanswered, default to
-   sharing a short plan before writing code (brief section 17: "plan before code for each
-   milestone"), since this is milestone-scale work, not another spike-sized chunk.
-2. **`dyn Module` dispatch cost** — does it need its own quick spike before the compiler gets
-   built around it, or measure as part of building the compiler? No answer yet. Reasonable
-   default if still unanswered: spike it first, cheaply (a `Box<dyn Module>` version of
-   `patch_demo.rs`'s loop, benched against the static-dispatch version already in
-   `benches/patch_integration.rs`) — a few hours of rework avoided is worth an hour of measuring.
-
-If the owner said something in between (redirected scope, answered one question but not the
-other, asked for something else entirely) — that message is the actual instruction; this section
-is only a fallback for what to do if no reply is found.
+**Second half not yet done: the compiler plan itself hasn't been written or shared yet.** Next
+session (or the rest of this one) should produce a short plan for the flat-schedule compiler
+before writing its code (brief section 17: "plan before code for each milestone" — this is
+milestone-scale work, the biggest remaining v1 chunk). The plan needs to cover, at minimum: topo
+sort over `PatchState`'s modules/cables, a buffer pool (block-sized scratch buffers, reused across
+`process()` calls, no per-block allocation), the voice/global rate split (brief section 7 — voice-
+rate modules run once per active voice, global-rate modules once per block), `ModuleId`-keyed
+state carry-over generalizing what S1 hand-rolled and `save_state`/`load_state` already support,
+and how a recompiled graph hooks into `swap.rs`'s existing crossfade mechanism (S1's swap+
+crossfade+deferred-drop is proven; it was only proven for S1's fixed 2-node shape, so the
+compiler needs to drive it for an arbitrary topology). Budget the design around `Box<dyn Module>`
+at the now-measured ~1.2x-of-static-dispatch cost, not against `patch_demo.rs`'s raw numbers.
 
 ## Spike checklist (brief section 11)
 
@@ -119,6 +118,10 @@ crates/
                                   calls like the other 3): 4 voices, 22 module instances, hand-
                                   wired. Correctness+bench in tests/patch_integration.rs and
                                   benches/patch_integration.rs.
+                 dyn_dispatch_spike.rs - same topology as patch_demo.rs, Box<dyn Module> fields
+                                  instead of concrete typed fields; measures vtable dispatch cost
+                                  (~17-19% over static). Correctness+bench in
+                                  tests/dyn_dispatch_spike.rs and benches/dyn_dispatch_spike.rs.
                None of this is the general compiler. Expect it to be replaced/absorbed, not
                extended indefinitely, once real compiler work starts.
   cables/, pedals/, learn/, ui/, standalone/, clap/
@@ -174,10 +177,12 @@ this against the commit it was last updated for.
 - **No module registry/catalog struct** — every test imports each `Module` type directly by
   name. Fine for 9 hand-known modules; will matter once the UI needs to enumerate "everything
   available" or `learn`'s unlock flags need to filter a list. Not built until something needs it.
-- **`dyn Module` dispatch cost unmeasured** — `patch_demo.rs` uses concrete typed fields
-  (static dispatch), not the `Box<dyn Module>` heterogeneous collection the real compiler needs.
-  Its ns/block number doesn't predict the real compiler's cost until someone measures the
-  vtable-indirection overhead specifically. Flagged for whoever builds the compiler.
+- ~~**`dyn Module` dispatch cost unmeasured**~~ — measured. `crates/engine/src/
+  dyn_dispatch_spike.rs`: `Box<dyn Module>` costs ~17-19% more than static dispatch on the same
+  22-instance patch (bit-exact correctness, tight ratio across runs). Not a blocker — `Box<dyn
+  Module>` is the only representation that fits an arbitrary module-kind mix; the compiler build
+  proceeds on that basis, budgeted for ~1.2x over `patch_demo.rs`'s static numbers, not a
+  different order of magnitude. See decisions.md.
 
 ## What to read next, depending on what you're about to do
 

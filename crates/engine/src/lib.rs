@@ -2,6 +2,7 @@
 //! v1 milestone in progress; spike S1 (graph swap) lives here first as the de-risking work
 //! ahead of the general compiler.
 
+pub mod dyn_dispatch_spike;
 pub mod graph;
 pub mod patch_demo;
 pub mod potato;
