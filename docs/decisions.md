@@ -780,3 +780,36 @@ Skipped for this pass, not silently: an audible WAV render (the owner won't hear
 morning regardless, and the waveform-vs-reference tests already prove correctness more precisely
 than an ear could at 1x speed) — can render one on request rather than spending effort on it now
 given the "conserve tokens" instruction.
+
+## 2026-09-21 — Voice allocator (`crates/engine/src/voice_allocator.rs`)
+
+Second autonomous-session item. Brief section 7's "voice allocator" was the one remaining v1
+milestone-checklist row nothing at all existed for — every test/demo that played more than one
+note (`patch_demo.rs`'s chord, `compile.rs`'s `chord_patch` tests) hand-picked which voice index
+each note went to, which only works because those are fixed test chords, not real playing.
+
+`VoiceAllocator` is deliberately decoupled from `CompiledPatch`/`midi.in`/pitch representation:
+`note_on(note_id: u32) -> usize` / `note_off(note_id: u32) -> Option<usize>`, where `note_id` is
+whatever the caller wants it to mean (a MIDI note number, in practice). Kept pitch-agnostic and
+graph-agnostic on purpose — it doesn't need to know semitones vs. MIDI note numbers vs. anything
+else, and testing the allocation policy shouldn't require compiling a patch. A caller (a MIDI
+router, not built yet) takes the returned voice index and calls the corresponding `MidiIn::
+note_on` itself — same "manual glue" shape `patch_demo.rs` already established for driving
+`midi.in`, just automated instead of hand-picked.
+
+Policy: lowest-index free voice first; steal the *oldest* still-held voice when all are busy
+(standard, simple voice-stealing — not velocity/envelope-stage-aware, which would need to inspect
+each voice's envelope state for a "steal the quietest" refinement; flagged as a real, deferred
+improvement, not attempted blind). A repeated `note_on` for an already-held note reuses its
+existing voice and refreshes its age, rather than leaking a second voice for one logical note —
+handles a real MIDI-source edge case (retriggered/stuck-key note-on) that a naive "always find a
+free voice" implementation would get wrong.
+
+9 tests in `crates/engine/tests/voice_allocator.rs`: 7 pure-logic (fill order, steal-oldest,
+stealing continues in oldest-first order across repeated steals, a stolen note's own `note_off`
+resolves to `None` and doesn't disturb the voice that stole it, unknown-note `note_off` is a
+no-op, repeated `note_on` reuses rather than steals, and refreshes age so it isn't immediately
+re-stolen) plus one integration test compiling a real minimal patch and confirming the allocator's
+returned voice indices land pitch changes on the exact right `midi.in` instance, including a
+free-before-steal check after an explicit release. All passing; workspace build/test/clippy/fmt
+clean.

@@ -5,7 +5,7 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-21, after `osc.va` gained square/triangle/sine + hard sync.
+Last updated: 2026-09-21, after the voice allocator was built.
 
 ## Autonomous overnight work (started 2026-09-21)
 
@@ -94,8 +94,12 @@ priority order for "something a person can actually patch and hear live":
    wasteful for anything beyond test-sized patches.
 3. Cycle handling still hard-errors instead of brief section 7.1's implicit 1-block delay — not
    needed by any v1 accept-test patch, but real feedback patches will hit it.
-4. No voice allocator — `voice_count` is a fixed `compile()` parameter, not dynamically assigned
-   from incoming MIDI note-on/off.
+4. ~~No voice allocator~~ — built. `voice_allocator.rs::VoiceAllocator` routes `note_on`/
+   `note_off` events to voice indices within a fixed `voice_count` (lowest-free-first, oldest-
+   steal when full). `voice_count` itself is still a fixed `compile()` parameter — the allocator
+   assigns *which* of the existing voice slots a note gets, it doesn't change how many exist.
+   No MIDI router wires a real MIDI stream into it yet (needs `standalone`'s `midir`
+   integration, item #1 above).
 5. Overlapping swaps (a second `build_swap` while one is still crossfading) aren't handled by
    either `Engine` or `PatchEngine` — a pre-existing S1 gap, not new.
 
@@ -120,7 +124,7 @@ What actually exists vs. what's still spike-scoped or missing:
 |---|---|
 | `core`: op log, undo/redo, coalescing, checkpoints, file format w/ schema version, property tests | **done, real.** `crates/core/`. |
 | `engine`: flat-schedule compiler | **built, correctness-tested, RT-safe.** `compile.rs`: topo sort, voice/global instancing, cycle detection, `recompile()` w/ state carry-over. `process_block` proven allocation-free (`tests/compile_rt_safety.rs`). No buffer-pool reuse yet. |
-| `engine`: voice allocator | **not built.** `voice_count` is a fixed compile-time parameter, not dynamically assigned from incoming MIDI notes. |
+| `engine`: voice allocator | **built.** `voice_allocator.rs::VoiceAllocator` — lowest-free-first, oldest-steal-when-full. Pitch/graph-agnostic (`note_id: u32` -> voice index); nothing routes real MIDI into it yet. `voice_count` is still a fixed `compile()` parameter. |
 | `engine`: SIMD batching | **prototyped in spike S3 only** (`simd_voices.rs`), not integrated into the compiler; measured ~1.5-1.7x speedup (target was 2.5x, missed — see decisions.md). |
 | `engine`: control-rate tier | **prototyped in spike S2 only** (`potato.rs`), not integrated into the compiler. |
 | `engine`: swap + crossfade | **wired to the real compiler.** `patch_engine.rs::PatchEngine` generalizes S1's `swap.rs::Engine` mechanism (equal-power crossfade, `basedrop` deferred drop) to arbitrary-topology `CompiledPatch`es via `recompile()`. Proven in `tests/patch_engine_swap.rs` (bit-exact outside crossfade, no allocation). No control surface calls it yet — see open items. |
@@ -175,6 +179,12 @@ crates/
                                 decisions.md "PatchEngine: wiring the compiler into S1's swap
                                 mechanism" -- also where env.adsr's gate_was_high state-
                                 carry-over bug was caught and fixed.
+                 voice_allocator.rs - VoiceAllocator: note_on/note_off(note_id: u32) -> voice
+                                index within a fixed voice_count. Lowest-free-first, oldest-
+                                steal-when-full. Pitch/graph-agnostic on purpose (see its own doc
+                                comment); nothing feeds it a real MIDI stream yet. Tests in
+                                tests/voice_allocator.rs (7 pure-logic + 1 driving a real
+                                CompiledPatch's midi.in instances).
                  graph.rs  - S1's fixed 2-node (4-voice chord -> cable depth -> filter) graph.
                  swap.rs   - S1's Engine: crossfade swap + basedrop deferred drop.
                  potato.rs - S2's fixed 20+3-module patch, naive vs. control-rate-optimized.
@@ -257,8 +267,8 @@ this against the commit it was last updated for.
 - **Compiler treats a cycle as a hard compile error**, not brief section 7.1's implicit 1-block
   delay. No v1 accept-test patch has a feedback loop, so not currently blocking; will matter for
   real feedback patches.
-- **No voice allocator** — `voice_count` is a fixed parameter passed to `compile()`, not
-  dynamically assigned from incoming MIDI note-on/off.
+- ~~**No voice allocator**~~ — built, `crates/engine/src/voice_allocator.rs`. See decisions.md
+  "Voice allocator". Nothing feeds it real MIDI yet (needs `standalone`'s `midir` integration).
 - **Overlapping swaps unhandled** — a second `build_swap` while one is still crossfading isn't
   accounted for in `swap::Engine` or `PatchEngine`. Pre-existing S1 gap, not new.
 - ~~**`dyn Module` dispatch cost unmeasured**~~ — measured. `crates/engine/src/
