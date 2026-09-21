@@ -90,7 +90,11 @@ impl SvfX4 {
     /// voices share one cutoff/resonance (same as S1/S2's patches), so this is a genuine
     /// broadcast, not an approximation: every lane gets the identical `a1`/`a2`/`a3`.
     #[inline]
-    pub fn process_with_coeffs(&mut self, input: f32x4, coeffs: &crate::dsp::SvfCoeffs) -> f32x4 {
+    pub fn process_with_coeffs(
+        &mut self,
+        input: f32x4,
+        coeffs: &kabl_modules::dsp::SvfCoeffs,
+    ) -> f32x4 {
         let a1 = f32x4::splat(coeffs.a1);
         let a2 = f32x4::splat(coeffs.a2);
         let a3 = f32x4::splat(coeffs.a3);
@@ -115,15 +119,17 @@ pub const RESONANCE: f32 = 0.3;
 /// the comparison isolates osc+filter cost, with nothing else (no cable depth, no mixing) to
 /// muddy the measurement.
 pub struct ScalarVoices {
-    voices: [(crate::dsp::Saw, crate::dsp::Svf); 4],
-    coeffs: crate::dsp::SvfCoeffs,
+    voices: [(kabl_modules::dsp::Saw, kabl_modules::dsp::Svf); 4],
+    coeffs: kabl_modules::dsp::SvfCoeffs,
 }
 
 impl ScalarVoices {
     pub fn new(sample_rate: f32) -> Self {
         ScalarVoices {
-            voices: std::array::from_fn(|_| (crate::dsp::Saw::new(), crate::dsp::Svf::new())),
-            coeffs: crate::dsp::SvfCoeffs::compute(CUTOFF_HZ, RESONANCE, sample_rate),
+            voices: std::array::from_fn(|_| {
+                (kabl_modules::dsp::Saw::new(), kabl_modules::dsp::Svf::new())
+            }),
+            coeffs: kabl_modules::dsp::SvfCoeffs::compute(CUTOFF_HZ, RESONANCE, sample_rate),
         }
     }
 
@@ -153,7 +159,7 @@ pub struct SimdVoices {
     osc: SawX4,
     filter: SvfX4,
     freq: f32x4,
-    coeffs: crate::dsp::SvfCoeffs,
+    coeffs: kabl_modules::dsp::SvfCoeffs,
 }
 
 impl SimdVoices {
@@ -162,7 +168,7 @@ impl SimdVoices {
             osc: SawX4::new(),
             filter: SvfX4::new(),
             freq: f32x4::new(VOICE_HZ),
-            coeffs: crate::dsp::SvfCoeffs::compute(CUTOFF_HZ, RESONANCE, sample_rate),
+            coeffs: kabl_modules::dsp::SvfCoeffs::compute(CUTOFF_HZ, RESONANCE, sample_rate),
         }
     }
 

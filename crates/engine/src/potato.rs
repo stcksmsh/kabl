@@ -14,8 +14,8 @@
 //! classifies them exactly as brief section 7 describes — "LFOs below ~100 Hz" and "envelopes in
 //! sustain" — and holds them as block-scalars instead.
 
-use crate::dsp::{Adsr, Lfo, Saw, Svf};
 use crate::graph::BLOCK;
+use kabl_modules::dsp::{Adsr, Lfo, Saw, Svf};
 
 pub const NUM_VOICES: usize = 4;
 pub const VOICE_HZ: [f32; NUM_VOICES] = [110.0, 130.81, 164.81, 220.0];

@@ -3,7 +3,7 @@
 //! general flat-schedule compiler (brief section 7), which is v1 milestone scope, not spike
 //! scope — the spike only needs to prove a graph can be swapped with state carried over.
 
-use crate::dsp::{Saw, Svf};
+use kabl_modules::dsp::{Saw, Svf};
 
 pub const BLOCK: usize = 64;
 pub const NUM_VOICES: usize = 4;

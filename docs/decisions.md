@@ -268,6 +268,21 @@ Starting real v1 (Engine) milestone work now: the module registry + `Module`/`Mo
 (brief section 8) first, since the compiler, cables, and UI all need it to exist before they're
 buildable — it's the one piece on the v1 checklist nothing else is downstream-independent of.
 
+## 2026-09-21 — Module registry: `dsp` relocated from `engine` to `modules`
+
+`Saw`/`Svf`/`Lfo`/`Adsr`/`SvfCoeffs`/`poly_blep` lived in `crates/engine/src/dsp.rs` because
+S1-S3 needed *some* real DSP to spike against, and `engine` was the only crate with content at
+the time. Per brief section 5, `modules` is where "built-in modules + metadata" belong — `engine`
+is the compiler/scheduler/swap layer, not a DSP owner. Now that `modules` is about to hold the
+real `Module` trait and built-in implementations, leaving the primitives in the wrong crate would
+mean either duplicating them or having `modules` depend on `engine` (backwards — `engine` is
+supposed to depend on `modules`, not the other way around).
+
+Moved `dsp.rs` to `crates/modules/src/dsp.rs` unchanged (`git mv`, pure relocation, zero logic
+changes), added `kabl-modules` as an `engine` dependency, updated `graph.rs`/`potato.rs`/
+`simd_voices.rs` imports from `crate::dsp::` to `kabl_modules::dsp::`. `cargo test --workspace`
+confirms bit-identical behavior — this is a move, not a rewrite.
+
 ## 2026-09-21 — `core`: op log inverse simplifications
 
 `Entry.inverse` is a single `Op`, per the brief's exact struct (section 6) — no new `Op` variant
