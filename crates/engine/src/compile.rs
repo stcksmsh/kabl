@@ -26,12 +26,18 @@
 //!   unset) at compile time and passed as `Signal::Scalar` every block, exactly matching how
 //!   `patch_demo.rs` already used literals for every param.
 //!
-//! Not yet RT-safe: `process_block` allocates scratch `Vec`s per call (copying inputs out of the
-//! buffer pool before taking mutable output borrows, and building `Signal`/output-slice arrays
-//! fresh each time). This is deliberate for a correctness-first pass — `CompiledPatch` isn't
-//! wired into `swap.rs`/the real audio thread yet, so brief section 3's zero-allocation rule
-//! doesn't bind here yet. Making this allocation-free is real, separate follow-up work before
-//! this can run inside `Engine::process_block`.
+//! `process_block` is now allocation-free (brief section 3), proven by
+//! `tests/compile_rt_safety.rs` running it inside `assert_no_alloc!` the same way spike S1 does.
+//! It got there by replacing the original correctness-first pass's per-call `Vec`s (copying
+//! inputs out of the buffer pool, building `Signal`/output-slice arrays fresh each block) with
+//! fixed-size stack arrays sized to `MAX_INPUTS`/`MAX_OUTPUTS`/`MAX_PARAMS` — constants derived
+//! from the largest counts among the 9 known built-ins (`mixer`: 4 inputs; `filter.svf`: 3
+//! outputs; `env.adsr`: 4 params). `compile()` (control-thread, allowed to allocate/return
+//! errors) rejects any module whose port/param counts exceed those bounds with
+//! `CompileError::TooManyPorts`, so a future built-in that needs more headroom fails loudly at
+//! compile time instead of the audio thread silently truncating or panicking. `CompiledPatch`
+//! still isn't wired into `swap.rs`/the real audio thread yet — that's the next gap, not this
+//! one.
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt;
@@ -43,6 +49,18 @@ use kabl_modules::{registry, Module, ModuleInfo, PortDirection, ProcessIo, Rate,
 use crate::graph::BLOCK;
 
 pub type BufIdx = usize;
+
+/// `process_block`'s per-step scratch (inputs, params) is a fixed-size stack array sized to
+/// these, not a `Vec`, so building it every block doesn't allocate. Set to the largest count any
+/// of the 9 known built-ins actually has (`mixer`: 4 inputs; `env.adsr`: 4 params) — `compile()`
+/// checks every module against these bounds and returns `CompileError::TooManyPorts` rather than
+/// silently truncating if a future built-in needs more.
+const MAX_INPUTS: usize = 4;
+/// Output arity the audio-thread match in `process_block` handles directly (0/1/2/3 — no module
+/// currently needs more; `filter.svf`'s 3 outputs is the largest). Bump alongside a new match arm
+/// if a module ever needs more, not just this constant.
+const MAX_OUTPUTS: usize = 3;
+const MAX_PARAMS: usize = 4;
 
 #[derive(Debug)]
 pub enum CompileError {
@@ -58,6 +76,17 @@ pub enum CompileError {
     /// Modules left over after topo-sorting everything with in-degree 0 repeatedly — a cycle.
     /// Brief section 7.1's 1-block-delay handling isn't implemented yet (see module doc).
     Cycle(Vec<ModuleId>),
+    /// A module's input/output/param count exceeds `MAX_INPUTS`/`MAX_OUTPUTS`/`MAX_PARAMS` — the
+    /// fixed-size scratch `process_block` uses to stay allocation-free can't hold it. Caught here
+    /// at compile time (control thread, safe to fail loudly) rather than truncating data or
+    /// panicking on the audio thread.
+    TooManyPorts {
+        id: ModuleId,
+        kind: String,
+        what: &'static str,
+        count: usize,
+        max: usize,
+    },
 }
 
 impl fmt::Display for CompileError {
@@ -71,6 +100,20 @@ impl fmt::Display for CompileError {
             }
             CompileError::Cycle(ids) => {
                 write!(f, "cycle among modules {ids:?} (not yet supported)")
+            }
+            CompileError::TooManyPorts {
+                id,
+                kind,
+                what,
+                count,
+                max,
+            } => {
+                write!(
+                    f,
+                    "module {id} (\"{kind}\") has {count} {what}, but the compiler's fixed \
+                     scratch space only supports up to {max} — bump the relevant MAX_* constant \
+                     in compile.rs"
+                )
             }
         }
     }
@@ -246,6 +289,34 @@ pub fn compile(
             .filter(|p| p.direction == PortDirection::Output)
             .collect();
 
+        if input_ports.len() > MAX_INPUTS {
+            return Err(CompileError::TooManyPorts {
+                id,
+                kind: meta.kind.clone(),
+                what: "input ports",
+                count: input_ports.len(),
+                max: MAX_INPUTS,
+            });
+        }
+        if output_ports.len() > MAX_OUTPUTS {
+            return Err(CompileError::TooManyPorts {
+                id,
+                kind: meta.kind.clone(),
+                what: "output ports",
+                count: output_ports.len(),
+                max: MAX_OUTPUTS,
+            });
+        }
+        if params.len() > MAX_PARAMS {
+            return Err(CompileError::TooManyPorts {
+                id,
+                kind: meta.kind.clone(),
+                what: "params",
+                count: params.len(),
+                max: MAX_PARAMS,
+            });
+        }
+
         let empty = Vec::new();
         let incoming = cables_by_dest.get(&id).unwrap_or(&empty);
         for cable in incoming {
@@ -383,49 +454,70 @@ impl CompiledPatch {
                     output_bufs,
                     params,
                 } => {
-                    // Copy inputs out (Copy type, cheap) before taking any mutable borrow, so
-                    // there's no aliasing between input reads and output writes below.
-                    let input_data: Vec<[f32; BLOCK]> = inputs
-                        .iter()
-                        .map(|src| match src {
+                    // Fixed-size stack scratch, not `Vec` — `compile()` already rejected any
+                    // module whose input/param count exceeds MAX_INPUTS/MAX_PARAMS, so these
+                    // never need to grow. Copy inputs out (Copy type, cheap) before taking any
+                    // mutable borrow below, so there's no aliasing between input reads and
+                    // output writes.
+                    let mut input_data = [[0.0f32; BLOCK]; MAX_INPUTS];
+                    for (slot, src) in input_data.iter_mut().zip(inputs.iter()) {
+                        *slot = match src {
                             InputSource::Buffer(idx) => self.buffers[*idx],
                             InputSource::Silence => [0.0; BLOCK],
-                        })
-                        .collect();
-                    let input_signals: Vec<Signal> =
-                        input_data.iter().map(|d| Signal::Buffer(&d[..])).collect();
-                    let param_signals: Vec<Signal> =
-                        params.iter().map(|&v| Signal::Scalar(v)).collect();
+                        };
+                    }
+                    let mut input_signals = [Signal::Scalar(0.0); MAX_INPUTS];
+                    for (slot, data) in input_signals.iter_mut().zip(input_data.iter()) {
+                        *slot = Signal::Buffer(&data[..]);
+                    }
+                    let input_signals = &input_signals[..inputs.len()];
 
-                    // Disjoint mutable output slices. `get_disjoint_mut` returns an error (not
-                    // UB) if two indices in `output_bufs` were somehow equal — a genuine
-                    // safety net, not just an assumption, since every output buffer is freshly
-                    // allocated per port and never reused across steps in this compiler pass.
-                    let mut output_slices: Vec<&mut [f32]> = Vec::with_capacity(output_bufs.len());
+                    let mut param_signals = [Signal::Scalar(0.0); MAX_PARAMS];
+                    for (slot, &v) in param_signals.iter_mut().zip(params.iter()) {
+                        *slot = Signal::Scalar(v);
+                    }
+                    let param_signals = &param_signals[..params.len()];
+
+                    // Disjoint mutable output slices, built straight into a stack array sized to
+                    // the exact arity (no `Vec`). `get_disjoint_mut` returns an error (not UB) if
+                    // two indices in `output_bufs` were somehow equal — a genuine safety net, not
+                    // just an assumption, since every output buffer is freshly allocated per port
+                    // and never reused across steps in this compiler pass. `compile()` already
+                    // rejected any module with more than MAX_OUTPUTS output ports, so the `_` arm
+                    // below is unreachable, not a latent panic.
                     match output_bufs.as_slice() {
-                        [] => {}
+                        [] => {
+                            let mut outputs: [&mut [f32]; 0] = [];
+                            let mut io =
+                                ProcessIo::new(input_signals, &mut outputs, param_signals, BLOCK);
+                            self.modules[*module_index].process(&mut io);
+                        }
                         &[a] => {
                             let [x] = self.buffers.get_disjoint_mut([a]).expect("disjoint");
-                            output_slices.push(&mut x[..]);
+                            let mut outputs = [&mut x[..]];
+                            let mut io =
+                                ProcessIo::new(input_signals, &mut outputs, param_signals, BLOCK);
+                            self.modules[*module_index].process(&mut io);
                         }
                         &[a, b] => {
                             let [x, y] = self.buffers.get_disjoint_mut([a, b]).expect("disjoint");
-                            output_slices.push(&mut x[..]);
-                            output_slices.push(&mut y[..]);
+                            let mut outputs = [&mut x[..], &mut y[..]];
+                            let mut io =
+                                ProcessIo::new(input_signals, &mut outputs, param_signals, BLOCK);
+                            self.modules[*module_index].process(&mut io);
                         }
                         &[a, b, c] => {
                             let [x, y, z] =
                                 self.buffers.get_disjoint_mut([a, b, c]).expect("disjoint");
-                            output_slices.push(&mut x[..]);
-                            output_slices.push(&mut y[..]);
-                            output_slices.push(&mut z[..]);
+                            let mut outputs = [&mut x[..], &mut y[..], &mut z[..]];
+                            let mut io =
+                                ProcessIo::new(input_signals, &mut outputs, param_signals, BLOCK);
+                            self.modules[*module_index].process(&mut io);
                         }
-                        _ => panic!("module with >3 output ports not yet handled by the compiler"),
+                        _ => unreachable!(
+                            "compile() rejects modules with more than MAX_OUTPUTS output ports"
+                        ),
                     }
-
-                    let mut io =
-                        ProcessIo::new(&input_signals, &mut output_slices, &param_signals, BLOCK);
-                    self.modules[*module_index].process(&mut io);
                 }
                 Step::SumVoices { sources, dest } => {
                     let mut sum = [0f32; BLOCK];

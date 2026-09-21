@@ -630,3 +630,41 @@ graph matches what the original would have produced — phase/envelope state isn
 the piece `swap.rs`'s crossfade mechanism (proven in spike S1) will need to call around; the two
 aren't wired together yet (`recompile()` returns a plain new `CompiledPatch`, not yet routed
 through `swap.rs`'s `Engine`).
+
+## 2026-09-21 — `process_block` made allocation-free
+
+First follow-up chosen off the compiler's own open-items list (RT-safety, swap.rs wiring, buffer
+pool reuse, cycle handling — picked RT-safety first since it's the one thing standing between "the
+compiler is correct" and "the compiler could run on a real audio thread"). Owner said "continue"
+without picking a specific item; RT-safety was next in the priority order STATUS.md's last
+handover already laid out, so proceeded on that basis rather than asking.
+
+Replaced `process_block`'s four per-call `Vec` allocations (copied input buffers, `Signal` arrays
+for inputs/params, the output-slice array) with fixed-size stack arrays: `[[f32; BLOCK];
+MAX_INPUTS]` for input copies, `[Signal; MAX_INPUTS]` / `[Signal; MAX_PARAMS]` for the signal
+views, and per-arity stack-literal output slices (`[&mut [f32]; N]`, N known at each match arm —
+this was already implicit in the existing 0/1/2/3-output match, just routed through an
+unnecessary intermediate `Vec` before).
+
+`MAX_INPUTS = 4`, `MAX_OUTPUTS = 3`, `MAX_PARAMS = 4` — measured, not guessed: grepped every
+built-in's `PORTS`/`PARAMS` table (`mixer`: 4 inputs; `filter.svf`: 3 outputs; `env.adsr`: 4
+params; nothing else comes close). A module exceeding these bounds would either need truncated
+scratch (silently wrong) or a runtime panic on the audio thread — neither acceptable — so
+`compile()` (control thread, safe to fail loudly) now checks every module's port/param counts
+against these constants and returns a new `CompileError::TooManyPorts` instead. The old
+`process_block` match already had a `_ => panic!(...)` for >3 outputs as a latent audio-thread
+risk; it's now `unreachable!()`, true by construction because `compile()` already rejected that
+patch.
+
+Proof, not assertion: `crates/engine/tests/compile_rt_safety.rs`, same pattern spike S1's
+`tests/spike_s1_swap.rs` established (`assert_no_alloc::{assert_no_alloc, AllocDisabler}` as
+`#[global_allocator]`, panics on any alloc/dealloc while active). Compiles the real 5-stage
+`chord_patch` at voice_count=4 (exercises voice-rate instancing, `SumVoices` averaging, and
+`filter.svf`'s 3-output arm — not a trivial single-module patch), triggers all 4 voices, then
+runs 200 blocks of `process_block()` inside the guard. Passes; output still finite and non-silent
+afterward (a no-alloc pass that also produced silence would be a hollow proof).
+
+Not done by this pass, still open: wiring `CompiledPatch`/`recompile()` into `swap.rs`'s `Engine`
+so a live repatch can actually reach the audio thread, and buffer-pool reuse (still one fresh
+buffer per output port — a memory footprint problem, not an RT-safety one, so lower priority than
+this was).

@@ -5,7 +5,7 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-21, after the flat-schedule compiler's first working version landed.
+Last updated: 2026-09-21, after `process_block` was made allocation-free (proven, not assumed).
 
 ## Workflow (changed 2026-09-21)
 
@@ -43,36 +43,43 @@ the same 5-stage voice chain `patch_demo.rs` hand-wired, built from `PatchState`
 compiled, and driven via MIDI — output matches `patch_demo.rs`'s numbers exactly. WAV sent to
 owner. See decisions.md's "Flat-schedule compiler v1" entry for the four design calls made here
 (averaging not summing for voice->global, cycle-as-compile-error, no buffer-pool reuse yet,
-params as compile-time constants) and the real gaps: **not yet RT-safe** (`process_block`
-allocates scratch `Vec`s per call) and **not yet wired to `swap.rs`**'s crossfade mechanism.
+params as compile-time constants).
+
+**`process_block` is now allocation-free**, proven the same way spike S1 proved it for the swap
+mechanism: `crates/engine/tests/compile_rt_safety.rs` runs 200 blocks of the real chord patch
+inside `assert_no_alloc!`. Got there by replacing 4 per-call `Vec`s with fixed-size stack arrays
+sized to `MAX_INPUTS`/`MAX_OUTPUTS`/`MAX_PARAMS` (measured off every built-in's port/param
+counts); `compile()` now rejects a module exceeding those bounds with `CompileError::TooManyPorts`
+instead of the audio thread ever truncating or panicking. See decisions.md's "`process_block` made
+allocation-free" entry. **Still not wired to `swap.rs`'s crossfade mechanism** — that's next.
 
 Still missing before anything is playable *by a person*: cables (v2 params beyond simple
-wiring), a UI, a standalone binary with real MIDI input, RT-safety on the compiler's hot path,
-and the swap.rs hookup so a live repatch doesn't click. `core` (the op log) is real,
-production-shaped code, already at v1 quality. `engine`'s S1/S2/S3 spike code is still
-hand-rolled fixed-topology graphs using raw `dsp` primitives directly — expect it to be absorbed
-into/replaced by the real compiler, not extended indefinitely.
+wiring), a UI, a standalone binary with real MIDI input, and the swap.rs hookup so a live repatch
+doesn't click. `core` (the op log) is real, production-shaped code, already at v1 quality.
+`engine`'s S1/S2/S3 spike code is still hand-rolled fixed-topology graphs using raw `dsp`
+primitives directly — expect it to be absorbed into/replaced by the real compiler, not extended
+indefinitely.
 
 ## Handover: next session starts here
 
-The compiler (this session's whole focus) is built, tested, and committed. What's NOT done, in
-rough priority order for "something a person can actually patch and hear live":
+The compiler is built, RT-safe, tested, and committed. What's NOT done, in rough priority order
+for "something a person can actually patch and hear live":
 
-1. **RT-safety**: `CompiledPatch::process_block()` currently allocates scratch `Vec`s per call
-   (building `Signal` arrays for `ProcessIo::new`). Needs those replaced with pre-allocated
-   scratch buffers sized at compile time before this can run on a real audio thread.
-2. **Wire `recompile()`/`CompiledPatch` into `swap.rs`'s `Engine`**: S1 proved swap + crossfade +
+1. **Wire `recompile()`/`CompiledPatch` into `swap.rs`'s `Engine`**: S1 proved swap + crossfade +
    deferred-drop for a fixed 2-node graph; the compiler now produces arbitrary-topology graphs
    with state carry-over via `recompile()`, but the two aren't connected yet — `Engine` still
-   only knows how to swap S1's specific shape.
-3. **Buffer-pool reuse**: every port gets its own fresh buffer right now; fine for correctness,
+   only knows how to swap S1's specific shape. This is the next natural chunk (RT-safety was the
+   prerequisite; this is what actually makes it live-repatchable).
+2. **Buffer-pool reuse**: every port gets its own fresh buffer right now; fine for correctness,
    wasteful for anything beyond test-sized patches.
-4. Cycle handling still hard-errors instead of brief section 7.1's implicit 1-block delay — not
+3. Cycle handling still hard-errors instead of brief section 7.1's implicit 1-block delay — not
    needed by any v1 accept-test patch, but real feedback patches will hit it.
+4. No voice allocator — `voice_count` is a fixed `compile()` parameter, not dynamically assigned
+   from incoming MIDI note-on/off.
 
-No new open question from the owner to resolve first — the natural next chunk is whichever of
-the above (or a different milestone entirely, e.g. starting the standalone binary/UI) the owner
-picks; ask before picking one un-prompted since this is a milestone boundary (brief section 17).
+No new open question from the owner to resolve first — the natural next chunk is #1 above (or a
+different milestone entirely, e.g. starting the standalone binary/UI) — ask before picking one
+un-prompted since this is a milestone boundary (brief section 17).
 
 ## Spike checklist (brief section 11)
 
@@ -90,7 +97,7 @@ What actually exists vs. what's still spike-scoped or missing:
 | Piece | State |
 |---|---|
 | `core`: op log, undo/redo, coalescing, checkpoints, file format w/ schema version, property tests | **done, real.** `crates/core/`. |
-| `engine`: flat-schedule compiler | **built, correctness-tested.** `compile.rs`: topo sort, voice/global instancing, cycle detection, `recompile()` w/ state carry-over. **Not yet RT-safe** (allocates scratch Vecs per block) and **not yet wired to `swap.rs`**. No buffer-pool reuse. |
+| `engine`: flat-schedule compiler | **built, correctness-tested, RT-safe.** `compile.rs`: topo sort, voice/global instancing, cycle detection, `recompile()` w/ state carry-over. `process_block` proven allocation-free (`tests/compile_rt_safety.rs`). **Not yet wired to `swap.rs`**. No buffer-pool reuse. |
 | `engine`: voice allocator | **not built.** `voice_count` is a fixed compile-time parameter, not dynamically assigned from incoming MIDI notes. |
 | `engine`: SIMD batching | **prototyped in spike S3 only** (`simd_voices.rs`), not integrated into the compiler; measured ~1.5-1.7x speedup (target was 2.5x, missed — see decisions.md). |
 | `engine`: control-rate tier | **prototyped in spike S2 only** (`potato.rs`), not integrated into the compiler. |
@@ -130,9 +137,13 @@ crates/
                                 detection), voice/global-rate instancing, voice->global averaging
                                 (SumVoices steps), recompile() with save_state/load_state carry-
                                 over via HashMapState. Correctness-tested end-to-end in
-                                tests/compile.rs (7 tests) against patch_demo.rs's numbers. NOT
-                                yet RT-safe (process_block allocates scratch Vecs) and NOT yet
-                                wired to swap.rs. See decisions.md "Flat-schedule compiler v1".
+                                tests/compile.rs (7 tests) against patch_demo.rs's numbers.
+                                process_block is allocation-free (fixed-size stack scratch sized
+                                to MAX_INPUTS/MAX_OUTPUTS/MAX_PARAMS; compile() rejects a module
+                                exceeding them) -- proven in tests/compile_rt_safety.rs via
+                                assert_no_alloc, same pattern as spike S1. NOT yet wired to
+                                swap.rs. See decisions.md "Flat-schedule compiler v1" and
+                                "process_block made allocation-free".
                  graph.rs  - S1's fixed 2-node (4-voice chord -> cable depth -> filter) graph.
                  swap.rs   - S1's Engine: crossfade swap + basedrop deferred drop.
                  potato.rs - S2's fixed 20+3-module patch, naive vs. control-rate-optimized.
@@ -199,9 +210,9 @@ this against the commit it was last updated for.
 - **`osc.va` is saw-only, no hard sync** — brief section 8's table entry wants square/tri/sine
   and a hard-sync input too. Tracked, not forgotten.
 - ~~**No module registry/catalog struct**~~ — built, `crates/modules/src/registry.rs`.
-- **Compiler's `process_block()` is not RT-safe yet** — allocates scratch `Vec`s per call. Needs
-  pre-allocated scratch buffers before this can run on a real audio thread. See decisions.md
-  "Flat-schedule compiler v1".
+- ~~**Compiler's `process_block()` is not RT-safe**~~ — fixed. Fixed-size stack scratch, no
+  per-call `Vec`s; proven allocation-free via `assert_no_alloc` in
+  `tests/compile_rt_safety.rs`. See decisions.md "`process_block` made allocation-free".
 - **Compiler not wired to `swap.rs`'s `Engine`** — `recompile()` produces a fresh `CompiledPatch`
   with state carried over, but nothing yet drives it through S1's proven crossfade mechanism for
   an arbitrary (not just S1's fixed 2-node) topology.
@@ -228,10 +239,11 @@ this against the commit it was last updated for.
   most complete examples (fast/slow-path split, real state carry-over). Test files
   `crates/modules/tests/*.rs` show the expected shape (matches-direct-dsp-call, buffer input,
   reset, save/load-state round-trip).
-- **Extending the compiler** (RT-safety, swap.rs hookup, buffer-pool reuse, cycle handling, voice
+- **Extending the compiler** (swap.rs hookup, buffer-pool reuse, cycle handling, voice
   allocator): `crates/engine/src/compile.rs`'s module doc comment + decisions.md's "Flat-schedule
-  compiler v1" entry lay out what's built, what's deferred, and why. `crates/engine/tests/
-  compile.rs` shows the expected external shape (build a `PatchState` from ops, `compile()`,
-  drive it, `recompile()`).
+  compiler v1" and "`process_block` made allocation-free" entries lay out what's built, what's
+  deferred, and why. `crates/engine/tests/compile.rs` shows the expected external shape (build a
+  `PatchState` from ops, `compile()`, drive it, `recompile()`); `tests/compile_rt_safety.rs`
+  shows the `assert_no_alloc` pattern to keep any future change RT-safe.
 - **Just want to know if it works:** `cargo test --workspace` and the commands above. If they're
   not all green, the repo is mid-edit — check `git log` for the last commit's message.
