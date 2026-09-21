@@ -117,7 +117,8 @@ crates/
                  patch_demo.rs  - first patch built from real Module trait objects (not raw dsp
                                   calls like the other 3): 4 voices, 22 module instances, hand-
                                   wired. Correctness+bench in tests/patch_integration.rs and
-                                  benches/patch_integration.rs.
+                                  benches/patch_integration.rs; a sequenced melody (not just a
+                                  held chord) in tests/melody.rs via Patch::note_on/note_off.
                  dyn_dispatch_spike.rs - same topology as patch_demo.rs, Box<dyn Module> fields
                                   instead of concrete typed fields; measures vtable dispatch cost
                                   (~17-19% over static). Correctness+bench in

@@ -147,6 +147,16 @@ impl Patch {
         }
     }
 
+    /// Single-voice control, for a melody rather than a held chord — same `midi.in` mechanism
+    /// (`note_on_chord` in a loop is this, called on all 4 voices at once).
+    pub fn note_on(&mut self, voice: usize, semitones: f32, velocity: f32) {
+        self.voices[voice].midi.note_on(semitones, velocity);
+    }
+
+    pub fn note_off(&mut self, voice: usize) {
+        self.voices[voice].midi.note_off();
+    }
+
     #[inline]
     pub fn process_block(&mut self) -> [f32; BLOCK] {
         let voice_outs: [[f32; BLOCK]; 4] = std::array::from_fn(|i| self.voices[i].process_block());

@@ -509,3 +509,21 @@ match arm added by hand for every new module kind including pedals/composites in
 brief section 4.1's "one module interface for built-in, composite, and code modules" — trading a
 ~17% ns/block cost for permanently coupling the compiler to a closed module-kind list is the wrong
 trade). Proceeding with `Box<dyn Module>` in the compiler design.
+
+## 2026-09-21 — Melody through `patch_demo.rs`, not just a held chord
+
+Owner asked to hear the real-module patch play a melody rather than a static chord, before
+continuing to the compiler. `crates/engine/tests/melody.rs`: same `Patch` as
+`patch_integration.rs`, but `Patch::note_on`/`note_off` (new, additive — `note_on_chord`/
+`note_off_chord` untouched) address a single voice instead of all four, called in sequence.
+"Twinkle Twinkle Little Star"'s opening phrase (C C G G A A G, semitones `[0,0,7,7,9,9,7]` from
+`BASE_HZ`), ~280ms hold + ~150ms gap per note on voice 0, voices 1-3 silent.
+
+No real MIDI input exists (`standalone` is still a stub) — this is the same `note_on`/`note_off`
+stand-in `midi_in.rs` already documents, just sequenced instead of held once. Confirms nothing
+about `midi.in`'s design assumed "one chord, held once": per-voice control, re-triggering, and a
+gap-then-new-note sequence all worked without changes to any of the 9 modules.
+
+Test asserts each note's hold window has real energy and each gap dips measurably below it —
+evidence of distinct notes, not one smeared tone (gaps don't fully silence: 150ms against a
+300ms release time constant is expected legato, not a bug). WAV sent to the owner.
