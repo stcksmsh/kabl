@@ -668,3 +668,51 @@ Not done by this pass, still open: wiring `CompiledPatch`/`recompile()` into `sw
 so a live repatch can actually reach the audio thread, and buffer-pool reuse (still one fresh
 buffer per output port — a memory footprint problem, not an RT-safety one, so lower priority than
 this was).
+
+## 2026-09-21 — `PatchEngine`: wiring the compiler into S1's swap mechanism
+
+Next item off the compiler's open-items list after RT-safety. New type,
+`crates/engine/src/patch_engine.rs::PatchEngine`, rather than generalizing `swap::Engine` in
+place — the two wrap genuinely different shapes (S1's `CompiledGraph` is mono, takes
+`sample_rate` per `process_block` call, rebuilds via a single `cable_depth: f32` knob;
+`CompiledPatch` is stereo, owns its `sample_rate`, rebuilds via `recompile()` against a whole
+`PatchState`). Forcing both through one trait/generic for exactly two call sites would be
+abstracting over the difference, not removing duplication — the "don't design for hypothetical
+future requirements" case. The actual shared thing, the equal-power crossfade formula itself
+(`swap::equal_power`, now `pub(crate)`), *is* reused verbatim rather than re-derived, since that
+part genuinely is the same math, not just similar-looking code.
+
+`PatchEngine::build_swap` (control thread) calls `compile::recompile()` against the current
+`active` graph and wraps the result in `Owned` for handoff; `receive_swap`/`process_block`
+(audio thread) mirror `swap::Engine`'s shape exactly — same `Owned<T>` single-slot-channel
+pattern, same elapsed-sample crossfade math, generalized to stereo.
+
+**Caught a real state-carry-over bug while proving this, not a hypothetical one.**
+`crates/engine/tests/patch_engine_swap.rs` swaps the same patch onto itself 20 times (chosen
+specifically because it gives an exact null test: since nothing about the patch changes and
+`recompile()` was already proven to carry state exactly in `compile.rs`'s own single-recompile
+test, a `hard` reference that never swaps at all should match `PatchEngine`'s output bit-exactly
+outside every crossfade window — a repeated-swap stress test that a single recompile can't
+exercise). First run failed: residual grew with each swap, engine consistently *louder* than the
+never-swapped reference, worsening over the 20 swaps. Root cause: `dsp::FullAdsr`'s
+`gate_was_high: bool` (the field `next()` uses to edge-trigger entering `Attack`/`Release`) was
+never part of `env.adsr`'s `save_state`/`load_state` — only `level`/`stage` were. A freshly
+`registry::create()`d `EnvAdsr` always starts with `gate_was_high: false` (via `FullAdsr::new`),
+so on every recompile, a continuously-held gate looked like a brand-new note-on: the envelope
+re-entered `Attack` from whatever `level` it had already reached, instead of continuing
+`Sustain`. One recompile's worth of this is a small, easy-to-miss bump; 20 in a row compounded
+into an obviously-wrong, steadily-diverging signal — exactly the kind of bug that only shows up
+under repeated-recompile stress, not a single before/after check.
+
+Fixed: made `FullAdsr::gate_was_high` `pub` (matching `stage`/`level`'s existing visibility) and
+added it to `env_adsr.rs`'s `save_state`/`load_state` as a third `f32` (`0.0`/`1.0`). Test now
+passes with `max_steady_residual == 0.0` (bit-exact, not just close) across all 20 swaps. Also
+proves `PatchEngine::process_block` itself adds no allocation on top of `CompiledPatch::
+process_block`'s existing allocation-freedom (same `assert_no_alloc` pattern as
+`compile_rt_safety.rs` and spike S1).
+
+Not done by this pass: overlapping swaps (a second `build_swap` while one is still crossfading)
+aren't accounted for in either `Engine` — `PatchEngine` inherits the same documented gap
+`swap::Engine` already had, not a new one. No hookup yet from a real control surface (no
+UI/standalone binary exists to actually call `build_swap` from user input) — `PatchEngine` is
+proven correct and ready, not yet reachable by a person.

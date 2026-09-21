@@ -5,7 +5,7 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-21, after `process_block` was made allocation-free (proven, not assumed).
+Last updated: 2026-09-21, after `PatchEngine` wired the real compiler into S1's swap mechanism.
 
 ## Workflow (changed 2026-09-21)
 
@@ -45,41 +45,53 @@ owner. See decisions.md's "Flat-schedule compiler v1" entry for the four design 
 (averaging not summing for voice->global, cycle-as-compile-error, no buffer-pool reuse yet,
 params as compile-time constants).
 
-**`process_block` is now allocation-free**, proven the same way spike S1 proved it for the swap
+**`process_block` is allocation-free**, proven the same way spike S1 proved it for the swap
 mechanism: `crates/engine/tests/compile_rt_safety.rs` runs 200 blocks of the real chord patch
 inside `assert_no_alloc!`. Got there by replacing 4 per-call `Vec`s with fixed-size stack arrays
 sized to `MAX_INPUTS`/`MAX_OUTPUTS`/`MAX_PARAMS` (measured off every built-in's port/param
 counts); `compile()` now rejects a module exceeding those bounds with `CompileError::TooManyPorts`
-instead of the audio thread ever truncating or panicking. See decisions.md's "`process_block` made
-allocation-free" entry. **Still not wired to `swap.rs`'s crossfade mechanism** — that's next.
+instead of the audio thread ever truncating or panicking.
+
+**The compiler is now wired into S1's swap mechanism**: `crates/engine/src/patch_engine.rs::
+PatchEngine`, a stereo/arbitrary-topology counterpart to `swap::Engine`, reusing the same
+equal-power crossfade curve and `basedrop` deferred-drop pattern. `build_swap` calls
+`compile::recompile()` (control thread), `process_block` blends active+incoming exactly like S1
+(audio thread, no allocation). Proven in `tests/patch_engine_swap.rs`: swaps the same 5-stage
+chord patch onto itself 20 times and checks the output against a never-swapped reference — bit-
+exact outside every crossfade window. **Caught a real bug doing this**: `env.adsr`'s state
+carry-over was missing `FullAdsr::gate_was_high`, so a continuously-held gate looked like a fresh
+note-on on every recompile, re-triggering `Attack` each time — invisible in a single recompile,
+glaringly wrong after 20 in a row. Fixed; see decisions.md's "`PatchEngine`: wiring the compiler
+into S1's swap mechanism" entry.
 
 Still missing before anything is playable *by a person*: cables (v2 params beyond simple
-wiring), a UI, a standalone binary with real MIDI input, and the swap.rs hookup so a live repatch
-doesn't click. `core` (the op log) is real, production-shaped code, already at v1 quality.
-`engine`'s S1/S2/S3 spike code is still hand-rolled fixed-topology graphs using raw `dsp`
-primitives directly — expect it to be absorbed into/replaced by the real compiler, not extended
-indefinitely.
+wiring), a UI, a standalone binary with real MIDI input to actually call `build_swap` from. `core`
+(the op log) is real, production-shaped code, already at v1 quality. `engine`'s S1/S2/S3 spike
+code is still hand-rolled fixed-topology graphs using raw `dsp` primitives directly — expect it
+to be absorbed into/replaced by the real compiler, not extended indefinitely.
 
 ## Handover: next session starts here
 
-The compiler is built, RT-safe, tested, and committed. What's NOT done, in rough priority order
-for "something a person can actually patch and hear live":
+The compiler is built, RT-safe, swappable, tested, and committed — every item on the "make the
+compiler runnable" list from the last few handovers is now done. What's NOT done, in rough
+priority order for "something a person can actually patch and hear live":
 
-1. **Wire `recompile()`/`CompiledPatch` into `swap.rs`'s `Engine`**: S1 proved swap + crossfade +
-   deferred-drop for a fixed 2-node graph; the compiler now produces arbitrary-topology graphs
-   with state carry-over via `recompile()`, but the two aren't connected yet — `Engine` still
-   only knows how to swap S1's specific shape. This is the next natural chunk (RT-safety was the
-   prerequisite; this is what actually makes it live-repatchable).
+1. **No control surface exists to actually drive `PatchEngine`** — no UI, no standalone binary
+   with real MIDI/audio I/O. `PatchEngine::build_swap`/`receive_swap` are proven correct but
+   nothing outside a test calls them yet. This is arguably the next big milestone (brief section
+   12's `standalone`/`ui` crates, both still empty stubs).
 2. **Buffer-pool reuse**: every port gets its own fresh buffer right now; fine for correctness,
    wasteful for anything beyond test-sized patches.
 3. Cycle handling still hard-errors instead of brief section 7.1's implicit 1-block delay — not
    needed by any v1 accept-test patch, but real feedback patches will hit it.
 4. No voice allocator — `voice_count` is a fixed `compile()` parameter, not dynamically assigned
    from incoming MIDI note-on/off.
+5. Overlapping swaps (a second `build_swap` while one is still crossfading) aren't handled by
+   either `Engine` or `PatchEngine` — a pre-existing S1 gap, not new.
 
-No new open question from the owner to resolve first — the natural next chunk is #1 above (or a
-different milestone entirely, e.g. starting the standalone binary/UI) — ask before picking one
-un-prompted since this is a milestone boundary (brief section 17).
+No new open question from the owner to resolve first — the natural next chunk is #1 above (a real
+milestone: standalone binary or UI) — ask before picking one un-prompted since this is a
+milestone boundary (brief section 17).
 
 ## Spike checklist (brief section 11)
 
@@ -97,11 +109,11 @@ What actually exists vs. what's still spike-scoped or missing:
 | Piece | State |
 |---|---|
 | `core`: op log, undo/redo, coalescing, checkpoints, file format w/ schema version, property tests | **done, real.** `crates/core/`. |
-| `engine`: flat-schedule compiler | **built, correctness-tested, RT-safe.** `compile.rs`: topo sort, voice/global instancing, cycle detection, `recompile()` w/ state carry-over. `process_block` proven allocation-free (`tests/compile_rt_safety.rs`). **Not yet wired to `swap.rs`**. No buffer-pool reuse. |
+| `engine`: flat-schedule compiler | **built, correctness-tested, RT-safe.** `compile.rs`: topo sort, voice/global instancing, cycle detection, `recompile()` w/ state carry-over. `process_block` proven allocation-free (`tests/compile_rt_safety.rs`). No buffer-pool reuse yet. |
 | `engine`: voice allocator | **not built.** `voice_count` is a fixed compile-time parameter, not dynamically assigned from incoming MIDI notes. |
 | `engine`: SIMD batching | **prototyped in spike S3 only** (`simd_voices.rs`), not integrated into the compiler; measured ~1.5-1.7x speedup (target was 2.5x, missed — see decisions.md). |
 | `engine`: control-rate tier | **prototyped in spike S2 only** (`potato.rs`), not integrated into the compiler. |
-| `engine`: swap + crossfade | **mechanism proven in S1** (`swap.rs`, `graph.rs`) for S1's specific 2-node shape; compiler now produces arbitrary-topology graphs with state carry-over (`recompile()`) but isn't hooked into `swap.rs`'s `Engine` yet. |
+| `engine`: swap + crossfade | **wired to the real compiler.** `patch_engine.rs::PatchEngine` generalizes S1's `swap.rs::Engine` mechanism (equal-power crossfade, `basedrop` deferred drop) to arbitrary-topology `CompiledPatch`es via `recompile()`. Proven in `tests/patch_engine_swap.rs` (bit-exact outside crossfade, no allocation). No control surface calls it yet — see open items. |
 | `engine`: quality tiers (Live/Render) | **not built.** |
 | `cables`: depth only | **not built.** `crates/cables` is an empty stub. |
 | `modules`: 9 v1 built-ins + metadata | **9 of 9 have a `Module` impl.** `Module` trait, `ModuleInfo`, `ProcessIo`/`Signal` all built and tested. `osc.va` (saw only) and `lfo` (no sync) are partial — see decisions.md. **Registry now exists** (`registry.rs`: `create(kind)`, `all_infos()`, `info_for(kind)`) — the compiler uses it to turn `ModuleState.kind` strings into instances. |
@@ -144,6 +156,15 @@ crates/
                                 assert_no_alloc, same pattern as spike S1. NOT yet wired to
                                 swap.rs. See decisions.md "Flat-schedule compiler v1" and
                                 "process_block made allocation-free".
+                 patch_engine.rs - PatchEngine: generalizes swap.rs's Engine (equal-power
+                                crossfade, basedrop deferred drop) to CompiledPatch (arbitrary
+                                topology, stereo, recompile()-based rebuild instead of S1's single
+                                cable_depth knob). Proven in tests/patch_engine_swap.rs: swaps a
+                                real chord patch onto itself 20x, bit-exact vs. a never-swapped
+                                reference outside every crossfade window, no allocation. See
+                                decisions.md "PatchEngine: wiring the compiler into S1's swap
+                                mechanism" -- also where env.adsr's gate_was_high state-
+                                carry-over bug was caught and fixed.
                  graph.rs  - S1's fixed 2-node (4-voice chord -> cable depth -> filter) graph.
                  swap.rs   - S1's Engine: crossfade swap + basedrop deferred drop.
                  potato.rs - S2's fixed 20+3-module patch, naive vs. control-rate-optimized.
@@ -213,9 +234,12 @@ this against the commit it was last updated for.
 - ~~**Compiler's `process_block()` is not RT-safe**~~ — fixed. Fixed-size stack scratch, no
   per-call `Vec`s; proven allocation-free via `assert_no_alloc` in
   `tests/compile_rt_safety.rs`. See decisions.md "`process_block` made allocation-free".
-- **Compiler not wired to `swap.rs`'s `Engine`** — `recompile()` produces a fresh `CompiledPatch`
-  with state carried over, but nothing yet drives it through S1's proven crossfade mechanism for
-  an arbitrary (not just S1's fixed 2-node) topology.
+- ~~**Compiler not wired to `swap.rs`'s `Engine`**~~ — fixed. `patch_engine.rs::PatchEngine`;
+  proven in `tests/patch_engine_swap.rs`. Along the way, fixed a real bug: `env.adsr` wasn't
+  carrying `FullAdsr::gate_was_high` across recompile, so a held gate re-triggered `Attack` on
+  every swap. See decisions.md "`PatchEngine`: wiring the compiler into S1's swap mechanism".
+- **No control surface drives `PatchEngine` yet** — no UI, no standalone binary. It's proven
+  correct in tests but nothing outside a test calls `build_swap`/`receive_swap` from real input.
 - **No buffer-pool reuse in the compiler** — every port gets a fresh `[f32; BLOCK]`. Correct,
   wasteful; deferred as a pure optimization on the same schedule shape.
 - **Compiler treats a cycle as a hard compile error**, not brief section 7.1's implicit 1-block
@@ -223,6 +247,8 @@ this against the commit it was last updated for.
   real feedback patches.
 - **No voice allocator** — `voice_count` is a fixed parameter passed to `compile()`, not
   dynamically assigned from incoming MIDI note-on/off.
+- **Overlapping swaps unhandled** — a second `build_swap` while one is still crossfading isn't
+  accounted for in `swap::Engine` or `PatchEngine`. Pre-existing S1 gap, not new.
 - ~~**`dyn Module` dispatch cost unmeasured**~~ — measured. `crates/engine/src/
   dyn_dispatch_spike.rs`: `Box<dyn Module>` costs ~17-19% more than static dispatch on the same
   22-instance patch (bit-exact correctness, tight ratio across runs). Not a blocker — `Box<dyn
@@ -239,11 +265,16 @@ this against the commit it was last updated for.
   most complete examples (fast/slow-path split, real state carry-over). Test files
   `crates/modules/tests/*.rs` show the expected shape (matches-direct-dsp-call, buffer input,
   reset, save/load-state round-trip).
-- **Extending the compiler** (swap.rs hookup, buffer-pool reuse, cycle handling, voice
-  allocator): `crates/engine/src/compile.rs`'s module doc comment + decisions.md's "Flat-schedule
-  compiler v1" and "`process_block` made allocation-free" entries lay out what's built, what's
-  deferred, and why. `crates/engine/tests/compile.rs` shows the expected external shape (build a
-  `PatchState` from ops, `compile()`, drive it, `recompile()`); `tests/compile_rt_safety.rs`
-  shows the `assert_no_alloc` pattern to keep any future change RT-safe.
+- **Extending the compiler** (buffer-pool reuse, cycle handling, voice allocator): `crates/engine/
+  src/compile.rs`'s module doc comment + decisions.md's "Flat-schedule compiler v1" and
+  "`process_block` made allocation-free" entries lay out what's built, what's deferred, and why.
+  `crates/engine/tests/compile.rs` shows the expected external shape (build a `PatchState` from
+  ops, `compile()`, drive it, `recompile()`); `tests/compile_rt_safety.rs` shows the
+  `assert_no_alloc` pattern to keep any future change RT-safe.
+- **Starting the standalone binary or UI** (the actual next milestone): `patch_engine.rs::
+  PatchEngine` is the thing to drive — `build_swap(handle, patch)` on the control thread,
+  `receive_swap`/`process_block` on the audio thread, same `Owned<T>`-over-a-channel handoff as
+  spike S1. `tests/patch_engine_swap.rs` is a complete worked example of the whole lifecycle
+  (minus real MIDI/audio I/O, which is what a standalone binary would add).
 - **Just want to know if it works:** `cargo test --workspace` and the commands above. If they're
   not all green, the repo is mid-edit — check `git log` for the last commit's message.

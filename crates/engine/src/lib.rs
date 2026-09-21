@@ -6,6 +6,7 @@ pub mod compile;
 pub mod dyn_dispatch_spike;
 pub mod graph;
 pub mod patch_demo;
+pub mod patch_engine;
 pub mod potato;
 pub mod simd_voices;
 pub mod swap;

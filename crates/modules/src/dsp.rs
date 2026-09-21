@@ -279,7 +279,12 @@ pub struct FullAdsr {
     decay_coeff: f32,
     release_coeff: f32,
     sustain_level: f32,
-    gate_was_high: bool,
+    /// Whether `next()` saw the gate high last call — edge-triggers `Attack`/`Release` entry.
+    /// `pub`, like `stage`/`level`: a module holding a `FullAdsr` needs to carry this across a
+    /// recompile exactly like the other two, or a continuously-held gate looks like a fresh
+    /// note-on every time state is reloaded into a freshly-constructed instance (whose `new()`
+    /// always starts this `false`) — see `builtins::env_adsr`'s `save_state`/`load_state`.
+    pub gate_was_high: bool,
 }
 
 /// Segment considered complete once within this of its target — same reasoning as

@@ -153,6 +153,7 @@ impl Module for EnvAdsr {
     fn save_state(&self, out: &mut dyn StateWriter) {
         out.write_f32("level", self.env.level);
         out.write_f32("stage", self.env.stage.to_u8() as f32);
+        out.write_f32("gate_was_high", self.env.gate_was_high as u8 as f32);
     }
 
     fn load_state(&mut self, s: &dyn StateReader) {
@@ -161,6 +162,14 @@ impl Module for EnvAdsr {
         }
         if let Some(stage) = s.read_f32("stage") {
             self.env.stage = crate::dsp::AdsrStage::from_u8(stage as u8);
+        }
+        // Without this, a continuously-held gate looks like a fresh note-on to a freshly
+        // constructed FullAdsr (whose `new()` always starts `gate_was_high: false`), re-entering
+        // Attack from the current `level` every recompile instead of continuing Sustain/Decay —
+        // caught by `tests/patch_engine_swap.rs` diverging further from a never-recompiled
+        // reference after every one of 20 repeated swaps of an identical, gate-held patch.
+        if let Some(g) = s.read_f32("gate_was_high") {
+            self.env.gate_was_high = g != 0.0;
         }
     }
 }

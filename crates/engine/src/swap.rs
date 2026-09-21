@@ -97,8 +97,11 @@ impl Engine {
 
 /// Equal-power (constant-power) crossfade curve: `(cos, sin)` of a quarter turn, so
 /// `g_old^2 + g_new^2 == 1` throughout — brief section 7 names this explicitly.
+/// `pub(crate)`: reused by `patch_engine.rs`, which generalizes this same crossfade mechanism to
+/// `CompiledPatch` — see that module's doc comment for why it's a separate `Engine`-shaped type
+/// rather than a generalization of this one in place.
 #[inline]
-fn equal_power(t: f32) -> (f32, f32) {
+pub(crate) fn equal_power(t: f32) -> (f32, f32) {
     let angle = t * std::f32::consts::FRAC_PI_2;
     (angle.cos(), angle.sin())
 }
