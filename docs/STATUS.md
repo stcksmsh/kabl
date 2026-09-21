@@ -5,15 +5,21 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-21, after the voice allocator was built.
+Last updated: 2026-09-21, after the standalone binary (`crates/standalone`, cpal + midir) landed.
 
 ## Autonomous overnight work (started 2026-09-21)
 
 Owner: fully autonomous, work the backlog, conserve tokens, self-restart if usage runs out, no
-further check-in expected until morning. Working self-contained items only (nothing needing
-hardware, a UI, or a human ear) — see each item's decisions.md entry for what was picked and why.
-If you're reading this mid-run: check `git log` for the latest commit and this file's "Where we
-are" below for the current real state; nothing here should be stale by more than one work chunk.
+further check-in expected until morning. Originally scoped to self-contained items only (nothing
+needing hardware, a UI, or a human ear) — owner then explicitly said "do the UI yourself, do
+everything, we can easily fix it later," authorizing the `standalone`/`ui` crates too. Built
+standalone first (cpal+midir — the actual "hear it" milestone; a UI without real audio/MIDI under
+it still can't make sound). **This container has no audio hardware (`/dev/snd` doesn't exist) and
+no display server** — checked, not assumed. Everything buildable/logic-testable without hardware
+was built and tested here; real device I/O and any GUI rendering need verification on a machine
+that actually has them. See each item's decisions.md entry for what was picked and why. If you're
+reading this mid-run: check `git log` for the latest commit and this file's "Where we are" below
+for the current real state; nothing here should be stale by more than one work chunk.
 
 ## Workflow (changed 2026-09-21)
 
@@ -74,38 +80,48 @@ note-on on every recompile, re-triggering `Attack` each time — invisible in a 
 glaringly wrong after 20 in a row. Fixed; see decisions.md's "`PatchEngine`: wiring the compiler
 into S1's swap mechanism" entry.
 
-Still missing before anything is playable *by a person*: cables (v2 params beyond simple
-wiring), a UI, a standalone binary with real MIDI input to actually call `build_swap` from. `core`
-(the op log) is real, production-shaped code, already at v1 quality. `engine`'s S1/S2/S3 spike
-code is still hand-rolled fixed-topology graphs using raw `dsp` primitives directly — expect it
-to be absorbed into/replaced by the real compiler, not extended indefinitely.
+**The standalone binary now exists**: `crates/standalone`, `cargo run -p kabl-standalone` (binary
+name `kabl`). Opens the default audio output device + first MIDI input port, compiles
+`default_patch()` (a full `midi.in -> osc.va -> filter.svf -> env.adsr/vca -> out` polysynth,
+`DEFAULT_VOICE_COUNT`=8 voices via `VoiceAllocator`), and plays it live through `PatchEngine`.
+MIDI resolution (which needs `VoiceAllocator`'s `HashMap`, not RT-safe) happens on the MIDI
+thread; only resolved `VoiceEvent`s cross an `rtrb` channel to the audio callback, applied with
+no allocation. **Unverified in this environment** — no `/dev/snd`, no MIDI hardware here — the
+binary correctly detects that and falls back to rendering a self-test WAV instead (sent to
+owner), proving the synthesis path but not real device I/O. Run it on a real machine to confirm
+actual playback. See decisions.md "Standalone binary" for the full design.
+
+Still missing before it's the *complete* "person can open, patch, and hear" product: cables (v2
+params beyond simple wiring), a UI (patchbay — next up), persistence (the binary always plays
+`default_patch()`, doesn't load a saved `.kabl` file yet even though `core`'s file format already
+exists). `core` (the op log) is real, production-shaped code, already at v1 quality. `engine`'s
+S1/S2/S3 spike code is still hand-rolled fixed-topology graphs using raw `dsp` primitives
+directly — expect it to be absorbed into/replaced by the real compiler, not extended indefinitely.
 
 ## Handover: next session starts here
 
-The compiler is built, RT-safe, swappable, tested, and committed — every item on the "make the
-compiler runnable" list from the last few handovers is now done. What's NOT done, in rough
-priority order for "something a person can actually patch and hear live":
+The compiler is built, RT-safe, swappable, tested, and committed; a standalone binary can now
+play it live (modulo verifying real hardware, which this environment can't do). What's NOT done,
+in rough priority order for "something a person can actually patch and hear live":
 
-1. **No control surface exists to actually drive `PatchEngine`** — no UI, no standalone binary
-   with real MIDI/audio I/O. `PatchEngine::build_swap`/`receive_swap` are proven correct but
-   nothing outside a test calls them yet. This is arguably the next big milestone (brief section
-   12's `standalone`/`ui` crates, both still empty stubs).
-2. **Buffer-pool reuse**: every port gets its own fresh buffer right now; fine for correctness,
+1. **No UI** — `crates/ui` is still an empty stub. Owner authorized building it autonomously
+   ("do the UI yourself... we can easily fix it later") — next item to build. This container has
+   no display server either, so the same "build + logic-test what's testable, flag what needs a
+   real environment" approach applies.
+2. **No persistence wired into the standalone binary** — always plays `default_patch()`;
+   `core`'s file format (op log, `PatchLog`) already exists and is tested, just not loaded here.
+3. **Buffer-pool reuse**: every port gets its own fresh buffer right now; fine for correctness,
    wasteful for anything beyond test-sized patches.
-3. Cycle handling still hard-errors instead of brief section 7.1's implicit 1-block delay — not
+4. Cycle handling still hard-errors instead of brief section 7.1's implicit 1-block delay — not
    needed by any v1 accept-test patch, but real feedback patches will hit it.
-4. ~~No voice allocator~~ — built. `voice_allocator.rs::VoiceAllocator` routes `note_on`/
-   `note_off` events to voice indices within a fixed `voice_count` (lowest-free-first, oldest-
-   steal when full). `voice_count` itself is still a fixed `compile()` parameter — the allocator
-   assigns *which* of the existing voice slots a note gets, it doesn't change how many exist.
-   No MIDI router wires a real MIDI stream into it yet (needs `standalone`'s `midir`
-   integration, item #1 above).
 5. Overlapping swaps (a second `build_swap` while one is still crossfading) aren't handled by
    either `Engine` or `PatchEngine` — a pre-existing S1 gap, not new.
+6. **`standalone`'s real device I/O is unverified** — needs to actually run on a machine with
+   audio hardware and a MIDI controller. The self-test WAV fallback proves the signal path but
+   not `cpal`/`midir` themselves.
 
-No new open question from the owner to resolve first — the natural next chunk is #1 above (a real
-milestone: standalone binary or UI) — ask before picking one un-prompted since this is a
-milestone boundary (brief section 17).
+No new open question from the owner to resolve first — the natural next chunk is #1 above (the
+UI) per the owner's explicit go-ahead.
 
 ## Spike checklist (brief section 11)
 
@@ -132,9 +148,9 @@ What actually exists vs. what's still spike-scoped or missing:
 | `cables`: depth only | **not built.** `crates/cables` is an empty stub. |
 | `modules`: 9 v1 built-ins + metadata | **9 of 9 have a `Module` impl.** `Module` trait, `ModuleInfo`, `ProcessIo`/`Signal` all built and tested. `osc.va` now has all 4 waveforms + hard sync (triangle naive, not BLEP/BLAMP-corrected). `lfo` has no sync (needs a clock, v3 scope) — see decisions.md. **Registry now exists** (`registry.rs`: `create(kind)`, `all_infos()`, `info_for(kind)`) — the compiler uses it to turn `ModuleState.kind` strings into instances. |
 | `learn`: unlock flags filter catalog | **not built.** `crates/learn` is an empty stub. |
-| `ui`: egui patchbay | **not built.** `crates/ui` is an empty stub. |
-| `standalone`: cpal + midir + JACK | **not built.** `crates/standalone` is an empty stub. |
-| **v1 accept test** (play a 4-voice MIDI chord, repatch live no click, undo, save, reload, replay construction log; potato gate passes) | **not achievable yet** — no UI, no standalone binary, no MIDI input, no real module system to patch. |
+| `ui`: egui patchbay | **not built yet.** `crates/ui` is still an empty stub — next item, owner authorized autonomous build. |
+| `standalone`: cpal + midir + JACK | **cpal + midir built** (`crates/standalone`, binary `kabl`). Default patch, live MIDI-in, RT-safe audio callback. Unverified on real hardware (none in this container) — falls back to a WAV self-test render instead. JACK not attempted (cpal's JACK backend needs a running jackd; deferred, not blocking — ALSA/default host covers the common case). No persistence (always plays `default_patch()`). |
+| **v1 accept test** (play a 4-voice MIDI chord, repatch live no click, undo, save, reload, replay construction log; potato gate passes) | **not fully achievable yet** — no UI to repatch/save/reload from. The "play a chord live" half now has real infrastructure (`standalone` + `PatchEngine`), unverified on real hardware from this environment. |
 
 Bottom line: the *risky architectural bets* (event-sourced patch, cable-as-node swap mechanism,
 control-rate optimization) are de-risked. The *product* — something Kosta can open, patch, and
@@ -200,9 +216,23 @@ crates/
                                   tests/dyn_dispatch_spike.rs and benches/dyn_dispatch_spike.rs.
                None of this is the general compiler. Expect it to be replaced/absorbed, not
                extended indefinitely, once real compiler work starts.
-  cables/, pedals/, learn/, ui/, standalone/, clap/
+  standalone/  REAL, first version. Binary `kabl` (cargo run -p kabl-standalone).
+                 lib.rs    - testable core: default_patch() (8-voice polysynth), RingBuffer
+                                (non-allocating, bridges PatchEngine's BLOCK=64 output against
+                                cpal's arbitrary callback size), resolve_midi_message (MIDI bytes
+                                -> VoiceEvent, control thread, uses VoiceAllocator), apply_
+                                voice_event (audio thread, no allocation). 13 tests in
+                                tests/lib_logic.rs, all hardware-independent.
+                 main.rs   - the actual cpal+midir wiring: opens default output device + first
+                                MIDI port, runs PatchEngine live. Falls back to rendering
+                                target/spike-renders/standalone_selftest.wav if no usable audio
+                                device is found (this container's case) instead of doing nothing
+                                observable. NOT verified against real audio/MIDI hardware --
+                                none exists in this container. See decisions.md "Standalone
+                                binary".
+  cables/, pedals/, learn/, ui/, clap/
                STUBS. `//! Stub — not yet implemented.` One-line lib.rs each, empty Cargo.toml
-               deps. Scaffolded so the workspace builds; no logic.
+               deps. Scaffolded so the workspace builds; no logic. `ui/` is next up.
 benches/       (top-level, per brief's tree) — not where Cargo benches actually live; see
                docs/decisions.md's "Structural note" under the dependency table. Real criterion
                harnesses: crates/engine/benches/{s2_potato,s3_simd_voices}.rs.
@@ -227,6 +257,10 @@ cargo fmt --all -- --check
 # S2/S3 benchmarks specifically (see docs/benchmarks.md for why taskset, and their caveats):
 taskset -c 0 cargo bench -p kabl-engine --bench s2_potato
 taskset -c 0 cargo bench -p kabl-engine --bench s3_simd_voices
+
+# Play it live (needs real audio output + optionally a MIDI controller; on Linux, cpal needs
+# libasound2-dev installed to build at all -- see decisions.md "Standalone binary"):
+cargo run -p kabl-standalone
 ```
 
 All green as of the latest commit on `master` — check `git log -1` to confirm you're reading
@@ -260,8 +294,10 @@ this against the commit it was last updated for.
   proven in `tests/patch_engine_swap.rs`. Along the way, fixed a real bug: `env.adsr` wasn't
   carrying `FullAdsr::gate_was_high` across recompile, so a held gate re-triggered `Attack` on
   every swap. See decisions.md "`PatchEngine`: wiring the compiler into S1's swap mechanism".
-- **No control surface drives `PatchEngine` yet** — no UI, no standalone binary. It's proven
-  correct in tests but nothing outside a test calls `build_swap`/`receive_swap` from real input.
+- ~~**No control surface drives `PatchEngine`**~~ — `standalone` now exists (`cargo run -p
+  kabl-standalone`). Still no UI, and `standalone`'s real audio/MIDI I/O is unverified (no
+  hardware in this container — see decisions.md "Standalone binary"). No persistence (always
+  plays `default_patch()`); no `--midi <port>` selection (connects to the first port found).
 - **No buffer-pool reuse in the compiler** — every port gets a fresh `[f32; BLOCK]`. Correct,
   wasteful; deferred as a pure optimization on the same schedule shape.
 - **Compiler treats a cycle as a hard compile error**, not brief section 7.1's implicit 1-block
@@ -293,10 +329,16 @@ this against the commit it was last updated for.
   `crates/engine/tests/compile.rs` shows the expected external shape (build a `PatchState` from
   ops, `compile()`, drive it, `recompile()`); `tests/compile_rt_safety.rs` shows the
   `assert_no_alloc` pattern to keep any future change RT-safe.
-- **Starting the standalone binary or UI** (the actual next milestone): `patch_engine.rs::
-  PatchEngine` is the thing to drive — `build_swap(handle, patch)` on the control thread,
-  `receive_swap`/`process_block` on the audio thread, same `Owned<T>`-over-a-channel handoff as
-  spike S1. `tests/patch_engine_swap.rs` is a complete worked example of the whole lifecycle
-  (minus real MIDI/audio I/O, which is what a standalone binary would add).
+- **Starting the UI** (the actual next milestone): `crates/standalone/src/main.rs` is the
+  reference for how everything wires together (`PatchEngine`, `VoiceAllocator`,
+  `resolve_midi_message`/`apply_voice_event`'s control-thread/audio-thread split). A UI needs the
+  same `PatchEngine::build_swap(handle, patch)` (control thread) / `receive_swap`/`process_block`
+  (audio thread) pattern, but building `patch: PatchState` from user interaction (dragging
+  cables, adding modules) via `core`'s op log instead of a hardcoded `default_patch()`. No
+  display server in this container — build and logic-test what doesn't need one (patch-editing
+  logic, op application), flag what needs real rendering to verify.
+- **Extending `standalone`** (persistence, MIDI port selection, JACK): `crates/standalone/src/
+  lib.rs`'s module doc + decisions.md's "Standalone binary" entry lay out what's built vs.
+  deferred. `tests/lib_logic.rs` shows what's provable without hardware.
 - **Just want to know if it works:** `cargo test --workspace` and the commands above. If they're
   not all green, the repo is mid-edit — check `git log` for the last commit's message.

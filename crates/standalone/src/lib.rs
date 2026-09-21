@@ -1,2 +1,232 @@
-//! Stub — not yet implemented. See brief section 5 / milestone table (section 12) for when
-//! this crate's content is scheduled.
+//! The standalone binary's testable core: a default patch, a non-allocating ring buffer for
+//! bridging `cpal`'s arbitrary callback buffer sizes against the engine's fixed `BLOCK`, and pure
+//! MIDI-byte-to-voice-event resolution. Kept separate from `main.rs` because `main.rs` itself
+//! needs a real audio device and MIDI port to do anything — everything that *can* be tested
+//! without hardware lives here instead, so "no `/dev/snd` in this container" doesn't mean "no
+//! tests for the standalone crate" (see `tests/` and the module docs below for what's proven).
+
+use kabl_core::{CableState, ModuleId, ModuleState, PatchState, PortRef, Vec2};
+use kabl_engine::patch_engine::PatchEngine;
+use kabl_modules::builtins::MidiIn;
+use std::collections::BTreeMap;
+
+/// How many notes can sound at once. Chosen as a reasonable default for a first-light polysynth,
+/// not derived from anything — the brief doesn't mandate a number and nothing yet lets a person
+/// change it at runtime.
+pub const DEFAULT_VOICE_COUNT: usize = 8;
+
+/// `osc.va`'s `base_hz` default is C4 (261.63 Hz) — MIDI note 60 is also C4, so a MIDI note
+/// number converts to `pitch` semitones as `note - MIDI_NOTE_FOR_BASE_HZ`.
+pub const MIDI_NOTE_FOR_BASE_HZ: i32 = 60;
+
+/// The default patch a freshly-started standalone binary plays: one voice-rate chain
+/// (`midi.in -> osc.va -> filter.svf -> env.adsr/vca -> out`), the same 5-stage shape
+/// `patch_demo.rs`/`compile.rs`'s tests already proved correct — the compiler instances it once
+/// per voice automatically (`Rate::Voice`), so this patch alone is already a full polysynth once
+/// paired with a `VoiceAllocator` routing MIDI notes across `DEFAULT_VOICE_COUNT` instances.
+pub fn default_patch() -> PatchState {
+    let mut patch = PatchState::new();
+    patch.modules.insert(1, module("midi.in", &[]));
+    patch.modules.insert(
+        2,
+        module("osc.va", &[("base_hz", 261.63), ("waveform", 2.0)]),
+    );
+    patch.modules.insert(
+        3,
+        module("filter.svf", &[("cutoff_hz", 3000.0), ("resonance", 0.2)]),
+    );
+    patch.modules.insert(
+        4,
+        module(
+            "env.adsr",
+            &[
+                ("attack_ms", 5.0),
+                ("decay_ms", 120.0),
+                ("sustain", 0.6),
+                ("release_ms", 250.0),
+            ],
+        ),
+    );
+    patch
+        .modules
+        .insert(5, module("vca", &[("gain", 0.0), ("exponential", 0.0)]));
+    patch.modules.insert(6, module("out", &[]));
+
+    patch.cables.insert(1, cable(1, "pitch", 2, "pitch"));
+    patch.cables.insert(2, cable(2, "out", 3, "in"));
+    patch.cables.insert(3, cable(1, "gate", 4, "gate"));
+    patch.cables.insert(4, cable(3, "lp", 5, "in"));
+    patch.cables.insert(5, cable(4, "out", 5, "cv"));
+    patch.cables.insert(6, cable(5, "out", 6, "left"));
+    patch.cables.insert(7, cable(5, "out", 6, "right"));
+    patch
+}
+
+/// The `midi.in` module's stable id in `default_patch()` — needed to reach the right instance
+/// via `CompiledPatch::module_mut(id, Some(voice))`.
+pub const MIDI_IN_ID: ModuleId = 1;
+
+fn module(kind: &str, params: &[(&str, f32)]) -> ModuleState {
+    ModuleState {
+        kind: kind.to_string(),
+        pos: Vec2 { x: 0.0, y: 0.0 },
+        params: params.iter().map(|&(k, v)| (k.to_string(), v)).collect(),
+    }
+}
+
+fn cable(from_id: u64, from_port: &str, to_id: u64, to_port: &str) -> CableState {
+    CableState {
+        from: PortRef::Module {
+            id: from_id,
+            port: from_port.to_string(),
+        },
+        to: PortRef::Module {
+            id: to_id,
+            port: to_port.to_string(),
+        },
+        params: BTreeMap::new(),
+        steps: Vec::new(),
+    }
+}
+
+/// A voice-level event, already resolved (MIDI note number -> voice index, done on the control
+/// thread by `resolve_midi_message`) — cheap enough to pass through an `rtrb` channel and apply
+/// on the audio thread with no allocation (`apply_voice_event`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum VoiceEvent {
+    NoteOn {
+        voice: usize,
+        semitones: f32,
+        velocity: f32,
+    },
+    NoteOff {
+        voice: usize,
+    },
+}
+
+/// Parses one raw MIDI message (as delivered by `midir`'s callback) into a `VoiceEvent`, using
+/// `allocator` to turn the note number into a voice index. Runs on the MIDI thread (not the
+/// audio thread) — `VoiceAllocator` uses a `HashMap` internally and is not RT-safe to call from
+/// the audio callback, which is exactly why voice resolution happens here and only the resolved
+/// `VoiceEvent` crosses to the audio thread.
+///
+/// Handles Note On (0x9n) and Note Off (0x8n); a Note On with velocity 0 is the standard MIDI
+/// convention for Note Off (lets a device use running status without an explicit 0x8n). Anything
+/// else (CC, pitch bend, sysex, ...) returns `None` — real, just not wired to anything yet.
+pub fn resolve_midi_message(
+    allocator: &mut kabl_engine::voice_allocator::VoiceAllocator,
+    data: &[u8],
+) -> Option<VoiceEvent> {
+    if data.len() < 3 {
+        return None;
+    }
+    let status = data[0] & 0xF0;
+    let note = data[1] as u32;
+    match status {
+        0x90 if data[2] > 0 => {
+            let voice = allocator.note_on(note);
+            let semitones = note as f32 - MIDI_NOTE_FOR_BASE_HZ as f32;
+            let velocity = data[2] as f32 / 127.0;
+            Some(VoiceEvent::NoteOn {
+                voice,
+                semitones,
+                velocity,
+            })
+        }
+        0x90 | 0x80 => allocator
+            .note_off(note)
+            .map(|voice| VoiceEvent::NoteOff { voice }),
+        _ => None,
+    }
+}
+
+/// Applies a resolved `VoiceEvent` to `engine`'s active graph — the audio-thread half of MIDI
+/// handling. No allocation: `module_mut` is a linear scan over an already-allocated `Vec`,
+/// `as_any_mut`/`downcast_mut` are pointer casts, `note_on`/`note_off` are field writes.
+pub fn apply_voice_event(engine: &mut PatchEngine, midi_in_id: ModuleId, event: VoiceEvent) {
+    let voice = match event {
+        VoiceEvent::NoteOn { voice, .. } => voice,
+        VoiceEvent::NoteOff { voice } => voice,
+    };
+    let Some(module) = engine.active_mut().module_mut(midi_in_id, Some(voice)) else {
+        return;
+    };
+    let Some(midi) = module.as_any_mut().downcast_mut::<MidiIn>() else {
+        return;
+    };
+    match event {
+        VoiceEvent::NoteOn {
+            semitones,
+            velocity,
+            ..
+        } => midi.note_on(semitones, velocity),
+        VoiceEvent::NoteOff { .. } => midi.note_off(),
+    }
+}
+
+/// A fixed-capacity, non-allocating single-producer/single-consumer sample queue — bridges
+/// `PatchEngine::process_block`'s fixed `BLOCK`-sized output against `cpal`'s callback, which can
+/// ask for any number of frames per call (varies by host/device/buffer-size setting, not a
+/// multiple of `BLOCK` in general). `push`/`pop` never allocate once constructed — the backing
+/// `Vec` is sized once at construction (control thread) and never grows after, so this is safe to
+/// drive entirely from the audio thread.
+pub struct RingBuffer {
+    buf: Vec<f32>,
+    read: usize,
+    write: usize,
+    len: usize,
+}
+
+impl RingBuffer {
+    pub fn new(capacity: usize) -> Self {
+        RingBuffer {
+            buf: vec![0.0; capacity],
+            read: 0,
+            write: 0,
+            len: 0,
+        }
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.buf.len()
+    }
+
+    pub fn available(&self) -> usize {
+        self.len
+    }
+
+    pub fn free(&self) -> usize {
+        self.buf.len() - self.len
+    }
+
+    /// Pushes `data`. Panics if `data.len() > self.free()` — a genuine logic error (the caller
+    /// should always keep the buffer topped up before it runs dry, never blindly overfill it),
+    /// not a runtime condition to silently truncate.
+    #[inline]
+    pub fn push_slice(&mut self, data: &[f32]) {
+        assert!(
+            data.len() <= self.free(),
+            "RingBuffer overflow: pushing {} samples with only {} free",
+            data.len(),
+            self.free()
+        );
+        let cap = self.buf.len();
+        for &s in data {
+            self.buf[self.write] = s;
+            self.write = (self.write + 1) % cap;
+        }
+        self.len += data.len();
+    }
+
+    #[inline]
+    pub fn pop(&mut self) -> Option<f32> {
+        if self.len == 0 {
+            return None;
+        }
+        let cap = self.buf.len();
+        let v = self.buf[self.read];
+        self.read = (self.read + 1) % cap;
+        self.len -= 1;
+        Some(v)
+    }
+}

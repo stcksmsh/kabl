@@ -36,6 +36,8 @@ brief's literal instruction.
 | `tempfile` | 3.27.0 | core (dev) | file-format round-trip test needs a scratch directory |
 | `criterion` | 0.8.2 | engine (dev, added 2026-09-21 for spike S2) | ns/block measurement for the control-rate-tier comparison; brief section 13 names it for the real `tiny`/`classic`/`potato` benches anyway, so bringing it forward rather than hand-rolling timing for S2 and redoing it later |
 | `wide` | 1.7.1 | engine (added 2026-09-21 for spike S3) | portable `f32x4` SIMD, per brief section 14's explicit suggestion; see "Spike S3" entry for why over `std::simd`/`pulp` |
+| `cpal` | 0.18.2 | standalone (added 2026-09-21) | cross-platform audio output, brief section 14's named choice. Needed `libasound2-dev` installed in this container just to build (not run) on Linux — see "Standalone binary" entry |
+| `midir` | 0.11.0 | standalone (added 2026-09-21) | cross-platform MIDI input, brief section 14's named choice |
 
 Not yet added (deferred to the milestone that needs them, per brief section 14): `cpal`, `midir`
 (standalone, v1 UI milestone), `egui` (ui crate), `nih-plug` (crates/clap, v5), `fundsp`
@@ -813,3 +815,65 @@ re-stolen) plus one integration test compiling a real minimal patch and confirmi
 returned voice indices land pitch changes on the exact right `midi.in` instance, including a
 free-before-steal check after an explicit release. All passing; workspace build/test/clippy/fmt
 clean.
+
+## 2026-09-21 — Standalone binary (`crates/standalone`): cpal + midir, "something to hear"
+
+Owner: "Do the UI yourself, do everything, we can easily fix it later" — explicit authorization
+to build brief section 12's `standalone`/`ui` crates autonomously, superseding this session's
+earlier self-imposed caution about needing a person for anything UI/hardware-shaped. Built the
+standalone binary first (not the UI) since it's the actual "a person can hear it" milestone —
+a patchbay UI without real audio/MIDI I/O underneath it still can't produce sound.
+
+**Environment reality, checked not assumed**: this container has no `/dev/snd`, no ALSA cards,
+and no display server. `cpal`'s Linux backend needed `libasound2-dev` even to *build* (not just
+run) — installed via `apt-get` (a safe, reversible dev-header install, not a destructive system
+change). The binary itself was run here and correctly detects "no usable audio device," proving
+the fallback path (see below) rather than the real `cpal` playback path, which cannot be verified
+in this environment. Real audio/MIDI I/O needs to be checked on the owner's own machine — flagged
+in STATUS.md, not glossed over.
+
+`kabl-standalone` splits into a testable `lib.rs` (default patch, MIDI-byte resolution, a non-
+allocating ring buffer, RT-safe event application — all provable without hardware) and a thin
+`main.rs` (the actual `cpal`/`midir` wiring, which by construction can't be unit-tested here).
+Design:
+
+- **`default_patch()`**: one voice-rate chain (`midi.in -> osc.va -> filter.svf -> env.adsr/vca
+  -> out`), the same 5-stage shape already proven throughout this session. The compiler instances
+  it once per voice (`Rate::Voice`) automatically — no per-voice wiring needed, it's already a
+  full `DEFAULT_VOICE_COUNT`-voice (8) polysynth once paired with `VoiceAllocator`.
+- **MIDI resolution split across two threads by design, not incidentally**: `resolve_midi_message`
+  (MIDI thread) turns raw bytes into a `VoiceEvent` using `VoiceAllocator` — deliberately *not*
+  called from the audio thread, since `VoiceAllocator`'s `HashMap` can allocate on insert/resize
+  and would violate brief section 3's RT rule. Only the resolved, `Copy`-able `VoiceEvent` crosses
+  an `rtrb` single-producer/single-consumer channel to the audio thread, where `apply_voice_event`
+  (proven allocation-free via `assert_no_alloc`) applies it — the same "resolve off the audio
+  thread, apply cheaply on it" split `PatchEngine::build_swap`/`receive_swap` already established
+  for graph swaps, now applied to MIDI events too.
+- **`RingBuffer`**: bridges `PatchEngine::process_block`'s fixed `BLOCK`=64-sample output against
+  `cpal`'s callback, which can request any number of frames per call (host/device/buffer-size
+  dependent, not a multiple of 64 in general). Fixed capacity (`BLOCK * 256` =~ 340ms headroom),
+  allocated once at stream setup (control thread), never grown after — `push`/`pop` are proven
+  allocation-free the same way. Overflowing it is an `assert!` panic, not a silent drop: it would
+  mean a host buffer size far outside anything reasonable, a real bug to see loudly, not paper
+  over.
+- **Fallback self-test render**: no output device (this container) or no usable `f32` config ->
+  instead of exiting with nothing to show, renders a short chord straight through `compile()`
+  (bypassing `PatchEngine`/`cpal` entirely) to `target/spike-renders/standalone_selftest.wav`.
+  Proves the synthesis path end-to-end even where real playback can't be verified. Sent to owner.
+
+13 tests in `crates/standalone/tests/lib_logic.rs`: `RingBuffer` round-trip/wraparound/overflow-
+panics/no-alloc, `resolve_midi_message` (correct voice+pitch+velocity, note-on-velocity-0-as-
+note-off MIDI convention, explicit note-off, unheld-note note-off resolves to `None`, non-note
+messages resolve to `None`), `apply_voice_event` (reaches the exact right compiled voice, other
+voices untouched, no allocation), and `default_patch()` actually compiles and produces audible,
+finite output when driven through a full note-on/render/verify cycle. All passing; workspace
+build/test/clippy/fmt clean (clippy now also covers `cpal`/`midir`/`alsa`'s dependency tree,
+clean).
+
+Not done by this pass: a `--midi <port>`/`--list-midi` CLI for picking among multiple MIDI ports
+(connects to the first available one only); no persistence (always plays `default_patch()`, no
+loading a saved `.kabl` file yet — `core`'s file format already exists, just not wired here);
+a mono output device gets the left channel only (not an L+R downmix) since channel 0 is always
+written from `left_ring` and channels 1+ from `right_ring` — a real but minor gap for the
+uncommon mono-output case, most devices are stereo. None of these block "can a person plug in a
+MIDI keyboard and hear the synth," which was the actual goal.
