@@ -80,6 +80,13 @@ impl Default for OscVa {
 }
 
 impl Module for OscVa {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn info(&self) -> &'static ModuleInfo {
         &OSC_VA_INFO
     }

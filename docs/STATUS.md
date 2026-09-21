@@ -5,7 +5,7 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-21, after the `dyn Module` dispatch spike (compiler plan still to write).
+Last updated: 2026-09-21, after the flat-schedule compiler's first working version landed.
 
 ## Workflow (changed 2026-09-21)
 
@@ -35,33 +35,44 @@ class of bug component-level tests can't catch. WAV sent to the owner. This is t
 standing between "9 modules exist" and "the compiler can be trusted to assemble them" — proof
 the trait design actually composes.
 
-Still missing before anything is playable *by a person*: the flat-schedule compiler that builds
-graphs like `patch_demo.rs`'s from patch ops instead of hand-written Rust, cables, a UI, a
-standalone binary with real MIDI input. `core` (the op log) is real, production-shaped code,
-already at v1 quality. `engine`'s S1/S2/S3 spike code is still hand-rolled fixed-topology graphs
-using raw `dsp` primitives directly, separate from `patch_demo.rs`'s real-`Module` approach —
-expect both to be absorbed into real compiler work, not extended indefinitely.
+**The flat-schedule compiler now exists and works**, `crates/engine/src/compile.rs`:
+`compile(&PatchState, sample_rate, voice_count) -> Result<CompiledPatch, CompileError>` turns an
+ops-authored patch into a running graph — topo sort, voice/global rate instancing, cable wiring,
+cycle detection, a `recompile()` that carries module state across a rebuild. Proven end-to-end:
+the same 5-stage voice chain `patch_demo.rs` hand-wired, built from `PatchState` ops instead,
+compiled, and driven via MIDI — output matches `patch_demo.rs`'s numbers exactly. WAV sent to
+owner. See decisions.md's "Flat-schedule compiler v1" entry for the four design calls made here
+(averaging not summing for voice->global, cycle-as-compile-error, no buffer-pool reuse yet,
+params as compile-time constants) and the real gaps: **not yet RT-safe** (`process_block`
+allocates scratch `Vec`s per call) and **not yet wired to `swap.rs`**'s crossfade mechanism.
+
+Still missing before anything is playable *by a person*: cables (v2 params beyond simple
+wiring), a UI, a standalone binary with real MIDI input, RT-safety on the compiler's hot path,
+and the swap.rs hookup so a live repatch doesn't click. `core` (the op log) is real,
+production-shaped code, already at v1 quality. `engine`'s S1/S2/S3 spike code is still
+hand-rolled fixed-topology graphs using raw `dsp` primitives directly — expect it to be absorbed
+into/replaced by the real compiler, not extended indefinitely.
 
 ## Handover: next session starts here
 
-Owner answered both open questions from the last handover: spike `dyn Module` dispatch cost
-first, then share the compiler plan (not write code yet). First half done this session — see
-"Spike: `dyn Module` dispatch cost" in decisions.md and benchmarks.md: ~17-19% overhead vs. static
-dispatch, bit-exact correctness, not a blocker. `Box<dyn Module>` confirmed as the compiler's
-module-storage representation.
+The compiler (this session's whole focus) is built, tested, and committed. What's NOT done, in
+rough priority order for "something a person can actually patch and hear live":
 
-**Second half not yet done: the compiler plan itself hasn't been written or shared yet.** Next
-session (or the rest of this one) should produce a short plan for the flat-schedule compiler
-before writing its code (brief section 17: "plan before code for each milestone" — this is
-milestone-scale work, the biggest remaining v1 chunk). The plan needs to cover, at minimum: topo
-sort over `PatchState`'s modules/cables, a buffer pool (block-sized scratch buffers, reused across
-`process()` calls, no per-block allocation), the voice/global rate split (brief section 7 — voice-
-rate modules run once per active voice, global-rate modules once per block), `ModuleId`-keyed
-state carry-over generalizing what S1 hand-rolled and `save_state`/`load_state` already support,
-and how a recompiled graph hooks into `swap.rs`'s existing crossfade mechanism (S1's swap+
-crossfade+deferred-drop is proven; it was only proven for S1's fixed 2-node shape, so the
-compiler needs to drive it for an arbitrary topology). Budget the design around `Box<dyn Module>`
-at the now-measured ~1.2x-of-static-dispatch cost, not against `patch_demo.rs`'s raw numbers.
+1. **RT-safety**: `CompiledPatch::process_block()` currently allocates scratch `Vec`s per call
+   (building `Signal` arrays for `ProcessIo::new`). Needs those replaced with pre-allocated
+   scratch buffers sized at compile time before this can run on a real audio thread.
+2. **Wire `recompile()`/`CompiledPatch` into `swap.rs`'s `Engine`**: S1 proved swap + crossfade +
+   deferred-drop for a fixed 2-node graph; the compiler now produces arbitrary-topology graphs
+   with state carry-over via `recompile()`, but the two aren't connected yet — `Engine` still
+   only knows how to swap S1's specific shape.
+3. **Buffer-pool reuse**: every port gets its own fresh buffer right now; fine for correctness,
+   wasteful for anything beyond test-sized patches.
+4. Cycle handling still hard-errors instead of brief section 7.1's implicit 1-block delay — not
+   needed by any v1 accept-test patch, but real feedback patches will hit it.
+
+No new open question from the owner to resolve first — the natural next chunk is whichever of
+the above (or a different milestone entirely, e.g. starting the standalone binary/UI) the owner
+picks; ask before picking one un-prompted since this is a milestone boundary (brief section 17).
 
 ## Spike checklist (brief section 11)
 
@@ -79,14 +90,14 @@ What actually exists vs. what's still spike-scoped or missing:
 | Piece | State |
 |---|---|
 | `core`: op log, undo/redo, coalescing, checkpoints, file format w/ schema version, property tests | **done, real.** `crates/core/`. |
-| `engine`: flat-schedule compiler | **not built.** S1/S2 use hand-rolled fixed 2-node / 23-node graphs, not a general compiler. |
-| `engine`: voice allocator | **not built.** |
-| `engine`: SIMD batching | **prototyped in spike S3 only** (`simd_voices.rs`), not integrated into a real compiler; measured ~1.5-1.7x speedup (target was 2.5x, missed — see decisions.md). |
-| `engine`: control-rate tier | **prototyped in spike S2 only** (`potato.rs`), not integrated into a real compiler. |
-| `engine`: swap + crossfade | **mechanism proven in S1** (`swap.rs`, `graph.rs`), but only for S1's specific 2-node shape — needs generalizing when the real compiler exists. |
+| `engine`: flat-schedule compiler | **built, correctness-tested.** `compile.rs`: topo sort, voice/global instancing, cycle detection, `recompile()` w/ state carry-over. **Not yet RT-safe** (allocates scratch Vecs per block) and **not yet wired to `swap.rs`**. No buffer-pool reuse. |
+| `engine`: voice allocator | **not built.** `voice_count` is a fixed compile-time parameter, not dynamically assigned from incoming MIDI notes. |
+| `engine`: SIMD batching | **prototyped in spike S3 only** (`simd_voices.rs`), not integrated into the compiler; measured ~1.5-1.7x speedup (target was 2.5x, missed — see decisions.md). |
+| `engine`: control-rate tier | **prototyped in spike S2 only** (`potato.rs`), not integrated into the compiler. |
+| `engine`: swap + crossfade | **mechanism proven in S1** (`swap.rs`, `graph.rs`) for S1's specific 2-node shape; compiler now produces arbitrary-topology graphs with state carry-over (`recompile()`) but isn't hooked into `swap.rs`'s `Engine` yet. |
 | `engine`: quality tiers (Live/Render) | **not built.** |
 | `cables`: depth only | **not built.** `crates/cables` is an empty stub. |
-| `modules`: 9 v1 built-ins + metadata | **9 of 9 have a `Module` impl.** `Module` trait, `ModuleInfo`, `ProcessIo`/`Signal` all built and tested. `osc.va` (saw only) and `lfo` (no sync) are partial — see decisions.md. No registry/catalog struct yet (nothing has needed to enumerate "all modules" as a collection so far; tests just import each type directly). |
+| `modules`: 9 v1 built-ins + metadata | **9 of 9 have a `Module` impl.** `Module` trait, `ModuleInfo`, `ProcessIo`/`Signal` all built and tested. `osc.va` (saw only) and `lfo` (no sync) are partial — see decisions.md. **Registry now exists** (`registry.rs`: `create(kind)`, `all_infos()`, `info_for(kind)`) — the compiler uses it to turn `ModuleState.kind` strings into instances. |
 | `learn`: unlock flags filter catalog | **not built.** `crates/learn` is an empty stub. |
 | `ui`: egui patchbay | **not built.** `crates/ui` is an empty stub. |
 | `standalone`: cpal + midir + JACK | **not built.** `crates/standalone` is an empty stub. |
@@ -108,8 +119,20 @@ crates/
                  dsp.rs       - Saw/Svf/Lfo/Adsr (S1-S3's originals) + SvfOutputs/FullAdsr/
                                 FullLfo (added for the 8 newer modules, originals untouched).
                  builtins/    - all 9 Module impls: osc_va, filter_svf, env_adsr, lfo, vca,
-                                ringmod, mixer, out, midi_in.
-  engine/      SPIKE CODE ONLY so far (depends on kabl-modules).
+                                ringmod, mixer, out, midi_in. All 9 also implement `as_any`/
+                                `as_any_mut` (required, not defaulted — see decisions.md) so the
+                                compiler can downcast `Box<dyn Module>` back to a concrete type.
+                 registry.rs  - kind string -> Module factory. KNOWN_KINDS, create(kind),
+                                all_infos(), info_for(kind). Tested in tests/registry.rs.
+  engine/      Real compiler + spike code (depends on kabl-modules, kabl-core).
+                 compile.rs - THE COMPILER. compile(&PatchState, sample_rate, voice_count) ->
+                                CompiledPatch: topo sort (Kahn's algorithm, doubles as cycle
+                                detection), voice/global-rate instancing, voice->global averaging
+                                (SumVoices steps), recompile() with save_state/load_state carry-
+                                over via HashMapState. Correctness-tested end-to-end in
+                                tests/compile.rs (7 tests) against patch_demo.rs's numbers. NOT
+                                yet RT-safe (process_block allocates scratch Vecs) and NOT yet
+                                wired to swap.rs. See decisions.md "Flat-schedule compiler v1".
                  graph.rs  - S1's fixed 2-node (4-voice chord -> cable depth -> filter) graph.
                  swap.rs   - S1's Engine: crossfade swap + basedrop deferred drop.
                  potato.rs - S2's fixed 20+3-module patch, naive vs. control-rate-optimized.
@@ -175,9 +198,20 @@ this against the commit it was last updated for.
   decisions.md "core: op log inverse simplifications." Revisit if they cause a real problem.
 - **`osc.va` is saw-only, no hard sync** — brief section 8's table entry wants square/tri/sine
   and a hard-sync input too. Tracked, not forgotten.
-- **No module registry/catalog struct** — every test imports each `Module` type directly by
-  name. Fine for 9 hand-known modules; will matter once the UI needs to enumerate "everything
-  available" or `learn`'s unlock flags need to filter a list. Not built until something needs it.
+- ~~**No module registry/catalog struct**~~ — built, `crates/modules/src/registry.rs`.
+- **Compiler's `process_block()` is not RT-safe yet** — allocates scratch `Vec`s per call. Needs
+  pre-allocated scratch buffers before this can run on a real audio thread. See decisions.md
+  "Flat-schedule compiler v1".
+- **Compiler not wired to `swap.rs`'s `Engine`** — `recompile()` produces a fresh `CompiledPatch`
+  with state carried over, but nothing yet drives it through S1's proven crossfade mechanism for
+  an arbitrary (not just S1's fixed 2-node) topology.
+- **No buffer-pool reuse in the compiler** — every port gets a fresh `[f32; BLOCK]`. Correct,
+  wasteful; deferred as a pure optimization on the same schedule shape.
+- **Compiler treats a cycle as a hard compile error**, not brief section 7.1's implicit 1-block
+  delay. No v1 accept-test patch has a feedback loop, so not currently blocking; will matter for
+  real feedback patches.
+- **No voice allocator** — `voice_count` is a fixed parameter passed to `compile()`, not
+  dynamically assigned from incoming MIDI note-on/off.
 - ~~**`dyn Module` dispatch cost unmeasured**~~ — measured. `crates/engine/src/
   dyn_dispatch_spike.rs`: `Box<dyn Module>` costs ~17-19% more than static dispatch on the same
   22-instance patch (bit-exact correctness, tight ratio across runs). Not a blocker — `Box<dyn
@@ -194,11 +228,10 @@ this against the commit it was last updated for.
   most complete examples (fast/slow-path split, real state carry-over). Test files
   `crates/modules/tests/*.rs` show the expected shape (matches-direct-dsp-call, buffer input,
   reset, save/load-state round-trip).
-- **Starting the real compiler:** read this file's "v1 milestone checklist" above first — it's
-  the actual gap list. Brief section 7 is the spec. `Module`/`ModuleInfo`/`ProcessIo` already
-  exist (`crates/modules/`) for the compiler to build graphs out of, and `crates/engine/src/
-  patch_demo.rs` shows a working topology hand-wired the way the compiler needs to do it
-  automatically from ops — read that first, it's the shape to generalize. Measure `dyn Module`
-  dispatch cost before assuming `patch_demo.rs`'s static-dispatch ns/block predicts anything.
+- **Extending the compiler** (RT-safety, swap.rs hookup, buffer-pool reuse, cycle handling, voice
+  allocator): `crates/engine/src/compile.rs`'s module doc comment + decisions.md's "Flat-schedule
+  compiler v1" entry lay out what's built, what's deferred, and why. `crates/engine/tests/
+  compile.rs` shows the expected external shape (build a `PatchState` from ops, `compile()`,
+  drive it, `recompile()`).
 - **Just want to know if it works:** `cargo test --workspace` and the commands above. If they're
   not all green, the repo is mid-edit — check `git log` for the last commit's message.

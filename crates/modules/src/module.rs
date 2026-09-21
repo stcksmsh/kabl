@@ -43,11 +43,23 @@ pub trait StateReader {
 
 /// brief section 8. `prepare` may allocate (called on the control thread when a graph compiles);
 /// `process` may not (audio thread, brief section 3's RT rules).
-pub trait Module: Send {
+///
+/// `Module: 'static` (via `Any`'s requirement) so `as_any`/`as_any_mut` can downcast a
+/// `Box<dyn Module>` back to its concrete type — needed by anything that has to reach a
+/// module-specific method through a compiled patch's type-erased storage: a MIDI router calling
+/// `MidiIn::note_on` on the right instance, or the (unbuilt) audio callback reading `Out::left`/
+/// `right`. Not default-implemented: a blanket `{ self }` body needs `Self: Sized`, which makes
+/// the method uncallable through `dyn Module` — the entire point here — so every impl provides
+/// its own two-line `{ self }`/`{ self }` body (mechanical, not meaningfully different per
+/// module).
+pub trait Module: Send + std::any::Any {
     fn info(&self) -> &'static ModuleInfo;
     fn prepare(&mut self, sample_rate: f32, max_block: usize, quality: &QualityConfig);
     fn process(&mut self, io: &mut ProcessIo);
     fn reset(&mut self);
     fn save_state(&self, _out: &mut dyn StateWriter) {}
     fn load_state(&mut self, _s: &dyn StateReader) {}
+
+    fn as_any(&self) -> &dyn std::any::Any;
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 }

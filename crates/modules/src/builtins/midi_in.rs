@@ -89,6 +89,13 @@ impl Default for MidiIn {
 }
 
 impl Module for MidiIn {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn info(&self) -> &'static ModuleInfo {
         &MIDI_IN_INFO
     }

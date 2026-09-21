@@ -527,3 +527,106 @@ gap-then-new-note sequence all worked without changes to any of the 9 modules.
 Test asserts each note's hold window has real energy and each gap dips measurably below it —
 evidence of distinct notes, not one smeared tone (gaps don't fully silence: 150ms against a
 300ms release time constant is expected legato, not a bug). WAV sent to the owner.
+
+## 2026-09-21 — Module registry (`crates/modules/src/registry.rs`)
+
+Needed before the compiler could turn a `ModuleState.kind: String` into a `Box<dyn Module>` —
+nothing previously mapped kind strings to constructors; every test imported each type directly.
+`KNOWN_KINDS: &[&str]`, `create(kind) -> Option<Box<dyn Module>>` (a `match` over the 9 kinds,
+`None` for unknown — a normal, expected outcome for a not-yet-patched or future kind, not a bug
+to panic on), `all_infos() -> &'static [&'static ModuleInfo]`, `info_for(kind)`. Plain `match`
+over dynamic registration/`inventory`-style linkme tricks: 9 fixed kinds, no plugin loading in
+v1, and v4's composite/code modules will need a different registration path anyway (they're
+authored patches, not Rust types) — no reason to pay dynamic-dispatch-at-startup complexity now
+for a problem v4 will have to solve differently regardless.
+
+`all_infos()` initially tried to build `[&ModuleInfo; 9]` fresh inside the function body — failed
+(E0515: can't return a reference to a temporary). Fixed by hoisting to a `static ALL_INFOS`.
+
+## 2026-09-21 — `Module: Send + Any`, `as_any`/`as_any_mut`
+
+The compiler needs to call module-specific methods (`MidiIn::note_on`, later `Out::left/right`)
+through a type-erased `Box<dyn Module>` — the only way back from `&dyn Module` to a concrete type
+is `std::any::Any` downcasting. Added `Module: Send + std::any::Any` and two required methods,
+`as_any`/`as_any_mut`.
+
+Tried a default body (`fn as_any(&self) -> &dyn Any { self }`) first — doesn't compile without
+`where Self: Sized`, and `Sized` makes the method uncallable through `dyn Module` (defeats the
+purpose; confirmed via the actual E0277, not assumed). So both methods are required, not
+defaulted, and got the same 2-line body copy-pasted into all 9 `builtins/*.rs` impls. Mechanical
+and repetitive, but there's no trait-level way around it in current Rust.
+
+## 2026-09-21 — Flat-schedule compiler v1 (`crates/engine/src/compile.rs`)
+
+The actual compiler: `compile(&PatchState, sample_rate, voice_count) -> Result<CompiledPatch,
+CompileError>`, turning ops-authored patches into a running graph the way `patch_demo.rs` was
+hand-wired. Proven end-to-end in `crates/engine/tests/compile.rs`: the same 5-stage voice chain
+`patch_demo.rs` hard-coded (`midi.in -> osc.va -> filter.svf -> env.adsr/vca -> out`), built from
+`PatchState` ops instead, compiled, driven via `as_any_mut` downcast MIDI triggering — output
+matches `patch_demo.rs`'s numbers exactly (`sustain_rms=0.2243, tail_rms=0.007959` both ways).
+WAV sent to owner (`compiler_chord.wav`).
+
+Mechanism: resolve each module's `ModuleInfo` via the new registry (unknown kind ->
+`CompileError::UnknownKind`); build cable adjacency from `PatchState.cables`; Kahn's-algorithm
+topo sort over modules (leftover un-orderable nodes -> `CompileError::Cycle`, see below);
+validate every cable's destination port resolves to a real input (`CompileError::UnknownPort`);
+walk topo order, instancing each module once per voice if `Rate::Voice` or once total if
+`Rate::Global`, wiring each input to its source's buffer (unconnected -> silence) or, for
+voice-output-into-global-input, a `SumVoices` step. `out`'s inputs are special-cased into
+`out_left`/`out_right` buffer indices directly (avoids needing to downcast `Out` just to read
+two buffer handles the compiler already has).
+
+Four design decisions made here, not specified by the brief, each documented at the top of
+`compile.rs` itself as well as here:
+
+1. **Voice-to-global signal combination is averaging, not summing.** Brief section 7 doesn't say
+   which. Summing would make an N-voice patch N times louder than a 1-voice patch through any
+   global-rate module downstream (e.g. a shared filter or output stage) — clearly wrong for a
+   "just add more voices" workflow. Averaging keeps loudness stable as voice count changes.
+   Tested two ways: `averaging_n_identical_voices_reproduces_a_single_voice_exactly` (4 identical
+   voices average back to bit-exact the single-voice signal — exact under IEEE754 because 4 is a
+   power of 2, no rounding) and `voice_count_does_not_change_loudness_for_identical_voices`
+   (4-voice vs. 8-voice, same patch, asserted within `1e-4` rather than bit-exact — sequential
+   summation of 8 equal values passes through non-power-of-2 partial sums (3v, 5v, 6v, 7v) that
+   round slightly differently than summing to 4v; both are correct to float precision, only
+   bit-exactness across different N would be the wrong thing to assert).
+
+2. **A cycle is a compile error, not brief section 7.1's implicit 1-block delay.** Kahn's
+   algorithm already detects cycles for free (nodes left over once the queue empties) — turning
+   that into a hard `CompileError::Cycle(Vec<ModuleId>)` was the zero-extra-work option. Breaking
+   cycles with an implicit delay is real work (need to choose *which* edge in the cycle gets
+   delayed, thread an extra block of latency through state) that doesn't block anything in v1's
+   accept test (brief section 12's test patch has no feedback loop). Deferred, not forgotten —
+   flagged in STATUS.md's open items.
+
+3. **No buffer-pool reuse yet.** Every output port on every module/voice instance gets its own
+   fresh `[f32; BLOCK]` in `CompiledPatch.buffers`. Correct but wasteful (a real patch's buffer
+   count grows with module-count × voice-count, all live for the process's lifetime, no reuse
+   even for buffers whose consumers have already finished reading them within the same block).
+   Kept simple to get a correct compiler first; buffer-pool reuse is a pure optimization on top
+   of the same schedule shape, not a design change, so it's safe to defer.
+
+4. **Params are compile-time constants**, resolved once from `ModuleState.params` (falling back
+   to `ParamInfo.default`) when a `Step::Process` is built, not re-read from `PatchState` every
+   block. Matches how `patch_demo.rs` and the 9 built-ins already treat most params (block-rate,
+   not sample-rate, values — see `env_adsr.rs`'s doc comment for the same reasoning applied at
+   the module level). A live-patching UI changing a knob mid-play will need a real
+   recompile-or-patch path either way (see `recompile()` below); this isn't a regression from
+   anything that worked before.
+
+**Not yet RT-safe**: `process_block()` allocates scratch `Vec`s per call (building `Signal`
+arrays for `ProcessIo::new`) — fine for the correctness tests here, but this cannot run on the
+actual audio thread yet without that allocation removed. Flagged explicitly in `compile.rs`'s
+module doc and in STATUS.md's open items; not silently swept under "it works."
+
+**State carry-over**: `recompile(old: &mut CompiledPatch, patch, sample_rate, voice_count) ->
+Result<CompiledPatch, ...>` compiles a fresh `CompiledPatch` against a (possibly changed) patch,
+then for every `(ModuleId, voice)` origin present in both old and new, round-trips
+`save_state`/`load_state` through a new reusable `HashMapState` (factors out the
+`HashMap<String,f32>` `StateWriter`/`StateReader` pattern every module's own test file had been
+hand-rolling locally). Tested (`recompile_carries_over_oscillator_phase_and_filter_state`):
+render 50 blocks, recompile against the same patch, confirm the next block from the recompiled
+graph matches what the original would have produced — phase/envelope state isn't reset. This is
+the piece `swap.rs`'s crossfade mechanism (proven in spike S1) will need to call around; the two
+aren't wired together yet (`recompile()` returns a plain new `CompiledPatch`, not yet routed
+through `swap.rs`'s `Engine`).

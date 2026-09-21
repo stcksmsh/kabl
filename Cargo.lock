@@ -396,6 +396,7 @@ dependencies = [
  "basedrop",
  "criterion",
  "hound",
+ "kabl-core",
  "kabl-modules",
  "rtrb",
  "wide",

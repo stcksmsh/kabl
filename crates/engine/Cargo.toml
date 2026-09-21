@@ -9,6 +9,7 @@ rtrb = "0.4.0"
 basedrop = "0.1.3"
 wide = "1.7.1"
 kabl-modules = { path = "../modules" }
+kabl-core = { path = "../core" }
 
 [dev-dependencies]
 assert_no_alloc = "1.1.2"
