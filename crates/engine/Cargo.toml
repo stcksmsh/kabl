@@ -22,3 +22,7 @@ harness = false
 [[bench]]
 name = "s3_simd_voices"
 harness = false
+
+[[bench]]
+name = "patch_integration"
+harness = false

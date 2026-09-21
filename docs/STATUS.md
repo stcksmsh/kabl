@@ -5,7 +5,7 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-21, after all 9 v1 built-in modules landed.
+Last updated: 2026-09-21, after the first patch built from real `Module` trait objects.
 
 ## Workflow (changed 2026-09-21)
 
@@ -26,14 +26,21 @@ modules now have a real `Module` trait implementation**, in `crates/modules/src/
 partial (`osc.va`: saw only, no hard sync; `lfo`: all waveforms but no sync) — tracked, not
 hidden, see decisions.md. `filter.svf` and `env.adsr` directly apply spike S3's and S2's
 findings (cache coefficients when nothing's actually modulating per-sample) in real module code,
-not just as spike war stories. Still missing before anything is playable: the flat-schedule
-compiler that assembles `Module`s into a graph, cables, a UI, a standalone binary. `core` (the
-op log) is real, production-shaped code, already at v1 quality. `engine`'s S1/S2/S3 spike code
-is still hand-rolled fixed-topology graphs using raw `dsp` primitives directly, not the `Module`
-trait at all — expect it to be absorbed into real compiler work, not extended indefinitely.
-**Next: an integration spike wiring several real `Module` instances into an actual patch**
-(midi.in -> osc.va -> filter.svf -> env.adsr/vca -> mixer -> out), proving the trait design
-composes into something that plays, ahead of writing the general compiler.
+not just as spike war stories. **A 4-voice patch built entirely from real `Module` trait objects now plays** —
+`crates/engine/src/patch_demo.rs`: `midi.in -> osc.va -> filter.svf -> env.adsr/vca -> mixer ->
+out`, 22 module instances, wired by hand (no cable system or compiler yet). Renders a real,
+correct C-major chord with a working release envelope — caught one real integration bug (vca
+gain-staging that silently defeated the envelope) before ever running anything, exactly the
+class of bug component-level tests can't catch. WAV sent to the owner. This is the last thing
+standing between "9 modules exist" and "the compiler can be trusted to assemble them" — proof
+the trait design actually composes.
+
+Still missing before anything is playable *by a person*: the flat-schedule compiler that builds
+graphs like `patch_demo.rs`'s from patch ops instead of hand-written Rust, cables, a UI, a
+standalone binary with real MIDI input. `core` (the op log) is real, production-shaped code,
+already at v1 quality. `engine`'s S1/S2/S3 spike code is still hand-rolled fixed-topology graphs
+using raw `dsp` primitives directly, separate from `patch_demo.rs`'s real-`Module` approach —
+expect both to be absorbed into real compiler work, not extended indefinitely.
 
 ## Spike checklist (brief section 11)
 
@@ -81,11 +88,15 @@ crates/
                                 FullLfo (added for the 8 newer modules, originals untouched).
                  builtins/    - all 9 Module impls: osc_va, filter_svf, env_adsr, lfo, vca,
                                 ringmod, mixer, out, midi_in.
-  engine/      SPIKE CODE ONLY so far (depends on kabl-modules for dsp.rs now).
+  engine/      SPIKE CODE ONLY so far (depends on kabl-modules).
                  graph.rs  - S1's fixed 2-node (4-voice chord -> cable depth -> filter) graph.
                  swap.rs   - S1's Engine: crossfade swap + basedrop deferred drop.
                  potato.rs - S2's fixed 20+3-module patch, naive vs. control-rate-optimized.
                  simd_voices.rs - S3's SawX4/SvfX4 (wide::f32x4) vs. scalar ScalarVoices/SimdVoices.
+                 patch_demo.rs  - first patch built from real Module trait objects (not raw dsp
+                                  calls like the other 3): 4 voices, 22 module instances, hand-
+                                  wired. Correctness+bench in tests/patch_integration.rs and
+                                  benches/patch_integration.rs.
                None of this is the general compiler. Expect it to be replaced/absorbed, not
                extended indefinitely, once real compiler work starts.
   cables/, pedals/, learn/, ui/, standalone/, clap/
@@ -141,6 +152,10 @@ this against the commit it was last updated for.
 - **No module registry/catalog struct** — every test imports each `Module` type directly by
   name. Fine for 9 hand-known modules; will matter once the UI needs to enumerate "everything
   available" or `learn`'s unlock flags need to filter a list. Not built until something needs it.
+- **`dyn Module` dispatch cost unmeasured** — `patch_demo.rs` uses concrete typed fields
+  (static dispatch), not the `Box<dyn Module>` heterogeneous collection the real compiler needs.
+  Its ns/block number doesn't predict the real compiler's cost until someone measures the
+  vtable-indirection overhead specifically. Flagged for whoever builds the compiler.
 
 ## What to read next, depending on what you're about to do
 
@@ -153,8 +168,9 @@ this against the commit it was last updated for.
   reset, save/load-state round-trip).
 - **Starting the real compiler:** read this file's "v1 milestone checklist" above first — it's
   the actual gap list. Brief section 7 is the spec. `Module`/`ModuleInfo`/`ProcessIo` already
-  exist (`crates/modules/`) for the compiler to build graphs out of; nothing compiles a `Module`
-  graph yet — `engine`'s spike code hand-rolls fixed topologies directly in Rust, not through
-  the `Module` trait at all.
+  exist (`crates/modules/`) for the compiler to build graphs out of, and `crates/engine/src/
+  patch_demo.rs` shows a working topology hand-wired the way the compiler needs to do it
+  automatically from ops — read that first, it's the shape to generalize. Measure `dyn Module`
+  dispatch cost before assuming `patch_demo.rs`'s static-dispatch ns/block predicts anything.
 - **Just want to know if it works:** `cargo test --workspace` and the commands above. If they're
   not all green, the repo is mid-edit — check `git log` for the last commit's message.

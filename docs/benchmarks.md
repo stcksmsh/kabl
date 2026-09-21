@@ -79,6 +79,29 @@ not an approximation, unlike S2's control-rate tier).
 **Not measured:** aarch64 (brief section 11 asks for "x86 and aarch64 if available" — only
 x86_64 available in this container, same hardware gap as S2's Pi-4 number).
 
+## First real-Module patch (`patch_demo.rs`) — integration spike
+
+See `docs/decisions.md` 2026-09-21 "First patch built from real Module trait objects." 4 voices
+x (midi.in, osc.va, filter.svf, env.adsr, vca) + mixer + out = 22 module instances, wired through
+`ProcessIo`, not hand-rolled `dsp::` calls like S1/S2/S3.
+
+`cargo bench -p kabl-engine --bench patch_integration`, `taskset -c 0`, 3 runs:
+
+| Run | ns/block |
+|---|---|
+| 1 | 3585 |
+| 2 | 3114 |
+| 3 | 3321 |
+
+Correctness (`cargo test -p kabl-engine --test patch_integration`): C-major chord (C4/E4/G4/C5)
+sustains at RMS 0.22, zero NaN/Inf across a 2s render, decays to RMS 0.008 (<5% of sustain)
+within 1s of release. WAV sent to the owner.
+
+**Not measured:** `dyn Module` dispatch cost — this patch uses concrete typed fields
+(static dispatch), not the heterogeneous `Box<dyn Module>` collection the real compiler will
+need. See decisions.md's "Real open item" for why that matters before trusting this number as
+predictive of the real compiler's cost.
+
 ## Not yet measured
 
 v1 milestone, needs the real compiler/module registry, not spike-scoped hand-rolled graphs:

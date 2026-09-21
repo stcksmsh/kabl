@@ -3,6 +3,7 @@
 //! ahead of the general compiler.
 
 pub mod graph;
+pub mod patch_demo;
 pub mod potato;
 pub mod simd_voices;
 pub mod swap;

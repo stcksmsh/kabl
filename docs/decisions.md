@@ -382,6 +382,53 @@ than first guessed, and the LFO range test needed a higher rate for enough S&H d
 statistically meaningful. Both were test-parameter bugs, not DSP bugs, but worth recording as a
 reminder that a new test failing isn't automatically the code's fault.
 
+## 2026-09-21 — First patch built from real `Module` trait objects
+
+The thing S1-S3, the DSP extensions, and all 9 built-in modules were building toward: a patch
+assembled from actual `Module` trait objects wired through `ProcessIo`, not hand-rolled `dsp::`
+calls. Topology (`crates/engine/src/patch_demo.rs`), 4 voices: `midi.in` -> `osc.va` (pitch-
+driven) -> `filter.svf` (lowpass tap) -> `vca` (gain from `env.adsr`, gated by the same
+`midi.in`) -> `mixer` (4 channels) -> `out`. Same chord shape S1/S2 used, but every node this
+time is a real module, and the wiring (which buffer feeds which port) is hand-written Rust
+standing in for what the compiler will eventually generate from ops — same relationship S1's
+`CompiledGraph` has to the real compiler, made explicit in the file's own doc comment so nobody
+mistakes it for the real thing.
+
+**Result: it plays, first real run, no debugging needed.** `cargo test -p kabl-engine --test
+patch_integration`: a held C-major chord (C4/E4/G4/C5) renders with real sustained energy (RMS
+0.22), no NaN/Inf anywhere in a 2-second render (brief section 13's robustness-fuzz idea,
+applied to the real module chain for the first time), and decays to nearly silent (RMS 0.008,
+<5% of sustain) within 1s of release — the `FullAdsr`'s release stage actually working through
+the real `vca` gain-staging, not just in `dsp_extensions.rs`'s isolated test. WAV sent to the
+owner.
+
+**A real bug this caught, worth recording:** the first version of `patch_demo.rs`'s `vca` wiring
+set the gain *param* to `1.0` and fed the envelope in as `cv` — but `vca`'s effective gain is
+`clamp(gain_param + cv, 0, 1)`, so `1.0 + envelope` clamps to `1.0` regardless of what the
+envelope is doing, silently defeating the envelope entirely (constant full volume, gate or no
+gate). Caught before running anything, by re-reading the gain formula while wiring the params —
+fixed by setting `gain` to `0.0` so the envelope's `cv` is the *only* thing setting amplitude.
+Exactly the kind of integration bug component-level tests (which all passed) can't catch — each
+piece was individually correct, the combination wasn't. This is the concrete case for why this
+spike existed at all: proving composition, not just units.
+
+**Numbers** (`crates/engine/benches/patch_integration.rs`, `taskset -c 0`, 3 runs): 3.08-3.60µs/
+block for the whole 22-module-instance patch (4 voices x 5 modules + mixer + out) — cheaper than
+S2's 20-module hand-rolled `potato` patch (3.37-3.87µs), plausibly because this patch's `env.adsr`
+and `filter.svf` both apply the coefficient-caching fast path from decisions.md's "Remaining 8
+built-in modules" entry, while `potato.rs`'s naive/optimized comparison was deliberately testing
+the *without*-caching case for half of it. Not a controlled comparison (different topologies,
+different module counts per voice) — a data point, not a benchmark claim. Same hardware caveat
+as S1-S3: no Pi-4, no percentage claim.
+
+**Real open item this surfaces:** every module call here is statically dispatched — `Voice` holds
+concrete typed fields (`MidiIn`, `OscVa`, ...), not `Box<dyn Module>`. The real compiler needs a
+heterogeneous collection of module instances (a patch has an arbitrary mix of module kinds), which
+means `dyn Module` trait objects and virtual dispatch — a real cost (vtable indirection, no
+inlining across the call) this benchmark doesn't capture at all. Flagging for whoever builds the
+compiler: measure `dyn Module` dispatch overhead before assuming this patch's ns/block number
+predicts anything about the real compiler's.
+
 ## 2026-09-21 — `core`: op log inverse simplifications
 
 `Entry.inverse` is a single `Op`, per the brief's exact struct (section 6) — no new `Op` variant
