@@ -17,15 +17,16 @@ otherwise.
 
 ## Where we are, one paragraph
 
-Pre-milestone: working through the brief's "week-one spikes" (section 11) before starting real
-v1 (Engine) milestone work. S1 (graph swap/crossfade) and S2 (control-rate tier) passed; S3
-(SIMD voice batching) is done but **missed its target** (measured ~1.5-1.7x, wanted >=2.5x) —
-correctness is solid, the speedup just isn't as big as hoped, reported honestly rather than
-massaged. Nothing playable or audible exists yet — no module registry, no compiler, no UI, no
-standalone binary. `core` (the op log) is real, production-shaped code, already at v1 quality.
+Week-one spikes (brief section 11) are done: S1 (graph swap/crossfade) and S2 (control-rate
+tier) passed; S3 (SIMD voice batching) landed with solid correctness but missed its 2.5x target
+(~1.5-1.7x measured) — reported honestly rather than massaged. S4 (wasmtime) deliberately
+skipped — doesn't gate any v1 decision, revisit at v4. **Now starting real v1 (Engine) milestone
+work**, module registry first (brief section 8) since the compiler, cables, and UI all need it
+to exist before they're buildable. Nothing playable or audible exists yet — no compiler, no UI,
+no standalone binary. `core` (the op log) is real, production-shaped code, already at v1 quality.
 Everything in `engine` so far is spike-scoped: hand-rolled fixed-topology graphs built to answer
-one architectural question each, not the general compiler. That's intentional (brief section 2:
-scope discipline) but means don't mistake spike code for the real engine.
+one architectural question each, not the general compiler — expect it to be absorbed into real
+compiler work, not extended indefinitely.
 
 ## Spike checklist (brief section 11)
 
@@ -34,7 +35,7 @@ scope discipline) but means don't mistake spike code for the real engine.
 | S1 | Can compiled graphs swap with state carry-over and no click? | **done, passed** | Steady-state residual bit-exact (0.0) outside crossfade; boundary curvature *below* typical in-chord curvature (0.58x); 0 allocations across 100 swaps. See `docs/decisions.md` "Spike S1". |
 | S2 | Does block-held scalar classification meet the potato gate? | **done, mechanism validated; gate itself unverified** | Optimization is correct (-41.4dB vs. naive once settled) and measurably cheaper (~13% mean, noisy). **No pass/fail on the actual gate** — this container has no Pi-4 hardware and no `cpufreq`; owner chose not to fake a conversion factor. Open item: run `crates/engine/benches/s2_potato.rs` on real Pi-4 hardware. See `docs/decisions.md` "Spike S2". |
 | S3 | Does f32x4 voice batching beat scalar by >=2.5x? | **done, target missed** | Bit-exact correctness vs. scalar (not an approximation). Measured ~1.5-1.7x (range 1.3-1.8x across 11 runs, two granularities), below the 2.5x bar. Root cause of the shortfall investigated but inconclusive (leading hypothesis: PolyBLEP's branchless form vs. scalar's near-free predicted branch — see decisions.md for the failed isolation attempt). aarch64 not measured (no ARM hardware in this container). Open call for the owner: still use SIMD batching in v1 at this ratio, or does missing 2.5x change the decision? See `docs/decisions.md` "Spike S3". |
-| S4 | Is a WASM sine oscillator RT-safe in the callback? | **not started, optional** | Brief marks this deferrable. Recommended next: skip and go straight to real v1 work — confirm with owner before skipping outright. |
+| S4 | Is a WASM sine oscillator RT-safe in the callback? | **skipped, deliberately** | Doesn't gate any v1 decision — brief itself sequences sandboxed WASM modules behind composite pedals and Faust->Rust, both v4. Revisit when v4 (pedals) actually starts. See decisions.md "Skipping S4". |
 
 ## v1 (Engine) milestone checklist (brief section 12)
 
@@ -113,8 +114,7 @@ this against the commit it was last updated for.
   pinned down (see decisions.md "Spike S3"). Open call: still use SIMD voice batching in v1 at
   this ratio, or does the miss change the decision? Also no aarch64 measurement (brief section
   11 asks for it "if available" — not available in this container).
-- **S4 (wasmtime)** — optional per brief; leaning toward skipping to get to real v1 work faster,
-  but that's a call to confirm with the owner, not decide silently.
+- ~~**S4 (wasmtime)**~~ — skipped, see decisions.md. Not blocking, revisit at v4.
 - **Brief section 16's open questions** (voice-rate/global-rate module reassignment, feedback
   loop semantics, standalone-vs-CLAP-first timing, sharing the op-log model with Hysteresis,
   MIDI learn/MPE timing) — none hit yet in practice; will surface once real module/compiler work

@@ -254,6 +254,20 @@ budget in a way that changes the decision? Also open: S3's brief text asks for "
 if available" — only x86_64 is available in this container (same hardware gap as S2); no aarch64
 measurement exists yet.
 
+## 2026-09-21 — Skipping S4 (wasmtime), starting real v1 work
+
+Brief section 11 marks S4 ("is a WASM sine oscillator RT-safe in the callback?") explicitly
+deferrable, and section 10 already sequences sandboxed WASM modules last ("later, gated") behind
+composite pedals (v4) and Faust->Rust (v4) — S4 only matters once that milestone is actually
+being built, which is v4, three milestones away. Flagged this call in STATUS.md after S3 landed;
+proceeding on it now rather than blocking further progress on a check-in for a spike whose
+result won't change any v1 decision. Reversible: nothing in v1's design depends on S4's answer,
+and it can be run whenever v4 (pedals) actually starts.
+
+Starting real v1 (Engine) milestone work now: the module registry + `Module`/`ModuleInfo`
+(brief section 8) first, since the compiler, cables, and UI all need it to exist before they're
+buildable — it's the one piece on the v1 checklist nothing else is downstream-independent of.
+
 ## 2026-09-21 — `core`: op log inverse simplifications
 
 `Entry.inverse` is a single `Op`, per the brief's exact struct (section 6) — no new `Op` variant
