@@ -324,6 +324,64 @@ actually matters for brief section 7.5 — saving a module's state and loading i
 instance continues identically to the original, proving the save/load-state mechanism generalizes
 what S1 hand-rolled.
 
+## 2026-09-21 — Remaining 8 built-in modules
+
+All 9 of brief section 8's v1 built-ins now have a `Module` impl (`crates/modules/src/
+builtins/`). Two design choices worth recording, plus what's still partial:
+
+- **`filter.svf`** exposes all three simultaneous outputs (LP/BP/HP), not a mode switch — the
+  TPT topology computes all three from the same recurrence, so there's no cost to giving all
+  three. Cutoff/resonance are each a param (base value) + an optional CV input: `cutoff_cv` is
+  1V/oct-style (exponential, matching `osc.va`'s pitch handling), `resonance_cv` is linear
+  additive. Not brief-mandated (it just says "cutoff + resonance CV"), a design choice.
+  **Applies spike S3's finding for real**, not just as a war story: if both CV inputs (and both
+  params) are `Signal::Scalar` for the block, coefficients are computed once and cached via
+  `process_with_coeffs_multi`; only a genuinely per-sample-varying CV falls back to recomputing
+  `tan()` every sample via `process_multi`. Test (`per_sample_cv_path_matches_scalar_path_when_
+  cv_is_actually_constant`) confirms the fast/slow paths agree — the optimization doesn't change
+  behavior, matching how S2's control-rate tier was verified.
+- **`env.adsr`** reads its attack/decay/sustain/release params once per block (`.at(0)`), not
+  per sample — same reasoning as the filter's fast path: these are knob values, not audio-rate
+  CV, in the overwhelming common case, and `FullAdsr::set_params` computes 3 `exp()` calls each
+  time it's invoked. A new `dsp::FullAdsr` (4-stage, real attack/decay/sustain/release) was added
+  rather than extending `dsp::Adsr` in place — the latter's exact attack-only-toward-sustain
+  behavior is what S1's `CompiledGraph` and S2's `PotatoPatch` are tested against; changing it
+  would risk their already-passed, already-reported numbers for no reason.
+- **`lfo`** implements all 5 waveforms (sine/tri/saw/square/S&H) — cheap since none need
+  anti-aliasing at LFO rates, so this one built-in table entry is actually complete except for
+  "sync," which the brief itself defers (no clock exists until v3). Waveform selection is a
+  stepped float param (0..=4, rounded) since `ParamInfo` has no enum variant — the standard
+  modular-software convention for a discrete choice, documented in the module's own doc comment
+  since it's not obvious from `ParamInfo`'s shape.
+- **`vca`**'s "exponential response" is approximated as `gain * gain` — cheap, common, not a
+  precise psychoacoustic curve. Flagged as an approximation in the module's doc comment.
+- **`mixer`** sums 4 channels with per-channel level knobs (default unity) — the brief only says
+  "4 inputs"; per-channel levels are the minimal, universally-expected reading of "mixer," not
+  scope creep.
+- **`out`** has no `Module` output ports (nothing in the graph consumes the final mix) — instead
+  exposes `left()`/`right()` accessors for the eventual audio callback (`standalone`, not built)
+  to read.
+- **`midi.in`** has no `Module` input ports either — its `gate`/`pitch`/`velocity` state is set
+  by `note_on`/`note_off`, called directly for now since there's no real MIDI plumbing
+  (`standalone`'s `midir` integration) yet. Monophonic-per-instance; a voice allocator (not built)
+  would eventually route real MIDI across instances for polyphony. This is a stand-in with the
+  same relationship to the real thing that S1's hand-rolled graphs have to the real compiler.
+- **Still partial, tracked, not hidden:** `osc.va` (saw only, no hard sync/square/tri/sine) and
+  `lfo` (all waveforms, no sync) — see their own module doc comments.
+
+`dsp.rs` gained `SvfOutputs`/`Svf::process_with_coeffs_multi`/`process_multi` (additive, `Svf`'s
+existing lowpass-only API untouched), `FullAdsr`/`AdsrStage` (new type, `Adsr` untouched),
+`FullLfo`/`LfoWaveform` (new type, `Lfo` untouched) — nothing S1/S2/S3 depend on changed.
+`FullLfo`'s S&H uses an inline xorshift32 PRNG (~5 lines) rather than adding the `rand` crate as
+a real dependency for one PRNG call.
+
+6 new test files (`crates/modules/tests/{dsp_extensions,filter_svf,env_adsr,lfo,vca_ringmod,
+mixer_out_midi_in}.rs`), 21 tests total for this batch. Two caught real bugs before they shipped
+— see the "Add DSP primitives" commit message: the ADSR convergence test needed far more samples
+than first guessed, and the LFO range test needed a higher rate for enough S&H draws to be
+statistically meaningful. Both were test-parameter bugs, not DSP bugs, but worth recording as a
+reminder that a new test failing isn't automatically the code's fault.
+
 ## 2026-09-21 — `core`: op log inverse simplifications
 
 `Entry.inverse` is a single `Op`, per the brief's exact struct (section 6) — no new `Op` variant

@@ -5,7 +5,7 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-21, after `Module` trait + `osc.va` (first real v1 module).
+Last updated: 2026-09-21, after all 9 v1 built-in modules landed.
 
 ## Workflow (changed 2026-09-21)
 
@@ -20,15 +20,20 @@ otherwise.
 Week-one spikes (brief section 11) are done: S1 (graph swap/crossfade) and S2 (control-rate
 tier) passed; S3 (SIMD voice batching) landed with solid correctness but missed its 2.5x target
 (~1.5-1.7x measured) — reported honestly rather than massaged. S4 (wasmtime) deliberately
-skipped — doesn't gate any v1 decision, revisit at v4. **Real v1 (Engine) milestone work has
-started.** The `Module` trait, `ModuleInfo`, and `ProcessIo`/`Signal` (brief section 8) are built
-and tested in `crates/modules/`, and `osc.va` (saw waveform only, no hard sync yet) is the first
-real module proving the design end-to-end. `dsp.rs` (the DSP primitives Saw/Svf/Lfo/Adsr) moved
-from `engine` to `modules` to make room. Still missing before anything is playable: 8 more
-built-in modules, the flat-schedule compiler, cables, a UI, a standalone binary. `core` (the op
-log) is real, production-shaped code, already at v1 quality. `engine`'s S1/S2/S3 spike code is
-still hand-rolled fixed-topology graphs, not the general compiler — expect it to be absorbed
-into real compiler work, not extended indefinitely.
+skipped — doesn't gate any v1 decision, revisit at v4. **All 9 of brief section 8's v1 built-in
+modules now have a real `Module` trait implementation**, in `crates/modules/src/builtins/`:
+`osc.va`, `filter.svf`, `env.adsr`, `lfo`, `vca`, `ringmod`, `mixer`, `out`, `midi.in`. Two are
+partial (`osc.va`: saw only, no hard sync; `lfo`: all waveforms but no sync) — tracked, not
+hidden, see decisions.md. `filter.svf` and `env.adsr` directly apply spike S3's and S2's
+findings (cache coefficients when nothing's actually modulating per-sample) in real module code,
+not just as spike war stories. Still missing before anything is playable: the flat-schedule
+compiler that assembles `Module`s into a graph, cables, a UI, a standalone binary. `core` (the
+op log) is real, production-shaped code, already at v1 quality. `engine`'s S1/S2/S3 spike code
+is still hand-rolled fixed-topology graphs using raw `dsp` primitives directly, not the `Module`
+trait at all — expect it to be absorbed into real compiler work, not extended indefinitely.
+**Next: an integration spike wiring several real `Module` instances into an actual patch**
+(midi.in -> osc.va -> filter.svf -> env.adsr/vca -> mixer -> out), proving the trait design
+composes into something that plays, ahead of writing the general compiler.
 
 ## Spike checklist (brief section 11)
 
@@ -53,7 +58,7 @@ What actually exists vs. what's still spike-scoped or missing:
 | `engine`: swap + crossfade | **mechanism proven in S1** (`swap.rs`, `graph.rs`), but only for S1's specific 2-node shape — needs generalizing when the real compiler exists. |
 | `engine`: quality tiers (Live/Render) | **not built.** |
 | `cables`: depth only | **not built.** `crates/cables` is an empty stub. |
-| `modules`: 9 v1 built-ins + metadata | **1 of 9 done.** `Module` trait, `ModuleInfo`, `ProcessIo`/`Signal` all built and tested (`crates/modules/src/{module,info,io}.rs`). `osc.va` implemented (saw only, no hard sync, no square/tri/sine — see decisions.md). Remaining 8 (`filter.svf`, `env.adsr`, `lfo`, `vca`, `ringmod`, `mixer`, `out`, `midi.in`) not yet wrapped as `Module` impls — the DSP for some already exists in `modules::dsp` (`Svf`, `Lfo`, `Adsr`) from spike reuse, just needs the `Module`-trait wrapper + `ModuleInfo` each `osc.va` got. No registry/catalog yet (nothing to catalog with only 1 module). |
+| `modules`: 9 v1 built-ins + metadata | **9 of 9 have a `Module` impl.** `Module` trait, `ModuleInfo`, `ProcessIo`/`Signal` all built and tested. `osc.va` (saw only) and `lfo` (no sync) are partial — see decisions.md. No registry/catalog struct yet (nothing has needed to enumerate "all modules" as a collection so far; tests just import each type directly). |
 | `learn`: unlock flags filter catalog | **not built.** `crates/learn` is an empty stub. |
 | `ui`: egui patchbay | **not built.** `crates/ui` is an empty stub. |
 | `standalone`: cpal + midir + JACK | **not built.** `crates/standalone` is an empty stub. |
@@ -68,12 +73,14 @@ hear — doesn't exist yet. That's the next phase of work.
 ```
 crates/
   core/        REAL. Op log, PatchState, PatchLog, file format. No audio deps. Fully tested.
-  modules/     REAL, in progress. Brief section 8's module system.
+  modules/     REAL, v1 built-ins done. Brief section 8's module system.
                  info.rs      - ModuleInfo, Category, Rate, PortInfo, ParamInfo, QualitySupport.
                  io.rs        - ProcessIo, Signal (scalar-or-buffer, with the .at(i) helper).
                  module.rs    - the Module trait, QualityConfig/Tier, StateWriter/StateReader.
-                 dsp.rs       - Saw (PolyBLEP), Svf (TPT/Zavalishin), Lfo, Adsr. Reusable DSP.
-                 builtins/    - Module impls. osc_va.rs done (saw only); 8 more pending.
+                 dsp.rs       - Saw/Svf/Lfo/Adsr (S1-S3's originals) + SvfOutputs/FullAdsr/
+                                FullLfo (added for the 8 newer modules, originals untouched).
+                 builtins/    - all 9 Module impls: osc_va, filter_svf, env_adsr, lfo, vca,
+                                ringmod, mixer, out, midi_in.
   engine/      SPIKE CODE ONLY so far (depends on kabl-modules for dsp.rs now).
                  graph.rs  - S1's fixed 2-node (4-voice chord -> cable depth -> filter) graph.
                  swap.rs   - S1's Engine: crossfade swap + basedrop deferred drop.
@@ -130,17 +137,20 @@ this against the commit it was last updated for.
   never-set param** — both documented, intentional-for-now simplifications in `core`. See
   decisions.md "core: op log inverse simplifications." Revisit if they cause a real problem.
 - **`osc.va` is saw-only, no hard sync** — brief section 8's table entry wants square/tri/sine
-  and a hard-sync input too. Tracked, not forgotten; next built-in module work should either
-  finish this one or move on to `filter.svf`/others and circle back — open call, not decided.
+  and a hard-sync input too. Tracked, not forgotten.
+- **No module registry/catalog struct** — every test imports each `Module` type directly by
+  name. Fine for 9 hand-known modules; will matter once the UI needs to enumerate "everything
+  available" or `learn`'s unlock flags need to filter a list. Not built until something needs it.
 
 ## What to read next, depending on what you're about to do
 
 - **Continuing spike/engine work:** `docs/decisions.md`'s S1/S2/S3 entries (method + results),
   then the code in `crates/engine/src/`.
-- **Adding another built-in module:** read `crates/modules/src/builtins/osc_va.rs` as the
-  template (it's the only one so far) and its test file `crates/modules/tests/osc_va.rs` for the
-  expected test shape (matches-a-direct-dsp-call, buffer-input, reset, save/load-state
-  round-trip). Brief section 8's table has the remaining 8.
+- **Modifying a built-in module or adding a composite/pedal later:** `crates/modules/src/
+  builtins/*.rs` — any of the 9 works as a template; `filter_svf.rs` and `env_adsr.rs` are the
+  most complete examples (fast/slow-path split, real state carry-over). Test files
+  `crates/modules/tests/*.rs` show the expected shape (matches-direct-dsp-call, buffer input,
+  reset, save/load-state round-trip).
 - **Starting the real compiler:** read this file's "v1 milestone checklist" above first — it's
   the actual gap list. Brief section 7 is the spec. `Module`/`ModuleInfo`/`ProcessIo` already
   exist (`crates/modules/`) for the compiler to build graphs out of; nothing compiles a `Module`

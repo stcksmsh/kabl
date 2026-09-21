@@ -247,6 +247,30 @@ pub enum AdsrStage {
     Release,
 }
 
+impl AdsrStage {
+    pub fn to_u8(self) -> u8 {
+        match self {
+            AdsrStage::Idle => 0,
+            AdsrStage::Attack => 1,
+            AdsrStage::Decay => 2,
+            AdsrStage::Sustain => 3,
+            AdsrStage::Release => 4,
+        }
+    }
+
+    /// Any value outside 0..=4 maps to `Idle` — state loaded from a corrupt/foreign source
+    /// should fail safe, not panic on the audio thread.
+    pub fn from_u8(v: u8) -> Self {
+        match v {
+            1 => AdsrStage::Attack,
+            2 => AdsrStage::Decay,
+            3 => AdsrStage::Sustain,
+            4 => AdsrStage::Release,
+            _ => AdsrStage::Idle,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct FullAdsr {
     pub stage: AdsrStage,
@@ -298,6 +322,14 @@ impl FullAdsr {
         self.decay_coeff = coeff(decay_ms);
         self.release_coeff = coeff(release_ms);
         self.sustain_level = sustain_level.clamp(0.0, 1.0);
+    }
+
+    /// Back to `Idle` at `level` 0 — keeps the currently-set coefficients (`set_params`/`new`),
+    /// only clears the envelope's run state.
+    pub fn reset(&mut self) {
+        self.stage = AdsrStage::Idle;
+        self.level = 0.0;
+        self.gate_was_high = false;
     }
 
     #[inline]
@@ -409,5 +441,17 @@ impl FullLfo {
             self.held_sample = (self.rng_state as f32 / u32::MAX as f32) * 2.0 - 1.0;
         }
         v
+    }
+
+    /// The sample-and-hold waveform's currently-held value — exposed for state carry-over
+    /// (brief section 7.5) so a repatch doesn't reset it. `rng_state` itself isn't carried over
+    /// (a repatch getting a fresh S&H sequence rather than continuing the exact same one is a
+    /// minor, acceptable simplification — the held *value* surviving is what a listener notices).
+    pub fn held_sample(&self) -> f32 {
+        self.held_sample
+    }
+
+    pub fn set_held_sample(&mut self, value: f32) {
+        self.held_sample = value;
     }
 }
