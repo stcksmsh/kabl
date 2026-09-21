@@ -460,3 +460,86 @@ impl FullLfo {
         self.held_sample = value;
     }
 }
+
+/// `osc.va`'s waveform selection (brief section 8's v1 table: "sine/square/tri/saw, PolyBLEP,
+/// hard sync input").
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OscWaveform {
+    Sine,
+    Triangle,
+    Saw,
+    Square,
+}
+
+/// Virtual-analog oscillator with all four brief-section-8 waveforms plus hard sync — the full
+/// `osc.va` table entry (`Saw` above only ever did the saw case, kept as-is since S1-S3's spikes
+/// depend on its exact shape).
+///
+/// **Saw and square are PolyBLEP-corrected** (`poly_blep`, same function `Saw` uses — square
+/// applies it at both of its discontinuities: phase 0's rising edge and phase 0.5's falling
+/// edge, the standard two-correction extension of the same technique). **Triangle is naive, not
+/// band-limited** — a real PolyBLEP triangle needs "polyBLAMP" (an integrated correction at the
+/// two corners, not the single discontinuity BLEP handles), which is a distinct algorithm this
+/// pass didn't implement. Triangle's corners alias at high fundamental frequencies the way an
+/// uncorrected square would; documented here rather than silently claiming full anti-aliasing
+/// for all four waveforms. Sine needs no correction (it has no discontinuity to alias).
+#[derive(Debug, Clone, Copy)]
+pub struct FullOsc {
+    pub phase: f32,
+}
+
+impl Default for FullOsc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl FullOsc {
+    pub fn new() -> Self {
+        FullOsc { phase: 0.0 }
+    }
+
+    /// Hard sync (brief section 8): snap phase back to 0 immediately. The caller (`builtins::
+    /// osc_va`) edge-detects the sync input and calls this once per rising edge — the resulting
+    /// phase discontinuity is what gives hard sync its characteristic sound, so this
+    /// deliberately does *not* try to smooth or band-limit the snap itself.
+    pub fn hard_sync(&mut self) {
+        self.phase = 0.0;
+    }
+
+    #[inline]
+    pub fn next(&mut self, freq_hz: f32, sample_rate: f32, waveform: OscWaveform) -> f32 {
+        let dt = freq_hz / sample_rate;
+        let v = match waveform {
+            OscWaveform::Saw => {
+                let mut v = 2.0 * self.phase - 1.0;
+                v -= poly_blep(self.phase, dt);
+                v
+            }
+            OscWaveform::Square => {
+                let mut v = if self.phase < 0.5 { 1.0 } else { -1.0 };
+                v += poly_blep(self.phase, dt);
+                v -= poly_blep((self.phase + 0.5).fract(), dt);
+                v
+            }
+            OscWaveform::Triangle => {
+                // Naive -- see the struct doc for why this one isn't PolyBLEP/BLAMP-corrected.
+                // Standard piecewise-linear triangle: 0 at phase 0, +1 at phase 0.25, -1 at
+                // phase 0.75, back to 0 at phase 1.
+                if self.phase < 0.25 {
+                    4.0 * self.phase
+                } else if self.phase < 0.75 {
+                    2.0 - 4.0 * self.phase
+                } else {
+                    4.0 * self.phase - 4.0
+                }
+            }
+            OscWaveform::Sine => (2.0 * PI * self.phase).sin(),
+        };
+        self.phase += dt;
+        if self.phase >= 1.0 {
+            self.phase -= 1.0;
+        }
+        v
+    }
+}

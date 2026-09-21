@@ -716,3 +716,67 @@ aren't accounted for in either `Engine` — `PatchEngine` inherits the same docu
 `swap::Engine` already had, not a new one. No hookup yet from a real control surface (no
 UI/standalone binary exists to actually call `build_swap` from user input) — `PatchEngine` is
 proven correct and ready, not yet reachable by a person.
+
+## 2026-09-21 — Autonomous overnight work begins
+
+Owner: "Continue working in perpetuity, make/test spikes you can do yourself when possible, I'll
+check up on the work in the morning, you're fully autonomous here now, make sure to conserve
+tokens and when you run out restart yourself when you get them again." No further user input
+expected for hours. Working the compiler's/modules' open-items list in priority order for
+self-contained, self-verifiable items only — nothing needing hardware (Pi-4, aarch64), a UI, or a
+human ear to judge (those stay flagged, not attempted blind). Self-rescheduling via
+`send_later` (short delay, message: continue the backlog) after each chunk, so the session keeps
+picking up work across the night without needing a person to re-prompt it; each chunk still gets
+the full existing rigor (plan, implement, test, clippy/fmt, decisions.md, STATUS.md, commit,
+push) — autonomy is not a license to skip verification, if anything it raises the bar since
+nobody's watching in real time to catch a mistake.
+
+## 2026-09-21 — `osc.va`: square/triangle/sine waveforms + hard sync
+
+First autonomous-session item, picked because it's the clearest remaining gap in brief section
+8's v1 built-in table (`osc.va` was saw-only since the very first module pass) and is fully
+self-testable — no external ground truth needed beyond DSP first-principles and internal
+consistency.
+
+Added `dsp::FullOsc` (parallel to `FullAdsr`/`FullLfo`): `OscWaveform::{Sine, Triangle, Saw,
+Square}`, `next(freq, sample_rate, waveform)`, `hard_sync()`. Saw and square are PolyBLEP-
+corrected (square applies the same `poly_blep` correction `Saw` already used, at both of its two
+discontinuities — phase 0's rising edge, phase 0.5's falling edge — the standard two-correction
+extension). **Triangle is naive, not band-limited** — a properly anti-aliased triangle needs
+"polyBLAMP" (an integrated correction at its two corner discontinuities, not the single-edge
+correction PolyBLEP handles), a distinct algorithm not implemented here. Chose to ship a correct-
+shape, honestly-labeled-as-aliased triangle now over blocking on polyBLAMP, which needs its own
+derivation/verification pass; `ModuleInfo.quality.anti_aliasing` stays `true` since it's a
+per-module not per-waveform flag, with the nuance documented in `FullOsc`'s doc comment instead
+(the coarsest-level-available limitation `lfo.rs`'s waveform-as-stepped-param comment already
+flagged for the same `ParamInfo`-shape reason).
+
+`osc_va.rs`: added a `waveform` stepped-float param (`0..=3`, same convention as `lfo.rs`,
+same relative ordering `Sine/Triangle/Saw/Square` for cross-module consistency) and a `sync`
+audio-rate input port, edge-detected per sample against the same `>0.5` "gate" threshold
+`env.adsr`/`midi.in` use. Default waveform is `2.0` (Saw) specifically to preserve this module's
+pre-existing sound, not because saw is otherwise privileged — every existing hand-wired caller
+(`patch_demo.rs`, `dyn_dispatch_spike.rs`) was updated to pass `waveform=2.0` and an unconnected
+`sync` input, keeping their numbers bit-exact (confirmed: their existing correctness tests still
+pass unchanged).
+
+**Applied the `gate_was_high` lesson proactively**: added `sync_was_high` to `osc_va.rs`'s
+`save_state`/`load_state` from the start, rather than waiting to hit the identical bug class
+`env.adsr`'s state carry-over just had (a continuously-held level looking like a fresh edge to a
+freshly-constructed instance). A test (`save_and_load_state_round_trips_sync_edge_flag`) exercises
+this directly: sync held high across a save/load boundary must not falsely re-trigger a hard sync.
+
+12 tests total in `crates/modules/tests/osc_va.rs`: the four pre-existing correctness tests
+(saw-vs-`dsp::Saw`, pitch shift, buffer input, reset, state round-trip) plus 8 new ones —
+square/triangle/sine each checked against `FullOsc` called directly (exact, not approximate,
+since the module wraps `FullOsc` with no extra transformation), a square-wave sanity check
+(bounded amplitude allowing PolyBLEP's small correction overshoot, correct zero-crossing count
+for a known frequency), a triangle sanity check (bounded exactly to [-1,1], no sample-to-sample
+step exceeding its known maximum slope), hard sync (a sync buffer with a single rising-edge
+sample snaps phase to 0 at that exact sample, verified against a fresh `FullOsc`), and the
+sync-state-carry-over test above. All passing; workspace build/test/clippy/fmt clean.
+
+Skipped for this pass, not silently: an audible WAV render (the owner won't hear it until
+morning regardless, and the waveform-vs-reference tests already prove correctness more precisely
+than an ear could at 1x speed) — can render one on request rather than spending effort on it now
+given the "conserve tokens" instruction.

@@ -5,7 +5,15 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-21, after `PatchEngine` wired the real compiler into S1's swap mechanism.
+Last updated: 2026-09-21, after `osc.va` gained square/triangle/sine + hard sync.
+
+## Autonomous overnight work (started 2026-09-21)
+
+Owner: fully autonomous, work the backlog, conserve tokens, self-restart if usage runs out, no
+further check-in expected until morning. Working self-contained items only (nothing needing
+hardware, a UI, or a human ear) — see each item's decisions.md entry for what was picked and why.
+If you're reading this mid-run: check `git log` for the latest commit and this file's "Where we
+are" below for the current real state; nothing here should be stale by more than one work chunk.
 
 ## Workflow (changed 2026-09-21)
 
@@ -22,9 +30,11 @@ tier) passed; S3 (SIMD voice batching) landed with solid correctness but missed 
 (~1.5-1.7x measured) — reported honestly rather than massaged. S4 (wasmtime) deliberately
 skipped — doesn't gate any v1 decision, revisit at v4. **All 9 of brief section 8's v1 built-in
 modules now have a real `Module` trait implementation**, in `crates/modules/src/builtins/`:
-`osc.va`, `filter.svf`, `env.adsr`, `lfo`, `vca`, `ringmod`, `mixer`, `out`, `midi.in`. Two are
-partial (`osc.va`: saw only, no hard sync; `lfo`: all waveforms but no sync) — tracked, not
-hidden, see decisions.md. `filter.svf` and `env.adsr` directly apply spike S3's and S2's
+`osc.va`, `filter.svf`, `env.adsr`, `lfo`, `vca`, `ringmod`, `mixer`, `out`, `midi.in`. `osc.va`
+now has all four waveforms (sine/triangle/saw/square) plus hard sync (triangle is naive, not
+PolyBLEP/BLAMP-corrected — documented, not hidden). `lfo` still has all waveforms but no sync
+(needs a clock, v3 scope) — tracked, not hidden, see decisions.md. `filter.svf` and `env.adsr`
+directly apply spike S3's and S2's
 findings (cache coefficients when nothing's actually modulating per-sample) in real module code,
 not just as spike war stories. **A 4-voice patch built entirely from real `Module` trait objects now plays** —
 `crates/engine/src/patch_demo.rs`: `midi.in -> osc.va -> filter.svf -> env.adsr/vca -> mixer ->
@@ -116,7 +126,7 @@ What actually exists vs. what's still spike-scoped or missing:
 | `engine`: swap + crossfade | **wired to the real compiler.** `patch_engine.rs::PatchEngine` generalizes S1's `swap.rs::Engine` mechanism (equal-power crossfade, `basedrop` deferred drop) to arbitrary-topology `CompiledPatch`es via `recompile()`. Proven in `tests/patch_engine_swap.rs` (bit-exact outside crossfade, no allocation). No control surface calls it yet — see open items. |
 | `engine`: quality tiers (Live/Render) | **not built.** |
 | `cables`: depth only | **not built.** `crates/cables` is an empty stub. |
-| `modules`: 9 v1 built-ins + metadata | **9 of 9 have a `Module` impl.** `Module` trait, `ModuleInfo`, `ProcessIo`/`Signal` all built and tested. `osc.va` (saw only) and `lfo` (no sync) are partial — see decisions.md. **Registry now exists** (`registry.rs`: `create(kind)`, `all_infos()`, `info_for(kind)`) — the compiler uses it to turn `ModuleState.kind` strings into instances. |
+| `modules`: 9 v1 built-ins + metadata | **9 of 9 have a `Module` impl.** `Module` trait, `ModuleInfo`, `ProcessIo`/`Signal` all built and tested. `osc.va` now has all 4 waveforms + hard sync (triangle naive, not BLEP/BLAMP-corrected). `lfo` has no sync (needs a clock, v3 scope) — see decisions.md. **Registry now exists** (`registry.rs`: `create(kind)`, `all_infos()`, `info_for(kind)`) — the compiler uses it to turn `ModuleState.kind` strings into instances. |
 | `learn`: unlock flags filter catalog | **not built.** `crates/learn` is an empty stub. |
 | `ui`: egui patchbay | **not built.** `crates/ui` is an empty stub. |
 | `standalone`: cpal + midir + JACK | **not built.** `crates/standalone` is an empty stub. |
@@ -228,8 +238,10 @@ this against the commit it was last updated for.
 - **`RemoveModule` undo losing param history** and **`SetParam`'s 0.0 fallback for a
   never-set param** — both documented, intentional-for-now simplifications in `core`. See
   decisions.md "core: op log inverse simplifications." Revisit if they cause a real problem.
-- **`osc.va` is saw-only, no hard sync** — brief section 8's table entry wants square/tri/sine
-  and a hard-sync input too. Tracked, not forgotten.
+- ~~**`osc.va` is saw-only, no hard sync**~~ — fixed. All 4 waveforms + hard sync, see
+  decisions.md "`osc.va`: square/triangle/sine waveforms + hard sync". Triangle stays naive
+  (not PolyBLEP/BLAMP-corrected) — a real gap, just a smaller one, flagged in `dsp::FullOsc`'s
+  doc comment.
 - ~~**No module registry/catalog struct**~~ — built, `crates/modules/src/registry.rs`.
 - ~~**Compiler's `process_block()` is not RT-safe**~~ — fixed. Fixed-size stack scratch, no
   per-call `Vec`s; proven allocation-free via `assert_no_alloc` in
