@@ -7,6 +7,7 @@ license.workspace = true
 [dependencies]
 rtrb = "0.4.0"
 basedrop = "0.1.3"
+wide = "1.7.1"
 
 [dev-dependencies]
 assert_no_alloc = "1.1.2"
@@ -15,4 +16,8 @@ criterion = "0.8.2"
 
 [[bench]]
 name = "s2_potato"
+harness = false
+
+[[bench]]
+name = "s3_simd_voices"
 harness = false

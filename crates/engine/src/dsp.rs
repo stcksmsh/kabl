@@ -77,18 +77,45 @@ impl Svf {
         resonance: f32,
         sample_rate: f32,
     ) -> f32 {
+        let coeffs = SvfCoeffs::compute(cutoff_hz, resonance, sample_rate);
+        self.process_with_coeffs(input, &coeffs)
+    }
+
+    /// Same math as `process_lowpass`, but with the coefficients precomputed by the caller —
+    /// for when `cutoff_hz`/`resonance` are constant across many calls (e.g. a whole block, or
+    /// several voices sharing one cutoff), so the `tan()` in `SvfCoeffs::compute` isn't paid
+    /// redundantly every sample. Spike S3 needed this split to get a clean SIMD-vs-scalar
+    /// comparison — see docs/decisions.md "Spike S3": recomputing coefficients per sample was
+    /// masking the actual state-update speedup being measured.
+    #[inline]
+    pub fn process_with_coeffs(&mut self, input: f32, coeffs: &SvfCoeffs) -> f32 {
+        let v3 = input - self.ic2eq;
+        let v1 = coeffs.a1 * self.ic1eq + coeffs.a2 * v3;
+        let v2 = self.ic2eq + coeffs.a2 * self.ic1eq + coeffs.a3 * v3;
+        self.ic1eq = 2.0 * v1 - self.ic1eq;
+        self.ic2eq = 2.0 * v2 - self.ic2eq;
+        v2
+    }
+}
+
+/// TPT SVF coefficients, precomputable once for however long `cutoff_hz`/`resonance` hold
+/// steady (see `Svf::process_with_coeffs`).
+#[derive(Debug, Clone, Copy)]
+pub struct SvfCoeffs {
+    pub a1: f32,
+    pub a2: f32,
+    pub a3: f32,
+}
+
+impl SvfCoeffs {
+    #[inline]
+    pub fn compute(cutoff_hz: f32, resonance: f32, sample_rate: f32) -> Self {
         let g = (PI * cutoff_hz / sample_rate).tan();
         let k = 2.0 - 2.0 * resonance.clamp(0.0, 0.95);
         let a1 = 1.0 / (1.0 + g * (g + k));
         let a2 = g * a1;
         let a3 = g * a2;
-
-        let v3 = input - self.ic2eq;
-        let v1 = a1 * self.ic1eq + a2 * v3;
-        let v2 = self.ic2eq + a2 * self.ic1eq + a3 * v3;
-        self.ic1eq = 2.0 * v1 - self.ic1eq;
-        self.ic2eq = 2.0 * v2 - self.ic2eq;
-        v2
+        SvfCoeffs { a1, a2, a3 }
     }
 }
 

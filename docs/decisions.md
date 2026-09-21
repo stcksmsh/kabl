@@ -35,6 +35,7 @@ brief's literal instruction.
 | `hound` | 3.5.1 | engine (dev) | writing spike renders to WAV for inspection |
 | `tempfile` | 3.27.0 | core (dev) | file-format round-trip test needs a scratch directory |
 | `criterion` | 0.8.2 | engine (dev, added 2026-09-21 for spike S2) | ns/block measurement for the control-rate-tier comparison; brief section 13 names it for the real `tiny`/`classic`/`potato` benches anyway, so bringing it forward rather than hand-rolling timing for S2 and redoing it later |
+| `wide` | 1.7.1 | engine (added 2026-09-21 for spike S3) | portable `f32x4` SIMD, per brief section 14's explicit suggestion; see "Spike S3" entry for why over `std::simd`/`pulp` |
 
 Not yet added (deferred to the milestone that needs them, per brief section 14): `cpal`, `midir`
 (standalone, v1 UI milestone), `egui` (ui crate), `nih-plug` (crates/clap, v5), `fundsp`
@@ -171,6 +172,87 @@ difference, and per the owner's answer this spike isn't extrapolating one number
 kabl-engine --bench s2_potato` (or the eventual real `potato` benchmark patch once the v1
 compiler exists) on an actual Raspberry Pi 4 to get a number the gate can actually be checked
 against.
+
+## 2026-09-21 — Spike S3 (SIMD voice batching): missed its target, reporting honestly
+
+Question (brief section 11): does f32x4 voice batching beat scalar by >=2.5x on osc+filter?
+
+**Result: no. Measured ratio ~1.5-1.7x (range 1.3-1.8x across 11 runs), consistently below the
+2.5x target.** Reporting this straight rather than picking a favorable run — brief section 17,
+"measure, then claim."
+
+**`wide` crate chosen** (brief section 14: "portable SIMD crate or std::arch behind a small
+abstraction, document the choice") over `std::simd`: this workspace runs stable Rust (`rustc
+1.94.1`, verified via `rustc --version`, no `-nightly` suffix) and `core::simd`/`std::simd`
+(`#![feature(portable_simd)]`) is nightly-only. `wide` v1.7.1 (checked via `cargo info`, this
+date), MSRV 1.89, picks SSE2/NEON/wasm128 per target behind a safe API — exactly what section 14
+asks for. Over `pulp` (also considered, `cargo info` checked same date): `wide`'s `f32x4` lane
+model maps directly onto "4 voices per lane" with less API surface to learn for this narrow use.
+
+**Method** (`crates/engine/src/simd_voices.rs`): `SawX4`/`SvfX4` batch the same PolyBLEP-saw/TPT-
+SVF math as `dsp.rs`'s scalar `Saw`/`Svf`, one `f32x4` lane per voice. Filter cutoff/resonance
+are shared across all 4 voices (same as S1/S2's patches), so their coefficients — which need
+`tan()` — stay plain scalars broadcast with `splat`; only oscillator phase and filter state
+(genuinely per-voice) are SIMD lanes. PolyBLEP's branch (`t < dt` / `t > 1-dt` / neither) has no
+scalar equivalent in SIMD — `poly_blep_x4` computes both regions unconditionally and selects
+with a mask.
+
+**Correctness gate (checked first, tighter bar than S2's):** unlike S2's control-rate tier —
+which brief section 7 explicitly allows to trade fidelity — SIMD batching is a pure
+implementation-strategy change; it should reproduce the scalar path, not approximate it.
+`crates/engine/tests/spike_s3_simd_voices.rs` confirms **bit-exact** agreement (`max_diff =
+0.0`) over 48,000 samples. This part fully succeeded: batching is safe to use.
+
+**A confound found and fixed along the way, additive, zero risk to S1/S2:** the first pass
+recomputed SVF coefficients (the `tan()` call) every sample in both the scalar and SIMD paths,
+identically wastefully in both — this doesn't change the fair comparison (both sides paid the
+same tax) but it's not how a real engine would do it, so it was cleaned up regardless: split
+`dsp::Svf::process_lowpass` into `SvfCoeffs::compute` (once, when cutoff/resonance actually
+change) + `process_with_coeffs` (every sample, reusing them) — `process_lowpass` itself is now a
+thin wrapper calling both, bit-identical behavior, `cargo test --workspace` confirms S1/S2
+unaffected. Re-measuring after this split changed nothing about the ratio (see below) — the
+compiler had apparently already hoisted the invariant `tan()` call in the original benchmark, so
+this was a real code-quality improvement, not the fix for the shortfall.
+
+**Ruled out call-overhead as the explanation.** First measurements were per-sample
+(`Engine::next`-style, one call per sample) — worried that criterion's own per-call overhead at
+a ~5-10ns granularity was compressing the ratio toward 1x. Added `process_block` (64
+samples/call, matching how the real engine actually calls into voice processing per brief
+section 7's flat schedule) to both paths and re-measured: **same ratio.** Not a granularity
+artifact.
+
+**Investigated but inconclusive: PolyBLEP's branchless cost.** Leading hypothesis is that
+`poly_blep_x4` computing both regions' divisions unconditionally trades away some of the 4-lane
+win against scalar's branch predictor, which skips both regions almost for free (the correction
+only applies within `dt` of a phase wrap — roughly 2 samples out of a ~400-sample period at
+these frequencies, so the scalar branch is >99% predictable and "no correction" is nearly free
+there). Tried to isolate this by benchmarking the SVF filter alone (no oscillator, fixed
+constant input, both scalar and SIMD) to separate "pure branchless arithmetic SIMD win" from
+"PolyBLEP's SIMD branch tax." That micro-benchmark measured **both** the scalar and SIMD
+filter-only paths at ~15-20x slower than their share of the combined osc+filter number — which
+isn't physically sensible (isolating a cheaper part of a pipeline shouldn't make it slower than
+the whole pipeline) and reads as a benchmarking artifact, not a real signal. Didn't chase it
+further: that's `perf stat`/`perf record` territory, not a criterion micro-benchmark, and
+disproportionate time for a spike. **So the PolyBLEP-branch hypothesis is plausible and
+unproven** — flagging honestly rather than reporting a root cause I don't actually have evidence
+for.
+
+**Numbers** (`taskset -c 0`, same noise caveat as S2 — shared cloud VM):
+
+| Granularity | runs | scalar (ns, mean of medians) | SIMD (ns, mean of medians) | mean ratio | range |
+|---|---|---|---|---|---|
+| per-sample | 6 | 8.57 | 5.57 | 1.54x | 1.31x-1.78x |
+| per-block (64 samples) | 5 | 579.4 | 349.0 | 1.66x | 1.53x-1.77x |
+
+**What this means for v1:** brief section 11 only names a fallback for S2 failing ("tighten the
+tier, cap default poly at 4"); it's silent on what to do if S3 falls short. My read: SIMD
+batching is still a real, verified-correct, ~1.5-1.7x win — worth keeping in the real compiler's
+voice-rate processing even though it misses the 2.5x bar, since "smaller win than hoped" isn't
+the same as "not worth it." Flagging as a call for the owner rather than deciding silently: keep
+SIMD voice batching in v1's design at this ratio, or is 2.5x load-bearing for the potato gate
+budget in a way that changes the decision? Also open: S3's brief text asks for "x86 and aarch64
+if available" — only x86_64 is available in this container (same hardware gap as S2); no aarch64
+measurement exists yet.
 
 ## 2026-09-21 — `core`: op log inverse simplifications
 

@@ -54,9 +54,34 @@ meaningful comparison to the 50%-of-a-Pi-4-core gate; flagged, not claimed as a 
 **Open item:** run the same bench on real Raspberry Pi 4 hardware for a number the gate can
 actually be checked against.
 
+## Spike S3 — SIMD voice batching (f32x4) vs. scalar
+
+See `docs/decisions.md` 2026-09-21 "Spike S3" entry — **missed its >=2.5x target**, reported
+honestly rather than picked favorably. Correctness is solid (bit-exact vs. scalar); the
+shortfall is in raw speedup, with a plausible-but-unproven hypothesis (PolyBLEP's branchless
+form pays for both regions unconditionally vs. scalar's near-free predicted branch) — see
+decisions.md for the failed isolation attempt and why it wasn't trustworthy enough to report as
+a root cause.
+
+`cargo bench -p kabl-engine --bench s3_simd_voices`, `taskset -c 0`, same shared-VM noise caveat
+as S2. Two granularities (added per-block after per-sample to rule out call-overhead as the
+explanation — it wasn't, same ratio both ways):
+
+| Granularity | runs | scalar mean (ns) | SIMD mean (ns) | mean ratio | range |
+|---|---|---|---|---|---|
+| per-sample | 6 | 8.57 | 5.57 | 1.54x | 1.31x-1.78x |
+| per-block (64 samples) | 5 | 579.4 | 349.0 | 1.66x | 1.53x-1.77x |
+
+Correctness (`cargo test -p kabl-engine simd_matches_scalar`): max \|scalar - SIMD\| = 0.0 over
+48,000 samples — bit-exact, as it should be (SIMD batching is a pure implementation strategy,
+not an approximation, unlike S2's control-rate tier).
+
+**Not measured:** aarch64 (brief section 11 asks for "x86 and aarch64 if available" — only
+x86_64 available in this container, same hardware gap as S2's Pi-4 number).
+
 ## Not yet measured
 
 v1 milestone, needs the real compiler/module registry, not spike-scoped hand-rolled graphs:
-ns/block for the brief's actual `tiny`/`classic`/`potato` benchmark patches (as opposed to this
-spike's stand-ins), a real potato-gate CPU percentage on Pi-4 hardware, jitter-gate soak, S3
-(SIMD voice batching), S4 (wasmtime, optional).
+ns/block for the brief's actual `tiny`/`classic`/`potato` benchmark patches (as opposed to these
+spikes' stand-ins), a real potato-gate CPU percentage on Pi-4 hardware, jitter-gate soak, S3's
+aarch64 numbers, S4 (wasmtime, optional).

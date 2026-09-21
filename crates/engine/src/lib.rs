@@ -5,4 +5,5 @@
 pub mod dsp;
 pub mod graph;
 pub mod potato;
+pub mod simd_voices;
 pub mod swap;
