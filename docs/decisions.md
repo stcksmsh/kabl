@@ -283,6 +283,47 @@ changes), added `kabl-modules` as an `engine` dependency, updated `graph.rs`/`po
 `simd_voices.rs` imports from `crate::dsp::` to `kabl_modules::dsp::`. `cargo test --workspace`
 confirms bit-identical behavior — this is a move, not a rewrite.
 
+## 2026-09-21 — `Module` trait + `ModuleInfo` + `ProcessIo`, and `osc.va` as first real module
+
+Built brief section 8 close to verbatim in `crates/modules/src/{info,io,module}.rs`:
+
+- `ModuleInfo` (`info.rs`): all fields from the brief's sketch — `kind`, `name`, `category`,
+  `rate`, `explain`, `lesson`, `requires`, `ports`, `params`, `quality`. `Category`/`Rate`/
+  `PortType`/`PortDirection`/`Taper` are the enums the brief's comments name inline.
+- `ProcessIo`/`Signal` (`io.rs`): `Signal::at(i)` is exactly the helper brief section 8 asks for
+  ("provide helpers so module authors handle both [scalar and buffer] without branching per
+  sample") — same idea S2's spike hand-rolled per-signal in `potato.rs`, now a reusable type any
+  module can use instead of every module reinventing it.
+- `Module` trait (`module.rs`): `info`/`prepare`/`process`/`reset`/`save_state`/`load_state`
+  match the brief's signatures. `QualityConfig`/`QualityTier` and `StateWriter`/`StateReader` are
+  deliberately minimal — brief section 7's full per-lever quality table and section 7.5's
+  `ModuleId`-keyed save/load both need a compiler that doesn't exist yet to actually drive them.
+  Building those out now would be designing ahead of their only caller. `QualityTier` has the
+  brief's three tiers (Live/Studio/Render); `StateWriter`/`StateReader` are minimal key/value
+  float traits, enough for a module to say "here's my float state" — matches what S1's spike
+  hand-rolled (`CompiledGraph::recompiled_with_depth` cloning phase/filter state directly)
+  through a trait instead of bespoke per-graph-shape code.
+
+**`osc.va`** (`crates/modules/src/builtins/osc_va.rs`) is the first real `Module` impl, wrapping
+`dsp::Saw`. **Only the saw waveform, no hard sync** — brief section 8's table entry is
+"saw/square/tri/sine, PolyBLEP, hard sync input"; this proves the trait/`ProcessIo` design works
+end-to-end, it doesn't finish the table entry. Square/tri/sine and hard sync are real, tracked
+gaps (see STATUS.md), not a silent partial implementation.
+
+Design choice worth flagging: `osc.va` takes frequency via a `pitch` input port (semitones, 1V/
+oct per brief section 8's `PortType::Pitch` semantics) combined with a `base_hz` param (the
+frequency at 0 semitones), rather than a single `freq_hz` param. This is what lets `midi.in`'s
+future `pitch` output (brief's built-in table: "per-voice gate, pitch, velocity") drive an
+oscillator by cable, and what a `cable` (v2) would modulate for pitch-bend/vibrato — a `freq_hz`-
+only param wouldn't support either. Reversible: nothing else depends on this shape yet.
+
+Tests (`crates/modules/tests/osc_va.rs`, 5 passing): output matches calling `dsp::Saw` directly
+byte-for-byte (the trait plumbing doesn't change the math), `Signal::Buffer` inputs are read
+per-sample correctly (not just `Signal::Scalar`), `reset()` zeroes phase, and — the one that
+actually matters for brief section 7.5 — saving a module's state and loading it into a *fresh*
+instance continues identically to the original, proving the save/load-state mechanism generalizes
+what S1 hand-rolled.
+
 ## 2026-09-21 — `core`: op log inverse simplifications
 
 `Entry.inverse` is a single `Op`, per the brief's exact struct (section 6) — no new `Op` variant
