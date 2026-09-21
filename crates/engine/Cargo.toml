@@ -11,3 +11,8 @@ basedrop = "0.1.3"
 [dev-dependencies]
 assert_no_alloc = "1.1.2"
 hound = "3.5.1"
+criterion = "0.8.2"
+
+[[bench]]
+name = "s2_potato"
+harness = false

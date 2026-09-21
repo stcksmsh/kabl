@@ -24,6 +24,39 @@ equiv.), cable depth toggled 1.0 ↔ 0.7, 100 times, 15 ms equal-power crossfade
 | Allocation during audio-thread path (100 swaps × 20 blocks each, `assert_no_alloc`-wrapped) | 0 | 0 | pass |
 | `basedrop::Owned<T>` drop timing (separate isolated test, 8 drops) | 0 destructors run before `Collector::collect()`, 8 after | inline drop count == 0 | pass |
 
-Not yet measured (v1 milestone, needs the real compiler/module registry, not this spike's
-hand-rolled 2-node graph): ns/block for `tiny`/`classic`/`potato` benchmark patches, potato-gate
-CPU percentage, jitter-gate soak.
+## Spike S2 — control-rate tier (block-held scalars) vs. potato gate
+
+See `docs/decisions.md` 2026-09-21 "Spike S2" entry — includes why this does **not** produce a
+potato-gate pass/fail verdict (no Pi-4 hardware, no `cpufreq` in this cloud container; owner
+chose "report raw + flag approximate" over a synthetic IPC conversion factor).
+
+Patch: `crates/engine/src/potato.rs`'s `PotatoPatch` — 4 voices × (osc.va, filter.svf, env.adsr,
+vca, ringmod) = 20 voice-rate modules + global lfo/mixer/out = 3 more. `cargo bench -p
+kabl-engine --bench s2_potato`, `taskset -c 0` (shared cloud VM — not a dedicated core; criterion
+reported 23-31% outliers across runs from neighbor contention), 5 runs:
+
+| Run | naive (µs/block) | optimized (µs/block) |
+|---|---|---|
+| 1 | 4.01 | 3.13 |
+| 2 | 3.80 | 3.30 |
+| 3 | 3.51 | 3.48 |
+| 4 | 4.08 | 3.46 |
+| 5 | 3.93 | 3.48 |
+| **mean** | **3.87** | **3.37** (~13% lower) |
+
+Correctness (`cargo test -p kabl-engine optimized_converges`): naive vs. optimized converge to
+-41.4 dB relative error once the ADSR settles — the optimization doesn't change what the patch
+sounds like.
+
+Both paths: well under 0.3% of one pinned Xeon @2.1GHz core at 48kHz/64-sample blocks — not a
+meaningful comparison to the 50%-of-a-Pi-4-core gate; flagged, not claimed as a pass.
+
+**Open item:** run the same bench on real Raspberry Pi 4 hardware for a number the gate can
+actually be checked against.
+
+## Not yet measured
+
+v1 milestone, needs the real compiler/module registry, not spike-scoped hand-rolled graphs:
+ns/block for the brief's actual `tiny`/`classic`/`potato` benchmark patches (as opposed to this
+spike's stand-ins), a real potato-gate CPU percentage on Pi-4 hardware, jitter-gate soak, S3
+(SIMD voice batching), S4 (wasmtime, optional).

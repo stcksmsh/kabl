@@ -4,4 +4,5 @@
 
 pub mod dsp;
 pub mod graph;
+pub mod potato;
 pub mod swap;

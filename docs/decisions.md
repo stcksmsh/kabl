@@ -34,11 +34,17 @@ brief's literal instruction.
 | `proptest` | 1.11.0 | core (dev) | op-log replay/undo property tests |
 | `hound` | 3.5.1 | engine (dev) | writing spike renders to WAV for inspection |
 | `tempfile` | 3.27.0 | core (dev) | file-format round-trip test needs a scratch directory |
+| `criterion` | 0.8.2 | engine (dev, added 2026-09-21 for spike S2) | ns/block measurement for the control-rate-tier comparison; brief section 13 names it for the real `tiny`/`classic`/`potato` benches anyway, so bringing it forward rather than hand-rolling timing for S2 and redoing it later |
 
 Not yet added (deferred to the milestone that needs them, per brief section 14): `cpal`, `midir`
-(standalone, v1 UI milestone), `egui` (ui crate), `criterion` (once real benchmark patches exist
-in v1, not needed for a one-off spike test), `nih-plug` (crates/clap, v5), `fundsp` (optional,
-not needed yet).
+(standalone, v1 UI milestone), `egui` (ui crate), `nih-plug` (crates/clap, v5), `fundsp`
+(optional, not needed yet).
+
+Structural note: the brief's tree (section 5) shows a top-level `benches/` directory. Cargo only
+auto-discovers bench harnesses inside each crate's own `benches/` folder, so the actual criterion
+harness lives at `crates/engine/benches/s2_potato.rs`. Reading the top-level `benches/` as "where
+benchmark *patches* (fixtures/data) might live later" rather than where harness code goes — not
+a deviation requiring a decision, just how Cargo physically requires it.
 
 ## 2026-09-21 — Spike S1 (graph swap): scope and result
 
@@ -101,6 +107,70 @@ dispatched through a module registry, brief section 8) is v1 milestone scope, no
 The spike proves the *swap+crossfade+deferred-drop* mechanism works; it does not yet prove the
 general per-module state carry-over will scale to an arbitrary graph — that's the compiler's job
 in v1.
+
+## 2026-09-21 — Spike S2 (control-rate tier): scope, method, and the hardware gap
+
+Question (brief section 11): does block-held scalar classification meet the potato gate?
+Pass criterion: 20-module, 4-voice patch < 50% of one Pi-4-class core.
+
+**Hardware blocker, raised to the owner before building anything.** This container is a 4-core
+x86_64 Xeon @ 2.1GHz cloud VM: no ARM, no `cpufreq` (no scaling driver exposed — checked
+`/sys/devices/system/cpu/cpu0/cpufreq`, doesn't exist), no `cpupower`. The brief's own fallback
+("`taskset` + `cpufreq`, document method") needs `cpufreq`, which isn't available here either.
+Asked the owner how to handle it; chose "pin with `taskset`, report raw numbers, flag as
+approximate" over deriving a synthetic Xeon:Cortex-A72 IPC conversion factor. **Result: this
+spike does not produce a potato-gate pass/fail verdict.** It answers S2's actual engineering
+question (does the optimization reduce CPU, and does it stay correct) and reports raw numbers;
+turning that into a Pi-4 percentage needs real Pi-4 hardware, still open.
+
+**Scope grew past S1's shape, confirmed with the owner first.** S1 reused a 2-node graph;
+answering S2 for real needs signals that are actually classifiable as slow (an LFO, a
+sustain-held envelope) sitting next to genuinely audio-rate ones. Built (`crates/engine/src/
+potato.rs`) a stand-in for the brief's `potato` benchmark patch: 4 voices × (`osc.va`,
+`filter.svf`, `env.adsr`, `vca`, `ringmod`) = 20 voice-rate modules, one global `lfo` (2 Hz, well
+under the brief's named "~100 Hz" control-rate threshold) feeding both the filter's cutoff
+modulation and the ring-mod depth, plus `mixer` and `out` = 3 global-rate modules. Still a
+hand-rolled fixed topology, not the general flat-schedule compiler (that's v1 milestone scope) —
+same simplification S1 made for state carry-over.
+
+**Method:** two process paths share the same DSP building blocks (`Saw`, `Svf` from S1, new
+`Lfo`/`Adsr` in `dsp.rs`). `process_naive` computes the LFO into a full 64-sample buffer every
+block (64 `sin()` calls) and re-runs the ADSR's one-pole recurrence every sample even once it's
+converged. `process_optimized` computes the LFO once per block (1 `sin()` call, shared by all 4
+voices) and skips the ADSR recurrence entirely once `|level - target| < 1e-5`, holding the
+converged scalar instead — exactly brief section 7's two named examples ("LFOs below ~100 Hz",
+"envelopes in sustain").
+
+**Correctness gate (checked before trusting any benchmark number):** with the patch's gate held
+throughout (a sustained chord, matching the brief's own swap-gate scenario), naive and optimized
+outputs converge to -41.4 dB relative error once the ADSR settles (`crates/engine/tests/
+spike_s2_potato.rs`) — the optimization changes *how* the patch is computed, not what it sounds
+like. This is the Live-tier approximation brief section 7 allows explicitly ("quality tiers ...
+change fidelity, never character") one level down, at the compiler's signal-classification tier.
+
+**Benchmark numbers — noisy, reported honestly rather than cherry-picked.** `taskset -c 0`
+pins the process to one core but this is a shared cloud VM, not a dedicated machine — neighbor
+contention shows up as 23-31% "outliers" in criterion's own report. Five runs:
+
+| Run | naive (µs/block) | optimized (µs/block) |
+|---|---|---|
+| 1 | 4.01 | 3.13 |
+| 2 | 3.80 | 3.30 |
+| 3 | 3.51 | 3.48 |
+| 4 | 4.08 | 3.46 |
+| 5 | 3.93 | 3.48 |
+| **mean** | **3.87** | **3.37** |
+
+Optimized is consistently faster or at worst tied (run 3, ~1% apart — within this container's
+noise floor); mean reduction ~13%, individual runs ranged 1-25%. At 48kHz/64-sample blocks
+(1333µs/block budget), both paths are under 0.3% of one pinned Xeon core — nowhere close to
+exercising this container's headroom, which is expected and uninformative: a modern server core
+at 2.1GHz is a different machine class from a Cortex-A72 at 1.5GHz, not just a clock-speed
+difference, and per the owner's answer this spike isn't extrapolating one number from the other.
+**Open item, needs the owner or real Pi-4 hardware:** run `taskset -c 0 cargo bench -p
+kabl-engine --bench s2_potato` (or the eventual real `potato` benchmark patch once the v1
+compiler exists) on an actual Raspberry Pi 4 to get a number the gate can actually be checked
+against.
 
 ## 2026-09-21 — `core`: op log inverse simplifications
 
