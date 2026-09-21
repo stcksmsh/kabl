@@ -8,6 +8,7 @@ pub mod dsp;
 pub mod info;
 pub mod io;
 pub mod module;
+pub mod registry;
 
 pub use info::{
     Category, LessonId, ModuleInfo, ParamInfo, PortDirection, PortInfo, PortType, QualitySupport,
