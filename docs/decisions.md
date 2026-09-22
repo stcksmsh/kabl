@@ -1511,3 +1511,35 @@ mapping matter to this use case. Old milestone numbering should not force their 
 Current design review keeps its small comparison patch and adds one future-performance
 storyboard. It should show room for sequencers, transport, layers and effects while clearly
 labeling unbuilt behavior. Stop point remains owner visual review; no product code is authorized.
+
+## 2026-09-22 — G1 visual review: owner feedback (partial answers)
+
+Owner answers to the G1 review (`docs/design/REVIEW.md`), recorded verbatim in substance:
+
+- **Direction:** likes A "a lot". C does not need further review as a main direction.
+- **Theming:** wants a dark mode with some of B's character (texture and material, not a flat
+  matte colour). C-style art should be an option for user-made or non-core modules. Colour/image
+  coding per module, with light/dark variants, is a nice-to-have. Using warm A as the look of the
+  core "starter pack" modules is suggested as a possibly good idea.
+- **Usability questions raised:** (1) how to modulate ADSR attack from the LFO; (2) the concept
+  lacks features that competitors have: LFO fine tuning, modulation of the LFO itself,
+  offset/amplitude/unipolar, and similar.
+- **Scope reminder:** kabl is not a toy. It should eventually make anything Surge/Vital-class
+  synths can, while being simpler and easier to learn and create with, rather than a player of
+  presets.
+
+Still unanswered: hidden-mode layout (G1 question 2), and display size / go-ahead for the
+interactive prototype (G1 question 3). No implementation is authorized by this entry.
+
+Agent interpretation, pending owner confirmation:
+
+- Every module param becomes a modulation destination: a cable can end on a knob. This follows
+  the Surge/Vital model rather than needing one CV jack per param.
+- Modules declare primary params (always on the panel) and advanced params (shown by expanding
+  the module in place).
+- Visual system: A light and A-dark material themes for core modules; skins supply per-mode
+  art/palette for other modules. The UI still draws every control.
+
+Relevant code fact: `ProcessIo::param` already returns `Signal` (Scalar or Buffer). Param
+modulation therefore mostly needs compiler work: params are compile-time `Scalar` today
+(compile.rs module doc).
