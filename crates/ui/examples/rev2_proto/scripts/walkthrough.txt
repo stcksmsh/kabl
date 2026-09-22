@@ -1,0 +1,141 @@
+# Owner-walkthrough tasks, driven through real egui input. Run at several sizes/themes.
+log reference patch
+shot 01-reference
+expect nooverlap
+expect routes 1
+
+log task: connect LFO -> ADSR Attack (drop on knob, default +25 %)
+press @jack:lfo.out
+moveto @knob:adsr.attack_ms
+shot 02-dragging-to-attack
+release
+expect route lfo.out adsr.attack_ms amount 0.25
+expect toast Modulate
+expect selected lfo
+shot 03-attack-modulated
+
+log task: adjust base separately from depth
+dragby @knob:adsr.attack_ms 0 -20
+expect route lfo.out adsr.attack_ms amount 0.25
+expect value adsr.attack_ms 25.3 0.3
+press @ring:adsr.attack_ms
+moveby 0 -30
+shot 04-ring-drag
+release
+expect route lfo.out adsr.attack_ms amount 0.40
+expect value adsr.attack_ms 25.3 0.3
+
+log task: precise numeric entry on base and on amount
+dblclick @pill:adsr.attack_ms
+type 8 ms
+key Enter
+expect value adsr.attack_ms 8 0.01
+dblclick @plug:adsr.attack_ms
+type +40 %
+key Enter
+expect route lfo.out adsr.attack_ms amount 0.40
+
+log task: fine adjustment (shift = x0.1)
+dragby @knob:filter.cutoff_hz 0 -50 shift
+expect value filter.cutoff_hz 1427 10
+
+log task: invert and bypass in the route card
+click @plug:adsr.attack_ms
+expect inspect adsr.attack_ms
+click @ui:card.invert.lfo.out>adsr.attack_ms
+expect route lfo.out adsr.attack_ms amount -0.40
+shot 05-inverted
+click @ui:card.bypass.lfo.out>adsr.attack_ms
+expect route lfo.out adsr.attack_ms bypass true
+shot 06-bypassed
+
+log task: hide cables (stable rack), then compact synth layout; patch and selection preserved
+mark
+click @ui:cables.hidden
+expect cables Hidden
+shot 07-hidden-rack
+click @ui:layout.compact
+expect same
+expect nooverlap
+shot 08-hidden-compact
+click @ui:layout.rack
+expect same
+
+log task: multiple sources on one knob, inspected
+click @ui:cables.all
+click @ui:card.bypass.lfo.out>adsr.attack_ms
+expect route lfo.out adsr.attack_ms bypass false
+drag @jack:midi.velocity @knob:adsr.attack_ms
+expect routes 3
+click @knob:adsr.attack_ms
+expect inspect adsr.attack_ms
+shot 09-two-sources-inspected
+
+log task: collapse a modulated control (LFO Amplitude)
+click @toggle:lfo
+expect expanded lfo true
+drag @jack:adsr.out @knob:lfo.amp
+expect route adsr.out lfo.amp amount 0.25
+shot 10-lfo-expanded-push
+click @toggle:lfo
+expect expanded lfo false
+expect visible lfo.amp false
+hover @toggle:lfo
+shot 11-collapsed-hidden-route
+click @ui:cables.hidden
+shot 12-collapsed-hidden-mode
+click @ui:cables.all
+
+log task: promote a primary control via context menu and pins
+rclick @header:lfo
+click @ui:menu.choose
+expect expanded lfo false
+click @pin:lfo.amp
+expect primary lfo.amp true
+expect visible lfo.amp true
+click @pin:lfo.offset
+expect primary lfo.offset true
+shot 13-choose-primary
+click @done:lfo
+expect nooverlap
+shot 14-promoted
+
+log task: undo / redo
+key Z ctrl
+expect primary lfo.offset false
+expect toast Undid: Pin LFO Offset
+key Z ctrl
+expect primary lfo.amp false
+key Z ctrl shift
+expect primary lfo.amp true
+shot 15-after-undo-redo
+
+log task: cancel gestures with Esc (knob drag and cable drag)
+press @knob:adsr.decay_ms
+moveby 0 -60
+key Escape
+release
+expect value adsr.decay_ms 240 0.5
+press @jack:lfo.out
+moveto @knob:adsr.release_ms
+key Escape
+release
+expect route lfo.out adsr.release_ms absent
+
+log task: theme switch and zoom/pan
+click @ui:theme.dark
+shot 16-dark
+click @ui:zoom.in
+expect zoom 1.2
+dragby @empty -200 -40
+shot 17-zoomed-panned
+click @ui:zoom.100
+expect zoom 1.0
+click @ui:theme.light
+
+log task: remove route via card
+click @plug:adsr.attack_ms
+click @ui:card.remove.lfo.out>adsr.attack_ms
+expect route lfo.out adsr.attack_ms absent
+key Z ctrl
+expect route lfo.out adsr.attack_ms present
