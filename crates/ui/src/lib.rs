@@ -27,6 +27,21 @@ const KNOB_RADIUS: f32 = 11.0;
 const KNOB_ROW_HEIGHT: f32 = 40.0;
 const PANEL_FILL: Color32 = Color32::from_rgb(32, 32, 36);
 const PANEL_FILL_SELECTED: Color32 = Color32::from_rgb(44, 48, 58);
+/// Rack grid cell size in pixels — `Eurorack` view only. A module's `ModuleInfo::width_units`
+/// times this is its panel width; row/column snapping rounds to multiples of this.
+const UNIT_PX: f32 = 20.0;
+/// Headroom past the furthest-out module for the scroll area, plus room to drag one further.
+const CANVAS_MARGIN: f32 = 200.0;
+
+/// Two ways to look at the same patch (same `PatchEditor`, same edits) — not two editors. The
+/// free-form patchbay is better for building/rearranging from scratch (owner's own framing);
+/// the tiled Eurorack view snaps modules to a rack-style grid with real per-module widths, closer
+/// to playing an instrument than constructing one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ViewMode {
+    Patchbay,
+    Eurorack,
+}
 
 /// A module's `Category` (brief section 8's grouping) doubles as its panel's accent color — the
 /// same idea real modular hardware uses (Make Noise/Mutable-style panel-color-by-function), so a
@@ -76,6 +91,7 @@ fn cable_color(id: CableId) -> Color32 {
 pub struct UiState {
     pub selected_kind: String,
     pub selected_module: Option<ModuleId>,
+    pub view_mode: ViewMode,
     pending_output: Option<PortRef>,
     dragging: Option<Dragging>,
     /// Directory `kabl_core::save`/`load` read and write — a plain text field rather than a
@@ -109,6 +125,9 @@ impl Default for UiState {
                 .unwrap_or("osc.va")
                 .to_string(),
             selected_module: None,
+            // Eurorack is the priority view (owner: better for playing, not building from
+            // scratch) — defaults on; Patchbay stays a click away for editing.
+            view_mode: ViewMode::Eurorack,
             pending_output: None,
             dragging: None,
             patch_path: "my-patch".to_string(),
@@ -183,6 +202,9 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                     "Click an input port to connect, or click the output port again to cancel.",
                 );
             }
+            ui.separator();
+            ui.selectable_value(&mut ui_state.view_mode, ViewMode::Eurorack, "Eurorack");
+            ui.selectable_value(&mut ui_state.view_mode, ViewMode::Patchbay, "Patchbay");
         });
         ui.horizontal(|ui| {
             ui.label("patch dir:");
@@ -225,8 +247,29 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     });
 
     egui::CentralPanel::default().show(ui, |ui| {
-        show_canvas(editor, ui_state, ui);
+        let available = ui.available_size();
+        let content_size = canvas_content_size(editor).max(available);
+        egui::ScrollArea::both().auto_shrink(false).show(ui, |ui| {
+            ui.set_min_size(content_size);
+            show_canvas(editor, ui_state, ui);
+        });
     });
+}
+
+/// Bounding box over every module's position + a generous margin, so the scroll area knows how
+/// far there is to scroll — a patch (or a wide rack in Eurorack view) bigger than the window used
+/// to just get clipped with no way to reach the rest of it.
+fn canvas_content_size(editor: &PatchEditor) -> EguiVec2 {
+    let mut max_x = 0.0f32;
+    let mut max_y = 0.0f32;
+    for m in editor.state().modules.values() {
+        let width = registry::info_for(&m.kind).map_or(MODULE_WIDTH, |i| {
+            (i.width_units as f32 * UNIT_PX).max(MODULE_WIDTH)
+        });
+        max_x = max_x.max(m.pos.x + width);
+        max_y = max_y.max(m.pos.y + 300.0); // generous fixed bound, exact height doesn't matter here
+    }
+    EguiVec2::new(max_x + CANVAS_MARGIN, max_y + CANVAS_MARGIN)
 }
 
 fn show_param_panel(editor: &mut PatchEditor, ui_state: &UiState, ui: &mut egui::Ui) {
@@ -272,6 +315,11 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &UiState, ui: &mut egui:
 fn show_canvas(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
     let origin = ui.min_rect().min;
     let painter = ui.painter().clone();
+    let eurorack = ui_state.view_mode == ViewMode::Eurorack;
+
+    if eurorack {
+        draw_rack_grid(&painter, ui.clip_rect(), origin);
+    }
 
     // Snapshot layout data before mutating `editor` mid-frame (immediate-mode + a shared
     // PatchLog don't mix well otherwise: we'd need `editor` borrowed both immutably, for
@@ -302,10 +350,17 @@ fn show_canvas(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
         std::collections::HashMap::new();
 
     for (id, kind, stored_pos, params) in &modules {
-        let pos = match &ui_state.dragging {
+        let mut pos = match &ui_state.dragging {
             Some(d) if d.id == *id => d.live_pos,
             _ => *stored_pos,
         };
+        // Eurorack only: snap to the rack grid for display *and* interaction. The underlying
+        // `ModuleState.pos` this commits on drag-release is the snapped value too (real per-cell
+        // placement, not just a visual overlay) -- but only while this view is active; Patchbay
+        // stays free-form on the same field, unaffected when the owner switches back to it.
+        if eurorack {
+            pos = eurorack_snap(pos);
+        }
         let info = registry::info_for(kind);
 
         if let Some(skin) = info.and_then(|i| i.skin) {
@@ -347,7 +402,14 @@ fn show_canvas(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
         let body_height = HEADER_HEIGHT
             + port_rows * PORT_ROW_HEIGHT
             + if has_knobs { KNOB_ROW_HEIGHT } else { 0.0 };
-        let size = EguiVec2::new(MODULE_WIDTH, body_height);
+        // Eurorack: real per-module rack width (`width_units`, snapped to the grid cell size).
+        // Patchbay: the same uniform width every module has always used there.
+        let module_width = if eurorack {
+            info.map_or(MODULE_WIDTH, |i| i.width_units as f32 * UNIT_PX)
+        } else {
+            MODULE_WIDTH
+        };
+        let size = EguiVec2::new(module_width, body_height);
         let rect = Rect::from_min_size(origin + EguiVec2::new(pos.x, pos.y), size);
 
         let selected = interact_body(ui, editor, ui_state, *id, *stored_pos, rect);
@@ -361,7 +423,7 @@ fn show_canvas(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
         // of module is this, at a glance" cue real modular panels use color for), a brighter
         // outline when selected instead of a flat gray one always.
         painter.rect_filled(rect, 5.0, fill);
-        let accent_rect = Rect::from_min_size(rect.min, EguiVec2::new(MODULE_WIDTH, ACCENT_HEIGHT));
+        let accent_rect = Rect::from_min_size(rect.min, EguiVec2::new(module_width, ACCENT_HEIGHT));
         painter.rect_filled(
             accent_rect,
             egui::CornerRadius {
@@ -407,7 +469,7 @@ fn show_canvas(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
         for (row, port) in outputs.iter().enumerate() {
             let p = rect.min
                 + EguiVec2::new(
-                    MODULE_WIDTH,
+                    module_width,
                     HEADER_HEIGHT + row as f32 * PORT_ROW_HEIGHT + PORT_ROW_HEIGHT / 2.0,
                 );
             port_pos.insert((*id, PortDirection::Output, port.name.to_string()), p);
@@ -427,7 +489,7 @@ fn show_canvas(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
                 + 6.0;
             let n = info.params.len() as f32;
             for (i, param) in info.params.iter().enumerate() {
-                let cx = rect.min.x + MODULE_WIDTH * (i as f32 + 0.5) / n;
+                let cx = rect.min.x + module_width * (i as f32 + 0.5) / n;
                 let center = Pos2::new(cx, knob_y);
                 let current = params.get(param.name).copied().unwrap_or(param.default);
                 let frac = if param.max > param.min {
@@ -492,6 +554,41 @@ fn cable_curve_points(a: Pos2, b: Pos2) -> Vec<Pos2> {
         .collect()
 }
 
+/// Rounds a position to the nearest rack grid cell — Eurorack view only. Applied to both the
+/// stored and the live-drag position, so dragging itself feels snapped, not just the final rest
+/// position.
+fn eurorack_snap(pos: Vec2) -> Vec2 {
+    Vec2 {
+        x: (pos.x / UNIT_PX).round() * UNIT_PX,
+        y: (pos.y / UNIT_PX).round() * UNIT_PX,
+    }
+}
+
+/// Faint grid lines every `UNIT_PX`, covering only what's actually visible (`clip_rect`, which a
+/// `ScrollArea` already keeps correct) — the "just that grid" background for Eurorack view, not a
+/// photorealistic rack texture.
+fn draw_rack_grid(painter: &egui::Painter, clip_rect: Rect, origin: Pos2) {
+    let stroke = Stroke::new(1.0, Color32::from_rgb(48, 48, 54));
+    let start_x = origin.x + ((clip_rect.min.x - origin.x) / UNIT_PX).floor() * UNIT_PX;
+    let mut x = start_x;
+    while x < clip_rect.max.x {
+        painter.line_segment(
+            [Pos2::new(x, clip_rect.min.y), Pos2::new(x, clip_rect.max.y)],
+            stroke,
+        );
+        x += UNIT_PX;
+    }
+    let start_y = origin.y + ((clip_rect.min.y - origin.y) / UNIT_PX).floor() * UNIT_PX;
+    let mut y = start_y;
+    while y < clip_rect.max.y {
+        painter.line_segment(
+            [Pos2::new(clip_rect.min.x, y), Pos2::new(clip_rect.max.x, y)],
+            stroke,
+        );
+        y += UNIT_PX;
+    }
+}
+
 /// Selection + drag handling shared by both the auto-layout panel and a skinned one -- the same
 /// logic either way, just parameterized on the panel's `rect` (which comes from a fixed
 /// `MODULE_WIDTH`-based layout in one case and `ModuleSkin.panel_size` in the other). Returns
@@ -505,6 +602,7 @@ fn interact_body(
     stored_pos: Vec2,
     rect: Rect,
 ) -> bool {
+    let eurorack = ui_state.view_mode == ViewMode::Eurorack;
     let body_id = Id::new(("kabl-module-body", id));
     let response = ui.interact(rect, body_id, Sense::click_and_drag());
     if response.clicked() {
@@ -525,8 +623,16 @@ fn interact_body(
     }
     if response.drag_stopped() {
         if let Some(d) = ui_state.dragging.take().filter(|d| d.id == id) {
-            if d.live_pos != d.start_pos {
-                editor.move_module(id, d.live_pos);
+            // Committed position snaps too in Eurorack view, not just the on-screen rendering
+            // while dragging -- real grid placement in the saved patch, not a visual-only
+            // overlay on top of wherever the raw drag happened to end.
+            let final_pos = if eurorack {
+                eurorack_snap(d.live_pos)
+            } else {
+                d.live_pos
+            };
+            if final_pos != d.start_pos {
+                editor.move_module(id, final_pos);
             }
         }
     }
@@ -771,5 +877,32 @@ fn on_port_click(
                 editor.connect(from, this_ref);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod eurorack_grid_tests {
+    use super::*;
+
+    #[test]
+    fn snap_rounds_to_the_nearest_grid_cell() {
+        assert_eq!(
+            eurorack_snap(Vec2 { x: 9.0, y: 11.0 }),
+            Vec2 { x: 0.0, y: 20.0 }
+        );
+        assert_eq!(
+            eurorack_snap(Vec2 { x: 213.0, y: 4.0 }),
+            Vec2 { x: 220.0, y: 0.0 }
+        );
+        assert_eq!(
+            eurorack_snap(Vec2 { x: -5.0, y: -16.0 }),
+            Vec2 { x: 0.0, y: -20.0 }
+        );
+    }
+
+    #[test]
+    fn snap_is_idempotent() {
+        let once = eurorack_snap(Vec2 { x: 137.0, y: -48.0 });
+        assert_eq!(eurorack_snap(once), once);
     }
 }

@@ -5,20 +5,25 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-22, after reconciling with a second session that worked this same backlog
-in parallel (see decisions.md "Two sessions diverged on the same backlog") — this file's own
-history above this line is that other session's; `git log` is the merged truth from here on.
+Last updated: 2026-09-22, after landing Eurorack view v1 (`kabl-ui`'s second, grid-snapped layout
+mode) — see decisions.md's "Eurorack view v1" entry for the full design. This file's own history
+above this line, up through the reconciliation note two paragraphs down, is a second session's
+that worked this backlog in parallel; `git log` is the merged truth from here on.
 
 **MIDI hardware verified live for the first time**: a real controller (KL Essential 61 mk3)
 connected and played through `kabl-standalone`, confirmed by the owner. Needed a small fix first
 (`--midi <substring>`, standalone/main.rs) — the binary was silently connecting to ALSA's own
 virtual "Midi Through" loopback port instead of the real controller.
 
-**Owner's next priority, stated directly**: a Eurorack-style "tiled" view — rack-mounted modules,
-real-cable-like curved cables, snapped/grid layout — as a second view mode alongside the existing
-free-form patchbay (patchbay stays for editing/certain views; Eurorack view for playing/not
-building from scratch). Explicitly referenced Surge/Vital's visual polish as the bar, "friendlier
-and more modular" than Surge specifically. Not scoped or started yet — see Handover below.
+**Eurorack view v1 is built and screenshot/drag-verified** (not live-audio-verified — see the
+real-hardware caveat in the handover note below): a `ViewMode::Eurorack` toggle in `kabl-ui`'s
+toolbar, sharing the exact same `PatchEditor`/`show_canvas` as the existing free-form Patchbay
+view, not a separate renderer. Modules snap to a grid (`ModuleInfo::width_units`, a new per-module
+field, times a fixed cell size); dragging commits the snapped position, not a raw pixel one.
+Canvas pan/scroll came back too (needed for a wide rack row). **Rough, not polished**: first-pass
+`width_units` values, untuned grid color, the one skinned module (`osc.va`) doesn't yet respect
+`width_units` for its own width (position snaps, width doesn't). See decisions.md for the full
+list of what's deliberately left rough vs. what's real.
 
 ## Autonomous overnight work (started 2026-09-21)
 
@@ -47,6 +52,31 @@ should set that up itself (see the pattern in git history around commits `7fe161
 `send_later` ~20-30 min out, instruction to read this file's "Handover" section, pick the next
 self-contained item, do it with full rigor, then reschedule) rather than assuming one is already
 running.
+
+**Context handover note (2026-09-22, after commit — check `git log -1` for the exact hash at
+push time)**: owner asked to checkpoint and clear context after Eurorack view v1 landed. Read this
+file cold, continue from it — no recap needed, same pattern as every prior handoff in this
+project. Concretely, in priority order:
+
+1. **Owner has real audio hardware, a real display, and a real MIDI controller on this machine**
+   (confirmed working this session) — but was mid-way through live-testing the Eurorack view
+   (drag-tested via a screenshot-only headless harness, never actually run with audio +
+   interactively clicked by a person) when context was cleared. If the owner is at the machine,
+   offer to run `cargo run -p kabl-ui` for real and get their eyes/hands on it — that's the
+   natural next step, not more headless iteration.
+2. **Eurorack view polish**, per decisions.md's "known rough edges": tune `width_units` per
+   built-in against how they actually look at real size (current values are first-pass guesses);
+   make the skinned module (`osc.va`) respect `width_units` for width, not just position; tune
+   grid line color/spacing; no zoom yet.
+3. Two smaller reapplications flagged during reconciliation and *not yet done*: the `PatchEngine`
+   Mutex-window shrink (`precompile`/`finish_swap` split, shrinks `kabl-ui`'s lock window to just
+   state-transfer) and a native file picker (`rfd`) for the Save/Load path field — both need
+   re-implementing against the current `compile.rs`/`ui/lib.rs`, not a clean cherry-pick from the
+   superseded local history (still reachable on branch `backup-local-before-reconcile` if useful
+   as reference for the *idea*, not as a literal patch to reapply).
+4. Real audio/MIDI hardware verification is still only partial: `kabl-standalone` confirmed
+   playing through a real controller; `kabl-ui` has not been run with real audio at all yet (only
+   the audio-free screenshot harness). See item 1.
 
 ## Workflow (changed 2026-09-21)
 

@@ -83,6 +83,7 @@ pub static ENV_ADSR_INFO: ModuleInfo = ModuleInfo {
         interpolation: false,
     },
     skin: None,
+    width_units: 8,
 };
 
 const GATE_IN: usize = 0;

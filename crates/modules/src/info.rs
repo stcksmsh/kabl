@@ -101,4 +101,10 @@ pub struct ModuleInfo {
     /// `crate::skin`'s module doc. `None` for every built-in except one demo; a skin-aware
     /// renderer falls back to its own auto-layout when this is `None`.
     pub skin: Option<&'static crate::skin::ModuleSkin>,
+    /// Panel width in rack grid units (owner ask: a Eurorack-style tiled view, modules snapped to
+    /// a square grid, each declaring its own width like real HP-width hardware). A UI's grid cell
+    /// size in pixels is its own choice — this is unitless, just how many cells wide. Unused by
+    /// the free-form patchbay view (every module there stays a uniform width); only the tiled view
+    /// reads it.
+    pub width_units: u32,
 }

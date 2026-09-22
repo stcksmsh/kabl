@@ -49,6 +49,7 @@ pub static MIDI_IN_INFO: ModuleInfo = ModuleInfo {
         interpolation: false,
     },
     skin: None,
+    width_units: 5,
 };
 
 const GATE: usize = 0;

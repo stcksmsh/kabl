@@ -66,6 +66,7 @@ pub static MIXER_INFO: ModuleInfo = ModuleInfo {
         interpolation: false,
     },
     skin: None,
+    width_units: 8,
 };
 
 const INPUTS: [usize; 4] = [0, 1, 2, 3];

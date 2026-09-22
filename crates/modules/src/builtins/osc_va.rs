@@ -77,6 +77,7 @@ pub static OSC_VA_INFO: ModuleInfo = ModuleInfo {
         interpolation: false,
     },
     skin: Some(&OSC_VA_SKIN),
+    width_units: 7,
 };
 
 static OSC_VA_PANEL_PNG: &[u8] = include_bytes!("../../assets/osc_va_panel.png");

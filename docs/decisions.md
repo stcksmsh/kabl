@@ -1418,3 +1418,52 @@ above was written specifically because the first attempt silently connected to A
 loopback port instead.
 
 Workspace build/test/clippy/fmt all clean after reconciliation.
+
+## 2026-09-22 — Eurorack view v1: a second, grid-snapped layout mode for `kabl-ui`
+
+Owner's stated priority right after MIDI hardware confirmed working live: a Eurorack-style
+"tiled" view — rack-mounted modules, real per-module widths, a visible grid — alongside the
+existing free-form patchbay, not replacing it ("patchbay helps with certain views/some editing
+... Eurorack view is MUCH better when playing/not making something from scratch"). Reference:
+Surge/Vital's polish, but "friendlier and more modular." Confirmed before building: full editing
+(add/remove/connect) stays available in both views, not a stripped-down play-only mode; module
+width in grid "units," a plain square-grid background rather than photorealistic rack texture
+(owner's own framing, not guessed at).
+
+**Not a second renderer** — one `ViewMode` enum (`Patchbay` | `Eurorack`) on `UiState`, toggled by
+two buttons in the toolbar, both driving the exact same `show_canvas` and the same `PatchEditor`.
+Reusing the existing patchbay rendering (already had category-colored headers, port-type-colored
+jacks, sagging bezier cables, on-panel knobs, the image-skin mechanism — a stronger base than
+expected) meant the actual diff is small: a `width_units: u32` field on `ModuleInfo` (declared per
+built-in, 5-8 units each depending on port/param count), an `eurorack_snap(Vec2) -> Vec2` rounding
+a position to the nearest grid cell, and a `draw_rack_grid` background — applied only when
+`view_mode == Eurorack`; Patchbay's rendering path is untouched.
+
+Snapping applies to both the live-drag visual (every frame while dragging) and the committed
+position (`editor.move_module`, on release) — real grid placement saved into the patch, not a
+cosmetic overlay on top of wherever the raw drag ended. Deliberately *not* stored separately from
+Patchbay's free-form position: both views read the same `ModuleState.pos`; switching to Eurorack
+just displays/snaps it, switching back to Patchbay shows the unsnapped value again undisturbed.
+
+Also reintroduced canvas pan/scroll (`egui::ScrollArea`, sized to a bounding box over every
+module's position) — cut from this reconciliation's carry-over list earlier today as "needs
+reapplying against the new lib.rs, not done here," turned out directly load-bearing for the grid
+view (a rack row is wide) so folded into this pass instead of deferring it again.
+
+**Verified via the same audio-free `eframe` harness used earlier this session** (a throwaway
+example running `show()` with no `AudioHost`/`cpal` at all, screenshotted under an isolated Xvfb —
+this container has real audio hardware now, so live playback still isn't triggered casually).
+Actually drag-tested, not just screenshotted static: dragged `midi.in` from an off-grid position
+and confirmed both the live visual and the final committed position snapped to the grid, cables
+following correctly. Two new unit tests, `eurorack_grid_tests` in `lib.rs`, cover `eurorack_snap`
+directly (rounds correctly including negative coordinates, idempotent on an already-snapped
+value).
+
+**Known rough edges, not polished yet**: `width_units` values are first-pass estimates, not tuned
+against how the modules actually look at real size. The one skinned module (`osc.va`) keeps its
+own fixed `skin.panel_size` regardless of view mode — its position snaps to the grid in Eurorack
+view, but its width doesn't quantize to whole units the way auto-layout modules' do (a skin's
+background image has a fixed pixel size; making it also respect `width_units` is real, separate
+follow-up work). Grid line color/spacing is a first guess, not tuned. No zoom.
+
+Workspace build/test/clippy/fmt all clean.

@@ -68,6 +68,7 @@ pub static VCA_INFO: ModuleInfo = ModuleInfo {
         interpolation: false,
     },
     skin: None,
+    width_units: 6,
 };
 
 const IN: usize = 0;
