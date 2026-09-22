@@ -24,14 +24,16 @@ each item's decisions.md entry for what was picked and why. If you're reading th
 `git log` for the latest commit and this file's "Where we are" below for the current real state;
 nothing here should be stale by more than one work chunk.
 
-**Context handover note (2026-09-22, after commit `7a3793c`)**: owner cleared context here on
-purpose — same pattern as earlier in this project (read this file cold, continue from it, no
-recap needed). A `send_later` self-continuation trigger is active in this session (fires roughly
-every 20-30 min with an instruction to read this file's "Handover" section and pick the next
-self-contained backlog item, same rigor as every prior chunk: plan, implement, test, verify
-clean, document, commit, push, reschedule). If you're the session that trigger just woke: just
-follow its instructions directly, this paragraph is only here so a human glancing at this file
-understands why work might keep happening with no one watching.
+**Context handover note (2026-09-22, after commit `617da9d`)**: owner is clearing context on
+purpose and starting a fresh agent from a tight resume prompt (same pattern as earlier in this
+project — read this file cold, continue from it, no recap needed). **No `send_later` trigger is
+currently active** — the previous one-shot trigger already fired (it's how the buffer-pool-reuse
+work above happened) and was not rescheduled, since the owner is taking over the handoff
+manually this time. If continued unattended autonomous work is wanted again, the new session
+should set that up itself (see the pattern in git history around commits `7fe161d`..`617da9d`:
+`send_later` ~20-30 min out, instruction to read this file's "Handover" section, pick the next
+self-contained item, do it with full rigor, then reschedule) rather than assuming one is already
+running.
 
 ## Workflow (changed 2026-09-21)
 
