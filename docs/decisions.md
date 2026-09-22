@@ -1491,3 +1491,23 @@ presentations, shared live controls over custom artwork, and one connection mode
 as both cables and routing rows. Exact palette, density, hidden-mode layout and prototype
 go-ahead remain owner decisions at the visual review gate; these recommendations are not
 recorded as approved final designs. Existing Patchbay view is not removed by this decision.
+
+## 2026-09-22 — Musical destination: Encore / Ricochet / Force Majeure
+
+Owner wants kabl eventually capable of Tangerine Dream-level music "at least in spirit",
+specifically the Encore / Ricochet / Force Majeure era. This establishes musical direction;
+owner did not request implementation, exact album recreation, or a specific vintage model.
+
+Planning interpretation: evolving interlocking sequences, atmospheric layers, performed leads,
+spatial effects, and hands-on development across long pieces. `docs/PLAN.md` now carries that
+destination, proposed future capabilities, and a 10–15 minute original-performance acceptance
+scenario. Those capabilities and exact scope are recommendations, not additional owner-approved
+implementation commitments.
+
+Recommended sequencing consequence: basic clock/sync and pitch/gate sequencing should arrive
+together, before elaborate probability/morph work. Effects, layer control and practical MIDI
+mapping matter to this use case. Old milestone numbering should not force their order.
+
+Current design review keeps its small comparison patch and adds one future-performance
+storyboard. It should show room for sequencers, transport, layers and effects while clearly
+labeling unbuilt behavior. Stop point remains owner visual review; no product code is authorized.

@@ -16,6 +16,10 @@ image-skinned modules, sagging/color-coded cables and Surge XT-like hidden-mode 
 This is design work, not authorization to implement. Historical overnight autonomy and
 next-step lists below do not expand that scope.
 
+Owner added eventual musical destination: Tangerine Dream in the spirit of Encore / Ricochet /
+Force Majeure. PLAN now includes that direction and a future-performance storyboard; clocks,
+sequencing, effects and performance controls remain proposed later capabilities, not built work.
+
 Hardware verification remains separate: standalone played live; `kabl-ui` has not been heard
 by owner. Real audio/display hardware is available. Pi-4 performance remains unmeasured.
 

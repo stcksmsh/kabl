@@ -31,6 +31,8 @@ Owner requirements:
 - Cables look physical, sag, and use some color coding.
 - Cables can be hidden; modulation remains visible and editable through a Surge XT-like view.
 - Visibility, usability, and beauty are core requirements.
+- Eventual musical target: Tangerine Dream in the spirit of the Encore / Ricochet /
+  Force Majeure era, as clarified by owner after this plan was first written.
 - Current work is design/planning, not implementation.
 
 Proposals to demonstrate, not silently record as final owner decisions:
@@ -44,6 +46,40 @@ Proposals to demonstrate, not silently record as final owner decisions:
 - Proposed minimum design viewport: 1280×800 logical pixels. Validate with Kosta at G1.
 
 Existing Patchbay view remains in place. Its long-term role is not settled by these mockups.
+
+## Musical north star — evolving, performed sequences
+
+Owner's album references establish a long-term musical destination. Agent interpretation:
+support extended pieces with interlocking sequences, slowly evolving timbre, atmospheric
+layers, performed melodies, spacious effects, and deliberate changes in density and tension.
+Exact instrument emulation, album reconstruction, and a complete DAW are not requirements.
+
+Tangerine Dream's [official biography](https://www.tangerinedreammusic.com/en/biography/index.asp?dat=index)
+describes long synthesizer/sequencer pieces and evolving sequences combined with solos.
+Their [Force Majeure description](https://tangerinedreammusic.com/en/music/detail.asp?id=17&tit=Force+Majeure)
+also emphasizes melodic development, guitars, and drums. This is musical direction, not a
+reason to restrict kabl to one timbre, visual era, or synthesis method.
+
+Recommended future priorities, pending owner decisions on implementation scope:
+
+| Musical need | Capability | Dependency / design consequence |
+|---|---|---|
+| Interlocking pulses | Shared clock, reset, division; at least two independently editable pitch/gate sequences with length, transpose, rests and gate length | Basic clock/sync belongs with first sequencer milestone, ahead of elaborate probability/morph features; reconsider older v2/v3 split. |
+| Development while playing | Layer mute/level, pattern edits, transpose, filter/envelope changes, deliberate reset and transition timing | Transport state and musical layers must be easy to find with cables visible or hidden; changes need predictable timing. |
+| Atmospheric depth | Delay, reverb, slow modulation, drones and sustained/string-like textures | Plan space for effects sends/returns and modulation; exact effect/module choices remain open. |
+| Hands-on performance | Keyboard lead plus a small set of assignable performance controls; MIDI controller mapping | Prioritize useful MIDI learn/performance controls when this workflow begins; MPE is a separate choice. |
+| Complete takes | Audio recording and recoverable patch/performance setup | Distinguish audio capture from construction-log replay; full DAW arrangement is separate scope. |
+
+Proposed eventual musical acceptance scenario: perform and record an original 10–15 minute
+piece moving through atmosphere → first pulse → second interlocking sequence → played lead →
+breakdown → return. Change note patterns, layer levels, timbre and effect depth without stopping
+transport or losing place. This is a proposed capability test, not a promise of matching the
+albums' production or a claim that these features exist.
+
+Immediate effect on P1–P5: retain the small reference patch for fair visual comparisons, and
+add one clearly labeled future-performance storyboard to test where sequencers, transport,
+layer controls and effects will fit. Do not implement them or expand all three art directions
+into full performance workstations before G1.
 
 ## Execution order
 
@@ -69,6 +105,10 @@ Use a fixed reference patch containing `midi.in`, `osc.va`, `filter.svf`, `env.a
 `vca`, and `out`. Document named connections and parameter values. Include LFO → filter cutoff
 as a proposed modulation route; check actual metadata and explicitly flag any unsupported
 target/depth behavior. Every visual direction must depict the same patch and state.
+
+Carry the musical north star into the brief. Separate today's reference patch from the future
+performance scenario; future sequencers, clock, effects and controller mappings must be labeled
+as proposed capabilities. Album references inform musical workflow, not copied panel artwork.
 
 References establish interaction principles, not artwork to copy:
 
@@ -168,6 +208,11 @@ outputs. Review with these concrete tasks in mind:
 - Select one connection among several on a jack; find its other endpoint.
 - Explain base value vs. modulation range and distinguish bypass from removal.
 - Open browser/routing drawer without making selected controls unreachable.
+
+Add a future-performance storyboard for direction A: locate clock/run/reset; distinguish two
+sequence layers; change one layer's transpose and level; find filter and delay controls; hide
+cables and keep those actions understandable. Use the musical journey above as context. Mark
+all future modules and behavior as conceptual. This storyboard tests layout capacity only.
 
 Produce additional specimens for recommended direction A: focused cables; crowded patch
 (at least 12 modules and 20 connections, allowing intentional pan/zoom); long names; and
