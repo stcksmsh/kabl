@@ -26,6 +26,9 @@ pub struct Script {
     fails: usize,
     mark: Option<(Patch, Option<usize>, Option<CtlRef>)>,
     finished: bool,
+    now: f64,
+    /// Input time before which nothing new is sent (keeps clicks from merging into multi-clicks).
+    until: f64,
 }
 
 pub fn route_key(p: &Patch, r: &Route) -> String {
@@ -88,6 +91,8 @@ impl Script {
             fails: 0,
             mark: None,
             finished: false,
+            now: 0.0,
+            until: 0.0,
         })
     }
 
@@ -122,7 +127,8 @@ impl Script {
             }
         }
         raw.modifiers = self.mods;
-        if self.pending_shot.is_some() {
+        self.now = raw.time.unwrap_or(self.now);
+        if self.pending_shot.is_some() || self.now < self.until {
             return;
         }
         if self.wait > 0 {
@@ -271,6 +277,8 @@ impl Script {
                 let p = need!(tgt(self, 1), w[1]);
                 self.set_mods(&w[2..]);
                 let b = if w[0] == "rclick" { PointerButton::Secondary } else { PointerButton::Primary };
+                // Longer than egui's double-click window, so separate clicks stay separate.
+                self.until = self.now + 0.35;
                 self.queue.push_back(vec![Event::PointerMoved(p)]);
                 let times = if w[0] == "dblclick" { 2 } else { 1 };
                 for _ in 0..times {
@@ -356,6 +364,13 @@ impl Script {
                 self.queue.push_back(vec![]);
                 true
             }
+            "probe" => {
+                match find_ctl(&app.patch, w[1]) {
+                    Some(c) => self.probe(app, n, c),
+                    None => self.fail(n, format!("no control {}", w[1])),
+                }
+                false
+            }
             "mark" => {
                 self.mark = Some((app.patch.clone(), app.selected, app.inspect));
                 false
@@ -368,6 +383,68 @@ impl Script {
                 self.fail(n, format!("unknown command: {line}"));
                 false
             }
+        }
+    }
+
+    /// Samples the drawn knob geometry (cap, and the drawn range arc at r+11 ± 2) and reports
+    /// what the hit-test returns there. Cap points must all hit the knob; with the ring-band
+    /// gesture, at least 90 % of the drawn arc must hit that knob's ring.
+    fn probe(&mut self, app: &App, n: usize, c: CtlRef) {
+        let Some(geom::CtlGeo::Knob { c: cen, r }) = app.layout.mods[c.m].ctls[c.c] else {
+            self.fail(n, "probe: not a visible knob".into());
+            return;
+        };
+        let p = &app.patch;
+        let base = p.modules[c.m].values[c.c];
+        let (lo, hi) = p.mod_span(c, false);
+        let (t0, t1) = ((base + lo).clamp(0.0, 1.0), (base + hi).clamp(0.0, 1.0));
+        let mut cap_bad = 0;
+        let mut cap_n = 0;
+        let mut arc: std::collections::BTreeMap<String, usize> = Default::default();
+        let mut arc_n = 0;
+        for k in 0..72 {
+            let a = k as f32 * 5.0_f32.to_radians();
+            for rf in [0.3, 0.8, 1.0] {
+                let pt = cen + vec2(a.cos(), a.sin()) * r * rf;
+                cap_n += 1;
+                if geom::hit_test(&app.regions, pt) != Some(Hit::Knob(c)) {
+                    cap_bad += 1;
+                }
+            }
+        }
+        let steps = 60;
+        for i in 0..=steps {
+            let t = t0 + (t1 - t0) * i as f32 / steps as f32;
+            for dr in [-2.0, 0.0, 2.0] {
+                let pt = geom::polar(cen, r + 11.0 + dr, t);
+                arc_n += 1;
+                let h = geom::hit_test(&app.regions, pt);
+                let key = match h {
+                    Some(Hit::Ring(x)) if x == c => "own ring".to_string(),
+                    Some(Hit::Knob(x)) if x == c => "own body".to_string(),
+                    Some(Hit::Handle(r)) if p.routes[r].dst == c => "own handle".to_string(),
+                    Some(Hit::Ring(_)) => "NEIGHBOUR ring".to_string(),
+                    Some(Hit::Knob(_)) => "NEIGHBOUR body".to_string(),
+                    Some(h) => format!("{h:?}").split('(').next().unwrap_or("?").to_string(),
+                    None => "nothing".to_string(),
+                };
+                *arc.entry(key).or_default() += 1;
+            }
+        }
+        let pct = |k: &str| 100.0 * *arc.get(k).unwrap_or(&0) as f32 / arc_n as f32;
+        let summary = arc.iter().map(|(k, v)| format!("{k} {:.0}%", 100.0 * *v as f32 / arc_n as f32)).collect::<Vec<_>>().join(", ");
+        let msg = format!(
+            "probe {} ({:?}, r {r}): cap {}/{} hit own knob; drawn arc: {summary}",
+            p.ctl_def(c).id,
+            app.geo.depth,
+            cap_n - cap_bad,
+            cap_n
+        );
+        let ring_ok = app.geo.depth != geom::DepthGesture::RingBand || pct("own ring") >= 90.0;
+        if cap_bad == 0 && ring_ok {
+            self.ok(n, msg);
+        } else {
+            self.fail(n, msg);
         }
     }
 
@@ -428,7 +505,7 @@ impl Script {
                 Some(s) => {
                     let h = geom::hit_test(&app.regions, app.xf().inv(s));
                     let got = format!("{h:?}");
-                    check(got.starts_with(w[2]), got)
+                    check(got.starts_with(&format!("Some({}", w[2])), got)
                 }
                 None => (false, "unresolved target".into()),
             },
@@ -441,6 +518,10 @@ impl Script {
                 let got = app.toast_text();
                 check(got.contains(&want), got)
             }
+            "samepatch" => match &self.mark {
+                Some((pm, ..)) => check(*pm == app.patch, "patch differs".into()),
+                None => (false, "no mark".into()),
+            },
             "same" => match &self.mark {
                 Some((pm, sel, ins)) => check(*pm == app.patch && *sel == app.selected && *ins == app.inspect, "patch/selection differ".into()),
                 None => (false, "no mark".into()),
@@ -467,6 +548,13 @@ impl Script {
                 }
                 check(bad.is_empty(), bad.join(", "))
             }
+            "x" => match find_mod(p, w[1]) {
+                Some(m) => {
+                    let x = app.layout.mods[m].rect.left();
+                    check((x - f(2).unwrap_or(f32::NAN)).abs() < 0.5, format!("{x}"))
+                }
+                None => (false, "no module".into()),
+            },
             "zoom" => check((app.zoom - f(1).unwrap_or(1.0)).abs() < 0.02, format!("{:.2}", app.zoom)),
             _ => (false, "unknown expect".into()),
         };

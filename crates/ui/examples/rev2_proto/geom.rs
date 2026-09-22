@@ -414,7 +414,7 @@ pub fn polar(c: Pos2, r: f32, t: f32) -> Pos2 {
 pub fn plug_pos(c: Pos2, r: f32, idx: usize, n: usize) -> Pos2 {
     let shown = n.min(3);
     let i = idx.min(2) as f32;
-    c + vec2((i - (shown as f32 - 1.0) / 2.0) * 15.0, r + 6.0)
+    c + vec2((i - (shown as f32 - 1.0) / 2.0) * 15.0, r + 8.0)
 }
 
 // ------------------------------------------------------------------------------ hit regions

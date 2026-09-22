@@ -1,0 +1,168 @@
+# Comparison variants, identical tasks per variant. Patch state carries across on purpose:
+# switching a variant must never change it (checked with mark/expect same).
+log setup: LFO -> Attack and LFO -> Decay (neighbouring small knobs both modulated)
+drag @jack:lfo.out @knob:adsr.attack_ms
+drag @jack:lfo.out @knob:adsr.decay_ms
+expect routes 3
+
+log === Q3 small knobs: ring band (spec)
+click @ui:depth.ring
+click @ui:hits
+probe adsr.attack_ms
+probe adsr.decay_ms
+probe filter.cutoff_hz
+shot v-ring-hits
+click @ui:hits
+expect hit @ring:adsr.attack_ms Ring
+expect hit @knob:adsr.attack_ms+0,-19 Knob
+expect hit @knob:adsr.attack_ms+0,-23 Ring
+log task: set Attack depth to +40 % without moving base (ring drag)
+dragby @ring:adsr.attack_ms 0 -30
+expect route lfo.out adsr.attack_ms amount 0.40
+expect value adsr.attack_ms 8 0.01
+key Z ctrl
+
+log === Q3 small knobs: explicit peak handle
+click @ui:depth.handle
+click @ui:hits
+probe adsr.attack_ms
+probe adsr.decay_ms
+shot v-handle-hits
+click @ui:hits
+dragby @handle:adsr.attack_ms 0 -30
+expect route lfo.out adsr.attack_ms amount 0.40
+expect value adsr.attack_ms 8 0.01
+key Z ctrl
+log body over the whole cap+ring area drags base in handle mode
+expect hit @knob:adsr.attack_ms+0,-23 Knob
+
+log === Q3 small knobs: inspector only
+click @ui:depth.inspector
+probe adsr.attack_ms
+click @knob:adsr.attack_ms
+expect inspect adsr.attack_ms
+dblclick @plug:adsr.attack_ms
+shot dbg-inspector-entry
+type +40 %
+key Enter
+expect route lfo.out adsr.attack_ms amount 0.40
+expect value adsr.attack_ms 8 0.01
+shot v-inspector
+key Z ctrl
+click @ui:depth.ring
+
+log === Q2 expansion: push
+click @ui:exp.push
+click @header:filter
+mark
+click @toggle:lfo
+expect x filter 834
+expect nooverlap
+dragby @knob:lfo.fade_ms 0 -20
+drag @jack:adsr.out @knob:lfo.phase
+expect route adsr.out lfo.phase present
+shot v-expand-push
+click @ui:autofocus
+expect cables Focus
+shot v-expand-push-autofocus
+click @ui:autofocus
+click @toggle:lfo
+expect x filter 444
+key Z ctrl
+key Z ctrl
+expect samepatch
+
+log === Q2 expansion: float
+click @ui:exp.float
+click @header:filter
+mark
+click @toggle:lfo
+expect x filter 444
+dragby @knob:lfo.fade_ms 0 -20
+drag @jack:adsr.out @knob:lfo.phase
+expect route adsr.out lfo.phase present
+expect hit @knob:lfo.phase Knob
+shot v-expand-float
+click @ui:autofocus
+shot v-expand-float-autofocus
+click @ui:autofocus
+click @toggle:lfo
+key Z ctrl
+key Z ctrl
+expect samepatch
+click @ui:exp.push
+
+log === Q1 hidden layout: identical task in both (set Cutoff by typing, bypass LFO -> Attack)
+click @ui:cables.hidden
+mark
+click @ui:layout.rack
+dblclick @pill:filter.cutoff_hz
+shot dbg-entry
+type 800
+key Enter
+expect value filter.cutoff_hz 800 1
+click @plug:adsr.attack_ms
+click @ui:card.bypass.lfo.out>adsr.attack_ms
+expect route lfo.out adsr.attack_ms bypass true
+shot v-hidden-rack
+key Z ctrl
+key Z ctrl
+expect samepatch
+mark
+click @ui:layout.compact
+expect same
+dblclick @pill:filter.cutoff_hz
+type 800
+key Enter
+expect value filter.cutoff_hz 800 1
+click @plug:adsr.attack_ms
+click @ui:card.bypass.lfo.out>adsr.attack_ms
+expect route lfo.out adsr.attack_ms bypass true
+shot v-hidden-compact
+key Z ctrl
+key Z ctrl
+expect samepatch
+log compact layout: drag-to-connect from a jack chip still works
+drag @jack:adsr.out @knob:filter.resonance
+expect route adsr.out filter.resonance present
+key Z ctrl
+click @ui:layout.rack
+click @ui:cables.all
+
+log === Q4 envelope timing A/B window
+click @ui:ab
+wait 40
+shot v-env-ab
+click @ui:ab.slow
+wait 10
+shot v-env-ab-slow
+click @ui:ab.patch
+click @ui:ab
+
+log === skin: labels_on_art both ways, both themes
+click @ui:skin.art
+shot v-skin-art-light
+click @ui:theme.dark
+shot v-skin-art-dark
+click @ui:skin.plates
+shot v-skin-plates-dark
+click @ui:theme.light
+
+log === crowded patch
+click @ui:patch.crowded
+expect nooverlap
+shot v-crowded-all
+click @ui:cables.focus
+click @header:lfo2
+shot v-crowded-focus
+click @ui:cables.hidden
+shot v-crowded-hidden-rack
+click @ui:layout.compact
+expect nooverlap
+shot v-crowded-hidden-compact
+click @knob:filter1.cutoff_hz
+expect inspect filter1.cutoff_hz
+shot v-crowded-compact-inspect
+click @ui:layout.rack
+click @ui:fit
+shot v-crowded-fit

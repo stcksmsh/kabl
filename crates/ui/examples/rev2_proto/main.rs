@@ -44,6 +44,7 @@ enum EntryTarget {
 struct Entry {
     target: EntryTarget,
     text: String,
+    current: String,
     pos: Pos2,
     focused: bool,
     error: bool,
@@ -341,7 +342,8 @@ impl App {
                 i.pointer.primary_down(),
                 i.pointer.delta(),
                 i.modifiers,
-                i.pointer.button_double_clicked(egui::PointerButton::Primary),
+                // egui reports a double-click within 0.6 s of an earlier click as a triple.
+                i.pointer.button_double_clicked(egui::PointerButton::Primary) || i.pointer.button_triple_clicked(egui::PointerButton::Primary),
                 i.pointer.secondary_pressed(),
                 i.smooth_scroll_delta,
                 i.key_pressed(Key::Escape),
@@ -375,7 +377,10 @@ impl App {
                 self.pan += scroll;
             }
         }
-        if pressed && over && self.entry.is_none() {
+        if pressed && over && self.entry.is_some() {
+            // A press on the rack outside the entry field cancels the entry.
+            self.entry = None;
+        } else if pressed && over {
             self.press = Some(Press { hit: self.hover, origin: pos.unwrap_or_default(), started: false });
         }
         let fine = if mods.shift { 0.1 } else { 1.0 };
@@ -473,11 +478,12 @@ impl App {
     }
 
     fn open_entry(&mut self, target: EntryTarget, at: Pos2) {
-        let text = match target {
+        let current = match target {
             EntryTarget::Base(c) => self.value_str(c),
             EntryTarget::Amount(r) => format!("{:+.0} %", self.patch.routes[r].amount * 100.0),
         };
-        self.entry = Some(Entry { target, text, pos: at + vec2(12.0, 12.0), focused: false, error: false });
+        // Empty field with the current value as the hint: typing replaces it.
+        self.entry = Some(Entry { target, text: String::new(), current, pos: at + vec2(12.0, 12.0), focused: false, error: false });
     }
 
     fn drop_wire(&mut self, from: JackRef, before: Patch, moved: Option<Route>, unplugged: bool, alt: bool) {
@@ -897,7 +903,7 @@ impl App {
                     EntryTarget::Amount(_) => "amount, e.g. +40 % · -25",
                 };
                 ui.label(egui::RichText::new(hint).small());
-                let resp = ui.add(egui::TextEdit::singleline(&mut e.text).desired_width(160.0).id(egui::Id::new("entry_text")));
+                let resp = ui.add(egui::TextEdit::singleline(&mut e.text).hint_text(e.current.as_str()).desired_width(160.0).id(egui::Id::new("entry_text")));
                 if !e.focused {
                     resp.request_focus();
                     e.focused = true;
@@ -1002,15 +1008,17 @@ impl App {
         }
     }
 
-    fn ab_window(&mut self, ctx: &egui::Context) {
+    fn ab_window(&mut self, ctx: &egui::Context, rects: &mut HashMap<String, Rect>) {
         let mut open = self.ab_open;
         let lfo = self.patch.modules.iter().position(|m| m.kind == Kind::Lfo);
         let env = self.patch.modules.iter().position(|m| m.kind == Kind::Adsr);
         egui::Window::new("Envelope-time modulation · A/B").open(&mut open).default_width(700.0).show(ctx, |ui| {
             ui.label(egui::RichText::new("SIMULATION, not engine output. Production kabl_modules::dsp FullAdsr/FullLfo/FullOsc/Svf, unmodified; route summing and the two timing policies are this harness's. Only the policy differs between A and B.").small());
             ui.horizontal(|ui| {
-                ui.radio_value(&mut self.ab_slow, false, "Current patch values");
-                ui.radio_value(&mut self.ab_slow, true, "Slow pad (stress case)");
+                let a = ui.radio_value(&mut self.ab_slow, false, "Current patch values");
+                let b = ui.radio_value(&mut self.ab_slow, true, "Slow pad (stress case)");
+                rects.insert("ab.patch".into(), a.rect);
+                rects.insert("ab.slow".into(), b.rect);
             });
             let sc = if self.ab_slow {
                 envtime::Scenario::slow_pad()
@@ -1145,7 +1153,7 @@ impl eframe::App for App {
         });
         self.entry_ui(&ctx);
         if self.ab_open {
-            self.ab_window(&ctx);
+            self.ab_window(&ctx, &mut rects);
         }
         self.ui_rects = rects;
         if self.flash.is_some() || self.toast.is_some() {

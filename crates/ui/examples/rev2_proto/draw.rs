@@ -222,7 +222,11 @@ pub fn canvas(app: &App, p: &Painter) {
     if cables != Cables::Hidden {
         draw_cables(app, p, &th, xf, focus, cables, false);
     }
-    // Floating advanced areas over neighbours, then any leads ending inside them.
+    // Pills and hidden-mode badges sit above cables.
+    for (mi, pl) in app.layout.mods.iter().enumerate() {
+        draw_pills(app, p, &th, xf, mi, pl, cables == Cables::Hidden, Some(false));
+    }
+    // Floating advanced areas over neighbours, then the leads and pills inside them.
     for (mi, pl) in app.layout.mods.iter().enumerate() {
         if pl.overlay {
             draw_module(app, p, &th, xf, mi, pl, true);
@@ -231,9 +235,10 @@ pub fn canvas(app: &App, p: &Painter) {
     if cables != Cables::Hidden {
         draw_cables(app, p, &th, xf, focus, cables, true);
     }
-    // Pills and hidden-mode badges sit above cables.
     for (mi, pl) in app.layout.mods.iter().enumerate() {
-        draw_pills(app, p, &th, xf, mi, pl, cables == Cables::Hidden);
+        if pl.overlay {
+            draw_pills(app, p, &th, xf, mi, pl, cables == Cables::Hidden, Some(true));
+        }
     }
 
     // Gesture feedback.
@@ -418,6 +423,43 @@ pub fn skin_color(dark: bool, f: f32) -> Color32 {
     }
 }
 
+fn moon(rect: Rect) -> (Pos2, f32) {
+    (pos2(rect.right() - rect.width() * 0.26, rect.top() + rect.height() * 0.2), rect.width() * 0.09)
+}
+
+fn moon_color(dark: bool) -> Color32 {
+    if dark {
+        hex("#f3e7c1")
+    } else {
+        hex("#fff6e2")
+    }
+}
+
+fn hill_y(rect: Rect, x: f32) -> f32 {
+    let f = (x - rect.left()) / rect.width();
+    rect.top() + rect.height() * (0.78 + 0.05 * (f * 9.0).sin())
+}
+
+fn hill_color(dark: bool) -> Color32 {
+    if dark {
+        hex("#1b1540")
+    } else {
+        hex("#6d5c9e")
+    }
+}
+
+/// Placeholder art colour under a point (panel rect and point in the same space).
+pub fn art_at(rect: Rect, pt: Pos2, dark: bool) -> Color32 {
+    let (mc, mr) = moon(rect);
+    if pt.distance(mc) <= mr {
+        moon_color(dark)
+    } else if pt.y >= hill_y(rect, pt.x) {
+        hill_color(dark)
+    } else {
+        skin_color(dark, (pt.y - rect.top()) / rect.height())
+    }
+}
+
 fn draw_skin_art(p: &Painter, rect: Rect, dark: bool) {
     let n = 40;
     for i in 0..n {
@@ -425,16 +467,16 @@ fn draw_skin_art(p: &Painter, rect: Rect, dark: bool) {
         let r = Rect::from_min_max(pos2(rect.left(), rect.top() + rect.height() * f0), pos2(rect.right(), rect.top() + rect.height() * (f0 + 1.0 / n as f32) + 1.0));
         p.rect_filled(r, CornerRadius::ZERO, skin_color(dark, f0));
     }
-    let moon = pos2(rect.right() - rect.width() * 0.26, rect.top() + rect.height() * 0.2);
-    p.circle_filled(moon, rect.width() * 0.09, if dark { hex("#f3e7c1") } else { hex("#fff6e2") });
-    let hills: Vec<Pos2> = (0..=12)
+    let (mc, mr) = moon(rect);
+    p.circle_filled(mc, mr, moon_color(dark));
+    let hills: Vec<Pos2> = (0..=24)
         .map(|i| {
-            let f = i as f32 / 12.0;
-            pos2(rect.left() + rect.width() * f, rect.top() + rect.height() * (0.78 + 0.05 * (f * 9.0).sin()))
+            let x = rect.left() + rect.width() * i as f32 / 24.0;
+            pos2(x, hill_y(rect, x))
         })
         .chain([rect.right_bottom(), rect.left_bottom()])
         .collect();
-    let hill = if dark { hex("#1b1540") } else { hex("#6d5c9e") };
+    let hill = hill_color(dark);
     for w in hills.windows(2) {
         let (a, b) = (w[0], w[1]);
         if a.y < rect.bottom() && b.y < rect.bottom() {
@@ -475,21 +517,23 @@ pub fn contrast(a: Color32, b: Color32) -> f32 {
     (x.max(y) + 0.05) / (x.min(y) + 0.05)
 }
 
-/// Worst label contrast over the art, measured at each label's position (placeholder art).
+/// Worst label contrast over the art: each label and value box is sampled on a 5×3 grid
+/// against the placeholder art under it (what a skin loader would measure on real art).
 pub fn skin_label_contrast(dark: bool, pl: &Placed) -> f32 {
     let ink = skin_ink(dark);
-    pl.ctls
-        .iter()
-        .flatten()
-        .flat_map(|g| {
-            let lab = g.label_pos();
-            let val = match *g {
-                CtlGeo::Knob { c, .. } => c + vec2(0.0, 38.0),
-                CtlGeo::Select { rect } => rect.center(),
-            };
-            [lab, val]
-        })
-        .map(|pt| contrast(ink, skin_color(dark, (pt.y - pl.rect.top()) / pl.rect.height())))
+    let boxes = pl.ctls.iter().flatten().flat_map(|g| {
+        let lab = Rect::from_center_size(g.label_pos(), vec2(44.0, 14.0));
+        let val = match *g {
+            CtlGeo::Knob { .. } => g.pill_rect("0.00 Hz").shrink2(vec2(4.0, 3.0)),
+            CtlGeo::Select { rect } => rect,
+        };
+        [lab, val]
+    });
+    let jacks = pl.jacks.iter().map(|j| Rect::from_center_size(j.center() - vec2(0.0, 24.0), vec2(20.0, 14.0)));
+    boxes
+        .chain(jacks)
+        .flat_map(|b| (0..15).map(move |i| pos2(b.left() + b.width() * (i % 5) as f32 / 4.0, b.top() + b.height() * (i / 5) as f32 / 2.0)))
+        .map(|pt| contrast(ink, art_at(pl.rect, pt, dark)))
         .fold(f32::MAX, f32::min)
 }
 
@@ -729,13 +773,17 @@ fn draw_knob(app: &App, p: &Painter, th: &Theme, xf: Xf, cref: CtlRef, cen: Pos2
     }
 }
 
-fn draw_pills(app: &App, p: &Painter, th: &Theme, xf: Xf, mi: usize, pl: &Placed, hidden: bool) {
+/// `overlay_pass`: Some(true) draws only a floating area's controls, Some(false) everything else.
+fn draw_pills(app: &App, p: &Painter, th: &Theme, xf: Xf, mi: usize, pl: &Placed, hidden: bool, overlay_pass: Option<bool>) {
     let m = &app.patch.modules[mi];
     let d = m.def();
     let z = xf.zoom;
     let on_art = m.kind == Kind::Ensemble && app.labels_on_art;
     for (c, g) in pl.ctls.iter().enumerate() {
         let Some(CtlGeo::Knob { c: cen, r }) = *g else { continue };
+        if overlay_pass.is_some_and(|o| o != (pl.overlay && !m.primary[c])) {
+            continue;
+        }
         let cref = CtlRef { m: mi, c };
         let value = fmt_value(&d.controls[c].spec, m.values[c]);
         let routes: Vec<(usize, &Route)> = app.patch.routes_to(cref).collect();
@@ -754,11 +802,11 @@ fn draw_pills(app: &App, p: &Painter, th: &Theme, xf: Xf, mi: usize, pl: &Placed
                 p.circle_filled(sp, 3.4 * z, pc);
             }
             let s = if routes.len() == 1 { format!("← {}", app.patch.module_label(routes[0].1.src.m)) } else { format!("← {} mods", routes.len()) };
-            badge(p, pos2(pr.center().x, pr.bottom() + 9.0 * z), &s, pc, th, z);
+            badge(p, badge_pos(app, pl, mi, c, pr, &s, xf), &s, pc, th, z);
         }
         pill(p, pr, &value, pc, th.panel, th.ink, 11.5 * z);
     }
-    if hidden && !pl.compact {
+    if hidden && !pl.compact && overlay_pass != Some(true) {
         // Jack badges: where each cable goes, in place of the cable.
         for (j, jd) in d.jacks.iter().enumerate() {
             let jr = JackRef { m: mi, j };
@@ -770,6 +818,42 @@ fn draw_pills(app: &App, p: &Painter, th: &Theme, xf: Xf, mi: usize, pl: &Placed
             }
         }
     }
+}
+
+/// Below the pill; if that hits another control's label or selector, beside the pill on
+/// whichever side stays inside the panel (revision-2 INTERACTIONS §2.1).
+fn badge_pos(app: &App, pl: &Placed, mi: usize, own: usize, pill: Rect, s: &str, xf: Xf) -> Pos2 {
+    let z = xf.zoom;
+    let d = app.patch.modules[mi].def();
+    let bw = (s.chars().count() as f32 * 6.2 + 12.0) * z;
+    let obstacles: Vec<Rect> = pl
+        .ctls
+        .iter()
+        .enumerate()
+        .filter(|(c, _)| *c != own)
+        .filter_map(|(c, g)| g.map(|g| (c, g)))
+        .flat_map(|(c, g)| {
+            let lab = Rect::from_center_size(g.label_pos(), vec2(d.controls[c].label.chars().count() as f32 * 7.0, 16.0));
+            let body = match g {
+                CtlGeo::Select { rect } => rect,
+                CtlGeo::Knob { c, r } => Rect::from_center_size(c, vec2(2.0 * r, 2.0 * r)),
+            };
+            let val = match g {
+                CtlGeo::Knob { .. } => g.pill_rect("0000000"),
+                CtlGeo::Select { rect } => rect,
+            };
+            [xf.r(lab), xf.r(body), xf.r(val)]
+        })
+        .collect();
+    let panel = xf.r(pl.adv.map_or(pl.rect, |a| pl.rect.union(a)));
+    let below = pos2(pill.center().x, pill.bottom() + 9.0 * z);
+    let right = pos2(pill.right() + 4.0 * z + bw / 2.0, pill.center().y);
+    let left = pos2(pill.left() - 4.0 * z - bw / 2.0, pill.center().y);
+    let fits = |c: Pos2| {
+        let r = Rect::from_center_size(c, vec2(bw, 15.0 * z));
+        panel.contains_rect(r) && !obstacles.iter().any(|o| o.intersects(r))
+    };
+    [below, right, left].into_iter().find(|c| fits(*c)).unwrap_or(below)
 }
 
 /// `← MIDI`, `→ Filter`, `→ 2 routes`; None when unconnected.
