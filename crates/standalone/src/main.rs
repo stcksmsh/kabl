@@ -1,6 +1,6 @@
-//! `kabl` standalone binary: opens the default audio output device and the first available MIDI
-//! input port, compiles `default_patch()`, and plays it live. This is brief section 12's
-//! `standalone` crate (cpal + midir) — the "something a person can open and hear" milestone.
+//! `kabl` standalone binary: opens the default audio output device and a MIDI input port,
+//! compiles `default_patch()`, and plays it live. This is brief section 12's `standalone` crate
+//! (cpal + midir) — the "something a person can open and hear" milestone.
 //!
 //! No UI yet (that's `kabl-ui`, separate) — this binary alone gets you a playable polysynth from
 //! any class-compliant MIDI controller, nothing to patch or configure yet beyond `default_patch()`.
@@ -14,6 +14,9 @@
 //! button writes) instead of playing `default_patch()`. `--save-default <dir>` writes
 //! `default_patch()` out in that format and exits, as a starting point to then edit with
 //! `kabl-ui` — neither binary shipped any way to get a save file onto disk before this existed.
+//! `--midi <substring>` connects to the first port whose name contains it (case-insensitive);
+//! without it, the first port that isn't ALSA's own "Midi Through" virtual loopback (confirmed
+//! live: a real controller plugged in still lost to it before this existed).
 
 use std::path::Path;
 
@@ -88,7 +91,7 @@ fn main() {
     };
 
     let (midi_producer, mut midi_consumer) = rtrb::RingBuffer::<VoiceEvent>::new(256);
-    let _midi_connection = connect_midi(midi_producer);
+    let _midi_connection = connect_midi(midi_producer, flag_value(&args, "--midi"));
 
     let mut left_ring = RingBuffer::new(RING_CAPACITY);
     let mut right_ring = RingBuffer::new(RING_CAPACITY);
@@ -178,6 +181,7 @@ fn pick_output_config(device: &cpal::Device) -> Option<cpal::SupportedStreamConf
 /// for why (`VoiceAllocator` isn't RT-safe to call from the audio callback).
 fn connect_midi(
     mut producer: rtrb::Producer<VoiceEvent>,
+    name_filter: Option<String>,
 ) -> Option<midir::MidiInputConnection<()>> {
     let midi_in = match midir::MidiInput::new("kabl") {
         Ok(m) => m,
@@ -191,7 +195,25 @@ fn connect_midi(
         eprintln!("kabl: no MIDI input ports found -- connect a controller and restart to play.");
         return None;
     }
-    let port = &ports[0];
+    // Default (no --midi): first port whose name doesn't look like ALSA's own virtual "Midi
+    // Through" loopback, since that's never the instrument a person actually wants to play --
+    // falls back to the first port if every port looks like that (still better than silently
+    // connecting to nothing).
+    let port = match &name_filter {
+        Some(filter) => ports.iter().find(|p| {
+            midi_in
+                .port_name(p)
+                .is_ok_and(|n| n.to_lowercase().contains(&filter.to_lowercase()))
+        }),
+        None => ports
+            .iter()
+            .find(|p| midi_in.port_name(p).is_ok_and(|n| !n.contains("Through"))),
+    }
+    .or(ports.first());
+    let Some(port) = port else {
+        eprintln!("kabl: no MIDI port matched --midi {name_filter:?}");
+        return None;
+    };
     let port_name = midi_in
         .port_name(port)
         .unwrap_or_else(|_| "unknown".to_string());
