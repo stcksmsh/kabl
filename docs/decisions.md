@@ -877,3 +877,96 @@ a mono output device gets the left channel only (not an L+R downmix) since chann
 written from `left_ring` and channels 1+ from `right_ring` — a real but minor gap for the
 uncommon mono-output case, most devices are stereo. None of these block "can a person plug in a
 MIDI keyboard and hear the synth," which was the actual goal.
+
+## 2026-09-22 — `kabl-ui`: the patchbay
+
+Owner: "Do the UI yourself, do everything, we can easily fix it later" — building brief section
+12's `ui` crate. Split the same way `standalone` was: `editor.rs`'s `PatchEditor` (patch-editing
+logic over `kabl_core::PatchLog` — every mutation is a real `Op`, so undo/redo comes from the
+existing log machinery, not a UI-layer reimplementation) is fully hardware-independent and
+tested headlessly; `lib.rs`'s `show()` is the actual `egui` widget tree; `main.rs` wires live
+audio (same `cpal`/`midir`/`PatchEngine` shape as `standalone`) plus `eframe` windowing.
+
+**egui/eframe version note**: latest (0.36.2) needs rustc 1.95; this toolchain has 1.94.1, so
+pinned to 0.35.0 — checked by trying to build, not guessed. 0.35's `Panel` API is a bigger
+change than a version bump suggests: `TopBottomPanel`/`SidePanel` were unified into one
+`egui::Panel::{top,bottom,left,right}(id)`, and `eframe::App::update(&mut self, ctx: &Context,
+...)` became `App::ui(&mut self, ui: &mut Ui, ...)` — panels now nest inside a `&mut Ui` the
+integration hands you, not a `&Context` you thread through yourself. Found by reading the
+installed crate source directly (`~/.cargo/registry/.../egui-0.35.0/src/containers/panel.rs`)
+after the pattern from memory didn't compile, rather than guessing at API shapes.
+
+**Also switched off the default `wgpu` renderer to `glow`** (`eframe = { default-features =
+false, features = ["glow", ...] }`). Checked, not assumed: this container has no `/dev/snd`
+*and* no display server, so before writing 500 lines of UI code the plan was verified against
+reality first — installed `libxkbcommon-x11-0` (a missing shared library `winit` needed just to
+open an X11 event loop), started a virtual X server (`Xvfb`) with `LIBGL_ALWAYS_SOFTWARE=1`
+(Mesa's `llvmpipe` software rasterizer, already present), and tried running the built binary.
+`wgpu`'s default backend selection failed outright (`CreateSurfaceError`) under Xvfb's software
+GL; `glow` (classic OpenGL via `glutin`) worked. This is a real, load-bearing finding, not a
+guess: it means this specific container can validate the UI actually renders, not just compiles.
+
+**Ran it and looked at the result** — `xwd`+`imagemagick` for a screenshot, `xdotool` to simulate
+a click, none of which existed in the container until installed (all safe, reversible dev-tool
+installs, same category as `libasound2-dev` earlier). This caught a real bug the same session's
+established "measure before claiming" rule exists for: `kabl_standalone::default_patch()` gave
+every module the identical `pos: Vec2{0,0}` (nobody had ever needed positions to be distinct
+before — `standalone`'s binary doesn't render anything). In the UI, all 6 modules rendered
+stacked exactly on top of each other; only the topmost (`out`, drawn last) was visible. Fixed by
+giving `default_patch()` real staggered positions (left-to-right in signal-flow order) — this is
+shared with `kabl-standalone`, so both crates now start from a patch that actually looks like
+what it is. A second, smaller issue found the same way: newly-added modules all spawned at the
+same fixed `(40,40)`, so repeated "Add module" clicks stacked new boxes on each other too — fixed
+with a cheap cascade offset (`40 + (count%10)*24`) rather than solving real auto-layout, which is
+follow-up work if it matters once dragging is the normal way to place things.
+
+Design choices in `editor.rs`/`lib.rs`:
+- **Snapshot-then-mutate, every frame.** `show_canvas`/`show_param_panel` clone the module/cable
+  data they need to draw *before* touching `editor` mutably (a click handled mid-draw calls
+  `editor.add_module`/`connect`/etc. immediately — immediate-mode UI, no separate "apply queued
+  actions" pass). Holding `editor.state()`'s borrow across a later `&mut editor` call doesn't
+  borrow-check otherwise; cloning a small `Vec` of positions/kinds once per UI frame is cheap
+  (this is the UI thread, not the audio thread — nothing here claims or needs RT-safety).
+- **Drags commit once, on release, not every frame.** Dragging a module updates only `UiState`'s
+  local `live_pos` each frame; a single `MoveModule` op is appended to the log on
+  `drag_stopped()`. Committing every frame would flood the undo history with one entry per
+  rendered frame for a single drag gesture — wrong grain for "undo" to operate at.
+- **Port-click-to-connect, not drag-a-cable.** Click an output port (arms it, shown in the
+  toolbar), then click an input port to complete the connection, or click the same output again
+  to cancel. Simpler to implement and test correctly than cable-dragging with hit-testing against
+  a moving cursor; a real "drag from port to port" interaction is nicer and can replace this
+  later without changing `PatchEditor`'s API at all (the UI layer is the only thing that would
+  change).
+- **No canvas panning/scrolling yet** — `default_patch()`'s modules already run off the visible
+  width at default window size (visible in the screenshot: `vca`/`out` are clipped by the side
+  panel). A real gap, not hidden — flagged in STATUS.md.
+- **`kind`/port validity isn't re-checked by the editor** (`add_module`/`connect` accept whatever
+  string/`PortRef` they're given). `compile()` already rejects an unknown kind or port
+  (`CompileError::UnknownKind`/`UnknownPort`) — the same error path a corrupted saved file would
+  hit — so the editor doesn't need a second, UI-layer copy of that validation. In practice `show()`
+  only ever offers valid kinds (from `registry::KNOWN_KINDS`) and valid ports (from the clicked
+  module's own `ModuleInfo`) as choices anyway.
+
+**Known, flagged compromise in `main.rs`, not textbook RT-safe**: the audio callback and the
+UI/control thread share one `PatchEngine` behind a `Mutex`. The callback only ever `try_lock`s
+(silence for that block on contention, never a blocking wait); the control thread takes a real
+lock only when an edit landed (`PatchEditor::take_dirty()`), for the duration of `build_swap`
+(which calls `compile()` — real, non-trivial work). Any audio block landing in that window gets
+silence, not corruption or a panic — a real, audible glitch risk on every edit, not a crash risk.
+The textbook fix is restructuring `PatchEngine` so the control thread reads a lock-free-published
+state snapshot instead of sharing the live instance — real follow-up work, not attempted blind
+tonight without a way to exercise actual concurrent audio+UI threads here to verify it.
+
+**Testing**: 16 tests in `crates/ui/tests/editor_and_ui.rs` — `PatchEditor`'s full surface (add/
+remove/connect/disconnect/move/set_param, undo/redo including no-op edge cases, `seed_from`
+reproducing the source patch exactly and being undoable back to empty, fresh IDs never colliding
+with seeded ones, the dirty flag's take-once semantics) plus two headless `show()` smoke tests
+proving the actual widget tree runs across several frames and with a module selected, without
+panicking — using `egui::Context::begin_pass`/`end_pass` directly (pure Rust, no window/GPU
+needed for this, confirmed by reading `egui::Context::run_ui`'s own doc example). Beyond the
+smoke test, the interactive/visual correctness (does a click really land, does it look right) was
+checked by hand this session (screenshot + a real `xdotool` click, both included above) rather
+than automated — a real gap between "proven" and "eyeballed once," flagged, not conflated.
+
+Workspace build/test/clippy/fmt all clean, including the full `egui`/`eframe`/`winit`/`wgpu`-free-
+`glow` dependency tree now pulled into the workspace.

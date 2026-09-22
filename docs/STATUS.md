@@ -5,7 +5,7 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-21, after the standalone binary (`crates/standalone`, cpal + midir) landed.
+Last updated: 2026-09-22, after `kabl-ui` (the patchbay) landed and was actually run + screenshotted.
 
 ## Autonomous overnight work (started 2026-09-21)
 
@@ -13,13 +13,16 @@ Owner: fully autonomous, work the backlog, conserve tokens, self-restart if usag
 further check-in expected until morning. Originally scoped to self-contained items only (nothing
 needing hardware, a UI, or a human ear) — owner then explicitly said "do the UI yourself, do
 everything, we can easily fix it later," authorizing the `standalone`/`ui` crates too. Built
-standalone first (cpal+midir — the actual "hear it" milestone; a UI without real audio/MIDI under
-it still can't make sound). **This container has no audio hardware (`/dev/snd` doesn't exist) and
-no display server** — checked, not assumed. Everything buildable/logic-testable without hardware
-was built and tested here; real device I/O and any GUI rendering need verification on a machine
-that actually has them. See each item's decisions.md entry for what was picked and why. If you're
-reading this mid-run: check `git log` for the latest commit and this file's "Where we are" below
-for the current real state; nothing here should be stale by more than one work chunk.
+standalone first (cpal+midir — the "hear it" milestone), then `kabl-ui` (the patchbay). **This
+container has no audio hardware (`/dev/snd` doesn't exist) and no display server** — checked, not
+assumed. For the UI specifically, a virtual X server (`Xvfb`) + Mesa's software GL renderer
+(`llvmpipe`, already installed) turned out to be enough to actually *run* it headlessly and
+capture a real screenshot (sent to owner) — so unlike `standalone`'s audio path, the UI's
+rendering and one real interaction (a simulated "Add module" click) are genuinely verified here,
+not just built and logic-tested. Audio playback and MIDI hardware still need a real machine. See
+each item's decisions.md entry for what was picked and why. If you're reading this mid-run: check
+`git log` for the latest commit and this file's "Where we are" below for the current real state;
+nothing here should be stale by more than one work chunk.
 
 ## Workflow (changed 2026-09-21)
 
@@ -91,37 +94,60 @@ binary correctly detects that and falls back to rendering a self-test WAV instea
 owner), proving the synthesis path but not real device I/O. Run it on a real machine to confirm
 actual playback. See decisions.md "Standalone binary" for the full design.
 
+**`kabl-ui` (the patchbay) now exists**: `crates/ui`, binary `kabl-ui`. A real node-graph editor —
+modules as draggable positioned boxes, click-a-port-then-click-a-port to cable, per-module param
+sliders, undo/redo — built on `editor.rs::PatchEditor`, which drives `kabl_core::PatchLog`
+directly (every edit is a real `Op`, so undo/redo is the existing log machinery, not reinvented).
+`main.rs` embeds the same `cpal`/`midir`/`PatchEngine` audio path `standalone` uses, recompiling
+and hot-swapping on every edit. **Actually run and screenshotted in this container** (Xvfb +
+software GL) — caught and fixed a real bug this way: `default_patch()`'s modules all shared
+position `(0,0)` and rendered stacked on top of each other; now staggered. See decisions.md
+"`kabl-ui`: the patchbay" for the full design, including a flagged, deliberate compromise (the
+audio callback and UI thread share one `PatchEngine` behind a `Mutex` with `try_lock` on the
+audio side — real glitch risk on every edit, not a crash risk; the textbook fix needs restructuring
+`PatchEngine` around a lock-free state-snapshot publish, not attempted blind).
+
 Still missing before it's the *complete* "person can open, patch, and hear" product: cables (v2
-params beyond simple wiring), a UI (patchbay — next up), persistence (the binary always plays
-`default_patch()`, doesn't load a saved `.kabl` file yet even though `core`'s file format already
-exists). `core` (the op log) is real, production-shaped code, already at v1 quality. `engine`'s
-S1/S2/S3 spike code is still hand-rolled fixed-topology graphs using raw `dsp` primitives
-directly — expect it to be absorbed into/replaced by the real compiler, not extended indefinitely.
+params beyond simple wiring), persistence (always starts from `default_patch()`, doesn't load or
+save a `.kabl` file yet even though `core`'s file format already exists), canvas panning (modules
+placed off the default window width are simply clipped, no scroll/zoom). `core` (the op log) is
+real, production-shaped code, already at v1 quality. `engine`'s S1/S2/S3 spike code is still
+hand-rolled fixed-topology graphs using raw `dsp` primitives directly — expect it to be absorbed
+into/replaced by the real compiler, not extended indefinitely.
 
 ## Handover: next session starts here
 
-The compiler is built, RT-safe, swappable, tested, and committed; a standalone binary can now
-play it live (modulo verifying real hardware, which this environment can't do). What's NOT done,
-in rough priority order for "something a person can actually patch and hear live":
+The compiler is built, RT-safe, swappable, tested, and committed. A standalone binary and a
+patchbay UI both exist and both embed live audio. Every crate in brief section 12's table now has
+*something* real in it except `cables`/`pedals`/`learn`/`clap` (still stubs, later milestones).
+What's NOT done, in rough priority order for "something a person can actually patch and hear
+live":
 
-1. **No UI** — `crates/ui` is still an empty stub. Owner authorized building it autonomously
-   ("do the UI yourself... we can easily fix it later") — next item to build. This container has
-   no display server either, so the same "build + logic-test what's testable, flag what needs a
-   real environment" approach applies.
-2. **No persistence wired into the standalone binary** — always plays `default_patch()`;
-   `core`'s file format (op log, `PatchLog`) already exists and is tested, just not loaded here.
-3. **Buffer-pool reuse**: every port gets its own fresh buffer right now; fine for correctness,
+1. **Nothing has been run on real audio/MIDI hardware or a real display.** This is the single
+   biggest remaining unknown — everything here was built against API docs/source and verified as
+   much as a headless container allows (Xvfb screenshots, WAV self-tests, `assert_no_alloc`), but
+   never actually heard or interacted with by a person. Run `cargo run -p kabl-standalone` and
+   `cargo run -p kabl-ui` on a real machine first, before trusting any of the audio/UI claims
+   beyond "it compiles and the logic tests pass."
+2. **No persistence** — neither binary loads/saves a `.kabl` file; both always start from
+   `default_patch()`. `core`'s file format already exists and is tested (`crates/core/src/
+   format.rs`), just not wired into either binary yet. Probably the next real feature: it's what
+   turns "always the same demo patch" into an actual instrument.
+3. **`kabl-ui`'s `Mutex`-sharing compromise** (see decisions.md) — works, flagged as not
+   textbook-RT-safe, real follow-up work if edit-time glitches turn out to be audible/annoying in
+   practice on real hardware.
+4. **Buffer-pool reuse**: every port gets its own fresh buffer right now; fine for correctness,
    wasteful for anything beyond test-sized patches.
-4. Cycle handling still hard-errors instead of brief section 7.1's implicit 1-block delay — not
+5. Cycle handling still hard-errors instead of brief section 7.1's implicit 1-block delay — not
    needed by any v1 accept-test patch, but real feedback patches will hit it.
-5. Overlapping swaps (a second `build_swap` while one is still crossfading) aren't handled by
+6. Overlapping swaps (a second `build_swap` while one is still crossfading) aren't handled by
    either `Engine` or `PatchEngine` — a pre-existing S1 gap, not new.
-6. **`standalone`'s real device I/O is unverified** — needs to actually run on a machine with
-   audio hardware and a MIDI controller. The self-test WAV fallback proves the signal path but
-   not `cpal`/`midir` themselves.
+7. No canvas pan/scroll in `kabl-ui` — a patch wider than the window is simply clipped.
 
-No new open question from the owner to resolve first — the natural next chunk is #1 above (the
-UI) per the owner's explicit go-ahead.
+No new open question from the owner to resolve first — everything on the originally-scoped
+autonomous list, plus the UI/standalone work the owner explicitly authorized, is now done. The
+natural next chunk is #1 (real-hardware verification, needs the owner) or #2 (persistence, still
+self-contained/testable) — see the end of this file for which the autonomous session picks next.
 
 ## Spike checklist (brief section 11)
 
@@ -148,9 +174,9 @@ What actually exists vs. what's still spike-scoped or missing:
 | `cables`: depth only | **not built.** `crates/cables` is an empty stub. |
 | `modules`: 9 v1 built-ins + metadata | **9 of 9 have a `Module` impl.** `Module` trait, `ModuleInfo`, `ProcessIo`/`Signal` all built and tested. `osc.va` now has all 4 waveforms + hard sync (triangle naive, not BLEP/BLAMP-corrected). `lfo` has no sync (needs a clock, v3 scope) — see decisions.md. **Registry now exists** (`registry.rs`: `create(kind)`, `all_infos()`, `info_for(kind)`) — the compiler uses it to turn `ModuleState.kind` strings into instances. |
 | `learn`: unlock flags filter catalog | **not built.** `crates/learn` is an empty stub. |
-| `ui`: egui patchbay | **not built yet.** `crates/ui` is still an empty stub — next item, owner authorized autonomous build. |
+| `ui`: egui patchbay | **built, run, and screenshotted.** `crates/ui`, binary `kabl-ui`. Node-graph editor over `PatchEditor` (real op-log-backed undo/redo), live audio via the same `cpal`/`midir`/`PatchEngine` path as `standalone` (shared behind a flagged, non-textbook-RT-safe `Mutex` — see decisions.md). Verified actually rendering + handling a real click in this container via Xvfb; audio playback itself still unverified (no device here). |
 | `standalone`: cpal + midir + JACK | **cpal + midir built** (`crates/standalone`, binary `kabl`). Default patch, live MIDI-in, RT-safe audio callback. Unverified on real hardware (none in this container) — falls back to a WAV self-test render instead. JACK not attempted (cpal's JACK backend needs a running jackd; deferred, not blocking — ALSA/default host covers the common case). No persistence (always plays `default_patch()`). |
-| **v1 accept test** (play a 4-voice MIDI chord, repatch live no click, undo, save, reload, replay construction log; potato gate passes) | **not fully achievable yet** — no UI to repatch/save/reload from. The "play a chord live" half now has real infrastructure (`standalone` + `PatchEngine`), unverified on real hardware from this environment. |
+| **v1 accept test** (play a 4-voice MIDI chord, repatch live no click, undo, save, reload, replay construction log; potato gate passes) | **infrastructure complete, unverified end-to-end.** `kabl-ui` now provides live repatch + undo/redo; persistence (save/reload) isn't wired into either binary yet (`core`'s file format exists, unused so far). Nothing here has been exercised on real audio/MIDI hardware or a real display by a person. |
 
 Bottom line: the *risky architectural bets* (event-sourced patch, cable-as-node swap mechanism,
 control-rate optimization) are de-risked. The *product* — something Kosta can open, patch, and
@@ -230,9 +256,33 @@ crates/
                                 observable. NOT verified against real audio/MIDI hardware --
                                 none exists in this container. See decisions.md "Standalone
                                 binary".
-  cables/, pedals/, learn/, ui/, clap/
+  ui/          REAL, first version. Binary `kabl-ui` (cargo run -p kabl-ui). Depends on
+               kabl-standalone as a library (reuses default_patch/RingBuffer/
+               resolve_midi_message/apply_voice_event -- no duplicated audio glue).
+                 editor.rs - PatchEditor: patch-editing logic over kabl_core::PatchLog (every
+                                edit is a real Op -- undo/redo is the log's, not reimplemented).
+                                add_module/remove_module/connect/disconnect/move_module/
+                                set_param/undo/redo/seed_from(existing PatchState). Hardware-
+                                independent, fully unit-tested.
+                 lib.rs    - show(): the egui widget tree. Node boxes positioned by ModuleState
+                                .pos, click-a-port-then-click-a-port cabling, per-module param
+                                sliders in a side panel, drag-to-move (commits one MoveModule op
+                                on release, not per-frame). Snapshots editor state before
+                                mutating mid-frame (immediate-mode borrow-checker reality).
+                 main.rs   - eframe app: embeds the same cpal/midir/PatchEngine path standalone
+                                uses, recompiling+hot-swapping on every edit. Known compromise:
+                                audio callback and UI thread share one PatchEngine behind a
+                                Mutex (try_lock on the audio side) -- flagged, not textbook RT-
+                                safe, see decisions.md.
+               16 tests in tests/editor_and_ui.rs: PatchEditor's full surface plus two headless
+               show() smoke tests (egui::Context::begin_pass/end_pass, no window/GPU needed).
+               Also actually RUN in this container via Xvfb + software GL + a real xdotool
+               click -- screenshot sent to owner, caught and fixed a real bug (default_patch()'s
+               modules all shared pos (0,0), rendered stacked). See decisions.md "kabl-ui: the
+               patchbay".
+  cables/, pedals/, learn/, clap/
                STUBS. `//! Stub — not yet implemented.` One-line lib.rs each, empty Cargo.toml
-               deps. Scaffolded so the workspace builds; no logic. `ui/` is next up.
+               deps. Scaffolded so the workspace builds; no logic. Later milestones (v2+).
 benches/       (top-level, per brief's tree) — not where Cargo benches actually live; see
                docs/decisions.md's "Structural note" under the dependency table. Real criterion
                harnesses: crates/engine/benches/{s2_potato,s3_simd_voices}.rs.
@@ -258,9 +308,13 @@ cargo fmt --all -- --check
 taskset -c 0 cargo bench -p kabl-engine --bench s2_potato
 taskset -c 0 cargo bench -p kabl-engine --bench s3_simd_voices
 
-# Play it live (needs real audio output + optionally a MIDI controller; on Linux, cpal needs
-# libasound2-dev installed to build at all -- see decisions.md "Standalone binary"):
+# Play it live, no UI (needs real audio output + optionally a MIDI controller; on Linux, cpal
+# needs libasound2-dev installed to build at all -- see decisions.md "Standalone binary"):
 cargo run -p kabl-standalone
+
+# Play it live WITH the patchbay UI (same hardware needs as above, plus a display; on Linux also
+# needs libxkbcommon-x11-0 -- see decisions.md "kabl-ui: the patchbay"):
+cargo run -p kabl-ui
 ```
 
 All green as of the latest commit on `master` — check `git log -1` to confirm you're reading
@@ -294,17 +348,30 @@ this against the commit it was last updated for.
   proven in `tests/patch_engine_swap.rs`. Along the way, fixed a real bug: `env.adsr` wasn't
   carrying `FullAdsr::gate_was_high` across recompile, so a held gate re-triggered `Attack` on
   every swap. See decisions.md "`PatchEngine`: wiring the compiler into S1's swap mechanism".
-- ~~**No control surface drives `PatchEngine`**~~ — `standalone` now exists (`cargo run -p
-  kabl-standalone`). Still no UI, and `standalone`'s real audio/MIDI I/O is unverified (no
-  hardware in this container — see decisions.md "Standalone binary"). No persistence (always
-  plays `default_patch()`); no `--midi <port>` selection (connects to the first port found).
+- ~~**No control surface drives `PatchEngine`**~~ — both `standalone` (`cargo run -p
+  kabl-standalone`) and `kabl-ui` (`cargo run -p kabl-ui`) exist now. Real audio/MIDI I/O is
+  unverified in this container (no hardware — see decisions.md "Standalone binary" and "`kabl-ui`:
+  the patchbay"); `kabl-ui`'s rendering itself *is* verified (ran + screenshotted via Xvfb). No
+  persistence in either binary (always starts from `default_patch()`); no `--midi <port>`
+  selection (connects to the first port found).
+- **`kabl-ui`'s audio/UI-thread `Mutex` sharing isn't textbook RT-safe** — a real, flagged
+  compromise (audio callback `try_lock`s, silence on contention; control thread takes a real lock
+  for the duration of `build_swap`). Fixing it properly needs `PatchEngine` to publish state over
+  a lock-free channel instead of being shared directly. See decisions.md.
+- **No persistence wired into `standalone`/`kabl-ui`** — both always play `default_patch()`.
+  `core`'s file format (op log, `PatchLog`) already exists and is tested
+  (`crates/core/src/format.rs`), just not loaded/saved by either binary yet. Likely the next real
+  feature.
+- **No canvas pan/scroll in `kabl-ui`** — a patch wider than the window is simply clipped
+  (visible in the sent screenshot: `vca`/`out` cut off by the side panel).
 - **No buffer-pool reuse in the compiler** — every port gets a fresh `[f32; BLOCK]`. Correct,
   wasteful; deferred as a pure optimization on the same schedule shape.
 - **Compiler treats a cycle as a hard compile error**, not brief section 7.1's implicit 1-block
   delay. No v1 accept-test patch has a feedback loop, so not currently blocking; will matter for
   real feedback patches.
 - ~~**No voice allocator**~~ — built, `crates/engine/src/voice_allocator.rs`. See decisions.md
-  "Voice allocator". Nothing feeds it real MIDI yet (needs `standalone`'s `midir` integration).
+  "Voice allocator". Now fed by real MIDI in both `standalone` and `kabl-ui` (via
+  `resolve_midi_message`), unverified against real hardware in this container.
 - **Overlapping swaps unhandled** — a second `build_swap` while one is still crossfading isn't
   accounted for in `swap::Engine` or `PatchEngine`. Pre-existing S1 gap, not new.
 - ~~**`dyn Module` dispatch cost unmeasured**~~ — measured. `crates/engine/src/
@@ -329,14 +396,16 @@ this against the commit it was last updated for.
   `crates/engine/tests/compile.rs` shows the expected external shape (build a `PatchState` from
   ops, `compile()`, drive it, `recompile()`); `tests/compile_rt_safety.rs` shows the
   `assert_no_alloc` pattern to keep any future change RT-safe.
-- **Starting the UI** (the actual next milestone): `crates/standalone/src/main.rs` is the
-  reference for how everything wires together (`PatchEngine`, `VoiceAllocator`,
-  `resolve_midi_message`/`apply_voice_event`'s control-thread/audio-thread split). A UI needs the
-  same `PatchEngine::build_swap(handle, patch)` (control thread) / `receive_swap`/`process_block`
-  (audio thread) pattern, but building `patch: PatchState` from user interaction (dragging
-  cables, adding modules) via `core`'s op log instead of a hardcoded `default_patch()`. No
-  display server in this container — build and logic-test what doesn't need one (patch-editing
-  logic, op application), flag what needs real rendering to verify.
+- **Extending `kabl-ui`** (persistence, cable-dragging instead of click-to-connect, canvas pan/
+  zoom, fixing the `Mutex`-sharing compromise): `crates/ui/src/editor.rs`'s module doc + `lib.rs`'s
+  module doc + decisions.md's "`kabl-ui`: the patchbay" entry lay out what's built and why.
+  `crates/ui/tests/editor_and_ui.rs` shows both the `PatchEditor` API and the headless `show()`
+  smoke-test pattern (`egui::Context::begin_pass`/`end_pass`, no window needed) for testing any
+  new interaction logic without a display.
+- **Adding persistence** (the most likely next real feature): `core::{load, save}` already exist
+  and are tested (`crates/core/src/format.rs`) — neither `standalone` nor `kabl-ui` calls them
+  yet. `kabl-ui`'s `PatchEditor` would need a "load a `PatchLog` from disk" constructor alongside
+  `seed_from`, and a save button calling `core::save`.
 - **Extending `standalone`** (persistence, MIDI port selection, JACK): `crates/standalone/src/
   lib.rs`'s module doc + decisions.md's "Standalone binary" entry lay out what's built vs.
   deferred. `tests/lib_logic.rs` shows what's provable without hardware.

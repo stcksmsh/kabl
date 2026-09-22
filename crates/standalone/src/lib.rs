@@ -26,18 +26,34 @@ pub const MIDI_NOTE_FOR_BASE_HZ: i32 = 60;
 /// paired with a `VoiceAllocator` routing MIDI notes across `DEFAULT_VOICE_COUNT` instances.
 pub fn default_patch() -> PatchState {
     let mut patch = PatchState::new();
-    patch.modules.insert(1, module("midi.in", &[]));
+    // Staggered left-to-right in signal-flow order, one per column -- not just cosmetic: a UI
+    // that lays modules out by their stored `pos` (see `kabl-ui`) needs them to not all collide
+    // at the same point, which an earlier all-(0,0) version of this patch did (caught visually
+    // running `kabl-ui` under Xvfb -- see decisions.md "kabl-ui: the patchbay").
+    patch
+        .modules
+        .insert(1, positioned_module("midi.in", &[], 40.0, 40.0));
     patch.modules.insert(
         2,
-        module("osc.va", &[("base_hz", 261.63), ("waveform", 2.0)]),
+        positioned_module(
+            "osc.va",
+            &[("base_hz", 261.63), ("waveform", 2.0)],
+            240.0,
+            40.0,
+        ),
     );
     patch.modules.insert(
         3,
-        module("filter.svf", &[("cutoff_hz", 3000.0), ("resonance", 0.2)]),
+        positioned_module(
+            "filter.svf",
+            &[("cutoff_hz", 3000.0), ("resonance", 0.2)],
+            440.0,
+            40.0,
+        ),
     );
     patch.modules.insert(
         4,
-        module(
+        positioned_module(
             "env.adsr",
             &[
                 ("attack_ms", 5.0),
@@ -45,12 +61,17 @@ pub fn default_patch() -> PatchState {
                 ("sustain", 0.6),
                 ("release_ms", 250.0),
             ],
+            240.0,
+            220.0,
         ),
+    );
+    patch.modules.insert(
+        5,
+        positioned_module("vca", &[("gain", 0.0), ("exponential", 0.0)], 640.0, 40.0),
     );
     patch
         .modules
-        .insert(5, module("vca", &[("gain", 0.0), ("exponential", 0.0)]));
-    patch.modules.insert(6, module("out", &[]));
+        .insert(6, positioned_module("out", &[], 840.0, 40.0));
 
     patch.cables.insert(1, cable(1, "pitch", 2, "pitch"));
     patch.cables.insert(2, cable(2, "out", 3, "in"));
@@ -66,10 +87,10 @@ pub fn default_patch() -> PatchState {
 /// via `CompiledPatch::module_mut(id, Some(voice))`.
 pub const MIDI_IN_ID: ModuleId = 1;
 
-fn module(kind: &str, params: &[(&str, f32)]) -> ModuleState {
+fn positioned_module(kind: &str, params: &[(&str, f32)], x: f32, y: f32) -> ModuleState {
     ModuleState {
         kind: kind.to_string(),
-        pos: Vec2 { x: 0.0, y: 0.0 },
+        pos: Vec2 { x, y },
         params: params.iter().map(|&(k, v)| (k.to_string(), v)).collect(),
     }
 }
