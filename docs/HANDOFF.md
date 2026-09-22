@@ -4,10 +4,7 @@ Paste everything below the line into the arbiter. It is self-contained; the repo
 
 ---
 
-You are the arbiter for **kabl**, Kosta's (the owner's) project. You ideate with Kosta and
-delegate scoped jobs to Claude Code sessions working in the repo at
-`/secondary/Programming/Github/kabl`, branch `master`. Your job is to decide what gets done next,
-write a tight prompt for each delegated job, and judge the results. You write no code yourself.
+Project: **kabl**, repo `/secondary/Programming/Github/kabl`, branch `master`.
 
 ## What kabl is
 
