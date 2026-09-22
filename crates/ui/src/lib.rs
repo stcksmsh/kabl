@@ -25,12 +25,18 @@ const PORT_RADIUS: f32 = 5.0;
 
 /// Interaction state that persists across frames but isn't part of the patch itself — which
 /// module is selected (for the param panel), an in-progress cable connection, an in-progress
-/// module drag, and which kind is selected in the "add module" palette.
+/// module drag, which kind is selected in the "add module" palette, and the Save/Load path field.
 pub struct UiState {
     pub selected_kind: String,
     pub selected_module: Option<ModuleId>,
     pending_output: Option<PortRef>,
     dragging: Option<Dragging>,
+    /// Directory `kabl_core::save`/`load` read and write — a plain text field rather than a
+    /// native file-picker dependency (`rfd` and friends), which would be unverifiable in this
+    /// container anyway (no display server to test a picker dialog against) and isn't needed for
+    /// the underlying save/load logic to be real and correct.
+    pub patch_path: String,
+    pub last_message: Option<String>,
 }
 
 struct Dragging {
@@ -53,6 +59,8 @@ impl Default for UiState {
             selected_module: None,
             pending_output: None,
             dragging: None,
+            patch_path: "my-patch".to_string(),
+            last_message: None,
         }
     }
 }
@@ -100,6 +108,40 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                 ui.label(
                     "Click an input port to connect, or click the output port again to cancel.",
                 );
+            }
+        });
+        ui.horizontal(|ui| {
+            ui.label("patch dir:");
+            ui.text_edit_singleline(&mut ui_state.patch_path);
+            if ui.button("Save").clicked() {
+                let path = std::path::Path::new(&ui_state.patch_path);
+                ui_state.last_message = Some(match kabl_core::save(path, editor.log()) {
+                    Ok(()) => format!("saved to {}", path.display()),
+                    Err(err) => format!("save failed: {err:?}"),
+                });
+            }
+            if ui.button("Load").clicked() {
+                let path = std::path::Path::new(&ui_state.patch_path);
+                match kabl_core::load(path) {
+                    Ok(log) => {
+                        *editor = PatchEditor::from_log(log);
+                        // `from_log` starts clean (right for the initial startup seed, whose
+                        // caller compiles the seeded patch directly) -- but a Load here replaces
+                        // a *live* patch, and the audio host only ever rebuilds by checking
+                        // `take_dirty()`, so this needs to mark it explicitly or the running
+                        // graph would silently keep playing the old patch.
+                        editor.mark_dirty();
+                        ui_state.selected_module = None;
+                        ui_state.pending_output = None;
+                        ui_state.last_message = Some(format!("loaded {}", path.display()));
+                    }
+                    Err(err) => {
+                        ui_state.last_message = Some(format!("load failed: {err:?}"));
+                    }
+                }
+            }
+            if let Some(msg) = &ui_state.last_message {
+                ui.label(msg);
             }
         });
     });

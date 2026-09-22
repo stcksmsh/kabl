@@ -20,3 +20,4 @@ kabl-core = { path = "../core" }
 
 [dev-dependencies]
 assert_no_alloc = "1.1.2"
+tempfile = "3.27.0"

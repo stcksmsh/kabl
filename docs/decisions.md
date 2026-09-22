@@ -970,3 +970,57 @@ than automated — a real gap between "proven" and "eyeballed once," flagged, no
 
 Workspace build/test/clippy/fmt all clean, including the full `egui`/`eframe`/`winit`/`wgpu`-free-
 `glow` dependency tree now pulled into the workspace.
+
+## 2026-09-22 — Persistence: `--patch`/`--save-default` and `kabl-ui`'s Save/Load
+
+Fourth autonomous-session item. `core::{load, save}` have existed and been tested since the very
+first session (the op-log file format), but nothing ever called them — both `standalone` and
+`kabl-ui` always started from `default_patch()` with no way to get a save file onto disk or back
+off it. Picked as the natural next item per STATUS.md's own handover note ("probably the next
+real feature: it's what turns 'always the same demo patch' into an actual instrument").
+
+`PatchEditor` gained two additions for this: `from_log(PatchLog) -> Self` (wraps an already-built
+log directly, preserving its *real* history — unlike `seed_from`, which replays a bare
+`PatchState` as fresh ops and is right only for a hardcoded starting patch that never had real
+history) and `log() -> &PatchLog` (what `core::save` actually needs — a bare `state()` snapshot
+would lose everything but the current values, discarding undo history a saved file should keep).
+
+**`kabl-standalone`**: `--patch <dir>` loads via `kabl_core::load` instead of playing
+`default_patch()`; `--save-default <dir>` writes `default_patch()` out (replayed as real ops, not
+a bare state dump — same reasoning as `PatchEditor::seed_from`, in miniature) and exits, as a
+starting point to then edit in `kabl-ui`. A tiny hand-rolled two-flag parser
+(`flag_value(&args, "--flag")`) rather than a CLI-parsing crate dependency — two optional flags
+each taking one path argument doesn't clear the bar for a new dependency (this project's standing
+rule: no new dependency without a decisions.md line justifying it).
+
+**`kabl-ui`**: a "patch dir" text field plus Save/Load buttons in the toolbar, not a native file-
+picker dialog (`rfd` or similar) — deliberately: a picker dialog is exactly the kind of thing this
+container's Xvfb setup *can't* verify (no real file-manager chrome to click through), while a
+plain text field's Save/Load logic is fully real and independently provable. Load replaces
+`*editor` wholesale with `PatchEditor::from_log(...)`, which (correctly) starts with `dirty:
+false` — right for the app's own startup seed, whose caller compiles the seeded patch directly,
+but wrong here: a Load mid-session replaces a *live* patch, and the audio host only ever
+recompiles by checking `take_dirty()`. Missing this would have meant Load silently doing nothing
+audible. Fixed with a new, explicit `PatchEditor::mark_dirty()` — a deliberate escape hatch for
+exactly this "I replaced state some other way, the host still needs to notice" case, not a
+workaround bolted onto `from_log` itself (which should stay clean for its own real use, the
+startup seed).
+
+**Verified running, not just tested**: rebuilt the same Xvfb + software-GL setup from `kabl-ui`'s
+own session, clicked the real "Save" button via `xdotool`, and confirmed the file landed on disk
+with the expected `log.jsonl`/`checkpoint.json`/`meta.toml` shape and the toolbar's own "saved to
+my-patch" confirmation message rendered. (A first attempt at also exercising the text field itself
+via synthetic key events didn't land the edit — `xdotool`'s keyboard synthesis under `winit`'s
+X11 focus handling is finicky; the earlier "Add module" click already proved click-driven
+mutations reach the render loop correctly, so this is a text-input-simulation gap in the test
+harness, not a signal about the Save/Load code path itself, which the direct file-on-disk check
+confirms independently.)
+
+24 new tests: 4 in `crates/standalone/tests/persistence.rs` (`default_patch()` round-trips
+through save/load exactly; a loaded patch compiles and renders bit-identical output to the
+original over 20 blocks; loading preserves real op-log entry count and `can_undo()`, not just a
+snapshot; a guard that `default_patch()` still has params worth exercising `SetParam` ops) plus 4
+new ones in `crates/ui/tests/editor_and_ui.rs` (`from_log` preserves state and starts clean,
+`mark_dirty` sets the flag without an op, a full save-then-load round-trip through a real
+temp-directory file, fresh IDs after `from_log` never collide with loaded ones). Workspace
+build/test/clippy/fmt all clean.

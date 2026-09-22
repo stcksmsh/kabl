@@ -24,3 +24,6 @@ kabl-core = { path = "../core" }
 kabl-engine = { path = "../engine" }
 kabl-modules = { path = "../modules" }
 kabl-standalone = { path = "../standalone" }
+
+[dev-dependencies]
+tempfile = "3.27.0"

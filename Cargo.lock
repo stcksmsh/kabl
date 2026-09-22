@@ -1599,6 +1599,7 @@ dependencies = [
  "kabl-modules",
  "midir",
  "rtrb",
+ "tempfile",
 ]
 
 [[package]]
@@ -1615,6 +1616,7 @@ dependencies = [
  "kabl-standalone",
  "midir",
  "rtrb",
+ "tempfile",
 ]
 
 [[package]]

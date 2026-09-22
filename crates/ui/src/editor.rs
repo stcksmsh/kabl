@@ -80,6 +80,27 @@ impl PatchEditor {
         editor
     }
 
+    /// Wraps an already-built `PatchLog` (e.g. loaded from disk via `kabl_core::load`) directly,
+    /// preserving its real history — unlike `seed_from`, which *replays* a bare `PatchState` as
+    /// fresh ops (right for a hardcoded starting patch that never had real history to begin
+    /// with, wrong for a file that already has genuine timestamps/sources worth keeping).
+    pub fn from_log(log: PatchLog) -> Self {
+        let next_module_id = log.state().modules.keys().max().copied().unwrap_or(0) + 1;
+        let next_cable_id = log.state().cables.keys().max().copied().unwrap_or(0) + 1;
+        PatchEditor {
+            log,
+            next_module_id,
+            next_cable_id,
+            dirty: false,
+        }
+    }
+
+    /// The full op log — what `kabl_core::save` needs to persist real undo history, not just a
+    /// snapshot of `state()`.
+    pub fn log(&self) -> &PatchLog {
+        &self.log
+    }
+
     pub fn state(&self) -> &PatchState {
         self.log.state()
     }
@@ -95,6 +116,16 @@ impl PatchEditor {
     /// True if the patch has changed since the last `take_dirty()` call.
     pub fn is_dirty(&self) -> bool {
         self.dirty
+    }
+
+    /// Explicitly flags the patch as needing a recompile+swap without going through one of the
+    /// `Op`-appending mutators — for a caller that replaced `*self` wholesale (e.g. `*editor =
+    /// PatchEditor::from_log(...)` after loading a file mid-session) and needs the audio host to
+    /// notice, unlike the initial startup seed (`seed_from`/`from_log` both start clean on
+    /// purpose, since their caller compiles the seeded patch directly rather than relying on
+    /// `take_dirty()`).
+    pub fn mark_dirty(&mut self) {
+        self.dirty = true;
     }
 
     /// Clears and returns the dirty flag — the audio host calls this once per check, so a swap

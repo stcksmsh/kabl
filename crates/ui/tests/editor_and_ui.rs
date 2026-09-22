@@ -169,6 +169,53 @@ fn known_kinds_is_the_full_registry() {
     assert_eq!(kinds.len(), kabl_modules::registry::KNOWN_KINDS.len());
 }
 
+#[test]
+fn from_log_preserves_state_and_is_not_dirty() {
+    let mut editor = PatchEditor::new();
+    editor.add_module("osc.va", zero());
+    editor.take_dirty();
+
+    let log = editor.log().clone();
+    let reloaded = PatchEditor::from_log(log);
+    assert_eq!(reloaded.state(), editor.state());
+    assert!(
+        !reloaded.is_dirty(),
+        "from_log should start clean -- its caller compiles the seeded patch directly"
+    );
+}
+
+#[test]
+fn mark_dirty_sets_the_flag_without_an_op() {
+    let mut editor = PatchEditor::new();
+    assert!(!editor.is_dirty());
+    editor.mark_dirty();
+    assert!(editor.is_dirty());
+}
+
+#[test]
+fn save_and_load_round_trip_through_a_real_file() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut editor = PatchEditor::new();
+    let id = editor.add_module("osc.va", Vec2 { x: 12.0, y: 34.0 });
+    editor.set_param(id, "base_hz", 330.0);
+
+    kabl_core::save(dir.path(), editor.log()).expect("save should succeed");
+    let log = kabl_core::load(dir.path()).expect("load should succeed");
+    let reloaded = PatchEditor::from_log(log);
+
+    assert_eq!(reloaded.state(), editor.state());
+}
+
+#[test]
+fn ids_assigned_after_from_log_do_not_collide() {
+    let mut editor = PatchEditor::new();
+    let id = editor.add_module("osc.va", zero());
+    let reloaded_log = editor.log().clone();
+    let mut reloaded = PatchEditor::from_log(reloaded_log);
+    let new_id = reloaded.add_module("out", zero());
+    assert!(new_id > id);
+}
+
 // --- headless show() smoke test: no window, no GPU, just egui's pure-Rust Context ---
 
 #[test]

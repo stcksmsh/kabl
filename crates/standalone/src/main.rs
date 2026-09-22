@@ -9,9 +9,17 @@
 //! falls back to rendering a short self-test WAV instead of exiting silently — proves the
 //! synthesis path is intact even on a machine (or container) with no audio hardware, rather than
 //! just failing with no evidence either way.
+//!
+//! `--patch <dir>` loads a patch saved by `kabl_core::save` (the same format `kabl-ui`'s "Save"
+//! button writes) instead of playing `default_patch()`. `--save-default <dir>` writes
+//! `default_patch()` out in that format and exits, as a starting point to then edit with
+//! `kabl-ui` — neither binary shipped any way to get a save file onto disk before this existed.
+
+use std::path::Path;
 
 use basedrop::Collector;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use kabl_core::{Op, PatchLog, PatchState, Source};
 use kabl_engine::graph::BLOCK;
 use kabl_engine::patch_engine::PatchEngine;
 use kabl_engine::voice_allocator::VoiceAllocator;
@@ -29,7 +37,26 @@ use kabl_standalone::{
 const RING_CAPACITY: usize = BLOCK * 256;
 
 fn main() {
-    let patch = default_patch();
+    let args: Vec<String> = std::env::args().collect();
+
+    if let Some(dir) = flag_value(&args, "--save-default") {
+        match save_default_patch(Path::new(&dir)) {
+            Ok(()) => eprintln!("kabl: wrote default_patch() to {dir}"),
+            Err(err) => eprintln!("kabl: failed to save to {dir}: {err:?}"),
+        }
+        return;
+    }
+
+    let patch = match flag_value(&args, "--patch") {
+        Some(dir) => match kabl_core::load(Path::new(&dir)) {
+            Ok(log) => log.state().clone(),
+            Err(err) => {
+                eprintln!("kabl: failed to load patch from {dir}: {err:?}");
+                std::process::exit(1);
+            }
+        },
+        None => default_patch(),
+    };
 
     let host = cpal::default_host();
     let Some(device) = host.default_output_device() else {
@@ -287,4 +314,59 @@ fn apply_note_off_direct(compiled: &mut kabl_engine::compile::CompiledPatch, voi
             midi.note_off();
         }
     }
+}
+
+/// `--flag value` (two separate argv entries) — the simplest possible parser for two optional
+/// flags. Not using a CLI-parsing crate here: two flags each taking one path argument doesn't
+/// justify a new dependency (matches this project's "no new dependency without a decisions.md
+/// line" rule), and this scales fine until a third flag actually needs it.
+fn flag_value(args: &[String], flag: &str) -> Option<String> {
+    let i = args.iter().position(|a| a == flag)?;
+    args.get(i + 1).cloned()
+}
+
+/// Writes `default_patch()` out via `kabl_core::save`, replaying it as real `AddModule`/
+/// `Connect`/`SetParam` ops (not just a bare state dump) so the saved file's history is genuine
+/// and undoable back to empty when opened in `kabl-ui` — same reasoning as `PatchEditor::
+/// seed_from`, duplicated here in miniature rather than depending on `kabl-ui` from `standalone`
+/// (wrong direction: `kabl-ui` already depends on `kabl-standalone`, not the other way around).
+fn save_default_patch(dir: &Path) -> Result<(), kabl_core::FormatError> {
+    let patch: PatchState = default_patch();
+    let mut log = PatchLog::new();
+    for (&id, m) in &patch.modules {
+        log.append(
+            Op::AddModule {
+                id,
+                kind: m.kind.clone(),
+                pos: m.pos,
+            },
+            0,
+            Source::User,
+        );
+        for (name, &value) in &m.params {
+            log.append(
+                Op::SetParam {
+                    target: kabl_core::ParamTarget::Module {
+                        id,
+                        param: name.clone(),
+                    },
+                    value,
+                },
+                0,
+                Source::User,
+            );
+        }
+    }
+    for (cable_id, c) in (1u64..).zip(patch.cables.values()) {
+        log.append(
+            Op::Connect {
+                id: cable_id,
+                from: c.from.clone(),
+                to: c.to.clone(),
+            },
+            0,
+            Source::User,
+        );
+    }
+    kabl_core::save(dir, &log)
 }
