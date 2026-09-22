@@ -68,12 +68,11 @@ project. Concretely, in priority order:
    built-in against how they actually look at real size (current values are first-pass guesses);
    make the skinned module (`osc.va`) respect `width_units` for width, not just position; tune
    grid line color/spacing; no zoom yet.
-3. Two smaller reapplications flagged during reconciliation and *not yet done*: the `PatchEngine`
-   Mutex-window shrink (`precompile`/`finish_swap` split, shrinks `kabl-ui`'s lock window to just
-   state-transfer) and a native file picker (`rfd`) for the Save/Load path field — both need
-   re-implementing against the current `compile.rs`/`ui/lib.rs`, not a clean cherry-pick from the
-   superseded local history (still reachable on branch `backup-local-before-reconcile` if useful
-   as reference for the *idea*, not as a literal patch to reapply).
+3. ~~`PatchEngine` Mutex-window shrink~~ done (`2cf3d29`: `kabl-ui` compiles unlocked, locks
+   only for `PatchEngine::finish_swap`). Also fixed (`2fd0aef`): `kabl-ui` had its own MIDI
+   connect that picked ALSA's "Midi Through" loopback — now shares standalone's port selection.
+   Still open: native file picker (`rfd`) for the Save/Load path field (idea reference on branch
+   `backup-local-before-reconcile`, not a literal patch).
 4. Real audio/MIDI hardware verification is still only partial: `kabl-standalone` confirmed
    playing through a real controller; `kabl-ui` has not been run with real audio at all yet (only
    the audio-free screenshot harness). See item 1.
