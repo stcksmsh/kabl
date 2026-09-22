@@ -29,6 +29,13 @@ use crate::swap::{equal_power, CROSSFADE_MS};
 pub struct PatchEngine {
     active: Owned<CompiledPatch>,
     incoming: Option<(Owned<CompiledPatch>, usize)>,
+    /// A swap that arrived while another was still crossfading in (brief section 7.6's
+    /// overlapping-swap gap, see `receive_swap`). Held until the in-flight fade completes, then
+    /// started as an ordinary fade from the now-promoted `active` — never dropped, never
+    /// discontinuous, just delayed by at most one crossfade's worth of latency. Only one slot: a
+    /// second overlapping arrival replaces it (last-request-wins), since nothing here needs an
+    /// unbounded queue of edits that are about to be superseded anyway.
+    pending: Option<Owned<CompiledPatch>>,
     crossfade_samples: usize,
     voice_count: usize,
 }
@@ -45,6 +52,7 @@ impl PatchEngine {
         Ok(PatchEngine {
             active: Owned::new(handle, compiled),
             incoming: None,
+            pending: None,
             crossfade_samples: (CROSSFADE_MS / 1000.0 * sample_rate).round() as usize,
             voice_count,
         })
@@ -54,8 +62,10 @@ impl PatchEngine {
         self.crossfade_samples
     }
 
+    /// True while any fade is in flight or queued — includes a `pending` swap waiting on the
+    /// current one to finish, not just the one actively blending.
     pub fn is_swapping(&self) -> bool {
-        self.incoming.is_some()
+        self.incoming.is_some() || self.pending.is_some()
     }
 
     /// Direct access to the active graph — for control-thread setup (e.g. triggering MIDI notes
@@ -70,10 +80,14 @@ impl PatchEngine {
     /// Control-thread call: recompiles `patch` against the current active graph, carrying state
     /// over (brief section 7.5, via `compile::recompile`), and wraps the result for deferred
     /// drop. Allocates — never call from the audio thread. Hand the result to the audio thread
-    /// through a channel (`rtrb`, brief section 7.6) and install it with `receive_swap`. Like
-    /// `swap::Engine::build_swap`, a swap already in flight isn't accounted for: the new graph
-    /// carries state from `active`, not from `incoming` — overlapping-swap choreography is a
-    /// real gap in both engines, not new here.
+    /// through a channel (`rtrb`, brief section 7.6) and install it with `receive_swap`.
+    ///
+    /// State is always carried from `active`, never from an in-flight `incoming` — if a second
+    /// `build_swap` runs before the first fade finishes, its state snapshot is up to one
+    /// crossfade behind what's about to become active (see `receive_swap`'s queueing). That's a
+    /// real staleness, not a new category of one: `active`'s state is already only ever a
+    /// control-thread snapshot of "as of whenever this ran," not synced to the audio thread's
+    /// exact position either way.
     pub fn build_swap(
         &mut self,
         handle: &Handle,
@@ -86,8 +100,17 @@ impl PatchEngine {
 
     /// Audio-thread call: installs a graph built by `build_swap` and starts its crossfade-in. No
     /// allocation.
+    ///
+    /// Brief section 7.6's overlapping-swap case: if a fade is already in flight, this doesn't
+    /// restart it (which would snap the blended output straight to a different signal — the exact
+    /// click the crossfade exists to prevent). It queues `new_patch` in `pending` instead;
+    /// `process_block` starts it as a normal fade the moment the current one finishes.
     pub fn receive_swap(&mut self, new_patch: Owned<CompiledPatch>) {
-        self.incoming = Some((new_patch, 0));
+        if self.incoming.is_some() {
+            self.pending = Some(new_patch);
+        } else {
+            self.incoming = Some((new_patch, 0));
+        }
     }
 
     /// Audio-thread call: must not allocate or deallocate. Runs the active graph, and — while a
@@ -129,6 +152,12 @@ impl PatchEngine {
             // node on the collector (atomic pointer swap) — no deallocation happens here.
             let (new_patch, _) = self.incoming.take().unwrap();
             self.active = new_patch;
+            // A swap queued while this fade was in flight (see `receive_swap`) starts now, from
+            // the graph that was just promoted — same as any other fresh `receive_swap`, just
+            // deferred instead of dropped or stepped on.
+            if let Some(pending) = self.pending.take() {
+                self.incoming = Some((pending, 0));
+            }
         }
     }
 }

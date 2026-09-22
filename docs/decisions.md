@@ -1147,3 +1147,74 @@ delay-buffer pre-creation ahead of the topo loop, `CopyToDelay` timing, `coalesc
 all live together), not just the DFS classification in isolation.
 
 Workspace build/test/clippy/fmt all clean.
+
+## 2026-09-22 — `PatchEngine`: overlapping swaps (`crates/engine/src/patch_engine.rs`)
+
+Seventh autonomous-session item off STATUS.md's handover list. Picked over canvas pan/scroll
+(`kabl-ui`, needs the Xvfb harness) and the delay-buffer-across-recompile gap (smaller, cosmetic
+correctness note rather than a real risk) because this one is a genuine live-editing hazard: brief
+section 7.6 describes a live-patchable synth, and a person dragging a knob twice within 15ms (the
+crossfade window) is an entirely ordinary interaction, not an edge case.
+
+**The bug**: `receive_swap` unconditionally did `self.incoming = Some((new_patch, 0))`. If a fade
+was already in flight, this replaced `incoming` outright — the blended output would snap from
+"blend of `active` and the first new patch" straight to "blend of `active` (still the *original*
+pre-first-swap graph, since `finished` never got a chance to fire) and the second new patch,
+restarted at `elapsed=0`" in one process_block call. Two problems at once: the first edit's
+graph is thrown away before ever becoming steady-state (a queued knob-turn silently vanishes), and
+the sudden change in what "new" means mid-blend is exactly the audible discontinuity the
+equal-power crossfade exists to prevent — the brief's own words, "not just fewer clicks."
+
+**Fix**: a `pending: Option<Owned<CompiledPatch>>` slot. `receive_swap` queues into `pending`
+instead of overwriting `incoming` when a fade is already running; `process_block`'s existing
+"fade finished, promote incoming to active" branch now also promotes `pending` into `incoming`
+(fresh `elapsed=0`) in the same step, so a queued swap starts the instant the one ahead of it
+finishes — no dropped edits, no restarted fades, at the cost of up to one crossfade's worth
+(15ms) of extra latency before the second edit's audio actually starts moving. Only one slot, not
+a queue: a *third* overlapping arrival replaces `pending` (last-request-wins) rather than growing
+unboundedly — nothing in a live-patching UI needs every intermediate knob position to survive,
+only the final one. `is_swapping()` now reports true while a swap is either blending or queued,
+not just blending, since both are "a swap is happening" from the caller's point of view.
+
+**Known remaining staleness, not fixed here**: `build_swap` always recompiles against `self.active`
+(the confirmed graph), never against an in-flight `incoming` — so a second `build_swap` called
+before the first fade finishes carries module state (oscillator phase, envelope stage, filter
+memory) snapshotted from *before* the first edit, not from wherever the first edit's graph will be
+once promoted. This is a staleness bound, not a correctness bug — `active`'s state was already
+only ever a control-thread snapshot of "as of whenever `build_swap` ran," never synced to the
+audio thread's exact position even in the non-overlapping case — but it does mean back-to-back
+edits can carry state that's up to one extra crossfade behind. Not attempted: recompiling
+against a hypothetical future-`active` (the not-yet-promoted `incoming`) would need a new API
+shape (what does "current state" even mean while two graphs are blending?) for a staleness window
+measured in tens of milliseconds, real over-engineering for what it buys. Flagged, not hidden.
+
+**Scope**: only `PatchEngine` (the real engine `standalone`/`kabl-ui` embed) got this fix.
+`swap.rs::Engine` — S1's spike, fixed 2-node mono graph — has the identical gap and was
+deliberately left alone: the repo map already documents spike code as "expect it to be
+replaced/absorbed into the real compiler, not extended indefinitely," and `patch_engine.rs`'s own
+module doc already treats the two engines' state-machine logic as intentionally unshared (only the
+crossfade *math*, `equal_power`, is factored out). Extending the soon-superseded spike engine to
+match would be exactly the kind of code this project has already decided not to keep investing in.
+
+**Tested**: new `crates/engine/tests/patch_engine_overlapping_swap.rs`. Three patches, identical
+except `vca`'s `gain` (1.0/0.5/0.0 — a compile-time-constant param, `vca` has no state to carry, so
+nothing about state-carryover ambiguity muddies the result), one shared `osc.va` at a fixed
+`base_hz` so every instance's phase stays bit-identical to the others throughout (same reasoning
+`compile.rs`'s own recompile test already establishes) — this lets two independently-`compile()`d
+references stand in for "what the engine's internal patch_b/patch_c instances should read at any
+given moment," the same pattern `patch_engine_swap.rs` already uses for the single-swap case,
+without needing to hand-derive any waveform. Fades: patch_a (active) -> patch_b (fade 1) ->
+[patch_c requested mid-fade-1, must queue] -> patch_c (fade 2, starts the instant fade 1
+finishes). Asserts: `is_swapping()` true right after the overlapping request; the window between
+the two fades matches patch_b's own reference bit-exact (proof the queued swap didn't skip or
+corrupt the first one — a buggy "just overwrite `incoming`" alternative would also eventually
+reach patch_c, so this window is what actually distinguishes correct sequencing from the old bug,
+not just the final state); the window after fade 2 matches patch_c (silence) bit-exact (proof the
+queued swap wasn't dropped); the handoff sample between the two fades matches patch_b's reference
+exactly (equal-power's `t=0` is `cos(0)=1, sin(0)=0` exactly, so it's provably an exact
+continuation, not a coincidence of rounding). Verified the test actually catches the bug it's
+named for: reverted the fix, confirmed this exact test fails (steady window between fades read as
+silence — patch_b never became real steady-state active, exactly the "queued edit gets dropped"
+failure mode described above), then restored the fix and reconfirmed green.
+
+Workspace build/test/clippy/fmt all clean.
