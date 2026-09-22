@@ -5,8 +5,7 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-22, after the compiler got brief section 7.1's implicit 1-block-delay cycle
-handling.
+Last updated: 2026-09-22, after `PatchEngine` got brief section 7.6's overlapping-swap handling.
 
 ## Autonomous overnight work (started 2026-09-21)
 
@@ -106,6 +105,24 @@ sized to `MAX_INPUTS`/`MAX_OUTPUTS`/`MAX_PARAMS` (measured off every built-in's 
 counts); `compile()` now rejects a module exceeding those bounds with `CompileError::TooManyPorts`
 instead of the audio thread ever truncating or panicking.
 
+**`PatchEngine` now handles overlapping swaps**, brief section 7.6: a second `build_swap`/
+`receive_swap` arriving while a fade is still in flight used to overwrite `incoming` outright —
+the first edit's graph never became steady-state active before being discarded, and the blended
+output snapped to a different signal mid-crossfade (the exact click equal-power blending exists to
+prevent). Fixed with a single `pending: Option<Owned<CompiledPatch>>` slot: `receive_swap` queues
+instead of overwriting when a fade is already running; `process_block` promotes `pending` into
+`incoming` (fresh `elapsed=0`) the instant the current fade finishes, so queued edits are never
+dropped and never cause a discontinuity, just delayed by up to one crossfade's worth of latency
+(15ms). A third+ overlapping arrival replaces `pending` (last-request-wins, no unbounded queue).
+Known remaining gap: `build_swap` always recompiles against `active`, never a not-yet-promoted
+`incoming`, so back-to-back edits can carry state up to one extra crossfade stale — documented,
+not fixed (see decisions.md for why). `swap.rs`'s S1 spike engine has the same original gap and
+was deliberately left alone (soon-superseded spike code). Tested in new
+`crates/engine/tests/patch_engine_overlapping_swap.rs`: two references independently prove the
+queued swap neither got dropped nor corrupted the first one, bit-exact in the steady windows
+between and after both fades — verified to actually fail against the pre-fix code before being
+left in place. See decisions.md "`PatchEngine`: overlapping swaps".
+
 **The compiler is now wired into S1's swap mechanism**: `crates/engine/src/patch_engine.rs::
 PatchEngine`, a stereo/arbitrary-topology counterpart to `swap::Engine`, reusing the same
 equal-power crossfade curve and `basedrop` deferred-drop pattern. `build_swap` calls
@@ -178,14 +195,15 @@ priority order for "something a person can actually patch and hear live":
 2. **`kabl-ui`'s `Mutex`-sharing compromise** (see decisions.md) — works, flagged as not
    textbook-RT-safe, real follow-up work if edit-time glitches turn out to be audible/annoying in
    practice on real hardware.
-3. Overlapping swaps (a second `build_swap` while one is still crossfading) aren't handled by
-   either `Engine` or `PatchEngine` — a pre-existing S1 gap, not new.
-4. No canvas pan/scroll in `kabl-ui` — a patch wider than the window is simply clipped.
-5. `kabl-ui`'s Save/Load uses a plain text path field, not a native file picker (deliberate, see
+3. No canvas pan/scroll in `kabl-ui` — a patch wider than the window is simply clipped.
+4. `kabl-ui`'s Save/Load uses a plain text path field, not a native file picker (deliberate, see
    decisions.md) — a nicer picker is cosmetic follow-up, not a functional gap.
-6. A cyclic patch's delay-buffer memory (see "Where we are" above) resets to silence on
+5. A cyclic patch's delay-buffer memory (see "Where we are" above) resets to silence on
    `recompile()`, unlike module state — not carried over yet, not exercised by any accept-test
    patch.
+6. `PatchEngine.build_swap`'s state snapshot can be up to one extra crossfade stale for a second
+   overlapping edit (see "Where we are" above) — a staleness bound, not a correctness bug; not
+   fixed, real follow-up if it turns out to matter in practice.
 
 No new open question from the owner to resolve first — everything on the originally-scoped
 autonomous list, plus the UI/standalone/persistence/buffer-pool work, is now done. The remaining
@@ -212,7 +230,7 @@ What actually exists vs. what's still spike-scoped or missing:
 | `engine`: voice allocator | **built.** `voice_allocator.rs::VoiceAllocator` — lowest-free-first, oldest-steal-when-full. Pitch/graph-agnostic (`note_id: u32` -> voice index); nothing routes real MIDI into it yet. `voice_count` is still a fixed `compile()` parameter. |
 | `engine`: SIMD batching | **prototyped in spike S3 only** (`simd_voices.rs`), not integrated into the compiler; measured ~1.5-1.7x speedup (target was 2.5x, missed — see decisions.md). |
 | `engine`: control-rate tier | **prototyped in spike S2 only** (`potato.rs`), not integrated into the compiler. |
-| `engine`: swap + crossfade | **wired to the real compiler.** `patch_engine.rs::PatchEngine` generalizes S1's `swap.rs::Engine` mechanism (equal-power crossfade, `basedrop` deferred drop) to arbitrary-topology `CompiledPatch`es via `recompile()`. Proven in `tests/patch_engine_swap.rs` (bit-exact outside crossfade, no allocation). No control surface calls it yet — see open items. |
+| `engine`: swap + crossfade | **wired to the real compiler, overlapping swaps handled.** `patch_engine.rs::PatchEngine` generalizes S1's `swap.rs::Engine` mechanism (equal-power crossfade, `basedrop` deferred drop) to arbitrary-topology `CompiledPatch`es via `recompile()`. Proven in `tests/patch_engine_swap.rs` (bit-exact outside crossfade, no allocation) and `tests/patch_engine_overlapping_swap.rs` (a swap queued mid-crossfade is never dropped or clicked). Driven live by both `standalone` and `kabl-ui`. |
 | `engine`: quality tiers (Live/Render) | **not built.** |
 | `cables`: depth only | **not built.** `crates/cables` is an empty stub. |
 | `modules`: 9 v1 built-ins + metadata | **9 of 9 have a `Module` impl.** `Module` trait, `ModuleInfo`, `ProcessIo`/`Signal` all built and tested. `osc.va` now has all 4 waveforms + hard sync (triangle naive, not BLEP/BLAMP-corrected). `lfo` has no sync (needs a clock, v3 scope) — see decisions.md. **Registry now exists** (`registry.rs`: `create(kind)`, `all_infos()`, `info_for(kind)`) — the compiler uses it to turn `ModuleState.kind` strings into instances. |
@@ -439,8 +457,12 @@ this against the commit it was last updated for.
 - ~~**No voice allocator**~~ — built, `crates/engine/src/voice_allocator.rs`. See decisions.md
   "Voice allocator". Now fed by real MIDI in both `standalone` and `kabl-ui` (via
   `resolve_midi_message`), unverified against real hardware in this container.
-- **Overlapping swaps unhandled** — a second `build_swap` while one is still crossfading isn't
-  accounted for in `swap::Engine` or `PatchEngine`. Pre-existing S1 gap, not new.
+- ~~**Overlapping swaps unhandled**~~ — fixed in `PatchEngine`: a `pending` slot queues a swap
+  that arrives mid-crossfade instead of overwriting `incoming` (which used to both drop the
+  in-flight edit and click). See decisions.md "`PatchEngine`: overlapping swaps". Remaining gap:
+  `build_swap` snapshots state from `active`, never a not-yet-promoted `incoming`, so a queued
+  edit's state can be up to one extra crossfade stale — documented, not fixed. `swap::Engine`
+  (S1 spike) still has the original gap, left alone deliberately (soon-superseded spike code).
 - ~~**`dyn Module` dispatch cost unmeasured**~~ — measured. `crates/engine/src/
   dyn_dispatch_spike.rs`: `Box<dyn Module>` costs ~17-19% more than static dispatch on the same
   22-instance patch (bit-exact correctness, tight ratio across runs). Not a blocker — `Box<dyn
@@ -457,13 +479,20 @@ this against the commit it was last updated for.
   most complete examples (fast/slow-path split, real state carry-over). Test files
   `crates/modules/tests/*.rs` show the expected shape (matches-direct-dsp-call, buffer input,
   reset, save/load-state round-trip).
-- **Extending the compiler** (overlapping swaps, carrying delay-buffer memory across recompile):
-  `crates/engine/src/compile.rs`'s module doc comment + decisions.md's "Flat-schedule compiler
-  v1", "`process_block` made allocation-free", "Compiler: buffer-pool reuse", and "Cycle handling:
+- **Extending the compiler** (carrying delay-buffer memory across recompile): `crates/engine/
+  src/compile.rs`'s module doc comment + decisions.md's "Flat-schedule compiler v1",
+  "`process_block` made allocation-free", "Compiler: buffer-pool reuse", and "Cycle handling:
   implicit 1-block delay" entries lay out what's built, what's deferred, and why. `crates/engine/
   tests/compile.rs` shows the expected external shape (build a `PatchState` from ops, `compile()`,
   drive it, `recompile()`); `tests/compile_rt_safety.rs` shows the `assert_no_alloc` pattern to
   keep any future change RT-safe.
+- **Extending `PatchEngine`** (the `build_swap`-snapshot staleness on a queued overlapping swap):
+  `crates/engine/src/patch_engine.rs`'s module doc + decisions.md's "`PatchEngine`: wiring the
+  compiler into S1's swap mechanism" and "`PatchEngine`: overlapping swaps" entries. `tests/
+  patch_engine_swap.rs` and `tests/patch_engine_overlapping_swap.rs` show the expected external
+  shape and the independent-reference-comparison pattern used to test crossfade correctness
+  without needing to replicate `swap::equal_power` (`pub(crate)`, not visible to integration
+  tests).
 - **Extending `kabl-ui`** (a native file picker instead of the text-path field, cable-dragging
   instead of click-to-connect, canvas pan/zoom, fixing the `Mutex`-sharing compromise):
   `crates/ui/src/editor.rs`'s module doc + `lib.rs`'s module doc + decisions.md's "`kabl-ui`: the
