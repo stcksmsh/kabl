@@ -834,6 +834,10 @@ def story_frames(th):
     att = find_ctl(env, "attack_ms")
     ax, ay = env["x"] + att["cx"], env["y"] + att["cy"]
     hint = "Drop a cable on any knob to modulate it · Esc cancels"
+
+    def swing(a):
+        rv = route_values(mods, route("t", ("lfo", "out"), ("env", "attack_ms"), a))
+        return f"Base {rv[0]} · swings {rv[1]} – {rv[2]}{' (clamped)' if rv[3] else ''}"
     f = []
     f.append(("1  Drag from LFO Out. Every knob is a destination; hovering Attack shows the default.",
               base(selected=("lfo",), caption=cap("storyboard 1/8"), hint=hint,
@@ -843,12 +847,12 @@ def story_frames(th):
               ref_routes(with_attack=False)))
     f.append(("2  Dropped: small plug at 6 o'clock, range ring, value pill. Tooltip gives units.",
               base(selected=("lfo",), caption=cap("storyboard 2/8"), hint=hint,
-                   tooltips=[(ax + 34, ay - 30, ["LFO → Attack  +25 %", "Base 8 ms · swings 0.45 – 142 ms"])]),
+                   tooltips=[(ax + 34, ay - 30, ["LFO → Attack  +25 %", swing(.25)])]),
               ref_routes(.25)))
     f.append(("3  Drag the ring (not the knob) to set depth: +40 %. Knob body still sets the base.",
               base(selected=("lfo",), ring_drag=("env", "attack_ms"), caption=cap("storyboard 3/8"),
                    hint="Ring = depth of the selected source · knob = base value · Shift = fine",
-                   tooltips=[(ax + 34, ay - 30, ["LFO → Attack  +40 %", "Base 8 ms · swings 0.16 – 400 ms"])],
+                   tooltips=[(ax + 34, ay - 30, ["LFO → Attack  +40 %", swing(.40)])],
                    cursor=(ax + 20, ay - 22)),
               ref_routes(.40)))
     f.append(("4  Route card: Invert flips the sign (−40 %); the peak dot moves to the low end.",
