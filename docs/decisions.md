@@ -1342,3 +1342,41 @@ it) — a 200x220 skinned panel makes the "patch runs off the visible width" pro
 not better.
 
 Workspace build/test/clippy/fmt all clean.
+
+## Cycle handling: carrying delay-buffer memory across recompile
+
+Follow-up to "Cycle handling: implicit 1-block delay" above — that entry's own doc comment flagged
+the gap: a feedback loop's delay buffer (holding its DFS-back-edge cable's previous-block value)
+reset to silence on every `recompile()`, unlike module state, which already carries over via
+`save_state`/`load_state`. Left as a documented gap rather than fixed at the time since no
+accept-test patch exercised it. Picked up now as the next self-contained backlog item (STATUS.md
+handover list item 5).
+
+**Design**: `CompiledPatch` gained a `delay_slots: HashMap<DelaySlotKey, BufIdx>` field —
+`DelaySlotKey { from_id, from_port_idx, lane }` identifies a delay buffer by *what it holds*
+(a delayed cable's source port, plus a voice lane or `None` for global/summed) rather than by its
+physical index, since `coalesce_buffers`' remap (and even the choice of which cable is a DFS back
+edge at all) can differ freely between two compiles of a similar-but-not-identical patch.
+`recompile()` builds the new `CompiledPatch` as before, then for every key present in *both* the
+old and new `delay_slots` maps, copies the old compile's buffer content into the new compile's
+buffer at that key's (possibly different) physical index. A key only in `old` (its cable stopped
+being delayed, or was removed) is simply dropped; a key only in `new` (a newly-cyclic edge) starts
+silent — identical behavior to a fresh `compile()`, which is the correct fallback since there's no
+prior value to carry.
+
+**Deliberately not carried**: `summed_delay_buf` (a voice-rate delayed source feeding a
+global-rate sink) isn't in `delay_slots` at all — it's a derived value, recomputed every block by
+its own `Step::SumVoices` from the per-lane voice delay buffers, which are themselves already
+carried. Carrying the sum too would be redundant (and subtly wrong the moment voice count changes
+across the recompile, since the old sum was over a different lane count).
+
+**Tested**: `crates/engine/tests/compile.rs::recompile_carries_over_a_cycles_delay_buffer_memory`,
+same two-track pattern as `recompile_carries_over_oscillator_phase_and_filter_state`: run the
+existing cyclic 2-`vca` test patch (from `cycle_compiles_with_implicit_one_block_delay`) for 10
+blocks, split into "keep processing the original `CompiledPatch`" vs. "`recompile()` against the
+same unchanged `PatchState`, then process one block" — bit-exact agreement between the two proves
+the recompiled side saw the real carried-over delay value, not silence (a reset would have
+desynced them on that very next block, since the cycle's feedback gain is not near-zero at block
+10 — asserted directly, not just assumed, so the test can't accidentally pass on a silent no-op).
+
+Workspace build/test/clippy/fmt all clean.

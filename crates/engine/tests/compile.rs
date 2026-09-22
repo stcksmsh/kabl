@@ -164,6 +164,57 @@ fn cycle_compiles_with_implicit_one_block_delay() {
     }
 }
 
+/// A cyclic patch's delay-buffer memory (the previous block's value flowing through the DFS back
+/// edge) must survive `recompile()`, not reset to silence like a fresh `compile()` — otherwise a
+/// live edit to any part of the patch would audibly glitch every feedback loop in it. Proven the
+/// same way `recompile_carries_over_oscillator_phase_and_filter_state` proves module-state
+/// carry-over: run the same cyclic patch two ways from the same point — one left alone, one
+/// recompiled against an unchanged `PatchState` (standing in for "the user edited something
+/// elsewhere") — and check they agree bit-exactly on the very next block. If delay-buffer memory
+/// were dropped, `recompiled`'s next block would see a silent `cv` input instead of the real
+/// carried-over value and diverge from `old_continued`.
+#[test]
+fn recompile_carries_over_a_cycles_delay_buffer_memory() {
+    const BASE_HZ: f32 = 220.0;
+
+    let mut patch = PatchState::new();
+    patch.modules.insert(
+        1,
+        module("osc.va", &[("base_hz", BASE_HZ), ("waveform", 2.0)]),
+    );
+    patch.modules.insert(2, module("vca", &[]));
+    patch.modules.insert(3, module("vca", &[]));
+    patch.modules.insert(4, module("out", &[]));
+    patch.cables.insert(1, cable(1, "out", 3, "in"));
+    patch.cables.insert(2, cable(3, "out", 2, "in"));
+    patch.cables.insert(3, cable(2, "out", 3, "cv")); // the back edge -> delayed
+    patch.cables.insert(4, cable(2, "out", 4, "left"));
+    patch.cables.insert(5, cable(2, "out", 4, "right"));
+
+    let mut compiled = compile(&patch, SAMPLE_RATE, 1).expect("should compile");
+    for _ in 0..10 {
+        compiled.process_block();
+    }
+
+    // Recompile against the same (unchanged) PatchState, as if the user nudged something
+    // irrelevant elsewhere in a bigger patch.
+    let mut recompiled = recompile(&mut compiled, &patch, SAMPLE_RATE, 1).expect("should compile");
+    let mut old_continued = compiled;
+    old_continued.process_block();
+    recompiled.process_block();
+
+    assert_eq!(
+        old_continued.left(),
+        recompiled.left(),
+        "recompile should carry the feedback loop's delay-buffer memory forward, not reset it"
+    );
+    assert_eq!(old_continued.right(), recompiled.right());
+
+    // And it isn't a trivial pass because both sides are silent — this patch's feedback loop is
+    // genuinely live by block 10.
+    assert!(old_continued.left().iter().any(|&s| s != 0.0));
+}
+
 #[test]
 fn unknown_module_kind_is_a_compile_error() {
     let mut patch = PatchState::new();

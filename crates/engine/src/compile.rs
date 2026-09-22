@@ -23,10 +23,13 @@
 //!   output from the *previous* `process_block()` call, refreshed by a `Step::CopyToDelay` at the
 //!   end of the schedule. First block after compile sees silence on that input (no history yet).
 //!   Delay buffers are pinned live-forever in `coalesce_buffers` (their whole point is surviving
-//!   past the block that writes them) and reset to silence on `recompile()` (a fresh `compile()`
-//!   call, like every other buffer) — a live edit momentarily drops feedback-loop memory, not
-//!   currently carried over the way module state is. See decisions.md "Cycle handling: implicit
-//!   1-block delay".
+//!   past the block that writes them) and, like module state, are carried across `recompile()`:
+//!   each delay buffer is keyed by what it holds (`DelaySlotKey` — its source port, plus a lane
+//!   for a voice-rate source) rather than where it physically lives, so `recompile()` can find the
+//!   same feedback loop's slot in the freshly-compiled patch and copy its last value forward. A
+//!   cable that stops being a DFS back edge (or is removed) simply drops its slot; a newly-cyclic
+//!   edge starts silent, same as any first compile. See decisions.md "Cycle handling: implicit
+//!   1-block delay" and "Cycle handling: carrying delay-buffer memory across recompile".
 //! - **Buffer-pool reuse** (brief section 7.4): `coalesce_buffers` remaps every buffer to a
 //!   smaller set of physical slots via greedy linear-scan register allocation over each buffer's
 //!   `[first_def, last_use]` schedule-step interval, run once at compile time after the schedule
@@ -276,6 +279,20 @@ fn output_port_index(info: &ModuleInfo, name: &str) -> Option<usize> {
         .position(|p| p.name == name)
 }
 
+/// Identifies one delay buffer (brief section 7.1's cycle-breaking) by what it holds, independent
+/// of its physical buffer index — a delayed cable's source port, plus a lane for a voice-rate
+/// source (`None` for global-rate/summed). Stable across recompile as long as the same cable stays
+/// a DFS back edge, which is what lets `recompile()` carry a feedback loop's one-block memory
+/// forward instead of resetting it to silence. Summed (voice-source-into-global-sink) delay
+/// buffers are intentionally not carried: they're a derived sum recomputed by `Step::SumVoices`
+/// every block from the per-lane delay buffers, which are themselves already carried.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+struct DelaySlotKey {
+    from_id: ModuleId,
+    from_port_idx: usize,
+    lane: Option<usize>,
+}
+
 pub struct CompiledPatch {
     modules: Vec<Box<dyn Module>>,
     /// Parallel to `modules`: which `(ModuleId, voice index)` each instance came from — `None`
@@ -283,6 +300,11 @@ pub struct CompiledPatch {
     module_origin: Vec<(ModuleId, Option<usize>)>,
     steps: Vec<Step>,
     buffers: Vec<[f32; BLOCK]>,
+    /// Every delay buffer's physical index, keyed by what it holds rather than where it lives —
+    /// lets `recompile()` find "the same" delay buffer in the new compile and copy its value
+    /// across, instead of every feedback loop resetting to silence on every edit. See
+    /// `DelaySlotKey`'s doc and module doc's "Cycle handling" section.
+    delay_slots: HashMap<DelaySlotKey, BufIdx>,
     out_left: BufIdx,
     out_right: BufIdx,
     sample_rate: f32,
@@ -673,6 +695,28 @@ pub fn compile(
         m.prepare(sample_rate, BLOCK, &quality);
     }
 
+    let mut delay_slots: HashMap<DelaySlotKey, BufIdx> = HashMap::new();
+    for (&(from_id, from_port_idx, lane), &buf) in &voice_delay_buf {
+        delay_slots.insert(
+            DelaySlotKey {
+                from_id,
+                from_port_idx,
+                lane: Some(lane),
+            },
+            buf,
+        );
+    }
+    for (&(from_id, from_port_idx), &buf) in &global_delay_buf {
+        delay_slots.insert(
+            DelaySlotKey {
+                from_id,
+                from_port_idx,
+                lane: None,
+            },
+            buf,
+        );
+    }
+
     let mut pinned = vec![silence_buf, out_left, out_right];
     pinned.extend(voice_delay_buf.values().copied());
     pinned.extend(global_delay_buf.values().copied());
@@ -707,6 +751,9 @@ pub fn compile(
     }
     out_left = remap[out_left];
     out_right = remap[out_right];
+    for buf in delay_slots.values_mut() {
+        *buf = remap[*buf];
+    }
     let buffers = vec![[0.0; BLOCK]; physical_count];
 
     Ok(CompiledPatch {
@@ -714,6 +761,7 @@ pub fn compile(
         module_origin,
         steps,
         buffers,
+        delay_slots,
         out_left,
         out_right,
         sample_rate,
@@ -894,6 +942,16 @@ pub fn recompile(
             let mut state = HashMapState::default();
             old_module.save_state(&mut state);
             new_module.load_state(&state);
+        }
+    }
+    // Carry a feedback loop's one-block memory across too (brief section 7.1's delay buffers) —
+    // for every delay slot present in both the old and new compile (same source port still a DFS
+    // back edge), copy its last-known value forward instead of the new compile's default silence.
+    // A slot only in `old` (the cable stopped being delayed, or was removed) is simply dropped; a
+    // slot only in `new` (a newly-cyclic edge) starts silent, same as any other fresh compile.
+    for (key, &new_buf) in &new_patch.delay_slots {
+        if let Some(&old_buf) = old.delay_slots.get(key) {
+            new_patch.buffers[new_buf] = old.buffers[old_buf];
         }
     }
     Ok(new_patch)
