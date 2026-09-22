@@ -5,3 +5,8 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+
+[dev-dependencies]
+# Only to verify a skin's embedded PNG actually decodes (crates/modules/tests/skin.rs) -- the
+# crate itself stays UI-framework/image-library-agnostic, see skin.rs's module doc.
+image = { version = "0.25", default-features = false, features = ["png"] }

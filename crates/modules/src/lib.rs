@@ -9,6 +9,7 @@ pub mod info;
 pub mod io;
 pub mod module;
 pub mod registry;
+pub mod skin;
 
 pub use info::{
     Category, LessonId, ModuleInfo, ParamInfo, PortDirection, PortInfo, PortType, QualitySupport,
@@ -16,3 +17,4 @@ pub use info::{
 };
 pub use io::{ProcessIo, Signal};
 pub use module::{Module, QualityConfig, QualityTier, StateReader, StateWriter};
+pub use skin::{ControlKind, ControlSkin, ModuleSkin};

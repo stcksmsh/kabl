@@ -15,13 +15,60 @@ pub use editor::PatchEditor;
 
 use egui::{Color32, Id, Pos2, Rect, Sense, Stroke, Vec2 as EguiVec2};
 use kabl_core::{CableId, ModuleId, PortRef, Vec2};
-use kabl_modules::info::PortDirection;
+use kabl_modules::info::{Category, PortDirection, PortType};
 use kabl_modules::registry;
 
 const MODULE_WIDTH: f32 = 160.0;
 const PORT_ROW_HEIGHT: f32 = 18.0;
-const HEADER_HEIGHT: f32 = 24.0;
+const HEADER_HEIGHT: f32 = 26.0;
 const PORT_RADIUS: f32 = 5.0;
+const ACCENT_HEIGHT: f32 = 4.0;
+const KNOB_RADIUS: f32 = 11.0;
+const KNOB_ROW_HEIGHT: f32 = 40.0;
+const PANEL_FILL: Color32 = Color32::from_rgb(32, 32, 36);
+const PANEL_FILL_SELECTED: Color32 = Color32::from_rgb(44, 48, 58);
+
+/// A module's `Category` (brief section 8's grouping) doubles as its panel's accent color — the
+/// same idea real modular hardware uses (Make Noise/Mutable-style panel-color-by-function), so a
+/// patch reads at a glance instead of every module being an identical gray box.
+fn category_color(category: Category) -> Color32 {
+    match category {
+        Category::Source => Color32::from_rgb(230, 140, 60),
+        Category::Filter => Color32::from_rgb(60, 180, 200),
+        Category::Modulator => Color32::from_rgb(170, 100, 220),
+        Category::Sequencer => Color32::from_rgb(120, 200, 90),
+        Category::Utility => Color32::from_rgb(140, 140, 155),
+        Category::Effect => Color32::from_rgb(220, 90, 150),
+    }
+}
+
+/// A port's `PortType` doubles as its jack color — common Eurorack convention (audio vs. CV vs.
+/// gate vs. pitch reading as distinct at a glance, not just by hovering to read a tooltip).
+fn port_type_color(port_type: PortType) -> Color32 {
+    match port_type {
+        PortType::Audio => Color32::from_rgb(235, 235, 235),
+        PortType::Cv => Color32::from_rgb(90, 160, 255),
+        PortType::Gate => Color32::from_rgb(255, 190, 60),
+        PortType::Pitch => Color32::from_rgb(110, 220, 150),
+    }
+}
+
+/// A fixed palette cables cycle through by `CableId`, so a patch with several cables reads as
+/// actually patched (distinguishable cables) rather than one flat color for every connection.
+const CABLE_COLORS: &[Color32] = &[
+    Color32::from_rgb(220, 80, 80),
+    Color32::from_rgb(80, 140, 220),
+    Color32::from_rgb(90, 200, 120),
+    Color32::from_rgb(230, 190, 60),
+    Color32::from_rgb(180, 100, 220),
+    Color32::from_rgb(230, 140, 70),
+    Color32::from_rgb(80, 200, 200),
+    Color32::from_rgb(230, 110, 170),
+];
+
+fn cable_color(id: CableId) -> Color32 {
+    CABLE_COLORS[(id as usize) % CABLE_COLORS.len()]
+}
 
 /// Interaction state that persists across frames but isn't part of the patch itself — which
 /// module is selected (for the param panel), an in-progress cable connection, an in-progress
@@ -37,6 +84,11 @@ pub struct UiState {
     /// the underlying save/load logic to be real and correct.
     pub patch_path: String,
     pub last_message: Option<String>,
+    /// Decoded skin background textures, keyed by module kind (one skin per kind, see
+    /// `kabl_modules::skin`) so a module's art is decoded once and reused every frame, not
+    /// re-decoded per instance per frame. `TextureHandle` is ref-counted and frees its GPU texture
+    /// on drop, so this cache is also what keeps a loaded skin's texture alive.
+    image_cache: std::collections::HashMap<&'static str, egui::TextureHandle>,
 }
 
 struct Dragging {
@@ -61,8 +113,30 @@ impl Default for UiState {
             dragging: None,
             patch_path: "my-patch".to_string(),
             last_message: None,
+            image_cache: std::collections::HashMap::new(),
         }
     }
+}
+
+/// Decodes `png_bytes` (a skin's embedded panel art) into an `egui` texture the first time `kind`
+/// is seen, and reuses the cached handle on every later call — decoding a PNG is real work, not
+/// something to repeat every frame for every instance of a skinned module.
+fn skin_texture(
+    ui: &egui::Ui,
+    cache: &mut std::collections::HashMap<&'static str, egui::TextureHandle>,
+    kind: &'static str,
+    png_bytes: &'static [u8],
+) -> egui::TextureId {
+    let handle = cache.entry(kind).or_insert_with(|| {
+        let decoded = image::load_from_memory(png_bytes)
+            .expect("skin background image must be a valid, embedded PNG")
+            .to_rgba8();
+        let size = [decoded.width() as usize, decoded.height() as usize];
+        let color_image = egui::ColorImage::from_rgba_unmultiplied(size, decoded.as_raw());
+        ui.ctx()
+            .load_texture(kind, color_image, egui::TextureOptions::LINEAR)
+    });
+    handle.id()
 }
 
 /// Draws the whole patchbay for one frame and applies any user-triggered edits to `editor`
@@ -204,11 +278,16 @@ fn show_canvas(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
     // reading positions/ports while drawing, and mutably, for applying an edit a click just
     // triggered, at the same time). Collecting positions once per frame is cheap (this is a UI
     // frame, not the audio thread) and keeps the borrow simple.
-    let modules: Vec<(ModuleId, String, Vec2)> = editor
+    let modules: Vec<(
+        ModuleId,
+        String,
+        Vec2,
+        std::collections::BTreeMap<String, f32>,
+    )> = editor
         .state()
         .modules
         .iter()
-        .map(|(&id, m)| (id, m.kind.clone(), m.pos))
+        .map(|(&id, m)| (id, m.kind.clone(), m.pos, m.params.clone()))
         .collect();
     let cables: Vec<(CableId, PortRef, PortRef)> = editor
         .state()
@@ -222,102 +301,150 @@ fn show_canvas(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
     let mut port_pos: std::collections::HashMap<(ModuleId, PortDirection, String), Pos2> =
         std::collections::HashMap::new();
 
-    for (id, kind, stored_pos) in &modules {
+    for (id, kind, stored_pos, params) in &modules {
         let pos = match &ui_state.dragging {
             Some(d) if d.id == *id => d.live_pos,
             _ => *stored_pos,
         };
         let info = registry::info_for(kind);
-        let inputs: Vec<&str> = info
+
+        if let Some(skin) = info.and_then(|i| i.skin) {
+            draw_skinned_module(
+                editor,
+                ui_state,
+                ui,
+                &painter,
+                &mut port_pos,
+                *id,
+                info.expect("skin implies info is Some"),
+                skin,
+                pos,
+                *stored_pos,
+                params,
+                origin,
+            );
+            continue;
+        }
+
+        let inputs: Vec<&kabl_modules::info::PortInfo> = info
             .map(|i| {
                 i.ports
                     .iter()
                     .filter(|p| p.direction == PortDirection::Input)
-                    .map(|p| p.name)
                     .collect()
             })
             .unwrap_or_default();
-        let outputs: Vec<&str> = info
+        let outputs: Vec<&kabl_modules::info::PortInfo> = info
             .map(|i| {
                 i.ports
                     .iter()
                     .filter(|p| p.direction == PortDirection::Output)
-                    .map(|p| p.name)
                     .collect()
             })
             .unwrap_or_default();
         let port_rows = inputs.len().max(outputs.len()).max(1) as f32;
-        let size = EguiVec2::new(MODULE_WIDTH, HEADER_HEIGHT + port_rows * PORT_ROW_HEIGHT);
+        let has_knobs = info.is_some_and(|i| !i.params.is_empty());
+        let body_height = HEADER_HEIGHT
+            + port_rows * PORT_ROW_HEIGHT
+            + if has_knobs { KNOB_ROW_HEIGHT } else { 0.0 };
+        let size = EguiVec2::new(MODULE_WIDTH, body_height);
         let rect = Rect::from_min_size(origin + EguiVec2::new(pos.x, pos.y), size);
 
-        let body_id = Id::new(("kabl-module-body", *id));
-        let response = ui.interact(rect, body_id, Sense::click_and_drag());
-        if response.clicked() {
-            ui_state.selected_module = Some(*id);
-        }
-        if response.drag_started() {
-            ui_state.dragging = Some(Dragging {
-                id: *id,
-                start_pos: *stored_pos,
-                live_pos: *stored_pos,
-            });
-        }
-        if response.dragged() {
-            if let Some(d) = ui_state.dragging.as_mut().filter(|d| d.id == *id) {
-                d.live_pos.x += response.drag_delta().x;
-                d.live_pos.y += response.drag_delta().y;
-            }
-        }
-        if response.drag_stopped() {
-            if let Some(d) = ui_state.dragging.take().filter(|d| d.id == *id) {
-                if d.live_pos != d.start_pos {
-                    editor.move_module(*id, d.live_pos);
-                }
-            }
-        }
-
-        let selected = ui_state.selected_module == Some(*id);
+        let selected = interact_body(ui, editor, ui_state, *id, *stored_pos, rect);
+        let accent = category_color(info.map(|i| i.category).unwrap_or(Category::Utility));
         let fill = if selected {
-            Color32::from_rgb(70, 90, 120)
+            PANEL_FILL_SELECTED
         } else {
-            Color32::from_rgb(50, 50, 55)
+            PANEL_FILL
         };
-        painter.rect_filled(rect, 4.0, fill);
+        // Faceplate: dark body, a category-colored accent strip along the top (the "which kind
+        // of module is this, at a glance" cue real modular panels use color for), a brighter
+        // outline when selected instead of a flat gray one always.
+        painter.rect_filled(rect, 5.0, fill);
+        let accent_rect = Rect::from_min_size(rect.min, EguiVec2::new(MODULE_WIDTH, ACCENT_HEIGHT));
+        painter.rect_filled(
+            accent_rect,
+            egui::CornerRadius {
+                nw: 5,
+                ne: 5,
+                sw: 0,
+                se: 0,
+            },
+            accent,
+        );
         painter.rect_stroke(
             rect,
-            4.0,
-            Stroke::new(1.0, Color32::from_gray(200)),
+            5.0,
+            Stroke::new(
+                if selected { 2.0 } else { 1.0 },
+                if selected {
+                    accent
+                } else {
+                    Color32::from_gray(90)
+                },
+            ),
             egui::StrokeKind::Outside,
         );
         painter.text(
-            rect.min + EguiVec2::new(6.0, 4.0),
+            rect.min + EguiVec2::new(6.0, ACCENT_HEIGHT + 3.0),
             egui::Align2::LEFT_TOP,
             format!("{kind} #{id}"),
             egui::FontId::proportional(12.0),
             Color32::WHITE,
         );
 
-        for (row, name) in inputs.iter().enumerate() {
+        for (row, port) in inputs.iter().enumerate() {
             let p = rect.min
                 + EguiVec2::new(
                     0.0,
                     HEADER_HEIGHT + row as f32 * PORT_ROW_HEIGHT + PORT_ROW_HEIGHT / 2.0,
                 );
-            port_pos.insert((*id, PortDirection::Input, name.to_string()), p);
-            draw_port(&painter, ui, p, name, PortDirection::Input, |pt| {
-                on_port_click(editor, ui_state, *id, PortDirection::Input, name, pt)
+            port_pos.insert((*id, PortDirection::Input, port.name.to_string()), p);
+            draw_port(&painter, ui, p, port, PortDirection::Input, |pt| {
+                on_port_click(editor, ui_state, *id, PortDirection::Input, port.name, pt)
             });
         }
-        for (row, name) in outputs.iter().enumerate() {
+        for (row, port) in outputs.iter().enumerate() {
             let p = rect.min
                 + EguiVec2::new(
                     MODULE_WIDTH,
                     HEADER_HEIGHT + row as f32 * PORT_ROW_HEIGHT + PORT_ROW_HEIGHT / 2.0,
                 );
-            port_pos.insert((*id, PortDirection::Output, name.to_string()), p);
-            draw_port(&painter, ui, p, name, PortDirection::Output, |pt| {
-                on_port_click(editor, ui_state, *id, PortDirection::Output, name, pt)
+            port_pos.insert((*id, PortDirection::Output, port.name.to_string()), p);
+            draw_port(&painter, ui, p, port, PortDirection::Output, |pt| {
+                on_port_click(editor, ui_state, *id, PortDirection::Output, port.name, pt)
             });
+        }
+
+        // On-panel knobs, one per param, in a row below the jacks -- brief's "specify where to
+        // put ... switches/readouts" in miniature: today every built-in only has continuous
+        // params, so `Knob` is the one control kind actually wired up (see `skin.rs`'s doc
+        // comment for the fuller custom-panel design this is a first slice of).
+        if let Some(info) = info.filter(|_| has_knobs) {
+            let knob_y = rect.min.y + HEADER_HEIGHT + port_rows * PORT_ROW_HEIGHT
+                - PORT_ROW_HEIGHT / 2.0
+                + KNOB_ROW_HEIGHT / 2.0
+                + 6.0;
+            let n = info.params.len() as f32;
+            for (i, param) in info.params.iter().enumerate() {
+                let cx = rect.min.x + MODULE_WIDTH * (i as f32 + 0.5) / n;
+                let center = Pos2::new(cx, knob_y);
+                let current = params.get(param.name).copied().unwrap_or(param.default);
+                let frac = if param.max > param.min {
+                    ((current - param.min) / (param.max - param.min)).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                let knob_id = Id::new(("kabl-knob", *id, param.name));
+                if let Some(delta_frac) = draw_knob(&painter, ui, center, frac, param.name, knob_id)
+                {
+                    let new_value = (current + delta_frac * (param.max - param.min))
+                        .clamp(param.min, param.max);
+                    if new_value != current {
+                        editor.set_param(*id, param.name, new_value);
+                    }
+                }
+            }
         }
     }
 
@@ -328,17 +455,190 @@ fn show_canvas(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
         ) else {
             continue;
         };
-        painter.line_segment([a, b], Stroke::new(2.0, Color32::from_rgb(200, 180, 80)));
-        // Small midpoint hit-target to disconnect -- clicking the cable removes it. A dedicated
-        // "delete" affordance beats needing a whole separate selection mode for cables.
-        let mid = a + (b - a) * 0.5;
-        let hit = Rect::from_center_size(mid, EguiVec2::splat(10.0));
+        let color = cable_color(*cable_id);
+        let points = cable_curve_points(a, b);
+        painter.add(egui::Shape::line(points.clone(), Stroke::new(2.5, color)));
+        // Small hit-target at the curve's own midpoint (not the straight-line one, now that
+        // cables sag) to disconnect -- clicking the cable removes it.
+        let mid = points[points.len() / 2];
+        let hit = Rect::from_center_size(mid, EguiVec2::splat(12.0));
         let resp = ui.interact(hit, Id::new(("kabl-cable", *cable_id)), Sense::click());
         if resp.clicked() {
             editor.disconnect(*cable_id);
         }
         if resp.hovered() {
-            painter.circle_stroke(mid, 6.0, Stroke::new(1.5, Color32::RED));
+            painter.circle_stroke(mid, 7.0, Stroke::new(1.5, Color32::RED));
+        }
+    }
+}
+
+/// Samples a quadratic bezier from `a` to `b` with a single control point pulled downward from
+/// the midpoint (a cheap stand-in for gravity droop) -- a hanging patch cable, not a ruler-straight
+/// wire. `sag` scales with horizontal distance so a short cable barely dips and a long one hangs
+/// visibly, clamped so it never gets silly on a very wide patch.
+fn cable_curve_points(a: Pos2, b: Pos2) -> Vec<Pos2> {
+    const SAMPLES: usize = 24;
+    let sag = ((b.x - a.x).abs() * 0.18).clamp(8.0, 50.0);
+    let control = Pos2::new((a.x + b.x) / 2.0, (a.y + b.y) / 2.0 + sag);
+    (0..=SAMPLES)
+        .map(|i| {
+            let t = i as f32 / SAMPLES as f32;
+            let mt = 1.0 - t;
+            Pos2::new(
+                mt * mt * a.x + 2.0 * mt * t * control.x + t * t * b.x,
+                mt * mt * a.y + 2.0 * mt * t * control.y + t * t * b.y,
+            )
+        })
+        .collect()
+}
+
+/// Selection + drag handling shared by both the auto-layout panel and a skinned one -- the same
+/// logic either way, just parameterized on the panel's `rect` (which comes from a fixed
+/// `MODULE_WIDTH`-based layout in one case and `ModuleSkin.panel_size` in the other). Returns
+/// whether this module is the selected one, for the caller to use when drawing its own
+/// selection-outline style.
+fn interact_body(
+    ui: &mut egui::Ui,
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    id: ModuleId,
+    stored_pos: Vec2,
+    rect: Rect,
+) -> bool {
+    let body_id = Id::new(("kabl-module-body", id));
+    let response = ui.interact(rect, body_id, Sense::click_and_drag());
+    if response.clicked() {
+        ui_state.selected_module = Some(id);
+    }
+    if response.drag_started() {
+        ui_state.dragging = Some(Dragging {
+            id,
+            start_pos: stored_pos,
+            live_pos: stored_pos,
+        });
+    }
+    if response.dragged() {
+        if let Some(d) = ui_state.dragging.as_mut().filter(|d| d.id == id) {
+            d.live_pos.x += response.drag_delta().x;
+            d.live_pos.y += response.drag_delta().y;
+        }
+    }
+    if response.drag_stopped() {
+        if let Some(d) = ui_state.dragging.take().filter(|d| d.id == id) {
+            if d.live_pos != d.start_pos {
+                editor.move_module(id, d.live_pos);
+            }
+        }
+    }
+    ui_state.selected_module == Some(id)
+}
+
+/// Renders a module that declares a `ModuleSkin` — custom panel art (if any) stretched to
+/// `skin.panel_size`, with every control drawn at its explicitly declared normalized position
+/// instead of the auto-layout row scheme `show_canvas`'s main loop uses for everything else. This
+/// is the "custom modules can use their own images as their background and specify where to put
+/// their jacks/ins/outs/switches/readouts" mechanism (owner ask) — see decisions.md "Module
+/// skins: custom panel art".
+#[allow(clippy::too_many_arguments)]
+fn draw_skinned_module(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    painter: &egui::Painter,
+    port_pos: &mut std::collections::HashMap<(ModuleId, PortDirection, String), Pos2>,
+    id: ModuleId,
+    info: &'static kabl_modules::info::ModuleInfo,
+    skin: &'static kabl_modules::skin::ModuleSkin,
+    pos: Vec2,
+    stored_pos: Vec2,
+    params: &std::collections::BTreeMap<String, f32>,
+    origin: Pos2,
+) {
+    let size = EguiVec2::new(skin.panel_size.0, skin.panel_size.1);
+    let rect = Rect::from_min_size(origin + EguiVec2::new(pos.x, pos.y), size);
+
+    let selected = interact_body(ui, editor, ui_state, id, stored_pos, rect);
+    let accent = category_color(info.category);
+
+    match skin.background_image {
+        Some(png) => {
+            let tex = skin_texture(ui, &mut ui_state.image_cache, info.kind, png);
+            painter.image(
+                tex,
+                rect,
+                Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(1.0, 1.0)),
+                Color32::WHITE,
+            );
+        }
+        None => {
+            painter.rect_filled(
+                rect,
+                5.0,
+                if selected {
+                    PANEL_FILL_SELECTED
+                } else {
+                    PANEL_FILL
+                },
+            );
+        }
+    }
+    // Selection feedback on top of either background: a plain rect_stroke would look identical
+    // to the auto-layout panel's, but a skin's art may already fill right up to its own edge, so
+    // draw it a hair outside the panel rather than risk it being covered.
+    if selected {
+        painter.rect_stroke(
+            rect.expand(1.5),
+            5.0,
+            Stroke::new(2.0, accent),
+            egui::StrokeKind::Outside,
+        );
+    }
+    painter.text(
+        rect.right_top() + EguiVec2::new(-4.0, 4.0),
+        egui::Align2::RIGHT_TOP,
+        format!("#{id}"),
+        egui::FontId::proportional(10.0),
+        Color32::from_gray(210),
+    );
+
+    for control in skin.controls {
+        let center = rect.min
+            + EguiVec2::new(
+                control.pos.0 * skin.panel_size.0,
+                control.pos.1 * skin.panel_size.1,
+            );
+        match control.kind {
+            kabl_modules::skin::ControlKind::Jack => {
+                let Some(port) = info.ports.iter().find(|p| p.name == control.id) else {
+                    continue;
+                };
+                port_pos.insert((id, port.direction, port.name.to_string()), center);
+                draw_port(painter, ui, center, port, port.direction, |pt| {
+                    on_port_click(editor, ui_state, id, port.direction, port.name, pt)
+                });
+            }
+            kabl_modules::skin::ControlKind::Knob => {
+                let Some(param) = info.params.iter().find(|p| p.name == control.id) else {
+                    continue;
+                };
+                let current = params.get(param.name).copied().unwrap_or(param.default);
+                let frac = if param.max > param.min {
+                    ((current - param.min) / (param.max - param.min)).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                let knob_id = Id::new(("kabl-knob", id, param.name));
+                if let Some(delta_frac) = draw_knob(painter, ui, center, frac, param.name, knob_id)
+                {
+                    let new_value = (current + delta_frac * (param.max - param.min))
+                        .clamp(param.min, param.max);
+                    if new_value != current {
+                        editor.set_param(id, param.name, new_value);
+                    }
+                }
+            }
+            // Declared, not yet rendered -- see kabl_modules::skin's module doc.
+            kabl_modules::skin::ControlKind::Switch | kabl_modules::skin::ControlKind::Readout => {}
         }
     }
 }
@@ -357,22 +657,93 @@ fn draw_port(
     painter: &egui::Painter,
     ui: &mut egui::Ui,
     pos: Pos2,
-    name: &str,
+    port: &kabl_modules::info::PortInfo,
     direction: PortDirection,
     on_click: impl FnOnce(Pos2),
 ) {
     let rect = Rect::from_center_size(pos, EguiVec2::splat(PORT_RADIUS * 2.5));
-    let id = Id::new(("kabl-port", direction, name, pos.x as i32, pos.y as i32));
+    let id = Id::new((
+        "kabl-port",
+        direction,
+        port.name,
+        pos.x as i32,
+        pos.y as i32,
+    ));
     let response = ui.interact(rect, id, Sense::click());
-    let color = if response.hovered() {
-        Color32::YELLOW
+    let base = port_type_color(port.port_type);
+    // Ring style (outer color ring, dark center) instead of a flat dot -- reads more like a real
+    // 1/4"/3.5mm jack; hovering brightens the ring rather than swapping to an unrelated color, so
+    // the port-type color stays legible even while highlighted.
+    let ring = if response.hovered() {
+        Color32::from_rgb(
+            base.r().saturating_add(30),
+            base.g().saturating_add(30),
+            base.b().saturating_add(30),
+        )
     } else {
-        Color32::LIGHT_BLUE
+        base
     };
-    painter.circle_filled(pos, PORT_RADIUS, color);
+    painter.circle_filled(pos, PORT_RADIUS, Color32::from_rgb(20, 20, 22));
+    painter.circle_stroke(pos, PORT_RADIUS, Stroke::new(2.0, ring));
+    let label_offset = match direction {
+        PortDirection::Input => EguiVec2::new(PORT_RADIUS + 4.0, 0.0),
+        PortDirection::Output => EguiVec2::new(-(PORT_RADIUS + 4.0), 0.0),
+    };
+    let align = match direction {
+        PortDirection::Input => egui::Align2::LEFT_CENTER,
+        PortDirection::Output => egui::Align2::RIGHT_CENTER,
+    };
+    painter.text(
+        pos + label_offset,
+        align,
+        port.name,
+        egui::FontId::proportional(9.0),
+        Color32::from_gray(190),
+    );
     if response.clicked() {
         on_click(pos);
     }
+}
+
+/// A draggable rotary knob: dark body, a ring in the module's accent-independent neutral color,
+/// and a pointer swept 270° (from lower-left at `frac=0` to lower-right at `frac=1`, straight up
+/// at `frac=0.5`) -- the same sweep convention real synth knobs use. Dragging vertically (up =
+/// increase, matching a real knob's feel) returns `Some(delta_frac)` for the caller to scale by
+/// the param's actual range and apply; `None` when not being dragged this frame.
+fn draw_knob(
+    painter: &egui::Painter,
+    ui: &mut egui::Ui,
+    center: Pos2,
+    frac: f32,
+    label: &str,
+    id: Id,
+) -> Option<f32> {
+    const DRAG_PIXELS_FOR_FULL_SWEEP: f32 = 150.0;
+    let rect = Rect::from_center_size(center, EguiVec2::splat(KNOB_RADIUS * 2.0));
+    let response = ui.interact(rect, id, Sense::drag());
+    let ring = if response.hovered() || response.dragged() {
+        Color32::from_gray(230)
+    } else {
+        Color32::from_gray(170)
+    };
+    painter.circle_filled(center, KNOB_RADIUS, Color32::from_rgb(22, 22, 25));
+    painter.circle_stroke(center, KNOB_RADIUS, Stroke::new(1.5, ring));
+    let angle = (-135.0 + frac.clamp(0.0, 1.0) * 270.0).to_radians();
+    let dir = EguiVec2::new(angle.sin(), -angle.cos());
+    painter.line_segment(
+        [center, center + dir * (KNOB_RADIUS * 0.75)],
+        Stroke::new(2.0, Color32::WHITE),
+    );
+    painter.text(
+        center + EguiVec2::new(0.0, KNOB_RADIUS + 9.0),
+        egui::Align2::CENTER_TOP,
+        label,
+        egui::FontId::proportional(8.0),
+        Color32::from_gray(170),
+    );
+    response
+        .dragged()
+        .then(|| -response.drag_delta().y / DRAG_PIXELS_FOR_FULL_SWEEP)
 }
 
 fn on_port_click(

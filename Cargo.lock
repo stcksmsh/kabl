@@ -1581,6 +1581,9 @@ version = "0.1.0"
 [[package]]
 name = "kabl-modules"
 version = "0.1.0"
+dependencies = [
+ "image",
+]
 
 [[package]]
 name = "kabl-pedals"
@@ -1610,6 +1613,7 @@ dependencies = [
  "cpal",
  "eframe",
  "egui",
+ "image",
  "kabl-core",
  "kabl-engine",
  "kabl-modules",

@@ -5,7 +5,8 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-22, after `PatchEngine` got brief section 7.6's overlapping-swap handling.
+Last updated: 2026-09-22, after `kabl-ui` got a real panel aesthetic + a working module-skin
+mechanism (owner feedback: the UI was "too simple and soulless").
 
 ## Autonomous overnight work (started 2026-09-21)
 
@@ -122,6 +123,32 @@ was deliberately left alone (soon-superseded spike code). Tested in new
 queued swap neither got dropped nor corrupted the first one, bit-exact in the steady windows
 between and after both fades — verified to actually fail against the pre-fix code before being
 left in place. See decisions.md "`PatchEngine`: overlapping swaps".
+
+**`kabl-ui` got a real panel aesthetic + a working module-skin mechanism**, owner feedback ("too
+simple and soulless"), not a backlog item. Two pieces: (1) every module's default rendering
+(`crates/ui/src/lib.rs`) now has a category-colored accent strip, port-type-colored jack rings
+with on-canvas name labels (there were none before), curved multi-colored cables instead of one
+flat straight yellow line for every connection, and on-panel draggable knobs (270° sweep) in
+addition to the existing side-panel sliders — no new dependency, pure rendering rewrite. (2) a new
+`ModuleSkin` mechanism (`crates/modules/src/skin.rs`) lets a module declare custom background art
+(raw embedded PNG bytes, kept out of `kabl_modules`' otherwise UI-framework-agnostic dependency
+graph) plus an explicit normalized position for every jack/knob — the owner's actual ask ("custom
+modules can use their own images as their background and specify where to put their
+jacks/ins/outs/switches/readouts"). `osc.va` is the one built-in that uses it, with an honest
+placeholder panel image (generated via ImageMagick, literally labeled "PLACEHOLDER PANEL ART" —
+no image-generation tool was available to produce real designed artwork, and none was faked as
+such); the other 8 built-ins still use the improved procedural panel from (1). `Switch`/`Readout`
+control kinds are declared (matching the owner's wording) but not rendered — no built-in has a
+discrete toggle or numeric readout yet, nothing real to wire them against. Verified beyond a code
+read: ran under the existing Xvfb+`xdotool` setup, screenshotted the skinned panel rendering
+correctly, and did a real interactive check — dragged the on-panel `waveform` knob and confirmed
+the side panel's numeric value actually changed (which is also what caught the knob's initially-
+backwards drag direction before shipping it). 2 new tests in `crates/modules/tests/skin.rs` (every
+skin's controls match real ports/params and cover all of them; every embedded image decodes).
+**No "rack" container/canvas-background concept was built** — the owner's other word — `kabl-ui`'s
+canvas is still free 2D placement, not rack slots; a real rack metaphor is a bigger design
+question flagged for the owner, not guessed at. See decisions.md "`kabl-ui`: real panel aesthetic
++ module skins".
 
 **The compiler is now wired into S1's swap mechanism**: `crates/engine/src/patch_engine.rs::
 PatchEngine`, a stereo/arbitrary-topology counterpart to `swap::Engine`, reusing the same
@@ -260,6 +287,17 @@ crates/
                                 compiler can downcast `Box<dyn Module>` back to a concrete type.
                  registry.rs  - kind string -> Module factory. KNOWN_KINDS, create(kind),
                                 all_infos(), info_for(kind). Tested in tests/registry.rs.
+                 skin.rs      - ModuleSkin/ControlSkin/ControlKind (owner ask, not a brief
+                                feature): optional custom panel art (embedded PNG bytes) + explicit
+                                normalized jack/knob positions, on ModuleInfo.skin. None for 8 of 9
+                                built-ins; osc.va carries a real (placeholder-art) demo. Only
+                                Jack/Knob are rendered by kabl-ui; Switch/Readout are declared, not
+                                wired to anything yet. Tested in tests/skin.rs (2 tests: every
+                                skin's controls match and cover its module's real ports/params;
+                                every embedded image decodes). See decisions.md "kabl-ui: real
+                                panel aesthetic + module skins".
+                 assets/osc_va_panel.png - the one skin demo's background image, an honest
+                                generated placeholder (ImageMagick), not designed art.
   engine/      Real compiler + spike code (depends on kabl-modules, kabl-core).
                  compile.rs - THE COMPILER. compile(&PatchState, sample_rate, voice_count) ->
                                 CompiledPatch: topo sort (Kahn's algorithm), voice/global-rate
@@ -343,13 +381,22 @@ crates/
                                 (what core::save needs)/mark_dirty() (flags a recompile is due
                                 after a wholesale state replacement, e.g. a Load). Hardware-
                                 independent, fully unit-tested.
-                 lib.rs    - show(): the egui widget tree. Node boxes positioned by ModuleState
-                                .pos, click-a-port-then-click-a-port cabling, per-module param
-                                sliders in a side panel, drag-to-move (commits one MoveModule op
-                                on release, not per-frame), a "patch dir" text field with real
-                                Save/Load buttons (kabl_core::save/load, not a native file
-                                picker -- deliberate, see decisions.md). Snapshots editor state
-                                before mutating mid-frame (immediate-mode borrow-checker reality).
+                 lib.rs    - show(): the egui widget tree. Node panels positioned by ModuleState
+                                .pos, category-colored accent strip, port-type-colored jack rings
+                                with on-canvas name labels, curved multi-colored cables (a
+                                quadratic-bezier droop, not a straight line), on-panel draggable
+                                knobs per param (plus the existing side-panel sliders for precise
+                                entry), click-a-port-then-click-a-port cabling, drag-to-move
+                                (commits one MoveModule op on release, not per-frame), a "patch
+                                dir" text field with real Save/Load buttons (kabl_core::save/load,
+                                not a native file picker -- deliberate, see decisions.md). A module
+                                with ModuleInfo.skin set (currently just osc.va) renders via
+                                draw_skinned_module instead: its own panel_size, its background
+                                image (decoded once, cached as an egui::TextureHandle in
+                                UiState.image_cache), every control at its exact declared
+                                position. Snapshots editor state before mutating mid-frame
+                                (immediate-mode borrow-checker reality). See decisions.md "kabl-ui:
+                                real panel aesthetic + module skins".
                  main.rs   - eframe app: embeds the same cpal/midir/PatchEngine path standalone
                                 uses, recompiling+hot-swapping on every edit. Known compromise:
                                 audio callback and UI thread share one PatchEngine behind a
@@ -404,6 +451,19 @@ this against the commit it was last updated for.
 
 ## Open items (not decided, not blocking, but real)
 
+- **No "rack" container/canvas concept** — owner mentioned "racks where you place what you need"
+  alongside the module-skin ask; only the skin mechanism (custom art + control placement per
+  module) was built, not a rack-slot canvas layout. Open question for the owner: fixed HP-width
+  slots like real Eurorack, or free placement with a rack-styled canvas background? Not guessed
+  at. See decisions.md "kabl-ui: real panel aesthetic + module skins".
+- **Only `osc.va` has a real skin** — proves the mechanism, not a finished aesthetic pass. The
+  other 8 built-ins use the improved procedural panel (category accent, colored jacks, on-panel
+  knobs) but no custom art. Real hardware-quality panel art for more/all modules is real design
+  work this container has no tool to produce (ImageMagick placeholder only) — needs either a
+  human designer or an image-generation tool this session doesn't have.
+- **`Switch`/`Readout` skin control kinds are declared, not rendered** — no built-in has a
+  discrete toggle or live numeric readout to bind one to yet; add the `kabl-ui` rendering when a
+  real module needs one.
 - **S2's potato-gate number** needs real Pi-4 hardware — this container can't produce one
   honestly (see decisions.md "Spike S2").
 - **S3 missed its 2.5x target** (~1.5-1.7x measured) — root cause of the shortfall not fully

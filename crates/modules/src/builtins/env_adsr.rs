@@ -82,6 +82,7 @@ pub static ENV_ADSR_INFO: ModuleInfo = ModuleInfo {
         anti_aliasing: false,
         interpolation: false,
     },
+    skin: None,
 };
 
 const GATE_IN: usize = 0;

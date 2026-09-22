@@ -1218,3 +1218,127 @@ silence — patch_b never became real steady-state active, exactly the "queued e
 failure mode described above), then restored the fix and reconfirmed green.
 
 Workspace build/test/clippy/fmt all clean.
+
+## 2026-09-22 — `kabl-ui`: real panel aesthetic + module skins ("too simple and soulless")
+
+Owner feedback, not a backlog item: "I do not like the patchbay UI too much, it's too simple and
+soulless. I like how surge looks aesthetically... I had this idea of racks where you place what
+you need, connect them up with cables, custom 'modules' can use their own images as their
+'background' and specify where to put their jacks/ins/outs/switches/readouts etc" — plus "don't
+wait so long for continuing, just do it if it makes sense to do something without my
+intervention/taste test." Two pieces, both in `crates/ui`/`crates/modules`, no brief section
+backing either (an owner design ask, tracked here like any other decision): (1) make every
+existing module's *default* rendering look like an instrument, not a wireframe; (2) build the
+"custom background image + explicit control placement" mechanism the owner described, proven with
+one real (if placeholder) demo rather than just designed on paper.
+
+### 1. Default panel aesthetic (`crates/ui/src/lib.rs`)
+
+No new dependency, no new data model — purely a rendering rewrite of the auto-layout path every
+module still uses unless it opts into a skin:
+- **Category-colored accent strip** per panel (`category_color`) — the same idea real modular
+  hardware uses panel color for (Make Noise/Mutable-style), so a patch reads at a glance instead
+  of nine identical gray boxes. Selection now brightens/thickens the *category-colored* outline
+  instead of switching to an unrelated blue.
+- **Port-type-colored jack rings** (`port_type_color`) instead of one flat light-blue dot for
+  every port — Audio/Cv/Gate/Pitch each get a distinct color (a common Eurorack convention), drawn
+  as a ring (dark center, colored stroke) rather than a filled dot, closer to a real 1/4"/3.5mm
+  jack. Port names are now drawn next to each jack (there was no on-canvas port label at all
+  before — the only way to know a port's name used to be memorizing panel position).
+- **Curved, colored cables** (`cable_curve_points`) — a quadratic bezier with a single control
+  point pulled downward from the midpoint (gravity-droop stand-in), sampled to 24 points and drawn
+  as a polyline, instead of a dead-straight `line_segment`. Each cable's color now cycles through
+  an 8-color fixed palette by `CableId` (`cable_color`) instead of one flat yellow for every
+  connection — a multi-cable patch now reads as actually patched, not one undifferentiated tangle.
+  The disconnect hit-target moved from the straight line's midpoint to the curve's own sampled
+  midpoint, so it still sits visually on the cable.
+- **On-panel knobs** (`draw_knob`) — every param now gets a small draggable rotary dial drawn
+  directly on the module's own panel (270° sweep, `-135°` at `frac=0` to `+135°` at `frac=1`,
+  straight up at the midpoint — the standard synth-knob convention), in a row below the ports.
+  This is in *addition* to the existing side-panel sliders (kept for precise numeric entry), not a
+  replacement — a real instrument gives you both a knob to grab and a readout to check. Drag
+  direction (up = increase) was verified empirically under Xvfb, not assumed (see "Verification"
+  below) — got it backwards on the first pass (`-drag_delta().y`), a manual click-and-check caught
+  it, not a code read.
+
+Refactored the shared "click to select, drag to move" logic (previously inlined once) into
+`interact_body`, since the skin path below needs the identical behavior against a
+differently-shaped `rect` and duplicating it would have been the wrong kind of shortcut.
+
+### 2. Module skins (`crates/modules/src/skin.rs`, new)
+
+The owner's actual ask: "custom modules can use their own images as their background and specify
+where to put their jacks/ins/outs/switches/readouts." Built as real, working infrastructure, not a
+speculative stub:
+
+- **`ModuleSkin`**: `panel_size: (f32, f32)` (UI points), `background_image: Option<&'static
+  [u8]>` (raw embedded PNG bytes, not a filesystem path or an `egui`-specific type — `kabl_modules`
+  stays UI-framework-agnostic, matching how it already has zero `egui`/GPU dependency; a path would
+  also mean a runtime "can't find the asset" failure mode this design doesn't have), `controls:
+  &'static [ControlSkin]` (every control this skin places, normalized `(0,0)`..`(1,1)` position
+  within `panel_size`).
+- **`ControlKind`**: `Jack`/`Knob` are wired up end-to-end in `kabl-ui`; `Switch`/`Readout` are
+  *declared*, matching the owner's words, but nothing renders them — no built-in has a discrete
+  toggle or a live numeric display yet, so there's nothing real to wire them against. Declaring
+  the enum variants now costs nothing and means a future switch/readout module doesn't need a data
+  model change, just a renderer match arm — the same "declared before consumed" precedent
+  `ParamInfo.taper` already set in this crate.
+- **`ModuleInfo.skin: Option<&'static ModuleSkin>`** — `None` for 8 of the 9 built-ins (mechanical
+  one-line addition to each, `skin: None`), `Some(&OSC_VA_SKIN)` for `osc.va` — the one demo,
+  chosen as the "flagship" oscillator.
+
+**The demo asset is an honest placeholder, not real design work**: `crates/modules/assets/
+osc_va_panel.png`, generated with ImageMagick (`convert`) — a dark panel, a title, and faint guide
+rings + labels at each control's exact declared position (so the art visually "expects" a jack or
+knob there, like a real silkscreened panel, rather than being an arbitrary unrelated background).
+No image-generation tool was available to produce real designed artwork in this container, and
+none was attempted to be faked as such — the panel literally says "PLACEHOLDER PANEL ART" on its
+face. What's real is the *mechanism*: an owner (or, later, an actual designer) can drop in any PNG
+and a coordinate list and get a genuinely custom-looking module, proven by this one working end to
+end, not asserted.
+
+`kabl-ui`'s renderer (`draw_skinned_module`, `skin_texture`): when `info.skin` is `Some`, draws
+the panel at `skin.panel_size` instead of the fixed auto-layout width, decodes and caches the
+background image as an `egui::TextureHandle` (keyed by module kind — decoded once, not once per
+instance per frame; `image = { default-features = false, features = ["png"] }`, PNG-only, no
+reason to pull the other decoders), and places each `Jack`/`Knob` at its exact normalized
+position instead of the auto-layout row scheme — `Jack` reuses `draw_port` (so cabling to a
+skinned module's ports works identically to any other module), `Knob` reuses `draw_knob`. Falls
+back to the procedural panel from part 1 if `background_image` is `None` but `controls` is set
+(a skin can place controls without supplying art) — not currently exercised by any built-in, but
+free given how the branch is already structured (`match skin.background_image`).
+
+**Tested**: `crates/modules/tests/skin.rs` (2 new tests) — every skinned module's `ControlSkin`s
+must name a real port/param of that same module (catches a stale `id` after a rename) *and* must
+cover every one of that module's actual ports/params (catches a newly-added port/param the skin
+forgot, which would make it unreachable from a skin-aware renderer); every declared position is
+inside the normalized `0..1` range; every embedded background image actually decodes as a valid
+PNG (`image` as a dev-dependency only, kept out of the crate's real dependency graph). `kabl-ui`'s
+existing headless smoke test (`show_runs_without_panicking_across_several_frames`, already seeding
+from `default_patch()`, which includes an `osc.va` instance) now exercises the whole skinned-
+rendering path — including the PNG decode and `egui::Context::load_texture` call — for free,
+confirming texture loading doesn't need a real GPU backend to at least not panic.
+
+**Verification, not just a code read**: ran `kabl-ui` under the existing Xvfb + `LIBGL_ALWAYS_
+SOFTWARE=1` + `xdotool` setup (same as the original "kabl-ui: the patchbay" session), screenshotted
+the result — the skinned `osc.va` panel renders its custom art with jacks/knobs landing exactly on
+the guide rings, colored cables reach them correctly, the category-accent selection outline draws
+over the image correctly. Then did a real interactive check, not just a static screenshot: dragged
+the on-panel `waveform` knob with `xdotool` and confirmed the side panel's numeric readout actually
+changed (2.00 -> 1.52) — this is also what caught the knob's initial backwards drag direction.
+Separately confirmed whole-module dragging still repositions a *skinned* module correctly (an
+accidental second data point from a mis-aimed manual test, not a dedicated one, but a real
+regression check on the `interact_body` refactor nonetheless).
+
+**Known gaps, not attempted**: only one module has a real skin (proving the mechanism, not meant
+to be the finished aesthetic pass on every module — the other 8 still use part 1's improved but
+plain procedural panel). No actual "rack" container/canvas-background concept was built (the
+owner's other word, "racks where you place what you need") — `kabl-ui`'s canvas is still a free
+2D plane, not a rack-slot layout; a real rack metaphor is a bigger, separate design question
+(fixed HP-width slots? free placement with a rack backdrop image?) not resolved here, flagged for
+the owner rather than guessed at. `Switch`/`Readout` control kinds are declared, not rendered
+(see above). No canvas pan/scroll still (pre-existing gap, STATUS.md's open items already track
+it) — a 200x220 skinned panel makes the "patch runs off the visible width" problem slightly worse,
+not better.
+
+Workspace build/test/clippy/fmt all clean.

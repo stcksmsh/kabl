@@ -56,6 +56,7 @@ pub static LFO_INFO: ModuleInfo = ModuleInfo {
         anti_aliasing: false,
         interpolation: false,
     },
+    skin: None,
 };
 
 const OUT: usize = 0;

@@ -97,4 +97,8 @@ pub struct ModuleInfo {
     pub ports: &'static [PortInfo],
     pub params: &'static [ParamInfo],
     pub quality: QualitySupport,
+    /// Optional custom panel art + explicit control layout (owner ask, not a brief feature) — see
+    /// `crate::skin`'s module doc. `None` for every built-in except one demo; a skin-aware
+    /// renderer falls back to its own auto-layout when this is `None`.
+    pub skin: Option<&'static crate::skin::ModuleSkin>,
 }

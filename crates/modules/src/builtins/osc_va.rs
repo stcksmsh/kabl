@@ -20,6 +20,7 @@ use crate::info::{
 };
 use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig, StateReader, StateWriter};
+use crate::skin::{ControlKind, ControlSkin, ModuleSkin};
 
 const PORTS: &[PortInfo] = &[
     PortInfo {
@@ -75,6 +76,47 @@ pub static OSC_VA_INFO: ModuleInfo = ModuleInfo {
         anti_aliasing: true, // PolyBLEP -- saw/square only, see dsp::FullOsc's doc.
         interpolation: false,
     },
+    skin: Some(&OSC_VA_SKIN),
+};
+
+static OSC_VA_PANEL_PNG: &[u8] = include_bytes!("../../assets/osc_va_panel.png");
+
+static OSC_VA_CONTROLS: &[ControlSkin] = &[
+    ControlSkin {
+        id: "pitch",
+        kind: ControlKind::Jack,
+        pos: (0.15, 0.35),
+    },
+    ControlSkin {
+        id: "sync",
+        kind: ControlKind::Jack,
+        pos: (0.15, 0.55),
+    },
+    ControlSkin {
+        id: "out",
+        kind: ControlKind::Jack,
+        pos: (0.85, 0.45),
+    },
+    ControlSkin {
+        id: "base_hz",
+        kind: ControlKind::Knob,
+        pos: (0.30, 0.80),
+    },
+    ControlSkin {
+        id: "waveform",
+        kind: ControlKind::Knob,
+        pos: (0.70, 0.80),
+    },
+];
+
+/// Demo skin proving the "custom modules can use their own background image and place their own
+/// jacks/knobs" mechanism end-to-end (owner ask, not a brief feature — see decisions.md "Module
+/// skins: custom panel art"). The art itself is an honest, generated placeholder, not designed
+/// hardware-panel art — flagged as such, not passed off as more than it is.
+static OSC_VA_SKIN: ModuleSkin = ModuleSkin {
+    panel_size: (200.0, 220.0),
+    background_image: Some(OSC_VA_PANEL_PNG),
+    controls: OSC_VA_CONTROLS,
 };
 
 /// Input port index for `pitch` — matches `PORTS` above. Named constants because `ProcessIo`'s
