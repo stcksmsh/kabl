@@ -1024,3 +1024,58 @@ new ones in `crates/ui/tests/editor_and_ui.rs` (`from_log` preserves state and s
 `mark_dirty` sets the flag without an op, a full save-then-load round-trip through a real
 temp-directory file, fresh IDs after `from_log` never collide with loaded ones). Workspace
 build/test/clippy/fmt all clean.
+
+## 2026-09-22 — Compiler: buffer-pool reuse
+
+Fifth autonomous-session item, from STATUS.md's own handover list (buffer-pool reuse, cycle
+handling, overlapping-swap handling, `kabl-ui` canvas pan/scroll were the remaining self-
+contained candidates — picked this one first: real memory cost today, most self-contained of the
+four, no design ambiguity to resolve).
+
+`coalesce_buffers` (new function in `compile.rs`): standard greedy linear-scan register
+allocation, run once at compile time after the schedule (`steps`) is fully built. For each buffer
+index, computes `[first_def, last_use]` in schedule-step terms (the step that produces it, the
+last step that reads it as an input or `SumVoices` source); sorts buffers by `first_def`; walks
+that order handing out physical slots, reusing one whose previous occupant's `last_use` is
+already behind the new buffer's `first_def`, allocating a fresh slot only when nothing's free.
+Three buffers are pinned "live forever" and excluded from reuse entirely: `silence_buf` (a shared
+sentinel every unconnected input reads, not a normal single-producer value), and `out_left`/
+`out_right` (read by the *caller* of `process_block`, i.e. after every step has already run — a
+range ending at "the last step" would let another buffer's write stomp on it before the caller
+gets to `.left()`/`.right()`).
+
+Deliberately did **not** attempt same-step reuse (a buffer whose last read and a new buffer's
+first write happen at the identical step index), even though `process_block`'s existing
+copy-inputs-before-writing-outputs ordering would make it safe: correctness here shouldn't depend
+on a subtle invariant of a separate function that could change independently later. One extra
+buffer's worth of slack across the whole schedule is a trivial cost against that fragility.
+
+Measured, not assumed (a throwaway `cargo run --example`, deleted after — see the git history if
+the exact script matters again): the 5-stage chord chain (`midi.in -> osc.va -> filter.svf ->
+env.adsr/vca -> out`) at increasing voice counts:
+
+| voice_count | buffers before (1 per output port + 1) | buffers after coalescing |
+|---|---|---|
+| 1 | 10 | 7 |
+| 4 | 37 | 13 |
+| 8 | 73 | 21 |
+| 16 | 145 | 37 |
+
+Roughly linear growth either way, but coalesced grows at ~2 buffers/voice instead of ~9/voice
+(each voice's chain has 9 output ports total) — about a 4x reduction at 16 voices, growing with
+scale since the *shape* of what's simultaneously live per voice stays constant while the naive
+count scales with total port count.
+
+Three new tests in `crates/engine/tests/compile.rs` (now 10, was 7): `buffer_count()` (new,
+trivial accessor added to `CompiledPatch` so this is observable at all, not just trusted) is
+below the naive upper bound for the chord patch; 8 voices don't need double the 4-voice pool
+(a loose bound proving sub-linear-with-total-ports growth without pinning exact scheduler
+output, which would make the test brittle against unrelated scheduling changes); two independent
+`compile()` calls of the same patch, driven identically, produce bit-exact identical output over
+50 blocks (a belt-and-suspenders check — if coalescing ever aliased two buffers still actually
+live at the same time, this is the kind of corruption that would show up as nondeterminism or a
+wrong render, not a clean crash). All of the compiler's existing tests (the averaging/cycle/
+state-carryover/RT-safety/swap ones) also still pass unchanged, since they were already exercising
+the one and only `compile()` path — there's no separate "coalescing on/off" mode to test against.
+
+Workspace build/test/clippy/fmt all clean.

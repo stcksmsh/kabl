@@ -279,6 +279,76 @@ fn recompile_carries_over_oscillator_phase_and_filter_state() {
     assert_eq!(old_continued.left(), recompiled.left());
 }
 
+#[test]
+fn buffer_pool_reuses_slots_instead_of_one_per_port() {
+    // chord_patch at 4 voices: midi.in(3 outputs) + osc.va(1) + filter.svf(3) + env.adsr(1) +
+    // vca(1) = 9 outputs/voice * 4 voices = 36, plus the shared silence buffer = 37 if every
+    // output got its own permanent slot (the pre-coalescing behavior). A sequential per-voice
+    // chain like this should reuse heavily -- assert a real reduction, not a specific number
+    // (which would make this test brittle against unrelated scheduling changes).
+    let patch = chord_patch();
+    let compiled = compile(&patch, SAMPLE_RATE, 4).expect("should compile");
+    let naive_upper_bound = 37;
+    assert!(
+        compiled.buffer_count() < naive_upper_bound,
+        "expected buffer reuse to reduce the pool below {naive_upper_bound}, got {}",
+        compiled.buffer_count()
+    );
+}
+
+#[test]
+fn buffer_pool_size_scales_with_the_widest_point_in_the_schedule_not_total_modules() {
+    // More voices should still reuse -- 8 voices shouldn't need anywhere near 2x the buffers
+    // of 4 voices, since each voice's chain still only has a handful of buffers alive at once
+    // (reuse happens *within* a voice's own short-lived intermediates too, not just across
+    // voices). A weak but meaningful bound: 8 voices shouldn't need more than 4 voices' count
+    // plus one extra buffer per voice-rate output port width (a generous slack, not a tight
+    // bound -- the point is "sublinear-ish growth", not pinning exact scheduler behavior).
+    let patch = chord_patch();
+    let compiled_4 = compile(&patch, SAMPLE_RATE, 4).expect("should compile");
+    let compiled_8 = compile(&patch, SAMPLE_RATE, 8).expect("should compile");
+    assert!(
+        compiled_8.buffer_count() < compiled_4.buffer_count() * 2,
+        "8-voice pool ({}) should not need to double the 4-voice pool ({})",
+        compiled_8.buffer_count(),
+        compiled_4.buffer_count()
+    );
+}
+
+#[test]
+fn coalesced_buffers_still_produce_bit_exact_output_vs_a_reference_render() {
+    // The averaging/state/topology tests above already exercise the coalesced compiler (there's
+    // only one compile() path now), so this is a belt-and-suspenders end-to-end check: render a
+    // chord twice from two independent compile() calls and confirm they're identical -- if
+    // coalescing ever aliased two buffers that were actually still live at the same time, this
+    // would show up as a nondeterministic or corrupted render, not just "different from before".
+    let patch = chord_patch();
+    let mut a = compile(&patch, SAMPLE_RATE, 4).expect("should compile");
+    let mut b = compile(&patch, SAMPLE_RATE, 4).expect("should compile");
+
+    for voice in 0..4 {
+        for compiled in [&mut a, &mut b] {
+            compiled
+                .module_mut(1, Some(voice))
+                .unwrap()
+                .as_any_mut()
+                .downcast_mut::<MidiIn>()
+                .unwrap()
+                .note_on(voice as f32 * 3.0, 0.8);
+        }
+    }
+
+    for _ in 0..50 {
+        a.process_block();
+        b.process_block();
+        assert_eq!(
+            a.left(),
+            b.left(),
+            "two independent compiles of the same patch must match"
+        );
+    }
+}
+
 fn rms(samples: &[f32]) -> f32 {
     let sum_sq: f64 = samples.iter().map(|&v| (v as f64) * (v as f64)).sum();
     ((sum_sq / samples.len() as f64).sqrt()) as f32

@@ -5,7 +5,7 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-22, after persistence (save/load) was wired into both `standalone`/`kabl-ui`.
+Last updated: 2026-09-22, after the compiler got buffer-pool reuse (~4x fewer buffers at scale).
 
 ## Autonomous overnight work (started 2026-09-21)
 
@@ -70,8 +70,16 @@ cycle detection, a `recompile()` that carries module state across a rebuild. Pro
 the same 5-stage voice chain `patch_demo.rs` hand-wired, built from `PatchState` ops instead,
 compiled, and driven via MIDI — output matches `patch_demo.rs`'s numbers exactly. WAV sent to
 owner. See decisions.md's "Flat-schedule compiler v1" entry for the four design calls made here
-(averaging not summing for voice->global, cycle-as-compile-error, no buffer-pool reuse yet,
-params as compile-time constants).
+(averaging not summing for voice->global, cycle-as-compile-error, params as compile-time
+constants — buffer-pool reuse, the fourth, is now done, see below).
+
+**Buffer-pool reuse is done**: `coalesce_buffers` remaps buffers to a smaller set of physical
+slots via greedy linear-scan register allocation over each buffer's compile-time-computed
+`[first_def, last_use]` schedule interval — real reuse, not just fewer allocations. Measured on
+the 5-stage chord chain: 37 -> 13 buffers at 4 voices, 145 -> 37 at 16 voices (~4x reduction at
+scale, growing since naive cost scales with total port count while coalesced cost tracks what's
+actually simultaneously live). `silence_buf`/`out_left`/`out_right` pinned live-forever, excluded
+from reuse. 3 new tests in `compile.rs` (now 10). See decisions.md "Compiler: buffer-pool reuse".
 
 **`process_block` is allocation-free**, proven the same way spike S1 proved it for the swap
 mechanism: `crates/engine/tests/compile_rt_safety.rs` runs 200 blocks of the real chord patch
@@ -152,20 +160,18 @@ priority order for "something a person can actually patch and hear live":
 2. **`kabl-ui`'s `Mutex`-sharing compromise** (see decisions.md) — works, flagged as not
    textbook-RT-safe, real follow-up work if edit-time glitches turn out to be audible/annoying in
    practice on real hardware.
-3. **Buffer-pool reuse**: every port gets its own fresh buffer right now; fine for correctness,
-   wasteful for anything beyond test-sized patches.
-4. Cycle handling still hard-errors instead of brief section 7.1's implicit 1-block delay — not
+3. Cycle handling still hard-errors instead of brief section 7.1's implicit 1-block delay — not
    needed by any v1 accept-test patch, but real feedback patches will hit it.
-5. Overlapping swaps (a second `build_swap` while one is still crossfading) aren't handled by
+4. Overlapping swaps (a second `build_swap` while one is still crossfading) aren't handled by
    either `Engine` or `PatchEngine` — a pre-existing S1 gap, not new.
-6. No canvas pan/scroll in `kabl-ui` — a patch wider than the window is simply clipped.
-7. `kabl-ui`'s Save/Load uses a plain text path field, not a native file picker (deliberate, see
+5. No canvas pan/scroll in `kabl-ui` — a patch wider than the window is simply clipped.
+6. `kabl-ui`'s Save/Load uses a plain text path field, not a native file picker (deliberate, see
    decisions.md) — a nicer picker is cosmetic follow-up, not a functional gap.
 
 No new open question from the owner to resolve first — everything on the originally-scoped
-autonomous list, plus the UI/standalone/persistence work the owner explicitly authorized, is now
-done. The remaining items are either genuinely needing real hardware (#1) or smaller polish (#2-7)
-— see the end of this file for what the autonomous session picks next.
+autonomous list, plus the UI/standalone/persistence/buffer-pool work, is now done. The remaining
+items are either genuinely needing real hardware (#1) or smaller polish (#2-6) — see the end of
+this file for what the autonomous session picks next.
 
 ## Spike checklist (brief section 11)
 
@@ -183,7 +189,7 @@ What actually exists vs. what's still spike-scoped or missing:
 | Piece | State |
 |---|---|
 | `core`: op log, undo/redo, coalescing, checkpoints, file format w/ schema version, property tests | **done, real.** `crates/core/`. |
-| `engine`: flat-schedule compiler | **built, correctness-tested, RT-safe.** `compile.rs`: topo sort, voice/global instancing, cycle detection, `recompile()` w/ state carry-over. `process_block` proven allocation-free (`tests/compile_rt_safety.rs`). No buffer-pool reuse yet. |
+| `engine`: flat-schedule compiler | **built, correctness-tested, RT-safe, buffer-pool reuse.** `compile.rs`: topo sort, voice/global instancing, cycle detection, `recompile()` w/ state carry-over. `process_block` proven allocation-free (`tests/compile_rt_safety.rs`). `coalesce_buffers` reuses non-overlapping buffer slots (~4x fewer at scale, measured). |
 | `engine`: voice allocator | **built.** `voice_allocator.rs::VoiceAllocator` — lowest-free-first, oldest-steal-when-full. Pitch/graph-agnostic (`note_id: u32` -> voice index); nothing routes real MIDI into it yet. `voice_count` is still a fixed `compile()` parameter. |
 | `engine`: SIMD batching | **prototyped in spike S3 only** (`simd_voices.rs`), not integrated into the compiler; measured ~1.5-1.7x speedup (target was 2.5x, missed — see decisions.md). |
 | `engine`: control-rate tier | **prototyped in spike S2 only** (`potato.rs`), not integrated into the compiler. |
@@ -222,14 +228,18 @@ crates/
                                 CompiledPatch: topo sort (Kahn's algorithm, doubles as cycle
                                 detection), voice/global-rate instancing, voice->global averaging
                                 (SumVoices steps), recompile() with save_state/load_state carry-
-                                over via HashMapState. Correctness-tested end-to-end in
-                                tests/compile.rs (7 tests) against patch_demo.rs's numbers.
+                                over via HashMapState, coalesce_buffers (greedy linear-scan
+                                register allocation over buffer live ranges -- ~4x fewer buffers
+                                measured at scale). Correctness-tested end-to-end in
+                                tests/compile.rs (10 tests) against patch_demo.rs's numbers.
                                 process_block is allocation-free (fixed-size stack scratch sized
                                 to MAX_INPUTS/MAX_OUTPUTS/MAX_PARAMS; compile() rejects a module
                                 exceeding them) -- proven in tests/compile_rt_safety.rs via
-                                assert_no_alloc, same pattern as spike S1. NOT yet wired to
-                                swap.rs. See decisions.md "Flat-schedule compiler v1" and
-                                "process_block made allocation-free".
+                                assert_no_alloc, same pattern as spike S1. Wired to swap.rs's
+                                mechanism via patch_engine.rs (below) and live in both
+                                standalone/ and ui/. See decisions.md "Flat-schedule compiler
+                                v1", "process_block made allocation-free", and "Compiler:
+                                buffer-pool reuse".
                  patch_engine.rs - PatchEngine: generalizes swap.rs's Engine (equal-power
                                 crossfade, basedrop deferred drop) to CompiledPatch (arbitrary
                                 topology, stereo, recompile()-based rebuild instead of S1's single
@@ -392,8 +402,9 @@ this against the commit it was last updated for.
   the file confirmed on disk. See decisions.md "Persistence".
 - **No canvas pan/scroll in `kabl-ui`** — a patch wider than the window is simply clipped
   (visible in the sent screenshot: `vca`/`out` cut off by the side panel).
-- **No buffer-pool reuse in the compiler** — every port gets a fresh `[f32; BLOCK]`. Correct,
-  wasteful; deferred as a pure optimization on the same schedule shape.
+- ~~**No buffer-pool reuse in the compiler**~~ — fixed. `coalesce_buffers` (greedy linear-scan
+  register allocation over compile-time buffer live ranges); ~4x fewer buffers measured at 16
+  voices on the chord patch. See decisions.md "Compiler: buffer-pool reuse".
 - **Compiler treats a cycle as a hard compile error**, not brief section 7.1's implicit 1-block
   delay. No v1 accept-test patch has a feedback loop, so not currently blocking; will matter for
   real feedback patches.
@@ -418,10 +429,11 @@ this against the commit it was last updated for.
   most complete examples (fast/slow-path split, real state carry-over). Test files
   `crates/modules/tests/*.rs` show the expected shape (matches-direct-dsp-call, buffer input,
   reset, save/load-state round-trip).
-- **Extending the compiler** (buffer-pool reuse, cycle handling, voice allocator): `crates/engine/
-  src/compile.rs`'s module doc comment + decisions.md's "Flat-schedule compiler v1" and
-  "`process_block` made allocation-free" entries lay out what's built, what's deferred, and why.
-  `crates/engine/tests/compile.rs` shows the expected external shape (build a `PatchState` from
+- **Extending the compiler** (cycle handling, overlapping swaps): `crates/engine/
+  src/compile.rs`'s module doc comment + decisions.md's "Flat-schedule compiler v1",
+  "`process_block` made allocation-free", and "Compiler: buffer-pool reuse" entries lay out what's
+  built, what's deferred, and why. `crates/engine/tests/compile.rs` shows the expected external
+  shape (build a `PatchState` from
   ops, `compile()`, drive it, `recompile()`); `tests/compile_rt_safety.rs` shows the
   `assert_no_alloc` pattern to keep any future change RT-safe.
 - **Extending `kabl-ui`** (a native file picker instead of the text-path field, cable-dragging
