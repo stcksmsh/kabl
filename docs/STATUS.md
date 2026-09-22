@@ -5,16 +5,19 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-22, after `2cf3d29` (kabl-ui compiles outside the engine lock) and
-`2fd0aef` (kabl-ui shares standalone's MIDI port selection).
+Last updated: 2026-09-22, design-planning session. No product code changed or new runtime
+verification performed in this session.
 
-**Current handover (supersedes every older handover note below):** no active task. The next
-session should orient, then wait for the owner's instruction. Two items were queued:
-- `docs/planning-prompt.md` is a ready-made prompt for a planning session (owner plus an agent)
-  that ends in `docs/PLAN.md`. It also lists the stale spots in this file, which were not all
-  rewritten here.
-- Hardware verification: owner runs `cargo run -p kabl-ui` with the real controller. It has
-  never been heard.
+**Current handover (supersedes every older handover note below):** design execution plan is
+written in [`PLAN.md`](PLAN.md); execution has not started. When asked to execute, produce
+three comparable visual directions, cable-visible/hidden views, interaction proposals and
+visual QA, then stop for owner's visual review. Owner wants physical Eurorack appearance,
+image-skinned modules, sagging/color-coded cables and Surge XT-like hidden-mode modulation.
+This is design work, not authorization to implement. Historical overnight autonomy and
+next-step lists below do not expand that scope.
+
+Hardware verification remains separate: standalone played live; `kabl-ui` has not been heard
+by owner. Real audio/display hardware is available. Pi-4 performance remains unmeasured.
 
 Stale below, not yet rewritten:
 - The older "Handover" list claims there is no canvas pan and nothing has run on real hardware.
@@ -22,6 +25,17 @@ Stale below, not yet rewritten:
 - Descriptions of the Mutex window lasting the whole `build_swap` are out of date. `kabl-ui` now
   locks only for `finish_swap`.
 - "Connects to the first MIDI port" is fixed in both binaries.
+- Both binaries support persistence and route MIDI through voice allocation. Standalone
+  exposes `--midi`; UI uses automatic selection. Unmatched filters still fall back to first port.
+- S2 validated its optimization mechanism, not the potato gate. Compiler and playable synth
+  exist; earlier statements saying otherwise describe previous stages.
+- Core writes a checkpoint file but loads by full log replay. Periodic checkpoint machinery
+  and visible construction playback are absent; undo simplifications remain.
+
+Additional acceptance risks found by static inspection during planning: MIDI events reach only
+active graph during swaps; UI never calls its deferred-drop collector; MIDI routing assumes
+module ID 1; layout edits also rebuild audio. These were not reproduced or repaired in this
+session. They do not block design mockups; relevant fixes belong in later implementation scope.
 
 AIW is not set up (no `.ai/state.json`). Owner said to skip AIW and Recall for now. Track work
 in git and this file.

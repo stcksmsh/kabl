@@ -1467,3 +1467,27 @@ background image has a fixed pixel size; making it also respect `width_units` is
 follow-up work). Grid line color/spacing is a first guess, not tuned. No zoom.
 
 Workspace build/test/clippy/fmt all clean.
+
+## 2026-09-22 — Physical rack direction; design review before implementation
+
+Owner clarified desired product: modules may use images as panel skins; appearance should feel
+like physical Eurorack; cables should sag, look physical, and use some color coding. Hiding
+cables should expose a useful modulation view inspired by Surge XT. Visibility, usability and
+beauty are central requirements.
+
+Owner explicitly requested high-level design/planning, no implementation, then asked for an
+agent plan that runs up to the point requiring visual review or input. `docs/PLAN.md` defines
+that proposed execution sequence: brief, interaction/layout design, three comparable visual
+directions, visual QA, then owner review. This session writes the plan only; no design execution
+or product implementation has occurred.
+
+Reason: broad instructions such as "make it look more like a synth" leave too many visual and
+interaction choices implicit. Concrete, comparable artifacts let owner choose character and
+workflow before investment in implementation. Continuing ad hoc UI polish or treating a code
+audit as the design deliverable would not answer this request.
+
+Agent recommendation is warm studio hardware, one stable layout across all/focus/hidden cable
+presentations, shared live controls over custom artwork, and one connection model represented
+as both cables and routing rows. Exact palette, density, hidden-mode layout and prototype
+go-ahead remain owner decisions at the visual review gate; these recommendations are not
+recorded as approved final designs. Existing Patchbay view is not removed by this decision.
