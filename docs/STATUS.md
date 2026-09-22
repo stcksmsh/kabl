@@ -24,6 +24,15 @@ each item's decisions.md entry for what was picked and why. If you're reading th
 `git log` for the latest commit and this file's "Where we are" below for the current real state;
 nothing here should be stale by more than one work chunk.
 
+**Context handover note (2026-09-22, after commit `7a3793c`)**: owner cleared context here on
+purpose — same pattern as earlier in this project (read this file cold, continue from it, no
+recap needed). A `send_later` self-continuation trigger is active in this session (fires roughly
+every 20-30 min with an instruction to read this file's "Handover" section and pick the next
+self-contained backlog item, same rigor as every prior chunk: plan, implement, test, verify
+clean, document, commit, push, reschedule). If you're the session that trigger just woke: just
+follow its instructions directly, this paragraph is only here so a human glancing at this file
+understands why work might keep happening with no one watching.
+
 ## Workflow (changed 2026-09-21)
 
 Owner (Kosta) said: push directly to `master`, no feature branches, no PRs. Commit frequently,
