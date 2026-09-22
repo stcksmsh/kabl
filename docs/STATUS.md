@@ -5,25 +5,36 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-22, design revision round 2. Docs/mockups only: no product code, engine,
-or prototype work.
+Last updated: 2026-09-23, revision-2 interactive prototype. Isolated example code only: no
+engine, production UI, file-format or behaviour change.
 
-**Current handover (supersedes every older handover note below):** design revision round 2 is
-done and reviewed. The owner likes it; "all the other things feel right" (decisions.md,
-"Revision 2 review: owner feedback"). One change: skins get a `labels_on_art` maker flag,
-default false (theme plates), which a maker may set to true. The package is
-[`design/revision-2/REVIEW.md`](design/revision-2/REVIEW.md), the spec is
-[`design/revision-2/INTERACTIONS.md`](design/revision-2/INTERACTIONS.md), and the sources are in
-`design/revision-2/render2.py`.
+**Current handover (supersedes every older handover note below):** the revision-2 prototype is
+built and ready for Kosta to try. The walkthrough, comparison switches, evidence and limitations
+are in [`design/revision-2/PROTOTYPE.md`](design/revision-2/PROTOTYPE.md).
 
-Open, to be settled in the prototype: hidden-mode layout; expansion pushing vs floating over
-neighbours; ring-vs-body drag at small radius; continuous vs stage-start envelope-time
-modulation. Viewport: 1440×900 default, 1280×800 minimum.
+    cargo run -p kabl-ui --example rev2_proto --release        # add --dark / --size 1280x800
+    cargo run -p kabl-ui --example rev2_env_ab --release       # envelope A/B WAVs
 
-Next: hand off to the supervisor with the updated [`HANDOFF.md`](HANDOFF.md). The prototype
-go-ahead has not been stated explicitly; the supervisor confirms it with Kosta first. No
-implementation has started. MIDI / graph-swap / undo correctness remains a prerequisite for
-any playable integration.
+Still open. Kosta decides each by using the prototype; the agent has not chosen any of them:
+
+1. Hidden mode: stable rack or compact synth layout (switch `Hidden layout`).
+2. Expansion: push the neighbours or float over them; auto-Focus (switch `Expand`).
+3. Small-knob depth: ring band, peak handle or inspector only (switch `Depth`). Scripted
+   hit-probing at r 17 found no misfires. Feel with a real hand is unmeasured.
+4. Envelope time: continuous or sampled at stage start (A/B window plus WAVs). The policies
+   measurably differ. It has not been listened to, so it stays unresolved.
+
+The skin contrast warning remains an agent recommendation. The prototype shows it firing on
+the placeholder art with `labels_on_art` set.
+
+Verified: 4 scripted runs, 160 checks, 0 failures (1440×900 A-light and 1280×800 A-dark, both
+scripts). One real-X `xdotool` pass. 7 unit tests. The screenshots in
+`design/revision-2/prototype/img/` are real framebuffer captures from Xvfb/llvmpipe, not from
+Kosta's display. Nothing is integrated into `kabl-ui` or the engine.
+
+Next: Kosta tries the prototype and answers the four questions. Do not start production
+integration before that. MIDI / graph-swap / undo correctness remains a prerequisite for any
+playable integration. No sequencers or effects in this scope.
 
 The handoff prompt for the arbiter agent is [`HANDOFF.md`](HANDOFF.md).
 

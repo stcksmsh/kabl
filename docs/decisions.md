@@ -1624,3 +1624,38 @@ Owner reviewed the revision-2 images. Recorded in substance:
   below 4.5:1.
 - Owner asked to hand off to the supervisor agent. Prototype go-ahead was **not** stated
   explicitly; the supervisor should confirm it before starting the prototype.
+
+## 2026-09-23 — Revision-2 interactive prototype
+
+Built on the supervisor's explicit authorization for prototype scope only. That authorization
+supersedes the "awaiting go-ahead" notes above for this scope and no further.
+
+- **Form:** an example target of `kabl-ui` (`crates/ui/examples/rev2_proto/`, plus
+  `rev2_env_ab.rs`). It uses only the existing egui/eframe/image dependencies and has its own
+  small prototype state (snapshot undo, travel-space knob values). It does not touch the
+  `kabl-ui` binary, the engine or the patch format. It opens no audio or MIDI device on
+  startup, or at all.
+- **Comparison switches, not choices.** Hidden layout (stable rack / compact synth), expansion
+  (push / float, optional auto-Focus), small-knob depth gesture (ring band / peak handle /
+  inspector only) and the envelope-timing A/B are explicit switches. Patch values and selection
+  are preserved across them. The agent picked none of them: each needs Kosta's taste or ear.
+- **The ring/body split does not misfire in geometry.** At r 17, with both neighbours
+  modulated, 100 % of the sampled cap points hit the body and 100 % of the drawn range-arc
+  points hit the ring. The handle and inspector-only alternatives exist anyway, as the brief
+  asked, because feel is still unmeasured.
+- **Envelope timing is left unresolved.** An offline harness renders matched A/B WAVs with the
+  unmodified production `FullAdsr`/`FullLfo`/`FullOsc`/`Svf`. Only the policy differs:
+  per-block continuous vs latched at note-on. The two differ clearly (slow pad: envelope RMS
+  diff 0.38; under stage-start, some notes never open). Pictures do not settle this, and nobody
+  has listened yet.
+- **Verification method:** a script driver injects pointer/key events into egui's raw input,
+  checks state and saves framebuffer screenshots (Xvfb + llvmpipe). One `xdotool` pass confirmed
+  the same path through real X events. The screenshots are runtime captures, not mockups. They
+  are not from the owner's display.
+- **Defects found and fixed during verification:** a double-click within 0.6 s of a previous
+  click registered as a triple-click (numeric entry silently failed); neighbour pills drew over
+  the floating advanced area; badges collided with labels in the compact layout; the
+  labels_on_art contrast check ignored parts of the art; Ctrl+Shift+Z undid instead of redoing;
+  a 1 px dead band separated the knob body from the ring band. The full list is in PROTOTYPE.md.
+
+Stopped for Kosta's hands-on review. No production integration.
