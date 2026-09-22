@@ -795,6 +795,11 @@ fn draw_pills(app: &App, p: &Painter, th: &Theme, xf: Xf, mi: usize, pl: &Placed
         }
         let active = routes.iter().any(|(_, r)| !r.bypass);
         let pc = if active { th.cv } else { th.ink2 };
+        if routes.len() > 3 {
+            // The 3rd plug position is shared by every further route.
+            let third = xf.p(geom::plug_pos(cen, r, 2, routes.len()));
+            text(p, third + vec2(9.0, 0.0) * z, Align2::LEFT_CENTER, &format!("+{}", routes.len() - 2), 10.0 * z, pc, false);
+        }
         if hidden {
             for (k, _) in routes.iter().enumerate().take(3) {
                 let sp = xf.p(geom::plug_pos(cen, r, k, routes.len()));

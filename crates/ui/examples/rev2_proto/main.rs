@@ -7,6 +7,9 @@
 //!
 //! See docs/design/revision-2/PROTOTYPE.md for the walkthrough and comparison switches.
 
+// Painting helpers take geometry, theme and transform explicitly; bundling them buys nothing here.
+#![allow(clippy::too_many_arguments)]
+
 mod draw;
 // Shared with the rev2_env_ab example; not every item is used by both.
 #[allow(dead_code)]
@@ -1244,10 +1247,7 @@ fn main() -> eframe::Result<()> {
         .and_then(|(a, b)| Some((a?, b?)))
         .unwrap_or((1440.0, 900.0));
     let dark = args.iter().any(|a| a == "--dark");
-    let script = match arg("--script") {
-        Some(path) => Some(script::Script::load(&path, arg("--shots").unwrap_or("target/rev2-proto/shots".into())).expect("readable script")),
-        None => None,
-    };
+    let script = arg("--script").map(|path| script::Script::load(&path, arg("--shots").unwrap_or("target/rev2-proto/shots".into())).expect("readable script"));
     let ppp: Option<f32> = arg("--ppp").and_then(|s| s.parse().ok());
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([w, h]).with_min_inner_size([1024.0, 700.0]).with_title("kabl · revision-2 prototype"),

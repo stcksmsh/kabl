@@ -472,7 +472,7 @@ pub struct Region {
 
 pub const BODY_R_ROUTED: f32 = 4.0;
 pub const BODY_R_FREE: f32 = 8.0;
-pub const RING_R0: f32 = 5.0;
+pub const RING_R0: f32 = 4.0;
 pub const RING_R1: f32 = 15.0;
 pub const HANDLE_R: f32 = 9.0;
 
