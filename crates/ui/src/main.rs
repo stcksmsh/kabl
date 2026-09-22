@@ -5,12 +5,10 @@
 //! **Known, flagged compromise, not textbook RT-safe**: the audio callback and the UI/control
 //! thread share one `PatchEngine` behind a `Mutex`. The audio callback only ever `try_lock`s (and
 //! outputs silence for a block on contention, never blocks) — a real but rare glitch risk, not a
-//! deadlock risk. The control thread takes a real blocking lock only when an edit actually
-//! happened (`PatchEditor::take_dirty()`), for the duration of `PatchEngine::build_swap` (which
-//! calls `compile()` — real work, not instant). Any audio block that lands inside that window
-//! gets silence instead of underrunning or corrupting anything. The textbook-correct fix is
-//! restructuring `PatchEngine` so the control thread reads a lock-free-published state snapshot
-//! instead of sharing the live instance directly — real follow-up work, not attempted here (see
+//! deadlock risk. The control thread runs `compile()` unlocked, then takes a blocking lock only
+//! for `PatchEngine::finish_swap` (state transfer + install, no compile). Any audio block that
+//! lands inside that window gets silence instead of underrunning or corrupting anything. The
+//! textbook-correct fix is a lock-free-published engine instead of a shared one (see
 //! decisions.md "kabl-ui: the patchbay").
 //!
 //! Neither the audio path nor the window itself could be run in this container (no audio device,
@@ -22,6 +20,7 @@ use std::sync::{Arc, Mutex};
 use basedrop::Collector;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use kabl_core::PatchState;
+use kabl_engine::compile::compile;
 use kabl_engine::graph::BLOCK;
 use kabl_engine::patch_engine::PatchEngine;
 use kabl_standalone::{
@@ -37,6 +36,7 @@ const RING_CAPACITY: usize = BLOCK * 256;
 /// living inside `App`.
 struct AudioHost {
     engine: Arc<Mutex<PatchEngine>>,
+    sample_rate: f32,
     handle: basedrop::Handle,
     status: String,
     _stream: Option<cpal::Stream>,
@@ -56,6 +56,7 @@ impl AudioHost {
                     PatchEngine::new(&handle, patch, 48000.0, DEFAULT_VOICE_COUNT)
                         .expect("default_patch should compile"),
                 )),
+                sample_rate: 48000.0,
                 handle,
                 status: "no audio output device found -- editing works, playback won't".into(),
                 _stream: None,
@@ -72,6 +73,7 @@ impl AudioHost {
                         PatchEngine::new(&handle, patch, 48000.0, DEFAULT_VOICE_COUNT)
                             .expect("default_patch should compile"),
                     )),
+                    sample_rate: 48000.0,
                     handle,
                     status: "no usable (f32) audio output config -- editing works, playback won't"
                         .into(),
@@ -101,7 +103,7 @@ impl AudioHost {
             config.config(),
             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                 // See this module's doc comment: try_lock, never block. Contention should be
-                // rare (only while an edit's build_swap is in flight) and results in a silent
+                // rare (only during an edit's finish_swap) and results in a silent
                 // block, not a glitch that corrupts state or panics.
                 let Ok(mut engine) = engine_for_stream.try_lock() else {
                     data.fill(0.0);
@@ -138,6 +140,7 @@ impl AudioHost {
             Ok(s) => match s.play() {
                 Ok(()) => AudioHost {
                     engine,
+                    sample_rate,
                     handle,
                     status: format!("playing -- {sample_rate} Hz, {channels} ch"),
                     _stream: Some(s),
@@ -146,6 +149,7 @@ impl AudioHost {
                 },
                 Err(err) => AudioHost {
                     engine,
+                    sample_rate,
                     handle,
                     status: format!("failed to start audio stream: {err}"),
                     _stream: None,
@@ -155,6 +159,7 @@ impl AudioHost {
             },
             Err(err) => AudioHost {
                 engine,
+                sample_rate,
                 handle,
                 status: format!("failed to build audio stream: {err}"),
                 _stream: None,
@@ -167,12 +172,15 @@ impl AudioHost {
     /// Control-thread call: recompiles `patch` and installs it. Blocks briefly on the shared
     /// lock -- see this module's doc comment for why that's an accepted, flagged tradeoff here.
     fn rebuild(&mut self, patch: &PatchState) {
-        let Ok(mut engine) = self.engine.lock() else {
-            return;
+        let new_patch = match compile(patch, self.sample_rate, DEFAULT_VOICE_COUNT) {
+            Ok(p) => p,
+            Err(err) => {
+                self.status = format!("recompile failed: {err}");
+                return;
+            }
         };
-        match engine.build_swap(&self.handle, patch) {
-            Ok(new_graph) => engine.receive_swap(new_graph),
-            Err(err) => self.status = format!("recompile failed: {err}"),
+        if let Ok(mut engine) = self.engine.lock() {
+            engine.finish_swap(&self.handle, new_patch);
         }
     }
 }

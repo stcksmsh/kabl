@@ -22,7 +22,7 @@
 use basedrop::{Handle, Owned};
 use kabl_core::PatchState;
 
-use crate::compile::{compile, recompile, CompileError, CompiledPatch};
+use crate::compile::{carry_state, compile, recompile, CompileError, CompiledPatch};
 use crate::graph::BLOCK;
 use crate::swap::{equal_power, CROSSFADE_MS};
 
@@ -96,6 +96,15 @@ impl PatchEngine {
         let sample_rate = self.active.sample_rate();
         let new_patch = recompile(&mut self.active, patch, sample_rate, self.voice_count)?;
         Ok(Owned::new(handle, new_patch))
+    }
+
+    /// Control-thread call, for a caller sharing this engine with the audio thread behind a lock:
+    /// run `compile()` (the expensive part) *before* taking the lock, then hand the result here to
+    /// carry state from `active` and install it. Same result as `build_swap` + `receive_swap`,
+    /// but the lock is held only for the state transfer. Allocates.
+    pub fn finish_swap(&mut self, handle: &Handle, mut new_patch: CompiledPatch) {
+        carry_state(&mut self.active, &mut new_patch);
+        self.receive_swap(Owned::new(handle, new_patch));
     }
 
     /// Audio-thread call: installs a graph built by `build_swap` and starts its crossfade-in. No

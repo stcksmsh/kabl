@@ -934,6 +934,13 @@ pub fn recompile(
     voice_count: usize,
 ) -> Result<CompiledPatch, CompileError> {
     let mut new_patch = compile(patch, sample_rate, voice_count)?;
+    carry_state(old, &mut new_patch);
+    Ok(new_patch)
+}
+
+/// The state-transfer half of `recompile`, split out so a caller can run the expensive
+/// `compile()` without holding whatever guards `old` (see `PatchEngine::finish_swap`).
+pub fn carry_state(old: &mut CompiledPatch, new_patch: &mut CompiledPatch) {
     let old_origins = old.module_origin.clone();
     for (id, voice) in old_origins {
         if let (Some(old_module), Some(new_module)) =
@@ -954,5 +961,4 @@ pub fn recompile(
             new_patch.buffers[new_buf] = old.buffers[old_buf];
         }
     }
-    Ok(new_patch)
 }
