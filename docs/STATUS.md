@@ -9,29 +9,21 @@ Last updated: 2026-09-22, design revision round 2. Docs/mockups only: no product
 or prototype work.
 
 **Current handover (supersedes every older handover note below):** design revision round 2 is
-done and **stopped for the owner's visual review**. Package: [`design/revision-2/REVIEW.md`](design/revision-2/REVIEW.md);
-spec: [`design/revision-2/INTERACTIONS.md`](design/revision-2/INTERACTIONS.md); sources:
-`design/revision-2/render2.py` (extends `design/render.py`; revision-1 images re-render
-byte-identical). It covers LFO → ADSR Attack by dropping on the knob (amount, invert, bypass,
-hide, inspect, undo), a rich LFO (compact / expanded / primary selection; features the engine
-lacks are marked ◆ conceptual), the difficult cases, A-light + A-dark reference patch with
-cables visible/hidden, an illustrated user module in light/dark (**placeholder art**, since no
-image generator was available), 1280×800 minimum and crowded examples, with measured QA.
+done and reviewed. The owner likes it; "all the other things feel right" (decisions.md,
+"Revision 2 review: owner feedback"). One change: skins get a `labels_on_art` maker flag,
+default false (theme plates), which a maker may set to true. The package is
+[`design/revision-2/REVIEW.md`](design/revision-2/REVIEW.md), the spec is
+[`design/revision-2/INTERACTIONS.md`](design/revision-2/INTERACTIONS.md), and the sources are in
+`design/revision-2/render2.py`.
 
-Owner decisions from G1 stand (decisions.md G1 entries). Everything new in revision 2 is an
-**agent recommendation, not approved**. It is logged in decisions.md "Design revision round 2".
+Open, to be settled in the prototype: hidden-mode layout; expansion pushing vs floating over
+neighbours; ring-vs-body drag at small radius; continuous vs stage-start envelope-time
+modulation. Viewport: 1440×900 default, 1280×800 minimum.
 
-Waiting on the owner:
-1. Do expanded modules + user-selected primary controls feel right?
-2. Does knob modulation stay clear with cables visible and hidden?
-3. What needs revision, or may the isolated interactive prototype begin?
-
-Still open: hidden-mode layout (settle in the prototype); expansion pushes neighbours vs
-floats over them; ring-vs-body drag at small knob radius; continuous vs stage-start envelope
-time modulation. Proposed default viewport 1440×900; 1280×800 stays the minimum.
-
-Not authorized: interactive prototype, production UI, engine groundwork. MIDI / graph-swap /
-undo correctness remains a prerequisite for any playable integration.
+Next: hand off to the supervisor with the updated [`HANDOFF.md`](HANDOFF.md). The prototype
+go-ahead has not been stated explicitly; the supervisor confirms it with Kosta first. No
+implementation has started. MIDI / graph-swap / undo correctness remains a prerequisite for
+any playable integration.
 
 The handoff prompt for the arbiter agent is [`HANDOFF.md`](HANDOFF.md).
 

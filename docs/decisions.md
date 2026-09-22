@@ -1606,3 +1606,21 @@ labelled as such. `docs/design/render.py` gained two backward-compatible hooks (
 width, header width). Revision-1 PNGs re-render byte-identical.
 
 Stopped for owner review; no prototype or implementation started.
+
+## 2026-09-22 — Revision 2 review: owner feedback
+
+Owner reviewed the revision-2 images. Recorded in substance:
+
+- Likes the revision. "All the other things feel right." That covers expanded modules with
+  user-chosen primary controls, and knob modulation with cables visible and hidden. The
+  revision-2 recommendations are therefore the accepted design direction. The items that
+  revision 2 itself marked [open] stay open for the prototype: hidden-mode layout, expansion
+  pushing vs floating over neighbours, ring-vs-body drag at small radius, and continuous vs
+  stage-start envelope-time modulation.
+- **Skins: change.** "Labels straight on art" is not rejected. It becomes a skin-maker flag,
+  `labels_on_art`, **default false** (theme plates). A maker may set it to true because it is
+  much more beautiful, and beauty is the point of skin art. Agent addition, not decided by the
+  owner: when the flag is set, the loader warns (without blocking) if label contrast is
+  below 4.5:1.
+- Owner asked to hand off to the supervisor agent. Prototype go-ahead was **not** stated
+  explicitly; the supervisor should confirm it before starting the prototype.

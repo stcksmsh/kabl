@@ -204,6 +204,11 @@ the prototype to show that it doesn't cause mis-grabs at r = 17.
   theme's colour**, not in the art's colour (the revision-1 C clear-zone rule). Text contrast
   therefore never depends on the picture. Measured against the placeholder art's extreme
   colours, the worst case is 10.2:1 (dark) and 11.1:1 (light).
+- **[owner]** Skin flag `labels_on_art`, **default false** (plates as above). A skin maker may
+  set it to true: labels and values then sit straight on the art, with no plates. Beauty is the
+  point of a skin, so the maker takes responsibility for contrast.
+- **[rec]** When `labels_on_art` is true, the skin loader measures label contrast over the art
+  and **warns** the maker if it is below 4.5:1. It does not block the skin.
 - **[rec]** If a skin has no `dark.png`, the light art is dimmed 35 % under dark plates.
 - Core modules stay A / A-dark **[owner]**.
 

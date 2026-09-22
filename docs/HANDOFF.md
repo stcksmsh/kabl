@@ -19,15 +19,15 @@ atmosphere, and performed leads.
 
 - `docs/STATUS.md`: the top "Current handover" block is authoritative. Older sections below it
   are partly stale, and the block names which parts.
-- `docs/decisions.md`: append-only rationale. The **last two 2026-09-22 G1 entries** hold
-  Kosta's latest design decisions.
+- `docs/decisions.md`: append-only rationale. The G1 entries and the three latest entries
+  (revision round 2; revision 2 review: owner feedback) hold Kosta's design decisions.
 - `docs/PLAN.md`: the design plan that was executed (P1–P5, then gate G1).
-- `docs/design/REVIEW.md`: the design review package. Supporting files:
-  - `BRIEF.md`: constraints and the capability map.
-  - `INTERACTIONS.md`: the full interaction spec.
-  - `QA.md`
-  - `render.py`: every mockup comes from this one layout model. Run
-    `python3 docs/design/render.py`, or add `--qa` for measurements.
+- `docs/design/revision-2/REVIEW.md`: the **current** design package. Its companions:
+  - `INTERACTIONS.md`: the current interaction spec. It overrides `docs/design/INTERACTIONS.md`.
+    Every rule is tagged [owner], [rec] or [open].
+  - `render2.py`: the mockups. Run `python3 docs/design/revision-2/render2.py`, or add `--qa`.
+- `docs/design/REVIEW.md`, `BRIEF.md`, `QA.md`, `render.py`: revision 1. Kept as history and
+  as the base layout model.
 
 ## State of the build (trust code and git over docs)
 
@@ -41,31 +41,33 @@ atmosphere, and performed leads.
 - Kosta's machine has real audio, a display and a MIDI controller. Pi-4 performance is
   unmeasured.
 
-## Design decisions (Kosta, at G1)
+## Design decisions (Kosta, at G1 and the revision-2 review)
 
-- **Look:** direction A (warm studio hardware) for the core "starter pack" modules. A dark
-  variant of A with B's material character: texture, knurled metal, some glowing indicators.
-- **Skins:** illustrated, image-based skins (the style of the rejected direction C) are for
-  user-made and non-core modules. They are eye-candy that draws people in, and they are
-  theme-dependent (light/dark). The UI always draws every control, label and value on top of a
-  skin, which is what keeps any skin readable.
-- **Modulation:** any knob accepts a modulation cable, Surge/Vital style; there is no CV jack
-  per param. A route is a cable with amount, polarity and bypass. The routing drawer, the jack
-  badges and the rings around knobs are all views of that same cable.
-- **Density:** modules declare primary and advanced params. The **user can choose which params
-  are primary**. Advanced params are shown by expanding the module in place.
-- **Cables:** one rack layout, shown three ways: All (physical, sagging, colour-coded), Focus,
-  and Hidden (jack badges plus the routing drawer).
+- **Look:** direction A (warm studio hardware) for core modules, plus A-dark: A's layout with
+  B's material (texture, knurled metal knobs, restrained glow).
+- **Skins:** illustrated light/dark art for user-made and non-core modules. The UI draws every
+  control, label and value. The skin flag `labels_on_art` is **default false** (labels on theme
+  plates); a skin maker may set it to true, putting labels straight on the art for beauty.
+- **Modulation:** any knob accepts a modulation cable; there is no CV jack per param. Amount,
+  polarity and bypass belong to the route. The cable, drawer row, badge and knob ring are views
+  of the same route.
+- **Density:** modules declare primary/advanced params. The user chooses the primary ones.
+  Advanced params appear by expanding the module in place.
+- **Cables:** one rack layout, shown All / Focus / Hidden.
+- **Revision 2 accepted as the direction** ("all the other things feel right"): the knob
+  anatomy (pointer = base, ring = result, peak dot, depth lanes when inspected); amount as a %
+  of knob travel, also shown in units, summed then clamped; the plug at 6 o'clock as a thinner
+  mod lead; the face = primary controls, with expansion appended right and jacks always on the
+  face; the rich LFO (features marked ◆ are conceptual, not in the engine); a 1440×900
+  default viewport with 1280×800 as the minimum.
 
-## Open questions
+## Open questions (settle in the prototype)
 
-- **Hidden-mode layout:** keep the same rack layout, or rearrange into a compact synth-style
-  layout? Kosta is unsure. The agent recommends building both in the prototype and letting him
-  play.
-- **Viewport:** 1280×800 is "workable but could be a tad better". Keep it as the minimum and
-  pick a larger default design size.
-- **Prototype go-ahead:** Kosta has not explicitly authorized the interactive prototype or any
-  implementation.
+- Hidden-mode layout: keep the same rack, or switch to a compact synth layout? Build both.
+- Expansion: push the neighbours (shown) or float over them? Auto-Focus while expanded?
+- Ring vs knob-body drag at a small knob radius.
+- Envelope-time modulation: continuous vs sampled at stage start (choose by ear).
+- **Prototype go-ahead has not been stated explicitly. Confirm it with Kosta before starting.**
 
 ## Known code gaps behind the design
 
@@ -83,23 +85,18 @@ atmosphere, and performed leads.
 
 ## Candidate next jobs (recommended order; confirm with Kosta before implementation)
 
-1. **Design revision round** (design only; the plan's gate still applies). Deliverables:
-   - a storyboard of LFO → ADSR Attack by dropping a cable on the knob;
-   - a full-featured LFO (sync, phase, amplitude, offset, uni/bipolar, trigger mode, fade-in),
-     compact and expanded, including choosing primary params;
-   - A-dark renders of the reference patch;
-   - one user-skinned module in light and dark;
-   - a larger default viewport.
-
-   Extend `render.py`, keep QA honest, and return to Kosta for review.
-2. **Engine groundwork for param modulation:** knob-as-destination routes with per-cable
-   amount/polarity, plus tests. This is safe to run in parallel with job 1, and it unblocks the
-   core decision.
-3. **Interactive prototype** of A: patching, knobs, drawer, All/Focus/Hidden, both hidden-mode
-   layouts. Only after Kosta says go.
-4. Deferred until Kosta prioritizes them: clock and sequencers (the performance target), more
-   modulation sources (MSEG, macros, velocity/aftertouch, random), and the correctness risks
-   listed above.
+1. ~~Design revision round~~: done and reviewed (revision 2).
+2. **Interactive prototype** of the revision-2 design, isolated from the engine: rack with
+   A/A-dark; knob drop, ring and body drag; route card and inspector; All/Focus/Hidden; both
+   hidden-mode layouts; expand/collapse and choosing primary controls. It has to answer the
+   open questions above. Start only after Kosta's go-ahead.
+3. **Engine groundwork for param modulation:** knob routes with per-route amount/sign/bypass,
+   summed then clamped, and tests. Independent of job 2.
+4. **Correctness prerequisites** for any playable integration: MIDI during swaps, the
+   deferred-drop collector, MIDI routing that assumes module ID 1, undo op grouping.
+5. Deferred until Kosta prioritizes them: the LFO features marked ◆, clock and sequencers,
+   more modulation sources, real skin art (image generation; prompts are in
+   `docs/design/IMAGEGEN_PROMPTS.md`).
 
 ## Rules for delegated jobs
 

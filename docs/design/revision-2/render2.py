@@ -1002,17 +1002,18 @@ def skin_sheet():
         o.append(cell_head(core, ax, y - 64, "Art layer only", ["Skin file: no text, no controls."]))
         o.append(f'<g transform="translate({ax},{y})"><clipPath id="clipart{row}"><rect width="210" height="{PANEL_H}" rx="2"/></clipPath>'
                  f'<g clip-path="url(#clipart{row})">{ensemble_art(dict(w=210), row == 1)}</g></g>')
-        # rejected: labels straight on art
+        # opt-in (skin maker flag): labels straight on art
         bx = ax + 210 + 60
-        o.append(cell_head(core, bx, y - 64, "Rejected: labels straight on art", ["Contrast depends on the picture."]))
+        o.append(cell_head(core, bx, y - 64, "Opt-in: labels straight on art", ["Maker sets labels_on_art = true."]))
         bare = dict(skin, panel="#00000000")
         mm = dict(mods["ens"], x=bx)
         o.append(R.draw_module(dict(bare, art="illustrated"), mm, dict(mods={}, rings={}, badges={}, selected=()))
                  .replace(f'fill="{bare["panel"]}" rx="8" opacity="0.96"', 'fill="none" rx="8" opacity="0"'))
         tx = bx + 210 + 50
-        notes = ["Manifest (proposal): light.png + dark.png,",
-                 "accent colour, optional 'busy zones'.",
-                 "Plates follow the theme, not the art.",
+        notes = ["Manifest: light.png + dark.png, accent",
+                 "colour, labels_on_art (default false).",
+                 "Default: plates follow the theme.",
+                 "Opt-in: maker owns label contrast.",
                  "Missing dark.png: light art dimmed 35 %",
                  "under dark plates.",
                  "",

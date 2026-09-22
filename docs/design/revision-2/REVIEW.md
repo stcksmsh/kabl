@@ -81,8 +81,9 @@ travel, and the UI also shows it in destination units.
 
 **The art is a procedural PLACEHOLDER.** No image generator was available in this session.
 This is not finished art. The sheet shows the rule: the skin supplies art only. The UI draws
-every control, label and value on **theme-coloured** plates. The "rejected" column shows labels
-placed straight on the art. The prompts for real art are in
+every control, label and value on **theme-coloured** plates by default. **Owner decision
+(after review):** the maker may set `labels_on_art = true` to put labels straight on the art
+(the third column). The prompts for real art are in
 [`../IMAGEGEN_PROMPTS.md`](../IMAGEGEN_PROMPTS.md); they need a light/dark pair added.
 
 ## 6. Minimum window and crowding
