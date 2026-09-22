@@ -13,15 +13,25 @@
 //!   compiler's test patch uses: a single voice-rate chain connected straight to `out` is the
 //!   correct, simpler shape once the compiler averages automatically. `mixer` remains available
 //!   for combining genuinely different signals, not for polyphony.
-//! - **Cycles are a compile error, not brief section 7.1's 1-block delay — yet.** Detecting and
-//!   correctly breaking a cycle with an implicit delay is real, untested work with no existing
-//!   spike to lean on; scoped out of this first correctness pass and left as an explicit `Err`
-//!   rather than silently doing the wrong thing.
+//! - **Cycles get brief section 7.1's implicit 1-block delay.** A DFS over the cable graph
+//!   (`kabl_core::PatchState.cables`, module-id order for determinism) classifies each cable as a
+//!   tree/forward/cross edge or a *back* edge (destination already on the current DFS stack).
+//!   Removing every back edge from the schedule-ordering graph leaves a DAG (standard result: any
+//!   cycle must contain a back edge w.r.t. any one DFS of it), so Kahn's algorithm always
+//!   completes — `CompileError::Cycle` is now an unreachable safety net, not the normal outcome.
+//!   Each back-edge cable instead reads a *delay buffer*: a separate buffer holding its source's
+//!   output from the *previous* `process_block()` call, refreshed by a `Step::CopyToDelay` at the
+//!   end of the schedule. First block after compile sees silence on that input (no history yet).
+//!   Delay buffers are pinned live-forever in `coalesce_buffers` (their whole point is surviving
+//!   past the block that writes them) and reset to silence on `recompile()` (a fresh `compile()`
+//!   call, like every other buffer) — a live edit momentarily drops feedback-loop memory, not
+//!   currently carried over the way module state is. See decisions.md "Cycle handling: implicit
+//!   1-block delay".
 //! - **Buffer-pool reuse** (brief section 7.4): `coalesce_buffers` remaps every buffer to a
 //!   smaller set of physical slots via greedy linear-scan register allocation over each buffer's
 //!   `[first_def, last_use]` schedule-step interval, run once at compile time after the schedule
-//!   is built. See that function's own doc comment for the algorithm and the three pinned-live-
-//!   forever exceptions (`silence_buf`, `out_left`, `out_right`).
+//!   is built. See that function's own doc comment for the algorithm and its pinned-live-forever
+//!   exceptions (`silence_buf`, `out_left`, `out_right`, every delay buffer).
 //! - **Params are compile-time constants.** v1 has no cable-to-param modulation (that's cable
 //!   depth, v2) — every param is read once from `ModuleState.params` (or `ParamInfo.default` if
 //!   unset) at compile time and passed as `Signal::Scalar` every block, exactly matching how
@@ -43,7 +53,7 @@
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt;
 
-use kabl_core::{ModuleId, PatchState, PortRef};
+use kabl_core::{CableId, ModuleId, PatchState, PortRef};
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::{registry, Module, ModuleInfo, PortDirection, ProcessIo, Rate, Signal};
 
@@ -74,8 +84,11 @@ pub enum CompileError {
         kind: &'static str,
         port: String,
     },
-    /// Modules left over after topo-sorting everything with in-degree 0 repeatedly — a cycle.
-    /// Brief section 7.1's 1-block-delay handling isn't implemented yet (see module doc).
+    /// Modules left over after topo-sorting everything with in-degree 0 repeatedly. Should not
+    /// happen in practice: every cycle's back edges (found via DFS) are excluded from this
+    /// ordering graph before Kahn's algorithm runs, which is proven to leave a DAG (see module
+    /// doc). Kept as a defensive fallback rather than an `unreachable!`/`panic!`, since a compiler
+    /// bug should fail loudly with a `Result`, not take down the caller.
     Cycle(Vec<ModuleId>),
     /// A module's input/output/param count exceeds `MAX_INPUTS`/`MAX_OUTPUTS`/`MAX_PARAMS` — the
     /// fixed-size scratch `process_block` uses to stay allocation-free can't hold it. Caught here
@@ -100,7 +113,11 @@ impl fmt::Display for CompileError {
                 write!(f, "module {id} (\"{kind}\") has no port named \"{port}\"")
             }
             CompileError::Cycle(ids) => {
-                write!(f, "cycle among modules {ids:?} (not yet supported)")
+                write!(
+                    f,
+                    "internal error: modules {ids:?} left over after topo sort despite back-edge \
+                     removal — this should be unreachable, please report it"
+                )
             }
             CompileError::TooManyPorts {
                 id,
@@ -137,6 +154,11 @@ enum Step {
     },
     /// Voice-rate output -> global-rate input: sum `sources` (one per voice) into `dest`.
     SumVoices { sources: Vec<BufIdx>, dest: BufIdx },
+    /// Cycle-breaking (brief section 7.1): copy `src`'s current-block content into `dest` (a
+    /// pinned delay buffer) for a delayed cable's reader to pick up on the *next* `process_block`
+    /// call. Placed at the end of the schedule so this block's own `Step::Process` reads (earlier
+    /// in `steps`) still see last block's value.
+    CopyToDelay { src: BufIdx, dest: BufIdx },
 }
 
 /// Reassigns buffer indices so buffers whose live ranges don't overlap share the same physical
@@ -148,13 +170,17 @@ enum Step {
 /// O(n log n) sort plus O(n) scan here is not worth agonizing over.
 ///
 /// A buffer's live range is `[step that produces it, last step that reads it]`, both in schedule
-/// order. Three exceptions get pinned to "live forever" (never eligible for reuse, and nothing
-/// else may ever be assigned their slot):
+/// order. `pinned` buffers get "live forever" instead (never eligible for reuse, and nothing else
+/// may ever be assigned their slot):
 /// - `silence_buf`: a shared sentinel every unconnected input reads, potentially from any step at
 ///   any point, not something with a normal single-producer lifetime.
 /// - `out_left`/`out_right`: read by the caller (`left()`/`right()`) *after* every step in
 ///   `process_block` has already run — a live range ending at "the last step" would still let
 ///   something else's buffer overwrite it before the caller gets to read it.
+/// - every delay buffer (brief section 7.1's cycle-breaking, see module doc): its value must
+///   survive from one `process_block()` call to the *next* one, not just to the end of this
+///   block's schedule — reuse within a single block's live-range analysis has no way to know
+///   that.
 ///
 /// Reuse within a single step (a buffer last-read by a step that also defines the buffer taking
 /// its slot) is deliberately *not* attempted, even though `process_block`'s copy-inputs-before-
@@ -164,9 +190,7 @@ enum Step {
 fn coalesce_buffers(
     steps: &[Step],
     buffer_count: usize,
-    silence_buf: BufIdx,
-    out_left: BufIdx,
-    out_right: BufIdx,
+    pinned: &[BufIdx],
 ) -> (Vec<BufIdx>, usize) {
     let mut first_def = vec![0usize; buffer_count];
     let mut last_use = vec![0usize; buffer_count];
@@ -195,10 +219,15 @@ fn coalesce_buffers(
                 first_def[*dest] = step_idx;
                 last_use[*dest] = last_use[*dest].max(step_idx);
             }
+            Step::CopyToDelay { src, dest } => {
+                last_use[*src] = last_use[*src].max(step_idx);
+                first_def[*dest] = step_idx;
+                last_use[*dest] = last_use[*dest].max(step_idx);
+            }
         }
     }
 
-    for &pinned in &[silence_buf, out_left, out_right] {
+    for &pinned in pinned {
         first_def[pinned] = 0;
         last_use[pinned] = usize::MAX;
     }
@@ -264,6 +293,10 @@ struct CableInfo {
     from_id: ModuleId,
     from_port: String,
     to_port: String,
+    /// This cable is a DFS back edge (brief section 7.1): its reader gets last block's value from
+    /// a delay buffer instead of this block's live value, and it's excluded from the
+    /// topo-ordering graph. See module doc.
+    delayed: bool,
 }
 
 pub fn compile(
@@ -291,12 +324,62 @@ pub fn compile(
         );
     }
 
+    // Brief section 7.1: find a feedback-arc set via DFS over the cable graph (cable-id order —
+    // `patch.cables` is a `BTreeMap`, so this is deterministic) so a cycle gets an implicit
+    // 1-block delay instead of failing to compile. Any cycle must contain at least one DFS back
+    // edge (destination still on the current recursion stack); removing every back edge found by
+    // one DFS run always leaves the graph acyclic, so Kahn's algorithm below is guaranteed to
+    // consume every module. See module doc.
+    let mut adj_by_cable: BTreeMap<ModuleId, Vec<(CableId, ModuleId)>> = BTreeMap::new();
+    for (&cable_id, cstate) in &patch.cables {
+        let PortRef::Module { id: from_id, .. } = &cstate.from;
+        let PortRef::Module { id: to_id, .. } = &cstate.to;
+        adj_by_cable
+            .entry(*from_id)
+            .or_default()
+            .push((cable_id, *to_id));
+    }
+
+    #[derive(Clone, Copy, PartialEq)]
+    enum Color {
+        White,
+        Gray,
+        Black,
+    }
+    fn mark_back_edges(
+        id: ModuleId,
+        adj: &BTreeMap<ModuleId, Vec<(CableId, ModuleId)>>,
+        color: &mut BTreeMap<ModuleId, Color>,
+        delayed: &mut std::collections::BTreeSet<CableId>,
+    ) {
+        color.insert(id, Color::Gray);
+        if let Some(children) = adj.get(&id) {
+            for &(cable_id, to_id) in children {
+                match color[&to_id] {
+                    Color::Gray => {
+                        delayed.insert(cable_id);
+                    }
+                    Color::White => mark_back_edges(to_id, adj, color, delayed),
+                    Color::Black => {}
+                }
+            }
+        }
+        color.insert(id, Color::Black);
+    }
+    let mut color: BTreeMap<ModuleId, Color> = metas.keys().map(|&id| (id, Color::White)).collect();
+    let mut delayed_cables: std::collections::BTreeSet<CableId> = Default::default();
+    for &id in metas.keys() {
+        if color[&id] == Color::White {
+            mark_back_edges(id, &adj_by_cable, &mut color, &mut delayed_cables);
+        }
+    }
+
     // Cables terminating at each module, keyed by destination id -> list of (dest port, source).
     let mut cables_by_dest: BTreeMap<ModuleId, Vec<CableInfo>> = BTreeMap::new();
     let mut edges: BTreeMap<ModuleId, Vec<ModuleId>> = BTreeMap::new();
     let mut indegree: BTreeMap<ModuleId, usize> = metas.keys().map(|&id| (id, 0)).collect();
 
-    for cstate in patch.cables.values() {
+    for (&cable_id, cstate) in &patch.cables {
         let PortRef::Module {
             id: from_id,
             port: from_port,
@@ -305,12 +388,16 @@ pub fn compile(
             id: to_id,
             port: to_port,
         } = &cstate.to;
-        edges.entry(*from_id).or_default().push(*to_id);
-        *indegree.entry(*to_id).or_insert(0) += 1;
+        let delayed = delayed_cables.contains(&cable_id);
+        if !delayed {
+            edges.entry(*from_id).or_default().push(*to_id);
+            *indegree.entry(*to_id).or_insert(0) += 1;
+        }
         cables_by_dest.entry(*to_id).or_default().push(CableInfo {
             from_id: *from_id,
             from_port: from_port.clone(),
             to_port: to_port.clone(),
+            delayed,
         });
     }
 
@@ -351,6 +438,41 @@ pub fn compile(
     let mut voice_output_buf: HashMap<(ModuleId, usize, usize), BufIdx> = HashMap::new();
     let mut global_output_buf: HashMap<(ModuleId, usize), BufIdx> = HashMap::new();
     let mut summed_buf: HashMap<(ModuleId, usize), BufIdx> = HashMap::new();
+
+    // Delay buffers for every delayed cable's source port (brief section 7.1), pre-created before
+    // the topo-order wiring loop below: a delayed cable's source can be scheduled *after* its
+    // reader now that the edge no longer constrains ordering, so the reader can't wait for the
+    // source's normal output-buffer bookkeeping to exist yet.
+    let mut voice_delay_buf: HashMap<(ModuleId, usize, usize), BufIdx> = HashMap::new();
+    let mut global_delay_buf: HashMap<(ModuleId, usize), BufIdx> = HashMap::new();
+    let mut summed_delay_buf: HashMap<(ModuleId, usize), BufIdx> = HashMap::new();
+    let mut delayed_sources: std::collections::BTreeSet<(ModuleId, String)> = Default::default();
+    for cables in cables_by_dest.values() {
+        for c in cables {
+            if c.delayed {
+                delayed_sources.insert((c.from_id, c.from_port.clone()));
+            }
+        }
+    }
+    for (from_id, from_port) in delayed_sources {
+        let src_meta = &metas[&from_id];
+        let src_out_idx = output_port_index(src_meta.info, &from_port).ok_or_else(|| {
+            CompileError::UnknownPort {
+                id: from_id,
+                kind: "source",
+                port: from_port.clone(),
+            }
+        })?;
+        if src_meta.info.rate == Rate::Voice {
+            for lane in 0..voice_count {
+                buffers.push([0.0; BLOCK]);
+                voice_delay_buf.insert((from_id, src_out_idx, lane), buffers.len() - 1);
+            }
+        } else {
+            buffers.push([0.0; BLOCK]);
+            global_delay_buf.insert((from_id, src_out_idx), buffers.len() - 1);
+        }
+    }
 
     let mut modules: Vec<Box<dyn Module>> = Vec::new();
     let mut module_origin: Vec<(ModuleId, Option<usize>)> = Vec::new();
@@ -439,7 +561,29 @@ pub fn compile(
                                 port: cable.from_port.clone(),
                             })?;
                         let src_is_voice = src_meta.info.rate == Rate::Voice;
-                        let buf = if src_is_voice && is_voice {
+                        let buf = if cable.delayed {
+                            // Brief section 7.1: read last block's value, not this block's —
+                            // `src_meta`'s ordering relative to this module is unconstrained.
+                            if src_is_voice && is_voice {
+                                voice_delay_buf[&(cable.from_id, src_out_idx, lane)]
+                            } else if src_is_voice && !is_voice {
+                                *summed_delay_buf
+                                    .entry((cable.from_id, src_out_idx))
+                                    .or_insert_with(|| {
+                                        let sources: Vec<BufIdx> = (0..voice_count)
+                                            .map(|v| {
+                                                voice_delay_buf[&(cable.from_id, src_out_idx, v)]
+                                            })
+                                            .collect();
+                                        buffers.push([0.0; BLOCK]);
+                                        let dest = buffers.len() - 1;
+                                        steps.push(Step::SumVoices { sources, dest });
+                                        dest
+                                    })
+                            } else {
+                                global_delay_buf[&(cable.from_id, src_out_idx)]
+                            }
+                        } else if src_is_voice && is_voice {
                             voice_output_buf[&(cable.from_id, src_out_idx, lane)]
                         } else if src_is_voice && !is_voice {
                             *summed_buf
@@ -500,6 +644,28 @@ pub fn compile(
         }
     }
 
+    // Refresh every delay buffer from this block's live value, for the *next* process_block()
+    // call to read — sorted keys, not raw `HashMap` iteration order, to keep the schedule
+    // deterministic (matters for reproducing `buffer_count()` across identical compiles).
+    let mut voice_delay_keys: Vec<_> = voice_delay_buf.keys().copied().collect();
+    voice_delay_keys.sort();
+    for key @ (from_id, out_idx, lane) in voice_delay_keys {
+        let live_buf = voice_output_buf[&(from_id, out_idx, lane)];
+        steps.push(Step::CopyToDelay {
+            src: live_buf,
+            dest: voice_delay_buf[&key],
+        });
+    }
+    let mut global_delay_keys: Vec<_> = global_delay_buf.keys().copied().collect();
+    global_delay_keys.sort();
+    for key @ (from_id, out_idx) in global_delay_keys {
+        let live_buf = global_output_buf[&(from_id, out_idx)];
+        steps.push(Step::CopyToDelay {
+            src: live_buf,
+            dest: global_delay_buf[&key],
+        });
+    }
+
     let quality = QualityConfig {
         tier: QualityTier::Live,
     };
@@ -507,8 +673,10 @@ pub fn compile(
         m.prepare(sample_rate, BLOCK, &quality);
     }
 
-    let (remap, physical_count) =
-        coalesce_buffers(&steps, buffers.len(), silence_buf, out_left, out_right);
+    let mut pinned = vec![silence_buf, out_left, out_right];
+    pinned.extend(voice_delay_buf.values().copied());
+    pinned.extend(global_delay_buf.values().copied());
+    let (remap, physical_count) = coalesce_buffers(&steps, buffers.len(), &pinned);
     for step in &mut steps {
         match step {
             Step::Process {
@@ -529,6 +697,10 @@ pub fn compile(
                 for src in sources.iter_mut() {
                     *src = remap[*src];
                 }
+                *dest = remap[*dest];
+            }
+            Step::CopyToDelay { src, dest } => {
+                *src = remap[*src];
                 *dest = remap[*dest];
             }
         }
@@ -667,6 +839,9 @@ impl CompiledPatch {
                         *s *= scale;
                     }
                     self.buffers[*dest] = sum;
+                }
+                Step::CopyToDelay { src, dest } => {
+                    self.buffers[*dest] = self.buffers[*src];
                 }
             }
         }

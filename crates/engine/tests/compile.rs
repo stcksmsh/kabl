@@ -110,21 +110,57 @@ fn unconnected_input_defaults_to_silence() {
     }
 }
 
+/// Brief section 7.1: a cycle compiles instead of erroring, with one cable in it delayed by
+/// exactly one block. `osc.va` (id 1) sits outside the cycle as an external driver; `vca`s 2 and 3
+/// form the cycle (`3.out -> 2.in` normal, `2.out -> 3.cv` delayed — DFS from module 1 reaches 3
+/// then 2 then finds `2 -> 3` a back edge, since 3 is still on the stack). `2.out` also feeds
+/// `out` (id 4).
+///
+/// Both `vca`s keep their default `gain=1.0`, `exponential=off` params, and `vca.cv` unconnected
+/// defaults to 0 — with `gain` fixed at 1.0, `vca`'s output is exactly `in * clamp(1.0 + cv, 0,
+/// 1)`, so a block's expected output is computable directly from the oscillator's reference
+/// samples and the *previous* block's own expected output (the value the delayed `cv` reads),
+/// without hand-deriving `osc.va`'s waveform — same reference-generator pattern
+/// `single_osc_patch`'s tests already use.
 #[test]
-fn cycle_is_a_compile_error_not_silently_wrong() {
-    let mut patch = PatchState::new();
-    patch.modules.insert(1, module("vca", &[]));
-    patch.modules.insert(2, module("vca", &[]));
-    // 1.out -> 2.in, 2.out -> 1.in: a cycle.
-    patch.cables.insert(1, cable(1, "out", 2, "in"));
-    patch.cables.insert(2, cable(2, "out", 1, "in"));
+fn cycle_compiles_with_implicit_one_block_delay() {
+    const BASE_HZ: f32 = 220.0;
 
-    match compile(&patch, SAMPLE_RATE, 1) {
-        Err(CompileError::Cycle(ids)) => {
-            assert_eq!(ids.len(), 2);
+    let mut patch = PatchState::new();
+    patch.modules.insert(
+        1,
+        module("osc.va", &[("base_hz", BASE_HZ), ("waveform", 2.0)]),
+    );
+    patch.modules.insert(2, module("vca", &[]));
+    patch.modules.insert(3, module("vca", &[]));
+    patch.modules.insert(4, module("out", &[]));
+    patch.cables.insert(1, cable(1, "out", 3, "in"));
+    patch.cables.insert(2, cable(3, "out", 2, "in"));
+    patch.cables.insert(3, cable(2, "out", 3, "cv")); // the back edge -> delayed
+    patch.cables.insert(4, cable(2, "out", 4, "left"));
+    patch.cables.insert(5, cable(2, "out", 4, "right"));
+
+    let mut compiled = compile(&patch, SAMPLE_RATE, 1)
+        .expect("a cycle should compile via an implicit 1-block delay, not error");
+
+    let mut osc_ref = Saw::new();
+    let mut prev_out2 = [0.0f32; kabl_engine::graph::BLOCK]; // delay buffer starts silent
+
+    for block in 0..5 {
+        compiled.process_block();
+
+        let mut out2 = [0.0f32; kabl_engine::graph::BLOCK];
+        for i in 0..kabl_engine::graph::BLOCK {
+            let osc_sample = osc_ref.next(BASE_HZ, SAMPLE_RATE);
+            let gain3 = (1.0f32 + prev_out2[i]).clamp(0.0, 1.0); // vca 3: cv = delayed vca 2 out
+            let out3 = osc_sample * gain3;
+            let gain2 = (1.0f32 + 0.0f32).clamp(0.0, 1.0); // vca 2: cv unconnected = 0
+            out2[i] = out3 * gain2;
         }
-        Err(other) => panic!("expected a Cycle error, got {other}"),
-        Ok(_) => panic!("expected a Cycle error, compiled successfully instead"),
+
+        assert_eq!(compiled.left(), &out2, "block {block} left");
+        assert_eq!(compiled.right(), &out2, "block {block} right");
+        prev_out2 = out2;
     }
 }
 

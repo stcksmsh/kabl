@@ -1079,3 +1079,71 @@ state-carryover/RT-safety/swap ones) also still pass unchanged, since they were 
 the one and only `compile()` path — there's no separate "coalescing on/off" mode to test against.
 
 Workspace build/test/clippy/fmt all clean.
+
+## 2026-09-22 — Cycle handling: implicit 1-block delay (`crates/engine/src/compile.rs`)
+
+Sixth autonomous-session item off STATUS.md's own handover list (the Mutex-sharing compromise
+needs real hardware to judge whether it matters in practice; overlapping swaps and canvas
+pan/scroll are UI/engine polish with no correctness question attached — cycle handling was the
+next item with a real, self-contained design decision still open). Was previously a hard
+`CompileError::Cycle` (see "Flat-schedule compiler v1" above) — brief section 7.1 asks for an
+implicit 1-block delay instead, which the original entry flagged as "real work, deferred not
+forgotten."
+
+**Mechanism**: a DFS over the cable graph (`patch.cables`, iterated in `CableId` order —
+`BTreeMap`, deterministic) classifies every cable as tree/forward/cross or *back* (destination
+already on the current recursion stack). A cycle must contain at least one back edge relative to
+any single DFS of the graph — standard result, not something specific to this graph shape — so
+excluding every back edge found this way from the topo-ordering graph always leaves a DAG. Kahn's
+algorithm then always consumes every module; `CompileError::Cycle`'s "leftover nodes" branch is
+now a defensive fallback that should be unreachable, not the normal outcome for a cyclic patch.
+Each back-edge cable's reader gets wired to a *delay buffer* instead of the source's live output
+buffer — a separate buffer refreshed by a new `Step::CopyToDelay` placed at the end of the
+schedule, so this block's own reads (earlier in the step list) still see *last* block's value.
+First block after compile reads silence on that input (no history yet, same convention as every
+other buffer starting zeroed).
+
+**Design calls made here, not spelled out by the brief**:
+
+1. **Which edge gets delayed, for a multi-edge cycle**: whichever cable the DFS marks a back edge
+   — not chosen for musical sensibility (there's no principled way to pick "the right" edge from
+   inside the compiler; that's a patch-design decision, not a compiler one), just the standard,
+   deterministic, always-correct choice. Cable-id-ordered DFS makes it reproducible: the same
+   patch always gets the same cable delayed.
+2. **Delay buffers are pinned live-forever in `coalesce_buffers`**, alongside `silence_buf`/
+   `out_left`/`out_right` (that function's signature changed from three named exceptions to a
+   `pinned: &[BufIdx]` slice to fit this in without special-casing a fourth category). A delay
+   buffer's whole purpose is surviving from one `process_block()` call to the next — the existing
+   `[first_def, last_use]` analysis only reasons about one block's schedule, so it has no way to
+   know a "last use" inside this block isn't actually the last use overall. Reusing its slot for
+   something else would silently corrupt the next block's feedback read.
+3. **Delay buffers reset to silence on `recompile()`**, same as every other buffer — `recompile()`
+   calls `compile()` fresh, and `compile()` always zero-initializes `buffers`. Only module state
+   (via `save_state`/`load_state`) carries across a recompile; a feedback loop's one-block memory
+   doesn't, so a live edit to a patch with a cycle momentarily "forgets" the loop's last value.
+   Not attempted here — no accept-test patch recompiles a cyclic patch, and carrying it over would
+   mean threading delay-buffer identity through `CompiledPatch`'s public surface the way
+   `module_origin` does for modules, real extra design work for an unexercised case. Flagged in
+   STATUS.md's open items if it turns out to matter once real feedback patches exist.
+4. **Cross-rate delayed cables reuse the existing voice/global/sum machinery**, just against a
+   parallel set of delay-buffer maps (`voice_delay_buf`/`global_delay_buf`/`summed_delay_buf`
+   mirroring `voice_output_buf`/`global_output_buf`/`summed_buf`) rather than a special case: a
+   delayed voice-rate source feeding a global-rate destination still averages across voices (via
+   `SumVoices` reading the delay buffers instead of the live ones), a delayed global source
+   broadcasts to every voice lane the same way a live one does. Not separately proven against a
+   real patch (no v1 built-in module combination needs a cross-rate feedback loop), but it falls
+   out of the same trichotomy the non-delayed path already used, not new logic.
+
+**Tested**: `crates/engine/tests/compile.rs`'s `cycle_is_a_compile_error_not_silently_wrong`
+replaced with `cycle_compiles_with_implicit_one_block_delay` — `osc.va` (external driver, outside
+the cycle) feeds two `vca`s wired into a 2-cycle (`3.out -> 2.in` normal, `2.out -> 3.cv` delayed;
+worked out by hand which edge the DFS picks — see the test's own doc comment for the full trace).
+Both `vca`s keep default `gain=1.0`/`exponential=off`/unconnected `cv`, which makes `vca`'s output
+exactly `in * clamp(1.0 + cv, 0, 1)` — the test computes each block's expected output directly
+from an independent `Saw` reference generator (same pattern `single_osc_patch`'s tests already
+use) and the *previous* block's own expected output (the value the delayed `cv` should read),
+asserted bit-exact over 5 blocks. This exercises the real mechanism end-to-end (DFS edge choice,
+delay-buffer pre-creation ahead of the topo loop, `CopyToDelay` timing, `coalesce_buffers` pinning
+all live together), not just the DFS classification in isolation.
+
+Workspace build/test/clippy/fmt all clean.
