@@ -35,7 +35,7 @@ crates/
 ## Status
 
 See [`docs/STATUS.md`](docs/STATUS.md) for the current, detailed answer. Short version:
-spikes S1 and S2 passed; nothing playable exists yet.
+the engine, 9 modules, a live standalone synth (`kabl`) and a patchbay UI (`kabl-ui`) exist and play.
 
 ## Building
 

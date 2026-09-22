@@ -5,10 +5,26 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-22, after landing Eurorack view v1 (`kabl-ui`'s second, grid-snapped layout
-mode) — see decisions.md's "Eurorack view v1" entry for the full design. This file's own history
-above this line, up through the reconciliation note two paragraphs down, is a second session's
-that worked this backlog in parallel; `git log` is the merged truth from here on.
+Last updated: 2026-09-22, after `2cf3d29` (kabl-ui compiles outside the engine lock) and
+`2fd0aef` (kabl-ui shares standalone's MIDI port selection).
+
+**Current handover (supersedes every older handover note below):** no active task. The next
+session should orient, then wait for the owner's instruction. Two items were queued:
+- `docs/planning-prompt.md` is a ready-made prompt for a planning session (owner plus an agent)
+  that ends in `docs/PLAN.md`. It also lists the stale spots in this file, which were not all
+  rewritten here.
+- Hardware verification: owner runs `cargo run -p kabl-ui` with the real controller. It has
+  never been heard.
+
+Stale below, not yet rewritten:
+- The older "Handover" list claims there is no canvas pan and nothing has run on real hardware.
+  Pan came back with Eurorack view v1, and standalone plays live.
+- Descriptions of the Mutex window lasting the whole `build_swap` are out of date. `kabl-ui` now
+  locks only for `finish_swap`.
+- "Connects to the first MIDI port" is fixed in both binaries.
+
+AIW is not set up (no `.ai/state.json`). Owner said to skip AIW and Recall for now. Track work
+in git and this file.
 
 **MIDI hardware verified live for the first time**: a real controller (KL Essential 61 mk3)
 connected and played through `kabl-standalone`, confirmed by the owner. Needed a small fix first
