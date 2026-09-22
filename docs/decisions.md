@@ -1380,3 +1380,41 @@ desynced them on that very next block, since the cycle's feedback gain is not ne
 10 — asserted directly, not just assumed, so the test can't accidentally pass on a silent no-op).
 
 Workspace build/test/clippy/fmt all clean.
+
+## 2026-09-22 — Two sessions diverged on the same backlog; reconciled onto origin
+
+A second, separate Claude Code session worked this repo's STATUS.md backlog in parallel with this
+one, without either side pushing/pulling first. Both independently built buffer-pool reuse, cycle
+handling (brief 7.1), and overlapping-swap handling (brief 7.6); the other session also built a
+PNG-image module-skin system for `kabl-ui` and, in its last commit before stopping, taught
+`recompile()` to carry a cycle's delay-buffer memory forward instead of resetting it to silence.
+This session had additionally built (not duplicated by the other side): a Mutex-window shrink in
+`PatchEngine`, canvas pan/scroll, a native file picker, a comment-trim pass, AIW adoption, and a
+first real-hardware audio run.
+
+Compared both sides' implementations of the three duplicated backend topics before deciding (see
+the fork investigation this session ran): the other session's cycle-handling uses a textbook DFS
+back-edge feedback-arc-set detection (vs. this session's ad-hoc Kahn's-stall cut) and also handles
+a delayed voice-rate-into-global-rate combination this session's version explicitly punted on with
+`CompileError::DelayedVoiceToGlobalNotSupported`. Its UI pass was drag-interaction-tested via
+`xdotool` (caught and fixed a real backwards-drag bug), not just screenshot-verified. Buffer-pool
+reuse and overlapping-swaps converged on near-identical designs on both sides. Decision: take
+origin/master (the other session's work) as the new base for all three backend topics and the UI,
+rather than merge two independent implementations of the same features into one file.
+
+`git reset --hard origin/master`, then cherry-picked this session's one piece of net-new,
+non-duplicated work — MIDI port selection (`--midi <substring>`, skip ALSA's virtual "Midi
+Through" loopback by default) — onto the new base; one small doc-comment merge conflict, no code
+conflicts. This session's superseded local commits remain reachable on branch
+`backup-local-before-reconcile` if anything needs recovering later — nothing was deleted, only
+re-based off of. The Mutex-window shrink, canvas pan/scroll, file picker, and comment-trim pass
+were not reapplied this pass (they'd need re-implementing against the other session's
+substantially different `compile.rs` and `ui/lib.rs`, not a clean cherry-pick) — real, still-
+valuable follow-up work, not done here.
+
+Also: **MIDI hardware verified live for the first time** — a real controller (`KL Essential 61
+mk3`) connected and played through `kabl-standalone`, confirmed by the owner. The `--midi` fix
+above was written specifically because the first attempt silently connected to ALSA's own virtual
+loopback port instead.
+
+Workspace build/test/clippy/fmt all clean after reconciliation.

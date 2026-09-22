@@ -5,8 +5,20 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-22, after the compiler started carrying a cycle's delay-buffer memory
-across `recompile()` instead of resetting it to silence.
+Last updated: 2026-09-22, after reconciling with a second session that worked this same backlog
+in parallel (see decisions.md "Two sessions diverged on the same backlog") — this file's own
+history above this line is that other session's; `git log` is the merged truth from here on.
+
+**MIDI hardware verified live for the first time**: a real controller (KL Essential 61 mk3)
+connected and played through `kabl-standalone`, confirmed by the owner. Needed a small fix first
+(`--midi <substring>`, standalone/main.rs) — the binary was silently connecting to ALSA's own
+virtual "Midi Through" loopback port instead of the real controller.
+
+**Owner's next priority, stated directly**: a Eurorack-style "tiled" view — rack-mounted modules,
+real-cable-like curved cables, snapped/grid layout — as a second view mode alongside the existing
+free-form patchbay (patchbay stays for editing/certain views; Eurorack view for playing/not
+building from scratch). Explicitly referenced Surge/Vital's visual polish as the bar, "friendlier
+and more modular" than Surge specifically. Not scoped or started yet — see Handover below.
 
 ## Autonomous overnight work (started 2026-09-21)
 
