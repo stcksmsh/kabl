@@ -316,6 +316,7 @@ def build_patch(rows, cables, names=None, params=None):
         x = RACK_X
         for mid, kind in row:
             name, wu, tpl, rate = KINDS[kind]
+            wu = params.get(mid, {}).get("wu", wu)  # per-instance width (revision 2: expanded modules)
             w = wu * UNIT
             controls, ports = tpl(w, params.get(mid, {}))
             mods[mid] = dict(id=mid, kind=kind, name=names.get(mid, name), x=x, y=ROW_Y[r], w=w,
@@ -640,16 +641,17 @@ def draw_module(th, m, sc):
     for sx, sy in ((10, 7), (w - 10, PANEL_H - 7)) if w < 180 else ((10, 7), (w - 10, 7), (10, PANEL_H - 7), (w - 10, PANEL_H - 7)):
         o.append(circle(sx, sy, 3.6, fill="url(#nut)", stroke=th["nut_edge"], sw=.6))
         o.append(f'<line x1="{sx - 2.2}" y1="{sy}" x2="{sx + 2.2}" y2="{sy}" stroke="{th["nut_edge"]}" stroke-width="1"/>')
-    # header
-    lines = wrap2(m["name"], 15, w - 36)
+    # header (centred over head_w: an expanded module keeps its name where the compact one had it)
+    hw = m.get("head_w", w)
+    lines = wrap2(m["name"], 15, hw - 36)
     if th["art"]:
-        o.append(clear_zone(th, 14, 13, w - 28, 22 + 18 * len(lines)))
+        o.append(clear_zone(th, 14, 13, hw - 28, 22 + 18 * len(lines)))
     for i, ln in enumerate(lines):
-        o.append(text(w / 2, 31 + i * 18, ln, 15, th["ink"], "middle", 600))
+        o.append(text(hw / 2, 31 + i * 18, ln, 15, th["ink"], "middle", 600))
     if len(lines) == 1:
-        tag = ("concept · " if m["kind"] in CONCEPT_KINDS else "") + m["kind"] + (
+        tag = ("concept · " if m["kind"] in CONCEPT_KINDS else "") + m.get("tag", m["kind"]) + (
             " · per voice" if m["kind"] == "lfo" else "")
-        o.append(text(w / 2, 47, tag, 11, th["ink2"], "middle", 400, mono=True))
+        o.append(text(hw / 2, 47, tag, 11, th["ink2"], "middle", 400, mono=True))
     # controls
     # C: all clear zones first, so a neighbouring zone never covers an already-drawn label
     for c in m["controls"]:
