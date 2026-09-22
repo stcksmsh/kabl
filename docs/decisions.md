@@ -1543,3 +1543,25 @@ Agent interpretation, pending owner confirmation:
 Relevant code fact: `ProcessIo::param` already returns `Signal` (Scalar or Buffer). Param
 modulation therefore mostly needs compiler work: params are compile-time `Scalar` today
 (compile.rs module doc).
+
+## 2026-09-22 — G1 follow-up: modulation model, primary params, skins, viewport
+
+Owner answers to the agent's follow-up proposals:
+
+- **Modulation model:** chose "any knob accepts a modulation cable" (the Surge/Vital-style param
+  destination) over one CV jack per param. Example: LFO → ADSR attack is a cable dropped on the
+  Attack knob, with an amount on the route.
+- **Primary / advanced params:** the module declares a default split, and the **user can choose
+  which params are primary**. The word is "primary", not "basic", for that reason. Advanced
+  params are shown by expanding the module in place.
+- **Skins:** C-style illustrated skins are wanted as eye-candy for user-made and non-core
+  modules. Theme-dependent skins (light/dark variants) are "really cool". Core modules use A,
+  plus an A-dark variant with B's material character.
+- **G1 Q2 (hidden-mode layout):** owner is unsure. Agent recommendation: settle it in the
+  interactive prototype by trying both.
+- **G1 Q3 (viewport):** 1280×800 is "workable but could be a tad better resolution". Agent
+  reading: keep 1280×800 as the supported minimum, and design the default layout for a larger
+  baseline (to be chosen, e.g. 1440×900 or 1920×1080).
+
+Prototype go-ahead has not been explicitly given. The next design work (the revision round
+listed in STATUS.md) and any implementation still need the owner's or the arbiter's instruction.

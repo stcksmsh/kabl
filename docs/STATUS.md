@@ -8,17 +8,28 @@ what's a stand-in, and what's next — before reading any code.
 Last updated: 2026-09-22, design-execution session. No product code changed or new runtime
 verification performed in this session.
 
-**Current handover (supersedes every older handover note below):** [`PLAN.md`](PLAN.md) P1–P5 are
-executed; work is **stopped at G1 (owner visual review)**. Start at
-[`design/REVIEW.md`](design/REVIEW.md): three directions (A warm / B dark / C illustrated), each
-with cables visible and hidden, a component sheet, an interaction spec, a storyboard, and QA.
-Recommendation: A. All images are concept mockups drawn by `docs/design/render.py`, not app
-screenshots. Direction C's art is a procedural placeholder. Prompts for bespoke art, to be made by
-a separate agent, are in `design/IMAGEGEN_PROMPTS.md`. Do not start the prototype or any product
-change until Kosta answers the three G1 questions. Record the answers append-only in
-`decisions.md`. The design found these engine/core dependencies: the compiler ignores
-`CableState.params` (so there is no per-cable amount/bypass), fan-in uses only the first cable,
-and the op log has no undo grouping.
+**Current handover (supersedes every older handover note below):** the design review ran
+([`design/REVIEW.md`](design/REVIEW.md)) and the owner answered at G1. See the two
+2026-09-22 G1 entries at the end of `decisions.md`. Decided: direction A for core modules;
+a dark A variant with B's material character; C-style illustrated, theme-dependent skins for
+user/non-core modules; any knob can take a modulation cable (Surge/Vital model); modules have
+user-selectable "primary" params, with advanced params shown by expanding in place; kabl is
+aimed at Surge/Vital-level capability, but easier to learn.
+
+Open: hidden-mode layout (owner unsure; recommended to settle it in the prototype); the default
+design viewport should go above 1280×800 (1280×800 stays the minimum); prototype go-ahead has
+not been given.
+
+Next candidates, none started:
+- (a) a design revision round: LFO → ADSR attack by dropping a cable on the knob; a full LFO
+  (sync, phase, amplitude/offset, uni/bipolar, trigger mode, fade-in) in compact and expanded
+  form, including choosing primary params; an A-dark theme; a user-skinned module in light and
+  dark.
+- (b) the isolated interactive prototype.
+- (c) engine groundwork for param modulation. `ProcessIo::param` is already a `Signal`; the
+  compiler passes constants.
+
+The handoff prompt for the arbiter agent is [`HANDOFF.md`](HANDOFF.md).
 
 Owner added eventual musical destination: Tangerine Dream in the spirit of Encore / Ricochet /
 Force Majeure. PLAN now includes that direction and a future-performance storyboard; clocks,
