@@ -251,3 +251,73 @@ impl RingBuffer {
         Some(v)
     }
 }
+
+/// Connects to a MIDI input port (see `name_filter` handling below), if any. Voice allocation happens here, on
+/// the MIDI callback thread (not the audio thread) -- see `resolve_midi_message`'s doc comment
+/// for why (`VoiceAllocator` isn't RT-safe to call from the audio callback).
+pub fn connect_midi(
+    client_name: &str,
+    mut producer: rtrb::Producer<VoiceEvent>,
+    name_filter: Option<String>,
+) -> Option<midir::MidiInputConnection<()>> {
+    let midi_in = match midir::MidiInput::new(client_name) {
+        Ok(m) => m,
+        Err(err) => {
+            eprintln!("kabl: MIDI input unavailable on this system: {err}");
+            return None;
+        }
+    };
+    let ports = midi_in.ports();
+    if ports.is_empty() {
+        eprintln!("kabl: no MIDI input ports found -- connect a controller and restart to play.");
+        return None;
+    }
+    // Default (no --midi): first port whose name doesn't look like ALSA's own virtual "Midi
+    // Through" loopback, since that's never the instrument a person actually wants to play --
+    // falls back to the first port if every port looks like that (still better than silently
+    // connecting to nothing).
+    let port = match &name_filter {
+        Some(filter) => ports.iter().find(|p| {
+            midi_in
+                .port_name(p)
+                .is_ok_and(|n| n.to_lowercase().contains(&filter.to_lowercase()))
+        }),
+        None => ports
+            .iter()
+            .find(|p| midi_in.port_name(p).is_ok_and(|n| !n.contains("Through"))),
+    }
+    .or(ports.first());
+    let Some(port) = port else {
+        eprintln!("kabl: no MIDI port matched --midi {name_filter:?}");
+        return None;
+    };
+    let port_name = midi_in
+        .port_name(port)
+        .unwrap_or_else(|_| "unknown".to_string());
+
+    let mut allocator = kabl_engine::voice_allocator::VoiceAllocator::new(DEFAULT_VOICE_COUNT);
+    let connection = midi_in.connect(
+        port,
+        "kabl-input",
+        move |_stamp_us, data, ()| {
+            if let Some(event) = resolve_midi_message(&mut allocator, data) {
+                // A full queue means events are arriving faster than the audio thread drains
+                // them (shouldn't happen at 256 slots' depth for note on/off traffic) -- drop
+                // rather than block, since blocking the MIDI thread is harmless but blocking
+                // would be the wrong failure mode to invite here.
+                let _ = producer.push(event);
+            }
+        },
+        (),
+    );
+    match connection {
+        Ok(conn) => {
+            eprintln!("kabl: listening for MIDI on \"{port_name}\"");
+            Some(conn)
+        }
+        Err(err) => {
+            eprintln!("kabl: failed to connect to MIDI port \"{port_name}\": {err}");
+            None
+        }
+    }
+}

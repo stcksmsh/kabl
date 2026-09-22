@@ -24,9 +24,8 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use kabl_core::PatchState;
 use kabl_engine::graph::BLOCK;
 use kabl_engine::patch_engine::PatchEngine;
-use kabl_engine::voice_allocator::VoiceAllocator;
 use kabl_standalone::{
-    apply_voice_event, default_patch, resolve_midi_message, RingBuffer, VoiceEvent,
+    apply_voice_event, connect_midi, default_patch, RingBuffer, VoiceEvent,
     DEFAULT_VOICE_COUNT, MIDI_IN_ID,
 };
 use kabl_ui::{show, PatchEditor, UiState};
@@ -92,7 +91,7 @@ impl AudioHost {
         ));
 
         let (midi_producer, mut midi_consumer) = rtrb::RingBuffer::<VoiceEvent>::new(256);
-        let midi_connection = connect_midi(midi_producer);
+        let midi_connection = connect_midi("kabl-ui", midi_producer, None);
 
         let engine_for_stream = engine.clone();
         let mut left_ring = RingBuffer::new(RING_CAPACITY);
@@ -178,26 +177,6 @@ impl AudioHost {
     }
 }
 
-fn connect_midi(
-    mut producer: rtrb::Producer<VoiceEvent>,
-) -> Option<midir::MidiInputConnection<()>> {
-    let midi_in = midir::MidiInput::new("kabl-ui").ok()?;
-    let ports = midi_in.ports();
-    let port = ports.first()?;
-    let mut allocator = VoiceAllocator::new(DEFAULT_VOICE_COUNT);
-    midi_in
-        .connect(
-            port,
-            "kabl-ui-input",
-            move |_stamp_us, data, ()| {
-                if let Some(event) = resolve_midi_message(&mut allocator, data) {
-                    let _ = producer.push(event);
-                }
-            },
-            (),
-        )
-        .ok()
-}
 
 struct App {
     editor: PatchEditor,
