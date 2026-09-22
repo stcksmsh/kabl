@@ -87,6 +87,18 @@ Stress specimens: `focus.png`; `crowded-working.png` (14 modules and 21 connecti
 panned, focus on); `crowded-hidden.png`; `crowded-overview.png` (50% overview with the selection at
 100%); `long-names.png`; `all-200pct.png` (2560×1600, vector-crisp); `layout-hit-regions.png`.
 
+Future-performance storyboard (`storyboard-performance.png`, frames `perf-1…4.png`, conceptual
+modules). **Inspected:**
+
+- Transport is findable in the top bar in every frame.
+- Seq A and Seq B are told apart by name, pattern display and colour-independent labels.
+- The transpose and level changes each get a named tooltip.
+- In Hidden mode, the transport, transpose, level, filter and delay controls are all
+  unobstructed.
+
+**Finding, not fixed:** in All/Focus mode, the inter-row cables into Layers cross the filter and
+delay controls. Recorded as a G1 input (REVIEW.md), not patched over.
+
 ## Known exceptions (left as-is, deliberately)
 
 - **All mode, reference patch:** C3 (Osc → Filter in) and C6 (LFO → Cutoff CV) pass over the

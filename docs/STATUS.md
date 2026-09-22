@@ -20,6 +20,10 @@ change until Kosta answers the three G1 questions. Record the answers append-onl
 `CableState.params` (so there is no per-cable amount/bypass), fan-in uses only the first cable,
 and the op log has no undo grouping.
 
+Owner added eventual musical destination: Tangerine Dream in the spirit of Encore / Ricochet /
+Force Majeure. PLAN now includes that direction and a future-performance storyboard; clocks,
+sequencing, effects and performance controls remain proposed later capabilities, not built work.
+
 Hardware verification remains separate: standalone played live; `kabl-ui` has not been heard
 by owner. Real audio/display hardware is available. Pi-4 performance remains unmeasured.
 

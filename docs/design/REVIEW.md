@@ -51,6 +51,23 @@ The storyboard shows: connect LFO to Cutoff CV, set amount +0.75 octave, hide ca
 Cutoff's sources, undo. The full interaction spec, including cancel, undo and keyboard, is in
 [INTERACTIONS.md](INTERACTIONS.md).
 
+### Future performance (musical north star)
+
+![Future-performance storyboard](storyboard-performance.png)
+
+This asks: can the same layout carry a Tangerine Dream-style performance rig (clock, two
+sequences, layers, filter, delay, reverb)? These are **conceptual modules**; none exist.
+
+- **What works:** transport lives in the top bar and is always reachable. The two layers have
+  names, and their transpose/level/mute are easy to find. Hidden mode (frame 4) stays clean, and
+  its badges read as the signal chain.
+- **What doesn't:** with two rows at 1280×800, the cables between the rows (oscillators and gates
+  into Layers) cross the filter and delay controls, even in Focus mode (frame 3).
+
+Implication for G1: for performance work, either Hidden mode becomes the primary playing view,
+or the rack needs a third row, a taller screen, or an automatic "tidy" that puts connected
+modules next to each other. This finding feeds question 2 below.
+
 Stress tests of A:
 [crowded, 14 modules / 21 cables](directions/a-warm/crowded-working.png) ·
 [crowded, hidden](directions/a-warm/crowded-hidden.png) ·
@@ -88,7 +105,8 @@ Stress tests of A:
 1. **Direction:** A, B, C, or a mix? Which elements feel wrong?
 2. **Hidden mode:** is the same layout plus routing drawer what you meant? The alternative is
    for hidden mode to rearrange controls into a compact synth-style layout. That shows more per
-   screen, but you lose "same place every time", and the design needs a second layout.
+   screen, but you lose "same place every time", and the design needs a second layout. The
+   performance storyboard suggests Hidden may end up being the main *playing* view.
 3. **Size and next step:** do 1280×800 and this density feel comfortable on your display? May
    work proceed to an isolated interactive prototype of the chosen design?
 

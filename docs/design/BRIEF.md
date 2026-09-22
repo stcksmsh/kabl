@@ -68,6 +68,26 @@ per-cable amount would give ±0.75 oct, which sweeps the cutoff from 714 Hz to 2
 1.20 kHz base. The engine's 20 Hz–20 kHz clamp still applies. The LFO is voice-rate, so each voice
 has its own LFO. The concepts label this "per voice".
 
+## Musical north star (added to PLAN during execution)
+
+Long-term target: Tangerine Dream in spirit, the Encore / Ricochet / Force Majeure era. That
+means interlocking sequences, slowly evolving timbre, atmospheric layers, performed leads and
+spatial effects, developed live over long pieces. The **reference patch above stays the fair
+comparison patch.** A separate *future-performance scenario* tests whether the layout can carry
+that work. It uses Clock, Seq A / Seq B, a Layers mixer, Delay and Reverb, which are all
+**conceptual modules, not built**, and are labelled `concept · <kind>` on their panels. Album
+references shape the workflow. No album artwork is copied. See
+[`storyboard-performance.png`](storyboard-performance.png).
+
+Proposed rules for that scenario:
+
+- Transport (run/stop, tempo, reset) is mirrored in the top bar, so it never depends on the rack
+  view or the cable presentation.
+- Musical changes (transpose, reset) take effect at the next bar, which makes the timing
+  predictable.
+- Layers are named instances (`Seq A · bass`, `Seq B · arp`). Their level and mute sit on one
+  Layers module.
+
 ## Capability map
 
 | Feature shown | Status |
@@ -84,6 +104,7 @@ has its own LFO. The concepts label this "per voice".
 | Several sources summed into one input | **requires engine work** (fan-in rule) |
 | Live modulated-value dot, level meter | **requires telemetry**; not drawn as real data |
 | Master output level | **requires engine work** (no master gain exists) |
+| Clock, step sequencers, layer mixer, delay, reverb, top-bar transport, bar-quantized changes | **future modules / engine work**, concept only |
 
 ## References (principles only; no art is copied)
 

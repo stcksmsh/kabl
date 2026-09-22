@@ -249,12 +249,62 @@ def tpl_ringmod(w, p):
         port("out", "Out", "out", "audio", w / 2, 290)]
 
 
+# ---- conceptual future modules (musical north star, PLAN.md). None of these exist in kabl.
+
+def btn_ctl(pid, label, on, x, y, w):
+    return dict(type="button", id=pid, label=label, on=on, x=x, y=y, w=w)
+
+
+def tpl_clock(w, p):
+    return [k("bpm", "Tempo", "112 BPM", .45, "L", w / 2, 112),
+            btn_ctl("run", "Run", p.get("running", True), 16, 190, 70),
+            btn_ctl("reset", "Reset", False, w - 86, 190, 70)], [
+        port("clock", "Clock", "out", "gate", 50, 272), port("reset", "Reset", "out", "gate", w - 50, 272)]
+
+
+def tpl_seq(w, p):
+    return [dict(type="steps", pattern=p.get("pattern", [0] * 16), x=16, y=54, w=w - 32, h=62),
+            k("length", "Length", "16", .5, "S", 50, 168),
+            k("transpose", "Transpose", p.get("transpose", "+0 st"), p.get("tt", .5), "S", w / 2, 168),
+            k("gate_len", "Gate", "50%", .5, "S", w - 50, 168)], [
+        port("clock", "Clock", "in", "gate", 40, 272), port("reset", "Reset", "in", "gate", 100, 272),
+        port("pitch", "Pitch", "out", "pitch", w - 100, 272), port("gate", "Gate", "out", "gate", w - 40, 272)]
+
+
+def tpl_layers(w, p):
+    la, lb = p.get("levels", (.8, .62))
+    return [k("level_a", "Seq A level", f"{la:.2f}", la, "L", w / 4 + 10, 112),
+            k("level_b", "Seq B level", f"{lb:.2f}", lb, "L", 3 * w / 4 - 10, 112),
+            btn_ctl("mute_a", "Mute A", False, w / 4 - 25, 190, 70),
+            btn_ctl("mute_b", "Mute B", False, 3 * w / 4 - 45, 190, 70)], [
+        port("in_a", "In A", "in", "audio", 34, 272), port("gate_a", "Gate A", "in", "gate", 94, 272),
+        port("in_b", "In B", "in", "audio", 154, 272), port("gate_b", "Gate B", "in", "gate", 214, 272),
+        port("out", "Out", "out", "audio", w - 34, 272)]
+
+
+def tpl_delay(w, p):
+    return [k("time", "Time", "3/16", .4, "S", 40, 140), k("feedback", "Feedback", "0.55", .55, "S", w / 2, 140),
+            k("mix", "Mix", "0.30", .3, "S", w - 40, 140)], [
+        port("in", "In", "in", "audio", 40, 272), port("out", "Out", "out", "audio", w - 40, 272)]
+
+
+def tpl_reverb(w, p):
+    return [k("size", "Size", "0.80", .8, "S", 50, 140), k("mix", "Mix", "0.25", .25, "S", w - 50, 140)], [
+        port("in", "In", "in", "audio", 34, 272), port("l", "L", "out", "audio", 100, 272),
+        port("r", "R", "out", "audio", 150, 272)]
+
+
+CONCEPT_KINDS = {"clock", "seq.step", "mix.layers", "fx.delay", "fx.reverb"}
+
 KINDS = {  # kind: (default name, width_units, template, rate)
     "midi.in": ("MIDI In", 5, tpl_midi, "voice"), "osc.va": ("VA Oscillator", 7, tpl_osc, "voice"),
     "filter.svf": ("SVF Filter", 7, tpl_filter, "voice"), "lfo": ("LFO", 7, tpl_lfo, "voice"),
     "env.adsr": ("ADSR Envelope", 8, tpl_env, "voice"), "vca": ("VCA", 7, tpl_vca, "voice"),
     "out": ("Output", 5, tpl_out, "global"), "mixer": ("Mixer", 8, tpl_mixer, "voice"),
     "ringmod": ("Ring Modulator", 5, tpl_ringmod, "voice"),
+    "clock": ("Clock", 6, tpl_clock, "global"), "seq.step": ("Sequencer", 10, tpl_seq, "global"),
+    "mix.layers": ("Layers", 10, tpl_layers, "global"), "fx.delay": ("Delay", 7, tpl_delay, "global"),
+    "fx.reverb": ("Reverb", 6, tpl_reverb, "global"),
 }
 
 
@@ -292,9 +342,11 @@ PORT_NAMES = {"cutoff_cv": "Cutoff CV", "resonance_cv": "Res CV", "lp": "LP", "b
 # Badge short labels: proposed per-instance "short name" (auto: kind abbreviation + index,
 # user-renamable). Badges never print a full module name.
 SHORT = {"midi": "MIDI", "osc": "Osc", "filter": "Filter", "lfo": "LFO", "env": "ADSR",
-         "vca": "VCA", "out": "Output", "osc1": "Osc 1", "osc2": "Osc 2", "ring": "Ring",
+         "vca": "VCA", "out": "Out", "osc1": "Osc 1", "osc2": "Osc 2", "ring": "Ring",
          "mix": "Mixer", "filt2": "Filter 2", "lfo1": "LFO 1", "lfo2": "LFO 2", "env1": "Amp Env",
-         "env2": "Filt Env", "vca1": "VCA 1", "vca2": "VCA 2"}
+         "env2": "Filt Env", "vca1": "VCA 1", "vca2": "VCA 2", "clock": "Clock", "seqA": "Seq A",
+         "seqB": "Seq B", "oscA": "Osc A", "oscB": "Osc B", "layers": "Layers", "delay": "Delay",
+         "reverb": "Reverb"}
 
 
 # --------------------------------------------------------------------------- drawing: defs
@@ -474,6 +526,30 @@ def draw_wave(th, c):
     return "".join(o)
 
 
+def draw_button(th, c):
+    x, y, w = c["x"], c["y"], c["w"]
+    led = th["sig"]["gate"] if c["on"] else th["seg_bg"]
+    return (rect(x, y, w, 28, fill=th["seg_on"] if c["on"] else th["seg_bg"], rx=6)
+            + circle(x + 13, y + 14, 4, fill=led, stroke=th["ink2"], sw=.8)
+            + text(x + w / 2 + 7, y + 19, c["label"], 13, th["seg_on_text"] if c["on"] else th["ink"],
+                   "middle", 600))
+
+
+def draw_steps(th, c):
+    x, y, w, h, pat = c["x"], c["y"], c["w"], c["h"], c["pattern"]
+    o = [rect(x, y, w, h, fill=th["display"], rx=5)]
+    sw = (w - 12) / len(pat)
+    for i, v in enumerate(pat):
+        bx = x + 6 + i * sw
+        if v is None:  # rest
+            o.append(rect(bx + 2, y + h - 12, sw - 4, 3, fill=th["display_ink"], opacity=.35))
+        else:
+            bh = 8 + v * (h - 22)
+            o.append(rect(bx + 2, y + h - 6 - bh, sw - 4, bh, fill=th["display_ink"], rx=1.5,
+                          opacity=.9 if i % 4 == 0 else .7))
+    return "".join(o)
+
+
 def draw_env(th, c):
     x, y, w, h = c["x"], c["y"], c["w"], c["h"]
     a, d, s, r = c["adsr"]
@@ -571,7 +647,8 @@ def draw_module(th, m, sc):
     for i, ln in enumerate(lines):
         o.append(text(w / 2, 31 + i * 18, ln, 15, th["ink"], "middle", 600))
     if len(lines) == 1:
-        tag = m["kind"] + (" · per voice" if m["kind"] == "lfo" else "")
+        tag = ("concept · " if m["kind"] in CONCEPT_KINDS else "") + m["kind"] + (
+            " · per voice" if m["kind"] == "lfo" else "")
         o.append(text(w / 2, 47, tag, 11, th["ink2"], "middle", 400, mono=True))
     # controls
     # C: all clear zones first, so a neighbouring zone never covers an already-drawn label
@@ -600,6 +677,10 @@ def draw_module(th, m, sc):
             o.append(draw_wave(th, c))
         elif c["type"] == "env":
             o.append(draw_env(th, c))
+        elif c["type"] == "button":
+            o.append(draw_button(th, c))
+        elif c["type"] == "steps":
+            o.append(draw_steps(th, c))
     # ports
     if th["art"]:
         for p in m["ports"].values():
@@ -724,12 +805,25 @@ def topbar(th, sc):
                        {"all": 0, "focus": 1, "hidden": 2}[sc["cables"]])
     o.append(seg)
     x += 16
-    o.append(text(x, 29, "Zoom", 13, th["ctext2"], "start", 500))
-    x += 44
-    for lab in ("−", f"{int(sc.get('zoom', 1) * 100)}%", "+", "Fit"):
-        b, bw = button(th, x, 9, lab, w=None if lab not in "−+" else 30)
+    if sc.get("transport"):  # mirrors the Clock module so run/reset never depend on the rack view
+        b, bw = button(th, x, 9, f"Zoom {int(sc.get('zoom', 1) * 100)}%")
         o.append(b)
-        x += bw + 4
+        x += bw + 12
+        hot = sc["transport"] == "hot"
+        o.append(rect(x, 9, 192, 30, fill=th["btn"], rx=7, stroke=th["sel"] if hot else th["chrome_edge"],
+                      sw=2 if hot else 1))
+        o.append(rect(x + 3, 12, 74, 24, fill=th["btn_on"], rx=5))
+        o.append(f'<polygon points="{x + 12},{17} {x + 12},{31} {x + 23},{24}" fill="{th["btn_on_text"]}"/>')
+        o.append(text(x + 50, 29, "Running", 12.5, th["btn_on_text"], "middle", 600))
+        o.append(text(x + 110, 29, "112 BPM", 12.5, th["ctext"], "middle", 500, mono=True))
+        o.append(text(x + 167, 29, "Reset", 12.5, th["ctext"], "middle", 500))
+    else:
+        o.append(text(x, 29, "Zoom", 13, th["ctext2"], "start", 500))
+        x += 44
+        for lab in ("−", f"{int(sc.get('zoom', 1) * 100)}%", "+", "Fit"):
+            b, bw = button(th, x, 9, lab, w=None if lab not in "−+" else 30)
+            o.append(b)
+            x += bw + 4
     # right side
     xr = W - 16
     lvl = "−6.0 dB"
@@ -1182,6 +1276,51 @@ def crowded_patch():
     return build_patch(rows, cables, names, params)
 
 
+def perf_patch(seqb_transpose="+0 st", tt=.5):
+    """Future-performance scenario (PLAN.md musical north star). Conceptual modules only."""
+    rows = [[("clock", "clock"), ("seqA", "seq.step"), ("seqB", "seq.step"), ("oscA", "osc.va"),
+             ("oscB", "osc.va")],
+            [("layers", "mix.layers"), ("filter", "filter.svf"), ("delay", "fx.delay"),
+             ("reverb", "fx.reverb"), ("out", "out")]]
+    cables = [("P1", "clock.clock", "seqA.clock"), ("P2", "clock.clock", "seqB.clock"),
+              ("P3", "clock.reset", "seqA.reset"), ("P4", "clock.reset", "seqB.reset"),
+              ("P5", "seqA.pitch", "oscA.pitch"), ("P6", "seqB.pitch", "oscB.pitch"),
+              ("P7", "oscA.out", "layers.in_a"), ("P8", "seqA.gate", "layers.gate_a"),
+              ("P9", "oscB.out", "layers.in_b"), ("P10", "seqB.gate", "layers.gate_b"),
+              ("P11", "layers.out", "filter.in"), ("P12", "filter.lp", "delay.in"),
+              ("P13", "delay.out", "reverb.in"), ("P14", "reverb.l", "out.left"),
+              ("P15", "reverb.r", "out.right")]
+    names = {"seqA": "Seq A · bass", "seqB": "Seq B · arp", "oscA": "Osc A", "oscB": "Osc B"}
+    params = {"seqA": dict(pattern=[0, None, 0, .3, 0, None, .5, 0, 0, None, 0, .3, .7, None, .5, .3]),
+              "seqB": dict(pattern=[.2, .5, .8, .5, .2, .6, .9, .6, .3, .6, 1, .6, .3, .5, .8, .5],
+                           transpose=seqb_transpose, tt=tt),
+              "oscB": dict(waveform=3, base_hz=523.3, base_hz_s="523.3 Hz")}
+    return build_patch(rows, cables, names, params)
+
+
+def perf_frames():
+    cap = "future-performance concept: Clock, Sequencer, Layers, Delay, Reverb do not exist"
+    common = dict(transport="on", patch_name="Night pulse (sketch)", caption=cap)
+    return [
+        ("1  Transport lives in the top bar, mirroring the Clock module; it never hides.",
+         base_scene(**dict(common, transport="hot"), selected=("clock",),
+                    tooltips=[(700, 52, ["Run / stop: Space · Reset: R", "Reset lands on the next bar"])]),
+         perf_patch()),
+        ("2  Two named layers. Seq B transpose +7 st, applied at the next bar.",
+         base_scene(**common, cables="focus", selected=("seqB",), hot_knob=("seqB", "transpose"),
+                    tooltips=[(560, 170, ["Seq B transpose  +7 st", "Takes effect at the next bar"])]),
+         perf_patch("+7 st", .65)),
+        ("3  Layer B level on Layers. Focus still leaves its long cables over filter/delay.",
+         base_scene(**common, cables="focus", selected=("layers",),
+                    hot_knob=("layers", "level_b"),
+                    tooltips=[(262, 470, ["Seq B level  0.62", "Mute B keeps its level"])]),
+         perf_patch("+7 st", .65)),
+        ("4  Cables hidden: same places for transport, transpose, levels, filter, delay.",
+         base_scene(**common, cables="hidden", selected=("seqB",)),
+         perf_patch("+7 st", .65)),
+    ]
+
+
 def storyboard_frames(th):
     drag = dict(from_=None)
     targets = {("filter", "cutoff_cv"), ("filter", "resonance_cv"), ("vca", "cv")}
@@ -1366,6 +1505,14 @@ def main():
     board([p for p, _ in frames], 2, 620, [c for _, c in frames],
           "Storyboard — assign LFO, set amount, hide cables, inspect, undo (Direction A)",
           HERE / "storyboard.png", "Concept frames. Engine support for per-cable amount is not built yet (BRIEF.md).")
+    pframes = []
+    for i, (cap, sc, patch) in enumerate(perf_frames()):
+        p = emit("a-warm", f"perf-{i + 1}", render_svg(th, sc, patch=patch)[0])
+        pframes.append((p, cap))
+    board([p for p, _ in pframes], 2, 620, [c for _, c in pframes],
+          "Future performance — can the layout carry sequences, transport, layers and effects?",
+          HERE / "storyboard-performance.png",
+          "Concept only. Clock, sequencers, layer mixer, delay and reverb are not built (PLAN.md musical north star).")
     if not only and len(rendered) == 6:
         imgs, caps = [], []
         for view in ("all", "hidden"):
