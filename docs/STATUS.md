@@ -5,29 +5,33 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-22, design-execution session. No product code changed or new runtime
-verification performed in this session.
+Last updated: 2026-09-22, design revision round 2. Docs/mockups only: no product code, engine,
+or prototype work.
 
-**Current handover (supersedes every older handover note below):** the design review ran
-([`design/REVIEW.md`](design/REVIEW.md)) and the owner answered at G1. See the two
-2026-09-22 G1 entries at the end of `decisions.md`. Decided: direction A for core modules;
-a dark A variant with B's material character; C-style illustrated, theme-dependent skins for
-user/non-core modules; any knob can take a modulation cable (Surge/Vital model); modules have
-user-selectable "primary" params, with advanced params shown by expanding in place; kabl is
-aimed at Surge/Vital-level capability, but easier to learn.
+**Current handover (supersedes every older handover note below):** design revision round 2 is
+done and **stopped for the owner's visual review**. Package: [`design/revision-2/REVIEW.md`](design/revision-2/REVIEW.md);
+spec: [`design/revision-2/INTERACTIONS.md`](design/revision-2/INTERACTIONS.md); sources:
+`design/revision-2/render2.py` (extends `design/render.py`; revision-1 images re-render
+byte-identical). It covers LFO → ADSR Attack by dropping on the knob (amount, invert, bypass,
+hide, inspect, undo), a rich LFO (compact / expanded / primary selection; features the engine
+lacks are marked ◆ conceptual), the difficult cases, A-light + A-dark reference patch with
+cables visible/hidden, an illustrated user module in light/dark (**placeholder art**, since no
+image generator was available), 1280×800 minimum and crowded examples, with measured QA.
 
-Open: hidden-mode layout (owner unsure; recommended to settle it in the prototype); the default
-design viewport should go above 1280×800 (1280×800 stays the minimum); prototype go-ahead has
-not been given.
+Owner decisions from G1 stand (decisions.md G1 entries). Everything new in revision 2 is an
+**agent recommendation, not approved**. It is logged in decisions.md "Design revision round 2".
 
-Next candidates, none started:
-- (a) a design revision round: LFO → ADSR attack by dropping a cable on the knob; a full LFO
-  (sync, phase, amplitude/offset, uni/bipolar, trigger mode, fade-in) in compact and expanded
-  form, including choosing primary params; an A-dark theme; a user-skinned module in light and
-  dark.
-- (b) the isolated interactive prototype.
-- (c) engine groundwork for param modulation. `ProcessIo::param` is already a `Signal`; the
-  compiler passes constants.
+Waiting on the owner:
+1. Do expanded modules + user-selected primary controls feel right?
+2. Does knob modulation stay clear with cables visible and hidden?
+3. What needs revision, or may the isolated interactive prototype begin?
+
+Still open: hidden-mode layout (settle in the prototype); expansion pushes neighbours vs
+floats over them; ring-vs-body drag at small knob radius; continuous vs stage-start envelope
+time modulation. Proposed default viewport 1440×900; 1280×800 stays the minimum.
+
+Not authorized: interactive prototype, production UI, engine groundwork. MIDI / graph-swap /
+undo correctness remains a prerequisite for any playable integration.
 
 The handoff prompt for the arbiter agent is [`HANDOFF.md`](HANDOFF.md).
 

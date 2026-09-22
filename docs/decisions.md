@@ -1565,3 +1565,44 @@ Owner answers to the agent's follow-up proposals:
 
 Prototype go-ahead has not been explicitly given. The next design work (the revision round
 listed in STATUS.md) and any implementation still need the owner's or the arbiter's instruction.
+
+## 2026-09-22 — Design revision round 2 (agent proposals, pending owner review)
+
+Executed the revision round listed in STATUS (arbiter instruction). The package is
+`docs/design/revision-2/` (REVIEW.md, INTERACTIONS.md, render2.py, img/). Docs and mockups only.
+**None of the following is owner-approved.** The G1 entries above remain the only owner
+decisions.
+
+Recommendations (each tagged [rec] in revision-2/INTERACTIONS.md):
+
+- **Knob routes:** the plug docks at the knob's 6 o'clock gap. Pointer = base, value pill =
+  base value, outer ring = summed and clamped result, dot = where the + peak lands (polarity),
+  per-source lanes appear only when the knob is inspected. Knob routes draw as thinner,
+  72%-opacity "mod leads". The value pill draws above cables.
+- **Amount unit:** % of knob travel in the param's taper (−100…+100), also shown in destination
+  units at the current base. Sum routes, then clamp once. Default drop amount +25 %; existing
+  jack cables keep 1.0. Discrete controls move by whole options, with hysteresis.
+- **Jacks:** only for function signals (audio, pitch, gate, VCA CV). The filter's Cutoff CV and
+  Res CV leave the panel; the engine inputs back the knob destinations instead.
+- **Primary/advanced:** face = primary controls in declared order. Face width grows with the
+  number of primary knobs. Expansion appends an advanced area to the right without moving face
+  controls. Jacks always stay on the face. A modulated hidden param docks on the `+N` button.
+  Pins pick primary controls, stored per instance and undoable.
+- **Rich LFO:** Fine, Phase, Fade-in, Amplitude, Offset, Sync, Polarity, Trigger
+  (FREE/NOTE/ONCE), Scope (VOICE/GLOBAL) and a Trig input. All conceptual; the engine has only
+  Rate and Waveform.
+- **A-dark:** A's layout on a graphite brushed panel, knurled light-metal caps, restrained glow.
+  Output plates are darker than the panel, not inverted as in B.
+- **Skins:** art only (light/dark PNG + accent). Controls sit on theme plates. Without a dark
+  PNG, the light art is dimmed 35 %.
+- **Viewport:** 1440×900 default, with a 50 px cable channel between the rows. 1280×800 minimum.
+
+Found during QA: expansion makes long cables that pass the module cross its advanced area.
+Focus mitigates this. Knob mod leads add 3 label/knob crossings to the reference patch in All
+mode (5 in total, against 2 in revision 1).
+
+Constraint: no image generator was available, so the skin art is a procedural placeholder and is
+labelled as such. `docs/design/render.py` gained two backward-compatible hooks (per-instance
+width, header width). Revision-1 PNGs re-render byte-identical.
+
+Stopped for owner review; no prototype or implementation started.
