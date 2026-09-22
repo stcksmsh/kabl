@@ -5,7 +5,8 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-22, after the compiler got buffer-pool reuse (~4x fewer buffers at scale).
+Last updated: 2026-09-22, after the compiler got brief section 7.1's implicit 1-block-delay cycle
+handling.
 
 ## Autonomous overnight work (started 2026-09-21)
 
@@ -74,6 +75,21 @@ compiled, and driven via MIDI — output matches `patch_demo.rs`'s numbers exact
 owner. See decisions.md's "Flat-schedule compiler v1" entry for the four design calls made here
 (averaging not summing for voice->global, cycle-as-compile-error, params as compile-time
 constants — buffer-pool reuse, the fourth, is now done, see below).
+
+**Cycles now compile via brief section 7.1's implicit 1-block delay**, instead of a hard
+`CompileError::Cycle`: `crates/engine/src/compile.rs` runs a DFS over the cable graph to find a
+feedback-arc set (back edges relative to that DFS — provably enough to leave the rest of the
+graph acyclic), excludes those edges from the topo-ordering graph, and wires each one's reader to
+a *delay buffer* holding its source's previous-block output (refreshed by a new
+`Step::CopyToDelay` at the end of the schedule) instead of the live one. `CompileError::Cycle` is
+now a defensive, should-be-unreachable fallback rather than the normal outcome for a cyclic patch.
+Delay buffers are pinned live-forever in `coalesce_buffers` (their value must survive to the
+*next* block, not just to the end of this one); they reset to silence on `recompile()` like every
+other buffer — module state still carries over, a feedback loop's one-block memory currently
+doesn't (documented gap, no accept-test patch exercises it). Tested end-to-end in
+`crates/engine/tests/compile.rs`'s `cycle_compiles_with_implicit_one_block_delay`: an external
+oscillator feeding a 2-`vca` cycle, asserted bit-exact against an independent reference generator
+over 5 blocks. See decisions.md "Cycle handling: implicit 1-block delay".
 
 **Buffer-pool reuse is done**: `coalesce_buffers` remaps buffers to a smaller set of physical
 slots via greedy linear-scan register allocation over each buffer's compile-time-computed
@@ -162,13 +178,14 @@ priority order for "something a person can actually patch and hear live":
 2. **`kabl-ui`'s `Mutex`-sharing compromise** (see decisions.md) — works, flagged as not
    textbook-RT-safe, real follow-up work if edit-time glitches turn out to be audible/annoying in
    practice on real hardware.
-3. Cycle handling still hard-errors instead of brief section 7.1's implicit 1-block delay — not
-   needed by any v1 accept-test patch, but real feedback patches will hit it.
-4. Overlapping swaps (a second `build_swap` while one is still crossfading) aren't handled by
+3. Overlapping swaps (a second `build_swap` while one is still crossfading) aren't handled by
    either `Engine` or `PatchEngine` — a pre-existing S1 gap, not new.
-5. No canvas pan/scroll in `kabl-ui` — a patch wider than the window is simply clipped.
-6. `kabl-ui`'s Save/Load uses a plain text path field, not a native file picker (deliberate, see
+4. No canvas pan/scroll in `kabl-ui` — a patch wider than the window is simply clipped.
+5. `kabl-ui`'s Save/Load uses a plain text path field, not a native file picker (deliberate, see
    decisions.md) — a nicer picker is cosmetic follow-up, not a functional gap.
+6. A cyclic patch's delay-buffer memory (see "Where we are" above) resets to silence on
+   `recompile()`, unlike module state — not carried over yet, not exercised by any accept-test
+   patch.
 
 No new open question from the owner to resolve first — everything on the originally-scoped
 autonomous list, plus the UI/standalone/persistence/buffer-pool work, is now done. The remaining
@@ -191,7 +208,7 @@ What actually exists vs. what's still spike-scoped or missing:
 | Piece | State |
 |---|---|
 | `core`: op log, undo/redo, coalescing, checkpoints, file format w/ schema version, property tests | **done, real.** `crates/core/`. |
-| `engine`: flat-schedule compiler | **built, correctness-tested, RT-safe, buffer-pool reuse.** `compile.rs`: topo sort, voice/global instancing, cycle detection, `recompile()` w/ state carry-over. `process_block` proven allocation-free (`tests/compile_rt_safety.rs`). `coalesce_buffers` reuses non-overlapping buffer slots (~4x fewer at scale, measured). |
+| `engine`: flat-schedule compiler | **built, correctness-tested, RT-safe, buffer-pool reuse, cycles handled.** `compile.rs`: topo sort, voice/global instancing, `recompile()` w/ state carry-over. Cycles get brief 7.1's implicit 1-block delay (DFS feedback-arc set) instead of a hard error. `process_block` proven allocation-free (`tests/compile_rt_safety.rs`). `coalesce_buffers` reuses non-overlapping buffer slots (~4x fewer at scale, measured). |
 | `engine`: voice allocator | **built.** `voice_allocator.rs::VoiceAllocator` — lowest-free-first, oldest-steal-when-full. Pitch/graph-agnostic (`note_id: u32` -> voice index); nothing routes real MIDI into it yet. `voice_count` is still a fixed `compile()` parameter. |
 | `engine`: SIMD batching | **prototyped in spike S3 only** (`simd_voices.rs`), not integrated into the compiler; measured ~1.5-1.7x speedup (target was 2.5x, missed — see decisions.md). |
 | `engine`: control-rate tier | **prototyped in spike S2 only** (`potato.rs`), not integrated into the compiler. |
@@ -227,21 +244,28 @@ crates/
                                 all_infos(), info_for(kind). Tested in tests/registry.rs.
   engine/      Real compiler + spike code (depends on kabl-modules, kabl-core).
                  compile.rs - THE COMPILER. compile(&PatchState, sample_rate, voice_count) ->
-                                CompiledPatch: topo sort (Kahn's algorithm, doubles as cycle
-                                detection), voice/global-rate instancing, voice->global averaging
-                                (SumVoices steps), recompile() with save_state/load_state carry-
-                                over via HashMapState, coalesce_buffers (greedy linear-scan
-                                register allocation over buffer live ranges -- ~4x fewer buffers
-                                measured at scale). Correctness-tested end-to-end in
-                                tests/compile.rs (10 tests) against patch_demo.rs's numbers.
+                                CompiledPatch: topo sort (Kahn's algorithm), voice/global-rate
+                                instancing, voice->global averaging (SumVoices steps), recompile()
+                                with save_state/load_state carry-over via HashMapState,
+                                coalesce_buffers (greedy linear-scan register allocation over
+                                buffer live ranges -- ~4x fewer buffers measured at scale). Cycles
+                                get brief 7.1's implicit 1-block delay: a DFS over the cable graph
+                                finds a feedback-arc set (back edges), excluded from the topo-
+                                ordering graph so Kahn's always completes; each back-edge cable
+                                reads a pinned delay buffer (last block's value, via a
+                                Step::CopyToDelay at schedule's end) instead of the live one --
+                                CompileError::Cycle is now a should-be-unreachable safety net, not
+                                the normal outcome. Correctness-tested end-to-end in
+                                tests/compile.rs (10 tests) against patch_demo.rs's numbers and,
+                                for the cycle case, an independent reference generator.
                                 process_block is allocation-free (fixed-size stack scratch sized
                                 to MAX_INPUTS/MAX_OUTPUTS/MAX_PARAMS; compile() rejects a module
                                 exceeding them) -- proven in tests/compile_rt_safety.rs via
                                 assert_no_alloc, same pattern as spike S1. Wired to swap.rs's
                                 mechanism via patch_engine.rs (below) and live in both
                                 standalone/ and ui/. See decisions.md "Flat-schedule compiler
-                                v1", "process_block made allocation-free", and "Compiler:
-                                buffer-pool reuse".
+                                v1", "process_block made allocation-free", "Compiler:
+                                buffer-pool reuse", and "Cycle handling: implicit 1-block delay".
                  patch_engine.rs - PatchEngine: generalizes swap.rs's Engine (equal-power
                                 crossfade, basedrop deferred drop) to CompiledPatch (arbitrary
                                 topology, stereo, recompile()-based rebuild instead of S1's single
@@ -407,9 +431,11 @@ this against the commit it was last updated for.
 - ~~**No buffer-pool reuse in the compiler**~~ — fixed. `coalesce_buffers` (greedy linear-scan
   register allocation over compile-time buffer live ranges); ~4x fewer buffers measured at 16
   voices on the chord patch. See decisions.md "Compiler: buffer-pool reuse".
-- **Compiler treats a cycle as a hard compile error**, not brief section 7.1's implicit 1-block
-  delay. No v1 accept-test patch has a feedback loop, so not currently blocking; will matter for
-  real feedback patches.
+- ~~**Compiler treats a cycle as a hard compile error**~~ — fixed. Brief section 7.1's implicit
+  1-block delay: DFS feedback-arc set, delayed cables read a pinned delay buffer instead of the
+  live one. See decisions.md "Cycle handling: implicit 1-block delay". Remaining gap: a delay
+  buffer resets to silence on `recompile()`, unlike module state — not carried over, not
+  exercised by any accept-test patch.
 - ~~**No voice allocator**~~ — built, `crates/engine/src/voice_allocator.rs`. See decisions.md
   "Voice allocator". Now fed by real MIDI in both `standalone` and `kabl-ui` (via
   `resolve_midi_message`), unverified against real hardware in this container.
@@ -431,13 +457,13 @@ this against the commit it was last updated for.
   most complete examples (fast/slow-path split, real state carry-over). Test files
   `crates/modules/tests/*.rs` show the expected shape (matches-direct-dsp-call, buffer input,
   reset, save/load-state round-trip).
-- **Extending the compiler** (cycle handling, overlapping swaps): `crates/engine/
-  src/compile.rs`'s module doc comment + decisions.md's "Flat-schedule compiler v1",
-  "`process_block` made allocation-free", and "Compiler: buffer-pool reuse" entries lay out what's
-  built, what's deferred, and why. `crates/engine/tests/compile.rs` shows the expected external
-  shape (build a `PatchState` from
-  ops, `compile()`, drive it, `recompile()`); `tests/compile_rt_safety.rs` shows the
-  `assert_no_alloc` pattern to keep any future change RT-safe.
+- **Extending the compiler** (overlapping swaps, carrying delay-buffer memory across recompile):
+  `crates/engine/src/compile.rs`'s module doc comment + decisions.md's "Flat-schedule compiler
+  v1", "`process_block` made allocation-free", "Compiler: buffer-pool reuse", and "Cycle handling:
+  implicit 1-block delay" entries lay out what's built, what's deferred, and why. `crates/engine/
+  tests/compile.rs` shows the expected external shape (build a `PatchState` from ops, `compile()`,
+  drive it, `recompile()`); `tests/compile_rt_safety.rs` shows the `assert_no_alloc` pattern to
+  keep any future change RT-safe.
 - **Extending `kabl-ui`** (a native file picker instead of the text-path field, cable-dragging
   instead of click-to-connect, canvas pan/zoom, fixing the `Mutex`-sharing compromise):
   `crates/ui/src/editor.rs`'s module doc + `lib.rs`'s module doc + decisions.md's "`kabl-ui`: the
