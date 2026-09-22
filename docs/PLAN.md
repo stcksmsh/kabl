@@ -1,6 +1,6 @@
 # kabl — design execution plan
 
-Status: ready for owner review; execution has not started.
+Status: P1–P5 executed 2026-09-22; stopped at G1. Review package: [`design/REVIEW.md`](design/REVIEW.md).
 Date: 2026-09-22. Code reviewed at `2b22d2a`; handover updated at `88a205f`, branch `master`.
 
 ## Objective and stopping point

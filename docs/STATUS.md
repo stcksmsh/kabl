@@ -5,20 +5,20 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-22, design-planning session. No product code changed or new runtime
+Last updated: 2026-09-22, design-execution session. No product code changed or new runtime
 verification performed in this session.
 
-**Current handover (supersedes every older handover note below):** design execution plan is
-written in [`PLAN.md`](PLAN.md); execution has not started. When asked to execute, produce
-three comparable visual directions, cable-visible/hidden views, interaction proposals and
-visual QA, then stop for owner's visual review. Owner wants physical Eurorack appearance,
-image-skinned modules, sagging/color-coded cables and Surge XT-like hidden-mode modulation.
-This is design work, not authorization to implement. Historical overnight autonomy and
-next-step lists below do not expand that scope.
-
-Owner added eventual musical destination: Tangerine Dream in the spirit of Encore / Ricochet /
-Force Majeure. PLAN now includes that direction and a future-performance storyboard; clocks,
-sequencing, effects and performance controls remain proposed later capabilities, not built work.
+**Current handover (supersedes every older handover note below):** [`PLAN.md`](PLAN.md) P1–P5 are
+executed; work is **stopped at G1 (owner visual review)**. Start at
+[`design/REVIEW.md`](design/REVIEW.md): three directions (A warm / B dark / C illustrated), each
+with cables visible and hidden, a component sheet, an interaction spec, a storyboard, and QA.
+Recommendation: A. All images are concept mockups drawn by `docs/design/render.py`, not app
+screenshots. Direction C's art is a procedural placeholder. Prompts for bespoke art, to be made by
+a separate agent, are in `design/IMAGEGEN_PROMPTS.md`. Do not start the prototype or any product
+change until Kosta answers the three G1 questions. Record the answers append-only in
+`decisions.md`. The design found these engine/core dependencies: the compiler ignores
+`CableState.params` (so there is no per-cable amount/bypass), fan-in uses only the first cable,
+and the op log has no undo grouping.
 
 Hardware verification remains separate: standalone played live; `kabl-ui` has not been heard
 by owner. Real audio/display hardware is available. Pi-4 performance remains unmeasured.
