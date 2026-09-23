@@ -189,6 +189,14 @@ impl PatchEditor {
         }
     }
 
+    /// Cancels the gesture whose first frame was the last edit: its value is reverted and no
+    /// undo or redo entry remains.
+    pub fn cancel_gesture(&mut self) {
+        if self.log.discard_last() {
+            self.dirty = true;
+        }
+    }
+
     /// Adds a modulation route from output `from` to param `param` of module `to`. The route
     /// starts at the engine's default amount (+25 %), not bypassed. Knobs take any number of
     /// routes.

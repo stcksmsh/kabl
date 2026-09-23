@@ -201,3 +201,36 @@ fn save_and_load_round_trips_the_full_log() {
     assert_eq!(loaded.state(), log.state());
     assert_eq!(loaded.entries().len(), log.entries().len());
 }
+
+#[test]
+fn discard_last_reverts_and_leaves_no_redo() {
+    let mut log = PatchLog::new();
+    log.append(
+        Op::AddModule {
+            id: 1,
+            kind: "vca".into(),
+            pos: Vec2 { x: 0.0, y: 0.0 },
+        },
+        0,
+        Source::User,
+    );
+    let before = log.state().clone();
+    log.append_new(
+        Op::SetParam {
+            target: ParamTarget::Module {
+                id: 1,
+                param: "gain".into(),
+            },
+            value: 0.3,
+        },
+        10,
+        Source::User,
+    );
+    assert!(log.discard_last());
+    assert_eq!(log.state(), &before);
+    assert_eq!(log.entries().len(), 1);
+    assert!(!log.can_redo());
+    // Not the newest entry (something to redo): refuses.
+    log.undo();
+    assert!(!log.discard_last());
+}

@@ -518,3 +518,125 @@ fn single_source_dot_and_removal_never_reassigns() {
         assert!(close(t.routes(ENV, "decay_ms")[0].1, 0.35));
     }
 }
+
+impl H {
+    /// Presses at `from` and moves to `to` without releasing.
+    fn hold(&mut self, from: Pos2, to: Pos2) {
+        self.move_to(from);
+        self.button(true);
+        for i in 1..=6 {
+            self.move_to(from + (to - from) * (i as f32 / 6.0));
+        }
+    }
+
+    fn release(&mut self) {
+        self.button(false);
+        self.frame();
+    }
+
+    fn undo_depth(&self) -> usize {
+        self.editor.log().entries().len()
+    }
+}
+
+#[test]
+fn shift_drags_ten_times_finer_on_body_ring_and_dot() {
+    for (w, h) in sizes() {
+        let mut t = H::new(w, h);
+        let before = t.routes(ENV, "attack_ms");
+        t.click(&format!("knob:{ENV}.attack_ms"));
+        t.click(&format!("row:{}", before[0].0));
+
+        // Ring, Shift held: 30 px = 0.2 of travel coarse, 0.02 fine.
+        t.modifiers = Modifiers::SHIFT;
+        t.ring_drag(ENV, "attack_ms", 30.0);
+        assert!(
+            close(t.routes(ENV, "attack_ms")[0].1, before[0].1 + 0.02),
+            "{w}x{h} ring"
+        );
+
+        // Lane dot of the other route, fine.
+        let p = t.at(&format!("lane:{}", before[1].0));
+        t.drag(p, p - egui::vec2(0.0, 30.0));
+        assert!(
+            close(t.routes(ENV, "attack_ms")[1].1, before[1].1 + 0.02),
+            "{w}x{h} dot"
+        );
+
+        // Body, fine: +0.02 of knob travel.
+        let info = kabl_modules::registry::info_for("env.adsr").unwrap().params[0];
+        let base = t.param(ENV, "attack_ms").unwrap();
+        let c = t.at(&format!("knob:{ENV}.attack_ms"));
+        t.drag(c, c - egui::vec2(0.0, 30.0));
+        let expect = info.from_norm(info.to_norm(base) + 0.02);
+        assert!(
+            (t.param(ENV, "attack_ms").unwrap() - expect).abs() < 1e-3,
+            "{w}x{h} body"
+        );
+        t.modifiers = Modifiers::NONE;
+
+        // Shift pressed mid-drag: the coarse part and the fine part add up.
+        let c = t.at(&format!("knob:{ENV}.release_ms"));
+        let rel = kabl_modules::registry::info_for("env.adsr").unwrap().params[3];
+        let r0 = t.param(ENV, "release_ms").unwrap();
+        t.hold(c, c - egui::vec2(0.0, 30.0));
+        t.modifiers = Modifiers::SHIFT;
+        t.move_to(c - egui::vec2(0.0, 60.0));
+        t.release();
+        t.modifiers = Modifiers::NONE;
+        let expect = rel.from_norm(rel.to_norm(r0) + 0.2 + 0.02);
+        assert!(
+            (t.param(ENV, "release_ms").unwrap() - expect).abs() < 1e-2,
+            "{w}x{h} mixed"
+        );
+    }
+}
+
+#[test]
+fn escape_cancels_body_ring_and_dot_drags_without_undo_entries() {
+    for (w, h) in sizes() {
+        let mut t = H::new(w, h);
+        let routes = t.routes(ENV, "attack_ms");
+        let base = t.param(ENV, "attack_ms");
+        t.click(&format!("knob:{ENV}.attack_ms"));
+        t.click(&format!("row:{}", routes[0].0));
+        let depth = t.undo_depth();
+
+        let ring = t.at(&format!("ring:{ENV}.attack_ms"));
+        let dot = t.at(&format!("lane:{}", routes[1].0));
+        let body = t.at(&format!("knob:{ENV}.attack_ms"));
+        for (what, p) in [("body", body), ("ring", ring), ("dot", dot)] {
+            t.hold(p, p - egui::vec2(0.0, 40.0));
+            assert!(
+                t.routes(ENV, "attack_ms") != routes || t.param(ENV, "attack_ms") != base,
+                "{w}x{h} {what}: the drag changed something live"
+            );
+            t.editor.take_dirty();
+            t.key(Key::Escape, Modifiers::NONE);
+            assert!(t.editor.is_dirty(), "{what}: audio rebuild requested");
+            // Keep moving after Escape: the cancelled drag stays inert until release.
+            t.move_to(p - egui::vec2(0.0, 80.0));
+            t.release();
+            assert_eq!(
+                t.routes(ENV, "attack_ms"),
+                routes,
+                "{w}x{h} {what}: routes restored"
+            );
+            assert_eq!(
+                t.param(ENV, "attack_ms"),
+                base,
+                "{w}x{h} {what}: base restored"
+            );
+            assert_eq!(t.undo_depth(), depth, "{w}x{h} {what}: no undo entry");
+            assert!(!t.editor.can_redo(), "{w}x{h} {what}: no redo entry");
+        }
+
+        // A completed drag is still exactly one undo step.
+        t.drag(body, body - egui::vec2(0.0, 40.0));
+        assert_eq!(t.undo_depth(), depth + 1);
+        t.key(Key::Z, Modifiers::COMMAND);
+        assert_eq!(t.param(ENV, "attack_ms"), base);
+        t.key(Key::Z, Modifiers::COMMAND | Modifiers::SHIFT);
+        assert_ne!(t.param(ENV, "attack_ms"), base, "redo");
+    }
+}

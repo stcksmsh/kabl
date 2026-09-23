@@ -123,10 +123,8 @@ pub struct UiState {
     pub selected_route: Option<CableId>,
     /// Output jack being dragged toward a knob or input.
     port_drag: Option<PortRef>,
-    /// Knob drag in progress: which knob, which part, and the value at press.
-    pub(crate) knob_grab: Option<(ModuleId, &'static str, routing::Grab, f32)>,
-    /// Lane-handle drag in progress: route and its amount at press.
-    pub(crate) lane_grab: Option<(CableId, f32)>,
+    /// Knob body / ring / lane-dot drag in progress.
+    pub(crate) drag: Option<routing::DragGrab>,
     pub(crate) base_text: String,
     pub(crate) base_text_for: Option<(ModuleId, String)>,
     /// Screen rects of interactive targets drawn last frame (`knob:4.attack_ms`,
@@ -170,8 +168,7 @@ impl Default for UiState {
             inspected: None,
             selected_route: None,
             port_drag: None,
-            knob_grab: None,
-            lane_grab: None,
+            drag: None,
             base_text: String::new(),
             base_text_for: None,
             hits: Default::default(),
@@ -245,6 +242,19 @@ fn skin_texture(
 /// `show_inside` rather than the older `Panel::show(ctx, ...)` pattern.
 pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
     ui_state.validate(editor);
+    // Escape mid-drag cancels it: revert the gesture's edit and leave no undo entry. The drag
+    // stays captured (and inert) until the button is released.
+    if let Some(g) = ui_state.drag.as_mut() {
+        if !g.cancelled && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+            if g.committed {
+                editor.cancel_gesture();
+            }
+            g.cancelled = true;
+        }
+    }
+    if !ui.input(|i| i.pointer.any_down()) {
+        ui_state.drag = None;
+    }
     if !ui.ctx().egui_wants_keyboard_input() {
         let (undo, redo) = ui.input_mut(|i| {
             let redo = i.consume_shortcut(&egui::KeyboardShortcut::new(

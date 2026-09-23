@@ -203,11 +203,79 @@ fn with_alpha(c: Color32, a: f32) -> Color32 {
     Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), (a * 255.0) as u8)
 }
 
-/// Which part of a knob a drag grabbed at its start.
+/// What a knob-area drag edits.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum Grab {
+    /// The base value (knob body), in knob travel 0..1.
     Body,
-    Ring,
+    /// The selected route's amount through the ring band.
+    Ring(CableId),
+    /// Ring band pressed with no source selected: edits nothing.
+    RingNone,
+    /// A route's amount through its lane dot.
+    Lane(CableId),
+}
+
+/// Shift-drag moves values this much slower.
+const FINE: f32 = 0.1;
+
+/// One drag on a knob body, ring or lane dot. The value follows each frame's vertical pointer
+/// motion, from the press point on (so egui's drag threshold loses nothing), ×0.1 while Shift
+/// is held. Escape cancels it (see `show`): the edit is reverted and leaves no undo entry.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct DragGrab {
+    pub id: ModuleId,
+    pub param: &'static str,
+    pub kind: Grab,
+    pub value: f32,
+    last_y: f32,
+    /// The gesture has written its first (undoable) edit.
+    pub committed: bool,
+    pub cancelled: bool,
+}
+
+impl DragGrab {
+    fn new(ui: &egui::Ui, id: ModuleId, param: &'static str, kind: Grab, value: f32) -> Self {
+        DragGrab {
+            id,
+            param,
+            kind,
+            value,
+            last_y: ui.input(|i| i.pointer.press_origin()).map_or(0.0, |p| p.y),
+            committed: false,
+            cancelled: false,
+        }
+    }
+
+    /// Advances by this frame's pointer motion. Returns the value to write and whether it is
+    /// the gesture's first write, or `None` once cancelled.
+    fn step(
+        &mut self,
+        ui: &egui::Ui,
+        resp: &egui::Response,
+        lo: f32,
+        hi: f32,
+    ) -> Option<(f32, bool)> {
+        if self.cancelled {
+            return None;
+        }
+        let y = resp.interact_pointer_pos()?.y;
+        let scale = if ui.input(|i| i.modifiers.shift) {
+            FINE
+        } else {
+            1.0
+        };
+        self.value =
+            (self.value - (y - self.last_y) / DRAG_PIXELS_FOR_FULL_SWEEP * scale).clamp(lo, hi);
+        self.last_y = y;
+        let first = !self.committed;
+        self.committed = true;
+        Some((self.value, first))
+    }
+
+    fn is(&self, id: ModuleId, param: &str) -> bool {
+        self.id == id && self.param == param
+    }
 }
 
 /// Makes `(id, param)` the inspected knob. Newly inspecting a knob with exactly one route
@@ -284,62 +352,54 @@ pub(crate) fn param_knob(
         let selected = routes
             .iter()
             .find(|rt| Some(rt.cable) == ui_state.selected_route);
-        // Remember the value at press, so the drag maps the total pointer offset (including
-        // the pixels egui needs before it calls it a drag) to the value.
         let grab = match selected {
             // Collapsed multi-source rings are display only: pressing them opens the lanes
             // (the `inspect` above) and edits nothing.
             _ if routes.len() >= 2 && !inspected && d > r + RING_INNER => None,
-            Some(sel) if d > r + RING_INNER => Some((Grab::Ring, sel.amount)),
-            None if !routes.is_empty() && d > r + RING_INNER => Some((Grab::Ring, 0.0)),
+            Some(sel) if d > r + RING_INNER => Some((Grab::Ring(sel.cable), sel.amount)),
+            None if !routes.is_empty() && d > r + RING_INNER => Some((Grab::RingNone, 0.0)),
             _ => Some((Grab::Body, base_n)),
         };
-        ui_state.knob_grab = grab.map(|g| (id, param.name, g.0, g.1));
+        ui_state.drag = grab.map(|(k, v)| DragGrab::new(ui, id, param.name, k, v));
     }
-    let grab = ui_state
-        .knob_grab
-        .filter(|g| g.0 == id && g.1 == param.name)
-        .map(|g| (g.2, g.3));
+    let mut grab = ui_state.drag.filter(|g| g.is(id, param.name));
     if resp.dragged() {
-        let offset = match (
-            ui.input(|i| i.pointer.press_origin()),
-            resp.interact_pointer_pos(),
-        ) {
-            (Some(o), Some(p)) => -(p.y - o.y) / DRAG_PIXELS_FOR_FULL_SWEEP,
-            _ => 0.0,
-        };
-        let first = resp.drag_started();
-        match grab {
-            Some((Grab::Ring, start)) => {
-                if let Some(sel) = routes
-                    .iter()
-                    .find(|rt| Some(rt.cable) == ui_state.selected_route)
-                {
-                    let amount = start + offset;
-                    if amount != sel.amount || first {
-                        editor.set_route_amount(sel.cable, amount, first);
+        if let Some(g) = grab.as_mut() {
+            match g.kind {
+                Grab::Ring(cable) => {
+                    if let Some((amount, first)) = g.step(ui, &resp, -1.0, 1.0) {
+                        editor.set_route_amount(cable, amount, first);
                     }
                 }
-            }
-            Some((Grab::Body, start)) => {
-                let v = param.from_norm(start + offset);
-                if v != base || first {
-                    editor.set_param_gesture(
-                        ParamTarget::Module {
-                            id,
-                            param: param.name.into(),
-                        },
-                        v,
-                        first,
-                    );
+                Grab::Body => {
+                    if let Some((n, first)) = g.step(ui, &resp, 0.0, 1.0) {
+                        editor.set_param_gesture(
+                            ParamTarget::Module {
+                                id,
+                                param: param.name.into(),
+                            },
+                            param.from_norm(n),
+                            first,
+                        );
+                    }
                 }
+                Grab::RingNone | Grab::Lane(_) => {}
             }
-            None => {}
+            ui_state.drag = Some(*g);
         }
     }
-    if resp.drag_stopped() {
-        ui_state.knob_grab = None;
+    if resp.drag_stopped() && grab.is_some() {
+        ui_state.drag = None;
     }
+    // Re-read after this frame's edit so the drawing below shows the new value.
+    let base = editor
+        .state()
+        .modules
+        .get(&id)
+        .and_then(|m| m.params.get(param.name).copied())
+        .unwrap_or(param.default);
+    let base_n = param.to_norm(base);
+    let routes = routes_into(editor.state(), id, param.name);
 
     // Collapsed knob with several sources: one thin ring per source (display only; pressing
     // opens the editable lanes). Otherwise: combined reachable range (faint), selected route's
@@ -488,21 +548,31 @@ pub(crate) fn param_knob(
     );
 
     // While editing: the value being changed, and whose.
-    let editing = match grab.map(|g| g.0) {
-        Some(Grab::Ring) if resp.dragged() => routes
+    let fine = if ui.input(|i| i.modifiers.shift) {
+        " · fine"
+    } else {
+        ""
+    };
+    let editing = match grab.map(|g| (g.kind, g.cancelled)) {
+        Some((_, true)) if resp.dragged() => Some("Cancelled".to_string()),
+        Some((Grab::Ring(_), _)) if resp.dragged() => routes
             .iter()
             .find(|rt| Some(rt.cable) == ui_state.selected_route)
             .map(|rt| {
                 format!(
-                    "{}: {:+.0} %",
+                    "{}: {:+.1} %{fine}",
                     source_label(editor.state(), rt.from_id, &rt.from_port),
                     rt.amount * 100.0
                 )
-            })
-            .or_else(|| Some("No source selected: pick one in the drawer".to_string())),
-        Some(Grab::Body) if resp.dragged() => {
-            Some(format!("{} {}", param_label(param), fmt_value(param, base)))
+            }),
+        Some((Grab::RingNone, _)) if resp.dragged() => {
+            Some("No source selected: pick one in the drawer".to_string())
         }
+        Some((Grab::Body, _)) if resp.dragged() => Some(format!(
+            "{} {}{fine}",
+            param_label(param),
+            fmt_value(param, base)
+        )),
         _ if resp.hovered() => Some(format!("{} {}", param_label(param), fmt_value(param, base))),
         _ => None,
     };
@@ -618,22 +688,27 @@ fn source_lanes(
             ui_state.selected_route = Some(rt.cable);
         }
         if resp.drag_started() {
-            ui_state.lane_grab = Some((rt.cable, rt.amount));
+            ui_state.drag = Some(DragGrab::new(
+                ui,
+                id,
+                param.name,
+                Grab::Lane(rt.cable),
+                rt.amount,
+            ));
         }
+        let mut grab = ui_state
+            .drag
+            .filter(|g| g.is(id, param.name) && g.kind == Grab::Lane(rt.cable));
         if resp.dragged() {
-            if let (Some((cable, start)), Some(o), Some(p)) = (
-                ui_state.lane_grab.filter(|g| g.0 == rt.cable),
-                ui.input(|i| i.pointer.press_origin()),
-                resp.interact_pointer_pos(),
-            ) {
-                let amount = start - (p.y - o.y) / DRAG_PIXELS_FOR_FULL_SWEEP;
-                if amount != rt.amount || resp.drag_started() {
-                    editor.set_route_amount(cable, amount, resp.drag_started());
+            if let Some(g) = grab.as_mut() {
+                if let Some((amount, first)) = g.step(ui, &resp, -1.0, 1.0) {
+                    editor.set_route_amount(rt.cable, amount, first);
                 }
+                ui_state.drag = Some(*g);
             }
         }
-        if resp.drag_stopped() {
-            ui_state.lane_grab = None;
+        if resp.drag_stopped() && grab.is_some() {
+            ui_state.drag = None;
         }
         if resp.hovered() || resp.dragged() {
             pill(
@@ -642,11 +717,14 @@ fn source_lanes(
                     Id::new("kabl-lane-pill"),
                 )),
                 center - EguiVec2::new(0.0, outer + 4.0),
-                &format!(
-                    "{}: {:+.0} %",
-                    source_label(editor.state(), rt.from_id, &rt.from_port),
-                    rt.amount * 100.0
-                ),
+                &match grab {
+                    Some(g) if g.cancelled => "Cancelled".to_string(),
+                    _ => format!(
+                        "{}: {:+.1} %",
+                        source_label(editor.state(), rt.from_id, &rt.from_port),
+                        grab.map_or(rt.amount, |g| g.value) * 100.0
+                    ),
+                },
             );
         }
     }

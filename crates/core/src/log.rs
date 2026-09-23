@@ -137,6 +137,17 @@ impl PatchLog {
         self.cursor = self.entries.len();
     }
 
+    /// Reverts the last entry and forgets it, leaving nothing to redo: for a gesture the user
+    /// cancelled (Escape mid-drag). Only acts when that entry is the newest one.
+    pub fn discard_last(&mut self) -> bool {
+        if self.cursor == 0 || self.cursor != self.entries.len() {
+            return false;
+        }
+        self.undo();
+        self.entries.truncate(self.cursor);
+        true
+    }
+
     /// O(1): apply the inverse of the last-applied entry, no replay.
     pub fn undo(&mut self) -> bool {
         if self.cursor == 0 {
