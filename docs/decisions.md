@@ -1987,3 +1987,48 @@ were not transplanted, only its look (palettes, geometry, drawing).
   `reset`, which restarts the pattern every 12 steps.
 - Kosta approved the fixed walkthrough ("Seems all ok now"). The sequencing slice is closed
   at `af0585b`. The next scope goes through the supervisor.
+
+## 2026-09-23 — Interlocking sequences: transport, clock divider, transpose (supervisor scope)
+
+- Scope (supervisor, for Kosta): two interlocking sequences from one shared clock. Record and
+  evidence: `docs/interlocking-sequences/README.md`.
+- **Transport is a runtime command, not a param.** `clock` takes `Transport::{Run, Stop,
+  Restart}` from the UI through an `rtrb` queue (`PatchEngine::transport`, applied to the
+  active and the fading-in graph; a queued graph gets it through state carry). Nothing enters
+  the op log, so undo, redo, reload and graph swaps cannot replay a Restart. The running state
+  is carried like any module state, and a freshly loaded patch starts running, as before.
+  - Stop holds `gate` low at once (envelopes release). Run starts a new pulse on the next
+    sample: that pulse is the next step. The pulse cut by Stop was already counted, so nothing
+    is played twice or skipped.
+  - Restart arms the new `reset` output. It rises with the next pulse that a (re)start begins
+    and stays high for that pulse. Running, that pulse starts at once; if `gate` was high, one
+    low sample comes first, so the edge is clean. Stopped, it waits for Run.
+  - Rejected: a param (it would be undoable and replay on reload), and hidden resets (the clock
+    resetting sequencers it drives). The reset line is a cable.
+- **`clock.div`** (Divider, global): `clock` and `reset` in, `gate` out, `div` 1–8 (default 2).
+  It passes every Nth pulse at its own width. The first pulse after a reset or a start passes.
+  A reset on the same sample as a clock edge counts first, so that is how Restart lines up
+  direct and divided patterns. A new `div` commits on the next rising edge, which passes and
+  restarts the count. It is never read mid-pulse, so a change cannot cut or add a pulse.
+- **Clock phase is f64** with a 1e-9 slack on its thresholds. In f32, a 120 bpm pulse at
+  48 kHz came out 6001 samples, about 1 sample late per pulse. Now it is exactly 6000. The
+  phase is carried across swaps as two f32 halves.
+- **`seq.transpose`**: −24..+24 st, rounded like the steps, default 0, an advanced control
+  next to `length`. It is added to every step, so editing it never restarts the pattern.
+  `MAX_PARAMS` is now 18.
+- **Pitch text:** the module panel's sliders (the drawer's module section) printed raw floats
+  ("16.0", and "6.6" for a value that plays +7). They now use the knob's formatter and parser.
+  `fmt_value` no longer prints "-0 st". Stored values are not rewritten. The first version also
+  used egui's `step_by(1.0)`: that rewrote a stored 12.8 as 13 every frame, so undo could not
+  get past it (seen in the walkthrough recording, fixed in `12c3bfe`).
+- **UI:** Stop/Run and Restart buttons on the clock face, under the BPM knob. The label
+  follows the audio thread's reported state (a second `rtrb` queue), not the click. There is
+  no toolbar copy: the toolbar is full at 1280 px, and every other control lives on its module.
+- **Demo `patches/interlocking`:** 116 bpm. A 7-step saw bass on every 16th (E2 around E minor
+  pentatonic, transpose −24, env → cutoff and a slow LFO on the cutoff) against a 5-step square
+  line on every 8th through the divider (E4–D5, one rest, the LFO inverted on its cutoff). The
+  two meet again every 70 sixteenths (about 9 s). `clock.reset` is patched to the divider and
+  both sequencers. Mixer `level1` 0.22 and `level2` 0.12. Measured over 20 s: peak −7.3 dBFS,
+  RMS −18.7 dBFS; bass alone −21.4 and lead alone −22.2 dBFS RMS.
+- Not built (out of scope): swing, probability, song arrangement, MIDI clock, effects, a
+  toolbar transport, per-clock shuffle, gate-length control.

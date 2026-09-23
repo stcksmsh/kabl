@@ -27,16 +27,28 @@ Launch (real audio + MIDI):
   expansion, 50–200 % zoom, pull-the-plug cable moves, skin renderer (no built-in skin).
 - Modulation: any knob takes routes (signed amount, invert, bypass); ring/lanes/drawer are one
   route; taper-space sum, one clamp, block rate; envelope timing CONT/KEY.
-- Verification: `cargo test --workspace` 197 pass (3 ignored = fixture writers), clippy clean.
+- Verification: `cargo test --workspace` 218 pass (4 ignored = fixture/script writers), clippy clean.
   Real-X tooling: `docs/rack-migration/drive.py` (+ `scripts/`), `closeout-real-x.sh`,
-  `record-walkthrough.sh`.
+  `record-walkthrough.sh`; `docs/interlocking-sequences/record-walkthrough.sh` records a patch
+  without MIDI.
 
 ## Sequencing — closed (Kosta approved the walkthrough, af0585b)
 
 `clock` (BPM, 16th-note gate) and the 8-step `seq` module (pitch plus OFF/ON gate per step,
 length, reset input, and a step light fed by the first audio → UI queue) are both global rate. The demo is `cargo run --release -p kabl-ui -- --patch patches/sequence`.
 The `decisions.md` entry "Shared clock + basic pitch/gate sequencing" lists what was built and
-what was deliberately left out. Wait for Kosta's feedback before extending it.
+what was deliberately left out.
+
+## Interlocking sequences — built, waiting for Kosta's review
+
+Supervisor scope: two interlocking sequences from one shared clock. Built: clock transport
+(`Clock::command`, `Transport::{Run, Stop, Restart}`, sent UI → audio through an `rtrb` queue in
+`crates/ui/src/main.rs`, never in the op log), the clock's `reset` output, `clock.div`, and
+`seq.transpose`. Module panel sliders now use the knob's formatter. The demo is
+`cargo run --release -p kabl-ui -- --patch patches/interlocking` (built by
+`crates/ui/tests/interlocking.rs`; rewrite it with `-- --ignored`). Record:
+`docs/interlocking-sequences/README.md` (video, screenshots, verification, open questions).
+Do not extend it before Kosta answers.
 
 ## Accepted limitations
 

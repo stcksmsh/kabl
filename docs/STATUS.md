@@ -5,7 +5,7 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-23, rack migration closed (owner approved the hands-on review).
+Last updated: 2026-09-23, interlocking sequences built, waiting for Kosta's review.
 
 **Current handover (supersedes every older handover note below):** the approved revision-2 rack
 is the production canvas, on real editor/engine state. Kosta reviewed it hands-on and approved
@@ -41,7 +41,17 @@ Sequencing (owner go-ahead, 2026-09-23): the new `clock` module (BPM, 16th-note 
 control) and a reset input.
 Try it with `cargo run --release -p kabl-ui -- --patch patches/sequence`. Details and what was
 left out are in the `decisions.md` entry "Shared clock + basic pitch/gate sequencing".
-Kosta approved the walkthrough videos; slice closed at af0585b. Next scope: supervisor.
+Kosta approved the walkthrough videos; slice closed at af0585b.
+
+**Interlocking sequences (supervisor scope, 2026-09-23), waiting for Kosta's review:** clock
+transport (Stop/Run and Restart buttons on the clock face, runtime commands that are never in
+the op log, and a `reset` output), the `clock.div` divider (/1–/8), and sequencer transpose
+(±24 st, advanced). Module panel pitch sliders now read like the knobs. The demo is
+`cargo run --release -p kabl-ui -- --patch patches/interlocking`: a 7-step bass on 16ths
+against a 5-step lead on 8ths. Record, video, screenshots and verification (218 tests pass,
+clippy clean): [`interlocking-sequences/README.md`](interlocking-sequences/README.md).
+Rationale: `decisions.md`, "Interlocking sequences: transport, clock divider, transpose".
+Commits 8d8dfa9..HEAD.
 
 Older sections below are history. Where they disagree with the above or with the code, they
 are stale: the MIDI/graph-swap/undo risks they list are fixed; the Mutex described there is

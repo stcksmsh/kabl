@@ -1,0 +1,59 @@
+# Walkthrough of patches/interlocking (record-walkthrough.sh). Sleeps leave time to listen.
+sleep 5
+# Layer levels: lead out and back (undo), then bass out and back.
+dragby knob:6.level2 0 20
+shot m01-lead-out
+sleep 3.5
+key ctrl+z
+shot m-undo-1
+sleep 2.5
+dragby knob:6.level1 0 35
+shot m02-bass-out
+sleep 3.5
+key ctrl+z
+shot m-undo-2
+sleep 2.5
+# Live pattern edits: bass step 2 down a fifth, the lead's rest (step 4) switched on.
+dragby knob:3.p2 0 22
+shot m03-bass-step2-edit
+sleep 3.5
+click sel:4.g4.1
+shot m04-lead-rest-on
+sleep 3.5
+# Lead transpose +5 st, then back.
+click toggle:4
+dragby knob:4.transpose 0 -16
+shot m05-lead-transpose
+sleep 4
+key ctrl+z
+shot m-undo-3
+click toggle:4
+sleep 2.5
+# Tempo 116 -> about 131 bpm, then back.
+dragby knob:1.bpm 0 -8
+shot m06-tempo
+sleep 4
+key ctrl+z
+shot m-undo-4
+sleep 2.5
+# Stop (envelopes release), Run (next step).
+click run:1
+shot m-transport-run-1
+sleep 2.5
+click run:1
+shot m-transport-run-2
+sleep 3.5
+# Restart while running: both lines back on step 1 together.
+click restart:1
+shot m-transport-restart-1
+sleep 3.5
+# Stop, Restart while stopped (armed), Run: starts on step 1.
+click run:1
+shot m-transport-run-3
+sleep 1.5
+click restart:1
+shot m-transport-restart-2
+sleep 1.5
+click run:1
+shot m-transport-run-4
+sleep 4.5

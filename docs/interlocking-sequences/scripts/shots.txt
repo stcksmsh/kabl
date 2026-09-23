@@ -1,0 +1,22 @@
+# Screenshots of patches/interlocking: start-up view, transport close up, expanded lead
+# sequencer (transpose), both themes.
+sleep 1
+shot 01-light
+click toggle:4
+shot 02-light-lead-expanded
+click toggle:4
+click theme:dark
+shot 03-dark
+click toggle:4
+shot 04-dark-lead-expanded
+click toggle:4
+click run:1
+sleep 0.5
+shot 05-dark-stopped
+click run:1
+sleep 0.5
+# Module panel: pitch sliders read like the knobs (clicking an already-on gate selects it).
+click sel:4.g1.1
+shot 06-dark-lead-panel
+click theme:light
+shot 07-light-lead-panel
