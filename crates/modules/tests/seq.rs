@@ -44,8 +44,8 @@ fn notes(changes: &[(usize, f32)], resets: &[usize], steps: usize) -> Vec<f32> {
                 }
             }
         }
-        let (mut gate, mut pitch) = ([0f32; BLOCK], [0f32; BLOCK]);
-        let mut outs: [&mut [f32]; 2] = [&mut gate, &mut pitch];
+        let (mut gate, mut pitch, mut velocity) = ([0f32; BLOCK], [0f32; BLOCK], [0f32; BLOCK]);
+        let mut outs: [&mut [f32]; 3] = [&mut gate, &mut pitch, &mut velocity];
         let ins = [Signal::Buffer(&tick), Signal::Buffer(&reset)];
         seq.process(&mut ProcessIo::new(&ins, &mut outs, &params, BLOCK));
         for i in 0..BLOCK {

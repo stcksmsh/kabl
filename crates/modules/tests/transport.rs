@@ -20,11 +20,13 @@ struct Frame {
     a_step: f32,
     b_gate: bool,
     b_step: f32,
+    a_vel: f32,
 }
 
 enum Event {
     Cmd(Transport),
     Div(f32),
+    Bpm(f32),
 }
 
 struct Rig {
@@ -33,6 +35,7 @@ struct Rig {
     a: Seq,
     b: Seq,
     division: f32,
+    bpm: f32,
     seq_params: Vec<f32>,
     frames: Vec<Frame>,
 }
@@ -48,6 +51,7 @@ impl Rig {
             a: Seq::new(),
             b: Seq::new(),
             division,
+            bpm: 120.0,
             seq_params: Seq::new()
                 .info()
                 .params
@@ -71,7 +75,7 @@ impl Rig {
         self.clock.process(&mut ProcessIo::new(
             &[],
             &mut outs,
-            &[Signal::Scalar(120.0)],
+            &[Signal::Scalar(self.bpm)],
             n,
         ));
 
@@ -87,14 +91,14 @@ impl Rig {
 
         let params: Vec<Signal> = self.seq_params.iter().map(|&v| Signal::Scalar(v)).collect();
         let run = |seq: &mut Seq, clock: &[f32]| {
-            let (mut g, mut p) = (vec![0f32; n], vec![0f32; n]);
-            let mut outs: [&mut [f32]; 2] = [&mut g, &mut p];
+            let (mut g, mut p, mut v) = (vec![0f32; n], vec![0f32; n], vec![0f32; n]);
+            let mut outs: [&mut [f32]; 3] = [&mut g, &mut p, &mut v];
             let ins = [Signal::Buffer(clock), Signal::Buffer(&rst)];
             seq.process(&mut ProcessIo::new(&ins, &mut outs, &params, n));
-            (g, p)
+            (g, p, v)
         };
-        let (ag, ap) = run(&mut self.a, &clk);
-        let (bg, bp) = run(&mut self.b, &dg);
+        let (ag, ap, av) = run(&mut self.a, &clk);
+        let (bg, bp, _) = run(&mut self.b, &dg);
         for i in 0..n {
             self.frames.push(Frame {
                 clock: clk[i] > 0.5,
@@ -104,6 +108,7 @@ impl Rig {
                 a_step: ap[i],
                 b_gate: bg[i] > 0.5,
                 b_step: bp[i],
+                a_vel: av[i],
             });
         }
     }
@@ -116,6 +121,7 @@ impl Rig {
                 match e {
                     Event::Cmd(c) => self.clock.command(*c),
                     Event::Div(d) => self.division = *d,
+                    Event::Bpm(b) => self.bpm = *b,
                 }
             }
             let next_event = events.iter().map(|(at, _)| *at).filter(|&at| at > t).min();
@@ -437,4 +443,115 @@ fn division_change_commits_on_the_next_edge_without_glitches() {
         .map(|k| k * STEP)
         .collect();
     assert_eq!(rises(f, |f| f.div), want);
+}
+
+// Gate length (LENGTH mode) and velocity. Param indices: g1 = 8, v1 = 18, gate_len = 26,
+// gate_mode = 27.
+const GATE_LEN: usize = 26;
+const GATE_MODE: usize = 27;
+
+fn timed(division: f32, percent: f32) -> Rig {
+    let mut r = Rig::new(division);
+    r.seq_params[GATE_MODE] = 1.0;
+    r.seq_params[GATE_LEN] = percent;
+    r
+}
+
+#[test]
+fn clock_mode_is_the_default_and_unchanged() {
+    let mut r = Rig::new(2.0);
+    r.run(10 * STEP, 64, &[]);
+    assert!(widths(&r.frames, |f| f.a_gate).iter().all(|&w| w == HALF));
+    assert!(widths(&r.frames, |f| f.b_gate).iter().all(|&w| w == HALF));
+    assert!(r.frames.iter().all(|f| f.a_vel == 1.0));
+}
+
+#[test]
+fn length_mode_gates_last_their_share_of_the_measured_step() {
+    let mut r = timed(2.0, 25.0);
+    r.run(20 * STEP, 64, &[]);
+    let a = widths(&r.frames, |f| f.a_gate);
+    let b = widths(&r.frames, |f| f.b_gate);
+    // The first step has no measured period yet and follows the clock pulse.
+    assert_eq!(a[0], HALF);
+    assert!(a[1..].iter().all(|&w| w == STEP / 4), "{a:?}");
+    assert_eq!(b[0], HALF);
+    assert!(b[1..].iter().all(|&w| w == 2 * STEP / 4), "{b:?}");
+    assert_eq!(
+        rises(&r.frames, |f| f.a_gate),
+        rises(&r.frames, |f| f.clock)
+    );
+}
+
+#[test]
+fn full_length_gates_retrigger_with_one_low_sample() {
+    let mut r = timed(1.0, 100.0);
+    r.run(10 * STEP, 17, &[]);
+    let a = widths(&r.frames, |f| f.a_gate);
+    // Step 2 follows step 1's clock-length gate, so it needs no gap.
+    assert_eq!(a[1], STEP);
+    assert!(a[2..a.len() - 1].iter().all(|&w| w == STEP - 1), "{a:?}");
+    // One note per step: the onset is one sample after each clock edge from step 3 on.
+    let onsets = rises(&r.frames, |f| f.a_gate);
+    let edges = rises(&r.frames, |f| f.clock);
+    assert_eq!(onsets.len(), edges.len());
+    for (o, e) in onsets.iter().zip(&edges).skip(2) {
+        assert_eq!(*o, e + 1);
+    }
+}
+
+#[test]
+fn a_tempo_change_is_followed_from_the_next_edge() {
+    let mut r = timed(1.0, 50.0);
+    // 120 → 240 bpm mid-step 6: the step length halves.
+    r.run(20 * STEP, 64, &[(5 * STEP + 1000, Event::Bpm(240.0))]);
+    let a = widths(&r.frames, |f| f.a_gate);
+    let n = a.len();
+    assert!(a[n - 5..].iter().all(|&w| w == STEP / 4), "{a:?}");
+    // And back down to 60 bpm (a 4× jump): taken once two intervals agree.
+    let mut r = timed(1.0, 50.0);
+    r.run(30 * STEP, 64, &[(5 * STEP + 1000, Event::Bpm(30.0))]);
+    let a = widths(&r.frames, |f| f.a_gate);
+    assert_eq!(*a.last().unwrap(), 2 * STEP);
+    assert!(a.iter().all(|&w| w <= 2 * STEP), "{a:?}");
+}
+
+#[test]
+fn stop_lets_the_gate_finish_and_run_does_not_stretch_it() {
+    let mut r = timed(2.0, 75.0);
+    r.run(
+        40 * STEP,
+        64,
+        &[
+            (8 * STEP + 100, Event::Cmd(Transport::Stop)),
+            (20 * STEP + 777, Event::Cmd(Transport::Run)),
+            (30 * STEP + 5, Event::Cmd(Transport::Restart)),
+        ],
+    );
+    let a = widths(&r.frames, |f| f.a_gate);
+    let b = widths(&r.frames, |f| f.b_gate);
+    assert!(a[1..].iter().all(|&w| w == 3 * STEP / 4), "{a:?}");
+    assert!(b[1..].iter().all(|&w| w <= 3 * 2 * STEP / 4), "{b:?}");
+    // Stopped: the gate playing at the Stop ends on time and nothing sounds until Run.
+    // B (on /2) started its last gate on the Stop's step too: 1.5 steps long.
+    let stopped = &r.frames[8 * STEP + 3 * STEP / 2..20 * STEP + 777];
+    assert!(stopped.iter().all(|f| !f.a_gate && !f.b_gate));
+}
+
+#[test]
+fn rests_stay_silent_and_velocity_follows_the_step() {
+    let mut r = timed(1.0, 50.0);
+    r.seq_params[8 + 2] = 0.0; // step 3 off
+    for k in 0..8 {
+        r.seq_params[18 + k] = 10.0 * (k + 1) as f32;
+    }
+    r.run(17 * STEP, 64, &[]);
+    for at in rises(&r.frames, |f| f.a_gate) {
+        let f = r.frames[at];
+        assert_ne!(f.a_step, 2.0, "a rest played");
+        assert_eq!(f.a_vel, 0.1 * (f.a_step + 1.0));
+    }
+    // Velocity is held through a rest (it is the step's value, the gate says whether it plays).
+    let rest = r.frames.iter().find(|f| f.a_step == 2.0).unwrap();
+    assert!((rest.a_vel - 0.3).abs() < 1e-6);
 }

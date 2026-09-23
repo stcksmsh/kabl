@@ -143,9 +143,10 @@ pub fn step_labels(kind: &str, param: &str) -> Option<&'static [&'static str]> {
         ("lfo", "waveform") => &["SIN", "TRI", "SAW", "SQR", "S&H"],
         ("osc.va", "waveform") => &["SIN", "TRI", "SAW", "SQR"],
         ("vca", "exponential") => &["LIN", "EXP"],
-        ("seq", g) if g.starts_with('g') => &["OFF", "ON"],
+        ("seq", g) if g.starts_with('g') && g.len() == 2 => &["OFF", "ON"],
         ("delay", "sync") => &["FREE", "1/16", "1/8", "1/8D", "1/4"],
         ("delay", "mode") => &["MONO", "PING"],
+        ("seq", "gate_mode") => &["CLOCK", "LENGTH"],
         _ => return None,
     })
 }
@@ -156,6 +157,10 @@ pub fn param_label(p: &ParamInfo) -> String {
         "base_hz" => return "Frequency".into(),
         "exponential" => return "Response".into(),
         "div" => return "Divide by".into(),
+        "gate_len" => return "Gate length".into(),
+        "gate_mode" => return "Gate".into(),
+        "damp_hz" => return "Damping".into(),
+        "predelay_ms" => return "Pre-delay".into(),
         n if n.starts_with("level") && n.len() > 5 => return format!("Level {}", &n[5..]),
         _ => {}
     }

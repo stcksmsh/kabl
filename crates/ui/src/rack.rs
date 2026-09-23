@@ -371,8 +371,12 @@ fn place_local(
     } else {
         // Jacks first: they anchor the bottom of the face and never move.
         let column = matches!(info.kind, "midi.in" | "out");
-        let two_rows =
-            !column && ins.len() + outs.len() > 3 && !(ins.len() + outs.len() == 4 && fw >= 240.0);
+        let ports = ins.len() + outs.len();
+        // A wide panel (the sequencer) keeps one row, clear of its selector row.
+        let two_rows = !column
+            && ports > 3
+            && !(ports == 4 && fw >= 240.0)
+            && fw < 100.0 * ports as f32;
         if column {
             let (ports, y0) = if info.kind == "midi.in" {
                 (&outs, 206.0)
@@ -501,17 +505,22 @@ fn place_local(
     let mut adv = None;
     let mut hidden: Vec<&'static ParamInfo> = Vec::new();
     if expanded && !off_face.is_empty() {
-        let hk: Vec<usize> = off_face
+        let mut hk: Vec<usize> = off_face
             .iter()
             .copied()
             .filter(|&i| knob(&info.params[i]))
             .collect();
+        // The sequencer's velocities get a row of their own, one knob per step.
+        let per_row = if info.kind == "seq" { 8 } else { 5 };
+        if info.kind == "seq" {
+            hk.sort_by_key(|&i| (!info.params[i].name.starts_with('v'), i));
+        }
         let hs: Vec<usize> = off_face
             .iter()
             .copied()
             .filter(|&i| !knob(&info.params[i]))
             .collect();
-        let cols = hk.len().min(5);
+        let cols = hk.len().min(per_row);
         let sel_w = |i: usize| {
             let (n, longest) = options(info, &info.params[i]);
             sel_width(n, longest)
@@ -527,11 +536,11 @@ fn place_local(
         let aw = (knob_w.max(sel_row.min(13.0 * UNIT)).max(5.0 * UNIT) / UNIT).ceil() * UNIT;
         let mut y = 112.0;
         for (k, &i) in hk.iter().enumerate() {
-            if k > 0 && k % 5 == 0 {
+            if k > 0 && k % per_row == 0 {
                 y += 110.0;
             }
             let x0 = (aw - 76.0 * (cols as f32 - 1.0)) / 2.0;
-            let c = pos2(fw + x0 + 76.0 * (k % 5) as f32, y);
+            let c = pos2(fw + x0 + 76.0 * (k % per_row) as f32, y);
             ctls.push(Ctl {
                 param: &info.params[i],
                 primary: false,

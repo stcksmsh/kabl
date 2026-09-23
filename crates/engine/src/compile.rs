@@ -50,7 +50,7 @@
 //! inputs out of the buffer pool, building `Signal`/output-slice arrays fresh each block) with
 //! fixed-size stack arrays sized to `MAX_INPUTS`/`MAX_OUTPUTS`/`MAX_PARAMS` — constants derived
 //! from the largest counts among the known built-ins (`mixer`: 4 inputs; `filter.svf`: 3
-//! outputs; `seq`: 18 params). `compile()` (control-thread, allowed to allocate/return
+//! outputs; `seq`: 28 params). `compile()` (control-thread, allowed to allocate/return
 //! errors) rejects any module whose port/param counts exceed those bounds with
 //! `CompileError::TooManyPorts`, so a future built-in that needs more headroom fails loudly at
 //! compile time instead of the audio thread silently truncating or panicking. `CompiledPatch` is
@@ -73,7 +73,7 @@ pub type BufIdx = usize;
 
 /// `process_block`'s per-step scratch (inputs, params) is a fixed-size stack array sized to
 /// these, not a `Vec`, so building it every block doesn't allocate. Set to the largest count any
-/// of the known built-ins actually has (`mixer`: 4 inputs; `seq`: 18 params) — `compile()`
+/// of the known built-ins actually has (`mixer`: 4 inputs; `seq`: 28 params) — `compile()`
 /// checks every module against these bounds and returns `CompileError::TooManyPorts` rather than
 /// silently truncating if a future built-in needs more.
 const MAX_INPUTS: usize = 4;
@@ -81,7 +81,7 @@ const MAX_INPUTS: usize = 4;
 /// currently needs more; `filter.svf`'s 3 outputs is the largest). Bump alongside a new match arm
 /// if a module ever needs more, not just this constant.
 const MAX_OUTPUTS: usize = 3;
-const MAX_PARAMS: usize = 18;
+const MAX_PARAMS: usize = 28;
 
 /// Route amount when a `PortRef::Param` cable has no stored `amount` (+25 % of knob travel, the
 /// UI's default on drop). A stored value always wins.
