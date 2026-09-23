@@ -590,15 +590,15 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
         }
         let mut value = current;
         // Same text as the knob (a pitch reads in the whole semitones the module plays).
-        let mut slider = egui::Slider::new(&mut value, param.min..=param.max)
-            .text(routing::param_label(param))
-            .logarithmic(param.taper == Taper::Exponential)
-            .custom_formatter(|v, _| routing::fmt_value(param, v as f32))
-            .custom_parser(|t| routing::parse_value(param, t).map(f64::from));
-        if param.unit == "st" {
-            slider = slider.step_by(1.0);
-        }
-        let resp = ui.add(slider);
+        // No `step_by`: egui snaps the shown value and reports it as a change every frame,
+        // which would rewrite a stored 12.8 as 13 and undo could never get back past it.
+        let resp = ui.add(
+            egui::Slider::new(&mut value, param.min..=param.max)
+                .text(routing::param_label(param))
+                .logarithmic(param.taper == Taper::Exponential)
+                .custom_formatter(|v, _| routing::fmt_value(param, v as f32))
+                .custom_parser(|t| routing::parse_value(param, t).map(f64::from)),
+        );
         // Only a real user change: the log slider's round trip can differ from `current` (at
         // the range ends), and writing that back every frame flooded undo.
         if resp.changed() && value != current {

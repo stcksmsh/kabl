@@ -1335,4 +1335,16 @@ fn transpose_is_an_advanced_control() {
     let after = t.param(LEAD, "transpose").unwrap();
     assert!(after > before, "{before} -> {after}");
     assert_eq!(t.param(LEAD, "p1"), Some(4.0), "steps untouched");
+    // The module panel shows a fractional value rounded but never writes it back.
+    assert_ne!(after, after.round(), "drag leaves a fraction ({after})");
+    let depth = t.undo_depth();
+    for _ in 0..3 {
+        t.frame();
+    }
+    assert_eq!(
+        (t.undo_depth(), t.param(LEAD, "transpose").unwrap()),
+        (depth, after)
+    );
+    t.key(Key::Z, Modifiers::COMMAND);
+    assert_eq!(t.param(LEAD, "transpose").unwrap_or(0.0), before, "undo");
 }
