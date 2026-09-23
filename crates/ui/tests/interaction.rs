@@ -69,6 +69,22 @@ impl H {
             .center()
     }
 
+    /// A point on bare rack: inside the canvas, outside every module and cable target.
+    fn empty_rack(&self) -> Pos2 {
+        let busy = |p: Pos2| self.ui.hits.values().any(|r| r.expand(4.0).contains(p));
+        let right = self.size.x - kabl_ui::DRAWER_W - 10.0;
+        (0..40)
+            .flat_map(|i| (0..30).map(move |j| (i, j)))
+            .map(|(i, j)| {
+                egui::pos2(
+                    10.0 + i as f32 * (right - 10.0) / 40.0,
+                    60.0 + j as f32 * (self.size.y - 100.0) / 30.0,
+                )
+            })
+            .find(|&p| !busy(p))
+            .expect("some bare rack")
+    }
+
     fn move_to(&mut self, p: Pos2) {
         self.pointer = p;
         self.events.push(Event::PointerMoved(p));
@@ -161,7 +177,7 @@ fn every_control_of_the_reference_patch_is_on_screen_left_of_the_drawer() {
         for (key, r) in &harness.ui.hits {
             if key.starts_with("knob:") || key.starts_with("out:") || key.starts_with("in:") {
                 assert!(
-                    r.max.x < w - 360.0 && r.max.y < h - 30.0 && r.min.y > 50.0,
+                    r.max.x < w - kabl_ui::DRAWER_W && r.max.y < h - 30.0 && r.min.y > 40.0,
                     "{w}x{h}: {key} at {r:?}"
                 );
             }
@@ -286,6 +302,9 @@ fn four_sources_each_selectable_and_edited_alone() {
 fn envelope_timing_selector_sets_and_undoes() {
     let mut t = H::new(1440.0, 900.0);
     assert_eq!(t.param(ENV, "timing"), None);
+    // Timing is an advanced control: expand the envelope first.
+    assert!(!t.ui.hits.contains_key(&format!("sel:{ENV}.timing.1")));
+    t.click(&format!("toggle:{ENV}"));
     t.click(&format!("sel:{ENV}.timing.1"));
     assert_eq!(t.param(ENV, "timing"), Some(1.0));
     t.click(&format!("sel:{ENV}.timing.0"));
@@ -444,7 +463,8 @@ fn source_lanes_select_and_edit_each_route_on_the_knob() {
             assert!(close(a.1, b.1));
         }
         // Clicking empty canvas closes the lanes.
-        t.move_to(egui::pos2(300.0, h - 60.0));
+        let p = t.empty_rack();
+        t.move_to(p);
         t.button(true);
         t.button(false);
         t.frame();

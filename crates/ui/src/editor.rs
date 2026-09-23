@@ -263,6 +263,39 @@ impl PatchEditor {
         id
     }
 
+    /// Sets which params of module `id` are on its face (`on_face`, aligned with the module's
+    /// declared params) as one undoable step. A choice equal to the module default is stored as
+    /// absent. Presentation only: never rebuilds audio. No-op when nothing changes.
+    pub fn set_primary(&mut self, id: ModuleId, on_face: &[bool]) {
+        let Some(m) = self.log.state().modules.get(&id) else {
+            return;
+        };
+        let Some(info) = registry::info_for(&m.kind) else {
+            return;
+        };
+        let mut ops = Vec::new();
+        for (p, &on) in info.params.iter().zip(on_face) {
+            let key = crate::rack::face_key(p.name);
+            let default = !info.advanced.contains(&p.name);
+            let target = ParamTarget::Module {
+                id,
+                param: key.clone(),
+            };
+            let stored = m.params.get(&key).map(|&v| v >= 0.5);
+            if on == default && stored.is_some() {
+                ops.push(Op::UnsetParam { target });
+            } else if on != default && stored != Some(on) {
+                ops.push(Op::SetParam {
+                    target,
+                    value: if on { 1.0 } else { 0.0 },
+                });
+            }
+        }
+        if !ops.is_empty() {
+            self.append(Op::Group { ops });
+        }
+    }
+
     pub fn disconnect(&mut self, id: CableId) {
         if self.log.state().cables.contains_key(&id) {
             self.append(Op::Disconnect { id });
@@ -289,11 +322,18 @@ impl PatchEditor {
     }
 }
 
-/// Whether applying `op` can change what the compiler produces. Moving a module or annotating
-/// the log is layout/history only and must not rebuild audio.
+/// Whether applying `op` can change what the compiler produces. Moving a module, choosing its
+/// face controls or annotating the log is presentation/history only and must not rebuild audio.
 pub fn affects_audio(op: &Op) -> bool {
     match op {
         Op::MoveModule { .. } | Op::Annotate { .. } | Op::Snapshot { .. } => false,
+        Op::SetParam {
+            target: ParamTarget::Module { param, .. },
+            ..
+        }
+        | Op::UnsetParam {
+            target: ParamTarget::Module { param, .. },
+        } if param.starts_with(crate::rack::FACE_PREFIX) => false,
         Op::Group { ops } => ops.iter().any(affects_audio),
         _ => true,
     }

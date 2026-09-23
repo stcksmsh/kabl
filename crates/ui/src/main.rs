@@ -222,7 +222,8 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "kabl",
         options,
-        Box::new(|_cc| {
+        Box::new(|cc| {
+            kabl_ui::theme::install_fonts(&cc.egui_ctx);
             Ok(Box::new(App {
                 editor,
                 ui_state,

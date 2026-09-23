@@ -1,49 +1,37 @@
-//! `kabl-ui`: the patchbay editor (brief section 12's `ui` crate). Split like `kabl-standalone`
-//! into a hardware/display-independent core (`editor.rs`'s `PatchEditor` — patch-editing logic
-//! over `kabl_core::PatchLog`, testable headlessly) and the `egui` rendering here. `main.rs`
-//! wires the actual live-audio (cpal/midir) and windowing (eframe) — neither of which can be
-//! verified in this container (no audio device, no display server) — see decisions.md.
+//! `kabl-ui`: the rack editor (brief section 12's `ui` crate). Split like `kabl-standalone` into a
+//! display-independent core (`editor.rs`'s `PatchEditor`: patch editing over
+//! `kabl_core::PatchLog`, testable headlessly), pure rack geometry (`rack.rs`), and the `egui`
+//! rendering here and in `routing.rs`. `main.rs` wires live audio (cpal/midir) and the window.
 //!
-//! `show()` itself *is* testable without a display: `egui::Context` is pure Rust and only needs
-//! `begin_pass`/`end_pass` (no window, no GPU) to drive a frame — see `tests/editor_and_ui.rs`'s
-//! smoke tests for the pattern. What can't be tested here is whether it actually *looks* right on
-//! screen or feels right to drag — that needs a real display, flagged not skipped.
+//! `show()` is testable without a display: `egui::Context` only needs `begin_pass`/`end_pass`
+//! to drive a frame, so real egui input can be injected (`tests/interaction.rs`).
+//!
+//! Everything view-only lives in `UiState` and never touches the patch or the audio: theme,
+//! zoom and pan, cable view, which modules are expanded, push vs float. The one presentation
+//! choice that is saved with the patch is each module's face (primary controls), stored as
+//! `face.*` params that the compiler never reads (`rack::FACE_PREFIX`).
 
 pub mod editor;
+pub mod rack;
 pub mod routing;
+pub mod theme;
 
 pub use editor::PatchEditor;
 
-use egui::{Color32, Id, Pos2, Rect, Sense, Stroke, Vec2 as EguiVec2};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+
+use egui::{pos2, vec2, Color32, CornerRadius, Id, Pos2, Rect, Sense, Stroke, Vec2 as EguiVec2};
 use kabl_core::{CableId, ModuleId, PortRef, Vec2};
-use kabl_modules::info::{Category, PortDirection, PortType, Taper};
+use kabl_modules::info::{PortDirection, Taper};
 use kabl_modules::registry;
+use rack::{Decor, Geo, Layout, Placed, JACK_R, PANEL_H};
+use routing::Look;
+use theme::{theme, Theme};
 
-const MODULE_WIDTH: f32 = 160.0;
-const PORT_ROW_HEIGHT: f32 = 18.0;
-const HEADER_HEIGHT: f32 = 26.0;
-const PORT_RADIUS: f32 = 5.0;
-const ACCENT_HEIGHT: f32 = 4.0;
-/// Knob, plug, label and (Hidden view) source badge. Fixed, so views never move controls.
-const KNOB_ROW_HEIGHT: f32 = 64.0;
-const SELECTOR_ROW_HEIGHT: f32 = 22.0;
-const PANEL_FILL: Color32 = Color32::from_rgb(32, 32, 36);
-const PANEL_FILL_SELECTED: Color32 = Color32::from_rgb(44, 48, 58);
-/// Rack grid cell size in pixels — `Eurorack` view only. A module's `ModuleInfo::width_units`
-/// times this is its panel width; row/column snapping rounds to multiples of this.
-const UNIT_PX: f32 = 20.0;
-/// Headroom past the furthest-out module for the scroll area, plus room to drag one further.
-const CANVAS_MARGIN: f32 = 200.0;
-
-/// Two ways to look at the same patch (same `PatchEditor`, same edits) — not two editors. The
-/// free-form patchbay is better for building/rearranging from scratch (owner's own framing);
-/// the tiled Eurorack view snaps modules to a rack-style grid with real per-module widths, closer
-/// to playing an instrument than constructing one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ViewMode {
-    Patchbay,
-    Eurorack,
-}
+/// Width of the routing drawer (right).
+pub const DRAWER_W: f32 = 336.0;
+pub const MIN_ZOOM: f32 = 0.5;
+pub const MAX_ZOOM: f32 = 2.0;
 
 /// How patch cables are drawn. Positions never change between modes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,37 +40,12 @@ pub enum CableView {
     All,
     /// Cables touching the selected module at full strength, the rest faint.
     Focus,
-    /// No cables; modulated knobs show a `< source` badge instead.
+    /// No cables; jacks and modulated knobs show badges instead.
     Hidden,
 }
 
-/// A module's `Category` (brief section 8's grouping) doubles as its panel's accent color — the
-/// same idea real modular hardware uses (Make Noise/Mutable-style panel-color-by-function), so a
-/// patch reads at a glance instead of every module being an identical gray box.
-fn category_color(category: Category) -> Color32 {
-    match category {
-        Category::Source => Color32::from_rgb(230, 140, 60),
-        Category::Filter => Color32::from_rgb(60, 180, 200),
-        Category::Modulator => Color32::from_rgb(170, 100, 220),
-        Category::Sequencer => Color32::from_rgb(120, 200, 90),
-        Category::Utility => Color32::from_rgb(140, 140, 155),
-        Category::Effect => Color32::from_rgb(220, 90, 150),
-    }
-}
-
-/// A port's `PortType` doubles as its jack color — common Eurorack convention (audio vs. CV vs.
-/// gate vs. pitch reading as distinct at a glance, not just by hovering to read a tooltip).
-fn port_type_color(port_type: PortType) -> Color32 {
-    match port_type {
-        PortType::Audio => Color32::from_rgb(235, 235, 235),
-        PortType::Cv | PortType::UnipolarCv => Color32::from_rgb(90, 160, 255),
-        PortType::Gate => Color32::from_rgb(255, 190, 60),
-        PortType::Pitch => Color32::from_rgb(110, 220, 150),
-    }
-}
-
-/// A fixed palette cables cycle through by `CableId`, so a patch with several cables reads as
-/// actually patched (distinguishable cables) rather than one flat color for every connection.
+/// Colours routes cycle through by `CableId`, so each source of a multi-source knob keeps one
+/// colour across its lead, lane, ring and drawer row.
 const CABLE_COLORS: &[Color32] = &[
     Color32::from_rgb(220, 80, 80),
     Color32::from_rgb(80, 140, 220),
@@ -98,19 +61,32 @@ pub(crate) fn cable_color(id: CableId) -> Color32 {
     CABLE_COLORS[(id as usize) % CABLE_COLORS.len()]
 }
 
-/// Interaction state that persists across frames but isn't part of the patch itself — which
-/// module is selected (for the param panel), an in-progress cable connection, an in-progress
-/// module drag, which kind is selected in the "add module" palette, and the Save/Load path field.
+/// World (rack units at 100 %) to screen.
+#[derive(Clone, Copy)]
+struct Xf {
+    origin: Pos2,
+    zoom: f32,
+}
+
+impl Xf {
+    fn p(&self, w: Pos2) -> Pos2 {
+        self.origin + w.to_vec2() * self.zoom
+    }
+    fn r(&self, r: Rect) -> Rect {
+        Rect::from_min_max(self.p(r.min), self.p(r.max))
+    }
+    fn inv(&self, s: Pos2) -> Pos2 {
+        ((s - self.origin) / self.zoom).to_pos2()
+    }
+}
+
+/// Interaction and view state that is not part of the patch.
 pub struct UiState {
     pub selected_kind: String,
     pub selected_module: Option<ModuleId>,
-    pub view_mode: ViewMode,
     pending_output: Option<PortRef>,
-    dragging: Option<Dragging>,
-    /// Directory `kabl_core::save`/`load` read and write — a plain text field rather than a
-    /// native file-picker dependency (`rfd` and friends), which would be unverifiable in this
-    /// container anyway (no display server to test a picker dialog against) and isn't needed for
-    /// the underlying save/load logic to be real and correct.
+    moving: Option<Moving>,
+    /// Directory `kabl_core::save`/`load` read and write (a plain text field).
     pub patch_path: String,
     pub last_message: Option<String>,
     pub cable_view: CableView,
@@ -128,24 +104,45 @@ pub struct UiState {
     pub(crate) base_text: String,
     pub(crate) base_text_for: Option<(ModuleId, String)>,
     /// Screen rects of interactive targets drawn last frame (`knob:4.attack_ms`,
-    /// `ring:4.attack_ms`, `out:9.out`, `in:5.cv`, `sel:4.timing.1`, `row:12`, ...), for
-    /// headless interaction tests and scripted real-input runs.
-    pub hits: std::collections::BTreeMap<String, Rect>,
-    frame_hits: std::collections::BTreeMap<String, Rect>,
-    /// Decoded skin background textures, keyed by module kind (one skin per kind, see
-    /// `kabl_modules::skin`) so a module's art is decoded once and reused every frame, not
-    /// re-decoded per instance per frame. `TextureHandle` is ref-counted and frees its GPU texture
-    /// on drop, so this cache is also what keeps a loaded skin's texture alive.
-    image_cache: std::collections::HashMap<&'static str, egui::TextureHandle>,
+    /// `ring:4.attack_ms`, `out:9.out`, `in:5.cv`, `sel:4.timing.1`, `row:12`, `toggle:4`,
+    /// `pin:4.timing`, `module:4`, ...), for headless interaction tests and scripted real-input
+    /// runs.
+    pub hits: BTreeMap<String, Rect>,
+    frame_hits: BTreeMap<String, Rect>,
+    /// Decoded skin art, keyed by (module kind, dark variant); the handle keeps the texture alive.
+    image_cache: HashMap<(&'static str, bool), egui::TextureHandle>,
+    /// A-dark when true, A-light otherwise.
+    pub dark: bool,
+    pub zoom: f32,
+    /// Screen offset of the rack origin from the canvas' top-left.
+    pub pan: EguiVec2,
+    pub drawer_open: bool,
+    /// Modules showing their advanced controls. View only: never saved, never undone.
+    pub expanded: BTreeSet<ModuleId>,
+    /// Advanced controls float over the neighbours instead of pushing them (setting).
+    pub float_expansion: bool,
+    /// Show illustrated skins where a module has one (core modules stay A / A-dark otherwise).
+    pub skins: bool,
+    /// Viewer preview of a skin's `labels_on_art` flag; `None` = the skin's own setting.
+    pub skin_labels_on_art: Option<bool>,
+    /// Module in choose-primary mode and its pending face choice (committed by `Done`).
+    pub choose: Option<(ModuleId, Vec<bool>)>,
+    flash: Option<(ModuleId, &'static str, f64)>,
+    /// Module to pan into view after the next layout (just expanded or revealed).
+    reveal: Option<ModuleId>,
+    canvas: Rect,
+    fitted: bool,
+    last_inspected: Option<(ModuleId, String)>,
+    /// Values, pills and badges: drawn after the cables so no cable hides them.
+    pub(crate) deferred: Vec<egui::Shape>,
 }
 
-struct Dragging {
+struct Moving {
     id: ModuleId,
-    /// Position at drag start, before any delta was applied — `MoveModule` only gets appended
-    /// once, on release, with the final position; see `editor.rs`'s doc comment on why moves
-    /// aren't committed per-frame.
-    start_pos: Vec2,
-    live_pos: Vec2,
+    /// Pointer minus module origin, in world units, at the press.
+    grab: EguiVec2,
+    live: Vec2,
+    start: Vec2,
 }
 
 impl Default for UiState {
@@ -157,11 +154,8 @@ impl Default for UiState {
                 .unwrap_or("osc.va")
                 .to_string(),
             selected_module: None,
-            // Eurorack is the priority view (owner: better for playing, not building from
-            // scratch) — defaults on; Patchbay stays a click away for editing.
-            view_mode: ViewMode::Eurorack,
             pending_output: None,
-            dragging: None,
+            moving: None,
             patch_path: "my-patch".to_string(),
             last_message: None,
             cable_view: CableView::All,
@@ -173,7 +167,22 @@ impl Default for UiState {
             base_text_for: None,
             hits: Default::default(),
             frame_hits: Default::default(),
-            image_cache: std::collections::HashMap::new(),
+            image_cache: HashMap::new(),
+            dark: false,
+            zoom: 1.0,
+            pan: EguiVec2::ZERO,
+            drawer_open: true,
+            expanded: BTreeSet::new(),
+            float_expansion: false,
+            skins: false,
+            skin_labels_on_art: None,
+            choose: None,
+            flash: None,
+            reveal: None,
+            canvas: Rect::NOTHING,
+            fitted: false,
+            last_inspected: None,
+            deferred: Vec::new(),
         }
     }
 }
@@ -211,46 +220,98 @@ impl UiState {
         {
             self.selected_module = None;
         }
+        self.expanded.retain(|id| state.modules.contains_key(id));
+        if self
+            .choose
+            .as_ref()
+            .is_some_and(|(id, _)| !state.modules.contains_key(id))
+        {
+            self.choose = None;
+        }
+    }
+
+    fn xf(&self) -> Xf {
+        Xf {
+            origin: self.canvas.min + self.pan,
+            zoom: self.zoom,
+        }
+    }
+
+    fn zoom_about(&mut self, zoom: f32, at: Pos2) {
+        let world = self.xf().inv(at);
+        self.zoom = zoom.clamp(MIN_ZOOM, MAX_ZOOM);
+        self.pan = at - self.canvas.min - world.to_vec2() * self.zoom;
+    }
+
+    /// Zooms so `world` fits the canvas (at most `max_zoom`), left-aligned, centred vertically
+    /// when there is room.
+    fn frame_world(&mut self, world: Rect, max_zoom: f32) {
+        let c = self.canvas.shrink(12.0);
+        let z = (c.width() / world.width())
+            .min(c.height() / world.height())
+            .clamp(MIN_ZOOM, max_zoom);
+        self.zoom = z;
+        self.pan = c.min - self.canvas.min - world.min.to_vec2() * z;
+        let spare = c.height() - world.height() * z;
+        if spare > 0.0 {
+            self.pan.y += spare / 2.0;
+        }
+    }
+
+    /// Pans the least needed to bring the screen rect `target` inside the canvas (its
+    /// top-left corner first when it cannot fit whole).
+    fn keep_visible(&mut self, target: Rect) {
+        let c = self.canvas.shrink(8.0);
+        let mut d = EguiVec2::ZERO;
+        if target.right() > c.right() {
+            d.x = c.right() - target.right();
+        }
+        if target.left() + d.x < c.left() {
+            d.x = c.left() - target.left();
+        }
+        if target.bottom() > c.bottom() {
+            d.y = c.bottom() - target.bottom();
+        }
+        if target.top() + d.y < c.top() {
+            d.y = c.top() - target.top();
+        }
+        self.pan += d;
+    }
+
+    fn view(&self) -> rack::View<'_> {
+        rack::View {
+            expanded: Some(&self.expanded),
+            float: self.float_expansion,
+            skins: self.skins,
+            choose: self.choose.as_ref().map(|(id, set)| (*id, set.as_slice())),
+            moving: self.moving.as_ref().map(|m| (m.id, m.live)),
+        }
+    }
+
+    fn flash_on(&self, id: ModuleId, param: &str, now: f64) -> bool {
+        matches!(self.flash, Some((fid, p, t)) if fid == id && p == param && now - t < 1.5)
     }
 }
 
-/// Decodes `png_bytes` (a skin's embedded panel art) into an `egui` texture the first time `kind`
-/// is seen, and reuses the cached handle on every later call — decoding a PNG is real work, not
-/// something to repeat every frame for every instance of a skinned module.
-fn skin_texture(
-    ui: &egui::Ui,
-    cache: &mut std::collections::HashMap<&'static str, egui::TextureHandle>,
-    kind: &'static str,
-    png_bytes: &'static [u8],
-) -> egui::TextureId {
-    let handle = cache.entry(kind).or_insert_with(|| {
-        let decoded = image::load_from_memory(png_bytes)
-            .expect("skin background image must be a valid, embedded PNG")
-            .to_rgba8();
-        let size = [decoded.width() as usize, decoded.height() as usize];
-        let color_image = egui::ColorImage::from_rgba_unmultiplied(size, decoded.as_raw());
-        ui.ctx()
-            .load_texture(kind, color_image, egui::TextureOptions::LINEAR)
-    });
-    handle.id()
-}
-
-/// Draws the whole patchbay for one frame and applies any user-triggered edits to `editor`
-/// directly (immediate-mode: the UI *is* the edit trigger, there's no separate "apply" step the
-/// caller needs to remember). Call once per frame, from `eframe::App::ui` — this version of
-/// `egui`/`eframe` hands the app a root `&mut Ui`, not a `&Context`, so panels nest inside it via
-/// `show_inside` rather than the older `Panel::show(ctx, ...)` pattern.
+/// Draws the rack editor for one frame and applies user edits to `editor` directly. Call once
+/// per frame from `eframe::App::ui`.
 pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
     ui_state.validate(editor);
+    let th = theme(ui_state.dark);
+    ui.ctx().set_visuals(th.visuals());
     // Escape mid-drag cancels it: revert the gesture's edit and leave no undo entry. The drag
-    // stays captured (and inert) until the button is released.
+    // stays captured (and inert) until the button is released. Otherwise Escape leaves choose
+    // mode without changing the face.
+    let esc = ui.input(|i| i.key_pressed(egui::Key::Escape));
     if let Some(g) = ui_state.drag.as_mut() {
-        if !g.cancelled && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+        if !g.cancelled && esc {
             if g.committed {
                 editor.cancel_gesture();
             }
             g.cancelled = true;
         }
+    } else if esc && ui_state.choose.is_some() {
+        ui_state.choose = None;
     }
     if !ui.input(|i| i.pointer.any_down()) {
         ui_state.drag = None;
@@ -277,131 +338,197 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
             editor.redo();
         }
     }
-    egui::Panel::top("kabl-toolbar").show(ui, |ui| {
-        ui.horizontal(|ui| {
-            egui::ComboBox::from_label("kind")
-                .selected_text(ui_state.selected_kind.clone())
-                .show_ui(ui, |ui| {
-                    for kind in PatchEditor::known_kinds() {
-                        ui.selectable_value(&mut ui_state.selected_kind, kind.to_string(), *kind);
-                    }
-                });
-            if ui.button("Add module").clicked() {
-                // Cascade so repeated adds don't all land exactly on top of each other -- easy
-                // to still overlap an existing module you've dragged elsewhere, but at least
-                // successive additions are never a literal stack. Modulo keeps it from
-                // wandering off canvas after many adds.
-                let n = (editor.state().modules.len() % 10) as f32;
-                let pos = Vec2 {
-                    x: 40.0 + n * 24.0,
-                    y: 40.0 + n * 24.0,
-                };
-                editor.add_module(&ui_state.selected_kind, pos);
-            }
-            if ui
-                .add_enabled(editor.can_undo(), egui::Button::new("Undo"))
-                .clicked()
-            {
-                editor.undo();
-            }
-            if ui
-                .add_enabled(editor.can_redo(), egui::Button::new("Redo"))
-                .clicked()
-            {
-                editor.redo();
-            }
-            if ui_state.pending_output.is_some() {
-                ui.label(
-                    "Click an input port to connect, or click the output port again to cancel.",
-                );
-            }
-            ui.separator();
-            ui.selectable_value(&mut ui_state.view_mode, ViewMode::Eurorack, "Eurorack");
-            ui.selectable_value(&mut ui_state.view_mode, ViewMode::Patchbay, "Patchbay");
-            ui.separator();
-            ui.label("Cables:");
-            for (mode, label) in [
-                (CableView::All, "All"),
-                (CableView::Focus, "Focus"),
-                (CableView::Hidden, "Hidden"),
-            ] {
-                let r = ui.selectable_value(&mut ui_state.cable_view, mode, label);
-                ui_state.record(format!("view:{label}"), r.rect);
-            }
-        });
-        ui.horizontal(|ui| {
-            ui.label("patch dir:");
-            let r = ui.text_edit_singleline(&mut ui_state.patch_path);
-            ui_state.record("patch-path".into(), r.rect);
-            let save = ui.button("Save");
-            ui_state.record("save".into(), save.rect);
-            if save.clicked() {
-                let path = std::path::Path::new(&ui_state.patch_path);
-                ui_state.last_message = Some(match kabl_core::save(path, editor.log()) {
-                    Ok(()) => format!("saved to {}", path.display()),
-                    Err(err) => format!("save failed: {err:?}"),
-                });
-            }
-            if ui.button("Load").clicked() {
-                let path = std::path::Path::new(&ui_state.patch_path);
-                match kabl_core::load(path) {
-                    Ok(log) => {
-                        *editor = PatchEditor::from_log(log);
-                        // `from_log` starts clean (right for the initial startup seed, whose
-                        // caller compiles the seeded patch directly) -- but a Load here replaces
-                        // a *live* patch, and the audio host only ever rebuilds by checking
-                        // `take_dirty()`, so this needs to mark it explicitly or the running
-                        // graph would silently keep playing the old patch.
-                        editor.mark_dirty();
-                        ui_state.selected_module = None;
-                        ui_state.inspected = None;
-                        ui_state.selected_route = None;
-                        ui_state.pending_output = None;
-                        ui_state.last_message = Some(format!("loaded {}", path.display()));
-                    }
-                    Err(err) => {
-                        ui_state.last_message = Some(format!("load failed: {err:?}"));
-                    }
-                }
-            }
-            if let Some(msg) = &ui_state.last_message {
-                ui.label(msg);
-            }
-        });
-    });
+    egui::Panel::top("kabl-toolbar")
+        .exact_size(40.0)
+        .show(ui, |ui| toolbar(editor, ui_state, ui));
 
-    egui::Panel::right("kabl-params")
-        .exact_size(360.0)
-        .show(ui, |ui| {
-            show_param_panel(editor, ui_state, ui);
-            routing::drawer(editor, ui_state, ui);
-        });
+    if ui_state.drawer_open {
+        egui::Panel::right("kabl-params")
+            .exact_size(DRAWER_W)
+            .resizable(false)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.heading("Routing");
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.button("Close").clicked() {
+                            ui_state.drawer_open = false;
+                        }
+                    });
+                });
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    show_param_panel(editor, ui_state, ui);
+                    routing::drawer(editor, ui_state, ui);
+                });
+            });
+    }
 
-    egui::CentralPanel::default().show(ui, |ui| {
-        let available = ui.available_size();
-        let content_size = canvas_content_size(editor).max(available);
-        egui::ScrollArea::both().auto_shrink(false).show(ui, |ui| {
-            ui.set_min_size(content_size);
-            show_canvas(editor, ui_state, ui);
-        });
-    });
+    egui::CentralPanel::default()
+        .frame(egui::Frame::NONE.fill(th.rack))
+        .show(ui, |ui| show_rack(editor, ui_state, ui, &th));
     ui_state.hits = std::mem::take(&mut ui_state.frame_hits);
 }
 
-/// Bounding box over every module's position + a generous margin, so the scroll area knows how
-/// far there is to scroll — a patch (or a wide rack in Eurorack view) bigger than the window used
-/// to just get clipped with no way to reach the rest of it.
-fn canvas_content_size(editor: &PatchEditor) -> EguiVec2 {
-    let mut max_x = 0.0f32;
-    let mut max_y = 0.0f32;
-    for m in editor.state().modules.values() {
-        let width = registry::info_for(&m.kind).map_or(MODULE_WIDTH, |i| {
-            (i.width_units as f32 * UNIT_PX).max(MODULE_WIDTH)
+fn tool(ui: &mut egui::Ui, ui_state: &mut UiState, key: &str, label: &str, on: bool) -> bool {
+    let r = ui.add(egui::Button::selectable(on, label));
+    ui_state.record(key.to_string(), r.rect);
+    r.clicked()
+}
+
+fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
+    ui.horizontal_centered(|ui| {
+        ui.label(egui::RichText::new("kabl").strong().size(17.0));
+        egui::ComboBox::from_id_salt("kind")
+            .width(90.0)
+            .selected_text(ui_state.selected_kind.clone())
+            .show_ui(ui, |ui| {
+                for kind in PatchEditor::known_kinds() {
+                    ui.selectable_value(&mut ui_state.selected_kind, kind.to_string(), *kind);
+                }
+            });
+        if tool(ui, ui_state, "add", "Add", false) {
+            // At the end of the first row.
+            let lay = rack::layout(editor.state(), &ui_state.view());
+            let x = lay
+                .mods
+                .iter()
+                .filter(|m| m.row == 0)
+                .map(|m| m.rect.right())
+                .fold(rack::RACK_X, f32::max);
+            let id = editor.add_module(&ui_state.selected_kind, Vec2 { x, y: rack::ROW_Y0 });
+            ui_state.selected_module = Some(id);
+            ui_state.reveal = Some(id);
+        }
+        ui.separator();
+        if ui
+            .add_enabled(editor.can_undo(), egui::Button::new("Undo"))
+            .clicked()
+        {
+            editor.undo();
+        }
+        if ui
+            .add_enabled(editor.can_redo(), egui::Button::new("Redo"))
+            .clicked()
+        {
+            editor.redo();
+        }
+        ui.separator();
+        ui.label("Cables");
+        for (mode, label) in [
+            (CableView::All, "All"),
+            (CableView::Focus, "Focus"),
+            (CableView::Hidden, "Hidden"),
+        ] {
+            if tool(
+                ui,
+                ui_state,
+                &format!("view:{label}"),
+                label,
+                ui_state.cable_view == mode,
+            ) {
+                ui_state.cable_view = mode;
+            }
+        }
+        ui.separator();
+        let c = ui_state.canvas.center();
+        if tool(ui, ui_state, "zoom:out", "−", false) {
+            ui_state.zoom_about(ui_state.zoom / 1.2, c);
+        }
+        let pct = format!("{:.0}%", ui_state.zoom * 100.0);
+        if tool(ui, ui_state, "zoom:100", &pct, false) {
+            ui_state.zoom_about(1.0, c);
+        }
+        if tool(ui, ui_state, "zoom:in", "+", false) {
+            ui_state.zoom_about(ui_state.zoom * 1.2, c);
+        }
+        if tool(ui, ui_state, "zoom:fit", "Fit", false) {
+            let lay = rack::layout(editor.state(), &ui_state.view());
+            ui_state.frame_world(lay.bounds.expand(4.0), 1.5);
+        }
+        let focus_target = ui_state
+            .inspected
+            .as_ref()
+            .map(|(id, _)| *id)
+            .or(ui_state.selected_module);
+        let r = ui.add_enabled(focus_target.is_some(), egui::Button::new("Focus"));
+        ui_state.record("zoom:focus".into(), r.rect);
+        if r.on_hover_text("Zoom to the selected module").clicked() {
+            let lay = rack::layout(editor.state(), &ui_state.view());
+            if let Some(world) = focus_target.and_then(|id| lay.get(id)).map(|m| m.full()) {
+                // Readable: at least 100 % unless the module is wider than the canvas.
+                let fit = (ui_state.canvas.width() - 48.0) / world.width();
+                ui_state.frame_world(
+                    world.expand(24.0),
+                    fit.clamp(MIN_ZOOM, 1.25).max(fit.min(1.0)),
+                );
+                let d = ui_state.canvas.center() - ui_state.xf().r(world).center();
+                ui_state.pan += d;
+            }
+        }
+        ui.separator();
+        if tool(ui, ui_state, "theme:light", "A-light", !ui_state.dark) {
+            ui_state.dark = false;
+        }
+        if tool(ui, ui_state, "theme:dark", "A-dark", ui_state.dark) {
+            ui_state.dark = true;
+        }
+        ui.separator();
+        let menu = ui.menu_button("View", |ui| {
+            ui.label("Expanded modules");
+            ui.radio_value(&mut ui_state.float_expansion, false, "Push neighbours");
+            ui.radio_value(&mut ui_state.float_expansion, true, "Float over neighbours");
+            ui.separator();
+            ui.checkbox(&mut ui_state.skins, "Illustrated skins");
+            ui.add_enabled_ui(ui_state.skins, |ui| {
+                let mut on_art = ui_state.skin_labels_on_art.unwrap_or(false);
+                if ui
+                    .checkbox(&mut on_art, "Preview labels_on_art")
+                    .on_hover_text("A skin maker's flag; off = theme plates (default)")
+                    .changed()
+                {
+                    ui_state.skin_labels_on_art = on_art.then_some(true);
+                }
+            });
         });
-        max_x = max_x.max(m.pos.x + width);
-        max_y = max_y.max(m.pos.y + 300.0); // generous fixed bound, exact height doesn't matter here
-    }
-    EguiVec2::new(max_x + CANVAS_MARGIN, max_y + CANVAS_MARGIN)
+        ui_state.record("view-menu".into(), menu.response.rect);
+        ui.separator();
+        let r = ui.add(egui::TextEdit::singleline(&mut ui_state.patch_path).desired_width(110.0));
+        ui_state.record("patch-path".into(), r.rect);
+        if tool(ui, ui_state, "save", "Save", false) {
+            let path = std::path::Path::new(&ui_state.patch_path);
+            ui_state.last_message = Some(match kabl_core::save(path, editor.log()) {
+                Ok(()) => format!("saved to {}", path.display()),
+                Err(err) => format!("save failed: {err:?}"),
+            });
+        }
+        if tool(ui, ui_state, "load", "Load", false) {
+            let path = std::path::Path::new(&ui_state.patch_path);
+            match kabl_core::load(path) {
+                Ok(log) => {
+                    *editor = PatchEditor::from_log(log);
+                    // A Load replaces a live patch; the audio host only rebuilds on `take_dirty`.
+                    editor.mark_dirty();
+                    ui_state.selected_module = None;
+                    ui_state.inspected = None;
+                    ui_state.selected_route = None;
+                    ui_state.pending_output = None;
+                    ui_state.choose = None;
+                    ui_state.last_message = Some(format!("loaded {}", path.display()));
+                }
+                Err(err) => {
+                    ui_state.last_message = Some(format!("load failed: {err:?}"));
+                }
+            }
+        }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let open = ui_state.drawer_open;
+            if tool(ui, ui_state, "routing", "Routing", open) {
+                ui_state.drawer_open = !open;
+            }
+            if let Some(msg) = &ui_state.last_message {
+                ui.label(egui::RichText::new(msg).small());
+            }
+        });
+    });
 }
 
 fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
@@ -409,23 +536,17 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
         ui.label("No module selected.");
         return;
     };
-    // Snapshot before mutating `editor` below -- same reasoning as `show_canvas`'s snapshot.
-    let Some((kind, params)) = editor
-        .state()
-        .modules
-        .get(&id)
-        .map(|m| (m.kind.clone(), m.params.clone()))
-    else {
+    let Some(kind) = editor.state().modules.get(&id).map(|m| m.kind.clone()) else {
         ui.label("No module selected.");
         return;
     };
-    ui.heading(format!("{kind} (#{id})"));
     let Some(info) = registry::info_for(&kind) else {
         ui.label("Unknown module kind.");
         return;
     };
+    ui.label(egui::RichText::new(format!("{} #{id}", info.name)).strong());
     for param in info.params {
-        let current = params.get(param.name).copied().unwrap_or(param.default);
+        let current = routing::base_value(editor.state(), id, param);
         if param.taper == Taper::Stepped {
             ui.horizontal(|ui| {
                 ui.label(routing::param_label(param));
@@ -467,752 +588,1003 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
     }
 }
 
-fn show_canvas(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
-    let origin = ui.min_rect().min;
-    let painter = ui.painter().clone();
-    let eurorack = ui_state.view_mode == ViewMode::Eurorack;
+/// The skin's art for this theme: its dark variant, else the light art (dimmed under A-dark).
+fn skin_texture(
+    ui: &egui::Ui,
+    cache: &mut HashMap<(&'static str, bool), egui::TextureHandle>,
+    kind: &'static str,
+    skin: &kabl_modules::skin::ModuleSkin,
+    dark: bool,
+) -> Option<(egui::TextureId, Color32)> {
+    let (bytes, variant, tint) = match (dark, skin.background_dark, skin.background_image) {
+        (true, Some(d), _) => (d, true, Color32::WHITE),
+        (true, None, Some(l)) => (l, false, Color32::from_gray(166)),
+        (_, _, Some(l)) => (l, false, Color32::WHITE),
+        _ => return None,
+    };
+    let handle = cache.entry((kind, variant)).or_insert_with(|| {
+        let decoded = image::load_from_memory(bytes)
+            .expect("skin art must be a valid, embedded PNG")
+            .to_rgba8();
+        let size = [decoded.width() as usize, decoded.height() as usize];
+        let color_image = egui::ColorImage::from_rgba_unmultiplied(size, decoded.as_raw());
+        ui.ctx().load_texture(
+            format!("{kind}-{variant}"),
+            color_image,
+            egui::TextureOptions::LINEAR,
+        )
+    });
+    Some((handle.id(), tint))
+}
 
-    if eurorack {
-        draw_rack_grid(&painter, ui.clip_rect(), origin);
+/// What the modules drew this frame, for cables and drop targets.
+#[derive(Default)]
+struct Drawn {
+    /// Jack centres by (module, direction, port).
+    ports: HashMap<(ModuleId, PortDirection, String), Pos2>,
+    /// Route cable ends (knob plugs, or the `+N` button of a collapsed module).
+    plugs: Vec<(CableId, Pos2)>,
+    /// Output-jack drag released this frame: (source, pointer position).
+    drop_at: Option<(PortRef, Pos2)>,
+}
+
+fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, th: &Theme) {
+    let canvas = ui.max_rect();
+    let now = ui.input(|i| i.time);
+    let lay = rack::layout(editor.state(), &ui_state.view());
+    if !ui_state.fitted {
+        // First frame: the whole patch, never above 100 %.
+        ui_state.canvas = canvas;
+        ui_state.frame_world(lay.bounds.expand(4.0), 1.0);
+        ui_state.fitted = true;
+    } else if canvas != ui_state.canvas {
+        // Drawer opened or window resized: keep what the user is working on reachable.
+        ui_state.canvas = canvas;
+        let target = ui_state
+            .inspected
+            .as_ref()
+            .and_then(|(id, p)| lay.get(*id)?.ctl(p).map(|c| c.geo.bounds()))
+            .or_else(|| {
+                ui_state
+                    .selected_module
+                    .and_then(|id| Some(lay.get(id)?.face))
+            });
+        if let Some(t) = target {
+            let t = ui_state.xf().r(t);
+            ui_state.keep_visible(t);
+        }
     }
-    // Clicking empty canvas ends knob inspection (and its source lanes). Registered before the
-    // modules, so every module control wins over it.
-    let bg = ui.interact(ui.clip_rect(), Id::new("kabl-canvas-bg"), Sense::click());
+    // Inspecting a control that is off the face (route selected, drawer) reveals it.
+    if ui_state.inspected != ui_state.last_inspected {
+        ui_state.last_inspected = ui_state.inspected.clone();
+        if let Some((id, p)) = &ui_state.inspected {
+            if let Some(h) = lay
+                .get(*id)
+                .and_then(|m| m.hidden.iter().find(|h| h.name == p))
+            {
+                ui_state.expanded.insert(*id);
+                ui_state.flash = Some((*id, h.name, now));
+                ui_state.reveal = Some(*id);
+            }
+        }
+    }
+    let lay = rack::layout(editor.state(), &ui_state.view());
+    if let Some(id) = ui_state.reveal.take() {
+        if let Some(m) = lay.get(id) {
+            let t = ui_state.xf().r(m.full());
+            ui_state.keep_visible(t);
+        }
+    }
+
+    // Wheel pans, Ctrl+wheel / pinch zooms about the pointer.
+    let pointer = ui.input(|i| i.pointer.hover_pos());
+    if let Some(p) = pointer.filter(|p| canvas.contains(*p)) {
+        let (scroll, zd) = ui.input(|i| (i.smooth_scroll_delta, i.zoom_delta()));
+        if zd != 1.0 {
+            ui_state.zoom_about(ui_state.zoom * zd, p);
+        } else if scroll != EguiVec2::ZERO {
+            ui_state.pan += scroll;
+        }
+    }
+    let bg = ui.interact(canvas, Id::new("kabl-canvas-bg"), Sense::click_and_drag());
+    if bg.dragged() && ui_state.port_drag.is_none() {
+        ui_state.pan += bg.drag_delta();
+    }
     if bg.clicked() {
+        // Clicking empty rack ends knob inspection (and its source lanes).
         ui_state.inspected = None;
         ui_state.selected_route = None;
     }
+    let xf = ui_state.xf();
+    let painter = ui.painter_at(canvas);
+    draw_rails(&painter, th, xf, canvas, lay.rows.max(2));
 
-    // Snapshot layout data before mutating `editor` mid-frame (immediate-mode + a shared
-    // PatchLog don't mix well otherwise: we'd need `editor` borrowed both immutably, for
-    // reading positions/ports while drawing, and mutably, for applying an edit a click just
-    // triggered, at the same time). Collecting positions once per frame is cheap (this is a UI
-    // frame, not the audio thread) and keeps the borrow simple.
-    let modules: Vec<(
-        ModuleId,
-        String,
-        Vec2,
-        std::collections::BTreeMap<String, f32>,
-    )> = editor
-        .state()
-        .modules
+    let mut drawn = Drawn::default();
+    ui_state.deferred.clear();
+    for m in &lay.mods {
+        draw_module(editor, ui_state, ui, &painter, th, xf, m, now, &mut drawn);
+    }
+    // Floating areas' visible screen rects, for drop targeting.
+    let floats: Vec<(ModuleId, Rect)> = lay
+        .mods
         .iter()
-        .map(|(&id, m)| (id, m.kind.clone(), m.pos, m.params.clone()))
-        .collect();
-    let cables: Vec<(CableId, PortRef, PortRef)> = editor
-        .state()
-        .cables
-        .iter()
-        .map(|(&id, c)| (id, c.from.clone(), c.to.clone()))
+        .filter(|m| m.overlay)
+        .filter_map(|m| Some((m.id, xf.r(m.adv?).intersect(canvas))))
         .collect();
 
-    // Port screen positions this frame, keyed by (module id, direction, port name) -- needed
-    // both to draw cables and to hit-test port clicks.
-    let mut port_pos: std::collections::HashMap<(ModuleId, PortDirection, String), Pos2> =
-        std::collections::HashMap::new();
-    // Route cable ends on knobs/selectors, filled while drawing modules.
-    let mut plugs: Vec<(CableId, Pos2)> = Vec::new();
-    // Output-jack drag released this frame: (source, pointer position).
-    let mut drop_at: Option<(PortRef, Pos2)> = None;
-
-    for (id, kind, stored_pos, params) in &modules {
-        let mut pos = match &ui_state.dragging {
-            Some(d) if d.id == *id => d.live_pos,
-            _ => *stored_pos,
-        };
-        // Eurorack only: snap to the rack grid for display *and* interaction. The underlying
-        // `ModuleState.pos` this commits on drag-release is the snapped value too (real per-cell
-        // placement, not just a visual overlay) -- but only while this view is active; Patchbay
-        // stays free-form on the same field, unaffected when the owner switches back to it.
-        if eurorack {
-            pos = eurorack_snap(pos);
-        }
-        let info = registry::info_for(kind);
-
-        if let Some(skin) = info.and_then(|i| i.skin) {
-            draw_skinned_module(
-                editor,
-                ui_state,
-                ui,
-                &painter,
-                &mut port_pos,
-                &mut plugs,
-                &mut drop_at,
-                *id,
-                info.expect("skin implies info is Some"),
-                skin,
-                pos,
-                *stored_pos,
-                origin,
-            );
+    let deferred = std::mem::take(&mut ui_state.deferred);
+    draw_cables(editor, ui_state, ui, &painter, th, xf, &lay, &drawn, None);
+    painter.extend(deferred);
+    // Hidden modulated controls: the lead docks on the `+N` button, which says so.
+    for m in &lay.mods {
+        let Some(t) = m.toggle else { continue };
+        let routed = hidden_routes(editor, m);
+        if routed.is_empty() {
             continue;
         }
-
-        let inputs: Vec<&kabl_modules::info::PortInfo> = info
-            .map(|i| {
-                i.ports
-                    .iter()
-                    .filter(|p| p.direction == PortDirection::Input)
-                    .collect()
-            })
-            .unwrap_or_default();
-        let outputs: Vec<&kabl_modules::info::PortInfo> = info
-            .map(|i| {
-                i.ports
-                    .iter()
-                    .filter(|p| p.direction == PortDirection::Output)
-                    .collect()
-            })
-            .unwrap_or_default();
-        let port_rows = inputs.len().max(outputs.len()).max(1) as f32;
-        let knobs: Vec<&'static kabl_modules::ParamInfo> = info
-            .map(|i| {
-                i.params
-                    .iter()
-                    .filter(|p| p.taper != Taper::Stepped)
-                    .collect()
-            })
-            .unwrap_or_default();
-        let selectors: Vec<&'static kabl_modules::ParamInfo> = info
-            .map(|i| {
-                i.params
-                    .iter()
-                    .filter(|p| p.taper == Taper::Stepped)
-                    .collect()
-            })
-            .unwrap_or_default();
-        let body_height = HEADER_HEIGHT
-            + port_rows * PORT_ROW_HEIGHT
-            + if knobs.is_empty() {
-                0.0
-            } else {
-                KNOB_ROW_HEIGHT
-            }
-            + selectors.len() as f32 * SELECTOR_ROW_HEIGHT
-            + 4.0;
-        // Eurorack: real per-module rack width (`width_units`, snapped to the grid cell size).
-        // Patchbay: the same uniform width every module has always used there.
-        let module_width = if eurorack {
-            info.map_or(MODULE_WIDTH, |i| i.width_units as f32 * UNIT_PX)
-        } else {
-            MODULE_WIDTH
-        };
-        let size = EguiVec2::new(module_width, body_height);
-        let rect = Rect::from_min_size(origin + EguiVec2::new(pos.x, pos.y), size);
-
-        let selected = interact_body(ui, editor, ui_state, *id, *stored_pos, rect);
-        let accent = category_color(info.map(|i| i.category).unwrap_or(Category::Utility));
-        let fill = if selected {
-            PANEL_FILL_SELECTED
-        } else {
-            PANEL_FILL
-        };
-        // Faceplate: dark body, a category-colored accent strip along the top (the "which kind
-        // of module is this, at a glance" cue real modular panels use color for), a brighter
-        // outline when selected instead of a flat gray one always.
-        painter.rect_filled(rect, 5.0, fill);
-        let accent_rect = Rect::from_min_size(rect.min, EguiVec2::new(module_width, ACCENT_HEIGHT));
-        painter.rect_filled(
-            accent_rect,
-            egui::CornerRadius {
-                nw: 5,
-                ne: 5,
-                sw: 0,
-                se: 0,
-            },
-            accent,
-        );
+        let r = xf.r(t);
         painter.rect_stroke(
-            rect,
-            5.0,
-            Stroke::new(
-                if selected { 2.0 } else { 1.0 },
-                if selected {
-                    accent
-                } else {
-                    Color32::from_gray(90)
-                },
-            ),
+            r.expand(3.0 * xf.zoom),
+            CornerRadius::same(6),
+            Stroke::new(2.5 * xf.zoom, th.cv),
             egui::StrokeKind::Outside,
         );
-        painter.text(
-            rect.min + EguiVec2::new(6.0, ACCENT_HEIGHT + 3.0),
-            egui::Align2::LEFT_TOP,
-            format!("{kind} #{id}"),
-            egui::FontId::proportional(12.0),
-            Color32::WHITE,
-        );
-
-        for (row, port) in inputs.iter().enumerate() {
-            let p = rect.min
-                + EguiVec2::new(
-                    0.0,
-                    HEADER_HEIGHT + row as f32 * PORT_ROW_HEIGHT + PORT_ROW_HEIGHT / 2.0,
-                );
-            port_pos.insert((*id, PortDirection::Input, port.name.to_string()), p);
-            port_control(editor, ui_state, ui, &painter, *id, port, p, &mut drop_at);
-        }
-        for (row, port) in outputs.iter().enumerate() {
-            let p = rect.min
-                + EguiVec2::new(
-                    module_width,
-                    HEADER_HEIGHT + row as f32 * PORT_ROW_HEIGHT + PORT_ROW_HEIGHT / 2.0,
-                );
-            port_pos.insert((*id, PortDirection::Output, port.name.to_string()), p);
-            port_control(editor, ui_state, ui, &painter, *id, port, p, &mut drop_at);
-        }
-
-        // Continuous params as knobs in one row below the jacks; stepped params (timing mode,
-        // waveforms) as segmented selectors, one row each.
-        let knob_y = rect.min.y + HEADER_HEIGHT + port_rows * PORT_ROW_HEIGHT + 20.0;
-        let n = knobs.len() as f32;
-        for (i, param) in knobs.iter().enumerate() {
-            let cx = rect.min.x + module_width * (i as f32 + 0.5) / n;
-            let knob_plugs = routing::param_knob(
-                editor,
+        if ui_state.cable_view == CableView::Hidden {
+            routing::defer_badge(
                 ui_state,
-                ui,
                 &painter,
-                *id,
-                param,
-                Pos2::new(cx, knob_y),
+                pos2(r.center().x, r.bottom() + 12.0 * xf.zoom),
+                &format!("{} hidden", routed.len()),
+                th.cv,
+                xf.zoom,
             );
-            plugs.extend(knob_plugs);
-        }
-        let mut sel_y = rect.min.y
-            + HEADER_HEIGHT
-            + port_rows * PORT_ROW_HEIGHT
-            + if knobs.is_empty() {
-                0.0
-            } else {
-                KNOB_ROW_HEIGHT
-            };
-        for param in &selectors {
-            let r = Rect::from_min_size(
-                Pos2::new(rect.min.x + 6.0, sel_y + 2.0),
-                EguiVec2::new(module_width - 12.0, SELECTOR_ROW_HEIGHT - 8.0),
-            );
-            plugs.extend(routing::stepped_selector(
-                editor, ui_state, ui, &painter, *id, kind, param, r,
-            ));
-            sel_y += SELECTOR_ROW_HEIGHT;
-        }
-        let _ = params;
-    }
-
-    // A port drag released this frame: onto a knob/selector makes a route, onto an input jack a
-    // cable. Resolved after every module is drawn, so every target's rect is known.
-    if let Some((from, at)) = drop_at {
-        let target = ui_state
-            .frame_hits
-            .iter()
-            .filter(|(k, r)| (k.starts_with("knob:") || k.starts_with("in:")) && r.contains(at))
-            .map(|(k, _)| k.clone())
-            .next();
-        if let Some(key) = target {
-            let (kind, rest) = key.split_once(':').unwrap();
-            let (mid, name) = rest.split_once('.').unwrap();
-            let mid: ModuleId = mid.parse().unwrap();
-            if kind == "knob" {
-                let cable = editor.connect_route(from, mid, name);
-                let routes = routing::routes_into(editor.state(), mid, name);
-                routing::inspect(ui_state, &routes, mid, name);
-                ui_state.selected_route = Some(cable);
-            } else {
-                editor.connect(
-                    from,
-                    PortRef::Module {
-                        id: mid,
-                        port: name.to_string(),
-                    },
-                );
-            }
+            painter.extend(std::mem::take(&mut ui_state.deferred));
         }
     }
 
-    let focus = ui_state.selected_module;
-    let view = ui_state.cable_view;
-    let alpha_for = |a: ModuleId, b: ModuleId| -> f32 {
-        match view {
-            CableView::All => 1.0,
-            CableView::Focus if focus == Some(a) || focus == Some(b) => 1.0,
-            CableView::Focus => 0.15,
-            CableView::Hidden => 0.0,
-        }
-    };
-
-    // Modulation routes: source jack -> knob plug, thinner than jack cables; bypassed ones
-    // grey and dashed; the selected route drawn strongest.
-    for (cable_id, pos) in &plugs {
-        let Some(c) = editor.state().cables.get(cable_id) else {
-            continue;
-        };
-        let Some(&a) = port_ref_pos(&port_pos, &c.from, PortDirection::Output) else {
-            continue;
-        };
-        let alpha = alpha_for(c.from.module_id(), c.to.module_id());
-        if alpha == 0.0 {
-            continue;
-        }
-        let bypass = c.params.get("bypass").is_some_and(|&b| b >= 0.5);
-        let selected = ui_state.selected_route == Some(*cable_id);
-        let base = if bypass {
-            Color32::from_gray(120)
-        } else {
-            cable_color(*cable_id)
-        };
-        let color = Color32::from_rgba_unmultiplied(
-            base.r(),
-            base.g(),
-            base.b(),
-            (alpha * if selected { 255.0 } else { 185.0 }) as u8,
+    for m in lay.mods.iter().filter(|m| m.overlay) {
+        draw_float(
+            editor, ui_state, ui, th, xf, m, now, &mut drawn, &lay, canvas,
         );
-        let width = if selected { 3.0 } else { 2.0 };
-        let points = cable_curve_points(a, *pos);
-        if bypass {
-            painter.extend(egui::Shape::dashed_line(
-                &points,
-                Stroke::new(width, color),
-                6.0,
-                4.0,
-            ));
-        } else {
-            painter.add(egui::Shape::line(points.clone(), Stroke::new(width, color)));
-        }
-        let mid = points[points.len() / 2];
-        let hit = Rect::from_center_size(mid, EguiVec2::splat(12.0));
-        ui_state.record(format!("route:{cable_id}"), hit);
-        let resp = ui.interact(hit, Id::new(("kabl-route", *cable_id)), Sense::click());
-        if resp.clicked() {
-            // Clicking a route selects it (never deletes: removal is explicit in the drawer).
-            if let PortRef::Param { id, param } = &c.to {
-                let (id, param) = (*id, param.clone());
-                ui_state.selected_module = Some(id);
-                ui_state.inspected = Some((id, param));
-                ui_state.selected_route = Some(*cable_id);
-            }
-        }
     }
 
-    // Output jacks feeding routes say how many when cables are hidden.
-    if ui_state.cable_view == CableView::Hidden {
-        let mut counts: std::collections::BTreeMap<(ModuleId, String), usize> = Default::default();
-        for c in editor.state().cables.values() {
-            if let (PortRef::Module { id, port }, PortRef::Param { .. }) = (&c.from, &c.to) {
-                *counts.entry((*id, port.clone())).or_default() += 1;
-            }
-        }
-        for ((id, port), n) in counts {
-            if let Some(&p) = port_pos.get(&(id, PortDirection::Output, port)) {
-                painter.text(
-                    p + EguiVec2::new(PORT_RADIUS + 3.0, -PORT_RADIUS - 3.0),
-                    egui::Align2::LEFT_BOTTOM,
-                    format!("> {n}"),
-                    egui::FontId::proportional(9.0),
-                    Color32::from_rgb(90, 170, 255),
-                );
-            }
-        }
+    if let Some((from, at)) = drawn.drop_at.take() {
+        drop_cable(editor, ui_state, from, at, &floats);
     }
-
-    // In-progress drag from an output jack: a live cable to the pointer, targets outlined.
-    if let Some(from) = &ui_state.port_drag {
-        if let (Some(&a), Some(b)) = (
-            port_ref_pos(&port_pos, from, PortDirection::Output),
-            ui.ctx().pointer_latest_pos(),
-        ) {
-            painter.add(egui::Shape::line(
-                cable_curve_points(a, b),
-                Stroke::new(2.0, Color32::from_rgb(90, 170, 255)),
-            ));
-            for (key, r) in &ui_state.frame_hits {
-                if key.starts_with("knob:") || key.starts_with("in:") {
-                    let hot = r.contains(b);
-                    painter.rect_stroke(
-                        r.expand(2.0),
-                        4.0,
-                        Stroke::new(
-                            if hot { 2.0 } else { 1.0 },
-                            Color32::from_rgba_unmultiplied(
-                                90,
-                                170,
-                                255,
-                                if hot { 255 } else { 90 },
-                            ),
-                        ),
-                        egui::StrokeKind::Outside,
-                    );
-                }
-            }
-            if let Some(key) = ui_state
-                .frame_hits
-                .iter()
-                .find(|(k, r)| k.starts_with("knob:") && r.contains(b))
-                .map(|(k, _)| k.clone())
-            {
-                let (mid, name) = key["knob:".len()..].split_once('.').unwrap_or(("", ""));
-                let label = mid
-                    .parse::<ModuleId>()
-                    .ok()
-                    .and_then(|mid| editor.state().modules.get(&mid))
-                    .and_then(|m| registry::info_for(&m.kind))
-                    .and_then(|i| i.params.iter().find(|p| p.name == name))
-                    .map_or(name.to_string(), routing::param_label);
-                let top = ui.ctx().layer_painter(egui::LayerId::new(
-                    egui::Order::Tooltip,
-                    Id::new("kabl-drop-hint"),
-                ));
-                routing::pill(
-                    &top,
-                    b - EguiVec2::new(0.0, 14.0),
-                    &format!(
-                        "Release to modulate {label} ({:+.0} %)",
-                        kabl_engine::compile::DEFAULT_ROUTE_AMOUNT * 100.0
-                    ),
-                );
-            }
-        }
+    draw_port_drag(editor, ui_state, ui, th, &drawn, &floats);
+    if ui_state.flash.is_some_and(|(_, _, t)| now - t < 1.6) {
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_millis(100));
     }
+}
 
-    for (cable_id, from, to) in &cables {
-        let (Some(&a), Some(&b)) = (
-            port_ref_pos(&port_pos, from, PortDirection::Output),
-            port_ref_pos(&port_pos, to, PortDirection::Input),
-        ) else {
-            continue;
-        };
-        let alpha = alpha_for(from.module_id(), to.module_id());
-        if alpha == 0.0 {
-            continue;
-        }
-        let base = cable_color(*cable_id);
-        let color =
-            Color32::from_rgba_unmultiplied(base.r(), base.g(), base.b(), (alpha * 255.0) as u8);
-        let points = cable_curve_points(a, b);
-        painter.add(egui::Shape::line(points.clone(), Stroke::new(2.5, color)));
-        // Small hit-target at the curve's own midpoint (not the straight-line one, now that
-        // cables sag) to disconnect -- clicking the cable removes it.
-        let mid = points[points.len() / 2];
-        let hit = Rect::from_center_size(mid, EguiVec2::splat(12.0));
-        let resp = ui.interact(hit, Id::new(("kabl-cable", *cable_id)), Sense::click());
-        if resp.clicked() {
-            editor.disconnect(*cable_id);
-        }
-        if resp.hovered() {
-            painter.circle_stroke(mid, 7.0, Stroke::new(1.5, Color32::RED));
+fn draw_rails(p: &egui::Painter, th: &Theme, xf: Xf, canvas: Rect, rows: usize) {
+    for row in 0..rows {
+        let y = rack::row_y(row);
+        for ry in [y - 8.0, y + PANEL_H] {
+            let r = Rect::from_min_max(
+                pos2(canvas.left(), xf.p(pos2(0.0, ry)).y),
+                pos2(canvas.right(), xf.p(pos2(0.0, ry + 8.0)).y),
+            );
+            p.rect_filled(r, CornerRadius::ZERO, th.rail);
+            p.line_segment([r.left_top(), r.right_top()], Stroke::new(1.0, th.rail_hi));
+            let step = rack::UNIT * xf.zoom;
+            let mut x = canvas.left() + (xf.origin.x - canvas.left()).rem_euclid(step);
+            while x < canvas.right() {
+                p.circle_filled(pos2(x, r.center().y), 2.0 * xf.zoom, th.hole);
+                x += step;
+            }
         }
     }
 }
 
-/// Samples a quadratic bezier from `a` to `b` with a single control point pulled downward from
-/// the midpoint (a cheap stand-in for gravity droop) -- a hanging patch cable, not a ruler-straight
-/// wire. `sag` scales with horizontal distance so a short cable barely dips and a long one hangs
-/// visibly, clamped so it never gets silly on a very wide patch.
-fn cable_curve_points(a: Pos2, b: Pos2) -> Vec<Pos2> {
-    const SAMPLES: usize = 24;
-    let sag = ((b.x - a.x).abs() * 0.18).clamp(8.0, 50.0);
-    let control = Pos2::new((a.x + b.x) / 2.0, (a.y + b.y) / 2.0 + sag);
-    (0..=SAMPLES)
-        .map(|i| {
-            let t = i as f32 / SAMPLES as f32;
-            let mt = 1.0 - t;
-            Pos2::new(
-                mt * mt * a.x + 2.0 * mt * t * control.x + t * t * b.x,
-                mt * mt * a.y + 2.0 * mt * t * control.y + t * t * b.y,
-            )
+/// Routes into params of `m` that currently have no visible control.
+fn hidden_routes(editor: &PatchEditor, m: &Placed) -> Vec<(CableId, &'static str)> {
+    m.hidden
+        .iter()
+        .flat_map(|p| {
+            routing::routes_into(editor.state(), m.id, p.name)
+                .into_iter()
+                .map(|r| (r.cable, p.name))
         })
         .collect()
 }
 
-/// Rounds a position to the nearest rack grid cell — Eurorack view only. Applied to both the
-/// stored and the live-drag position, so dragging itself feels snapped, not just the final rest
-/// position.
-fn eurorack_snap(pos: Vec2) -> Vec2 {
-    Vec2 {
-        x: (pos.x / UNIT_PX).round() * UNIT_PX,
-        y: (pos.y / UNIT_PX).round() * UNIT_PX,
-    }
+fn text(
+    p: &egui::Painter,
+    pos: Pos2,
+    align: egui::Align2,
+    s: &str,
+    size: f32,
+    col: Color32,
+    mono: bool,
+) -> Rect {
+    let f = if mono {
+        egui::FontId::monospace(size)
+    } else {
+        egui::FontId::proportional(size)
+    };
+    p.text(pos, align, s, f, col)
 }
 
-/// Faint grid lines every `UNIT_PX`, covering only what's actually visible (`clip_rect`, which a
-/// `ScrollArea` already keeps correct) — the "just that grid" background for Eurorack view, not a
-/// photorealistic rack texture.
-fn draw_rack_grid(painter: &egui::Painter, clip_rect: Rect, origin: Pos2) {
-    let stroke = Stroke::new(1.0, Color32::from_rgb(48, 48, 54));
-    let start_x = origin.x + ((clip_rect.min.x - origin.x) / UNIT_PX).floor() * UNIT_PX;
-    let mut x = start_x;
-    while x < clip_rect.max.x {
-        painter.line_segment(
-            [Pos2::new(x, clip_rect.min.y), Pos2::new(x, clip_rect.max.y)],
-            stroke,
-        );
-        x += UNIT_PX;
-    }
-    let start_y = origin.y + ((clip_rect.min.y - origin.y) / UNIT_PX).floor() * UNIT_PX;
-    let mut y = start_y;
-    while y < clip_rect.max.y {
-        painter.line_segment(
-            [Pos2::new(clip_rect.min.x, y), Pos2::new(clip_rect.max.x, y)],
-            stroke,
-        );
-        y += UNIT_PX;
-    }
-}
-
-/// Selection + drag handling shared by both the auto-layout panel and a skinned one -- the same
-/// logic either way, just parameterized on the panel's `rect` (which comes from a fixed
-/// `MODULE_WIDTH`-based layout in one case and `ModuleSkin.panel_size` in the other). Returns
-/// whether this module is the selected one, for the caller to use when drawing its own
-/// selection-outline style.
-fn interact_body(
-    ui: &mut egui::Ui,
-    editor: &mut PatchEditor,
-    ui_state: &mut UiState,
-    id: ModuleId,
-    stored_pos: Vec2,
-    rect: Rect,
-) -> bool {
-    let eurorack = ui_state.view_mode == ViewMode::Eurorack;
-    let body_id = Id::new(("kabl-module-body", id));
-    let response = ui.interact(rect, body_id, Sense::click_and_drag());
-    if response.clicked() {
-        ui_state.selected_module = Some(id);
-    }
-    if response.drag_started() {
-        ui_state.dragging = Some(Dragging {
-            id,
-            start_pos: stored_pos,
-            live_pos: stored_pos,
-        });
-    }
-    if response.dragged() {
-        if let Some(d) = ui_state.dragging.as_mut().filter(|d| d.id == id) {
-            d.live_pos.x += response.drag_delta().x;
-            d.live_pos.y += response.drag_delta().y;
-        }
-    }
-    if response.drag_stopped() {
-        if let Some(d) = ui_state.dragging.take().filter(|d| d.id == id) {
-            // Committed position snaps too in Eurorack view, not just the on-screen rendering
-            // while dragging -- real grid placement in the saved patch, not a visual-only
-            // overlay on top of wherever the raw drag happened to end.
-            let final_pos = if eurorack {
-                eurorack_snap(d.live_pos)
-            } else {
-                d.live_pos
-            };
-            if final_pos != d.start_pos {
-                editor.move_module(id, final_pos);
-            }
-        }
-    }
-    ui_state.selected_module == Some(id)
-}
-
-/// Renders a module that declares a `ModuleSkin` — custom panel art (if any) stretched to
-/// `skin.panel_size`, with every control drawn at its explicitly declared normalized position
-/// instead of the auto-layout row scheme `show_canvas`'s main loop uses for everything else. This
-/// is the "custom modules can use their own images as their background and specify where to put
-/// their jacks/ins/outs/switches/readouts" mechanism (owner ask) — see decisions.md "Module
-/// skins: custom panel art".
 #[allow(clippy::too_many_arguments)]
-fn draw_skinned_module(
+fn draw_module(
     editor: &mut PatchEditor,
     ui_state: &mut UiState,
     ui: &mut egui::Ui,
     painter: &egui::Painter,
-    port_pos: &mut std::collections::HashMap<(ModuleId, PortDirection, String), Pos2>,
-    plugs: &mut Vec<(CableId, Pos2)>,
-    drop_at: &mut Option<(PortRef, Pos2)>,
-    id: ModuleId,
-    info: &'static kabl_modules::info::ModuleInfo,
-    skin: &'static kabl_modules::skin::ModuleSkin,
-    pos: Vec2,
-    stored_pos: Vec2,
-    origin: Pos2,
+    th: &Theme,
+    xf: Xf,
+    m: &Placed,
+    now: f64,
+    drawn: &mut Drawn,
 ) {
-    let size = EguiVec2::new(skin.panel_size.0, skin.panel_size.1);
-    let rect = Rect::from_min_size(origin + EguiVec2::new(pos.x, pos.y), size);
+    let z = xf.zoom;
+    let rect = xf.r(m.rect);
+    let face = xf.r(m.face);
+    ui_state.record(format!("module:{}", m.id), face);
 
-    let selected = interact_body(ui, editor, ui_state, id, stored_pos, rect);
-    let accent = category_color(info.category);
-
-    match skin.background_image {
-        Some(png) => {
-            let tex = skin_texture(ui, &mut ui_state.image_cache, info.kind, png);
-            painter.image(
-                tex,
-                rect,
-                Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(1.0, 1.0)),
-                Color32::WHITE,
-            );
-        }
-        None => {
-            painter.rect_filled(
-                rect,
-                5.0,
-                if selected {
-                    PANEL_FILL_SELECTED
-                } else {
-                    PANEL_FILL
-                },
-            );
+    // Body: select, drag to move (rows snap on release), context menu.
+    let body = ui.interact(
+        rect,
+        Id::new(("kabl-module-body", m.id)),
+        Sense::click_and_drag(),
+    );
+    if body.clicked() {
+        ui_state.selected_module = Some(m.id);
+    }
+    if body.drag_started() {
+        if let (Some(p), Some(stored)) = (
+            ui.input(|i| i.pointer.press_origin()),
+            editor.state().modules.get(&m.id).map(|s| s.pos),
+        ) {
+            ui_state.selected_module = Some(m.id);
+            ui_state.moving = Some(Moving {
+                id: m.id,
+                grab: xf.inv(p) - m.face.min,
+                live: stored,
+                start: stored,
+            });
         }
     }
-    // Selection feedback on top of either background: a plain rect_stroke would look identical
-    // to the auto-layout panel's, but a skin's art may already fill right up to its own edge, so
-    // draw it a hair outside the panel rather than risk it being covered.
-    if selected {
+    if body.dragged() {
+        if let (Some(mv), Some(p)) = (
+            ui_state.moving.as_mut().filter(|mv| mv.id == m.id),
+            body.interact_pointer_pos(),
+        ) {
+            let w = xf.inv(p) - mv.grab;
+            mv.live = Vec2 { x: w.x, y: w.y };
+        }
+    }
+    if body.drag_stopped() {
+        if let Some(mv) = ui_state.moving.take().filter(|mv| mv.id == m.id) {
+            let to = rack::snap(pos2(mv.live.x, mv.live.y));
+            if to != mv.start {
+                editor.move_module(m.id, to);
+            }
+        }
+    }
+    body.context_menu(|ui| module_menu(editor, ui_state, ui, m));
+
+    let skin = m.skin;
+    let on_art = skin.is_some_and(|s| ui_state.skin_labels_on_art.unwrap_or(s.labels_on_art));
+    painter.rect_filled(rect, CornerRadius::same(3), th.panel);
+    if let Some((tex, tint)) =
+        skin.and_then(|s| skin_texture(ui, &mut ui_state.image_cache, m.info.kind, s, th.dark))
+    {
+        painter.image(
+            tex,
+            face,
+            Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0)),
+            tint,
+        );
+    } else {
+        // Brushed texture: faint horizontal strokes.
+        let step = (4.0 * z).max(3.0);
+        let mut y = rect.top() + step;
+        let tex = if th.dark {
+            Color32::from_white_alpha(6)
+        } else {
+            Color32::from_black_alpha(7)
+        };
+        while y < rect.bottom() {
+            painter.line_segment(
+                [pos2(rect.left(), y), pos2(rect.right(), y)],
+                Stroke::new(1.0, tex),
+            );
+            y += step;
+        }
+    }
+    painter.rect_stroke(
+        rect,
+        CornerRadius::same(3),
+        Stroke::new(1.0, th.panel_edge),
+        egui::StrokeKind::Inside,
+    );
+    if m.adv.is_some() && !m.overlay {
+        // Engraved divider between the face and the advanced area.
+        let x = face.right();
+        painter.line_segment(
+            [
+                pos2(x, rect.top() + 12.0 * z),
+                pos2(x, rect.bottom() - 12.0 * z),
+            ],
+            Stroke::new(1.5, th.panel_edge.lerp_to_gamma(Color32::BLACK, 0.2)),
+        );
+    }
+    for (sx, sy) in [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)] {
+        let c = pos2(
+            rect.left() + 9.0 * z + sx * (rect.width() - 18.0 * z),
+            rect.top() + 9.0 * z + sy * (rect.height() - 18.0 * z),
+        );
+        painter.circle_filled(c, 3.5 * z, th.nut);
+        painter.circle_stroke(c, 3.5 * z, Stroke::new(1.0, th.nut_edge));
+    }
+    let (ink, ink2) = match skin {
+        Some(s) if on_art => {
+            let c = s.art_ink[usize::from(th.dark)];
+            let c = Color32::from_rgb(c[0], c[1], c[2]);
+            (c, c)
+        }
+        _ => (th.ink, th.ink2),
+    };
+    if skin.is_some() && !on_art {
+        let hdr = Rect::from_center_size(
+            pos2(face.center().x, face.top() + 33.0 * z),
+            vec2(170.0, 38.0) * z,
+        );
+        painter.rect_filled(hdr, CornerRadius::same(4), th.panel.gamma_multiply(0.96));
+    }
+    let choosing = ui_state.choose.as_ref().filter(|(id, _)| *id == m.id);
+    text(
+        painter,
+        pos2(face.center().x, face.top() + 26.0 * z),
+        egui::Align2::CENTER_CENTER,
+        m.info.name,
+        15.0 * z,
+        ink,
+        false,
+    );
+    let tag = match choosing {
+        Some((_, set)) => {
+            let n = set.iter().filter(|on| **on).count();
+            format!("choose face · {n} on face")
+        }
+        None if skin.is_some() => format!("{} · skin · #{}", m.info.kind, m.id),
+        None => format!("{} · #{}", m.info.kind, m.id),
+    };
+    text(
+        painter,
+        pos2(face.center().x, face.top() + 43.0 * z),
+        egui::Align2::CENTER_CENTER,
+        &tag,
+        11.0 * z,
+        ink2,
+        true,
+    );
+    if ui_state.selected_module == Some(m.id) {
         painter.rect_stroke(
-            rect.expand(1.5),
-            5.0,
-            Stroke::new(2.0, accent),
+            rect.expand(1.0),
+            CornerRadius::same(4),
+            Stroke::new(2.5, th.sel),
             egui::StrokeKind::Outside,
         );
     }
-    painter.text(
-        rect.right_top() + EguiVec2::new(-4.0, 4.0),
-        egui::Align2::RIGHT_TOP,
-        format!("#{id}"),
-        egui::FontId::proportional(10.0),
-        Color32::from_gray(210),
-    );
+    if skin.is_none() {
+        draw_decor(editor, painter, th, xf, m);
+    }
+    if let Some(p) = m.plate {
+        painter.rect_filled(xf.r(p), CornerRadius::same(6), th.plate);
+    }
 
-    for control in skin.controls {
-        let center = rect.min
-            + EguiVec2::new(
-                control.pos.0 * skin.panel_size.0,
-                control.pos.1 * skin.panel_size.1,
+    let look = Look { z, ink, ink2 };
+    let plates = skin.is_some() && !on_art;
+    for c in m.ctls.iter().filter(|c| c.primary || !m.overlay) {
+        draw_control(
+            editor, ui_state, ui, painter, th, xf, m, c, look, plates, now, drawn,
+        );
+    }
+    draw_jacks(editor, ui_state, ui, painter, th, xf, m, on_art, drawn);
+
+    if let Some(t) = m.toggle {
+        let r = xf.r(t);
+        let expanded = m.adv.is_some();
+        let label = if expanded {
+            "Less".to_string()
+        } else {
+            format!("+{}", m.hidden.len())
+        };
+        ui_state.record(format!("toggle:{}", m.id), r);
+        let resp = ui.interact(r, Id::new(("kabl-toggle", m.id)), Sense::click());
+        painter.rect_filled(
+            r,
+            CornerRadius::same(4),
+            if th.dark { th.btn } else { th.plate },
+        );
+        if resp.hovered() {
+            painter.rect_stroke(
+                r,
+                CornerRadius::same(4),
+                Stroke::new(1.0, th.sel),
+                egui::StrokeKind::Inside,
             );
-        match control.kind {
-            kabl_modules::skin::ControlKind::Jack => {
-                let Some(port) = info.ports.iter().find(|p| p.name == control.id) else {
-                    continue;
-                };
-                port_pos.insert((id, port.direction, port.name.to_string()), center);
-                port_control(editor, ui_state, ui, painter, id, port, center, drop_at);
-            }
-            kabl_modules::skin::ControlKind::Knob => {
-                let Some(param) = info.params.iter().find(|p| p.name == control.id) else {
-                    continue;
-                };
-                if param.taper == Taper::Stepped {
-                    let n = (param.max - param.min).round() + 1.0;
-                    let r = Rect::from_center_size(center, EguiVec2::new(n * 18.0, 14.0));
-                    plugs.extend(routing::stepped_selector(
-                        editor, ui_state, ui, painter, id, info.kind, param, r,
-                    ));
-                } else {
-                    plugs.extend(routing::param_knob(
-                        editor, ui_state, ui, painter, id, param, center,
-                    ));
+        }
+        text(
+            painter,
+            r.center(),
+            egui::Align2::CENTER_CENTER,
+            &label,
+            12.0 * z,
+            th.plate_ink,
+            false,
+        );
+        let routed = hidden_routes(editor, m);
+        for (cable, _) in &routed {
+            drawn.plugs.push((*cable, r.center()));
+        }
+        let resp = if routed.is_empty() {
+            resp.on_hover_text(if expanded {
+                "Hide advanced controls"
+            } else {
+                "Show advanced controls"
+            })
+        } else {
+            let lines: Vec<String> = routed
+                .iter()
+                .map(|(cable, p)| {
+                    let src = match editor.state().cables.get(cable).map(|c| &c.from) {
+                        Some(PortRef::Module { id, port }) => {
+                            routing::source_label(editor.state(), *id, port)
+                        }
+                        _ => "?".into(),
+                    };
+                    let label = m
+                        .info
+                        .params
+                        .iter()
+                        .find(|q| q.name == *p)
+                        .map_or(p.to_string(), routing::param_label);
+                    format!("Modulated, off the face: {src} > {label}")
+                })
+                .collect();
+            resp.on_hover_text(lines.join("\n"))
+        };
+        if resp.clicked() {
+            if expanded {
+                ui_state.expanded.remove(&m.id);
+            } else {
+                ui_state.expanded.insert(m.id);
+                ui_state.reveal = Some(m.id);
+                if let Some((_, p)) = routed.first() {
+                    ui_state.flash = Some((m.id, p, now));
                 }
             }
-            // Declared, not yet rendered -- see kabl_modules::skin's module doc.
-            kabl_modules::skin::ControlKind::Switch | kabl_modules::skin::ControlKind::Readout => {}
+        }
+    }
+    if let Some(d) = m.done {
+        let r = xf.r(d);
+        ui_state.record(format!("done:{}", m.id), r);
+        let resp = ui.interact(r, Id::new(("kabl-done", m.id)), Sense::click());
+        painter.rect_filled(r, CornerRadius::same(4), th.sel);
+        text(
+            painter,
+            r.center(),
+            egui::Align2::CENTER_CENTER,
+            "Done",
+            12.0 * z,
+            Color32::WHITE,
+            false,
+        );
+        if resp.clicked() {
+            if let Some((id, set)) = ui_state.choose.take() {
+                editor.set_primary(id, &set);
+            }
         }
     }
 }
 
-fn port_ref_pos<'a>(
-    port_pos: &'a std::collections::HashMap<(ModuleId, PortDirection, String), Pos2>,
-    port_ref: &PortRef,
-    direction: PortDirection,
-) -> Option<&'a Pos2> {
-    let PortRef::Module { id, port } = port_ref else {
-        return None;
-    };
-    port_pos.get(&(*id, direction, port.clone()))
+fn module_menu(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, m: &Placed) {
+    ui.label(egui::RichText::new(format!("{} #{}", m.info.name, m.id)).strong());
+    if !m.info.params.is_empty() && ui.button("Choose primary controls…").clicked() {
+        let set = editor
+            .state()
+            .modules
+            .get(&m.id)
+            .map(|s| rack::primary_set(s, m.info))
+            .unwrap_or_default();
+        ui_state.choose = Some((m.id, set));
+        ui_state.reveal = Some(m.id);
+        ui.close();
+    }
+    if !m.info.params.is_empty() && ui.button("Reset face to module default").clicked() {
+        let defaults: Vec<bool> = m
+            .info
+            .params
+            .iter()
+            .map(|p| !m.info.advanced.contains(&p.name))
+            .collect();
+        editor.set_primary(m.id, &defaults);
+        ui.close();
+    }
+    if m.toggle.is_some() {
+        let expanded = ui_state.expanded.contains(&m.id);
+        if ui
+            .button(if expanded { "Collapse" } else { "Expand" })
+            .clicked()
+        {
+            if expanded {
+                ui_state.expanded.remove(&m.id);
+            } else {
+                ui_state.expanded.insert(m.id);
+                ui_state.reveal = Some(m.id);
+            }
+            ui.close();
+        }
+    }
+    ui.separator();
+    if ui.button("Remove module").clicked() {
+        editor.remove_module(m.id);
+        ui.close();
+    }
 }
 
-/// Draws one jack and handles it: click-click connects (output, then input); dragging an
-/// output and releasing it on a knob or input connects there (resolved by `show_canvas`).
+fn draw_decor(editor: &PatchEditor, p: &egui::Painter, th: &Theme, xf: Xf, m: &Placed) {
+    let z = xf.zoom;
+    match m.decor {
+        Decor::Keys(r) => {
+            let r = xf.r(r);
+            let n = 7;
+            let w = r.width() / n as f32;
+            for i in 0..n {
+                let k = Rect::from_min_size(
+                    pos2(r.left() + w * i as f32, r.top()),
+                    vec2(w - 1.0, r.height()),
+                );
+                p.rect_filled(
+                    k,
+                    CornerRadius::same(2),
+                    Color32::from_rgb(0xf2, 0xee, 0xe6),
+                );
+                p.rect_stroke(
+                    k,
+                    CornerRadius::same(2),
+                    Stroke::new(1.0, th.tick),
+                    egui::StrokeKind::Inside,
+                );
+            }
+            for i in [0, 1, 3, 4, 5] {
+                let k = Rect::from_min_size(
+                    pos2(r.left() + w * (i as f32 + 0.68), r.top()),
+                    vec2(w * 0.62, r.height() * 0.6),
+                );
+                p.rect_filled(
+                    k,
+                    CornerRadius::same(1),
+                    Color32::from_rgb(0x2a, 0x28, 0x26),
+                );
+            }
+        }
+        Decor::Speaker(c) => {
+            let c = xf.p(c);
+            for r in [40.0, 30.0, 20.0, 10.0] {
+                p.circle_stroke(c, r * z, Stroke::new(1.2, th.ink2));
+            }
+        }
+        Decor::Envelope(r) => {
+            // Drawn from the knob values (not telemetry).
+            let r = xf.r(r);
+            p.rect_filled(r, CornerRadius::same(3), th.display);
+            let v = |name: &str| {
+                m.info
+                    .params
+                    .iter()
+                    .find(|q| q.name == name)
+                    .map_or(0.0, |q| routing::base_value(editor.state(), m.id, q))
+            };
+            let (a, d, s, rel) = (v("attack_ms"), v("decay_ms"), v("sustain"), v("release_ms"));
+            let wlog = |ms: f32| (1.0 + ms.max(0.1)).ln();
+            let total = wlog(a) + wlog(d) + wlog(rel) + 2.0;
+            let sx = |x: f32| r.left() + 6.0 * z + (r.width() - 12.0 * z) * x / total;
+            let sy = |y: f32| r.bottom() - 6.0 * z - (r.height() - 12.0 * z) * y;
+            let (x1, x2) = (wlog(a), wlog(a) + wlog(d));
+            let pts = vec![
+                pos2(sx(0.0), sy(0.0)),
+                pos2(sx(x1), sy(1.0)),
+                pos2(sx(x2), sy(s)),
+                pos2(sx(x2 + 2.0), sy(s)),
+                pos2(sx(total), sy(0.0)),
+            ];
+            p.add(egui::Shape::line(pts, Stroke::new(1.6 * z, th.display_ink)));
+        }
+        Decor::None => {}
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
-fn port_control(
+fn draw_control(
     editor: &mut PatchEditor,
     ui_state: &mut UiState,
     ui: &mut egui::Ui,
     painter: &egui::Painter,
-    id: ModuleId,
-    port: &kabl_modules::info::PortInfo,
-    pos: Pos2,
-    drop_at: &mut Option<(PortRef, Pos2)>,
+    th: &Theme,
+    xf: Xf,
+    m: &Placed,
+    c: &rack::Ctl,
+    look: Look,
+    plates: bool,
+    now: f64,
+    drawn: &mut Drawn,
 ) {
-    let direction = port.direction;
-    let rect = Rect::from_center_size(pos, EguiVec2::splat(PORT_RADIUS * 2.5));
-    let dir_key = match direction {
-        PortDirection::Input => "in",
-        PortDirection::Output => "out",
-    };
-    ui_state.record(format!("{dir_key}:{id}.{}", port.name), rect);
-    let sense = match direction {
-        PortDirection::Input => Sense::click(),
-        PortDirection::Output => Sense::click_and_drag(),
-    };
-    let response = ui.interact(
-        rect,
-        Id::new(("kabl-port", id, direction, port.name)),
-        sense,
-    );
-    let base = port_type_color(port.port_type);
-    // Ring style (outer color ring, dark center) instead of a flat dot -- reads more like a real
-    // 1/4"/3.5mm jack; hovering brightens the ring rather than swapping to an unrelated color, so
-    // the port-type color stays legible even while highlighted.
-    let ring = if response.hovered() {
-        Color32::from_rgb(
-            base.r().saturating_add(30),
-            base.g().saturating_add(30),
-            base.b().saturating_add(30),
-        )
-    } else {
-        base
-    };
-    painter.circle_filled(pos, PORT_RADIUS, Color32::from_rgb(20, 20, 22));
-    painter.circle_stroke(pos, PORT_RADIUS, Stroke::new(2.0, ring));
-    let label_offset = match direction {
-        PortDirection::Input => EguiVec2::new(PORT_RADIUS + 4.0, 0.0),
-        PortDirection::Output => EguiVec2::new(-(PORT_RADIUS + 4.0), 0.0),
-    };
-    let align = match direction {
-        PortDirection::Input => egui::Align2::LEFT_CENTER,
-        PortDirection::Output => egui::Align2::RIGHT_CENTER,
-    };
-    painter.text(
-        pos + label_offset,
-        align,
-        port.name,
-        egui::FontId::proportional(9.0),
-        Color32::from_gray(190),
-    );
-    let this_ref = PortRef::Module {
-        id,
-        port: port.name.to_string(),
-    };
-    if response.drag_started() {
-        ui_state.pending_output = None;
-        ui_state.port_drag = Some(this_ref.clone());
+    let z = xf.zoom;
+    if plates {
+        // Theme plate behind each control group: contrast never depends on the art.
+        let plate = match c.geo {
+            Geo::Knob { c, r } => {
+                Rect::from_min_max(c + vec2(-r - 14.0, -58.0), c + vec2(r + 14.0, 50.0))
+            }
+            Geo::Select { rect } => rect
+                .expand2(vec2(6.0, 6.0))
+                .union(Rect::from_center_size(c.geo.label_pos(), vec2(70.0, 18.0))),
+        };
+        painter.rect_filled(
+            xf.r(plate),
+            CornerRadius::same(5),
+            th.panel.gamma_multiply(0.96),
+        );
     }
-    if response.drag_stopped() {
-        if let (Some(from), Some(at)) = (ui_state.port_drag.take(), ui.ctx().pointer_latest_pos()) {
-            *drop_at = Some((from, at));
+    match c.geo {
+        Geo::Knob { c: cen, r } => {
+            let plugs = routing::param_knob(
+                editor,
+                ui_state,
+                ui,
+                painter,
+                m.id,
+                c.param,
+                xf.p(cen),
+                r,
+                look,
+            );
+            drawn.plugs.extend(plugs);
+            if ui_state.flash_on(m.id, c.param.name, now) {
+                painter.circle_stroke(xf.p(cen), (r + 20.0) * z, Stroke::new(3.0 * z, th.sel));
+            }
+        }
+        Geo::Select { rect } => {
+            let plugs = routing::stepped_selector(
+                editor,
+                ui_state,
+                ui,
+                painter,
+                m.id,
+                m.info.kind,
+                c.param,
+                xf.r(rect),
+                look,
+            );
+            drawn.plugs.extend(plugs);
+            if ui_state.flash_on(m.id, c.param.name, now) {
+                painter.rect_stroke(
+                    xf.r(rect).expand(5.0 * z),
+                    CornerRadius::same(6),
+                    Stroke::new(3.0 * z, th.sel),
+                    egui::StrokeKind::Outside,
+                );
+            }
         }
     }
-    if response.clicked() {
-        on_port_click(editor, ui_state, id, direction, port.name);
+    // Choose mode: a pin on every control; filled = on the face.
+    let Some((_, set)) = ui_state.choose.as_ref().filter(|(id, _)| *id == m.id) else {
+        return;
+    };
+    let Some(i) = m.info.params.iter().position(|p| p.name == c.param.name) else {
+        return;
+    };
+    let on = set[i];
+    let pr = xf.r(c.geo.pin_rect(&routing::param_label(c.param)));
+    ui_state.record(format!("pin:{}.{}", m.id, c.param.name), pr);
+    let resp = ui.interact(
+        pr,
+        Id::new(("kabl-pin", m.id, c.param.name)),
+        Sense::click(),
+    );
+    let resp = resp.on_hover_text(if on {
+        "On the face: click to move to the advanced area"
+    } else {
+        "Advanced: click to put on the face"
+    });
+    painter.circle_filled(pr.center(), 7.5 * z, if on { th.sel } else { th.panel });
+    painter.circle_stroke(pr.center(), 7.5 * z, Stroke::new(1.6, th.sel));
+    painter.circle_filled(
+        pr.center(),
+        2.5 * z,
+        if on { Color32::WHITE } else { th.sel },
+    );
+    if resp.clicked() {
+        if let Some((_, set)) = ui_state.choose.as_mut() {
+            set[i] = !on;
+        }
     }
+}
+
+/// Short text badge for a jack in Hidden view: where its cables go or come from.
+fn jack_badge(
+    editor: &PatchEditor,
+    id: ModuleId,
+    port: &str,
+    dir: PortDirection,
+) -> Option<String> {
+    let state = editor.state();
+    let name = |mid: ModuleId| {
+        state
+            .modules
+            .get(&mid)
+            .map_or("?", |m| routing::short_name(&m.kind))
+    };
+    let here = PortRef::Module {
+        id,
+        port: port.to_string(),
+    };
+    match dir {
+        PortDirection::Output => {
+            let dests: Vec<ModuleId> = state
+                .cables
+                .values()
+                .filter(|c| c.from == here)
+                .map(|c| c.to.module_id())
+                .collect();
+            match dests.as_slice() {
+                [] => None,
+                [one] => Some(format!("> {}", name(*one))),
+                [first, ..] if dests.iter().all(|d| d == first) => {
+                    Some(format!("> {} x{}", name(*first), dests.len()))
+                }
+                _ => Some(format!("> {} routes", dests.len())),
+            }
+        }
+        PortDirection::Input => state
+            .cables
+            .values()
+            .find(|c| c.to == here)
+            .map(|c| format!("< {}", name(c.from.module_id()))),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn draw_jacks(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    painter: &egui::Painter,
+    th: &Theme,
+    xf: Xf,
+    m: &Placed,
+    on_art: bool,
+    drawn: &mut Drawn,
+) {
+    let z = xf.zoom;
+    for j in &m.jacks {
+        let c = xf.p(j.c);
+        let port = j.port;
+        drawn
+            .ports
+            .insert((m.id, port.direction, port.name.to_string()), c);
+        let on_plate = m.plate.is_some_and(|p| p.contains(j.c));
+        let ink = if on_plate {
+            th.plate_ink
+        } else if on_art {
+            let k = m.skin.map_or([0; 3], |s| s.art_ink[usize::from(th.dark)]);
+            Color32::from_rgb(k[0], k[1], k[2])
+        } else {
+            th.ink
+        };
+        if m.skin.is_some() && !on_art {
+            painter.rect_filled(
+                Rect::from_center_size(c + vec2(0.0, -10.0) * z, vec2(44.0, 52.0) * z),
+                CornerRadius::same(5),
+                th.panel.gamma_multiply(0.96),
+            );
+        }
+        let label = port_label(port.name);
+        if j.label_right {
+            text(
+                painter,
+                c + vec2(20.0 * z, 0.0),
+                egui::Align2::LEFT_CENTER,
+                &label,
+                12.5 * z,
+                ink,
+                false,
+            );
+        } else {
+            text(
+                painter,
+                c - vec2(0.0, 24.0 * z),
+                egui::Align2::CENTER_CENTER,
+                &label,
+                12.5 * z,
+                ink,
+                false,
+            );
+        }
+        let hit = Rect::from_center_size(c, EguiVec2::splat(((JACK_R + 3.0) * 2.0 * z).max(20.0)));
+        let dir_key = match port.direction {
+            PortDirection::Input => "in",
+            PortDirection::Output => "out",
+        };
+        ui_state.record(format!("{dir_key}:{}.{}", m.id, port.name), hit);
+        let sense = match port.direction {
+            PortDirection::Input => Sense::click(),
+            PortDirection::Output => Sense::click_and_drag(),
+        };
+        let resp = ui.interact(
+            hit,
+            Id::new(("kabl-port", m.id, port.direction, port.name)),
+            sense,
+        );
+        let this_ref = PortRef::Module {
+            id: m.id,
+            port: port.name.to_string(),
+        };
+        painter.circle_filled(c, JACK_R * z, th.nut);
+        painter.circle_stroke(c, JACK_R * z, Stroke::new(1.0, th.nut_edge));
+        let badge = (ui_state.cable_view == CableView::Hidden)
+            .then(|| jack_badge(editor, m.id, port.name, port.direction))
+            .flatten();
+        if badge.is_some() {
+            painter.circle_stroke(
+                c,
+                (JACK_R - 2.0) * z,
+                Stroke::new(3.0 * z, th.signal(port.port_type)),
+            );
+        }
+        painter.circle_filled(c, 7.0 * z, th.hole_c);
+        if resp.hovered() || ui_state.pending_output.as_ref() == Some(&this_ref) {
+            painter.circle_stroke(c, (JACK_R + 3.0) * z, Stroke::new(1.5, th.sel));
+        }
+        if let Some(b) = badge {
+            routing::defer_badge(
+                ui_state,
+                painter,
+                c + vec2(0.0, 23.0 * z),
+                &b,
+                th.signal(port.port_type),
+                z,
+            );
+        }
+        if resp.drag_started() {
+            ui_state.pending_output = None;
+            ui_state.port_drag = Some(this_ref.clone());
+        }
+        if resp.drag_stopped() {
+            if let (Some(from), Some(at)) =
+                (ui_state.port_drag.take(), ui.ctx().pointer_latest_pos())
+            {
+                drawn.drop_at = Some((from, at));
+            }
+        }
+        if resp.clicked() {
+            on_port_click(editor, ui_state, this_ref, port.direction);
+        }
+    }
+}
+
+/// `cutoff_cv` -> `Cutoff CV`, `lp` -> `LP`, `in2` -> `In 2`.
+fn port_label(name: &str) -> String {
+    name.split('_')
+        .map(|w| {
+            let w = if w == "resonance" { "res" } else { w };
+            let (word, digits) = w.split_at(w.trim_end_matches(|c: char| c.is_ascii_digit()).len());
+            let mut s = if word.len() <= 2 && word != "in" {
+                word.to_uppercase()
+            } else {
+                let mut s = word.to_string();
+                s[..1].make_ascii_uppercase();
+                s
+            };
+            if !digits.is_empty() {
+                s = format!("{s} {digits}");
+            }
+            s
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// The advanced area of a module whose expansion floats over its neighbours. It is its own
+/// egui layer, above the rack, so it owns every pointer event in its visible area.
+#[allow(clippy::too_many_arguments)]
+fn draw_float(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    th: &Theme,
+    xf: Xf,
+    m: &Placed,
+    now: f64,
+    drawn: &mut Drawn,
+    lay: &Layout,
+    canvas: Rect,
+) {
+    let Some(adv) = m.adv else { return };
+    let z = xf.zoom;
+    let screen = xf.r(adv);
+    let visible = screen.intersect(canvas);
+    if !visible.is_positive() {
+        return;
+    }
+    ui_state.record(format!("float:{}", m.id), visible);
+    egui::Area::new(Id::new(("kabl-float", m.id)))
+        .order(egui::Order::Middle)
+        .fixed_pos(visible.min)
+        .constrain(false)
+        .show(ui.ctx(), |ui| {
+            ui.set_clip_rect(visible);
+            // Claims the whole visible area: nothing underneath can be pressed through it.
+            let _ = ui.allocate_rect(visible, Sense::click_and_drag());
+            let painter = ui.painter_at(visible);
+            painter.rect_filled(
+                screen.translate(vec2(6.0, 8.0) * z),
+                CornerRadius::same(6),
+                Color32::from_black_alpha(110),
+            );
+            painter.rect_filled(screen, CornerRadius::same(3), th.panel);
+            painter.rect_stroke(
+                screen,
+                CornerRadius::same(3),
+                Stroke::new(1.0, th.panel_edge),
+                egui::StrokeKind::Inside,
+            );
+            text(
+                &painter,
+                screen.left_top() + vec2(10.0, 10.0) * z,
+                egui::Align2::LEFT_TOP,
+                "advanced · floating",
+                10.0 * z,
+                th.ink2,
+                false,
+            );
+            let look = Look {
+                z,
+                ink: th.ink,
+                ink2: th.ink2,
+            };
+            let mut own = Drawn::default();
+            let outer = std::mem::take(&mut ui_state.deferred);
+            for c in m.ctls.iter().filter(|c| !c.primary) {
+                draw_control(
+                    editor, ui_state, ui, &painter, th, xf, m, c, look, false, now, &mut own,
+                );
+            }
+            let deferred = std::mem::replace(&mut ui_state.deferred, outer);
+            // Leads into the floating controls, drawn above the float panel.
+            let both = Drawn {
+                ports: drawn.ports.clone(),
+                plugs: own.plugs.clone(),
+                drop_at: None,
+            };
+            draw_cables(
+                editor,
+                ui_state,
+                ui,
+                &painter,
+                th,
+                xf,
+                lay,
+                &both,
+                Some(m.id),
+            );
+            painter.extend(deferred);
+            drawn.plugs.extend(own.plugs);
+        });
 }
 
 fn on_port_click(
     editor: &mut PatchEditor,
     ui_state: &mut UiState,
-    id: ModuleId,
+    this_ref: PortRef,
     direction: PortDirection,
-    name: &str,
 ) {
-    let this_ref = PortRef::Module {
-        id,
-        port: name.to_string(),
-    };
     match direction {
         PortDirection::Output => {
             if ui_state.pending_output.as_ref() == Some(&this_ref) {
@@ -1229,29 +1601,318 @@ fn on_port_click(
     }
 }
 
-#[cfg(test)]
-mod eurorack_grid_tests {
-    use super::*;
+/// Target key under `at`: a knob/selector (`knob:`) or input jack (`in:`). Inside a floating
+/// advanced area only that module's targets count.
+fn target_at(ui_state: &UiState, at: Pos2, floats: &[(ModuleId, Rect)]) -> Option<String> {
+    let only = floats
+        .iter()
+        .find(|(_, r)| r.contains(at))
+        .map(|(id, _)| *id);
+    let module_of = |k: &str| {
+        k.split_once(':')
+            .and_then(|(_, rest)| rest.split_once('.'))
+            .and_then(|(mid, _)| mid.parse::<ModuleId>().ok())
+    };
+    ui_state
+        .frame_hits
+        .iter()
+        .filter(|(k, r)| (k.starts_with("knob:") || k.starts_with("in:")) && r.contains(at))
+        .find(|(k, _)| only.is_none_or(|id| module_of(k) == Some(id)))
+        .map(|(k, _)| k.clone())
+}
 
-    #[test]
-    fn snap_rounds_to_the_nearest_grid_cell() {
-        assert_eq!(
-            eurorack_snap(Vec2 { x: 9.0, y: 11.0 }),
-            Vec2 { x: 0.0, y: 20.0 }
-        );
-        assert_eq!(
-            eurorack_snap(Vec2 { x: 213.0, y: 4.0 }),
-            Vec2 { x: 220.0, y: 0.0 }
-        );
-        assert_eq!(
-            eurorack_snap(Vec2 { x: -5.0, y: -16.0 }),
-            Vec2 { x: 0.0, y: -20.0 }
+/// An output-jack drag released: onto a knob/selector makes a route, onto an input jack a cable.
+fn drop_cable(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    from: PortRef,
+    at: Pos2,
+    floats: &[(ModuleId, Rect)],
+) {
+    let Some(key) = target_at(ui_state, at, floats) else {
+        return;
+    };
+    let (kind, rest) = key.split_once(':').unwrap();
+    let (mid, name) = rest.split_once('.').unwrap();
+    let mid: ModuleId = mid.parse().unwrap();
+    if kind == "knob" {
+        let cable = editor.connect_route(from, mid, name);
+        let routes = routing::routes_into(editor.state(), mid, name);
+        routing::inspect(ui_state, &routes, mid, name);
+        ui_state.selected_route = Some(cable);
+    } else {
+        editor.connect(
+            from,
+            PortRef::Module {
+                id: mid,
+                port: name.to_string(),
+            },
         );
     }
+}
+
+fn draw_port_drag(
+    editor: &PatchEditor,
+    ui_state: &UiState,
+    ui: &egui::Ui,
+    th: &Theme,
+    drawn: &Drawn,
+    floats: &[(ModuleId, Rect)],
+) {
+    let Some(from) = &ui_state.port_drag else {
+        return;
+    };
+    let (Some(&a), Some(b)) = (
+        port_ref_pos(&drawn.ports, from, PortDirection::Output),
+        ui.ctx().pointer_latest_pos(),
+    ) else {
+        return;
+    };
+    let top = ui
+        .ctx()
+        .layer_painter(egui::LayerId::new(
+            egui::Order::Foreground,
+            Id::new("kabl-port-drag"),
+        ))
+        .with_clip_rect(ui_state.canvas);
+    cable_path(&top, a, b, th.sel, 4.0 * ui_state.zoom, 1.0, false);
+    let hot = target_at(ui_state, b, floats);
+    for (key, r) in &ui_state.frame_hits {
+        if key.starts_with("knob:") || key.starts_with("in:") {
+            let is_hot = hot.as_deref() == Some(key.as_str());
+            top.rect_stroke(
+                r.expand(2.0),
+                4.0,
+                Stroke::new(
+                    if is_hot { 2.0 } else { 1.0 },
+                    th.sel.gamma_multiply(if is_hot { 1.0 } else { 0.4 }),
+                ),
+                egui::StrokeKind::Outside,
+            );
+        }
+    }
+    if let Some(key) = hot.filter(|k| k.starts_with("knob:")) {
+        let (mid, name) = key["knob:".len()..].split_once('.').unwrap_or(("", ""));
+        let label = mid
+            .parse::<ModuleId>()
+            .ok()
+            .and_then(|mid| editor.state().modules.get(&mid))
+            .and_then(|m| registry::info_for(&m.kind))
+            .and_then(|i| i.params.iter().find(|p| p.name == name))
+            .map_or(name.to_string(), routing::param_label);
+        let tip = ui.ctx().layer_painter(egui::LayerId::new(
+            egui::Order::Tooltip,
+            Id::new("kabl-drop-hint"),
+        ));
+        routing::pill(
+            &tip,
+            b - EguiVec2::new(0.0, 14.0),
+            &format!(
+                "Release to modulate {label} ({:+.0} %)",
+                kabl_engine::compile::DEFAULT_ROUTE_AMOUNT * 100.0
+            ),
+        );
+    }
+}
+
+fn port_ref_pos<'a>(
+    ports: &'a HashMap<(ModuleId, PortDirection, String), Pos2>,
+    port_ref: &PortRef,
+    direction: PortDirection,
+) -> Option<&'a Pos2> {
+    let PortRef::Module { id, port } = port_ref else {
+        return None;
+    };
+    ports.get(&(*id, direction, port.clone()))
+}
+
+/// A hanging patch cable: a cubic with both handles pulled down, sagging more when longer.
+fn cable_points(a: Pos2, b: Pos2, z: f32) -> Vec<Pos2> {
+    let sag = 30.0 * z + 0.25 * (b - a).length();
+    let (c1, c2) = (a + vec2(0.0, sag), b + vec2(0.0, sag));
+    (0..=40)
+        .map(|i| {
+            let t = i as f32 / 40.0;
+            let u = 1.0 - t;
+            (a.to_vec2() * u * u * u
+                + c1.to_vec2() * 3.0 * u * u * t
+                + c2.to_vec2() * 3.0 * u * t * t
+                + b.to_vec2() * t * t * t)
+                .to_pos2()
+        })
+        .collect()
+}
+
+fn cable_path(
+    p: &egui::Painter,
+    a: Pos2,
+    b: Pos2,
+    col: Color32,
+    w: f32,
+    alpha: f32,
+    bypass: bool,
+) -> Vec<Pos2> {
+    let pts = cable_points(a, b, w / 5.5);
+    if bypass {
+        p.extend(egui::Shape::dashed_line(
+            &pts,
+            Stroke::new(w, Color32::from_gray(140).gamma_multiply(alpha)),
+            7.0,
+            5.0,
+        ));
+    } else {
+        p.add(egui::Shape::line(
+            pts.clone(),
+            Stroke::new(w + 2.0, Color32::from_black_alpha((90.0 * alpha) as u8)),
+        ));
+        p.add(egui::Shape::line(
+            pts.clone(),
+            Stroke::new(w, col.gamma_multiply(alpha)),
+        ));
+    }
+    for e in [a, b] {
+        p.circle_filled(
+            e,
+            w * 1.35,
+            col.lerp_to_gamma(Color32::BLACK, 0.35)
+                .gamma_multiply(alpha),
+        );
+        p.circle_filled(e, w * 0.9, col.gamma_multiply(alpha));
+    }
+    pts
+}
+
+/// Jack cables and route leads. `only`: just the leads into that module's floating area.
+#[allow(clippy::too_many_arguments)]
+fn draw_cables(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    painter: &egui::Painter,
+    th: &Theme,
+    xf: Xf,
+    lay: &Layout,
+    drawn: &Drawn,
+    only: Option<ModuleId>,
+) {
+    if ui_state.cable_view == CableView::Hidden {
+        return;
+    }
+    let z = xf.zoom;
+    let focus = ui_state.selected_module;
+    let view = ui_state.cable_view;
+    let alpha_for = |a: ModuleId, b: ModuleId| match view {
+        CableView::Focus if focus != Some(a) && focus != Some(b) => 0.12,
+        _ => 1.0,
+    };
+    // A lead ends inside a floating area when its knob is one of that area's controls.
+    let floating = |c: &kabl_core::CableState| match &c.to {
+        PortRef::Param { id, param } => lay
+            .get(*id)
+            .is_some_and(|m| m.overlay && m.ctl(param).is_some_and(|c| !c.primary)),
+        _ => false,
+    };
+    let cables: Vec<(CableId, kabl_core::CableState)> = editor
+        .state()
+        .cables
+        .iter()
+        .map(|(&id, c)| (id, c.clone()))
+        .collect();
+    if only.is_none() {
+        for (cable_id, c) in &cables {
+            let (Some(&a), Some(&b)) = (
+                port_ref_pos(&drawn.ports, &c.from, PortDirection::Output),
+                port_ref_pos(&drawn.ports, &c.to, PortDirection::Input),
+            ) else {
+                continue;
+            };
+            let col = port_color(th, editor, &c.from);
+            let alpha = alpha_for(c.from.module_id(), c.to.module_id());
+            let pts = cable_path(painter, a, b, col, 5.5 * z, alpha, false);
+            // Click the cable (at its middle) to remove it.
+            let mid = pts[pts.len() / 2];
+            let hit = Rect::from_center_size(mid, EguiVec2::splat(12.0));
+            ui_state.record(format!("cable:{cable_id}"), hit);
+            let resp = ui.interact(hit, Id::new(("kabl-cable", *cable_id)), Sense::click());
+            if resp.hovered() {
+                painter.circle_stroke(mid, 7.0, Stroke::new(1.5, Color32::RED));
+            }
+            if resp.clicked() {
+                editor.disconnect(*cable_id);
+            }
+        }
+    }
+    for (cable_id, pos) in &drawn.plugs {
+        let Some((_, c)) = cables.iter().find(|(id, _)| id == cable_id) else {
+            continue;
+        };
+        if floating(c) != only.is_some() || only.is_some_and(|id| c.to.module_id() != id) {
+            continue;
+        }
+        let Some(&a) = port_ref_pos(&drawn.ports, &c.from, PortDirection::Output) else {
+            continue;
+        };
+        let bypass = c.params.get("bypass").is_some_and(|&b| b >= 0.5);
+        let inspected = matches!((&c.to, &ui_state.inspected),
+            (PortRef::Param { id, param }, Some((iid, ip))) if id == iid && param == ip);
+        let strong = ui_state.selected_route == Some(*cable_id)
+            || inspected
+            || focus == Some(c.from.module_id());
+        let alpha =
+            alpha_for(c.from.module_id(), c.to.module_id()) * if strong { 1.0 } else { 0.72 };
+        let pts = cable_path(
+            painter,
+            a,
+            *pos,
+            cable_color(*cable_id),
+            4.0 * z,
+            alpha,
+            bypass,
+        );
+        let mid = pts[pts.len() / 2];
+        let hit = Rect::from_center_size(mid, EguiVec2::splat(12.0));
+        ui_state.record(format!("route:{cable_id}"), hit);
+        let resp = ui.interact(hit, Id::new(("kabl-route", *cable_id)), Sense::click());
+        if resp.clicked() {
+            // Clicking a route selects it (never deletes: removal is explicit in the drawer).
+            if let PortRef::Param { id, param } = &c.to {
+                ui_state.selected_module = Some(*id);
+                ui_state.inspected = Some((*id, param.clone()));
+                ui_state.selected_route = Some(*cable_id);
+            }
+        }
+    }
+}
+
+fn port_color(th: &Theme, editor: &PatchEditor, from: &PortRef) -> Color32 {
+    let PortRef::Module { id, port } = from else {
+        return th.cv;
+    };
+    editor
+        .state()
+        .modules
+        .get(id)
+        .and_then(|m| registry::info_for(&m.kind))
+        .and_then(|i| {
+            i.ports
+                .iter()
+                .find(|p| p.name == port && p.direction == PortDirection::Output)
+        })
+        .map_or(th.cv, |p| th.signal(p.port_type))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::port_label;
 
     #[test]
-    fn snap_is_idempotent() {
-        let once = eurorack_snap(Vec2 { x: 137.0, y: -48.0 });
-        assert_eq!(eurorack_snap(once), once);
+    fn port_labels_read_like_panel_text() {
+        assert_eq!(port_label("cutoff_cv"), "Cutoff CV");
+        assert_eq!(port_label("resonance_cv"), "Res CV");
+        assert_eq!(port_label("lp"), "LP");
+        assert_eq!(port_label("in3"), "In 3");
+        assert_eq!(port_label("velocity"), "Velocity");
+        assert_eq!(port_label("in"), "In");
+        assert_eq!(port_label("a"), "A");
     }
 }
