@@ -39,7 +39,7 @@ length, reset input, and a step light fed by the first audio → UI queue) are b
 The `decisions.md` entry "Shared clock + basic pitch/gate sequencing" lists what was built and
 what was deliberately left out.
 
-## Interlocking sequences — built, waiting for Kosta's review
+## Interlocking sequences — closed (Kosta approved hands-on, b7a645b)
 
 Supervisor scope: two interlocking sequences from one shared clock. Built: clock transport
 (`Clock::command`, `Transport::{Run, Stop, Restart}`, sent UI → audio through an `rtrb` queue in
@@ -47,8 +47,9 @@ Supervisor scope: two interlocking sequences from one shared clock. Built: clock
 `seq.transpose`. Module panel sliders now use the knob's formatter. The demo is
 `cargo run --release -p kabl-ui -- --patch patches/interlocking` (built by
 `crates/ui/tests/interlocking.rs`; rewrite it with `-- --ignored`). Record:
-`docs/interlocking-sequences/README.md` (video, screenshots, verification, open questions).
-Do not extend it before Kosta answers.
+`docs/interlocking-sequences/README.md` (video, screenshots, verification, deferred items).
+Deferred, not blockers: toolbar transport copy; Fit density of the four-row demo. Next scope
+goes through the supervisor.
 
 ## Accepted limitations
 

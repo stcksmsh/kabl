@@ -2032,3 +2032,12 @@ were not transplanted, only its look (palettes, geometry, drawing).
   RMS −18.7 dBFS; bass alone −21.4 and lead alone −22.2 dBFS RMS.
 - Not built (out of scope): swing, probability, song arrangement, MIDI clock, effects, a
   toolbar transport, per-clock shuffle, gate-length control.
+
+## 2026-09-23 — Interlocking sequences closed (owner approved hands-on)
+
+- Kosta tried `patches/interlocking` hands-on and approved it ("it works great"). The slice
+  is closed at `b7a645b`. Record: `docs/interlocking-sequences/README.md`.
+- Deferred, not approval blockers: a toolbar copy of the transport (the toolbar is full at
+  1280 px) and the density of the four-row demo at Fit zoom (56 % at 1440×900, 50 % at
+  1280×800). The other limits in the README stand as accepted.
+- Next scope goes through the supervisor.

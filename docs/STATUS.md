@@ -5,7 +5,7 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-23, interlocking sequences built, waiting for Kosta's review.
+Last updated: 2026-09-23, interlocking sequences closed (owner approved hands-on).
 
 **Current handover (supersedes every older handover note below):** the approved revision-2 rack
 is the production canvas, on real editor/engine state. Kosta reviewed it hands-on and approved
@@ -43,7 +43,7 @@ Try it with `cargo run --release -p kabl-ui -- --patch patches/sequence`. Detail
 left out are in the `decisions.md` entry "Shared clock + basic pitch/gate sequencing".
 Kosta approved the walkthrough videos; slice closed at af0585b.
 
-**Interlocking sequences (supervisor scope, 2026-09-23), waiting for Kosta's review:** clock
+**Interlocking sequences (supervisor scope, 2026-09-23), closed: Kosta approved it hands-on.** Clock
 transport (Stop/Run and Restart buttons on the clock face, runtime commands that are never in
 the op log, and a `reset` output), the `clock.div` divider (/1–/8), and sequencer transpose
 (±24 st, advanced). Module panel pitch sliders now read like the knobs. The demo is
@@ -51,7 +51,8 @@ the op log, and a `reset` output), the `clock.div` divider (/1–/8), and sequen
 against a 5-step lead on 8ths. Record, video, screenshots and verification (218 tests pass,
 clippy clean): [`interlocking-sequences/README.md`](interlocking-sequences/README.md).
 Rationale: `decisions.md`, "Interlocking sequences: transport, clock divider, transpose".
-Commits 8d8dfa9..HEAD.
+Commits 8d8dfa9..b7a645b. Deferred, not blockers: a toolbar transport copy and the density of
+the four-row demo at Fit zoom. Next scope: supervisor.
 
 Older sections below are history. Where they disagree with the above or with the code, they
 are stale: the MIDI/graph-swap/undo risks they list are fixed; the Mutex described there is

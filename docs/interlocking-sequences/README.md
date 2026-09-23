@@ -1,6 +1,8 @@
 # Interlocking sequences: transport, clock divider, transpose
 
-**Status: built and verified, waiting for Kosta's review.** Scope came through the supervisor:
+**Closed 2026-09-23:** Kosta tried it hands-on and approved it (decisions.md, "Interlocking
+sequences closed"). The toolbar transport and Fit density below are deferred, not blockers.
+Scope came through the supervisor:
 two interlocking sequences playable from one shared clock. Rationale:
 `decisions.md`, "Interlocking sequences: transport, clock divider, transpose".
 
@@ -140,11 +142,12 @@ buttons, bring them to 100 %.
 - The first demo had a lead step at +26 st, above the 24 st range. The notes are the same now
   (transpose 0, steps 12 lower). The patch test checks ranges.
 
-## Known limits / questions for Kosta
+## Known limits (deferred at approval)
 
 - At Fit zoom the four-row patch is small (56 % / 50 %). Everything is reachable by pan and
   zoom, as on any rack patch. A toolbar transport copy was not added: the toolbar is full at
-  1280 px, and the clock face carries the reset jack that goes with it. Say if you want one.
+  1280 px, and the clock face carries the reset jack that goes with it. Both are deferred:
+  not blockers, revisit if a later scope asks.
 - The divider's committed division is state, so it survives swaps. A division change to the
   same value is not a change, so it does not re-anchor the count.
 - The step lights lag the audio by the UI frame (30 ms) plus the audio buffer, as before.
