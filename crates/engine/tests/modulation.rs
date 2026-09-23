@@ -257,3 +257,39 @@ fn a_route_to_an_unknown_param_is_a_compile_error() {
         .insert(10, route((SQUARE, "out"), (VCA, "nope"), 0.3, false));
     assert!(compile(&p, SR, 1).is_err());
 }
+
+/// `gate (1.0) -> mixer in1 + in2 -> out`: the output is `level1 + level2`.
+fn mixer_probe(params: &[(&str, f32)]) -> PatchState {
+    let mut p = PatchState::new();
+    p.modules.insert(MIDI, module("midi.in", &[]));
+    p.modules.insert(VCA, module("mixer", params));
+    p.modules.insert(OUT, module("out", &[]));
+    p.cables.insert(1, jack((MIDI, "gate"), (VCA, "in1")));
+    p.cables.insert(2, jack((MIDI, "gate"), (VCA, "in2")));
+    p.cables.insert(3, jack((VCA, "out"), (OUT, "left")));
+    p
+}
+
+#[test]
+fn mixer_channel_levels_are_separate_params() {
+    let p = mixer_probe(&[("level1", 0.25), ("level2", 0.5)]);
+    assert!(close(gain_out(&p), 0.75));
+}
+
+#[test]
+fn legacy_mixer_level_still_sets_every_channel_and_routes_reach_channel_one() {
+    // Before the rename every channel was named `level`; a stored `level` set all four.
+    let p = mixer_probe(&[("level", 0.25)]);
+    assert!(close(gain_out(&p), 0.5));
+    let mut p = mixer_probe(&[("level", 0.25), ("level2", 0.0)]);
+    p.modules.insert(
+        SQUARE,
+        module("lfo", &[("rate_hz", 0.01), ("waveform", 3.0)]),
+    );
+    p.cables
+        .insert(10, route((SQUARE, "out"), (VCA, "level"), 0.5, false));
+    assert!(
+        close(gain_out(&p), 0.75),
+        "route to old `level` = channel 1"
+    );
+}

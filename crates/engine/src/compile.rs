@@ -559,7 +559,10 @@ pub fn compile(
                 let index = info
                     .params
                     .iter()
-                    .position(|p| p.name == param)
+                    .position(|p| {
+                        p.name == param
+                            || registry::legacy_param(info.kind, p.name) == Some(param.as_str())
+                    })
                     .ok_or_else(|| CompileError::UnknownParam {
                         id: *id,
                         param: param.clone(),
@@ -670,7 +673,17 @@ pub fn compile(
             .info
             .params
             .iter()
-            .map(|p| mstate.params.get(p.name).copied().unwrap_or(p.default))
+            .map(|p| {
+                mstate
+                    .params
+                    .get(p.name)
+                    .or_else(|| {
+                        registry::legacy_param(meta.info.kind, p.name)
+                            .and_then(|old| mstate.params.get(old))
+                    })
+                    .copied()
+                    .unwrap_or(p.default)
+            })
             .collect();
 
         let input_ports: Vec<_> = meta

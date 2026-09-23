@@ -76,3 +76,10 @@ pub fn all_infos() -> &'static [&'static ModuleInfo] {
 pub fn info_for(kind: &str) -> Option<&'static ModuleInfo> {
     all_infos().iter().copied().find(|info| info.kind == kind)
 }
+
+/// The stored name an older patch used for `param` of `kind`, if it differs. Only the mixer's
+/// channel levels were renamed (`level` -> `level1`..`level4`); an old stored `level` still sets
+/// every channel, and an old route to `level` still reaches channel 1, exactly as before.
+pub fn legacy_param(kind: &str, param: &str) -> Option<&'static str> {
+    (kind == "mixer" && param.starts_with("level")).then_some(crate::builtins::LEGACY_LEVEL)
+}

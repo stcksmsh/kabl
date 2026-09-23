@@ -38,17 +38,30 @@ const PORTS: &[PortInfo] = &[
     },
 ];
 
-const LEVEL_PARAM: ParamInfo = ParamInfo {
-    name: "level",
-    min: 0.0,
-    max: 1.0,
-    default: 1.0,
-    unit: "",
-    taper: Taper::Linear,
-    smoothing_ms: 5.0,
-};
+const fn level(name: &'static str) -> ParamInfo {
+    ParamInfo {
+        name,
+        min: 0.0,
+        max: 1.0,
+        default: 1.0,
+        unit: "",
+        taper: Taper::Linear,
+        smoothing_ms: 5.0,
+    }
+}
 
-const PARAMS: &[ParamInfo] = &[LEVEL_PARAM, LEVEL_PARAM, LEVEL_PARAM, LEVEL_PARAM];
+/// One distinct name per channel. They used to share the name `level`, so a stored `level`
+/// set all four and a route reached only the first; `LEGACY_LEVEL` keeps that meaning for old
+/// patches (see `crate::registry::legacy_param`).
+const PARAMS: &[ParamInfo] = &[
+    level("level1"),
+    level("level2"),
+    level("level3"),
+    level("level4"),
+];
+
+/// The pre-rename shared param name.
+pub const LEGACY_LEVEL: &str = "level";
 
 pub static MIXER_INFO: ModuleInfo = ModuleInfo {
     kind: "mixer",
@@ -67,6 +80,7 @@ pub static MIXER_INFO: ModuleInfo = ModuleInfo {
     },
     skin: None,
     width_units: 8,
+    advanced: &[],
 };
 
 const INPUTS: [usize; 4] = [0, 1, 2, 3];

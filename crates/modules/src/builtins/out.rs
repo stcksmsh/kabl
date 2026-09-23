@@ -39,6 +39,7 @@ pub static OUT_INFO: ModuleInfo = ModuleInfo {
     },
     skin: None,
     width_units: 5,
+    advanced: &[],
 };
 
 const LEFT: usize = 0;

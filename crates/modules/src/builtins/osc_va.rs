@@ -78,45 +78,51 @@ pub static OSC_VA_INFO: ModuleInfo = ModuleInfo {
     },
     skin: Some(&OSC_VA_SKIN),
     width_units: 7,
+    advanced: &[],
 };
 
-static OSC_VA_PANEL_PNG: &[u8] = include_bytes!("../../assets/osc_va_panel.png");
+static OSC_VA_LIGHT_PNG: &[u8] = include_bytes!("../../assets/osc_va_light.png");
+static OSC_VA_DARK_PNG: &[u8] = include_bytes!("../../assets/osc_va_dark.png");
 
+/// Where each control sits on the art, as a fraction of the 7u × 340 face.
 static OSC_VA_CONTROLS: &[ControlSkin] = &[
-    ControlSkin {
-        id: "pitch",
-        kind: ControlKind::Jack,
-        pos: (0.15, 0.35),
-    },
-    ControlSkin {
-        id: "sync",
-        kind: ControlKind::Jack,
-        pos: (0.15, 0.55),
-    },
-    ControlSkin {
-        id: "out",
-        kind: ControlKind::Jack,
-        pos: (0.85, 0.45),
-    },
     ControlSkin {
         id: "base_hz",
         kind: ControlKind::Knob,
-        pos: (0.30, 0.80),
+        pos: (0.5, 0.36),
     },
     ControlSkin {
         id: "waveform",
         kind: ControlKind::Knob,
-        pos: (0.70, 0.80),
+        pos: (0.5, 0.6),
+    },
+    ControlSkin {
+        id: "pitch",
+        kind: ControlKind::Jack,
+        pos: (0.19, 0.84),
+    },
+    ControlSkin {
+        id: "sync",
+        kind: ControlKind::Jack,
+        pos: (0.5, 0.84),
+    },
+    ControlSkin {
+        id: "out",
+        kind: ControlKind::Jack,
+        pos: (0.81, 0.84),
     },
 ];
 
-/// Demo skin proving the "custom modules can use their own background image and place their own
-/// jacks/knobs" mechanism end-to-end (owner ask, not a brief feature — see decisions.md "Module
-/// skins: custom panel art"). The art itself is an honest, generated placeholder, not designed
-/// hardware-panel art — flagged as such, not passed off as more than it is.
+/// Demo skin for the illustrated-skin mechanism (owner ask; decisions.md "Module skins" and the
+/// rack migration entry): light and dark art, controls drawn by the UI. The art is an honest
+/// PLACEHOLDER (procedural, `assets/placeholder_art.py`), marked as such on the art itself.
+/// Core modules show the A / A-dark theme unless the viewer turns skins on.
 static OSC_VA_SKIN: ModuleSkin = ModuleSkin {
-    panel_size: (200.0, 220.0),
-    background_image: Some(OSC_VA_PANEL_PNG),
+    panel_size: (210.0, 340.0),
+    background_image: Some(OSC_VA_LIGHT_PNG),
+    background_dark: Some(OSC_VA_DARK_PNG),
+    labels_on_art: false,
+    art_ink: [[0x2b, 0x1d, 0x33], [0xff, 0xf1, 0xd6]],
     controls: OSC_VA_CONTROLS,
 };
 

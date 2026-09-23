@@ -105,6 +105,7 @@ pub static ENV_ADSR_INFO: ModuleInfo = ModuleInfo {
     },
     skin: None,
     width_units: 8,
+    advanced: &["timing"],
 };
 
 const GATE_IN: usize = 0;

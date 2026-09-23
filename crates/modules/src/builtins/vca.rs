@@ -69,6 +69,7 @@ pub static VCA_INFO: ModuleInfo = ModuleInfo {
     },
     skin: None,
     width_units: 6,
+    advanced: &["exponential"],
 };
 
 const IN: usize = 0;

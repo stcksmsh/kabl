@@ -50,6 +50,7 @@ pub static MIDI_IN_INFO: ModuleInfo = ModuleInfo {
     },
     skin: None,
     width_units: 5,
+    advanced: &[],
 };
 
 const GATE: usize = 0;

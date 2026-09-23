@@ -17,7 +17,7 @@ pub use env_adsr::{EnvAdsr, ENV_ADSR_INFO};
 pub use filter_svf::{FilterSvf, FILTER_SVF_INFO};
 pub use lfo::{Lfo, LFO_INFO};
 pub use midi_in::{MidiIn, MIDI_IN_INFO};
-pub use mixer::{Mixer, MIXER_INFO};
+pub use mixer::{Mixer, LEGACY_LEVEL, MIXER_INFO};
 pub use osc_va::{OscVa, OSC_VA_INFO};
 pub use out::{Out, OUT_INFO};
 pub use ringmod::{RingMod, RINGMOD_INFO};

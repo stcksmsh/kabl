@@ -156,4 +156,8 @@ pub struct ModuleInfo {
     /// the free-form patchbay view (every module there stays a uniform width); only the tiled view
     /// reads it.
     pub width_units: u32,
+    /// Params the UI keeps off the module face by default (the "advanced" controls, shown when
+    /// the module expands). Every other param is a default primary control. Presentation only:
+    /// the user's own per-instance choice overrides it, and the engine never reads it.
+    pub advanced: &'static [&'static str],
 }

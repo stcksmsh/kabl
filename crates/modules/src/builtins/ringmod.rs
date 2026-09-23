@@ -41,6 +41,7 @@ pub static RINGMOD_INFO: ModuleInfo = ModuleInfo {
     },
     skin: None,
     width_units: 5,
+    advanced: &[],
 };
 
 const A: usize = 0;

@@ -78,16 +78,18 @@ fn every_skin_background_image_decodes_as_a_valid_png() {
     for &kind in registry::KNOWN_KINDS {
         let info = registry::info_for(kind).expect("known kind must resolve");
         let Some(skin) = info.skin else { continue };
-        let Some(bytes) = skin.background_image else {
-            continue;
-        };
-        let decoded = image::load_from_memory(bytes)
-            .unwrap_or_else(|e| panic!("{kind}'s skin image failed to decode: {e}"));
-        assert!(
-            decoded.width() > 0 && decoded.height() > 0,
-            "{kind}'s skin image decoded to zero size"
-        );
-        checked += 1;
+        for bytes in [skin.background_image, skin.background_dark]
+            .into_iter()
+            .flatten()
+        {
+            let decoded = image::load_from_memory(bytes)
+                .unwrap_or_else(|e| panic!("{kind}'s skin image failed to decode: {e}"));
+            assert!(
+                decoded.width() > 0 && decoded.height() > 0,
+                "{kind}'s skin image decoded to zero size"
+            );
+            checked += 1;
+        }
     }
     assert!(
         checked > 0,

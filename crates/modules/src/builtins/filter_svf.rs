@@ -93,6 +93,7 @@ pub static FILTER_SVF_INFO: ModuleInfo = ModuleInfo {
     },
     skin: None,
     width_units: 7,
+    advanced: &[],
 };
 
 const IN: usize = 0;

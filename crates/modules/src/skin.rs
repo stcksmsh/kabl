@@ -48,8 +48,17 @@ pub struct ModuleSkin {
     /// them.
     pub panel_size: (f32, f32),
     /// Raw PNG bytes, embedded via `include_bytes!` — `None` means the renderer draws its own
-    /// procedural panel (dark faceplate + category accent strip) instead of an image.
+    /// themed panel instead of an image. Used under the light theme (and, dimmed, under the dark
+    /// one when `background_dark` is `None`).
     pub background_image: Option<&'static [u8]>,
+    /// Art for the dark theme, if the skin has a separate variant.
+    pub background_dark: Option<&'static [u8]>,
+    /// `false` (the default for a skin): the renderer puts labels and values on theme-coloured
+    /// plates, so their contrast never depends on the art. `true`: they sit straight on the art in
+    /// `art_ink`; the skin maker takes responsibility for contrast.
+    pub labels_on_art: bool,
+    /// Label colour on the art, `[light art, dark art]`, when `labels_on_art` is set.
+    pub art_ink: [[u8; 3]; 2],
     /// Every control this skin explicitly places. A port or param with no entry here simply isn't
     /// drawn by a skin-aware renderer — every control a module actually has should appear, or it
     /// becomes unreachable from that renderer's UI.

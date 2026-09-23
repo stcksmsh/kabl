@@ -58,6 +58,7 @@ pub static LFO_INFO: ModuleInfo = ModuleInfo {
     },
     skin: None,
     width_units: 7,
+    advanced: &[],
 };
 
 const OUT: usize = 0;
