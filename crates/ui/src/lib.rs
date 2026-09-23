@@ -1061,14 +1061,14 @@ fn draw_module(
         };
         let word = match lock {
             DelayLock::Free => "free",
-            DelayLock::Unlocked => "no clock · free",
+            DelayLock::Unlocked => "unlocked",
             DelayLock::Locked => "sync",
             DelayLock::Held => "held",
         };
         text(
             painter,
             xf.p(p),
-            egui::Align2::CENTER_CENTER,
+            egui::Align2::LEFT_CENTER,
             &format!("{word} · {time}"),
             11.0 * z,
             if lock == DelayLock::Locked {

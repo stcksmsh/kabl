@@ -103,7 +103,7 @@ pub enum Decor {
     Envelope(Rect),
     /// The clock's Run/Stop and Restart buttons.
     Transport(Rect),
-    /// Centre of the delay's sync readout line.
+    /// Left end of the delay's sync readout line (left of the output plate).
     Status(Pos2),
 }
 
@@ -435,7 +435,7 @@ fn place_local(
                 decor = Decor::Keys(Rect::from_min_size(pos2(12.0, 70.0), vec2(fw - 24.0, 64.0)))
             }
             "out" => decor = Decor::Speaker(pos2(fw / 2.0, 112.0)),
-            "delay" => decor = Decor::Status(pos2(fw / 2.0, 226.0)),
+            "delay" => decor = Decor::Status(pos2(14.0, 228.0)),
             "clock" => {
                 decor = Decor::Transport(Rect::from_min_size(
                     pos2(12.0, 174.0),

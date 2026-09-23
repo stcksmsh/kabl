@@ -310,3 +310,37 @@ fn saved_patch_has_no_audio_history() {
         .sum();
     assert!(bytes < 64 * 1024, "{bytes} bytes");
 }
+
+/// Not a check: writes 10 s A/B listening clips of the demo to `target/echo-clips/*.wav`
+/// (converted for docs/echo/audio by hand). `cargo test -p kabl-engine --test echo
+/// write_listening_clips -- --ignored`.
+#[test]
+#[ignore]
+fn write_listening_clips() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/echo-clips");
+    std::fs::create_dir_all(&dir).unwrap();
+    let spec = hound::WavSpec {
+        channels: 2,
+        sample_rate: SR as u32,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+    for (name, p) in [
+        ("01-dry", with(patch(), DELAY, "mix", 0.0)),
+        ("02-echo", patch()),
+        ("03-straight-eighths", with(patch(), DELAY, "sync", 2.0)),
+        ("04-mono", with(patch(), DELAY, "mode", 0.0)),
+        ("05-free-time-lfo", with(patch(), DELAY, "sync", 0.0)),
+    ] {
+        let mut c = compile(&p, SR, VOICES).unwrap();
+        let mut w = hound::WavWriter::create(dir.join(format!("{name}.wav")), spec).unwrap();
+        for _ in 0..10 * SEC {
+            c.process_block();
+            for (l, r) in c.left().iter().zip(c.right()) {
+                w.write_sample(*l).unwrap();
+                w.write_sample(*r).unwrap();
+            }
+        }
+        w.finalize().unwrap();
+    }
+}

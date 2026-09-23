@@ -73,9 +73,9 @@ pub fn echo() -> PatchEditor {
     e.connect(port(mixer_r, "out"), port(OUT, "right"));
 
     // Dotted eighths against the lead's straight eighths, bouncing left and right; repeats
-    // darker than the lead and gone in about two seconds.
+    // darker than the lead, audible for two to three seconds after the notes stop.
     e.set_param(delay, "sync", 3.0);
-    e.set_param(delay, "feedback", 45.0);
+    e.set_param(delay, "feedback", 55.0);
     e.set_param(delay, "mix", 32.0);
     e.set_param(delay, "tone_hz", 3200.0);
     e.set_param(delay, "mode", 1.0);
