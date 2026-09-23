@@ -1,0 +1,43 @@
+# Current-build walkthrough for record-walkthrough.sh: playing patch, knob modulation, source
+# lanes, face choice, push and float expansion, Hidden view, zoom.
+sleep 2
+dragby knob:3.cutoff_hz 0 60
+sleep 1
+dragby knob:3.cutoff_hz 0 -100
+sleep 1
+click knob:3.cutoff_hz
+sleep 1
+dragby lane:12 0 -40
+sleep 1
+dragby lane:10 0 30 shift
+sleep 1
+click view:Hidden
+sleep 2
+click view:All
+click toggle:5
+sleep 2
+click view-menu
+click menu:float
+key Escape
+sleep 2
+click toggle:5
+click view-menu
+click menu:float
+key Escape
+rclick module:5
+click menu:choose
+sleep 1
+click pin:5.exponential
+sleep 1
+click done:5
+sleep 1
+click theme:dark
+sleep 1
+wheel knob:4.attack_ms 3 ctrl
+sleep 1
+click knob:4.attack_ms
+sleep 1
+dragby lane:8 0 -30
+sleep 1
+click zoom:fit
+sleep 2

@@ -1,0 +1,10 @@
+# Source lanes of a knob panned against the drawer edge and zoomed: they pan fully into view.
+pan 60 560 knob:3.cutoff_hz 890 80
+wheel knob:3.cutoff_hz 1 ctrl
+shot e01-cutoff-at-drawer-edge
+click knob:3.cutoff_hz
+shot e02-lanes-panned-into-view
+dragby lane:10 0 -15
+shot e03-dot-dragged
+click theme:dark
+shot e04-dark

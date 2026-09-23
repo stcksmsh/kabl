@@ -5,7 +5,7 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-23, rack UI migration into production `kabl-ui`.
+Last updated: 2026-09-23, rack review preparation (lane edge fix, fresh screenshots, A/V walkthrough).
 
 **Current handover (supersedes every older handover note below):** the approved revision-2 rack
 is now the production canvas, on real editor/engine state, and it is ready for Kosta's review.
@@ -18,7 +18,7 @@ What is real now (production `kabl-ui`, op log, engine, file format):
 
 - Rack: A-light / A-dark, stable rows, All/Focus/Hidden with badges, pan and zoom (50–200 %,
   about the pointer; 100 %, Fit, Focus), closable routing drawer that keeps the inspected
-  control in view.
+  control in view; an inspected knob's source lanes pan fully into view (drawer, canvas edge).
 - Faces: module-declared default primary controls, user choice per instance (one undo step,
   saved as `face.*` params the compiler never reads, never rebuilds audio); advanced controls
   expand in place, pushing neighbours (default) or floating (setting); off-face modulated
@@ -35,6 +35,9 @@ Review status (corrected): Kosta heard the remote recordings and renders of the 
 slice (CONT/KEY difference clear, live edit clean) and approved this migration. **Nobody has
 used either build by hand**: grab feel, his display and scale factor, his MIDI controller and
 his sound card remain untested. Screenshots are Xvfb/llvmpipe runs. Pi 4 unmeasured.
+A 49 s screen + audio walkthrough of the current build is in
+[`rack-migration/walkthrough.mp4`](rack-migration/walkthrough.mp4) (level-checked, not yet
+listened to).
 
 Next human gate: Kosta reviews the migrated rack. Do not start sequencers, effects or another
 scope before that.

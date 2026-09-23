@@ -7,7 +7,7 @@ click view:All
 shot c03-all-dark
 click knob:6.cutoff_hz
 shot c04-four-sources-dark
-click toggle:12
+click toggle:9
 shot c05-offface-revealed
 click zoom:fit
 shot c06-fit

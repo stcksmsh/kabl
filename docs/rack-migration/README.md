@@ -14,13 +14,20 @@ Before: one free-form dark canvas (Eurorack grid or Patchbay), every param on ev
 one skinned module (`osc.va`, art with baked-in labels), a scroll area, no zoom, drawer always
 open. After: the A-light / A-dark rack from the approved design (panel materials, IBM Plex type,
 knob/jack/cable styling, output plates, rails), user-chosen faces with in-place expansion,
-pan and zoom, closable drawer, illustrated skin demo with plates or labels on art. Modulation
-controls behave exactly as in the closed slice.
+pan and zoom, closable drawer, skin renderer (plates or labels on art; no built-in ships a skin
+yet). Modulation controls behave exactly as in the closed slice.
+
+Screenshots are from the current build (`1e402cf`) unless under `img/historical/`.
 
 ![A-light 1440×900](img/01-a-light-1440.png)
 ![A-dark 1440×900](img/02-a-dark-1440.png)
 
 ## Walkthrough
+
+**View menu defaults.** Expansion pushes neighbours; *Illustrated skins* is on; *Preview
+labels_on_art* is off.
+
+![View menu defaults](img/08-view-menu-defaults.png)
 
 **Themes.** Toolbar `A-light` / `A-dark`. All nine built-ins, the toolbar and the drawer use
 the approved palettes; chrome stays dark in both, as designed. View only, never saved.
@@ -35,7 +42,8 @@ stays off it: `vca` Response). ADSR Timing is on the face (owner): CONT/KEY take
 envelope picture's place, so the knobs sit exactly where they do with the picture. Right-click a module → *Choose primary
 controls…*: the module expands, every control gets a pin (filled = on the face), the header
 counts them; `Done` commits the whole choice as **one** undo step, `Esc` discards it.
-*Reset face to module default* is in the same menu. The choice is saved in the patch as
+*Reset face to module default* is in the same menu. The reference ADSR shows the default face
+with Timing (every screenshot above). The choice is saved in the patch as
 `face.<param>` params (1 on / 0 off / absent = default), which the compiler never reads:
 choosing never rebuilds audio.
 
@@ -63,19 +71,16 @@ at ≥ 100 % when it fits). Panels, art, cables, rings, lanes, badges and hit re
 transform; toolbar and drawer stay at 100 %. Start-up fits the patch, never above 100 %.
 Opening the drawer or resizing keeps the inspected control in view.
 
-![200 %, zoomed about the pointer](img/10-zoom-200.png)
+![Ctrl+wheel zoom about the pointer](img/10-zoom-in-pointer.png)
 ![Crowded at 50 %](img/11-crowded-50.png)
 ![Focus](img/13-focus.png)
 
-**Skins.** *View → Illustrated skins*, on by default. No built-in ships a skin: the `osc.va`
-demo (procedural **PLACEHOLDER ART**) was dropped after review at the owner's request, so the
-screenshots below show the renderer with that since-removed demo; the renderer stays and is
-covered by a test skin. `labels_on_art = false` (the skin's setting): labels
-and values on theme plates. *View → Preview labels_on_art* shows the maker's `true` case:
-labels in the skin's ink straight on the art. Controls are the normal widgets either way.
-
-![Skin, plates, A-dark](img/08-skin-plates-dark.png)
-![Skin, labels on art, A-light](img/09-skin-on-art-light.png)
+**Skins.** *View → Illustrated skins*, on by default. No built-in module ships a skin (the
+`osc.va` placeholder demo was dropped at the owner's request), so the current rack shows no
+art; the renderer stays and is covered by a test skin in `rack.rs`. For a skin,
+`labels_on_art = false` (default) keeps labels and values on theme plates; *View → Preview
+labels_on_art* shows the maker's `true` case. Historical screenshots of the dropped demo, for
+reference only: [`img/historical/`](img/historical/).
 
 **Cables.** Drag an output to an input or a knob. To move or remove a jack cable, pull its
 plug out of the input and drop it on another input, a knob, or bare rack (one undo step; as
@@ -85,10 +90,27 @@ in VCV Rack and Voltage Modular). A click on a cable never deletes it; right-cli
 **Modules.** Drag a panel to move it; it snaps to the nearest row and unit on release (one
 undoable move, no audio rebuild).
 
+![Pulling a plug out of the VCA input](img/09-plug-in-hand.png)
+
+**Source lanes at the edge.** Inspecting a knob (or adding a route to it) pans the rack, once
+the pointer is up, just enough to show its whole lane disk, so no dot hides under the drawer
+or the canvas edge; opening the drawer does the same. A drag in progress is never panned.
+
+![Lanes of a knob panned against the drawer, 147 %](img/16-lanes-at-drawer-edge-1280.png)
+![Same, A-dark](img/17-lanes-at-drawer-edge-dark.png)
+
+## Walkthrough video
+
+[`walkthrough.mp4`](walkthrough.mp4) (49 s, 1440×900 scaled to 1280, real audio): chords play
+throughout while Cutoff base is dragged down and up, the Cutoff lanes open and the envelope
+and LFO dots are dragged (one with Shift), Hidden view, VCA push then float expansion, choose
+mode (Response onto the face), A-dark, Ctrl+wheel zoom on Attack, an Attack lane dot drag, Fit.
+Recorded by [`record-walkthrough.sh`](record-walkthrough.sh) (`scripts/walkthrough.txt`).
+
 ## Verification
 
 **Measured / automated**
-- `cargo test --workspace`: 192 pass, 0 fail (3 ignored: fixture/script writers). Clippy clean.
+- `cargo test --workspace`: 193 pass, 0 fail (3 ignored: fixture/script writers). Clippy clean.
   `cargo fmt --check` clean except the untouched prototype examples.
 - New regression tests, real egui input through `show()` at 1440×900 and 1280×800
   (`crates/ui/tests/interaction.rs`): primary choice = one undo step, saved/reloaded, undo
@@ -99,7 +121,8 @@ undoable move, no audio rebuild).
   ring +20 % per 30 px, Shift ×0.1, Escape leaves no undo entry, lane dot and undo work; view
   changes (theme, cable view, zoom, fit, expand, float, skins, drawer) leave patch, history and
   dirty flag untouched; `face.*` params render bit-identical audio; opening the drawer keeps
-  the inspected knob left of it. Layout unit tests (`rack.rs`): no overlaps, controls inside
+  the inspected knob left of it; a knob's lanes pan fully into view next to the drawer and at
+  the bottom-left corner, and a dot there still drags. Layout unit tests (`rack.rs`): no overlaps, controls inside
   panels for every built-in in every face/expansion combination.
 - Every existing modulation regression test still passes unchanged in intent (one was adapted:
   "click empty rack" finds bare rack itself). New: pulling a plug moves or removes a jack cable
@@ -114,25 +137,32 @@ undoable move, no audio rebuild).
 
 **Inspected** (runtime screenshots, Xvfb + llvmpipe, `scripts/{tour,crowded,scale}.txt`):
 both themes at both sizes, Hidden badges, lanes, push and float, choose mode, skin plates and
-labels on art in both themes, 50–200 % zoom, Focus, crowded rack, display scale 1.25 with a
-skin at 200 % (art, labels and hit areas aligned; a real drag landed on the knob). Defects found
+labels on art in both themes (before the demo skin was dropped), 50–200 % zoom, Focus,
+crowded rack, display scale 1.25 zoomed (labels and hit areas aligned; a real drag landed on
+the knob). Rerun on `1e402cf` at both sizes and both themes, drawer open, with pan and zoom
+(`scripts/{tour,crowded,replug,edge,scale}.txt`); `img/` holds that run. Defects found
 and fixed: drawer rows widened the drawer over the rack (clipped); the first drawer width
-(336 px) overflowed the same way.
+(336 px) overflowed the same way; lanes clipped at the canvas edge and drawer (fixed in
+`1e402cf`: see *Source lanes at the edge*); the selected drawer row's source name was route
+colour on the blue selection fill (now white).
 
 **Unverified**
 - Kosta's hands, display, scale factor, MIDI controller and sound card. Grab feel of dots vs
   ring vs body, now also at other zoom levels.
-- Nobody listened to the migrated build. Presentation operations are shown not to rebuild or
-  change audio (tests above); the audio path itself is unchanged.
-- The skin art is a placeholder; no contrast warning for `labels_on_art` (the maker owns it).
+- Nobody has listened to `walkthrough.mp4` yet: the recording was checked by level only
+  (mean −21 dB, peak −6.6 dB, no clipping), not by ear for clicks or zipper noise. The audio
+  path is unchanged and presentation operations are shown not to rebuild or change audio.
+- No built-in skin; no contrast warning for `labels_on_art` (the maker owns it).
 - Pi 4 / low-end GPU rendering cost of the richer drawing.
 
 ## Limits (known, left)
 
 Rich LFO controls are not shown (only real params exist). Selector routes show a plug, not the
-reachable-options bracket. Lanes near the canvas edge are clipped by it. A module dragged far along a full row
+reachable-options bracket. Lanes pan into view when a knob is inspected, not when the user later pans or zooms them off
+the canvas (then they clip, by the user's choice). A module dragged far along a full row
 inserts itself by stored x; there is no "make room" drag preview beyond the live packing.
 Compact synth layout and x-ray cable fading are not built (out of scope).
 
 Tools: [`drive.py`](drive.py) (xdotool driver), [`closeout-real-x.sh`](closeout-real-x.sh),
+[`record-walkthrough.sh`](record-walkthrough.sh),
 [`scripts/`](scripts/). Screenshots: [`img/`](img/).

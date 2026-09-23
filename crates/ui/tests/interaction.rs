@@ -1186,7 +1186,7 @@ fn write_crowded_patch() {
         ("midi", "velocity", "env1", "attack_ms"),
         ("lfo3", "out", "mix", "level2"),
         ("lfo1", "out", "lfo3", "rate_hz"),
-        ("env1", "out", "env2", "timing"),
+        ("env1", "out", "vca2", "exponential"),
     ] {
         e.connect_route(port(a, ap), ids[b], param);
     }

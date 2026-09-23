@@ -1,13 +1,7 @@
-# Artwork, labels and hit areas at a non-1 display scale, with skins and zoom.
-click view-menu
-click menu:skins
-key Escape
+# Labels and hit areas at a non-1 display scale, zoomed.
 click knob:2.base_hz
-shot s01-skin-plates
-click view-menu
-click menu:labels-on-art
-key Escape
+shot s01-scaled
 wheel knob:2.base_hz 2 ctrl
-shot s02-skin-art-zoomed
+shot s02-scaled-zoomed
 dragby knob:2.base_hz 0 -30
 shot s03-after-body-drag
