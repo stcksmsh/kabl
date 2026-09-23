@@ -1777,3 +1777,11 @@ in a pill while dragging. Agent decisions inside those rules:
   as drop targets; their routes are edited in the drawer.
 - Knob drags map the total pointer offset from the press point (not per-frame deltas), so the
   pixels egui needs to recognise a drag are not lost.
+
+## 2026-09-23 — Envelope timing default: CONTINUOUS (confirmed, follows common practice)
+
+Kosta heard the CONT/KEY renders ("the difference is clear") and asked to follow what other
+synths do. Surge XT (`ADSRModulationSource::process_block` reads the attack/decay/release
+params every block) and Vital (`envelope.cpp` reads the time inputs every control/audio-rate
+call) both evaluate envelope times continuously, so a running stage follows modulation. CONT
+stays the default; KEY-TRIGGER stays available per envelope.
