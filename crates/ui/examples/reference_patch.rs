@@ -6,6 +6,8 @@
 //! cargo run -p kabl-ui --example reference_patch -- render patches/reference docs/modulation-slice/renders
 //! ```
 //!
+//! Renders are 5 s mono 16-bit WAVs, 8 voices, four overlapping notes, identical on every run.
+//!
 //! Patch: `midi.in -> osc.va (saw) -> filter.svf -> vca -> out`, `env.adsr` on the VCA.
 //! Attack has two sources (slow LFO +30 %, velocity -25 %). Cutoff has four (slow LFO,
 //! fast LFO, envelope, velocity): the selection stress case.
@@ -139,35 +141,68 @@ fn main() {
                 .find(|(_, m)| m.kind == "env.adsr")
                 .map(|(&id, _)| id)
                 .unwrap();
-            let mut results = Vec::new();
-            for (mode, timing) in [("continuous", 0.0), ("key-trigger", 1.0)] {
-                let mut state = log.state().clone();
-                state
-                    .modules
-                    .get_mut(&env)
-                    .unwrap()
-                    .params
-                    .insert("timing".into(), timing);
-                let a = render(&state);
-                assert_eq!(a, render(&state), "render is deterministic");
-                let path = out_dir.join(format!("reference-{mode}.wav"));
-                write_wav(&path, &a);
-                let peak = a.iter().fold(0.0f32, |m, s| m.max(s.abs()));
-                let rms = (a.iter().map(|s| s * s).sum::<f32>() / a.len() as f32).sqrt();
-                println!("{}: peak {peak:.3}, rms {rms:.4}", path.display());
-                results.push(a);
-            }
-            let diff = results[0]
+            // "reference" is the patch as saved. "exaggerated" lengthens Attack to 300 ms and adds
+            // the 3.1 Hz LFO on Attack at +50 %, so the two timing modes are easy to hear apart.
+            let mut exaggerated = log.state().clone();
+            exaggerated
+                .modules
+                .get_mut(&env)
+                .unwrap()
+                .params
+                .insert("attack_ms".into(), 300.0);
+            let fast = exaggerated
+                .modules
                 .iter()
-                .zip(&results[1])
-                .map(|(x, y)| (x - y) * (x - y))
-                .sum::<f32>()
-                / results[0].len() as f32;
-            let first = results[0].iter().zip(&results[1]).position(|(x, y)| x != y);
-            println!(
-                "modes differ: rms diff {:.4}, first differing sample {first:?}",
-                diff.sqrt()
+                .filter(|(_, m)| m.kind == "lfo")
+                .map(|(&id, _)| id)
+                .max()
+                .unwrap();
+            exaggerated.cables.insert(
+                1000,
+                kabl_core::CableState {
+                    from: jack(fast, "out"),
+                    to: PortRef::Param {
+                        id: env,
+                        param: "attack_ms".into(),
+                    },
+                    params: [("amount".to_string(), 0.5)].into(),
+                    steps: Vec::new(),
+                },
             );
+            for (name, base) in [
+                ("reference", log.state().clone()),
+                ("exaggerated", exaggerated),
+            ] {
+                let mut results = Vec::new();
+                for (mode, timing) in [("continuous", 0.0), ("key-trigger", 1.0)] {
+                    let mut state = base.clone();
+                    state
+                        .modules
+                        .get_mut(&env)
+                        .unwrap()
+                        .params
+                        .insert("timing".into(), timing);
+                    let a = render(&state);
+                    assert_eq!(a, render(&state), "render is deterministic");
+                    let path = out_dir.join(format!("{name}-{mode}.wav"));
+                    write_wav(&path, &a);
+                    let peak = a.iter().fold(0.0f32, |m, s| m.max(s.abs()));
+                    let rms = (a.iter().map(|s| s * s).sum::<f32>() / a.len() as f32).sqrt();
+                    println!("{}: peak {peak:.3}, rms {rms:.4}", path.display());
+                    results.push(a);
+                }
+                let diff = results[0]
+                    .iter()
+                    .zip(&results[1])
+                    .map(|(x, y)| (x - y) * (x - y))
+                    .sum::<f32>()
+                    / results[0].len() as f32;
+                let first = results[0].iter().zip(&results[1]).position(|(x, y)| x != y);
+                println!(
+                    "{name}: modes differ by rms {:.4}, first differing sample {first:?}",
+                    diff.sqrt()
+                );
+            }
         }
         _ => eprintln!("usage: reference_patch write <dir> | render <patch dir> <out dir>"),
     }
