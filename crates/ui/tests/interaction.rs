@@ -1329,10 +1329,10 @@ fn transpose_is_an_advanced_control() {
     const LEAD: u64 = 4;
     assert!(!t.ui.hits.contains_key("knob:4.transpose"));
     t.click("toggle:4");
-    let before = t.param(LEAD, "transpose").unwrap();
+    let before = t.param(LEAD, "transpose").unwrap_or(0.0);
     let k = t.at("knob:4.transpose");
     t.drag(k, k - egui::vec2(0.0, 40.0));
     let after = t.param(LEAD, "transpose").unwrap();
     assert!(after > before, "{before} -> {after}");
-    assert_eq!(t.param(LEAD, "p1"), Some(16.0), "steps untouched");
+    assert_eq!(t.param(LEAD, "p1"), Some(4.0), "steps untouched");
 }

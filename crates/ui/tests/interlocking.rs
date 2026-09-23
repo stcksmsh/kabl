@@ -48,13 +48,12 @@ pub fn interlocking() -> PatchEditor {
     set(&mut e, bass, "length", 7.0);
     set(&mut e, bass, "transpose", -24.0);
 
-    // Lead: 5 steps on 8ths with one rest, two octaves above the bass (E4 up).
-    for (k, p) in [16.0, 19.0, 23.0, 21.0, 26.0].iter().enumerate() {
+    // Lead: 5 steps on 8ths with one rest, E4 up, two octaves above the bass.
+    for (k, p) in [4.0, 7.0, 11.0, 9.0, 14.0].iter().enumerate() {
         set(&mut e, lead, &format!("p{}", k + 1), *p);
     }
     set(&mut e, lead, "g4", 0.0);
     set(&mut e, lead, "length", 5.0);
-    set(&mut e, lead, "transpose", -12.0);
 
     // Voice A: saw bass, short plucky filter envelope, slow LFO sweep on the cutoff.
     set(&mut e, osc_a, "waveform", 2.0);
@@ -127,4 +126,12 @@ fn committed_patch_matches_the_builder() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/interlocking");
     let saved = kabl_core::load(&dir).unwrap();
     assert_eq!(saved.state(), interlocking().state());
+    for m in saved.state().modules.values() {
+        let info = kabl_modules::registry::info_for(&m.kind).unwrap();
+        for p in info.params {
+            if let Some(&v) = m.params.get(p.name) {
+                assert!((p.min..=p.max).contains(&v), "{} {} = {v}", m.kind, p.name);
+            }
+        }
+    }
 }
