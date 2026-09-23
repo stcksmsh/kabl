@@ -67,6 +67,16 @@
         "y": 300.0
       },
       "params": {}
+    },
+    "8": {
+      "kind": "mixer",
+      "pos": {
+        "x": 870.0,
+        "y": 20.0
+      },
+      "params": {
+        "level1": 0.35
+      }
     }
   },
   "cables": {
@@ -175,8 +185,8 @@
       },
       "to": {
         "Module": {
-          "id": 7,
-          "port": "left"
+          "id": 8,
+          "port": "in1"
         }
       },
       "params": {},
@@ -185,7 +195,23 @@
     "8": {
       "from": {
         "Module": {
-          "id": 6,
+          "id": 8,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 7,
+          "port": "left"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "9": {
+      "from": {
+        "Module": {
+          "id": 8,
           "port": "out"
         }
       },

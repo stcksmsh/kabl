@@ -456,7 +456,8 @@ fn write_wav(path: &std::path::Path, samples: &[f32], sample_rate: u32) {
 }
 
 /// The committed `patches/sequence` (clock -> seq -> voice chain) compiles and every 16th-note
-/// step of the first two bars sounds: global-rate sources driving a voice-rate chain.
+/// step of the first two bars sounds, below full scale: global-rate sources driving a voice-rate
+/// chain (every voice plays, so the voice average does not lower the level).
 #[test]
 fn sequence_patch_plays_every_step() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/sequence");
@@ -473,6 +474,6 @@ fn sequence_patch_plays_every_step() {
     }
     for (k, w) in out.chunks(step).take(16).enumerate() {
         let peak = w.iter().fold(0.0f32, |m, v| m.max(v.abs()));
-        assert!(peak > 0.01 && peak.is_finite(), "step {k}: peak {peak}");
+        assert!(peak > 0.01 && peak < 1.0, "step {k}: peak {peak}");
     }
 }

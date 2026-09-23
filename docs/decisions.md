@@ -1946,7 +1946,10 @@ were not transplanted, only its look (palettes, geometry, drawing).
 - `MAX_PARAMS` in `compile.rs` rises from 5 to 16 (the sequencer's 16 params).
 - Not built (YAGNI until asked): pattern length or direction, reset/run inputs, swing, clock
   divisions, a playing-step indicator, per-step velocity, and MIDI clock sync.
-- Demo patch: `patches/sequence` (clock → seq → osc.va → filter.svf → vca → out, with
-  env.adsr on the VCA). Checks: `crates/modules/tests/seq.rs` (step order, rests, wrap) and
+- Demo patch: `patches/sequence` (clock → seq → osc.va → filter.svf → vca → mixer → out,
+  with env.adsr on the VCA). Every voice plays the sequence, so the voice average does not lower
+  the level the way it does for one MIDI note (about 18 dB louder at 8 voices). The first
+  version peaked at +2 dBFS. A mixer at `level1` 0.35 brings the peak to about −7 dBFS, and
+  the engine test now asserts the output peak stays below 1.0. Checks: `crates/modules/tests/seq.rs` (step order, rests, wrap) and
   `sequence_patch_plays_every_step` in `crates/engine/tests/compile.rs`. 195 tests pass, and
   clippy is clean.
