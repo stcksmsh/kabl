@@ -20,6 +20,10 @@ Script lines (# comments):
     shot NAME                                    screenshot to OUTDIR/NAME.png
     save DIR                                     type DIR into the patch field and press Save
     sleep S
+    midi LINE                                    a line for the virtual controller (KABL_PLAYER)
+
+Environment: KABL_ARGS adds kabl-ui arguments; KABL_PLAYER=1 starts
+target/release/examples/midi_player first (a virtual MIDI port, `kabl-player`).
 """
 import os
 import subprocess
@@ -33,7 +37,13 @@ os.makedirs(out, exist_ok=True)
 scale = float(os.environ.get("WINIT_X11_SCALE_FACTOR", "1"))
 hits_file = os.path.join(out, "hits.txt")
 env = dict(os.environ, KABL_HITS_FILE=hits_file)
-app = subprocess.Popen(["./target/release/kabl-ui", "--patch", patch, "--size", size],
+player = None
+if os.environ.get("KABL_PLAYER"):
+    player = subprocess.Popen(["./target/release/examples/midi_player"], stdin=subprocess.PIPE,
+                              text=True)
+    time.sleep(0.5)
+extra = os.environ.get("KABL_ARGS", "").split()
+app = subprocess.Popen(["./target/release/kabl-ui", "--patch", patch, "--size", size, *extra],
                        env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
@@ -150,8 +160,14 @@ try:
             time.sleep(0.5)
         elif cmd == "sleep":
             time.sleep(float(a[0]))
+        elif cmd == "midi":
+            player.stdin.write(" ".join(a) + "\n")
+            player.stdin.flush()
+            continue
         else:
             raise SystemExit(f"unknown command {cmd}")
         time.sleep(0.3)
 finally:
     app.terminate()
+    if player:
+        player.terminate()

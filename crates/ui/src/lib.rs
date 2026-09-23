@@ -615,7 +615,9 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) 
                 );
             }
             if let Some(msg) = &ui_state.last_message {
-                ui.label(egui::RichText::new(msg).small());
+                // Truncated to the room left, never over the tools.
+                ui.add(egui::Label::new(egui::RichText::new(msg).small()).truncate())
+                    .on_hover_text(msg);
             }
         });
     });

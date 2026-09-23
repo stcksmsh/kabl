@@ -619,6 +619,28 @@ pub fn compile(
         return Err(CompileError::Cycle(remaining));
     }
 
+    // Voice-rate modules only need an instance per voice when a `midi.in` reaches them. A chain
+    // driven only by global modules (a sequencer, a drone) would play the same samples in every
+    // voice, so it runs once, as a global instance; the voice average of identical lanes is that
+    // lane exactly.
+    let mut voiced: std::collections::BTreeSet<ModuleId> = metas
+        .iter()
+        .filter(|(_, m)| m.kind == "midi.in")
+        .map(|(&id, _)| id)
+        .collect();
+    loop {
+        let before = voiced.len();
+        for c in patch.cables.values().filter(|c| !route_bypassed(c)) {
+            let (from, to) = (c.from.module_id(), c.to.module_id());
+            if voiced.contains(&from) && metas[&to].info.rate == Rate::Voice {
+                voiced.insert(to);
+            }
+        }
+        if voiced.len() == before {
+            break;
+        }
+    }
+
     let mut w = Wiring {
         buffers: Vec::new(),
         steps: Vec::new(),
@@ -649,7 +671,7 @@ pub fn compile(
                 port: from_port.clone(),
             }
         })?;
-        if src_meta.info.rate == Rate::Voice {
+        if voiced.contains(&from_id) {
             for lane in 0..voice_count {
                 let b = w.new_buf();
                 w.delay.voice.insert((from_id, src_out_idx, lane), b);
@@ -669,7 +691,7 @@ pub fn compile(
     for &id in &order {
         let meta = &metas[&id];
         let mstate = &patch.modules[&id];
-        let is_voice = meta.info.rate == Rate::Voice;
+        let is_voice = voiced.contains(&id);
         let n_lanes = if is_voice { voice_count } else { 1 };
 
         let params: Vec<f32> = meta
@@ -761,7 +783,7 @@ pub fn compile(
                 .port_type;
             let (lo, hi) = port_type.nominal_range();
             let full_scale = lo.abs().max(hi.abs());
-            sources.push((src_out_idx, src_info.rate == Rate::Voice, full_scale));
+            sources.push((src_out_idx, voiced.contains(&cable.from_id), full_scale));
         }
 
         for lane in 0..n_lanes {
@@ -1234,7 +1256,15 @@ pub fn carry_state(old: &mut CompiledPatch, new_patch: &mut CompiledPatch) {
         return;
     }
     for (new_index, &origin) in new_patch.module_origin.iter().enumerate() {
-        let Some(old_index) = old.module_origin.iter().position(|&o| o == origin) else {
+        // A module that changed between one instance and one per voice (a `midi.in` cable came
+        // or went) carries from voice 0, or into every voice.
+        let fallback = (origin.0, if origin.1.is_some() { None } else { Some(0) });
+        let Some(old_index) = old
+            .module_origin
+            .iter()
+            .position(|&o| o == origin)
+            .or_else(|| old.module_origin.iter().position(|&o| o == fallback))
+        else {
             continue;
         };
         let old_module = &old.modules[old_index];

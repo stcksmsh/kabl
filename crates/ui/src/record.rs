@@ -354,11 +354,13 @@ pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, th: &crate::th
     // Right to left.
     if let Some(path) = rec.path() {
         let lost = rec.lost();
-        let r = ui.label(
-            RichText::new(format!("→ {}", path.display()))
-                .small()
-                .monospace(),
+        let name = path.file_name().map_or_else(
+            || path.display().to_string(),
+            |n| n.to_string_lossy().into_owned(),
         );
+        let r = ui
+            .label(RichText::new(format!("→ {name}")).small().monospace())
+            .on_hover_text(path.display().to_string());
         hits.push(("rec-dest".to_string(), r.rect));
         if lost > 0 {
             ui.label(
@@ -383,10 +385,9 @@ pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, th: &crate::th
         let r = ui.button(RichText::new("● Record").strong());
         hits.push(("rec-start".to_string(), r.rect));
         if r.clicked() {
-            message = Some(match rec.start() {
-                Ok(p) => format!("recording to {}", p.display()),
-                Err(e) => e,
-            });
+            if let Err(e) = rec.start() {
+                message = Some(e);
+            }
         }
         let r = ui.add(egui::TextEdit::singleline(&mut rec.dir).desired_width(120.0));
         hits.push(("rec-dir".to_string(), r.rect));

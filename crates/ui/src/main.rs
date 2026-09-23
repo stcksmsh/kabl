@@ -23,6 +23,7 @@ use kabl_standalone::{
     DEFAULT_VOICE_COUNT,
 };
 use kabl_ui::{record, show, PatchEditor, UiState};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 const RING_CAPACITY: usize = BLOCK * 256;
@@ -47,7 +48,57 @@ struct AudioHost {
     /// Transport commands to the audio callback (runtime only, never in the op log).
     transport_tx: Option<rtrb::Producer<(ModuleId, Transport)>>,
     recorder: Option<record::Recorder>,
+    timing: Option<Arc<CallbackTiming>>,
     _stream: Option<cpal::Stream>,
+}
+
+/// Audio-callback timing, written by the callback with relaxed atomics (no locks), read by the
+/// status bar and `KABL_STATS_FILE`. The first second (stream start-up) is counted apart.
+#[derive(Default)]
+struct CallbackTiming {
+    count: AtomicU64,
+    worst_ns: AtomicU64,
+    /// Callbacks that took longer than the audio they produced (after the first second).
+    late: AtomicU64,
+    /// Callbacks over half their budget (after the first second).
+    over_half: AtomicU64,
+    startup_worst_ns: AtomicU64,
+    frames: AtomicU64,
+}
+
+impl CallbackTiming {
+    fn record(&self, took: std::time::Duration, frames: usize, sample_rate: f32) {
+        let ns = took.as_nanos() as u64;
+        let n = self.count.fetch_add(1, Ordering::Relaxed);
+        self.frames.store(frames as u64, Ordering::Relaxed);
+        if (n * frames as u64) < sample_rate as u64 {
+            self.startup_worst_ns.fetch_max(ns, Ordering::Relaxed);
+            return;
+        }
+        self.worst_ns.fetch_max(ns, Ordering::Relaxed);
+        let budget = frames as f64 / sample_rate as f64 * 1e9;
+        if ns as f64 > budget {
+            self.late.fetch_add(1, Ordering::Relaxed);
+        }
+        if ns as f64 > budget / 2.0 {
+            self.over_half.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    fn line(&self, sample_rate: f32) -> String {
+        let frames = self.frames.load(Ordering::Relaxed);
+        let us = |a: &AtomicU64| a.load(Ordering::Relaxed) as f64 / 1e3;
+        format!(
+            "callbacks {} × {frames} frames: worst {:.0} µs of {:.0} µs, {} over half, {} late \
+             (first second: worst {:.0} µs)",
+            self.count.load(Ordering::Relaxed),
+            us(&self.worst_ns),
+            frames as f64 / sample_rate as f64 * 1e6,
+            self.over_half.load(Ordering::Relaxed),
+            self.late.load(Ordering::Relaxed),
+            us(&self.startup_worst_ns),
+        )
+    }
 }
 
 impl AudioHost {
@@ -62,11 +113,18 @@ impl AudioHost {
             delays_rx: None,
             transport_tx: None,
             recorder: None,
+            timing: None,
             _stream: None,
         }
     }
 
-    fn start(patch: &PatchState, notes: rtrb::Consumer<VoiceEvent>) -> Self {
+    /// `rate`/`frames`: a sample rate and a fixed callback size to ask the device for.
+    fn start(
+        patch: &PatchState,
+        notes: rtrb::Consumer<VoiceEvent>,
+        rate: Option<u32>,
+        frames: Option<u32>,
+    ) -> Self {
         let mut midi_consumer = notes;
         let collector = Collector::new();
         let handle = collector.handle();
@@ -78,18 +136,38 @@ impl AudioHost {
                 "no audio output device found -- editing works, playback won't".into(),
             );
         };
-        let config = match device.default_output_config() {
-            Ok(c) if c.sample_format() == cpal::SampleFormat::F32 => c,
-            _ => {
-                return Self::offline(
-                    collector,
-                    "no usable (f32) audio output config -- editing works, playback won't".into(),
-                )
-            }
+        let f32_at = |r: u32| {
+            device.supported_output_configs().ok()?.find_map(|c| {
+                (c.sample_format() == cpal::SampleFormat::F32)
+                    .then(|| c.try_with_sample_rate(r))
+                    .flatten()
+            })
         };
+        let config = match rate {
+            Some(r) => f32_at(r),
+            None => device
+                .default_output_config()
+                .ok()
+                .filter(|c| c.sample_format() == cpal::SampleFormat::F32),
+        };
+        let Some(config) = config else {
+            return Self::offline(
+                collector,
+                format!(
+                    "no usable f32 audio output config{} -- editing works, playback won't",
+                    rate.map_or(String::new(), |r| format!(" at {r} Hz"))
+                ),
+            );
+        };
+        let mut stream_config = config.config();
+        if let Some(n) = frames {
+            stream_config.buffer_size = cpal::BufferSize::Fixed(n);
+        }
 
         let sample_rate = config.sample_rate() as f32;
         let channels = config.channels() as usize;
+        let timing = Arc::new(CallbackTiming::default());
+        let t = timing.clone();
 
         let mut engine = match PatchEngine::new(&handle, patch, sample_rate, DEFAULT_VOICE_COUNT) {
             Ok(e) => e,
@@ -108,8 +186,9 @@ impl AudioHost {
         let mut right_ring = RingBuffer::new(RING_CAPACITY);
 
         let stream = device.build_output_stream(
-            config.config(),
+            stream_config,
             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                let started = std::time::Instant::now();
                 // Audio thread. No allocation, no locks: install queued graphs (state carry is
                 // allocation-free), apply MIDI to every running graph, render.
                 engine.drain_swaps(&mut swap_rx);
@@ -152,6 +231,7 @@ impl AudioHost {
                         *s = r;
                     }
                 }
+                t.record(started.elapsed(), frames_needed, sample_rate);
             },
             |err| eprintln!("kabl-ui: audio stream error: {err}"),
             None,
@@ -161,7 +241,10 @@ impl AudioHost {
             Ok(s) => match s.play() {
                 Ok(()) => (
                     Some(s),
-                    format!("playing -- {sample_rate} Hz, {channels} ch"),
+                    format!(
+                        "playing -- {sample_rate} Hz, {channels} ch{}",
+                        frames.map_or(String::new(), |n| format!(", {n}-frame buffers asked"))
+                    ),
                 ),
                 Err(err) => (None, format!("failed to start audio stream: {err}")),
             },
@@ -177,6 +260,7 @@ impl AudioHost {
             delays_rx: Some(delays_rx),
             transport_tx: Some(transport_tx),
             recorder: stream.is_some().then_some(recorder),
+            timing: stream.is_some().then_some(timing),
             _stream: stream,
         }
     }
@@ -327,12 +411,20 @@ struct App {
     /// `KABL_HITS_FILE`: where to write the drawn target rects (for scripted real-input runs).
     hits_file: Option<String>,
     hits_written: String,
+    /// `KABL_STATS_FILE`: callback timing, rewritten about once a second.
+    stats_file: Option<(String, std::time::Instant)>,
 }
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::Panel::bottom("kabl-status").show(ui, |ui| {
-            ui.label(&self.audio.status);
+            ui.horizontal(|ui| {
+                ui.label(&self.audio.status);
+                if let Some(t) = &self.audio.timing {
+                    ui.separator();
+                    ui.label(t.line(self.audio.sample_rate));
+                }
+            });
         });
         if let Some(rx) = self.audio.steps_rx.as_mut() {
             while let Ok((id, step)) = rx.pop() {
@@ -405,6 +497,14 @@ impl eframe::App for App {
                 let _ = tx.push(cmd);
             }
         }
+        if let (Some((path, at)), Some(t)) = (self.stats_file.as_mut(), &self.audio.timing) {
+            if at.elapsed().as_secs_f32() > 1.0 {
+                *at = std::time::Instant::now();
+                let _ = std::fs::write(path, t.line(self.audio.sample_rate) + "\n");
+            }
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(500));
+        }
         if self.editor.take_dirty() {
             let fresh = std::mem::take(&mut self.ui_state.loaded);
             self.audio.rebuild(self.editor.state(), fresh);
@@ -447,7 +547,8 @@ fn main() -> eframe::Result<()> {
     let (notes_tx, notes_rx) = rtrb::RingBuffer::<VoiceEvent>::new(256);
     let mut midi = Midi::new(notes_tx);
     midi.connect_default(flag("--midi").as_deref());
-    let mut audio = AudioHost::start(editor.state(), notes_rx);
+    let num = |name: &str| flag(name).and_then(|v| v.parse::<u32>().ok());
+    let mut audio = AudioHost::start(editor.state(), notes_rx, num("--rate"), num("--frames"));
     ui_state.recorder = audio.recorder.take();
     if let (Some(rec), Some(dir)) = (ui_state.recorder.as_mut(), flag("--record-dir")) {
         rec.dir = dir;
@@ -476,6 +577,9 @@ fn main() -> eframe::Result<()> {
                 midi,
                 hits_file: std::env::var("KABL_HITS_FILE").ok(),
                 hits_written: String::new(),
+                stats_file: std::env::var("KABL_STATS_FILE")
+                    .ok()
+                    .map(|f| (f, std::time::Instant::now())),
             }))
         }),
     )

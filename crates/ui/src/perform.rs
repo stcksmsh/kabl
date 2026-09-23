@@ -439,7 +439,7 @@ fn card(
     let size = egui::vec2(CARD_W + 18.0, PANEL_H - 60.0);
     let frame = ui.allocate_ui_with_layout(size, egui::Layout::top_down(egui::Align::Min), |ui| {
         egui::Frame::group(ui.style())
-            .fill(th.panel)
+            .fill(ui.visuals().faint_bg_color)
             .inner_margin(8.0)
             .show(ui, |ui| {
                 ui.set_width(CARD_W);
@@ -448,7 +448,7 @@ fn card(
                 egui::Sides::new().show(
                     ui,
                     |ui| {
-                        ui.label(RichText::new(name).color(th.ink2).small());
+                        ui.label(RichText::new(name).weak().small());
                     },
                     |ui| {
                         let small = |t: &str| egui::Button::new(RichText::new(t).small());
@@ -487,6 +487,9 @@ fn card(
                     return;
                 };
                 ui.label(RichText::new(routing::param_label(p)).strong().size(16.0));
+                if let Some(src) = mixer_source(editor.state(), pin.id, p.name) {
+                    ui.label(RichText::new(format!("from {src}")).small());
+                }
                 ui.spacing_mut().slider_width = CARD_W - 70.0;
                 param_editor(
                     editor,
@@ -520,7 +523,7 @@ fn midi_row(
     ui.horizontal(|ui| {
         match map {
             Some(m) => ui.label(RichText::new(cc_text(m)).monospace()),
-            None => ui.label(RichText::new("no CC").color(th.ink2)),
+            None => ui.label(RichText::new("no CC").weak()),
         };
         let r = ui.selectable_label(learning, if learning { "Learning…" } else { "Learn" });
         ui_state.record(format!("plearn:{key}"), r.rect);
@@ -558,6 +561,44 @@ fn midi_row(
     ui_state.record(format!("ppickup:{key}"), r.rect);
 }
 
+/// For a mixer channel level: the sequencer, MIDI input or oscillator its input comes from,
+/// traced upstream through the audio cables (nearest sequencer or MIDI input first).
+fn mixer_source(state: &PatchState, id: ModuleId, param: &str) -> Option<String> {
+    let ch = param.strip_prefix("level")?;
+    if state.modules.get(&id)?.kind != "mixer" {
+        return None;
+    }
+    let into = |id: ModuleId, port: Option<&str>| -> Vec<ModuleId> {
+        state
+            .cables
+            .values()
+            .filter_map(|c| match (&c.to, &c.from) {
+                (
+                    kabl_core::PortRef::Module { id: to, port: p },
+                    kabl_core::PortRef::Module { id: from, .. },
+                ) if *to == id && port.is_none_or(|q| q == p) => Some(*from),
+                _ => None,
+            })
+            .collect()
+    };
+    let mut queue: std::collections::VecDeque<ModuleId> = into(id, Some(&format!("in{ch}"))).into();
+    let first = *queue.front()?;
+    let mut seen = std::collections::BTreeSet::new();
+    let mut osc = None;
+    while let Some(m) = queue.pop_front() {
+        if !seen.insert(m) {
+            continue;
+        }
+        match state.modules.get(&m).map(|s| s.kind.as_str()) {
+            Some("seq" | "midi.in") => return Some(routing::source_label(state, m, "out")),
+            Some("osc.va") if osc.is_none() => osc = Some(m),
+            _ => {}
+        }
+        queue.extend(into(m, None));
+    }
+    Some(routing::source_label(state, osc.unwrap_or(first), "out"))
+}
+
 fn transport_card(
     ui_state: &mut UiState,
     ui: &mut egui::Ui,
@@ -566,13 +607,12 @@ fn transport_card(
 ) {
     let running = ui_state.clock_running.get(&id).copied().unwrap_or(true);
     ui.label(RichText::new("Transport").strong().size(16.0));
-    ui.label(
-        RichText::new(if running { "● running" } else { "stopped" }).color(if running {
-            th.gate
-        } else {
-            th.ink2
-        }),
-    );
+    let state = RichText::new(if running { "● running" } else { "stopped" });
+    ui.label(if running {
+        state.color(th.gate)
+    } else {
+        state.weak()
+    });
     ui.horizontal(|ui| {
         let big =
             |t: &str| egui::Button::new(RichText::new(t).size(15.0)).min_size([76.0, 34.0].into());

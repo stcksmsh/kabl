@@ -480,3 +480,20 @@ fn sequence_patch_plays_every_step() {
     patch.seq_steps(|id, step| steps.push((id, step)));
     assert_eq!(steps, [(2, 7)]);
 }
+
+/// A voice-rate chain only a global module drives runs once; one a `midi.in` reaches runs per
+/// voice, and a swap between the two carries its state.
+#[test]
+fn only_midi_driven_voice_modules_are_instanced_per_voice() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/performance");
+    let p = kabl_core::load(&dir).unwrap().state().clone();
+    let mut c = kabl_engine::compile::compile(&p, 48000.0, 8).unwrap();
+    // Bass oscillator (sequencer-driven): one instance. Lead oscillator (MIDI): eight.
+    assert!(c.module_mut(5, None).is_some());
+    assert!(c.module_mut(5, Some(0)).is_none());
+    assert!(c.module_mut(21, None).is_none());
+    assert!(c.module_mut(21, Some(7)).is_some());
+    // The mixers after the lead are per voice; the reverb bus is global.
+    assert!(c.module_mut(25, Some(0)).is_some());
+    assert!(c.module_mut(30, None).is_some());
+}
