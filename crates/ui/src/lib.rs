@@ -29,7 +29,7 @@ use routing::Look;
 use theme::{theme, Theme};
 
 /// Width of the routing drawer (right).
-pub const DRAWER_W: f32 = 336.0;
+pub const DRAWER_W: f32 = 360.0;
 pub const MIN_ZOOM: f32 = 0.5;
 pub const MAX_ZOOM: f32 = 2.0;
 
@@ -474,17 +474,20 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) 
         ui.separator();
         let menu = ui.menu_button("View", |ui| {
             ui.label("Expanded modules");
-            ui.radio_value(&mut ui_state.float_expansion, false, "Push neighbours");
-            ui.radio_value(&mut ui_state.float_expansion, true, "Float over neighbours");
+            let r = ui.radio_value(&mut ui_state.float_expansion, false, "Push neighbours");
+            ui_state.record("menu:push".into(), r.rect);
+            let r = ui.radio_value(&mut ui_state.float_expansion, true, "Float over neighbours");
+            ui_state.record("menu:float".into(), r.rect);
             ui.separator();
-            ui.checkbox(&mut ui_state.skins, "Illustrated skins");
+            let r = ui.checkbox(&mut ui_state.skins, "Illustrated skins");
+            ui_state.record("menu:skins".into(), r.rect);
             ui.add_enabled_ui(ui_state.skins, |ui| {
                 let mut on_art = ui_state.skin_labels_on_art.unwrap_or(false);
-                if ui
+                let r = ui
                     .checkbox(&mut on_art, "Preview labels_on_art")
-                    .on_hover_text("A skin maker's flag; off = theme plates (default)")
-                    .changed()
-                {
+                    .on_hover_text("A skin maker's flag; off = theme plates (default)");
+                ui_state.record("menu:labels-on-art".into(), r.rect);
+                if r.changed() {
                     ui_state.skin_labels_on_art = on_art.then_some(true);
                 }
             });
@@ -1085,7 +1088,12 @@ fn draw_module(
 
 fn module_menu(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, m: &Placed) {
     ui.label(egui::RichText::new(format!("{} #{}", m.info.name, m.id)).strong());
-    if !m.info.params.is_empty() && ui.button("Choose primary controls…").clicked() {
+    fn item(ui: &mut egui::Ui, ui_state: &mut UiState, key: &str, label: &str) -> bool {
+        let r = ui.button(label);
+        ui_state.record(format!("menu:{key}"), r.rect);
+        r.clicked()
+    }
+    if !m.info.params.is_empty() && item(ui, ui_state, "choose", "Choose primary controls…") {
         let set = editor
             .state()
             .modules
@@ -1096,7 +1104,8 @@ fn module_menu(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
         ui_state.reveal = Some(m.id);
         ui.close();
     }
-    if !m.info.params.is_empty() && ui.button("Reset face to module default").clicked() {
+    if !m.info.params.is_empty() && item(ui, ui_state, "reset-face", "Reset face to module default")
+    {
         let defaults: Vec<bool> = m
             .info
             .params
@@ -1108,10 +1117,12 @@ fn module_menu(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
     }
     if m.toggle.is_some() {
         let expanded = ui_state.expanded.contains(&m.id);
-        if ui
-            .button(if expanded { "Collapse" } else { "Expand" })
-            .clicked()
-        {
+        if item(
+            ui,
+            ui_state,
+            "expand",
+            if expanded { "Collapse" } else { "Expand" },
+        ) {
             if expanded {
                 ui_state.expanded.remove(&m.id);
             } else {
@@ -1122,7 +1133,7 @@ fn module_menu(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
         }
     }
     ui.separator();
-    if ui.button("Remove module").clicked() {
+    if item(ui, ui_state, "remove", "Remove module") {
         editor.remove_module(m.id);
         ui.close();
     }

@@ -164,6 +164,9 @@ struct App {
     editor: PatchEditor,
     ui_state: UiState,
     audio: AudioHost,
+    /// `KABL_HITS_FILE`: where to write the drawn target rects (for scripted real-input runs).
+    hits_file: Option<String>,
+    hits_written: String,
 }
 
 impl eframe::App for App {
@@ -172,6 +175,24 @@ impl eframe::App for App {
             ui.label(&self.audio.status);
         });
         show(&mut self.editor, &mut self.ui_state, ui);
+        // Scripted real-input runs (xdotool) read the drawn targets from here.
+        if let Some(path) = &self.hits_file {
+            let text: String = self
+                .ui_state
+                .hits
+                .iter()
+                .map(|(k, r)| {
+                    format!(
+                        "{k} {:.0} {:.0} {:.0} {:.0}\n",
+                        r.min.x, r.min.y, r.max.x, r.max.y
+                    )
+                })
+                .collect();
+            if text != self.hits_written {
+                let _ = std::fs::write(path, &text);
+                self.hits_written = text;
+            }
+        }
         if self.editor.take_dirty() {
             self.audio.rebuild(self.editor.state());
         }
@@ -228,6 +249,8 @@ fn main() -> eframe::Result<()> {
                 editor,
                 ui_state,
                 audio,
+                hits_file: std::env::var("KABL_HITS_FILE").ok(),
+                hits_written: String::new(),
             }))
         }),
     )

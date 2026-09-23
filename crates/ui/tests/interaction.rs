@@ -822,3 +822,321 @@ fn a_fast_body_drag_to_the_range_end_cancels_and_undoes_cleanly() {
         assert_eq!(t.param(FILTER, "cutoff_hz"), Some(1400.0), "{w}x{h} undo");
     }
 }
+
+// --- Rack migration: faces, expansion, zoom/pan, presentation-only edits ---
+
+impl H {
+    fn rclick(&mut self, key: &str) {
+        let p = self.at(key);
+        self.move_to(p);
+        for pressed in [true, false] {
+            self.events.push(Event::PointerButton {
+                pos: p,
+                button: PointerButton::Secondary,
+                pressed,
+                modifiers: Modifiers::NONE,
+            });
+            self.frame();
+        }
+        self.frame();
+    }
+
+    fn zoom_at(&mut self, p: Pos2, factor: f32) {
+        self.move_to(p);
+        self.modifiers = Modifiers::COMMAND;
+        self.events.push(Event::Zoom(factor));
+        self.frame();
+        self.modifiers = Modifiers::NONE;
+        self.frame();
+    }
+
+    fn face(&self, id: u64, param: &str) -> Option<f32> {
+        self.param(id, &format!("face.{param}"))
+    }
+}
+
+const VCA: u64 = 5;
+const OUTPUT: u64 = 6;
+
+#[test]
+fn choosing_primary_controls_is_one_undo_step_saved_and_never_rebuilds_audio() {
+    let mut t = H::new(1440.0, 900.0);
+    let _ = t.editor.take_dirty();
+    assert!(
+        !t.ui.hits.contains_key(&format!("sel:{VCA}.exponential.1")),
+        "advanced by default"
+    );
+    t.rclick(&format!("module:{VCA}"));
+    t.click("menu:choose");
+    let entries = t.undo_depth();
+    t.click(&format!("pin:{VCA}.exponential"));
+    t.click(&format!("pin:{VCA}.gain"));
+    assert_eq!(t.undo_depth(), entries, "pins are pending until Done");
+    t.click(&format!("done:{VCA}"));
+    assert_eq!(t.undo_depth(), entries + 1, "one step");
+    assert_eq!(t.face(VCA, "exponential"), Some(1.0));
+    assert_eq!(t.face(VCA, "gain"), Some(0.0));
+    assert!(
+        !t.editor.take_dirty(),
+        "presentation only: no audio rebuild"
+    );
+    // The face now shows Response and not Gain, without expanding.
+    assert!(t.ui.hits.contains_key(&format!("sel:{VCA}.exponential.1")));
+    assert!(!t.ui.hits.contains_key(&format!("knob:{VCA}.gain")));
+    assert!(t.ui.hits.contains_key(&format!("toggle:{VCA}")));
+
+    // Saved and reloaded.
+    let dir = tempfile::tempdir().unwrap();
+    kabl_core::save(dir.path(), t.editor.log()).unwrap();
+    let back = kabl_ui::PatchEditor::from_log(kabl_core::load(dir.path()).unwrap());
+    assert_eq!(back.state(), t.editor.state());
+
+    // Undo restores the default face exactly (params absent), redo re-applies.
+    t.key(Key::Z, Modifiers::COMMAND);
+    assert_eq!(
+        (t.face(VCA, "exponential"), t.face(VCA, "gain")),
+        (None, None)
+    );
+    assert!(!t.editor.take_dirty());
+    t.key(Key::Z, Modifiers::COMMAND | Modifiers::SHIFT);
+    assert_eq!(t.face(VCA, "exponential"), Some(1.0));
+
+    // Escape in choose mode discards the pending choice.
+    t.rclick(&format!("module:{VCA}"));
+    t.click("menu:choose");
+    t.click(&format!("pin:{VCA}.gain"));
+    t.key(Key::Escape, Modifiers::NONE);
+    assert_eq!(t.face(VCA, "gain"), Some(0.0));
+    assert!(t.ui.choose.is_none());
+}
+
+#[test]
+fn push_expansion_moves_neighbours_and_collapses_back_exactly() {
+    for (w, h) in sizes() {
+        let mut t = H::new(w, h);
+        let out = t.ui.hits[&format!("module:{OUTPUT}")];
+        let gain = t.ui.hits[&format!("knob:{VCA}.gain")];
+        let jack = t.ui.hits[&format!("in:{VCA}.cv")];
+        for _ in 0..3 {
+            t.click(&format!("toggle:{VCA}"));
+            assert!(
+                t.ui.hits[&format!("module:{OUTPUT}")].min.x > out.min.x + 50.0,
+                "{w}x{h} pushed"
+            );
+            assert_eq!(
+                t.ui.hits[&format!("knob:{VCA}.gain")],
+                gain,
+                "face control stays"
+            );
+            assert_eq!(t.ui.hits[&format!("in:{VCA}.cv")], jack, "jack stays");
+            // The expanded area is fully on screen (reachable).
+            let sel = t.ui.hits[&format!("sel:{VCA}.exponential.1")];
+            assert!(sel.max.x < w - kabl_ui::DRAWER_W, "{w}x{h} {sel:?}");
+            t.click(&format!("toggle:{VCA}"));
+            assert_eq!(
+                t.ui.hits[&format!("module:{OUTPUT}")],
+                out,
+                "{w}x{h} no drift"
+            );
+        }
+    }
+}
+
+#[test]
+fn floating_expansion_owns_its_area_and_moves_nothing() {
+    let mut t = H::new(1440.0, 900.0);
+    t.ui.float_expansion = true;
+    t.frame();
+    let out = t.ui.hits[&format!("module:{OUTPUT}")];
+    let out_pos = t.editor.state().modules[&OUTPUT].pos;
+    t.click(&format!("toggle:{VCA}"));
+    assert_eq!(
+        t.ui.hits[&format!("module:{OUTPUT}")],
+        out,
+        "float pushes nothing"
+    );
+    let float = t.ui.hits[&format!("float:{VCA}")];
+    assert!(float.intersects(out), "the area covers the neighbour");
+    // A drag on the float where it covers Output neither moves nor selects Output.
+    let p = float.intersect(out).center();
+    t.drag(p, p + egui::vec2(60.0, 40.0));
+    assert_eq!(t.editor.state().modules[&OUTPUT].pos, out_pos);
+    assert_ne!(t.ui.selected_module, Some(OUTPUT));
+    // Its own controls work.
+    t.click(&format!("sel:{VCA}.exponential.1"));
+    assert_eq!(t.param(VCA, "exponential"), Some(1.0));
+    // A cable dropped on the float lands on the float's control, not the one under it.
+    let from = t.at(&format!("out:{FAST_LFO}.out"));
+    let to = t.at(&format!("knob:{VCA}.exponential"));
+    t.drag(from, to);
+    assert_eq!(t.routes(VCA, "exponential").len(), 1);
+    t.click(&format!("toggle:{VCA}"));
+    assert_eq!(t.ui.hits[&format!("module:{OUTPUT}")], out);
+}
+
+#[test]
+fn a_route_to_an_off_face_control_docks_on_the_toggle_and_selecting_it_reveals() {
+    let mut t = H::new(1440.0, 900.0);
+    let cable = t.editor.connect_route(
+        kabl_core::PortRef::Module {
+            id: FAST_LFO,
+            port: "out".into(),
+        },
+        ENV,
+        "timing",
+    );
+    t.frame();
+    t.frame();
+    assert!(!t.ui.expanded.contains(&ENV));
+    let toggle = t.ui.hits[&format!("toggle:{ENV}")];
+    assert!(
+        t.ui.hits.contains_key(&format!("route:{cable}")),
+        "the lead is drawn"
+    );
+    // Selecting the route (its cable) inspects the destination and reveals it.
+    t.click(&format!("route:{cable}"));
+    assert_eq!(t.ui.inspected, Some((ENV, "timing".to_string())));
+    t.frame();
+    assert!(t.ui.expanded.contains(&ENV));
+    assert!(t.ui.hits.contains_key(&format!("sel:{ENV}.timing.1")));
+    let _ = toggle;
+    // Hidden cables: the toggle still exists, the route is still editable in the drawer.
+    t.click(&format!("toggle:{ENV}"));
+    t.click("view:Hidden");
+    assert!(t.ui.hits.contains_key(&format!("toggle:{ENV}")));
+}
+
+#[test]
+fn zoom_and_pan_keep_every_knob_gesture_and_scale_hit_regions() {
+    for (w, h) in sizes() {
+        let mut t = H::new(w, h);
+        let knob = t.ui.hits[&format!("knob:{ENV}.attack_ms")];
+        t.zoom_at(knob.center(), 1.5);
+        let z = t.ui.zoom;
+        let big = t.ui.hits[&format!("knob:{ENV}.attack_ms")];
+        assert!(
+            (big.width() / knob.width() - 1.5).abs() < 0.05,
+            "{w}x{h}: {knob:?} -> {big:?} at {z}"
+        );
+        assert!(
+            big.center().distance(knob.center()) < 2.0,
+            "zoom about the pointer"
+        );
+        // Pan by dragging bare rack.
+        let p = t.empty_rack();
+        t.drag(p, p + egui::vec2(-40.0, -30.0));
+        let moved = t.ui.hits[&format!("knob:{ENV}.attack_ms")];
+        assert!(
+            (moved.center() - (big.center() + egui::vec2(-40.0, -30.0))).length() < 2.0,
+            "{w}x{h} pan"
+        );
+
+        // Ring (selected source), Shift fine, Escape cancel: as at 100 %.
+        let before = t.routes(ENV, "attack_ms");
+        t.click(&format!("knob:{ENV}.attack_ms"));
+        t.click(&format!("row:{}", before[0].0));
+        t.ring_drag(ENV, "attack_ms", 30.0);
+        assert!(
+            close(t.routes(ENV, "attack_ms")[0].1, before[0].1 + 0.2),
+            "{w}x{h} ring"
+        );
+        t.modifiers = Modifiers::SHIFT;
+        t.ring_drag(ENV, "attack_ms", 30.0);
+        t.modifiers = Modifiers::NONE;
+        assert!(
+            close(t.routes(ENV, "attack_ms")[0].1, before[0].1 + 0.22),
+            "{w}x{h} fine"
+        );
+        let depth = t.undo_depth();
+        let r = t.at(&format!("ring:{ENV}.attack_ms"));
+        t.hold(r, r - egui::vec2(0.0, 30.0));
+        t.key(Key::Escape, Modifiers::NONE);
+        t.release();
+        assert_eq!(t.undo_depth(), depth, "{w}x{h} escape leaves no entry");
+        assert!(close(t.routes(ENV, "attack_ms")[0].1, before[0].1 + 0.22));
+        // Lane dot of the other source, zoomed.
+        let lane = t.at(&format!("lane:{}", before[1].0));
+        t.drag(lane, lane - egui::vec2(0.0, 15.0));
+        assert!(
+            close(t.routes(ENV, "attack_ms")[1].1, before[1].1 + 0.1),
+            "{w}x{h} lane"
+        );
+        t.key(Key::Z, Modifiers::COMMAND);
+        assert!(
+            close(t.routes(ENV, "attack_ms")[1].1, before[1].1),
+            "{w}x{h} undo"
+        );
+    }
+}
+
+#[test]
+fn view_changes_never_touch_the_patch_or_the_audio() {
+    let mut t = H::new(1280.0, 800.0);
+    let _ = t.editor.take_dirty();
+    let state = t.editor.state().clone();
+    let depth = t.undo_depth();
+    for key in [
+        "theme:dark",
+        "view:Hidden",
+        "zoom:in",
+        "zoom:out",
+        "zoom:fit",
+        "view:Focus",
+        "theme:light",
+        "zoom:100",
+    ] {
+        t.click(key);
+    }
+    t.click(&format!("toggle:{ENV}"));
+    t.click(&format!("toggle:{VCA}"));
+    t.ui.float_expansion = true;
+    t.ui.skins = true;
+    t.frame();
+    t.click(&format!("toggle:{ENV}"));
+    t.click("routing");
+    t.click("routing");
+    assert_eq!(t.editor.state(), &state);
+    assert_eq!(t.undo_depth(), depth);
+    assert!(!t.editor.take_dirty());
+}
+
+#[test]
+fn face_params_do_not_change_the_sound() {
+    use kabl_engine::compile::compile;
+    let t = H::new(1440.0, 900.0);
+    let mut faced = t.editor.state().clone();
+    for m in faced.modules.values_mut() {
+        m.params.insert("face.gain".into(), 0.0);
+        m.params.insert("face.timing".into(), 1.0);
+        m.params.insert("face.rate_hz".into(), 0.0);
+    }
+    let render = |p: &kabl_core::PatchState| {
+        let mut c = compile(p, 48000.0, 4).unwrap();
+        c.note_on(0, 0.0, 1.0);
+        let mut out = Vec::new();
+        for _ in 0..40 {
+            c.process_block();
+            out.extend_from_slice(c.left());
+        }
+        out
+    };
+    let a = render(t.editor.state());
+    assert!(a.iter().any(|s| *s != 0.0));
+    assert_eq!(a, render(&faced), "bit-identical");
+}
+
+#[test]
+fn opening_the_drawer_keeps_the_inspected_control_reachable() {
+    let mut t = H::new(1280.0, 800.0);
+    t.click("routing"); // close
+                        // Pan so the filter cutoff sits where the drawer will be.
+    let k = t.at(&format!("knob:{FILTER}.cutoff_hz"));
+    let target = egui::pos2(1280.0 - 150.0, k.y);
+    let p = t.empty_rack();
+    t.drag(p, p + (target - k));
+    t.click(&format!("knob:{FILTER}.cutoff_hz"));
+    t.click("routing"); // open
+    t.frame();
+    let r = t.ui.hits[&format!("knob:{FILTER}.cutoff_hz")];
+    assert!(r.max.x < 1280.0 - kabl_ui::DRAWER_W, "{r:?}");
+}

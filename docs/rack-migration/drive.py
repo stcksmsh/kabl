@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""Drives the real release kabl-ui with real X input (xdotool) from a small script, aiming at
+the targets the app itself reports (KABL_HITS_FILE), and saves screenshots.
+
+    Xvfb :97 -screen 0 1600x1000x24 &
+    DISPLAY=:97 python3 docs/rack-migration/drive.py docs/rack-migration/scripts/tour.txt 1440x900 OUTDIR
+
+Script lines (# comments):
+    click KEY | rclick KEY | dclick KEY          press on a target's centre
+    clickat X Y | rclickat X Y
+    drag KEY KEY                                 press on one target, release on another
+    dragby KEY DX DY [shift]                     press, move by (DX, DY), release
+    hold KEY DX DY | release                     press and move without releasing
+    wheel KEY N [ctrl]                           N wheel notches (negative = down) over a target
+    key COMBO                                    e.g. ctrl+z, Escape
+    type TEXT
+    at X Y                                       move the pointer
+    shot NAME                                    screenshot to OUTDIR/NAME.png
+    save DIR                                     type DIR into the patch field and press Save
+    sleep S
+"""
+import os
+import subprocess
+import sys
+import time
+
+script, size, out = sys.argv[1], sys.argv[2], sys.argv[3]
+patch = sys.argv[4] if len(sys.argv) > 4 else "patches/reference"
+os.makedirs(out, exist_ok=True)
+hits_file = os.path.join(out, "hits.txt")
+env = dict(os.environ, KABL_HITS_FILE=hits_file)
+app = subprocess.Popen(["./target/release/kabl-ui", "--patch", patch, "--size", size],
+                       env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def x(*args):
+    subprocess.run(["xdotool", *map(str, args)], check=True)
+
+
+def hits():
+    out = {}
+    for line in open(hits_file):
+        k, *r = line.split()
+        out[k] = tuple(map(float, r))
+    return out
+
+
+def centre(key):
+    for _ in range(20):
+        h = hits()
+        if key in h:
+            x0, y0, x1, y1 = h[key]
+            return round((x0 + x1) / 2), round((y0 + y1) / 2)
+        time.sleep(0.1)
+    raise SystemExit(f"no target {key}")
+
+
+def glide(tx, ty, steps=10):
+    loc = subprocess.run(["xdotool", "getmouselocation", "--shell"], capture_output=True, text=True).stdout
+    cur = dict(l.split("=") for l in loc.split())
+    cx, cy = int(cur["X"]), int(cur["Y"])
+    for i in range(1, steps + 1):
+        x("mousemove", round(cx + (tx - cx) * i / steps), round(cy + (ty - cy) * i / steps))
+        time.sleep(0.02)
+    time.sleep(0.15)
+
+
+def press_move(ax, ay, bx, by):
+    glide(ax, ay)
+    x("mousedown", 1)
+    time.sleep(0.1)
+    for i in range(1, 13):
+        x("mousemove", round(ax + (bx - ax) * i / 12), round(ay + (by - ay) * i / 12))
+        time.sleep(0.03)
+    time.sleep(0.2)
+
+
+try:
+    time.sleep(3)
+    wid = subprocess.run(["xdotool", "search", "--name", "^kabl$"], capture_output=True, text=True).stdout.split()[0]
+    x("windowfocus", "--sync", wid)
+    w, h = size.split("x")
+    for raw in open(script):
+        line = raw.split("#")[0].strip()
+        if not line:
+            continue
+        cmd, *a = line.split()
+        if cmd in ("click", "rclick", "dclick"):
+            glide(*centre(a[0]))
+            x("click", *(["--repeat", "2", "--delay", "80"] if cmd == "dclick" else []), 3 if cmd == "rclick" else 1)
+        elif cmd in ("clickat", "rclickat"):
+            glide(int(a[0]), int(a[1]))
+            x("click", 3 if cmd == "rclickat" else 1)
+        elif cmd == "drag":
+            press_move(*centre(a[0]), *centre(a[1]))
+            x("mouseup", 1)
+        elif cmd == "dragby":
+            ax, ay = centre(a[0])
+            if a[3:] == ["shift"]:
+                x("keydown", "shift")
+            press_move(ax, ay, ax + int(a[1]), ay + int(a[2]))
+            x("mouseup", 1)
+            if a[3:] == ["shift"]:
+                x("keyup", "shift")
+        elif cmd == "hold":
+            ax, ay = centre(a[0])
+            press_move(ax, ay, ax + int(a[1]), ay + int(a[2]))
+        elif cmd == "release":
+            x("mouseup", 1)
+        elif cmd == "wheel":
+            glide(*centre(a[0]))
+            n = int(a[1])
+            if a[2:] == ["ctrl"]:
+                x("keydown", "ctrl")
+            for _ in range(abs(n)):
+                x("click", 4 if n > 0 else 5)
+                time.sleep(0.05)
+            if a[2:] == ["ctrl"]:
+                x("keyup", "ctrl")
+        elif cmd == "key":
+            x("key", a[0])
+        elif cmd == "type":
+            x("type", "--delay", "5", " ".join(a))
+        elif cmd == "at":
+            glide(int(a[0]), int(a[1]))
+        elif cmd == "shot":
+            time.sleep(0.4)
+            subprocess.run(["import", "-window", "root", "-crop", f"{w}x{h}+0+0",
+                            os.path.join(out, a[0] + ".png")], check=True)
+        elif cmd == "save":
+            glide(*centre("patch-path"))
+            x("click", 1)
+            x("key", "ctrl+a")
+            x("type", "--delay", "5", os.path.abspath(a[0]))
+            x("key", "Return")
+            glide(*centre("save"))
+            x("click", 1)
+            time.sleep(0.5)
+        elif cmd == "sleep":
+            time.sleep(float(a[0]))
+        else:
+            raise SystemExit(f"unknown command {cmd}")
+        time.sleep(0.3)
+finally:
+    app.terminate()
