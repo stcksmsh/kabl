@@ -28,6 +28,12 @@ What is real now (production `kabl-ui`, op log, engine, file format):
 - Exact undo: absent params, removed modules with cables and route settings, grouped repatch,
   one step per drag. v1 patches load, undo exactly and render bit-exact to the baseline.
 
+Remote review (Kosta, by phone, same day): CONT stays default (matches Surge/Vital); removing
+the selected source leaves none selected; +25 % drop default kept; live-edit render judged
+clean. Added on request: per-source lanes on an inspected multi-source knob (drag a source's
+dot to set its depth, no drawer) and thin display-only per-source rings when collapsed;
+vertical drag kept (common default). Open: should single-source knobs also get a lane dot?
+
 Next human gate: Kosta plays it, checks ring/source selection, and listens to both envelope
 modes (live, and `exaggerated-*.wav` from the render command in the slice README). Do not
 continue into broader UI migration, sequencers or effects before that.
