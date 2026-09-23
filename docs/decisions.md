@@ -1928,3 +1928,25 @@ were not transplanted, only its look (palettes, geometry, drawing).
   Pi 4 / low-end GPU cost unmeasured; compact layout and x-ray cable fading not built.
 - Next planned scope (owner): a shared clock plus basic pitch/gate sequencing together, so
   repeating patterns are playable. Planned only; implementation needs its own go-ahead.
+
+## 2026-09-23 — Shared clock + basic pitch/gate sequencing (owner go-ahead)
+
+- Kosta authorized the next scope. Two new built-ins, both `Rate::Global`:
+  - `clock`: `bpm` (20–300, default 120) and one `gate` output, a 50 % duty pulse per 16th
+    note (four per beat). One clock can drive any number of sequencers, so they stay in step.
+  - `seq`: 8 steps. `clock` input; `gate` and `pitch` outputs. Per step, a pitch knob
+    (`p1..p8`, −24..+24 st, rounded to whole semitones in the module and shown as `+7 st`) and
+    an OFF/ON gate (`g1..g8`). Each rising clock edge advances one step. `gate` follows the
+    clock pulse on ON steps, so two ON steps in a row retrigger an envelope. The default pattern
+    is 0, 3, 7, 10, 12, 10, 7, 3, so a freshly added sequencer plays something right away.
+- Why global rate: the voice-rate chain the sequencer feeds gets the same notes in every voice.
+  The compiler averages voices into `out`, so the result is as loud as one voice. The cost is
+  that the chain is computed once per voice for one line of notes (a `ponytail:` note in
+  `seq.rs`). Revisit this if the Pi measurement shows it matters.
+- `MAX_PARAMS` in `compile.rs` rises from 5 to 16 (the sequencer's 16 params).
+- Not built (YAGNI until asked): pattern length or direction, reset/run inputs, swing, clock
+  divisions, a playing-step indicator, per-step velocity, and MIDI clock sync.
+- Demo patch: `patches/sequence` (clock → seq → osc.va → filter.svf → vca → out, with
+  env.adsr on the VCA). Checks: `crates/modules/tests/seq.rs` (step order, rests, wrap) and
+  `sequence_patch_plays_every_step` in `crates/engine/tests/compile.rs`. 195 tests pass, and
+  clippy is clean.
