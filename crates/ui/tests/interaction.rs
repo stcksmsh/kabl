@@ -640,3 +640,127 @@ fn escape_cancels_body_ring_and_dot_drags_without_undo_entries() {
         assert_ne!(t.param(ENV, "attack_ms"), base, "redo");
     }
 }
+
+/// Not a check by itself: runs the closeout scenario headlessly (asserting as it goes) and
+/// writes, per size, the pointer/key script for `docs/modulation-slice/closeout-real-x.sh` plus
+/// the expected saved patch. The real-X run must save an identical `checkpoint.json`.
+/// `cargo test -p kabl-ui --test interaction -- --ignored`.
+#[test]
+#[ignore]
+fn closeout_scenario_script() {
+    fn xy(p: Pos2) -> String {
+        format!("{:.0} {:.0}", p.x, p.y)
+    }
+    for (w, h) in sizes() {
+        let mut t = H::new(w, h);
+        let mut s: Vec<String> = Vec::new();
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(format!("../../target/slice-closeout/{w}x{h}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        macro_rules! drag {
+            ($from:expr, $to:expr) => {{
+                let (a, b) = ($from, $to);
+                s.push(format!("drag {} {}", xy(a), xy(b)));
+                t.drag(a, b);
+            }};
+        }
+        macro_rules! click {
+            ($key:expr) => {{
+                let k = $key;
+                s.push(format!("click {}", xy(t.at(&k))));
+                t.click(&k);
+            }};
+        }
+        let up = |p: Pos2, dy: f32| p - egui::vec2(0.0, dy);
+
+        // 1. New single source on Decay, edited on its dot, fine, then a cancelled drag.
+        drag!(t.at("out:8.out"), t.at(&format!("knob:{ENV}.decay_ms")));
+        let d = t.ui.selected_route.unwrap();
+        s.push("shot 01-single-dot".into());
+        drag!(
+            t.at(&format!("lane:{d}")),
+            up(t.at(&format!("lane:{d}")), 30.0)
+        );
+        assert!(close(t.routes(ENV, "decay_ms")[0].1, 0.45));
+        s.push("shift down".into());
+        t.modifiers = Modifiers::SHIFT;
+        drag!(
+            t.at(&format!("lane:{d}")),
+            up(t.at(&format!("lane:{d}")), 30.0)
+        );
+        s.push("shift up".into());
+        t.modifiers = Modifiers::NONE;
+        assert!(close(t.routes(ENV, "decay_ms")[0].1, 0.47));
+        let p = t.at(&format!("lane:{d}"));
+        s.push(format!("hold {} {}", xy(p), xy(up(p, 40.0))));
+        t.hold(p, up(p, 40.0));
+        s.push("shot 02-dot-drag-before-escape".into());
+        s.push("key Escape".into());
+        t.key(Key::Escape, Modifiers::NONE);
+        s.push(format!("move {}", xy(up(p, 70.0))));
+        t.move_to(up(p, 70.0));
+        s.push("release".into());
+        t.release();
+        assert!(close(t.routes(ENV, "decay_ms")[0].1, 0.47), "cancelled");
+        s.push("shot 03-after-escape".into());
+
+        // 2. Body drag on Attack cancelled.
+        let base = t.param(ENV, "attack_ms");
+        let c = t.at(&format!("knob:{ENV}.attack_ms"));
+        s.push(format!("hold {} {}", xy(c), xy(up(c, 40.0))));
+        t.hold(c, up(c, 40.0));
+        s.push("key Escape".into());
+        t.key(Key::Escape, Modifiers::NONE);
+        s.push("release".into());
+        t.release();
+        assert_eq!(t.param(ENV, "attack_ms"), base);
+
+        // 3. Attack's two sources: velocity on its dot; LFO #7 fine in Hidden view.
+        click!(format!("knob:{ENV}.attack_ms"));
+        let a = t.routes(ENV, "attack_ms");
+        drag!(
+            t.at(&format!("lane:{}", a[1].0)),
+            up(t.at(&format!("lane:{}", a[1].0)), 15.0)
+        );
+        assert!(close(t.routes(ENV, "attack_ms")[1].1, -0.15));
+        s.push("shot 04-attack-lanes".into());
+        click!("view:Hidden".to_string());
+        s.push("shift down".into());
+        t.modifiers = Modifiers::SHIFT;
+        drag!(
+            t.at(&format!("lane:{}", a[0].0)),
+            up(t.at(&format!("lane:{}", a[0].0)), 30.0)
+        );
+        s.push("shift up".into());
+        t.modifiers = Modifiers::NONE;
+        assert!(close(t.routes(ENV, "attack_ms")[0].1, 0.32));
+        s.push("shot 05-hidden-fine".into());
+        click!("view:All".to_string());
+
+        // 4. Remove the selected source: nothing selected, the ring edits nothing.
+        click!(format!("remove:{}", a[0].0));
+        assert_eq!(t.ui.selected_route, None);
+        let rem = t.routes(ENV, "attack_ms");
+        let r = t.at(&format!("ring:{ENV}.attack_ms"));
+        drag!(r, up(r, 30.0));
+        assert_eq!(t.routes(ENV, "attack_ms"), rem);
+        s.push("shot 06-removed-none-selected".into());
+
+        // 5. Undo the removal and the fine drag, redo the fine drag.
+        s.push("move 700 700".into());
+        t.move_to(egui::pos2(700.0, 700.0));
+        for _ in 0..2 {
+            s.push("key ctrl+z".into());
+            t.key(Key::Z, Modifiers::COMMAND);
+        }
+        assert!(close(t.routes(ENV, "attack_ms")[0].1, 0.30));
+        s.push("key ctrl+shift+z".into());
+        t.key(Key::Z, Modifiers::COMMAND | Modifiers::SHIFT);
+        assert!(close(t.routes(ENV, "attack_ms")[0].1, 0.32));
+        s.push("shot 07-after-undo-redo".into());
+        s.push("save".into());
+
+        kabl_core::save(&dir.join("expected"), t.editor.log()).unwrap();
+        std::fs::write(dir.join("script.txt"), s.join("\n") + "\n").unwrap();
+    }
+}
