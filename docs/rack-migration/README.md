@@ -1,5 +1,9 @@
 # Rack UI migration (production `kabl-ui`)
 
+**Closed 2026-09-23:** Kosta reviewed the rack hands-on and approved it (decisions.md, "Rack
+migration closed"). The "Unverified" items below were the review's open questions; the
+limits listed at the end are accepted as they stand.
+
 The approved revision-2 rack is now the production canvas. It draws from the real
 `PatchEditor` / op log / engine state; nothing from the `rev2_proto` example's state, snapshot
 undo or mock DSP was transplanted. The old Eurorack/Patchbay canvas is gone (see decisions.md).

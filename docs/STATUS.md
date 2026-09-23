@@ -5,12 +5,13 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-23, rack review preparation (lane edge fix, fresh screenshots, A/V walkthrough).
+Last updated: 2026-09-23, rack migration closed (owner approved the hands-on review).
 
 **Current handover (supersedes every older handover note below):** the approved revision-2 rack
-is now the production canvas, on real editor/engine state, and it is ready for Kosta's review.
-Details, screenshots, verification and limits: [`rack-migration/README.md`](rack-migration/README.md).
-Handover for the next agent: [`HANDOFF.md`](HANDOFF.md).
+is the production canvas, on real editor/engine state. Kosta reviewed it hands-on and approved
+it; the migration is closed. Details, screenshots, verification and limits:
+[`rack-migration/README.md`](rack-migration/README.md). Handover for the next agent:
+[`HANDOFF.md`](HANDOFF.md).
 
     cargo run --release -p kabl-ui -- --patch patches/reference          # add --size 1280x800
 
@@ -31,16 +32,12 @@ What is real now (production `kabl-ui`, op log, engine, file format):
   save/reload, lock-free live edits.
 - Mixer channel levels are separate params (`level1`..`level4`); old patches keep their sound.
 
-Review status (corrected): Kosta heard the remote recordings and renders of the modulation
-slice (CONT/KEY difference clear, live edit clean) and approved this migration. **Nobody has
-used either build by hand**: grab feel, his display and scale factor, his MIDI controller and
-his sound card remain untested. Screenshots are Xvfb/llvmpipe runs. Pi 4 unmeasured.
-A 49 s screen + audio walkthrough of the current build is in
-[`rack-migration/walkthrough.mp4`](rack-migration/walkthrough.mp4) (level-checked, not yet
-listened to).
+Review status: Kosta reviewed the rack hands-on and approved it, and watched and approved
+[`rack-migration/walkthrough.mp4`](rack-migration/walkthrough.mp4). Accepted limitations are
+listed in `decisions.md` ("Rack migration closed"). Pi 4 unmeasured.
 
-Next human gate: Kosta reviews the migrated rack. Do not start sequencers, effects or another
-scope before that.
+Next planned scope: shared clock + basic pitch/gate sequencing (playable repeating patterns).
+Not yet authorized: wait for Kosta's go-ahead before any sequencer code.
 
 Older sections below are history. Where they disagree with the above or with the code, they
 are stale: the MIDI/graph-swap/undo risks they list are fixed; the Mutex described there is

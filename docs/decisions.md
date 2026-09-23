@@ -1913,3 +1913,18 @@ were not transplanted, only its look (palettes, geometry, drawing).
   A / A-dark and no placeholder art ships. The renderer (light/dark art, plates, labels on art)
   stays; `rack.rs` checks skin placement with a test skin; the skin tests no longer require a
   skinned built-in. Assets and the placeholder-art script are removed (in git history).
+
+## 2026-09-23 — Rack migration closed (owner approved hands-on review)
+
+- Kosta reviewed the migrated rack hands-on and approved it; the rack migration is closed.
+  Review prep before it: `1e402cf` (an inspected knob's lanes pan fully into view; selected
+  drawer row text white), `fcfa326` (screenshots from the final build, `walkthrough.mp4`,
+  which Kosta watched and approved).
+- Limitations accepted as they stand (not fixed, not blocking): block-rate modulation; no
+  hysteresis on stepped destinations; pitch full scale ±60 st; state carry O(modules²) per
+  swap; one cable per jack input; quiet engine output; drawer sliders lack Shift/Escape;
+  selector routes show no reachable-options bracket; lanes pan into view only on inspection
+  (a later pan/zoom can clip them); no `labels_on_art` contrast warning; no built-in skin;
+  Pi 4 / low-end GPU cost unmeasured; compact layout and x-ray cable fading not built.
+- Next planned scope (owner): a shared clock plus basic pitch/gate sequencing together, so
+  repeating patterns are playable. Planned only; implementation needs its own go-ahead.
