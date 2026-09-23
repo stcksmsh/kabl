@@ -1,8 +1,8 @@
 //! `seq`: an 8-step pitch/gate sequencer. Each rising edge on `clock` advances one step; `pitch`
 //! holds that step's pitch (whole semitones, same reference as `midi.in`'s `pitch`), and `gate`
 //! follows the clock pulse while the step is on, so consecutive on-steps retrigger an envelope.
-//! The pattern loops over the first `length` steps. A rising edge on `reset` makes the next
-//! clock tick play step 1.
+//! The pattern loops over the first `length` steps. A rising edge on `reset` jumps to step 1 if
+//! the clock is high, otherwise it makes the next clock tick play step 1.
 //!
 //! An input counts as high above 0, not at the usual 0.5: a `midi.in` gate reaching this global
 //! module is averaged over the voices, so one held key arrives as 1 / voice count.
@@ -173,13 +173,15 @@ impl Module for Seq {
         let start = (self.step, self.clock_high, self.reset_high);
         let walk = move || {
             (0..n).scan(start, move |(step, c_high, r_high), i| {
-                let r = reset.at(i) > 0.0;
-                if r && !*r_high {
-                    *step = length - 1;
-                }
                 let c = clock.at(i) > 0.0;
                 if c && !*c_high {
                     *step = if *step + 1 >= length { 0 } else { *step + 1 };
+                }
+                // During a clock pulse, reset restarts that pulse's note on step 1 (two clocks
+                // rarely tick on the same sample); between pulses it arms step 1 for the next.
+                let r = reset.at(i) > 0.0;
+                if r && !*r_high {
+                    *step = if c { 0 } else { length - 1 };
                 }
                 (*c_high, *r_high) = (c, r);
                 Some((c, r, *step))

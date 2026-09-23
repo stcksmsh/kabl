@@ -9,7 +9,7 @@ const LENGTH: usize = 16;
 
 /// Runs a 120 bpm clock into a sequencer for `steps` 16th notes, with `params` changed from the
 /// defaults and a reset pulse at each sample index in `resets`. Returns the pitch of every note
-/// played (each rising edge of the gate output).
+/// played, read on its last gated sample (so a pitch change mid-note shows).
 fn notes(changes: &[(usize, f32)], resets: &[usize], steps: usize) -> Vec<f32> {
     let q = QualityConfig {
         tier: QualityTier::Live,
@@ -52,6 +52,9 @@ fn notes(changes: &[(usize, f32)], resets: &[usize], steps: usize) -> Vec<f32> {
             if gate[i] > 0.5 && !high {
                 out.push(pitch[i]);
             }
+            if gate[i] > 0.5 {
+                *out.last_mut().unwrap() = pitch[i];
+            }
             high = gate[i] > 0.5;
         }
     }
@@ -82,4 +85,11 @@ fn reset_restarts_the_pattern_on_the_next_tick() {
         notes(&[], &[2 * STEP + 4000], 6),
         [0.0, 3.0, 7.0, 0.0, 3.0, 7.0]
     );
+}
+
+/// A reset landing just after a tick (two clocks a few samples apart) restarts on that tick's note:
+/// step 1 plays now instead of the loop's last step.
+#[test]
+fn reset_just_after_a_tick_plays_step_one() {
+    assert_eq!(notes(&[], &[3 * STEP + 50], 5), [0.0, 3.0, 7.0, 0.0, 3.0]);
 }

@@ -1963,10 +1963,13 @@ were not transplanted, only its look (palettes, geometry, drawing).
   8-option selector. It appears when the module expands, and the existing face choice can pin
   it to the face. Selectors with no named options now label each segment with its value (1..8)
   instead of its 0-based index.
-- **Reset input:** a rising edge on `reset` makes the next clock tick play step 1. The
-  sequencer parks on the loop's last step, so a reset that arrives together with a clock edge
-  plays step 1 on that edge. Between an off-beat reset and the next tick, the pitch output and
-  the step light stay on the last step.
+- **Reset input:** a rising edge on `reset` while the clock is high jumps straight to step 1.
+  Between clock pulses, it arms step 1 for the next tick: the sequencer parks on the loop's
+  last step, and the pitch output and step light stay there until that tick.
+  - The first version always parked. Two clocks rarely tick on the same sample, so a reset a
+    few samples after a tick moved the playing note onto the last step. Kosta heard it as
+    "1-2-8" in the video: the reset clock ran at 40 BPM, which is a reset every 3 steps,
+    because the clock sends 4 ticks per beat. Test: `reset_just_after_a_tick_plays_step_one`.
 - **Input threshold:** the `clock` and `reset` inputs count as high above 0, not at 0.5. A
   `midi.in` gate that reaches this global module is averaged over the voices, so one held key
   arrives as 1/8 at 8 voices. Taking the maximum for gate-typed voice → global cables would be
@@ -1979,5 +1982,6 @@ were not transplanted, only its look (palettes, geometry, drawing).
   the UI requests a repaint every 30 ms, because egui otherwise repaints only on input.
 - `MAX_PARAMS` is now 17. Tests: `crates/modules/tests/seq.rs` (length, reset, rests) and a
   `seq_steps` assertion in `sequence_patch_plays_every_step`; 197 pass, and clippy is clean.
-  Kosta watched `target/seq-walkthrough/sequence-2.mp4` (not committed); it was recorded
-  from a scratch copy of `patches/sequence` with a 40 BPM clock patched into `reset`.
+  Walkthrough: `target/seq-walkthrough/sequence-3.mp4` (not committed). It was recorded from
+  a scratch copy of `patches/sequence` with an LFO square wave (0.667 Hz) patched into
+  `reset`, which restarts the pattern every 12 steps.
