@@ -1985,3 +1985,5 @@ were not transplanted, only its look (palettes, geometry, drawing).
   Walkthrough: `target/seq-walkthrough/sequence-3.mp4` (not committed). It was recorded from
   a scratch copy of `patches/sequence` with an LFO square wave (0.667 Hz) patched into
   `reset`, which restarts the pattern every 12 steps.
+- Kosta approved the fixed walkthrough ("Seems all ok now"). The sequencing slice is closed
+  at `af0585b`. The next scope goes through the supervisor.

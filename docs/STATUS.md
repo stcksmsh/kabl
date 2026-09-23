@@ -41,7 +41,7 @@ Sequencing (owner go-ahead, 2026-09-23): the new `clock` module (BPM, 16th-note 
 control) and a reset input.
 Try it with `cargo run --release -p kabl-ui -- --patch patches/sequence`. Details and what was
 left out are in the `decisions.md` entry "Shared clock + basic pitch/gate sequencing".
-Kosta approved the recorded walkthrough ("sounds and looks good"); not yet tried hands-on.
+Kosta approved the walkthrough videos; slice closed at af0585b. Next scope: supervisor.
 
 Older sections below are history. Where they disagree with the above or with the code, they
 are stale: the MIDI/graph-swap/undo risks they list are fixed; the Mutex described there is
