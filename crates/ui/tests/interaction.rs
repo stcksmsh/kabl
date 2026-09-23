@@ -1348,3 +1348,37 @@ fn transpose_is_an_advanced_control() {
     t.key(Key::Z, Modifiers::COMMAND);
     assert_eq!(t.param(LEAD, "transpose").unwrap_or(0.0), before, "undo");
 }
+
+/// The delay: time, feedback, mix and sync on the face, tone and mode in the advanced area.
+/// Load asks `main.rs` for a fresh graph (no state carried from the playing one).
+#[test]
+fn delay_controls_and_a_fresh_load() {
+    let mut t = H::open("echo", 1440.0, 900.0);
+    const DELAY: u64 = 16;
+    for k in [
+        "knob:16.time_ms",
+        "knob:16.feedback",
+        "knob:16.mix",
+        "sel:16.sync.3",
+    ] {
+        assert!(t.ui.hits.contains_key(k), "{k} on the face");
+    }
+    assert!(!t.ui.hits.contains_key("knob:16.tone_hz"));
+    t.click("toggle:16");
+    assert!(t.ui.hits.contains_key("knob:16.tone_hz"));
+    t.click("sel:16.mode.0");
+    t.click("sel:16.sync.2");
+    assert_eq!(
+        (t.param(DELAY, "mode"), t.param(DELAY, "sync")),
+        (Some(0.0), Some(2.0))
+    );
+    assert!(!t.ui.loaded, "an edit is a live edit");
+
+    t.ui.patch_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../patches/echo")
+        .display()
+        .to_string();
+    t.click("load");
+    assert!(t.ui.loaded && t.editor.take_dirty(), "Load rebuilds fresh");
+    assert_eq!(t.param(DELAY, "sync"), Some(3.0), "the file's settings");
+}
