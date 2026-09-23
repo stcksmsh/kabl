@@ -1251,3 +1251,37 @@ fn a_jack_cable_is_removed_by_pulling_its_plug_never_by_a_click() {
         assert_eq!(t.undo_depth(), depth);
     }
 }
+
+#[test]
+fn source_lanes_of_a_knob_at_the_canvas_edge_pan_fully_into_view_and_stay_draggable() {
+    for (w, h) in sizes() {
+        let right = w - kabl_ui::DRAWER_W;
+        // Corners of the canvas: next to the drawer, and at the bottom left.
+        for target in [egui::pos2(right - 20.0, 60.0), egui::pos2(20.0, h - 40.0)] {
+            let mut t = H::new(w, h);
+            let key = format!("knob:{FILTER}.cutoff_hz");
+            let k = t.at(&key);
+            let p = t.empty_rack();
+            t.drag(p, p + (target - k));
+            t.click(&key);
+            t.frame();
+            let routes = t.routes(FILTER, "cutoff_hz");
+            for r in &routes {
+                let dot = t.ui.hits[&format!("lane:{}", r.0)];
+                assert!(
+                    dot.min.x > 0.0
+                        && dot.max.x < right
+                        && dot.min.y > 40.0
+                        && dot.max.y < h - 20.0,
+                    "{w}x{h} {target:?}: lane {} at {dot:?}",
+                    r.0
+                );
+            }
+            let cable = routes[0].0;
+            let p = t.at(&format!("lane:{cable}"));
+            t.drag(p, p - egui::vec2(0.0, 15.0));
+            assert_eq!(t.ui.selected_route, Some(cable));
+            assert!(close(t.routes(FILTER, "cutoff_hz")[0].1, routes[0].1 + 0.1));
+        }
+    }
+}

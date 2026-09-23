@@ -816,6 +816,11 @@ fn arc_points(center: Pos2, radius: f32, n0: f32, n1: f32) -> Vec<Pos2> {
         .collect()
 }
 
+/// Unzoomed radius of the backdrop behind `n` source lanes around a knob of radius `r`.
+pub(crate) fn lanes_outer(r: f32, n: usize) -> f32 {
+    r + RING_OUTER + LANE_GAP * n as f32 + LANE_GAP / 2.0
+}
+
 /// Concentric lanes, one per route, shown around the inspected knob (a single lane for a
 /// single source): each lane draws that route's own span, and its handle (at the route's positive
 /// peak) selects the route and drags its amount, without the drawer. Drawn and hit-tested on
@@ -834,14 +839,15 @@ fn source_lanes(
     routes: &[RouteView],
 ) {
     let lane_radius = |k: usize| (r + RING_OUTER + LANE_GAP * (k as f32 + 1.0)) * z;
+    let canvas = ui.clip_rect();
     let top = ui
         .ctx()
         .layer_painter(egui::LayerId::new(
             egui::Order::Foreground,
             Id::new(("kabl-lanes", id, param.name)),
         ))
-        .with_clip_rect(ui.clip_rect());
-    let outer = lane_radius(routes.len() - 1) + LANE_GAP * z / 2.0;
+        .with_clip_rect(canvas);
+    let outer = lanes_outer(r, routes.len()) * z;
     top.circle_filled(
         center,
         outer,
@@ -876,6 +882,14 @@ fn source_lanes(
         let at = on_circle(center, radius, travel_angle(peak));
         // At least 9 px to grab, whatever the zoom.
         let hit = Rect::from_center_size(at, EguiVec2::splat(((LANE_GAP + 2.0) * z).max(9.0)));
+        // A dot outside the canvas is not drawn, so it must not catch presses meant for the
+        // drawer or toolbar either (unless it is mid-drag: the drag keeps its dot).
+        let dragging = ui_state
+            .drag
+            .is_some_and(|g| g.is(id, param.name) && g.kind == Grab::Lane(rt.cable));
+        if !canvas.contains(at) && !dragging {
+            continue;
+        }
         ui_state.record(format!("lane:{}", rt.cable), hit);
         let resp = egui::Area::new(Id::new(("kabl-lane", rt.cable)))
             .order(egui::Order::Foreground)
@@ -1144,7 +1158,10 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
             let label = source_label(editor.state(), rt.from_id, &rt.from_port);
             let resp = ui.selectable_label(
                 selected,
-                egui::RichText::new(label.clone()).color(if rt.bypass {
+                // Route colours are unreadable on the selection fill.
+                egui::RichText::new(label.clone()).color(if selected {
+                    Color32::WHITE
+                } else if rt.bypass {
                     BYPASS_GREY
                 } else {
                     cable_color(rt.cable)

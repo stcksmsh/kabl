@@ -135,6 +135,8 @@ pub struct UiState {
     canvas: Rect,
     fitted: bool,
     last_inspected: Option<(ModuleId, String)>,
+    /// Inspected knob and route count whose source lanes were last panned into view.
+    lanes_shown: Option<(ModuleId, String, usize)>,
     /// Values, pills and badges: drawn after the cables so no cable hides them.
     pub(crate) deferred: Vec<egui::Shape>,
 }
@@ -185,6 +187,7 @@ impl Default for UiState {
             canvas: Rect::NOTHING,
             fitted: false,
             last_inspected: None,
+            lanes_shown: None,
             deferred: Vec::new(),
         }
     }
@@ -625,6 +628,26 @@ fn skin_texture(
     Some((handle.id(), tint))
 }
 
+/// World rect of the inspected control plus, for a knob, its source lanes; keyed by the control
+/// and its route count.
+fn inspected_extent(
+    editor: &PatchEditor,
+    ui_state: &UiState,
+    lay: &Layout,
+) -> Option<(Rect, (ModuleId, String, usize))> {
+    let (id, p) = ui_state.inspected.as_ref()?;
+    let geo = lay.get(*id)?.ctl(p)?.geo;
+    let n = routing::routes_into(editor.state(), *id, p).len();
+    let r = match geo {
+        Geo::Knob { c, r } if n > 0 => geo.bounds().union(Rect::from_center_size(
+            c,
+            EguiVec2::splat(2.0 * routing::lanes_outer(r, n)),
+        )),
+        _ => geo.bounds(),
+    };
+    Some((r, (*id, p.clone(), n)))
+}
+
 /// What the modules drew this frame, for cables and drop targets.
 #[derive(Default)]
 struct Drawn {
@@ -648,10 +671,8 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     } else if canvas != ui_state.canvas {
         // Drawer opened or window resized: keep what the user is working on reachable.
         ui_state.canvas = canvas;
-        let target = ui_state
-            .inspected
-            .as_ref()
-            .and_then(|(id, p)| lay.get(*id)?.ctl(p).map(|c| c.geo.bounds()))
+        let target = inspected_extent(editor, ui_state, &lay)
+            .map(|(r, _)| r)
             .or_else(|| {
                 ui_state
                     .selected_module
@@ -681,6 +702,20 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         if let Some(m) = lay.get(id) {
             let t = ui_state.xf().r(m.full());
             ui_state.keep_visible(t);
+        }
+    }
+
+    // Newly inspected knob, or a route added to it: once the pointer is up, pan its source lanes
+    // fully into view so no dot hides under the drawer or the canvas edge.
+    if !ui.input(|i| i.pointer.any_down()) {
+        match inspected_extent(editor, ui_state, &lay) {
+            Some((t, key)) if ui_state.lanes_shown.as_ref() != Some(&key) => {
+                let t = ui_state.xf().r(t);
+                ui_state.keep_visible(t);
+                ui_state.lanes_shown = Some(key);
+            }
+            Some(_) => {}
+            None => ui_state.lanes_shown = None,
         }
     }
 
@@ -760,6 +795,10 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         drop_cable(editor, ui_state, from, at, &floats);
     }
     draw_port_drag(editor, ui_state, ui, th, &drawn, &floats);
+    // Inspection starts mid-frame; the next frame pans its lanes into view.
+    if inspected_extent(editor, ui_state, &lay).map(|(_, k)| k) != ui_state.lanes_shown {
+        ui.ctx().request_repaint();
+    }
     if ui_state.flash.is_some_and(|(_, _, t)| now - t < 1.6) {
         ui.ctx()
             .request_repaint_after(std::time::Duration::from_millis(100));

@@ -10,6 +10,7 @@ Script lines (# comments):
     clickat X Y | rclickat X Y
     drag KEY KEY                                 press on one target, release on another
     dragby KEY DX DY [shift]                     press, move by (DX, DY), release
+    pan BX BY KEY X Y                            drag bare rack at (BX, BY) so KEY lands at (X, Y)
     hold KEY DX DY | release                     press and move without releasing
     wheel KEY N [ctrl]                           N wheel notches (negative = down) over a target
     key COMBO                                    e.g. ctrl+z, Escape
@@ -105,6 +106,10 @@ try:
             x("mouseup", 1)
             if a[3:] == ["shift"]:
                 x("keyup", "shift")
+        elif cmd == "pan":
+            bx, by, kx, ky = int(a[0]), int(a[1]), *centre(a[2])
+            press_move(bx, by, bx + int(a[3]) - kx, by + int(a[4]) - ky)
+            x("mouseup", 1)
         elif cmd == "hold":
             ax, ay = centre(a[0])
             press_move(ax, ay, ax + int(a[1]), ay + int(a[2]))
