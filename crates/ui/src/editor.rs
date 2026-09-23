@@ -299,6 +299,32 @@ impl PatchEditor {
     /// Pulls the plug of cable `old` out of its input (the common modular gesture) and, when
     /// `to` is given, plugs the same source into `to`: an input jack (replacing its cable) or a
     /// knob (a new route). One undo step. Dropping it back where it was changes nothing.
+    /// Sets (`Some`) or removes (`None`) presentation params (`rack::is_presentation`) as one
+    /// undo step. Never rebuilds audio.
+    pub fn set_presentation(&mut self, changes: &[(ModuleId, String, Option<f32>)]) {
+        let ops: Vec<Op> = changes
+            .iter()
+            .filter(|(id, _, _)| self.log.state().modules.contains_key(id))
+            .map(|(id, param, v)| {
+                debug_assert!(crate::rack::is_presentation(param));
+                let target = ParamTarget::Module {
+                    id: *id,
+                    param: param.clone(),
+                };
+                match v {
+                    Some(value) => Op::SetParam {
+                        target,
+                        value: *value,
+                    },
+                    None => Op::UnsetParam { target },
+                }
+            })
+            .collect();
+        if !ops.is_empty() {
+            self.append(Op::Group { ops });
+        }
+    }
+
     pub fn replug(&mut self, old: CableId, to: Option<PortRef>) -> Option<CableId> {
         let c = self.log.state().cables.get(&old)?;
         if to.as_ref() == Some(&c.to) {
@@ -360,7 +386,7 @@ pub fn affects_audio(op: &Op) -> bool {
         }
         | Op::UnsetParam {
             target: ParamTarget::Module { param, .. },
-        } if param.starts_with(crate::rack::FACE_PREFIX) => false,
+        } if crate::rack::is_presentation(param) => false,
         Op::Group { ops } => ops.iter().any(affects_audio),
         _ => true,
     }

@@ -12,7 +12,9 @@
 //! `face.*` params that the compiler never reads (`rack::FACE_PREFIX`).
 
 pub mod editor;
+pub mod perform;
 pub mod rack;
+pub mod record;
 pub mod routing;
 pub mod theme;
 
@@ -23,7 +25,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use egui::{pos2, vec2, Color32, CornerRadius, Id, Pos2, Rect, Sense, Stroke, Vec2 as EguiVec2};
 use kabl_core::{CableId, ModuleId, PortRef, Vec2};
 use kabl_modules::builtins::{DelayLock, Transport};
-use kabl_modules::info::{PortDirection, Taper};
+use kabl_modules::info::PortDirection;
 use kabl_modules::registry;
 use rack::{Decor, Geo, Layout, Placed, JACK_R, PANEL_H};
 use routing::Look;
@@ -152,6 +154,22 @@ pub struct UiState {
     lanes_shown: Option<(ModuleId, String, usize)>,
     /// Values, pills and badges: drawn after the cables so no cable hides them.
     pub(crate) deferred: Vec<egui::Shape>,
+    /// The performance panel (bottom) is open.
+    pub perform_open: bool,
+    /// Param waiting for the next MIDI CC to map to it.
+    pub learn: Option<(ModuleId, String)>,
+    pub takeover: perform::TakeoverMap,
+    /// The mapping a CC gesture is on and when its last message came (seconds, egui time).
+    pub(crate) cc_gesture: Option<((ModuleId, String), f64)>,
+    /// Incoming MIDI CC `(channel, controller, value)` for the next frame, fed by `main.rs`.
+    pub midi_cc: Vec<(u8, u8, u8)>,
+    /// MIDI input ports seen, the connected one, and a switch the user asked for.
+    pub midi_inputs: Vec<String>,
+    pub midi_input: Option<String>,
+    /// `Some(None)` = disconnect.
+    pub midi_select: Option<Option<String>>,
+    /// Stereo output recorder; `None` without an audio device.
+    pub recorder: Option<record::Recorder>,
 }
 
 struct Moving {
@@ -207,6 +225,15 @@ impl Default for UiState {
             last_inspected: None,
             lanes_shown: None,
             deferred: Vec::new(),
+            perform_open: false,
+            learn: None,
+            takeover: Default::default(),
+            cc_gesture: None,
+            midi_cc: Vec::new(),
+            midi_inputs: Vec::new(),
+            midi_input: None,
+            midi_select: None,
+            recorder: None,
         }
     }
 }
@@ -245,6 +272,13 @@ impl UiState {
             self.selected_module = None;
         }
         self.expanded.retain(|id| state.modules.contains_key(id));
+        if self
+            .learn
+            .as_ref()
+            .is_some_and(|(id, _)| !state.modules.contains_key(id))
+        {
+            self.learn = None;
+        }
         if self
             .choose
             .as_ref()
@@ -336,7 +370,12 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
         }
     } else if esc && ui_state.choose.is_some() {
         ui_state.choose = None;
+    } else if esc && ui_state.learn.is_some() {
+        ui_state.learn = None;
     }
+    let now = ui.input(|i| i.time);
+    perform::apply_cc(editor, ui_state, now);
+    perform::sync_takeover(editor, ui_state);
     if !ui.input(|i| i.pointer.any_down()) {
         ui_state.drag = None;
     }
@@ -366,6 +405,12 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
         .exact_size(40.0)
         .show(ui, |ui| toolbar(editor, ui_state, ui));
 
+    if ui_state.perform_open {
+        egui::Panel::bottom("kabl-perform")
+            .exact_size(perform::PANEL_H)
+            .resizable(false)
+            .show(ui, |ui| perform::panel(editor, ui_state, ui));
+    }
     if ui_state.drawer_open {
         egui::Panel::right("kabl-params")
             .exact_size(DRAWER_W)
@@ -543,6 +588,8 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) 
                     ui_state.selected_route = None;
                     ui_state.pending_output = None;
                     ui_state.choose = None;
+                    ui_state.learn = None;
+                    ui_state.takeover.clear();
                     ui_state.last_message = Some(format!("loaded {}", path.display()));
                 }
                 Err(err) => {
@@ -554,6 +601,18 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) 
             let open = ui_state.drawer_open;
             if tool(ui, ui_state, "routing", "Routing", open) {
                 ui_state.drawer_open = !open;
+            }
+            let open = ui_state.perform_open;
+            if tool(ui, ui_state, "perform", "Perform", open) {
+                ui_state.perform_open = !open;
+            }
+            if let Some(rec) = ui_state.recorder.as_ref().filter(|r| r.recording()) {
+                let t = rec.elapsed() as u64;
+                ui.label(
+                    egui::RichText::new(format!("● REC {:02}:{:02}", t / 60, t % 60))
+                        .color(Color32::from_rgb(220, 60, 50))
+                        .strong(),
+                );
             }
             if let Some(msg) = &ui_state.last_message {
                 ui.label(egui::RichText::new(msg).small());
@@ -577,46 +636,9 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
     };
     ui.label(egui::RichText::new(format!("{} #{id}", info.name)).strong());
     for param in info.params {
-        let current = routing::base_value(editor.state(), id, param);
-        if param.taper == Taper::Stepped {
-            ui.horizontal_wrapped(|ui| {
-                ui.label(routing::param_label(param));
-                let labels = routing::step_labels(&kind, param.name);
-                let n = (param.max - param.min).round() as usize + 1;
-                for k in 0..n {
-                    let opt = param.min + k as f32;
-                    let text = labels
-                        .and_then(|l| l.get(k).copied())
-                        .map_or(format!("{opt}"), str::to_string);
-                    if ui.selectable_label(current.round() == opt, text).clicked()
-                        && current.round() != opt
-                    {
-                        editor.set_param(id, param.name, opt);
-                    }
-                }
-            });
-            continue;
-        }
-        let mut value = current;
-        // Same text as the knob (a pitch reads in the whole semitones the module plays).
-        // No `step_by`: egui snaps the shown value and reports it as a change every frame,
-        // which would rewrite a stored 12.8 as 13 and undo could never get back past it.
-        let resp = ui.add(
-            egui::Slider::new(&mut value, param.min..=param.max)
-                .text(routing::param_label(param))
-                .logarithmic(param.taper == Taper::Exponential)
-                .custom_formatter(|v, _| routing::fmt_value(param, v as f32))
-                .custom_parser(|t| routing::parse_value(param, t).map(f64::from)),
-        );
-        // Only a real user change: the log slider's round trip can differ from `current` (at
-        // the range ends), and writing that back every frame flooded undo.
-        if resp.changed() && value != current {
-            let target = kabl_core::ParamTarget::Module {
-                id,
-                param: param.name.into(),
-            };
-            let continuing = resp.dragged() && !resp.drag_started();
-            editor.set_param_gesture(target, value, !continuing);
+        perform::param_editor(editor, ui_state, ui, id, param, true, None);
+        if let Some(m) = perform::mapping(editor.state(), id, param.name) {
+            ui.label(egui::RichText::new(perform::cc_text(m)).small().monospace());
         }
     }
     if ui.button("Remove module").clicked() {
@@ -1239,6 +1261,8 @@ fn module_menu(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
             ui.close();
         }
     }
+    ui.separator();
+    perform::module_menu(editor, ui_state, ui, m.id, m.info);
     ui.separator();
     if item(ui, ui_state, "remove", "Remove module") {
         editor.remove_module(m.id);

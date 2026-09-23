@@ -29,6 +29,14 @@ pub const JACK_R: f32 = 13.0;
 /// declared param names, so it never sees these.
 pub const FACE_PREFIX: &str = "face.";
 
+/// Stored params that are presentation or control metadata, never audio: faces, performance
+/// pins (`pin.*`) and MIDI CC mappings (`cc.*`). Editing them never rebuilds the graph.
+pub fn is_presentation(param: &str) -> bool {
+    param.starts_with(FACE_PREFIX)
+        || param.starts_with(crate::perform::PIN_PREFIX)
+        || param.starts_with(crate::perform::CC_PREFIX)
+}
+
 pub fn face_key(param: &str) -> String {
     format!("{FACE_PREFIX}{param}")
 }
@@ -373,10 +381,8 @@ fn place_local(
         let column = matches!(info.kind, "midi.in" | "out");
         let ports = ins.len() + outs.len();
         // A wide panel (the sequencer) keeps one row, clear of its selector row.
-        let two_rows = !column
-            && ports > 3
-            && !(ports == 4 && fw >= 240.0)
-            && fw < 100.0 * ports as f32;
+        let two_rows =
+            !column && ports > 3 && !(ports == 4 && fw >= 240.0) && fw < 100.0 * ports as f32;
         if column {
             let (ports, y0) = if info.kind == "midi.in" {
                 (&outs, 206.0)

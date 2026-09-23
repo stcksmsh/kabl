@@ -16,11 +16,14 @@ use kabl_core::{ModuleId, PatchState};
 use kabl_engine::compile::compile;
 use kabl_engine::graph::BLOCK;
 use kabl_engine::patch_engine::{swap_channel, PatchEngine, SwapSender};
+use kabl_engine::voice_allocator::VoiceAllocator;
 use kabl_modules::builtins::{DelayLock, Transport};
 use kabl_standalone::{
-    apply_voice_event, connect_midi, default_patch, RingBuffer, VoiceEvent, DEFAULT_VOICE_COUNT,
+    apply_voice_event, default_patch, resolve_midi_message, RingBuffer, VoiceEvent,
+    DEFAULT_VOICE_COUNT,
 };
-use kabl_ui::{show, PatchEditor, UiState};
+use kabl_ui::{record, show, PatchEditor, UiState};
+use std::sync::{Arc, Mutex};
 
 const RING_CAPACITY: usize = BLOCK * 256;
 
@@ -43,8 +46,8 @@ struct AudioHost {
     delays_rx: Option<rtrb::Consumer<(ModuleId, DelayLock, f32)>>,
     /// Transport commands to the audio callback (runtime only, never in the op log).
     transport_tx: Option<rtrb::Producer<(ModuleId, Transport)>>,
+    recorder: Option<record::Recorder>,
     _stream: Option<cpal::Stream>,
-    _midi_connection: Option<midir::MidiInputConnection<()>>,
 }
 
 impl AudioHost {
@@ -58,12 +61,13 @@ impl AudioHost {
             clocks_rx: None,
             delays_rx: None,
             transport_tx: None,
+            recorder: None,
             _stream: None,
-            _midi_connection: None,
         }
     }
 
-    fn start(patch: &PatchState) -> Self {
+    fn start(patch: &PatchState, notes: rtrb::Consumer<VoiceEvent>) -> Self {
+        let mut midi_consumer = notes;
         let collector = Collector::new();
         let handle = collector.handle();
 
@@ -93,8 +97,7 @@ impl AudioHost {
         };
 
         let (swap_tx, mut swap_rx) = swap_channel(SWAP_QUEUE);
-        let (midi_producer, mut midi_consumer) = rtrb::RingBuffer::<VoiceEvent>::new(256);
-        let midi_connection = connect_midi("kabl-ui", midi_producer, None);
+        let (recorder, mut tap) = record::pair(sample_rate as u32);
 
         let (mut steps_tx, steps_rx) = rtrb::RingBuffer::<(ModuleId, usize)>::new(256);
         let (mut clocks_tx, clocks_rx) = rtrb::RingBuffer::<(ModuleId, bool)>::new(64);
@@ -137,9 +140,13 @@ impl AudioHost {
                     let _ = delays_tx.push((id, lock, ms));
                 });
 
+                let rec = tap.begin(frames_needed);
                 for frame in data.chunks_mut(channels) {
                     let l = left_ring.pop().unwrap_or(0.0);
                     let r = right_ring.pop().unwrap_or(0.0);
+                    if rec {
+                        tap.frame(l, r);
+                    }
                     frame[0] = l;
                     for s in frame.iter_mut().skip(1) {
                         *s = r;
@@ -169,8 +176,8 @@ impl AudioHost {
             clocks_rx: Some(clocks_rx),
             delays_rx: Some(delays_rx),
             transport_tx: Some(transport_tx),
+            recorder: stream.is_some().then_some(recorder),
             _stream: stream,
-            _midi_connection: midi_connection,
         }
     }
 
@@ -198,10 +205,125 @@ impl AudioHost {
     }
 }
 
+/// What the MIDI callback owns: note events to the audio thread, CC to the UI.
+struct MidiSink {
+    notes: rtrb::Producer<VoiceEvent>,
+    cc: rtrb::Producer<(u8, u8, u8)>,
+    allocator: VoiceAllocator,
+    ctx: Option<egui::Context>,
+}
+
+/// The MIDI input connection. The sink outlives connections, so switching ports keeps the
+/// queues; a switch releases every voice first so no note hangs.
+struct Midi {
+    sink: Arc<Mutex<MidiSink>>,
+    conn: Option<midir::MidiInputConnection<Arc<Mutex<MidiSink>>>>,
+    port: Option<String>,
+    cc_rx: rtrb::Consumer<(u8, u8, u8)>,
+    ports: Vec<String>,
+    scanned: Option<std::time::Instant>,
+}
+
+fn input_names() -> Vec<String> {
+    let Ok(m) = midir::MidiInput::new("kabl-ui-scan") else {
+        return Vec::new();
+    };
+    m.ports()
+        .iter()
+        .filter_map(|p| m.port_name(p).ok())
+        .collect()
+}
+
+impl Midi {
+    fn new(notes: rtrb::Producer<VoiceEvent>) -> Self {
+        let (cc, cc_rx) = rtrb::RingBuffer::new(1024);
+        Midi {
+            sink: Arc::new(Mutex::new(MidiSink {
+                notes,
+                cc,
+                allocator: VoiceAllocator::new(DEFAULT_VOICE_COUNT),
+                ctx: None,
+            })),
+            conn: None,
+            port: None,
+            cc_rx,
+            ports: Vec::new(),
+            scanned: None,
+        }
+    }
+
+    fn disconnect(&mut self) {
+        if let Some(c) = self.conn.take() {
+            c.close();
+        }
+        self.port = None;
+        let mut s = self.sink.lock().unwrap();
+        for voice in 0..DEFAULT_VOICE_COUNT {
+            let _ = s.notes.push(VoiceEvent::NoteOff { voice });
+        }
+        s.allocator = VoiceAllocator::new(DEFAULT_VOICE_COUNT);
+    }
+
+    fn connect(&mut self, name: &str) -> Result<(), String> {
+        self.disconnect();
+        let midi_in = midir::MidiInput::new("kabl-ui").map_err(|e| e.to_string())?;
+        let port = midi_in
+            .ports()
+            .into_iter()
+            .find(|p| midi_in.port_name(p).is_ok_and(|n| n == name))
+            .ok_or_else(|| format!("MIDI input \"{name}\" is gone"))?;
+        let conn = midi_in
+            .connect(
+                &port,
+                "kabl-input",
+                |_stamp, data, sink: &mut Arc<Mutex<MidiSink>>| {
+                    let Ok(mut s) = sink.lock() else { return };
+                    let s = &mut *s;
+                    if data.len() >= 3 && data[0] & 0xF0 == 0xB0 {
+                        let _ = s.cc.push((data[0] & 0x0F, data[1], data[2]));
+                        if let Some(ctx) = &s.ctx {
+                            ctx.request_repaint();
+                        }
+                    } else if let Some(e) = resolve_midi_message(&mut s.allocator, data) {
+                        let _ = s.notes.push(e);
+                    }
+                },
+                self.sink.clone(),
+            )
+            .map_err(|e| e.to_string())?;
+        eprintln!("kabl-ui: listening for MIDI on \"{name}\"");
+        self.conn = Some(conn);
+        self.port = Some(name.to_string());
+        Ok(())
+    }
+
+    /// The first port whose name contains `filter` (case-insensitive), else the first that isn't
+    /// ALSA's own loopback.
+    fn connect_default(&mut self, filter: Option<&str>) {
+        let names = input_names();
+        let pick = match filter {
+            Some(f) => names
+                .iter()
+                .find(|n| n.to_lowercase().contains(&f.to_lowercase())),
+            None => names.iter().find(|n| !n.contains("Through")),
+        };
+        match pick {
+            Some(n) => {
+                if let Err(e) = self.connect(&n.clone()) {
+                    eprintln!("kabl-ui: {e}");
+                }
+            }
+            None => eprintln!("kabl-ui: no MIDI input matched {filter:?}"),
+        }
+        self.ports = names;
+    }
+}
+
 struct App {
     editor: PatchEditor,
     ui_state: UiState,
     audio: AudioHost,
+    midi: Midi,
     /// `KABL_HITS_FILE`: where to write the drawn target rects (for scripted real-input runs).
     hits_file: Option<String>,
     hits_written: String,
@@ -222,6 +344,32 @@ impl eframe::App for App {
                 self.ui_state.clock_running.insert(id, running);
             }
         }
+        while let Ok(cc) = self.midi.cc_rx.pop() {
+            self.ui_state.midi_cc.push(cc);
+        }
+        if let Some(pick) = self.ui_state.midi_select.take() {
+            let r = match pick {
+                Some(name) => self.midi.connect(&name),
+                None => {
+                    self.midi.disconnect();
+                    Ok(())
+                }
+            };
+            if let Err(e) = r {
+                self.ui_state.last_message = Some(e);
+            }
+        }
+        if self.ui_state.perform_open
+            && self
+                .midi
+                .scanned
+                .is_none_or(|t| t.elapsed().as_secs_f32() > 2.0)
+        {
+            self.midi.ports = input_names();
+            self.midi.scanned = Some(std::time::Instant::now());
+        }
+        self.ui_state.midi_inputs = self.midi.ports.clone();
+        self.ui_state.midi_input = self.midi.port.clone();
         if let Some(rx) = self.audio.delays_rx.as_mut() {
             while let Ok((id, lock, ms)) = rx.pop() {
                 self.ui_state.delay_status.insert(id, (lock, ms));
@@ -296,7 +444,17 @@ fn main() -> eframe::Result<()> {
             Some([w.parse().ok()?, h.parse().ok()?])
         })
         .unwrap_or([1440.0, 900.0]);
-    let audio = AudioHost::start(editor.state());
+    let (notes_tx, notes_rx) = rtrb::RingBuffer::<VoiceEvent>::new(256);
+    let mut midi = Midi::new(notes_tx);
+    midi.connect_default(flag("--midi").as_deref());
+    let mut audio = AudioHost::start(editor.state(), notes_rx);
+    ui_state.recorder = audio.recorder.take();
+    if let (Some(rec), Some(dir)) = (ui_state.recorder.as_mut(), flag("--record-dir")) {
+        rec.dir = dir;
+    }
+    if args.iter().any(|a| a == "--perform") {
+        ui_state.perform_open = true;
+    }
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -310,10 +468,12 @@ fn main() -> eframe::Result<()> {
         options,
         Box::new(|cc| {
             kabl_ui::theme::install_fonts(&cc.egui_ctx);
+            midi.sink.lock().unwrap().ctx = Some(cc.egui_ctx.clone());
             Ok(Box::new(App {
                 editor,
                 ui_state,
                 audio,
+                midi,
                 hits_file: std::env::var("KABL_HITS_FILE").ok(),
                 hits_written: String::new(),
             }))

@@ -20,6 +20,7 @@ cpal = "0.18.2"
 midir = "0.11.0"
 rtrb = "0.4.0"
 basedrop = "0.1.3"
+hound = "3.5.1"
 image = { version = "0.25", default-features = false, features = ["png"] }
 kabl-core = { path = "../core" }
 kabl-engine = { path = "../engine" }
@@ -28,4 +29,3 @@ kabl-standalone = { path = "../standalone" }
 
 [dev-dependencies]
 tempfile = "3.27.0"
-hound = "3.5.1"
