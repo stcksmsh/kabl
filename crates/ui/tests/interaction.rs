@@ -465,3 +465,56 @@ fn collapsed_rings_are_display_only_and_open_the_lanes() {
     assert_eq!(t.ui.inspected, Some((FILTER, "cutoff_hz".to_string())));
     assert!(t.ui.hits.contains_key(&format!("lane:{}", before[0].0)));
 }
+
+#[test]
+fn single_source_dot_and_removal_never_reassigns() {
+    for (w, h) in sizes() {
+        let mut t = H::new(w, h);
+        let attack = t.routes(ENV, "attack_ms");
+        let attack_base = t.param(ENV, "attack_ms");
+        let from = t.at(&format!("out:{FAST_LFO}.out"));
+        let to = t.at(&format!("knob:{ENV}.decay_ms"));
+        t.drag(from, to);
+        let only = t.routes(ENV, "decay_ms")[0].0;
+        // One source, inspected: its dot is there and drags its depth like a multi-source lane.
+        let p = t.at(&format!("lane:{only}"));
+        t.drag(p, p - egui::vec2(0.0, 15.0));
+        assert!(close(t.routes(ENV, "decay_ms")[0].1, 0.35), "{w}x{h}");
+        assert_eq!(
+            t.routes(ENV, "attack_ms"),
+            attack,
+            "neighbour routes untouched"
+        );
+        assert_eq!(
+            t.param(ENV, "attack_ms"),
+            attack_base,
+            "neighbour base untouched"
+        );
+
+        // Second source on Decay, remove the selected one: one remains, nothing is selected,
+        // and the ring edits nothing until the remaining dot is grabbed.
+        let from = t.at("out:7.out");
+        t.drag(from, t.at(&format!("knob:{ENV}.decay_ms")));
+        let second = t.ui.selected_route.unwrap();
+        t.click(&format!("remove:{second}"));
+        assert_eq!(t.ui.selected_route, None);
+        let remaining = t.routes(ENV, "decay_ms");
+        assert_eq!(remaining.len(), 1);
+        t.ring_drag(ENV, "decay_ms", 30.0);
+        assert_eq!(
+            t.routes(ENV, "decay_ms"),
+            remaining,
+            "no silent reassignment"
+        );
+        let p = t.at(&format!("lane:{only}"));
+        t.drag(p, p - egui::vec2(0.0, 15.0));
+        assert_eq!(t.ui.selected_route, Some(only), "explicit grab selects");
+        assert!(close(t.routes(ENV, "decay_ms")[0].1, 0.45));
+
+        // Hidden mode: the dot still works.
+        t.click("view:Hidden");
+        let p = t.at(&format!("lane:{only}"));
+        t.drag(p, p + egui::vec2(0.0, 15.0));
+        assert!(close(t.routes(ENV, "decay_ms")[0].1, 0.35));
+    }
+}

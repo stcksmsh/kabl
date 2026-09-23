@@ -541,14 +541,14 @@ pub(crate) fn param_knob(
             ROUTE_ACCENT,
         );
     }
-    if inspected && routes.len() >= 2 {
+    if inspected && !routes.is_empty() {
         source_lanes(editor, ui_state, ui, id, param, center, base_n, &routes);
     }
     plugs
 }
 
-/// Concentric lanes, one per route, shown around the inspected knob when it has several
-/// sources: each lane draws that route's own span, and its handle (at the route's positive
+/// Concentric lanes, one per route, shown around the inspected knob (a single lane for a
+/// single source): each lane draws that route's own span, and its handle (at the route's positive
 /// peak) selects the route and drags its amount, without the drawer. Drawn and hit-tested on
 /// the foreground layer so neighbouring knobs never steal the handles.
 #[allow(clippy::too_many_arguments)]
