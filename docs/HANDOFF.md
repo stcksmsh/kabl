@@ -57,7 +57,7 @@ view with one demo skin (`osc.va`).
 
 ## Verification evidence
 
-- `cargo test --workspace`: 174 pass (2 ignored = script generators). Clippy clean; fmt clean
+- `cargo test --workspace`: 176 pass (2 ignored = script generators). Clippy clean; fmt clean
   except the untouched `rev2_proto` files.
 - Key suites: `crates/engine/tests/{live_edit,modulation,env_timing,legacy_sound}.rs`,
   `crates/core/tests/{legacy_format,replay_proptest,log_unit}.rs`,
