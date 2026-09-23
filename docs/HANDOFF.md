@@ -57,8 +57,8 @@ goes through the supervisor.
 loop, MONO/PING. `Module::carry_from` carries its 4 s lines across live swaps (audio thread,
 no allocation). Load now builds a `fresh` graph that carries nothing. The demo is
 `cargo run --release -p kabl-ui -- --patch patches/echo` (built by `crates/ui/tests/echo.rs`;
-rewrite it with `-- write_echo_patch --ignored`, keeping the name filter, because the file
-includes `interlocking.rs` and its writer). Record, video, clips, timings and the listening checklist:
+rewrite it with `cargo test -p kabl-ui --test echo write_echo_patch -- --ignored`, keeping the
+name filter, because the file includes `interlocking.rs` and its writer). Record, video, clips, timings and the listening checklist:
 `docs/echo/README.md`. Timing harness: `crates/ui/examples/bench_echo.rs`. Stopped for Kosta:
 do not extend effects (reverb, tape, etc.) before his answer.
 
