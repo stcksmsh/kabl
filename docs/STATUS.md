@@ -32,7 +32,7 @@ scripts). One real-X `xdotool` pass. 7 unit tests. The screenshots in
 `design/revision-2/prototype/img/` are real framebuffer captures from Xvfb/llvmpipe, not from
 Kosta's display. Nothing is integrated into `kabl-ui` or the engine.
 
-Owner answers so far (decisions.md, "Prototype review"): stable rack wins; ring band wins but needs multi-source support (not built); envelope timing to become selectable (continuous / key-trigger); push-vs-float unanswered, needs clearer framing.
+Owner answers so far (decisions.md, "Prototype review"): stable rack wins; ring band wins but needs multi-source support (not built); envelope timing to become selectable (continuous / key-trigger); expansion pushes by default, with a setting for float.
 
 Next: resolve the remaining items with Kosta. Do not start production
 integration before that. MIDI / graph-swap / undo correctness remains a prerequisite for any

@@ -1672,3 +1672,4 @@ Stopped for Kosta's hands-on review. No production integration.
 - **Envelope time:** the owner sees it as continuous vs key-trigger (sampled at note-on) and
   suggests making it selectable. Agent reading, not confirmed: default continuous, with a
   per-route "latch at note-on" option.
+- **Expansion (follow-up):** push by default; a setting switches to float.
