@@ -361,3 +361,50 @@ fn inspecting_a_single_source_knob_selects_it_automatically() {
     t.ring_drag(ENV, "release_ms", 15.0);
     assert!(close(t.routes(ENV, "release_ms")[0].1, 0.35));
 }
+
+/// Not a check: writes the target rects for the scripted real-X (`xdotool`) pass to
+/// `target/slice-shots/hits-WxH.txt`. `cargo test -p kabl-ui --test interaction -- --ignored`.
+#[test]
+#[ignore]
+fn dump_hit_targets_for_real_input_runs() {
+    for (w, h) in sizes() {
+        let mut t = H::new(w, h);
+        let mut all = t.ui.hits.clone();
+        for knob in [
+            format!("knob:{ENV}.attack_ms"),
+            format!("knob:{FILTER}.cutoff_hz"),
+        ] {
+            t.click(&knob);
+            all.extend(t.ui.hits.clone());
+        }
+        let mut out = String::new();
+        for (k, r) in all {
+            out.push_str(&format!("{k} {:.0} {:.0}\n", r.center().x, r.center().y));
+        }
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/slice-shots");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(format!("hits-{w}x{h}.txt")), out).unwrap();
+    }
+}
+
+#[test]
+fn selecting_a_source_does_not_move_the_drawer_rows() {
+    let mut t = H::new(1440.0, 900.0);
+    t.click(&format!("knob:{ENV}.attack_ms"));
+    let rows: Vec<(String, Rect)> =
+        t.ui.hits
+            .iter()
+            .filter(|(k, _)| k.starts_with("invert:") || k.starts_with("row:"))
+            .map(|(k, r)| (k.clone(), *r))
+            .collect();
+    let first = rows
+        .iter()
+        .find(|(k, _)| k.starts_with("row:"))
+        .unwrap()
+        .0
+        .clone();
+    t.click(&first);
+    for (k, r) in rows {
+        assert_eq!(t.ui.hits.get(&k), Some(&r), "{k} moved");
+    }
+}

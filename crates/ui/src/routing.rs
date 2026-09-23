@@ -471,8 +471,13 @@ pub(crate) fn param_knob(
         _ => None,
     };
     if let Some(text) = editing {
+        // Tooltip layer: above cables and not clipped by the canvas.
+        let top = ui.ctx().layer_painter(egui::LayerId::new(
+            egui::Order::Tooltip,
+            Id::new("kabl-knob-pill"),
+        ));
         pill(
-            painter,
+            &top,
             center - EguiVec2::new(0.0, r + RING_OUTER + 4.0),
             &text,
         );
@@ -480,13 +485,17 @@ pub(crate) fn param_knob(
 
     // Hidden cables: say where modulation comes from.
     if ui_state.cable_view == crate::CableView::Hidden && !routes.is_empty() {
+        // ASCII only: the bundled fonts have no arrow glyphs.
         let badge = if routes.len() == 1 {
-            format!(
-                "← {}",
-                source_label(editor.state(), routes[0].from_id, &routes[0].from_port)
-            )
+            let name = editor
+                .state()
+                .modules
+                .get(&routes[0].from_id)
+                .and_then(|m| registry::info_for(&m.kind))
+                .map_or("?", |i| i.name);
+            format!("< {name}")
         } else {
-            format!("← {} mods", routes.len())
+            format!("< {} mods", routes.len())
         };
         painter.text(
             center + EguiVec2::new(0.0, r + PLUG_DROP + 15.0),
@@ -499,7 +508,7 @@ pub(crate) fn param_knob(
     plugs
 }
 
-fn pill(painter: &egui::Painter, bottom_center: Pos2, text: &str) {
+pub(crate) fn pill(painter: &egui::Painter, bottom_center: Pos2, text: &str) {
     let galley = painter.layout_no_wrap(
         text.to_string(),
         egui::FontId::proportional(11.0),
@@ -590,7 +599,7 @@ pub(crate) fn stepped_selector(
                 plug + EguiVec2::new(0.0, 3.0),
                 egui::Align2::CENTER_TOP,
                 format!(
-                    "← {} mod{}",
+                    "< {} mod{}",
                     routes.len(),
                     if routes.len() == 1 { "" } else { "s" }
                 ),
@@ -669,25 +678,29 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
         fmt_value(param, param.from_norm(lo)),
         fmt_value(param, param.from_norm(hi))
     ));
-    if let Some(sel) = routes
+    // Exactly one status line whether or not a source is selected, so selecting one never
+    // shifts the rows below under the pointer.
+    match routes
         .iter()
         .find(|r| Some(r.cable) == ui_state.selected_route)
     {
-        let (a, b) = route_span(sel, base_n);
-        ui.label(format!(
-            "Selected ({}): {} – {}",
-            source_label(editor.state(), sel.from_id, &sel.from_port),
-            fmt_value(param, param.from_norm(a)),
-            fmt_value(param, param.from_norm(b))
-        ));
+        Some(sel) => {
+            let (a, b) = route_span(sel, base_n);
+            ui.label(format!(
+                "Selected ({}): {} – {}",
+                source_label(editor.state(), sel.from_id, &sel.from_port),
+                fmt_value(param, param.from_norm(a)),
+                fmt_value(param, param.from_norm(b))
+            ));
+        }
+        None => {
+            ui.colored_label(
+                Color32::from_rgb(255, 200, 90),
+                "No source selected: click one below to edit its depth.",
+            );
+        }
     }
-    ui.small("Reachable range from each source's nominal range, not a measurement. Updates per 64-sample block.");
-    if ui_state.selected_route.is_none() {
-        ui.colored_label(
-            Color32::from_rgb(255, 200, 90),
-            "No source selected: click one below to edit its depth with the ring.",
-        );
-    }
+    ui.small("Ranges are computed from each source's nominal range, not measured. Block rate (64 samples).");
 
     let mut remove = None;
     for rt in &routes {
@@ -696,7 +709,7 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
             let label = source_label(editor.state(), rt.from_id, &rt.from_port);
             let resp = ui.selectable_label(
                 selected,
-                egui::RichText::new(format!("● {label}")).color(if rt.bypass {
+                egui::RichText::new(label.clone()).color(if rt.bypass {
                     BYPASS_GREY
                 } else {
                     cable_color(rt.cable)
@@ -730,7 +743,7 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
             if resp.changed() {
                 editor.set_route_bypass(rt.cable, bypass);
             }
-            let resp = ui.small_button("✕");
+            let resp = ui.small_button("Remove");
             ui_state.record(format!("remove:{}", rt.cable), resp.rect);
             if resp.clicked() {
                 remove = Some(rt.cable);

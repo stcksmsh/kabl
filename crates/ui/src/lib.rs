@@ -24,7 +24,8 @@ const PORT_ROW_HEIGHT: f32 = 18.0;
 const HEADER_HEIGHT: f32 = 26.0;
 const PORT_RADIUS: f32 = 5.0;
 const ACCENT_HEIGHT: f32 = 4.0;
-const KNOB_ROW_HEIGHT: f32 = 52.0;
+/// Knob, plug, label and (Hidden view) source badge. Fixed, so views never move controls.
+const KNOB_ROW_HEIGHT: f32 = 64.0;
 const SELECTOR_ROW_HEIGHT: f32 = 22.0;
 const PANEL_FILL: Color32 = Color32::from_rgb(32, 32, 36);
 const PANEL_FILL_SELECTED: Color32 = Color32::from_rgb(44, 48, 58);
@@ -51,7 +52,7 @@ pub enum CableView {
     All,
     /// Cables touching the selected module at full strength, the rest faint.
     Focus,
-    /// No cables; modulated knobs show a `← source` badge instead.
+    /// No cables; modulated knobs show a `< source` badge instead.
     Hidden,
 }
 
@@ -317,8 +318,11 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
         });
         ui.horizontal(|ui| {
             ui.label("patch dir:");
-            ui.text_edit_singleline(&mut ui_state.patch_path);
-            if ui.button("Save").clicked() {
+            let r = ui.text_edit_singleline(&mut ui_state.patch_path);
+            ui_state.record("patch-path".into(), r.rect);
+            let save = ui.button("Save");
+            ui_state.record("save".into(), save.rect);
+            if save.clicked() {
                 let path = std::path::Path::new(&ui_state.patch_path);
                 ui_state.last_message = Some(match kabl_core::save(path, editor.log()) {
                     Ok(()) => format!("saved to {}", path.display()),
@@ -781,7 +785,7 @@ fn show_canvas(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
                 painter.text(
                     p + EguiVec2::new(PORT_RADIUS + 3.0, -PORT_RADIUS - 3.0),
                     egui::Align2::LEFT_BOTTOM,
-                    format!("→ {n}"),
+                    format!("> {n}"),
                     egui::FontId::proportional(9.0),
                     Color32::from_rgb(90, 170, 255),
                 );
@@ -824,16 +828,25 @@ fn show_canvas(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
                 .find(|(k, r)| k.starts_with("knob:") && r.contains(b))
                 .map(|(k, _)| k.clone())
             {
-                let name = key.rsplit('.').next().unwrap_or("");
-                painter.text(
-                    b + EguiVec2::new(12.0, -12.0),
-                    egui::Align2::LEFT_BOTTOM,
-                    format!(
-                        "Release to modulate {name} ({:+.0} %)",
+                let (mid, name) = key["knob:".len()..].split_once('.').unwrap_or(("", ""));
+                let label = mid
+                    .parse::<ModuleId>()
+                    .ok()
+                    .and_then(|mid| editor.state().modules.get(&mid))
+                    .and_then(|m| registry::info_for(&m.kind))
+                    .and_then(|i| i.params.iter().find(|p| p.name == name))
+                    .map_or(name.to_string(), routing::param_label);
+                let top = ui.ctx().layer_painter(egui::LayerId::new(
+                    egui::Order::Tooltip,
+                    Id::new("kabl-drop-hint"),
+                ));
+                routing::pill(
+                    &top,
+                    b - EguiVec2::new(0.0, 14.0),
+                    &format!(
+                        "Release to modulate {label} ({:+.0} %)",
                         kabl_engine::compile::DEFAULT_ROUTE_AMOUNT * 100.0
                     ),
-                    egui::FontId::proportional(11.0),
-                    Color32::WHITE,
                 );
             }
         }
