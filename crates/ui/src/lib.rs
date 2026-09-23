@@ -177,7 +177,7 @@ impl Default for UiState {
             drawer_open: true,
             expanded: BTreeSet::new(),
             float_expansion: false,
-            skins: false,
+            skins: true,
             skin_labels_on_art: None,
             choose: None,
             flash: None,

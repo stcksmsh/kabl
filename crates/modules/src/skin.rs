@@ -1,10 +1,8 @@
 //! Optional per-module visual skin — not a brief-specified feature, an owner ask: "custom modules
 //! can use their own images as their background and specify where to put their
-//! jacks/ins/outs/switches/readouts". `ModuleInfo.skin` is `None` for every built-in except one
-//! demo (`osc.va` — see decisions.md "Module skins: custom panel art") that proves the mechanism
-//! end-to-end with a real (if placeholder) asset. `None` means `kabl-ui` falls back to its own
-//! auto-layout procedural panel — every other built-in still gets that, unaffected by this file
-//! existing.
+//! jacks/ins/outs/switches/readouts". `ModuleInfo.skin` is `None` for every built-in: core modules show the
+//! A / A-dark theme (owner). The mechanism is for user and non-core modules; `kabl-ui` renders it
+//! (light/dark art, plates or labels on the art) and its layout tests use a test skin.
 //!
 //! Deliberately UI-framework-agnostic: this crate has no `egui`/GPU dependency, so
 //! `background_image` is raw embedded PNG bytes (`include_bytes!` at the point a skin constant is

@@ -1909,5 +1909,7 @@ were not transplanted, only its look (palettes, geometry, drawing).
   another input (moves, replacing that input's cable) or a knob (becomes a route). One undo
   step (`PatchEditor::replug`); pushing it back into its own jack changes nothing. A plain click
   on a cable no longer deletes it; right-click → Remove cable does.
-- Skins on by default: pending. Only the osc.va demo is skinned, so "on" would show
-  placeholder art on a core module at launch.
+- Skins on by default, and the osc.va demo skin is dropped (owner), so core modules show
+  A / A-dark and no placeholder art ships. The renderer (light/dark art, plates, labels on art)
+  stays; `rack.rs` checks skin placement with a test skin; the skin tests no longer require a
+  skinned built-in. Assets and the placeholder-art script are removed (in git history).

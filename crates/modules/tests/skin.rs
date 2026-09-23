@@ -11,11 +11,9 @@ use kabl_modules::skin::ControlKind;
 
 #[test]
 fn every_skin_controls_id_matches_a_real_port_or_param_and_covers_all_of_them() {
-    let mut any_skinned = false;
     for &kind in registry::KNOWN_KINDS {
         let info = registry::info_for(kind).expect("known kind must resolve");
         let Some(skin) = info.skin else { continue };
-        any_skinned = true;
 
         for control in skin.controls {
             match control.kind {
@@ -66,15 +64,10 @@ fn every_skin_controls_id_matches_a_real_port_or_param_and_covers_all_of_them() 
             );
         }
     }
-    assert!(
-        any_skinned,
-        "test setup: expected at least one built-in to demonstrate a real skin"
-    );
 }
 
 #[test]
 fn every_skin_background_image_decodes_as_a_valid_png() {
-    let mut checked = 0;
     for &kind in registry::KNOWN_KINDS {
         let info = registry::info_for(kind).expect("known kind must resolve");
         let Some(skin) = info.skin else { continue };
@@ -88,11 +81,6 @@ fn every_skin_background_image_decodes_as_a_valid_png() {
                 decoded.width() > 0 && decoded.height() > 0,
                 "{kind}'s skin image decoded to zero size"
             );
-            checked += 1;
         }
     }
-    assert!(
-        checked > 0,
-        "test setup: expected at least one built-in with a real embedded background image"
-    );
 }

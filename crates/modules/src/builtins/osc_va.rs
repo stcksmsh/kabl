@@ -20,7 +20,6 @@ use crate::info::{
 };
 use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig, StateReader, StateWriter};
-use crate::skin::{ControlKind, ControlSkin, ModuleSkin};
 
 const PORTS: &[PortInfo] = &[
     PortInfo {
@@ -76,54 +75,9 @@ pub static OSC_VA_INFO: ModuleInfo = ModuleInfo {
         anti_aliasing: true, // PolyBLEP -- saw/square only, see dsp::FullOsc's doc.
         interpolation: false,
     },
-    skin: Some(&OSC_VA_SKIN),
+    skin: None,
     width_units: 7,
     advanced: &[],
-};
-
-static OSC_VA_LIGHT_PNG: &[u8] = include_bytes!("../../assets/osc_va_light.png");
-static OSC_VA_DARK_PNG: &[u8] = include_bytes!("../../assets/osc_va_dark.png");
-
-/// Where each control sits on the art, as a fraction of the 7u × 340 face.
-static OSC_VA_CONTROLS: &[ControlSkin] = &[
-    ControlSkin {
-        id: "base_hz",
-        kind: ControlKind::Knob,
-        pos: (0.5, 0.36),
-    },
-    ControlSkin {
-        id: "waveform",
-        kind: ControlKind::Knob,
-        pos: (0.5, 0.6),
-    },
-    ControlSkin {
-        id: "pitch",
-        kind: ControlKind::Jack,
-        pos: (0.19, 0.84),
-    },
-    ControlSkin {
-        id: "sync",
-        kind: ControlKind::Jack,
-        pos: (0.5, 0.84),
-    },
-    ControlSkin {
-        id: "out",
-        kind: ControlKind::Jack,
-        pos: (0.81, 0.84),
-    },
-];
-
-/// Demo skin for the illustrated-skin mechanism (owner ask; decisions.md "Module skins" and the
-/// rack migration entry): light and dark art, controls drawn by the UI. The art is an honest
-/// PLACEHOLDER (procedural, `assets/placeholder_art.py`), marked as such on the art itself.
-/// Core modules show the A / A-dark theme unless the viewer turns skins on.
-static OSC_VA_SKIN: ModuleSkin = ModuleSkin {
-    panel_size: (210.0, 340.0),
-    background_image: Some(OSC_VA_LIGHT_PNG),
-    background_dark: Some(OSC_VA_DARK_PNG),
-    labels_on_art: false,
-    art_ink: [[0x2b, 0x1d, 0x33], [0xff, 0xf1, 0xd6]],
-    controls: OSC_VA_CONTROLS,
 };
 
 /// Input port index for `pitch` — matches `PORTS` above. Named constants because `ProcessIo`'s

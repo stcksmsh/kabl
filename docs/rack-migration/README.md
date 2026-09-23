@@ -67,9 +67,10 @@ Opening the drawer or resizing keeps the inspected control in view.
 ![Crowded at 50 %](img/11-crowded-50.png)
 ![Focus](img/13-focus.png)
 
-**Skins.** *View → Illustrated skins* (off by default: core modules stay A / A-dark).
-The `osc.va` demo skin has light and dark art (procedural **PLACEHOLDER ART**, marked on the
-art; no image generator was available). `labels_on_art = false` (the skin's setting): labels
+**Skins.** *View → Illustrated skins*, on by default. No built-in ships a skin: the `osc.va`
+demo (procedural **PLACEHOLDER ART**) was dropped after review at the owner's request, so the
+screenshots below show the renderer with that since-removed demo; the renderer stays and is
+covered by a test skin. `labels_on_art = false` (the skin's setting): labels
 and values on theme plates. *View → Preview labels_on_art* shows the maker's `true` case:
 labels in the skin's ink straight on the art. Controls are the normal widgets either way.
 
@@ -87,7 +88,7 @@ undoable move, no audio rebuild).
 ## Verification
 
 **Measured / automated**
-- `cargo test --workspace`: 191 pass, 0 fail (3 ignored: fixture/script writers). Clippy clean.
+- `cargo test --workspace`: 192 pass, 0 fail (3 ignored: fixture/script writers). Clippy clean.
   `cargo fmt --check` clean except the untouched prototype examples.
 - New regression tests, real egui input through `show()` at 1440×900 and 1280×800
   (`crates/ui/tests/interaction.rs`): primary choice = one undo step, saved/reloaded, undo

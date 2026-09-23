@@ -23,8 +23,8 @@ What is real now (production `kabl-ui`, op log, engine, file format):
   saved as `face.*` params the compiler never reads, never rebuilds audio); advanced controls
   expand in place, pushing neighbours (default) or floating (setting); off-face modulated
   controls dock their route on `+N` and are revealed when selected.
-- Skins: light/dark art, `labels_on_art` (plates by default); `osc.va` placeholder-art demo,
-  off by default (View menu).
+- Skins: light/dark art, `labels_on_art` (plates by default), on by default; no built-in has
+  one (the osc.va demo was dropped, owner), so the rack shows A / A-dark.
 - Modulation slice unchanged in behaviour: knob routes (amount/sign/bypass, taper-space sum,
   one clamp), body = base, ring = selected route, per-source lanes and collapsed rings,
   vertical drag, Shift ×0.1, Escape without undo entry, CONT/KEY envelope timing, exact undo,

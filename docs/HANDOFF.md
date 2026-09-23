@@ -41,11 +41,12 @@ block rate; envelope timing CONT (default) / KEY per envelope.
   modulation logic, A-style drawing, zoom-aware geometry.
 - Face choice = `face.<param>` params (grouped op, no audio rebuild, no schema change).
   `ModuleInfo.advanced` declares defaults. Mixer params renamed with legacy compatibility.
-- Skin struct: dark art, `labels_on_art`, `art_ink`. osc.va demo skin is placeholder art.
+- Skin struct: dark art, `labels_on_art`, `art_ink`. Skins on by default; no built-in has one
+  (osc.va demo dropped, owner); the renderer is covered by a test skin in `rack.rs`.
 
 ## Verification evidence
 
-- `cargo test --workspace`: 191 pass (3 ignored = fixture/script writers). Clippy clean.
+- `cargo test --workspace`: 192 pass (3 ignored = fixture/script writers). Clippy clean.
 - `crates/ui/tests/interaction.rs`: modulation suite plus rack tests (faces, push/float,
   off-face reveal, gestures after zoom/pan, view changes don't touch patch/audio, face params
   render bit-identical, drawer keeps selection visible), both sizes.
@@ -60,16 +61,15 @@ Review of the migrated rack. Kosta heard the remote recordings/renders; nobody h
 builds by hand: grab feel (dots/ring/body, now also zoomed), his display and scale factor, his
 MIDI controller and sound card are unverified. If he reports a concrete problem, fix it within
 this scope. Owner answers after the first review: Patchbay stays removed; ADSR Timing on the default
-face; jack cables are removed by pulling the plug (what VCV Rack / Voltage Modular do). Open:
-skins on by default? (Only the osc.va demo has a skin; on would show its placeholder art at
-launch.)
+face; jack cables are removed by pulling the plug (what VCV Rack / Voltage Modular do); skins
+on by default with the osc.va demo skin dropped; no real art needed.
 
 ## Unresolved / known limits
 
 Block-rate modulation; no hysteresis on stepped destinations; pitch full scale ±60 st; state
 carry O(modules²) per swap; jack inputs take one cable; engine output quiet; Pi 4 unmeasured;
 drawer sliders lack Shift/Escape; selector routes show no reachable-options bracket; lanes clip at the canvas edge; no `labels_on_art` contrast
-warning; skin art is a placeholder; `docs/modulation-slice/xdotool-walkthrough.sh` uses
+warning; no module ships a skin yet (screenshots 08/09/14 show the dropped demo); `docs/modulation-slice/xdotool-walkthrough.sh` uses
 headless coordinates and is stale for the rack (use `drive.py`).
 
 ## Not in scope

@@ -781,4 +781,69 @@ mod tests {
         );
         assert_eq!(row_of(snap(pos2(0.0, 900.0)).y), 2);
     }
+
+    /// No built-in has a skin (core modules stay A / A-dark), so the skin path is checked with a
+    /// test skin on the oscillator: controls land where the art places them, inside the face.
+    #[test]
+    fn a_skin_places_face_controls_where_its_art_says() {
+        use kabl_modules::skin::ControlSkin;
+        static CONTROLS: &[ControlSkin] = &[
+            ControlSkin {
+                id: "base_hz",
+                kind: ControlKind::Knob,
+                pos: (0.5, 0.36),
+            },
+            ControlSkin {
+                id: "waveform",
+                kind: ControlKind::Knob,
+                pos: (0.5, 0.6),
+            },
+            ControlSkin {
+                id: "pitch",
+                kind: ControlKind::Jack,
+                pos: (0.19, 0.84),
+            },
+            ControlSkin {
+                id: "sync",
+                kind: ControlKind::Jack,
+                pos: (0.5, 0.84),
+            },
+            ControlSkin {
+                id: "out",
+                kind: ControlKind::Jack,
+                pos: (0.81, 0.84),
+            },
+        ];
+        static SKIN: ModuleSkin = ModuleSkin {
+            panel_size: (210.0, 340.0),
+            background_image: None,
+            background_dark: None,
+            labels_on_art: false,
+            art_ink: [[0; 3]; 2],
+            controls: CONTROLS,
+        };
+        let info = registry::info_for("osc.va").unwrap();
+        let p = place_local(1, info, &[true, true], false, false, Some(&SKIN));
+        assert_eq!(p.face.width(), 210.0);
+        assert_eq!(
+            p.ctl("base_hz").map(|c| c.geo),
+            Some(Geo::Knob {
+                c: pos2(105.0, 0.36 * PANEL_H),
+                r: R_LARGE
+            })
+        );
+        assert!(matches!(
+            p.ctl("waveform").map(|c| c.geo),
+            Some(Geo::Select { .. })
+        ));
+        assert_eq!(p.jacks.len(), 3);
+        for c in &p.ctls {
+            assert!(p.face.contains_rect(c.geo.bounds()), "{}", c.param.name);
+        }
+        // Off the face: the waveform goes to the advanced area like any module's.
+        let p = place_local(1, info, &[true, false], true, false, Some(&SKIN));
+        assert!(p.adv.is_some_and(|a| p
+            .ctl("waveform")
+            .is_some_and(|c| a.contains_rect(c.geo.bounds()))));
+    }
 }
