@@ -79,6 +79,17 @@ After each run the saved patch was checked: new Decay route at the default amoun
 route −25 % → −5 % (ring +30 px) → inverted +5 % → bypassed, LFO #7 route untouched,
 envelope→Cutoff 30 % → 40 %, timing KEY after undo + redo. Identical at both sizes.
 
+## Live A/V recordings
+
+`docs/modulation-slice/record-av.sh`: the release `kabl-ui` binary's real audio output
+(`PIPEWIRE_NODE=kabl_rec`, a PipeWire null sink, so nothing reaches the speakers), recorded
+from the sink monitor together with the Xvfb screen in one ffmpeg; MIDI notes played into
+the app through ALSA Midi Through with `aplaymidi`; knobs driven by xdotool. Clip A plays
+chords while sweeping Cutoff, dragging the envelope lane, adding LFO → Decay and hiding
+cables. Clip B sets Attack to 300 ms, drops the fast LFO on Attack, and plays notes in CONT,
+then KEY. Outputs in `target/slice-av/` (not committed). Still not a hardware MIDI controller
+or Kosta's sound card.
+
 ## Offline renders
 
 `cargo run --release -p kabl-ui --example reference_patch -- render patches/reference docs/modulation-slice/renders`

@@ -799,7 +799,7 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
                 .desired_width(80.0)
                 .id(Id::new("kabl-base-entry")),
         );
-        ui_state.record("base-entry".into(), resp.rect);
+        ui_state.record(format!("base-entry:{id}.{pname}"), resp.rect);
         if resp.lost_focus() {
             if let Some(v) = parse_value(param, &ui_state.base_text) {
                 if v != base {

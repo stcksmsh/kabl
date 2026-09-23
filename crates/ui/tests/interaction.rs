@@ -299,7 +299,7 @@ fn envelope_timing_selector_sets_and_undoes() {
 fn base_value_entry_in_the_drawer() {
     let mut t = H::new(1440.0, 900.0);
     t.click(&format!("knob:{ENV}.attack_ms"));
-    t.click("base-entry");
+    t.click(&format!("base-entry:{ENV}.attack_ms"));
     t.key(Key::A, Modifiers::COMMAND);
     t.events.push(Event::Text("25 ms".into()));
     t.frame();
