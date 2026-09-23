@@ -1896,3 +1896,18 @@ were not transplanted, only its look (palettes, geometry, drawing).
 - **Verification tooling:** `KABL_HITS_FILE` makes the binary write its drawn target rects;
   `docs/rack-migration/drive.py` aims xdotool at them (display-scale aware). The modulation
   closeout replay now uses target keys and matches the headless result at both sizes.
+
+## 2026-09-23 — Rack migration: owner answers (first pass)
+
+- Patchbay view stays removed.
+- ADSR Timing is on the default face (`env.adsr` no longer lists it as advanced). With four
+  knobs and a selector there is no room for the envelope picture as well, so the CONT/KEY
+  selector takes the picture's place and the knobs stay where they were.
+- Jack cable removal, following common practice (VCV Rack manual: "Move or delete an existing
+  cable by dragging one of its plugs"; Voltage Modular: drag an end to a non-jack area, or
+  right-click → Disconnect): pull the plug out of the input and drop it on bare rack (removes),
+  another input (moves, replacing that input's cable) or a knob (becomes a route). One undo
+  step (`PatchEditor::replug`); pushing it back into its own jack changes nothing. A plain click
+  on a cable no longer deletes it; right-click → Remove cable does.
+- Skins on by default: pending. Only the osc.va demo is skinned, so "on" would show
+  placeholder art on a core module at launch.

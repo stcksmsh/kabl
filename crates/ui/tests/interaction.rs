@@ -302,9 +302,6 @@ fn four_sources_each_selectable_and_edited_alone() {
 fn envelope_timing_selector_sets_and_undoes() {
     let mut t = H::new(1440.0, 900.0);
     assert_eq!(t.param(ENV, "timing"), None);
-    // Timing is an advanced control: expand the envelope first.
-    assert!(!t.ui.hits.contains_key(&format!("sel:{ENV}.timing.1")));
-    t.click(&format!("toggle:{ENV}"));
     t.click(&format!("sel:{ENV}.timing.1"));
     assert_eq!(t.param(ENV, "timing"), Some(1.0));
     t.click(&format!("sel:{ENV}.timing.0"));
@@ -966,28 +963,28 @@ fn a_route_to_an_off_face_control_docks_on_the_toggle_and_selecting_it_reveals()
             id: FAST_LFO,
             port: "out".into(),
         },
-        ENV,
-        "timing",
+        VCA,
+        "exponential",
     );
     t.frame();
     t.frame();
-    assert!(!t.ui.expanded.contains(&ENV));
-    let toggle = t.ui.hits[&format!("toggle:{ENV}")];
+    assert!(!t.ui.expanded.contains(&VCA));
+    let toggle = t.ui.hits[&format!("toggle:{VCA}")];
     assert!(
         t.ui.hits.contains_key(&format!("route:{cable}")),
         "the lead is drawn"
     );
     // Selecting the route (its cable) inspects the destination and reveals it.
     t.click(&format!("route:{cable}"));
-    assert_eq!(t.ui.inspected, Some((ENV, "timing".to_string())));
+    assert_eq!(t.ui.inspected, Some((VCA, "exponential".to_string())));
     t.frame();
-    assert!(t.ui.expanded.contains(&ENV));
-    assert!(t.ui.hits.contains_key(&format!("sel:{ENV}.timing.1")));
+    assert!(t.ui.expanded.contains(&VCA));
+    assert!(t.ui.hits.contains_key(&format!("sel:{VCA}.exponential.1")));
     let _ = toggle;
     // Hidden cables: the toggle still exists, the route is still editable in the drawer.
-    t.click(&format!("toggle:{ENV}"));
+    t.click(&format!("toggle:{VCA}"));
     t.click("view:Hidden");
-    assert!(t.ui.hits.contains_key(&format!("toggle:{ENV}")));
+    assert!(t.ui.hits.contains_key(&format!("toggle:{VCA}")));
 }
 
 #[test]
@@ -1071,12 +1068,10 @@ fn view_changes_never_touch_the_patch_or_the_audio() {
     ] {
         t.click(key);
     }
-    t.click(&format!("toggle:{ENV}"));
     t.click(&format!("toggle:{VCA}"));
     t.ui.float_expansion = true;
     t.ui.skins = true;
     t.frame();
-    t.click(&format!("toggle:{ENV}"));
     t.click("routing");
     t.click("routing");
     assert_eq!(t.editor.state(), &state);
@@ -1197,4 +1192,62 @@ fn write_crowded_patch() {
     }
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/crowded");
     kabl_core::save(&dir, e.log()).unwrap();
+}
+
+#[test]
+fn a_jack_cable_is_removed_by_pulling_its_plug_never_by_a_click() {
+    for (w, h) in sizes() {
+        let mut t = H::new(w, h);
+        let into = |t: &H, id: u64, port: &str| {
+            t.editor
+                .state()
+                .cables
+                .iter()
+                .find(|(_, c)| {
+                    c.to == kabl_core::PortRef::Module {
+                        id,
+                        port: port.into(),
+                    }
+                })
+                .map(|(&cid, c)| (cid, c.from.clone()))
+        };
+        let (cable, from) = into(&t, VCA, "in").expect("filter -> vca in");
+        // A click on the cable only selects nothing and deletes nothing.
+        t.click(&format!("cable:{cable}"));
+        assert_eq!(into(&t, VCA, "in").map(|c| c.0), Some(cable), "{w}x{h}");
+        // Pull the plug out onto bare rack: removed, one undo brings the same cable back.
+        let depth = t.undo_depth();
+        let p = t.empty_rack();
+        t.drag(t.at(&format!("in:{VCA}.in")), p);
+        assert_eq!(into(&t, VCA, "in"), None, "{w}x{h} removed");
+        assert_eq!(t.undo_depth(), depth + 1);
+        t.key(Key::Z, Modifiers::COMMAND);
+        assert_eq!(
+            into(&t, VCA, "in").map(|c| c.0),
+            Some(cable),
+            "{w}x{h} undo"
+        );
+        // Move it to another input: one step, same source.
+        t.drag(
+            t.at(&format!("in:{VCA}.in")),
+            t.at(&format!("in:{FILTER}.cutoff_cv")),
+        );
+        assert_eq!(into(&t, VCA, "in"), None);
+        assert_eq!(
+            into(&t, FILTER, "cutoff_cv").map(|c| c.1),
+            Some(from.clone())
+        );
+        assert_eq!(t.undo_depth(), depth + 1);
+        t.key(Key::Z, Modifiers::COMMAND);
+        assert_eq!(into(&t, VCA, "in").map(|c| c.0), Some(cable));
+        assert_eq!(into(&t, FILTER, "cutoff_cv"), None);
+        // Pulled out and pushed back into its own jack: nothing changes, no undo entry.
+        let depth = t.undo_depth();
+        let j = t.at(&format!("in:{VCA}.in"));
+        t.hold(j, j + egui::vec2(60.0, 0.0));
+        t.move_to(j);
+        t.release();
+        assert_eq!(into(&t, VCA, "in").map(|c| c.0), Some(cable), "{w}x{h}");
+        assert_eq!(t.undo_depth(), depth);
+    }
 }

@@ -31,7 +31,8 @@ the approved palettes; chrome stays dark in both, as designed. View only, never 
 ![Hidden, A-dark](img/03-hidden-dark.png)
 
 **Primary controls.** Each module declares its default face (`ModuleInfo.advanced` lists what
-stays off it: `env.adsr` Timing, `vca` Response). Right-click a module → *Choose primary
+stays off it: `vca` Response). ADSR Timing is on the face (owner): CONT/KEY takes the
+envelope picture's place, so the knobs sit exactly where they do with the picture. Right-click a module → *Choose primary
 controls…*: the module expands, every control gets a pin (filled = on the face), the header
 counts them; `Done` commits the whole choice as **one** undo step, `Esc` discards it.
 *Reset face to module default* is in the same menu. The choice is saved in the patch as
@@ -74,6 +75,11 @@ labels in the skin's ink straight on the art. Controls are the normal widgets ei
 
 ![Skin, plates, A-dark](img/08-skin-plates-dark.png)
 ![Skin, labels on art, A-light](img/09-skin-on-art-light.png)
+
+**Cables.** Drag an output to an input or a knob. To move or remove a jack cable, pull its
+plug out of the input and drop it on another input, a knob, or bare rack (one undo step; as
+in VCV Rack and Voltage Modular). A click on a cable never deletes it; right-click →
+*Remove cable* does.
 
 **Modules.** Drag a panel to move it; it snaps to the nearest row and unit on release (one
 undoable move, no audio rebuild).
@@ -122,8 +128,7 @@ and fixed: drawer rows widened the drawer over the rack (clipped); the first dra
 ## Limits (known, left)
 
 Rich LFO controls are not shown (only real params exist). Selector routes show a plug, not the
-reachable-options bracket. Jack cables still delete on a click at their midpoint (existing
-behaviour). Lanes near the canvas edge are clipped by it. A module dragged far along a full row
+reachable-options bracket. Lanes near the canvas edge are clipped by it. A module dragged far along a full row
 inserts itself by stored x; there is no "make room" drag preview beyond the live packing.
 Compact synth layout and x-ray cable fading are not built (out of scope).
 

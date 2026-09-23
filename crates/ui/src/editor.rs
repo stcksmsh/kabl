@@ -296,6 +296,33 @@ impl PatchEditor {
         }
     }
 
+    /// Pulls the plug of cable `old` out of its input (the common modular gesture) and, when
+    /// `to` is given, plugs the same source into `to`: an input jack (replacing its cable) or a
+    /// knob (a new route). One undo step. Dropping it back where it was changes nothing.
+    pub fn replug(&mut self, old: CableId, to: Option<PortRef>) -> Option<CableId> {
+        let c = self.log.state().cables.get(&old)?;
+        if to.as_ref() == Some(&c.to) {
+            return Some(old);
+        }
+        let from = c.from.clone();
+        let mut ops = vec![Op::Disconnect { id: old }];
+        let new = to.map(|to| {
+            if matches!(to, PortRef::Module { .. }) {
+                for (&other, oc) in &self.log.state().cables {
+                    if other != old && oc.to == to {
+                        ops.push(Op::Disconnect { id: other });
+                    }
+                }
+            }
+            let id = self.next_cable_id;
+            self.next_cable_id += 1;
+            ops.push(Op::Connect { id, from, to });
+            id
+        });
+        self.append(Op::Group { ops });
+        new
+    }
+
     pub fn disconnect(&mut self, id: CableId) {
         if self.log.state().cables.contains_key(&id) {
             self.append(Op::Disconnect { id });

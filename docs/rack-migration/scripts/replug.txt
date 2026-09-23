@@ -1,0 +1,8 @@
+# ADSR face with Timing (default now) and a jack cable pulled out of its input.
+shot r01-adsr-timing-face
+hold in:5.in 90 60
+shot r02-plug-in-hand
+release
+shot r03-removed
+key ctrl+z
+shot r04-undone

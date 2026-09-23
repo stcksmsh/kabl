@@ -59,15 +59,16 @@ block rate; envelope timing CONT (default) / KEY per envelope.
 Review of the migrated rack. Kosta heard the remote recordings/renders; nobody has used the
 builds by hand: grab feel (dots/ring/body, now also zoomed), his display and scale factor, his
 MIDI controller and sound card are unverified. If he reports a concrete problem, fix it within
-this scope. Open questions worth asking: keep the Patchbay view removed? skins default off?
-advanced defaults (ADSR Timing, VCA Response) right?
+this scope. Owner answers after the first review: Patchbay stays removed; ADSR Timing on the default
+face; jack cables are removed by pulling the plug (what VCV Rack / Voltage Modular do). Open:
+skins on by default? (Only the osc.va demo has a skin; on would show its placeholder art at
+launch.)
 
 ## Unresolved / known limits
 
 Block-rate modulation; no hysteresis on stepped destinations; pitch full scale ±60 st; state
 carry O(modules²) per swap; jack inputs take one cable; engine output quiet; Pi 4 unmeasured;
-drawer sliders lack Shift/Escape; selector routes show no reachable-options bracket; jack
-cables delete on a midpoint click; lanes clip at the canvas edge; no `labels_on_art` contrast
+drawer sliders lack Shift/Escape; selector routes show no reachable-options bracket; lanes clip at the canvas edge; no `labels_on_art` contrast
 warning; skin art is a placeholder; `docs/modulation-slice/xdotool-walkthrough.sh` uses
 headless coordinates and is stale for the rack (use `drive.py`).
 

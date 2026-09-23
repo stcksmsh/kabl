@@ -99,6 +99,8 @@ pub struct UiState {
     pub selected_route: Option<CableId>,
     /// Output jack being dragged toward a knob or input.
     port_drag: Option<PortRef>,
+    /// Jack cable whose plug is being pulled out of its input (moved or removed on release).
+    unplug: Option<CableId>,
     /// Knob body / ring / lane-dot drag in progress.
     pub(crate) drag: Option<routing::DragGrab>,
     pub(crate) base_text: String,
@@ -162,6 +164,7 @@ impl Default for UiState {
             inspected: None,
             selected_route: None,
             port_drag: None,
+            unplug: None,
             drag: None,
             base_text: String::new(),
             base_text_for: None,
@@ -1426,10 +1429,7 @@ fn draw_jacks(
             PortDirection::Output => "out",
         };
         ui_state.record(format!("{dir_key}:{}.{}", m.id, port.name), hit);
-        let sense = match port.direction {
-            PortDirection::Input => Sense::click(),
-            PortDirection::Output => Sense::click_and_drag(),
-        };
+        let sense = Sense::click_and_drag();
         let resp = ui.interact(
             hit,
             Id::new(("kabl-port", m.id, port.direction, port.name)),
@@ -1467,7 +1467,19 @@ fn draw_jacks(
         }
         if resp.drag_started() {
             ui_state.pending_output = None;
-            ui_state.port_drag = Some(this_ref.clone());
+            match port.direction {
+                PortDirection::Output => ui_state.port_drag = Some(this_ref.clone()),
+                // Pull the plug out of a patched input: move it elsewhere or drop it on bare
+                // rack to remove it (VCV Rack, Voltage Modular).
+                PortDirection::Input => {
+                    if let Some((&id, c)) =
+                        editor.state().cables.iter().find(|(_, c)| c.to == this_ref)
+                    {
+                        ui_state.port_drag = Some(c.from.clone());
+                        ui_state.unplug = Some(id);
+                    }
+                }
+            }
         }
         if resp.drag_stopped() {
             if let (Some(from), Some(at)) =
@@ -1642,7 +1654,32 @@ fn drop_cable(
     at: Pos2,
     floats: &[(ModuleId, Rect)],
 ) {
-    let Some(key) = target_at(ui_state, at, floats) else {
+    let target = target_at(ui_state, at, floats);
+    if let Some(old) = ui_state.unplug.take() {
+        let to = target.as_deref().and_then(|key| {
+            let (kind, rest) = key.split_once(':')?;
+            let (mid, name) = rest.split_once('.')?;
+            let id: ModuleId = mid.parse().ok()?;
+            Some(match kind {
+                "knob" => PortRef::Param {
+                    id,
+                    param: name.to_string(),
+                },
+                _ => PortRef::Module {
+                    id,
+                    port: name.to_string(),
+                },
+            })
+        });
+        let new = editor.replug(old, to.clone());
+        if let (Some(cable), Some(PortRef::Param { id, param })) = (new, to) {
+            let routes = routing::routes_into(editor.state(), id, &param);
+            routing::inspect(ui_state, &routes, id, &param);
+            ui_state.selected_route = Some(cable);
+        }
+        return;
+    }
+    let Some(key) = target else {
         return;
     };
     let (kind, rest) = key.split_once(':').unwrap();
@@ -1833,6 +1870,9 @@ fn draw_cables(
         .collect();
     if only.is_none() {
         for (cable_id, c) in &cables {
+            if ui_state.unplug == Some(*cable_id) {
+                continue; // in the hand, drawn to the pointer
+            }
             let (Some(&a), Some(&b)) = (
                 port_ref_pos(&drawn.ports, &c.from, PortDirection::Output),
                 port_ref_pos(&drawn.ports, &c.to, PortDirection::Input),
@@ -1842,17 +1882,23 @@ fn draw_cables(
             let col = port_color(th, editor, &c.from);
             let alpha = alpha_for(c.from.module_id(), c.to.module_id());
             let pts = cable_path(painter, a, b, col, 5.5 * z, alpha, false);
-            // Click the cable (at its middle) to remove it.
+            // Removing is explicit: pull the plug out of its input, or right-click the cable.
             let mid = pts[pts.len() / 2];
             let hit = Rect::from_center_size(mid, EguiVec2::splat(12.0));
             ui_state.record(format!("cable:{cable_id}"), hit);
             let resp = ui.interact(hit, Id::new(("kabl-cable", *cable_id)), Sense::click());
             if resp.hovered() {
-                painter.circle_stroke(mid, 7.0, Stroke::new(1.5, Color32::RED));
+                painter.circle_stroke(mid, 7.0, Stroke::new(1.5, th.sel));
             }
-            if resp.clicked() {
-                editor.disconnect(*cable_id);
-            }
+            let resp = resp.on_hover_text("Drag its plug out of the input to move or remove it");
+            resp.context_menu(|ui| {
+                let r = ui.button("Remove cable");
+                ui_state.record("menu:remove-cable".into(), r.rect);
+                if r.clicked() {
+                    editor.disconnect(*cable_id);
+                    ui.close();
+                }
+            });
         }
     }
     for (cable_id, pos) in &drawn.plugs {

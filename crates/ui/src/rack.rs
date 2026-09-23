@@ -423,6 +423,7 @@ fn place_local(
             y
         };
         let mut y = 52.0;
+        let mut sels_top = None;
         match info.kind {
             "midi.in" => {
                 decor = Decor::Keys(Rect::from_min_size(pos2(12.0, 70.0), vec2(fw - 24.0, 64.0)))
@@ -431,6 +432,12 @@ fn place_local(
             "env.adsr" if block(108.0) <= room => {
                 decor =
                     Decor::Envelope(Rect::from_min_size(pos2(16.0, 54.0), vec2(fw - 32.0, 54.0)));
+                y = 108.0;
+            }
+            // No room for the picture and a selector row under the knobs: the selectors take
+            // the picture's place, so the knobs stay exactly where they are with the picture.
+            "env.adsr" if !face_knobs.is_empty() && block(52.0) <= room => {
+                sels_top = Some(52.0);
                 y = 108.0;
             }
             _ => {}
@@ -467,7 +474,7 @@ fn place_local(
         for &i in &face_sels {
             let avail = fw - 28.0 - 10.0 * (face_sels.len() as f32 - 1.0);
             let w = avail * options(info, &info.params[i]).0 as f32 / total as f32;
-            let rect = Rect::from_min_size(pos2(x, y + 26.0), vec2(w, 28.0));
+            let rect = Rect::from_min_size(pos2(x, sels_top.unwrap_or(y) + 26.0), vec2(w, 28.0));
             ctls.push(Ctl {
                 param: &info.params[i],
                 primary: true,
@@ -627,7 +634,7 @@ mod tests {
         let env = p
             .modules
             .iter()
-            .find(|(_, m)| m.kind == "env.adsr")
+            .find(|(_, m)| m.kind == "vca")
             .map(|(&id, _)| id)
             .unwrap();
         let before = layout(&p, &View::default());
@@ -654,8 +661,8 @@ mod tests {
                 c.param.name
             );
         }
-        let adv = b.adv.expect("timing is advanced");
-        assert!(b.ctl("timing").is_some() && a.ctl("timing").is_none());
+        let adv = b.adv.expect("response is advanced");
+        assert!(b.ctl("exponential").is_some() && a.ctl("exponential").is_none());
         // Right-hand neighbours in the row move by exactly the advanced width; others stay.
         for m in &open.mods {
             let old = before.get(m.id).unwrap();
