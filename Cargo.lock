@@ -1613,6 +1613,7 @@ dependencies = [
  "cpal",
  "eframe",
  "egui",
+ "hound",
  "image",
  "kabl-core",
  "kabl-engine",

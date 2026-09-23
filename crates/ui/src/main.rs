@@ -181,18 +181,51 @@ impl eframe::App for App {
     }
 }
 
+/// `kabl-ui [--patch <dir>] [--size <W>x<H>]`. Without `--patch`, starts from
+/// `default_patch()`. Default window 1440×900; 1280×800 is the supported minimum.
 fn main() -> eframe::Result<()> {
-    let patch = default_patch();
-    let editor = PatchEditor::seed_from(&patch);
-    let audio = AudioHost::start(&patch);
+    let args: Vec<String> = std::env::args().collect();
+    let flag = |name: &str| {
+        args.iter()
+            .position(|a| a == name)
+            .and_then(|i| args.get(i + 1).cloned())
+    };
+    let mut ui_state = UiState::default();
+    let editor = match flag("--patch") {
+        Some(dir) => match kabl_core::load(std::path::Path::new(&dir)) {
+            Ok(log) => {
+                ui_state.patch_path = dir;
+                PatchEditor::from_log(log)
+            }
+            Err(err) => {
+                eprintln!("kabl-ui: failed to load patch from {dir}: {err:?}");
+                std::process::exit(1);
+            }
+        },
+        None => PatchEditor::seed_from(&default_patch()),
+    };
+    let size = flag("--size")
+        .and_then(|s| {
+            let (w, h) = s.split_once('x')?;
+            Some([w.parse().ok()?, h.parse().ok()?])
+        })
+        .unwrap_or([1440.0, 900.0]);
+    let audio = AudioHost::start(editor.state());
 
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_title("kabl")
+            .with_inner_size(size)
+            .with_min_inner_size([1280.0, 800.0]),
+        ..Default::default()
+    };
     eframe::run_native(
         "kabl",
-        eframe::NativeOptions::default(),
+        options,
         Box::new(|_cc| {
             Ok(Box::new(App {
                 editor,
-                ui_state: UiState::default(),
+                ui_state,
                 audio,
             }))
         }),

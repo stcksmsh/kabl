@@ -28,3 +28,4 @@ kabl-standalone = { path = "../standalone" }
 
 [dev-dependencies]
 tempfile = "3.27.0"
+hound = "3.5.1"
