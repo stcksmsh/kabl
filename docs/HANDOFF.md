@@ -5,8 +5,8 @@ last entries of `docs/decisions.md`. Trust code and git over older docs.
 
 ## Where things are
 
-- Branch `master`, local only (not pushed). Modulation slice closed out at commit `7361270`
-  plus the docs commit that adds this file (`git log -3`). Baseline before the slice: `e6db377`.
+- Branch `master`, local only (not pushed). Modulation slice closed out; code at `c02fc89`,
+  docs in the commit after it (`git log -3`). Baseline before the slice: `e6db377`.
 - Workflow: commit small working changes straight to `master`; no branches, PRs or pushes
   unless Kosta asks. Leave `.ai/` alone. AIW/Recall not in use.
 
@@ -70,16 +70,17 @@ view with one demo skin (`osc.va`).
   examples. Benchmark: `bench_reference` example (6 routes ≈ 17.8 µs/block vs ≈ 15.4
   routeless, 8 voices; details in `docs/benchmarks.md`).
 - Kosta heard renders/recordings remotely: CONT/KEY difference clear, live edit clean.
+- Hands-on checklist recorded from the real app with real audio (`record-av.sh`, clips C and D
+  in `target/slice-av/`): dot edits, Shift, Escape, undo/redo, save/reload while MIDI chords
+  play and release mid-drag; saved state checked. This found and fixed three bugs (see
+  decisions.md "Defects found recording the hands-on checklist").
 
-## Awaiting Kosta (hands-on, cannot be automated)
+## Awaiting Kosta (only what automation cannot cover)
 
-1. Grab individual source dots, the ring and the knob body with a real hand: any mis-grabs?
-2. Hold a MIDI chord (real controller) while editing base and depth.
-3. Release keys during edits: no hanging or cut notes.
-4. Shift fine drag; Escape mid-drag; undo/redo.
-5. Save, restart with `--patch <dir>`, check routes/amounts/bypass/timing.
-
-Fix concrete problems he reports within this slice before moving on.
+Kosta can't test by hand right now; everything on the checklist was shown to him on video
+from the real app. Still unverified: grab feel with a real hand (dots vs ring vs body, near
+neighbouring knobs), his hardware MIDI controller, and his sound card. If he reports a
+concrete problem, fix it within the slice before starting the next scope.
 
 ## Unresolved / known limits
 

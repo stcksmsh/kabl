@@ -32,8 +32,8 @@ Remote review (Kosta, by phone, same day): CONT stays default (matches Surge/Vit
 the selected source leaves none selected; +25 % drop default kept; live-edit render judged
 clean. Added on request: per-source lanes with draggable dots on an inspected knob (single and
 multi-source), thin display-only per-source rings when collapsed, Shift fine drag and Escape
-cancel on body/ring/dot; vertical drag kept (common default). Slice closed out; handover for
-the next agent: [`HANDOFF.md`](HANDOFF.md).
+cancel on body/ring/dot; vertical drag kept (common default). Slice closed out; the hands-on checklist was recorded from the real app with sound (three
+bugs found and fixed, see decisions.md). Handover for the next agent: [`HANDOFF.md`](HANDOFF.md).
 
 Next human gate: Kosta plays it, checks ring/source selection, and listens to both envelope
 modes (live, and `exaggerated-*.wav` from the render command in the slice README). Do not

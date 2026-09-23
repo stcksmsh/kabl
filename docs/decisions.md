@@ -1834,3 +1834,16 @@ press point (instead of total offset), so Shift can change mid-drag without a ju
 cancelled drag stays captured and inert until release; cancellation uses
 `PatchLog::discard_last`, which only acts on the newest entry. Drawer sliders and DragValues
 keep egui's own behaviour (not covered by this rule).
+
+## 2026-09-23 — Defects found recording the hands-on checklist (fixed)
+
+Kosta can't test by hand, so the checklist was recorded from the real app (real audio to a
+null sink, MIDI chords via aplaymidi, xdotool). The recording exposed three bugs, all fixed in
+`c02fc89` with regression tests:
+- `ParamInfo::from_norm` returned 20000.002 Hz at full travel (exp/ln round-off); it now
+  clamps to the param range.
+- The module panel slider wrote back its own clamped value whenever it differed from the
+  stored one, every frame, without user input: undo flooded, and Escape/undo hit those
+  entries instead of the drag. It now writes only on a real user change.
+- Body vs ring was decided at the drag-start position (past egui's threshold) instead of the
+  press point, so a quick flick from the knob centre grabbed the ring.
