@@ -110,6 +110,11 @@ impl PatchEngine {
     /// restarting the fade (which would click). A newer arrival replaces an older pending one
     /// (last request wins; the replaced graph is dropped through `basedrop`, not freed here).
     pub fn receive_swap(&mut self, mut new_patch: Owned<CompiledPatch>) {
+        // An edit that replaces a queued fresh load is built on the loaded patch, so it must not
+        // carry from the old one either.
+        if let Some(p) = &self.pending {
+            new_patch.fresh |= p.fresh;
+        }
         if self.incoming.is_some() {
             self.pending = Some(new_patch);
         } else {
@@ -131,6 +136,17 @@ impl PatchEngine {
         match &self.incoming {
             Some((g, _)) => g.seq_steps(f),
             None => self.active.seq_steps(f),
+        }
+    }
+
+    /// Audio-thread call: `CompiledPatch::delays` of the graph fading in, else the active one.
+    pub fn delays(
+        &self,
+        f: impl FnMut(kabl_core::ModuleId, kabl_modules::builtins::DelayLock, f32),
+    ) {
+        match &self.incoming {
+            Some((g, _)) => g.delays(f),
+            None => self.active.delays(f),
         }
     }
 

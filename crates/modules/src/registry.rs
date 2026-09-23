@@ -16,7 +16,9 @@
 //! `PatchState` loaded from an old or foreign `.kabl` file naming a kind this binary doesn't
 //! know is expected to happen eventually (missing pedal, older schema), not a bug to crash on.
 
-use crate::builtins::{Clock, ClockDiv, Out, Seq, CLOCK_DIV_INFO, CLOCK_INFO, OUT_INFO, SEQ_INFO};
+use crate::builtins::{
+    Clock, ClockDiv, Delay, Out, Seq, CLOCK_DIV_INFO, CLOCK_INFO, DELAY_INFO, OUT_INFO, SEQ_INFO,
+};
 use crate::builtins::{
     EnvAdsr, FilterSvf, Lfo, MidiIn, Mixer, OscVa, RingMod, Vca, ENV_ADSR_INFO, FILTER_SVF_INFO,
     LFO_INFO, MIDI_IN_INFO, MIXER_INFO, OSC_VA_INFO, RINGMOD_INFO, VCA_INFO,
@@ -38,6 +40,7 @@ pub const KNOWN_KINDS: &[&str] = &[
     "clock",
     "seq",
     "clock.div",
+    "delay",
 ];
 
 /// Builds a fresh instance of `kind`, or `None` if `kind` isn't a known built-in.
@@ -55,13 +58,14 @@ pub fn create(kind: &str) -> Option<Box<dyn Module>> {
         "clock" => Box::new(Clock::new()),
         "seq" => Box::new(Seq::new()),
         "clock.div" => Box::new(ClockDiv::new()),
+        "delay" => Box::new(Delay::new()),
         _ => return None,
     })
 }
 
 /// `ModuleInfo` for every known kind, in the same order as `KNOWN_KINDS` — what a catalog UI
 /// (not built) would enumerate.
-static ALL_INFOS: [&ModuleInfo; 12] = [
+static ALL_INFOS: [&ModuleInfo; 13] = [
     &OSC_VA_INFO,
     &FILTER_SVF_INFO,
     &ENV_ADSR_INFO,
@@ -74,6 +78,7 @@ static ALL_INFOS: [&ModuleInfo; 12] = [
     &CLOCK_INFO,
     &SEQ_INFO,
     &CLOCK_DIV_INFO,
+    &DELAY_INFO,
 ];
 
 pub fn all_infos() -> &'static [&'static ModuleInfo] {

@@ -61,7 +61,7 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt;
 
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
-use kabl_modules::builtins::{Clock, MidiIn, Seq, Transport};
+use kabl_modules::builtins::{Clock, Delay, DelayLock, MidiIn, Seq, Transport};
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::{
     registry, Module, ModuleInfo, ParamInfo, PortDirection, ProcessIo, Rate, Signal, StateBuf,
@@ -353,6 +353,9 @@ pub struct CompiledPatch {
     out_right: BufIdx,
     sample_rate: f32,
     voice_count: usize,
+    /// A freshly loaded patch: `carry_state` copies nothing into it, so it starts like a
+    /// startup load (empty delay lines, clocks running) even where module ids match.
+    pub fresh: bool,
 }
 
 enum CableTo {
@@ -971,6 +974,7 @@ pub fn compile(
         out_right,
         sample_rate,
         voice_count,
+        fresh: false,
     })
 }
 
@@ -1018,6 +1022,16 @@ impl CompiledPatch {
             .and_then(|m| m.as_any_mut().downcast_mut::<Clock>())
         {
             c.command(t);
+        }
+    }
+
+    /// Calls `f(id, lock, target ms)` for every `delay` module. No allocation.
+    pub fn delays(&self, mut f: impl FnMut(ModuleId, DelayLock, f32)) {
+        for (m, &(id, _)) in self.modules.iter().zip(&self.module_origin) {
+            if let Some(d) = m.as_any().downcast_ref::<Delay>() {
+                let (lock, ms) = d.status();
+                f(id, lock, ms);
+            }
         }
     }
 
@@ -1216,6 +1230,9 @@ pub fn recompile(
 /// search, `HashMap` lookups only), so `PatchEngine` runs it on the audio thread at the moment a
 /// new graph starts its crossfade, from the graph that is actually playing.
 pub fn carry_state(old: &mut CompiledPatch, new_patch: &mut CompiledPatch) {
+    if new_patch.fresh {
+        return;
+    }
     for (new_index, &origin) in new_patch.module_origin.iter().enumerate() {
         let Some(old_index) = old.module_origin.iter().position(|&o| o == origin) else {
             continue;
@@ -1228,6 +1245,7 @@ pub fn carry_state(old: &mut CompiledPatch, new_patch: &mut CompiledPatch) {
         let mut state = StateBuf::default();
         old_module.save_state(&mut state);
         new_module.load_state(&state);
+        new_module.carry_from(old_module.as_ref());
     }
     // Carry a feedback loop's one-block memory across too (brief section 7.1's delay buffers) —
     // for every delay slot present in both the old and new compile (same source port still a DFS

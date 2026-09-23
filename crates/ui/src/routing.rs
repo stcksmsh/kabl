@@ -144,6 +144,8 @@ pub fn step_labels(kind: &str, param: &str) -> Option<&'static [&'static str]> {
         ("osc.va", "waveform") => &["SIN", "TRI", "SAW", "SQR"],
         ("vca", "exponential") => &["LIN", "EXP"],
         ("seq", g) if g.starts_with('g') => &["OFF", "ON"],
+        ("delay", "sync") => &["FREE", "1/16", "1/8", "1/8D", "1/4"],
+        ("delay", "mode") => &["MONO", "PING"],
         _ => return None,
     })
 }
@@ -179,6 +181,7 @@ pub fn fmt_value(p: &ParamInfo, v: f32) -> String {
         // `+ 0.0` turns the -0 that `round` gives for -0.4 into 0, as the module plays it.
         "st" => format!("{:+} st", v.round() + 0.0),
         "bpm" => format!("{v:.0} bpm"),
+        "%" => format!("{v:.0} %"),
         _ => format!("{v:.2}"),
     }
 }

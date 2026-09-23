@@ -127,6 +127,9 @@ pub trait Module: Send + std::any::Any {
     fn reset(&mut self);
     fn save_state(&self, _out: &mut dyn StateWriter) {}
     fn load_state(&mut self, _s: &dyn StateReader) {}
+    /// State too big for `StateBuf` (a delay's audio history), copied from `old`, the same kind
+    /// in the playing graph, after `load_state`. Audio thread: no allocation.
+    fn carry_from(&mut self, _old: &dyn Module) {}
 
     fn as_any(&self) -> &dyn std::any::Any;
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;

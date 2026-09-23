@@ -16,7 +16,7 @@ use kabl_core::{ModuleId, PatchState};
 use kabl_engine::compile::compile;
 use kabl_engine::graph::BLOCK;
 use kabl_engine::patch_engine::{swap_channel, PatchEngine, SwapSender};
-use kabl_modules::builtins::Transport;
+use kabl_modules::builtins::{DelayLock, Transport};
 use kabl_standalone::{
     apply_voice_event, connect_midi, default_patch, RingBuffer, VoiceEvent, DEFAULT_VOICE_COUNT,
 };
@@ -39,6 +39,8 @@ struct AudioHost {
     steps_rx: Option<rtrb::Consumer<(ModuleId, usize)>>,
     /// Each clock's run state, published by the audio callback.
     clocks_rx: Option<rtrb::Consumer<(ModuleId, bool)>>,
+    /// Each delay's lock state and target time, published by the audio callback.
+    delays_rx: Option<rtrb::Consumer<(ModuleId, DelayLock, f32)>>,
     /// Transport commands to the audio callback (runtime only, never in the op log).
     transport_tx: Option<rtrb::Producer<(ModuleId, Transport)>>,
     _stream: Option<cpal::Stream>,
@@ -54,6 +56,7 @@ impl AudioHost {
             status,
             steps_rx: None,
             clocks_rx: None,
+            delays_rx: None,
             transport_tx: None,
             _stream: None,
             _midi_connection: None,
@@ -95,6 +98,7 @@ impl AudioHost {
 
         let (mut steps_tx, steps_rx) = rtrb::RingBuffer::<(ModuleId, usize)>::new(256);
         let (mut clocks_tx, clocks_rx) = rtrb::RingBuffer::<(ModuleId, bool)>::new(64);
+        let (mut delays_tx, delays_rx) = rtrb::RingBuffer::<(ModuleId, DelayLock, f32)>::new(64);
         let (transport_tx, mut transport_rx) = rtrb::RingBuffer::<(ModuleId, Transport)>::new(64);
 
         let mut left_ring = RingBuffer::new(RING_CAPACITY);
@@ -129,6 +133,9 @@ impl AudioHost {
                 engine.clocks(|id, running| {
                     let _ = clocks_tx.push((id, running));
                 });
+                engine.delays(|id, lock, ms| {
+                    let _ = delays_tx.push((id, lock, ms));
+                });
 
                 for frame in data.chunks_mut(channels) {
                     let l = left_ring.pop().unwrap_or(0.0);
@@ -160,21 +167,24 @@ impl AudioHost {
             status,
             steps_rx: Some(steps_rx),
             clocks_rx: Some(clocks_rx),
+            delays_rx: Some(delays_rx),
             transport_tx: Some(transport_tx),
             _stream: stream,
             _midi_connection: midi_connection,
         }
     }
 
-    /// UI-thread call: compiles `patch` and queues it for the audio thread.
-    fn rebuild(&mut self, patch: &PatchState) {
-        let new_patch = match compile(patch, self.sample_rate, DEFAULT_VOICE_COUNT) {
+    /// UI-thread call: compiles `patch` and queues it for the audio thread. A `fresh` graph (a
+    /// Load) carries no state from the playing one.
+    fn rebuild(&mut self, patch: &PatchState, fresh: bool) {
+        let mut new_patch = match compile(patch, self.sample_rate, DEFAULT_VOICE_COUNT) {
             Ok(p) => p,
             Err(err) => {
                 self.status = format!("recompile failed: {err}");
                 return;
             }
         };
+        new_patch.fresh = fresh;
         if let Some(tx) = self.swap_tx.as_mut() {
             tx.send(Owned::new(&self.collector.handle(), new_patch));
         }
@@ -212,8 +222,13 @@ impl eframe::App for App {
                 self.ui_state.clock_running.insert(id, running);
             }
         }
-        if !self.ui_state.seq_steps.is_empty() {
-            // egui only repaints on input; the step light needs frames of its own.
+        if let Some(rx) = self.audio.delays_rx.as_mut() {
+            while let Ok((id, lock, ms)) = rx.pop() {
+                self.ui_state.delay_status.insert(id, (lock, ms));
+            }
+        }
+        if !self.ui_state.seq_steps.is_empty() || !self.ui_state.delay_status.is_empty() {
+            // egui only repaints on input; the step light and readouts need frames of their own.
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(30));
         }
@@ -243,7 +258,8 @@ impl eframe::App for App {
             }
         }
         if self.editor.take_dirty() {
-            self.audio.rebuild(self.editor.state());
+            let fresh = std::mem::take(&mut self.ui_state.loaded);
+            self.audio.rebuild(self.editor.state(), fresh);
         }
         if self.audio.tick() {
             ui.ctx().request_repaint();

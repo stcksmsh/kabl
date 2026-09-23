@@ -22,7 +22,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use egui::{pos2, vec2, Color32, CornerRadius, Id, Pos2, Rect, Sense, Stroke, Vec2 as EguiVec2};
 use kabl_core::{CableId, ModuleId, PortRef, Vec2};
-use kabl_modules::builtins::Transport;
+use kabl_modules::builtins::{DelayLock, Transport};
 use kabl_modules::info::{PortDirection, Taper};
 use kabl_modules::registry;
 use rack::{Decor, Geo, Layout, Placed, JACK_R, PANEL_H};
@@ -121,6 +121,11 @@ pub struct UiState {
     /// Transport commands for `main.rs` to send to the audio thread. Runtime only: never in the
     /// op log, so undo and reload can't replay them.
     pub transport: Vec<(ModuleId, Transport)>,
+    /// Each delay's lock state and target time as the audio thread last reported it.
+    pub delay_status: HashMap<ModuleId, (DelayLock, f32)>,
+    /// The last rebuild request came from Load: `main.rs` sends that graph fresh (no state
+    /// carry), then clears this.
+    pub loaded: bool,
     /// A-dark when true, A-light otherwise.
     pub dark: bool,
     pub zoom: f32,
@@ -184,6 +189,8 @@ impl Default for UiState {
             seq_steps: HashMap::new(),
             clock_running: HashMap::new(),
             transport: Vec::new(),
+            delay_status: HashMap::new(),
+            loaded: false,
             dark: false,
             zoom: 1.0,
             pan: EguiVec2::ZERO,
@@ -529,6 +536,8 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) 
                     *editor = PatchEditor::from_log(log);
                     // A Load replaces a live patch; the audio host only rebuilds on `take_dirty`.
                     editor.mark_dirty();
+                    ui_state.loaded = true;
+                    ui_state.delay_status.clear();
                     ui_state.selected_module = None;
                     ui_state.inspected = None;
                     ui_state.selected_route = None;
@@ -1039,6 +1048,37 @@ fn draw_module(
     if let Decor::Transport(r) = m.decor {
         draw_transport(ui_state, ui, painter, th, xf, m.id, r);
     }
+    if let Decor::Status(p) = m.decor {
+        let (lock, ms) = ui_state
+            .delay_status
+            .get(&m.id)
+            .copied()
+            .unwrap_or((DelayLock::Unlocked, f32::NAN));
+        let time = if ms.is_finite() {
+            routing::fmt_value(&m.info.params[0], ms)
+        } else {
+            "…".into()
+        };
+        let word = match lock {
+            DelayLock::Free => "free",
+            DelayLock::Unlocked => "no clock · free",
+            DelayLock::Locked => "sync",
+            DelayLock::Held => "held",
+        };
+        text(
+            painter,
+            xf.p(p),
+            egui::Align2::CENTER_CENTER,
+            &format!("{word} · {time}"),
+            11.0 * z,
+            if lock == DelayLock::Locked {
+                th.gate
+            } else {
+                ink2
+            },
+            true,
+        );
+    }
     // Step light: beside the playing step's pitch label.
     if let Some(c) = (ui_state.seq_steps.get(&m.id)).and_then(|s| m.ctl(&format!("p{}", s + 1))) {
         painter.circle_filled(xf.p(c.geo.label_pos() - vec2(16.0, 0.0)), 4.0 * z, th.gate);
@@ -1349,7 +1389,7 @@ fn draw_decor(editor: &PatchEditor, p: &egui::Painter, th: &Theme, xf: Xf, m: &P
             ];
             p.add(egui::Shape::line(pts, Stroke::new(1.6 * z, th.display_ink)));
         }
-        Decor::None | Decor::Transport(_) => {}
+        Decor::None | Decor::Transport(_) | Decor::Status(_) => {}
     }
 }
 

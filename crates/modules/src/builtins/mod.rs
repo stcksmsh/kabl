@@ -5,6 +5,7 @@
 
 mod clock;
 mod clock_div;
+mod delay;
 mod env_adsr;
 mod filter_svf;
 mod lfo;
@@ -18,6 +19,7 @@ mod vca;
 
 pub use clock::{Clock, Transport, CLOCK_INFO};
 pub use clock_div::{ClockDiv, CLOCK_DIV_INFO};
+pub use delay::{Delay, DelayLock, DELAY_INFO};
 pub use env_adsr::{EnvAdsr, ENV_ADSR_INFO};
 pub use filter_svf::{FilterSvf, FILTER_SVF_INFO};
 pub use lfo::{Lfo, LFO_INFO};
