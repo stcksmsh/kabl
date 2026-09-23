@@ -40,7 +40,7 @@ Sequencing (owner go-ahead, 2026-09-23): the new `clock` module (BPM, 16th-note 
 8-step `seq` module (pitch knob plus OFF/ON gate per step) make repeating patterns playable.
 Try it with `cargo run --release -p kabl-ui -- --patch patches/sequence`. Details and what was
 left out are in the `decisions.md` entry "Shared clock + basic pitch/gate sequencing".
-Kosta has not tried it hands-on yet.
+Kosta approved the recorded walkthrough ("sounds and looks good"); not yet tried hands-on.
 
 Older sections below are history. Where they disagree with the above or with the code, they
 are stale: the MIDI/graph-swap/undo risks they list are fixed; the Mutex described there is

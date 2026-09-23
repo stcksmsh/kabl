@@ -1953,3 +1953,5 @@ were not transplanted, only its look (palettes, geometry, drawing).
   the engine test now asserts the output peak stays below 1.0. Checks: `crates/modules/tests/seq.rs` (step order, rests, wrap) and
   `sequence_patch_plays_every_step` in `crates/engine/tests/compile.rs`. 195 tests pass, and
   clippy is clean.
+- Kosta watched `target/seq-walkthrough/sequence.mp4` (not committed): "It sounds and looks
+  good." He has not tried it hands-on yet.

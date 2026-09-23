@@ -31,7 +31,7 @@ Launch (real audio + MIDI):
   Real-X tooling: `docs/rack-migration/drive.py` (+ `scripts/`), `closeout-real-x.sh`,
   `record-walkthrough.sh`.
 
-## Sequencing — built, waiting for Kosta to try it
+## Sequencing — built; Kosta approved the video, not yet tried hands-on
 
 `clock` (BPM, 16th-note gate) and the 8-step `seq` module (pitch plus OFF/ON gate per step)
 are both global rate. The demo is `cargo run --release -p kabl-ui -- --patch patches/sequence`.
