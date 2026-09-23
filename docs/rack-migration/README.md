@@ -87,7 +87,7 @@ undoable move, no audio rebuild).
 ## Verification
 
 **Measured / automated**
-- `cargo test --workspace`: 190 pass, 0 fail (3 ignored: fixture/script writers). Clippy clean.
+- `cargo test --workspace`: 191 pass, 0 fail (3 ignored: fixture/script writers). Clippy clean.
   `cargo fmt --check` clean except the untouched prototype examples.
 - New regression tests, real egui input through `show()` at 1440×900 and 1280×800
   (`crates/ui/tests/interaction.rs`): primary choice = one undo step, saved/reloaded, undo
@@ -100,8 +100,9 @@ undoable move, no audio rebuild).
   dirty flag untouched; `face.*` params render bit-identical audio; opening the drawer keeps
   the inspected knob left of it. Layout unit tests (`rack.rs`): no overlaps, controls inside
   panels for every built-in in every face/expansion combination.
-- Every existing modulation regression test still passes unchanged in intent (two were adapted:
-  Timing is now an advanced control, and "click empty rack" finds bare rack itself).
+- Every existing modulation regression test still passes unchanged in intent (one was adapted:
+  "click empty rack" finds bare rack itself). New: pulling a plug moves or removes a jack cable
+  in one undo step, a click never deletes, pushing it back changes nothing.
 - Real binary, real X input (xdotool via `drive.py`, which aims at the targets the app itself
   reports through `KABL_HITS_FILE`): the modulation closeout scenario
   (`closeout-real-x.sh`: new single-source dot, Shift, Escape on dot and body, Hidden view fine

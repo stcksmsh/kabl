@@ -45,7 +45,7 @@ block rate; envelope timing CONT (default) / KEY per envelope.
 
 ## Verification evidence
 
-- `cargo test --workspace`: 190 pass (3 ignored = fixture/script writers). Clippy clean.
+- `cargo test --workspace`: 191 pass (3 ignored = fixture/script writers). Clippy clean.
 - `crates/ui/tests/interaction.rs`: modulation suite plus rack tests (faces, push/float,
   off-face reveal, gestures after zoom/pan, view changes don't touch patch/audio, face params
   render bit-identical, drawer keeps selection visible), both sizes.
