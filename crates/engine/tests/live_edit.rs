@@ -258,3 +258,57 @@ fn swap_queue_bounds_holds_newest_and_drains_without_alloc() {
     collector.collect();
     assert_eq!(collector.alloc_count(), 1, "only the active graph remains");
 }
+
+/// The committed reference patch (6 routes: 2 on Attack, 4 on Cutoff) through every audio-thread
+/// path this slice touches, with allocation forbidden: modulated params, key-trigger capture,
+/// swaps queued mid-fade (state carry), MIDI to active + incoming.
+#[test]
+fn reference_patch_audio_thread_paths_do_not_allocate() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/reference");
+    let patch = kabl_core::load(&dir)
+        .expect("reference patch")
+        .state()
+        .clone();
+    let mut key = patch.clone();
+    key.modules
+        .get_mut(&4)
+        .unwrap()
+        .params
+        .insert("timing".into(), 1.0);
+    let mut deeper = key.clone();
+    deeper
+        .cables
+        .get_mut(&12)
+        .unwrap()
+        .params
+        .insert("amount".into(), 0.6);
+
+    let mut collector = Collector::new();
+    let h = collector.handle();
+    let mut engine = PatchEngine::new(&h, &patch, SR, 8).unwrap();
+    let (mut tx, mut rx) = swap_channel(4);
+    let (mut l, mut r) = ([0.0; BLOCK], [0.0; BLOCK]);
+    let mut peak = 0.0f32;
+    for block in 0..600 {
+        if block % 40 == 5 {
+            // Two edits back to back: the second queues behind the first fade.
+            tx.send(Owned::new(&h, compile(&key, SR, 8).unwrap()));
+            tx.send(Owned::new(&h, compile(&deeper, SR, 8).unwrap()));
+        }
+        assert_no_alloc(|| {
+            engine.drain_swaps(&mut rx);
+            if block % 50 == 0 {
+                engine.note_on((block / 50) % 8, (block % 12) as f32, 0.8);
+            }
+            if block % 50 == 30 {
+                engine.note_off((block / 50) % 8);
+            }
+            engine.process_block(&mut l, &mut r);
+        });
+        tx.flush();
+        collector.collect();
+        peak = l.iter().fold(peak, |m, s| m.max(s.abs()));
+    }
+    assert!(peak > 0.01, "reference patch makes sound ({peak})");
+    assert!(l.iter().chain(&r).all(|s| s.is_finite()));
+}
