@@ -1803,3 +1803,17 @@ undo step per drag as the ring). Handles are separate foreground areas, so neigh
 never steal them and the knob body underneath keeps working. Clicking empty canvas ends
 inspection and hides the lanes. Single-route knobs keep only the ring (the route is
 auto-selected). Grab feel with a real hand is still untested.
+
+## 2026-09-23 — Collapsed per-source rings; drag direction
+
+- Owner: per-source rings must be visible without the expanded view, display only; trying to
+  edit them opens the expanded view. Built: a knob with 2+ routes that isn't inspected draws up
+  to 4 thin rings (2.5 px apart, inside the ring band), one per route's span in its cable
+  colour. Pressing the band opens the lanes and edits nothing. More than 4 sources: the first 4
+  rings plus the existing `+N` plug label. Single-source knobs are unchanged.
+- Owner asked whether depth should be set by dragging up/down or by moving the dot around the
+  circle, and what others do. Common default is vertical (up/down) drag: Serum's blue ring and
+  Vital's modulation ring are grabbed on the ring/dot but move with a linear drag; circular
+  knob modes exist only as host/plugin settings (VST's circular / relative circular / linear
+  knob modes). Kept vertical drag for ring, lanes and knob body; a circular mode stays a
+  possible later setting, not built.

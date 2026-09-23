@@ -53,7 +53,9 @@ Patch: `midi.in → osc.va (saw) → filter.svf → vca → out`, `env.adsr` on 
 Four-source stress case: click Cutoff. Concentric **source lanes** appear around it, one per
 route, each showing that route's span with a handle at its positive peak. Drag a handle to
 select that source and set its depth, no drawer needed; hovering names it. Click empty canvas
-to close the lanes. (Picking rows in the drawer and dragging the ring still works too.)
+to close the lanes. When the knob isn't open, the same sources show as thin display-only rings
+([collapsed](img/1440-19-collapsed-rings.png)); pressing them opens the lanes. Depth drags are
+vertical everywhere (the common default). (Drawer rows + ring still work too.)
 [Close-up](img/1440-18-source-lanes.png).
 
 ## Screenshots (real, from the xdotool run)

@@ -452,3 +452,16 @@ fn source_lanes_select_and_edit_each_route_on_the_knob() {
         assert!(!t.ui.hits.keys().any(|k| k.starts_with("lane:")));
     }
 }
+
+#[test]
+fn collapsed_rings_are_display_only_and_open_the_lanes() {
+    let mut t = H::new(1440.0, 900.0);
+    let before = t.routes(FILTER, "cutoff_hz");
+    assert_eq!(t.ui.inspected, None);
+    assert!(!t.ui.hits.keys().any(|k| k.starts_with("lane:")));
+    // Pressing the collapsed ring band and dragging: lanes open, no amount changes.
+    t.ring_drag(FILTER, "cutoff_hz", 30.0);
+    assert_eq!(t.routes(FILTER, "cutoff_hz"), before);
+    assert_eq!(t.ui.inspected, Some((FILTER, "cutoff_hz".to_string())));
+    assert!(t.ui.hits.contains_key(&format!("lane:{}", before[0].0)));
+}

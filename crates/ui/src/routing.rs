@@ -26,6 +26,9 @@ const PLUG_SPREAD: f32 = 7.0;
 const MAX_PLUGS: usize = 3;
 /// Spacing between per-source lanes around an inspected multi-source knob.
 const LANE_GAP: f32 = 7.0;
+/// Collapsed per-source rings: at most this many, this far apart, inside the ring band.
+const MINI_LANES: usize = 4;
+const MINI_GAP: f32 = 2.5;
 
 const ROUTE_ACCENT: Color32 = Color32::from_rgb(90, 170, 255);
 const BYPASS_GREY: Color32 = Color32::from_gray(120);
@@ -284,11 +287,14 @@ pub(crate) fn param_knob(
         // Remember the value at press, so the drag maps the total pointer offset (including
         // the pixels egui needs before it calls it a drag) to the value.
         let grab = match selected {
-            Some(sel) if d > r + RING_INNER => (Grab::Ring, sel.amount),
-            None if !routes.is_empty() && d > r + RING_INNER => (Grab::Ring, 0.0),
-            _ => (Grab::Body, base_n),
+            // Collapsed multi-source rings are display only: pressing them opens the lanes
+            // (the `inspect` above) and edits nothing.
+            _ if routes.len() >= 2 && !inspected && d > r + RING_INNER => None,
+            Some(sel) if d > r + RING_INNER => Some((Grab::Ring, sel.amount)),
+            None if !routes.is_empty() && d > r + RING_INNER => Some((Grab::Ring, 0.0)),
+            _ => Some((Grab::Body, base_n)),
         };
-        ui_state.knob_grab = Some((id, param.name, grab.0, grab.1));
+        ui_state.knob_grab = grab.map(|g| (id, param.name, g.0, g.1));
     }
     let grab = ui_state
         .knob_grab
@@ -335,8 +341,36 @@ pub(crate) fn param_knob(
         ui_state.knob_grab = None;
     }
 
-    // Ring: combined reachable range (faint), selected route's own span (strong) + peak dot.
-    if !routes.is_empty() {
+    // Collapsed knob with several sources: one thin ring per source (display only; pressing
+    // opens the editable lanes). Otherwise: combined reachable range (faint), selected route's
+    // own span (strong) + peak dot.
+    if routes.len() >= 2 && !inspected {
+        for (k, rt) in routes.iter().take(MINI_LANES).enumerate() {
+            let radius = r + RING_INNER + 1.0 + MINI_GAP * k as f32;
+            arc(
+                painter,
+                center,
+                radius,
+                0.0,
+                1.0,
+                Stroke::new(0.5, Color32::from_gray(60)),
+            );
+            let (lo, hi) = route_span(rt, base_n);
+            let color = if rt.bypass {
+                BYPASS_GREY
+            } else {
+                cable_color(rt.cable)
+            };
+            arc(
+                painter,
+                center,
+                radius,
+                lo.clamp(0.0, 1.0),
+                hi.clamp(0.0, 1.0),
+                Stroke::new(1.8, color),
+            );
+        }
+    } else if !routes.is_empty() {
         let track = Stroke::new(1.0, Color32::from_gray(70));
         arc(painter, center, r + RING_DRAW, 0.0, 1.0, track);
         let active = routes.iter().any(|rt| !rt.bypass);
