@@ -22,6 +22,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use egui::{pos2, vec2, Color32, CornerRadius, Id, Pos2, Rect, Sense, Stroke, Vec2 as EguiVec2};
 use kabl_core::{CableId, ModuleId, PortRef, Vec2};
+use kabl_modules::builtins::Transport;
 use kabl_modules::info::{PortDirection, Taper};
 use kabl_modules::registry;
 use rack::{Decor, Geo, Layout, Placed, JACK_R, PANEL_H};
@@ -115,6 +116,11 @@ pub struct UiState {
     image_cache: HashMap<(&'static str, bool), egui::TextureHandle>,
     /// Each sequencer's playing step (0-based), fed by `main.rs` from the audio thread.
     pub seq_steps: HashMap<ModuleId, usize>,
+    /// Each clock's run state as the audio thread last reported it; absent means running.
+    pub clock_running: HashMap<ModuleId, bool>,
+    /// Transport commands for `main.rs` to send to the audio thread. Runtime only: never in the
+    /// op log, so undo and reload can't replay them.
+    pub transport: Vec<(ModuleId, Transport)>,
     /// A-dark when true, A-light otherwise.
     pub dark: bool,
     pub zoom: f32,
@@ -176,6 +182,8 @@ impl Default for UiState {
             frame_hits: Default::default(),
             image_cache: HashMap::new(),
             seq_steps: HashMap::new(),
+            clock_running: HashMap::new(),
+            transport: Vec::new(),
             dark: false,
             zoom: 1.0,
             pan: EguiVec2::ZERO,
@@ -1023,6 +1031,9 @@ fn draw_module(
     if skin.is_none() {
         draw_decor(editor, painter, th, xf, m);
     }
+    if let Decor::Transport(r) = m.decor {
+        draw_transport(ui_state, ui, painter, th, xf, m.id, r);
+    }
     // Step light: beside the playing step's pitch label.
     if let Some(c) = (ui_state.seq_steps.get(&m.id)).and_then(|s| m.ctl(&format!("p{}", s + 1))) {
         painter.circle_filled(xf.p(c.geo.label_pos() - vec2(16.0, 0.0)), 4.0 * z, th.gate);
@@ -1190,6 +1201,81 @@ fn module_menu(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
     }
 }
 
+/// Run/Stop and Restart. The label follows the audio thread's report, not the click.
+fn draw_transport(
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    painter: &egui::Painter,
+    th: &Theme,
+    xf: Xf,
+    id: ModuleId,
+    r: Rect,
+) {
+    let running = ui_state.clock_running.get(&id).copied().unwrap_or(true);
+    let half = (r.width() - 8.0) / 2.0;
+    let buttons = [
+        ("run", if running { "Stop" } else { "Run" }, 0.0),
+        ("restart", "Restart", half + 8.0),
+    ];
+    for (key, label, dx) in buttons {
+        let b = xf.r(Rect::from_min_size(
+            r.min + vec2(dx, 0.0),
+            vec2(half, r.height()),
+        ));
+        ui_state.record(format!("{key}:{id}"), b);
+        let resp = ui.interact(b, Id::new(("kabl-transport", key, id)), Sense::click());
+        let lit = key == "run" && running;
+        painter.rect_filled(
+            b,
+            CornerRadius::same(4),
+            if th.dark { th.btn } else { th.plate },
+        );
+        if lit {
+            painter.circle_filled(
+                b.left_center() + vec2(10.0 * xf.zoom, 0.0),
+                3.5 * xf.zoom,
+                th.gate,
+            );
+        }
+        painter.rect_stroke(
+            b,
+            CornerRadius::same(4),
+            Stroke::new(
+                1.0,
+                if resp.hovered() {
+                    th.sel
+                } else {
+                    th.panel_edge
+                },
+            ),
+            egui::StrokeKind::Inside,
+        );
+        text(
+            painter,
+            b.center() + vec2(if lit { 5.0 * xf.zoom } else { 0.0 }, 0.0),
+            egui::Align2::CENTER_CENTER,
+            label,
+            12.0 * xf.zoom,
+            th.plate_ink,
+            false,
+        );
+        let resp = resp.on_hover_text(match key {
+            "run" if running => "Stop the clock: gates go low, envelopes release",
+            "run" => "Start the clock on the next step",
+            _ if running => "Restart every pattern on step 1 now (sends a pulse on reset)",
+            _ => "Start on step 1 when the clock runs again",
+        });
+        if resp.clicked() {
+            let t = match key {
+                "run" if running => Transport::Stop,
+                "run" => Transport::Run,
+                _ => Transport::Restart,
+            };
+            ui_state.transport.push((id, t));
+        }
+    }
+}
+
 fn draw_decor(editor: &PatchEditor, p: &egui::Painter, th: &Theme, xf: Xf, m: &Placed) {
     let z = xf.zoom;
     match m.decor {
@@ -1258,7 +1344,7 @@ fn draw_decor(editor: &PatchEditor, p: &egui::Painter, th: &Theme, xf: Xf, m: &P
             ];
             p.add(egui::Shape::line(pts, Stroke::new(1.6 * z, th.display_ink)));
         }
-        Decor::None => {}
+        Decor::None | Decor::Transport(_) => {}
     }
 }
 

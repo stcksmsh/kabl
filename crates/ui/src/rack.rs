@@ -101,6 +101,8 @@ pub enum Decor {
     Keys(Rect),
     Speaker(Pos2),
     Envelope(Rect),
+    /// The clock's Run/Stop and Restart buttons.
+    Transport(Rect),
 }
 
 #[derive(Debug, Clone)]
@@ -164,6 +166,7 @@ impl Placed {
             Decor::Keys(r) => Decor::Keys(r.translate(d)),
             Decor::Speaker(c) => Decor::Speaker(c + d),
             Decor::Envelope(r) => Decor::Envelope(r.translate(d)),
+            Decor::Transport(r) => Decor::Transport(r.translate(d)),
         };
     }
 }
@@ -429,6 +432,12 @@ fn place_local(
                 decor = Decor::Keys(Rect::from_min_size(pos2(12.0, 70.0), vec2(fw - 24.0, 64.0)))
             }
             "out" => decor = Decor::Speaker(pos2(fw / 2.0, 112.0)),
+            "clock" => {
+                decor = Decor::Transport(Rect::from_min_size(
+                    pos2(12.0, 174.0),
+                    vec2(fw - 24.0, 32.0),
+                ))
+            }
             "env.adsr" if block(108.0) <= room => {
                 decor =
                     Decor::Envelope(Rect::from_min_size(pos2(16.0, 54.0), vec2(fw - 32.0, 54.0)));

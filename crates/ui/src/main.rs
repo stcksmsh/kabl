@@ -16,6 +16,7 @@ use kabl_core::{ModuleId, PatchState};
 use kabl_engine::compile::compile;
 use kabl_engine::graph::BLOCK;
 use kabl_engine::patch_engine::{swap_channel, PatchEngine, SwapSender};
+use kabl_modules::builtins::Transport;
 use kabl_standalone::{
     apply_voice_event, connect_midi, default_patch, RingBuffer, VoiceEvent, DEFAULT_VOICE_COUNT,
 };
@@ -36,6 +37,10 @@ struct AudioHost {
     status: String,
     /// Each sequencer's playing step, published by the audio callback.
     steps_rx: Option<rtrb::Consumer<(ModuleId, usize)>>,
+    /// Each clock's run state, published by the audio callback.
+    clocks_rx: Option<rtrb::Consumer<(ModuleId, bool)>>,
+    /// Transport commands to the audio callback (runtime only, never in the op log).
+    transport_tx: Option<rtrb::Producer<(ModuleId, Transport)>>,
     _stream: Option<cpal::Stream>,
     _midi_connection: Option<midir::MidiInputConnection<()>>,
 }
@@ -48,6 +53,8 @@ impl AudioHost {
             collector,
             status,
             steps_rx: None,
+            clocks_rx: None,
+            transport_tx: None,
             _stream: None,
             _midi_connection: None,
         }
@@ -87,6 +94,8 @@ impl AudioHost {
         let midi_connection = connect_midi("kabl-ui", midi_producer, None);
 
         let (mut steps_tx, steps_rx) = rtrb::RingBuffer::<(ModuleId, usize)>::new(256);
+        let (mut clocks_tx, clocks_rx) = rtrb::RingBuffer::<(ModuleId, bool)>::new(64);
+        let (transport_tx, mut transport_rx) = rtrb::RingBuffer::<(ModuleId, Transport)>::new(64);
 
         let mut left_ring = RingBuffer::new(RING_CAPACITY);
         let mut right_ring = RingBuffer::new(RING_CAPACITY);
@@ -99,6 +108,9 @@ impl AudioHost {
                 engine.drain_swaps(&mut swap_rx);
                 while let Ok(event) = midi_consumer.pop() {
                     apply_voice_event(&mut engine, event);
+                }
+                while let Ok((id, t)) = transport_rx.pop() {
+                    engine.transport(id, t);
                 }
 
                 let frames_needed = data.len() / channels;
@@ -113,6 +125,9 @@ impl AudioHost {
                 // Full queue (UI not drawing): the UI just misses these, nothing waits.
                 engine.seq_steps(|id, step| {
                     let _ = steps_tx.push((id, step));
+                });
+                engine.clocks(|id, running| {
+                    let _ = clocks_tx.push((id, running));
                 });
 
                 for frame in data.chunks_mut(channels) {
@@ -144,6 +159,8 @@ impl AudioHost {
             collector,
             status,
             steps_rx: Some(steps_rx),
+            clocks_rx: Some(clocks_rx),
+            transport_tx: Some(transport_tx),
             _stream: stream,
             _midi_connection: midi_connection,
         }
@@ -190,6 +207,11 @@ impl eframe::App for App {
                 self.ui_state.seq_steps.insert(id, step);
             }
         }
+        if let Some(rx) = self.audio.clocks_rx.as_mut() {
+            while let Ok((id, running)) = rx.pop() {
+                self.ui_state.clock_running.insert(id, running);
+            }
+        }
         if !self.ui_state.seq_steps.is_empty() {
             // egui only repaints on input; the step light needs frames of its own.
             ui.ctx()
@@ -212,6 +234,12 @@ impl eframe::App for App {
             if text != self.hits_written {
                 let _ = std::fs::write(path, &text);
                 self.hits_written = text;
+            }
+        }
+        for cmd in self.ui_state.transport.drain(..) {
+            if let Some(tx) = self.audio.transport_tx.as_mut() {
+                // Full only if the audio thread stalls; the click is then lost, not queued.
+                let _ = tx.push(cmd);
             }
         }
         if self.editor.take_dirty() {

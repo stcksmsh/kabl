@@ -134,6 +134,23 @@ impl PatchEngine {
         }
     }
 
+    /// Audio-thread call: a clock transport command to every running graph (a `pending` graph
+    /// gets it through `carry_state`). No allocation.
+    pub fn transport(&mut self, id: kabl_core::ModuleId, t: kabl_modules::builtins::Transport) {
+        self.active.transport(id, t);
+        if let Some((g, _)) = self.incoming.as_mut() {
+            g.transport(id, t);
+        }
+    }
+
+    /// Audio-thread call: `CompiledPatch::clocks` of the graph fading in, else the active one.
+    pub fn clocks(&self, f: impl FnMut(kabl_core::ModuleId, bool)) {
+        match &self.incoming {
+            Some((g, _)) => g.clocks(f),
+            None => self.active.clocks(f),
+        }
+    }
+
     /// Audio-thread call: note-off for `voice` in every running graph. No allocation.
     pub fn note_off(&mut self, voice: usize) {
         self.active.note_off(voice);

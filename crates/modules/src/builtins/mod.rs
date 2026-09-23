@@ -4,6 +4,7 @@
 //! - `lfo`: all 5 waveforms, no sync (brief itself defers "sync" — no clock exists yet, v3).
 
 mod clock;
+mod clock_div;
 mod env_adsr;
 mod filter_svf;
 mod lfo;
@@ -15,7 +16,8 @@ mod ringmod;
 mod seq;
 mod vca;
 
-pub use clock::{Clock, CLOCK_INFO};
+pub use clock::{Clock, Transport, CLOCK_INFO};
+pub use clock_div::{ClockDiv, CLOCK_DIV_INFO};
 pub use env_adsr::{EnvAdsr, ENV_ADSR_INFO};
 pub use filter_svf::{FilterSvf, FILTER_SVF_INFO};
 pub use lfo::{Lfo, LFO_INFO};

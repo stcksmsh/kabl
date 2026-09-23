@@ -153,6 +153,7 @@ pub fn param_label(p: &ParamInfo) -> String {
     match p.name {
         "base_hz" => return "Frequency".into(),
         "exponential" => return "Response".into(),
+        "div" => return "Divide by".into(),
         n if n.starts_with("level") && n.len() > 5 => return format!("Level {}", &n[5..]),
         _ => {}
     }
@@ -175,7 +176,8 @@ pub fn fmt_value(p: &ParamInfo, v: f32) -> String {
         "Hz" if v >= 1000.0 => format!("{:.2} kHz", v / 1000.0),
         "Hz" if v < 10.0 => format!("{v:.2} Hz"),
         "Hz" => format!("{v:.0} Hz"),
-        "st" => format!("{:+} st", v.round()),
+        // `+ 0.0` turns the -0 that `round` gives for -0.4 into 0, as the module plays it.
+        "st" => format!("{:+} st", v.round() + 0.0),
         "bpm" => format!("{v:.0} bpm"),
         _ => format!("{v:.2}"),
     }
@@ -1209,6 +1211,26 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
         editor.disconnect(cable);
         if ui_state.selected_route == Some(cable) {
             ui_state.selected_route = None;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The label shows the semitone the sequencer plays (it rounds), never "-0 st".
+    #[test]
+    fn pitch_labels_match_the_played_semitone() {
+        let p = kabl_modules::registry::info_for("seq").unwrap().params[0];
+        for (v, want) in [
+            (-0.4, "+0 st"),
+            (0.4, "+0 st"),
+            (6.6, "+7 st"),
+            (-6.5, "-7 st"),
+        ] {
+            assert_eq!(fmt_value(&p, v), want);
+            assert_eq!(fmt_value(&p, v), format!("{:+} st", v.round() + 0.0));
         }
     }
 }

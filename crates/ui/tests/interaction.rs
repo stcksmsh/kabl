@@ -25,8 +25,14 @@ struct H {
 
 impl H {
     fn new(w: f32, h: f32) -> Self {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/reference");
-        let editor = PatchEditor::from_log(kabl_core::load(&dir).expect("reference patch"));
+        Self::open("reference", w, h)
+    }
+
+    fn open(patch: &str, w: f32, h: f32) -> Self {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../patches")
+            .join(patch);
+        let editor = PatchEditor::from_log(kabl_core::load(&dir).expect("patch"));
         let mut h = H {
             ctx: egui::Context::default(),
             editor,
@@ -1284,4 +1290,49 @@ fn source_lanes_of_a_knob_at_the_canvas_edge_pan_fully_into_view_and_stay_dragga
             assert!(close(t.routes(FILTER, "cutoff_hz")[0].1, routes[0].1 + 0.1));
         }
     }
+}
+
+/// Clock transport buttons queue runtime commands; they never touch the op log.
+#[test]
+fn transport_buttons_send_commands_not_edits() {
+    use kabl_modules::builtins::Transport;
+    for (w, h) in sizes() {
+        let mut t = H::open("interlocking", w, h);
+        let screen = Rect::from_min_size(Pos2::ZERO, t.size);
+        for key in ["run:1", "restart:1"] {
+            let r = t.ui.hits[key];
+            assert!(screen.contains_rect(r), "{key} on screen at {w}x{h}");
+            assert!(r.height() >= 14.0, "{key} big enough to hit: {r:?}");
+        }
+        let depth = t.undo_depth();
+        t.click("run:1");
+        t.click("restart:1");
+        assert_eq!(
+            t.ui.transport,
+            [(1, Transport::Stop), (1, Transport::Restart)]
+        );
+        // The label follows the audio thread's report.
+        t.ui.transport.clear();
+        t.ui.clock_running.insert(1, false);
+        t.frame();
+        t.click("run:1");
+        assert_eq!(t.ui.transport, [(1, Transport::Run)]);
+        assert_eq!(t.undo_depth(), depth, "no op-log entries");
+        assert!(!t.editor.take_dirty(), "no graph rebuild");
+    }
+}
+
+/// Transpose lives in the sequencer's advanced area and edits as one param.
+#[test]
+fn transpose_is_an_advanced_control() {
+    let mut t = H::open("interlocking", 1440.0, 900.0);
+    const LEAD: u64 = 4;
+    assert!(!t.ui.hits.contains_key("knob:4.transpose"));
+    t.click("toggle:4");
+    let before = t.param(LEAD, "transpose").unwrap();
+    let k = t.at("knob:4.transpose");
+    t.drag(k, k - egui::vec2(0.0, 40.0));
+    let after = t.param(LEAD, "transpose").unwrap();
+    assert!(after > before, "{before} -> {after}");
+    assert_eq!(t.param(LEAD, "p1"), Some(16.0), "steps untouched");
 }

@@ -1,7 +1,8 @@
 //! `seq`: an 8-step pitch/gate sequencer. Each rising edge on `clock` advances one step; `pitch`
 //! holds that step's pitch (whole semitones, same reference as `midi.in`'s `pitch`), and `gate`
 //! follows the clock pulse while the step is on, so consecutive on-steps retrigger an envelope.
-//! The pattern loops over the first `length` steps. A rising edge on `reset` jumps to step 1 if
+//! `transpose` shifts every step by whole semitones. The pattern loops over the first `length`
+//! steps. A rising edge on `reset` jumps to step 1 if
 //! the clock is high, otherwise it makes the next clock tick play step 1.
 //!
 //! An input counts as high above 0, not at the usual 0.5: a `midi.in` gate reaching this global
@@ -67,7 +68,7 @@ const fn gate(name: &'static str) -> ParamInfo {
     }
 }
 
-/// Pitches `p1..p8`, gates `g1..g8`, then `length`; `process` relies on that order.
+/// Pitches `p1..p8`, gates `g1..g8`, `length`, then `transpose`; `process` relies on that order.
 const PARAMS: &[ParamInfo] = &[
     pitch("p1", 0.0),
     pitch("p2", 3.0),
@@ -94,6 +95,7 @@ const PARAMS: &[ParamInfo] = &[
         taper: Taper::Stepped,
         smoothing_ms: 0.0,
     },
+    pitch("transpose", 0.0),
 ];
 
 pub static SEQ_INFO: ModuleInfo = ModuleInfo {
@@ -114,10 +116,11 @@ pub static SEQ_INFO: ModuleInfo = ModuleInfo {
     },
     skin: None,
     width_units: 22,
-    advanced: &["length"],
+    advanced: &["length", "transpose"],
 };
 
 const LENGTH_PARAM: usize = 2 * STEPS;
+const TRANSPOSE_PARAM: usize = 2 * STEPS + 1;
 
 pub struct Seq {
     step: usize,
@@ -163,7 +166,8 @@ impl Module for Seq {
 
     #[inline]
     fn process(&mut self, io: &mut ProcessIo) {
-        let pitches: [f32; STEPS] = std::array::from_fn(|k| io.param(k).at(0).round());
+        let transpose = io.param(TRANSPOSE_PARAM).at(0).round();
+        let pitches: [f32; STEPS] = std::array::from_fn(|k| io.param(k).at(0).round() + transpose);
         let gates: [bool; STEPS] = std::array::from_fn(|k| io.param(STEPS + k).at(0) >= 0.5);
         let length = (io.param(LENGTH_PARAM).at(0).round() as usize).clamp(1, STEPS);
         let (clock, reset) = (io.input(0), io.input(1));

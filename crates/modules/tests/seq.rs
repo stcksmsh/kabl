@@ -25,8 +25,8 @@ fn notes(changes: &[(usize, f32)], resets: &[usize], steps: usize) -> Vec<f32> {
 
     let (mut out, mut high) = (Vec::new(), false);
     for b in 0..(steps * STEP / BLOCK) {
-        let mut tick = [0f32; BLOCK];
-        let mut outs: [&mut [f32]; 1] = [&mut tick];
+        let (mut tick, mut clock_reset) = ([0f32; BLOCK], [0f32; BLOCK]);
+        let mut outs: [&mut [f32]; 2] = [&mut tick, &mut clock_reset];
         clock.process(&mut ProcessIo::new(
             &[],
             &mut outs,
