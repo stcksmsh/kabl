@@ -451,7 +451,9 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
                 .text(routing::param_label(param))
                 .logarithmic(param.taper == Taper::Exponential),
         );
-        if value != current {
+        // Only a real user change: the log slider's round trip can differ from `current` (at
+        // the range ends), and writing that back every frame flooded undo.
+        if resp.changed() && value != current {
             let target = kabl_core::ParamTarget::Module {
                 id,
                 param: param.name.into(),

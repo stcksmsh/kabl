@@ -70,3 +70,42 @@ pause 8.5
 click sel:4.timing.1               # KEY
 wait $MIDI || true
 stop B-cont-vs-key
+
+# C: hands-on checklist on video. Chords keep playing (keys release every 2.5 s, often mid-drag)
+# while: velocity dot on Attack, Shift fine drag on the LFO dot, envelope dot on Cutoff, an
+# Escape-cancelled Cutoff drag, undo/undo/redo, save.
+start C-checklist
+aplaymidi -p 14:0 "$OUT/chords.mid" & MIDI=$!
+pause 1.5
+click knob:4.attack_ms
+sdrag lane:9 0 -30 2
+xdotool keydown shift; sdrag lane:8 0 -60 2; xdotool keyup shift
+click knob:3.cutoff_hz
+sdrag lane:12 0 -45 3
+read -r x y <<<"$(at knob:3.cutoff_hz)"; glide "$x" "$y"; pause 0.3; xdotool mousedown 1
+for i in $(seq 1 40); do xdotool mousemove "$x" $((y - i * 2)); sleep 0.04; done
+pause 0.8; xdotool key Escape; pause 0.3
+for i in $(seq 41 60); do xdotool mousemove "$x" $((y - i * 2)); sleep 0.04; done
+xdotool mouseup 1; pause 1
+glide 700 700
+xdotool key ctrl+z; pause 1.5; xdotool key ctrl+z; pause 1.5; xdotool key ctrl+shift+z; pause 1.5
+read -r x y <<<"$(at patch-path)"; glide "$x" "$y"; xdotool click 1
+xdotool key ctrl+a; xdotool type --delay 5 "$PWD/$OUT/saved"; xdotool key Return
+click save
+wait $MIDI || true
+stop C-checklist
+
+# D: reload the saved patch in a fresh process, show routes, play chords.
+PATCH_DIR="$OUT/saved"
+PIPEWIRE_NODE=kabl_rec ./target/release/kabl-ui --patch "$PATCH_DIR" --size $SIZE >/dev/null 2>&1 &
+APP=$!; sleep 3; focus; xdotool mousemove 900 700
+ffmpeg -loglevel error -y -thread_queue_size 1024 -f x11grab -draw_mouse 1 -framerate 30 \
+  -video_size $SIZE -i "$DISPLAY+0,0" -thread_queue_size 1024 -f pulse -i kabl_rec.monitor \
+  -vf scale=1280:-2 -c:v libx264 -preset veryfast -crf 26 -pix_fmt yuv420p \
+  -c:a aac -b:a 160k -shortest "$OUT/D-reloaded.mp4" &
+REC=$!; pause 1
+aplaymidi -p 14:0 "$OUT/short.mid" & MIDI=$!
+click knob:4.attack_ms; pause 2
+click knob:3.cutoff_hz; pause 2
+wait $MIDI || true
+stop D-reloaded

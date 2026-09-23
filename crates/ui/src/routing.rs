@@ -346,8 +346,10 @@ pub(crate) fn param_knob(
         inspect(ui_state, &routes, id, param.name);
     }
     if resp.drag_started() {
-        let d = resp
-            .interact_pointer_pos()
+        // Where the button went down, not where the pointer is once egui calls it a drag: a
+        // quick flick from the body must not grab the ring.
+        let d = ui
+            .input(|i| i.pointer.press_origin())
             .map_or(0.0, |p| p.distance(center));
         let selected = routes
             .iter()

@@ -41,3 +41,20 @@ fn info_for_matches_the_built_instance() {
         assert!(std::ptr::eq(info, instance.info()));
     }
 }
+
+#[test]
+fn from_norm_stays_inside_every_param_range() {
+    for info in kabl_modules::registry::all_infos() {
+        for p in info.params {
+            for n in [0.0f32, 0.5, 1.0] {
+                let v = p.from_norm(n);
+                assert!(
+                    v >= p.min && v <= p.max,
+                    "{}.{} at {n}: {v}",
+                    info.kind,
+                    p.name
+                );
+            }
+        }
+    }
+}

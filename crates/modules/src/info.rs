@@ -98,7 +98,10 @@ impl ParamInfo {
     pub fn from_norm(&self, norm: f32) -> f32 {
         let n = norm.clamp(0.0, 1.0);
         match self.taper {
-            Taper::Exponential => self.min * ((self.max / self.min).ln() * n).exp(),
+            // Clamped: exp/ln round-off can land a hair outside the range (20000.002 Hz).
+            Taper::Exponential => {
+                (self.min * ((self.max / self.min).ln() * n).exp()).clamp(self.min, self.max)
+            }
             Taper::Linear => self.min + (self.max - self.min) * n,
             Taper::Stepped => (self.min + (self.max - self.min) * n).round(),
         }

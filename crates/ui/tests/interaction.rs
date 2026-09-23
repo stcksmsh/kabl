@@ -764,3 +764,41 @@ fn closeout_scenario_script() {
         std::fs::write(dir.join("script.txt"), s.join("\n") + "\n").unwrap();
     }
 }
+
+#[test]
+fn a_fast_body_drag_to_the_range_end_cancels_and_undoes_cleanly() {
+    // Found in the real-X A/V run. A fast drag from the knob centre (first move past egui's
+    // drag threshold in one step) used to grab the ring; the body must win, clamp at the range
+    // end, cancel with Escape, and a completed drag must stay one undo entry.
+    for (w, h) in sizes() {
+        let mut t = H::new(w, h);
+        t.click(&format!("knob:{FILTER}.cutoff_hz"));
+        let depth = t.undo_depth();
+        let c = t.at(&format!("knob:{FILTER}.cutoff_hz"));
+        t.hold(c, c - egui::vec2(0.0, 120.0));
+        assert_eq!(
+            t.param(FILTER, "cutoff_hz"),
+            Some(20000.0),
+            "{w}x{h}: body drag, clamped"
+        );
+        t.key(Key::Escape, Modifiers::NONE);
+        t.release();
+        assert_eq!(
+            t.param(FILTER, "cutoff_hz"),
+            Some(1400.0),
+            "{w}x{h} cancelled"
+        );
+        assert_eq!(t.undo_depth(), depth, "{w}x{h}");
+        t.drag(c, c - egui::vec2(0.0, 120.0));
+        for _ in 0..10 {
+            t.frame();
+        }
+        assert_eq!(
+            t.undo_depth(),
+            depth + 1,
+            "{w}x{h}: one drag, one entry, idle frames add none"
+        );
+        t.key(Key::Z, Modifiers::COMMAND);
+        assert_eq!(t.param(FILTER, "cutoff_hz"), Some(1400.0), "{w}x{h} undo");
+    }
+}
