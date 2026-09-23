@@ -356,6 +356,8 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                     });
                 });
                 egui::ScrollArea::vertical().show(ui, |ui| {
+                    // Rows wrap instead of widening the drawer over the rack.
+                    ui.set_max_width(DRAWER_W - 24.0);
                     show_param_panel(editor, ui_state, ui);
                     routing::drawer(editor, ui_state, ui);
                 });
@@ -551,7 +553,7 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
     for param in info.params {
         let current = routing::base_value(editor.state(), id, param);
         if param.taper == Taper::Stepped {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label(routing::param_label(param));
                 let labels = routing::step_labels(&kind, param.name);
                 let n = (param.max - param.min).round() as usize + 1;

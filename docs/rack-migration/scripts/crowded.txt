@@ -1,0 +1,20 @@
+# Crowded rack: 15 modules, 17 cables, 11 routes (one to an off-face control).
+shot c01-all-light
+click view:Hidden
+shot c02-hidden-light
+click theme:dark
+click view:All
+shot c03-all-dark
+click knob:6.cutoff_hz
+shot c04-four-sources-dark
+click toggle:12
+shot c05-offface-revealed
+click zoom:fit
+shot c06-fit
+click zoom:out
+click zoom:out
+click zoom:out
+shot c07-min-zoom
+click knob:6.cutoff_hz
+click zoom:focus
+shot c08-focus-selection

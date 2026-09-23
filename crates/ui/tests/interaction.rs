@@ -662,62 +662,55 @@ fn escape_cancels_body_ring_and_dot_drags_without_undo_entries() {
 }
 
 /// Not a check by itself: runs the closeout scenario headlessly (asserting as it goes) and
-/// writes, per size, the pointer/key script for `docs/modulation-slice/closeout-real-x.sh` plus
+/// writes, per size, the pointer/key script for `docs/rack-migration/closeout-real-x.sh` plus
 /// the expected saved patch. The real-X run must save an identical `checkpoint.json`.
 /// `cargo test -p kabl-ui --test interaction -- --ignored`.
 #[test]
 #[ignore]
 fn closeout_scenario_script() {
-    fn xy(p: Pos2) -> String {
-        format!("{:.0} {:.0}", p.x, p.y)
-    }
     for (w, h) in sizes() {
         let mut t = H::new(w, h);
         let mut s: Vec<String> = Vec::new();
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join(format!("../../target/slice-closeout/{w}x{h}"));
         std::fs::create_dir_all(&dir).unwrap();
-        macro_rules! drag {
-            ($from:expr, $to:expr) => {{
-                let (a, b) = ($from, $to);
-                s.push(format!("drag {} {}", xy(a), xy(b)));
-                t.drag(a, b);
+        // Lines for docs/rack-migration/drive.py: targets by key, so the real app (other
+        // fonts, a status bar, its own start-up fit) is hit where it drew them.
+        macro_rules! drag_up {
+            ($key:expr, $dy:expr, $extra:expr) => {{
+                let k: String = $key;
+                s.push(format!("dragby {k} 0 {}{}", -$dy, $extra));
+                let p = t.at(&k);
+                t.drag(p, p - egui::vec2(0.0, $dy as f32));
             }};
         }
         macro_rules! click {
             ($key:expr) => {{
                 let k = $key;
-                s.push(format!("click {}", xy(t.at(&k))));
+                s.push(format!("click {k}"));
                 t.click(&k);
             }};
         }
         let up = |p: Pos2, dy: f32| p - egui::vec2(0.0, dy);
 
         // 1. New single source on Decay, edited on its dot, fine, then a cancelled drag.
-        drag!(t.at("out:8.out"), t.at(&format!("knob:{ENV}.decay_ms")));
+        s.push(format!("drag out:8.out knob:{ENV}.decay_ms"));
+        t.drag(t.at("out:8.out"), t.at(&format!("knob:{ENV}.decay_ms")));
         let d = t.ui.selected_route.unwrap();
         s.push("shot 01-single-dot".into());
-        drag!(
-            t.at(&format!("lane:{d}")),
-            up(t.at(&format!("lane:{d}")), 30.0)
-        );
+        drag_up!(format!("lane:{d}"), 30, "");
         assert!(close(t.routes(ENV, "decay_ms")[0].1, 0.45));
-        s.push("shift down".into());
         t.modifiers = Modifiers::SHIFT;
-        drag!(
-            t.at(&format!("lane:{d}")),
-            up(t.at(&format!("lane:{d}")), 30.0)
-        );
-        s.push("shift up".into());
+        drag_up!(format!("lane:{d}"), 30, " shift");
         t.modifiers = Modifiers::NONE;
         assert!(close(t.routes(ENV, "decay_ms")[0].1, 0.47));
         let p = t.at(&format!("lane:{d}"));
-        s.push(format!("hold {} {}", xy(p), xy(up(p, 40.0))));
+        s.push(format!("hold lane:{d} 0 -40"));
         t.hold(p, up(p, 40.0));
         s.push("shot 02-dot-drag-before-escape".into());
         s.push("key Escape".into());
         t.key(Key::Escape, Modifiers::NONE);
-        s.push(format!("move {}", xy(up(p, 70.0))));
+        s.push("nudge 0 -30".into());
         t.move_to(up(p, 70.0));
         s.push("release".into());
         t.release();
@@ -727,7 +720,7 @@ fn closeout_scenario_script() {
         // 2. Body drag on Attack cancelled.
         let base = t.param(ENV, "attack_ms");
         let c = t.at(&format!("knob:{ENV}.attack_ms"));
-        s.push(format!("hold {} {}", xy(c), xy(up(c, 40.0))));
+        s.push(format!("hold knob:{ENV}.attack_ms 0 -40"));
         t.hold(c, up(c, 40.0));
         s.push("key Escape".into());
         t.key(Key::Escape, Modifiers::NONE);
@@ -738,20 +731,12 @@ fn closeout_scenario_script() {
         // 3. Attack's two sources: velocity on its dot; LFO #7 fine in Hidden view.
         click!(format!("knob:{ENV}.attack_ms"));
         let a = t.routes(ENV, "attack_ms");
-        drag!(
-            t.at(&format!("lane:{}", a[1].0)),
-            up(t.at(&format!("lane:{}", a[1].0)), 15.0)
-        );
+        drag_up!(format!("lane:{}", a[1].0), 15, "");
         assert!(close(t.routes(ENV, "attack_ms")[1].1, -0.15));
         s.push("shot 04-attack-lanes".into());
         click!("view:Hidden".to_string());
-        s.push("shift down".into());
         t.modifiers = Modifiers::SHIFT;
-        drag!(
-            t.at(&format!("lane:{}", a[0].0)),
-            up(t.at(&format!("lane:{}", a[0].0)), 30.0)
-        );
-        s.push("shift up".into());
+        drag_up!(format!("lane:{}", a[0].0), 30, " shift");
         t.modifiers = Modifiers::NONE;
         assert!(close(t.routes(ENV, "attack_ms")[0].1, 0.32));
         s.push("shot 05-hidden-fine".into());
@@ -761,14 +746,13 @@ fn closeout_scenario_script() {
         click!(format!("remove:{}", a[0].0));
         assert_eq!(t.ui.selected_route, None);
         let rem = t.routes(ENV, "attack_ms");
-        let r = t.at(&format!("ring:{ENV}.attack_ms"));
-        drag!(r, up(r, 30.0));
+        drag_up!(format!("ring:{ENV}.attack_ms"), 30, "");
         assert_eq!(t.routes(ENV, "attack_ms"), rem);
         s.push("shot 06-removed-none-selected".into());
 
         // 5. Undo the removal and the fine drag, redo the fine drag.
-        s.push("move 700 700".into());
-        t.move_to(egui::pos2(700.0, 700.0));
+        let p = t.empty_rack();
+        t.move_to(p);
         for _ in 0..2 {
             s.push("key ctrl+z".into());
             t.key(Key::Z, Modifiers::COMMAND);
@@ -778,7 +762,7 @@ fn closeout_scenario_script() {
         t.key(Key::Z, Modifiers::COMMAND | Modifiers::SHIFT);
         assert!(close(t.routes(ENV, "attack_ms")[0].1, 0.32));
         s.push("shot 07-after-undo-redo".into());
-        s.push("save".into());
+        s.push(format!("save {}", dir.join("real").display()));
 
         kabl_core::save(&dir.join("expected"), t.editor.log()).unwrap();
         std::fs::write(dir.join("script.txt"), s.join("\n") + "\n").unwrap();
@@ -1139,4 +1123,78 @@ fn opening_the_drawer_keeps_the_inspected_control_reachable() {
     t.frame();
     let r = t.ui.hits[&format!("knob:{FILTER}.cutoff_hz")];
     assert!(r.max.x < 1280.0 - kabl_ui::DRAWER_W, "{r:?}");
+}
+
+/// Not a check: writes `patches/crowded` (15 modules on three rows, jack cables and knob routes
+/// crossing everywhere), the fixture for crowding screenshots.
+/// `cargo test -p kabl-ui --test interaction write_crowded_patch -- --ignored`.
+#[test]
+#[ignore]
+fn write_crowded_patch() {
+    use kabl_core::{PortRef, Vec2};
+    let mut e = kabl_ui::PatchEditor::new();
+    let row = |r: usize| kabl_ui::rack::row_y(r);
+    let mut ids = std::collections::BTreeMap::new();
+    let layout: [(&str, &str, usize, f32); 15] = [
+        ("midi", "midi.in", 0, 24.0),
+        ("osc1", "osc.va", 0, 180.0),
+        ("osc2", "osc.va", 0, 390.0),
+        ("mix", "mixer", 0, 600.0),
+        ("ring", "ringmod", 0, 840.0),
+        ("f1", "filter.svf", 1, 24.0),
+        ("f2", "filter.svf", 1, 240.0),
+        ("vca1", "vca", 1, 450.0),
+        ("vca2", "vca", 1, 630.0),
+        ("out", "out", 1, 810.0),
+        ("env1", "env.adsr", 2, 24.0),
+        ("env2", "env.adsr", 2, 270.0),
+        ("lfo1", "lfo", 2, 510.0),
+        ("lfo2", "lfo", 2, 720.0),
+        ("lfo3", "lfo", 2, 930.0),
+    ];
+    for (name, kind, r, x) in layout {
+        ids.insert(name, e.add_module(kind, Vec2 { x, y: row(r) }));
+    }
+    let port = |n: &str, p: &str| PortRef::Module {
+        id: ids[n],
+        port: p.into(),
+    };
+    for (a, ap, b, bp) in [
+        ("midi", "pitch", "osc1", "pitch"),
+        ("midi", "pitch", "osc2", "pitch"),
+        ("midi", "gate", "env1", "gate"),
+        ("midi", "gate", "env2", "gate"),
+        ("osc1", "out", "mix", "in1"),
+        ("osc2", "out", "mix", "in2"),
+        ("osc1", "out", "ring", "a"),
+        ("osc2", "out", "ring", "b"),
+        ("ring", "out", "mix", "in3"),
+        ("mix", "out", "f1", "in"),
+        ("mix", "out", "f2", "in"),
+        ("f1", "lp", "vca1", "in"),
+        ("f2", "bp", "vca2", "in"),
+        ("env1", "out", "vca1", "cv"),
+        ("env2", "out", "vca2", "cv"),
+        ("vca1", "out", "out", "left"),
+        ("vca2", "out", "out", "right"),
+    ] {
+        e.connect(port(a, ap), port(b, bp));
+    }
+    for (a, ap, b, param) in [
+        ("lfo1", "out", "f1", "cutoff_hz"),
+        ("lfo2", "out", "f1", "cutoff_hz"),
+        ("env2", "out", "f1", "cutoff_hz"),
+        ("midi", "velocity", "f1", "cutoff_hz"),
+        ("lfo3", "out", "f2", "resonance"),
+        ("lfo1", "out", "osc2", "base_hz"),
+        ("lfo2", "out", "env1", "attack_ms"),
+        ("midi", "velocity", "env1", "attack_ms"),
+        ("lfo3", "out", "mix", "level2"),
+        ("lfo1", "out", "lfo3", "rate_hz"),
+        ("env1", "out", "env2", "timing"),
+    ] {
+        e.connect_route(port(a, ap), ids[b], param);
+    }
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/crowded");
+    kabl_core::save(&dir, e.log()).unwrap();
 }

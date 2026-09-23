@@ -1140,7 +1140,7 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
     let mut remove = None;
     for rt in &routes {
         let selected = Some(rt.cable) == ui_state.selected_route;
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             let label = source_label(editor.state(), rt.from_id, &rt.from_port);
             let resp = ui.selectable_label(
                 selected,

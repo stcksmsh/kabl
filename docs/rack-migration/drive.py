@@ -15,6 +15,7 @@ Script lines (# comments):
     key COMBO                                    e.g. ctrl+z, Escape
     type TEXT
     at X Y                                       move the pointer
+    nudge DX DY                                  move the pointer relative (button state unchanged)
     shot NAME                                    screenshot to OUTDIR/NAME.png
     save DIR                                     type DIR into the patch field and press Save
     sleep S
@@ -27,6 +28,8 @@ import time
 script, size, out = sys.argv[1], sys.argv[2], sys.argv[3]
 patch = sys.argv[4] if len(sys.argv) > 4 else "patches/reference"
 os.makedirs(out, exist_ok=True)
+# Display scale (WINIT_X11_SCALE_FACTOR): targets are in egui points, xdotool works in pixels.
+scale = float(os.environ.get("WINIT_X11_SCALE_FACTOR", "1"))
 hits_file = os.path.join(out, "hits.txt")
 env = dict(os.environ, KABL_HITS_FILE=hits_file)
 app = subprocess.Popen(["./target/release/kabl-ui", "--patch", patch, "--size", size],
@@ -50,7 +53,7 @@ def centre(key):
         h = hits()
         if key in h:
             x0, y0, x1, y1 = h[key]
-            return round((x0 + x1) / 2), round((y0 + y1) / 2)
+            return round((x0 + x1) / 2 * scale), round((y0 + y1) / 2 * scale)
         time.sleep(0.1)
     raise SystemExit(f"no target {key}")
 
@@ -79,7 +82,7 @@ try:
     time.sleep(3)
     wid = subprocess.run(["xdotool", "search", "--name", "^kabl$"], capture_output=True, text=True).stdout.split()[0]
     x("windowfocus", "--sync", wid)
-    w, h = size.split("x")
+    w, h = (round(int(v) * scale) for v in size.split("x"))
     for raw in open(script):
         line = raw.split("#")[0].strip()
         if not line:
@@ -98,7 +101,7 @@ try:
             ax, ay = centre(a[0])
             if a[3:] == ["shift"]:
                 x("keydown", "shift")
-            press_move(ax, ay, ax + int(a[1]), ay + int(a[2]))
+            press_move(ax, ay, ax + round(int(a[1]) * scale), ay + round(int(a[2]) * scale))
             x("mouseup", 1)
             if a[3:] == ["shift"]:
                 x("keyup", "shift")
@@ -121,6 +124,10 @@ try:
             x("key", a[0])
         elif cmd == "type":
             x("type", "--delay", "5", " ".join(a))
+        elif cmd == "nudge":
+            loc = subprocess.run(["xdotool", "getmouselocation", "--shell"], capture_output=True, text=True).stdout
+            cur = dict(l.split("=") for l in loc.split())
+            glide(int(cur["X"]) + int(a[0]), int(cur["Y"]) + int(a[1]))
         elif cmd == "at":
             glide(int(a[0]), int(a[1]))
         elif cmd == "shot":
