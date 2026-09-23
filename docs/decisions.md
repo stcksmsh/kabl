@@ -1847,3 +1847,52 @@ null sink, MIDI chords via aplaymidi, xdotool). The recording exposed three bugs
   entries instead of the drag. It now writes only on a real user change.
 - Body vs ring was decided at the drag-start position (past egui's threshold) instead of the
   press point, so a quick flick from the knob centre grabbed the ring.
+
+## 2026-09-23 — Rack UI migration into production `kabl-ui`
+
+Authorized by Kosta's migration brief (supersedes "wait before broader UI migration"). Built on
+real `PatchEditor` / op log / engine state; the prototype's state, snapshot undo and mock DSP
+were not transplanted, only its look (palettes, geometry, drawing).
+
+- **One canvas.** The Eurorack/Patchbay views are replaced by the rack. Keeping the old
+  free-form view would mean a second renderer to theme, zoom and expand; say if it is wanted
+  back.
+- **Rows from stored positions.** `ModuleState.pos` = row (nearest of `10 + 370·n`) and a
+  wished x; each row packs left to right, a module starting at max(its x, previous right edge).
+  Old positions keep their order. Drag-to-move snaps to row and 30 px unit on release. Push
+  expansion only widens the module in the layout, so collapse restores the stored arrangement
+  exactly (no position writes, no drift); expansion state is view-only and unsaved.
+- **Face choice stored as params, not a new op or schema.** `face.<param>` = 1/0 on the module
+  (absent = module default from the new `ModuleInfo.advanced`). A choice is one `Op::Group` of
+  `SetParam`/`UnsetParam`, so undo, save/load and module-delete restore already work; v1/v2
+  files and schema stay as they are, and an older build loading a newer patch ignores the keys.
+  `editor::affects_audio` treats `face.*` edits as presentation (no rebuild); the compiler reads
+  only declared param names (rendering verified bit-identical). Pins in choose mode are pending
+  until `Done`, so the whole choice is one step; Esc discards.
+- **Defaults:** every param primary except `env.adsr` Timing and `vca` Response (real params
+  that exercise expansion). Filter CV jacks stay: the engine still has them.
+- **Off-face modulated controls:** the lead docks on `+N` (ring, tooltip, Hidden badge).
+  Anything that inspects that param (route cable click, drop) expands the module and flashes
+  the control. Never silently hidden.
+- **Float** is its own egui layer (`Order::Middle`) sized to its visible part, so it owns
+  presses there; drop targets under it resolve to its controls only.
+- **Zoom** is a manual world→screen transform (like the prototype), not `egui::Scene`, so
+  tooltips, lanes (foreground layer) and pills stay consistent and toolbar/drawer never scale.
+  Drag sensitivity stays in screen pixels (150 px = full sweep) at every zoom. Range 50–200 %;
+  start-up fits the patch at ≤ 100 %; hit rects keep a 20 px minimum.
+- **Values above cables:** values, pills and badges are deferred and painted after the cables.
+- **Skins:** art only (light/dark PNG), controls are the normal widgets. `labels_on_art` false
+  = theme plates; true = the skin's `art_ink`. Missing dark art = light art dimmed. Skins are
+  off by default because core modules stay A / A-dark (owner); the View menu turns the demo on
+  and previews `labels_on_art`. The osc.va art is a procedural placeholder
+  (`modules/assets/placeholder_art.py`); the old panel art with baked labels was removed. No
+  contrast warning for `labels_on_art` (agent [rec], not built).
+- **Mixer metadata fix (needed for faithful knobs):** its four params were all named `level`,
+  so four knobs would edit one value and a route reached only channel 1. Renamed
+  `level1..level4`; `registry::legacy_param` keeps old patches' meaning (stored `level` sets
+  all four, a route to `level` reaches channel 1).
+- **Drawer** width 360 with wrapping rows (336 and non-wrapping rows let it overflow over the
+  rack).
+- **Verification tooling:** `KABL_HITS_FILE` makes the binary write its drawn target rects;
+  `docs/rack-migration/drive.py` aims xdotool at them (display-scale aware). The modulation
+  closeout replay now uses target keys and matches the headless result at both sizes.

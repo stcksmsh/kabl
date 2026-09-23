@@ -5,47 +5,44 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-23, first production modulation slice (LFO → ADSR Attack).
+Last updated: 2026-09-23, rack UI migration into production `kabl-ui`.
 
-**Current handover (supersedes every older handover note below, including the revision-2
-"prototype only / awaiting permission" notes):** the production modulation slice is built,
-tested and ready for Kosta's live review. Details, walkthrough, screenshots, renders, checks,
-benchmark and limitations: [`modulation-slice/README.md`](modulation-slice/README.md).
+**Current handover (supersedes every older handover note below):** the approved revision-2 rack
+is now the production canvas, on real editor/engine state, and it is ready for Kosta's review.
+Details, screenshots, verification and limits: [`rack-migration/README.md`](rack-migration/README.md).
+Handover for the next agent: [`HANDOFF.md`](HANDOFF.md).
 
     cargo run --release -p kabl-ui -- --patch patches/reference          # add --size 1280x800
 
 What is real now (production `kabl-ui`, op log, engine, file format):
 
-- Knob modulation routes (`PortRef::Param` cables, schema v2): amount/sign/bypass, taper-space
-  sum + one clamp, unipolar/bipolar/pitch source scaling, stepped params, feedback, per voice.
-- UI: drag an output onto a knob; knob body = base, ring = selected route only; routing drawer
-  (select, amount, invert, bypass, remove, base entry); All/Focus/Hidden; CONT/KEY selector.
-- `env.adsr` timing: CONTINUOUS (default) or KEY-TRIGGER, in the DSP, per envelope, saved.
-- Live-edit correctness: MIDI through active/incoming/queued graphs; state carried on the audio
-  thread at fade start (allocation-free); no mutex in `kabl-ui`; bounded swap queue; retired
-  graphs collected; notes reach every `midi.in`; moves don't rebuild audio; linear crossfade
-  (equal-power swelled held notes +41 % per edit).
-- Exact undo: absent params, removed modules with cables and route settings, grouped repatch,
-  one step per drag. v1 patches load, undo exactly and render bit-exact to the baseline.
+- Rack: A-light / A-dark, stable rows, All/Focus/Hidden with badges, pan and zoom (50–200 %,
+  about the pointer; 100 %, Fit, Focus), closable routing drawer that keeps the inspected
+  control in view.
+- Faces: module-declared default primary controls, user choice per instance (one undo step,
+  saved as `face.*` params the compiler never reads, never rebuilds audio); advanced controls
+  expand in place, pushing neighbours (default) or floating (setting); off-face modulated
+  controls dock their route on `+N` and are revealed when selected.
+- Skins: light/dark art, `labels_on_art` (plates by default); `osc.va` placeholder-art demo,
+  off by default (View menu).
+- Modulation slice unchanged in behaviour: knob routes (amount/sign/bypass, taper-space sum,
+  one clamp), body = base, ring = selected route, per-source lanes and collapsed rings,
+  vertical drag, Shift ×0.1, Escape without undo entry, CONT/KEY envelope timing, exact undo,
+  save/reload, lock-free live edits.
+- Mixer channel levels are separate params (`level1`..`level4`); old patches keep their sound.
 
-Remote review (Kosta, by phone, same day): CONT stays default (matches Surge/Vital); removing
-the selected source leaves none selected; +25 % drop default kept; live-edit render judged
-clean. Added on request: per-source lanes with draggable dots on an inspected knob (single and
-multi-source), thin display-only per-source rings when collapsed, Shift fine drag and Escape
-cancel on body/ring/dot; vertical drag kept (common default). Slice closed out; the hands-on checklist was recorded from the real app with sound (three
-bugs found and fixed, see decisions.md). Handover for the next agent: [`HANDOFF.md`](HANDOFF.md).
+Review status (corrected): Kosta heard the remote recordings and renders of the modulation
+slice (CONT/KEY difference clear, live edit clean) and approved this migration. **Nobody has
+used either build by hand**: grab feel, his display and scale factor, his MIDI controller and
+his sound card remain untested. Screenshots are Xvfb/llvmpipe runs. Pi 4 unmeasured.
 
-Next human gate: Kosta plays it, checks ring/source selection, and listens to both envelope
-modes (live, and `exaggerated-*.wav` from the render command in the slice README). Do not
-continue into broader UI migration, sequencers or effects before that.
-
-Not verified: nobody has heard the renders or played this build; screenshots are Xvfb/llvmpipe,
-not Kosta's display; Pi 4 performance unmeasured. `rev2_proto` stays as the reference for
-features not migrated (listed in the slice README).
+Next human gate: Kosta reviews the migrated rack. Do not start sequencers, effects or another
+scope before that.
 
 Older sections below are history. Where they disagree with the above or with the code, they
 are stale: the MIDI/graph-swap/undo risks they list are fixed; the Mutex described there is
-gone; "params are compile-time constants" no longer holds.
+gone; "params are compile-time constants" no longer holds; the Eurorack/Patchbay canvas and
+the osc.va panel-art skin they describe were replaced by the rack.
 
 AIW is not set up (no `.ai/state.json`). Owner said to skip AIW and Recall for now. Track work
 in git and this file.
