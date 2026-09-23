@@ -146,3 +146,19 @@ ns per 64-sample block over 25 × 4000 blocks. See `docs/modulation-slice/README
 
 Audio-thread state carry per swap (`receive_swap`, 200 swaps): 2 829 ns median, 7 331 ns max.
 Routeless difference is within run-to-run noise; routes cost ~2.4 µs/block here.
+
+## Echo slice: audio callback with delays (2026-09-23)
+
+`cargo run --release -p kabl-ui --example bench_echo [frames]`, `taskset -c 2`, i7-13700H,
+48 kHz, 8 voices, 4 s delay lines full of signal. A new graph arrives every 4th callback, three
+at once every 40th (compiled outside the timing). Worst observed callback, µs. Details:
+`docs/echo/README.md`.
+
+| frames (budget) | patch | steady max | max with swaps |
+|---|---|---|---|
+| 64 (1333) | interlocking / one delay / two delays | 137 / 64 / 46 | 171 / 294 / 546 |
+| 256 (5333) | same | 251 / 297 / 339 | 619 / 738 / 955 |
+| 1024 (21333) | same | 906 / 1019 / 1133 | 1422 / 1954 / 2203 |
+
+One delay: about +11 µs median per 256 frames steady; about +80 µs per swap that carries it
+(1.5 MB line copy). Pi 4 unmeasured.

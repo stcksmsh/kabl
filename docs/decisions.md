@@ -2041,3 +2041,45 @@ were not transplanted, only its look (palettes, geometry, drawing).
   1280 px) and the density of the four-row demo at Fit zoom (56 % at 1440×900, 50 % at
   1280×800). The other limits in the README stand as accepted.
 - Next scope goes through the supervisor.
+
+## 2026-09-23 — Delay: first echo module (supervisor scope)
+
+- Scope (supervisor, for Kosta): a production delay in the approved rack, with live editing.
+  Record and evidence: `docs/echo/README.md`.
+- **`delay`, global rate.** Mono in, stereo out, a `clock` gate input. Time 20 ms–4 s (free),
+  sync FREE/1/16/1/8/1/8D/1/4 (one clock pulse = one 16th), feedback 0–95 %, equal-power mix,
+  tone low-pass in the feedback loop, MONO/PING. Tone and mode are advanced controls.
+- **One ping-pong network, mode = output matrix.** The input feeds the left line, and each
+  line feeds the other. Mono sums both lines at 1/√2 to both sides. So echo timing and decay
+  are the same in both modes, loudness matches (equal power), and a mode switch never drops the
+  tail. Rejected: separate mono and stereo line paths (a switch would drop or strand history).
+- **Glide:** a one-pole (100 ms) on the delay in samples, in f64 (in f32 the last steps round
+  away and the time settles several samples short), with the read speed held to 0.5–1.5×.
+  4-point Hermite reads. Pitch moves during a change; the waveform never jumps.
+- **Sync acquisition by interval agreement.** An interval between rising edges is accepted only
+  within 10 % of the one before it. The first interval after Stop/Run or Restart includes the
+  gap, so it is never taken as tempo. Relock takes three pulses. The last accepted time is
+  held while the clock is stopped. No reset input was needed. Rejected: reading the gate's
+  duty cycle (breaks on `clock.div`, whose pulses keep the source width) and a stall timeout
+  that drops the lock (the time would jump back to the free time on every Stop).
+- **Live-edit state: `Module::carry_from(&dyn Module)`.** It is called after `load_state` in
+  `carry_state`, same module id and kind, on the audio thread at fade start. `StateBuf` stays
+  at 12 scalars. The delay copies its whole lines. Lines are allocated and page-touched in
+  `prepare` (UI thread) and freed by `basedrop` on the UI thread. Rejected: swapping buffers
+  between graphs (the old graph plays for another 15 ms of crossfade and would lose its echo
+  mid-fade); sharing one line between both graphs (both would write it).
+- **Load is fresh.** `CompiledPatch::fresh` (set by `kabl-ui` for Load) makes `carry_state`
+  copy nothing, so a loaded patch starts with empty delay lines and default module state even
+  where ids match. This changes the earlier behaviour, where Load carried every module's state
+  by id. A live edit that replaces a queued fresh graph inherits the flag.
+- **Status readout:** a third audio → UI queue, `(id, DelayLock, target ms)`, drawn left of
+  the output plate: `sync`, `held`, `unlocked`, `free`.
+- Measured (i7-13700H, 48 kHz, full lines): one delay adds ~11 µs per 256 frames. A swap that
+  carries one delay costs ~80 µs more. The worst callback with swaps and two delays was 955 µs
+  of a 5333 µs budget at 256 frames, 546 of 1333 µs at 64 frames. Pi 4 unmeasured. A
+  `ponytail:` note in `delay.rs` marks the whole-line copy.
+- Demo `patches/echo`: the interlocking demo with the lead through the delay (1/8D, 55 %,
+  3.2 kHz, 32 %, PING) into one mixer per side, the bass dry on both. Peak −6.4 dBFS; dry
+  (mix 0) and echo within 0.3 dB RMS.
+- Not built: reverb, tape model, saturation, self-oscillation, reset input, MIDI sync, a Time
+  knob that shows the synced time.

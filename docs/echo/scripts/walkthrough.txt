@@ -1,0 +1,66 @@
+# Walkthrough of patches/echo (record-walkthrough.sh). Sleeps leave time to listen.
+sleep 6
+# Dry versus echo: mix to 0 %, then back (undo).
+dragby knob:16.mix 0 80
+shot m01-dry
+sleep 5
+key ctrl+z
+shot m02-echo
+sleep 5
+# Straight eighths, then back to dotted eighths.
+click sel:16.sync.2
+shot m03-straight-eighth
+sleep 5
+click sel:16.sync.3
+shot m04-dotted-eighth
+sleep 4
+# Mono, then ping-pong again (the advanced area has the mode).
+click toggle:16
+click sel:16.mode.0
+shot m05-mono
+sleep 5
+click sel:16.mode.1
+shot m06-ping-pong
+sleep 4
+# More feedback, then a darker tone; both undone.
+dragby knob:16.feedback 0 -40
+shot m07-feedback-up
+sleep 5
+dragby knob:16.tone_hz 0 50
+shot m08-tone-darker
+sleep 5
+key ctrl+z
+key ctrl+z
+shot m09-feedback-tone-undone
+sleep 3
+# Free time: the slow LFO route moves the delay time a little.
+click sel:16.sync.0
+shot m10-free-lfo-time
+sleep 9
+click sel:16.sync.3
+shot m11-sync-again
+sleep 3
+# Tempo 116 -> faster: the delay relocks and glides to the new dotted eighth. Then back.
+dragby knob:1.bpm 0 -14
+shot m12-tempo-up
+sleep 5
+key ctrl+z
+shot m13-tempo-back
+sleep 4
+# Stop with the feedback raised: the notes release and the echoes decay for several seconds;
+# an unrelated edit (bass cutoff) lands in the tail. Run again, then both edits undone.
+dragby knob:16.feedback 0 -45
+shot m14-feedback-for-tail
+sleep 3
+click run:1
+shot m15-stopped
+dragby knob:9.cutoff_hz 0 -25
+shot m16-edit-in-tail
+sleep 4.5
+click run:1
+shot m17-run
+sleep 4
+key ctrl+z
+key ctrl+z
+shot m18-undone
+sleep 4

@@ -1,0 +1,24 @@
+# Screenshots of patches/echo: start-up view, delay close up (face, expanded), both themes,
+# stopped (held).
+sleep 1.5
+shot 01-light
+click toggle:16
+sleep 0.3
+shot 02-light-delay-expanded
+click module:16
+click zoom:focus
+sleep 0.5
+shot 03-light-delay-close
+click theme:dark
+sleep 0.3
+shot 04-dark-delay-close
+click toggle:16
+click zoom:fit
+sleep 0.5
+shot 05-dark
+click run:1
+sleep 2
+click module:16
+click zoom:focus
+sleep 0.5
+shot 06-dark-stopped-held

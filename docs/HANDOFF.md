@@ -13,7 +13,7 @@ Trust code and git over older docs.
   crate: it reformats the untouched `rev2_proto` / `rev2_env_ab` examples; use `rustfmt` on
   the files you changed.
 
-Launch (real audio + MIDI):
+Launch (real audio + MIDI). The newest demo is `--patch patches/echo`:
 
     cargo run --release -p kabl-ui -- --patch patches/reference            # 1440×900
     cargo run --release -p kabl-ui -- --patch patches/reference --size 1280x800
@@ -27,7 +27,7 @@ Launch (real audio + MIDI):
   expansion, 50–200 % zoom, pull-the-plug cable moves, skin renderer (no built-in skin).
 - Modulation: any knob takes routes (signed amount, invert, bypass); ring/lanes/drawer are one
   route; taper-space sum, one clamp, block rate; envelope timing CONT/KEY.
-- Verification: `cargo test --workspace` 218 pass (4 ignored = fixture/script writers), clippy clean.
+- Verification: `cargo test --workspace` 240 pass (7 ignored = fixture/patch/clip writers), clippy clean.
   Real-X tooling: `docs/rack-migration/drive.py` (+ `scripts/`), `closeout-real-x.sh`,
   `record-walkthrough.sh`; `docs/interlocking-sequences/record-walkthrough.sh` records a patch
   without MIDI.
@@ -51,6 +51,17 @@ Supervisor scope: two interlocking sequences from one shared clock. Built: clock
 Deferred, not blockers: toolbar transport copy; Fit density of the four-row demo. Next scope
 goes through the supervisor.
 
+## Echo — built, waiting for Kosta's review (supervisor scope)
+
+`delay` (global): mono in, stereo out, clock-synced or free time, feedback, mix, tone in the
+loop, MONO/PING. `Module::carry_from` carries its 4 s lines across live swaps (audio thread,
+no allocation). Load now builds a `fresh` graph that carries nothing. The demo is
+`cargo run --release -p kabl-ui -- --patch patches/echo` (built by `crates/ui/tests/echo.rs`;
+rewrite it with `-- write_echo_patch --ignored`, keeping the name filter, because the file
+includes `interlocking.rs` and its writer). Record, video, clips, timings and the listening checklist:
+`docs/echo/README.md`. Timing harness: `crates/ui/examples/bench_echo.rs`. Stopped for Kosta:
+do not extend effects (reverb, tape, etc.) before his answer.
+
 ## Accepted limitations
 
 Block-rate modulation; no hysteresis on stepped destinations; pitch full scale ±60 st; state
@@ -61,4 +72,5 @@ into view only on inspection; no `labels_on_art` contrast warning; no built-in s
 
 ## Not in scope
 
-Effects, new synthesis, full rich LFO, plugin work, compact layout, framework change.
+Effects beyond the delay, new synthesis, full rich LFO, plugin work, compact layout, framework
+change.
