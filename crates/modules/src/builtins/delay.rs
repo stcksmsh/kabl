@@ -367,6 +367,8 @@ impl Module for Delay {
         if o.left.len() != self.left.len() || o.c.sample_rate != self.c.sample_rate {
             return;
         }
+        // ponytail: copies both whole lines (~1.5 MB at 48 kHz) per swap; copy only the span in
+        // use if a Pi measurement says the callback can't afford it.
         self.left.copy_from_slice(&o.left);
         self.right.copy_from_slice(&o.right);
         self.c = o.c;
