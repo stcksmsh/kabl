@@ -37,7 +37,8 @@ Review status: Kosta reviewed the rack hands-on and approved it, and watched and
 listed in `decisions.md` ("Rack migration closed"). Pi 4 unmeasured.
 
 Sequencing (owner go-ahead, 2026-09-23): the new `clock` module (BPM, 16th-note gate) and the
-8-step `seq` module (pitch knob plus OFF/ON gate per step) make repeating patterns playable.
+8-step `seq` module (pitch knob plus OFF/ON gate per step) make repeating patterns playable, with a playing-step light, a pattern length (advanced
+control) and a reset input.
 Try it with `cargo run --release -p kabl-ui -- --patch patches/sequence`. Details and what was
 left out are in the `decisions.md` entry "Shared clock + basic pitch/gate sequencing".
 Kosta approved the recorded walkthrough ("sounds and looks good"); not yet tried hands-on.

@@ -126,6 +126,14 @@ impl PatchEngine {
         }
     }
 
+    /// Audio-thread call: `CompiledPatch::seq_steps` of the graph fading in, else the active one.
+    pub fn seq_steps(&self, f: impl FnMut(kabl_core::ModuleId, usize)) {
+        match &self.incoming {
+            Some((g, _)) => g.seq_steps(f),
+            None => self.active.seq_steps(f),
+        }
+    }
+
     /// Audio-thread call: note-off for `voice` in every running graph. No allocation.
     pub fn note_off(&mut self, voice: usize) {
         self.active.note_off(voice);

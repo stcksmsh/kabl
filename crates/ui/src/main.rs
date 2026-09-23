@@ -12,7 +12,7 @@
 
 use basedrop::{Collector, Owned};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use kabl_core::PatchState;
+use kabl_core::{ModuleId, PatchState};
 use kabl_engine::compile::compile;
 use kabl_engine::graph::BLOCK;
 use kabl_engine::patch_engine::{swap_channel, PatchEngine, SwapSender};
@@ -34,6 +34,8 @@ struct AudioHost {
     sample_rate: f32,
     collector: Collector,
     status: String,
+    /// Each sequencer's playing step, published by the audio callback.
+    steps_rx: Option<rtrb::Consumer<(ModuleId, usize)>>,
     _stream: Option<cpal::Stream>,
     _midi_connection: Option<midir::MidiInputConnection<()>>,
 }
@@ -45,6 +47,7 @@ impl AudioHost {
             sample_rate: 48000.0,
             collector,
             status,
+            steps_rx: None,
             _stream: None,
             _midi_connection: None,
         }
@@ -83,6 +86,8 @@ impl AudioHost {
         let (midi_producer, mut midi_consumer) = rtrb::RingBuffer::<VoiceEvent>::new(256);
         let midi_connection = connect_midi("kabl-ui", midi_producer, None);
 
+        let (mut steps_tx, steps_rx) = rtrb::RingBuffer::<(ModuleId, usize)>::new(256);
+
         let mut left_ring = RingBuffer::new(RING_CAPACITY);
         let mut right_ring = RingBuffer::new(RING_CAPACITY);
 
@@ -104,6 +109,11 @@ impl AudioHost {
                     left_ring.push_slice(&l);
                     right_ring.push_slice(&r);
                 }
+
+                // Full queue (UI not drawing): the UI just misses these, nothing waits.
+                engine.seq_steps(|id, step| {
+                    let _ = steps_tx.push((id, step));
+                });
 
                 for frame in data.chunks_mut(channels) {
                     let l = left_ring.pop().unwrap_or(0.0);
@@ -133,6 +143,7 @@ impl AudioHost {
             sample_rate,
             collector,
             status,
+            steps_rx: Some(steps_rx),
             _stream: stream,
             _midi_connection: midi_connection,
         }
@@ -174,6 +185,16 @@ impl eframe::App for App {
         egui::Panel::bottom("kabl-status").show(ui, |ui| {
             ui.label(&self.audio.status);
         });
+        if let Some(rx) = self.audio.steps_rx.as_mut() {
+            while let Ok((id, step)) = rx.pop() {
+                self.ui_state.seq_steps.insert(id, step);
+            }
+        }
+        if !self.ui_state.seq_steps.is_empty() {
+            // egui only repaints on input; the step light needs frames of its own.
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(30));
+        }
         show(&mut self.editor, &mut self.ui_state, ui);
         // Scripted real-input runs (xdotool) read the drawn targets from here.
         if let Some(path) = &self.hits_file {

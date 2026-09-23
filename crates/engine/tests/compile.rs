@@ -475,5 +475,8 @@ fn sequence_patch_plays_every_step() {
     for (k, w) in out.chunks(step).take(16).enumerate() {
         let peak = w.iter().fold(0.0f32, |m, v| m.max(v.abs()));
         assert!(peak > 0.01 && peak < 1.0, "step {k}: peak {peak}");
-    }
+    } // 16 ticks of an 8-step pattern: the sequencer (module 2) is on its last step.
+    let mut steps = Vec::new();
+    patch.seq_steps(|id, step| steps.push((id, step)));
+    assert_eq!(steps, [(2, 7)]);
 }

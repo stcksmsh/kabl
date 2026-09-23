@@ -50,7 +50,7 @@
 //! inputs out of the buffer pool, building `Signal`/output-slice arrays fresh each block) with
 //! fixed-size stack arrays sized to `MAX_INPUTS`/`MAX_OUTPUTS`/`MAX_PARAMS` — constants derived
 //! from the largest counts among the known built-ins (`mixer`: 4 inputs; `filter.svf`: 3
-//! outputs; `seq`: 16 params). `compile()` (control-thread, allowed to allocate/return
+//! outputs; `seq`: 17 params). `compile()` (control-thread, allowed to allocate/return
 //! errors) rejects any module whose port/param counts exceed those bounds with
 //! `CompileError::TooManyPorts`, so a future built-in that needs more headroom fails loudly at
 //! compile time instead of the audio thread silently truncating or panicking. `CompiledPatch` is
@@ -61,7 +61,7 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt;
 
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
-use kabl_modules::builtins::MidiIn;
+use kabl_modules::builtins::{MidiIn, Seq};
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::{
     registry, Module, ModuleInfo, ParamInfo, PortDirection, ProcessIo, Rate, Signal, StateBuf,
@@ -73,7 +73,7 @@ pub type BufIdx = usize;
 
 /// `process_block`'s per-step scratch (inputs, params) is a fixed-size stack array sized to
 /// these, not a `Vec`, so building it every block doesn't allocate. Set to the largest count any
-/// of the known built-ins actually has (`mixer`: 4 inputs; `seq`: 16 params) — `compile()`
+/// of the known built-ins actually has (`mixer`: 4 inputs; `seq`: 17 params) — `compile()`
 /// checks every module against these bounds and returns `CompileError::TooManyPorts` rather than
 /// silently truncating if a future built-in needs more.
 const MAX_INPUTS: usize = 4;
@@ -81,7 +81,7 @@ const MAX_INPUTS: usize = 4;
 /// currently needs more; `filter.svf`'s 3 outputs is the largest). Bump alongside a new match arm
 /// if a module ever needs more, not just this constant.
 const MAX_OUTPUTS: usize = 3;
-const MAX_PARAMS: usize = 16;
+const MAX_PARAMS: usize = 17;
 
 /// Route amount when a `PortRef::Param` cable has no stored `amount` (+25 % of knob travel, the
 /// UI's default on drop). A stored value always wins.
@@ -998,6 +998,16 @@ impl CompiledPatch {
             .iter()
             .position(|&(origin_id, origin_voice)| origin_id == id && origin_voice == voice)?;
         Some(self.modules[index].as_mut())
+    }
+
+    /// Calls `f(id, step)` for every `seq` module: the step it is playing (0-based). No
+    /// allocation, for the audio thread to publish to the UI.
+    pub fn seq_steps(&self, mut f: impl FnMut(ModuleId, usize)) {
+        for (m, &(id, _)) in self.modules.iter().zip(&self.module_origin) {
+            if let Some(seq) = m.as_any().downcast_ref::<Seq>() {
+                f(id, seq.step());
+            }
+        }
     }
 
     #[inline]

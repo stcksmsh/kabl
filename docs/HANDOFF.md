@@ -27,14 +27,14 @@ Launch (real audio + MIDI):
   expansion, 50–200 % zoom, pull-the-plug cable moves, skin renderer (no built-in skin).
 - Modulation: any knob takes routes (signed amount, invert, bypass); ring/lanes/drawer are one
   route; taper-space sum, one clamp, block rate; envelope timing CONT/KEY.
-- Verification: `cargo test --workspace` 195 pass (3 ignored = fixture writers), clippy clean.
+- Verification: `cargo test --workspace` 197 pass (3 ignored = fixture writers), clippy clean.
   Real-X tooling: `docs/rack-migration/drive.py` (+ `scripts/`), `closeout-real-x.sh`,
   `record-walkthrough.sh`.
 
 ## Sequencing — built; Kosta approved the video, not yet tried hands-on
 
-`clock` (BPM, 16th-note gate) and the 8-step `seq` module (pitch plus OFF/ON gate per step)
-are both global rate. The demo is `cargo run --release -p kabl-ui -- --patch patches/sequence`.
+`clock` (BPM, 16th-note gate) and the 8-step `seq` module (pitch plus OFF/ON gate per step,
+length, reset input, and a step light fed by the first audio → UI queue) are both global rate. The demo is `cargo run --release -p kabl-ui -- --patch patches/sequence`.
 The `decisions.md` entry "Shared clock + basic pitch/gate sequencing" lists what was built and
 what was deliberately left out. Wait for Kosta's feedback before extending it.
 

@@ -1955,3 +1955,29 @@ were not transplanted, only its look (palettes, geometry, drawing).
   clippy is clean.
 - Kosta watched `target/seq-walkthrough/sequence.mp4` (not committed): "It sounds and looks
   good." He has not tried it hands-on yet.
+
+## 2026-09-23 — Sequencer: step light, pattern length, reset (owner asked for all three)
+
+- **Pattern length:** `length` (1–8, default 8) loops the first N steps. It is an advanced
+  control: the face already carries 8 knobs and 8 gate switches, so there is no room for an
+  8-option selector. It appears when the module expands, and the existing face choice can pin
+  it to the face. Selectors with no named options now label each segment with its value (1..8)
+  instead of its 0-based index.
+- **Reset input:** a rising edge on `reset` makes the next clock tick play step 1. The
+  sequencer parks on the loop's last step, so a reset that arrives together with a clock edge
+  plays step 1 on that edge. Between an off-beat reset and the next tick, the pitch output and
+  the step light stay on the last step.
+- **Input threshold:** the `clock` and `reset` inputs count as high above 0, not at 0.5. A
+  `midi.in` gate that reaches this global module is averaged over the voices, so one held key
+  arrives as 1/8 at 8 voices. Taking the maximum for gate-typed voice → global cables would be
+  the general fix. It was not done because nothing else needs it yet.
+- **Step light:** the first audio-thread → UI channel. After each callback the audio thread
+  calls `PatchEngine::seq_steps` (the graph fading in, else the active one; downcasts, no
+  allocation) and pushes `(module id, step)` into an `rtrb` queue of 256 entries. If the queue
+  is full, pushes are dropped. The UI drains the queue every frame and draws a dot in the
+  gate-cable colour beside the playing step's pitch label. While any sequencer reports a step,
+  the UI requests a repaint every 30 ms, because egui otherwise repaints only on input.
+- `MAX_PARAMS` is now 17. Tests: `crates/modules/tests/seq.rs` (length, reset, rests) and a
+  `seq_steps` assertion in `sequence_patch_plays_every_step`; 197 pass, and clippy is clean.
+  Kosta watched `target/seq-walkthrough/sequence-2.mp4` (not committed); it was recorded
+  from a scratch copy of `patches/sequence` with a 40 BPM clock patched into `reset`.

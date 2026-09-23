@@ -143,7 +143,7 @@ pub fn step_labels(kind: &str, param: &str) -> Option<&'static [&'static str]> {
         ("lfo", "waveform") => &["SIN", "TRI", "SAW", "SQR", "S&H"],
         ("osc.va", "waveform") => &["SIN", "TRI", "SAW", "SQR"],
         ("vca", "exponential") => &["LIN", "EXP"],
-        ("seq", _) => &["OFF", "ON"],
+        ("seq", g) if g.starts_with('g') => &["OFF", "ON"],
         _ => return None,
     })
 }
@@ -1026,7 +1026,7 @@ pub(crate) fn stepped_selector(
         }
         let text = labels
             .and_then(|l| l.get(k).copied())
-            .map_or(format!("{k}"), str::to_string);
+            .map_or(format!("{}", param.min + k as f32), str::to_string);
         painter.text(
             r.center(),
             egui::Align2::CENTER_CENTER,

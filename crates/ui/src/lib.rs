@@ -113,6 +113,8 @@ pub struct UiState {
     frame_hits: BTreeMap<String, Rect>,
     /// Decoded skin art, keyed by (module kind, dark variant); the handle keeps the texture alive.
     image_cache: HashMap<(&'static str, bool), egui::TextureHandle>,
+    /// Each sequencer's playing step (0-based), fed by `main.rs` from the audio thread.
+    pub seq_steps: HashMap<ModuleId, usize>,
     /// A-dark when true, A-light otherwise.
     pub dark: bool,
     pub zoom: f32,
@@ -173,6 +175,7 @@ impl Default for UiState {
             hits: Default::default(),
             frame_hits: Default::default(),
             image_cache: HashMap::new(),
+            seq_steps: HashMap::new(),
             dark: false,
             zoom: 1.0,
             pan: EguiVec2::ZERO,
@@ -567,7 +570,7 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
                     let opt = param.min + k as f32;
                     let text = labels
                         .and_then(|l| l.get(k).copied())
-                        .map_or(format!("{k}"), str::to_string);
+                        .map_or(format!("{opt}"), str::to_string);
                     if ui.selectable_label(current.round() == opt, text).clicked()
                         && current.round() != opt
                     {
@@ -1019,6 +1022,10 @@ fn draw_module(
     }
     if skin.is_none() {
         draw_decor(editor, painter, th, xf, m);
+    }
+    // Step light: beside the playing step's pitch label.
+    if let Some(c) = (ui_state.seq_steps.get(&m.id)).and_then(|s| m.ctl(&format!("p{}", s + 1))) {
+        painter.circle_filled(xf.p(c.geo.label_pos() - vec2(16.0, 0.0)), 4.0 * z, th.gate);
     }
     if let Some(p) = m.plate {
         painter.rect_filled(xf.r(p), CornerRadius::same(6), th.plate);
