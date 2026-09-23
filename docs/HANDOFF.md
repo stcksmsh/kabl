@@ -1,112 +1,106 @@
-# Handoff prompt: arbiter agent
+# Handoff — for the next blank-context agent
 
-Paste everything below the line into the arbiter. It is self-contained; the repo holds the detail.
+Replaces the earlier handoff prompt. Read this, then `docs/STATUS.md` (top section) and the
+last entries of `docs/decisions.md`. Trust code and git over older docs.
 
----
+## Where things are
 
-Project: **kabl**, repo `/secondary/Programming/Github/kabl`, branch `master`.
+- Branch `master`, local only (not pushed). Modulation slice closed out at commit `7361270`
+  plus the docs commit that adds this file (`git log -3`). Baseline before the slice: `e6db377`.
+- Workflow: commit small working changes straight to `master`; no branches, PRs or pushes
+  unless Kosta asks. Leave `.ai/` alone. AIW/Recall not in use.
 
-## What kabl is
+Launch (real audio + MIDI; first non-"Midi Through" port):
 
-kabl is a modular synthesizer in Rust. Its pitch: cables are instruments, patches explain
-themselves, and modules can be built like guitar pedals. The goal is **not a toy**. kabl should
-eventually make anything Surge XT or Vital can, while being simpler to learn, start with and
-create in, rather than a player of presets. The long-term musical target is Tangerine Dream in
-spirit (the Encore / Ricochet / Force Majeure era): interlocking sequences, evolving timbre,
-atmosphere, and performed leads.
+    cargo run --release -p kabl-ui -- --patch patches/reference            # 1440×900
+    cargo run --release -p kabl-ui -- --patch patches/reference --size 1280x800
 
-## Where things are (have the worker read these first)
+## Accepted decisions (owner-confirmed)
 
-- `docs/STATUS.md`: the top "Current handover" block is authoritative. Older sections below it
-  are partly stale, and the block names which parts.
-- `docs/decisions.md`: append-only rationale. The G1 entries and the three latest entries
-  (revision round 2; revision 2 review: owner feedback) hold Kosta's design decisions.
-- `docs/PLAN.md`: the design plan that was executed (P1–P5, then gate G1).
-- `docs/design/revision-2/REVIEW.md`: the **current** design package. Its companions:
-  - `INTERACTIONS.md`: the current interaction spec. It overrides `docs/design/INTERACTIONS.md`.
-    Every rule is tagged [owner], [rec] or [open].
-  - `render2.py`: the mockups. Run `python3 docs/design/revision-2/render2.py`, or add `--qa`.
-- `docs/design/REVIEW.md`, `BRIEF.md`, `QA.md`, `render.py`: revision 1. Kept as history and
-  as the base layout model.
+Visual / layout (not built yet — see next scope): A-light / A-dark core modules; illustrated
+custom skins with `labels_on_art` default false; user-selected primary controls, advanced
+controls expand in place; Hidden cables use the stable rack; expansion pushes neighbours by
+default, float is a setting; 1440×900 default, 1280×800 usable minimum; compact layout later
+and optional.
 
-## State of the build (trust code and git over docs)
+Modulation (built):
+- Any knob accepts modulation cables. Cable, ring, lane/dot, badge and drawer row are the same
+  route. Each route: amount (signed = polarity), invert, bypass (keeps amount). Default +25 %
+  on drop.
+- Knob body = base. Ring = the **selected** route's amount only. Inspecting a knob shows one
+  lane per route with a draggable dot (single source too); collapsed multi-source knobs show
+  thin display-only rings, pressing them opens the lanes.
+- Single source auto-selects only when the knob becomes inspected. Removing the selected
+  source clears the selection even if one remains; never silently edit another route.
+- Vertical drag everywhere (common default); Shift = ×0.1; Escape mid-drag cancels with no
+  undo entry; a completed drag is one undo step.
+- Math: taper-space sum of all active routes, one clamp, back to units; block rate (64
+  samples); unipolar/bipolar/pitch sources scaled by nominal range.
+- Envelope timing per envelope, saved: CONTINUOUS default (Surge/Vital behaviour), KEY-TRIGGER
+  captures A/D/R at note-on and uses them through release; sustain always live. No per-route
+  latching.
 
-- Engine: flat-schedule compiler with cycles, buffer reuse and carry-over on recompile.
-  `process_block` does not allocate. Swaps crossfade and can overlap.
-- Nine built-in modules.
-- `kabl-standalone` has been played live with a real MIDI keyboard.
-- `kabl-ui` (egui) has a Patchbay view and a rough Eurorack view v1. It has never been run with
-  real audio.
-- The new rack design exists only as mockups.
-- Kosta's machine has real audio, a display and a MIDI controller. Pi-4 performance is
-  unmeasured.
+## Production vs prototype-only
 
-## Design decisions (Kosta, at G1 and the revision-2 review)
+Production (`crates/ui/src`, engine, core, file format schema v2): everything under
+"Modulation" above; drag-to-knob; routing drawer (select, amount, invert, bypass, remove, base
+entry, computed-range text); All/Focus/Hidden; stepped selectors (CONT/KEY, waveforms);
+exact undo/redo incl. grouped repatch and module delete with cables; save/reload; live-edit
+safety (MIDI through swaps, audio-thread state carry, lock-free swap queue, reclamation,
+linear crossfade).
 
-- **Look:** direction A (warm studio hardware) for core modules, plus A-dark: A's layout with
-  B's material (texture, knurled metal knobs, restrained glow).
-- **Skins:** illustrated light/dark art for user-made and non-core modules. The UI draws every
-  control, label and value. The skin flag `labels_on_art` is **default false** (labels on theme
-  plates); a skin maker may set it to true, putting labels straight on the art for beauty.
-- **Modulation:** any knob accepts a modulation cable; there is no CV jack per param. Amount,
-  polarity and bypass belong to the route. The cable, drawer row, badge and knob ring are views
-  of the same route.
-- **Density:** modules declare primary/advanced params. The user chooses the primary ones.
-  Advanced params appear by expanding the module in place.
-- **Cables:** one rack layout, shown All / Focus / Hidden.
-- **Revision 2 accepted as the direction** ("all the other things feel right"): the knob
-  anatomy (pointer = base, ring = result, peak dot, depth lanes when inspected); amount as a %
-  of knob travel, also shown in units, summed then clamped; the plug at 6 o'clock as a thinner
-  mod lead; the face = primary controls, with expansion appended right and jacks always on the
-  face; the rich LFO (features marked ◆ are conceptual, not in the engine); a 1440×900
-  default viewport with 1280×800 as the minimum.
+Prototype-only (`crates/ui/examples/rev2_proto/`, reference for the next scope): A/A-dark
+themes, illustrated skins + contrast warning, primary/advanced controls and in-place
+expansion (push/float), zoom and pan polish, toasts, `+40 %` text entry on the plug, x-ray
+cable fading, rich LFO. The existing production canvas is still the old Eurorack/Patchbay
+view with one demo skin (`osc.va`).
 
-## Open questions (settle in the prototype)
+## Verification evidence
 
-- Hidden-mode layout: keep the same rack, or switch to a compact synth layout? Build both.
-- Expansion: push the neighbours (shown) or float over them? Auto-Focus while expanded?
-- Ring vs knob-body drag at a small knob radius.
-- Envelope-time modulation: continuous vs sampled at stage start (choose by ear).
-- **Prototype go-ahead has not been stated explicitly. Confirm it with Kosta before starting.**
+- `cargo test --workspace`: 174 pass (2 ignored = script generators). Clippy clean; fmt clean
+  except the untouched `rev2_proto` files.
+- Key suites: `crates/engine/tests/{live_edit,modulation,env_timing,legacy_sound}.rs`,
+  `crates/core/tests/{legacy_format,replay_proptest,log_unit}.rs`,
+  `crates/ui/tests/{interaction,editor_undo}.rs` (real egui input through `show()` at both
+  sizes).
+- Real binary, real X input: `docs/modulation-slice/{xdotool-walkthrough,closeout-real-x}.sh`
+  — saved patches match expectations at 1440×900 and 1280×800.
+- Real app audio + screen muxed (PipeWire null sink, MIDI via `aplaymidi`):
+  `docs/modulation-slice/record-av.sh`. Offline renders: `reference_patch`, `live_edit_render`
+  examples. Benchmark: `bench_reference` example (6 routes ≈ 17.8 µs/block vs ≈ 15.4
+  routeless, 8 voices; details in `docs/benchmarks.md`).
+- Kosta heard renders/recordings remotely: CONT/KEY difference clear, live edit clean.
 
-## Known code gaps behind the design
+## Awaiting Kosta (hands-on, cannot be automated)
 
-- The compiler passes params as constants. `ProcessIo::param` already returns `Signal`
-  (Scalar/Buffer), so param modulation is mostly compiler plumbing. Voice-rate vs global-rate and
-  control-rate need care.
-- `CableState.params` exists but the compiler ignores it, so there is no per-cable amount yet.
-- Fan-in: only the first cable into an input is used.
-- The op log has no undo grouping, so replace or repatch takes two undo steps.
-- Risks found by reading the code but never reproduced:
-  - MIDI reaches only the active graph during swaps.
-  - The UI never calls its deferred-drop collector.
-  - MIDI routing assumes module ID 1.
-  - Layout edits rebuild the audio.
+1. Grab individual source dots, the ring and the knob body with a real hand: any mis-grabs?
+2. Hold a MIDI chord (real controller) while editing base and depth.
+3. Release keys during edits: no hanging or cut notes.
+4. Shift fine drag; Escape mid-drag; undo/redo.
+5. Save, restart with `--patch <dir>`, check routes/amounts/bypass/timing.
 
-## Candidate next jobs (recommended order; confirm with Kosta before implementation)
+Fix concrete problems he reports within this slice before moving on.
 
-1. ~~Design revision round~~: done and reviewed (revision 2).
-2. **Interactive prototype** of the revision-2 design, isolated from the engine: rack with
-   A/A-dark; knob drop, ring and body drag; route card and inspector; All/Focus/Hidden; both
-   hidden-mode layouts; expand/collapse and choosing primary controls. It has to answer the
-   open questions above. Start only after Kosta's go-ahead.
-3. **Engine groundwork for param modulation:** knob routes with per-route amount/sign/bypass,
-   summed then clamped, and tests. Independent of job 2.
-4. **Correctness prerequisites** for any playable integration: MIDI during swaps, the
-   deferred-drop collector, MIDI routing that assumes module ID 1, undo op grouping.
-5. Deferred until Kosta prioritizes them: the LFO features marked ◆, clock and sequencers,
-   more modulation sources, real skin art (image generation; prompts are in
-   `docs/design/IMAGEGEN_PROMPTS.md`).
+## Unresolved / known limits
 
-## Rules for delegated jobs
+Block-rate modulation only; no hysteresis on stepped destinations; pitch full scale ±60 st;
+mixer's four `level` params share a name (route reaches only the first); state carry is
+O(modules²) per swap; jack inputs take one cable (replace on connect); engine output is quiet
+(voice averaging); Pi 4 unmeasured; drawer sliders don't have Shift/Escape.
 
-- Commit small, meaningful changes directly to `master`. No branches, no PRs. Pushing needs
-  Kosta's request.
-- AIW and Recall are not in use. Track progress in `docs/STATUS.md` (overwritten) and
-  `docs/decisions.md` (append-only).
-- Preserve unrelated files, including the untracked `.ai/`.
-- Be honest about status: a concept is never presented as built, measurements are reported
-  as they are, and anything unverified is labelled.
-- Kosta prefers terse, token-lean replies and minimal, non-speculative code.
-- A worker that ends a job updates the STATUS handover block, so the next session can start
-  cold.
+## Recommended next scope
+
+Approved rack UI migration into production `kabl-ui`, reusing rev2_proto appearance but real
+editor/engine state: A/A-dark themes, skins (`labels_on_art`), primary/advanced controls with
+in-place expansion (push default, float setting), zoom. Keep the modulation controls in
+`crates/ui/src/routing.rs` working through the migration. Not in scope: sequencers, effects,
+another prototype round.
+
+## Files
+
+- Core: `crates/core/src/{op,state,log,format}.rs` (PortRef::Param, UnsetParam, Group, schema v2)
+- Engine: `crates/engine/src/{compile,patch_engine}.rs` (routes, carry, MIDI, swap queue)
+- Modules: `crates/modules/src/{info,module}.rs`, `builtins/env_adsr.rs` (timing), `StateBuf`
+- UI: `crates/ui/src/{lib,routing,editor,main}.rs`
+- Reference patch: `patches/reference/`; slice doc: `docs/modulation-slice/README.md`
+- Design specs: `docs/design/revision-2/{INTERACTIONS,PROTOTYPE,REVIEW}.md`

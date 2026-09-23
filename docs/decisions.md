@@ -1817,3 +1817,20 @@ auto-selected). Grab feel with a real hand is still untested.
   knob modes exist only as host/plugin settings (VST's circular / relative circular / linear
   knob modes). Kept vertical drag for ring, lanes and knob body; a circular mode stays a
   possible later setting, not built.
+
+## 2026-09-23 — Modulation slice closeout: single-source dot, Shift, Escape
+
+Owner-specified for closeout:
+- **Single-source dot:** an inspected knob with one route shows the same draggable lane dot
+  as multi-source knobs, same vertical gesture. Removing the selected source clears the
+  selection even when one source remains; no silent reassignment (grabbing the remaining dot
+  selects it explicitly).
+- **Shift fine drag** (×0.1) and **Escape cancel** for knob body, ring and lane dots. Escape
+  restores the pre-drag value, triggers an audio rebuild and leaves no undo (or redo) entry; a
+  completed drag stays one undo step.
+
+Implementation choices: drags now accumulate each frame's vertical pointer motion from the
+press point (instead of total offset), so Shift can change mid-drag without a jump; the
+cancelled drag stays captured and inert until release; cancellation uses
+`PatchLog::discard_last`, which only acts on the newest entry. Drawer sliders and DragValues
+keep egui's own behaviour (not covered by this rule).

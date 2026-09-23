@@ -45,13 +45,17 @@ Patch: `midi.in → osc.va (saw) → filter.svf → vca → out`, `env.adsr` on 
    `< 2 mods` under modulated knobs and `> 2` at source jacks; the ring still works.
 9. **Envelope timing:** click **KEY**. Now Attack/Decay/Release are captured at each note-on
    and held for that note, release included. Back to **CONT**: times follow modulation live.
-10. **Undo/redo:** Ctrl+Z / Ctrl+Shift+Z (or the buttons). Each drag, connect, repatch, delete
+10. **Fine / cancel:** hold Shift while dragging the body, ring or a dot for ×0.1 (can be pressed
+    mid-drag). Escape mid-drag restores the value from before the drag, updates the sound and
+    leaves no undo or redo entry; the drag stays inert until you release.
+11. **Undo/redo:** Ctrl+Z / Ctrl+Shift+Z (or the buttons). Each drag, connect, repatch, delete
     (with its cables) or route change is one step.
-11. **Save / reload:** type a directory in `patch dir`, **Save**; restart with `--patch <dir>`
+12. **Save / reload:** type a directory in `patch dir`, **Save**; restart with `--patch <dir>`
     (or **Load**). Routes, ids, amounts, bypass and timing mode come back, with undo history.
 
-Four-source stress case: click Cutoff. Concentric **source lanes** appear around it, one per
-route, each showing that route's span with a handle at its positive peak. Drag a handle to
+**Source lanes:** click any modulated knob. A lane per route appears around it (one lane for a
+single source), each showing that route's span with a dot at its positive peak. Four-source
+case: Cutoff. Drag a handle to
 select that source and set its depth, no drawer needed; hovering names it. Click empty canvas
 to close the lanes. When the knob isn't open, the same sources show as thin display-only rings
 ([collapsed](img/1440-19-collapsed-rings.png)); pressing them opens the lanes. Depth drags are
@@ -89,6 +93,18 @@ chords while sweeping Cutoff, dragging the envelope lane, adding LFO → Decay a
 cables. Clip B sets Attack to 300 ms, drops the fast LFO on Attack, and plays notes in CONT,
 then KEY. Outputs in `target/slice-av/` (not committed). Still not a hardware MIDI controller
 or Kosta's sound card.
+
+## Closeout verification (single-source dot, Shift, Escape)
+
+`closeout-real-x.sh` replays a scenario written by a headless run of the same steps
+(`interaction.rs::closeout_scenario_script`) on the release binary with xdotool: new single
+source on Decay edited on its dot, Shift fine drags, Escape on a dot drag and on a body drag,
+Hidden view, removing the selected source (ring then edits nothing), undo ×2 + redo, save.
+The real run's saved patch equals the headless expectation at 1440×900 and 1280×800 (within
+1e-5; same undo-history length, so no cancelled drag left an entry).
+Screenshots: [dot drag before Escape](img/1440-20-dot-drag-before-escape.png) ·
+[after Escape](img/1440-21-after-escape.png) · [Hidden, fine drag](img/1280-22-hidden-fine-drag.png) ·
+[removed, none selected](img/1280-23-removed-none-selected.png).
 
 ## Offline renders
 
@@ -143,13 +159,12 @@ Production (real editor, op log, engine, file format):
 routes as typed `PortRef::Param` cables with persistent ids; amount / sign / bypass; taper-space
 summing with one clamp; unipolar/bipolar/pitch source scaling; stepped params; feedback routes
 with a 1-block delay; per-voice routing; envelope CONT/KEY in DSP; drag-to-knob; ring edits the
-selected route; per-source lanes on inspected multi-source knobs; drawer; base entry; All/Focus/Hidden; exact undo/redo; save/reload; live-edit
+selected route; per-source lanes (dots) on inspected knobs; Shift fine drag and Escape cancel; drawer; base entry; All/Focus/Hidden; exact undo/redo; save/reload; live-edit
 safety (MIDI through swaps, audio-thread state carry, lock-free queue, reclamation).
 
 Still prototype-only (rev2_proto), not built here: primary/advanced controls and in-place
 expansion, peak-handle/inspector depth variants, x-ray cable fading,
-numeric amount entry by `+40 %` text on the plug, fine (Shift) drag, Esc-cancel of drags, toast
-messages, themes (A-light/A-dark), skins beyond the existing `osc.va` demo, rich LFO, zoom.
+numeric amount entry by `+40 %` text on the plug, toast messages, themes (A-light/A-dark), skins beyond the existing `osc.va` demo, rich LFO, zoom.
 
 ## Known limitations
 
