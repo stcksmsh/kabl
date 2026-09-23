@@ -47,7 +47,7 @@ const PARAMS: &[ParamInfo] = &[
         max: 1.0,
         default: 0.0, // linear response by default
         unit: "",
-        taper: Taper::Linear,
+        taper: Taper::Stepped,
         smoothing_ms: 0.0,
     },
 ];

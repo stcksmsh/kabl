@@ -27,8 +27,7 @@ use kabl_engine::graph::BLOCK;
 use kabl_engine::patch_engine::PatchEngine;
 use kabl_engine::voice_allocator::VoiceAllocator;
 use kabl_standalone::{
-    apply_voice_event, connect_midi, default_patch, RingBuffer, VoiceEvent,
-    DEFAULT_VOICE_COUNT, MIDI_IN_ID,
+    apply_voice_event, connect_midi, default_patch, RingBuffer, VoiceEvent, DEFAULT_VOICE_COUNT,
 };
 
 /// Samples of headroom each ring buffer keeps between the engine's `BLOCK`-sized output and
@@ -102,7 +101,7 @@ fn main() {
             // Audio thread: apply any MIDI events queued since the last callback, then produce
             // and interleave samples. No allocation anywhere in this closure body.
             while let Ok(event) = midi_consumer.pop() {
-                apply_voice_event(&mut engine, MIDI_IN_ID, event);
+                apply_voice_event(&mut engine, event);
             }
 
             let frames_needed = data.len() / channels;
@@ -248,25 +247,11 @@ fn apply_note_on_direct(
     semitones: f32,
     velocity: f32,
 ) {
-    if let Some(m) = compiled.module_mut(MIDI_IN_ID, Some(voice)) {
-        if let Some(midi) = m
-            .as_any_mut()
-            .downcast_mut::<kabl_modules::builtins::MidiIn>()
-        {
-            midi.note_on(semitones, velocity);
-        }
-    }
+    compiled.note_on(voice, semitones, velocity);
 }
 
 fn apply_note_off_direct(compiled: &mut kabl_engine::compile::CompiledPatch, voice: usize) {
-    if let Some(m) = compiled.module_mut(MIDI_IN_ID, Some(voice)) {
-        if let Some(midi) = m
-            .as_any_mut()
-            .downcast_mut::<kabl_modules::builtins::MidiIn>()
-        {
-            midi.note_off();
-        }
-    }
+    compiled.note_off(voice);
 }
 
 /// `--flag value` (two separate argv entries) — the simplest possible parser for two optional

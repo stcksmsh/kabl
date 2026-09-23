@@ -62,7 +62,7 @@ fn category_color(category: Category) -> Color32 {
 fn port_type_color(port_type: PortType) -> Color32 {
     match port_type {
         PortType::Audio => Color32::from_rgb(235, 235, 235),
-        PortType::Cv => Color32::from_rgb(90, 160, 255),
+        PortType::Cv | PortType::UnipolarCv => Color32::from_rgb(90, 160, 255),
         PortType::Gate => Color32::from_rgb(255, 190, 60),
         PortType::Pitch => Color32::from_rgb(110, 220, 150),
     }
@@ -754,7 +754,9 @@ fn port_ref_pos<'a>(
     port_ref: &PortRef,
     direction: PortDirection,
 ) -> Option<&'a Pos2> {
-    let PortRef::Module { id, port } = port_ref;
+    let PortRef::Module { id, port } = port_ref else {
+        return None;
+    };
     port_pos.get(&(*id, direction, port.clone()))
 }
 

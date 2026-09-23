@@ -2,116 +2,98 @@
 //! over the real op log) with the same `cpal`/`midir` wiring `kabl-standalone` uses, so editing a
 //! patch here and hearing the result are the same window, not a separate player process.
 //!
-//! **Known, flagged compromise, not textbook RT-safe**: the audio callback and the UI/control
-//! thread share one `PatchEngine` behind a `Mutex`. The audio callback only ever `try_lock`s (and
-//! outputs silence for a block on contention, never blocks) — a real but rare glitch risk, not a
-//! deadlock risk. The control thread runs `compile()` unlocked, then takes a blocking lock only
-//! for `PatchEngine::finish_swap` (state transfer + install, no compile). Any audio block that
-//! lands inside that window gets silence instead of underrunning or corrupting anything. The
-//! textbook-correct fix is a lock-free-published engine instead of a shared one (see
-//! decisions.md "kabl-ui: the patchbay").
-//!
-//! Neither the audio path nor the window itself could be run in this container (no audio device,
-//! no display server) — built and logic-tested, not seen or heard. Run on a real machine to
-//! verify.
+//! **Audio handoff is lock-free.** The audio callback owns the `PatchEngine` outright. The UI
+//! thread compiles each edit, wraps it for deferred drop (`basedrop::Owned`) and pushes it into
+//! a bounded `rtrb` queue (`SWAP_QUEUE`). The callback drains the queue and installs each graph
+//! with `PatchEngine::receive_swap`, which carries state from the playing graph without
+//! allocating. No mutex, so an edit can never silence a block. If the queue is full, `SwapSender`
+//! keeps only the newest unsent graph and retries next frame (older unsent ones are superseded).
+//! Retired graphs are freed on the UI thread by `Collector::collect()` every frame.
 
-use std::sync::{Arc, Mutex};
-
-use basedrop::Collector;
+use basedrop::{Collector, Owned};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use kabl_core::PatchState;
 use kabl_engine::compile::compile;
 use kabl_engine::graph::BLOCK;
-use kabl_engine::patch_engine::PatchEngine;
+use kabl_engine::patch_engine::{swap_channel, PatchEngine, SwapSender};
 use kabl_standalone::{
-    apply_voice_event, connect_midi, default_patch, RingBuffer, VoiceEvent,
-    DEFAULT_VOICE_COUNT, MIDI_IN_ID,
+    apply_voice_event, connect_midi, default_patch, RingBuffer, VoiceEvent, DEFAULT_VOICE_COUNT,
 };
 use kabl_ui::{show, PatchEditor, UiState};
 
 const RING_CAPACITY: usize = BLOCK * 256;
 
-/// Owns everything audio-related: the shared engine, the stream, the MIDI connection, and the
-/// `basedrop` handle the UI thread needs to build swaps. Kept alive for the app's lifetime by
-/// living inside `App`.
+/// Graphs in flight from the UI thread to the audio callback. The callback drains it every
+/// callback, so it only fills if the audio thread stalls; see `AudioHost::flush`.
+const SWAP_QUEUE: usize = 4;
+
+/// Owns everything audio-related: the swap queue's producer, the stream, the MIDI connection,
+/// and the `basedrop` collector that frees retired graphs. Lives inside `App`.
 struct AudioHost {
-    engine: Arc<Mutex<PatchEngine>>,
+    swap_tx: Option<SwapSender>,
     sample_rate: f32,
-    handle: basedrop::Handle,
+    collector: Collector,
     status: String,
     _stream: Option<cpal::Stream>,
     _midi_connection: Option<midir::MidiInputConnection<()>>,
-    _collector: Collector,
 }
 
 impl AudioHost {
+    fn offline(collector: Collector, status: String) -> Self {
+        AudioHost {
+            swap_tx: None,
+            sample_rate: 48000.0,
+            collector,
+            status,
+            _stream: None,
+            _midi_connection: None,
+        }
+    }
+
     fn start(patch: &PatchState) -> Self {
         let collector = Collector::new();
         let handle = collector.handle();
 
         let host = cpal::default_host();
         let Some(device) = host.default_output_device() else {
-            return AudioHost {
-                engine: Arc::new(Mutex::new(
-                    PatchEngine::new(&handle, patch, 48000.0, DEFAULT_VOICE_COUNT)
-                        .expect("default_patch should compile"),
-                )),
-                sample_rate: 48000.0,
-                handle,
-                status: "no audio output device found -- editing works, playback won't".into(),
-                _stream: None,
-                _midi_connection: None,
-                _collector: collector,
-            };
+            return Self::offline(
+                collector,
+                "no audio output device found -- editing works, playback won't".into(),
+            );
         };
-
         let config = match device.default_output_config() {
             Ok(c) if c.sample_format() == cpal::SampleFormat::F32 => c,
             _ => {
-                return AudioHost {
-                    engine: Arc::new(Mutex::new(
-                        PatchEngine::new(&handle, patch, 48000.0, DEFAULT_VOICE_COUNT)
-                            .expect("default_patch should compile"),
-                    )),
-                    sample_rate: 48000.0,
-                    handle,
-                    status: "no usable (f32) audio output config -- editing works, playback won't"
-                        .into(),
-                    _stream: None,
-                    _midi_connection: None,
-                    _collector: collector,
-                };
+                return Self::offline(
+                    collector,
+                    "no usable (f32) audio output config -- editing works, playback won't".into(),
+                )
             }
         };
 
         let sample_rate = config.sample_rate() as f32;
         let channels = config.channels() as usize;
 
-        let engine = Arc::new(Mutex::new(
-            PatchEngine::new(&handle, patch, sample_rate, DEFAULT_VOICE_COUNT)
-                .expect("default_patch should compile"),
-        ));
+        let mut engine = match PatchEngine::new(&handle, patch, sample_rate, DEFAULT_VOICE_COUNT) {
+            Ok(e) => e,
+            Err(err) => return Self::offline(collector, format!("patch failed to compile: {err}")),
+        };
 
+        let (swap_tx, mut swap_rx) = swap_channel(SWAP_QUEUE);
         let (midi_producer, mut midi_consumer) = rtrb::RingBuffer::<VoiceEvent>::new(256);
         let midi_connection = connect_midi("kabl-ui", midi_producer, None);
 
-        let engine_for_stream = engine.clone();
         let mut left_ring = RingBuffer::new(RING_CAPACITY);
         let mut right_ring = RingBuffer::new(RING_CAPACITY);
 
         let stream = device.build_output_stream(
             config.config(),
             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                // See this module's doc comment: try_lock, never block. Contention should be
-                // rare (only during an edit's finish_swap) and results in a silent
-                // block, not a glitch that corrupts state or panics.
-                let Ok(mut engine) = engine_for_stream.try_lock() else {
-                    data.fill(0.0);
-                    return;
-                };
-
+                // Audio thread. No allocation, no locks: install queued graphs (state carry is
+                // allocation-free), apply MIDI to every running graph, render.
+                engine.drain_swaps(&mut swap_rx);
                 while let Ok(event) = midi_consumer.pop() {
-                    apply_voice_event(&mut engine, MIDI_IN_ID, event);
+                    apply_voice_event(&mut engine, event);
                 }
 
                 let frames_needed = data.len() / channels;
@@ -136,41 +118,27 @@ impl AudioHost {
             None,
         );
 
-        match stream {
+        let (stream, status) = match stream {
             Ok(s) => match s.play() {
-                Ok(()) => AudioHost {
-                    engine,
-                    sample_rate,
-                    handle,
-                    status: format!("playing -- {sample_rate} Hz, {channels} ch"),
-                    _stream: Some(s),
-                    _midi_connection: midi_connection,
-                    _collector: collector,
-                },
-                Err(err) => AudioHost {
-                    engine,
-                    sample_rate,
-                    handle,
-                    status: format!("failed to start audio stream: {err}"),
-                    _stream: None,
-                    _midi_connection: midi_connection,
-                    _collector: collector,
-                },
+                Ok(()) => (
+                    Some(s),
+                    format!("playing -- {sample_rate} Hz, {channels} ch"),
+                ),
+                Err(err) => (None, format!("failed to start audio stream: {err}")),
             },
-            Err(err) => AudioHost {
-                engine,
-                sample_rate,
-                handle,
-                status: format!("failed to build audio stream: {err}"),
-                _stream: None,
-                _midi_connection: midi_connection,
-                _collector: collector,
-            },
+            Err(err) => (None, format!("failed to build audio stream: {err}")),
+        };
+        AudioHost {
+            swap_tx: Some(swap_tx),
+            sample_rate,
+            collector,
+            status,
+            _stream: stream,
+            _midi_connection: midi_connection,
         }
     }
 
-    /// Control-thread call: recompiles `patch` and installs it. Blocks briefly on the shared
-    /// lock -- see this module's doc comment for why that's an accepted, flagged tradeoff here.
+    /// UI-thread call: compiles `patch` and queues it for the audio thread.
     fn rebuild(&mut self, patch: &PatchState) {
         let new_patch = match compile(patch, self.sample_rate, DEFAULT_VOICE_COUNT) {
             Ok(p) => p,
@@ -179,12 +147,18 @@ impl AudioHost {
                 return;
             }
         };
-        if let Ok(mut engine) = self.engine.lock() {
-            engine.finish_swap(&self.handle, new_patch);
+        if let Some(tx) = self.swap_tx.as_mut() {
+            tx.send(Owned::new(&self.collector.handle(), new_patch));
         }
     }
-}
 
+    /// UI-thread, once per frame: retry a waiting graph and free retired ones.
+    fn tick(&mut self) -> bool {
+        let waiting = self.swap_tx.as_mut().is_some_and(|tx| tx.flush());
+        self.collector.collect();
+        waiting
+    }
+}
 
 struct App {
     editor: PatchEditor,
@@ -200,6 +174,9 @@ impl eframe::App for App {
         show(&mut self.editor, &mut self.ui_state, ui);
         if self.editor.take_dirty() {
             self.audio.rebuild(self.editor.state());
+        }
+        if self.audio.tick() {
+            ui.ctx().request_repaint();
         }
     }
 }

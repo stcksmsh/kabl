@@ -36,7 +36,7 @@ const PARAMS: &[ParamInfo] = &[
         max: 4.0,
         default: 0.0, // Sine
         unit: "",
-        taper: Taper::Linear,
+        taper: Taper::Stepped,
         smoothing_ms: 0.0,
     },
 ];

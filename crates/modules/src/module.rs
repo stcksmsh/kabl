@@ -41,6 +41,74 @@ pub trait StateReader {
     fn read_f32(&self, key: &str) -> Option<f32>;
 }
 
+/// Maximum entries and key length `StateBuf` holds. Every built-in writes at most 7 keys of at
+/// most 13 bytes; `tests/registry.rs` checks each one fits.
+pub const STATE_BUF_ENTRIES: usize = 12;
+pub const STATE_BUF_KEY_LEN: usize = 16;
+
+/// Fixed-capacity, non-allocating `StateWriter`/`StateReader`. Lets the audio thread carry
+/// module state into a new graph at the moment its crossfade starts, instead of from a stale
+/// control-thread snapshot. Writes past capacity (or keys longer than `STATE_BUF_KEY_LEN`) are
+/// dropped and counted in `overflowed`.
+pub struct StateBuf {
+    keys: [[u8; STATE_BUF_KEY_LEN]; STATE_BUF_ENTRIES],
+    key_lens: [u8; STATE_BUF_ENTRIES],
+    values: [f32; STATE_BUF_ENTRIES],
+    len: usize,
+    pub overflowed: usize,
+}
+
+impl Default for StateBuf {
+    fn default() -> Self {
+        StateBuf {
+            keys: [[0; STATE_BUF_KEY_LEN]; STATE_BUF_ENTRIES],
+            key_lens: [0; STATE_BUF_ENTRIES],
+            values: [0.0; STATE_BUF_ENTRIES],
+            len: 0,
+            overflowed: 0,
+        }
+    }
+}
+
+impl StateBuf {
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    fn find(&self, key: &str) -> Option<usize> {
+        let k = key.as_bytes();
+        (0..self.len).find(|&i| &self.keys[i][..self.key_lens[i] as usize] == k)
+    }
+}
+
+impl StateWriter for StateBuf {
+    fn write_f32(&mut self, key: &str, value: f32) {
+        if let Some(i) = self.find(key) {
+            self.values[i] = value;
+            return;
+        }
+        let k = key.as_bytes();
+        if self.len == STATE_BUF_ENTRIES || k.len() > STATE_BUF_KEY_LEN {
+            self.overflowed += 1;
+            return;
+        }
+        self.keys[self.len][..k.len()].copy_from_slice(k);
+        self.key_lens[self.len] = k.len() as u8;
+        self.values[self.len] = value;
+        self.len += 1;
+    }
+}
+
+impl StateReader for StateBuf {
+    fn read_f32(&self, key: &str) -> Option<f32> {
+        self.find(key).map(|i| self.values[i])
+    }
+}
+
 /// brief section 8. `prepare` may allocate (called on the control thread when a graph compiles);
 /// `process` may not (audio thread, brief section 3's RT rules).
 ///

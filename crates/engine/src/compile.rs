@@ -35,10 +35,14 @@
 //!   `[first_def, last_use]` schedule-step interval, run once at compile time after the schedule
 //!   is built. See that function's own doc comment for the algorithm and its pinned-live-forever
 //!   exceptions (`silence_buf`, `out_left`, `out_right`, every delay buffer).
-//! - **Params are compile-time constants.** v1 has no cable-to-param modulation (that's cable
-//!   depth, v2) — every param is read once from `ModuleState.params` (or `ParamInfo.default` if
-//!   unset) at compile time and passed as `Signal::Scalar` every block, exactly matching how
-//!   `patch_demo.rs` already used literals for every param.
+//! - **Params are a compile-time base plus block-rate modulation.** Each param's base comes from
+//!   `ModuleState.params` (or `ParamInfo.default`). A cable into `PortRef::Param` is a
+//!   modulation route. Per block, the compiler normalizes the base into the param's taper
+//!   (`ParamInfo::to_norm`), adds `source[0] × amount / source full scale` for every
+//!   non-bypassed route, clamps once to 0..1, and converts back (`ParamInfo::from_norm`, which
+//!   rounds `Stepped` params). Evaluation is block rate (one value per `BLOCK` samples) for every
+//!   param, whatever the destination module does with it. Routes take part in scheduling and
+//!   cycle handling like any cable: a feedback route reads its source one block late.
 //!
 //! `process_block` is now allocation-free (brief section 3), proven by
 //! `tests/compile_rt_safety.rs` running it inside `assert_no_alloc!` the same way spike S1 does.
@@ -57,8 +61,11 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt;
 
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
+use kabl_modules::builtins::MidiIn;
 use kabl_modules::module::{QualityConfig, QualityTier};
-use kabl_modules::{registry, Module, ModuleInfo, PortDirection, ProcessIo, Rate, Signal};
+use kabl_modules::{
+    registry, Module, ModuleInfo, ParamInfo, PortDirection, ProcessIo, Rate, Signal, StateBuf,
+};
 
 use crate::graph::BLOCK;
 
@@ -74,7 +81,11 @@ const MAX_INPUTS: usize = 4;
 /// currently needs more; `filter.svf`'s 3 outputs is the largest). Bump alongside a new match arm
 /// if a module ever needs more, not just this constant.
 const MAX_OUTPUTS: usize = 3;
-const MAX_PARAMS: usize = 4;
+const MAX_PARAMS: usize = 5;
+
+/// Route amount when a `PortRef::Param` cable has no stored `amount` (+25 % of knob travel, the
+/// UI's default on drop). A stored value always wins.
+pub const DEFAULT_ROUTE_AMOUNT: f32 = 0.25;
 
 #[derive(Debug)]
 pub enum CompileError {
@@ -86,6 +97,16 @@ pub enum CompileError {
         id: ModuleId,
         kind: &'static str,
         port: String,
+    },
+    /// A modulation route names a param the destination module doesn't have.
+    UnknownParam {
+        id: ModuleId,
+        param: String,
+    },
+    /// A cable references a module id that isn't in the patch.
+    MissingModule {
+        cable: CableId,
+        id: ModuleId,
     },
     /// Modules left over after topo-sorting everything with in-degree 0 repeatedly. Should not
     /// happen in practice: every cycle's back edges (found via DFS) are excluded from this
@@ -114,6 +135,12 @@ impl fmt::Display for CompileError {
             }
             CompileError::UnknownPort { id, kind, port } => {
                 write!(f, "module {id} (\"{kind}\") has no port named \"{port}\"")
+            }
+            CompileError::UnknownParam { id, param } => {
+                write!(f, "module {id} has no param named \"{param}\"")
+            }
+            CompileError::MissingModule { cable, id } => {
+                write!(f, "cable {cable} references missing module {id}")
             }
             CompileError::Cycle(ids) => {
                 write!(
@@ -148,12 +175,22 @@ enum InputSource {
     Buffer(BufIdx),
 }
 
+/// One modulated param of one `Step::Process`: base in knob travel plus every active route.
+struct ParamMod {
+    index: usize,
+    info: ParamInfo,
+    base_norm: f32,
+    /// (source buffer, signed amount / source full scale).
+    routes: Vec<(BufIdx, f32)>,
+}
+
 enum Step {
     Process {
         module_index: usize,
         inputs: Vec<InputSource>,
         output_bufs: Vec<BufIdx>,
         params: Vec<f32>,
+        mods: Vec<ParamMod>,
     },
     /// Voice-rate output -> global-rate input: sum `sources` (one per voice) into `dest`.
     SumVoices { sources: Vec<BufIdx>, dest: BufIdx },
@@ -203,12 +240,16 @@ fn coalesce_buffers(
             Step::Process {
                 inputs,
                 output_bufs,
+                mods,
                 ..
             } => {
                 for src in inputs {
                     if let InputSource::Buffer(idx) = src {
                         last_use[*idx] = last_use[*idx].max(step_idx);
                     }
+                }
+                for &(idx, _) in mods.iter().flat_map(|m| &m.routes) {
+                    last_use[idx] = last_use[idx].max(step_idx);
                 }
                 for &out_idx in output_bufs {
                     first_def[out_idx] = step_idx;
@@ -295,6 +336,9 @@ struct DelaySlotKey {
 
 pub struct CompiledPatch {
     modules: Vec<Box<dyn Module>>,
+    /// `(module index, voice)` of every `midi.in` instance. Every `midi.in` in the patch
+    /// receives every note, voice for voice (see `note_on`).
+    midi_ins: Vec<(usize, usize)>,
     /// Parallel to `modules`: which `(ModuleId, voice index)` each instance came from — `None`
     /// voice index for global-rate modules. Used for state carry-over on recompile.
     module_origin: Vec<(ModuleId, Option<usize>)>,
@@ -311,14 +355,95 @@ pub struct CompiledPatch {
     voice_count: usize,
 }
 
+enum CableTo {
+    Port(String),
+    /// Modulation route into a param: `scale` is the signed amount already divided by the
+    /// source's nominal full scale.
+    Param {
+        index: usize,
+        amount: f32,
+    },
+}
+
 struct CableInfo {
     from_id: ModuleId,
     from_port: String,
-    to_port: String,
+    to: CableTo,
     /// This cable is a DFS back edge (brief section 7.1): its reader gets last block's value from
     /// a delay buffer instead of this block's live value, and it's excluded from the
     /// topo-ordering graph. See module doc.
     delayed: bool,
+}
+
+/// A route with `bypass` set contributes nothing and is left out of the compiled graph; its
+/// settings stay in the patch.
+fn route_bypassed(c: &kabl_core::CableState) -> bool {
+    matches!(c.to, PortRef::Param { .. }) && c.params.get("bypass").is_some_and(|&b| b >= 0.5)
+}
+
+#[derive(Default)]
+struct BufMaps {
+    voice: HashMap<(ModuleId, usize, usize), BufIdx>,
+    global: HashMap<(ModuleId, usize), BufIdx>,
+    summed: HashMap<(ModuleId, usize), BufIdx>,
+}
+
+/// Buffer and step bookkeeping while `compile` wires modules. `live` holds this block's output
+/// buffers, `delay` the one-block-late copies read by feedback cables.
+struct Wiring {
+    buffers: Vec<[f32; BLOCK]>,
+    steps: Vec<Step>,
+    voice_count: usize,
+    live: BufMaps,
+    delay: BufMaps,
+}
+
+impl Wiring {
+    fn new_buf(&mut self) -> BufIdx {
+        self.buffers.push([0.0; BLOCK]);
+        self.buffers.len() - 1
+    }
+
+    /// The buffer a reader in `lane` sees for source output `(from_id, out_idx)`. Voice → voice
+    /// is per lane, global → anything is shared, voice → global is the average over voices
+    /// (a `SumVoices` step, created once per source).
+    fn source_buf(
+        &mut self,
+        from_id: ModuleId,
+        out_idx: usize,
+        src_is_voice: bool,
+        dest_is_voice: bool,
+        lane: usize,
+        delayed: bool,
+    ) -> BufIdx {
+        let maps = if delayed {
+            &mut self.delay
+        } else {
+            &mut self.live
+        };
+        if !src_is_voice {
+            return maps.global[&(from_id, out_idx)];
+        }
+        if dest_is_voice {
+            return maps.voice[&(from_id, out_idx, lane)];
+        }
+        if let Some(&b) = maps.summed.get(&(from_id, out_idx)) {
+            return b;
+        }
+        let sources: Vec<BufIdx> = (0..self.voice_count)
+            .map(|v| maps.voice[&(from_id, out_idx, v)])
+            .collect();
+        self.buffers.push([0.0; BLOCK]);
+        let dest = self.buffers.len() - 1;
+        self.steps.push(Step::SumVoices { sources, dest });
+        let maps = if delayed {
+            &mut self.delay
+        } else {
+            &mut self.live
+        };
+        maps.summed.insert((from_id, out_idx), dest);
+        dest
+    }
 }
 
 pub fn compile(
@@ -354,12 +479,22 @@ pub fn compile(
     // consume every module. See module doc.
     let mut adj_by_cable: BTreeMap<ModuleId, Vec<(CableId, ModuleId)>> = BTreeMap::new();
     for (&cable_id, cstate) in &patch.cables {
-        let PortRef::Module { id: from_id, .. } = &cstate.from;
-        let PortRef::Module { id: to_id, .. } = &cstate.to;
+        if route_bypassed(cstate) {
+            continue;
+        }
+        let (from_id, to_id) = (cstate.from.module_id(), cstate.to.module_id());
+        for id in [from_id, to_id] {
+            if !metas.contains_key(&id) {
+                return Err(CompileError::MissingModule {
+                    cable: cable_id,
+                    id,
+                });
+            }
+        }
         adj_by_cable
-            .entry(*from_id)
+            .entry(from_id)
             .or_default()
-            .push((cable_id, *to_id));
+            .push((cable_id, to_id));
     }
 
     #[derive(Clone, Copy, PartialEq)]
@@ -396,29 +531,56 @@ pub fn compile(
         }
     }
 
-    // Cables terminating at each module, keyed by destination id -> list of (dest port, source).
+    // Cables terminating at each module, keyed by destination id. Jack cables and modulation
+    // routes both order the schedule (a route's source must run before the param is read).
     let mut cables_by_dest: BTreeMap<ModuleId, Vec<CableInfo>> = BTreeMap::new();
     let mut edges: BTreeMap<ModuleId, Vec<ModuleId>> = BTreeMap::new();
     let mut indegree: BTreeMap<ModuleId, usize> = metas.keys().map(|&id| (id, 0)).collect();
 
     for (&cable_id, cstate) in &patch.cables {
+        if route_bypassed(cstate) {
+            continue;
+        }
         let PortRef::Module {
             id: from_id,
             port: from_port,
-        } = &cstate.from;
-        let PortRef::Module {
-            id: to_id,
-            port: to_port,
-        } = &cstate.to;
+        } = &cstate.from
+        else {
+            return Err(CompileError::UnknownPort {
+                id: cstate.from.module_id(),
+                kind: "source",
+                port: "<param used as a cable source>".into(),
+            });
+        };
+        let (to_id, to) = match &cstate.to {
+            PortRef::Module { id, port } => (*id, CableTo::Port(port.clone())),
+            PortRef::Param { id, param } => {
+                let info = metas[id].info;
+                let index = info
+                    .params
+                    .iter()
+                    .position(|p| p.name == param)
+                    .ok_or_else(|| CompileError::UnknownParam {
+                        id: *id,
+                        param: param.clone(),
+                    })?;
+                let amount = cstate
+                    .params
+                    .get("amount")
+                    .copied()
+                    .unwrap_or(DEFAULT_ROUTE_AMOUNT);
+                (*id, CableTo::Param { index, amount })
+            }
+        };
         let delayed = delayed_cables.contains(&cable_id);
         if !delayed {
-            edges.entry(*from_id).or_default().push(*to_id);
-            *indegree.entry(*to_id).or_insert(0) += 1;
+            edges.entry(*from_id).or_default().push(to_id);
+            *indegree.entry(to_id).or_insert(0) += 1;
         }
-        cables_by_dest.entry(*to_id).or_default().push(CableInfo {
+        cables_by_dest.entry(to_id).or_default().push(CableInfo {
             from_id: *from_id,
             from_port: from_port.clone(),
-            to_port: to_port.clone(),
+            to,
             delayed,
         });
     }
@@ -451,23 +613,19 @@ pub fn compile(
         return Err(CompileError::Cycle(remaining));
     }
 
-    let mut buffers: Vec<[f32; BLOCK]> = Vec::new();
-    let silence_buf = {
-        buffers.push([0.0; BLOCK]);
-        buffers.len() - 1
+    let mut w = Wiring {
+        buffers: Vec::new(),
+        steps: Vec::new(),
+        voice_count,
+        live: BufMaps::default(),
+        delay: BufMaps::default(),
     };
-
-    let mut voice_output_buf: HashMap<(ModuleId, usize, usize), BufIdx> = HashMap::new();
-    let mut global_output_buf: HashMap<(ModuleId, usize), BufIdx> = HashMap::new();
-    let mut summed_buf: HashMap<(ModuleId, usize), BufIdx> = HashMap::new();
+    let silence_buf = w.new_buf();
 
     // Delay buffers for every delayed cable's source port (brief section 7.1), pre-created before
     // the topo-order wiring loop below: a delayed cable's source can be scheduled *after* its
     // reader now that the edge no longer constrains ordering, so the reader can't wait for the
     // source's normal output-buffer bookkeeping to exist yet.
-    let mut voice_delay_buf: HashMap<(ModuleId, usize, usize), BufIdx> = HashMap::new();
-    let mut global_delay_buf: HashMap<(ModuleId, usize), BufIdx> = HashMap::new();
-    let mut summed_delay_buf: HashMap<(ModuleId, usize), BufIdx> = HashMap::new();
     let mut delayed_sources: std::collections::BTreeSet<(ModuleId, String)> = Default::default();
     for cables in cables_by_dest.values() {
         for c in cables {
@@ -487,18 +645,18 @@ pub fn compile(
         })?;
         if src_meta.info.rate == Rate::Voice {
             for lane in 0..voice_count {
-                buffers.push([0.0; BLOCK]);
-                voice_delay_buf.insert((from_id, src_out_idx, lane), buffers.len() - 1);
+                let b = w.new_buf();
+                w.delay.voice.insert((from_id, src_out_idx, lane), b);
             }
         } else {
-            buffers.push([0.0; BLOCK]);
-            global_delay_buf.insert((from_id, src_out_idx), buffers.len() - 1);
+            let b = w.new_buf();
+            w.delay.global.insert((from_id, src_out_idx), b);
         }
     }
 
     let mut modules: Vec<Box<dyn Module>> = Vec::new();
     let mut module_origin: Vec<(ModuleId, Option<usize>)> = Vec::new();
-    let mut steps: Vec<Step> = Vec::new();
+    let mut midi_ins: Vec<(usize, usize)> = Vec::new();
     let mut out_left = silence_buf;
     let mut out_right = silence_buf;
 
@@ -558,85 +716,98 @@ pub fn compile(
 
         let empty = Vec::new();
         let incoming = cables_by_dest.get(&id).unwrap_or(&empty);
+        // Resolve every incoming cable's source port once (validates names too).
+        let mut sources = Vec::with_capacity(incoming.len());
         for cable in incoming {
-            if input_port_index(meta.info, &cable.to_port).is_none() {
-                return Err(CompileError::UnknownPort {
-                    id,
-                    kind: "destination",
-                    port: cable.to_port.clone(),
-                });
+            if let CableTo::Port(port) = &cable.to {
+                if input_port_index(meta.info, port).is_none() {
+                    return Err(CompileError::UnknownPort {
+                        id,
+                        kind: "destination",
+                        port: port.clone(),
+                    });
+                }
             }
+            let src_info = metas[&cable.from_id].info;
+            let src_out_idx = output_port_index(src_info, &cable.from_port).ok_or_else(|| {
+                CompileError::UnknownPort {
+                    id: cable.from_id,
+                    kind: "source",
+                    port: cable.from_port.clone(),
+                }
+            })?;
+            let port_type = src_info
+                .ports
+                .iter()
+                .filter(|p| p.direction == PortDirection::Output)
+                .nth(src_out_idx)
+                .expect("index from output_port_index")
+                .port_type;
+            let (lo, hi) = port_type.nominal_range();
+            let full_scale = lo.abs().max(hi.abs());
+            sources.push((src_out_idx, src_info.rate == Rate::Voice, full_scale));
         }
 
         for lane in 0..n_lanes {
             let mut lane_inputs = Vec::with_capacity(input_ports.len());
             for port in &input_ports {
-                let cable = incoming.iter().find(|c| c.to_port == port.name);
-                let source = match cable {
+                let found = incoming
+                    .iter()
+                    .position(|c| matches!(&c.to, CableTo::Port(p) if p == port.name));
+                lane_inputs.push(match found {
                     None => InputSource::Silence,
-                    Some(cable) => {
-                        let src_meta = &metas[&cable.from_id];
-                        let src_out_idx = output_port_index(src_meta.info, &cable.from_port)
-                            .ok_or_else(|| CompileError::UnknownPort {
-                                id: cable.from_id,
-                                kind: "source",
-                                port: cable.from_port.clone(),
-                            })?;
-                        let src_is_voice = src_meta.info.rate == Rate::Voice;
-                        let buf = if cable.delayed {
-                            // Brief section 7.1: read last block's value, not this block's —
-                            // `src_meta`'s ordering relative to this module is unconstrained.
-                            if src_is_voice && is_voice {
-                                voice_delay_buf[&(cable.from_id, src_out_idx, lane)]
-                            } else if src_is_voice && !is_voice {
-                                *summed_delay_buf
-                                    .entry((cable.from_id, src_out_idx))
-                                    .or_insert_with(|| {
-                                        let sources: Vec<BufIdx> = (0..voice_count)
-                                            .map(|v| {
-                                                voice_delay_buf[&(cable.from_id, src_out_idx, v)]
-                                            })
-                                            .collect();
-                                        buffers.push([0.0; BLOCK]);
-                                        let dest = buffers.len() - 1;
-                                        steps.push(Step::SumVoices { sources, dest });
-                                        dest
-                                    })
-                            } else {
-                                global_delay_buf[&(cable.from_id, src_out_idx)]
-                            }
-                        } else if src_is_voice && is_voice {
-                            voice_output_buf[&(cable.from_id, src_out_idx, lane)]
-                        } else if src_is_voice && !is_voice {
-                            *summed_buf
-                                .entry((cable.from_id, src_out_idx))
-                                .or_insert_with(|| {
-                                    let sources: Vec<BufIdx> = (0..voice_count)
-                                        .map(|v| voice_output_buf[&(cable.from_id, src_out_idx, v)])
-                                        .collect();
-                                    buffers.push([0.0; BLOCK]);
-                                    let dest = buffers.len() - 1;
-                                    steps.push(Step::SumVoices { sources, dest });
-                                    dest
-                                })
-                        } else {
-                            global_output_buf[&(cable.from_id, src_out_idx)]
-                        };
-                        InputSource::Buffer(buf)
+                    Some(k) => {
+                        let (src_out_idx, src_is_voice, _) = sources[k];
+                        let c = &incoming[k];
+                        InputSource::Buffer(w.source_buf(
+                            c.from_id,
+                            src_out_idx,
+                            src_is_voice,
+                            is_voice,
+                            lane,
+                            c.delayed,
+                        ))
                     }
+                });
+            }
+
+            let mut mods: Vec<ParamMod> = Vec::new();
+            for (k, c) in incoming.iter().enumerate() {
+                let CableTo::Param { index, amount } = c.to else {
+                    continue;
                 };
-                lane_inputs.push(source);
+                let (src_out_idx, src_is_voice, full_scale) = sources[k];
+                let buf = w.source_buf(
+                    c.from_id,
+                    src_out_idx,
+                    src_is_voice,
+                    is_voice,
+                    lane,
+                    c.delayed,
+                );
+                let route = (buf, amount / full_scale);
+                match mods.iter_mut().find(|m| m.index == index) {
+                    Some(m) => m.routes.push(route),
+                    None => {
+                        let info = meta.info.params[index];
+                        mods.push(ParamMod {
+                            index,
+                            info,
+                            base_norm: info.to_norm(params[index]),
+                            routes: vec![route],
+                        });
+                    }
+                }
             }
 
             let mut lane_outputs = Vec::with_capacity(output_ports.len());
             for (out_idx, _) in output_ports.iter().enumerate() {
-                buffers.push([0.0; BLOCK]);
-                let buf = buffers.len() - 1;
+                let buf = w.new_buf();
                 lane_outputs.push(buf);
                 if is_voice {
-                    voice_output_buf.insert((id, out_idx, lane), buf);
+                    w.live.voice.insert((id, out_idx, lane), buf);
                 } else {
-                    global_output_buf.insert((id, out_idx), buf);
+                    w.live.global.insert((id, out_idx), buf);
                 }
             }
 
@@ -656,15 +827,31 @@ pub fn compile(
             let module_index = modules.len();
             modules.push(instance);
             module_origin.push((id, if is_voice { Some(lane) } else { None }));
+            if meta.kind == "midi.in" {
+                midi_ins.push((module_index, lane));
+            }
 
-            steps.push(Step::Process {
+            w.steps.push(Step::Process {
                 module_index,
                 inputs: lane_inputs,
                 output_bufs: lane_outputs,
                 params: params.clone(),
+                mods,
             });
         }
     }
+
+    let Wiring {
+        buffers,
+        mut steps,
+        live,
+        delay,
+        ..
+    } = w;
+    let voice_output_buf = live.voice;
+    let global_output_buf = live.global;
+    let voice_delay_buf = delay.voice;
+    let global_delay_buf = delay.global;
 
     // Refresh every delay buffer from this block's live value, for the *next* process_block()
     // call to read — sorted keys, not raw `HashMap` iteration order, to keep the schedule
@@ -726,12 +913,16 @@ pub fn compile(
             Step::Process {
                 inputs,
                 output_bufs,
+                mods,
                 ..
             } => {
                 for src in inputs.iter_mut() {
                     if let InputSource::Buffer(idx) = src {
                         *idx = remap[*idx];
                     }
+                }
+                for route in mods.iter_mut().flat_map(|m| m.routes.iter_mut()) {
+                    route.0 = remap[route.0];
                 }
                 for out_idx in output_bufs.iter_mut() {
                     *out_idx = remap[*out_idx];
@@ -758,6 +949,7 @@ pub fn compile(
 
     Ok(CompiledPatch {
         modules,
+        midi_ins,
         module_origin,
         steps,
         buffers,
@@ -804,6 +996,7 @@ impl CompiledPatch {
                     inputs,
                     output_bufs,
                     params,
+                    mods,
                 } => {
                     // Fixed-size stack scratch, not `Vec` — `compile()` already rejected any
                     // module whose input/param count exceeds MAX_INPUTS/MAX_PARAMS, so these
@@ -826,6 +1019,18 @@ impl CompiledPatch {
                     let mut param_signals = [Signal::Scalar(0.0); MAX_PARAMS];
                     for (slot, &v) in param_signals.iter_mut().zip(params.iter()) {
                         *slot = Signal::Scalar(v);
+                    }
+                    // Block-rate modulation in knob-travel space: base + Σ source × scale,
+                    // clamped once inside `from_norm`. A non-finite source leaves the base.
+                    for m in mods.iter() {
+                        let mut n = m.base_norm;
+                        for &(buf, scale) in &m.routes {
+                            n += self.buffers[buf][0] * scale;
+                        }
+                        if !n.is_finite() {
+                            n = m.base_norm;
+                        }
+                        param_signals[m.index] = Signal::Scalar(m.info.from_norm(n));
                     }
                     let param_signals = &param_signals[..params.len()];
 
@@ -895,6 +1100,30 @@ impl CompiledPatch {
         }
     }
 
+    /// Starts a note on `voice` in every `midi.in` of this patch. No allocation. With several
+    /// `midi.in` modules, each one plays every note (deterministic, like MIDI thru); a patch
+    /// with none ignores notes.
+    pub fn note_on(&mut self, voice: usize, semitones: f32, velocity: f32) {
+        for &(index, v) in &self.midi_ins {
+            if v == voice {
+                if let Some(m) = self.modules[index].as_any_mut().downcast_mut::<MidiIn>() {
+                    m.note_on(semitones, velocity);
+                }
+            }
+        }
+    }
+
+    /// Releases `voice` in every `midi.in`. No allocation.
+    pub fn note_off(&mut self, voice: usize) {
+        for &(index, v) in &self.midi_ins {
+            if v == voice {
+                if let Some(m) = self.modules[index].as_any_mut().downcast_mut::<MidiIn>() {
+                    m.note_off();
+                }
+            }
+        }
+    }
+
     pub fn left(&self) -> &[f32; BLOCK] {
         &self.buffers[self.out_left]
     }
@@ -938,18 +1167,24 @@ pub fn recompile(
     Ok(new_patch)
 }
 
-/// The state-transfer half of `recompile`, split out so a caller can run the expensive
-/// `compile()` without holding whatever guards `old` (see `PatchEngine::finish_swap`).
+/// The state-transfer half of `recompile`: for every `(ModuleId, voice)` present in both
+/// graphs with the same kind, copies module state from `old` into `new_patch`, plus every
+/// feedback delay slot present in both. Allocation-free (fixed-size `StateBuf`, linear origin
+/// search, `HashMap` lookups only), so `PatchEngine` runs it on the audio thread at the moment a
+/// new graph starts its crossfade, from the graph that is actually playing.
 pub fn carry_state(old: &mut CompiledPatch, new_patch: &mut CompiledPatch) {
-    let old_origins = old.module_origin.clone();
-    for (id, voice) in old_origins {
-        if let (Some(old_module), Some(new_module)) =
-            (old.module_mut(id, voice), new_patch.module_mut(id, voice))
-        {
-            let mut state = HashMapState::default();
-            old_module.save_state(&mut state);
-            new_module.load_state(&state);
+    for (new_index, &origin) in new_patch.module_origin.iter().enumerate() {
+        let Some(old_index) = old.module_origin.iter().position(|&o| o == origin) else {
+            continue;
+        };
+        let old_module = &old.modules[old_index];
+        let new_module = &mut new_patch.modules[new_index];
+        if old_module.info().kind != new_module.info().kind {
+            continue;
         }
+        let mut state = StateBuf::default();
+        old_module.save_state(&mut state);
+        new_module.load_state(&state);
     }
     // Carry a feedback loop's one-block memory across too (brief section 7.1's delay buffers) —
     // for every delay slot present in both the old and new compile (same source port still a DFS

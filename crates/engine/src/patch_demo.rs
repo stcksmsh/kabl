@@ -93,6 +93,7 @@ impl Voice {
                 Signal::Scalar(80.0),  // decay_ms
                 Signal::Scalar(0.7),   // sustain
                 Signal::Scalar(300.0), // release_ms
+                Signal::Scalar(0.0),   // timing: continuous
             ];
             let mut outputs: [&mut [f32]; 1] = [&mut env_out];
             let mut io = ProcessIo::new(&inputs, &mut outputs, &params, BLOCK);

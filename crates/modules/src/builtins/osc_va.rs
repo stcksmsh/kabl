@@ -56,7 +56,7 @@ const PARAMS: &[ParamInfo] = &[
         max: 3.0,
         default: 2.0, // Saw — matches this module's behavior before waveform selection existed.
         unit: "",
-        taper: Taper::Linear,
+        taper: Taper::Stepped,
         smoothing_ms: 0.0,
     },
 ];

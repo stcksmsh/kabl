@@ -106,6 +106,7 @@ impl DynVoice {
                 Signal::Scalar(80.0),
                 Signal::Scalar(0.7),
                 Signal::Scalar(300.0),
+                Signal::Scalar(0.0),
             ];
             let mut outputs: [&mut [f32]; 1] = [&mut env_out];
             let mut io = ProcessIo::new(&inputs, &mut outputs, &params, BLOCK);

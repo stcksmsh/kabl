@@ -32,9 +32,25 @@ pub enum PortType {
     Audio,
     /// Control voltage, ±1 nominal range.
     Cv,
+    /// Control voltage, 0..1 nominal range (envelope output, velocity).
+    UnipolarCv,
     Gate,
     /// Float semitones, 1V/oct semantics (brief section 8).
     Pitch,
+}
+
+impl PortType {
+    /// Nominal `(low, high)` range of a signal of this type. Parameter modulation scales a
+    /// source by `1 / max(|low|, |high|)`, so a full-scale source moves a knob by exactly its
+    /// route amount, whether the source is bipolar or unipolar. Pitch uses ±60 semitones
+    /// (five octaves) as its nominal full scale.
+    pub fn nominal_range(self) -> (f32, f32) {
+        match self {
+            PortType::Audio | PortType::Cv => (-1.0, 1.0),
+            PortType::UnipolarCv | PortType::Gate => (0.0, 1.0),
+            PortType::Pitch => (-60.0, 60.0),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -57,6 +73,36 @@ pub struct PortInfo {
 pub enum Taper {
     Linear,
     Exponential,
+    /// Whole-number choices from `min` to `max` (waveform, mode switches). Linear travel,
+    /// rounded to the nearest option.
+    Stepped,
+}
+
+impl ParamInfo {
+    /// Position of `value` along the knob's travel, 0..1, in this param's own taper
+    /// (logarithmic for `Exponential`). Parameter modulation adds in this space.
+    pub fn to_norm(&self, value: f32) -> f32 {
+        let n = match self.taper {
+            Taper::Exponential => (value / self.min).ln() / (self.max / self.min).ln(),
+            Taper::Linear | Taper::Stepped => (value - self.min) / (self.max - self.min),
+        };
+        if n.is_finite() {
+            n.clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
+    }
+
+    /// Inverse of `to_norm`: knob travel 0..1 back to destination units. `Stepped` rounds to
+    /// the nearest option.
+    pub fn from_norm(&self, norm: f32) -> f32 {
+        let n = norm.clamp(0.0, 1.0);
+        match self.taper {
+            Taper::Exponential => self.min * ((self.max / self.min).ln() * n).exp(),
+            Taper::Linear => self.min + (self.max - self.min) * n,
+            Taper::Stepped => (self.min + (self.max - self.min) * n).round(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

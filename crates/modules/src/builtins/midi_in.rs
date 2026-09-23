@@ -27,7 +27,7 @@ const PORTS: &[PortInfo] = &[
     },
     PortInfo {
         name: "velocity",
-        port_type: PortType::Cv,
+        port_type: PortType::UnipolarCv,
         direction: PortDirection::Output,
     },
 ];

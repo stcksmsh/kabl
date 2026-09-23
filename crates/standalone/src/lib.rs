@@ -7,7 +7,6 @@
 
 use kabl_core::{CableState, ModuleId, ModuleState, PatchState, PortRef, Vec2};
 use kabl_engine::patch_engine::PatchEngine;
-use kabl_modules::builtins::MidiIn;
 use std::collections::BTreeMap;
 
 /// How many notes can sound at once. Chosen as a reasonable default for a first-light polysynth,
@@ -83,8 +82,8 @@ pub fn default_patch() -> PatchState {
     patch
 }
 
-/// The `midi.in` module's stable id in `default_patch()` — needed to reach the right instance
-/// via `CompiledPatch::module_mut(id, Some(voice))`.
+/// The `midi.in` module's id in `default_patch()`. MIDI routing does not depend on it (notes
+/// reach every `midi.in`, see `CompiledPatch::note_on`); tests use it to inspect that module.
 pub const MIDI_IN_ID: ModuleId = 1;
 
 fn positioned_module(kind: &str, params: &[(&str, f32)], x: f32, y: f32) -> ModuleState {
@@ -161,27 +160,17 @@ pub fn resolve_midi_message(
     }
 }
 
-/// Applies a resolved `VoiceEvent` to `engine`'s active graph — the audio-thread half of MIDI
-/// handling. No allocation: `module_mut` is a linear scan over an already-allocated `Vec`,
-/// `as_any_mut`/`downcast_mut` are pointer casts, `note_on`/`note_off` are field writes.
-pub fn apply_voice_event(engine: &mut PatchEngine, midi_in_id: ModuleId, event: VoiceEvent) {
-    let voice = match event {
-        VoiceEvent::NoteOn { voice, .. } => voice,
-        VoiceEvent::NoteOff { voice } => voice,
-    };
-    let Some(module) = engine.active_mut().module_mut(midi_in_id, Some(voice)) else {
-        return;
-    };
-    let Some(midi) = module.as_any_mut().downcast_mut::<MidiIn>() else {
-        return;
-    };
+/// Applies a resolved `VoiceEvent` to every graph `engine` is running (active and, during a
+/// crossfade, incoming), reaching every `midi.in` instance in the patch — the audio-thread half
+/// of MIDI handling. No allocation.
+pub fn apply_voice_event(engine: &mut PatchEngine, event: VoiceEvent) {
     match event {
         VoiceEvent::NoteOn {
+            voice,
             semitones,
             velocity,
-            ..
-        } => midi.note_on(semitones, velocity),
-        VoiceEvent::NoteOff { .. } => midi.note_off(),
+        } => engine.note_on(voice, semitones, velocity),
+        VoiceEvent::NoteOff { voice } => engine.note_off(voice),
     }
 }
 

@@ -25,6 +25,7 @@ fn run_block(
         Signal::Scalar(decay_ms),
         Signal::Scalar(sustain),
         Signal::Scalar(release_ms),
+        Signal::Scalar(0.0),
     ];
     let mut buf = [0f32; BLOCK];
     let mut outputs: [&mut [f32]; 1] = [&mut buf];

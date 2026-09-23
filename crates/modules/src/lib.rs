@@ -16,5 +16,5 @@ pub use info::{
     Rate, Taper,
 };
 pub use io::{ProcessIo, Signal};
-pub use module::{Module, QualityConfig, QualityTier, StateReader, StateWriter};
+pub use module::{Module, QualityConfig, QualityTier, StateBuf, StateReader, StateWriter};
 pub use skin::{ControlKind, ControlSkin, ModuleSkin};

@@ -10,9 +10,18 @@
 //! voice_count)` (a whole patch, arbitrary changes). Forcing both through one generic/trait would
 //! mean abstracting over a mono-vs-stereo output shape and a one-knob-vs-whole-patch rebuild
 //! signature for exactly two call sites — the "don't design for hypothetical future
-//! requirements" case, not a real shared shape. The crossfade math itself (`equal_power`, brief
-//! section 7's "10-20ms equal-power blend") is shared via `swap::equal_power` (`pub(crate)`),
-//! since that's genuinely the same formula, not just structurally similar code.
+//! requirements" case, not a real shared shape. The crossfade is linear here, not S1's
+//! equal-power curve: see `process_block` and decisions.md "Live-edit crossfade is linear".
+//!
+//! **State carry happens on the audio thread, when a fade starts.** `receive_swap` (or the
+//! promotion of a queued `pending` graph) runs `compile::carry_state` from the graph that is
+//! actually playing at that instant: `incoming` if a fade is in flight, else `active`.
+//! `carry_state` is allocation-free, so this needs no lock. A control-thread snapshot taken at
+//! build time would be stale by the time a queued graph starts: notes released in between would
+//! come back, envelopes would jump back in time.
+//!
+//! **MIDI reaches every running graph.** `note_on`/`note_off` apply to `active` and `incoming`.
+//! A `pending` graph gets them through `carry_state` when its fade starts.
 //!
 //! `process_block` is allocation-free — `CompiledPatch::process_block` already is (see
 //! `compile.rs`), and this wrapper adds no allocation of its own. Proven the same way as
@@ -22,9 +31,9 @@
 use basedrop::{Handle, Owned};
 use kabl_core::PatchState;
 
-use crate::compile::{carry_state, compile, recompile, CompileError, CompiledPatch};
+use crate::compile::{carry_state, compile, CompileError, CompiledPatch};
 use crate::graph::BLOCK;
-use crate::swap::{equal_power, CROSSFADE_MS};
+use crate::swap::CROSSFADE_MS;
 
 pub struct PatchEngine {
     active: Owned<CompiledPatch>,
@@ -77,48 +86,51 @@ impl PatchEngine {
         &mut self.active
     }
 
-    /// Control-thread call: recompiles `patch` against the current active graph, carrying state
-    /// over (brief section 7.5, via `compile::recompile`), and wraps the result for deferred
-    /// drop. Allocates — never call from the audio thread. Hand the result to the audio thread
-    /// through a channel (`rtrb`, brief section 7.6) and install it with `receive_swap`.
-    ///
-    /// State is always carried from `active`, never from an in-flight `incoming` — if a second
-    /// `build_swap` runs before the first fade finishes, its state snapshot is up to one
-    /// crossfade behind what's about to become active (see `receive_swap`'s queueing). That's a
-    /// real staleness, not a new category of one: `active`'s state is already only ever a
-    /// control-thread snapshot of "as of whenever this ran," not synced to the audio thread's
-    /// exact position either way.
+    /// Control-thread call: compiles `patch` and wraps it for deferred drop. Allocates — never
+    /// call from the audio thread. Hand the result to the audio thread through a channel
+    /// (`rtrb`, brief section 7.6) and install it with `receive_swap`, which carries state.
     pub fn build_swap(
-        &mut self,
+        &self,
         handle: &Handle,
         patch: &PatchState,
     ) -> Result<Owned<CompiledPatch>, CompileError> {
-        let sample_rate = self.active.sample_rate();
-        let new_patch = recompile(&mut self.active, patch, sample_rate, self.voice_count)?;
+        let new_patch = compile(patch, self.active.sample_rate(), self.voice_count)?;
         Ok(Owned::new(handle, new_patch))
     }
 
-    /// Control-thread call, for a caller sharing this engine with the audio thread behind a lock:
-    /// run `compile()` (the expensive part) *before* taking the lock, then hand the result here to
-    /// carry state from `active` and install it. Same result as `build_swap` + `receive_swap`,
-    /// but the lock is held only for the state transfer. Allocates.
-    pub fn finish_swap(&mut self, handle: &Handle, mut new_patch: CompiledPatch) {
-        carry_state(&mut self.active, &mut new_patch);
+    /// Same-thread convenience for tests and offline rendering: wrap and install `new_patch`.
+    pub fn finish_swap(&mut self, handle: &Handle, new_patch: CompiledPatch) {
         self.receive_swap(Owned::new(handle, new_patch));
     }
 
-    /// Audio-thread call: installs a graph built by `build_swap` and starts its crossfade-in. No
-    /// allocation.
+    /// Audio-thread call: installs a graph built by `build_swap`. No allocation.
     ///
-    /// Brief section 7.6's overlapping-swap case: if a fade is already in flight, this doesn't
-    /// restart it (which would snap the blended output straight to a different signal — the exact
-    /// click the crossfade exists to prevent). It queues `new_patch` in `pending` instead;
-    /// `process_block` starts it as a normal fade the moment the current one finishes.
-    pub fn receive_swap(&mut self, new_patch: Owned<CompiledPatch>) {
+    /// No fade in flight: carries state from `active` and starts the crossfade now. Fade in
+    /// flight (brief section 7.6's overlapping swaps): queues `new_patch` in `pending` instead of
+    /// restarting the fade (which would click). A newer arrival replaces an older pending one
+    /// (last request wins; the replaced graph is dropped through `basedrop`, not freed here).
+    pub fn receive_swap(&mut self, mut new_patch: Owned<CompiledPatch>) {
         if self.incoming.is_some() {
             self.pending = Some(new_patch);
         } else {
+            carry_state(&mut self.active, &mut new_patch);
             self.incoming = Some((new_patch, 0));
+        }
+    }
+
+    /// Audio-thread call: note-on for `voice` in every running graph. No allocation.
+    pub fn note_on(&mut self, voice: usize, semitones: f32, velocity: f32) {
+        self.active.note_on(voice, semitones, velocity);
+        if let Some((g, _)) = self.incoming.as_mut() {
+            g.note_on(voice, semitones, velocity);
+        }
+    }
+
+    /// Audio-thread call: note-off for `voice` in every running graph. No allocation.
+    pub fn note_off(&mut self, voice: usize) {
+        self.active.note_off(voice);
+        if let Some((g, _)) = self.incoming.as_mut() {
+            g.note_off(voice);
         }
     }
 
@@ -143,8 +155,11 @@ impl PatchEngine {
                     out_left[i] = new_left[i];
                     out_right[i] = new_right[i];
                 } else {
-                    let t = pos as f32 / self.crossfade_samples as f32;
-                    let (g_old, g_new) = equal_power(t);
+                    // Linear (gains sum to 1), not equal-power: both graphs start from the same
+                    // carried state, so they are strongly correlated, and equal-power would
+                    // swell an unchanged signal by up to +41 % mid-fade on every edit.
+                    let g_new = pos as f32 / self.crossfade_samples as f32;
+                    let g_old = 1.0 - g_new;
                     out_left[i] = old_left[i] * g_old + new_left[i] * g_new;
                     out_right[i] = old_right[i] * g_old + new_right[i] * g_new;
                 }
@@ -164,9 +179,54 @@ impl PatchEngine {
             // A swap queued while this fade was in flight (see `receive_swap`) starts now, from
             // the graph that was just promoted — same as any other fresh `receive_swap`, just
             // deferred instead of dropped or stepped on.
-            if let Some(pending) = self.pending.take() {
+            if let Some(mut pending) = self.pending.take() {
+                carry_state(&mut self.active, &mut pending);
                 self.incoming = Some((pending, 0));
             }
+        }
+    }
+}
+
+/// Control-thread end of the graph handoff queue (see `swap_channel`).
+pub struct SwapSender {
+    tx: rtrb::Producer<Owned<CompiledPatch>>,
+    /// Newest graph that didn't fit in the queue yet. A newer `send` replaces it: only the
+    /// latest edit matters, and the replaced graph is dropped here, on the control thread.
+    unsent: Option<Owned<CompiledPatch>>,
+}
+
+/// Bounded single-producer/single-consumer queue of compiled graphs from the control thread to
+/// the audio thread. The audio side calls `PatchEngine::drain_swaps` every callback.
+pub fn swap_channel(capacity: usize) -> (SwapSender, rtrb::Consumer<Owned<CompiledPatch>>) {
+    let (tx, rx) = rtrb::RingBuffer::new(capacity);
+    (SwapSender { tx, unsent: None }, rx)
+}
+
+impl SwapSender {
+    /// Queues `graph`, or holds it (replacing any older held graph) if the queue is full.
+    /// Returns true if a graph is still held; call `flush` again later.
+    pub fn send(&mut self, graph: Owned<CompiledPatch>) -> bool {
+        self.unsent = Some(graph);
+        self.flush()
+    }
+
+    /// Retries the held graph. Returns true if it is still held.
+    pub fn flush(&mut self) -> bool {
+        if let Some(graph) = self.unsent.take() {
+            if let Err(rtrb::PushError::Full(graph)) = self.tx.push(graph) {
+                self.unsent = Some(graph);
+            }
+        }
+        self.unsent.is_some()
+    }
+}
+
+impl PatchEngine {
+    /// Audio-thread call: installs every graph waiting in the queue, in order (each one after
+    /// the first replaces the previous as `pending`). No allocation.
+    pub fn drain_swaps(&mut self, rx: &mut rtrb::Consumer<Owned<CompiledPatch>>) {
+        while let Ok(graph) = rx.pop() {
+            self.receive_swap(graph);
         }
     }
 }

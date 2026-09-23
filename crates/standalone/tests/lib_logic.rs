@@ -159,7 +159,6 @@ fn apply_voice_event_reaches_the_correct_compiled_voice() {
 
     apply_voice_event(
         &mut engine,
-        MIDI_IN_ID,
         VoiceEvent::NoteOn {
             voice: 2,
             semitones: 7.0,
@@ -174,7 +173,7 @@ fn apply_voice_event_reaches_the_correct_compiled_voice() {
         "other voices untouched"
     );
 
-    apply_voice_event(&mut engine, MIDI_IN_ID, VoiceEvent::NoteOff { voice: 2 });
+    apply_voice_event(&mut engine, VoiceEvent::NoteOff { voice: 2 });
     assert_eq!(
         pitch_of(engine.active_mut(), 2),
         None,
@@ -193,14 +192,13 @@ fn apply_voice_event_does_not_allocate() {
     assert_no_alloc(|| {
         apply_voice_event(
             &mut engine,
-            MIDI_IN_ID,
             VoiceEvent::NoteOn {
                 voice: 0,
                 semitones: 0.0,
                 velocity: 0.8,
             },
         );
-        apply_voice_event(&mut engine, MIDI_IN_ID, VoiceEvent::NoteOff { voice: 0 });
+        apply_voice_event(&mut engine, VoiceEvent::NoteOff { voice: 0 });
     });
 }
 
