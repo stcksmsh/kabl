@@ -143,6 +143,7 @@ pub fn step_labels(kind: &str, param: &str) -> Option<&'static [&'static str]> {
         ("lfo", "waveform") => &["SIN", "TRI", "SAW", "SQR", "S&H"],
         ("osc.va", "waveform") => &["SIN", "TRI", "SAW", "SQR"],
         ("vca", "exponential") => &["LIN", "EXP"],
+        ("seq", _) => &["OFF", "ON"],
         _ => return None,
     })
 }
@@ -174,6 +175,8 @@ pub fn fmt_value(p: &ParamInfo, v: f32) -> String {
         "Hz" if v >= 1000.0 => format!("{:.2} kHz", v / 1000.0),
         "Hz" if v < 10.0 => format!("{v:.2} Hz"),
         "Hz" => format!("{v:.0} Hz"),
+        "st" => format!("{:+} st", v.round()),
+        "bpm" => format!("{v:.0} bpm"),
         _ => format!("{v:.2}"),
     }
 }

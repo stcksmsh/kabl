@@ -7,20 +7,20 @@
 //! once the UI needs to enumerate everything, or the compiler needs to construct modules from
 //! kind strings") — the compiler is exactly that first real need.
 //!
-//! A `match` over 9 known kinds, not a `HashMap`/`inventory`-style dynamic registration: brief
+//! A `match` over the known kinds, not a `HashMap`/`inventory`-style dynamic registration: brief
 //! section 4.1's foundational decision 5 ("one module interface for built-in, composite and
 //! code modules") means composites/code modules (v4+) will need a different registration story
 //! anyway (they're not compiled into the binary as a fixed list) — building a fancier mechanism
-//! now for 9 statically-known kinds would be solving a problem the v4 milestone hasn't defined
+//! now for a handful of statically-known kinds would be solving a problem the v4 milestone hasn't defined
 //! yet. `create` returning `Option` (not panicking on an unknown kind) is deliberate: a
 //! `PatchState` loaded from an old or foreign `.kabl` file naming a kind this binary doesn't
 //! know is expected to happen eventually (missing pedal, older schema), not a bug to crash on.
 
+use crate::builtins::{Clock, Out, Seq, CLOCK_INFO, OUT_INFO, SEQ_INFO};
 use crate::builtins::{
     EnvAdsr, FilterSvf, Lfo, MidiIn, Mixer, OscVa, RingMod, Vca, ENV_ADSR_INFO, FILTER_SVF_INFO,
     LFO_INFO, MIDI_IN_INFO, MIXER_INFO, OSC_VA_INFO, RINGMOD_INFO, VCA_INFO,
 };
-use crate::builtins::{Out, OUT_INFO};
 use crate::module::Module;
 use crate::ModuleInfo;
 
@@ -35,6 +35,8 @@ pub const KNOWN_KINDS: &[&str] = &[
     "mixer",
     "out",
     "midi.in",
+    "clock",
+    "seq",
 ];
 
 /// Builds a fresh instance of `kind`, or `None` if `kind` isn't a known built-in.
@@ -49,13 +51,15 @@ pub fn create(kind: &str) -> Option<Box<dyn Module>> {
         "mixer" => Box::new(Mixer::new()),
         "out" => Box::new(Out::new()),
         "midi.in" => Box::new(MidiIn::new()),
+        "clock" => Box::new(Clock::new()),
+        "seq" => Box::new(Seq::new()),
         _ => return None,
     })
 }
 
 /// `ModuleInfo` for every known kind, in the same order as `KNOWN_KINDS` — what a catalog UI
 /// (not built) would enumerate.
-static ALL_INFOS: [&ModuleInfo; 9] = [
+static ALL_INFOS: [&ModuleInfo; 11] = [
     &OSC_VA_INFO,
     &FILTER_SVF_INFO,
     &ENV_ADSR_INFO,
@@ -65,6 +69,8 @@ static ALL_INFOS: [&ModuleInfo; 9] = [
     &MIXER_INFO,
     &OUT_INFO,
     &MIDI_IN_INFO,
+    &CLOCK_INFO,
+    &SEQ_INFO,
 ];
 
 pub fn all_infos() -> &'static [&'static ModuleInfo] {

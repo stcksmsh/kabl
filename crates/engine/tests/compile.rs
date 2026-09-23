@@ -454,3 +454,25 @@ fn write_wav(path: &std::path::Path, samples: &[f32], sample_rate: u32) {
     }
     writer.finalize().expect("finalize wav");
 }
+
+/// The committed `patches/sequence` (clock -> seq -> voice chain) compiles and every 16th-note
+/// step of the first two bars sounds: global-rate sources driving a voice-rate chain.
+#[test]
+fn sequence_patch_plays_every_step() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/sequence");
+    let state = kabl_core::load(&dir)
+        .expect("sequence patch")
+        .state()
+        .clone();
+    let mut patch = compile(&state, 48000.0, 8).expect("compiles");
+    let step = 48000 * 60 / 120 / 4; // samples per 16th at 120 bpm
+    let mut out = Vec::new();
+    while out.len() < 16 * step {
+        patch.process_block();
+        out.extend_from_slice(patch.left());
+    }
+    for (k, w) in out.chunks(step).take(16).enumerate() {
+        let peak = w.iter().fold(0.0f32, |m, v| m.max(v.abs()));
+        assert!(peak > 0.01 && peak.is_finite(), "step {k}: peak {peak}");
+    }
+}

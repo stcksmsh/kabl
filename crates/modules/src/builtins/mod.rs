@@ -3,6 +3,7 @@
 //! - `osc.va`: saw waveform only, no hard sync.
 //! - `lfo`: all 5 waveforms, no sync (brief itself defers "sync" — no clock exists yet, v3).
 
+mod clock;
 mod env_adsr;
 mod filter_svf;
 mod lfo;
@@ -11,8 +12,10 @@ mod mixer;
 mod osc_va;
 mod out;
 mod ringmod;
+mod seq;
 mod vca;
 
+pub use clock::{Clock, CLOCK_INFO};
 pub use env_adsr::{EnvAdsr, ENV_ADSR_INFO};
 pub use filter_svf::{FilterSvf, FILTER_SVF_INFO};
 pub use lfo::{Lfo, LFO_INFO};
@@ -21,4 +24,5 @@ pub use mixer::{Mixer, LEGACY_LEVEL, MIXER_INFO};
 pub use osc_va::{OscVa, OSC_VA_INFO};
 pub use out::{Out, OUT_INFO};
 pub use ringmod::{RingMod, RINGMOD_INFO};
+pub use seq::{Seq, SEQ_INFO};
 pub use vca::{Vca, VCA_INFO};
