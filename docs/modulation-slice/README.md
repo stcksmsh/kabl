@@ -50,7 +50,11 @@ Patch: `midi.in → osc.va (saw) → filter.svf → vca → out`, `env.adsr` on 
 11. **Save / reload:** type a directory in `patch dir`, **Save**; restart with `--patch <dir>`
     (or **Load**). Routes, ids, amounts, bypass and timing mode come back, with undo history.
 
-Four-source stress case: click Cutoff, pick each of the four rows in turn and drag the ring.
+Four-source stress case: click Cutoff. Concentric **source lanes** appear around it, one per
+route, each showing that route's span with a handle at its positive peak. Drag a handle to
+select that source and set its depth, no drawer needed; hovering names it. Click empty canvas
+to close the lanes. (Picking rows in the drawer and dragging the ring still works too.)
+[Close-up](img/1440-18-source-lanes.png).
 
 ## Screenshots (real, from the xdotool run)
 
@@ -126,11 +130,11 @@ Production (real editor, op log, engine, file format):
 routes as typed `PortRef::Param` cables with persistent ids; amount / sign / bypass; taper-space
 summing with one clamp; unipolar/bipolar/pitch source scaling; stepped params; feedback routes
 with a 1-block delay; per-voice routing; envelope CONT/KEY in DSP; drag-to-knob; ring edits the
-selected route; drawer; base entry; All/Focus/Hidden; exact undo/redo; save/reload; live-edit
+selected route; per-source lanes on inspected multi-source knobs; drawer; base entry; All/Focus/Hidden; exact undo/redo; save/reload; live-edit
 safety (MIDI through swaps, audio-thread state carry, lock-free queue, reclamation).
 
 Still prototype-only (rev2_proto), not built here: primary/advanced controls and in-place
-expansion, per-source inner lanes, peak-handle/inspector depth variants, x-ray cable fading,
+expansion, peak-handle/inspector depth variants, x-ray cable fading,
 numeric amount entry by `+40 %` text on the plug, fine (Shift) drag, Esc-cancel of drags, toast
 messages, themes (A-light/A-dark), skins beyond the existing `osc.va` demo, rich LFO, zoom.
 

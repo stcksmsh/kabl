@@ -24,6 +24,8 @@ const DRAG_PIXELS_FOR_FULL_SWEEP: f32 = 150.0;
 const PLUG_DROP: f32 = 7.0;
 const PLUG_SPREAD: f32 = 7.0;
 const MAX_PLUGS: usize = 3;
+/// Spacing between per-source lanes around an inspected multi-source knob.
+const LANE_GAP: f32 = 7.0;
 
 const ROUTE_ACCENT: Color32 = Color32::from_rgb(90, 170, 255);
 const BYPASS_GREY: Color32 = Color32::from_gray(120);
@@ -505,7 +507,120 @@ pub(crate) fn param_knob(
             ROUTE_ACCENT,
         );
     }
+    if inspected && routes.len() >= 2 {
+        source_lanes(editor, ui_state, ui, id, param, center, base_n, &routes);
+    }
     plugs
+}
+
+/// Concentric lanes, one per route, shown around the inspected knob when it has several
+/// sources: each lane draws that route's own span, and its handle (at the route's positive
+/// peak) selects the route and drags its amount, without the drawer. Drawn and hit-tested on
+/// the foreground layer so neighbouring knobs never steal the handles.
+#[allow(clippy::too_many_arguments)]
+fn source_lanes(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    id: ModuleId,
+    param: &'static ParamInfo,
+    center: Pos2,
+    base_n: f32,
+    routes: &[RouteView],
+) {
+    let top = ui.ctx().layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        Id::new(("kabl-lanes", id, param.name)),
+    ));
+    let outer = lane_radius(routes.len() - 1) + LANE_GAP / 2.0;
+    top.circle_filled(
+        center,
+        outer,
+        Color32::from_rgba_unmultiplied(14, 14, 18, 215),
+    );
+    for (k, rt) in routes.iter().enumerate() {
+        let radius = lane_radius(k);
+        let selected = Some(rt.cable) == ui_state.selected_route;
+        let color = if rt.bypass {
+            BYPASS_GREY
+        } else {
+            cable_color(rt.cable)
+        };
+        arc(
+            &top,
+            center,
+            radius,
+            0.0,
+            1.0,
+            Stroke::new(1.0, Color32::from_gray(60)),
+        );
+        let (lo, hi) = route_span(rt, base_n);
+        arc(
+            &top,
+            center,
+            radius,
+            lo.clamp(0.0, 1.0),
+            hi.clamp(0.0, 1.0),
+            Stroke::new(if selected { 4.0 } else { 2.5 }, color),
+        );
+        let peak = (base_n + rt.amount * rt.src.1).clamp(0.0, 1.0);
+        let at = on_circle(center, radius, travel_angle(peak));
+        let hit = Rect::from_center_size(at, EguiVec2::splat(LANE_GAP + 2.0));
+        ui_state.record(format!("lane:{}", rt.cable), hit);
+        let resp = egui::Area::new(Id::new(("kabl-lane", rt.cable)))
+            .order(egui::Order::Foreground)
+            .fixed_pos(hit.min)
+            .show(ui.ctx(), |ui| {
+                ui.allocate_exact_size(hit.size(), Sense::click_and_drag())
+                    .1
+            })
+            .inner;
+        let hot = selected || resp.hovered() || resp.dragged();
+        top.circle_filled(at, if hot { 5.0 } else { 3.5 }, color);
+        if hot {
+            top.circle_stroke(at, 5.5, Stroke::new(1.0, Color32::WHITE));
+        }
+        if resp.clicked() || resp.drag_started() {
+            ui_state.selected_route = Some(rt.cable);
+        }
+        if resp.drag_started() {
+            ui_state.lane_grab = Some((rt.cable, rt.amount));
+        }
+        if resp.dragged() {
+            if let (Some((cable, start)), Some(o), Some(p)) = (
+                ui_state.lane_grab.filter(|g| g.0 == rt.cable),
+                ui.input(|i| i.pointer.press_origin()),
+                resp.interact_pointer_pos(),
+            ) {
+                let amount = start - (p.y - o.y) / DRAG_PIXELS_FOR_FULL_SWEEP;
+                if amount != rt.amount || resp.drag_started() {
+                    editor.set_route_amount(cable, amount, resp.drag_started());
+                }
+            }
+        }
+        if resp.drag_stopped() {
+            ui_state.lane_grab = None;
+        }
+        if resp.hovered() || resp.dragged() {
+            pill(
+                &ui.ctx().layer_painter(egui::LayerId::new(
+                    egui::Order::Tooltip,
+                    Id::new("kabl-lane-pill"),
+                )),
+                center - EguiVec2::new(0.0, outer + 4.0),
+                &format!(
+                    "{}: {:+.0} %",
+                    source_label(editor.state(), rt.from_id, &rt.from_port),
+                    rt.amount * 100.0
+                ),
+            );
+        }
+    }
+}
+
+/// Radius of lane `k` around an inspected knob.
+fn lane_radius(k: usize) -> f32 {
+    KNOB_RADIUS + RING_OUTER + LANE_GAP * (k as f32 + 1.0)
 }
 
 pub(crate) fn pill(painter: &egui::Painter, bottom_center: Pos2, text: &str) {

@@ -408,3 +408,47 @@ fn selecting_a_source_does_not_move_the_drawer_rows() {
         assert_eq!(t.ui.hits.get(&k), Some(&r), "{k} moved");
     }
 }
+
+#[test]
+fn source_lanes_select_and_edit_each_route_on_the_knob() {
+    for (w, h) in sizes() {
+        let mut t = H::new(w, h);
+        assert!(
+            !t.ui.hits.keys().any(|k| k.starts_with("lane:")),
+            "hidden until inspected"
+        );
+        t.click(&format!("knob:{FILTER}.cutoff_hz"));
+        let before = t.routes(FILTER, "cutoff_hz");
+        for (i, r) in before.iter().enumerate() {
+            assert!(
+                t.ui.hits.contains_key(&format!("lane:{}", r.0)),
+                "{w}x{h} lane {i}"
+            );
+        }
+        let mut expect = before.clone();
+        for i in [2, 0, 3, 1] {
+            let cable = before[i].0;
+            let p = t.at(&format!("lane:{cable}"));
+            t.drag(p, p - egui::vec2(0.0, 15.0));
+            expect[i].1 += 0.1;
+            assert_eq!(t.ui.selected_route, Some(cable));
+            for (a, b) in t.routes(FILTER, "cutoff_hz").iter().zip(&expect) {
+                assert!(close(a.1, b.1), "{w}x{h}: route {} {} vs {}", a.0, a.1, b.1);
+            }
+        }
+        // Base untouched by lane drags; one undo reverts one lane drag.
+        assert_eq!(t.param(FILTER, "cutoff_hz"), Some(1400.0));
+        t.key(Key::Z, Modifiers::COMMAND);
+        expect[1].1 -= 0.1;
+        for (a, b) in t.routes(FILTER, "cutoff_hz").iter().zip(&expect) {
+            assert!(close(a.1, b.1));
+        }
+        // Clicking empty canvas closes the lanes.
+        t.move_to(egui::pos2(300.0, h - 60.0));
+        t.button(true);
+        t.button(false);
+        t.frame();
+        assert_eq!(t.ui.inspected, None);
+        assert!(!t.ui.hits.keys().any(|k| k.starts_with("lane:")));
+    }
+}

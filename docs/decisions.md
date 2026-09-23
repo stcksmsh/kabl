@@ -1785,3 +1785,21 @@ synths do. Surge XT (`ADSRModulationSource::process_block` reads the attack/deca
 params every block) and Vital (`envelope.cpp` reads the time inputs every control/audio-rate
 call) both evaluate envelope times continuously, so a running stage follows modulation. CONT
 stays the default; KEY-TRIGGER stays available per envelope.
+
+## 2026-09-23 — Remote review answers; per-source lanes on the knob
+
+Kosta reviewed clips and renders remotely (phone):
+- Removing the selected source leaves nothing selected: **keep**.
+- New route default **+25 %**: keep.
+- Live-edit render (held chord, knob and ring dragged, keys released mid-drag): **clean**.
+- Four sources: the plug row + "+2" + drawer list is not enough; wants **per-source lanes**, and
+  in general a way to change each source's amount on the knob without the drawer ("concentric
+  rings").
+
+Built: inspecting a knob with two or more routes shows concentric lanes around it (7 px apart,
+dark backing, foreground layer). Each lane draws its route's span; a handle at the route's
+positive peak selects that route and drags its amount (same absolute-offset mapping and one
+undo step per drag as the ring). Handles are separate foreground areas, so neighbouring knobs
+never steal them and the knob body underneath keeps working. Clicking empty canvas ends
+inspection and hides the lanes. Single-route knobs keep only the ring (the route is
+auto-selected). Grab feel with a real hand is still untested.

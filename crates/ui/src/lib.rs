@@ -125,6 +125,8 @@ pub struct UiState {
     port_drag: Option<PortRef>,
     /// Knob drag in progress: which knob, which part, and the value at press.
     pub(crate) knob_grab: Option<(ModuleId, &'static str, routing::Grab, f32)>,
+    /// Lane-handle drag in progress: route and its amount at press.
+    pub(crate) lane_grab: Option<(CableId, f32)>,
     pub(crate) base_text: String,
     pub(crate) base_text_for: Option<(ModuleId, String)>,
     /// Screen rects of interactive targets drawn last frame (`knob:4.attack_ms`,
@@ -169,6 +171,7 @@ impl Default for UiState {
             selected_route: None,
             port_drag: None,
             knob_grab: None,
+            lane_grab: None,
             base_text: String::new(),
             base_text_for: None,
             hits: Default::default(),
@@ -459,6 +462,13 @@ fn show_canvas(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
 
     if eurorack {
         draw_rack_grid(&painter, ui.clip_rect(), origin);
+    }
+    // Clicking empty canvas ends knob inspection (and its source lanes). Registered before the
+    // modules, so every module control wins over it.
+    let bg = ui.interact(ui.clip_rect(), Id::new("kabl-canvas-bg"), Sense::click());
+    if bg.clicked() {
+        ui_state.inspected = None;
+        ui_state.selected_route = None;
     }
 
     // Snapshot layout data before mutating `editor` mid-frame (immediate-mode + a shared

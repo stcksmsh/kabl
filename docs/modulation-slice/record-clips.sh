@@ -74,3 +74,12 @@ click view:All
 click sel:4.timing.1; pause
 glide 900 700; xdotool key ctrl+z; pause 1.2; xdotool key ctrl+shift+z; pause 1.2
 stop 4-views-timing
+
+# 5: per-source lanes on the knob: pick and edit each source without the drawer.
+start 5-source-lanes
+click knob:3.cutoff_hz; pause
+for r in 12 10 13 11; do vdrag lane:$r 25; done
+glide 300 820; xdotool click 1; pause   # empty canvas closes the lanes
+click knob:4.attack_ms; pause
+vdrag lane:9 -30
+stop 5-source-lanes
