@@ -34,40 +34,61 @@ impl PatchState {
         Self::default()
     }
 
-    /// Inverse of `op` computed against the state *before* `op` is applied.
+    /// Inverse of `op` computed against the state *before* `op` is applied. An op on something
+    /// that doesn't exist has an empty `Group` (no-op) inverse. Applying `op` then its inverse
+    /// restores the state exactly: params absent before stay absent, a removed
+    /// module comes back with its params and cables, a removed cable with its settings.
     pub fn inverse_for(&self, op: &Op) -> Op {
         match op {
             Op::AddModule { id, .. } => Op::RemoveModule { id: *id },
             Op::RemoveModule { id } => {
-                let m = self
-                    .modules
-                    .get(id)
-                    .expect("inverse_for(RemoveModule) requires the module to exist");
-                Op::AddModule {
+                let Some(m) = self.modules.get(id) else {
+                    return Op::Group { ops: Vec::new() };
+                };
+                let mut ops = vec![Op::AddModule {
                     id: *id,
                     kind: m.kind.clone(),
                     pos: m.pos,
+                }];
+                for (param, &value) in &m.params {
+                    ops.push(Op::SetParam {
+                        target: ParamTarget::Module {
+                            id: *id,
+                            param: param.clone(),
+                        },
+                        value,
+                    });
                 }
+                for (&cid, c) in &self.cables {
+                    if c.from.module_id() == *id || c.to.module_id() == *id {
+                        ops.extend(cable_restore_ops(cid, c));
+                    }
+                }
+                Op::Group { ops }
             }
-            Op::Connect { id, .. } => Op::Disconnect { id: *id },
-            Op::Disconnect { id } => {
-                let c = self
+            Op::Connect { id, .. } => match self.cables.get(id) {
+                // Connecting over an existing id replaces it; the inverse puts the old one back.
+                Some(c) => Op::Group {
+                    ops: cable_restore_ops(*id, c),
+                },
+                None => Op::Disconnect { id: *id },
+            },
+            Op::Disconnect { id } => Op::Group {
+                ops: self
                     .cables
                     .get(id)
-                    .expect("inverse_for(Disconnect) requires the cable to exist");
-                Op::Connect {
-                    id: *id,
-                    from: c.from.clone(),
-                    to: c.to.clone(),
-                }
-            }
-            Op::SetParam { target, .. } => {
-                let old = self.param(target).unwrap_or(0.0);
-                Op::SetParam {
+                    .map(|c| cable_restore_ops(*id, c))
+                    .unwrap_or_default(),
+            },
+            Op::SetParam { target, .. } | Op::UnsetParam { target } => match self.param(target) {
+                Some(old) => Op::SetParam {
                     target: target.clone(),
                     value: old,
-                }
-            }
+                },
+                None => Op::UnsetParam {
+                    target: target.clone(),
+                },
+            },
             Op::SetCablePattern { id, .. } => {
                 let old = self
                     .cables
@@ -79,20 +100,29 @@ impl PatchState {
                     steps: old,
                 }
             }
-            Op::MoveModule { id, .. } => {
-                let old = self
-                    .modules
-                    .get(id)
-                    .expect("inverse_for(MoveModule) requires the module to exist")
-                    .pos;
-                Op::MoveModule { id: *id, pos: old }
-            }
+            Op::MoveModule { id, .. } => match self.modules.get(id) {
+                Some(m) => Op::MoveModule {
+                    id: *id,
+                    pos: m.pos,
+                },
+                None => Op::Group { ops: Vec::new() },
+            },
             Op::Snapshot { name } => Op::Snapshot { name: name.clone() },
             Op::Annotate { text } => Op::Annotate { text: text.clone() },
+            Op::Group { ops } => {
+                let mut scratch = self.clone();
+                let mut inverses = Vec::with_capacity(ops.len());
+                for op in ops {
+                    inverses.push(scratch.inverse_for(op));
+                    scratch.apply(op);
+                }
+                inverses.reverse();
+                Op::Group { ops: inverses }
+            }
         }
     }
 
-    fn param(&self, target: &ParamTarget) -> Option<f32> {
+    pub fn param(&self, target: &ParamTarget) -> Option<f32> {
         match target {
             ParamTarget::Module { id, param } => self.modules.get(id)?.params.get(param).copied(),
             ParamTarget::Cable { id, param } => self.cables.get(id)?.params.get(param).copied(),
@@ -113,6 +143,9 @@ impl PatchState {
             }
             Op::RemoveModule { id } => {
                 self.modules.remove(id);
+                // No dangling cables: a cable to or from a removed module goes with it.
+                self.cables
+                    .retain(|_, c| c.from.module_id() != *id && c.to.module_id() != *id);
             }
             Op::Connect { id, from, to } => {
                 self.cables.insert(
@@ -140,6 +173,18 @@ impl PatchState {
                     }
                 }
             },
+            Op::UnsetParam { target } => match target {
+                ParamTarget::Module { id, param } => {
+                    if let Some(m) = self.modules.get_mut(id) {
+                        m.params.remove(param);
+                    }
+                }
+                ParamTarget::Cable { id, param } => {
+                    if let Some(c) = self.cables.get_mut(id) {
+                        c.params.remove(param);
+                    }
+                }
+            },
             Op::SetCablePattern { id, steps } => {
                 if let Some(c) = self.cables.get_mut(id) {
                     c.steps = steps.clone();
@@ -151,6 +196,36 @@ impl PatchState {
                 }
             }
             Op::Snapshot { .. } | Op::Annotate { .. } => {}
+            Op::Group { ops } => {
+                for op in ops {
+                    self.apply(op);
+                }
+            }
         }
     }
+}
+
+/// Ops that recreate cable `id` exactly: the connection, its params, its step pattern.
+fn cable_restore_ops(id: CableId, c: &CableState) -> Vec<Op> {
+    let mut ops = vec![Op::Connect {
+        id,
+        from: c.from.clone(),
+        to: c.to.clone(),
+    }];
+    for (param, &value) in &c.params {
+        ops.push(Op::SetParam {
+            target: ParamTarget::Cable {
+                id,
+                param: param.clone(),
+            },
+            value,
+        });
+    }
+    if !c.steps.is_empty() {
+        ops.push(Op::SetCablePattern {
+            id,
+            steps: c.steps.clone(),
+        });
+    }
+    ops
 }

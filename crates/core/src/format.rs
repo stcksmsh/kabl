@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 use crate::log::PatchLog;
 use crate::op::Entry;
 
-pub const CURRENT_SCHEMA_VERSION: u32 = 1;
+/// v2 adds `PortRef::Param` (modulation routes), `Op::UnsetParam` and `Op::Group`. v1 files
+/// are a strict subset of v2 and load unchanged; there is nothing to migrate.
+pub const CURRENT_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Meta {
@@ -63,7 +65,7 @@ pub fn save(dir: &Path, log: &PatchLog) -> Result<(), FormatError> {
 pub fn load(dir: &Path) -> Result<PatchLog, FormatError> {
     let meta_text = fs::read_to_string(dir.join("meta.toml"))?;
     let meta: Meta = toml::from_str(&meta_text).map_err(|e| FormatError::Toml(e.to_string()))?;
-    if meta.schema_version != CURRENT_SCHEMA_VERSION {
+    if !(1..=CURRENT_SCHEMA_VERSION).contains(&meta.schema_version) {
         return Err(FormatError::UnknownSchemaVersion(meta.schema_version));
     }
 

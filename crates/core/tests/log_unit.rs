@@ -55,13 +55,12 @@ fn consecutive_set_param_within_window_coalesces() {
 
     // Undo the coalesced SetParam entry: goes straight back to pre-SetParam state (the merged
     // entry's inverse is the value from *before the first* of the three calls), not one step
-    // back through 300 -> 200 -> 100. The param didn't exist before, and `SetParam` has no way
-    // to express "unset" (see docs/decisions.md), so its inverse falls back to 0.0.
+    // back through 300 -> 200 -> 100. The param didn't exist before, so undo removes it again
+    // (`UnsetParam`) rather than inventing a value.
     log.undo();
-    assert_eq!(
-        log.state().modules[&1].params["freq"],
-        0.0,
-        "single undo of the coalesced entry should fall back to the pre-existence default"
+    assert!(
+        !log.state().modules[&1].params.contains_key("freq"),
+        "single undo of the coalesced entry should restore the absent param"
     );
 }
 
@@ -108,7 +107,7 @@ fn set_param_outside_window_does_not_coalesce() {
 /// round-trip property (see replay_proptest.rs) because forward `redo` always re-applies the
 /// exact stored `Op`, not a value derived from the (possibly lossy) undo state.
 #[test]
-fn undo_of_remove_module_restores_position_but_not_params() {
+fn undo_of_remove_module_restores_position_and_params() {
     let mut log = PatchLog::new();
     log.append(
         Op::AddModule {
@@ -140,10 +139,7 @@ fn undo_of_remove_module_restores_position_but_not_params() {
         Vec2 { x: 3.0, y: 4.0 },
         "position is restored"
     );
-    assert!(
-        restored.params.is_empty(),
-        "params are known-lost on undo of a remove — see docs/decisions.md"
-    );
+    assert_eq!(restored.params["freq"], 440.0, "params are restored");
 }
 
 #[test]

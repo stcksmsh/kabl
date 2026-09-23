@@ -60,11 +60,31 @@ impl PatchLog {
     /// entry when it's a `SetParam` on the same target, same source, within
     /// `COALESCE_WINDOW_MS`.
     pub fn append(&mut self, op: Op, t_ms: u64, source: Source) {
+        self.append_inner(op, t_ms, source, Some(COALESCE_WINDOW_MS));
+    }
+
+    /// Like `append`, but never coalesces: the start of a new drag gesture is its own undo
+    /// step even right after a previous gesture on the same target.
+    pub fn append_new(&mut self, op: Op, t_ms: u64, source: Source) {
+        self.append_inner(op, t_ms, source, None);
+    }
+
+    /// Like `append`, but a `SetParam` always merges into the previous entry when that entry
+    /// is a `SetParam` on the same target from the same source, however long ago it was. For
+    /// the frames after the first one of a continuous drag gesture, so the whole gesture undoes
+    /// as one step even when the hand pauses longer than `COALESCE_WINDOW_MS`.
+    pub fn append_continuing(&mut self, op: Op, t_ms: u64, source: Source) {
+        self.append_inner(op, t_ms, source, Some(u64::MAX));
+    }
+
+    /// `window`: merge a `SetParam` into the previous same-target, same-source `SetParam` if it
+    /// is at most this many ms older. `None` never merges.
+    fn append_inner(&mut self, op: Op, t_ms: u64, source: Source, window: Option<u64>) {
         self.entries.truncate(self.cursor);
 
-        if let Op::SetParam { target, value } = &op {
+        if let (Op::SetParam { target, value }, Some(window)) = (&op, window) {
             if let Some(last) = self.entries.last_mut() {
-                if last.source == source && t_ms.saturating_sub(last.t_ms) <= COALESCE_WINDOW_MS {
+                if last.source == source && t_ms.saturating_sub(last.t_ms) <= window {
                     if let Op::SetParam {
                         target: last_target,
                         value: last_value,
@@ -95,9 +115,22 @@ impl PatchLog {
         self.cursor = self.entries.len();
     }
 
-    /// Push a fully-formed entry (from a file load) without coalescing or inverse
-    /// recomputation — the entry already carries the correct inverse from when it was saved.
-    pub(crate) fn append_entry_raw(&mut self, entry: Entry) {
+    /// The entry the next `undo()` would revert, if any.
+    pub fn undo_entry(&self) -> Option<&Entry> {
+        self.cursor.checked_sub(1).map(|i| &self.entries[i])
+    }
+
+    /// The entry the next `redo()` would re-apply, if any.
+    pub fn redo_entry(&self) -> Option<&Entry> {
+        self.entries.get(self.cursor)
+    }
+
+    /// Push an entry loaded from a file without coalescing. The inverse is recomputed from the
+    /// replayed state rather than trusted from the file: schema-v1 files stored lossy inverses
+    /// (`0.0` for an absent param, a bare `AddModule` for a removed module), and the replayed
+    /// state is exactly what the op was originally applied to.
+    pub(crate) fn append_entry_raw(&mut self, mut entry: Entry) {
+        entry.inverse = self.state.inverse_for(&entry.op);
         self.state.apply(&entry.op);
         self.next_seq = self.next_seq.max(entry.seq + 1);
         self.entries.push(entry);

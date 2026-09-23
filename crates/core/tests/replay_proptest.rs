@@ -1,6 +1,7 @@
 //! Property tests for the op log (brief section 6):
 //!   - `replay(log) == state`
-//!   - `undo^n(redo^n(state)) == state`
+//!   - `undo^n(redo^n(state)) == state`, and every intermediate undo equals a replay of the
+//!     remaining prefix
 //!
 //! Fuzzing raw `Op` values mostly produces no-ops (references to ids that don't exist), so this
 //! generates small abstract `Action`s and interprets them against a live-id tracker, emitting
@@ -17,6 +18,10 @@ enum Action {
     Connect(u8, u8, u8),
     Disconnect(u8),
     SetParam(u8, u8),
+    /// Route amount on a live cable, or bypass when the second value is odd.
+    SetCableParam(u8, u8),
+    /// Disconnect a cable and connect a replacement as one grouped action (a repatch).
+    Repatch(u8, u8),
     MoveModule(u8, i8, i8),
     Annotate,
 }
@@ -30,6 +35,8 @@ fn action_strategy() -> impl Strategy<Value = Action> {
         (0u8..4, 0u8..4, 0u8..4).prop_map(|(c, f, t)| Action::Connect(c, f, t)),
         (0u8..4).prop_map(Action::Disconnect),
         (0u8..4, 0u8..2).prop_map(|(m, p)| Action::SetParam(m, p)),
+        (0u8..4, 0u8..2).prop_map(|(c, p)| Action::SetCableParam(c, p)),
+        (0u8..4, 0u8..4).prop_map(|(c, t)| Action::Repatch(c, t)),
         (0u8..4, -5i8..5i8, -5i8..5i8).prop_map(|(m, x, y)| Action::MoveModule(m, x, y)),
         Just(Action::Annotate),
     ]
@@ -73,9 +80,16 @@ fn apply_action(log: &mut PatchLog, action: &Action, t_ms: u64) {
                             id: from_id,
                             port: "out".into(),
                         },
-                        to: PortRef::Module {
-                            id: to_id,
-                            port: "in".into(),
+                        to: if cid % 2 == 1 {
+                            PortRef::Param {
+                                id: to_id,
+                                param: "freq".into(),
+                            }
+                        } else {
+                            PortRef::Module {
+                                id: to_id,
+                                port: "in".into(),
+                            }
                         },
                     },
                     t_ms,
@@ -97,6 +111,48 @@ fn apply_action(log: &mut PatchLog, action: &Action, t_ms: u64) {
                     Op::SetParam {
                         target: ParamTarget::Module { id: mid, param },
                         value: t_ms as f32 * 0.01,
+                    },
+                    t_ms,
+                    Source::User,
+                );
+            }
+        }
+        Action::SetCableParam(cid, p) => {
+            let cid = cid as CableId;
+            if live_cables.contains(&cid) {
+                let param = if p % 2 == 0 { "amount" } else { "bypass" };
+                log.append(
+                    Op::SetParam {
+                        target: ParamTarget::Cable {
+                            id: cid,
+                            param: param.into(),
+                        },
+                        value: t_ms as f32 * 0.001,
+                    },
+                    t_ms,
+                    Source::User,
+                );
+            }
+        }
+        Action::Repatch(cid, to) => {
+            let cid = cid as CableId;
+            let to_id = to as ModuleId;
+            if let (Some(c), true) = (log.state().cables.get(&cid), live_modules.contains(&to_id)) {
+                let from = c.from.clone();
+                let new_id = 100 + t_ms;
+                log.append(
+                    Op::Group {
+                        ops: vec![
+                            Op::Disconnect { id: cid },
+                            Op::Connect {
+                                id: new_id,
+                                from,
+                                to: PortRef::Module {
+                                    id: to_id,
+                                    port: "in".into(),
+                                },
+                            },
+                        ],
                     },
                     t_ms,
                     Source::User,
@@ -166,10 +222,18 @@ proptest! {
         let final_state = log.state().clone();
         let n = log.entries().len();
 
-        for _ in 0..n {
+        // Every undo step must land exactly on the state a fresh replay of the remaining prefix
+        // produces: absent params stay absent, removed modules return with params and cables.
+        for k in (0..n).rev() {
             prop_assert!(log.undo());
+            let mut replay = PatchState::new();
+            for e in &log.all_entries()[..k] {
+                replay.apply(&e.op);
+            }
+            prop_assert_eq!(log.state(), &replay);
         }
         prop_assert!(!log.undo());
+        prop_assert_eq!(log.state(), &PatchState::new());
 
         for _ in 0..n {
             prop_assert!(log.redo());

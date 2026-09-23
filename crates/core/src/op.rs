@@ -9,9 +9,21 @@ pub struct Vec2 {
     pub y: f32,
 }
 
+/// One end of a cable. `Module` is a signal jack. `Param` is a parameter knob as a modulation
+/// destination: a cable into it is a modulation route whose settings (`amount`, `bypass`) live
+/// in the cable's params. Schema v2; v1 files only contain `Module`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum PortRef {
     Module { id: ModuleId, port: String },
+    Param { id: ModuleId, param: String },
+}
+
+impl PortRef {
+    pub fn module_id(&self) -> ModuleId {
+        match self {
+            PortRef::Module { id, .. } | PortRef::Param { id, .. } => *id,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -50,6 +62,11 @@ pub enum Op {
         target: ParamTarget,
         value: f32,
     },
+    /// Removes a stored param value so the module default applies again. Exists so undoing the
+    /// first `SetParam` on a param restores "absent", not a made-up 0.0. Schema v2.
+    UnsetParam {
+        target: ParamTarget,
+    },
     SetCablePattern {
         id: CableId,
         steps: Vec<f32>,
@@ -63,6 +80,11 @@ pub enum Op {
     },
     Annotate {
         text: String,
+    },
+    /// Several ops applied in order as one user action, so one undo reverts all of them
+    /// (repatch, delete with its cables, connect-and-configure). Schema v2.
+    Group {
+        ops: Vec<Op>,
     },
 }
 
