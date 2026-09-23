@@ -5,65 +5,40 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-23, revision-2 interactive prototype. Isolated example code only: no
-engine, production UI, file-format or behaviour change.
+Last updated: 2026-09-23, first production modulation slice (LFO → ADSR Attack).
 
-**Current handover (supersedes every older handover note below):** the revision-2 prototype is
-built and ready for Kosta to try. The walkthrough, comparison switches, evidence and limitations
-are in [`design/revision-2/PROTOTYPE.md`](design/revision-2/PROTOTYPE.md).
+**Current handover (supersedes every older handover note below, including the revision-2
+"prototype only / awaiting permission" notes):** the production modulation slice is built,
+tested and ready for Kosta's live review. Details, walkthrough, screenshots, renders, checks,
+benchmark and limitations: [`modulation-slice/README.md`](modulation-slice/README.md).
 
-    cargo run -p kabl-ui --example rev2_proto --release        # add --dark / --size 1280x800
-    cargo run -p kabl-ui --example rev2_env_ab --release       # envelope A/B WAVs
+    cargo run --release -p kabl-ui -- --patch patches/reference          # add --size 1280x800
 
-Still open. Kosta decides each by using the prototype; the agent has not chosen any of them:
+What is real now (production `kabl-ui`, op log, engine, file format):
 
-1. Hidden mode: stable rack or compact synth layout (switch `Hidden layout`).
-2. Expansion: push the neighbours or float over them; auto-Focus (switch `Expand`).
-3. Small-knob depth: ring band, peak handle or inspector only (switch `Depth`). Scripted
-   hit-probing at r 17 found no misfires. Feel with a real hand is unmeasured.
-4. Envelope time: continuous or sampled at stage start (A/B window plus WAVs). The policies
-   measurably differ. It has not been listened to, so it stays unresolved.
+- Knob modulation routes (`PortRef::Param` cables, schema v2): amount/sign/bypass, taper-space
+  sum + one clamp, unipolar/bipolar/pitch source scaling, stepped params, feedback, per voice.
+- UI: drag an output onto a knob; knob body = base, ring = selected route only; routing drawer
+  (select, amount, invert, bypass, remove, base entry); All/Focus/Hidden; CONT/KEY selector.
+- `env.adsr` timing: CONTINUOUS (default) or KEY-TRIGGER, in the DSP, per envelope, saved.
+- Live-edit correctness: MIDI through active/incoming/queued graphs; state carried on the audio
+  thread at fade start (allocation-free); no mutex in `kabl-ui`; bounded swap queue; retired
+  graphs collected; notes reach every `midi.in`; moves don't rebuild audio; linear crossfade
+  (equal-power swelled held notes +41 % per edit).
+- Exact undo: absent params, removed modules with cables and route settings, grouped repatch,
+  one step per drag. v1 patches load, undo exactly and render bit-exact to the baseline.
 
-The skin contrast warning remains an agent recommendation. The prototype shows it firing on
-the placeholder art with `labels_on_art` set.
+Next human gate: Kosta plays it, checks ring/source selection, and listens to both envelope
+modes (live, and `exaggerated-*.wav` from the render command in the slice README). Do not
+continue into broader UI migration, sequencers or effects before that.
 
-Verified: 4 scripted runs, 160 checks, 0 failures (1440×900 A-light and 1280×800 A-dark, both
-scripts). One real-X `xdotool` pass. 7 unit tests. The screenshots in
-`design/revision-2/prototype/img/` are real framebuffer captures from Xvfb/llvmpipe, not from
-Kosta's display. Nothing is integrated into `kabl-ui` or the engine.
+Not verified: nobody has heard the renders or played this build; screenshots are Xvfb/llvmpipe,
+not Kosta's display; Pi 4 performance unmeasured. `rev2_proto` stays as the reference for
+features not migrated (listed in the slice README).
 
-Owner answers so far (decisions.md, "Prototype review"): stable rack wins; ring band wins but needs multi-source support (not built); envelope timing to become selectable (continuous / key-trigger); expansion pushes by default, with a setting for float.
-
-Next: resolve the remaining items with Kosta. Do not start production
-integration before that. MIDI / graph-swap / undo correctness remains a prerequisite for any
-playable integration. No sequencers or effects in this scope.
-
-The handoff prompt for the arbiter agent is [`HANDOFF.md`](HANDOFF.md).
-
-Owner added eventual musical destination: Tangerine Dream in the spirit of Encore / Ricochet /
-Force Majeure. PLAN now includes that direction and a future-performance storyboard; clocks,
-sequencing, effects and performance controls remain proposed later capabilities, not built work.
-
-Hardware verification remains separate: standalone played live; `kabl-ui` has not been heard
-by owner. Real audio/display hardware is available. Pi-4 performance remains unmeasured.
-
-Stale below, not yet rewritten:
-- The older "Handover" list claims there is no canvas pan and nothing has run on real hardware.
-  Pan came back with Eurorack view v1, and standalone plays live.
-- Descriptions of the Mutex window lasting the whole `build_swap` are out of date. `kabl-ui` now
-  locks only for `finish_swap`.
-- "Connects to the first MIDI port" is fixed in both binaries.
-- Both binaries support persistence and route MIDI through voice allocation. Standalone
-  exposes `--midi`; UI uses automatic selection. Unmatched filters still fall back to first port.
-- S2 validated its optimization mechanism, not the potato gate. Compiler and playable synth
-  exist; earlier statements saying otherwise describe previous stages.
-- Core writes a checkpoint file but loads by full log replay. Periodic checkpoint machinery
-  and visible construction playback are absent; undo simplifications remain.
-
-Additional acceptance risks found by static inspection during planning: MIDI events reach only
-active graph during swaps; UI never calls its deferred-drop collector; MIDI routing assumes
-module ID 1; layout edits also rebuild audio. These were not reproduced or repaired in this
-session. They do not block design mockups; relevant fixes belong in later implementation scope.
+Older sections below are history. Where they disagree with the above or with the code, they
+are stale: the MIDI/graph-swap/undo risks they list are fixed; the Mutex described there is
+gone; "params are compile-time constants" no longer holds.
 
 AIW is not set up (no `.ai/state.json`). Owner said to skip AIW and Recall for now. Track work
 in git and this file.

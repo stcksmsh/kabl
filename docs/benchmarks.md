@@ -130,3 +130,19 @@ v1 milestone, needs the real compiler/module registry, not spike-scoped hand-rol
 ns/block for the brief's actual `tiny`/`classic`/`potato` benchmark patches (as opposed to these
 spikes' stand-ins), a real potato-gate CPU percentage on Pi-4 hardware, jitter-gate soak, S3's
 aarch64 numbers, S4 (wasmtime, optional).
+
+## Modulation slice: reference patch, before/after (2026-09-23)
+
+`cargo run --release -p kabl-ui --example bench_reference` (current) and the same `routeless`/
+`bench` code built at e6db377 (baseline), runs interleaved. i7-13700H, 8 voices all held, median
+ns per 64-sample block over 25 × 4000 blocks. See `docs/modulation-slice/README.md`.
+
+| Run | baseline routeless | now routeless | now, 6 routes | now, 6 routes, key-trigger |
+|---|---|---|---|---|
+| 1 | 16 709 | 14 203 | 17 906 | 18 606 |
+| 2 | 15 231 | 15 525 | 17 913 | 18 324 |
+| 3 | 13 967 | 15 420 | 17 780 | 19 798 |
+| 4 | 15 157 | 15 428 | 17 699 | 19 637 |
+
+Audio-thread state carry per swap (`receive_swap`, 200 swaps): 2 829 ns median, 7 331 ns max.
+Routeless difference is within run-to-run noise; routes cost ~2.4 µs/block here.

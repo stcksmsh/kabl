@@ -1673,3 +1673,107 @@ Stopped for Kosta's hands-on review. No production integration.
   suggests making it selectable. Agent reading, not confirmed: default continuous, with a
   per-route "latch at note-on" option.
 - **Expansion (follow-up):** push by default; a setting switches to float.
+
+## 2026-09-23 — Envelope timing modes (owner-approved)
+
+Confirmed by Kosta; supersedes the "agent reading" in the entry above (per-route latching is
+out of scope).
+
+- Timing mode is **per envelope**, saved with the patch: `env.adsr` param `timing`
+  (`Taper::Stepped`, 0 = CONTINUOUS, 1 = KEY-TRIGGER). Absent = CONTINUOUS, so every existing
+  patch keeps its behaviour.
+- **CONTINUOUS** (default): each block uses the current, modulated Attack/Decay/Release. Level
+  and stage in progress are kept; only the running segment's rate changes.
+- **KEY-TRIGGER**: Attack, Decay and Release are captured at the gate's rising edge (the actual
+  note-on sample, with that block's modulated values) and used for the whole note. Release
+  uses the captured Release. A retrigger captures fresh values. Not sampled per stage.
+- **Sustain** is a level, not a time: always live in both modes.
+- Captured values are module state (`save_state`/`load_state`), so they survive recompiles
+  and live edits; they are taken at the trigger, never at compile or swap time.
+- Mode change during a held note (agent-defined): CONT → KEY captures the current times at the
+  switch, and the next note-on captures again; KEY → CONT follows the live times from the next
+  block.
+- Resolution: block rate (64 samples = 1.33 ms at 48 kHz) for every time; "continuous" is a
+  policy, not a promise of per-sample evaluation.
+
+## 2026-09-23 — Knob modulation routes: representation and math
+
+- **Route = cable into `PortRef::Param { id, param }`** (new `PortRef` variant; not a fake port
+  name). Route id = cable id, stable through edits, undo and save/load. Settings are cable
+  params: `amount` (signed fraction of knob travel, −1…1; absent = +0.25, the UI's drop default)
+  and `bypass` (≥ 0.5 = bypassed). Polarity is the sign of the amount; Invert flips it.
+- **Math (per block, per voice):** `n = to_norm(base)` in the param's taper (log for
+  `Exponential`), `n += source[0] × amount / full_scale` for every non-bypassed route, clamp once
+  to 0…1, `from_norm(n)` back to units (`Stepped` rounds). `full_scale = max(|lo|, |hi|)` of the
+  source port's `PortType::nominal_range()`: Audio/Cv ±1, new `UnipolarCv` and Gate 0…1, Pitch
+  ±60 st. Envelope out and velocity are now `UnipolarCv`, so a unipolar source adds 0…amount,
+  never ±amount.
+- Bypassed routes are left out of the compiled graph entirely; their settings stay in the patch.
+- Routes join scheduling and the existing DFS cycle handling like any cable: a feedback route
+  (LFO → its own Rate) reads one block late. Voice → voice per lane, global → voice shared,
+  voice → global averaged (existing rule).
+- New `Taper::Stepped` marks discrete params (LFO/OSC waveform, VCA response, envelope timing).
+- File format: **schema v2** (adds `PortRef::Param`, `Op::UnsetParam`, `Op::Group`). v1 files
+  are a subset and load unchanged; real v1 fixtures written by the baseline build render
+  bit-exact to their baseline renders (`engine/tests/legacy_sound.rs`).
+
+## 2026-09-23 — Exact undo and grouped user actions
+
+Supersedes "core: op log inverse simplifications" (2026-09-21).
+
+- `Op::UnsetParam`: inverse of the first `SetParam` on a param, so undo restores "absent"
+  (module default) instead of a made-up 0.0.
+- `RemoveModule` now also removes every cable touching the module (dangling cables used to make
+  `compile` panic). Its inverse is a `Group` that restores the module, its params and those
+  cables with their params/patterns.
+- `Op::Group { ops }` applies several ops as one undo step: repatching an occupied jack
+  (Disconnect + Connect), and anything else that is one user action.
+- Loading recomputes every inverse from the replayed state instead of trusting the file, so v1
+  histories get exact undo too.
+- Drag gestures: the first frame starts a new entry (`append_new`), later frames merge into it
+  regardless of timing (`append_continuing`). One drag = one undo step.
+- Moves (and undo/redo of moves) no longer trigger an audio rebuild (`editor::affects_audio`).
+
+## 2026-09-23 — Live-edit handoff: no mutex, carry at fade start
+
+- `kabl-ui`'s audio callback owns the `PatchEngine`; there is no shared lock any more. The UI
+  compiles, wraps in `basedrop::Owned` and sends through a bounded `rtrb` queue (4 slots,
+  `SwapSender`). On overflow the sender holds only the newest graph and retries next frame;
+  superseded graphs are dropped on the UI thread. `Collector::collect()` runs every UI frame
+  (it never ran before, so every edit leaked a graph).
+- State carry moved to the moment a graph's fade starts, on the audio thread, from the graph
+  actually playing. `carry_state` is now allocation-free (`StateBuf`, fixed 12 entries × 16-byte
+  keys; every built-in fits, tested). The old path copied state from `active` at build time, so
+  a queued graph could revive a released note or rewind an envelope. The allocating carry was
+  not moved into the callback; a non-allocating one replaced it.
+- MIDI goes to the active and the incoming graph; a pending graph gets MIDI state through the
+  carry. Every `midi.in` receives every note, voice for voice (was: only module id 1). A patch
+  without `midi.in` ignores notes.
+- Measured: carry for the 8-voice reference patch 2.8 µs median, 7.3 µs max per swap.
+
+## 2026-09-23 — Live-edit crossfade is linear
+
+The `PatchEngine` crossfade changed from equal-power to linear (gains sum to 1). Old and new
+graphs start from the same carried state, so they are strongly correlated; equal-power swelled
+an unchanged held note by up to +41 % mid-fade on every edit (found by
+`env_timing.rs::many_live_edits_during_a_held_note_never_retrigger`). Spike S1's `swap::Engine`
+keeps equal-power.
+
+## 2026-09-23 — Knob modulation UI rules (production)
+
+Owner rules implemented as stated in the task: knob body = base, ring = selected source's
+amount only; cable, ring, plug and drawer row are one route; active source name + amount shown
+in a pill while dragging. Agent decisions inside those rules:
+
+- Auto-select happens only when a knob **becomes** inspected with exactly one route (or when a
+  drag creates a route). Re-pressing the inspected knob never re-points the selection, so after
+  removing the selected route the ring edits nothing until a source is picked.
+- Clicking a route cable selects it; it never deletes it (delete is the drawer's Remove).
+- The drawer's status line is always one line (selected span, or "No source selected"), so
+  selecting a source does not move rows under the pointer (found in the real-X run).
+- The knob row reserves a fixed badge line, so All/Focus/Hidden never move a control.
+- Badges are ASCII (`< LFO`, `< 2 mods`, `> 2`): the bundled fonts lack arrow glyphs.
+- Stepped params render as segmented selectors (CONT/KEY, SIN…S&H, LIN/EXP) and accept routes
+  as drop targets; their routes are edited in the drawer.
+- Knob drags map the total pointer offset from the press point (not per-frame deltas), so the
+  pixels egui needs to recognise a drag are not lost.
