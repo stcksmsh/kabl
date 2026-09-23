@@ -51,7 +51,7 @@ Supervisor scope: two interlocking sequences from one shared clock. Built: clock
 Deferred, not blockers: toolbar transport copy; Fit density of the four-row demo. Next scope
 goes through the supervisor.
 
-## Echo — built, waiting for Kosta's review (supervisor scope)
+## Echo — closed (Kosta approved hands-on, 2026-09-24)
 
 `delay` (global): mono in, stereo out, clock-synced or free time, feedback, mix, tone in the
 loop, MONO/PING. `Module::carry_from` carries its 4 s lines across live swaps (audio thread,
@@ -59,8 +59,8 @@ no allocation). Load now builds a `fresh` graph that carries nothing. The demo i
 `cargo run --release -p kabl-ui -- --patch patches/echo` (built by `crates/ui/tests/echo.rs`;
 rewrite it with `cargo test -p kabl-ui --test echo write_echo_patch -- --ignored`, keeping the
 name filter, because the file includes `interlocking.rs` and its writer). Record, video, clips, timings and the listening checklist:
-`docs/echo/README.md`. Timing harness: `crates/ui/examples/bench_echo.rs`. Stopped for Kosta:
-do not extend effects (reverb, tape, etc.) before his answer.
+`docs/echo/README.md`. Timing harness: `crates/ui/examples/bench_echo.rs`. Next scope goes
+through the supervisor; don't extend effects (reverb, tape, etc.) without it.
 
 ## Accepted limitations
 

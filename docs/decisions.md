@@ -2083,3 +2083,13 @@ were not transplanted, only its look (palettes, geometry, drawing).
   (mix 0) and echo within 0.3 dB RMS.
 - Not built: reverb, tape model, saturation, self-oscillation, reset input, MIDI sync, a Time
   knob that shows the synced time.
+
+## 2026-09-24 — Echo closed (owner approved hands-on)
+
+- Kosta watched the walkthrough, listened to the A/B clips and tested `patches/echo`
+  hands-on: "Everything is good, sounds good, no tears/blips/issues and seems to work as
+  intended." The slice is closed. Record: `docs/echo/README.md`.
+- The limits listed there stand as accepted: Pi 4 unmeasured (the whole-line swap copy is
+  the first thing to measure), the Time knob shows the free time while synced, and Load
+  starts fresh.
+- Next scope goes through the supervisor.

@@ -5,7 +5,7 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-23, first delay module built; waiting for Kosta's sound and control review.
+Last updated: 2026-09-24, echo slice closed (Kosta approved it hands-on).
 
 **Current handover (supersedes every older handover note below):** the approved revision-2 rack
 is the production canvas, on real editor/engine state. Kosta reviewed it hands-on and approved
@@ -54,7 +54,7 @@ Rationale: `decisions.md`, "Interlocking sequences: transport, clock divider, tr
 Commits 8d8dfa9..b7a645b. Deferred, not blockers: a toolbar transport copy and the density of
 the four-row demo at Fit zoom. Next scope: supervisor.
 
-**Echo (supervisor scope, 2026-09-23): built, waiting for Kosta's sound and control review.**
+**Echo (supervisor scope, 2026-09-23), closed: Kosta approved it hands-on (2026-09-24). Next scope: supervisor.**
 The first effect: `delay`, a global echo with mono in and stereo out. Controls: free time
 20 ms–4 s, or sync to a clock cable (1/16, 1/8, 1/8D, 1/4), feedback 0–95 %, mix, and a tone
 low-pass in the loop. MONO/PING mode. A readout shows `sync`/`held`/`unlocked`/`free` and the

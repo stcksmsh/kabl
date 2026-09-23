@@ -1,7 +1,7 @@
 # Echo: the first delay module
 
 Supervisor scope (2026-09-23): a production delay/echo in the approved rack, with live editing.
-Built, verified, and waiting for Kosta's sound and control review.
+Closed: Kosta tested it hands-on (2026-09-24) and approved it: "sounds good, no tears/blips/issues".
 
     cargo run --release -p kabl-ui -- --patch patches/echo                    # 1440×900
     cargo run --release -p kabl-ui -- --patch patches/echo --size 1280x800
