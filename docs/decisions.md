@@ -1659,3 +1659,16 @@ supersedes the "awaiting go-ahead" notes above for this scope and no further.
   a 1 px dead band separated the knob body from the ring band. The full list is in PROTOTYPE.md.
 
 Stopped for Kosta's hands-on review. No production integration.
+
+## 2026-09-23 — Prototype review: owner answers (partial)
+
+- **Hidden layout:** stable rack, "a lot better". Compact synth may be useful in some situations,
+  perhaps as a view switch; it is not the default.
+- **Expansion push vs float:** unanswered. The owner did not understand what to test; the
+  question needs a clearer framing.
+- **Small-knob depth:** ring band, but it must work with several modulations on one knob. A
+  multi-source ring (active-source plug marker, grabbable per-source lanes when inspected) was
+  started and reverted uncommitted, to end the session. Not built.
+- **Envelope time:** the owner sees it as continuous vs key-trigger (sampled at note-on) and
+  suggests making it selectable. Agent reading, not confirmed: default continuous, with a
+  per-route "latch at note-on" option.
