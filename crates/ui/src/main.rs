@@ -564,6 +564,9 @@ struct App {
     stats_file: Option<(String, std::time::Instant)>,
     peaks: Arc<record::PeakTap>,
     meter_at: std::time::Instant,
+    /// Callback count last seen and when it last moved: a stream that stops calling back
+    /// (an unsupported buffer size, a device gone) is reported, not left silent.
+    watchdog: (u64, std::time::Instant),
 }
 
 impl eframe::App for App {
@@ -656,9 +659,20 @@ impl eframe::App for App {
             self.midi.release_all();
             self.ui_state.last_message = Some("all MIDI voices released".into());
         }
-        if self.audio.timing.is_some() {
+        if let Some(t) = &self.audio.timing {
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(50));
+            let n = t.count.load(Ordering::Relaxed);
+            if n != self.watchdog.0 {
+                self.watchdog = (n, std::time::Instant::now());
+            } else if self.watchdog.1.elapsed().as_secs_f32() > 1.5
+                && !self.audio.status.starts_with("audio stalled")
+            {
+                self.audio.status = format!(
+                    "audio stalled: no callbacks for over a second after {n} \
+                     (the device may not support these settings, or it went away)"
+                );
+            }
         }
         let dt = self.meter_at.elapsed().as_secs_f32();
         self.meter_at = std::time::Instant::now();
@@ -790,6 +804,7 @@ fn main() -> eframe::Result<()> {
                 hits_file: std::env::var("KABL_HITS_FILE").ok(),
                 peaks,
                 meter_at: std::time::Instant::now(),
+                watchdog: (0, std::time::Instant::now()),
                 hits_written: String::new(),
                 stats_file: std::env::var("KABL_STATS_FILE")
                     .ok()
