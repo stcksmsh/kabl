@@ -357,6 +357,6 @@ fn overlapping_transition_swaps_stay_finite_and_converge() {
     assert!(fast.iter().all(|x| x.is_finite()));
     let tail = 900 * BLOCK;
     let d = max_diff(&fast[tail..], &reference[tail..]);
-    println!("overlapping transitions: difference after 8 s {d:.2e}");
+    println!("overlapping transitions: difference 1.2 s later {d:.2e}");
     assert!(d < 1e-3);
 }

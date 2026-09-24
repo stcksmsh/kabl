@@ -5,7 +5,7 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-24, performance batch built; waiting for Kosta's hands-on review.
+Last updated: 2026-09-24, performance batch and its follow-up built; waiting for Kosta's hands-on review.
 
 **Current handover (supersedes every older handover note below):** the approved revision-2 rack
 is the production canvas, on real editor/engine state. Kosta reviewed it hands-on and approved
@@ -71,11 +71,17 @@ output) and gate length (CLOCK default / LENGTH), a Perform panel of pinned cont
 transport included), MIDI CC learn with soft takeover, and a stereo WAV recorder of the final
 output. Engine: voice-rate chains no `midi.in` reaches run once (renders unchanged, the demo's
 callback 2.4× cheaper). The demo is
-`cargo run --release -p kabl-ui -- --patch patches/performance --perform`. Record, 6-minute
+`cargo run --release -p kabl-ui -- --patch patches/performance --perform --rate 48000 --frames 256`. Record, 6-minute
 take recorded by kabl, walkthrough, screenshots, timings and the hands-on checklist:
 [`performance-batch/README.md`](performance-batch/README.md). Rationale: `decisions.md`,
-"Performance batch". 279 tests pass, clippy clean. Automated evidence only: no hardware
-controller or speaker check yet. Pi 4 unmeasured.
+"Performance batch" and its follow-up. Follow-up (same day, owner-authorized): pin labels
+(schema v3 `Op::SetLabel`), compact wrapping panel, a `gain` module, a measured output meter,
+MIDI unplug/replug recovery and All notes off, CC undo groups across knobs, recorder
+never-overwrite / failure handling, an audit of single-instance compilation against a
+per-voice reference, real-time priority for the audio thread (rtkit) with separate execution /
+arrival / xrun telemetry, and a 32-minute soak (0 late, 0 xruns, flat memory). Start with
+[`performance-batch/TOMORROW.md`](performance-batch/TOMORROW.md). 296 tests pass, clippy clean.
+Automated evidence only: no hardware controller or speaker check yet. Pi 4 unmeasured.
 
 Older sections below are history. Where they disagree with the above or with the code, they
 are stale: the MIDI/graph-swap/undo risks they list are fixed; the Mutex described there is

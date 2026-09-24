@@ -2163,3 +2163,40 @@ were not transplanted, only its look (palettes, geometry, drawing).
   the real app (virtual MIDI controller + real clicks), peak −4.1 dBFS, no lost frames.
 - Not built: relative encoders, NRPN, MPE, MIDI clock/transport mapping, 14-bit CC, named pins,
   a device-specific mapping, multitrack or normalized takes, real-time thread priority.
+
+## 2026-09-24 — Performance batch follow-up (owner-authorized, before the hands-on review)
+
+- Record: `docs/performance-batch/README.md` ("Follow-up"); first-play guide:
+  `docs/performance-batch/TOMORROW.md`. The batch stays **built, not approved**.
+- **Pin labels are text metadata, not params.** `Op::SetLabel { id, key, text }` and
+  `PatchState.labels` (serde default, skipped when empty), schema v3; v1/v2 files load
+  unchanged. Removing a module removes its labels, its inverse restores them. Rejected:
+  encoding text in f32 params; a per-pin struct outside the op log (no undo, no save).
+- **Perform panel layout:** compact 138 px cards wrap in rows (the demo's 12 fit at
+  1280×800), fixed height with a Taller toggle (egui's resizable bottom panel sized itself to
+  its first frame's content, so a user-resizable one wasn't dependable), transport cards in a
+  fixed column, move/rename/unpin in a ⋯ menu, long names truncated with hover text.
+- **CC undo groups across mappings:** `PatchLog::append_to_group` merges `SetParam`s into the
+  newest group entry from the same source (`Source::Midi`); CC messages under 1 s apart on any
+  mappings are one step. A pickup exactly at the value writes nothing.
+- **`gain` module** (voice rate, −60…+24 dB, 20 ms glide) replaces the demo's ×4 mixer.
+- **Output meter:** `PeakTap` (two atomics, `fetch_max` on non-negative float bits, a NaN
+  flag) fed per frame by the callback, taken by the UI. Display only; no limiter.
+- **MIDI:** an input missing from the 2 s port scan is disconnected with its notes released and
+  reconnected when a port with the same base name returns; reconnects and switches reset
+  pickup. All notes off in the panel.
+- **Recorder:** `create_new` + numbered names, never overwrite; a writer error ends the take
+  by itself; failed and lossy takes both become `-INCOMPLETE.wav`; Open folder, Copy path;
+  test hooks `KABL_RECORD_FAIL_AFTER`, `KABL_RECORD_RING_FRAMES`; Ctrl+Q quits normally.
+- **Single-instance audit:** `compile_per_voice` reference; identical output on the covered
+  shapes; defined transition: per voice → one instance continues voice 0. Delay-slot carry got
+  the same voice-0 fallback as module state.
+- **Callback misses:** execution, arrival, xruns and actual sizes are measured separately. The
+  scheduling hypothesis was confirmed: without real-time priority, arrival was late up to 3691
+  times per ~70 s and 48 kHz / 64 frames underran 1899 times; with it (requested once from the
+  first callback via `audio_thread_priority`/rtkit; cpal's own promotion skips PipeWire's ALSA
+  plugin), 0 late and 0 xruns at 48/256, 48/64 and 96/256. 96/64 doesn't run here and is
+  reported as stalled. New dependency: `audio_thread_priority` 0.38 (MPL-2.0, D-Bus).
+- **Soak:** 32 min at 48/256 with recording, CC, notes, swaps, transport, save/load, unplug:
+  0 late, 0 xruns, flat memory, 1–2 live graph allocations, ten complete takes, 0 notes held.
+- Review setting: 48 kHz / 256 frames, RT on.

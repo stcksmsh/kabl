@@ -13,7 +13,8 @@ Trust code and git over older docs.
   crate: it reformats the untouched `rev2_proto` / `rev2_env_ab` examples; use `rustfmt` on
   the files you changed.
 
-Launch (real audio + MIDI). The newest demo is `--patch patches/performance --perform`:
+Launch (real audio + MIDI). The newest demo is `--patch patches/performance --perform --rate 48000 --frames 256`
+(first-play guide: `docs/performance-batch/TOMORROW.md`):
 
     cargo run --release -p kabl-ui -- --patch patches/reference            # 1440×900
     cargo run --release -p kabl-ui -- --patch patches/reference --size 1280x800
@@ -27,7 +28,7 @@ Launch (real audio + MIDI). The newest demo is `--patch patches/performance --pe
   expansion, 50–200 % zoom, pull-the-plug cable moves, skin renderer (no built-in skin).
 - Modulation: any knob takes routes (signed amount, invert, bypass); ring/lanes/drawer are one
   route; taper-space sum, one clamp, block rate; envelope timing CONT/KEY.
-- Verification: `cargo test --workspace` 279 pass (9 ignored = fixture/patch/clip writers), clippy clean.
+- Verification: `cargo test --workspace` 296 pass (9 ignored = fixture/patch/clip writers), clippy clean.
   Real-X tooling: `docs/rack-migration/drive.py` (+ `scripts/`), `closeout-real-x.sh`,
   `record-walkthrough.sh`; `docs/interlocking-sequences/record-walkthrough.sh` records a patch
   without MIDI.
@@ -83,6 +84,15 @@ Supervisor scope, authorized as one batch. Record and checklist:
   clicks the panel instead (and a following ctrl+z can undo the patch's own pins, which are
   the last op of its log). Close the panel or pan first. The panel's horizontal scroll hides
   far cards; new/moved pins scroll into view, transport stays at the left.
+
+Follow-up (same day, `3c41a55..`): labels (`Op::SetLabel`, schema v3), compact panel,
+`gain`, output meter (`record::PeakTap`), MIDI reconnect/notes-off, CC undo groups
+(`PatchLog::append_to_group`), recorder never-overwrite and failure handling, single-instance
+audit (`compile_per_voice`, `tests/single_instance.rs`), RT priority + callback telemetry
+(`main.rs` `CallbackTiming`, `KABL_STATS_FILE`), soak. Scripts in
+`docs/performance-batch/scripts/` (`recovery.txt`, `load.txt`, `make_soak.py`); drive.py has
+`midikill`/`midistart`. Test hooks: `KABL_RECORD_FAIL_AFTER`, `KABL_RECORD_RING_FRAMES`,
+`--no-rt`. Still awaiting Kosta's hands-on approval.
 
 ## Accepted limitations
 

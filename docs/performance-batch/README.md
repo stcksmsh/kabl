@@ -4,12 +4,18 @@ Supervisor scope (2026-09-24), owner-authorized as one batch: Kosta can build, p
 record an evolving piece inside kabl. Built on `master` (local, not pushed), commits
 `b742a70..`. Rationale: `docs/decisions.md`, "Performance batch".
 
-    cargo run --release -p kabl-ui -- --patch patches/performance --perform       # 1440×900
-    cargo run --release -p kabl-ui -- --patch patches/performance --perform --size 1280x800
+    cargo run --release -p kabl-ui -- --patch patches/performance --perform --rate 48000 --frames 256
+    # add --size 1280x800 for the smaller window
     # choose the MIDI input in the Perform panel, or: --midi "KL Essential"
 
 Other flags: `--record-dir DIR` (where takes go; default `recordings/`, git-ignored),
-`--rate 96000` and `--frames 256` (ask the device for a rate and a fixed buffer).
+`--rate 96000` and `--frames 256` (ask the device for a rate and a fixed buffer), `--no-rt`
+(don't ask for real-time priority; for comparison only). Ctrl+Q quits.
+
+**Start with [`TOMORROW.md`](TOMORROW.md)** (launch, controller, control map, first-play
+checklist). The follow-up work from the same day (labels, gain, meter, recovery, the
+single-instance audit, callback investigation, a 30-minute soak) is described in "Follow-up"
+below; where it changed something described earlier, the earlier text is updated.
 
 **Automated vs. owner evidence.** Everything below was checked by tests or by driving the
 real release app on a virtual X display, with MIDI from a virtual controller
@@ -71,56 +77,69 @@ Stereo in (`in_l`, `in_r`), stereo out (`left`, `right`).
 `Perform` (toolbar, or `--perform`) opens a bottom panel of **pinned controls**.
 
 - Pin from a module's right-click menu: **Pin to Perform ▸** (any control; on a clock,
-  *Transport*). Cards show the module (`Mixer #27`), the control (`Level 2`), and for mixer
-  levels where the channel comes from (`from VA Oscillator #16`, traced upstream to the nearest
-  sequencer, MIDI input or oscillator).
-- ◀ ▶ reorder, ✕ unpins. Pins are saved with the patch, undo like any edit and never rebuild
-  audio. Deleting a module removes its pins and mappings; undo brings them back.
+  *Transport*). Each card has a **label** (double-click it, or **⋯ → Rename**; empty = the
+  control's own name), saved with the patch as text metadata (`Op::SetLabel`, schema v3), and
+  under it the real identity in grey: `Mixer #27 · Level 2 · from VA Oscillator #16` (mixer
+  levels are traced upstream to the nearest sequencer, MIDI input or oscillator).
+- **⋯** moves a card left/right and unpins it. Pins and labels are saved with the patch, undo
+  like any edit and never rebuild audio. Deleting a module removes its pins and mappings;
+  undo brings them back.
 - A card's slider is the real control: same stored value as the rack knob, same undo (one
   step per drag), modulation routes still add on top.
-- The transport card sends Run/Stop and Restart to that clock, exactly like the clock's face
-  (runtime commands, never undo entries).
-- Fixed size (206 px tall, 184 px cards, egui widgets), so it reads the same at any rack zoom.
-  Keyboard: Tab to a slider, arrows change it. Both themes.
+- The transport cards stay in a column at the left and send Run/Stop and Restart to that
+  clock, exactly like the clock's face (runtime commands, never undo entries).
+- Compact cards (138 px) wrap into rows: the demo's 12 controls fit together at 1280×800
+  without scrolling. **Taller** gives the panel more rows. Fixed sizes, egui widgets, so it
+  reads the same at any rack zoom; keyboard: Tab to a slider, arrows change it; both themes.
+- Long MIDI device names, file names and paths are truncated (hover shows them whole), so
+  the buttons never move off screen.
 
 ### MIDI CC learn
 
-- **Learn** on a card (or right-click a module → **MIDI learn ▸**), then move a knob: the
-  control gets that CC and channel (`CC 74 · ch 1`). Learning a CC that's already in use moves
-  it. **Clear** removes it. Escape or Cancel stops learning. Mappings save with the patch.
+- **Learn** (the badge on a card, or right-click a module → **MIDI learn ▸**), then move a
+  knob: the control gets that CC and channel (badge `CC 74 · 1`). Learning a CC that's already
+  in use moves it. **✕** removes it. Escape or **Cancel learn** stops. Mappings save with the
+  patch.
 - The MIDI input is chosen in the panel (the list refreshes every 2 s) or with `--midi`.
   Switching releases every voice. Mappings are channel + CC, not tied to a device name.
 - **Soft takeover** (default, always): a mapping moves its control only once the hardware
   reaches the control's position (within 1.5/127, or by passing it). Until then the card shows
-  `pickup: turn up to 42 %`; after it, `● hardware in control`. Any other change to that value
-  (mouse, undo, redo, load) cancels the pickup again, so the next turn never jumps.
-- A turn is one undo step (messages less than 1 s apart). CC drives the base value; routes
-  still modulate on top. Absolute 7-bit CC only, continuous controls only (not switches).
+  `↑ 42%` / `↓ 42%` (which way to turn); after it, `● live`. Picking up right at the value
+  writes nothing. Any other change to that value (mouse, undo, redo, load), a reconnect or a
+  controller switch cancels the pickup again, so the next turn never jumps.
+- A gesture is one undo step: CC messages on any mappings less than 1 s apart form one group
+  (`PatchLog::append_to_group`), so two knobs turned together undo together. CC drives the
+  base value; routes still modulate on top. Absolute 7-bit CC only, continuous controls only.
+- An unplugged input releases its notes and reconnects when it comes back (checked every
+  2 s; ALSA's renumbering tolerated). **All notes off** releases every MIDI voice.
 - Notes are untouched: they still go straight to the audio thread.
 
 ### Recorder
 
-Right end of the Perform panel: **● Record** / **■ Stop**, elapsed time, file name (hover:
-full path), and the folder field.
+The recorder row of the Perform panel: **● Record** / **■ Stop**, elapsed time, the take's
+file name (hover: full path), the **to** folder field, **Open folder**, and after a take
+**Last take** (length) with **Copy path**.
 
 - Records exactly what goes to the device: final stereo output, 32-bit float WAV at the
-  device rate, named `kabl-YYYYMMDD-HHMMSSZ.wav` (UTC).
+  device rate, named `kabl-YYYYMMDD-HHMMSSZ.wav` (UTC). A name that exists gets `-2`, `-3` …:
+  files are created with `create_new`, so nothing is ever overwritten.
 - The audio callback copies frames into a 4 s lock-free ring; a writer thread writes the file
   and updates the WAV header every 0.5 s. No allocation, lock or I/O on the audio thread.
 - Stopping the sequencer leaves the recorder running (releases and tails are captured).
-  Recording is a runtime action, never an undo entry.
-- Stop finalizes the file; closing the window does too. A killed process leaves a file that
-  is readable up to the last checkpoint (≤ 0.5 s lost).
-- If the writer falls 4 s behind, the frames that don't fit are counted: the panel shows
-  `N frames lost: take incomplete` in red and the file is renamed `…-INCOMPLETE.wav`. Write
-  errors (disk full, bad folder) stop the take and show the error.
+  Recording is a runtime action, never an undo entry. Load during a take keeps recording.
+- Stop finalizes the file; closing the window or Ctrl+Q does too. A killed process leaves a
+  file that is readable up to the last checkpoint (≤ 0.5 s lost).
+- Frames that don't fit the ring are counted (`N frames lost: incomplete`, red); a write error
+  ends the take by itself and shows. Either way the file keeps what was written and is renamed
+  `…-INCOMPLETE.wav`, never shown as complete.
 
 ### Engine change: one instance for chains no MIDI reaches
 
 Voice-rate modules that no `midi.in` feeds (the demo's sequencer voices and pad) used to run
 in all 8 voices with identical results. They now run once. Renders are unchanged (every
 existing test passes unchanged); the demo's median callback fell from 84 to 35 µs at 64
-frames. The status bar now shows live callback timing.
+frames. The status bar shows live callback timing. Audited against a per-voice reference
+in the follow-up (below).
 
 ## Demo: `patches/performance`
 
@@ -132,7 +151,7 @@ frames. The status bar now shows live callback timing.
 | Bass | `seq #3`, 8 steps on 16ths, LENGTH 35 %, accented velocities → saw → filter → VCA | Mixer #26 Level 1 | 20 |
 | Arp | `seq #4`, 7 steps on 16ths (against the bass's 8), a rest, LENGTH 60 % → square | Mixer #27 Level 1 | 21 |
 | Pad | two detuned saws (E3, B3), slow LFO on the filter | Mixer #27 Level 2 | 22 |
-| Lead | MIDI keyboard → saw → filter → VCA → `Mixer #25` (×4, see below) → echo | Mixer #28 Level 1 | 23 |
+| Lead | MIDI keyboard → saw → filter → VCA → `Gain #25` (+12 dB, see below) → echo | Mixer #28 Level 1 | 23 |
 
 Other pins: clock transport, bass cutoff (CC 24), arp cutoff (CC 25), pad cutoff (CC 26),
 bass transpose, echo feedback (CC 27), reverb mix (CC 28), reverb decay (CC 29).
@@ -142,9 +161,11 @@ stereo bus into the reverb (6 s, 4.5 kHz damping, 30 ms pre-delay, mix 35 %), wh
 both mains. The arp also has a small echo send. Headroom (offline, 10 s with a lead phrase):
 peak −5.8 dBFS, RMS −19.3 dBFS; each layer alone −23.7 to −25.8 dBFS RMS.
 
-`Mixer #25` takes the lead VCA on all four inputs: the voice average makes one MIDI note
-1/8 as loud as a sequencer voice, and this is the only gain above 1 a patch can build today
-(+12 dB).
+`Gain #25` (+12 dB) makes up for the voice average: one MIDI note is 1/8 as loud as a
+sequencer voice. Full-velocity chords on the lead: 1 note −5.7, 3 notes −3.3, 4 notes −2.6
+dBFS peak. (Until the follow-up this was a mixer with the VCA on all four inputs, ×4; the level
+is the same within 0.04 dB, so the recorded take stands.) Pins carry labels: Bass, Arp, Pad,
+Lead, Bass cutoff, …
 
 **Reassigning to your controller:** click **Learn** on a card, turn the knob. Save the patch
 to keep it.
@@ -163,21 +184,23 @@ to keep it.
   the full mix's RMS (gains in dB): `01-full`, `02-no-reverb` (+1.4), `03-no-echo` (−0.3),
   `04-dry` (+1.3), `05-long-dark-reverb` (14 s, 2 kHz, −1.0), `06-clock-gates` (both
   sequencers CLOCK, −0.1), `07-flat-velocity` (all 100 %, −2.3).
-- `walkthrough.mp4` (1:42, 1440×900, screen and stereo audio of the real release app;
-  MIDI from the virtual controller). Script `scripts/walkthrough.txt`, recorder
-  `record-walkthrough.sh`, scene times (±0.5 s) in `walkthrough-marks.txt`:
+- `walkthrough.mp4` (1:53, 1440×900, screen and stereo audio of the real release app;
+  MIDI from the virtual controller; refreshed after the follow-up). Script
+  `scripts/walkthrough.txt`, recorder `record-walkthrough.sh`, scene times (±0.5 s) in
+  `walkthrough-marks.txt`:
 
   | ~time | scene |
   |---|---|
-  | 0:05 | the patch playing, Perform panel open |
+  | 0:05 | the patch playing, Perform panel open (labelled cards, Out meter bottom left) |
   | 0:13 | the bass sequencer's advanced area: velocity row, gate mode, gate length |
   | 0:19 | step 2's velocity to 100 % (an accent), then undone |
   | 0:26 | gate CLOCK (the old half-step gates), then back to LENGTH 35 % |
-  | 0:41 | pin the lead filter's cutoff from the module menu; move it left twice |
-  | 0:49 | Learn, CC 74 sent far below the value: `pickup: turn up to …`, a held lead note |
-  | 0:57 | the controller turns up: nothing moves until it reaches the value, then it follows |
-  | 1:05 | reverb mix to 100 % (fully wet), then undone |
-  | 1:23 | Record; 1:32 the sequencer stops, the take keeps the tails; 1:35 Stop, saved |
+  | 0:41 | pin the lead filter's cutoff from the module menu; 0:46 renamed "Lead cutoff", moved left |
+  | 0:51 | Learn, CC 74 sent far below the value: pickup pending (`↑`), a held lead note |
+  | 0:59 | the controller turns up: nothing moves until it reaches the value, then `● live` |
+  | 1:08 | two knobs turned together (Bass cutoff, Echo feedback); 1:12 one Ctrl+Z takes both back |
+  | 1:16 | reverb mix to 100 % (fully wet), then undone |
+  | 1:35 | Record; 1:44 the sequencer stops, the take keeps the tails; 1:47 Stop, Last take shown |
 
 - `img/` (both window sizes, both themes; script `scripts/shots.txt`): `01`/`02` the demo
   with the Perform panel, `03`/`04` the reverb close-up with its advanced controls,
@@ -186,7 +209,7 @@ to keep it.
 
 ## Verification
 
-`cargo test --workspace`: 279 pass, 9 ignored (patch, fixture and clip writers). `cargo
+`cargo test --workspace`: 296 pass, 9 ignored (patch, fixture and clip writers). `cargo
 clippy --workspace --all-targets`: clean.
 
 - `crates/modules/tests/reverb.rs` (9): RT60 follows the knob at 44.1/48/96 kHz; the
@@ -260,11 +283,123 @@ The recorded 6-minute take (48 kHz, 256 frames asked, live CC edits = graph swap
 frame of a turn, recording on): 71270 callbacks, worst 4054 of 5333 µs, 4 over half, **0
 late**, no lost frames.
 
-Reading: the compute is well inside every budget (medians 3–13 %), but single callbacks on
-this laptop occasionally take several milliseconds. Those are scheduling stalls, not work: the
-same callbacks take 35–150 µs offline. At 96 kHz / 256 frames that produced 2 late callbacks
-in 9104. The fix is real-time priority for the audio thread (cpal's `audio_thread_priority`
-feature, or rtkit); not done in this batch. **Pi 4 unmeasured.**
+Reading at the time: the compute is well inside every budget (medians 3–13 %), but single
+callbacks occasionally took several milliseconds, suspected to be scheduling. The follow-up
+tested that hypothesis ("Callback misses: measured", below): with real-time priority granted
+there were no late callbacks and no xruns in any configuration. **Pi 4 unmeasured.**
+
+## Follow-up (2026-09-24, after the first review package)
+
+Owner-authorized follow-up before the hands-on review. Commits `3c41a55..` on `master`.
+
+### Usability, gain, meter
+
+- Pin labels, compact wrapping cards, Taller, card menus, truncation: see "Perform panel"
+  above. `tests/perform.rs` (12): labels (double-click, type, Enter; Escape cancels; undo;
+  save/reload; never rebuild audio; the source line stays), the demo's 12 cards all visible
+  and apart at 1280×800 and 1440×900 with the recorder, MIDI, notes-off and transport
+  controls on screen and the rack still over 350 px tall.
+- `gain` (Utility, voice rate so it works per voice before the average): −60…+24 dB, unity
+  default and exact at 0 dB, 20 ms glide, modulation/undo/save like any param
+  (`tests/gain.rs`). The mixer and voice averaging are unchanged.
+- **Out meter** (status bar): the callback folds every output frame's |L|, |R| into two
+  atomics (`PeakTap::feed`, `fetch_max` on the float bits); the UI takes and clears them each
+  frame. Peak hold falling 20 dB/s, yellow above −6 dBFS, a CLIP light latched at ≥ 0 dBFS or
+  a non-finite sample, click to reset, hover shows the highest peak. No limiter.
+
+### MIDI and recorder recovery (real app, `scripts/recovery.txt`)
+
+Driven through the real release app with the virtual controller; evidence in
+`target/recovery` at the time, summarised here:
+
+| workflow | result |
+|---|---|
+| controller unplugged with a note held | "disconnected: its notes were released"; the note's band falls ~23 dB over the next seconds (release + echo) |
+| plugged back in | reconnects by itself (≤ 2 s), every mapping waits for pickup again |
+| mouse edit, then the knob far away | no jump (value kept, `↑ 40%` shown) |
+| two knobs together, one Ctrl+Z | both restored in one step (also `tests/perform.rs`) |
+| All notes off with notes held | released |
+| delete the Lead's mixer (pinned + learned), undo | card and mapping gone, then back |
+| Stop then Record at once; Load while recording | two takes, both valid; the take continues through Load |
+| bad folder (`/proc/…`) | "Recording failed: can't record to …", nothing claimed |
+| injected write error (`KABL_RECORD_FAIL_AFTER`) | the take ends by itself, red error, `-INCOMPLETE.wav` kept and readable |
+| forced overflow (`KABL_RECORD_RING_FRAMES=128`) | `N frames lost: incomplete` while recording, `-INCOMPLETE.wav` after |
+| Ctrl+Q while recording | the take is finalized (valid WAV, header = data) |
+| 96 kHz / 64 frames (the device doesn't run it) | status bar: "audio stalled: no callbacks …" |
+| three takes in one second, a file already there | `-2`, `-3` names; the existing file untouched (`tests/record.rs`) |
+
+Found and fixed on the way: a pickup at the value nudged it by up to 1/127 and made its own
+undo step (now writes nothing); a newly picked-up mapping started a separate undo group (now
+joins the gesture); after a writer error the panel kept showing ● REC until Stop (now ends at
+once); a failed take wasn't marked (now `-INCOMPLETE`); the transport card could scroll away
+(now a fixed column); the toolbar meter overlapped Save/Load at 1280 (moved to the status bar).
+
+### Single-instance compilation audit
+
+`compile_per_voice` keeps every voice-rate module per voice (the compiler before 48ce23c) as
+a reference. `crates/engine/tests/single_instance.rs` (6) compares on a patch with a
+sequenced chain, a MIDI chain, an LFO route, a delay and a feedback cycle:
+
+- identical output (difference 0.0) with MIDI through jacks, MIDI through a velocity
+  modulation route, a bypassed route, and MIDI pitch into the sequenced chain;
+- only modules a `midi.in` reaches (through cables or routes, cycles included; bypassed routes
+  excluded) are per voice; voices stay independent;
+- adding MIDI influence while playing: identical through the swap (every voice inherits the
+  single instance's state, which every reference lane had);
+- removing it while voices differ (defined behaviour): the single instance continues voice 0;
+  no step beyond the reference's at the swap; within 1.6e-5 of the reference one second later;
+- six overlapping swaps between the shapes: finite, within 4e-6 of the reference 1.2 s later.
+
+Fixed: the one-block feedback buffers now carry across the transition like module state.
+
+### Callback misses: measured
+
+The status bar and `KABL_STATS_FILE` now keep apart execution time (against the callback's
+own audio), arrival (interval between callbacks against the period), backend xruns (cpal's
+`ErrorKind::Xrun`), and the frames each callback actually asked for. kabl asks for real-time
+priority for its audio thread once, on the first callback (`audio_thread_priority`, MPL-2.0,
+via rtkit; `--no-rt` skips it). cpal's own promotion doesn't apply here: the default device is
+PipeWire's ALSA plugin, which cpal excludes. Granted on this machine (RLIMIT_RTPRIO is 0; rtkit
+grants it).
+
+Same load for every run (`scripts/load.txt`, ~70 s: recording, CC turns on four controls at
+once, lead notes, rack knob drags = live swaps with effect-state copies, a Restart), same
+host, 1440×900 on Xvfb, negotiated rate and sizes as asked (the device honoured them):
+
+| setting | RT | callbacks | execution worst | late (execution) | arrival worst | arrival > 1.5× period | xruns | take |
+|---|---|---|---|---|---|---|---|---|
+| 48 kHz, 256 (5333 µs) | on | 11912 | 1246 µs | 0 | 5722 µs | 0 | 0 | 55.9 s, complete |
+| 48 kHz, 256 | off | 11919 | 3491 µs | 0 | 9148 µs | 220 | 0 | 56.0 s, complete |
+| 48 kHz, 64 (1333 µs) | on | 47658 | 478 µs | 0 | 1622 µs | 0 | 0 | 56.0 s, complete |
+| 48 kHz, 64 | off | 45700 | 2888 µs | 1 | 5527 µs | 3691 | **1899** | 53.7 s, complete |
+| 96 kHz, 256 (2667 µs) | on | 23846 | 1272 µs | 0 | 3045 µs | 0 | 0 | 56.0 s, complete |
+| 96 kHz, 256 | off | 23825 | 3309 µs | 1 | 6449 µs | 2206 | 0 | 56.0 s, complete |
+| 96 kHz, 64 | – | stalls after 1 callback (reported) | | | | | | |
+
+The hypothesis holds: without real-time priority the callback is often woken late (arrival)
+and at 64 frames the device underran 1899 times, though the work itself stays small; with it,
+no late wake-ups, no late execution and no xruns in any setting. ("Take complete" means no
+frames lost between the callback and the file; device xruns happen after the callback, so a
+take can be complete while playback glitched: the 53.7 s take is short because the stream
+lost time.) These are ~70 s runs on one laptop; they are not a real-time guarantee.
+
+### 30-minute soak
+
+`scripts/soak.txt` (generated by `make_soak.py`), 48 kHz / 256 frames, RT on: ten ~3-minute
+cycles, each a new take (so Stop → Record ten times), CC turns on four controls at once, lead
+phrases and a four-note chord, rack drags, fast back-and-forth tempo drags (bursts of
+overlapping swaps) and two undos, Stop / Restart / Run, Save and Load while recording (3×),
+the controller unplugged with a note held and replugged, All notes off.
+
+- 361,479 callbacks (32.1 min): execution worst 1234 of 5333 µs, 0 over half, **0 late, 0
+  late arrivals, 0 xruns**.
+- Memory (RSS every 10 s, 192 samples): 136–158 MB, quartile means 150/149/147/150 MB: no
+  growth. Live graph allocations 1 (2 during a swap); the undo log grew to 1056 entries.
+- Ten takes, 31.7 min: every header matches its data, no NaN, no silent gaps, peaks −2.3 to
+  −0.6 dBFS (the CC turns open filters and feedback well past the demo's defaults), no
+  `-INCOMPLETE`.
+- Hung notes: a separate run of the same notes, chords, unplug and notes-off cycles ended with
+  **0 MIDI notes held** (the allocator's count, now in the stats file).
 
 ## Limits and not built
 
@@ -272,14 +407,14 @@ feature, or rtkit); not done in this batch. **Pi 4 unmeasured.**
 - Relative encoders, NRPN, MPE, MIDI clock/transport mapping, 14-bit CC (out of scope). CC
   on switches (stepped controls) isn't offered.
 - One MIDI input at a time; mappings aren't tied to a device name.
-- Pins can't be renamed; mixer levels are identified by what feeds them.
 - The recorder has no input monitoring, no pause and no multitrack; takes aren't normalized.
   Names use UTC.
 - A killed process loses up to 0.5 s of its take (the last checkpoint).
 - Reverb inputs aren't normalled: patch both `in_l` and `in_r` (a mono source into both).
-- The lead needs the ×4 mixer trick (voice average); a gain stage or a mono voice mode would
-  remove it.
-- The callback runs at normal (not real-time) thread priority; see Callback timing.
+- The lead needs +12 dB of gain because of the voice average; a mono voice mode would remove
+  that.
+- Real-time priority depends on rtkit (or an RT rlimit) on the machine; if refused, the
+  status bar says so and small buffers may glitch (measured below).
 
 ## Hands-on checklist for Kosta
 
