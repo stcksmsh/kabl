@@ -5,7 +5,7 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-24, performance batch closed (Kosta approved it hands-on).
+Last updated: 2026-09-24, Composition + Motion batch built, waiting for Kosta's hands-on review.
 
 **Current handover (supersedes every older handover note below):** the approved revision-2 rack
 is the production canvas, on real editor/engine state. Kosta reviewed it hands-on and approved
@@ -82,6 +82,21 @@ per-voice reference, real-time priority for the audio thread (rtkit) with separa
 arrival / xrun telemetry, and a 32-minute soak (0 late, 0 xruns, flat memory). Start with
 [`performance-batch/TOMORROW.md`](performance-batch/TOMORROW.md). 296 tests pass, clippy clean.
 Hardware controller and speaker checks done by Kosta. Pi 4 unmeasured.
+
+**Composition + Motion batch (supervisor scope, 2026-09-24): built, waiting for Kosta's
+hands-on review.** Sequencer pattern banks A–D (old patches are bank A, unchanged), queued
+bank launches on a reference clock (now / next step / next bar, sample-exact, divider phase
+kept, replace and cancel), a `cues` module with up to eight named section cues, direction
+(FWD/REV/PEND) and per-step probability, a clock-synced `lfo` (1/16 to 8 bars, glides onto
+the beat, holds tempo when stopped), a `macro` module with four named performance knobs, and
+MIDI button actions (launch, cancel, transport) beside the continuous mappings. The demo is
+`cargo run --release -p kabl-ui -- --patch patches/composition --perform --rate 48000 --frames 256`.
+Record, 9-minute take recorded by kabl, walkthrough, screenshots, timings and the hands-on
+checklist: [`composition-batch/README.md`](composition-batch/README.md) and
+[`composition-batch/CHECKLIST.md`](composition-batch/CHECKLIST.md). Rationale:
+`decisions.md`, "Composition + Motion batch"; launch rules: `composition-batch/design.md`.
+346 tests pass, clippy clean. Real app: 0 late, 0 xruns; one 3–5 ms callback per 9-minute
+take, cause not found (README). Pi 4 unmeasured.
 
 Older sections below are history. Where they disagree with the above or with the code, they
 are stale: the MIDI/graph-swap/undo risks they list are fixed; the Mutex described there is

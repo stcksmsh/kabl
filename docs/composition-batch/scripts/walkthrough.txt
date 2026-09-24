@@ -1,0 +1,93 @@
+# Walkthrough of the Composition + Motion batch in patches/composition (record-walkthrough.sh),
+# 1440x900. MIDI comes from the virtual controller (KABL_PLAYER): macro knobs CC 20-23, cue
+# buttons CC 40-44, run/stop CC 46, all channel 1. Sleeps leave time to listen.
+sleep 3
+midi cc 1 20 51
+midi cc 1 21 64
+midi cc 1 22 38
+midi cc 1 23 38
+click perform
+shot w01-intro-perform
+sleep 5
+# The bass sequencer: EDIT tabs (left), PLAY buttons (right). Intro (A) plays.
+click perform
+click module:6
+click zoom:focus
+shot w02-bass-banks
+sleep 3
+# Edit bank C while A plays: the face shows C, the step light goes hollow, nothing changes in
+# the sound. Then undo.
+click bank-edit:6.2
+shot w03-editing-c
+sleep 2
+dragby knob:6.c.p1 0 -12
+shot w04-inactive-edit
+sleep 3
+key ctrl+z
+# Restart (controller button: the bar grid starts now), queue bank B for the next bar,
+# cancel it inside the bar, queue it again and let it land.
+midi cc 1 47 127
+midi cc 1 47 0
+sleep 0.3
+click bank-play:6.1
+click bank-cancel:6
+shot w05-cancelled
+sleep 2
+click bank-play:6.1
+sleep 3
+shot w07-drive-playing
+sleep 3
+# Cues from the controller's buttons: Main, then Variation.
+click perform
+midi cc 1 41 127
+midi cc 1 41 0
+shot w08-main-queued
+sleep 5
+midi cc 1 42 127
+midi cc 1 42 0
+sleep 3
+shot w09-variation
+sleep 3
+# Macros: Energy up, Space up.
+midi ramp 1 20 51 110 6
+sleep 6
+shot w10-energy
+midi ramp 1 22 38 100 6
+sleep 7
+shot w11-space
+# The synced LFO: 4 bars, locked to the clock.
+click perform
+click module:4
+click zoom:focus
+click toggle:4
+shot w12-lfo-synced
+sleep 3
+click toggle:4
+click perform
+# Arp direction: pendulum, then back.
+click pslider:7.direction.2
+shot w13-pendulum
+sleep 6
+click pslider:7.direction.0
+# Breakdown, a lead line over it.
+midi cc 1 43 127
+midi cc 1 43 0
+sleep 3
+shot w14-breakdown
+midi on 76 80
+sleep 3
+midi off 76
+midi on 74 80
+sleep 3
+midi off 74
+sleep 3
+# Return, then Stop: the tails ring out.
+midi cc 1 44 127
+midi cc 1 44 0
+sleep 5
+shot w15-return
+sleep 4
+midi cc 1 46 127
+midi cc 1 46 0
+shot w16-stopped
+sleep 7

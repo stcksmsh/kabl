@@ -13,8 +13,8 @@ Trust code and git over older docs.
   crate: it reformats the untouched `rev2_proto` / `rev2_env_ab` examples; use `rustfmt` on
   the files you changed.
 
-Launch (real audio + MIDI). The newest demo is `--patch patches/performance --perform --rate 48000 --frames 256`
-(first-play guide: `docs/performance-batch/TOMORROW.md`):
+Launch (real audio + MIDI). The newest demo is `--patch patches/composition --perform --rate 48000 --frames 256`
+(checklist: `docs/composition-batch/CHECKLIST.md`):
 
     cargo run --release -p kabl-ui -- --patch patches/reference            # 1440×900
     cargo run --release -p kabl-ui -- --patch patches/reference --size 1280x800
@@ -93,6 +93,32 @@ audit (`compile_per_voice`, `tests/single_instance.rs`), RT priority + callback 
 `docs/performance-batch/scripts/` (`recovery.txt`, `load.txt`, `make_soak.py`); drive.py has
 `midikill`/`midistart`. Test hooks: `KABL_RECORD_FAIL_AFTER`, `KABL_RECORD_RING_FRAMES`,
 `--no-rt`. Kosta approved the whole batch hands-on. Next scope goes through the supervisor.
+
+## Composition + Motion — built, waiting for Kosta's hands-on review
+
+Supervisor scope, one batch. Record, evidence and checklist: `docs/composition-batch/README.md`
+(+ `CHECKLIST.md`, `design.md` for the launch rules); rationale: decisions.md "Composition +
+Motion batch". Commits `5d54b68..` on master.
+
+- `seq.rs`: banks A–D (A = the historic param names, B–D prefixed `b.`/`c.`/`d.`; helpers
+  `bank_of`, `bank_param`, `slot_name`), `direction`, probability `r1..r8`, startup `bank`,
+  `arm`/`cancel`, seeded xorshift; state rides in `carry_from`.
+- Engine: `Clock` counts pulses per epoch (`next_tick`, `block_ticks`); `PatchEngine` holds
+  pending launches (`launch`, `cancel`, `command(&Command)`, `seqs` report) and arms
+  sequencers inside `CompiledPatch::process_block_with`; clocks are scheduled first.
+  `MAX_PARAMS` 143, `MAX_OUTPUTS` 4, per-step params prebuilt.
+- New modules: `macro` (`macros.rs`), `cues` (`cues.rs`, no audio). `lfo` gained clock sync.
+- UI: `banks.rs` (bank ops, launch settings), `cues.rs` (cue data, `references_to` used by
+  `PatchEditor::remove_module`), `perform.rs` (bank/cue cards, `btn.*` MIDI buttons),
+  `rack.rs` (`View::edit_banks`, `visible`, `face_name`), `lib.rs` (bank strip, cue face,
+  drawer panels). `main.rs`: command queue, seq/LFO reports, stereo config with `--rate`,
+  worst-callback time in the stats line.
+- Demo `patches/composition`, built by `crates/ui/tests/composition.rs`
+  (`cargo test -p kabl-ui --test composition write_composition_patch -- --ignored`).
+  Scripts: `docs/composition-batch/scripts/` (take, walkthrough, shots);
+  `record-walkthrough.sh`; `examples/bench_composition`. `drive.py` takes `KABL_DRIVE_LOG`.
+- Pitfall: a scripted Cancel right after a launch races the bar (a bar is 2.1 s at 112 bpm);
+  send a Restart first (button CC 47) to start the bar grid, as the walkthrough does.
 
 ## Accepted limitations
 

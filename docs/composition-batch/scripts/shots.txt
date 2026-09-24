@@ -1,0 +1,59 @@
+# Screenshots of patches/composition (KABL_PLAYER=1, KABL_ARGS="--midi kabl-player --perform"),
+# run once per size; each view in A-light then A-dark.
+sleep 3
+midi cc 1 20 51
+midi cc 1 21 64
+midi cc 1 22 38
+midi cc 1 23 38
+# 1. Perform panel, Main queued from a controller button.
+midi cc 1 47 127
+midi cc 1 47 0
+sleep 1
+midi cc 1 41 127
+midi cc 1 41 0
+shot 01-light-perform-queued
+click theme:dark
+shot 02-dark-perform-queued
+click theme:light
+sleep 2.5
+# 2. The bass sequencer editing an inactive bank (C) while B plays; advanced rows open.
+click perform
+click module:6
+click zoom:focus
+click bank-edit:6.2
+click toggle:6
+sleep 1
+shot 03-light-bass-editing-c
+click theme:dark
+shot 04-dark-bass-editing-c
+click theme:light
+click toggle:6
+# 3. Cues: the face and the drawer's cue editor.
+click zoom:fit
+click module:2
+click zoom:focus
+sleep 1
+shot 05-light-cues
+click theme:dark
+shot 06-dark-cues
+click theme:light
+# 4. The synced LFO, advanced area open; macros beside it.
+click zoom:fit
+click module:4
+click zoom:focus
+click toggle:4
+sleep 1
+shot 07-light-lfo-synced
+click theme:dark
+shot 08-dark-lfo-synced
+click theme:light
+click toggle:4
+# 5. A macro's routes on a destination: the bass filter's cutoff inspected.
+click zoom:fit
+click module:11
+click zoom:focus
+click knob:11.cutoff_hz
+sleep 1
+shot 09-light-macro-routes
+click theme:dark
+shot 10-dark-macro-routes

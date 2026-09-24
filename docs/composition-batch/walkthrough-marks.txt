@@ -1,0 +1,15 @@
+w01-intro-perform 4.3
+w02-bass-banks 12.8
+w03-editing-c 17.8
+w04-inactive-edit 22.3
+w05-cancelled 29.0
+w07-drive-playing 36.3
+w08-main-queued 41.2
+w09-variation 50.7
+w10-energy 61.1
+w11-space 69.3
+w12-lfo-synced 73.3
+w13-pendulum 79.8
+w14-breakdown 91.0
+w15-return 107.1
+w16-stopped 112.2
