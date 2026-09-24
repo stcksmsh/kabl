@@ -168,7 +168,10 @@ fn midi_pitch_on_osc_a() -> PatchState {
 
 /// Note events (block, voice, semitones or None for off). Voices get different notes and
 /// velocities, so a per-voice chain really differs between voices.
-const NOTES: &[(usize, usize, Option<(f32, f32)>)] = &[
+/// (block, voice, note on with (semitones, velocity) or off).
+type NoteEvent = (usize, usize, Option<(f32, f32)>);
+
+const NOTES: &[NoteEvent] = &[
     (20, 0, Some((0.0, 1.0))),
     (60, 3, Some((7.0, 0.4))),
     (140, 5, Some((-5.0, 0.7))),
