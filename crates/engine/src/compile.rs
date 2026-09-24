@@ -62,7 +62,7 @@ use std::fmt;
 
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
 use kabl_modules::builtins::{
-    Clock, Delay, DelayLock, Lfo, LfoSync, MidiIn, Noise, Seq, Transport,
+    Clock, Delay, DelayLock, KeySettings, Lfo, LfoSync, MidiIn, Noise, Seq, Transport,
 };
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::{
@@ -70,6 +70,7 @@ use kabl_modules::{
 };
 
 use crate::graph::BLOCK;
+use crate::keyboard::Action;
 
 pub type BufIdx = usize;
 
@@ -896,6 +897,9 @@ fn compile_inner(
             if let Some(noise) = instance.as_any_mut().downcast_mut::<Noise>() {
                 noise.seed(id, lane);
             }
+            if let Some(midi) = instance.as_any_mut().downcast_mut::<MidiIn>() {
+                midi.configure(&params);
+            }
             let module_index = modules.len();
             modules.push(instance);
             module_origin.push((id, if is_voice { Some(lane) } else { None }));
@@ -1301,6 +1305,42 @@ impl CompiledPatch {
             if v == voice {
                 if let Some(m) = self.modules[index].as_any_mut().downcast_mut::<MidiIn>() {
                     m.note_off();
+                }
+            }
+        }
+    }
+
+    /// Every `midi.in` module (its voice-0 instance) and its keyboard settings. No allocation.
+    pub fn keyboards(&self, mut f: impl FnMut(ModuleId, KeySettings)) {
+        for &(index, lane) in &self.midi_ins {
+            if lane == 0 {
+                if let Some(m) = self.modules[index].as_any().downcast_ref::<MidiIn>() {
+                    f(self.module_origin[index].0, m.settings());
+                }
+            }
+        }
+    }
+
+    /// Carries out a keyboard action on voice `voice` of the `midi.in` module `id`. No
+    /// allocation.
+    pub fn key_action(&mut self, id: ModuleId, a: Action) {
+        let voice = match a {
+            Action::Play { voice, .. } | Action::Release { voice } => voice,
+        };
+        for &(index, lane) in &self.midi_ins {
+            if lane != voice || self.module_origin[index].0 != id {
+                continue;
+            }
+            if let Some(m) = self.modules[index].as_any_mut().downcast_mut::<MidiIn>() {
+                match a {
+                    Action::Play {
+                        pitch,
+                        velocity,
+                        glide,
+                        retrigger,
+                        ..
+                    } => m.play(pitch, velocity, glide, retrigger),
+                    Action::Release { .. } => m.note_off(),
                 }
             }
         }

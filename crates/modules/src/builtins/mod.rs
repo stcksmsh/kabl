@@ -37,7 +37,7 @@ pub use filter_svf::{FilterSvf, FILTER_SVF_INFO};
 pub use gain::{db_to_gain, Gain, GAIN_INFO};
 pub use lfo::{Lfo, LfoSync, LFO_INFO, SYNC_LABELS, SYNC_TICKS};
 pub use macros::{Macro, MACROS, MACRO_INFO};
-pub use midi_in::{MidiIn, MIDI_IN_INFO};
+pub use midi_in::{KeySettings, MidiIn, MIDI_IN_INFO};
 pub use mixer::{Mixer, LEGACY_LEVEL, MIXER_INFO};
 pub use noise::{Noise, NOISE_INFO};
 pub use osc_va::{OscVa, OSC_VA_INFO};

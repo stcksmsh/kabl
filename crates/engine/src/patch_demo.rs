@@ -9,6 +9,14 @@ use kabl_modules::builtins::{EnvAdsr, FilterSvf, MidiIn, Mixer, OscVa, Out, Vca}
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::{Module, ProcessIo, Signal};
 
+/// `midi.in`'s params at their defaults (POLY, LAST, glide OFF, 120 ms).
+const MIDI_PARAMS: [Signal<'static>; 4] = [
+    Signal::Scalar(0.0),
+    Signal::Scalar(0.0),
+    Signal::Scalar(0.0),
+    Signal::Scalar(120.0),
+];
+
 pub const SAMPLE_RATE: f32 = 48000.0;
 pub const BLOCK: usize = 64;
 const BASE_HZ: f32 = 261.63; // C4
@@ -55,7 +63,7 @@ impl Voice {
         let mut velocity = [0f32; BLOCK];
         {
             let mut outputs: [&mut [f32]; 3] = [&mut gate, &mut pitch, &mut velocity];
-            let mut io = ProcessIo::new(&[], &mut outputs, &[], BLOCK);
+            let mut io = ProcessIo::new(&[], &mut outputs, &MIDI_PARAMS, BLOCK);
             self.midi.process(&mut io);
         }
 

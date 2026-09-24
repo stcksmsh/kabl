@@ -14,6 +14,14 @@ use kabl_modules::{Module, ProcessIo, Signal};
 
 use crate::patch_demo::{BLOCK, CHORD_SEMITONES, SAMPLE_RATE};
 
+/// `midi.in`'s params at their defaults (POLY, LAST, glide OFF, 120 ms).
+const MIDI_PARAMS: [Signal<'static>; 4] = [
+    Signal::Scalar(0.0),
+    Signal::Scalar(0.0),
+    Signal::Scalar(0.0),
+    Signal::Scalar(120.0),
+];
+
 const BASE_HZ: f32 = 261.63; // C4
 
 fn quality() -> QualityConfig {
@@ -69,7 +77,7 @@ impl DynVoice {
         let mut velocity = [0f32; BLOCK];
         {
             let mut outputs: [&mut [f32]; 3] = [&mut gate, &mut pitch, &mut velocity];
-            let mut io = ProcessIo::new(&[], &mut outputs, &[], BLOCK);
+            let mut io = ProcessIo::new(&[], &mut outputs, &MIDI_PARAMS, BLOCK);
             self.modules[MIDI].process(&mut io);
         }
 

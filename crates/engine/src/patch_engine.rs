@@ -33,7 +33,9 @@ use kabl_core::PatchState;
 
 use crate::compile::{carry_state, compile, CompileError, CompiledPatch, PendingLaunch};
 use crate::graph::BLOCK;
+use crate::keyboard::{Action, KeyEvent, Keyboard};
 use crate::swap::CROSSFADE_MS;
+use kabl_modules::builtins::KeySettings;
 
 pub struct PatchEngine {
     active: Owned<CompiledPatch>,
@@ -52,7 +54,13 @@ pub struct PatchEngine {
     launches: [Option<PendingLaunch>; MAX_PENDING],
     /// `launches` packed, for `process_block_with`.
     packed: [PendingLaunch; MAX_PENDING],
+    /// One keyboard per `midi.in` of the playing graph, outside the graphs like the launches
+    /// (docs/sound-palette-batch/keyboard.md).
+    keyboards: [Option<Keyboard>; MAX_KEYBOARDS],
 }
+
+/// Most `midi.in` modules with a keyboard of their own; any beyond get no notes.
+pub const MAX_KEYBOARDS: usize = 8;
 
 pub const MAX_PENDING: usize = 32;
 /// Sequencers one launch command can name.
@@ -123,7 +131,7 @@ impl PatchEngine {
         voice_count: usize,
     ) -> Result<Self, CompileError> {
         let compiled = compile(patch, sample_rate, voice_count)?;
-        Ok(PatchEngine {
+        let mut e = PatchEngine {
             active: Owned::new(handle, compiled),
             incoming: None,
             pending: None,
@@ -131,13 +139,16 @@ impl PatchEngine {
             voice_count,
             launches: [None; MAX_PENDING],
             packed: [NO_LAUNCH; MAX_PENDING],
-        })
+            keyboards: Default::default(),
+        };
+        e.sync_keyboards();
+        Ok(e)
     }
 
     /// An engine playing an already compiled graph.
     pub fn with_compiled(handle: &Handle, compiled: CompiledPatch, voice_count: usize) -> Self {
         let crossfade_samples = (CROSSFADE_MS / 1000.0 * compiled.sample_rate()).round() as usize;
-        PatchEngine {
+        let mut e = PatchEngine {
             active: Owned::new(handle, compiled),
             incoming: None,
             pending: None,
@@ -145,7 +156,87 @@ impl PatchEngine {
             voice_count,
             launches: [None; MAX_PENDING],
             packed: [NO_LAUNCH; MAX_PENDING],
+            keyboards: Default::default(),
+        };
+        e.sync_keyboards();
+        e
+    }
+
+    /// Audio-thread call: a key event for every keyboard, carried out in every running graph.
+    /// No allocation.
+    pub fn key(&mut self, e: KeyEvent) {
+        self.sync_keyboards();
+        let PatchEngine {
+            keyboards,
+            active,
+            incoming,
+            ..
+        } = self;
+        for kb in keyboards.iter_mut().flatten() {
+            let id = kb.id;
+            kb.event(e, &mut |a| act(active, incoming, id, a));
         }
+    }
+
+    /// Keys physically down (the most any keyboard holds) and voices sounding (all keyboards).
+    pub fn keys(&self) -> (usize, usize) {
+        let kbs = self.keyboards.iter().flatten();
+        (
+            kbs.clone().map(Keyboard::keys_held).max().unwrap_or(0),
+            kbs.map(Keyboard::voices_sounding).sum(),
+        )
+    }
+
+    /// Matches the keyboards to the `midi.in` modules of the graph playing (fading in, else
+    /// active): a new module gets a keyboard, a deleted one's keyboard releases and goes, and
+    /// changed settings apply (a mode change releases). `fresh`: a Load, every keyboard
+    /// starts over. No allocation.
+    fn sync(&mut self, fresh: bool) {
+        let PatchEngine {
+            keyboards,
+            active,
+            incoming,
+            voice_count,
+            ..
+        } = self;
+        let mut found = [(0, KeySettings::default()); MAX_KEYBOARDS];
+        let mut n = 0;
+        {
+            let graph: &CompiledPatch = match incoming {
+                Some((g, _)) => g,
+                None => active,
+            };
+            graph.keyboards(|id, s| {
+                if n < MAX_KEYBOARDS {
+                    found[n] = (id, s);
+                    n += 1;
+                }
+            });
+        }
+        let found = &found[..n];
+        for slot in keyboards.iter_mut() {
+            if let Some(kb) = slot {
+                if fresh || !found.iter().any(|&(id, _)| id == kb.id) {
+                    let id = kb.id;
+                    kb.event(KeyEvent::AllOff, &mut |a| act(active, incoming, id, a));
+                    *slot = None;
+                }
+            }
+        }
+        for &(id, s) in found {
+            match keyboards.iter_mut().flatten().find(|kb| kb.id == id) {
+                Some(kb) => kb.set_settings(s, &mut |a| act(active, incoming, id, a)),
+                None => {
+                    if let Some(slot) = keyboards.iter_mut().find(|k| k.is_none()) {
+                        *slot = Some(Keyboard::new(id, s, *voice_count));
+                    }
+                }
+            }
+        }
+    }
+
+    fn sync_keyboards(&mut self) {
+        self.sync(false);
     }
 
     pub fn crossfade_samples(&self) -> usize {
@@ -204,7 +295,9 @@ impl PatchEngine {
             self.pending = Some(new_patch);
         } else {
             carry_state(&mut self.active, &mut new_patch);
+            let fresh = new_patch.fresh;
             self.incoming = Some((new_patch, 0));
+            self.sync(fresh);
         }
     }
 
@@ -431,9 +524,24 @@ impl PatchEngine {
             // deferred instead of dropped or stepped on.
             if let Some(mut pending) = self.pending.take() {
                 carry_state(&mut self.active, &mut pending);
+                let fresh = pending.fresh;
                 self.incoming = Some((pending, 0));
+                self.sync(fresh);
             }
         }
+    }
+}
+
+/// A keyboard action in every running graph.
+fn act(
+    active: &mut CompiledPatch,
+    incoming: &mut Option<(Owned<CompiledPatch>, usize)>,
+    id: kabl_core::ModuleId,
+    a: Action,
+) {
+    active.key_action(id, a);
+    if let Some((g, _)) = incoming.as_mut() {
+        g.key_action(id, a);
     }
 }
 

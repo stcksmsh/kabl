@@ -2,6 +2,14 @@ use kabl_modules::builtins::{MidiIn, Mixer, Out};
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::{Module, ProcessIo, Signal};
 
+/// `midi.in`'s params at their defaults (POLY, LAST, glide OFF, 120 ms).
+const MIDI_PARAMS: [Signal<'static>; 4] = [
+    Signal::Scalar(0.0),
+    Signal::Scalar(0.0),
+    Signal::Scalar(0.0),
+    Signal::Scalar(120.0),
+];
+
 const BLOCK: usize = 8;
 
 fn quality() -> QualityConfig {
@@ -70,7 +78,7 @@ fn midi_in_note_on_off_drives_gate_pitch_velocity() {
     let mut velocity = [0f32; BLOCK];
     {
         let mut outputs: [&mut [f32]; 3] = [&mut gate, &mut pitch, &mut velocity];
-        let mut io = ProcessIo::new(&[], &mut outputs, &[], BLOCK);
+        let mut io = ProcessIo::new(&[], &mut outputs, &MIDI_PARAMS, BLOCK);
         module.process(&mut io);
     }
     assert!(gate.iter().all(|&v| v == 1.0));
@@ -83,7 +91,7 @@ fn midi_in_note_on_off_drives_gate_pitch_velocity() {
     let mut velocity2 = [0f32; BLOCK];
     {
         let mut outputs: [&mut [f32]; 3] = [&mut gate2, &mut pitch2, &mut velocity2];
-        let mut io = ProcessIo::new(&[], &mut outputs, &[], BLOCK);
+        let mut io = ProcessIo::new(&[], &mut outputs, &MIDI_PARAMS, BLOCK);
         module.process(&mut io);
     }
     assert!(
