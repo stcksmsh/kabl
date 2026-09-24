@@ -1,0 +1,42 @@
+# Real app, patches/performance, 48 kHz / 256, fifo controller (KABL_MIDI_PIPE).
+# t (s) | source | what. 'stats' = the stats line (written about once a second).
+  -1.81  stats  held 0 sounding 0
+   2.30  drive  midi on 64 100
+   2.30  drive  midi on 67 100
+   3.32  stats  held 2 sounding 2
+   3.80  drive  midi cc 1 64 127
+   3.80  drive  midi off 64
+   3.80  drive  midi off 67
+   4.33  stats  held 0 sounding 2
+   5.30  drive  midi cc 1 64 0
+   5.34  stats  held 0 sounding 0
+   6.80  drive  midi on 72 100
+   7.45  stats  held 1 sounding 1
+   8.30  drive  midikill
+   9.57  stats  held 0 sounding 0
+  12.91  drive  midistart
+  18.01  drive  midi off 72
+  19.51  drive  midi on 60 100
+  19.51  drive  dragby knob:6.resonance 0 -40
+  19.84  stats  held 1 sounding 1
+  20.98  drive  key ctrl+z
+  22.82  drive  midi off 60
+  22.87  stats  held 0 sounding 0
+  24.33  drive  click load
+  24.33  drive  midi on 62 100
+  27.96  drive  midi off 62
+  29.46  drive  midi cc 1 64 127
+  29.46  drive  midi on 65 100
+  30.12  stats  held 1 sounding 1
+  30.96  drive  click perform
+  31.80  drive  click notes-off
+  33.15  stats  held 0 sounding 0
+  34.13  drive  midi off 65
+  34.13  drive  midi cc 1 64 0
+  35.63  drive  click prestart:1
+  35.63  drive  midi on 67 100
+  36.26  stats  held 1 sounding 1
+  37.36  drive  click prun:1
+  39.09  drive  click prun:1
+  40.85  drive  midi off 67
+  41.30  stats  held 0 sounding 0

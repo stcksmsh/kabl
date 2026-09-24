@@ -8,6 +8,10 @@
 //!
 //! `cargo run --release -p kabl-ui --example midi_player`, then start kabl-ui with
 //! `--midi kabl-player`. `docs/rack-migration/drive.py` starts it when `KABL_PLAYER` is set.
+//!
+//! With `KABL_MIDI_PIPE=PATH` (a machine without an ALSA sequencer, e.g. a container) it
+//! creates the fifo PATH instead and writes each message there as hex bytes, one per line;
+//! kabl-ui started with the same variable lists it as the input `kabl-pipe`.
 
 use std::io::BufRead;
 use std::sync::{Arc, Mutex};
@@ -16,12 +20,34 @@ use std::time::Duration;
 #[cfg(unix)]
 fn main() {
     use midir::os::unix::VirtualOutput;
-    let out = midir::MidiOutput::new("kabl-player").expect("MIDI output");
-    let conn = Arc::new(Mutex::new(
-        out.create_virtual("kabl-player").expect("virtual port"),
-    ));
-    let send = |conn: &Arc<Mutex<midir::MidiOutputConnection>>, msg: &[u8]| {
-        let _ = conn.lock().unwrap().send(msg);
+    type Out = Box<dyn FnMut(&[u8]) + Send>;
+    let out: Out = match std::env::var("KABL_MIDI_PIPE") {
+        Ok(path) => {
+            let _ = std::fs::remove_file(&path);
+            let made = std::process::Command::new("mkfifo").arg(&path).status();
+            assert!(made.is_ok_and(|s| s.success()), "mkfifo {path}");
+            eprintln!("midi_player: fifo {path}, waiting for kabl-ui");
+            let mut f = std::fs::OpenOptions::new()
+                .write(true)
+                .open(&path)
+                .expect("fifo");
+            Box::new(move |msg: &[u8]| {
+                use std::io::Write;
+                let line: Vec<String> = msg.iter().map(|b| format!("{b:02x}")).collect();
+                let _ = writeln!(f, "{}", line.join(" "));
+            })
+        }
+        Err(_) => {
+            let out = midir::MidiOutput::new("kabl-player").expect("MIDI output");
+            let mut conn = out.create_virtual("kabl-player").expect("virtual port");
+            Box::new(move |msg: &[u8]| {
+                let _ = conn.send(msg);
+            })
+        }
+    };
+    let conn = Arc::new(Mutex::new(out));
+    let send = |conn: &Arc<Mutex<Out>>, msg: &[u8]| {
+        (conn.lock().unwrap())(msg);
     };
     eprintln!("midi_player: port kabl-player open");
     for line in std::io::stdin().lock().lines() {
@@ -46,7 +72,7 @@ fn main() {
                     for k in 0..=steps {
                         let v = (v0 + (v1 - v0) * k as f32 / steps as f32).round() as u8;
                         if last != Some(v) {
-                            let _ = conn.lock().unwrap().send(&[0xB0 | ch, num, v.min(127)]);
+                            (conn.lock().unwrap())(&[0xB0 | ch, num, v.min(127)]);
                             last = Some(v);
                         }
                         std::thread::sleep(Duration::from_millis(20));

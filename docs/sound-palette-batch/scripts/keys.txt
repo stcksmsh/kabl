@@ -1,0 +1,55 @@
+# Stuck-note check in the real app (patches/performance, its MIDI lead). A watcher logs the
+# stats line's "MIDI notes held · voices sounding" with times (scripts/watch_stats.py).
+sleep 2
+# two keys, then the pedal holds them after key up, pedal up releases
+midi on 64 100
+midi on 67 100
+sleep 1.2
+midi cc 1 64 127
+midi off 64
+midi off 67
+sleep 1.2
+midi cc 1 64 0
+sleep 1.2
+# a held key when the controller is unplugged; replugged; its late note-off is ignored
+midi on 72 100
+sleep 1.2
+midikill
+sleep 4
+midistart
+sleep 4
+midi off 72
+sleep 1.2
+# a held key across live edits (graph swaps) and an undo
+midi on 60 100
+dragby knob:6.resonance 0 -40
+key ctrl+z
+sleep 1.2
+midi off 60
+sleep 1.2
+# a held key across Load (fresh graph)
+midi on 62 100
+click load
+sleep 2.5
+midi off 62
+sleep 1.2
+# All notes off with a held key and the pedal down
+midi cc 1 64 127
+midi on 65 100
+sleep 1.2
+click perform
+click notes-off
+sleep 1.2
+midi off 65
+midi cc 1 64 0
+sleep 1.2
+# transport: Restart and Stop/Run with a held key
+midi on 67 100
+click prestart:1
+sleep 0.6
+click prun:1
+sleep 0.6
+click prun:1
+sleep 0.6
+midi off 67
+sleep 1.5

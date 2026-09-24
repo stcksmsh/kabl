@@ -25,7 +25,9 @@ Script lines (# comments):
 
 Environment: KABL_DRIVE_LOG=FILE logs each line with its wall-clock time; KABL_ARGS adds
 kabl-ui arguments; KABL_PLAYER=1 starts
-target/release/examples/midi_player first (a virtual MIDI port, `kabl-player`).
+target/release/examples/midi_player first (a virtual MIDI port, `kabl-player`). Without an ALSA
+sequencer (a container) also set KABL_MIDI_PIPE=PATH and pass `--midi kabl-pipe`: the player
+and kabl-ui then talk through that fifo (a test hook, see crates/ui/src/main.rs).
 """
 import os
 import subprocess
@@ -176,6 +178,12 @@ try:
         elif cmd == "midikill":
             player.kill()
             player.wait()
+            # The fifo stand-in (KABL_MIDI_PIPE) is "unplugged" when it is gone.
+            if os.environ.get("KABL_MIDI_PIPE"):
+                try:
+                    os.remove(os.environ["KABL_MIDI_PIPE"])
+                except FileNotFoundError:
+                    pass
         elif cmd == "midistart":
             player = start_player()
         elif cmd == "midi":
