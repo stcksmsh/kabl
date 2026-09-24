@@ -1,5 +1,7 @@
 # Performance batch: reverb, sequence expression, Perform panel, MIDI learn, recorder
 
+**Closed: Kosta approved it hands-on (2026-09-24): "everything works amazingly, its perfect."**
+
 Supervisor scope (2026-09-24), owner-authorized as one batch: Kosta can build, play and
 record an evolving piece inside kabl. Built on `master` (local, not pushed), commits
 `b742a70..`. Rationale: `docs/decisions.md`, "Performance batch".

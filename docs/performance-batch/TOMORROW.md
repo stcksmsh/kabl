@@ -1,6 +1,6 @@
 # Tomorrow: playing the performance batch
 
-The batch is **built, not approved**. This page is for your first hands-on session. The full
+The batch is **closed: Kosta approved it hands-on (2026-09-24)**. This page is for your first hands-on session. The full
 record is [`README.md`](README.md).
 
 ## Launch

@@ -63,7 +63,7 @@ name filter, because the file includes `interlocking.rs` and its writer). Record
 `docs/echo/README.md`. Timing harness: `crates/ui/examples/bench_echo.rs`. Next scope goes
 through the supervisor; don't extend effects (reverb, tape, etc.) without it.
 
-## Performance batch — built, waiting for Kosta (2026-09-24)
+## Performance batch — closed (Kosta approved hands-on, 2026-09-24)
 
 Supervisor scope, authorized as one batch. Record and checklist:
 `docs/performance-batch/README.md`; rationale: decisions.md "Performance batch".
@@ -92,7 +92,7 @@ audit (`compile_per_voice`, `tests/single_instance.rs`), RT priority + callback 
 (`main.rs` `CallbackTiming`, `KABL_STATS_FILE`), soak. Scripts in
 `docs/performance-batch/scripts/` (`recovery.txt`, `load.txt`, `make_soak.py`); drive.py has
 `midikill`/`midistart`. Test hooks: `KABL_RECORD_FAIL_AFTER`, `KABL_RECORD_RING_FRAMES`,
-`--no-rt`. Still awaiting Kosta's hands-on approval.
+`--no-rt`. Kosta approved the whole batch hands-on. Next scope goes through the supervisor.
 
 ## Accepted limitations
 

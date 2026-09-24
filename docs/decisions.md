@@ -2200,3 +2200,14 @@ were not transplanted, only its look (palettes, geometry, drawing).
 - **Soak:** 32 min at 48/256 with recording, CC, notes, swaps, transport, save/load, unplug:
   0 late, 0 xruns, flat memory, 1–2 live graph allocations, ten complete takes, 0 notes held.
 - Review setting: 48 kHz / 256 frames, RT on.
+
+## 2026-09-24 — Performance batch closed (owner approved hands-on)
+
+- Kosta tested the performance batch and its follow-up hands-on (controller, sound, recording):
+  "everything works amazingly, its perfect." The batch is closed. Record:
+  `docs/performance-batch/README.md`; guide: `docs/performance-batch/TOMORROW.md`.
+- The limits listed there stand as accepted: one MIDI input at a time, absolute 7-bit CC
+  only, stepped controls not learnable, 2 s unplug detection, peak-only meter, real-time
+  priority depends on rtkit, 96 kHz / 64 frames unsupported on this PipeWire setup, Pi 4
+  unmeasured.
+- Next scope goes through the supervisor.

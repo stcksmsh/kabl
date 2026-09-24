@@ -5,7 +5,7 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-24, performance batch and its follow-up built; waiting for Kosta's hands-on review.
+Last updated: 2026-09-24, performance batch closed (Kosta approved it hands-on).
 
 **Current handover (supersedes every older handover note below):** the approved revision-2 rack
 is the production canvas, on real editor/engine state. Kosta reviewed it hands-on and approved
@@ -65,8 +65,8 @@ fresh (no state carried). The demo is
 callback timings and a listening checklist: [`echo/README.md`](echo/README.md). Rationale:
 `decisions.md`, "Delay: first echo module". 240 tests pass, clippy clean. Pi 4 unmeasured.
 
-**Performance batch (supervisor scope, 2026-09-24): built, waiting for Kosta's hands-on
-review.** A stereo plate `reverb` (Dattorro), sequencer velocity (`V1`–`V8`, a `velocity`
+**Performance batch (supervisor scope, 2026-09-24), closed: Kosta approved it hands-on
+("everything works amazingly, its perfect"). Next scope: supervisor.** A stereo plate `reverb` (Dattorro), sequencer velocity (`V1`–`V8`, a `velocity`
 output) and gate length (CLOCK default / LENGTH), a Perform panel of pinned controls (clock
 transport included), MIDI CC learn with soft takeover, and a stereo WAV recorder of the final
 output. Engine: voice-rate chains no `midi.in` reaches run once (renders unchanged, the demo's
@@ -81,7 +81,7 @@ never-overwrite / failure handling, an audit of single-instance compilation agai
 per-voice reference, real-time priority for the audio thread (rtkit) with separate execution /
 arrival / xrun telemetry, and a 32-minute soak (0 late, 0 xruns, flat memory). Start with
 [`performance-batch/TOMORROW.md`](performance-batch/TOMORROW.md). 296 tests pass, clippy clean.
-Automated evidence only: no hardware controller or speaker check yet. Pi 4 unmeasured.
+Hardware controller and speaker checks done by Kosta. Pi 4 unmeasured.
 
 Older sections below are history. Where they disagree with the above or with the code, they
 are stale: the MIDI/graph-swap/undo risks they list are fixed; the Mutex described there is
