@@ -210,20 +210,25 @@ pub fn apply_cc(editor: &mut PatchEditor, ui_state: &mut UiState, now: f64) {
             let base = routing::base_value(editor.state(), id, p);
             let t = ui_state.takeover.entry(key.clone()).or_default();
             let was = t.picked;
-            let Some(n) = t.feed(hw, p.to_norm(base)) else {
+            let at = p.to_norm(base);
+            let Some(n) = t.feed(hw, at) else {
                 continue;
             };
+            // Picked up right at the value: nothing to write (no nudge, no undo step).
+            if !was && (n - at).abs() <= PICKUP {
+                t.sent = Some(base);
+                continue;
+            }
             let value = p.from_norm(n);
             t.sent = Some(value);
             if value == base {
                 continue;
             }
             // One gesture while CCs keep coming (on any mappings) with gaps under a second.
-            let continuing = was
-                && ui_state
-                    .cc_gesture
-                    .as_ref()
-                    .is_some_and(|(_, at)| now - at < GESTURE_GAP_S);
+            let continuing = ui_state
+                .cc_gesture
+                .as_ref()
+                .is_some_and(|(_, at)| now - at < GESTURE_GAP_S);
             let target = ParamTarget::Module {
                 id,
                 param: p.name.into(),

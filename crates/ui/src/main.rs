@@ -257,7 +257,17 @@ impl AudioHost {
         };
 
         let (swap_tx, mut swap_rx) = swap_channel(SWAP_QUEUE);
-        let (recorder, mut tap) = record::pair(sample_rate as u32);
+        // Test hooks: a small ring forces lost frames, a failure point forces a write error.
+        let ring_frames = std::env::var("KABL_RECORD_RING_FRAMES")
+            .ok()
+            .and_then(|v| v.parse().ok());
+        let (mut recorder, mut tap) = match ring_frames {
+            Some(n) => record::pair_sized(sample_rate as u32, n),
+            None => record::pair(sample_rate as u32),
+        };
+        recorder.fail_after = std::env::var("KABL_RECORD_FAIL_AFTER")
+            .ok()
+            .and_then(|v| v.parse().ok());
 
         let (mut steps_tx, steps_rx) = rtrb::RingBuffer::<(ModuleId, usize)>::new(256);
         let (mut clocks_tx, clocks_rx) = rtrb::RingBuffer::<(ModuleId, bool)>::new(64);
@@ -558,6 +568,15 @@ struct App {
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        // Ctrl+Q quits the normal way (the recorder finalizes its take on the way out).
+        if ui.input_mut(|i| {
+            i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::COMMAND,
+                egui::Key::Q,
+            ))
+        }) {
+            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+        }
         egui::Panel::bottom("kabl-status").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label("Out");

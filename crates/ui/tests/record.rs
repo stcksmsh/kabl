@@ -226,3 +226,34 @@ fn the_meter_holds_peaks_and_latches_clips() {
     m.update(p, bad, 0.05);
     assert!(m.nonfinite);
 }
+
+#[test]
+fn a_write_failure_ends_the_take_and_keeps_a_marked_readable_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut rec, mut tap) = pair(SR);
+    rec.fail_after = Some(4800);
+    rec.start_at(dir.path().join("f.wav")).unwrap();
+    let mut n = 0;
+    for _ in 0..40 {
+        callback(&mut tap, &mut n, 480);
+        std::thread::sleep(Duration::from_millis(5));
+        if rec.failed() {
+            break;
+        }
+    }
+    let t0 = std::time::Instant::now();
+    while !rec.failed() && t0.elapsed() < Duration::from_secs(3) {
+        let mut d = 0;
+        callback(&mut tap, &mut d, 480);
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(rec.failed(), "the UI can see the failure without Stop");
+    let Some(Outcome::Failed(msg)) = rec.stop() else {
+        panic!("not a failure")
+    };
+    assert!(msg.contains("injected"), "{msg}");
+    let kept = dir.path().join("f-INCOMPLETE.wav");
+    assert!(msg.contains("f-INCOMPLETE.wav"), "{msg}");
+    assert!(read(&kept).1.len() <= 2 * 4800);
+    assert!(!dir.path().join("f.wav").exists());
+}

@@ -1,0 +1,70 @@
+# Recovery workflows in the real app (KABL_PLAYER=1, --midi kabl-player). Screenshots named
+# after each check; drive.py fails on any missing target.
+sleep 2
+click perform
+click rec-start
+sleep 1
+# A held lead note, then the controller is unplugged: its notes must be released.
+midi on 76 110
+sleep 1
+shot r01-note-held
+midikill
+sleep 3.5
+shot r02-unplugged
+# Plugged back in: reconnects by itself, every mapping waits for pickup again.
+midistart
+sleep 3.5
+shot r03-reconnected
+# Pick the Bass level up and turn it; a mouse edit on it; the hardware must not jump it back.
+midi cc 1 20 28
+midi ramp 1 20 28 40 1
+sleep 1.5
+shot r04-bass-live
+dragby pslider:26.level1 -30 0
+sleep 0.5
+midi cc 1 20 41
+sleep 0.5
+shot r05-after-mouse-no-jump
+# Two knobs at once, then one undo takes both back.
+midi cc 1 24 53
+midi cc 1 27 60
+midi ramp 1 24 53 90 1.5
+midi ramp 1 27 60 90 1.5
+sleep 2
+shot r06-two-knobs
+key ctrl+z
+sleep 0.5
+shot r07-both-undone
+# All notes off with a note held.
+midi on 64 110
+sleep 1
+click notes-off
+sleep 1.5
+shot r08-notes-off
+# Delete the Lead level's mixer (a pinned, learned target), then undo.
+click perform
+rclick module:28
+click menu:remove
+click perform
+sleep 0.5
+shot r09-lead-deleted
+key ctrl+z
+sleep 0.5
+shot r10-lead-back
+# Stop, and record again at once; then a Load while recording.
+click rec-stop
+click rec-start
+sleep 2
+click load
+sleep 2
+shot r11-loaded-while-recording
+click rec-stop
+sleep 1
+shot r12-stopped
+# Bad destination.
+click rec-dir
+key ctrl+a
+type /proc/kabl-not-here
+click rec-start
+sleep 0.5
+shot r13-bad-destination

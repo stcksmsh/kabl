@@ -90,6 +90,8 @@ pub enum Outcome {
 
 struct Job {
     handle: JoinHandle<(rtrb::Consumer<f32>, Result<(), String>)>,
+    /// Set by the writer when it hits an error (the take then ends on its own).
+    failed: Arc<AtomicBool>,
     stop: Arc<AtomicBool>,
     frames: Arc<AtomicU64>,
     path: PathBuf,
@@ -104,6 +106,9 @@ pub struct Recorder {
     pub dir: String,
     job: Option<Job>,
     pub last: Option<Outcome>,
+    /// Failure injection for testing (`KABL_RECORD_FAIL_AFTER`): the writer reports a write
+    /// error once this many frames are written.
+    pub fail_after: Option<u64>,
 }
 
 /// A recorder and its audio-thread tap, ring sized for `RING_SECONDS` at `sample_rate`.
@@ -123,6 +128,7 @@ pub fn pair_sized(sample_rate: u32, frames: usize) -> (Recorder, Tap) {
             dir: "recordings".into(),
             job: None,
             last: None,
+            fail_after: None,
         },
         Tap { tx, shared },
     )
@@ -142,6 +148,13 @@ impl Recorder {
         self.job.as_ref().map_or(0.0, |j| {
             j.frames.load(Ordering::Relaxed) as f32 / self.sample_rate as f32
         })
+    }
+
+    /// The writer failed and finished; `stop` collects the error.
+    pub fn failed(&self) -> bool {
+        self.job
+            .as_ref()
+            .is_some_and(|j| j.failed.load(Ordering::Acquire))
     }
 
     pub fn path(&self) -> Option<&Path> {
@@ -193,6 +206,9 @@ impl Recorder {
         let frames = Arc::new(AtomicU64::new(0));
         let shared = self.shared.clone();
         let (stop2, frames2) = (stop.clone(), frames.clone());
+        let fail_after = self.fail_after;
+        let failed = Arc::new(AtomicBool::new(false));
+        let failed2 = failed.clone();
         shared.state.store(REC, Ordering::Release);
         let handle = std::thread::Builder::new()
             .name("kabl-recorder".into())
@@ -205,6 +221,17 @@ impl Recorder {
                     if n > 0 {
                         let chunk = rx.read_chunk(n).expect("n slots are readable");
                         let (a, b) = chunk.as_slices();
+                        let injected = fail_after
+                            .is_some_and(|f| frames2.load(Ordering::Relaxed) + n as u64 / 2 > f);
+                        if result.is_ok() && injected {
+                            result = Err("injected write failure (KABL_RECORD_FAIL_AFTER)".into());
+                            let _ = shared.state.compare_exchange(
+                                REC,
+                                STOPPING,
+                                Ordering::AcqRel,
+                                Ordering::Relaxed,
+                            );
+                        }
                         if result.is_ok() {
                             for &s in a.iter().chain(b) {
                                 if let Err(e) = writer.write_sample(s) {
@@ -248,6 +275,9 @@ impl Recorder {
                         std::thread::sleep(Duration::from_millis(10));
                     }
                 }
+                if result.is_err() {
+                    failed2.store(true, Ordering::Release);
+                }
                 // No callbacks answered (device gone): nothing else will push.
                 shared.state.store(IDLE, Ordering::Release);
                 let fin = writer.finalize().map_err(|e| e.to_string());
@@ -256,6 +286,7 @@ impl Recorder {
             .expect("spawn recorder thread");
         self.job = Some(Job {
             handle,
+            failed,
             stop,
             frames,
             path: path.clone(),
@@ -276,26 +307,33 @@ impl Recorder {
                 self.rx = Some(rx);
                 let frames = job.frames.load(Ordering::Relaxed);
                 let lost = self.lost();
-                match result {
-                    Err(e) => Outcome::Failed(format!(
-                        "recording failed after {:.1} s ({}): {e}",
-                        frames as f32 / self.sample_rate as f32,
-                        job.path.display()
-                    )),
-                    Ok(()) if lost > 0 => {
-                        let stem = job.path.with_extension("");
-                        let bad = PathBuf::from(format!("{}-INCOMPLETE.wav", stem.display()));
-                        // Never over another file.
-                        let path = if bad.exists() {
-                            job.path.clone()
-                        } else {
-                            match std::fs::rename(&job.path, &bad) {
-                                Ok(()) => bad,
-                                Err(_) => job.path.clone(),
-                            }
-                        };
-                        Outcome::Incomplete { path, frames, lost }
+                // A take that lost frames or hit an error keeps what was written, marked.
+                let mark = |p: &Path| {
+                    let bad =
+                        PathBuf::from(format!("{}-INCOMPLETE.wav", p.with_extension("").display()));
+                    if !bad.exists() && std::fs::rename(p, &bad).is_ok() {
+                        bad
+                    } else {
+                        p.to_path_buf()
                     }
+                };
+                match result {
+                    Err(e) => {
+                        let kept = if job.path.exists() {
+                            format!(", kept as {}", mark(&job.path).display())
+                        } else {
+                            String::new()
+                        };
+                        Outcome::Failed(format!(
+                            "recording failed after {:.1} s: {e}{kept}",
+                            frames as f32 / self.sample_rate as f32
+                        ))
+                    }
+                    Ok(()) if lost > 0 => Outcome::Incomplete {
+                        path: mark(&job.path),
+                        frames,
+                        lost,
+                    },
                     Ok(()) => Outcome::Complete {
                         path: job.path.clone(),
                         frames,
@@ -402,6 +440,9 @@ pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, th: &crate::th
     };
     let mut hits = Vec::new();
     let mut message = None;
+    if rec.failed() {
+        message = rec.stop().map(|o| describe(&o));
+    }
     let name = |p: &Path| {
         p.file_name().map_or_else(
             || p.display().to_string(),
