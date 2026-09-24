@@ -130,8 +130,8 @@ keyboard rules); rationale: decisions.md "Sound palette batch". Composition + Mo
 still **separately waiting for its review** — approve neither on Kosta's behalf.
 
 **Where the commits are:** this batch was finished in a cloud session on the branch
-`claude/sound-palette-playable-voices-q6j9ft` (pushed; it starts at master's c41420c), not
-on local master. Fast-forward master to it after review (`git merge --ff-only`).
+`claude/sound-palette-playable-voices-q6j9ft` (it starts at master's c41420c), not on local
+master. Push it (and fast-forward master) only when Kosta asks. 
 
 - Modules (`crates/modules/src/builtins/`): `osc_va` (pw, fine, unison, detune, band-limited
   sync), `noise`, `filter_ladder`, `chorus`, `drive`. Tests in `crates/modules/tests/`
