@@ -669,6 +669,53 @@ fn compile_inner(
             break;
         }
     }
+    // Noise is the one voice-rate source whose lanes differ (each is seeded by its lane), so a
+    // noise chain that only feeds MIDI voice chains runs per voice: every voice gets its own
+    // stream, and a chord adds in power, not amplitude. Backwards from the voiced modules: a
+    // voice-rate module with a noise upstream whose every consumer is voiced becomes voiced. A
+    // chain that also feeds anything unvoiced stays one instance (lane 0), so that path keeps
+    // its level instead of becoming a voice average of independent streams.
+    if single_instance {
+        let live: Vec<&kabl_core::CableState> = patch
+            .cables
+            .values()
+            .filter(|c| !route_bypassed(c))
+            .collect();
+        let mut noisy: std::collections::BTreeSet<ModuleId> = metas
+            .iter()
+            .filter(|(_, m)| m.kind == "noise")
+            .map(|(&id, _)| id)
+            .collect();
+        loop {
+            let before = noisy.len();
+            for c in &live {
+                let (from, to) = (c.from.module_id(), c.to.module_id());
+                if noisy.contains(&from) && metas[&to].info.rate == Rate::Voice {
+                    noisy.insert(to);
+                }
+            }
+            if noisy.len() == before {
+                break;
+            }
+        }
+        loop {
+            let before = voiced.len();
+            for &id in &noisy {
+                if voiced.contains(&id) {
+                    continue;
+                }
+                let mut consumers = live.iter().filter(|c| c.from.module_id() == id).peekable();
+                if consumers.peek().is_some()
+                    && consumers.all(|c| voiced.contains(&c.to.module_id()))
+                {
+                    voiced.insert(id);
+                }
+            }
+            if voiced.len() == before {
+                break;
+            }
+        }
+    }
 
     let mut w = Wiring {
         buffers: Vec::new(),
