@@ -79,7 +79,7 @@ pub static MIDI_IN_INFO: ModuleInfo = ModuleInfo {
     category: Category::Source,
     rate: Rate::Voice,
     explain:
-        "Turns a played note into gate, pitch, and velocity signals the rest of the patch can use.",
+        "Turns a played note into gate, pitch, and velocity signals the rest of the patch can use. Its Mode, Priority and Glide settings belong to this module: they apply only to the voices it drives.",
     lesson: None,
     requires: &[],
     ports: PORTS,
@@ -90,7 +90,7 @@ pub static MIDI_IN_INFO: ModuleInfo = ModuleInfo {
         interpolation: false,
     },
     skin: None,
-    width_units: 5,
+    width_units: 6,
     advanced: &["priority", "glide_ms"],
 };
 

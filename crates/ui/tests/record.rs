@@ -115,7 +115,14 @@ fn write_failures_are_visible() {
     assert!(err.contains("can't record"), "{err}");
     assert!(matches!(rec.last, Some(Outcome::Failed(_))));
     // A device that accepts the open but fails every write.
-    if let Ok(_path) = rec.start_at("/dev/full".into()) {
+    // (As root, /dev is writable and the never-overwrite rule records to a new regular file
+    // beside it instead; that proves nothing here, so it is removed and skipped.)
+    if let Ok(path) = rec.start_at("/dev/full".into()) {
+        if path != std::path::Path::new("/dev/full") {
+            rec.stop();
+            let _ = std::fs::remove_file(&path);
+            return;
+        }
         let mut n = 0;
         for _ in 0..100 {
             callback(&mut tap, &mut n, 256);

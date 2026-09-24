@@ -160,6 +160,9 @@ pub fn step_labels(kind: &str, param: &str) -> Option<&'static [&'static str]> {
         ("seq", "direction") => &["FWD", "REV", "PEND"],
         ("lfo", "sync") => &kabl_modules::builtins::SYNC_LABELS,
         ("seq", "bank") => &seq::BANK_NAMES,
+        ("midi.in", "mode") => &["POLY", "MONO", "LEGATO"],
+        ("midi.in", "priority") => &["LAST", "LOW", "HIGH"],
+        ("midi.in", "glide") => &["OFF", "ALWAYS", "LEGATO"],
         _ => return None,
     })
 }
