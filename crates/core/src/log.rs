@@ -77,6 +77,42 @@ impl PatchLog {
         self.append_inner(op, t_ms, source, Some(u64::MAX));
     }
 
+    /// For hardware gestures that move several targets at once (MIDI CCs): with `continuing`,
+    /// a `SetParam` joins the newest entry when that is a group of `SetParam`s from the same
+    /// source (replacing its value for a target already in it); otherwise it starts a new
+    /// group. So interleaved turns on different controls undo as one step.
+    pub fn append_to_group(&mut self, op: Op, t_ms: u64, source: Source, continuing: bool) {
+        self.entries.truncate(self.cursor);
+        if let (Op::SetParam { target, value }, true) = (&op, continuing) {
+            let restore = self.state.inverse_for(&op);
+            if let Some(last) = self.entries.last_mut().filter(|e| e.source == source) {
+                if let (Op::Group { ops }, Op::Group { ops: inverse }) =
+                    (&mut last.op, &mut last.inverse)
+                {
+                    if !ops.is_empty() && ops.iter().all(|o| matches!(o, Op::SetParam { .. })) {
+                        match ops.iter_mut().find_map(|o| match o {
+                            Op::SetParam {
+                                target: t,
+                                value: v,
+                            } if t == target => Some(v),
+                            _ => None,
+                        }) {
+                            Some(v) => *v = *value,
+                            None => {
+                                ops.push(op.clone());
+                                inverse.push(restore);
+                            }
+                        }
+                        last.t_ms = t_ms;
+                        self.state.apply(&op);
+                        return;
+                    }
+                }
+            }
+        }
+        self.append_inner(Op::Group { ops: vec![op] }, t_ms, source, None);
+    }
+
     /// `window`: merge a `SetParam` into the previous same-target, same-source `SetParam` if it
     /// is at most this many ms older. `None` never merges.
     fn append_inner(&mut self, op: Op, t_ms: u64, source: Source, window: Option<u64>) {

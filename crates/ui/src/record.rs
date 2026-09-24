@@ -153,10 +153,11 @@ impl Recorder {
         self.shared.lost.load(Ordering::Relaxed)
     }
 
-    /// Starts a take in `dir` with a timestamped name.
+    /// Starts a take in `dir` with a timestamped name (`-2`, `-3`, … when that name is taken).
     pub fn start(&mut self) -> Result<PathBuf, String> {
-        let name = format!("kabl-{}.wav", utc_stamp());
-        self.start_at(Path::new(&self.dir).join(name))
+        let stamp = utc_stamp();
+        let dir = Path::new(&self.dir).to_path_buf();
+        self.start_at(dir.join(format!("kabl-{stamp}.wav")))
     }
 
     pub fn start_at(&mut self, path: PathBuf) -> Result<PathBuf, String> {
@@ -177,13 +178,8 @@ impl Recorder {
             bits_per_sample: 32,
             sample_format: hound::SampleFormat::Float,
         };
-        let writer = path
-            .parent()
-            .filter(|p| !p.as_os_str().is_empty())
-            .map_or(Ok(()), std::fs::create_dir_all)
-            .map_err(|e| e.to_string())
-            .and_then(|()| hound::WavWriter::create(&path, spec).map_err(|e| e.to_string()));
-        let mut writer = match writer {
+        let writer = create_new(&path, spec);
+        let (mut writer, path) = match writer {
             Ok(w) => w,
             Err(e) => {
                 self.rx = Some(rx);
@@ -289,9 +285,14 @@ impl Recorder {
                     Ok(()) if lost > 0 => {
                         let stem = job.path.with_extension("");
                         let bad = PathBuf::from(format!("{}-INCOMPLETE.wav", stem.display()));
-                        let path = match std::fs::rename(&job.path, &bad) {
-                            Ok(()) => bad,
-                            Err(_) => job.path.clone(),
+                        // Never over another file.
+                        let path = if bad.exists() {
+                            job.path.clone()
+                        } else {
+                            match std::fs::rename(&job.path, &bad) {
+                                Ok(()) => bad,
+                                Err(_) => job.path.clone(),
+                            }
                         };
                         Outcome::Incomplete { path, frames, lost }
                     }
@@ -312,6 +313,54 @@ impl Drop for Recorder {
     fn drop(&mut self) {
         self.stop();
     }
+}
+
+type Writer = hound::WavWriter<std::io::BufWriter<std::fs::File>>;
+
+/// Creates `path` (and its folder) without ever replacing a file: if the name is taken, the
+/// first free `name-2.wav`, `name-3.wav`, … is used instead.
+fn create_new(path: &Path, spec: hound::WavSpec) -> Result<(Writer, PathBuf), String> {
+    if let Some(dir) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    let stem = path.with_extension("");
+    for k in 1..1000 {
+        let candidate = if k == 1 {
+            path.to_path_buf()
+        } else {
+            PathBuf::from(format!("{}-{k}.wav", stem.display()))
+        };
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&candidate)
+        {
+            Ok(f) => {
+                let w = hound::WavWriter::new(std::io::BufWriter::new(f), spec)
+                    .map_err(|e| e.to_string())?;
+                return Ok((w, candidate));
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    Err("no free file name".into())
+}
+
+/// Opens a folder in the desktop's file manager.
+pub fn open_folder(dir: &Path) -> Result<(), String> {
+    let opener = if cfg!(target_os = "macos") {
+        "open"
+    } else if cfg!(windows) {
+        "explorer"
+    } else {
+        "xdg-open"
+    };
+    std::process::Command::new(opener)
+        .arg(dir)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("can't open {}: {e}", dir.display()))
 }
 
 /// `YYYYMMDD-HHMMSSZ` (UTC) for take names.
@@ -343,63 +392,111 @@ fn clock(s: f32) -> String {
     format!("{:02}:{:02}", s / 60, s % 60)
 }
 
-/// Record/Stop, elapsed time, destination and the last outcome.
+/// The recorder row: Record/Stop, elapsed time, the take's file, the destination folder and
+/// the last take. Long names are truncated (hover shows them whole), so the buttons stay put.
 pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, th: &crate::theme::Theme) {
+    let red = egui::Color32::from_rgb(220, 60, 50);
     let Some(rec) = ui_state.recorder.as_mut() else {
-        ui.label(RichText::new("recording needs an audio device").color(th.ink2));
+        ui.label(RichText::new("Recording needs an audio device.").color(th.ink2));
         return;
     };
     let mut hits = Vec::new();
     let mut message = None;
-    // Right to left.
-    if let Some(path) = rec.path() {
-        let lost = rec.lost();
-        let name = path.file_name().map_or_else(
-            || path.display().to_string(),
+    let name = |p: &Path| {
+        p.file_name().map_or_else(
+            || p.display().to_string(),
             |n| n.to_string_lossy().into_owned(),
-        );
+        )
+    };
+    if let Some(path) = rec.path().map(Path::to_path_buf) {
         let r = ui
-            .label(RichText::new(format!("→ {name}")).small().monospace())
-            .on_hover_text(path.display().to_string());
-        hits.push(("rec-dest".to_string(), r.rect));
-        if lost > 0 {
-            ui.label(
-                RichText::new(format!("{lost} frames lost: take incomplete"))
-                    .color(egui::Color32::from_rgb(220, 60, 50))
-                    .strong(),
-            );
-        }
-        let r = ui.label(
-            RichText::new(format!("● REC {}", clock(rec.elapsed())))
-                .color(egui::Color32::from_rgb(220, 60, 50))
-                .strong()
-                .monospace(),
-        );
-        hits.push(("rec-time".to_string(), r.rect));
-        let r = ui.button(RichText::new("■ Stop").strong());
+            .add(egui::Button::new(RichText::new("■ Stop").strong()).min_size([84.0, 0.0].into()));
         hits.push(("rec-stop".to_string(), r.rect));
         if r.clicked() {
             message = rec.stop().map(|o| describe(&o));
         }
+        let r = ui.label(
+            RichText::new(format!("● REC {}", clock(rec.elapsed())))
+                .color(red)
+                .strong()
+                .monospace(),
+        );
+        hits.push(("rec-time".to_string(), r.rect));
+        let lost = rec.lost();
+        if lost > 0 {
+            ui.label(
+                RichText::new(format!("{lost} frames lost: incomplete"))
+                    .color(red)
+                    .strong(),
+            );
+        }
+        let r = ui
+            .add(
+                egui::Label::new(
+                    RichText::new(format!("→ {}", name(&path)))
+                        .small()
+                        .monospace(),
+                )
+                .truncate(),
+            )
+            .on_hover_text(path.display().to_string());
+        hits.push(("rec-dest".to_string(), r.rect));
     } else {
-        let r = ui.button(RichText::new("● Record").strong());
+        let r = ui.add(
+            egui::Button::new(RichText::new("● Record").strong()).min_size([84.0, 0.0].into()),
+        );
         hits.push(("rec-start".to_string(), r.rect));
         if r.clicked() {
             if let Err(e) = rec.start() {
                 message = Some(e);
             }
         }
-        let r = ui.add(egui::TextEdit::singleline(&mut rec.dir).desired_width(120.0));
+        ui.label("to");
+        let r = ui
+            .add(egui::TextEdit::singleline(&mut rec.dir).desired_width(140.0))
+            .on_hover_text("Folder for new takes (created if missing)");
         hits.push(("rec-dir".to_string(), r.rect));
-        ui.label("Record to");
-        if let Some(o) = &rec.last {
-            let (t, bad) = (describe(o), !matches!(o, Outcome::Complete { .. }));
-            let text = RichText::new(t).small();
-            ui.label(if bad {
-                text.color(egui::Color32::from_rgb(220, 60, 50))
-            } else {
-                text
-            });
+        let r = ui.small_button("Open folder");
+        hits.push(("rec-open".to_string(), r.rect));
+        if r.clicked() {
+            let dir = std::path::PathBuf::from(&rec.dir);
+            if let Err(e) = std::fs::create_dir_all(&dir)
+                .map_err(|e| e.to_string())
+                .and_then(|()| open_folder(&dir))
+            {
+                message = Some(e);
+            }
+        }
+        if let Some(o) = rec.last.clone() {
+            let (path, ok) = match &o {
+                Outcome::Complete { path, .. } => (Some(path.clone()), true),
+                Outcome::Incomplete { path, .. } => (Some(path.clone()), false),
+                Outcome::Failed(_) => (None, false),
+            };
+            ui.separator();
+            let text = match &o {
+                Outcome::Complete { path, frames } => format!(
+                    "Last take: {} ({})",
+                    name(path),
+                    clock(*frames as f32 / rec.sample_rate() as f32)
+                ),
+                Outcome::Incomplete { path, lost, .. } => {
+                    format!("Last take INCOMPLETE ({lost} frames lost): {}", name(path))
+                }
+                Outcome::Failed(e) => format!("Recording failed: {e}"),
+            };
+            let t = RichText::new(text).small();
+            let r = ui
+                .add(egui::Label::new(if ok { t } else { t.color(red) }).truncate())
+                .on_hover_text(describe(&o));
+            hits.push(("rec-last".to_string(), r.rect));
+            if let Some(p) = path {
+                let r = ui.small_button("Copy path");
+                hits.push(("rec-copy".to_string(), r.rect));
+                if r.clicked() {
+                    ui.ctx().copy_text(p.display().to_string());
+                }
+            }
         }
     }
     if rec.recording() {
@@ -424,4 +521,141 @@ pub fn describe(o: &Outcome) -> String {
         ),
         Outcome::Failed(e) => e.clone(),
     }
+}
+
+/// Final-output peak telemetry: the audio callback folds each frame's |L|, |R| in with
+/// `fetch_max` on the f32 bits (non-negative floats order like their bits), the UI takes and
+/// clears them. Lock-free, fixed size.
+#[derive(Default)]
+pub struct PeakTap {
+    l: std::sync::atomic::AtomicU32,
+    r: std::sync::atomic::AtomicU32,
+    nonfinite: AtomicBool,
+}
+
+impl PeakTap {
+    /// Audio thread.
+    #[inline]
+    pub fn feed(&self, l: f32, r: f32) {
+        if !(l.is_finite() && r.is_finite()) {
+            self.nonfinite.store(true, Ordering::Relaxed);
+            return;
+        }
+        self.l.fetch_max(l.abs().to_bits(), Ordering::Relaxed);
+        self.r.fetch_max(r.abs().to_bits(), Ordering::Relaxed);
+    }
+
+    /// UI thread: peaks since the last take, and whether a non-finite sample was seen.
+    pub fn take(&self) -> ([f32; 2], bool) {
+        (
+            [
+                f32::from_bits(self.l.swap(0, Ordering::Relaxed)),
+                f32::from_bits(self.r.swap(0, Ordering::Relaxed)),
+            ],
+            self.nonfinite.swap(false, Ordering::Relaxed),
+        )
+    }
+}
+
+/// The output meter's display state: peak hold falling at 20 dB/s, a clip latch (any sample at
+/// or above 0 dBFS, or non-finite) that stays until clicked.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Meter {
+    pub level: [f32; 2],
+    pub clip: bool,
+    pub nonfinite: bool,
+    /// Highest peak since the last reset, dBFS.
+    pub max_db: Option<f32>,
+}
+
+impl Meter {
+    pub fn update(&mut self, peaks: [f32; 2], nonfinite: bool, dt: f32) {
+        let fall = 10f32.powf(-20.0 * dt / 20.0);
+        for (lv, p) in self.level.iter_mut().zip(peaks) {
+            *lv = (*lv * fall).max(p);
+            if p >= 1.0 {
+                self.clip = true;
+            }
+        }
+        let p = peaks[0].max(peaks[1]);
+        if p > 0.0 {
+            let db = 20.0 * p.log10();
+            self.max_db = Some(self.max_db.map_or(db, |m| m.max(db)));
+        }
+        self.nonfinite |= nonfinite;
+        self.clip |= nonfinite;
+    }
+}
+
+/// Two bars (L, R), −60..0 dBFS, the peak hold, and a CLIP light. Click resets.
+pub fn meter_ui(ui: &mut egui::Ui, meter: &mut Meter) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(132.0, 20.0), egui::Sense::click());
+    let p = ui.painter();
+    let bars = egui::Rect::from_min_size(rect.min, egui::vec2(84.0, rect.height()));
+    let bg = ui.visuals().extreme_bg_color;
+    let to_x = |v: f32| {
+        let db = if v > 0.0 { 20.0 * v.log10() } else { -120.0 };
+        bars.left() + bars.width() * ((db + 60.0) / 60.0).clamp(0.0, 1.0)
+    };
+    for (k, &v) in meter.level.iter().enumerate() {
+        let y0 = bars.top() + 2.0 + k as f32 * 9.0;
+        let track = egui::Rect::from_min_max(
+            egui::pos2(bars.left(), y0),
+            egui::pos2(bars.right(), y0 + 7.0),
+        );
+        p.rect_filled(track, 2.0, bg);
+        let x = to_x(v);
+        let color = if v >= 1.0 {
+            egui::Color32::from_rgb(220, 60, 50)
+        } else if v >= 10f32.powf(-6.0 / 20.0) {
+            egui::Color32::from_rgb(220, 170, 50)
+        } else {
+            egui::Color32::from_rgb(90, 190, 110)
+        };
+        p.rect_filled(
+            egui::Rect::from_min_max(track.min, egui::pos2(x, track.bottom())),
+            2.0,
+            color,
+        );
+    }
+    // 0 dB is the right edge; a tick at −6 dB.
+    let x6 = to_x(10f32.powf(-6.0 / 20.0));
+    p.line_segment(
+        [egui::pos2(x6, bars.top()), egui::pos2(x6, bars.bottom())],
+        egui::Stroke::new(1.0, ui.visuals().weak_text_color()),
+    );
+    let clip = egui::Rect::from_min_size(
+        egui::pos2(bars.right() + 4.0, rect.top() + 2.0),
+        egui::vec2(40.0, 16.0),
+    );
+    p.rect_filled(
+        clip,
+        3.0,
+        if meter.clip {
+            egui::Color32::from_rgb(220, 60, 50)
+        } else {
+            bg
+        },
+    );
+    p.text(
+        clip.center(),
+        egui::Align2::CENTER_CENTER,
+        if meter.nonfinite { "NaN" } else { "CLIP" },
+        egui::FontId::proportional(10.0),
+        if meter.clip {
+            egui::Color32::WHITE
+        } else {
+            ui.visuals().weak_text_color()
+        },
+    );
+    let max = meter
+        .max_db
+        .map_or("no signal".to_string(), |m| format!("{m:+.1} dBFS"));
+    let resp = resp.on_hover_text(format!(
+        "Final output, measured: peak since reset {max}. Click to reset the clip light."
+    ));
+    if resp.clicked() {
+        *meter = Meter::default();
+    }
+    resp
 }

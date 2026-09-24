@@ -135,8 +135,10 @@ fn pins_are_presentation_edits_that_save_undo_and_reorder() {
     for k in &keys(&h) {
         h.rect(&format!("pcard:{k}"));
     }
+    h.click("pmenu:1.transport");
     h.click("pleft:1.transport");
     assert_eq!(keys(&h), ["9.cutoff_hz", "1.transport", "16.mix"]);
+    h.click("pmenu:9.cutoff_hz");
     h.click("pright:9.cutoff_hz");
     assert_eq!(keys(&h), ["1.transport", "9.cutoff_hz", "16.mix"]);
     assert!(!h.editor.take_dirty());
@@ -154,6 +156,7 @@ fn pins_are_presentation_edits_that_save_undo_and_reorder() {
         "pins survive save/reload"
     );
 
+    h.click("pmenu:16.mix");
     h.click("punpin:16.mix");
     assert_eq!(keys(&h), ["1.transport", "9.cutoff_hz"]);
     assert!(!h.editor.take_dirty());
@@ -380,7 +383,7 @@ fn the_panel_reads_at_both_sizes_whatever_the_rack_zoom() {
             .collect();
         for (i, c) in cards.iter().enumerate() {
             assert!(screen.contains_rect(*c), "{w}: card {i} {c:?} off screen");
-            assert!(c.width() >= 180.0 && c.height() >= 120.0, "{c:?}");
+            assert!(c.width() >= 138.0 && c.height() >= 100.0, "{c:?}");
             for d in &cards[i + 1..] {
                 assert!(!c.intersects(*d));
             }
@@ -422,4 +425,134 @@ fn a_new_pin_scrolls_into_view() {
     }
     let screen = Rect::from_min_size(Pos2::ZERO, egui::vec2(1280.0, 800.0));
     assert!(screen.contains_rect(h.rect("pcard:1.transport")));
+}
+
+/// A key press through egui.
+fn key(h: &mut H, key: egui::Key) {
+    for pressed in [true, false] {
+        h.events.push(Event::Key {
+            key,
+            physical_key: None,
+            pressed,
+            repeat: false,
+            modifiers: Default::default(),
+        });
+    }
+    h.frame();
+}
+
+#[test]
+fn pins_take_labels_that_undo_save_and_keep_their_source() {
+    let mut h = H::new(1440.0, 900.0);
+    h.pin(FILTER, "cutoff_hz");
+    h.editor.take_dirty();
+    // Double-click the title, type, Enter.
+    let r = h.rect("plabel:9.cutoff_hz");
+    h.move_to(r.center());
+    for _ in 0..2 {
+        h.button(true);
+        h.button(false);
+    }
+    h.frame();
+    assert!(h.ui.renaming.is_some());
+    h.events.push(Event::Key {
+        key: egui::Key::A,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::COMMAND,
+    });
+    h.events.push(Event::Text("Bass cutoff".into()));
+    h.frame();
+    key(&mut h, egui::Key::Enter);
+    h.frame();
+    let pin = &pins(h.editor.state())[0];
+    assert_eq!(perform::pin_label(h.editor.state(), pin), "Bass cutoff");
+    assert!(perform::pin_source(h.editor.state(), pin).contains("SVF Filter #9 · Cutoff"));
+    assert!(!h.editor.take_dirty(), "a label never rebuilds audio");
+    let dir = tempfile::tempdir().unwrap();
+    kabl_core::save(dir.path(), h.editor.log()).unwrap();
+    let back = PatchEditor::from_log(kabl_core::load(dir.path()).unwrap());
+    assert_eq!(perform::pin_label(back.state(), pin), "Bass cutoff");
+    h.editor.undo();
+    assert_eq!(perform::pin_label(h.editor.state(), pin), "Cutoff");
+    // Escape cancels an edit.
+    h.ui.renaming = Some((FILTER, "cutoff_hz".into(), "nope".into()));
+    h.frame();
+    key(&mut h, egui::Key::Escape);
+    assert_eq!(perform::pin_label(h.editor.state(), pin), "Cutoff");
+}
+
+#[test]
+fn simultaneous_cc_turns_undo_together_and_keep_final_values() {
+    let mut h = H::new(1440.0, 900.0);
+    h.pin(DELAY, "mix");
+    h.pin(DELAY, "feedback");
+    h.click("plearn:16.mix");
+    let mix0 = (h.value(DELAY, "mix") / 100.0 * 127.0).round() as u8;
+    h.cc(0, 1, mix0);
+    h.click("plearn:16.feedback");
+    let fb0 = (h.value(DELAY, "feedback") / 95.0 * 127.0).round() as u8;
+    h.cc(0, 2, fb0);
+    let (mix_before, fb_before) = (h.value(DELAY, "mix"), h.value(DELAY, "feedback"));
+    let entries = h.editor.log().entries().len();
+    // Both knobs turned together: messages interleave, several per frame.
+    for k in 1..=20u8 {
+        h.ui.midi_cc.push((0, 1, mix0 + k));
+        h.ui.midi_cc.push((0, 2, fb0 - k));
+        h.t += 0.01;
+        h.frame();
+    }
+    let (mix, fb) = (h.value(DELAY, "mix"), h.value(DELAY, "feedback"));
+    let p = |kind: &str, name: &str| {
+        *kabl_modules::registry::info_for(kind)
+            .unwrap()
+            .params
+            .iter()
+            .find(|p| p.name == name)
+            .unwrap()
+    };
+    assert_eq!(mix, p("delay", "mix").from_norm((mix0 + 20) as f32 / 127.0));
+    assert_eq!(fb, p("delay", "feedback").from_norm((fb0 - 20) as f32 / 127.0));
+    assert_eq!(h.editor.log().entries().len(), entries + 1, "one undo step");
+    h.editor.undo();
+    assert_eq!(
+        (h.value(DELAY, "mix"), h.value(DELAY, "feedback")),
+        (mix_before, fb_before)
+    );
+    h.editor.redo();
+    assert_eq!((h.value(DELAY, "mix"), h.value(DELAY, "feedback")), (mix, fb));
+}
+
+#[test]
+fn the_demo_controls_fit_together_at_1280() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/performance");
+    for (w, hgt) in sizes() {
+        let mut h = H::new(w, hgt);
+        h.editor = PatchEditor::from_log(kabl_core::load(&dir).unwrap());
+        let (rec, tap) = kabl_ui::record::pair(48000);
+        h.ui.recorder = Some(rec);
+        std::mem::forget(tap);
+        for _ in 0..4 {
+            h.frame();
+        }
+        let screen = Rect::from_min_size(Pos2::ZERO, egui::vec2(w, hgt));
+        let all = pins(h.editor.state());
+        assert_eq!(all.len(), 12);
+        let mut rects: Vec<Rect> = Vec::new();
+        for p in &all {
+            let r = h.rect(&format!("pcard:{}.{}", p.id, p.key));
+            assert!(screen.contains_rect(r), "{w}: {}.{} at {r:?}", p.id, p.key);
+            for q in &rects {
+                assert!(!q.shrink(1.0).intersects(r), "{w}: overlap");
+            }
+            rects.push(r);
+        }
+        for k in ["rec-start", "midi-input", "notes-off", "prun:1", "prestart:1"] {
+            assert!(screen.contains_rect(h.rect(k)), "{w}: {k}");
+        }
+        // The rack keeps a usable height.
+        let rack_h = rects.iter().map(|r| r.top()).fold(f32::MAX, f32::min) - 40.0;
+        assert!(rack_h > 350.0, "{w}: rack {rack_h}");
+    }
 }

@@ -7,9 +7,10 @@ use serde::{Deserialize, Serialize};
 use crate::log::PatchLog;
 use crate::op::Entry;
 
-/// v2 adds `PortRef::Param` (modulation routes), `Op::UnsetParam` and `Op::Group`. v1 files
-/// are a strict subset of v2 and load unchanged; there is nothing to migrate.
-pub const CURRENT_SCHEMA_VERSION: u32 = 2;
+/// v2 adds `PortRef::Param` (modulation routes), `Op::UnsetParam` and `Op::Group`; v3 adds
+/// `Op::SetLabel`. Each is a strict superset of the one before, so older files load unchanged;
+/// there is nothing to migrate.
+pub const CURRENT_SCHEMA_VERSION: u32 = 3;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Meta {

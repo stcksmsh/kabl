@@ -191,6 +191,18 @@ impl PatchEditor {
 
     /// Cancels the gesture whose first frame was the last edit: its value is reverted and no
     /// undo or redo entry remains.
+    /// A hardware (MIDI CC) change: joins the running CC gesture group when `continuing`, so
+    /// turns on several controls at once undo as one step.
+    pub fn set_param_cc(&mut self, target: ParamTarget, value: f32, continuing: bool) {
+        self.dirty = true;
+        self.log.append_to_group(
+            Op::SetParam { target, value },
+            now_ms(),
+            Source::Midi,
+            continuing,
+        );
+    }
+
     pub fn cancel_gesture(&mut self) {
         if self.log.discard_last() {
             self.dirty = true;
@@ -325,6 +337,19 @@ impl PatchEditor {
         }
     }
 
+    /// Sets or removes a module's text label (`Op::SetLabel`). One undo step, no audio rebuild.
+    pub fn set_label(&mut self, id: ModuleId, key: &str, text: Option<String>) {
+        if self.log.state().modules.contains_key(&id)
+            && self.log.state().label(id, key) != text.as_deref()
+        {
+            self.append(Op::SetLabel {
+                id,
+                key: key.to_string(),
+                text,
+            });
+        }
+    }
+
     pub fn replug(&mut self, old: CableId, to: Option<PortRef>) -> Option<CableId> {
         let c = self.log.state().cables.get(&old)?;
         if to.as_ref() == Some(&c.to) {
@@ -379,7 +404,9 @@ impl PatchEditor {
 /// face controls or annotating the log is presentation/history only and must not rebuild audio.
 pub fn affects_audio(op: &Op) -> bool {
     match op {
-        Op::MoveModule { .. } | Op::Annotate { .. } | Op::Snapshot { .. } => false,
+        Op::MoveModule { .. } | Op::Annotate { .. } | Op::Snapshot { .. } | Op::SetLabel { .. } => {
+            false
+        }
         Op::SetParam {
             target: ParamTarget::Module { param, .. },
             ..

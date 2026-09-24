@@ -24,8 +24,11 @@ pub const CC_PREFIX: &str = "cc.";
 /// Pin key for a clock's transport buttons.
 pub const TRANSPORT: &str = "transport";
 /// Height of the performance panel.
-pub const PANEL_H: f32 = 206.0;
-const CARD_W: f32 = 184.0;
+pub const PANEL_H: f32 = 296.0;
+/// Height with `UiState::perform_tall`.
+pub const PANEL_TALL_H: f32 = 470.0;
+const CARD_W: f32 = 138.0;
+const CARD_H: f32 = 106.0;
 /// How close (in 0..1 travel) the hardware must come to pick a parameter up.
 const PICKUP: f32 = 1.5 / 127.0;
 /// A CC message this long after the previous one on the same mapping starts a new undo step.
@@ -215,14 +218,17 @@ pub fn apply_cc(editor: &mut PatchEditor, ui_state: &mut UiState, now: f64) {
             if value == base {
                 continue;
             }
-            let first = !was
-                || !matches!(&ui_state.cc_gesture,
-                    Some((g, at)) if *g == key && now - at < GESTURE_GAP_S);
+            // One gesture while CCs keep coming (on any mappings) with gaps under a second.
+            let continuing = was
+                && ui_state
+                    .cc_gesture
+                    .as_ref()
+                    .is_some_and(|(_, at)| now - at < GESTURE_GAP_S);
             let target = ParamTarget::Module {
                 id,
                 param: p.name.into(),
             };
-            editor.set_param_gesture(target, value, first);
+            editor.set_param_cc(target, value, continuing);
             ui_state.cc_gesture = Some((key, now));
         }
     }
@@ -348,7 +354,51 @@ pub(crate) fn param_editor(
     }
 }
 
-/// The panel: header (MIDI input, learn state, recorder) and one card per pin.
+/// The label a pin shows: the user's, else the control's own name.
+pub fn pin_label(state: &PatchState, pin: &Pin) -> String {
+    if let Some(l) = state.label(pin.id, &format!("{PIN_PREFIX}{}", pin.key)) {
+        return l.to_string();
+    }
+    if pin.key == TRANSPORT {
+        return "Transport".into();
+    }
+    pin_param(state, pin).map_or(pin.key.clone(), routing::param_label)
+}
+
+fn pin_param(state: &PatchState, pin: &Pin) -> Option<&'static ParamInfo> {
+    state
+        .modules
+        .get(&pin.id)
+        .and_then(|m| registry::info_for(&m.kind))
+        .and_then(|i| i.params.iter().find(|p| p.name == pin.key))
+}
+
+/// What a pin really is: `Mixer #26 · Level 1 · from Sequencer #3`.
+pub fn pin_source(state: &PatchState, pin: &Pin) -> String {
+    let control = if pin.key == TRANSPORT {
+        "Run/Stop, Restart".to_string()
+    } else {
+        pin_param(state, pin).map_or(pin.key.clone(), routing::param_label)
+    };
+    let mut s = format!("{} #{} · {control}", module_name(state, pin.id), pin.id);
+    if let Some(src) = mixer_source(state, pin.id, &pin.key) {
+        s.push_str(&format!(" · from {src}"));
+    }
+    s
+}
+
+/// Renames a pin (empty = back to the control's own name). One undo step, no audio rebuild.
+pub fn rename_pin(editor: &mut PatchEditor, id: ModuleId, key: &str, text: &str) {
+    let text = text.trim();
+    editor.set_label(
+        id,
+        &format!("{PIN_PREFIX}{key}"),
+        (!text.is_empty()).then(|| text.to_string()),
+    );
+}
+
+/// The panel: a header (MIDI input, notes off, learn state, recorder) and the pinned cards,
+/// wrapped in rows. Transport cards stay in a column at the left.
 pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
     let th = crate::theme::theme(ui_state.dark);
     ui.horizontal(|ui| {
@@ -357,8 +407,9 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         ui.label("MIDI in");
         let current = ui_state.midi_input.clone().unwrap_or_else(|| "none".into());
         let combo = egui::ComboBox::from_id_salt("midi-input")
-            .width(180.0)
-            .selected_text(current)
+            .width(150.0)
+            .truncate()
+            .selected_text(current.clone())
             .show_ui(ui, |ui| {
                 let mut pick = None;
                 if ui
@@ -375,9 +426,29 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                 }
                 pick
             });
-        ui_state.record("midi-input".into(), combo.response.rect);
+        let combo_rect = combo.response.rect;
+        combo.response.on_hover_text(current);
+        ui_state.record("midi-input".into(), combo_rect);
         if let Some(pick) = combo.inner.flatten() {
             ui_state.midi_select = Some(pick);
+        }
+        if let Some(note) = &ui_state.midi_note {
+            ui.label(RichText::new(note).color(th.cv).small());
+        }
+        let tall = ui_state.perform_tall;
+        let r = ui
+            .button(if tall { "Shorter" } else { "Taller" })
+            .on_hover_text("More rows of controls, less rack");
+        ui_state.record("perform-size".into(), r.rect);
+        if r.clicked() {
+            ui_state.perform_tall = !tall;
+        }
+        let r = ui
+            .button("All notes off")
+            .on_hover_text("Release every MIDI voice (keyboard notes). Sequencers keep playing.");
+        ui_state.record("notes-off".into(), r.rect);
+        if r.clicked() {
+            ui_state.all_notes_off = true;
         }
         if let Some((id, param)) = ui_state.learn.clone() {
             let label = registry::info_for(
@@ -389,23 +460,26 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             )
             .and_then(|i| i.params.iter().find(|p| p.name == param))
             .map_or(param.clone(), routing::param_label);
-            ui.label(
-                RichText::new(format!(
-                    "Learning {} #{id} {label}: move a control…",
-                    module_name(editor.state(), id)
-                ))
-                .color(th.cv)
-                .strong(),
-            );
-            let r = ui.button("Cancel");
+            let r = ui.button("Cancel learn");
             ui_state.record("learn-cancel".into(), r.rect);
             if r.clicked() {
                 ui_state.learn = None;
             }
+            ui.add(
+                egui::Label::new(
+                    RichText::new(format!(
+                        "Learning {} #{id} {label}: move a control…",
+                        module_name(editor.state(), id)
+                    ))
+                    .color(th.cv)
+                    .strong(),
+                )
+                .truncate(),
+            );
         }
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            crate::record::controls(ui_state, ui, &th);
-        });
+    });
+    ui.horizontal(|ui| {
+        crate::record::controls(ui_state, ui, &th);
     });
     ui.separator();
     let all = pins(editor.state());
@@ -416,19 +490,24 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         );
         return;
     }
-    // Transport stays in reach at the left; the other cards scroll.
     let n = all.len();
     ui.horizontal_top(|ui| {
-        for (i, pin) in all.iter().enumerate().filter(|(_, p)| p.key == TRANSPORT) {
-            card(editor, ui_state, ui, &th, pin, i, n);
-        }
-        egui::ScrollArea::horizontal().show(ui, |ui| {
-            ui.horizontal_top(|ui| {
-                for (i, pin) in all.iter().enumerate().filter(|(_, p)| p.key != TRANSPORT) {
-                    card(editor, ui_state, ui, &th, pin, i, n);
-                }
-            });
+        ui.vertical(|ui| {
+            for (i, pin) in all.iter().enumerate().filter(|(_, p)| p.key == TRANSPORT) {
+                card(editor, ui_state, ui, &th, pin, i, n);
+            }
         });
+        egui::ScrollArea::vertical()
+            .id_salt("perform-cards")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
+                    for (i, pin) in all.iter().enumerate().filter(|(_, p)| p.key != TRANSPORT) {
+                        card(editor, ui_state, ui, &th, pin, i, n);
+                    }
+                });
+            });
     });
 }
 
@@ -442,61 +521,92 @@ fn card(
     count: usize,
 ) {
     let key = format!("{}.{}", pin.id, pin.key);
-    let size = egui::vec2(CARD_W + 18.0, PANEL_H - 60.0);
+    let title = pin_label(editor.state(), pin);
+    let source = pin_source(editor.state(), pin);
+    let size = egui::vec2(CARD_W + 16.0, CARD_H);
     let frame = ui.allocate_ui_with_layout(size, egui::Layout::top_down(egui::Align::Min), |ui| {
         egui::Frame::group(ui.style())
             .fill(ui.visuals().faint_bg_color)
-            .inner_margin(8.0)
+            .inner_margin(egui::Margin::symmetric(8, 6))
             .show(ui, |ui| {
                 ui.set_width(CARD_W);
-                ui.set_min_height(PANEL_H - 70.0);
-                let name = format!("{} #{}", module_name(editor.state(), pin.id), pin.id);
-                egui::Sides::new().show(
-                    ui,
-                    |ui| {
-                        ui.label(RichText::new(name).weak().small());
-                    },
-                    |ui| {
-                        let small = |t: &str| egui::Button::new(RichText::new(t).small());
-                        let r = ui.add(small("✕")).on_hover_text("Unpin");
-                        ui_state.record(format!("punpin:{key}"), r.rect);
+                ui.set_height(CARD_H - 14.0);
+                ui.spacing_mut().item_spacing.y = 3.0;
+                let renaming = ui_state
+                    .renaming
+                    .as_ref()
+                    .is_some_and(|(id, k, _)| *id == pin.id && *k == pin.key);
+                ui.horizontal(|ui| {
+                    let menu = ui.menu_button(RichText::new("⋯").strong(), |ui| {
+                        let r = ui.button("Rename…");
+                        ui_state.record(format!("prename:{key}"), r.rect);
                         if r.clicked() {
-                            toggle_pin(editor, pin.id, &pin.key);
+                            ui_state.renaming = Some((pin.id, pin.key.clone(), title.clone()));
+                            ui.close();
                         }
-                        let r = ui
-                            .add_enabled(index + 1 < count, small("▶"))
-                            .on_hover_text("Move right");
-                        ui_state.record(format!("pright:{key}"), r.rect);
-                        if r.clicked() {
-                            move_pin(editor, index, 1);
-                        }
-                        let r = ui
-                            .add_enabled(index > 0, small("◀"))
-                            .on_hover_text("Move left");
+                        let r = ui.add_enabled(index > 0, egui::Button::new("Move left"));
                         ui_state.record(format!("pleft:{key}"), r.rect);
                         if r.clicked() {
                             move_pin(editor, index, -1);
+                            ui_state.pin_reveal = Some((pin.id, pin.key.clone()));
+                            ui.close();
                         }
-                    },
-                );
+                        let r = ui.add_enabled(index + 1 < count, egui::Button::new("Move right"));
+                        ui_state.record(format!("pright:{key}"), r.rect);
+                        if r.clicked() {
+                            move_pin(editor, index, 1);
+                            ui_state.pin_reveal = Some((pin.id, pin.key.clone()));
+                            ui.close();
+                        }
+                        let r = ui.button("Unpin");
+                        ui_state.record(format!("punpin:{key}"), r.rect);
+                        if r.clicked() {
+                            toggle_pin(editor, pin.id, &pin.key);
+                            ui.close();
+                        }
+                    });
+                    ui_state.record(format!("pmenu:{key}"), menu.response.rect);
+                    menu.response.on_hover_text("Rename, move, unpin");
+                    if renaming {
+                        let (_, _, text) = ui_state.renaming.as_mut().unwrap();
+                        let r =
+                            ui.add(egui::TextEdit::singleline(text).desired_width(CARD_W - 34.0));
+                        ui_state.record(format!("plabel-edit:{key}"), r.rect);
+                        r.request_focus();
+                        let enter = ui.input(|i| i.key_pressed(egui::Key::Enter));
+                        let esc = ui.input(|i| i.key_pressed(egui::Key::Escape));
+                        if esc {
+                            ui_state.renaming = None;
+                        } else if enter || r.lost_focus() {
+                            if let Some((id, k, text)) = ui_state.renaming.take() {
+                                if text.trim() != title {
+                                    rename_pin(editor, id, &k, &text);
+                                }
+                            }
+                        }
+                    } else {
+                        let r = ui
+                            .add(
+                                egui::Label::new(RichText::new(&title).strong().size(15.0))
+                                    .truncate()
+                                    .sense(egui::Sense::click()),
+                            )
+                            .on_hover_text(format!("{source}\nDouble-click to rename"));
+                        ui_state.record(format!("plabel:{key}"), r.rect);
+                        if r.double_clicked() {
+                            ui_state.renaming = Some((pin.id, pin.key.clone(), title.clone()));
+                        }
+                    }
+                });
+                ui.add(egui::Label::new(RichText::new(&source).weak().small()).truncate());
                 if pin.key == TRANSPORT {
                     transport_card(ui_state, ui, th, pin.id);
                     return;
                 }
-                let Some(p) = editor
-                    .state()
-                    .modules
-                    .get(&pin.id)
-                    .and_then(|m| registry::info_for(&m.kind))
-                    .and_then(|i| i.params.iter().find(|p| p.name == pin.key))
-                else {
+                let Some(p) = pin_param(editor.state(), pin) else {
                     return;
                 };
-                ui.label(RichText::new(routing::param_label(p)).strong().size(16.0));
-                if let Some(src) = mixer_source(editor.state(), pin.id, p.name) {
-                    ui.label(RichText::new(format!("from {src}")).small());
-                }
-                ui.spacing_mut().slider_width = CARD_W - 70.0;
+                ui.spacing_mut().slider_width = CARD_W - 64.0;
                 param_editor(
                     editor,
                     ui_state,
@@ -518,7 +628,7 @@ fn card(
     }
 }
 
-/// CC assignment, Learn/Clear, and the pickup state.
+/// CC assignment with Learn/Clear, and the pickup state, on one line.
 fn midi_row(
     editor: &mut PatchEditor,
     ui_state: &mut UiState,
@@ -531,44 +641,58 @@ fn midi_row(
     let map = mapping(editor.state(), id, p.name);
     let learning = ui_state.learn.as_ref() == Some(&(id, p.name.to_string()));
     ui.horizontal(|ui| {
-        match map {
-            Some(m) => ui.label(RichText::new(cc_text(m)).monospace()),
-            None => ui.label(RichText::new("no CC").weak()),
+        let text = match (learning, map) {
+            (true, _) => "Learning…".to_string(),
+            (false, Some((ch, cc))) => format!("CC {cc} · {}", ch + 1),
+            (false, None) => "Learn".to_string(),
         };
-        let r = ui.selectable_label(learning, if learning { "Learning…" } else { "Learn" });
+        let r = ui
+            .selectable_label(learning, RichText::new(text).small().monospace())
+            .on_hover_text(match map {
+                Some(m) => format!("{}: click to learn another control", cc_text(m)),
+                None => "Click, then move a hardware control".into(),
+            });
         ui_state.record(format!("plearn:{key}"), r.rect);
         if r.clicked() {
             ui_state.learn = (!learning).then(|| (id, p.name.to_string()));
         }
         if map.is_some() {
-            let r = ui.button("Clear").on_hover_text("Remove the MIDI mapping");
+            let r = ui
+                .small_button("✕")
+                .on_hover_text("Remove the MIDI mapping");
             ui_state.record(format!("pclear:{key}"), r.rect);
             if r.clicked() {
                 unlearn(editor, id, p.name);
             }
+            let t = ui_state
+                .takeover
+                .get(&(id, p.name.to_string()))
+                .copied()
+                .unwrap_or_default();
+            let at = p.to_norm(routing::base_value(editor.state(), id, p));
+            let (text, tip) = if t.picked {
+                (
+                    RichText::new("● live").color(th.gate),
+                    "The hardware controls it".to_string(),
+                )
+            } else {
+                let arrow = match t.hw {
+                    Some(h) if h < at => "↑",
+                    Some(_) => "↓",
+                    None => "→",
+                };
+                (
+                    RichText::new(format!("{arrow} {:.0}%", at * 100.0)).color(th.cv),
+                    format!(
+                        "Pickup: move the hardware to {:.0} % to take over (it won't jump)",
+                        at * 100.0
+                    ),
+                )
+            };
+            let r = ui.label(text.small()).on_hover_text(tip);
+            ui_state.record(format!("ppickup:{key}"), r.rect);
         }
     });
-    if map.is_none() {
-        return;
-    }
-    let t = ui_state
-        .takeover
-        .get(&(id, p.name.to_string()))
-        .copied()
-        .unwrap_or_default();
-    let text = if t.picked {
-        RichText::new("● hardware in control").color(th.gate)
-    } else {
-        let at = p.to_norm(routing::base_value(editor.state(), id, p));
-        let hint = match t.hw {
-            Some(h) if h < at => format!("pickup: turn up to {:.0} %", at * 100.0),
-            Some(_) => format!("pickup: turn down to {:.0} %", at * 100.0),
-            None => format!("pickup at {:.0} %", at * 100.0),
-        };
-        RichText::new(hint).color(th.cv)
-    };
-    let r = ui.label(text.small());
-    ui_state.record(format!("ppickup:{key}"), r.rect);
 }
 
 /// For a mixer channel level: the sequencer, MIDI input or oscillator its input comes from,
@@ -616,16 +740,9 @@ fn transport_card(
     id: ModuleId,
 ) {
     let running = ui_state.clock_running.get(&id).copied().unwrap_or(true);
-    ui.label(RichText::new("Transport").strong().size(16.0));
-    let state = RichText::new(if running { "● running" } else { "stopped" });
-    ui.label(if running {
-        state.color(th.gate)
-    } else {
-        state.weak()
-    });
     ui.horizontal(|ui| {
         let big =
-            |t: &str| egui::Button::new(RichText::new(t).size(15.0)).min_size([76.0, 34.0].into());
+            |t: &str| egui::Button::new(RichText::new(t).size(14.0)).min_size([64.0, 28.0].into());
         let r = ui.add(big(if running { "Stop" } else { "Run" }));
         ui_state.record(format!("prun:{id}"), r.rect);
         if r.clicked() {
@@ -643,6 +760,12 @@ fn transport_card(
         if r.clicked() {
             ui_state.transport.push((id, Transport::Restart));
         }
+    });
+    let state = RichText::new(if running { "● running" } else { "stopped" }).small();
+    ui.label(if running {
+        state.color(th.gate)
+    } else {
+        state.weak()
     });
 }
 

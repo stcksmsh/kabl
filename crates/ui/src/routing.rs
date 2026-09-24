@@ -187,6 +187,7 @@ pub fn fmt_value(p: &ParamInfo, v: f32) -> String {
         "st" => format!("{:+} st", v.round() + 0.0),
         "bpm" => format!("{v:.0} bpm"),
         "%" => format!("{v:.0} %"),
+        "dB" => format!("{:+.1} dB", v + 0.0),
         _ => format!("{v:.2}"),
     }
 }

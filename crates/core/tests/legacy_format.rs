@@ -44,11 +44,11 @@ fn v1_history_undoes_to_empty_exactly() {
 }
 
 #[test]
-fn resaving_a_v1_patch_writes_v2_that_loads_identically() {
+fn resaving_a_v1_patch_writes_the_current_version_that_loads_identically() {
     let log = load(&fixture("v1_edited")).unwrap();
     let dir = tempfile::tempdir().unwrap();
     save(dir.path(), &log).unwrap();
     let meta = std::fs::read_to_string(dir.path().join("meta.toml")).unwrap();
-    assert!(meta.contains("schema_version = 2"));
+    assert!(meta.contains(&format!("schema_version = {}", kabl_core::CURRENT_SCHEMA_VERSION)));
     assert_eq!(load(dir.path()).unwrap().state(), log.state());
 }

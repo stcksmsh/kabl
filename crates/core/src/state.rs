@@ -27,6 +27,9 @@ pub struct CableState {
 pub struct PatchState {
     pub modules: BTreeMap<ModuleId, ModuleState>,
     pub cables: BTreeMap<CableId, CableState>,
+    /// Text labels per module (`Op::SetLabel`). Absent in files from before schema v3.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub labels: BTreeMap<ModuleId, BTreeMap<String, String>>,
 }
 
 impl PatchState {
@@ -57,6 +60,13 @@ impl PatchState {
                             param: param.clone(),
                         },
                         value,
+                    });
+                }
+                for (key, text) in self.labels.get(id).into_iter().flatten() {
+                    ops.push(Op::SetLabel {
+                        id: *id,
+                        key: key.clone(),
+                        text: Some(text.clone()),
                     });
                 }
                 for (&cid, c) in &self.cables {
@@ -107,6 +117,11 @@ impl PatchState {
                 },
                 None => Op::Group { ops: Vec::new() },
             },
+            Op::SetLabel { id, key, .. } => Op::SetLabel {
+                id: *id,
+                key: key.clone(),
+                text: self.label(*id, key).map(str::to_string),
+            },
             Op::Snapshot { name } => Op::Snapshot { name: name.clone() },
             Op::Annotate { text } => Op::Annotate { text: text.clone() },
             Op::Group { ops } => {
@@ -120,6 +135,10 @@ impl PatchState {
                 Op::Group { ops: inverses }
             }
         }
+    }
+
+    pub fn label(&self, id: ModuleId, key: &str) -> Option<&str> {
+        self.labels.get(&id)?.get(key).map(String::as_str)
     }
 
     pub fn param(&self, target: &ParamTarget) -> Option<f32> {
@@ -143,6 +162,7 @@ impl PatchState {
             }
             Op::RemoveModule { id } => {
                 self.modules.remove(id);
+                self.labels.remove(id);
                 // No dangling cables: a cable to or from a removed module goes with it.
                 self.cables
                     .retain(|_, c| c.from.module_id() != *id && c.to.module_id() != *id);
@@ -195,6 +215,22 @@ impl PatchState {
                     m.pos = *pos;
                 }
             }
+            Op::SetLabel { id, key, text } => match text {
+                Some(t) if self.modules.contains_key(id) => {
+                    self.labels
+                        .entry(*id)
+                        .or_default()
+                        .insert(key.clone(), t.clone());
+                }
+                _ => {
+                    if let Some(m) = self.labels.get_mut(id) {
+                        m.remove(key);
+                        if m.is_empty() {
+                            self.labels.remove(id);
+                        }
+                    }
+                }
+            },
             Op::Snapshot { .. } | Op::Annotate { .. } => {}
             Op::Group { ops } => {
                 for op in ops {

@@ -159,6 +159,14 @@ pub struct UiState {
     /// Param waiting for the next MIDI CC to map to it.
     pub learn: Option<(ModuleId, String)>,
     pub takeover: perform::TakeoverMap,
+    /// The performance panel shows more rows (taller), at the rack's expense.
+    pub perform_tall: bool,
+    /// Pin being renamed: (module, pin key, text so far).
+    pub renaming: Option<(ModuleId, String, String)>,
+    /// A MIDI input notice for the panel ("disconnected", "reconnected").
+    pub midi_note: Option<String>,
+    /// The user asked to release every MIDI voice; `main.rs` sends the note-offs.
+    pub all_notes_off: bool,
     /// Pin card to scroll into view on the next frame (just pinned or moved).
     pub pin_reveal: Option<(ModuleId, String)>,
     /// The mapping a CC gesture is on and when its last message came (seconds, egui time).
@@ -170,6 +178,8 @@ pub struct UiState {
     pub midi_input: Option<String>,
     /// `Some(None)` = disconnect.
     pub midi_select: Option<Option<String>>,
+    /// Final output meter (fed by `main.rs` from the audio callback).
+    pub meter: record::Meter,
     /// Stereo output recorder; `None` without an audio device.
     pub recorder: Option<record::Recorder>,
 }
@@ -231,12 +241,17 @@ impl Default for UiState {
             learn: None,
             takeover: Default::default(),
             pin_reveal: None,
+            renaming: None,
+            perform_tall: false,
+            midi_note: None,
+            all_notes_off: false,
             cc_gesture: None,
             midi_cc: Vec::new(),
             midi_inputs: Vec::new(),
             midi_input: None,
             midi_select: None,
             recorder: None,
+            meter: Default::default(),
         }
     }
 }
@@ -410,7 +425,11 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
 
     if ui_state.perform_open {
         egui::Panel::bottom("kabl-perform")
-            .exact_size(perform::PANEL_H)
+            .exact_size(if ui_state.perform_tall {
+                perform::PANEL_TALL_H
+            } else {
+                perform::PANEL_H
+            })
             .resizable(false)
             .show(ui, |ui| perform::panel(editor, ui_state, ui));
     }
@@ -609,6 +628,8 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) 
             if tool(ui, ui_state, "perform", "Perform", open) {
                 ui_state.perform_open = !open;
             }
+            let r = record::meter_ui(ui, &mut ui_state.meter);
+            ui_state.record("meter".into(), r.rect);
             if let Some(rec) = ui_state.recorder.as_ref().filter(|r| r.recording()) {
                 let t = rec.elapsed() as u64;
                 ui.label(

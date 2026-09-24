@@ -75,6 +75,13 @@ pub enum Op {
         id: ModuleId,
         pos: Vec2,
     },
+    /// Sets (`Some`) or removes a text label on a module, keyed like a param (`pin.cutoff_hz`
+    /// labels that pin). Presentation text; the compiler never reads it.
+    SetLabel {
+        id: ModuleId,
+        key: String,
+        text: Option<String>,
+    },
     Snapshot {
         name: String,
     },

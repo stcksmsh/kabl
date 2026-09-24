@@ -52,50 +52,108 @@ struct AudioHost {
     _stream: Option<cpal::Stream>,
 }
 
-/// Audio-callback timing, written by the callback with relaxed atomics (no locks), read by the
-/// status bar and `KABL_STATS_FILE`. The first second (stream start-up) is counted apart.
+/// Audio-callback telemetry, written by the callback (and the stream's error callback) with
+/// relaxed atomics, read by the status bar and `KABL_STATS_FILE`. Kept apart:
+/// - execution: how long the callback ran, against the audio it produced (its budget);
+/// - arrival: the interval between callback starts, against the same period;
+/// - xruns the backend reported (`cpal::ErrorKind::Xrun`);
+/// - the frames each callback actually asked for.
+///
+/// The first second (stream start-up) is counted apart.
 #[derive(Default)]
 struct CallbackTiming {
     count: AtomicU64,
     worst_ns: AtomicU64,
-    /// Callbacks that took longer than the audio they produced (after the first second).
+    /// Execution longer than the callback's audio (after the first second).
     late: AtomicU64,
-    /// Callbacks over half their budget (after the first second).
+    /// Execution over half of it.
     over_half: AtomicU64,
     startup_worst_ns: AtomicU64,
-    frames: AtomicU64,
+    /// Longest interval between callback starts, and intervals over 1.5 × the period.
+    arrival_worst_ns: AtomicU64,
+    arrival_late: AtomicU64,
+    frames_min: AtomicU64,
+    frames_max: AtomicU64,
+    xruns: AtomicU64,
+    other_errors: AtomicU64,
+    /// 0 not tried, 1 granted, 2 refused.
+    rt: std::sync::atomic::AtomicU8,
+    rt_error: std::sync::OnceLock<String>,
 }
 
 impl CallbackTiming {
-    fn record(&self, took: std::time::Duration, frames: usize, sample_rate: f32) {
+    fn record(
+        &self,
+        took: std::time::Duration,
+        since_last: Option<std::time::Duration>,
+        frames: usize,
+        sample_rate: f32,
+    ) {
         let ns = took.as_nanos() as u64;
         let n = self.count.fetch_add(1, Ordering::Relaxed);
-        self.frames.store(frames as u64, Ordering::Relaxed);
+        if n == 0 {
+            self.frames_min.store(u64::MAX, Ordering::Relaxed);
+        }
+        self.frames_min.fetch_min(frames as u64, Ordering::Relaxed);
+        self.frames_max.fetch_max(frames as u64, Ordering::Relaxed);
         if (n * frames as u64) < sample_rate as u64 {
             self.startup_worst_ns.fetch_max(ns, Ordering::Relaxed);
             return;
         }
-        self.worst_ns.fetch_max(ns, Ordering::Relaxed);
         let budget = frames as f64 / sample_rate as f64 * 1e9;
+        self.worst_ns.fetch_max(ns, Ordering::Relaxed);
         if ns as f64 > budget {
             self.late.fetch_add(1, Ordering::Relaxed);
         }
         if ns as f64 > budget / 2.0 {
             self.over_half.fetch_add(1, Ordering::Relaxed);
         }
+        if let Some(gap) = since_last {
+            let g = gap.as_nanos() as u64;
+            self.arrival_worst_ns.fetch_max(g, Ordering::Relaxed);
+            if g as f64 > 1.5 * budget {
+                self.arrival_late.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
+
+    fn error(&self, err: &cpal::Error) {
+        if err.kind() == cpal::ErrorKind::Xrun {
+            self.xruns.fetch_add(1, Ordering::Relaxed);
+        } else {
+            self.other_errors.fetch_add(1, Ordering::Relaxed);
+        }
     }
 
     fn line(&self, sample_rate: f32) -> String {
-        let frames = self.frames.load(Ordering::Relaxed);
-        let us = |a: &AtomicU64| a.load(Ordering::Relaxed) as f64 / 1e3;
+        let get = |a: &AtomicU64| a.load(Ordering::Relaxed);
+        let us = |a: &AtomicU64| get(a) as f64 / 1e3;
+        let (fmin, fmax) = (get(&self.frames_min), get(&self.frames_max));
+        let frames = if fmin == fmax {
+            format!("{fmax}")
+        } else {
+            format!("{fmin}–{fmax}")
+        };
+        let rt = match self.rt.load(Ordering::Relaxed) {
+            1 => "RT priority on".to_string(),
+            2 => format!(
+                "RT priority refused ({})",
+                self.rt_error.get().map_or("?", String::as_str)
+            ),
+            _ => "RT priority not tried".to_string(),
+        };
         format!(
-            "callbacks {} × {frames} frames: worst {:.0} µs of {:.0} µs, {} over half, {} late \
+            "{} callbacks × {frames} frames at {sample_rate} Hz · run: worst {:.0} of {:.0} µs, \
+             {} over half, {} late · arrival: worst {:.0} µs, {} late · {} xruns · {rt} \
              (first second: worst {:.0} µs)",
-            self.count.load(Ordering::Relaxed),
+            get(&self.count),
             us(&self.worst_ns),
-            frames as f64 / sample_rate as f64 * 1e6,
-            self.over_half.load(Ordering::Relaxed),
-            self.late.load(Ordering::Relaxed),
+            fmax as f64 / sample_rate as f64 * 1e6,
+            get(&self.over_half),
+            get(&self.late),
+            us(&self.arrival_worst_ns),
+            get(&self.arrival_late),
+            get(&self.xruns),
             us(&self.startup_worst_ns),
         )
     }
@@ -124,6 +182,8 @@ impl AudioHost {
         notes: rtrb::Consumer<VoiceEvent>,
         rate: Option<u32>,
         frames: Option<u32>,
+        realtime: bool,
+        peaks: Arc<record::PeakTap>,
     ) -> Self {
         let mut midi_consumer = notes;
         let collector = Collector::new();
@@ -168,6 +228,10 @@ impl AudioHost {
         let channels = config.channels() as usize;
         let timing = Arc::new(CallbackTiming::default());
         let t = timing.clone();
+        let t_err = timing.clone();
+        let mut last_start: Option<std::time::Instant> = None;
+        let mut rt_handle = None;
+        let mut rt_tried = !realtime;
 
         let mut engine = match PatchEngine::new(&handle, patch, sample_rate, DEFAULT_VOICE_COUNT) {
             Ok(e) => e,
@@ -188,7 +252,30 @@ impl AudioHost {
         let stream = device.build_output_stream(
             stream_config,
             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                // Once, on the first callback: ask for real-time priority for this thread (rtkit
+                // over D-Bus, else the rlimit). It may allocate and block briefly; the stream
+                // is starting and silent. Refusal leaves the thread as it was.
+                if !rt_tried {
+                    rt_tried = true;
+                    let frames = (data.len() / channels) as u32;
+                    match audio_thread_priority::promote_current_thread_to_real_time(
+                        frames,
+                        sample_rate as u32,
+                    ) {
+                        Ok(h) => {
+                            rt_handle = Some(h);
+                            t.rt.store(1, Ordering::Relaxed);
+                        }
+                        Err(e) => {
+                            let _ = t.rt_error.set(e.to_string());
+                            t.rt.store(2, Ordering::Relaxed);
+                        }
+                    }
+                }
+                let _ = &rt_handle;
                 let started = std::time::Instant::now();
+                let since_last = last_start.map(|l| started - l);
+                last_start = Some(started);
                 // Audio thread. No allocation, no locks: install queued graphs (state carry is
                 // allocation-free), apply MIDI to every running graph, render.
                 engine.drain_swaps(&mut swap_rx);
@@ -226,14 +313,18 @@ impl AudioHost {
                     if rec {
                         tap.frame(l, r);
                     }
+                    peaks.feed(l, r);
                     frame[0] = l;
                     for s in frame.iter_mut().skip(1) {
                         *s = r;
                     }
                 }
-                t.record(started.elapsed(), frames_needed, sample_rate);
+                t.record(started.elapsed(), since_last, frames_needed, sample_rate);
             },
-            |err| eprintln!("kabl-ui: audio stream error: {err}"),
+            move |err| {
+                t_err.error(&err);
+                eprintln!("kabl-ui: audio stream error: {err}");
+            },
             None,
         );
 
@@ -306,6 +397,8 @@ struct Midi {
     cc_rx: rtrb::Consumer<(u8, u8, u8)>,
     ports: Vec<String>,
     scanned: Option<std::time::Instant>,
+    /// The port that disappeared while connected; reconnected when it comes back.
+    lost: Option<String>,
 }
 
 fn input_names() -> Vec<String> {
@@ -333,6 +426,7 @@ impl Midi {
             cc_rx,
             ports: Vec::new(),
             scanned: None,
+            lost: None,
         }
     }
 
@@ -341,6 +435,11 @@ impl Midi {
             c.close();
         }
         self.port = None;
+        self.release_all();
+    }
+
+    /// Note-off to every MIDI voice, and a fresh allocator.
+    fn release_all(&self) {
         let mut s = self.sink.lock().unwrap();
         for voice in 0..DEFAULT_VOICE_COUNT {
             let _ = s.notes.push(VoiceEvent::NoteOff { voice });
@@ -403,6 +502,28 @@ impl Midi {
     }
 }
 
+/// A MIDI port name without ALSA's trailing `client:port` numbers.
+fn base_name(name: &str) -> &str {
+    match name.rsplit_once(' ') {
+        Some((head, tail))
+            if tail.split(':').count() == 2
+                && tail
+                    .split(':')
+                    .all(|p| p.chars().all(|c| c.is_ascii_digit())) =>
+        {
+            head
+        }
+        _ => name,
+    }
+}
+
+/// Every MIDI mapping waits for pickup again (new or reconnected hardware).
+fn reset_pickup(ui: &mut UiState) {
+    for t in ui.takeover.values_mut() {
+        *t = Default::default();
+    }
+}
+
 struct App {
     editor: PatchEditor,
     ui_state: UiState,
@@ -413,6 +534,8 @@ struct App {
     hits_written: String,
     /// `KABL_STATS_FILE`: callback timing, rewritten about once a second.
     stats_file: Option<(String, std::time::Instant)>,
+    peaks: Arc<record::PeakTap>,
+    meter_at: std::time::Instant,
 }
 
 impl eframe::App for App {
@@ -440,6 +563,9 @@ impl eframe::App for App {
             self.ui_state.midi_cc.push(cc);
         }
         if let Some(pick) = self.ui_state.midi_select.take() {
+            self.midi.lost = None;
+            self.ui_state.midi_note = None;
+            reset_pickup(&mut self.ui_state);
             let r = match pick {
                 Some(name) => self.midi.connect(&name),
                 None => {
@@ -451,15 +577,51 @@ impl eframe::App for App {
                 self.ui_state.last_message = Some(e);
             }
         }
-        if self.ui_state.perform_open
-            && self
-                .midi
-                .scanned
-                .is_none_or(|t| t.elapsed().as_secs_f32() > 2.0)
+        if self
+            .midi
+            .scanned
+            .is_none_or(|t| t.elapsed().as_secs_f32() > 2.0)
         {
-            self.midi.ports = input_names();
             self.midi.scanned = Some(std::time::Instant::now());
+            self.midi.ports = input_names();
+            // The connected input vanished (unplugged): release its notes, keep its name, and
+            // reconnect when it comes back. Hardware positions are unknown either way, so every
+            // mapping waits for pickup again.
+            if let Some(port) = self.midi.port.clone() {
+                if !self.midi.ports.contains(&port) {
+                    self.midi.disconnect();
+                    self.midi.lost = Some(port.clone());
+                    self.ui_state.midi_note =
+                        Some(format!("\"{port}\" disconnected: its notes were released"));
+                    reset_pickup(&mut self.ui_state);
+                }
+            } else if let Some(port) = self.midi.lost.clone() {
+                // ALSA renumbers a replugged device's client (`… 24:0` → `… 28:0`).
+                let back = self
+                    .midi
+                    .ports
+                    .iter()
+                    .find(|n| base_name(n) == base_name(&port))
+                    .cloned();
+                if let Some(now) = back.filter(|n| self.midi.connect(n).is_ok()) {
+                    self.midi.lost = None;
+                    self.ui_state.midi_note = Some(format!("\"{now}\" reconnected"));
+                    reset_pickup(&mut self.ui_state);
+                }
+            }
         }
+        if std::mem::take(&mut self.ui_state.all_notes_off) {
+            self.midi.release_all();
+            self.ui_state.last_message = Some("all MIDI voices released".into());
+        }
+        if self.audio.timing.is_some() {
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(50));
+        }
+        let dt = self.meter_at.elapsed().as_secs_f32();
+        self.meter_at = std::time::Instant::now();
+        let (p, bad) = self.peaks.take();
+        self.ui_state.meter.update(p, bad, dt);
         self.ui_state.midi_inputs = self.midi.ports.clone();
         self.ui_state.midi_input = self.midi.port.clone();
         if let Some(rx) = self.audio.delays_rx.as_mut() {
@@ -548,7 +710,15 @@ fn main() -> eframe::Result<()> {
     let mut midi = Midi::new(notes_tx);
     midi.connect_default(flag("--midi").as_deref());
     let num = |name: &str| flag(name).and_then(|v| v.parse::<u32>().ok());
-    let mut audio = AudioHost::start(editor.state(), notes_rx, num("--rate"), num("--frames"));
+    let peaks = Arc::new(record::PeakTap::default());
+    let mut audio = AudioHost::start(
+        editor.state(),
+        notes_rx,
+        num("--rate"),
+        num("--frames"),
+        !args.iter().any(|a| a == "--no-rt"),
+        peaks.clone(),
+    );
     ui_state.recorder = audio.recorder.take();
     if let (Some(rec), Some(dir)) = (ui_state.recorder.as_mut(), flag("--record-dir")) {
         rec.dir = dir;
@@ -576,6 +746,8 @@ fn main() -> eframe::Result<()> {
                 audio,
                 midi,
                 hits_file: std::env::var("KABL_HITS_FILE").ok(),
+                peaks,
+                meter_at: std::time::Instant::now(),
                 hits_written: String::new(),
                 stats_file: std::env::var("KABL_STATS_FILE")
                     .ok()

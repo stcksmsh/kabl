@@ -234,3 +234,40 @@ fn discard_last_reverts_and_leaves_no_redo() {
     log.undo();
     assert!(!log.discard_last());
 }
+
+#[test]
+fn labels_set_undo_and_come_back_with_their_module() {
+    use kabl_core::{Op, PatchLog, Source, Vec2};
+    let mut log = PatchLog::new();
+    log.append(
+        Op::AddModule {
+            id: 1,
+            kind: "mixer".into(),
+            pos: Vec2::default(),
+        },
+        0,
+        Source::User,
+    );
+    let label = |text: Option<&str>| Op::SetLabel {
+        id: 1,
+        key: "pin.level1".into(),
+        text: text.map(str::to_string),
+    };
+    log.append(label(Some("Bass")), 1, Source::User);
+    log.append(label(Some("Bass line")), 2, Source::User);
+    assert_eq!(log.state().label(1, "pin.level1"), Some("Bass line"));
+    log.undo();
+    assert_eq!(log.state().label(1, "pin.level1"), Some("Bass"));
+    log.append(Op::RemoveModule { id: 1 }, 3, Source::User);
+    assert!(log.state().labels.is_empty());
+    log.undo();
+    assert_eq!(log.state().label(1, "pin.level1"), Some("Bass"));
+    log.append(label(None), 4, Source::User);
+    assert!(log.state().labels.is_empty());
+    log.undo();
+    let dir = tempfile::tempdir().unwrap();
+    kabl_core::save(dir.path(), &log).unwrap();
+    let back = kabl_core::load(dir.path()).unwrap();
+    assert_eq!(back.state(), log.state());
+    assert_eq!(back.state().label(1, "pin.level1"), Some("Bass"));
+}
