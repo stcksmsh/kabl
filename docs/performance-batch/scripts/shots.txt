@@ -1,0 +1,46 @@
+# Screenshots of patches/performance (KABL_PLAYER=1, KABL_ARGS="--midi kabl-player").
+sleep 2
+click perform
+sleep 1.5
+shot 01-light-perform
+click theme:dark
+sleep 1
+shot 02-dark-perform
+click theme:light
+# Reverb: selected, focused, advanced controls open (panel closed: its face sits under it).
+click perform
+click module:32
+click zoom:focus
+click toggle:32
+sleep 1
+shot 03-light-reverb
+click theme:dark
+shot 04-dark-reverb
+click perform
+# Sequencer: velocity row, gate mode and length.
+click zoom:fit
+click module:3
+click zoom:focus
+click toggle:3
+sleep 1
+shot 05-dark-seq-velocity
+click theme:light
+shot 06-light-seq-velocity
+# MIDI: learn the bass cutoff to CC 74 with the hardware away from the value.
+click perform
+click zoom:fit
+click perform
+click plearn:6.cutoff_hz
+midi cc 1 74 100
+sleep 1
+shot 07-light-pickup-pending
+midi ramp 1 74 100 40 2
+sleep 2.5
+shot 08-light-hardware-in-control
+click theme:dark
+click rec-start
+sleep 3
+shot 09-dark-recording
+click rec-stop
+sleep 1
+shot 10-dark-take-saved

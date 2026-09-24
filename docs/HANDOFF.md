@@ -13,7 +13,7 @@ Trust code and git over older docs.
   crate: it reformats the untouched `rev2_proto` / `rev2_env_ab` examples; use `rustfmt` on
   the files you changed.
 
-Launch (real audio + MIDI). The newest demo is `--patch patches/echo`:
+Launch (real audio + MIDI). The newest demo is `--patch patches/performance --perform`:
 
     cargo run --release -p kabl-ui -- --patch patches/reference            # 1440×900
     cargo run --release -p kabl-ui -- --patch patches/reference --size 1280x800
@@ -27,7 +27,7 @@ Launch (real audio + MIDI). The newest demo is `--patch patches/echo`:
   expansion, 50–200 % zoom, pull-the-plug cable moves, skin renderer (no built-in skin).
 - Modulation: any knob takes routes (signed amount, invert, bypass); ring/lanes/drawer are one
   route; taper-space sum, one clamp, block rate; envelope timing CONT/KEY.
-- Verification: `cargo test --workspace` 240 pass (7 ignored = fixture/patch/clip writers), clippy clean.
+- Verification: `cargo test --workspace` 279 pass (9 ignored = fixture/patch/clip writers), clippy clean.
   Real-X tooling: `docs/rack-migration/drive.py` (+ `scripts/`), `closeout-real-x.sh`,
   `record-walkthrough.sh`; `docs/interlocking-sequences/record-walkthrough.sh` records a patch
   without MIDI.
@@ -62,6 +62,28 @@ name filter, because the file includes `interlocking.rs` and its writer). Record
 `docs/echo/README.md`. Timing harness: `crates/ui/examples/bench_echo.rs`. Next scope goes
 through the supervisor; don't extend effects (reverb, tape, etc.) without it.
 
+## Performance batch — built, waiting for Kosta (2026-09-24)
+
+Supervisor scope, authorized as one batch. Record and checklist:
+`docs/performance-batch/README.md`; rationale: decisions.md "Performance batch".
+
+- `reverb` (Dattorro plate, `crates/modules/src/builtins/reverb.rs`), `seq` velocity + gate
+  length (`seq.rs`; CLOCK stays the default), `crates/ui/src/perform.rs` (pins `pin.*`, CC
+  maps `cc.*`, soft takeover, panel), `record.rs` (recorder), `main.rs` (MIDI input switching,
+  CC queue, `--rate/--frames/--record-dir/--perform/--midi`, callback timing).
+- Engine: voice-rate modules no `midi.in` reaches compile to one instance (`compile.rs`,
+  `voiced`), with a carry fallback between the two.
+- Demo `patches/performance`, built by `crates/ui/tests/performance.rs`
+  (`cargo test -p kabl-ui --test performance write_performance_patch -- --ignored`).
+- Scripted real-app runs: `drive.py` now takes `KABL_ARGS`, `KABL_PLAYER=1` (starts
+  `examples/midi_player`, a virtual MIDI port) and `midi …` lines;
+  `docs/performance-batch/record-walkthrough.sh`; the long take's script comes from
+  `scripts/make_performance.py`. Timing: `examples/bench_performance`.
+- Pitfalls: a rack target hidden under the Perform panel still has a hit rect, so drive.py
+  clicks the panel instead (and a following ctrl+z can undo the patch's own pins, which are
+  the last op of its log). Close the panel or pan first. The panel's horizontal scroll hides
+  far cards; new/moved pins scroll into view, transport stays at the left.
+
 ## Accepted limitations
 
 Block-rate modulation; no hysteresis on stepped destinations; pitch full scale ±60 st; state
@@ -72,5 +94,5 @@ into view only on inspection; no `labels_on_art` contrast warning; no built-in s
 
 ## Not in scope
 
-Effects beyond the delay, new synthesis, full rich LFO, plugin work, compact layout, framework
-change.
+New synthesis, full rich LFO, plugin work, compact layout, framework change, MIDI sync,
+probability/swing, tape modeling.

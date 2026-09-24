@@ -1,0 +1,14 @@
+w01-perform-panel 4.9
+w02-seq-advanced 13.4
+w03-velocity-up 19.0
+w04-clock-gates 26.3
+w05-length-gates 32.7
+w06-pinned 41.1
+w07-moved 43.5
+w08-learned-pickup 48.8
+w09-hardware-in-control 56.8
+w10-reverb-wet 64.5
+w11-reverb-back 71.0
+w12-recording 83.3
+w13-stopped-tails 92.2
+w14-saved 95.2

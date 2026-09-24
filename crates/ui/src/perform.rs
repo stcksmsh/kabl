@@ -416,12 +416,18 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         );
         return;
     }
-    egui::ScrollArea::horizontal().show(ui, |ui| {
-        ui.horizontal_top(|ui| {
-            let n = all.len();
-            for (i, pin) in all.iter().enumerate() {
-                card(editor, ui_state, ui, &th, pin, i, n);
-            }
+    // Transport stays in reach at the left; the other cards scroll.
+    let n = all.len();
+    ui.horizontal_top(|ui| {
+        for (i, pin) in all.iter().enumerate().filter(|(_, p)| p.key == TRANSPORT) {
+            card(editor, ui_state, ui, &th, pin, i, n);
+        }
+        egui::ScrollArea::horizontal().show(ui, |ui| {
+            ui.horizontal_top(|ui| {
+                for (i, pin) in all.iter().enumerate().filter(|(_, p)| p.key != TRANSPORT) {
+                    card(editor, ui_state, ui, &th, pin, i, n);
+                }
+            });
         });
     });
 }
@@ -506,6 +512,10 @@ fn card(
             });
     });
     ui_state.record(format!("pcard:{key}"), frame.response.rect);
+    if ui_state.pin_reveal.as_ref() == Some(&(pin.id, pin.key.clone())) {
+        ui.scroll_to_rect(frame.response.rect, None);
+        ui_state.pin_reveal = None;
+    }
 }
 
 /// CC assignment, Learn/Clear, and the pickup state.
@@ -652,6 +662,7 @@ pub fn module_menu(
             if r.clicked() {
                 toggle_pin(editor, id, TRANSPORT);
                 ui_state.perform_open = true;
+                ui_state.pin_reveal = Some((id, TRANSPORT.to_string()));
             }
         }
         for p in info.params {
@@ -661,6 +672,7 @@ pub fn module_menu(
             if r.clicked() {
                 toggle_pin(editor, id, p.name);
                 ui_state.perform_open = true;
+                ui_state.pin_reveal = Some((id, p.name.to_string()));
             }
         }
     });
@@ -677,6 +689,7 @@ pub fn module_menu(
                 if r.clicked() {
                     ui_state.learn = Some((id, p.name.to_string()));
                     ui_state.perform_open = true;
+                    ui_state.pin_reveal = Some((id, p.name.to_string()));
                     ui.close();
                 }
             }

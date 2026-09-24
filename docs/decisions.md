@@ -2093,3 +2093,73 @@ were not transplanted, only its look (palettes, geometry, drawing).
   the first thing to measure), the Time knob shows the free time while synced, and Load
   starts fresh.
 - Next scope goes through the supervisor.
+
+## 2026-09-24 — Performance batch: reverb, sequence expression, Perform panel, MIDI learn, recorder (supervisor scope)
+
+- Scope (supervisor, owner-authorized as one batch): Kosta can build, play and record an
+  evolving piece in kabl. Record, evidence and the hands-on checklist:
+  `docs/performance-batch/README.md`.
+- **`reverb`, global, stereo in/out: Dattorro's plate** (JAES 1997, figure 1 and table 2),
+  written from the paper, no code copied. Change from the paper: each input side has its own
+  diffuser chain and feeds the tank half whose nodes that side's output taps first, so a
+  panned source stays on its side early (left-only input: +15.8 dB left in the first 80 ms);
+  the halves still cross-feed. Decay 0.3–30 s (RT60; the paper's `decay` gain is applied twice
+  per half-loop, so the gain is `0.001^(half-loop / 2T)`; measured within 10 % at 44.1/48/96
+  kHz), damping (one-pole in the loop), mix (equal power, exact endpoints, 100 % = send/return),
+  pre-delay 0–250 ms (glides ≤ ±0.5 samples per sample), width (mid/side). Controls smoothed
+  over 20 ms. History (~0.9 s of lines) carried by `carry_from`. Rejected: Freeverb (mono-summed
+  input, a metallic long tail), a room-model selector (out of scope).
+- **`seq` expression.** `v1..v8` (0–100 %) and a `velocity` output that holds the step's value
+  whether the step plays or rests (the gate alone says rest). `gate_mode` CLOCK (default, the
+  old behaviour: the gate is the clock pulse) or LENGTH: the gate rises on the step edge and
+  lasts `gate_len` % of the step period. The period is the interval between rising edges,
+  accepted when it agrees within 10 % with the interval before it (the delay's rule), so a
+  Stop/Run gap or a Restart's cut interval never sets the length, a divided clock works, a
+  tempo jump is taken after two agreeing intervals. The first step after load follows the clock
+  pulse. A gate still high at the next edge drops for one sample (no merged notes). Stop lets
+  the playing gate finish. `MAX_PARAMS` 18 → 28. Old patches: CLOCK and velocity 100 % by
+  default, their sound unchanged (legacy tests pass).
+- **Velocity to amplitude in the demo** is patched, not built in: envelope × velocity through
+  `ringmod` into the VCA's CV (and a small velocity route to the filter cutoff).
+- **Perform panel: pins are presentation params on the module they show.** `pin.<param>` =
+  order, `pin.transport` on a clock. Like `face.*`: saved in the patch, undoable, never rebuild
+  audio (`rack::is_presentation`), gone with their module, so no stale binding can exist. The
+  panel edits the real stored base value through the same gesture path as a knob (one undo
+  step per drag; routes untouched). Transport buttons send the same runtime commands as the
+  clock's face. Bottom panel, fixed 206 px, egui widgets (keyboard focus, both themes),
+  independent of rack zoom. Mixer levels name the sequencer/MIDI/oscillator upstream ("from
+  Sequencer #3"). Rejected: a separate performance state (duplicate values), named pins (no
+  string params; the upstream name identifies them).
+- **MIDI CC learn.** Mapping `cc.<param>` = channel × 128 + CC, same presentation rules.
+  Absolute 7-bit CC only; continuous params only. One CC drives one param (learning takes it
+  from another). Soft takeover: a mapping moves its param only once the hardware is within 1.5
+  steps of 127 or crosses the value; any other change to the value (mouse, undo, load) drops
+  the pickup. Pending pickup shows the direction and target. CC messages on one mapping less
+  than 1 s apart are one undo step. The MIDI input is chosen at runtime in the panel (or
+  `--midi`); a switch releases every voice. Notes still go straight to the audio thread; CC
+  goes to the UI thread only.
+- **Recorder.** The callback pushes the exact frames it gives the device into a bounded
+  `rtrb` ring (4 s) only while recording; a writer thread writes 32-bit float WAV at the device
+  rate and checkpoints the header every 0.5 s (a killed process leaves a readable file). A
+  callback that finds no room drops that callback's frames and counts them; such a take is
+  renamed `*-INCOMPLETE.wav` and reported. Stop and app exit (drop) finalize. Write errors stop
+  the take and show. Runtime only, never in the op log. Takes go to `recordings/` (ignored).
+- **Engine: voice-rate chains no `midi.in` reaches run once.** They played identical samples in
+  all 8 voices. Now they compile to one global instance; the voice average of identical lanes
+  is exactly that lane, so renders are unchanged (every existing test passes). A module that
+  switches (a MIDI cable added) carries state from voice 0 / into every voice. Median callback
+  of the demo at 64 frames: 84 → 35 µs.
+- **Callback timing in the app.** `--rate`/`--frames` ask the device for a rate and a fixed
+  buffer; the status bar (and `KABL_STATS_FILE`) shows worst, over-half and late callbacks.
+- Measured (i7-13700H, release): offline whole-callback worst ≤ 22 % of budget at 48 kHz,
+  61 % at 96 kHz / 64 frames. Real device: 48 kHz 64 and 256 frames 0 late; 96 kHz / 256
+  frames 2 late of 9104 (scheduling stalls of a normal-priority thread, the same callbacks take
+  35–150 µs offline); 96 kHz / 64 didn't run on this PipeWire setup. Real-time priority for the
+  audio thread is the fix, not done here. Pi 4 unmeasured.
+- Demo `patches/performance` (112 bpm, E minor): bass and arp sequences (8 against 7 steps)
+  with velocity and LENGTH gates, a drone pad, a MIDI lead (a 4-input mixer as ×4 gain: one
+  note is 1/8 of the voice average), delay and reverb on a stereo bus, the bass dry. 12 pins,
+  CC 20–29 on channel 1. A 6:07 automated performance was recorded by kabl's own recorder in
+  the real app (virtual MIDI controller + real clicks), peak −4.1 dBFS, no lost frames.
+- Not built: relative encoders, NRPN, MPE, MIDI clock/transport mapping, 14-bit CC, named pins,
+  a device-specific mapping, multitrack or normalized takes, real-time thread priority.

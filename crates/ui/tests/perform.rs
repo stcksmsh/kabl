@@ -398,3 +398,28 @@ fn the_panel_reads_at_both_sizes_whatever_the_rack_zoom() {
         }
     }
 }
+
+#[test]
+fn a_new_pin_scrolls_into_view() {
+    let mut h = H::new(1280.0, 800.0);
+    // Enough pins to overflow the panel, then one more from the module menu path.
+    for (id, k) in [
+        (FILTER, "cutoff_hz"),
+        (FILTER, "resonance"),
+        (DELAY, "mix"),
+        (DELAY, "feedback"),
+        (DELAY, "time_ms"),
+        (DELAY, "tone_hz"),
+        (CLOCK, "bpm"),
+    ] {
+        h.pin(id, k);
+    }
+    perform::toggle_pin(&mut h.editor, CLOCK, TRANSPORT);
+    // What pinning from the module menu sets.
+    h.ui.pin_reveal = Some((CLOCK, TRANSPORT.into()));
+    for _ in 0..40 {
+        h.frame();
+    }
+    let screen = Rect::from_min_size(Pos2::ZERO, egui::vec2(1280.0, 800.0));
+    assert!(screen.contains_rect(h.rect("pcard:1.transport")));
+}

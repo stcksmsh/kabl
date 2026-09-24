@@ -5,7 +5,7 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-24, echo slice closed (Kosta approved it hands-on).
+Last updated: 2026-09-24, performance batch built; waiting for Kosta's hands-on review.
 
 **Current handover (supersedes every older handover note below):** the approved revision-2 rack
 is the production canvas, on real editor/engine state. Kosta reviewed it hands-on and approved
@@ -64,6 +64,18 @@ fresh (no state carried). The demo is
 `cargo run --release -p kabl-ui -- --patch patches/echo`. Record, walkthrough video, A/B clips,
 callback timings and a listening checklist: [`echo/README.md`](echo/README.md). Rationale:
 `decisions.md`, "Delay: first echo module". 240 tests pass, clippy clean. Pi 4 unmeasured.
+
+**Performance batch (supervisor scope, 2026-09-24): built, waiting for Kosta's hands-on
+review.** A stereo plate `reverb` (Dattorro), sequencer velocity (`V1`–`V8`, a `velocity`
+output) and gate length (CLOCK default / LENGTH), a Perform panel of pinned controls (clock
+transport included), MIDI CC learn with soft takeover, and a stereo WAV recorder of the final
+output. Engine: voice-rate chains no `midi.in` reaches run once (renders unchanged, the demo's
+callback 2.4× cheaper). The demo is
+`cargo run --release -p kabl-ui -- --patch patches/performance --perform`. Record, 6-minute
+take recorded by kabl, walkthrough, screenshots, timings and the hands-on checklist:
+[`performance-batch/README.md`](performance-batch/README.md). Rationale: `decisions.md`,
+"Performance batch". 279 tests pass, clippy clean. Automated evidence only: no hardware
+controller or speaker check yet. Pi 4 unmeasured.
 
 Older sections below are history. Where they disagree with the above or with the code, they
 are stale: the MIDI/graph-swap/undo risks they list are fixed; the Mutex described there is

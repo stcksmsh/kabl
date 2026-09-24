@@ -159,6 +159,8 @@ pub struct UiState {
     /// Param waiting for the next MIDI CC to map to it.
     pub learn: Option<(ModuleId, String)>,
     pub takeover: perform::TakeoverMap,
+    /// Pin card to scroll into view on the next frame (just pinned or moved).
+    pub pin_reveal: Option<(ModuleId, String)>,
     /// The mapping a CC gesture is on and when its last message came (seconds, egui time).
     pub(crate) cc_gesture: Option<((ModuleId, String), f64)>,
     /// Incoming MIDI CC `(channel, controller, value)` for the next frame, fed by `main.rs`.
@@ -228,6 +230,7 @@ impl Default for UiState {
             perform_open: false,
             learn: None,
             takeover: Default::default(),
+            pin_reveal: None,
             cc_gesture: None,
             midi_cc: Vec::new(),
             midi_inputs: Vec::new(),
