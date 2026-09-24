@@ -205,7 +205,7 @@ impl Default for Delay {
 
 /// Allocates a zeroed line and writes every page, so the audio thread never takes the first-
 /// touch page faults of a fresh (lazily zeroed) allocation.
-fn line(len: usize) -> Vec<f32> {
+pub(crate) fn line(len: usize) -> Vec<f32> {
     let mut v = vec![0.0f32; len];
     for x in v.iter_mut().step_by(1024) {
         *x = std::hint::black_box(0.0);
@@ -215,7 +215,7 @@ fn line(len: usize) -> Vec<f32> {
 
 /// 4-point Hermite read `d` samples behind `write` (d ≥ 3).
 #[inline]
-fn read(buf: &[f32], write: usize, d: f64) -> f32 {
+pub(crate) fn read(buf: &[f32], write: usize, d: f64) -> f32 {
     let len = buf.len();
     let di = d.floor();
     let t = (d - di) as f32;

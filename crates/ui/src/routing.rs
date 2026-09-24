@@ -389,6 +389,8 @@ pub fn short_name(kind: &str) -> &'static str {
         "ringmod" => "Ring",
         "noise" => "Noise",
         "filter.ladder" => "Ladder",
+        "chorus" => "Chorus",
+        "drive" => "Drive",
         _ => "?",
     }
 }

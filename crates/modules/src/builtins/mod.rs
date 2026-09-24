@@ -3,10 +3,12 @@
 //! - `osc.va`: saw waveform only, no hard sync.
 //! - `lfo`: all 5 waveforms, no sync (brief itself defers "sync" — no clock exists yet, v3).
 
+mod chorus;
 mod clock;
 mod clock_div;
 mod cues;
 mod delay;
+mod drive;
 mod env_adsr;
 mod filter_ladder;
 mod filter_svf;
@@ -23,10 +25,12 @@ mod ringmod;
 pub mod seq;
 mod vca;
 
+pub use chorus::{Chorus, CHORUS_INFO};
 pub use clock::{Clock, Transport, CLOCK_INFO};
 pub use clock_div::{ClockDiv, CLOCK_DIV_INFO};
 pub use cues::{Cues, CUES, CUES_INFO};
 pub use delay::{Delay, DelayLock, DELAY_INFO};
+pub use drive::{drive_g, Drive, DRIVE_INFO};
 pub use env_adsr::{EnvAdsr, ENV_ADSR_INFO};
 pub use filter_ladder::{FilterLadder, FILTER_LADDER_INFO};
 pub use filter_svf::{FilterSvf, FILTER_SVF_INFO};

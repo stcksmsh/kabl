@@ -17,11 +17,12 @@
 //! know is expected to happen eventually (missing pedal, older schema), not a bug to crash on.
 
 use crate::builtins::{
-    Clock, ClockDiv, Delay, Out, Reverb, Seq, CLOCK_DIV_INFO, CLOCK_INFO, DELAY_INFO, OUT_INFO,
-    REVERB_INFO, SEQ_INFO,
+    Chorus, Cues, Drive, FilterLadder, Macro, Noise, CHORUS_INFO, CUES_INFO, DRIVE_INFO,
+    FILTER_LADDER_INFO, MACRO_INFO, NOISE_INFO,
 };
 use crate::builtins::{
-    Cues, FilterLadder, Macro, Noise, CUES_INFO, FILTER_LADDER_INFO, MACRO_INFO, NOISE_INFO,
+    Clock, ClockDiv, Delay, Out, Reverb, Seq, CLOCK_DIV_INFO, CLOCK_INFO, DELAY_INFO, OUT_INFO,
+    REVERB_INFO, SEQ_INFO,
 };
 use crate::builtins::{
     EnvAdsr, FilterSvf, Gain, Lfo, MidiIn, Mixer, OscVa, RingMod, Vca, ENV_ADSR_INFO,
@@ -52,6 +53,8 @@ pub const KNOWN_KINDS: &[&str] = &[
     "cues",
     "noise",
     "filter.ladder",
+    "chorus",
+    "drive",
 ];
 
 /// Builds a fresh instance of `kind`, or `None` if `kind` isn't a known built-in.
@@ -76,13 +79,15 @@ pub fn create(kind: &str) -> Option<Box<dyn Module>> {
         "cues" => Box::new(Cues),
         "noise" => Box::new(Noise::new()),
         "filter.ladder" => Box::new(FilterLadder::new()),
+        "chorus" => Box::new(Chorus::new()),
+        "drive" => Box::new(Drive::new()),
         _ => return None,
     })
 }
 
 /// `ModuleInfo` for every known kind, in the same order as `KNOWN_KINDS` — what a catalog UI
 /// (not built) would enumerate.
-static ALL_INFOS: [&ModuleInfo; 19] = [
+static ALL_INFOS: [&ModuleInfo; 21] = [
     &OSC_VA_INFO,
     &FILTER_SVF_INFO,
     &ENV_ADSR_INFO,
@@ -102,6 +107,8 @@ static ALL_INFOS: [&ModuleInfo; 19] = [
     &CUES_INFO,
     &NOISE_INFO,
     &FILTER_LADDER_INFO,
+    &CHORUS_INFO,
+    &DRIVE_INFO,
 ];
 
 pub fn all_infos() -> &'static [&'static ModuleInfo] {
