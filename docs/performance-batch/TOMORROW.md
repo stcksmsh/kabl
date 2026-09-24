@@ -114,4 +114,6 @@ Pi 4 unmeasured.
 - Record and verification: [`README.md`](README.md) ("Follow-up" sections).
 - Walkthrough video: [`walkthrough.mp4`](walkthrough.mp4); screenshots: [`img/`](img/).
 - Musical take (recorded by kabl): [`audio/performance-take.m4a`](audio/performance-take.m4a).
-- Final commit: FINAL
+- Code and evidence: `master` (local), review package at `416cd24` plus this page's commit;
+  `git log --oneline 4a632ea..` lists the follow-up. Callback measurements and the soak:
+  README "Callback misses: measured" and "30-minute soak".
