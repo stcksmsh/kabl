@@ -12,6 +12,7 @@
 //! `face.*` params that the compiler never reads (`rack::FACE_PREFIX`).
 
 pub mod banks;
+pub mod cues;
 pub mod editor;
 pub mod perform;
 pub mod rack;
@@ -26,7 +27,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use egui::{pos2, vec2, Color32, CornerRadius, Id, Pos2, Rect, Sense, Stroke, Vec2 as EguiVec2};
 use kabl_core::{CableId, ModuleId, PatchState, PortRef, Vec2};
 use kabl_engine::patch_engine::Command;
-use kabl_modules::builtins::{seq, DelayLock, Transport};
+use kabl_modules::builtins::{seq, DelayLock, LfoSync, Transport};
 use kabl_modules::info::PortDirection;
 use kabl_modules::registry;
 use rack::{Decor, Geo, Layout, Placed, JACK_R, PANEL_H};
@@ -130,6 +131,14 @@ pub struct UiState {
     edit_view: HashMap<ModuleId, usize>,
     /// Bank launches and cancels for `main.rs` to send to the audio thread (runtime only).
     pub launches: Vec<Command>,
+    /// Last state of each MIDI button (channel, CC): high = pressed.
+    pub(crate) button_high: HashMap<(u8, u8), bool>,
+    /// Egui time before which button presses only set state (after a (re)connect).
+    pub(crate) button_guard: f64,
+    /// Set by `main.rs` on MIDI (re)connect: forget button states and start the guard.
+    pub button_rearm: bool,
+    /// Cue (or macro, index 100 + k) name being typed: (module, cue number, text).
+    cue_rename: Option<(ModuleId, usize, String)>,
     /// Bank name being typed: (sequencer, bank, text).
     bank_rename: Option<(ModuleId, usize, String)>,
     /// The inspected control whose bank was last shown.
@@ -139,6 +148,8 @@ pub struct UiState {
     /// Transport commands for `main.rs` to send to the audio thread. Runtime only: never in the
     /// op log, so undo and reload can't replay them.
     pub transport: Vec<(ModuleId, Transport)>,
+    /// Each LFO's sync state as the audio thread last reported it.
+    pub lfo_status: HashMap<ModuleId, LfoSync>,
     /// Each delay's lock state and target time as the audio thread last reported it.
     pub delay_status: HashMap<ModuleId, (DelayLock, f32)>,
     /// The last rebuild request came from Load: `main.rs` sends that graph fresh (no state
@@ -238,10 +249,15 @@ impl Default for UiState {
             edit_view: HashMap::new(),
             launches: Vec::new(),
             bank_rename: None,
+            cue_rename: None,
+            button_high: HashMap::new(),
+            button_guard: 0.0,
+            button_rearm: true,
             bank_revealed: None,
             clock_running: HashMap::new(),
             transport: Vec::new(),
             delay_status: HashMap::new(),
+            lfo_status: HashMap::new(),
             loaded: false,
             dark: false,
             zoom: 1.0,
@@ -721,6 +737,33 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
     if kind == "seq" {
         seq_panel(editor, ui_state, ui, id, edit);
     }
+    if kind == "cues" {
+        cues_panel(editor, ui_state, ui, id);
+    }
+    if kind == "macro" {
+        for (k, p) in info.params.iter().enumerate() {
+            ui.horizontal(|ui| {
+                ui.label(format!("M{} name", k + 1));
+                let key = format!("name.{}", p.name);
+                let stored = editor.state().label(id, &key).unwrap_or("").to_string();
+                let mut t = ui_state
+                    .cue_rename
+                    .as_ref()
+                    .filter(|(i, n, _)| (*i, *n) == (id, 100 + k))
+                    .map_or(stored.clone(), |(_, _, t)| t.clone());
+                let r = ui.add(egui::TextEdit::singleline(&mut t).desired_width(120.0));
+                ui_state.record(format!("macro-name:{id}.{}", p.name), r.rect);
+                if r.changed() {
+                    ui_state.cue_rename = Some((id, 100 + k, t.clone()));
+                }
+                if r.lost_focus() {
+                    ui_state.cue_rename = None;
+                    let t = t.trim();
+                    editor.set_label(id, &key, (!t.is_empty()).then(|| t.to_string()));
+                }
+            });
+        }
+    }
     for param in info
         .params
         .iter()
@@ -846,6 +889,14 @@ fn seq_panel(
         editor.set_presentation(&[(id, banks::LAUNCH_TIMING.into(), v)]);
     }
     ui.separator();
+}
+
+/// A macro knob's name (label `name.m1`), for its knob, jack, pins and route sources.
+pub fn macro_name(state: &PatchState, id: ModuleId, param: &str) -> Option<String> {
+    (state.modules.get(&id)?.kind == "macro")
+        .then(|| state.label(id, &format!("name.{param}")))
+        .flatten()
+        .map(str::to_string)
 }
 
 /// The skin's art for this theme: its dark variant, else the light art (dimmed under A-dark).
@@ -1264,6 +1315,32 @@ fn draw_module(
                 )
             }
         }
+        None if m.info.kind == "lfo" => {
+            let sync = editor
+                .state()
+                .modules
+                .get(&m.id)
+                .and_then(|s| s.params.get("sync"))
+                .map_or(0, |v| v.round() as usize);
+            match (sync, ui_state.lfo_status.get(&m.id)) {
+                (0, _) => format!("lfo · #{}", m.id),
+                (s, st) => format!(
+                    "lfo · #{} · {} · {}",
+                    m.id,
+                    kabl_modules::builtins::SYNC_LABELS
+                        .get(s)
+                        .copied()
+                        .unwrap_or("?")
+                        .to_lowercase(),
+                    match st {
+                        Some(LfoSync::Synced) => "synced",
+                        Some(LfoSync::Held) => "held",
+                        Some(LfoSync::Free) | None => "free rate",
+                        Some(LfoSync::Acquiring) => "acquiring",
+                    }
+                ),
+            }
+        }
         None => format!("{} · #{}", m.info.kind, m.id),
     };
     text(
@@ -1288,6 +1365,9 @@ fn draw_module(
     }
     if let Decor::Transport(r) = m.decor {
         draw_transport(ui_state, ui, painter, th, xf, m.id, r);
+    }
+    if let Decor::Cues(r) = m.decor {
+        draw_cues(editor, ui_state, ui, painter, th, xf, m.id, r, now);
     }
     if let Decor::Banks(r) = m.decor {
         draw_banks(editor, ui_state, ui, painter, th, xf, m.id, r, now, drawn);
@@ -1780,6 +1860,357 @@ fn draw_banks(
     }
 }
 
+/// A playing (lit) / queued (blinking) launch button on the rack.
+#[allow(clippy::too_many_arguments)]
+fn pad(
+    ui_state: &mut UiState,
+    ui: &egui::Ui,
+    painter: &egui::Painter,
+    th: &Theme,
+    z: f32,
+    key: String,
+    r: Rect,
+    label: &str,
+    lit: bool,
+    queued: bool,
+    now: f64,
+) -> egui::Response {
+    ui_state.record(key.clone(), r);
+    let resp = ui.interact(r, Id::new(("kabl-pad", key)), Sense::click());
+    painter.rect_filled(
+        r,
+        CornerRadius::same(5),
+        if lit {
+            th.gate
+        } else if th.dark {
+            th.btn
+        } else {
+            th.plate
+        },
+    );
+    painter.rect_stroke(
+        r,
+        CornerRadius::same(5),
+        Stroke::new(
+            1.0,
+            if resp.hovered() {
+                th.sel
+            } else {
+                th.panel_edge
+            },
+        ),
+        egui::StrokeKind::Inside,
+    );
+    if queued {
+        let a = if (now * 4.0) as i64 % 2 == 0 {
+            1.0
+        } else {
+            0.35
+        };
+        painter.rect_stroke(
+            r.expand(1.5 * z),
+            CornerRadius::same(6),
+            Stroke::new(2.5 * z, th.gate.gamma_multiply(a)),
+            egui::StrokeKind::Outside,
+        );
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_millis(120));
+    }
+    text(
+        painter,
+        r.center(),
+        egui::Align2::CENTER_CENTER,
+        label,
+        12.5 * z,
+        if lit { Color32::WHITE } else { th.plate_ink },
+        false,
+    );
+    resp
+}
+
+/// The cues module's face: eight cue buttons (active lit, queued blinking) and Cancel.
+#[allow(clippy::too_many_arguments)]
+fn draw_cues(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    painter: &egui::Painter,
+    th: &Theme,
+    xf: Xf,
+    id: ModuleId,
+    r: Rect,
+    now: f64,
+) {
+    let z = xf.zoom;
+    let state = editor.state();
+    let all = cues::cues(state, id);
+    let bank_of = |s: ModuleId| {
+        ui_state
+            .seq_banks
+            .get(&s)
+            .copied()
+            .unwrap_or((banks::startup(state, s), None))
+    };
+    let standing: Vec<(bool, bool)> = all.iter().map(|c| cues::standing(c, &bank_of)).collect();
+    let (gap, h) = (8.0, 50.0);
+    let w = (r.width() - 3.0 * gap) / 4.0;
+    let mut launch = None;
+    for n in 1..=kabl_modules::builtins::CUES {
+        let (col, row) = ((n - 1) % 4, (n - 1) / 4);
+        let b = xf.r(Rect::from_min_size(
+            r.min + vec2(col as f32 * (w + gap), row as f32 * (h + gap)),
+            vec2(w, h),
+        ));
+        match all.iter().position(|c| c.n == n) {
+            Some(i) => {
+                let c = &all[i];
+                let (active, queued) = standing[i];
+                let resp = pad(
+                    ui_state,
+                    ui,
+                    painter,
+                    th,
+                    z,
+                    format!("cue:{id}.{n}"),
+                    b,
+                    &c.name,
+                    active,
+                    queued,
+                    now,
+                );
+                let tip = format!(
+                    "Launch {} ({}){}",
+                    c.name,
+                    banks::TIMINGS
+                        .iter()
+                        .find(|t| t.0 == c.timing)
+                        .map_or("", |t| t.1)
+                        .to_lowercase(),
+                    perform::button_text(state, id, &format!("cue.{n}"))
+                        .map_or(String::new(), |t| format!("\n{t}"))
+                );
+                if resp.on_hover_text(tip).clicked() {
+                    launch = Some(n);
+                }
+            }
+            None => {
+                painter.rect_stroke(
+                    b,
+                    CornerRadius::same(5),
+                    Stroke::new(1.0, th.panel_edge),
+                    egui::StrokeKind::Inside,
+                );
+            }
+        }
+    }
+    let y = r.top() + 2.0 * (h + gap) + 6.0;
+    let queued = all.iter().zip(&standing).find(|(_, s)| s.1).map(|(c, _)| c);
+    let active = all.iter().zip(&standing).find(|(_, s)| s.0).map(|(c, _)| c);
+    let line = match (active, queued) {
+        (_, Some(q)) => format!("queued: {}", q.name),
+        (Some(a), None) => format!("playing: {}", a.name),
+        (None, None) if all.is_empty() => "no cues: add them in the drawer".into(),
+        (None, None) => "no cue matches what plays".into(),
+    };
+    text(
+        painter,
+        xf.p(pos2(r.left(), y + 14.0)),
+        egui::Align2::LEFT_CENTER,
+        &line,
+        11.5 * z,
+        th.ink2,
+        true,
+    );
+    if let Some(q) = queued {
+        let c = xf.r(Rect::from_min_size(
+            pos2(r.right() - 90.0, y),
+            vec2(90.0, 28.0),
+        ));
+        let resp = pad(
+            ui_state,
+            ui,
+            painter,
+            th,
+            z,
+            format!("cue-cancel:{id}"),
+            c,
+            "Cancel",
+            false,
+            false,
+            now,
+        );
+        if resp.on_hover_text("Drop the queued cue").clicked() {
+            for &(s, _) in &q.targets {
+                ui_state.launches.push(Command::Cancel(Some(s)));
+            }
+        }
+    }
+    if let Some(n) = launch {
+        if let Err(e) = cues::launch(&mut ui_state.launches, editor.state(), id, n) {
+            ui_state.last_message = Some(e);
+        }
+    }
+}
+
+/// The drawer's cue editor: per cue, its name, reference clock, timing and a bank (or Keep)
+/// per sequencer; add, capture what plays, delete.
+fn cues_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, id: ModuleId) {
+    let state = editor.state();
+    let all = cues::cues(state, id);
+    let clocks: Vec<ModuleId> = state
+        .modules
+        .iter()
+        .filter(|(_, m)| m.kind == "clock")
+        .map(|(&c, _)| c)
+        .collect();
+    let seqs: Vec<ModuleId> = state
+        .modules
+        .iter()
+        .filter(|(_, m)| m.kind == "seq")
+        .map(|(&c, _)| c)
+        .collect();
+    let playing_now: HashMap<ModuleId, usize> = seqs
+        .iter()
+        .map(|&s| {
+            (
+                s,
+                ui_state
+                    .seq_banks
+                    .get(&s)
+                    .map_or_else(|| banks::startup(state, s), |b| b.0),
+            )
+        })
+        .collect();
+    enum Edit {
+        Add,
+        Delete(usize),
+        Capture(usize),
+        Clock(usize, ModuleId),
+        Timing(usize, kabl_engine::patch_engine::Timing),
+        Target(usize, ModuleId, Option<usize>),
+        Rename(usize, String),
+    }
+    let mut edit = None;
+    for c in &all {
+        ui.separator();
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new(format!("{}", c.n)).strong());
+            let mut name = ui_state
+                .cue_rename
+                .as_ref()
+                .filter(|(i, n, _)| (*i, *n) == (id, c.n))
+                .map_or_else(|| c.name.clone(), |(_, _, t)| t.clone());
+            let r = ui.add(egui::TextEdit::singleline(&mut name).desired_width(120.0));
+            ui_state.record(format!("cue-name:{id}.{}", c.n), r.rect);
+            if r.changed() {
+                ui_state.cue_rename = Some((id, c.n, name.clone()));
+            }
+            if r.lost_focus() {
+                ui_state.cue_rename = None;
+                if name != c.name {
+                    edit = Some(Edit::Rename(c.n, name));
+                }
+            }
+            let r = ui.small_button("Capture");
+            ui_state.record(format!("cue-capture:{id}.{}", c.n), r.rect);
+            if r.on_hover_text("Set every sequencer to the bank it plays now")
+                .clicked()
+            {
+                edit = Some(Edit::Capture(c.n));
+            }
+            let r = ui.small_button("Delete");
+            ui_state.record(format!("cue-delete:{id}.{}", c.n), r.rect);
+            if r.clicked() {
+                edit = Some(Edit::Delete(c.n));
+            }
+        });
+        ui.horizontal_wrapped(|ui| {
+            egui::ComboBox::from_id_salt(("cue-clock", id, c.n))
+                .selected_text(
+                    c.clock
+                        .map_or("choose clock".into(), |k| format!("Clock #{k}")),
+                )
+                .show_ui(ui, |ui| {
+                    for &k in &clocks {
+                        if ui
+                            .selectable_label(c.clock == Some(k), format!("Clock #{k}"))
+                            .clicked()
+                        {
+                            edit = Some(Edit::Clock(c.n, k));
+                        }
+                    }
+                });
+            egui::ComboBox::from_id_salt(("cue-timing", id, c.n))
+                .selected_text(
+                    banks::TIMINGS
+                        .iter()
+                        .find(|t| t.0 == c.timing)
+                        .map_or("", |t| t.1),
+                )
+                .show_ui(ui, |ui| {
+                    for (t, name) in banks::TIMINGS {
+                        if ui.selectable_label(c.timing == t, name).clicked() {
+                            edit = Some(Edit::Timing(c.n, t));
+                        }
+                    }
+                });
+        });
+        for &s in &seqs {
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new(format!("Sequencer #{s}")).small());
+                let current = c.targets.iter().find(|t| t.0 == s).map(|t| t.1);
+                let r = ui.selectable_label(current.is_none(), "Keep");
+                ui_state.record(format!("cue-bank:{id}.{}.{s}.keep", c.n), r.rect);
+                if r.on_hover_text("This cue leaves it playing").clicked() {
+                    edit = Some(Edit::Target(c.n, s, None));
+                }
+                for b in 0..seq::BANKS {
+                    let r = ui
+                        .selectable_label(current == Some(b), seq::BANK_NAMES[b])
+                        .on_hover_text(banks::title(state, s, b));
+                    ui_state.record(format!("cue-bank:{id}.{}.{s}.{b}", c.n), r.rect);
+                    if r.clicked() {
+                        edit = Some(Edit::Target(c.n, s, Some(b)));
+                    }
+                }
+            });
+        }
+    }
+    ui.separator();
+    let r = ui.add_enabled(
+        all.len() < kabl_modules::builtins::CUES,
+        egui::Button::new("Add cue (from what plays)"),
+    );
+    ui_state.record(format!("cue-add:{id}"), r.rect);
+    if r.clicked() {
+        edit = Some(Edit::Add);
+    }
+    match edit {
+        Some(Edit::Add) => {
+            cues::add(editor, id, &|s| playing_now.get(&s).copied().unwrap_or(0));
+        }
+        Some(Edit::Delete(n)) => cues::delete(editor, id, n),
+        Some(Edit::Capture(n)) => {
+            let ops = seqs
+                .iter()
+                .map(|&s| kabl_core::Op::SetParam {
+                    target: kabl_core::ParamTarget::Module {
+                        id,
+                        param: format!("cue{n}.seq.{s}"),
+                    },
+                    value: playing_now[&s] as f32,
+                })
+                .collect();
+            editor.edit(ops);
+        }
+        Some(Edit::Clock(n, k)) => cues::set_clock(editor, id, n, k),
+        Some(Edit::Timing(n, t)) => cues::set_timing(editor, id, n, t),
+        Some(Edit::Target(n, s, b)) => cues::set_target(editor, id, n, s, b),
+        Some(Edit::Rename(n, t)) => cues::rename(editor, id, n, &t),
+        None => {}
+    }
+}
+
 /// Bank edits for sequencer `id`, bank `b`: copy to another bank, clear, rename, startup.
 fn bank_menu(
     editor: &mut PatchEditor,
@@ -1909,7 +2340,8 @@ fn draw_decor(editor: &PatchEditor, p: &egui::Painter, th: &Theme, xf: Xf, m: &P
             ];
             p.add(egui::Shape::line(pts, Stroke::new(1.6 * z, th.display_ink)));
         }
-        Decor::None | Decor::Transport(_) | Decor::Status(_) | Decor::Banks(_) => {}
+        Decor::None | Decor::Transport(_) | Decor::Status(_) | Decor::Banks(_) | Decor::Cues(_) => {
+        }
     }
 }
 
@@ -2104,7 +2536,8 @@ fn draw_jacks(
                 th.panel.gamma_multiply(0.96),
             );
         }
-        let label = port_label(port.name);
+        let label =
+            macro_name(editor.state(), m.id, port.name).unwrap_or_else(|| port_label(port.name));
         if j.label_right {
             text(
                 painter,

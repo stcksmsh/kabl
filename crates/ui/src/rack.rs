@@ -38,6 +38,8 @@ pub fn is_presentation(param: &str) -> bool {
         || param.starts_with(crate::perform::PIN_PREFIX)
         || param.starts_with(crate::perform::CC_PREFIX)
         || param.starts_with("launch.")
+        || param.starts_with("cue")
+        || param.starts_with(crate::perform::BTN_PREFIX)
 }
 
 pub fn face_key(param: &str) -> String {
@@ -137,6 +139,8 @@ pub enum Decor {
     Status(Pos2),
     /// The sequencer's header strip: EDIT tabs on the left, PLAY buttons on the right.
     Banks(Rect),
+    /// The cue buttons (two rows of four) and Cancel.
+    Cues(Rect),
 }
 
 #[derive(Debug, Clone)]
@@ -203,6 +207,7 @@ impl Placed {
             Decor::Transport(r) => Decor::Transport(r.translate(d)),
             Decor::Status(c) => Decor::Status(c + d),
             Decor::Banks(r) => Decor::Banks(r.translate(d)),
+            Decor::Cues(r) => Decor::Cues(r.translate(d)),
         };
     }
 }
@@ -485,6 +490,12 @@ fn place_local(
             "seq" => {
                 decor = Decor::Banks(Rect::from_min_size(pos2(14.0, 12.0), vec2(fw - 74.0, 26.0)))
             }
+            "cues" => {
+                decor = Decor::Cues(Rect::from_min_size(
+                    pos2(16.0, 64.0),
+                    vec2(fw - 32.0, 250.0),
+                ))
+            }
             "clock" => {
                 decor = Decor::Transport(Rect::from_min_size(
                     pos2(12.0, 174.0),
@@ -588,7 +599,7 @@ fn place_local(
         } else {
             0.0
         };
-        let aw = (knob_w.max(sel_row.min(13.0 * UNIT)).max(5.0 * UNIT) / UNIT).ceil() * UNIT;
+        let aw = (knob_w.max(sel_row.min(14.0 * UNIT)).max(5.0 * UNIT) / UNIT).ceil() * UNIT;
         let mut y = 112.0;
         for (k, &i) in hk.iter().enumerate() {
             if k > 0 && k % per_row == 0 {

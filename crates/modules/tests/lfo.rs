@@ -12,8 +12,13 @@ fn quality() -> QualityConfig {
 }
 
 fn run(module: &mut Lfo, rate_hz: f32, waveform: f32) -> [f32; BLOCK] {
-    let inputs: [Signal; 0] = [];
-    let params = [Signal::Scalar(rate_hz), Signal::Scalar(waveform)];
+    let inputs = [Signal::Scalar(0.0), Signal::Scalar(0.0)];
+    let params = [
+        Signal::Scalar(rate_hz),
+        Signal::Scalar(waveform),
+        Signal::Scalar(0.0),
+        Signal::Scalar(0.0),
+    ];
     let mut buf = [0f32; BLOCK];
     let mut outputs: [&mut [f32]; 1] = [&mut buf];
     let mut io = ProcessIo::new(&inputs, &mut outputs, &params, BLOCK);

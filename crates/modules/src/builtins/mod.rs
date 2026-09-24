@@ -5,11 +5,13 @@
 
 mod clock;
 mod clock_div;
+mod cues;
 mod delay;
 mod env_adsr;
 mod filter_svf;
 mod gain;
 mod lfo;
+mod macros;
 mod midi_in;
 mod mixer;
 mod osc_va;
@@ -21,11 +23,13 @@ mod vca;
 
 pub use clock::{Clock, Transport, CLOCK_INFO};
 pub use clock_div::{ClockDiv, CLOCK_DIV_INFO};
+pub use cues::{Cues, CUES, CUES_INFO};
 pub use delay::{Delay, DelayLock, DELAY_INFO};
 pub use env_adsr::{EnvAdsr, ENV_ADSR_INFO};
 pub use filter_svf::{FilterSvf, FILTER_SVF_INFO};
 pub use gain::{db_to_gain, Gain, GAIN_INFO};
-pub use lfo::{Lfo, LFO_INFO};
+pub use lfo::{Lfo, LfoSync, LFO_INFO, SYNC_LABELS, SYNC_TICKS};
+pub use macros::{Macro, MACROS, MACRO_INFO};
 pub use midi_in::{MidiIn, MIDI_IN_INFO};
 pub use mixer::{Mixer, LEGACY_LEVEL, MIXER_INFO};
 pub use osc_va::{OscVa, OSC_VA_INFO};

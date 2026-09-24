@@ -335,6 +335,14 @@ impl PatchEngine {
         });
     }
 
+    /// Audio-thread call: `CompiledPatch::lfos` of the graph fading in, else the active one.
+    pub fn lfos(&self, f: impl FnMut(kabl_core::ModuleId, kabl_modules::builtins::LfoSync)) {
+        match &self.incoming {
+            Some((g, _)) => g.lfos(f),
+            None => self.active.lfos(f),
+        }
+    }
+
     /// Audio-thread call: `CompiledPatch::clocks` of the graph fading in, else the active one.
     pub fn clocks(&self, f: impl FnMut(kabl_core::ModuleId, bool)) {
         match &self.incoming {

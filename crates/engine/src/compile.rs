@@ -61,7 +61,7 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt;
 
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
-use kabl_modules::builtins::{Clock, Delay, DelayLock, MidiIn, Seq, Transport};
+use kabl_modules::builtins::{Clock, Delay, DelayLock, Lfo, LfoSync, MidiIn, Seq, Transport};
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::{
     registry, Module, ModuleInfo, ParamInfo, PortDirection, ProcessIo, Rate, Signal, StateBuf,
@@ -1082,6 +1082,20 @@ impl CompiledPatch {
             if let Some(d) = m.as_any().downcast_ref::<Delay>() {
                 let (lock, ms) = d.status();
                 f(id, lock, ms);
+            }
+        }
+    }
+
+    /// Calls `f(id, sync state)` for every `lfo` instance (voice 0 of a per-voice one). No
+    /// allocation.
+    pub fn lfos(&self, mut f: impl FnMut(ModuleId, LfoSync)) {
+        for (m, &(id, v)) in self.modules.iter().zip(&self.module_origin) {
+            if let Some(l) = m
+                .as_any()
+                .downcast_ref::<Lfo>()
+                .filter(|_| v.unwrap_or(0) == 0)
+            {
+                f(id, l.status());
             }
         }
     }

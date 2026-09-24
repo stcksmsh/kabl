@@ -123,8 +123,11 @@ pub fn combined_span(routes: &[RouteView], base_norm: f32) -> (f32, f32) {
     (lo, hi)
 }
 
-/// "LFO #9", or "MIDI In #1 velocity" for a non-`out` port.
+/// "LFO #9", or "MIDI In #1 velocity" for a non-`out` port; a named macro by its name.
 pub fn source_label(state: &PatchState, from_id: ModuleId, port: &str) -> String {
+    if let Some(n) = crate::macro_name(state, from_id, port) {
+        return format!("{n} (Macros #{from_id})");
+    }
     let name = state
         .modules
         .get(&from_id)
@@ -154,6 +157,7 @@ pub fn step_labels(kind: &str, param: &str) -> Option<&'static [&'static str]> {
         ("delay", "mode") => &["MONO", "PING"],
         ("seq", "gate_mode") => &["CLOCK", "LENGTH"],
         ("seq", "direction") => &["FWD", "REV", "PEND"],
+        ("lfo", "sync") => &kabl_modules::builtins::SYNC_LABELS,
         ("seq", "bank") => &seq::BANK_NAMES,
         _ => return None,
     })
@@ -220,6 +224,7 @@ pub fn fmt_value(p: &ParamInfo, v: f32) -> String {
         "bpm" => format!("{v:.0} bpm"),
         "%" => format!("{v:.0} %"),
         "dB" => format!("{:+.1} dB", v + 0.0),
+        "°" => format!("{v:.0}°"),
         _ => format!("{v:.2}"),
     }
 }
@@ -746,7 +751,7 @@ pub(crate) fn param_knob(
     painter.text(
         center - EguiVec2::new(0.0, 47.0 * z),
         egui::Align2::CENTER_CENTER,
-        param_label(param),
+        crate::macro_name(editor.state(), id, param.name).unwrap_or_else(|| param_label(param)),
         egui::FontId::proportional(12.5 * z),
         look.ink,
     );

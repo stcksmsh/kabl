@@ -21,13 +21,27 @@ use crate::{routing, PatchEditor, UiState};
 
 pub const PIN_PREFIX: &str = "pin.";
 pub const CC_PREFIX: &str = "cc.";
+/// MIDI button mapping of a runtime action: `btn.<action>` = channel × 128 + CC, on the module
+/// the action belongs to (`bank.<0..3>` on a sequencer, `cue.<1..8>` and `cancel` on a cues
+/// module, `run` and `restart` on a clock).
+pub const BTN_PREFIX: &str = "btn.";
+/// After a (re)connect, messages this long only set button states, never fire: a controller
+/// that reports its button positions on connect cannot trigger anything.
+const BUTTON_GUARD_S: f64 = 0.5;
 /// Pin key for a clock's transport buttons.
 pub const TRANSPORT: &str = "transport";
+/// Pin key for a sequencer's bank launch buttons.
+pub const BANKS: &str = "banks";
+/// Pin key for a cues module's cue buttons.
+pub const CUE_PADS: &str = "cues";
 /// Height of the performance panel.
 pub const PANEL_H: f32 = 296.0;
 /// Height with `UiState::perform_tall`.
 pub const PANEL_TALL_H: f32 = 470.0;
 const CARD_W: f32 = 138.0;
+/// A cue button; the cues card is four of them wide, plus Cancel.
+const CUE_W: f32 = 96.0;
+const CUES_CARD_W: f32 = 4.0 * CUE_W + 9.0 + 64.0;
 const CARD_H: f32 = 106.0;
 /// How close (in 0..1 travel) the hardware must come to pick a parameter up.
 const PICKUP: f32 = 1.5 / 127.0;
@@ -53,10 +67,11 @@ pub fn pins(state: &PatchState) -> Vec<Pin> {
             let Some(key) = name.strip_prefix(PIN_PREFIX) else {
                 break;
             };
-            let valid = if key == TRANSPORT {
-                m.kind == "clock"
-            } else {
-                info.params.iter().any(|p| p.name == key)
+            let valid = match key {
+                TRANSPORT => m.kind == "clock",
+                BANKS => m.kind == "seq",
+                CUE_PADS => m.kind == "cues",
+                _ => info.params.iter().any(|p| p.name == key),
             };
             if valid {
                 out.push(Pin {
@@ -198,11 +213,26 @@ pub fn sync_takeover(editor: &PatchEditor, ui_state: &mut UiState) {
 /// first one; otherwise each drives the params mapped to it.
 pub fn apply_cc(editor: &mut PatchEditor, ui_state: &mut UiState, now: f64) {
     let events = std::mem::take(&mut ui_state.midi_cc);
+    if std::mem::take(&mut ui_state.button_rearm) {
+        ui_state.button_high.clear();
+        ui_state.button_guard = now + BUTTON_GUARD_S;
+    }
     for (ch, cc, value) in events {
         let hw = value.min(127) as f32 / 127.0;
+        let high = value >= 64;
+        let was_high = ui_state.button_high.insert((ch, cc), high).unwrap_or(false);
         if let Some((id, param)) = ui_state.learn.take() {
-            learn(editor, ui_state, id, &param, ch, cc, hw);
+            match param.strip_prefix(BTN_PREFIX) {
+                Some(action) => learn_button(editor, ui_state, id, action, ch, cc),
+                None => learn(editor, ui_state, id, &param, ch, cc, hw),
+            }
             continue;
+        }
+        // Buttons: one action per press (low → high); release and repeats do nothing.
+        if high && !was_high && now >= ui_state.button_guard {
+            for (id, action) in mapped_buttons(editor.state(), ch, cc) {
+                fire(editor, ui_state, id, &action);
+            }
         }
         sync_takeover(editor, ui_state);
         for (id, p) in mapped(editor.state(), ch, cc) {
@@ -263,6 +293,11 @@ fn learn(
         .filter(|&(oid, op)| (oid, op.name) != (id, param))
         .map(|(oid, op)| (oid, format!("{CC_PREFIX}{}", op.name), None))
         .collect();
+    changes.extend(
+        mapped_buttons(state, ch, cc)
+            .into_iter()
+            .map(|(oid, a)| (oid, format!("{BTN_PREFIX}{a}"), None)),
+    );
     changes.push((
         id,
         format!("{CC_PREFIX}{param}"),
@@ -280,6 +315,145 @@ fn learn(
         module_name(editor.state(), id),
         routing::target_label(p)
     ));
+}
+
+/// The runtime actions module `id` offers to MIDI buttons: (action key, label).
+pub fn button_actions(state: &PatchState, id: ModuleId) -> Vec<(String, String)> {
+    let Some(m) = state.modules.get(&id) else {
+        return Vec::new();
+    };
+    match m.kind.as_str() {
+        "seq" => (0..kabl_modules::builtins::seq::BANKS)
+            .map(|b| {
+                (
+                    format!("bank.{b}"),
+                    format!("Launch bank {}", crate::banks::title(state, id, b)),
+                )
+            })
+            .collect(),
+        "cues" => crate::cues::cues(state, id)
+            .into_iter()
+            .map(|c| (format!("cue.{}", c.n), format!("Launch {}", c.name)))
+            .chain([("cancel".to_string(), "Cancel queued launches".to_string())])
+            .collect(),
+        "clock" => vec![
+            ("run".into(), "Run / Stop".into()),
+            ("restart".into(), "Restart".into()),
+        ],
+        _ => Vec::new(),
+    }
+}
+
+/// `(channel, controller)` of the button mapped to `action` on module `id`.
+pub fn button_mapping(state: &PatchState, id: ModuleId, action: &str) -> Option<(u8, u8)> {
+    let v = *state
+        .modules
+        .get(&id)?
+        .params
+        .get(&format!("{BTN_PREFIX}{action}"))?;
+    let code = v as u32;
+    (v >= 0.0 && code < 16 * 128).then_some(((code / 128) as u8, (code % 128) as u8))
+}
+
+/// Every (module, action) whose button is this CC.
+fn mapped_buttons(state: &PatchState, ch: u8, cc: u8) -> Vec<(ModuleId, String)> {
+    let code = (ch as u32 * 128 + cc as u32) as f32;
+    let mut out = Vec::new();
+    for (&id, m) in &state.modules {
+        for (k, &v) in m.params.range(BTN_PREFIX.to_string()..) {
+            let Some(action) = k.strip_prefix(BTN_PREFIX) else {
+                break;
+            };
+            if v == code {
+                out.push((id, action.to_string()));
+            }
+        }
+    }
+    out
+}
+
+fn learn_button(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    id: ModuleId,
+    action: &str,
+    ch: u8,
+    cc: u8,
+) {
+    let state = editor.state();
+    let Some((_, label)) = button_actions(state, id)
+        .into_iter()
+        .find(|(a, _)| a == action)
+    else {
+        return;
+    };
+    // One CC, one use: continuous mappings and other buttons on it are cleared.
+    let mut changes: Vec<_> = mapped(state, ch, cc)
+        .into_iter()
+        .map(|(oid, op)| (oid, format!("{CC_PREFIX}{}", op.name), None))
+        .collect();
+    changes.extend(
+        mapped_buttons(state, ch, cc)
+            .into_iter()
+            .filter(|(oid, a)| (*oid, a.as_str()) != (id, action))
+            .map(|(oid, a)| (oid, format!("{BTN_PREFIX}{a}"), None)),
+    );
+    changes.push((
+        id,
+        format!("{BTN_PREFIX}{action}"),
+        Some((ch as u32 * 128 + cc as u32) as f32),
+    ));
+    editor.set_presentation(&changes);
+    ui_state.last_message = Some(format!(
+        "{} button → {} #{id} · {label}",
+        cc_text((ch, cc)),
+        module_name(editor.state(), id)
+    ));
+}
+
+/// Runs a button's action: a launch, a cancel or a transport command (runtime only).
+fn fire(editor: &PatchEditor, ui_state: &mut UiState, id: ModuleId, action: &str) {
+    let state = editor.state();
+    let result = match action.split_once('.') {
+        Some(("bank", b)) => b
+            .parse()
+            .map_err(|_| "bad action".to_string())
+            .and_then(|b| crate::banks::launch(&mut ui_state.launches, state, id, b)),
+        Some(("cue", n)) => n
+            .parse()
+            .map_err(|_| "bad action".to_string())
+            .and_then(|n| crate::cues::launch(&mut ui_state.launches, state, id, n)),
+        _ => {
+            match action {
+                "cancel" => ui_state
+                    .launches
+                    .push(kabl_engine::patch_engine::Command::Cancel(None)),
+                "run" => {
+                    let running = ui_state.clock_running.get(&id).copied().unwrap_or(true);
+                    ui_state.transport.push((
+                        id,
+                        if running {
+                            Transport::Stop
+                        } else {
+                            Transport::Run
+                        },
+                    ));
+                }
+                "restart" => ui_state.transport.push((id, Transport::Restart)),
+                _ => {}
+            }
+            Ok(())
+        }
+    };
+    if let Err(e) = result {
+        ui_state.last_message = Some(e);
+    }
+}
+
+/// A button mapping's hover text: `CC 40 · ch 1 → Launch bank B`.
+pub fn button_text(state: &PatchState, id: ModuleId, action: &str) -> Option<String> {
+    let m = button_mapping(state, id, action)?;
+    Some(format!("MIDI button {}", cc_text(m)))
 }
 
 pub fn unlearn(editor: &mut PatchEditor, id: ModuleId, param: &str) {
@@ -364,8 +538,14 @@ pub fn pin_label(state: &PatchState, pin: &Pin) -> String {
     if let Some(l) = state.label(pin.id, &format!("{PIN_PREFIX}{}", pin.key)) {
         return l.to_string();
     }
-    if pin.key == TRANSPORT {
-        return "Transport".into();
+    match pin.key.as_str() {
+        TRANSPORT => return "Transport".into(),
+        BANKS => return "Banks".into(),
+        CUE_PADS => return "Cues".into(),
+        _ => {}
+    }
+    if let Some(name) = crate::macro_name(state, pin.id, &pin.key) {
+        return name;
     }
     pin_param(state, pin).map_or(pin.key.clone(), routing::target_label)
 }
@@ -380,10 +560,11 @@ fn pin_param(state: &PatchState, pin: &Pin) -> Option<&'static ParamInfo> {
 
 /// What a pin really is: `Mixer #26 · Level 1 · from Sequencer #3`.
 pub fn pin_source(state: &PatchState, pin: &Pin) -> String {
-    let control = if pin.key == TRANSPORT {
-        "Run/Stop, Restart".to_string()
-    } else {
-        pin_param(state, pin).map_or(pin.key.clone(), routing::target_label)
+    let control = match pin.key.as_str() {
+        TRANSPORT => "Run/Stop, Restart".to_string(),
+        BANKS => "Launch A–D".to_string(),
+        CUE_PADS => "Launch cues".to_string(),
+        _ => pin_param(state, pin).map_or(pin.key.clone(), routing::target_label),
     };
     let mut s = format!("{} #{} · {control}", module_name(state, pin.id), pin.id);
     if let Some(src) = mixer_source(state, pin.id, &pin.key) {
@@ -456,15 +637,23 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             ui_state.all_notes_off = true;
         }
         if let Some((id, param)) = ui_state.learn.clone() {
-            let label = registry::info_for(
-                editor
-                    .state()
-                    .modules
-                    .get(&id)
-                    .map_or("", |m| m.kind.as_str()),
-            )
-            .and_then(|i| i.params.iter().find(|p| p.name == param))
-            .map_or(param.clone(), routing::target_label);
+            let button = param.strip_prefix(BTN_PREFIX).and_then(|a| {
+                button_actions(editor.state(), id)
+                    .into_iter()
+                    .find(|(k, _)| k == a)
+                    .map(|(_, l)| format!("{l} (press a button)"))
+            });
+            let label = button.unwrap_or_else(|| {
+                registry::info_for(
+                    editor
+                        .state()
+                        .modules
+                        .get(&id)
+                        .map_or("", |m| m.kind.as_str()),
+                )
+                .and_then(|i| i.params.iter().find(|p| p.name == param))
+                .map_or(param.clone(), routing::target_label)
+            });
             let r = ui.button("Cancel learn");
             ui_state.record("learn-cancel".into(), r.rect);
             if r.clicked() {
@@ -528,13 +717,18 @@ fn card(
     let key = format!("{}.{}", pin.id, pin.key);
     let title = pin_label(editor.state(), pin);
     let source = pin_source(editor.state(), pin);
-    let size = egui::vec2(CARD_W + 16.0, CARD_H);
+    let w = if pin.key == CUE_PADS {
+        CUES_CARD_W
+    } else {
+        CARD_W
+    };
+    let size = egui::vec2(w + 16.0, CARD_H);
     let frame = ui.allocate_ui_with_layout(size, egui::Layout::top_down(egui::Align::Min), |ui| {
         egui::Frame::group(ui.style())
             .fill(ui.visuals().faint_bg_color)
             .inner_margin(egui::Margin::symmetric(8, 6))
             .show(ui, |ui| {
-                ui.set_width(CARD_W);
+                ui.set_width(w);
                 ui.set_height(CARD_H - 14.0);
                 ui.spacing_mut().item_spacing.y = 3.0;
                 let renaming = ui_state
@@ -604,9 +798,11 @@ fn card(
                     }
                 });
                 ui.add(egui::Label::new(RichText::new(&source).weak().small()).truncate());
-                if pin.key == TRANSPORT {
-                    transport_card(ui_state, ui, th, pin.id);
-                    return;
+                match pin.key.as_str() {
+                    TRANSPORT => return transport_card(editor, ui_state, ui, th, pin.id),
+                    BANKS => return banks_card(editor, ui_state, ui, th, pin.id),
+                    CUE_PADS => return cues_card(editor, ui_state, ui, th, pin.id),
+                    _ => {}
                 }
                 let Some(p) = pin_param(editor.state(), pin) else {
                     return;
@@ -738,12 +934,182 @@ fn mixer_source(state: &PatchState, id: ModuleId, param: &str) -> Option<String>
     Some(routing::source_label(state, osc.unwrap_or(first), "out"))
 }
 
-fn transport_card(
+/// A launch button: lit when playing/active, a blinking outline while queued. Hover names the
+/// MIDI button mapped to it.
+#[allow(clippy::too_many_arguments)]
+fn launch_button(
+    ui: &mut egui::Ui,
+    th: &crate::theme::Theme,
+    text: &str,
+    width: f32,
+    lit: bool,
+    queued: bool,
+    hover: String,
+) -> egui::Response {
+    let fill = if lit {
+        th.gate
+    } else {
+        ui.visuals().widgets.inactive.bg_fill
+    };
+    let ink = if lit {
+        egui::Color32::WHITE
+    } else {
+        ui.visuals().text_color()
+    };
+    let r = ui.add(
+        egui::Button::new(RichText::new(text).color(ink))
+            .fill(fill)
+            .truncate()
+            .min_size([width, 24.0].into()),
+    );
+    if queued {
+        let t = ui.input(|i| i.time);
+        let a = if (t * 4.0) as i64 % 2 == 0 { 1.0 } else { 0.35 };
+        ui.painter().rect_stroke(
+            r.rect.expand(1.5),
+            egui::CornerRadius::same(5),
+            egui::Stroke::new(2.5, th.gate.gamma_multiply(a)),
+            egui::StrokeKind::Outside,
+        );
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_millis(120));
+    }
+    r.on_hover_text(hover)
+}
+
+/// A sequencer's bank buttons: launch with its own settings, playing lit, queued blinking,
+/// Cancel while something is queued.
+fn banks_card(
+    editor: &PatchEditor,
     ui_state: &mut UiState,
     ui: &mut egui::Ui,
     th: &crate::theme::Theme,
     id: ModuleId,
 ) {
+    let state = editor.state();
+    let (playing, queued) = ui_state
+        .seq_banks
+        .get(&id)
+        .copied()
+        .unwrap_or((crate::banks::startup(state, id), None));
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 3.0;
+        for b in 0..kabl_modules::builtins::seq::BANKS {
+            let name = crate::banks::title(state, id, b);
+            let hover = format!(
+                "Launch bank {name}{}",
+                button_text(state, id, &format!("bank.{b}"))
+                    .map_or(String::new(), |t| format!("\n{t}"))
+            );
+            let r = launch_button(
+                ui,
+                th,
+                kabl_modules::builtins::seq::BANK_NAMES[b],
+                28.0,
+                b == playing,
+                queued == Some(b),
+                hover,
+            );
+            ui_state.record(format!("pbank:{id}.{b}"), r.rect);
+            if r.clicked() {
+                if let Err(e) = crate::banks::launch(&mut ui_state.launches, state, id, b) {
+                    ui_state.last_message = Some(e);
+                }
+            }
+        }
+    });
+    ui.horizontal(|ui| {
+        let text = match queued {
+            Some(q) => format!("→ {}", crate::banks::title(state, id, q)),
+            None => format!("▶ {}", crate::banks::title(state, id, playing)),
+        };
+        ui.add(egui::Label::new(RichText::new(text).small()).truncate());
+        if queued.is_some() {
+            let r = ui.small_button("Cancel");
+            ui_state.record(format!("pbank-cancel:{id}"), r.rect);
+            if r.clicked() {
+                ui_state
+                    .launches
+                    .push(kabl_engine::patch_engine::Command::Cancel(Some(id)));
+            }
+        }
+    });
+}
+
+/// A cues module's cue buttons (two rows of four), and Cancel while one is queued.
+fn cues_card(
+    editor: &PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    th: &crate::theme::Theme,
+    id: ModuleId,
+) {
+    let state = editor.state();
+    let all = crate::cues::cues(state, id);
+    let bank_of = |s: ModuleId| {
+        ui_state
+            .seq_banks
+            .get(&s)
+            .copied()
+            .unwrap_or((crate::banks::startup(state, s), None))
+    };
+    let standing: Vec<(bool, bool)> = all
+        .iter()
+        .map(|c| crate::cues::standing(c, &bank_of))
+        .collect();
+    let any_queued = standing.iter().any(|s| s.1);
+    let rows = all.len().div_ceil(4);
+    for (i, row) in all.chunks(4).zip(standing.chunks(4)).enumerate() {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 3.0;
+            for (c, &(active, queued)) in row.0.iter().zip(row.1) {
+                let hover = format!(
+                    "Launch {}{}",
+                    c.name,
+                    button_text(state, id, &format!("cue.{}", c.n))
+                        .map_or(String::new(), |t| format!("\n{t}"))
+                );
+                let r = launch_button(ui, th, &c.name, CUE_W, active, queued, hover);
+                ui_state.record(format!("pcue:{id}.{}", c.n), r.rect);
+                if r.clicked() {
+                    if let Err(e) = crate::cues::launch(&mut ui_state.launches, state, id, c.n) {
+                        ui_state.last_message = Some(e);
+                    }
+                }
+            }
+            if i + 1 == rows && any_queued {
+                ui.add_space(CUE_W * (4 - row.0.len()) as f32);
+                let r = ui.button("Cancel");
+                ui_state.record(format!("pcue-cancel:{id}"), r.rect);
+                if r.on_hover_text("Drop the queued cue").clicked() {
+                    for c in all.iter().zip(&standing).filter(|(_, s)| s.1) {
+                        for &(s, _) in &c.0.targets {
+                            ui_state
+                                .launches
+                                .push(kabl_engine::patch_engine::Command::Cancel(Some(s)));
+                        }
+                    }
+                }
+            }
+        });
+    }
+    if all.is_empty() {
+        ui.label(
+            RichText::new("No cues yet: add them in the drawer")
+                .small()
+                .weak(),
+        );
+    }
+}
+
+fn transport_card(
+    editor: &PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    th: &crate::theme::Theme,
+    id: ModuleId,
+) {
+    let _ = editor;
     let running = ui_state.clock_running.get(&id).copied().unwrap_or(true);
     ui.horizontal(|ui| {
         let big =
@@ -782,18 +1148,26 @@ pub fn module_menu(
     id: ModuleId,
     info: &'static kabl_modules::ModuleInfo,
 ) {
+    let edit = ui_state.edit_bank_of(editor.state(), id);
+    let shown = |p: &&ParamInfo| crate::rack::visible(info, p.name, edit);
     let r = ui.menu_button("Pin to Perform", |ui| {
-        if info.kind == "clock" {
-            let mut on = is_pinned(editor.state(), id, TRANSPORT);
-            let r = ui.checkbox(&mut on, "Transport (Run/Stop, Restart)");
-            ui_state.record(format!("menu:pin:{TRANSPORT}"), r.rect);
+        let special = match info.kind {
+            "clock" => Some((TRANSPORT, "Transport (Run/Stop, Restart)")),
+            "seq" => Some((BANKS, "Bank launch buttons")),
+            "cues" => Some((CUE_PADS, "Cue buttons")),
+            _ => None,
+        };
+        if let Some((key, text)) = special {
+            let mut on = is_pinned(editor.state(), id, key);
+            let r = ui.checkbox(&mut on, text);
+            ui_state.record(format!("menu:pin:{key}"), r.rect);
             if r.clicked() {
-                toggle_pin(editor, id, TRANSPORT);
+                toggle_pin(editor, id, key);
                 ui_state.perform_open = true;
-                ui_state.pin_reveal = Some((id, TRANSPORT.to_string()));
+                ui_state.pin_reveal = Some((id, key.to_string()));
             }
         }
-        for p in info.params {
+        for p in info.params.iter().filter(shown) {
             let mut on = is_pinned(editor.state(), id, p.name);
             let r = ui.checkbox(&mut on, routing::param_label(p));
             ui_state.record(format!("menu:pin:{}", p.name), r.rect);
@@ -805,9 +1179,37 @@ pub fn module_menu(
         }
     });
     ui_state.record("menu:pin".into(), r.response.rect);
+    let actions = button_actions(editor.state(), id);
+    if !actions.is_empty() {
+        let r = ui.menu_button("MIDI button", |ui| {
+            for (action, label) in actions {
+                let map = button_mapping(editor.state(), id, &action);
+                let text = match map {
+                    Some(m) => format!("{label}  ({})", cc_text(m)),
+                    None => label,
+                };
+                let r = ui.button(text);
+                ui_state.record(format!("menu:button:{action}"), r.rect);
+                if r.clicked() {
+                    ui_state.learn = Some((id, format!("{BTN_PREFIX}{action}")));
+                    ui_state.perform_open = true;
+                    ui.close();
+                }
+                if map.is_some() {
+                    let r = ui.small_button("  ✕ clear");
+                    ui_state.record(format!("menu:button-clear:{action}"), r.rect);
+                    if r.clicked() {
+                        editor.set_presentation(&[(id, format!("{BTN_PREFIX}{action}"), None)]);
+                        ui.close();
+                    }
+                }
+            }
+        });
+        ui_state.record("menu:button".into(), r.response.rect);
+    }
     if info.params.iter().any(learnable) {
         let r = ui.menu_button("MIDI learn", |ui| {
-            for p in info.params.iter().filter(|p| learnable(p)) {
+            for p in info.params.iter().filter(shown).filter(|p| learnable(p)) {
                 let text = match mapping(editor.state(), id, p.name) {
                     Some(m) => format!("{}  ({})", routing::target_label(p), cc_text(m)),
                     None => routing::target_label(p),

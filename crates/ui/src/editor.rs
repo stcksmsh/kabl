@@ -155,9 +155,17 @@ impl PatchEditor {
         id
     }
 
+    /// Removes a module with its cables, and the cue and launch settings that name it, as one
+    /// undo step (undo restores those references with it).
     pub fn remove_module(&mut self, id: ModuleId) {
         if self.log.state().modules.contains_key(&id) {
-            self.append(Op::RemoveModule { id });
+            let mut ops = crate::cues::references_to(self.log.state(), id);
+            if ops.is_empty() {
+                self.append(Op::RemoveModule { id });
+            } else {
+                ops.push(Op::RemoveModule { id });
+                self.append(Op::Group { ops });
+            }
         }
     }
 

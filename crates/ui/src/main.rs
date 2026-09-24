@@ -17,7 +17,7 @@ use kabl_engine::compile::compile;
 use kabl_engine::graph::BLOCK;
 use kabl_engine::patch_engine::{swap_channel, Command, PatchEngine, SwapSender};
 use kabl_engine::voice_allocator::VoiceAllocator;
-use kabl_modules::builtins::{DelayLock, Transport};
+use kabl_modules::builtins::{DelayLock, LfoSync, Transport};
 use kabl_standalone::{
     apply_voice_event, default_patch, resolve_midi_message, RingBuffer, VoiceEvent,
     DEFAULT_VOICE_COUNT,
@@ -47,6 +47,8 @@ struct AudioHost {
     steps_rx: Option<rtrb::Consumer<SeqReport>>,
     /// Each clock's run state, published by the audio callback.
     clocks_rx: Option<rtrb::Consumer<(ModuleId, bool)>>,
+    /// Each LFO's sync state, published by the audio callback.
+    lfos_rx: Option<rtrb::Consumer<(ModuleId, LfoSync)>>,
     /// Each delay's lock state and target time, published by the audio callback.
     delays_rx: Option<rtrb::Consumer<(ModuleId, DelayLock, f32)>>,
     /// Transport commands to the audio callback (runtime only, never in the op log).
@@ -193,6 +195,7 @@ impl AudioHost {
             steps_rx: None,
             clocks_rx: None,
             delays_rx: None,
+            lfos_rx: None,
             transport_tx: None,
             command_tx: None,
             recorder: None,
@@ -279,6 +282,7 @@ impl AudioHost {
         let (mut steps_tx, steps_rx) = rtrb::RingBuffer::<SeqReport>::new(256);
         let (mut clocks_tx, clocks_rx) = rtrb::RingBuffer::<(ModuleId, bool)>::new(64);
         let (mut delays_tx, delays_rx) = rtrb::RingBuffer::<(ModuleId, DelayLock, f32)>::new(64);
+        let (mut lfos_tx, lfos_rx) = rtrb::RingBuffer::<(ModuleId, LfoSync)>::new(128);
         let (transport_tx, mut transport_rx) = rtrb::RingBuffer::<(ModuleId, Transport)>::new(64);
         let (command_tx, mut command_rx) = rtrb::RingBuffer::<Command>::new(64);
 
@@ -344,6 +348,9 @@ impl AudioHost {
                 engine.delays(|id, lock, ms| {
                     let _ = delays_tx.push((id, lock, ms));
                 });
+                engine.lfos(|id, sync| {
+                    let _ = lfos_tx.push((id, sync));
+                });
 
                 let rec = tap.begin(frames_needed);
                 for frame in data.chunks_mut(channels) {
@@ -388,6 +395,7 @@ impl AudioHost {
             steps_rx: Some(steps_rx),
             clocks_rx: Some(clocks_rx),
             delays_rx: Some(delays_rx),
+            lfos_rx: Some(lfos_rx),
             transport_tx: Some(transport_tx),
             command_tx: Some(command_tx),
             recorder: stream.is_some().then_some(recorder),
@@ -559,6 +567,7 @@ fn base_name(name: &str) -> &str {
 
 /// Every MIDI mapping waits for pickup again (new or reconnected hardware).
 fn reset_pickup(ui: &mut UiState) {
+    ui.button_rearm = true;
     for t in ui.takeover.values_mut() {
         *t = Default::default();
     }
@@ -696,6 +705,11 @@ impl eframe::App for App {
         if let Some(rx) = self.audio.delays_rx.as_mut() {
             while let Ok((id, lock, ms)) = rx.pop() {
                 self.ui_state.delay_status.insert(id, (lock, ms));
+            }
+        }
+        if let Some(rx) = self.audio.lfos_rx.as_mut() {
+            while let Ok((id, sync)) = rx.pop() {
+                self.ui_state.lfo_status.insert(id, sync);
             }
         }
         if !self.ui_state.seq_steps.is_empty() || !self.ui_state.delay_status.is_empty() {
