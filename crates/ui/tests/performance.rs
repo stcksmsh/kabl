@@ -8,8 +8,8 @@
 //! - arp `seq B` (16ths, 7 steps against the bass's 8) → same shape → `atmos` level 1, and
 //!   `echo` level 2 (an echo send).
 //! - pad: two detuned saws → `padmix` → filter (slow LFO) → `atmos` level 2.
-//! - lead: `midi.in` → osc → filter → VCA → `lead x4` (all four inputs from the VCA: one MIDI
-//!   note is 1/8 of the voice average, so this makes up 12 dB) → `echo` level 1 → delay.
+//! - lead: `midi.in` → osc → filter → VCA → `gain` +12 dB (one MIDI note is 1/8 of the voice
+//!   average; this makes up most of it) → `echo` level 1 → delay.
 //! - `atmos` and the delay's left/right → `bus L`/`bus R` → reverb (an insert on this bus, mix
 //!   35 %) → main L/R level 2; main L/R → out.
 
@@ -75,7 +75,7 @@ pub fn performance() -> PatchEditor {
     let filt_l = e.add_module("filter.svf", at(1464.0, 2));
     let env_l = e.add_module("env.adsr", at(1674.0, 2));
     let vca_l = e.add_module("vca", at(1914.0, 2));
-    let lead_x4 = e.add_module("mixer", at(2094.0, 2));
+    let lead_gain = e.add_module("gain", at(2094.0, 2));
     // Row 3: mixing and effects.
     let dry = e.add_module("mixer", at(24.0, 3));
     let atmos = e.add_module("mixer", at(264.0, 3));
@@ -216,15 +216,14 @@ pub fn performance() -> PatchEditor {
     ] {
         set(&mut e, env_l, p, v);
     }
-    for ch in ["in1", "in2", "in3", "in4"] {
-        e.connect(port(vca_l, "out"), port(lead_x4, ch));
-    }
+    e.connect(port(vca_l, "out"), port(lead_gain, "in"));
+    set(&mut e, lead_gain, "gain_db", 12.0);
 
     // Mixing.
     e.connect(port(vca_a, "out"), port(dry, "in1"));
     e.connect(port(vca_b, "out"), port(atmos, "in1"));
     e.connect(port(pad_filt, "lp"), port(atmos, "in2"));
-    e.connect(port(lead_x4, "out"), port(echo, "in1"));
+    e.connect(port(lead_gain, "out"), port(echo, "in1"));
     e.connect(port(vca_b, "out"), port(echo, "in2"));
     e.connect(port(echo, "out"), port(delay, "in"));
     e.connect(port(clock, "gate"), port(delay, "clock"));
@@ -259,28 +258,31 @@ pub fn performance() -> PatchEditor {
     set(&mut e, reverb, "predelay_ms", 30.0);
 
     // Performance pins and CC mappings (channel 1).
-    let controls: [(ModuleId, &str, Option<u8>); 12] = [
-        (clock, TRANSPORT, None),
-        (dry, "level1", Some(20)),
-        (atmos, "level1", Some(21)),
-        (atmos, "level2", Some(22)),
-        (echo, "level1", Some(23)),
-        (filt_a, "cutoff_hz", Some(24)),
-        (filt_b, "cutoff_hz", Some(25)),
-        (pad_filt, "cutoff_hz", Some(26)),
-        (seq_a, "transpose", None),
-        (delay, "feedback", Some(27)),
-        (reverb, "mix", Some(28)),
-        (reverb, "decay_s", Some(29)),
+    let controls: [(ModuleId, &str, Option<u8>, &str); 12] = [
+        (clock, TRANSPORT, None, "Transport"),
+        (dry, "level1", Some(20), "Bass"),
+        (atmos, "level1", Some(21), "Arp"),
+        (atmos, "level2", Some(22), "Pad"),
+        (echo, "level1", Some(23), "Lead"),
+        (filt_a, "cutoff_hz", Some(24), "Bass cutoff"),
+        (filt_b, "cutoff_hz", Some(25), "Arp cutoff"),
+        (pad_filt, "cutoff_hz", Some(26), "Pad cutoff"),
+        (seq_a, "transpose", None, "Bass transpose"),
+        (delay, "feedback", Some(27), "Echo feedback"),
+        (reverb, "mix", Some(28), "Reverb"),
+        (reverb, "decay_s", Some(29), "Reverb decay"),
     ];
     let mut changes = Vec::new();
-    for (i, (id, key, cc)) in controls.iter().enumerate() {
+    for (i, (id, key, cc, _)) in controls.iter().enumerate() {
         changes.push((*id, format!("{PIN_PREFIX}{key}"), Some(i as f32)));
         if let Some(cc) = cc {
             changes.push((*id, format!("{CC_PREFIX}{key}"), Some(*cc as f32)));
         }
     }
     e.set_presentation(&changes);
+    for (id, key, _, label) in controls {
+        e.set_label(id, &format!("{PIN_PREFIX}{key}"), Some(label.to_string()));
+    }
     e
 }
 

@@ -417,3 +417,34 @@ fn write_listening_clips() {
         w.finalize().unwrap();
     }
 }
+
+/// The lead is one voice per note: a chord is louder than a single note (voices average over
+/// all 8). Peak of the full mix with 1-, 3- and 4-note chords held for 3 s.
+#[test]
+fn chords_on_the_lead_keep_headroom() {
+    for notes in [&[4.0][..], &[4.0, 7.0, 11.0], &[4.0, 7.0, 11.0, 14.0]] {
+        let mut c = compile(&patch(), SR, VOICES).unwrap();
+        let mut all = Vec::new();
+        for b in 0..5 * SEC {
+            if b == SEC {
+                for (v, &st) in notes.iter().enumerate() {
+                    c.note_on(v, st, 1.0);
+                }
+            }
+            if b == 4 * SEC {
+                for v in 0..notes.len() {
+                    c.note_off(v);
+                }
+            }
+            c.process_block();
+            all.extend_from_slice(c.left());
+            all.extend_from_slice(c.right());
+        }
+        println!(
+            "{}-note chord at full velocity: mix peak {:.1} dBFS",
+            notes.len(),
+            db(peak(&all))
+        );
+        assert!(db(peak(&all)) < -1.0, "{} notes clip-close", notes.len());
+    }
+}
