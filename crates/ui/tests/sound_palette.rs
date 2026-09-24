@@ -343,10 +343,11 @@ fn lead(r: &mut Rack, row: usize, macro_src: (ModuleId, &str)) -> Lead {
         ],
     );
     let vca = r.add("vca", &[("gain", 0.0)]);
-    let gain = r.add("gain", &[("gain_db", 20.0)]);
+    // Into the drive at about −6 dBFS peak, so the drive shapes rather than clips.
+    let gain = r.add("gain", &[("gain_db", 11.0)]);
     let drive = r.add(
         "drive",
-        &[("drive_db", 8.0), ("mix", 60.0), ("trim_db", -2.0)],
+        &[("drive_db", 8.0), ("mix", 60.0), ("trim_db", 2.0)],
     );
     let vib = r.add("lfo", &[("rate_hz", 5.2)]);
     let vibrato = r.add("ringmod", &[]);
@@ -1495,4 +1496,192 @@ fn write_offline_renders() {
         }
         w.finalize().unwrap();
     }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Comparisons at matched levels.
+
+/// Renders `st` playing `events` ((time s, note, on)) for `secs`, stereo interleaved.
+fn render_events(st: &PatchState, events: &[(f32, u8, bool)], secs: f32) -> Vec<f32> {
+    let collector = basedrop::Collector::new();
+    let handle = collector.handle();
+    let mut e = PatchEngine::new(&handle, st, SR, 8).unwrap();
+    let (mut l, mut r) = ([0f32; BLOCK], [0f32; BLOCK]);
+    let mut out = Vec::new();
+    for b in 0..(secs * SR) as usize / BLOCK {
+        let t0 = (b * BLOCK) as f32 / SR;
+        let t1 = t0 + BLOCK as f32 / SR;
+        for &(t, n, on) in events {
+            if t >= t0 && t < t1 {
+                e.key(if on {
+                    KeyEvent::On {
+                        note: n,
+                        velocity: 100,
+                    }
+                } else {
+                    KeyEvent::Off { note: n }
+                });
+            }
+        }
+        e.process_block(&mut l, &mut r);
+        for (a, c) in l.iter().zip(&r) {
+            out.push(*a);
+            out.push(*c);
+        }
+    }
+    out
+}
+
+fn rms_of(v: &[f32]) -> f32 {
+    (v.iter().map(|x| x * x).sum::<f32>() / v.len().max(1) as f32).sqrt()
+}
+
+fn write_wav(path: &std::path::Path, v: &[f32]) {
+    let spec = hound::WavSpec {
+        channels: 2,
+        sample_rate: SR as u32,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+    let mut w = hound::WavWriter::create(path, spec).unwrap();
+    for &s in v {
+        w.write_sample(s).unwrap();
+    }
+    w.finalize().unwrap();
+}
+
+/// Not a check: the A/B comparisons (`target/palette-compare/*.wav` and `levels.md`). Each is
+/// the same phrase rendered with the feature off (A) and on (B); both are scaled to one RMS
+/// and the adjustments are reported, so the difference heard is the feature, not loudness. Offline
+/// renders through the same compiler and engine the app runs.
+/// `cargo test --release -p kabl-ui --test sound_palette write_comparisons -- --ignored`.
+#[test]
+#[ignore]
+fn write_comparisons() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/palette-compare");
+    std::fs::create_dir_all(&dir).unwrap();
+    let chord = |t: f32, ns: &[u8], d: f32| -> Vec<(f32, u8, bool)> {
+        ns.iter()
+            .flat_map(|&n| [(t, n, true), (t + d, n, false)])
+            .collect()
+    };
+    let mut pads = chord(0.1, &[52, 59, 64, 67], 5.5);
+    pads.extend(chord(6.0, &[48, 55, 59, 64], 5.5));
+    let lead_line: Vec<(f32, u8, bool)> = [
+        (64u8, 0.1, 0.9),
+        (67, 0.8, 1.6),
+        (71, 1.5, 3.0),
+        (69, 3.0, 3.8),
+        (67, 3.7, 4.6),
+        (64, 4.5, 6.5),
+    ]
+    .iter()
+    .flat_map(|&(n, a, b)| [(a, n, true), (b, n, false)])
+    .collect();
+    // (name, patch, change for A (off), events, seconds)
+    type Edit = fn(&mut PatchState);
+    fn find(st: &PatchState, kind: &str) -> Vec<ModuleId> {
+        st.modules
+            .iter()
+            .filter(|(_, m)| m.kind == kind)
+            .map(|(&id, _)| id)
+            .collect()
+    }
+    fn setp(st: &mut PatchState, id: ModuleId, p: &str, v: f32) {
+        st.modules.get_mut(&id).unwrap().params.insert(p.into(), v);
+    }
+    let pwm_off: Edit = |st| {
+        // Bypass the LFO → pulse width route: the pulse stays at 35 %.
+        let osc = find(st, "osc.va")[0];
+        for c in st.cables.values_mut() {
+            if matches!(&c.to, PortRef::Param { id, param } if *id == osc && param == "pw") {
+                c.params.insert("bypass".into(), 1.0);
+            }
+        }
+    };
+    let unison_off: Edit = |st| {
+        for id in find(st, "osc.va") {
+            setp(st, id, "unison", 1.0);
+        }
+    };
+    let chorus_off: Edit = |st| {
+        for id in find(st, "chorus") {
+            setp(st, id, "mix", 0.0);
+        }
+        // The Ensemble macro also reaches the chorus mix; at 0 it adds nothing either.
+        for id in find(st, "macro") {
+            setp(st, id, "m2", 0.0);
+        }
+    };
+    let drive_off: Edit = |st| {
+        for id in find(st, "drive") {
+            setp(st, id, "drive_db", 0.0);
+        }
+        for id in find(st, "macro") {
+            setp(st, id, "m3", 0.0);
+        }
+    };
+    let comparisons: [(&str, &str, Builder, Edit, &[(f32, u8, bool)], f32); 4] = [
+        ("pwm", "palette/pad", pad_patch, pwm_off, &pads, 14.0),
+        (
+            "unison",
+            "palette/strings",
+            strings_patch,
+            unison_off,
+            &pads,
+            13.0,
+        ),
+        (
+            "chorus",
+            "palette/strings",
+            strings_patch,
+            chorus_off,
+            &pads,
+            13.0,
+        ),
+        (
+            "drive",
+            "palette/lead",
+            lead_patch,
+            drive_off,
+            &lead_line,
+            8.5,
+        ),
+    ];
+    let mut md = String::from(
+        "| comparison | patch | A (off) RMS | B (on) RMS | matched RMS | A gain | B gain |\n|---|---|---|---|---|---|---|\n",
+    );
+    for (name, patch, build, off, events, secs) in comparisons {
+        let on_state = build().state().clone();
+        let mut off_state = on_state.clone();
+        off(&mut off_state);
+        let mut a = render_events(&off_state, events, secs);
+        let mut b = render_events(&on_state, events, secs);
+        let (ra, rb) = (rms_of(&a), rms_of(&b));
+        // Both to one RMS: −20 dBFS, or lower if either would then peak above −1 dBFS.
+        let pk = |v: &[f32]| v.iter().fold(0f32, |m, s| m.max(s.abs()));
+        let target = [(pk(&a), ra), (pk(&b), rb)]
+            .iter()
+            .map(|&(p, r)| r * 10f32.powf(-1.0 / 20.0) / p)
+            .fold(10f32.powf(-20.0 / 20.0), f32::min);
+        let (ka, kb) = (target / ra, target / rb);
+        a.iter_mut().for_each(|s| *s *= ka);
+        b.iter_mut().for_each(|s| *s *= kb);
+        let gap = vec![0.0f32; (SR as usize) * 2];
+        let mut ab = a.clone();
+        ab.extend_from_slice(&gap);
+        ab.extend_from_slice(&b);
+        write_wav(&dir.join(format!("compare-{name}-a-off.wav")), &a);
+        write_wav(&dir.join(format!("compare-{name}-b-on.wav")), &b);
+        write_wav(&dir.join(format!("compare-{name}-ab.wav")), &ab);
+        md += &format!(
+            "| {name} | {patch} | {:.1} | {:.1} | {:.1} | {:+.1} dB | {:+.1} dB |\n",
+            db(ra),
+            db(rb),
+            db(target),
+            db(ka),
+            db(kb)
+        );
+    }
+    std::fs::write(dir.join("levels.md"), md).unwrap();
 }

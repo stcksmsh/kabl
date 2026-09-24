@@ -20,10 +20,12 @@ Script lines (# comments):
     shot NAME                                    screenshot to OUTDIR/NAME.png
     save DIR                                     type DIR into the patch field and press Save
     sleep S
+    wait T                                       until T s after the script's first line
     midi LINE                                    a line for the virtual controller (KABL_PLAYER)
     midikill | midistart                         unplug / plug the virtual controller back in
 
-Environment: KABL_DRIVE_LOG=FILE logs each line with its wall-clock time; KABL_ARGS adds
+Environment: KABL_DRIVE_LOG=FILE logs each line with its wall-clock time; KABL_APP_LOG=FILE
+keeps kabl-ui's stderr; KABL_ARGS adds
 kabl-ui arguments; KABL_PLAYER=1 starts
 target/release/examples/midi_player first (a virtual MIDI port, `kabl-player`). Without an ALSA
 sequencer (a container) also set KABL_MIDI_PIPE=PATH and pass `--midi kabl-pipe`: the player
@@ -55,7 +57,9 @@ if os.environ.get("KABL_PLAYER"):
     player = start_player()
 extra = os.environ.get("KABL_ARGS", "").split()
 app = subprocess.Popen(["./target/release/kabl-ui", "--patch", patch, "--size", size, *extra],
-                       env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                       env=env, stdout=subprocess.DEVNULL,
+                       stderr=open(os.environ["KABL_APP_LOG"], "w") if os.environ.get("KABL_APP_LOG")
+                       else subprocess.DEVNULL)
 
 
 def x(*args):
@@ -71,7 +75,8 @@ def hits():
 
 
 def centre(key):
-    for _ in range(20):
+    # Up to 10 s: a heavy patch can take a few seconds to draw its first frames.
+    for _ in range(100):
         h = hits()
         if key in h:
             x0, y0, x1, y1 = h[key]
@@ -106,6 +111,7 @@ try:
     x("windowfocus", "--sync", wid)
     w, h = (round(int(v) * scale) for v in size.split("x"))
     log = open(os.environ["KABL_DRIVE_LOG"], "w") if os.environ.get("KABL_DRIVE_LOG") else None
+    start = time.time()
     for raw in open(script):
         line = raw.split("#")[0].strip()
         if not line:
@@ -175,6 +181,10 @@ try:
             time.sleep(0.5)
         elif cmd == "sleep":
             time.sleep(float(a[0]))
+        elif cmd == "wait":
+            # Absolute: until T s after the script started (no settle time after it).
+            time.sleep(max(0.0, start + float(a[0]) - time.time()))
+            continue
         elif cmd == "midikill":
             player.kill()
             player.wait()
