@@ -64,7 +64,14 @@ impl Voice {
             // sync unconnected (Scalar(0.0), never crosses the >0.5 edge threshold); waveform
             // 2.0 = Saw, matching this hand-wired demo's original (pre-waveform-param) sound.
             let inputs = [Signal::Buffer(&pitch), Signal::Scalar(0.0)];
-            let params = [Signal::Scalar(BASE_HZ), Signal::Scalar(2.0)];
+            let params = [
+                Signal::Scalar(BASE_HZ),
+                Signal::Scalar(2.0),
+                Signal::Scalar(50.0),
+                Signal::Scalar(0.0),
+                Signal::Scalar(1.0),
+                Signal::Scalar(15.0),
+            ];
             let mut outputs: [&mut [f32]; 1] = [&mut osc_out];
             let mut io = ProcessIo::new(&inputs, &mut outputs, &params, BLOCK);
             self.osc.process(&mut io);

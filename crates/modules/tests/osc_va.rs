@@ -46,7 +46,14 @@ fn run_block(
     waveform: f32,
 ) -> [f32; BLOCK] {
     let inputs = [pitch, sync];
-    let params = [Signal::Scalar(base_hz), Signal::Scalar(waveform)];
+    let params = [
+        Signal::Scalar(base_hz),
+        Signal::Scalar(waveform),
+        Signal::Scalar(50.0),
+        Signal::Scalar(0.0),
+        Signal::Scalar(1.0),
+        Signal::Scalar(15.0),
+    ];
     let mut buf = [0f32; BLOCK];
     let mut outputs: [&mut [f32]; 1] = [&mut buf];
     let mut io = ProcessIo::new(&inputs, &mut outputs, &params, BLOCK);
@@ -377,12 +384,29 @@ fn hard_sync_resets_phase_on_next_rising_edge() {
         SAW,
     );
 
-    let mut fresh = FullOsc::new();
-    let expected_at_sync = fresh.next(220.0, SAMPLE_RATE, OscWaveform::Saw);
-    assert_eq!(
-        buf[10], expected_at_sync,
-        "hard sync should snap phase to 0 at the sync rising edge"
+    // The edge lies halfway between samples 9 and 10 (0 → 1 crosses 0.5 at 0.5), so the
+    // phase restarts there: at sample 10 it is half a sample's increment, and the block ends
+    // (BLOCK - 10) increments later. A second oscillator at a different phase, synced by the
+    // same edge, plays the same samples from 11 on.
+    let dt = 220.0 / SAMPLE_RATE;
+    let mut state = MapState(HashMap::new());
+    module.save_state(&mut state);
+    let expected = (0.5 + (BLOCK - 10) as f32) * dt;
+    assert!((state.0["phase"] - expected).abs() < 1e-5);
+    let mut other = OscVa::new();
+    other.prepare(SAMPLE_RATE, BLOCK, &quality());
+    let other_buf = run_block(
+        &mut other,
+        Signal::Scalar(0.0),
+        Signal::Buffer(&sync_buf),
+        220.0,
+        SAW,
     );
+    for i in 11..BLOCK {
+        assert!((buf[i] - other_buf[i]).abs() < 1e-5, "sample {i}");
+    }
+    // The samples either side of the edge are band-limited, not a bare jump to -1.
+    assert!(buf[10] > -1.0 && buf[9] < buf[8] + 0.1);
 }
 
 #[test]

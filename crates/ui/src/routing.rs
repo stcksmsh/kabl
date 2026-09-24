@@ -197,6 +197,7 @@ pub fn param_label(p: &ParamInfo) -> String {
         "gate_len" => return "Gate length".into(),
         "gate_mode" => return "Gate".into(),
         "damp_hz" => return "Damping".into(),
+        "pw" => return "Pulse width".into(),
         "predelay_ms" => return "Pre-delay".into(),
         n if n.starts_with("level") && n.len() > 5 => return format!("Level {}", &n[5..]),
         _ => {}
@@ -225,6 +226,7 @@ pub fn fmt_value(p: &ParamInfo, v: f32) -> String {
         "%" => format!("{v:.0} %"),
         "dB" => format!("{:+.1} dB", v + 0.0),
         "°" => format!("{v:.0}°"),
+        "ct" => format!("{:+.0} ct", v.round() + 0.0),
         _ => format!("{v:.2}"),
     }
 }
