@@ -5,7 +5,7 @@ Trust code and git over older docs.
 
 ## Where things are
 
-- Branch `master`, local only (not pushed). The rack UI migration is **closed**: Kosta
+- Branch `master`, pushed to `origin` on 2026-09-24 at Kosta's request (sound palette WIP). The rack UI migration is **closed**: Kosta
   reviewed it hands-on and approved it (decisions.md, "Rack migration closed"). Record:
   `docs/rack-migration/README.md` (screenshots, `walkthrough.mp4`, verification).
 - Workflow: commit small working changes straight to `master`; no branches, PRs or pushes
