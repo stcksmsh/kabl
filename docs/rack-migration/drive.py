@@ -13,6 +13,7 @@ Script lines (# comments):
     pan BX BY KEY X Y                            drag bare rack at (BX, BY) so KEY lands at (X, Y)
     hold KEY DX DY | release                     press and move without releasing
     wheel KEY N [ctrl]                           N wheel notches (negative = down) over a target
+    goto KEY X Y                                 wheel-pan until KEY's centre is near (X, Y)
     key COMBO                                    e.g. ctrl+z, Escape
     type TEXT
     at X Y                                       move the pointer
@@ -70,7 +71,10 @@ def hits():
     out = {}
     for line in open(hits_file):
         k, *r = line.split()
-        out[k] = tuple(map(float, r))
+        try:
+            out[k] = tuple(map(float, r))
+        except ValueError:
+            pass  # a line caught mid-rewrite; the next read has it
     return out
 
 
@@ -179,6 +183,19 @@ try:
             glide(*centre("save"))
             x("click", 1)
             time.sleep(0.5)
+        elif cmd == "goto":
+            # Wheel-pan (the canvas pans on the wheel) until KEY's centre is near (X, Y).
+            tx, ty = round(int(a[1]) * scale), round(int(a[2]) * scale)
+            x("mousemove", tx, ty)
+            for _ in range(200):
+                cx, cy = centre(a[0])
+                if abs(cy - ty) <= 60 and abs(cx - tx) <= 120:
+                    break
+                if abs(cy - ty) > 60:
+                    x("click", 5 if cy > ty else 4)
+                else:
+                    x("click", 7 if cx > tx else 6)
+                time.sleep(0.12)
         elif cmd == "sleep":
             time.sleep(float(a[0]))
         elif cmd == "wait":

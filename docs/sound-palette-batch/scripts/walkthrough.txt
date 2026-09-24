@@ -1,0 +1,174 @@
+# Walkthrough of patches/sound-palette in the real app (scripted: a script plays the virtual
+# controller and clicks). Marks: `shot wNN-*` frames land in the shots folder with times.
+sleep 2
+# Pick up the mappings at their saved values (macros, faders, echo).
+midi cc 1 20 38
+midi cc 1 21 51
+midi cc 1 22 51
+midi cc 1 23 51
+midi cc 1 24 102
+midi cc 1 25 0
+midi cc 1 26 0
+midi cc 1 27 0
+midi cc 1 28 0
+shot w01-perform-breath
+# 1. Breath: per-voice noise through a key-tracked band.
+midi on 64 85
+midi on 71 85
+sleep 4
+midi off 64
+midi off 71
+midi on 67 85
+midi on 74 85
+sleep 3.5
+midi off 67
+midi off 74
+sleep 1
+# 2. Strings: the fader up, a chord; the oscillator's unison in its advanced area.
+midi ramp 1 24 102 30 2
+midi ramp 1 25 0 95 2
+click perform
+goto module:48 500 400
+click module:48
+click zoom:focus
+click toggle:48
+shot w02-strings-unison
+midi on 52 90
+midi on 59 90
+midi on 64 90
+midi on 67 90
+sleep 3
+midi ramp 1 21 51 115 3
+sleep 3.5
+midi off 52
+midi off 59
+midi off 64
+midi off 67
+sleep 1.5
+click toggle:48
+# 3. Pad: pulse width modulated by a slow LFO, under the strings.
+click zoom:fit
+goto module:59 500 400
+click module:59
+click zoom:focus
+click toggle:59
+shot w03-pad-pwm
+midi ramp 1 26 0 80 2
+midi ramp 1 25 95 40 2
+midi on 48 85
+midi on 55 85
+midi on 59 85
+midi on 64 85
+sleep 7
+midi off 48
+midi off 55
+midi off 59
+midi off 64
+sleep 1
+click toggle:59
+# 4. Groove from a cue button; the bass ladder opens with Energy.
+midi cc 1 42 127
+midi cc 1 42 0
+click zoom:fit
+goto module:31 500 400
+click module:31
+click zoom:focus
+sleep 3
+shot w04-bass-ladder
+midi ramp 1 20 38 110 5
+sleep 6
+midi ramp 1 20 110 60 3
+sleep 3
+# 5. Lead: layers out, LEGATO with legato glide; then MONO (every note re-attacks), back.
+midi ramp 1 25 40 0 2
+midi ramp 1 26 80 0 2
+midi ramp 1 27 0 100 2
+midi ramp 1 28 0 45 2
+click zoom:fit
+goto module:70 500 400
+click module:70
+click zoom:focus
+shot w05-lead-legato
+midi on 76 100
+sleep 0.9
+midi on 79 100
+sleep 0.1
+midi off 76
+sleep 0.8
+midi on 78 100
+sleep 0.1
+midi off 79
+sleep 0.8
+midi on 74 100
+sleep 0.1
+midi off 78
+sleep 1.4
+midi off 74
+sleep 0.6
+click sel:70.mode.1
+shot w06-lead-mono
+midi on 76 100
+sleep 0.9
+midi on 79 100
+sleep 0.1
+midi off 76
+sleep 0.8
+midi on 78 100
+sleep 0.1
+midi off 79
+sleep 0.8
+midi off 78
+sleep 0.6
+click sel:70.mode.2
+midi on 71 100
+sleep 0.5
+midi on 74 100
+sleep 0.1
+midi off 71
+sleep 0.5
+midi on 76 100
+sleep 0.1
+midi off 74
+sleep 2.5
+midi off 76
+sleep 1
+# 6. The lead's drive and the shared chorus.
+click zoom:fit
+goto module:78 500 400
+click module:78
+click zoom:focus
+click toggle:78
+shot w07-drive
+sleep 2
+click toggle:78
+click zoom:fit
+goto module:84 500 400
+click module:84
+click zoom:focus
+click toggle:84
+shot w08-chorus
+sleep 2
+click toggle:84
+click zoom:fit
+# 7. Breakdown from a button, big space, breath back; Stop, tails ring.
+midi cc 1 44 127
+midi cc 1 44 0
+midi ramp 1 27 100 0 2
+midi ramp 1 24 30 90 3
+midi ramp 1 23 51 110 4
+click perform
+shot w09-perform-break
+midi on 52 80
+midi on 59 80
+midi on 66 80
+midi on 71 80
+sleep 6
+midi off 52
+midi off 59
+midi off 66
+midi off 71
+midi cc 1 46 127
+midi cc 1 46 0
+sleep 5
+shot w10-stopped
+sleep 1
