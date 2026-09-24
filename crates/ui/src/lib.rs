@@ -769,7 +769,15 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
         .iter()
         .filter(|p| rack::visible(info, p.name, edit))
     {
-        perform::param_editor(editor, ui_state, ui, id, param, true, None);
+        perform::param_editor(
+            editor,
+            ui_state,
+            ui,
+            id,
+            param,
+            true,
+            Some(format!("dparam:{id}.{}", param.name)),
+        );
         if let Some(m) = perform::mapping(editor.state(), id, param.name) {
             ui.label(egui::RichText::new(perform::cc_text(m)).small().monospace());
         }

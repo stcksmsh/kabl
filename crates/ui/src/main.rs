@@ -72,6 +72,10 @@ struct AudioHost {
 struct CallbackTiming {
     count: AtomicU64,
     worst_ns: AtomicU64,
+    /// Seconds into the stream of the worst execution (to line it up with what happened).
+    worst_at_ms: AtomicU64,
+    /// Wall-clock time of the worst execution, ms since the Unix epoch.
+    worst_wall_ms: AtomicU64,
     /// Execution longer than the callback's audio (after the first second).
     late: AtomicU64,
     /// Execution over half of it.
@@ -109,7 +113,14 @@ impl CallbackTiming {
             return;
         }
         let budget = frames as f64 / sample_rate as f64 * 1e9;
-        self.worst_ns.fetch_max(ns, Ordering::Relaxed);
+        if self.worst_ns.fetch_max(ns, Ordering::Relaxed) < ns {
+            let ms = n as f64 * frames as f64 / sample_rate as f64 * 1e3;
+            self.worst_at_ms.store(ms as u64, Ordering::Relaxed);
+            let wall = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_millis() as u64);
+            self.worst_wall_ms.store(wall, Ordering::Relaxed);
+        }
         if ns as f64 > budget {
             self.late.fetch_add(1, Ordering::Relaxed);
         }
@@ -169,12 +180,14 @@ impl CallbackTiming {
             _ => "RT priority not tried".to_string(),
         };
         format!(
-            "{} callbacks × {frames} frames at {sample_rate} Hz · run: worst {:.0} of {:.0} µs, \
-             {} over half, {} late · arrival: worst {:.0} µs, {} late · {} xruns · {rt} \
+            "{} callbacks × {frames} frames at {sample_rate} Hz · run: worst {:.0} of {:.0} µs \
+             (at {:.1} s, wall {}), {} over half, {} late · arrival: worst {:.0} µs, {} late · {} xruns · {rt} \
              (first second: worst {:.0} µs)",
             get(&self.count),
             us(&self.worst_ns),
             fmax as f64 / sample_rate as f64 * 1e6,
+            get(&self.worst_at_ms) as f64 / 1e3,
+            get(&self.worst_wall_ms),
             get(&self.over_half),
             get(&self.late),
             us(&self.arrival_worst_ns),
@@ -224,12 +237,14 @@ impl AudioHost {
                 "no audio output device found -- editing works, playback won't".into(),
             );
         };
+        // Stereo first: the first matching config can be a mono one, which would fold the mix.
         let f32_at = |r: u32| {
-            device.supported_output_configs().ok()?.find_map(|c| {
-                (c.sample_format() == cpal::SampleFormat::F32)
-                    .then(|| c.try_with_sample_rate(r))
-                    .flatten()
-            })
+            device
+                .supported_output_configs()
+                .ok()?
+                .filter(|c| c.sample_format() == cpal::SampleFormat::F32)
+                .filter_map(|c| c.try_with_sample_rate(r))
+                .max_by_key(|c| (c.channels() == 2, c.channels()))
         };
         let config = match rate {
             Some(r) => f32_at(r),

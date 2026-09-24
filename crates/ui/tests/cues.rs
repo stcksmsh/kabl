@@ -241,3 +241,36 @@ fn macros_are_named_pinned_and_learnable_like_any_knob() {
     assert_eq!(perform::mapping(h.editor.state(), m, "m1"), Some((0, 90)));
     h.frame();
 }
+
+#[test]
+fn a_cue_shows_queued_only_when_all_its_banks_are_coming() {
+    let cue = |targets: Vec<(ModuleId, usize)>| cues::Cue {
+        n: 1,
+        name: "x".into(),
+        clock: Some(CLOCK),
+        timing: Timing::NextBar,
+        targets,
+    };
+    // Bass queued B, arp queued B: Main (B, B) is queued, Return (B, C) is not.
+    let now = |_: ModuleId| (0, Some(1));
+    assert_eq!(
+        cues::standing(&cue(vec![(BASS, 1), (ARP, 1)]), &now),
+        (false, true)
+    );
+    assert_eq!(
+        cues::standing(&cue(vec![(BASS, 1), (ARP, 2)]), &now),
+        (false, false)
+    );
+    // Landed: Main active.
+    let now = |_: ModuleId| (1, None);
+    assert_eq!(
+        cues::standing(&cue(vec![(BASS, 1), (ARP, 1)]), &now),
+        (true, false)
+    );
+    // Bass already on B, only the arp queued: still queued, not active.
+    let now = |s: ModuleId| if s == BASS { (1, None) } else { (0, Some(1)) };
+    assert_eq!(
+        cues::standing(&cue(vec![(BASS, 1), (ARP, 1)]), &now),
+        (false, true)
+    );
+}

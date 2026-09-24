@@ -194,16 +194,20 @@ pub fn launch(
 }
 
 /// How cue `n` stands against what the sequencers report (`bank_of`: playing, queued):
-/// `(active, queued)`. Active = every target plays its bank; queued = some target has its bank
-/// queued.
+/// `(active, queued)`. Active: every target plays its bank with nothing else queued. Queued:
+/// once what is queued lands, every target will play its bank, and one of them is still
+/// waiting (a cue sharing only some banks with the queued one is not shown as queued).
 pub fn standing(cue: &Cue, bank_of: &dyn Fn(ModuleId) -> (usize, Option<usize>)) -> (bool, bool) {
-    let active = !cue.targets.is_empty()
-        && cue
-            .targets
-            .iter()
-            .all(|&(s, b)| bank_of(s).0 == b && bank_of(s).1.is_none_or(|q| q == b));
-    let queued = cue.targets.iter().any(|&(s, b)| bank_of(s).1 == Some(b));
-    (active, queued && !active)
+    if cue.targets.is_empty() {
+        return (false, false);
+    }
+    let lands = |&(s, b): &(ModuleId, usize)| {
+        let (playing, queued) = bank_of(s);
+        queued.unwrap_or(playing) == b
+    };
+    let waiting = cue.targets.iter().any(|&(s, b)| bank_of(s).1 == Some(b));
+    let all = cue.targets.iter().all(lands);
+    (all && !waiting, all && waiting)
 }
 
 /// Ops removing every cue and launch-setting reference to module `removed` (a sequencer's cue

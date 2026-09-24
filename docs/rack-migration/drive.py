@@ -23,7 +23,8 @@ Script lines (# comments):
     midi LINE                                    a line for the virtual controller (KABL_PLAYER)
     midikill | midistart                         unplug / plug the virtual controller back in
 
-Environment: KABL_ARGS adds kabl-ui arguments; KABL_PLAYER=1 starts
+Environment: KABL_DRIVE_LOG=FILE logs each line with its wall-clock time; KABL_ARGS adds
+kabl-ui arguments; KABL_PLAYER=1 starts
 target/release/examples/midi_player first (a virtual MIDI port, `kabl-player`).
 """
 import os
@@ -102,10 +103,14 @@ try:
     wid = subprocess.run(["xdotool", "search", "--name", "^kabl$"], capture_output=True, text=True).stdout.split()[0]
     x("windowfocus", "--sync", wid)
     w, h = (round(int(v) * scale) for v in size.split("x"))
+    log = open(os.environ["KABL_DRIVE_LOG"], "w") if os.environ.get("KABL_DRIVE_LOG") else None
     for raw in open(script):
         line = raw.split("#")[0].strip()
         if not line:
             continue
+        if log:
+            log.write(f"{time.time():.3f} {line}\n")
+            log.flush()
         cmd, *a = line.split()
         if cmd in ("click", "rclick", "dclick"):
             glide(*centre(a[0]))

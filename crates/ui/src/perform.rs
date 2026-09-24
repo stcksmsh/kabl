@@ -495,9 +495,11 @@ pub(crate) fn param_editor(
                 let text = labels
                     .and_then(|l| l.get(k).copied())
                     .map_or(format!("{opt}"), str::to_string);
-                if ui.selectable_label(current.round() == opt, text).clicked()
-                    && current.round() != opt
-                {
+                let r = ui.selectable_label(current.round() == opt, text);
+                if let Some(h) = &hit {
+                    ui_state.record(format!("{h}.{k}"), r.rect);
+                }
+                if r.clicked() && current.round() != opt {
                     editor.set_param(id, param.name, opt);
                 }
             }

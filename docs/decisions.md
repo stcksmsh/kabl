@@ -2211,3 +2211,58 @@ were not transplanted, only its look (palettes, geometry, drawing).
   priority depends on rtkit, 96 kHz / 64 frames unsupported on this PipeWire setup, Pi 4
   unmeasured.
 - Next scope goes through the supervisor.
+
+## 2026-09-24 — Composition + Motion batch: banks, launches, cues, synced LFO, macros, MIDI buttons (supervisor scope)
+
+- Scope (supervisor, owner-authorized as one batch): Kosta can develop a piece through
+  sections while playback continues. Record, evidence and the hands-on checklist:
+  `docs/composition-batch/README.md`; the launch rules were written first, in
+  `docs/composition-batch/design.md`.
+- **Banks are params, bank A keeps the old names.** `seq` has banks A–D: bank A is `p1`…,
+  `g1`…, `v1`…, `length`, `gate_len`, `gate_mode` (plus new `r1..r8`, probability); B–D are
+  the same names prefixed `b.`/`c.`/`d.`. An old patch is bank A with no migration and no
+  schema bump; its routes, pins and CC maps keep naming what they named. Every bank param is
+  a real target, and its name carries its bank (the UI labels it `C · P3` outside the face).
+  Rejected: a separate bank table (second storage model, new op + migration, routes could not
+  target it); one param set copied in and out on switch (inactive banks not editable, targets
+  silently change meaning). `MAX_PARAMS` 28 → 143; per-step params now live in a vector
+  built at compile time (no per-block 143-entry initialisation).
+- **Edit bank is a view choice** (per sequencer, not saved, not undone; default: the playing
+  bank). The face, advanced area, drawer and module menus show the edit bank only. Inspecting
+  a control in another bank (route, pin, mapping) switches the edit bank to show it, never
+  launches. A route into a bank that is not on the face plugs into that bank's EDIT tab.
+  Face choices are shared by the four banks (stored under bank A's names).
+- **Playing bank is runtime state** carried in the sequencer; a fresh graph (startup, Load)
+  starts on the saved startup bank (`bank`, an ordinary undoable param). Bank copy/clear are
+  one Group each; names are labels (`bank.a`…).
+- **Direction** (module-wide, like transpose): FWD, REV, PEND (endpoints once per turn).
+  **Probability**: one xorshift draw per advance, seeded by module id at compile, reseeded on
+  a reset edge, carried through swaps; a rejected step is a rest.
+- **Launch engine.** Clocks count pulses per epoch (a Restart pulse starts a new epoch at
+  tick 0). `PatchEngine` keeps at most one pending launch per sequencer (a new one replaces
+  it) outside the graphs, so swaps neither lose nor replay it. When a clock starts the
+  boundary pulse, the engine arms the sequencer with the pulse's sample offset before the
+  sequencer runs (clocks are scheduled first); the sequencer switches on its first own clock
+  edge at or after that sample, so divider phase is kept and no edge is invented. Stop turns
+  a pending launch into a selection (armed, played on Run); launches while stopped are
+  selections; a Restart pulse lands pending launches; Load drops them. Commands go through an
+  `rtrb` queue as fixed-size `Command`s (unboxed: the audio thread must not free).
+- **Cues** are a `cues` module (no audio) holding up to 8 cues as presentation params
+  (`cue<N>.*`) and labels. A cue: explicit reference clock (the first clock at creation,
+  changeable), timing (default next bar), a bank or Keep per sequencer. Deleting a module
+  removes the cue entries and launch settings that name it in the same undo step. Rejected:
+  cue data on the clock (deleting the clock would take the cues).
+- **Synced LFO**: `lfo` gets `clock`/`reset` inputs, `sync` (FREE, 1/16 … 8 bars) and
+  `phase`. Tempo by the delay's interval-agreement rule; each edge gives the target phase and
+  the error is spread over the next pulse at most ±50 % of the synced rate (glides, never
+  jumps); f64 phase while synced; the last tempo is held when the clock stops. FREE is
+  sample-identical to the old LFO.
+- **Macros**: a `macro` module, four 0–1 knobs → four CV outputs, 20 ms glide, names as
+  labels. They reach destinations only through ordinary routes (no second assignment engine).
+  `MAX_OUTPUTS` 3 → 4.
+- **MIDI buttons**: `btn.<action>` = channel × 128 + CC on the module the action belongs to.
+  Fire on low → high (≥ 64) only; releases and repeated highs do nothing; no pickup; a
+  0.5 s guard after every (re)connect only records button states. A CC has one use: learning
+  a button clears continuous mappings on that CC and the reverse.
+- Not built (out of scope): song timeline, cue chaining, parameter snapshots, swing, MIDI
+  clock, relative encoders, drawn waveforms.
