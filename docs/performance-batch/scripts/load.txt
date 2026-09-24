@@ -1,0 +1,99 @@
+# ~70 s of load for callback timing: recording, CC turns on four controls, lead notes,
+# rack knob drags (live graph swaps, effect state copied at every swap), a Restart.
+sleep 2
+click perform
+click rec-start
+midi cc 1 24 53
+midi cc 1 27 60
+midi cc 1 28 44
+midi cc 1 20 28
+midi ramp 1 24 53 100 6
+midi ramp 1 27 60 90 6
+midi ramp 1 28 44 80 6
+midi ramp 1 20 28 20 6
+midi on 64 100
+dragby knob:6.resonance 0 -40
+sleep 2
+midi off 64
+midi ramp 1 24 100 53 5
+midi ramp 1 27 90 60 5
+midi ramp 1 28 80 44 5
+midi ramp 1 20 20 28 5
+midi on 71 90
+dragby knob:1.bpm 0 -20
+key ctrl+z
+sleep 3
+midi off 71
+click prestart:1
+sleep 4
+midi cc 1 24 53
+midi cc 1 27 60
+midi cc 1 28 44
+midi cc 1 20 28
+midi ramp 1 24 53 100 6
+midi ramp 1 27 60 90 6
+midi ramp 1 28 44 80 6
+midi ramp 1 20 28 20 6
+midi on 64 100
+dragby knob:6.resonance 0 -40
+sleep 2
+midi off 64
+midi ramp 1 24 100 53 5
+midi ramp 1 27 90 60 5
+midi ramp 1 28 80 44 5
+midi ramp 1 20 20 28 5
+midi on 71 90
+dragby knob:1.bpm 0 -20
+key ctrl+z
+sleep 3
+midi off 71
+click prestart:1
+sleep 4
+midi cc 1 24 53
+midi cc 1 27 60
+midi cc 1 28 44
+midi cc 1 20 28
+midi ramp 1 24 53 100 6
+midi ramp 1 27 60 90 6
+midi ramp 1 28 44 80 6
+midi ramp 1 20 28 20 6
+midi on 64 100
+dragby knob:6.resonance 0 -40
+sleep 2
+midi off 64
+midi ramp 1 24 100 53 5
+midi ramp 1 27 90 60 5
+midi ramp 1 28 80 44 5
+midi ramp 1 20 20 28 5
+midi on 71 90
+dragby knob:1.bpm 0 -20
+key ctrl+z
+sleep 3
+midi off 71
+click prestart:1
+sleep 4
+midi cc 1 24 53
+midi cc 1 27 60
+midi cc 1 28 44
+midi cc 1 20 28
+midi ramp 1 24 53 100 6
+midi ramp 1 27 60 90 6
+midi ramp 1 28 44 80 6
+midi ramp 1 20 28 20 6
+midi on 64 100
+dragby knob:6.resonance 0 -40
+sleep 2
+midi off 64
+midi ramp 1 24 100 53 5
+midi ramp 1 27 90 60 5
+midi ramp 1 28 80 44 5
+midi ramp 1 20 20 28 5
+midi on 71 90
+dragby knob:1.bpm 0 -20
+key ctrl+z
+sleep 3
+midi off 71
+click prestart:1
+sleep 4
+click rec-stop
+sleep 1

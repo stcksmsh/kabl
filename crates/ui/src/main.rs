@@ -718,7 +718,15 @@ impl eframe::App for App {
         if let (Some((path, at)), Some(t)) = (self.stats_file.as_mut(), &self.audio.timing) {
             if at.elapsed().as_secs_f32() > 1.0 {
                 *at = std::time::Instant::now();
-                let _ = std::fs::write(path, t.line(self.audio.sample_rate) + "\n");
+                let _ = std::fs::write(
+                    path,
+                    format!(
+                        "{} · {} live graph allocations · {} undo entries\n",
+                        t.line(self.audio.sample_rate),
+                        self.audio.collector.alloc_count(),
+                        self.editor.log().entries().len()
+                    ),
+                );
             }
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(500));
