@@ -67,6 +67,18 @@ impl PatchEngine {
         })
     }
 
+    /// An engine playing an already compiled graph.
+    pub fn with_compiled(handle: &Handle, compiled: CompiledPatch, voice_count: usize) -> Self {
+        let crossfade_samples = (CROSSFADE_MS / 1000.0 * compiled.sample_rate()).round() as usize;
+        PatchEngine {
+            active: Owned::new(handle, compiled),
+            incoming: None,
+            pending: None,
+            crossfade_samples,
+            voice_count,
+        }
+    }
+
     pub fn crossfade_samples(&self) -> usize {
         self.crossfade_samples
     }

@@ -454,6 +454,25 @@ pub fn compile(
     sample_rate: f32,
     voice_count: usize,
 ) -> Result<CompiledPatch, CompileError> {
+    compile_inner(patch, sample_rate, voice_count, true)
+}
+
+/// Every voice-rate module instanced per voice, whatever drives it (the compiler before
+/// single-instance chains). The reference `tests/single_instance.rs` compares against.
+pub fn compile_per_voice(
+    patch: &PatchState,
+    sample_rate: f32,
+    voice_count: usize,
+) -> Result<CompiledPatch, CompileError> {
+    compile_inner(patch, sample_rate, voice_count, false)
+}
+
+fn compile_inner(
+    patch: &PatchState,
+    sample_rate: f32,
+    voice_count: usize,
+    single_instance: bool,
+) -> Result<CompiledPatch, CompileError> {
     struct ModuleMeta {
         kind: String,
         info: &'static ModuleInfo,
@@ -625,7 +644,7 @@ pub fn compile(
     // lane exactly.
     let mut voiced: std::collections::BTreeSet<ModuleId> = metas
         .iter()
-        .filter(|(_, m)| m.kind == "midi.in")
+        .filter(|(_, m)| m.kind == "midi.in" || (!single_instance && m.info.rate == Rate::Voice))
         .map(|(&id, _)| id)
         .collect();
     loop {
@@ -1283,7 +1302,16 @@ pub fn carry_state(old: &mut CompiledPatch, new_patch: &mut CompiledPatch) {
     // A slot only in `old` (the cable stopped being delayed, or was removed) is simply dropped; a
     // slot only in `new` (a newly-cyclic edge) starts silent, same as any other fresh compile.
     for (key, &new_buf) in &new_patch.delay_slots {
-        if let Some(&old_buf) = old.delay_slots.get(key) {
+        // A source that changed between one instance and per voice: voice 0 / every voice.
+        let fallback = DelaySlotKey {
+            lane: if key.lane.is_some() { None } else { Some(0) },
+            ..*key
+        };
+        if let Some(&old_buf) = old
+            .delay_slots
+            .get(key)
+            .or_else(|| old.delay_slots.get(&fallback))
+        {
             new_patch.buffers[new_buf] = old.buffers[old_buf];
         }
     }
