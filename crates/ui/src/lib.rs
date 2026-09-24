@@ -628,8 +628,7 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) 
             if tool(ui, ui_state, "perform", "Perform", open) {
                 ui_state.perform_open = !open;
             }
-            let r = record::meter_ui(ui, &mut ui_state.meter);
-            ui_state.record("meter".into(), r.rect);
+
             if let Some(rec) = ui_state.recorder.as_ref().filter(|r| r.recording()) {
                 let t = rec.elapsed() as u64;
                 ui.label(

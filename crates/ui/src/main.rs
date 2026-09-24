@@ -125,6 +125,24 @@ impl CallbackTiming {
         }
     }
 
+    /// A short status-bar line and the full report.
+    fn summary(&self, sample_rate: f32) -> (String, String) {
+        let get = |a: &AtomicU64| a.load(Ordering::Relaxed);
+        let short = format!(
+            "callback worst {:.0}/{:.0} µs · {} late · {} xruns · RT {}",
+            get(&self.worst_ns) as f64 / 1e3,
+            get(&self.frames_max) as f64 / sample_rate as f64 * 1e6,
+            get(&self.late) + get(&self.arrival_late),
+            get(&self.xruns),
+            match self.rt.load(Ordering::Relaxed) {
+                1 => "on",
+                2 => "refused",
+                _ => "off",
+            }
+        );
+        (short, self.line(sample_rate))
+    }
+
     fn line(&self, sample_rate: f32) -> String {
         let get = |a: &AtomicU64| a.load(Ordering::Relaxed);
         let us = |a: &AtomicU64| get(a) as f64 / 1e3;
@@ -333,8 +351,8 @@ impl AudioHost {
                 Ok(()) => (
                     Some(s),
                     format!(
-                        "playing -- {sample_rate} Hz, {channels} ch{}",
-                        frames.map_or(String::new(), |n| format!(", {n}-frame buffers asked"))
+                        "playing {sample_rate} Hz, {channels} ch{}",
+                        frames.map_or(String::new(), |n| format!(", {n} frames asked"))
                     ),
                 ),
                 Err(err) => (None, format!("failed to start audio stream: {err}")),
@@ -542,10 +560,15 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::Panel::bottom("kabl-status").show(ui, |ui| {
             ui.horizontal(|ui| {
+                ui.label("Out");
+                kabl_ui::record::meter_ui(ui, &mut self.ui_state.meter);
+                ui.separator();
                 ui.label(&self.audio.status);
                 if let Some(t) = &self.audio.timing {
                     ui.separator();
-                    ui.label(t.line(self.audio.sample_rate));
+                    let (short, full) = t.summary(self.audio.sample_rate);
+                    ui.add(egui::Label::new(egui::RichText::new(short).small()).truncate())
+                        .on_hover_text(full);
                 }
             });
         });

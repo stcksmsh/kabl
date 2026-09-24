@@ -167,3 +167,62 @@ fn a_killed_process_leaves_a_readable_file_up_to_the_last_checkpoint() {
     assert_eq!(samples.len(), 9600);
     std::mem::forget(rec);
 }
+
+#[test]
+fn takes_never_overwrite_and_record_again_right_after_stop() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut rec, mut tap) = pair(SR);
+    rec.dir = dir.path().display().to_string();
+    // Someone else's file where the first take would go is left alone.
+    let path = dir.path().join("take.wav");
+    std::fs::write(&path, b"not ours").unwrap();
+    let got = rec.start_at(path.clone()).unwrap();
+    assert_eq!(got, dir.path().join("take-2.wav"));
+    let mut n = 0;
+    callback(&mut tap, &mut n, 480);
+    rec.stop();
+    assert_eq!(std::fs::read(&path).unwrap(), b"not ours");
+    // Three takes back to back within one second: three files.
+    let mut names = Vec::new();
+    for _ in 0..3 {
+        let p = rec.start().unwrap();
+        callback(&mut tap, &mut n, 480);
+        rec.stop().unwrap();
+        names.push(p);
+    }
+    names.sort();
+    names.dedup();
+    assert_eq!(names.len(), 3);
+    for p in &names {
+        assert_eq!(read(p).1.len(), 960);
+    }
+}
+
+#[test]
+fn the_meter_holds_peaks_and_latches_clips() {
+    use kabl_ui::record::{Meter, PeakTap};
+    let tap = PeakTap::default();
+    tap.feed(0.5, -0.25);
+    tap.feed(-0.1, 0.1);
+    let (p, bad) = tap.take();
+    assert_eq!((p, bad), ([0.5, 0.25], false));
+    assert_eq!(tap.take().0, [0.0, 0.0]);
+    let mut m = Meter::default();
+    m.update(p, false, 0.05);
+    assert!(!m.clip);
+    assert!((m.max_db.unwrap() - 20.0 * 0.5f32.log10()).abs() < 1e-4);
+    m.update([0.0, 0.0], false, 1.0);
+    assert!(
+        m.level[0] < 0.06 && m.level[0] > 0.04,
+        "falls 20 dB/s: {}",
+        m.level[0]
+    );
+    tap.feed(1.0, 0.0);
+    let (p, _) = tap.take();
+    m.update(p, false, 0.05);
+    assert!(m.clip);
+    tap.feed(f32::NAN, 0.0);
+    let (p, bad) = tap.take();
+    m.update(p, bad, 0.05);
+    assert!(m.nonfinite);
+}
