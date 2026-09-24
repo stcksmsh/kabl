@@ -678,11 +678,11 @@ fn midi_in_face(
     ctls: &mut Vec<Ctl>,
     off_face: &mut Vec<usize>,
 ) -> Decor {
-    const TOP: f32 = 44.0;
+    const TOP: f32 = 54.0;
     const BOTTOM: f32 = 212.0;
-    const SEL_ROW: f32 = 56.0;
+    const SEL_ROW: f32 = 52.0;
     const KNOB_ROW: f32 = 110.0;
-    const PICTURE: f32 = 56.0;
+    const PICTURE: f32 = 46.0;
     let mut sels = sels.to_vec();
     let mut knobs = knobs.to_vec();
     let height = |s: &[usize], k: &[usize]| {
@@ -701,7 +701,7 @@ fn midi_in_face(
     off_face.sort_unstable();
     let picture = height(&sels, &knobs) + PICTURE <= BOTTOM - TOP;
     let decor = if picture {
-        Decor::Keys(Rect::from_min_size(pos2(12.0, TOP), vec2(fw - 24.0, 36.0)))
+        Decor::Keys(Rect::from_min_size(pos2(12.0, TOP), vec2(fw - 24.0, 26.0)))
     } else {
         Decor::None
     };

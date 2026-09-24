@@ -203,6 +203,7 @@ pub fn param_label(p: &ParamInfo) -> String {
         "damp_hz" => return "Damping".into(),
         "pw" => return "Pulse width".into(),
         "predelay_ms" => return "Pre-delay".into(),
+        "glide_ms" => return "Glide time".into(),
         n if n.starts_with("level") && n.len() > 5 => return format!("Level {}", &n[5..]),
         _ => {}
     }
