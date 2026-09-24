@@ -61,7 +61,9 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt;
 
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
-use kabl_modules::builtins::{Clock, Delay, DelayLock, Lfo, LfoSync, MidiIn, Seq, Transport};
+use kabl_modules::builtins::{
+    Clock, Delay, DelayLock, Lfo, LfoSync, MidiIn, Noise, Seq, Transport,
+};
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::{
     registry, Module, ModuleInfo, ParamInfo, PortDirection, ProcessIo, Rate, Signal, StateBuf,
@@ -890,6 +892,9 @@ fn compile_inner(
                 registry::create(&meta.kind).expect("kind already validated when building `metas`");
             if let Some(seq) = instance.as_any_mut().downcast_mut::<Seq>() {
                 seq.seed(id);
+            }
+            if let Some(noise) = instance.as_any_mut().downcast_mut::<Noise>() {
+                noise.seed(id, lane);
             }
             let module_index = modules.len();
             modules.push(instance);

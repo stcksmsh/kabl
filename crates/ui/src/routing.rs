@@ -151,6 +151,7 @@ pub fn step_labels(kind: &str, param: &str) -> Option<&'static [&'static str]> {
         ("env.adsr", "timing") => &["CONT", "KEY"],
         ("lfo", "waveform") => &["SIN", "TRI", "SAW", "SQR", "S&H"],
         ("osc.va", "waveform") => &["SIN", "TRI", "SAW", "SQR"],
+        ("noise", "color") => &["WHITE", "PINK"],
         ("vca", "exponential") => &["LIN", "EXP"],
         ("seq", g) if g.starts_with('g') && g.len() == 2 => &["OFF", "ON"],
         ("delay", "sync") => &["FREE", "1/16", "1/8", "1/8D", "1/4"],
@@ -386,6 +387,8 @@ pub fn short_name(kind: &str) -> &'static str {
         "out" => "Out",
         "mixer" => "Mixer",
         "ringmod" => "Ring",
+        "noise" => "Noise",
+        "filter.ladder" => "Ladder",
         _ => "?",
     }
 }
