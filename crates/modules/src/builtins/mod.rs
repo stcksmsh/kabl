@@ -16,7 +16,7 @@ mod osc_va;
 mod out;
 mod reverb;
 mod ringmod;
-mod seq;
+pub mod seq;
 mod vca;
 
 pub use clock::{Clock, Transport, CLOCK_INFO};
@@ -32,5 +32,5 @@ pub use osc_va::{OscVa, OSC_VA_INFO};
 pub use out::{Out, OUT_INFO};
 pub use reverb::{Reverb, REVERB_INFO};
 pub use ringmod::{RingMod, RINGMOD_INFO};
-pub use seq::{Seq, SEQ_INFO};
+pub use seq::{Direction, Seq, SEQ_INFO};
 pub use vca::{Vca, VCA_INFO};

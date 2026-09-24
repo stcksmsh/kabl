@@ -15,7 +15,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use kabl_core::{ModuleId, PatchState};
 use kabl_engine::compile::compile;
 use kabl_engine::graph::BLOCK;
-use kabl_engine::patch_engine::{swap_channel, PatchEngine, SwapSender};
+use kabl_engine::patch_engine::{swap_channel, Command, PatchEngine, SwapSender};
 use kabl_engine::voice_allocator::VoiceAllocator;
 use kabl_modules::builtins::{DelayLock, Transport};
 use kabl_standalone::{
@@ -28,6 +28,9 @@ use std::sync::{Arc, Mutex};
 
 const RING_CAPACITY: usize = BLOCK * 256;
 
+/// (sequencer, step, playing bank, queued bank).
+type SeqReport = (ModuleId, usize, usize, Option<usize>);
+
 /// Graphs in flight from the UI thread to the audio callback. The callback drains it every
 /// callback, so it only fills if the audio thread stalls; see `AudioHost::flush`.
 const SWAP_QUEUE: usize = 4;
@@ -39,14 +42,17 @@ struct AudioHost {
     sample_rate: f32,
     collector: Collector,
     status: String,
-    /// Each sequencer's playing step, published by the audio callback.
-    steps_rx: Option<rtrb::Consumer<(ModuleId, usize)>>,
+    /// Each sequencer's playing step, playing bank and queued bank, published by the audio
+    /// callback.
+    steps_rx: Option<rtrb::Consumer<SeqReport>>,
     /// Each clock's run state, published by the audio callback.
     clocks_rx: Option<rtrb::Consumer<(ModuleId, bool)>>,
     /// Each delay's lock state and target time, published by the audio callback.
     delays_rx: Option<rtrb::Consumer<(ModuleId, DelayLock, f32)>>,
     /// Transport commands to the audio callback (runtime only, never in the op log).
     transport_tx: Option<rtrb::Producer<(ModuleId, Transport)>>,
+    /// Bank launches and cancels to the audio callback (runtime only).
+    command_tx: Option<rtrb::Producer<Command>>,
     recorder: Option<record::Recorder>,
     timing: Option<Arc<CallbackTiming>>,
     _stream: Option<cpal::Stream>,
@@ -188,6 +194,7 @@ impl AudioHost {
             clocks_rx: None,
             delays_rx: None,
             transport_tx: None,
+            command_tx: None,
             recorder: None,
             timing: None,
             _stream: None,
@@ -269,10 +276,11 @@ impl AudioHost {
             .ok()
             .and_then(|v| v.parse().ok());
 
-        let (mut steps_tx, steps_rx) = rtrb::RingBuffer::<(ModuleId, usize)>::new(256);
+        let (mut steps_tx, steps_rx) = rtrb::RingBuffer::<SeqReport>::new(256);
         let (mut clocks_tx, clocks_rx) = rtrb::RingBuffer::<(ModuleId, bool)>::new(64);
         let (mut delays_tx, delays_rx) = rtrb::RingBuffer::<(ModuleId, DelayLock, f32)>::new(64);
         let (transport_tx, mut transport_rx) = rtrb::RingBuffer::<(ModuleId, Transport)>::new(64);
+        let (command_tx, mut command_rx) = rtrb::RingBuffer::<Command>::new(64);
 
         let mut left_ring = RingBuffer::new(RING_CAPACITY);
         let mut right_ring = RingBuffer::new(RING_CAPACITY);
@@ -313,6 +321,9 @@ impl AudioHost {
                 while let Ok((id, t)) = transport_rx.pop() {
                     engine.transport(id, t);
                 }
+                while let Ok(c) = command_rx.pop() {
+                    engine.command(&c);
+                }
 
                 let frames_needed = data.len() / channels;
                 while left_ring.available() < frames_needed {
@@ -324,8 +335,8 @@ impl AudioHost {
                 }
 
                 // Full queue (UI not drawing): the UI just misses these, nothing waits.
-                engine.seq_steps(|id, step| {
-                    let _ = steps_tx.push((id, step));
+                engine.seqs(|id, step, bank, queued| {
+                    let _ = steps_tx.push((id, step, bank, queued));
                 });
                 engine.clocks(|id, running| {
                     let _ = clocks_tx.push((id, running));
@@ -378,6 +389,7 @@ impl AudioHost {
             clocks_rx: Some(clocks_rx),
             delays_rx: Some(delays_rx),
             transport_tx: Some(transport_tx),
+            command_tx: Some(command_tx),
             recorder: stream.is_some().then_some(recorder),
             timing: stream.is_some().then_some(timing),
             _stream: stream,
@@ -595,8 +607,9 @@ impl eframe::App for App {
             });
         });
         if let Some(rx) = self.audio.steps_rx.as_mut() {
-            while let Ok((id, step)) = rx.pop() {
+            while let Ok((id, step, bank, queued)) = rx.pop() {
                 self.ui_state.seq_steps.insert(id, step);
+                self.ui_state.seq_banks.insert(id, (bank, queued));
             }
         }
         if let Some(rx) = self.audio.clocks_rx.as_mut() {
@@ -712,6 +725,11 @@ impl eframe::App for App {
         for cmd in self.ui_state.transport.drain(..) {
             if let Some(tx) = self.audio.transport_tx.as_mut() {
                 // Full only if the audio thread stalls; the click is then lost, not queued.
+                let _ = tx.push(cmd);
+            }
+        }
+        for cmd in self.ui_state.launches.drain(..) {
+            if let Some(tx) = self.audio.command_tx.as_mut() {
                 let _ = tx.push(cmd);
             }
         }

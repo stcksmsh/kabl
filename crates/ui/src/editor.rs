@@ -287,8 +287,13 @@ impl PatchEditor {
         };
         let mut ops = Vec::new();
         for (p, &on) in info.params.iter().zip(on_face) {
-            let key = crate::rack::face_key(p.name);
-            let default = !info.advanced.contains(&p.name);
+            // Sequencer banks B–D share bank A's face choice.
+            let name = crate::rack::face_name(info, p.name);
+            if name != p.name {
+                continue;
+            }
+            let key = crate::rack::face_key(name);
+            let default = !info.advanced.contains(&name);
             let target = ParamTarget::Module {
                 id,
                 param: key.clone(),
@@ -332,6 +337,13 @@ impl PatchEditor {
                 }
             })
             .collect();
+        if !ops.is_empty() {
+            self.append(Op::Group { ops });
+        }
+    }
+
+    /// Applies `ops` as one undo step (nothing when empty).
+    pub fn edit(&mut self, ops: Vec<Op>) {
         if !ops.is_empty() {
             self.append(Op::Group { ops });
         }

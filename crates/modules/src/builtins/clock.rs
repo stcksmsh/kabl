@@ -70,6 +70,10 @@ pub enum Transport {
     Restart,
 }
 
+/// Pulses a block can start: one at most below ~750 bpm-equivalent rates, room to spare.
+const MAX_BLOCK_TICKS: usize = 4;
+
+#[derive(Clone, Copy)]
 pub struct Clock {
     /// f64: in f32 the phase sum drifts by about one sample per pulse at 48 kHz.
     phase: f64,
@@ -81,6 +85,13 @@ pub struct Clock {
     gap: bool,
     reset_high: bool,
     gate_high: bool,
+    /// Pulses started since the last Restart pulse (or the load); a Restart pulse starts a new
+    /// epoch at tick 0. Launch boundaries are counted in these.
+    epoch: u32,
+    ticks: u64,
+    /// `(epoch, tick, sample offset)` of each pulse started in the last block.
+    block_ticks: [(u32, u64, u32); MAX_BLOCK_TICKS],
+    n_block_ticks: usize,
 }
 
 impl Clock {
@@ -93,11 +104,25 @@ impl Clock {
             gap: false,
             reset_high: false,
             gate_high: false,
+            epoch: 0,
+            ticks: 0,
+            block_ticks: [(0, 0, 0); MAX_BLOCK_TICKS],
+            n_block_ticks: 0,
         }
     }
 
     pub fn running(&self) -> bool {
         self.running
+    }
+
+    /// `(epoch, tick)` of the next pulse to start.
+    pub fn next_tick(&self) -> (u32, u64) {
+        (self.epoch, self.ticks)
+    }
+
+    /// `(epoch, tick, sample offset)` of every pulse the last processed block started.
+    pub fn block_ticks(&self) -> &[(u32, u64, u32)] {
+        &self.block_ticks[..self.n_block_ticks]
     }
 
     /// Audio-thread call. No allocation.
@@ -148,48 +173,47 @@ impl Module for Clock {
         let n = io.block_len();
         // Yields (gate, reset) per sample from the stored state. Run once per output:
         // `ProcessIo` lends one output buffer at a time.
-        let start = (
-            self.phase,
-            self.running,
-            self.armed,
-            self.gap,
-            self.reset_high,
-            self.gate_high,
-        );
+        let start = *self;
         let walk = move || {
             (0..n).scan(start, move |st, _| {
-                let (phase, running, armed, gap, reset, gate) = st;
-                if !*running || *gap {
-                    (*gap, *reset, *gate) = (false, false, false);
+                let started = if !st.running || st.gap {
+                    (st.gap, st.reset_high, st.gate_high) = (false, false, false);
+                    false
                 } else {
-                    let g = *phase < 0.5 - EPS;
-                    if g && !*gate && *armed {
-                        (*reset, *armed) = (true, false);
+                    let g = st.phase < 0.5 - EPS;
+                    let started = g && !st.gate_high;
+                    if started && st.armed {
+                        (st.reset_high, st.armed) = (true, false);
+                        (st.epoch, st.ticks) = (st.epoch.wrapping_add(1), 0);
                     }
-                    *reset &= g;
-                    *gate = g;
-                    *phase += inc;
-                    if *phase >= 1.0 - EPS {
-                        *phase -= 1.0;
+                    if started {
+                        st.ticks += 1;
                     }
-                }
-                Some(*st)
+                    st.reset_high &= g;
+                    st.gate_high = g;
+                    st.phase += inc;
+                    if st.phase >= 1.0 - EPS {
+                        st.phase -= 1.0;
+                    }
+                    started
+                };
+                Some((*st, started))
             })
         };
-        for (o, st) in io.output(0)[..n].iter_mut().zip(walk()) {
-            *o = st.5 as u8 as f32;
+        for (o, (st, _)) in io.output(0)[..n].iter_mut().zip(walk()) {
+            *o = st.gate_high as u8 as f32;
         }
-        for (o, st) in io.output(1)[..n].iter_mut().zip(walk()) {
-            *o = st.4 as u8 as f32;
-            (
-                self.phase,
-                self.running,
-                self.armed,
-                self.gap,
-                self.reset_high,
-                self.gate_high,
-            ) = st;
+        let mut ticks = [(0, 0, 0); MAX_BLOCK_TICKS];
+        let mut count = 0;
+        for (i, (o, (st, started))) in io.output(1)[..n].iter_mut().zip(walk()).enumerate() {
+            *o = st.reset_high as u8 as f32;
+            if started && count < MAX_BLOCK_TICKS {
+                ticks[count] = (st.epoch, st.ticks - 1, i as u32);
+                count += 1;
+            }
+            *self = st;
         }
+        (self.block_ticks, self.n_block_ticks) = (ticks, count);
     }
 
     fn reset(&mut self) {
@@ -229,6 +253,13 @@ impl Module for Clock {
             if let Some(x) = s.read_f32(k) {
                 *v = x >= 0.5;
             }
+        }
+    }
+
+    /// Tick count and epoch ride along exactly (`load_state` has the rest).
+    fn carry_from(&mut self, old: &dyn Module) {
+        if let Some(o) = old.as_any().downcast_ref::<Clock>() {
+            (self.epoch, self.ticks) = (o.epoch, o.ticks);
         }
     }
 }

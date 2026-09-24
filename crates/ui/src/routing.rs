@@ -10,6 +10,7 @@
 use egui::{Color32, Id, Pos2, Rect, Sense, Stroke, Vec2 as EguiVec2};
 use kabl_core::{CableId, ModuleId, ParamTarget, PatchState, PortRef};
 use kabl_engine::compile::DEFAULT_ROUTE_AMOUNT;
+use kabl_modules::builtins::{seq, SEQ_INFO};
 use kabl_modules::{registry, ParamInfo, PortDirection, Taper};
 
 use crate::theme::theme;
@@ -138,6 +139,11 @@ pub fn source_label(state: &PatchState, from_id: ModuleId, port: &str) -> String
 
 /// Option names for stepped params, where the module defines them.
 pub fn step_labels(kind: &str, param: &str) -> Option<&'static [&'static str]> {
+    let param = if kind == "seq" {
+        seq::slot_name(param)
+    } else {
+        param
+    };
     Some(match (kind, param) {
         ("env.adsr", "timing") => &["CONT", "KEY"],
         ("lfo", "waveform") => &["SIN", "TRI", "SAW", "SQR", "S&H"],
@@ -147,13 +153,40 @@ pub fn step_labels(kind: &str, param: &str) -> Option<&'static [&'static str]> {
         ("delay", "sync") => &["FREE", "1/16", "1/8", "1/8D", "1/4"],
         ("delay", "mode") => &["MONO", "PING"],
         ("seq", "gate_mode") => &["CLOCK", "LENGTH"],
+        ("seq", "direction") => &["FWD", "REV", "PEND"],
+        ("seq", "bank") => &seq::BANK_NAMES,
         _ => return None,
     })
 }
 
-/// Human label for a param name: `attack_ms` → `Attack`.
+/// Label naming the target outside its module's face: a sequencer bank param says its bank
+/// (`B · P3`), everything else as `param_label`.
+pub fn target_label(p: &ParamInfo) -> String {
+    match seq::bank_of(p.name) {
+        Some((b, _)) if SEQ_INFO.params.iter().any(|q| std::ptr::eq(q, p)) => {
+            format!("{} · {}", seq::BANK_NAMES[b], param_label(p))
+        }
+        _ => param_label(p),
+    }
+}
+
+/// Human label for a param name: `attack_ms` → `Attack`. A sequencer bank param is labelled
+/// by its slot (`c.v2` → `V2`), as on the face.
 pub fn param_label(p: &ParamInfo) -> String {
-    match p.name {
+    let name = if SEQ_INFO.params.iter().any(|q| std::ptr::eq(q, p)) {
+        let slot = seq::slot_name(p.name);
+        if let Some(k) = slot.strip_prefix('r').filter(|k| k.len() == 1) {
+            return format!("Prob {k}");
+        }
+        match slot {
+            "bank" => return "Startup".into(),
+            "direction" => return "Direction".into(),
+            _ => slot,
+        }
+    } else {
+        p.name
+    };
+    match name {
         "base_hz" => return "Frequency".into(),
         "exponential" => return "Response".into(),
         "div" => return "Divide by".into(),
@@ -164,10 +197,9 @@ pub fn param_label(p: &ParamInfo) -> String {
         n if n.starts_with("level") && n.len() > 5 => return format!("Level {}", &n[5..]),
         _ => {}
     }
-    let base = p
-        .name
+    let base = name
         .strip_suffix(&format!("_{}", p.unit.to_lowercase()))
-        .unwrap_or(p.name);
+        .unwrap_or(name);
     let mut s = base.replace('_', " ");
     if let Some(first) = s.get_mut(0..1) {
         first.make_ascii_uppercase();
@@ -1098,7 +1130,7 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
     let routes = routes_into(editor.state(), id, param.name);
 
     ui.separator();
-    ui.heading(format!("{} · {kind} #{id}", param_label(param)));
+    ui.heading(format!("{} · {kind} #{id}", target_label(param)));
 
     // Base value entry.
     ui.horizontal(|ui| {

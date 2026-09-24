@@ -71,17 +71,18 @@ use crate::graph::BLOCK;
 
 pub type BufIdx = usize;
 
-/// `process_block`'s per-step scratch (inputs, params) is a fixed-size stack array sized to
-/// these, not a `Vec`, so building it every block doesn't allocate. Set to the largest count any
-/// of the known built-ins actually has (`mixer`: 4 inputs; `seq`: 28 params) — `compile()`
-/// checks every module against these bounds and returns `CompileError::TooManyPorts` rather than
-/// silently truncating if a future built-in needs more.
+/// `process_block`'s per-step input scratch is a fixed-size stack array sized to these, not a
+/// `Vec`, so building it every block doesn't allocate; params live in a per-step vector built at
+/// compile time. Set to the largest count any of the known built-ins actually has (`mixer`: 4
+/// inputs; `seq`: 143 params) — `compile()` checks every module against these bounds and
+/// returns `CompileError::TooManyPorts` rather than silently truncating if a future built-in
+/// needs more.
 const MAX_INPUTS: usize = 4;
-/// Output arity the audio-thread match in `process_block` handles directly (0/1/2/3 — no module
-/// currently needs more; `filter.svf`'s 3 outputs is the largest). Bump alongside a new match arm
-/// if a module ever needs more, not just this constant.
-const MAX_OUTPUTS: usize = 3;
-const MAX_PARAMS: usize = 28;
+/// Output arity the audio-thread match in `process_block` handles directly (0–4; `macro`'s 4
+/// outputs is the largest). Bump alongside a new match arm if a module ever needs more, not just
+/// this constant.
+const MAX_OUTPUTS: usize = 4;
+const MAX_PARAMS: usize = 143;
 
 /// Route amount when a `PortRef::Param` cable has no stored `amount` (+25 % of knob travel, the
 /// UI's default on drop). A stored value always wins.
@@ -189,7 +190,8 @@ enum Step {
         module_index: usize,
         inputs: Vec<InputSource>,
         output_bufs: Vec<BufIdx>,
-        params: Vec<f32>,
+        /// Base values; a modulated entry is overwritten every block from its `ParamMod`.
+        params: Vec<Signal<'static>>,
         mods: Vec<ParamMod>,
     },
     /// Voice-rate output -> global-rate input: sum `sources` (one per voice) into `dest`.
@@ -611,11 +613,16 @@ fn compile_inner(
     }
 
     // Kahn's algorithm, BTreeMap/sorted throughout for a deterministic schedule.
+    // Clocks first: a launch boundary a clock finds in this block arms the sequencers before
+    // they run it (see `process_block_with`).
     let mut queue: VecDeque<ModuleId> = indegree
         .iter()
         .filter(|&(_, &d)| d == 0)
         .map(|(&id, _)| id)
         .collect();
+    queue
+        .make_contiguous()
+        .sort_by_key(|id| metas[id].kind != "clock");
     let mut order = Vec::with_capacity(metas.len());
     while let Some(id) = queue.pop_front() {
         order.push(id);
@@ -879,8 +886,11 @@ fn compile_inner(
                 };
             }
 
-            let instance =
+            let mut instance =
                 registry::create(&meta.kind).expect("kind already validated when building `metas`");
+            if let Some(seq) = instance.as_any_mut().downcast_mut::<Seq>() {
+                seq.seed(id);
+            }
             let module_index = modules.len();
             modules.push(instance);
             module_origin.push((id, if is_voice { Some(lane) } else { None }));
@@ -892,7 +902,7 @@ fn compile_inner(
                 module_index,
                 inputs: lane_inputs,
                 output_bufs: lane_outputs,
-                params: params.clone(),
+                params: params.iter().map(|&v| Signal::Scalar(v)).collect(),
                 mods,
             });
         }
@@ -1085,8 +1095,49 @@ impl CompiledPatch {
         }
     }
 
+    /// Calls `f(id, step, playing bank, armed bank)` for every `seq` module. No allocation.
+    pub fn seqs(&self, mut f: impl FnMut(ModuleId, usize, usize, Option<usize>)) {
+        for (m, &(id, _)) in self.modules.iter().zip(&self.module_origin) {
+            if let Some(seq) = m.as_any().downcast_ref::<Seq>() {
+                f(id, seq.step(), seq.bank(), seq.armed());
+            }
+        }
+    }
+
+    /// The global `clock` module `id`, if this graph has one.
+    pub fn clock(&self, id: ModuleId) -> Option<&Clock> {
+        let i = self.module_origin.iter().position(|&o| o == (id, None))?;
+        self.modules[i].as_any().downcast_ref::<Clock>()
+    }
+
+    /// Audio thread: runs `f` on the `seq` module `id`, if this graph has one. No allocation.
+    pub fn with_seq(&mut self, id: ModuleId, f: impl FnOnce(&mut Seq)) {
+        if let Some(s) = self
+            .module_mut(id, None)
+            .and_then(|m| m.as_any_mut().downcast_mut::<Seq>())
+        {
+            f(s);
+        }
+    }
+
+    /// Audio thread: runs `f` on every `seq` module. No allocation.
+    pub fn for_each_seq(&mut self, mut f: impl FnMut(&mut Seq)) {
+        for m in &mut self.modules {
+            if let Some(s) = m.as_any_mut().downcast_mut::<Seq>() {
+                f(s);
+            }
+        }
+    }
+
     #[inline]
     pub fn process_block(&mut self) {
+        self.process_block_with(&[]);
+    }
+
+    /// `process_block`, arming the sequencers of `launches` whose boundary a clock reaches in
+    /// this block, at the boundary's sample offset (clocks are scheduled before sequencers).
+    #[inline]
+    pub fn process_block_with(&mut self, launches: &[PendingLaunch]) {
         for step in &mut self.steps {
             match step {
                 Step::Process {
@@ -1114,10 +1165,6 @@ impl CompiledPatch {
                     }
                     let input_signals = &input_signals[..inputs.len()];
 
-                    let mut param_signals = [Signal::Scalar(0.0); MAX_PARAMS];
-                    for (slot, &v) in param_signals.iter_mut().zip(params.iter()) {
-                        *slot = Signal::Scalar(v);
-                    }
                     // Block-rate modulation in knob-travel space: base + Σ source × scale,
                     // clamped once inside `from_norm`. A non-finite source leaves the base.
                     for m in mods.iter() {
@@ -1128,9 +1175,9 @@ impl CompiledPatch {
                         if !n.is_finite() {
                             n = m.base_norm;
                         }
-                        param_signals[m.index] = Signal::Scalar(m.info.from_norm(n));
+                        params[m.index] = Signal::Scalar(m.info.from_norm(n));
                     }
-                    let param_signals = &param_signals[..params.len()];
+                    let param_signals = &params[..];
 
                     // Disjoint mutable output slices, built straight into a stack array sized to
                     // the exact arity (no `Vec`). `get_disjoint_mut` returns an error (not UB) if
@@ -1168,9 +1215,27 @@ impl CompiledPatch {
                                 ProcessIo::new(input_signals, &mut outputs, param_signals, BLOCK);
                             self.modules[*module_index].process(&mut io);
                         }
+                        &[a, b, c, d] => {
+                            let [x, y, z, w] = self
+                                .buffers
+                                .get_disjoint_mut([a, b, c, d])
+                                .expect("disjoint");
+                            let mut outputs = [&mut x[..], &mut y[..], &mut z[..], &mut w[..]];
+                            let mut io =
+                                ProcessIo::new(input_signals, &mut outputs, param_signals, BLOCK);
+                            self.modules[*module_index].process(&mut io);
+                        }
                         _ => unreachable!(
                             "compile() rejects modules with more than MAX_OUTPUTS output ports"
                         ),
+                    }
+                    if !launches.is_empty() {
+                        arm_launches(
+                            &mut self.modules,
+                            &self.module_origin,
+                            *module_index,
+                            launches,
+                        );
                     }
                 }
                 Step::SumVoices { sources, dest } => {
@@ -1228,6 +1293,52 @@ impl CompiledPatch {
 
     pub fn right(&self) -> &[f32; BLOCK] {
         &self.buffers[self.out_right]
+    }
+}
+
+/// A sequencer bank change waiting for a boundary of a reference clock: the pulse
+/// `(epoch, tick)` of `clock` (see `Clock::next_tick`). Any pulse of a later epoch (a Restart)
+/// counts as reached too.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PendingLaunch {
+    pub seq: ModuleId,
+    pub bank: u8,
+    pub clock: ModuleId,
+    pub at: (u32, u64),
+}
+
+impl PendingLaunch {
+    /// The pulse `(epoch, tick)` is at or past the boundary.
+    pub fn reached_by(&self, (epoch, tick): (u32, u64)) -> bool {
+        epoch != self.at.0 || tick >= self.at.1
+    }
+}
+
+/// After module `index` ran: if it is a clock that started a boundary pulse of some launch in
+/// this block, arm that launch's sequencer from the pulse's sample offset.
+fn arm_launches(
+    modules: &mut [Box<dyn Module>],
+    origin: &[(ModuleId, Option<usize>)],
+    index: usize,
+    launches: &[PendingLaunch],
+) {
+    let Some(clock) = modules[index].as_any().downcast_ref::<Clock>() else {
+        return;
+    };
+    let id = origin[index].0;
+    let mut ticks = [(0u32, 0u64, 0u32); 4];
+    let n = clock.block_ticks().len().min(ticks.len());
+    ticks[..n].copy_from_slice(&clock.block_ticks()[..n]);
+    for l in launches.iter().filter(|l| l.clock == id) {
+        let Some(&(_, _, offset)) = ticks[..n].iter().find(|t| l.reached_by((t.0, t.1))) else {
+            continue;
+        };
+        let Some(si) = origin.iter().position(|&o| o == (l.seq, None)) else {
+            continue;
+        };
+        if let Some(seq) = modules[si].as_any_mut().downcast_mut::<Seq>() {
+            seq.arm(l.bank as usize, offset as usize);
+        }
     }
 }
 

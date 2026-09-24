@@ -31,7 +31,7 @@
 use basedrop::{Handle, Owned};
 use kabl_core::PatchState;
 
-use crate::compile::{carry_state, compile, CompileError, CompiledPatch};
+use crate::compile::{carry_state, compile, CompileError, CompiledPatch, PendingLaunch};
 use crate::graph::BLOCK;
 use crate::swap::CROSSFADE_MS;
 
@@ -47,7 +47,72 @@ pub struct PatchEngine {
     pending: Option<Owned<CompiledPatch>>,
     crossfade_samples: usize,
     voice_count: usize,
+    /// Launches waiting for their clock boundary, at most one per sequencer. Lives here, not in
+    /// a graph, so graph swaps neither lose nor replay it (docs/composition-batch/design.md).
+    launches: [Option<PendingLaunch>; MAX_PENDING],
+    /// `launches` packed, for `process_block_with`.
+    packed: [PendingLaunch; MAX_PENDING],
 }
+
+pub const MAX_PENDING: usize = 32;
+/// Sequencers one launch command can name.
+pub const MAX_TARGETS: usize = 16;
+
+/// When a launch lands, on its reference clock.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Timing {
+    Now,
+    NextStep,
+    NextBar,
+}
+
+/// Pulses per bar: 16 sixteenths, 4/4.
+pub const BAR_TICKS: u64 = 16;
+
+/// A launch command from the UI: bank per sequencer (`targets[..count]`), timed on `clock`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Launch {
+    pub clock: kabl_core::ModuleId,
+    pub timing: Timing,
+    pub targets: [(kabl_core::ModuleId, u8); MAX_TARGETS],
+    pub count: usize,
+}
+
+impl Launch {
+    pub fn new(
+        clock: kabl_core::ModuleId,
+        timing: Timing,
+        targets: &[(kabl_core::ModuleId, u8)],
+    ) -> Self {
+        let mut t = [(0, 0); MAX_TARGETS];
+        let count = targets.len().min(MAX_TARGETS);
+        t[..count].copy_from_slice(&targets[..count]);
+        Launch {
+            clock,
+            timing,
+            targets: t,
+            count,
+        }
+    }
+}
+
+/// A runtime command from the UI to the audio thread. Never in the op log, so undo, redo,
+/// reload and graph swaps cannot replay one.
+/// Unboxed on purpose: the audio thread drops what it pops, and must not free memory.
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Command {
+    Launch(Launch),
+    /// Cancel one sequencer's pending launch, or every one.
+    Cancel(Option<kabl_core::ModuleId>),
+}
+
+const NO_LAUNCH: PendingLaunch = PendingLaunch {
+    seq: 0,
+    bank: 0,
+    clock: 0,
+    at: (0, 0),
+};
 
 impl PatchEngine {
     /// Control-thread call: compiles `patch` and wraps it for deferred drop. Allocates.
@@ -64,6 +129,8 @@ impl PatchEngine {
             pending: None,
             crossfade_samples: (CROSSFADE_MS / 1000.0 * sample_rate).round() as usize,
             voice_count,
+            launches: [None; MAX_PENDING],
+            packed: [NO_LAUNCH; MAX_PENDING],
         })
     }
 
@@ -76,6 +143,8 @@ impl PatchEngine {
             pending: None,
             crossfade_samples,
             voice_count,
+            launches: [None; MAX_PENDING],
+            packed: [NO_LAUNCH; MAX_PENDING],
         }
     }
 
@@ -127,6 +196,10 @@ impl PatchEngine {
         if let Some(p) = &self.pending {
             new_patch.fresh |= p.fresh;
         }
+        // A Load drops pending launches: the loaded sequencers start on their startup banks.
+        if new_patch.fresh {
+            self.launches = [None; MAX_PENDING];
+        }
         if self.incoming.is_some() {
             self.pending = Some(new_patch);
         } else {
@@ -163,12 +236,103 @@ impl PatchEngine {
     }
 
     /// Audio-thread call: a clock transport command to every running graph (a `pending` graph
-    /// gets it through `carry_state`). No allocation.
+    /// gets it through `carry_state`). Stop turns the launches pending on that clock into
+    /// selections: armed now, they start on the sequencers' next edges (Run). No allocation.
     pub fn transport(&mut self, id: kabl_core::ModuleId, t: kabl_modules::builtins::Transport) {
         self.active.transport(id, t);
         if let Some((g, _)) = self.incoming.as_mut() {
             g.transport(id, t);
         }
+        if t == kabl_modules::builtins::Transport::Stop {
+            for slot in self.launches.iter_mut() {
+                if let Some(l) = slot.filter(|l| l.clock == id) {
+                    *slot = None;
+                    arm_all(&mut self.active, &mut self.incoming, l.seq, l.bank as usize);
+                }
+            }
+        }
+    }
+
+    /// Audio-thread call: a bank launch. Each target replaces its sequencer's pending launch.
+    /// Now, or a stopped reference clock: armed at once (a selection while stopped). Otherwise
+    /// queued for the clock's next step or bar. An unknown clock drops the command. No
+    /// allocation.
+    pub fn launch(&mut self, l: &Launch) {
+        let graph = match &self.incoming {
+            Some((g, _)) => g,
+            None => &self.active,
+        };
+        let Some(clock) = graph.clock(l.clock) else {
+            return;
+        };
+        let (epoch, next) = clock.next_tick();
+        let at = match l.timing {
+            _ if !clock.running() => None,
+            Timing::Now => None,
+            Timing::NextStep => Some((epoch, next)),
+            Timing::NextBar => Some((epoch, next.div_ceil(BAR_TICKS) * BAR_TICKS)),
+        };
+        for &(seq, bank) in &l.targets[..l.count.min(MAX_TARGETS)] {
+            self.cancel(Some(seq));
+            match at {
+                None => arm_all(&mut self.active, &mut self.incoming, seq, bank as usize),
+                Some(at) => {
+                    if let Some(slot) = self.launches.iter_mut().find(|s| s.is_none()) {
+                        *slot = Some(PendingLaunch {
+                            seq,
+                            bank,
+                            clock: l.clock,
+                            at,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    /// Audio-thread call: applies a UI command. No allocation.
+    pub fn command(&mut self, c: &Command) {
+        match c {
+            Command::Launch(l) => self.launch(l),
+            Command::Cancel(s) => self.cancel(*s),
+        }
+    }
+
+    /// Audio-thread call: drops the pending launch and the arm of sequencer `seq`, or of every
+    /// sequencer. No allocation.
+    pub fn cancel(&mut self, seq: Option<kabl_core::ModuleId>) {
+        for slot in self.launches.iter_mut() {
+            if slot.is_some_and(|l| seq.is_none_or(|s| s == l.seq)) {
+                *slot = None;
+            }
+        }
+        let disarm = |g: &mut CompiledPatch| match seq {
+            Some(id) => g.with_seq(id, |s| s.cancel()),
+            None => g.for_each_seq(|s| s.cancel()),
+        };
+        disarm(&mut self.active);
+        if let Some((g, _)) = self.incoming.as_mut() {
+            disarm(g);
+        }
+    }
+
+    /// Audio-thread call: `f(id, step, playing bank, queued bank)` for every sequencer of the
+    /// graph fading in, else the active one; queued = a pending launch or an arm. No allocation.
+    pub fn seqs(&self, mut f: impl FnMut(kabl_core::ModuleId, usize, usize, Option<usize>)) {
+        let graph = match &self.incoming {
+            Some((g, _)) => g,
+            None => &self.active,
+        };
+        graph.seqs(|id, step, bank, armed| {
+            let queued = self
+                .launches
+                .iter()
+                .flatten()
+                .find(|l| l.seq == id)
+                .map(|l| l.bank as usize)
+                .or(armed);
+            f(id, step, bank, queued)
+        });
     }
 
     /// Audio-thread call: `CompiledPatch::clocks` of the graph fading in, else the active one.
@@ -192,13 +356,19 @@ impl PatchEngine {
     /// unlike `swap::Engine::process_block` (S1's graph was mono).
     #[inline]
     pub fn process_block(&mut self, out_left: &mut [f32; BLOCK], out_right: &mut [f32; BLOCK]) {
-        self.active.process_block();
+        let mut n = 0;
+        for l in self.launches.iter().flatten() {
+            self.packed[n] = *l;
+            n += 1;
+        }
+        let launches = &self.packed[..n];
+        self.active.process_block_with(launches);
         let old_left = *self.active.left();
         let old_right = *self.active.right();
 
         let mut finished = false;
         if let Some((new_patch, elapsed)) = self.incoming.as_mut() {
-            new_patch.process_block();
+            new_patch.process_block_with(launches);
             let new_left = *new_patch.left();
             let new_right = *new_patch.right();
 
@@ -224,6 +394,25 @@ impl PatchEngine {
             *out_right = old_right;
         }
 
+        // A launch whose boundary passed was armed in every running graph this block. One whose
+        // clock is gone from the playing graph is dropped.
+        if n > 0 {
+            let graph = match &self.incoming {
+                Some((g, _)) => g,
+                None => &self.active,
+            };
+            for slot in self.launches.iter_mut() {
+                if let Some(l) = slot {
+                    let done = graph
+                        .clock(l.clock)
+                        .is_none_or(|c| l.reached_by(c.next_tick()) && c.next_tick() != l.at);
+                    if done {
+                        *slot = None;
+                    }
+                }
+            }
+        }
+
         if finished {
             // Move, not clone: drops the old `active` in place. `Owned::drop` only queues the
             // node on the collector (atomic pointer swap) — no deallocation happens here.
@@ -237,6 +426,19 @@ impl PatchEngine {
                 self.incoming = Some((pending, 0));
             }
         }
+    }
+}
+
+/// Arms `seq` with `bank` from the start of the next block in the running graphs.
+fn arm_all(
+    active: &mut CompiledPatch,
+    incoming: &mut Option<(Owned<CompiledPatch>, usize)>,
+    seq: kabl_core::ModuleId,
+    bank: usize,
+) {
+    active.with_seq(seq, |s| s.arm(bank, 0));
+    if let Some((g, _)) = incoming.as_mut() {
+        g.with_seq(seq, |s| s.arm(bank, 0));
     }
 }
 

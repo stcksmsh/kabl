@@ -12,6 +12,7 @@ use std::collections::BTreeSet;
 
 use egui::{pos2, vec2, Pos2, Rect};
 use kabl_core::{ModuleId, ModuleState, PatchState};
+use kabl_modules::builtins::seq;
 use kabl_modules::skin::{ControlKind, ModuleSkin};
 use kabl_modules::{registry, ModuleInfo, ParamInfo, PortDirection, PortInfo, Taper};
 
@@ -30,26 +31,47 @@ pub const JACK_R: f32 = 13.0;
 pub const FACE_PREFIX: &str = "face.";
 
 /// Stored params that are presentation or control metadata, never audio: faces, performance
-/// pins (`pin.*`) and MIDI CC mappings (`cc.*`). Editing them never rebuilds the graph.
+/// pins (`pin.*`), MIDI CC mappings (`cc.*`) and a sequencer's launch settings (`launch.*`).
+/// Editing them never rebuilds the graph.
 pub fn is_presentation(param: &str) -> bool {
     param.starts_with(FACE_PREFIX)
         || param.starts_with(crate::perform::PIN_PREFIX)
         || param.starts_with(crate::perform::CC_PREFIX)
+        || param.starts_with("launch.")
 }
 
 pub fn face_key(param: &str) -> String {
     format!("{FACE_PREFIX}{param}")
 }
 
+/// The name a param's face choice is stored under: a sequencer bank param shares its bank-A
+/// slot's choice (`c.v2` → `v2`), so every bank shows the same face.
+pub fn face_name<'a>(info: &ModuleInfo, name: &'a str) -> &'a str {
+    if info.kind == "seq" {
+        seq::slot_name(name)
+    } else {
+        name
+    }
+}
+
 /// Which of `info.params` are on the face: the user's choice where stored, else the default.
 pub fn primary_set(m: &ModuleState, info: &ModuleInfo) -> Vec<bool> {
     info.params
         .iter()
-        .map(|p| match m.params.get(&face_key(p.name)) {
-            Some(&v) => v >= 0.5,
-            None => !info.advanced.contains(&p.name),
+        .map(|p| {
+            let name = face_name(info, p.name);
+            match m.params.get(&face_key(name)) {
+                Some(&v) => v >= 0.5,
+                None => !info.advanced.contains(&name),
+            }
         })
         .collect()
+}
+
+/// Whether param `name` of a module is drawn at all: a sequencer shows its module-wide params
+/// and the edit bank's; every other module everything.
+pub fn visible(info: &ModuleInfo, name: &str, edit_bank: usize) -> bool {
+    info.kind != "seq" || seq::bank_of(name).is_none_or(|(b, _)| b == edit_bank)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -113,6 +135,8 @@ pub enum Decor {
     Transport(Rect),
     /// Left end of the delay's sync readout line (left of the output plate).
     Status(Pos2),
+    /// The sequencer's header strip: EDIT tabs on the left, PLAY buttons on the right.
+    Banks(Rect),
 }
 
 #[derive(Debug, Clone)]
@@ -178,6 +202,7 @@ impl Placed {
             Decor::Envelope(r) => Decor::Envelope(r.translate(d)),
             Decor::Transport(r) => Decor::Transport(r.translate(d)),
             Decor::Status(c) => Decor::Status(c + d),
+            Decor::Banks(r) => Decor::Banks(r.translate(d)),
         };
     }
 }
@@ -192,6 +217,8 @@ pub struct View<'a> {
     pub choose: Option<(ModuleId, &'a [bool])>,
     /// Module being dragged and its live world position.
     pub moving: Option<(ModuleId, kabl_core::Vec2)>,
+    /// Each sequencer's edit bank; absent = A.
+    pub edit_banks: Option<&'a std::collections::HashMap<ModuleId, usize>>,
 }
 
 pub struct Layout {
@@ -236,7 +263,13 @@ pub fn layout(state: &PatchState, v: &View) -> Layout {
         let choosing = v.choose.is_some_and(|(cid, _)| cid == id);
         let expanded = choosing || v.expanded.is_some_and(|e| e.contains(&id));
         let skin = info.skin.filter(|_| v.skins);
-        let mut pl = place_local(id, info, &primary, expanded, choosing, skin);
+        let bank = v.edit_banks.and_then(|b| b.get(&id)).copied().unwrap_or(0);
+        let shown: Vec<bool> = info
+            .params
+            .iter()
+            .map(|p| visible(info, p.name, bank))
+            .collect();
+        let mut pl = place_local(id, info, &primary, &shown, expanded, choosing, skin);
         if v.float && pl.adv.is_some() && !choosing {
             pl.overlay = true;
             pl.rect = pl.face;
@@ -299,16 +332,17 @@ fn place_local(
     id: ModuleId,
     info: &'static ModuleInfo,
     primary: &[bool],
+    shown: &[bool],
     expanded: bool,
     choosing: bool,
     skin: Option<&'static ModuleSkin>,
 ) -> Placed {
     let knob = |p: &ParamInfo| p.taper != Taper::Stepped;
     let face_knobs: Vec<usize> = (0..info.params.len())
-        .filter(|&i| primary[i] && knob(&info.params[i]))
+        .filter(|&i| shown[i] && primary[i] && knob(&info.params[i]))
         .collect();
     let face_sels: Vec<usize> = (0..info.params.len())
-        .filter(|&i| primary[i] && !knob(&info.params[i]))
+        .filter(|&i| shown[i] && primary[i] && !knob(&info.params[i]))
         .collect();
     let base_w = info.width_units as f32 * UNIT;
     let fw = match skin {
@@ -321,7 +355,9 @@ fn place_local(
     let mut ctls: Vec<Ctl> = Vec::new();
     let mut jacks: Vec<Jack> = Vec::new();
     let mut decor = Decor::None;
-    let mut off_face: Vec<usize> = (0..info.params.len()).filter(|&i| !primary[i]).collect();
+    let mut off_face: Vec<usize> = (0..info.params.len())
+        .filter(|&i| shown[i] && !primary[i])
+        .collect();
     let ins: Vec<&'static PortInfo> = info
         .ports
         .iter()
@@ -446,6 +482,9 @@ fn place_local(
             }
             "out" => decor = Decor::Speaker(pos2(fw / 2.0, 112.0)),
             "delay" => decor = Decor::Status(pos2(14.0, 228.0)),
+            "seq" => {
+                decor = Decor::Banks(Rect::from_min_size(pos2(14.0, 12.0), vec2(fw - 74.0, 26.0)))
+            }
             "clock" => {
                 decor = Decor::Transport(Rect::from_min_size(
                     pos2(12.0, 174.0),
@@ -516,10 +555,20 @@ fn place_local(
             .copied()
             .filter(|&i| knob(&info.params[i]))
             .collect();
-        // The sequencer's velocities get a row of their own, one knob per step.
-        let per_row = if info.kind == "seq" { 8 } else { 5 };
+        // The sequencer: a velocity row (then gate length) and a probability row (then
+        // transpose), one knob per step.
+        let per_row = if info.kind == "seq" { 9 } else { 5 };
         if info.kind == "seq" {
-            hk.sort_by_key(|&i| (!info.params[i].name.starts_with('v'), i));
+            hk.sort_by_key(|&i| {
+                let slot = seq::slot_name(info.params[i].name);
+                let row = match slot.as_bytes()[0] {
+                    b'v' => 0,
+                    b'g' => 1,
+                    b'r' => 2,
+                    _ => 3,
+                };
+                (row, i)
+            });
         }
         let hs: Vec<usize> = off_face
             .iter()
@@ -783,7 +832,13 @@ mod tests {
                     }
                     if !expanded {
                         let shown = m.ctls.len() + m.hidden.len();
-                        assert_eq!(shown, m.info.params.len(), "{}", m.info.kind);
+                        let visible = m
+                            .info
+                            .params
+                            .iter()
+                            .filter(|p| visible(m.info, p.name, 0))
+                            .count();
+                        assert_eq!(shown, visible, "{}", m.info.kind);
                     }
                 }
             }
@@ -851,7 +906,15 @@ mod tests {
             controls: CONTROLS,
         };
         let info = registry::info_for("osc.va").unwrap();
-        let p = place_local(1, info, &[true, true], false, false, Some(&SKIN));
+        let p = place_local(
+            1,
+            info,
+            &[true, true],
+            &[true, true],
+            false,
+            false,
+            Some(&SKIN),
+        );
         assert_eq!(p.face.width(), 210.0);
         assert_eq!(
             p.ctl("base_hz").map(|c| c.geo),
@@ -869,7 +932,15 @@ mod tests {
             assert!(p.face.contains_rect(c.geo.bounds()), "{}", c.param.name);
         }
         // Off the face: the waveform goes to the advanced area like any module's.
-        let p = place_local(1, info, &[true, false], true, false, Some(&SKIN));
+        let p = place_local(
+            1,
+            info,
+            &[true, false],
+            &[true, true],
+            true,
+            false,
+            Some(&SKIN),
+        );
         assert!(p.adv.is_some_and(|a| p
             .ctl("waveform")
             .is_some_and(|c| a.contains_rect(c.geo.bounds()))));

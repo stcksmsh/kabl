@@ -278,7 +278,7 @@ fn learn(
         "{} → {} #{id} {}",
         cc_text((ch, cc)),
         module_name(editor.state(), id),
-        routing::param_label(p)
+        routing::target_label(p)
     ));
 }
 
@@ -367,7 +367,7 @@ pub fn pin_label(state: &PatchState, pin: &Pin) -> String {
     if pin.key == TRANSPORT {
         return "Transport".into();
     }
-    pin_param(state, pin).map_or(pin.key.clone(), routing::param_label)
+    pin_param(state, pin).map_or(pin.key.clone(), routing::target_label)
 }
 
 fn pin_param(state: &PatchState, pin: &Pin) -> Option<&'static ParamInfo> {
@@ -383,7 +383,7 @@ pub fn pin_source(state: &PatchState, pin: &Pin) -> String {
     let control = if pin.key == TRANSPORT {
         "Run/Stop, Restart".to_string()
     } else {
-        pin_param(state, pin).map_or(pin.key.clone(), routing::param_label)
+        pin_param(state, pin).map_or(pin.key.clone(), routing::target_label)
     };
     let mut s = format!("{} #{} · {control}", module_name(state, pin.id), pin.id);
     if let Some(src) = mixer_source(state, pin.id, &pin.key) {
@@ -464,7 +464,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                     .map_or("", |m| m.kind.as_str()),
             )
             .and_then(|i| i.params.iter().find(|p| p.name == param))
-            .map_or(param.clone(), routing::param_label);
+            .map_or(param.clone(), routing::target_label);
             let r = ui.button("Cancel learn");
             ui_state.record("learn-cancel".into(), r.rect);
             if r.clicked() {
@@ -809,8 +809,8 @@ pub fn module_menu(
         let r = ui.menu_button("MIDI learn", |ui| {
             for p in info.params.iter().filter(|p| learnable(p)) {
                 let text = match mapping(editor.state(), id, p.name) {
-                    Some(m) => format!("{}  ({})", routing::param_label(p), cc_text(m)),
-                    None => routing::param_label(p),
+                    Some(m) => format!("{}  ({})", routing::target_label(p), cc_text(m)),
+                    None => routing::target_label(p),
                 };
                 let r = ui.button(text);
                 ui_state.record(format!("menu:learn:{}", p.name), r.rect);
