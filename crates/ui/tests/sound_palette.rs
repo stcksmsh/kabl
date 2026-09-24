@@ -1621,7 +1621,8 @@ fn write_comparisons() {
             setp(st, id, "m3", 0.0);
         }
     };
-    let comparisons: [(&str, &str, Builder, Edit, &[(f32, u8, bool)], f32); 4] = [
+    type Comparison<'a> = (&'a str, &'a str, Builder, Edit, &'a [(f32, u8, bool)], f32);
+    let comparisons: [Comparison; 4] = [
         ("pwm", "palette/pad", pad_patch, pwm_off, &pads, 14.0),
         (
             "unison",

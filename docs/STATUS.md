@@ -5,7 +5,23 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-24, Composition + Motion batch built, waiting for Kosta's hands-on review.
+Last updated: 2026-09-24, Sound Palette + Playable Voices batch built, waiting for Kosta's
+hands-on listening and keyboard review (Composition + Motion also still waiting, separately).
+
+**Sound Palette + Playable Voices (supervisor scope, 2026-09-24): built, waiting for Kosta's
+hands-on review.** New `noise`, `filter.ladder`, `chorus`, `drive`; `osc.va` pulse width,
+fine, unison 1–4, band-limited sync; keyboard expression on the audio thread (POLY / MONO /
+LEGATO, LAST/LOW/HIGH, glide OFF/ALWAYS/LEGATO, sustain pedal) with settings on each
+`midi.in`; per-voice noise in MIDI chains; six playable patches (`patches/palette/*`:
+strings, pad, lead, bass, breath, perc) and the piece patch `patches/sound-palette` with a
+scripted 9½-minute take, examples, matched-level comparisons, walkthrough and screenshots.
+Record, measurements and limits: [`sound-palette-batch/README.md`](sound-palette-batch/README.md);
+checklist: [`sound-palette-batch/CHECKLIST.md`](sound-palette-batch/CHECKLIST.md). Evidence
+was produced in a cloud container (no sound card, fifo MIDI stand-in, slower VM): the dense
+piece had late callbacks/xruns at 256 frames there and twice the stream stalled after an
+xrun burst — to be checked on the laptop. 407 tests pass, clippy clean. Pi 4 unmeasured.
+
+    cargo run --release -p kabl-ui -- --patch patches/sound-palette --perform --rate 48000 --frames 256
 
 **Current handover (supersedes every older handover note below):** the approved revision-2 rack
 is the production canvas, on real editor/engine state. Kosta reviewed it hands-on and approved

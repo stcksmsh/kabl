@@ -39,8 +39,8 @@ Patch guide (controls, CCs): [PATCHES.md](PATCHES.md). Macros are CC 20–23 on 
 - [ ] Glide **ALWAYS** vs **LEGATO**; Glide time (CC 24 in the lead patch) from snappy to slow.
 - [ ] The MIDI In face line (e.g. `LEGATO · LAST · glide 90 ms`) always says what the keys do.
 - [ ] No stuck notes: unplug the controller with keys held, plug back; All notes off in the
-  Perform panel; Load with keys held; live edits and transport with keys held. The status
-  hover shows notes held / voices sounding.
+  Perform panel; Load with keys held; live edits and transport with keys held. With
+  `KABL_STATS_FILE=/tmp/kabl-stats.txt` the stats line shows notes held / voices sounding.
 - [ ] Sustain pedal, CC 120/123 never get MIDI-learned (try Learn and press the pedal).
 
 ## Controls and UI (1440×900 and `--size 1280x800`, A-light and A-dark)

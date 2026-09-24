@@ -9,6 +9,7 @@
 //! - `strings 8×unison`: `patches/palette/strings` with both oscillators at 4-voice unison and
 //!   an 8-note chord (every voice, the most unison a realistic patch reaches).
 //! - `lead fx`: `patches/palette/lead` (sync, ladder, drive, delay, plate), a held note.
+//!
 //! Each steady, then with controller traffic and live edits: a macro edit (a graph swap)
 //! every 4th callback, three at once every 40th, and a key event every callback (the chord
 //! re-voiced note by note). Swap graphs are compiled outside the timing, as the UI does.

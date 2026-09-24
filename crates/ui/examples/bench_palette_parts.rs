@@ -13,7 +13,10 @@ fn median(p: &PatchState) -> f64 {
     let h = c.handle();
     let mut e = PatchEngine::new(&h, p, 48000.0, 8).unwrap();
     for n in [40, 52, 59, 62, 66, 71] {
-        e.key(KeyEvent::On { note: n, velocity: 100 });
+        e.key(KeyEvent::On {
+            note: n,
+            velocity: 100,
+        });
     }
     let (mut l, mut r) = ([0f32; BLOCK], [0f32; BLOCK]);
     for _ in 0..3000 {
@@ -45,7 +48,8 @@ fn main() {
     for (name, midi) in [("breath", 36), ("strings", 47), ("pad", 58), ("lead", 70)] {
         let mut q = p.clone();
         q.modules.remove(&(midi as ModuleId));
-        q.cables.retain(|_, c| c.from.module_id() != midi && c.to.module_id() != midi);
+        q.cables
+            .retain(|_, c| c.from.module_id() != midi && c.to.module_id() != midi);
         println!("without the {name} layer's voices: {:.0} µs", median(&q));
     }
     for (name, ids) in [
@@ -59,7 +63,8 @@ fn main() {
         let mut q = p.clone();
         for id in ids {
             q.modules.remove(id);
-            q.cables.retain(|_, c| c.from.module_id() != *id && c.to.module_id() != *id);
+            q.cables
+                .retain(|_, c| c.from.module_id() != *id && c.to.module_id() != *id);
         }
         println!("without the {name}: {:.0} µs", median(&q));
     }

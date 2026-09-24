@@ -1,0 +1,11 @@
+whole piece: 1604 µs per 256 frames
+without the breath layer's voices: 1541 µs
+without the strings layer's voices: 1327 µs
+without the pad layer's voices: 1505 µs
+without the lead layer's voices: 1315 µs
+without the drum room: 1557 µs
+without the plate: 1553 µs
+without the chorus: 1577 µs
+without the echo: 1585 µs
+without the drums: 1554 µs
+without the bass sequencer: 1583 µs
