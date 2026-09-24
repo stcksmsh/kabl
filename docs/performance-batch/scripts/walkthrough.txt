@@ -28,9 +28,15 @@ rclick module:22
 click menu:pin
 click menu:pin:cutoff_hz
 shot w06-pinned
+# Rename it, move it left.
+click pmenu:22.cutoff_hz
+click prename:22.cutoff_hz
+key ctrl+a
+type Lead cutoff
+key Return
+click pmenu:22.cutoff_hz
 click pleft:22.cutoff_hz
-click pleft:22.cutoff_hz
-shot w07-moved
+shot w07-renamed-moved
 sleep 2
 # MIDI learn: CC 74 from the controller, far below the value: pickup pending.
 click plearn:22.cutoff_hz
@@ -47,23 +53,33 @@ midi ramp 1 74 110 60 2
 sleep 2.5
 midi off 64
 sleep 1
+# Two knobs at once (the demo's Bass cutoff and Echo feedback on CC 24 and 27), then one undo.
+midi cc 1 24 53
+midi cc 1 27 60
+midi ramp 1 24 53 95 3
+midi ramp 1 27 60 90 3
+sleep 3.5
+shot w10-two-knobs
+key ctrl+z
+sleep 3
+shot w11-one-undo
 # Reverb: mix up to fully wet, back with undo.
 pan 1060 120 knob:32.mix 700 420
 dragby knob:32.mix 0 -150
-shot w10-reverb-wet
+shot w12-reverb-wet
 sleep 5
 key ctrl+z
-shot w11-reverb-back
+shot w13-reverb-back
 sleep 4
 # Record, stop the sequencer (the take keeps the tails), stop recording.
 click rec-start
 sleep 6
-shot w12-recording
+shot w14-recording
 click prun:1
 sleep 7
-shot w13-stopped-tails
+shot w15-stopped-tails
 click rec-stop
 sleep 1
-shot w14-saved
+shot w16-saved
 click prun:1
 sleep 4

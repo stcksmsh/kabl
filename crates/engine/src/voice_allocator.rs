@@ -45,6 +45,11 @@ impl VoiceAllocator {
         self.voices.len()
     }
 
+    /// Voices holding a note (on, not yet off).
+    pub fn held(&self) -> usize {
+        self.voices.iter().filter(|v| v.is_some()).count()
+    }
+
     /// Assigns `note_id` a voice: the lowest-index free voice if one exists, otherwise the
     /// oldest currently-held voice (stolen — whatever note it was playing loses its voice
     /// without a `note_off` of its own; the caller decides whether/how to signal that, e.g. by

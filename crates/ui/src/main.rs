@@ -721,10 +721,11 @@ impl eframe::App for App {
                 let _ = std::fs::write(
                     path,
                     format!(
-                        "{} · {} live graph allocations · {} undo entries\n",
+                        "{} · {} live graph allocations · {} undo entries · {} MIDI notes held\n",
                         t.line(self.audio.sample_rate),
                         self.audio.collector.alloc_count(),
-                        self.editor.log().entries().len()
+                        self.editor.log().entries().len(),
+                        self.midi.sink.lock().map_or(0, |s| s.allocator.held())
                     ),
                 );
             }
