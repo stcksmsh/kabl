@@ -797,7 +797,6 @@ fn card(
                         let r =
                             ui.add(egui::TextEdit::singleline(text).desired_width(CARD_W - 34.0));
                         ui_state.record(format!("plabel-edit:{key}"), r.rect);
-                        r.request_focus();
                         let enter = ui.input(|i| i.key_pressed(egui::Key::Enter));
                         let esc = ui.input(|i| i.key_pressed(egui::Key::Escape));
                         if esc {
@@ -808,6 +807,13 @@ fn card(
                                     rename_pin(editor, id, &k, &text);
                                 }
                             }
+                        }
+                        // Focus only while renaming: a field that is gone must not keep the
+                        // keyboard (undo, Escape) after Enter or Escape.
+                        if ui_state.renaming.is_some() {
+                            r.request_focus();
+                        } else {
+                            r.surrender_focus();
                         }
                     } else {
                         let r = ui

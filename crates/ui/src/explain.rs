@@ -105,6 +105,8 @@ pub struct Explain {
     pub(crate) card_flash: Option<(ModuleId, String, f64)>,
     saved: Option<SavedView>,
     editor: u64,
+    /// A text field had keyboard focus at the end of the last frame.
+    pub(crate) typing: bool,
 }
 
 impl Explain {
