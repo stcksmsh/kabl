@@ -226,3 +226,165 @@ is N1 (docs). There are no open correctness or acceptance failures in D02's own 
 
 **Implementer note on N1:** resolved. `REPORT.md` was added in 0bad86a, a docs-only commit
 with no product change after e60300c.
+
+## Combined-head recheck (D02 + D01-R1)
+
+Rechecked by a fresh, independent reviewer subagent on 2026-09-25. Read-only apart from this
+section.
+
+**Commits rechecked**
+
+- `998e06d`: the D02 docs head reviewed before. Its product code is identical to `e60300c`.
+- `326bbdc`: master with D01-R1 (PR #4). D01-R1's product diff read as `58e6622..326bbdc`.
+- `4fa0402`: the merge of origin/master into the D02 branch.
+- `4b478fd`: the one integration test commit. This is the combined product head.
+- `cf1e889`: the docs head, checked out while I ran the commands.
+  `git diff 4b478fd cf1e889 -- crates` is empty.
+
+**Merge integrity**
+
+- `git diff 326bbdc 4fa0402` over `browser.rs`, `library.rs`, `main.rs`, `tests/browser.rs`
+  and `tests/library.rs` is empty. D01-R1's files came through the merge byte for byte, and
+  nothing of theirs was lost.
+- `git diff 998e06d 4fa0402 -- crates` contains exactly D01-R1's diff, `58e6622..326bbdc`:
+  the same five files with the same stat. D02's files (`explain.rs`, `help.rs`, `editor.rs`,
+  `lib.rs`, `perform.rs`, `routing.rs`, `tests/explain.rs`) are unchanged by the merge.
+- There was no textual overlap. D02 never touched D01-R1's files, and D01-R1 never touched
+  D02's.
+- `4fa0402..4b478fd` adds only one test to `tests/explain.rs`, 20 lines.
+- In the shared docs (`decisions.md`, `HANDOFF.md`, `STATUS.md`), `326bbdc..cf1e889`
+  removes only the three places where D01-R1 was called "submitted" or "not merged", plus
+  STATUS's old "Last updated" line. `decisions.md` is append-only: 44 lines added after
+  D01-R1's entry, 0 removed.
+
+**Interaction review** (static, against the merged code)
+
+- **Escape against `browser.dialog`.** In `lib.rs` `show()`, the explanation closes on
+  Escape only when `ui_state.browser.dialog.is_none()`. `show()` runs before
+  `browser::dialogs()`, and that function drops the dialog on the same Escape
+  (`browser.rs:1280`). So one Escape closes only the dialog, and the next one closes the
+  explanation.
+  - The guard covers every `Dialog` variant: Save As, Unsaved (including the close question
+    that D01-R1's `main.rs` raises) and Rename.
+  - D01-R1's new `main.rs` branch, "close while a dialog is open", only sets `last_message`.
+    It does not touch the dialog or the explanation.
+  - `a_save_dialog_over_an_explanation_keeps_escape_and_the_document` checks this for Save
+    As.
+  - Unsaved and Rename rely on the same guard and have no dedicated test. That is an
+    observation, not a finding.
+- **`replace_patch` and `PatchEditor::instance`.**
+  - D01-R1 did not change `replace_patch`. It still builds a new editor through
+    `PatchEditor::from_log`, which calls `next_instance()`, so the next frame's
+    `Explain::validate` closes the explanation.
+  - D01-R1's `Pending::OpenFolder` now runs `repair_folder` before `read_patch`. On a failed
+    load the editor is untouched, so the explanation correctly stays, which matches "Your
+    sound is unchanged".
+  - A `then` pending after a successful save goes through `perform` → `replace_patch`, and
+    closes the explanation as intended.
+  - A successful save, Save As or folder save keeps the same editor, and the explanation
+    stays open. That is correct, because the patch is the same.
+- **Document dirty state.** `is_modified` still compares `doc.saved` with `editor.state()`.
+  D01-R1 changes only the fields `save()` writes: `saved`, plus `name` taken from the
+  library.
+  - D02's explanation state is view-only. `explain.rs` makes no editor calls except
+    `state()` and `instance()`, and `SavedView` holds only UI fields.
+  - The integration test's `unchanged_since` confirms that opening an explanation and a Save
+    As dialog, and cancelling them, leaves the document clean.
+- **Folder save and repair paths.** `save_folder`, `repair_folder` and the fail-point hooks
+  touch only the filesystem and `ui.doc`, never the editor or `ui.explain`. D02 has no code
+  on these paths. I found no interaction.
+
+**Commands run** (at `cf1e889`, whose product code is identical to `4b478fd`)
+
+- `cargo test -p kabl-ui`: exit 0, every suite ok. `explain` is 19 passed and 1 ignored,
+  `browser` is 17 passed, `library` is 23 passed and 1 ignored, and the unit tests are 13
+  passed.
+- `cargo clippy --workspace --all-targets`: exit 0, 0 warnings.
+- `cargo test --workspace`: every suite ok. Summed over the `test result:` lines, it is
+  **479 passed, 0 failed, 15 ignored**, which matches `evidence/test-workspace.txt`.
+
+**Docs checked**
+
+- The `decisions.md` D02 entry matches the code:
+  - `instance()` is used instead of a reset in `replace_patch`;
+  - the Escape order matches the `show()` chain;
+  - it cites the 512-module path bound, the 24-row hop limit and `routing::reaches`.
+  - It does not restate or change the D01-R1 entry.
+- HANDOFF: the new D02 section is accurate. D01-R1's section keeps its body. Only its
+  heading changed, to "merged through PR #4, owner checks pending", which is correct.
+- STATUS: D01-R1 is "merged (PR #4); owner checks pending". Its body text is unchanged
+  (457 tests at b579fb3 is D01-R1's own figure). The D02 paragraph and the headline are
+  accurate, and owner review is pending for D01, D01-R1 and D02.
+- README: these are accurate:
+  - the combined head `4b478fd`;
+  - merge `4fa0402`;
+  - 479/0/15;
+  - clippy clean;
+  - 19 explain tests;
+  - "D01-R1-owned files were not touched";
+  - the new `*-dark-save-as-over-explain` shots. I viewed the 1440×900 one: Save As over an
+    open Attack explanation.
+  - the walkthrough stats (37 late, 16.7 ms worst, 878 arrival late, 12 xruns), which match
+    `walkthrough-stats.txt`.
+
+**Findings**
+
+- **C1 (minor, docs), `docs/musical-controls/REPORT.md`.** At `cf1e889`, REPORT still
+  describes the state before the integration:
+  - line 15: "READY FOR INTEGRATION; AWAITING D01-R1. Not merge-ready";
+  - line 52: the integration row reads "**not done, waiting on D01-R1**";
+  - line 137: "Not yet integrated with D01-R1";
+  - the regression row still gives `e60300c: 465 passed`;
+  - the layout row says `img/ (8 shots)`, but there are 10.
+
+  Scenario: Kosta opens the report the brief asks for and reads that D02 is still waiting
+  on D01-R1. That contradicts the README, HANDOFF, STATUS and decisions.md. The report's own
+  resume step 6 ("update this report with the integration commit") was not done.
+
+  Correction: update REPORT with the merge `4fa0402`, the product head `4b478fd`, 479/0/15
+  and clean clippy at `4b478fd`, 10 shots, and a pointer to this recheck. Change the
+  engineering status accordingly, and keep owner review pending.
+- **C2 (nit, docs), `docs/musical-controls/README.md:139-140`.** The README still says "The
+  append-only `docs/decisions.md` entry, plus HANDOFF and STATUS, wait for integration after
+  D01-R1". They have been written. Correction: say that they were added at `cf1e889`.
+- **C3 (nit, docs), `docs/musical-controls/README.md`, Verification.** The README says "The
+  screenshots and walkthrough were re-recorded from the release build of 4b478fd." In git,
+  `cf1e889` changes only the two new `save-as-over-explain` PNGs and `walkthrough.mp4`. The
+  other eight PNGs last changed in `2516be4` (the `0987db5` build). The full `shots.txt` may
+  have been rerun and produced byte-identical files, but the record does not show that.
+  Correction: say either that the eight earlier shots re-rendered identically at `4b478fd`,
+  or that they are from `0987db5` and D01-R1 does not change what they show.
+
+  Outside D02's scope, and not a finding against D02: D01-R1's `Pending::OpenFolder` calls
+  `repair_folder` and then `read_patch`, which calls it again. The second call finds no
+  marker and does nothing, so this is harmless.
+
+**Verdict.** There is **no blocker or major issue**. The merge keeps both behaviours.
+D01-R1's files are identical to master, and D02's are identical to the reviewed `e60300c`
+code. The one real interaction point, Escape against `browser.dialog`, is correct and
+tested. Tests, the workspace run and clippy pass on the combined head. Nothing here
+prevents a merge-ready claim for D02's engineering. C1 should be fixed first, because the
+report itself still says "Not merge-ready". C2 and C3 are wording. Owner review stays
+pending, and reviewer approval is not owner approval.
+
+**Limits of this recheck**
+
+- The interaction review is static, plus the test, workspace and clippy runs.
+- I did not run the real app or play the re-recorded walkthrough, and I did not listen to
+  the audio. I viewed one screenshot: `1440x900-dark-save-as-over-explain.png`.
+- I did not re-review D01-R1's own correctness. That belongs to its own review, in
+  `docs/find-play-save/repair-1/REVIEW.md`. I checked only that it survived the merge and how
+  it interacts with D02.
+- There is no test for Escape with the Unsaved or Rename dialog over an explanation. I
+  judged those cases correct by reading the code.
+- The runs were in the cloud container, not on laptop hardware.
+
+**Implementer responses to the combined-head recheck:**
+
+- C1: fixed in d721d57, which was committed while this recheck was running. REPORT.md now
+  gives the merge (4fa0402), the combined head 4b478fd, 479/0/15, 10 screenshots and the
+  integration row, and points here.
+- C2: fixed. The README now says the decisions.md, HANDOFF and STATUS updates are written.
+- C3: fixed with a clarification. All ten screenshots were re-rendered from 4b478fd. Eight
+  came out byte-identical to the 0987db5 renders, which is why git shows no change for them.
+  The README now says so.

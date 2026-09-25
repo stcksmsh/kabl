@@ -136,8 +136,8 @@ instead:
 - **Ring modulator.** The factory sounds use it as a depth control (macro × LFO).
 - **Ladder resonance.** Above about 91 % it self-oscillates.
 
-These notes are D02 implementation records. The append-only `docs/decisions.md` entry, plus
-HANDOFF and STATUS, wait for integration after D01-R1, as the brief says.
+The `docs/decisions.md` entry ("D02: musical controls that explain themselves") and the
+HANDOFF and STATUS updates were written after the D01-R1 integration, as the brief asks.
 
 ## Files
 
@@ -175,8 +175,10 @@ D01-R1-owned files were not touched: `browser.rs`, `library.rs`, `main.rs` and
 Cloud container: Ubuntu 24.04.4, 4 vCPU VM, rustc 1.94.1. No sound card, no ALSA sequencer,
 no rtkit. Combined head tested: **4b478fd**. That is D02 (product last changed at e60300c)
 merged with master containing D01-R1 (merge 4fa0402), plus one integration test. Later
-commits change docs and evidence only. The screenshots and walkthrough were re-recorded from
-the release build of 4b478fd.
+commits change docs and evidence only. Every screenshot and the walkthrough were re-rendered
+from the release build of 4b478fd. Eight of the ten PNGs came out byte-identical to the
+0987db5 renders, so git shows no change for them; the two Save As shots and the video are
+new.
 
 - `cargo test --workspace` at 4b478fd: **479 passed, 0 failed, 15 ignored**, exit 0
   ([`evidence/test-workspace.txt`](evidence/test-workspace.txt)). New:
