@@ -5,7 +5,7 @@ Batch ID / outcome: D03 — Signal inspection and three listening recipes (+ own
   operational logging). A musician can inspect one signal, tell a broken connection from an
   unobserved trigger, and try three short listening experiments without losing work.
 Starting commit: e19a6ff (origin/master; product = 4eb4104 D02 merge, plus the D03 brief)
-Submitted head commit: see "Commits" below
+Submitted head commit: the branch head containing this file (docs only after 05734dd)
 Branch / pushed remote / PR if environment-required: claude/d02-musical-controls-knjmgu on
   origin (the cloud environment requires this branch name); PR for Kosta: see "Commits".
 Engineering status: submitted
@@ -14,9 +14,13 @@ Owner-review status: pending
 
 ## Commits
 
-- Starting: `e19a6ff`. Implementation commits `34bd347` … `496a5c2` (reviewed), review
-  fixes `f28d262`, docs `2967b06` and later.
-- Tested / reviewed / submitted: filled in at the end of this file ("Final state").
+- Starting: `e19a6ff` (origin/master at start; product code = `4eb4104`).
+- First reviewed head: `496a5c2`. Review fixes: `f28d262` (F1–F10); recheck at `2967b06`
+  found N1–N3; fixes `05734dd`; second recheck at `05734dd`: all resolved, no new findings.
+- **Tested product head: `05734dd`** (`cargo test --workspace` 519/0/15, clippy clean:
+  `evidence/test-workspace.txt`, `evidence/clippy.txt`). **Reviewed head: `05734dd`.**
+  **Submitted head:** the next commit(s) change only docs (`REPORT.md`, `README.md`,
+  `HANDOFF.md`, `STATUS.md`, evidence text); product code equals `05734dd`.
 
 ## What now works (user-facing)
 
@@ -80,14 +84,22 @@ Environment: cloud container, Ubuntu 24.04.4, Linux 6.18.44 x86_64, 4 vCPU, rust
 D-Bus (for wireplumber) but no system D-Bus (RT priority refused), MIDI through the
 `KABL_MIDI_PIPE` fifo stand-in. No audio or MIDI hardware.
 
-Commands and totals: "Final state" below. Earlier runs: 512/0/15 at `496a5c2` (reviewer's
-own run too), 518/0/15 at `f28d262`.
+- `cargo test --workspace` at `05734dd`: exit 0, **519 passed, 0 failed, 15 ignored**
+  (`evidence/test-workspace.txt`); reviewer's own run at `05734dd`: same totals.
+- `cargo clippy --workspace --all-targets` at `05734dd`: exit 0, no warnings
+  (`evidence/clippy.txt`).
+- Earlier: 512/0/15 at `496a5c2`, 518/0/15 at `f28d262`.
+- Focused: `cargo test -p kabl-engine --test probe` (9), `-p kabl-ui --test
+  signal_inspection` (21), `-p kabl-standalone` (applog unit 4, `applog_*` 3,
+  `rt_with_logging` 1).
 
 ## Subagent review
 
 Fresh reviewer subagent; base `e19a6ff`, head `496a5c2`; [REVIEW.md](REVIEW.md). Findings:
-F1–F3 major, F4–F8 minor, F9–F10 nits; all fixed in `f28d262` (responses in REVIEW.md).
-Recheck: see REVIEW.md "Recheck".
+F1–F3 major, F4–F8 minor, F9–F10 nits, fixed in `f28d262`. Recheck at `2967b06`: F1
+partly (N1 major: a measurement window carried across a wiring change), N2/N3 nits, F6
+partly (accepted: the kabl-ui callback closure itself is not under an allocation check).
+Fixed in `05734dd`; second recheck at `05734dd`: N1–N3 and F1 resolved, no new findings.
 
 ## Real-app evidence
 
@@ -118,7 +130,10 @@ line added; the `watch_stats.py` regex still matches). No plugin automation invo
   restore replaces the redo tail like any edit.
 - Only outputs are measured; one at a time; up to 16 voice lanes.
 - No injected audio-device fault; stream-error handling tested at the hand-off function.
-- Evidence media predates the review fixes except the knob-drag screenshot.
+- Evidence media (walkthrough, screenshots, logging and perf runs, package) was recorded at
+  `ef9ed7b`–`db29445`, before the review fixes; the fixes change staleness handling, the
+  aid's wording for VCAs/filters and log text, not the flows shown. The knob-drag check
+  (`scripts/knob-drag.txt`, `img/1440x900-light-knob-drag-live.png`) is at `f28d262`.
 
 ## Owner checklist
 

@@ -1,7 +1,8 @@
 # D03 — Signal inspection and three listening recipes
 
 Owner-authorized batch (brief: [`../product-research/briefs/D03.md`](../product-research/briefs/D03.md)).
-Engineering: submitted, see [REPORT.md](REPORT.md) and [REVIEW.md](REVIEW.md). **Owner review:
+Engineering: submitted (tested and reviewed product head `05734dd`), see
+[REPORT.md](REPORT.md) and [REVIEW.md](REVIEW.md). **Owner review:
 pending** ([CHECKLIST.md](CHECKLIST.md)). Design note written first: [design.md](design.md).
 
 Built in a cloud session on branch `claude/d02-musical-controls-knjmgu` (the environment
@@ -136,6 +137,11 @@ priority (no system D-Bus).
   durations, recipe/compare/inspect transitions), `evidence/logging-blocked.txt` (log
   directory blocked: the app runs; the status bar shows it), `evidence/logging-badload.txt`
   (a missing `--patch`: ERROR line written before exit 1).
+- **Knob turned while inspecting** (review F3/N1): [`scripts/knob-drag.txt`](scripts/knob-drag.txt),
+  `img/1440x900-light-knob-drag-live.png` — VCA #4 out stays live while Filter #3 Cutoff is
+  dragged continuously (a rebuild per frame), labelled as measured on the edited version.
+- **Tests / clippy at `05734dd`**: [`evidence/test-workspace.txt`](evidence/test-workspace.txt)
+  (519/0/15), [`evidence/clippy.txt`](evidence/clippy.txt).
 - **Measurements**: [`evidence/perf.md`](evidence/perf.md).
 - **Package**: [`evidence/package.txt`](evidence/package.txt).
 

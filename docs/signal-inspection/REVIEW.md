@@ -142,3 +142,21 @@ Fixes in the commit after `2967b06` ("D03 recheck fixes N1-N3"); `cargo test --w
 | N3 | **Fixed.** `hand_off_stream_error` returns early for an xrun without a message (it owns nothing; callers count xruns themselves), so xruns never fill the queue ahead of a real device error. |
 
 ## Second recheck
+
+- **Second recheck head:** `05734dd`. I reviewed `git diff 2967b06..05734dd -- crates docs/signal-inspection/design.md`.
+- **Tests run at `05734dd`, debug target only:**
+  - `cargo test -p kabl-engine --test probe`: 9 passed, including `a_wiring_change_mid_window_starts_the_measurement_over` and `a_knob_being_turned_does_not_stop_the_measurement`.
+  - `cargo test --workspace`: **519 passed, 0 failed, 15 ignored**.
+  - `cargo clippy --workspace --all-targets`: no warnings.
+- **N1 reproduction rerun:** the same scratch program as in the recheck, unchanged, against this head.
+
+| ID | Status | Evidence |
+|---|---|---|
+| N1 | Resolved | `compile_inner` sets `topology_of(patch)`, a hash of module ids with kinds plus cable ids with `from`/`to`. `continue_probe_from` now also requires `old.topology == self.topology`. These are the same ingredients the UI's `inspect::topology()` uses to raise its floor, so the engine restarts a window exactly when the UI starts rejecting older generations. The hash is computed on the compile (control) thread; the audio-thread check is one `u64` compare. The scratch rerun, with the cable into VCA #3 removed 5, 20 or 37 blocks into a window, printed for every case: `first new report gen 2 fading true peak 0.000`, `summary peak 0.000`. In the recheck it was 0.075 Live. The knob-drag test still passes, so param-only swaps still continue. design.md now matches. |
+| N2 | Resolved | Both binaries log `errors_lost - lost_seen` and then update `lost_seen`, with the line reading "in that time". The kabl-ui baseline only moves when a WARN line is written. That cannot under-report, because a lost error implies a full queue, and a full queue means some errors were delivered, which triggers the line. |
+| N3 | Resolved | `hand_off_stream_error` returns before pushing when the error is an xrun with no message. The returned error is dropped with nothing owned, so nothing is freed. Both callers count xruns before the call (kabl-ui in `t_err.error`, standalone in `xruns_cb`). An xrun that does carry a message still goes through the queue and is forgotten if the queue is full, which is correct. |
+| F1 | **Resolved** | The UI part was already fixed at `2967b06`; the engine part (N1) is now fixed too. The removed-connection case shows no stale level as Live, as the N1 scratch run shows through `Inspect::rebuilt` / `accept` / `summary`. |
+
+New findings: none.
+
+Limits: I did not run the real app. N1 was verified through the engine and `Inspect` APIs, not the GUI. Only removing a cable was exercised; adding a cable and changing a module's kind go through the same signature check but were not run. This is not approval, and it is not Kosta's hands-on review.
