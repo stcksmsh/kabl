@@ -109,7 +109,8 @@ are listed under their directory name.
   says nothing was overwritten. If putting back fails too, the message says where the old
   files are instead. A save killed half way is settled on the next open or save of that
   folder (kept if the new log is in place, otherwise rolled back; the open message says so).
-  `.kabl-save` is reserved: one kabl didn't make is never touched and blocks saving there.
+  `.kabl-save` is reserved: a non-empty one kabl didn't make is never touched and blocks
+  saving there (an empty one is removed).
 - Test hook: `KABL_SAVE_FAIL=<stage>` (`staged`, `replace:dir`, `replace:meta.toml`,
   `replace:checkpoint.json`, `replace:log.jsonl`) makes saves fail at that stage, for
   scripted runs only.
