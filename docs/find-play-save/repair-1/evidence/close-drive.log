@@ -1,4 +1,4 @@
-== close-1-cancel-save (video t0 = first line of part 1)
+== close-1-cancel-save
 1790344832.743 sleep 2
 1790344835.044 click sound:factory:palette/pad
 1790344835.871 click open
@@ -26,7 +26,7 @@
 1790344855.096 click dlg:save
 1790344855.962 exited 5
 1790344855.962 = exited 0
-== close-2-failed-save (video t0 = first line of part 1)
+== close-2-failed-save
 1790344859.034 sleep 2
 1790344861.334 click filter:user
 1790344862.202 click sound:user:closed-pad
@@ -51,7 +51,7 @@
 1790344877.043 click dlg:discard
 1790344877.915 exited 5
 1790344877.915 = exited 0
-== close-3-dialog-open (video t0 = first line of part 1)
+== close-3-dialog-open
 1790344880.987 sleep 2
 1790344883.288 click sound:factory:palette/lead
 1790344884.116 click open
@@ -73,7 +73,7 @@
 1790344897.555 click dlg:discard
 1790344898.416 exited 5
 1790344898.416 = exited 0
-== close-4-unedited (video t0 = first line of part 1)
+== close-4-unedited
 1790344901.472 sleep 2
 1790344903.773 click sound:factory:palette/lead
 1790344904.590 click open
