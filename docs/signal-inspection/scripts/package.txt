@@ -1,0 +1,20 @@
+# The installed package, fresh HOME, checkout patches hidden: the recipes find their
+# patches and the log lands in the user's state directory.
+sleep 3
+click learn-open
+click recipe:pluck-to-pad
+sleep 1
+click recipe-inspect
+click recipe-note
+sleep 1.5
+shot package-recipe
+click learn-close
+click learn-open
+click recipe:interlocking
+sleep 1
+click recipe-inspect
+click why
+sleep 2
+shot package-interlocking-stopped
+key ctrl+q
+exited 5

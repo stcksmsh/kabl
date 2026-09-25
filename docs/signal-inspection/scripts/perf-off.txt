@@ -1,0 +1,2 @@
+# Inspector closed: the piece runs 60 s.
+sleep 62

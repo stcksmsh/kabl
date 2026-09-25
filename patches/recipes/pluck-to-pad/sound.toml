@@ -1,0 +1,10 @@
+name = "Recipe: Pluck to Pad"
+category = "Study"
+tags = [
+    "recipe",
+    "envelope",
+    "keyboard",
+]
+description = "Starting patch of the Pluck to pad recipe (Learn): a plucked saw with its envelope on the Perform panel."
+keys = true
+sequence = false

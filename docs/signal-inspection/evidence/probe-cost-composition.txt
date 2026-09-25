@@ -1,0 +1,7 @@
+patch patches/composition, 39 modules; tap on #26 filter.svf output 0; 60 s per run, 3 runs per mode, interleaved; 48000 Hz, 256-frame callbacks (budget 5333 µs)
+memory: tap state 720 B per graph, report 552 B, report queue 8 × 552 B
+mode             callbacks   p50 µs   p90 µs   p99 µs  p99.9 µs   max µs  mean µs
+off                  33750    276.8    316.4    492.6     883.4  59128.9    294.2
+on                   33750    287.2    328.0    530.9    1002.2   4869.3    303.6
+off+swaps            33750    276.6    328.9    536.0    1223.9  11449.6    298.2
+on+select+swaps      33750    285.8    574.4    842.1    1311.7   4752.5    351.5

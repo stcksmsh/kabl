@@ -1,0 +1,10 @@
+commit 99c28d3 · cargo run --release -p kabl-engine --example probe_cost -- patches/composition 60 3
+patch patches/composition, 39 modules; tap on #26 filter.svf output 0; 60 s per run, 3 runs per mode, interleaved; 48000 Hz, 256-frame callbacks (budget 5333 µs)
+memory: tap state 720 B per graph, report 560 B, report queue 8 × 560 B
+mode             callbacks   p50 µs   p90 µs   p99 µs  p99.9 µs   max µs  mean µs
+off                  33750    211.9    248.2    415.1     887.6   3320.8    220.3
+on                   33750    223.1    249.9    387.1    1605.9   3532.5    228.6
+off+swaps            33750    215.2    243.9    361.1    1564.7   5471.5    222.7
+on+select+swaps      33750    216.3    431.4    674.8     926.3   6638.5    256.6
+off+edits+topo       33750    216.3    436.2    707.5    1640.0   4016.2    265.3
+on+edits+topo        33750    226.2    446.9    699.4     925.0   4710.4    266.6

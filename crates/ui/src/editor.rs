@@ -373,6 +373,19 @@ impl PatchEditor {
         }
     }
 
+    /// Applies `ops` (a whole-patch restore, `compare::diff`) as one undo step. Ids the
+    /// restore brings back are never handed out again.
+    pub fn restore_to(&mut self, ops: Vec<Op>) {
+        self.edit(ops);
+        let s = self.log.state();
+        self.next_module_id = self
+            .next_module_id
+            .max(s.modules.keys().max().map_or(0, |m| m + 1));
+        self.next_cable_id = self
+            .next_cable_id
+            .max(s.cables.keys().max().map_or(0, |c| c + 1));
+    }
+
     /// Sets or removes a module's text label (`Op::SetLabel`). One undo step, no audio rebuild.
     pub fn set_label(&mut self, id: ModuleId, key: &str, text: Option<String>) {
         if self.log.state().modules.contains_key(&id)

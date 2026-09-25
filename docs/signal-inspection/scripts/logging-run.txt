@@ -1,0 +1,28 @@
+# Logging evidence: an edit, a Save As that fails (KABL_SAVE_FAIL=staged), a recording that
+# fails by itself after 0.5 s (KABL_RECORD_FAIL_AFTER), a recipe start, Ctrl+Q. Start on Init Keyboard with Perform.
+sleep 3
+shot start
+click inspect-open
+click module:4
+click inspect-port:4.out
+click knob:4.gain
+fill base-entry:4.gain 0.5
+key Return
+sleep 1
+click save-as
+sleep 0.5
+click dlg:save
+sleep 1
+key Escape
+click rec-start
+midi on 60 90
+sleep 2
+midi off 60
+sleep 2
+click learn-open
+click recipe:filter-movement
+sleep 1
+click dlg:discard
+sleep 2
+key ctrl+q
+exited 5

@@ -71,6 +71,7 @@ use kabl_modules::{
 
 use crate::graph::BLOCK;
 use crate::keyboard::Action;
+use crate::probe::{ProbeReport, ProbeStatus, ProbeTarget, Tap, PROBE_LANES};
 
 pub type BufIdx = usize;
 
@@ -361,6 +362,30 @@ pub struct CompiledPatch {
     /// A freshly loaded patch: `carry_state` copies nothing into it, so it starts like a
     /// startup load (empty delay lines, clocks running) even where module ids match.
     pub fresh: bool,
+    /// The `out` module whose inputs are the output (the last in schedule order), if any.
+    output: Option<ModuleId>,
+    /// Set by whoever builds graphs (the UI counts its rebuilds), carried into probe reports
+    /// so a measurement names the graph it came from. 0 when nobody set it.
+    pub generation: u64,
+    /// The selected-signal tap (`probe.rs`); inactive unless `PatchEngine` sets a target.
+    tap: Tap,
+    /// Modules (with kinds) and cable endpoints of the source patch: equal between two
+    /// graphs when only values changed. A measurement window only continues across a swap
+    /// that keeps it.
+    topology: u64,
+}
+
+/// `CompiledPatch::topology` of `patch`.
+fn topology_of(patch: &PatchState) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    for (id, m) in &patch.modules {
+        (id, &m.kind).hash(&mut h);
+    }
+    for (id, c) in &patch.cables {
+        (id, format!("{:?}{:?}", c.from, c.to)).hash(&mut h);
+    }
+    h.finish()
 }
 
 enum CableTo {
@@ -763,6 +788,7 @@ fn compile_inner(
     let mut midi_ins: Vec<(usize, usize)> = Vec::new();
     let mut out_left = silence_buf;
     let mut out_right = silence_buf;
+    let mut out_module = None;
 
     for &id in &order {
         let meta = &metas[&id];
@@ -926,6 +952,7 @@ fn compile_inner(
             }
 
             if meta.kind == "out" {
+                out_module = Some(id);
                 out_left = match lane_inputs.first() {
                     Some(InputSource::Buffer(b)) => *b,
                     _ => silence_buf,
@@ -1082,6 +1109,10 @@ fn compile_inner(
         sample_rate,
         voice_count,
         fresh: false,
+        output: out_module,
+        generation: 0,
+        tap: Tap::default(),
+        topology: topology_of(patch),
     })
 }
 
@@ -1098,6 +1129,12 @@ impl CompiledPatch {
     /// anyone curious) can observe that reuse is actually happening, not just trust it silently.
     pub fn buffer_count(&self) -> usize {
         self.buffers.len()
+    }
+
+    /// The `out` module this graph plays (with several, the last in schedule order; the others
+    /// are not heard).
+    pub fn output_module(&self) -> Option<ModuleId> {
+        self.output
     }
 
     /// Module instance at `(id, voice)` — `voice` ignored for global-rate modules. `None` if no
@@ -1299,6 +1336,15 @@ impl CompiledPatch {
                             "compile() rejects modules with more than MAX_OUTPUTS output ports"
                         ),
                     }
+                    // The selected tap reads this instance's output now, before any later step
+                    // can reuse the slot (`coalesce_buffers`).
+                    if self.tap.found {
+                        if let Some(lane) = self.tap.lane_of(*module_index) {
+                            if let Some(&b) = output_bufs.get(self.tap.port) {
+                                self.tap.feed(lane, &self.buffers[b]);
+                            }
+                        }
+                    }
                     if !launches.is_empty() {
                         arm_launches(
                             &mut self.modules,
@@ -1391,6 +1437,108 @@ impl CompiledPatch {
                 }
             }
         }
+    }
+
+    /// Points the tap at `target` (`None`: off) and starts a new window. Linear in the number
+    /// of instances, no allocation: called by `PatchEngine` on the audio thread when the target
+    /// or the measured graph changes, never per block.
+    pub fn set_probe(&mut self, target: Option<ProbeTarget>) {
+        let mut tap = Tap {
+            target,
+            ..Tap::default()
+        };
+        if let Some(t) = target {
+            for (index, (&(id, voice), m)) in
+                self.module_origin.iter().zip(&self.modules).enumerate()
+            {
+                if id != t.module || m.info().kind != t.kind {
+                    continue;
+                }
+                let outputs = m
+                    .info()
+                    .ports
+                    .iter()
+                    .filter(|p| p.direction == PortDirection::Output)
+                    .count();
+                if t.port as usize >= outputs {
+                    continue;
+                }
+                if tap.n < PROBE_LANES {
+                    tap.modules[tap.n] = index as u32;
+                    tap.n += 1;
+                }
+                tap.total += 1;
+                tap.voiced = voice.is_some();
+            }
+            tap.port = t.port as usize;
+            tap.found = tap.n > 0;
+        }
+        self.tap = tap;
+    }
+
+    /// Continues `old`'s open window in this graph when only values changed (same modules and
+    /// cables) and the target resolved to the same lanes and port, so a run of swaps (a knob
+    /// being turned rebuilds every frame) never restarts the measurement; marks the window as
+    /// spanning a fade. After a wiring change the window starts over: what was measured before
+    /// it is not this patch. No allocation.
+    pub fn continue_probe_from(&mut self, old: &CompiledPatch) {
+        let (o, t) = (&old.tap, &mut self.tap);
+        if old.topology == self.topology
+            && o.found
+            && t.found
+            && o.target == t.target
+            && o.n == t.n
+            && o.port == t.port
+        {
+            t.acc = o.acc;
+            t.prev = o.prev;
+            t.samples = o.samples;
+            t.blocks = o.blocks;
+            t.fading = true;
+        }
+    }
+
+    /// The tap's target, if any.
+    pub fn probe_target(&self) -> Option<ProbeTarget> {
+        self.tap.target
+    }
+
+    /// After a block: counts it into the window (`fading`: it was part of a crossfade) and,
+    /// once the window has `window_blocks` blocks, returns its report and starts the next.
+    /// No allocation.
+    pub fn probe_block_end(
+        &mut self,
+        window_blocks: u32,
+        fading: bool,
+        seq: u64,
+    ) -> Option<ProbeReport> {
+        let t = self.tap.target?;
+        let tap = &mut self.tap;
+        tap.blocks += 1;
+        tap.samples += BLOCK as u32;
+        tap.fading |= fading;
+        if tap.blocks < window_blocks.max(1) {
+            return None;
+        }
+        let report = ProbeReport {
+            token: t.token,
+            generation: self.generation,
+            seq,
+            end_sample: 0,
+            status: if tap.found {
+                ProbeStatus::Measured
+            } else {
+                ProbeStatus::NotInGraph
+            },
+            fading: tap.fading,
+            samples: tap.samples,
+            lanes: tap.n as u8,
+            lanes_total: tap.total.min(u16::MAX as usize) as u16,
+            voiced: tap.voiced,
+            lane: tap.acc,
+        };
+        tap.reset_window();
+        Some(report)
     }
 
     pub fn left(&self) -> &[f32; BLOCK] {

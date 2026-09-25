@@ -5,20 +5,43 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-25. D03 cloud engineering is authorized; implementation has not been
-verified as started. D02 is merged through PR #3 (4eb4104), integrated on top of D01-R1,
-and waits for Kosta's hands-on review. D01 and D01-R1 also wait for his
-hands-on checks. Composition + Motion and Sound Palette are still waiting for their own
-hands-on reviews: Kosta explicitly deferred them, and they are not approved. D00 is not
-complete. Nothing after D03 is authorized.
+Last updated: 2026-09-25. D03 is built and submitted in the cloud (branch
+`claude/d02-musical-controls-knjmgu`, PR for Kosta); its owner review is pending. D02, D01 and
+D01-R1 also wait for Kosta's hands-on checks. Composition + Motion and Sound Palette are still
+waiting for their own hands-on reviews: Kosta explicitly deferred them, and they are not
+approved. D00 is not complete. Nothing after D03 is authorized.
 
-**D03 Signal inspection and three listening recipes: authorized for cloud engineering.**
-Kosta asked to continue while the laptop is unavailable for approximately two days. Scope:
-one selected signal, observation-led silence help, one reversible comparison reference and
-three optional listening recipes, plus bounded operational logging (INFO and above by default;
-DEBUG/TRACE available through an explicit override). Brief: [D03](product-research/briefs/D03.md); launch:
-[D03-LAUNCH](product-research/briefs/D03-LAUNCH.md). Normal sequential workflow resumes;
-D04 does not start automatically. Prior hands-on checks remain pending.
+**D03 Signal inspection and three listening recipes (owner-authorized, 2026-09-25): built,
+awaiting Kosta's review.**
+
+- **Inspect one signal** (drawer → Inspect, or a module's menu): one output, measured inside
+  the engine's schedule, per voice lane, with its interval and age; waiting, stale,
+  unavailable and missing are never shown as zero.
+- **Why no sound?** Graph facts, measurements and possibilities kept apart; no claims about
+  speakers, devices, controllers or intent.
+- **Compare**: capture a reference of the whole patch; restore it as one undo step; Undo/Redo
+  switch between it and your version with all edits.
+- **Learn**: Pluck to pad, Filter movement, Interlocking sequences — optional, through the
+  ordinary unsaved question, with Show/Back, inspection, a fixed test note and comparison.
+- **Operational logging**: `~/.local/state/kabl/logs/kabl.log`, INFO by default,
+  `KABL_LOG=debug` for more, bounded and rotated (4 MiB), never from the audio thread.
+- **Record**: [`signal-inspection/README.md`](signal-inspection/README.md), checklist
+  [`signal-inspection/CHECKLIST.md`](signal-inspection/CHECKLIST.md), report
+  [`signal-inspection/REPORT.md`](signal-inspection/REPORT.md).
+- **Evidence limits**: scripted in the cloud (Xvfb, PipeWire null sink, fifo MIDI stand-in,
+  no RT priority); not laptop, controller or learning evidence. The cloud walkthrough still
+  shows short audio dips correlated with VM xruns; no cause is established.
+- **D03-R1 correction (submitted).**
+  - Stream errors are now bounded: at most 16 are outstanding; the rest are counted by kind
+    and dropped in the error callback, where the D03 version leaked them.
+  - This depends on a **contract adjustment that needs a decision**: the backend allocates
+    the messages on the audio thread, so a bound means freeing them there. See
+    `signal-inspection/design.md`, "Stream-error ownership".
+  - Real-app, logging, cost and package evidence were refreshed on the final head. The
+    known cloud stream stall hit twice (one perf run and one logging run).
+  - Workspace tests: 520 passed, 0 failed, 15 ignored.
+
+    cargo run --release -p kabl-ui -- --patch patches/init-keyboard --perform --rate 48000 --frames 256
 
 **D02 Musical controls that explain themselves (owner-authorized, 2026-09-25): built,
 awaiting Kosta's review.**

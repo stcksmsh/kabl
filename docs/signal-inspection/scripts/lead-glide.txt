@@ -1,0 +1,12 @@
+# D02 carried gap: the Singing Lead's direct pin "Glide time" (MIDI In #2 glide_ms, off the
+# module face) before Show, shown, and after Back. Start on patches/palette/lead with Perform.
+sleep 2
+click pexplain:2.glide_ms
+sleep 1
+shot light-lead-glide-before
+click explain-show:2.glide_ms
+sleep 1.5
+shot light-lead-glide-shown
+click explain-back
+sleep 1.5
+shot light-lead-glide-back

@@ -5,6 +5,102 @@
 //! without hardware lives here instead, so "no `/dev/snd` in this container" doesn't mean "no
 //! tests for the standalone crate" (see `tests/` and the module docs below for what's proven).
 
+pub mod applog;
+
+/// Stream errors from the error callback to another thread (`stream_errors`). This bounds the
+/// errors whose ownership is outstanding at once; every error is also counted by kind.
+pub const STREAM_ERROR_QUEUE: usize = 16;
+
+/// The `cpal::ErrorKind`s counted apart; any other (the enum is non-exhaustive) counts in one
+/// more slot, "unknown".
+pub const STREAM_ERROR_KINDS: [cpal::ErrorKind; 14] = {
+    use cpal::ErrorKind::*;
+    [
+        DeviceBusy,
+        DeviceChanged,
+        DeviceNotAvailable,
+        HostUnavailable,
+        InvalidInput,
+        PermissionDenied,
+        RealtimeDenied,
+        ResourceExhausted,
+        StreamInvalidated,
+        UnsupportedConfig,
+        UnsupportedOperation,
+        Xrun,
+        BackendError,
+        Other,
+    ]
+};
+
+/// Written by the error callback with relaxed atomics: every handed-over error by kind, and how
+/// many found the queue full.
+#[derive(Default)]
+pub struct StreamErrorCounts {
+    pub by_kind: [std::sync::atomic::AtomicU64; STREAM_ERROR_KINDS.len() + 1],
+    pub undelivered: std::sync::atomic::AtomicU64,
+}
+
+impl StreamErrorCounts {
+    /// Off the audio thread: the counts since `seen` as "Kind=n …" (empty when none) and the
+    /// undelivered count since then; updates `seen`.
+    pub fn since(&self, seen: &mut [u64; STREAM_ERROR_KINDS.len() + 2]) -> (String, u64) {
+        use std::sync::atomic::Ordering::Relaxed;
+        let mut text = String::new();
+        for (i, c) in self.by_kind.iter().enumerate() {
+            let n = c.load(Relaxed);
+            if n != seen[i] {
+                let name = STREAM_ERROR_KINDS
+                    .get(i)
+                    .map_or("unknown".to_string(), |k| format!("{k:?}"));
+                text += &format!(
+                    "{}{name}={}",
+                    if text.is_empty() { "" } else { " " },
+                    n - seen[i]
+                );
+                seen[i] = n;
+            }
+        }
+        let u = self.undelivered.load(Relaxed);
+        let lost = u - seen[STREAM_ERROR_KINDS.len() + 1];
+        seen[STREAM_ERROR_KINDS.len() + 1] = u;
+        (text, lost)
+    }
+}
+
+/// For a stream's error callback, which runs on the audio thread (cpal 0.18.2 ALSA calls it
+/// from the stream's worker thread, between data callbacks; see signal-inspection design.md):
+/// counts `err` by kind and moves it into `tx` for another thread to log and drop. Never
+/// allocates, formats, logs or blocks, and takes no lock of its own.
+///
+/// When the queue is full the error is dropped here and counted in `undelivered`. That frees
+/// its message if the backend allocated one (on this build, ALSA without cpal's `realtime`
+/// feature, only `BackendError` does, allocated by cpal on this thread just before the call);
+/// the allocator's `free` may take its own lock. Keeping the error instead would hold memory
+/// without bound while the consumer is paused. At most `STREAM_ERROR_QUEUE` errors are
+/// outstanding. This is a proposed contract adjustment: see design.md, "Stream-error
+/// ownership".
+pub fn hand_off_stream_error(
+    err: cpal::Error,
+    tx: &mut rtrb::Producer<cpal::Error>,
+    counts: &StreamErrorCounts,
+) {
+    use std::sync::atomic::Ordering::Relaxed;
+    // A bare xrun owns nothing (callers count xruns themselves): dropping it here frees
+    // nothing, and it cannot crowd a real device error out of the queue.
+    if err.kind() == cpal::ErrorKind::Xrun && err.message().is_none() {
+        return;
+    }
+    let i = STREAM_ERROR_KINDS
+        .iter()
+        .position(|k| *k == err.kind())
+        .unwrap_or(STREAM_ERROR_KINDS.len());
+    counts.by_kind[i].fetch_add(1, Relaxed);
+    if tx.push(err).is_err() {
+        counts.undelivered.fetch_add(1, Relaxed);
+    }
+}
+
 use kabl_core::{CableState, ModuleId, ModuleState, PatchState, PortRef, Vec2};
 use kabl_engine::patch_engine::PatchEngine;
 use std::collections::BTreeMap;
@@ -252,13 +348,13 @@ pub fn connect_midi(
     let midi_in = match midir::MidiInput::new(client_name) {
         Ok(m) => m,
         Err(err) => {
-            eprintln!("kabl: MIDI input unavailable on this system: {err}");
+            log::warn!(target: "midi", "MIDI input unavailable on this system: {err}");
             return None;
         }
     };
     let ports = midi_in.ports();
     if ports.is_empty() {
-        eprintln!("kabl: no MIDI input ports found -- connect a controller and restart to play.");
+        log::warn!(target: "midi", "no MIDI input ports found -- connect a controller and restart to play.");
         return None;
     }
     // Default (no --midi): first port whose name doesn't look like ALSA's own virtual "Midi
@@ -277,7 +373,7 @@ pub fn connect_midi(
     }
     .or(ports.first());
     let Some(port) = port else {
-        eprintln!("kabl: no MIDI port matched --midi {name_filter:?}");
+        log::warn!(target: "midi", "no MIDI port matched --midi {name_filter:?}");
         return None;
     };
     let port_name = midi_in
@@ -301,11 +397,11 @@ pub fn connect_midi(
     );
     match connection {
         Ok(conn) => {
-            eprintln!("kabl: listening for MIDI on \"{port_name}\"");
+            log::info!(target: "midi", "listening for MIDI on \"{port_name}\"");
             Some(conn)
         }
         Err(err) => {
-            eprintln!("kabl: failed to connect to MIDI port \"{port_name}\": {err}");
+            log::warn!(target: "midi", "failed to connect to MIDI port \"{port_name}\": {err}");
             None
         }
     }

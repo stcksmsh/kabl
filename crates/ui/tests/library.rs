@@ -132,6 +132,22 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
          filter and envelope.",
     ),
     (
+        "recipes/pluck-to-pad",
+        "Recipe: Pluck to Pad",
+        "Study",
+        &["recipe", "envelope", "keyboard"],
+        "Starting patch of the Pluck to pad recipe (Learn): a plucked saw with its envelope on \
+         the Perform panel.",
+    ),
+    (
+        "recipes/filter-movement",
+        "Recipe: Filter Movement",
+        "Study",
+        &["recipe", "filter", "lfo", "keyboard"],
+        "Starting patch of the Filter movement recipe (Learn): a held saw through a resonant \
+         low-pass, with an LFO route to Cutoff that starts bypassed.",
+    ),
+    (
         "crowded",
         "Crowded Rack",
         "Study",
@@ -197,6 +213,16 @@ fn init_keyboard() -> PatchEditor {
 fn write_factory_library() {
     let root = factory();
     kabl_core::save(&root.join("init-keyboard"), init_keyboard().log()).unwrap();
+    kabl_core::save(
+        &root.join("recipes/pluck-to-pad"),
+        kabl_ui::recipes::pluck_to_pad().log(),
+    )
+    .unwrap();
+    kabl_core::save(
+        &root.join("recipes/filter-movement"),
+        kabl_ui::recipes::filter_movement().log(),
+    )
+    .unwrap();
     for (dir, name, category, tags, description) in FACTORY {
         let log = kabl_core::load(&root.join(dir)).unwrap();
         let (keys, sequence) = Meta::play_of(log.state());
@@ -218,6 +244,20 @@ fn write_factory_library() {
 
 fn open(user: &Path) -> Library {
     Library::open(Some(factory()), user.to_path_buf())
+}
+
+#[test]
+fn the_recipe_patches_are_what_the_code_builds() {
+    for (dir, e) in [
+        ("recipes/pluck-to-pad", kabl_ui::recipes::pluck_to_pad()),
+        (
+            "recipes/filter-movement",
+            kabl_ui::recipes::filter_movement(),
+        ),
+    ] {
+        let saved = kabl_core::load(&factory().join(dir)).unwrap();
+        assert_eq!(saved.state(), e.state(), "{dir}");
+    }
 }
 
 #[test]

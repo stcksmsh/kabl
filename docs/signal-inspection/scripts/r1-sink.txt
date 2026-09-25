@@ -1,0 +1,7 @@
+# D03-R1: the log location is blocked (KABL_LOG_DIR under a plain file): the app runs, the
+# toolbar reports the logging failure once, and the Log button's hover gives the full text.
+sleep 4
+shot 10-log-sink-failure
+at 473 888
+sleep 1.5
+shot 11-log-sink-hover

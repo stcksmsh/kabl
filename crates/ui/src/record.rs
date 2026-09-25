@@ -197,11 +197,13 @@ impl Recorder {
             Err(e) => {
                 self.rx = Some(rx);
                 let msg = format!("can't record to {}: {e}", path.display());
+                log::warn!(target: "recorder", "{msg}");
                 self.last = Some(Outcome::Failed(msg.clone()));
                 return Err(msg);
             }
         };
         self.shared.lost.store(0, Ordering::Relaxed);
+        log::info!(target: "recorder", "take started");
         let stop = Arc::new(AtomicBool::new(false));
         let frames = Arc::new(AtomicU64::new(0));
         let shared = self.shared.clone();
@@ -342,6 +344,12 @@ impl Recorder {
             }
             Err(_) => Outcome::Failed("recorder thread panicked".into()),
         };
+        match &outcome {
+            Outcome::Complete { frames, .. } => {
+                log::info!(target: "recorder", "take complete frames={frames}")
+            }
+            o => log::warn!(target: "recorder", "take ended badly: {}", describe(o)),
+        }
         self.last = Some(outcome.clone());
         Some(outcome)
     }

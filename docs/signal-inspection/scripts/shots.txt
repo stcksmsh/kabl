@@ -1,0 +1,79 @@
+# D03 screenshots (scripted, real X input, fifo MIDI stand-in). Run per size with Perform open,
+# starting on Init Keyboard. Names get the size prefix from shots.sh.
+sleep 2
+# Inspection of a voiced output while a chord is held: per-voice lanes.
+click inspect-open
+click module:4
+click inspect-port:4.out
+midi on 48 90
+midi on 55 90
+midi on 64 90
+sleep 2
+shot light-inspect-chord
+midi off 48
+midi off 55
+midi off 64
+# Missing trigger: MIDI gate observed, no key.
+click module:1
+click inspect-port:1.gate
+click why
+sleep 2
+shot light-why-missing-trigger
+# Removed connection.
+dragby in:5.left 0 170
+dragby in:5.right 0 150
+click module:4
+click inspect-port:4.out
+midi on 60 90
+sleep 2
+click theme:dark
+sleep 1
+shot dark-why-disconnected
+midi off 60
+key ctrl+z
+key ctrl+z
+click why
+click inspect-close
+# A recipe step with its inspection and the test note.
+click learn-open
+click recipe:pluck-to-pad
+sleep 1
+click recipe-inspect
+click recipe-next
+click recipe-show
+fill base-entry:6.sustain 0.7
+key Return
+click recipe-note
+sleep 1.2
+shot dark-recipe-step
+click recipe-next
+click recipe-next
+click recipe-next
+click recipe-compare
+sleep 0.5
+click compare-restore
+sleep 0.5
+click theme:light
+sleep 1
+shot light-restore-dialog
+click dlg:restore
+sleep 1
+shot light-restored-undo-offered
+click compare-undo
+click learn-close
+click compare-open
+# D02 carried gap: browser + Perform + drawer/inspection, text in the search field, Escape.
+click browser
+sleep 0.5
+fill search pad
+sleep 1
+click module:6
+click inspect-port:6.out
+sleep 1
+click theme:dark
+sleep 0.5
+shot dark-browser-perform-inspect-search
+key Escape
+sleep 0.5
+shot dark-browser-perform-after-escape
+click browser

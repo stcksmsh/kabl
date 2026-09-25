@@ -1,0 +1,39 @@
+== blocked stderr
+kabl-ui: start kabl-ui 0.1.0 (commit 99c28d30a08d) level=INFO log=target/signal-inspection-logging/blocked/file/logs/kabl.log
+kabl-ui: factory sounds: /home/user/kabl/patches; your sounds: target/signal-inspection-logging/blocked/sounds
+ALSA lib seq_hw.c:528:(snd_seq_hw_open) open /dev/snd/seq failed: No such file or directory
+kabl-ui: listening for MIDI on "kabl-pipe" (test pipe)
+kabl-ui: backend=Alsa requested rate=Some(48000) frames=Some(256) rt=true
+kabl-ui: device=Some("Default Audio Device") rate=48000 channels=2 buffer=Fixed(256)
+kabl-ui: error setting XSETTINGS; Xft options won't reload automatically
+kabl-ui: XRandR reported that the display's 0mm in size, which is certifiably insane
+kabl-ui: real-time priority refused: AudioThreadPriorityError: org.freedesktop.DBus.Error.FileNotFound:Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+ALSA lib seq_hw.c:528:(snd_seq_hw_open) open /dev/snd/seq failed: No such file or directory
+ALSA lib seq_hw.c:528:(snd_seq_hw_open) open /dev/snd/seq failed: No such file or directory
+ALSA lib seq_hw.c:528:(snd_seq_hw_open) open /dev/snd/seq failed: No such file or directory
+ALSA lib seq_hw.c:528:(snd_seq_hw_open) open /dev/snd/seq failed: No such file or directory
+ALSA lib seq_hw.c:528:(snd_seq_hw_open) open /dev/snd/seq failed: No such file or directory
+kabl-ui: last 10.0s: xruns=1 late_executions=0 late_arrivals=92 callbacks=1888 worst_run_us=3898
+ALSA lib seq_hw.c:528:(snd_seq_hw_open) open /dev/snd/seq failed: No such file or directory
+ALSA lib seq_hw.c:528:(snd_seq_hw_open) open /dev/snd/seq failed: No such file or directory
+ALSA lib seq_hw.c:528:(snd_seq_hw_open) open /dev/snd/seq failed: No such file or directory
+kabl-ui: stalled: no callbacks for over 1.5 s after 2428
+kabl-ui: save-as failed error=io (injected failure at staged); edits kept
+ALSA lib seq_hw.c:528:(snd_seq_hw_open) open /dev/snd/seq failed: No such file or directory
+kabl-ui: take started
+ALSA lib seq_hw.c:528:(snd_seq_hw_open) open /dev/snd/seq failed: No such file or directory
+ALSA lib seq_hw.c:528:(snd_seq_hw_open) open /dev/snd/seq failed: No such file or directory
+ALSA lib seq_hw.c:528:(snd_seq_hw_open) open /dev/snd/seq failed: No such file or directory
+ALSA lib seq_hw.c:528:(snd_seq_hw_open) open /dev/snd/seq failed: No such file or directory
+kabl-ui: open ok origin=factory:recipes/filter-movement editor=2
+ALSA lib seq_hw.c:528:(snd_seq_hw_open) open /dev/snd/seq failed: No such file or directory
+ALSA lib seq_hw.c:528:(snd_seq_hw_open) open /dev/snd/seq failed: No such file or directory
+kabl-ui: take complete frames=0
+kabl-ui: shutdown result=ok
+total 20
+drwxr-xr-x 4 root root 4096 Sep 25 22:46 .
+drwxr-xr-x 9 root root 4096 Sep 25 22:46 ..
+-rw-r--r-- 1 root root    0 Sep 25 22:46 file
+-rw-r--r-- 1 root root   79 Sep 25 22:46 library.json
+drwxr-xr-x 2 root root 4096 Sep 25 22:46 recordings
+drwxr-xr-x 2 root root 4096 Sep 25 22:46 sounds

@@ -1,0 +1,148 @@
+   0.53 sleep 2
+   2.83 click inspect-open
+   3.67 click module:4
+   4.49 click inspect-port:4.out
+   5.34 sleep 1
+   6.64 midi on 60 90
+   6.64 sleep 3
+   9.94 midi off 60
+   9.94 sleep 2
+  12.24 click module:1
+  13.08 click inspect-port:1.gate
+  13.93 click why
+  14.77 sleep 5
+  20.07 midi on 64 90
+  20.07 sleep 2
+  22.38 midi off 64
+  22.38 sleep 3
+  25.68 dragby in:5.left 0 170
+  27.15 dragby in:5.right 0 150
+  28.65 click module:4
+  29.47 click inspect-port:4.out
+  30.35 midi on 60 90
+  30.35 sleep 6
+  36.65 midi off 60
+  36.65 key ctrl+z
+  36.98 key ctrl+z
+  37.32 sleep 1
+  38.62 midi on 60 90
+  38.62 sleep 3
+  41.92 midi off 60
+  41.92 click why
+  42.75 click inspect-close
+  43.58 sleep 1
+  44.88 click learn-open
+  45.73 click recipe:pluck-to-pad
+  46.55 sleep 2
+  48.85 click recipe-inspect
+  49.69 click recipe-note
+  50.55 sleep 3
+  53.85 click recipe-next
+  54.69 click recipe-show
+  55.53 sleep 1
+  56.83 fill base-entry:6.sustain 0.7
+  57.74 key Return
+  58.07 click recipe-note
+  58.91 sleep 3
+  62.21 click recipe-next
+  63.04 click recipe-show
+  63.87 fill base-entry:6.release_ms 1000
+  64.82 key Return
+  65.15 click recipe-note
+  65.99 sleep 4
+  70.30 click recipe-next
+  71.15 click recipe-show
+  71.99 fill base-entry:6.attack_ms 600
+  72.90 key Return
+  73.22 click recipe-note
+  74.04 sleep 4
+  78.35 click recipe-next
+  79.17 click recipe-compare
+  80.02 sleep 1
+  81.32 click compare-restore
+  82.17 sleep 1
+  83.47 click dlg:restore
+  84.30 click recipe-note
+  85.13 sleep 3
+  88.43 click compare-undo
+  89.26 click recipe-note
+  90.09 sleep 4
+  94.39 click recipe-next
+  95.21 sleep 3
+  98.51 click learn-close
+  99.35 sleep 1
+ 100.65 click learn-open
+ 101.48 click recipe:filter-movement
+ 102.32 sleep 1
+ 103.64 click dlg:discard
+ 104.48 sleep 1
+ 105.79 click recipe-show
+ 106.61 click recipe-note
+ 107.45 sleep 1
+ 108.75 fill base-entry:3.cutoff_hz 300
+ 109.65 key Return
+ 109.97 sleep 1.5
+ 111.77 fill base-entry:3.cutoff_hz 900
+ 112.69 key Return
+ 113.01 sleep 1.5
+ 114.82 click recipe-next
+ 115.64 click recipe-show
+ 116.48 sleep 1
+ 117.78 click recipe-note
+ 118.61 click bypass:8
+ 119.48 sleep 4
+ 123.78 click recipe-next
+ 124.62 click recipe-inspect
+ 125.45 click recipe-show
+ 126.28 click recipe-note
+ 127.14 sleep 1
+ 128.45 fill base-entry:7.rate_hz 2
+ 129.36 key Return
+ 129.68 sleep 3
+ 132.98 click recipe-next
+ 133.82 click recipe-next
+ 134.66 click recipe-compare
+ 135.50 sleep 1
+ 136.80 click compare-restore
+ 137.66 click dlg:restore
+ 138.53 click recipe-note
+ 139.39 sleep 3
+ 142.69 click compare-undo
+ 143.51 click recipe-note
+ 144.35 sleep 4
+ 148.65 click learn-close
+ 149.49 click learn-open
+ 150.34 click recipe:interlocking
+ 151.19 sleep 1
+ 152.49 click dlg:discard
+ 153.33 sleep 1
+ 154.63 click recipe-inspect
+ 155.47 click why
+ 156.31 sleep 4
+ 160.61 click run:1
+ 161.46 sleep 4
+ 165.77 click recipe-next
+ 166.60 click recipe-inspect
+ 167.46 sleep 4
+ 171.76 click recipe-next
+ 172.60 click recipe-show
+ 173.44 fill base-entry:4.length 4
+ 174.31 key Return
+ 174.64 sleep 6
+ 180.94 click recipe-next
+ 181.78 click recipe-show
+ 182.62 fill base-entry:3.length 8
+ 183.52 key Return
+ 183.84 sleep 6
+ 190.15 click recipe-next
+ 191.00 click recipe-compare
+ 191.86 sleep 1
+ 193.16 click compare-restore
+ 194.00 click dlg:restore
+ 194.86 sleep 5
+ 200.16 click compare-undo
+ 201.00 sleep 4
+ 205.30 click recipe-next
+ 206.16 sleep 3
+ 209.46 click learn-close
+ 210.32 sleep 2

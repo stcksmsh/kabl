@@ -34,6 +34,7 @@ use kabl_core::PatchState;
 use crate::compile::{carry_state, compile, CompileError, CompiledPatch, PendingLaunch};
 use crate::graph::BLOCK;
 use crate::keyboard::{Action, KeyEvent, Keyboard};
+use crate::probe::{ProbeReport, ProbeTarget, WINDOW_SECS};
 use crate::swap::CROSSFADE_MS;
 use kabl_modules::builtins::KeySettings;
 
@@ -63,6 +64,14 @@ pub struct PatchEngine {
     held_preview: u128,
     /// Blocks until the preview's notes release; 0 = no preview running.
     preview_blocks: u32,
+    /// The selected signal (D03): measured in the graph fading in, else the active one.
+    probe: Option<ProbeTarget>,
+    probe_window: u32,
+    probe_seq: u64,
+    /// Samples rendered since this engine started (reports carry it as their time).
+    rendered: u64,
+    /// The last finished window, until the callback takes it.
+    report: Option<ProbeReport>,
 }
 
 /// Most notes one preview plays (a chord).
@@ -134,6 +143,8 @@ pub enum Command {
     },
     /// Release the preview's notes now (those the controller doesn't also hold).
     PreviewStop,
+    /// Measure this output (`None`: stop measuring). View only: no effect on the sound.
+    Inspect(Option<ProbeTarget>),
 }
 
 const NO_LAUNCH: PendingLaunch = PendingLaunch {
@@ -164,7 +175,13 @@ impl PatchEngine {
             held_controller: 0,
             held_preview: 0,
             preview_blocks: 0,
+            probe: None,
+            probe_window: 1,
+            probe_seq: 0,
+            rendered: 0,
+            report: None,
         };
+        e.probe_window = window_blocks(sample_rate);
         e.sync_keyboards();
         Ok(e)
     }
@@ -184,7 +201,13 @@ impl PatchEngine {
             held_controller: 0,
             held_preview: 0,
             preview_blocks: 0,
+            probe: None,
+            probe_window: 1,
+            probe_seq: 0,
+            rendered: 0,
+            report: None,
         };
+        e.probe_window = window_blocks(e.active.sample_rate());
         e.sync_keyboards();
         e
     }
@@ -379,9 +402,40 @@ impl PatchEngine {
         } else {
             carry_state(&mut self.active, &mut new_patch);
             let fresh = new_patch.fresh;
+            self.move_probe(&mut new_patch);
             self.incoming = Some((new_patch, 0));
             self.sync(fresh);
         }
+    }
+
+    /// Audio-thread call: the measurement moves to `new`, the graph fading in, keeping the
+    /// open window when the same lanes are measured there. `active` is always the graph that
+    /// was measured until now (a fade starts from it, and a promoted graph has just become
+    /// it). No allocation.
+    fn move_probe(&mut self, new: &mut CompiledPatch) {
+        if self.probe.is_some() {
+            new.set_probe(self.probe);
+            new.continue_probe_from(&self.active);
+            self.active.set_probe(None);
+        }
+    }
+
+    /// Audio-thread call: measure `target` from now on (`None`: stop). No allocation.
+    pub fn inspect(&mut self, target: Option<ProbeTarget>) {
+        self.probe = target;
+        self.report = None;
+        match self.incoming.as_mut() {
+            Some((g, _)) => {
+                self.active.set_probe(None);
+                g.set_probe(target);
+            }
+            None => self.active.set_probe(target),
+        }
+    }
+
+    /// Audio-thread call: the last finished measurement window, if one is waiting.
+    pub fn take_probe_report(&mut self) -> Option<ProbeReport> {
+        self.report.take()
     }
 
     /// Audio-thread call: note-on for `voice` in every running graph. No allocation.
@@ -481,6 +535,7 @@ impl PatchEngine {
                 self.preview(&notes[..n], *velocity, *blocks);
             }
             Command::PreviewStop => self.preview_stop(),
+            Command::Inspect(t) => self.inspect(*t),
         }
     }
 
@@ -613,6 +668,20 @@ impl PatchEngine {
             }
         }
 
+        self.rendered += BLOCK as u64;
+        if self.probe.is_some() {
+            let fading = self.incoming.is_some();
+            let g: &mut CompiledPatch = match self.incoming.as_mut() {
+                Some((g, _)) => g,
+                None => &mut self.active,
+            };
+            if let Some(mut r) = g.probe_block_end(self.probe_window, fading, self.probe_seq) {
+                r.end_sample = self.rendered;
+                self.report = Some(r);
+                self.probe_seq += 1;
+            }
+        }
+
         if finished {
             // Move, not clone: drops the old `active` in place. `Owned::drop` only queues the
             // node on the collector (atomic pointer swap) — no deallocation happens here.
@@ -624,11 +693,17 @@ impl PatchEngine {
             if let Some(mut pending) = self.pending.take() {
                 carry_state(&mut self.active, &mut pending);
                 let fresh = pending.fresh;
+                self.move_probe(&mut pending);
                 self.incoming = Some((pending, 0));
                 self.sync(fresh);
             }
         }
     }
+}
+
+/// Blocks per probe window at `sample_rate` (at least one).
+fn window_blocks(sample_rate: f32) -> u32 {
+    ((WINDOW_SECS * sample_rate / BLOCK as f32).ceil() as u32).max(1)
 }
 
 fn bit(note: u8) -> u128 {

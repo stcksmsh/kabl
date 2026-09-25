@@ -19,6 +19,8 @@
 //! live: a real controller plugged in still lost to it before this existed).
 
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 use basedrop::Collector;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -40,21 +42,44 @@ const RING_CAPACITY: usize = BLOCK * 256;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    let (level, bad_level) = kabl_standalone::applog::level_from(&args);
+    let log = kabl_standalone::applog::init("kabl", level, kabl_standalone::applog::log_dir());
+    log::info!(
+        target: "app",
+        "start kabl {} level={level} log={}",
+        kabl_standalone::applog::build_id(),
+        log.as_ref().map_or("unavailable".into(), |l| l.path.display().to_string())
+    );
+    if let Some(w) = bad_level {
+        log::warn!(target: "app", "unknown log level {w:?}: using info");
+    }
+    let code = run(&args);
+    if let Some(mut l) = log {
+        l.shutdown();
+    }
+    if code != 0 {
+        std::process::exit(code);
+    }
+}
+
+/// The program; returns the exit code (the logger flushes before exiting).
+fn run(args: &[String]) -> i32 {
+    let args = args.to_vec();
 
     if let Some(dir) = flag_value(&args, "--save-default") {
         match save_default_patch(Path::new(&dir)) {
-            Ok(()) => eprintln!("kabl: wrote default_patch() to {dir}"),
-            Err(err) => eprintln!("kabl: failed to save to {dir}: {err:?}"),
+            Ok(()) => log::info!(target: "app", "wrote default_patch() to {dir}"),
+            Err(err) => log::warn!(target: "app", "failed to save to {dir}: {err:?}"),
         }
-        return;
+        return 0;
     }
 
     let patch = match flag_value(&args, "--patch") {
         Some(dir) => match kabl_core::load(Path::new(&dir)) {
             Ok(log) => log.state().clone(),
             Err(err) => {
-                eprintln!("kabl: failed to load patch from {dir}: {err:?}");
-                std::process::exit(1);
+                log::error!(target: "app", "failed to load patch from {dir}: {err:?}");
+                return 1;
             }
         },
         None => default_patch(),
@@ -62,21 +87,20 @@ fn main() {
 
     let host = cpal::default_host();
     let Some(device) = host.default_output_device() else {
-        eprintln!("kabl: no audio output device found on this system.");
+        log::warn!(target: "app", "no audio output device found on this system.");
         render_self_test(&patch);
-        return;
+        return 0;
     };
 
     let Some(config) = pick_output_config(&device) else {
-        eprintln!("kabl: no usable (f32) output config found for the default audio device.");
+        log::warn!(target: "app", "no usable (f32) output config found for the default audio device.");
         render_self_test(&patch);
-        return;
+        return 0;
     };
 
     let sample_rate = config.sample_rate() as f32;
     let channels = config.channels() as usize;
-    eprintln!(
-        "kabl: output device ready, {sample_rate} Hz, {channels} channel(s), {DEFAULT_VOICE_COUNT} voices"
+    log::info!(target: "app", "output device ready, {sample_rate} Hz, {channels} channel(s), {DEFAULT_VOICE_COUNT} voices"
     );
 
     let collector = Collector::new();
@@ -84,14 +108,20 @@ fn main() {
     let mut engine = match PatchEngine::new(&handle, &patch, sample_rate, DEFAULT_VOICE_COUNT) {
         Ok(e) => e,
         Err(err) => {
-            eprintln!("kabl: failed to compile the default patch: {err}");
-            std::process::exit(1);
+            log::error!(target: "app", "failed to compile the default patch: {err}");
+            return 1;
         }
     };
 
     let (midi_producer, mut midi_consumer) = rtrb::RingBuffer::<VoiceEvent>::new(256);
     let _midi_connection = connect_midi("kabl", midi_producer, flag_value(&args, "--midi"));
 
+    let xruns = Arc::new(AtomicU64::new(0));
+    let xruns_cb = xruns.clone();
+    let errors = Arc::new(kabl_standalone::StreamErrorCounts::default());
+    let errors_cb = errors.clone();
+    let (mut faults_tx, mut faults_rx) =
+        rtrb::RingBuffer::<cpal::Error>::new(kabl_standalone::STREAM_ERROR_QUEUE);
     let mut left_ring = RingBuffer::new(RING_CAPACITY);
     let mut right_ring = RingBuffer::new(RING_CAPACITY);
 
@@ -122,33 +152,63 @@ fn main() {
                 }
             }
         },
-        |err| eprintln!("kabl: audio stream error: {err}"),
+        // On the audio thread: count and hand over unformatted; logged below.
+        move |err| {
+            if err.kind() == cpal::ErrorKind::Xrun {
+                xruns_cb.fetch_add(1, Ordering::Relaxed);
+            }
+            kabl_standalone::hand_off_stream_error(err, &mut faults_tx, &errors_cb);
+        },
         None,
     );
 
     let stream = match stream {
         Ok(s) => s,
         Err(err) => {
-            eprintln!("kabl: failed to build audio output stream: {err}");
+            log::warn!(target: "app", "failed to build audio output stream: {err}");
             render_self_test(&patch);
-            return;
+            return 0;
         }
     };
 
     if let Err(err) = stream.play() {
-        eprintln!("kabl: failed to start audio stream: {err}");
+        log::warn!(target: "app", "failed to start audio stream: {err}");
         render_self_test(&patch);
-        return;
+        return 0;
     }
 
-    eprintln!("kabl: playing. Ctrl+C to quit.");
+    log::info!(target: "app", "playing. Ctrl+C to quit.");
     // `collector`/`stream` just need to stay alive for the process's lifetime -- an infinite
     // loop here keeps both in scope without an explicit leak. Nothing to swap yet (no UI/
     // repatching), so no periodic `collector.collect()` is needed either: deferred-drop nodes
     // only queue up on a completed swap, and none happen in this v1 binary.
-    loop {
-        std::thread::sleep(std::time::Duration::from_secs(3600));
+    // Every second: drop the handed-over errors here (not on the audio thread); every 10 s,
+    // log what the audio side counted, as one line when something happened.
+    let (mut seen, mut errors_seen) = (0, [0; kabl_standalone::STREAM_ERROR_KINDS.len() + 2]);
+    let mut last = None::<String>;
+    for tick in 1u64.. {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        while let Ok(e) = faults_rx.pop() {
+            last = Some(e.to_string());
+        }
+        if tick % 10 != 0 {
+            continue;
+        }
+        let x = xruns.load(Ordering::Relaxed);
+        if x != seen {
+            log::info!(target: "audio.health", "last 10s: xruns={}", x - seen);
+            seen = x;
+        }
+        let (kinds, lost) = errors.since(&mut errors_seen);
+        if !kinds.is_empty() {
+            log::warn!(
+                target: "audio",
+                "stream errors in 10s: {kinds}; last delivered: {}; not delivered (queue full): {lost}",
+                last.take().as_deref().unwrap_or("none")
+            );
+        }
     }
+    0
 }
 
 /// Picks the default output config if it supports `f32` samples, else scans every supported
@@ -184,7 +244,7 @@ fn render_self_test(patch: &kabl_core::PatchState) {
     {
         Ok(c) => c,
         Err(err) => {
-            eprintln!("kabl: self-test patch failed to compile: {err}");
+            log::warn!(target: "app", "self-test patch failed to compile: {err}");
             return;
         }
     };
@@ -232,12 +292,11 @@ fn render_self_test(patch: &kabl_core::PatchState) {
                 let _ = writer.write_sample(s);
             }
             let _ = writer.finalize();
-            eprintln!(
-                "kabl: no audio device -- wrote a self-test render proving the synth path works: {}",
+            log::warn!(target: "app", "no audio device -- wrote a self-test render proving the synth path works: {}",
                 path.display()
             );
         }
-        Err(err) => eprintln!("kabl: couldn't write self-test render: {err}"),
+        Err(err) => log::warn!(target: "app", "couldn't write self-test render: {err}"),
     }
 }
 

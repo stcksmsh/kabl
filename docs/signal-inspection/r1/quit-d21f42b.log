@@ -1,0 +1,2 @@
+2026-09-25T23:20:48.824Z +0.000s INFO  [app] session=ff40d7c4 start kabl-ui 0.1.0 (commit d21f42bf560e+modified) level=INFO log=target/r1-quit/user/logs/kabl.log
+2026-09-25T23:20:56.188Z +7.364s INFO  [app] session=ff40d7c4 shutdown result=ok

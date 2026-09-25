@@ -1,0 +1,133 @@
+# Review F3 in the real app: inspect VCA #4 out while a note is held and Filter #3 Cutoff
+# is dragged continuously (a rebuild every frame); screenshots mid-drag.
+sleep 2
+click inspect-open
+click module:4
+click inspect-port:4.out
+midi on 60 90
+sleep 1
+hold knob:3.cutoff_hz 0 -2
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+shot mid-drag-1
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 -2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+nudge 0 2
+sleep 0.05
+shot mid-drag-2
+release
+midi off 60

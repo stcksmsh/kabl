@@ -1,0 +1,8 @@
+212.0 s analysed at 48000 Hz
+dropouts: 5
+   40.825 s  before  -27.6 dB  gap  -84.0 dB  after  -26.8 dB
+   90.500 s  before  -25.5 dB  gap -200.0 dB  after  -31.1 dB
+   90.525 s  before  -31.1 dB  gap -200.0 dB  after  -29.1 dB
+  194.255 s  before  -20.0 dB  gap  -64.5 dB  after  -19.8 dB
+  211.197 s  before  -19.5 dB  gap  -64.4 dB  after  -21.7 dB
+sample jumps > 0.5: 0 in 0 places
