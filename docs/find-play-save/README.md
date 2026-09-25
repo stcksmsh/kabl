@@ -127,14 +127,17 @@ are listed under their directory name.
 ## Verification
 
 Cloud container: Ubuntu 24.04.4, 4 vCPU VM, rustc 1.94.1. No sound card, no ALSA sequencer,
-no rtkit. Product code at **f3bebd9**; the final head adds tests and documents only (see
-[`REPORT.md`](REPORT.md) for the final-head test run).
+no rtkit. Product code is unchanged after **f3bebd9** (the real-app evidence build); the
+tests below ran at **7030b74**, which adds the focus-loss test and these documents.
 
-- `cargo test --workspace`: see [`evidence/test-workspace.txt`](evidence/test-workspace.txt).
-  New: `crates/engine/tests/preview.rs` (10), `crates/ui/tests/library.rs` (14 + 1 ignored
+- `cargo test --workspace` at 7030b74: **444 passed, 0 failed, 14 ignored** (the 13
+  fixture/render writers plus `write_factory_library`), exit 0:
+  [`evidence/test-workspace.txt`](evidence/test-workspace.txt). New in D01:
+  `crates/engine/tests/preview.rs` (10), `crates/ui/tests/library.rs` (14 + 1 ignored
   writer), `crates/ui/tests/browser.rs` (13, real egui input through `show()` at 1440×900 and
   1280×800). `interaction.rs`'s folder-load test now answers the unsaved question.
-- `cargo clippy --workspace --all-targets`: clean ([`evidence/clippy.txt`](evidence/clippy.txt)).
+- `cargo clippy --workspace --all-targets` at 7030b74: no warnings, exit 0
+  ([`evidence/clippy.txt`](evidence/clippy.txt)).
 
 ## Real-app evidence
 
