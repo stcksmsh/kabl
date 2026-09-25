@@ -216,7 +216,8 @@ So when the queue is full, no policy can meet both "never frees on the audio thr
   line shows the most recently delivered message, which may date from an earlier interval
   than the counts next to it.
 - On teardown, kabl-ui drops the stream before the error queue's consumer (`AudioHost`
-  field order). The exiting audio thread therefore frees nothing, and queued errors are
+  field order). The exiting audio thread therefore frees no stream error and no error queue (it still frees
+  the data callback's own buffers), and queued errors are
   freed on the UI thread. The standalone `kabl` never tears down (it runs until killed).
 
 **Contract adjustment (for the supervisor/owner).**
@@ -225,8 +226,10 @@ So when the queue is full, no policy can meet both "never frees on the audio thr
   I/O, locks or allocation/deallocation in the new RT path, even with DEBUG/TRACE enabled."
 - Proposed adjustment: "…except that the stream error callback, when its bounded hand-off
   queue is full, drops the error, which frees a message the audio backend allocated on
-  that thread in the same call. That free may take the allocator's internal lock. No other
-  RT path allocates, frees or locks." On this build this applies only to `BackendError`.
+  that thread in the same call. That free may take the allocator's internal lock. Nothing
+  else D03 added to the RT path allocates, frees or locks." This leaves one older exception
+  in place: since `51c2cd7`, kabl-ui's first audio callback asks for real-time priority,
+  which can allocate and block. It is not part of D03. On this build this applies only to `BackendError`.
 - Rejected alternatives: keeping `mem::forget`, which has no bound; a larger queue, which
   moves the limit but keeps it; a deferred-free list, which is unbounded; and a blocking
   or locking writer.

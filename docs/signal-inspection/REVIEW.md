@@ -296,3 +296,59 @@ Fixes are in `d21f42b` (code and comments) and the docs commit that follows it.
 The evidence builds (99c28d3, and b298eb6+modified for the package) predate R1-5's
 teardown order. None of the recorded flows exercises teardown with queued errors, so no
 evidence was rerun, as the reviewer noted.
+
+## D03-R1 recheck
+
+- **Rechecked head:** `2f0e527`. Code fix `d21f42b`; the docs commit follows it. I reviewed `git diff 68f6cee..2f0e527` in full, apart from the regenerated `r1/test-workspace.txt`, where I checked only the header. My earlier "D03-R1 review" section is unchanged in that diff (no deleted lines in REVIEW.md).
+- **Commands run at `2f0e527`**, debug profile:
+  - `cargo test -p kabl-standalone`: exit 0, every suite ok, including `stream_error_overflow` 1/1 and `rt_with_logging` 1/1.
+  - `cargo build -p kabl-ui`: exit 0.
+  - I did not rerun `cargo test --workspace` or clippy. `r1/test-workspace.txt` and `r1/clippy.txt` now carry the implementer's `d21f42b` runs (520/0/15; clippy exit 0).
+- **Drop order, read directly.** `AudioHost` now declares `_stream` first. Rust drops fields in declaration order, so `Stream::drop` joins `cpal_alsa_out` before any consumer, `collector` or `recorder` is dropped. The consequences:
+  - **Queues:** every rtrb consumer (`faults_rx`, `probe_rx`, `steps_rx`, …) now outlives its producer in the callbacks. So the ring buffers and any queued `cpal::Error` are freed on the UI thread. rtrb frees on the last end dropped.
+  - **`Recorder::drop` → `stop()`** now runs after the audio tap has stopped. That is benign, arguably better, because no sample is pushed during finalisation.
+  - **basedrop:** `Collector` has no `Drop`. It leaks its allocations when dropped, in both the old and the new order (basedrop 0.1.3 `collector.rs` doc). The engine's `Owned` graphs are now queued to a collector that is still alive, and then leaked with it at exit. Before, they were queued to an already-leaked one. There is no use-after-free and no change in outcome.
+  - No other field has a `Drop` impl with side effects. `AudioHost` is never reassigned while running; it is only built once at L1302. The implementer's `r1/quit-d21f42b.log` shows `shutdown result=ok`.
+
+### Status of findings
+
+| ID | Status | Evidence |
+|---|---|---|
+| R1-1 | Resolved | design.md, README, REPORT, HANDOFF, the `lib.rs` doc and the test module doc now say that only `BackendError` owns a message on this build. `RealtimeDenied` is described as a feature-gated case, and the RT-refused line is attributed to kabl-ui's own promotion call. |
+| R1-2 | Resolved | The second stall (logging "blocked" run, after callback 2428, 0-frame recording) is now in the REPORT R2 table, perf.md, README limits and STATUS. |
+| R1-3 | Resolved | The acceptance matrix RT row names the overflow-free exception and the test that counts it. The Logging row adds the `r1/logging` evidence and marks the old files as historical. |
+| R1-4 | **Partly** | design.md now quotes the brief's clause verbatim and discloses the allocator lock. `lib.rs` says "takes no lock of its own". **But** REPORT "D03-R1 follow-up", "What the code does now", still says "still never allocates, formats, logs, locks or blocks" (see R1-9). The new proposed clause also adds an over-broad sentence (see R1-10). |
+| R1-5 | Resolved | Field order checked as above. The side effects are none, or benign. `cargo build -p kabl-ui` passes. A nit on the design.md wording is R1-11. |
+| R1-6 | Resolved | The REPORT package row records `b298eb6+modified`, a docs-only edit, with product code equal to `f1edf70`'s. I did not verify which file was uncommitted at that time; that is the implementer's statement. |
+| R1-7 | Resolved (documented) | design.md discloses that "last delivered" can come from an earlier interval. The counts are exact, and the code is unchanged, which is acceptable. |
+
+### New findings
+
+| ID | Severity | File / function | Concrete failure scenario | Evidence | Requested correction |
+|---|---|---|---|---|---|
+| R1-8 | minor | REPORT.md "D03-R1 follow-up" header and R2 table; REPORT L8 | The exact tested, reviewed and submitted identities are missing or stale. The header says "Tested head: see 'Verification after the review' below", but **no such section exists** in REPORT.md (`grep` finds only that reference). L8 still says "tested head 3c8872e". The R2 table row reads "`cargo test --workspace` / clippy at 3c8872e", while the files it cites (`r1/test-workspace.txt`, `r1/clippy.txt`) now contain the `d21f42b` runs. The brief asks for exact tested, reviewed and submitted commits. | `grep -n "Verification after the review\|3c8872e" REPORT.md` → L8, L29, L82. `head -1 r1/test-workspace.txt` → `commit d21f42b`. | Add the section, or put the identities inline: tested product head `d21f42b` (520/0/15, clippy clean); reviewed head `2f0e527` (this recheck); submitted head. Fix L8 and the row label. |
+| R1-9 | minor | REPORT.md "D03-R1 follow-up" → "What the code does now" | This remains from R1-4. The REPORT still states the hand-off "still never allocates, formats, logs, locks or blocks". That contradicts design.md and the acceptance-matrix row, which now say the overflow free may take the allocator's lock. | REPORT.md, R1 disposition bullet list, last item. | Use the design.md wording: "never allocates, formats, logs or blocks and takes no lock of its own; the overflow free may take the allocator's internal lock". |
+| R1-10 | minor | design.md "Contract adjustment", proposed clause | The proposed clause ends "No other RT path allocates, frees or locks." That is a universal claim the code does not meet. kabl-ui's data callback, on its first call, runs `audio_thread_priority::promote_current_thread_to_real_time` (D-Bus/rtkit; may allocate and block, per its own comment) and `rt_error.set(e.to_string())` (allocates). This has existed since `51c2cd7`, before D03, and the code comment discloses it. The kabl-ui callback closure is also explicitly not under an allocation check (REPORT, RT row). The owner would be asked to approve a sentence that is already false. | `crates/ui/src/main.rs` ~L417–433; `git log -S promote_current_thread_to_real_time` → `51c2cd7`. | Scope the sentence to the D03 new RT path ("No other part of the new RT path allocates, frees or locks"), or drop it. If wanted, mention the pre-existing first-callback promotion as outside this clause. |
+| R1-11 | nit | design.md "Policy (R1)", teardown bullet | "The exiting audio thread therefore frees nothing" is over-broad. The data closure owned by the worker still drops on that thread at exit, including `left_ring`/`right_ring` (`Vec<f32>`) and the priority handle. Only stream errors and the rtrb rings are now freed on the UI thread. This is harmless, because no period is processed after the join. | `crates/ui/src/main.rs` L413–414 (rings moved into the data closure); cpal `new_output` moves both closures into the worker thread. | Say "frees no stream error or queue". |
+
+### Final verdict
+
+- **R1: bounded; contract adjustment nearly precise.** The code is unchanged in behaviour apart from the R1-5 teardown order, which is correct and has no harmful side effects. At most 16 stream errors are outstanding in every state I examined. The adjustment now names the right clause, the right owned kind and the lock exposure. Before it goes to the supervisor/owner, R1-10 should be fixed: the proposed text must not assert a universal "no other RT path" guarantee. The adjustment still needs their decision; this recheck does not approve it.
+- **R2: supported.** The disclosure gaps from R1-2, R1-3 and R1-6 are closed. What remains is bookkeeping: R1-8, the exact tested/reviewed/submitted identities in REPORT, and R1-9, one stale sentence. Neither needs evidence to be rerun. The evidence builds predate R1-5, and that is correctly stated as outside every recorded flow.
+
+### Limits of this recheck
+
+- I ran `cargo test -p kabl-standalone` and `cargo build -p kabl-ui` only, not the workspace tests or clippy. I did not run the app, the quit check, or any teardown with queued errors: the R1-5 behaviour was checked by reading the code, rtrb's last-end-frees semantics and cpal's `Drop for Stream`.
+- I did not re-inspect the screenshots or media, because no R2 artifact changed except the test and clippy logs and the new quit log.
+- This is not approval, and it is not Kosta's hands-on review.
+
+## D03-R1 implementer responses to the recheck
+
+Docs only; no product change after `d21f42b`.
+
+| ID | Resolution |
+|---|---|
+| R1-8 | **Fixed.** The REPORT header and the D03-R1 block now name `d21f42b` as the tested and reviewed product head, with its test and clippy logs. They also give the review range, the recheck commits, and the submitted head (the branch head; its product code equals `d21f42b`). The R2 table row now says `d21f42b`. |
+| R1-9 | **Fixed.** REPORT's "What the code does now" says the hand-off takes no lock of its own and that the overflow free goes through the allocator, which may lock. |
+| R1-10 | **Fixed.** The proposed clause is now limited to "Nothing else D03 added to the RT path…". design.md records that the pre-D03 exception still stands (since `51c2cd7`, kabl-ui's first callback requests RT promotion) and that it is not part of D03. |
+| R1-11 | **Fixed.** design.md now says the exiting audio thread frees no stream error or error queue, but still frees the data callback's own buffers. |

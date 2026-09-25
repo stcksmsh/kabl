@@ -5,7 +5,7 @@ Batch ID / outcome: D03 — Signal inspection and three listening recipes (+ own
   operational logging). A musician can inspect one signal, tell a broken connection from an
   unobserved trigger, and try three short listening experiments without losing work.
 Starting commit: e19a6ff (origin/master; product = 4eb4104 D02 merge, plus the D03 brief)
-Submitted head commit: superseded by the D03-R1 follow-up below (tested head 3c8872e)
+Submitted head commit: superseded by the D03-R1 follow-up below (tested and reviewed product head d21f42b)
 Branch / pushed remote / PR if environment-required: claude/d02-musical-controls-knjmgu on
   origin (the cloud environment requires this branch name); PR for Kosta:
   https://github.com/stcksmsh/kabl/pull/5 (not merged by the agent).
@@ -26,7 +26,12 @@ Product commits:
   - f1edf70: comments/docs
   - review fixes (R1-1..R1-7): kabl-ui drops the stream before the error queue (R1-5),
     plus comments/docs; see the review section
-Tested head: see "Verification after the review" below.
+Tested head: d21f42b, the product head. `cargo test --workspace` 520/0/15 and clippy
+  clean, both at d21f42b (r1/test-workspace.txt, r1/clippy.txt). Earlier the same totals at
+  3c8872e (before R1-5).
+Reviewed: 08f9d06..68f6cee (D03-R1 review), then rechecked at 2f0e527 (docs head) and
+  d21f42b (product); the final docs-only fixes follow in the commit after 2f0e527.
+Submitted: the branch head containing this text. Product code equals d21f42b.
 Evidence build: release 99c28d3. Product behaviour equals the tested head except R1-5's
   teardown order, which none of the recorded flows exercises.
 Engineering status: submitted. R1 includes a contract adjustment that needs a decision.
@@ -48,7 +53,8 @@ Owner review: pending
   - queues it in a 16-slot rtrb queue;
   - on overflow, drops it in the callback and counts it as undelivered;
   - never has more than 16 outstanding;
-  - still never allocates, formats, logs, locks or blocks.
+  - still never allocates, formats, logs or blocks, and takes no lock of its own (the
+    overflow free goes through the allocator, which may lock).
 
   The `mem::forget` leak is gone. The drop frees only a message the backend allocated on
   that thread in the same call. That is the **proposed contract adjustment** for
@@ -79,7 +85,7 @@ Owner review: pending
 | Inspection cost: simple and dense, tap off/on, parameter swaps, topology change, sizes | measured (cloud VM, no target) | `evidence/perf.md` "D03-R1 re-measurement", `r1/probe-cost-*.txt` |
 | Real app, dense piece, off/on/busy × 3 (+1) | measured. The **cloud stream stall** hit twice in this R2 session: perf busy-1 at 24 s, and the logging "blocked" run ("stalled … after 2428"; its recording has 0 frames). Both were logged and neither recovered (D05). | `r1/perf-app-summary.txt`, `r1/perf-busy-1-stall-kabl.log`, `r1/logging/blocked.txt` |
 | Package outside the repo: recipes found, log in `~/.local/state` | pass (cloud). Built from `b298eb6` with an uncommitted docs-only edit (`perf.md`), so the log reads `b298eb65381d+modified`. Product code was that of f1edf70. | `r1/package.txt`, `r1/img/1440x900-package-*.png` |
-| `cargo test --workspace` / clippy at 3c8872e | 520 passed, 0 failed, 15 ignored; clippy clean | `r1/test-workspace.txt`, `r1/clippy.txt` |
+| `cargo test --workspace` / clippy at d21f42b (after the review fixes) | 520 passed, 0 failed, 15 ignored; clippy clean | `r1/test-workspace.txt`, `r1/clippy.txt` |
 
 - **What the older evidence still covers.** Media under `img/`, `evidence/` and
   `walkthrough.mp4` from before the fixes stays as the record of those commits (see
