@@ -2313,3 +2313,27 @@ were not transplanted, only its look (palettes, geometry, drawing).
   item stays open, unexplained.
 - Follow-up candidates (not done): compile a chain driven only by a mono `midi.in` once
   instead of per voice (the piece's largest single cost); recover a stalled audio stream.
+
+## 2026-09-25 — Product direction clarified; continuation roadmap proposed
+
+- Kosta requested the supervisor audit current code/state, research existing synths and
+  libraries, and prepare sequential deliverables for fresh agents he starts in separate
+  containers. The supervisor checks returned evidence; only Kosta approves hands-on.
+- Confirmed priority: **shape sounds quickly**, for **musicians new to modular**, while
+  retaining evolving Tangerine Dream-style performance and conventional MIDI production.
+  Linux and REAPER come first. Ease of learning/use is the intended differentiation.
+- Performance baseline is Kosta's laptop (ThinkBook, i7-13700H). Pi was an example, never a
+  requirement. Broader hardware efficiency is desirable when feasible, not a Pi release gate.
+- Creator goal includes reusable composites **and** new code/DSP/behaviour, with custom
+  light/dark images and chosen control/jack placement and size. Composite-only support
+  must not be presented as fulfilling the complete creator goal.
+- Research and proposed order: `docs/PRODUCT-PLAN.md` and
+  `docs/product-research/RESEARCH.md`; execution/report contract:
+  `docs/product-research/AGENT-WORKFLOW.md`; first proposed brief:
+  `docs/product-research/briefs/D01.md`.
+- The order, automation-slot design, composite persistence/compilation and code-runtime
+  candidate are supervisor recommendations, **not owner decisions or implementation
+  authorization**. Technical selection belongs to runnable proofs in the relevant batch.
+- No product code changed or new hands-on/build evidence collected. Composition + Motion
+  and Sound Palette remain built/merged and separately awaiting Kosta's review. Existing
+  unexplained callback spike and cloud stream-stall observations remain open.

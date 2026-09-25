@@ -3,6 +3,20 @@
 Read this, then `docs/STATUS.md` (top section) and the last entries of `docs/decisions.md`.
 Trust code and git over older docs.
 
+## Product direction and continuation planning — 2026-09-25
+
+Kosta requested a product/code audit, competitor research and a sequential plan for fresh
+implementing agents. See `docs/PRODUCT-PLAN.md`, `docs/product-research/RESEARCH.md` and
+`docs/product-research/AGENT-WORKFLOW.md`. The proposed first brief is
+`docs/product-research/briefs/D01.md`. **These are planning documents, not authorization
+of all proposed batches.** Composition + Motion and Sound Palette still await separate
+owner reviews; no approval status changed in this planning session.
+
+Confirmed priorities: shape useful sounds quickly; musicians new to modular; Linux/REAPER
+first; laptop-class performance (Pi was an example, not a target); eventual reusable
+composites, custom light/dark panels and actual user-written DSP/behaviour. See the latest
+decisions entry. Proposed ordering/architecture remain recommendations pending disposition.
+
 ## Where things are
 
 - Branch `master` on `origin`. The sound palette batch was merged into it on 2026-09-25 (PR #1,
