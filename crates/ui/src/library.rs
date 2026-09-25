@@ -109,7 +109,16 @@ pub enum LibError {
     NameTaken(String),
     /// Factory sounds are never written.
     Factory,
+    /// A replacement names a sound whose name isn't the one being saved (a stale
+    /// confirmation): nothing is written.
+    ReplaceMismatch {
+        target: String,
+        name: String,
+    },
     Io(String),
+    /// A save failed half way and putting the previous files back failed too: they are kept
+    /// aside and restored on the next start or open (the message says where).
+    Interrupted(String),
     /// The patch files could not be read or parsed.
     Unreadable(String),
     /// The patch parsed but does not compile (unknown module, bad port, ...).
@@ -122,7 +131,11 @@ impl std::fmt::Display for LibError {
             LibError::BadName(why) => write!(f, "{why}"),
             LibError::NameTaken(_) => write!(f, "a sound with that name already exists"),
             LibError::Factory => write!(f, "factory sounds can't be overwritten: use Save As"),
-            LibError::Io(e) => write!(f, "{e}"),
+            LibError::ReplaceMismatch { target, name } => write!(
+                f,
+                "\"{target}\" is not called \"{name}\", so it was not replaced"
+            ),
+            LibError::Io(e) | LibError::Interrupted(e) => write!(f, "{e}"),
             LibError::Unreadable(e) => write!(f, "can't read the patch: {e}"),
             LibError::Uncompilable(e) => write!(f, "the patch doesn't build: {e}"),
         }
@@ -253,6 +266,7 @@ fn check_name(name: &str) -> Result<String, LibError> {
 /// Reads a patch directory and checks that it compiles, without touching anything else:
 /// the caller replaces its working sound only on `Ok`.
 pub fn read_patch(dir: &Path) -> Result<PatchLog, LibError> {
+    repair_folder(dir);
     let log = kabl_core::load(dir).map_err(|e| LibError::Unreadable(format!("{e:?}")))?;
     kabl_engine::compile::compile(log.state(), 48000.0, kabl_standalone::DEFAULT_VOICE_COUNT)
         .map_err(|e| LibError::Uncompilable(e.to_string()))?;
@@ -265,22 +279,213 @@ pub fn read_patch(dir: &Path) -> Result<PatchLog, LibError> {
 fn commit_dir(staged: &Path, target: &Path) -> Result<(), LibError> {
     let old = sibling(target, "old");
     if old.exists() {
-        fs::remove_dir_all(&old).map_err(|e| io("can't clear", &old, e))?;
+        if !target.exists() {
+            // The only saved copy: put it back rather than clear it.
+            fs::rename(&old, target).map_err(|e| io("can't restore", &old, e))?;
+        } else {
+            fs::remove_dir_all(&old).map_err(|e| io("can't clear", &old, e))?;
+        }
     }
     let had = target.exists();
     if had {
         fs::rename(target, &old).map_err(|e| io("can't replace", target, e))?;
     }
-    if let Err(e) = fs::rename(staged, target) {
+    let moved = fail_point("replace:dir")
+        .and_then(|()| fs::rename(staged, target).map_err(|e| io("can't write", target, e)));
+    if let Err(e) = moved {
         if had {
-            let _ = fs::rename(&old, target);
+            if let Err(back) = fs::rename(&old, target) {
+                return Err(LibError::Interrupted(format!(
+                    "{e}; the previous version is kept at {} ({back}) and is restored the next \
+                     time kabl starts",
+                    old.display()
+                )));
+            }
         }
-        return Err(io("can't write", target, e));
+        return Err(e);
     }
     if had {
         let _ = fs::remove_dir_all(&old);
     }
     Ok(())
+}
+
+thread_local! {
+    static FAIL_AT: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Test hook: the next saves on this thread fail at `stage` (`None` clears it). The app
+/// reads the same stage from `KABL_SAVE_FAIL` (a test hook for scripted real-app runs, like
+/// `KABL_RECORD_FAIL_AFTER`; never set in normal use). Stages: `staged` (the new copy is written and
+/// read back, nothing replaced yet), `replace:dir` (a sound of yours moved aside),
+/// `replace:<file>` (a folder save after that file was replaced: `meta.toml`,
+/// `checkpoint.json`, `log.jsonl`).
+pub fn fail_saves_at(stage: Option<&str>) {
+    FAIL_AT.with(|f| *f.borrow_mut() = stage.map(str::to_string));
+}
+
+fn fail_point(stage: &str) -> Result<(), LibError> {
+    let hit = FAIL_AT.with(|f| f.borrow().as_deref() == Some(stage))
+        || std::env::var("KABL_SAVE_FAIL").is_ok_and(|v| v == stage);
+    if hit {
+        Err(LibError::Io(format!("injected failure at {stage}")))
+    } else {
+        Ok(())
+    }
+}
+
+/// The patch files a folder save replaces, in the order it replaces them: the log, the only
+/// authoritative one, last.
+const FOLDER_FILES: [&str; 3] = ["meta.toml", "checkpoint.json", "log.jsonl"];
+/// Staging directory a folder save keeps inside the patch folder while it works.
+const FOLDER_STAGING: &str = ".kabl-save";
+
+/// Marker file inside a staging directory kabl made: `writing` while the new copy is written,
+/// `replacing` once it has been read back and files start moving, `done` (the save stands)
+/// or `undone` (rolled back) before the staging is cleaned up. A `.kabl-save` without it is
+/// not kabl's and is never touched.
+const FOLDER_MARKER: &str = "kabl-staging";
+
+/// Saves `log` into a patch folder the user chose, touching only its three patch files
+/// (other files in the folder stay). The new files are written and read back in
+/// `<dir>/.kabl-save/`, then each old file is moved into the staging directory and the new
+/// one moved in, `log.jsonl` last. Any failure moves the old files back and removes files
+/// the save added, so the folder is as it was. A crash half way is finished or undone by
+/// `repair_folder` on the next open or save of that folder. Not crash-proof on power loss
+/// (no fsync). A `.kabl-save` that kabl didn't make blocks the save instead of being used.
+pub fn save_folder(dir: &Path, log: &PatchLog) -> Result<(), LibError> {
+    repair_folder(dir);
+    let staging = dir.join(FOLDER_STAGING);
+    let marker = staging.join(FOLDER_MARKER);
+    // An empty one (kabl stopped right after making it) just goes.
+    let _ = fs::remove_dir(&staging);
+    if marker.exists() {
+        return Err(LibError::Interrupted(format!(
+            "an earlier save here could not be undone: the previous files are kept in {}",
+            staging.display()
+        )));
+    }
+    if staging.exists() {
+        return Err(LibError::Io(format!(
+            "{} is in the way (kabl didn't make it): rename it to save here",
+            staging.display()
+        )));
+    }
+    let written = (|| {
+        fs::create_dir_all(&staging).map_err(|e| io("can't create", &staging, e))?;
+        fs::write(&marker, "writing").map_err(|e| io("can't write", &marker, e))?;
+        kabl_core::save(&staging, log)
+            .map_err(|e| LibError::Io(format!("can't save to {}: {e:?}", dir.display())))?;
+        let back = kabl_core::load(&staging)
+            .map_err(|e| LibError::Io(format!("saved copy doesn't read back: {e:?}")))?;
+        if back.state() != log.state() {
+            return Err(LibError::Io("saved copy doesn't match the sound".into()));
+        }
+        fail_point("staged")?;
+        fs::write(&marker, "replacing").map_err(|e| io("can't write", &marker, e))
+    })();
+    if let Err(e) = written {
+        remove_staging(&staging);
+        return Err(e);
+    }
+    let mut result = Ok(());
+    for f in FOLDER_FILES {
+        let (live, new, old) = (
+            dir.join(f),
+            staging.join(f),
+            staging.join(format!("{f}.old")),
+        );
+        let step = (|| {
+            if live.exists() {
+                fs::rename(&live, &old).map_err(|e| io("can't replace", &live, e))?;
+            }
+            fs::rename(&new, &live).map_err(|e| io("can't write", &live, e))?;
+            fail_point(&format!("replace:{f}"))
+        })();
+        if let Err(e) = step {
+            result = Err(e);
+            break;
+        }
+    }
+    if let Err(e) = result {
+        if roll_back(dir, &staging) {
+            let _ = fs::write(&marker, "undone");
+            remove_staging(&staging);
+            return Err(e);
+        }
+        return Err(LibError::Interrupted(format!(
+            "{e}; putting the previous files back failed: they are kept in {} and the next \
+             open or save of this folder settles it",
+            staging.display()
+        )));
+    }
+    // The save stands from here on, whatever happens to the cleanup.
+    let _ = fs::write(&marker, "done");
+    remove_staging(&staging);
+    Ok(())
+}
+
+/// Undoes a folder save in the `replacing` phase: every `.old` goes back over its file, and a
+/// patch file the save moved in where there was none (its staged copy gone, no `.old`) is
+/// removed. True when everything was undone.
+fn roll_back(dir: &Path, staging: &Path) -> bool {
+    let mut ok = true;
+    for f in FOLDER_FILES {
+        let (live, new, old) = (
+            dir.join(f),
+            staging.join(f),
+            staging.join(format!("{f}.old")),
+        );
+        let r = if old.exists() {
+            fs::rename(&old, &live)
+        } else if !new.exists() && live.exists() {
+            fs::remove_file(&live)
+        } else {
+            Ok(())
+        };
+        ok &= r.is_ok();
+    }
+    ok
+}
+
+/// Removes a staging directory kabl made: only the files it writes, then the directory
+/// itself (not recursively, so anything else in it stays and keeps the directory).
+fn remove_staging(staging: &Path) {
+    for f in FOLDER_FILES {
+        let _ = fs::remove_file(staging.join(f));
+        let _ = fs::remove_file(staging.join(format!("{f}.old")));
+    }
+    let _ = fs::remove_file(staging.join(FOLDER_MARKER));
+    let _ = fs::remove_dir(staging);
+}
+
+/// Finishes or undoes a folder save that stopped half way (see `save_folder`). Acts only on
+/// a staging directory with kabl's marker. `writing`: nothing in the folder changed.
+/// `done` / `undone`: only the cleanup was left. `replacing`: the log moves last, so if the
+/// new log is in place (its staged copy gone and `log.jsonl` present) the save completed and
+/// stands; otherwise it is rolled back. Returns a note for the user when something was
+/// restored.
+pub fn repair_folder(dir: &Path) -> Option<String> {
+    let staging = dir.join(FOLDER_STAGING);
+    let phase = fs::read_to_string(staging.join(FOLDER_MARKER)).ok()?;
+    let committed = !staging.join("log.jsonl").exists() && dir.join("log.jsonl").exists();
+    let mut note = None;
+    if phase.trim() == "replacing" && !committed {
+        if roll_back(dir, &staging) {
+            note = Some(format!(
+                "{}: an interrupted save was undone; the folder is as it was before it",
+                dir.display()
+            ));
+        } else {
+            return Some(format!(
+                "{}: an interrupted save could not be undone; the previous files are in {}",
+                dir.display(),
+                staging.display()
+            ));
+        }
+    }
+    remove_staging(&staging);
+    note
 }
 
 /// `.name.old` / `.name.new` beside `dir`.
@@ -447,6 +652,9 @@ impl Library {
         if let Some(taken) = self.user_named(&meta.name, replace) {
             return Err(LibError::NameTaken(taken.id.clone()));
         }
+        // A swap that stopped half way earlier this session is settled first, so its `.old`
+        // (possibly the only saved copy) is put back rather than cleared by this save.
+        repair(&self.sounds_dir(), &mut self.notes);
         let target = match replace {
             Some(id) => {
                 let e = self
@@ -454,6 +662,13 @@ impl Library {
                     .ok_or_else(|| LibError::Io(format!("\"{id}\" is gone")))?;
                 if e.origin == Origin::Factory {
                     return Err(LibError::Factory);
+                }
+                // Only the sound that has this name (or had it: Save in place) is replaced.
+                if e.meta.name.trim().to_lowercase() != meta.name.to_lowercase() {
+                    return Err(LibError::ReplaceMismatch {
+                        target: e.meta.name.clone(),
+                        name: meta.name.clone(),
+                    });
                 }
                 e.dir.clone()
             }
@@ -485,6 +700,7 @@ impl Library {
             if back.state() != log.state() {
                 return Err(LibError::Io("saved copy doesn't match the sound".into()));
             }
+            fail_point("staged")?;
             commit_dir(&staged, &target)
         })();
         if written.is_err() {

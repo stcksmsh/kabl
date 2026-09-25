@@ -17,6 +17,18 @@ first; laptop-class performance (Pi was an example, not a target); eventual reus
 composites, custom light/dark panels and actual user-written DSP/behaviour. See the latest
 decisions entry. Proposed ordering/architecture remain recommendations pending disposition.
 
+## D01-R1 saving repairs — submitted (2026-09-25)
+
+Owner-authorized repair, run in parallel with D02 (its own branch/PR; D01-R1 merges first).
+Both supervisor concerns reproduced and fixed; the real window-manager close is verified in
+the cloud (Xvfb + openbox). Record: `docs/find-play-save/repair-1/REPORT.md` (+ `REVIEW.md`,
+fresh reviewer subagent, final recheck at b579fb3). Code: `library.rs` `save_folder` /
+`repair_folder` (staging in `<folder>/.kabl-save` with a `kabl-staging` marker; `.kabl-save`
+is reserved), `ReplaceMismatch`, fault hook `KABL_SAVE_FAIL` / `library::fail_saves_at`;
+`browser.rs` Save As offer tied to its name. drive.py: `wmclose`, `running`, `exited`
+(needs an EWMH WM: `repair-1/scripts/openbox-rc.xml`). D01's owner checklist, Composition +
+Motion and Sound Palette reviews remain pending. Preview picker/Stop semantics unchanged.
+
 ## D01 Find, play and save — built, awaiting Kosta's review (2026-09-25)
 
 Kosta authorized D01 as a whole and **explicitly deferred** the Composition + Motion and Sound

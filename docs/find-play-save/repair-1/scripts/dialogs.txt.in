@@ -1,0 +1,27 @@
+# Affected dialogs (scripted), theme THEME: the collision offer, the offer gone after the
+# name changes, the window-manager close question.
+sleep 2
+click theme:THEME
+click sound:factory:palette/pad
+click open
+sleep 1
+click save-as
+fill dlg:name Twin
+click dlg:save
+sleep 1
+click perform
+sleep 0.5
+dragby pslider:1.m1 60 0
+click save-as
+fill dlg:name twin
+click dlg:save
+sleep 0.8
+shot THEME-replace-offered
+fill dlg:name Twin Two
+sleep 0.8
+shot THEME-name-changed-offer-gone
+click dlg:cancel
+wmclose
+sleep 1
+shot THEME-close-question
+click dlg:cancel

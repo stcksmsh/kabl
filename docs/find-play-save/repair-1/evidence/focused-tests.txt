@@ -1,0 +1,47 @@
+commit b579fb3
+$ cargo test -p kabl-ui --test browser --test library
+     Running tests/browser.rs (target/debug/deps/browser-78be73912b097ff9)
+test a_failed_folder_save_leaves_the_saved_folder_unchanged ... ok
+test browsing_never_makes_sound_or_loads ... ok
+test a_piece_opens_stopped_and_starts_explicitly ... ok
+test a_failed_save_keeps_the_work_and_the_question ... ok
+test cancel_after_a_collision_keeps_the_other_sound ... ok
+test missing_recents_and_bad_patches_are_explained ... ok
+test losing_window_focus_stops_a_preview ... ok
+test edit_save_as_reopen_and_the_factory_file_stays ... ok
+test every_control_is_reachable_at_both_sizes ... ok
+test open_a_voice_and_audition_it ... ok
+test quit_with_unsaved_changes_asks ... ok
+test replace_never_targets_a_sound_after_the_name_changed ... ok
+test rename_through_the_browser ... ok
+test save_from_the_question_then_continues ... ok
+test save_to_folder_is_staged_too ... ok
+test save_as_onto_a_taken_name_offers_replace ... ok
+test unsaved_edits_ask_and_cancel_keeps_them_exactly ... ok
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s
+     Running tests/library.rs (target/debug/deps/library-0e8f607e7f8c4197)
+test a_kabl_save_directory_kabl_didnt_make_is_left_alone ... ok
+test a_missing_factory_directory_is_a_note_not_a_failure ... ok
+test a_failed_save_leaves_the_old_sound_and_explains ... ok
+test a_folder_save_writes_the_patch_and_keeps_other_files ... ok
+test a_read_only_user_directory_is_an_error_not_a_panic ... ok
+test a_replacement_must_name_the_sound_it_replaces ... ok
+test a_folder_save_failing_at_any_stage_leaves_the_folder_as_it_was ... ok
+test a_retry_after_an_interrupted_user_save_keeps_the_only_copy ... ok
+test a_save_killed_during_cleanup_stands ... ok
+test an_interrupted_folder_save_is_repaired_on_the_next_open ... ok
+test a_user_save_failing_at_any_stage_keeps_the_saved_sound ... ok
+test factory_paths_are_recognized_for_the_advanced_folder_save ... ok
+test leftover_staging_is_cleared_or_explained ... ok
+test an_interrupted_save_is_repaired_on_the_next_scan ... ok
+test malformed_and_uncompilable_patches_are_reported_not_loaded ... ok
+test old_patch_directories_without_metadata_are_listed ... ok
+test names_and_directories_never_collide_silently ... ok
+test save_as_reopen_rename_and_the_factory_file_is_unchanged ... ok
+test slugs_are_plain ... ok
+test the_init_keyboard_file_is_what_the_code_builds ... ok
+test write_factory_library ... ignored, writes patches/init-keyboard and every factory sound.toml
+test favorites_and_recents_persist_and_missing_ones_are_kept_until_forgotten ... ok
+test search_matches_every_word_across_name_category_and_tags ... ok
+test every_factory_sound_is_discoverable_categorized_and_loads ... ok
+test result: ok. 23 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.03s

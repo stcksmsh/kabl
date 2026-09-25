@@ -25,6 +25,10 @@ Script lines (# comments):
     wait T                                       until T s after the script's first line
     midi LINE                                    a line for the virtual controller (KABL_PLAYER)
     midikill | midistart                         unplug / plug the virtual controller back in
+    wmclose                                      ask the window manager to close kabl (wmctrl -c;
+                                                 needs an EWMH window manager such as openbox)
+    running                                      stop the script unless kabl-ui is still running
+    exited T                                     stop the script unless kabl-ui exits within T s
 
 The optional 4th argument is the patch folder; `-` starts kabl-ui without `--patch` (the
 browser opens). Environment: KABL_BIN=PATH runs another kabl-ui binary (an installed
@@ -230,6 +234,22 @@ try:
                     pass
         elif cmd == "midistart":
             player = start_player()
+        elif cmd == "wmclose":
+            subprocess.run(["wmctrl", "-c", "kabl"], check=True)
+        elif cmd == "running":
+            if app.poll() is not None:
+                raise SystemExit(f"kabl-ui exited ({app.returncode}), expected it running")
+            if log:
+                log.write(f"{time.time():.3f} = running\n")
+        elif cmd == "exited":
+            try:
+                code = app.wait(timeout=float(a[0]))
+            except subprocess.TimeoutExpired:
+                raise SystemExit("kabl-ui still running, expected it to exit")
+            if log:
+                log.write(f"{time.time():.3f} = exited {code}\n")
+                log.flush()
+            break
         elif cmd == "midi":
             player.stdin.write(" ".join(a) + "\n")
             player.stdin.flush()

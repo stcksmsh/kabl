@@ -30,6 +30,15 @@ Test counts: see the report (rerun at the submitted head).
     packaging/linux/package.sh && mkdir -p ~/opt && tar -xzf target/dist/kabl-0.1.0-linux-x86_64.tar.gz -C ~/opt
     ~/opt/kabl-0.1.0-linux-x86_64/bin/kabl-ui --rate 48000 --frames 256
 
+**D01-R1 saving repairs (owner-authorized, 2026-09-25): submitted, not merged.** Save As
+"Replace it" now applies only to the name it was offered for (a stale offer overwrote and
+renamed another sound); folder saves are staged in `<folder>/.kabl-save`, roll back on
+failure and are settled after a crash (they used to rewrite `log.jsonl` before failing while
+claiming nothing was overwritten); the window-manager close with unsaved work is verified in
+the real app (cloud, openbox). 457 tests pass, clippy clean at b579fb3; reviewed by a fresh
+subagent. Record: [`find-play-save/repair-1/REPORT.md`](find-play-save/repair-1/REPORT.md).
+D01's hands-on checklist is still pending (Kosta's remote walkthrough OK is not that).
+
 **Sound Palette + Playable Voices (supervisor scope, 2026-09-24): built, waiting for Kosta's
 hands-on review.** New `noise`, `filter.ladder`, `chorus`, `drive`; `osc.va` pulse width,
 fine, unison 1–4, band-limited sync; keyboard expression on the audio thread (POLY / MONO /

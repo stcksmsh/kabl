@@ -1,0 +1,27 @@
+# R3 part 1 (scripted): edit, close through the window manager (wmctrl -c → WM_DELETE_WINDOW),
+# Cancel keeps the work; close again, Save → Save As (factory sound) → the app then quits.
+sleep 2
+click sound:factory:palette/pad
+click open
+sleep 1
+click perform
+sleep 0.5
+dragby pslider:1.m1 60 0
+sleep 0.5
+shot c1-edited
+wmclose
+sleep 1
+shot c1-close-question
+click dlg:cancel
+sleep 1
+running
+shot c1-after-cancel
+wmclose
+sleep 1
+click dlg:save
+sleep 0.8
+fill dlg:name Closed Pad
+sleep 0.5
+shot c1-save-as-from-close
+click dlg:save
+exited 5
