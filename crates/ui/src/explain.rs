@@ -107,6 +107,8 @@ pub struct Explain {
     editor: u64,
     /// A text field had keyboard focus at the end of the last frame.
     pub(crate) typing: bool,
+    /// Show just inspected a control: the drawer scrolls to its routes once.
+    pub(crate) scroll_to_routes: bool,
 }
 
 impl Explain {
@@ -183,6 +185,7 @@ pub fn go(editor: &PatchEditor, ui_state: &mut UiState, target: Target, now: f64
             if let Some(p) = param_of(editor.state(), id, param) {
                 ui_state.flash = Some((id, p.name, now));
             }
+            ui_state.explain.scroll_to_routes = true;
         }
         Target::Jack { .. } | Target::Module(_) => {
             ui_state.inspected = None;
@@ -555,6 +558,9 @@ fn dest_detail(state: &PatchState, d: &Dest) -> String {
             // Drop the source label: the row is under its source already.
             if let Some((_, rest)) = s.split_once(": ") {
                 s = rest.to_string();
+            }
+            if let Some(now) = macro_now(state, d.to, param, &r) {
+                s.push_str(&format!(" · {now}"));
             }
             let others = routing::routes_into(state, d.to, param.name).len() - 1;
             if others > 0 {

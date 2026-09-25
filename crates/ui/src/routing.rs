@@ -1146,7 +1146,7 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
     let routes = routes_into(editor.state(), id, param.name);
 
     ui.separator();
-    ui.horizontal_wrapped(|ui| {
+    let head = ui.horizontal_wrapped(|ui| {
         ui.heading(format!("{} · {kind} #{id}", target_label(param)));
         let r = ui
             .small_button("Explain")
@@ -1163,6 +1163,10 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
             );
         }
     });
+    // Just shown from an explanation: this control's routes, not the module list, in view.
+    if std::mem::take(&mut ui_state.explain.scroll_to_routes) {
+        ui.scroll_to_rect(head.response.rect, Some(egui::Align::TOP));
+    }
     if ui_state.explain.help {
         if let Some(h) = crate::help::param_help(&kind, param.name) {
             ui.add(egui::Label::new(h).wrap());

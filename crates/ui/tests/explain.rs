@@ -169,6 +169,13 @@ fn a_macro_card_lists_its_real_destinations_and_reveals_an_off_face_one() {
             h.ui.explain.target,
             Some(Target::Control { id: LADDER, .. })
         ));
+        // Its route row (bypass, depth) is in view in the drawer, above the Perform panel.
+        let row = h.rect("bypass:29");
+        let perform_top = h.rect("pcard:1.m1").top();
+        assert!(
+            row.top() > h.rect("explain-dest:29").bottom() && row.bottom() < perform_top,
+            "route row hidden at {w}x{hgt}: {row:?}"
+        );
         h.unchanged_since(&before);
         // Back: the view before Show, the card again.
         h.click("explain-back");
