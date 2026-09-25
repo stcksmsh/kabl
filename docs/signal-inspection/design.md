@@ -47,9 +47,11 @@ one-sample pulse is an edge.
   graph". No allocation: the resolved lanes are a fixed array.
 - Which graph: the one fading in during a fade, else the active one. Only that graph
   collects; the other has collection off. A window that spans a fade start continues in the
-  new graph when the target resolves to the same lanes and port there (so a knob turned
-  continuously, a swap per frame, still yields reports); it is flagged `fading`. *(Changed
-  after review F3; the first version restarted the window.)*
+  new graph only when the swap changed values, not wiring (same modules, kinds and cable
+  endpoints: `CompiledPatch::topology`), and the target resolves to the same lanes and
+  port there, so a knob turned continuously (a swap per frame) still yields reports,
+  flagged `fading`. After a wiring change the window starts over, matching the UI's floor.
+  *(Changed after review F3 and recheck N1; the first version always restarted.)*
 - Closed inspection: target `None`, each schedule step pays one boolean test.
 - When a window completes, the engine holds one `ProbeReport` (fixed size, `Copy`). The
   audio callback pushes it into a dedicated `rtrb` queue of 8; a full queue drops the

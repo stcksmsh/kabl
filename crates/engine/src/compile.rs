@@ -369,6 +369,23 @@ pub struct CompiledPatch {
     pub generation: u64,
     /// The selected-signal tap (`probe.rs`); inactive unless `PatchEngine` sets a target.
     tap: Tap,
+    /// Modules (with kinds) and cable endpoints of the source patch: equal between two
+    /// graphs when only values changed. A measurement window only continues across a swap
+    /// that keeps it.
+    topology: u64,
+}
+
+/// `CompiledPatch::topology` of `patch`.
+fn topology_of(patch: &PatchState) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    for (id, m) in &patch.modules {
+        (id, &m.kind).hash(&mut h);
+    }
+    for (id, c) in &patch.cables {
+        (id, format!("{:?}{:?}", c.from, c.to)).hash(&mut h);
+    }
+    h.finish()
 }
 
 enum CableTo {
@@ -1095,6 +1112,7 @@ fn compile_inner(
         output: out_module,
         generation: 0,
         tap: Tap::default(),
+        topology: topology_of(patch),
     })
 }
 
@@ -1458,12 +1476,20 @@ impl CompiledPatch {
         self.tap = tap;
     }
 
-    /// Continues `old`'s open window in this graph when the target resolved to the same lanes
-    /// and port here, so a run of swaps (a knob being turned rebuilds every frame) never
-    /// restarts the measurement; marks the window as spanning a fade. No allocation.
+    /// Continues `old`'s open window in this graph when only values changed (same modules and
+    /// cables) and the target resolved to the same lanes and port, so a run of swaps (a knob
+    /// being turned rebuilds every frame) never restarts the measurement; marks the window as
+    /// spanning a fade. After a wiring change the window starts over: what was measured before
+    /// it is not this patch. No allocation.
     pub fn continue_probe_from(&mut self, old: &CompiledPatch) {
         let (o, t) = (&old.tap, &mut self.tap);
-        if o.found && t.found && o.target == t.target && o.n == t.n && o.port == t.port {
+        if old.topology == self.topology
+            && o.found
+            && t.found
+            && o.target == t.target
+            && o.n == t.n
+            && o.port == t.port
+        {
             t.acc = o.acc;
             t.prev = o.prev;
             t.samples = o.samples;

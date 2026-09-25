@@ -19,6 +19,11 @@ pub fn hand_off_stream_error(
     tx: &mut rtrb::Producer<cpal::Error>,
     lost: &std::sync::atomic::AtomicU64,
 ) {
+    // A bare xrun owns nothing (callers count xruns themselves): dropping it here frees
+    // nothing, and it cannot crowd a real device error out of the queue.
+    if err.kind() == cpal::ErrorKind::Xrun && err.message().is_none() {
+        return;
+    }
     if let Err(rtrb::PushError::Full(e)) = tx.push(err) {
         lost.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         std::mem::forget(e);

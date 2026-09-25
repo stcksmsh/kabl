@@ -90,3 +90,55 @@ Evidence recorded before `f28d262` (walkthrough at `ef9ed7b`, screenshots/loggin
 
 
 ## Recheck
+
+- **Recheck head:** `2967b06` (product fixes in `f28d262`). I reviewed `git diff 496a5c2..2967b06 -- crates docs/signal-inspection/{design,README}.md` and checked each resolution in the code.
+- **Tests run at `2967b06`, debug target, in the cloud container:**
+  - `cargo test -p kabl-engine --test probe`: 8 passed, including `a_knob_being_turned_does_not_stop_the_measurement`.
+  - `cargo test -p kabl-ui --test signal_inspection`: 21 passed.
+  - `cargo test -p kabl-standalone --test rt_with_logging`: 1 passed.
+  - `cargo test --workspace`: exit 0, **518 passed, 0 failed, 15 ignored**.
+  - `cargo clippy --workspace --all-targets`: exit 0, no warnings.
+- **Scratch reproduction:** a throwaway program outside the repo, built into the existing debug `target/` with no release build. It drives `PatchEngine`, `compile` and `Inspect` directly. Its output is quoted under N1.
+
+### Per-finding status
+
+| ID | Status | Evidence |
+|---|---|---|
+| F1 | **Partly** | The UI side is fixed: `rebuilt` now drops the kept reports with `generation < floor` and restarts "waiting", and `a_wiring_change_drops_what_was_measured_before_it` covers that. The F3 fix brings the stale measurement back from the engine side, though, for the same removed-connection case. See N1. |
+| F2 | Resolved | `base()` reads the stored value, falling back to the registry default through `explain::param_of`. `routes_into()` counts routes into the param that are not bypassed. "Passes nothing" is only said when the base is ≤ 0 and neither cv nor a route drives the param. Cutoff uses the same helpers. Covered by `why_no_sound_reads_defaults_and_routes_for_the_vca`. |
+| F3 | Resolved (with N1) | `continue_probe_from` copies `acc`, `prev`, `samples` and `blocks`, and sets `fading`, but only when both taps are `found` and target (token included), lane count `n` and `port` are equal. So a changed selection, an editor replacement, a module that is gone or a different lane count restarts the window. `move_probe` continues from `active`, which is correct on both paths: on a direct `receive_swap`, `active` is the graph measured so far; on pending promotion, `active` is the just-promoted graph that was measured during the fade. Nothing allocates (fixed-size copy). The engine test gets ≥ 35 reports per 2 s with swaps every 6, 12 or 24 blocks. I did not look at the real-app run (`scripts/knob-drag.txt`, screenshot). |
+| F4 | Resolved | `end_sample` is the engine's `rendered` count, advanced by `BLOCK` on every `process_block`. The UI ages each report against `frames_total`, which `record` adds after each callback. Both counters are created in the same `AudioHost::new`, so they share an origin. The engine renders at most one block ahead of what is delivered, so the difference saturates at 0 rather than going negative. The UI stores `now - age`. `a_report_that_waited_in_the_queue_is_not_live` covers `accept` with an age. The age computation in `main.rs` itself has no test. |
+| F5 | Resolved | `hand_off_stream_error` pushes into a 256-slot queue. When the queue is full it calls `mem::forget` on the error and counts it, so nothing is freed on the audio thread. Both binaries use it. The standalone binary now drains the queue every 1 s. The README documents the bounded leak. See also N3. |
+| F6 | Partly (accepted) | `rt_with_logging.rs` installs `applog` at TRACE, then runs engine swaps, selection changes, a report push into a full queue and a stream-error hand-off into a full queue with owned messages, all under `assert_no_alloc` (which also catches deallocation). The kabl-ui callback closure itself is still untested; its remaining additions are relaxed atomic adds, as the implementer states. |
+| F7 | Resolved | `why_panel` caches `engine_output` per `topology()` signature. `output_module()` and every `CompileError` variant depend only on modules, kinds and endpoints, so the cache cannot go stale on a parameter edit. `topology()` still formats one string per cable each frame while the aid is open, which is cheap and has no RT impact. |
+| F8 | Resolved | Every `doc` failure line uses `LibError::log_text`, which gives the kind plus the text after the last `": "`, i.e. the system's reason. No `doc` log line carries an id, name or path now; I grepped every `target: "doc"` line. The README is corrected for the lines that still carry paths (start, library directories, `--patch`, devices). Covered by `library_errors_are_logged_without_paths_or_names`. |
+| F9 | Resolved | `via_cable`, its label and `midi_connected` are removed. There are no remaining references. |
+| F10 | Resolved | Both process-ending paths in `standalone/src/main.rs` now use `log::error!`. |
+
+### New findings
+
+| ID | Severity | File / function | Concrete failure scenario | Supporting evidence | Requested correction |
+|---|---|---|---|---|---|
+| N1 | major | `engine/src/compile.rs` `continue_probe_from`, called from `patch_engine.rs` `move_probe` | The carry checks the target, lane count and port, but not whether the swap changed topology. When a cable into the inspected module is removed, the open window, with the old graph's peaks and RMS, continues into the new graph and is reported with the **new** generation. The UI raised its floor to that generation, so it accepts the report. `summary()` then shows the old peak as **Live** for 1 s (`SUMMARY_SECS`), while the new graph measures silence. This is F1's symptom again, and the Why panel reads the same summary. This happens on every topology edit made while inspecting, whatever point the window has reached. design.md is now self-contradictory: "reports already kept from before [the floor] are dropped" vs. "a window that spans a fade start continues". | Scratch program with `chain()` (macro 0.3 → VCA ×0.5 → VCA #3 ×0.5 → out), tapping VCA #3 out. Cable 2 (into VCA #3) is removed 5, 20 or 37 blocks into a window, the new graph gets gen 2, and `Inspect::rebuilt(2, …)` is called. Every case printed: first new report `gen 2 fading true peak 0.075 last 0.000`, `UI accepted true, summary peak 0.075 status Live`; second report peak 0.000; summary still 0.075 half a second later, cleared only after 1 s. | Carry only across swaps that keep the topology. For example, give `CompiledPatch` a topology signature computed in `compile` (or a `param_only` flag set by the builder) and require it to match in `continue_probe_from`. Otherwise restart the window as before. Add an engine test: tap on, remove the cable into the tapped module mid-window, and the first new-generation report must not contain the old level. A UI-level test that feeds real engine reports would also catch it. |
+| N2 | nit | `ui/src/main.rs` `log_health`, `standalone/src/main.rs` loop | The count in "not delivered (queue full): N" is cumulative since start, but it sits on a line that reports "stream errors=… in 10s / in {secs}s". A reader will take it for a per-period count. | `get(&t.errors_lost)` and `lost.load(..)` are never reset or diffed. | Log the difference since the last line, or label it "since start". |
+| N3 | nit (plausible) | `ui/src/main.rs` error callback → `hand_off_stream_error` | Xruns now go into the fault queue too (before this change only non-xrun errors did). If the UI does not run `update` for a while (e.g. a minimized window on a platform that stops repainting), a burst of 256 or more xruns fills the queue. A later real device error is then forgotten: its message is leaked, and it is never shown in `fault_text`, only counted. I have not observed this. | The diff queues every error in the kabl-ui callback. `update` filters xruns only after draining. | Keep counting xruns on the audio side (they are already counted in `t_err.error`) and queue only non-xrun errors, as the standalone binary could too. |
+
+### Limits of this recheck
+
+- I did not run the real app, look at `scripts/knob-drag.txt` or the new screenshot, or rerun the walkthrough, perf or logging evidence. As the implementer notes, that evidence predates `f28d262`.
+- N1 was reproduced by calling the engine and `Inspect` APIs directly, not in the GUI. The GUI goes through the same `rebuilt`/`accept`/`summary` path, so I expect the same visible result, but I did not see it.
+- F4's aging in `main.rs` was checked by reading only. So was the claim that the standalone `kabl` binary drains its queue every second.
+- This recheck is not approval, and it is not Kosta's hands-on review.
+
+## Implementer responses to the recheck
+
+Fixes in the commit after `2967b06` ("D03 recheck fixes N1-N3"); `cargo test --workspace`
+519 passed, 0 failed, 15 ignored; clippy clean.
+
+| ID | Resolution |
+|---|---|
+| N1 | **Fixed.** `CompiledPatch` carries a `topology` signature (modules with kinds, cable ids with endpoints; computed in `compile`). `continue_probe_from` continues the window only when it is equal, so a wiring change restarts the measurement exactly when the UI raises its floor. Engine test `a_wiring_change_mid_window_starts_the_measurement_over`: the cable into the tapped VCA is removed 20 blocks into a window; the first report of the new graph has peak 0. design.md corrected. |
+| N2 | **Fixed.** Both binaries log the "not delivered (queue full)" count for that interval (difference since the last line). |
+| N3 | **Fixed.** `hand_off_stream_error` returns early for an xrun without a message (it owns nothing; callers count xruns themselves), so xruns never fill the queue ahead of a real device error. |
+
+## Second recheck

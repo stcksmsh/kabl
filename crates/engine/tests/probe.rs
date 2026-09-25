@@ -392,3 +392,28 @@ fn a_knob_being_turned_does_not_stop_the_measurement() {
             .all(|w| w[1].end_sample > w[0].end_sample));
     }
 }
+
+#[test]
+fn a_wiring_change_mid_window_starts_the_measurement_over() {
+    // Tap on VCA #3 (0.075); the cable into it goes 20 blocks into a window: the first
+    // report of the new graph must not carry the old level.
+    let c = Collector::new();
+    let h = c.handle();
+    let mut e = PatchEngine::new(&h, &chain(), SR, 4).unwrap();
+    e.inspect(Some(target(1, 3, 0, "vca")));
+    let r0 = next_report(&mut e, 100);
+    assert!((r0.lane[0].peak - 0.075).abs() < 1e-6);
+    let (mut l, mut r) = ([0.0; BLOCK], [0.0; BLOCK]);
+    for _ in 0..20 {
+        e.process_block(&mut l, &mut r);
+        assert!(e.take_probe_report().is_none());
+    }
+    let mut p = chain();
+    p.cables.remove(&2);
+    let mut g = e.build_swap(&h, &p).unwrap();
+    g.generation = 2;
+    e.receive_swap(g);
+    let r1 = next_report(&mut e, 100);
+    assert_eq!(r1.generation, 2);
+    assert_eq!(r1.lane[0].peak, 0.0, "old level carried: {:?}", r1.lane[0]);
+}

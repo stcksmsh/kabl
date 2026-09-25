@@ -835,6 +835,8 @@ struct Health {
     stalled: bool,
     /// Stream errors taken from the queue since the last WARN line.
     faults: u64,
+    /// `errors_lost` at the last WARN line.
+    lost_seen: u64,
     fault_text: Option<String>,
     log_problem: Option<String>,
     log_checked: std::time::Instant,
@@ -850,6 +852,7 @@ impl Health {
             rt_logged: false,
             stalled: false,
             faults: 0,
+            lost_seen: 0,
             fault_text: None,
             log_problem: None,
             log_checked: now,
@@ -908,11 +911,12 @@ impl App {
             if h.faults > 0 {
                 log::warn!(
                     target: "audio",
-                    "stream errors={} in {secs:.1}s, last: {}; not delivered (queue full): {}",
+                    "stream errors={} in {secs:.1}s, last: {}; not delivered (queue full) in that time: {}",
                     h.faults,
                     h.fault_text.as_deref().unwrap_or("?"),
-                    get(&t.errors_lost)
+                    get(&t.errors_lost) - h.lost_seen
                 );
+                h.lost_seen = get(&t.errors_lost);
                 h.faults = 0;
             }
             h.counts = now;

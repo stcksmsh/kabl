@@ -184,7 +184,7 @@ fn run(args: &[String]) -> i32 {
     // only queue up on a completed swap, and none happen in this v1 binary.
     // Every second: drop the handed-over errors here (not on the audio thread); every 10 s,
     // log what the audio side counted, as one line when something happened.
-    let mut seen = 0;
+    let (mut seen, mut lost_seen) = (0, 0);
     let (mut n, mut last) = (0u64, None::<String>);
     for tick in 1u64.. {
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -203,11 +203,13 @@ fn run(args: &[String]) -> i32 {
             seen = x;
         }
         if let Some(e) = last.take() {
+            let l = lost.load(Ordering::Relaxed);
             log::warn!(
                 target: "audio",
-                "stream errors={n} in 10s, last: {e}; not delivered (queue full): {}",
-                lost.load(Ordering::Relaxed)
+                "stream errors={n} in 10s, last: {e}; not delivered (queue full) in that time: {}",
+                l - lost_seen
             );
+            lost_seen = l;
             n = 0;
         }
     }
