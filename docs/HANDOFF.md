@@ -5,13 +5,13 @@ Trust code and git over older docs.
 
 ## Where things are
 
-- Branch `master`, pushed to `origin` on 2026-09-24 at Kosta's request (sound palette WIP).
-  The finished sound palette batch is on `claude/sound-palette-playable-voices-q6j9ft`
-  (see its section below). The rack UI migration is **closed**: Kosta
+- Branch `master` on `origin`. The sound palette batch was merged into it on 2026-09-25 (PR #1,
+  merge 73be119). Kosta allows pushing straight to `master` (solo, unreleased project). The
+  rack UI migration is **closed**: Kosta
   reviewed it hands-on and approved it (decisions.md, "Rack migration closed"). Record:
   `docs/rack-migration/README.md` (screenshots, `walkthrough.mp4`, verification).
-- Workflow: commit small working changes straight to `master`; no branches, PRs or pushes
-  unless Kosta asks. Leave `.ai/` alone. AIW/Recall not in use. Don't `cargo fmt` the whole
+- Workflow: commit small working changes straight to `master` and push them; no branches or
+  PRs unless Kosta asks. Leave `.ai/` alone. AIW/Recall not in use. Don't `cargo fmt` the whole
   crate: it reformats the untouched `rev2_proto` / `rev2_env_ab` examples; use `rustfmt` on
   the files you changed.
 
@@ -129,9 +129,9 @@ Supervisor scope, one batch. Record, evidence, measurements, limits:
 keyboard rules); rationale: decisions.md "Sound palette batch". Composition + Motion is
 still **separately waiting for its review** — approve neither on Kosta's behalf.
 
-**Where the commits are:** this batch was finished in a cloud session on the branch
-`claude/sound-palette-playable-voices-q6j9ft` (it starts at master's c41420c), not on local
-master. Push it (and fast-forward master) only when Kosta asks. 
+**Where the commits are:** finished in a cloud session on the branch
+`claude/sound-palette-playable-voices-q6j9ft` (c41420c..04749eb), merged into `master` as PR #1
+(73be119) on 2026-09-25. Merged is not approved: the hands-on review is still open. 
 
 - Modules (`crates/modules/src/builtins/`): `osc_va` (pw, fine, unison, detune, band-limited
   sync), `noise`, `filter_ladder`, `chorus`, `drive`. Tests in `crates/modules/tests/`
