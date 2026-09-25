@@ -1,6 +1,7 @@
 //! D03 inspector cost, offline on this machine: the same patch and the same scripted input
 //! rendered in 256-frame "callbacks" (four 64-sample blocks) with the tap off, on, and on while
-//! the selection and the graph change quickly. Prints per-callback execution distributions.
+//! the selection and the graph change quickly, and with parameter edits and a topology change
+//! (D03-R1). Prints per-callback execution distributions.
 //! Not an audio-device measurement: no arrival lateness or xruns exist here.
 //!
 //!     cargo run --release -p kabl-engine --example probe_cost -- patches/composition 60
@@ -26,9 +27,73 @@ enum Mode {
     OffSwaps,
     /// On, a new selection every 10 callbacks and a graph swap every 20.
     Busy,
+    /// Off, a parameter edit swapped in every 20 callbacks and every 10th swap a topology
+    /// change (one cable removed, then restored): the baseline for `Edits`.
+    OffEdits,
+    /// On (a fixed selection), with the same edits: the measurement window continues across
+    /// parameter swaps and restarts on the topology change.
+    Edits,
 }
 
-fn run(patch: &kabl_core::PatchState, secs: f32, mode: Mode, target: ProbeTarget) -> Vec<u64> {
+/// The graphs `Edits` cycles through: the patch with one parameter nudged either way, and the
+/// patch without one cable.
+struct Variants {
+    params: [kabl_core::PatchState; 2],
+    cut: kabl_core::PatchState,
+}
+
+impl Variants {
+    fn new(patch: &kabl_core::PatchState) -> Self {
+        // The first stored, non-presentation, linear/exponential parameter of any module.
+        let (id, name, v) = patch
+            .modules
+            .iter()
+            .flat_map(|(&id, m)| {
+                let info = kabl_modules::registry::info_for(&m.kind).unwrap();
+                info.params
+                    .iter()
+                    .filter(|p| p.taper != kabl_modules::Taper::Stepped && p.max > p.min)
+                    .map(move |p| {
+                        (
+                            id,
+                            p.name,
+                            m.params.get(p.name).copied().unwrap_or(p.default),
+                        )
+                    })
+            })
+            .next()
+            .expect("a continuous parameter");
+        let set = |f: f32| {
+            let mut p = patch.clone();
+            p.modules
+                .get_mut(&id)
+                .unwrap()
+                .params
+                .insert(name.into(), v * f);
+            p
+        };
+        let mut cut = patch.clone();
+        let cable = *cut
+            .cables
+            .iter()
+            .find(|(_, c)| matches!(c.to, kabl_core::PortRef::Module { .. }))
+            .expect("a signal cable")
+            .0;
+        cut.cables.remove(&cable);
+        Variants {
+            params: [set(0.99), set(1.01)],
+            cut,
+        }
+    }
+}
+
+fn run(
+    patch: &kabl_core::PatchState,
+    variants: &Variants,
+    secs: f32,
+    mode: Mode,
+    target: ProbeTarget,
+) -> Vec<u64> {
     let mut collector = Collector::new();
     let handle = collector.handle();
     let mut e = PatchEngine::new(&handle, patch, SR, 8).unwrap();
@@ -37,7 +102,7 @@ fn run(patch: &kabl_core::PatchState, secs: f32, mode: Mode, target: ProbeTarget
         .iter()
         .map(|(&id, m)| (id, kabl_modules::registry::info_for(&m.kind).unwrap().kind))
         .collect();
-    if matches!(mode, Mode::On | Mode::Busy) {
+    if matches!(mode, Mode::On | Mode::Busy | Mode::Edits) {
         e.command(&Command::Inspect(Some(target)));
     }
     let (mut tx, mut rx) = rtrb::RingBuffer::<ProbeReport>::new(8);
@@ -46,8 +111,20 @@ fn run(patch: &kabl_core::PatchState, secs: f32, mode: Mode, target: ProbeTarget
     let (mut l, mut r) = ([0.0; BLOCK], [0.0; BLOCK]);
     for n in 0..callbacks {
         // Control side (not timed): a graph for every 20th callback, chords every second.
-        let swap =
-            (mode == Mode::Busy && n % 20 == 0).then(|| e.build_swap(&handle, patch).unwrap());
+        let edits = matches!(mode, Mode::OffEdits | Mode::Edits);
+        let swap = match n % 20 {
+            0 if mode == Mode::Busy => Some(e.build_swap(&handle, patch).unwrap()),
+            0 if edits => {
+                let k = n / 20;
+                let g = match k % 10 {
+                    9 => &variants.cut,
+                    0 if k > 0 => patch, // the cable back
+                    _ => &variants.params[k % 2],
+                };
+                Some(e.build_swap(&handle, g).unwrap())
+            }
+            _ => None,
+        };
         let t = Instant::now();
         if let Some(g) = swap {
             e.receive_swap(g);
@@ -125,15 +202,18 @@ fn main() {
         std::mem::size_of::<ProbeReport>(),
         std::mem::size_of::<ProbeReport>()
     );
-    let mut all: [(Mode, &str, Vec<u64>); 4] = [
+    let variants = Variants::new(&patch);
+    let mut all: [(Mode, &str, Vec<u64>); 6] = [
         (Mode::Off, "off", Vec::new()),
         (Mode::On, "on", Vec::new()),
         (Mode::OffSwaps, "off+swaps", Vec::new()),
         (Mode::Busy, "on+select+swaps", Vec::new()),
+        (Mode::OffEdits, "off+edits+topo", Vec::new()),
+        (Mode::Edits, "on+edits+topo", Vec::new()),
     ];
     for _ in 0..runs {
         for (mode, _, v) in all.iter_mut() {
-            v.extend(run(&patch, secs, *mode, target));
+            v.extend(run(&patch, &variants, secs, *mode, target));
         }
     }
     println!("mode             callbacks   p50 µs   p90 µs   p99 µs  p99.9 µs   max µs  mean µs");
