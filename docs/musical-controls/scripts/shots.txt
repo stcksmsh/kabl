@@ -23,3 +23,9 @@ sleep 1
 click explain-show:8.attack_ms
 sleep 1.5
 shot dark-direct-pin
+# Integration with D01-R1: Save As over an open explanation; Escape closes only the dialog.
+click save-as
+sleep 1
+shot dark-save-as-over-explain
+key Escape
+sleep 0.5

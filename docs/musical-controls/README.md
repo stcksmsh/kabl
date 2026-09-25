@@ -1,6 +1,6 @@
 # D02 — Musical controls that explain themselves
 
-**Built, engineering submitted as a draft: ready for integration, awaiting D01-R1.** Owner review: pending.
+**Built and integrated with D01-R1 (merged master, re-verified on the combined head).** Owner review: pending.
 Brief: [`product-research/briefs/D02.md`](../product-research/briefs/D02.md). Checklist:
 [`CHECKLIST.md`](CHECKLIST.md). Report: [`REPORT.md`](REPORT.md). Review: [`REVIEW.md`](REVIEW.md).
 Coverage table: [`coverage.md`](coverage.md). Draft PR: https://github.com/stcksmsh/kabl/pull/3
@@ -165,7 +165,7 @@ HANDOFF and STATUS, wait for integration after D01-R1, as the brief says.
 - `crates/ui/src/routing.rs`: the drawer heading's Explain button, inline help, the one-shot
   scroll to a shown control's routes, and `reaches` (legacy route names, also used by
   `UiState::validate`).
-- `crates/ui/tests/explain.rs` (new): 18 tests plus the ignored coverage writer.
+- `crates/ui/tests/explain.rs` (new): 19 tests plus the ignored coverage writer.
 
 D01-R1-owned files were not touched: `browser.rs`, `library.rs`, `main.rs` and
 `docs/find-play-save`.
@@ -173,17 +173,18 @@ D01-R1-owned files were not touched: `browser.rs`, `library.rs`, `main.rs` and
 ## Verification
 
 Cloud container: Ubuntu 24.04.4, 4 vCPU VM, rustc 1.94.1. No sound card, no ALSA sequencer,
-no rtkit. Product head tested: **e60300c** (after the review fixes). Later commits change docs
-and evidence only. The screenshots and walkthrough were recorded from the release build of
-**0987db5**; e60300c only narrows the transport card's "Acts on" list to sequencers and adds
-a test assertion, and neither of those appears in the recordings.
+no rtkit. Combined head tested: **4b478fd**. That is D02 (product last changed at e60300c)
+merged with master containing D01-R1 (merge 4fa0402), plus one integration test. Later
+commits change docs and evidence only. The screenshots and walkthrough were re-recorded from
+the release build of 4b478fd.
 
-- `cargo test --workspace` at e60300c: **465 passed, 0 failed, 15 ignored**, exit 0
+- `cargo test --workspace` at 4b478fd: **479 passed, 0 failed, 15 ignored**, exit 0
   ([`evidence/test-workspace.txt`](evidence/test-workspace.txt)). New:
-  - `crates/ui/tests/explain.rs` (18 tests, real egui input through `show()` at 1280×800 and
+  - `crates/ui/tests/explain.rs` (19 tests, one of them `a_save_dialog_over_an_explanation_keeps_escape_and_the_document`,
+    which covers D01-R1's Save As; real egui input through `show()` at 1280×800 and
     1440×900);
   - `help.rs` unit tests (3), including "every built-in parameter has help".
-- `cargo clippy --workspace --all-targets` at e60300c: no warnings, exit 0
+- `cargo clippy --workspace --all-targets` at 4b478fd: no warnings, exit 0
   ([`evidence/clippy.txt`](evidence/clippy.txt)).
 - Focused: `cargo test -p kabl-ui --test explain`. To regenerate the coverage table:
   `cargo test -p kabl-ui --test explain write_help_coverage -- --ignored`.
@@ -191,14 +192,16 @@ a test assertion, and neither of those appears in the recordings.
 ## Real-app evidence
 
 All real-app evidence is **scripted**. `docs/rack-migration/drive.py` uses xdotool on Xvfb
-(1600×1000) and aims at the targets the app reports. The app is the release build of 0987db5.
+(1600×1000) and aims at the targets the app reports. The app is the release build of 4b478fd (combined head).
 
 - **Screenshots**, 1440×900 and 1280×800, in A-light and A-dark. Files are
   `img/<size>-<name>.png`:
   - `light-module-help`: module explanation with inline help;
   - `light-macro-shown` and `dark-macro-shown`: the "Warmth" macro with the off-face ladder
     Drive revealed;
-  - `dark-direct-pin`: the "Attack" pin shown in the rack.
+  - `dark-direct-pin`: the "Attack" pin shown in the rack;
+  - `dark-save-as-over-explain`: D01-R1's Save As dialog over an open explanation (Escape
+    closes only the dialog).
 
   Script: [`scripts/shots.txt`](scripts/shots.txt). Command:
   `DISPLAY=:97 KABL_ARGS=--perform python3 docs/rack-migration/drive.py docs/musical-controls/scripts/shots.txt 1440x900 OUT patches/palette/pad`.
@@ -216,14 +219,14 @@ All real-app evidence is **scripted**. `docs/rack-migration/drive.py` uses xdoto
   8. 1:06 / 1:10 Toggle Help, then close with Escape.
 
   Audio is 48 kHz with 256-frame buffers. The app plays through ALSA → PipeWire 1.0.5 into a
-  silent null sink and is recorded from its monitor. The track's mean is −18.9 dB, peak −2.5 dB.
+  silent null sink and is recorded from its monitor. The track's mean is −18.9 dB, peak −3.2 dB.
 - **Stand-ins.** The "controller" is `examples/midi_player` writing to the `KABL_MIDI_PIPE`
   fifo, not hardware.
 - **Timing on the VM**, from [`evidence/walkthrough-stats.txt`](evidence/walkthrough-stats.txt),
   reported separately:
-  - execution: 20 late callbacks, worst 12.4 ms against a 5.3 ms budget;
-  - arrival: 1446 late;
-  - 5 xruns;
+  - execution: 37 late callbacks, worst 16.7 ms against a 5.3 ms budget;
+  - arrival: 878 late;
+  - 12 xruns;
   - RT priority refused (no rtkit).
 
   This is not laptop evidence. D02 adds no audio-thread code.
@@ -241,4 +244,5 @@ All real-app evidence is **scripted**. `docs/rack-migration/drive.py` uses xdoto
   rows can need a scroll.
 - Patch replacement and module deletion with an explanation open are verified by the
   interaction tests (real egui input through `show()`), not in the recorded real-app run.
-- **Integration state:** not yet merged with D01-R1. The resume steps are in REPORT.md.
+- **Integration state:** D01-R1 is merged in, and the combined head is verified and
+  rechecked (see REVIEW.md).

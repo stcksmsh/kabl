@@ -5,9 +5,34 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-25, D01 Find, play and save a sound built, awaiting Kosta's review.
-Composition + Motion and Sound Palette are still separately waiting for his hands-on reviews
-(explicitly deferred by Kosta for D01, not approved). D00 is not complete; D02+ not authorized.
+Last updated: 2026-09-25. D02 (musical controls that explain themselves) is built and
+integrated on top of D01-R1, and waits for Kosta's review. D01 and D01-R1 also wait for his
+hands-on checks. Composition + Motion and Sound Palette are still waiting for their own
+hands-on reviews: Kosta explicitly deferred them, and they are not approved. D00 is not
+complete. Nothing after D02 is authorized.
+
+**D02 Musical controls that explain themselves (owner-authorized, 2026-09-25): built,
+awaiting Kosta's review.**
+
+- **Explain a Perform card.** **?** on any card shows what it really controls, read from the
+  current patch graph:
+  - For a macro: every destination, with signed depth, bypass, and the value at the stored
+    macro position.
+  - For a direct pin: the parameter, help and units, base versus modulation, a note that
+    the MIDI CC is not a modulation source, and the signal path.
+- **Show and Back.** Show brings a target into view in the rack, including off-face
+  controls, which are revealed without being saved. Back returns to the card.
+- **Explain in the rack.** Explain in the drawer and in the module menu, plus opt-in inline
+  Help.
+- **No side effects.** Navigation never edits the patch, the undo history, the unsaved state
+  or the audio.
+- **Record.** [`musical-controls/README.md`](musical-controls/README.md), checklist
+  [`musical-controls/CHECKLIST.md`](musical-controls/CHECKLIST.md), report
+  [`musical-controls/REPORT.md`](musical-controls/REPORT.md).
+- **Evidence limits.** The evidence is scripted in the cloud (Xvfb, PipeWire null sink, fifo
+  MIDI stand-in). It is not laptop, controller or beginner evidence.
+
+    cargo run --release -p kabl-ui -- --patch patches/palette/pad --perform --rate 48000 --frames 256
 
 **D01 Find, play and save a sound (owner-authorized, 2026-09-25): built, awaiting Kosta's
 review.** A Sounds panel with Factory and Your Sounds, search, categories, favorites and
@@ -30,7 +55,7 @@ Test counts: see the report (rerun at the submitted head).
     packaging/linux/package.sh && mkdir -p ~/opt && tar -xzf target/dist/kabl-0.1.0-linux-x86_64.tar.gz -C ~/opt
     ~/opt/kabl-0.1.0-linux-x86_64/bin/kabl-ui --rate 48000 --frames 256
 
-**D01-R1 saving repairs (owner-authorized, 2026-09-25): submitted, not merged.** Save As
+**D01-R1 saving repairs (owner-authorized, 2026-09-25): merged (PR #4); owner checks pending.** Save As
 "Replace it" now applies only to the name it was offered for (a stale offer overwrote and
 renamed another sound); folder saves are staged in `<folder>/.kabl-save`, roll back on
 failure and are settled after a crash (they used to rewrite `log.jsonl` before failing while
