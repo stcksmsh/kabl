@@ -6,14 +6,15 @@ Batch ID / outcome: D02 — Musical controls that explain themselves. A musician
   to each target in the rack, including controls that are off the module face. Back returns
   to the card. Nothing about the sound, the saved patch or the undo history changes.
 Starting commit: 58e662290f5df69e7b66e5d8e48d6d8e5e583ae3 (origin/master when the batch began).
-  At the last check, master had nothing newer.
-Submitted head commit: see "Submitted" below. Product code head e60300c; reviewer recheck
-  recorded in REVIEW.md.
+Integration: D01-R1 merged to master (PR #4, 326bbdc); master merged into D02 with 4fa0402.
+Submitted head commit: combined product head 4b478fd (D02's product code last changed at
+  e60300c). The docs head is the latest commit on the branch. The combined-head recheck is
+  in REVIEW.md.
 Branch / pushed remote / PR if environment-required: claude/d02-musical-controls-knjmgu. The
   environment requires this name; it stands in for work/d02-controls. Pushed to origin. Draft
   PR https://github.com/stcksmsh/kabl/pull/3
-Engineering status: submitted as a draft. READY FOR INTEGRATION; AWAITING D01-R1. Not
-  merge-ready.
+Engineering status: integrated with D01-R1 and re-verified on the combined head. Merge-ready
+  only once REVIEW.md's combined-head recheck finds no blocker.
 Owner-review status: pending.
 ```
 
@@ -47,9 +48,9 @@ Owner-review status: pending.
 | Base/modulation distinction with units | pass | test `base_and_modulation_…`; screenshots |
 | Factory help coverage | pass | `coverage.md` (every factory card); tests `every_factory_card_gets_specific_help`, `every_builtin_param_has_help` |
 | Navigation/focus: return, patch replacement, deletion, text entry, Escape | pass (software); replacement and deletion tested only, not recorded in the real app | tests `module_removal_and_patch_replacement_…`, `escape_and_text_fields_…`, `escape_with_a_menu_open_…`, `a_card_rename_commits_…`; walkthrough (Back, Escape) |
-| Layout: both sizes and both themes; audible walkthrough | pass (cloud, scripted) | `img/` (8 shots); `walkthrough.mp4` 77 s with audio (mean −18.9 dB) |
-| Regression: workspace tests and clippy at the reported head | pass | `evidence/test-workspace.txt` (e60300c: 465 passed, 0 failed, 15 ignored), `evidence/clippy.txt` (clean) |
-| Final integration with D01-R1 plus reviewer recheck of the combined result | **not done, waiting on D01-R1** | resume steps below |
+| Layout: both sizes and both themes; audible walkthrough | pass (cloud, scripted) | `img/` (10 shots, including Save As over an explanation); `walkthrough.mp4` 77 s with audio (mean −18.9 dB), recorded from the combined head 4b478fd |
+| Regression: workspace tests and clippy at the reported head | pass | `evidence/test-workspace.txt` (combined head 4b478fd: 479 passed, 0 failed, 15 ignored), `evidence/clippy.txt` (clean) |
+| Final integration with D01-R1 plus reviewer recheck of the combined result | pass (merge 4fa0402; recheck in REVIEW.md) | test `a_save_dialog_over_an_explanation_keeps_escape_and_the_document`; `img/*-dark-save-as-over-explain.png`; REVIEW.md "Combined-head recheck" |
 | Novice task (brighter/slower pad, explain it) | unverified; owner observation | CHECKLIST step 10 |
 
 ## Changes
@@ -84,9 +85,10 @@ the brief requires.
 
 ## Verification
 
-- `cargo test --workspace` at e60300c: exit 0, **465 passed, 0 failed, 15 ignored**.
-- `cargo clippy --workspace --all-targets` at e60300c: exit 0, no warnings.
-- Focused: `cargo test -p kabl-ui --test explain`: 18 passed, 1 ignored (the writer).
+- `cargo test --workspace` at the combined head 4b478fd: exit 0, **479 passed, 0 failed, 15 ignored**.
+  Before integration, e60300c: 465 passed.
+- `cargo clippy --workspace --all-targets` at 4b478fd: exit 0, no warnings.
+- Focused: `cargo test -p kabl-ui --test explain`: 19 passed, 1 ignored (the writer).
 - Environment: Ubuntu 24.04.4 cloud VM, 4 vCPU, rustc 1.94.1. System packages installed
   for the build: libasound2-dev, libudev-dev, libdbus-1-dev, xdotool, ffmpeg, pipewire and
   wireplumber.
@@ -97,15 +99,14 @@ the brief requires.
   minor/nit findings, no blocker or major.
 - All were fixed except R8(a), which is disputed with evidence. R4 was kept as intended
   behaviour, now documented and tested.
-- The recheck against e60300c/2516be4 is recorded in `REVIEW.md` → "Recheck".
+- The recheck against e60300c/2516be4 is recorded in `REVIEW.md` → "Recheck". A fresh reviewer then rechecked the combined head: see "Combined-head recheck".
 
 ## Real-app evidence
 
 - Screenshots `img/{1440x900,1280x800}-{light-module-help,light-macro-shown,dark-macro-shown,dark-direct-pin}.png`.
 - `walkthrough.mp4`, from `record-walkthrough.sh` running `scripts/walkthrough.txt`.
 - Screenshot script `scripts/shots.txt`.
-- All scripted with xdotool on Xvfb, using the release build of 0987db5. The recordings don't
-  show anything that changed between 0987db5 and e60300c.
+- All scripted with xdotool on Xvfb, using the release build of the combined head 4b478fd.
 - Audio at 48 kHz, 256 frames, through PipeWire into a null sink. MIDI came from the
   fifo stand-in (`examples/midi_player`), **not hardware**.
 
@@ -113,9 +114,9 @@ the brief requires.
 
 Walkthrough run on the VM: 14833 callbacks. Execution and arrival are reported separately:
 
-- execution: 20 late, worst 12.4 ms against a 5.3 ms budget;
-- arrival: 1446 late;
-- 5 xruns;
+- execution: 37 late, worst 16.7 ms against a 5.3 ms budget;
+- arrival: 878 late;
+- 12 xruns;
 - RT priority refused.
 
 D02 adds no audio-thread code. None of this is laptop evidence.
@@ -134,7 +135,8 @@ D02 adds no audio-thread code. None of this is laptop evidence.
 - Replacing the patch and deleting a module while an explanation is open are tested through
   egui input only, not in the real app.
 - Outline under a floating expansion: see README Limits.
-- **Not yet integrated with D01-R1.**
+- Integrated with D01-R1 in the cloud only. The owner checks for D01, D01-R1 and D02 are all
+  pending.
 
 ## Owner checklist
 
@@ -151,30 +153,22 @@ D02 adds no audio-thread code. None of this is laptop evidence.
 - The "Bpm" label for the clock tempo parameter (`routing::param_label`) could read "Tempo".
   That is a rack-wide label change, so it was left for a separate decision.
 
-## Integration state and exact resume instructions
+## Integration state
 
-Waiting for D01-R1. After Kosta merges D01-R1 into master:
+Done, following the brief.
 
-```sh
-git fetch origin master claude/d02-musical-controls-knjmgu
-git checkout claude/d02-musical-controls-knjmgu && git pull
-git merge origin/master   # no rebase, no force-push
-```
-
-1. Resolve conflicts. The likely file is `crates/ui/src/lib.rs`: D02's hunks are the
-   `UiState::explain` field, validate plus Escape in `show()`, the drawer header/scroll, the
-   module panel, the module menu, the rack marker, and the end-of-frame focus flag. Keep both
-   sides.
-2. Rerun:
-   - `cargo test -p kabl-ui --test explain --test browser --test library`
-   - `cargo test --workspace`
-   - `cargo clippy --workspace --all-targets`
-3. Real-app smoke test: `scripts/shots.txt` at both sizes. Confirm that Save/quit dialogs and
-   Escape priority still hold with an explanation open.
-4. Get a fresh reviewer recheck of the combined head.
-5. Append the D02 entry to `docs/decisions.md` and update HANDOFF/STATUS, on top of D01-R1's
-   entries.
-6. Update this report with the integration commit, then mark the PR ready for Kosta.
+1. D01-R1 merged to master by Kosta (PR #4).
+2. `git merge origin/master` into this branch: merge 4fa0402, no rebase, no force-push. There
+   were no conflicts; D01-R1 changed only `browser.rs`, `library.rs`, `main.rs`, their tests
+   and docs.
+3. Added the integration test (4b478fd). With an explanation open, D01-R1's Save As dialog
+   takes Escape first, and the document stays clean.
+4. Reran the full suite: `cargo test --workspace` gives 479 passed, 0 failed, 15 ignored, and
+   clippy is clean. Re-recorded the screenshots at both sizes (including Save As over an
+   explanation) and the audible walkthrough, from the combined build.
+5. Wrote the `docs/decisions.md` D02 entry and updated HANDOFF and STATUS, after D01-R1's
+   entries. D01-R1 is marked merged.
+6. The reviewer recheck of the combined head is in REVIEW.md.
 
 ## Repo status
 
