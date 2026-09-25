@@ -26,7 +26,7 @@ D00 is not complete; no later batch (D02+) is authorized. Record, evidence, limi
 "D01 Find, play and save a sound".
 
 - Built in a cloud session on branch `claude/install-caveman-ponytail-bhigco` (the
-  container required it); a PR to `master` is open for Kosta to merge.
+  container required it); PR https://github.com/stcksmsh/kabl/pull/2 to `master` is open for Kosta to merge.
 - Code: `crates/ui/src/library.rs` (discovery, `sound.toml` metadata, staged user saves and
   repair, favorites/recents), `crates/ui/src/browser.rs` (panel, document/unsaved state,
   audition, Start/Stop, dialogs), `crates/engine/src/patch_engine.rs` (`Command::Preview`,

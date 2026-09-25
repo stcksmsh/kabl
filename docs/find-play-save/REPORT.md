@@ -11,7 +11,7 @@ Submitted head commit: the commit that adds this REPORT.md on the branch below (
   for its SHA). Tests/clippy ran at 7030b74; commits after it change REPORT.md/README.md only.
   Product code unchanged since f3bebd9 (real-app evidence build) except crates/ui/tests.
 Branch / pushed remote / PR if required: claude/install-caveman-ponytail-bhigco on origin
-  (the cloud container required this branch). PR to master for Kosta to merge: PR_LINK.
+  (the cloud container required this branch). PR to master for Kosta to merge: https://github.com/stcksmsh/kabl/pull/2.
   Not merged by the agent.
 Engineering status: submitted — built, awaiting Kosta's review.
 Owner-review status: pending. (Composition + Motion and Sound Palette reviews: still pending,
