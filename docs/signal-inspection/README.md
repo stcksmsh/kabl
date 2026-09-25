@@ -110,6 +110,12 @@ crossfade the measurement is of the graph fading in, and says so.
 
 ## Evidence (cloud VM; not laptop)
 
+**D03-R1** added evidence on the final product head in [`r1/`](r1/): the real-app sequence
+(live signal, knob drag, cable removal, undo, default-gain VCA), the logging runs including
+the sink failure, re-measured cost (`evidence/perf.md`, last section) and the package smoke
+test. REPORT.md, "D03-R1 follow-up", indexes it. Media outside `r1/` is historical: it was
+recorded before the review fixes.
+
 Environment: see REPORT.md. Scripted real X input (xdotool) on the release binary, audio
 into a PipeWire null sink, MIDI through the fifo stand-in (`KABL_MIDI_PIPE`). No RT
 priority (no system D-Bus).
@@ -168,6 +174,10 @@ priority (no system D-Bus).
   allocated on the audio thread is freed there, which is the contract adjustment for the
   supervisor/owner (design.md). Messages of undelivered errors are not kept.
 - Audio dips in the cloud walkthrough remain unexplained VM observations.
+- One real-app perf run (D03-R1, busy mode) hit the cloud stream stall: no callbacks after
+  24 s. It was logged; nothing recovers the stream (D05).
+- "Why no sound?" does not name an unplugged audio input on the path; it checks gate inputs
+  only (D03-R1 follow-up).
 
 ## Reproduce
 

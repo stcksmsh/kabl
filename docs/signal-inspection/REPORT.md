@@ -5,13 +5,90 @@ Batch ID / outcome: D03 — Signal inspection and three listening recipes (+ own
   operational logging). A musician can inspect one signal, tell a broken connection from an
   unobserved trigger, and try three short listening experiments without losing work.
 Starting commit: e19a6ff (origin/master; product = 4eb4104 D02 merge, plus the D03 brief)
-Submitted head commit: the branch head containing this file (docs only after 05734dd)
+Submitted head commit: superseded by the D03-R1 follow-up below (tested head 3c8872e)
 Branch / pushed remote / PR if environment-required: claude/d02-musical-controls-knjmgu on
   origin (the cloud environment requires this branch name); PR for Kosta:
   https://github.com/stcksmsh/kabl/pull/5 (not merged by the agent).
 Engineering status: submitted
 Owner-review status: pending
 ```
+
+## D03-R1 follow-up (supervisor correction, brief `docs/product-research/briefs/D03-R1.md`)
+
+```text
+Batch: D03-R1, which bounds stream-error ownership (R1) and refreshes the affected evidence
+  on the final head (R2)
+Starting point: PR #5 head 08f9d06 (reviewed product 05734dd); master planning docs merged
+  in with 55430ad
+Product commits:
+  - 25a9f78: error hand-off
+  - 99c28d3: probe_cost gains parameter-edit and topology modes (example only)
+  - f1edf70: comments/docs; also names RealtimeDenied as owning a message
+Tested head: 3c8872e. Its product code is f1edf70; everything after is docs/evidence.
+Evidence build: release 99c28d3, the same product behaviour as f1edf70 (comment-only diff)
+Engineering status: submitted. R1 includes a contract adjustment that needs a decision.
+Owner review: pending
+```
+
+**R1 disposition: bounded, with an explicit contract adjustment.**
+
+- **Where the callback runs.** On cpal 0.18.2 ALSA, the only Linux backend built, the error
+  callback runs on the stream worker (audio) thread. cpal allocates `BackendError`
+  (`alsa::Error` text) and `RealtimeDenied` (`format!`, once at start) on that thread
+  immediately before calling it. Every other error on that path owns no heap memory.
+  Source references are in design.md, "Stream-error ownership".
+- **The incompatibility.** Once the hand-off queue is full, no policy can both avoid freeing
+  on the audio thread and keep a total bound.
+- **What the code does now** (`hand_off_stream_error`):
+  - counts every error by kind (14 kinds plus "unknown") in relaxed atomics;
+  - queues it in a 16-slot rtrb queue;
+  - on overflow, drops it in the callback and counts it as undelivered;
+  - never has more than 16 outstanding;
+  - still never allocates, formats, logs, locks or blocks.
+
+  The `mem::forget` leak is gone. The drop frees only a message the backend allocated on
+  that thread in the same call. That is the **proposed contract adjustment** for
+  Kosta/supervisor. Rejected alternatives: a larger queue, a deferred-free list, a blocking
+  writer.
+- **Test.** `crates/standalone/tests/stream_error_overflow.rs` drives 1000 owned errors plus
+  other kinds through a paused consumer and checks:
+  - live heap blocks never exceed 16;
+  - no allocation, and exactly one free per overflow;
+  - exact counts per kind and undelivered;
+  - drain and recovery;
+  - zero outstanding after shutdown.
+
+  `rt_with_logging.rs` still checks the no-allocation paths. Both binaries call this one
+  function. Logs report per-kind counts, the last delivered message and the undelivered
+  count.
+- **Not tested.** No real device failure was injected. The test calls the hand-off
+  directly.
+
+**R2 disposition: done on the final head.**
+
+| Check | Result | Evidence |
+|---|---|---|
+| Live signal; continuous drag keeps readings; removing the cable into the tapped VCA rejects old readings (new window 0.6 s, silence); undo recovers | pass (scripted, real app) | `r1/r1-app.mp4`, `r1/img/1440x900-{1-live,2-mid-drag,3-after-drag,4-just-removed,5-new-silence,6-why-removed,7-undone}.png`, `r1/r1-app-kabl-debug.log` (about 4 600 parameter swaps, ≈50/s, during the ≈90 s scripted drag; readings stay live) |
+| Default-gain VCA not called silent | pass | `r1/img/1440x900-9-default-vca-why.png` (peak −0.6 dBFS; no "passes nothing") |
+| Logging: INFO default, DEBUG, sink failure, save failure without paths, bad load | pass (release binary) | `r1/logging/*.txt`; `r1/img/1440x900-{10-log-sink-failure,11-log-sink-hover}.png` ("logging: 8 lines dropped, 1 write failures (last: create log dir: Not a directory (os error 20))") |
+| Overflow ownership regression | pass (direct hand-off test, labelled; not a device failure) | `stream_error_overflow.rs` in `r1/test-workspace.txt` |
+| Inspection cost: simple and dense, tap off/on, parameter swaps, topology change, sizes | measured (cloud VM, no target) | `evidence/perf.md` "D03-R1 re-measurement", `r1/probe-cost-*.txt` |
+| Real app, dense piece, off/on/busy × 3 (+1) | measured; **one busy run hit the known cloud stream stall at 24 s** (logged, not recovered; D05) | `r1/perf-app-summary.txt`, `r1/perf-busy-1-stall-kabl.log` |
+| Package outside the repo: recipes found, log in `~/.local/state` | pass (cloud) | `r1/package.txt`, `r1/img/1440x900-package-*.png` |
+| `cargo test --workspace` / clippy at 3c8872e | 520 passed, 0 failed, 15 ignored; clippy clean | `r1/test-workspace.txt`, `r1/clippy.txt` |
+
+- **What the older evidence still covers.** Media under `img/`, `evidence/` and
+  `walkthrough.mp4` from before the fixes stays as the record of those commits (see
+  "Limits" below). They are kept, not regenerated, because nothing changed the lesson and
+  layout screenshots or the 212 s tutorial. Since `db29445`, `recipes.rs` and `lib.rs` lost
+  only F9's unused `via_cable`/`midi_connected` fields (no text or layout change). The
+  behaviour changes in `inspect.rs` (F1–F4, N1) are what the new R2 captures above cover.
+- **New follow-up, not fixed here.** After the cable into VCA #4 `in` is pulled, "Why no
+  sound?" doesn't name the unplugged audio input. It reports measured silence and points at
+  the ADSR/cv instead (`r1/img/1440x900-6-why-removed.png`). `diagnose` checks unconnected
+  gate inputs but not audio inputs on the path. This weakens the "intentionally broken
+  connection" diagnosis in the real app; the automated disconnected-output case still
+  passes. Suggested scope: a small diagnosis addition, in a later repair or D05.
 
 ## Commits
 

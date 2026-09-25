@@ -3,7 +3,7 @@
 Read this, then `docs/STATUS.md` (top section) and the last entries of `docs/decisions.md`.
 Trust code and git over older docs.
 
-## D03 Signal inspection and three listening recipes — built, owner review pending (2026-09-25)
+## D03 Signal inspection and three listening recipes (+ D03-R1) — built, owner review pending (2026-09-25)
 
 Implemented in the cloud on branch `claude/d02-musical-controls-knjmgu` (environment-required
 name; PR https://github.com/stcksmsh/kabl/pull/5 for Kosta, not merged by the agent). Record: `docs/signal-inspection/README.md`
@@ -26,6 +26,14 @@ pending**; all evidence is scripted on a VM.
 - **Logs:** `~/.local/state/kabl/logs/kabl.log` (`KABL_LOG_DIR`, `KABL_USER_DIR/logs`);
   `KABL_LOG=debug` or `--log-level debug`. `KABL_STATS_FILE` gained a histogram line.
 - **Cloud audio setup** needs a session D-Bus for wireplumber (see README "Reproduce").
+- **D03-R1 (supervisor correction):** stream-error ownership is now bounded. Every error is
+  counted by kind and handed over through a 16-slot queue; on overflow it is dropped in the
+  error callback. Evidence on the final head is in `docs/signal-inspection/r1/`, indexed by
+  REPORT.md, "D03-R1 follow-up".
+  - **Decision needed:** cpal 0.18.2 ALSA allocates `BackendError`/`RealtimeDenied`
+    messages on the audio thread, so a bound means freeing them there on overflow. The
+    proposed contract adjustment is in `design.md`, "Stream-error ownership".
+  - **New follow-up:** "Why no sound?" does not name an unplugged audio input on the path.
 - Nothing after D03 is authorized; do not start D04.
 
 ## D03 — cloud engineering authorized (2026-09-25)

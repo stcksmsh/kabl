@@ -31,6 +31,15 @@ awaiting Kosta's review.**
 - **Evidence limits**: scripted in the cloud (Xvfb, PipeWire null sink, fifo MIDI stand-in,
   no RT priority); not laptop, controller or learning evidence. The cloud walkthrough still
   shows short audio dips correlated with VM xruns; no cause is established.
+- **D03-R1 correction (submitted).**
+  - Stream errors are now bounded: at most 16 are outstanding; the rest are counted by kind
+    and dropped in the error callback, where the D03 version leaked them.
+  - This depends on a **contract adjustment that needs a decision**: the backend allocates
+    the messages on the audio thread, so a bound means freeing them there. See
+    `signal-inspection/design.md`, "Stream-error ownership".
+  - Real-app, logging, cost and package evidence were refreshed on the final head. One
+    perf run hit the known cloud stream stall.
+  - Workspace tests: 520 passed, 0 failed, 15 ignored.
 
     cargo run --release -p kabl-ui -- --patch patches/init-keyboard --perform --rate 48000 --frames 256
 
