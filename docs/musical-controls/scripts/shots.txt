@@ -1,0 +1,25 @@
+# D02 screenshots (scripted, real X input): Evolving Pad with Perform open. Run per size.
+sleep 2
+click help
+click module:8
+sleep 0.5
+click explain-module:8
+sleep 1
+shot light-module-help
+click help
+key Escape
+click pexplain:1.m1
+sleep 1
+click explain-dest:29
+sleep 1.5
+shot light-macro-shown
+click theme:dark
+sleep 1
+shot dark-macro-shown
+click explain-back
+sleep 1
+click pexplain:8.attack_ms
+sleep 1
+click explain-show:8.attack_ms
+sleep 1.5
+shot dark-direct-pin
