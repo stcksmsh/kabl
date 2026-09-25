@@ -7,7 +7,8 @@ Batch ID / outcome: D03 — Signal inspection and three listening recipes (+ own
 Starting commit: e19a6ff (origin/master; product = 4eb4104 D02 merge, plus the D03 brief)
 Submitted head commit: the branch head containing this file (docs only after 05734dd)
 Branch / pushed remote / PR if environment-required: claude/d02-musical-controls-knjmgu on
-  origin (the cloud environment requires this branch name); PR for Kosta: see "Commits".
+  origin (the cloud environment requires this branch name); PR for Kosta:
+  https://github.com/stcksmsh/kabl/pull/5 (not merged by the agent).
 Engineering status: submitted
 Owner-review status: pending
 ```

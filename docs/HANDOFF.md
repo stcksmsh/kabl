@@ -6,7 +6,7 @@ Trust code and git over older docs.
 ## D03 Signal inspection and three listening recipes — built, owner review pending (2026-09-25)
 
 Implemented in the cloud on branch `claude/d02-musical-controls-knjmgu` (environment-required
-name; PR for Kosta, not merged by the agent). Record: `docs/signal-inspection/README.md`
+name; PR https://github.com/stcksmsh/kabl/pull/5 for Kosta, not merged by the agent). Record: `docs/signal-inspection/README.md`
 (+ `design.md`, `CHECKLIST.md`, `REPORT.md`, `REVIEW.md`, `evidence/`). **Owner review is
 pending**; all evidence is scripted on a VM.
 
