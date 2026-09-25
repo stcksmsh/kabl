@@ -1,0 +1,50 @@
+# D02 walkthrough (scripted, real X input, fifo MIDI stand-in): Evolving Pad, 1440x900.
+# Hold a chord, explain "Warmth", turn it (CC 20 = its mapping), show both destinations
+# (one off the face), go back, explain a direct pin, bypass a route and undo, Escape.
+sleep 2
+midi on 48 80
+midi on 55 80
+midi on 60 80
+midi on 64 80
+sleep 3
+click pexplain:1.m1
+sleep 4
+midi ramp 1 20 51 120 4
+sleep 5
+click explain-dest:28
+sleep 4
+click explain-dest:29
+sleep 4
+midi ramp 1 20 120 30 4
+sleep 5
+click explain-back
+sleep 3
+click pexplain:8.attack_ms
+sleep 3
+click explain-show:8.attack_ms
+sleep 3
+midi off 48
+midi off 55
+midi off 60
+midi off 64
+sleep 3
+click pexplain:1.m1
+sleep 1
+click explain-dest:28
+sleep 2
+midi on 48 80
+midi on 60 80
+midi on 67 80
+sleep 3
+click bypass:28
+sleep 4
+key ctrl+z
+sleep 4
+click help
+sleep 3
+key Escape
+sleep 2
+midi off 48
+midi off 60
+midi off 67
+sleep 4

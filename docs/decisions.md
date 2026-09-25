@@ -2438,3 +2438,47 @@ were not transplanted, only its look (palettes, geometry, drawing).
   and `KABL_SAVE_FAIL=<stage>` (`staged`, `replace:dir`, `replace:<file>`).
 - A window-manager close while a dialog is open keeps the dialog and says so (before, the
   close was silently ignored). Verified in the real app with openbox + `wmctrl -c`.
+
+## 2026-09-25 — D02: musical controls that explain themselves (owner-authorized batch)
+
+- **Scope.** `docs/product-research/briefs/D02.md`. It ran in parallel with D01-R1 on its own
+  branch and PR, and was integrated after D01-R1 merged.
+- **Record.** `docs/musical-controls/{README,CHECKLIST,REPORT,REVIEW}.md`. REVIEW covers the
+  fresh reviewer subagent, a recheck at e60300c, and a recheck of the combined result.
+- **Owner review.** Pending.
+- **Explanations read the current graph every frame.** Macro destinations are the actual
+  cables leaving that macro output. The only authored text is per module kind and parameter
+  (`help.rs`), and it is never keyed by a card label. Signal jacks are followed one hop, at
+  most 24 rows. The signal-path search is bounded at 512 modules, and past that limit it
+  says "not worked out" instead of claiming there is no path.
+  - Rejected: authored per-patch explanation lists, which drift from the patch.
+  - Rejected: a full graph walk.
+- **Show reuses the rack's reveal.** It sets the inspected knob and uses the transient
+  expansion, flash and pan. An off-face control is shown without writing `face.*`.
+  - Rejected: temporarily changing the saved face.
+- **Back restores a view snapshot**: pan, zoom, inspection, selection, expansion, edit bank
+  and the Perform panel. It is not an undo step, because navigation is not a musical edit
+  (U18).
+- **An explanation is tied to its editor.** Each editor gets an id from
+  `PatchEditor::instance()`, and opening another sound closes the explanation.
+  - Rejected: adding a reset to `browser.rs::replace_patch`, a file D01-R1 owned during the
+    overlap.
+- **Base and modulation are kept apart.**
+  - The explanation describes the stored base, the routes that add on top in knob travel,
+    and the one clamp.
+  - Reach is labelled "configured, not measured".
+  - A macro route's value is given only at the macro's stored position, and is labelled
+    "this route alone" when other routes also move that control.
+  - It says a MIDI CC writes the base value and is not a modulation source.
+  - No instantaneous values (no telemetry yet) and no host automation (D08).
+- **Escape order.** An active drag goes first, then choose mode, MIDI learn, a text field, a
+  dialog, a popup or menu, and only then the explanation. egui clears a field's focus on
+  Escape before the frame runs, so the end-of-frame state decides.
+  - Fixed on the way: an ended Perform card rename kept keyboard focus, which blocked undo
+    and Escape. A rename now commits when you click elsewhere.
+- **Old patches.** A mixer route stored under the pre-rename `level` resolves to Level 1, as
+  the compiler does (`routing::reaches`). This applies to both the explanation and the
+  drawer.
+- **`ModuleInfo.explain`** was checked against every module's code and left unchanged. The
+  ring modulator's use as a depth control, and ladder self-oscillation, are documented in
+  `help.rs`.

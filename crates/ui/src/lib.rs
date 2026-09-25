@@ -15,6 +15,8 @@ pub mod banks;
 pub mod browser;
 pub mod cues;
 pub mod editor;
+pub mod explain;
+pub mod help;
 pub mod library;
 pub mod perform;
 pub mod rack;
@@ -222,6 +224,8 @@ pub struct UiState {
     pub meter: record::Meter,
     /// Stereo output recorder; `None` without an audio device.
     pub recorder: Option<record::Recorder>,
+    /// The open "what does this control change" explanation and inline help (view only).
+    pub explain: explain::Explain,
 }
 
 struct Moving {
@@ -309,6 +313,7 @@ impl Default for UiState {
             midi_select: None,
             recorder: None,
             meter: Default::default(),
+            explain: Default::default(),
         }
     }
 }
@@ -334,7 +339,8 @@ impl UiState {
         if let Some(cable) = self.selected_route {
             let belongs = state.cables.get(&cable).is_some_and(|c| {
                 matches!((&c.to, &self.inspected),
-                    (PortRef::Param { id, param }, Some((iid, ip))) if id == iid && param == ip)
+                    (PortRef::Param { id, param }, Some((iid, ip)))
+                        if id == iid && routing::reaches(state, *id, param, ip))
             });
             if !belongs {
                 self.selected_route = None;
@@ -442,6 +448,7 @@ impl UiState {
 pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
     browser::frame_input(editor, ui_state, ui);
     ui_state.validate(editor);
+    ui_state.explain.validate(editor);
     // Inspecting a control in another bank (a route, a pin, a CC mapping) shows that bank on
     // the face. It never launches it.
     if ui_state.inspected != ui_state.bank_revealed {
@@ -481,6 +488,16 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
         ui_state.choose = None;
     } else if esc && ui_state.learn.is_some() {
         ui_state.learn = None;
+    } else if esc
+        && ui_state.explain.is_open()
+        && ui_state.browser.dialog.is_none()
+        && !ui.ctx().egui_wants_keyboard_input()
+        && !egui::Popup::is_any_open(ui.ctx())
+        // egui drops a text field's focus on Escape before this frame runs: that Escape
+        // was the field's.
+        && !ui_state.explain.typing
+    {
+        ui_state.explain.close();
     }
     let now = ui.input(|i| i.time);
     perform::apply_cc(editor, ui_state, now);
@@ -541,8 +558,28 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                         if ui.button("Close").clicked() {
                             ui_state.drawer_open = false;
                         }
+                        let on = ui_state.explain.help;
+                        let r = ui
+                            .add(egui::Button::selectable(on, "? Help"))
+                            .on_hover_text("Show what each module and control does");
+                        ui_state.record("help".into(), r.rect);
+                        if r.clicked() {
+                            ui_state.explain.help = !on;
+                        }
                     });
                 });
+                if ui_state.explain.is_open() {
+                    // Its own scroll area, at most about half the drawer: the module and
+                    // routing sections below stay in reach while it is open.
+                    let h = ui.available_height() * 0.55;
+                    egui::ScrollArea::vertical()
+                        .id_salt("kabl-explain")
+                        .max_height(h)
+                        .show(ui, |ui| {
+                            ui.set_max_width(DRAWER_W - 24.0);
+                            explain::panel(editor, ui_state, ui);
+                        });
+                }
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     // Rows wrap instead of widening the drawer over the rack.
                     ui.set_max_width(DRAWER_W - 24.0);
@@ -556,6 +593,8 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
         .frame(egui::Frame::NONE.fill(th.rack))
         .show(ui, |ui| show_rack(editor, ui_state, ui, &th));
     browser::dialogs(editor, ui_state, ui.ctx());
+    ui_state.explain.typing =
+        ui.ctx().egui_wants_keyboard_input() || egui::Popup::is_any_open(ui.ctx());
     ui_state.hits = std::mem::take(&mut ui_state.frame_hits);
 }
 
@@ -730,7 +769,19 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
         ui.label("Unknown module kind.");
         return;
     };
-    ui.label(egui::RichText::new(format!("{} #{id}", info.name)).strong());
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new(format!("{} #{id}", info.name)).strong());
+        let r = ui
+            .small_button("Explain")
+            .on_hover_text("What this module does and what it is connected to");
+        ui_state.record(format!("explain-module:{id}"), r.rect);
+        if r.clicked() {
+            explain::open(ui_state, explain::Subject::Module(id), None);
+        }
+    });
+    if ui_state.explain.help {
+        ui.add(egui::Label::new(egui::RichText::new(info.explain).small()).wrap());
+    }
     let edit = ui_state.edit_bank_of(editor.state(), id);
     if kind == "seq" {
         seq_panel(editor, ui_state, ui, id, edit);
@@ -778,6 +829,11 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
         );
         if let Some(m) = perform::mapping(editor.state(), id, param.name) {
             ui.label(egui::RichText::new(perform::cc_text(m)).small().monospace());
+        }
+        if ui_state.explain.help {
+            if let Some(h) = help::param_help(&kind, param.name) {
+                ui.add(egui::Label::new(egui::RichText::new(h).small().weak()).wrap());
+            }
         }
     }
     if ui.button("Remove module").clicked() {
@@ -1097,6 +1153,20 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         );
     }
 
+    explain::mark_target(
+        ui_state,
+        &painter,
+        th,
+        xf.zoom,
+        &lay,
+        |r| xf.r(r),
+        |id, port| {
+            drawn
+                .ports
+                .get(&(id, PortDirection::Input, port.to_string()))
+                .copied()
+        },
+    );
     if let Some((from, at)) = drawn.drop_at.take() {
         drop_cable(editor, ui_state, from, at, &floats);
     }
@@ -1552,6 +1622,11 @@ fn module_menu(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
         let r = ui.button(label);
         ui_state.record(format!("menu:{key}"), r.rect);
         r.clicked()
+    }
+    if item(ui, ui_state, "explain", "Explain this module") {
+        explain::open(ui_state, explain::Subject::Module(m.id), None);
+        ui_state.selected_module = Some(m.id);
+        ui.close();
     }
     if !m.info.params.is_empty() && item(ui, ui_state, "choose", "Choose primary controls…") {
         let set = editor

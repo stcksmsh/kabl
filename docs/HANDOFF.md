@@ -17,7 +17,30 @@ first; laptop-class performance (Pi was an example, not a target); eventual reus
 composites, custom light/dark panels and actual user-written DSP/behaviour. See the latest
 decisions entry. Proposed ordering/architecture remain recommendations pending disposition.
 
-## D01-R1 saving repairs — submitted (2026-09-25)
+## D02 Musical controls that explain themselves — built, integrated with D01-R1 (2026-09-25)
+
+Owner-authorized. It ran in parallel with D01-R1, then current master (with D01-R1) was merged
+in, and it was re-verified and rechecked on the combined head. **Owner review is pending.**
+Draft PR: https://github.com/stcksmsh/kabl/pull/3 (branch
+`claude/d02-musical-controls-knjmgu`). Record: `docs/musical-controls/README.md`, plus
+`CHECKLIST.md`, `REPORT.md`, `REVIEW.md` and `coverage.md`.
+
+- **Code:**
+  - `crates/ui/src/explain.rs`: the graph model, the drawer section, Show/Back and the target
+    marker.
+  - `help.rs`: authored help per module and parameter.
+  - `PatchEditor::instance`.
+  - Small hunks in `lib.rs`, `perform.rs` (the card **?** button) and `routing.rs` (Explain
+    button, legacy `reaches`).
+- **Tests:** `crates/ui/tests/explain.rs`. Regenerate the coverage table with
+  `cargo test -p kabl-ui --test explain write_help_coverage -- --ignored`.
+- **Hit keys for drive.py:** `pexplain:<id>.<key>`, `explain-dest:<cable>`,
+  `explain-show:<id>[.<param>]`, `explain-back`, `explain-close`, `explain-module:<id>`,
+  `explain-control:<id>.<param>`, `help`, `menu:explain`.
+- **Still open:** the owner checklist, including the beginner "brighter / slower pad" task.
+  All evidence so far is scripted in the cloud.
+
+## D01-R1 saving repairs — merged through PR #4, owner checks pending (2026-09-25)
 
 Owner-authorized repair, run in parallel with D02 (its own branch/PR; D01-R1 merges first).
 Both supervisor concerns reproduced and fixed; the real window-manager close is verified in

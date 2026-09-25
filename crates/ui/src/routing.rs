@@ -62,7 +62,7 @@ pub fn routes_into(state: &PatchState, id: ModuleId, param: &str) -> Vec<RouteVi
         let PortRef::Param { id: to, param: p } = &c.to else {
             continue;
         };
-        if *to != id || p != param {
+        if *to != id || !reaches(state, id, p, param) {
             continue;
         }
         let PortRef::Module {
@@ -101,6 +101,28 @@ pub fn routes_into(state: &PatchState, id: ModuleId, param: &str) -> Vec<RouteVi
         });
     }
     out
+}
+
+/// Whether a route stored as `stored` on module `id` drives `param`, as the compiler reads it:
+/// the same name, or an old patch's pre-rename name (a mixer's shared `level`), which reaches
+/// the first param it names (channel 1).
+pub fn reaches(state: &PatchState, id: ModuleId, stored: &str, param: &str) -> bool {
+    if stored == param {
+        return true;
+    }
+    let Some(info) = state
+        .modules
+        .get(&id)
+        .and_then(|m| registry::info_for(&m.kind))
+    else {
+        return false;
+    };
+    !info.params.iter().any(|p| p.name == stored)
+        && info
+            .params
+            .iter()
+            .find(|p| registry::legacy_param(info.kind, p.name) == Some(stored))
+            .is_some_and(|p| p.name == param)
 }
 
 /// Unclamped knob-travel span one route can add to `base_norm`: `(low, high)`.
@@ -1146,7 +1168,40 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
     let routes = routes_into(editor.state(), id, param.name);
 
     ui.separator();
-    ui.heading(format!("{} · {kind} #{id}", target_label(param)));
+    let head = ui.horizontal_wrapped(|ui| {
+        ui.heading(format!("{} · {kind} #{id}", target_label(param)));
+        let r = ui
+            .small_button("Explain")
+            .on_hover_text("What this control does, its base value and what moves it");
+        ui_state.record(format!("explain-control:{id}.{pname}"), r.rect);
+        if r.clicked() {
+            crate::explain::open(
+                ui_state,
+                crate::explain::Subject::Control {
+                    id,
+                    key: pname.clone(),
+                },
+                None,
+            );
+        }
+    });
+    // Just shown from an explanation: this control's routes, not the module list, in view.
+    if std::mem::take(&mut ui_state.explain.scroll_to_routes) {
+        ui.scroll_to_rect(head.response.rect, Some(egui::Align::TOP));
+    }
+    if ui_state.explain.help {
+        if let Some(h) = crate::help::param_help(&kind, param.name) {
+            ui.add(egui::Label::new(h).wrap());
+        }
+        ui.add(
+            egui::Label::new(
+                egui::RichText::new(crate::help::range_text(&kind, param))
+                    .small()
+                    .weak(),
+            )
+            .wrap(),
+        );
+    }
 
     // Base value entry.
     ui.horizontal(|ui| {
