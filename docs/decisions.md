@@ -2337,3 +2337,69 @@ were not transplanted, only its look (palettes, geometry, drawing).
 - No product code changed or new hands-on/build evidence collected. Composition + Motion
   and Sound Palette remain built/merged and separately awaiting Kosta's review. Existing
   unexplained callback spike and cloud stream-stall observations remain open.
+
+## 2026-09-25 — D01 Find, play and save a sound (owner-authorized batch)
+
+- Scope: Kosta authorized D01 as a whole on 2026-09-25 and explicitly deferred the pending
+  Composition + Motion and Sound Palette hands-on reviews (his laptop is away for a few days);
+  neither review is approved by this. Record: `docs/find-play-save/README.md`. **Built,
+  awaiting Kosta's review.**
+- **A sound is a patch directory; browser metadata is an optional `sound.toml` beside the
+  log.** Name, category, tags, description and how it plays (keys/sequence). The op log stays
+  the only musical state, and every old patch directory still loads (a missing `sound.toml`
+  falls back to the directory name and reads keys/sequence from the patch). Rejected: a
+  library database or index file (a second source of truth that can drift from the
+  directories), tags inside the op log (not musical state, would enter undo).
+- **Identity is the directory** (`factory:<relative path>`, `user:<dir name>`), never the
+  display name. Rename rewrites `sound.toml` only, so favorites and recents survive a rename;
+  a new save's directory is a slug of its name with `-2`, `-3`… when taken. User names are
+  unique case-insensitively (Save As offers "Replace it", Rename refuses); factory names never
+  block a user name. Rejected: name-as-identity (a rename breaks favorites; two similar
+  names collide on disk).
+- **Categories are a fixed small vocabulary** (Basic, Bass, Lead, Pad, Strings, Wind,
+  Percussion, Piece, Study); tags are free words. **Keys/Sequence** come from the patch
+  (`midi.in` present / `clock` present), so a user save is classified correctly without
+  asking; a piece with a keyboard shows both.
+- **Locations.** Factory: `KABL_FACTORY_DIR`, else `<exe>/../share/kabl/patches` (the
+  package layout), else `$XDG_DATA_DIRS/kabl/patches`, else the source checkout (development
+  builds). User: `KABL_USER_DIR`, else `$XDG_DATA_HOME/kabl`, else `~/.local/share/kabl`
+  (`sounds/<dir>/` and `library.json` for favorites/recents). `packaging/linux/package.sh`
+  makes a relocatable `bin/` + `share/kabl/patches` tree and tarball. Rejected: `~/.config`
+  (sounds are data, not configuration), embedding factory patches in the binary (hides them
+  from users who want to read or copy them; the files are the documentation).
+- **User saves are staged and swapped.** Write a complete `.name.new/` beside the target,
+  read it back and require the same state, then rename target → `.name.old`, `.new` →
+  target, remove `.old`; any failure before the second rename leaves the old sound intact,
+  and the next scan finishes or undoes an interrupted swap. Metadata-only changes go through a
+  temp file and a rename. **No fsync**: survives process crashes and failed writes, not
+  necessarily power loss (documented). Factory directories are never written (Save becomes
+  Save As; the advanced folder save refuses a factory path).
+- **Load = parse + compile first.** `library::read_patch` loads the log and compiles it
+  before anything is replaced, so a malformed or uncompilable patch leaves the working sound
+  and its unsaved edits alone. A browser load is a fresh graph (existing `fresh` semantics).
+- **Unsaved = `PatchState` differs from the state last opened or saved.** Undoing back to
+  it is clean again; the audio-rebuild flag and runtime state (transport, edit banks,
+  previews) never count. Open, New and quit (window close, Ctrl+Q) ask Save / Don't save /
+  Cancel; Save on a factory or new sound goes through Save As and then continues; a failed
+  save keeps the question open with the reason. Rejected: a counter of log entries since the
+  save (coalescing edits the last entry in place, so the count can lie in both directions).
+- **Audition goes through the engine's keyboards, bounded on the audio thread.**
+  `Command::Preview { notes ≤ 4, velocity, blocks }` / `PreviewStop` on the existing UI →
+  audio command queue; the engine presses the notes and releases them itself after the block
+  count (capped at 10 s), on Stop, on a new preview, on All Notes Off / MIDI disconnect /
+  port switch, on Load (fresh graph) and when the window loses focus (the UI sends Stop).
+  **Per-source key ownership**: two 128-bit masks (controller, preview); a key-up from one
+  source is held back while the other still holds that key, so a preview never cuts a key
+  the player holds and the reverse. Sustain applies to preview keys like any released key
+  (the pedal holds them; pedal up releases). Rejected: sending the preview through the MIDI
+  note queue from a UI timer (the UI thread would own the note lifetime; a stalled UI leaves
+  a note stuck), and a separate preview voice path (would not be the sound the user plays).
+- **Pieces open stopped.** A browser load of a patch with a clock stops its clocks before the
+  graph is sent (UI thread, before the audio thread sees it); **Start/Stop** send the existing
+  transport Run/Stop to every clock. `--patch` launches and the advanced folder Load keep the
+  old behaviour (clocks run).
+- The old toolbar path field moved into the browser's collapsed "Patch folder (advanced)"
+  section (Load folder / Save to folder). The toolbar shows the document name with a ● when
+  unsaved, Save and Save As. At 1280 wide the document name is 100 px (truncated, full name
+  on hover) so the toolbar keeps its existing tools.
+- Not built (out of scope): delete for user sounds, import/export, D02 explanations.

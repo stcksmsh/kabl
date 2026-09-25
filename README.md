@@ -35,7 +35,18 @@ crates/
 ## Status
 
 See [`docs/STATUS.md`](docs/STATUS.md) for the current, detailed answer. Short version:
-the engine, 9 modules, a live standalone synth (`kabl`) and a patchbay UI (`kabl-ui`) exist and play.
+the engine, 21 built-in module kinds, a live standalone synth (`kabl`) and the rack UI
+(`kabl-ui`) with a sound browser exist and play.
+
+## Running
+
+```
+cargo run --release -p kabl-ui          # opens the Sounds browser
+packaging/linux/package.sh              # relocatable Linux package in target/dist
+```
+
+Factory sounds ship in `patches/` (`share/kabl/patches` in the package); your own sounds are
+saved to `~/.local/share/kabl/sounds`. See [`docs/find-play-save/README.md`](docs/find-play-save/README.md).
 
 ## Building
 

@@ -1,0 +1,3 @@
+commit f3bebd9 · cargo clippy --workspace --all-targets
+    Finished `dev` profile [optimized + debuginfo] target(s) in 0.47s
+EXIT=0

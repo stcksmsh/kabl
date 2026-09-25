@@ -1,0 +1,172 @@
+commit f3bebd9749c90187e4ae29f7e8dea59a771ddd07 · cargo test --workspace · rustc 1.94.1 · Ubuntu 24.04.4 (cloud container, 4 vCPU)
+     Running unittests src/lib.rs (target/debug/deps/kabl_cables-7157148d5d665614)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (target/debug/deps/kabl_clap-fe1af34c6d113bec)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (target/debug/deps/kabl_core-69a1530d751bb220)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/legacy_format.rs (target/debug/deps/legacy_format-441e4a18f288c8d8)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/log_unit.rs (target/debug/deps/log_unit-d6d5ec2b251ed5e5)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/replay_proptest.rs (target/debug/deps/replay_proptest-7d226e0a2a942e97)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running unittests src/lib.rs (target/debug/deps/kabl_engine-105f10f46faf3c23)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/compile.rs (target/debug/deps/compile-0cc457a70dccbbc2)
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/compile_rt_safety.rs (target/debug/deps/compile_rt_safety-5a5cf7e2743449cb)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/composition.rs (target/debug/deps/composition-86b2fa079d21a3da)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.84s
+     Running tests/dyn_dispatch_spike.rs (target/debug/deps/dyn_dispatch_spike-7b9b5cbe1b956c18)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/echo.rs (target/debug/deps/echo-f340411ee60b850e)
+test result: ok. 6 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.14s
+     Running tests/env_timing.rs (target/debug/deps/env_timing-7cca156b1323aabe)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/interlocking.rs (target/debug/deps/interlocking-b0bdad0570a97267)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.96s
+     Running tests/keyboard.rs (target/debug/deps/keyboard-8c647f1ce460eb57)
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/launch.rs (target/debug/deps/launch-ccbb67138c65d485)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+     Running tests/legacy_sound.rs (target/debug/deps/legacy_sound-854dac2f95441c7d)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/live_edit.rs (target/debug/deps/live_edit-97a985a5badd5bff)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running tests/melody.rs (target/debug/deps/melody-43d3d1586e86805d)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/modulation.rs (target/debug/deps/modulation-0fc9d704b9536816)
+test result_clamps_at_the_param_limit ... ok
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/patch_engine_overlapping_swap.rs (target/debug/deps/patch_engine_overlapping_swap-661edc6d90447e4e)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/patch_engine_swap.rs (target/debug/deps/patch_engine_swap-53e1a4f8dd0a5846)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/patch_integration.rs (target/debug/deps/patch_integration-1deff5f98aa5dc55)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/performance.rs (target/debug/deps/performance-470bd888fc0867fb)
+test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 3.41s
+     Running tests/preview.rs (target/debug/deps/preview-51d3231945f5d99d)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/single_instance.rs (target/debug/deps/single_instance-12c6379a87e14b8b)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+     Running tests/sound_palette.rs (target/debug/deps/sound_palette-2feec96f6dba6d50)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.23s
+     Running tests/spike_s1_swap.rs (target/debug/deps/spike_s1_swap-e2903f8456f1c468)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/spike_s2_potato.rs (target/debug/deps/spike_s2_potato-90890c3b133ea569)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/spike_s3_simd_voices.rs (target/debug/deps/spike_s3_simd_voices-83d46a6d5a243c3d)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/voice_allocator.rs (target/debug/deps/voice_allocator-782c162e54696a2b)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (target/debug/deps/kabl_learn-86efa66e3988dd33)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (target/debug/deps/kabl_modules-af7f93170ee7eeb4)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/chorus_drive.rs (target/debug/deps/chorus_drive-ef69056659833ed9)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+     Running tests/delay.rs (target/debug/deps/delay-03d66e02bd97025b)
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+     Running tests/dsp_extensions.rs (target/debug/deps/dsp_extensions-b4a01e0158a99586)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/env_adsr.rs (target/debug/deps/env_adsr-cf94049746a23bb7)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/filter_svf.rs (target/debug/deps/filter_svf-dcf0a4f9a3289263)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/gain.rs (target/debug/deps/gain-fa82e0e1d77d0b69)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ladder.rs (target/debug/deps/ladder-ea466ab2cbbe089a)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+     Running tests/lfo.rs (target/debug/deps/lfo-41e5f7dfc5e59607)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/lfo_sync.rs (target/debug/deps/lfo_sync-6625e0029b0d1538)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/macros.rs (target/debug/deps/macros-25a93f0e50e5c35e)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/mixer_out_midi_in.rs (target/debug/deps/mixer_out_midi_in-187110c973984284)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/noise.rs (target/debug/deps/noise-360eb169e00b31c1)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+     Running tests/osc_palette.rs (target/debug/deps/osc_palette-45062f92eb035685)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+     Running tests/osc_va.rs (target/debug/deps/osc_va-f9150d78208cde9b)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/registry.rs (target/debug/deps/registry-c03621c8190c4a9e)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/reverb.rs (target/debug/deps/reverb-c2719940b6b54393)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
+     Running tests/seq.rs (target/debug/deps/seq-65894d5c7a590c99)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/seq_banks.rs (target/debug/deps/seq_banks-af4299b97fb9b34a)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+     Running tests/skin.rs (target/debug/deps/skin-5fbb8ed0b2573510)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/transport.rs (target/debug/deps/transport-3119ffe666f1598c)
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+     Running tests/vca_ringmod.rs (target/debug/deps/vca_ringmod-21b6bcaad8098a6d)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (target/debug/deps/kabl_pedals-7a338485a2131c79)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (target/debug/deps/kabl_standalone-2199c55880da0354)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/main.rs (target/debug/deps/kabl-0d4aabc818131cfe)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/lib_logic.rs (target/debug/deps/lib_logic-0c81404d6e0b418d)
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+     Running tests/persistence.rs (target/debug/deps/persistence-b06f1e57f7356fd6)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (target/debug/deps/kabl_ui-d5b6edd9c4977db5)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/main.rs (target/debug/deps/kabl_ui-80a68e87ebfc5dfa)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/banks.rs (target/debug/deps/banks-af3e7b3df68e4396)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+     Running tests/browser.rs (target/debug/deps/browser-53ad32ba0bd7d5be)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+     Running tests/composition.rs (target/debug/deps/composition-e17d1835e9783b95)
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cues.rs (target/debug/deps/cues-fcff113b2e25cadb)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+     Running tests/echo.rs (target/debug/deps/echo-695950de752058db)
+test result: ok. 2 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/editor_and_ui.rs (target/debug/deps/editor_and_ui-8ace98bbd8dc57ee)
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/editor_undo.rs (target/debug/deps/editor_undo-e38390bf970375bd)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+     Running tests/interaction.rs (target/debug/deps/interaction-f60890177315c873)
+test result: ok. 30 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.60s
+     Running tests/interlocking.rs (target/debug/deps/interlocking-2e7e22915271cbd2)
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/library.rs (target/debug/deps/library-b804f3782d8dcc8f)
+test result: ok. 14 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/perform.rs (target/debug/deps/perform-d412a06756fefa86)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+     Running tests/performance.rs (target/debug/deps/performance-165cb24083ea4806)
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/record.rs (target/debug/deps/record-dd450a7a8ffdbb42)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.82s
+     Running tests/sound_palette.rs (target/debug/deps/sound_palette-b88ad8f16c41901a)
+test result: ok. 2 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 29.26s
+   Doc-tests kabl_cables
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests kabl_clap
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests kabl_core
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests kabl_engine
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests kabl_learn
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests kabl_modules
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests kabl_pedals
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests kabl_standalone
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests kabl_ui
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+EXIT=0
+TOTAL: 443 passed, 0 failed, 14 ignored

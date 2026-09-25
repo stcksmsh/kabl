@@ -18,6 +18,7 @@ fn factory() -> PathBuf {
 }
 
 struct H {
+    focused: bool,
     ctx: egui::Context,
     editor: PatchEditor,
     ui: UiState,
@@ -39,6 +40,7 @@ impl H {
         ui.browser_open = true;
         ui.library = Some(Library::open(Some(factory()), user.path().to_path_buf()));
         let mut h = H {
+            focused: true,
             ctx: egui::Context::default(),
             editor: PatchEditor::seed_from(&kabl_standalone::default_patch()),
             ui,
@@ -58,6 +60,7 @@ impl H {
             screen_rect: Some(Rect::from_min_size(Pos2::ZERO, self.size)),
             events: std::mem::take(&mut self.events),
             time: Some(self.t),
+            focused: self.focused,
             ..Default::default()
         };
         self.t += 1.0 / 60.0;
@@ -590,4 +593,24 @@ fn every_control_is_reachable_at_both_sizes() {
             }
         }
     }
+}
+
+#[test]
+fn losing_window_focus_stops_a_preview() {
+    let mut t = H::new(1440.0, 900.0);
+    t.open("factory:init-keyboard");
+    t.click("play");
+    t.ui.launches.clear();
+    t.focused = false;
+    t.frame();
+    assert_eq!(t.ui.launches, [Command::PreviewStop]);
+    t.focused = true;
+    t.frame();
+    t.frame();
+    assert_eq!(t.ui.launches.len(), 1, "once");
+    // Without a preview running, focus changes send nothing.
+    t.ui.launches.clear();
+    t.focused = false;
+    t.frame();
+    assert!(t.ui.launches.is_empty());
 }
