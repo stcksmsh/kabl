@@ -46,8 +46,10 @@ one-sample pulse is an edge.
   promoted. Resolution checks id, kind and port index; a mismatch reports "not in this
   graph". No allocation: the resolved lanes are a fixed array.
 - Which graph: the one fading in during a fade, else the active one. Only that graph
-  collects; the other has collection off. A window that spans a fade start restarts; a
-  window that included fade blocks is flagged `fading`.
+  collects; the other has collection off. A window that spans a fade start continues in the
+  new graph when the target resolves to the same lanes and port there (so a knob turned
+  continuously, a swap per frame, still yields reports); it is flagged `fading`. *(Changed
+  after review F3; the first version restarted the window.)*
 - Closed inspection: target `None`, each schedule step pays one boolean test.
 - When a window completes, the engine holds one `ProbeReport` (fixed size, `Copy`). The
   audio callback pushes it into a dedicated `rtrb` queue of 8; a full queue drops the
@@ -59,9 +61,12 @@ one-sample pulse is an edge.
   A report with another token is ignored.
 - Every rebuild attempt gets a new graph generation (`CompiledPatch::generation`, set by
   `main.rs`). A report names the generation it measured.
-- Reports older than a floor are ignored. The floor rises to the current generation on: a
-  failed compile (the measured graph is then not the patch on screen; the UI says so), and
-  a topology change (modules or cables added/removed). Parameter-only edits keep the floor,
+- Reports older than a floor are ignored, and reports already kept from before it are
+  dropped (review F1). The floor rises to the current generation on: a failed compile (the
+  measured graph is then not the patch on screen; the UI says so), and a topology change
+  (modules or cables added/removed).
+- Reports carry the engine's rendered-sample count; the UI ages them against the frames
+  delivered to the device, so a report that waited in the queue is not "live" (review F4). Parameter-only edits keep the floor,
   so the meter keeps moving while a knob turns; the panel labels such a report as
   "measured on the previous version" until the new graph reports.
 - Accepted generations are monotonic (overlapping swaps cannot move it backwards).

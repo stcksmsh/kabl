@@ -235,8 +235,6 @@ pub struct UiState {
     pub compare: compare::Compare,
     /// The listening recipes (D03, view only).
     pub recipes: recipes::Learn,
-    /// MIDI input connected (`main.rs`), for the "Why no sound?" aid.
-    pub midi_connected: bool,
 }
 
 struct Moving {
@@ -328,7 +326,6 @@ impl Default for UiState {
             inspect: Default::default(),
             compare: Default::default(),
             recipes: Default::default(),
-            midi_connected: false,
         }
     }
 }
@@ -1719,7 +1716,6 @@ fn module_menu(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
                 inspect::Sel {
                     id: m.id,
                     port: p.name.to_string(),
-                    via_cable: false,
                 },
                 now,
             );

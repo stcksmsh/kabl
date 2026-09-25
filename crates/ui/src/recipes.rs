@@ -510,7 +510,6 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                         Sel {
                             id,
                             port: port.to_string(),
-                            via_cable: false,
                         },
                         now,
                     );

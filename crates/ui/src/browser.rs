@@ -307,7 +307,7 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
                     );
                 }
                 Err(err) => {
-                    log::warn!(target: "doc", "open failed origin={} error={err}; working patch kept", origin_kind(&id));
+                    log::warn!(target: "doc", "open failed origin={} error={}; working patch kept", origin_kind(&id), err.log_text());
                     message(
                         ui,
                         format!("couldn't open: {err}. Your sound is unchanged."),
@@ -339,7 +339,7 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
                     );
                 }
                 Err(err) => message(ui, {
-                    log::warn!(target: "doc", "open failed origin=folder error={err}; working patch kept");
+                    log::warn!(target: "doc", "open failed origin=folder error={}; working patch kept", err.log_text());
                     format!(
                         "load failed: {err}. Your sound is unchanged.{}",
                         repaired.map_or(String::new(), |n| format!(" ({n})"))
@@ -420,7 +420,7 @@ fn save(editor: &mut PatchEditor, ui: &mut UiState, then: Option<Pending>) -> Op
             None
         }
         Err(e) => {
-            log::warn!(target: "doc", "save failed origin={} error={e}; edits kept", doc_kind(&doc.origin));
+            log::warn!(target: "doc", "save failed origin={} error={}; edits kept", doc_kind(&doc.origin), e.log_text());
             let text = save_failed(&e);
             message(ui, text.clone());
             Some(text)
@@ -518,7 +518,7 @@ fn save_as(
             format!("\"{}\" is already in Your Sounds.", name.trim()),
         )),
         Err(e) => {
-            log::warn!(target: "doc", "save-as failed error={e}; edits kept");
+            log::warn!(target: "doc", "save-as failed error={}; edits kept", e.log_text());
             let text = save_failed(&e);
             message(ui, text.clone());
             Err((None, text))

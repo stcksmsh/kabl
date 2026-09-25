@@ -78,7 +78,7 @@ fn run(args: &[String]) -> i32 {
         Some(dir) => match kabl_core::load(Path::new(&dir)) {
             Ok(log) => log.state().clone(),
             Err(err) => {
-                log::warn!(target: "app", "failed to load patch from {dir}: {err:?}");
+                log::error!(target: "app", "failed to load patch from {dir}: {err:?}");
                 return 1;
             }
         },
@@ -108,7 +108,7 @@ fn run(args: &[String]) -> i32 {
     let mut engine = match PatchEngine::new(&handle, &patch, sample_rate, DEFAULT_VOICE_COUNT) {
         Ok(e) => e,
         Err(err) => {
-            log::warn!(target: "app", "failed to compile the default patch: {err}");
+            log::error!(target: "app", "failed to compile the default patch: {err}");
             return 1;
         }
     };
@@ -118,7 +118,10 @@ fn run(args: &[String]) -> i32 {
 
     let xruns = Arc::new(AtomicU64::new(0));
     let xruns_cb = xruns.clone();
-    let (mut faults_tx, mut faults_rx) = rtrb::RingBuffer::<cpal::Error>::new(8);
+    let lost = Arc::new(AtomicU64::new(0));
+    let lost_cb = lost.clone();
+    let (mut faults_tx, mut faults_rx) =
+        rtrb::RingBuffer::<cpal::Error>::new(kabl_standalone::STREAM_ERROR_QUEUE);
     let mut left_ring = RingBuffer::new(RING_CAPACITY);
     let mut right_ring = RingBuffer::new(RING_CAPACITY);
 
@@ -153,9 +156,8 @@ fn run(args: &[String]) -> i32 {
         move |err| {
             if err.kind() == cpal::ErrorKind::Xrun {
                 xruns_cb.fetch_add(1, Ordering::Relaxed);
-            } else {
-                let _ = faults_tx.push(err);
             }
+            kabl_standalone::hand_off_stream_error(err, &mut faults_tx, &lost_cb);
         },
         None,
     );
@@ -180,25 +182,36 @@ fn run(args: &[String]) -> i32 {
     // loop here keeps both in scope without an explicit leak. Nothing to swap yet (no UI/
     // repatching), so no periodic `collector.collect()` is needed either: deferred-drop nodes
     // only queue up on a completed swap, and none happen in this v1 binary.
-    // Every 10 s: what the audio side counted, as one line when something happened.
+    // Every second: drop the handed-over errors here (not on the audio thread); every 10 s,
+    // log what the audio side counted, as one line when something happened.
     let mut seen = 0;
-    loop {
-        std::thread::sleep(std::time::Duration::from_secs(10));
+    let (mut n, mut last) = (0u64, None::<String>);
+    for tick in 1u64.. {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        while let Ok(e) = faults_rx.pop() {
+            if e.kind() != cpal::ErrorKind::Xrun {
+                n += 1;
+                last = Some(e.to_string());
+            }
+        }
+        if tick % 10 != 0 {
+            continue;
+        }
         let x = xruns.load(Ordering::Relaxed);
         if x != seen {
             log::info!(target: "audio.health", "last 10s: xruns={}", x - seen);
             seen = x;
         }
-        let mut n = 0;
-        let mut last = None;
-        while let Ok(e) = faults_rx.pop() {
-            n += 1;
-            last = Some(e.to_string());
-        }
-        if let Some(e) = last {
-            log::warn!(target: "audio", "stream errors={n} in 10s, last: {e}");
+        if let Some(e) = last.take() {
+            log::warn!(
+                target: "audio",
+                "stream errors={n} in 10s, last: {e}; not delivered (queue full): {}",
+                lost.load(Ordering::Relaxed)
+            );
+            n = 0;
         }
     }
+    0
 }
 
 /// Picks the default output config if it supports `f32` samples, else scans every supported

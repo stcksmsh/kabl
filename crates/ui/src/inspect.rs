@@ -30,8 +30,6 @@ pub const MAX_VISIT: usize = 512;
 pub struct Sel {
     pub id: ModuleId,
     pub port: String,
-    /// Chosen through a cable: labelled as the source of that cable.
-    pub via_cable: bool,
 }
 
 /// Inspection state. View only.
@@ -65,6 +63,9 @@ pub struct Inspect {
     pub dropped: u64,
     /// The audio engine is running (`main.rs`); without it nothing can be measured.
     pub audio: bool,
+    /// `engine_output` for a topology, so the open aid compiles once per wiring change, not
+    /// per frame.
+    output: Option<(Vec<u64>, EngineOutput)>,
 }
 
 impl Inspect {
@@ -97,19 +98,32 @@ impl Inspect {
     /// `main.rs`, after each rebuild attempt: `generation` is the new graph's; `error` when it
     /// did not compile. A failure or a topology change (modules or cables added or removed)
     /// makes older measurements not describe the patch on screen.
-    pub fn rebuilt(&mut self, generation: u64, error: Option<String>, state: &PatchState) {
+    pub fn rebuilt(
+        &mut self,
+        generation: u64,
+        error: Option<String>,
+        state: &PatchState,
+        now: f64,
+    ) {
         self.generation = generation;
         let topo = topology(state);
         if error.is_some() || self.topology.as_ref() != Some(&topo) {
             self.floor = generation;
+            // What was measured before describes another patch: waiting again.
+            let before = self.reports.len();
+            self.reports.retain(|(_, r)| r.generation >= generation);
+            if self.reports.len() != before {
+                self.since = now;
+            }
         }
         self.topology = Some(topo);
         self.compile_error = error;
     }
 
-    /// A report from the audio thread. Kept when it answers the current selection from the
-    /// current graph lineage; returns whether it was kept.
-    pub fn accept(&mut self, r: ProbeReport, now: f64) -> bool {
+    /// A report from the audio thread, `age` seconds old on the audio clock (it may have
+    /// waited in the queue). Kept when it answers the current selection from the current
+    /// graph lineage; returns whether it was kept.
+    pub fn accept(&mut self, r: ProbeReport, now: f64, age: f64) -> bool {
         if self.sel.is_none() || r.token != self.token {
             return false;
         }
@@ -121,7 +135,7 @@ impl Inspect {
         }
         self.last_seq = Some(r.seq);
         self.newest = r.generation;
-        self.reports.push_back((now, r));
+        self.reports.push_back((now - age.max(0.0), r));
         while self.reports.len() > 64
             || self
                 .reports
@@ -520,21 +534,66 @@ pub struct Context<'a> {
     pub tap: Option<(&'a Sel, PortType, Option<Summary>)>,
     pub midi_input: Option<&'a str>,
     pub sample_rate: f32,
+    /// `engine_output(state)`, when the caller has it cached; computed otherwise.
+    pub output: Option<&'a EngineOutput>,
+}
+
+/// The played `out` module, or why the patch does not compile.
+pub type EngineOutput = Result<Option<ModuleId>, String>;
+
+/// The `out` module the engine plays for `state` (the last in its schedule), or the compile
+/// error. Compiles the patch: cache it per topology (`Inspect::output`).
+pub fn engine_output(state: &PatchState) -> EngineOutput {
+    kabl_engine::compile::compile(state, 48000.0, 1)
+        .map(|c| c.output_module())
+        .map_err(|e| e.to_string())
+}
+
+/// The stored base value of `param` on module `id`, else its default.
+fn base(state: &PatchState, id: ModuleId, param: &str) -> Option<f32> {
+    let p = explain::param_of(state, id, param)?;
+    let stored = &state.modules.get(&id)?.params;
+    Some(
+        stored
+            .get(p.name)
+            .or_else(|| stored.get(param))
+            .copied()
+            .unwrap_or(p.default),
+    )
+}
+
+/// Active (not bypassed) modulation routes into `param` of `id`.
+fn routes_into(state: &PatchState, id: ModuleId, param: &str) -> usize {
+    state
+        .cables
+        .values()
+        .filter(|c| {
+            matches!(&c.to, PortRef::Param { id: t, param: p } if *t == id && p == param)
+                && !c.params.get("bypass").is_some_and(|&b| b >= 0.5)
+        })
+        .count()
 }
 
 /// Why is there no sound? Facts from the graph, what was measured, and possibilities. The
 /// focus is the inspected module, else `focus`.
 pub fn diagnose(state: &PatchState, focus: Option<ModuleId>, cx: &Context) -> Diagnosis {
     let mut d = Diagnosis::default();
-    let compiled = kabl_engine::compile::compile(state, 48000.0, 1);
-    let out = match &compiled {
+    let computed;
+    let compiled = match cx.output {
+        Some(o) => o,
+        None => {
+            computed = engine_output(state);
+            &computed
+        }
+    };
+    let out = match compiled {
         Err(e) => {
             d.facts.push(format!(
                 "The patch does not compile ({e}); audio keeps playing the last version that did."
             ));
             return d;
         }
-        Ok(c) => c.output_module(),
+        Ok(o) => *o,
     };
     let outs: Vec<ModuleId> = state
         .modules
@@ -667,30 +726,46 @@ pub fn diagnose(state: &PatchState, focus: Option<ModuleId>, cx: &Context) -> Di
                 .push("Press Start (or Run on the clock) to run it.".into());
         }
     }
-    // Parameters that may hold the path at silence.
+    // Parameters that may hold the path at silence: the effective base (stored, else the
+    // module default), and whether routes move it.
     for &m in &path_modules {
         let Some(ms) = state.modules.get(&m) else {
             continue;
         };
-        let p = |name: &str, default: f32| ms.params.get(name).copied().unwrap_or(default);
         let cv_in = state
             .cables
             .values()
             .any(|c| matches!(&c.to, PortRef::Module { id, port } if *id == m && port == "cv"));
         match ms.kind.as_str() {
-            "vca" if p("gain", 0.0) <= 0.0 && !cv_in => d.possible.push(format!(
-                "{} gain is 0 and its cv input has no cable: it passes nothing.",
-                title(state, m)
-            )),
-            "vca" if p("gain", 0.0) <= 0.0 => d.possible.push(format!(
-                "{} opens only as far as its cv input: inspect what drives it.",
-                title(state, m)
-            )),
-            "filter.svf" | "filter.ladder" if p("cutoff_hz", 1000.0) < 60.0 => {
+            "vca" if base(state, m, "gain").is_some_and(|g| g <= 0.0) => {
+                let routes = routes_into(state, m, "gain");
+                d.possible.push(if cv_in || routes > 0 {
+                    format!(
+                        "{} gain is 0 at its base: it opens only as far as its cv input or the \
+                         routes into Gain move it. Inspect what drives it.",
+                        title(state, m)
+                    )
+                } else {
+                    format!(
+                        "{} gain is 0 and nothing drives its cv or Gain: it passes nothing.",
+                        title(state, m)
+                    )
+                })
+            }
+            "filter.svf" | "filter.ladder"
+                if base(state, m, "cutoff_hz").is_some_and(|c| c < 60.0) =>
+            {
+                let routes = routes_into(state, m, "cutoff_hz");
                 d.possible.push(format!(
-                    "{} cutoff is very low ({:.0} Hz): a low-pass removes most of the sound.",
+                    "{} cutoff is very low at its base ({:.0} Hz){}: a low-pass there removes \
+                     most of the sound.",
                     title(state, m),
-                    p("cutoff_hz", 1000.0)
+                    base(state, m, "cutoff_hz").unwrap_or(0.0),
+                    if routes > 0 {
+                        format!("; {routes} route(s) move it")
+                    } else {
+                        String::new()
+                    }
                 ))
             }
             _ => {}
@@ -944,7 +1019,6 @@ pub fn panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, no
                                 Sel {
                                     id,
                                     port: p.to_string(),
-                                    via_cable: false,
                                 },
                                 now,
                             );
@@ -974,13 +1048,6 @@ pub fn panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, no
             ))
             .strong(),
         );
-        if sel.via_cable {
-            weak(
-                ui,
-                "Source output of the cable. A destination can read it one block late \
-                 (feedback), averaged over voices or scaled as a route.",
-            );
-        }
         match &status {
             Status::Missing(id) => para(ui, format!("Module #{id} or this output is no longer in the patch. Undo brings it back.")),
             Status::NoAudio => para(ui, "Unavailable: no audio engine is running, so nothing can be measured."),
@@ -1069,6 +1136,20 @@ fn why_panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, no
         tap,
         midi_input: ui_state.midi_input.as_deref(),
         sample_rate: ui_state.sample_rate,
+        output: None,
+    };
+    let topo = topology(state);
+    if ui_state
+        .inspect
+        .output
+        .as_ref()
+        .is_none_or(|(t, _)| *t != topo)
+    {
+        ui_state.inspect.output = Some((topo, engine_output(state)));
+    }
+    let cx = Context {
+        output: ui_state.inspect.output.as_ref().map(|(_, o)| o),
+        ..cx
     };
     let d = diagnose(state, ui_state.selected_module, &cx);
     egui::Frame::group(ui.style()).show(ui, |ui| {
@@ -1090,14 +1171,7 @@ fn why_panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, no
             ui_state.record("why-next".into(), r.rect);
             if r.clicked() {
                 ui_state.selected_module = Some(id);
-                ui_state.inspect.select(
-                    Sel {
-                        id,
-                        port,
-                        via_cable: false,
-                    },
-                    now,
-                );
+                ui_state.inspect.select(Sel { id, port }, now);
             }
         }
     });

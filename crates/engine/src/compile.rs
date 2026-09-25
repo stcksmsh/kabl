@@ -1458,6 +1458,20 @@ impl CompiledPatch {
         self.tap = tap;
     }
 
+    /// Continues `old`'s open window in this graph when the target resolved to the same lanes
+    /// and port here, so a run of swaps (a knob being turned rebuilds every frame) never
+    /// restarts the measurement; marks the window as spanning a fade. No allocation.
+    pub fn continue_probe_from(&mut self, old: &CompiledPatch) {
+        let (o, t) = (&old.tap, &mut self.tap);
+        if o.found && t.found && o.target == t.target && o.n == t.n && o.port == t.port {
+            t.acc = o.acc;
+            t.prev = o.prev;
+            t.samples = o.samples;
+            t.blocks = o.blocks;
+            t.fading = true;
+        }
+    }
+
     /// The tap's target, if any.
     pub fn probe_target(&self) -> Option<ProbeTarget> {
         self.tap.target
@@ -1484,6 +1498,7 @@ impl CompiledPatch {
             token: t.token,
             generation: self.generation,
             seq,
+            end_sample: 0,
             status: if tap.found {
                 ProbeStatus::Measured
             } else {

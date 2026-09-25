@@ -7,6 +7,24 @@
 
 pub mod applog;
 
+/// Stream errors from the error callback to another thread (`stream_errors`).
+pub const STREAM_ERROR_QUEUE: usize = 256;
+
+/// For a stream's error callback, which can run on the audio thread: moves `err` into `tx`
+/// for another thread to log and drop. When the queue is full the error is forgotten, not
+/// dropped here (dropping can free its message on the audio thread), and counted in `lost`.
+/// Never formats, logs, locks or frees.
+pub fn hand_off_stream_error(
+    err: cpal::Error,
+    tx: &mut rtrb::Producer<cpal::Error>,
+    lost: &std::sync::atomic::AtomicU64,
+) {
+    if let Err(rtrb::PushError::Full(e)) = tx.push(err) {
+        lost.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        std::mem::forget(e);
+    }
+}
+
 use kabl_core::{CableState, ModuleId, ModuleState, PatchState, PortRef, Vec2};
 use kabl_engine::patch_engine::PatchEngine;
 use std::collections::BTreeMap;

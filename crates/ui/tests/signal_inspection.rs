@@ -155,6 +155,7 @@ fn report(t: &ProbeTarget, generation: u64, seq: u64, lane: LaneStats) -> ProbeR
         token: t.token,
         generation,
         seq,
+        end_sample: 0,
         status: ProbeStatus::Measured,
         fading: false,
         samples: 2432,
@@ -207,7 +208,7 @@ fn selecting_opening_and_closing_inspection_never_edits() {
 fn only_current_measurements_are_shown_as_current() {
     let mut h = H::new(1440.0, 900.0);
     h.open(INIT);
-    h.ui.inspect.rebuilt(10, None, h.editor.state());
+    h.ui.inspect.rebuilt(10, None, h.editor.state(), h.t);
     let t = h.inspect(4, "out");
     let now = h.t;
     let st = |h: &H| h.ui.inspect.status(h.editor.state(), h.t);
@@ -215,23 +216,26 @@ fn only_current_measurements_are_shown_as_current() {
     // Another selection's report is ignored.
     let mut other = t;
     other.token += 99;
-    assert!(!h.ui.inspect.accept(report(&other, 10, 0, level(0.5)), now));
-    assert!(h.ui.inspect.accept(report(&t, 10, 0, level(0.5)), now));
+    assert!(!h
+        .ui
+        .inspect
+        .accept(report(&other, 10, 0, level(0.5)), now, 0.0));
+    assert!(h.ui.inspect.accept(report(&t, 10, 0, level(0.5)), now, 0.0));
     assert_eq!(st(&h), Status::Live);
 
     // A parameter edit: the older graph's report still counts (labelled while the edit
     // compiles), so a turning knob keeps its meter.
     h.editor.set_param(3, "cutoff_hz", 900.0);
-    h.ui.inspect.rebuilt(11, None, h.editor.state());
-    assert!(h.ui.inspect.accept(report(&t, 10, 1, level(0.4)), h.t));
+    h.ui.inspect.rebuilt(11, None, h.editor.state(), h.t);
+    assert!(h.ui.inspect.accept(report(&t, 10, 1, level(0.4)), h.t, 0.0));
     // A topology edit: reports from before it are not the patch on screen.
     h.editor
         .disconnect(*h.editor.state().cables.keys().next().unwrap());
-    h.ui.inspect.rebuilt(12, None, h.editor.state());
-    assert!(!h.ui.inspect.accept(report(&t, 11, 2, level(0.4)), h.t));
-    assert!(h.ui.inspect.accept(report(&t, 12, 3, level(0.3)), h.t));
+    h.ui.inspect.rebuilt(12, None, h.editor.state(), h.t);
+    assert!(!h.ui.inspect.accept(report(&t, 11, 2, level(0.4)), h.t, 0.0));
+    assert!(h.ui.inspect.accept(report(&t, 12, 3, level(0.3)), h.t, 0.0));
     // Overlapping swaps can't move it back.
-    assert!(!h.ui.inspect.accept(report(&t, 11, 4, level(0.3)), h.t));
+    assert!(!h.ui.inspect.accept(report(&t, 11, 4, level(0.3)), h.t, 0.0));
     assert_eq!(
         h.ui.inspect.dropped, 1,
         "seq 2 was accepted-rejected, seq gap counted once"
@@ -239,13 +243,13 @@ fn only_current_measurements_are_shown_as_current() {
 
     // A failed compile: unavailable, never an old value as current.
     h.ui.inspect
-        .rebuilt(13, Some("boom".into()), h.editor.state());
+        .rebuilt(13, Some("boom".into()), h.editor.state(), h.t);
     assert!(matches!(st(&h), Status::NotCompiled(_)));
-    assert!(!h.ui.inspect.accept(report(&t, 12, 5, level(0.3)), h.t));
+    assert!(!h.ui.inspect.accept(report(&t, 12, 5, level(0.3)), h.t, 0.0));
 
     // Stale after half a second without reports.
-    h.ui.inspect.rebuilt(14, None, h.editor.state());
-    assert!(h.ui.inspect.accept(report(&t, 14, 6, level(0.3)), h.t));
+    h.ui.inspect.rebuilt(14, None, h.editor.state(), h.t);
+    assert!(h.ui.inspect.accept(report(&t, 14, 6, level(0.3)), h.t, 0.0));
     for _ in 0..40 {
         h.frame();
     }
@@ -265,14 +269,14 @@ fn another_sound_never_inherits_a_measurement_by_reused_id() {
     let mut h = H::new(1440.0, 900.0);
     h.open(INIT);
     let t = h.inspect(4, "out");
-    assert!(h.ui.inspect.accept(report(&t, 1, 0, level(0.5)), h.t));
+    assert!(h.ui.inspect.accept(report(&t, 1, 0, level(0.5)), h.t, 0.0));
     // The pluck recipe patch has a VCA #4 too.
     h.open("factory:recipes/pluck-to-pad");
     assert!(
         h.ui.inspect.sel.is_none(),
         "selection dropped with the old sound"
     );
-    assert!(!h.ui.inspect.accept(report(&t, 2, 1, level(0.5)), h.t));
+    assert!(!h.ui.inspect.accept(report(&t, 2, 1, level(0.5)), h.t, 0.0));
 }
 
 #[test]
@@ -300,6 +304,7 @@ fn cx<'a>(
         tap,
         midi_input: None,
         sample_rate: 48000.0,
+        output: None,
     }
 }
 
@@ -310,7 +315,6 @@ fn summary(t_stats: LaneStats, lanes: usize) -> inspect::Summary {
         Sel {
             id: 1,
             port: "x".into(),
-            via_cable: false,
         },
         0.0,
     );
@@ -332,7 +336,7 @@ fn summary(t_stats: LaneStats, lanes: usize) -> inspect::Summary {
     for l in 0..lanes {
         r.lane[l] = t_stats;
     }
-    assert!(i.accept(r, 0.0));
+    assert!(i.accept(r, 0.0, 0.0));
     i.summary(0.0).unwrap()
 }
 
@@ -382,7 +386,6 @@ fn why_no_sound_a_missing_trigger_is_an_observation() {
     let sel = Sel {
         id: 1,
         port: "gate".into(),
-        via_cable: false,
     };
     let sum = summary(LaneStats::default(), 8);
     let d = inspect::diagnose(
@@ -430,7 +433,6 @@ fn why_no_sound_does_not_diagnose_a_valid_quiet_or_stopped_patch() {
     let sel = Sel {
         id: 1,
         port: "gate".into(),
-        via_cable: false,
     };
     let held = LaneStats {
         min: 1.0,
@@ -472,7 +474,6 @@ fn why_no_sound_does_not_diagnose_a_valid_quiet_or_stopped_patch() {
     let sel = Sel {
         id: 11,
         port: "out".into(),
-        via_cable: false,
     };
     let running = HashMap::new();
     let d = inspect::diagnose(
@@ -842,4 +843,99 @@ fn a_path_search_that_hits_its_limit_is_unknown_not_disconnected() {
         d.facts
     );
     assert!(!d.facts.iter().any(|f| f.contains("No signal cable path")));
+}
+
+#[test]
+fn a_wiring_change_drops_what_was_measured_before_it() {
+    let mut h = H::new(1440.0, 900.0);
+    h.open(INIT);
+    h.ui.inspect.rebuilt(10, None, h.editor.state(), h.t);
+    let t = h.inspect(4, "out");
+    assert!(h.ui.inspect.accept(report(&t, 10, 0, level(0.5)), h.t, 0.0));
+    // The cable into the VCA goes: the old reading is not shown, as live or at all.
+    let c = cable_to(h.editor.state(), 4, "in");
+    h.editor.disconnect(c);
+    h.ui.inspect.rebuilt(11, None, h.editor.state(), h.t);
+    assert!(h.ui.inspect.summary(h.t).is_none());
+    assert_eq!(h.ui.inspect.status(h.editor.state(), h.t), Status::Waiting);
+    assert!(h.ui.inspect.accept(report(&t, 11, 1, level(0.0)), h.t, 0.0));
+    let s = h.ui.inspect.summary(h.t).unwrap();
+    assert_eq!((s.windows, s.generation, s.peak_all()), (1, 11, 0.0));
+}
+
+#[test]
+fn a_report_that_waited_in_the_queue_is_not_live() {
+    let mut h = H::new(1440.0, 900.0);
+    h.open(INIT);
+    let t = h.inspect(4, "out");
+    // Read now, but produced 2 s ago on the audio clock (the UI was stalled).
+    assert!(h.ui.inspect.accept(report(&t, 1, 0, level(0.5)), h.t, 2.0));
+    assert!(
+        h.ui.inspect.summary(h.t).is_none(),
+        "outside the 1 s summary"
+    );
+    assert!(!matches!(
+        h.ui.inspect.status(h.editor.state(), h.t),
+        Status::Live
+    ));
+}
+
+#[test]
+fn why_no_sound_reads_defaults_and_routes_for_the_vca() {
+    let clocks = HashMap::new();
+    // A VCA with no stored params: the engine default gain is 1.0, not 0.
+    let mut s = init_state();
+    s.modules.get_mut(&4).unwrap().params.clear();
+    let c = cable_to(&s, 4, "cv");
+    s.cables.remove(&c);
+    let d = inspect::diagnose(&s, Some(2), &cx(&clocks, None));
+    assert!(!d.possible.iter().any(|p| p.contains("gain is 0")), "{d:?}");
+    // Gain stored 0, no cv, but a route into Gain: modulated, not "passes nothing".
+    let mut s = init_state();
+    let c = cable_to(&s, 4, "cv");
+    s.cables.remove(&c);
+    s.cables.insert(
+        99,
+        kabl_core::CableState {
+            from: PortRef::Module {
+                id: 6,
+                port: "out".into(),
+            },
+            to: PortRef::Param {
+                id: 4,
+                param: "gain".into(),
+            },
+            params: Default::default(),
+            steps: Vec::new(),
+        },
+    );
+    let d = inspect::diagnose(&s, Some(2), &cx(&clocks, None));
+    assert!(
+        d.possible.iter().any(|p| p.contains("routes into Gain")),
+        "{d:?}"
+    );
+    assert!(!d.possible.iter().any(|p| p.contains("passes nothing")));
+    // Gain 0, nothing drives it: the claim stays.
+    let mut s = init_state();
+    let c = cable_to(&s, 4, "cv");
+    s.cables.remove(&c);
+    let d = inspect::diagnose(&s, Some(2), &cx(&clocks, None));
+    assert!(
+        d.possible.iter().any(|p| p.contains("passes nothing")),
+        "{d:?}"
+    );
+}
+
+#[test]
+fn library_errors_are_logged_without_paths_or_names() {
+    use kabl_ui::library::LibError;
+    let e = LibError::Io(
+        "write /home/me/.local/share/kabl/sounds/my-secret-song: No space left on device".into(),
+    );
+    assert_eq!(e.log_text(), "io (No space left on device)");
+    let e = LibError::ReplaceMismatch {
+        target: "user:my-secret-song".into(),
+        name: "My Secret Song".into(),
+    };
+    assert_eq!(e.log_text(), "replace-mismatch");
 }

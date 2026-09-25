@@ -351,3 +351,44 @@ fn the_audio_thread_path_never_allocates_with_the_tap_on() {
     }
     assert!(rx.pop().is_ok());
 }
+
+#[test]
+fn a_knob_being_turned_does_not_stop_the_measurement() {
+    // The UI rebuilds on every frame of a drag: a swap every 8–32 ms, shorter than a window.
+    let c = Collector::new();
+    let h = c.handle();
+    let mut e = PatchEngine::new(&h, &chain(), SR, 4).unwrap();
+    e.inspect(Some(target(1, 3, 0, "vca")));
+    let (mut l, mut r) = ([0.0; BLOCK], [0.0; BLOCK]);
+    for every in [6, 12, 24] {
+        let mut reports = Vec::new();
+        for i in 0..1500 {
+            if i % every == 0 {
+                let mut p = chain();
+                let g = 0.5 + (i % 7) as f32 * 0.01;
+                p.modules
+                    .get_mut(&3)
+                    .unwrap()
+                    .params
+                    .insert("gain".into(), g);
+                e.receive_swap(e.build_swap(&h, &p).unwrap());
+            }
+            e.process_block(&mut l, &mut r);
+            if let Some(rep) = e.take_probe_report() {
+                reports.push(rep);
+            }
+        }
+        // 1500 blocks = 2 s: about 39 windows of 38 blocks.
+        assert!(
+            reports.len() >= 35,
+            "every {every} blocks: {} reports",
+            reports.len()
+        );
+        assert!(reports.iter().all(|r| r.status == ProbeStatus::Measured));
+        assert!(reports.iter().any(|r| r.fading));
+        // Report times follow the audio clock.
+        assert!(reports
+            .windows(2)
+            .all(|w| w[1].end_sample > w[0].end_sample));
+    }
+}

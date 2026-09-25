@@ -142,6 +142,24 @@ impl std::fmt::Display for LibError {
     }
 }
 
+impl LibError {
+    /// The error for the log: its kind and, for I/O, the system's reason, without the paths
+    /// and names in the message (user sound paths and names are typed by the user).
+    pub fn log_text(&self) -> String {
+        let reason = |e: &str| e.rsplit(": ").next().unwrap_or("").to_string();
+        match self {
+            LibError::BadName(_) => "bad-name".into(),
+            LibError::NameTaken(_) => "name-taken".into(),
+            LibError::Factory => "factory".into(),
+            LibError::ReplaceMismatch { .. } => "replace-mismatch".into(),
+            LibError::Io(e) => format!("io ({})", reason(e)),
+            LibError::Interrupted(e) => format!("interrupted ({})", reason(e)),
+            LibError::Unreadable(e) => format!("unreadable ({})", reason(e)),
+            LibError::Uncompilable(_) => "uncompilable".into(),
+        }
+    }
+}
+
 fn io(what: &str, path: &Path, e: std::io::Error) -> LibError {
     LibError::Io(format!("{what} {}: {e}", path.display()))
 }

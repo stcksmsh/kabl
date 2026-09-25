@@ -68,6 +68,8 @@ pub struct PatchEngine {
     probe: Option<ProbeTarget>,
     probe_window: u32,
     probe_seq: u64,
+    /// Samples rendered since this engine started (reports carry it as their time).
+    rendered: u64,
     /// The last finished window, until the callback takes it.
     report: Option<ProbeReport>,
 }
@@ -176,6 +178,7 @@ impl PatchEngine {
             probe: None,
             probe_window: 1,
             probe_seq: 0,
+            rendered: 0,
             report: None,
         };
         e.probe_window = window_blocks(sample_rate);
@@ -201,6 +204,7 @@ impl PatchEngine {
             probe: None,
             probe_window: 1,
             probe_seq: 0,
+            rendered: 0,
             report: None,
         };
         e.probe_window = window_blocks(e.active.sample_rate());
@@ -404,11 +408,15 @@ impl PatchEngine {
         }
     }
 
-    /// Audio-thread call: the measurement moves to `new`, the graph fading in. No allocation.
+    /// Audio-thread call: the measurement moves to `new`, the graph fading in, keeping the
+    /// open window when the same lanes are measured there. `active` is always the graph that
+    /// was measured until now (a fade starts from it, and a promoted graph has just become
+    /// it). No allocation.
     fn move_probe(&mut self, new: &mut CompiledPatch) {
         if self.probe.is_some() {
-            self.active.set_probe(None);
             new.set_probe(self.probe);
+            new.continue_probe_from(&self.active);
+            self.active.set_probe(None);
         }
     }
 
@@ -660,13 +668,15 @@ impl PatchEngine {
             }
         }
 
+        self.rendered += BLOCK as u64;
         if self.probe.is_some() {
             let fading = self.incoming.is_some();
             let g: &mut CompiledPatch = match self.incoming.as_mut() {
                 Some((g, _)) => g,
                 None => &mut self.active,
             };
-            if let Some(r) = g.probe_block_end(self.probe_window, fading, self.probe_seq) {
+            if let Some(mut r) = g.probe_block_end(self.probe_window, fading, self.probe_seq) {
+                r.end_sample = self.rendered;
                 self.report = Some(r);
                 self.probe_seq += 1;
             }

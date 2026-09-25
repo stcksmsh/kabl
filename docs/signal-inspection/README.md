@@ -93,10 +93,14 @@ crossfade the measurement is of the graph fading in, and says so.
   DEBUG: graph compile with generation and duration, inspection/recipe/comparison
   transitions, arrival-lateness counts, a full timing line per minute.
 - Not logged: audio, patch contents, notes, search text, typed names (user sounds are
-  logged as `origin=user`). Paths and device names appear where they help diagnosis, so a
-  log can contain local details.
+  logged as `origin=user`; a failed library open/save logs the error kind and the system's
+  reason, e.g. `io (No space left on device)`, without its paths). The start line, the
+  library directories, a failed `--patch` path and device names appear because they help
+  diagnosis, so a log can contain local details.
 - The audio callback and the stream error callback never call the logger; see
-  `decisions.md`. `KABL_STATS_FILE` keeps its first line; a second line adds the histogram.
+  `decisions.md`. The error callback moves each `cpal::Error` into a 256-slot queue for the
+  UI thread (the standalone `kabl` drains it every second); when that is full it forgets the
+  error instead of freeing it on the audio thread and counts it ("not delivered"). `KABL_STATS_FILE` keeps its first line; a second line adds the histogram.
 
 ## Evidence (cloud VM; not laptop)
 
@@ -145,8 +149,10 @@ priority (no system D-Bus).
 - The comparison is not a sample-exact A/B: a restore rebuilds like any edit (crossfade;
   held notes, tails and phases continue). No loudness matching.
 - Like any edit, a restore replaces the redo tail (the dialog says so when there is one).
-- No deterministic audio-device fault hook exists; stream-fault logging is exercised by the
-  code path and unit tests of the counters, not by an injected device failure.
+- No deterministic audio-device fault hook exists; the stream-error hand-off is tested
+  directly (`crates/standalone/tests/rt_with_logging.rs`), not by an injected device failure.
+- A stream error that finds the queue full is forgotten (its message, if any, is leaked)
+  rather than freed on the audio thread; counted and logged.
 - Audio dips in the cloud walkthrough remain unexplained VM observations.
 
 ## Reproduce

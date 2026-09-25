@@ -95,6 +95,10 @@ struct CallbackTiming {
     frames_max: AtomicU64,
     xruns: AtomicU64,
     other_errors: AtomicU64,
+    /// Stream errors the error callback could not hand over (queue full; forgotten there).
+    errors_lost: AtomicU64,
+    /// Frames delivered to the device: the audio clock probe reports are aged against.
+    frames_total: AtomicU64,
     /// Execution times after the first second, in `HIST_BIN_US` bins (the last one open).
     hist: Hist,
     /// 0 not tried, 1 granted, 2 refused.
@@ -183,6 +187,8 @@ impl CallbackTiming {
         sample_rate: f32,
     ) {
         let ns = took.as_nanos() as u64;
+        self.frames_total
+            .fetch_add(frames as u64, Ordering::Relaxed);
         let n = self.count.fetch_add(1, Ordering::Relaxed);
         if n == 0 {
             self.frames_min.store(u64::MAX, Ordering::Relaxed);
@@ -376,7 +382,8 @@ impl AudioHost {
         };
         engine.active_mut().generation = 1;
         let (mut probe_tx, probe_rx) = rtrb::RingBuffer::<ProbeReport>::new(8);
-        let (mut faults_tx, faults_rx) = rtrb::RingBuffer::<cpal::Error>::new(8);
+        let (mut faults_tx, faults_rx) =
+            rtrb::RingBuffer::<cpal::Error>::new(kabl_standalone::STREAM_ERROR_QUEUE);
 
         let (swap_tx, mut swap_rx) = swap_channel(SWAP_QUEUE);
         // Test hooks: a small ring forces lost frames, a failure point forces a write error.
@@ -486,12 +493,10 @@ impl AudioHost {
                 t.record(started.elapsed(), since_last, frames_needed, sample_rate);
             },
             move |err| {
-                // May run on the audio thread: count, and hand the error over unformatted.
-                // A full queue drops it (it was counted).
+                // May run on the audio thread: count, and hand the error over unformatted to
+                // the UI thread, which logs and drops it (`hand_off_stream_error`).
                 t_err.error(&err);
-                if err.kind() != cpal::ErrorKind::Xrun {
-                    let _ = faults_tx.push(err);
-                }
+                kabl_standalone::hand_off_stream_error(err, &mut faults_tx, &t_err.errors_lost);
             },
             None,
         );
@@ -858,8 +863,10 @@ impl App {
         let h = &mut self.health;
         if let Some(rx) = self.audio.faults_rx.as_mut() {
             while let Ok(e) = rx.pop() {
-                h.faults += 1;
-                h.fault_text = Some(e.to_string());
+                if e.kind() != cpal::ErrorKind::Xrun {
+                    h.faults += 1;
+                    h.fault_text = Some(e.to_string());
+                }
             }
         }
         let Some(t) = &self.audio.timing else {
@@ -901,9 +908,10 @@ impl App {
             if h.faults > 0 {
                 log::warn!(
                     target: "audio",
-                    "stream errors={} in {secs:.1}s, last: {}",
+                    "stream errors={} in {secs:.1}s, last: {}; not delivered (queue full): {}",
                     h.faults,
-                    h.fault_text.as_deref().unwrap_or("?")
+                    h.fault_text.as_deref().unwrap_or("?"),
+                    get(&t.errors_lost)
                 );
                 h.faults = 0;
             }
@@ -971,8 +979,17 @@ impl eframe::App for App {
         let now = ui.input(|i| i.time);
         self.ui_state.inspect.audio = self.audio.timing.is_some();
         if let Some(rx) = self.audio.probe_rx.as_mut() {
+            // Aged on the audio clock: a report that waited in the queue (the UI stalled) is
+            // not fresh just because it was read now.
+            let played = self
+                .audio
+                .timing
+                .as_ref()
+                .map_or(0, |t| t.frames_total.load(Ordering::Relaxed));
             while let Ok(r) = rx.pop() {
-                self.ui_state.inspect.accept(r, now);
+                let age =
+                    played.saturating_sub(r.end_sample) as f64 / self.audio.sample_rate as f64;
+                self.ui_state.inspect.accept(r, now, age);
             }
         }
         self.log_health();
@@ -1150,6 +1167,7 @@ impl eframe::App for App {
                 self.audio.generation,
                 self.audio.compile_error.clone(),
                 self.editor.state(),
+                ui.input(|i| i.time),
             );
         }
         // Closing the window (or Ctrl+Q) with unsaved changes asks first.
@@ -1289,7 +1307,7 @@ fn main() -> eframe::Result<()> {
         !args.iter().any(|a| a == "--no-rt"),
         peaks.clone(),
     );
-    ui_state.inspect.rebuilt(1, None, editor.state());
+    ui_state.inspect.rebuilt(1, None, editor.state(), 0.0);
     ui_state.recorder = audio.recorder.take();
     ui_state.sample_rate = audio.sample_rate;
     if let (Some(rec), Some(dir)) = (ui_state.recorder.as_mut(), flag("--record-dir")) {

@@ -78,6 +78,9 @@ pub struct ProbeReport {
     pub generation: u64,
     /// Counts every report the engine produced (gaps = reports dropped on the way).
     pub seq: u64,
+    /// Samples the engine had rendered when this window ended: its time on the audio clock,
+    /// so a report that waited in a queue can be aged correctly.
+    pub end_sample: u64,
     pub status: ProbeStatus,
     /// Some block of this window was inside a crossfade (the measured graph is the new one).
     pub fading: bool,
