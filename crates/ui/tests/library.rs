@@ -626,3 +626,303 @@ fn slugs_are_plain() {
     assert_eq!(library::slug("???"), "sound");
     assert_eq!(library::slug("Čelo"), "čelo");
 }
+
+// ---- D01-R1 repairs (docs/find-play-save/repair-1) ----
+
+fn files(d: &Path) -> Vec<(String, Vec<u8>)> {
+    let mut v: Vec<_> = fs::read_dir(d)
+        .unwrap()
+        .flatten()
+        .filter(|e| e.path().is_file())
+        .map(|e| {
+            (
+                e.file_name().to_string_lossy().to_string(),
+                fs::read(e.path()).unwrap(),
+            )
+        })
+        .collect();
+    v.sort();
+    v
+}
+
+#[test]
+fn a_replacement_must_name_the_sound_it_replaces() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut lib = open(tmp.path());
+    let e = edited_pad(&lib);
+    let named = |n: &str| Meta {
+        name: n.into(),
+        ..Meta::default()
+    };
+    let a = lib.save(e.log(), named("Alpha"), None).unwrap();
+    let before = dir_bytes(&lib.get(&a).unwrap().dir);
+    let mut e2 = PatchEditor::from_log(e.log().clone());
+    e2.undo();
+    // A stale confirmation: target Alpha, name Beta.
+    let err = lib.save(e2.log(), named("Beta"), Some(&a)).unwrap_err();
+    assert!(matches!(err, LibError::ReplaceMismatch { .. }), "{err:?}");
+    assert_eq!(dir_bytes(&lib.get(&a).unwrap().dir), before);
+    assert!(lib.get("user:beta").is_none());
+    // Legitimate: Save in place and a replacement of the sound with that name.
+    assert_eq!(lib.save(e2.log(), named("ALPHA"), Some(&a)).unwrap(), a);
+    assert_eq!(lib.read(&a).unwrap().state(), e2.state());
+}
+
+#[test]
+fn a_user_save_failing_at_any_stage_keeps_the_saved_sound() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut lib = open(tmp.path());
+    let e = edited_pad(&lib);
+    let meta = Meta {
+        name: "Keep".into(),
+        ..Meta::default()
+    };
+    let id = lib.save(e.log(), meta.clone(), None).unwrap();
+    let dir = lib.get(&id).unwrap().dir.clone();
+    let before = dir_bytes(&dir);
+    let mut e2 = PatchEditor::from_log(e.log().clone());
+    e2.undo();
+    for stage in ["staged", "replace:dir"] {
+        library::fail_saves_at(Some(stage));
+        let err = lib.save(e2.log(), meta.clone(), Some(&id)).unwrap_err();
+        library::fail_saves_at(None);
+        assert!(err.to_string().contains(stage), "{err}");
+        assert_eq!(dir_bytes(&dir), before, "{stage}");
+        let names: Vec<_> = fs::read_dir(tmp.path().join("sounds"))
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(names, ["keep"], "{stage}: nothing left over");
+    }
+    assert_eq!(lib.read(&id).unwrap().state(), e.state());
+}
+
+#[test]
+fn a_folder_save_writes_the_patch_and_keeps_other_files() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("song");
+    let e = init_keyboard();
+    // A new folder.
+    library::save_folder(&dir, e.log()).unwrap();
+    assert_eq!(kabl_core::load(&dir).unwrap().state(), e.state());
+    // An existing one with the user's own files and metadata.
+    fs::write(dir.join("notes.txt"), "mine").unwrap();
+    fs::write(dir.join(library::META_FILE), "name = \"Song\"\n").unwrap();
+    let mut e2 = PatchEditor::from_log(e.log().clone());
+    e2.set_param(3, "cutoff_hz", 900.0);
+    library::save_folder(&dir, e2.log()).unwrap();
+    assert_eq!(library::read_patch(&dir).unwrap().state(), e2.state());
+    assert_eq!(fs::read(dir.join("notes.txt")).unwrap(), b"mine");
+    assert_eq!(
+        fs::read(dir.join(library::META_FILE)).unwrap(),
+        b"name = \"Song\"\n"
+    );
+    assert!(!dir.join(".kabl-save").exists());
+}
+
+#[test]
+fn a_folder_save_failing_at_any_stage_leaves_the_folder_as_it_was() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("song");
+    let e = init_keyboard();
+    kabl_core::save(&dir, e.log()).unwrap();
+    fs::write(dir.join("notes.txt"), "mine").unwrap();
+    let before = files(&dir);
+    let mut e2 = PatchEditor::from_log(e.log().clone());
+    e2.set_param(3, "cutoff_hz", 900.0);
+    for stage in [
+        "staged",
+        "replace:meta.toml",
+        "replace:checkpoint.json",
+        "replace:log.jsonl",
+    ] {
+        library::fail_saves_at(Some(stage));
+        let err = library::save_folder(&dir, e2.log()).unwrap_err();
+        library::fail_saves_at(None);
+        assert!(matches!(err, LibError::Io(_)), "{stage}: {err:?}");
+        assert_eq!(files(&dir), before, "{stage}");
+        assert!(!dir.join(".kabl-save").exists(), "{stage}");
+        assert_eq!(kabl_core::load(&dir).unwrap().state(), e.state());
+    }
+    // A new folder whose first save fails is left without patch files, not half of them.
+    let fresh = tmp.path().join("fresh");
+    library::fail_saves_at(Some("replace:log.jsonl"));
+    assert!(library::save_folder(&fresh, e2.log()).is_err());
+    library::fail_saves_at(None);
+    assert!(files(&fresh).is_empty());
+}
+
+/// Builds the state a folder save killed part way leaves: staging with kabl's marker in
+/// `phase`, the new copy staged, and `moved` files already swapped (old aside, new in).
+fn crashed_save(dir: &Path, new: &PatchEditor, phase: &str, moved: &[&str]) {
+    let staging = dir.join(".kabl-save");
+    kabl_core::save(&staging, new.log()).unwrap();
+    fs::write(staging.join("kabl-staging"), phase).unwrap();
+    for f in moved {
+        if dir.join(f).exists() {
+            fs::rename(dir.join(f), staging.join(format!("{f}.old"))).unwrap();
+        }
+        fs::rename(staging.join(f), dir.join(f)).unwrap();
+    }
+}
+
+#[test]
+fn an_interrupted_folder_save_is_repaired_on_the_next_open() {
+    let tmp = tempfile::tempdir().unwrap();
+    let old = init_keyboard();
+    let mut new = PatchEditor::from_log(old.log().clone());
+    new.set_param(3, "cutoff_hz", 900.0);
+    let complete = |name: &str| {
+        let dir = tmp.path().join(name);
+        kabl_core::save(&dir, old.log()).unwrap();
+        (dir.clone(), files(&dir))
+    };
+
+    // Killed with meta and checkpoint swapped and the old log moved aside: rolled back.
+    let (dir, before) = complete("a");
+    crashed_save(&dir, &new, "replacing", &["meta.toml", "checkpoint.json"]);
+    fs::rename(dir.join("log.jsonl"), dir.join(".kabl-save/log.jsonl.old")).unwrap();
+    let note = library::repair_folder(&dir).expect("says it restored");
+    assert!(note.contains("undone"), "{note}");
+    assert_eq!(files(&dir), before);
+    assert!(!dir.join(".kabl-save").exists());
+
+    // Killed after the new log moved in, before cleanup: the save stands.
+    let (dir, _) = complete("b");
+    crashed_save(
+        &dir,
+        &new,
+        "replacing",
+        &["meta.toml", "checkpoint.json", "log.jsonl"],
+    );
+    assert_eq!(library::read_patch(&dir).unwrap().state(), new.state());
+    assert!(!dir.join(".kabl-save").exists());
+
+    // Killed while the new copy was still being written: the folder never changed.
+    let (dir, before) = complete("c");
+    crashed_save(&dir, &new, "writing", &[]);
+    assert_eq!(library::read_patch(&dir).unwrap().state(), old.state());
+    assert_eq!(files(&dir), before);
+    assert!(!dir.join(".kabl-save").exists());
+
+    // A folder without checkpoint.json: the checkpoint the save added goes on rollback.
+    let (dir, _) = complete("d");
+    fs::remove_file(dir.join("checkpoint.json")).unwrap();
+    let before = files(&dir);
+    crashed_save(&dir, &new, "replacing", &["meta.toml", "checkpoint.json"]);
+    library::repair_folder(&dir);
+    assert_eq!(files(&dir), before, "no stray checkpoint");
+
+    // A brand-new folder: rollback leaves no half patch.
+    let dir = tmp.path().join("e");
+    fs::create_dir_all(&dir).unwrap();
+    crashed_save(&dir, &new, "replacing", &["meta.toml", "checkpoint.json"]);
+    library::repair_folder(&dir);
+    assert!(files(&dir).is_empty());
+    assert!(!dir.join(".kabl-save").exists());
+}
+
+#[test]
+fn a_kabl_save_directory_kabl_didnt_make_is_left_alone() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("song");
+    let e = init_keyboard();
+    kabl_core::save(&dir, e.log()).unwrap();
+    fs::create_dir_all(dir.join(".kabl-save")).unwrap();
+    fs::write(dir.join(".kabl-save/precious.txt"), "mine").unwrap();
+    fs::write(dir.join(".kabl-save/log.jsonl.old"), "not kabl's").unwrap();
+    let before = files(&dir);
+    assert!(library::repair_folder(&dir).is_none());
+    assert!(library::read_patch(&dir).is_ok());
+    let err = library::save_folder(&dir, e.log()).unwrap_err();
+    assert!(err.to_string().contains("in the way"), "{err}");
+    assert_eq!(files(&dir), before);
+    assert_eq!(
+        fs::read(dir.join(".kabl-save/precious.txt")).unwrap(),
+        b"mine"
+    );
+    // Even kabl's own staging keeps anything else put in it.
+    let other = tmp.path().join("other");
+    kabl_core::save(&other, e.log()).unwrap();
+    crashed_save(&other, &e, "writing", &[]);
+    fs::write(other.join(".kabl-save/extra.txt"), "x").unwrap();
+    library::repair_folder(&other);
+    assert_eq!(fs::read(other.join(".kabl-save/extra.txt")).unwrap(), b"x");
+}
+
+#[test]
+fn a_retry_after_an_interrupted_user_save_keeps_the_only_copy() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut lib = open(tmp.path());
+    let e = edited_pad(&lib);
+    let meta = Meta {
+        name: "Keep".into(),
+        ..Meta::default()
+    };
+    let id = lib.save(e.log(), meta.clone(), None).unwrap();
+    let sounds = tmp.path().join("sounds");
+    // What an Interrupted save leaves: the only copy aside as .keep.old.
+    fs::rename(sounds.join("keep"), sounds.join(".keep.old")).unwrap();
+    let mut e2 = PatchEditor::from_log(e.log().clone());
+    e2.undo();
+    library::fail_saves_at(Some("replace:dir"));
+    assert!(lib.save(e2.log(), meta, Some(&id)).is_err());
+    library::fail_saves_at(None);
+    assert_eq!(
+        lib.read(&id).unwrap().state(),
+        e.state(),
+        "the old copy survives"
+    );
+}
+
+#[test]
+fn a_save_killed_during_cleanup_stands() {
+    let tmp = tempfile::tempdir().unwrap();
+    let old = init_keyboard();
+    let mut new = PatchEditor::from_log(old.log().clone());
+    new.set_param(3, "cutoff_hz", 900.0);
+    for (name, existing) in [("existing", true), ("brand-new", false)] {
+        for phase in ["replacing", "done"] {
+            let dir = tmp.path().join(format!("{name}-{phase}"));
+            if existing {
+                kabl_core::save(&dir, old.log()).unwrap();
+            }
+            library::save_folder(&dir, new.log()).unwrap();
+            let saved = files(&dir);
+            // Cleanup got as far as removing every staged file but the marker.
+            fs::create_dir_all(dir.join(".kabl-save")).unwrap();
+            fs::write(dir.join(".kabl-save/kabl-staging"), phase).unwrap();
+            assert_eq!(
+                library::read_patch(&dir).unwrap().state(),
+                new.state(),
+                "{name} {phase}"
+            );
+            assert_eq!(files(&dir), saved, "{name} {phase}");
+            assert!(!dir.join(".kabl-save").exists());
+        }
+    }
+}
+
+#[test]
+fn leftover_staging_is_cleared_or_explained() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("song");
+    let e = init_keyboard();
+    kabl_core::save(&dir, e.log()).unwrap();
+    // Empty (kabl stopped right after making it): the save goes ahead.
+    fs::create_dir_all(dir.join(".kabl-save")).unwrap();
+    library::save_folder(&dir, e.log()).unwrap();
+    // kabl's own, which could not be undone: the save says where the old files are.
+    let staging = dir.join(".kabl-save");
+    fs::create_dir_all(&staging).unwrap();
+    fs::write(staging.join("kabl-staging"), "replacing").unwrap();
+    fs::write(staging.join("log.jsonl"), "staged").unwrap();
+    fs::create_dir_all(staging.join("log.jsonl.old")).unwrap(); // can't be renamed back over a file
+    fs::write(staging.join("log.jsonl.old/x"), "").unwrap();
+    let note = library::repair_folder(&dir).unwrap();
+    assert!(note.contains("could not be undone"), "{note}");
+    let err = library::save_folder(&dir, e.log()).unwrap_err();
+    assert!(matches!(err, LibError::Interrupted(_)), "{err:?}");
+    assert!(err.to_string().contains("kept in"), "{err}");
+}

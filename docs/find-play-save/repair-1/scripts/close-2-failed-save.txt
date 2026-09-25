@@ -1,0 +1,24 @@
+# R3 part 2 (scripted, KABL_SAVE_FAIL=replace:dir injects a save failure): open the sound
+# saved in part 1, edit, close → Save fails → the question stays with the reason and the
+# app keeps running; a second close while the question is open is refused; Don't save quits.
+sleep 2
+click filter:user
+click sound:user:closed-pad
+click open
+sleep 1
+click perform
+sleep 0.5
+dragby pslider:1.m1 -60 0
+sleep 0.5
+wmclose
+sleep 1
+click dlg:save
+sleep 1
+shot c2-save-failed
+running
+wmclose
+sleep 1
+running
+shot c2-close-while-question-open
+click dlg:discard
+exited 5

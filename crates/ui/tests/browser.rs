@@ -457,7 +457,7 @@ fn save_as_onto_a_taken_name_offers_replace() {
     match &t.ui.browser.dialog {
         Some(Dialog::SaveAs {
             error: Some(e),
-            taken: Some(id),
+            taken: Some((id, _)),
             ..
         }) => {
             assert!(e.contains("already in Your Sounds"), "{e}");
@@ -613,4 +613,218 @@ fn losing_window_focus_stops_a_preview() {
     t.focused = false;
     t.frame();
     assert!(t.ui.launches.is_empty());
+}
+
+// ---- D01-R1 repairs (docs/find-play-save/repair-1) ----
+
+fn saved_state(t: &H, id: &str) -> PatchState {
+    t.ui.library
+        .as_ref()
+        .unwrap()
+        .read(id)
+        .unwrap()
+        .state()
+        .clone()
+}
+
+fn user_ids(t: &H) -> Vec<String> {
+    t.ui.library
+        .as_ref()
+        .unwrap()
+        .entries
+        .iter()
+        .filter(|e| e.id.starts_with("user:"))
+        .map(|e| e.id.clone())
+        .collect()
+}
+
+/// R1: after a collision, changing the name must not keep the old replacement target.
+#[test]
+fn replace_never_targets_a_sound_after_the_name_changed() {
+    let mut t = H::new(1440.0, 900.0);
+    t.open("factory:palette/pad");
+    t.click("save-as");
+    t.save_as_named("Alpha");
+    let alpha = saved_state(&t, "user:alpha");
+    t.edit("filter.ladder", "cutoff_hz", 1234.0);
+    let work = t.editor.state().clone();
+    t.click("save-as");
+    t.save_as_named("alpha");
+    assert!(t.has("dlg:replace"), "a collision offers Replace it");
+    // The user types a new, unused name.
+    if let Some(Dialog::SaveAs { name, .. }) = t.ui.browser.dialog.as_mut() {
+        *name = "Beta".into();
+    }
+    t.frame();
+    assert!(
+        !t.has("dlg:replace"),
+        "a new name drops the old confirmation"
+    );
+    assert!(
+        matches!(
+            &t.ui.browser.dialog,
+            Some(Dialog::SaveAs {
+                taken: None,
+                error: None,
+                ..
+            })
+        ),
+        "and its message"
+    );
+    t.click("dlg:save");
+    let lib = t.ui.library.as_ref().unwrap();
+    assert!(
+        saved_state(&t, "user:alpha") == alpha
+            && lib.get("user:alpha").unwrap().meta.name == "Alpha",
+        "Alpha was replaced: it is now named {:?}, and user sounds are {:?}",
+        lib.get("user:alpha").unwrap().meta.name,
+        user_ids(&t)
+    );
+    assert_eq!(
+        lib.get("user:beta").map(|e| e.meta.name.as_str()),
+        Some("Beta")
+    );
+    assert_eq!(saved_state(&t, "user:beta"), work);
+    assert_eq!(t.doc_origin(), DocOrigin::Library("user:beta".into()));
+    assert_eq!(user_ids(&t).len(), 2);
+}
+
+fn folder_doc(t: &mut H, dir: &Path) {
+    t.ui.doc = Some(kabl_ui::browser::Doc::new(
+        "folder",
+        DocOrigin::Folder(dir.display().to_string()),
+        t.editor.state(),
+    ));
+}
+
+/// R2: a folder save that fails part way leaves the folder as it was and says so. At the
+/// base (58e6622) this was reproduced with `checkpoint.json` made a directory, which failed
+/// the old direct writer after it had rewritten `log.jsonl` (evidence/repro-before.txt); the
+/// staged save moves such a directory aside, so the failure is injected here instead: after
+/// the new `log.jsonl` is in place, the stage the old writer failed after.
+#[test]
+fn a_failed_folder_save_leaves_the_saved_folder_unchanged() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("song");
+    let mut t = H::new(1440.0, 900.0);
+    kabl_core::save(&dir, t.editor.log()).unwrap();
+    std::fs::write(dir.join("notes.txt"), "mine").unwrap();
+    let files = |d: &Path| -> Vec<(String, Vec<u8>)> {
+        let mut v: Vec<_> = std::fs::read_dir(d)
+            .unwrap()
+            .flatten()
+            .map(|e| {
+                (
+                    e.file_name().to_string_lossy().to_string(),
+                    std::fs::read(e.path()).unwrap(),
+                )
+            })
+            .collect();
+        v.sort();
+        v
+    };
+    let before = files(&dir);
+    folder_doc(&mut t, &dir);
+    t.edit("filter.svf", "cutoff_hz", 321.0);
+    let work = t.editor.state().clone();
+    kabl_ui::library::fail_saves_at(Some("replace:log.jsonl"));
+    t.click("save");
+    let msg = t.ui.last_message.clone().unwrap();
+    assert!(
+        msg.starts_with("save failed") && msg.contains("Nothing was overwritten"),
+        "{msg}"
+    );
+    assert!(
+        files(&dir) == before,
+        "folder changed though the message says: {msg}"
+    );
+    assert_eq!(t.editor.state(), &work);
+    assert!(t.modified(), "still unsaved");
+
+    // Save-then-Open doesn't continue after the failure.
+    t.open("factory:palette/pad");
+    t.click("dlg:save");
+    assert!(
+        matches!(
+            &t.ui.browser.dialog,
+            Some(Dialog::Unsaved { error: Some(_), .. })
+        ),
+        "the question stays with the reason"
+    );
+    assert_eq!(t.editor.state(), &work, "nothing opened");
+
+    // Once saving works again, Save writes the folder and the open continues.
+    kabl_ui::library::fail_saves_at(None);
+    // The pointer leaves and comes back: a second press on the same spot right away is a
+    // double click to egui.
+    t.events.push(Event::PointerMoved(Pos2::new(5.0, 5.0)));
+    t.frame();
+    t.click("dlg:save");
+    assert_eq!(
+        t.doc_origin(),
+        DocOrigin::Library("factory:palette/pad".into())
+    );
+    assert_eq!(kabl_core::load(&dir).unwrap().state(), &work);
+    assert_eq!(std::fs::read(dir.join("notes.txt")).unwrap(), b"mine");
+    assert!(!dir.join(".kabl-save").exists());
+}
+
+/// R2: Save to folder (the advanced section) goes through the same staged save.
+#[test]
+fn save_to_folder_is_staged_too() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("other");
+    let mut t = H::new(1440.0, 900.0);
+    kabl_core::save(&dir, t.editor.log()).unwrap();
+    let log_before = std::fs::read(dir.join("log.jsonl")).unwrap();
+    t.edit("filter.svf", "cutoff_hz", 222.0);
+    t.ui.browser.folder = dir.display().to_string();
+    t.click("folder-header");
+    kabl_ui::library::fail_saves_at(Some("replace:meta.toml"));
+    t.click("save-folder");
+    let msg = t.ui.last_message.clone().unwrap();
+    assert!(msg.contains("Nothing was overwritten"), "{msg}");
+    assert_eq!(std::fs::read(dir.join("log.jsonl")).unwrap(), log_before);
+    kabl_ui::library::fail_saves_at(None);
+    t.click("save-folder");
+    assert_eq!(kabl_core::load(&dir).unwrap().state(), t.editor.state());
+    assert!(!t.modified(), "the folder is now the document");
+}
+
+/// R1: Cancel after a collision writes nothing.
+#[test]
+fn cancel_after_a_collision_keeps_the_other_sound() {
+    let mut t = H::new(1440.0, 900.0);
+    t.open("factory:palette/pad");
+    t.click("save-as");
+    t.save_as_named("Alpha");
+    let dir =
+        t.ui.library
+            .as_ref()
+            .unwrap()
+            .get("user:alpha")
+            .unwrap()
+            .dir
+            .clone();
+    let bytes = |d: &Path| -> Vec<Vec<u8>> {
+        let mut v: Vec<_> = std::fs::read_dir(d)
+            .unwrap()
+            .flatten()
+            .map(|e| std::fs::read(e.path()).unwrap())
+            .collect();
+        v.sort();
+        v
+    };
+    let before = bytes(&dir);
+    t.edit("filter.ladder", "cutoff_hz", 999.0);
+    let work = t.editor.state().clone();
+    t.click("save-as");
+    t.save_as_named("ALPHA");
+    assert!(t.has("dlg:replace"));
+    t.click("dlg:cancel");
+    assert!(t.ui.browser.dialog.is_none());
+    assert_eq!(bytes(&dir), before);
+    assert_eq!(user_ids(&t), ["user:alpha"]);
+    assert_eq!(t.editor.state(), &work);
+    assert!(t.modified());
 }

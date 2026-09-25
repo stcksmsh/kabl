@@ -880,6 +880,11 @@ impl eframe::App for App {
                     &mut self.ui_state,
                     kabl_ui::browser::Pending::Quit,
                 );
+            } else {
+                // A dialog (Save As, a question) is already open: it stays, and the close
+                // waits for it rather than replacing it.
+                self.ui_state.last_message =
+                    Some("close: finish or cancel the open dialog first".into());
             }
         }
         if self.ui_state.quit_now && !close {

@@ -77,8 +77,9 @@ pub enum Dialog {
         name: String,
         category: String,
         tags: String,
-        /// A same-named user sound the user may replace (offered after a collision).
-        taken: Option<String>,
+        /// The user sound that has the name tried last (id, that name), offered for
+        /// replacement only while the name field still says that name.
+        taken: Option<(String, String)>,
         then: Option<Pending>,
         error: Option<String>,
     },
@@ -291,6 +292,8 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
             }
         }
         Pending::OpenFolder(path) => {
+            // Settle an interrupted save first, and say so.
+            let repaired = crate::library::repair_folder(std::path::Path::new(&path));
             match crate::library::read_patch(std::path::Path::new(&path)) {
                 Ok(log) => {
                     replace_patch(editor, ui, log);
@@ -302,9 +305,21 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
                         DocOrigin::Folder(path.clone()),
                         editor.state(),
                     ));
-                    message(ui, format!("loaded {path}"));
+                    message(
+                        ui,
+                        repaired.map_or_else(
+                            || format!("loaded {path}"),
+                            |n| format!("loaded {path} ({n})"),
+                        ),
+                    );
                 }
-                Err(err) => message(ui, format!("load failed: {err}. Your sound is unchanged.")),
+                Err(err) => message(
+                    ui,
+                    format!(
+                        "load failed: {err}. Your sound is unchanged.{}",
+                        repaired.map_or(String::new(), |n| format!(" ({n})"))
+                    ),
+                ),
             }
         }
         Pending::New => {
@@ -338,9 +353,9 @@ fn save(editor: &mut PatchEditor, ui: &mut UiState, then: Option<Pending>) -> Op
                 .and_then(|l| l.get(id))
                 .is_some_and(|e| e.origin == Origin::User) =>
         {
+            // The sound keeps its library name and metadata; only the patch is new.
             let lib = ui.library.as_mut().unwrap();
-            let mut meta = lib.get(id).unwrap().meta.clone();
-            meta.name = doc.name.clone();
+            let meta = lib.get(id).unwrap().meta.clone();
             lib.save(editor.log(), meta, Some(id)).map(|_| ())
         }
         DocOrigin::Folder(path)
@@ -349,8 +364,7 @@ fn save(editor: &mut PatchEditor, ui: &mut UiState, then: Option<Pending>) -> Op
                 .as_ref()
                 .is_some_and(|l| l.is_factory_path(std::path::Path::new(path))) =>
         {
-            kabl_core::save(std::path::Path::new(path), editor.log())
-                .map_err(|e| LibError::Io(format!("{e:?}")))
+            crate::library::save_folder(std::path::Path::new(path), editor.log())
         }
         _ => {
             open_save_as(ui, then);
@@ -359,21 +373,39 @@ fn save(editor: &mut PatchEditor, ui: &mut UiState, then: Option<Pending>) -> Op
     };
     match result {
         Ok(()) => {
+            // The library's name for the sound is the one on disk (an outside edit may differ).
+            let name = match &doc.origin {
+                DocOrigin::Library(id) => ui
+                    .library
+                    .as_ref()
+                    .and_then(|l| l.get(id))
+                    .map_or(doc.name.clone(), |e| e.meta.name.clone()),
+                _ => doc.name.clone(),
+            };
             if let Some(d) = ui.doc.as_mut() {
                 d.saved = editor.state().clone();
+                d.name = name.clone();
             }
-            message(ui, format!("saved \"{}\"", doc.name));
+            message(ui, format!("saved \"{name}\""));
             if let Some(p) = then {
                 perform(editor, ui, p);
             }
             None
         }
         Err(e) => {
-            let text =
-                format!("save failed: {e}. Nothing was overwritten; your edits are still here.");
+            let text = save_failed(&e);
             message(ui, text.clone());
             Some(text)
         }
+    }
+}
+
+/// What a failed save tells the user: the saved copy on disk is unchanged (every save path
+/// restores it on failure) unless restoring itself failed.
+fn save_failed(e: &LibError) -> String {
+    match e {
+        LibError::Interrupted(_) => format!("save failed: {e}. Your edits are still here."),
+        _ => format!("save failed: {e}. Nothing was overwritten; your edits are still here."),
     }
 }
 
@@ -412,7 +444,7 @@ fn save_as(
     tags: &str,
     replace: Option<String>,
     then: Option<Pending>,
-) -> Result<(), (Option<String>, String)> {
+) -> Result<(), (Option<(String, String)>, String)> {
     let Some(lib) = ui.library.as_mut() else {
         return Err((None, "the sound library isn't available".into()));
     };
@@ -453,12 +485,13 @@ fn save_as(
             Ok(())
         }
         Err(LibError::NameTaken(id)) => Err((
-            Some(id),
+            Some((id, name.trim().to_string())),
             format!("\"{}\" is already in Your Sounds.", name.trim()),
         )),
         Err(e) => {
-            message(ui, format!("save failed: {e}"));
-            Err((None, format!("Not saved: {e}. Your edits are still here.")))
+            let text = save_failed(&e);
+            message(ui, text.clone());
+            Err((None, text))
         }
     }
 }
@@ -856,7 +889,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                     {
                         "that folder is a factory sound: choose another folder, or Save As".into()
                     } else {
-                        match kabl_core::save(path, editor.log()) {
+                        match crate::library::save_folder(path, editor.log()) {
                             Ok(()) => {
                                 let name = path
                                     .file_name()
@@ -868,7 +901,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                                 ));
                                 format!("saved to {p}")
                             }
-                            Err(err) => format!("save failed: {err:?}"),
+                            Err(err) => save_failed(&err),
                         }
                     };
                     message(ui_state, text);
@@ -1107,9 +1140,9 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
             mut name,
             mut category,
             mut tags,
-            taken,
+            mut taken,
             then,
-            error,
+            mut error,
         } => {
             let mut submit: Option<Option<String>> = None;
             let mut cancel = false;
@@ -1125,6 +1158,16 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
                         submit = Some(None);
                     }
                 });
+                // A confirmation belongs to the name it was offered for: editing the name drops
+                // it (and its message) before the buttons are drawn, so Replace it can never
+                // send an old target with a new name.
+                if taken
+                    .as_ref()
+                    .is_some_and(|(_, n)| n.to_lowercase() != name.trim().to_lowercase())
+                {
+                    taken = None;
+                    error = None;
+                }
                 ui.horizontal(|ui| {
                     ui.label("Category");
                     egui::ComboBox::from_id_salt("dlg-category")
@@ -1152,7 +1195,7 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
                     if r.clicked() {
                         submit = Some(None);
                     }
-                    if let Some(id) = &taken {
+                    if let Some((id, _)) = &taken {
                         let r = ui.button("Replace it");
                         hit(ui_state, "dlg:replace", &r);
                         if r.clicked() {

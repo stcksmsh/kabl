@@ -1,0 +1,7 @@
+# R3 part 4 (scripted): nothing edited, the window-manager close quits without a question.
+sleep 2
+click sound:factory:palette/lead
+click open
+sleep 1
+wmclose
+exited 5

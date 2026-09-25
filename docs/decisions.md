@@ -2403,3 +2403,38 @@ were not transplanted, only its look (palettes, geometry, drawing).
   unsaved, Save and Save As. At 1280 wide the document name is 100 px (truncated, full name
   on hover) so the toolbar keeps its existing tools.
 - Not built (out of scope): delete for user sounds, import/export, D02 explanations.
+
+## 2026-09-25 — D01-R1: saving safety repairs (owner-authorized repair task)
+
+- Scope: `docs/product-research/briefs/D01-R1.md`, run in parallel with D02 on its own
+  branch/PR. Record: `docs/find-play-save/repair-1/{REPORT,REVIEW}.md` (fresh reviewer
+  subagent, final recheck at b579fb3). D01's owner checklist,
+  Composition + Motion and Sound Palette reviews stay pending.
+- **R1 — a replacement belongs to a name.** Both supervisor concerns reproduced at 58e6622
+  (`repair-1/evidence/repro-before.txt`). The Save As collision offer stores (sound id, the
+  name that collided) and is dropped, with its message, as soon as the name field says
+  something else; `Library::save` also refuses a replacement whose target is not called the
+  saved name (`ReplaceMismatch`), and Save in place keeps the library's own name. Rejected:
+  re-resolving the typed name at click time only (the button would still be on screen next
+  to a name it doesn't apply to).
+- **R2 — folder saves are staged.** `library::save_folder` writes and reads back the patch in
+  `<dir>/.kabl-save/`, then replaces `meta.toml`, `checkpoint.json` and `log.jsonl` (the
+  authoritative file last), moving each old file into the staging directory; a failure puts
+  them back and removes files the save added. A `kabl-staging` marker (writing → replacing →
+  done/undone) lets `repair_folder` (run on every folder open/save) act only on kabl's own
+  staging: a save whose new log is in place (the log moves last) stands, any other
+  `replacing` save is rolled back, other phases only clean up. The reviewer found that
+  judging "complete" by the presence of `log.jsonl.old` deleted a completed save killed
+  during cleanup; fixed by the `done` phase and the staged-log rule. Only those three files are touched, so a user's folder
+  keeps its other contents. Rejected: reusing the library's whole-directory swap (it would
+  move the user's other files), and writing in place with a backup of the log only (meta and
+  checkpoint would be left changed after a failure while the message says nothing changed).
+  No fsync, no multi-writer protection (unchanged, documented).
+- A user-library save first settles an interrupted swap, so a retry can never clear the
+  only saved copy (reviewer finding).
+- Failure messages say "Nothing was overwritten" only when every step was undone; a failed
+  restore (`LibError::Interrupted`) says where the old files are instead.
+- Fault injection for tests and real-app evidence: `library::fail_saves_at` (thread-local)
+  and `KABL_SAVE_FAIL=<stage>` (`staged`, `replace:dir`, `replace:<file>`).
+- A window-manager close while a dialog is open keeps the dialog and says so (before, the
+  close was silently ignored). Verified in the real app with openbox + `wmctrl -c`.
