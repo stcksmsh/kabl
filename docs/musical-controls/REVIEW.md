@@ -163,3 +163,66 @@ walkthrough were re-recorded at 0987db5. I did not add a real-app screenshot wit
 panel open; the browser is D01-R1's area and D02 does not change it.
 
 ## Recheck
+
+Rechecked by the same reviewer subagent on 2026-09-25.
+
+- **Product head rechecked:** `e60300c6df45eb9934f18ad80e0e7bb086b0a69b`. The fixes are in
+  `0987db5` and `e60300c`.
+- **Docs head rechecked:** `2516be4`. `git diff e60300c..2516be4 -- crates` is empty.
+- **What I read:** `git diff 8e4d2fb..e60300c -- crates/ui/src crates/ui/tests` in full, and
+  the README, `evidence/clippy.txt` and `evidence/test-workspace.txt` diffs. I also looked at
+  one re-recorded screenshot, `img/1440x900-light-macro-shown.png`, which shows the new R1
+  wording on the Cutoff row.
+- **What I ran:**
+  - `cargo test -p kabl-ui`: exit 0, all suites ok. The `explain` suite is 18 passed and
+    1 ignored; unit tests are 13 passed.
+  - `cargo test -p kabl-ui --test explain`: 18 passed, 1 ignored.
+  - `cargo clippy -p kabl-ui --all-targets`: no warnings.
+- **Ownership:** `git diff --stat 58e6622..2516be4` over `browser.rs`, `library.rs`,
+  `main.rs`, `docs/find-play-save` and `.ai` is empty.
+
+| ID | Status | Recheck notes |
+|---|---|---|
+| R1 | **Resolved** | `macro_now` now looks for other routes into the same control that are not bypassed and are not this one. When any exist, it labels the figure "base + this route alone … (the other routes move it further)". The number is unchanged: base plus this route at the macro's stored position, clamped. The test asserts this on pad Cutoff, and the re-recorded screenshot shows it. |
+| R2 | **Resolved** | `routing::reaches` matches the compiler's rule: the exact name, else, if the stored name is not a real param, the first param whose legacy name it is. `routes_into` uses it, which fixes `dest_detail` and `base_and_modulation`, and so does `UiState::validate`, so Show's route selection now survives. The new test covers destination, `routes_into` on level1 and level2, and "not Modulation: none". Side effect: the routing drawer now also lists legacy routes under Level 1. That matches the engine and is an improvement. |
+| R3 | **Resolved** | `a_direct_pin_to_an_off_face_control_reveals_it` checks that `palette/lead` MIDI In #2 `glide_ms` starts hidden. It then checks that Show inspects it, expands the module and draws the knob, that the patch, undo, rebuild flag and document are unchanged, and that Back collapses it again. There is still no real-app capture of this particular case. It is covered by the interaction test (real egui input through `show()`). |
+| R4 | **Resolved** (kept as intended; documented and tested) | `a_card_rename_commits_when_you_click_elsewhere` checks that the label is committed, that exactly one log entry is added, and that no keyboard focus is left. The README Focus section documents it. |
+| R5 | **Resolved** | `path_to_output` returns `Result<Option<_>, PathLimit>`, and the panel says "not worked out" when the limit is hit. A 600-module chain test gives `Err(PathLimit)`, and the cycle test gives `Ok(None)`. |
+| R6 | **Resolved** | `clocked` walks clock-jack cables through `clock.div` (visited set, bounded) and lists only `seq`. Test on `interlocking`: [3, 4]. Edge case, not a finding: a cable from the clock's `reset` output into a divider's or sequencer's `clock` jack would also be counted. No factory patch does that. |
+| R7 | **Resolved** | `SavedView` saves and restores all of `edit_bank`. A click in the Controls list goes through `open()`, so the target is reset and the origin card kept. The edit-bank restore has no dedicated test; I verified it by reading the code. |
+| R8 | (a) **Disputed, accepted.** (b) **Resolved** | (a) My finding was wrong. `browser::frame_input` sets `ui_state.doc` on the first frame (`browser.rs:472-473`), so `is_modified` is a real check in the harness. `H::new` now asserts that, and the new test shows a real edit makes it true. (b) `edits_through_the_card_and_the_rack_agree_while_explained` drags `pslider:3.cutoff_hz` and `dparam:3.cutoff_hz`, and checks that the explanation's base line follows and that undo returns to a clean document. |
+| R9 | **Resolved** | The Escape branch now also requires that no popup is open, now or at the end of the last frame (folded into the `typing` latch). I checked egui 0.35: `Popup::is_any_open` reads `Memory::any_popup_open`, and tooltips do not register there, so hovering a button does not swallow Escape. The test opens the card's ⋯ menu, checks that the first Escape leaves the explanation open and the second closes it. Minor gap: the test does not assert that the menu itself closed after the first Escape. |
+| R10 | **Resolved** | The glide help now says "in MONO and LEGATO modes", which matches `keyboard.rs:235` (POLY glides only on ALWAYS). The `module_title` doc comment is fixed. |
+
+**New issues found in the fix diff.** No code issues. One documentation inaccuracy:
+
+- **N1 (nit, docs):** the README (line 5 and the last line of Limits) links `REPORT.md` for
+  the report and the resume steps, but `docs/musical-controls/REPORT.md` still does not exist
+  at `2516be4`. Create it, as the brief requires, or drop the link until it exists.
+
+**Other README claims checked:**
+
+- Accurate: the test counts (18 explain tests), the product head `e60300c`, and the
+  recordings at `0987db5`. `e60300c` changes only `clocked` and a test assertion, and the
+  walkthrough (Evolving Pad) has no transport card. The limits addition says real-app
+  deletion and replacement are test-only.
+- The transport wording "the sequencers on a clock's gate, through dividers too" is slightly
+  broader than the code, which counts any clock output cabled into a `clock` jack (see the R6
+  note). Acceptable.
+
+**Status.** All original findings are resolved or disputed-and-accepted. The only open item
+is N1 (docs). There are no open correctness or acceptance failures in D02's own scope.
+
+**Limits of this recheck:**
+
+- The recheck is static, apart from the `kabl-ui` test and clippy runs. The workspace-wide
+  totals (465 passed at `e60300c`) come from the implementer's log; I did not rerun them.
+- I did not run the real app. Of the re-recorded video I reviewed only one screenshot, and
+  not the audio.
+- **D01-R1 is still not integrated.** This recheck does not cover the combined result. After
+  the merge, a further recheck of the combined product head is required before any
+  merge-ready claim.
+- Reviewer approval is not owner approval. The CHECKLIST owner items remain pending.
+
+**Implementer note on N1:** resolved. `REPORT.md` was added in 0bad86a, a docs-only commit
+with no product change after e60300c.
