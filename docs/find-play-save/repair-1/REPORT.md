@@ -8,7 +8,7 @@ Product head (tested, reviewed): b579fb3
 Submitted head commit: the docs commit adding this file (PR below has the SHA); after
   b579fb3 only docs/** change.
 Branch / pushed remote / PR: claude/install-caveman-ponytail-bhigco (environment-required,
-  restarted from 58e6622 after PR #2 merged) → PR_LINK. Not merged by the agent.
+  restarted from 58e6622 after PR #2 merged) → https://github.com/stcksmsh/kabl/pull/4. Not merged by the agent.
 Engineering status: submitted
 Owner-review status: pending (D01 hands-on checklist not done; Composition + Motion and
   Sound Palette reviews pending)
