@@ -62,7 +62,7 @@ pub fn routes_into(state: &PatchState, id: ModuleId, param: &str) -> Vec<RouteVi
         let PortRef::Param { id: to, param: p } = &c.to else {
             continue;
         };
-        if *to != id || p != param {
+        if *to != id || !reaches(state, id, p, param) {
             continue;
         }
         let PortRef::Module {
@@ -101,6 +101,28 @@ pub fn routes_into(state: &PatchState, id: ModuleId, param: &str) -> Vec<RouteVi
         });
     }
     out
+}
+
+/// Whether a route stored as `stored` on module `id` drives `param`, as the compiler reads it:
+/// the same name, or an old patch's pre-rename name (a mixer's shared `level`), which reaches
+/// the first param it names (channel 1).
+pub fn reaches(state: &PatchState, id: ModuleId, stored: &str, param: &str) -> bool {
+    if stored == param {
+        return true;
+    }
+    let Some(info) = state
+        .modules
+        .get(&id)
+        .and_then(|m| registry::info_for(&m.kind))
+    else {
+        return false;
+    };
+    !info.params.iter().any(|p| p.name == stored)
+        && info
+            .params
+            .iter()
+            .find(|p| registry::legacy_param(info.kind, p.name) == Some(stored))
+            .is_some_and(|p| p.name == param)
 }
 
 /// Unclamped knob-travel span one route can add to `base_norm`: `(low, high)`.

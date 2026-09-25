@@ -339,7 +339,8 @@ impl UiState {
         if let Some(cable) = self.selected_route {
             let belongs = state.cables.get(&cable).is_some_and(|c| {
                 matches!((&c.to, &self.inspected),
-                    (PortRef::Param { id, param }, Some((iid, ip))) if id == iid && param == ip)
+                    (PortRef::Param { id, param }, Some((iid, ip)))
+                        if id == iid && routing::reaches(state, *id, param, ip))
             });
             if !belongs {
                 self.selected_route = None;
@@ -491,6 +492,7 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
         && ui_state.explain.is_open()
         && ui_state.browser.dialog.is_none()
         && !ui.ctx().egui_wants_keyboard_input()
+        && !egui::Popup::is_any_open(ui.ctx())
         // egui drops a text field's focus on Escape before this frame runs: that Escape
         // was the field's.
         && !ui_state.explain.typing
@@ -591,7 +593,8 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
         .frame(egui::Frame::NONE.fill(th.rack))
         .show(ui, |ui| show_rack(editor, ui_state, ui, &th));
     browser::dialogs(editor, ui_state, ui.ctx());
-    ui_state.explain.typing = ui.ctx().egui_wants_keyboard_input();
+    ui_state.explain.typing =
+        ui.ctx().egui_wants_keyboard_input() || egui::Popup::is_any_open(ui.ctx());
     ui_state.hits = std::mem::take(&mut ui_state.frame_hits);
 }
 

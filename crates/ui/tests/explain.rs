@@ -40,7 +40,37 @@ impl H {
         h.frame();
         h.frame();
         h.editor.take_dirty();
+        // The document the unsaved check compares against (set by the first frame).
+        assert!(h.ui.doc.is_some() && !browser::is_modified(&h.editor, &h.ui));
         h
+    }
+
+    fn drag(&mut self, key: &str, dx: f32) {
+        let p = self.rect(key).center();
+        self.pointer = p;
+        self.events.push(Event::PointerMoved(p));
+        self.frame();
+        self.events.push(Event::PointerButton {
+            pos: p,
+            button: egui::PointerButton::Primary,
+            pressed: true,
+            modifiers: Default::default(),
+        });
+        self.frame();
+        for k in 1..=6 {
+            let q = p + egui::vec2(dx * k as f32 / 6.0, 0.0);
+            self.pointer = q;
+            self.events.push(Event::PointerMoved(q));
+            self.frame();
+        }
+        self.events.push(Event::PointerButton {
+            pos: self.pointer,
+            button: egui::PointerButton::Primary,
+            pressed: false,
+            modifiers: Default::default(),
+        });
+        self.frame();
+        self.frame();
     }
 
     fn frame(&mut self) {
@@ -332,7 +362,7 @@ fn signal_jack_destinations_list_one_bounded_hop() {
 #[test]
 fn signal_paths_come_from_cables_and_stay_bounded() {
     let e = load("init-keyboard");
-    let path = explain::path_to_output(e.state(), 2).unwrap();
+    let path = explain::path_to_output(e.state(), 2).unwrap().unwrap();
     assert_eq!(path.first(), Some(&2));
     assert_eq!(e.state().modules[path.last().unwrap()].kind, "out");
     assert!(explain::path_text(e.state(), &path).contains("Osc #2"));
@@ -343,7 +373,22 @@ fn signal_paths_come_from_cables_and_stay_bounded() {
     let port = |id, p: &str| PortRef::Module { id, port: p.into() };
     ed.connect(port(a, "out"), port(b, "in"));
     ed.connect(port(b, "out"), port(a, "in"));
-    assert_eq!(explain::path_to_output(ed.state(), a), None);
+    assert_eq!(explain::path_to_output(ed.state(), a), Ok(None));
+    // A chain longer than the search limit: unknown, not "no path".
+    let mut ed = PatchEditor::new();
+    let first = ed.add_module("vca", kabl_core::Vec2::default());
+    let mut prev = first;
+    for _ in 0..600 {
+        let n = ed.add_module("vca", kabl_core::Vec2::default());
+        ed.connect(port(prev, "out"), port(n, "in"));
+        prev = n;
+    }
+    let out = ed.add_module("out", kabl_core::Vec2::default());
+    ed.connect(port(prev, "out"), port(out, "left"));
+    assert_eq!(
+        explain::path_to_output(ed.state(), first),
+        Err(explain::PathLimit)
+    );
 }
 
 #[test]
@@ -630,4 +675,119 @@ fn write_help_coverage() {
         .join("../../docs/musical-controls/coverage.md");
     std::fs::create_dir_all(out.parent().unwrap()).unwrap();
     std::fs::write(out, md).unwrap();
+}
+
+#[test]
+fn a_direct_pin_to_an_off_face_control_reveals_it() {
+    // palette/lead "Glide time" is MIDI In #2 glide_ms, an advanced (off-face) control.
+    let mut h = H::new("palette/lead", 1280.0, 800.0);
+    let before = h.snapshot();
+    assert!(
+        !h.ui.hits.contains_key("knob:2.glide_ms"),
+        "starts off the face"
+    );
+    h.click("pexplain:2.glide_ms");
+    h.click("explain-show:2.glide_ms");
+    assert_eq!(h.ui.inspected, Some((2, "glide_ms".into())));
+    assert!(h.ui.expanded.contains(&2));
+    assert!(h.ui.hits.contains_key("knob:2.glide_ms"));
+    h.unchanged_since(&before);
+    h.click("explain-back");
+    assert!(!h.ui.expanded.contains(&2));
+    h.unchanged_since(&before);
+}
+
+#[test]
+fn a_legacy_mixer_level_route_is_explained_on_channel_1() {
+    // An old patch's route to the shared `level` reaches channel 1 in the engine.
+    let mut ed = PatchEditor::new();
+    let mac = ed.add_module("macro", kabl_core::Vec2::default());
+    let mix = ed.add_module("mixer", kabl_core::Vec2::default());
+    let c = ed.connect(
+        PortRef::Module {
+            id: mac,
+            port: "m1".into(),
+        },
+        PortRef::Param {
+            id: mix,
+            param: "level".into(),
+        },
+    );
+    let s = ed.state();
+    let (rows, _) = explain::destinations(s, mac, "m1");
+    assert!(matches!(&rows[0].reach, Reach::Param { param, .. } if param.name == "level1"));
+    let l1 = explain::param_of(s, mix, "level1").unwrap();
+    assert_eq!(routing::routes_into(s, mix, "level1")[0].cable, c);
+    assert!(routing::routes_into(s, mix, "level2").is_empty());
+    let lines = explain::base_and_modulation(s, mix, l1);
+    assert!(
+        !lines.iter().any(|l| l.starts_with("Modulation: none")),
+        "{lines:?}"
+    );
+}
+
+#[test]
+fn transport_acts_on_sequencers_behind_a_divider() {
+    // interlocking: Clock #1 → Sequencer #3, and → Divider #2 → Sequencer #4.
+    let e = load("interlocking");
+    assert_eq!(explain::clocked(e.state(), 1), [3, 4]);
+}
+
+#[test]
+fn edits_through_the_card_and_the_rack_agree_while_explained() {
+    let mut h = H::new("init-keyboard", 1440.0, 900.0);
+    h.click("pexplain:3.cutoff_hz");
+    let p = param(&h, 3, "cutoff_hz");
+    let base = |h: &H| routing::base_value(h.editor.state(), 3, p);
+    let b0 = base(&h);
+    h.drag("pslider:3.cutoff_hz", 30.0);
+    let b1 = base(&h);
+    assert!(b1 > b0, "the card slider moves the stored base");
+    assert!(explain::base_and_modulation(h.editor.state(), 3, p)[0]
+        .contains(&routing::fmt_value(p, b1)));
+    // The same value from the rack's drawer control.
+    h.click("explain-show:3.cutoff_hz");
+    h.drag("dparam:3.cutoff_hz", -60.0);
+    let b2 = base(&h);
+    assert!(b2 < b1);
+    assert!(
+        browser::is_modified(&h.editor, &h.ui),
+        "real edits do mark the document"
+    );
+    h.editor.undo();
+    h.editor.undo();
+    h.frame();
+    assert_eq!(base(&h), b0);
+    assert!(!browser::is_modified(&h.editor, &h.ui));
+}
+
+#[test]
+fn escape_with_a_menu_open_closes_only_the_menu() {
+    let mut h = H::new("palette/pad", 1440.0, 900.0);
+    h.click("pexplain:1.m1");
+    h.click("pmenu:1.m1");
+    assert!(egui::Popup::is_any_open(&h.ctx), "the card menu is open");
+    h.key(Key::Escape);
+    assert!(h.ui.explain.is_open());
+    h.frame();
+    h.frame();
+    h.key(Key::Escape);
+    assert!(!h.ui.explain.is_open());
+}
+
+#[test]
+fn a_card_rename_commits_when_you_click_elsewhere() {
+    let mut h = H::new("palette/pad", 1440.0, 900.0);
+    h.ui.renaming = Some((MACROS, "m1".into(), "Heat".into()));
+    h.frame();
+    h.frame();
+    let undo = h.editor.log().entries().len();
+    h.click("pexplain:1.m2");
+    assert!(h.ui.renaming.is_none());
+    assert_eq!(
+        perform::pin_label(h.editor.state(), &pin(MACROS, "m1")),
+        "Heat"
+    );
+    assert_eq!(h.editor.log().entries().len(), undo + 1, "one undo step");
+    assert!(!h.ctx.egui_wants_keyboard_input(), "no focus left behind");
 }

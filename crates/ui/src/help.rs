@@ -142,7 +142,8 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
             "Which held key a MONO/LEGATO voice plays: the last pressed, lowest or highest."
         }
         ("midi.in", "glide") => {
-            "Slides pitch between notes: OFF, ALWAYS, or LEGATO (only between overlapping notes)."
+            "Slides pitch between notes in MONO and LEGATO modes: OFF, ALWAYS, or LEGATO (only \
+             between overlapping notes)."
         }
         ("midi.in", "glide_ms") => "How long a glide takes.",
         _ => return None,
@@ -240,7 +241,7 @@ pub fn range_text(kind: &str, p: &ParamInfo) -> String {
     )
 }
 
-/// Module title with its user-facing name and kind: `Ladder Filter #7 (filter.ladder)`.
+/// Module title with its user-facing name and id: `Ladder Filter #7`.
 pub fn module_title(kind: &str, id: kabl_core::ModuleId) -> String {
     let name = registry::info_for(kind).map_or("Unknown module", |i| i.name);
     format!("{name} #{id}")

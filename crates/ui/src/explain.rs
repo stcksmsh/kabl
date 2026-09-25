@@ -87,6 +87,7 @@ struct SavedView {
     selected_module: Option<ModuleId>,
     selected_route: Option<CableId>,
     expanded: BTreeSet<ModuleId>,
+    edit_bank: std::collections::HashMap<ModuleId, usize>,
     perform_open: bool,
 }
 
@@ -105,7 +106,8 @@ pub struct Explain {
     pub(crate) card_flash: Option<(ModuleId, String, f64)>,
     saved: Option<SavedView>,
     editor: u64,
-    /// A text field had keyboard focus at the end of the last frame.
+    /// A text field had keyboard focus, or a popup or menu was open, at the end of the last
+    /// frame: an Escape now is theirs.
     pub(crate) typing: bool,
     /// Show just inspected a control: the drawer scrolls to its routes once.
     pub(crate) scroll_to_routes: bool,
@@ -172,6 +174,7 @@ pub fn go(editor: &PatchEditor, ui_state: &mut UiState, target: Target, now: f64
             selected_module: ui_state.selected_module,
             selected_route: ui_state.selected_route,
             expanded: ui_state.expanded.clone(),
+            edit_bank: ui_state.edit_bank.clone(),
             perform_open: ui_state.perform_open,
         });
     }
@@ -207,6 +210,7 @@ pub fn back(ui_state: &mut UiState, now: f64) {
         ui_state.selected_module = v.selected_module;
         ui_state.selected_route = v.selected_route;
         ui_state.expanded = v.expanded;
+        ui_state.edit_bank = v.edit_bank;
         ui_state.perform_open = v.perform_open;
     }
     ui_state.explain.target = None;
@@ -358,7 +362,10 @@ fn output_ports(state: &PatchState, id: ModuleId) -> Vec<&'static str> {
 /// included, or `None` when no cable path leads to one. Breadth-first over at most
 /// `MAX_VISIT` modules, so cycles and large patches stay bounded. Modulation routes (into
 /// knobs) are not signal paths and are not followed.
-pub fn path_to_output(state: &PatchState, id: ModuleId) -> Option<Vec<ModuleId>> {
+pub fn path_to_output(
+    state: &PatchState,
+    id: ModuleId,
+) -> Result<Option<Vec<ModuleId>>, PathLimit> {
     let mut prev = std::collections::BTreeMap::new();
     let mut queue = VecDeque::from([id]);
     prev.insert(id, id);
@@ -371,10 +378,10 @@ pub fn path_to_output(state: &PatchState, id: ModuleId) -> Option<Vec<ModuleId>>
                 path.push(at);
             }
             path.reverse();
-            return Some(path);
+            return Ok(Some(path));
         }
         if prev.len() >= MAX_VISIT {
-            return None;
+            return Err(PathLimit);
         }
         for c in state.cables.values() {
             if let (PortRef::Module { id: f, .. }, PortRef::Module { id: t, .. }) = (&c.from, &c.to)
@@ -386,8 +393,12 @@ pub fn path_to_output(state: &PatchState, id: ModuleId) -> Option<Vec<ModuleId>>
             }
         }
     }
-    None
+    Ok(None)
 }
+
+/// The signal-path search stopped at `MAX_VISIT` modules: whether a path exists is unknown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PathLimit;
 
 /// `Osc #2 → Filter #3 → VCA #4 → Output #5`.
 pub fn path_text(state: &PatchState, path: &[ModuleId]) -> String {
@@ -459,11 +470,19 @@ fn macro_now(state: &PatchState, id: ModuleId, p: &ParamInfo, r: &RouteView) -> 
     }
     let pos = routing::base_value(state, r.from_id, knob).clamp(0.0, 1.0);
     let base_n = p.to_norm(routing::base_value(state, id, p));
-    Some(format!(
-        "at its stored {:.0} %: {}",
-        pos * 100.0,
-        routing::fmt_value(p, p.from_norm(base_n + r.amount * pos))
-    ))
+    let value = routing::fmt_value(p, p.from_norm(base_n + r.amount * pos));
+    let others = routing::routes_into(state, id, p.name)
+        .iter()
+        .any(|o| o.cable != r.cable && !o.bypass);
+    Some(if others {
+        format!(
+            "base + this route alone at its stored {:.0} %: {value} (the other routes move it \
+             further)",
+            pos * 100.0
+        )
+    } else {
+        format!("at its stored {:.0} %: {value}", pos * 100.0)
+    })
 }
 
 /// Base value versus modulation for `(id, p)`, as lines of text: what sets the base, each
@@ -790,11 +809,18 @@ fn path_line(state: &PatchState, ui: &mut egui::Ui, id: ModuleId) {
         return;
     }
     match path_to_output(state, id) {
-        Some(p) => weak(
+        Err(PathLimit) => weak(
+            ui,
+            format!(
+                "Signal path (cables): not worked out, the patch is too large to search \
+                 (over {MAX_VISIT} modules)."
+            ),
+        ),
+        Ok(Some(p)) => weak(
             ui,
             format!("Signal path (cables): {}", path_text(state, &p)),
         ),
-        None => weak(
+        Ok(None) => weak(
             ui,
             format!(
                 "Signal path (cables): no cable path from {} to an Output. It can still \
@@ -883,6 +909,33 @@ fn macro_destinations(
     }
 }
 
+/// Sequencers, LFOs and delays a clock reaches through signal cables into their clock jacks
+/// (through dividers too), breadth-first over at most `MAX_VISIT` modules.
+pub fn clocked(state: &PatchState, clock: ModuleId) -> Vec<ModuleId> {
+    let mut seen = BTreeSet::from([clock]);
+    let mut queue = VecDeque::from([clock]);
+    let mut out = Vec::new();
+    while let Some(m) = queue.pop_front() {
+        for c in state.cables.values() {
+            let (PortRef::Module { id: f, .. }, PortRef::Module { id: t, port }) = (&c.from, &c.to)
+            else {
+                continue;
+            };
+            if *f != m || seen.len() >= MAX_VISIT {
+                continue;
+            }
+            // Only a clock input counts: a reset cable alone does not make a module clocked.
+            match state.modules.get(t).map_or("", |s| s.kind.as_str()) {
+                "clock.div" if port == "clock" && seen.insert(*t) => queue.push_back(*t),
+                "seq" | "lfo" | "delay" if port == "clock" && seen.insert(*t) => out.push(*t),
+                _ => {}
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
 /// Transport, bank and cue cards: what they act on, from the patch.
 fn special(
     editor: &PatchEditor,
@@ -905,10 +958,7 @@ fn special(
         ui.label(RichText::new(module_title(state, id)).small());
     });
     let driven: Vec<ModuleId> = match key {
-        TRANSPORT => outgoing(state, id, "gate")
-            .into_iter()
-            .map(|d| d.to)
-            .collect(),
+        TRANSPORT => clocked(state, id),
         CUE_PADS => crate::cues::cues(state, id)
             .into_iter()
             .flat_map(|c| c.targets.into_iter().map(|t| t.0))
@@ -1016,10 +1066,15 @@ fn module(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, id: M
                         let r = ui.small_button(routing::target_label(p));
                         ui_state.record(format!("explain-ctl:{id}.{}", p.name), r.rect);
                         if r.on_hover_text("Explain this control").clicked() {
-                            ui_state.explain.subject = Some(Subject::Control {
-                                id,
-                                key: p.name.to_string(),
-                            });
+                            let card = ui_state.explain.card.clone();
+                            open(
+                                ui_state,
+                                Subject::Control {
+                                    id,
+                                    key: p.name.to_string(),
+                                },
+                                card,
+                            );
                         }
                         weak(ui, help::param_help(info.kind, p.name).unwrap_or(""));
                     });
