@@ -14,6 +14,7 @@ kabl-core = { path = "../core" }
 [dev-dependencies]
 assert_no_alloc = "1.1.2"
 hound = "3.5.1"
+tempfile = "3.27.0"
 criterion = "0.8.2"
 
 [[bench]]

@@ -15,13 +15,10 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use kabl_core::{ModuleId, PatchState};
 use kabl_engine::compile::compile;
 use kabl_engine::graph::BLOCK;
+use kabl_engine::keyboard::KeyEvent;
 use kabl_engine::patch_engine::{swap_channel, Command, PatchEngine, SwapSender};
-use kabl_engine::voice_allocator::VoiceAllocator;
 use kabl_modules::builtins::{DelayLock, LfoSync, Transport};
-use kabl_standalone::{
-    apply_voice_event, default_patch, resolve_midi_message, RingBuffer, VoiceEvent,
-    DEFAULT_VOICE_COUNT,
-};
+use kabl_standalone::{default_patch, RingBuffer, DEFAULT_VOICE_COUNT};
 use kabl_ui::{record, show, PatchEditor, UiState};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -220,7 +217,8 @@ impl AudioHost {
     /// `rate`/`frames`: a sample rate and a fixed callback size to ask the device for.
     fn start(
         patch: &PatchState,
-        notes: rtrb::Consumer<VoiceEvent>,
+        notes: rtrb::Consumer<KeyEvent>,
+        keys: Arc<AtomicU64>,
         rate: Option<u32>,
         frames: Option<u32>,
         realtime: bool,
@@ -335,7 +333,7 @@ impl AudioHost {
                 // allocation-free), apply MIDI to every running graph, render.
                 engine.drain_swaps(&mut swap_rx);
                 while let Ok(event) = midi_consumer.pop() {
-                    apply_voice_event(&mut engine, event);
+                    engine.key(event);
                 }
                 while let Ok((id, t)) = transport_rx.pop() {
                     engine.transport(id, t);
@@ -366,6 +364,8 @@ impl AudioHost {
                 engine.lfos(|id, sync| {
                     let _ = lfos_tx.push((id, sync));
                 });
+                let (held, sounding) = engine.keys();
+                keys.store(pack_keys(held, sounding), Ordering::Relaxed);
 
                 let rec = tap.begin(frames_needed);
                 for frame in data.chunks_mut(channels) {
@@ -443,12 +443,71 @@ impl AudioHost {
     }
 }
 
-/// What the MIDI callback owns: note events to the audio thread, CC to the UI.
+/// What the MIDI callback owns: key events (notes, sustain pedal, All Notes Off / All Sound
+/// Off) to the audio thread, where the engine's keyboards assign voices; every other CC to
+/// the UI (learn, mappings, buttons).
 struct MidiSink {
-    notes: rtrb::Producer<VoiceEvent>,
+    notes: rtrb::Producer<KeyEvent>,
     cc: rtrb::Producer<(u8, u8, u8)>,
-    allocator: VoiceAllocator,
     ctx: Option<egui::Context>,
+}
+
+/// CCs that are key events, never learnable: sustain pedal, All Sound Off, All Notes Off.
+fn is_key_cc(cc: u8) -> bool {
+    matches!(cc, 64 | 120 | 123)
+}
+
+/// Keys held and voices sounding, as the audio thread publishes them.
+fn pack_keys(held: usize, sounding: usize) -> u64 {
+    ((held as u64) << 32) | sounding as u64
+}
+
+fn unpack_keys(v: u64) -> (u64, u64) {
+    (v >> 32, v & 0xFFFF_FFFF)
+}
+
+/// One incoming MIDI message: a key event to the audio thread, any other CC to the UI.
+fn on_message(s: &mut MidiSink, data: &[u8]) {
+    if let Some(e) = KeyEvent::from_midi(data) {
+        let _ = s.notes.push(e);
+    } else if data.len() >= 3 && data[0] & 0xF0 == 0xB0 && !is_key_cc(data[1]) {
+        let _ = s.cc.push((data[0] & 0x0F, data[1], data[2]));
+        if let Some(ctx) = &s.ctx {
+            ctx.request_repaint();
+        }
+    }
+}
+
+/// Test hook for machines without an ALSA sequencer (a container): `KABL_MIDI_PIPE=PATH`
+/// lists the input `kabl-pipe` while the fifo PATH exists (`examples/midi_player` makes it
+/// and writes hex bytes, one message per line). Connecting reads it on a thread through the
+/// same `on_message` as a real port; removing the fifo is an unplug.
+const PIPE_PORT: &str = "kabl-pipe";
+
+fn pipe_path() -> Option<String> {
+    std::env::var("KABL_MIDI_PIPE").ok()
+}
+
+fn read_pipe(path: String, sink: Arc<Mutex<MidiSink>>, stop: Arc<std::sync::atomic::AtomicBool>) {
+    use std::io::BufRead;
+    while !stop.load(Ordering::Acquire) {
+        let Ok(f) = std::fs::File::open(&path) else {
+            return;
+        };
+        for line in std::io::BufReader::new(f).lines() {
+            let Ok(line) = line else { break };
+            if stop.load(Ordering::Acquire) {
+                return;
+            }
+            let data: Vec<u8> = line
+                .split_whitespace()
+                .filter_map(|b| u8::from_str_radix(b, 16).ok())
+                .collect();
+            if let Ok(mut s) = sink.lock() {
+                on_message(&mut s, &data);
+            }
+        }
+    }
 }
 
 /// The MIDI input connection. The sink outlives connections, so switching ports keeps the
@@ -456,8 +515,12 @@ struct MidiSink {
 struct Midi {
     sink: Arc<Mutex<MidiSink>>,
     conn: Option<midir::MidiInputConnection<Arc<Mutex<MidiSink>>>>,
+    /// Stop flag of the `KABL_MIDI_PIPE` reader, when that is the input.
+    pipe: Option<Arc<std::sync::atomic::AtomicBool>>,
     port: Option<String>,
     cc_rx: rtrb::Consumer<(u8, u8, u8)>,
+    /// Keys held and voices sounding (`pack_keys`), from the audio thread.
+    keys: Arc<AtomicU64>,
     ports: Vec<String>,
     scanned: Option<std::time::Instant>,
     /// The port that disappeared while connected; reconnected when it comes back.
@@ -465,28 +528,34 @@ struct Midi {
 }
 
 fn input_names() -> Vec<String> {
-    let Ok(m) = midir::MidiInput::new("kabl-ui-scan") else {
-        return Vec::new();
+    let mut names: Vec<String> = match midir::MidiInput::new("kabl-ui-scan") {
+        Ok(m) => m
+            .ports()
+            .iter()
+            .filter_map(|p| m.port_name(p).ok())
+            .collect(),
+        Err(_) => Vec::new(),
     };
-    m.ports()
-        .iter()
-        .filter_map(|p| m.port_name(p).ok())
-        .collect()
+    if pipe_path().is_some_and(|p| std::path::Path::new(&p).exists()) {
+        names.push(PIPE_PORT.into());
+    }
+    names
 }
 
 impl Midi {
-    fn new(notes: rtrb::Producer<VoiceEvent>) -> Self {
+    fn new(notes: rtrb::Producer<KeyEvent>) -> Self {
         let (cc, cc_rx) = rtrb::RingBuffer::new(1024);
         Midi {
             sink: Arc::new(Mutex::new(MidiSink {
                 notes,
                 cc,
-                allocator: VoiceAllocator::new(DEFAULT_VOICE_COUNT),
                 ctx: None,
             })),
             conn: None,
+            pipe: None,
             port: None,
             cc_rx,
+            keys: Arc::new(AtomicU64::new(0)),
             ports: Vec::new(),
             scanned: None,
             lost: None,
@@ -497,21 +566,31 @@ impl Midi {
         if let Some(c) = self.conn.take() {
             c.close();
         }
+        if let Some(stop) = self.pipe.take() {
+            stop.store(true, Ordering::Release);
+        }
         self.port = None;
         self.release_all();
     }
 
-    /// Note-off to every MIDI voice, and a fresh allocator.
+    /// Every keyboard releases every voice and forgets its keys and the pedal
+    /// (docs/sound-palette-batch/keyboard.md, "Other events").
     fn release_all(&self) {
         let mut s = self.sink.lock().unwrap();
-        for voice in 0..DEFAULT_VOICE_COUNT {
-            let _ = s.notes.push(VoiceEvent::NoteOff { voice });
-        }
-        s.allocator = VoiceAllocator::new(DEFAULT_VOICE_COUNT);
+        let _ = s.notes.push(KeyEvent::AllOff);
     }
 
     fn connect(&mut self, name: &str) -> Result<(), String> {
         self.disconnect();
+        if let Some(path) = pipe_path().filter(|_| name == PIPE_PORT) {
+            let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let (sink, flag) = (self.sink.clone(), stop.clone());
+            std::thread::spawn(move || read_pipe(path, sink, flag));
+            eprintln!("kabl-ui: listening for MIDI on \"{name}\" (test pipe)");
+            self.pipe = Some(stop);
+            self.port = Some(name.to_string());
+            return Ok(());
+        }
         let midi_in = midir::MidiInput::new("kabl-ui").map_err(|e| e.to_string())?;
         let port = midi_in
             .ports()
@@ -523,15 +602,8 @@ impl Midi {
                 &port,
                 "kabl-input",
                 |_stamp, data, sink: &mut Arc<Mutex<MidiSink>>| {
-                    let Ok(mut s) = sink.lock() else { return };
-                    let s = &mut *s;
-                    if data.len() >= 3 && data[0] & 0xF0 == 0xB0 {
-                        let _ = s.cc.push((data[0] & 0x0F, data[1], data[2]));
-                        if let Some(ctx) = &s.ctx {
-                            ctx.request_repaint();
-                        }
-                    } else if let Some(e) = resolve_midi_message(&mut s.allocator, data) {
-                        let _ = s.notes.push(e);
+                    if let Ok(mut s) = sink.lock() {
+                        on_message(&mut s, data);
                     }
                 },
                 self.sink.clone(),
@@ -765,14 +837,16 @@ impl eframe::App for App {
         if let (Some((path, at)), Some(t)) = (self.stats_file.as_mut(), &self.audio.timing) {
             if at.elapsed().as_secs_f32() > 1.0 {
                 *at = std::time::Instant::now();
+                let (held, sounding) = unpack_keys(self.midi.keys.load(Ordering::Relaxed));
                 let _ = std::fs::write(
                     path,
                     format!(
-                        "{} · {} live graph allocations · {} undo entries · {} MIDI notes held\n",
+                        "{} · {} live graph allocations · {} undo entries · {} MIDI notes held · {} voices sounding\n",
                         t.line(self.audio.sample_rate),
                         self.audio.collector.alloc_count(),
                         self.editor.log().entries().len(),
-                        self.midi.sink.lock().map_or(0, |s| s.allocator.held())
+                        held,
+                        sounding,
                     ),
                 );
             }
@@ -818,7 +892,7 @@ fn main() -> eframe::Result<()> {
             Some([w.parse().ok()?, h.parse().ok()?])
         })
         .unwrap_or([1440.0, 900.0]);
-    let (notes_tx, notes_rx) = rtrb::RingBuffer::<VoiceEvent>::new(256);
+    let (notes_tx, notes_rx) = rtrb::RingBuffer::<KeyEvent>::new(1024);
     let mut midi = Midi::new(notes_tx);
     midi.connect_default(flag("--midi").as_deref());
     let num = |name: &str| flag(name).and_then(|v| v.parse::<u32>().ok());
@@ -826,6 +900,7 @@ fn main() -> eframe::Result<()> {
     let mut audio = AudioHost::start(
         editor.state(),
         notes_rx,
+        midi.keys.clone(),
         num("--rate"),
         num("--frames"),
         !args.iter().any(|a| a == "--no-rt"),

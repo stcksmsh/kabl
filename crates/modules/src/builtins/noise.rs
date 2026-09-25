@@ -12,9 +12,13 @@
 //! id and the voice lane (`seed`), so two noise modules, or two voices of one, never play the
 //! same samples, and a render is reproducible. A live edit carries the generator and the pink
 //! filter into the new graph (`carry_from`) instead of reseeding, so the stream just continues.
-//! `noise` is a voice-rate module: in a chain a `midi.in` reaches it runs once per voice (each
-//! voice its own stream); anywhere else it compiles to one instance, seeded as lane 0, which is
-//! also the stream voice 0 would play, so a chain switching between the two keeps lane 0's.
+//! `noise` is a voice-rate module. It runs once per voice (each voice its own stream, so a
+//! chord adds in power) when a `midi.in` reaches it through a route, or when everything it
+//! feeds is a MIDI voice chain (`compile.rs`: a noise chain whose every consumer is voiced is
+//! voiced too). Anywhere else, including a noise that also feeds a path no MIDI reaches, it
+//! compiles to one instance, seeded as lane 0, which is also the stream voice 0 would play, so
+//! a chain switching between the two keeps lane 0's. (Use two noise modules for a per-voice
+//! noise and a separate noise bed.)
 
 use crate::info::{
     Category, ModuleInfo, ParamInfo, PortDirection, PortInfo, PortType, QualitySupport, Rate, Taper,

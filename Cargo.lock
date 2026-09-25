@@ -1596,6 +1596,7 @@ dependencies = [
  "kabl-core",
  "kabl-modules",
  "rtrb",
+ "tempfile",
  "wide",
 ]
 

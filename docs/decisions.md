@@ -2266,3 +2266,50 @@ were not transplanted, only its look (palettes, geometry, drawing).
   a button clears continuous mappings on that CC and the reverse.
 - Not built (out of scope): song timeline, cue chaining, parameter snapshots, swing, MIDI
   clock, relative encoders, drawn waveforms.
+
+## 2026-09-24 — Sound palette batch: palette modules, keyboard expression, patch library (supervisor scope)
+
+- Scope (supervisor, owner-authorized as one batch): distinct playable voices. Record,
+  evidence, limits and the hands-on checklist: `docs/sound-palette-batch/README.md`
+  (+ `CHECKLIST.md`, `PATCHES.md`); the keyboard rules were written first, in
+  `docs/sound-palette-batch/keyboard.md`. **Built, not approved**; Composition + Motion is
+  still separately waiting for its review.
+- **Modules:** `osc.va` gains PW, fine, unison 1–4 and band-limited sync (defaults are the
+  old oscillator sample for sample); new `noise`, `filter.ladder`, `chorus`, `drive`. Drive
+  is ADAA-only (no oversampling): measured 6–10 dB less on the worst alias; reported as a
+  limit rather than hidden. Rejected: a 3-tap chorus (notched the wet 10 dB at 100–200 Hz).
+- **Keyboard on the audio thread, settings on the `midi.in`.** One `Keyboard` per
+  `midi.in` inside `PatchEngine`, outside the graphs, so swaps neither lose nor replay a
+  key; mode/priority/glide/glide time are ordinary params of that module (saved, undoable).
+  The face names all four settings in one line under the keys, so it is explicit whose
+  settings they are and what is off the face. Rejected: global keyboard settings (a patch
+  with two keyboard chains needs two behaviours); the UI thread's `VoiceAllocator` (a swap
+  could split a key from its voice).
+- **MIDI:** notes, CC 64, 120, 123 → `KeyEvent` → `rtrb` → `engine.key()`; those CCs never
+  reach MIDI learn. All notes off, disconnect and port switches send `AllOff`.
+- **Per-voice noise.** A noise chain whose every consumer is a MIDI voice chain now runs per
+  voice (chords add in power); one that also feeds an unvoiced path stays one lane-0
+  instance so that path keeps its level. Before, noise feeding a per-voice VCA was one
+  shared stream (+6 dB per doubling). Rejected: voicing every chain upstream of a voice
+  (deterministic chains would only cost CPU), and voicing a noise with mixed consumers
+  (its unvoiced path would become a −9 dB voice average of independent streams).
+- **midi.in face:** 6 units wide (was 5; the three-option selectors with LEGATO/ALWAYS need
+  the width), outputs in a row on a plate like other modules, overflow to the advanced area.
+  Wider panel shifts the packing of patches that had a module flush right of a `midi.in`
+  by one unit; nothing else moves.
+- **Patches as data built by code** (`crates/ui/tests/sound_palette.rs`), like the earlier
+  demos. Gains set from a measured headroom table (6-note chords near −4 dBFS peak). The
+  lead's gain into its drive lowered 20 → 11 dB after the matched-level drive comparison
+  showed the drive clipping a +3 dBFS input. The piece patch uses layer faders because every
+  `midi.in` hears every key (zones are out of scope), a −4 dB master trim, and cues for the
+  sequences.
+- **Evidence from a cloud container**, not the laptop (no sound card, no ALSA sequencer, no
+  rtkit, ~2.1× slower VM with host stalls). Added test hooks: `KABL_MIDI_PIPE` (a fifo
+  stand-in MIDI port through the same handler), drive.py `wait`/`goto`/`KABL_APP_LOG`. The
+  dense piece at 48 kHz / 256 frames had late callbacks and xruns there, and twice the
+  PipeWire-ALSA stream stopped calling back after an xrun burst; the take was recorded at
+  512 frames (the recorded audio doesn't depend on the callback size). Whether the stall can
+  happen on the laptop is unknown and is on the checklist. The Composition 3–5 ms watch
+  item stays open, unexplained.
+- Follow-up candidates (not done): compile a chain driven only by a mono `midi.in` once
+  instead of per voice (the piece's largest single cost); recover a stalled audio stream.

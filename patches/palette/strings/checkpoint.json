@@ -1,0 +1,732 @@
+{
+  "modules": {
+    "1": {
+      "kind": "midi.in",
+      "pos": {
+        "x": 24.0,
+        "y": 10.0
+      },
+      "params": {
+        "pin.mode": 7.0
+      }
+    },
+    "2": {
+      "kind": "osc.va",
+      "pos": {
+        "x": 234.0,
+        "y": 10.0
+      },
+      "params": {
+        "detune": 35.0,
+        "unison": 4.0,
+        "waveform": 2.0
+      }
+    },
+    "3": {
+      "kind": "osc.va",
+      "pos": {
+        "x": 474.0,
+        "y": 10.0
+      },
+      "params": {
+        "base_hz": 130.81,
+        "detune": 20.0,
+        "fine": -6.0,
+        "unison": 2.0,
+        "waveform": 2.0
+      }
+    },
+    "4": {
+      "kind": "mixer",
+      "pos": {
+        "x": 714.0,
+        "y": 10.0
+      },
+      "params": {
+        "level1": 0.5,
+        "level2": 0.35
+      }
+    },
+    "5": {
+      "kind": "filter.ladder",
+      "pos": {
+        "x": 984.0,
+        "y": 10.0
+      },
+      "params": {
+        "cutoff_hz": 2400.0,
+        "drive_db": 2.0,
+        "resonance": 0.12
+      }
+    },
+    "6": {
+      "kind": "env.adsr",
+      "pos": {
+        "x": 24.0,
+        "y": 380.0
+      },
+      "params": {
+        "attack_ms": 280.0,
+        "cc.release_ms": 25.0,
+        "decay_ms": 600.0,
+        "pin.release_ms": 5.0,
+        "release_ms": 1100.0,
+        "sustain": 0.85
+      }
+    },
+    "7": {
+      "kind": "ringmod",
+      "pos": {
+        "x": 294.0,
+        "y": 380.0
+      },
+      "params": {}
+    },
+    "8": {
+      "kind": "vca",
+      "pos": {
+        "x": 474.0,
+        "y": 380.0
+      },
+      "params": {
+        "gain": 0.0
+      }
+    },
+    "9": {
+      "kind": "gain",
+      "pos": {
+        "x": 684.0,
+        "y": 380.0
+      },
+      "params": {
+        "cc.gain_db": 26.0,
+        "gain_db": 5.0,
+        "pin.gain_db": 6.0
+      }
+    },
+    "10": {
+      "kind": "lfo",
+      "pos": {
+        "x": 864.0,
+        "y": 380.0
+      },
+      "params": {
+        "rate_hz": 0.23,
+        "waveform": 1.0
+      }
+    },
+    "11": {
+      "kind": "lfo",
+      "pos": {
+        "x": 1104.0,
+        "y": 380.0
+      },
+      "params": {
+        "rate_hz": 5.3
+      }
+    },
+    "12": {
+      "kind": "chorus",
+      "pos": {
+        "x": 24.0,
+        "y": 750.0
+      },
+      "params": {
+        "cc.rate_hz": 24.0,
+        "depth": 65.0,
+        "mix": 55.0,
+        "pin.rate_hz": 4.0,
+        "rate_hz": 0.35,
+        "width": 100.0
+      }
+    },
+    "13": {
+      "kind": "reverb",
+      "pos": {
+        "x": 294.0,
+        "y": 750.0
+      },
+      "params": {
+        "damp_hz": 6000.0,
+        "decay_s": 2.2,
+        "mix": 18.0,
+        "predelay_ms": 20.0
+      }
+    },
+    "14": {
+      "kind": "out",
+      "pos": {
+        "x": 564.0,
+        "y": 750.0
+      },
+      "params": {}
+    },
+    "15": {
+      "kind": "macro",
+      "pos": {
+        "x": 744.0,
+        "y": 750.0
+      },
+      "params": {
+        "cc.m1": 20.0,
+        "cc.m2": 21.0,
+        "cc.m3": 22.0,
+        "cc.m4": 23.0,
+        "m1": 0.4,
+        "m2": 0.5,
+        "m3": 0.3,
+        "m4": 0.3,
+        "pin.m1": 0.0,
+        "pin.m2": 1.0,
+        "pin.m3": 2.0,
+        "pin.m4": 3.0
+      }
+    }
+  },
+  "cables": {
+    "1": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "pitch"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 2,
+          "port": "pitch"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "2": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "pitch"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 3,
+          "port": "pitch"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "3": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "gate"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 6,
+          "port": "gate"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "4": {
+      "from": {
+        "Module": {
+          "id": 2,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 4,
+          "port": "in1"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "5": {
+      "from": {
+        "Module": {
+          "id": 3,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 4,
+          "port": "in2"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "6": {
+      "from": {
+        "Module": {
+          "id": 4,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 5,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "7": {
+      "from": {
+        "Module": {
+          "id": 5,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 8,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "8": {
+      "from": {
+        "Module": {
+          "id": 6,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 7,
+          "port": "a"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "9": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "velocity"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 7,
+          "port": "b"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "10": {
+      "from": {
+        "Module": {
+          "id": 7,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 8,
+          "port": "cv"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "11": {
+      "from": {
+        "Module": {
+          "id": 8,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 9,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "12": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "pitch"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 5,
+          "param": "cutoff_hz"
+        }
+      },
+      "params": {
+        "amount": 0.35
+      },
+      "steps": []
+    },
+    "13": {
+      "from": {
+        "Module": {
+          "id": 6,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 5,
+          "param": "cutoff_hz"
+        }
+      },
+      "params": {
+        "amount": 0.08
+      },
+      "steps": []
+    },
+    "14": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "velocity"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 5,
+          "param": "cutoff_hz"
+        }
+      },
+      "params": {
+        "amount": 0.08
+      },
+      "steps": []
+    },
+    "15": {
+      "from": {
+        "Module": {
+          "id": 10,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 5,
+          "param": "cutoff_hz"
+        }
+      },
+      "params": {
+        "amount": 0.05
+      },
+      "steps": []
+    },
+    "16": {
+      "from": {
+        "Module": {
+          "id": 11,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 2,
+          "param": "fine"
+        }
+      },
+      "params": {
+        "amount": 0.05
+      },
+      "steps": []
+    },
+    "17": {
+      "from": {
+        "Module": {
+          "id": 11,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 3,
+          "param": "fine"
+        }
+      },
+      "params": {
+        "amount": 0.05
+      },
+      "steps": []
+    },
+    "18": {
+      "from": {
+        "Module": {
+          "id": 9,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 12,
+          "port": "in_l"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "19": {
+      "from": {
+        "Module": {
+          "id": 9,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 12,
+          "port": "in_r"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "20": {
+      "from": {
+        "Module": {
+          "id": 12,
+          "port": "left"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 13,
+          "port": "in_l"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "21": {
+      "from": {
+        "Module": {
+          "id": 12,
+          "port": "right"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 13,
+          "port": "in_r"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "22": {
+      "from": {
+        "Module": {
+          "id": 13,
+          "port": "left"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 14,
+          "port": "left"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "23": {
+      "from": {
+        "Module": {
+          "id": 13,
+          "port": "right"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 14,
+          "port": "right"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "24": {
+      "from": {
+        "Module": {
+          "id": 15,
+          "port": "m1"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 5,
+          "param": "cutoff_hz"
+        }
+      },
+      "params": {
+        "amount": 0.25
+      },
+      "steps": []
+    },
+    "25": {
+      "from": {
+        "Module": {
+          "id": 15,
+          "port": "m2"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 12,
+          "param": "depth"
+        }
+      },
+      "params": {
+        "amount": 0.3
+      },
+      "steps": []
+    },
+    "26": {
+      "from": {
+        "Module": {
+          "id": 15,
+          "port": "m2"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 12,
+          "param": "mix"
+        }
+      },
+      "params": {
+        "amount": 0.2
+      },
+      "steps": []
+    },
+    "27": {
+      "from": {
+        "Module": {
+          "id": 15,
+          "port": "m2"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 2,
+          "param": "detune"
+        }
+      },
+      "params": {
+        "amount": 0.3
+      },
+      "steps": []
+    },
+    "28": {
+      "from": {
+        "Module": {
+          "id": 15,
+          "port": "m3"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 6,
+          "param": "attack_ms"
+        }
+      },
+      "params": {
+        "amount": 0.14
+      },
+      "steps": []
+    },
+    "29": {
+      "from": {
+        "Module": {
+          "id": 15,
+          "port": "m3"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 6,
+          "param": "release_ms"
+        }
+      },
+      "params": {
+        "amount": 0.08
+      },
+      "steps": []
+    },
+    "30": {
+      "from": {
+        "Module": {
+          "id": 15,
+          "port": "m4"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 13,
+          "param": "mix"
+        }
+      },
+      "params": {
+        "amount": 0.3
+      },
+      "steps": []
+    },
+    "31": {
+      "from": {
+        "Module": {
+          "id": 15,
+          "port": "m4"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 13,
+          "param": "decay_s"
+        }
+      },
+      "params": {
+        "amount": 0.15
+      },
+      "steps": []
+    }
+  },
+  "labels": {
+    "1": {
+      "pin.mode": "Keys"
+    },
+    "6": {
+      "pin.release_ms": "Release"
+    },
+    "9": {
+      "pin.gain_db": "Level"
+    },
+    "12": {
+      "pin.rate_hz": "Chorus rate"
+    },
+    "15": {
+      "name.m1": "Bright",
+      "name.m2": "Ensemble",
+      "name.m3": "Bow",
+      "name.m4": "Space"
+    }
+  }
+}

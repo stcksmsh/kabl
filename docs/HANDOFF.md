@@ -5,7 +5,9 @@ Trust code and git over older docs.
 
 ## Where things are
 
-- Branch `master`, pushed to `origin` on 2026-09-24 at Kosta's request (sound palette WIP). The rack UI migration is **closed**: Kosta
+- Branch `master`, pushed to `origin` on 2026-09-24 at Kosta's request (sound palette WIP).
+  The finished sound palette batch is on `claude/sound-palette-playable-voices-q6j9ft`
+  (see its section below). The rack UI migration is **closed**: Kosta
   reviewed it hands-on and approved it (decisions.md, "Rack migration closed"). Record:
   `docs/rack-migration/README.md` (screenshots, `walkthrough.mp4`, verification).
 - Workflow: commit small working changes straight to `master`; no branches, PRs or pushes
@@ -13,8 +15,8 @@ Trust code and git over older docs.
   crate: it reformats the untouched `rev2_proto` / `rev2_env_ab` examples; use `rustfmt` on
   the files you changed.
 
-Launch (real audio + MIDI). The newest demo is `--patch patches/composition --perform --rate 48000 --frames 256`
-(checklist: `docs/composition-batch/CHECKLIST.md`):
+Launch (real audio + MIDI). The newest demo is `--patch patches/sound-palette --perform --rate 48000 --frames 256`
+(checklist: `docs/sound-palette-batch/CHECKLIST.md`); Composition's is `--patch patches/composition`:
 
     cargo run --release -p kabl-ui -- --patch patches/reference            # 1440×900
     cargo run --release -p kabl-ui -- --patch patches/reference --size 1280x800
@@ -28,7 +30,7 @@ Launch (real audio + MIDI). The newest demo is `--patch patches/composition --pe
   expansion, 50–200 % zoom, pull-the-plug cable moves, skin renderer (no built-in skin).
 - Modulation: any knob takes routes (signed amount, invert, bypass); ring/lanes/drawer are one
   route; taper-space sum, one clamp, block rate; envelope timing CONT/KEY.
-- Verification: `cargo test --workspace` 296 pass (9 ignored = fixture/patch/clip writers), clippy clean.
+- Verification: `cargo test --workspace` 407 pass (13 ignored = fixture/patch/clip/render writers), clippy clean.
   Real-X tooling: `docs/rack-migration/drive.py` (+ `scripts/`), `closeout-real-x.sh`,
   `record-walkthrough.sh`; `docs/interlocking-sequences/record-walkthrough.sh` records a patch
   without MIDI.
@@ -120,70 +122,44 @@ Motion batch". Commits `5d54b68..` on master.
 - Pitfall: a scripted Cancel right after a launch races the bar (a bar is 2.1 s at 112 bpm);
   send a Restart first (button CC 47) to start the bar grid, as the walkthrough does.
 
-## Sound Palette + Playable Voices — IN PROGRESS (stages A–B partly done)
+## Sound Palette + Playable Voices — built, waiting for Kosta's hands-on review
 
-Supervisor scope, one batch (full brief: the owner's prompt of 2026-09-24; summary below).
-Composition + Motion is still **waiting for Kosta's hands-on review** — keep the two separate,
-approve neither on his behalf.
+Supervisor scope, one batch. Record, evidence, measurements, limits:
+`docs/sound-palette-batch/README.md` (+ `CHECKLIST.md`, `PATCHES.md`, `keyboard.md` for the
+keyboard rules); rationale: decisions.md "Sound palette batch". Composition + Motion is
+still **separately waiting for its review** — approve neither on Kosta's behalf.
 
-Goal: distinct playable strings, pads, leads, basses, textures, percussion. Stages: A osc/noise/
-filter, B chorus/drive/keyboard, C patch library + `patches/sound-palette` + 8–10 min take +
-isolated examples/comparisons + walkthrough, D regression, callback measurements (execution,
-arrival, xruns separately; carry the Composition 3–5 ms spike watch item), screenshots at
-1440×900 and 1280×800 in both themes, docs in `docs/sound-palette-batch/` (README with
-sources/licenses/limits, launch commands, patch guide, CHECKLIST), HANDOFF/STATUS/decisions.
+**Where the commits are:** this batch was finished in a cloud session on the branch
+`claude/sound-palette-playable-voices-q6j9ft` (it starts at master's c41420c), not on local
+master. Push it (and fast-forward master) only when Kosta asks. 
 
-### Done and committed
-
-- `ffdbd26` **osc.va**: `pw` (5–95 %, per-sample ramp, DC removed), `fine` (±100 ct), `unison`
-  1–4 (1/√N, 20 ms fades, fixed spread table), `detune`; band-limited hard sync (interpolated
-  edge, PolyBLEP residual, in-block lookahead). Defaults bit-exact with the old oscillator (legacy
-  render tests pass). New params are advanced. Tests + alias measurements:
-  `crates/modules/tests/osc_palette.rs` (`-- --nocapture` prints the table). Measured: saw
-  worst alias −49 dB @440, −37 @1760, −30 @3520 (naive −38/−26/−20); sync 7–10 dB better
-  than the old naive sync. PolyBLEP limits at high notes are documented, not hidden.
-- `a89a568` **noise** (white/pink Kellet, both −14 dBFS RMS, seeded by module id + lane in
-  `compile.rs`, `carry_from` only for the same seed) and **filter.ladder** (Zavalishin ZDF
-  4-pole, tanh input stage, k = 4.4·res, input compensation 1+k/2, drive 0–24 dB, cutoff_cv
-  2^cv, g ramped per block). Tests: `tests/noise.rs`, `tests/ladder.rs`.
-- `5c0c1c4` **chorus** (stereo, one swept tap per side — 3-tap version notched the wet by
-  10 dB, see module doc; equal-power mix, exact endpoints; width = right-side phase offset) and
-  **drive** (tanh(g·x)/tanh(g), g = 10^(dB/20)−1, first-order ADAA, 0.5-sample latency,
-  exact bypass at 0 dB with 10 ms engage fade; no oversampling — measured 8–13 dB alias
-  reduction, report it honestly). Tests: `tests/chorus_drive.rs`. Test helpers (Rig, FFT,
-  alias_db): `crates/modules/tests/common/mod.rs`.
-
-### Committed as work in progress (this commit): keyboard expression
-
-- Spec first: `docs/sound-palette-batch/keyboard.md` (the rules; implement to it).
-- `crates/engine/src/keyboard.rs`: `KeyEvent` (incl. `from_midi`: notes, CC64, CC120/123),
-  `Keyboard` (POLY LRU/steal, pedal, MONO/LEGATO, priorities, glide flags), `Action`.
-- `midi.in` params `mode`/`priority`/`glide`/`glide_ms`; `play(pitch, vel, glide,
-  retrigger)` with a one-sample gate dip; `configure()` called from `compile.rs`.
-- `CompiledPatch::keyboards`, `key_action`; `PatchEngine::key`, `keys()`, `sync()` (per
-  `midi.in` keyboards, mode change / Load / deleted module release everything).
-- `crates/engine/tests/keyboard.rs`: 19 pass.
-
-### Next steps (in order)
-
-1. **Failing test**: `kabl-ui` `rack::tests::controls_stay_inside_their_panel_and_apart` —
-   `midi.in` now has params; its column layout (`rack.rs` ~l.422, Keys decor) overlaps the
-   new selectors with its jacks. Fix the layout (widen midi.in or place selectors below the
-   keys decor), add step labels in `routing.rs::step_labels` (`mode` POLY/MONO/LEGATO,
-   `priority` LAST/LOW/HIGH, `glide` OFF/ALWAYS/LEGATO). All else: 380+ pass, clippy clean.
-2. **Wire MIDI in `crates/ui/src/main.rs`**: replace `VoiceEvent`/`VoiceAllocator` in
-   `MidiSink` with `KeyEvent::from_midi` → rtrb → `engine.key(e)` on the audio thread; keep CC
-   64/120/123 out of the learn queue; `release_all` = push `KeyEvent::AllOff`; stats line
-   "MIDI notes held" from `engine.keys()` via an atomic. Leave `kabl-standalone` as is.
-3. UI: short names exist for new kinds (`routing.rs`); check faces/advanced areas for osc,
-   ladder, chorus, drive, noise, midi.in in the real app (both sizes, both themes).
-4. Engine test `crates/engine/tests/sound_palette.rs`: self-swap null test with all new
-   modules, overlapping swaps, no allocation; noise per-voice independence and
-   single-instance (lane-0 stream) documented behaviour.
-5. Stage C patches (build via a `crates/ui/tests/<name>.rs` writer like `composition.rs`),
-   measured headroom incl. chords; `patches/sound-palette`; recordings via
-   `docs/composition-batch/scripts` + `drive.py` (`KABL_PLAYER=1`); label scripted takes.
-6. Stage D docs and measurements as above. Then stop for Kosta's hands-on review.
+- Modules (`crates/modules/src/builtins/`): `osc_va` (pw, fine, unison, detune, band-limited
+  sync), `noise`, `filter_ladder`, `chorus`, `drive`. Tests in `crates/modules/tests/`
+  (`osc_palette`, `noise`, `ladder`, `chorus_drive`; `-- --nocapture` prints the alias tables).
+- Keyboard: `crates/engine/src/keyboard.rs`, `PatchEngine::key/keys`, `midi.in` params
+  mode/priority/glide/glide_ms; `crates/engine/tests/keyboard.rs`. The app's MIDI goes
+  through `KeyEvent::from_midi` → rtrb → `engine.key()` (`crates/ui/src/main.rs`); CC
+  64/120/123 never reach learn; notes-off/disconnect push `AllOff`.
+- `compile.rs`: a noise chain whose every consumer is voiced runs per voice.
+- UI: `rack.rs` `midi_in_face` (keys + settings line, full-width selectors, jacks row,
+  overflow to the advanced area); `routing.rs` step labels; `lib.rs` `midi_in_summary`.
+- Patches: `patches/palette/{strings,pad,lead,bass,breath,perc}`, `patches/sound-palette`,
+  built by `crates/ui/tests/sound_palette.rs`
+  (`cargo test -p kabl-ui --test sound_palette write_palette_patches -- --ignored`; also
+  `write_comparisons`, `write_offline_renders`; `headroom_of_every_patch -- --nocapture`).
+- Engine tests: `crates/engine/tests/sound_palette.rs` (self-swap nulls, histories, noise,
+  lifecycle). Timing: `examples/bench_palette`, `examples/bench_palette_parts`.
+- Scripts: `docs/sound-palette-batch/scripts/` (`make_piece.py` → `piece.txt`,
+  `make_examples.py` → `examples/`, `walkthrough.txt`, `keys.txt`, `faces-*.txt`,
+  `shots-piece.txt`, `watch_stats.py`), `record-walkthrough.sh`.
+- Container test hooks: `KABL_MIDI_PIPE=/path` (fifo stand-in MIDI port `kabl-pipe`; the
+  midi_player writes it; drive.py `midikill` removes it). drive.py gained `wait T`,
+  `goto KEY X Y`, `KABL_APP_LOG`. Without rtkit, give the audio thread RT with
+  `chrt -f -p 80 <tid of cpal_alsa_out>`.
+- Open items for the review: the dense piece's callback load on the laptop (estimated ~30 %
+  of budget while a knob turns; container runs had xruns and two stream stalls after xrun
+  bursts at 256 frames); the Composition 3–5 ms watch item (not investigated here).
+  Follow-up candidates: compile mono-`midi.in` chains once; recover a stalled stream.
 
 ## Accepted limitations
 

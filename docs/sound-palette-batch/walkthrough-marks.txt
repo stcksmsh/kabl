@@ -1,0 +1,16 @@
+# Walkthrough timeline (video time, from drive.py's log; scripted).
+0:02.8  shot w01-perform-breath
+0:20.9  shot w02-strings-unison
+0:40.3  shot w03-pad-pwm
+0:50.6  midi cc 1 42 127
+0:59.4  shot w04-bass-ladder
+1:19.3  shot w05-lead-legato
+1:27.4  click sel:70.mode.1
+1:28.2  shot w06-lead-mono
+1:34.2  click sel:70.mode.2
+1:51.2  shot w07-drive
+2:06.1  shot w08-chorus
+2:11.0  midi cc 1 44 127
+2:11.8  shot w09-perform-break
+2:19.1  midi cc 1 46 127
+2:24.4  shot w10-stopped

@@ -419,21 +419,16 @@ fn place_local(
         }
     } else {
         // Jacks first: they anchor the bottom of the face and never move.
-        let column = matches!(info.kind, "midi.in" | "out");
+        let column = info.kind == "out";
         let ports = ins.len() + outs.len();
         // A wide panel (the sequencer) keeps one row, clear of its selector row.
         let two_rows =
             !column && ports > 3 && !(ports == 4 && fw >= 240.0) && fw < 100.0 * ports as f32;
         if column {
-            let (ports, y0) = if info.kind == "midi.in" {
-                (&outs, 206.0)
-            } else {
-                (&ins, 230.0)
-            };
-            for (i, &port) in ports.iter().enumerate() {
+            for (i, &port) in ins.iter().enumerate() {
                 jacks.push(Jack {
                     port,
-                    c: pos2(40.0, y0 + 48.0 * i as f32),
+                    c: pos2(40.0, 230.0 + 48.0 * i as f32),
                     label_right: true,
                 });
             }
@@ -482,9 +477,6 @@ fn place_local(
         let mut y = 52.0;
         let mut sels_top = None;
         match info.kind {
-            "midi.in" => {
-                decor = Decor::Keys(Rect::from_min_size(pos2(12.0, 70.0), vec2(fw - 24.0, 64.0)))
-            }
             "out" => decor = Decor::Speaker(pos2(fw / 2.0, 112.0)),
             "delay" => decor = Decor::Status(pos2(14.0, 228.0)),
             "seq" => {
@@ -515,45 +507,50 @@ fn place_local(
             }
             _ => {}
         }
-        let n = face_knobs.len();
-        for (k, &i) in face_knobs.iter().enumerate() {
-            let r = if n == 1 || (n == 2 && k == 0 && i == 0) {
-                R_LARGE
-            } else {
-                R_SMALL
-            };
-            let x = match n {
-                1 => fw / 2.0,
-                2 => fw * (k as f32 + 0.5) / 2.0,
-                _ => 36.0 + k as f32 * (fw - 72.0) / (n as f32 - 1.0),
-            };
-            ctls.push(Ctl {
-                param: &info.params[i],
-                primary: true,
-                geo: Geo::Knob {
-                    c: pos2(x, y + 60.0),
-                    r,
-                },
-            });
-        }
-        if n > 0 {
-            y += 110.0;
-        }
-        let total: usize = face_sels
-            .iter()
-            .map(|&i| options(info, &info.params[i]).0)
-            .sum();
-        let mut x = 14.0;
-        for &i in &face_sels {
-            let avail = fw - 28.0 - 10.0 * (face_sels.len() as f32 - 1.0);
-            let w = avail * options(info, &info.params[i]).0 as f32 / total as f32;
-            let rect = Rect::from_min_size(pos2(x, sels_top.unwrap_or(y) + 26.0), vec2(w, 28.0));
-            ctls.push(Ctl {
-                param: &info.params[i],
-                primary: true,
-                geo: Geo::Select { rect },
-            });
-            x += w + 10.0;
+        if info.kind == "midi.in" {
+            decor = midi_in_face(info, &face_knobs, &face_sels, fw, &mut ctls, &mut off_face);
+        } else {
+            let n = face_knobs.len();
+            for (k, &i) in face_knobs.iter().enumerate() {
+                let r = if n == 1 || (n == 2 && k == 0 && i == 0) {
+                    R_LARGE
+                } else {
+                    R_SMALL
+                };
+                let x = match n {
+                    1 => fw / 2.0,
+                    2 => fw * (k as f32 + 0.5) / 2.0,
+                    _ => 36.0 + k as f32 * (fw - 72.0) / (n as f32 - 1.0),
+                };
+                ctls.push(Ctl {
+                    param: &info.params[i],
+                    primary: true,
+                    geo: Geo::Knob {
+                        c: pos2(x, y + 60.0),
+                        r,
+                    },
+                });
+            }
+            if n > 0 {
+                y += 110.0;
+            }
+            let total: usize = face_sels
+                .iter()
+                .map(|&i| options(info, &info.params[i]).0)
+                .sum();
+            let mut x = 14.0;
+            for &i in &face_sels {
+                let avail = fw - 28.0 - 10.0 * (face_sels.len() as f32 - 1.0);
+                let w = avail * options(info, &info.params[i]).0 as f32 / total as f32;
+                let rect =
+                    Rect::from_min_size(pos2(x, sels_top.unwrap_or(y) + 26.0), vec2(w, 28.0));
+                ctls.push(Ctl {
+                    param: &info.params[i],
+                    primary: true,
+                    geo: Geo::Select { rect },
+                });
+                x += w + 10.0;
+            }
         }
     }
 
@@ -638,7 +635,8 @@ fn place_local(
     let toggle = (has_off_face && !choosing)
         .then(|| Rect::from_min_size(pos2(fw - 46.0, 12.0), vec2(36.0, 26.0)));
     let done = choosing.then(|| Rect::from_min_size(pos2(fw - 62.0, 12.0), vec2(52.0, 26.0)));
-    let plate = (skin.is_none() && info.kind != "midi.in")
+    let plate = skin
+        .is_none()
         .then(|| {
             jacks
                 .iter()
@@ -646,11 +644,7 @@ fn place_local(
                 .map(|j| Rect::from_min_max(j.c - vec2(30.0, 53.0), j.c + vec2(30.0, 23.0)))
                 .reduce(|a, b| a.union(b))
         })
-        .flatten()
-        .or_else(|| {
-            (info.kind == "midi.in")
-                .then(|| Rect::from_min_size(pos2(10.0, 182.0), vec2(fw - 20.0, 144.0)))
-        });
+        .flatten();
     let face = Rect::from_min_size(Pos2::ZERO, vec2(fw, PANEL_H));
     let push_w = adv.map_or(0.0, |a| a.width());
     Placed {
@@ -670,6 +664,71 @@ fn place_local(
         skin,
         row: 0,
     }
+}
+
+/// The MIDI In face, top to bottom: the keys picture with a line naming this module's voice
+/// settings, then one full-width row per selector (three options with long names need the
+/// width), then a knob row. They must end above the output plate; the picture goes first when
+/// room is short, then chosen controls from the last, which move to the advanced area.
+fn midi_in_face(
+    info: &'static ModuleInfo,
+    knobs: &[usize],
+    sels: &[usize],
+    fw: f32,
+    ctls: &mut Vec<Ctl>,
+    off_face: &mut Vec<usize>,
+) -> Decor {
+    const TOP: f32 = 54.0;
+    const BOTTOM: f32 = 212.0;
+    const SEL_ROW: f32 = 52.0;
+    const KNOB_ROW: f32 = 110.0;
+    const PICTURE: f32 = 46.0;
+    let mut sels = sels.to_vec();
+    let mut knobs = knobs.to_vec();
+    let height = |s: &[usize], k: &[usize]| {
+        s.len() as f32 * SEL_ROW + if k.is_empty() { 0.0 } else { KNOB_ROW }
+    };
+    while height(&sels, &knobs) > BOTTOM - TOP {
+        let last_knob = knobs.last().copied();
+        let last_sel = sels.last().copied();
+        let drop = match (last_knob, last_sel) {
+            (Some(k), Some(s)) if k > s => knobs.pop(),
+            (Some(_), None) => knobs.pop(),
+            _ => sels.pop(),
+        };
+        off_face.extend(drop);
+    }
+    off_face.sort_unstable();
+    let picture = height(&sels, &knobs) + PICTURE <= BOTTOM - TOP;
+    let decor = if picture {
+        Decor::Keys(Rect::from_min_size(pos2(12.0, TOP), vec2(fw - 24.0, 26.0)))
+    } else {
+        Decor::None
+    };
+    let mut y = if picture { TOP + PICTURE } else { TOP };
+    for &i in &sels {
+        let rect = Rect::from_min_size(pos2(14.0, y + 26.0), vec2(fw - 28.0, 28.0));
+        ctls.push(Ctl {
+            param: &info.params[i],
+            primary: true,
+            geo: Geo::Select { rect },
+        });
+        y += SEL_ROW;
+    }
+    let n = knobs.len();
+    for (k, &i) in knobs.iter().enumerate() {
+        let x = fw * (k as f32 + 0.5) / n as f32;
+        let r = if n == 1 { R_LARGE } else { R_SMALL };
+        ctls.push(Ctl {
+            param: &info.params[i],
+            primary: true,
+            geo: Geo::Knob {
+                c: pos2(x, y + 60.0),
+                r,
+            },
+        });
+    }
+    decor
 }
 
 #[cfg(test)]
@@ -855,6 +914,51 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn midi_in_face_shows_keys_mode_and_glide_with_room_for_their_names() {
+        let mut p = PatchState::new();
+        p.modules.insert(1, module("midi.in", RACK_X, row_y(0)));
+        let l = layout(&p, &View::default());
+        let m = l.get(1).unwrap();
+        let Decor::Keys(keys) = m.decor else {
+            panic!("no keys picture: {:?}", m.decor)
+        };
+        let names: Vec<&str> = m.ctls.iter().map(|c| c.param.name).collect();
+        assert_eq!(names, ["mode", "glide"]);
+        let plate = m.plate.expect("output plate");
+        for c in &m.ctls {
+            let Geo::Select { rect } = c.geo else {
+                panic!("{} is not a selector", c.param.name)
+            };
+            // Three segments, each wide enough for LEGATO / ALWAYS in 11.5 px mono.
+            assert!(rect.width() / 3.0 >= 6.0 * 7.0, "{rect:?}");
+            assert!(c.geo.bounds().top() > keys.bottom() + 10.0);
+            assert!(c.geo.bounds().bottom() < plate.top());
+        }
+        // Everything on the face: the three selectors fit, the glide time knob moves to the
+        // advanced area and the picture gives way.
+        let q = {
+            let mut q = p.clone();
+            for par in MIDI_PARAMS {
+                q.modules
+                    .get_mut(&1)
+                    .unwrap()
+                    .params
+                    .insert(face_key(par), 1.0);
+            }
+            q
+        };
+        let l = layout(&q, &View::default());
+        let m = l.get(1).unwrap();
+        assert_eq!(m.decor, Decor::None);
+        let names: Vec<&str> = m.ctls.iter().map(|c| c.param.name).collect();
+        assert_eq!(names, ["mode", "priority", "glide"]);
+        assert_eq!(m.hidden.len(), 1);
+        assert!(m.toggle.is_some());
+    }
+
+    const MIDI_PARAMS: [&str; 4] = ["mode", "priority", "glide", "glide_ms"];
 
     #[test]
     fn snapping_picks_the_nearest_row_and_unit() {

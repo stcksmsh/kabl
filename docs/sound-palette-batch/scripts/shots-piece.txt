@@ -1,0 +1,20 @@
+# The piece's Perform panel (KABL_ARGS adds --perform) mid-groove, in A-light then A-dark.
+sleep 3
+midi cc 1 20 38
+midi cc 1 24 102
+midi cc 1 25 0
+midi ramp 1 25 0 90 1
+midi cc 1 42 127
+midi cc 1 42 0
+midi on 52 90
+midi on 59 90
+midi on 64 90
+sleep 4
+shot 11-light-piece-perform
+click theme:dark
+shot 12-dark-piece-perform
+click theme:light
+midi off 52
+midi off 59
+midi off 64
+sleep 1

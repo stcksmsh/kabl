@@ -1371,6 +1371,19 @@ fn draw_module(
     if skin.is_none() {
         draw_decor(editor, painter, th, xf, m);
     }
+    if let Decor::Keys(r) = m.decor {
+        // The voice settings this MIDI In gives the chain it drives, including the ones off
+        // the face, so it is plain whose settings they are.
+        text(
+            painter,
+            xf.p(pos2(r.center().x, r.bottom() + 11.0)),
+            egui::Align2::CENTER_CENTER,
+            &midi_in_summary(editor.state(), m),
+            10.5 * z,
+            ink2,
+            true,
+        );
+    }
     if let Decor::Transport(r) = m.decor {
         draw_transport(ui_state, ui, painter, th, xf, m.id, r);
     }
@@ -2278,6 +2291,34 @@ fn bank_menu(
     } else {
         ui_state.bank_rename = Some((id, b, t));
     }
+}
+
+/// `POLY`, `MONO · LOW`, `LEGATO · LAST · glide 120 ms`: a MIDI In's voice settings.
+fn midi_in_summary(state: &kabl_core::PatchState, m: &Placed) -> String {
+    let get = |name: &str| {
+        let p = m.info.params.iter().find(|p| p.name == name);
+        state
+            .modules
+            .get(&m.id)
+            .and_then(|s| s.params.get(name).copied())
+            .or(p.map(|p| p.default))
+            .unwrap_or(0.0)
+    };
+    let label = |name: &str| {
+        let i = get(name).round().clamp(0.0, 2.0) as usize;
+        routing::step_labels("midi.in", name).map_or("?", |l| l[i])
+    };
+    let mut s = label("mode").to_string();
+    if get("mode") >= 0.5 {
+        s += " · ";
+        s += label("priority");
+    }
+    if get("glide") >= 0.5 {
+        let ms = m.info.params.iter().find(|p| p.name == "glide_ms");
+        s += " · glide ";
+        s += &ms.map_or(String::new(), |p| routing::fmt_value(p, get("glide_ms")));
+    }
+    s
 }
 
 fn draw_decor(editor: &PatchEditor, p: &egui::Painter, th: &Theme, xf: Xf, m: &Placed) {

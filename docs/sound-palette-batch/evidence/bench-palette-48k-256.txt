@@ -1,0 +1,18 @@
+piece dense (6-note chord on 4 layers), 48000 Hz, 256 frames (5333 µs budget), recording on
+  steady            median   1606  p99   1843  p99.9   2419  max   3301 µs  (62 % of budget at max, n=4000)
+  key every cb      median   1609  p99   1914  p99.9   3154  max   6403 µs  (120 % of budget at max, n=4000)
+  keys + edits: no-swap cb median   3251  p99   4927  p99.9   6775  max   7269 µs  (136 % of budget at max, n=3000)
+  + swap            median   3514  p99   5381  p99.9   5926  max   6923 µs  (130 % of budget at max, n=900)
+  + 3-graph burst   median   3536  p99   4952  p99.9   4952  max   5337 µs  (100 % of budget at max, n=100)
+strings 8 voices x 2 osc x 4-voice unison, 48000 Hz, 256 frames (5333 µs budget), recording on
+  steady            median    414  p99    568  p99.9    671  max   2041 µs  (38 % of budget at max, n=4000)
+  key every cb      median    415  p99    657  p99.9   1239  max   4422 µs  (83 % of budget at max, n=4000)
+  keys + edits: no-swap cb median    818  p99   1189  p99.9   1717  max   3160 µs  (59 % of budget at max, n=3000)
+  + swap            median    842  p99   1228  p99.9   2134  max   3291 µs  (62 % of budget at max, n=900)
+  + 3-graph burst   median    857  p99   1210  p99.9   1210  max   3348 µs  (63 % of budget at max, n=100)
+lead fx, 48000 Hz, 256 frames (5333 µs budget), recording on
+  steady            median    387  p99    731  p99.9   1462  max   8235 µs  (154 % of budget at max, n=4000)
+  key every cb      median    386  p99    595  p99.9    803  max   1639 µs  (31 % of budget at max, n=4000)
+  keys + edits: no-swap cb median    779  p99   1064  p99.9   2053  max   2659 µs  (50 % of budget at max, n=3000)
+  + swap            median    913  p99   1241  p99.9   1389  max   1588 µs  (30 % of budget at max, n=900)
+  + 3-graph burst   median    929  p99   1132  p99.9   1132  max   1177 µs  (22 % of budget at max, n=100)
