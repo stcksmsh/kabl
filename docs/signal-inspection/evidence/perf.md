@@ -72,3 +72,63 @@ Reading: on this VM the run-to-run spread (off: 0–11 xruns, 3–12 late runs) 
 any difference between modes. The medians and p99 bins are the same with the inspector off,
 on and busy. This does not show the inspector causes or prevents xruns here, and says
 nothing about the laptop.
+
+## D03-R1 re-measurement on the final product head (99c28d3)
+
+Everything above this section is **historical**. It was measured at `ef9ed7b`–`db29445`,
+before the review fixes F1–F10 and N1–N3 and before the R1 error-ownership change, so it
+does not measure the changed implementation. The numbers below come from the release build
+of `99c28d3`. That commit's product code equals `25a9f78` plus the extended `probe_cost`
+example; later commits change comments and docs only. Same VM class, 48 kHz, 256-frame
+callbacks (5333 µs budget), no RT priority, no overhead target.
+
+### Offline, engine only (`probe_cost`, 60 s × 3 runs per mode, interleaved)
+
+`probe_cost` now also has **edits+topo** modes. Every 20 callbacks a graph with one
+parameter nudged ±1 % is swapped in. Every 10th swap removes one signal cable, and the swap
+after that restores it: that is the topology change, and the measurement window restarts
+there (N1). Raw output: [`../r1/probe-cost-init-keyboard.txt`](../r1/probe-cost-init-keyboard.txt),
+[`../r1/probe-cost-composition.txt`](../r1/probe-cost-composition.txt).
+
+Simple voice (Init Keyboard, 6 modules; tap on SVF #3 lp, 8 lanes), 33 750 callbacks per mode:
+
+| mode | p50 µs | p90 | p99 | p99.9 | max | mean |
+|---|---|---|---|---|---|---|
+| off | 82.0 | 92.6 | 115.5 | 225.0 | 1923.5 | 82.6 |
+| on | 87.1 | 102.4 | 144.6 | 194.2 | 1036.8 | 89.8 |
+| off + swaps | 81.1 | 105.9 | 143.9 | 658.0 | 3109.4 | 84.5 |
+| on + selection + swaps | 89.2 | 154.0 | 215.3 | 306.3 | 1416.6 | 99.5 |
+| off + edits + topology | 79.9 | 142.4 | 192.0 | 312.1 | 2411.8 | 85.5 |
+| on + edits + topology | 85.5 | 147.8 | 200.9 | 555.1 | 4183.4 | 93.0 |
+
+Dense piece (Composition, 39 modules; tap on SVF #26 lp), 33 750 callbacks per mode:
+
+| mode | p50 µs | p90 | p99 | p99.9 | max | mean |
+|---|---|---|---|---|---|---|
+| off | 211.9 | 248.2 | 415.1 | 887.6 | 3320.8 | 220.3 |
+| on | 223.1 | 249.9 | 387.1 | 1605.9 | 3532.5 | 228.6 |
+| off + swaps | 215.2 | 243.9 | 361.1 | 1564.7 | 5471.5 | 222.7 |
+| on + selection + swaps | 216.3 | 431.4 | 674.8 | 926.3 | 6638.5 | 256.6 |
+| off + edits + topology | 216.3 | 436.2 | 707.5 | 1640.0 | 4016.2 | 265.3 |
+| on + edits + topology | 226.2 | 446.9 | 699.4 | 925.0 | 4710.4 | 266.6 |
+
+**Reading.**
+
+- A steady tap costs about 5–11 µs at the median, as before. The absolute times are lower
+  than the historical table because this is a different VM instance; compare modes only
+  within one table.
+- Continuing the measurement window through parameter swaps, and restarting it on a
+  topology change, costs about the same as the edits alone. For the dense piece, "on"
+  versus "off" with edits and topology is 266.6 versus 265.3 µs mean and 446.9 versus
+  436.2 µs p90. The higher p90 in both edit modes comes from the swaps themselves: the
+  crossfade renders two graphs.
+- The tails (p99.9 and max) swing in both directions between modes and runs. That is VM
+  noise.
+
+**Sizes.**
+
+- Tap state: 720 B per graph (unchanged).
+- Report: **560 B**, up from 552 B, because F4 added `end_sample`.
+- Report queue: 8 × 560 B.
+- Stream-error queue: 16 slots of `cpal::Error`, down from 256. At most 16 errors are
+  outstanding (R1).

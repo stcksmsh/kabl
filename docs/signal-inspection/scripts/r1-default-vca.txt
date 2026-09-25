@@ -1,0 +1,10 @@
+# D03-R1: a VCA left at its default gain (1.0) with no cv cable passes signal; the aid must
+# not call it silent. Derived patch (see r1-app.sh), no MIDI needed (the oscillator drones).
+sleep 2
+click inspect-open
+click module:4
+click inspect-port:4.out
+sleep 2
+click why
+sleep 1.5
+shot 9-default-vca-why

@@ -1,0 +1,10 @@
+commit 99c28d3 · cargo run --release -p kabl-engine --example probe_cost -- patches/init-keyboard 60 3
+patch patches/init-keyboard, 6 modules; tap on #3 filter.svf output 0; 60 s per run, 3 runs per mode, interleaved; 48000 Hz, 256-frame callbacks (budget 5333 µs)
+memory: tap state 720 B per graph, report 560 B, report queue 8 × 560 B
+mode             callbacks   p50 µs   p90 µs   p99 µs  p99.9 µs   max µs  mean µs
+off                  33750     82.0     92.6    115.5     225.0   1923.5     82.6
+on                   33750     87.1    102.4    144.6     194.2   1036.8     89.8
+off+swaps            33750     81.1    105.9    143.9     658.0   3109.4     84.5
+on+select+swaps      33750     89.2    154.0    215.3     306.3   1416.6     99.5
+off+edits+topo       33750     79.9    142.4    192.0     312.1   2411.8     85.5
+on+edits+topo        33750     85.5    147.8    200.9     555.1   4183.4     93.0
