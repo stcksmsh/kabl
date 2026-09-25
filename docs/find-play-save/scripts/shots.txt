@@ -1,0 +1,26 @@
+# Size/theme screenshots of the browser with a voice open and the Perform panel (scripted).
+sleep 2
+fill search pad
+click sound:factory:palette/pad
+click open
+sleep 1
+click perform
+sleep 1
+click fav:factory:palette/pad
+shot light
+click theme:dark
+sleep 0.5
+shot dark
+click save-as
+sleep 0.5
+fill dlg:name My Warm Pad
+shot dark-save-as
+key Escape
+click theme:light
+sleep 0.5
+dragby pslider:1.m1 40 0
+fill search lead
+click sound:factory:palette/lead
+click open
+sleep 1
+shot light-unsaved-question

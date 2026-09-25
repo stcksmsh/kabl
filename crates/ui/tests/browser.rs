@@ -169,8 +169,8 @@ fn browsing_never_makes_sound_or_loads() {
         t.click(&format!("sound:{id}"));
         assert_eq!(t.ui.browser.selected.as_deref(), Some(id));
     }
-    t.click("filter:★ Favorites");
-    t.click("filter:All");
+    t.click("filter:favorites");
+    t.click("filter:all");
     t.click("fav:factory:palette/lead");
     t.click("search");
     t.key(Key::ArrowDown, Modifiers::NONE);
@@ -298,7 +298,7 @@ fn edit_save_as_reopen_and_the_factory_file_stays() {
 
     // Away and back: found under Your Sounds with the edit.
     t.open("factory:palette/lead");
-    t.click("filter:Your Sounds");
+    t.click("filter:user");
     t.open("user:bright-pad");
     assert_eq!(t.editor.state(), &saved);
     assert_eq!(t.ui.doc.as_ref().unwrap().name, "Bright Pad");
@@ -485,7 +485,7 @@ fn rename_through_the_browser() {
     t.save_as_named("First");
     t.click("save-as");
     t.save_as_named("Second");
-    t.click("filter:Your Sounds");
+    t.click("filter:user");
     t.click("sound:user:first");
     t.click("rename");
     if let Some(Dialog::Rename { name, .. }) = t.ui.browser.dialog.as_mut() {
@@ -528,7 +528,7 @@ fn missing_recents_and_bad_patches_are_explained() {
     let mut t = H::with_user(1440.0, 900.0, user);
     t.edit("filter.svf", "cutoff_hz", 300.0);
     let work: PatchState = t.editor.state().clone();
-    t.click("filter:Your Sounds");
+    t.click("filter:user");
     t.open("user:alien");
     t.click("dlg:discard");
     let msg = t.ui.last_message.clone().unwrap();
@@ -539,7 +539,7 @@ fn missing_recents_and_bad_patches_are_explained() {
     assert_eq!(t.editor.state(), &work, "the working sound survives");
     assert!(t.modified(), "and is still unsaved");
 
-    t.click("filter:Recent");
+    t.click("filter:recent");
     assert!(t.has("forget:user:gone"));
     assert!(t.has("sound:factory:palette/pad"));
     t.click("forget:user:gone");
@@ -576,13 +576,6 @@ fn every_control_is_reachable_at_both_sizes() {
                 screen.contains_rect(*r),
                 "{w}×{h}: {key} at {r:?} off screen"
             );
-        }
-        if std::env::var("PRINT_HITS").is_ok() {
-            let mut v: Vec<_> = t.ui.hits.iter().filter(|(_, r)| r.max.y < 42.0).collect();
-            v.sort_by(|a, b| a.1.min.x.total_cmp(&b.1.min.x));
-            for (k, r) in v {
-                eprintln!("{w} {k} {:.0}..{:.0}", r.min.x, r.max.x);
-            }
         }
         // Toolbar items don't overlap.
         let row = [

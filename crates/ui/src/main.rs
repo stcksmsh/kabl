@@ -903,6 +903,14 @@ fn main() -> eframe::Result<()> {
     };
     let mut ui_state = UiState::default();
     let library = kabl_ui::browser::open_library();
+    eprintln!(
+        "kabl-ui: factory sounds: {}; your sounds: {}",
+        library
+            .factory_dir
+            .as_ref()
+            .map_or("not found".into(), |d| d.display().to_string()),
+        library.sounds_dir().display()
+    );
     for note in &library.notes {
         eprintln!("kabl-ui: {note}");
     }

@@ -441,6 +441,9 @@ fn save_as(
                     meta: e.meta.clone(),
                     saved: editor.state().clone(),
                 });
+                // Show the new sound in the list, whatever was searched before.
+                ui.browser.query.clear();
+                ui.browser.category = None;
                 ui.browser.selected = Some(id);
                 message(ui, format!("saved \"{}\" in Your Sounds", e.meta.name));
             }
@@ -569,18 +572,18 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     );
     hit(ui_state, "search", &r);
     ui.horizontal_wrapped(|ui| {
-        for (f, label) in [
-            (Filter::All, "All"),
-            (Filter::Favorites, "★ Favorites"),
-            (Filter::Recent, "Recent"),
-            (Filter::Factory, "Factory"),
-            (Filter::User, "Your Sounds"),
+        for (f, key, label) in [
+            (Filter::All, "all", "All"),
+            (Filter::Favorites, "favorites", "★ Favorites"),
+            (Filter::Recent, "recent", "Recent"),
+            (Filter::Factory, "factory", "Factory"),
+            (Filter::User, "user", "Your Sounds"),
         ] {
             let r = ui.add(egui::Button::selectable(
                 ui_state.browser.filter == f,
                 label,
             ));
-            hit(ui_state, &format!("filter:{label}"), &r);
+            hit(ui_state, &format!("filter:{key}"), &r);
             if r.clicked() {
                 ui_state.browser.filter = f;
             }
@@ -666,7 +669,11 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         .auto_shrink([false, false])
         .show(ui, |ui| {
             let mut last_origin = None;
-            if rows.is_empty() {
+            let narrowed =
+                !ui_state.browser.query.trim().is_empty() || ui_state.browser.category.is_some();
+            if rows.is_empty() && narrowed {
+                ui.weak("No sound matches the search or category.");
+            } else if rows.is_empty() {
                 ui.weak(match filter {
                     Filter::Favorites => "No favorites yet: click ☆ next to a sound.",
                     Filter::Recent => "Nothing opened yet.",
@@ -703,8 +710,9 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                             }
                             let sel = ui_state.browser.selected.as_deref() == Some(&e.id);
                             let r = ui.add(
-                                egui::Button::selectable(sel, &e.meta.name)
-                                    .min_size(egui::vec2(140.0, 0.0)),
+                                egui::Button::selectable(sel, "")
+                                    .left_text(e.meta.name.as_str())
+                                    .min_size(egui::vec2(150.0, 0.0)),
                             );
                             ui_state.record(format!("sound:{}", e.id), r.rect);
                             if r.clicked() {
@@ -899,9 +907,15 @@ fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui:
     ui.label(RichText::new(format!("In the rack: {name}")).strong());
     let (keys, sequence) = Meta::play_of(editor.state());
     if keys {
+        let mut chord_hits = Vec::new();
         let a = &mut ui_state.browser.audition;
         ui.horizontal(|ui| {
-            egui::ComboBox::from_id_salt("audition-note")
+            let r = ui.small_button("−8").on_hover_text("An octave down");
+            chord_hits.push(("note-down".to_string(), r.rect));
+            if r.clicked() {
+                a.note = a.note.saturating_sub(12).max(24);
+            }
+            let r = egui::ComboBox::from_id_salt("audition-note")
                 .width(56.0)
                 .selected_text(note_name(a.note))
                 .show_ui(ui, |ui| {
@@ -909,26 +923,33 @@ fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui:
                         ui.selectable_value(&mut a.note, n, note_name(n));
                     }
                 });
+            chord_hits.push(("note".to_string(), r.response.rect));
+            let r = ui.small_button("+8").on_hover_text("An octave up");
+            chord_hits.push(("note-up".to_string(), r.rect));
+            if r.clicked() {
+                a.note = (a.note + 12).min(96);
+            }
             for c in [Chord::Single, Chord::Major, Chord::Minor] {
-                if ui
-                    .add(egui::Button::selectable(a.chord == c, c.label()))
-                    .clicked()
-                {
+                let r = ui.add(egui::Button::selectable(a.chord == c, c.label()));
+                chord_hits.push((format!("chord:{}", c.label()), r.rect));
+                if r.clicked() {
                     a.chord = c;
                 }
             }
         });
         ui.horizontal(|ui| {
             ui.label("Velocity");
-            ui.add(egui::Slider::new(&mut a.velocity, 1..=127).show_value(true));
+            let r = ui.add(egui::Slider::new(&mut a.velocity, 1..=127).show_value(true));
+            chord_hits.push(("velocity".to_string(), r.rect));
         });
         ui.horizontal(|ui| {
             ui.label("Length");
-            ui.add(
+            let r = ui.add(
                 egui::Slider::new(&mut a.secs, 0.25..=4.0)
                     .step_by(0.25)
                     .suffix(" s"),
             );
+            chord_hits.push(("length".to_string(), r.rect));
         });
         let label = format!(
             "▶ Play {}{}",
@@ -950,8 +971,11 @@ fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui:
             a.velocity,
             a.secs
         );
-        let cmd = a.command(ui_state.sample_rate);
         let secs = a.secs as f64;
+        let cmd = a.command(ui_state.sample_rate);
+        for (k, r) in chord_hits {
+            ui_state.record(k, r);
+        }
         ui.horizontal(|ui| {
             let r = ui.button(label).on_hover_text(&help);
             hit(ui_state, "play", &r);
