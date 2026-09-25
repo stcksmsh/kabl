@@ -341,8 +341,9 @@ const FOLDER_FILES: [&str; 3] = ["meta.toml", "checkpoint.json", "log.jsonl"];
 const FOLDER_STAGING: &str = ".kabl-save";
 
 /// Marker file inside a staging directory kabl made: `writing` while the new copy is written,
-/// `replacing` once it has been read back and files start moving. A `.kabl-save` without
-/// it is not kabl's and is never touched.
+/// `replacing` once it has been read back and files start moving, `done` (the save stands)
+/// or `undone` (rolled back) before the staging is cleaned up. A `.kabl-save` without it is
+/// not kabl's and is never touched.
 const FOLDER_MARKER: &str = "kabl-staging";
 
 /// Saves `log` into a patch folder the user chose, touching only its three patch files
@@ -355,13 +356,21 @@ const FOLDER_MARKER: &str = "kabl-staging";
 pub fn save_folder(dir: &Path, log: &PatchLog) -> Result<(), LibError> {
     repair_folder(dir);
     let staging = dir.join(FOLDER_STAGING);
+    let marker = staging.join(FOLDER_MARKER);
+    // An empty one (kabl stopped right after making it) just goes.
+    let _ = fs::remove_dir(&staging);
+    if marker.exists() {
+        return Err(LibError::Interrupted(format!(
+            "an earlier save here could not be undone: the previous files are kept in {}",
+            staging.display()
+        )));
+    }
     if staging.exists() {
         return Err(LibError::Io(format!(
             "{} is in the way (kabl didn't make it): rename it to save here",
             staging.display()
         )));
     }
-    let marker = staging.join(FOLDER_MARKER);
     let written = (|| {
         fs::create_dir_all(&staging).map_err(|e| io("can't create", &staging, e))?;
         fs::write(&marker, "writing").map_err(|e| io("can't write", &marker, e))?;
@@ -400,6 +409,7 @@ pub fn save_folder(dir: &Path, log: &PatchLog) -> Result<(), LibError> {
     }
     if let Err(e) = result {
         if roll_back(dir, &staging) {
+            let _ = fs::write(&marker, "undone");
             remove_staging(&staging);
             return Err(e);
         }
@@ -409,6 +419,8 @@ pub fn save_folder(dir: &Path, log: &PatchLog) -> Result<(), LibError> {
             staging.display()
         )));
     }
+    // The save stands from here on, whatever happens to the cleanup.
+    let _ = fs::write(&marker, "done");
     remove_staging(&staging);
     Ok(())
 }
@@ -448,14 +460,15 @@ fn remove_staging(staging: &Path) {
 }
 
 /// Finishes or undoes a folder save that stopped half way (see `save_folder`). Acts only on
-/// a staging directory with kabl's marker. While `writing`, nothing in the folder changed:
-/// the staging goes. While `replacing`: if the new log is in place (`log.jsonl.old` staged
-/// and `log.jsonl` present) the save completed; otherwise it is rolled back. Returns a note
-/// for the user when something was restored.
+/// a staging directory with kabl's marker. `writing`: nothing in the folder changed.
+/// `done` / `undone`: only the cleanup was left. `replacing`: the log moves last, so if the
+/// new log is in place (its staged copy gone and `log.jsonl` present) the save completed and
+/// stands; otherwise it is rolled back. Returns a note for the user when something was
+/// restored.
 pub fn repair_folder(dir: &Path) -> Option<String> {
     let staging = dir.join(FOLDER_STAGING);
     let phase = fs::read_to_string(staging.join(FOLDER_MARKER)).ok()?;
-    let committed = staging.join("log.jsonl.old").exists() && dir.join("log.jsonl").exists();
+    let committed = !staging.join("log.jsonl").exists() && dir.join("log.jsonl").exists();
     let mut note = None;
     if phase.trim() == "replacing" && !committed {
         if roll_back(dir, &staging) {

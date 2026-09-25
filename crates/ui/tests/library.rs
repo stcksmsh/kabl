@@ -875,3 +875,54 @@ fn a_retry_after_an_interrupted_user_save_keeps_the_only_copy() {
         "the old copy survives"
     );
 }
+
+#[test]
+fn a_save_killed_during_cleanup_stands() {
+    let tmp = tempfile::tempdir().unwrap();
+    let old = init_keyboard();
+    let mut new = PatchEditor::from_log(old.log().clone());
+    new.set_param(3, "cutoff_hz", 900.0);
+    for (name, existing) in [("existing", true), ("brand-new", false)] {
+        for phase in ["replacing", "done"] {
+            let dir = tmp.path().join(format!("{name}-{phase}"));
+            if existing {
+                kabl_core::save(&dir, old.log()).unwrap();
+            }
+            library::save_folder(&dir, new.log()).unwrap();
+            let saved = files(&dir);
+            // Cleanup got as far as removing every staged file but the marker.
+            fs::create_dir_all(dir.join(".kabl-save")).unwrap();
+            fs::write(dir.join(".kabl-save/kabl-staging"), phase).unwrap();
+            assert_eq!(
+                library::read_patch(&dir).unwrap().state(),
+                new.state(),
+                "{name} {phase}"
+            );
+            assert_eq!(files(&dir), saved, "{name} {phase}");
+            assert!(!dir.join(".kabl-save").exists());
+        }
+    }
+}
+
+#[test]
+fn leftover_staging_is_cleared_or_explained() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("song");
+    let e = init_keyboard();
+    kabl_core::save(&dir, e.log()).unwrap();
+    // Empty (kabl stopped right after making it): the save goes ahead.
+    fs::create_dir_all(dir.join(".kabl-save")).unwrap();
+    library::save_folder(&dir, e.log()).unwrap();
+    // kabl's own, which could not be undone: the save says where the old files are.
+    let staging = dir.join(".kabl-save");
+    fs::create_dir_all(&staging).unwrap();
+    fs::write(staging.join("kabl-staging"), "replacing").unwrap();
+    fs::write(staging.join("log.jsonl"), "staged").unwrap();
+    fs::create_dir_all(staging.join("log.jsonl.old")).unwrap(); // can't be renamed back over a file
+    fs::write(staging.join("log.jsonl.old/x"), "").unwrap();
+    let note = library::repair_folder(&dir).unwrap();
+    assert!(note.contains("could not be undone"), "{note}");
+    let err = library::save_folder(&dir, e.log()).unwrap_err();
+    assert!(matches!(err, LibError::Interrupted(_)), "{err:?}");
+    assert!(err.to_string().contains("kept in"), "{err}");
+}
