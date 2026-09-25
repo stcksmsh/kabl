@@ -731,17 +731,22 @@ pub fn diagnose(state: &PatchState, focus: Option<ModuleId>, cx: &Context) -> Di
                         ));
                         d.next = Some((id, port));
                     }
-                } else if !quiet {
-                    if let Some(next) = at.and_then(|i| path_modules.get(i + 1)).copied() {
-                        if let Some(port) = first_output(state, next)
-                            .filter(|_| state.modules.get(&next).is_some_and(|m| m.kind != "out"))
-                        {
-                            d.possible.push(format!(
+                } else if let Some(next) = at.and_then(|i| path_modules.get(i + 1)).copied() {
+                    // Only a measured audio level is called "present"; a CV at 0 is a value,
+                    // not an absence.
+                    let present = *t == PortType::Audio && s.peak_all() > QUIET;
+                    if let Some(port) = first_output(state, next)
+                        .filter(|_| state.modules.get(&next).is_some_and(|m| m.kind != "out"))
+                    {
+                        d.possible.push(if present {
+                            format!(
                                 "Signal is present here: inspect the next stage, {} {port}.",
                                 title(state, next)
-                            ));
-                            d.next = Some((next, port));
-                        }
+                            )
+                        } else {
+                            format!("Next stage on the path: {} {port}.", title(state, next))
+                        });
+                        d.next = Some((next, port));
                     }
                 }
             }

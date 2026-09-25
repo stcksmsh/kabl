@@ -14,11 +14,13 @@ fn info_default_suppresses_debug_and_trace() {
     log::info!(target: "doc", "i1 id=3");
     log::debug!(target: "graph", "d1");
     log::trace!(target: "graph", "t1");
+    log::info!(target: "winit::platform", "third-party info");
     h.shutdown();
     let text = std::fs::read_to_string(&h.path).unwrap();
     let lines: Vec<&str> = text.lines().collect();
     assert_eq!(lines.len(), 3, "{text}");
     assert!(!text.contains("d1") && !text.contains("t1"));
+    assert!(!text.contains("third-party"), "other crates' INFO is capped at WARN");
     let l = lines[2];
     assert!(l.contains(" INFO  [doc] session="), "{l}");
     assert!(l.contains(&format!("session={} i1 id=3", h.session)), "{l}");

@@ -204,9 +204,31 @@ pub fn init(app: &'static str, level: LevelFilter, dir: PathBuf) -> Option<LogHa
     })
 }
 
+/// Log targets of kabl's own subsystems (the first `.`-segment). Other crates (windowing,
+/// audio backends) are capped at WARN unless TRACE is asked for, so their start-up chatter
+/// does not fill the file.
+const OWN: &[&str] = &[
+    "app",
+    "audio",
+    "midi",
+    "doc",
+    "library",
+    "graph",
+    "inspect",
+    "compare",
+    "recipe",
+    "recorder",
+    "test",
+    "kabl_ui",
+    "kabl_standalone",
+    "kabl_engine",
+];
+
 impl Log for Logger {
     fn enabled(&self, m: &Metadata) -> bool {
+        let own = OWN.contains(&m.target().split(['.', ':']).next().unwrap_or(""));
         m.level() <= log::max_level()
+            && (own || m.level() <= Level::Warn || log::max_level() == LevelFilter::Trace)
     }
 
     fn log(&self, r: &Record) {
