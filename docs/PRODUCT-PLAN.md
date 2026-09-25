@@ -6,6 +6,22 @@ Date: 2026-09-25. Repository audit: `master` at `c1def5361d66caeee477b2be5c737c7
 
 Read alongside [research and sources](product-research/RESEARCH.md), [agent workflow](product-research/AGENT-WORKFLOW.md), and the [first implementation brief](product-research/briefs/D01.md). The older `docs/PLAN.md` is the historical rack-design plan, not this continuation roadmap.
 
+## Post-D01 planning addendum — 2026-09-25
+
+Kosta explicitly instructed: **D01 stays the same; no updates to its agent's work.**
+The active D01 brief and launch prompt remain its complete review contract. Do not apply
+later design findings retroactively or pause its work for this planning addendum.
+
+For D02 and later, read [Post-D01 interaction plan](product-research/POST-D01-INTERACTION-PLAN.md).
+It resolves the proposed patch/module model, records source-grounded risks, and assigns
+28 interaction questions and 12 workflow scenarios to future scopes. Most ordering remains
+unchanged; routing, state ownership and replacement rules must be explicit before their
+dependent features. All new architecture remains recommended, not owner-approved.
+
+Laptop checks and the two previous hands-on reviews remain pending while separately
+authorized cloud engineering proceeds. This is a review deferral, not acceptance or a
+claim that D00 is complete. No later batch is authorized by this addendum.
+
 ## 1. Product intent
 
 Build a musical instrument Kosta uses himself, and which other musicians can use without his help. It must support both evolving, performed, interlocking sequences in the spirit of Tangerine Dream's Encore/Ricochet/Force Majeure era and ordinary MIDI instrument production in REAPER. These are two uses of one engine and patch model, not separate products or a reason to build a DAW.
