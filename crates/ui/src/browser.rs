@@ -245,6 +245,24 @@ pub fn request(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
     }
 }
 
+/// A library id's kind for the log: the factory id, or just "user" (user ids carry names
+/// the user typed, which the log does not record).
+fn origin_kind(id: &str) -> &str {
+    if id.starts_with("factory:") {
+        id
+    } else {
+        "user"
+    }
+}
+
+fn doc_kind(o: &DocOrigin) -> &str {
+    match o {
+        DocOrigin::New => "new",
+        DocOrigin::Library(id) => origin_kind(id),
+        DocOrigin::Folder(_) => "folder",
+    }
+}
+
 fn message(ui: &mut UiState, text: String) {
     ui.last_message = Some(text);
 }
@@ -263,6 +281,7 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
                     let note = lib.touch(&id);
                     let Some(e) = e else { return };
                     replace_patch(editor, ui, log);
+                    log::info!(target: "doc", "open ok origin={} editor={}", origin_kind(&id), editor.instance());
                     ui.load_stopped = e.meta.sequence;
                     ui.doc = Some(Doc {
                         name: e.meta.name.clone(),
@@ -285,10 +304,13 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
                         }),
                     );
                 }
-                Err(err) => message(
-                    ui,
-                    format!("couldn't open: {err}. Your sound is unchanged."),
-                ),
+                Err(err) => {
+                    log::warn!(target: "doc", "open failed origin={} error={err}; working patch kept", origin_kind(&id));
+                    message(
+                        ui,
+                        format!("couldn't open: {err}. Your sound is unchanged."),
+                    )
+                }
             }
         }
         Pending::OpenFolder(path) => {
@@ -297,6 +319,7 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
             match crate::library::read_patch(std::path::Path::new(&path)) {
                 Ok(log) => {
                     replace_patch(editor, ui, log);
+                    log::info!(target: "doc", "open ok origin=folder editor={}", editor.instance());
                     let name = std::path::Path::new(&path)
                         .file_name()
                         .map_or(path.clone(), |n| n.to_string_lossy().to_string());
@@ -313,13 +336,13 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
                         ),
                     );
                 }
-                Err(err) => message(
-                    ui,
+                Err(err) => message(ui, {
+                    log::warn!(target: "doc", "open failed origin=folder error={err}; working patch kept");
                     format!(
                         "load failed: {err}. Your sound is unchanged.{}",
                         repaired.map_or(String::new(), |n| format!(" ({n})"))
-                    ),
-                ),
+                    )
+                }),
             }
         }
         Pending::New => {
@@ -336,6 +359,7 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
             let mut doc = Doc::new("Untitled", DocOrigin::New, editor.state());
             doc.meta.category = "Basic".into();
             ui.doc = Some(doc);
+            log::info!(target: "doc", "new editor={}", editor.instance());
             message(ui, "new sound from Init Keyboard".into());
         }
     }
@@ -386,6 +410,7 @@ fn save(editor: &mut PatchEditor, ui: &mut UiState, then: Option<Pending>) -> Op
                 d.saved = editor.state().clone();
                 d.name = name.clone();
             }
+            log::info!(target: "doc", "save ok origin={}", doc_kind(&doc.origin));
             message(ui, format!("saved \"{name}\""));
             if let Some(p) = then {
                 perform(editor, ui, p);
@@ -393,6 +418,7 @@ fn save(editor: &mut PatchEditor, ui: &mut UiState, then: Option<Pending>) -> Op
             None
         }
         Err(e) => {
+            log::warn!(target: "doc", "save failed origin={} error={e}; edits kept", doc_kind(&doc.origin));
             let text = save_failed(&e);
             message(ui, text.clone());
             Some(text)
@@ -477,6 +503,7 @@ fn save_as(
                 ui.browser.query.clear();
                 ui.browser.category = None;
                 ui.browser.selected = Some(id);
+                log::info!(target: "doc", "save-as ok origin=user");
                 message(ui, format!("saved \"{}\" in Your Sounds", e.meta.name));
             }
             if let Some(p) = then {
@@ -489,6 +516,7 @@ fn save_as(
             format!("\"{}\" is already in Your Sounds.", name.trim()),
         )),
         Err(e) => {
+            log::warn!(target: "doc", "save-as failed error={e}; edits kept");
             let text = save_failed(&e);
             message(ui, text.clone());
             Err((None, text))

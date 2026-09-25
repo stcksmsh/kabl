@@ -5,6 +5,8 @@
 //! without hardware lives here instead, so "no `/dev/snd` in this container" doesn't mean "no
 //! tests for the standalone crate" (see `tests/` and the module docs below for what's proven).
 
+pub mod applog;
+
 use kabl_core::{CableState, ModuleId, ModuleState, PatchState, PortRef, Vec2};
 use kabl_engine::patch_engine::PatchEngine;
 use std::collections::BTreeMap;
@@ -252,13 +254,13 @@ pub fn connect_midi(
     let midi_in = match midir::MidiInput::new(client_name) {
         Ok(m) => m,
         Err(err) => {
-            eprintln!("kabl: MIDI input unavailable on this system: {err}");
+            log::warn!(target: "midi", "MIDI input unavailable on this system: {err}");
             return None;
         }
     };
     let ports = midi_in.ports();
     if ports.is_empty() {
-        eprintln!("kabl: no MIDI input ports found -- connect a controller and restart to play.");
+        log::warn!(target: "midi", "no MIDI input ports found -- connect a controller and restart to play.");
         return None;
     }
     // Default (no --midi): first port whose name doesn't look like ALSA's own virtual "Midi
@@ -277,7 +279,7 @@ pub fn connect_midi(
     }
     .or(ports.first());
     let Some(port) = port else {
-        eprintln!("kabl: no MIDI port matched --midi {name_filter:?}");
+        log::warn!(target: "midi", "no MIDI port matched --midi {name_filter:?}");
         return None;
     };
     let port_name = midi_in
@@ -301,11 +303,11 @@ pub fn connect_midi(
     );
     match connection {
         Ok(conn) => {
-            eprintln!("kabl: listening for MIDI on \"{port_name}\"");
+            log::info!(target: "midi", "listening for MIDI on \"{port_name}\"");
             Some(conn)
         }
         Err(err) => {
-            eprintln!("kabl: failed to connect to MIDI port \"{port_name}\": {err}");
+            log::warn!(target: "midi", "failed to connect to MIDI port \"{port_name}\": {err}");
             None
         }
     }

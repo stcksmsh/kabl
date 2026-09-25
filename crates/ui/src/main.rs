@@ -17,6 +17,7 @@ use kabl_engine::compile::compile;
 use kabl_engine::graph::BLOCK;
 use kabl_engine::keyboard::KeyEvent;
 use kabl_engine::patch_engine::{swap_channel, Command, PatchEngine, SwapSender};
+use kabl_engine::probe::ProbeReport;
 use kabl_modules::builtins::{DelayLock, LfoSync, Transport};
 use kabl_standalone::{default_patch, RingBuffer, DEFAULT_VOICE_COUNT};
 use kabl_ui::{record, show, PatchEditor, UiState};
@@ -54,6 +55,15 @@ struct AudioHost {
     command_tx: Option<rtrb::Producer<Command>>,
     recorder: Option<record::Recorder>,
     timing: Option<Arc<CallbackTiming>>,
+    /// Selected-signal measurements from the audio callback (D03).
+    probe_rx: Option<rtrb::Consumer<ProbeReport>>,
+    /// Non-xrun stream errors, moved out of the error callback unformatted (it may run on the
+    /// audio thread); logged here.
+    faults_rx: Option<rtrb::Consumer<cpal::Error>>,
+    /// Graph generation of the last rebuild attempt (`CompiledPatch::generation`).
+    generation: u64,
+    /// The last rebuild's compile error, if it failed.
+    compile_error: Option<String>,
     _stream: Option<cpal::Stream>,
 }
 
@@ -210,6 +220,10 @@ impl AudioHost {
             command_tx: None,
             recorder: None,
             timing: None,
+            probe_rx: None,
+            faults_rx: None,
+            generation: 1,
+            compile_error: None,
             _stream: None,
         }
     }
@@ -229,7 +243,9 @@ impl AudioHost {
         let handle = collector.handle();
 
         let host = cpal::default_host();
+        log::info!(target: "audio", "backend={:?} requested rate={rate:?} frames={frames:?} rt={realtime}", host.id());
         let Some(device) = host.default_output_device() else {
+            log::warn!(target: "audio", "no output device: editing only, no playback");
             return Self::offline(
                 collector,
                 "no audio output device found -- editing works, playback won't".into(),
@@ -252,6 +268,7 @@ impl AudioHost {
                 .filter(|c| c.sample_format() == cpal::SampleFormat::F32),
         };
         let Some(config) = config else {
+            log::warn!(target: "audio", "no usable f32 output config (rate {rate:?}): no playback");
             return Self::offline(
                 collector,
                 format!(
@@ -276,8 +293,14 @@ impl AudioHost {
 
         let mut engine = match PatchEngine::new(&handle, patch, sample_rate, DEFAULT_VOICE_COUNT) {
             Ok(e) => e,
-            Err(err) => return Self::offline(collector, format!("patch failed to compile: {err}")),
+            Err(err) => {
+                log::error!(target: "audio", "startup patch failed to compile: {err}");
+                return Self::offline(collector, format!("patch failed to compile: {err}"));
+            }
         };
+        engine.active_mut().generation = 1;
+        let (mut probe_tx, probe_rx) = rtrb::RingBuffer::<ProbeReport>::new(8);
+        let (mut faults_tx, faults_rx) = rtrb::RingBuffer::<cpal::Error>::new(8);
 
         let (swap_tx, mut swap_rx) = swap_channel(SWAP_QUEUE);
         // Test hooks: a small ring forces lost frames, a failure point forces a write error.
@@ -366,6 +389,10 @@ impl AudioHost {
                 });
                 let (held, sounding) = engine.keys();
                 keys.store(pack_keys(held, sounding), Ordering::Relaxed);
+                // Full (UI not drawing): this window is dropped; the UI counts the gap.
+                if let Some(r) = engine.take_probe_report() {
+                    let _ = probe_tx.push(r);
+                }
 
                 let rec = tap.begin(frames_needed);
                 for frame in data.chunks_mut(channels) {
@@ -383,12 +410,22 @@ impl AudioHost {
                 t.record(started.elapsed(), since_last, frames_needed, sample_rate);
             },
             move |err| {
+                // May run on the audio thread: count, and hand the error over unformatted.
+                // A full queue drops it (it was counted).
                 t_err.error(&err);
-                eprintln!("kabl-ui: audio stream error: {err}");
+                if err.kind() != cpal::ErrorKind::Xrun {
+                    let _ = faults_tx.push(err);
+                }
             },
             None,
         );
 
+        log::info!(
+            target: "audio",
+            "device={:?} rate={sample_rate} channels={channels} buffer={:?}",
+            device.description().map(|d| d.name().to_string()).ok(),
+            stream_config.buffer_size
+        );
         let (stream, status) = match stream {
             Ok(s) => match s.play() {
                 Ok(()) => (
@@ -415,6 +452,10 @@ impl AudioHost {
             command_tx: Some(command_tx),
             recorder: stream.is_some().then_some(recorder),
             timing: stream.is_some().then_some(timing),
+            probe_rx: stream.is_some().then_some(probe_rx),
+            faults_rx: stream.is_some().then_some(faults_rx),
+            generation: 1,
+            compile_error: None,
             _stream: stream,
         }
     }
@@ -423,13 +464,26 @@ impl AudioHost {
     /// Load) carries no state from the playing one; `stopped`: its clocks start stopped (a
     /// piece opened from the browser waits for Start).
     fn rebuild(&mut self, patch: &PatchState, fresh: bool, stopped: bool) {
+        self.generation += 1;
+        let started = std::time::Instant::now();
         let mut new_patch = match compile(patch, self.sample_rate, DEFAULT_VOICE_COUNT) {
             Ok(p) => p,
             Err(err) => {
+                log::warn!(target: "graph", "compile failed generation={} error={err}; audio keeps the previous graph", self.generation);
                 self.status = format!("recompile failed: {err}");
+                self.compile_error = Some(err.to_string());
                 return;
             }
         };
+        self.compile_error = None;
+        log::debug!(
+            target: "graph",
+            "compiled generation={} fresh={fresh} modules={} took_us={}",
+            self.generation,
+            patch.modules.len(),
+            started.elapsed().as_micros()
+        );
+        new_patch.generation = self.generation;
         new_patch.fresh = fresh;
         if stopped {
             let mut clocks = Vec::new();
@@ -571,6 +625,9 @@ impl Midi {
     }
 
     fn disconnect(&mut self) {
+        if let Some(p) = &self.port {
+            log::info!(target: "midi", "disconnect \"{p}\"");
+        }
         if let Some(c) = self.conn.take() {
             c.close();
         }
@@ -594,7 +651,7 @@ impl Midi {
             let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
             let (sink, flag) = (self.sink.clone(), stop.clone());
             std::thread::spawn(move || read_pipe(path, sink, flag));
-            eprintln!("kabl-ui: listening for MIDI on \"{name}\" (test pipe)");
+            log::info!(target: "midi", "listening for MIDI on \"{name}\" (test pipe)");
             self.pipe = Some(stop);
             self.port = Some(name.to_string());
             return Ok(());
@@ -617,7 +674,7 @@ impl Midi {
                 self.sink.clone(),
             )
             .map_err(|e| e.to_string())?;
-        eprintln!("kabl-ui: listening for MIDI on \"{name}\"");
+        log::info!(target: "midi", "listening for MIDI on \"{name}\"");
         self.conn = Some(conn);
         self.port = Some(name.to_string());
         Ok(())
@@ -636,10 +693,10 @@ impl Midi {
         match pick {
             Some(n) => {
                 if let Err(e) = self.connect(&n.clone()) {
-                    eprintln!("kabl-ui: {e}");
+                    log::warn!(target: "midi", "{e}");
                 }
             }
-            None => eprintln!("kabl-ui: no MIDI input matched {filter:?}"),
+            None => log::info!(target: "midi", "no MIDI input matched {filter:?}"),
         }
         self.ports = names;
     }
@@ -683,6 +740,110 @@ struct App {
     /// Callback count last seen and when it last moved: a stream that stops calling back
     /// (an unsupported buffer size, a device gone) is reported, not left silent.
     watchdog: (u64, std::time::Instant),
+    log: Option<kabl_standalone::applog::LogHandle>,
+    health: Health,
+}
+
+/// Audio health as last logged: the log gets counts per interval, never a line per event.
+struct Health {
+    at: std::time::Instant,
+    debug_at: std::time::Instant,
+    /// (xruns, late executions, late arrivals, other errors, callbacks) at `at`.
+    counts: [u64; 5],
+    rt_logged: bool,
+    stalled: bool,
+    /// Stream errors taken from the queue since the last WARN line.
+    faults: u64,
+    fault_text: Option<String>,
+    log_problem: Option<String>,
+    log_checked: std::time::Instant,
+}
+
+impl Health {
+    fn new() -> Self {
+        let now = std::time::Instant::now();
+        Health {
+            at: now,
+            debug_at: now,
+            counts: [0; 5],
+            rt_logged: false,
+            stalled: false,
+            faults: 0,
+            fault_text: None,
+            log_problem: None,
+            log_checked: now,
+        }
+    }
+}
+
+impl App {
+    /// UI thread, every frame: logs what the audio side counted, rate-limited.
+    fn log_health(&mut self) {
+        let h = &mut self.health;
+        if let Some(rx) = self.audio.faults_rx.as_mut() {
+            while let Ok(e) = rx.pop() {
+                h.faults += 1;
+                h.fault_text = Some(e.to_string());
+            }
+        }
+        let Some(t) = &self.audio.timing else {
+            return;
+        };
+        let get = |a: &AtomicU64| a.load(Ordering::Relaxed);
+        if !h.rt_logged && t.rt.load(Ordering::Relaxed) != 0 {
+            h.rt_logged = true;
+            match t.rt.load(Ordering::Relaxed) {
+                1 => log::info!(target: "audio", "real-time priority granted"),
+                _ => log::warn!(
+                    target: "audio",
+                    "real-time priority refused: {}",
+                    t.rt_error.get().map_or("?", String::as_str)
+                ),
+            }
+        }
+        let now = [
+            get(&t.xruns),
+            get(&t.late),
+            get(&t.arrival_late),
+            get(&t.other_errors),
+            get(&t.count),
+        ];
+        let secs = h.at.elapsed().as_secs_f64();
+        if secs >= 10.0 {
+            let d: Vec<u64> = now.iter().zip(h.counts).map(|(a, b)| a - b).collect();
+            if d[0] + d[1] + d[2] > 0 {
+                log::info!(
+                    target: "audio.health",
+                    "last {secs:.1}s: xruns={} late_executions={} late_arrivals={} callbacks={} worst_run_us={:.0}",
+                    d[0], d[1], d[2], d[4], get(&t.worst_ns) as f64 / 1e3
+                );
+            }
+            if h.faults > 0 {
+                log::warn!(
+                    target: "audio",
+                    "stream errors={} in {secs:.1}s, last: {}",
+                    h.faults,
+                    h.fault_text.as_deref().unwrap_or("?")
+                );
+                h.faults = 0;
+            }
+            h.counts = now;
+            h.at = std::time::Instant::now();
+        }
+        if h.debug_at.elapsed().as_secs() >= 60 {
+            h.debug_at = std::time::Instant::now();
+            log::debug!(target: "audio.health", "{}", t.line(self.audio.sample_rate));
+        }
+        let stalled = self.audio.status.starts_with("audio stalled");
+        if stalled != h.stalled {
+            h.stalled = stalled;
+            if stalled {
+                log::warn!(target: "audio", "stalled: no callbacks for over 1.5 s after {}", now[4]);
+            } else {
+                log::info!(target: "audio", "callbacks resumed");
+            }
+        }
+    }
 }
 
 impl eframe::App for App {
@@ -702,6 +863,22 @@ impl eframe::App for App {
                 kabl_ui::record::meter_ui(ui, &mut self.ui_state.meter);
                 ui.separator();
                 ui.label(&self.audio.status);
+                if let Some(log) = &self.log {
+                    ui.separator();
+                    let problem = self.health.log_problem.clone();
+                    let text = if problem.is_some() { "Log ⚠" } else { "Log" };
+                    let r = ui.small_button(text).on_hover_text(format!(
+                        "{}\nLevel {} (KABL_LOG or --log-level to change). Click to copy the path.",
+                        problem.unwrap_or_else(|| log.path.display().to_string()),
+                        log.level
+                    ));
+                    self.ui_state.record("log-path".into(), r.rect);
+                    if r.clicked() {
+                        ui.ctx().copy_text(log.path.display().to_string());
+                        self.ui_state.last_message =
+                            Some(format!("log path copied: {}", log.path.display()));
+                    }
+                }
                 if let Some(t) = &self.audio.timing {
                     ui.separator();
                     let (short, full) = t.summary(self.audio.sample_rate);
@@ -710,6 +887,24 @@ impl eframe::App for App {
                 }
             });
         });
+        // Measurements for the inspector: only the newest few matter.
+        let now = ui.input(|i| i.time);
+        self.ui_state.inspect.audio = self.audio.timing.is_some();
+        if let Some(rx) = self.audio.probe_rx.as_mut() {
+            while let Ok(r) = rx.pop() {
+                self.ui_state.inspect.accept(r, now);
+            }
+        }
+        self.log_health();
+        if self.health.log_checked.elapsed().as_secs() >= 2 {
+            self.health.log_checked = std::time::Instant::now();
+            let p = self.log.as_ref().and_then(|l| l.problem());
+            if p.is_some() && p != self.health.log_problem {
+                // Shown once per change, never per line.
+                self.ui_state.last_message = p.clone();
+            }
+            self.health.log_problem = p;
+        }
         if let Some(rx) = self.audio.steps_rx.as_mut() {
             while let Ok((id, step, bank, queued)) = rx.pop() {
                 self.ui_state.seq_steps.insert(id, step);
@@ -753,6 +948,7 @@ impl eframe::App for App {
                 if !self.midi.ports.contains(&port) {
                     self.midi.disconnect();
                     self.midi.lost = Some(port.clone());
+                    log::warn!(target: "midi", "input \"{port}\" disappeared: its notes were released");
                     self.ui_state.midi_note =
                         Some(format!("\"{port}\" disconnected: its notes were released"));
                     reset_pickup(&mut self.ui_state);
@@ -768,6 +964,7 @@ impl eframe::App for App {
                 if let Some(now) = back.filter(|n| self.midi.connect(n).is_ok()) {
                     self.midi.lost = None;
                     self.ui_state.midi_note = Some(format!("\"{now}\" reconnected"));
+                    log::info!(target: "midi", "input \"{now}\" reconnected");
                     reset_pickup(&mut self.ui_state);
                 }
             }
@@ -782,6 +979,9 @@ impl eframe::App for App {
             let n = t.count.load(Ordering::Relaxed);
             if n != self.watchdog.0 {
                 self.watchdog = (n, std::time::Instant::now());
+                if self.audio.status.starts_with("audio stalled") {
+                    self.audio.status = format!("audio resumed after a stall (callback {n})");
+                }
             } else if self.watchdog.1.elapsed().as_secs_f32() > 1.5
                 && !self.audio.status.starts_with("audio stalled")
             {
@@ -865,6 +1065,11 @@ impl eframe::App for App {
             let fresh = std::mem::take(&mut self.ui_state.loaded);
             let stopped = std::mem::take(&mut self.ui_state.load_stopped);
             self.audio.rebuild(self.editor.state(), fresh, stopped);
+            self.ui_state.inspect.rebuilt(
+                self.audio.generation,
+                self.audio.compile_error.clone(),
+                self.editor.state(),
+            );
         }
         // Closing the window (or Ctrl+Q) with unsaved changes asks first.
         let close = ui.ctx().input(|i| i.viewport().close_requested());
@@ -906,10 +1111,23 @@ fn main() -> eframe::Result<()> {
             .position(|a| a == name)
             .and_then(|i| args.get(i + 1).cloned())
     };
+    use kabl_standalone::applog;
+    let (level, bad_level) = applog::level_from(&args);
+    let mut log = applog::init("kabl-ui", level, applog::log_dir());
+    log::info!(
+        target: "app",
+        "start kabl-ui {} level={level} log={}",
+        applog::build_id(),
+        log.as_ref().map_or("unavailable".into(), |l| l.path.display().to_string())
+    );
+    if let Some(w) = bad_level {
+        log::warn!(target: "app", "unknown log level {w:?}: using info");
+    }
     let mut ui_state = UiState::default();
     let library = kabl_ui::browser::open_library();
-    eprintln!(
-        "kabl-ui: factory sounds: {}; your sounds: {}",
+    log::info!(
+        target: "library",
+        "factory sounds: {}; your sounds: {}",
         library
             .factory_dir
             .as_ref()
@@ -917,7 +1135,7 @@ fn main() -> eframe::Result<()> {
         library.sounds_dir().display()
     );
     for note in &library.notes {
-        eprintln!("kabl-ui: {note}");
+        log::warn!(target: "library", "{note}");
     }
     let editor = match flag("--patch") {
         Some(dir) => match kabl_core::load(std::path::Path::new(&dir)) {
@@ -953,7 +1171,10 @@ fn main() -> eframe::Result<()> {
                 editor
             }
             Err(err) => {
-                eprintln!("kabl-ui: failed to load patch from {dir}: {err:?}");
+                log::error!(target: "doc", "failed to load patch from {dir}: {err:?}");
+                if let Some(l) = log.as_mut() {
+                    l.shutdown();
+                }
                 std::process::exit(1);
             }
         },
@@ -987,6 +1208,7 @@ fn main() -> eframe::Result<()> {
         !args.iter().any(|a| a == "--no-rt"),
         peaks.clone(),
     );
+    ui_state.inspect.rebuilt(1, None, editor.state());
     ui_state.recorder = audio.recorder.take();
     ui_state.sample_rate = audio.sample_rate;
     if let (Some(rec), Some(dir)) = (ui_state.recorder.as_mut(), flag("--record-dir")) {
@@ -1003,7 +1225,7 @@ fn main() -> eframe::Result<()> {
             .with_min_inner_size([1280.0, 800.0]),
         ..Default::default()
     };
-    eframe::run_native(
+    let result = eframe::run_native(
         "kabl",
         options,
         Box::new(|cc| {
@@ -1022,7 +1244,14 @@ fn main() -> eframe::Result<()> {
                 stats_file: std::env::var("KABL_STATS_FILE")
                     .ok()
                     .map(|f| (f, std::time::Instant::now())),
+                log: log.as_ref().map(|l| l.view()),
+                health: Health::new(),
             }))
         }),
-    )
+    );
+    log::info!(target: "app", "shutdown result={}", if result.is_ok() { "ok" } else { "error" });
+    if let Some(l) = log.as_mut() {
+        l.shutdown();
+    }
+    result
 }

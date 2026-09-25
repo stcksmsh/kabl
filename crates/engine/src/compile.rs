@@ -362,6 +362,8 @@ pub struct CompiledPatch {
     /// A freshly loaded patch: `carry_state` copies nothing into it, so it starts like a
     /// startup load (empty delay lines, clocks running) even where module ids match.
     pub fresh: bool,
+    /// The `out` module whose inputs are the output (the last in schedule order), if any.
+    output: Option<ModuleId>,
     /// Set by whoever builds graphs (the UI counts its rebuilds), carried into probe reports
     /// so a measurement names the graph it came from. 0 when nobody set it.
     pub generation: u64,
@@ -769,6 +771,7 @@ fn compile_inner(
     let mut midi_ins: Vec<(usize, usize)> = Vec::new();
     let mut out_left = silence_buf;
     let mut out_right = silence_buf;
+    let mut out_module = None;
 
     for &id in &order {
         let meta = &metas[&id];
@@ -932,6 +935,7 @@ fn compile_inner(
             }
 
             if meta.kind == "out" {
+                out_module = Some(id);
                 out_left = match lane_inputs.first() {
                     Some(InputSource::Buffer(b)) => *b,
                     _ => silence_buf,
@@ -1088,6 +1092,7 @@ fn compile_inner(
         sample_rate,
         voice_count,
         fresh: false,
+        output: out_module,
         generation: 0,
         tap: Tap::default(),
     })
@@ -1106,6 +1111,12 @@ impl CompiledPatch {
     /// anyone curious) can observe that reuse is actually happening, not just trust it silently.
     pub fn buffer_count(&self) -> usize {
         self.buffers.len()
+    }
+
+    /// The `out` module this graph plays (with several, the last in schedule order; the others
+    /// are not heard).
+    pub fn output_module(&self) -> Option<ModuleId> {
+        self.output
     }
 
     /// Module instance at `(id, voice)` — `voice` ignored for global-rate modules. `None` if no

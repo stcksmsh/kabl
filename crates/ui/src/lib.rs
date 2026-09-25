@@ -17,6 +17,7 @@ pub mod cues;
 pub mod editor;
 pub mod explain;
 pub mod help;
+pub mod inspect;
 pub mod library;
 pub mod perform;
 pub mod rack;
@@ -226,6 +227,10 @@ pub struct UiState {
     pub recorder: Option<record::Recorder>,
     /// The open "what does this control change" explanation and inline help (view only).
     pub explain: explain::Explain,
+    /// The selected signal and its measurements (D03, view only).
+    pub inspect: inspect::Inspect,
+    /// MIDI input connected (`main.rs`), for the "Why no sound?" aid.
+    pub midi_connected: bool,
 }
 
 struct Moving {
@@ -314,12 +319,14 @@ impl Default for UiState {
             recorder: None,
             meter: Default::default(),
             explain: Default::default(),
+            inspect: Default::default(),
+            midi_connected: false,
         }
     }
 }
 
 impl UiState {
-    pub(crate) fn record(&mut self, key: String, rect: Rect) {
+    pub fn record(&mut self, key: String, rect: Rect) {
         self.frame_hits.insert(key, rect);
     }
 
@@ -449,6 +456,10 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     browser::frame_input(editor, ui_state, ui);
     ui_state.validate(editor);
     ui_state.explain.validate(editor);
+    let now = ui.input(|i| i.time);
+    if let Some(c) = ui_state.inspect.frame(editor, ui_state.drawer_open, now) {
+        ui_state.launches.push(c);
+    }
     // Inspecting a control in another bank (a route, a pin, a CC mapping) shows that bank on
     // the face. It never launches it.
     if ui_state.inspected != ui_state.bank_revealed {
@@ -499,7 +510,6 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     {
         ui_state.explain.close();
     }
-    let now = ui.input(|i| i.time);
     perform::apply_cc(editor, ui_state, now);
     perform::sync_takeover(editor, ui_state);
     if !ui.input(|i| i.pointer.any_down()) {
@@ -558,6 +568,14 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                         if ui.button("Close").clicked() {
                             ui_state.drawer_open = false;
                         }
+                        let on = ui_state.inspect.open;
+                        let r = ui
+                            .add(egui::Button::selectable(on, "Inspect"))
+                            .on_hover_text("Measure one output and ask why there is no sound");
+                        ui_state.record("inspect-open".into(), r.rect);
+                        if r.clicked() {
+                            ui_state.inspect.open = !on;
+                        }
                         let on = ui_state.explain.help;
                         let r = ui
                             .add(egui::Button::selectable(on, "? Help"))
@@ -583,6 +601,11 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     // Rows wrap instead of widening the drawer over the rack.
                     ui.set_max_width(DRAWER_W - 24.0);
+                    if ui_state.inspect.open {
+                        egui::Frame::group(ui.style()).show(ui, |ui| {
+                            inspect::panel(editor, ui_state, ui, now);
+                        });
+                    }
                     show_param_panel(editor, ui_state, ui);
                     routing::drawer(editor, ui_state, ui);
                 });
@@ -1627,6 +1650,32 @@ fn module_menu(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
         explain::open(ui_state, explain::Subject::Module(m.id), None);
         ui_state.selected_module = Some(m.id);
         ui.close();
+    }
+    for p in m
+        .info
+        .ports
+        .iter()
+        .filter(|p| p.direction == PortDirection::Output)
+    {
+        if item(
+            ui,
+            ui_state,
+            &format!("inspect:{}", p.name),
+            &format!("Inspect output \"{}\"", p.name),
+        ) {
+            ui_state.selected_module = Some(m.id);
+            ui_state.drawer_open = true;
+            let now = ui.input(|i| i.time);
+            ui_state.inspect.select(
+                inspect::Sel {
+                    id: m.id,
+                    port: p.name.to_string(),
+                    via_cable: false,
+                },
+                now,
+            );
+            ui.close();
+        }
     }
     if !m.info.params.is_empty() && item(ui, ui_state, "choose", "Choose primary controls…") {
         let set = editor
