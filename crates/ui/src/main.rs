@@ -140,7 +140,16 @@ impl CallbackTiming {
 
     /// The histogram for `KABL_STATS_FILE`: nonzero bins as `upper_µs:count`.
     fn hist_line(&self) -> String {
-        let q = |p| self.quantile(p).map_or("-".into(), |v| format!("≤{v}"));
+        let open = HIST_BINS as u64 * HIST_BIN_US;
+        let q = |p| {
+            self.quantile(p).map_or("-".into(), |v| {
+                if v == open {
+                    format!(">{}", open - HIST_BIN_US)
+                } else {
+                    format!("≤{v}")
+                }
+            })
+        };
         let bins: Vec<String> = self
             .hist
             .0
@@ -148,7 +157,13 @@ impl CallbackTiming {
             .enumerate()
             .filter_map(|(i, b)| {
                 let n = b.load(Ordering::Relaxed);
-                (n > 0).then(|| format!("{}:{n}", (i as u64 + 1) * HIST_BIN_US))
+                (n > 0).then(|| {
+                    if i + 1 == HIST_BINS {
+                        format!(">{}:{n}", i as u64 * HIST_BIN_US)
+                    } else {
+                        format!("{}:{n}", (i as u64 + 1) * HIST_BIN_US)
+                    }
+                })
             })
             .collect();
         format!(

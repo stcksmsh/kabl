@@ -1,0 +1,4 @@
+== badload (exit 1): target/signal-inspection-logging/badload/logs/kabl.log
+2026-09-25T19:30:47.594Z +0.000s INFO  [app] session=b379b1b2 start kabl-ui 0.1.0 (commit ef9ed7bd2501) level=INFO log=target/signal-inspection-logging/badload/logs/kabl.log
+2026-09-25T19:30:47.595Z +0.001s INFO  [library] session=b379b1b2 factory sounds: /home/user/kabl/patches; your sounds: target/signal-inspection-logging/badload/sounds
+2026-09-25T19:30:47.595Z +0.001s ERROR [doc] session=b379b1b2 failed to load patch from target/signal-inspection-logging/no-such-patch: Io(Os { code: 2, kind: NotFound, message: "No such file or directory" })

@@ -1,0 +1,6 @@
+# Inspector open on Filter #26 lp (a per-voice filter) for 60 s.
+sleep 1
+click inspect-open
+click module:26
+click inspect-port:26.lp
+sleep 60

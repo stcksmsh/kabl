@@ -448,7 +448,11 @@ pub fn measurement_lines(s: &Summary, t: PortType, name: &str, sample_rate: f32)
                 "At {name}: peak {} {during}{}.",
                 db(s.peak_all()),
                 if s.voiced {
-                    format!(" (loudest lane; {} lanes active)", s.active_lanes())
+                    let n = s.active_lanes();
+                    format!(
+                        " (loudest lane; {n} lane{} active)",
+                        if n == 1 { "" } else { "s" }
+                    )
                 } else {
                     String::new()
                 }

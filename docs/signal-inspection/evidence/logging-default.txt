@@ -1,0 +1,18 @@
+== default: 14 lines; by level:
+      9 INFO
+      5 WARN
+-- lines (session and time columns kept):
+2026-09-25T19:29:19.556Z +0.000s INFO  [app] session=13df1f75 start kabl-ui 0.1.0 (commit ef9ed7bd2501) level=INFO log=target/signal-inspection-logging/default/logs/kabl.log
+2026-09-25T19:29:19.557Z +0.001s INFO  [library] session=13df1f75 factory sounds: /home/user/kabl/patches; your sounds: target/signal-inspection-logging/default/sounds
+2026-09-25T19:29:19.558Z +0.002s INFO  [midi] session=13df1f75 listening for MIDI on "kabl-pipe" (test pipe)
+2026-09-25T19:29:19.558Z +0.002s INFO  [audio] session=13df1f75 backend=Alsa requested rate=Some(48000) frames=Some(256) rt=true
+2026-09-25T19:29:19.571Z +0.015s INFO  [audio] session=13df1f75 device=Some("Default Audio Device") rate=48000 channels=2 buffer=Fixed(256)
+2026-09-25T19:29:19.574Z +0.018s WARN  [winit::platform_impl::linux::x11::xdisplay] session=13df1f75 error setting XSETTINGS; Xft options won't reload automatically
+2026-09-25T19:29:19.593Z +0.038s WARN  [winit::platform_impl::linux::x11::util::randr] session=13df1f75 XRandR reported that the display's 0mm in size, which is certifiably insane
+2026-09-25T19:29:19.651Z +0.095s WARN  [audio] session=13df1f75 real-time priority refused: AudioThreadPriorityError: org.freedesktop.DBus.Error.FileNotFound:Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+2026-09-25T19:29:29.668Z +10.112s INFO  [audio.health] session=13df1f75 last 10.0s: xruns=0 late_executions=1 late_arrivals=118 callbacks=1895 worst_run_us=5826
+2026-09-25T19:29:34.621Z +15.065s WARN  [doc] session=13df1f75 save-as failed error=injected failure at staged; edits kept
+2026-09-25T19:29:37.075Z +17.519s INFO  [recorder] session=13df1f75 take started
+2026-09-25T19:29:37.608Z +18.052s WARN  [recorder] session=13df1f75 take ended badly: recording failed after 0.5 s: injected write failure (KABL_RECORD_FAIL_AFTER), kept as target/signal-inspection-logging/default/recordings/kabl-20260925-192937Z-INCOMPLETE.wav
+2026-09-25T19:29:45.521Z +25.965s INFO  [doc] session=13df1f75 open ok origin=factory:recipes/filter-movement editor=2
+2026-09-25T19:29:48.286Z +28.730s INFO  [app] session=13df1f75 shutdown result=ok

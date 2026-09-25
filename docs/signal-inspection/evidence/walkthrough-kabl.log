@@ -1,0 +1,98 @@
+2026-09-25T19:08:35.103Z +0.000s INFO  [app] session=5022af82 start kabl-ui 0.1.0 (commit ef9ed7bd2501) level=DEBUG log=target/signal-inspection-walkthrough/user/logs/kabl.log
+2026-09-25T19:08:35.104Z +0.001s INFO  [library] session=5022af82 factory sounds: /home/user/kabl/patches; your sounds: target/signal-inspection-walkthrough/user/sounds
+2026-09-25T19:08:35.104Z +0.001s INFO  [midi] session=5022af82 listening for MIDI on "kabl-pipe" (test pipe)
+2026-09-25T19:08:35.104Z +0.001s INFO  [audio] session=5022af82 backend=Alsa requested rate=Some(48000) frames=Some(256) rt=true
+2026-09-25T19:08:35.116Z +0.013s INFO  [audio] session=5022af82 device=Some("Default Audio Device") rate=48000 channels=2 buffer=Fixed(256)
+2026-09-25T19:08:35.119Z +0.016s WARN  [winit::platform_impl::linux::x11::xdisplay] session=5022af82 error setting XSETTINGS; Xft options won't reload automatically
+2026-09-25T19:08:35.137Z +0.034s WARN  [winit::platform_impl::linux::x11::util::randr] session=5022af82 XRandR reported that the display's 0mm in size, which is certifiably insane
+2026-09-25T19:08:35.207Z +0.104s WARN  [audio] session=5022af82 real-time priority refused: AudioThreadPriorityError: org.freedesktop.DBus.Error.FileNotFound:Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+2026-09-25T19:08:42.523Z +7.420s DEBUG [inspect] session=5022af82 select module=4 port=out
+2026-09-25T19:08:45.212Z +10.109s INFO  [audio.health] session=5022af82 last 10.0s: xruns=0 late_executions=1 late_arrivals=138 callbacks=1894 worst_run_us=5415
+2026-09-25T19:08:51.115Z +16.012s DEBUG [inspect] session=5022af82 select module=1 port=gate
+2026-09-25T19:08:51.968Z +16.865s DEBUG [inspect] session=5022af82 why-no-sound open=true
+2026-09-25T19:08:55.215Z +20.112s INFO  [audio.health] session=5022af82 last 10.0s: xruns=0 late_executions=1 late_arrivals=164 callbacks=1876 worst_run_us=5417
+2026-09-25T19:09:04.434Z +29.331s DEBUG [graph] session=5022af82 compiled generation=2 fresh=false modules=6 took_us=50
+2026-09-25T19:09:05.228Z +30.125s INFO  [audio.health] session=5022af82 last 10.0s: xruns=0 late_executions=1 late_arrivals=158 callbacks=1877 worst_run_us=5417
+2026-09-25T19:09:05.934Z +30.831s DEBUG [graph] session=5022af82 compiled generation=3 fresh=false modules=6 took_us=47
+2026-09-25T19:09:07.527Z +32.424s DEBUG [inspect] session=5022af82 select module=4 port=out
+2026-09-25T19:09:14.247Z +39.144s DEBUG [graph] session=5022af82 compiled generation=4 fresh=false modules=6 took_us=58
+2026-09-25T19:09:14.592Z +39.489s DEBUG [graph] session=5022af82 compiled generation=5 fresh=false modules=6 took_us=54
+2026-09-25T19:09:15.230Z +40.127s INFO  [audio.health] session=5022af82 last 10.0s: xruns=1 late_executions=1 late_arrivals=147 callbacks=1872 worst_run_us=5575
+2026-09-25T19:09:19.934Z +44.831s DEBUG [inspect] session=5022af82 why-no-sound open=false
+2026-09-25T19:09:20.772Z +45.669s DEBUG [inspect] session=5022af82 clear
+2026-09-25T19:09:23.737Z +48.634s DEBUG [recipe] session=5022af82 start requested recipe=pluck-to-pad
+2026-09-25T19:09:23.737Z +48.634s INFO  [doc] session=5022af82 open ok origin=factory:recipes/pluck-to-pad editor=2
+2026-09-25T19:09:23.738Z +48.635s DEBUG [graph] session=5022af82 compiled generation=6 fresh=true modules=6 took_us=74
+2026-09-25T19:09:23.767Z +48.664s DEBUG [compare] session=5022af82 capture by=the recipe editor=2
+2026-09-25T19:09:23.767Z +48.664s DEBUG [recipe] session=5022af82 active recipe=pluck-to-pad
+2026-09-25T19:09:25.232Z +50.129s INFO  [audio.health] session=5022af82 last 10.0s: xruns=0 late_executions=0 late_arrivals=142 callbacks=1872 worst_run_us=5575
+2026-09-25T19:09:26.886Z +51.783s DEBUG [inspect] session=5022af82 select module=6 port=out
+2026-09-25T19:09:31.870Z +56.767s DEBUG [recipe] session=5022af82 step recipe=pluck-to-pad step=1
+2026-09-25T19:09:35.230Z +60.127s DEBUG [audio.health] session=5022af82 11265 callbacks × 256 frames at 48000 Hz · run: worst 7450 of 5333 µs (at 53.9 s, wall 1790363369067), 46 over half, 7 late · arrival: worst 35872 µs, 900 late · 1 xruns · RT priority refused (AudioThreadPriorityError: org.freedesktop.DBus.Error.FileNotFound:Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory) (first second: worst 322 µs)
+2026-09-25T19:09:35.265Z +60.162s INFO  [audio.health] session=5022af82 last 10.0s: xruns=0 late_executions=3 late_arrivals=151 callbacks=1880 worst_run_us=7450
+2026-09-25T19:09:35.332Z +60.229s DEBUG [graph] session=5022af82 compiled generation=7 fresh=false modules=6 took_us=65
+2026-09-25T19:09:40.216Z +65.113s DEBUG [recipe] session=5022af82 step recipe=pluck-to-pad step=2
+2026-09-25T19:09:42.448Z +67.345s DEBUG [graph] session=5022af82 compiled generation=8 fresh=false modules=6 took_us=92
+2026-09-25T19:09:45.276Z +70.173s INFO  [audio.health] session=5022af82 last 10.0s: xruns=0 late_executions=1 late_arrivals=157 callbacks=1877 worst_run_us=7450
+2026-09-25T19:09:48.319Z +73.216s DEBUG [recipe] session=5022af82 step recipe=pluck-to-pad step=3
+2026-09-25T19:09:50.509Z +75.406s DEBUG [graph] session=5022af82 compiled generation=9 fresh=false modules=6 took_us=65
+2026-09-25T19:09:55.309Z +80.206s INFO  [audio.health] session=5022af82 last 10.0s: xruns=0 late_executions=2 late_arrivals=150 callbacks=1881 worst_run_us=7450
+2026-09-25T19:09:56.359Z +81.256s DEBUG [recipe] session=5022af82 step recipe=pluck-to-pad step=4
+2026-09-25T19:10:01.508Z +86.405s DEBUG [compare] session=5022af82 restore applied
+2026-09-25T19:10:01.509Z +86.406s DEBUG [graph] session=5022af82 compiled generation=10 fresh=false modules=6 took_us=69
+2026-09-25T19:10:05.335Z +90.232s INFO  [audio.health] session=5022af82 last 10.0s: xruns=0 late_executions=1 late_arrivals=143 callbacks=1880 worst_run_us=7450
+2026-09-25T19:10:06.460Z +91.357s DEBUG [graph] session=5022af82 compiled generation=11 fresh=false modules=6 took_us=121
+2026-09-25T19:10:12.416Z +97.312s DEBUG [recipe] session=5022af82 step recipe=pluck-to-pad step=5
+2026-09-25T19:10:15.343Z +100.240s INFO  [audio.health] session=5022af82 last 10.0s: xruns=1 late_executions=2 late_arrivals=148 callbacks=1869 worst_run_us=8218
+2026-09-25T19:10:19.497Z +104.394s DEBUG [recipe] session=5022af82 start requested recipe=filter-movement
+2026-09-25T19:10:21.669Z +106.566s INFO  [doc] session=5022af82 open ok origin=factory:recipes/filter-movement editor=3
+2026-09-25T19:10:21.669Z +106.566s DEBUG [graph] session=5022af82 compiled generation=12 fresh=true modules=7 took_us=50
+2026-09-25T19:10:21.703Z +106.600s DEBUG [compare] session=5022af82 reference dropped: editor replaced
+2026-09-25T19:10:21.703Z +106.600s DEBUG [compare] session=5022af82 capture by=the recipe editor=3
+2026-09-25T19:10:21.703Z +106.600s DEBUG [recipe] session=5022af82 active recipe=filter-movement
+2026-09-25T19:10:21.703Z +106.600s DEBUG [inspect] session=5022af82 clear
+2026-09-25T19:10:25.358Z +110.255s INFO  [audio.health] session=5022af82 last 10.0s: xruns=1 late_executions=0 late_arrivals=140 callbacks=1869 worst_run_us=8218
+2026-09-25T19:10:27.247Z +112.144s DEBUG [graph] session=5022af82 compiled generation=13 fresh=false modules=7 took_us=120
+2026-09-25T19:10:30.305Z +115.202s DEBUG [graph] session=5022af82 compiled generation=14 fresh=false modules=7 took_us=75
+2026-09-25T19:10:32.859Z +117.756s DEBUG [recipe] session=5022af82 step recipe=filter-movement step=1
+2026-09-25T19:10:35.244Z +120.141s DEBUG [audio.health] session=5022af82 22499 callbacks × 256 frames at 48000 Hz · run: worst 8218 of 5333 µs (at 91.3 s, wall 1790363406416), 83 over half, 13 late · arrival: worst 55688 µs, 1777 late · 4 xruns · RT priority refused (AudioThreadPriorityError: org.freedesktop.DBus.Error.FileNotFound:Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory) (first second: worst 322 µs)
+2026-09-25T19:10:35.385Z +120.282s INFO  [audio.health] session=5022af82 last 10.0s: xruns=1 late_executions=0 late_arrivals=141 callbacks=1879 worst_run_us=8218
+2026-09-25T19:10:36.641Z +121.538s DEBUG [graph] session=5022af82 compiled generation=15 fresh=false modules=7 took_us=79
+2026-09-25T19:10:41.833Z +126.730s DEBUG [recipe] session=5022af82 step recipe=filter-movement step=2
+2026-09-25T19:10:42.635Z +127.532s DEBUG [inspect] session=5022af82 select module=7 port=out
+2026-09-25T19:10:45.422Z +130.319s INFO  [audio.health] session=5022af82 last 10.0s: xruns=0 late_executions=0 late_arrivals=175 callbacks=1880 worst_run_us=8218
+2026-09-25T19:10:46.951Z +131.848s DEBUG [graph] session=5022af82 compiled generation=16 fresh=false modules=7 took_us=197
+2026-09-25T19:10:51.017Z +135.914s DEBUG [recipe] session=5022af82 step recipe=filter-movement step=3
+2026-09-25T19:10:51.848Z +136.745s DEBUG [recipe] session=5022af82 step recipe=filter-movement step=4
+2026-09-25T19:10:55.455Z +140.352s INFO  [audio.health] session=5022af82 last 10.0s: xruns=0 late_executions=3 late_arrivals=159 callbacks=1881 worst_run_us=8218
+2026-09-25T19:10:55.742Z +140.639s DEBUG [compare] session=5022af82 restore applied
+2026-09-25T19:10:55.743Z +140.640s DEBUG [graph] session=5022af82 compiled generation=17 fresh=false modules=7 took_us=72
+2026-09-25T19:11:00.694Z +145.591s DEBUG [graph] session=5022af82 compiled generation=18 fresh=false modules=7 took_us=75
+2026-09-25T19:11:05.471Z +150.368s INFO  [audio.health] session=5022af82 last 10.0s: xruns=0 late_executions=4 late_arrivals=156 callbacks=1878 worst_run_us=8471
+2026-09-25T19:11:08.395Z +153.292s DEBUG [recipe] session=5022af82 start requested recipe=interlocking
+2026-09-25T19:11:10.537Z +155.434s INFO  [doc] session=5022af82 open ok origin=factory:interlocking editor=4
+2026-09-25T19:11:10.537Z +155.434s DEBUG [graph] session=5022af82 compiled generation=19 fresh=true modules=15 took_us=49
+2026-09-25T19:11:10.573Z +155.470s DEBUG [compare] session=5022af82 reference dropped: editor replaced
+2026-09-25T19:11:10.573Z +155.470s DEBUG [compare] session=5022af82 capture by=the recipe editor=4
+2026-09-25T19:11:10.573Z +155.470s DEBUG [recipe] session=5022af82 active recipe=interlocking
+2026-09-25T19:11:10.573Z +155.470s DEBUG [inspect] session=5022af82 clear
+2026-09-25T19:11:12.652Z +157.549s DEBUG [inspect] session=5022af82 select module=1 port=gate
+2026-09-25T19:11:13.518Z +158.415s DEBUG [inspect] session=5022af82 why-no-sound open=true
+2026-09-25T19:11:15.481Z +160.378s INFO  [audio.health] session=5022af82 last 10.0s: xruns=0 late_executions=1 late_arrivals=167 callbacks=1877 worst_run_us=8471
+2026-09-25T19:11:23.796Z +168.693s DEBUG [recipe] session=5022af82 step recipe=interlocking step=1
+2026-09-25T19:11:24.667Z +169.564s DEBUG [inspect] session=5022af82 select module=2 port=gate
+2026-09-25T19:11:25.496Z +170.393s INFO  [audio.health] session=5022af82 last 10.0s: xruns=0 late_executions=2 late_arrivals=179 callbacks=1878 worst_run_us=9664
+2026-09-25T19:11:29.780Z +174.677s DEBUG [recipe] session=5022af82 step recipe=interlocking step=2
+2026-09-25T19:11:31.913Z +176.810s DEBUG [graph] session=5022af82 compiled generation=20 fresh=false modules=15 took_us=78
+2026-09-25T19:11:35.271Z +180.168s DEBUG [audio.health] session=5022af82 33752 callbacks × 256 frames at 48000 Hz · run: worst 9664 of 5333 µs (at 166.5 s, wall 1790363481777), 117 over half, 24 late · arrival: worst 55688 µs, 2787 late · 4 xruns · RT priority refused (AudioThreadPriorityError: org.freedesktop.DBus.Error.FileNotFound:Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory) (first second: worst 322 µs)
+2026-09-25T19:11:35.528Z +180.425s INFO  [audio.health] session=5022af82 last 10.0s: xruns=0 late_executions=1 late_arrivals=178 callbacks=1880 worst_run_us=9664
+2026-09-25T19:11:38.964Z +183.861s DEBUG [recipe] session=5022af82 step recipe=interlocking step=3
+2026-09-25T19:11:41.138Z +186.035s DEBUG [graph] session=5022af82 compiled generation=21 fresh=false modules=15 took_us=52
+2026-09-25T19:11:45.551Z +190.448s INFO  [audio.health] session=5022af82 last 10.0s: xruns=0 late_executions=2 late_arrivals=164 callbacks=1880 worst_run_us=9664
+2026-09-25T19:11:48.188Z +193.085s DEBUG [recipe] session=5022af82 step recipe=interlocking step=4
+2026-09-25T19:11:52.059Z +196.956s DEBUG [compare] session=5022af82 restore applied
+2026-09-25T19:11:52.060Z +196.957s DEBUG [graph] session=5022af82 compiled generation=22 fresh=false modules=15 took_us=47
+2026-09-25T19:11:55.585Z +200.482s INFO  [audio.health] session=5022af82 last 10.0s: xruns=1 late_executions=1 late_arrivals=166 callbacks=1878 worst_run_us=9664
+2026-09-25T19:11:58.202Z +203.099s DEBUG [graph] session=5022af82 compiled generation=23 fresh=false modules=15 took_us=48
+2026-09-25T19:12:03.372Z +208.269s DEBUG [recipe] session=5022af82 step recipe=interlocking step=5
+2026-09-25T19:12:05.609Z +210.506s INFO  [audio.health] session=5022af82 last 10.0s: xruns=0 late_executions=3 late_arrivals=176 callbacks=1879 worst_run_us=9664

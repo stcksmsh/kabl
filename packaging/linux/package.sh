@@ -28,6 +28,9 @@ Run:        ./bin/kabl-ui                  (opens the sound browser)
 Factory sounds: share/kabl/patches (read-only; Save As makes your own copy).
 Your sounds:    \$XDG_DATA_HOME/kabl/sounds, usually ~/.local/share/kabl/sounds
                 (favorites and recents: ~/.local/share/kabl/library.json).
+Logs:           ~/.local/state/kabl/logs/kabl.log (INFO and above; up to 4 MiB rotated).
+                KABL_LOG=debug ./bin/kabl-ui (or --log-level debug) adds detail;
+                KABL_LOG_DIR=<dir> puts them elsewhere. The status bar's Log button copies the path.
 Overrides:      KABL_FACTORY_DIR=<dir>, KABL_USER_DIR=<dir>.
 Needs: ALSA (libasound2), X11 or Wayland with OpenGL, libxkbcommon-x11.
 TXT

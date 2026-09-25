@@ -1,0 +1,7 @@
+patch patches/init-keyboard, 6 modules; tap on #3 filter.svf output 0; 60 s per run, 3 runs per mode, interleaved; 48000 Hz, 256-frame callbacks (budget 5333 µs)
+memory: tap state 720 B per graph, report 552 B, report queue 8 × 552 B
+mode             callbacks   p50 µs   p90 µs   p99 µs  p99.9 µs   max µs  mean µs
+off                  33750    107.8    130.8    210.0     360.4   2014.8    115.1
+on                   33750    116.9    143.4    226.7     591.0   2294.5    126.3
+off+swaps            33750    107.8    130.8    219.4     429.0   1925.5    115.8
+on+select+swaps      33750    117.3    227.9    384.2     674.7   3795.4    147.6

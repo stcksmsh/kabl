@@ -1,0 +1,27 @@
+== debug: 22 lines; by level:
+      7 DEBUG
+     10 INFO
+      5 WARN
+-- lines (session and time columns kept):
+2026-09-25T19:29:49.088Z +0.000s INFO  [app] session=7884103a start kabl-ui 0.1.0 (commit ef9ed7bd2501) level=DEBUG log=target/signal-inspection-logging/debug/logs/kabl.log
+2026-09-25T19:29:49.089Z +0.001s INFO  [library] session=7884103a factory sounds: /home/user/kabl/patches; your sounds: target/signal-inspection-logging/debug/sounds
+2026-09-25T19:29:49.090Z +0.002s INFO  [midi] session=7884103a listening for MIDI on "kabl-pipe" (test pipe)
+2026-09-25T19:29:49.090Z +0.002s INFO  [audio] session=7884103a backend=Alsa requested rate=Some(48000) frames=Some(256) rt=true
+2026-09-25T19:29:49.103Z +0.015s INFO  [audio] session=7884103a device=Some("Default Audio Device") rate=48000 channels=2 buffer=Fixed(256)
+2026-09-25T19:29:49.106Z +0.017s WARN  [winit::platform_impl::linux::x11::xdisplay] session=7884103a error setting XSETTINGS; Xft options won't reload automatically
+2026-09-25T19:29:49.123Z +0.035s WARN  [winit::platform_impl::linux::x11::util::randr] session=7884103a XRandR reported that the display's 0mm in size, which is certifiably insane
+2026-09-25T19:29:49.178Z +0.089s WARN  [audio] session=7884103a real-time priority refused: AudioThreadPriorityError: org.freedesktop.DBus.Error.FileNotFound:Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+2026-09-25T19:29:58.357Z +9.268s DEBUG [inspect] session=7884103a select module=4 port=out
+2026-09-25T19:29:59.196Z +10.107s INFO  [audio.health] session=7884103a last 10.0s: xruns=1 late_executions=1 late_arrivals=95 callbacks=1893 worst_run_us=5676
+2026-09-25T19:30:00.489Z +11.401s DEBUG [graph] session=7884103a compiled generation=2 fresh=false modules=6 took_us=69
+2026-09-25T19:30:04.155Z +15.067s WARN  [doc] session=7884103a save-as failed error=injected failure at staged; edits kept
+2026-09-25T19:30:06.574Z +17.486s INFO  [recorder] session=7884103a take started
+2026-09-25T19:30:07.106Z +18.018s WARN  [recorder] session=7884103a take ended badly: recording failed after 0.5 s: injected write failure (KABL_RECORD_FAIL_AFTER), kept as target/signal-inspection-logging/debug/recordings/kabl-20260925-193006Z-INCOMPLETE.wav
+2026-09-25T19:30:09.198Z +20.110s INFO  [audio.health] session=7884103a last 10.0s: xruns=0 late_executions=2 late_arrivals=139 callbacks=1875 worst_run_us=5738
+2026-09-25T19:30:12.813Z +23.725s DEBUG [recipe] session=7884103a start requested recipe=filter-movement
+2026-09-25T19:30:14.959Z +25.871s INFO  [doc] session=7884103a open ok origin=factory:recipes/filter-movement editor=2
+2026-09-25T19:30:14.960Z +25.871s DEBUG [graph] session=7884103a compiled generation=3 fresh=true modules=7 took_us=79
+2026-09-25T19:30:14.991Z +25.902s DEBUG [compare] session=7884103a capture by=the recipe editor=2
+2026-09-25T19:30:14.991Z +25.902s DEBUG [recipe] session=7884103a active recipe=filter-movement
+2026-09-25T19:30:14.991Z +25.902s DEBUG [inspect] session=7884103a clear
+2026-09-25T19:30:17.728Z +28.640s INFO  [app] session=7884103a shutdown result=ok
