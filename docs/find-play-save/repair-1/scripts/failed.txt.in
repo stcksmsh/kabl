@@ -1,0 +1,20 @@
+# The failed-save message (scripted, run with KABL_SAVE_FAIL=staged), theme THEME:
+# close → Save → Save As on the factory pad → the save fails, the dialog says so.
+sleep 2
+click theme:THEME
+click sound:factory:palette/pad
+click open
+sleep 1
+click perform
+sleep 0.5
+dragby pslider:1.m1 60 0
+wmclose
+sleep 1
+click dlg:save
+sleep 0.8
+fill dlg:name Mine
+click dlg:save
+sleep 1
+shot THEME-save-failed
+running
+click dlg:cancel

@@ -1,0 +1,6 @@
+close-1-cancel-save: script finished
+closed-pad
+close-2-failed-save: script finished
+closed-pad unchanged by the failed save
+close-3-dialog-open: script finished
+close-4-unedited: script finished

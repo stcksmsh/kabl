@@ -1,0 +1,22 @@
+# R3 part 3 (scripted): close while a Save As dialog is open (the dialog stays, the app keeps
+# running), Cancel, then close → Don't save quits. Part 4 below: an unedited sound quits
+# at once.
+sleep 2
+click sound:factory:palette/lead
+click open
+sleep 1
+click perform
+sleep 0.5
+dragby pslider:1.m1 40 0
+click save-as
+sleep 0.8
+wmclose
+sleep 1
+running
+shot c3-close-while-save-as-open
+click dlg:cancel
+sleep 0.5
+wmclose
+sleep 1
+click dlg:discard
+exited 5
