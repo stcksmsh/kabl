@@ -204,16 +204,16 @@ All real-app evidence is **scripted**. `docs/rack-migration/drive.py` uses xdoto
   `DISPLAY=:97 KABL_ARGS=--perform python3 docs/rack-migration/drive.py docs/musical-controls/scripts/shots.txt 1440x900 OUT patches/palette/pad`.
 - **Walkthrough with audio**: [`walkthrough.mp4`](walkthrough.mp4), 77 s, Evolving Pad at
   1440×900, recorded by [`record-walkthrough.sh`](record-walkthrough.sh) from
-  [`scripts/walkthrough.txt`](scripts/walkthrough.txt). The steps:
-  1. Hold a chord and explain "Warmth".
-  2. Turn Warmth up and down through its mapping, MIDI CC 20. The sound brightens and darkens,
+  [`scripts/walkthrough.txt`](scripts/walkthrough.txt). The steps (video time in seconds from `evidence/walkthrough-drive.log` minus `walkthrough-t0.txt`):
+  1. 0:06 Hold a chord and explain "Warmth".
+  2. 0:11 and 0:27 Turn Warmth up and down through its mapping, MIDI CC 20. The sound brightens and darkens,
      and the card shows `● live`.
-  3. Show Cutoff, then the off-face Drive.
-  4. Back to the card.
-  5. Explain and Show the direct "Attack" pin.
-  6. Bypass the Warmth → Cutoff route. The explanation row is struck through at once.
-  7. Undo with Ctrl+Z. The row returns.
-  8. Toggle Help, then close with Escape.
+  3. 0:17 / 0:22 Show Cutoff, then the off-face Drive.
+  4. 0:32 Back to the card.
+  5. 0:36 / 0:40 Explain and Show the direct "Attack" pin.
+  6. 0:56 Bypass the Warmth → Cutoff route. The explanation row is struck through at once.
+  7. 1:01 Undo with Ctrl+Z. The row returns.
+  8. 1:06 / 1:10 Toggle Help, then close with Escape.
 
   Audio is 48 kHz with 256-frame buffers. The app plays through ALSA → PipeWire 1.0.5 into a
   silent null sink and is recorded from its monitor. The track's mean is −18.9 dB, peak −2.5 dB.
