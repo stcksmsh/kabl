@@ -3,6 +3,25 @@
 Read this, then `docs/STATUS.md` (top section) and the last entries of `docs/decisions.md`.
 Trust code and git over older docs.
 
+## Current assignment — D03 closeout followed by D04 (2026-09-26)
+
+Kosta authorized one agent to finish D03 and implement D04 sequentially; no parallel work.
+Brief: docs/product-research/briefs/D04.md. Launch:
+docs/product-research/briefs/D04-LAUNCH.md. Engineering is authorized, not yet reported started.
+This supersedes the older "do not start D04" instructions below. Stop after D04; no D05.
+
+Kosta accepted the narrow D03-R1 stream-error overflow free/allocator-lock exception.
+See the latest decisions.md entry. Normal audio/control callback safety is not relaxed.
+D03-R2 closes the intermediate audio-input diagnosis gap and clarifies the age of a last
+delivered error message. D04 then delivers runtime parameters and editor-independent mapped
+controls with generation ordering, history/save compatibility and combined reviewer coverage.
+
+PR #5 is merged by Kosta at 6404b219837d87da59029390052e62ac6290da1f; its product tree
+matches tested/reviewed d21f42b. Prior handoff references to the PR awaiting merge and
+the contract decision pending are historical. All hands-on reviews remain pending:
+D03, D02, D01/D01-R1, Composition + Motion and Sound Palette. D00 remains incomplete.
+The two D03-R1 cloud stalls were observed, not explained or recovered.
+
 ## D03 Signal inspection and three listening recipes (+ D03-R1) — built, owner review pending (2026-09-25)
 
 Implemented in the cloud on branch `claude/d02-musical-controls-knjmgu` (environment-required

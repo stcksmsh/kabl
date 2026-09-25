@@ -5,11 +5,16 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-25. D03 is built and submitted in the cloud (branch
-`claude/d02-musical-controls-knjmgu`, PR for Kosta); its owner review is pending. D02, D01 and
-D01-R1 also wait for Kosta's hands-on checks. Composition + Motion and Sound Palette are still
-waiting for their own hands-on reviews: Kosta explicitly deferred them, and they are not
-approved. D00 is not complete. Nothing after D03 is authorized.
+Last updated: 2026-09-26. D03 + D03-R1 are merged through PR #5 at
+6404b219837d87da59029390052e62ac6290da1f. Product code matches tested/reviewed d21f42b.
+Kosta accepted the narrow backend-error overflow free/allocator-lock exception; see the
+latest decisions.md entry. This is not hands-on acceptance.
+
+**Next authorized assignment: D03-R2 closeout, then D04, one sequential agent.**
+Brief: [D04](product-research/briefs/D04.md); launch:
+[D04-LAUNCH](product-research/briefs/D04-LAUNCH.md). Engineering authorized; no start/result
+reported yet. No parallel work. D05 is not authorized. D03, D02, D01/D01-R1,
+Composition + Motion and Sound Palette hands-on reviews remain pending. D00 is incomplete.
 
 **D03 Signal inspection and three listening recipes (owner-authorized, 2026-09-25): built,
 awaiting Kosta's review.**
@@ -31,12 +36,13 @@ awaiting Kosta's review.**
 - **Evidence limits**: scripted in the cloud (Xvfb, PipeWire null sink, fifo MIDI stand-in,
   no RT priority); not laptop, controller or learning evidence. The cloud walkthrough still
   shows short audio dips correlated with VM xruns; no cause is established.
-- **D03-R1 correction (submitted).**
+- **D03-R1 correction (merged; owner hands-on pending).**
   - Stream errors are now bounded: at most 16 are outstanding; the rest are counted by kind
     and dropped in the error callback, where the D03 version leaked them.
-  - This depends on a **contract adjustment that needs a decision**: the backend allocates
-    the messages on the audio thread, so a bound means freeing them there. See
-    `signal-inspection/design.md`, "Stream-error ownership".
+  - Kosta accepted the narrow contract adjustment on 2026-09-26: the backend allocates
+    messages on the audio thread; overflow may free one there and acquire the allocator's
+    internal lock. See `signal-inspection/design.md`, "Stream-error ownership", and the
+    latest decisions.md entry. Normal data/control callback safety is unchanged.
   - Real-app, logging, cost and package evidence were refreshed on the final head. The
     known cloud stream stall hit twice (one perf run and one logging run).
   - Workspace tests: 520 passed, 0 failed, 15 ignored.

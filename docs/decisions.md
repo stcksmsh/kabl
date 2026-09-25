@@ -2561,3 +2561,25 @@ Implementation choices inside the authorized D03 brief. Not owner approvals. Rec
   xruns or late executions happened; arrival lateness alone at DEBUG). The existing
   `eprintln!` in that callback is gone. `KABL_STATS_FILE`'s first line is unchanged; a second
   line adds a 50 µs-bin execution histogram (one relaxed atomic add per callback).
+
+## 2026-09-26 — D03 closeout and D04 authorized, one sequential agent
+
+- Kosta accepted the supervisor's D03-R1 recommendation with "Let's do it" and asked for
+  the remaining D03 work and D04 in the same agent. He clarified: "No need for
+  parallelization actually, just D03 finish and D04".
+- Accepted contract exception: when the bounded stream-error hand-off queue is full,
+  its callback may drop the backend-owned message, whose free may take the allocator's
+  internal lock. This applies to BackendError on the pinned cpal 0.18.2 ALSA build.
+  No broader relaxation of normal audio/control callback safety is authorized.
+- Keep the 16-slot bound and error counts. The original D03-R1 proposal remains in
+  signal-inspection/design.md as historical rationale; this entry supplies its disposition.
+- One assignment: D03-R2 broken-audio-input diagnosis and error-message age clarification,
+  then D04 runtime controls without recompilation. Brief:
+  product-research/briefs/D04.md; launch: product-research/briefs/D04-LAUNCH.md.
+  Internal increments are not approval gates. No parallel work and no D05 authorization.
+- Verified master 6404b219837d87da59029390052e62ac6290da1f is Kosta's PR #5 merge and
+  retains d21f42b's product code. Later differences are documentation/evidence.
+  The supervisor checked merge identity, report, reviewer findings and the remaining
+  diagnosis source; did not rerun the workspace tests or duplicate a full code review.
+- D03/D02/D01/D01-R1/Composition + Motion/Sound Palette hands-on reviews remain pending.
+  D00 is incomplete. The cloud stalls and Composition spike remain unresolved.
