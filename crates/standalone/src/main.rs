@@ -118,8 +118,8 @@ fn run(args: &[String]) -> i32 {
 
     let xruns = Arc::new(AtomicU64::new(0));
     let xruns_cb = xruns.clone();
-    let lost = Arc::new(AtomicU64::new(0));
-    let lost_cb = lost.clone();
+    let errors = Arc::new(kabl_standalone::StreamErrorCounts::default());
+    let errors_cb = errors.clone();
     let (mut faults_tx, mut faults_rx) =
         rtrb::RingBuffer::<cpal::Error>::new(kabl_standalone::STREAM_ERROR_QUEUE);
     let mut left_ring = RingBuffer::new(RING_CAPACITY);
@@ -152,12 +152,12 @@ fn run(args: &[String]) -> i32 {
                 }
             }
         },
-        // May run on the audio thread: count and hand over unformatted; logged below.
+        // On the audio thread: count and hand over unformatted; logged below.
         move |err| {
             if err.kind() == cpal::ErrorKind::Xrun {
                 xruns_cb.fetch_add(1, Ordering::Relaxed);
             }
-            kabl_standalone::hand_off_stream_error(err, &mut faults_tx, &lost_cb);
+            kabl_standalone::hand_off_stream_error(err, &mut faults_tx, &errors_cb);
         },
         None,
     );
@@ -184,15 +184,12 @@ fn run(args: &[String]) -> i32 {
     // only queue up on a completed swap, and none happen in this v1 binary.
     // Every second: drop the handed-over errors here (not on the audio thread); every 10 s,
     // log what the audio side counted, as one line when something happened.
-    let (mut seen, mut lost_seen) = (0, 0);
-    let (mut n, mut last) = (0u64, None::<String>);
+    let (mut seen, mut errors_seen) = (0, [0; kabl_standalone::STREAM_ERROR_KINDS.len() + 2]);
+    let mut last = None::<String>;
     for tick in 1u64.. {
         std::thread::sleep(std::time::Duration::from_secs(1));
         while let Ok(e) = faults_rx.pop() {
-            if e.kind() != cpal::ErrorKind::Xrun {
-                n += 1;
-                last = Some(e.to_string());
-            }
+            last = Some(e.to_string());
         }
         if tick % 10 != 0 {
             continue;
@@ -202,15 +199,13 @@ fn run(args: &[String]) -> i32 {
             log::info!(target: "audio.health", "last 10s: xruns={}", x - seen);
             seen = x;
         }
-        if let Some(e) = last.take() {
-            let l = lost.load(Ordering::Relaxed);
+        let (kinds, lost) = errors.since(&mut errors_seen);
+        if !kinds.is_empty() {
             log::warn!(
                 target: "audio",
-                "stream errors={n} in 10s, last: {e}; not delivered (queue full) in that time: {}",
-                l - lost_seen
+                "stream errors in 10s: {kinds}; last delivered: {}; not delivered (queue full): {lost}",
+                last.take().as_deref().unwrap_or("none")
             );
-            lost_seen = l;
-            n = 0;
         }
     }
     0

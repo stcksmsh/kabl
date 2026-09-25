@@ -57,8 +57,8 @@ struct AudioHost {
     timing: Option<Arc<CallbackTiming>>,
     /// Selected-signal measurements from the audio callback (D03).
     probe_rx: Option<rtrb::Consumer<ProbeReport>>,
-    /// Non-xrun stream errors, moved out of the error callback unformatted (it may run on the
-    /// audio thread); logged here.
+    /// Stream errors except bare xruns, moved out of the error callback unformatted (it runs
+    /// on the audio thread); logged here.
     faults_rx: Option<rtrb::Consumer<cpal::Error>>,
     /// Graph generation of the last rebuild attempt (`CompiledPatch::generation`).
     generation: u64,
@@ -95,8 +95,9 @@ struct CallbackTiming {
     frames_max: AtomicU64,
     xruns: AtomicU64,
     other_errors: AtomicU64,
-    /// Stream errors the error callback could not hand over (queue full; forgotten there).
-    errors_lost: AtomicU64,
+    /// Stream errors the error callback handed over, by kind, and those that found the queue
+    /// full (dropped there).
+    errors: kabl_standalone::StreamErrorCounts,
     /// Frames delivered to the device: the audio clock probe reports are aged against.
     frames_total: AtomicU64,
     /// Execution times after the first second, in `HIST_BIN_US` bins (the last one open).
@@ -493,10 +494,10 @@ impl AudioHost {
                 t.record(started.elapsed(), since_last, frames_needed, sample_rate);
             },
             move |err| {
-                // May run on the audio thread: count, and hand the error over unformatted to
-                // the UI thread, which logs and drops it (`hand_off_stream_error`).
+                // On the audio thread: count, and hand the error over unformatted to the UI
+                // thread, which logs and drops it (`hand_off_stream_error`).
                 t_err.error(&err);
-                kabl_standalone::hand_off_stream_error(err, &mut faults_tx, &t_err.errors_lost);
+                kabl_standalone::hand_off_stream_error(err, &mut faults_tx, &t_err.errors);
             },
             None,
         );
@@ -833,10 +834,9 @@ struct Health {
     counts: [u64; 5],
     rt_logged: bool,
     stalled: bool,
-    /// Stream errors taken from the queue since the last WARN line.
-    faults: u64,
-    /// `errors_lost` at the last WARN line.
-    lost_seen: u64,
+    /// `errors` at the last WARN line.
+    errors_seen: [u64; kabl_standalone::STREAM_ERROR_KINDS.len() + 2],
+    /// The last error taken from the queue since the last WARN line.
     fault_text: Option<String>,
     log_problem: Option<String>,
     log_checked: std::time::Instant,
@@ -851,8 +851,7 @@ impl Health {
             counts: [0; 5],
             rt_logged: false,
             stalled: false,
-            faults: 0,
-            lost_seen: 0,
+            errors_seen: [0; kabl_standalone::STREAM_ERROR_KINDS.len() + 2],
             fault_text: None,
             log_problem: None,
             log_checked: now,
@@ -866,10 +865,7 @@ impl App {
         let h = &mut self.health;
         if let Some(rx) = self.audio.faults_rx.as_mut() {
             while let Ok(e) = rx.pop() {
-                if e.kind() != cpal::ErrorKind::Xrun {
-                    h.faults += 1;
-                    h.fault_text = Some(e.to_string());
-                }
+                h.fault_text = Some(e.to_string());
             }
         }
         let Some(t) = &self.audio.timing else {
@@ -908,16 +904,13 @@ impl App {
                     d[0], d[1], d[2], d[4], get(&t.worst_ns) as f64 / 1e3
                 );
             }
-            if h.faults > 0 {
+            let (kinds, lost) = t.errors.since(&mut h.errors_seen);
+            if !kinds.is_empty() {
                 log::warn!(
                     target: "audio",
-                    "stream errors={} in {secs:.1}s, last: {}; not delivered (queue full) in that time: {}",
-                    h.faults,
-                    h.fault_text.as_deref().unwrap_or("?"),
-                    get(&t.errors_lost) - h.lost_seen
+                    "stream errors in {secs:.1}s: {kinds}; last delivered: {}; not delivered (queue full): {lost}",
+                    h.fault_text.take().as_deref().unwrap_or("none")
                 );
-                h.lost_seen = get(&t.errors_lost);
-                h.faults = 0;
             }
             h.counts = now;
             h.at = std::time::Instant::now();

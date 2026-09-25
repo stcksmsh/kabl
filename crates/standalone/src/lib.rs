@@ -7,26 +7,94 @@
 
 pub mod applog;
 
-/// Stream errors from the error callback to another thread (`stream_errors`).
-pub const STREAM_ERROR_QUEUE: usize = 256;
+/// Stream errors from the error callback to another thread (`stream_errors`). This bounds the
+/// errors whose ownership is outstanding at once; every error is also counted by kind.
+pub const STREAM_ERROR_QUEUE: usize = 16;
 
-/// For a stream's error callback, which can run on the audio thread: moves `err` into `tx`
-/// for another thread to log and drop. When the queue is full the error is forgotten, not
-/// dropped here (dropping can free its message on the audio thread), and counted in `lost`.
-/// Never formats, logs, locks or frees.
+/// The `cpal::ErrorKind`s counted apart; any other (the enum is non-exhaustive) counts in one
+/// more slot, "unknown".
+pub const STREAM_ERROR_KINDS: [cpal::ErrorKind; 14] = {
+    use cpal::ErrorKind::*;
+    [
+        DeviceBusy,
+        DeviceChanged,
+        DeviceNotAvailable,
+        HostUnavailable,
+        InvalidInput,
+        PermissionDenied,
+        RealtimeDenied,
+        ResourceExhausted,
+        StreamInvalidated,
+        UnsupportedConfig,
+        UnsupportedOperation,
+        Xrun,
+        BackendError,
+        Other,
+    ]
+};
+
+/// Written by the error callback with relaxed atomics: every handed-over error by kind, and how
+/// many found the queue full.
+#[derive(Default)]
+pub struct StreamErrorCounts {
+    pub by_kind: [std::sync::atomic::AtomicU64; STREAM_ERROR_KINDS.len() + 1],
+    pub undelivered: std::sync::atomic::AtomicU64,
+}
+
+impl StreamErrorCounts {
+    /// Off the audio thread: the counts since `seen` as "Kind=n …" (empty when none) and the
+    /// undelivered count since then; updates `seen`.
+    pub fn since(&self, seen: &mut [u64; STREAM_ERROR_KINDS.len() + 2]) -> (String, u64) {
+        use std::sync::atomic::Ordering::Relaxed;
+        let mut text = String::new();
+        for (i, c) in self.by_kind.iter().enumerate() {
+            let n = c.load(Relaxed);
+            if n != seen[i] {
+                let name = STREAM_ERROR_KINDS
+                    .get(i)
+                    .map_or("unknown".to_string(), |k| format!("{k:?}"));
+                text += &format!(
+                    "{}{name}={}",
+                    if text.is_empty() { "" } else { " " },
+                    n - seen[i]
+                );
+                seen[i] = n;
+            }
+        }
+        let u = self.undelivered.load(Relaxed);
+        let lost = u - seen[STREAM_ERROR_KINDS.len() + 1];
+        seen[STREAM_ERROR_KINDS.len() + 1] = u;
+        (text, lost)
+    }
+}
+
+/// For a stream's error callback, which runs on the audio thread (cpal 0.18.2 ALSA calls it
+/// from the stream's worker thread, between data callbacks; see signal-inspection design.md):
+/// counts `err` by kind and moves it into `tx` for another thread to log and drop. Never
+/// allocates, formats, logs, locks or blocks.
+///
+/// When the queue is full the error is dropped here and counted in `undelivered`. That frees
+/// its message if the backend allocated one (on ALSA only `BackendError` does, allocated by
+/// cpal on this thread just before the call); keeping it instead would hold memory without
+/// bound while the consumer is paused. At most `STREAM_ERROR_QUEUE` errors are outstanding.
 pub fn hand_off_stream_error(
     err: cpal::Error,
     tx: &mut rtrb::Producer<cpal::Error>,
-    lost: &std::sync::atomic::AtomicU64,
+    counts: &StreamErrorCounts,
 ) {
+    use std::sync::atomic::Ordering::Relaxed;
     // A bare xrun owns nothing (callers count xruns themselves): dropping it here frees
     // nothing, and it cannot crowd a real device error out of the queue.
     if err.kind() == cpal::ErrorKind::Xrun && err.message().is_none() {
         return;
     }
-    if let Err(rtrb::PushError::Full(e)) = tx.push(err) {
-        lost.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        std::mem::forget(e);
+    let i = STREAM_ERROR_KINDS
+        .iter()
+        .position(|k| *k == err.kind())
+        .unwrap_or(STREAM_ERROR_KINDS.len());
+    counts.by_kind[i].fetch_add(1, Relaxed);
+    if tx.push(err).is_err() {
+        counts.undelivered.fetch_add(1, Relaxed);
     }
 }
 

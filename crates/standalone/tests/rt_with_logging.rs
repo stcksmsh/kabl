@@ -1,17 +1,18 @@
 //! D03: the audio-side paths stay allocation-free with the logger installed at TRACE: the
 //! engine with the tap on (swaps, selection changes), the report hand-off into a full queue,
-//! and the stream-error hand-off into a full queue with an error that owns its message
-//! (forgotten, not freed, on the audio thread). The callback's timing counters are relaxed
+//! and the stream-error hand-off into a full queue with an error like cpal's ALSA disconnect
+//! (a static message: dropping it frees nothing). An error with an owned message is freed on
+//! overflow; `tests/stream_error_overflow.rs` covers that path. The callback's timing counters are relaxed
 //! atomics and are not repeated here.
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::Ordering;
 
 use assert_no_alloc::{assert_no_alloc, AllocDisabler};
 use basedrop::Collector;
 use kabl_engine::graph::BLOCK;
 use kabl_engine::patch_engine::{Command, PatchEngine};
 use kabl_engine::probe::{ProbeReport, ProbeTarget};
-use kabl_standalone::{applog, hand_off_stream_error};
+use kabl_standalone::{applog, hand_off_stream_error, StreamErrorCounts};
 
 #[global_allocator]
 static ALLOCATOR: AllocDisabler = AllocDisabler;
@@ -33,15 +34,13 @@ fn audio_side_paths_do_not_allocate_with_trace_logging() {
     let mut e = PatchEngine::new(&h, &patch, 48000.0, 8).unwrap();
     let (mut ptx, _prx) = rtrb::RingBuffer::<ProbeReport>::new(1);
     let (mut etx, _erx) = rtrb::RingBuffer::<cpal::Error>::new(1);
-    let lost = AtomicU64::new(0);
+    let counts = StreamErrorCounts::default();
     let (mut l, mut r) = ([0.0; BLOCK], [0.0; BLOCK]);
     for i in 0..400u64 {
         let g = (i % 40 == 0).then(|| e.build_swap(&h, &patch).unwrap());
-        // Made off the audio thread, like cpal does; handed over on it.
-        let err = cpal::Error::with_message(
-            cpal::ErrorKind::DeviceNotAvailable,
-            format!("device went away #{i}"),
-        );
+        // cpal 0.18.2 ALSA's own disconnect error (`poll_for_period`).
+        let err =
+            cpal::Error::with_message(cpal::ErrorKind::DeviceNotAvailable, "Device disconnected");
         assert_no_alloc(|| {
             if let Some(g) = g {
                 e.receive_swap(g);
@@ -58,13 +57,13 @@ fn audio_side_paths_do_not_allocate_with_trace_logging() {
             if let Some(rep) = e.take_probe_report() {
                 let _ = ptx.push(rep);
             }
-            hand_off_stream_error(err, &mut etx, &lost);
+            hand_off_stream_error(err, &mut etx, &counts);
         });
     }
     assert_eq!(
-        lost.load(Ordering::Relaxed),
+        counts.undelivered.load(Ordering::Relaxed),
         399,
-        "one delivered, the rest forgotten"
+        "one delivered, the rest dropped"
     );
     log.shutdown();
 }
