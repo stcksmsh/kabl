@@ -36,6 +36,9 @@ const SWAP_QUEUE: usize = 4;
 /// Owns everything audio-related: the swap queue's producer, the stream, the MIDI connection,
 /// and the `basedrop` collector that frees retired graphs. Lives inside `App`.
 struct AudioHost {
+    /// Dropped first (fields drop in declaration order): the audio thread stops before the
+    /// queues it feeds are torn down.
+    _stream: Option<cpal::Stream>,
     swap_tx: Option<SwapSender>,
     sample_rate: f32,
     collector: Collector,
@@ -58,13 +61,14 @@ struct AudioHost {
     /// Selected-signal measurements from the audio callback (D03).
     probe_rx: Option<rtrb::Consumer<ProbeReport>>,
     /// Stream errors except bare xruns, moved out of the error callback unformatted (it runs
-    /// on the audio thread); logged here.
+    /// on the audio thread); logged here. Declared after `_stream` so the stream (and the
+    /// producer in its error callback) goes first on teardown: queued errors are then freed
+    /// here, with this consumer, not on the exiting audio thread.
     faults_rx: Option<rtrb::Consumer<cpal::Error>>,
     /// Graph generation of the last rebuild attempt (`CompiledPatch::generation`).
     generation: u64,
     /// The last rebuild's compile error, if it failed.
     compile_error: Option<String>,
-    _stream: Option<cpal::Stream>,
 }
 
 /// Audio-callback telemetry, written by the callback (and the stream's error callback) with

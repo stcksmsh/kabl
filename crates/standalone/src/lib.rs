@@ -71,12 +71,13 @@ impl StreamErrorCounts {
 /// For a stream's error callback, which runs on the audio thread (cpal 0.18.2 ALSA calls it
 /// from the stream's worker thread, between data callbacks; see signal-inspection design.md):
 /// counts `err` by kind and moves it into `tx` for another thread to log and drop. Never
-/// allocates, formats, logs, locks or blocks.
+/// allocates, formats, logs or blocks, and takes no lock of its own.
 ///
 /// When the queue is full the error is dropped here and counted in `undelivered`. That frees
-/// its message if the backend allocated one (on ALSA `BackendError` and `RealtimeDenied` do,
-/// allocated by cpal on this thread just before the call); keeping it instead would hold
-/// memory without bound while the consumer is paused. At most `STREAM_ERROR_QUEUE` errors are
+/// its message if the backend allocated one (on this build, ALSA without cpal's `realtime`
+/// feature, only `BackendError` does, allocated by cpal on this thread just before the call);
+/// the allocator's `free` may take its own lock. Keeping the error instead would hold memory
+/// without bound while the consumer is paused. At most `STREAM_ERROR_QUEUE` errors are
 /// outstanding. This is a proposed contract adjustment: see design.md, "Stream-error
 /// ownership".
 pub fn hand_off_stream_error(

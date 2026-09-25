@@ -4,9 +4,8 @@
 //!
 //! This drives the hand-off directly (no audio device fails here). Errors are built the way
 //! cpal 0.18.2's ALSA backend builds them, on the thread that then calls the error callback:
-//! `BackendError` with a message from `alsa::Error`'s `Display` (heap; `RealtimeDenied`'s
-//! `format!` message is the same case), `DeviceNotAvailable` with a static message, and
-//! message-less kinds.
+//! `BackendError` with a message from `alsa::Error`'s `Display` (heap; the only owned message
+//! on this build), `DeviceNotAvailable` with a static message, and message-less kinds.
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
