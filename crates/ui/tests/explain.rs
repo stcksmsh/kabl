@@ -425,9 +425,9 @@ fn base_and_modulation_are_told_apart_with_units() {
     let e = load("palette/pad");
     let p = explain::param_of(e.state(), LADDER, "cutoff_hz").unwrap();
     let lines = explain::base_and_modulation(e.state(), LADDER, p);
-    assert!(lines
-        .iter()
-        .any(|l| l.contains("Warmth") && l.contains("at its stored 40 %")));
+    assert!(lines.iter().any(|l| l.contains("Warmth")
+        && l.contains("base + this route alone at its stored 40 %")
+        && l.contains("the other routes move it further")));
     let p = explain::param_of(e.state(), MACROS, "m1").unwrap();
     let lines = explain::base_and_modulation(e.state(), MACROS, p);
     assert!(lines.iter().any(|l| l.contains("MIDI CC 20")), "{lines:?}");

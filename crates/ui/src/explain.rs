@@ -909,7 +909,7 @@ fn macro_destinations(
     }
 }
 
-/// Sequencers, LFOs and delays a clock reaches through signal cables into their clock jacks
+/// Sequencers a clock reaches through signal cables into their clock jacks
 /// (through dividers too), breadth-first over at most `MAX_VISIT` modules.
 pub fn clocked(state: &PatchState, clock: ModuleId) -> Vec<ModuleId> {
     let mut seen = BTreeSet::from([clock]);
@@ -927,7 +927,9 @@ pub fn clocked(state: &PatchState, clock: ModuleId) -> Vec<ModuleId> {
             // Only a clock input counts: a reset cable alone does not make a module clocked.
             match state.modules.get(t).map_or("", |s| s.kind.as_str()) {
                 "clock.div" if port == "clock" && seen.insert(*t) => queue.push_back(*t),
-                "seq" | "lfo" | "delay" if port == "clock" && seen.insert(*t) => out.push(*t),
+                // Only sequencers start and stop with the transport; a synced LFO or delay
+                // keeps its last rate.
+                "seq" if port == "clock" && seen.insert(*t) => out.push(*t),
                 _ => {}
             }
         }
