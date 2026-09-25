@@ -12,6 +12,7 @@
 //! `face.*` params that the compiler never reads (`rack::FACE_PREFIX`).
 
 pub mod banks;
+pub mod browser;
 pub mod cues;
 pub mod editor;
 pub mod library;
@@ -93,8 +94,19 @@ pub struct UiState {
     pub selected_module: Option<ModuleId>,
     pending_output: Option<PortRef>,
     moving: Option<Moving>,
-    /// Directory `kabl_core::save`/`load` read and write (a plain text field).
-    pub patch_path: String,
+    /// The sound library (`None` until `main.rs` opens it, or in tests that don't need it).
+    pub library: Option<library::Library>,
+    /// The open document; set from the editor on the first frame when `None`.
+    pub doc: Option<browser::Doc>,
+    pub browser: browser::Browser,
+    /// The sound browser (left panel) is open.
+    pub browser_open: bool,
+    /// Every question answered: `main.rs` closes the window.
+    pub quit_now: bool,
+    /// The last Load came from the browser and is a piece: its clocks start stopped.
+    pub load_stopped: bool,
+    /// Output sample rate, for preview lengths (set by `main.rs`).
+    pub sample_rate: f32,
     pub last_message: Option<String>,
     pub cable_view: CableView,
     /// The knob (module, param) whose routes the drawer lists and whose ring edits
@@ -231,7 +243,13 @@ impl Default for UiState {
             selected_module: None,
             pending_output: None,
             moving: None,
-            patch_path: "my-patch".to_string(),
+            library: None,
+            doc: None,
+            browser: Default::default(),
+            browser_open: false,
+            quit_now: false,
+            load_stopped: false,
+            sample_rate: 48000.0,
             last_message: None,
             cable_view: CableView::All,
             inspected: None,
@@ -422,6 +440,7 @@ impl UiState {
 /// Draws the rack editor for one frame and applies user edits to `editor` directly. Call once
 /// per frame from `eframe::App::ui`.
 pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
+    browser::frame_input(editor, ui_state, ui);
     ui_state.validate(editor);
     // Inspecting a control in another bank (a route, a pin, a CC mapping) shows that bank on
     // the face. It never launches it.
@@ -469,7 +488,7 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     if !ui.input(|i| i.pointer.any_down()) {
         ui_state.drag = None;
     }
-    if !ui.ctx().egui_wants_keyboard_input() {
+    if !ui.ctx().egui_wants_keyboard_input() && ui_state.browser.dialog.is_none() {
         let (undo, redo) = ui.input_mut(|i| {
             let redo = i.consume_shortcut(&egui::KeyboardShortcut::new(
                 egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
@@ -494,6 +513,12 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     egui::Panel::top("kabl-toolbar")
         .exact_size(40.0)
         .show(ui, |ui| toolbar(editor, ui_state, ui));
+    if ui_state.browser_open {
+        egui::Panel::left("kabl-browser")
+            .exact_size(browser::PANEL_W)
+            .resizable(false)
+            .show(ui, |ui| browser::panel(editor, ui_state, ui));
+    }
 
     if ui_state.perform_open {
         egui::Panel::bottom("kabl-perform")
@@ -530,6 +555,7 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     egui::CentralPanel::default()
         .frame(egui::Frame::NONE.fill(th.rack))
         .show(ui, |ui| show_rack(editor, ui_state, ui, &th));
+    browser::dialogs(editor, ui_state, ui.ctx());
     ui_state.hits = std::mem::take(&mut ui_state.frame_hits);
 }
 
@@ -542,6 +568,10 @@ fn tool(ui: &mut egui::Ui, ui_state: &mut UiState, key: &str, label: &str, on: b
 fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
     ui.horizontal_centered(|ui| {
         ui.label(egui::RichText::new("kabl").strong().size(17.0));
+        let open = ui_state.browser_open;
+        if tool(ui, ui_state, "browser", "Sounds", open) {
+            ui_state.browser_open = !open;
+        }
         egui::ComboBox::from_id_salt("kind")
             .width(90.0)
             .selected_text(ui_state.selected_kind.clone())
@@ -659,40 +689,7 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) 
         });
         ui_state.record("view-menu".into(), menu.response.rect);
         ui.separator();
-        let r = ui.add(egui::TextEdit::singleline(&mut ui_state.patch_path).desired_width(110.0));
-        ui_state.record("patch-path".into(), r.rect);
-        if tool(ui, ui_state, "save", "Save", false) {
-            let path = std::path::Path::new(&ui_state.patch_path);
-            ui_state.last_message = Some(match kabl_core::save(path, editor.log()) {
-                Ok(()) => format!("saved to {}", path.display()),
-                Err(err) => format!("save failed: {err:?}"),
-            });
-        }
-        if tool(ui, ui_state, "load", "Load", false) {
-            let path = std::path::Path::new(&ui_state.patch_path);
-            match kabl_core::load(path) {
-                Ok(log) => {
-                    *editor = PatchEditor::from_log(log);
-                    // A Load replaces a live patch; the audio host only rebuilds on `take_dirty`.
-                    editor.mark_dirty();
-                    ui_state.loaded = true;
-                    ui_state.delay_status.clear();
-                    ui_state.seq_banks.clear();
-                    ui_state.edit_bank.clear();
-                    ui_state.selected_module = None;
-                    ui_state.inspected = None;
-                    ui_state.selected_route = None;
-                    ui_state.pending_output = None;
-                    ui_state.choose = None;
-                    ui_state.learn = None;
-                    ui_state.takeover.clear();
-                    ui_state.last_message = Some(format!("loaded {}", path.display()));
-                }
-                Err(err) => {
-                    ui_state.last_message = Some(format!("load failed: {err:?}"));
-                }
-            }
-        }
+        browser::toolbar(editor, ui_state, ui);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let open = ui_state.drawer_open;
             if tool(ui, ui_state, "routing", "Routing", open) {

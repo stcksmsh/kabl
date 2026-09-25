@@ -1374,11 +1374,22 @@ fn delay_controls_and_a_fresh_load() {
     );
     assert!(!t.ui.loaded, "an edit is a live edit");
 
-    t.ui.patch_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+    t.ui.browser.folder = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../patches/echo")
         .display()
         .to_string();
+    // The advanced folder Load, in the browser; the edits above are unsaved, so it asks.
+    let user = tempfile::tempdir().unwrap();
+    t.ui.library = Some(kabl_ui::library::Library::open(
+        Some(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches")),
+        user.path().to_path_buf(),
+    ));
+    t.ui.browser_open = true;
+    t.frame();
+    t.click("folder-header");
     t.click("load");
+    assert!(!t.ui.loaded, "asks before replacing unsaved edits");
+    t.click("dlg:discard");
     assert!(t.ui.loaded && t.editor.take_dirty(), "Load rebuilds fresh");
     assert_eq!(t.param(DELAY, "sync"), Some(3.0), "the file's settings");
 }

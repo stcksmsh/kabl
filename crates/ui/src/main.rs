@@ -420,8 +420,9 @@ impl AudioHost {
     }
 
     /// UI-thread call: compiles `patch` and queues it for the audio thread. A `fresh` graph (a
-    /// Load) carries no state from the playing one.
-    fn rebuild(&mut self, patch: &PatchState, fresh: bool) {
+    /// Load) carries no state from the playing one; `stopped`: its clocks start stopped (a
+    /// piece opened from the browser waits for Start).
+    fn rebuild(&mut self, patch: &PatchState, fresh: bool, stopped: bool) {
         let mut new_patch = match compile(patch, self.sample_rate, DEFAULT_VOICE_COUNT) {
             Ok(p) => p,
             Err(err) => {
@@ -430,6 +431,13 @@ impl AudioHost {
             }
         };
         new_patch.fresh = fresh;
+        if stopped {
+            let mut clocks = Vec::new();
+            new_patch.clocks(|id, _| clocks.push(id));
+            for id in clocks {
+                new_patch.transport(id, Transport::Stop);
+            }
+        }
         if let Some(tx) = self.swap_tx.as_mut() {
             tx.send(Owned::new(&self.collector.handle(), new_patch));
         }
@@ -855,7 +863,28 @@ impl eframe::App for App {
         }
         if self.editor.take_dirty() {
             let fresh = std::mem::take(&mut self.ui_state.loaded);
-            self.audio.rebuild(self.editor.state(), fresh);
+            let stopped = std::mem::take(&mut self.ui_state.load_stopped);
+            self.audio.rebuild(self.editor.state(), fresh, stopped);
+        }
+        // Closing the window (or Ctrl+Q) with unsaved changes asks first.
+        let close = ui.ctx().input(|i| i.viewport().close_requested());
+        if close
+            && !self.ui_state.quit_now
+            && kabl_ui::browser::is_modified(&self.editor, &self.ui_state)
+        {
+            ui.ctx()
+                .send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            if self.ui_state.browser.dialog.is_none() {
+                kabl_ui::browser::request(
+                    &mut self.editor,
+                    &mut self.ui_state,
+                    kabl_ui::browser::Pending::Quit,
+                );
+            }
+        }
+        if self.ui_state.quit_now && !close {
+            self.ui_state.launches.clear();
+            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
         }
         if self.audio.tick() {
             ui.ctx().request_repaint();
@@ -873,19 +902,58 @@ fn main() -> eframe::Result<()> {
             .and_then(|i| args.get(i + 1).cloned())
     };
     let mut ui_state = UiState::default();
+    let library = kabl_ui::browser::open_library();
+    for note in &library.notes {
+        eprintln!("kabl-ui: {note}");
+    }
     let editor = match flag("--patch") {
         Some(dir) => match kabl_core::load(std::path::Path::new(&dir)) {
             Ok(log) => {
-                ui_state.patch_path = dir;
-                PatchEditor::from_log(log)
+                let editor = PatchEditor::from_log(log);
+                // A library sound opened by path keeps its library identity (factory
+                // protection, name); anything else is a plain folder.
+                let canonical = std::path::Path::new(&dir).canonicalize().ok();
+                let doc = match library
+                    .entries
+                    .iter()
+                    .find(|e| e.dir.canonicalize().ok() == canonical)
+                {
+                    Some(e) => kabl_ui::browser::Doc {
+                        name: e.meta.name.clone(),
+                        origin: kabl_ui::browser::DocOrigin::Library(e.id.clone()),
+                        meta: e.meta.clone(),
+                        saved: editor.state().clone(),
+                    },
+                    None => {
+                        let name = std::path::Path::new(&dir)
+                            .file_name()
+                            .map_or(dir.clone(), |n| n.to_string_lossy().to_string());
+                        kabl_ui::browser::Doc::new(
+                            &name,
+                            kabl_ui::browser::DocOrigin::Folder(dir.clone()),
+                            editor.state(),
+                        )
+                    }
+                };
+                ui_state.browser.folder = dir;
+                ui_state.doc = Some(doc);
+                editor
             }
             Err(err) => {
                 eprintln!("kabl-ui: failed to load patch from {dir}: {err:?}");
                 std::process::exit(1);
             }
         },
-        None => PatchEditor::seed_from(&default_patch()),
+        None => {
+            // No patch named: start with the browser open on the plain start patch.
+            ui_state.browser_open = true;
+            PatchEditor::seed_from(&default_patch())
+        }
     };
+    ui_state.library = Some(library);
+    if args.iter().any(|a| a == "--browser") {
+        ui_state.browser_open = true;
+    }
     let size = flag("--size")
         .and_then(|s| {
             let (w, h) = s.split_once('x')?;
@@ -907,6 +975,7 @@ fn main() -> eframe::Result<()> {
         peaks.clone(),
     );
     ui_state.recorder = audio.recorder.take();
+    ui_state.sample_rate = audio.sample_rate;
     if let (Some(rec), Some(dir)) = (ui_state.recorder.as_mut(), flag("--record-dir")) {
         rec.dir = dir;
     }
