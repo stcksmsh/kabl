@@ -95,12 +95,71 @@ struct CallbackTiming {
     frames_max: AtomicU64,
     xruns: AtomicU64,
     other_errors: AtomicU64,
+    /// Execution times after the first second, in `HIST_BIN_US` bins (the last one open).
+    hist: Hist,
     /// 0 not tried, 1 granted, 2 refused.
     rt: std::sync::atomic::AtomicU8,
     rt_error: std::sync::OnceLock<String>,
 }
 
+struct Hist([AtomicU64; HIST_BINS]);
+
+impl Default for Hist {
+    fn default() -> Self {
+        Hist(std::array::from_fn(|_| AtomicU64::new(0)))
+    }
+}
+
+/// Execution histogram: 64 bins of 50 µs (the last collects everything above 3.15 ms).
+const HIST_BINS: usize = 64;
+const HIST_BIN_US: u64 = 50;
+
 impl CallbackTiming {
+    /// `p` quantile (0..1) of the execution histogram, as the bin's upper edge in µs.
+    fn quantile(&self, p: f64) -> Option<u64> {
+        let counts: Vec<u64> = self
+            .hist
+            .0
+            .iter()
+            .map(|b| b.load(Ordering::Relaxed))
+            .collect();
+        let total: u64 = counts.iter().sum();
+        if total == 0 {
+            return None;
+        }
+        let want = (total as f64 * p).ceil() as u64;
+        let mut seen = 0;
+        for (i, c) in counts.iter().enumerate() {
+            seen += c;
+            if seen >= want {
+                return Some((i as u64 + 1) * HIST_BIN_US);
+            }
+        }
+        None
+    }
+
+    /// The histogram for `KABL_STATS_FILE`: nonzero bins as `upper_µs:count`.
+    fn hist_line(&self) -> String {
+        let q = |p| self.quantile(p).map_or("-".into(), |v| format!("≤{v}"));
+        let bins: Vec<String> = self
+            .hist
+            .0
+            .iter()
+            .enumerate()
+            .filter_map(|(i, b)| {
+                let n = b.load(Ordering::Relaxed);
+                (n > 0).then(|| format!("{}:{n}", (i as u64 + 1) * HIST_BIN_US))
+            })
+            .collect();
+        format!(
+            "run histogram ({HIST_BIN_US} µs bins, after the first second): p50 {} p99 {} p99.9 {} µs · {}",
+            q(0.5),
+            q(0.99),
+            q(0.999),
+            bins.join(" ")
+        )
+    }
+
     fn record(
         &self,
         took: std::time::Duration,
@@ -120,6 +179,8 @@ impl CallbackTiming {
             return;
         }
         let budget = frames as f64 / sample_rate as f64 * 1e9;
+        let bin = ((ns / 1000 / HIST_BIN_US) as usize).min(HIST_BINS - 1);
+        self.hist.0[bin].fetch_add(1, Ordering::Relaxed);
         if self.worst_ns.fetch_max(ns, Ordering::Relaxed) < ns {
             let ms = n as f64 * frames as f64 / sample_rate as f64 * 1e3;
             self.worst_at_ms.store(ms as u64, Ordering::Relaxed);
@@ -1049,12 +1110,13 @@ impl eframe::App for App {
                 let _ = std::fs::write(
                     path,
                     format!(
-                        "{} · {} live graph allocations · {} undo entries · {} MIDI notes held · {} voices sounding\n",
+                        "{} · {} live graph allocations · {} undo entries · {} MIDI notes held · {} voices sounding\n{}\n",
                         t.line(self.audio.sample_rate),
                         self.audio.collector.alloc_count(),
                         self.editor.log().entries().len(),
                         held,
                         sounding,
+                        t.hist_line(),
                     ),
                 );
             }
