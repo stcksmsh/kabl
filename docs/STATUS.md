@@ -5,11 +5,20 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-25. D02 (musical controls that explain themselves) is built and
-integrated on top of D01-R1, and waits for Kosta's review. D01 and D01-R1 also wait for his
+Last updated: 2026-09-25. D03 cloud engineering is authorized; implementation has not been
+verified as started. D02 is merged through PR #3 (4eb4104), integrated on top of D01-R1,
+and waits for Kosta's hands-on review. D01 and D01-R1 also wait for his
 hands-on checks. Composition + Motion and Sound Palette are still waiting for their own
 hands-on reviews: Kosta explicitly deferred them, and they are not approved. D00 is not
-complete. Nothing after D02 is authorized.
+complete. Nothing after D03 is authorized.
+
+**D03 Signal inspection and three listening recipes: authorized for cloud engineering.**
+Kosta asked to continue while the laptop is unavailable for approximately two days. Scope:
+one selected signal, observation-led silence help, one reversible comparison reference and
+three optional listening recipes, plus bounded operational logging (INFO and above by default;
+DEBUG/TRACE available through an explicit override). Brief: [D03](product-research/briefs/D03.md); launch:
+[D03-LAUNCH](product-research/briefs/D03-LAUNCH.md). Normal sequential workflow resumes;
+D04 does not start automatically. Prior hands-on checks remain pending.
 
 **D02 Musical controls that explain themselves (owner-authorized, 2026-09-25): built,
 awaiting Kosta's review.**

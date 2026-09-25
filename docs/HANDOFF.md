@@ -3,6 +3,26 @@
 Read this, then `docs/STATUS.md` (top section) and the last entries of `docs/decisions.md`.
 Trust code and git over older docs.
 
+## D03 — cloud engineering authorized (2026-09-25)
+
+Kosta asked to proceed with D03 while his laptop is unavailable for approximately two days.
+Brief: `docs/product-research/briefs/D03.md`; launch prompt:
+`docs/product-research/briefs/D03-LAUNCH.md`. One sequential implementing agent; do not
+start D04 automatically. D01/D01-R1, D02, Composition + Motion and Sound Palette hands-on
+reviews remain deferred/pending. D00 is not complete.
+
+Verified baseline: master `4eb410465a34fc47fadd35a807fb649ecfa2bad2`, the merge of D02 PR #3.
+Product code matches tested/reviewed `4b478fd`; 479/0/15 in checked logs, clean clippy.
+The supervisor checked merge identity, reports, review coverage and selected logs; did not
+rerun tests or duplicate the full code review. The D01-R1/D02 parallel exception is finished.
+
+D03 delivers bounded selected-signal inspection, an observation-led silence aid, one
+reversible comparison reference, three optional listening recipes and owner-requested operational
+logging (production INFO and above, opt-in DEBUG/TRACE, no callback logging). Its brief includes
+document/history protection, reused-buffer capture, stale-graph rejection, package evidence
+and a fresh reviewer subagent. Remaining D02 real-app gaps are named in the brief.
+No laptop result or VM-only explanation of the audio gaps is established.
+
 ## Product direction and continuation planning — 2026-09-25
 
 Kosta requested a product/code audit, competitor research and a sequential plan for fresh
@@ -21,7 +41,7 @@ decisions entry. Proposed ordering/architecture remain recommendations pending d
 
 Owner-authorized. It ran in parallel with D01-R1, then current master (with D01-R1) was merged
 in, and it was re-verified and rechecked on the combined head. **Owner review is pending.**
-Draft PR: https://github.com/stcksmsh/kabl/pull/3 (branch
+Merged PR: https://github.com/stcksmsh/kabl/pull/3 (merge 4eb4104; branch
 `claude/d02-musical-controls-knjmgu`). Record: `docs/musical-controls/README.md`, plus
 `CHECKLIST.md`, `REPORT.md`, `REVIEW.md` and `coverage.md`.
 
@@ -56,12 +76,12 @@ Motion and Sound Palette reviews remain pending. Preview picker/Stop semantics u
 
 Kosta authorized D01 as a whole and **explicitly deferred** the Composition + Motion and Sound
 Palette hands-on reviews while his laptop is away. Those two stay **pending, not approved**;
-D00 is not complete; no later batch (D02+) is authorized. Record, evidence, limits:
+D00 is not complete. D02 was subsequently authorized and merged; D03 cloud engineering is now authorized above. Record, evidence, limits:
 `docs/find-play-save/README.md` (+ `CHECKLIST.md`, `REPORT.md`); rationale: decisions.md
 "D01 Find, play and save a sound".
 
 - Built in a cloud session on branch `claude/install-caveman-ponytail-bhigco` (the
-  container required it); PR https://github.com/stcksmsh/kabl/pull/2 to `master` is open for Kosta to merge.
+  container required it); PR https://github.com/stcksmsh/kabl/pull/2 was merged to `master` as 12deda3.
 - Code: `crates/ui/src/library.rs` (discovery, `sound.toml` metadata, staged user saves and
   repair, favorites/recents), `crates/ui/src/browser.rs` (panel, document/unsaved state,
   audition, Start/Stop, dialogs), `crates/engine/src/patch_engine.rs` (`Command::Preview`,

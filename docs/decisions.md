@@ -2482,3 +2482,29 @@ were not transplanted, only its look (palettes, geometry, drawing).
 - **`ModuleInfo.explain`** was checked against every module's code and left unchanged. The
   ring modulator's use as a depth control, and ladder self-oscillation, are documented in
   `help.rs`.
+
+
+## 2026-09-25 — D03 cloud engineering authorized; owner reviews deferred
+
+- After D02 merged, Kosta asked: "Shall we go to D03 (we don't have laptop for ~2 days, so untill then let's make as much as we can)".
+- Proceed with one D03 implementing agent. Brief: `product-research/briefs/D03.md`;
+  launch: `product-research/briefs/D03-LAUNCH.md`. Internal increments are not approval
+  gates. This authorizes D03, not automatic implementation of the remaining roadmap.
+- D01/D01-R1, D02, Composition + Motion and Sound Palette hands-on reviews remain pending.
+  D00 is not complete. Laptop absence does not prevent bounded cloud engineering.
+- Verified starting master is 4eb410465a34fc47fadd35a807fb649ecfa2bad2 (D02 merge, PR #3).
+  It contains D01-R1 and the tested/reviewed product code at 4b478fd. Checked test logs
+  total 479 passed, 0 failed, 15 ignored; clippy clean. Supervisor did not rerun tests or
+  duplicate the full review.
+- Supervisor-scoped D03: one bounded selected signal, cautious observation-led diagnosis,
+  one reversible comparison reference and exactly three optional listening recipes.
+  Comparison restores must preserve working edits/history; recipes do not silently replace
+  the current document. Inspection must respect buffer reuse and graph/selection identity.
+  These are the issued implementation constraints, not claims of implemented capabilities.
+- The D01-R1/D02 parallel exception ends. Continue sequentially and finalize the next brief
+  against D03's actual results. No automatic D04 start.
+- Existing cloud dropouts/xruns, Composition spike and Sound Palette stall are not resolved
+  by this authorization. D02's reported VM-artifact disposition defers laptop checking; it
+  does not establish a root cause.
+
+- Follow-up owner request: "We should also have logging, with production only having above D, right? This would make stuff easier to diagnose". D03 includes operational logging, separate from PatchLog: release defaults to INFO/WARN/ERROR, DEBUG/TRACE available by explicit runtime override, bounded rotating local files and bounded event buffering. Formatting/writing stays off the audio thread. Exact backend and retention values are routine implementation choices; no analytics service or automatic uploads.
