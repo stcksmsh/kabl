@@ -790,3 +790,41 @@ fn save_to_folder_is_staged_too() {
     assert_eq!(kabl_core::load(&dir).unwrap().state(), t.editor.state());
     assert!(!t.modified(), "the folder is now the document");
 }
+
+/// R1: Cancel after a collision writes nothing.
+#[test]
+fn cancel_after_a_collision_keeps_the_other_sound() {
+    let mut t = H::new(1440.0, 900.0);
+    t.open("factory:palette/pad");
+    t.click("save-as");
+    t.save_as_named("Alpha");
+    let dir =
+        t.ui.library
+            .as_ref()
+            .unwrap()
+            .get("user:alpha")
+            .unwrap()
+            .dir
+            .clone();
+    let bytes = |d: &Path| -> Vec<Vec<u8>> {
+        let mut v: Vec<_> = std::fs::read_dir(d)
+            .unwrap()
+            .flatten()
+            .map(|e| std::fs::read(e.path()).unwrap())
+            .collect();
+        v.sort();
+        v
+    };
+    let before = bytes(&dir);
+    t.edit("filter.ladder", "cutoff_hz", 999.0);
+    let work = t.editor.state().clone();
+    t.click("save-as");
+    t.save_as_named("ALPHA");
+    assert!(t.has("dlg:replace"));
+    t.click("dlg:cancel");
+    assert!(t.ui.browser.dialog.is_none());
+    assert_eq!(bytes(&dir), before);
+    assert_eq!(user_ids(&t), ["user:alpha"]);
+    assert_eq!(t.editor.state(), &work);
+    assert!(t.modified());
+}

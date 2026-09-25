@@ -292,6 +292,8 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
             }
         }
         Pending::OpenFolder(path) => {
+            // Settle an interrupted save first, and say so.
+            let repaired = crate::library::repair_folder(std::path::Path::new(&path));
             match crate::library::read_patch(std::path::Path::new(&path)) {
                 Ok(log) => {
                     replace_patch(editor, ui, log);
@@ -303,9 +305,21 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
                         DocOrigin::Folder(path.clone()),
                         editor.state(),
                     ));
-                    message(ui, format!("loaded {path}"));
+                    message(
+                        ui,
+                        repaired.map_or_else(
+                            || format!("loaded {path}"),
+                            |n| format!("loaded {path} ({n})"),
+                        ),
+                    );
                 }
-                Err(err) => message(ui, format!("load failed: {err}. Your sound is unchanged.")),
+                Err(err) => message(
+                    ui,
+                    format!(
+                        "load failed: {err}. Your sound is unchanged.{}",
+                        repaired.map_or(String::new(), |n| format!(" ({n})"))
+                    ),
+                ),
             }
         }
         Pending::New => {
@@ -359,10 +373,20 @@ fn save(editor: &mut PatchEditor, ui: &mut UiState, then: Option<Pending>) -> Op
     };
     match result {
         Ok(()) => {
+            // The library's name for the sound is the one on disk (an outside edit may differ).
+            let name = match &doc.origin {
+                DocOrigin::Library(id) => ui
+                    .library
+                    .as_ref()
+                    .and_then(|l| l.get(id))
+                    .map_or(doc.name.clone(), |e| e.meta.name.clone()),
+                _ => doc.name.clone(),
+            };
             if let Some(d) = ui.doc.as_mut() {
                 d.saved = editor.state().clone();
+                d.name = name.clone();
             }
-            message(ui, format!("saved \"{}\"", doc.name));
+            message(ui, format!("saved \"{name}\""));
             if let Some(p) = then {
                 perform(editor, ui, p);
             }

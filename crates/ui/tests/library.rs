@@ -753,29 +753,125 @@ fn a_folder_save_failing_at_any_stage_leaves_the_folder_as_it_was() {
     assert!(files(&fresh).is_empty());
 }
 
+/// Builds the state a folder save killed part way leaves: staging with kabl's marker in
+/// `phase`, the new copy staged, and `moved` files already swapped (old aside, new in).
+fn crashed_save(dir: &Path, new: &PatchEditor, phase: &str, moved: &[&str]) {
+    let staging = dir.join(".kabl-save");
+    kabl_core::save(&staging, new.log()).unwrap();
+    fs::write(staging.join("kabl-staging"), phase).unwrap();
+    for f in moved {
+        if dir.join(f).exists() {
+            fs::rename(dir.join(f), staging.join(format!("{f}.old"))).unwrap();
+        }
+        fs::rename(staging.join(f), dir.join(f)).unwrap();
+    }
+}
+
 #[test]
 fn an_interrupted_folder_save_is_repaired_on_the_next_open() {
     let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("song");
     let old = init_keyboard();
     let mut new = PatchEditor::from_log(old.log().clone());
     new.set_param(3, "cutoff_hz", 900.0);
-    kabl_core::save(&dir, old.log()).unwrap();
-    let staging = dir.join(".kabl-save");
-    // Killed after the old log was moved aside, before the new one moved in: roll back.
-    kabl_core::save(&staging, new.log()).unwrap();
-    for f in ["meta.toml", "checkpoint.json", "log.jsonl"] {
-        fs::rename(dir.join(f), staging.join(format!("{f}.old"))).unwrap();
-        if f != "log.jsonl" {
-            fs::rename(staging.join(f), dir.join(f)).unwrap();
-        }
-    }
-    assert_eq!(library::read_patch(&dir).unwrap().state(), old.state());
-    assert!(!staging.exists());
-    // Killed after the new log moved in, before cleanup: keep the new one.
-    kabl_core::save(&staging, new.log()).unwrap();
-    fs::rename(dir.join("log.jsonl"), staging.join("log.jsonl.old")).unwrap();
-    fs::rename(staging.join("log.jsonl"), dir.join("log.jsonl")).unwrap();
+    let complete = |name: &str| {
+        let dir = tmp.path().join(name);
+        kabl_core::save(&dir, old.log()).unwrap();
+        (dir.clone(), files(&dir))
+    };
+
+    // Killed with meta and checkpoint swapped and the old log moved aside: rolled back.
+    let (dir, before) = complete("a");
+    crashed_save(&dir, &new, "replacing", &["meta.toml", "checkpoint.json"]);
+    fs::rename(dir.join("log.jsonl"), dir.join(".kabl-save/log.jsonl.old")).unwrap();
+    let note = library::repair_folder(&dir).expect("says it restored");
+    assert!(note.contains("undone"), "{note}");
+    assert_eq!(files(&dir), before);
+    assert!(!dir.join(".kabl-save").exists());
+
+    // Killed after the new log moved in, before cleanup: the save stands.
+    let (dir, _) = complete("b");
+    crashed_save(
+        &dir,
+        &new,
+        "replacing",
+        &["meta.toml", "checkpoint.json", "log.jsonl"],
+    );
     assert_eq!(library::read_patch(&dir).unwrap().state(), new.state());
-    assert!(!staging.exists());
+    assert!(!dir.join(".kabl-save").exists());
+
+    // Killed while the new copy was still being written: the folder never changed.
+    let (dir, before) = complete("c");
+    crashed_save(&dir, &new, "writing", &[]);
+    assert_eq!(library::read_patch(&dir).unwrap().state(), old.state());
+    assert_eq!(files(&dir), before);
+    assert!(!dir.join(".kabl-save").exists());
+
+    // A folder without checkpoint.json: the checkpoint the save added goes on rollback.
+    let (dir, _) = complete("d");
+    fs::remove_file(dir.join("checkpoint.json")).unwrap();
+    let before = files(&dir);
+    crashed_save(&dir, &new, "replacing", &["meta.toml", "checkpoint.json"]);
+    library::repair_folder(&dir);
+    assert_eq!(files(&dir), before, "no stray checkpoint");
+
+    // A brand-new folder: rollback leaves no half patch.
+    let dir = tmp.path().join("e");
+    fs::create_dir_all(&dir).unwrap();
+    crashed_save(&dir, &new, "replacing", &["meta.toml", "checkpoint.json"]);
+    library::repair_folder(&dir);
+    assert!(files(&dir).is_empty());
+    assert!(!dir.join(".kabl-save").exists());
+}
+
+#[test]
+fn a_kabl_save_directory_kabl_didnt_make_is_left_alone() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("song");
+    let e = init_keyboard();
+    kabl_core::save(&dir, e.log()).unwrap();
+    fs::create_dir_all(dir.join(".kabl-save")).unwrap();
+    fs::write(dir.join(".kabl-save/precious.txt"), "mine").unwrap();
+    fs::write(dir.join(".kabl-save/log.jsonl.old"), "not kabl's").unwrap();
+    let before = files(&dir);
+    assert!(library::repair_folder(&dir).is_none());
+    assert!(library::read_patch(&dir).is_ok());
+    let err = library::save_folder(&dir, e.log()).unwrap_err();
+    assert!(err.to_string().contains("in the way"), "{err}");
+    assert_eq!(files(&dir), before);
+    assert_eq!(
+        fs::read(dir.join(".kabl-save/precious.txt")).unwrap(),
+        b"mine"
+    );
+    // Even kabl's own staging keeps anything else put in it.
+    let other = tmp.path().join("other");
+    kabl_core::save(&other, e.log()).unwrap();
+    crashed_save(&other, &e, "writing", &[]);
+    fs::write(other.join(".kabl-save/extra.txt"), "x").unwrap();
+    library::repair_folder(&other);
+    assert_eq!(fs::read(other.join(".kabl-save/extra.txt")).unwrap(), b"x");
+}
+
+#[test]
+fn a_retry_after_an_interrupted_user_save_keeps_the_only_copy() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut lib = open(tmp.path());
+    let e = edited_pad(&lib);
+    let meta = Meta {
+        name: "Keep".into(),
+        ..Meta::default()
+    };
+    let id = lib.save(e.log(), meta.clone(), None).unwrap();
+    let sounds = tmp.path().join("sounds");
+    // What an Interrupted save leaves: the only copy aside as .keep.old.
+    fs::rename(sounds.join("keep"), sounds.join(".keep.old")).unwrap();
+    let mut e2 = PatchEditor::from_log(e.log().clone());
+    e2.undo();
+    library::fail_saves_at(Some("replace:dir"));
+    assert!(lib.save(e2.log(), meta, Some(&id)).is_err());
+    library::fail_saves_at(None);
+    assert_eq!(
+        lib.read(&id).unwrap().state(),
+        e.state(),
+        "the old copy survives"
+    );
 }
