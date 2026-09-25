@@ -286,6 +286,8 @@ pub struct Summary {
     pub rises: [u32; PROBE_LANES],
     /// Lanes above the gate threshold for every sample of the interval.
     pub held: [bool; PROBE_LANES],
+    /// Samples above the gate threshold, per lane.
+    pub high: [u32; PROBE_LANES],
     pub last: [f32; PROBE_LANES],
     pub nonfinite: u32,
     /// Age of the newest window (s).
@@ -310,6 +312,7 @@ impl Summary {
             max: f32::NEG_INFINITY,
             rises: [0; PROBE_LANES],
             held: [true; PROBE_LANES],
+            high: [0; PROBE_LANES],
             last: [0.0; PROBE_LANES],
             nonfinite: 0,
             newest_age: 0.0,
@@ -333,6 +336,7 @@ impl Summary {
             }
             self.rises[l] += s.rises;
             self.held[l] &= s.high == r.samples;
+            self.high[l] += s.high;
             self.last[l] = s.last;
             self.nonfinite += s.nonfinite;
         }
@@ -694,7 +698,10 @@ pub fn diagnose(state: &PatchState, focus: Option<ModuleId>, cx: &Context) -> Di
                 d.measured
                     .extend(measurement_lines(s, *t, &name, cx.sample_rate));
                 let quiet = match t {
-                    PortType::Gate => s.rises_all() == 0,
+                    // A held gate (high, no new edge) is not a missing trigger.
+                    PortType::Gate => {
+                        s.rises_all() == 0 && s.high[..s.lanes].iter().all(|&h| h == 0)
+                    }
                     PortType::Audio => s.peak_all() <= QUIET,
                     _ => false,
                 };
