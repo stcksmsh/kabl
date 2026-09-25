@@ -132,3 +132,42 @@ Dense piece (Composition, 39 modules; tap on SVF #26 lp), 33 750 callbacks per m
 - Report queue: 8 × 560 B.
 - Stream-error queue: 16 slots of `cpal::Error`, down from 256. At most 16 errors are
   outstanding (R1).
+
+### Real app, dense piece (`scripts/perf.sh`, RUNS=3, plus one extra busy run)
+
+Composition, release build of `99c28d3`, 48 kHz/256, run through the PipeWire null sink,
+xdotool on Xvfb. The modes:
+
+- **off**: inspector closed.
+- **on**: inspector open on Filter #26 lp for 60 s.
+- **busy**: the selection moves between outputs while undo/redo rebuild the graph about
+  2.5 times a second.
+
+Runs were interleaved. Raw data: [`../r1/perf-app-summary.txt`](../r1/perf-app-summary.txt).
+Callback **execution**, **arrival** lateness and **xruns** are kept apart. The p-columns are
+histogram bins (50 µs) after the first second.
+
+| run | callbacks | exec p50 | p99 | p99.9 | exec worst µs | > half budget | late executions | late arrivals (worst µs) | xruns |
+|---|---|---|---|---|---|---|---|---|---|
+| off-1 | 12098 | ≤300 | ≤500 | >3150 | 5851 | 23 | 6 | 758 (19373) | 6 |
+| off-2 | 12097 | ≤300 | ≤550 | ≤3150 | 17147 | 12 | 4 | 547 (24756) | 2 |
+| off-3 | 12105 | ≤300 | ≤500 | ≤3100 | 11642 | 19 | 3 | 583 (29329) | 2 |
+| on-1 | 12500 | ≤300 | ≤550 | >3150 | 6081 | 16 | 7 | 821 (18489) | 7 |
+| on-2 | 12522 | ≤300 | ≤500 | >3150 | 15094 | 16 | 8 | 617 (21178) | 3 |
+| on-3 | 12517 | ≤300 | ≤500 | ≤2700 | 5429 | 13 | 2 | 611 (49192) | 0 |
+| busy-1 | 4277 | ≤300 | ≤550 | ≤2800 | 5127 | 5 | 0 | 164 (21272) | 1 |
+| busy-2 | 14014 | ≤300 | ≤500 | >3150 | 5598 | 22 | 4 | 773 (17234) | 0 |
+| busy-3 | 14059 | ≤300 | ≤550 | >3150 | 5569 | 28 | 5 | 643 (48755) | 0 |
+| busy-4 | 13988 | ≤300 | ≤500 | >3150 | 20044 | 18 | 6 | 797 (22923) | 2 |
+
+**`busy-1` stopped early.** At 24.4 s the audio stream **stalled**: no callbacks for over
+1.5 s after callback 4277, which the app logged at WARN
+([`../r1/perf-busy-1-stall-kabl.log`](../r1/perf-busy-1-stall-kabl.log)). The UI kept
+running, but the stream did not recover. This is the cloud stream stall already reported in
+earlier batches, and recovery belongs to D05. I can't tell from one occurrence whether the
+inspector's busy mode made it more likely. `busy-4` was run to give three complete busy
+runs; `busy-1` stays in the table as observed.
+
+**Reading.** The p50 and p99 bins are the same in every mode. The worst execution times,
+late executions and xruns vary more from run to run within a mode than between modes, as in
+the historical runs. These are VM measurements, not laptop results.
