@@ -34,7 +34,9 @@ What the explanation shows:
   - signed depth: `+20 % of travel at full` for unipolar sources, `±12 %` for bipolar ones,
     with `(inverted)` when the amount is negative;
   - the configured values it spans: `→ 650 Hz – 2.59 kHz`;
-  - the value at the macro's stored position, when the macro knob has no routes of its own;
+  - the value at the macro's stored position, when the macro knob has no routes of its own.
+    When other active routes also move that control, it reads "base + this route alone …
+    (the other routes move it further)" rather than claiming a total;
   - bypass, shown as strikethrough plus "bypassed, adds nothing now";
   - other routes into the same control, and whether the destination has a Perform card.
 
@@ -42,7 +44,8 @@ What the explanation shows:
   what that module then moves: one hop, at most 24 rows. With no destinations the
   explanation says the macro changes nothing and how to give it one.
 - **Transport, bank and cue cards**: what the card does, the clock or sequencer it belongs to,
-  and what it acts on (the sequencers on a clock's gate, and the sequencers a cue switches).
+  and what it acts on (the sequencers on a clock's gate, through dividers too, and the sequencers a cue
+  switches).
 - **Module**: its `ModuleInfo.explain` text (checked against the DSP code, see Decisions), a
   note where one helps, the signal path, inputs and outputs from the cables, and a
   collapsible list of controls, each with one-line help and its own Explain.
@@ -59,7 +62,8 @@ What the explanation shows:
     work as before.
 - **Back to "Warmth"** restores the view from before the first Show: pan, zoom, inspected
   knob, selection, expanded modules and whether the Perform panel was open. It also
-  scrolls to the originating card and flashes it.
+  scrolls to the originating card and flashes it, and puts back the sequencer bank a Show
+  switched the face to.
 - **✕** or **Escape** closes the explanation without moving the view.
 
 **Base vs modulation.**
@@ -100,11 +104,18 @@ with it closed.
     previous frame.
   - A pre-existing bug surfaced here and is fixed: after Enter or Escape, a finished Perform
     card rename kept keyboard focus. That also blocked the Ctrl+Z and Escape shortcuts.
+  - An Escape while a menu or popup is open (a card's ⋯ menu, a combo box) closes that popup
+    only.
+  - A card rename now commits when you click elsewhere (one undo step), as the existing
+    `lost_focus` code intended; before, the field grabbed focus back every frame.
   - Help and navigation never start a preview, the transport, or a parameter edit.
 - **Bounded graph work.** Destinations go one hop and stop at 24 rows. The signal-path
   search is breadth-first over at most 512 modules, keeps a visited set so cycles end, and
   follows signal cables only. An explanation says "no cable path" when there is none; it
-  never guesses why a patch is silent.
+  never guesses why a patch is silent. Over the 512-module limit it says the path was not
+  worked out, rather than "no path".
+- **Old patches.** A route stored on a mixer's pre-rename `level` is shown on Level 1, as the
+  engine applies it (`routing::reaches`).
 
 ## Decisions
 
@@ -145,14 +156,16 @@ HANDOFF and STATUS, wait for integration after D01-R1, as the brief says.
   - the module panel's Explain button and inline help;
   - the **Explain this module** menu entry;
   - the rack target marker;
-  - recording text-field focus at the end of the frame.
+  - recording text-field focus and open popups at the end of the frame;
+  - `validate` resolves legacy route names through `routing::reaches`.
 - `crates/ui/src/perform.rs`:
   - the card's **?** button, its origin outline and Back flash;
   - the rename-focus fix;
   - `mixer_source` made `pub(crate)`.
-- `crates/ui/src/routing.rs`: the drawer heading's Explain button, inline help, and the
-  one-shot scroll to a shown control's routes.
-- `crates/ui/tests/explain.rs` (new): 12 tests plus the ignored coverage writer.
+- `crates/ui/src/routing.rs`: the drawer heading's Explain button, inline help, the one-shot
+  scroll to a shown control's routes, and `reaches` (legacy route names, also used by
+  `UiState::validate`).
+- `crates/ui/tests/explain.rs` (new): 18 tests plus the ignored coverage writer.
 
 D01-R1-owned files were not touched: `browser.rs`, `library.rs`, `main.rs` and
 `docs/find-play-save`.
@@ -160,15 +173,17 @@ D01-R1-owned files were not touched: `browser.rs`, `library.rs`, `main.rs` and
 ## Verification
 
 Cloud container: Ubuntu 24.04.4, 4 vCPU VM, rustc 1.94.1. No sound card, no ALSA sequencer,
-no rtkit. Product commit tested: **e824aad**. Later commits change docs and evidence only,
-unless REVIEW.md says otherwise.
+no rtkit. Product head tested: **e60300c** (after the review fixes). Later commits change docs
+and evidence only. The screenshots and walkthrough were recorded from the release build of
+**0987db5**; e60300c only narrows the transport card's "Acts on" list to sequencers and adds
+a test assertion, and neither of those appears in the recordings.
 
-- `cargo test --workspace` at e824aad: **459 passed, 0 failed, 15 ignored**, exit 0
+- `cargo test --workspace` at e60300c: **465 passed, 0 failed, 15 ignored**, exit 0
   ([`evidence/test-workspace.txt`](evidence/test-workspace.txt)). New:
-  - `crates/ui/tests/explain.rs` (12 tests, real egui input through `show()` at 1280×800 and
+  - `crates/ui/tests/explain.rs` (18 tests, real egui input through `show()` at 1280×800 and
     1440×900);
   - `help.rs` unit tests (3), including "every built-in parameter has help".
-- `cargo clippy --workspace --all-targets` at e824aad: no warnings, exit 0
+- `cargo clippy --workspace --all-targets` at e60300c: no warnings, exit 0
   ([`evidence/clippy.txt`](evidence/clippy.txt)).
 - Focused: `cargo test -p kabl-ui --test explain`. To regenerate the coverage table:
   `cargo test -p kabl-ui --test explain write_help_coverage -- --ignored`.
@@ -176,7 +191,7 @@ unless REVIEW.md says otherwise.
 ## Real-app evidence
 
 All real-app evidence is **scripted**. `docs/rack-migration/drive.py` uses xdotool on Xvfb
-(1600×1000) and aims at the targets the app reports. The app is the release build of e824aad.
+(1600×1000) and aims at the targets the app reports. The app is the release build of 0987db5.
 
 - **Screenshots**, 1440×900 and 1280×800, in A-light and A-dark. Files are
   `img/<size>-<name>.png`:
@@ -201,14 +216,14 @@ All real-app evidence is **scripted**. `docs/rack-migration/drive.py` uses xdoto
   8. Toggle Help, then close with Escape.
 
   Audio is 48 kHz with 256-frame buffers. The app plays through ALSA → PipeWire 1.0.5 into a
-  silent null sink and is recorded from its monitor. The track's mean is −18.8 dB, peak −2.4 dB.
+  silent null sink and is recorded from its monitor. The track's mean is −18.9 dB, peak −2.5 dB.
 - **Stand-ins.** The "controller" is `examples/midi_player` writing to the `KABL_MIDI_PIPE`
   fifo, not hardware.
 - **Timing on the VM**, from [`evidence/walkthrough-stats.txt`](evidence/walkthrough-stats.txt),
   reported separately:
-  - execution: 17 late callbacks, worst 13.1 ms against a 5.3 ms budget;
-  - arrival: 1134 late;
-  - 3 xruns;
+  - execution: 20 late callbacks, worst 12.4 ms against a 5.3 ms budget;
+  - arrival: 1446 late;
+  - 5 xruns;
   - RT priority refused (no rtkit).
 
   This is not laptop evidence. D02 adds no audio-thread code.
@@ -224,4 +239,6 @@ All real-app evidence is **scripted**. `docs/rack-migration/drive.py` uses xdoto
   flash, but the outline is drawn under the floating area.
 - The route rows sit in the drawer's lower scroll area. With many routes at 1280×800, the last
   rows can need a scroll.
+- Patch replacement and module deletion with an explanation open are verified by the
+  interaction tests (real egui input through `show()`), not in the recorded real-app run.
 - **Integration state:** not yet merged with D01-R1. The resume steps are in REPORT.md.
