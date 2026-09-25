@@ -791,3 +791,23 @@ fn a_card_rename_commits_when_you_click_elsewhere() {
     assert_eq!(h.editor.log().entries().len(), undo + 1, "one undo step");
     assert!(!h.ctx.egui_wants_keyboard_input(), "no focus left behind");
 }
+
+#[test]
+fn a_save_dialog_over_an_explanation_keeps_escape_and_the_document() {
+    // D01's Save As dialog (D01-R1 repaired) takes Escape first; the explanation stays, and
+    // explaining never makes the sound count as unsaved.
+    let mut h = H::new("palette/pad", 1440.0, 900.0);
+    let before = h.snapshot();
+    h.click("pexplain:1.m1");
+    h.click("explain-dest:29");
+    h.click("save-as");
+    assert!(h.ui.browser.dialog.is_some(), "Save As opened");
+    h.key(Key::Escape);
+    assert!(h.ui.browser.dialog.is_none(), "Escape closed the dialog");
+    assert!(h.ui.explain.is_open(), "and only the dialog");
+    h.frame();
+    h.frame();
+    h.key(Key::Escape);
+    assert!(!h.ui.explain.is_open());
+    h.unchanged_since(&before);
+}
