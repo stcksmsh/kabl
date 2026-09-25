@@ -30,8 +30,8 @@ pending**; all evidence is scripted on a VM.
   counted by kind and handed over through a 16-slot queue; on overflow it is dropped in the
   error callback. Evidence on the final head is in `docs/signal-inspection/r1/`, indexed by
   REPORT.md, "D03-R1 follow-up".
-  - **Decision needed:** cpal 0.18.2 ALSA allocates `BackendError`/`RealtimeDenied`
-    messages on the audio thread, so a bound means freeing them there on overflow. The
+  - **Decision needed:** cpal 0.18.2 ALSA allocates `BackendError` messages on the
+    audio thread, so a bound means freeing them there on overflow. The
     proposed contract adjustment is in `design.md`, "Stream-error ownership".
   - **New follow-up:** "Why no sound?" does not name an unplugged audio input on the path.
 - Nothing after D03 is authorized; do not start D04.

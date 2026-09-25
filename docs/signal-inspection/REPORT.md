@@ -23,9 +23,12 @@ Starting point: PR #5 head 08f9d06 (reviewed product 05734dd); master planning d
 Product commits:
   - 25a9f78: error hand-off
   - 99c28d3: probe_cost gains parameter-edit and topology modes (example only)
-  - f1edf70: comments/docs; also names RealtimeDenied as owning a message
-Tested head: 3c8872e. Its product code is f1edf70; everything after is docs/evidence.
-Evidence build: release 99c28d3, the same product behaviour as f1edf70 (comment-only diff)
+  - f1edf70: comments/docs
+  - review fixes (R1-1..R1-7): kabl-ui drops the stream before the error queue (R1-5),
+    plus comments/docs; see the review section
+Tested head: see "Verification after the review" below.
+Evidence build: release 99c28d3. Product behaviour equals the tested head except R1-5's
+  teardown order, which none of the recorded flows exercises.
 Engineering status: submitted. R1 includes a contract adjustment that needs a decision.
 Owner review: pending
 ```
@@ -34,8 +37,9 @@ Owner review: pending
 
 - **Where the callback runs.** On cpal 0.18.2 ALSA, the only Linux backend built, the error
   callback runs on the stream worker (audio) thread. cpal allocates `BackendError`
-  (`alsa::Error` text) and `RealtimeDenied` (`format!`, once at start) on that thread
-  immediately before calling it. Every other error on that path owns no heap memory.
+  (`alsa::Error` text) on that thread immediately before calling it. `RealtimeDenied` would
+  own a message only with cpal's `realtime` feature, which kabl does not enable. Every other
+  error on that path owns no heap memory.
   Source references are in design.md, "Stream-error ownership".
 - **The incompatibility.** Once the hand-off queue is full, no policy can both avoid freeing
   on the audio thread and keep a total bound.
@@ -73,8 +77,8 @@ Owner review: pending
 | Logging: INFO default, DEBUG, sink failure, save failure without paths, bad load | pass (release binary) | `r1/logging/*.txt`; `r1/img/1440x900-{10-log-sink-failure,11-log-sink-hover}.png` ("logging: 8 lines dropped, 1 write failures (last: create log dir: Not a directory (os error 20))") |
 | Overflow ownership regression | pass (direct hand-off test, labelled; not a device failure) | `stream_error_overflow.rs` in `r1/test-workspace.txt` |
 | Inspection cost: simple and dense, tap off/on, parameter swaps, topology change, sizes | measured (cloud VM, no target) | `evidence/perf.md` "D03-R1 re-measurement", `r1/probe-cost-*.txt` |
-| Real app, dense piece, off/on/busy × 3 (+1) | measured; **one busy run hit the known cloud stream stall at 24 s** (logged, not recovered; D05) | `r1/perf-app-summary.txt`, `r1/perf-busy-1-stall-kabl.log` |
-| Package outside the repo: recipes found, log in `~/.local/state` | pass (cloud) | `r1/package.txt`, `r1/img/1440x900-package-*.png` |
+| Real app, dense piece, off/on/busy × 3 (+1) | measured. The **cloud stream stall** hit twice in this R2 session: perf busy-1 at 24 s, and the logging "blocked" run ("stalled … after 2428"; its recording has 0 frames). Both were logged and neither recovered (D05). | `r1/perf-app-summary.txt`, `r1/perf-busy-1-stall-kabl.log`, `r1/logging/blocked.txt` |
+| Package outside the repo: recipes found, log in `~/.local/state` | pass (cloud). Built from `b298eb6` with an uncommitted docs-only edit (`perf.md`), so the log reads `b298eb65381d+modified`. Product code was that of f1edf70. | `r1/package.txt`, `r1/img/1440x900-package-*.png` |
 | `cargo test --workspace` / clippy at 3c8872e | 520 passed, 0 failed, 15 ignored; clippy clean | `r1/test-workspace.txt`, `r1/clippy.txt` |
 
 - **What the older evidence still covers.** Media under `img/`, `evidence/` and
@@ -114,13 +118,13 @@ Learn (Pluck to pad, Filter movement, Interlocking sequences); operational loggi
 |---|---|---|
 | Correct tap: known audio/CV/gate/pitch fixtures, before buffer reuse, short edges, voice/channel, feedback/source | pass (automated) | `crates/engine/tests/probe.rs` (DC chain through coalesced buffers, lanes/pitch/held gate, clock edge rate), `probe.rs` unit test (one-sample pulses, NaN); README "Voice, channel and feedback meaning" |
 | Lifecycle: selection change, deletion/undo, reused ids, failed compile, overlapping swaps | pass (automated) | engine `swaps_name_the_graph_and_a_missing_target_says_so`, `overlapping_swaps_report_the_newest_graph_and_never_go_back`, `a_knob_being_turned_does_not_stop_the_measurement`; UI `only_current_measurements_are_shown_as_current`, `a_wiring_change_drops_what_was_measured_before_it`, `another_sound_never_inherits_a_measurement_by_reused_id`, `a_report_that_waited_in_the_queue_is_not_live`, `a_stuck_command_queue_is_retried` |
-| RT safety: no alloc on changed paths; saturated queue and stalled consumer don't block | pass (automated) | `the_audio_thread_path_never_allocates_with_the_tap_on` (full report queue), `crates/standalone/tests/rt_with_logging.rs` (TRACE logger installed, full report and error queues); kabl-ui callback closure itself not under the check (its added work: relaxed atomic adds) |
+| RT safety: no alloc on changed paths; saturated queue and stalled consumer don't block | pass (automated), **except one path under a proposed contract adjustment (D03-R1).** On overflow the stream-error callback frees a backend-allocated `BackendError` message, and the allocator may lock. `stream_error_overflow.rs` counts that exactly: one free, no allocation, at most 16 outstanding. | `the_audio_thread_path_never_allocates_with_the_tap_on` (full report queue), `crates/standalone/tests/rt_with_logging.rs` (TRACE logger installed, full report and error queues); kabl-ui callback closure itself not under the check (its added work: relaxed atomic adds) |
 | Sound preservation: inspection off/on identical | pass (automated) | `inspection_on_or_off_renders_the_same_samples` (every output of composition, palette/pad, echo; bit-identical) |
 | Diagnostics: disconnected, missing trigger, valid quiet/stopped | pass (automated + scripted real app) | UI tests `why_no_sound_*`; screenshots `img/*-why-missing-trigger.png`, `img/*-dark-why-disconnected.png`; walkthrough 0:13–0:42 and the stopped piece at 2:35–2:40 |
 | Work preservation: restore/undo, unrelated edits, MIDI, Save/Open/New/quit/cancel/failure, history, origin | pass (automated) / partly scripted | `a_restore_is_one_undo_step_and_keeps_the_working_version`, `the_restore_difference_reproduces_every_factory_sound` (all factory pairs), `another_sound_drops_the_reference_and_a_failed_open_keeps_it`, `save_targets_the_current_patch_while_comparing`, recipe start/cancel tests; MIDI CC edits go through the same current patch (no hidden version exists); quit uses the unchanged D01 path (logging runs show `shutdown result=ok` after Ctrl+Q) |
 | Recipes: all three complete in the real app with audio, reveal, comparison, exit/keep, unguided task | pass (scripted; not learning evidence) | `walkthrough.mp4`, `evidence/walkthrough-drive.txt`, `evidence/walkthrough-kabl.log` (recipe/compare transitions) |
 | Layout/focus: 1440×900 and 1280×800, A-light/A-dark, browser/Perform/drawer/dialog, off-face pin | pass (scripted screenshots) | `img/` (both sizes; light and dark); D02 gaps: `*-lead-glide-{before,shown,back}`, `*-dark-browser-perform-{inspect-search,after-escape}`; UI test `escape_in_a_dialog_over_inspection_and_comparison_closes_only_the_dialog` (Unsaved and Rename) |
-| Logging: INFO default, DEBUG override, rotation/queues, sink failure, no callback logging | pass (automated + real binary) | `crates/standalone` unit tests (rotation cap, unwritable dir), `applog_stalled_sink`, `applog_full_disk`, `applog_levels`; `evidence/logging-{default,debug,blocked,badload}.txt`; `img/1440x900-light-log-sink-failure.png` |
+| Logging: INFO default, DEBUG override, rotation/queues, sink failure, no callback logging | pass (automated + real binary) | `crates/standalone` unit tests (rotation cap, unwritable dir), `applog_stalled_sink`, `applog_full_disk`, `applog_levels`; `evidence/logging-{default,debug,blocked,badload}.txt`; `img/1440x900-light-log-sink-failure.png` (historical, ef9ed7b). **Final head (D03-R1):** `r1/logging/*.txt`, `r1/img/1440x900-{10-log-sink-failure,11-log-sink-hover}.png` |
 | Package: launch outside checkout; recipes discoverable | pass (cloud) | `evidence/package.txt`, `img/1440x900-light-package-interlocking-stopped.png` |
 | Regression: focused tests, `cargo test --workspace`, clippy at head | pass | "Final state" below |
 | Measurements: off/on, simple and dense, distributions, memory, lateness/xruns apart, rapid selection + edits | done (cloud; no target) | `evidence/perf.md` |

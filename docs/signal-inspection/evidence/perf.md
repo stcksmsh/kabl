@@ -166,7 +166,8 @@ histogram bins (50 µs) after the first second.
 running, but the stream did not recover. This is the cloud stream stall already reported in
 earlier batches, and recovery belongs to D05. I can't tell from one occurrence whether the
 inspector's busy mode made it more likely. `busy-4` was run to give three complete busy
-runs; `busy-1` stays in the table as observed.
+runs; `busy-1` stays in the table as observed. The same stall also hit the separate logging "blocked" run in
+this session (`r1/logging/blocked.txt`: "stalled … after 2428").
 
 **Reading.** The p50 and p99 bins are the same in every mode. The worst execution times,
 late executions and xruns vary more from run to run within a mode than between modes, as in

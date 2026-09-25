@@ -103,7 +103,7 @@ crossfade the measurement is of the graph fading in, and says so.
   16-slot queue for the UI thread (the standalone `kabl` drains it every second). When that
   queue is full, the error is dropped in the callback and counted as "not delivered". At
   most 16 errors are outstanding. Dropping an error there frees its message only if cpal
-  allocated one on that same thread (on ALSA: `BackendError` and `RealtimeDenied`). This
+  allocated one on that same thread (on this build: `BackendError` only). This
   is a proposed contract adjustment, described in design.md, "Stream-error ownership".
   The log line gives the counts per kind, the last delivered message and the number not
   delivered. `KABL_STATS_FILE` keeps its first line; a second line adds the histogram.
@@ -174,8 +174,8 @@ priority (no system D-Bus).
   allocated on the audio thread is freed there, which is the contract adjustment for the
   supervisor/owner (design.md). Messages of undelivered errors are not kept.
 - Audio dips in the cloud walkthrough remain unexplained VM observations.
-- One real-app perf run (D03-R1, busy mode) hit the cloud stream stall: no callbacks after
-  24 s. It was logged; nothing recovers the stream (D05).
+- The cloud stream stall hit twice during the D03-R1 runs (perf busy-1 at 24 s, and the
+  logging "blocked" run). It was logged each time; nothing recovers the stream (D05).
 - "Why no sound?" does not name an unplugged audio input on the path; it checks gate inputs
   only (D03-R1 follow-up).
 

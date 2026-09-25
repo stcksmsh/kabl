@@ -160,3 +160,139 @@ Fixes in the commit after `2967b06` ("D03 recheck fixes N1-N3"); `cargo test --w
 New findings: none.
 
 Limits: I did not run the real app. N1 was verified through the engine and `Inspect` APIs, not the GUI. Only removing a cable was exercised; adding a cable and changing a module's kind go through the same signature check but were not run. This is not approval, and it is not Kosta's hands-on review.
+
+## D03-R1 review
+
+- **Reviewer:** a fresh reviewer subagent (Claude). It had no part in the D03-R1 correction and changed no product code; this section is its only edit.
+- **Reviewed base:** `08f9d06` (PR #5 head the brief was prepared against).
+- **Reviewed head:** `68f6cee` (branch HEAD). Product commits `25a9f78` (hand-off), `99c28d3` (`probe_cost` example), `f1edf70` (comments only; I checked that `git diff 99c28d3 f1edf70 -- crates` has no non-comment line). `git diff f1edf70 68f6cee -- crates Cargo.toml Cargo.lock packaging` is empty, so the product code at the head equals `f1edf70`.
+- **Contract checked against:** `docs/product-research/briefs/D03-R1.md`, and the original RT clause in `briefs/D03.md` (line 155: "No logger calls, text formatting, file I/O, locks or allocation/deallocation in the new RT path"; acceptance row "No-allocation/deallocation checks on changed callback paths").
+
+### Coverage
+
+- **Code, read directly:**
+  - `crates/standalone/src/lib.rs`: `hand_off_stream_error`, `StreamErrorCounts`, `STREAM_ERROR_KINDS`, `STREAM_ERROR_QUEUE`.
+  - `crates/standalone/src/main.rs`: the error callback and the 1 s drain / 10 s log loop.
+  - `crates/ui/src/main.rs`: the error callback, `CallbackTiming::error`, `AudioHost` field order, `log_health` (drain plus WARN line) and where `update` calls it.
+  - Tests: `crates/standalone/tests/stream_error_overflow.rs` and `rt_with_logging.rs`.
+  - Diff: `crates/engine/examples/probe_cost.rs`.
+- **Pinned backend source**, `~/.cargo/registry/src/*/cpal-0.18.2`:
+  - `src/error.rs`: `Error`, `ErrorKind`, `From<AudioThreadPriorityError>`, `ResultExt::context`.
+  - `src/host/alsa/mod.rs`: `new_output`/`new_input`, `output_stream_worker`/`input_stream_worker`, `poll_for_period`, `try_resume`, `process_output`/`process_input`, `From<alsa::Error>`, `Drop for Stream`.
+  - cpal's `[features]` in its `Cargo.toml`, `cargo tree -e features -i cpal` and `Cargo.lock`.
+- **Docs:**
+  - design.md, "Stream-error ownership";
+  - REPORT.md, "D03-R1 follow-up", plus the older acceptance matrix, Verification and Commits sections;
+  - README.md diff, HANDOFF/STATUS diff;
+  - evidence/perf.md, last section.
+- **Evidence opened:**
+  - `r1/perf-app-summary.txt` (every row checked against the perf.md table), `r1/perf-busy-1-stall-kabl.log`, `r1/probe-cost-composition.txt`;
+  - `r1/logging/{default,debug,blocked,badload}.txt`, `r1/r1-sink.stderr`, `r1/package.txt`;
+  - `r1/r1-app-drive.log` and `r1/r1-app-kabl-debug.log` (4 593 `compiled generation` lines; the drag runs from 160.6 s to 252.0 s of drive time), `r1/r1-app-stats.txt`, `r1/test-workspace.txt`;
+  - `scripts/r1-app.sh`, `r1-default-vca.txt`, `r1-sink.txt`;
+  - screenshots `r1/img/1440x900-{2-mid-drag,4-just-removed,5-new-silence,7-undone,9-default-vca-why,10-log-sink-failure}.png`;
+  - `ffprobe`: `r1/r1-app.mp4` is 117.8 s.
+- **Commands run at `68f6cee`** (debug profile, cloud container):
+  - `cargo test -p kabl-standalone`: exit 0. All suites pass, including `stream_error_overflow` 1/1 and `rt_with_logging` 1/1.
+  - `cargo clippy --workspace --all-targets`: exit 0, 0 warnings.
+  - `cargo test --workspace`: exit 0, **520 passed, 0 failed, 15 ignored** (summed over every `test result` line). This matches the implementer's 3c8872e totals.
+
+### Findings
+
+| ID | Severity | File / function | Concrete failure scenario | Evidence | Requested correction |
+|---|---|---|---|---|---|
+| R1-1 | minor | design.md "Stream-error ownership"; README "Logging"/limits; REPORT "D03-R1 follow-up"; HANDOFF; `lib.rs` `hand_off_stream_error` doc; `stream_error_overflow.rs` module doc | The docs say that on this build cpal allocates **`RealtimeDenied`** messages on the audio thread "once, when the worker starts". Kabl does not enable cpal's `realtime` feature, so that code is compiled out. On this build, cpal never produces `RealtimeDenied`, and **`BackendError` is the only kind with a heap message** on the error-callback path. The "real-time priority refused" lines in every R2 log come from kabl-ui's own `audio_thread_priority` call in the *data* callback. They are not a cpal stream error. A reader of the contract decision will overstate what the backend does. | `cpal-0.18.2/Cargo.toml`: `default = []`, `realtime = ["dep:audio_thread_priority", …]`. `cargo tree -e features -i cpal` shows only `cpal feature "default"`, and Cargo.lock's `cpal` entry has no `audio_thread_priority`. `alsa/mod.rs` lines 916/973 and `error.rs`'s `From<AudioThreadPriorityError>` are `#[cfg(feature = "realtime")]`. `crates/ui/src/main.rs` ~L421 promotes the thread itself. | State that on this build only `BackendError` (from `From<alsa::Error>` for an unmapped errno) owns a heap message. `RealtimeDenied` would too if cpal's `realtime` feature were enabled. Keep the provenance-based clause, which already covers both. |
+| R1-2 | minor | REPORT "D03-R1 follow-up" R2 table; perf.md last section; README limits; commit `3c8872e` message | The R2 evidence contains **a second stream stall that is not disclosed**. The release sink-failure logging run (`r1/logging/blocked.txt`, commit 99c28d3) logs `stalled: no callbacks for over 1.5 s after 2428`. Its recording then ends `take complete frames=0`. The REPORT, perf.md, README and STATUS all say that *one* busy perf run hit the stall. The brief asks for the observed stall to be labelled honestly. As written, a reader concludes the stall happened once in about 11 app runs, but it happened twice. Logging and sink-failure behaviour are still shown correctly by that run. | `r1/logging/blocked.txt` lines 20 and 31. `grep -n "2428\|stall"` over REPORT/README/perf.md finds only the busy-1 case. | Add the blocked-logging stall to the R2 table and the README/STATUS limit ("two of the R2 app runs stalled: perf busy-1 at 24 s, logging-blocked after callback 2428; the recorder there captured 0 frames"). No rerun is needed. |
+| R1-3 | minor | REPORT.md acceptance matrix, "RT safety" row (and the "Logging" row) | The main acceptance matrix still reads **"RT safety: no alloc on changed paths … pass (automated)"**, citing `rt_with_logging.rs` "full … error queues". At `25a9f78` the stream-error overflow path intentionally **deallocates** an owned message on the audio thread, pending a supervisor/owner decision. `rt_with_logging` was changed to a static-message error, so it no longer exercises that path. The matrix therefore reports an unconditional pass for a clause that the correction itself proposes to relax. The Logging row still cites only the historical `evidence/logging-*` files. The brief asks the matrix and identities to be updated. | REPORT.md acceptance matrix rows (unchanged by `git diff 08f9d06..HEAD -- REPORT.md`, which only edits the header and appends the follow-up). The `rt_with_logging.rs` diff uses `"Device disconnected"` (a static `&str`). | Mark the RT row "pass, except the stream-error overflow free (contract adjustment pending; `stream_error_overflow.rs`)". Point the Logging row at `r1/logging/*` too. Or add one sentence above the matrix saying the follow-up table supersedes the matching rows. |
+| R1-4 | minor | design.md "Contract adjustment"; `lib.rs` `hand_off_stream_error` doc ("Never allocates, formats, logs, locks or blocks"); REPORT | The adjusted clause is not fully precise, for two reasons. (a) The overflow drop calls the global allocator's `free`. glibc's `free` is usually served from the per-thread tcache, but it can take the arena mutex (tcache bin full, or a larger block). So "never … locks" is not guaranteed on the overflow path. (b) The "original clause" is quoted as "the error callback never frees on the audio thread". The D03 brief actually says "no logger calls, text formatting, file I/O, locks or allocation/deallocation in the new RT path". The adjustment should name the clause it amends. It is fair to note that cpal's own `malloc` of the same message, moments earlier on the same thread, has the same lock exposure. | `D03.md` L155. `lib.rs` doc comment on `hand_off_stream_error` and design.md "Policy (R1)" bullet: "The hand-off itself never allocates, formats, logs, locks or blocks". | Quote the brief's clause. Word the exemption as "may deallocate (through the global allocator, which may briefly lock as cpal's own allocation of it may) exactly one message that cpal allocated on this thread in the same call, and only when the hand-off queue is full". Qualify "never locks" in the doc comment accordingly. |
+| R1-5 | nit | `crates/ui/src/main.rs` `AudioHost` field order; design.md clause "only while the hand-off queue is full" | At teardown, `AudioHost` drops `faults_rx` (declared first) before `_stream`. `Stream::drop` then joins `cpal_alsa_out`, and that thread drops the error closure, which holds the last `Producer`. So the rtrb buffer and up to 16 queued errors, with any owned messages, are freed **on the audio worker thread** as it exits. This is outside the "queue full" case the clause names. It is harmless for audio, because no more periods are processed. The shutdown step in `stream_error_overflow.rs` drops both ends on one test thread, so it does not model this ordering. | `crates/ui/src/main.rs` L62 (`faults_rx`) before L67 (`_stream`); cpal `new_output` moves `error_callback` into the spawned closure. `Drop for Stream` joins it. | Either declare `_stream` before `faults_rx`, so the consumer outlives the stream and drops the leftovers on the UI thread, or add "and at stream teardown, after the last period" to the clause. |
+| R1-6 | nit | REPORT "D03-R1 follow-up" header / package row; `r1/package.txt` | The package smoke test's binary reports `commit b298eb65381d+modified`, which means it was built from a working tree with modified tracked files. The REPORT gives the evidence build as "release 99c28d3" and doesn't mention this identity. No crate file changes after `f1edf70` in any commit, so the product code is very likely the same. But a "+modified" package is not an exact identity. | `r1/package.txt` line 24. `crates/standalone/build.rs` marks "+modified" when `git status --porcelain --untracked-files=no` is non-empty. | Record the package's identity (b298eb6 plus which files were modified, presumably docs), or rebuild the package from a clean tree and refresh `r1/package.txt`. |
+| R1-7 | nit | `standalone/src/main.rs` loop; `ui/src/main.rs` `log_health` | "last delivered" can belong to another interval. The hand-off counts before it pushes, and the consumers drain before they call `since`. So an error counted just after a drain is reported in interval *k*'s kinds, while its text arrives in interval *k+1*. If *k+1* has no new errors, the text is held and shown later next to unrelated counts. The counts themselves are exact. | Order of `fetch_add` then `push` in `hand_off_stream_error`, and drain then `since` in both callers. | Cosmetic. Either call `since` before draining, or clear the text when an interval has no errors. |
+
+Checked with no finding:
+
+- **Bound.** Every non-bare-xrun error is either in the 16-slot rtrb queue or dropped in the same call. Nothing is forgotten (`mem::forget` is gone from the code; `grep` finds it only in design.md's history). So outstanding error ownership is at most `STREAM_ERROR_QUEUE` = 16 errors, each with at most one heap block, whatever the consumer does. This holds for a paused consumer, for kabl-ui with no UI frames (drain only in `log_health` ← `update`, so the queue just stays full), and for `kabl`'s 1 s drain. Both binaries size the queue from `kabl_standalone::STREAM_ERROR_QUEUE` and call the same function.
+- **Counts.**
+  - `STREAM_ERROR_KINDS` lists all 14 variants of cpal 0.18.2's `#[non_exhaustive] ErrorKind`, so "unknown" (index 14) is unreachable today and exists only for the future.
+  - `seen` has `len()+2` = 16 entries: indices 0–14 for kinds, 15 for undelivered. The indexing is correct.
+  - Every undelivered error is also counted by kind, so the WARN line (printed only when kinds is non-empty) can never hide a non-zero undelivered count.
+  - A bare `Xrun` returns before counting, and both callers count xruns themselves.
+  - An `Xrun` with a message (cpal's `try_resume` static "Device does not support suspend/resume") is queued, and it is counted both as a stream error (`Xrun=`) and in the xrun counters. That is consistent and owns nothing.
+  - The subtractions can't underflow because the counters are monotonic.
+- **Where the callback runs.** Confirmed: `new_output`/`new_input` spawn `cpal_alsa_out`/`_in` and move the error closure into it. `output_stream_worker` calls it between periods, on the same thread as the data callback. Every error on that path is built on that thread just before the call. `ResultExt::context` (which would `format!` for any kind) is not used on the worker path.
+- **Is the incompatibility real?** Yes. cpal allocates a fresh `String` per `BackendError`, and a persistent unmapped ALSA errno can repeat it every poll. With no consumer progress, a total bound requires that some of these be freed. The only thread that holds them and still runs is the audio thread. Every alternative the brief excludes (a larger queue, a deferred-free list, blocking, forgetting) or that I considered (a fixed "graveyard" slot, a capped count of forgets) either only moves the limit or eventually frees on that thread. A dedicated drain thread in kabl-ui, instead of the UI frame, would make a full queue much rarer: today it fills whenever the UI stops running frames. But it would not remove the need for the clause. Avoiding the allocation would need a patched cpal, which the brief does not ask for. The provenance-based clause is the smallest adjustment, subject to R1-4 and R1-5.
+- **Test.** `stream_error_overflow.rs` checks bounded outstanding ownership directly: a process-wide live-block counter stays ≤ 16 after every one of 1000 overflowing hand-offs, there are 0 allocations and exactly 1 free per overflowing call (per-thread counters), and exact per-kind and undelivered counts, plus the drain contents and order, recovery and shutdown. It checks both the bound and ownership, not RSS alone or a no-alloc assertion alone. "Unknown" can't be constructed, so it is untested.
+- **No leftover "bounded leak" claim.** README, design, REPORT, HANDOFF and STATUS now describe a drop, not a leak. `mem::forget` appears only as the rejected D03 behaviour. I found no universal "never frees on the audio thread" claim left, apart from R1-3's matrix row and R1-4's "never locks".
+- **R2 artifacts checked:**
+  - **Drag, removal, undo** (`r1-app`, release `99c28d3` = product `f1edf70` behaviour):
+    - mid-drag the reading stays live, "measured on the edited version while it crossfades in";
+    - just after removing the cable into VCA #4 `in`, the panel shows a new 0.6 s window below −90 dBFS with 0 lanes active, not the old level;
+    - 1.5 s later it shows a full 1.0 s window of silence;
+    - after undo it shows −3.7 dBFS with 1 lane active, and "Why no sound?" gives the correct gain-0/cv explanation;
+    - about 4 600 compile lines in the DEBUG log.
+  - **Default-gain VCA:** gain 1.00 with no cv, peak −0.6 dBFS, 8 lanes active, and no "passes nothing" wording.
+  - **Logging:** INFO default (no DEBUG lines), DEBUG override, a bad `--patch` exits 1 at ERROR, and the sink-failure toolbar text and Log ⚠ are shown.
+  - **Re-measurement:**
+    - `probe_cost` has off/on edits+topology modes: every 10th swap removes the first module-to-module cable, and the next swap restores it. That changes the topology signature and restarts the window.
+    - I checked the perf.md tables against the raw `probe-cost-*.txt` and `perf-app-summary.txt`, and they match.
+    - Execution, arrival and xruns are kept apart.
+    - The historical sections are labelled as such.
+  - **Package:** run outside the checkout with the checkout's patches hidden. The recipes are found and the log goes to `~/.local/state/kabl/logs`.
+
+### Verdict on R1
+
+**Bounded: yes.** Outstanding stream-error ownership is at most 16 errors in all states I examined: a paused consumer, kabl-ui with no frames, `kabl`'s drain, and shutdown. The regression test verifies this directly. The `mem::forget` escape is gone. The incompatibility between a total bound and never deallocating on the audio thread is real for unmodified cpal 0.18.2 ALSA. The provenance-based adjustment is the smallest one that works.
+
+The adjustment is **precise in substance but needs three wording fixes before the supervisor/owner decides**:
+- name the right owned kinds (R1-1): on this build only `BackendError`;
+- quote the actual original clause and disclose the allocator-lock exposure of the free (R1-4);
+- cover or remove the teardown free (R1-5).
+
+None of these changes the bound or the behaviour. The adjustment itself still needs a supervisor/owner decision. This review does not approve it.
+
+### Verdict on R2
+
+**Supported, with disclosure gaps.** The artifacts in `r1/` and the last perf.md section support the R2 table:
+- the real-app drag, cable removal, new silence and undo;
+- the default-gain VCA;
+- INFO, DEBUG and sink failure;
+- a re-measurement that includes the topology change;
+- a package smoke test;
+- historical evidence labelled as historical.
+
+Three gaps:
+- the second observed stream stall is undisclosed (R1-2);
+- the acceptance matrix's RT and Logging rows were not updated (R1-3);
+- the package's `+modified` build identity is unrecorded (R1-6).
+
+These are documentation corrections. None needs a rerun.
+
+### Limits of this review
+
+- I did not run the real app, the perf harnesses, the logging runs or the package. I read their artifacts and six screenshots. I did not watch `r1-app.mp4`; I only checked its length.
+- No device failure was injected. The ALSA error paths were checked by reading cpal's source, not by running them.
+- The glibc `free` lock point (R1-4) comes from knowledge of glibc's allocator design, not from a trace on this machine.
+- I did not check whether eframe stops calling `update` for a minimized window on the target desktop. That affects how often kabl-ui's queue fills, not the bound.
+- Tests were run in the debug profile only.
+- This is not approval, and it is not Kosta's hands-on review.
+
+## D03-R1 implementer responses
+
+Fixes are in `d21f42b` (code and comments) and the docs commit that follows it.
+`cargo test --workspace` at `d21f42b`: 520 passed, 0 failed, 15 ignored; clippy is clean
+(`r1/test-workspace.txt`, `r1/clippy.txt`). A real-app start/quit on the release build of
+`d21f42b` logged `shutdown result=ok` (`r1/quit-d21f42b.log`).
+
+| ID | Resolution |
+|---|---|
+| R1-1 | **Fixed.** Confirmed with `cargo tree -e features -i cpal`: only cpal's `default` feature, which is empty, is enabled; `realtime` is off. design.md, README, REPORT, HANDOFF and the comments in `lib.rs`/the test now say that `BackendError` is the only owned message on this build. `RealtimeDenied` is described as owning a message only with that feature, and the "RT priority refused" line is attributed to kabl-ui's own promotion call. |
+| R1-2 | **Fixed.** The second stall (the logging "blocked" run, after callback 2428, with a 0-frame recording) is now reported in the REPORT R2 table, perf.md, README limits and STATUS. |
+| R1-3 | **Fixed.** The main acceptance table's RT-safety row now names the exception under the proposed adjustment. The Logging row cites the final-head evidence in `r1/logging` and marks the older files as historical. |
+| R1-4 | **Fixed.** design.md now quotes the D03 brief's clause word for word ("No logger calls, text formatting, file I/O, locks or allocation/deallocation in the new RT path…"). The proposed adjustment adds that the overflow free may take the allocator's internal lock. The claim "never locks" is now "takes no lock of its own" (design.md and the `lib.rs` doc comment). |
+| R1-5 | **Fixed in code.** `AudioHost` declares `_stream` first, so the stream and the producer in its error callback drop before `faults_rx`. Queued errors are then freed on the UI thread, not on the exiting audio thread. The standalone `kabl` runs until killed (it never tears down), which design.md records. |
+| R1-6 | **Fixed.** REPORT records that the package was built from `b298eb6` with an uncommitted docs-only edit (`+modified`), and that its product code is `f1edf70`'s. |
+| R1-7 | **Documented.** design.md says the "last delivered" message can come from an earlier interval than the counts beside it. The code is unchanged: the brief asks for classification and counts, and the counts are exact. |
+
+The evidence builds (99c28d3, and b298eb6+modified for the package) predate R1-5's
+teardown order. None of the recorded flows exercises teardown with queued errors, so no
+evidence was rerun, as the reviewer noted.

@@ -178,8 +178,12 @@ before calling us. `cpal::Error` is `{ kind, message: Option<Cow<'static, str>> 
   - `From<alsa::Error>` for an errno that has no specific kind becomes
     `BackendError(err.to_string())` (`mod.rs` around line 1722). This can happen on any
     failed poll/avail/prepare/start.
-  - `From<AudioThreadPriorityError>` becomes `RealtimeDenied(format!(…))` (`error.rs`
-    around line 199). This happens once, when the worker starts, before the first period.
+  - With cpal's `realtime` feature, `From<AudioThreadPriorityError>` would also produce an
+    owned `RealtimeDenied(format!(…))` once, when the worker starts (`error.rs` around line
+    199). kabl does **not** enable that feature (cpal's defaults are empty), so on this
+    build that path doesn't exist. The "real-time priority refused" log line comes from
+    kabl-ui's own promotion call. On this build, **`BackendError` is the only owned
+    message.**
 - **No allocation:** every other error on this path is either message-less (`Xrun` from
   EPIPE, `DeviceBusy`, …) or carries a `&'static str` (`Cow::Borrowed`, e.g.
   `DeviceNotAvailable` "Device disconnected").
@@ -204,18 +208,25 @@ So when the queue is full, no policy can meet both "never frees on the audio thr
   thread (kabl-ui) or the main loop (`kabl`) drains.
 - A bare `Xrun` is not queued (it owns nothing); callers count xruns separately.
 - If the queue is full, the error is dropped in the callback and counted as "undelivered".
-  At most 16 errors are outstanding. Only a `BackendError` or `RealtimeDenied` message is
-  freed there, and it is a block cpal allocated on this same thread moments earlier. The
-  hand-off itself never allocates, formats, logs, locks or blocks.
-- The count is kept by kind. The message text of an undelivered error is lost; the last
-  delivered message is logged.
+  At most 16 errors are outstanding. Only a `BackendError` message is freed there, and it
+  is a block cpal allocated on this same thread moments earlier. The hand-off never
+  allocates, formats, logs or blocks, and takes no lock of its own. The overflow `free`
+  goes through the system allocator, which may take its own internal lock (glibc arenas).
+- The count is kept by kind. The message text of an undelivered error is lost. The log
+  line shows the most recently delivered message, which may date from an earlier interval
+  than the counts next to it.
+- On teardown, kabl-ui drops the stream before the error queue's consumer (`AudioHost`
+  field order). The exiting audio thread therefore frees nothing, and queued errors are
+  freed on the UI thread. The standalone `kabl` never tears down (it runs until killed).
 
 **Contract adjustment (for the supervisor/owner).**
 
-- Original clause: "the error callback never frees on the audio thread".
-- Proposed clause: "the error callback frees on the audio thread only a message that the
-  backend allocated on that thread in the same call, and only while the hand-off queue is
-  full".
+- Original clause (D03 brief, logging section): "No logger calls, text formatting, file
+  I/O, locks or allocation/deallocation in the new RT path, even with DEBUG/TRACE enabled."
+- Proposed adjustment: "…except that the stream error callback, when its bounded hand-off
+  queue is full, drops the error, which frees a message the audio backend allocated on
+  that thread in the same call. That free may take the allocator's internal lock. No other
+  RT path allocates, frees or locks." On this build this applies only to `BackendError`.
 - Rejected alternatives: keeping `mem::forget`, which has no bound; a larger queue, which
   moves the limit but keeps it; a deferred-free list, which is unbounded; and a blocking
   or locking writer.

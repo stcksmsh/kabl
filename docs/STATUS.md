@@ -37,8 +37,8 @@ awaiting Kosta's review.**
   - This depends on a **contract adjustment that needs a decision**: the backend allocates
     the messages on the audio thread, so a bound means freeing them there. See
     `signal-inspection/design.md`, "Stream-error ownership".
-  - Real-app, logging, cost and package evidence were refreshed on the final head. One
-    perf run hit the known cloud stream stall.
+  - Real-app, logging, cost and package evidence were refreshed on the final head. The
+    known cloud stream stall hit twice (one perf run and one logging run).
   - Workspace tests: 520 passed, 0 failed, 15 ignored.
 
     cargo run --release -p kabl-ui -- --patch patches/init-keyboard --perform --rate 48000 --frames 256
