@@ -74,9 +74,11 @@ impl StreamErrorCounts {
 /// allocates, formats, logs, locks or blocks.
 ///
 /// When the queue is full the error is dropped here and counted in `undelivered`. That frees
-/// its message if the backend allocated one (on ALSA only `BackendError` does, allocated by
-/// cpal on this thread just before the call); keeping it instead would hold memory without
-/// bound while the consumer is paused. At most `STREAM_ERROR_QUEUE` errors are outstanding.
+/// its message if the backend allocated one (on ALSA `BackendError` and `RealtimeDenied` do,
+/// allocated by cpal on this thread just before the call); keeping it instead would hold
+/// memory without bound while the consumer is paused. At most `STREAM_ERROR_QUEUE` errors are
+/// outstanding. This is a proposed contract adjustment: see design.md, "Stream-error
+/// ownership".
 pub fn hand_off_stream_error(
     err: cpal::Error,
     tx: &mut rtrb::Producer<cpal::Error>,

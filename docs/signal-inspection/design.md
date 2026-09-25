@@ -157,4 +157,72 @@ counts drops. The backend is a `log::Log` impl + one writer thread.
 - The audio callback and the stream error callback never call the logger. They update
   atomics (existing `CallbackTiming`) and a bounded error queue; the UI thread reports
   changes at most every 10 s (INFO/WARN with counts), DEBUG summaries every 60 s.
+
+### Stream-error ownership (D03-R1)
+
+**Where the error callback runs.** Source is cpal 0.18.2 (`Cargo.lock`), ALSA, the only
+Linux backend built.
+
+- `Stream::new_output`/`new_input` start one worker thread per stream (`cpal_alsa_out` /
+  `cpal_alsa_in`). The closure passed as the error callback is moved into that thread and
+  only called there, by `output_stream_worker` / `input_stream_worker`
+  (`src/host/alsa/mod.rs`, around lines 909–1021). This is the same thread that calls the
+  data callback, between periods. So the error callback runs on the audio thread.
+- `stream.play()` and `pause()` return their errors to the caller; they don't go through
+  the callback.
+
+**Which errors own heap memory.** cpal builds each error on that worker thread immediately
+before calling us. `cpal::Error` is `{ kind, message: Option<Cow<'static, str>> }`.
+
+- **Owned (heap) messages:**
+  - `From<alsa::Error>` for an errno that has no specific kind becomes
+    `BackendError(err.to_string())` (`mod.rs` around line 1722). This can happen on any
+    failed poll/avail/prepare/start.
+  - `From<AudioThreadPriorityError>` becomes `RealtimeDenied(format!(…))` (`error.rs`
+    around line 199). This happens once, when the worker starts, before the first period.
+- **No allocation:** every other error on this path is either message-less (`Xrun` from
+  EPIPE, `DeviceBusy`, …) or carries a `&'static str` (`Cow::Borrowed`, e.g.
+  `DeviceNotAvailable` "Device disconnected").
+
+**What that means for the RT contract.** The backend itself allocates the owned messages
+on the audio thread. The application can't prevent that allocation. It can only decide
+where the memory is freed, and how much can be outstanding at once. There are only three
+places the error can end up:
+
+1. Freed in the callback.
+2. Handed to another thread through a bounded queue, which is full when the consumer
+   stalls.
+3. Kept forever (D03's `mem::forget`), which is unbounded while the consumer stalls.
+
+So when the queue is full, no policy can meet both "never frees on the audio thread" and
+"bounded memory".
+
+**Policy (R1).**
+
+- `hand_off_stream_error` counts every error by `ErrorKind` in relaxed atomics: 14 known
+  kinds plus "unknown". It then pushes the error into a 16-slot `rtrb` queue that the UI
+  thread (kabl-ui) or the main loop (`kabl`) drains.
+- A bare `Xrun` is not queued (it owns nothing); callers count xruns separately.
+- If the queue is full, the error is dropped in the callback and counted as "undelivered".
+  At most 16 errors are outstanding. Only a `BackendError` or `RealtimeDenied` message is
+  freed there, and it is a block cpal allocated on this same thread moments earlier. The
+  hand-off itself never allocates, formats, logs, locks or blocks.
+- The count is kept by kind. The message text of an undelivered error is lost; the last
+  delivered message is logged.
+
+**Contract adjustment (for the supervisor/owner).**
+
+- Original clause: "the error callback never frees on the audio thread".
+- Proposed clause: "the error callback frees on the audio thread only a message that the
+  backend allocated on that thread in the same call, and only while the hand-off queue is
+  full".
+- Rejected alternatives: keeping `mem::forget`, which has no bound; a larger queue, which
+  moves the limit but keeps it; a deferred-free list, which is unbounded; and a blocking
+  or locking writer.
+- The data callback's contract (no allocation or free) is unchanged.
+- Regression test: `crates/standalone/tests/stream_error_overflow.rs`. It sends 1000
+  owned errors plus other kinds through a paused consumer, then checks the live heap
+  blocks (never more than 16 outstanding), the frees per call (exactly one on overflow,
+  never an allocation), the per-kind and undelivered counts, drain and recovery, and that
+  shutdown leaves nothing behind. Both binaries call this same function.
 - Not logged by default: audio, patch contents, notes, typed search/rename text.

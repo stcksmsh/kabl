@@ -99,9 +99,14 @@ crossfade the measurement is of the graph fading in, and says so.
   library directories, a failed `--patch` path and device names appear because they help
   diagnosis, so a log can contain local details.
 - The audio callback and the stream error callback never call the logger; see
-  `decisions.md`. The error callback moves each `cpal::Error` into a 256-slot queue for the
-  UI thread (the standalone `kabl` drains it every second); when that is full it forgets the
-  error instead of freeing it on the audio thread and counts it ("not delivered"). `KABL_STATS_FILE` keeps its first line; a second line adds the histogram.
+  `decisions.md`. The error callback counts each `cpal::Error` by kind and moves it into a
+  16-slot queue for the UI thread (the standalone `kabl` drains it every second). When that
+  queue is full, the error is dropped in the callback and counted as "not delivered". At
+  most 16 errors are outstanding. Dropping an error there frees its message only if cpal
+  allocated one on that same thread (on ALSA: `BackendError` and `RealtimeDenied`). This
+  is a proposed contract adjustment, described in design.md, "Stream-error ownership".
+  The log line gives the counts per kind, the last delivered message and the number not
+  delivered. `KABL_STATS_FILE` keeps its first line; a second line adds the histogram.
 
 ## Evidence (cloud VM; not laptop)
 
@@ -156,9 +161,12 @@ priority (no system D-Bus).
   held notes, tails and phases continue). No loudness matching.
 - Like any edit, a restore replaces the redo tail (the dialog says so when there is one).
 - No deterministic audio-device fault hook exists; the stream-error hand-off is tested
-  directly (`crates/standalone/tests/rt_with_logging.rs`), not by an injected device failure.
-- A stream error that finds the queue full is forgotten (its message, if any, is leaked)
-  rather than freed on the audio thread; counted and logged.
+  directly (`crates/standalone/tests/rt_with_logging.rs`, `stream_error_overflow.rs`), not
+  by an injected device failure.
+- A stream error that finds the 16-slot queue full is dropped in the error callback and
+  counted by kind. This bounds outstanding error memory. It also means a message that cpal
+  allocated on the audio thread is freed there, which is the contract adjustment for the
+  supervisor/owner (design.md). Messages of undelivered errors are not kept.
 - Audio dips in the cloud walkthrough remain unexplained VM observations.
 
 ## Reproduce
