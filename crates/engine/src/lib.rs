@@ -8,6 +8,7 @@ pub mod graph;
 pub mod keyboard;
 pub mod patch_demo;
 pub mod patch_engine;
+pub mod probe;
 pub mod potato;
 pub mod simd_voices;
 pub mod swap;

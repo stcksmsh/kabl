@@ -71,6 +71,7 @@ use kabl_modules::{
 
 use crate::graph::BLOCK;
 use crate::keyboard::Action;
+use crate::probe::{ProbeReport, ProbeStatus, ProbeTarget, Tap, PROBE_LANES};
 
 pub type BufIdx = usize;
 
@@ -361,6 +362,11 @@ pub struct CompiledPatch {
     /// A freshly loaded patch: `carry_state` copies nothing into it, so it starts like a
     /// startup load (empty delay lines, clocks running) even where module ids match.
     pub fresh: bool,
+    /// Set by whoever builds graphs (the UI counts its rebuilds), carried into probe reports
+    /// so a measurement names the graph it came from. 0 when nobody set it.
+    pub generation: u64,
+    /// The selected-signal tap (`probe.rs`); inactive unless `PatchEngine` sets a target.
+    tap: Tap,
 }
 
 enum CableTo {
@@ -1082,6 +1088,8 @@ fn compile_inner(
         sample_rate,
         voice_count,
         fresh: false,
+        generation: 0,
+        tap: Tap::default(),
     })
 }
 
@@ -1299,6 +1307,15 @@ impl CompiledPatch {
                             "compile() rejects modules with more than MAX_OUTPUTS output ports"
                         ),
                     }
+                    // The selected tap reads this instance's output now, before any later step
+                    // can reuse the slot (`coalesce_buffers`).
+                    if self.tap.found {
+                        if let Some(lane) = self.tap.lane_of(*module_index) {
+                            if let Some(&b) = output_bufs.get(self.tap.port) {
+                                self.tap.feed(lane, &self.buffers[b]);
+                            }
+                        }
+                    }
                     if !launches.is_empty() {
                         arm_launches(
                             &mut self.modules,
@@ -1391,6 +1408,85 @@ impl CompiledPatch {
                 }
             }
         }
+    }
+
+    /// Points the tap at `target` (`None`: off) and starts a new window. Linear in the number
+    /// of instances, no allocation: called by `PatchEngine` on the audio thread when the target
+    /// or the measured graph changes, never per block.
+    pub fn set_probe(&mut self, target: Option<ProbeTarget>) {
+        let mut tap = Tap {
+            target,
+            ..Tap::default()
+        };
+        if let Some(t) = target {
+            for (index, (&(id, voice), m)) in
+                self.module_origin.iter().zip(&self.modules).enumerate()
+            {
+                if id != t.module || m.info().kind != t.kind {
+                    continue;
+                }
+                let outputs = m
+                    .info()
+                    .ports
+                    .iter()
+                    .filter(|p| p.direction == PortDirection::Output)
+                    .count();
+                if t.port as usize >= outputs {
+                    continue;
+                }
+                if tap.n < PROBE_LANES {
+                    tap.modules[tap.n] = index as u32;
+                    tap.n += 1;
+                }
+                tap.total += 1;
+                tap.voiced = voice.is_some();
+            }
+            tap.port = t.port as usize;
+            tap.found = tap.n > 0;
+        }
+        self.tap = tap;
+    }
+
+    /// The tap's target, if any.
+    pub fn probe_target(&self) -> Option<ProbeTarget> {
+        self.tap.target
+    }
+
+    /// After a block: counts it into the window (`fading`: it was part of a crossfade) and,
+    /// once the window has `window_blocks` blocks, returns its report and starts the next.
+    /// No allocation.
+    pub fn probe_block_end(
+        &mut self,
+        window_blocks: u32,
+        fading: bool,
+        seq: u64,
+    ) -> Option<ProbeReport> {
+        let t = self.tap.target?;
+        let tap = &mut self.tap;
+        tap.blocks += 1;
+        tap.samples += BLOCK as u32;
+        tap.fading |= fading;
+        if tap.blocks < window_blocks.max(1) {
+            return None;
+        }
+        let report = ProbeReport {
+            token: t.token,
+            generation: self.generation,
+            seq,
+            status: if tap.found {
+                ProbeStatus::Measured
+            } else {
+                ProbeStatus::NotInGraph
+            },
+            fading: tap.fading,
+            samples: tap.samples,
+            lanes: tap.n as u8,
+            lanes_total: tap.total.min(u16::MAX as usize) as u16,
+            voiced: tap.voiced,
+            lane: tap.acc,
+        };
+        tap.reset_window();
+        Some(report)
     }
 
     pub fn left(&self) -> &[f32; BLOCK] {
