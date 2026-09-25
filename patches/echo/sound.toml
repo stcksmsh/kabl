@@ -1,0 +1,10 @@
+name = "Echo Sequence"
+category = "Piece"
+tags = [
+    "sequenced",
+    "echo",
+    "delay",
+]
+description = "A sequence through the clock-synced echo."
+keys = false
+sequence = true

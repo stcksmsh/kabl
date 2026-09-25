@@ -1,0 +1,12 @@
+name = "Composition"
+category = "Piece"
+tags = [
+    "sequenced",
+    "banks",
+    "cues",
+    "evolving",
+    "keyboard",
+]
+description = "Interlocking sequences that move through sections: pattern banks, cues, a synced LFO and macros."
+keys = true
+sequence = true

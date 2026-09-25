@@ -1,0 +1,12 @@
+name = "Evolving Pad"
+category = "Pad"
+tags = [
+    "warm",
+    "slow",
+    "poly",
+    "evolving",
+    "echo",
+]
+description = "Warm evolving pad: slow pulse-width motion, a breathing driven ladder filter, echo and a big room."
+keys = true
+sequence = false

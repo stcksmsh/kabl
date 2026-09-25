@@ -1,0 +1,10 @@
+name = "Reference Voice"
+category = "Study"
+tags = [
+    "keyboard",
+    "modulation",
+    "lfo",
+]
+description = "The rack's reference patch: a keyboard voice with LFO and envelope routes into the filter and envelope."
+keys = true
+sequence = false

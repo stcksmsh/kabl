@@ -14,6 +14,7 @@
 pub mod banks;
 pub mod cues;
 pub mod editor;
+pub mod library;
 pub mod perform;
 pub mod rack;
 pub mod record;

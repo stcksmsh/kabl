@@ -1,0 +1,11 @@
+name = "Sound Palette Piece"
+category = "Piece"
+tags = [
+    "sequenced",
+    "layers",
+    "cues",
+    "keyboard",
+]
+description = "The palette voices together: sequenced bass and percussion with section cues, and four keyboard layers on faders."
+keys = true
+sequence = true

@@ -1,0 +1,10 @@
+name = "Noise Percussion"
+category = "Percussion"
+tags = [
+    "drums",
+    "sequenced",
+    "noise",
+]
+description = "Kick, snare and hat from noise and sines on three sequencers from one clock. Runs its own sequence; press Start."
+keys = false
+sequence = true

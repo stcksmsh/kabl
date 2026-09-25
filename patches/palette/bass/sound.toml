@@ -1,0 +1,10 @@
+name = "Sequence Bass"
+category = "Bass"
+tags = [
+    "sequenced",
+    "resonant",
+    "dry",
+]
+description = "Resonant sequence bass: saw plus square sub through a resonant ladder, accents from the sequencer. Runs its own sequence; press Start."
+keys = false
+sequence = true

@@ -1,0 +1,11 @@
+name = "Performance"
+category = "Piece"
+tags = [
+    "sequenced",
+    "reverb",
+    "echo",
+    "keyboard",
+]
+description = "A sequenced piece with a plate reverb, echo, velocity and gate length, set up for the Perform panel."
+keys = true
+sequence = true
