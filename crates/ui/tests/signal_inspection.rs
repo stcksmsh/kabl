@@ -939,3 +939,155 @@ fn library_errors_are_logged_without_paths_or_names() {
     };
     assert_eq!(e.log_text(), "replace-mismatch");
 }
+
+/// D03-R2: the cable into the VCA's audio input removed while the VCA out is inspected and
+/// quiet. The missing audio input is a named graph fact; the envelope on its cv is not
+/// suggested as the audio source; the filter left without a destination is offered as a
+/// possibility, not as the user's intent.
+#[test]
+fn why_no_sound_names_an_unplugged_intermediate_audio_input() {
+    let clocks = HashMap::new();
+    let whole = init_state();
+    let mut s = whole.clone();
+    let c = cable_to(&s, 4, "in");
+    s.cables.remove(&c);
+    let sel = Sel {
+        id: 4,
+        port: "out".into(),
+    };
+    let quiet = summary(LaneStats::default(), 8);
+    let d = inspect::diagnose(
+        &s,
+        None,
+        &cx(
+            &clocks,
+            Some((&sel, kabl_modules::PortType::Audio, Some(quiet.clone()))),
+        ),
+    );
+    assert!(
+        d.facts
+            .iter()
+            .any(|f| f.starts_with("No cable into VCA #4 in: that is its audio input")),
+        "{d:?}"
+    );
+    // The measurement stays a measurement; the fact stays a fact.
+    assert!(d.measured.iter().any(|m| m.contains("VCA #4 out")), "{d:?}");
+    assert!(d.facts.iter().all(|f| !f.contains("measured")));
+    // Not the envelope on the cv: a CV reading says nothing about audio arriving.
+    assert_ne!(d.next, Some((6, "out".to_string())), "{d:?}");
+    assert_eq!(d.next, Some((3, "lp".to_string())), "{d:?}");
+    assert!(
+        d.possible
+            .iter()
+            .any(|p| p.contains("Audio outputs that feed nothing: Filter #3 lp")),
+        "{d:?}"
+    );
+    assert!(d.possible.iter().all(|p| !p.contains("ADSR")), "{d:?}");
+    // Without a tap the fact is the same.
+    let d = inspect::diagnose(&s, Some(4), &cx(&clocks, None));
+    assert!(d
+        .facts
+        .iter()
+        .any(|f| f.contains("No cable into VCA #4 in")));
+
+    // The whole patch (the state Undo restores): no missing input, and a quiet VCA still
+    // points at its audio feed, the filter.
+    let d = inspect::diagnose(
+        &whole,
+        None,
+        &cx(
+            &clocks,
+            Some((&sel, kabl_modules::PortType::Audio, Some(quiet))),
+        ),
+    );
+    assert!(
+        d.facts.iter().all(|f| !f.contains("No cable into")),
+        "{d:?}"
+    );
+    assert_eq!(d.next, Some((3, "lp".to_string())), "{d:?}");
+}
+
+/// Optional inputs are not faults: a VCA without cv (default gain), a mixer with one of four
+/// channels, reverb and chorus fed on one side, a filter without cutoff CV.
+#[test]
+fn why_no_sound_leaves_optional_inputs_alone() {
+    let clocks = HashMap::new();
+    let mut s = init_state();
+    let c = cable_to(&s, 4, "cv");
+    s.cables.remove(&c);
+    let d = inspect::diagnose(&s, Some(2), &cx(&clocks, None));
+    assert!(
+        d.facts.iter().all(|f| !f.contains("No cable into")),
+        "{d:?}"
+    );
+
+    // VCA out -> mixer in2 -> reverb in_l -> chorus in_r -> out.
+    let mut s = init_state();
+    for c in [cable_to(&s, 5, "left"), cable_to(&s, 5, "right")] {
+        s.cables.remove(&c);
+    }
+    for (id, kind) in [(10, "mixer"), (11, "reverb"), (12, "chorus")] {
+        s.modules.insert(
+            id,
+            kabl_core::ModuleState {
+                kind: kind.into(),
+                pos: kabl_core::Vec2 { x: 0.0, y: 0.0 },
+                params: Default::default(),
+            },
+        );
+    }
+    let wire = |s: &mut PatchState, n: u64, from: (u64, &str), to: (u64, &str)| {
+        s.cables.insert(
+            n,
+            kabl_core::CableState {
+                from: PortRef::Module {
+                    id: from.0,
+                    port: from.1.into(),
+                },
+                to: PortRef::Module {
+                    id: to.0,
+                    port: to.1.into(),
+                },
+                params: Default::default(),
+                steps: Vec::new(),
+            },
+        );
+    };
+    wire(&mut s, 50, (4, "out"), (10, "in2"));
+    wire(&mut s, 51, (10, "out"), (11, "in_l"));
+    wire(&mut s, 52, (11, "left"), (12, "in_r"));
+    wire(&mut s, 53, (12, "left"), (5, "left"));
+    wire(&mut s, 54, (12, "right"), (5, "right"));
+    let d = inspect::diagnose(&s, Some(2), &cx(&clocks, None));
+    assert!(
+        d.facts.iter().all(|f| !f.contains("No cable into")),
+        "{d:?}"
+    );
+    // Every channel of the mixer unplugged: now the mixer has nothing to pass.
+    s.cables.remove(&50);
+    let d = inspect::diagnose(&s, Some(10), &cx(&clocks, None));
+    assert!(
+        d.facts
+            .iter()
+            .any(|f| f.contains("No cable into Mixer #10 in1 / in2 / in3 / in4")),
+        "{d:?}"
+    );
+}
+
+/// Every input `needed_inputs` names exists on its module and carries audio.
+#[test]
+fn needed_inputs_are_real_audio_inputs() {
+    for kind in kabl_modules::registry::KNOWN_KINDS {
+        let info = kabl_modules::registry::info_for(kind).unwrap();
+        for group in inspect::needed_inputs(kind) {
+            for name in *group {
+                let p = info
+                    .ports
+                    .iter()
+                    .find(|p| p.name == *name && p.direction == kabl_modules::PortDirection::Input)
+                    .unwrap_or_else(|| panic!("{kind} has no input {name}"));
+                assert_eq!(p.port_type, kabl_modules::PortType::Audio, "{kind} {name}");
+            }
+        }
+    }
+}

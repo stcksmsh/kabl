@@ -840,8 +840,9 @@ struct Health {
     stalled: bool,
     /// `errors` at the last WARN line.
     errors_seen: [u64; kabl_standalone::STREAM_ERROR_KINDS.len() + 2],
-    /// The last error taken from the queue since the last WARN line.
-    fault_text: Option<String>,
+    /// The last error taken from the queue, and when (its age is logged: it may predate the
+    /// interval whose counts it is printed with).
+    fault_text: Option<(String, std::time::Instant)>,
     log_problem: Option<String>,
     log_checked: std::time::Instant,
 }
@@ -869,7 +870,7 @@ impl App {
         let h = &mut self.health;
         if let Some(rx) = self.audio.faults_rx.as_mut() {
             while let Ok(e) = rx.pop() {
-                h.fault_text = Some(e.to_string());
+                h.fault_text = Some((e.to_string(), std::time::Instant::now()));
             }
         }
         let Some(t) = &self.audio.timing else {
@@ -910,10 +911,14 @@ impl App {
             }
             let (kinds, lost) = t.errors.since(&mut h.errors_seen);
             if !kinds.is_empty() {
+                let last = h
+                    .fault_text
+                    .as_ref()
+                    .map(|(t, at)| (t.as_str(), at.elapsed().as_secs_f64()));
                 log::warn!(
                     target: "audio",
-                    "stream errors in {secs:.1}s: {kinds}; last delivered: {}; not delivered (queue full): {lost}",
-                    h.fault_text.take().as_deref().unwrap_or("none")
+                    "{}",
+                    kabl_standalone::stream_error_line(secs, &kinds, last, lost)
                 );
             }
             h.counts = now;

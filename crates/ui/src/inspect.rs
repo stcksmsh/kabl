@@ -704,6 +704,47 @@ pub fn diagnose(state: &PatchState, focus: Option<ModuleId>, cx: &Context) -> Di
             }
         }
     }
+    // Signal inputs a stage on the path needs to pass audio, with no cable (an unplugged input
+    // reads silence). Optional inputs (cv, clock, a mixer's other channels, a stereo pair's
+    // second side) are not listed: see `needed_inputs`.
+    let mut missing: Vec<(ModuleId, String)> = Vec::new();
+    for &m in &path_modules {
+        let Some(kind) = state.modules.get(&m).map(|s| s.kind.as_str()) else {
+            continue;
+        };
+        for group in needed_inputs(kind) {
+            if !group.iter().any(|p| plugged_in(state, m, p)) {
+                missing.push((m, group.join(" / ")));
+            }
+        }
+    }
+    for (m, ports) in &missing {
+        d.facts.push(format!(
+            "No cable into {} {ports}: that is its audio input, and an unplugged input reads \
+             silence, so this stage passes nothing.",
+            title(state, *m)
+        ));
+    }
+    if let Some((m, _)) = missing.first() {
+        let idle = idle_audio_outputs(state, *m);
+        if idle.is_empty() {
+            d.possible.push(format!(
+                "Plug an audio source into {} to hear this path.",
+                title(state, *m)
+            ));
+        } else {
+            let names: Vec<String> = idle
+                .iter()
+                .map(|(id, port)| format!("{} {port}", title(state, *id)))
+                .collect();
+            d.possible.push(format!(
+                "Audio outputs that feed nothing: {}. If one of them should feed {}, plug it \
+                 there (Undo brings back a cable you just removed).",
+                names.join(", "),
+                title(state, *m)
+            ));
+        }
+    }
     if !open_gates.is_empty() {
         d.facts
             .push(format!("No cable into: {}.", open_gates.join(", ")));
@@ -804,11 +845,24 @@ pub fn diagnose(state: &PatchState, focus: Option<ModuleId>, cx: &Context) -> Di
                 }
                 let at = path_modules.iter().position(|&m| m == sel.id);
                 if quiet && *t == PortType::Audio {
-                    // Upstream: whatever feeds the tapped module's first connected input.
+                    // Upstream: whatever feeds the tapped module's first connected audio
+                    // input. A CV source (an envelope on a VCA's cv) says nothing about
+                    // whether audio arrives, so it is never suggested here.
                     if let Some((id, port)) = upstream(state, sel.id) {
                         d.possible.push(format!(
                             "Nothing measured here: inspect {} {port} to see whether signal \
                              arrives before this stage.",
+                            title(state, id)
+                        ));
+                        d.next = Some((id, port));
+                    } else if let Some((id, port)) = missing
+                        .iter()
+                        .find(|(m, _)| *m == sel.id)
+                        .and_then(|(m, _)| idle_audio_outputs(state, *m).into_iter().next())
+                    {
+                        d.possible.push(format!(
+                            "Nothing measured here, and no cable brings audio in: inspect {} \
+                             {port} to see whether it carries signal.",
                             title(state, id)
                         ));
                         d.next = Some((id, port));
@@ -854,13 +908,59 @@ pub fn diagnose(state: &PatchState, focus: Option<ModuleId>, cx: &Context) -> Di
     d
 }
 
-/// The first connected signal input of `id` and the output feeding it.
+/// Input groups a module needs to pass audio: each group needs at least one cable. Every
+/// built-in reads an unplugged input as silence, so a stage whose group is empty outputs
+/// nothing. Read from each module's `process`: a VCA, filter, delay, drive or gain multiplies
+/// or filters `in`; a mixer sums any of its four channels; reverb and chorus take either side
+/// of their stereo pair; a ring modulator multiplies `a` by `b`. Modulation inputs (cv,
+/// clock, sync, pitch, reset) are never needed: they only move the stage. Sources and `out`
+/// (checked on its own) need nothing here.
+pub fn needed_inputs(kind: &str) -> &'static [&'static [&'static str]] {
+    match kind {
+        "vca" | "filter.svf" | "filter.ladder" | "delay" | "drive" | "gain" => &[&["in"]],
+        "mixer" => &[&["in1", "in2", "in3", "in4"]],
+        "reverb" | "chorus" => &[&["in_l", "in_r"]],
+        "ringmod" => &[&["a"], &["b"]],
+        _ => &[],
+    }
+}
+
+/// A cable is plugged into input `port` of module `id`.
+fn plugged_in(state: &PatchState, id: ModuleId, port: &str) -> bool {
+    state
+        .cables
+        .values()
+        .any(|c| matches!(&c.to, PortRef::Module { id: t, port: p } if *t == id && p == port))
+}
+
+/// Audio outputs of modules other than `except` and the outputs, on modules none of whose
+/// outputs has a cable: candidates for a missing audio input. Module order, one per module.
+fn idle_audio_outputs(state: &PatchState, except: ModuleId) -> Vec<(ModuleId, String)> {
+    let mut out = Vec::new();
+    for (&id, m) in &state.modules {
+        if id == except || m.kind == "out" {
+            continue;
+        }
+        let Some(info) = registry::info_for(&m.kind) else {
+            continue;
+        };
+        if state.cables.values().any(|c| c.from.module_id() == id) {
+            continue;
+        }
+        if let Some(p) = outputs(info).find(|p| p.port_type == PortType::Audio) {
+            out.push((id, p.name.to_string()));
+        }
+    }
+    out
+}
+
+/// The first connected audio input of `id` and the output feeding it.
 fn upstream(state: &PatchState, id: ModuleId) -> Option<(ModuleId, String)> {
     let info = registry::info_for(&state.modules.get(&id)?.kind)?;
     for p in info
         .ports
         .iter()
-        .filter(|p| p.direction == PortDirection::Input)
+        .filter(|p| p.direction == PortDirection::Input && p.port_type == PortType::Audio)
     {
         for c in state.cables.values() {
             if let (PortRef::Module { id: f, port: fp }, PortRef::Module { id: t, port: tp }) =
