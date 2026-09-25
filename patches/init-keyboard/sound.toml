@@ -1,0 +1,10 @@
+name = "Init Keyboard"
+category = "Basic"
+tags = [
+    "starting point",
+    "simple",
+    "saw",
+]
+description = "A plain keyboard voice to start from: one saw oscillator, a low-pass filter and an envelope. Its main controls are on the Perform panel."
+keys = true
+sequence = false

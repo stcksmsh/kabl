@@ -1,0 +1,9 @@
+--- app log
+kabl-ui: factory sounds: /tmp/claude-0/port/kabl-0.1.0-linux-x86_64/share/kabl/patches; your sounds: /tmp/claude-0/port/home/.local/share/kabl/sounds
+kabl-ui: no MIDI input matched None
+--- saved files
+/tmp/claude-0/port/home/.local/share/kabl/library.json
+/tmp/claude-0/port/home/.local/share/kabl/sounds/portable-test/checkpoint.json
+/tmp/claude-0/port/home/.local/share/kabl/sounds/portable-test/log.jsonl
+/tmp/claude-0/port/home/.local/share/kabl/sounds/portable-test/meta.toml
+/tmp/claude-0/port/home/.local/share/kabl/sounds/portable-test/sound.toml

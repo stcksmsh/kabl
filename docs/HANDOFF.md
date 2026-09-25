@@ -17,6 +17,32 @@ first; laptop-class performance (Pi was an example, not a target); eventual reus
 composites, custom light/dark panels and actual user-written DSP/behaviour. See the latest
 decisions entry. Proposed ordering/architecture remain recommendations pending disposition.
 
+## D01 Find, play and save — built, awaiting Kosta's review (2026-09-25)
+
+Kosta authorized D01 as a whole and **explicitly deferred** the Composition + Motion and Sound
+Palette hands-on reviews while his laptop is away. Those two stay **pending, not approved**;
+D00 is not complete; no later batch (D02+) is authorized. Record, evidence, limits:
+`docs/find-play-save/README.md` (+ `CHECKLIST.md`, `REPORT.md`); rationale: decisions.md
+"D01 Find, play and save a sound".
+
+- Built in a cloud session on branch `claude/install-caveman-ponytail-bhigco` (the
+  container required it); PR https://github.com/stcksmsh/kabl/pull/2 to `master` is open for Kosta to merge.
+- Code: `crates/ui/src/library.rs` (discovery, `sound.toml` metadata, staged user saves and
+  repair, favorites/recents), `crates/ui/src/browser.rs` (panel, document/unsaved state,
+  audition, Start/Stop, dialogs), `crates/engine/src/patch_engine.rs` (`Command::Preview`,
+  `PreviewStop`, per-source key ownership), `main.rs` (library at start, pieces open
+  stopped, quit guard). Tests: `crates/engine/tests/preview.rs`, `crates/ui/tests/{library,browser}.rs`.
+- Factory metadata: `patches/**/sound.toml` and the new `patches/init-keyboard`, written by
+  `cargo test -p kabl-ui --test library write_factory_library -- --ignored`.
+- Package: `packaging/linux/package.sh` → `target/dist/kabl-<v>-linux-<arch>.tar.gz`
+  (`bin/kabl-ui`, `share/kabl/patches`). User data: `~/.local/share/kabl/`.
+- Scripted real-app tooling: `drive.py` now takes `KABL_BIN`, patch `-` (no `--patch`) and
+  `fill KEY TEXT`; its `save DIR` uses the browser's advanced folder section. D01 scripts in
+  `docs/find-play-save/scripts/`; `record-walkthrough.sh`. Hit keys: `sound:<id>`, `open`,
+  `play`, `stop-preview`, `start`, `stop`, `save`, `save-as`, `dlg:*`, `filter:*`, `fav:<id>`.
+- Open items for the review: the 60-second first-sound observation, controller/preview feel,
+  laptop timing at 256 frames. Composition spike and Sound Palette stall questions unchanged.
+
 ## Where things are
 
 - Branch `master` on `origin`. The sound palette batch was merged into it on 2026-09-25 (PR #1,

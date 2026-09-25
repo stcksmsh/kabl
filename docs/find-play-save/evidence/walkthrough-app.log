@@ -1,0 +1,7 @@
+kabl-ui: factory sounds: /tmp/claude-0/pkg/kabl-0.1.0-linux-x86_64/share/kabl/patches; your sounds: target/find-play-save-walkthrough/user/sounds
+kabl-ui: listening for MIDI on "kabl-pipe" (test pipe)
+kabl-ui: audio stream error: A buffer underrun or overrun occurred.
+kabl-ui: audio stream error: A buffer underrun or overrun occurred.
+kabl-ui: audio stream error: A buffer underrun or overrun occurred.
+kabl-ui: audio stream error: A buffer underrun or overrun occurred.
+kabl-ui: audio stream error: A buffer underrun or overrun occurred.

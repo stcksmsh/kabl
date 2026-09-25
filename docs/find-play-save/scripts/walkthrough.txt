@@ -1,0 +1,120 @@
+# D01 walkthrough in the real release kabl-ui (the installed package), launched without
+# --patch, so the browser opens. SCRIPTED: xdotool clicks and types; the "controller" in
+# part 8 is examples/midi_player through the KABL_MIDI_PIPE fifo stand-in (no ALSA
+# sequencer or hardware in the container). Marks: `shot wNN-*` (times in drive.log).
+sleep 2
+shot w01-launch
+# 1. Browsing makes no sound: select several sounds, search.
+click sound:factory:palette/strings
+sleep 0.8
+click sound:factory:composition
+sleep 0.8
+click sound:factory:palette/bass
+sleep 0.8
+fill search pad
+sleep 1
+click sound:factory:palette/pad
+sleep 1
+shot w02-selected-no-sound
+# 2. Open the pad; audition a note, a chord, an octave lower; stop one early.
+click open
+sleep 1.5
+click play
+sleep 4
+click chord:Major
+click play
+sleep 4.5
+click note-down
+click play
+sleep 4.5
+click note-up
+click play
+sleep 0.7
+click stop-preview
+sleep 2.5
+shot w03-pad-audition
+# 3. Change an existing control (the Warmth macro on the Perform panel) and hear it.
+click perform
+sleep 0.8
+dragby pslider:1.m1 80 0
+sleep 0.5
+click play
+sleep 4.5
+shot w04-edited-unsaved
+# 4. Opening another sound asks first; Cancel keeps the edit.
+fill search lead
+sleep 0.5
+click sound:factory:palette/lead
+click open
+sleep 1
+shot w05-unsaved-question
+click dlg:cancel
+sleep 1
+# 5. Save on a factory sound asks for a name (Save As): the factory pad is untouched.
+click save
+sleep 0.8
+fill dlg:name My Warm Pad
+sleep 0.5
+shot w06-save-as
+click dlg:save
+sleep 1.5
+# 6. The lead: favorite it, open, play.
+fill search lead
+click fav:factory:palette/lead
+click sound:factory:palette/lead
+click open
+sleep 1
+click chord:Note
+click play
+sleep 3.5
+# 7. A piece opens stopped; Start and Stop run it.
+fill search bass
+click sound:factory:palette/bass
+click open
+sleep 2
+shot w07-piece-stopped
+click start
+sleep 9
+shot w08-piece-running
+click stop
+sleep 2
+# 8. Your Sounds: find the saved pad again, play it, rename it.
+click search
+key ctrl+a
+key BackSpace
+click filter:user
+sleep 0.5
+click sound:user:my-warm-pad
+click open
+sleep 1
+click chord:Major
+click play
+sleep 4
+shot w09-your-sound
+click rename
+sleep 0.5
+fill dlg:name Warm Pad Bright
+click dlg:save
+sleep 1
+# 9. Controller and preview together (fifo stand-in controller), on Init Keyboard:
+#    the controller holds C4; a C major preview ends; the controller's C4 keeps sounding
+#    until its own key-up.
+click new
+sleep 1.5
+midi on 60 90
+sleep 1
+click play
+sleep 3
+midi off 60
+sleep 2
+# 10. Recent and Favorites; A-dark.
+click filter:recent
+sleep 1
+shot w10-recent
+click filter:favorites
+sleep 1
+click theme:dark
+sleep 1
+shot w11-dark
+click filter:all
+sleep 2

@@ -1,0 +1,9 @@
+name = "Interlocking Sequences"
+category = "Piece"
+tags = [
+    "sequenced",
+    "polyrhythm",
+]
+description = "A 7-step bass on 16ths against a 5-step lead on 8ths from one clock."
+keys = false
+sequence = true

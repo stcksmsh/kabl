@@ -74,6 +74,7 @@ Grounding: `crates/modules/src/registry.rs`, `info.rs`, `skin.rs`; `crates/ui/sr
 ### Approval and evidence ledger
 
 - Closed: rack migration, sequencing, interlocking sequences, echo, performance.
+- **2026-09-25 update:** Kosta authorized D01 as a whole and explicitly deferred the Composition + Motion and Sound Palette hands-on reviews (laptop unavailable); both remain pending, not approved. D00 is not complete. D01 is built, awaiting Kosta's review: `docs/find-play-save/`.
 - Composition + Motion: merged, awaiting Kosta's hands-on review.
 - Sound Palette: merged through PR #1, awaiting Kosta's listening/keyboard review.
 - Sound Palette cloud evidence used a FIFO MIDI stand-in and silent sink. Dense-piece take and walkthrough used 512 frames. Laptop performance at 48 kHz/256 is not established by those recordings.

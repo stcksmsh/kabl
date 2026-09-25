@@ -19,13 +19,16 @@ Script lines (# comments):
     at X Y                                       move the pointer
     nudge DX DY                                  move the pointer relative (button state unchanged)
     shot NAME                                    screenshot to OUTDIR/NAME.png
-    save DIR                                     type DIR into the patch field and press Save
+    save DIR                                     type DIR into the patch-folder field and press Save to folder
+    fill KEY TEXT                                click a text field, select all, type TEXT
     sleep S
     wait T                                       until T s after the script's first line
     midi LINE                                    a line for the virtual controller (KABL_PLAYER)
     midikill | midistart                         unplug / plug the virtual controller back in
 
-Environment: KABL_DRIVE_LOG=FILE logs each line with its wall-clock time; KABL_APP_LOG=FILE
+The optional 4th argument is the patch folder; `-` starts kabl-ui without `--patch` (the
+browser opens). Environment: KABL_BIN=PATH runs another kabl-ui binary (an installed
+package); KABL_DRIVE_LOG=FILE logs each line with its wall-clock time; KABL_APP_LOG=FILE
 keeps kabl-ui's stderr; KABL_ARGS adds
 kabl-ui arguments; KABL_PLAYER=1 starts
 target/release/examples/midi_player first (a virtual MIDI port, `kabl-player`). Without an ALSA
@@ -57,7 +60,9 @@ def start_player():
 if os.environ.get("KABL_PLAYER"):
     player = start_player()
 extra = os.environ.get("KABL_ARGS", "").split()
-app = subprocess.Popen(["./target/release/kabl-ui", "--patch", patch, "--size", size, *extra],
+binary = os.environ.get("KABL_BIN", "./target/release/kabl-ui")
+patch_args = [] if patch == "-" else ["--patch", patch]
+app = subprocess.Popen([binary, *patch_args, "--size", size, *extra],
                        env=env, stdout=subprocess.DEVNULL,
                        stderr=open(os.environ["KABL_APP_LOG"], "w") if os.environ.get("KABL_APP_LOG")
                        else subprocess.DEVNULL)
@@ -174,13 +179,25 @@ try:
             time.sleep(0.4)
             subprocess.run(["import", "-window", "root", "-crop", f"{w}x{h}+0+0",
                             os.path.join(out, a[0] + ".png")], check=True)
+        elif cmd == "fill":
+            glide(*centre(a[0]))
+            x("click", 1)
+            x("key", "ctrl+a")
+            x("type", "--delay", "20", " ".join(a[1:]))
         elif cmd == "save":
+            if "patch-path" not in hits():
+                glide(*centre("browser"))
+                x("click", 1)
+                time.sleep(0.3)
+                glide(*centre("folder-header"))
+                x("click", 1)
+                time.sleep(0.3)
             glide(*centre("patch-path"))
             x("click", 1)
             x("key", "ctrl+a")
             x("type", "--delay", "5", os.path.abspath(a[0]))
             x("key", "Return")
-            glide(*centre("save"))
+            glide(*centre("save-folder"))
             x("click", 1)
             time.sleep(0.5)
         elif cmd == "goto":

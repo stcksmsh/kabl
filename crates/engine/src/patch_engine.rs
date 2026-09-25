@@ -57,7 +57,18 @@ pub struct PatchEngine {
     /// One keyboard per `midi.in` of the playing graph, outside the graphs like the launches
     /// (docs/sound-palette-batch/keyboard.md).
     keyboards: [Option<Keyboard>; MAX_KEYBOARDS],
+    /// Who holds each key (bit n = MIDI note n): a key held by both the controller and the
+    /// preview is released only when both have let go (docs/find-play-save/README.md).
+    held_controller: u128,
+    held_preview: u128,
+    /// Blocks until the preview's notes release; 0 = no preview running.
+    preview_blocks: u32,
 }
+
+/// Most notes one preview plays (a chord).
+pub const MAX_PREVIEW_NOTES: usize = 4;
+/// Longest preview, in seconds: the audio thread releases it after this whatever the UI does.
+pub const MAX_PREVIEW_SECS: f32 = 10.0;
 
 /// Most `midi.in` modules with a keyboard of their own; any beyond get no notes.
 pub const MAX_KEYBOARDS: usize = 8;
@@ -113,6 +124,16 @@ pub enum Command {
     Launch(Launch),
     /// Cancel one sequencer's pending launch, or every one.
     Cancel(Option<kabl_core::ModuleId>),
+    /// Audition: press `notes[..count]` at `velocity` through the keyboards, release them
+    /// after `blocks` blocks (at most `MAX_PREVIEW_SECS`). Replaces a preview still running.
+    Preview {
+        notes: [u8; MAX_PREVIEW_NOTES],
+        count: u8,
+        velocity: u8,
+        blocks: u32,
+    },
+    /// Release the preview's notes now (those the controller doesn't also hold).
+    PreviewStop,
 }
 
 const NO_LAUNCH: PendingLaunch = PendingLaunch {
@@ -140,6 +161,9 @@ impl PatchEngine {
             launches: [None; MAX_PENDING],
             packed: [NO_LAUNCH; MAX_PENDING],
             keyboards: Default::default(),
+            held_controller: 0,
+            held_preview: 0,
+            preview_blocks: 0,
         };
         e.sync_keyboards();
         Ok(e)
@@ -157,14 +181,67 @@ impl PatchEngine {
             launches: [None; MAX_PENDING],
             packed: [NO_LAUNCH; MAX_PENDING],
             keyboards: Default::default(),
+            held_controller: 0,
+            held_preview: 0,
+            preview_blocks: 0,
         };
         e.sync_keyboards();
         e
     }
 
-    /// Audio-thread call: a key event for every keyboard, carried out in every running graph.
-    /// No allocation.
+    /// Audio-thread call: a key event from the MIDI controller. A key-up is held back while the
+    /// preview also holds that key. No allocation.
     pub fn key(&mut self, e: KeyEvent) {
+        match e {
+            KeyEvent::On { note, .. } => self.held_controller |= bit(note),
+            KeyEvent::Off { note } => {
+                self.held_controller &= !bit(note);
+                if self.held_preview & bit(note) != 0 {
+                    return;
+                }
+            }
+            KeyEvent::AllOff => {
+                self.held_controller = 0;
+                self.held_preview = 0;
+                self.preview_blocks = 0;
+            }
+            KeyEvent::Sustain(_) => {}
+        }
+        self.send_key(e);
+    }
+
+    /// Audio-thread call: starts a preview (replacing one still running). No allocation.
+    pub fn preview(&mut self, notes: &[u8], velocity: u8, blocks: u32) {
+        self.preview_stop();
+        let max = (MAX_PREVIEW_SECS * self.active.sample_rate() / BLOCK as f32) as u32;
+        self.preview_blocks = blocks.clamp(1, max.max(1));
+        for &note in notes.iter().take(MAX_PREVIEW_NOTES) {
+            let note = note & 0x7F;
+            self.held_preview |= bit(note);
+            self.send_key(KeyEvent::On {
+                note,
+                velocity: velocity.clamp(1, 127),
+            });
+        }
+    }
+
+    /// Audio-thread call: releases the preview's keys, except those the controller holds.
+    pub fn preview_stop(&mut self) {
+        self.preview_blocks = 0;
+        let held = std::mem::take(&mut self.held_preview);
+        for note in 0..128u8 {
+            if held & bit(note) != 0 && self.held_controller & bit(note) == 0 {
+                self.send_key(KeyEvent::Off { note });
+            }
+        }
+    }
+
+    /// Keys the preview holds right now (bit n = note n), for tests and the UI.
+    pub fn preview_keys(&self) -> u128 {
+        self.held_preview
+    }
+
+    fn send_key(&mut self, e: KeyEvent) {
         self.sync_keyboards();
         let PatchEngine {
             keyboards,
@@ -192,6 +269,12 @@ impl PatchEngine {
     /// changed settings apply (a mode change releases). `fresh`: a Load, every keyboard
     /// starts over. No allocation.
     fn sync(&mut self, fresh: bool) {
+        if fresh {
+            // Every keyboard starts over, so nobody holds a key.
+            self.held_controller = 0;
+            self.held_preview = 0;
+            self.preview_blocks = 0;
+        }
         let PatchEngine {
             keyboards,
             active,
@@ -388,6 +471,16 @@ impl PatchEngine {
         match c {
             Command::Launch(l) => self.launch(l),
             Command::Cancel(s) => self.cancel(*s),
+            Command::Preview {
+                notes,
+                count,
+                velocity,
+                blocks,
+            } => {
+                let n = (*count as usize).min(MAX_PREVIEW_NOTES);
+                self.preview(&notes[..n], *velocity, *blocks);
+            }
+            Command::PreviewStop => self.preview_stop(),
         }
     }
 
@@ -457,6 +550,12 @@ impl PatchEngine {
     /// unlike `swap::Engine::process_block` (S1's graph was mono).
     #[inline]
     pub fn process_block(&mut self, out_left: &mut [f32; BLOCK], out_right: &mut [f32; BLOCK]) {
+        if self.preview_blocks > 0 {
+            self.preview_blocks -= 1;
+            if self.preview_blocks == 0 {
+                self.preview_stop();
+            }
+        }
         let mut n = 0;
         for l in self.launches.iter().flatten() {
             self.packed[n] = *l;
@@ -530,6 +629,10 @@ impl PatchEngine {
             }
         }
     }
+}
+
+fn bit(note: u8) -> u128 {
+    1u128 << (note & 0x7F)
 }
 
 /// A keyboard action in every running graph.

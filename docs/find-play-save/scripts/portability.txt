@@ -1,0 +1,18 @@
+# Launch check of the installed package, outside the source checkout (scripted).
+sleep 2
+shot p01-installed-launch
+fill search init
+click sound:factory:init-keyboard
+click open
+sleep 1
+click play
+sleep 2
+click save-as
+sleep 0.5
+fill dlg:name Portable Test
+click dlg:save
+sleep 1
+click filter:user
+click folder-header
+sleep 0.5
+shot p02-saved-outside-checkout

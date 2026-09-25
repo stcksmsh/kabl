@@ -5,8 +5,30 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-24, Sound Palette + Playable Voices batch built, waiting for Kosta's
-hands-on listening and keyboard review (Composition + Motion also still waiting, separately).
+Last updated: 2026-09-25, D01 Find, play and save a sound built, awaiting Kosta's review.
+Composition + Motion and Sound Palette are still separately waiting for his hands-on reviews
+(explicitly deferred by Kosta for D01, not approved). D00 is not complete; D02+ not authorized.
+
+**D01 Find, play and save a sound (owner-authorized, 2026-09-25): built, awaiting Kosta's
+review.** A Sounds panel with Factory and Your Sounds, search, categories, favorites and
+recents; 15 factory sounds (a new Init Keyboard, the six palette voices, the pieces, two rack
+studies) marked Keys / Sequence / Seq + Keys; browsing is silent; Open loads through a
+parse-and-compile check; audition (note/chord, velocity, length) through the engine's
+keyboards, bounded on the audio thread and never releasing controller-held keys; pieces open
+stopped with Start/Stop; Save / Save As / Rename into `~/.local/share/kabl/sounds` with
+factory protection, explicit replace on a taken name, staged saves with repair; unsaved-edit
+questions on Open/New/quit (undo back to the saved state is clean); a relocatable Linux
+package (`packaging/linux/package.sh`). The old toolbar path field is now the browser's
+"Patch folder (advanced)" section. Record, walkthrough, screenshots, measurements and
+limits: [`find-play-save/README.md`](find-play-save/README.md); checklist:
+[`find-play-save/CHECKLIST.md`](find-play-save/CHECKLIST.md); report:
+[`find-play-save/REPORT.md`](find-play-save/REPORT.md). Evidence is scripted from a cloud
+container (Xvfb, PipeWire null sink, fifo MIDI stand-in; 5 xruns / 2 late executions / 49
+late arrivals at 256 frames on the VM) — not laptop, controller or beginner evidence.
+Test counts: see the report (rerun at the submitted head).
+
+    packaging/linux/package.sh && mkdir -p ~/opt && tar -xzf target/dist/kabl-0.1.0-linux-x86_64.tar.gz -C ~/opt
+    ~/opt/kabl-0.1.0-linux-x86_64/bin/kabl-ui --rate 48000 --frames 256
 
 **Sound Palette + Playable Voices (supervisor scope, 2026-09-24): built, waiting for Kosta's
 hands-on review.** New `noise`, `filter.ladder`, `chorus`, `drive`; `osc.va` pulse width,

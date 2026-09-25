@@ -1,0 +1,11 @@
+name = "Singing Lead"
+category = "Lead"
+tags = [
+    "mono",
+    "legato",
+    "glide",
+    "bright",
+]
+description = "Singing mono lead: legato glide between overlapping notes, a synced vowel on each attack, drive and ping-pong echo."
+keys = true
+sequence = false

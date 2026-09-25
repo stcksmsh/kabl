@@ -1,0 +1,9 @@
+name = "Crowded Rack"
+category = "Study"
+tags = [
+    "keyboard",
+    "layout",
+]
+description = "Many modules and cables, for trying the rack's cable views and zoom."
+keys = true
+sequence = false

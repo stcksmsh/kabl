@@ -1,0 +1,9 @@
+name = "First Sequence"
+category = "Piece"
+tags = [
+    "sequenced",
+    "simple",
+]
+description = "The smallest sequence: one clock and one 8-step sequencer playing a voice."
+keys = false
+sequence = true

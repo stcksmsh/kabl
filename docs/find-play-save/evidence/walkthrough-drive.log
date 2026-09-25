@@ -1,0 +1,104 @@
+1790340320.948 sleep 2
+1790340323.251 shot w01-launch
+1790340324.144 click sound:factory:palette/strings
+1790340324.965 sleep 0.8
+1790340326.066 click sound:factory:composition
+1790340326.900 sleep 0.8
+1790340328.000 click sound:factory:palette/bass
+1790340328.860 sleep 0.8
+1790340329.960 fill search pad
+1790340330.872 sleep 1
+1790340332.172 click sound:factory:palette/pad
+1790340333.004 sleep 1
+1790340334.304 shot w02-selected-no-sound
+1790340335.187 click open
+1790340336.021 sleep 1.5
+1790340337.823 click play
+1790340338.685 sleep 4
+1790340342.988 click chord:Major
+1790340343.832 click play
+1790340344.668 sleep 4.5
+1790340349.470 click note-down
+1790340350.337 click play
+1790340351.213 sleep 4.5
+1790340356.015 click note-up
+1790340356.864 click play
+1790340357.705 sleep 0.7
+1790340358.708 click stop-preview
+1790340359.576 sleep 2.5
+1790340362.376 shot w03-pad-audition
+1790340363.323 click perform
+1790340364.185 sleep 0.8
+1790340365.285 dragby pslider:1.m1 80 0
+1790340366.802 sleep 0.5
+1790340367.602 click play
+1790340368.450 sleep 4.5
+1790340373.250 shot w04-edited-unsaved
+1790340374.160 fill search lead
+1790340375.102 sleep 0.5
+1790340375.903 click sound:factory:palette/lead
+1790340376.753 click open
+1790340377.594 sleep 1
+1790340378.898 shot w05-unsaved-question
+1790340379.791 click dlg:cancel
+1790340380.645 sleep 1
+1790340381.945 click save
+1790340382.771 sleep 0.8
+1790340383.871 fill dlg:name My Warm Pad
+1790340384.883 sleep 0.5
+1790340385.683 shot w06-save-as
+1790340386.564 click dlg:save
+1790340387.410 sleep 1.5
+1790340389.211 fill search lead
+1790340390.110 click fav:factory:palette/lead
+1790340390.944 click sound:factory:palette/lead
+1790340391.802 click open
+1790340392.661 sleep 1
+1790340393.962 click chord:Note
+1790340394.800 click play
+1790340395.637 sleep 3.5
+1790340399.437 fill search bass
+1790340400.365 click sound:factory:palette/bass
+1790340401.189 click open
+1790340402.029 sleep 2
+1790340404.332 shot w07-piece-stopped
+1790340405.253 click start
+1790340406.091 sleep 9
+1790340415.393 shot w08-piece-running
+1790340416.328 click stop
+1790340417.146 sleep 2
+1790340419.446 click search
+1790340420.280 key ctrl+a
+1790340420.614 key BackSpace
+1790340420.936 click filter:user
+1790340421.759 sleep 0.5
+1790340422.559 click sound:user:my-warm-pad
+1790340423.395 click open
+1790340424.227 sleep 1
+1790340425.532 click chord:Major
+1790340426.352 click play
+1790340427.196 sleep 4
+1790340431.497 shot w09-your-sound
+1790340432.394 click rename
+1790340433.260 sleep 0.5
+1790340434.061 fill dlg:name Warm Pad Bright
+1790340435.161 click dlg:save
+1790340436.034 sleep 1
+1790340437.334 click new
+1790340438.156 sleep 1.5
+1790340439.956 midi on 60 90
+1790340439.956 sleep 1
+1790340441.256 click play
+1790340442.099 sleep 3
+1790340445.399 midi off 60
+1790340445.399 sleep 2
+1790340447.699 click filter:recent
+1790340448.559 sleep 1
+1790340449.860 shot w10-recent
+1790340450.731 click filter:favorites
+1790340451.559 sleep 1
+1790340452.859 click theme:dark
+1790340453.691 sleep 1
+1790340454.994 shot w11-dark
+1790340455.892 click filter:all
+1790340456.728 sleep 2

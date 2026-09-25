@@ -1,0 +1,11 @@
+name = "Breath"
+category = "Wind"
+tags = [
+    "noise",
+    "airy",
+    "poly",
+    "texture",
+]
+description = "Airy wind texture: noise through a narrow band that follows the key, gusts from a slow LFO, wide chorus and a long room."
+keys = true
+sequence = false

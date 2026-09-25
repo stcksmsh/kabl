@@ -1,0 +1,11 @@
+name = "Ensemble Strings"
+category = "Strings"
+tags = [
+    "warm",
+    "chorus",
+    "poly",
+    "evolving",
+]
+description = "Animated ensemble strings: two detuned saws, slow bow envelope, vibrato, stereo chorus."
+keys = true
+sequence = false
