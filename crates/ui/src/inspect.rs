@@ -39,6 +39,8 @@ pub struct Sel {
 pub struct Inspect {
     /// The drawer shows the inspector (and measures while a selection exists).
     pub open: bool,
+    /// Scroll the section into view on the next frame (just opened or selected).
+    pub reveal: bool,
     pub sel: Option<Sel>,
     /// The "Why no sound?" aid is open.
     pub why: bool,
@@ -78,6 +80,7 @@ impl Inspect {
         }
         self.sel = Some(sel);
         self.open = true;
+        self.reveal = true;
     }
 
     /// Stops measuring (the inspector itself stays as it is).
@@ -889,6 +892,9 @@ fn lanes_ui(ui: &mut egui::Ui, s: &Summary, t: PortType) {
 
 /// The drawer section: selection, measurement, "Why no sound?".
 pub fn panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, now: f64) {
+    if std::mem::take(&mut ui_state.inspect.reveal) {
+        ui.scroll_to_cursor(Some(egui::Align::TOP));
+    }
     let state = editor.state();
     ui.horizontal(|ui| {
         ui.strong("Inspect a signal");

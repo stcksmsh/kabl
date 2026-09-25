@@ -25,6 +25,8 @@ pub struct Reference {
 #[derive(Debug, Default)]
 pub struct Compare {
     pub open: bool,
+    /// Scroll the section into view on the next frame (just opened).
+    pub reveal: bool,
     pub reference: Option<Reference>,
     /// Sequence number of the log entry our last restore appended.
     restored: Option<u64>,
@@ -251,6 +253,9 @@ fn weak(ui: &mut egui::Ui, text: impl Into<String>) {
 
 /// The drawer section.
 pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
+    if std::mem::take(&mut ui_state.compare.reveal) {
+        ui.scroll_to_cursor(Some(egui::Align::TOP));
+    }
     ui.horizontal(|ui| {
         ui.strong("Compare with a reference");
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

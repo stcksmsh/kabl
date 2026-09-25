@@ -530,6 +530,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                 ui_state.record("recipe-compare".into(), b.rect);
                 if b.clicked() {
                     ui_state.compare.open = true;
+                    ui_state.compare.reveal = true;
                 }
             }
         });

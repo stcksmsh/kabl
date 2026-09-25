@@ -1,0 +1,157 @@
+# D03 walkthrough (scripted, real X input, fifo MIDI stand-in), Init Keyboard, 1440x900.
+# 1. Inspect an output while playing. 2. Why no sound: missing trigger (no key), then a
+# removed connection, undone. 3. The three recipes with reveal, inspection, comparison,
+# exit/keep and the unguided task; a stopped piece as the valid-quiet case.
+sleep 2
+click inspect-open
+click module:4
+click inspect-port:4.out
+sleep 1
+midi on 60 90
+sleep 3
+midi off 60
+sleep 2
+# Missing trigger: MIDI #1 gate observed with no key down.
+click module:1
+click inspect-port:1.gate
+click why
+sleep 5
+midi on 64 90
+sleep 2
+midi off 64
+sleep 3
+# Removed connection: pull both plugs out of the Output, look, undo.
+dragby in:5.left 0 170
+dragby in:5.right 0 150
+click module:4
+click inspect-port:4.out
+midi on 60 90
+sleep 6
+midi off 60
+key ctrl+z
+key ctrl+z
+sleep 1
+midi on 60 90
+sleep 3
+midi off 60
+click why
+click inspect-close
+sleep 1
+# Recipe 1: Pluck to pad.
+click learn-open
+click recipe:pluck-to-pad
+sleep 2
+click recipe-inspect
+click recipe-note
+sleep 3
+click recipe-next
+click recipe-show
+sleep 1
+fill base-entry:6.sustain 0.7
+key Return
+click recipe-note
+sleep 3
+click recipe-next
+click recipe-show
+fill base-entry:6.release_ms 1000
+key Return
+click recipe-note
+sleep 4
+click recipe-next
+click recipe-show
+fill base-entry:6.attack_ms 600
+key Return
+click recipe-note
+sleep 4
+click recipe-next
+click recipe-compare
+sleep 1
+click compare-restore
+sleep 1
+click dlg:restore
+click recipe-note
+sleep 3
+click compare-undo
+click recipe-note
+sleep 4
+click recipe-next
+sleep 3
+click learn-close
+sleep 1
+# Recipe 2: Filter movement (the pad edits are unsaved: the ordinary question).
+click learn-open
+click recipe:filter-movement
+sleep 1
+click dlg:discard
+sleep 1
+click recipe-show
+click recipe-note
+sleep 1
+fill base-entry:3.cutoff_hz 300
+key Return
+sleep 1.5
+fill base-entry:3.cutoff_hz 900
+key Return
+sleep 1.5
+click recipe-next
+click recipe-show
+sleep 1
+click recipe-note
+click bypass:8
+sleep 4
+click recipe-next
+click recipe-inspect
+click recipe-show
+click recipe-note
+sleep 1
+fill base-entry:7.rate_hz 2
+key Return
+sleep 3
+click recipe-next
+click recipe-next
+click recipe-compare
+sleep 1
+click compare-restore
+click dlg:restore
+click recipe-note
+sleep 3
+click compare-undo
+click recipe-note
+sleep 4
+click learn-close
+# Recipe 3: Interlocking sequences; stopped first: the valid-quiet case.
+click learn-open
+click recipe:interlocking
+sleep 1
+click dlg:discard
+sleep 1
+click recipe-inspect
+click why
+sleep 4
+click run:1
+sleep 4
+click recipe-next
+click recipe-inspect
+sleep 4
+click recipe-next
+click recipe-show
+fill base-entry:4.length 4
+key Return
+sleep 6
+click recipe-next
+click recipe-show
+fill base-entry:3.length 8
+key Return
+sleep 6
+click recipe-next
+click recipe-compare
+sleep 1
+click compare-restore
+click dlg:restore
+sleep 5
+click compare-undo
+sleep 4
+click recipe-next
+sleep 3
+click learn-close
+sleep 2

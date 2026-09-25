@@ -596,6 +596,7 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                     ui_state.record("inspect-open".into(), r.rect);
                     if r.clicked() {
                         ui_state.inspect.open = !on;
+                        ui_state.inspect.reveal = !on;
                     }
                     let on = ui_state.compare.open;
                     let r = ui
@@ -604,6 +605,7 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                     ui_state.record("compare-open".into(), r.rect);
                     if r.clicked() {
                         ui_state.compare.open = !on;
+                        ui_state.compare.reveal = !on;
                     }
                     let on = ui_state.recipes.open;
                     let r = ui
@@ -614,6 +616,20 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                         ui_state.recipes.open = !on;
                     }
                 });
+                if ui_state.recipes.open {
+                    // Above the drawer's scrolling content, so Show (which scrolls the drawer
+                    // to the routes) never scrolls the recipe away.
+                    let h = ui.available_height() * 0.4;
+                    egui::ScrollArea::vertical()
+                        .id_salt("kabl-recipes")
+                        .max_height(h)
+                        .show(ui, |ui| {
+                            ui.set_max_width(DRAWER_W - 24.0);
+                            egui::Frame::group(ui.style()).show(ui, |ui| {
+                                recipes::panel(editor, ui_state, ui, now);
+                            });
+                        });
+                }
                 if ui_state.explain.is_open() {
                     // Its own scroll area, at most about half the drawer: the module and
                     // routing sections below stay in reach while it is open.
@@ -629,11 +645,6 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     // Rows wrap instead of widening the drawer over the rack.
                     ui.set_max_width(DRAWER_W - 24.0);
-                    if ui_state.recipes.open {
-                        egui::Frame::group(ui.style()).show(ui, |ui| {
-                            recipes::panel(editor, ui_state, ui, now);
-                        });
-                    }
                     if ui_state.inspect.open {
                         egui::Frame::group(ui.style()).show(ui, |ui| {
                             inspect::panel(editor, ui_state, ui, now);

@@ -872,7 +872,11 @@ impl App {
         let secs = h.at.elapsed().as_secs_f64();
         if secs >= 10.0 {
             let d: Vec<u64> = now.iter().zip(h.counts).map(|(a, b)| a - b).collect();
-            if d[0] + d[1] + d[2] > 0 {
+            // Xruns and late executions are INFO; arrival lateness alone (common on a busy
+            // machine, and not itself a dropout) only at DEBUG.
+            if d[0] + d[1] > 0
+                || (d[2] > 0 && log::log_enabled!(target: "audio.health", log::Level::Debug))
+            {
                 log::info!(
                     target: "audio.health",
                     "last {secs:.1}s: xruns={} late_executions={} late_arrivals={} callbacks={} worst_run_us={:.0}",
