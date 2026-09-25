@@ -174,6 +174,10 @@ impl Tap {
     }
 }
 
+/// Bytes the tap adds to every compiled graph (inline, allocated with the graph off the audio
+/// thread).
+pub const TAP_BYTES: usize = std::mem::size_of::<Tap>();
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,7 +212,3 @@ mod tests {
         assert_eq!(fresh.acc[0].min, 0.25);
     }
 }
-
-/// Bytes the tap adds to every compiled graph (inline, allocated with the graph off the audio
-/// thread).
-pub const TAP_BYTES: usize = std::mem::size_of::<Tap>();

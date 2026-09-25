@@ -599,7 +599,7 @@ pub fn diagnose(state: &PatchState, focus: Option<ModuleId>, cx: &Context) -> Di
                 ));
                 path_modules = vec![f];
             }
-            Err(()) => d.facts.push(format!(
+            Err(explain::PathLimit) => d.facts.push(format!(
                 "The path search stopped after {MAX_VISIT} modules: whether {} reaches the \
                  output is unknown.",
                 title(state, f)
@@ -811,7 +811,7 @@ pub fn path_between(
     state: &PatchState,
     from: ModuleId,
     to: ModuleId,
-) -> Result<Option<Vec<ModuleId>>, ()> {
+) -> Result<Option<Vec<ModuleId>>, explain::PathLimit> {
     let mut prev = BTreeMap::new();
     let mut queue = VecDeque::from([from]);
     prev.insert(from, from);
@@ -827,7 +827,7 @@ pub fn path_between(
             return Ok(Some(path));
         }
         if prev.len() >= MAX_VISIT {
-            return Err(());
+            return Err(explain::PathLimit);
         }
         for c in state.cables.values() {
             if let (PortRef::Module { id: f, .. }, PortRef::Module { id: t, .. }) = (&c.from, &c.to)

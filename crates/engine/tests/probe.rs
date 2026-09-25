@@ -7,7 +7,6 @@ use std::collections::BTreeMap;
 use assert_no_alloc::{assert_no_alloc, AllocDisabler};
 use basedrop::Collector;
 use kabl_core::{CableState, ModuleState, PatchState, PortRef, Vec2};
-use kabl_engine::compile::compile;
 use kabl_engine::graph::BLOCK;
 use kabl_engine::keyboard::KeyEvent;
 use kabl_engine::patch_engine::{Command, PatchEngine};

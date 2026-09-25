@@ -798,3 +798,48 @@ fn opening_another_sound_detaches_a_recipe() {
     let a = h.ui.recipes.active.clone().unwrap();
     assert!(!a.detached && a.recipe == 1);
 }
+
+#[test]
+fn a_path_search_that_hits_its_limit_is_unknown_not_disconnected() {
+    // 600 VCAs in a chain into an Output: longer than the search visits.
+    let mut s = PatchState::new();
+    let m = |kind: &str| kabl_core::ModuleState {
+        kind: kind.into(),
+        pos: kabl_core::Vec2 { x: 0.0, y: 0.0 },
+        params: Default::default(),
+    };
+    for id in 1..=600u64 {
+        s.modules.insert(id, m("vca"));
+    }
+    s.modules.insert(601, m("out"));
+    for id in 1..=600u64 {
+        let to = if id == 600 {
+            (601, "left")
+        } else {
+            (id + 1, "in")
+        };
+        s.cables.insert(
+            id,
+            kabl_core::CableState {
+                from: PortRef::Module {
+                    id,
+                    port: "out".into(),
+                },
+                to: PortRef::Module {
+                    id: to.0,
+                    port: to.1.into(),
+                },
+                params: Default::default(),
+                steps: Vec::new(),
+            },
+        );
+    }
+    let clocks = HashMap::new();
+    let d = inspect::diagnose(&s, Some(1), &cx(&clocks, None));
+    assert!(
+        d.facts.iter().any(|f| f.contains("is unknown")),
+        "{:?}",
+        d.facts
+    );
+    assert!(!d.facts.iter().any(|f| f.contains("No signal cable path")));
+}
