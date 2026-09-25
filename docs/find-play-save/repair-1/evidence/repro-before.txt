@@ -1,0 +1,27 @@
+Reproduction at base 58e6622 (product code as merged in D01) with the two new tests added to crates/ui/tests/browser.rs:
+$ cargo test -p kabl-ui --test browser -- replace_never_targets a_failed_folder_save
+
+running 2 tests
+test a_failed_folder_save_leaves_the_saved_log_unchanged ... FAILED
+test replace_never_targets_a_sound_after_the_name_changed ... FAILED
+
+failures:
+
+---- a_failed_folder_save_leaves_the_saved_log_unchanged stdout ----
+
+thread 'a_failed_folder_save_leaves_the_saved_log_unchanged' (4714) panicked at crates/ui/tests/browser.rs:704:5:
+log.jsonl changed (3996 -> 4216 bytes) though the message says: save failed: Io(Os { code: 21, kind: IsADirectory, message: "Is a directory" }). Nothing was overwritten; your edits are still here.
+
+---- replace_never_targets_a_sound_after_the_name_changed stdout ----
+
+thread 'replace_never_targets_a_sound_after_the_name_changed' (4715) panicked at crates/ui/tests/browser.rs:665:5:
+Alpha was replaced: it is now named "Beta", and user sounds are ["user:alpha"]
+
+
+failures:
+    a_failed_folder_save_leaves_the_saved_log_unchanged
+    replace_never_targets_a_sound_after_the_name_changed
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.26s
+
+error: test failed, to rerun pass `-p kabl-ui --test browser`
