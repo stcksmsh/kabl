@@ -1146,7 +1146,36 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
     let routes = routes_into(editor.state(), id, param.name);
 
     ui.separator();
-    ui.heading(format!("{} · {kind} #{id}", target_label(param)));
+    ui.horizontal_wrapped(|ui| {
+        ui.heading(format!("{} · {kind} #{id}", target_label(param)));
+        let r = ui
+            .small_button("Explain")
+            .on_hover_text("What this control does, its base value and what moves it");
+        ui_state.record(format!("explain-control:{id}.{pname}"), r.rect);
+        if r.clicked() {
+            crate::explain::open(
+                ui_state,
+                crate::explain::Subject::Control {
+                    id,
+                    key: pname.clone(),
+                },
+                None,
+            );
+        }
+    });
+    if ui_state.explain.help {
+        if let Some(h) = crate::help::param_help(&kind, param.name) {
+            ui.add(egui::Label::new(h).wrap());
+        }
+        ui.add(
+            egui::Label::new(
+                egui::RichText::new(crate::help::range_text(&kind, param))
+                    .small()
+                    .weak(),
+            )
+            .wrap(),
+        );
+    }
 
     // Base value entry.
     ui.horizontal(|ui| {

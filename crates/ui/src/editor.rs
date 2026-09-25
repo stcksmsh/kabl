@@ -15,6 +15,14 @@ pub struct PatchEditor {
     /// this crate's core logic decoupled from the audio-engine wiring, same reasoning
     /// `VoiceAllocator` stayed decoupled from `CompiledPatch`).
     dirty: bool,
+    /// Distinct for every editor this process builds (`instance()`).
+    instance: u64,
+}
+
+/// A new editor's `instance`.
+fn next_instance() -> u64 {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
 impl Default for PatchEditor {
@@ -30,6 +38,7 @@ impl PatchEditor {
             next_module_id: 1,
             next_cable_id: 1,
             dirty: false,
+            instance: next_instance(),
         }
     }
 
@@ -92,7 +101,14 @@ impl PatchEditor {
             next_module_id,
             next_cable_id,
             dirty: false,
+            instance: next_instance(),
         }
+    }
+
+    /// Identifies this editor: opening another sound builds a new one, so view state tied to
+    /// the old patch (an explanation) can tell it no longer applies. Undo keeps it.
+    pub fn instance(&self) -> u64 {
+        self.instance
     }
 
     /// The full op log — what `kabl_core::save` needs to persist real undo history, not just a

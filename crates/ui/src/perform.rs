@@ -768,6 +768,30 @@ fn card(
                     });
                     ui_state.record(format!("pmenu:{key}"), menu.response.rect);
                     menu.response.on_hover_text("Rename, move, unpin");
+                    let explaining = ui_state.explain.card.as_ref()
+                        == Some(&(pin.id, pin.key.clone()))
+                        && ui_state.explain.is_open();
+                    let r = ui
+                        .add(egui::Button::selectable(
+                            explaining,
+                            RichText::new("?").strong(),
+                        ))
+                        .on_hover_text("Explain: what this control really changes, and where");
+                    ui_state.record(format!("pexplain:{key}"), r.rect);
+                    if r.clicked() {
+                        if explaining {
+                            ui_state.explain.close();
+                        } else {
+                            crate::explain::open(
+                                ui_state,
+                                crate::explain::Subject::Control {
+                                    id: pin.id,
+                                    key: pin.key.clone(),
+                                },
+                                Some((pin.id, pin.key.clone())),
+                            );
+                        }
+                    }
                     if renaming {
                         let (_, _, text) = ui_state.renaming.as_mut().unwrap();
                         let r =
@@ -825,6 +849,32 @@ fn card(
             });
     });
     ui_state.record(format!("pcard:{key}"), frame.response.rect);
+    // The card an open explanation came from stays outlined; after Back it flashes.
+    let origin = ui_state.explain.is_open()
+        && ui_state.explain.card.as_ref() == Some(&(pin.id, pin.key.clone()));
+    let now = ui.input(|i| i.time);
+    let flash = ui_state
+        .explain
+        .card_flash
+        .as_ref()
+        .is_some_and(|(id, k, t)| (*id, k) == (pin.id, &pin.key) && now - t < 1.5);
+    if origin || flash {
+        let a = if flash && (now * 4.0) as i64 % 2 == 1 {
+            0.4
+        } else {
+            1.0
+        };
+        ui.painter().rect_stroke(
+            frame.response.rect.shrink(1.0),
+            egui::CornerRadius::same(6),
+            egui::Stroke::new(2.5, th.cv.gamma_multiply(a)),
+            egui::StrokeKind::Inside,
+        );
+        if flash {
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(120));
+        }
+    }
     if ui_state.pin_reveal.as_ref() == Some(&(pin.id, pin.key.clone())) {
         ui.scroll_to_rect(frame.response.rect, None);
         ui_state.pin_reveal = None;
@@ -900,7 +950,7 @@ fn midi_row(
 
 /// For a mixer channel level: the sequencer, MIDI input or oscillator its input comes from,
 /// traced upstream through the audio cables (nearest sequencer or MIDI input first).
-fn mixer_source(state: &PatchState, id: ModuleId, param: &str) -> Option<String> {
+pub(crate) fn mixer_source(state: &PatchState, id: ModuleId, param: &str) -> Option<String> {
     let ch = param.strip_prefix("level")?;
     if state.modules.get(&id)?.kind != "mixer" {
         return None;
