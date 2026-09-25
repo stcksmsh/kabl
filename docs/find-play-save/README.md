@@ -1,6 +1,7 @@
 # D01 — Find, play and save a sound
 
-**Built, awaiting Kosta's review.** Owner-authorized batch (2026-09-25), brief:
+**Built, awaiting Kosta's review.** Repair D01-R1 (saving safety, window close):
+[`repair-1/REPORT.md`](repair-1/REPORT.md). Owner-authorized batch (2026-09-25), brief:
 [`product-research/briefs/D01.md`](../product-research/briefs/D01.md). Rationale:
 `docs/decisions.md`, "D01 Find, play and save a sound". Hands-on checklist:
 [`CHECKLIST.md`](CHECKLIST.md). Structured report: [`REPORT.md`](REPORT.md).
@@ -95,7 +96,23 @@ are listed under their directory name.
   `.name.new` → `name`) and removes `.old`. A failure before the swap leaves the old
   directory untouched; a failure in the swap puts it back. An interrupted swap (process
   killed) is repaired on the next scan: a lone `.old` is restored, a leftover `.new` removed.
-  Metadata-only changes (rename) go through a temp file and a rename.
+  Metadata-only changes (rename) go through a temp file and a rename. A save settles any
+  interrupted swap first, so it never clears the only saved copy (D01-R1).
+- **Save As → Replace it** applies only to the name it was offered for: editing the name
+  removes the offer, and the library refuses a replacement whose target has another name
+  (D01-R1).
+- **Saving to a patch folder** (a folder document's Save, the advanced Save to folder)
+  touches only `log.jsonl`, `checkpoint.json` and `meta.toml`; the folder's other files stay
+  (D01-R1). The new files are written and read back in `<folder>/.kabl-save/` (with a
+  `kabl-staging` marker), then swapped in one by one, `log.jsonl` last, each old file moved
+  aside; any failure puts everything back, removes files the save added, and the message
+  says nothing was overwritten. If putting back fails too, the message says where the old
+  files are instead. A save killed half way is settled on the next open or save of that
+  folder (kept if the new log is in place, otherwise rolled back; the open message says so).
+  `.kabl-save` is reserved: one kabl didn't make is never touched and blocks saving there.
+- Test hook: `KABL_SAVE_FAIL=<stage>` (`staged`, `replace:dir`, `replace:meta.toml`,
+  `replace:checkpoint.json`, `replace:log.jsonl`) makes saves fail at that stage, for
+  scripted runs only.
 - **Not guaranteed:** durability across power loss (no fsync); concurrent writers (two kabl
   instances saving the same sound).
 - A read-only or unusable user directory: Save/Save As report "can't create …" and keep the
