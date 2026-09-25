@@ -69,4 +69,24 @@ Checked with no finding:
 
 ## Implementer responses
 
+Fixes are in `f28d262` ("D03 review fixes F1-F10"); verification at that commit:
+`cargo test --workspace` 518 passed, 0 failed, 15 ignored; `cargo clippy --workspace
+--all-targets` clean.
+
+| ID | Resolution |
+|---|---|
+| F1 | **Fixed.** `Inspect::rebuilt` drops kept reports older than the raised floor (and restarts "waiting"). Test `a_wiring_change_drops_what_was_measured_before_it`: report, cable removed, summary empty and status Waiting; a new-graph report is then the only one. |
+| F2 | **Fixed.** `diagnose` reads the effective base (stored, else the registry default via `explain::param_of`) and counts non-bypassed routes into the param. "passes nothing" only when gain is 0 and neither cv nor a route drives it; otherwise worded as "opens only as far as its cv input or the routes into Gain move it". Cutoff uses the same helper. Test `why_no_sound_reads_defaults_and_routes_for_the_vca` (default-param VCA, route into gain, and the true case). |
+| F3 | **Fixed.** `CompiledPatch::continue_probe_from` carries the open window (accumulators, `prev`, counts) into the graph fading in when the target resolves to the same lanes and port; the window is flagged `fading`. Engine test `a_knob_being_turned_does_not_stop_the_measurement`: swaps every 6/12/24 blocks for 2 s each, ≥35 reports each. Real app: `scripts/knob-drag.txt`, Filter #3 Cutoff dragged continuously with a note held while VCA #4 out is inspected (2 578 rebuilds in 66 s); the panel stayed live, labelled "measured on the edited version while it crossfades in" (`img/1440x900-light-knob-drag-live.png`). |
+| F4 | **Fixed.** Reports carry `end_sample` (samples the engine had rendered); `main.rs` ages them against `CallbackTiming::frames_total` and `Inspect::accept(r, now, age)` stores the audio-clock time. A backlog read after a stall falls outside the 1 s summary. Test `a_report_that_waited_in_the_queue_is_not_live`. |
+| F5 | **Fixed.** `kabl_standalone::hand_off_stream_error`: every error (xruns too) is moved into a 256-slot queue; when full it is `mem::forget`-ten (never freed on the audio thread) and counted (`errors_lost`, logged as "not delivered"). Xruns carry no message in cpal 0.18, so forgetting them leaks nothing; an owned message is leaked only when 256 errors arrive between two drains (UI: every frame; standalone: now every second). Documented in README. |
+| F6 | **Fixed (partly as asked).** `crates/standalone/tests/rt_with_logging.rs` runs the engine with the tap on (swaps, selection changes), the report push into a full queue and the stream-error hand-off into a full queue with owned messages, under `assert_no_alloc`, with `applog` installed at TRACE. The kabl-ui callback closure itself is still not factored out; its remaining new work is relaxed atomic adds (histogram, `frames_total`), stated in the test's doc. |
+| F7 | **Fixed.** `Inspect` caches `engine_output` per topology signature; the open aid compiles once per wiring change (`Context::output`). |
+| F8 | **Fixed.** `LibError::log_text` (kind + system reason, no paths/names) is used for every library open/save failure line, including folder opens. README corrected: the start line, library directories, a failed `--patch` path and device names can appear. Test `library_errors_are_logged_without_paths_or_names`. |
+| F9 | **Fixed** by removal (`Sel::via_cable`, its label, `UiState::midi_connected`). Cable → source navigation stays unimplemented (optional in the brief, not claimed). |
+| F10 | **Fixed.** Process-ending failures in `kabl` log at ERROR. |
+
+Evidence recorded before `f28d262` (walkthrough at `ef9ed7b`, screenshots/logging/perf/package at `ef9ed7b`–`db29445`) predates these fixes; only `img/1440x900-light-knob-drag-live.png` was taken at `f28d262`.
+
+
 ## Recheck
