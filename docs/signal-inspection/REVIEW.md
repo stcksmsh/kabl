@@ -352,3 +352,17 @@ Docs only; no product change after `d21f42b`.
 | R1-9 | **Fixed.** REPORT's "What the code does now" says the hand-off takes no lock of its own and that the overflow free goes through the allocator, which may lock. |
 | R1-10 | **Fixed.** The proposed clause is now limited to "Nothing else D03 added to the RT path…". design.md records that the pre-D03 exception still stands (since `51c2cd7`, kabl-ui's first callback requests RT promotion) and that it is not part of D03. |
 | R1-11 | **Fixed.** design.md now says the exiting audio thread frees no stream error or error queue, but still frees the data callback's own buffers. |
+
+## D03-R1 final recheck
+
+- **Rechecked head:** `27b8333`. I reviewed `git diff 2f0e527..27b8333`, which touches REPORT.md, design.md and REVIEW.md only. REVIEW.md has additions only; no earlier line changed.
+- **Product code:** `git diff d21f42b 27b8333 -- crates Cargo.toml Cargo.lock packaging` is empty, so the product code at `27b8333` equals `d21f42b`. No tests were rerun, since no product change was made.
+
+| ID | Status | Evidence |
+|---|---|---|
+| R1-8 | Resolved | REPORT header: tested head `d21f42b` (520/0/15, clippy clean, matching the `r1/` log headers); reviewed ranges and rechecks named; submitted = branch head with product code equal to `d21f42b`. L8 and the R2 test row now say `d21f42b`. |
+| R1-9 | Resolved | REPORT now says "never allocates, formats, logs or blocks, and takes no lock of its own (the overflow free goes through the allocator, which may lock)", consistent with design.md and `lib.rs`. |
+| R1-10 | Resolved | The clause now reads "Nothing else D03 added to the RT path allocates, frees or locks". The pre-D03 first-callback RT-priority request (`51c2cd7`) is named as an existing exception outside D03. One nit, with no action required: the trailing "On this build this applies only to `BackendError`" now follows that sentence, so "this" is best read as the overflow free. |
+| R1-11 | Resolved | design.md: "frees no stream error and no error queue (it still frees the data callback's own buffers)". |
+
+**Final verdict:** R1 is bounded (at most 16 outstanding stream errors), and the contract adjustment is now precise and scoped. It still awaits a supervisor/owner decision, which this review does not make. R2 evidence and identities are supported and correctly labelled. No open findings remain. This is not approval, and it is not Kosta's hands-on review.
