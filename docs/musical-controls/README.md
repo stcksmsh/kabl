@@ -233,6 +233,25 @@ All real-app evidence is **scripted**. `docs/rack-migration/drive.py` uses xdoto
 
   This is not laptop evidence. D02 adds no audio-thread code.
 
+  **Audible dropouts, not clipping.** The track peaks at 0.69 of full scale (−3.2 dBFS) and no
+  sample reaches 0.99, so nothing clips. It does contain six silent gaps, where every sample
+  in a run of at least 64 is below 1e-6. These are buffer underruns on the VM, and they are
+  heard as clicks:
+
+  | Time | Gap length |
+  |---|---|
+  | 0:12.9 | 3 ms |
+  | 0:23.7 | 8 ms |
+  | 0:24.6 | 13 ms |
+  | 0:24.9 | 3 ms |
+  | 0:25.3 | 51 ms |
+  | 0:44.8 | 8 ms |
+
+  The cluster around 0:25 falls while Warmth is near full: it drives the ladder filter and
+  opens the cutoff while a four-note chord plays. The worst callback execution, 16.7 ms
+  against a 5.3 ms budget, was logged at about the same moment. The laptop checklist should
+  listen for this at 256 frames.
+
 ## Limits
 
 - Scripted clicks are software evidence. Whether a beginner finds this easy, and how the
