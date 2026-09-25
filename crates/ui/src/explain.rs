@@ -200,6 +200,11 @@ pub fn go(editor: &PatchEditor, ui_state: &mut UiState, target: Target, now: f64
     ui_state.explain.target_lost = false;
 }
 
+/// A Show saved a view that Back can return to.
+pub fn can_go_back(e: &Explain) -> bool {
+    e.saved.is_some()
+}
+
 /// Returns to where the explanation started: the saved view, and the originating card
 /// scrolled into view and outlined.
 pub fn back(ui_state: &mut UiState, now: f64) {

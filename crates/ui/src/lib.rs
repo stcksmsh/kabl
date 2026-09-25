@@ -13,6 +13,7 @@
 
 pub mod banks;
 pub mod browser;
+pub mod compare;
 pub mod cues;
 pub mod editor;
 pub mod explain;
@@ -21,6 +22,7 @@ pub mod inspect;
 pub mod library;
 pub mod perform;
 pub mod rack;
+pub mod recipes;
 pub mod record;
 pub mod routing;
 pub mod theme;
@@ -229,6 +231,10 @@ pub struct UiState {
     pub explain: explain::Explain,
     /// The selected signal and its measurements (D03, view only).
     pub inspect: inspect::Inspect,
+    /// The comparison reference (D03, session only).
+    pub compare: compare::Compare,
+    /// The listening recipes (D03, view only).
+    pub recipes: recipes::Learn,
     /// MIDI input connected (`main.rs`), for the "Why no sound?" aid.
     pub midi_connected: bool,
 }
@@ -320,6 +326,8 @@ impl Default for UiState {
             meter: Default::default(),
             explain: Default::default(),
             inspect: Default::default(),
+            compare: Default::default(),
+            recipes: Default::default(),
             midi_connected: false,
         }
     }
@@ -456,6 +464,8 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     browser::frame_input(editor, ui_state, ui);
     ui_state.validate(editor);
     ui_state.explain.validate(editor);
+    ui_state.compare.validate(editor);
+    recipes::frame(editor, ui_state);
     let now = ui.input(|i| i.time);
     if let Some(c) = ui_state.inspect.frame(editor, ui_state.drawer_open, now) {
         ui_state.launches.push(c);
@@ -568,14 +578,6 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                         if ui.button("Close").clicked() {
                             ui_state.drawer_open = false;
                         }
-                        let on = ui_state.inspect.open;
-                        let r = ui
-                            .add(egui::Button::selectable(on, "Inspect"))
-                            .on_hover_text("Measure one output and ask why there is no sound");
-                        ui_state.record("inspect-open".into(), r.rect);
-                        if r.clicked() {
-                            ui_state.inspect.open = !on;
-                        }
                         let on = ui_state.explain.help;
                         let r = ui
                             .add(egui::Button::selectable(on, "? Help"))
@@ -585,6 +587,32 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                             ui_state.explain.help = !on;
                         }
                     });
+                });
+                ui.horizontal(|ui| {
+                    let on = ui_state.inspect.open;
+                    let r = ui
+                        .add(egui::Button::selectable(on, "Inspect"))
+                        .on_hover_text("Measure one output and ask why there is no sound");
+                    ui_state.record("inspect-open".into(), r.rect);
+                    if r.clicked() {
+                        ui_state.inspect.open = !on;
+                    }
+                    let on = ui_state.compare.open;
+                    let r = ui
+                        .add(egui::Button::selectable(on, "Compare"))
+                        .on_hover_text("Keep a reference copy of the patch and restore it");
+                    ui_state.record("compare-open".into(), r.rect);
+                    if r.clicked() {
+                        ui_state.compare.open = !on;
+                    }
+                    let on = ui_state.recipes.open;
+                    let r = ui
+                        .add(egui::Button::selectable(on, "Learn"))
+                        .on_hover_text("Three short listening recipes (optional)");
+                    ui_state.record("learn-open".into(), r.rect);
+                    if r.clicked() {
+                        ui_state.recipes.open = !on;
+                    }
                 });
                 if ui_state.explain.is_open() {
                     // Its own scroll area, at most about half the drawer: the module and
@@ -601,9 +629,19 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     // Rows wrap instead of widening the drawer over the rack.
                     ui.set_max_width(DRAWER_W - 24.0);
+                    if ui_state.recipes.open {
+                        egui::Frame::group(ui.style()).show(ui, |ui| {
+                            recipes::panel(editor, ui_state, ui, now);
+                        });
+                    }
                     if ui_state.inspect.open {
                         egui::Frame::group(ui.style()).show(ui, |ui| {
                             inspect::panel(editor, ui_state, ui, now);
+                        });
+                    }
+                    if ui_state.compare.open {
+                        egui::Frame::group(ui.style()).show(ui, |ui| {
+                            compare::panel(editor, ui_state, ui);
                         });
                     }
                     show_param_panel(editor, ui_state, ui);

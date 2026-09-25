@@ -88,6 +88,8 @@ pub enum Dialog {
         name: String,
         error: Option<String>,
     },
+    /// Restore the comparison reference over the whole current patch (`compare.rs`).
+    Restore,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1303,6 +1305,50 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
             } else {
                 Some(Dialog::Rename { id, name, error })
             }
+        }
+        Dialog::Restore => {
+            let mut next = Some(Dialog::Restore);
+            let redo = editor.can_redo();
+            let at = ui_state
+                .compare
+                .reference
+                .as_ref()
+                .map_or(String::new(), |r| r.at.clone());
+            egui::Modal::new(egui::Id::new("dlg-restore")).show(ctx, |ui| {
+                ui.set_width(380.0);
+                ui.heading("Restore reference");
+                ui.label(format!(
+                    "Replace the whole current patch (values, cables, routes, labels, Perform \
+                     pins, MIDI mappings) with the reference captured {at}?"
+                ));
+                ui.label(
+                    "It is one undo step: Undo brings your current version back with all \
+                     its edits.",
+                );
+                if redo {
+                    ui.label(
+                        RichText::new(
+                            "Like any edit, it replaces the steps you could Redo right now.",
+                        )
+                        .color(red),
+                    );
+                }
+                ui.horizontal(|ui| {
+                    let r = ui.button("Restore");
+                    hit(ui_state, "dlg:restore", &r);
+                    if r.clicked() {
+                        let m = crate::compare::restore(editor, ui_state);
+                        message(ui_state, m);
+                        next = None;
+                    }
+                    let r = ui.button("Cancel");
+                    hit(ui_state, "dlg:cancel", &r);
+                    if r.clicked() {
+                        next = None;
+                    }
+                });
+            });
+            next
         }
     };
     let escape = ctx.input(|i| i.key_pressed(egui::Key::Escape));

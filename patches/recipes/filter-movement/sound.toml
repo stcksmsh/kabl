@@ -1,0 +1,11 @@
+name = "Recipe: Filter Movement"
+category = "Study"
+tags = [
+    "recipe",
+    "filter",
+    "lfo",
+    "keyboard",
+]
+description = "Starting patch of the Filter movement recipe (Learn): a held saw through a resonant low-pass, with an LFO route to Cutoff that starts bypassed."
+keys = true
+sequence = false
