@@ -1,0 +1,17 @@
+patches/palette/strings: 20 s, hash f9be6dc94b885eae, peak 0.540179, rms 0.088641
+patches/palette/pad: 20 s, hash 0baa7deaf18b854d, peak 0.587698, rms 0.093245
+patches/palette/lead: 20 s, hash 0db2e7723f4dc267, peak 0.539064, rms 0.119231
+patches/palette/bass: 20 s, hash 07dc2818d9e54d91, peak 0.497663, rms 0.211138
+patches/palette/breath: 20 s, hash 78beee12d64612af, peak 0.450536, rms 0.079323
+patches/palette/perc: 20 s, hash 4cca2b522e7a44a6, peak 0.616311, rms 0.136402
+patches/init-keyboard: 20 s, hash ca4ff1e8cc20c7a5, peak 0.429016, rms 0.080766
+patches/sound-palette: 20 s, hash 6261e721f6d6f8c0, peak 0.112468, rms 0.018458
+patches/composition: 20 s, hash 1718bd2d3d23ee9e, peak 0.729757, rms 0.127492
+patches/performance: 20 s, hash 4d064626535db4c3, peak 0.657562, rms 0.135484
+patches/echo: 20 s, hash 58ab756f55b5b2db, peak 0.480921, rms 0.121533
+patches/interlocking: 20 s, hash 124c9c07a774f0a9, peak 0.429487, rms 0.115512
+patches/sequence: 20 s, hash f16fffcfae240ab9, peak 0.374445, rms 0.156461
+patches/recipes/pluck-to-pad: 20 s, hash 9e304e4101d81fe9, peak 0.455211, rms 0.016384
+patches/recipes/filter-movement: 20 s, hash 7099a1dcadc9e77d, peak 0.472070, rms 0.097964
+patches/reference: 20 s, hash 9b0a1d5220f5b4f5, peak 0.499238, rms 0.075056
+patches/crowded: 20 s, hash 50986e364f98cda0, peak 2.576941, rms 0.326056

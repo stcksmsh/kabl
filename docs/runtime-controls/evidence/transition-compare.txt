@@ -1,0 +1,6 @@
+patches/init-keyboard #3 cutoff_hz -> 600: before identical true; after: max |diff| in 50 ms 0.07248 (output peak 0.858); rms diff 0-50 ms 0.012729, 50-500 ms 0.000000, 0.5-1.5 s 0.000000
+patches/init-keyboard #6 sustain -> 0.3: before identical true; after: max |diff| in 50 ms 0.00603 (output peak 0.858); rms diff 0-50 ms 0.002193, 50-500 ms 0.001361, 0.5-1.5 s 0.000203
+patches/palette/pad #7 cutoff_hz -> 900: before identical true; after: max |diff| in 50 ms 0.10051 (output peak 0.693); rms diff 0-50 ms 0.014681, 50-500 ms 0.000000, 0.5-1.5 s 0.000000
+patches/composition #3 m1 -> 0.9: before identical true; after: max |diff| in 50 ms 0.01907 (output peak 1.172); rms diff 0-50 ms 0.001136, 50-500 ms 0.000000, 0.5-1.5 s 0.000000
+patches/composition #32 level1 -> 0.2: before identical true; after: max |diff| in 50 ms 0.00548 (output peak 1.172); rms diff 0-50 ms 0.001126, 50-500 ms 0.001778, 0.5-1.5 s 0.000969
+patches/echo #16 feedback -> 80: before identical true; after: max |diff| in 50 ms 0.00000 (output peak 0.882); rms diff 0-50 ms 0.000000, 50-500 ms 0.000000, 0.5-1.5 s 0.000000
