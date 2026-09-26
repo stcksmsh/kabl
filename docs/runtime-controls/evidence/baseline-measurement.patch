@@ -1,0 +1,192 @@
+diff --git a/crates/ui/src/main.rs b/crates/ui/src/main.rs
+index 0464101..17b7053 100644
+--- a/crates/ui/src/main.rs
++++ b/crates/ui/src/main.rs
+@@ -65,6 +65,7 @@ struct AudioHost {
+     /// producer in its error callback) goes first on teardown: queued errors are then freed
+     /// here, with this consumer, not on the exiting audio thread.
+     faults_rx: Option<rtrb::Consumer<cpal::Error>>,
++    applied_rx: Option<rtrb::Consumer<(u64, f64)>>,
+     /// Graph generation of the last rebuild attempt (`CompiledPatch::generation`).
+     generation: u64,
+     /// The last rebuild's compile error, if it failed.
+@@ -309,6 +310,7 @@ impl AudioHost {
+             timing: None,
+             probe_rx: None,
+             faults_rx: None,
++            applied_rx: None,
+             generation: 1,
+             compile_error: None,
+             _stream: None,
+@@ -391,6 +393,8 @@ impl AudioHost {
+             rtrb::RingBuffer::<cpal::Error>::new(kabl_standalone::STREAM_ERROR_QUEUE);
+ 
+         let (swap_tx, mut swap_rx) = swap_channel(SWAP_QUEUE);
++        let (mut applied_tx, applied_rx) = rtrb::RingBuffer::<(u64, f64)>::new(1024);
++        let measure = std::env::var_os("KABL_LATENCY_FILE").is_some();
+         // Test hooks: a small ring forces lost frames, a failure point forces a write error.
+         let ring_frames = std::env::var("KABL_RECORD_RING_FRAMES")
+             .ok()
+@@ -442,7 +446,14 @@ impl AudioHost {
+                 last_start = Some(started);
+                 // Audio thread. No allocation, no locks: install queued graphs (state carry is
+                 // allocation-free), apply MIDI to every running graph, render.
+-                engine.drain_swaps(&mut swap_rx);
++                // Measurement only: `drain_swaps` inlined to report each graph's generation.
++                while let Ok(g) = swap_rx.pop() {
++                    let generation = g.generation;
++                    engine.receive_swap(g);
++                    if measure {
++                        let _ = applied_tx.push((generation, clock_s()));
++                    }
++                }
+                 while let Ok(event) = midi_consumer.pop() {
+                     engine.key(event);
+                 }
+@@ -540,6 +551,7 @@ impl AudioHost {
+             timing: stream.is_some().then_some(timing),
+             probe_rx: stream.is_some().then_some(probe_rx),
+             faults_rx: stream.is_some().then_some(faults_rx),
++            applied_rx: (stream.is_some() && measure).then_some(applied_rx),
+             generation: 1,
+             compile_error: None,
+             _stream: stream,
+@@ -591,12 +603,55 @@ impl AudioHost {
+     }
+ }
+ 
++/// Measurement only (D04 baseline, `KABL_LATENCY_FILE`): seconds since the process started.
++fn clock_s() -> f64 {
++    static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
++    START
++        .get_or_init(std::time::Instant::now)
++        .elapsed()
++        .as_secs_f64()
++}
++
++/// Measurement only: CC arrival to the audio callback that installed the graph it made.
++#[derive(Default)]
++struct Latency {
++    waiting: std::collections::VecDeque<(u64, f64)>,
++    samples: Vec<f64>,
++}
++
++impl Latency {
++    fn applied(&mut self, rev: u64, at: f64) {
++        while self.waiting.front().is_some_and(|w| w.0 <= rev) {
++            let (_, arrived) = self.waiting.pop_front().unwrap();
++            self.samples.push(at - arrived);
++        }
++    }
++
++    fn line(&self) -> String {
++        let mut v = self.samples.clone();
++        v.sort_by(f64::total_cmp);
++        let q = |p: f64| {
++            v.get(((v.len() as f64 * p).ceil() as usize).saturating_sub(1))
++                .map_or("-".into(), |x| format!("{:.2}", x * 1e3))
++        };
++        format!(
++            "CC to audio callback: {} batches · p50 {} ms · p90 {} ms · p99 {} ms · max {} ms · {} waiting",
++            v.len(),
++            q(0.5),
++            q(0.9),
++            q(0.99),
++            q(1.0),
++            self.waiting.len()
++        )
++    }
++}
++
+ /// What the MIDI callback owns: key events (notes, sustain pedal, All Notes Off / All Sound
+ /// Off) to the audio thread, where the engine's keyboards assign voices; every other CC to
+ /// the UI (learn, mappings, buttons).
+ struct MidiSink {
+     notes: rtrb::Producer<KeyEvent>,
+-    cc: rtrb::Producer<(u8, u8, u8)>,
++    cc: rtrb::Producer<((u8, u8, u8), f64)>,
+     ctx: Option<egui::Context>,
+ }
+ 
+@@ -619,7 +674,7 @@ fn on_message(s: &mut MidiSink, data: &[u8]) {
+     if let Some(e) = KeyEvent::from_midi(data) {
+         let _ = s.notes.push(e);
+     } else if data.len() >= 3 && data[0] & 0xF0 == 0xB0 && !is_key_cc(data[1]) {
+-        let _ = s.cc.push((data[0] & 0x0F, data[1], data[2]));
++        let _ = s.cc.push(((data[0] & 0x0F, data[1], data[2]), clock_s()));
+         if let Some(ctx) = &s.ctx {
+             ctx.request_repaint();
+         }
+@@ -666,7 +721,7 @@ struct Midi {
+     /// Stop flag of the `KABL_MIDI_PIPE` reader, when that is the input.
+     pipe: Option<Arc<std::sync::atomic::AtomicBool>>,
+     port: Option<String>,
+-    cc_rx: rtrb::Consumer<(u8, u8, u8)>,
++    cc_rx: rtrb::Consumer<((u8, u8, u8), f64)>,
+     /// Keys held and voices sounding (`pack_keys`), from the audio thread.
+     keys: Arc<AtomicU64>,
+     ports: Vec<String>,
+@@ -812,6 +867,9 @@ fn reset_pickup(ui: &mut UiState) {
+ }
+ 
+ struct App {
++    latency: Option<Latency>,
++    latency_at: std::time::Instant,
++    cc_arrived: f64,
+     editor: PatchEditor,
+     ui_state: UiState,
+     audio: AudioHost,
+@@ -1014,8 +1072,9 @@ impl eframe::App for App {
+                 self.ui_state.clock_running.insert(id, running);
+             }
+         }
+-        while let Ok(cc) = self.midi.cc_rx.pop() {
++        while let Ok((cc, t)) = self.midi.cc_rx.pop() {
+             self.ui_state.midi_cc.push(cc);
++            self.cc_arrived = self.cc_arrived.min(t);
+         }
+         if let Some(pick) = self.ui_state.midi_select.take() {
+             self.midi.lost = None;
+@@ -1160,10 +1219,24 @@ impl eframe::App for App {
+             ui.ctx()
+                 .request_repaint_after(std::time::Duration::from_millis(500));
+         }
++        if let (Some(rx), Some(l)) = (self.audio.applied_rx.as_mut(), self.latency.as_mut()) {
++            while let Ok((g, at)) = rx.pop() {
++                l.applied(g, at);
++            }
++        }
++        if let (Some(l), Ok(path)) = (self.latency.as_ref(), std::env::var("KABL_LATENCY_FILE")) {
++            if self.latency_at.elapsed().as_secs_f32() > 1.0 {
++                self.latency_at = std::time::Instant::now();
++                let _ = std::fs::write(path, l.line() + "\n");
++            }
++        }
+         if self.editor.take_dirty() {
+             let fresh = std::mem::take(&mut self.ui_state.loaded);
+             let stopped = std::mem::take(&mut self.ui_state.load_stopped);
+             self.audio.rebuild(self.editor.state(), fresh, stopped);
++            if let Some(l) = self.latency.as_mut().filter(|_| self.cc_arrived < f64::MAX) {
++                l.waiting.push_back((self.audio.generation, self.cc_arrived));
++            }
+             self.ui_state.inspect.rebuilt(
+                 self.audio.generation,
+                 self.audio.compile_error.clone(),
+@@ -1171,6 +1244,7 @@ impl eframe::App for App {
+                 ui.input(|i| i.time),
+             );
+         }
++        self.cc_arrived = f64::MAX;
+         // Closing the window (or Ctrl+Q) with unsaved changes asks first.
+         let close = ui.ctx().input(|i| i.viewport().close_requested());
+         if close
+@@ -1332,6 +1406,9 @@ fn main() -> eframe::Result<()> {
+             kabl_ui::theme::install_fonts(&cc.egui_ctx);
+             midi.sink.lock().unwrap().ctx = Some(cc.egui_ctx.clone());
+             Ok(Box::new(App {
++                latency: std::env::var_os("KABL_LATENCY_FILE").map(|_| Latency::default()),
++                latency_at: std::time::Instant::now(),
++                cc_arrived: f64::MAX,
+                 editor,
+                 ui_state,
+                 audio,

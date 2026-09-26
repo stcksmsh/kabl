@@ -34,3 +34,4 @@ kabl-standalone = { path = "../standalone" }
 
 [dev-dependencies]
 tempfile = "3.27.0"
+assert_no_alloc = "1.1.2"

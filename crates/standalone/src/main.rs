@@ -185,11 +185,11 @@ fn run(args: &[String]) -> i32 {
     // Every second: drop the handed-over errors here (not on the audio thread); every 10 s,
     // log what the audio side counted, as one line when something happened.
     let (mut seen, mut errors_seen) = (0, [0; kabl_standalone::STREAM_ERROR_KINDS.len() + 2]);
-    let mut last = None::<String>;
+    let mut last = None::<(String, std::time::Instant)>;
     for tick in 1u64.. {
         std::thread::sleep(std::time::Duration::from_secs(1));
         while let Ok(e) = faults_rx.pop() {
-            last = Some(e.to_string());
+            last = Some((e.to_string(), std::time::Instant::now()));
         }
         if tick % 10 != 0 {
             continue;
@@ -201,10 +201,13 @@ fn run(args: &[String]) -> i32 {
         }
         let (kinds, lost) = errors.since(&mut errors_seen);
         if !kinds.is_empty() {
+            let last = last
+                .as_ref()
+                .map(|(t, at)| (t.as_str(), at.elapsed().as_secs_f64()));
             log::warn!(
                 target: "audio",
-                "stream errors in 10s: {kinds}; last delivered: {}; not delivered (queue full): {lost}",
-                last.take().as_deref().unwrap_or("none")
+                "{}",
+                kabl_standalone::stream_error_line(10.0, &kinds, last, lost)
             );
         }
     }

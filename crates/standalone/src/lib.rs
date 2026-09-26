@@ -68,6 +68,20 @@ impl StreamErrorCounts {
     }
 }
 
+/// Off the audio thread: the WARN text for one interval's stream errors. `kinds` and `lost`
+/// are the interval's counts (`StreamErrorCounts::since`). `last` is the last message taken
+/// from the queue and how many seconds ago it was taken: it may belong to an earlier interval
+/// than the counts beside it, so the line gives its age instead of pairing it with them.
+pub fn stream_error_line(secs: f64, kinds: &str, last: Option<(&str, f64)>, lost: u64) -> String {
+    let last = match last {
+        Some((text, age)) => {
+            format!("last delivered message (taken {age:.1}s ago, possibly before this interval): {text}")
+        }
+        None => "no message delivered yet".into(),
+    };
+    format!("stream errors in {secs:.1}s: {kinds}; {last}; not delivered (queue full): {lost}")
+}
+
 /// For a stream's error callback, which runs on the audio thread (cpal 0.18.2 ALSA calls it
 /// from the stream's worker thread, between data callbacks; see signal-inspection design.md):
 /// counts `err` by kind and moves it into `tx` for another thread to log and drop. Never

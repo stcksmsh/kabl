@@ -1,0 +1,70 @@
+# D03-R2 + D04 combined walkthrough, Composition (the dense piece) at 48 kHz / 256 frames,
+# Perform panel open, the fifo MIDI stand-in as the controller. Real X input (xdotool).
+sleep 3
+shot wt-01-playing
+# 1. Runtime controls: a rack knob (Macros m1) turned by the mouse, a Perform slider (m3), and
+#    mapped CCs (m2 on CC 21, the lead level on CC 24) swept by the controller. No graph builds.
+wiggle knob:3.m1 3 30
+dragby pslider:3.m3 -60 0
+midi ramp 1 21 0 127 2
+midi ramp 1 24 127 20 2
+sleep 1
+shot wt-02-cc-moving
+sleep 1.2
+# 2. A structural edit while a CC is moving: plug Osc #10 into the free mixer input (a compile).
+midi ramp 1 21 127 0 3
+drag out:10.out in:22.in4
+sleep 0.5
+shot wt-03-structural-during-cc
+sleep 2.5
+# 3. Undo twice: the CC movement after the plug (runtime values), then the plug (a compile).
+#    Redo twice brings both back.
+key ctrl+z
+sleep 1
+key ctrl+z
+sleep 1.2
+key ctrl+shift+z
+sleep 1
+key ctrl+shift+z
+sleep 1.2
+# 4. Comparison: capture, change two controls, restore the reference, back to my version.
+click compare-open
+sleep 0.5
+click compare-capture
+sleep 0.5
+dragby pslider:3.m4 -80 0
+midi ramp 1 24 20 110 1
+sleep 1.5
+click compare-restore
+sleep 0.5
+click dlg:restore
+sleep 1.5
+shot wt-04-reference-restored
+click compare-undo
+sleep 1.5
+shot wt-05-my-version
+click compare-close
+sleep 0.5
+# 5. Inspector freshness while controls move: VCA #14 out, then the knob and a CC keep going.
+click inspect-open
+click module:14
+click inspect-port:14.out
+sleep 1.5
+midi ramp 1 20 0 127 3
+wiggle knob:3.m1 2 25
+shot wt-06-inspect-during-controls
+sleep 1
+# 6. D03-R2: pull the cable into VCA #14's audio input (from Filter #11 lp) while it plays.
+dragby in:14.in 0 170
+sleep 1.5
+click why
+sleep 1
+shot wt-07-why-missing-audio-input
+sleep 2
+# Undo restores the cable, the reading and the sound.
+key ctrl+z
+sleep 2
+click why
+sleep 1
+shot wt-08-why-undone
+sleep 2

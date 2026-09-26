@@ -1,0 +1,183 @@
+# Two mapped CCs swept for 60 s through the fifo controller: macro m1 (CC 20) and the lead
+# mixer level (CC 24), 50 messages per second each (a ramp crosses the stored value: pickup).
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1
+midi ramp 1 20 0 127 1
+midi ramp 1 24 127 0 1
+sleep 1
+midi ramp 1 20 127 0 1
+midi ramp 1 24 0 127 1
+sleep 1

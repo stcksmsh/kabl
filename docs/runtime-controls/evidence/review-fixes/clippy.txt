@@ -1,0 +1,3 @@
+# cargo clippy --workspace --all-targets -- -D warnings at 58a59340eb9b5278e2bd56ede03107385ce6b5bf
+    Finished (clean)
+exit 0

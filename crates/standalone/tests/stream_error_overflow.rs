@@ -37,6 +37,9 @@ unsafe impl GlobalAlloc for Counting {
 #[global_allocator]
 static A: Counting = Counting;
 
+/// `LIVE` counts every thread's heap blocks, so this file holds this one test only: another
+/// test running in parallel in the same process (and libtest starting its thread) would shift
+/// the counts. The D03-R2 message-age test lives in `stream_error_line.rs`.
 fn live() -> isize {
     LIVE.load(Ordering::Relaxed)
 }

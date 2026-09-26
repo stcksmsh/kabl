@@ -10,6 +10,7 @@ pub mod patch_demo;
 pub mod patch_engine;
 pub mod potato;
 pub mod probe;
+pub mod runtime;
 pub mod simd_voices;
 pub mod swap;
 pub mod voice_allocator;

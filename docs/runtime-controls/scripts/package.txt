@@ -1,0 +1,20 @@
+# Installed package, Evolving Pad: hold a chord, sweep Warmth's mapped CC 20 and drag a rack
+# knob (runtime values, no graph builds), then quit.
+sleep 3
+midi on 48 80
+midi on 55 80
+midi on 60 80
+midi ramp 1 20 20 120 3
+sleep 3.5
+wiggle knob:7.cutoff_hz 2 25
+shot package-runtime-controls
+midi off 48
+midi off 55
+midi off 60
+sleep 1
+key ctrl+q
+# The CC and knob edits changed the sound: the unsaved question appears (D01). Don't save.
+sleep 1
+shot package-quit-question
+click dlg:discard
+exited 5

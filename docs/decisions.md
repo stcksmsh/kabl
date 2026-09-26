@@ -2583,3 +2583,74 @@ Implementation choices inside the authorized D03 brief. Not owner approvals. Rec
   diagnosis source; did not rerun the workspace tests or duplicate a full code review.
 - D03/D02/D01/D01-R1/Composition + Motion/Sound Palette hands-on reviews remain pending.
   D00 is incomplete. The cloud stalls and Composition spike remain unresolved.
+
+## 2026-09-26 — D03-R2 and D04 runtime controls (implementation rationale)
+
+Implementation choices of the authorized assignment; not owner approvals. Record:
+`docs/runtime-controls/` (design.md has the full rules), D03-R2 in
+`docs/signal-inspection/REPORT.md`.
+
+- **D03-R2 diagnosis from module semantics.** `inspect::needed_inputs` lists, per built-in,
+  the input groups that must carry a cable for the stage to pass audio (read from each
+  `process`: an unplugged input is silence). A mixer needs any one channel; reverb and chorus
+  either side; a ring modulator both. Cv, clock, sync, pitch and reset inputs are never
+  needed. A quiet audio tap only suggests an audio-typed upstream input; when none is plugged
+  the aid lists audio outputs that feed nothing as a possibility. Rejected: guessing the
+  removed cable from the undo log (intent), a generic "inputs with no cable" list (optional
+  inputs would read as faults).
+- **Error-message age.** The stream-error WARN line prints the last delivered message with
+  its age ("taken N s ago, possibly before this interval") instead of pairing it with the
+  interval's counts. Rejected: clearing it per interval (then "none" is just as misleading
+  when the queue overflowed).
+- **One document, a diff to the audio side.** `control::Delivery` diffs the document against
+  the state the audio side converges to (`runtime::runtime_changes`, the compiler's own view:
+  effective values, aliases, defaults, bypass). Runtime values when only runtime params or
+  route amounts changed, else a compile. Rejected: per-call-site runtime commands (every edit
+  path — mouse, CC, undo, restore, recipes — would need its own and could disagree with the
+  saved patch); a second audio-side patch model.
+- **Identity and order.** Module id + kind + param index (or cable id), plus a revision
+  counter shared by values and graphs; a graph applies only newer values; one FIFO carries
+  both. Rejected: separate queues (a graph could overtake values); an audio-side replay table.
+- **Classification.** Every built-in reads its params per block, so everything is runtime
+  except `midi.in` mode/priority/glide (the keyboard outside the graph reads them on install).
+  Route bypass and all wiring are structural. Generated table: classification.md.
+- **Smoothing.** Continuous params the module does not smooth ramp over 15 ms (the old
+  crossfade length) in knob travel and end on the compiler's exact value; stepped choices,
+  sequencer step data and self-smoothed params are set. A graph that has not played is set,
+  never ramped. Rejected: no ramp (a mixer or VCA level jump clicks), ramping everything
+  (double smoothing, notes between two pitches).
+- **Bounds.** 256-message queue; at most 2 graphs in it; one held graph and one held value per
+  target on the control side, retried every UI frame, every CC batch and every 5 ms; past 1024
+  held targets a compile; at most 256 messages drained per callback; 32 ramps per graph.
+  Refused commands are reported, not retried (late launches land on another beat).
+- **MIDI off the editor frame.** Editor, UI state and delivery share one mutex; a control
+  thread applies CCs (unchanged `perform::apply_cc`) and retries. The MIDI callback only
+  queues and wakes it (no lock nesting). Run/Stop buttons send `Transport::Toggle`, resolved
+  from the playing clock on the audio thread; the button guard starts at connect time.
+  Rejected: processing in the MIDI callback (lock-order inversion with the sink lock), moving
+  CC state out of `UiState` (churn with no behaviour gained).
+
+## 2026-09-26 — D04 review fixes (implementation rationale)
+
+Responses to the independent review (`docs/runtime-controls/REVIEW.md`, R-01..R-06); not
+owner approvals. They amend the "Bounds" and "Identity and order" points of the previous
+entry.
+
+- **Ramps have no ceiling (R-01).** Each compiled graph allocates its ramp table at compile
+  with room for every distinct rampable target, so a restore or undo of many knobs ramps all
+  of them as the old crossfade did. Rejected: compiling instead past 32 ramped values (a
+  second code path, and concurrent ramps from separate edits could still hit a cap); asking
+  Kosta to accept the steps (a fix without tradeoff existed).
+- **Commands share the FIFO (R-02).** Launch, cancel, preview, inspect and transport travel in
+  `ToAudio`, held behind earlier values and graphs and merged with them by revision, so a
+  launch never plays pre-edit bank data and a Restart never uses the old tempo. At most 64
+  wait; past that one is refused and reported. Waiting commands are delivered late rather
+  than dropped when the audio thread resumes; a "Now" launch then lands later. Rejected:
+  sending commands only when nothing waits (a race remains between drain and the command
+  queue within one callback).
+- **Diagnosis wording (R-03).** A missing audio input is a graph fact; that the stage is
+  therefore silent is a possibility (resonant filters and tails keep sounding).
+- **Load fences old graphs (R-05).** After a fresh graph arrives, runtime values skip graphs of
+  the replaced document.
+- **Lock scope (R-04).** Documented as one editor frame's whole logic, file operations and
+  port connect included; not moved out of the lock, not measured.
