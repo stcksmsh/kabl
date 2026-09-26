@@ -424,3 +424,95 @@ fn every_voice_lane_takes_the_value() {
     assert_eq!(g.param_values(2, 0), c.param_values(2, 0));
     assert_eq!(g.param_values(2, 0).len(), 4);
 }
+
+/// Writes docs/runtime-controls/classification.md: every param of every built-in with its
+/// class, whether a runtime value ramps and why. `cargo test -p kabl-engine --test
+/// runtime_controls write_classification -- --ignored`.
+#[test]
+#[ignore]
+fn write_classification() {
+    use kabl_engine::runtime::{param_class, ramped, smoothed_by_module, ParamClass};
+    use kabl_modules::Taper;
+    let mut out = String::from(
+        "# Parameter classification (generated)\n\n\
+         Written by `cargo test -p kabl-engine --test runtime_controls write_classification -- \
+         --ignored` from `kabl_engine::runtime` and the module registry. Rules and reasons: \
+         [design.md](design.md).\n\n\
+         | Module | Param | Taper | Class | Runtime value | Reason |\n|---|---|---|---|---|---|\n",
+    );
+    let mut counts = [0usize; 3];
+    for kind in kabl_modules::registry::KNOWN_KINDS {
+        let info = kabl_modules::registry::info_for(kind).unwrap();
+        if info.params.is_empty() {
+            out += &format!("| `{kind}` | (none) | | | | no params |\n");
+            continue;
+        }
+        // Sequencer banks B–D repeat bank A's params: summarized.
+        for p in info.params {
+            if *kind == "seq" && p.name.contains('.') {
+                continue;
+            }
+            let taper = match p.taper {
+                Taper::Linear => "linear",
+                Taper::Exponential => "exponential",
+                Taper::Stepped => "stepped",
+            };
+            let (class, how, why) = match param_class(kind, p.name) {
+                ParamClass::Structural => {
+                    counts[2] += 1;
+                    (
+                        "structural",
+                        "compile",
+                        "keyboard configuration: read by the keyboard outside the graph when a graph is installed (voice assignment; a mode change releases)",
+                    )
+                }
+                ParamClass::Runtime if ramped(kind, p) => {
+                    counts[0] += 1;
+                    (
+                        "runtime",
+                        "ramped 15 ms",
+                        "read every block; the module does not smooth it",
+                    )
+                }
+                ParamClass::Runtime => {
+                    counts[1] += 1;
+                    let why = if p.taper == Taper::Stepped {
+                        "read every block; a choice, set at once (never through invalid states)"
+                    } else if smoothed_by_module(kind, p.name) {
+                        "read every block; the module smooths it itself"
+                    } else if *kind == "seq" {
+                        "step data, read when a step plays; set at once (a ramp could play a note between values)"
+                    } else {
+                        "read every block"
+                    };
+                    ("runtime", "set at once", why)
+                }
+            };
+            out += &format!(
+                "| `{kind}` | `{}` | {taper} | {class} | {how} | {why} |\n",
+                p.name
+            );
+        }
+        if *kind == "seq" {
+            out += "| `seq` | `b.*`, `c.*`, `d.*` (banks B–D) | as bank A | runtime | set at once | same as bank A's params |\n";
+        }
+    }
+    out += &format!(
+        "\n{} runtime params ramp, {} are set at once, {} are structural (bank A of `seq` \
+         counted; banks B–D behave the same).\n\n\
+         ## Cable parameters\n\n\
+         | Cable | Param | Class | Reason |\n|---|---|---|---|\n\
+         | route (into a knob) | `amount` | runtime, ramped 15 ms (as a scale) | read every block from the route's scale; a bypassed route is not compiled, so its amount changes nothing |\n\
+         | route | `bypass` | structural | a bypassed route leaves the compiled graph: scheduling and feedback (DFS back edges) change |\n\
+         | route | creation / deletion | structural | scheduling, cycle breaking and buffers change |\n\
+         | jack cable | any | structural (wiring); its params are not read | the compiler reads no jack cable params |\n\n\
+         ## Presentation (never reaches the engine)\n\n\
+         `face.*`, `pin.*`, `cc.*`, `btn.*`, `launch.*`, `cue*`, labels and positions: \
+         `rack::is_presentation` / `Op::SetLabel` / `Op::MoveModule`. The compiler does not read \
+         them, so `runtime_changes` finds nothing to send.\n",
+        counts[0], counts[1], counts[2]
+    );
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/runtime-controls");
+    std::fs::create_dir_all(&path).unwrap();
+    std::fs::write(path.join("classification.md"), out).unwrap();
+}
