@@ -720,12 +720,18 @@ pub fn diagnose(state: &PatchState, focus: Option<ModuleId>, cx: &Context) -> Di
     }
     for (m, ports) in &missing {
         d.facts.push(format!(
-            "No cable into {} {ports}: that is its audio input, and an unplugged input reads \
-             silence, so this stage passes nothing.",
+            "No cable into {} {ports}: that is its audio input.",
             title(state, *m)
         ));
     }
     if let Some((m, _)) = missing.first() {
+        // An inference, not a graph fact: a resonant filter or a delay/reverb tail can keep
+        // sounding with nothing plugged in (review R-03).
+        d.possible.push(format!(
+            "An unplugged input reads silence, so nothing new reaches {} through it; a \
+             self-oscillating filter or a delay or reverb tail can still sound.",
+            title(state, *m)
+        ));
         let idle = idle_audio_outputs(state, *m);
         if idle.is_empty() {
             d.possible.push(format!(

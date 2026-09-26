@@ -970,6 +970,20 @@ fn why_no_sound_names_an_unplugged_intermediate_audio_input() {
             .any(|f| f.starts_with("No cable into VCA #4 in: that is its audio input")),
         "{d:?}"
     );
+    // The graph fact does not claim the stage is silent (review R-03: a resonant filter or a
+    // tail can keep sounding); that inference is a possibility, with its caveat.
+    assert!(
+        d.facts
+            .iter()
+            .all(|f| !f.contains("passes nothing") && !f.contains("silence")),
+        "{d:?}"
+    );
+    assert!(
+        d.possible
+            .iter()
+            .any(|p| p.contains("nothing new reaches VCA #4") && p.contains("tail")),
+        "{d:?}"
+    );
     // The measurement stays a measurement; the fact stays a fact.
     assert!(d.measured.iter().any(|m| m.contains("VCA #4 out")), "{d:?}");
     assert!(d.facts.iter().all(|f| !f.contains("measured")));
