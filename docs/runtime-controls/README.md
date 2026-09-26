@@ -87,7 +87,53 @@ Kosta's PR #5 merge). Exact commits: REPORT.md.
 
 ## Performance
 
-PERF
+All numbers come from the cloud VM (4 vCPU, no RT priority). Composition, the dense piece, ran
+at 48 kHz / 256 frames through a PipeWire null sink, with xdotool on Xvfb and the fifo MIDI
+stand-in. That is not laptop evidence, and no overhead target was set.
+
+The two builds were run interleaved, 3 runs per workload, about 60 s each:
+
+- **base:** `6404b21` plus the measurement-only patch
+  [evidence/baseline-measurement.patch](evidence/baseline-measurement.patch);
+- **final:** release build of **`e7dca9a`**.
+
+The workloads:
+
+- **steady:** the piece playing on its own;
+- **knob:** a rack knob kept turning;
+- **cc:** two mapped CCs swept continuously from the fifo controller;
+- **swaps:** a cable's undo and redo, a topology change, about 3 per second.
+
+Full table: [evidence/perf-table.md](evidence/perf-table.md); raw data:
+[evidence/perf-summary.txt](evidence/perf-summary.txt). Callback execution, arrival lateness
+and xruns are kept apart.
+
+| Workload | Graph builds per run (base → final) | Runtime values (final) | Execution p99 bin (base → final) | CC arrival → audio callback (base → final) |
+|---|---|---|---|---|
+| steady | 0 → 0 | 0 | ≤550–600 → ≤550 µs | — |
+| knob | 1075–1148 → **0** | 1136–1170 | ≤1000–1100 → **≤550** µs | — |
+| cc | 1230–1266 → **0** | 5929–5943 | ≤1000 → **≤550** µs | p50 49–50 ms, p99 66–68 ms, max 76–167 ms → **p50 2.9–3.1 ms, p99 8.5–8.9 ms, max 16–24 ms** |
+| swaps | 201 → 201 | 0 | ≤850–900 → ≤800–850 µs | — |
+
+**Reading.**
+
+- Turning knobs and CCs no longer builds graphs. The callback p99 bin falls to the
+  steady-play level while controls move.
+- CC-to-audio latency drops by about 16× at the median. In the baseline a CC waited for an
+  editor frame plus a compile and crossfade. It now takes the control thread and the next
+  callback.
+- Topology swaps still compile, and cost the same in both builds.
+- Worst-case execution, late callbacks and xruns vary more between runs than between builds.
+  VM noise dominates the tails.
+
+**Stalls (censored runs).**
+
+- The known cloud stream stall, with no callbacks for more than 1.5 s, hit **one baseline
+  run** (swaps-base-2, after 2161 callbacks) and **one final run** (knob-final-1, after 2260
+  callbacks).
+- Both are kept in the table with their shortened counts. Neither recovered; recovery belongs
+  to D05.
+- This D04 data can't assign a cause. The stall happens with and without the new code.
 
 ## Real-app evidence
 
