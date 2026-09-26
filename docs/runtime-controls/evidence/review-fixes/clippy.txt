@@ -1,0 +1,4 @@
+# cargo clippy --workspace --all-targets -- -D warnings at 05179e18c0d2c96760bf46fc5e095556f80aa413 (crates identical at HEAD)
+    Checking kabl-ui v0.1.0 (/home/user/kabl/crates/ui)
+    Finished `dev` profile [optimized + debuginfo] target(s) in 2.33s
+exit 0

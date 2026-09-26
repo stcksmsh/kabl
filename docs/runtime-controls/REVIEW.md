@@ -289,7 +289,35 @@ After the fixes, a final recheck of the product head is needed.
 
 ## Implementer (coordinator) responses
 
-Pending.
+Fixes on top of the reviewed head `b217118`. Product fix commits: `dbce9bc` (R-03), `d717685`
+(R-01), `05179e1` (R-02, R-05 and the regression tests). Docs: `69c8621` (this record), the
+design/checklist commit after `05179e1`, and the evidence commit that adds this section.
+Fixed product head: `05179e18c0d2c96760bf46fc5e095556f80aa413`.
+
+| ID | Disposition | What changed | Check |
+|---|---|---|---|
+| R-01 major | **fixed** (correction (a)) | `compile.rs`: `MAX_RAMPS` removed. `CompiledPatch::ramps` is a `Vec<Ramp>` whose capacity, allocated in `compile` (off the audio thread), is the number of distinct rampable targets (ramped params by (id, index) plus routes by cable). One ramp per target, so `push` never exceeds capacity; an unreachable `else` sets rather than allocate. Removal uses `swap_remove`. No product tradeoff left for Kosta. | `a_restore_of_many_targets_ramps_every_one` (ui, Composition: every ramped non-clock param edited, then Restore; all ramp after one block, none stepped, then land exactly; runs under `assert_no_alloc`) |
+| R-02 minor | **fixed** (the recommended correction, not only the doc) | `runtime.rs`: `ToAudio::Command`, `ToAudio::Transport`; `Feedback::actions_taken`. `patch_engine.rs::drain` applies them in queue order. `control.rs`: the separate command/transport queues are gone; `Delivery::command`/`transport` hold actions (≤ `MAX_HELD_ACTIONS` = 64, else refused and reported) tagged with the current revision; `flush` sends the held graph, then values and actions merged by revision. `pending()` counts actions. `main.rs`: the callback's separate transport/command loops are removed. design.md §5/§6/§12 state the exact guarantee, including (iii) `launch` against a pending Load (pre-existing, documented, not changed). | `commands_never_overtake_earlier_edits` (the reviewer's scenario: full queue, `p1` and bpm edits, Launch Now + Restart; asserts that when any action is taken both edits were already applied) |
+| R-03 minor | **fixed** | `inspect.rs::diagnose`: fact is now "No cable into X in: that is its audio input."; the silence inference moves to *possible* with the self-oscillation/tail caveat. Checklists updated to the new wording. | `why_no_sound_names_an_unplugged_intermediate_audio_input` extended (no fact claims silence; caveat present) |
+| R-04 minor | **claim corrected** (not measured) | design.md §11/§12 and REPORT now say the lock covers one editor frame's whole logic, including Open/Save file I/O, port connect, stats writes, compiles and collection; measured latency covers the cc workload only. No code moved out of the lock. | docs only; remains an evidence gap, listed in REPORT limits |
+| R-05 nit | **fixed** | `patch_engine.rs`: `fresh_rev` recorded in `receive_swap` for a fresh (Load) graph; `set` skips graphs with `rev < fresh_rev`. | `a_new_documents_values_skip_the_outgoing_graph` (fails without the guard: old graph moved 0.25 → 0.297) |
+| R-06 nit | **wording corrected** | design.md §11 says the allocation check wraps a copy of the callback's control part and lists what it leaves out. | docs only |
+
+Verification at `05179e1` (crates identical at the docs head):
+
+- `cargo test --workspace`: **543 passed, 0 failed, 16 ignored**, exit 0 (540 + the three new
+  tests). `evidence/review-fixes/test-workspace.txt`.
+- `cargo clippy --workspace --all-targets -- -D warnings`: clean. `evidence/review-fixes/clippy.txt`.
+- `render_hash` (the same 17 sounds, 20 s): byte-identical output to `evidence/render-hash-final.txt`,
+  so still bit-identical to baseline `6404b21`. `transition_compare`: byte-identical to
+  `evidence/transition-compare.txt`. Copies in `evidence/review-fixes/`.
+- D03-R2 screenshots (`img/{1440x900,1280x800}-{light,dark}-why-audio-input.png`,
+  `*-dark-why-undone.png`) re-shot on the release build of `05179e1` (same Xvfb/null-sink/fifo
+  setup): they show the new wording. The previous images remain in git history at `b217118`.
+- Not re-run, with reasons: perf runs and package (the fixes change no path those workloads
+  exercise at scale: single-target ramps, no commands in knob/cc/swaps loops; a restore with
+  >32 targets was not in them); the walkthrough video and its `wt-07` frame, recorded on
+  `e7dca9a`, still show the pre-R-03 fact wording and the pre-R-02 command queues.
 
 ## Recheck
 
