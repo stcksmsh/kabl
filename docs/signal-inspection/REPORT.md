@@ -240,3 +240,38 @@ line added; the `watch_stats.py` regex still matches). No plugin automation invo
 
 Clean at the submitted head; `.ai/` untouched; no unrelated files reformatted
 (`rustfmt` on changed files only).
+
+## D03-R2 closeout (with D04, brief `docs/product-research/briefs/D04.md` §A)
+
+```text
+Batch: D03-R2 — Why no sound? names an unplugged intermediate audio input; the stream-error
+  log line states the age of the last delivered message
+Starting commit: 4f7e729 (origin/master; product = 6404b21, Kosta's PR #5 merge)
+Code commit: 9adac68 (inspect.rs, standalone lib.rs/main.rs, ui main.rs, tests)
+Tested / reviewed / submitted heads: the combined D04 heads in docs/runtime-controls/REPORT.md
+Engineering status: submitted with D04
+Owner-review status: pending (CHECKLIST.md items 13–15)
+```
+
+- **Reproduced** from source and D03-R1's real-app finding: with VCA #4 out inspected and
+  the cable into VCA #4 `in` removed, `diagnose` reported no graph fact and `upstream`
+  suggested the ADSR on the VCA's cv.
+- **Fix.** `inspect::needed_inputs` (per built-in, from each module's `process`: an unplugged
+  input is silence) names the missing audio input of any stage on the path as a graph fact.
+  Optional inputs are not reported: cv/clock/sync/pitch/reset, a mixer with at least one
+  channel, reverb/chorus fed on either side. A quiet audio tap only suggests an audio-typed
+  upstream input; with none plugged, audio outputs that feed nothing are listed as a
+  possibility ("If one of them should feed …, plug it there"), never as the user's intent.
+  Missing-trigger, held-gate, default-gain VCA and multiple-Output behaviour are unchanged
+  (their tests pass unchanged).
+- **Log age.** `kabl_standalone::stream_error_line` prints "last delivered message (taken
+  N s ago, possibly before this interval)" in both binaries; formatting stays on the UI/main
+  thread.
+- **Tests.** `crates/ui/tests/signal_inspection.rs`:
+  `why_no_sound_names_an_unplugged_intermediate_audio_input`,
+  `why_no_sound_leaves_optional_inputs_alone`, `needed_inputs_are_real_audio_inputs`;
+  `crates/standalone/tests/stream_error_overflow.rs`: `the_last_delivered_message_carries_its_age`.
+- **Real app.** docs/runtime-controls/README.md "Real-app evidence": the audible cable
+  removal on Composition (VCA #14, walkthrough) and on Init Keyboard (VCA #4, screenshots at
+  both sizes and themes), undo restoring cable, reading and sound.
+- Historical D03/D03-R1 records, media and findings above are unchanged.

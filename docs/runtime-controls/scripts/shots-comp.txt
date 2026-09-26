@@ -1,0 +1,17 @@
+# Composition with Perform open: runtime controls moving (a CC sweep and a rack knob), then the
+# inspector on VCA #14 out while a CC moves, light then dark. Size prefix from shots.sh.
+sleep 3
+midi ramp 1 20 0 127 3
+wiggle knob:3.m3 1.5 20
+shot light-runtime-controls
+click inspect-open
+click module:14
+click inspect-port:14.out
+midi ramp 1 24 127 20 3
+sleep 1.5
+shot light-inspect-during-cc
+click theme:dark
+sleep 1
+midi ramp 1 20 127 0 2
+sleep 1
+shot dark-inspect-during-cc

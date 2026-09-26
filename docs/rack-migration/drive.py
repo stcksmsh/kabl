@@ -166,13 +166,14 @@ try:
             ax, ay = centre(a[0])
             glide(ax, ay)
             x("mousedown", 1)
+            time.sleep(0.1)
             end, k, amp = time.time() + float(a[1]), 0, int(a[2])
             while time.time() < end:
                 # A triangle between ay - amp and ay + amp, 2 px per step.
                 k += 1
                 off = (k * 2) % (4 * amp)
                 off = off if off < 2 * amp else 4 * amp - off
-                x("mousemove", ax, ay - amp + off)
+                x("mousemove", ax, ay + amp - off)
                 time.sleep(0.02)
             x("mouseup", 1)
         elif cmd == "wheel":

@@ -27,3 +27,11 @@ anywhere, run `bin/kabl-ui --rate 48000 --frames 256`.
 
 Also still pending from earlier batches: D01/D01-R1, D02, Composition + Motion and Sound
 Palette hands-on reviews.
+
+## D03-R2 addition (2026-09-26, pending)
+
+| # | Do | Expect | Pass/fail, notes |
+|---|---|---|---|
+| 13 | Init Keyboard: hold a key, **Inspect** VCA #4 **out**, pull the cable out of **VCA #4 in** (drag the plug away), open **Why no sound?** Then Ctrl+Z. | Sound stops. *From the patch*: "No cable into VCA #4 in: that is its audio input, and an unplugged input reads silence, so this stage passes nothing." *Could be*: audio outputs that feed nothing (Filter #3 lp …), not the ADSR on the cv. Ctrl+Z brings back the cable, the reading and the sound. | |
+| 14 | Same, but pull the envelope's cable out of **VCA #4 cv** instead. | No "No cable into … cv" fact: cv is optional. | |
+| 15 | (Log) If the log shows "stream errors in …", read the "last delivered message". | It says how long ago it was taken ("taken N s ago, possibly before this interval"), not that it belongs to those counts. | |

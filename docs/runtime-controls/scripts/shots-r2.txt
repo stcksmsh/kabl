@@ -1,0 +1,22 @@
+# D03-R2 on Init Keyboard: the cable into VCA #4's audio input pulled while a note is held.
+sleep 2
+click inspect-open
+click module:4
+click inspect-port:4.out
+midi on 60 90
+sleep 2
+dragby in:4.in 0 170
+sleep 1.5
+click why
+sleep 1
+shot light-why-audio-input
+click theme:dark
+sleep 1
+shot dark-why-audio-input
+key ctrl+z
+sleep 2
+click why
+sleep 1
+shot dark-why-undone
+midi off 60
+sleep 1
