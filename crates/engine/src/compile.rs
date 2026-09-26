@@ -210,8 +210,6 @@ enum Step {
 
 /// A `ParamSlot::modi` for a param no route modulates.
 const NO_MOD: u32 = u32::MAX;
-/// Most runtime values one graph ramps at once; a value beyond them is set at once.
-pub const MAX_RAMPS: usize = 32;
 /// How long a runtime value ramps (`runtime.rs`, smoothing): the crossfade a rebuild used to
 /// give every edit.
 pub const RAMP_MS: f32 = crate::swap::CROSSFADE_MS;
@@ -256,14 +254,6 @@ struct Ramp {
     exact: f32,
     left: u16,
 }
-
-const NO_RAMP: Ramp = Ramp {
-    on: RampOn::Param(0, 0),
-    from: 0.0,
-    to: 0.0,
-    exact: 0.0,
-    left: 0,
-};
 
 /// A value for slots `lo..hi`: an exact destination value or a position in knob travel.
 #[derive(Clone, Copy)]
@@ -497,8 +487,9 @@ pub struct CompiledPatch {
     /// Every compiled route, sorted by (cable, step).
     route_slots: Vec<RouteSlot>,
     /// Runtime values moving toward their target, one per target (`runtime.rs`, smoothing).
-    ramps: [Ramp; MAX_RAMPS],
-    n_ramps: usize,
+    /// Its capacity, set at compile, is every rampable target of the graph, so any number of
+    /// targets can ramp at once and a push never allocates.
+    ramps: Vec<Ramp>,
     /// Blocks a ramp takes (`RAMP_MS`).
     ramp_blocks: u16,
 }
@@ -1256,6 +1247,18 @@ fn compile_inner(
     let buffers = vec![[0.0; BLOCK]; physical_count];
     param_slots.sort_by_key(|p| (p.id, p.index, p.step));
     route_slots.sort_by_key(|r| (r.cable, r.step));
+    // One ramp per target: distinct ramped params and distinct routes.
+    let rampable = param_slots
+        .iter()
+        .filter(|p| p.ramped)
+        .map(|p| (p.id, p.index))
+        .collect::<std::collections::BTreeSet<_>>()
+        .len()
+        + route_slots
+            .iter()
+            .map(|r| r.cable)
+            .collect::<std::collections::BTreeSet<_>>()
+            .len();
 
     Ok(CompiledPatch {
         modules,
@@ -1277,8 +1280,7 @@ fn compile_inner(
         started: false,
         param_slots,
         route_slots,
-        ramps: [NO_RAMP; MAX_RAMPS],
-        n_ramps: 0,
+        ramps: Vec::with_capacity(rampable),
         ramp_blocks: ((RAMP_MS / 1000.0 * sample_rate / BLOCK as f32).round() as u16).max(1),
     })
 }
@@ -1413,7 +1415,7 @@ impl CompiledPatch {
     #[inline]
     pub fn process_block_with(&mut self, launches: &[PendingLaunch]) {
         self.started = true;
-        if self.n_ramps > 0 {
+        if !self.ramps.is_empty() {
             self.run_ramps();
         }
         for step in &mut self.steps {
@@ -1716,7 +1718,7 @@ impl CompiledPatch {
     /// graph: module `id` compiled as the same kind, or the compiled route of that cable.
     /// `ramp` (the graph is playing): a continuous param the module does not smooth itself, and
     /// a route amount, move there over `RAMP_MS` in knob travel (a scale for a route); anything
-    /// else, or a value beyond `MAX_RAMPS` ramps, is set now. A target already ramping starts
+    /// else is set now. A target already ramping starts
     /// again from where it is. Returns whether the target resolved. No allocation.
     pub fn set_runtime(&mut self, target: RuntimeTarget, value: f32, ramp: bool) -> bool {
         let (on, from, to) = match target {
@@ -1801,15 +1803,11 @@ impl CompiledPatch {
             exact: value,
             left: self.ramp_blocks,
         };
-        let n = self.n_ramps;
-        match self.ramps[..n].iter().position(|x| x.on == on) {
+        match self.ramps.iter().position(|x| x.on == on) {
             Some(i) => self.ramps[i] = r,
-            None if n < MAX_RAMPS => {
-                self.ramps[n] = r;
-                self.n_ramps += 1;
-            }
-            // ponytail: past MAX_RAMPS a value steps instead of ramping; raise the bound if
-            // many targets ever move at once.
+            // Capacity is every rampable target, one ramp each: this push never allocates.
+            None if self.ramps.len() < self.ramps.capacity() => self.ramps.push(r),
+            // Unreachable by construction; setting beats allocating on the audio thread.
             None => self.write(on, Val::Exact(value)),
         }
         true
@@ -1827,17 +1825,16 @@ impl CompiledPatch {
 
     /// Forgets the ramp of `on`, if any (a value set directly replaces it).
     fn drop_ramp(&mut self, on: RampOn) {
-        if let Some(i) = self.ramps[..self.n_ramps].iter().position(|r| r.on == on) {
-            self.n_ramps -= 1;
-            self.ramps.swap(i, self.n_ramps);
+        if let Some(i) = self.ramps.iter().position(|r| r.on == on) {
+            self.ramps.swap_remove(i);
         }
     }
 
     /// Start of a block: every ramp moves one block; a finished one writes its exact value and
-    /// goes. No allocation; work is at most `MAX_RAMPS` targets.
+    /// goes. No allocation; work is at most one per rampable target.
     fn run_ramps(&mut self) {
         let mut i = 0;
-        while i < self.n_ramps {
+        while i < self.ramps.len() {
             let r = &mut self.ramps[i];
             r.left -= 1;
             let done = r.left == 0;
@@ -1850,8 +1847,7 @@ impl CompiledPatch {
             let on = r.on;
             self.write(on, v);
             if done {
-                self.n_ramps -= 1;
-                self.ramps.swap(i, self.n_ramps);
+                self.ramps.swap_remove(i);
             } else {
                 i += 1;
             }
@@ -1918,7 +1914,7 @@ impl CompiledPatch {
 
     /// Runtime values still ramping.
     pub fn ramps(&self) -> usize {
-        self.n_ramps
+        self.ramps.len()
     }
 
     /// Rendered at least one block.
