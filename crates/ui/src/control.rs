@@ -79,7 +79,11 @@ pub struct Delivery {
     /// The document state the audio side converges to; `None` = compile next.
     sent: Option<PatchState>,
     held_graph: Option<Owned<CompiledPatch>>,
-    held: BTreeMap<RuntimeTarget, ParamSet>,
+    /// The newest value per target, with its send-order key: the revision of the oldest
+    /// value it coalesced, so a coalesced edit keeps its place before a later command.
+    held: BTreeMap<RuntimeTarget, (u64, ParamSet)>,
+    /// The held graph is a Load whose clocks start stopped.
+    held_stopped: bool,
     /// Commands and transport in request order, each with the revision current when it was
     /// requested: it goes after every waiting value up to that revision.
     held_actions: VecDeque<(u64, ToAudio)>,
@@ -112,6 +116,7 @@ impl Delivery {
             sent: playing.cloned(),
             held_graph: None,
             held: BTreeMap::new(),
+            held_stopped: false,
             held_actions: VecDeque::new(),
             graphs_sent: 0,
             values_sent: 0,
@@ -138,9 +143,14 @@ impl Delivery {
                         target: *target,
                         value: *value,
                     };
-                    if self.held.insert(*target, s).is_some() {
-                        self.counts.coalesced += 1;
-                    }
+                    let order = match self.held.get(target) {
+                        Some(&(order, _)) => {
+                            self.counts.coalesced += 1;
+                            order
+                        }
+                        None => self.rev,
+                    };
+                    self.held.insert(*target, (order, s));
                 }
                 self.counts.values += v.len() as u64;
                 Outcome::Values(v.len())
@@ -157,7 +167,13 @@ impl Delivery {
         outcome
     }
 
-    fn compile(&mut self, doc: &PatchState, fresh: bool, stopped: bool) -> Outcome {
+    fn compile(&mut self, doc: &PatchState, mut fresh: bool, mut stopped: bool) -> Outcome {
+        // A waiting Load this graph replaces keeps its meaning: no state carried across
+        // documents, and its clocks stopped when it was loaded stopped (review RC-02).
+        if self.held_graph.as_ref().is_some_and(|g| g.fresh) {
+            fresh = true;
+            stopped |= self.held_stopped;
+        }
         self.generation += 1;
         self.rev += 1;
         let started = std::time::Instant::now();
@@ -192,6 +208,7 @@ impl Delivery {
         // The graph carries every value before it; a replaced waiting graph is freed here.
         self.held.clear();
         self.held_graph = Some(Owned::new(&self.handle, g));
+        self.held_stopped = stopped;
         self.counts.graphs += 1;
         Outcome::Compiled
     }
@@ -223,14 +240,14 @@ impl Delivery {
         }
         // Values and actions merged by revision: an action goes after every value requested
         // before it (ties: the value, which was requested first).
-        let mut order: Vec<ParamSet> = self.held.values().copied().collect();
-        order.sort_by_key(|s| s.rev);
+        let mut order: Vec<(u64, ParamSet)> = self.held.values().copied().collect();
+        order.sort_by_key(|&(key, _)| key);
         let mut values = order.into_iter().peekable();
         loop {
             let action_first = match (values.peek(), self.held_actions.front()) {
                 (_, None) => false,
                 (None, Some(_)) => true,
-                (Some(v), Some((rev, _))) => *rev < v.rev,
+                (Some((key, _)), Some((rev, _))) => rev < key,
             };
             if action_first {
                 let (rev, a) = self.held_actions.pop_front().expect("peeked");
@@ -242,7 +259,7 @@ impl Delivery {
                     }
                 }
             } else {
-                let Some(s) = values.next() else {
+                let Some((_, s)) = values.next() else {
                     break;
                 };
                 if tx.push(ToAudio::Set(s)).is_err() {

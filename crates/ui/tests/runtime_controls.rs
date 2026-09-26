@@ -608,3 +608,111 @@ fn a_new_documents_values_skip_the_outgoing_graph() {
     h.settle();
     assert_eq!(h.engine.active_mut().param_value(MIXER, 0), Some(0.77));
 }
+
+/// Recheck RC-01: an edit made before a command, then replaced (coalesced) by a newer value of
+/// the same target while both wait, still reaches the audio thread before the command.
+#[test]
+fn a_coalesced_edit_keeps_its_place_before_a_command() {
+    let mut h = H::new();
+    h.settle();
+    // The audio thread pauses: the queue fills, then 255 distinct values wait.
+    for k in 0..300 {
+        h.editor
+            .set_param(MIXER, "level1", 0.2 + (k % 50) as f32 * 0.01);
+        h.deliver();
+    }
+    assert_eq!(h.rx.slots(), control::QUEUE);
+    let seq: ModuleId = 6;
+    let s = h.editor.state().clone();
+    'o: for (&id, m) in &s.modules {
+        let info = registry::info_for(&m.kind).unwrap();
+        for p in info.params {
+            if h.d.waiting() >= 255 {
+                break 'o;
+            }
+            if (id == seq && p.name == "p1")
+                || (id == MIXER && p.name == "level1")
+                || kabl_engine::runtime::param_class(info.kind, p.name)
+                    == kabl_engine::runtime::ParamClass::Structural
+                || p.taper == kabl_modules::Taper::Stepped
+            {
+                continue;
+            }
+            let n = p.to_norm(routing::base_value(&s, id, p));
+            h.editor.set_param(
+                id,
+                p.name,
+                p.from_norm(if n > 0.5 { n - 0.2 } else { n + 0.2 }),
+            );
+            h.deliver();
+        }
+    }
+    assert_eq!(h.d.waiting(), 255);
+    let p1 = registry::info_for("seq")
+        .unwrap()
+        .params
+        .iter()
+        .position(|p| p.name == "p1")
+        .unwrap();
+    let before = h.engine.active_mut().param_value(seq, p1).unwrap();
+    h.editor.set_param(seq, "p1", before + 7.0); // before the launch
+    h.deliver();
+    h.ui.launches.push(Command::Launch(Launch::new(
+        CLOCK,
+        Timing::Now,
+        &[(seq, 1)],
+    )));
+    h.deliver();
+    h.editor.set_param(seq, "p1", before + 5.0); // after it: replaces the first
+    h.deliver();
+    // The audio thread resumes: one callback takes the old queue, the control side flushes
+    // exactly up to the queue boundary, the next callback takes that.
+    h.callback(0);
+    h.d.flush();
+    h.callback(1);
+    if Feedback::get(&h.fb.actions_taken) > 0 {
+        assert_eq!(
+            h.engine.active_mut().param_value(seq, p1),
+            Some(before + 5.0),
+            "the launch ran without the edit requested before it"
+        );
+    }
+    h.settle();
+    assert_eq!(Feedback::get(&h.fb.actions_taken), 1);
+    h.assert_engine_matches_document();
+}
+
+fn clock_running(h: &H) -> Option<bool> {
+    let mut running = None;
+    h.engine.clocks(|id, run| {
+        if id == CLOCK {
+            running = Some(run)
+        }
+    });
+    running
+}
+
+/// Recheck RC-02: a Load opened stopped, waiting behind queued graphs, then replaced by the
+/// next structural edit, still starts stopped and carries no state from the old document.
+#[test]
+fn a_waiting_load_replaced_by_an_edit_stays_a_stopped_load() {
+    for extra_edit in [false, true] {
+        let mut h = H::new();
+        for _ in 0..2 {
+            h.editor
+                .add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+            h.deliver();
+        }
+        assert_eq!(h.d.graphs_queued(), MAX_GRAPHS_QUEUED);
+        kabl_ui::browser::replace_patch(&mut h.editor, &mut h.ui, piece());
+        h.ui.load_stopped = true;
+        assert_eq!(h.deliver(), Outcome::Compiled);
+        if extra_edit {
+            h.editor
+                .add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+            assert_eq!(h.deliver(), Outcome::Compiled);
+        }
+        h.settle();
+        assert_eq!(clock_running(&h), Some(false), "extra edit: {extra_edit}");
+    }
+}
