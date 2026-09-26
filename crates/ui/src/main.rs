@@ -997,6 +997,12 @@ impl eframe::App for App {
                 kabl_ui::record::meter_ui(ui, &mut ui_state.meter);
                 ui.separator();
                 ui.label(&self.audio.status);
+                // Requested but not yet with the audio thread (it is not taking messages).
+                let waiting = delivery.pending();
+                if waiting > 0 && self.audio.timing.is_some() {
+                    ui.separator();
+                    ui.label(format!("{waiting} change(s) waiting for audio"));
+                }
                 if let Some(log) = &self.log {
                     ui.separator();
                     let problem = self.health.log_problem.clone();
@@ -1197,8 +1203,12 @@ impl eframe::App for App {
         // its readings still describe the patch.
         if delivery.generation != self.seen_generation {
             self.seen_generation = delivery.generation;
-            if let Some(e) = &delivery.compile_error {
-                self.audio.status = format!("recompile failed: {e}");
+            match &delivery.compile_error {
+                Some(e) => self.audio.status = format!("recompile failed: {e}"),
+                None if self.audio.status.starts_with("recompile failed") => {
+                    self.audio.status = "recompiled: playing the current patch".into()
+                }
+                None => {}
             }
             ui_state.inspect.rebuilt(
                 delivery.generation,
@@ -1238,8 +1248,8 @@ fn delivery_line(d: &Delivery) -> String {
     let fb = &d.feedback;
     format!(
         "control: {} graphs compiled ({} failed, {} as fallback) · {} runtime values ({} coalesced) \
-         · audio took {} graphs ({} refused as stale), {} values ({} unresolved) · {} waiting · \
-         {} revisions behind · {} actions not delivered",
+         · audio took {} graphs ({} refused as stale), {} values ({} unresolved) · {} pending \
+         · {} actions not delivered",
         c.graphs,
         c.failed,
         c.fallbacks,
@@ -1249,8 +1259,7 @@ fn delivery_line(d: &Delivery) -> String {
         Feedback::get(&fb.stale_graphs),
         Feedback::get(&fb.sets_taken),
         Feedback::get(&fb.unresolved),
-        d.waiting(),
-        d.behind(),
+        d.pending(),
         c.dropped_actions,
     )
 }

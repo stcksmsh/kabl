@@ -78,6 +78,7 @@ pub struct Delivery {
     held_graph: Option<Owned<CompiledPatch>>,
     held: BTreeMap<RuntimeTarget, ParamSet>,
     graphs_sent: u64,
+    values_sent: u64,
     pub compile_error: Option<String>,
     pub counts: Counts,
 }
@@ -110,6 +111,7 @@ impl Delivery {
             held_graph: None,
             held: BTreeMap::new(),
             graphs_sent: 0,
+            values_sent: 0,
             compile_error: None,
             counts: Counts::default(),
         }
@@ -193,6 +195,7 @@ impl Delivery {
     /// Sends what waits, in order, as far as the queue takes it. Returns how many messages
     /// still wait.
     pub fn flush(&mut self) -> usize {
+        let queued = self.graphs_queued();
         let Some(tx) = self.tx.as_mut() else {
             // No audio: nothing will take them.
             self.held_graph = None;
@@ -200,7 +203,6 @@ impl Delivery {
             return 0;
         };
         if let Some(g) = self.held_graph.take() {
-            let queued = self.graphs_sent - Feedback::get(&self.feedback.graphs_taken);
             if queued >= MAX_GRAPHS_QUEUED {
                 self.held_graph = Some(g);
                 return self.waiting();
@@ -221,10 +223,16 @@ impl Delivery {
                 if tx.push(ToAudio::Set(s)).is_err() {
                     break;
                 }
+                self.values_sent += 1;
                 self.held.remove(&s.target);
             }
         }
         self.waiting()
+    }
+
+    /// Graphs in the queue the audio thread has not taken yet.
+    pub fn graphs_queued(&self) -> u64 {
+        self.graphs_sent - Feedback::get(&self.feedback.graphs_taken)
     }
 
     /// Messages waiting to be sent.
@@ -232,10 +240,11 @@ impl Delivery {
         self.held_graph.is_some() as usize + self.held.len()
     }
 
-    /// Revisions handed out but not applied yet on the audio side (0 = caught up).
-    pub fn behind(&self) -> u64 {
-        self.rev
-            .saturating_sub(Feedback::get(&self.feedback.applied_rev).max(1))
+    /// Messages requested and not yet taken by the audio thread: waiting here or in the
+    /// queue (0 = the audio side has everything).
+    pub fn pending(&self) -> u64 {
+        self.waiting() as u64 + self.graphs_queued() + self.values_sent
+            - Feedback::get(&self.feedback.sets_taken)
     }
 
     /// Sends a runtime command; false when the queue refused it.
