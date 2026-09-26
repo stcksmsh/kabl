@@ -9,15 +9,18 @@ Kosta authorized one agent to finish D03 and implement D04 sequentially; no para
 Brief: docs/product-research/briefs/D04.md. Launch:
 docs/product-research/briefs/D04-LAUNCH.md.
 
-**State (2026-09-26): implemented and evidence produced; independent review still owed.**
+**State (2026-09-26): submitted; independent review and recheck done, findings addressed;
+PR #6 draft awaiting the supervisor's check and Kosta's hands-on review.**
 
 - **Record.** `docs/runtime-controls/` (README, design, classification, REPORT, REVIEW,
   CHECKLIST) and the D03-R2 section of `docs/signal-inspection/REPORT.md`.
-- **Branch.** `claude/d02-musical-controls-knjmgu`, the environment-required name, with a new
-  PR for Kosta. Product code equals `b2e9fd6`.
-- **Review gap.** The reviewer subagent hit the platform's weekly limit (it resets
-  2026-09-30 22:00 UTC) before writing anything. Next step: a fresh reviewer on base
-  `4f7e729` and the head, then fixes and a recheck (REVIEW.md lists the required coverage).
+- **Branch.** `claude/d02-musical-controls-knjmgu` (environment-required name), PR #6.
+  Product head `58a5934`; later commits are docs only.
+- **Review.** A fresh reviewer subagent reviewed `b217118` (R-01 major: >32 simultaneous
+  ramps stepped; R-02..R-04 minor; R-05/R-06 nits), rechecked `05179e1` (RC-01/RC-02 minor,
+  RC-03 nit), rechecked `34162f7` (RC-04 nit) and `58a5934` (REVIEW.md). All fixed or
+  disclosed; R-04 (CC latency during Save/Open/reconnect) remains unmeasured.
+- **Tests.** 545 passed, 0 failed, 16 ignored; clippy clean at `58a5934`.
 - **Code.**
   - `crates/engine/src/runtime.rs`, `crates/ui/src/control.rs`.
   - The control thread and `Core` mutex live in `crates/ui/src/main.rs`.

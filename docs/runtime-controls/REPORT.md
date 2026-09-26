@@ -7,17 +7,22 @@ Batch: Kosta's combined assignment. D03-R2 (Why no sound? names an unplugged aud
 Starting commit: 4f7e729 (origin/master; planning on top of product 6404b21, the PR #5 merge)
 Product commits: 9adac68 (D03-R2); 4bd84b3, 9a4864a, 07b2607, 7e5d908, b20e758 (examples),
   5e148f1 (opt-in latency measurement), e7dca9a (clippy); b2e9fd6 (a test moved to its own
-  file). Everything after b2e9fd6 is docs/evidence.
-Tested head: b2e9fd6. cargo test --workspace 540 passed, 0 failed, 16 ignored; clippy clean
-  (evidence/test-workspace.txt, evidence/clippy.txt)
-Evidence build: release e7dca9a (perf, walkthrough, screenshots, package). The runtime
-  behaviour is identical to b2e9fd6, which only moved a test.
-Reviewed head: NONE. The independent reviewer subagent was stopped by a platform rate limit
-  before writing any finding (REVIEW.md). This is an open gap, not a pass.
-Submitted head: the branch head that contains this file (product code = b2e9fd6)
+  file). Review fixes (coordinated closeout): dbce9bc (R-03), d717685 (R-01), 05179e1 (R-02,
+  R-05), 34162f7 (RC-01, RC-02), 58a5934
+  (RC-04). Everything after 58a5934 is docs/evidence.
+Tested head: 58a59340eb9b5278e2bd56ede03107385ce6b5bf. cargo test --workspace 545 passed,
+  0 failed, 16 ignored; clippy -D warnings clean (evidence/review-fixes/). Earlier: b2e9fd6
+  540/0/16 (evidence/test-workspace.txt).
+Evidence builds: release e7dca9a (perf, walkthrough, package; not re-run after the fixes);
+  release 05179e1 (D03-R2 screenshots re-shot; render_hash and transition_compare outputs
+  byte-identical to the e7dca9a evidence). Engine code is unchanged after 05179e1.
+Reviewed: independent reviewer subagent reviewed b2171180 (product = b2e9fd6), rechecked
+  05179e1 (dcd3a46), short rechecks of 34162f7 and 58a5934 (REVIEW.md).
+Submitted head: the branch head that contains this file (product code = 58a5934)
 Branch / PR: claude/d02-musical-controls-knjmgu, which the cloud environment requires. It was
-  reset to master 4f7e729 for this assignment. New PR for Kosta (the merged PR #5 is not reused).
-Engineering status: implemented and evidence produced. NOT complete: independent review pending.
+  reset to master 4f7e729 for this assignment. PR #6 for Kosta (draft; the merged PR #5 is not reused).
+Engineering status: submitted; independent review R-01..R-06 and rechecks RC-01..RC-04
+  addressed (REVIEW.md); PR kept draft for the supervisor and Kosta.
 Owner review: pending (CHECKLIST.md; D03-R2 items 13–15 in signal-inspection/CHECKLIST.md)
 ```
 
@@ -46,13 +51,13 @@ Owner review: pending (CHECKLIST.md; D03-R2 items 13–15 in signal-inspection/C
 | No routine recompilation | D04 | pass (automated + real app) | `routine_controls_never_build_a_graph`. perf: knob 1075–1148 → 0 builds, cc 1230–1266 → 0; package run 0 graphs / 137 values; walkthrough log (only cable edits compile) |
 | Compatibility | D04 | pass for fixed settings. Transitions differ by design and are documented | `render_hash`: all 17 factory sounds give bit-identical hashes to 6404b21 (engine unchanged since b20e758); `a_set_value_renders_like_a_compile_of_it`; `evidence/transition-compare.txt` |
 | Ordering and identity | D04 | pass (automated) | `values_and_graphs_keep_revision_order`, `stale_and_reused_targets_are_rejected`, `a_structural_edit_while_controls_move_keeps_every_value`, `comparison_restore_and_recipe_like_edits_converge_on_the_document`, `deletion_recreation_and_a_new_document_reject_old_values` |
-| Backpressure and failure | D04 | pass (automated) | `a_paused_audio_thread_bounds_the_queue_and_gets_the_last_value`, `draining_is_bounded_ordered_and_allocation_free`, `a_failed_compile_keeps_the_graph_and_runtime_values_still_apply`; refused discrete commands are counted ("actions not delivered"), not reported as success |
+| Backpressure and failure | D04 | pass (automated) | `a_paused_audio_thread_bounds_the_queue_and_gets_the_last_value`, `draining_is_bounded_ordered_and_allocation_free`, `a_failed_compile_keeps_the_graph_and_runtime_values_still_apply`, `commands_never_overtake_earlier_edits`, `a_coalesced_edit_keeps_its_place_before_a_command`, `a_waiting_load_replaced_by_an_edit_stays_a_stopped_load`, `a_restore_of_many_targets_ramps_every_one`, `a_new_documents_values_skip_the_outgoing_graph`; refused discrete commands (past 64 waiting) are counted ("actions not delivered"), not reported as success |
 | Editor independence | D04 | pass (automated + real app) | `midi_buttons_and_pickup_work_without_a_frame_and_the_ui_catches_up`; perf cc runs (control thread; CC to callback p50 ≈3 ms) |
-| RT safety | D04 | pass for the checked paths | The ui production-path tests forbid allocation in every audio callback, through saturation and swaps. The narrowly accepted D03-R1 backend-error exception is unchanged. The source review of the `Core` mutex and callback destruction was the implementer's own: **not independently reviewed** |
+| RT safety | D04 | pass for the checked paths | The ui production-path tests forbid allocation in a copy of the callback's control part (drain + `process_block`), through saturation, swaps and >64 simultaneous ramps. The narrowly accepted D03-R1 backend-error exception is unchanged. Lock scope and callback destruction independently reviewed (REVIEW.md R-04, R-06: wording corrected; CC latency during Save/Open/reconnect unmeasured) |
 | D02/D03 integration | both | pass (automated + real app) | `inspector_readings_survive_runtime_edits_but_not_rewiring`; walkthrough 46–53 s (inspect while controls move), 29–44 s (comparison restore without a compile) |
 | Performance | D04 | measured (cloud VM) | README "Performance", `evidence/perf-table.md`: 3 runs per workload per build, interleaved; two censored stall runs, one per build |
 | Delivery | both | pass (cloud) | workspace tests/clippy at b2e9fd6; `evidence/package.txt` (outside the checkout, clean shutdown) |
-| Independent review | both | **not done** | REVIEW.md: the reviewer subagent was rate-limited before any finding |
+| Independent review | both | done; findings addressed | REVIEW.md: review of b217118 (R-01 major, R-02..R-04 minor, R-05/R-06 nits), recheck of 05179e1 (RC-01/RC-02 minor, RC-03 nit), short recheck of 34162f7 (RC-04 nit), recheck of 58a5934 |
 | Owner | both | **pending** | CHECKLIST.md |
 
 ## Changes
@@ -83,7 +88,10 @@ These are recorded in `docs/decisions.md`, "2026-09-26 — D03-R2 and D04 runtim
 Environment: cloud container, Ubuntu 24.04, 4 vCPU, rustc 1.94.1, Xvfb, PipeWire 1.0.5 null
 sink, fifo MIDI stand-in, no RT priority.
 
-- `cargo test --workspace` at b2e9fd6 gives 540 passed, 0 failed, 16 ignored (exit 0).
+- `cargo test --workspace` at 58a5934 gives 545 passed, 0 failed, 16 ignored (exit 0);
+  `cargo clippy --workspace --all-targets -- -D warnings` clean (evidence/review-fixes/).
+  The reviewer independently got 543/0/16 and clean clippy at 05179e1.
+- `cargo test --workspace` at b2e9fd6 gave 540 passed, 0 failed, 16 ignored (exit 0).
 - Before b2e9fd6, one workspace run failed in `stream_error_overflow`. Cause: the D03-R2 test
   had been added to the same binary, and its parallel allocations shifted the process-wide
   heap count. The test was moved to its own file, after which 12/12 focused runs passed.
@@ -114,17 +122,20 @@ patch) against final `e7dca9a`, 3 runs each, interleaved.
 
 ## Limits / deviations
 
-- **No independent review** (REVIEW.md). This work must not be treated as reviewed or
-  merge-ready until a fresh reviewer has inspected it and rechecked the final head.
+- Perf runs, package and walkthrough were recorded on `e7dca9a` and not re-run after the
+  review fixes (R-01/R-02/R-05/RC-01/RC-02 change ramp capacity, command delivery and held
+  ordering; none of the perf workloads sends commands or moves >32 targets). The walkthrough
+  video and `wt-07` frame show the pre-R-03 diagnosis wording.
 - All evidence is cloud and scripted. There is no listening, controller-feel, beginner or
   laptop evidence.
 - Two perf runs were censored by the cloud stream stall. It happened in both builds, with no
   cause known.
 - Rules from design.md §12:
-  - past 32 simultaneous ramps per graph, further targets step instead of ramping;
-  - commands refused by a full queue are reported, not retried;
-  - CC latency while the editor draws includes up to one layout pass.
-- The evidence media was recorded on the `e7dca9a` build. `b2e9fd6` only moved a test.
+  - up to 64 commands wait behind earlier edits; past that one is refused and reported; a
+    waiting "Now" launch lands late when audio resumes;
+  - a CC arriving during an editor frame waits for that frame's whole logic, including any
+    Save/Open file I/O or port connect; only the cc workload is measured (R-04);
+  - `launch` resolves against the playing graph, not a Load still queued (pre-existing).
 
 ## Owner checklist
 
@@ -133,14 +144,21 @@ patch) against final `e7dca9a`, 3 runs each, interleaved.
 
 ## Follow-ups (not implemented)
 
-- The independent review and recheck described above, once reviewer capacity returns.
+- Measure CC latency during Save/Open/reconnect and swaps, or move file I/O and port
+  connect out of the frame lock (R-04).
+- Pre-existing engine-side gap (recheck residual note): a stopped Load pending behind a fade
+  and replaced by an edit graph within that fade (≤ 15 ms) runs; `stopped` is applied at
+  compile time and `receive_swap` cannot carry it.
+- Re-record perf and the walkthrough on the final head if the supervisor wants media newer
+  than `e7dca9a`.
 - D05: stream stall recovery. The stall appeared again in both builds here.
 - Two routes to a lower CC latency: a MIDI-thread fast path, or not taking the lock during
   layout. Neither is needed for correctness.
 
 ## Repo status
 
-- Clean at the submitted head. `.ai/` is untouched.
+- Clean at the submitted head. `.ai/` is untouched. The reviewer worked in an isolated
+  worktree (`.claude/worktrees/`, locally excluded, never committed).
 - rustfmt was run only on changed files.
 - No force push. The branch was reset to master for this assignment, and its one unpushed
   commit was recovered from the reflog.

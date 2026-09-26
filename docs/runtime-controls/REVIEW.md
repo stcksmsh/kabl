@@ -1,6 +1,13 @@
 # D03-R2 + D04 review record
 
-## Status: independent subagent review NOT done
+## Current status (2026-09-26)
+
+Independent review done by a fresh reviewer subagent (coordinated run below): review of
+`b217118`, recheck of `05179e1`, short rechecks of `34162f7` and `58a5934`. Findings and
+dispositions follow. The next two sections are the history of the first, rate-limited attempt,
+kept as written.
+
+## History: first attempt — independent subagent review NOT done
 
 The brief (D04.md, "Review and return") and AGENT-WORKFLOW.md require a fresh reviewer
 subagent to inspect the combined D03-R2 + D04 code, fix findings, and recheck the final
@@ -23,7 +30,7 @@ What happened:
 - Per AGENT-WORKFLOW, the implementer's own checking is **not** relabelled as a subagent
   review. None of the verification in REPORT.md counts as independent review.
 
-## What still has to happen
+## What still had to happen (done in the coordinated run below)
 
 Once subagent capacity is available again (after 2026-09-30 22:00 UTC), or through a
 supervisor-routed reviewer:
@@ -534,3 +541,41 @@ The scratch files were removed and the worktree is clean. Copies are in the revi
 | RC-04 nit | **fixed** | `Delivery::compile` inherits the held Load's `fresh`/`stopped` only when the replacing compile is not itself a Load (`if !fresh && …`). Commit `58a5934`. | `a_waiting_load_replaced_by_an_edit_stays_a_stopped_load` extended: a second Load replacing a waiting stopped Load plays (fails without the fix: clock stopped) |
 | Residual engine-side note | **not changed** (pre-existing, before D04) | A stopped Load pending behind a fade and replaced by an edit graph within that fade (≤ 15 ms) runs; `stopped` is applied at compile time and `receive_swap` cannot carry it. Listed in REPORT follow-ups. | — |
 
+### Recheck of RC-04 (reviewer subagent, 2026-09-26)
+
+**Target (checked with `git fetch origin` and `git rev-parse`)**
+- Branch head: `5f8860370d15435afbd1a73bbeb3446984767b55`
+- Product fix: `58a59340eb9b5278e2bd56ede03107385ce6b5bf`, on top of `34162f7`
+- `origin/master`: `0d97ed1e5010f4ac1bfdf03e90d2a4e25b397bfb`, docs only
+- `git diff --stat 58a5934 5f88603 -- crates` is empty, so **crates are identical**. `5f88603` is docs and evidence only.
+
+**1. RC-04 is resolved, and RC-02 still holds.**
+- The change is one condition in `crates/ui/src/control.rs::Delivery::compile`: `if !fresh && held_graph.is_some_and(|g| g.fresh)`. A new Load now keeps its own `fresh` and `stopped` flags. An edit that replaces a waiting Load still inherits the Load's flags.
+- The failed-compile path is unchanged: nothing is touched before `compile` returns.
+- Evidence, executed at `5f88603` with scratch tests (removed afterwards):
+  - My RC-04 reproducer `r_a_load_replacing_a_waiting_stopped_load_inherits_stopped` now **fails** as intended: the second Load's clock is running (`Some(true)`).
+  - My RC-02 reproducer (a waiting stopped Load replaced by an edit) still shows the clock stopped (`Some(false)`), so the RC-02 fix holds.
+  - My RC-01 reproducer still shows the fix: the target is at the newest value (−15) before the Launch.
+  - `cargo test -p kabl-ui --test runtime_controls`: 13 passed, including the extended `a_waiting_load_replaced_by_an_edit_stays_a_stopped_load`.
+- No regression found.
+
+**2. Crates are identical** between `58a5934` and the branch head `5f88603`.
+
+**3. Verification run by this reviewer at `5f88603`:**
+- `cargo test --workspace`: **545 passed, 0 failed, 16 ignored**, exit 0.
+- `cargo clippy --workspace --all-targets -- -D warnings`: clean.
+
+The worktree is clean.
+
+**Final stance.**
+- No blocker, no major and no acceptance failure remains. All findings are resolved: R-01 to R-06, RC-01, RC-02 and RC-04. R-04 remains a disclosed gap: CC latency during Save, Open, reconnect and swaps is not measured.
+- The engine-side note (a stopped Load pending behind a fade and replaced within 15 ms runs) is pre-existing and correctly listed as a follow-up.
+- **I do not object to engineering completion.**
+- Owner checks remain Kosta's, and this review does not approve them: listening to knob transitions (a 15 ms ramp or the module's own smoothing, instead of a crossfade), controller feel, the unmeasured CC latency while the editor frame holds the lock, and hardware/laptop runs.
+
+## Final state
+
+Reviewed product head: `58a59340eb9b5278e2bd56ede03107385ce6b5bf` (final recheck above; the
+branch head after it is docs only). No blocker, major or acceptance failure open. Disclosed
+gaps: R-04 latency unmeasured; perf/walkthrough/package media from `e7dca9a`; the pre-existing
+engine-side stopped-Load note. Owner checks pending (CHECKLIST.md).

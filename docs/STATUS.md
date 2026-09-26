@@ -10,8 +10,8 @@ Last updated: 2026-09-26. D03 + D03-R1 are merged through PR #5 at
 Kosta accepted the narrow backend-error overflow free/allocator-lock exception; see the
 latest decisions.md entry. This is not hands-on acceptance.
 
-**D03-R2 + D04 runtime controls (authorized, 2026-09-26): implemented, evidence produced,
-independent review pending.**
+**D03-R2 + D04 runtime controls (authorized, 2026-09-26): engineering submitted, independent
+review and recheck done (PR #6, draft). Owner review pending.**
 
 - **Record.** [`runtime-controls/README.md`](runtime-controls/README.md), with
   [REPORT](runtime-controls/REPORT.md), [REVIEW](runtime-controls/REVIEW.md) and
@@ -22,13 +22,14 @@ independent review pending.**
   - Mapped CCs and MIDI buttons work without editor frames.
   - "Why no sound?" names an unplugged audio input.
 - **Checks.**
-  - Tests at b2e9fd6: 540 passed, 0 failed, 16 ignored; clippy clean.
+  - Tests at product head 58a5934: 545 passed, 0 failed, 16 ignored; clippy clean.
   - Factory renders at fixed settings are bit-identical to 6404b21.
   - Cloud performance: knob and CC graph builds go from about 1100–1270 to 0 per run; CC to
     audio callback p50 goes from about 49 ms to about 3 ms.
-- **Open.** The independent reviewer subagent was stopped by a platform rate limit before
-  writing any finding, so the review and recheck are still owed. Do not treat this as
-  reviewed or merge-ready.
+- **Review.** Independent reviewer findings R-01..R-06 and recheck findings RC-01..RC-04 are
+  fixed or disclosed ([REVIEW](runtime-controls/REVIEW.md)). Open: CC latency during
+  Save/Open/reconnect unmeasured (R-04); perf and walkthrough media predate the fixes.
+  Merge is Kosta's decision.
 - D05 is not authorized. D03, D02, D01/D01-R1,
 Composition + Motion and Sound Palette hands-on reviews remain pending. D00 is incomplete.
 
