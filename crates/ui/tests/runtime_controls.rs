@@ -715,4 +715,18 @@ fn a_waiting_load_replaced_by_an_edit_stays_a_stopped_load() {
         h.settle();
         assert_eq!(clock_running(&h), Some(false), "extra edit: {extra_edit}");
     }
+    // Recheck RC-04: a second Load that should play, replacing the waiting stopped one, plays.
+    let mut h = H::new();
+    for _ in 0..2 {
+        h.editor
+            .add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+        h.deliver();
+    }
+    kabl_ui::browser::replace_patch(&mut h.editor, &mut h.ui, piece());
+    h.ui.load_stopped = true;
+    assert_eq!(h.deliver(), Outcome::Compiled);
+    kabl_ui::browser::replace_patch(&mut h.editor, &mut h.ui, piece());
+    assert_eq!(h.deliver(), Outcome::Compiled);
+    h.settle();
+    assert_eq!(clock_running(&h), Some(true));
 }

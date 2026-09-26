@@ -168,9 +168,10 @@ impl Delivery {
     }
 
     fn compile(&mut self, doc: &PatchState, mut fresh: bool, mut stopped: bool) -> Outcome {
-        // A waiting Load this graph replaces keeps its meaning: no state carried across
-        // documents, and its clocks stopped when it was loaded stopped (review RC-02).
-        if self.held_graph.as_ref().is_some_and(|g| g.fresh) {
+        // A waiting Load this edit replaces keeps its meaning: no state carried across
+        // documents, and its clocks stopped when it was loaded stopped (review RC-02). A new
+        // Load has its own (RC-04).
+        if !fresh && self.held_graph.as_ref().is_some_and(|g| g.fresh) {
             fresh = true;
             stopped |= self.held_stopped;
         }
