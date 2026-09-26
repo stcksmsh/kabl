@@ -2654,3 +2654,28 @@ entry.
   the replaced document.
 - **Lock scope (R-04).** Documented as one editor frame's whole logic, file operations and
   port connect included; not moved out of the lock, not measured.
+
+## 2026-09-26 — D04 merged; D05 authorized
+
+- Kosta: "Finished with agent and merged, now we go to D05?" Proceed with one D05
+  implementing agent, followed by independent reviewer subagent, fixes and final recheck.
+  Internal increments are not approval gates. No D06 authorization.
+- Verified master 5e64101486e942649e1bab6fb9f4f79d7fecbb75 is PR #6's merge of
+  e866a0e3464d61365efb37208a4ca658759c03f3. Product code matches final reviewed/tested
+  58a59340eb9b5278e2bd56ede03107385ce6b5bf. Checked test log totals: 545/0/16;
+  clippy clean reported. Supervisor did not rerun tests or duplicate independent review.
+- D04 final reviewer reports no remaining blocker, major or acceptance failure. Ramp
+  capacity and command ordering concerns were reproduced and fixed. Preserve all review
+  history. R-04 latency remains unmeasured; pending-Load stopped-state issue remains.
+- D05 brief: product-research/briefs/D05.md; launch: D05-LAUNCH.md in that directory.
+  Recovery/device selection and interrupted-recording integrity first; fault testing,
+  relevant load/command/lock fixes, then measured mono-chain optimization only if justified.
+  A documented optimization deferral is valid. The brief scopes recovery reset behavior:
+  preserve documents/accepted values; clear transient notes/actions and resume clocks stopped,
+  with an explicit Start. This is the issued recovery contract, not implemented capability
+  or a change to ordinary preview behavior.
+- D04 media/performance/package evidence from e7dca9a remains historical. D05 must
+  establish the merged baseline and final-head recovery evidence. Cloud stalls and the
+  Composition spike retain their unknown causes.
+- D04 and earlier hands-on reviews remain pending. Merge and engineering review do not
+  provide owner acceptance; D00 remains incomplete. Laptop evidence is still pending.

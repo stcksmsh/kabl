@@ -5,13 +5,20 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-26. D03 + D03-R1 are merged through PR #5 at
-6404b219837d87da59029390052e62ac6290da1f. Product code matches tested/reviewed d21f42b.
-Kosta accepted the narrow backend-error overflow free/allocator-lock exception; see the
-latest decisions.md entry. This is not hands-on acceptance.
+Last updated: 2026-09-26. PR #6 is merged by Kosta at
+5e64101486e942649e1bab6fb9f4f79d7fecbb75; product code matches final tested/reviewed
+58a5934. D03-R2 + D04 engineering review is complete; hands-on acceptance remains pending.
 
-**D03-R2 + D04 runtime controls (authorized, 2026-09-26): engineering submitted, independent
-review and recheck done (PR #6, draft). Owner review pending.**
+**D05 authorized: audio recovery and measured efficiency.**
+Brief: [D05](product-research/briefs/D05.md); launch:
+[D05-LAUNCH](product-research/briefs/D05-LAUNCH.md). One sequential agent, independent
+review/recheck, no D06. Engineering authorized; no implementation result reported yet.
+Recovery comes first. Mono optimization requires profiling and compatibility evidence.
+D04/D03/D02/D01/D01-R1/Composition + Motion/Sound Palette owner reviews remain pending;
+D00 is incomplete. The narrow D03-R1 backend-error overflow exception remains accepted.
+
+**D03-R2 + D04 runtime controls (authorized, 2026-09-26): merged, independent
+review and recheck done (PR #6). Owner review pending.**
 
 - **Record.** [`runtime-controls/README.md`](runtime-controls/README.md), with
   [REPORT](runtime-controls/REPORT.md), [REVIEW](runtime-controls/REVIEW.md) and

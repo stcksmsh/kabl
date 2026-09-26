@@ -3,7 +3,29 @@
 Read this, then `docs/STATUS.md` (top section) and the last entries of `docs/decisions.md`.
 Trust code and git over older docs.
 
-## Current assignment — D03 closeout followed by D04 (2026-09-26)
+## Current assignment — D05 audio recovery and measured efficiency (2026-09-26)
+
+Kosta reported completing the D04 agent and merging, then requested D05.
+Brief: docs/product-research/briefs/D05.md.
+Launch: docs/product-research/briefs/D05-LAUNCH.md.
+One sequential implementing agent with independent reviewer/recheck; no D06 authorization.
+
+PR #6 is merged at 5e64101486e942649e1bab6fb9f4f79d7fecbb75. Product code matches
+58a59340eb9b5278e2bd56ede03107385ce6b5bf, the final tested/reviewed head. Checked test log:
+545 passed, 0 failed, 16 ignored; clippy reported clean. The supervisor checked merge identity,
+review findings/rechecks and logs, without rerunning tests or duplicating the code review.
+Older draft-PR wording below is historical.
+
+D05: explicit audio retry/device selection, recording interruption handling, deterministic
+fault tests, pending-Load/command lifetime fixes and Core-lock latency measurement; profile
+mono processing and optimize only if justified. Known stalls/spikes still have no established
+cause. D04 perf/package/walkthrough predates its review fixes; D05 needs a current baseline.
+
+D04 and all earlier pending hands-on reviews remain pending; D00 is incomplete. A merge
+does not approve sound/controller feel or laptop performance. Engineering authorization is
+not a report that the D05 agent has started.
+
+## Previous assignment — D03 closeout followed by D04 (2026-09-26)
 
 Kosta authorized one agent to finish D03 and implement D04 sequentially; no parallel work.
 Brief: docs/product-research/briefs/D04.md. Launch:
