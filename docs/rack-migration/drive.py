@@ -12,6 +12,9 @@ Script lines (# comments):
     dragby KEY DX DY [shift]                     press, move by (DX, DY), release
     pan BX BY KEY X Y                            drag bare rack at (BX, BY) so KEY lands at (X, Y)
     hold KEY DX DY | release                     press and move without releasing
+    wiggle KEY SECONDS PIXELS                    press on KEY, move up and down by PIXELS about 50
+                                                 times a second for SECONDS, release (a knob kept
+                                                 turning)
     wheel KEY N [ctrl]                           N wheel notches (negative = down) over a target
     goto KEY X Y                                 wheel-pan until KEY's centre is near (X, Y)
     key COMBO                                    e.g. ctrl+z, Escape
@@ -158,6 +161,19 @@ try:
             ax, ay = centre(a[0])
             press_move(ax, ay, ax + int(a[1]), ay + int(a[2]))
         elif cmd == "release":
+            x("mouseup", 1)
+        elif cmd == "wiggle":
+            ax, ay = centre(a[0])
+            glide(ax, ay)
+            x("mousedown", 1)
+            end, k, amp = time.time() + float(a[1]), 0, int(a[2])
+            while time.time() < end:
+                # A triangle between ay - amp and ay + amp, 2 px per step.
+                k += 1
+                off = (k * 2) % (4 * amp)
+                off = off if off < 2 * amp else 4 * amp - off
+                x("mousemove", ax, ay - amp + off)
+                time.sleep(0.02)
             x("mouseup", 1)
         elif cmd == "wheel":
             glide(*centre(a[0]))

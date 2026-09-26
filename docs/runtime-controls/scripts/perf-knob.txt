@@ -1,0 +1,4 @@
+# A rack knob (Macros #3 m2) kept turning for 60 s by the mouse.
+sleep 1
+wiggle knob:3.m2 60 40
+sleep 1
