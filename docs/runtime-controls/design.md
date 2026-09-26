@@ -122,9 +122,12 @@ then acts on the newer graph.
 What cannot be sent now waits in `Delivery`:
 
 - at most one graph (`held_graph`); a newer compile replaces it (the older is freed on the
-  control thread);
+  control thread). A replaced waiting Load passes on its meaning: the new graph is fresh too
+  and keeps the Load's stopped clocks (recheck RC-02);
 - at most one value per target (`held`, the newest; the replaced one is counted as coalesced),
-  kept behind the held graph. A compile clears them: the graph carries them;
+  kept behind the held graph. A compile clears them: the graph carries them. A coalesced
+  value keeps the send position of the oldest value it replaced (recheck RC-01), so an edit
+  never falls behind a command requested after it;
 - at most `MAX_HELD_ACTIONS` (64) commands in request order, each tagged with the revision
   current when it was requested; `flush` merges them with the values by revision. Past 64 a
   command is refused, counted and reported (the audio thread is not taking them).

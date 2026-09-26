@@ -321,4 +321,131 @@ Verification at `05179e1` (crates identical at the docs head):
 
 ## Recheck
 
-Not started.
+The same reviewer subagent (resumed with its context, D04-RECHECK-LAUNCH.md, same no-commit
+override) rechecked `05179e1`/`dcd3a46`. Recorded verbatim:
+
+### Final recheck (reviewer subagent, 2026-09-26)
+
+**Target (checked with `git fetch origin` and `git rev-parse`)**
+- Base: `4f7e72950a93765b79d3f229df00ce11d50e7c51`
+- Previously reviewed head: `b2171180ae72f7d0e82cc172389ac5c191c464ad`
+- Current branch head: `dcd3a4623fe262d461f8c109437f2d0936a19669` (`claude/d02-musical-controls-knjmgu`)
+- Fixed product head: `05179e18c0d2c96760bf46fc5e095556f80aa413`. `git diff --stat 05179e1 dcd3a46 -- crates` is empty, so `dcd3a46` is a docs-only head on top of it.
+- `origin/master`: `0d97ed1e5010f4ac1bfdf03e90d2a4e25b397bfb`, still planning docs only. No integration with master is needed.
+
+What I read:
+- the full diff `b217118..05179e1` for `crates/engine/{compile,patch_engine,runtime}.rs`, `crates/ui/src/{control,inspect,main}.rs` and the tests;
+- the design.md diff;
+- REVIEW.md "Implementer (coordinator) responses".
+
+Each disposition was checked in code, not from the prose.
+
+#### Per-finding disposition
+
+| ID | Disposition | Verified |
+|---|---|---|
+| R-01 (major) | **Resolved** | See below. |
+| R-02 (minor) | **Resolved for the reported scenario; one residual exception (RC-01)** | See below. |
+| R-03 (minor) | **Resolved** | `diagnose` keeps the fact "No cable into X in: that is its audio input." The silence inference, with the self-oscillation/tail caveat, moved to `possible`. The test was extended. |
+| R-04 (minor) | **Claim corrected; the gap remains and is disclosed** | design §11/§12 and REPORT now describe the full frame-lock scope. It was not measured. |
+| R-05 (nit) | **Resolved** | See below. |
+| R-06 (nit) | **Resolved** | design §11 wording. |
+
+**R-01.**
+- `MAX_RAMPS` is gone. `ramps: Vec<Ramp>` is given, in `compile`, a capacity equal to the distinct ramped `(id, index)` pairs plus the distinct route cables.
+- The capacity matches the one-ramp-per-target invariant:
+  - `RampOn::Param(lo, hi)` is unique per `(id, index)` within a graph.
+  - Route ramps are taken for every compiled route regardless of `ramped`, and every route is counted.
+  - `set_runtime` replaces an existing ramp for the same `on` before it pushes.
+- A push happens only under `len < capacity`, so it cannot reallocate. The fallback arm is dead code that sets rather than allocates. `swap_remove` does not free.
+- The Vec is freed with the graph through basedrop, on the collector's thread. A graph with no rampable targets has capacity 0 and never pushes.
+- `a_restore_of_many_targets_ramps_every_one` runs under `assert_no_alloc` and passes.
+
+**R-02.**
+- `Command` and `Transport` are now `ToAudio` variants in the one FIFO, and `drain` applies them in queue order.
+- Held actions carry the revision current when they were requested, and `flush` merges them with held values by revision.
+- The callback's separate command/transport loops are removed.
+- `pending()` counts actions (`actions_sent - actions_taken`) and cannot underflow. With `tx = None`, actions are refused, and they are reported only when audio exists (as before).
+- A held graph always goes before held actions. design §5 discloses this ("the command then acts on the newer graph").
+- The reviewer scenario (`commands_never_overtake_earlier_edits`) passes.
+- Commands are now applied inside `drain`, before key events in the same callback. Previously they came after. This is harmless: these are independent sources with no defined relative order.
+
+**R-05.**
+- `fresh_rev` is set in `receive_swap` for fresh graphs, and `set` skips graphs with `rev < fresh_rev`.
+- Pending case: if a fresh Load L is pending and a newer edit graph E replaces it, `fresh_rev` stays at L's revision and `E.rev ≥ fresh_rev`. The ordering of the `fresh |=` assignment does not matter.
+- rev-0 unversioned graphs and startup (`fresh_rev = 0`) are unaffected.
+- `a_new_documents_values_skip_the_outgoing_graph` passes.
+
+#### New findings
+
+**RC-01: minor, confirmed failure (the ordering guarantee in design §5 is broken by coalescing, and the stated exception is backwards).**
+- **Location:** `crates/ui/src/control.rs`, `Delivery::sync`, where `held.insert(*target, s)` replaces the older value with the newer revision; and `Delivery::flush`, the merge by `s.rev`. design.md §5, "Guaranteed order".
+- **Failure scenario:**
+  1. With the queue saturated, edit X (seq `p1`) is made at revision r1.
+  2. A Launch is requested, tagged r1.
+  3. A newer edit Y of the same target is made at revision r2 > r1. It replaces X in `held`, so the value now sorts after the Launch.
+  4. The Launch is sent first. If the queue fills between the two, the Launch runs and a block renders with neither X nor Y applied.
+- **What design.md says instead:** the only exception it gives is "a value requested after a command may be sent before it". The code does the opposite: an edit requested before the command is sent after it.
+- **Evidence (executed, scratch `crates/ui/tests/review_recheck.rs`, since removed):** `r_coalescing_lets_a_command_overtake_an_earlier_edit`.
+  - Composition, queue full, 255 held values before the Launch, then X (p1 −20 → −13), then Launch Now, then Y (−15).
+  - After resume, drain, flush and drain, the Launch was taken (`actions_taken = 1`) and a block rendered with `p1 = -20`.
+  - It converged to −15 afterwards.
+- **Impact:** only under saturation, plus the exact queue boundary. At most one callback of pre-edit step data, the same class as R-02 but much narrower. Not audible in normal use.
+- **Requested correction** (either one):
+  - Keep the coalesced value at its oldest ordering position when a held action lies between the two edits. For example, sort on a separate order key equal to `min(old key, new rev)`, and keep `rev` for the graph rule.
+  - Or correct design §5 to state the real exception: an edit requested before a waiting command can be delivered after it when a newer value of the same target coalesced with it.
+
+**RC-02: minor, confirmed failure, pre-existing (the base's `SwapSender` had the same behavior), not a regression.**
+- **Location:** `crates/ui/src/control.rs::Delivery::compile`, `self.held_graph = Some(...)`.
+- **Failure scenario:** when a held graph is replaced, its `fresh` and `stopped` flags are lost. If a Load is waiting in `Delivery` (because `MAX_GRAPHS_QUEUED` graphs are untaken) and the next structural edit replaces it, the new graph goes out with `fresh = false` and without the stopped clocks. As a result:
+  - state is carried across documents by module id;
+  - pending launches are not cleared;
+  - a piece opened as "stopped: press Start" plays;
+  - the R-05 fence is bypassed for that Load.
+- **Evidence (executed):**
+  - `r_held_load_replaced_by_an_edit_loses_fresh_and_stopped`: two structural edits with audio not draining, then a Load with `load_stopped = true`, then one more structural edit. After settling, clock #1 is running (`Some(true)`).
+  - Control test without the extra edit: `Some(false)`.
+- **Impact:** needs the audio thread to take no graphs across at least three compiles, for example during the known cloud stream stall. `MAX_GRAPHS_QUEUED = 2` makes this slightly easier to reach than the base's `SWAP_QUEUE = 4`.
+- **Requested correction:** when replacing a held graph, carry its flags over: `g.fresh |= old.fresh`, and apply Stop to the clocks if the replaced graph was a stopped Load (track `stopped` in `Delivery`). Add a test. This can be a follow-up if Kosta prefers, since it is pre-existing.
+
+**RC-03: nit, evidence gap.**
+- The perf runs and the walkthrough video were not re-run on `05179e1`, although the callback path changed: commands now go through `drain`.
+- REVIEW.md discloses this. The walkthrough frame `wt-07` still shows the pre-R-03 wording.
+- No correction is required beyond keeping the disclosure.
+
+#### Commands run by this reviewer
+
+All run at `dcd3a46`; crates are identical to `05179e1`.
+
+| Command | Result |
+|---|---|
+| `cargo test --workspace` (CARGO_INCREMENTAL=0, debug=0) | **543 passed, 0 failed, 16 ignored**, exit 0 |
+| `cargo clippy --workspace --all-targets -- -D warnings` | exit 0, clean |
+| `cargo test -p kabl-ui --test review_recheck -- --nocapture` (scratch, removed) | 3 passed, confirming RC-01, RC-02 and the RC-02 control |
+
+The scratch copy is at `/tmp/claude-0/-home-user-kabl/e0bc9845-1c97-47d0-9470-0491a6d7c135/scratchpad/review_recheck.rs`. The worktree is clean.
+
+Taken from the implementer's artifacts, not re-run: `render_hash` and `transition_compare` byte-identity, the refreshed D03-R2 screenshots, and the package run.
+
+#### Limitations
+- No GUI, audio device, MIDI hardware or listening.
+- Perf and latency were not re-measured after the fixes.
+- RC-01 and RC-02 need queue saturation or an audio stall to reach.
+
+#### Assessment
+- **No blocker or major finding remains.** No original acceptance criterion is failing in code.
+- R-01 is fixed rather than accepted as a tradeoff, so no ramp tradeoff is left for Kosta.
+- What remains for Kosta is owner judgment already recorded as pending:
+  - the by-design change from a 15 ms crossfade to a 15 ms ramp or module smoothing on knob transitions (listening);
+  - the unmeasured CC latency while the editor frame holds the lock (R-04, disclosed).
+- **Recommendation:** fix RC-01 before calling this engineering-complete. A doc correction or the order-key change is enough. RC-02 is pre-existing and can be fixed now or filed as a follow-up. With RC-01 handled, I have no objection to engineering completion. A code change for RC-01 would need a short recheck of `control.rs::flush`/`sync` only.
+
+## Coordinator responses to the recheck
+
+Fix commit: see the commit after `a3b480b` touching `crates/ui/src/control.rs`.
+
+| ID | Disposition | What changed | Check |
+|---|---|---|---|
+| RC-01 minor | **fixed** (order key) | `Delivery::held` stores `(order, ParamSet)`. A new target's order is its revision; a coalesced value keeps the order of the oldest value it replaced, while `rev` (the graph rule) is the newest. `flush` sorts and merges with actions by order. So an edit requested before a command is never sent after it; a newer value of that target may ride ahead of the command in its place, which is the exception design.md §5 already states. | `a_coalesced_edit_keeps_its_place_before_a_command` (the reviewer's scenario at the exact queue boundary; fails without the fix with `p1 = -20`) |
+| RC-02 minor (pre-existing) | **fixed** | `Delivery::compile`: when the held graph it replaces is fresh (a Load), the new graph is fresh too and inherits the Load's stopped clocks (`held_stopped`). | `a_waiting_load_replaced_by_an_edit_stays_a_stopped_load` (with and without the extra edit; fails without the fix: clock running) |
+| RC-03 nit | **disclosure kept** | Perf, package and walkthrough are not re-run; see REPORT "Limits". | — |
