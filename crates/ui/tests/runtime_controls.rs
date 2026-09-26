@@ -14,7 +14,7 @@ use assert_no_alloc::{assert_no_alloc, AllocDisabler};
 use basedrop::Collector;
 use kabl_core::{ModuleId, ParamTarget, PatchState, PortRef};
 use kabl_engine::graph::BLOCK;
-use kabl_engine::patch_engine::{Command, PatchEngine};
+use kabl_engine::patch_engine::{Command, Launch, PatchEngine, Timing};
 use kabl_engine::runtime::{Feedback, ToAudio};
 use kabl_modules::builtins::Transport;
 use kabl_modules::registry;
@@ -42,8 +42,6 @@ struct H {
     d: Delivery,
     engine: PatchEngine,
     rx: rtrb::Consumer<ToAudio>,
-    commands: rtrb::Consumer<Command>,
-    transport: rtrb::Consumer<(ModuleId, Transport)>,
     fb: Arc<Feedback>,
     collector: Collector,
     /// Steady clock for the control layer, seconds.
@@ -58,13 +56,9 @@ impl H {
         engine.active_mut().rev = 1;
         engine.active_mut().generation = 1;
         let (tx, rx) = rtrb::RingBuffer::new(control::QUEUE);
-        let (ctx, commands) = rtrb::RingBuffer::new(64);
-        let (ttx, transport) = rtrb::RingBuffer::new(64);
         let fb = Arc::new(Feedback::default());
         let d = Delivery::new(
             Some(tx),
-            Some(ctx),
-            Some(ttx),
             collector.handle(),
             fb.clone(),
             SR,
@@ -77,8 +71,6 @@ impl H {
             d,
             engine,
             rx,
-            commands,
-            transport,
             fb,
             collector,
             t: 10.0,
@@ -90,22 +82,9 @@ impl H {
     /// One audio callback: what `main.rs` does before rendering, then `blocks` blocks. Every
     /// call in every test runs with allocation (and freeing) forbidden.
     fn callback(&mut self, blocks: usize) {
-        let H {
-            engine,
-            rx,
-            transport,
-            commands,
-            fb,
-            ..
-        } = self;
+        let H { engine, rx, fb, .. } = self;
         assert_no_alloc(|| {
             engine.drain(rx, control::QUEUE, fb);
-            while let Ok((id, t)) = transport.pop() {
-                engine.transport(id, t);
-            }
-            while let Ok(c) = commands.pop() {
-                engine.command(&c);
-            }
             let (mut l, mut r) = ([0.0; BLOCK], [0.0; BLOCK]);
             for _ in 0..blocks {
                 engine.process_block(&mut l, &mut r);
@@ -511,4 +490,121 @@ fn inspector_readings_survive_runtime_edits_but_not_rewiring() {
         g + 1,
         "rewiring is a new graph the inspector hears about"
     );
+}
+
+/// Review R-01: a restore that moves far more targets than any fixed ramp table held ramps
+/// every one of them (none steps), then lands exactly on the document.
+#[test]
+fn a_restore_of_many_targets_ramps_every_one() {
+    let mut h = H::new();
+    h.settle();
+    h.ui.compare.capture(&h.editor, "test");
+    let s = h.editor.state().clone();
+    let mut edited = Vec::new();
+    for (&id, m) in &s.modules {
+        let info = registry::info_for(&m.kind).unwrap();
+        if m.kind == "clock" || m.kind == "midi.in" {
+            continue;
+        }
+        for (i, p) in info.params.iter().enumerate() {
+            if !kabl_engine::runtime::ramped(info.kind, p) {
+                continue;
+            }
+            let n = p.to_norm(routing::base_value(&s, id, p));
+            let v = p.from_norm(if n > 0.5 { n - 0.3 } else { n + 0.3 });
+            h.editor.set_param(id, p.name, v);
+            edited.push((id, i));
+        }
+    }
+    assert!(edited.len() > 64, "{} targets", edited.len());
+    h.deliver();
+    h.settle();
+    compare::restore(&mut h.editor, &mut h.ui);
+    assert_eq!(h.deliver(), Outcome::Values(edited.len()));
+    h.callback(1);
+    let doc = h.editor.state().clone();
+    let g = h.engine.active_mut();
+    assert_eq!(g.ramps(), edited.len());
+    for &(id, i) in &edited {
+        let p = registry::info_for(&doc.modules[&id].kind).unwrap().params[i];
+        let want = routing::base_value(&doc, id, &p);
+        let got = g.param_value(id, i).unwrap();
+        assert!(
+            (got - want).abs() > 1e-5 * want.abs().max(1.0),
+            "#{id} {} stepped to {want}",
+            p.name
+        );
+    }
+    h.settle();
+    assert_eq!(h.engine.active_mut().ramps(), 0);
+    h.assert_engine_matches_document();
+}
+
+/// Review R-02: a launch and a Restart requested after bank data and tempo edits never reach
+/// the audio thread before those edits, even when the edits wait behind a full queue.
+#[test]
+fn commands_never_overtake_earlier_edits() {
+    let mut h = H::new();
+    h.settle();
+    // The audio thread pauses; the queue fills with mixer values.
+    for k in 0..300 {
+        h.editor
+            .set_param(MIXER, "level1", 0.2 + (k % 50) as f32 * 0.01);
+        h.deliver();
+    }
+    assert_eq!(h.rx.slots(), control::QUEUE, "the queue is full");
+    let seq = 6;
+    let p1 = registry::info_for("seq")
+        .unwrap()
+        .params
+        .iter()
+        .position(|p| p.name == "p1")
+        .unwrap();
+    let before = h.engine.active_mut().param_value(seq, p1).unwrap();
+    h.editor.set_param(seq, "p1", before + 7.0);
+    h.editor.set_param(CLOCK, "bpm", 90.0);
+    assert!(matches!(h.deliver(), Outcome::Values(2)));
+    let edits = h.d.rev();
+    h.ui.launches.push(Command::Launch(Launch::new(
+        CLOCK,
+        Timing::Now,
+        &[(seq, 1)],
+    )));
+    h.ui.transport.push((CLOCK, Transport::Restart));
+    h.deliver();
+    let mut callbacks = 0;
+    while Feedback::get(&h.fb.actions_taken) < 2 {
+        h.callback(0);
+        h.d.flush();
+        callbacks += 1;
+        assert!(callbacks < 20);
+        if Feedback::get(&h.fb.actions_taken) > 0 {
+            // Both edits were applied first (the bank step set, the tempo ramping to 90).
+            assert!(Feedback::get(&h.fb.applied_rev) >= edits);
+            assert_eq!(
+                h.engine.active_mut().param_value(seq, p1),
+                Some(before + 7.0)
+            );
+        }
+    }
+    assert_eq!(h.d.counts.dropped_actions, 0);
+    h.settle();
+    h.assert_engine_matches_document();
+}
+
+/// Review R-05: after a Load, a knob of the new document does not reach the graph of the old
+/// document while it fades out; the new graph takes it.
+#[test]
+fn a_new_documents_values_skip_the_outgoing_graph() {
+    let mut h = H::new();
+    h.settle();
+    let old = h.engine.active_mut().param_value(MIXER, 0).unwrap();
+    kabl_ui::browser::replace_patch(&mut h.editor, &mut h.ui, piece());
+    assert_eq!(h.deliver(), Outcome::Compiled);
+    h.callback(0); // the loaded graph arrives; the old one is still `active`, fading out
+    h.drag(MIXER, "level1", 0.77, true);
+    h.callback(1); // one block: a value taken by the old graph would have started ramping
+    assert_eq!(h.engine.active_mut().param_value(MIXER, 0), Some(old));
+    h.settle();
+    assert_eq!(h.engine.active_mut().param_value(MIXER, 0), Some(0.77));
 }

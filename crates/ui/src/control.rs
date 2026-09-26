@@ -6,15 +6,17 @@
 //!   (`kabl_engine::runtime::runtime_changes`): runtime values when only those changed, else a
 //!   compile. Mouse, CC, undo/redo, recipes and comparison restore all edit the document, so
 //!   they all arrive the same way.
-//! - **Order and bounds.** Graphs and values go through one FIFO in revision order. What does
-//!   not fit waits here: at most one graph (a newer one replaces it) and one value per target
-//!   (the newest), behind that graph. A graph subsumes every value before it. At most
-//!   `MAX_GRAPHS_QUEUED` graphs are in the queue at once. Nothing waiting is lost: `flush`
-//!   retries it, and past `MAX_HELD` targets a compile replaces them.
+//! - **Order and bounds.** Graphs, values, commands and transport go through one FIFO in
+//!   request order. What does not fit waits here: at most one graph (a newer one replaces it),
+//!   one value per target (the newest) and up to `MAX_HELD_ACTIONS` commands, behind that
+//!   graph. A graph subsumes every value before it. A command never overtakes a value or graph
+//!   requested before it. At most `MAX_GRAPHS_QUEUED` graphs are in the queue at once. No
+//!   waiting value is lost: `flush` retries it, and past `MAX_HELD` targets a compile replaces
+//!   them. A command past `MAX_HELD_ACTIONS` is refused and reported.
 //! - **MIDI without the editor.** `midi` applies CC mappings, pickup and buttons and delivers
 //!   the result; `main.rs` calls it from its control thread, never from a frame.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 use std::sync::Arc;
 
 use basedrop::{Handle, Owned};
@@ -32,6 +34,8 @@ pub const QUEUE: usize = 256;
 pub const MAX_GRAPHS_QUEUED: u64 = 2;
 /// Targets whose newest value may wait here; past it a compile carries them all.
 pub const MAX_HELD: usize = 1024;
+/// Commands and transport messages that may wait here; past it one is refused.
+pub const MAX_HELD_ACTIONS: usize = 64;
 
 /// What one `sync` did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -56,15 +60,14 @@ pub struct Counts {
     /// Compiles made because too many values waited.
     pub fallbacks: u64,
     pub failed: u64,
-    /// Launch, preview, inspect or transport commands the queue refused (audio not running).
+    /// Launch, preview, inspect or transport commands refused: `MAX_HELD_ACTIONS` already
+    /// waited (the audio thread is not taking them).
     pub dropped_actions: u64,
 }
 
 /// The control side of the audio queues.
 pub struct Delivery {
     tx: Option<rtrb::Producer<ToAudio>>,
-    commands: Option<rtrb::Producer<Command>>,
-    transport: Option<rtrb::Producer<(ModuleId, Transport)>>,
     handle: Handle,
     pub feedback: Arc<Feedback>,
     sample_rate: f32,
@@ -77,8 +80,12 @@ pub struct Delivery {
     sent: Option<PatchState>,
     held_graph: Option<Owned<CompiledPatch>>,
     held: BTreeMap<RuntimeTarget, ParamSet>,
+    /// Commands and transport in request order, each with the revision current when it was
+    /// requested: it goes after every waiting value up to that revision.
+    held_actions: VecDeque<(u64, ToAudio)>,
     graphs_sent: u64,
     values_sent: u64,
+    actions_sent: u64,
     pub compile_error: Option<String>,
     pub counts: Counts,
 }
@@ -86,11 +93,8 @@ pub struct Delivery {
 impl Delivery {
     /// `playing`: the document the audio thread's first graph was compiled from, at revision
     /// and generation 1.
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         tx: Option<rtrb::Producer<ToAudio>>,
-        commands: Option<rtrb::Producer<Command>>,
-        transport: Option<rtrb::Producer<(ModuleId, Transport)>>,
         handle: Handle,
         feedback: Arc<Feedback>,
         sample_rate: f32,
@@ -99,8 +103,6 @@ impl Delivery {
     ) -> Self {
         Delivery {
             tx,
-            commands,
-            transport,
             handle,
             feedback,
             sample_rate,
@@ -110,8 +112,10 @@ impl Delivery {
             sent: playing.cloned(),
             held_graph: None,
             held: BTreeMap::new(),
+            held_actions: VecDeque::new(),
             graphs_sent: 0,
             values_sent: 0,
+            actions_sent: 0,
             compile_error: None,
             counts: Counts::default(),
         }
@@ -200,6 +204,7 @@ impl Delivery {
             // No audio: nothing will take them.
             self.held_graph = None;
             self.held.clear();
+            self.held_actions.clear();
             return 0;
         };
         if let Some(g) = self.held_graph.take() {
@@ -216,10 +221,30 @@ impl Delivery {
                 Err(_) => unreachable!("pushed a graph"),
             }
         }
-        if !self.held.is_empty() {
-            let mut order: Vec<ParamSet> = self.held.values().copied().collect();
-            order.sort_by_key(|s| s.rev);
-            for s in order {
+        // Values and actions merged by revision: an action goes after every value requested
+        // before it (ties: the value, which was requested first).
+        let mut order: Vec<ParamSet> = self.held.values().copied().collect();
+        order.sort_by_key(|s| s.rev);
+        let mut values = order.into_iter().peekable();
+        loop {
+            let action_first = match (values.peek(), self.held_actions.front()) {
+                (_, None) => false,
+                (None, Some(_)) => true,
+                (Some(v), Some((rev, _))) => *rev < v.rev,
+            };
+            if action_first {
+                let (rev, a) = self.held_actions.pop_front().expect("peeked");
+                match tx.push(a) {
+                    Ok(()) => self.actions_sent += 1,
+                    Err(rtrb::PushError::Full(a)) => {
+                        self.held_actions.push_front((rev, a));
+                        break;
+                    }
+                }
+            } else {
+                let Some(s) = values.next() else {
+                    break;
+                };
                 if tx.push(ToAudio::Set(s)).is_err() {
                     break;
                 }
@@ -242,7 +267,7 @@ impl Delivery {
 
     /// Messages waiting to be sent.
     pub fn waiting(&self) -> usize {
-        self.held_graph.is_some() as usize + self.held.len()
+        self.held_graph.is_some() as usize + self.held.len() + self.held_actions.len()
     }
 
     /// Messages requested and not yet taken by the audio thread: waiting here or in the
@@ -250,16 +275,27 @@ impl Delivery {
     pub fn pending(&self) -> u64 {
         self.waiting() as u64 + self.graphs_queued() + self.values_sent
             - Feedback::get(&self.feedback.sets_taken)
+            + self.actions_sent
+            - Feedback::get(&self.feedback.actions_taken)
     }
 
-    /// Sends a runtime command; false when the queue refused it.
+    /// Queues a runtime command behind everything requested before it (`flush` sends it);
+    /// false when there is no audio or `MAX_HELD_ACTIONS` already wait.
     pub fn command(&mut self, c: Command) -> bool {
-        self.commands.as_mut().is_some_and(|q| q.push(c).is_ok())
+        self.action(ToAudio::Command(c))
     }
 
-    /// Sends a transport command; false when the queue refused it.
-    pub fn transport(&mut self, t: (ModuleId, Transport)) -> bool {
-        self.transport.as_mut().is_some_and(|q| q.push(t).is_ok())
+    /// Queues a transport command like `command`.
+    pub fn transport(&mut self, (id, t): (ModuleId, Transport)) -> bool {
+        self.action(ToAudio::Transport(id, t))
+    }
+
+    fn action(&mut self, a: ToAudio) -> bool {
+        if self.tx.is_none() || self.held_actions.len() >= MAX_HELD_ACTIONS {
+            return false;
+        }
+        self.held_actions.push_back((self.rev, a));
+        true
     }
 }
 
@@ -272,7 +308,6 @@ pub fn deliver(editor: &mut PatchEditor, ui_state: &mut UiState, d: &mut Deliver
         let stopped = std::mem::take(&mut ui_state.load_stopped);
         d.sync(editor.state(), fresh, stopped)
     } else {
-        d.flush();
         Outcome::Nothing
     };
     let mut refused = 0;
@@ -286,9 +321,10 @@ pub fn deliver(editor: &mut PatchEditor, ui_state: &mut UiState, d: &mut Deliver
             refused += 1;
         }
     }
+    d.flush();
     if refused > 0 && d.tx.is_some() {
         d.counts.dropped_actions += refused;
-        log::warn!(target: "control", "{refused} command(s) not delivered: the audio queue is full");
+        log::warn!(target: "control", "{refused} command(s) not delivered: {MAX_HELD_ACTIONS} already wait for the audio thread");
         ui_state.last_message = Some(format!(
             "{refused} action(s) not delivered: audio is not responding"
         ));

@@ -75,6 +75,9 @@ pub struct PatchEngine {
     report: Option<ProbeReport>,
     /// Revision of the newest graph received: an older one arriving later is refused.
     newest_rev: u64,
+    /// Revision of the newest fresh graph (a Load) received: graphs of an older document take
+    /// no runtime values (review R-05).
+    fresh_rev: u64,
 }
 
 /// Most notes one preview plays (a chord).
@@ -184,6 +187,7 @@ impl PatchEngine {
             rendered: 0,
             report: None,
             newest_rev: 0,
+            fresh_rev: 0,
         };
         e.probe_window = window_blocks(sample_rate);
         e.sync_keyboards();
@@ -211,6 +215,7 @@ impl PatchEngine {
             rendered: 0,
             report: None,
             newest_rev: 0,
+            fresh_rev: 0,
         };
         e.newest_rev = e.active.rev;
         e.probe_window = window_blocks(e.active.sample_rate());
@@ -400,6 +405,9 @@ impl PatchEngine {
             return;
         }
         self.newest_rev = new_patch.rev;
+        if new_patch.fresh {
+            self.fresh_rev = new_patch.rev;
+        }
         // An edit that replaces a queued fresh load is built on the loaded patch, so it must not
         // carry from the old one either.
         if let Some(p) = &self.pending {
@@ -803,13 +811,15 @@ impl PatchEngine {
         }
     }
 
-    /// Audio-thread call: a runtime value (`runtime.rs`) to every graph compiled from an
-    /// older revision: `active` and `incoming` (ramped when playing) and `pending` (set, it
-    /// has not started). Returns whether it resolved in any of them. No allocation.
+    /// Audio-thread call: a runtime value (`runtime.rs`) to every graph of the current
+    /// document compiled from an older revision: `active` and `incoming` (ramped when playing)
+    /// and `pending` (set, it has not started). A graph of a document a Load replaced takes
+    /// nothing. Returns whether it resolved in any of them. No allocation.
     pub fn set(&mut self, s: &ParamSet) -> bool {
         let mut hit = false;
+        let fresh_rev = self.fresh_rev;
         let mut apply = |g: &mut CompiledPatch| {
-            if s.rev > g.rev {
+            if s.rev > g.rev && g.rev >= fresh_rev {
                 let ramp = g.started();
                 hit |= g.set_runtime(s.target, s.value, ramp);
             }
@@ -825,7 +835,7 @@ impl PatchEngine {
     }
 
     /// Audio-thread call: takes at most `max` messages from the control queue, in order:
-    /// graphs through `receive_swap`, values through `set`. Reports in `fb`. Bounded work: the
+    /// graphs through `receive_swap`, values through `set`, commands and transport. Reports in `fb`. Bounded work: the
     /// rest waits for the next callback. No allocation.
     pub fn drain(&mut self, rx: &mut rtrb::Consumer<ToAudio>, max: usize, fb: &Feedback) {
         use std::sync::atomic::Ordering::Relaxed;
@@ -851,6 +861,14 @@ impl PatchEngine {
                     } else {
                         fb.unresolved.fetch_add(1, Relaxed);
                     }
+                }
+                ToAudio::Command(c) => {
+                    self.command(&c);
+                    fb.actions_taken.fetch_add(1, Relaxed);
+                }
+                ToAudio::Transport(id, t) => {
+                    self.transport(id, t);
+                    fb.actions_taken.fetch_add(1, Relaxed);
                 }
             }
         }

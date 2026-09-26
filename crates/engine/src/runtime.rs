@@ -7,8 +7,8 @@
 //!   when it is newer than the revision the graph was compiled from (`CompiledPatch::rev`), so
 //!   a delayed value cannot overwrite a newer graph, and a graph of another document (a higher
 //!   revision) never takes an old one. The kind check stops a reused id of another kind.
-//! - **Order.** Values and graphs share one FIFO queue (`ToAudio`), filled by one producer in
-//!   revision order; a graph subsumes every value before it.
+//! - **Order.** Graphs, values, commands and transport share one FIFO queue (`ToAudio`),
+//!   filled by one producer in request order; a graph subsumes every value before it.
 //! - **Classification.** `runtime_changes` diffs two document states the way the compiler
 //!   reads them (effective values: stored, legacy alias, else default). Only values of
 //!   runtime params and route amounts changed: those values. Anything else (modules, cables,
@@ -21,6 +21,8 @@ use kabl_core::{CableId, ModuleId, PatchState, PortRef};
 use kabl_modules::{registry, ModuleInfo};
 
 use crate::compile::{CompiledPatch, DEFAULT_ROUTE_AMOUNT};
+use crate::patch_engine::Command;
+use kabl_modules::builtins::Transport;
 
 /// What a runtime value changes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -43,11 +45,17 @@ pub struct ParamSet {
     pub value: f32,
 }
 
-/// The control thread's queue to the audio thread: graphs and runtime values, in revision
-/// order. The audio thread drops what it pops without freeing: a graph goes to the collector.
+/// The control thread's queue to the audio thread: graphs, runtime values, commands and
+/// transport, in request order. The audio thread drops what it pops without freeing: a graph
+/// goes to the collector.
+#[allow(clippy::large_enum_variant)]
 pub enum ToAudio {
     Graph(Owned<CompiledPatch>),
     Set(ParamSet),
+    /// A launch, preview or inspect command (`PatchEngine::command`).
+    Command(Command),
+    /// A clock transport command (`PatchEngine::transport`).
+    Transport(ModuleId, Transport),
 }
 
 /// What the audio thread reports back (relaxed atomics, written by `PatchEngine::drain`).
@@ -63,6 +71,8 @@ pub struct Feedback {
     pub unresolved: AtomicU64,
     /// Graphs refused because a newer one had already arrived.
     pub stale_graphs: AtomicU64,
+    /// Commands and transport messages taken from the queue.
+    pub actions_taken: AtomicU64,
 }
 
 impl Feedback {

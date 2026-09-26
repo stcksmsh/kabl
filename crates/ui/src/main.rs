@@ -20,10 +20,10 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use kabl_core::{ModuleId, PatchState};
 use kabl_engine::graph::BLOCK;
 use kabl_engine::keyboard::KeyEvent;
-use kabl_engine::patch_engine::{Command, PatchEngine};
+use kabl_engine::patch_engine::PatchEngine;
 use kabl_engine::probe::ProbeReport;
 use kabl_engine::runtime::{Feedback, ToAudio};
-use kabl_modules::builtins::{DelayLock, LfoSync, Transport};
+use kabl_modules::builtins::{DelayLock, LfoSync};
 use kabl_standalone::{default_patch, RingBuffer, DEFAULT_VOICE_COUNT};
 use kabl_ui::control::{self, Delivery};
 use kabl_ui::{record, show, PatchEditor, UiState};
@@ -310,8 +310,6 @@ impl AudioHost {
     fn offline_delivery(&self, patch: &PatchState) -> Delivery {
         Delivery::new(
             None,
-            None,
-            None,
             self.collector.handle(),
             Arc::new(Feedback::default()),
             self.sample_rate,
@@ -429,8 +427,6 @@ impl AudioHost {
         let (mut clocks_tx, clocks_rx) = rtrb::RingBuffer::<(ModuleId, bool)>::new(64);
         let (mut delays_tx, delays_rx) = rtrb::RingBuffer::<(ModuleId, DelayLock, f32)>::new(64);
         let (mut lfos_tx, lfos_rx) = rtrb::RingBuffer::<(ModuleId, LfoSync)>::new(128);
-        let (transport_tx, mut transport_rx) = rtrb::RingBuffer::<(ModuleId, Transport)>::new(64);
-        let (command_tx, mut command_rx) = rtrb::RingBuffer::<Command>::new(64);
 
         let mut left_ring = RingBuffer::new(RING_CAPACITY);
         let mut right_ring = RingBuffer::new(RING_CAPACITY);
@@ -462,9 +458,9 @@ impl AudioHost {
                 let started = std::time::Instant::now();
                 let since_last = last_start.map(|l| started - l);
                 last_start = Some(started);
-                // Audio thread. No allocation, no locks: install queued graphs and runtime
-                // values in order (state carry and values are allocation-free, at most one
-                // queue's worth per callback), apply MIDI to every running graph, render.
+                // Audio thread. No allocation, no locks: install queued graphs, runtime values,
+                // commands and transport in request order (allocation-free, at most one queue's
+                // worth per callback), apply MIDI to every running graph, render.
                 engine.drain(&mut control_rx, control::QUEUE, &fb);
                 if measure {
                     let a = Feedback::get(&fb.applied_rev);
@@ -475,12 +471,6 @@ impl AudioHost {
                 }
                 while let Ok(event) = midi_consumer.pop() {
                     engine.key(event);
-                }
-                while let Ok((id, t)) = transport_rx.pop() {
-                    engine.transport(id, t);
-                }
-                while let Ok(c) = command_rx.pop() {
-                    engine.command(&c);
                 }
 
                 let frames_needed = data.len() / channels;
@@ -557,8 +547,6 @@ impl AudioHost {
         };
         let delivery = Delivery::new(
             stream.is_some().then_some(control_tx),
-            stream.is_some().then_some(command_tx),
-            stream.is_some().then_some(transport_tx),
             collector.handle(),
             feedback,
             sample_rate,
