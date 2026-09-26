@@ -56,6 +56,8 @@ impl H {
             egui::UiBuilder::new().max_rect(Rect::from_min_size(Pos2::ZERO, self.size)),
         );
         show(&mut self.editor, &mut self.ui, &mut root);
+        // What the control thread does every few milliseconds.
+        perform::rearm(&mut self.ui, self.t);
         let _ = self.ctx.end_pass();
     }
 
@@ -90,8 +92,9 @@ impl H {
         self.frame();
     }
 
+    /// A CC through the control layer (no frame needed), then a frame to draw it.
     fn cc(&mut self, ch: u8, cc: u8, v: u8) {
-        self.ui.midi_cc.push((ch, cc, v));
+        perform::apply_cc(&mut self.editor, &mut self.ui, &[(ch, cc, v)], self.t);
         self.t += 0.02;
         self.frame();
     }
@@ -498,8 +501,13 @@ fn simultaneous_cc_turns_undo_together_and_keep_final_values() {
     let entries = h.editor.log().entries().len();
     // Both knobs turned together: messages interleave, several per frame.
     for k in 1..=20u8 {
-        h.ui.midi_cc.push((0, 1, mix0 + k));
-        h.ui.midi_cc.push((0, 2, fb0 - k));
+        let t = h.t;
+        perform::apply_cc(
+            &mut h.editor,
+            &mut h.ui,
+            &[(0, 1, mix0 + k), (0, 2, fb0 - k)],
+            t,
+        );
         h.t += 0.01;
         h.frame();
     }
@@ -513,7 +521,10 @@ fn simultaneous_cc_turns_undo_together_and_keep_final_values() {
             .unwrap()
     };
     assert_eq!(mix, p("delay", "mix").from_norm((mix0 + 20) as f32 / 127.0));
-    assert_eq!(fb, p("delay", "feedback").from_norm((fb0 - 20) as f32 / 127.0));
+    assert_eq!(
+        fb,
+        p("delay", "feedback").from_norm((fb0 - 20) as f32 / 127.0)
+    );
     assert_eq!(h.editor.log().entries().len(), entries + 1, "one undo step");
     h.editor.undo();
     assert_eq!(
@@ -521,7 +532,10 @@ fn simultaneous_cc_turns_undo_together_and_keep_final_values() {
         (mix_before, fb_before)
     );
     h.editor.redo();
-    assert_eq!((h.value(DELAY, "mix"), h.value(DELAY, "feedback")), (mix, fb));
+    assert_eq!(
+        (h.value(DELAY, "mix"), h.value(DELAY, "feedback")),
+        (mix, fb)
+    );
 }
 
 #[test]
@@ -548,7 +562,13 @@ fn the_demo_controls_fit_together_at_1280() {
             }
             rects.push(r);
         }
-        for k in ["rec-start", "midi-input", "notes-off", "prun:1", "prestart:1"] {
+        for k in [
+            "rec-start",
+            "midi-input",
+            "notes-off",
+            "prun:1",
+            "prestart:1",
+        ] {
             assert!(screen.contains_rect(h.rect(k)), "{w}: {k}");
         }
         // The rack keeps a usable height.

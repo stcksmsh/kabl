@@ -209,15 +209,27 @@ pub fn sync_takeover(editor: &PatchEditor, ui_state: &mut UiState) {
     });
 }
 
-/// Applies incoming CC messages `(channel, controller, value)`: a pending learn takes the
-/// first one; otherwise each drives the params mapped to it.
-pub fn apply_cc(editor: &mut PatchEditor, ui_state: &mut UiState, now: f64) {
-    let events = std::mem::take(&mut ui_state.midi_cc);
+/// After a (re)connect (`UiState::button_rearm`): forget button states and start the guard
+/// from `now`. The control thread calls it every few milliseconds, so the guard starts at the
+/// connect, not at the first message.
+pub fn rearm(ui_state: &mut UiState, now: f64) {
     if std::mem::take(&mut ui_state.button_rearm) {
         ui_state.button_high.clear();
         ui_state.button_guard = now + BUTTON_GUARD_S;
     }
-    for (ch, cc, value) in events {
+}
+
+/// Applies incoming CC messages `(channel, controller, value)`: a pending learn takes the
+/// first one; otherwise each drives the params mapped to it. Runs on the control thread
+/// (`control::midi`), not in an editor frame; `now` is seconds on one steady clock.
+pub fn apply_cc(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    events: &[(u8, u8, u8)],
+    now: f64,
+) {
+    rearm(ui_state, now);
+    for &(ch, cc, value) in events {
         let hw = value.min(127) as f32 / 127.0;
         let high = value >= 64;
         let was_high = ui_state.button_high.insert((ch, cc), high).unwrap_or(false);
@@ -428,17 +440,9 @@ fn fire(editor: &PatchEditor, ui_state: &mut UiState, id: ModuleId, action: &str
                 "cancel" => ui_state
                     .launches
                     .push(kabl_engine::patch_engine::Command::Cancel(None)),
-                "run" => {
-                    let running = ui_state.clock_running.get(&id).copied().unwrap_or(true);
-                    ui_state.transport.push((
-                        id,
-                        if running {
-                            Transport::Stop
-                        } else {
-                            Transport::Run
-                        },
-                    ));
-                }
+                // Decided on the audio thread from the clock's state: a report the UI has not
+                // drawn yet cannot make the button do the wrong thing.
+                "run" => ui_state.transport.push((id, Transport::Toggle)),
                 "restart" => ui_state.transport.push((id, Transport::Restart)),
                 _ => {}
             }

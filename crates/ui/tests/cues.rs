@@ -52,11 +52,14 @@ impl H {
                 .max_rect(Rect::from_min_size(Pos2::ZERO, egui::vec2(1440.0, 900.0))),
         );
         show(&mut self.editor, &mut self.ui, &mut root);
+        // What the control thread does every few milliseconds.
+        kabl_ui::perform::rearm(&mut self.ui, self.t);
         let _ = self.ctx.end_pass();
     }
 
+    /// A CC through the control layer, then a frame.
     fn cc(&mut self, cc: u8, v: u8) {
-        self.ui.midi_cc.push((0, cc, v));
+        kabl_ui::perform::apply_cc(&mut self.editor, &mut self.ui, &[(0, cc, v)], self.t);
         self.frame();
     }
 

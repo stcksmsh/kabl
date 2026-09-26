@@ -14,6 +14,7 @@
 pub mod banks;
 pub mod browser;
 pub mod compare;
+pub mod control;
 pub mod cues;
 pub mod editor;
 pub mod explain;
@@ -216,8 +217,6 @@ pub struct UiState {
     pub pin_reveal: Option<(ModuleId, String)>,
     /// The mapping a CC gesture is on and when its last message came (seconds, egui time).
     pub(crate) cc_gesture: Option<((ModuleId, String), f64)>,
-    /// Incoming MIDI CC `(channel, controller, value)` for the next frame, fed by `main.rs`.
-    pub midi_cc: Vec<(u8, u8, u8)>,
     /// MIDI input ports seen, the connected one, and a switch the user asked for.
     pub midi_inputs: Vec<String>,
     pub midi_input: Option<String>,
@@ -316,7 +315,6 @@ impl Default for UiState {
             midi_note: None,
             all_notes_off: false,
             cc_gesture: None,
-            midi_cc: Vec::new(),
             midi_inputs: Vec::new(),
             midi_input: None,
             midi_select: None,
@@ -517,7 +515,8 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     {
         ui_state.explain.close();
     }
-    perform::apply_cc(editor, ui_state, now);
+    // MIDI CCs are applied by the control layer (`control::midi`), not here: pickup only
+    // follows edits made in this frame.
     perform::sync_takeover(editor, ui_state);
     if !ui.input(|i| i.pointer.any_down()) {
         ui_state.drag = None;

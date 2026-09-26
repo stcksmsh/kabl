@@ -2,24 +2,30 @@
 //! over the real op log) with the same `cpal`/`midir` wiring `kabl-standalone` uses, so editing a
 //! patch here and hearing the result are the same window, not a separate player process.
 //!
-//! **Audio handoff is lock-free.** The audio callback owns the `PatchEngine` outright. The UI
-//! thread compiles each edit, wraps it for deferred drop (`basedrop::Owned`) and pushes it into
-//! a bounded `rtrb` queue (`SWAP_QUEUE`). The callback drains the queue and installs each graph
-//! with `PatchEngine::receive_swap`, which carries state from the playing graph without
-//! allocating. No mutex, so an edit can never silence a block. If the queue is full, `SwapSender`
-//! keeps only the newest unsent graph and retries next frame (older unsent ones are superseded).
-//! Retired graphs are freed on the UI thread by `Collector::collect()` every frame.
+//! **Audio handoff is lock-free.** The audio callback owns the `PatchEngine` outright. Document
+//! changes go through `kabl_ui::control::Delivery`: runtime values when only knob values or
+//! route amounts changed, else a compiled graph wrapped for deferred drop (`basedrop::Owned`),
+//! both through one bounded `rtrb` queue in revision order. The callback takes a bounded number
+//! of messages per call (`PatchEngine::drain`); state carry and value changes are
+//! allocation-free. No mutex on the audio thread. Retired graphs are freed on the UI thread by
+//! `Collector::collect()` every frame.
+//!
+//! **Control without the editor (D04).** The document, the UI state and the delivery live in
+//! one `Core` behind a mutex that only non-audio threads take: the UI for a frame, and the
+//! control thread (`pump`) for MIDI CCs and retries. MIDI mappings, pickup and buttons run
+//! there, so they reach the audio whether or not a frame is drawn.
 
-use basedrop::{Collector, Owned};
+use basedrop::Collector;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use kabl_core::{ModuleId, PatchState};
-use kabl_engine::compile::compile;
 use kabl_engine::graph::BLOCK;
 use kabl_engine::keyboard::KeyEvent;
-use kabl_engine::patch_engine::{swap_channel, Command, PatchEngine, SwapSender};
+use kabl_engine::patch_engine::{Command, PatchEngine};
 use kabl_engine::probe::ProbeReport;
+use kabl_engine::runtime::{Feedback, ToAudio};
 use kabl_modules::builtins::{DelayLock, LfoSync, Transport};
 use kabl_standalone::{default_patch, RingBuffer, DEFAULT_VOICE_COUNT};
+use kabl_ui::control::{self, Delivery};
 use kabl_ui::{record, show, PatchEditor, UiState};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -29,17 +35,12 @@ const RING_CAPACITY: usize = BLOCK * 256;
 /// (sequencer, step, playing bank, queued bank).
 type SeqReport = (ModuleId, usize, usize, Option<usize>);
 
-/// Graphs in flight from the UI thread to the audio callback. The callback drains it every
-/// callback, so it only fills if the audio thread stalls; see `AudioHost::flush`.
-const SWAP_QUEUE: usize = 4;
-
 /// Owns everything audio-related: the swap queue's producer, the stream, the MIDI connection,
 /// and the `basedrop` collector that frees retired graphs. Lives inside `App`.
 struct AudioHost {
     /// Dropped first (fields drop in declaration order): the audio thread stops before the
     /// queues it feeds are torn down.
     _stream: Option<cpal::Stream>,
-    swap_tx: Option<SwapSender>,
     sample_rate: f32,
     collector: Collector,
     status: String,
@@ -52,10 +53,6 @@ struct AudioHost {
     lfos_rx: Option<rtrb::Consumer<(ModuleId, LfoSync)>>,
     /// Each delay's lock state and target time, published by the audio callback.
     delays_rx: Option<rtrb::Consumer<(ModuleId, DelayLock, f32)>>,
-    /// Transport commands to the audio callback (runtime only, never in the op log).
-    transport_tx: Option<rtrb::Producer<(ModuleId, Transport)>>,
-    /// Bank launches and cancels to the audio callback (runtime only).
-    command_tx: Option<rtrb::Producer<Command>>,
     recorder: Option<record::Recorder>,
     timing: Option<Arc<CallbackTiming>>,
     /// Selected-signal measurements from the audio callback (D03).
@@ -65,10 +62,6 @@ struct AudioHost {
     /// producer in its error callback) goes first on teardown: queued errors are then freed
     /// here, with this consumer, not on the exiting audio thread.
     faults_rx: Option<rtrb::Consumer<cpal::Error>>,
-    /// Graph generation of the last rebuild attempt (`CompiledPatch::generation`).
-    generation: u64,
-    /// The last rebuild's compile error, if it failed.
-    compile_error: Option<String>,
 }
 
 /// Audio-callback telemetry, written by the callback (and the stream's error callback) with
@@ -295,7 +288,6 @@ impl CallbackTiming {
 impl AudioHost {
     fn offline(collector: Collector, status: String) -> Self {
         AudioHost {
-            swap_tx: None,
             sample_rate: 48000.0,
             collector,
             status,
@@ -303,19 +295,30 @@ impl AudioHost {
             clocks_rx: None,
             delays_rx: None,
             lfos_rx: None,
-            transport_tx: None,
-            command_tx: None,
             recorder: None,
             timing: None,
             probe_rx: None,
             faults_rx: None,
-            generation: 1,
-            compile_error: None,
             _stream: None,
         }
     }
 
+    /// The control side for an offline host: nothing is sent.
+    fn offline_delivery(&self, patch: &PatchState) -> Delivery {
+        Delivery::new(
+            None,
+            None,
+            None,
+            self.collector.handle(),
+            Arc::new(Feedback::default()),
+            self.sample_rate,
+            DEFAULT_VOICE_COUNT,
+            Some(patch),
+        )
+    }
+
     /// `rate`/`frames`: a sample rate and a fixed callback size to ask the device for.
+    /// Returns the host and the control side of its queues.
     fn start(
         patch: &PatchState,
         notes: rtrb::Consumer<KeyEvent>,
@@ -324,7 +327,7 @@ impl AudioHost {
         frames: Option<u32>,
         realtime: bool,
         peaks: Arc<record::PeakTap>,
-    ) -> Self {
+    ) -> (Self, Delivery) {
         let mut midi_consumer = notes;
         let collector = Collector::new();
         let handle = collector.handle();
@@ -333,10 +336,12 @@ impl AudioHost {
         log::info!(target: "audio", "backend={:?} requested rate={rate:?} frames={frames:?} rt={realtime}", host.id());
         let Some(device) = host.default_output_device() else {
             log::warn!(target: "audio", "no output device: editing only, no playback");
-            return Self::offline(
+            let a = Self::offline(
                 collector,
                 "no audio output device found -- editing works, playback won't".into(),
             );
+            let d = a.offline_delivery(patch);
+            return (a, d);
         };
         // Stereo first: the first matching config can be a mono one, which would fold the mix.
         let f32_at = |r: u32| {
@@ -356,13 +361,15 @@ impl AudioHost {
         };
         let Some(config) = config else {
             log::warn!(target: "audio", "no usable f32 output config (rate {rate:?}): no playback");
-            return Self::offline(
+            let a = Self::offline(
                 collector,
                 format!(
                     "no usable f32 audio output config{} -- editing works, playback won't",
                     rate.map_or(String::new(), |r| format!(" at {r} Hz"))
                 ),
             );
+            let d = a.offline_delivery(patch);
+            return (a, d);
         };
         let mut stream_config = config.config();
         if let Some(n) = frames {
@@ -382,15 +389,22 @@ impl AudioHost {
             Ok(e) => e,
             Err(err) => {
                 log::error!(target: "audio", "startup patch failed to compile: {err}");
-                return Self::offline(collector, format!("patch failed to compile: {err}"));
+                let a = Self::offline(collector, format!("patch failed to compile: {err}"));
+                // Nothing plays: the next edit compiles from scratch.
+                let mut d = a.offline_delivery(patch);
+                d.compile_error = Some(err.to_string());
+                return (a, d);
             }
         };
         engine.active_mut().generation = 1;
+        engine.active_mut().rev = 1;
         let (mut probe_tx, probe_rx) = rtrb::RingBuffer::<ProbeReport>::new(8);
         let (mut faults_tx, faults_rx) =
             rtrb::RingBuffer::<cpal::Error>::new(kabl_standalone::STREAM_ERROR_QUEUE);
 
-        let (swap_tx, mut swap_rx) = swap_channel(SWAP_QUEUE);
+        let (control_tx, mut control_rx) = rtrb::RingBuffer::<ToAudio>::new(control::QUEUE);
+        let feedback = Arc::new(Feedback::default());
+        let fb = feedback.clone();
         // Test hooks: a small ring forces lost frames, a failure point forces a write error.
         let ring_frames = std::env::var("KABL_RECORD_RING_FRAMES")
             .ok()
@@ -440,9 +454,10 @@ impl AudioHost {
                 let started = std::time::Instant::now();
                 let since_last = last_start.map(|l| started - l);
                 last_start = Some(started);
-                // Audio thread. No allocation, no locks: install queued graphs (state carry is
-                // allocation-free), apply MIDI to every running graph, render.
-                engine.drain_swaps(&mut swap_rx);
+                // Audio thread. No allocation, no locks: install queued graphs and runtime
+                // values in order (state carry and values are allocation-free, at most one
+                // queue's worth per callback), apply MIDI to every running graph, render.
+                engine.drain(&mut control_rx, control::QUEUE, &fb);
                 while let Ok(event) = midi_consumer.pop() {
                     engine.key(event);
                 }
@@ -525,8 +540,17 @@ impl AudioHost {
             },
             Err(err) => (None, format!("failed to build audio stream: {err}")),
         };
-        AudioHost {
-            swap_tx: Some(swap_tx),
+        let delivery = Delivery::new(
+            stream.is_some().then_some(control_tx),
+            stream.is_some().then_some(command_tx),
+            stream.is_some().then_some(transport_tx),
+            collector.handle(),
+            feedback,
+            sample_rate,
+            DEFAULT_VOICE_COUNT,
+            Some(patch),
+        );
+        let host = AudioHost {
             sample_rate,
             collector,
             status,
@@ -534,60 +558,59 @@ impl AudioHost {
             clocks_rx: Some(clocks_rx),
             delays_rx: Some(delays_rx),
             lfos_rx: Some(lfos_rx),
-            transport_tx: Some(transport_tx),
-            command_tx: Some(command_tx),
             recorder: stream.is_some().then_some(recorder),
             timing: stream.is_some().then_some(timing),
             probe_rx: stream.is_some().then_some(probe_rx),
             faults_rx: stream.is_some().then_some(faults_rx),
-            generation: 1,
-            compile_error: None,
             _stream: stream,
-        }
-    }
-
-    /// UI-thread call: compiles `patch` and queues it for the audio thread. A `fresh` graph (a
-    /// Load) carries no state from the playing one; `stopped`: its clocks start stopped (a
-    /// piece opened from the browser waits for Start).
-    fn rebuild(&mut self, patch: &PatchState, fresh: bool, stopped: bool) {
-        self.generation += 1;
-        let started = std::time::Instant::now();
-        let mut new_patch = match compile(patch, self.sample_rate, DEFAULT_VOICE_COUNT) {
-            Ok(p) => p,
-            Err(err) => {
-                log::warn!(target: "graph", "compile failed generation={} error={err}; audio keeps the previous graph", self.generation);
-                self.status = format!("recompile failed: {err}");
-                self.compile_error = Some(err.to_string());
-                return;
-            }
         };
-        self.compile_error = None;
-        log::debug!(
-            target: "graph",
-            "compiled generation={} fresh={fresh} modules={} took_us={}",
-            self.generation,
-            patch.modules.len(),
-            started.elapsed().as_micros()
-        );
-        new_patch.generation = self.generation;
-        new_patch.fresh = fresh;
-        if stopped {
-            let mut clocks = Vec::new();
-            new_patch.clocks(|id, _| clocks.push(id));
-            for id in clocks {
-                new_patch.transport(id, Transport::Stop);
-            }
-        }
-        if let Some(tx) = self.swap_tx.as_mut() {
-            tx.send(Owned::new(&self.collector.handle(), new_patch));
-        }
+        (host, delivery)
     }
+}
 
-    /// UI-thread, once per frame: retry a waiting graph and free retired ones.
-    fn tick(&mut self) -> bool {
-        let waiting = self.swap_tx.as_mut().is_some_and(|tx| tx.flush());
-        self.collector.collect();
-        waiting
+/// The document, the UI state and the control side of the audio queues: one lock, taken by
+/// the UI for a frame and by the control thread for MIDI CCs and retries, never by audio.
+struct Core {
+    editor: PatchEditor,
+    ui: UiState,
+    delivery: Delivery,
+}
+
+/// Seconds since the process started: the control layer's steady clock (CC gestures, the
+/// button guard).
+fn clock_s() -> f64 {
+    static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    START
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_secs_f64()
+}
+
+/// The control thread: applies MIDI CCs (mappings, pickup, buttons) and retries whatever waits
+/// for the audio queue, without an editor frame. Woken by the MIDI input for each CC, and every
+/// few milliseconds while something waits.
+fn pump(core: Arc<Mutex<Core>>, mut cc: rtrb::Consumer<(u8, u8, u8)>) {
+    let mut events = Vec::with_capacity(64);
+    loop {
+        std::thread::park_timeout(std::time::Duration::from_millis(5));
+        events.clear();
+        while let Ok(e) = cc.pop() {
+            events.push(e);
+        }
+        let Ok(mut c) = core.lock() else {
+            return;
+        };
+        let Core {
+            editor,
+            ui,
+            delivery,
+        } = &mut *c;
+        kabl_ui::perform::rearm(ui, clock_s());
+        if !events.is_empty() {
+            control::midi(editor, ui, delivery, &events, clock_s());
+        } else if delivery.waiting() > 0 {
+            delivery.flush();
+        }
     }
 }
 
@@ -598,6 +621,8 @@ struct MidiSink {
     notes: rtrb::Producer<KeyEvent>,
     cc: rtrb::Producer<(u8, u8, u8)>,
     ctx: Option<egui::Context>,
+    /// The control thread (`pump`), woken for each CC.
+    pump: Option<std::thread::Thread>,
 }
 
 /// CCs that are key events, never learnable: sustain pedal, All Sound Off, All Notes Off.
@@ -620,6 +645,9 @@ fn on_message(s: &mut MidiSink, data: &[u8]) {
         let _ = s.notes.push(e);
     } else if data.len() >= 3 && data[0] & 0xF0 == 0xB0 && !is_key_cc(data[1]) {
         let _ = s.cc.push((data[0] & 0x0F, data[1], data[2]));
+        if let Some(p) = &s.pump {
+            p.unpark();
+        }
         if let Some(ctx) = &s.ctx {
             ctx.request_repaint();
         }
@@ -666,7 +694,6 @@ struct Midi {
     /// Stop flag of the `KABL_MIDI_PIPE` reader, when that is the input.
     pipe: Option<Arc<std::sync::atomic::AtomicBool>>,
     port: Option<String>,
-    cc_rx: rtrb::Consumer<(u8, u8, u8)>,
     /// Keys held and voices sounding (`pack_keys`), from the audio thread.
     keys: Arc<AtomicU64>,
     ports: Vec<String>,
@@ -691,23 +718,25 @@ fn input_names() -> Vec<String> {
 }
 
 impl Midi {
-    fn new(notes: rtrb::Producer<KeyEvent>) -> Self {
+    /// Also returns the CC queue's consumer, for the control thread.
+    fn new(notes: rtrb::Producer<KeyEvent>) -> (Self, rtrb::Consumer<(u8, u8, u8)>) {
         let (cc, cc_rx) = rtrb::RingBuffer::new(1024);
-        Midi {
+        let m = Midi {
             sink: Arc::new(Mutex::new(MidiSink {
                 notes,
                 cc,
                 ctx: None,
+                pump: None,
             })),
             conn: None,
             pipe: None,
             port: None,
-            cc_rx,
             keys: Arc::new(AtomicU64::new(0)),
             ports: Vec::new(),
             scanned: None,
             lost: None,
-        }
+        };
+        (m, cc_rx)
     }
 
     fn disconnect(&mut self) {
@@ -812,8 +841,9 @@ fn reset_pickup(ui: &mut UiState) {
 }
 
 struct App {
-    editor: PatchEditor,
-    ui_state: UiState,
+    core: Arc<Mutex<Core>>,
+    /// `Delivery::generation` the inspector last heard about.
+    seen_generation: u64,
     audio: AudioHost,
     midi: Midi,
     /// `KABL_HITS_FILE`: where to write the drawn target rects (for scripted real-input runs).
@@ -942,6 +972,16 @@ impl App {
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        // The whole frame edits under the core lock; the control thread waits meanwhile.
+        let core = self.core.clone();
+        let Ok(mut core) = core.lock() else {
+            return;
+        };
+        let Core {
+            editor,
+            ui: ui_state,
+            delivery,
+        } = &mut *core;
         // Ctrl+Q quits the normal way (the recorder finalizes its take on the way out).
         if ui.input_mut(|i| {
             i.consume_shortcut(&egui::KeyboardShortcut::new(
@@ -954,7 +994,7 @@ impl eframe::App for App {
         egui::Panel::bottom("kabl-status").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label("Out");
-                kabl_ui::record::meter_ui(ui, &mut self.ui_state.meter);
+                kabl_ui::record::meter_ui(ui, &mut ui_state.meter);
                 ui.separator();
                 ui.label(&self.audio.status);
                 if let Some(log) = &self.log {
@@ -966,10 +1006,10 @@ impl eframe::App for App {
                         problem.unwrap_or_else(|| log.path.display().to_string()),
                         log.level
                     ));
-                    self.ui_state.record("log-path".into(), r.rect);
+                    ui_state.record("log-path".into(), r.rect);
                     if r.clicked() {
                         ui.ctx().copy_text(log.path.display().to_string());
-                        self.ui_state.last_message =
+                        ui_state.last_message =
                             Some(format!("log path copied: {}", log.path.display()));
                     }
                 }
@@ -983,7 +1023,7 @@ impl eframe::App for App {
         });
         // Measurements for the inspector: only the newest few matter.
         let now = ui.input(|i| i.time);
-        self.ui_state.inspect.audio = self.audio.timing.is_some();
+        ui_state.inspect.audio = self.audio.timing.is_some();
         if let Some(rx) = self.audio.probe_rx.as_mut() {
             // Aged on the audio clock: a report that waited in the queue (the UI stalled) is
             // not fresh just because it was read now.
@@ -995,7 +1035,7 @@ impl eframe::App for App {
             while let Ok(r) = rx.pop() {
                 let age =
                     played.saturating_sub(r.end_sample) as f64 / self.audio.sample_rate as f64;
-                self.ui_state.inspect.accept(r, now, age);
+                ui_state.inspect.accept(r, now, age);
             }
         }
         self.log_health();
@@ -1004,28 +1044,25 @@ impl eframe::App for App {
             let p = self.log.as_ref().and_then(|l| l.problem());
             if p.is_some() && p != self.health.log_problem {
                 // Shown once per change, never per line.
-                self.ui_state.last_message = p.clone();
+                ui_state.last_message = p.clone();
             }
             self.health.log_problem = p;
         }
         if let Some(rx) = self.audio.steps_rx.as_mut() {
             while let Ok((id, step, bank, queued)) = rx.pop() {
-                self.ui_state.seq_steps.insert(id, step);
-                self.ui_state.seq_banks.insert(id, (bank, queued));
+                ui_state.seq_steps.insert(id, step);
+                ui_state.seq_banks.insert(id, (bank, queued));
             }
         }
         if let Some(rx) = self.audio.clocks_rx.as_mut() {
             while let Ok((id, running)) = rx.pop() {
-                self.ui_state.clock_running.insert(id, running);
+                ui_state.clock_running.insert(id, running);
             }
         }
-        while let Ok(cc) = self.midi.cc_rx.pop() {
-            self.ui_state.midi_cc.push(cc);
-        }
-        if let Some(pick) = self.ui_state.midi_select.take() {
+        if let Some(pick) = ui_state.midi_select.take() {
             self.midi.lost = None;
-            self.ui_state.midi_note = None;
-            reset_pickup(&mut self.ui_state);
+            ui_state.midi_note = None;
+            reset_pickup(ui_state);
             let r = match pick {
                 Some(name) => self.midi.connect(&name),
                 None => {
@@ -1034,7 +1071,7 @@ impl eframe::App for App {
                 }
             };
             if let Err(e) = r {
-                self.ui_state.last_message = Some(e);
+                ui_state.last_message = Some(e);
             }
         }
         if self
@@ -1052,9 +1089,9 @@ impl eframe::App for App {
                     self.midi.disconnect();
                     self.midi.lost = Some(port.clone());
                     log::warn!(target: "midi", "input \"{port}\" disappeared: its notes were released");
-                    self.ui_state.midi_note =
+                    ui_state.midi_note =
                         Some(format!("\"{port}\" disconnected: its notes were released"));
-                    reset_pickup(&mut self.ui_state);
+                    reset_pickup(ui_state);
                 }
             } else if let Some(port) = self.midi.lost.clone() {
                 // ALSA renumbers a replugged device's client (`… 24:0` → `… 28:0`).
@@ -1066,15 +1103,15 @@ impl eframe::App for App {
                     .cloned();
                 if let Some(now) = back.filter(|n| self.midi.connect(n).is_ok()) {
                     self.midi.lost = None;
-                    self.ui_state.midi_note = Some(format!("\"{now}\" reconnected"));
+                    ui_state.midi_note = Some(format!("\"{now}\" reconnected"));
                     log::info!(target: "midi", "input \"{now}\" reconnected");
-                    reset_pickup(&mut self.ui_state);
+                    reset_pickup(ui_state);
                 }
             }
         }
-        if std::mem::take(&mut self.ui_state.all_notes_off) {
+        if std::mem::take(&mut ui_state.all_notes_off) {
             self.midi.release_all();
-            self.ui_state.last_message = Some("all MIDI voices released".into());
+            ui_state.last_message = Some("all MIDI voices released".into());
         }
         if let Some(t) = &self.audio.timing {
             ui.ctx()
@@ -1097,29 +1134,28 @@ impl eframe::App for App {
         let dt = self.meter_at.elapsed().as_secs_f32();
         self.meter_at = std::time::Instant::now();
         let (p, bad) = self.peaks.take();
-        self.ui_state.meter.update(p, bad, dt);
-        self.ui_state.midi_inputs = self.midi.ports.clone();
-        self.ui_state.midi_input = self.midi.port.clone();
+        ui_state.meter.update(p, bad, dt);
+        ui_state.midi_inputs = self.midi.ports.clone();
+        ui_state.midi_input = self.midi.port.clone();
         if let Some(rx) = self.audio.delays_rx.as_mut() {
             while let Ok((id, lock, ms)) = rx.pop() {
-                self.ui_state.delay_status.insert(id, (lock, ms));
+                ui_state.delay_status.insert(id, (lock, ms));
             }
         }
         if let Some(rx) = self.audio.lfos_rx.as_mut() {
             while let Ok((id, sync)) = rx.pop() {
-                self.ui_state.lfo_status.insert(id, sync);
+                ui_state.lfo_status.insert(id, sync);
             }
         }
-        if !self.ui_state.seq_steps.is_empty() || !self.ui_state.delay_status.is_empty() {
+        if !ui_state.seq_steps.is_empty() || !ui_state.delay_status.is_empty() {
             // egui only repaints on input; the step light and readouts need frames of their own.
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(30));
         }
-        show(&mut self.editor, &mut self.ui_state, ui);
+        show(editor, ui_state, ui);
         // Scripted real-input runs (xdotool) read the drawn targets from here.
         if let Some(path) = &self.hits_file {
-            let text: String = self
-                .ui_state
+            let text: String = ui_state
                 .hits
                 .iter()
                 .map(|(k, r)| {
@@ -1134,17 +1170,6 @@ impl eframe::App for App {
                 self.hits_written = text;
             }
         }
-        for cmd in self.ui_state.transport.drain(..) {
-            if let Some(tx) = self.audio.transport_tx.as_mut() {
-                // Full only if the audio thread stalls; the click is then lost, not queued.
-                let _ = tx.push(cmd);
-            }
-        }
-        for cmd in self.ui_state.launches.drain(..) {
-            if let Some(tx) = self.audio.command_tx.as_mut() {
-                let _ = tx.push(cmd);
-            }
-        }
         if let (Some((path, at)), Some(t)) = (self.stats_file.as_mut(), &self.audio.timing) {
             if at.elapsed().as_secs_f32() > 1.0 {
                 *at = std::time::Instant::now();
@@ -1152,59 +1177,82 @@ impl eframe::App for App {
                 let _ = std::fs::write(
                     path,
                     format!(
-                        "{} · {} live graph allocations · {} undo entries · {} MIDI notes held · {} voices sounding\n{}\n",
+                        "{} · {} live graph allocations · {} undo entries · {} MIDI notes held · {} voices sounding\n{}\n{}\n",
                         t.line(self.audio.sample_rate),
                         self.audio.collector.alloc_count(),
-                        self.editor.log().entries().len(),
+                        editor.log().entries().len(),
                         held,
                         sounding,
                         t.hist_line(),
+                        delivery_line(delivery),
                     ),
                 );
             }
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(500));
         }
-        if self.editor.take_dirty() {
-            let fresh = std::mem::take(&mut self.ui_state.loaded);
-            let stopped = std::mem::take(&mut self.ui_state.load_stopped);
-            self.audio.rebuild(self.editor.state(), fresh, stopped);
-            self.ui_state.inspect.rebuilt(
-                self.audio.generation,
-                self.audio.compile_error.clone(),
-                self.editor.state(),
+        // Document changes and queued commands to the audio thread (runtime values or a graph).
+        control::deliver(editor, ui_state, delivery);
+        // A compile happened (here or on the control thread): the inspector checks whether
+        // its readings still describe the patch.
+        if delivery.generation != self.seen_generation {
+            self.seen_generation = delivery.generation;
+            if let Some(e) = &delivery.compile_error {
+                self.audio.status = format!("recompile failed: {e}");
+            }
+            ui_state.inspect.rebuilt(
+                delivery.generation,
+                delivery.compile_error.clone(),
+                editor.state(),
                 ui.input(|i| i.time),
             );
         }
         // Closing the window (or Ctrl+Q) with unsaved changes asks first.
         let close = ui.ctx().input(|i| i.viewport().close_requested());
-        if close
-            && !self.ui_state.quit_now
-            && kabl_ui::browser::is_modified(&self.editor, &self.ui_state)
-        {
+        if close && !ui_state.quit_now && kabl_ui::browser::is_modified(editor, ui_state) {
             ui.ctx()
                 .send_viewport_cmd(egui::ViewportCommand::CancelClose);
-            if self.ui_state.browser.dialog.is_none() {
-                kabl_ui::browser::request(
-                    &mut self.editor,
-                    &mut self.ui_state,
-                    kabl_ui::browser::Pending::Quit,
-                );
+            if ui_state.browser.dialog.is_none() {
+                kabl_ui::browser::request(editor, ui_state, kabl_ui::browser::Pending::Quit);
             } else {
                 // A dialog (Save As, a question) is already open: it stays, and the close
                 // waits for it rather than replacing it.
-                self.ui_state.last_message =
+                ui_state.last_message =
                     Some("close: finish or cancel the open dialog first".into());
             }
         }
-        if self.ui_state.quit_now && !close {
-            self.ui_state.launches.clear();
+        if ui_state.quit_now && !close {
+            ui_state.launches.clear();
             ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
         }
-        if self.audio.tick() {
+        self.audio.collector.collect();
+        if delivery.waiting() > 0 {
             ui.ctx().request_repaint();
         }
     }
+}
+
+/// The control counters for `KABL_STATS_FILE`.
+fn delivery_line(d: &Delivery) -> String {
+    let c = d.counts;
+    let fb = &d.feedback;
+    format!(
+        "control: {} graphs compiled ({} failed, {} as fallback) · {} runtime values ({} coalesced) \
+         · audio took {} graphs ({} refused as stale), {} values ({} unresolved) · {} waiting · \
+         {} revisions behind · {} actions not delivered",
+        c.graphs,
+        c.failed,
+        c.fallbacks,
+        c.values,
+        c.coalesced,
+        Feedback::get(&fb.graphs_taken),
+        Feedback::get(&fb.stale_graphs),
+        Feedback::get(&fb.sets_taken),
+        Feedback::get(&fb.unresolved),
+        d.waiting(),
+        d.behind(),
+        c.dropped_actions,
+    )
 }
 
 /// `kabl-ui [--patch <dir>] [--size <W>x<H>]`. Without `--patch`, starts from
@@ -1300,11 +1348,11 @@ fn main() -> eframe::Result<()> {
         })
         .unwrap_or([1440.0, 900.0]);
     let (notes_tx, notes_rx) = rtrb::RingBuffer::<KeyEvent>::new(1024);
-    let mut midi = Midi::new(notes_tx);
+    let (mut midi, cc_rx) = Midi::new(notes_tx);
     midi.connect_default(flag("--midi").as_deref());
     let num = |name: &str| flag(name).and_then(|v| v.parse::<u32>().ok());
     let peaks = Arc::new(record::PeakTap::default());
-    let mut audio = AudioHost::start(
+    let (mut audio, delivery) = AudioHost::start(
         editor.state(),
         notes_rx,
         midi.keys.clone(),
@@ -1335,10 +1383,24 @@ fn main() -> eframe::Result<()> {
         options,
         Box::new(|cc| {
             kabl_ui::theme::install_fonts(&cc.egui_ctx);
-            midi.sink.lock().unwrap().ctx = Some(cc.egui_ctx.clone());
-            Ok(Box::new(App {
+            let core = Arc::new(Mutex::new(Core {
                 editor,
-                ui_state,
+                ui: ui_state,
+                delivery,
+            }));
+            let c = core.clone();
+            let pump = std::thread::Builder::new()
+                .name("kabl-control".into())
+                .spawn(move || pump(c, cc_rx))
+                .expect("spawn the control thread");
+            {
+                let mut sink = midi.sink.lock().unwrap();
+                sink.ctx = Some(cc.egui_ctx.clone());
+                sink.pump = Some(pump.thread().clone());
+            }
+            Ok(Box::new(App {
+                core,
+                seen_generation: 1,
                 audio,
                 midi,
                 hits_file: std::env::var("KABL_HITS_FILE").ok(),
