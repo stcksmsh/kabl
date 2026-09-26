@@ -449,3 +449,88 @@ Fix commit: `34162f7` (product head for the short recheck).
 | RC-01 minor | **fixed** (order key) | `Delivery::held` stores `(order, ParamSet)`. A new target's order is its revision; a coalesced value keeps the order of the oldest value it replaced, while `rev` (the graph rule) is the newest. `flush` sorts and merges with actions by order. So an edit requested before a command is never sent after it; a newer value of that target may ride ahead of the command in its place, which is the exception design.md §5 already states. | `a_coalesced_edit_keeps_its_place_before_a_command` (the reviewer's scenario at the exact queue boundary; fails without the fix with `p1 = -20`) |
 | RC-02 minor (pre-existing) | **fixed** | `Delivery::compile`: when the held graph it replaces is fresh (a Load), the new graph is fresh too and inherits the Load's stopped clocks (`held_stopped`). | `a_waiting_load_replaced_by_an_edit_stays_a_stopped_load` (with and without the extra edit; fails without the fix: clock running) |
 | RC-03 nit | **disclosure kept** | Perf, package and walkthrough are not re-run; see REPORT "Limits". | — |
+
+### Short recheck of RC-01/RC-02 (reviewer subagent, 2026-09-26)
+
+**Target (checked with `git fetch origin` and `git rev-parse`)**
+- Branch head: `b1952f4a85cdb28d132aa7678404d706893f2043` (`claude/d02-musical-controls-knjmgu`)
+- Product fix commit: `34162f7`. `git diff --stat 34162f7 b1952f4 -- crates` is empty, so everything after it is docs only (`aa819c1`, `b1952f4`).
+- Previously checked product head: `05179e18c0d2c96760bf46fc5e095556f80aa413`
+- `origin/master`: `0d97ed1e5010f4ac1bfdf03e90d2a4e25b397bfb`, still docs only.
+- Scope: the diff `05179e1..34162f7` in `crates/ui/src/control.rs`, and the two new tests.
+
+#### Dispositions
+
+**RC-01: resolved.**
+- `held` now stores `(order key, ParamSet)`. A coalesced value keeps the oldest key and the newest `rev`. `flush` sorts by key and merges with actions by key.
+- On a tie, the value goes first. Correct: a key equal to an action's tag was assigned before that action was requested.
+- My earlier reproducer `r_coalescing_lets_a_command_overtake_an_earlier_edit`, which asserted the bug, now **fails** as intended. When the first block renders, the target is already at the newest value (−15) and the Launch comes after it.
+
+**RC-02: resolved for the reported path.**
+- `compile` inherits `fresh`, and `stopped |= held_stopped`, when the held graph it replaces is fresh.
+- My earlier reproducer `r_held_load_replaced_by_an_edit_loses_fresh_and_stopped` now **fails** as intended: the clock stays stopped. The control case still passes.
+
+#### Regression checks (inspected in code)
+
+- **MAX_HELD:** unchanged. The `held.len() + v.len()` bound and the fallback compile, which clears `held`, behave as before. Held actions keep their tags and go after the fallback graph, as §5 states.
+- **Values out of `rev` order across targets:** harmless.
+  - The graph rule is per value (`s.rev > g.rev`), and `applied_rev` uses `fetch_max`.
+  - A held graph is always pushed before any held value, and a compile clears `held`. So a value with an old key never goes ahead of a graph that already contains it.
+  - For the same target, an earlier value is either already in the queue (older, so ahead) or was coalesced.
+- **`waiting`/`pending`:** unchanged semantics. There is still one entry per target, and `remove` is by target.
+- **Failed compile while a fresh graph is held:**
+  - `compile` returns `Failed` before touching `held_graph` or `held_stopped`, so the held Load is still sent as is.
+  - `sent` becomes the failing document, as before (§6).
+  - A later successful compile still inherits `fresh`, which is correct because it is the same new document.
+- **`sent` / `runtime_changes` after a held Load is replaced:** unchanged. `sent` always equals the document just synced, and a fresh Load forces a compile.
+- **After the held graph is sent:** `held_stopped` is left over but harmless. Inheritance needs a held graph that is fresh, and the next compile overwrites `held_stopped`.
+- **The replacing compile is itself a Load:** see RC-04 below.
+
+#### New findings
+
+**RC-04: nit, confirmed (a narrow regression introduced by the RC-02 fix).**
+- **Location:** `crates/ui/src/control.rs::Delivery::compile`, the inheritance block: `stopped |= self.held_stopped` is applied even when the replacing compile is itself a Load.
+- **Scenario:** the audio thread has not taken the 2 queued graphs. The user:
+  1. opens a library piece, which is loaded stopped (`load_stopped = meta.sequence`, i.e. the piece has a clock);
+  2. then, before audio resumes, opens a folder patch. `OpenFolder` does not set `load_stopped`, so that patch should play.
+
+  The second Load starts with its clocks stopped.
+- **Evidence (executed, scratch `r_a_load_replacing_a_waiting_stopped_load_inherits_stopped`):** clock #1 reads `Some(false)` after the second Load.
+- **Impact:** only during an audio stall, and only for Open followed by Open-folder. The user presses Start. Nothing is lost.
+- **Requested correction:** inherit only when the replacing compile is not itself a Load, e.g. `if !fresh && held is fresh { fresh = true; stopped |= held_stopped }`.
+
+**Residual note (pre-existing, not new, no action required for D04).** The engine-side equivalent has the same gap:
+- `PatchEngine::receive_swap` ORs `fresh` when a graph replaces a *pending* fresh graph behind a fade, but it cannot carry `stopped`, because `stopped` is applied at compile time.
+- A stopped Load that is pending behind a fade and replaced by an edit graph within that fade (at most 15 ms) would therefore run.
+- This existed before D04.
+
+#### Commands run by this reviewer (at `b1952f4`)
+
+| Command | Result |
+|---|---|
+| `cargo test -p kabl-ui --test runtime_controls` | 13 passed, including `a_coalesced_edit_keeps_its_place_before_a_command` and `a_waiting_load_replaced_by_an_edit_stays_a_stopped_load` |
+| My earlier RC-01/RC-02 reproducers (scratch) | Both bug assertions now fail, confirming the fixes; the control passes |
+| Scratch RC-04 reproducer | Passes, confirming RC-04 |
+| `cargo test --workspace` (CARGO_INCREMENTAL=0, debug=0) | **545 passed, 0 failed, 16 ignored**, exit 0 |
+| `cargo clippy --workspace --all-targets -- -D warnings` | Clean |
+
+The scratch files were removed and the worktree is clean. Copies are in the reviewer scratchpad (`review_recheck.rs`, `review_recheck2.rs`).
+
+#### Limitations
+- This recheck covers only the affected path.
+- No GUI, audio, MIDI or perf runs.
+- The earlier limitations stand: R-04 latency is not measured, and listening and controller feel are pending for Kosta.
+
+#### Assessment
+- **No blocker, no major and no acceptance failure remains.**
+- RC-01 and RC-02 are resolved. RC-04 is a stall-only nit and can be fixed in one line or filed as a follow-up. The residual engine-side note is pre-existing.
+- **I do not object to engineering completion.**
+- Kosta still owns: listening to knob transitions (a 15 ms ramp or the module's own smoothing, instead of a crossfade), controller feel, and the unmeasured CC latency while the editor frame holds the lock. These are owner checks, not tradeoffs this review approves.
+
+## Coordinator responses to the short recheck
+
+| ID | Disposition | What changed | Check |
+|---|---|---|---|
+| RC-04 nit | **fixed** | `Delivery::compile` inherits the held Load's `fresh`/`stopped` only when the replacing compile is not itself a Load (`if !fresh && …`). Commit `58a5934`. | `a_waiting_load_replaced_by_an_edit_stays_a_stopped_load` extended: a second Load replacing a waiting stopped Load plays (fails without the fix: clock stopped) |
+| Residual engine-side note | **not changed** (pre-existing, before D04) | A stopped Load pending behind a fade and replaced by an edit graph within that fade (≤ 15 ms) runs; `stopped` is applied at compile time and `receive_swap` cannot carry it. Listed in REPORT follow-ups. | — |
+
