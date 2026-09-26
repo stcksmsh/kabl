@@ -442,7 +442,7 @@ Taken from the implementer's artifacts, not re-run: `render_hash` and `transitio
 
 ## Coordinator responses to the recheck
 
-Fix commit: see the commit after `a3b480b` touching `crates/ui/src/control.rs`.
+Fix commit: `34162f7` (product head for the short recheck).
 
 | ID | Disposition | What changed | Check |
 |---|---|---|---|
