@@ -91,6 +91,14 @@ pub fn param_class(kind: &str, name: &str) -> ParamClass {
     }
 }
 
+/// Whether a runtime value of this param ramps (`compile::RAMP_MS`) in a playing graph, or is
+/// set at once: stepped choices (never through invalid states), params the module smooths
+/// itself (no double smoothing) and sequencer step data (read when a step plays: a ramp could
+/// play a note between two values). design.md, "Smoothing".
+pub fn ramped(kind: &str, p: &kabl_modules::ParamInfo) -> bool {
+    p.taper != kabl_modules::Taper::Stepped && kind != "seq" && !smoothed_by_module(kind, p.name)
+}
+
 /// Params whose module smooths a change itself, so a runtime value is set, not ramped (no
 /// double smoothing). Read from each module's `process` (design.md, "Smoothing").
 pub fn smoothed_by_module(kind: &str, name: &str) -> bool {

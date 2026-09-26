@@ -102,6 +102,32 @@ fn settle(e: &mut PatchEngine) -> f32 {
     last
 }
 
+/// Which values ramp in a playing graph: continuous levels and times; never stepped choices,
+/// sequencer step data (a ramp could play a note between two values) or params the module
+/// smooths itself.
+#[test]
+fn only_continuous_unsmoothed_values_ramp() {
+    use kabl_engine::runtime::ramped;
+    let p = |kind: &str, name: &str| {
+        *kabl_modules::registry::info_for(kind)
+            .unwrap()
+            .params
+            .iter()
+            .find(|p| p.name == name)
+            .unwrap()
+    };
+    assert!(ramped("vca", &p("vca", "gain")));
+    assert!(ramped("mixer", &p("mixer", "level1")));
+    assert!(ramped("env.adsr", &p("env.adsr", "sustain")));
+    assert!(ramped("filter.svf", &p("filter.svf", "cutoff_hz")));
+    assert!(!ramped("vca", &p("vca", "exponential")));
+    assert!(!ramped("seq", &p("seq", "transpose")));
+    assert!(!ramped("seq", &p("seq", "p1")));
+    assert!(!ramped("gain", &p("gain", "gain_db")));
+    assert!(!ramped("macro", &p("macro", "m1")));
+    assert!(!ramped("osc.va", &p("osc.va", "pw")));
+}
+
 #[test]
 fn only_runtime_values_are_runtime_changes() {
     let base = probe(0.5);

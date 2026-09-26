@@ -224,9 +224,8 @@ struct ParamSlot {
     index: u16,
     step: u32,
     modi: u32,
-    stepped: bool,
-    /// The module smooths this param itself: a runtime value is set, never ramped.
-    smoothed: bool,
+    /// `runtime::ramped`: a runtime value ramps in a playing graph (else it is set).
+    ramped: bool,
 }
 
 /// Where one route of one instance lives: `steps[step]`, `mods[modi].routes[route]`.
@@ -1137,8 +1136,7 @@ fn compile_inner(
                         .iter()
                         .position(|m| m.index == index)
                         .map_or(NO_MOD, |k| k as u32),
-                    stepped: info.taper == kabl_modules::Taper::Stepped,
-                    smoothed: crate::runtime::smoothed_by_module(meta.info.kind, info.name),
+                    ramped: crate::runtime::ramped(meta.info.kind, info),
                 });
             }
             w.steps.push(Step::Process {
@@ -1747,7 +1745,7 @@ impl CompiledPatch {
                     return false;
                 }
                 let on = RampOn::Param(lo as u32, hi as u32);
-                if !ramp || slot.stepped || slot.smoothed {
+                if !ramp || !slot.ramped {
                     self.drop_ramp(on);
                     write_param(
                         &mut self.steps,
