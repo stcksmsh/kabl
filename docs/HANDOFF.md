@@ -22,7 +22,7 @@ docs/product-research/briefs/D04-LAUNCH.md.
   - `crates/engine/src/runtime.rs`, `crates/ui/src/control.rs`.
   - The control thread and `Core` mutex live in `crates/ui/src/main.rs`.
   - Tests: engine/ui `runtime_controls.rs`.
-- **Hit keys added to drive.py:** `wiggle KEY SECONDS AMPLITUDE`.
+- **drive.py addition:** `wiggle KEY SECONDS PIXELS` (a continuous knob drag).
 This supersedes the older "do not start D04" instructions below. Stop after D04; no D05.
 
 Kosta accepted the narrow D03-R1 stream-error overflow free/allocator-lock exception.
