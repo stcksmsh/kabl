@@ -780,9 +780,12 @@ fn input_names() -> Vec<String> {
     names
 }
 
+/// Incoming CC messages `((channel, controller, value), arrival time)` for the control thread.
+type CcQueue = rtrb::Consumer<((u8, u8, u8), f64)>;
+
 impl Midi {
     /// Also returns the CC queue's consumer, for the control thread.
-    fn new(notes: rtrb::Producer<KeyEvent>) -> (Self, rtrb::Consumer<((u8, u8, u8), f64)>) {
+    fn new(notes: rtrb::Producer<KeyEvent>) -> (Self, CcQueue) {
         let (cc, cc_rx) = rtrb::RingBuffer::new(1024);
         let m = Midi {
             sink: Arc::new(Mutex::new(MidiSink {
