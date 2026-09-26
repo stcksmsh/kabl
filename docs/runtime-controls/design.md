@@ -107,17 +107,27 @@ path back to it.
 
 ## 5. Queue, bounds and backpressure
 
-One `rtrb` SPSC queue `ToAudio` (capacity `control::QUEUE` = 256) carries graphs and values in
-revision order. Commands (launch, preview, inspect) and transport keep their own queues: their
-order relative to values does not matter (they act on sequencers, clocks, keys and the tap,
-not on params).
+One `rtrb` SPSC queue `ToAudio` (capacity `control::QUEUE` = 256) carries graphs, values,
+commands (launch, cancel, preview, inspect) and transport in request order. (Review R-02:
+before the fix commands and transport had their own queues and could overtake values waiting
+here, so a launch could play a bank step's pre-edit data or a Restart use the old tempo.)
+
+Guaranteed order: a command never reaches the audio thread before a value or graph requested
+before it; values and graphs keep revision order; commands keep their order. A value requested
+after a command may be sent before it only when both wait here and a newer value of the same
+target replaced an older one (coalescing keeps the newest). A graph waiting here carries every
+document edit up to its compile, including edits made after a waiting command, so that command
+then acts on the newer graph.
 
 What cannot be sent now waits in `Delivery`:
 
 - at most one graph (`held_graph`); a newer compile replaces it (the older is freed on the
   control thread);
 - at most one value per target (`held`, the newest; the replaced one is counted as coalesced),
-  kept behind the held graph. A compile clears them: the graph carries them.
+  kept behind the held graph. A compile clears them: the graph carries them;
+- at most `MAX_HELD_ACTIONS` (64) commands in request order, each tagged with the revision
+  current when it was requested; `flush` merges them with the values by revision. Past 64 a
+  command is refused, counted and reported (the audio thread is not taking them).
 - Past `MAX_HELD` (1024) targets, a compile replaces the values (counted as a fallback).
 
 Absolute values of one target may coalesce because the last one is what the document holds;
@@ -137,8 +147,8 @@ the bounds and that the engine ends on the document's values.
 
 Per-callback work: `PatchEngine::drain` takes at most `control::QUEUE` messages per callback
 (so a producer that keeps pushing cannot keep the callback draining); each value is two binary
-searches and a write per voice lane; ramps are at most `MAX_RAMPS` (32) targets per graph per
-block.
+searches and a write per voice lane; ramps are at most one per rampable target of the graph
+per block (review R-01: previously capped at 32).
 
 ## 6. Requested, applied, failed
 
@@ -154,9 +164,10 @@ block.
   the inspector (`Inspect::rebuilt`). Runtime values for modules the playing graph has still
   apply; values for modules only in the failed document resolve nowhere and are counted.
   A later successful compile clears the error.
-- A command the queue refuses (the audio thread stopped taking them) is reported in the
-  status line and the log and counted, never treated as done. It is not retried: a launch or a
-  Restart delivered late would land on a different beat.
+- A command waits behind earlier edits (§5). When 64 already wait (the audio thread stopped
+  taking them) it is refused, reported in the status line and the log and counted, never
+  treated as done. Waiting commands are delivered in order when the audio thread resumes; a
+  launch timed "Now" then lands later than asked.
 
 ## 7. Control and MIDI
 
@@ -220,8 +231,9 @@ Which params ramp is listed in [classification.md](classification.md) (20 of 95)
 triggers are signals, not params, and are untouched. A graph that has not rendered a block
 (a pending graph, a Load) takes values exactly: an initial load starts at the stored value,
 never from zero. A new value for a target already ramping starts a new ramp from where it is.
-Past `MAX_RAMPS` concurrent ramps in one graph a value is set at once (a `ponytail:` note marks
-the ceiling).
+Any number of targets ramp at once: each graph's ramp table is allocated at compile with room
+for every rampable target (distinct ramped params plus routes), so a restore or undo that moves
+many knobs ramps all of them (review R-01; previously a 33rd target stepped).
 
 Audible difference from before, by design of D04: an edit used to reach the sound through a
 15 ms crossfade between two graphs; it now reaches it through the module's own smoothing or
@@ -243,13 +255,19 @@ Audio thread, changed code only: `drain` (pop, match, `receive_swap`, `set`), `s
 graph is dropped as `basedrop::Owned`, which queues it for the collector (the UI thread frees
 it); values are `Copy`. Checked with `assert_no_alloc` around the production calls, including a
 saturated queue and swaps (`draining_is_bounded_ordered_and_allocation_free`; every callback of
-`crates/ui/tests/runtime_controls.rs`). The narrowly accepted D03-R1 exception (freeing a
+`crates/ui/tests/runtime_controls.rs`). That test callback is a copy of the production
+callback's control part (drain and `process_block`), not the whole `main.rs` closure: key
+events, report pushes, the probe push, the output ring and the tap are unchanged from the base
+and not covered by this check (review R-06). The narrowly accepted D03-R1 exception (freeing a
 backend error message when the 16-slot error queue is full) is untouched; the first-callback RT
 priority request remains the older documented exception.
 
-Off the audio thread: the core mutex is taken by the UI (a frame's layout) and the control
-thread. A CC therefore waits at most for one frame's layout; with no frame it is applied at
-once. Compiles happen on whichever of the two threads delivers a structural change (in practice
+Off the audio thread: the core mutex is taken by the UI and the control thread. The UI holds
+it for one editor frame's whole logic (`App::ui`), which can include a browser Open or Save
+(file I/O and a validation compile), a MIDI port connect, the stats/latency file writes, a
+structural compile and freeing retired graphs. A CC waits for whatever the frame in progress
+does; with no frame it is applied at once. Measured CC latency covers the cc workload only
+(README "Performance"), not CCs during Save, Open, reconnect or swaps (review R-04). Compiles happen on whichever of the two threads delivers a structural change (in practice
 the UI; the control thread compiles only for the `MAX_HELD` fallback).
 
 ## 12. Limits and rejected alternatives
@@ -258,11 +276,12 @@ the UI; the control thread compiles only for the `MAX_HELD` fallback).
   undo would have to reconcile them). Rejected: an audio-side table of recent values re-applied
   to late graphs (unneeded with one FIFO and revisions; more audio-thread state).
 - Rejected: separate queues for graphs and values (their relative order is what makes a
-  queued graph safe).
+  queued graph safe), and, after review R-02, separate queues for commands.
 - Rejected: CC processing in the MIDI callback (it would take the core lock while holding the
   sink lock that the UI also takes: a lock-order inversion).
 - Kept: `SwapSender`/`drain_swaps` for the existing live-edit tests and the offline example.
-- `MAX_RAMPS` is 32 per graph: a 33rd simultaneous target steps.
-- Commands refused by a full queue are reported, not retried.
-- A frame's layout holds the lock, so CC latency with the editor drawing includes up to one
-  layout pass (measured in README "Performance").
+- Past 64 waiting commands one is refused and reported.
+- A frame holds the lock for its whole logic, so a CC arriving during a frame waits for it,
+  including any file operation or port connect in it; only the cc workload is measured.
+- `launch` resolves against the incoming or active graph, not a pending one: a launch for a
+  Load still queued behind a fade resolves against the old graph (existed before D04).

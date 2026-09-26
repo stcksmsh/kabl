@@ -39,7 +39,7 @@ Kosta's PR #5 merge). Exact commits: REPORT.md.
 - `crates/engine/src/runtime.rs`: targets, `ParamSet`, `ToAudio`, `Feedback`, the
   classification (`param_class`, `ramped`, `smoothed_by_module`) and `runtime_changes`.
 - `crates/engine/src/compile.rs`: `CompiledPatch::rev`, sorted param/route slots,
-  `set_runtime`, ramps (`RAMP_MS`, `MAX_RAMPS`), `param_value`/`route_amount` for tests.
+  `set_runtime`, ramps (`RAMP_MS`; a table sized at compile for every rampable target), `param_value`/`route_amount` for tests.
 - `crates/engine/src/patch_engine.rs`: `set`, bounded `drain`, stale-graph refusal in
   `receive_swap`, `Transport::Toggle` in `transport`.
 - `crates/ui/src/control.rs`: `Delivery` (diff, revisions, held graph/values, flush,

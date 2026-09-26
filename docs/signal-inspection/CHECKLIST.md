@@ -32,6 +32,6 @@ Palette hands-on reviews.
 
 | # | Do | Expect | Pass/fail, notes |
 |---|---|---|---|
-| 13 | Init Keyboard: hold a key, **Inspect** VCA #4 **out**, pull the cable out of **VCA #4 in** (drag the plug away), open **Why no sound?** Then Ctrl+Z. | Sound stops. *From the patch*: "No cable into VCA #4 in: that is its audio input, and an unplugged input reads silence, so this stage passes nothing." *Could be*: audio outputs that feed nothing (Filter #3 lp …), not the ADSR on the cv. Ctrl+Z brings back the cable, the reading and the sound. | |
+| 13 | Init Keyboard: hold a key, **Inspect** VCA #4 **out**, pull the cable out of **VCA #4 in** (drag the plug away), open **Why no sound?** Then Ctrl+Z. | Sound stops. *From the patch*: "No cable into VCA #4 in: that is its audio input." *Could be*: "An unplugged input reads silence, so nothing new reaches VCA #4 through it; a self-oscillating filter or a delay or reverb tail can still sound." (wording since D04 review R-03), audio outputs that feed nothing (Filter #3 lp …), not the ADSR on the cv. Ctrl+Z brings back the cable, the reading and the sound. | |
 | 14 | Same, but pull the envelope's cable out of **VCA #4 cv** instead. | No "No cable into … cv" fact: cv is optional. | |
 | 15 | (Log) If the log shows "stream errors in …", read the "last delivered message". | It says how long ago it was taken ("taken N s ago, possibly before this interval"), not that it belongs to those counts. | |
