@@ -5,6 +5,8 @@ midi ramp 1 20 0 127 3
 wiggle knob:3.m3 1.5 20
 shot light-runtime-controls
 click inspect-open
+# At 1280x800 VCA #14 sits under the Perform panel: pan it into view first.
+goto module:14 480 300
 click module:14
 click inspect-port:14.out
 midi ramp 1 24 127 20 3

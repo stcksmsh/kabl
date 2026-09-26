@@ -1,0 +1,26 @@
+2026-09-26T18:36:24.879Z +0.000s INFO  [app] session=aa4cc289 start kabl-ui 0.1.0 (commit e7dca9a168b7) level=DEBUG log=target/runtime-controls-walkthrough/logs/kabl.log
+2026-09-26T18:36:24.879Z +0.001s INFO  [library] session=aa4cc289 factory sounds: /home/user/kabl/patches; your sounds: target/runtime-controls-walkthrough/user/sounds
+2026-09-26T18:36:24.881Z +0.002s INFO  [midi] session=aa4cc289 listening for MIDI on "kabl-pipe" (test pipe)
+2026-09-26T18:36:24.881Z +0.002s INFO  [audio] session=aa4cc289 backend=Alsa requested rate=Some(48000) frames=Some(256) rt=true
+2026-09-26T18:36:24.894Z +0.016s INFO  [audio] session=aa4cc289 device=Some("Default Audio Device") rate=48000 channels=2 buffer=Fixed(256)
+2026-09-26T18:36:24.898Z +0.019s WARN  [winit::platform_impl::linux::x11::xdisplay] session=aa4cc289 error setting XSETTINGS; Xft options won't reload automatically
+2026-09-26T18:36:24.920Z +0.041s WARN  [winit::platform_impl::linux::x11::util::randr] session=aa4cc289 XRandR reported that the display's 0mm in size, which is certifiably insane
+2026-09-26T18:36:24.984Z +0.105s WARN  [audio] session=aa4cc289 real-time priority refused: AudioThreadPriorityError: org.freedesktop.DBus.Error.FileNotFound:Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+2026-09-26T18:36:34.986Z +10.107s INFO  [audio.health] session=aa4cc289 last 10.0s: xruns=1 late_executions=0 late_arrivals=120 callbacks=1891 worst_run_us=4472
+2026-09-26T18:36:45.010Z +20.131s INFO  [audio.health] session=aa4cc289 last 10.0s: xruns=0 late_executions=0 late_arrivals=135 callbacks=1879 worst_run_us=4720
+2026-09-26T18:36:45.057Z +20.178s DEBUG [graph] session=aa4cc289 compiled generation=2 rev=198 fresh=false modules=39 took_us=373
+2026-09-26T18:36:51.532Z +26.654s DEBUG [graph] session=aa4cc289 compiled generation=3 rev=278 fresh=false modules=39 took_us=321
+2026-09-26T18:36:53.366Z +28.487s DEBUG [graph] session=aa4cc289 compiled generation=4 rev=279 fresh=false modules=39 took_us=465
+2026-09-26T18:36:55.035Z +30.156s INFO  [audio.health] session=aa4cc289 last 10.0s: xruns=0 late_executions=0 late_arrivals=166 callbacks=1880 worst_run_us=5235
+2026-09-26T18:36:58.902Z +34.023s DEBUG [compare] session=aa4cc289 capture by=you editor=1
+2026-09-26T18:37:05.060Z +40.181s INFO  [audio.health] session=aa4cc289 last 10.0s: xruns=0 late_executions=1 late_arrivals=141 callbacks=1879 worst_run_us=6427
+2026-09-26T18:37:05.390Z +40.511s DEBUG [compare] session=aa4cc289 restore applied
+2026-09-26T18:37:15.097Z +50.218s INFO  [audio.health] session=aa4cc289 last 10.0s: xruns=0 late_executions=0 late_arrivals=148 callbacks=1882 worst_run_us=6427
+2026-09-26T18:37:15.717Z +50.838s DEBUG [inspect] session=aa4cc289 select module=14 port=out
+2026-09-26T18:37:24.110Z +59.231s DEBUG [graph] session=aa4cc289 compiled generation=5 rev=398 fresh=false modules=39 took_us=452
+2026-09-26T18:37:24.984Z +60.105s DEBUG [audio.health] session=aa4cc289 11264 callbacks × 256 frames at 48000 Hz · run: worst 6427 of 5333 µs (at 34.5 s, wall 1790447819440), 44 over half, 2 late · arrival: worst 17330 µs, 854 late · 1 xruns · RT priority refused (AudioThreadPriorityError: org.freedesktop.DBus.Error.FileNotFound:Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory) (first second: worst 4248 µs)
+2026-09-26T18:37:25.103Z +60.224s INFO  [audio.health] session=aa4cc289 last 10.0s: xruns=0 late_executions=1 late_arrivals=145 callbacks=1875 worst_run_us=6427
+2026-09-26T18:37:26.627Z +61.749s DEBUG [inspect] session=aa4cc289 why-no-sound open=true
+2026-09-26T18:37:31.562Z +66.683s DEBUG [graph] session=aa4cc289 compiled generation=6 rev=399 fresh=false modules=39 took_us=411
+2026-09-26T18:37:34.598Z +69.719s DEBUG [inspect] session=aa4cc289 why-no-sound open=false
+2026-09-26T18:37:35.137Z +70.258s INFO  [audio.health] session=aa4cc289 last 10.0s: xruns=0 late_executions=0 late_arrivals=161 callbacks=1874 worst_run_us=6427
