@@ -1,0 +1,15 @@
+package: kabl-0.1.0-linux-x86_64.tar.gz, installed in /tmp/kabl-install.Oq3G, HOME=/tmp/kabl-install.Oq3G/home, checkout patches hidden
+--- stats
+3252 callbacks × 256 frames at 48000 Hz · run: worst 5551 of 5333 µs (at 14.8 s, wall 1790448361330), 4 over half, 1 late · arrival: worst 14319 µs, 207 late · 0 xruns · RT priority refused (AudioThreadPriorityError: org.freedesktop.DBus.Error.FileNotFound:Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory) (first second: worst 640 µs) · 1 live graph allocations · 113 undo entries · 0 MIDI notes held · 0 voices sounding
+run histogram (50 µs bins, after the first second): p50 ≤400 p99 ≤650 p99.9 ≤2800 µs · 300:250 350:405 400:1195 450:475 500:294 550:342 600:59 650:21 700:3 750:2 800:2 850:2 900:1 1050:2 1100:1 1350:1 1400:1 1850:1 2050:1 2100:1 2600:1 2800:1 >3150:3
+control: 0 graphs compiled (0 failed, 0 as fallback) · 137 runtime values (0 coalesced) · audio took 0 graphs (0 refused as stale), 137 values (0 unresolved) · 0 pending · 0 actions not delivered
+--- log
+2026-09-26T18:45:46.476Z +0.000s INFO  [app] session=d26bcbf0 start kabl-ui 0.1.0 (commit 74ab5c8ca588) level=INFO log=/tmp/kabl-install.Oq3G/home/.local/state/kabl/logs/kabl.log
+2026-09-26T18:45:46.477Z +0.001s INFO  [library] session=d26bcbf0 factory sounds: /tmp/kabl-install.Oq3G/kabl-0.1.0-linux-x86_64/share/kabl/patches; your sounds: /tmp/kabl-install.Oq3G/home/.local/share/kabl/sounds
+2026-09-26T18:45:46.478Z +0.002s INFO  [midi] session=d26bcbf0 listening for MIDI on "kabl-pipe" (test pipe)
+2026-09-26T18:45:46.478Z +0.002s INFO  [audio] session=d26bcbf0 backend=Alsa requested rate=Some(48000) frames=Some(256) rt=true
+2026-09-26T18:45:46.492Z +0.016s INFO  [audio] session=d26bcbf0 device=Some("Default Audio Device") rate=48000 channels=2 buffer=Fixed(256)
+2026-09-26T18:45:46.495Z +0.019s WARN  [winit::platform_impl::linux::x11::xdisplay] session=d26bcbf0 error setting XSETTINGS; Xft options won't reload automatically
+2026-09-26T18:45:46.517Z +0.041s WARN  [winit::platform_impl::linux::x11::util::randr] session=d26bcbf0 XRandR reported that the display's 0mm in size, which is certifiably insane
+2026-09-26T18:45:46.608Z +0.132s WARN  [audio] session=d26bcbf0 real-time priority refused: AudioThreadPriorityError: org.freedesktop.DBus.Error.FileNotFound:Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+2026-09-26T18:46:04.646Z +18.170s INFO  [app] session=d26bcbf0 shutdown result=ok
