@@ -64,8 +64,9 @@ Kosta's PR #5 merge). Exact commits: REPORT.md.
   audio thread (bounded, then the last values); a failed compile; MIDI buttons and pickup with
   no frame, then a frame, save and undo; inspector lineage.
 - `crates/ui/tests/signal_inspection.rs`: the D03-R2 cable removal, optional inputs, the
-  `needed_inputs` table against the registry. `crates/standalone/tests/stream_error_overflow.rs`:
-  the message age.
+  `needed_inputs` table against the registry. `crates/standalone/tests/stream_error_line.rs`:
+  the message age. It has its own file so that the heap count in `stream_error_overflow.rs`
+  runs alone in its process.
 
 ## Compatibility
 
@@ -137,7 +138,49 @@ and xruns are kept apart.
 
 ## Real-app evidence
 
-WALK
+All of this is scripted: xdotool on Xvfb (1600×1000). The app is the release build of
+**`e7dca9a`**. Its runtime behaviour is the same as the submitted product head: later commits
+change only a test file and docs. Audio goes through ALSA → PipeWire into a silent null sink
+and is recorded from the sink's monitor. The "controller" is `examples/midi_player`, writing to
+the `KABL_MIDI_PIPE` fifo. None of it is hardware, listening or laptop evidence.
+
+- **Walkthrough:** [walkthrough.mp4](walkthrough.mp4), 63 s, Composition at 1440×900 and
+  48 kHz / 256, with audio (mean −19.6 dB, peak −5.7 dB). Script:
+  [scripts/walkthrough.txt](scripts/walkthrough.txt). Log, drive timeline and stats:
+  [evidence/walkthrough/](evidence/walkthrough/). Timeline, in video seconds:
+  - **7–15:** a rack knob (Macros m1), a Perform slider (m3), and mapped CCs 21 and 24 swept by
+    the controller. These are runtime values: no graph build.
+  - **16.5:** plugging Osc #10 into Mixer #22 in4 while CC 21 is still moving. That compiles
+    once (generation 2) and the CC keeps working.
+  - **22.5–27.6:** Undo, Undo, Redo, Redo. Only the steps involving the cable compile
+    (generations 3 and 4); the undone and redone CC movement doesn't.
+  - **29–44:** Compare. Capture a reference, change m4 and CC 24, then restore the reference.
+    Restoring applies runtime values and doesn't compile. "Back to my version" also doesn't.
+  - **46–53:** Inspect VCA #14 out while CC 20 and the knob keep moving. The reading keeps
+    updating ("updated 0.0x s ago").
+  - **55.6:** D03-R2. Pulling the cable into VCA #14 in compiles (generation 5), the sound
+    goes, and **Why no sound?** names "No cable into VCA #14 in". Undo at 64 compiles
+    (generation 6) and brings back the cable, the reading and the sound.
+
+  CC to audio callback during the take: 242 batches, p50 2.97 ms, max 10.15 ms. There was
+  1 xrun and no stall.
+- **Screenshots**, 1440×900 and 1280×800, in A-light and A-dark, in [img/](img/). Script:
+  [scripts/shots.sh](scripts/shots.sh).
+  - Composition: `light-runtime-controls`, and `{light,dark}-inspect-during-cc`.
+  - Init Keyboard (D03-R2): `{light,dark}-why-audio-input`, `dark-why-undone`.
+  - Walkthrough frames: `1440x900-wt-*`.
+
+  The dark 1280×800 inspect shot catches the status bar's "1 change(s) waiting for audio"
+  mid-sweep: a value queued but not yet taken by the callback.
+- **Package**, [evidence/package.txt](evidence/package.txt), run by
+  [scripts/package.sh](scripts/package.sh):
+  - The package was built from the checkout and installed in a temp directory with a fresh
+    HOME, with the checkout's `patches/` hidden.
+  - With the installed Evolving Pad, a mapped CC sweep plus a rack knob drag gave "0 graphs
+    compiled · 137 runtime values · 0 actions not delivered".
+  - Quitting showed D01's unsaved question. After "Don't save", the log reads
+    `shutdown result=ok`.
+  - Screenshots: `img/1440x900-package-{runtime-controls,quit-question}.png`.
 
 ## Reproduce
 

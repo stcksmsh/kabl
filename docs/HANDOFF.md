@@ -7,7 +7,22 @@ Trust code and git over older docs.
 
 Kosta authorized one agent to finish D03 and implement D04 sequentially; no parallel work.
 Brief: docs/product-research/briefs/D04.md. Launch:
-docs/product-research/briefs/D04-LAUNCH.md. Engineering is authorized, not yet reported started.
+docs/product-research/briefs/D04-LAUNCH.md.
+
+**State (2026-09-26): implemented and evidence produced; independent review still owed.**
+
+- **Record.** `docs/runtime-controls/` (README, design, classification, REPORT, REVIEW,
+  CHECKLIST) and the D03-R2 section of `docs/signal-inspection/REPORT.md`.
+- **Branch.** `claude/d02-musical-controls-knjmgu`, the environment-required name, with a new
+  PR for Kosta. Product code equals `b2e9fd6`.
+- **Review gap.** The reviewer subagent hit the platform's weekly limit (it resets
+  2026-09-30 22:00 UTC) before writing anything. Next step: a fresh reviewer on base
+  `4f7e729` and the head, then fixes and a recheck (REVIEW.md lists the required coverage).
+- **Code.**
+  - `crates/engine/src/runtime.rs`, `crates/ui/src/control.rs`.
+  - The control thread and `Core` mutex live in `crates/ui/src/main.rs`.
+  - Tests: engine/ui `runtime_controls.rs`.
+- **Hit keys added to drive.py:** `wiggle KEY SECONDS AMPLITUDE`.
 This supersedes the older "do not start D04" instructions below. Stop after D04; no D05.
 
 Kosta accepted the narrow D03-R1 stream-error overflow free/allocator-lock exception.

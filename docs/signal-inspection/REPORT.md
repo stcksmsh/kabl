@@ -270,7 +270,10 @@ Owner-review status: pending (CHECKLIST.md items 13–15)
 - **Tests.** `crates/ui/tests/signal_inspection.rs`:
   `why_no_sound_names_an_unplugged_intermediate_audio_input`,
   `why_no_sound_leaves_optional_inputs_alone`, `needed_inputs_are_real_audio_inputs`;
-  `crates/standalone/tests/stream_error_overflow.rs`: `the_last_delivered_message_carries_its_age`.
+  `crates/standalone/tests/stream_error_line.rs`: `the_last_delivered_message_carries_its_age`. It
+  was first added to `stream_error_overflow.rs`. There, running in parallel with the overflow
+  test made that test's process-wide heap count flaky (seen in 1 of 1 workspace runs, then 4
+  of 8 focused runs), so it moved to its own file in `b2e9fd6` (12/12 runs of both pass).
 - **Real app.** docs/runtime-controls/README.md "Real-app evidence": the audible cable
   removal on Composition (VCA #14, walkthrough) and on Init Keyboard (VCA #4, screenshots at
   both sizes and themes), undo restoring cable, reading and sound.

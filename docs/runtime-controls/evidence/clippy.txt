@@ -1,0 +1,5 @@
+commit b2e9fd6 · cargo clippy --workspace --all-targets
+   Compiling kabl-standalone v0.1.0 (/home/user/kabl/crates/standalone)
+    Checking kabl-ui v0.1.0 (/home/user/kabl/crates/ui)
+    Finished `dev` profile [optimized + debuginfo] target(s) in 2.76s
+exit 0
