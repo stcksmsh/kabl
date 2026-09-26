@@ -230,6 +230,11 @@ impl Delivery {
         self.waiting()
     }
 
+    /// The last revision handed out (a value or a graph).
+    pub fn rev(&self) -> u64 {
+        self.rev
+    }
+
     /// Graphs in the queue the audio thread has not taken yet.
     pub fn graphs_queued(&self) -> u64 {
         self.graphs_sent - Feedback::get(&self.feedback.graphs_taken)

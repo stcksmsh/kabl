@@ -62,6 +62,8 @@ struct AudioHost {
     /// producer in its error callback) goes first on teardown: queued errors are then freed
     /// here, with this consumer, not on the exiting audio thread.
     faults_rx: Option<rtrb::Consumer<cpal::Error>>,
+    /// Revisions the callback applied and when (`KABL_LATENCY_FILE` only).
+    applied_rx: Option<rtrb::Consumer<(u64, f64)>>,
 }
 
 /// Audio-callback telemetry, written by the callback (and the stream's error callback) with
@@ -299,6 +301,7 @@ impl AudioHost {
             timing: None,
             probe_rx: None,
             faults_rx: None,
+            applied_rx: None,
             _stream: None,
         }
     }
@@ -405,6 +408,11 @@ impl AudioHost {
         let (control_tx, mut control_rx) = rtrb::RingBuffer::<ToAudio>::new(control::QUEUE);
         let feedback = Arc::new(Feedback::default());
         let fb = feedback.clone();
+        // Measurement only (`KABL_LATENCY_FILE`): the callback reports each newly applied
+        // revision with its time.
+        let (mut applied_tx, applied_rx) = rtrb::RingBuffer::<(u64, f64)>::new(1024);
+        let measure = std::env::var_os("KABL_LATENCY_FILE").is_some();
+        let mut last_applied = 0;
         // Test hooks: a small ring forces lost frames, a failure point forces a write error.
         let ring_frames = std::env::var("KABL_RECORD_RING_FRAMES")
             .ok()
@@ -458,6 +466,13 @@ impl AudioHost {
                 // values in order (state carry and values are allocation-free, at most one
                 // queue's worth per callback), apply MIDI to every running graph, render.
                 engine.drain(&mut control_rx, control::QUEUE, &fb);
+                if measure {
+                    let a = Feedback::get(&fb.applied_rev);
+                    if a != last_applied {
+                        last_applied = a;
+                        let _ = applied_tx.push((a, clock_s()));
+                    }
+                }
                 while let Ok(event) = midi_consumer.pop() {
                     engine.key(event);
                 }
@@ -562,6 +577,7 @@ impl AudioHost {
             timing: stream.is_some().then_some(timing),
             probe_rx: stream.is_some().then_some(probe_rx),
             faults_rx: stream.is_some().then_some(faults_rx),
+            applied_rx: (stream.is_some() && measure).then_some(applied_rx),
             _stream: stream,
         };
         (host, delivery)
@@ -574,6 +590,45 @@ struct Core {
     editor: PatchEditor,
     ui: UiState,
     delivery: Delivery,
+    /// `KABL_LATENCY_FILE` only.
+    latency: Option<Latency>,
+}
+
+/// Measurement only (`KABL_LATENCY_FILE`): from a CC's arrival at the MIDI input to the audio
+/// callback that took the change it made (a value, or a graph for a structural fallback).
+#[derive(Default)]
+struct Latency {
+    /// (revision a CC batch ended on, the batch's earliest arrival), oldest first.
+    waiting: std::collections::VecDeque<(u64, f64)>,
+    /// Seconds.
+    samples: Vec<f64>,
+}
+
+impl Latency {
+    fn applied(&mut self, rev: u64, at: f64) {
+        while self.waiting.front().is_some_and(|w| w.0 <= rev) {
+            let (_, arrived) = self.waiting.pop_front().unwrap();
+            self.samples.push(at - arrived);
+        }
+    }
+
+    fn line(&self) -> String {
+        let mut v = self.samples.clone();
+        v.sort_by(f64::total_cmp);
+        let q = |p: f64| {
+            v.get(((v.len() as f64 * p).ceil() as usize).saturating_sub(1))
+                .map_or("-".into(), |x| format!("{:.2}", x * 1e3))
+        };
+        format!(
+            "CC to audio callback: {} batches · p50 {} ms · p90 {} ms · p99 {} ms · max {} ms · {} waiting",
+            v.len(),
+            q(0.5),
+            q(0.9),
+            q(0.99),
+            q(1.0),
+            self.waiting.len()
+        )
+    }
 }
 
 /// Seconds since the process started: the control layer's steady clock (CC gestures, the
@@ -589,13 +644,15 @@ fn clock_s() -> f64 {
 /// The control thread: applies MIDI CCs (mappings, pickup, buttons) and retries whatever waits
 /// for the audio queue, without an editor frame. Woken by the MIDI input for each CC, and every
 /// few milliseconds while something waits.
-fn pump(core: Arc<Mutex<Core>>, mut cc: rtrb::Consumer<(u8, u8, u8)>) {
+fn pump(core: Arc<Mutex<Core>>, mut cc: rtrb::Consumer<((u8, u8, u8), f64)>) {
     let mut events = Vec::with_capacity(64);
     loop {
         std::thread::park_timeout(std::time::Duration::from_millis(5));
         events.clear();
-        while let Ok(e) = cc.pop() {
+        let mut arrived = f64::MAX;
+        while let Ok((e, t)) = cc.pop() {
             events.push(e);
+            arrived = arrived.min(t);
         }
         let Ok(mut c) = core.lock() else {
             return;
@@ -604,10 +661,15 @@ fn pump(core: Arc<Mutex<Core>>, mut cc: rtrb::Consumer<(u8, u8, u8)>) {
             editor,
             ui,
             delivery,
+            latency,
         } = &mut *c;
         kabl_ui::perform::rearm(ui, clock_s());
         if !events.is_empty() {
+            let before = delivery.rev();
             control::midi(editor, ui, delivery, &events, clock_s());
+            if let Some(l) = latency.as_mut().filter(|_| delivery.rev() > before) {
+                l.waiting.push_back((delivery.rev(), arrived));
+            }
         } else if delivery.waiting() > 0 {
             delivery.flush();
         }
@@ -619,7 +681,8 @@ fn pump(core: Arc<Mutex<Core>>, mut cc: rtrb::Consumer<(u8, u8, u8)>) {
 /// the UI (learn, mappings, buttons).
 struct MidiSink {
     notes: rtrb::Producer<KeyEvent>,
-    cc: rtrb::Producer<(u8, u8, u8)>,
+    /// CCs with their arrival time (`clock_s`).
+    cc: rtrb::Producer<((u8, u8, u8), f64)>,
     ctx: Option<egui::Context>,
     /// The control thread (`pump`), woken for each CC.
     pump: Option<std::thread::Thread>,
@@ -644,7 +707,7 @@ fn on_message(s: &mut MidiSink, data: &[u8]) {
     if let Some(e) = KeyEvent::from_midi(data) {
         let _ = s.notes.push(e);
     } else if data.len() >= 3 && data[0] & 0xF0 == 0xB0 && !is_key_cc(data[1]) {
-        let _ = s.cc.push((data[0] & 0x0F, data[1], data[2]));
+        let _ = s.cc.push(((data[0] & 0x0F, data[1], data[2]), clock_s()));
         if let Some(p) = &s.pump {
             p.unpark();
         }
@@ -719,7 +782,7 @@ fn input_names() -> Vec<String> {
 
 impl Midi {
     /// Also returns the CC queue's consumer, for the control thread.
-    fn new(notes: rtrb::Producer<KeyEvent>) -> (Self, rtrb::Consumer<(u8, u8, u8)>) {
+    fn new(notes: rtrb::Producer<KeyEvent>) -> (Self, rtrb::Consumer<((u8, u8, u8), f64)>) {
         let (cc, cc_rx) = rtrb::RingBuffer::new(1024);
         let m = Midi {
             sink: Arc::new(Mutex::new(MidiSink {
@@ -844,6 +907,7 @@ struct App {
     core: Arc<Mutex<Core>>,
     /// `Delivery::generation` the inspector last heard about.
     seen_generation: u64,
+    latency_at: std::time::Instant,
     audio: AudioHost,
     midi: Midi,
     /// `KABL_HITS_FILE`: where to write the drawn target rects (for scripted real-input runs).
@@ -981,7 +1045,13 @@ impl eframe::App for App {
             editor,
             ui: ui_state,
             delivery,
+            latency,
         } = &mut *core;
+        if let (Some(rx), Some(l)) = (self.audio.applied_rx.as_mut(), latency.as_mut()) {
+            while let Ok((rev, at)) = rx.pop() {
+                l.applied(rev, at);
+            }
+        }
         // Ctrl+Q quits the normal way (the recorder finalizes its take on the way out).
         if ui.input_mut(|i| {
             i.consume_shortcut(&egui::KeyboardShortcut::new(
@@ -1174,6 +1244,12 @@ impl eframe::App for App {
             if text != self.hits_written {
                 let _ = std::fs::write(path, &text);
                 self.hits_written = text;
+            }
+        }
+        if let (Some(l), Ok(path)) = (latency.as_ref(), std::env::var("KABL_LATENCY_FILE")) {
+            if self.latency_at.elapsed().as_secs_f32() > 1.0 {
+                self.latency_at = std::time::Instant::now();
+                let _ = std::fs::write(path, l.line() + "\n");
             }
         }
         if let (Some((path, at)), Some(t)) = (self.stats_file.as_mut(), &self.audio.timing) {
@@ -1396,6 +1472,7 @@ fn main() -> eframe::Result<()> {
                 editor,
                 ui: ui_state,
                 delivery,
+                latency: std::env::var_os("KABL_LATENCY_FILE").map(|_| Latency::default()),
             }));
             let c = core.clone();
             let pump = std::thread::Builder::new()
@@ -1410,6 +1487,7 @@ fn main() -> eframe::Result<()> {
             Ok(Box::new(App {
                 core,
                 seen_generation: 1,
+                latency_at: std::time::Instant::now(),
                 audio,
                 midi,
                 hits_file: std::env::var("KABL_HITS_FILE").ok(),
