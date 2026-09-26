@@ -68,6 +68,9 @@ pub enum Transport {
     Run,
     Stop,
     Restart,
+    /// Run when stopped, Stop when running: decided where the clock runs (a MIDI button needs
+    /// no report of the run state).
+    Toggle,
 }
 
 /// Pulses a block can start: one at most below ~750 bpm-equivalent rates, room to spare.
@@ -134,6 +137,11 @@ impl Clock {
                 self.phase = 0.0;
             }
             Transport::Run => {}
+            Transport::Toggle => self.command(if self.running {
+                Transport::Stop
+            } else {
+                Transport::Run
+            }),
             Transport::Restart => {
                 self.armed = true;
                 if self.running {

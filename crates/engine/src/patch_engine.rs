@@ -35,6 +35,7 @@ use crate::compile::{carry_state, compile, CompileError, CompiledPatch, PendingL
 use crate::graph::BLOCK;
 use crate::keyboard::{Action, KeyEvent, Keyboard};
 use crate::probe::{ProbeReport, ProbeTarget, WINDOW_SECS};
+use crate::runtime::{Feedback, ParamSet, ToAudio};
 use crate::swap::CROSSFADE_MS;
 use kabl_modules::builtins::KeySettings;
 
@@ -72,6 +73,8 @@ pub struct PatchEngine {
     rendered: u64,
     /// The last finished window, until the callback takes it.
     report: Option<ProbeReport>,
+    /// Revision of the newest graph received: an older one arriving later is refused.
+    newest_rev: u64,
 }
 
 /// Most notes one preview plays (a chord).
@@ -180,6 +183,7 @@ impl PatchEngine {
             probe_seq: 0,
             rendered: 0,
             report: None,
+            newest_rev: 0,
         };
         e.probe_window = window_blocks(sample_rate);
         e.sync_keyboards();
@@ -206,7 +210,9 @@ impl PatchEngine {
             probe_seq: 0,
             rendered: 0,
             report: None,
+            newest_rev: 0,
         };
+        e.newest_rev = e.active.rev;
         e.probe_window = window_blocks(e.active.sample_rate());
         e.sync_keyboards();
         e
@@ -388,6 +394,12 @@ impl PatchEngine {
     /// restarting the fade (which would click). A newer arrival replaces an older pending one
     /// (last request wins; the replaced graph is dropped through `basedrop`, not freed here).
     pub fn receive_swap(&mut self, mut new_patch: Owned<CompiledPatch>) {
+        // Compiled from an older document revision than a graph already received: it would
+        // undo newer edits. Refused (dropped through `basedrop`, not freed here).
+        if new_patch.rev < self.newest_rev {
+            return;
+        }
+        self.newest_rev = new_patch.rev;
         // An edit that replaces a queued fresh load is built on the loaded patch, so it must not
         // carry from the old one either.
         if let Some(p) = &self.pending {
@@ -467,8 +479,20 @@ impl PatchEngine {
 
     /// Audio-thread call: a clock transport command to every running graph (a `pending` graph
     /// gets it through `carry_state`). Stop turns the launches pending on that clock into
-    /// selections: armed now, they start on the sequencers' next edges (Run). No allocation.
+    /// selections: armed now, they start on the sequencers' next edges (Run). Toggle becomes
+    /// Run or Stop from the clock's state in the graph playing. No allocation.
     pub fn transport(&mut self, id: kabl_core::ModuleId, t: kabl_modules::builtins::Transport) {
+        use kabl_modules::builtins::Transport;
+        let playing = match &self.incoming {
+            Some((g, _)) => g,
+            None => &self.active,
+        };
+        let t = match (t, playing.clock(id)) {
+            (Transport::Toggle, Some(c)) if c.running() => Transport::Stop,
+            (Transport::Toggle, Some(_)) => Transport::Run,
+            (Transport::Toggle, None) => return,
+            (t, _) => t,
+        };
         self.active.transport(id, t);
         if let Some((g, _)) = self.incoming.as_mut() {
             g.transport(id, t);
@@ -776,6 +800,59 @@ impl PatchEngine {
     pub fn drain_swaps(&mut self, rx: &mut rtrb::Consumer<Owned<CompiledPatch>>) {
         while let Ok(graph) = rx.pop() {
             self.receive_swap(graph);
+        }
+    }
+
+    /// Audio-thread call: a runtime value (`runtime.rs`) to every graph compiled from an
+    /// older revision: `active` and `incoming` (ramped when playing) and `pending` (set, it
+    /// has not started). Returns whether it resolved in any of them. No allocation.
+    pub fn set(&mut self, s: &ParamSet) -> bool {
+        let mut hit = false;
+        let mut apply = |g: &mut CompiledPatch| {
+            if s.rev > g.rev {
+                let ramp = g.started();
+                hit |= g.set_runtime(s.target, s.value, ramp);
+            }
+        };
+        apply(&mut self.active);
+        if let Some((g, _)) = self.incoming.as_mut() {
+            apply(g);
+        }
+        if let Some(g) = self.pending.as_mut() {
+            apply(g);
+        }
+        hit
+    }
+
+    /// Audio-thread call: takes at most `max` messages from the control queue, in order:
+    /// graphs through `receive_swap`, values through `set`. Reports in `fb`. Bounded work: the
+    /// rest waits for the next callback. No allocation.
+    pub fn drain(&mut self, rx: &mut rtrb::Consumer<ToAudio>, max: usize, fb: &Feedback) {
+        use std::sync::atomic::Ordering::Relaxed;
+        for _ in 0..max {
+            let Ok(m) = rx.pop() else {
+                break;
+            };
+            match m {
+                ToAudio::Graph(g) => {
+                    let rev = g.rev;
+                    self.receive_swap(g);
+                    fb.graphs_taken.fetch_add(1, Relaxed);
+                    if self.newest_rev == rev {
+                        fb.applied_rev.fetch_max(rev, Relaxed);
+                    } else {
+                        fb.stale_graphs.fetch_add(1, Relaxed);
+                    }
+                }
+                ToAudio::Set(s) => {
+                    fb.sets_taken.fetch_add(1, Relaxed);
+                    if self.set(&s) {
+                        fb.applied_rev.fetch_max(s.rev, Relaxed);
+                    } else {
+                        fb.unresolved.fetch_add(1, Relaxed);
+                    }
+                }
+            }
         }
     }
 }

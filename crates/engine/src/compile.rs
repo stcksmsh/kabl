@@ -72,6 +72,7 @@ use kabl_modules::{
 use crate::graph::BLOCK;
 use crate::keyboard::Action;
 use crate::probe::{ProbeReport, ProbeStatus, ProbeTarget, Tap, PROBE_LANES};
+use crate::runtime::RuntimeTarget;
 
 pub type BufIdx = usize;
 
@@ -205,6 +206,119 @@ enum Step {
     /// call. Placed at the end of the schedule so this block's own `Step::Process` reads (earlier
     /// in `steps`) still see last block's value.
     CopyToDelay { src: BufIdx, dest: BufIdx },
+}
+
+/// A `ParamSlot::modi` for a param no route modulates.
+const NO_MOD: u32 = u32::MAX;
+/// Most runtime values one graph ramps at once; a value beyond them is set at once.
+pub const MAX_RAMPS: usize = 32;
+/// How long a runtime value ramps (`runtime.rs`, smoothing): the crossfade a rebuild used to
+/// give every edit.
+pub const RAMP_MS: f32 = crate::swap::CROSSFADE_MS;
+
+/// Where one param of one instance lives: `steps[step]`, `params[index]`, and its `mods[modi]`
+/// when routes modulate it.
+#[derive(Clone, Copy)]
+struct ParamSlot {
+    id: ModuleId,
+    index: u16,
+    step: u32,
+    modi: u32,
+    stepped: bool,
+    /// The module smooths this param itself: a runtime value is set, never ramped.
+    smoothed: bool,
+}
+
+/// Where one route of one instance lives: `steps[step]`, `mods[modi].routes[route]`.
+#[derive(Clone, Copy)]
+struct RouteSlot {
+    cable: CableId,
+    step: u32,
+    modi: u32,
+    route: u32,
+    full_scale: f32,
+}
+
+/// Slots `lo..hi` of `param_slots` (a param) or `route_slots` (a route): one target.
+#[derive(Clone, Copy, PartialEq)]
+enum RampOn {
+    Param(u32, u32),
+    Route(u32, u32),
+}
+
+/// A runtime value moving from `from` to `to` in `left` more blocks: knob travel (`to_norm`)
+/// for a param, the route's scale for a route. The last block writes `exact`, the value the
+/// compiler would have used, so a settled ramp leaves the graph bit-identical to a compile.
+#[derive(Clone, Copy)]
+struct Ramp {
+    on: RampOn,
+    from: f32,
+    to: f32,
+    exact: f32,
+    left: u16,
+}
+
+const NO_RAMP: Ramp = Ramp {
+    on: RampOn::Param(0, 0),
+    from: 0.0,
+    to: 0.0,
+    exact: 0.0,
+    left: 0,
+};
+
+/// A value for slots `lo..hi`: an exact destination value or a position in knob travel.
+#[derive(Clone, Copy)]
+enum Val {
+    Exact(f32),
+    Norm(f32),
+}
+
+/// Writes `v` into param slots `lo..hi`. No allocation.
+fn write_param(
+    steps: &mut [Step],
+    slots: &[ParamSlot],
+    modules: &[Box<dyn Module>],
+    lo: u32,
+    hi: u32,
+    v: Val,
+) {
+    for slot in &slots[lo as usize..hi as usize] {
+        let Step::Process {
+            module_index,
+            params,
+            mods,
+            ..
+        } = &mut steps[slot.step as usize]
+        else {
+            continue;
+        };
+        let info = &modules[*module_index].info().params[slot.index as usize];
+        let i = slot.index as usize;
+        match v {
+            Val::Exact(raw) => {
+                params[i] = Signal::Scalar(raw);
+                if slot.modi != NO_MOD {
+                    mods[slot.modi as usize].base_norm = info.to_norm(raw);
+                }
+            }
+            Val::Norm(n) if slot.modi != NO_MOD => mods[slot.modi as usize].base_norm = n,
+            Val::Norm(n) => params[i] = Signal::Scalar(info.from_norm(n)),
+        }
+    }
+}
+
+/// Writes a route scale into route slots `lo..hi`: `Exact(amount)` (divided by each source's
+/// full scale, as the compiler does) or `Norm(scale)`. No allocation.
+fn write_route(steps: &mut [Step], slots: &[RouteSlot], lo: u32, hi: u32, v: Val) {
+    for slot in &slots[lo as usize..hi as usize] {
+        let Step::Process { mods, .. } = &mut steps[slot.step as usize] else {
+            continue;
+        };
+        mods[slot.modi as usize].routes[slot.route as usize].1 = match v {
+            Val::Exact(amount) => amount / slot.full_scale,
+            Val::Norm(scale) => scale,
+        };
+    }
 }
 
 /// Reassigns buffer indices so buffers whose live ranges don't overlap share the same physical
@@ -373,6 +487,21 @@ pub struct CompiledPatch {
     /// graphs when only values changed. A measurement window only continues across a swap
     /// that keeps it.
     topology: u64,
+    /// The document revision this graph was compiled from (`runtime.rs`): a runtime value
+    /// applies only when it is newer. 0 = unversioned (tests, offline renders).
+    pub rev: u64,
+    /// Rendered at least one block: runtime values ramp from here on (before, they are set).
+    started: bool,
+    /// Every param of every instance, sorted by (module, param, step): where a runtime value
+    /// lands.
+    param_slots: Vec<ParamSlot>,
+    /// Every compiled route, sorted by (cable, step).
+    route_slots: Vec<RouteSlot>,
+    /// Runtime values moving toward their target, one per target (`runtime.rs`, smoothing).
+    ramps: [Ramp; MAX_RAMPS],
+    n_ramps: usize,
+    /// Blocks a ramp takes (`RAMP_MS`).
+    ramp_blocks: u16,
 }
 
 /// `CompiledPatch::topology` of `patch`.
@@ -399,6 +528,7 @@ enum CableTo {
 }
 
 struct CableInfo {
+    cable: CableId,
     from_id: ModuleId,
     from_port: String,
     to: CableTo,
@@ -633,6 +763,7 @@ fn compile_inner(
             *indegree.entry(to_id).or_insert(0) += 1;
         }
         cables_by_dest.entry(to_id).or_default().push(CableInfo {
+            cable: cable_id,
             from_id: *from_id,
             from_port: from_port.clone(),
             to,
@@ -783,6 +914,8 @@ fn compile_inner(
         }
     }
 
+    let mut param_slots: Vec<ParamSlot> = Vec::new();
+    let mut route_slots: Vec<RouteSlot> = Vec::new();
     let mut modules: Vec<Box<dyn Module>> = Vec::new();
     let mut module_origin: Vec<(ModuleId, Option<usize>)> = Vec::new();
     let mut midi_ins: Vec<(usize, usize)> = Vec::new();
@@ -912,6 +1045,7 @@ fn compile_inner(
             }
 
             let mut mods: Vec<ParamMod> = Vec::new();
+            let first_route = route_slots.len();
             for (k, c) in incoming.iter().enumerate() {
                 let CableTo::Param { index, amount } = c.to else {
                     continue;
@@ -926,18 +1060,27 @@ fn compile_inner(
                     c.delayed,
                 );
                 let route = (buf, amount / full_scale);
-                match mods.iter_mut().find(|m| m.index == index) {
-                    Some(m) => m.routes.push(route),
+                let m = match mods.iter().position(|m| m.index == index) {
+                    Some(k) => k,
                     None => {
                         let info = meta.info.params[index];
                         mods.push(ParamMod {
                             index,
                             info,
                             base_norm: info.to_norm(params[index]),
-                            routes: vec![route],
+                            routes: Vec::new(),
                         });
+                        mods.len() - 1
                     }
-                }
+                };
+                route_slots.push(RouteSlot {
+                    cable: c.cable,
+                    step: 0,
+                    modi: m as u32,
+                    route: mods[m].routes.len() as u32,
+                    full_scale,
+                });
+                mods[m].routes.push(route);
             }
 
             let mut lane_outputs = Vec::with_capacity(output_ports.len());
@@ -981,6 +1124,23 @@ fn compile_inner(
                 midi_ins.push((module_index, lane));
             }
 
+            let step = w.steps.len() as u32;
+            for r in &mut route_slots[first_route..] {
+                r.step = step;
+            }
+            for (index, info) in meta.info.params.iter().enumerate() {
+                param_slots.push(ParamSlot {
+                    id,
+                    index: index as u16,
+                    step,
+                    modi: mods
+                        .iter()
+                        .position(|m| m.index == index)
+                        .map_or(NO_MOD, |k| k as u32),
+                    stepped: info.taper == kabl_modules::Taper::Stepped,
+                    smoothed: crate::runtime::smoothed_by_module(meta.info.kind, info.name),
+                });
+            }
             w.steps.push(Step::Process {
                 module_index,
                 inputs: lane_inputs,
@@ -1096,6 +1256,8 @@ fn compile_inner(
         *buf = remap[*buf];
     }
     let buffers = vec![[0.0; BLOCK]; physical_count];
+    param_slots.sort_by_key(|p| (p.id, p.index, p.step));
+    route_slots.sort_by_key(|r| (r.cable, r.step));
 
     Ok(CompiledPatch {
         modules,
@@ -1113,6 +1275,13 @@ fn compile_inner(
         generation: 0,
         tap: Tap::default(),
         topology: topology_of(patch),
+        rev: 0,
+        started: false,
+        param_slots,
+        route_slots,
+        ramps: [NO_RAMP; MAX_RAMPS],
+        n_ramps: 0,
+        ramp_blocks: ((RAMP_MS / 1000.0 * sample_rate / BLOCK as f32).round() as u16).max(1),
     })
 }
 
@@ -1245,6 +1414,10 @@ impl CompiledPatch {
     /// this block, at the boundary's sample offset (clocks are scheduled before sequencers).
     #[inline]
     pub fn process_block_with(&mut self, launches: &[PendingLaunch]) {
+        self.started = true;
+        if self.n_ramps > 0 {
+            self.run_ramps();
+        }
         for step in &mut self.steps {
             match step {
                 Step::Process {
@@ -1539,6 +1712,220 @@ impl CompiledPatch {
         };
         tap.reset_window();
         Some(report)
+    }
+
+    /// Audio thread: applies a runtime value (`runtime.rs`) when `target` resolves in this
+    /// graph: module `id` compiled as the same kind, or the compiled route of that cable.
+    /// `ramp` (the graph is playing): a continuous param the module does not smooth itself, and
+    /// a route amount, move there over `RAMP_MS` in knob travel (a scale for a route); anything
+    /// else, or a value beyond `MAX_RAMPS` ramps, is set now. A target already ramping starts
+    /// again from where it is. Returns whether the target resolved. No allocation.
+    pub fn set_runtime(&mut self, target: RuntimeTarget, value: f32, ramp: bool) -> bool {
+        let (on, from, to) = match target {
+            RuntimeTarget::Param { id, kind, index } => {
+                let lo = self
+                    .param_slots
+                    .partition_point(|s| (s.id, s.index) < (id, index));
+                let hi = self
+                    .param_slots
+                    .partition_point(|s| (s.id, s.index) <= (id, index));
+                if lo == hi {
+                    return false;
+                }
+                let slot = self.param_slots[lo];
+                let Step::Process {
+                    module_index,
+                    params,
+                    mods,
+                    ..
+                } = &self.steps[slot.step as usize]
+                else {
+                    return false;
+                };
+                let info = self.modules[*module_index].info();
+                if info.kind != kind {
+                    return false;
+                }
+                let on = RampOn::Param(lo as u32, hi as u32);
+                if !ramp || slot.stepped || slot.smoothed {
+                    self.drop_ramp(on);
+                    write_param(
+                        &mut self.steps,
+                        &self.param_slots,
+                        &self.modules,
+                        lo as u32,
+                        hi as u32,
+                        Val::Exact(value),
+                    );
+                    return true;
+                }
+                let p = &info.params[slot.index as usize];
+                let now = if slot.modi != NO_MOD {
+                    mods[slot.modi as usize].base_norm
+                } else {
+                    match params[slot.index as usize] {
+                        Signal::Scalar(v) => p.to_norm(v),
+                        Signal::Buffer(b) => p.to_norm(b[0]),
+                    }
+                };
+                (on, now, p.to_norm(value))
+            }
+            RuntimeTarget::Route { cable } => {
+                let lo = self.route_slots.partition_point(|s| s.cable < cable);
+                let hi = self.route_slots.partition_point(|s| s.cable <= cable);
+                if lo == hi {
+                    return false;
+                }
+                let on = RampOn::Route(lo as u32, hi as u32);
+                if !ramp {
+                    self.drop_ramp(on);
+                    write_route(
+                        &mut self.steps,
+                        &self.route_slots,
+                        lo as u32,
+                        hi as u32,
+                        Val::Exact(value),
+                    );
+                    return true;
+                }
+                let slot = self.route_slots[lo];
+                let Step::Process { mods, .. } = &self.steps[slot.step as usize] else {
+                    return false;
+                };
+                let now = mods[slot.modi as usize].routes[slot.route as usize].1;
+                (on, now, value / slot.full_scale)
+            }
+        };
+        let r = Ramp {
+            on,
+            from,
+            to,
+            exact: value,
+            left: self.ramp_blocks,
+        };
+        let n = self.n_ramps;
+        match self.ramps[..n].iter().position(|x| x.on == on) {
+            Some(i) => self.ramps[i] = r,
+            None if n < MAX_RAMPS => {
+                self.ramps[n] = r;
+                self.n_ramps += 1;
+            }
+            // ponytail: past MAX_RAMPS a value steps instead of ramping; raise the bound if
+            // many targets ever move at once.
+            None => self.write(on, Val::Exact(value)),
+        }
+        true
+    }
+
+    /// Writes `v` to the slots of `on`. No allocation.
+    fn write(&mut self, on: RampOn, v: Val) {
+        match on {
+            RampOn::Param(lo, hi) => {
+                write_param(&mut self.steps, &self.param_slots, &self.modules, lo, hi, v)
+            }
+            RampOn::Route(lo, hi) => write_route(&mut self.steps, &self.route_slots, lo, hi, v),
+        }
+    }
+
+    /// Forgets the ramp of `on`, if any (a value set directly replaces it).
+    fn drop_ramp(&mut self, on: RampOn) {
+        if let Some(i) = self.ramps[..self.n_ramps].iter().position(|r| r.on == on) {
+            self.n_ramps -= 1;
+            self.ramps.swap(i, self.n_ramps);
+        }
+    }
+
+    /// Start of a block: every ramp moves one block; a finished one writes its exact value and
+    /// goes. No allocation; work is at most `MAX_RAMPS` targets.
+    fn run_ramps(&mut self) {
+        let mut i = 0;
+        while i < self.n_ramps {
+            let r = &mut self.ramps[i];
+            r.left -= 1;
+            let done = r.left == 0;
+            let v = if done {
+                Val::Exact(r.exact)
+            } else {
+                let t = r.left as f32 / self.ramp_blocks as f32;
+                Val::Norm(r.to + (r.from - r.to) * t)
+            };
+            let on = r.on;
+            self.write(on, v);
+            if done {
+                self.n_ramps -= 1;
+                self.ramps.swap(i, self.n_ramps);
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    /// The current base value of param `index` of module `id` (its first instance), as the
+    /// graph uses it this block before modulation. For tests and evidence.
+    pub fn param_value(&self, id: ModuleId, index: usize) -> Option<f32> {
+        let slot = self
+            .param_slots
+            .iter()
+            .find(|s| s.id == id && s.index as usize == index)?;
+        let Step::Process {
+            module_index,
+            params,
+            mods,
+            ..
+        } = &self.steps[slot.step as usize]
+        else {
+            return None;
+        };
+        Some(if slot.modi != NO_MOD {
+            self.modules[*module_index].info().params[index]
+                .from_norm(mods[slot.modi as usize].base_norm)
+        } else {
+            match params[index] {
+                Signal::Scalar(v) => v,
+                Signal::Buffer(b) => b[0],
+            }
+        })
+    }
+
+    /// `param_value` for every instance (voice lanes in order). Allocates: tests and evidence.
+    pub fn param_values(&self, id: ModuleId, index: usize) -> Vec<f32> {
+        self.param_slots
+            .iter()
+            .filter(|s| s.id == id && s.index as usize == index)
+            .filter_map(|s| match &self.steps[s.step as usize] {
+                Step::Process { params, .. } if s.modi == NO_MOD => match params[index] {
+                    Signal::Scalar(v) => Some(v),
+                    Signal::Buffer(b) => Some(b[0]),
+                },
+                Step::Process {
+                    module_index, mods, ..
+                } => Some(
+                    self.modules[*module_index].info().params[index]
+                        .from_norm(mods[s.modi as usize].base_norm),
+                ),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The signed amount of route `cable` as the graph uses it (its first instance), if
+    /// compiled. For tests and evidence.
+    pub fn route_amount(&self, cable: CableId) -> Option<f32> {
+        let slot = self.route_slots.iter().find(|s| s.cable == cable)?;
+        let Step::Process { mods, .. } = &self.steps[slot.step as usize] else {
+            return None;
+        };
+        Some(mods[slot.modi as usize].routes[slot.route as usize].1 * slot.full_scale)
+    }
+
+    /// Runtime values still ramping.
+    pub fn ramps(&self) -> usize {
+        self.n_ramps
+    }
+
+    /// Rendered at least one block.
+    pub fn started(&self) -> bool {
+        self.started
     }
 
     pub fn left(&self) -> &[f32; BLOCK] {
