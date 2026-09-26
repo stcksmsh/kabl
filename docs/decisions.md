@@ -2629,3 +2629,28 @@ Implementation choices of the authorized assignment; not owner approvals. Record
   from the playing clock on the audio thread; the button guard starts at connect time.
   Rejected: processing in the MIDI callback (lock-order inversion with the sink lock), moving
   CC state out of `UiState` (churn with no behaviour gained).
+
+## 2026-09-26 — D04 review fixes (implementation rationale)
+
+Responses to the independent review (`docs/runtime-controls/REVIEW.md`, R-01..R-06); not
+owner approvals. They amend the "Bounds" and "Identity and order" points of the previous
+entry.
+
+- **Ramps have no ceiling (R-01).** Each compiled graph allocates its ramp table at compile
+  with room for every distinct rampable target, so a restore or undo of many knobs ramps all
+  of them as the old crossfade did. Rejected: compiling instead past 32 ramped values (a
+  second code path, and concurrent ramps from separate edits could still hit a cap); asking
+  Kosta to accept the steps (a fix without tradeoff existed).
+- **Commands share the FIFO (R-02).** Launch, cancel, preview, inspect and transport travel in
+  `ToAudio`, held behind earlier values and graphs and merged with them by revision, so a
+  launch never plays pre-edit bank data and a Restart never uses the old tempo. At most 64
+  wait; past that one is refused and reported. Waiting commands are delivered late rather
+  than dropped when the audio thread resumes; a "Now" launch then lands later. Rejected:
+  sending commands only when nothing waits (a race remains between drain and the command
+  queue within one callback).
+- **Diagnosis wording (R-03).** A missing audio input is a graph fact; that the stage is
+  therefore silent is a possibility (resonant filters and tails keep sounding).
+- **Load fences old graphs (R-05).** After a fresh graph arrives, runtime values skip graphs of
+  the replaced document.
+- **Lock scope (R-04).** Documented as one editor frame's whole logic, file operations and
+  port connect included; not moved out of the lock, not measured.
