@@ -340,12 +340,15 @@ pub fn deliver(editor: &mut PatchEditor, ui_state: &mut UiState, d: &mut Deliver
         }
     }
     d.flush();
-    if refused > 0 && d.tx.is_some() {
+    if refused > 0 {
         d.counts.dropped_actions += refused;
-        log::warn!(target: "control", "{refused} command(s) not delivered: {MAX_HELD_ACTIONS} already wait for the audio thread");
-        ui_state.last_message = Some(format!(
-            "{refused} action(s) not delivered: audio is not responding"
-        ));
+        let reason = if d.tx.is_some() {
+            format!("{MAX_HELD_ACTIONS} already wait for the audio thread")
+        } else {
+            "audio unavailable or restarting".into()
+        };
+        log::warn!(target: "control", "{refused} action(s) not delivered: {reason}");
+        ui_state.last_message = Some(format!("{refused} action(s) refused: {reason}"));
     }
     out
 }

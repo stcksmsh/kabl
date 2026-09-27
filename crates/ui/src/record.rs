@@ -85,6 +85,12 @@ pub enum Outcome {
         frames: u64,
         lost: u64,
     },
+    /// A stream interruption ended the take; no-callback time cannot be reconstructed.
+    Interrupted {
+        path: PathBuf,
+        frames: u64,
+        lost: u64,
+    },
     Failed(String),
 }
 
@@ -298,6 +304,15 @@ impl Recorder {
 
     /// Stops the take, waits for the file to be finalized, and reports how it ended.
     pub fn stop(&mut self) -> Option<Outcome> {
+        self.stop_with(false)
+    }
+
+    /// Finalizes a usable prefix and marks it partial even without ring overflow.
+    pub fn stop_interrupted(&mut self) -> Option<Outcome> {
+        self.stop_with(true)
+    }
+
+    fn stop_with(&mut self, interrupted: bool) -> Option<Outcome> {
         let job = self.job.take()?;
         let _ =
             self.shared
@@ -331,6 +346,11 @@ impl Recorder {
                             frames as f32 / self.sample_rate as f32
                         ))
                     }
+                    Ok(()) if interrupted => Outcome::Interrupted {
+                        path: mark(&job.path),
+                        frames,
+                        lost,
+                    },
                     Ok(()) if lost > 0 => Outcome::Incomplete {
                         path: mark(&job.path),
                         frames,
@@ -519,7 +539,9 @@ pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, th: &crate::th
         if let Some(o) = rec.last.clone() {
             let (path, ok) = match &o {
                 Outcome::Complete { path, .. } => (Some(path.clone()), true),
-                Outcome::Incomplete { path, .. } => (Some(path.clone()), false),
+                Outcome::Incomplete { path, .. } | Outcome::Interrupted { path, .. } => {
+                    (Some(path.clone()), false)
+                }
                 Outcome::Failed(_) => (None, false),
             };
             ui.separator();
@@ -532,6 +554,10 @@ pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, th: &crate::th
                 Outcome::Incomplete { path, lost, .. } => {
                     format!("Last take INCOMPLETE ({lost} frames lost): {}", name(path))
                 }
+                Outcome::Interrupted { path, frames, lost } => format!(
+                    "Last take INTERRUPTED ({frames} frames written, {lost} dropped): {}",
+                    name(path)
+                ),
                 Outcome::Failed(e) => format!("Recording failed: {e}"),
             };
             let t = RichText::new(text).small();
@@ -566,6 +592,10 @@ pub fn describe(o: &Outcome) -> String {
         }
         Outcome::Incomplete { path, frames, lost } => format!(
             "INCOMPLETE: {lost} frames lost; {frames} written to {}",
+            path.display()
+        ),
+        Outcome::Interrupted { path, frames, lost } => format!(
+            "INTERRUPTED: {frames} frames written, {lost} recording frames dropped; usable prefix at {}. Time without callbacks is unknown",
             path.display()
         ),
         Outcome::Failed(e) => e.clone(),

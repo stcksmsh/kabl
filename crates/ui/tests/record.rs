@@ -147,6 +147,27 @@ fn stop_without_an_audio_callback_still_finalizes() {
 }
 
 #[test]
+fn interruption_marks_a_playable_prefix_and_a_new_take_is_separate() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut rec, mut tap) = pair(SR);
+    let first = rec.start_at(dir.path().join("first.wav")).unwrap();
+    let mut n = 0;
+    callback(&mut tap, &mut n, 480);
+    let out = rec.stop_interrupted().unwrap();
+    let Outcome::Interrupted { path, frames, lost } = out else {
+        panic!("{out:?}")
+    };
+    assert_eq!((frames, lost), (480, 0));
+    assert_ne!(path, first);
+    assert_eq!(read(&path).1.len(), 960);
+    let second = rec.start_at(dir.path().join("second.wav")).unwrap();
+    callback(&mut tap, &mut n, 240);
+    assert!(matches!(rec.stop(), Some(Outcome::Complete { .. })));
+    assert_eq!(read(&second).1.len(), 480);
+    assert_eq!(read(&path).1.len(), 960);
+}
+
+#[test]
 fn dropping_the_recorder_finalizes_the_take() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("exit.wav");

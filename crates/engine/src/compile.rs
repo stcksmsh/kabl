@@ -1300,6 +1300,11 @@ impl CompiledPatch {
         self.buffers.len()
     }
 
+    /// Counts executed module instances and steps for offline profiling.
+    pub fn profile_counts(&self) -> (usize, usize, usize) {
+        (self.modules.len(), self.module_origin.iter().filter(|(_, v)| v.is_some()).count(), self.steps.len())
+    }
+
     /// The `out` module this graph plays (with several, the last in schedule order; the others
     /// are not heard).
     pub fn output_module(&self) -> Option<ModuleId> {
@@ -1396,6 +1401,16 @@ impl CompiledPatch {
                 self.transport(id, Transport::Stop);
             }
         }
+    }
+
+    /// A selection made after a queued Load belongs to that graph, even if an edit replaces
+    /// it before the fade starts. Pending graphs have not rendered yet.
+    pub fn inherit_armed_seqs(&mut self, previous: &Self) {
+        previous.seqs(|id, _, _, armed| {
+            if let Some(bank) = armed {
+                self.with_seq(id, |s| s.arm(bank, 0));
+            }
+        });
     }
 
     /// Audio thread: runs `f` on the `seq` module `id`, if this graph has one. No allocation.

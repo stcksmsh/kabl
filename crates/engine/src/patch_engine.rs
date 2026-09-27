@@ -405,7 +405,8 @@ impl PatchEngine {
             return;
         }
         self.newest_rev = new_patch.rev;
-        if new_patch.fresh {
+        let explicit_load = new_patch.fresh;
+        if explicit_load {
             self.fresh_rev = new_patch.rev;
         }
         // An edit that replaces a queued fresh load is built on the loaded patch, so it must not
@@ -415,11 +416,12 @@ impl PatchEngine {
                 if p.fresh {
                     new_patch.inherit_stopped_clocks(p);
                 }
+                new_patch.inherit_armed_seqs(p);
                 new_patch.fresh = p.fresh;
             }
         }
         // A Load drops pending launches: the loaded sequencers start on their startup banks.
-        if new_patch.fresh {
+        if explicit_load {
             self.launches = [None; MAX_PENDING];
         }
         if self.incoming.is_some() {
@@ -496,6 +498,25 @@ impl PatchEngine {
     /// Run or Stop from the clock's state in the graph playing. No allocation.
     pub fn transport(&mut self, id: kabl_core::ModuleId, t: kabl_modules::builtins::Transport) {
         use kabl_modules::builtins::Transport;
+        if self.pending.as_ref().is_some_and(|g| g.fresh) {
+            let g = self.pending.as_mut().unwrap();
+            let t = match (t, g.clock(id)) {
+                (Transport::Toggle, Some(c)) if c.running() => Transport::Stop,
+                (Transport::Toggle, Some(_)) => Transport::Run,
+                (Transport::Toggle, None) => return,
+                (t, _) => t,
+            };
+            g.transport(id, t);
+            if t == Transport::Stop {
+                for slot in self.launches.iter_mut() {
+                    if let Some(l) = slot.filter(|l| l.clock == id) {
+                        *slot = None;
+                        g.with_seq(l.seq, |s| s.arm(l.bank as usize, 0));
+                    }
+                }
+            }
+            return;
+        }
         let playing = match &self.incoming {
             Some((g, _)) => g,
             None => &self.active,
@@ -517,7 +538,13 @@ impl PatchEngine {
             for slot in self.launches.iter_mut() {
                 if let Some(l) = slot.filter(|l| l.clock == id) {
                     *slot = None;
-                    arm_all(&mut self.active, &mut self.incoming, l.seq, l.bank as usize);
+                    arm_all(
+                        &mut self.active,
+                        &mut self.incoming,
+                        &mut self.pending,
+                        l.seq,
+                        l.bank as usize,
+                    );
                 }
             }
         }
@@ -528,9 +555,10 @@ impl PatchEngine {
     /// queued for the clock's next step or bar. An unknown clock drops the command. No
     /// allocation.
     pub fn launch(&mut self, l: &Launch) {
-        let graph = match &self.incoming {
-            Some((g, _)) => g,
-            None => &self.active,
+        let graph = match (&self.pending, &self.incoming) {
+            (Some(g), _) if g.fresh => g,
+            (_, Some((g, _))) => g,
+            _ => &self.active,
         };
         let Some(clock) = graph.clock(l.clock) else {
             return;
@@ -545,7 +573,19 @@ impl PatchEngine {
         for &(seq, bank) in &l.targets[..l.count.min(MAX_TARGETS)] {
             self.cancel(Some(seq));
             match at {
-                None => arm_all(&mut self.active, &mut self.incoming, seq, bank as usize),
+                None if self.pending.as_ref().is_some_and(|g| g.fresh) => {
+                    self.pending
+                        .as_mut()
+                        .unwrap()
+                        .with_seq(seq, |s| s.arm(bank as usize, 0));
+                }
+                None => arm_all(
+                    &mut self.active,
+                    &mut self.incoming,
+                    &mut self.pending,
+                    seq,
+                    bank as usize,
+                ),
                 Some(at) => {
                     if let Some(slot) = self.launches.iter_mut().find(|s| s.is_none()) {
                         *slot = Some(PendingLaunch {
@@ -591,8 +631,15 @@ impl PatchEngine {
             Some(id) => g.with_seq(id, |s| s.cancel()),
             None => g.for_each_seq(|s| s.cancel()),
         };
+        if self.pending.as_ref().is_some_and(|g| g.fresh) {
+            disarm(self.pending.as_mut().unwrap());
+            return;
+        }
         disarm(&mut self.active);
         if let Some((g, _)) = self.incoming.as_mut() {
+            disarm(g);
+        }
+        if let Some(g) = self.pending.as_mut() {
             disarm(g);
         }
     }
@@ -767,11 +814,15 @@ fn act(
 fn arm_all(
     active: &mut CompiledPatch,
     incoming: &mut Option<(Owned<CompiledPatch>, usize)>,
+    pending: &mut Option<Owned<CompiledPatch>>,
     seq: kabl_core::ModuleId,
     bank: usize,
 ) {
     active.with_seq(seq, |s| s.arm(bank, 0));
     if let Some((g, _)) = incoming.as_mut() {
+        g.with_seq(seq, |s| s.arm(bank, 0));
+    }
+    if let Some(g) = pending.as_mut() {
         g.with_seq(seq, |s| s.arm(bank, 0));
     }
 }
