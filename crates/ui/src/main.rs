@@ -1164,6 +1164,11 @@ struct RetryResult {
     retired_graphs: usize,
 }
 
+struct RetryFault {
+    delay_ms: u64,
+    fail_reopen: bool,
+}
+
 /// The old stream is dropped before its collector is drained or a new stream is opened.
 fn retry_worker(
     mut old: AudioHost,
@@ -1172,17 +1177,16 @@ fn retry_worker(
     keys: Arc<AtomicU64>,
     request: AudioRequest,
     peaks: Arc<record::PeakTap>,
-    delay_ms: u64,
-    fail_reopen: bool,
+    fault: RetryFault,
 ) -> RetryResult {
     drop(old._stream.take());
     old.collector.collect();
     let retired_graphs = old.collector.alloc_count();
     drop(old);
-    if delay_ms > 0 {
-        std::thread::sleep(std::time::Duration::from_millis(delay_ms.min(5000)));
+    if fault.delay_ms > 0 {
+        std::thread::sleep(std::time::Duration::from_millis(fault.delay_ms.min(5000)));
     }
-    let (audio, delivery) = if fail_reopen {
+    let (audio, delivery) = if fault.fail_reopen {
         let a = AudioHost::offline(
             Collector::new(),
             "injected reopen failure; choose output and Retry".into(),
@@ -1315,7 +1319,10 @@ impl App {
             .is_some_and(|n| session <= n + 1);
         let handle = std::thread::Builder::new()
             .name("kabl-audio-retry".into())
-            .spawn(move || retry_worker(old, notes, notes_rx, keys, request, peaks, delay, fail))
+            .spawn(move || retry_worker(old, notes, notes_rx, keys, request, peaks, RetryFault {
+                delay_ms: delay,
+                fail_reopen: fail,
+            }))
             .expect("spawn one audio retry worker");
         self.retry = Some(RetryTask {
             handle,
@@ -1743,14 +1750,15 @@ impl eframe::App for App {
                 let _ = std::fs::write(
                     path,
                     format!(
-                        "{} · {} live graph allocations · {} undo entries · {} MIDI notes held · {} voices sounding\n{}\n{}\n",
+                        "{} · {} live graph allocations · {} undo entries · {} MIDI notes held · {} voices sounding\n{}\n{} · {} stale CC events discarded\n",
                         t.line(self.audio.sample_rate),
                         self.audio.collector.alloc_count(),
                         editor.log().entries().len(),
                         held,
                         sounding,
                         t.hist_line(),
-                        format!("{} · {} stale CC events discarded", delivery_line(delivery), stale_cc),
+                        delivery_line(delivery),
+                        stale_cc,
                     ),
                 );
             }
@@ -2174,8 +2182,10 @@ mod recovery_tests {
                 keys.clone(),
                 request.clone(),
                 peaks.clone(),
-                delay,
-                fail,
+                RetryFault {
+                    delay_ms: delay,
+                    fail_reopen: fail,
+                },
             );
             assert_eq!(done.retired_graphs, 0);
             assert!(at.elapsed().as_millis() >= delay as u128);
