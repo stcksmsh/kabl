@@ -54,6 +54,11 @@ pub struct PatchEngine {
     /// Launches waiting for their clock boundary, at most one per sequencer. Lives here, not in
     /// a graph, so graph swaps neither lose nor replay it (docs/composition-batch/design.md).
     launches: [Option<PendingLaunch>; MAX_PENDING],
+    /// Timed launches for a fresh Load still waiting behind a fade. They must not tick or
+    /// expire against the outgoing document before the loaded graph starts rendering.
+    deferred_launches: [Option<PendingLaunch>; MAX_PENDING],
+    /// A preview requested for that fresh document waits until it alone is active.
+    deferred_preview: Option<Command>,
     /// `launches` packed, for `process_block_with`.
     packed: [PendingLaunch; MAX_PENDING],
     /// One keyboard per `midi.in` of the playing graph, outside the graphs like the launches
@@ -176,6 +181,8 @@ impl PatchEngine {
             crossfade_samples: (CROSSFADE_MS / 1000.0 * sample_rate).round() as usize,
             voice_count,
             launches: [None; MAX_PENDING],
+            deferred_launches: [None; MAX_PENDING],
+            deferred_preview: None,
             packed: [NO_LAUNCH; MAX_PENDING],
             keyboards: Default::default(),
             held_controller: 0,
@@ -204,6 +211,8 @@ impl PatchEngine {
             crossfade_samples,
             voice_count,
             launches: [None; MAX_PENDING],
+            deferred_launches: [None; MAX_PENDING],
+            deferred_preview: None,
             packed: [NO_LAUNCH; MAX_PENDING],
             keyboards: Default::default(),
             held_controller: 0,
@@ -423,6 +432,9 @@ impl PatchEngine {
         // A Load drops pending launches: the loaded sequencers start on their startup banks.
         if explicit_load {
             self.launches = [None; MAX_PENDING];
+            self.deferred_launches = [None; MAX_PENDING];
+            self.deferred_preview = None;
+            self.preview_stop();
         }
         if self.incoming.is_some() {
             self.pending = Some(new_patch);
@@ -508,7 +520,7 @@ impl PatchEngine {
             };
             g.transport(id, t);
             if t == Transport::Stop {
-                for slot in self.launches.iter_mut() {
+                for slot in self.deferred_launches.iter_mut() {
                     if let Some(l) = slot.filter(|l| l.clock == id) {
                         *slot = None;
                         g.with_seq(l.seq, |s| s.arm(l.bank as usize, 0));
@@ -587,7 +599,12 @@ impl PatchEngine {
                     bank as usize,
                 ),
                 Some(at) => {
-                    if let Some(slot) = self.launches.iter_mut().find(|s| s.is_none()) {
+                    let slots = if self.pending.as_ref().is_some_and(|g| g.fresh) {
+                        &mut self.deferred_launches
+                    } else {
+                        &mut self.launches
+                    };
+                    if let Some(slot) = slots.iter_mut().find(|s| s.is_none()) {
                         *slot = Some(PendingLaunch {
                             seq,
                             bank,
@@ -611,10 +628,19 @@ impl PatchEngine {
                 velocity,
                 blocks,
             } => {
-                let n = (*count as usize).min(MAX_PREVIEW_NOTES);
-                self.preview(&notes[..n], *velocity, *blocks);
+                if self.pending.as_ref().is_some_and(|g| g.fresh)
+                    || self.incoming.as_ref().is_some_and(|(g, _)| g.fresh)
+                {
+                    self.deferred_preview = Some(*c);
+                } else {
+                    let n = (*count as usize).min(MAX_PREVIEW_NOTES);
+                    self.preview(&notes[..n], *velocity, *blocks);
+                }
             }
-            Command::PreviewStop => self.preview_stop(),
+            Command::PreviewStop => {
+                self.deferred_preview = None;
+                self.preview_stop();
+            }
             Command::Inspect(t) => self.inspect(*t),
         }
     }
@@ -623,6 +649,11 @@ impl PatchEngine {
     /// sequencer. No allocation.
     pub fn cancel(&mut self, seq: Option<kabl_core::ModuleId>) {
         for slot in self.launches.iter_mut() {
+            if slot.is_some_and(|l| seq.is_none_or(|s| s == l.seq)) {
+                *slot = None;
+            }
+        }
+        for slot in self.deferred_launches.iter_mut() {
             if slot.is_some_and(|l| seq.is_none_or(|s| s == l.seq)) {
                 *slot = None;
             }
@@ -704,7 +735,14 @@ impl PatchEngine {
             n += 1;
         }
         let launches = &self.packed[..n];
-        self.active.process_block_with(launches);
+        // A fresh incoming document owns its launches. The outgoing graph can share ids,
+        // but must not arm the new document's bank during the fade.
+        let active_launches = if self.incoming.as_ref().is_some_and(|(g, _)| g.fresh) {
+            &[][..]
+        } else {
+            launches
+        };
+        self.active.process_block_with(active_launches);
         let old_left = *self.active.left();
         let old_right = *self.active.right();
 
@@ -783,6 +821,11 @@ impl PatchEngine {
                 self.move_probe(&mut pending);
                 self.incoming = Some((pending, 0));
                 self.sync(fresh);
+                if fresh {
+                    self.launches = std::mem::replace(&mut self.deferred_launches, [None; MAX_PENDING]);
+                }
+            } else if let Some(Command::Preview { notes, count, velocity, blocks }) = self.deferred_preview.take() {
+                self.preview(&notes[..(count as usize).min(MAX_PREVIEW_NOTES)], velocity, blocks);
             }
         }
     }

@@ -565,7 +565,9 @@ impl AudioHost {
                         ready_frames = 0;
                     }
                     if ready_frames >= sample_rate as usize / 40 {
-                        audio_gate.store(u64::MAX, Ordering::Relaxed);
+                        // A failure or a newer edit may have closed/revised the gate since
+                        // this callback read `want`; never overwrite that decision.
+                        let _ = unmute_if_current(&audio_gate, want);
                     }
                 }
                 let muted = audio_gate.load(Ordering::Relaxed) != u64::MAX;
@@ -668,6 +670,7 @@ struct Core {
     latency: Option<Latency>,
     progress: Option<Progress>,
     record_finish: Option<std::thread::JoinHandle<record::Recorder>>,
+    record_dir: String,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -689,6 +692,11 @@ struct Progress {
     failure: Option<AudioPhase>,
 }
 
+fn unmute_if_current(gate: &AtomicU64, revision: u64) -> bool {
+    gate.compare_exchange(revision, u64::MAX, Ordering::AcqRel, Ordering::Relaxed)
+        .is_ok()
+}
+
 impl Progress {
     fn new(timing: Arc<CallbackTiming>, gate: Arc<AtomicU64>) -> Self {
         Self {
@@ -701,6 +709,7 @@ impl Progress {
     }
     fn observe(&mut self) {
         if self.failure.is_some() {
+            self.gate.store(0, Ordering::Release);
             return;
         }
         let n = self.timing.count.load(Ordering::Relaxed);
@@ -789,6 +798,7 @@ fn pump(
             p.observe();
             if p.failure.is_some() && c.record_finish.is_none() {
                 if let Some(mut rec) = c.ui.recorder.take() {
+                    c.record_dir = rec.dir.clone();
                     if rec.recording() {
                         c.record_finish = Some(std::thread::spawn(move || {
                             rec.stop_interrupted();
@@ -805,6 +815,7 @@ fn pump(
             latency,
             progress,
             record_finish: _,
+            record_dir: _,
         } = &mut *c;
         kabl_ui::perform::rearm(ui, clock_s());
         if !events.is_empty() {
@@ -1106,7 +1117,6 @@ struct App {
     pending_notes: Option<rtrb::Producer<KeyEvent>>,
     pending_recorder: Option<record::Recorder>,
     record_finish: Option<std::thread::JoinHandle<record::Recorder>>,
-    record_dir: String,
     record_last: Option<record::Outcome>,
     control_stop: Arc<AtomicBool>,
     control_thread: Option<std::thread::JoinHandle<()>>,
@@ -1201,7 +1211,7 @@ impl App {
         let Some(mut rec) = core.ui.recorder.take() else {
             return;
         };
-        self.record_dir = rec.dir.clone();
+        core.record_dir = rec.dir.clone();
         if rec.recording() {
             self.record_finish = Some(std::thread::spawn(move || {
                 rec.stop_interrupted();
@@ -1286,6 +1296,9 @@ impl App {
 
     fn poll_retry(&mut self, core: &mut Core) {
         if !self.retry.as_ref().is_some_and(|r| r.handle.is_finished()) {
+            if self.retry.as_ref().is_some_and(|r| r.started.elapsed().as_secs() >= 10) {
+                self.audio.status = "backend close/open still blocked; editing and Save work; wait or quit (Retry remains disabled while the worker owns the stream)".into();
+            }
             return;
         }
         let task = self.retry.take().unwrap();
@@ -1305,7 +1318,7 @@ impl App {
                 self.phase = AudioPhase::Starting;
                 self.pending_notes = Some(done.notes);
                 if let Some(mut rec) = done.audio.recorder.take() {
-                    rec.dir = self.record_dir.clone();
+                    rec.dir = core.record_dir.clone();
                     rec.last = self.record_last.clone();
                     self.pending_recorder = Some(rec);
                 }
@@ -1442,6 +1455,7 @@ impl eframe::App for App {
             latency,
             progress,
             record_finish: _,
+            record_dir,
         } = &mut *core;
         if let (Some(rx), Some(l)) = (self.audio.applied_rx.as_mut(), latency.as_mut()) {
             while let Ok((rev, at)) = rx.pop() {
@@ -1647,6 +1661,11 @@ impl eframe::App for App {
                 .request_repaint_after(std::time::Duration::from_millis(30));
         }
         show(editor, ui_state, ui);
+        if let Some(rec) = ui_state.recorder.as_ref() {
+            // Keep the chosen folder even if the control pump takes this recorder on a
+            // failure before the next UI frame.
+            *record_dir = rec.dir.clone();
+        }
         // Scripted real-input runs (xdotool) read the drawn targets from here.
         if let Some(path) = &self.hits_file {
             let text: String = ui_state
@@ -1970,6 +1989,7 @@ fn main() -> eframe::Result<()> {
                     .as_ref()
                     .map(|t| Progress::new(t.clone(), audio.gate.clone())),
                 record_finish: None,
+                record_dir: record_dir.clone(),
             }));
             let c = core.clone();
             let control_stop = Arc::new(AtomicBool::new(false));
@@ -2008,7 +2028,6 @@ fn main() -> eframe::Result<()> {
                 pending_notes: None,
                 pending_recorder: None,
                 record_finish: None,
-                record_dir,
                 record_last: None,
                 control_stop,
                 control_thread: Some(pump),
@@ -2042,6 +2061,23 @@ mod recovery_tests {
         timing.count.store(9, Ordering::Relaxed);
         p.observe();
         assert_eq!(p.failure, Some(AudioPhase::Stalled));
+        gate.store(2, Ordering::Relaxed);
+        p.observe();
+        assert_eq!(gate.load(Ordering::Relaxed), 0, "sticky failure closes a later gate too");
+    }
+
+    #[test]
+    fn stale_callback_cannot_reopen_a_failed_or_revised_gate() {
+        let gate = AtomicU64::new(4);
+        // Callback read revision 4; the detector failed or an edit became revision 5.
+        gate.store(0, Ordering::Release);
+        assert!(!unmute_if_current(&gate, 4));
+        assert_eq!(gate.load(Ordering::Acquire), 0);
+        gate.store(5, Ordering::Release);
+        assert!(!unmute_if_current(&gate, 4));
+        assert_eq!(gate.load(Ordering::Acquire), 5);
+        assert!(unmute_if_current(&gate, 5));
+        assert_eq!(gate.load(Ordering::Acquire), u64::MAX);
     }
 
     /// Opt-in cpal stream and callback test against an ALSA null PCM. No physical device.

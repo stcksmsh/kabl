@@ -546,11 +546,8 @@ pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, th: &crate::th
             };
             ui.separator();
             let text = match &o {
-                Outcome::Complete { path, frames } => format!(
-                    "Last take: {} ({})",
-                    name(path),
-                    clock(*frames as f32 / rec.sample_rate() as f32)
-                ),
+                Outcome::Complete { path, frames } =>
+                    format!("Last take: {} ({frames} frames)", name(path)),
                 Outcome::Incomplete { path, lost, .. } => {
                     format!("Last take INCOMPLETE ({lost} frames lost): {}", name(path))
                 }
