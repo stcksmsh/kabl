@@ -1,0 +1,745 @@
+{
+  "results": [
+    {
+      "test": {
+        "plugin-library": {
+          "test": "query-nonexistent-factory",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 959331
+      }
+    },
+    {
+      "test": {
+        "plugin-library": {
+          "test": "create-id-with-trailing-garbage",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 879711
+      }
+    },
+    {
+      "test": {
+        "plugin-library": {
+          "test": "scan-rtld-now",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 696473
+      }
+    },
+    {
+      "test": {
+        "plugin-library": {
+          "test": "scan-time",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": "The plugin can be scanned in 0 milliseconds."
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 690394
+      }
+    },
+    {
+      "test": {
+        "plugin-library": {
+          "test": "preset-discovery-crawl",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so"
+        }
+      },
+      "status": {
+        "code": "skipped",
+        "details": "The plugin does not implement the 'clap.preset-discovery-factory/2' factory."
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 632918
+      }
+    },
+    {
+      "test": {
+        "plugin-library": {
+          "test": "preset-discovery-descriptor-consistency",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so"
+        }
+      },
+      "status": {
+        "code": "skipped",
+        "details": "The plugin does not implement the 'clap.preset-discovery-factory/2' factory."
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 560258
+      }
+    },
+    {
+      "test": {
+        "plugin-library": {
+          "test": "preset-discovery-load",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so"
+        }
+      },
+      "status": {
+        "code": "skipped",
+        "details": "The plugin does not implement the 'clap.preset-discovery-factory/2' factory."
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 695232
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "descriptor-consistency",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 1371625
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "features-categories",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 743064
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "features-duplicates",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 768953
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "process-audio-basic-out-of-place",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 6874113
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "process-audio-basic-in-place",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 6413963
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "process-audio-double-out-of-place",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "skipped",
+        "details": "The plugin does not support 64-bit floating point audio."
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 1433568
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "process-audio-double-in-place",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "skipped",
+        "details": "The plugin does not support 64-bit floating point audio."
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 1300387
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "process-audio-denormals",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "skipped",
+        "details": "The plugin implements the 'audio-ports' extension but it does not have any input audio ports."
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 1353222
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "process-sleep-constant-mask",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": "The plugin never set the constant flag on any output"
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 35616686
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "process-sleep-process-status",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": "The plugin never went to sleep during the test."
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 55255446
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "process-note-out-of-place-basic",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 7823465
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "process-note-inconsistent",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 7070225
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "process-note-wildcard",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 7191889
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "process-varying-sample-rates",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 63375475
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "process-varying-block-sizes",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 123180723
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "process-random-block-sizes",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 36515044
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "process-reset-reactivate",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 5653922
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "layout-audio-ports-activation",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "skipped",
+        "details": "The plugin does not implement the 'audio-ports-activation' extension."
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 1519188
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "layout-audio-ports-config",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 7919685
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "layout-configurable-audio-ports",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "skipped",
+        "details": "The plugin does not implement the 'configurable-audio-ports' extension."
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 1819082
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "param-set-events",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 3369657
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "param-set-no-cookies",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 3073599
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "param-set-wrong-namespace",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 2627644
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "param-fuzz-basic",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 253697769
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "param-fuzz-bounds",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 256256405
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "param-fuzz-sample-accurate",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 12472246
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "param-fuzz-modulation",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 3392041
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "param-conversions",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 1610727
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "param-default-values",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 1422632
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "state-invalid-empty",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 1300046
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "state-invalid-random",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "crashed",
+        "details": "signal: 6 (SIGABRT)"
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 3194262
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "state-reproducibility-basic",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "failed",
+        "details": "After reloading the state, these parameter values changed without a rescan request: \n - Filter cutoff (199910052) - 3000 Hz (0.1479) vs 1158.7692 Hz (0.0556)"
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 2367602
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "state-reproducibility-binary",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "failed",
+        "details": "After reloading the state, these parameter values changed without a rescan request: \n - Filter cutoff (199910052) - 3000 Hz (0.1479) vs 1158.7692 Hz (0.0556)"
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 3368786
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "state-reproducibility-buffered",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "failed",
+        "details": "After reloading the state, these parameter values changed without a rescan request: \n - Filter cutoff (199910052) - 3000 Hz (0.1479) vs 1158.7692 Hz (0.0556)"
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 2710119
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "transport-null",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 3743392
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "transport-fuzz",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 20344464
+      }
+    },
+    {
+      "test": {
+        "plugin-instance": {
+          "test": "transport-fuzz-sample-accurate",
+          "path": "kabl/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so",
+          "plugin_id": "dev.stcksmsh.kabl.reaper-proof"
+        }
+      },
+      "status": {
+        "code": "success",
+        "details": null
+      },
+      "duration": {
+        "secs": 0,
+        "nanos": 24396849
+      }
+    }
+  ]
+}

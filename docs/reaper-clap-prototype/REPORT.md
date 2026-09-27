@@ -14,13 +14,13 @@ CLAP notes are preferred; nice-plug Basic also advertises MIDI. Both map pitch 0
 
 ## Evidence and acceptance
 
-Prior workspace run on Ubuntu 24.04.3, Rust 1.98.1, official REAPER Linux 7.80 tarball, Xvfb 21.1.12: `cargo test --lib` passed 2 tests at initial review head `f896c4e1dff647fd7cda2e3f0f3a31d1e01988d1`; `cargo build --lib` passed. CLAP validator 0.4.1 at `152b9823e992d782c5c1fd33bca0295478b919aa` returned 32 success, 8 skipped, 3 failed and 1 crashed, exit 1. Note/processing tests passed after guarding invalid note 255. The three state reproducibility tests report Filter cutoff changes from 3000 Hz to 1158.7692 Hz without parameter rescan. `state-invalid-random` SIGABRTed from `Vec::with_capacity` on a declared length of 1025222176999353387 bytes in the pinned framework's `ext_state_load`. This is a blocker, not an accepted validator pass. Review fixes subsequently added rejected GUI snapshot and host cutoff synchronization tests and bounded swaps; final verification is recorded separately below.
+Initial workspace run on Ubuntu 24.04.3, Rust 1.98.1, official REAPER Linux 7.80 tarball, Xvfb 21.1.12: `cargo test --lib` passed 2 tests at initial review head `f896c4e1dff647fd7cda2e3f0f3a31d1e01988d1`; `cargo build --lib` passed. CLAP validator 0.4.1 at `152b9823e992d782c5c1fd33bca0295478b919aa` returned 32 success, 8 skipped, 3 failed and 1 crashed, exit 1. Note/processing tests passed after guarding invalid note 255. The three state reproducibility tests report Filter cutoff changes from 3000 Hz to 1158.7692 Hz without parameter rescan. `state-invalid-random` SIGABRTed from `Vec::with_capacity` on a declared length of 1025222176999353387 bytes in the pinned framework's `ext_state_load`. This is a blocker, not an accepted validator pass. Review fixes subsequently added rejected GUI snapshot and host cutoff synchronization tests and bounded swaps; reconstructed head retest passed all 4 unit tests and the CLAP library built successfully; see evidence/build-test.txt.
 
-REAPER could be downloaded/extracted, but **not launched as a GUI**. Python `socket.socket(AF_UNIX)` returned `PermissionError: [Errno 1] Operation not permitted`; Xvfb failed to establish local/unix listening sockets. Thus no REAPER scan, stereo sound, editor screenshot, project recall, offline render or repeated instance lifecycle is claimed. The original MIDI fixture is provided for the future host run.
+REAPER could be downloaded/extracted, but **not launched as a GUI**. Python `socket.socket(AF_UNIX)` returned `PermissionError: [Errno 1] Operation not permitted`; Xvfb failed to establish local/unix listening sockets. Thus no REAPER scan, stereo sound, editor screenshot, project recall, offline render or repeated instance lifecycle is claimed. The original MIDI fixture is provided for the future host run. On the reconstructed head, Rust 1.98.1 `cargo test --locked --lib` passed 4/4 and `cargo build --locked --lib` succeeded. The pinned validator was rebuilt and reproduced the same 32 success, 8 skipped, 3 failed, 1 crashed result; current raw JSON/stderr are in evidence.
 
 | Requirement | Status | Evidence/limit |
 | --- | --- | --- |
-| Real engine/editor CLAP build | Prior build pass | `evidence/build-test.txt`; final retest below |
+| Real engine/editor CLAP build | Prior build pass | `evidence/build-test.txt`; 4 tests pass on reconstructed head |
 | CLAP scan, note/audio processing | Validator pass | Processing tests only, not REAPER |
 | Host state validation | Fail | 3 reproducibility failures, malformed-state abort, partial load |
 | REAPER render/editor/reopen | Unverified | GUI socket blocked |
@@ -34,4 +34,4 @@ REAPER could be downloaded/extracted, but **not launched as a GUI**. Python `soc
 3. Editor-independent bounded control submission and guaranteed retired-graph collection, coordinated with D05's lifecycle ownership.
 4. Stable host parameter mapping and bidirectional control sync before D08 expands automation; one hardcoded cutoff proves only the narrow seam.
 
-No production API diff is applied. The owner host walkthrough remains open in [CHECKLIST](CHECKLIST.md); this draft does not settle framework approval or D06/D07 acceptance.
+Layout-only rack edits can still cause unnecessary graph compilation/crossfades; this is a performance follow-up for D07. No production API diff is applied. The owner host walkthrough remains open in [CHECKLIST](CHECKLIST.md); this draft does not settle framework approval or D06/D07 acceptance.

@@ -19,4 +19,4 @@ The independent lockfile pins Circuit-Stitch nice-plug revision `263b16877d0b0ad
 clap-validator validate -j 1 --json target/debug/libkabl_reaper_proof.so > validation.json
 ```
 
-The prior run exited 1 with state failures. Avoid `--in-process` for random-state fuzzing; the pinned framework can abort on an unbounded length field. See [evidence](evidence/). Complete the host walkthrough in CHECKLIST on a Linux desktop. The cloud X11 display could not start because Unix sockets were denied, so no REAPER observation is claimed.
+The final reconstructed-head run exited 1 with state failures. Avoid `--in-process` for random-state fuzzing; the pinned framework can abort on an unbounded length field. See [evidence](evidence/). Complete the host walkthrough in CHECKLIST on a Linux desktop. The cloud X11 display could not start because Unix sockets were denied, so no REAPER observation is claimed.

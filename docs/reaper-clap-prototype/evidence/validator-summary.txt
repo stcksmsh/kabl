@@ -1,6 +1,6 @@
-Prior run: clap-validator 0.4.1, commit 152b9823e992d782c5c1fd33bca0295478b919aa
+Final reconstructed-head run: clap-validator 0.4.1, commit 152b9823e992d782c5c1fd33bca0295478b919aa
 Command: clap-validator validate -j 1 --json prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so
 Exit 1: success 32, skipped 8, failed 3, crashed 1.
 state-invalid-random: SIGABRT; pinned nice-plug loader allocated length 1025222176999353387 bytes.
 state-reproducibility-basic/binary/buffered: Filter cutoff 3000 Hz vs 1158.7692 Hz changed without parameter rescan.
-The raw JSON/stderr were lost in workspace maintenance; these exact counts/details came from the prior run and are not a fresh validation of the reconstructed head.
+Raw final-run JSON and stderr are adjacent. The earlier raw logs were pruned, but the same counts and failures reproduced on the reconstructed head.

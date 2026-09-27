@@ -1,0 +1,38 @@
+    3ms  INFO Test query-nonexistent-factory completed clap_validator::validator
+    5ms  INFO Test create-id-with-trailing-garbage completed clap_validator::validator
+    7ms  INFO Test scan-rtld-now completed clap_validator::validator
+    9ms  INFO Test scan-time completed clap_validator::validator
+   18ms  INFO Test descriptor-consistency completed clap_validator::validator
+   20ms  INFO Test features-categories completed clap_validator::validator
+   22ms  INFO Test features-duplicates completed clap_validator::validator
+   30ms  INFO Test process-audio-basic-out-of-place completed clap_validator::validator
+   39ms  INFO Test process-audio-basic-in-place completed clap_validator::validator
+   85ms  INFO Test process-sleep-constant-mask completed clap_validator::validator
+  143ms  INFO Test process-sleep-process-status completed clap_validator::validator
+  152ms  INFO Test process-note-out-of-place-basic completed clap_validator::validator
+  161ms  INFO Test process-note-inconsistent completed clap_validator::validator
+  170ms  INFO Test process-note-wildcard completed clap_validator::validator
+  235ms  INFO Test process-varying-sample-rates completed clap_validator::validator
+  361ms  INFO Test process-varying-block-sizes completed clap_validator::validator
+  400ms  INFO Test process-random-block-sizes completed clap_validator::validator
+  407ms  INFO Test process-reset-reactivate completed clap_validator::validator
+  421ms  INFO Test layout-audio-ports-config completed clap_validator::validator
+  429ms  INFO Test param-set-events completed clap_validator::validator
+  434ms  INFO Test param-set-no-cookies completed clap_validator::validator
+  438ms  INFO Test param-set-wrong-namespace completed clap_validator::validator
+  694ms  INFO Test param-fuzz-basic completed clap_validator::validator
+  953ms  INFO Test param-fuzz-bounds completed clap_validator::validator
+  968ms  INFO Test param-fuzz-sample-accurate completed clap_validator::validator
+  972ms  INFO Test param-fuzz-modulation completed clap_validator::validator
+  975ms  INFO Test param-conversions completed clap_validator::validator
+  978ms  INFO Test param-default-values completed clap_validator::validator
+  981ms  INFO Test state-invalid-empty completed clap_validator::validator
+memory allocation of 1025222176999353387 bytes failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+  984ms ERROR Test state-invalid-random crashed: signal: 6 (SIGABRT) clap_validator::validator
+  988ms ERROR Test state-reproducibility-basic failed clap_validator::validator
+  993ms ERROR Test state-reproducibility-binary failed clap_validator::validator
+  998ms ERROR Test state-reproducibility-buffered failed clap_validator::validator
+ 1003ms  INFO Test transport-null completed clap_validator::validator
+ 1025ms  INFO Test transport-fuzz completed clap_validator::validator
+ 1052ms  INFO Test transport-fuzz-sample-accurate completed clap_validator::validator
