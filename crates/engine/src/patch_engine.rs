@@ -668,6 +668,13 @@ impl PatchEngine {
             disarm(self.pending.as_mut().unwrap());
             return;
         }
+        if self.incoming.as_ref().is_some_and(|(g, _)| g.fresh) {
+            disarm(&mut self.incoming.as_mut().unwrap().0);
+            if let Some(g) = self.pending.as_mut() {
+                disarm(g);
+            }
+            return;
+        }
         disarm(&mut self.active);
         if let Some((g, _)) = self.incoming.as_mut() {
             disarm(g);

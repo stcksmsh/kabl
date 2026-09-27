@@ -873,8 +873,10 @@ fn timed_launch_waits_for_pending_fresh_document() {
             incoming = Some((bank, queued));
         }
     });
-    assert!(matches!(incoming, Some((1, _)) | Some((_, Some(1)))),
-        "the loaded graph keeps or has played the timed launch: {incoming:?}");
+    assert!(
+        matches!(incoming, Some((1, _)) | Some((_, Some(1)))),
+        "the loaded graph keeps or has played the timed launch: {incoming:?}"
+    );
 }
 
 #[test]
@@ -955,4 +957,39 @@ fn commands_during_fresh_incoming_fade_leave_outgoing_document_alone() {
     });
     assert_eq!(new_queued, Some(1));
     assert_eq!(clock_running(&h), Some(false));
+}
+
+#[test]
+fn cancel_during_fresh_fade_does_not_disarm_outgoing_document() {
+    let mut h = H::new();
+    let seq = *h
+        .editor
+        .state()
+        .modules
+        .iter()
+        .find(|(_, m)| m.kind == "seq")
+        .unwrap()
+        .0;
+    h.engine
+        .launch(&Launch::new(CLOCK, Timing::Now, &[(seq, 1)]));
+    let mut outgoing = None;
+    h.engine.active_mut().seqs(|id, _, _, queued| {
+        if id == seq {
+            outgoing = queued
+        }
+    });
+    assert_eq!(outgoing, Some(1));
+    kabl_ui::browser::replace_patch(&mut h.editor, &mut h.ui, piece());
+    h.deliver();
+    h.callback(0); // fresh incoming graph, old graph still fading out
+    h.ui.launches.push(Command::Cancel(Some(seq)));
+    h.deliver();
+    h.callback(0);
+    outgoing = None;
+    h.engine.active_mut().seqs(|id, _, _, queued| {
+        if id == seq {
+            outgoing = queued
+        }
+    });
+    assert_eq!(outgoing, Some(1));
 }
