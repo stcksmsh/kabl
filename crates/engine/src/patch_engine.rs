@@ -539,7 +539,9 @@ impl PatchEngine {
             (Transport::Toggle, None) => return,
             (t, _) => t,
         };
-        self.active.transport(id, t);
+        if !self.incoming.as_ref().is_some_and(|(g, _)| g.fresh) {
+            self.active.transport(id, t);
+        }
         if let Some((g, _)) = self.incoming.as_mut() {
             g.transport(id, t);
         }
@@ -550,7 +552,7 @@ impl PatchEngine {
             for slot in self.launches.iter_mut() {
                 if let Some(l) = slot.filter(|l| l.clock == id) {
                     *slot = None;
-                    arm_all(
+                    arm_scoped(
                         &mut self.active,
                         &mut self.incoming,
                         &mut self.pending,
@@ -591,7 +593,7 @@ impl PatchEngine {
                         .unwrap()
                         .with_seq(seq, |s| s.arm(bank as usize, 0));
                 }
-                None => arm_all(
+                None => arm_scoped(
                     &mut self.active,
                     &mut self.incoming,
                     &mut self.pending,
@@ -822,10 +824,21 @@ impl PatchEngine {
                 self.incoming = Some((pending, 0));
                 self.sync(fresh);
                 if fresh {
-                    self.launches = std::mem::replace(&mut self.deferred_launches, [None; MAX_PENDING]);
+                    self.launches =
+                        std::mem::replace(&mut self.deferred_launches, [None; MAX_PENDING]);
                 }
-            } else if let Some(Command::Preview { notes, count, velocity, blocks }) = self.deferred_preview.take() {
-                self.preview(&notes[..(count as usize).min(MAX_PREVIEW_NOTES)], velocity, blocks);
+            } else if let Some(Command::Preview {
+                notes,
+                count,
+                velocity,
+                blocks,
+            }) = self.deferred_preview.take()
+            {
+                self.preview(
+                    &notes[..(count as usize).min(MAX_PREVIEW_NOTES)],
+                    velocity,
+                    blocks,
+                );
             }
         }
     }
@@ -853,14 +866,29 @@ fn act(
     }
 }
 
-/// Arms `seq` with `bank` from the start of the next block in the running graphs.
-fn arm_all(
+/// Arms the target document, excluding an outgoing graph during a fresh Load fade.
+fn arm_scoped(
     active: &mut CompiledPatch,
     incoming: &mut Option<(Owned<CompiledPatch>, usize)>,
     pending: &mut Option<Owned<CompiledPatch>>,
     seq: kabl_core::ModuleId,
     bank: usize,
 ) {
+    if let Some(g) = pending.as_mut().filter(|g| g.fresh) {
+        g.with_seq(seq, |s| s.arm(bank, 0));
+        return;
+    }
+    if incoming.as_ref().is_some_and(|(g, _)| g.fresh) {
+        incoming
+            .as_mut()
+            .unwrap()
+            .0
+            .with_seq(seq, |s| s.arm(bank, 0));
+        if let Some(g) = pending.as_mut() {
+            g.with_seq(seq, |s| s.arm(bank, 0));
+        }
+        return;
+    }
     active.with_seq(seq, |s| s.arm(bank, 0));
     if let Some((g, _)) = incoming.as_mut() {
         g.with_seq(seq, |s| s.arm(bank, 0));

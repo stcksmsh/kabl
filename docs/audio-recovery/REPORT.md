@@ -10,8 +10,8 @@ Base: fetched `origin/master` at `e951b2535d817bc7c21872cd0e46e815d35747ac`. Bra
 | Explicit lifecycle, bounded retries and stale session fencing | Focused `recovery_tests` and code in `ui/src/main.rs`; actual ALSA null backend tests pass. Physical loss and blocked close unverified. |
 | Fault hooks | Opt-in stall/error, reopen failure and delay in `main.rs`. Callback error and repeated close/open tested on ALSA null; synthetic hooks cannot establish physical ALSA device loss. |
 | Document latest revision / compile error / control reset | `poll_retry` synchronizes the current editor state before it opens the gate; pending Load/Toggle tests in `runtime_controls.rs`. GUI edit/undo during a retry unverified. |
-| Pending Load across fade, second Load and explicit Start | `runtime_controls.rs` deterministic tests, including stopped incoming graph and pending command target. |
-| Recorder prefix and new take | `record.rs` and `tests/record.rs` interruption test. No audible GUI take in this container. |
+| Pending Load across fade, second Load and explicit Start | `runtime_controls.rs` deterministic tests, including stopped incoming graph, timed Launch and deferred Preview. |
+| Recorder prefix and new take | `record.rs` and `tests/record.rs` interruption test; reviewer fixes preserve the chosen folder and avoid cross-rate duration errors. No audible GUI take in this container. |
 | Core/CC latency during Save/Open/reconnect | **Open gap.** Retry backend I/O and recording file finalization are outside `Core`, but browser Save/Open and retry compile still take it. No controlled CC latency result yet. |
 | Production callback bounds | Atomic gate and counters in actual callback; D04 helper test covers drain/render only. No complete new production callback allocation check. |
 | Mono efficiency | Profile below; no optimization applied without a measured eligible win. |
@@ -30,7 +30,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo run --release -p kabl-engine --example mono_profile
 ```
 
-The focused run on product commit `0415527c59a6091594439deeb0162a395f069892` had 27 passed, 0 failed, 2 ignored (`main` 1/0/2, record 10, runtime controls 16); opt-in ALSA null run had 2 passed. The tests run the `cpal` stream on ALSA null PCM but do not drive the graphical app. Full workspace and clippy totals will be filled in at the final product head.
+The initial focused run on product commit `0415527c59a6091594439deeb0162a395f069892` had 27 passed, 0 failed, 2 ignored (`main` 1/0/2, record 10, runtime controls 16); opt-in ALSA null run had 2 passed. Full workspace on `fad24e4` had 550 passed, 0 failed, 18 ignored. The tests run the `cpal` stream on ALSA null PCM but do not drive the graphical app. Reviewer repairs at `a9b9eb1` are being reverified; final totals will be recorded at the final product head.
 
 ## Profile (no DSP optimization)
 
@@ -46,4 +46,4 @@ The dense graph is costly, but the harness does not isolate a safe mono-only sub
 
 ## Review and limits
 
-An independent subagent review and final recheck of the combined head are required before submission; see REVIEW.md. The acceptance gaps above prevent a claim that all D05 criteria are complete. In particular, physical device recovery, real app/package walkthrough, Core/CC latency under Save/Open, and the owner checklist remain pending. Backend close can block without a deadline; one retry worker stays owned, preventing repeated detached attempts.
+The independent subagent's first review found a gate race, pending-document command bugs and recording metadata faults; corrections are in `a9b9eb1`, with final recheck pending (REVIEW.md). The acceptance gaps above prevent a claim that all D05 criteria are complete. In particular, physical device recovery, real app/package walkthrough, Core/CC latency under Save/Open, and the owner checklist remain pending. Backend close can block without a deadline; one retry worker stays owned and the UI names the blocked state after ten seconds.

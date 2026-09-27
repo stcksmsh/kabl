@@ -671,6 +671,7 @@ struct Core {
     progress: Option<Progress>,
     record_finish: Option<std::thread::JoinHandle<record::Recorder>>,
     record_dir: String,
+    record_last: Option<record::Outcome>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -804,6 +805,8 @@ fn pump(
                             rec.stop_interrupted();
                             rec
                         }));
+                    } else {
+                        c.record_last = rec.last.take();
                     }
                 }
             }
@@ -816,6 +819,7 @@ fn pump(
             progress,
             record_finish: _,
             record_dir: _,
+            record_last: _,
         } = &mut *c;
         kabl_ui::perform::rearm(ui, clock_s());
         if !events.is_empty() {
@@ -1296,7 +1300,11 @@ impl App {
 
     fn poll_retry(&mut self, core: &mut Core) {
         if !self.retry.as_ref().is_some_and(|r| r.handle.is_finished()) {
-            if self.retry.as_ref().is_some_and(|r| r.started.elapsed().as_secs() >= 10) {
+            if self
+                .retry
+                .as_ref()
+                .is_some_and(|r| r.started.elapsed().as_secs() >= 10)
+            {
                 self.audio.status = "backend close/open still blocked; editing and Save work; wait or quit (Retry remains disabled while the worker owns the stream)".into();
             }
             return;
@@ -1438,6 +1446,9 @@ impl eframe::App for App {
         if self.record_finish.is_none() {
             self.record_finish = core.record_finish.take();
         }
+        if let Some(last) = core.record_last.take() {
+            self.record_last = Some(last);
+        }
         self.poll_record_finish(&mut core);
         self.poll_retry(&mut core);
         let ready_at_frame_start = self.phase == AudioPhase::Starting
@@ -1456,6 +1467,7 @@ impl eframe::App for App {
             progress,
             record_finish: _,
             record_dir,
+            record_last: _,
         } = &mut *core;
         if let (Some(rx), Some(l)) = (self.audio.applied_rx.as_mut(), latency.as_mut()) {
             while let Ok((rev, at)) = rx.pop() {
@@ -1990,6 +2002,7 @@ fn main() -> eframe::Result<()> {
                     .map(|t| Progress::new(t.clone(), audio.gate.clone())),
                 record_finish: None,
                 record_dir: record_dir.clone(),
+                record_last: None,
             }));
             let c = core.clone();
             let control_stop = Arc::new(AtomicBool::new(false));
@@ -2063,7 +2076,11 @@ mod recovery_tests {
         assert_eq!(p.failure, Some(AudioPhase::Stalled));
         gate.store(2, Ordering::Relaxed);
         p.observe();
-        assert_eq!(gate.load(Ordering::Relaxed), 0, "sticky failure closes a later gate too");
+        assert_eq!(
+            gate.load(Ordering::Relaxed),
+            0,
+            "sticky failure closes a later gate too"
+        );
     }
 
     #[test]
@@ -2152,9 +2169,20 @@ mod recovery_tests {
         std::env::set_var("KABL_AUDIO_FAULT_AFTER", "3");
         let patch = default_patch();
         let (_, rx) = rtrb::RingBuffer::new(1024);
-        let request = AudioRequest { rate: Some(48000), frames: Some(256), realtime: false, device: None };
-        let (mut host, delivery) = AudioHost::start(&patch, rx, Arc::new(AtomicU64::new(0)),
-            &request, false, Arc::new(record::PeakTap::default()));
+        let request = AudioRequest {
+            rate: Some(48000),
+            frames: Some(256),
+            realtime: false,
+            device: None,
+        };
+        let (mut host, delivery) = AudioHost::start(
+            &patch,
+            rx,
+            Arc::new(AtomicU64::new(0)),
+            &request,
+            false,
+            Arc::new(record::PeakTap::default()),
+        );
         assert!(host._stream.is_some(), "{}", host.status);
         let mut progress = Progress::new(host.timing.as_ref().unwrap().clone(), host.gate.clone());
         std::thread::sleep(std::time::Duration::from_millis(120));

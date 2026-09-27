@@ -831,8 +831,17 @@ fn toggle_after_pending_stopped_load_starts_new_clock_only() {
 #[test]
 fn timed_launch_waits_for_pending_fresh_document() {
     let mut h = H::new();
-    let seq = h.editor.state().modules.iter().find(|(_, m)| m.kind == "seq").unwrap().0.to_owned();
-    h.editor.add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+    let seq = h
+        .editor
+        .state()
+        .modules
+        .iter()
+        .find(|(_, m)| m.kind == "seq")
+        .unwrap()
+        .0
+        .to_owned();
+    h.editor
+        .add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
     h.deliver();
     h.callback(1); // old graph is fading, so the Load enters the pending slot
     kabl_ui::browser::replace_patch(&mut h.editor, &mut h.ui, piece());
@@ -840,31 +849,110 @@ fn timed_launch_waits_for_pending_fresh_document() {
     h.deliver();
     h.callback(0);
     h.ui.transport.push((CLOCK, Transport::Run));
-    h.ui.launches.push(Command::Launch(Launch::new(CLOCK, Timing::NextBar, &[(seq, 1)])));
+    h.ui.launches.push(Command::Launch(Launch::new(
+        CLOCK,
+        Timing::NextBar,
+        &[(seq, 1)],
+    )));
     h.deliver();
     h.callback(1);
     let mut outgoing_queued = None;
-    h.engine.seqs(|id, _, _, queued| if id == seq { outgoing_queued = queued });
-    assert_eq!(outgoing_queued, None, "the outgoing document must not see the launch");
+    h.engine.seqs(|id, _, _, queued| {
+        if id == seq {
+            outgoing_queued = queued
+        }
+    });
+    assert_eq!(
+        outgoing_queued, None,
+        "the outgoing document must not see the launch"
+    );
     h.callback(12); // first fade promotes the Load; its own fade begins
-    let mut incoming_queued = None;
-    h.engine.seqs(|id, _, _, queued| if id == seq { incoming_queued = queued });
-    assert_eq!(incoming_queued, Some(1), "the loaded graph keeps the timed launch");
+    let mut incoming = None;
+    h.engine.seqs(|id, _, bank, queued| {
+        if id == seq {
+            incoming = Some((bank, queued));
+        }
+    });
+    assert!(matches!(incoming, Some((1, _)) | Some((_, Some(1)))),
+        "the loaded graph keeps or has played the timed launch: {incoming:?}");
 }
 
 #[test]
 fn preview_waits_until_pending_fresh_document_is_active() {
     let mut h = H::new();
-    h.editor.add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+    h.editor
+        .add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
     h.deliver();
     h.callback(1);
     kabl_ui::browser::replace_patch(&mut h.editor, &mut h.ui, piece());
     h.deliver();
     h.callback(0);
-    h.ui.launches.push(Command::Preview { notes: [60, 0, 0, 0], count: 1, velocity: 80, blocks: 300 });
+    h.ui.launches.push(Command::Preview {
+        notes: [60, 0, 0, 0],
+        count: 1,
+        velocity: 80,
+        blocks: 300,
+    });
     h.deliver();
     h.callback(1);
-    assert_eq!(h.engine.preview_keys(), 0, "the outgoing document stays silent");
+    assert_eq!(
+        h.engine.preview_keys(),
+        0,
+        "the outgoing document stays silent"
+    );
     h.callback(40);
-    assert_ne!(h.engine.preview_keys(), 0, "the new document receives the preview");
+    assert_ne!(
+        h.engine.preview_keys(),
+        0,
+        "the new document receives the preview"
+    );
+}
+
+#[test]
+fn commands_during_fresh_incoming_fade_leave_outgoing_document_alone() {
+    let mut h = H::new();
+    let seq = *h
+        .editor
+        .state()
+        .modules
+        .iter()
+        .find(|(_, m)| m.kind == "seq")
+        .unwrap()
+        .0;
+    assert_eq!(
+        h.engine.active_mut().clock(CLOCK).map(|c| c.running()),
+        Some(true)
+    );
+    kabl_ui::browser::replace_patch(&mut h.editor, &mut h.ui, piece());
+    h.ui.load_stopped = true;
+    h.deliver();
+    h.callback(0); // fresh graph is incoming; outgoing is still audible during the fade
+    h.ui.transport.push((CLOCK, Transport::Stop));
+    h.ui.launches.push(Command::Launch(Launch::new(
+        CLOCK,
+        Timing::Now,
+        &[(seq, 1)],
+    )));
+    h.deliver();
+    h.callback(0);
+    assert_eq!(
+        h.engine.active_mut().clock(CLOCK).map(|c| c.running()),
+        Some(true)
+    );
+    let mut outgoing_queued = None;
+    h.engine.active_mut().seqs(|id, _, _, queued| {
+        if id == seq {
+            outgoing_queued = queued;
+        }
+    });
+    assert_eq!(outgoing_queued, None);
+    h.callback(24);
+    let mut new_queued = None;
+    h.engine.seqs(|id, _, _, queued| {
+        if id == seq {
+            new_queued = queued
+        }
+    });
+    assert_eq!(new_queued, Some(1));
+    assert_eq!(clock_running(&h), Some(false));
 }

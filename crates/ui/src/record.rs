@@ -546,8 +546,9 @@ pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, th: &crate::th
             };
             ui.separator();
             let text = match &o {
-                Outcome::Complete { path, frames } =>
-                    format!("Last take: {} ({frames} frames)", name(path)),
+                Outcome::Complete { path, frames } => {
+                    format!("Last take: {} ({frames} frames)", name(path))
+                }
                 Outcome::Incomplete { path, lost, .. } => {
                     format!("Last take INCOMPLETE ({lost} frames lost): {}", name(path))
                 }
