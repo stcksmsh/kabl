@@ -3,6 +3,19 @@
 Read this, then `docs/STATUS.md` (top section) and the last entries of `docs/decisions.md`.
 Trust code and git over older docs.
 
+## Parallel assignment — isolated REAPER/CLAP proof (2026-09-27)
+
+Kosta authorized a separate cloud agent to work while D05's branch is active.
+Prompt: docs/product-research/briefs/D07-P1-LAUNCH.md.
+This is a bounded exception to sequential work, not full D07 or D06 authorization.
+
+The second agent owns only prototypes/reaper-clap/ and docs/reaper-clap-prototype/
+on its own branch/draft PR. Production crates, shared manifests, D05 work and shared
+status/decision docs are read-only for that agent. D05 continues its existing scope.
+The prototype must use the actual engine/editor in REAPER and return independent review
+and honest cloud evidence, or a precise feasibility limitation. No automatic integration;
+reconcile against D05/D06 before production D07. All owner reviews remain pending.
+
 ## Current assignment — D05 audio recovery and measured efficiency (2026-09-26)
 
 Kosta reported completing the D04 agent and merging, then requested D05.

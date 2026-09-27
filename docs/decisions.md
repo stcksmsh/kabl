@@ -2679,3 +2679,22 @@ entry.
   Composition spike retain their unknown causes.
 - D04 and earlier hands-on reviews remain pending. Merge and engineering review do not
   provide owner acceptance; D00 remains incomplete. Laptop evidence is still pending.
+
+## 2026-09-27 — parallel REAPER/CLAP proof authorized
+
+- Kosta requested a task for a separate cloud agent while D05 runs in the first agent,
+  then requested the launch prompt for the proposed REAPER/CLAP integration prototype.
+- D07-P1 is an isolated feasibility proof, not full D07 implementation. Prompt:
+  product-research/briefs/D07-P1-LAUNCH.md. Separate branch and draft PR; no production
+  pushes to master by the prototype agent.
+- Writable paths are only prototypes/reaper-clap/ and docs/reaper-clap-prototype/.
+  Existing crates/shared manifests and D05 are read-only. The overseer maintains shared
+  status/decisions. D05's current engineering scope remains unchanged.
+- Outcome: real engine and actual egui editor hosted in REAPER, note/stereo processing,
+  one persistent control, embedded patch state, editor-independent processing and instance
+  isolation, with runnable evidence and independent review/recheck.
+- Production changes required to make the proof work are reported as precise interface
+  requirements; they are not permission to modify D05-owned code or fork the engine.
+  Reconcile after D05/D06 before integrating into production D07.
+- Framework choice is a tested recommendation, not final owner architecture approval.
+  Cloud proof is not laptop/listening acceptance. No D06 or full D07 authorization.
