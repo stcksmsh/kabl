@@ -1,0 +1,9 @@
+Prior 2026-09-27 Ubuntu 24.04.3 sandbox: official REAPER 7.80 Linux tarball extracted; no GUI host launch.
+Python socket.socket(socket.AF_UNIX): PermissionError: [Errno 1] Operation not permitted
+Xvfb :88 -screen 0 1280x800x24 -nolisten tcp:
+_XSERVTransSocketOpenCOTSServer: Unable to open socket for local
+_XSERVTransOpen: transport open failed for local/a1dc13bc4040:88
+_XSERVTransSocketOpenCOTSServer: Unable to open socket for unix
+_XSERVTransOpen: transport open failed for unix/a1dc13bc4040:88
+Fatal server error: Cannot establish any listening sockets
+No scan/editor/audio/project observations in REAPER.

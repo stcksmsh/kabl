@@ -1,0 +1,2 @@
+Prior workspace at f896c4e: cargo test --lib passed 2/2; cargo build --lib passed.
+Raw logs were pruned with the workspace. Final reconstructed-head commands must be rerun and recorded.
