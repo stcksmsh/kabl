@@ -19,9 +19,11 @@ Recovery comes first. Mono optimization requires profiling and compatibility evi
 based on fetched `origin/master` `e951b25`. Explicit retry/output selection, interrupted
 recording and pending Load/command ordering are implemented. Focused tests and ALSA null
 software-backend checks pass; see [`audio-recovery/REPORT.md`](audio-recovery/REPORT.md).
-Independent review/recheck and full evidence are in progress. No graphical or physical
-audio session is available in this container; Save/Open Core lock latency remains open.
-Engineering submission and owner acceptance are not claimed. Do not start D06.
+Product tree `47abdc4` passed workspace tests (557/0/18), strict Clippy, ALSA null
+recovery tests (2/0), and an independent final recheck;
+draft PR #8 is open, unmerged. No graphical or physical audio session is available in this
+container; Save/Open Core lock latency remains a **major unresolved D05 gap**. Engineering
+completion and owner acceptance are not claimed. Do not start D06.
 D04/D03/D02/D01/D01-R1/Composition + Motion/Sound Palette owner reviews remain pending;
 D00 is incomplete. The narrow D03-R1 backend-error overflow exception remains accepted.
 

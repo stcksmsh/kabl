@@ -7,12 +7,13 @@ Trust code and git over older docs.
 
 The initial fetched `origin/master` was `e951b2535d817bc7c21872cd0e46e815d35747ac`;
 the branch has incorporated the newer D07-P1 authorization commit `f1e2c9e`.
-Engineering is on `codex/d05-audio-recovery`; the product record is
+Engineering is on `codex/d05-audio-recovery`, draft PR #8; the product record is
 [`audio-recovery/REPORT.md`](audio-recovery/REPORT.md) with design, owner checklist and
 review. Explicit Retry/device selection, interrupted takes and stopped Load ordering are
-implemented and focused tests plus ALSA null backend checks pass. Full verification and
-independent final review are still in progress. Browser Save/Open Core lock latency, real
-GUI/device/package evidence and hardware acceptance are not yet established. Do not merge
+implemented. Product tree `47abdc4` passed workspace tests (557/0/18), strict Clippy,
+ALSA null recovery tests (2/0), and independent
+review/recheck; REVIEW.md retains one major unresolved Core Save/Open latency gap. Real
+GUI/device/package evidence and hardware acceptance are not established. Do not merge
 or start D06. Owner review remains pending.
 
 ## Parallel assignment — isolated REAPER/CLAP proof (2026-09-27)

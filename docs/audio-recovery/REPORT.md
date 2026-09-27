@@ -1,6 +1,6 @@
 # D05 engineering report (2026-09-27)
 
-Base: fetched `origin/master` at `e951b2535d817bc7c21872cd0e46e815d35747ac`. Branch: `codex/d05-audio-recovery`, not merged. Product changes: stopped Load carry in the engine, pending document command targeting, explicit audio state/retry/output selection, session gates, recording interruption, and offline mono profiling. The exact final tested/reviewed/submitted SHAs and PR are recorded after the review recheck.
+Base: fetched `origin/master` at `e951b2535d817bc7c21872cd0e46e815d35747ac`, then incorporated its documentation-only successor `f1e2c9e`. Branch: `codex/d05-audio-recovery`; [draft PR #8](https://github.com/stcksmsh/kabl/pull/8), not merged. Tested and independently rechecked **product tree `47abdc4d34dc03d694d663863ebdf0f0443511ed`**, remote commit `7fd3a966eca193ef1babf83b5947333bb1e440b4`. Product changes: stopped Load carry in the engine, pending document command targeting, explicit audio state/retry/output selection, session gates, recording interruption, and offline mono profiling. The branch documentation head follows this product commit. Engineering is a draft with R-03 unresolved; owner review pending.
 
 ## Acceptance matrix
 
@@ -15,7 +15,7 @@ Base: fetched `origin/master` at `e951b2535d817bc7c21872cd0e46e815d35747ac`. Bra
 | Core/CC latency during Save/Open/reconnect | **Open gap.** Retry backend I/O and recording file finalization are outside `Core`, but browser Save/Open and retry compile still take it. No controlled CC latency result yet. |
 | Production callback bounds | Atomic gate and counters in actual callback; D04 helper test covers drain/render only. No complete new production callback allocation check. |
 | Mono efficiency | Profile below; no optimization applied without a measured eligible win. |
-| Workspace regression, clippy, package | Focused tests and ALSA null pass; full workspace/clippy result and package status below. |
+| Workspace regression, clippy, package | Workspace 557/0/18, strict Clippy clean, and final-tree ALSA null 2/0. Package/runtime status below. |
 | Visual/audio/owner evidence | No graphical session or hardware; 1440×900/1280×800 light/dark screenshots, audio and Kosta's checks pending. |
 
 ## Verification environment and commands
@@ -30,7 +30,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo run --release -p kabl-engine --example mono_profile
 ```
 
-The initial focused run on product commit `0415527c59a6091594439deeb0162a395f069892` had 27 passed, 0 failed, 2 ignored (`main` 1/0/2, record 10, runtime controls 16); opt-in ALSA null run had 2 passed. Full workspace on `fad24e4` had 550 passed, 0 failed, 18 ignored. The tests run the `cpal` stream on ALSA null PCM but do not drive the graphical app. Reviewer repairs at `a9b9eb1` are being reverified; final totals will be recorded at the final product head.
+At product head `cada932`, focused main/record/runtime/inspection tests gave 57 passed, 0 failed, 2 ignored. At final product tree `47abdc4`, `cargo test --workspace` gave **557 passed, 0 failed, 18 ignored**, `cargo clippy --workspace --all-targets -- -D warnings` passed, and the opt-in ALSA null recovery tests gave **2 passed, 0 failed**. The tests use a real `cpal` stream on ALSA null PCM but do not drive the graphical app. Strict Clippy needed four small lint fixes after the first recheck; the independent reviewer rechecked the exact resulting tree.
 
 ## Profile (no DSP optimization)
 
@@ -46,4 +46,4 @@ The dense graph is costly, but the harness does not isolate a safe mono-only sub
 
 ## Review and limits
 
-The independent subagent's first review found a gate race, pending-document command bugs and recording metadata faults; corrections are in `a9b9eb1`, with final recheck pending (REVIEW.md). The acceptance gaps above prevent a claim that all D05 criteria are complete. In particular, physical device recovery, real app/package walkthrough, Core/CC latency under Save/Open, and the owner checklist remain pending. Backend close can block without a deadline; one retry worker stays owned and the UI names the blocked state after ten seconds.
+The independent subagent's first review and final tree recheck are in REVIEW.md; the recheck found its code findings resolved but kept R-03 major and open. The acceptance gaps above prevent a claim that all D05 criteria are complete. In particular, physical device recovery, real app/package walkthrough, Core/CC latency under Save/Open, production callback allocation coverage, and the owner checklist remain pending. Backend close can block without a deadline; one retry worker stays owned and the UI names the blocked state after ten seconds.
