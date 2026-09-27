@@ -5,7 +5,8 @@ Trust code and git over older docs.
 
 ## D05 in progress on a separate branch (2026-09-27)
 
-The current fetched `origin/master` is `e951b2535d817bc7c21872cd0e46e815d35747ac`.
+The initial fetched `origin/master` was `e951b2535d817bc7c21872cd0e46e815d35747ac`;
+the branch has incorporated the newer D07-P1 authorization commit `f1e2c9e`.
 Engineering is on `codex/d05-audio-recovery`; the product record is
 [`audio-recovery/REPORT.md`](audio-recovery/REPORT.md) with design, owner checklist and
 review. Explicit Retry/device selection, interrupted takes and stopped Load ordering are
@@ -13,6 +14,19 @@ implemented and focused tests plus ALSA null backend checks pass. Full verificat
 independent final review are still in progress. Browser Save/Open Core lock latency, real
 GUI/device/package evidence and hardware acceptance are not yet established. Do not merge
 or start D06. Owner review remains pending.
+
+## Parallel assignment — isolated REAPER/CLAP proof (2026-09-27)
+
+Kosta authorized a separate cloud agent to work while D05's branch is active.
+Prompt: docs/product-research/briefs/D07-P1-LAUNCH.md.
+This is a bounded exception to sequential work, not full D07 or D06 authorization.
+
+The second agent owns only prototypes/reaper-clap/ and docs/reaper-clap-prototype/
+on its own branch/draft PR. Production crates, shared manifests, D05 work and shared
+status/decision docs are read-only for that agent. D05 continues its existing scope.
+The prototype must use the actual engine/editor in REAPER and return independent review
+and honest cloud evidence, or a precise feasibility limitation. No automatic integration;
+reconcile against D05/D06 before production D07. All owner reviews remain pending.
 
 ## Current assignment — D05 audio recovery and measured efficiency (2026-09-26)
 
