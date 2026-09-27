@@ -15,7 +15,7 @@ Base: fetched `origin/master` at `e951b2535d817bc7c21872cd0e46e815d35747ac`, the
 | Core/CC latency during Save/Open/reconnect | **Open gap.** Retry backend I/O and recording file finalization are outside `Core`, but browser Save/Open and retry compile still take it. No controlled CC latency result yet. |
 | Production callback bounds | Atomic gate and counters in actual callback; D04 helper test covers drain/render only. No complete new production callback allocation check. |
 | Mono efficiency | Profile below; no optimization applied without a measured eligible win. |
-| Workspace regression, clippy, package | Workspace 557/0/18, strict Clippy clean, and final-tree ALSA null 2/0. Package/runtime status below. |
+| Workspace regression, clippy, package | Workspace 557/0/18, strict Clippy clean, final-tree ALSA null 2/0, release binary and Linux archive built. Graphical package playback is unverified. |
 | Visual/audio/owner evidence | No graphical session or hardware; 1440×900/1280×800 light/dark screenshots, audio and Kosta's checks pending. |
 
 ## Verification environment and commands
@@ -31,6 +31,8 @@ cargo run --release -p kabl-engine --example mono_profile
 ```
 
 At product head `cada932`, focused main/record/runtime/inspection tests gave 57 passed, 0 failed, 2 ignored. At final product tree `47abdc4`, `cargo test --workspace` gave **557 passed, 0 failed, 18 ignored**, `cargo clippy --workspace --all-targets -- -D warnings` passed, and the opt-in ALSA null recovery tests gave **2 passed, 0 failed**. The tests use a real `cpal` stream on ALSA null PCM but do not drive the graphical app. Strict Clippy needed four small lint fixes after the first recheck; the independent reviewer rechecked the exact resulting tree.
+
+`cargo build --release -p kabl-ui --bin kabl-ui` passed on the same tree (5m 10s cold build). `OUT=/workspace/scratch/94df265b395c/d05-package bash packaging/linux/package.sh` assembled `kabl-0.1.0-linux-x86_64.tar.gz` outside the checkout: 94 archive entries, 4.9 MiB, `ldd` with no missing libraries. No package GUI launch/playback was possible here; this is build and archive evidence only.
 
 ## Profile (no DSP optimization)
 
