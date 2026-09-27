@@ -730,3 +730,30 @@ fn a_waiting_load_replaced_by_an_edit_stays_a_stopped_load() {
     h.settle();
     assert_eq!(clock_running(&h), Some(true));
 }
+
+/// The older queued-graph test does not enter the engine's overlapping fade slot. Put a
+/// stopped Load in `pending`, replace it during the fade, then promote it deterministically.
+#[test]
+fn stopped_load_in_engine_fade_survives_edit_and_explicit_start() {
+    for start_before_edit in [false, true] {
+        let mut h = H::new();
+        h.editor.add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+        h.deliver();
+        h.callback(1); // incoming graph is still fading in
+
+        kabl_ui::browser::replace_patch(&mut h.editor, &mut h.ui, piece());
+        h.ui.load_stopped = true;
+        assert_eq!(h.deliver(), Outcome::Compiled);
+        h.callback(0); // stopped Load is now the engine's pending graph
+        if start_before_edit {
+            h.ui.transport.push((CLOCK, Transport::Run));
+            h.deliver();
+            h.callback(0);
+        }
+        h.editor.add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+        assert_eq!(h.deliver(), Outcome::Compiled);
+        h.callback(0); // edit replaces pending Load
+        h.callback(40); // both fades complete
+        assert_eq!(clock_running(&h), Some(start_before_edit));
+    }
+}

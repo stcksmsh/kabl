@@ -411,7 +411,12 @@ impl PatchEngine {
         // An edit that replaces a queued fresh load is built on the loaded patch, so it must not
         // carry from the old one either.
         if let Some(p) = &self.pending {
-            new_patch.fresh |= p.fresh;
+            if !new_patch.fresh {
+                if p.fresh {
+                    new_patch.inherit_stopped_clocks(p);
+                }
+                new_patch.fresh = p.fresh;
+            }
         }
         // A Load drops pending launches: the loaded sequencers start on their startup banks.
         if new_patch.fresh {
@@ -503,6 +508,9 @@ impl PatchEngine {
         };
         self.active.transport(id, t);
         if let Some((g, _)) = self.incoming.as_mut() {
+            g.transport(id, t);
+        }
+        if let Some(g) = self.pending.as_mut() {
             g.transport(id, t);
         }
         if t == kabl_modules::builtins::Transport::Stop {

@@ -1386,6 +1386,18 @@ impl CompiledPatch {
         self.modules[i].as_any().downcast_ref::<Clock>()
     }
 
+    /// A queued edit replacing a stopped Load must retain its transport intent. This is
+    /// deliberately limited to clocks present in both graphs; a different Load starts from
+    /// its own compiled policy. Runs on the audio thread without allocating.
+    pub fn inherit_stopped_clocks(&mut self, previous: &Self) {
+        for i in 0..self.module_origin.len() {
+            let (id, lane) = self.module_origin[i];
+            if lane.is_none() && previous.clock(id).is_some_and(|c| !c.running()) {
+                self.transport(id, Transport::Stop);
+            }
+        }
+    }
+
     /// Audio thread: runs `f` on the `seq` module `id`, if this graph has one. No allocation.
     pub fn with_seq(&mut self, id: ModuleId, f: impl FnOnce(&mut Seq)) {
         if let Some(s) = self
