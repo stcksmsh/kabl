@@ -69,6 +69,23 @@ pub struct Inspect {
 }
 
 impl Inspect {
+    /// A new audio stream has its own generation and report sequence. Keep the selected
+    /// signal, but make old measurements and the previous command acknowledgment unusable.
+    pub fn reset_audio_session(&mut self, now: f64) {
+        self.token += 1;
+        self.sent = None;
+        self.since = now;
+        self.generation = 0;
+        self.floor = 0;
+        self.newest = 0;
+        self.compile_error = None;
+        self.topology = None;
+        self.reports.clear();
+        self.last_seq = None;
+        self.dropped = 0;
+        self.audio = false;
+    }
+
     /// Measures `sel` from now on; opens the inspector.
     pub fn select(&mut self, sel: Sel, now: f64) {
         if self.sel.as_ref() != Some(&sel) {

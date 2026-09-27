@@ -265,6 +265,38 @@ fn only_current_measurements_are_shown_as_current() {
 }
 
 #[test]
+fn retry_resets_inspection_lineage_and_resends_selection() {
+    for old_generation in [2, 20] {
+        let mut h = H::new(1440.0, 900.0);
+        h.open(INIT);
+        h.ui.inspect
+            .rebuilt(old_generation, None, h.editor.state(), h.t);
+        let old = h.inspect(4, "out");
+        assert!(h
+            .ui
+            .inspect
+            .accept(report(&old, old_generation, 0, level(0.5)), h.t, 0.0));
+        assert_eq!(h.ui.inspect.status(h.editor.state(), h.t), Status::Live);
+        h.ui.inspect.reset_audio_session(h.t);
+        h.ui.inspect.rebuilt(2, None, h.editor.state(), h.t);
+        h.ui.inspect.audio = true;
+        assert!(h.ui.inspect.reports.is_empty());
+        assert!(!h
+            .ui
+            .inspect
+            .accept(report(&old, 2, 1, level(0.5)), h.t, 0.0));
+        h.frame();
+        let new = h.sent().flatten().expect("session resends selected signal");
+        assert!(new.token > old.token);
+        assert!(h
+            .ui
+            .inspect
+            .accept(report(&new, 2, 0, level(0.5)), h.t, 0.0));
+        assert_eq!(h.ui.inspect.status(h.editor.state(), h.t), Status::Live);
+    }
+}
+
+#[test]
 fn another_sound_never_inherits_a_measurement_by_reused_id() {
     let mut h = H::new(1440.0, 900.0);
     h.open(INIT);

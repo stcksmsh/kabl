@@ -672,6 +672,9 @@ struct Core {
     record_finish: Option<std::thread::JoinHandle<record::Recorder>>,
     record_dir: String,
     record_last: Option<record::Outcome>,
+    /// CCs queued before the most recent retry boundary must not apply afterward.
+    cc_cutoff: f64,
+    stale_cc: u64,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -784,17 +787,21 @@ fn pump(
     stop: Arc<AtomicBool>,
 ) {
     let mut events = Vec::with_capacity(64);
+    let mut fresh = Vec::with_capacity(64);
     while !stop.load(Ordering::Acquire) {
         std::thread::park_timeout(std::time::Duration::from_millis(5));
         events.clear();
-        let mut arrived = f64::MAX;
         while let Ok((e, t)) = cc.pop() {
-            events.push(e);
-            arrived = arrived.min(t);
+            events.push((e, t));
         }
         let Ok(mut c) = core.lock() else {
             return;
         };
+        let (discarded, arrived) = fresh_cc(&events, c.cc_cutoff, &mut fresh);
+        c.stale_cc += discarded as u64;
+        if discarded > 0 {
+            log::info!(target: "midi", "discarded {discarded} CC events queued before audio retry");
+        }
         if let Some(p) = c.progress.as_mut() {
             p.observe();
             if p.failure.is_some() && c.record_finish.is_none() {
@@ -820,9 +827,11 @@ fn pump(
             record_finish: _,
             record_dir: _,
             record_last: _,
+            cc_cutoff: _,
+            stale_cc: _,
         } = &mut *c;
         kabl_ui::perform::rearm(ui, clock_s());
-        if !events.is_empty() {
+        if !fresh.is_empty() {
             let starting = progress
                 .as_ref()
                 .is_some_and(|p| p.failure.is_none() && p.gate.load(Ordering::Relaxed) != u64::MAX);
@@ -830,7 +839,7 @@ fn pump(
                 progress.as_ref().unwrap().gate.store(0, Ordering::Relaxed);
             }
             let before = delivery.rev();
-            control::midi(editor, ui, delivery, &events, clock_s());
+            control::midi(editor, ui, delivery, &fresh, clock_s());
             if starting {
                 progress.as_ref().unwrap().gate.store(
                     if delivery.compile_error.is_none() {
@@ -848,6 +857,22 @@ fn pump(
             delivery.flush();
         }
     }
+}
+
+fn fresh_cc(
+    events: &[((u8, u8, u8), f64)],
+    cutoff: f64,
+    output: &mut Vec<(u8, u8, u8)>,
+) -> (usize, f64) {
+    output.clear();
+    let mut arrived = f64::MAX;
+    for &(event, at) in events {
+        if at > cutoff {
+            output.push(event);
+            arrived = arrived.min(at);
+        }
+    }
+    (events.len() - output.len(), arrived)
 }
 
 /// What the MIDI callback owns: key events (notes, sustain pedal, All Notes Off / All Sound
@@ -1248,6 +1273,7 @@ impl App {
             return;
         }
         self.session += 1;
+        core.cc_cutoff = clock_s();
         let session = self.session;
         self.midi.suspend_notes();
         reset_pickup(&mut core.ui);
@@ -1298,7 +1324,7 @@ impl App {
         });
     }
 
-    fn poll_retry(&mut self, core: &mut Core) {
+    fn poll_retry(&mut self, core: &mut Core, now: f64) {
         if !self.retry.as_ref().is_some_and(|r| r.handle.is_finished()) {
             if self
                 .retry
@@ -1354,7 +1380,14 @@ impl App {
         self.watchdog = (0, std::time::Instant::now());
         self.health = Health::new();
         core.ui.sample_rate = self.audio.sample_rate;
-        core.ui.inspect.audio = false;
+        core.ui.inspect.reset_audio_session(now);
+        core.ui.inspect.rebuilt(
+            core.delivery.generation,
+            core.delivery.compile_error.clone(),
+            core.editor.state(),
+            now,
+        );
+        self.seen_generation = core.delivery.generation;
     }
 
     /// UI thread, every frame: logs what the audio side counted, rate-limited.
@@ -1450,7 +1483,7 @@ impl eframe::App for App {
             self.record_last = Some(last);
         }
         self.poll_record_finish(&mut core);
-        self.poll_retry(&mut core);
+        self.poll_retry(&mut core, ui.input(|i| i.time));
         let ready_at_frame_start = self.phase == AudioPhase::Starting
             && self.audio.gate.load(Ordering::Relaxed) == u64::MAX;
         let start_rev = core.delivery.rev();
@@ -1468,6 +1501,8 @@ impl eframe::App for App {
             record_finish: _,
             record_dir,
             record_last: _,
+            cc_cutoff: _,
+            stale_cc,
         } = &mut *core;
         if let (Some(rx), Some(l)) = (self.audio.applied_rx.as_mut(), latency.as_mut()) {
             while let Ok((rev, at)) = rx.pop() {
@@ -1715,7 +1750,7 @@ impl eframe::App for App {
                         held,
                         sounding,
                         t.hist_line(),
-                        delivery_line(delivery),
+                        format!("{} · {} stale CC events discarded", delivery_line(delivery), stale_cc),
                     ),
                 );
             }
@@ -2003,6 +2038,8 @@ fn main() -> eframe::Result<()> {
                 record_finish: None,
                 record_dir: record_dir.clone(),
                 record_last: None,
+                cc_cutoff: f64::NEG_INFINITY,
+                stale_cc: 0,
             }));
             let c = core.clone();
             let control_stop = Arc::new(AtomicBool::new(false));
@@ -2095,6 +2132,16 @@ mod recovery_tests {
         assert_eq!(gate.load(Ordering::Acquire), 5);
         assert!(unmute_if_current(&gate, 5));
         assert_eq!(gate.load(Ordering::Acquire), u64::MAX);
+    }
+
+    #[test]
+    fn retry_boundary_discards_only_earlier_cc_arrivals() {
+        let events = [((0, 24, 50), 1.0), ((0, 46, 127), 2.0), ((0, 24, 60), 3.0)];
+        let mut fresh = Vec::new();
+        let (dropped, earliest) = fresh_cc(&events, 2.0, &mut fresh);
+        assert_eq!(dropped, 2);
+        assert_eq!(earliest, 3.0);
+        assert_eq!(fresh, vec![(0, 24, 60)]);
     }
 
     /// Opt-in cpal stream and callback test against an ALSA null PCM. No physical device.
