@@ -189,6 +189,50 @@ pub struct Browser {
     pub folder: String,
     /// The window had focus last frame.
     focused: bool,
+    /// The standalone app runs file operations on one owned worker. Library-only tests use
+    /// the synchronous path so their observable calls remain deterministic.
+    pub async_io: bool,
+    io: Option<IoTask>,
+}
+
+#[derive(Clone)]
+enum IoRequest {
+    Perform(Pending),
+    Save(Option<Pending>),
+    SaveAs {
+        name: String,
+        category: String,
+        tags: String,
+        replace: Option<String>,
+        then: Option<Pending>,
+    },
+    SaveFolder(String),
+}
+
+struct IoTask {
+    handle: std::thread::JoinHandle<IoDone>,
+    before: PatchState,
+    origin: Option<DocOrigin>,
+    request: IoRequest,
+}
+
+struct IoDone {
+    library: Option<Library>,
+    doc: Option<Doc>,
+    log: Option<PatchLog>,
+    load_stopped: bool,
+    selected: Option<String>,
+    message: Option<String>,
+    error: Option<(Option<(String, String)>, String)>,
+}
+
+impl Drop for Browser {
+    fn drop(&mut self) {
+        if let Some(task) = self.io.take() {
+            // An in-flight transactional write must not be detached at shutdown.
+            let _ = task.handle.join();
+        }
+    }
 }
 
 impl Default for Browser {
@@ -203,6 +247,151 @@ impl Default for Browser {
             preview_until: None,
             folder: "my-patch".into(),
             focused: true,
+            async_io: false,
+            io: None,
+        }
+    }
+}
+
+pub fn io_busy(ui: &UiState) -> bool {
+    ui.browser.io.is_some()
+}
+
+fn start_io(editor: &PatchEditor, ui: &mut UiState, request: IoRequest) {
+    if io_busy(ui) {
+        message(ui, "finish the current file operation first".into());
+        return;
+    }
+    let before = editor.state().clone();
+    let origin = ui.doc.as_ref().map(|d| d.origin.clone());
+    let log = editor.log().clone();
+    let library = ui.library.clone();
+    let doc = ui.doc.clone();
+    let work = request.clone();
+    let handle = std::thread::Builder::new()
+        .name("kabl-document-io".into())
+        .spawn(move || {
+            let delay = std::env::var("KABL_BROWSER_IO_DELAY_MS")
+                .ok()
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(0)
+                .min(5000);
+            if delay > 0 {
+                std::thread::sleep(std::time::Duration::from_millis(delay));
+            }
+            let mut scratch = UiState::default();
+            scratch.library = library;
+            scratch.doc = doc;
+            let mut scratch_editor = PatchEditor::from_log(log);
+            let mut error = None;
+            match work {
+                IoRequest::Perform(p) => perform(&mut scratch_editor, &mut scratch, p),
+                IoRequest::Save(_) => {
+                    error = save(&mut scratch_editor, &mut scratch, None).map(|e| (None, e));
+                }
+                IoRequest::SaveAs { name, category, tags, replace, .. } => {
+                    error = save_as(&mut scratch_editor, &mut scratch, &name, &category,
+                        &tags, replace, None).err();
+                }
+                IoRequest::SaveFolder(path) => {
+                    match crate::library::save_folder(std::path::Path::new(&path), scratch_editor.log()) {
+                        Ok(()) => {
+                            let name = std::path::Path::new(&path).file_name()
+                                .map_or(path.clone(), |n| n.to_string_lossy().to_string());
+                            scratch.doc = Some(Doc::new(&name, DocOrigin::Folder(path.clone()),
+                                scratch_editor.state()));
+                            message(&mut scratch, format!("saved to {path}"));
+                        }
+                        Err(e) => {
+                            let text = save_failed(&e);
+                            message(&mut scratch, text.clone());
+                            error = Some((None, text));
+                        }
+                    }
+                }
+            }
+            IoDone {
+                library: scratch.library,
+                doc: scratch.doc,
+                log: scratch.loaded.then(|| scratch_editor.log().clone()),
+                load_stopped: scratch.load_stopped,
+                selected: scratch.browser.selected.take(),
+                message: scratch.last_message,
+                error,
+            }
+        })
+        .expect("spawn one document I/O worker");
+    ui.browser.io = Some(IoTask { handle, before, origin, request });
+    message(ui, "file operation in progress; editing remains available".into());
+}
+
+/// Reconcile one finished transaction without blocking the editor or the CC pump on I/O.
+/// A load never replaces an edit accepted while the worker was reading its patch.
+pub fn poll_io(editor: &mut PatchEditor, ui: &mut UiState) {
+    if !ui.browser.io.as_ref().is_some_and(|t| t.handle.is_finished()) {
+        return;
+    }
+    let task = ui.browser.io.take().unwrap();
+    let Ok(done) = task.handle.join() else {
+        message(ui, "file operation failed; working patch kept".into());
+        return;
+    };
+    let same_doc = ui.doc.as_ref().map(|d| &d.origin) == task.origin.as_ref();
+    match task.request {
+        IoRequest::Perform(p) => {
+            if let Some(log) = done.log {
+                if same_doc && editor.state() == &task.before {
+                    replace_patch(editor, ui, log);
+                    ui.doc = done.doc;
+                    ui.load_stopped = done.load_stopped;
+                    ui.library = done.library;
+                    ui.last_message = done.message;
+                } else {
+                    message(ui, "the patch changed while loading; confirm the new open".into());
+                    request(editor, ui, p);
+                }
+            } else {
+                ui.last_message = done.message;
+            }
+        }
+        IoRequest::Save(then) => {
+            if let Some((_, e)) = done.error {
+                if let Some(p) = then {
+                    ui.browser.dialog = Some(Dialog::Unsaved { then: p, error: Some(e) });
+                } else {
+                    message(ui, e);
+                }
+            } else if same_doc {
+                ui.library = done.library;
+                ui.doc = done.doc;
+                ui.last_message = done.message;
+                if let Some(p) = then {
+                    request(editor, ui, p);
+                }
+            }
+        }
+        IoRequest::SaveAs { name, category, tags, then, .. } => {
+            if let Some((taken, e)) = done.error {
+                ui.browser.dialog = Some(Dialog::SaveAs {
+                    name, category, tags, taken, then, error: Some(e),
+                });
+            } else if same_doc {
+                ui.library = done.library;
+                ui.doc = done.doc;
+                ui.browser.query.clear();
+                ui.browser.category = None;
+                ui.browser.selected = done.selected;
+                ui.last_message = done.message;
+                if let Some(p) = then {
+                    request(editor, ui, p);
+                }
+            }
+        }
+        IoRequest::SaveFolder(_) => {
+            if done.error.is_none() && same_doc {
+                ui.doc = done.doc;
+            }
+            ui.last_message = done.message;
         }
     }
 }
@@ -237,6 +426,10 @@ pub fn replace_patch(editor: &mut PatchEditor, ui: &mut UiState, log: PatchLog) 
 
 /// Asks before `p` replaces unsaved work; runs it at once when nothing is unsaved.
 pub fn request(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
+    if io_busy(ui) {
+        message(ui, "finish the current file operation first".into());
+        return;
+    }
     if is_modified(editor, ui) {
         ui.browser.dialog = Some(Dialog::Unsaved {
             then: p,
@@ -271,6 +464,10 @@ fn message(ui: &mut UiState, text: String) {
 
 /// Does `p` without asking. A failure leaves the editor as it was and says why.
 pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
+    if ui.browser.async_io && p != Pending::Quit {
+        start_io(editor, ui, IoRequest::Perform(p));
+        return;
+    }
     match p {
         Pending::Quit => ui.quit_now = true,
         Pending::Open(id) => {
@@ -371,6 +568,21 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
 /// successful save. Returns an error message when the save failed (the dialog shows it).
 fn save(editor: &mut PatchEditor, ui: &mut UiState, then: Option<Pending>) -> Option<String> {
     let doc = ui.doc.clone()?;
+    if ui.browser.async_io {
+        let writable = match &doc.origin {
+            DocOrigin::Library(id) => ui.library.as_ref()
+                .and_then(|l| l.get(id)).is_some_and(|e| e.origin == Origin::User),
+            DocOrigin::Folder(path) => !ui.library.as_ref()
+                .is_some_and(|l| l.is_factory_path(std::path::Path::new(path))),
+            DocOrigin::New => false,
+        };
+        if writable {
+            start_io(editor, ui, IoRequest::Save(then));
+        } else {
+            open_save_as(ui, then);
+        }
+        return None;
+    }
     let result = match &doc.origin {
         DocOrigin::Library(id)
             if ui
@@ -473,6 +685,12 @@ fn save_as(
     replace: Option<String>,
     then: Option<Pending>,
 ) -> Result<(), (Option<(String, String)>, String)> {
+    if ui.browser.async_io {
+        start_io(editor, ui, IoRequest::SaveAs {
+            name: name.into(), category: category.into(), tags: tags.into(), replace, then,
+        });
+        return Ok(());
+    }
     let Some(lib) = ui.library.as_mut() else {
         return Err((None, "the sound library isn't available".into()));
     };
@@ -545,7 +763,7 @@ pub fn frame_input(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &egui::
     if ui_state.browser.preview_until.is_some_and(|t| now > t) {
         ui_state.browser.preview_until = None;
     }
-    if ui_state.browser.dialog.is_none()
+    if !io_busy(ui_state) && ui_state.browser.dialog.is_none()
         && ui.input_mut(|i| {
             i.consume_shortcut(&egui::KeyboardShortcut::new(
                 egui::Modifiers::COMMAND,
@@ -583,7 +801,8 @@ pub fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
             name.clone()
         });
     hit(ui_state, "doc-name", &r);
-    let r = ui.button("Save").on_hover_text("Ctrl+S");
+    let r = ui.add_enabled(!io_busy(ui_state), egui::Button::new("Save"))
+        .on_hover_text("Ctrl+S");
     hit(ui_state, "save", &r);
     if r.clicked() {
         save(editor, ui_state, None);
@@ -607,6 +826,10 @@ fn badge(ui: &mut egui::Ui, e: &Meta) {
 
 /// The left panel.
 pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
+    if io_busy(ui_state) {
+        ui.label("Reading or saving a sound… editing remains available.");
+        return;
+    }
     ui.horizontal(|ui| {
         ui.heading("Sounds");
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -919,6 +1142,10 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                     {
                         "that folder is a factory sound: choose another folder, or Save As".into()
                     } else {
+                        if ui_state.browser.async_io {
+                            start_io(editor, ui_state, IoRequest::SaveFolder(p.clone()));
+                            "saving folder in background".into()
+                        } else {
                         match crate::library::save_folder(path, editor.log()) {
                             Ok(()) => {
                                 let name = path
@@ -932,6 +1159,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                                 format!("saved to {p}")
                             }
                             Err(err) => save_failed(&err),
+                        }
                         }
                     };
                     message(ui_state, text);
@@ -1112,6 +1340,9 @@ fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui:
 
 /// The open dialog, if any (modal). Escape cancels it.
 pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Context) {
+    if io_busy(ui_state) {
+        return;
+    }
     let Some(dialog) = ui_state.browser.dialog.take() else {
         return;
     };

@@ -1483,6 +1483,11 @@ impl eframe::App for App {
         let Ok(mut core) = core.lock() else {
             return;
         };
+        let Core { editor, ui: ui_state, .. } = &mut *core;
+        kabl_ui::browser::poll_io(editor, ui_state);
+        if kabl_ui::browser::io_busy(&core.ui) {
+            ui.ctx().request_repaint_after(std::time::Duration::from_millis(20));
+        }
         if self.record_finish.is_none() {
             self.record_finish = core.record_finish.take();
         }
@@ -1817,7 +1822,10 @@ impl eframe::App for App {
         }
         // Closing the window (or Ctrl+Q) with unsaved changes asks first.
         let close = ui.ctx().input(|i| i.viewport().close_requested());
-        if close && !ui_state.quit_now && kabl_ui::browser::is_modified(editor, ui_state) {
+        if close && kabl_ui::browser::io_busy(ui_state) {
+            ui.ctx().send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            ui_state.last_message = Some("wait for the file operation to finish before closing".into());
+        } else if close && !ui_state.quit_now && kabl_ui::browser::is_modified(editor, ui_state) {
             ui.ctx()
                 .send_viewport_cmd(egui::ViewportCommand::CancelClose);
             if ui_state.browser.dialog.is_none() {
@@ -1975,6 +1983,7 @@ fn main() -> eframe::Result<()> {
         }
     };
     ui_state.library = Some(library);
+    ui_state.browser.async_io = true;
     if args.iter().any(|a| a == "--browser") {
         ui_state.browser_open = true;
     }
