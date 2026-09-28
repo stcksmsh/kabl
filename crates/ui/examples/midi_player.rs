@@ -4,6 +4,9 @@
 //!     cc CH NUM VAL              channel 1..16, controller, value
 //!     ramp CH NUM V0 V1 SECONDS  a turn from V0 to V1, 50 messages per second (in the background)
 //!     on NOTE VEL | off NOTE     channel 1
+//!     bend CH V0 V1 SECONDS      pitch bend 0..16383 (8192 center) from V0 to V1, 100 per
+//!                                second (in the background); SECONDS 0 sends V1 once
+//!     raw HEX...                 any message, e.g. `raw 91 3c 64` (note on, channel 2)
 //!     quit
 //!
 //! `cargo run --release -p kabl-ui --example midi_player`, then start kabl-ui with
@@ -78,6 +81,32 @@ fn main() {
                         std::thread::sleep(Duration::from_millis(20));
                     }
                 });
+            }
+            Some("bend") => {
+                let (ch, v0, v1, secs) = (n(1) as u8 - 1, n(2), n(3), n(4));
+                let conn = conn.clone();
+                std::thread::spawn(move || {
+                    let steps = (secs * 100.0) as usize;
+                    for k in 0..=steps {
+                        let v = if steps == 0 {
+                            v1
+                        } else {
+                            v0 + (v1 - v0) * k as f32 / steps as f32
+                        };
+                        let v = v.round().clamp(0.0, 16383.0) as u16;
+                        (conn.lock().unwrap())(&[0xE0 | ch, (v & 0x7F) as u8, (v >> 7) as u8]);
+                        if steps > 0 {
+                            std::thread::sleep(Duration::from_millis(10));
+                        }
+                    }
+                });
+            }
+            Some("raw") => {
+                let bytes: Vec<u8> = w[1..]
+                    .iter()
+                    .filter_map(|b| u8::from_str_radix(b, 16).ok())
+                    .collect();
+                send(&conn, &bytes);
             }
             Some("on") => send(&conn, &[0x90, n(1) as u8, n(2) as u8]),
             Some("off") => send(&conn, &[0x80, n(1) as u8, 0]),

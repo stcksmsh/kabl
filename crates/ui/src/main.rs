@@ -2341,7 +2341,7 @@ mod recovery_tests {
     fn midi_messages_reach_the_wheel_and_the_mappings() {
         let (notes, mut notes_rx) = rtrb::RingBuffer::<Note>::new(64);
         let (mut midi, mut cc_rx) = Midi::new(notes);
-        let mut send = |d: &[u8]| on_message(&mut midi.sink.lock().unwrap(), d);
+        let send = |d: &[u8]| on_message(&mut midi.sink.lock().unwrap(), d);
         send(&[0xB2, 1, 99]);
         send(&[0xE2, 0, 0x60]);
         send(&[0xB2, 121, 0]);
