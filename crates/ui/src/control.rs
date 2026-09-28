@@ -194,18 +194,22 @@ impl Delivery {
         // A waiting Load this edit replaces keeps its meaning: no state carried across
         // documents, and its clocks stopped when it was loaded stopped (review RC-02). A new
         // Load has its own (RC-04).
-        if !fresh && (self.held_graph.as_ref().is_some_and(|g| g.fresh)
-            || self.compile_fresh) {
+        if !fresh && (self.held_graph.as_ref().is_some_and(|g| g.fresh) || self.compile_fresh) {
             fresh = true;
             stopped |= self.held_stopped || self.compile_stopped;
         }
         self.generation += 1;
         self.rev += 1;
         if self.async_compile && self.tx.is_some() {
+            self.compile_error = None;
             self.held_graph = None;
             self.held.clear();
             self.next_compile = Some(CompileRequest {
-                doc: doc.clone(), generation: self.generation, rev: self.rev, fresh, stopped,
+                doc: doc.clone(),
+                generation: self.generation,
+                rev: self.rev,
+                fresh,
+                stopped,
             });
             self.compile_fresh = fresh;
             self.compile_stopped = stopped;
@@ -257,28 +261,37 @@ impl Delivery {
             let sample_rate = self.sample_rate;
             let voice_count = self.voice_count;
             let delay = self.compile_delay_ms;
-            self.compiling = Some(std::thread::Builder::new()
-                .name("kabl-graph-compile".into())
-                .spawn(move || {
-                    if delay != 0 { std::thread::sleep(std::time::Duration::from_millis(delay)); }
-                    let mut graph = compile(&request.doc, sample_rate, voice_count)
-                        .map_err(|e| e.to_string())?;
-                    graph.generation = request.generation;
-                    graph.rev = request.rev;
-                    graph.fresh = request.fresh;
-                    if request.stopped {
-                        let mut clocks = Vec::new();
-                        graph.clocks(|id, _| clocks.push(id));
-                        for id in clocks { graph.transport(id, Transport::Stop); }
-                    }
-                    Ok(graph)
-                }).expect("spawn graph compiler"));
+            self.compiling = Some(
+                std::thread::Builder::new()
+                    .name("kabl-graph-compile".into())
+                    .spawn(move || {
+                        if delay != 0 {
+                            std::thread::sleep(std::time::Duration::from_millis(delay));
+                        }
+                        let mut graph = compile(&request.doc, sample_rate, voice_count)
+                            .map_err(|e| e.to_string())?;
+                        graph.generation = request.generation;
+                        graph.rev = request.rev;
+                        graph.fresh = request.fresh;
+                        if request.stopped {
+                            let mut clocks = Vec::new();
+                            graph.clocks(|id, _| clocks.push(id));
+                            for id in clocks {
+                                graph.transport(id, Transport::Stop);
+                            }
+                        }
+                        Ok(graph)
+                    })
+                    .expect("spawn graph compiler"),
+            );
             self.held_stopped = request.stopped;
         }
     }
 
     fn poll_compile(&mut self) {
-        if !self.compiling.as_ref().is_some_and(JoinHandle::is_finished) { return; }
+        if !self.compiling.as_ref().is_some_and(JoinHandle::is_finished) {
+            return;
+        }
         let result = self.compiling.take().unwrap().join();
         if self.next_compile.is_some() {
             self.start_compile();
@@ -308,7 +321,9 @@ impl Delivery {
     /// still wait.
     pub fn flush(&mut self) -> usize {
         self.poll_compile();
-        if self.compiling.is_some() || self.next_compile.is_some() { return self.waiting(); }
+        if self.compiling.is_some() || self.next_compile.is_some() {
+            return self.waiting();
+        }
         let queued = self.graphs_queued();
         let Some(tx) = self.tx.as_mut() else {
             // No audio: nothing will take them.
@@ -377,7 +392,9 @@ impl Delivery {
 
     /// Messages waiting to be sent.
     pub fn waiting(&self) -> usize {
-        self.held_graph.is_some() as usize + self.held.len() + self.held_actions.len()
+        self.held_graph.is_some() as usize
+            + self.held.len()
+            + self.held_actions.len()
             + (self.compiling.is_some() || self.next_compile.is_some()) as usize
     }
 
@@ -412,7 +429,9 @@ impl Delivery {
 
 impl Drop for Delivery {
     fn drop(&mut self) {
-        if let Some(worker) = self.compiling.take() { let _ = worker.join(); }
+        if let Some(worker) = self.compiling.take() {
+            let _ = worker.join();
+        }
     }
 }
 

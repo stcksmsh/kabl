@@ -288,17 +288,38 @@ fn start_io(editor: &PatchEditor, ui: &mut UiState, request: IoRequest) {
                 IoRequest::Save(_) => {
                     error = save(&mut scratch_editor, &mut scratch, None).map(|e| (None, e));
                 }
-                IoRequest::SaveAs { name, category, tags, replace, .. } => {
-                    error = save_as(&mut scratch_editor, &mut scratch, &name, &category,
-                        &tags, replace, None).err();
+                IoRequest::SaveAs {
+                    name,
+                    category,
+                    tags,
+                    replace,
+                    ..
+                } => {
+                    error = save_as(
+                        &mut scratch_editor,
+                        &mut scratch,
+                        &name,
+                        &category,
+                        &tags,
+                        replace,
+                        None,
+                    )
+                    .err();
                 }
                 IoRequest::SaveFolder(path) => {
-                    match crate::library::save_folder(std::path::Path::new(&path), scratch_editor.log()) {
+                    match crate::library::save_folder(
+                        std::path::Path::new(&path),
+                        scratch_editor.log(),
+                    ) {
                         Ok(()) => {
-                            let name = std::path::Path::new(&path).file_name()
+                            let name = std::path::Path::new(&path)
+                                .file_name()
                                 .map_or(path.clone(), |n| n.to_string_lossy().to_string());
-                            scratch.doc = Some(Doc::new(&name, DocOrigin::Folder(path.clone()),
-                                scratch_editor.state()));
+                            scratch.doc = Some(Doc::new(
+                                &name,
+                                DocOrigin::Folder(path.clone()),
+                                scratch_editor.state(),
+                            ));
                             message(&mut scratch, format!("saved to {path}"));
                         }
                         Err(e) => {
@@ -320,14 +341,27 @@ fn start_io(editor: &PatchEditor, ui: &mut UiState, request: IoRequest) {
             }
         })
         .expect("spawn one document I/O worker");
-    ui.browser.io = Some(IoTask { handle, before, origin, request });
-    message(ui, "file operation in progress; editing remains available".into());
+    ui.browser.io = Some(IoTask {
+        handle,
+        before,
+        origin,
+        request,
+    });
+    message(
+        ui,
+        "file operation in progress; editing remains available".into(),
+    );
 }
 
 /// Reconcile one finished transaction without blocking the editor or the CC pump on I/O.
 /// A load never replaces an edit accepted while the worker was reading its patch.
 pub fn poll_io(editor: &mut PatchEditor, ui: &mut UiState) {
-    if !ui.browser.io.as_ref().is_some_and(|t| t.handle.is_finished()) {
+    if !ui
+        .browser
+        .io
+        .as_ref()
+        .is_some_and(|t| t.handle.is_finished())
+    {
         return;
     }
     let task = ui.browser.io.take().unwrap();
@@ -346,7 +380,10 @@ pub fn poll_io(editor: &mut PatchEditor, ui: &mut UiState) {
                     ui.library = done.library;
                     ui.last_message = done.message;
                 } else {
-                    message(ui, "the patch changed while loading; confirm the new open".into());
+                    message(
+                        ui,
+                        "the patch changed while loading; confirm the new open".into(),
+                    );
                     request(editor, ui, p);
                 }
             } else {
@@ -356,7 +393,10 @@ pub fn poll_io(editor: &mut PatchEditor, ui: &mut UiState) {
         IoRequest::Save(then) => {
             if let Some((_, e)) = done.error {
                 if let Some(p) = then {
-                    ui.browser.dialog = Some(Dialog::Unsaved { then: p, error: Some(e) });
+                    ui.browser.dialog = Some(Dialog::Unsaved {
+                        then: p,
+                        error: Some(e),
+                    });
                 } else {
                     message(ui, e);
                 }
@@ -369,10 +409,21 @@ pub fn poll_io(editor: &mut PatchEditor, ui: &mut UiState) {
                 }
             }
         }
-        IoRequest::SaveAs { name, category, tags, then, .. } => {
+        IoRequest::SaveAs {
+            name,
+            category,
+            tags,
+            then,
+            ..
+        } => {
             if let Some((taken, e)) = done.error {
                 ui.browser.dialog = Some(Dialog::SaveAs {
-                    name, category, tags, taken, then, error: Some(e),
+                    name,
+                    category,
+                    tags,
+                    taken,
+                    then,
+                    error: Some(e),
                 });
             } else if same_doc {
                 ui.library = done.library;
@@ -569,9 +620,14 @@ fn save(editor: &mut PatchEditor, ui: &mut UiState, then: Option<Pending>) -> Op
     let doc = ui.doc.clone()?;
     if ui.browser.async_io {
         let writable = match &doc.origin {
-            DocOrigin::Library(id) => ui.library.as_ref()
-                .and_then(|l| l.get(id)).is_some_and(|e| e.origin == Origin::User),
-            DocOrigin::Folder(path) => !ui.library.as_ref()
+            DocOrigin::Library(id) => ui
+                .library
+                .as_ref()
+                .and_then(|l| l.get(id))
+                .is_some_and(|e| e.origin == Origin::User),
+            DocOrigin::Folder(path) => !ui
+                .library
+                .as_ref()
                 .is_some_and(|l| l.is_factory_path(std::path::Path::new(path))),
             DocOrigin::New => false,
         };
@@ -685,9 +741,17 @@ fn save_as(
     then: Option<Pending>,
 ) -> Result<(), (Option<(String, String)>, String)> {
     if ui.browser.async_io {
-        start_io(editor, ui, IoRequest::SaveAs {
-            name: name.into(), category: category.into(), tags: tags.into(), replace, then,
-        });
+        start_io(
+            editor,
+            ui,
+            IoRequest::SaveAs {
+                name: name.into(),
+                category: category.into(),
+                tags: tags.into(),
+                replace,
+                then,
+            },
+        );
         return Ok(());
     }
     let Some(lib) = ui.library.as_mut() else {
@@ -762,7 +826,8 @@ pub fn frame_input(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &egui::
     if ui_state.browser.preview_until.is_some_and(|t| now > t) {
         ui_state.browser.preview_until = None;
     }
-    if !io_busy(ui_state) && ui_state.browser.dialog.is_none()
+    if !io_busy(ui_state)
+        && ui_state.browser.dialog.is_none()
         && ui.input_mut(|i| {
             i.consume_shortcut(&egui::KeyboardShortcut::new(
                 egui::Modifiers::COMMAND,
@@ -800,7 +865,8 @@ pub fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
             name.clone()
         });
     hit(ui_state, "doc-name", &r);
-    let r = ui.add_enabled(!io_busy(ui_state), egui::Button::new("Save"))
+    let r = ui
+        .add_enabled(!io_busy(ui_state), egui::Button::new("Save"))
         .on_hover_text("Ctrl+S");
     hit(ui_state, "save", &r);
     if r.clicked() {
@@ -1145,20 +1211,20 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                             start_io(editor, ui_state, IoRequest::SaveFolder(p.clone()));
                             "saving folder in background".into()
                         } else {
-                        match crate::library::save_folder(path, editor.log()) {
-                            Ok(()) => {
-                                let name = path
-                                    .file_name()
-                                    .map_or(p.clone(), |n| n.to_string_lossy().to_string());
-                                ui_state.doc = Some(Doc::new(
-                                    &name,
-                                    DocOrigin::Folder(p.clone()),
-                                    editor.state(),
-                                ));
-                                format!("saved to {p}")
+                            match crate::library::save_folder(path, editor.log()) {
+                                Ok(()) => {
+                                    let name = path
+                                        .file_name()
+                                        .map_or(p.clone(), |n| n.to_string_lossy().to_string());
+                                    ui_state.doc = Some(Doc::new(
+                                        &name,
+                                        DocOrigin::Folder(p.clone()),
+                                        editor.state(),
+                                    ));
+                                    format!("saved to {p}")
+                                }
+                                Err(err) => save_failed(&err),
                             }
-                            Err(err) => save_failed(&err),
-                        }
                         }
                     };
                     message(ui_state, text);

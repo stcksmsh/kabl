@@ -42,32 +42,44 @@ mod callback_allocations {
     pub struct Counter;
     unsafe impl GlobalAlloc for Counter {
         unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-            if INSIDE.try_with(|v| v.get()).unwrap_or(false) { ALLOCS.fetch_add(1, Ordering::Relaxed); }
+            if INSIDE.try_with(|v| v.get()).unwrap_or(false) {
+                ALLOCS.fetch_add(1, Ordering::Relaxed);
+            }
             System.alloc(layout)
         }
         unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-            if INSIDE.try_with(|v| v.get()).unwrap_or(false) { DEALLOCS.fetch_add(1, Ordering::Relaxed); }
+            if INSIDE.try_with(|v| v.get()).unwrap_or(false) {
+                DEALLOCS.fetch_add(1, Ordering::Relaxed);
+            }
             System.dealloc(ptr, layout)
         }
         unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, size: usize) -> *mut u8 {
-            if INSIDE.try_with(|v| v.get()).unwrap_or(false) { ALLOCS.fetch_add(1, Ordering::Relaxed); }
+            if INSIDE.try_with(|v| v.get()).unwrap_or(false) {
+                ALLOCS.fetch_add(1, Ordering::Relaxed);
+            }
             System.realloc(ptr, layout, size)
         }
         unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
-            if INSIDE.try_with(|v| v.get()).unwrap_or(false) { ALLOCS.fetch_add(1, Ordering::Relaxed); }
+            if INSIDE.try_with(|v| v.get()).unwrap_or(false) {
+                ALLOCS.fetch_add(1, Ordering::Relaxed);
+            }
             System.alloc_zeroed(layout)
         }
     }
     pub struct Scope(bool);
     impl Scope {
         pub fn new(enabled: bool) -> Self {
-            if enabled { INSIDE.with(|v| v.set(true)); }
+            if enabled {
+                INSIDE.with(|v| v.set(true));
+            }
             Self(enabled)
         }
     }
     impl Drop for Scope {
         fn drop(&mut self) {
-            if self.0 { INSIDE.with(|v| v.set(false)); }
+            if self.0 {
+                INSIDE.with(|v| v.set(false));
+            }
         }
     }
 }
@@ -1357,7 +1369,9 @@ impl App {
             ),
         );
         let old_delivery = std::mem::replace(
-            &mut core.delivery, self.audio.offline_delivery(core.editor.state()));
+            &mut core.delivery,
+            self.audio.offline_delivery(core.editor.state()),
+        );
         core.progress = None;
         if let Some(l) = core.latency.as_mut() {
             l.waiting.clear();
@@ -1377,10 +1391,21 @@ impl App {
             .is_some_and(|n| session <= n + 1);
         let handle = std::thread::Builder::new()
             .name("kabl-audio-retry".into())
-            .spawn(move || retry_worker(old, old_delivery, notes, notes_rx, keys, request, peaks, RetryFault {
-                delay_ms: delay,
-                fail_reopen: fail,
-            }))
+            .spawn(move || {
+                retry_worker(
+                    old,
+                    old_delivery,
+                    notes,
+                    notes_rx,
+                    keys,
+                    request,
+                    peaks,
+                    RetryFault {
+                        delay_ms: delay,
+                        fail_reopen: fail,
+                    },
+                )
+            })
             .expect("spawn one audio retry worker");
         self.retry = Some(RetryTask {
             handle,
@@ -1411,7 +1436,9 @@ impl App {
         if done.audio._stream.is_some() {
             done.delivery.async_compile = true;
             done.delivery.compile_delay_ms = std::env::var("KABL_COMPILE_DELAY_MS")
-                .ok().and_then(|s| s.parse().ok()).unwrap_or(0);
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
             let outcome = done.delivery.sync(core.editor.state(), true, true);
             if outcome != control::Outcome::Failed {
                 done.audio
@@ -1544,10 +1571,15 @@ impl eframe::App for App {
         let Ok(mut core) = core.lock() else {
             return;
         };
-        let Core { editor, ui: ui_state, .. } = &mut *core;
+        let Core {
+            editor,
+            ui: ui_state,
+            ..
+        } = &mut *core;
         kabl_ui::browser::poll_io(editor, ui_state);
         if kabl_ui::browser::io_busy(&core.ui) {
-            ui.ctx().request_repaint_after(std::time::Duration::from_millis(20));
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(20));
         }
         if self.record_finish.is_none() {
             self.record_finish = core.record_finish.take();
@@ -1884,8 +1916,10 @@ impl eframe::App for App {
         // Closing the window (or Ctrl+Q) with unsaved changes asks first.
         let close = ui.ctx().input(|i| i.viewport().close_requested());
         if close && kabl_ui::browser::io_busy(ui_state) {
-            ui.ctx().send_viewport_cmd(egui::ViewportCommand::CancelClose);
-            ui_state.last_message = Some("wait for the file operation to finish before closing".into());
+            ui.ctx()
+                .send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            ui_state.last_message =
+                Some("wait for the file operation to finish before closing".into());
         } else if close && !ui_state.quit_now && kabl_ui::browser::is_modified(editor, ui_state) {
             ui.ctx()
                 .send_viewport_cmd(egui::ViewportCommand::CancelClose);
@@ -2046,7 +2080,9 @@ fn main() -> eframe::Result<()> {
     ui_state.library = Some(library);
     ui_state.browser.async_io = true;
     ui_state.browser.io_delay_ms = std::env::var("KABL_BROWSER_IO_DELAY_MS")
-        .ok().and_then(|s| s.parse().ok()).unwrap_or(0);
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
     if args.iter().any(|a| a == "--browser") {
         ui_state.browser_open = true;
     }
@@ -2077,7 +2113,9 @@ fn main() -> eframe::Result<()> {
     );
     delivery.async_compile = true;
     delivery.compile_delay_ms = std::env::var("KABL_COMPILE_DELAY_MS")
-        .ok().and_then(|s| s.parse().ok()).unwrap_or(0);
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
     let phase = if audio._stream.is_some() {
         AudioPhase::Starting
     } else {
@@ -2304,13 +2342,24 @@ mod recovery_tests {
         let patch = default_patch();
         let (_, rx) = rtrb::RingBuffer::new(1024);
         let request = AudioRequest {
-            rate: Some(48000), frames: Some(256), realtime: false, device: None,
+            rate: Some(48000),
+            frames: Some(256),
+            realtime: false,
+            device: None,
         };
         let (mut host, mut delivery) = AudioHost::start(
-            &patch, rx, Arc::new(AtomicU64::new(0)), &request, true,
-            Arc::new(record::PeakTap::default()));
+            &patch,
+            rx,
+            Arc::new(AtomicU64::new(0)),
+            &request,
+            true,
+            Arc::new(record::PeakTap::default()),
+        );
         assert!(host._stream.is_some(), "{}", host.status);
-        assert_eq!(delivery.sync(&patch, true, true), control::Outcome::Compiled);
+        assert_eq!(
+            delivery.sync(&patch, true, true),
+            control::Outcome::Compiled
+        );
         host.gate.store(delivery.rev(), Ordering::Relaxed);
         std::thread::sleep(std::time::Duration::from_millis(300));
         assert_eq!(host.gate.load(Ordering::Relaxed), u64::MAX);

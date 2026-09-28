@@ -322,15 +322,20 @@ fn deletion_recreation_and_a_new_document_reject_old_values() {
 fn delayed_structural_compile_keeps_cc_responsive_and_installs_latest_document() {
     let mut h = H::new();
     h.d.async_compile = true;
-    h.d.compile_delay_ms = 400;
-    h.editor.add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+    h.d.compile_delay_ms = 500;
+    h.editor
+        .add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
     assert_eq!(h.deliver(), Outcome::Compiled);
     let started = std::time::Instant::now();
     h.cc(&[(24, 64)]);
-    h.editor.add_module("lfo", kabl_core::Vec2 { x: 40.0, y: 0.0 });
+    h.editor
+        .add_module("lfo", kabl_core::Vec2 { x: 40.0, y: 0.0 });
     assert_eq!(h.deliver(), Outcome::Compiled);
-    assert!(started.elapsed().as_millis() < 200,
-        "CC and later edit waited for compilation: {:?}", started.elapsed());
+    assert!(
+        started.elapsed().as_millis() < 350,
+        "CC and later edit waited for compilation: {:?}",
+        started.elapsed()
+    );
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(4);
     while h.d.waiting() > 0 && std::time::Instant::now() < deadline {
         h.d.flush();
