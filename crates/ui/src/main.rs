@@ -1238,8 +1238,7 @@ struct RetryFault {
 
 /// The old stream is dropped before its collector is drained or a new stream is opened.
 fn retry_worker(
-    mut old: AudioHost,
-    old_delivery: Delivery,
+    old_session: (AudioHost, Delivery),
     notes: rtrb::Producer<KeyEvent>,
     notes_rx: rtrb::Consumer<KeyEvent>,
     keys: Arc<AtomicU64>,
@@ -1247,6 +1246,7 @@ fn retry_worker(
     peaks: Arc<record::PeakTap>,
     fault: RetryFault,
 ) -> RetryResult {
+    let (mut old, old_delivery) = old_session;
     drop(old._stream.take());
     drop(old_delivery);
     old.collector.collect();
@@ -1393,8 +1393,7 @@ impl App {
             .name("kabl-audio-retry".into())
             .spawn(move || {
                 retry_worker(
-                    old,
-                    old_delivery,
+                    (old, old_delivery),
                     notes,
                     notes_rx,
                     keys,
@@ -2290,8 +2289,7 @@ mod recovery_tests {
             let at = std::time::Instant::now();
             let old_delivery = old.offline_delivery(&patch);
             let mut done = retry_worker(
-                old,
-                old_delivery,
+                (old, old_delivery),
                 notes,
                 rx,
                 keys.clone(),
