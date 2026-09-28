@@ -2294,6 +2294,32 @@ mod recovery_tests {
         assert_eq!(old.collector.alloc_count(), 0);
     }
 
+    /// Exercises the production cpal closure, including queue drain, MIDI, reports, gate,
+    /// recording tap and timing, after two startup callbacks. Requires ALSA null PCM.
+    #[test]
+    #[ignore = "set ALSA_CONFIG_PATH to an ALSA null PCM and run explicitly"]
+    fn production_callback_warmed_path_has_no_alloc_or_dealloc() {
+        let patch = default_patch();
+        let (_, rx) = rtrb::RingBuffer::new(1024);
+        let request = AudioRequest {
+            rate: Some(48000), frames: Some(256), realtime: false, device: None,
+        };
+        let (mut host, mut delivery) = AudioHost::start(
+            &patch, rx, Arc::new(AtomicU64::new(0)), &request, true,
+            Arc::new(record::PeakTap::default()));
+        assert!(host._stream.is_some(), "{}", host.status);
+        assert_eq!(delivery.sync(&patch, true, true), control::Outcome::Compiled);
+        host.gate.store(delivery.rev(), Ordering::Relaxed);
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        assert_eq!(host.gate.load(Ordering::Relaxed), u64::MAX);
+        drop(host._stream.take());
+        assert!(host.timing.as_ref().unwrap().count.load(Ordering::Relaxed) > 2);
+        assert_eq!(callback_allocations::ALLOCS.load(Ordering::Relaxed), 0);
+        assert_eq!(callback_allocations::DEALLOCS.load(Ordering::Relaxed), 0);
+        drop(delivery);
+        host.collector.collect();
+    }
+
     #[test]
     #[ignore = "set ALSA_CONFIG_PATH to an ALSA null PCM and run explicitly"]
     fn actual_callback_fault_sticks_and_mutes() {
