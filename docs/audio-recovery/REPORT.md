@@ -1,6 +1,6 @@
-# D05 engineering report (2026-09-27)
+# D05 engineering report (updated 2026-09-28)
 
-Base: fetched `origin/master` at `e951b2535d817bc7c21872cd0e46e815d35747ac`, then incorporated its documentation-only successor `f1e2c9e`. Branch: `codex/d05-audio-recovery`; [draft PR #8](https://github.com/stcksmsh/kabl/pull/8), not merged. Tested and independently rechecked **product tree `47abdc4d34dc03d694d663863ebdf0f0443511ed`**, remote commit `7fd3a966eca193ef1babf83b5947333bb1e440b4`. Product changes: stopped Load carry in the engine, pending document command targeting, explicit audio state/retry/output selection, session gates, recording interruption, and offline mono profiling. The branch documentation head follows this product commit. Engineering is a draft with R-03 unresolved; owner review pending.
+Base: fetched `origin/master` at `e951b2535d817bc7c21872cd0e46e815d35747ac`, then incorporated its documentation-only successor `f1e2c9e`. Branch: `codex/d05-audio-recovery`; [draft PR #8](https://github.com/stcksmsh/kabl/pull/8), not merged. The first review covered **product tree `47abdc4d34dc03d694d663863ebdf0f0443511ed`**, remote commit `7fd3a966eca193ef1babf83b5947333bb1e440b4`. R-03 at that head is addressed in the 2026-09-28 update below. Owner review remains pending.
 
 ## Acceptance matrix
 
@@ -12,10 +12,10 @@ Base: fetched `origin/master` at `e951b2535d817bc7c21872cd0e46e815d35747ac`, the
 | Document latest revision / compile error / control reset | `poll_retry` synchronizes the current editor state before it opens the gate; pending Load/Toggle tests in `runtime_controls.rs`. GUI edit/undo during a retry unverified. |
 | Pending Load across fade, second Load and explicit Start | `runtime_controls.rs` deterministic tests, including stopped incoming graph, timed Launch and deferred Preview. |
 | Recorder prefix and new take | `record.rs` and `tests/record.rs` interruption test; reviewer fixes preserve the chosen folder and avoid cross-rate duration errors. No audible GUI take in this container. |
-| Core/CC latency during Save/Open/reconnect | **Open gap.** Retry backend I/O and recording file finalization are outside `Core`, but browser Save/Open and retry compile still take it. No controlled CC latency result yet. |
-| Production callback bounds | Atomic gate and counters in actual callback; D04 helper test covers drain/render only. No complete new production callback allocation check. |
+| Core/CC latency during Save/Open/reconnect | 500 ms Save and Open workers: mapped CC reached the actual ALSA null callback in 6.2/6.3 ms during Save and 4.1/6.3 ms during Open across two controlled runs. Structural compile is on a coalescing worker; delayed compile test verifies prompt CC handling and newest graph installation. Backend retry/teardown remains off `Core`. Physical controller/device latency pending. |
+| Production callback bounds | Opt-in actual `cpal` closure test counts allocation and deallocation over warmed drain, note, render, report, gate, active recording tap and timing: zero of each on ALSA null. The first two startup callbacks are excluded. |
 | Mono efficiency | Profile below; no optimization applied without a measured eligible win. |
-| Workspace regression, clippy, package | Workspace 557/0/18, strict Clippy clean, final-tree ALSA null 2/0, release binary and Linux archive built. Graphical package playback is unverified. |
+| Workspace regression, clippy, package | Earlier tree: workspace 557/0/18. New code: UI 229/0/16 at its earlier checkpoint, workspace 560/0/20, strict Clippy clean, ALSA null backend tests pass. Hosted release package built; graphical recovery evidence is described below when verified. |
 | Visual/audio/owner evidence | No graphical session or hardware; 1440×900/1280×800 light/dark screenshots, audio and Kosta's checks pending. |
 
 ## Verification environment and commands
@@ -48,4 +48,14 @@ The dense graph is costly, but the harness does not isolate a safe mono-only sub
 
 ## Review and limits
 
-The independent subagent's first review and final tree recheck are in REVIEW.md; the recheck found its code findings resolved but kept R-03 major and open. The acceptance gaps above prevent a claim that all D05 criteria are complete. In particular, physical device recovery, real app/package walkthrough, Core/CC latency under Save/Open, production callback allocation coverage, and the owner checklist remain pending. Backend close can block without a deadline; one retry worker stays owned and the UI names the blocked state after ten seconds.
+The independent subagent's first review and tree recheck are in REVIEW.md; that recheck found its code findings resolved but kept R-03 major and open at the earlier product tree. The 2026-09-28 work below changes that evidence. Physical device disruption, controller feel, listening, and the owner checklist remain pending. Backend close can block without a deadline; one retry worker stays owned and the UI names the blocked state after ten seconds.
+
+## 2026-09-28 R-03 repair and callback verification
+
+Browser Save, Save As, folder Save, Open, New and folder Open now run on one owned worker using document/log/library snapshots. Completion under `Core` is short and only installs a loaded patch if its document and editor state still match; an intervening edit gets a new unsaved-change question. A Save commits its starting snapshot, leaving later edits visibly unsaved. The worker is joined at shutdown rather than detached. Delayed Open and Save UI tests pass with 500 ms I/O and an intervening edit.
+
+`Delivery` now schedules structural compilation on one owned worker. Edits during a build replace its next job; a superseded result is discarded. Fresh/stopped Load intent, revision ordering and queued actions remain behind the newest graph. During Retry the previous delivery moves with the old stream to the retry worker, so joining an in-flight compiler is also outside `Core`. A 500 ms compile test accepts a mapped CC and a subsequent structural edit within 350 ms, then installs the newest graph. While a structural graph is pending, its audio application can still wait for that build; the test does not claim subframe callback latency for a CC that changes the pending document.
+
+An opt-in test uses the actual control pump, `Core` lock and `cpal` ALSA null callback while a 500 ms browser Save and Open worker runs. Two runs measured mapped CC arrival to callback acknowledgment at **6.2/6.3 ms during Save and 4.1/6.3 ms during Open**, below the test's 350 ms bound. This is controlled software-backend evidence, not a distribution or a physical-controller guarantee. An opt-in counting allocator surrounds every warmed production callback (after two startup callbacks); with a note and active recording tap it counted **zero allocations and zero deallocations**. The callback test includes queue drain, MIDI, render, reports, gate, tap and timing. The first two callbacks, backend error callback and backend internals are outside that count.
+
+On the revised code, `cargo test --workspace` gave **560 passed, 0 failed, 20 ignored**; `cargo clippy --workspace --all-targets -- -D warnings` passed. The four opt-in ALSA null tests cover repeated reopen/failure, injected callback stall, warmed production allocation and delayed Save/Open CC delivery. The local environment has no physical output/controller; hardware and hands-on acceptance stay with Kosta.
