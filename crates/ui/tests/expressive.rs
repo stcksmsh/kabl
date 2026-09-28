@@ -104,6 +104,28 @@ pub fn split() -> PatchEditor {
     e
 }
 
+/// Measurement fixture `docs/midi-timing/fixtures/gate-probe`: every voice's gate straight to
+/// both outputs (plus an unconnected LFO), so a recording shows each note's first sample (1/8 per sounding voice). Only
+/// pre-D06 params, so the baseline build opens it too.
+pub fn gate_probe() -> PatchEditor {
+    let mut e = PatchEditor::new();
+    let midi = e.add_module("midi.in", at(24.0, 0));
+    let out = e.add_module("out", at(174.0, 0));
+    e.connect(port(midi, "gate"), port(out, "left"));
+    e.connect(port(midi, "gate"), port(out, "right"));
+    // Unconnected: a face knob for measurement scripts to keep turning (UI and runtime
+    // values) without changing the recorded gate.
+    e.add_module("lfo", at(324.0, 0));
+    e
+}
+
+#[test]
+#[ignore = "writes docs/midi-timing/fixtures/gate-probe"]
+fn write_gate_probe() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/midi-timing/fixtures/gate-probe");
+    kabl_core::save(&dir, gate_probe().log()).unwrap();
+}
+
 #[test]
 #[ignore = "writes patches/expressive"]
 fn write_expressive_patches() {

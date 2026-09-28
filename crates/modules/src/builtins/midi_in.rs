@@ -208,6 +208,36 @@ struct Core {
     n_changes: u8,
 }
 
+impl Core {
+    /// One keyboard change, at the current sample. `high`: the gate of the sample before.
+    fn apply(&mut self, change: Change, high: bool) {
+        match change {
+            Change::Play {
+                pitch,
+                velocity,
+                glide,
+                retrigger,
+            } => {
+                self.dip |= retrigger && (self.gate > 0.5 || high);
+                self.gate = 1.0;
+                self.velocity = velocity.clamp(0.0, 1.0);
+                self.pitch = pitch;
+                if glide && self.played {
+                    self.from = self.at;
+                } else {
+                    (self.at, self.from) = (pitch, pitch);
+                }
+                self.played = true;
+            }
+            Change::Release => self.gate = 0.0,
+            Change::Expression { bend, wheel } => {
+                self.bend = bend.clamp(-1.0, 1.0);
+                self.wheel = wheel.clamp(0.0, 1.0);
+            }
+        }
+    }
+}
+
 pub struct MidiIn {
     c: Core,
     sample_rate: f32,
@@ -350,39 +380,15 @@ impl Module for MidiIn {
         // Constant-time glide: the whole interval takes glide_ms, a straight line in semitones.
         let step_of = |c: &Core| (c.pitch - c.from).abs() / (c.glide_ms * 0.001 * sample_rate);
         let mut step = step_of(c);
-        let changes = c.changes;
         let count = std::mem::take(&mut c.n_changes) as usize;
         let mut next = 0;
         // The gate of the sample before (the last block's last sample at first): a note that
         // replaces a sounding one at the same sample dips the gate for that sample.
         let mut high = c.high_out;
         for i in 0..n {
-            while next < count && changes[next].0 as usize <= i {
-                match changes[next].1 {
-                    Change::Play {
-                        pitch,
-                        velocity,
-                        glide,
-                        retrigger,
-                    } => {
-                        c.dip |= retrigger && (c.gate > 0.5 || high);
-                        c.gate = 1.0;
-                        c.velocity = velocity.clamp(0.0, 1.0);
-                        c.pitch = pitch;
-                        if glide && c.played {
-                            c.from = c.at;
-                        } else {
-                            (c.at, c.from) = (pitch, pitch);
-                        }
-                        c.played = true;
-                        step = step_of(c);
-                    }
-                    Change::Release => c.gate = 0.0,
-                    Change::Expression { bend, wheel } => {
-                        c.bend = bend.clamp(-1.0, 1.0);
-                        c.wheel = wheel.clamp(0.0, 1.0);
-                    }
-                }
+            while next < count && c.changes[next].0 as usize <= i {
+                c.apply(c.changes[next].1, high);
+                step = step_of(c);
                 next += 1;
             }
             let gate = if std::mem::take(&mut c.dip) {
@@ -406,6 +412,12 @@ impl Module for MidiIn {
             if wheel_out {
                 io.output(WHEEL)[i] = c.wheel;
             }
+        }
+        // Offsets past this block (outside the engine's contract): the state still changes,
+        // so a release is never lost.
+        while next < count {
+            c.apply(c.changes[next].1, high);
+            next += 1;
         }
         c.high_out = high;
     }

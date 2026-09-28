@@ -2720,3 +2720,53 @@ entry.
   Reconcile after D05/D06 before integrating into production D07.
 - Framework choice is a tested recommendation, not final owner architecture approval.
   Cloud proof is not laptop/listening acceptance. No D06 or full D07 authorization.
+
+## 2026-09-28 — D06 expressive MIDI and event timing (implementation rationale)
+
+Kosta authorized D06 on 2026-09-28 (launch prompt in this session; supersedes older "do not
+start D06" instructions). Engineering rationale only; owner review pending. Design:
+`midi-timing/design.md`.
+
+- **Timing adapter: fixed 64-frame latency on an absolute grid.** `engine::timeline::Timeline`
+  renders engine block *k* only once host sample `64k+64` is reached, so every event of the
+  block is known and the engine sees identical calls for any host partition; output is
+  bit-identical and exactly `LATENCY` = 64 frames late. Rejected: splitting blocks at host
+  boundaries or events (changes feedback delay, block-rate modulation sampling, ramps and
+  random advancement); rounding events to block starts (not sample accurate); 63 frames (the
+  theoretical minimum) for one frame less at the cost of unaligned output blocks.
+- **Sample-offset events inside `midi.in`.** The keyboard's actions carry the event's offset;
+  `midi.in` applies them at that sample (gate, pitch, velocity, bend, wheel) from a bounded
+  64-entry list. Params stay block rate: a mid-block velocity/wheel change reaches modulated
+  knobs at the next block boundary (the existing grid). Offset-0 events reproduce the old
+  outputs bit for bit; 17 factory patches render bit-identical to `bd64165`.
+- **Live arrival mapping: one callback period, jitter removed.** Each MIDI message keeps its
+  place inside the previous callback period (arrival instant), one period later. Constant
+  delay (period + 64 frames, 6.7 ms at 48 kHz/256) instead of 0–5.3 ms quantized jitter.
+  Rejected: applying all messages at the callback start (lower mean latency, callback-phase
+  jitter). Owner check: whether the feel is acceptable.
+- **Identity = (source, channel, key).** A POLY voice is keyed by (channel, key) with a holder
+  bit per source, preserving the D01 rule that the controller and the preview share a key's
+  voice and release only when both let go. Different channels never share. Sustain is per
+  (source, channel); a note is held while any source's pedal on its channel is down (keeps
+  D01's "the pedal holds a preview"). Rejected: separate voices per source (would break the
+  D01 sharing contract and double level).
+- **Routing: a `channel` param per `midi.in` (ALL default).** Starts filter by channel;
+  releases, pedal-up, notes off, reset and source loss go to every keyboard, which ends only
+  what it holds, so a reroute never strands a note. Default ALL keeps existing layering.
+  Rejected for D06: composite routing UI, splits, MPE, per-device sources.
+- **Bend and wheel in `midi.in`.** Bend range is a `bend` param (0–24 st, default 2, knob,
+  rounded); the wheel is a new `wheel` output, identical on every lane so voice averaging into
+  global modules does not dilute it. Both reset on CC 121 (same source/channel), source loss,
+  channel change and fresh keyboards; not on notes off/panic. CC 1 still reaches learn and
+  mappings, so an existing CC 1 soft-takeover mapping keeps working alongside the wheel.
+  Rejected: RPN bend range (not supported), smoothing bend (kept a 14-bit step for exact
+  timing), 14-bit wheel.
+- **Cleanup scopes.** CC 120/123 end that source and channel (previously everything); the
+  panel button and Load remain a panic; a controller disconnect ends only the controller
+  (a running preview continues). A full adapter queue drops starting events but turns an
+  overflowing release into its source's notes off at the release's time.
+- **UI.** Bend and Channel are advanced knobs on MIDI In; the face shows a second summary
+  line (`bend ±2 st · ALL ch`); the Velocity jack label is `Vel` so four jacks fit.
+- **Verification toolchain.** The laptop has Rust 1.93, whose Clippy flags a pre-existing
+  collapsible `else if` in `browser.rs` at the baseline too; strict Clippy was run with the
+  1.98.1 toolchain D05 used (installed per user with rustup, default unchanged).

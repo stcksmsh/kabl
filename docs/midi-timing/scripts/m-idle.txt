@@ -1,0 +1,6 @@
+# Measurement: record, no UI activity.
+sleep 2
+click rec-start
+wait 49
+click rec-stop
+sleep 1.5

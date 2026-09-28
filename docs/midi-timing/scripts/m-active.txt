@@ -1,0 +1,24 @@
+# Measurement with UI and file work while the controller plays: a knob kept turning, Save As,
+# Open of the saved copy (a Load), Save. KNOB is replaced per patch (measure-all.sh).
+sleep 2
+click rec-start
+wait 7
+wiggle KNOB 6 40
+click save-as
+sleep 0.5
+fill dlg:name D06 Measure Copy
+click dlg:save
+sleep 4
+click browser
+sleep 0.8
+click sound:user:d06-measure-copy
+click open
+sleep 3
+click browser-close
+wiggle KNOB 6 40
+click save
+sleep 2
+wiggle KNOB 6 40
+wait 49
+click rec-stop
+sleep 1.5

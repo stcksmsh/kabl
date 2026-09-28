@@ -1,0 +1,62 @@
+{
+  "modules": {
+    "1": {
+      "kind": "midi.in",
+      "pos": {
+        "x": 24.0,
+        "y": 10.0
+      },
+      "params": {}
+    },
+    "2": {
+      "kind": "out",
+      "pos": {
+        "x": 174.0,
+        "y": 10.0
+      },
+      "params": {}
+    },
+    "3": {
+      "kind": "lfo",
+      "pos": {
+        "x": 324.0,
+        "y": 10.0
+      },
+      "params": {}
+    }
+  },
+  "cables": {
+    "1": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "gate"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 2,
+          "port": "left"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "2": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "gate"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 2,
+          "port": "right"
+        }
+      },
+      "params": {},
+      "steps": []
+    }
+  }
+}
