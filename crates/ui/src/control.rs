@@ -18,6 +18,7 @@
 
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::Arc;
+use std::thread::JoinHandle;
 
 use basedrop::{Handle, Owned};
 use kabl_core::{ModuleId, PatchState};
@@ -92,6 +93,21 @@ pub struct Delivery {
     actions_sent: u64,
     pub compile_error: Option<String>,
     pub counts: Counts,
+    /// A single structural compiler, outside the Core lock. Newer edits replace its next job.
+    pub async_compile: bool,
+    pub compile_delay_ms: u64,
+    compiling: Option<JoinHandle<Result<CompiledPatch, String>>>,
+    next_compile: Option<CompileRequest>,
+    compile_fresh: bool,
+    compile_stopped: bool,
+}
+
+struct CompileRequest {
+    doc: PatchState,
+    generation: u64,
+    rev: u64,
+    fresh: bool,
+    stopped: bool,
 }
 
 impl Delivery {
@@ -123,6 +139,12 @@ impl Delivery {
             actions_sent: 0,
             compile_error: None,
             counts: Counts::default(),
+            async_compile: false,
+            compile_delay_ms: 0,
+            compiling: None,
+            next_compile: None,
+            compile_fresh: false,
+            compile_stopped: false,
         }
     }
 
@@ -130,6 +152,7 @@ impl Delivery {
     /// `stopped`: its clocks start stopped.
     pub fn sync(&mut self, doc: &PatchState, fresh: bool, stopped: bool) -> Outcome {
         let changes = match &self.sent {
+            _ if self.compiling.is_some() || self.next_compile.is_some() => None,
             Some(sent) if !fresh => runtime_changes(sent, doc),
             _ => None,
         };
@@ -171,12 +194,24 @@ impl Delivery {
         // A waiting Load this edit replaces keeps its meaning: no state carried across
         // documents, and its clocks stopped when it was loaded stopped (review RC-02). A new
         // Load has its own (RC-04).
-        if !fresh && self.held_graph.as_ref().is_some_and(|g| g.fresh) {
+        if !fresh && (self.held_graph.as_ref().is_some_and(|g| g.fresh)
+            || self.compile_fresh) {
             fresh = true;
-            stopped |= self.held_stopped;
+            stopped |= self.held_stopped || self.compile_stopped;
         }
         self.generation += 1;
         self.rev += 1;
+        if self.async_compile && self.tx.is_some() {
+            self.held_graph = None;
+            self.held.clear();
+            self.next_compile = Some(CompileRequest {
+                doc: doc.clone(), generation: self.generation, rev: self.rev, fresh, stopped,
+            });
+            self.compile_fresh = fresh;
+            self.compile_stopped = stopped;
+            self.start_compile();
+            return Outcome::Compiled;
+        }
         let started = std::time::Instant::now();
         let mut g = match compile(doc, self.sample_rate, self.voice_count) {
             Ok(g) => g,
@@ -214,9 +249,66 @@ impl Delivery {
         Outcome::Compiled
     }
 
+    fn start_compile(&mut self) {
+        if self.compiling.is_some() {
+            return;
+        }
+        if let Some(request) = self.next_compile.take() {
+            let sample_rate = self.sample_rate;
+            let voice_count = self.voice_count;
+            let delay = self.compile_delay_ms;
+            self.compiling = Some(std::thread::Builder::new()
+                .name("kabl-graph-compile".into())
+                .spawn(move || {
+                    if delay != 0 { std::thread::sleep(std::time::Duration::from_millis(delay)); }
+                    let mut graph = compile(&request.doc, sample_rate, voice_count)
+                        .map_err(|e| e.to_string())?;
+                    graph.generation = request.generation;
+                    graph.rev = request.rev;
+                    graph.fresh = request.fresh;
+                    if request.stopped {
+                        let mut clocks = Vec::new();
+                        graph.clocks(|id, _| clocks.push(id));
+                        for id in clocks { graph.transport(id, Transport::Stop); }
+                    }
+                    Ok(graph)
+                }).expect("spawn graph compiler"));
+            self.held_stopped = request.stopped;
+        }
+    }
+
+    fn poll_compile(&mut self) {
+        if !self.compiling.as_ref().is_some_and(JoinHandle::is_finished) { return; }
+        let result = self.compiling.take().unwrap().join();
+        if self.next_compile.is_some() {
+            self.start_compile();
+            return; // The newer document subsumes the completed graph.
+        }
+        self.compile_fresh = false;
+        self.compile_stopped = false;
+        match result {
+            Ok(Ok(graph)) => {
+                self.compile_error = None;
+                self.held_graph = Some(Owned::new(&self.handle, graph));
+                self.held.clear();
+                self.counts.graphs += 1;
+            }
+            Ok(Err(err)) => {
+                self.compile_error = Some(err);
+                self.counts.failed += 1;
+            }
+            Err(_) => {
+                self.compile_error = Some("graph compiler panicked".into());
+                self.counts.failed += 1;
+            }
+        }
+    }
+
     /// Sends what waits, in order, as far as the queue takes it. Returns how many messages
     /// still wait.
     pub fn flush(&mut self) -> usize {
+        self.poll_compile();
+        if self.compiling.is_some() || self.next_compile.is_some() { return self.waiting(); }
         let queued = self.graphs_queued();
         let Some(tx) = self.tx.as_mut() else {
             // No audio: nothing will take them.
@@ -286,6 +378,7 @@ impl Delivery {
     /// Messages waiting to be sent.
     pub fn waiting(&self) -> usize {
         self.held_graph.is_some() as usize + self.held.len() + self.held_actions.len()
+            + (self.compiling.is_some() || self.next_compile.is_some()) as usize
     }
 
     /// Messages requested and not yet taken by the audio thread: waiting here or in the
@@ -314,6 +407,12 @@ impl Delivery {
         }
         self.held_actions.push_back((self.rev, a));
         true
+    }
+}
+
+impl Drop for Delivery {
+    fn drop(&mut self) {
+        if let Some(worker) = self.compiling.take() { let _ = worker.join(); }
     }
 }
 

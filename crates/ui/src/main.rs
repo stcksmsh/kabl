@@ -30,6 +30,53 @@ use kabl_ui::{record, show, PatchEditor, UiState};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
+#[cfg(test)]
+mod callback_allocations {
+    use std::alloc::{GlobalAlloc, Layout, System};
+    use std::cell::Cell;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    thread_local! { static INSIDE: Cell<bool> = const { Cell::new(false) }; }
+    pub static ALLOCS: AtomicUsize = AtomicUsize::new(0);
+    pub static DEALLOCS: AtomicUsize = AtomicUsize::new(0);
+    pub struct Counter;
+    unsafe impl GlobalAlloc for Counter {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            if INSIDE.try_with(|v| v.get()).unwrap_or(false) { ALLOCS.fetch_add(1, Ordering::Relaxed); }
+            System.alloc(layout)
+        }
+        unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+            if INSIDE.try_with(|v| v.get()).unwrap_or(false) { DEALLOCS.fetch_add(1, Ordering::Relaxed); }
+            System.dealloc(ptr, layout)
+        }
+        unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+            if INSIDE.try_with(|v| v.get()).unwrap_or(false) { ALLOCS.fetch_add(1, Ordering::Relaxed); }
+            System.realloc(ptr, layout, size)
+        }
+        unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+            if INSIDE.try_with(|v| v.get()).unwrap_or(false) { ALLOCS.fetch_add(1, Ordering::Relaxed); }
+            System.alloc_zeroed(layout)
+        }
+    }
+    pub struct Scope(bool);
+    impl Scope {
+        pub fn new(enabled: bool) -> Self {
+            if enabled { INSIDE.with(|v| v.set(true)); }
+            Self(enabled)
+        }
+    }
+    impl Drop for Scope {
+        fn drop(&mut self) {
+            if self.0 { INSIDE.with(|v| v.set(false)); }
+        }
+    }
+}
+#[cfg(test)]
+#[global_allocator]
+static CALLBACK_ALLOCATOR: callback_allocations::Counter = callback_allocations::Counter;
+#[cfg(test)]
+use callback_allocations::Scope as CallbackAllocationScope;
+
 const RING_CAPACITY: usize = BLOCK * 256;
 
 /// (sequencer, step, playing bank, queued bank).
@@ -482,9 +529,17 @@ impl AudioHost {
         let mut left_ring = RingBuffer::new(RING_CAPACITY);
         let mut right_ring = RingBuffer::new(RING_CAPACITY);
 
+        #[cfg(test)]
+        let mut callback_warmups = 0u32;
+
         let stream = device.build_output_stream(
             stream_config,
             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                #[cfg(test)]
+                let _allocation_scope = {
+                    callback_warmups += 1;
+                    CallbackAllocationScope::new(callback_warmups > 2)
+                };
                 // Once, on the first callback: ask for real-time priority for this thread (rtkit
                 // over D-Bus, else the rlimit). It may allocate and block briefly; the stream
                 // is starting and silent. Refusal leaves the thread as it was.
@@ -1172,6 +1227,7 @@ struct RetryFault {
 /// The old stream is dropped before its collector is drained or a new stream is opened.
 fn retry_worker(
     mut old: AudioHost,
+    old_delivery: Delivery,
     notes: rtrb::Producer<KeyEvent>,
     notes_rx: rtrb::Consumer<KeyEvent>,
     keys: Arc<AtomicU64>,
@@ -1180,6 +1236,7 @@ fn retry_worker(
     fault: RetryFault,
 ) -> RetryResult {
     drop(old._stream.take());
+    drop(old_delivery);
     old.collector.collect();
     let retired_graphs = old.collector.alloc_count();
     drop(old);
@@ -1299,7 +1356,8 @@ impl App {
                 "restarting audio; editing and Save remain available".into(),
             ),
         );
-        core.delivery = self.audio.offline_delivery(core.editor.state());
+        let old_delivery = std::mem::replace(
+            &mut core.delivery, self.audio.offline_delivery(core.editor.state()));
         core.progress = None;
         if let Some(l) = core.latency.as_mut() {
             l.waiting.clear();
@@ -1319,7 +1377,7 @@ impl App {
             .is_some_and(|n| session <= n + 1);
         let handle = std::thread::Builder::new()
             .name("kabl-audio-retry".into())
-            .spawn(move || retry_worker(old, notes, notes_rx, keys, request, peaks, RetryFault {
+            .spawn(move || retry_worker(old, old_delivery, notes, notes_rx, keys, request, peaks, RetryFault {
                 delay_ms: delay,
                 fail_reopen: fail,
             }))
@@ -1351,6 +1409,9 @@ impl App {
         log::info!(target:"audio", "session={} retry completed in {:.2}s; retired graphs remaining={}",
             task.session, task.started.elapsed().as_secs_f32(), done.retired_graphs);
         if done.audio._stream.is_some() {
+            done.delivery.async_compile = true;
+            done.delivery.compile_delay_ms = std::env::var("KABL_COMPILE_DELAY_MS")
+                .ok().and_then(|s| s.parse().ok()).unwrap_or(0);
             let outcome = done.delivery.sync(core.editor.state(), true, true);
             if outcome != control::Outcome::Failed {
                 done.audio
@@ -2004,7 +2065,7 @@ fn main() -> eframe::Result<()> {
         realtime: !args.iter().any(|a| a == "--no-rt"),
         device: None,
     };
-    let (mut audio, delivery) = AudioHost::start(
+    let (mut audio, mut delivery) = AudioHost::start(
         editor.state(),
         notes_rx,
         midi.keys.clone(),
@@ -2012,6 +2073,9 @@ fn main() -> eframe::Result<()> {
         false,
         peaks.clone(),
     );
+    delivery.async_compile = true;
+    delivery.compile_delay_ms = std::env::var("KABL_COMPILE_DELAY_MS")
+        .ok().and_then(|s| s.parse().ok()).unwrap_or(0);
     let phase = if audio._stream.is_some() {
         AudioPhase::Starting
     } else {
@@ -2184,8 +2248,10 @@ mod recovery_tests {
         for (fail, delay) in [(true, 20), (false, 0), (false, 0)] {
             let (notes, rx) = rtrb::RingBuffer::new(1024);
             let at = std::time::Instant::now();
+            let old_delivery = old.offline_delivery(&patch);
             let mut done = retry_worker(
                 old,
+                old_delivery,
                 notes,
                 rx,
                 keys.clone(),
