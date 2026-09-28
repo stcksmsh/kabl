@@ -138,7 +138,11 @@ impl NiceEguiApp for RackApp {
             .and_then(|m| m.params.get("cutoff_hz"))
             .copied()
             .filter(|rack_cutoff| {
-                let stored = c.patch.modules.get(&3).and_then(|m| m.params.get("cutoff_hz"));
+                let stored = c
+                    .patch
+                    .modules
+                    .get(&3)
+                    .and_then(|m| m.params.get("cutoff_hz"));
                 dirty && stored.is_none_or(|v| v.to_bits() != rack_cutoff.to_bits())
             });
         if c.submit_editor_snapshot(snapshot) {

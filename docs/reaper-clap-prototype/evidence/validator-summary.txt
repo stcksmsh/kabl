@@ -1,6 +1,5 @@
-Final reconstructed-head run: clap-validator 0.4.1, commit 152b9823e992d782c5c1fd33bca0295478b919aa
+Final pinned run on Ubuntu 24.04.3 / Rust 1.98.1 / clap-validator 0.4.1 commit 152b9823e992d782c5c1fd33bca0295478b919aa.
 Command: clap-validator validate -j 1 --json prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so
-Exit 1: success 32, skipped 8, failed 3, crashed 1.
-state-invalid-random: SIGABRT; pinned nice-plug loader allocated length 1025222176999353387 bytes.
-state-reproducibility-basic/binary/buffered: Filter cutoff 3000 Hz vs 1158.7692 Hz changed without parameter rescan.
-Raw final-run JSON and stderr are adjacent. The earlier raw logs were pruned, but the same counts and failures reproduced on the reconstructed head.
+Exit 0: 36 success, 8 skipped, 0 failed/crashed. The skipped tests cover unsupported preset-discovery, f64 processing, audio-port activation/configuration and denormal input ports.
+Previously failing state-invalid-random and three state-reproducibility tests now pass. Raw JSON and stderr are adjacent.
+This pass does not establish atomic state acceptance under queue saturation or REAPER control editing.

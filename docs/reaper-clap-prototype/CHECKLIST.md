@@ -1,11 +1,11 @@
 # Owner host acceptance checklist
 
-Future experiment, not a recorded pass. Resolve the state loader/rescan failures first. Use the README commands, a fresh REAPER profile and throwaway project.
+The cloud proof now builds, passes the pinned validator and renders MIDI from two CLAP instances in REAPER 7.80. The following are still owner host experiments; use the [fresh-profile commands](evidence/host-run.txt) and do not overwrite existing projects or preferences.
 
-- [ ] Rebuild/test and rerun validator; record compiler, plugin SHA and exact REAPER version, display and audio backend.
-- [ ] Install the CLAP, rescan, insert, import [proof.mid](evidence/proof.mid); render finite nonzero left/right audio and attach the render.
-- [ ] Capture actual kabl rack screenshot; change host and rack cutoff, hear/render, close/reopen three times during playback, offline render closed.
-- [ ] Edit one cable, save/quit, hide source patch directory, reopen; verify cutoff, topology and sound with evidence.
-- [ ] Duplicate two instances, edit one, create/destroy and deactivate/reactivate repeatedly; check logs and collector growth.
-- [ ] Exercise 1/63/64/65/127/256/512 frames, rates, note release and state reload, recording onset/timing rather than inferring accuracy.
-- [ ] Attach throwaway `.rpp`, audio, screenshots and steps under evidence, update matrix, keep owner listening separate.
+- [x] Build/test and rerun pinned validator: 5 unit tests, 36 validator success/8 skipped; exact build and raw logs in evidence.
+- [x] REAPER scan and insertion, two MIDI tracks, nonzero offline stereo render; [project](evidence/proof.rpp) and [WAV](evidence/proof-render.wav) attached.
+- [ ] On a working audio backend, open the actual kabl rack and capture it; edit host and rack cutoff, close/reopen repeatedly during playback, and offline render with editor closed.
+- [ ] Edit topology, save/quit, hide any source patch directory, reopen, and compare sound, cutoff and cable layout.
+- [ ] Change only one of two instances and verify the other remains independent through save/reload; create/destroy and deactivate/reactivate repeatedly while checking logs and collector growth.
+- [ ] Measure 1/63/64/65/127/256/512-frame boundaries, rates, note release and state reload. Record onset/timing; do not infer D06 accuracy from validator success.
+- [ ] Resolve queue-saturation state acceptance and host parameter readback before approving a production D07 integration.

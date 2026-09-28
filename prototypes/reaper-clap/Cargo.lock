@@ -1609,6 +1609,7 @@ name = "kabl-reaper-proof"
 version = "0.1.0"
 dependencies = [
  "basedrop",
+ "clap-sys",
  "egui",
  "kabl-core",
  "kabl-engine",
