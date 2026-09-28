@@ -43,9 +43,10 @@ pub struct Timeline {
     len: usize,
     /// Time of the newest queued event.
     last: u64,
-    /// Releases that did not fit: per source, notes off at the next block; or a panic.
-    forced: [bool; MAX_SOURCES],
-    forced_panic: bool,
+    /// Releases that did not fit, at their time (after everything queued before them): per
+    /// source, notes off on every channel; or a panic.
+    forced: [Option<u64>; MAX_SOURCES],
+    forced_panic: Option<u64>,
     stats: Stats,
 }
 
@@ -74,8 +75,8 @@ impl Timeline {
             head: 0,
             len: 0,
             last: 0,
-            forced: [false; MAX_SOURCES],
-            forced_panic: false,
+            forced: [None; MAX_SOURCES],
+            forced_panic: None,
             stats: Stats::default(),
         }
     }
@@ -117,11 +118,13 @@ impl Timeline {
         if self.len == QUEUE {
             if e.is_release() {
                 self.stats.forced += 1;
-                if e.event == KeyEvent::AllOff {
-                    self.forced_panic = true;
+                let slot = if e.event == KeyEvent::AllOff {
+                    &mut self.forced_panic
                 } else {
-                    self.forced[e.source as usize] = true;
-                }
+                    &mut self.forced[e.source as usize]
+                };
+                *slot = Some(slot.map_or(t, |at| at.max(t)));
+                self.last = t;
             } else {
                 self.stats.dropped += 1;
             }
@@ -181,19 +184,6 @@ impl Timeline {
         before_block: &mut impl FnMut(&mut PatchEngine, u64),
     ) {
         before_block(engine, start);
-        if std::mem::take(&mut self.forced_panic) {
-            engine.key_at(MidiEvent::new(Source::Controller, 0, KeyEvent::AllOff), 0);
-        }
-        for (s, source) in [Source::Controller, Source::Preview, Source::Host]
-            .into_iter()
-            .enumerate()
-        {
-            if std::mem::take(&mut self.forced[s]) {
-                for ch in 0..16 {
-                    engine.key_at(MidiEvent::new(source, ch, KeyEvent::NotesOff), 0);
-                }
-            }
-        }
         let end = start + BLOCK as u64;
         while self.len > 0 {
             let (t, e) = self.queue[self.head];
@@ -202,8 +192,30 @@ impl Timeline {
             }
             self.head = (self.head + 1) % QUEUE;
             self.len -= 1;
-            engine.key_at(e, t.saturating_sub(start).min(BLOCK as u64 - 1) as usize);
+            engine.key_at(e, offset(t, start));
+        }
+        if let Some(at) = self.forced_panic.filter(|&at| at < end) {
+            self.forced_panic = None;
+            let panic = MidiEvent::new(Source::Controller, 0, KeyEvent::AllOff);
+            engine.key_at(panic, offset(at, start));
+        }
+        for (s, source) in [Source::Controller, Source::Preview, Source::Host]
+            .into_iter()
+            .enumerate()
+        {
+            if let Some(at) = self.forced[s].filter(|&at| at < end) {
+                self.forced[s] = None;
+                for ch in 0..16 {
+                    let off = MidiEvent::new(source, ch, KeyEvent::NotesOff);
+                    engine.key_at(off, offset(at, start));
+                }
+            }
         }
         engine.process_block(&mut self.left, &mut self.right);
     }
+}
+
+/// Sample offset of timeline time `t` in the block starting at `start`.
+fn offset(t: u64, start: u64) -> usize {
+    t.saturating_sub(start).min(BLOCK as u64 - 1) as usize
 }

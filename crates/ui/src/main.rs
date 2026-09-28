@@ -2334,6 +2334,39 @@ fn main() -> eframe::Result<()> {
 mod recovery_tests {
     use super::*;
 
+    /// D06: CC 1 is the wheel for the audio thread and still a learnable CC for mappings
+    /// (soft takeover unchanged); bend and CC 121 go only to the audio thread; other CCs
+    /// only to the control thread; a disconnect ends the controller source, not everything.
+    #[test]
+    fn midi_messages_reach_the_wheel_and_the_mappings() {
+        let (notes, mut notes_rx) = rtrb::RingBuffer::<Note>::new(64);
+        let (mut midi, mut cc_rx) = Midi::new(notes);
+        let mut send = |d: &[u8]| on_message(&mut midi.sink.lock().unwrap(), d);
+        send(&[0xB2, 1, 99]);
+        send(&[0xE2, 0, 0x60]);
+        send(&[0xB2, 121, 0]);
+        send(&[0xB2, 74, 10]);
+        send(&[0x92, 60, 0]);
+        let got: Vec<MidiEvent> = std::iter::from_fn(|| notes_rx.pop().ok().map(|n| n.1)).collect();
+        let ev = |e| MidiEvent::new(Source::Controller, 2, e);
+        assert_eq!(
+            got,
+            [
+                ev(KeyEvent::Wheel(99)),
+                ev(KeyEvent::Bend(0x60 << 7)),
+                ev(KeyEvent::ResetControllers),
+                ev(KeyEvent::Off { note: 60 }),
+            ]
+        );
+        let ccs: Vec<(u8, u8, u8)> = std::iter::from_fn(|| cc_rx.pop().ok().map(|c| c.0)).collect();
+        assert_eq!(ccs, [(2, 1, 99), (2, 74, 10)]);
+        midi.disconnect();
+        assert_eq!(
+            notes_rx.pop().unwrap().1,
+            MidiEvent::new(Source::Controller, 0, KeyEvent::SourceLost)
+        );
+    }
+
     #[test]
     fn delayed_compile_failure_and_repair_update_the_visible_notice() {
         let patch = default_patch();
@@ -2726,6 +2759,10 @@ mod recovery_tests {
                 velocity: 96,
             }))
             .unwrap();
+        // D06: expression through the timeline's queue in the same warmed callbacks.
+        for e in [KeyEvent::Bend(12000), KeyEvent::Wheel(90), KeyEvent::Sustain(true)] {
+            notes.push(note_now(e)).unwrap();
+        }
         std::thread::sleep(std::time::Duration::from_millis(300));
         assert_eq!(host.gate.load(Ordering::Relaxed), u64::MAX);
         drop(host._stream.take());
