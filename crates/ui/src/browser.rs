@@ -618,7 +618,7 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
 
 /// Save to where the document lives, or ask for a name (factory, new). `then` runs after a
 /// successful save. Returns an error message when the save failed (the dialog shows it).
-fn save(editor: &mut PatchEditor, ui: &mut UiState, then: Option<Pending>) -> Option<String> {
+pub fn save(editor: &mut PatchEditor, ui: &mut UiState, then: Option<Pending>) -> Option<String> {
     let doc = ui.doc.clone()?;
     if ui.browser.async_io {
         let writable = match &doc.origin {

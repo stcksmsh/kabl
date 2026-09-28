@@ -2215,6 +2215,164 @@ fn main() -> eframe::Result<()> {
 mod recovery_tests {
     use super::*;
 
+    /// The real control pump and cpal callback keep processing a mapped CC while a 500 ms
+    /// Save or Open worker runs. The environment has a software PCM, not a controller.
+    #[test]
+    #[ignore = "set ALSA_CONFIG_PATH to an ALSA null PCM and run explicitly"]
+    fn cc_to_callback_during_delayed_save_and_open() {
+        use kabl_ui::{
+            browser,
+            library::{Library, Meta},
+            routing,
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let factory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches");
+        let log = kabl_core::load(&factory.join("composition")).unwrap();
+        let mut lib = Library::open(Some(factory), dir.path().to_path_buf());
+        let mut meta = Meta::default();
+        meta.name = "CC latency piece".into();
+        let id = lib.save(&log, meta, None).unwrap();
+        let editor = PatchEditor::from_log(log);
+        let mut ui = UiState::default();
+        ui.library = Some(lib);
+        ui.doc = Some(browser::Doc::new(
+            "CC latency piece",
+            browser::DocOrigin::Library(id),
+            editor.state(),
+        ));
+        ui.browser.async_io = true;
+        ui.browser.io_delay_ms = 500;
+        let (_, notes_rx) = rtrb::RingBuffer::new(1024);
+        let request = AudioRequest {
+            rate: Some(48000),
+            frames: Some(256),
+            realtime: false,
+            device: None,
+        };
+        let (mut host, mut delivery) = AudioHost::start(
+            editor.state(),
+            notes_rx,
+            Arc::new(AtomicU64::new(0)),
+            &request,
+            false,
+            Arc::new(record::PeakTap::default()),
+        );
+        assert!(host._stream.is_some(), "{}", host.status);
+        delivery.async_compile = true;
+        let feedback = delivery.feedback.clone();
+        let core = Arc::new(Mutex::new(Core {
+            editor,
+            ui,
+            delivery,
+            latency: None,
+            progress: None,
+            record_finish: None,
+            record_dir: String::new(),
+            record_last: None,
+            cc_cutoff: f64::NEG_INFINITY,
+            stale_cc: 0,
+        }));
+        let (mut cc_tx, cc_rx) = rtrb::RingBuffer::new(128);
+        let stop = Arc::new(AtomicBool::new(false));
+        let pump_core = core.clone();
+        let pump_stop = stop.clone();
+        let pump_thread = std::thread::spawn(move || pump(pump_core, cc_rx, pump_stop));
+
+        let send_and_measure =
+            |core: &Arc<Mutex<Core>>, tx: &mut rtrb::Producer<((u8, u8, u8), f64)>| {
+                let c = core.lock().unwrap();
+                let before = c.delivery.rev();
+                let state = c.editor.state();
+                let module = &state.modules[&3];
+                let info = kabl_modules::registry::info_for(&module.kind).unwrap();
+                let p = info.params.iter().find(|p| p.name == "m1").unwrap();
+                let at = (routing::base_value(state, 3, p) * 127.0).round() as u8;
+                drop(c);
+                let moved = if at < 107 { at + 20 } else { at - 20 };
+                let start = std::time::Instant::now();
+                tx.push(((0, 20, at), clock_s())).unwrap();
+                tx.push(((0, 20, moved), clock_s())).unwrap();
+                let deadline = start + std::time::Duration::from_millis(350);
+                loop {
+                    let rev = core.lock().unwrap().delivery.rev();
+                    if rev > before && Feedback::get(&feedback.applied_rev) >= rev {
+                        return start.elapsed();
+                    }
+                    assert!(
+                        std::time::Instant::now() < deadline,
+                        "CC did not reach callback within 350 ms during file I/O"
+                    );
+                    std::thread::sleep(std::time::Duration::from_millis(2));
+                }
+            };
+        {
+            let mut c = core.lock().unwrap();
+            let Core { editor, ui, .. } = &mut *c;
+            assert!(browser::save(editor, ui, None).is_none());
+            assert!(browser::io_busy(ui));
+        }
+        let save_latency = send_and_measure(&core, &mut cc_tx);
+        assert!(core.lock().unwrap().ui.browser.async_io);
+        let save_deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        loop {
+            let mut c = core.lock().unwrap();
+            if !browser::io_busy(&c.ui) {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < save_deadline,
+                "Save worker did not finish"
+            );
+            let Core { editor, ui, .. } = &mut *c;
+            browser::poll_io(editor, ui);
+            drop(c);
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        {
+            let mut c = core.lock().unwrap();
+            let Core { editor, ui, .. } = &mut *c;
+            browser::perform(
+                editor,
+                ui,
+                browser::Pending::Open("factory:palette/pad".into()),
+            );
+            assert!(browser::io_busy(ui));
+            ui.takeover.clear();
+        }
+        let open_latency = send_and_measure(&core, &mut cc_tx);
+        eprintln!(
+            "CC to callback during 500 ms worker: Save {:.1} ms, Open {:.1} ms",
+            save_latency.as_secs_f64() * 1e3,
+            open_latency.as_secs_f64() * 1e3
+        );
+        assert!(save_latency.as_millis() < 350 && open_latency.as_millis() < 350);
+        let open_deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        loop {
+            let mut c = core.lock().unwrap();
+            if !browser::io_busy(&c.ui) {
+                assert!(matches!(
+                    c.ui.browser.dialog,
+                    Some(browser::Dialog::Unsaved { .. })
+                ));
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < open_deadline,
+                "Open worker did not finish"
+            );
+            let Core { editor, ui, .. } = &mut *c;
+            browser::poll_io(editor, ui);
+            drop(c);
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        stop.store(true, Ordering::Release);
+        pump_thread.thread().unpark();
+        pump_thread.join().unwrap();
+        drop(host._stream.take());
+        drop(core);
+        host.collector.collect();
+    }
+
     #[test]
     fn callback_failure_sticks_and_xrun_alone_does_not_fail() {
         let timing = Arc::new(CallbackTiming::default());
