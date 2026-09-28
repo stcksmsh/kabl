@@ -1510,15 +1510,18 @@ fn draw_module(
     if let Decor::Keys(r) = m.decor {
         // The voice settings this MIDI In gives the chain it drives, including the ones off
         // the face, so it is plain whose settings they are.
-        text(
-            painter,
-            xf.p(pos2(r.center().x, r.bottom() + 11.0)),
-            egui::Align2::CENTER_CENTER,
-            &midi_in_summary(editor.state(), m),
-            10.5 * z,
-            ink2,
-            true,
-        );
+        let (voice, midi) = midi_in_summary(editor.state(), m);
+        for (line, dy) in [(voice, 9.0), (midi, 20.0)] {
+            text(
+                painter,
+                xf.p(pos2(r.center().x, r.bottom() + dy)),
+                egui::Align2::CENTER_CENTER,
+                &line,
+                10.5 * z,
+                ink2,
+                true,
+            );
+        }
     }
     if let Decor::Transport(r) = m.decor {
         draw_transport(ui_state, ui, painter, th, xf, m.id, r);
@@ -2459,8 +2462,9 @@ fn bank_menu(
     }
 }
 
-/// `POLY`, `MONO · LOW`, `LEGATO · LAST · glide 120 ms`: a MIDI In's voice settings.
-fn midi_in_summary(state: &kabl_core::PatchState, m: &Placed) -> String {
+/// A MIDI In's voice settings (`POLY`, `MONO · LOW`, `LEGATO · LAST · glide 120 ms`), then its
+/// bend range and channel (`bend ±2 st · ALL ch`, `bend ±12 st · ch 2`).
+fn midi_in_summary(state: &kabl_core::PatchState, m: &Placed) -> (String, String) {
     let get = |name: &str| {
         let p = m.info.params.iter().find(|p| p.name == name);
         state
@@ -2484,7 +2488,15 @@ fn midi_in_summary(state: &kabl_core::PatchState, m: &Placed) -> String {
         s += " · glide ";
         s += &ms.map_or(String::new(), |p| routing::fmt_value(p, get("glide_ms")));
     }
-    s
+    let fmt = |name: &str| {
+        let p = m.info.params.iter().find(|p| p.name == name);
+        p.map_or(String::new(), |p| routing::fmt_value(p, get(name)))
+    };
+    let channel = match fmt("channel") {
+        c if c == "ALL" => "ALL ch".to_string(),
+        c => c,
+    };
+    (s, format!("bend {} · {channel}", fmt("bend")))
 }
 
 fn draw_decor(editor: &PatchEditor, p: &egui::Painter, th: &Theme, xf: Xf, m: &Placed) {
@@ -2849,7 +2861,12 @@ fn draw_jacks(
 fn port_label(name: &str) -> String {
     name.split('_')
         .map(|w| {
-            let w = if w == "resonance" { "res" } else { w };
+            let w = match w {
+                "resonance" => "res",
+                // Four jacks share the MIDI In face.
+                "velocity" => "vel",
+                w => w,
+            };
             let (word, digits) = w.split_at(w.trim_end_matches(|c: char| c.is_ascii_digit()).len());
             let mut s = if word.len() <= 2 && word != "in" {
                 word.to_uppercase()
@@ -3321,7 +3338,7 @@ mod tests {
         assert_eq!(port_label("resonance_cv"), "Res CV");
         assert_eq!(port_label("lp"), "LP");
         assert_eq!(port_label("in3"), "In 3");
-        assert_eq!(port_label("velocity"), "Velocity");
+        assert_eq!(port_label("velocity"), "Vel");
         assert_eq!(port_label("in"), "In");
         assert_eq!(port_label("a"), "A");
     }

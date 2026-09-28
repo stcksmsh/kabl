@@ -1,0 +1,12 @@
+name = "Expressive Lead"
+category = "Lead"
+tags = [
+    "mono",
+    "legato",
+    "bend",
+    "wheel",
+    "vibrato",
+]
+description = "The palette's mono lead set up for a controller: bend ±2 semitones, and the modulation wheel adds vibrato."
+keys = true
+sequence = false

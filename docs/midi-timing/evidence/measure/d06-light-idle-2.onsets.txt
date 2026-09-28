@@ -1,0 +1,4 @@
+d06-light-idle-2 take: 48000 Hz, 352 onsets for 352 scripted note-ons
+  offset vs script: std 0.202 ms, peak-to-peak 2.577 ms, p99 |dev| 0.694 ms
+  inter-onset error: std 0.258 ms, max |err| 2.198 ms
+  onsets on one 64-frame phase: 6/352

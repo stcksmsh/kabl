@@ -75,6 +75,18 @@ impl<'a> ProcessIo<'a> {
         self.params[index]
     }
 
+    /// Params the caller supplied (a hand-wired caller may pass fewer than the module has).
+    #[inline]
+    pub fn param_count(&self) -> usize {
+        self.params.len()
+    }
+
+    /// Output buffers the caller supplied.
+    #[inline]
+    pub fn output_count(&self) -> usize {
+        self.outputs.len()
+    }
+
     #[inline]
     pub fn output(&mut self, index: usize) -> &mut [f32] {
         self.outputs[index]

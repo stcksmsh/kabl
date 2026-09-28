@@ -103,6 +103,22 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
          Perform panel.",
     ),
     (
+        "expressive/lead",
+        "Expressive Lead",
+        "Lead",
+        &["mono", "legato", "bend", "wheel", "vibrato"],
+        "The palette's mono lead set up for a controller: bend ±2 semitones, and the \
+         modulation wheel adds vibrato.",
+    ),
+    (
+        "expressive/split",
+        "Keys and Bass by Channel",
+        "Study",
+        &["channels", "split", "bass", "wheel", "bend"],
+        "Two keyboards played apart: MIDI channel 1 plays polyphonic keys (the wheel opens \
+         their filter), channel 2 a legato bass with glide and a ±12 semitone bend.",
+    ),
+    (
         "interlocking",
         "Interlocking Sequences",
         "Piece",

@@ -1,0 +1,4 @@
+base-light-idle-2 take: 48000 Hz, 352 onsets for 352 scripted note-ons
+  offset vs script: std 1.565 ms, peak-to-peak 6.364 ms, p99 |dev| 2.849 ms
+  inter-onset error: std 2.462 ms, max |err| 3.697 ms
+  onsets on one 64-frame phase: 352/352

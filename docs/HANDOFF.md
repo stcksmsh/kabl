@@ -3,6 +3,29 @@
 Read this, then `docs/STATUS.md` (top section) and the last entries of `docs/decisions.md`.
 Trust code and git over older docs.
 
+## D06 expressive MIDI and event timing — submitted, owner review pending (2026-09-28)
+
+Kosta authorized D06 (launch prompt, 2026-09-28), superseding older "do not start D06" notes.
+Base `bd64165` (D05 PR #8 and REAPER/CLAP prototype PR #7 merged). Branch
+`codex/d06-expressive-midi`, draft PR #9 (https://github.com/stcksmsh/kabl/pull/9); not merged.
+Record: [`midi-timing/`](midi-timing/README.md) (design, REPORT, REVIEW, CHECKLIST, evidence,
+walkthrough, screenshots). Built on Kosta's laptop through remote control, virtual MIDI only.
+
+- **Code.** `crates/engine/src/timeline.rs` (adapter: absolute 64-sample grid, fixed
+  `LATENCY` = 64 frames, bounded queue), `keyboard.rs` (`MidiEvent`, `Source`, identity
+  (source, channel, key), channel routing, bend/wheel, cleanup scopes), `patch_engine.rs`
+  (`key_at`, `sync_once`), `compile.rs` (`key_action` with offset), `midi_in.rs` (sample-offset
+  change list, `bend`/`channel` params, `wheel` output), `ui/src/main.rs` (arrival-stamped
+  MIDI mapped one period later, callback renders through `Timeline`).
+- **Tests.** `engine/tests/{timeline,expression}.rs`, `ui/tests/expressive.rs`, main.rs
+  `midi_messages_reach_the_wheel_and_the_mappings`. Partition invariance is bit-exact.
+- **Tools.** `examples/render_midi` (offline render of `.events`), `midi_player` gained
+  `bend`/`raw`; `docs/midi-timing/scripts/` (make_demos, play_events, onsets, measure,
+  measure-all, record-walkthrough, make-bundle).
+- **Patches.** `patches/expressive/{lead,split}`; fixture `docs/midi-timing/fixtures/gate-probe`.
+- **Open.** Owner checklist; physical controller/latency; dense-patch Xvfb freezes seen in
+  both builds (follow-up in REPORT). Do not start D07/D08.
+
 ## D05 in progress on a separate branch (2026-09-27)
 
 The initial fetched `origin/master` was `e951b2535d817bc7c21872cd0e46e815d35747ac`;

@@ -33,7 +33,7 @@ use kabl_core::PatchState;
 
 use crate::compile::{carry_state, compile, CompileError, CompiledPatch, PendingLaunch};
 use crate::graph::BLOCK;
-use crate::keyboard::{Action, KeyEvent, Keyboard};
+use crate::keyboard::{Action, KeyEvent, Keyboard, MidiEvent, Source};
 use crate::probe::{ProbeReport, ProbeTarget, WINDOW_SECS};
 use crate::runtime::{Feedback, ParamSet, ToAudio};
 use crate::swap::CROSSFADE_MS;
@@ -64,9 +64,9 @@ pub struct PatchEngine {
     /// One keyboard per `midi.in` of the playing graph, outside the graphs like the launches
     /// (docs/sound-palette-batch/keyboard.md).
     keyboards: [Option<Keyboard>; MAX_KEYBOARDS],
-    /// Who holds each key (bit n = MIDI note n): a key held by both the controller and the
-    /// preview is released only when both have let go (docs/find-play-save/README.md).
-    held_controller: u128,
+    /// Keys the preview holds (bit n = MIDI note n). The keyboards own release: a key held by
+    /// both the controller and the preview on one channel is released only when both have
+    /// let go (docs/find-play-save/README.md, docs/midi-timing/design.md section 7).
     held_preview: u128,
     /// Blocks until the preview's notes release; 0 = no preview running.
     preview_blocks: u32,
@@ -76,6 +76,8 @@ pub struct PatchEngine {
     probe_seq: u64,
     /// Samples rendered since this engine started (reports carry it as their time).
     rendered: u64,
+    /// `rendered` when the keyboards last matched the graph (`sync_once`).
+    synced: Option<u64>,
     /// The last finished window, until the callback takes it.
     report: Option<ProbeReport>,
     /// Revision of the newest graph received: an older one arriving later is refused.
@@ -185,13 +187,13 @@ impl PatchEngine {
             deferred_preview: None,
             packed: [NO_LAUNCH; MAX_PENDING],
             keyboards: Default::default(),
-            held_controller: 0,
             held_preview: 0,
             preview_blocks: 0,
             probe: None,
             probe_window: 1,
             probe_seq: 0,
             rendered: 0,
+            synced: None,
             report: None,
             newest_rev: 0,
             fresh_rev: 0,
@@ -215,13 +217,13 @@ impl PatchEngine {
             deferred_preview: None,
             packed: [NO_LAUNCH; MAX_PENDING],
             keyboards: Default::default(),
-            held_controller: 0,
             held_preview: 0,
             preview_blocks: 0,
             probe: None,
             probe_window: 1,
             probe_seq: 0,
             rendered: 0,
+            synced: None,
             report: None,
             newest_rev: 0,
             fresh_rev: 0,
@@ -232,25 +234,22 @@ impl PatchEngine {
         e
     }
 
-    /// Audio-thread call: a key event from the MIDI controller. A key-up is held back while the
-    /// preview also holds that key. No allocation.
+    /// Audio-thread call: a key event from the MIDI controller on channel 1, at the start of
+    /// the next block (the pre-D06 entry point). No allocation.
     pub fn key(&mut self, e: KeyEvent) {
-        match e {
-            KeyEvent::On { note, .. } => self.held_controller |= bit(note),
-            KeyEvent::Off { note } => {
-                self.held_controller &= !bit(note);
-                if self.held_preview & bit(note) != 0 {
-                    return;
-                }
-            }
-            KeyEvent::AllOff => {
-                self.held_controller = 0;
-                self.held_preview = 0;
-                self.preview_blocks = 0;
-            }
-            KeyEvent::Sustain(_) => {}
+        self.key_at(MidiEvent::new(Source::Controller, 0, e), 0);
+    }
+
+    /// Audio-thread call: `e` at sample `offset` (0..BLOCK) of the next block. Events of one
+    /// block come in time order (`Timeline` does this). No allocation.
+    pub fn key_at(&mut self, e: MidiEvent, offset: usize) {
+        if e.event == KeyEvent::AllOff
+            || (e.source == Source::Preview && e.event == KeyEvent::SourceLost)
+        {
+            self.held_preview = 0;
+            self.preview_blocks = 0;
         }
-        self.send_key(e);
+        self.send_key(e, offset);
     }
 
     /// Audio-thread call: starts a preview (replacing one still running). No allocation.
@@ -261,20 +260,23 @@ impl PatchEngine {
         for &note in notes.iter().take(MAX_PREVIEW_NOTES) {
             let note = note & 0x7F;
             self.held_preview |= bit(note);
-            self.send_key(KeyEvent::On {
+            let on = KeyEvent::On {
                 note,
                 velocity: velocity.clamp(1, 127),
-            });
+            };
+            self.send_key(MidiEvent::new(Source::Preview, 0, on), 0);
         }
     }
 
-    /// Audio-thread call: releases the preview's keys, except those the controller holds.
+    /// Audio-thread call: releases the preview's keys (a key the controller also holds keeps
+    /// sounding). No allocation.
     pub fn preview_stop(&mut self) {
         self.preview_blocks = 0;
         let held = std::mem::take(&mut self.held_preview);
         for note in 0..128u8 {
-            if held & bit(note) != 0 && self.held_controller & bit(note) == 0 {
-                self.send_key(KeyEvent::Off { note });
+            if held & bit(note) != 0 {
+                let off = MidiEvent::new(Source::Preview, 0, KeyEvent::Off { note });
+                self.send_key(off, 0);
             }
         }
     }
@@ -284,8 +286,19 @@ impl PatchEngine {
         self.held_preview
     }
 
-    fn send_key(&mut self, e: KeyEvent) {
-        self.sync_keyboards();
+    /// Bend (-1..1) and wheel (0..1) of the keyboard of `midi.in` `id`, for tests and the UI.
+    pub fn expression(&self, id: kabl_core::ModuleId) -> Option<(f32, f32)> {
+        self.keyboards
+            .iter()
+            .flatten()
+            .find(|kb| kb.id == id)
+            .map(Keyboard::expression)
+    }
+
+    /// Every keyboard gets `e`; each decides from its channel and what it holds
+    /// (`Keyboard::midi`).
+    fn send_key(&mut self, e: MidiEvent, offset: usize) {
+        self.sync_once();
         let PatchEngine {
             keyboards,
             active,
@@ -294,7 +307,7 @@ impl PatchEngine {
         } = self;
         for kb in keyboards.iter_mut().flatten() {
             let id = kb.id;
-            kb.event(e, &mut |a| act(active, incoming, id, a));
+            kb.midi(e, &mut |a| act(active, incoming, id, a, offset));
         }
     }
 
@@ -314,7 +327,6 @@ impl PatchEngine {
     fn sync(&mut self, fresh: bool) {
         if fresh {
             // Every keyboard starts over, so nobody holds a key.
-            self.held_controller = 0;
             self.held_preview = 0;
             self.preview_blocks = 0;
         }
@@ -344,14 +356,14 @@ impl PatchEngine {
             if let Some(kb) = slot {
                 if fresh || !found.iter().any(|&(id, _)| id == kb.id) {
                     let id = kb.id;
-                    kb.event(KeyEvent::AllOff, &mut |a| act(active, incoming, id, a));
+                    kb.event(KeyEvent::AllOff, &mut |a| act(active, incoming, id, a, 0));
                     *slot = None;
                 }
             }
         }
         for &(id, s) in found {
             match keyboards.iter_mut().flatten().find(|kb| kb.id == id) {
-                Some(kb) => kb.set_settings(s, &mut |a| act(active, incoming, id, a)),
+                Some(kb) => kb.set_settings(s, &mut |a| act(active, incoming, id, a, 0)),
                 None => {
                     if let Some(slot) = keyboards.iter_mut().find(|k| k.is_none()) {
                         *slot = Some(Keyboard::new(id, s, *voice_count));
@@ -363,6 +375,15 @@ impl PatchEngine {
 
     fn sync_keyboards(&mut self) {
         self.sync(false);
+    }
+
+    /// `sync_keyboards` at most once per block: settings only change when a block runs
+    /// (`midi.in` reads its params in `process`) or a graph arrives (`receive_swap` syncs).
+    fn sync_once(&mut self) {
+        if self.synced != Some(self.rendered) {
+            self.sync_keyboards();
+            self.synced = Some(self.rendered);
+        }
     }
 
     pub fn crossfade_samples(&self) -> usize {
@@ -444,6 +465,7 @@ impl PatchEngine {
             self.move_probe(&mut new_patch);
             self.incoming = Some((new_patch, 0));
             self.sync(fresh);
+            self.synced = Some(self.rendered);
         }
     }
 
@@ -732,6 +754,9 @@ impl PatchEngine {
     /// unlike `swap::Engine::process_block` (S1's graph was mono).
     #[inline]
     pub fn process_block(&mut self, out_left: &mut [f32; BLOCK], out_right: &mut [f32; BLOCK]) {
+        // Settings changed by a runtime value (mode, channel) apply before this block, not
+        // only at the next key.
+        self.sync_once();
         if self.preview_blocks > 0 {
             self.preview_blocks -= 1;
             if self.preview_blocks == 0 {
@@ -860,16 +885,17 @@ fn bit(note: u8) -> u128 {
     1u128 << (note & 0x7F)
 }
 
-/// A keyboard action in every running graph.
+/// A keyboard action in every running graph, at `offset` of the next block.
 fn act(
     active: &mut CompiledPatch,
     incoming: &mut Option<(Owned<CompiledPatch>, usize)>,
     id: kabl_core::ModuleId,
     a: Action,
+    offset: usize,
 ) {
-    active.key_action(id, a);
+    active.key_action(id, a, offset);
     if let Some((g, _)) = incoming.as_mut() {
-        g.key_action(id, a);
+        g.key_action(id, a, offset);
     }
 }
 

@@ -62,7 +62,7 @@ use std::fmt;
 
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
 use kabl_modules::builtins::{
-    Clock, Delay, DelayLock, KeySettings, Lfo, LfoSync, MidiIn, Noise, Seq, Transport,
+    Change, Clock, Delay, DelayLock, KeySettings, Lfo, LfoSync, MidiIn, Noise, Seq, Transport,
 };
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::{
@@ -1302,7 +1302,14 @@ impl CompiledPatch {
 
     /// Counts executed module instances and steps for offline profiling.
     pub fn profile_counts(&self) -> (usize, usize, usize) {
-        (self.modules.len(), self.module_origin.iter().filter(|(_, v)| v.is_some()).count(), self.steps.len())
+        (
+            self.modules.len(),
+            self.module_origin
+                .iter()
+                .filter(|(_, v)| v.is_some())
+                .count(),
+            self.steps.len(),
+        )
     }
 
     /// The `out` module this graph plays (with several, the last in schedule order; the others
@@ -1614,27 +1621,34 @@ impl CompiledPatch {
         }
     }
 
-    /// Carries out a keyboard action on voice `voice` of the `midi.in` module `id`. No
-    /// allocation.
-    pub fn key_action(&mut self, id: ModuleId, a: Action) {
-        let voice = match a {
-            Action::Play { voice, .. } | Action::Release { voice } => voice,
+    /// Carries out a keyboard action on voice `voice` of the `midi.in` module `id` (every voice
+    /// for `Expression`), at sample `offset` of the next block. No allocation.
+    pub fn key_action(&mut self, id: ModuleId, a: Action, offset: usize) {
+        let (voice, change) = match a {
+            Action::Play {
+                voice,
+                pitch,
+                velocity,
+                glide,
+                retrigger,
+            } => (
+                Some(voice),
+                Change::Play {
+                    pitch,
+                    velocity,
+                    glide,
+                    retrigger,
+                },
+            ),
+            Action::Release { voice } => (Some(voice), Change::Release),
+            Action::Expression { bend, wheel } => (None, Change::Expression { bend, wheel }),
         };
         for &(index, lane) in &self.midi_ins {
-            if lane != voice || self.module_origin[index].0 != id {
+            if voice.is_some_and(|v| v != lane) || self.module_origin[index].0 != id {
                 continue;
             }
             if let Some(m) = self.modules[index].as_any_mut().downcast_mut::<MidiIn>() {
-                match a {
-                    Action::Play {
-                        pitch,
-                        velocity,
-                        glide,
-                        retrigger,
-                        ..
-                    } => m.play(pitch, velocity, glide, retrigger),
-                    Action::Release { .. } => m.note_off(),
-                }
+                m.schedule(offset, change);
             }
         }
     }

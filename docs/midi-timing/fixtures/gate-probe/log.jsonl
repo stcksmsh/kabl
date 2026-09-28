@@ -1,0 +1,5 @@
+{"seq":0,"t_ms":1790621383089,"op":{"AddModule":{"id":1,"kind":"midi.in","pos":{"x":24.0,"y":10.0}}},"inverse":{"RemoveModule":{"id":1}},"source":"User"}
+{"seq":1,"t_ms":1790621383089,"op":{"AddModule":{"id":2,"kind":"out","pos":{"x":174.0,"y":10.0}}},"inverse":{"RemoveModule":{"id":2}},"source":"User"}
+{"seq":2,"t_ms":1790621383089,"op":{"Connect":{"id":1,"from":{"Module":{"id":1,"port":"gate"}},"to":{"Module":{"id":2,"port":"left"}}}},"inverse":{"Disconnect":{"id":1}},"source":"User"}
+{"seq":3,"t_ms":1790621383089,"op":{"Connect":{"id":2,"from":{"Module":{"id":1,"port":"gate"}},"to":{"Module":{"id":2,"port":"right"}}}},"inverse":{"Disconnect":{"id":2}},"source":"User"}
+{"seq":4,"t_ms":1790621383089,"op":{"AddModule":{"id":3,"kind":"lfo","pos":{"x":324.0,"y":10.0}}},"inverse":{"RemoveModule":{"id":3}},"source":"User"}

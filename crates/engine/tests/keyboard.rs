@@ -45,6 +45,7 @@ fn run(kb: &mut Keyboard, events: &[KeyEvent]) -> Vec<A> {
                     ..
                 } => ('P', voice, pitch as i32 + 60, glide, retrigger),
                 Action::Release { voice } => ('R', voice, 0, false, false),
+                Action::Expression { .. } => ('E', 0, 0, false, false),
             })
         });
     }
@@ -58,6 +59,7 @@ fn kb(mode: u8, priority: u8, glide: u8) -> Keyboard {
             mode,
             priority,
             glide,
+            ..Default::default()
         },
         VOICES,
     )
@@ -302,6 +304,7 @@ fn all_notes_off_and_mode_changes_release_and_forget() {
             mode: 1,
             priority: 0,
             glide: 0,
+            ..Default::default()
         },
         &mut |x| a.push(x),
     );
@@ -315,6 +318,7 @@ fn all_notes_off_and_mode_changes_release_and_forget() {
             mode: 1,
             priority: 2,
             glide: 1,
+            ..Default::default()
         },
         &mut |x| a.push(x),
     );

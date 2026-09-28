@@ -701,7 +701,8 @@ fn midi_in_face(
     off_face.sort_unstable();
     let picture = height(&sels, &knobs) + PICTURE <= BOTTOM - TOP;
     let decor = if picture {
-        Decor::Keys(Rect::from_min_size(pos2(12.0, TOP), vec2(fw - 24.0, 26.0)))
+        // Shorter keys leave two text lines under them: voice settings, then bend and channel.
+        Decor::Keys(Rect::from_min_size(pos2(12.0, TOP), vec2(fw - 24.0, 18.0)))
     } else {
         Decor::None
     };
@@ -936,8 +937,8 @@ mod tests {
             assert!(c.geo.bounds().top() > keys.bottom() + 10.0);
             assert!(c.geo.bounds().bottom() < plate.top());
         }
-        // Everything on the face: the three selectors fit, the glide time knob moves to the
-        // advanced area and the picture gives way.
+        // Everything on the face: the three selectors fit, the knobs (glide time, bend,
+        // channel) move to the advanced area and the picture gives way.
         let q = {
             let mut q = p.clone();
             for par in MIDI_PARAMS {
@@ -954,11 +955,11 @@ mod tests {
         assert_eq!(m.decor, Decor::None);
         let names: Vec<&str> = m.ctls.iter().map(|c| c.param.name).collect();
         assert_eq!(names, ["mode", "priority", "glide"]);
-        assert_eq!(m.hidden.len(), 1);
+        assert_eq!(m.hidden.len(), 3, "glide time, bend and channel");
         assert!(m.toggle.is_some());
     }
 
-    const MIDI_PARAMS: [&str; 4] = ["mode", "priority", "glide", "glide_ms"];
+    const MIDI_PARAMS: [&str; 6] = ["mode", "priority", "glide", "glide_ms", "bend", "channel"];
 
     #[test]
     fn snapping_picks_the_nearest_row_and_unit() {

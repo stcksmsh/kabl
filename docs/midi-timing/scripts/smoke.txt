@@ -1,0 +1,14 @@
+# Smoke: two keyboards by channel, bend and wheel from the virtual controller (scripted MIDI).
+sleep 3
+shot s01-open
+midi raw 90 3c 64
+midi raw 91 30 64
+sleep 1
+midi bend 2 8192 16383 1
+midi cc 1 1 100
+sleep 1.5
+shot s02-playing
+midi raw 80 3c 00
+midi raw 81 30 00
+sleep 1
+running

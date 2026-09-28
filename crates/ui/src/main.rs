@@ -19,7 +19,19 @@ use basedrop::Collector;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use kabl_core::{ModuleId, PatchState};
 use kabl_engine::graph::BLOCK;
-use kabl_engine::keyboard::KeyEvent;
+use kabl_engine::keyboard::{KeyEvent, MidiEvent, Source};
+use kabl_engine::timeline::Timeline;
+
+/// A key event and when the MIDI thread received it (docs/midi-timing/design.md, section 4).
+type Note = (std::time::Instant, MidiEvent);
+
+/// A controller key event received now.
+fn note_now(event: KeyEvent) -> Note {
+    (
+        std::time::Instant::now(),
+        MidiEvent::new(Source::Controller, 0, event),
+    )
+}
 use kabl_engine::patch_engine::PatchEngine;
 use kabl_engine::probe::ProbeReport;
 use kabl_engine::runtime::{Feedback, ToAudio};
@@ -90,6 +102,8 @@ static CALLBACK_ALLOCATOR: callback_allocations::Counter = callback_allocations:
 use callback_allocations::Scope as CallbackAllocationScope;
 
 const RING_CAPACITY: usize = BLOCK * 256;
+/// Frames the callback renders through the timeline at a time (stack buffers).
+const CHUNK: usize = 256;
 
 /// (sequencer, step, playing bank, queued bank).
 type SeqReport = (ModuleId, usize, usize, Option<usize>);
@@ -185,6 +199,17 @@ struct CallbackTiming {
     /// 0 not tried, 1 granted, 2 refused.
     rt: std::sync::atomic::AtomicU8,
     rt_error: std::sync::OnceLock<String>,
+    /// MIDI key events scheduled, and those that arrived before the previous callback
+    /// started or past its length (placed at an edge).
+    midi_events: AtomicU64,
+    midi_late: AtomicU64,
+    /// Arrival to the scheduled frame of the callback that renders it (excluding the
+    /// adapter's fixed 64 frames and the device's own latency), shortest and longest.
+    midi_wait_min_ns: AtomicU64,
+    midi_wait_max_ns: AtomicU64,
+    /// Adapter queue: events dropped or forced to a release, and events moved in time.
+    timeline_dropped: AtomicU64,
+    timeline_moved: AtomicU64,
 }
 
 struct Hist([AtomicU64; HIST_BINS]);
@@ -352,7 +377,8 @@ impl CallbackTiming {
         format!(
             "{} callbacks × {frames} frames at {sample_rate} Hz · run: worst {:.0} of {:.0} µs \
              (at {:.1} s, wall {}), {} over half, {} late · arrival: worst {:.0} µs, {} late · {} xruns · {rt} \
-             (first second: worst {:.0} µs)",
+             (first second: worst {:.0} µs) · MIDI: {} events, {} late, arrival to frame \
+             {:.2}–{:.2} ms · adapter: {} frames latency, {} dropped, {} moved",
             get(&self.count),
             us(&self.worst_ns),
             fmax as f64 / sample_rate as f64 * 1e6,
@@ -364,6 +390,14 @@ impl CallbackTiming {
             get(&self.arrival_late),
             get(&self.xruns),
             us(&self.startup_worst_ns),
+            get(&self.midi_events),
+            get(&self.midi_late),
+            // No events yet: no range ("-"), not a zero delay.
+            if get(&self.midi_events) == 0 { f64::NAN } else { get(&self.midi_wait_min_ns) as f64 / 1e6 },
+            if get(&self.midi_events) == 0 { f64::NAN } else { get(&self.midi_wait_max_ns) as f64 / 1e6 },
+            kabl_engine::timeline::LATENCY,
+            get(&self.timeline_dropped),
+            get(&self.timeline_moved),
         )
     }
 }
@@ -405,7 +439,7 @@ impl AudioHost {
     /// Returns the host and the control side of its queues.
     fn start(
         patch: &PatchState,
-        notes: rtrb::Consumer<KeyEvent>,
+        notes: rtrb::Consumer<Note>,
         keys: Arc<AtomicU64>,
         request: &AudioRequest,
         restarting: bool,
@@ -540,6 +574,8 @@ impl AudioHost {
 
         let mut left_ring = RingBuffer::new(RING_CAPACITY);
         let mut right_ring = RingBuffer::new(RING_CAPACITY);
+        // Boxed: its event queue is too big for the stack of the thread that builds it.
+        let mut timeline = Box::new(Timeline::new());
 
         #[cfg(test)]
         let mut callback_warmups = 0u32;
@@ -574,7 +610,8 @@ impl AudioHost {
                 }
                 let _ = &rt_handle;
                 let started = std::time::Instant::now();
-                let since_last = last_start.map(|l| started - l);
+                let previous = last_start;
+                let since_last = previous.map(|l| started - l);
                 last_start = Some(started);
                 // Audio thread. No allocation, no locks: install queued graphs, runtime values,
                 // commands and transport in request order (allocation-free, at most one queue's
@@ -587,18 +624,46 @@ impl AudioHost {
                         let _ = applied_tx.push((a, clock_s()));
                     }
                 }
-                while let Ok(event) = midi_consumer.pop() {
-                    engine.key(event);
+                let frames_needed = data.len() / channels;
+                // Each message keeps its place inside the previous callback period, one
+                // period later (docs/midi-timing/design.md, section 4).
+                while let Ok((at, event)) = midi_consumer.pop() {
+                    let offset = match previous {
+                        Some(p) if at >= p => {
+                            ((at - p).as_secs_f64() * sample_rate as f64) as usize
+                        }
+                        _ => {
+                            t.midi_late.fetch_add(1, Ordering::Relaxed);
+                            0
+                        }
+                    };
+                    if offset >= frames_needed {
+                        t.midi_late.fetch_add(1, Ordering::Relaxed);
+                    }
+                    let offset = offset.min(frames_needed.saturating_sub(1));
+                    let waited = started.saturating_duration_since(at).as_nanos() as u64
+                        + (offset as f64 / sample_rate as f64 * 1e9) as u64;
+                    if t.midi_events.fetch_add(1, Ordering::Relaxed) == 0 {
+                        t.midi_wait_min_ns.store(waited, Ordering::Relaxed);
+                    }
+                    t.midi_wait_max_ns.fetch_max(waited, Ordering::Relaxed);
+                    t.midi_wait_min_ns.fetch_min(waited, Ordering::Relaxed);
+                    timeline.push(offset, frames_needed, event);
                 }
 
-                let frames_needed = data.len() / channels;
+                // The shared timing path: any callback size, one 64-sample engine grid.
                 while left_ring.available() < frames_needed {
-                    let mut l = [0f32; BLOCK];
-                    let mut r = [0f32; BLOCK];
-                    engine.process_block(&mut l, &mut r);
-                    left_ring.push_slice(&l);
-                    right_ring.push_slice(&r);
+                    let n = (frames_needed - left_ring.available()).min(CHUNK);
+                    let (mut l, mut r) = ([0f32; CHUNK], [0f32; CHUNK]);
+                    timeline.render(&mut engine, &mut l[..n], &mut r[..n], |_, _| {});
+                    left_ring.push_slice(&l[..n]);
+                    right_ring.push_slice(&r[..n]);
                 }
+                let q = timeline.stats();
+                t.timeline_dropped
+                    .store(q.dropped + q.forced, Ordering::Relaxed);
+                t.timeline_moved
+                    .store(q.clamped + q.reordered, Ordering::Relaxed);
 
                 // Full queue (UI not drawing): the UI just misses these, nothing waits.
                 engine.seqs(|id, step, bank, queued| {
@@ -946,7 +1011,7 @@ fn fresh_cc(
 /// Off) to the audio thread, where the engine's keyboards assign voices; every other CC to
 /// the UI (learn, mappings, buttons).
 struct MidiSink {
-    notes: Option<rtrb::Producer<KeyEvent>>,
+    notes: Option<rtrb::Producer<Note>>,
     /// CCs with their arrival time (`clock_s`).
     cc: rtrb::Producer<((u8, u8, u8), f64)>,
     ctx: Option<egui::Context>,
@@ -954,9 +1019,10 @@ struct MidiSink {
     pump: Option<std::thread::Thread>,
 }
 
-/// CCs that are key events, never learnable: sustain pedal, All Sound Off, All Notes Off.
+/// CCs that are key events, never learnable: sustain pedal, All Sound Off, Reset All
+/// Controllers, All Notes Off. CC 1 is both the wheel and learnable (design.md section 7).
 fn is_key_cc(cc: u8) -> bool {
-    matches!(cc, 64 | 120 | 123)
+    matches!(cc, 64 | 120 | 121 | 123)
 }
 
 /// Keys held and voices sounding, as the audio thread publishes them.
@@ -968,13 +1034,15 @@ fn unpack_keys(v: u64) -> (u64, u64) {
     (v >> 32, v & 0xFFFF_FFFF)
 }
 
-/// One incoming MIDI message: a key event to the audio thread, any other CC to the UI.
+/// One incoming MIDI message: a key event (notes, bend, wheel, pedal, notes off, reset) to the
+/// audio thread with its arrival time; any other CC, and CC 1 as well, to the UI.
 fn on_message(s: &mut MidiSink, data: &[u8]) {
-    if let Some(e) = KeyEvent::from_midi(data) {
+    if let Some(e) = MidiEvent::parse(Source::Controller, data) {
         if let Some(notes) = s.notes.as_mut() {
-            let _ = notes.push(e);
+            let _ = notes.push((std::time::Instant::now(), e));
         }
-    } else if data.len() >= 3 && data[0] & 0xF0 == 0xB0 && !is_key_cc(data[1]) {
+    }
+    if data.len() >= 3 && data[0] & 0xF0 == 0xB0 && !is_key_cc(data[1]) {
         let _ = s.cc.push(((data[0] & 0x0F, data[1], data[2]), clock_s()));
         if let Some(p) = &s.pump {
             p.unpark();
@@ -1053,7 +1121,7 @@ type CcQueue = rtrb::Consumer<((u8, u8, u8), f64)>;
 
 impl Midi {
     /// Also returns the CC queue's consumer, for the control thread.
-    fn new(notes: rtrb::Producer<KeyEvent>) -> (Self, CcQueue) {
+    fn new(notes: rtrb::Producer<Note>) -> (Self, CcQueue) {
         let (cc, cc_rx) = rtrb::RingBuffer::new(1024);
         let m = Midi {
             sink: Arc::new(Mutex::new(MidiSink {
@@ -1083,17 +1151,25 @@ impl Midi {
         if let Some(stop) = self.pipe.take() {
             stop.store(true, Ordering::Release);
         }
-        self.port = None;
-        self.release_all();
+        // Only a controller that was connected leaves notes to end.
+        if self.port.take().is_some() {
+            self.send(KeyEvent::SourceLost);
+        }
+    }
+
+    /// The controller's notes, pedals and expression end; a running preview does not
+    /// (docs/midi-timing/design.md, "Cleanup").
+    fn send(&self, e: KeyEvent) {
+        let mut s = self.sink.lock().unwrap();
+        if let Some(notes) = s.notes.as_mut() {
+            let _ = notes.push(note_now(e));
+        }
     }
 
     /// Every keyboard releases every voice and forgets its keys and the pedal
     /// (docs/sound-palette-batch/keyboard.md, "Other events").
     fn release_all(&self) {
-        let mut s = self.sink.lock().unwrap();
-        if let Some(notes) = s.notes.as_mut() {
-            let _ = notes.push(KeyEvent::AllOff);
-        }
+        self.send(KeyEvent::AllOff);
     }
 
     fn suspend_notes(&self) {
@@ -1101,7 +1177,7 @@ impl Midi {
         self.keys.store(0, Ordering::Relaxed);
     }
 
-    fn resume_notes(&self, notes: rtrb::Producer<KeyEvent>) {
+    fn resume_notes(&self, notes: rtrb::Producer<Note>) {
         self.sink.lock().unwrap().notes = Some(notes);
     }
 
@@ -1263,7 +1339,7 @@ struct App {
     phase: AudioPhase,
     retry: Option<RetryTask>,
     session: u64,
-    pending_notes: Option<rtrb::Producer<KeyEvent>>,
+    pending_notes: Option<rtrb::Producer<Note>>,
     pending_recorder: Option<record::Recorder>,
     record_finish: Option<std::thread::JoinHandle<record::Recorder>>,
     record_last: Option<record::Outcome>,
@@ -1280,7 +1356,7 @@ struct RetryTask {
 struct RetryResult {
     audio: AudioHost,
     delivery: Delivery,
-    notes: rtrb::Producer<KeyEvent>,
+    notes: rtrb::Producer<Note>,
     retired_graphs: usize,
 }
 
@@ -1292,8 +1368,8 @@ struct RetryFault {
 /// The old stream is dropped before its collector is drained or a new stream is opened.
 fn retry_worker(
     old_session: (AudioHost, Delivery),
-    notes: rtrb::Producer<KeyEvent>,
-    notes_rx: rtrb::Consumer<KeyEvent>,
+    notes: rtrb::Producer<Note>,
+    notes_rx: rtrb::Consumer<Note>,
     keys: Arc<AtomicU64>,
     request: AudioRequest,
     peaks: Arc<record::PeakTap>,
@@ -2136,7 +2212,7 @@ fn main() -> eframe::Result<()> {
             Some([w.parse().ok()?, h.parse().ok()?])
         })
         .unwrap_or([1440.0, 900.0]);
-    let (notes_tx, notes_rx) = rtrb::RingBuffer::<KeyEvent>::new(1024);
+    let (notes_tx, notes_rx) = rtrb::RingBuffer::<Note>::new(1024);
     let (mut midi, cc_rx) = Midi::new(notes_tx);
     midi.connect_default(flag("--midi").as_deref());
     let num = |name: &str| flag(name).and_then(|v| v.parse::<u32>().ok());
@@ -2260,6 +2336,42 @@ fn main() -> eframe::Result<()> {
 #[cfg(test)]
 mod recovery_tests {
     use super::*;
+
+    /// D06: CC 1 is the wheel for the audio thread and still a learnable CC for mappings
+    /// (soft takeover unchanged); bend and CC 121 go only to the audio thread; other CCs
+    /// only to the control thread; a disconnect ends the controller source, not everything.
+    #[test]
+    fn midi_messages_reach_the_wheel_and_the_mappings() {
+        let (notes, mut notes_rx) = rtrb::RingBuffer::<Note>::new(64);
+        let (mut midi, mut cc_rx) = Midi::new(notes);
+        let send = |d: &[u8]| on_message(&mut midi.sink.lock().unwrap(), d);
+        send(&[0xB2, 1, 99]);
+        send(&[0xE2, 0, 0x60]);
+        send(&[0xB2, 121, 0]);
+        send(&[0xB2, 74, 10]);
+        send(&[0x92, 60, 0]);
+        let got: Vec<MidiEvent> = std::iter::from_fn(|| notes_rx.pop().ok().map(|n| n.1)).collect();
+        let ev = |e| MidiEvent::new(Source::Controller, 2, e);
+        assert_eq!(
+            got,
+            [
+                ev(KeyEvent::Wheel(99)),
+                ev(KeyEvent::Bend(0x60 << 7)),
+                ev(KeyEvent::ResetControllers),
+                ev(KeyEvent::Off { note: 60 }),
+            ]
+        );
+        let ccs: Vec<(u8, u8, u8)> = std::iter::from_fn(|| cc_rx.pop().ok().map(|c| c.0)).collect();
+        assert_eq!(ccs, [(2, 1, 99), (2, 74, 10)]);
+        midi.disconnect();
+        assert!(notes_rx.pop().is_err(), "nothing was connected: nothing to end");
+        midi.port = Some("kabl-player".into());
+        midi.disconnect();
+        assert_eq!(
+            notes_rx.pop().unwrap().1,
+            MidiEvent::new(Source::Controller, 0, KeyEvent::SourceLost)
+        );
+    }
 
     #[test]
     fn delayed_compile_failure_and_repair_update_the_visible_notice() {
@@ -2648,11 +2760,15 @@ mod recovery_tests {
             .start_at(dir.path().join("callback.wav"))
             .unwrap();
         notes
-            .push(KeyEvent::On {
+            .push(note_now(KeyEvent::On {
                 note: 60,
                 velocity: 96,
-            })
+            }))
             .unwrap();
+        // D06: expression through the timeline's queue in the same warmed callbacks.
+        for e in [KeyEvent::Bend(12000), KeyEvent::Wheel(90), KeyEvent::Sustain(true)] {
+            notes.push(note_now(e)).unwrap();
+        }
         std::thread::sleep(std::time::Duration::from_millis(300));
         assert_eq!(host.gate.load(Ordering::Relaxed), u64::MAX);
         drop(host._stream.take());
