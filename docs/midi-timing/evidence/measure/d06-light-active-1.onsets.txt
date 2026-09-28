@@ -1,0 +1,4 @@
+d06-light-active-1 take: 48000 Hz, 352 onsets for 352 scripted note-ons
+  offset vs script: std 0.168 ms, peak-to-peak 1.964 ms, p99 |dev| 0.337 ms
+  inter-onset error: std 0.196 ms, max |err| 1.656 ms
+  onsets on one 64-frame phase: 6/352

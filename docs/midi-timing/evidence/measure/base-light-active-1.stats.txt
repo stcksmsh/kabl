@@ -1,0 +1,3 @@
+10058 callbacks × 256 frames at 48000 Hz · run: worst 121 of 5333 µs (at 53.2 s, wall 1790621837976), 0 over half, 0 late · arrival: worst 5611 µs, 0 late · 0 xruns · RT priority on (first second: worst 78 µs) · 1 live graph allocations · 8 undo entries · 0 MIDI notes held · 0 voices sounding
+run histogram (50 µs bins, after the first second): p50 ≤50 p99 ≤100 p99.9 ≤150 µs · 50:9203 100:647 150:20
+control: 1 graphs compiled (0 failed, 0 as fallback) · 788 runtime values (0 coalesced) · audio took 1 graphs (0 refused as stale), 788 values (0 unresolved) · 0 pending · 0 actions not delivered · 0 stale CC events discarded

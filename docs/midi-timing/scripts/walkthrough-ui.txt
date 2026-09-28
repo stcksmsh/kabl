@@ -1,0 +1,27 @@
+# D06 walkthrough (record-walkthrough.sh), 1440x900, A-light. Real app; the controller is the
+# virtual midi_player fed by play_events.py (scripted MIDI, not a physical controller). The
+# app records its own output (Perform > Record); the video's sound is that take.
+sleep 2
+click rec-start
+shot w01-split-open
+# Keyboard 1 (channel 1, keys) and 6 (channel 2, bass): open both advanced areas.
+click toggle:1
+sleep 1
+shot w02-keys-bend-channel
+wait 36
+click toggle:6
+sleep 1
+shot w03-bass-bend-channel
+# Bass Channel to ALL: channel-1 notes now layer on both keyboards (the performance plays a
+# channel-1 chord at 39 s); then undo back to channel 2.
+dragby knob:6.channel 0 120
+sleep 1
+shot w04-bass-all-channels
+wait 49
+key ctrl+z
+sleep 1
+shot w05-bass-back-to-ch2
+wait 52
+click rec-stop
+sleep 1
+shot w06-take
