@@ -6,7 +6,7 @@ Base: fetched `origin/master` at `e951b2535d817bc7c21872cd0e46e815d35747ac`, the
 
 | D05 criterion | Status and evidence |
 |---|---|
-| Initial unavailable output, edit/save, select another, play in same app | Source paths implemented; no GUI walkthrough in this container. Unverified end to end. |
+| Initial unavailable output, edit/save, select another, play in same app | Source paths and focused tests implemented. Hosted graphical evidence covers injected stall → Retry → Running in one installed app. The distinct initial-unavailable/edit/save/select-output sequence remains for owner review. |
 | Explicit lifecycle, bounded retries and stale session fencing | Focused `recovery_tests` and code in `ui/src/main.rs`; actual ALSA null backend tests pass. Physical loss and blocked close unverified. |
 | Fault hooks | Opt-in stall/error, reopen failure and delay in `main.rs`. Callback error and repeated close/open tested on ALSA null; synthetic hooks cannot establish physical ALSA device loss. |
 | Document latest revision / compile error / control reset | `poll_retry` synchronizes the current editor state before it opens the gate; pending Load/Toggle tests in `runtime_controls.rs`. GUI edit/undo during a retry unverified. |
@@ -15,12 +15,12 @@ Base: fetched `origin/master` at `e951b2535d817bc7c21872cd0e46e815d35747ac`, the
 | Core/CC latency during Save/Open/reconnect | 500 ms Save and Open workers: mapped CC reached the actual ALSA null callback in 6.2/6.3 ms during Save and 4.1/6.3 ms during Open across two controlled runs. Structural compile is on a coalescing worker; delayed compile test verifies prompt CC handling and newest graph installation. Backend retry/teardown remains off `Core`. Physical controller/device latency pending. |
 | Production callback bounds | Opt-in actual `cpal` closure test counts allocation and deallocation over warmed drain, note, render, report, gate, active recording tap and timing: zero of each on ALSA null. The first two startup callbacks are excluded. |
 | Mono efficiency | Profile below; no optimization applied without a measured eligible win. |
-| Workspace regression, clippy, package | Earlier tree: workspace 557/0/18. New code: UI 229/0/16 at its earlier checkpoint, workspace 560/0/20, strict Clippy clean, ALSA null backend tests pass. Hosted release package built; graphical recovery evidence is described below when verified. |
-| Visual/audio/owner evidence | No graphical session or hardware; 1440×900/1280×800 light/dark screenshots, audio and Kosta's checks pending. |
+| Workspace regression, clippy, package | Earlier tree: workspace 557/0/18. New code: workspace 560/0/20, strict Clippy clean, ALSA null backend 4/0. Hosted release package built and launched; graphical recovery evidence below. |
+| Visual/audio/owner evidence | Installed package screenshots at 1440×900 A-light show Stalled, Starting and Running. No physical device, listening, controller or 1280×800/dark owner walkthrough; Kosta's checks pending. |
 
 ## Verification environment and commands
 
-Ubuntu 24.04 cloud container, x86_64, Rust 1.98.1, 4 virtual CPUs. Native ALSA development files were extracted into scratch for compilation; `ALSA_CONFIG_PATH` points to a `pcm.!default { type null }` software PCM. There is no `/dev/snd`, Xvfb or usable graphical display, and no real controller. The installed toolchain is in a scratch path; the reproducible repository commands are:
+Ubuntu 24.04 cloud container, x86_64, Rust 1.98.1, 4 virtual CPUs. Native ALSA development files were extracted into scratch for compilation; `ALSA_CONFIG_PATH` points to a `pcm.!default { type null }` software PCM. The local container has no `/dev/snd` or usable X display; the hosted Actions runner supplies Xvfb. Neither has a real controller. The installed local toolchain was in a scratch path; the reproducible repository commands are:
 
 ```
 cargo test -p kabl-ui --bin kabl-ui --test runtime_controls --test record
@@ -32,7 +32,7 @@ cargo run --release -p kabl-engine --example mono_profile
 
 At product head `cada932`, focused main/record/runtime/inspection tests gave 57 passed, 0 failed, 2 ignored. At final product tree `47abdc4`, `cargo test --workspace` gave **557 passed, 0 failed, 18 ignored**, `cargo clippy --workspace --all-targets -- -D warnings` passed, and the opt-in ALSA null recovery tests gave **2 passed, 0 failed**. The tests use a real `cpal` stream on ALSA null PCM but do not drive the graphical app. Strict Clippy needed four small lint fixes after the first recheck; the independent reviewer rechecked the exact resulting tree.
 
-`cargo build --release -p kabl-ui --bin kabl-ui` passed on the same tree (5m 10s cold build). `OUT=/workspace/scratch/94df265b395c/d05-package bash packaging/linux/package.sh` assembled `kabl-0.1.0-linux-x86_64.tar.gz` outside the checkout: 94 archive entries, 4.9 MiB, `ldd` with no missing libraries. No package GUI launch/playback was possible here; this is build and archive evidence only.
+`cargo build --release -p kabl-ui --bin kabl-ui` passed on the earlier tree (5m 10s cold build). `OUT=/workspace/scratch/94df265b395c/d05-package bash packaging/linux/package.sh` assembled `kabl-0.1.0-linux-x86_64.tar.gz` outside the checkout: 94 archive entries, 4.9 MiB, `ldd` with no missing libraries. The later hosted run launches a newly built installed archive in Xvfb; this is software PCM playback, not listening evidence.
 
 ## Profile (no DSP optimization)
 
@@ -59,3 +59,13 @@ Browser Save, Save As, folder Save, Open, New and folder Open now run on one own
 An opt-in test uses the actual control pump, `Core` lock and `cpal` ALSA null callback while a 500 ms browser Save and Open worker runs. Two runs measured mapped CC arrival to callback acknowledgment at **6.2/6.3 ms during Save and 4.1/6.3 ms during Open**, below the test's 350 ms bound. This is controlled software-backend evidence, not a distribution or a physical-controller guarantee. An opt-in counting allocator surrounds every warmed production callback (after two startup callbacks); with a note and active recording tap it counted **zero allocations and zero deallocations**. The callback test includes queue drain, MIDI, render, reports, gate, tap and timing. The first two callbacks, backend error callback and backend internals are outside that count.
 
 On the revised code, `cargo test --workspace` gave **560 passed, 0 failed, 20 ignored**; `cargo clippy --workspace --all-targets -- -D warnings` passed. The four opt-in ALSA null tests cover repeated reopen/failure, injected callback stall, warmed production allocation and delayed Save/Open CC delivery. The local environment has no physical output/controller; hardware and hands-on acceptance stay with Kosta.
+
+## Installed package graphical recovery
+
+GitHub Actions [run 36397200289](https://github.com/stcksmsh/kabl/actions/runs/36397200289) built `packaging/linux/package.sh`, extracted the release archive and ran its `bin/kabl-ui` under Xvfb/Openbox with ALSA null at 48 kHz / 256 frames. The Composition patch was opened; `KABL_AUDIO_FAULT=stall` stopped the first stream after callback 30. The scripted real X click on **Retry audio** led to `session=2 retry completed in 0.65s`, and the app remained open in Running. The final stats file reports 19,952 callbacks, one replacement graph taken, zero stale graphs, zero pending commands and zero retired allocations; ALSA null is unpaced, so this count is a liveness check, not real-time performance evidence. The workflow asserts retry completion and more than 100 callbacks before it succeeds. Its [artifact](https://github.com/stcksmsh/kabl/actions/runs/36397200289/artifacts/10959310862) contains the drive log, application log, stats and full screenshots.
+
+| Injected stall | Retry in progress | Current graph running |
+|---|---|---|
+| ![Stalled after callback 30](img/recovery/01-stalled.png) | ![Starting session 2](img/recovery/02-restarting.png) | ![Running session 2](img/recovery/03-recovered.png) |
+
+These images establish the displayed state transition in the installed app on a software PCM. Physical output loss/reselection, actual sound, recording playback, controller feel and owner device checks remain on the pending checklist.
