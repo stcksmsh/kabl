@@ -1,0 +1,12 @@
+name = "Keys and Bass by Channel"
+category = "Study"
+tags = [
+    "channels",
+    "split",
+    "bass",
+    "wheel",
+    "bend",
+]
+description = "Two keyboards played apart: MIDI channel 1 plays polyphonic keys (the wheel opens their filter), channel 2 a legato bass with glide and a ±12 semitone bend."
+keys = true
+sequence = false
