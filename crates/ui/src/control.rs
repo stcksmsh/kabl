@@ -201,7 +201,7 @@ impl Delivery {
         self.generation += 1;
         self.rev += 1;
         if self.async_compile && self.tx.is_some() {
-            self.compile_error = None;
+            // Keep a failure visible until a replacement actually compiles.
             self.held_graph = None;
             self.held.clear();
             self.next_compile = Some(CompileRequest {

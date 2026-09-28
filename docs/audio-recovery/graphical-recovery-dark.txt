@@ -1,0 +1,9 @@
+# Installed release package, ALSA null PCM, Xvfb. Select the dark theme before retry.
+click theme:dark
+sleep 2
+shot 01-stalled
+click audio-retry
+shot 02-restarting
+sleep 3
+shot 03-recovered
+running

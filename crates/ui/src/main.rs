@@ -1185,10 +1185,26 @@ fn reset_pickup(ui: &mut UiState) {
     }
 }
 
+/// A scheduled generation and its eventual worker result are separate UI observations.
+fn compile_notice_changed(
+    seen_generation: &mut u64,
+    seen_error: &mut Option<String>,
+    delivery: &Delivery,
+) -> bool {
+    if *seen_generation == delivery.generation && *seen_error == delivery.compile_error {
+        return false;
+    }
+    *seen_generation = delivery.generation;
+    *seen_error = delivery.compile_error.clone();
+    true
+}
+
 struct App {
     core: Arc<Mutex<Core>>,
     /// `Delivery::generation` the inspector last heard about.
     seen_generation: u64,
+    /// Async compilation can finish without advancing generation again.
+    seen_compile_error: Option<String>,
     latency_at: std::time::Instant,
     audio: AudioHost,
     midi: Midi,
@@ -1482,6 +1498,7 @@ impl App {
             now,
         );
         self.seen_generation = core.delivery.generation;
+        self.seen_compile_error = core.delivery.compile_error.clone();
     }
 
     /// UI thread, every frame: logs what the audio side counted, rate-limited.
@@ -1896,8 +1913,11 @@ impl eframe::App for App {
         }
         // A compile happened (here or on the control thread): the inspector checks whether
         // its readings still describe the patch.
-        if delivery.generation != self.seen_generation {
-            self.seen_generation = delivery.generation;
+        if compile_notice_changed(
+            &mut self.seen_generation,
+            &mut self.seen_compile_error,
+            delivery,
+        ) {
             match &delivery.compile_error {
                 Some(e) => self.audio.status = format!("recompile failed: {e}"),
                 None if self.audio.status.starts_with("recompile failed") => {
@@ -2176,6 +2196,7 @@ fn main() -> eframe::Result<()> {
             Ok(Box::new(App {
                 core,
                 seen_generation: 1,
+                seen_compile_error: None,
                 latency_at: std::time::Instant::now(),
                 audio,
                 midi,
@@ -2214,6 +2235,48 @@ fn main() -> eframe::Result<()> {
 #[cfg(test)]
 mod recovery_tests {
     use super::*;
+
+    #[test]
+    fn delayed_compile_failure_and_repair_update_the_visible_notice() {
+        let patch = default_patch();
+        let collector = basedrop::Collector::new();
+        let (tx, _rx) = rtrb::RingBuffer::new(control::QUEUE);
+        let mut delivery = Delivery::new(
+            Some(tx), collector.handle(), Arc::new(Feedback::default()),
+            48000.0, 8, Some(&patch),
+        );
+        delivery.async_compile = true;
+        delivery.compile_delay_ms = 80;
+        let mut editor = PatchEditor::seed_from(&patch);
+        let mut seen_generation = delivery.generation;
+        let mut seen_error = None;
+        editor.add_module("no-such-module", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+        assert_eq!(delivery.sync(editor.state(), false, false), control::Outcome::Compiled);
+        assert!(compile_notice_changed(&mut seen_generation, &mut seen_error, &delivery));
+        assert!(seen_error.is_none(), "the worker has not finished yet");
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        while delivery.compile_error.is_none() {
+            delivery.flush();
+            assert!(std::time::Instant::now() < deadline, "compile failure timed out");
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        assert!(compile_notice_changed(&mut seen_generation, &mut seen_error, &delivery));
+        assert!(seen_error.as_deref().unwrap().contains("no-such-module"));
+        assert!(!compile_notice_changed(&mut seen_generation, &mut seen_error, &delivery));
+
+        editor.undo();
+        assert_eq!(delivery.sync(editor.state(), false, false), control::Outcome::Compiled);
+        assert!(delivery.compile_error.is_some(), "failure remains visible while compiling");
+        assert!(compile_notice_changed(&mut seen_generation, &mut seen_error, &delivery));
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        while delivery.compile_error.is_some() {
+            delivery.flush();
+            assert!(std::time::Instant::now() < deadline, "compile repair timed out");
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        assert!(compile_notice_changed(&mut seen_generation, &mut seen_error, &delivery));
+        assert!(seen_error.is_none());
+    }
 
     /// The real control pump and cpal callback keep processing a mapped CC while a 500 ms
     /// Save or Open worker runs. The environment has a software PCM, not a controller.
