@@ -38,6 +38,7 @@ jobs:
           export KABL_STATS_FILE="$PWD/target/d05-graphical/stats.txt"
           export KABL_ARGS='--no-rt --rate 48000 --frames 256'
           export WINIT_UNIX_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1
+          export KABL_CAPTURE_WINDOW=1
           xvfb-run -a -s '-screen 0 1600x1000x24' bash -c '
             openbox >/dev/null 2>&1 &
             exec timeout 45s python3 docs/rack-migration/drive.py \

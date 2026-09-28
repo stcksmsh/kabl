@@ -52,6 +52,7 @@ patch = sys.argv[4] if len(sys.argv) > 4 else "patches/reference"
 os.makedirs(out, exist_ok=True)
 # Display scale (WINIT_X11_SCALE_FACTOR): targets are in egui points, xdotool works in pixels.
 scale = float(os.environ.get("WINIT_X11_SCALE_FACTOR", "1"))
+capture_window = os.environ.get("KABL_CAPTURE_WINDOW") == "1"
 hits_file = os.path.join(out, "hits.txt")
 env = dict(os.environ, KABL_HITS_FILE=hits_file)
 player = None
@@ -96,7 +97,14 @@ def centre(key):
         h = hits()
         if key in h:
             x0, y0, x1, y1 = h[key]
-            return round((x0 + x1) / 2 * scale), round((y0 + y1) / 2 * scale)
+            cx, cy = round((x0 + x1) / 2 * scale), round((y0 + y1) / 2 * scale)
+            if capture_window:
+                geometry = subprocess.run(["xdotool", "getwindowgeometry", "--shell", wid],
+                                          capture_output=True, text=True, check=True).stdout
+                origin = dict(line.split("=") for line in geometry.splitlines() if "=" in line)
+                cx += int(origin["X"])
+                cy += int(origin["Y"])
+            return cx, cy
         time.sleep(0.1)
     raise SystemExit(f"no target {key}")
 
@@ -198,8 +206,12 @@ try:
             glide(int(a[0]), int(a[1]))
         elif cmd == "shot":
             time.sleep(0.4)
-            subprocess.run(["import", "-window", "root", "-crop", f"{w}x{h}+0+0",
-                            os.path.join(out, a[0] + ".png")], check=True)
+            if capture_window:
+                subprocess.run(["import", "-window", wid,
+                                os.path.join(out, a[0] + ".png")], check=True)
+            else:
+                subprocess.run(["import", "-window", "root", "-crop", f"{w}x{h}+0+0",
+                                os.path.join(out, a[0] + ".png")], check=True)
         elif cmd == "fill":
             glide(*centre(a[0]))
             x("click", 1)
