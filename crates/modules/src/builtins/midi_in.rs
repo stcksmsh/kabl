@@ -5,7 +5,10 @@
 //! LEGATO), note priority, glide (OFF, ALWAYS, LEGATO) and glide time. The keyboard reads them
 //! (`settings`); this module only carries out a glide (constant time, a straight line in
 //! semitones, per sample) and an envelope restart (the gate held low for the first sample of
-//! the next block). Gate and velocity are held for the block; notes land at block starts.
+//! the next block). D06: the keyboard schedules each change at its sample offset inside the
+//! block (`schedule`), so a note, release, bend or wheel move lands on its own sample; the
+//! params stay block rate. Bend range and the channel filter are params too, and the wheel is
+//! an output (docs/midi-timing/design.md, section 7).
 
 use crate::info::{
     Category, ModuleInfo, ParamInfo, PortDirection, PortInfo, PortType, QualitySupport, Rate, Taper,
@@ -26,6 +29,12 @@ const PORTS: &[PortInfo] = &[
     },
     PortInfo {
         name: "velocity",
+        port_type: PortType::UnipolarCv,
+        direction: PortDirection::Output,
+    },
+    // The modulation wheel (CC 1), 0..1, the same on every voice of this keyboard.
+    PortInfo {
+        name: "wheel",
         port_type: PortType::UnipolarCv,
         direction: PortDirection::Output,
     },
@@ -71,6 +80,26 @@ const PARAMS: &[ParamInfo] = &[
         taper: Taper::Exponential,
         smoothing_ms: 0.0,
     },
+    // Pitch bend range: a full bend moves the pitch this many semitones either way.
+    ParamInfo {
+        name: "bend",
+        min: 0.0,
+        max: 24.0,
+        default: 2.0,
+        unit: "st",
+        taper: Taper::Stepped,
+        smoothing_ms: 0.0,
+    },
+    // Which MIDI channel plays this keyboard: 0 = ALL, else 1..16.
+    ParamInfo {
+        name: "channel",
+        min: 0.0,
+        max: 16.0,
+        default: 0.0,
+        unit: "",
+        taper: Taper::Stepped,
+        smoothing_ms: 0.0,
+    },
 ];
 
 pub static MIDI_IN_INFO: ModuleInfo = ModuleInfo {
@@ -91,12 +120,17 @@ pub static MIDI_IN_INFO: ModuleInfo = ModuleInfo {
     },
     skin: None,
     width_units: 6,
-    advanced: &["priority", "glide_ms"],
+    advanced: &["priority", "glide_ms", "channel"],
 };
 
 const GATE: usize = 0;
 const PITCH: usize = 1;
 const VELOCITY: usize = 2;
+const WHEEL: usize = 3;
+const BEND_PARAM: usize = 4;
+const CHANNEL_PARAM: usize = 5;
+/// Most changes one voice takes in one block (docs/midi-timing/design.md, section 3).
+pub const MAX_CHANGES: usize = 64;
 
 /// Keyboard settings of one `midi.in` (its params; `crates/engine/src/keyboard.rs` reads
 /// them, docs/sound-palette-batch/keyboard.md has the rules).
@@ -108,6 +142,8 @@ pub struct KeySettings {
     pub priority: u8,
     /// 0 OFF, 1 ALWAYS, 2 LEGATO.
     pub glide: u8,
+    /// 0 ALL, else the one MIDI channel (1..16) this keyboard plays from.
+    pub channel: u8,
 }
 
 impl KeySettings {
@@ -118,8 +154,29 @@ impl KeySettings {
             mode: at(0),
             priority: at(1),
             glide: at(2),
+            channel: p
+                .get(CHANNEL_PARAM)
+                .map_or(0, |v| v.round().clamp(0.0, 16.0) as u8),
         }
     }
+}
+
+/// A keyboard change for one voice, at a sample offset inside the next block.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Change {
+    /// `MidiIn::play`'s arguments.
+    Play {
+        pitch: f32,
+        velocity: f32,
+        glide: bool,
+        retrigger: bool,
+    },
+    Release,
+    /// Bend -1..1 (times the bend range) and wheel 0..1.
+    Expression {
+        bend: f32,
+        wheel: f32,
+    },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -141,6 +198,12 @@ struct Core {
     high_out: bool,
     settings: KeySettings,
     glide_ms: f32,
+    /// Bend, -1..1, and wheel, 0..1, from the keyboard.
+    bend: f32,
+    wheel: f32,
+    /// Changes for the next block, sorted by offset (equal offsets in arrival order).
+    changes: [(u8, Change); MAX_CHANGES],
+    n_changes: u8,
 }
 
 pub struct MidiIn {
@@ -162,6 +225,10 @@ impl MidiIn {
                 high_out: false,
                 settings: KeySettings::default(),
                 glide_ms: PARAMS[3].default,
+                bend: 0.0,
+                wheel: 0.0,
+                changes: [(0, Change::Release); MAX_CHANGES],
+                n_changes: 0,
             },
             sample_rate: 48000.0,
         }
@@ -191,6 +258,33 @@ impl MidiIn {
             (c.at, c.from) = (pitch, pitch);
         }
         c.played = true;
+    }
+
+    /// Queues `change` at sample `offset` (clamped into the block) of the next `process`.
+    /// Sorted insert, stable for equal offsets. Full: a release replaces the last change (a
+    /// gate never sticks high), anything else is dropped. No allocation.
+    pub fn schedule(&mut self, offset: usize, change: Change) {
+        let c = &mut self.c;
+        let offset = offset.min(u8::MAX as usize) as u8;
+        let n = c.n_changes as usize;
+        if n == MAX_CHANGES {
+            if change == Change::Release {
+                c.changes[n - 1].1 = Change::Release;
+            }
+            return;
+        }
+        let at = c.changes[..n]
+            .iter()
+            .rposition(|&(o, _)| o <= offset)
+            .map_or(0, |i| i + 1);
+        c.changes.copy_within(at..n, at + 1);
+        c.changes[at] = (offset, change);
+        c.n_changes += 1;
+    }
+
+    /// Bend (-1..1) and wheel (0..1) now.
+    pub fn expression(&self) -> (f32, f32) {
+        (self.c.bend, self.c.wheel)
     }
 
     /// Gate high (a note is sounding).
@@ -237,33 +331,81 @@ impl Module for MidiIn {
     #[inline]
     fn process(&mut self, io: &mut ProcessIo) {
         let n = io.block_len();
-        let p = [0, 1, 2, 3].map(|i| io.param(i).at(0));
+        // Hand-wired callers from before D06 pass four params and three outputs.
+        let p = [0, 1, 2, 3, BEND_PARAM, CHANNEL_PARAM].map(|i| {
+            if i < io.param_count() {
+                io.param(i).at(0)
+            } else {
+                PARAMS[i].default
+            }
+        });
+        let wheel_out = io.output_count() > WHEEL;
+        let sample_rate = self.sample_rate;
         let c = &mut self.c;
         c.settings = KeySettings::from_params(&p);
         c.glide_ms = p[3].clamp(5.0, 3000.0);
-        let (gate, velocity) = (c.gate, c.velocity);
-        c.high_out = gate > 0.5;
-        io.output(GATE)[..n].fill(gate);
-        if std::mem::take(&mut c.dip) && n > 0 {
-            io.output(GATE)[0] = 0.0;
-        }
-        io.output(VELOCITY)[..n].fill(velocity);
+        let range = p[4].clamp(0.0, 24.0);
         // Constant-time glide: the whole interval takes glide_ms, a straight line in semitones.
-        let step = (c.pitch - c.from).abs() / (c.glide_ms * 0.001 * self.sample_rate);
-        let out = &mut io.output(PITCH)[..n];
-        if c.at == c.pitch {
-            out.fill(c.at);
-        } else {
-            for o in out.iter_mut() {
+        let step_of = |c: &Core| (c.pitch - c.from).abs() / (c.glide_ms * 0.001 * sample_rate);
+        let mut step = step_of(c);
+        let changes = c.changes;
+        let count = std::mem::take(&mut c.n_changes) as usize;
+        let mut next = 0;
+        // The gate of the sample before (the last block's last sample at first): a note that
+        // replaces a sounding one at the same sample dips the gate for that sample.
+        let mut high = c.high_out;
+        for i in 0..n {
+            while next < count && changes[next].0 as usize <= i {
+                match changes[next].1 {
+                    Change::Play {
+                        pitch,
+                        velocity,
+                        glide,
+                        retrigger,
+                    } => {
+                        c.dip |= retrigger && (c.gate > 0.5 || high);
+                        c.gate = 1.0;
+                        c.velocity = velocity.clamp(0.0, 1.0);
+                        c.pitch = pitch;
+                        if glide && c.played {
+                            c.from = c.at;
+                        } else {
+                            (c.at, c.from) = (pitch, pitch);
+                        }
+                        c.played = true;
+                        step = step_of(c);
+                    }
+                    Change::Release => c.gate = 0.0,
+                    Change::Expression { bend, wheel } => {
+                        c.bend = bend.clamp(-1.0, 1.0);
+                        c.wheel = wheel.clamp(0.0, 1.0);
+                    }
+                }
+                next += 1;
+            }
+            let gate = if std::mem::take(&mut c.dip) {
+                0.0
+            } else {
+                c.gate
+            };
+            high = c.gate > 0.5;
+            if c.at != c.pitch {
                 let d = c.pitch - c.at;
                 c.at = if d.abs() <= step {
                     c.pitch
                 } else {
                     c.at + step.copysign(d)
                 };
-                *o = c.at;
+            }
+            let bend = c.bend * range;
+            io.output(GATE)[i] = gate;
+            io.output(PITCH)[i] = if bend == 0.0 { c.at } else { c.at + bend };
+            io.output(VELOCITY)[i] = c.velocity;
+            if wheel_out {
+                io.output(WHEEL)[i] = c.wheel;
             }
         }
+        c.high_out = high;
     }
 
     fn reset(&mut self) {

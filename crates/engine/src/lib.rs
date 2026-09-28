@@ -13,4 +13,5 @@ pub mod probe;
 pub mod runtime;
 pub mod simd_voices;
 pub mod swap;
+pub mod timeline;
 pub mod voice_allocator;
