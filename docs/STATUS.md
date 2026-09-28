@@ -5,9 +5,19 @@
 If you're a human or an agent picking this up cold, this is where you find out what's real,
 what's a stand-in, and what's next — before reading any code.
 
-Last updated: 2026-09-26. PR #6 is merged by Kosta at
+Last updated: 2026-09-28 (D06 entry below). Previously 2026-09-26: PR #6 is merged by Kosta at
 5e64101486e942649e1bab6fb9f4f79d7fecbb75; product code matches final tested/reviewed
 58a5934. D03-R2 + D04 engineering review is complete; hands-on acceptance remains pending.
+
+**D06 expressive MIDI and event timing (authorized 2026-09-28): engineering submitted on
+draft PR #9 (`codex/d06-expressive-midi`), independent review done, owner review pending.**
+Pitch bend with a per-keyboard range, a modulation-wheel output, MIDI channel routing between
+keyboards, (source, channel, key) note identity, and a production timing adapter that makes
+rendering bit-identical for any host buffer partition at a fixed 64-frame latency; the app
+now plays live MIDI at a constant one-period delay. Evidence and limits:
+[`midi-timing/REPORT.md`](midi-timing/REPORT.md). Laptop runs used virtual MIDI only; the
+controller checks are in [`midi-timing/CHECKLIST.md`](midi-timing/CHECKLIST.md). D05 and
+earlier owner reviews remain pending; D00 is incomplete.
 
 **D05 authorized: audio recovery and measured efficiency.**
 Brief: [D05](product-research/briefs/D05.md); launch:

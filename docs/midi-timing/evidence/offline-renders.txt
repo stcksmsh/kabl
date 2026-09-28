@@ -1,0 +1,13 @@
+lead-1.wav: 34.50 s at 48000 Hz, frames 1, policy grid, hash e461712dc8467f41, peak -4.8 dBFS, active 32.90 s, 824 events, adapter Stats { queued: 824, clamped: 0, reordered: 0, dropped: 0, forced: 0 }
+lead-64.wav: 34.50 s at 48000 Hz, frames 64, policy grid, hash e461712dc8467f41, peak -4.8 dBFS, active 32.90 s, 824 events, adapter Stats { queued: 824, clamped: 0, reordered: 0, dropped: 0, forced: 0 }
+lead-256.wav: 34.50 s at 48000 Hz, frames 256, policy grid, hash e461712dc8467f41, peak -4.8 dBFS, active 32.90 s, 824 events, adapter Stats { queued: 824, clamped: 0, reordered: 0, dropped: 0, forced: 0 }
+lead-irregular.wav: 34.50 s at 48000 Hz, frames irregular, policy grid, hash e461712dc8467f41, peak -4.8 dBFS, active 32.90 s, 824 events, adapter Stats { queued: 824, clamped: 0, reordered: 0, dropped: 0, forced: 0 }
+keys-1.wav: 31.00 s at 48000 Hz, frames 1, policy grid, hash e4921f40415a127d, peak -1.4 dBFS, active 31.00 s, 383 events, adapter Stats { queued: 383, clamped: 0, reordered: 0, dropped: 0, forced: 0 }
+keys-64.wav: 31.00 s at 48000 Hz, frames 64, policy grid, hash e4921f40415a127d, peak -1.4 dBFS, active 31.00 s, 383 events, adapter Stats { queued: 383, clamped: 0, reordered: 0, dropped: 0, forced: 0 }
+keys-256.wav: 31.00 s at 48000 Hz, frames 256, policy grid, hash e4921f40415a127d, peak -1.4 dBFS, active 31.00 s, 383 events, adapter Stats { queued: 383, clamped: 0, reordered: 0, dropped: 0, forced: 0 }
+keys-irregular.wav: 31.00 s at 48000 Hz, frames irregular, policy grid, hash e4921f40415a127d, peak -1.4 dBFS, active 31.00 s, 383 events, adapter Stats { queued: 383, clamped: 0, reordered: 0, dropped: 0, forced: 0 }
+timing-1.wav: 22.68 s at 48000 Hz, frames 1, policy grid, hash b587d49ffaa9de84, peak -1.4 dBFS, active 22.70 s, 1331 events, adapter Stats { queued: 1331, clamped: 0, reordered: 0, dropped: 0, forced: 0 }
+timing-64.wav: 22.68 s at 48000 Hz, frames 64, policy grid, hash b587d49ffaa9de84, peak -1.4 dBFS, active 22.70 s, 1331 events, adapter Stats { queued: 1331, clamped: 0, reordered: 0, dropped: 0, forced: 0 }
+timing-256.wav: 22.68 s at 48000 Hz, frames 256, policy grid, hash b587d49ffaa9de84, peak -1.4 dBFS, active 22.70 s, 1331 events, adapter Stats { queued: 1331, clamped: 0, reordered: 0, dropped: 0, forced: 0 }
+timing-irregular.wav: 22.68 s at 48000 Hz, frames irregular, policy grid, hash b587d49ffaa9de84, peak -1.4 dBFS, active 22.70 s, 1331 events, adapter Stats { queued: 1331, clamped: 0, reordered: 0, dropped: 0, forced: 0 }
+timing-pre.wav: 22.68 s at 48000 Hz, frames 256, policy pre-d06, hash efc4dddb6c67cd87, peak -1.4 dBFS, active 22.70 s, 1331 events, adapter Stats { queued: 1331, clamped: 0, reordered: 0, dropped: 0, forced: 0 }

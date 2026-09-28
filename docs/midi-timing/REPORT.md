@@ -111,15 +111,16 @@ delay is period + 64 frames + device output latency, which the app does not meas
 
 ## Listening files and walkthrough
 
-Offline renders (production `Timeline`, `render_midi.rs`, 48 kHz): hashes identical for
-host buffers of 1, 64, 256 frames and irregular 1–700:
+Offline renders (production `Timeline`, `render_midi.rs`, 48 kHz; `evidence/offline-renders.txt`): hashes identical for
+host buffers of 1, 64, 256 frames and irregular 1–700, before and after the review fixes. Float WAVs are in the
+bundle; `audio/*.m4a` are AAC copies for the repository:
 
 | File | Patch / performance | Length | Active (>-50 dBFS, 50 ms windows) | Peak | Hash |
 |---|---|---|---|---|---|
 | lead.wav | expressive/lead, lead.events | 34.5 s | 32.9 s | -4.8 dBFS | e461712dc8467f41 |
 | keys.wav | expressive/split, keys.events | 31.0 s | 31.0 s | -1.4 dBFS | e4921f40415a127d |
-| timing.wav | expressive/split, timing.events | ≈23 s | (see bundle) | | |
-| timing-pre-d06-emulation.wav | same, events quantized to 256-frame callback starts | | | | |
+| timing.wav | expressive/split, timing.events | 22.7 s | 22.7 s | -1.4 dBFS | b587d49ffaa9de84 |
+| timing-pre-d06-emulation.wav | same, events moved to the next 256-frame callback start (offline emulation of the old app, for comparison only) | 22.7 s | 22.7 s | -1.4 dBFS | efc4dddb6c67cd87 |
 
 Intentional silence: each file starts 0.5 s before the first note; the last 3–4 s are release,
 echo and reverb tails. `lead` has vibrato (wheel) at 1.5–5 s and 17–21 s, bends at 10.8–15 s,
