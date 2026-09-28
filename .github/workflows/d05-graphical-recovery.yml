@@ -1,5 +1,7 @@
 name: D05 graphical recovery evidence
 on:
+  pull_request:
+    branches: [master]
   push:
     branches: [codex/d05-audio-recovery]
   workflow_dispatch:

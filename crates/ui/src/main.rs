@@ -2045,6 +2045,8 @@ fn main() -> eframe::Result<()> {
     };
     ui_state.library = Some(library);
     ui_state.browser.async_io = true;
+    ui_state.browser.io_delay_ms = std::env::var("KABL_BROWSER_IO_DELAY_MS")
+        .ok().and_then(|s| s.parse().ok()).unwrap_or(0);
     if args.iter().any(|a| a == "--browser") {
         ui_state.browser_open = true;
     }

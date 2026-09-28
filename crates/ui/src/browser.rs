@@ -192,6 +192,8 @@ pub struct Browser {
     /// The standalone app runs file operations on one owned worker. Library-only tests use
     /// the synchronous path so their observable calls remain deterministic.
     pub async_io: bool,
+    /// Deterministic worker delay for recovery tests.
+    pub io_delay_ms: u64,
     io: Option<IoTask>,
 }
 
@@ -248,6 +250,7 @@ impl Default for Browser {
             folder: "my-patch".into(),
             focused: true,
             async_io: false,
+            io_delay_ms: 0,
             io: None,
         }
     }
@@ -268,14 +271,10 @@ fn start_io(editor: &PatchEditor, ui: &mut UiState, request: IoRequest) {
     let library = ui.library.clone();
     let doc = ui.doc.clone();
     let work = request.clone();
+    let delay = ui.browser.io_delay_ms.min(5000);
     let handle = std::thread::Builder::new()
         .name("kabl-document-io".into())
         .spawn(move || {
-            let delay = std::env::var("KABL_BROWSER_IO_DELAY_MS")
-                .ok()
-                .and_then(|s| s.parse::<u64>().ok())
-                .unwrap_or(0)
-                .min(5000);
             if delay > 0 {
                 std::thread::sleep(std::time::Duration::from_millis(delay));
             }
