@@ -2340,7 +2340,7 @@ mod recovery_tests {
     #[ignore = "set ALSA_CONFIG_PATH to an ALSA null PCM and run explicitly"]
     fn production_callback_warmed_path_has_no_alloc_or_dealloc() {
         let patch = default_patch();
-        let (_, rx) = rtrb::RingBuffer::new(1024);
+        let (mut notes, rx) = rtrb::RingBuffer::new(1024);
         let request = AudioRequest {
             rate: Some(48000),
             frames: Some(256),
@@ -2361,12 +2361,25 @@ mod recovery_tests {
             control::Outcome::Compiled
         );
         host.gate.store(delivery.rev(), Ordering::Relaxed);
+        let dir = tempfile::tempdir().unwrap();
+        host.recorder
+            .as_mut()
+            .unwrap()
+            .start_at(dir.path().join("callback.wav"))
+            .unwrap();
+        notes
+            .push(KeyEvent::On {
+                note: 60,
+                velocity: 96,
+            })
+            .unwrap();
         std::thread::sleep(std::time::Duration::from_millis(300));
         assert_eq!(host.gate.load(Ordering::Relaxed), u64::MAX);
         drop(host._stream.take());
         assert!(host.timing.as_ref().unwrap().count.load(Ordering::Relaxed) > 2);
         assert_eq!(callback_allocations::ALLOCS.load(Ordering::Relaxed), 0);
         assert_eq!(callback_allocations::DEALLOCS.load(Ordering::Relaxed), 0);
+        assert!(host.recorder.as_mut().unwrap().stop().is_some());
         drop(delivery);
         host.collector.collect();
     }

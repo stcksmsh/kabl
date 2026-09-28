@@ -278,9 +278,11 @@ fn start_io(editor: &PatchEditor, ui: &mut UiState, request: IoRequest) {
             if delay > 0 {
                 std::thread::sleep(std::time::Duration::from_millis(delay));
             }
-            let mut scratch = UiState::default();
-            scratch.library = library;
-            scratch.doc = doc;
+            let mut scratch = UiState {
+                library,
+                doc,
+                ..UiState::default()
+            };
             let mut scratch_editor = PatchEditor::from_log(log);
             let mut error = None;
             match work {
