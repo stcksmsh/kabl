@@ -11,6 +11,7 @@ license = "MIT OR Apache-2.0"
 crate-type = ["cdylib"]
 
 [dependencies]
+clap-sys = "=0.5.0"
 kabl-core = { path = "../../crates/core" }
 kabl-engine = { path = "../../crates/engine" }
 kabl-ui = { path = "../../crates/ui" }

@@ -47,9 +47,11 @@ impl Control {
             }
         }
     }
-    fn submit_editor_snapshot(&mut self, snapshot: PatchState) {
+    fn submit_editor_snapshot(&mut self, snapshot: PatchState) -> bool {
         if snapshot != self.patch {
-            self.queue(snapshot, false);
+            self.queue(snapshot, false)
+        } else {
+            true
         }
     }
     fn queue(&mut self, patch: PatchState, fresh: bool) -> bool {
@@ -121,12 +123,6 @@ impl NiceEguiApp for RackApp {
         c.sync_cutoff_from_host(old);
         ui.add(egui::Slider::new(&mut cutoff, 50.0..=20000.0).text("Filter cutoff Hz"));
         if cutoff != old {
-            if let Some(gui) = &self.gui {
-                let setter = gui.param_setter();
-                setter.begin_set_parameter(&self.params.cutoff);
-                setter.set_parameter(&self.params.cutoff, cutoff);
-                setter.end_set_parameter(&self.params.cutoff);
-            }
             c.editor.set_param(3, "cutoff_hz", cutoff);
         }
         if let Some(message) = &c.error {
@@ -136,26 +132,23 @@ impl NiceEguiApp for RackApp {
         kabl_ui::show(editor, view, ui);
         let dirty = c.editor.take_dirty();
         let snapshot = c.editor.state().clone();
-        if let Some(&rack_cutoff) = snapshot
+        let accepted_cutoff = snapshot
             .modules
             .get(&3)
             .and_then(|m| m.params.get("cutoff_hz"))
-        {
-            let stored = c
-                .patch
-                .modules
-                .get(&3)
-                .and_then(|m| m.params.get("cutoff_hz"));
-            if dirty && stored.is_none_or(|v| v.to_bits() != rack_cutoff.to_bits()) {
-                if let Some(gui) = &self.gui {
-                    let setter = gui.param_setter();
-                    setter.begin_set_parameter(&self.params.cutoff);
-                    setter.set_parameter(&self.params.cutoff, rack_cutoff);
-                    setter.end_set_parameter(&self.params.cutoff);
-                }
+            .copied()
+            .filter(|rack_cutoff| {
+                let stored = c.patch.modules.get(&3).and_then(|m| m.params.get("cutoff_hz"));
+                dirty && stored.is_none_or(|v| v.to_bits() != rack_cutoff.to_bits())
+            });
+        if c.submit_editor_snapshot(snapshot) {
+            if let (Some(rack_cutoff), Some(gui)) = (accepted_cutoff, &self.gui) {
+                let setter = gui.param_setter();
+                setter.begin_set_parameter(&self.params.cutoff);
+                setter.set_parameter(&self.params.cutoff, rack_cutoff);
+                setter.end_set_parameter(&self.params.cutoff);
             }
         }
-        c.submit_editor_snapshot(snapshot);
         c.collector.collect();
     }
 }
@@ -382,7 +375,7 @@ impl ClapPlugin for Proof {
     const CLAP_SUPPORT_URL: Option<&'static str> = None;
     const CLAP_FEATURES: &'static [ClapFeature] = &[ClapFeature::Instrument, ClapFeature::Stereo];
 }
-nice_plug::nice_export_clap!(Proof);
+mod state_bridge;
 
 #[cfg(test)]
 mod tests {
