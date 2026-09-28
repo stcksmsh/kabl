@@ -1,0 +1,1 @@
+Historical initial attempt: AF_UNIX was denied and an Xvfb instance listening only on local/unix sockets failed to start. Follow-up used Xvfb TCP in the same sandbox network namespace and launched REAPER 7.80; see host-run.txt. Live JACK audio device and embedded editor observation remain blocked in that run.

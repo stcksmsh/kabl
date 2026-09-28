@@ -1,0 +1,7 @@
+Cannot create socket err = Operation not permitted
+Cannot connect to server request channel
+jack server is not running or cannot be started
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+error creating client
+LC_NUMERIC / LANG is set to 'C.UTF-8', overriding LC_NUMERIC environment to POSIX

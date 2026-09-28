@@ -1,0 +1,14 @@
+2026-09-28, Ubuntu 24.04.3, official REAPER Linux x86_64 7.80, Xvfb 21.1.12-1ubuntu1.6 over loopback TCP at DISPLAY=127.0.0.1:88. Fresh -cfgfile scratch profile, CLAP_PATH scratch symlink to built plugin, no owner's REAPER files.
+Xvfb used -nolisten unix -nolisten local -listen tcp -ac because this sandbox denies AF_UNIX; Xvfb and REAPER ran in one isolated network namespace. REAPER GUI process was started and its ReaScript executed. JACK could not open a device (see reaper-render.log), so no live playback/listening is claimed. GUI launch sessions were ended by timeout after the scripts wrote their logs; the offline render exited 0.
+
+Reproduction from a Linux GUI session after building:
+  mkdir -p /tmp/kabl-proof/{plugins,profile}
+  ln -s "$PWD/prototypes/reaper-clap/target/debug/libkabl_reaper_proof.so" /tmp/kabl-proof/plugins/KablProof.clap
+  export CLAP_PATH=/tmp/kabl-proof/plugins KABL_PROOF_DIR=/tmp/kabl-proof
+  KABL_PROOF_MODE=create reaper -newinst -nosplash -cfgfile /tmp/kabl-proof/profile/reaper.ini -new "$PWD/docs/reaper-clap-prototype/scripts/host-smoke.lua"
+  reaper -newinst -nosplash -cfgfile /tmp/kabl-proof/profile/reaper.ini -renderproject /tmp/kabl-proof/proof.rpp
+  KABL_PROOF_MODE=reopen reaper -newinst -nosplash -cfgfile /tmp/kabl-proof/profile/reaper.ini /tmp/kabl-proof/proof.rpp "$PWD/docs/reaper-clap-prototype/scripts/host-smoke.lua"
+
+Observed: both CLAP inserts returned FX index 0; saved two MIDI tracks and reopened project with one named CLAP FX per track. The offline 2.000 s PCM 24-bit/48 kHz render has two nonzero channels, peak -12.777534 dBFS and RMS -29.473732 dBFS per channel (ffprobe/ffmpeg astats). Project SHA-256 eb4d157048744dc73a5d8d21b9ef74fb510fab9862e5af69ff96bc360eee6876; render SHA-256 8c6447c1e5473562b79ea8edecd82eba3a37c2477f4ac1b5a2a1b053d03bd496. Evidence project retains an absolute scratch render path; use the script to make a new project in a local destination.
+
+Unresolved: scripted normalized cutoff set returned true but read back 0.14786967635155 after one second, matching both instances' default, in this no-device session. No independent parameter edit/state separation is claimed. The rack editor was requested in the earlier GUI probe but no successful embedded editor screenshot or repeated close/reopen was obtained; a REAPER 'Error opening devices' dialog and lack of a working window manager obstructed it. Source patch directory removal and owner listening remain untested.

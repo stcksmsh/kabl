@@ -1,0 +1,5 @@
+Rust 1.98.1 (48a229cea 2026-09-01), Ubuntu 24.04.3. Prototype lockfile, no production crate changes.
+Command: cd prototypes/reaper-clap && cargo test --locked --lib && cargo build --locked --lib
+Five unit tests passed, zero failed. Dev cdylib built successfully.
+Plugin SHA-256: 1ebd5e1fa8f0294aabb44113a7b8a430fd6d737ebf5cda15a147db9c6ce1d921
+The build used scratch-local ALSA/D-Bus development headers; no repo manifests outside the prototype were changed.

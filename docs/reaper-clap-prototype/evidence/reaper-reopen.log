@@ -1,0 +1,8 @@
+REAPER 7.80/linux-x86_64
+tracks 2
+track 0 FX 1 name CLAPi: kabl REAPER proof (stcksmsh) cutoff 0.14786967635155 range 0.0..1.0
+track 1 FX 1 name CLAPi: kabl REAPER proof (stcksmsh) cutoff 0.14786967635155 range 0.0..1.0
+set track 0 cutoff to normalized 0.25: true
+after 1s track 0 cutoff normalized 0.14786967635155
+after 1s track 1 cutoff normalized 0.14786967635155
+saved proof-recalled.rpp
