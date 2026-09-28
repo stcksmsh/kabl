@@ -44,6 +44,17 @@ jobs:
             exec timeout 45s python3 docs/rack-migration/drive.py \
               docs/audio-recovery/graphical-recovery.txt 1440x900 target/d05-graphical/shots patches/composition
           '
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          root = Path('target/d05-graphical')
+          log = (root / 'user/logs/kabl.log').read_text()
+          stats = (root / 'stats.txt').read_text()
+          callbacks = int(re.search(r'(\d+) callbacks', stats).group(1))
+          assert 'retry completed' in log, 'Retry did not reach the backend'
+          assert callbacks > 100, f'new stream did not keep calling back: {callbacks}'
+          print(f'Graphical retry verified: {callbacks} callbacks on the new stream')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:

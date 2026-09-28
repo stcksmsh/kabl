@@ -99,11 +99,12 @@ def centre(key):
             x0, y0, x1, y1 = h[key]
             cx, cy = round((x0 + x1) / 2 * scale), round((y0 + y1) / 2 * scale)
             if capture_window:
-                geometry = subprocess.run(["xdotool", "getwindowgeometry", "--shell", wid],
+                # X translates from the app's client coordinates through the WM frame.
+                x("mousemove", "--window", wid, cx, cy)
+                location = subprocess.run(["xdotool", "getmouselocation", "--shell"],
                                           capture_output=True, text=True, check=True).stdout
-                origin = dict(line.split("=") for line in geometry.splitlines() if "=" in line)
-                cx += int(origin["X"])
-                cy += int(origin["Y"])
+                absolute = dict(line.split("=") for line in location.splitlines() if "=" in line)
+                cx, cy = int(absolute["X"]), int(absolute["Y"])
             return cx, cy
         time.sleep(0.1)
     raise SystemExit(f"no target {key}")
