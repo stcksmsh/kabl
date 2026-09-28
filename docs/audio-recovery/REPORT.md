@@ -16,7 +16,7 @@ Base: fetched `origin/master` at `e951b2535d817bc7c21872cd0e46e815d35747ac`, the
 | Production callback bounds | Opt-in actual `cpal` closure test counts allocation and deallocation over warmed drain, note, render, report, gate, active recording tap and timing: zero of each on ALSA null. The first two startup callbacks are excluded. |
 | Mono efficiency | Profile below; no optimization applied without a measured eligible win. |
 | Workspace regression, clippy, package | Earlier tree: workspace 557/0/18. New code: workspace 560/0/20, strict Clippy clean, ALSA null backend 4/0. Hosted release package built and launched; graphical recovery evidence below. |
-| Visual/audio/owner evidence | Installed package screenshots at 1440×900 A-light show Stalled, Starting and Running. No physical device, listening, controller or 1280×800/dark owner walkthrough; Kosta's checks pending. |
+| Visual/audio/owner evidence | Installed package screenshots show Stalled, Starting and Running at 1440×900 and 1280×800 in both themes. No physical device, listening or controller walkthrough; Kosta's checks pending. |
 
 ## Verification environment and commands
 
@@ -69,3 +69,14 @@ GitHub Actions [run 36397200289](https://github.com/stcksmsh/kabl/actions/runs/3
 | ![Stalled after callback 30](img/recovery/01-stalled.png) | ![Starting session 2](img/recovery/02-restarting.png) | ![Running session 2](img/recovery/03-recovered.png) |
 
 These images establish the displayed state transition in the installed app on a software PCM. Physical output loss/reselection, actual sound, recording playback, controller feel and owner device checks remain on the pending checklist.
+
+## Final async failure and four-case visual recheck
+
+At product tree `e87b42664e77732988ba42ac677606932ed96fe5` (remote commit `87a66c47e8ef0c8b92aee1a7baacdc358cc87128`), a delayed invalid structural compile now updates the status and inspector when its worker finishes, even though the generation already advanced when work was scheduled. The previous failure stays visible during a repair compile and clears only after that compile succeeds. The deterministic `delayed_compile_failure_and_repair_update_the_visible_notice` test passed. This closes the independent reviewer's late async error visibility finding; see REVIEW for its final recheck disposition.
+
+Hosted [run 36435105917](https://github.com/stcksmsh/kabl/actions/runs/36435105917) built and launched the release archive, then drove a stalled callback, real X click on Retry, and a running replacement stream in each of 1440×900 light/dark and 1280×800 light/dark. Its [artifact 10974864248](https://github.com/stcksmsh/kabl/actions/runs/36435105917/artifacts/10974864248) includes twelve full window PNGs, drive and app logs, and stats. Each case asserted Retry completion, more than 100 callbacks on the new stream, and three screenshots. Counts were 14,543 / 14,181 / 16,402 / 16,607 respectively. I inspected the 1280×800 dark stalled and recovered images: the dark theme is selected, the first shows “audio Stalled after callback 30”, and the second shows “audio running · session 2 · current graph installed”. This is a software PCM liveness walkthrough, not an audible or physical-device test.
+
+| Size | A-light | A-dark |
+|---|---|---|
+| 1440×900 | [Stalled](img/recovery/01-stalled.png) · [Starting](img/recovery/02-restarting.png) · [Running](img/recovery/03-recovered.png) | [Stalled](img/recovery/1440x900-dark/01-stalled.png) · [Starting](img/recovery/1440x900-dark/02-restarting.png) · [Running](img/recovery/1440x900-dark/03-recovered.png) |
+| 1280×800 | [Stalled](img/recovery/1280x800-light/01-stalled.png) · [Starting](img/recovery/1280x800-light/02-restarting.png) · [Running](img/recovery/1280x800-light/03-recovered.png) | [Stalled](img/recovery/1280x800-dark/01-stalled.png) · [Starting](img/recovery/1280x800-dark/02-restarting.png) · [Running](img/recovery/1280x800-dark/03-recovered.png) |
