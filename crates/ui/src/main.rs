@@ -1150,8 +1150,10 @@ impl Midi {
         if let Some(stop) = self.pipe.take() {
             stop.store(true, Ordering::Release);
         }
-        self.port = None;
-        self.send(KeyEvent::SourceLost);
+        // Only a controller that was connected leaves notes to end.
+        if self.port.take().is_some() {
+            self.send(KeyEvent::SourceLost);
+        }
     }
 
     /// The controller's notes, pedals and expression end; a running preview does not
@@ -2360,6 +2362,9 @@ mod recovery_tests {
         );
         let ccs: Vec<(u8, u8, u8)> = std::iter::from_fn(|| cc_rx.pop().ok().map(|c| c.0)).collect();
         assert_eq!(ccs, [(2, 1, 99), (2, 74, 10)]);
+        midi.disconnect();
+        assert!(notes_rx.pop().is_err(), "nothing was connected: nothing to end");
+        midi.port = Some("kabl-player".into());
         midi.disconnect();
         assert_eq!(
             notes_rx.pop().unwrap().1,

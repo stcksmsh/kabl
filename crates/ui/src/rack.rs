@@ -701,7 +701,8 @@ fn midi_in_face(
     off_face.sort_unstable();
     let picture = height(&sels, &knobs) + PICTURE <= BOTTOM - TOP;
     let decor = if picture {
-        Decor::Keys(Rect::from_min_size(pos2(12.0, TOP), vec2(fw - 24.0, 26.0)))
+        // Shorter keys leave two text lines under them: voice settings, then bend and channel.
+        Decor::Keys(Rect::from_min_size(pos2(12.0, TOP), vec2(fw - 24.0, 18.0)))
     } else {
         Decor::None
     };

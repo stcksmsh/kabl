@@ -97,6 +97,6 @@
 {"seq":96,"t_ms":1790272434477,"op":{"SetLabel":{"id":9,"key":"pin.gain_db","text":"Level"}},"inverse":{"SetLabel":{"id":9,"key":"pin.gain_db","text":null}},"source":"User"}
 {"seq":97,"t_ms":1790272434477,"op":{"SetLabel":{"id":2,"key":"pin.mode","text":"Keys"}},"inverse":{"SetLabel":{"id":2,"key":"pin.mode","text":null}},"source":"User"}
 {"seq":98,"t_ms":1790272434477,"op":{"SetLabel":{"id":2,"key":"pin.glide","text":"Glide"}},"inverse":{"SetLabel":{"id":2,"key":"pin.glide","text":null}},"source":"User"}
-{"seq":99,"t_ms":1790619096456,"op":{"SetParam":{"target":{"Module":{"id":2,"param":"bend"}},"value":2.0}},"inverse":{"UnsetParam":{"target":{"Module":{"id":2,"param":"bend"}}}},"source":"User"}
-{"seq":100,"t_ms":1790619096456,"op":{"Connect":{"id":30,"from":{"Module":{"id":2,"port":"wheel"}},"to":{"Param":{"id":1,"param":"m2"}}}},"inverse":{"Disconnect":{"id":30}},"source":"User"}
-{"seq":101,"t_ms":1790619096456,"op":{"SetParam":{"target":{"Cable":{"id":30,"param":"amount"}},"value":0.8}},"inverse":{"UnsetParam":{"target":{"Cable":{"id":30,"param":"amount"}}}},"source":"User"}
+{"seq":99,"t_ms":1790619713103,"op":{"SetParam":{"target":{"Module":{"id":2,"param":"bend"}},"value":2.0}},"inverse":{"UnsetParam":{"target":{"Module":{"id":2,"param":"bend"}}}},"source":"User"}
+{"seq":100,"t_ms":1790619713103,"op":{"Connect":{"id":30,"from":{"Module":{"id":2,"port":"wheel"}},"to":{"Param":{"id":1,"param":"m2"}}}},"inverse":{"Disconnect":{"id":30}},"source":"User"}
+{"seq":101,"t_ms":1790619713103,"op":{"SetParam":{"target":{"Cable":{"id":30,"param":"amount"}},"value":0.8}},"inverse":{"UnsetParam":{"target":{"Cable":{"id":30,"param":"amount"}}}},"source":"User"}
