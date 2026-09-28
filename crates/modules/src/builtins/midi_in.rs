@@ -292,18 +292,19 @@ impl MidiIn {
         c.played = true;
     }
 
-    /// Queues `change` at sample `offset` (clamped into the block) of the next `process`.
-    /// Sorted insert, stable for equal offsets. Full: a release replaces the last change (a
-    /// gate never sticks high), anything else is dropped. No allocation.
+    /// Queues `change` at sample `offset` of the next `process`. Sorted insert, stable for
+    /// equal offsets. Full: a release takes the place of the latest change and still lands at
+    /// its own sample (a gate never sticks high); anything else is dropped. No allocation.
     pub fn schedule(&mut self, offset: usize, change: Change) {
         let c = &mut self.c;
         let offset = offset.min(u8::MAX as usize) as u8;
         let n = c.n_changes as usize;
         if n == MAX_CHANGES {
-            if change == Change::Release {
-                c.changes[n - 1].1 = Change::Release;
+            if change != Change::Release {
+                return;
             }
-            return;
+            c.n_changes -= 1;
+            return self.schedule(offset as usize, change);
         }
         let at = c.changes[..n]
             .iter()

@@ -482,6 +482,26 @@ fn late_out_of_range_and_overflowing_events_never_strand_a_note() {
         (0, 0),
         "the forced release ended every controller key"
     );
+
+    // A reset that overflows still returns bend and wheel to rest (review R-01).
+    tl.push(0, 256, ev(Source::Controller, 0, KeyEvent::Bend(0)));
+    tl.push(0, 256, ev(Source::Controller, 0, KeyEvent::Wheel(127)));
+    tl.render(&mut e, &mut l, &mut r, |_, _| {});
+    tl.render(&mut e, &mut l, &mut r, |_, _| {});
+    assert_eq!(e.expression(1), Some((-1.0, 1.0)));
+    for i in 0..QUEUE {
+        let wheel = KeyEvent::Wheel((i % 100) as u8);
+        tl.push(i % 256, 256, ev(Source::Controller, 0, wheel));
+    }
+    tl.push(
+        255,
+        256,
+        ev(Source::Controller, 0, KeyEvent::ResetControllers),
+    );
+    for _ in 0..8 {
+        tl.render(&mut e, &mut l, &mut r, |_, _| {});
+    }
+    assert_eq!(e.expression(1), Some((0.0, 0.0)));
 }
 
 /// Restart (D05 Retry, a new sample rate): a fresh engine and a reset timeline replay the

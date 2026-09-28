@@ -27,7 +27,8 @@ pub struct Stats {
     pub reordered: u64,
     /// Queue full: a starting event dropped.
     pub dropped: u64,
-    /// Queue full: a release turned into its source's notes off at the next block.
+    /// Queue full: a release turned into its source's loss (notes, pedals, expression end)
+    /// at the release's time.
     pub forced: u64,
 }
 
@@ -44,7 +45,7 @@ pub struct Timeline {
     /// Time of the newest queued event.
     last: u64,
     /// Releases that did not fit, at their time (after everything queued before them): per
-    /// source, notes off on every channel; or a panic.
+    /// source, a source loss; or a panic.
     forced: [Option<u64>; MAX_SOURCES],
     forced_panic: Option<u64>,
     stats: Stats,
@@ -203,12 +204,12 @@ impl Timeline {
             .into_iter()
             .enumerate()
         {
+            // Whatever release overflowed (a note off, pedal up, reset, source loss), the
+            // source ends as if lost: notes, pedals and its bend/wheel.
             if let Some(at) = self.forced[s].filter(|&at| at < end) {
                 self.forced[s] = None;
-                for ch in 0..16 {
-                    let off = MidiEvent::new(source, ch, KeyEvent::NotesOff);
-                    engine.key_at(off, offset(at, start));
-                }
+                let lost = MidiEvent::new(source, 0, KeyEvent::SourceLost);
+                engine.key_at(lost, offset(at, start));
             }
         }
         engine.process_block(&mut self.left, &mut self.right);

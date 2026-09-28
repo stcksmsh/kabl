@@ -392,8 +392,9 @@ impl CallbackTiming {
             us(&self.startup_worst_ns),
             get(&self.midi_events),
             get(&self.midi_late),
-            get(&self.midi_wait_min_ns) as f64 / 1e6,
-            get(&self.midi_wait_max_ns) as f64 / 1e6,
+            // No events yet: no range ("-"), not a zero delay.
+            if get(&self.midi_events) == 0 { f64::NAN } else { get(&self.midi_wait_min_ns) as f64 / 1e6 },
+            if get(&self.midi_events) == 0 { f64::NAN } else { get(&self.midi_wait_max_ns) as f64 / 1e6 },
             kabl_engine::timeline::LATENCY,
             get(&self.timeline_dropped),
             get(&self.timeline_moved),

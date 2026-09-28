@@ -54,13 +54,13 @@ never changes it at runtime. Offline renders flush by processing at least
   event's time (never earlier than something already queued) and counted. By construction an
   in-contract event can never be earlier than a rendered block.
 - **Overflow.** When the queue is full, a *release-type* event (note off, sustain up, notes
-  off, reset controllers, source lost, panic) is never dropped: it sets a bounded fallback
-  flag that forces the equivalent source-wide release at the start of the next rendered block
-  (a panic when a panic overflowed). Other events (note on, bend, wheel, sustain down) are
+  off, reset controllers, source lost, panic) is never dropped: it is applied at its own
+  time, after everything queued before it: that source ends as if lost (notes, pedals, bend
+  and wheel), or a panic when a panic overflowed. Other events (note on, bend, wheel, sustain down) are
   dropped and counted. No stuck note can result from overflow; notes may be lost.
-- `midi.in` keeps at most 64 sample-offset changes per voice per block. More merge into the
-  last slot (the change lands a few samples early/late within the block; a release never
-  disappears). The adapter never delivers that many to one voice in practice; the bound exists
+- `midi.in` keeps at most 64 sample-offset changes per voice per block. Beyond that, a release
+  replaces the latest queued change and still lands on its own sample; other changes are
+  dropped (a gate never sticks high). The adapter never delivers that many to one voice in practice; the bound exists
   for the realtime guarantee and is covered by a test.
 
 Counters (`TimelineStats`: queued, clamped, reordered, dropped, forced releases, late live
@@ -222,8 +222,9 @@ straight into the audio callback, as before.
 
 The callback drains control messages (D04 order, D05 gate/fences unchanged), maps queued
 MIDI to offsets (section 4), then calls `Timeline::process` for the callback's frames. The
-old pre-render ring is gone. Recording, metering and muting read the adapter's output as they
-read the ring before. The legacy `kabl` binary (crates/standalone) is not the product app and
+free-running pre-render no longer decides timing: the callback renders exactly its own frames
+through the timeline into the existing ring (a staging buffer, empty after each callback),
+which recording, metering and muting read as before. The legacy `kabl` binary (crates/standalone) is not the product app and
 keeps its own block loop; `kabl-ui` is the standalone app.
 
 ## 9. Isolated REAPER/CLAP prototype

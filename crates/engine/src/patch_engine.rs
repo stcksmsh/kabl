@@ -76,6 +76,8 @@ pub struct PatchEngine {
     probe_seq: u64,
     /// Samples rendered since this engine started (reports carry it as their time).
     rendered: u64,
+    /// `rendered` when the keyboards last matched the graph (`sync_once`).
+    synced: Option<u64>,
     /// The last finished window, until the callback takes it.
     report: Option<ProbeReport>,
     /// Revision of the newest graph received: an older one arriving later is refused.
@@ -191,6 +193,7 @@ impl PatchEngine {
             probe_window: 1,
             probe_seq: 0,
             rendered: 0,
+            synced: None,
             report: None,
             newest_rev: 0,
             fresh_rev: 0,
@@ -220,6 +223,7 @@ impl PatchEngine {
             probe_window: 1,
             probe_seq: 0,
             rendered: 0,
+            synced: None,
             report: None,
             newest_rev: 0,
             fresh_rev: 0,
@@ -294,7 +298,7 @@ impl PatchEngine {
     /// Every keyboard gets `e`; each decides from its channel and what it holds
     /// (`Keyboard::midi`).
     fn send_key(&mut self, e: MidiEvent, offset: usize) {
-        self.sync_keyboards();
+        self.sync_once();
         let PatchEngine {
             keyboards,
             active,
@@ -371,6 +375,15 @@ impl PatchEngine {
 
     fn sync_keyboards(&mut self) {
         self.sync(false);
+    }
+
+    /// `sync_keyboards` at most once per block: settings only change when a block runs
+    /// (`midi.in` reads its params in `process`) or a graph arrives (`receive_swap` syncs).
+    fn sync_once(&mut self) {
+        if self.synced != Some(self.rendered) {
+            self.sync_keyboards();
+            self.synced = Some(self.rendered);
+        }
     }
 
     pub fn crossfade_samples(&self) -> usize {
@@ -452,6 +465,7 @@ impl PatchEngine {
             self.move_probe(&mut new_patch);
             self.incoming = Some((new_patch, 0));
             self.sync(fresh);
+            self.synced = Some(self.rendered);
         }
     }
 
@@ -742,7 +756,7 @@ impl PatchEngine {
     pub fn process_block(&mut self, out_left: &mut [f32; BLOCK], out_right: &mut [f32; BLOCK]) {
         // Settings changed by a runtime value (mode, channel) apply before this block, not
         // only at the next key.
-        self.sync_keyboards();
+        self.sync_once();
         if self.preview_blocks > 0 {
             self.preview_blocks -= 1;
             if self.preview_blocks == 0 {

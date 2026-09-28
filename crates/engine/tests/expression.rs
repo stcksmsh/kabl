@@ -399,7 +399,7 @@ fn a_voice_takes_at_most_its_bound_of_changes_and_a_release_always_lands() {
     );
     for i in 0..200 {
         m.schedule(
-            i % BLOCK,
+            0,
             Change::Play {
                 pitch: i as f32,
                 velocity: 1.0,
@@ -408,14 +408,19 @@ fn a_voice_takes_at_most_its_bound_of_changes_and_a_release_always_lands() {
             },
         );
     }
-    m.schedule(BLOCK - 1, Change::Release);
+    m.schedule(10, Change::Release);
     let params = [Signal::Scalar(0.0); 6];
     let mut bufs = [[0f32; BLOCK]; 4];
     let [a, b, cc, d] = &mut bufs;
     let mut outs: [&mut [f32]; 4] = [a, b, cc, d];
     let mut io = ProcessIo::new(&[], &mut outs, &params, BLOCK);
     m.process(&mut io);
-    assert!(!m.gate(), "the release replaced the last change");
+    assert_eq!(
+        (bufs[0][9], bufs[0][10]),
+        (1.0, 0.0),
+        "the release lands on its own sample"
+    );
+    assert!(!m.gate());
 }
 
 #[test]

@@ -1,5 +1,5 @@
-# render_hash, 20 s per patch, baseline bd64165 vs D06 (identical: diff empty)
-## baseline
+# render_hash, 20 s per patch: baseline bd64165 vs D06 (diff empty = identical). D06 rerun after review fixes.
+## baseline bd64165
 patches/init-keyboard: 20 s, hash ca4ff1e8cc20c7a5, peak 0.429016, rms 0.080766
 patches/palette/lead: 20 s, hash 0db2e7723f4dc267, peak 0.539064, rms 0.119231
 patches/palette/pad: 20 s, hash 0baa7deaf18b854d, peak 0.587698, rms 0.093245
