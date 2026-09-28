@@ -2229,8 +2229,10 @@ mod recovery_tests {
         let factory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches");
         let log = kabl_core::load(&factory.join("composition")).unwrap();
         let mut lib = Library::open(Some(factory), dir.path().to_path_buf());
-        let mut meta = Meta::default();
-        meta.name = "CC latency piece".into();
+        let meta = Meta {
+            name: "CC latency piece".into(),
+            ..Meta::default()
+        };
         let id = lib.save(&log, meta, None).unwrap();
         let editor = PatchEditor::from_log(log);
         let mut ui = UiState::default();

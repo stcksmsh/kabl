@@ -131,8 +131,17 @@ def press_move(ax, ay, bx, by):
 
 try:
     time.sleep(3)
-    wid = subprocess.run(["xdotool", "search", "--name", "^kabl$"], capture_output=True, text=True).stdout.split()[0]
-    x("windowfocus", "--sync", wid)
+    for _ in range(100):
+        candidates = subprocess.run(["xdotool", "search", "--onlyvisible", "--name", "^kabl$"],
+                                    capture_output=True, text=True).stdout.split()
+        if candidates:
+            wid = candidates[0]
+            if subprocess.run(["xdotool", "windowfocus", "--sync", wid],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+                break
+        time.sleep(0.1)
+    else:
+        raise SystemExit("kabl window did not become focusable")
     w, h = (round(int(v) * scale) for v in size.split("x"))
     log = open(os.environ["KABL_DRIVE_LOG"], "w") if os.environ.get("KABL_DRIVE_LOG") else None
     start = time.time()
