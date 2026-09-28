@@ -86,8 +86,9 @@ const PARAMS: &[ParamInfo] = &[
         min: 0.0,
         max: 24.0,
         default: 2.0,
-        unit: "st",
-        taper: Taper::Stepped,
+        unit: "±st",
+        // A knob (25 / 17 options are too many for a selector); the module rounds.
+        taper: Taper::Linear,
         smoothing_ms: 0.0,
     },
     // Which MIDI channel plays this keyboard: 0 = ALL, else 1..16.
@@ -96,8 +97,9 @@ const PARAMS: &[ParamInfo] = &[
         min: 0.0,
         max: 16.0,
         default: 0.0,
-        unit: "",
-        taper: Taper::Stepped,
+        unit: "ch",
+        // A knob (25 / 17 options are too many for a selector); the module rounds.
+        taper: Taper::Linear,
         smoothing_ms: 0.0,
     },
 ];
@@ -120,7 +122,7 @@ pub static MIDI_IN_INFO: ModuleInfo = ModuleInfo {
     },
     skin: None,
     width_units: 6,
-    advanced: &["priority", "glide_ms", "channel"],
+    advanced: &["priority", "glide_ms", "bend", "channel"],
 };
 
 const GATE: usize = 0;
@@ -344,7 +346,7 @@ impl Module for MidiIn {
         let c = &mut self.c;
         c.settings = KeySettings::from_params(&p);
         c.glide_ms = p[3].clamp(5.0, 3000.0);
-        let range = p[4].clamp(0.0, 24.0);
+        let range = p[4].round().clamp(0.0, 24.0);
         // Constant-time glide: the whole interval takes glide_ms, a straight line in semitones.
         let step_of = |c: &Core| (c.pitch - c.from).abs() / (c.glide_ms * 0.001 * sample_rate);
         let mut step = step_of(c);

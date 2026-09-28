@@ -146,6 +146,14 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
              between overlapping notes)."
         }
         ("midi.in", "glide_ms") => "How long a glide takes.",
+        ("midi.in", "bend") => {
+            "How far the pitch bend wheel moves this keyboard's notes, in semitones either \
+             way. Center is no bend."
+        }
+        ("midi.in", "channel") => {
+            "Which MIDI channel plays this keyboard. ALL takes every channel, so every \
+             keyboard in the patch plays together; 1–16 lets two keyboards be played apart."
+        }
         _ => return None,
     })
 }
@@ -192,7 +200,8 @@ pub fn module_note(kind: &str) -> Option<&'static str> {
              macro sets how much the LFO moves its destinations."
         }
         "midi.in" => {
-            "Its settings apply to the voices this keyboard drives, not to other keyboards."
+            "Its settings apply to the voices this keyboard drives, not to other keyboards. \
+             The wheel jack carries the modulation wheel (0–1): route it to any knob."
         }
         _ => return None,
     })

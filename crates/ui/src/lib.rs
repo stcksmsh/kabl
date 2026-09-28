@@ -2459,7 +2459,8 @@ fn bank_menu(
     }
 }
 
-/// `POLY`, `MONO · LOW`, `LEGATO · LAST · glide 120 ms`: a MIDI In's voice settings.
+/// `POLY · bend ±2 st`, `MONO · LOW · bend ±12 st · ch 2`, `LEGATO · LAST · glide 120 ms ·
+/// bend ±2 st`: a MIDI In's voice settings, its bend range and (when not ALL) its channel.
 fn midi_in_summary(state: &kabl_core::PatchState, m: &Placed) -> String {
     let get = |name: &str| {
         let p = m.info.params.iter().find(|p| p.name == name);
@@ -2483,6 +2484,16 @@ fn midi_in_summary(state: &kabl_core::PatchState, m: &Placed) -> String {
         let ms = m.info.params.iter().find(|p| p.name == "glide_ms");
         s += " · glide ";
         s += &ms.map_or(String::new(), |p| routing::fmt_value(p, get("glide_ms")));
+    }
+    let fmt = |name: &str| {
+        let p = m.info.params.iter().find(|p| p.name == name);
+        p.map_or(String::new(), |p| routing::fmt_value(p, get(name)))
+    };
+    s += " · bend ";
+    s += &fmt("bend");
+    if get("channel") >= 0.5 {
+        s += " · ";
+        s += &fmt("channel");
     }
     s
 }
