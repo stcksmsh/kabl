@@ -397,6 +397,63 @@ fn save_from_the_question_then_continues() {
 }
 
 #[test]
+fn delayed_open_preserves_an_edit_accepted_while_reading() {
+    let mut t = H::new(1440.0, 900.0);
+    t.open("factory:palette/breath");
+    t.ui.browser.async_io = true;
+    t.ui.browser.io_delay_ms = 500;
+    kabl_ui::browser::request(
+        &mut t.editor,
+        &mut t.ui,
+        Pending::Open("factory:palette/pad".into()),
+    );
+    assert!(kabl_ui::browser::io_busy(&t.ui));
+    let started = std::time::Instant::now();
+    t.edit("chorus", "mix", 0.23);
+    let edited = t.editor.state().clone();
+    assert!(started.elapsed().as_millis() < 350);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    while kabl_ui::browser::io_busy(&t.ui) && std::time::Instant::now() < deadline {
+        kabl_ui::browser::poll_io(&mut t.editor, &mut t.ui);
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    assert!(!kabl_ui::browser::io_busy(&t.ui));
+    assert_eq!(t.editor.state(), &edited);
+    assert_eq!(
+        t.doc_origin(),
+        DocOrigin::Library("factory:palette/breath".into())
+    );
+    assert!(matches!(t.ui.browser.dialog, Some(Dialog::Unsaved { .. })));
+}
+
+#[test]
+fn delayed_save_commits_a_snapshot_without_hiding_a_later_edit() {
+    let mut t = H::new(1440.0, 900.0);
+    t.open("factory:palette/pad");
+    t.click("save-as");
+    t.save_as_named("Async Pad");
+    t.edit("filter.ladder", "cutoff_hz", 4300.0);
+    let saved = t.editor.state().clone();
+    t.ui.browser.async_io = true;
+    t.ui.browser.io_delay_ms = 500;
+    let started = std::time::Instant::now();
+    t.click("save");
+    assert!(kabl_ui::browser::io_busy(&t.ui));
+    t.edit("filter.ladder", "cutoff_hz", 1400.0);
+    assert!(started.elapsed().as_millis() < 350);
+    let later = t.editor.state().clone();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    while kabl_ui::browser::io_busy(&t.ui) && std::time::Instant::now() < deadline {
+        kabl_ui::browser::poll_io(&mut t.editor, &mut t.ui);
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    assert!(!kabl_ui::browser::io_busy(&t.ui));
+    assert_eq!(t.editor.state(), &later);
+    assert_eq!(saved_state(&t, "user:async-pad"), saved);
+    assert!(t.modified());
+}
+
+#[test]
 fn quit_with_unsaved_changes_asks() {
     let mut t = H::new(1440.0, 900.0);
     kabl_ui::browser::request(&mut t.editor, &mut t.ui, Pending::Quit);

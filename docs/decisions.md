@@ -2677,6 +2677,28 @@ entry.
 - D04 media/performance/package evidence from e7dca9a remains historical. D05 must
   establish the merged baseline and final-head recovery evidence. Cloud stalls and the
   Composition spike retain their unknown causes.
+
+## 2026-09-27 — D05 implementation rationale (engineering, not owner approval)
+
+- **Explicit single-flight Retry.** Close old stream and collect its graph ownership on
+  one worker, open the selected output muted, and install the current editor document as
+  a fresh stopped graph. Wait for callback progress and graph/fade acknowledgment before
+  reporting Running. Rejected: automatic loops or a successful stream constructor as
+  proof of recovery; reusing a stale graph captured before edits during retry.
+- **Session boundary.** Old queues, probe reports, notes and CC pickup are replaced; a
+  recording is finalized as interrupted with its prefix and dropped frames, and a new
+  take requires Record. Rejected: carrying DSP tails, transport or a continuous WAV
+  across a possibly different sample rate.
+- **Pending Load.** Preserve the new document's stopped policy and redirect pending
+  commands to it across a fade and edit replacement. Rejected: restarting an outgoing
+  clock because the pending graph was not yet installed.
+- **Efficiency.** Profile current mono/dense/mixed material, then defer reduced lanes:
+  no safe eligibility plus repeatable gain was established, and averaging/gain and state
+  compatibility would be at risk. A shared VM run is not laptop proof.
+- **Known lock/evidence gap.** Backend open/close and recording finalization are outside
+  Core; the older browser Save/Open and retry compile still hold it. The current container
+  has no physical device or graphical session. These are open acceptance items, not
+  owner-approved deferrals; see `audio-recovery/REPORT.md` and `CHECKLIST.md`.
 - D04 and earlier hands-on reviews remain pending. Merge and engineering review do not
   provide owner acceptance; D00 remains incomplete. Laptop evidence is still pending.
 

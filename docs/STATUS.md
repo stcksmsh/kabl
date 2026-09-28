@@ -12,8 +12,18 @@ Last updated: 2026-09-26. PR #6 is merged by Kosta at
 **D05 authorized: audio recovery and measured efficiency.**
 Brief: [D05](product-research/briefs/D05.md); launch:
 [D05-LAUNCH](product-research/briefs/D05-LAUNCH.md). One sequential agent, independent
-review/recheck, no D06. Engineering authorized; no implementation result reported yet.
+review/recheck, no D06. Engineering is in progress on the branch described below.
 Recovery comes first. Mono optimization requires profiling and compatibility evidence.
+
+**D05 progress (2026-09-27):** `codex/d05-audio-recovery` is an unmerged engineering branch
+based on fetched `origin/master` `e951b25`. Explicit retry/output selection, interrupted
+recording and pending Load/command ordering are implemented. Focused tests and ALSA null
+software-backend checks pass; see [`audio-recovery/REPORT.md`](audio-recovery/REPORT.md).
+Product tree `47abdc4` passed workspace tests (557/0/18), strict Clippy, ALSA null
+recovery tests (2/0), and an independent final recheck;
+draft PR #8 is open, unmerged. No graphical or physical audio session is available in this
+container; Save/Open Core lock latency remains a **major unresolved D05 gap**. Engineering
+completion and owner acceptance are not claimed. Do not start D06.
 D04/D03/D02/D01/D01-R1/Composition + Motion/Sound Palette owner reviews remain pending;
 D00 is incomplete. The narrow D03-R1 backend-error overflow exception remains accepted.
 

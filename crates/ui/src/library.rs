@@ -164,6 +164,7 @@ fn io(what: &str, path: &Path, e: std::io::Error) -> LibError {
     LibError::Io(format!("{what} {}: {e}", path.display()))
 }
 
+#[derive(Clone)]
 pub struct Library {
     /// Where factory sounds were found, if anywhere.
     pub factory_dir: Option<PathBuf>,

@@ -186,7 +186,7 @@ fn run(args: &[String]) -> i32 {
     // log what the audio side counted, as one line when something happened.
     let (mut seen, mut errors_seen) = (0, [0; kabl_standalone::STREAM_ERROR_KINDS.len() + 2]);
     let mut last = None::<(String, std::time::Instant)>;
-    for tick in 1u64.. {
+    for tick in 1u64..=u64::MAX {
         std::thread::sleep(std::time::Duration::from_secs(1));
         while let Ok(e) = faults_rx.pop() {
             last = Some((e.to_string(), std::time::Instant::now()));

@@ -3,6 +3,19 @@
 Read this, then `docs/STATUS.md` (top section) and the last entries of `docs/decisions.md`.
 Trust code and git over older docs.
 
+## D05 in progress on a separate branch (2026-09-27)
+
+The initial fetched `origin/master` was `e951b2535d817bc7c21872cd0e46e815d35747ac`;
+the branch has incorporated the newer D07-P1 authorization commit `f1e2c9e`.
+Engineering is on `codex/d05-audio-recovery`, draft PR #8; the product record is
+[`audio-recovery/REPORT.md`](audio-recovery/REPORT.md) with design, owner checklist and
+review. Explicit Retry/device selection, interrupted takes and stopped Load ordering are
+implemented. Product tree `47abdc4` passed workspace tests (557/0/18), strict Clippy,
+ALSA null recovery tests (2/0), and independent
+review/recheck; REVIEW.md retains one major unresolved Core Save/Open latency gap. Real
+GUI/device/package evidence and hardware acceptance are not established. Do not merge
+or start D06. Owner review remains pending.
+
 ## Parallel assignment — isolated REAPER/CLAP proof (2026-09-27)
 
 Kosta authorized a separate cloud agent to work while D05's branch is active.
@@ -35,8 +48,8 @@ mono processing and optimize only if justified. Known stalls/spikes still have n
 cause. D04 perf/package/walkthrough predates its review fixes; D05 needs a current baseline.
 
 D04 and all earlier pending hands-on reviews remain pending; D00 is incomplete. A merge
-does not approve sound/controller feel or laptop performance. Engineering authorization is
-not a report that the D05 agent has started.
+does not approve sound/controller feel or laptop performance. This section records the
+launch baseline; the progress section above supersedes its earlier pending-start status.
 
 ## Previous assignment — D03 closeout followed by D04 (2026-09-26)
 

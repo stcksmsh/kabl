@@ -742,7 +742,7 @@ fn control(
     let label = routing::target_label(p);
     let is_macro = kind == "macro";
     let display = if is_macro {
-        crate::macro_name(state, id, p.name).map_or(label.clone(), |n| n)
+        crate::macro_name(state, id, p.name).unwrap_or(label.clone())
     } else {
         card.clone().unwrap_or(label.clone())
     };

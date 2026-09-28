@@ -1300,6 +1300,11 @@ impl CompiledPatch {
         self.buffers.len()
     }
 
+    /// Counts executed module instances and steps for offline profiling.
+    pub fn profile_counts(&self) -> (usize, usize, usize) {
+        (self.modules.len(), self.module_origin.iter().filter(|(_, v)| v.is_some()).count(), self.steps.len())
+    }
+
     /// The `out` module this graph plays (with several, the last in schedule order; the others
     /// are not heard).
     pub fn output_module(&self) -> Option<ModuleId> {
@@ -1384,6 +1389,28 @@ impl CompiledPatch {
     pub fn clock(&self, id: ModuleId) -> Option<&Clock> {
         let i = self.module_origin.iter().position(|&o| o == (id, None))?;
         self.modules[i].as_any().downcast_ref::<Clock>()
+    }
+
+    /// A queued edit replacing a stopped Load must retain its transport intent. This is
+    /// deliberately limited to clocks present in both graphs; a different Load starts from
+    /// its own compiled policy. Runs on the audio thread without allocating.
+    pub fn inherit_stopped_clocks(&mut self, previous: &Self) {
+        for i in 0..self.module_origin.len() {
+            let (id, lane) = self.module_origin[i];
+            if lane.is_none() && previous.clock(id).is_some_and(|c| !c.running()) {
+                self.transport(id, Transport::Stop);
+            }
+        }
+    }
+
+    /// A selection made after a queued Load belongs to that graph, even if an edit replaces
+    /// it before the fade starts. Pending graphs have not rendered yet.
+    pub fn inherit_armed_seqs(&mut self, previous: &Self) {
+        previous.seqs(|id, _, _, armed| {
+            if let Some(bank) = armed {
+                self.with_seq(id, |s| s.arm(bank, 0));
+            }
+        });
     }
 
     /// Audio thread: runs `f` on the `seq` module `id`, if this graph has one. No allocation.

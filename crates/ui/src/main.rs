@@ -27,8 +27,67 @@ use kabl_modules::builtins::{DelayLock, LfoSync};
 use kabl_standalone::{default_patch, RingBuffer, DEFAULT_VOICE_COUNT};
 use kabl_ui::control::{self, Delivery};
 use kabl_ui::{record, show, PatchEditor, UiState};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+
+#[cfg(test)]
+mod callback_allocations {
+    use std::alloc::{GlobalAlloc, Layout, System};
+    use std::cell::Cell;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    thread_local! { static INSIDE: Cell<bool> = const { Cell::new(false) }; }
+    pub static ALLOCS: AtomicUsize = AtomicUsize::new(0);
+    pub static DEALLOCS: AtomicUsize = AtomicUsize::new(0);
+    pub struct Counter;
+    unsafe impl GlobalAlloc for Counter {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            if INSIDE.try_with(|v| v.get()).unwrap_or(false) {
+                ALLOCS.fetch_add(1, Ordering::Relaxed);
+            }
+            System.alloc(layout)
+        }
+        unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+            if INSIDE.try_with(|v| v.get()).unwrap_or(false) {
+                DEALLOCS.fetch_add(1, Ordering::Relaxed);
+            }
+            System.dealloc(ptr, layout)
+        }
+        unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+            if INSIDE.try_with(|v| v.get()).unwrap_or(false) {
+                ALLOCS.fetch_add(1, Ordering::Relaxed);
+            }
+            System.realloc(ptr, layout, size)
+        }
+        unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+            if INSIDE.try_with(|v| v.get()).unwrap_or(false) {
+                ALLOCS.fetch_add(1, Ordering::Relaxed);
+            }
+            System.alloc_zeroed(layout)
+        }
+    }
+    pub struct Scope(bool);
+    impl Scope {
+        pub fn new(enabled: bool) -> Self {
+            if enabled {
+                INSIDE.with(|v| v.set(true));
+            }
+            Self(enabled)
+        }
+    }
+    impl Drop for Scope {
+        fn drop(&mut self) {
+            if self.0 {
+                INSIDE.with(|v| v.set(false));
+            }
+        }
+    }
+}
+#[cfg(test)]
+#[global_allocator]
+static CALLBACK_ALLOCATOR: callback_allocations::Counter = callback_allocations::Counter;
+#[cfg(test)]
+use callback_allocations::Scope as CallbackAllocationScope;
 
 const RING_CAPACITY: usize = BLOCK * 256;
 
@@ -41,7 +100,9 @@ struct AudioHost {
     /// Dropped first (fields drop in declaration order): the audio thread stops before the
     /// queues it feeds are torn down.
     _stream: Option<cpal::Stream>,
+    gate: Arc<AtomicU64>,
     sample_rate: f32,
+    settings: String,
     collector: Collector,
     status: String,
     /// Each sequencer's playing step, playing bank and queued bank, published by the audio
@@ -64,6 +125,26 @@ struct AudioHost {
     faults_rx: Option<rtrb::Consumer<cpal::Error>>,
     /// Revisions the callback applied and when (`KABL_LATENCY_FILE` only).
     applied_rx: Option<rtrb::Consumer<(u64, f64)>>,
+}
+
+#[derive(Clone)]
+struct AudioRequest {
+    rate: Option<u32>,
+    frames: Option<u32>,
+    realtime: bool,
+    /// Exact enumerated output, with its name checked again before opening.
+    device: Option<(usize, String)>,
+}
+
+fn output_names() -> Vec<(usize, String)> {
+    cpal::default_host()
+        .output_devices()
+        .map(|ds| {
+            ds.enumerate()
+                .filter_map(|(i, d)| d.description().ok().map(|x| (i, x.name().to_string())))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Audio-callback telemetry, written by the callback (and the stream's error callback) with
@@ -290,7 +371,9 @@ impl CallbackTiming {
 impl AudioHost {
     fn offline(collector: Collector, status: String) -> Self {
         AudioHost {
+            gate: Arc::new(AtomicU64::new(0)),
             sample_rate: 48000.0,
+            settings: String::new(),
             collector,
             status,
             steps_rx: None,
@@ -324,22 +407,35 @@ impl AudioHost {
         patch: &PatchState,
         notes: rtrb::Consumer<KeyEvent>,
         keys: Arc<AtomicU64>,
-        rate: Option<u32>,
-        frames: Option<u32>,
-        realtime: bool,
+        request: &AudioRequest,
+        restarting: bool,
         peaks: Arc<record::PeakTap>,
     ) -> (Self, Delivery) {
+        let (rate, frames, realtime) = (request.rate, request.frames, request.realtime);
         let mut midi_consumer = notes;
         let collector = Collector::new();
         let handle = collector.handle();
 
         let host = cpal::default_host();
         log::info!(target: "audio", "backend={:?} requested rate={rate:?} frames={frames:?} rt={realtime}", host.id());
-        let Some(device) = host.default_output_device() else {
+        let device = match &request.device {
+            Some((index, name)) => host
+                .output_devices()
+                .ok()
+                .and_then(|mut ds| ds.nth(*index))
+                .filter(|d| d.description().is_ok_and(|desc| desc.name() == name)),
+            None => host.default_output_device(),
+        };
+        let Some(device) = device else {
             log::warn!(target: "audio", "no output device: editing only, no playback");
             let a = Self::offline(
                 collector,
-                "no audio output device found -- editing works, playback won't".into(),
+                match &request.device {
+                    Some((_, name)) => {
+                        format!("output \"{name}\" unavailable; choose another output or Retry")
+                    }
+                    None => "no default audio output; choose an output or Retry".into(),
+                },
             );
             let d = a.offline_delivery(patch);
             return (a, d);
@@ -385,6 +481,16 @@ impl AudioHost {
         let mut last_start: Option<std::time::Instant> = None;
         let mut rt_handle = None;
         let mut rt_tried = !realtime;
+        let fault = if restarting {
+            None
+        } else {
+            std::env::var("KABL_AUDIO_FAULT").ok()
+        };
+        let fault_after = std::env::var("KABL_AUDIO_FAULT_AFTER")
+            .ok()
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or(30);
+        let mut fault_sent = false;
 
         let mut engine = match PatchEngine::new(&handle, patch, sample_rate, DEFAULT_VOICE_COUNT) {
             Ok(e) => e,
@@ -406,6 +512,10 @@ impl AudioHost {
         let (control_tx, mut control_rx) = rtrb::RingBuffer::<ToAudio>::new(control::QUEUE);
         let feedback = Arc::new(Feedback::default());
         let fb = feedback.clone();
+        let gate = Arc::new(AtomicU64::new(if restarting { 0 } else { u64::MAX }));
+        let audio_gate = gate.clone();
+        let mut ready_frames = 0usize;
+        let mut ready_for = 0u64;
         // Measurement only (`KABL_LATENCY_FILE`): the callback reports each newly applied
         // revision with its time.
         let (mut applied_tx, applied_rx) = rtrb::RingBuffer::<(u64, f64)>::new(1024);
@@ -431,9 +541,17 @@ impl AudioHost {
         let mut left_ring = RingBuffer::new(RING_CAPACITY);
         let mut right_ring = RingBuffer::new(RING_CAPACITY);
 
+        #[cfg(test)]
+        let mut callback_warmups = 0u32;
+
         let stream = device.build_output_stream(
             stream_config,
             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                #[cfg(test)]
+                let _allocation_scope = {
+                    callback_warmups += 1;
+                    CallbackAllocationScope::new(callback_warmups > 2)
+                };
                 // Once, on the first callback: ask for real-time priority for this thread (rtkit
                 // over D-Bus, else the rlimit). It may allocate and block briefly; the stream
                 // is starting and silent. Refusal leaves the thread as it was.
@@ -502,10 +620,29 @@ impl AudioHost {
                     let _ = probe_tx.push(r);
                 }
 
-                let rec = tap.begin(frames_needed);
+                let want = audio_gate.load(Ordering::Relaxed);
+                if want != 0 && want != u64::MAX {
+                    if ready_for != want {
+                        ready_for = want;
+                        ready_frames = 0;
+                    }
+                    if Feedback::get(&fb.applied_rev) >= want && !engine.is_swapping() {
+                        ready_frames += frames_needed;
+                    } else {
+                        ready_frames = 0;
+                    }
+                    if ready_frames >= sample_rate as usize / 40 {
+                        // A failure or a newer edit may have closed/revised the gate since
+                        // this callback read `want`; never overwrite that decision.
+                        let _ = unmute_if_current(&audio_gate, want);
+                    }
+                }
+                let muted = audio_gate.load(Ordering::Relaxed) != u64::MAX;
+                let rec = tap.begin(frames_needed) && !muted;
                 for frame in data.chunks_mut(channels) {
                     let l = left_ring.pop().unwrap_or(0.0);
                     let r = right_ring.pop().unwrap_or(0.0);
+                    let (l, r) = if muted { (0.0, 0.0) } else { (l, r) };
                     if rec {
                         tap.frame(l, r);
                     }
@@ -513,6 +650,16 @@ impl AudioHost {
                     frame[0] = l;
                     for s in frame.iter_mut().skip(1) {
                         *s = r;
+                    }
+                }
+                if t.count.load(Ordering::Relaxed) >= fault_after {
+                    match fault.as_deref() {
+                        Some("stall") => return,
+                        Some("error") if !fault_sent => {
+                            fault_sent = true;
+                            t.other_errors.fetch_add(1, Ordering::Relaxed);
+                        }
+                        _ => {}
                     }
                 }
                 t.record(started.elapsed(), since_last, frames_needed, sample_rate);
@@ -554,7 +701,15 @@ impl AudioHost {
             Some(patch),
         );
         let host = AudioHost {
+            gate,
             sample_rate,
+            settings: format!(
+                "{} · {sample_rate} Hz · {channels} channels · requested buffer {:?}",
+                device
+                    .description()
+                    .map_or("unknown output".into(), |d| d.name().to_string()),
+                stream_config.buffer_size
+            ),
             collector,
             status,
             steps_rx: Some(steps_rx),
@@ -580,6 +735,67 @@ struct Core {
     delivery: Delivery,
     /// `KABL_LATENCY_FILE` only.
     latency: Option<Latency>,
+    progress: Option<Progress>,
+    record_finish: Option<std::thread::JoinHandle<record::Recorder>>,
+    record_dir: String,
+    record_last: Option<record::Outcome>,
+    /// CCs queued before the most recent retry boundary must not apply afterward.
+    cc_cutoff: f64,
+    stale_cc: u64,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum AudioPhase {
+    Starting,
+    Running,
+    Stalled,
+    Failed,
+    Restarting,
+    Unavailable,
+}
+
+/// Sticky detection also runs while the UI is suspended.
+struct Progress {
+    timing: Arc<CallbackTiming>,
+    gate: Arc<AtomicU64>,
+    last: u64,
+    at: std::time::Instant,
+    failure: Option<AudioPhase>,
+}
+
+fn unmute_if_current(gate: &AtomicU64, revision: u64) -> bool {
+    gate.compare_exchange(revision, u64::MAX, Ordering::AcqRel, Ordering::Relaxed)
+        .is_ok()
+}
+
+impl Progress {
+    fn new(timing: Arc<CallbackTiming>, gate: Arc<AtomicU64>) -> Self {
+        Self {
+            timing,
+            gate,
+            last: 0,
+            at: std::time::Instant::now(),
+            failure: None,
+        }
+    }
+    fn observe(&mut self) {
+        if self.failure.is_some() {
+            self.gate.store(0, Ordering::Release);
+            return;
+        }
+        let n = self.timing.count.load(Ordering::Relaxed);
+        if self.timing.other_errors.load(Ordering::Relaxed) > 0 {
+            self.failure = Some(AudioPhase::Failed);
+        } else if n != self.last {
+            self.last = n;
+            self.at = std::time::Instant::now();
+        } else if self.at.elapsed().as_secs_f32() > if n == 0 { 3.0 } else { 1.5 } {
+            self.failure = Some(AudioPhase::Stalled);
+        }
+        if self.failure.is_some() {
+            self.gate.store(0, Ordering::Relaxed);
+        }
+    }
 }
 
 /// Measurement only (`KABL_LATENCY_FILE`): from a CC's arrival at the MIDI input to the audio
@@ -632,29 +848,75 @@ fn clock_s() -> f64 {
 /// The control thread: applies MIDI CCs (mappings, pickup, buttons) and retries whatever waits
 /// for the audio queue, without an editor frame. Woken by the MIDI input for each CC, and every
 /// few milliseconds while something waits.
-fn pump(core: Arc<Mutex<Core>>, mut cc: rtrb::Consumer<((u8, u8, u8), f64)>) {
+fn pump(
+    core: Arc<Mutex<Core>>,
+    mut cc: rtrb::Consumer<((u8, u8, u8), f64)>,
+    stop: Arc<AtomicBool>,
+) {
     let mut events = Vec::with_capacity(64);
-    loop {
+    let mut fresh = Vec::with_capacity(64);
+    while !stop.load(Ordering::Acquire) {
         std::thread::park_timeout(std::time::Duration::from_millis(5));
         events.clear();
-        let mut arrived = f64::MAX;
         while let Ok((e, t)) = cc.pop() {
-            events.push(e);
-            arrived = arrived.min(t);
+            events.push((e, t));
         }
         let Ok(mut c) = core.lock() else {
             return;
         };
+        let (discarded, arrived) = fresh_cc(&events, c.cc_cutoff, &mut fresh);
+        c.stale_cc += discarded as u64;
+        if discarded > 0 {
+            log::info!(target: "midi", "discarded {discarded} CC events queued before audio retry");
+        }
+        if let Some(p) = c.progress.as_mut() {
+            p.observe();
+            if p.failure.is_some() && c.record_finish.is_none() {
+                if let Some(mut rec) = c.ui.recorder.take() {
+                    c.record_dir = rec.dir.clone();
+                    if rec.recording() {
+                        c.record_finish = Some(std::thread::spawn(move || {
+                            rec.stop_interrupted();
+                            rec
+                        }));
+                    } else {
+                        c.record_last = rec.last.take();
+                    }
+                }
+            }
+        }
         let Core {
             editor,
             ui,
             delivery,
             latency,
+            progress,
+            record_finish: _,
+            record_dir: _,
+            record_last: _,
+            cc_cutoff: _,
+            stale_cc: _,
         } = &mut *c;
         kabl_ui::perform::rearm(ui, clock_s());
-        if !events.is_empty() {
+        if !fresh.is_empty() {
+            let starting = progress
+                .as_ref()
+                .is_some_and(|p| p.failure.is_none() && p.gate.load(Ordering::Relaxed) != u64::MAX);
+            if starting {
+                progress.as_ref().unwrap().gate.store(0, Ordering::Relaxed);
+            }
             let before = delivery.rev();
-            control::midi(editor, ui, delivery, &events, clock_s());
+            control::midi(editor, ui, delivery, &fresh, clock_s());
+            if starting {
+                progress.as_ref().unwrap().gate.store(
+                    if delivery.compile_error.is_none() {
+                        delivery.rev()
+                    } else {
+                        0
+                    },
+                    Ordering::Relaxed,
+                );
+            }
             if let Some(l) = latency.as_mut().filter(|_| delivery.rev() > before) {
                 l.waiting.push_back((delivery.rev(), arrived));
             }
@@ -664,11 +926,27 @@ fn pump(core: Arc<Mutex<Core>>, mut cc: rtrb::Consumer<((u8, u8, u8), f64)>) {
     }
 }
 
+fn fresh_cc(
+    events: &[((u8, u8, u8), f64)],
+    cutoff: f64,
+    output: &mut Vec<(u8, u8, u8)>,
+) -> (usize, f64) {
+    output.clear();
+    let mut arrived = f64::MAX;
+    for &(event, at) in events {
+        if at > cutoff {
+            output.push(event);
+            arrived = arrived.min(at);
+        }
+    }
+    (events.len() - output.len(), arrived)
+}
+
 /// What the MIDI callback owns: key events (notes, sustain pedal, All Notes Off / All Sound
 /// Off) to the audio thread, where the engine's keyboards assign voices; every other CC to
 /// the UI (learn, mappings, buttons).
 struct MidiSink {
-    notes: rtrb::Producer<KeyEvent>,
+    notes: Option<rtrb::Producer<KeyEvent>>,
     /// CCs with their arrival time (`clock_s`).
     cc: rtrb::Producer<((u8, u8, u8), f64)>,
     ctx: Option<egui::Context>,
@@ -693,7 +971,9 @@ fn unpack_keys(v: u64) -> (u64, u64) {
 /// One incoming MIDI message: a key event to the audio thread, any other CC to the UI.
 fn on_message(s: &mut MidiSink, data: &[u8]) {
     if let Some(e) = KeyEvent::from_midi(data) {
-        let _ = s.notes.push(e);
+        if let Some(notes) = s.notes.as_mut() {
+            let _ = notes.push(e);
+        }
     } else if data.len() >= 3 && data[0] & 0xF0 == 0xB0 && !is_key_cc(data[1]) {
         let _ = s.cc.push(((data[0] & 0x0F, data[1], data[2]), clock_s()));
         if let Some(p) = &s.pump {
@@ -777,7 +1057,7 @@ impl Midi {
         let (cc, cc_rx) = rtrb::RingBuffer::new(1024);
         let m = Midi {
             sink: Arc::new(Mutex::new(MidiSink {
-                notes,
+                notes: Some(notes),
                 cc,
                 ctx: None,
                 pump: None,
@@ -811,7 +1091,18 @@ impl Midi {
     /// (docs/sound-palette-batch/keyboard.md, "Other events").
     fn release_all(&self) {
         let mut s = self.sink.lock().unwrap();
-        let _ = s.notes.push(KeyEvent::AllOff);
+        if let Some(notes) = s.notes.as_mut() {
+            let _ = notes.push(KeyEvent::AllOff);
+        }
+    }
+
+    fn suspend_notes(&self) {
+        self.sink.lock().unwrap().notes = None;
+        self.keys.store(0, Ordering::Relaxed);
+    }
+
+    fn resume_notes(&self, notes: rtrb::Producer<KeyEvent>) {
+        self.sink.lock().unwrap().notes = Some(notes);
     }
 
     fn connect(&mut self, name: &str) -> Result<(), String> {
@@ -894,10 +1185,63 @@ fn reset_pickup(ui: &mut UiState) {
     }
 }
 
+/// Scheduled, compiled and acknowledged graphs are distinct UI observations.
+struct CompileNotice {
+    generation: u64,
+    error: Option<String>,
+    graphs: u64,
+    awaiting_rev: Option<u64>,
+}
+
+impl CompileNotice {
+    fn new(delivery: &Delivery) -> Self {
+        Self {
+            generation: delivery.generation,
+            error: delivery.compile_error.clone(),
+            graphs: delivery.counts.graphs,
+            awaiting_rev: None,
+        }
+    }
+
+    /// Returns whether inspection needs rebuilding. A failed audio phase owns its actionable
+    /// status; a successful compile is not described as playing until the callback accepts it.
+    fn observe(&mut self, phase: AudioPhase, status: &mut String, delivery: &Delivery) -> bool {
+        let generation_changed = self.generation != delivery.generation;
+        let error_changed = self.error != delivery.compile_error;
+        let graphs_changed = self.graphs != delivery.counts.graphs;
+        let changed = generation_changed || error_changed || graphs_changed;
+        if changed {
+            self.generation = delivery.generation;
+            self.error = delivery.compile_error.clone();
+            self.graphs = delivery.counts.graphs;
+            if phase == AudioPhase::Running {
+                if let Some(error) = &delivery.compile_error {
+                    *status = format!("recompile failed: {error}");
+                    self.awaiting_rev = None;
+                } else if graphs_changed {
+                    *status = "audio running · current graph queued".into();
+                    self.awaiting_rev = Some(delivery.rev());
+                } else if generation_changed {
+                    *status = "audio running · compiling current document".into();
+                    self.awaiting_rev = None;
+                }
+            } else {
+                self.awaiting_rev = None;
+            }
+        }
+        if phase == AudioPhase::Running
+            && self.awaiting_rev.is_some_and(|rev| Feedback::get(&delivery.feedback.applied_rev) >= rev)
+        {
+            *status = "audio running · current graph installed".into();
+            self.awaiting_rev = None;
+        }
+        changed
+    }
+}
+
 struct App {
     core: Arc<Mutex<Core>>,
-    /// `Delivery::generation` the inspector last heard about.
-    seen_generation: u64,
+    compile_notice: CompileNotice,
     latency_at: std::time::Instant,
     audio: AudioHost,
     midi: Midi,
@@ -913,6 +1257,74 @@ struct App {
     watchdog: (u64, std::time::Instant),
     log: Option<kabl_standalone::applog::LogHandle>,
     health: Health,
+    request: AudioRequest,
+    outputs: Vec<(usize, String)>,
+    output_scanned: std::time::Instant,
+    phase: AudioPhase,
+    retry: Option<RetryTask>,
+    session: u64,
+    pending_notes: Option<rtrb::Producer<KeyEvent>>,
+    pending_recorder: Option<record::Recorder>,
+    record_finish: Option<std::thread::JoinHandle<record::Recorder>>,
+    record_last: Option<record::Outcome>,
+    control_stop: Arc<AtomicBool>,
+    control_thread: Option<std::thread::JoinHandle<()>>,
+}
+
+struct RetryTask {
+    handle: std::thread::JoinHandle<RetryResult>,
+    started: std::time::Instant,
+    session: u64,
+}
+
+struct RetryResult {
+    audio: AudioHost,
+    delivery: Delivery,
+    notes: rtrb::Producer<KeyEvent>,
+    retired_graphs: usize,
+}
+
+struct RetryFault {
+    delay_ms: u64,
+    fail_reopen: bool,
+}
+
+/// The old stream is dropped before its collector is drained or a new stream is opened.
+fn retry_worker(
+    old_session: (AudioHost, Delivery),
+    notes: rtrb::Producer<KeyEvent>,
+    notes_rx: rtrb::Consumer<KeyEvent>,
+    keys: Arc<AtomicU64>,
+    request: AudioRequest,
+    peaks: Arc<record::PeakTap>,
+    fault: RetryFault,
+) -> RetryResult {
+    let (mut old, old_delivery) = old_session;
+    drop(old._stream.take());
+    drop(old_delivery);
+    old.collector.collect();
+    let retired_graphs = old.collector.alloc_count();
+    drop(old);
+    if fault.delay_ms > 0 {
+        std::thread::sleep(std::time::Duration::from_millis(fault.delay_ms.min(5000)));
+    }
+    let (audio, delivery) = if fault.fail_reopen {
+        let a = AudioHost::offline(
+            Collector::new(),
+            "injected reopen failure; choose output and Retry".into(),
+        );
+        let d = a.offline_delivery(&default_patch());
+        (a, d)
+    } else {
+        // Always muted; the current editor state is installed before the gate opens.
+        AudioHost::start(&default_patch(), notes_rx, keys, &request, true, peaks)
+    };
+    RetryResult {
+        audio,
+        delivery,
+        notes,
+        retired_graphs,
+    }
 }
 
 /// Audio health as last logged: the log gets counts per interval, never a line per event.
@@ -950,6 +1362,181 @@ impl Health {
 }
 
 impl App {
+    fn interrupt_record(&mut self, core: &mut Core) {
+        let Some(mut rec) = core.ui.recorder.take() else {
+            return;
+        };
+        core.record_dir = rec.dir.clone();
+        if rec.recording() {
+            self.record_finish = Some(std::thread::spawn(move || {
+                rec.stop_interrupted();
+                rec
+            }));
+        } else {
+            self.record_last = rec.last.take();
+        }
+    }
+
+    fn poll_record_finish(&mut self, core: &mut Core) {
+        if self.record_finish.as_ref().is_some_and(|h| h.is_finished()) {
+            if let Ok(rec) = self.record_finish.take().unwrap().join() {
+                self.record_last = rec.last.clone();
+                if let Some(last) = &self.record_last {
+                    core.ui.last_message = Some(record::describe(last));
+                    if let Some(r) = core.ui.recorder.as_mut() {
+                        r.last = Some(last.clone());
+                    }
+                    if let Some(r) = self.pending_recorder.as_mut() {
+                        r.last = Some(last.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    fn begin_retry(&mut self, core: &mut Core) {
+        if self.retry.is_some() {
+            return;
+        }
+        self.session += 1;
+        core.cc_cutoff = clock_s();
+        let session = self.session;
+        self.midi.suspend_notes();
+        reset_pickup(&mut core.ui);
+        core.ui.launches.clear();
+        core.ui.transport.clear();
+        core.ui.clock_running.clear();
+        core.ui.seq_steps.clear();
+        core.ui.seq_banks.clear();
+        core.ui.delay_status.clear();
+        core.ui.lfo_status.clear();
+        core.ui.last_message =
+            Some("Audio restart: live notes and tails end; clocks stay stopped until Start".into());
+        self.interrupt_record(core);
+        self.audio.gate.store(0, Ordering::Relaxed);
+        let old = std::mem::replace(
+            &mut self.audio,
+            AudioHost::offline(
+                Collector::new(),
+                "restarting audio; editing and Save remain available".into(),
+            ),
+        );
+        let old_delivery = std::mem::replace(
+            &mut core.delivery,
+            self.audio.offline_delivery(core.editor.state()),
+        );
+        core.progress = None;
+        if let Some(l) = core.latency.as_mut() {
+            l.waiting.clear();
+        }
+        let request = self.request.clone();
+        let peaks = self.peaks.clone();
+        let keys = self.midi.keys.clone();
+        let (notes, notes_rx) = rtrb::RingBuffer::new(1024);
+        self.phase = AudioPhase::Restarting;
+        let delay = std::env::var("KABL_AUDIO_RETRY_DELAY_MS")
+            .ok()
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or(0);
+        let fail = std::env::var("KABL_AUDIO_FAIL_REOPEN_ATTEMPTS")
+            .ok()
+            .and_then(|s| s.parse::<u64>().ok())
+            .is_some_and(|n| session <= n + 1);
+        let handle = std::thread::Builder::new()
+            .name("kabl-audio-retry".into())
+            .spawn(move || {
+                retry_worker(
+                    (old, old_delivery),
+                    notes,
+                    notes_rx,
+                    keys,
+                    request,
+                    peaks,
+                    RetryFault {
+                        delay_ms: delay,
+                        fail_reopen: fail,
+                    },
+                )
+            })
+            .expect("spawn one audio retry worker");
+        self.retry = Some(RetryTask {
+            handle,
+            started: std::time::Instant::now(),
+            session,
+        });
+    }
+
+    fn poll_retry(&mut self, core: &mut Core, now: f64) {
+        if !self.retry.as_ref().is_some_and(|r| r.handle.is_finished()) {
+            if self
+                .retry
+                .as_ref()
+                .is_some_and(|r| r.started.elapsed().as_secs() >= 10)
+            {
+                self.audio.status = "backend close/open still blocked; editing and Save work; wait or quit (Retry remains disabled while the worker owns the stream)".into();
+            }
+            return;
+        }
+        let task = self.retry.take().unwrap();
+        let Ok(mut done) = task.handle.join() else {
+            self.phase = AudioPhase::Failed;
+            self.audio.status = "audio retry worker failed; choose output and Retry".into();
+            return;
+        };
+        log::info!(target:"audio", "session={} retry completed in {:.2}s; retired graphs remaining={}",
+            task.session, task.started.elapsed().as_secs_f32(), done.retired_graphs);
+        if done.audio._stream.is_some() {
+            done.delivery.async_compile = true;
+            done.delivery.compile_delay_ms = std::env::var("KABL_COMPILE_DELAY_MS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
+            let outcome = done.delivery.sync(core.editor.state(), true, true);
+            if outcome != control::Outcome::Failed {
+                done.audio
+                    .gate
+                    .store(done.delivery.rev(), Ordering::Relaxed);
+                self.phase = AudioPhase::Starting;
+                self.pending_notes = Some(done.notes);
+                if let Some(mut rec) = done.audio.recorder.take() {
+                    rec.dir = core.record_dir.clone();
+                    rec.last = self.record_last.clone();
+                    self.pending_recorder = Some(rec);
+                }
+            } else {
+                done.audio.gate.store(0, Ordering::Relaxed);
+                done.audio.status = format!(
+                    "document cannot play: {}; edit to repair, then Retry",
+                    done.delivery
+                        .compile_error
+                        .as_deref()
+                        .unwrap_or("compile failed")
+                );
+                self.phase = AudioPhase::Failed;
+            }
+        } else {
+            self.phase = AudioPhase::Unavailable;
+        }
+        self.audio = done.audio;
+        core.delivery = done.delivery;
+        core.progress = self
+            .audio
+            .timing
+            .as_ref()
+            .map(|t| Progress::new(t.clone(), self.audio.gate.clone()));
+        self.watchdog = (0, std::time::Instant::now());
+        self.health = Health::new();
+        core.ui.sample_rate = self.audio.sample_rate;
+        core.ui.inspect.reset_audio_session(now);
+        core.ui.inspect.rebuilt(
+            core.delivery.generation,
+            core.delivery.compile_error.clone(),
+            core.editor.state(),
+            now,
+        );
+        self.compile_notice = CompileNotice::new(&core.delivery);
+    }
+
     /// UI thread, every frame: logs what the audio side counted, rate-limited.
     fn log_health(&mut self) {
         let h = &mut self.health;
@@ -1027,6 +1614,10 @@ impl App {
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        if self.output_scanned.elapsed().as_secs_f32() >= 2.0 {
+            self.outputs = output_names();
+            self.output_scanned = std::time::Instant::now();
+        }
         // The whole frame edits under the core lock; the control thread waits meanwhile.
         let core = self.core.clone();
         let Ok(mut core) = core.lock() else {
@@ -1035,8 +1626,40 @@ impl eframe::App for App {
         let Core {
             editor,
             ui: ui_state,
+            ..
+        } = &mut *core;
+        kabl_ui::browser::poll_io(editor, ui_state);
+        if kabl_ui::browser::io_busy(&core.ui) {
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(20));
+        }
+        if self.record_finish.is_none() {
+            self.record_finish = core.record_finish.take();
+        }
+        if let Some(last) = core.record_last.take() {
+            self.record_last = Some(last);
+        }
+        self.poll_record_finish(&mut core);
+        self.poll_retry(&mut core, ui.input(|i| i.time));
+        let ready_at_frame_start = self.phase == AudioPhase::Starting
+            && self.audio.gate.load(Ordering::Relaxed) == u64::MAX;
+        let start_rev = core.delivery.rev();
+        if self.phase == AudioPhase::Starting && self.session > 1 {
+            self.audio.gate.store(0, Ordering::Relaxed);
+        }
+        let mut retry_clicked = false;
+        let mut interrupt_take = false;
+        let Core {
+            editor,
+            ui: ui_state,
             delivery,
             latency,
+            progress,
+            record_finish: _,
+            record_dir,
+            record_last: _,
+            cc_cutoff: _,
+            stale_cc,
         } = &mut *core;
         if let (Some(rx), Some(l)) = (self.audio.applied_rx.as_mut(), latency.as_mut()) {
             while let Ok((rev, at)) = rx.pop() {
@@ -1058,6 +1681,28 @@ impl eframe::App for App {
                 kabl_ui::record::meter_ui(ui, &mut ui_state.meter);
                 ui.separator();
                 ui.label(&self.audio.status);
+                ui.label(format!("{:?} · session {}", self.phase, self.session));
+                if !self.audio.settings.is_empty() {
+                    ui.label("Output settings").on_hover_text(&self.audio.settings);
+                }
+                if let Some(last) = ui_state.recorder.as_ref().and_then(|r| r.last.as_ref())
+                    .or(self.record_last.as_ref()) {
+                    ui.label("Last take").on_hover_text(record::describe(last));
+                }
+                let chosen = self.request.device.as_ref().map_or("System default".to_string(),
+                    |(i, name)| format!("{i}: {name}"));
+                egui::ComboBox::from_id_salt("audio-output").selected_text(chosen).width(150.0)
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut self.request.device, None, "System default");
+                        for (i, name) in &self.outputs {
+                            ui.selectable_value(&mut self.request.device, Some((*i, name.clone())),
+                                format!("{i}: {name}"));
+                        }
+                    });
+                let r = ui.add_enabled(self.retry.is_none(), egui::Button::new("Retry audio"))
+                    .on_hover_text("Restarts stream; live notes and tails end, clocks stop, and a recording becomes a partial take");
+                ui_state.record("audio-retry".into(), r.rect);
+                retry_clicked = r.clicked();
                 // Requested but not yet with the audio thread (it is not taking messages).
                 let waiting = delivery.pending();
                 if waiting > 0 && self.audio.timing.is_some() {
@@ -1090,7 +1735,7 @@ impl eframe::App for App {
         });
         // Measurements for the inspector: only the newest few matter.
         let now = ui.input(|i| i.time);
-        ui_state.inspect.audio = self.audio.timing.is_some();
+        ui_state.inspect.audio = self.phase == AudioPhase::Running;
         if let Some(rx) = self.audio.probe_rx.as_mut() {
             // Aged on the audio clock: a report that waited in the queue (the UI stalled) is
             // not fresh just because it was read now.
@@ -1184,18 +1829,18 @@ impl eframe::App for App {
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(50));
             let n = t.count.load(Ordering::Relaxed);
+            if let Some(failure) = progress.as_ref().and_then(|p| p.failure) {
+                if matches!(self.phase, AudioPhase::Running | AudioPhase::Starting) {
+                    self.phase = failure;
+                    self.audio.status = format!(
+                        "audio {:?} after callback {n}; choose an output and Retry",
+                        failure
+                    );
+                    interrupt_take = true;
+                }
+            }
             if n != self.watchdog.0 {
                 self.watchdog = (n, std::time::Instant::now());
-                if self.audio.status.starts_with("audio stalled") {
-                    self.audio.status = format!("audio resumed after a stall (callback {n})");
-                }
-            } else if self.watchdog.1.elapsed().as_secs_f32() > 1.5
-                && !self.audio.status.starts_with("audio stalled")
-            {
-                self.audio.status = format!(
-                    "audio stalled: no callbacks for over a second after {n} \
-                     (the device may not support these settings, or it went away)"
-                );
             }
         }
         let dt = self.meter_at.elapsed().as_secs_f32();
@@ -1220,6 +1865,11 @@ impl eframe::App for App {
                 .request_repaint_after(std::time::Duration::from_millis(30));
         }
         show(editor, ui_state, ui);
+        if let Some(rec) = ui_state.recorder.as_ref() {
+            // Keep the chosen folder even if the control pump takes this recorder on a
+            // failure before the next UI frame.
+            *record_dir = rec.dir.clone();
+        }
         // Scripted real-input runs (xdotool) read the drawn targets from here.
         if let Some(path) = &self.hits_file {
             let text: String = ui_state
@@ -1250,7 +1900,7 @@ impl eframe::App for App {
                 let _ = std::fs::write(
                     path,
                     format!(
-                        "{} · {} live graph allocations · {} undo entries · {} MIDI notes held · {} voices sounding\n{}\n{}\n",
+                        "{} · {} live graph allocations · {} undo entries · {} MIDI notes held · {} voices sounding\n{}\n{} · {} stale CC events discarded\n",
                         t.line(self.audio.sample_rate),
                         self.audio.collector.alloc_count(),
                         editor.log().entries().len(),
@@ -1258,6 +1908,7 @@ impl eframe::App for App {
                         sounding,
                         t.hist_line(),
                         delivery_line(delivery),
+                        stale_cc,
                     ),
                 );
             }
@@ -1266,17 +1917,39 @@ impl eframe::App for App {
         }
         // Document changes and queued commands to the audio thread (runtime values or a graph).
         control::deliver(editor, ui_state, delivery);
+        if self.phase == AudioPhase::Starting {
+            if let Some(err) = delivery.compile_error.as_deref() {
+                self.audio.gate.store(0, Ordering::Relaxed);
+                self.phase = AudioPhase::Failed;
+                self.audio.status =
+                    format!("document cannot play: {err}; edit to repair, then Retry");
+            } else if ready_at_frame_start
+                && delivery.rev() == start_rev
+                && self
+                    .audio
+                    .timing
+                    .as_ref()
+                    .is_some_and(|t| t.count.load(Ordering::Relaxed) > 0)
+            {
+                self.audio.gate.store(u64::MAX, Ordering::Relaxed);
+                self.phase = AudioPhase::Running;
+                self.audio.status = format!(
+                    "audio running · session {} · current graph installed",
+                    self.session
+                );
+                if let Some(notes) = self.pending_notes.take() {
+                    self.midi.resume_notes(notes);
+                }
+                if let Some(rec) = self.pending_recorder.take() {
+                    ui_state.recorder = Some(rec);
+                }
+            } else if self.session > 1 {
+                self.audio.gate.store(delivery.rev(), Ordering::Relaxed);
+            }
+        }
         // A compile happened (here or on the control thread): the inspector checks whether
         // its readings still describe the patch.
-        if delivery.generation != self.seen_generation {
-            self.seen_generation = delivery.generation;
-            match &delivery.compile_error {
-                Some(e) => self.audio.status = format!("recompile failed: {e}"),
-                None if self.audio.status.starts_with("recompile failed") => {
-                    self.audio.status = "recompiled: playing the current patch".into()
-                }
-                None => {}
-            }
+        if self.compile_notice.observe(self.phase, &mut self.audio.status, delivery) {
             ui_state.inspect.rebuilt(
                 delivery.generation,
                 delivery.compile_error.clone(),
@@ -1286,7 +1959,12 @@ impl eframe::App for App {
         }
         // Closing the window (or Ctrl+Q) with unsaved changes asks first.
         let close = ui.ctx().input(|i| i.viewport().close_requested());
-        if close && !ui_state.quit_now && kabl_ui::browser::is_modified(editor, ui_state) {
+        if close && kabl_ui::browser::io_busy(ui_state) {
+            ui.ctx()
+                .send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            ui_state.last_message =
+                Some("wait for the file operation to finish before closing".into());
+        } else if close && !ui_state.quit_now && kabl_ui::browser::is_modified(editor, ui_state) {
             ui.ctx()
                 .send_viewport_cmd(egui::ViewportCommand::CancelClose);
             if ui_state.browser.dialog.is_none() {
@@ -1305,6 +1983,36 @@ impl eframe::App for App {
         self.audio.collector.collect();
         if delivery.waiting() > 0 {
             ui.ctx().request_repaint();
+        }
+        if self.retry.is_some() {
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(50));
+        }
+        if retry_clicked {
+            self.begin_retry(&mut core);
+        } else if interrupt_take {
+            self.interrupt_record(&mut core);
+        }
+    }
+}
+
+impl Drop for App {
+    fn drop(&mut self) {
+        self.control_stop.store(true, Ordering::Release);
+        if let Some(thread) = self.control_thread.take() {
+            thread.thread().unpark();
+            let _ = thread.join();
+        }
+        if let Some(task) = self.retry.take() {
+            let _ = task.handle.join();
+        }
+        if let Some(writer) = self.record_finish.take() {
+            let _ = writer.join();
+        }
+        if let Ok(mut core) = self.core.lock() {
+            if let Some(writer) = core.record_finish.take() {
+                let _ = writer.join();
+            }
         }
     }
 }
@@ -1414,6 +2122,11 @@ fn main() -> eframe::Result<()> {
         }
     };
     ui_state.library = Some(library);
+    ui_state.browser.async_io = true;
+    ui_state.browser.io_delay_ms = std::env::var("KABL_BROWSER_IO_DELAY_MS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
     if args.iter().any(|a| a == "--browser") {
         ui_state.browser_open = true;
     }
@@ -1428,15 +2141,30 @@ fn main() -> eframe::Result<()> {
     midi.connect_default(flag("--midi").as_deref());
     let num = |name: &str| flag(name).and_then(|v| v.parse::<u32>().ok());
     let peaks = Arc::new(record::PeakTap::default());
-    let (mut audio, delivery) = AudioHost::start(
+    let request = AudioRequest {
+        rate: num("--rate"),
+        frames: num("--frames"),
+        realtime: !args.iter().any(|a| a == "--no-rt"),
+        device: None,
+    };
+    let (mut audio, mut delivery) = AudioHost::start(
         editor.state(),
         notes_rx,
         midi.keys.clone(),
-        num("--rate"),
-        num("--frames"),
-        !args.iter().any(|a| a == "--no-rt"),
+        &request,
+        false,
         peaks.clone(),
     );
+    delivery.async_compile = true;
+    delivery.compile_delay_ms = std::env::var("KABL_COMPILE_DELAY_MS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+    let phase = if audio._stream.is_some() {
+        AudioPhase::Starting
+    } else {
+        AudioPhase::Unavailable
+    };
     ui_state.inspect.rebuilt(1, None, editor.state(), 0.0);
     ui_state.recorder = audio.recorder.take();
     ui_state.sample_rate = audio.sample_rate;
@@ -1446,6 +2174,10 @@ fn main() -> eframe::Result<()> {
     if args.iter().any(|a| a == "--perform") {
         ui_state.perform_open = true;
     }
+    let record_dir = ui_state
+        .recorder
+        .as_ref()
+        .map_or_else(|| "Recordings".into(), |r| r.dir.clone());
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -1459,16 +2191,28 @@ fn main() -> eframe::Result<()> {
         options,
         Box::new(|cc| {
             kabl_ui::theme::install_fonts(&cc.egui_ctx);
+            let compile_notice = CompileNotice::new(&delivery);
             let core = Arc::new(Mutex::new(Core {
                 editor,
                 ui: ui_state,
                 delivery,
                 latency: std::env::var_os("KABL_LATENCY_FILE").map(|_| Latency::default()),
+                progress: audio
+                    .timing
+                    .as_ref()
+                    .map(|t| Progress::new(t.clone(), audio.gate.clone())),
+                record_finish: None,
+                record_dir: record_dir.clone(),
+                record_last: None,
+                cc_cutoff: f64::NEG_INFINITY,
+                stale_cc: 0,
             }));
             let c = core.clone();
+            let control_stop = Arc::new(AtomicBool::new(false));
+            let stop = control_stop.clone();
             let pump = std::thread::Builder::new()
                 .name("kabl-control".into())
-                .spawn(move || pump(c, cc_rx))
+                .spawn(move || pump(c, cc_rx, stop))
                 .expect("spawn the control thread");
             {
                 let mut sink = midi.sink.lock().unwrap();
@@ -1477,7 +2221,7 @@ fn main() -> eframe::Result<()> {
             }
             Ok(Box::new(App {
                 core,
-                seen_generation: 1,
+                compile_notice,
                 latency_at: std::time::Instant::now(),
                 audio,
                 midi,
@@ -1491,6 +2235,18 @@ fn main() -> eframe::Result<()> {
                     .map(|f| (f, std::time::Instant::now())),
                 log: log.as_ref().map(|l| l.view()),
                 health: Health::new(),
+                request,
+                outputs: output_names(),
+                output_scanned: std::time::Instant::now(),
+                phase,
+                retry: None,
+                session: 1,
+                pending_notes: None,
+                pending_recorder: None,
+                record_finish: None,
+                record_last: None,
+                control_stop,
+                control_thread: Some(pump),
             }))
         }),
     );
@@ -1499,4 +2255,450 @@ fn main() -> eframe::Result<()> {
         l.shutdown();
     }
     result
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+
+    #[test]
+    fn delayed_compile_failure_and_repair_update_the_visible_notice() {
+        let patch = default_patch();
+        let collector = basedrop::Collector::new();
+        let (tx, _rx) = rtrb::RingBuffer::new(control::QUEUE);
+        let mut delivery = Delivery::new(
+            Some(tx), collector.handle(), Arc::new(Feedback::default()),
+            48000.0, 8, Some(&patch),
+        );
+        delivery.async_compile = true;
+        delivery.compile_delay_ms = 80;
+        let mut editor = PatchEditor::seed_from(&patch);
+        let mut notice = CompileNotice::new(&delivery);
+        let mut status = "audio running · current graph installed".to_string();
+        editor.add_module("no-such-module", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+        assert_eq!(delivery.sync(editor.state(), false, false), control::Outcome::Compiled);
+        assert!(notice.observe(AudioPhase::Running, &mut status, &delivery));
+        assert!(status.contains("compiling"));
+        assert!(notice.error.is_none(), "the worker has not finished yet");
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        while delivery.compile_error.is_none() {
+            delivery.flush();
+            assert!(std::time::Instant::now() < deadline, "compile failure timed out");
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        assert!(notice.observe(AudioPhase::Running, &mut status, &delivery));
+        assert!(status.contains("recompile failed"));
+        assert!(notice.error.as_deref().unwrap().contains("no-such-module"));
+        assert!(!notice.observe(AudioPhase::Running, &mut status, &delivery));
+
+        editor.undo();
+        assert_eq!(delivery.sync(editor.state(), false, false), control::Outcome::Compiled);
+        assert!(delivery.compile_error.is_some(), "failure remains visible while compiling");
+        assert!(notice.observe(AudioPhase::Running, &mut status, &delivery));
+        assert!(status.contains("recompile failed"));
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        while delivery.compile_error.is_some() {
+            delivery.flush();
+            assert!(std::time::Instant::now() < deadline, "compile repair timed out");
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        assert!(notice.observe(AudioPhase::Running, &mut status, &delivery));
+        assert!(notice.error.is_none());
+        assert!(status.contains("queued"), "must not claim playback before callback ack");
+        assert!(!notice.observe(AudioPhase::Running, &mut status, &delivery));
+        assert!(status.contains("queued"));
+        delivery.feedback.applied_rev.store(delivery.rev(), Ordering::Relaxed);
+        assert!(!notice.observe(AudioPhase::Running, &mut status, &delivery));
+        assert!(status.contains("installed"));
+
+        // A failed retry leaves an actionable status even when a later edit compiles.
+        editor.add_module("no-such-module", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+        assert_eq!(delivery.sync(editor.state(), false, false), control::Outcome::Compiled);
+        status = "document cannot play: invalid graph; edit to repair, then Retry".into();
+        assert!(notice.observe(AudioPhase::Failed, &mut status, &delivery));
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        while delivery.compile_error.is_none() {
+            delivery.flush();
+            assert!(std::time::Instant::now() < deadline, "retry compile failure timed out");
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        assert!(notice.observe(AudioPhase::Failed, &mut status, &delivery));
+        editor.undo();
+        assert_eq!(delivery.sync(editor.state(), false, false), control::Outcome::Compiled);
+        notice.observe(AudioPhase::Failed, &mut status, &delivery);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        while delivery.compile_error.is_some() {
+            delivery.flush();
+            assert!(std::time::Instant::now() < deadline, "retry repair timed out");
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        assert!(notice.observe(AudioPhase::Failed, &mut status, &delivery));
+        assert!(status.contains("Retry"));
+        assert!(!status.contains("playing"));
+    }
+
+    /// The real control pump and cpal callback keep processing a mapped CC while a 500 ms
+    /// Save or Open worker runs. The environment has a software PCM, not a controller.
+    #[test]
+    #[ignore = "set ALSA_CONFIG_PATH to an ALSA null PCM and run explicitly"]
+    fn cc_to_callback_during_delayed_save_and_open() {
+        use kabl_ui::{
+            browser,
+            library::{Library, Meta},
+            routing,
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let factory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches");
+        let log = kabl_core::load(&factory.join("composition")).unwrap();
+        let mut lib = Library::open(Some(factory), dir.path().to_path_buf());
+        let meta = Meta {
+            name: "CC latency piece".into(),
+            ..Meta::default()
+        };
+        let id = lib.save(&log, meta, None).unwrap();
+        let editor = PatchEditor::from_log(log);
+        let mut ui = UiState::default();
+        ui.library = Some(lib);
+        ui.doc = Some(browser::Doc::new(
+            "CC latency piece",
+            browser::DocOrigin::Library(id),
+            editor.state(),
+        ));
+        ui.browser.async_io = true;
+        ui.browser.io_delay_ms = 500;
+        let (_, notes_rx) = rtrb::RingBuffer::new(1024);
+        let request = AudioRequest {
+            rate: Some(48000),
+            frames: Some(256),
+            realtime: false,
+            device: None,
+        };
+        let (mut host, mut delivery) = AudioHost::start(
+            editor.state(),
+            notes_rx,
+            Arc::new(AtomicU64::new(0)),
+            &request,
+            false,
+            Arc::new(record::PeakTap::default()),
+        );
+        assert!(host._stream.is_some(), "{}", host.status);
+        delivery.async_compile = true;
+        let feedback = delivery.feedback.clone();
+        let core = Arc::new(Mutex::new(Core {
+            editor,
+            ui,
+            delivery,
+            latency: None,
+            progress: None,
+            record_finish: None,
+            record_dir: String::new(),
+            record_last: None,
+            cc_cutoff: f64::NEG_INFINITY,
+            stale_cc: 0,
+        }));
+        let (mut cc_tx, cc_rx) = rtrb::RingBuffer::new(128);
+        let stop = Arc::new(AtomicBool::new(false));
+        let pump_core = core.clone();
+        let pump_stop = stop.clone();
+        let pump_thread = std::thread::spawn(move || pump(pump_core, cc_rx, pump_stop));
+
+        let send_and_measure =
+            |core: &Arc<Mutex<Core>>, tx: &mut rtrb::Producer<((u8, u8, u8), f64)>| {
+                let c = core.lock().unwrap();
+                let before = c.delivery.rev();
+                let state = c.editor.state();
+                let module = &state.modules[&3];
+                let info = kabl_modules::registry::info_for(&module.kind).unwrap();
+                let p = info.params.iter().find(|p| p.name == "m1").unwrap();
+                let at = (routing::base_value(state, 3, p) * 127.0).round() as u8;
+                drop(c);
+                let moved = if at < 107 { at + 20 } else { at - 20 };
+                let start = std::time::Instant::now();
+                tx.push(((0, 20, at), clock_s())).unwrap();
+                tx.push(((0, 20, moved), clock_s())).unwrap();
+                let deadline = start + std::time::Duration::from_millis(350);
+                loop {
+                    let rev = core.lock().unwrap().delivery.rev();
+                    if rev > before && Feedback::get(&feedback.applied_rev) >= rev {
+                        return start.elapsed();
+                    }
+                    assert!(
+                        std::time::Instant::now() < deadline,
+                        "CC did not reach callback within 350 ms during file I/O"
+                    );
+                    std::thread::sleep(std::time::Duration::from_millis(2));
+                }
+            };
+        {
+            let mut c = core.lock().unwrap();
+            let Core { editor, ui, .. } = &mut *c;
+            assert!(browser::save(editor, ui, None).is_none());
+            assert!(browser::io_busy(ui));
+        }
+        let save_latency = send_and_measure(&core, &mut cc_tx);
+        assert!(core.lock().unwrap().ui.browser.async_io);
+        let save_deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        loop {
+            let mut c = core.lock().unwrap();
+            if !browser::io_busy(&c.ui) {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < save_deadline,
+                "Save worker did not finish"
+            );
+            let Core { editor, ui, .. } = &mut *c;
+            browser::poll_io(editor, ui);
+            drop(c);
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        {
+            let mut c = core.lock().unwrap();
+            let Core { editor, ui, .. } = &mut *c;
+            browser::perform(
+                editor,
+                ui,
+                browser::Pending::Open("factory:palette/pad".into()),
+            );
+            assert!(browser::io_busy(ui));
+            ui.takeover.clear();
+        }
+        let open_latency = send_and_measure(&core, &mut cc_tx);
+        eprintln!(
+            "CC to callback during 500 ms worker: Save {:.1} ms, Open {:.1} ms",
+            save_latency.as_secs_f64() * 1e3,
+            open_latency.as_secs_f64() * 1e3
+        );
+        assert!(save_latency.as_millis() < 350 && open_latency.as_millis() < 350);
+        let open_deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        loop {
+            let mut c = core.lock().unwrap();
+            if !browser::io_busy(&c.ui) {
+                assert!(matches!(
+                    c.ui.browser.dialog,
+                    Some(browser::Dialog::Unsaved { .. })
+                ));
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < open_deadline,
+                "Open worker did not finish"
+            );
+            let Core { editor, ui, .. } = &mut *c;
+            browser::poll_io(editor, ui);
+            drop(c);
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        stop.store(true, Ordering::Release);
+        pump_thread.thread().unpark();
+        pump_thread.join().unwrap();
+        drop(host._stream.take());
+        drop(core);
+        host.collector.collect();
+    }
+
+    #[test]
+    fn callback_failure_sticks_and_xrun_alone_does_not_fail() {
+        let timing = Arc::new(CallbackTiming::default());
+        let gate = Arc::new(AtomicU64::new(u64::MAX));
+        let mut p = Progress::new(timing.clone(), gate.clone());
+        timing.xruns.store(3, Ordering::Relaxed);
+        timing.count.store(8, Ordering::Relaxed);
+        p.observe();
+        assert_eq!(p.failure, None);
+        p.at = std::time::Instant::now() - std::time::Duration::from_secs(2);
+        p.observe();
+        assert_eq!(p.failure, Some(AudioPhase::Stalled));
+        assert_eq!(gate.load(Ordering::Relaxed), 0);
+        timing.count.store(9, Ordering::Relaxed);
+        p.observe();
+        assert_eq!(p.failure, Some(AudioPhase::Stalled));
+        gate.store(2, Ordering::Relaxed);
+        p.observe();
+        assert_eq!(
+            gate.load(Ordering::Relaxed),
+            0,
+            "sticky failure closes a later gate too"
+        );
+    }
+
+    #[test]
+    fn stale_callback_cannot_reopen_a_failed_or_revised_gate() {
+        let gate = AtomicU64::new(4);
+        // Callback read revision 4; the detector failed or an edit became revision 5.
+        gate.store(0, Ordering::Release);
+        assert!(!unmute_if_current(&gate, 4));
+        assert_eq!(gate.load(Ordering::Acquire), 0);
+        gate.store(5, Ordering::Release);
+        assert!(!unmute_if_current(&gate, 4));
+        assert_eq!(gate.load(Ordering::Acquire), 5);
+        assert!(unmute_if_current(&gate, 5));
+        assert_eq!(gate.load(Ordering::Acquire), u64::MAX);
+    }
+
+    #[test]
+    fn retry_boundary_discards_only_earlier_cc_arrivals() {
+        let events = [((0, 24, 50), 1.0), ((0, 46, 127), 2.0), ((0, 24, 60), 3.0)];
+        let mut fresh = Vec::new();
+        let (dropped, earliest) = fresh_cc(&events, 2.0, &mut fresh);
+        assert_eq!(dropped, 2);
+        assert_eq!(earliest, 3.0);
+        assert_eq!(fresh, vec![(0, 24, 60)]);
+    }
+
+    /// Opt-in cpal stream and callback test against an ALSA null PCM. No physical device.
+    #[test]
+    #[ignore = "set ALSA_CONFIG_PATH to an ALSA null PCM and run explicitly"]
+    fn actual_backend_repeated_reopen_and_fault() {
+        let patch = default_patch();
+        let request = AudioRequest {
+            rate: Some(48000),
+            frames: Some(256),
+            realtime: false,
+            device: None,
+        };
+        let keys = Arc::new(AtomicU64::new(0));
+        let peaks = Arc::new(record::PeakTap::default());
+        let (_, rx) = rtrb::RingBuffer::new(1024);
+        let mut invalid = request.clone();
+        invalid.device = Some((usize::MAX, "missing".into()));
+        let (unavailable, _) =
+            AudioHost::start(&patch, rx, keys.clone(), &invalid, true, peaks.clone());
+        assert!(unavailable._stream.is_none());
+        let mut old = AudioHost::offline(Collector::new(), "offline".into());
+        for (fail, delay) in [(true, 20), (false, 0), (false, 0)] {
+            let (notes, rx) = rtrb::RingBuffer::new(1024);
+            let at = std::time::Instant::now();
+            let old_delivery = old.offline_delivery(&patch);
+            let mut done = retry_worker(
+                (old, old_delivery),
+                notes,
+                rx,
+                keys.clone(),
+                request.clone(),
+                peaks.clone(),
+                RetryFault {
+                    delay_ms: delay,
+                    fail_reopen: fail,
+                },
+            );
+            assert_eq!(done.retired_graphs, 0);
+            assert!(at.elapsed().as_millis() >= delay as u128);
+            assert_eq!(done.audio._stream.is_some(), !fail);
+            if !fail {
+                assert_eq!(
+                    done.delivery.sync(&patch, true, true),
+                    control::Outcome::Compiled
+                );
+                done.audio
+                    .gate
+                    .store(done.delivery.rev(), Ordering::Relaxed);
+                std::thread::sleep(std::time::Duration::from_millis(120));
+                assert!(
+                    done.audio
+                        .timing
+                        .as_ref()
+                        .unwrap()
+                        .count
+                        .load(Ordering::Relaxed)
+                        > 0
+                );
+                assert_eq!(done.audio.gate.load(Ordering::Relaxed), u64::MAX);
+            }
+            drop(done.delivery);
+            drop(done.notes);
+            old = done.audio;
+        }
+        drop(old._stream.take());
+        old.collector.collect();
+        assert_eq!(old.collector.alloc_count(), 0);
+    }
+
+    /// Exercises the production cpal closure, including queue drain, MIDI, reports, gate,
+    /// recording tap and timing, after two startup callbacks. Requires ALSA null PCM.
+    #[test]
+    #[ignore = "set ALSA_CONFIG_PATH to an ALSA null PCM and run explicitly"]
+    fn production_callback_warmed_path_has_no_alloc_or_dealloc() {
+        let patch = default_patch();
+        let (mut notes, rx) = rtrb::RingBuffer::new(1024);
+        let request = AudioRequest {
+            rate: Some(48000),
+            frames: Some(256),
+            realtime: false,
+            device: None,
+        };
+        let (mut host, mut delivery) = AudioHost::start(
+            &patch,
+            rx,
+            Arc::new(AtomicU64::new(0)),
+            &request,
+            true,
+            Arc::new(record::PeakTap::default()),
+        );
+        assert!(host._stream.is_some(), "{}", host.status);
+        assert_eq!(
+            delivery.sync(&patch, true, true),
+            control::Outcome::Compiled
+        );
+        host.gate.store(delivery.rev(), Ordering::Relaxed);
+        let dir = tempfile::tempdir().unwrap();
+        host.recorder
+            .as_mut()
+            .unwrap()
+            .start_at(dir.path().join("callback.wav"))
+            .unwrap();
+        notes
+            .push(KeyEvent::On {
+                note: 60,
+                velocity: 96,
+            })
+            .unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        assert_eq!(host.gate.load(Ordering::Relaxed), u64::MAX);
+        drop(host._stream.take());
+        assert!(host.timing.as_ref().unwrap().count.load(Ordering::Relaxed) > 2);
+        assert_eq!(callback_allocations::ALLOCS.load(Ordering::Relaxed), 0);
+        assert_eq!(callback_allocations::DEALLOCS.load(Ordering::Relaxed), 0);
+        assert!(host.recorder.as_mut().unwrap().stop().is_some());
+        drop(delivery);
+        host.collector.collect();
+    }
+
+    #[test]
+    #[ignore = "set ALSA_CONFIG_PATH to an ALSA null PCM and run explicitly"]
+    fn actual_callback_fault_sticks_and_mutes() {
+        std::env::set_var("KABL_AUDIO_FAULT", "stall");
+        std::env::set_var("KABL_AUDIO_FAULT_AFTER", "3");
+        let patch = default_patch();
+        let (_, rx) = rtrb::RingBuffer::new(1024);
+        let request = AudioRequest {
+            rate: Some(48000),
+            frames: Some(256),
+            realtime: false,
+            device: None,
+        };
+        let (mut host, delivery) = AudioHost::start(
+            &patch,
+            rx,
+            Arc::new(AtomicU64::new(0)),
+            &request,
+            false,
+            Arc::new(record::PeakTap::default()),
+        );
+        assert!(host._stream.is_some(), "{}", host.status);
+        let mut progress = Progress::new(host.timing.as_ref().unwrap().clone(), host.gate.clone());
+        std::thread::sleep(std::time::Duration::from_millis(120));
+        progress.observe();
+        assert!(progress.last >= 3);
+        std::thread::sleep(std::time::Duration::from_millis(1600));
+        progress.observe();
+        assert_eq!(progress.failure, Some(AudioPhase::Stalled));
+        assert_eq!(host.gate.load(Ordering::Relaxed), 0);
+        drop(delivery);
+        drop(host._stream.take());
+        host.collector.collect();
+        assert_eq!(host.collector.alloc_count(), 0);
+        std::env::remove_var("KABL_AUDIO_FAULT");
+        std::env::remove_var("KABL_AUDIO_FAULT_AFTER");
+    }
 }

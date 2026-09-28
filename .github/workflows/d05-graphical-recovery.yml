@@ -1,0 +1,74 @@
+name: D05 graphical recovery evidence
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [codex/d05-audio-recovery]
+  workflow_dispatch:
+jobs:
+  recovery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libxkbcommon-dev libxkbcommon-x11-0 libdbus-1-dev xvfb xdotool imagemagick libgl1-mesa-dri openbox
+      - name: Build installed package
+        run: packaging/linux/package.sh
+      - name: Drive recovery in graphical session
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/d05-graphical
+          cat > target/d05-graphical/alsa-null.conf <<'EOF'
+          pcm.!default { type null }
+          ctl.!default { type hw card 0 }
+          EOF
+          tar -xzf target/dist/kabl-0.1.0-linux-x86_64.tar.gz -C target/d05-graphical
+          export KABL_BIN="$PWD/target/d05-graphical/kabl-0.1.0-linux-x86_64/bin/kabl-ui"
+          export ALSA_CONFIG_PATH="$PWD/target/d05-graphical/alsa-null.conf"
+          export KABL_AUDIO_FAULT=stall KABL_AUDIO_FAULT_AFTER=30
+          export KABL_AUDIO_RETRY_DELAY_MS=600 KABL_COMPILE_DELAY_MS=400
+          export KABL_ARGS='--no-rt --rate 48000 --frames 256'
+          export WINIT_UNIX_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1
+          export KABL_CAPTURE_WINDOW=1
+          for spec in '1440x900 light' '1440x900 dark' '1280x800 light' '1280x800 dark'; do
+            read -r size theme <<< "$spec"
+            case_dir="$PWD/target/d05-graphical/$size-$theme"
+            mkdir -p "$case_dir"
+            export KABL_USER_DIR="$case_dir/user"
+            export KABL_APP_LOG="$case_dir/app.log"
+            export KABL_DRIVE_LOG="$case_dir/drive.log"
+            export KABL_STATS_FILE="$case_dir/stats.txt"
+            script=docs/audio-recovery/graphical-recovery.txt
+            if [[ "$theme" == dark ]]; then
+              script=docs/audio-recovery/graphical-recovery-dark.txt
+            fi
+            xvfb-run -a -s '-screen 0 1600x1000x24' bash -c '
+              openbox >/dev/null 2>&1 &
+              exec timeout 45s python3 docs/rack-migration/drive.py "$1" "$2" "$3" patches/composition
+            ' _ "$script" "$size" "$case_dir/shots"
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          root = Path('target/d05-graphical')
+          for size in ('1440x900', '1280x800'):
+              for theme in ('light', 'dark'):
+                  case = root / f'{size}-{theme}'
+                  log = (case / 'user/logs/kabl.log').read_text()
+                  stats = (case / 'stats.txt').read_text()
+                  callbacks = int(re.search(r'(\d+) callbacks', stats).group(1))
+                  assert 'retry completed' in log, f'{case}: Retry did not reach the backend'
+                  assert callbacks > 100, f'{case}: stream stalled after Retry: {callbacks}'
+                  assert len(list((case / 'shots').glob('*.png'))) == 3, f'{case}: missing screenshots'
+                  print(f'{size} {theme}: {callbacks} callbacks on the new stream')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: d05-graphical-recovery
+          path: target/d05-graphical/

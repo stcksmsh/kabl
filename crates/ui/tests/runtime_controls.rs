@@ -319,6 +319,36 @@ fn deletion_recreation_and_a_new_document_reject_old_values() {
 }
 
 #[test]
+fn delayed_structural_compile_keeps_cc_responsive_and_installs_latest_document() {
+    let mut h = H::new();
+    h.d.async_compile = true;
+    h.d.compile_delay_ms = 500;
+    h.editor
+        .add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+    assert_eq!(h.deliver(), Outcome::Compiled);
+    let started = std::time::Instant::now();
+    h.cc(&[(24, 64)]);
+    h.editor
+        .add_module("lfo", kabl_core::Vec2 { x: 40.0, y: 0.0 });
+    assert_eq!(h.deliver(), Outcome::Compiled);
+    assert!(
+        started.elapsed().as_millis() < 350,
+        "CC and later edit waited for compilation: {:?}",
+        started.elapsed()
+    );
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(4);
+    while h.d.waiting() > 0 && std::time::Instant::now() < deadline {
+        h.d.flush();
+        h.callback(4);
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    h.settle();
+    assert_eq!(h.d.waiting(), 0);
+    h.assert_engine_matches_document();
+    assert_eq!(h.engine.active_mut().generation, h.d.generation);
+}
+
+#[test]
 fn a_paused_audio_thread_bounds_the_queue_and_gets_the_last_value() {
     let mut h = H::new();
     h.settle();
@@ -729,4 +759,267 @@ fn a_waiting_load_replaced_by_an_edit_stays_a_stopped_load() {
     assert_eq!(h.deliver(), Outcome::Compiled);
     h.settle();
     assert_eq!(clock_running(&h), Some(true));
+}
+
+/// The older queued-graph test does not enter the engine's overlapping fade slot. Put a
+/// stopped Load in `pending`, replace it during the fade, then promote it deterministically.
+#[test]
+fn stopped_load_in_engine_fade_survives_edit_and_explicit_start() {
+    for start_before_edit in [false, true] {
+        let mut h = H::new();
+        h.editor
+            .add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+        h.deliver();
+        h.callback(1); // incoming graph is still fading in
+
+        kabl_ui::browser::replace_patch(&mut h.editor, &mut h.ui, piece());
+        h.ui.load_stopped = true;
+        assert_eq!(h.deliver(), Outcome::Compiled);
+        h.callback(0); // stopped Load is now the engine's pending graph
+        if start_before_edit {
+            h.ui.transport.push((CLOCK, Transport::Run));
+            h.deliver();
+            h.callback(0);
+        }
+        h.editor
+            .add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+        assert_eq!(h.deliver(), Outcome::Compiled);
+        h.callback(0); // edit replaces pending Load
+        h.callback(40); // both fades complete
+        assert_eq!(clock_running(&h), Some(start_before_edit));
+    }
+}
+
+#[test]
+fn pending_stopped_load_keeps_selection_without_touching_outgoing_graph() {
+    let mut h = H::new();
+    let seq = *h
+        .editor
+        .state()
+        .modules
+        .iter()
+        .find(|(_, m)| m.kind == "seq")
+        .unwrap()
+        .0;
+    h.editor
+        .add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+    h.deliver();
+    h.callback(1);
+    kabl_ui::browser::replace_patch(&mut h.editor, &mut h.ui, piece());
+    h.ui.load_stopped = true;
+    h.deliver();
+    h.callback(0);
+    h.ui.launches.push(Command::Launch(Launch::new(
+        CLOCK,
+        Timing::NextBar,
+        &[(seq, 1)],
+    )));
+    h.deliver();
+    h.callback(0);
+    let mut outgoing = None;
+    h.engine.seqs(|id, _, _, armed| {
+        if id == seq {
+            outgoing = armed;
+        }
+    });
+    assert_eq!(outgoing, None);
+    h.editor
+        .add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+    h.deliver();
+    h.callback(0);
+    h.settle();
+    assert_eq!(clock_running(&h), Some(false));
+    let mut armed = None;
+    h.engine.seqs(|id, _, _, bank| {
+        if id == seq {
+            armed = bank;
+        }
+    });
+    assert_eq!(armed, Some(1));
+}
+
+#[test]
+fn toggle_after_pending_stopped_load_starts_new_clock_only() {
+    let mut h = H::new();
+    h.editor
+        .add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+    h.deliver();
+    h.callback(1);
+    kabl_ui::browser::replace_patch(&mut h.editor, &mut h.ui, piece());
+    h.ui.load_stopped = true;
+    h.deliver();
+    h.callback(0);
+    assert_eq!(clock_running(&h), Some(true));
+    h.ui.transport.push((CLOCK, Transport::Toggle));
+    h.deliver();
+    h.callback(0);
+    assert_eq!(clock_running(&h), Some(true));
+    h.settle();
+    assert_eq!(clock_running(&h), Some(true));
+}
+
+#[test]
+fn timed_launch_waits_for_pending_fresh_document() {
+    let mut h = H::new();
+    let seq = h
+        .editor
+        .state()
+        .modules
+        .iter()
+        .find(|(_, m)| m.kind == "seq")
+        .unwrap()
+        .0
+        .to_owned();
+    h.editor
+        .add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+    h.deliver();
+    h.callback(1); // old graph is fading, so the Load enters the pending slot
+    kabl_ui::browser::replace_patch(&mut h.editor, &mut h.ui, piece());
+    h.ui.load_stopped = true;
+    h.deliver();
+    h.callback(0);
+    h.ui.transport.push((CLOCK, Transport::Run));
+    h.ui.launches.push(Command::Launch(Launch::new(
+        CLOCK,
+        Timing::NextBar,
+        &[(seq, 1)],
+    )));
+    h.deliver();
+    h.callback(1);
+    let mut outgoing_queued = None;
+    h.engine.seqs(|id, _, _, queued| {
+        if id == seq {
+            outgoing_queued = queued
+        }
+    });
+    assert_eq!(
+        outgoing_queued, None,
+        "the outgoing document must not see the launch"
+    );
+    h.callback(12); // first fade promotes the Load; its own fade begins
+    let mut incoming = None;
+    h.engine.seqs(|id, _, bank, queued| {
+        if id == seq {
+            incoming = Some((bank, queued));
+        }
+    });
+    assert!(
+        matches!(incoming, Some((1, _)) | Some((_, Some(1)))),
+        "the loaded graph keeps or has played the timed launch: {incoming:?}"
+    );
+}
+
+#[test]
+fn preview_waits_until_pending_fresh_document_is_active() {
+    let mut h = H::new();
+    h.editor
+        .add_module("lfo", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+    h.deliver();
+    h.callback(1);
+    kabl_ui::browser::replace_patch(&mut h.editor, &mut h.ui, piece());
+    h.deliver();
+    h.callback(0);
+    h.ui.launches.push(Command::Preview {
+        notes: [60, 0, 0, 0],
+        count: 1,
+        velocity: 80,
+        blocks: 300,
+    });
+    h.deliver();
+    h.callback(1);
+    assert_eq!(
+        h.engine.preview_keys(),
+        0,
+        "the outgoing document stays silent"
+    );
+    h.callback(40);
+    assert_ne!(
+        h.engine.preview_keys(),
+        0,
+        "the new document receives the preview"
+    );
+}
+
+#[test]
+fn commands_during_fresh_incoming_fade_leave_outgoing_document_alone() {
+    let mut h = H::new();
+    let seq = *h
+        .editor
+        .state()
+        .modules
+        .iter()
+        .find(|(_, m)| m.kind == "seq")
+        .unwrap()
+        .0;
+    assert_eq!(
+        h.engine.active_mut().clock(CLOCK).map(|c| c.running()),
+        Some(true)
+    );
+    kabl_ui::browser::replace_patch(&mut h.editor, &mut h.ui, piece());
+    h.ui.load_stopped = true;
+    h.deliver();
+    h.callback(0); // fresh graph is incoming; outgoing is still audible during the fade
+    h.ui.transport.push((CLOCK, Transport::Stop));
+    h.ui.launches.push(Command::Launch(Launch::new(
+        CLOCK,
+        Timing::Now,
+        &[(seq, 1)],
+    )));
+    h.deliver();
+    h.callback(0);
+    assert_eq!(
+        h.engine.active_mut().clock(CLOCK).map(|c| c.running()),
+        Some(true)
+    );
+    let mut outgoing_queued = None;
+    h.engine.active_mut().seqs(|id, _, _, queued| {
+        if id == seq {
+            outgoing_queued = queued;
+        }
+    });
+    assert_eq!(outgoing_queued, None);
+    h.callback(24);
+    let mut new_queued = None;
+    h.engine.seqs(|id, _, _, queued| {
+        if id == seq {
+            new_queued = queued
+        }
+    });
+    assert_eq!(new_queued, Some(1));
+    assert_eq!(clock_running(&h), Some(false));
+}
+
+#[test]
+fn cancel_during_fresh_fade_does_not_disarm_outgoing_document() {
+    let mut h = H::new();
+    let seq = *h
+        .editor
+        .state()
+        .modules
+        .iter()
+        .find(|(_, m)| m.kind == "seq")
+        .unwrap()
+        .0;
+    h.engine
+        .launch(&Launch::new(CLOCK, Timing::Now, &[(seq, 1)]));
+    let mut outgoing = None;
+    h.engine.active_mut().seqs(|id, _, _, queued| {
+        if id == seq {
+            outgoing = queued
+        }
+    });
+    assert_eq!(outgoing, Some(1));
+    kabl_ui::browser::replace_patch(&mut h.editor, &mut h.ui, piece());
+    h.deliver();
+    h.callback(0); // fresh incoming graph, old graph still fading out
+    h.ui.launches.push(Command::Cancel(Some(seq)));
+    h.deliver();
+    h.callback(0);
+    outgoing = None;
+    h.engine.active_mut().seqs(|id, _, _, queued| {
+        if id == seq {
+            outgoing = queued
+        }
+    });
+    assert_eq!(outgoing, Some(1));
 }
