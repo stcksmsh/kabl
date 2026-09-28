@@ -25,4 +25,19 @@ tests.
 
 ## Recheck
 
-Pending (fix head below).
+The same reviewer rechecked head `304cfcd300f0203d74b8560c5965a272100eef0d` against
+`b32049f` (read-only). Findings RC-01..RC-06 confirm R-01, R-02, R-03, R-05 and R-06 fixed and
+complete: the forced release fires `end_keys` plus expression reset; `sync_once` runs at most
+once per block, `receive_swap` marks the sync and a promotion at block end is caught by the
+next block's `rendered` change (a runtime mode/channel change reaching keyboards one block
+later is pre-existing behaviour); the overflow reinsert recurses at most once and keeps sort
+order. R-07/R-08 accepted with the stated reasons. It also read the UI files it skipped first
+(`midi_in_summary`, `midi_in_face`, `fmt_value` `±st`/`ch`, help) and found no issue beyond a
+cosmetic note: neither summary line is clipped to the face width, so `bend ±12 st · ch 16` can
+overrun a narrow face at small zoom (the voice line already could before D06). Verdict: no
+remaining blocker at this head.
+
+Commits after `304cfcd` change only documentation, scripts and evidence (`git diff --stat
+304cfcd..HEAD -- crates prototypes patches` is empty); the product code reviewed is the
+submitted product code. The reviewer did not rerun the test suite; it is not Kosta's
+acceptance.

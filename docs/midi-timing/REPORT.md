@@ -4,9 +4,10 @@
 Batch ID / outcome: D06 — expressive, correctly timed MIDI (bend, wheel, channel routing,
                     note identity, partition-independent sample-accurate timing)
 Starting commit:    bd64165840bda6bf543191a01302a4af5165dd34 (origin/master, verified)
-Submitted head:     see "Commits" below (updated at submission)
+Product head:       304cfcd300f0203d74b8560c5965a272100eef0d (tested, reviewed, rechecked)
+Submitted head:     the branch tip; later commits are docs/evidence only
 Branch / PR:        codex/d06-expressive-midi (worktree ../kabl-d06), draft PR #9 https://github.com/stcksmsh/kabl/pull/9
-Engineering status: submitted; independent review in REVIEW.md
+Engineering status: submitted; independent review and recheck complete (REVIEW.md)
 Owner-review status: pending
 ```
 
@@ -51,7 +52,7 @@ installed but was not used (D07 scope; no projects or settings touched).
 
 ## Verification
 
-At product tree of commit `ebfac5f` (Rust 1.93 unless noted):
+At `ebfac5f` and again at product head `304cfcd` after the review fixes (Rust 1.93 unless noted):
 
 - `cargo test --workspace`: **586 passed, 0 failed, 22 ignored** (baseline `bd64165` on the same
   machine: 561/0/20).
@@ -59,7 +60,7 @@ At product tree of commit `ebfac5f` (Rust 1.93 unless noted):
 - `ALSA_CONFIG_PATH=<null PCM> cargo test -p kabl-ui --bin kabl-ui recovery_tests:: -- --ignored`:
   **4 passed** (repeated reopen/fault, stall mutes, warmed production callback 0 alloc/0 dealloc
   with note + bend + wheel + pedal through the new timeline, CC during 500 ms Save/Open:
-  Save 6.3 ms, Open 4.2 ms).
+  Save 6.3 ms, Open 4.2 ms at `ebfac5f`; 4 passed again at `304cfcd`: Save 6.3 ms, Open 6.3 ms).
 - Prototype (separate workspace): `cd prototypes/reaper-clap && cargo build --lib` succeeds
   unchanged (it still uses the pre-D06 `PatchEngine::key` and fixed blocks; see design.md §9).
 
@@ -133,6 +134,12 @@ the bass keyboard switched to ALL (a channel-1 chord then layers on both) and un
 track is the app's own recording of its output (Perform > Record), placed at the Record click
 (offset from `drive.log`), not offline audio. Screenshots: `img/walkthrough/`, and
 `img/{1440x900,1280x800}-{light,dark}/` (faces, bass advanced, bass drawer).
+
+Measurement and walkthrough reuse: they ran at `ebfac5f`. The later product changes (review
+fixes) touch only queue-overflow paths, change-list overflow, a stats label and how often
+keyboards re-read settings (once per block instead of per event; same results, bit-identical
+renders and factory hashes); none of the measured runs hit an overflow, so the recordings are
+reused. Offline renders were regenerated at `304cfcd` with identical hashes.
 
 ## Compatibility
 
