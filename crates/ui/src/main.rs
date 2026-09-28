@@ -1185,26 +1185,63 @@ fn reset_pickup(ui: &mut UiState) {
     }
 }
 
-/// A scheduled generation and its eventual worker result are separate UI observations.
-fn compile_notice_changed(
-    seen_generation: &mut u64,
-    seen_error: &mut Option<String>,
-    delivery: &Delivery,
-) -> bool {
-    if *seen_generation == delivery.generation && *seen_error == delivery.compile_error {
-        return false;
+/// Scheduled, compiled and acknowledged graphs are distinct UI observations.
+struct CompileNotice {
+    generation: u64,
+    error: Option<String>,
+    graphs: u64,
+    awaiting_rev: Option<u64>,
+}
+
+impl CompileNotice {
+    fn new(delivery: &Delivery) -> Self {
+        Self {
+            generation: delivery.generation,
+            error: delivery.compile_error.clone(),
+            graphs: delivery.counts.graphs,
+            awaiting_rev: None,
+        }
     }
-    *seen_generation = delivery.generation;
-    *seen_error = delivery.compile_error.clone();
-    true
+
+    /// Returns whether inspection needs rebuilding. A failed audio phase owns its actionable
+    /// status; a successful compile is not described as playing until the callback accepts it.
+    fn observe(&mut self, phase: AudioPhase, status: &mut String, delivery: &Delivery) -> bool {
+        let generation_changed = self.generation != delivery.generation;
+        let error_changed = self.error != delivery.compile_error;
+        let graphs_changed = self.graphs != delivery.counts.graphs;
+        let changed = generation_changed || error_changed || graphs_changed;
+        if changed {
+            self.generation = delivery.generation;
+            self.error = delivery.compile_error.clone();
+            self.graphs = delivery.counts.graphs;
+            if phase == AudioPhase::Running {
+                if let Some(error) = &delivery.compile_error {
+                    *status = format!("recompile failed: {error}");
+                    self.awaiting_rev = None;
+                } else if graphs_changed {
+                    *status = "audio running · current graph queued".into();
+                    self.awaiting_rev = Some(delivery.rev());
+                } else if generation_changed {
+                    *status = "audio running · compiling current document".into();
+                    self.awaiting_rev = None;
+                }
+            } else {
+                self.awaiting_rev = None;
+            }
+        }
+        if phase == AudioPhase::Running
+            && self.awaiting_rev.is_some_and(|rev| Feedback::get(&delivery.feedback.applied_rev) >= rev)
+        {
+            *status = "audio running · current graph installed".into();
+            self.awaiting_rev = None;
+        }
+        changed
+    }
 }
 
 struct App {
     core: Arc<Mutex<Core>>,
-    /// `Delivery::generation` the inspector last heard about.
-    seen_generation: u64,
-    /// Async compilation can finish without advancing generation again.
-    seen_compile_error: Option<String>,
+    compile_notice: CompileNotice,
     latency_at: std::time::Instant,
     audio: AudioHost,
     midi: Midi,
@@ -1497,8 +1534,7 @@ impl App {
             core.editor.state(),
             now,
         );
-        self.seen_generation = core.delivery.generation;
-        self.seen_compile_error = core.delivery.compile_error.clone();
+        self.compile_notice = CompileNotice::new(&core.delivery);
     }
 
     /// UI thread, every frame: logs what the audio side counted, rate-limited.
@@ -1913,18 +1949,7 @@ impl eframe::App for App {
         }
         // A compile happened (here or on the control thread): the inspector checks whether
         // its readings still describe the patch.
-        if compile_notice_changed(
-            &mut self.seen_generation,
-            &mut self.seen_compile_error,
-            delivery,
-        ) {
-            match &delivery.compile_error {
-                Some(e) => self.audio.status = format!("recompile failed: {e}"),
-                None if self.audio.status.starts_with("recompile failed") => {
-                    self.audio.status = "recompiled: playing the current patch".into()
-                }
-                None => {}
-            }
+        if self.compile_notice.observe(self.phase, &mut self.audio.status, delivery) {
             ui_state.inspect.rebuilt(
                 delivery.generation,
                 delivery.compile_error.clone(),
@@ -2166,6 +2191,7 @@ fn main() -> eframe::Result<()> {
         options,
         Box::new(|cc| {
             kabl_ui::theme::install_fonts(&cc.egui_ctx);
+            let compile_notice = CompileNotice::new(&delivery);
             let core = Arc::new(Mutex::new(Core {
                 editor,
                 ui: ui_state,
@@ -2195,8 +2221,7 @@ fn main() -> eframe::Result<()> {
             }
             Ok(Box::new(App {
                 core,
-                seen_generation: 1,
-                seen_compile_error: None,
+                compile_notice,
                 latency_at: std::time::Instant::now(),
                 audio,
                 midi,
@@ -2248,34 +2273,68 @@ mod recovery_tests {
         delivery.async_compile = true;
         delivery.compile_delay_ms = 80;
         let mut editor = PatchEditor::seed_from(&patch);
-        let mut seen_generation = delivery.generation;
-        let mut seen_error = None;
+        let mut notice = CompileNotice::new(&delivery);
+        let mut status = "audio running · current graph installed".to_string();
         editor.add_module("no-such-module", kabl_core::Vec2 { x: 0.0, y: 0.0 });
         assert_eq!(delivery.sync(editor.state(), false, false), control::Outcome::Compiled);
-        assert!(compile_notice_changed(&mut seen_generation, &mut seen_error, &delivery));
-        assert!(seen_error.is_none(), "the worker has not finished yet");
+        assert!(notice.observe(AudioPhase::Running, &mut status, &delivery));
+        assert!(status.contains("compiling"));
+        assert!(notice.error.is_none(), "the worker has not finished yet");
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
         while delivery.compile_error.is_none() {
             delivery.flush();
             assert!(std::time::Instant::now() < deadline, "compile failure timed out");
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
-        assert!(compile_notice_changed(&mut seen_generation, &mut seen_error, &delivery));
-        assert!(seen_error.as_deref().unwrap().contains("no-such-module"));
-        assert!(!compile_notice_changed(&mut seen_generation, &mut seen_error, &delivery));
+        assert!(notice.observe(AudioPhase::Running, &mut status, &delivery));
+        assert!(status.contains("recompile failed"));
+        assert!(notice.error.as_deref().unwrap().contains("no-such-module"));
+        assert!(!notice.observe(AudioPhase::Running, &mut status, &delivery));
 
         editor.undo();
         assert_eq!(delivery.sync(editor.state(), false, false), control::Outcome::Compiled);
         assert!(delivery.compile_error.is_some(), "failure remains visible while compiling");
-        assert!(compile_notice_changed(&mut seen_generation, &mut seen_error, &delivery));
+        assert!(notice.observe(AudioPhase::Running, &mut status, &delivery));
+        assert!(status.contains("recompile failed"));
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
         while delivery.compile_error.is_some() {
             delivery.flush();
             assert!(std::time::Instant::now() < deadline, "compile repair timed out");
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
-        assert!(compile_notice_changed(&mut seen_generation, &mut seen_error, &delivery));
-        assert!(seen_error.is_none());
+        assert!(notice.observe(AudioPhase::Running, &mut status, &delivery));
+        assert!(notice.error.is_none());
+        assert!(status.contains("queued"), "must not claim playback before callback ack");
+        assert!(!notice.observe(AudioPhase::Running, &mut status, &delivery));
+        assert!(status.contains("queued"));
+        delivery.feedback.applied_rev.store(delivery.rev(), Ordering::Relaxed);
+        assert!(!notice.observe(AudioPhase::Running, &mut status, &delivery));
+        assert!(status.contains("installed"));
+
+        // A failed retry leaves an actionable status even when a later edit compiles.
+        editor.add_module("no-such-module", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+        assert_eq!(delivery.sync(editor.state(), false, false), control::Outcome::Compiled);
+        status = "document cannot play: invalid graph; edit to repair, then Retry".into();
+        assert!(notice.observe(AudioPhase::Failed, &mut status, &delivery));
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        while delivery.compile_error.is_none() {
+            delivery.flush();
+            assert!(std::time::Instant::now() < deadline, "retry compile failure timed out");
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        assert!(notice.observe(AudioPhase::Failed, &mut status, &delivery));
+        editor.undo();
+        assert_eq!(delivery.sync(editor.state(), false, false), control::Outcome::Compiled);
+        notice.observe(AudioPhase::Failed, &mut status, &delivery);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        while delivery.compile_error.is_some() {
+            delivery.flush();
+            assert!(std::time::Instant::now() < deadline, "retry repair timed out");
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        assert!(notice.observe(AudioPhase::Failed, &mut status, &delivery));
+        assert!(status.contains("Retry"));
+        assert!(!status.contains("playing"));
     }
 
     /// The real control pump and cpal callback keep processing a mapped CC while a 500 ms
