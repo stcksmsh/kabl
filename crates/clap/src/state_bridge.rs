@@ -2,14 +2,16 @@
 //! owns GUI/lifecycle/parameter events; its non-atomic state loader is never used.
 use super::{Instrument, Shared};
 use crate::sound_state::{SoundState, MAX_STATE_BYTES};
-use std::cell::RefCell;
+use std::cell::{RefCell, UnsafeCell};
 use std::sync::Weak;
-thread_local! { static CAPTURE: RefCell<Option<Weak<Shared>>> = const { RefCell::new(None) }; }
-pub(super) fn capture(shared: &Arc<Shared>) {
-    CAPTURE.with(|c| *c.borrow_mut() = Some(Arc::downgrade(shared)));
+type Capture = (Weak<Shared>, rtrb::Producer<(u32, [u8; 3])>);
+thread_local! { static CAPTURE: RefCell<Option<Capture>> = const { RefCell::new(None) }; }
+pub(super) fn capture(shared: &Arc<Shared>, midi: rtrb::Producer<(u32, [u8; 3])>) {
+    CAPTURE.with(|c| *c.borrow_mut() = Some((Arc::downgrade(shared), midi)));
 }
 use clap_sys::{
     entry::clap_plugin_entry,
+    events::*,
     ext::{
         note_ports::{
             clap_note_port_info, clap_plugin_note_ports, CLAP_EXT_NOTE_PORTS,
@@ -21,6 +23,7 @@ use clap_sys::{
     factory::plugin_factory::{clap_plugin_factory, CLAP_PLUGIN_FACTORY_ID},
     host::clap_host,
     plugin::{clap_plugin, clap_plugin_descriptor},
+    process::{clap_process, clap_process_status, CLAP_PROCESS_ERROR},
     stream::{clap_istream, clap_ostream},
     version::CLAP_VERSION,
 };
@@ -29,16 +32,14 @@ use nice_plug::wrapper::{
     setup_logger,
 };
 use std::{
-    collections::HashMap,
     ffi::{c_char, c_void, CStr},
     ptr,
-    sync::{Arc, Mutex, OnceLock},
+    sync::{Arc, OnceLock},
 };
 
 type GetExtension = unsafe extern "C" fn(*const clap_plugin, *const c_char) -> *const c_void;
 type Destroy = unsafe extern "C" fn(*const clap_plugin);
 
-#[derive(Clone)]
 struct Bridge {
     get_extension: GetExtension,
     destroy: Destroy,
@@ -46,18 +47,22 @@ struct Bridge {
     shared: Arc<Shared>,
     on_main: unsafe extern "C" fn(*const clap_plugin),
 }
-static BRIDGES: OnceLock<Mutex<HashMap<usize, Bridge>>> = OnceLock::new();
-static DESCRIPTOR: OnceLock<PluginDescriptor> = OnceLock::new();
-
-fn bridges() -> &'static Mutex<HashMap<usize, Bridge>> {
-    BRIDGES.get_or_init(|| Mutex::new(HashMap::new()))
+// The first field is the host-facing CLAP object. Delegated wrapper callbacks continue to
+// read its unchanged plugin_data. No global lookup, mutex or Arc clone enters process().
+#[repr(C)]
+struct Outer {
+    plugin: clap_plugin,
+    bridge: Bridge,
+    process: unsafe extern "C" fn(*const clap_plugin, *const clap_process) -> clap_process_status,
+    midi: UnsafeCell<rtrb::Producer<(u32, [u8; 3])>>,
 }
-fn bridge(plugin: *const clap_plugin) -> Option<Bridge> {
-    bridges()
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .get(&(plugin as usize))
-        .cloned()
+static DESCRIPTOR: OnceLock<PluginDescriptor> = OnceLock::new();
+fn bridge<'a>(plugin: *const clap_plugin) -> Option<&'a Bridge> {
+    if plugin.is_null() {
+        None
+    } else {
+        Some(unsafe { &(*(plugin.cast::<Outer>())).bridge })
+    }
 }
 fn descriptor() -> &'static PluginDescriptor {
     DESCRIPTOR.get_or_init(PluginDescriptor::for_plugin::<Instrument>)
@@ -85,35 +90,37 @@ unsafe extern "C" fn create(
         return ptr::null();
     }
     let wrapper = unsafe { Wrapper::<Instrument>::new(host) };
-    let mut plugin = wrapper.clap_plugin.borrow_mut();
-    let (Some(get_extension), Some(destroy)) = (plugin.get_extension, plugin.destroy) else {
+    let original = *wrapper.clap_plugin.borrow();
+    let (Some(get_extension), Some(destroy), Some(process)) =
+        (original.get_extension, original.destroy, original.process)
+    else {
         return ptr::null();
     };
-    let shared = CAPTURE
+    let (shared, midi) = CAPTURE
         .with(|c| c.borrow_mut().take())
-        .and_then(|s| s.upgrade())
         .expect("instance capture");
+    let shared = shared.upgrade().expect("live instance");
     shared
         .host
         .store(host as u64, std::sync::atomic::Ordering::Release);
-    let on_main = plugin.on_main_thread.expect("main callback");
-    plugin.on_main_thread = Some(on_main_bridge);
-    plugin.get_extension = Some(get_extension_bridge);
-    plugin.destroy = Some(destroy_bridge);
-    let ptr = &*plugin as *const clap_plugin;
-    bridges().lock().unwrap_or_else(|e| e.into_inner()).insert(
-        ptr as usize,
-        Bridge {
+    let mut outer = Box::new(Outer {
+        plugin: original,
+        bridge: Bridge {
             get_extension,
             destroy,
             host: host as usize,
             shared,
-            on_main,
+            on_main: original.on_main_thread.expect("main callback"),
         },
-    );
-    drop(plugin);
-    let _ = Arc::into_raw(wrapper); // Released by nice-plug's original destroy callback.
-    ptr
+        process,
+        midi: UnsafeCell::new(midi),
+    });
+    outer.plugin.on_main_thread = Some(on_main_bridge);
+    outer.plugin.get_extension = Some(get_extension_bridge);
+    outer.plugin.destroy = Some(destroy_bridge);
+    outer.plugin.process = Some(process_bridge);
+    let _ = Arc::into_raw(wrapper); // Released by the delegated destroy callback.
+    Box::into_raw(outer).cast()
 }
 unsafe extern "C" fn get_extension_bridge(
     plugin: *const clap_plugin,
@@ -134,19 +141,113 @@ unsafe extern "C" fn get_extension_bridge(
     }
 }
 unsafe extern "C" fn destroy_bridge(plugin: *const clap_plugin) {
-    if let Some(b) = bridges()
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .remove(&(plugin as usize))
-    {
-        unsafe { (b.destroy)(plugin) };
+    if !plugin.is_null() {
+        let outer = unsafe { Box::from_raw(plugin.cast_mut().cast::<Outer>()) };
+        unsafe { (outer.bridge.destroy)(plugin) };
+        drop(outer);
     }
+}
+
+const MAX_HOST_EVENTS: u32 = 2048;
+const MAX_PARAMS: usize = 128;
+struct ParamEvents {
+    events: [*const clap_event_header; MAX_PARAMS],
+    len: usize,
+}
+unsafe extern "C" fn filtered_size(list: *const clap_input_events) -> u32 {
+    unsafe { (&*((*list).ctx.cast::<ParamEvents>())).len as u32 }
+}
+unsafe extern "C" fn filtered_get(
+    list: *const clap_input_events,
+    index: u32,
+) -> *const clap_event_header {
+    let list = unsafe { &*((*list).ctx.cast::<ParamEvents>()) };
+    if (index as usize) < list.len {
+        list.events[index as usize]
+    } else {
+        ptr::null()
+    }
+}
+unsafe extern "C" fn process_bridge(
+    plugin: *const clap_plugin,
+    process: *const clap_process,
+) -> clap_process_status {
+    if plugin.is_null() || process.is_null() {
+        return CLAP_PROCESS_ERROR;
+    }
+    let outer = unsafe { &*plugin.cast::<Outer>() };
+    let input = unsafe { &*process };
+    let shared = &outer.bridge.shared;
+    shared
+        .host_frames
+        .store(input.frames_count, std::sync::atomic::Ordering::Relaxed);
+    let mut parameters = ParamEvents {
+        events: [ptr::null(); MAX_PARAMS],
+        len: 0,
+    };
+    let mut overflow = false;
+    if let Some(events) = unsafe { input.in_events.as_ref() } {
+        if let (Some(size), Some(get)) = (events.size, events.get) {
+            let count = unsafe { size(events) };
+            overflow = count > MAX_HOST_EVENTS;
+            // CLAP serializes process calls for one instance; only audio owns this producer.
+            let midi = unsafe { &mut *outer.midi.get() };
+            for index in 0..count.min(MAX_HOST_EVENTS) {
+                let event = unsafe { get(events, index) };
+                let Some(header) = (unsafe { event.as_ref() }) else {
+                    continue;
+                };
+                if header.space_id != CLAP_CORE_EVENT_SPACE_ID {
+                    continue;
+                }
+                match header.type_ {
+                    CLAP_EVENT_MIDI
+                        if header.size as usize >= std::mem::size_of::<clap_event_midi>() =>
+                    {
+                        let event = unsafe { &*event.cast::<clap_event_midi>() };
+                        if event.port_index == 0 && midi.push((header.time, event.data)).is_err() {
+                            overflow = true;
+                        }
+                    }
+                    CLAP_EVENT_PARAM_VALUE | CLAP_EVENT_PARAM_MOD => {
+                        let minimum = if header.type_ == CLAP_EVENT_PARAM_VALUE {
+                            std::mem::size_of::<clap_event_param_value>()
+                        } else {
+                            std::mem::size_of::<clap_event_param_mod>()
+                        };
+                        if header.size as usize >= minimum
+                            && parameters.len < MAX_PARAMS
+                            && header.time < input.frames_count
+                        {
+                            parameters.events[parameters.len] = event;
+                            parameters.len += 1;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    shared
+        .midi_overflow
+        .store(overflow, std::sync::atomic::Ordering::Relaxed);
+    let filtered = clap_input_events {
+        ctx: (&mut parameters as *mut ParamEvents).cast(),
+        size: Some(filtered_size),
+        get: Some(filtered_get),
+    };
+    let mut bounded = *input;
+    bounded.in_events = &filtered;
+    unsafe { (outer.process)(plugin, &bounded) }
 }
 unsafe extern "C" fn save(plugin: *const clap_plugin, stream: *const clap_ostream) -> bool {
     let Some(b) = bridge(plugin) else {
         return false;
     };
     let state = b.shared.snapshot();
+    if state.validate().is_err() {
+        return false;
+    }
     let Ok(data) = serde_json::to_vec(&state) else {
         return false;
     };
@@ -318,3 +419,129 @@ pub static clap_entry: clap_plugin_entry = clap_plugin_entry {
     deinit: Some(deinit),
     get_factory: Some(get_factory),
 };
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use assert_no_alloc::assert_no_alloc;
+    use clap_sys::audio_buffer::clap_audio_buffer;
+    use clap_sys::ext::params::{clap_param_info, clap_plugin_params};
+    use std::sync::atomic::Ordering;
+
+    unsafe extern "C" fn event_size(list: *const clap_input_events) -> u32 {
+        unsafe { (&*((*list).ctx.cast::<Vec<clap_event_midi>>())).len() as u32 }
+    }
+    unsafe extern "C" fn event_get(
+        list: *const clap_input_events,
+        index: u32,
+    ) -> *const clap_event_header {
+        unsafe { &(&*((*list).ctx.cast::<Vec<clap_event_midi>>()))[index as usize].header }
+    }
+    unsafe extern "C" fn host_extension(_: *const clap_host, _: *const c_char) -> *const c_void {
+        ptr::null()
+    }
+    unsafe extern "C" fn host_request(_: *const clap_host) {}
+    #[test]
+    fn exported_callback_is_bounded_under_raw_midi_flood_and_lifecycle_reset() {
+        let host = clap_host {
+            clap_version: CLAP_VERSION,
+            host_data: ptr::null_mut(),
+            name: c"test host".as_ptr(),
+            vendor: c"kabl".as_ptr(),
+            url: c"".as_ptr(),
+            version: c"1".as_ptr(),
+            get_extension: Some(host_extension),
+            request_restart: Some(host_request),
+            request_process: Some(host_request),
+            request_callback: Some(host_request),
+        };
+        unsafe {
+            let plugin = create(&FACTORY, &host, descriptor().clap_id().as_ptr());
+            assert!(!plugin.is_null());
+            let p = &*plugin;
+            assert!(p.init.unwrap()(plugin));
+            let shared = &(*plugin.cast::<Outer>()).bridge.shared;
+            shared.stop.store(true, Ordering::Release);
+            assert!(p.activate.unwrap()(plugin, 48000.0, 1, 4096));
+            assert!(p.start_processing.unwrap()(plugin));
+            let params = &*(p.get_extension.unwrap()(plugin, CLAP_EXT_PARAMS.as_ptr())
+                .cast::<clap_plugin_params>());
+            let mut info: clap_param_info = std::mem::zeroed();
+            assert!(params.get_info.unwrap()(plugin, 0, &mut info));
+            assert_eq!(params.count.unwrap()(plugin), 1);
+            let mut value = 0.0;
+            assert!(params.get_value.unwrap()(plugin, info.id, &mut value));
+            assert_eq!(value, 1.0);
+            let mut events: Vec<_> = (0..4097)
+                .map(|index| clap_event_midi {
+                    header: clap_event_header {
+                        size: std::mem::size_of::<clap_event_midi>() as u32,
+                        time: index.min(255),
+                        space_id: CLAP_CORE_EVENT_SPACE_ID,
+                        type_: CLAP_EVENT_MIDI,
+                        flags: 0,
+                    },
+                    port_index: 0,
+                    data: if index == 4096 {
+                        [0x80, 60, 0]
+                    } else {
+                        [0x90, 60, 100]
+                    },
+                })
+                .collect();
+            let input = clap_input_events {
+                ctx: (&mut events as *mut Vec<clap_event_midi>).cast(),
+                size: Some(event_size),
+                get: Some(event_get),
+            };
+            let mut left = [0.0f32; 4096];
+            let mut right = [0.0f32; 4096];
+            let mut channels = [left.as_mut_ptr(), right.as_mut_ptr()];
+            let mut output = clap_audio_buffer {
+                data32: channels.as_mut_ptr(),
+                data64: ptr::null_mut(),
+                channel_count: 2,
+                latency: 0,
+                constant_mask: 0,
+            };
+            let mut process = clap_process {
+                steady_time: -1,
+                frames_count: 256,
+                transport: ptr::null(),
+                audio_inputs: ptr::null(),
+                audio_outputs: &mut output,
+                audio_inputs_count: 0,
+                audio_outputs_count: 1,
+                in_events: &input,
+                out_events: ptr::null(),
+            };
+            assert_no_alloc(|| {
+                assert_ne!(p.process.unwrap()(plugin, &process), CLAP_PROCESS_ERROR);
+            });
+            events.clear();
+            process.frames_count = 4096;
+            for _ in 0..40 {
+                assert_no_alloc(|| {
+                    assert_ne!(p.process.unwrap()(plugin, &process), CLAP_PROCESS_ERROR);
+                });
+            }
+            assert!(
+                left.iter().all(|&sample| sample.abs() < 1e-6),
+                "overflow must release unseen note-offs: peak {}",
+                left.iter().copied().map(f32::abs).fold(0.0, f32::max)
+            );
+            assert_no_alloc(|| p.reset.unwrap()(plugin));
+            p.stop_processing.unwrap()(plugin);
+            p.deactivate.unwrap()(plugin);
+            assert!(p.activate.unwrap()(plugin, 96000.0, 1, 4096));
+            assert!(p.start_processing.unwrap()(plugin));
+            assert_no_alloc(|| {
+                assert_ne!(p.process.unwrap()(plugin, &process), CLAP_PROCESS_ERROR);
+            });
+            assert!(left.iter().all(|&sample| sample == 0.0));
+            p.stop_processing.unwrap()(plugin);
+            p.deactivate.unwrap()(plugin);
+            p.destroy.unwrap()(plugin);
+        }
+    }
+}

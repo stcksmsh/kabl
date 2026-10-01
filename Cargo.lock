@@ -1759,6 +1759,7 @@ dependencies = [
  "egui",
  "kabl-core",
  "kabl-engine",
+ "kabl-modules",
  "kabl-standalone",
  "kabl-ui",
  "nice-plug",

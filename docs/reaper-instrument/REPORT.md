@@ -72,3 +72,27 @@ screenshots and full recall/live/render evidence remain required.
 Remaining review fixes: accurate effect tails, runtime UI feedback, collector final cleanup,
 and bounded raw CLAP MIDI before the framework's event queue. Then rebuild and refresh host
 artifacts, validator, full workspace checks, demos/package, independent final recheck and PR.
+
+## Review fixes: callback, feedback, tails and shutdown
+
+Previous head: `b993a95`. Eleven production unit tests pass; strict plugin Clippy passes.
+New exported-entry test drives the actual CLAP wrapper with 4,097 raw MIDI events, including
+an unseen release, then reset/deactivation/reactivation at 96 kHz. Every process/reset is
+allocation/deallocation guarded. Intake reads at most 2,048 events, holds 1,024 MIDI events
+and forwards at most 128 parameter events. Overflow schedules Host source loss; D06 retains
+full host offsets across parameter subblocks. The outer CLAP object delegates lifecycle and
+GUI using unchanged framework plugin_data, without a global map lock on audio.
+
+Runtime clock/sequence/LFO/delay/probe reports use a fixed queue; the control worker updates
+rack feedback with the editor closed. Probe age uses the actual engine sample clock. State
+replacement discards reports from the prior session. Collector storage now calls try_cleanup
+only after queued values and Handles drop. Targeted cleanup and closed-editor feedback tests
+pass. The finite-tail policy recognizes MIDI-envelope-gated output routes and sums conservative
+release/effect settling times; other routes advertise KeepAlive with an explicit free-sound
+reason. FullAdsr release is a time constant, so its settling bound uses ten release periods.
+A 30-second reverb no longer receives an arbitrary eight-second tail.
+
+These fixes need independent recheck and new real-host evidence. Earlier debug plugin remains
+loaded in scratch REAPER; close that task-created scratch profile before replacing its binary.
+Host control readback, final workspace/validator/lifecycle evidence, demonstrations, packaging
+and PR remain outstanding. Owner acceptance remains pending.

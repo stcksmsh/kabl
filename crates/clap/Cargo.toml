@@ -9,6 +9,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 clap-sys = "=0.5.0"
+kabl-modules = { path = "../modules" }
 kabl-core = { path = "../core" }
 kabl-engine = { path = "../engine" }
 kabl-ui = { path = "../ui" }

@@ -79,5 +79,14 @@ pub fn validate_patch(p: &PatchState) -> Result<(), String> {
     }) {
         return Err("Patch label limit".into());
     }
+    // The same cap applies to editor/browser documents and project loads. Reserve space
+    // for the version/gain envelope so every accepted patch can also be saved.
+    if serde_json::to_vec(p)
+        .map_err(|error| error.to_string())?
+        .len()
+        > MAX_STATE_BYTES - 1024
+    {
+        return Err("Patch serialized size limit".into());
+    }
     Ok(())
 }

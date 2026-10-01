@@ -517,6 +517,11 @@ impl PatchEngine {
     }
 
     /// Audio-thread call: the last finished measurement window, if one is waiting.
+    /// Current audio sample clock; control hosts use it to age queued probe reports.
+    pub fn rendered_samples(&self) -> u64 {
+        self.rendered
+    }
+
     pub fn take_probe_report(&mut self) -> Option<ProbeReport> {
         self.report.take()
     }
