@@ -96,3 +96,16 @@ These fixes need independent recheck and new real-host evidence. Earlier debug p
 loaded in scratch REAPER; close that task-created scratch profile before replacing its binary.
 Host control readback, final workspace/validator/lifecycle evidence, demonstrations, packaging
 and PR remain outstanding. Owner acceptance remains pending.
+
+## Follow-up independent recheck fixes
+
+Reviewed head: `94a22bf5c4675a859f4f708ccdc41ebe81e4b902`. Reviewer resolved R1/R4–R8;
+R2/R3 and new R9/R10 are detailed in REVIEW.md. Follow-up code/tests fix all four scenarios.
+Eleven plugin tests and 21 standalone runtime-control tests pass; strict plugin Clippy passes.
+Standalone intentionally lets existing runtime controls operate after a bad structural edit;
+that contract is preserved. The plugin additionally compiles recovery candidates before
+accepting their complete state. Gain base remains persistent; host monophonic modulation now
+reaches audio. Saturated automation preserves the final value/modulation independently.
+Release build is running; scratch desktop restarted on DISPLAY=:100 after prior processes
+ended across interruption. Persistent profile/projects remain available. Host and package
+acceptance are still incomplete; no final reviewer or owner approval claimed.

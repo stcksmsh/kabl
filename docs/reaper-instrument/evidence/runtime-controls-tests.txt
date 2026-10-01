@@ -1,0 +1,30 @@
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d07/crates/standalone)
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d07/crates/ui)
+    Finished `test` profile [optimized + debuginfo] target(s) in 3.10s
+     Running tests/runtime_controls.rs (target/debug/deps/runtime_controls-d8ee7c7ac39b1a55)
+
+running 21 tests
+test cancel_during_fresh_fade_does_not_disarm_outgoing_document ... ok
+test timed_launch_waits_for_pending_fresh_document ... ok
+test inspector_readings_survive_runtime_edits_but_not_rewiring ... ok
+test commands_during_fresh_incoming_fade_leave_outgoing_document_alone ... ok
+test preview_waits_until_pending_fresh_document_is_active ... ok
+test pending_stopped_load_keeps_selection_without_touching_outgoing_graph ... ok
+test deletion_recreation_and_a_new_document_reject_old_values ... ok
+test a_new_documents_values_skip_the_outgoing_graph ... ok
+test toggle_after_pending_stopped_load_starts_new_clock_only ... ok
+test comparison_restore_and_recipe_like_edits_converge_on_the_document ... ok
+test a_restore_of_many_targets_ramps_every_one ... ok
+test a_failed_compile_keeps_the_graph_and_runtime_values_still_apply ... ok
+test stopped_load_in_engine_fade_survives_edit_and_explicit_start ... ok
+test routine_controls_never_build_a_graph ... ok
+test a_coalesced_edit_keeps_its_place_before_a_command ... ok
+test commands_never_overtake_earlier_edits ... ok
+test midi_buttons_and_pickup_work_without_a_frame_and_the_ui_catches_up ... ok
+test a_waiting_load_replaced_by_an_edit_stays_a_stopped_load ... ok
+test a_structural_edit_while_controls_move_keeps_every_value ... ok
+test a_paused_audio_thread_bounds_the_queue_and_gets_the_last_value ... ok
+test delayed_structural_compile_keeps_cc_responsive_and_installs_latest_document ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.03s
+

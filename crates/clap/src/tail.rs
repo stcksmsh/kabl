@@ -2,7 +2,7 @@
 //! crosses a zero-base VCA driven solely by a MIDI-gated envelope. Other racks may sustain
 //! themselves (free oscillators, clocks, feedback, bypass routes) and remain active.
 use kabl_core::{PatchState, PortRef};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 fn input<'a>(p: &'a PatchState, id: u64, port: &str) -> Vec<&'a PortRef> {
     p.cables.values().filter(|c| matches!(&c.to, PortRef::Module { id: target, port: name } if *target == id && name == port)).map(|c| &c.from).collect()
@@ -23,23 +23,42 @@ fn gated(p: &PatchState, id: u64) -> bool {
     let gate = input(p, *env, "gate");
     matches!(gate.as_slice(), [PortRef::Module { id: midi, port }] if port == "gate" && p.modules.get(midi).is_some_and(|m| m.kind == "midi.in"))
 }
-fn finite_route(p: &PatchState, id: u64, visiting: &mut BTreeSet<u64>) -> bool {
+fn finite_route(
+    p: &PatchState,
+    id: u64,
+    visiting: &mut BTreeSet<u64>,
+    memo: &mut BTreeMap<u64, bool>,
+) -> bool {
+    if let Some(&finite) = memo.get(&id) {
+        return finite;
+    }
     if gated(p, id) {
+        memo.insert(id, true);
         return true;
     }
     if !visiting.insert(id) {
         return false;
     }
-    let routes: Vec<_> = p
-        .cables
-        .values()
-        .filter(|c| c.to.module_id() == id)
-        .collect();
+    // A modulation path into a generator does not silence its audio. Only explicitly
+    // silence-preserving audio processors participate; filters may self-oscillate.
+    let Some(module) = p.modules.get(&id) else {
+        return false;
+    };
+    if !matches!(
+        module.kind.as_str(),
+        "out" | "gain" | "mixer" | "vca" | "delay" | "reverb" | "chorus" | "drive" | "ringmod"
+    ) {
+        visiting.remove(&id);
+        return false;
+    }
+    let routes: Vec<_> = p.cables.values().filter(|c| matches!(&c.to,
+        PortRef::Module { id: target, port } if *target == id && matches!(port.as_str(), "in" | "in_l" | "in_r" | "left" | "right" | "a" | "b" | "c" | "d" | "in1" | "in2" | "in3" | "in4"))) .collect();
     let finite = !routes.is_empty()
         && routes
             .iter()
-            .all(|c| finite_route(p, c.from.module_id(), visiting));
+            .all(|c| finite_route(p, c.from.module_id(), visiting, memo));
     visiting.remove(&id);
+    memo.insert(id, finite);
     finite
 }
 fn value(p: &PatchState, id: u64, name: &str, default: f64, max: f64) -> f64 {
@@ -64,9 +83,10 @@ pub fn samples(p: &PatchState, rate: f32) -> u64 {
         .filter(|(_, m)| m.kind == "out")
         .map(|(&id, _)| id)
         .collect();
+    let mut memo = BTreeMap::new();
     if outputs
         .iter()
-        .any(|&id| !finite_route(p, id, &mut BTreeSet::new()))
+        .any(|&id| !finite_route(p, id, &mut BTreeSet::new(), &mut memo))
     {
         return u64::MAX;
     }
@@ -76,7 +96,13 @@ pub fn samples(p: &PatchState, rate: f32) -> u64 {
     for (&id, m) in &p.modules {
         seconds += match m.kind.as_str() {
             // FullAdsr times are exponential time constants, settling at 1e-4 (9.21 tau).
-            "env.adsr" => 10.0 * value(p, id, "release_ms", 200.0, 10000.0) / 1000.0,
+            "env.adsr" => {
+                10.0 * if value(p, id, "timing", 0.0, 1.0) >= 0.5 {
+                    10000.0
+                } else {
+                    value(p, id, "release_ms", 200.0, 10000.0)
+                } / 1000.0
+            }
             "delay" => {
                 // Sync/modulation may reach the delay's 4-second clamp.
                 let time = if value(p, id, "sync", 0.0, 4.0) != 0.0 {

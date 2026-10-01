@@ -17,7 +17,10 @@ use clap_sys::{
             clap_note_port_info, clap_plugin_note_ports, CLAP_EXT_NOTE_PORTS,
             CLAP_NOTE_DIALECT_MIDI,
         },
-        params::{clap_host_params, CLAP_EXT_PARAMS, CLAP_PARAM_RESCAN_VALUES},
+        params::{
+            clap_host_params, clap_param_info, clap_plugin_params, CLAP_EXT_PARAMS,
+            CLAP_PARAM_RESCAN_VALUES,
+        },
         state::{clap_host_state, clap_plugin_state, CLAP_EXT_STATE},
     },
     factory::plugin_factory::{clap_plugin_factory, CLAP_PLUGIN_FACTORY_ID},
@@ -55,6 +58,7 @@ struct Outer {
     bridge: Bridge,
     process: unsafe extern "C" fn(*const clap_plugin, *const clap_process) -> clap_process_status,
     midi: UnsafeCell<rtrb::Producer<(u32, [u8; 3])>>,
+    gain_id: u32,
 }
 static DESCRIPTOR: OnceLock<PluginDescriptor> = OnceLock::new();
 fn bridge<'a>(plugin: *const clap_plugin) -> Option<&'a Bridge> {
@@ -103,6 +107,13 @@ unsafe extern "C" fn create(
     shared
         .host
         .store(host as u64, std::sync::atomic::Ordering::Release);
+    let parameters = unsafe {
+        &*(get_extension(&original, CLAP_EXT_PARAMS.as_ptr()).cast::<clap_plugin_params>())
+    };
+    let mut gain: clap_param_info = unsafe { std::mem::zeroed() };
+    if !unsafe { parameters.get_info.expect("gain info")(&original, 0, &mut gain) } {
+        return ptr::null();
+    }
     let mut outer = Box::new(Outer {
         plugin: original,
         bridge: Bridge {
@@ -114,6 +125,7 @@ unsafe extern "C" fn create(
         },
         process,
         midi: UnsafeCell::new(midi),
+        gain_id: gain.id,
     });
     outer.plugin.on_main_thread = Some(on_main_bridge);
     outer.plugin.get_extension = Some(get_extension_bridge);
@@ -153,6 +165,31 @@ const MAX_PARAMS: usize = 128;
 struct ParamEvents {
     events: [*const clap_event_header; MAX_PARAMS],
     len: usize,
+}
+impl ParamEvents {
+    unsafe fn push(&mut self, event: *const clap_event_header) {
+        // Preserve ordinary automation. On saturation retain the final value and modulation
+        // separately, in timestamp order, so the single host control always converges.
+        if self.len < MAX_PARAMS - 2 {
+            self.events[self.len] = event;
+            self.len += 1;
+            return;
+        }
+        let kind = unsafe { (*event).type_ };
+        let index = (MAX_PARAMS - 2..self.len)
+            .find(|&index| unsafe { (*self.events[index]).type_ == kind });
+        if let Some(index) = index {
+            self.events[index] = event;
+        } else {
+            self.events[self.len] = event;
+            self.len += 1;
+        }
+        if self.len == MAX_PARAMS
+            && unsafe { (*self.events[MAX_PARAMS - 2]).time > (*self.events[MAX_PARAMS - 1]).time }
+        {
+            self.events.swap(MAX_PARAMS - 2, MAX_PARAMS - 1);
+        }
+    }
 }
 unsafe extern "C" fn filtered_size(list: *const clap_input_events) -> u32 {
     unsafe { (&*((*list).ctx.cast::<ParamEvents>())).len as u32 }
@@ -215,12 +252,17 @@ unsafe extern "C" fn process_bridge(
                         } else {
                             std::mem::size_of::<clap_event_param_mod>()
                         };
-                        if header.size as usize >= minimum
-                            && parameters.len < MAX_PARAMS
-                            && header.time < input.frames_count
-                        {
-                            parameters.events[parameters.len] = event;
-                            parameters.len += 1;
+                        if header.size as usize >= minimum && header.time < input.frames_count {
+                            let id = if header.type_ == CLAP_EVENT_PARAM_VALUE {
+                                unsafe { (*event.cast::<clap_event_param_value>()).param_id }
+                            } else {
+                                unsafe { (*event.cast::<clap_event_param_mod>()).param_id }
+                            };
+                            if id == outer.gain_id {
+                                unsafe {
+                                    parameters.push(event);
+                                }
+                            }
                         }
                     }
                     _ => {}
@@ -437,6 +479,15 @@ mod tests {
     ) -> *const clap_event_header {
         unsafe { &(&*((*list).ctx.cast::<Vec<clap_event_midi>>()))[index as usize].header }
     }
+    unsafe extern "C" fn pointer_size(list: *const clap_input_events) -> u32 {
+        unsafe { (&*((*list).ctx.cast::<Vec<*const clap_event_header>>())).len() as u32 }
+    }
+    unsafe extern "C" fn pointer_get(
+        list: *const clap_input_events,
+        index: u32,
+    ) -> *const clap_event_header {
+        unsafe { (&*((*list).ctx.cast::<Vec<*const clap_event_header>>()))[index as usize] }
+    }
     unsafe extern "C" fn host_extension(_: *const clap_host, _: *const c_char) -> *const c_void {
         ptr::null()
     }
@@ -530,6 +581,85 @@ mod tests {
                 "overflow must release unseen note-offs: peak {}",
                 left.iter().copied().map(f32::abs).fold(0.0, f32::max)
             );
+            // Normal host note, then saturated gain automation + monophonic modulation.
+            p.reset.unwrap()(plugin);
+            events.push(clap_event_midi {
+                header: clap_event_header {
+                    size: std::mem::size_of::<clap_event_midi>() as u32,
+                    time: 0,
+                    space_id: CLAP_CORE_EVENT_SPACE_ID,
+                    type_: CLAP_EVENT_MIDI,
+                    flags: 0,
+                },
+                port_index: 0,
+                data: [0x90, 60, 100],
+            });
+            assert_no_alloc(|| {
+                p.process.unwrap()(plugin, &process);
+            });
+            let baseline = left;
+            assert!(baseline.iter().any(|sample| sample.abs() > 0.001));
+            p.reset.unwrap()(plugin);
+            let values: Vec<_> = (0..257)
+                .map(|index| clap_event_param_value {
+                    header: clap_event_header {
+                        size: std::mem::size_of::<clap_event_param_value>() as u32,
+                        time: 0,
+                        space_id: CLAP_CORE_EVENT_SPACE_ID,
+                        type_: CLAP_EVENT_PARAM_VALUE,
+                        flags: 0,
+                    },
+                    param_id: info.id,
+                    cookie: ptr::null_mut(),
+                    note_id: -1,
+                    port_index: -1,
+                    channel: -1,
+                    key: -1,
+                    value: if index == 256 { 0.4 } else { 0.7 },
+                })
+                .collect();
+            let modulation = clap_event_param_mod {
+                header: clap_event_header {
+                    size: std::mem::size_of::<clap_event_param_mod>() as u32,
+                    time: 0,
+                    space_id: CLAP_CORE_EVENT_SPACE_ID,
+                    type_: CLAP_EVENT_PARAM_MOD,
+                    flags: 0,
+                },
+                param_id: info.id,
+                cookie: ptr::null_mut(),
+                note_id: -1,
+                port_index: -1,
+                channel: -1,
+                key: -1,
+                amount: 0.2,
+            };
+            let mut pointers: Vec<*const clap_event_header> = values
+                .iter()
+                .map(|value| &value.header as *const _)
+                .collect();
+            pointers.push(&modulation.header);
+            pointers.push(&events[0].header);
+            let gain_events = clap_input_events {
+                ctx: (&mut pointers as *mut Vec<*const clap_event_header>).cast(),
+                size: Some(pointer_size),
+                get: Some(pointer_get),
+            };
+            process.in_events = &gain_events;
+            assert_no_alloc(|| {
+                p.process.unwrap()(plugin, &process);
+            });
+            assert!((shared.snapshot().output_gain - 0.4).abs() < 1e-6);
+            assert!(params.get_value.unwrap()(plugin, info.id, &mut value));
+            assert!((value - 0.6).abs() < 1e-6);
+            assert!(
+                left.iter()
+                    .zip(baseline)
+                    .all(|(&sample, reference)| (sample - reference * 0.6).abs() < 1e-6),
+                "gain modulation must reach audio"
+            );
+            events.clear();
+            process.in_events = &input;
             assert_no_alloc(|| p.reset.unwrap()(plugin));
             p.stop_processing.unwrap()(plugin);
             p.deactivate.unwrap()(plugin);

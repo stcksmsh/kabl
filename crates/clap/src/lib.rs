@@ -159,6 +159,19 @@ impl Control {
                 self.delivery.flush();
                 return false;
             }
+            // Standalone deliberately permits existing runtime controls after a failed graph.
+            // Plugin recall requires the entire candidate to compile before accepting it.
+            if self.rejected.is_some() {
+                if let Err(error) =
+                    kabl_engine::compile::compile(self.editor.state(), self.rate, VOICES)
+                {
+                    self.rejected = Some(self.editor.state().clone());
+                    self.editor.take_dirty();
+                    self.view.last_message = Some(error.to_string());
+                    self.delivery.flush();
+                    return false;
+                }
+            }
             self.editor.mark_dirty();
         } else if changed {
             self.editor.take_dirty();
@@ -470,7 +483,7 @@ impl Instrument {
         // A state transaction in flight must not apply its new parameter to the old graph.
         let epoch = self.shared.committed.load(Ordering::SeqCst);
         if epoch == s.epoch * 2 {
-            let gain = self.shared.params.gain.unmodulated_plain_value();
+            let gain = self.shared.params.gain.value();
             if self.shared.committed.load(Ordering::SeqCst) == epoch {
                 s.gain = gain;
             }
@@ -769,6 +782,12 @@ mod tests {
         assert!(!c.pump());
         assert!(!c.pump());
         assert_eq!(c.patch, accepted);
+        c.editor.set_param(2, "base_hz", 880.0);
+        assert!(
+            !c.pump(),
+            "a knob edit must not accept the same failed topology"
+        );
+        assert_eq!(c.patch, accepted);
         c.editor.remove_module(id);
         c.editor.set_label(2, "title", Some("Repaired".into()));
         assert!(c.pump());
@@ -841,6 +860,20 @@ mod tests {
             .params
             .insert("decay_s".into(), 30.0);
         assert!(tail::samples(&long, 48000.0) > 120 * 48000);
+        let mut latched = patch.clone();
+        latched
+            .modules
+            .get_mut(&4)
+            .unwrap()
+            .params
+            .insert("timing".into(), 1.0);
+        latched
+            .modules
+            .get_mut(&4)
+            .unwrap()
+            .params
+            .insert("release_ms".into(), 0.1);
+        assert!(tail::samples(&latched, 48000.0) > 100 * 48000);
         let mut ungated = patch;
         ungated
             .modules
@@ -849,6 +882,39 @@ mod tests {
             .params
             .insert("gain".into(), 1.0);
         assert_eq!(tail::samples(&ungated, 48000.0), u64::MAX);
+        let mut modulation = kabl_standalone::default_patch();
+        modulation.cables.retain(|_, c| c.to.module_id() != 6);
+        modulation.cables.insert(
+            100,
+            kabl_core::CableState {
+                from: kabl_core::PortRef::Module {
+                    id: 5,
+                    port: "out".into(),
+                },
+                to: kabl_core::PortRef::Param {
+                    id: 2,
+                    param: "base_hz".into(),
+                },
+                params: Default::default(),
+                steps: vec![],
+            },
+        );
+        modulation.cables.insert(
+            101,
+            kabl_core::CableState {
+                from: kabl_core::PortRef::Module {
+                    id: 2,
+                    port: "out".into(),
+                },
+                to: kabl_core::PortRef::Module {
+                    id: 6,
+                    port: "left".into(),
+                },
+                params: Default::default(),
+                steps: vec![],
+            },
+        );
+        assert_eq!(tail::samples(&modulation, 48000.0), u64::MAX);
     }
     #[test]
     fn identity_overflow_is_rejected_before_state_mutation() {
