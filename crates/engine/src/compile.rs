@@ -1286,6 +1286,22 @@ fn compile_inner(
 }
 
 impl CompiledPatch {
+    /// Host reset: clear DSP history without allocating or changing accepted parameters.
+    pub fn reset(&mut self) {
+        // Complete any parameter ramps before clearing transient DSP state.
+        while let Some(ramp) = self.ramps.pop() {
+            self.write(ramp.on, Val::Exact(ramp.exact));
+        }
+        for module in &mut self.modules {
+            module.reset();
+        }
+        for buffer in &mut self.buffers {
+            buffer.fill(0.0);
+        }
+        self.started = false;
+        self.tap.reset_window();
+    }
+
     pub fn sample_rate(&self) -> f32 {
         self.sample_rate
     }

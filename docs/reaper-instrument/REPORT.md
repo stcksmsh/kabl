@@ -34,3 +34,21 @@ Implement production `crates/clap` vertical slice: embedded rack/browser, cohere
 host control, transactional complete sound state and editor-independent collector. Test in
 scratch REAPER profile on existing PipeWire setup. Then finish acceptance, fresh independent
 review/fixes/recheck and draft/ready PR according to actual evidence. Commit/push increments.
+
+## 2026-10-01 recovery checkpoint
+
+The initial `/tmp/kabl-d07` and scratch host directory disappeared across the interruption.
+Only the documentation checkpoint `85a0db8` had been committed/pushed; the uncommitted source
+was recovered exactly from this chat's tool-call records. The worktree now lives persistently
+at `/secondary/Programming/Github/kabl/.worktrees/d07`. Do not use `/tmp` for resumable source.
+
+Recovered implementation: production `crates/clap`, pinned nice-plug wrapper, transactional
+complete state, independent control/collector worker, MIDI-only note port, production Timeline,
+engine DSP reset. Prior five targeted tests passed and debug cdylib built; rerunning now, then
+commit the source. Host acceptance was not established: initial scratch scan opened a Wine
+bridge desktop and never produced the host-info script output. Preserve this as failed evidence,
+not successful scan/embedding. New scratch profile disables unrelated VST scanning.
+
+Remaining: strict Clippy/workspace/regression tests, atomic/callback/lifecycle review, real GUI
+vertical slice, all acceptance/demos/measurements, fresh independent review and final recheck,
+packaging and PR. No engineering completion claimed. `.ai/` remains untouched.
