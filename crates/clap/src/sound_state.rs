@@ -34,6 +34,15 @@ pub fn validate_patch(p: &PatchState) -> Result<(), String> {
     if p.modules.len() > 128 || p.cables.len() > 512 || p.labels.len() > 128 {
         return Err("Patch graph limit".into());
     }
+    // The editor reserves the successor when seeding IDs. Reject overflow before any mutation.
+    if p.modules
+        .keys()
+        .chain(p.cables.keys())
+        .any(|&id| id == u64::MAX)
+        || p.labels.keys().any(|id| !p.modules.contains_key(id))
+    {
+        return Err("Invalid patch identity".into());
+    }
     let effects = p
         .modules
         .values()

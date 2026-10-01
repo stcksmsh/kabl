@@ -1,2 +1,7 @@
-/target/
+/target
+*.wav
+.DS_Store
+docs/design/build/
+/recordings/
+
 /scratch/

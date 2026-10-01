@@ -52,3 +52,23 @@ not successful scan/embedding. New scratch profile disables unrelated VST scanni
 Remaining: strict Clippy/workspace/regression tests, atomic/callback/lifecycle review, real GUI
 vertical slice, all acceptance/demos/measurements, fresh independent review and final recheck,
 packaging and PR. No engineering completion claimed. `.ai/` remains untouched.
+
+## 2026-10-01 review fixes checkpoint
+
+Product checkpoint before these fixes: `b2fef9e`. Independent reviewer found eight substantive
+issues; final acceptance and reviewer recheck remain pending. Fixed metadata-only recall,
+complete editor seeding (cable parameters, patterns and labels), state identity overflow,
+and consistent editor/load resource bounds. Failed editor documents remain visible but never
+replace the accepted persistent sound; subsequent worker ticks cannot silently accept them.
+Checks: seven production CLAP unit tests pass; two focused UI seeding regressions pass.
+Restored preexisting `.gitignore` rules and added only `/scratch/`.
+
+Persistent host scratch: `.worktrees/d07/scratch/host`; REAPER 7.75/linux-x86_64,
+PipeWire/JACK negotiated 48 kHz / 128 frames. Fresh scratch-profile insertion succeeds.
+Host gain readback currently reports 1.0 despite the script requesting 0.4: unresolved.
+Do not claim host-control acceptance yet. Actual embedded rack observed; fresh final-build
+screenshots and full recall/live/render evidence remain required.
+
+Remaining review fixes: accurate effect tails, runtime UI feedback, collector final cleanup,
+and bounded raw CLAP MIDI before the framework's event queue. Then rebuild and refresh host
+artifacts, validator, full workspace checks, demos/package, independent final recheck and PR.

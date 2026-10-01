@@ -129,8 +129,20 @@ fn mutations_set_the_dirty_flag_and_take_dirty_clears_it() {
 
 #[test]
 fn seed_from_reproduces_the_source_patch_exactly() {
-    let source = default_patch();
-    let editor = PatchEditor::seed_from(&source);
+    let mut source = default_patch();
+    let cable = source.cables.values_mut().next().unwrap();
+    cable.params.insert("amount".into(), 0.37);
+    cable.params.insert("bypass".into(), 1.0);
+    cable.steps = vec![0.2, 0.8, 0.4];
+    source
+        .labels
+        .entry(2)
+        .or_default()
+        .insert("pin.base_hz".into(), "Pitch".into());
+    let mut editor = PatchEditor::seed_from(&source);
+    assert_eq!(editor.state(), &source);
+    editor.set_label(2, "title", Some("Edited".into()));
+    editor.undo();
     assert_eq!(editor.state(), &source);
 }
 

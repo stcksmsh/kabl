@@ -25,6 +25,7 @@ use std::{
 };
 
 const VOICES: usize = 8;
+type PreparedSession = (Owned<Session>, Delivery, rtrb::Consumer<(u8, u8, u8)>);
 
 #[derive(Params)]
 struct InstrumentParams {
@@ -45,6 +46,7 @@ struct Session {
 
 struct Control {
     patch: kabl_core::PatchState,
+    rejected: Option<kabl_core::PatchState>,
     editor: PatchEditor,
     view: UiState,
     delivery: Delivery,
@@ -56,13 +58,45 @@ struct Control {
     cc: rtrb::Consumer<(u8, u8, u8)>,
 }
 
+impl Control {
+    /// Only a successfully prepared document becomes persistent sound state. Metadata-only
+    /// edits also pass through sync; a failed document never becomes accepted on the next tick.
+    fn pump(&mut self) -> bool {
+        let changed = self.patch != *self.editor.state();
+        if changed && self.rejected.as_ref() != Some(self.editor.state()) {
+            if let Err(error) = sound_state::validate_patch(self.editor.state()) {
+                self.rejected = Some(self.editor.state().clone());
+                self.editor.take_dirty();
+                self.view.last_message = Some(error);
+                self.delivery.flush();
+                return false;
+            }
+            self.editor.mark_dirty();
+        } else if changed {
+            self.editor.take_dirty();
+            self.delivery.flush();
+            return false;
+        }
+        let out = kabl_ui::control::deliver(&mut self.editor, &mut self.view, &mut self.delivery);
+        if out == kabl_ui::control::Outcome::Failed {
+            self.rejected = Some(self.editor.state().clone());
+            return false;
+        }
+        if changed {
+            self.patch = self.editor.state().clone();
+            self.rejected = None;
+        }
+        changed
+    }
+}
+
 fn prepare(
     patch: &kabl_core::PatchState,
     rate: f32,
     handle: &Handle,
     epoch: u64,
     gain: f32,
-) -> Result<(Owned<Session>, Delivery, rtrb::Consumer<(u8, u8, u8)>), String> {
+) -> Result<PreparedSession, String> {
     sound_state::validate_patch(patch)?;
     let mut engine = PatchEngine::new(handle, patch, rate, VOICES).map_err(|e| e.to_string())?;
     engine.reset();
@@ -125,13 +159,15 @@ impl Shared {
         let epoch = c.epoch + 1;
         let (session, delivery, cc) =
             prepare(&state.patch, c.rate, &c.handle, epoch, state.output_gain)?;
+        let editor = PatchEditor::seed_from(&state.patch);
         c.tx.push(session)
             .map_err(|_| "State queue full".to_string())?;
         self.committed.store(epoch * 2 - 1, Ordering::SeqCst);
         c.delivery = delivery;
         c.cc = cc;
         c.patch = state.patch;
-        c.editor = PatchEditor::seed_from(&c.patch);
+        c.editor = editor;
+        c.rejected = None;
         // Keep library and view preferences; discard commands, keys and CC pickup.
         c.view.loaded = false;
         c.view.launches.clear();
@@ -218,6 +254,7 @@ impl Default for Instrument {
                 editor: PatchEditor::seed_from(&patch),
                 view: UiState::default(),
                 patch,
+                rejected: None,
                 delivery,
                 collector,
                 handle,
@@ -255,23 +292,14 @@ impl Default for Instrument {
                                 break;
                             }
                         }
-                        let Control {
-                            editor,
-                            view,
-                            delivery,
-                            ..
-                        } = &mut *c;
+                        let Control { editor, view, .. } = &mut *c;
                         kabl_ui::perform::apply_cc(
                             editor,
                             view,
                             &events,
                             start.elapsed().as_secs_f64(),
                         );
-                        let out = kabl_ui::control::deliver(editor, view, delivery);
-                        if out != kabl_ui::control::Outcome::Nothing
-                            && out != kabl_ui::control::Outcome::Failed
-                        {
-                            c.patch = c.editor.state().clone();
+                        if c.pump() {
                             worker_shared.dirty.store(true, Ordering::Release);
                             state_bridge::request_main(&worker_shared);
                         }
@@ -304,7 +332,11 @@ impl Instrument {
             }
             let ready = self.pending.as_ref().is_some_and(|s| {
                 self.shared.committed.load(Ordering::SeqCst) >= s.epoch * 2
-                    && self.shared.committed.load(Ordering::SeqCst) % 2 == 0
+                    && self
+                        .shared
+                        .committed
+                        .load(Ordering::SeqCst)
+                        .is_multiple_of(2)
             });
             if !ready {
                 break;
@@ -563,6 +595,42 @@ mod tests {
         assert_eq!(p.session.as_ref().unwrap().gain, 0.4);
         let patch = p.shared.snapshot().patch;
         assert_eq!(p.shared.control.lock().unwrap().editor.state(), &patch);
+    }
+    #[test]
+    fn edits_preserve_metadata_and_reject_invalid_documents_until_repaired() {
+        let p = instrument();
+        let mut c = p.shared.control.lock().unwrap();
+        c.editor.set_label(2, "title", Some("Recall me".into()));
+        assert!(c.pump());
+        assert_eq!(c.patch.label(2, "title"), Some("Recall me"));
+        let accepted = c.patch.clone();
+        let id = c
+            .editor
+            .add_module("bad.module", kabl_core::Vec2::default());
+        assert!(!c.pump());
+        assert!(!c.pump());
+        assert_eq!(c.patch, accepted);
+        c.editor.remove_module(id);
+        c.editor.set_label(2, "title", Some("Repaired".into()));
+        assert!(c.pump());
+        assert_eq!(c.patch.label(2, "title"), Some("Repaired"));
+        let accepted = c.patch.clone();
+        for _ in 0..9 {
+            c.editor.add_module("delay", kabl_core::Vec2::default());
+        }
+        assert!(!c.pump());
+        assert!(!c.pump());
+        assert_eq!(c.patch, accepted);
+    }
+    #[test]
+    fn identity_overflow_is_rejected_before_state_mutation() {
+        let p = instrument();
+        let before = serde_json::to_vec(&p.shared.snapshot()).unwrap();
+        let mut state = p.shared.snapshot();
+        let module = state.patch.modules.remove(&2).unwrap();
+        state.patch.modules.insert(u64::MAX, module);
+        assert!(p.shared.load(state).is_err());
+        assert_eq!(serde_json::to_vec(&p.shared.snapshot()).unwrap(), before);
     }
     #[test]
     fn state_decode_bounds_version_truncation_and_nonfinite() {
