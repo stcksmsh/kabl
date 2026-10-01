@@ -1,0 +1,11 @@
+{
+  "files": [
+    "scratch/host/d07-musical.wav",
+    "scratch/host/d07-musical-repeat.wav"
+  ],
+  "pcm_equal": false,
+  "pcm_sha256": [
+    "606bf0684811a3b46cb5465a2ca2ff98b9501c8f257e5cb7d92df304bcf42872",
+    "6e5b96b7c9fc9ff64d38169a294e0f27e460b72c7c5958f77c7cf361ec2ad46c"
+  ]
+}

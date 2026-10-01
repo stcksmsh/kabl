@@ -1,0 +1,9 @@
+REAPER 7.75/linux-x86_64
+insert=0
+parameter 0 Output gain 1.0
+parameter 1 Bypass 0.0
+parameter 2 Wet 1.0
+parameter 3 Delta 0.0
+gain set=true
+gain=0.40000000596046
+play=1

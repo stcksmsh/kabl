@@ -109,3 +109,37 @@ reaches audio. Saturated automation preserves the final value/modulation indepen
 Release build is running; scratch desktop restarted on DISPLAY=:100 after prior processes
 ended across interruption. Persistent profile/projects remain available. Host and package
 acceptance are still incomplete; no final reviewer or owner approval claimed.
+
+## Real-host acceptance checkpoint
+
+Current product before the sample-rate change: `043708d`. The rate guard now covers
+1,000..768,000 Hz (finite only), including the official validator's unusual fractional rates;
+tails larger than CLAP's finite u32 representation use KeepAlive rather than truncation.
+The first validator run rejected 384 kHz and is preserved as validator-first-*. The refreshed
+release passes 35 tests, with nine explicit skips and no failures/crashes. Raw JSON/stderr are
+retained. Full workspace tests and strict workspace Clippy pass (final-head rerun still due).
+
+Actual scratch REAPER: output gain set/readback 0.40000000596; real embedded rack operated.
+Saved actual knob edit to cutoff 20 kHz and cable replug from left output to right. Opened the
+factory Expressive Lead through the browser, confirming the rack's unsaved-change dialog
+only after the edited snapshot had been saved. The two-instance project contains distinct
+complete states: 6 modules/6 cables/gain 0.4 and 15 modules/30 cables/gain 0.55. Full process
+quit/restart with KABL_FACTORY_DIR pointing to a nonexistent scratch path preserved both
+states exactly, including topology. Ten complete editor open/close cycles during playback
+retain gain and playing state; final editor closed. Virtual keyboard recording through
+REAPER's input queue records five notes and six CC/bend/cleanup events. No physical controller
+was present; listening/feel acceptance remains Kosta's.
+
+Scratch artifacts: `scratch/host/{two-instances,reopened,after-cycles,virtual-recording}.rpp`,
+actual rack/browser screenshots, operation-1.mp4 and editor-cycles.mp4. Offline musical render
+is 52 s at 48 kHz stereo float32; peak 0.138675, activity at -60 dB RMS 0.5..30.5 s and at
+-90 dB 0.5..32.2 s. Last-second RMS 2.25e-22. The longer ending is deliberate tail settling
+verification. A 36 s listening copy and 34.6 s REAPER-node-only live capture are trimmed and
+scaled uniformly by 6.423 (+16.15 dB); original raw files remain retained. Screen videos have
+no audio; offline and live audio are separate and clearly labeled.
+
+The first repeated render differs: preserved render-repeat.json, not a reproducibility pass.
+Testing an explicit host fresh-instance reset (offline/online) before each render, with no
+concurrent project mutation until a completion marker. Remaining: reproducibility diagnosis,
+measurements, viewport/theme evidence, package outside source/relocation launch, final tests,
+independent final source/evidence recheck, documentation/handoff/PR. No completion claimed.

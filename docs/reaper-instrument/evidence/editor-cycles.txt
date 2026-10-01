@@ -1,0 +1,21 @@
+transition 1 open=true play=1 gain=0.40000000596046
+transition 2 open=false play=1 gain=0.40000000596046
+transition 3 open=true play=1 gain=0.40000000596046
+transition 4 open=false play=1 gain=0.40000000596046
+transition 5 open=true play=1 gain=0.40000000596046
+transition 6 open=false play=1 gain=0.40000000596046
+transition 7 open=true play=1 gain=0.40000000596046
+transition 8 open=false play=1 gain=0.40000000596046
+transition 9 open=true play=1 gain=0.40000000596046
+transition 10 open=false play=1 gain=0.40000000596046
+transition 11 open=true play=1 gain=0.40000000596046
+transition 12 open=false play=1 gain=0.40000000596046
+transition 13 open=true play=1 gain=0.40000000596046
+transition 14 open=false play=1 gain=0.40000000596046
+transition 15 open=true play=1 gain=0.40000000596046
+transition 16 open=false play=1 gain=0.40000000596046
+transition 17 open=true play=1 gain=0.40000000596046
+transition 18 open=false play=1 gain=0.40000000596046
+transition 19 open=true play=1 gain=0.40000000596046
+transition 20 open=false play=1 gain=0.40000000596046
+10 complete open/close cycles; final editor closed

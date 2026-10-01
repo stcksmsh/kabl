@@ -551,7 +551,7 @@ impl Plugin for Instrument {
         config: &BufferConfig,
         context: &mut impl ActivateContext<Self>,
     ) -> bool {
-        if !config.sample_rate.is_finite() || !(8000.0..=192000.0).contains(&config.sample_rate) {
+        if !config.sample_rate.is_finite() || !(1000.0..=768000.0).contains(&config.sample_rate) {
             return false;
         }
         let mut c = self.shared.control.lock().unwrap();
@@ -636,8 +636,8 @@ impl Plugin for Instrument {
             self.render(left[0], right[0]);
         }
         match self.shared.tail_samples.load(Ordering::Relaxed) {
-            u64::MAX => ProcessStatus::KeepAlive,
-            samples => ProcessStatus::Tail(samples.min(u32::MAX as u64 - 1) as u32),
+            samples if samples >= u32::MAX as u64 => ProcessStatus::KeepAlive,
+            samples => ProcessStatus::Tail(samples as u32),
         }
     }
     fn deactivate(&mut self) {
