@@ -1208,25 +1208,23 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                         .is_some_and(|l| l.is_factory_path(path))
                     {
                         "that folder is a factory sound: choose another folder, or Save As".into()
+                    } else if ui_state.browser.async_io {
+                        start_io(editor, ui_state, IoRequest::SaveFolder(p.clone()));
+                        "saving folder in background".into()
                     } else {
-                        if ui_state.browser.async_io {
-                            start_io(editor, ui_state, IoRequest::SaveFolder(p.clone()));
-                            "saving folder in background".into()
-                        } else {
-                            match crate::library::save_folder(path, editor.log()) {
-                                Ok(()) => {
-                                    let name = path
-                                        .file_name()
-                                        .map_or(p.clone(), |n| n.to_string_lossy().to_string());
-                                    ui_state.doc = Some(Doc::new(
-                                        &name,
-                                        DocOrigin::Folder(p.clone()),
-                                        editor.state(),
-                                    ));
-                                    format!("saved to {p}")
-                                }
-                                Err(err) => save_failed(&err),
+                        match crate::library::save_folder(path, editor.log()) {
+                            Ok(()) => {
+                                let name = path
+                                    .file_name()
+                                    .map_or(p.clone(), |n| n.to_string_lossy().to_string());
+                                ui_state.doc = Some(Doc::new(
+                                    &name,
+                                    DocOrigin::Folder(p.clone()),
+                                    editor.state(),
+                                ));
+                                format!("saved to {p}")
                             }
+                            Err(err) => save_failed(&err),
                         }
                     };
                     message(ui_state, text);
