@@ -32,3 +32,14 @@ runtime-control behavior following compile failure remains unchanged (21 regress
 
 Final independent source/evidence recheck is still required after final product changes and
 actual-host/package verification. This document does not approve D07 or owner sound/feel.
+
+## Source recheck at c9541bc
+
+Reviewer independently inspected `c9541bcf9caaa377767caf6907c29ebbd694369e` and reported
+R2/R3/R9/R10 resolved within the declared 2,048-event intake bound, with no new substantive
+source finding. It reran all eleven plugin tests successfully and independently decoded the
+states in two-instances.rpp, reopened.rpp and after-cycles.rpp: exact equality across those
+snapshots, with the two distinct module/cable/gain combinations retained. It corroborated
+host-control, ten-cycle and virtual-recording logs and validator 35-success/9-skip results.
+This was a source/evidence checkpoint, not final D07 acceptance. The reviewer's subsequent
+turn ended at the account usage limit; final package/remaining evidence review is pending.

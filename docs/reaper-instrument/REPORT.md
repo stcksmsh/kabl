@@ -143,3 +143,21 @@ Testing an explicit host fresh-instance reset (offline/online) before each rende
 concurrent project mutation until a completion marker. Remaining: reproducibility diagnosis,
 measurements, viewport/theme evidence, package outside source/relocation launch, final tests,
 independent final source/evidence recheck, documentation/handoff/PR. No completion claimed.
+
+## 2026-10-03 continuation state
+
+Product source and pushed branch head: `c9541bcf9caaa377767caf6907c29ebbd694369e`.
+Reviewer source recheck at that exact head is recorded in REVIEW.md. No new product source
+has been edited since. One pending reproduction script, render-fresh-second.lua, is saved
+with this checkpoint. First explicit fresh-instance render completed in 3.276793095 s and
+produced scratch/host/d07-fresh.wav. Second fresh render has no completion marker/file
+verification; reproducibility remains unresolved. Earlier nonidentical repeated renders are
+preserved, not relabeled as passing. Proposed performance instrumentation was not implemented.
+
+Next action: inspect scratch REAPER state and finish the controlled second fresh render,
+compare PCM and resolve/document reset behavior. Then measure light/dense one/two instances
+with editors open/closed, capture second viewport/theme evidence, prepare and verify an
+outside-checkout installable bundle/relocated project, finish README/design/CHECKLIST, run
+final-head checks, obtain final independent acceptance/package recheck, update HANDOFF/STATUS/
+decisions and submit PR. No PR exists yet; no merge or D08 work authorized. Owner listening,
+physical-controller feel and acceptance remain pending.
