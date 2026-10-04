@@ -107,7 +107,12 @@ pub fn replace_bank(
     engine: &mut kabl_engine::patch_engine::PatchEngine,
     current: &mut Bank,
     next: Bank,
+    fresh: bool,
 ) {
+    if fresh {
+        *current = next;
+        return;
+    }
     for (i, previous) in current.iter().enumerate() {
         if let Some(previous) = previous {
             if next[i].is_none_or(|new| new.target != previous.target) {

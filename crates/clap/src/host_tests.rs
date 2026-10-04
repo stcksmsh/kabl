@@ -192,7 +192,9 @@ fn unassigning_a_lane_restores_its_document_base_without_allocations() {
         assert_no_alloc(|| engine.process_block(&mut left, &mut right));
     }
     assert!(left.iter().all(|v| v.abs() < 1e-6));
-    assert_no_alloc(|| automation::replace_bank(&mut engine, &mut bank, [None; automation::SLOTS]));
+    assert_no_alloc(|| {
+        automation::replace_bank(&mut engine, &mut bank, [None; automation::SLOTS], false)
+    });
     let mut peak = 0.0f32;
     for _ in 0..100 {
         assert_no_alloc(|| engine.process_block(&mut left, &mut right));
@@ -235,4 +237,78 @@ fn live_mode_and_values_wait_for_complete_scene_publication() {
     assert_no_alloc(|| p.accept_loads());
     assert!(p.session.as_ref().unwrap().host_clock);
     assert!((p.session.as_ref().unwrap().slot_values[0] - 0.9).abs() < 1e-6);
+}
+
+#[test]
+fn fresh_browser_load_does_not_restore_old_bases_into_reused_module_ids() {
+    let collector = Collector::new();
+    let mut old = kabl_standalone::default_patch();
+    old.modules
+        .get_mut(&5)
+        .unwrap()
+        .params
+        .insert("gain".into(), 1.0);
+    old.cables.remove(&5);
+    let target = automation::Target {
+        module: 5,
+        kind: "vca".into(),
+        param: "gain".into(),
+    };
+    let mut bank = [None; automation::SLOTS];
+    bank[0] = automation::resolve(&old, &target);
+    let mut fresh = old.clone();
+    fresh
+        .modules
+        .get_mut(&5)
+        .unwrap()
+        .params
+        .insert("gain".into(), 0.25);
+    let mut engine = PatchEngine::new(&collector.handle(), &fresh, 48000.0, VOICES).unwrap();
+    let mut reference = PatchEngine::new(&collector.handle(), &fresh, 48000.0, VOICES).unwrap();
+    assert_no_alloc(|| {
+        automation::replace_bank(&mut engine, &mut bank, [None; automation::SLOTS], true)
+    });
+    let note = MidiEvent::parse(Source::Host, &[0x90, 60, 100]).unwrap();
+    engine.key_at(note, 0);
+    reference.key_at(note, 0);
+    for _ in 0..100 {
+        let mut left = [0.0; 64];
+        let mut right = [0.0; 64];
+        let mut expected = [0.0; 64];
+        let mut expected_right = [0.0; 64];
+        assert_no_alloc(|| {
+            engine.process_block(&mut left, &mut right);
+            reference.process_block(&mut expected, &mut expected_right);
+        });
+        assert_eq!(left, expected);
+        assert_eq!(right, expected_right);
+    }
+}
+
+#[test]
+fn rejected_browser_load_keeps_previous_automation_bank() {
+    let mut p = tests::instrument();
+    let mut c = p.shared.control.lock().unwrap();
+    let lanes = c.lanes.clone();
+    let mut invalid = c.patch.clone();
+    invalid.modules.get_mut(&2).unwrap().kind = "missing.kind".into();
+    c.editor = PatchEditor::seed_from(&invalid);
+    c.view.loaded = true;
+    c.view.load_stopped = true;
+    assert!(!c.pump());
+    assert_eq!(c.lanes, lanes);
+    assert!(c.view.loaded && c.view.load_stopped);
+    let mut valid = c.patch.clone();
+    valid
+        .modules
+        .get_mut(&2)
+        .unwrap()
+        .params
+        .insert("base_hz".into(), 330.0);
+    c.editor = PatchEditor::seed_from(&valid);
+    assert!(c.pump());
+    assert!(c.lanes.iter().all(|lane| lane.target.is_none()));
+    drop(c);
+    let (_, fresh) = p.session.as_mut().unwrap().banks.pop().unwrap();
+    assert!(fresh);
 }

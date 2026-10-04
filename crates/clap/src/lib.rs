@@ -33,7 +33,7 @@ type PreparedSession = (
     Delivery,
     rtrb::Consumer<(u8, u8, u8)>,
     rtrb::Consumer<RuntimeReport>,
-    rtrb::Producer<automation::Bank>,
+    rtrb::Producer<(automation::Bank, bool)>,
 );
 // Fixed 256-slot queue (~140 KiB). Inline probe snapshots keep audio allocation-free.
 #[allow(clippy::large_enum_variant)]
@@ -75,7 +75,7 @@ struct Session {
     cc: rtrb::Producer<(u8, u8, u8)>,
     reports: rtrb::Producer<RuntimeReport>,
     bank: automation::Bank,
-    banks: rtrb::Consumer<automation::Bank>,
+    banks: rtrb::Consumer<(automation::Bank, bool)>,
 }
 
 struct Control {
@@ -91,8 +91,9 @@ struct Control {
     cc: rtrb::Consumer<(u8, u8, u8)>,
     reports: rtrb::Consumer<RuntimeReport>,
     lanes: [automation::Lane; automation::SLOTS],
-    banks: rtrb::Producer<automation::Bank>,
+    banks: rtrb::Producer<(automation::Bank, bool)>,
     bank_dirty: bool,
+    bank_fresh: bool,
     // Last: all queued Owned values and Handles must drop before collector storage.
     collector: CollectorGuard,
 }
@@ -171,13 +172,6 @@ impl Control {
     }
     fn pump(&mut self) -> bool {
         let changed = self.patch != *self.editor.state();
-        if self.view.loaded {
-            for lane in &mut self.lanes {
-                lane.retired |= lane.target.is_some();
-                lane.target = None;
-            }
-            self.bank_dirty = true;
-        }
         if changed && self.rejected.as_ref() != Some(self.editor.state()) {
             if let Err(error) = sound_state::validate_patch(self.editor.state()) {
                 self.rejected = Some(self.editor.state().clone());
@@ -205,10 +199,22 @@ impl Control {
             self.delivery.flush();
             return false;
         }
+        let loaded = self.view.loaded;
+        let stopped = self.view.load_stopped;
         let out = kabl_ui::control::deliver(&mut self.editor, &mut self.view, &mut self.delivery);
         if out == kabl_ui::control::Outcome::Failed {
+            self.view.loaded = loaded;
+            self.view.load_stopped = stopped;
             self.rejected = Some(self.editor.state().clone());
             return false;
+        }
+        if loaded {
+            for lane in &mut self.lanes {
+                lane.retired |= lane.target.is_some();
+                lane.target = None;
+            }
+            self.bank_dirty = true;
+            self.bank_fresh = true;
         }
         if changed {
             self.patch = self.editor.state().clone();
@@ -219,10 +225,11 @@ impl Control {
         if self.bank_dirty
             && self
                 .banks
-                .push(automation::bank(&self.patch, &self.lanes))
+                .push((automation::bank(&self.patch, &self.lanes), self.bank_fresh))
                 .is_ok()
         {
             self.bank_dirty = false;
+            self.bank_fresh = false;
         }
         changed
     }
@@ -332,12 +339,14 @@ impl Shared {
         c.banks = banks;
         c.lanes = state.lanes;
         c.bank_dirty = false;
+        c.bank_fresh = false;
         c.clear_reports();
         c.patch = state.patch;
         c.editor = editor;
         c.rejected = None;
         // Keep library and view preferences; discard commands, keys and CC pickup.
         c.view.loaded = false;
+        c.view.load_stopped = false;
         c.view.launches.clear();
         c.view.transport.clear();
         c.view.takeover.clear();
@@ -633,6 +642,7 @@ impl Default for Instrument {
                 lanes,
                 banks,
                 bank_dirty: true,
+                bank_fresh: false,
             }),
             params: Arc::new(InstrumentParams {
                 gain: FloatParam::new(
@@ -816,8 +826,8 @@ impl Instrument {
         s.engine
             .drain(&mut s.rx, kabl_ui::control::QUEUE, &s.feedback);
         for _ in 0..4 {
-            if let Ok(bank) = s.banks.pop() {
-                automation::replace_bank(&mut s.engine, &mut s.bank, bank);
+            if let Ok((bank, fresh)) = s.banks.pop() {
+                automation::replace_bank(&mut s.engine, &mut s.bank, bank, fresh);
             } else {
                 break;
             }
@@ -908,6 +918,7 @@ impl Plugin for Instrument {
             std::array::from_fn(|i| self.shared.params.slots[i].value.unmodulated_plain_value());
         c.banks = banks;
         c.bank_dirty = false;
+        c.bank_fresh = false;
         c.rate = config.sample_rate;
         self.shared
             .tail_samples
