@@ -2794,3 +2794,8 @@ second starts, so restart causality remains unproven. Do not bypass framework re
 or add transport/phase synchronization on this evidence. Keep ff11434 product and draft PR.
 Final GUI/performance evidence is refreshed; callback lifetime, playback duration, backend
 counters and physical latency remain distinct. Owner acceptance and render engineering remain open.
+
+
+## D08 context checkpoint — 2026-10-04
+
+User authorized D08 and requested durable handover before clearing context. Stable automation/state and initial Host scheduling implemented; acceptance remains incomplete. Retain ordinary render failures and explicitly label provisional serial warm-up policy. Resume details and unresolved risks: `host-production/HANDOVER.md`. No final reviewer, PR, merge or owner approval yet.

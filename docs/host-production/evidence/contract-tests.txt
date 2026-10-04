@@ -1,0 +1,24 @@
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d08/crates/standalone)
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d08/crates/ui)
+   Compiling kabl-clap v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d08/crates/clap)
+    Finished `test` profile [optimized + debuginfo] target(s) in 3.05s
+     Running unittests src/lib.rs (target/debug/deps/kabl_clap-79d582f95182b392)
+
+running 14 tests
+test tests::host_midi_keeps_channel_source_bend_wheel_and_release ... ok
+test tests::collector_storage_is_released_after_retired_values_and_handles ... ok
+test host_tests::missing_transport_stops_host_clocks_but_free_clock_keeps_running ... ok
+test tests::tail_covers_long_effects_and_keeps_ungated_racks_alive ... ok
+test tests::identity_overflow_is_rejected_before_state_mutation ... ok
+test tests::state_rejection_is_atomic_even_when_queue_is_full ... ok
+test tests::state_decode_bounds_version_truncation_and_nonfinite ... ok
+test host_tests::stable_lanes_legacy_state_and_atomic_rejection ... ok
+test tests::edits_preserve_metadata_and_reject_invalid_documents_until_repaired ... ok
+test tests::runtime_reports_update_closed_editor_and_are_cleared_on_load ... ok
+test tests::state_load_replaces_old_commands_and_callback_ownership_without_allocations ... ok
+test state_bridge::tests::exported_callback_is_bounded_under_raw_midi_flood_and_lifecycle_reset ... ok
+test tests::reset_repeats_sound_clears_sustain_and_is_allocation_free ... ok
+test host_tests::host_automation_tempo_stop_schedule_is_partition_independent_and_realtime_safe ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+

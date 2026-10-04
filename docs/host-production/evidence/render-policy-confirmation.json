@@ -1,0 +1,28 @@
+{
+  "files": [
+    "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-checkpoint/host/d08-render-12.wav",
+    "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-checkpoint/host/d08-render-13.wav",
+    "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-checkpoint/host/d08-render-15.wav",
+    "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-checkpoint/host/d08-render-16.wav"
+  ],
+  "format": "36 s / 48 kHz / stereo float32",
+  "pcm_equal": true,
+  "pcm_sha256": [
+    "fcf577142b2f11660409a0ba21289c61f4be5466e508a19a770fb760d63e0b11",
+    "fcf577142b2f11660409a0ba21289c61f4be5466e508a19a770fb760d63e0b11",
+    "fcf577142b2f11660409a0ba21289c61f4be5466e508a19a770fb760d63e0b11",
+    "fcf577142b2f11660409a0ba21289c61f4be5466e508a19a770fb760d63e0b11"
+  ],
+  "different_samples": [
+    0,
+    0,
+    0
+  ],
+  "maximum_abs_difference": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "policy": "Provisional: audio device closed; I_PERFFLAGS=3 on both tracks; discard one complete warm-up render per process. Warm-up renders 11 and 14 excluded explicitly.",
+  "scope": "Diagnostic proxy around tested D08 source. Final unwrapped production/head validation remains pending."
+}
