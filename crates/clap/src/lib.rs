@@ -33,7 +33,7 @@ type PreparedSession = (
     Delivery,
     rtrb::Consumer<(u8, u8, u8)>,
     rtrb::Consumer<RuntimeReport>,
-    rtrb::Producer<(automation::Bank, bool)>,
+    rtrb::Producer<(automation::Bank, automation::Bank)>,
 );
 // Fixed 256-slot queue (~140 KiB). Inline probe snapshots keep audio allocation-free.
 #[allow(clippy::large_enum_variant)]
@@ -75,7 +75,7 @@ struct Session {
     cc: rtrb::Producer<(u8, u8, u8)>,
     reports: rtrb::Producer<RuntimeReport>,
     bank: automation::Bank,
-    banks: rtrb::Consumer<(automation::Bank, bool)>,
+    banks: rtrb::Consumer<(automation::Bank, automation::Bank)>,
 }
 
 struct Control {
@@ -91,9 +91,9 @@ struct Control {
     cc: rtrb::Consumer<(u8, u8, u8)>,
     reports: rtrb::Consumer<RuntimeReport>,
     lanes: [automation::Lane; automation::SLOTS],
-    banks: rtrb::Producer<(automation::Bank, bool)>,
+    banks: rtrb::Producer<(automation::Bank, automation::Bank)>,
     bank_dirty: bool,
-    bank_fresh: bool,
+    published_bank: automation::Bank,
     // Last: all queued Owned values and Handles must drop before collector storage.
     collector: CollectorGuard,
 }
@@ -207,7 +207,7 @@ impl Control {
             self.reports = reports;
             self.banks = banks;
             self.bank_dirty = false;
-            self.bank_fresh = false;
+            self.published_bank = [None; automation::SLOTS];
             for lane in &mut self.lanes {
                 lane.retired |= lane.target.is_some();
                 lane.target = None;
@@ -253,22 +253,10 @@ impl Control {
             self.delivery.flush();
             return false;
         }
-        let loaded = self.view.loaded;
-        let stopped = self.view.load_stopped;
         let out = kabl_ui::control::deliver(&mut self.editor, &mut self.view, &mut self.delivery);
         if out == kabl_ui::control::Outcome::Failed {
-            self.view.loaded = loaded;
-            self.view.load_stopped = stopped;
             self.rejected = Some(self.editor.state().clone());
             return false;
-        }
-        if loaded {
-            for lane in &mut self.lanes {
-                lane.retired |= lane.target.is_some();
-                lane.target = None;
-            }
-            self.bank_dirty = true;
-            self.bank_fresh = true;
         }
         if changed {
             self.patch = self.editor.state().clone();
@@ -276,14 +264,13 @@ impl Control {
             self.bank_dirty = true;
             self.rejected = None;
         }
-        if self.bank_dirty
-            && self
-                .banks
-                .push((automation::bank(&self.patch, &self.lanes), self.bank_fresh))
-                .is_ok()
-        {
-            self.bank_dirty = false;
-            self.bank_fresh = false;
+        if self.bank_dirty {
+            let next = automation::bank(&self.patch, &self.lanes);
+            let restored = automation::release_bases(&self.patch, self.published_bank);
+            if self.banks.push((next, restored)).is_ok() {
+                self.bank_dirty = false;
+                self.published_bank = next;
+            }
         }
         changed
     }
@@ -390,6 +377,7 @@ impl Shared {
         let (mut session, delivery, cc, reports, banks) =
             prepare(&state.patch, c.rate, &c.handle, epoch, state.output_gain)?;
         session.bank = automation::bank(&state.patch, &state.lanes);
+        let published_bank = session.bank;
         session.host_clock = state.host_clock;
         session.slot_values = state.slot_values;
         let editor = PatchEditor::seed_from(&state.patch);
@@ -402,7 +390,7 @@ impl Shared {
         c.banks = banks;
         c.lanes = state.lanes;
         c.bank_dirty = false;
-        c.bank_fresh = false;
+        c.published_bank = published_bank;
         c.clear_reports();
         c.patch = state.patch;
         c.editor = editor;
@@ -693,6 +681,7 @@ impl Default for Instrument {
                 target: candidates.get(i).cloned(),
                 retired: false,
             });
+        let published_bank = automation::bank(&patch, &lanes);
         let initial_values = std::array::from_fn(|i| {
             lanes[i]
                 .target
@@ -722,7 +711,7 @@ impl Default for Instrument {
                 lanes,
                 banks,
                 bank_dirty: true,
-                bank_fresh: false,
+                published_bank,
             }),
             params: Arc::new(InstrumentParams {
                 gain: FloatParam::new(
@@ -928,8 +917,8 @@ impl Instrument {
             }
         }
         for _ in 0..4 {
-            if let Ok((bank, fresh)) = s.banks.pop() {
-                automation::replace_bank(&mut s.engine, &mut s.bank, bank, fresh);
+            if let Ok((bank, restored)) = s.banks.pop() {
+                automation::replace_bank(&mut s.engine, &mut s.bank, bank, restored);
             } else {
                 break;
             }
@@ -1019,12 +1008,13 @@ impl Plugin for Instrument {
             return false;
         };
         session.bank = automation::bank(&c.patch, &c.lanes);
+        let published_bank = session.bank;
         session.host_clock = self.shared.params.host_clock.value();
         session.slot_values =
             std::array::from_fn(|i| self.shared.params.slots[i].value.unmodulated_plain_value());
         c.banks = banks;
         c.bank_dirty = false;
-        c.bank_fresh = false;
+        c.published_bank = published_bank;
         c.rate = config.sample_rate;
         self.shared
             .tail_samples

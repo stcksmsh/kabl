@@ -107,18 +107,33 @@ pub fn replace_bank(
     engine: &mut kabl_engine::patch_engine::PatchEngine,
     current: &mut Bank,
     next: Bank,
-    fresh: bool,
+    restored: Bank,
 ) {
-    if fresh {
-        *current = next;
-        return;
-    }
     for (i, previous) in current.iter().enumerate() {
         if let Some(previous) = previous {
             if next[i].is_none_or(|new| new.target != previous.target) {
-                engine.automate(i, previous.target, previous.base);
+                if let Some(restored) = restored[i].filter(|r| r.target == previous.target) {
+                    engine.automate(i, restored.target, restored.base);
+                }
             }
         }
     }
     *current = next;
+}
+
+/// Resolve release values from the latest accepted document, including publication retries.
+pub fn release_bases(patch: &PatchState, previous: Bank) -> Bank {
+    previous.map(|previous| {
+        previous.and_then(|mut resolved| {
+            let RuntimeTarget::Param { id, kind, .. } = resolved.target else {
+                return None;
+            };
+            let module = patch.modules.get(&id)?;
+            if module.kind != kind {
+                return None;
+            }
+            resolved.base = kabl_ui::routing::base_value(patch, id, resolved.param);
+            Some(resolved)
+        })
+    })
 }

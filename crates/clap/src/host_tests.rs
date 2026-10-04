@@ -192,8 +192,9 @@ fn unassigning_a_lane_restores_its_document_base_without_allocations() {
         assert_no_alloc(|| engine.process_block(&mut left, &mut right));
     }
     assert!(left.iter().all(|v| v.abs() < 1e-6));
+    let restored = bank;
     assert_no_alloc(|| {
-        automation::replace_bank(&mut engine, &mut bank, [None; automation::SLOTS], false)
+        automation::replace_bank(&mut engine, &mut bank, [None; automation::SLOTS], restored)
     });
     let mut peak = 0.0f32;
     for _ in 0..100 {
@@ -266,7 +267,12 @@ fn fresh_browser_load_does_not_restore_old_bases_into_reused_module_ids() {
     let mut engine = PatchEngine::new(&collector.handle(), &fresh, 48000.0, VOICES).unwrap();
     let mut reference = PatchEngine::new(&collector.handle(), &fresh, 48000.0, VOICES).unwrap();
     assert_no_alloc(|| {
-        automation::replace_bank(&mut engine, &mut bank, [None; automation::SLOTS], true)
+        automation::replace_bank(
+            &mut engine,
+            &mut bank,
+            [None; automation::SLOTS],
+            [None; automation::SLOTS],
+        )
     });
     let note = MidiEvent::parse(Source::Host, &[0x90, 60, 100]).unwrap();
     engine.key_at(note, 0);
@@ -348,8 +354,8 @@ fn queued_old_banks_cannot_change_fresh_browser_document() {
             session
                 .engine
                 .drain(&mut session.rx, kabl_ui::control::QUEUE, &session.feedback);
-            while let Ok((bank, fresh)) = session.banks.pop() {
-                automation::replace_bank(&mut session.engine, &mut session.bank, bank, fresh);
+            while let Ok((bank, restored)) = session.banks.pop() {
+                automation::replace_bank(&mut session.engine, &mut session.bank, bank, restored);
             }
             session.engine.process_block(&mut left, &mut right);
             reference.process_block(&mut expected, &mut expected_right);
@@ -426,6 +432,10 @@ fn state_recall_clears_native_modulation_before_restoring_saved_bases() {
 
 #[test]
 fn queued_unassignment_cannot_overwrite_later_document_base_edit() {
+    unassignment_base_edit(false);
+    unassignment_base_edit(true);
+}
+fn unassignment_base_edit(saturated: bool) {
     let mut p = tests::instrument();
     let mut state = p.shared.snapshot();
     state.patch.cables.remove(&5);
@@ -439,6 +449,13 @@ fn queued_unassignment_cannot_overwrite_later_document_base_edit() {
     p.shared.load(state).unwrap();
     p.accept_loads();
     let mut c = p.shared.control.lock().unwrap();
+    if saturated {
+        for _ in 0..4 {
+            c.bank_dirty = true;
+            c.pump();
+        }
+        assert_eq!(c.banks.slots(), 0);
+    }
     for lane in &mut c.lanes {
         if lane
             .target
@@ -464,10 +481,21 @@ fn queued_unassignment_cannot_overwrite_later_document_base_edit() {
         let mut right = [0.0; 64];
         assert_no_alloc(|| p.render(&mut left, &mut right));
     }
+    if saturated {
+        let mut c = p.shared.control.lock().unwrap();
+        assert!(c.bank_dirty);
+        c.pump();
+        drop(c);
+        let mut l = [0.0; 64];
+        let mut r = [0.0; 64];
+        for _ in 0..100 {
+            p.render(&mut l, &mut r);
+        }
+    }
     let mut expected = [0.0; 64];
     let mut expected_right = [0.0; 64];
     let mut reference_timeline = Timeline::new();
-    for _ in 0..100 {
+    for _ in 0..(100 + 100 * usize::from(saturated)) {
         reference_timeline.render(
             &mut reference,
             &mut expected,
