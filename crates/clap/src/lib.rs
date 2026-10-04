@@ -171,6 +171,60 @@ impl Control {
         self.view.inspect.reset_audio_session(0.0);
     }
     fn pump(&mut self) -> bool {
+        if self.view.loaded {
+            // A browser document owns new queues too. Old bank/base updates must never
+            // cross into reused module identities, even when audio was paused.
+            if self.tx.slots() == 0 {
+                self.view.last_message = Some("State queue full; previous sound retained".into());
+                return false;
+            }
+            let prepared = prepare(
+                self.editor.state(),
+                self.rate,
+                &self.handle,
+                self.epoch,
+                1.0,
+            );
+            let (mut session, delivery, cc, reports, banks) = match prepared {
+                Ok(prepared) => prepared,
+                Err(error) => {
+                    self.view.last_message = Some(error);
+                    return false;
+                }
+            };
+            if self.view.load_stopped {
+                for (&id, module) in &self.editor.state().modules {
+                    if module.kind == "clock" {
+                        session
+                            .engine
+                            .transport(id, kabl_modules::builtins::Transport::Stop);
+                    }
+                }
+            }
+            self.tx.push(session).expect("checked state queue capacity");
+            self.delivery = delivery;
+            self.cc = cc;
+            self.reports = reports;
+            self.banks = banks;
+            self.bank_dirty = false;
+            self.bank_fresh = false;
+            for lane in &mut self.lanes {
+                lane.retired |= lane.target.is_some();
+                lane.target = None;
+            }
+            self.patch = self.editor.state().clone();
+            self.editor.take_dirty();
+            self.rejected = None;
+            self.clear_reports();
+            self.view.loaded = false;
+            self.view.load_stopped = false;
+            self.view.launches.clear();
+            self.view.transport.clear();
+            self.view.takeover.clear();
+            self.view.button_rearm = true;
+            self.view.learn = None;
+            return true;
+        }
         let changed = self.patch != *self.editor.state();
         if changed && self.rejected.as_ref() != Some(self.editor.state()) {
             if let Err(error) = sound_state::validate_patch(self.editor.state()) {
@@ -296,11 +350,20 @@ struct Shared {
     midi_overflow: AtomicBool,
     event_drops: AtomicU64,
     gestures: AtomicU32,
+    gesture_values: [AtomicU32; automation::SLOTS],
+    flushed_values: [AtomicU32; automation::SLOTS],
+    value_notify: AtomicU32,
+    flushed_modulation: [AtomicU32; automation::SLOTS],
+    modulation_notify: AtomicU32,
     cc_notify: AtomicU32,
     start_reset: AtomicBool,
 }
 
 impl Shared {
+    fn gesture(&self, slot: usize, value: f32) {
+        self.gesture_values[slot].store(value.to_bits(), Ordering::Relaxed);
+        self.gestures.fetch_or(1 << slot, Ordering::Release);
+    }
     fn snapshot(&self) -> SoundState {
         let c = self.control.lock().unwrap();
         SoundState {
@@ -358,6 +421,7 @@ impl Shared {
             .store(tail::samples(&c.patch, c.rate), Ordering::Relaxed);
         // No wrapper persistent-field loader or activation here. Pointer remains alive via Arc.
         unsafe {
+            self.params.gain.as_ptr()._internal_modulate_value(0.0);
             self.params
                 .gain
                 .as_ptr()
@@ -368,6 +432,10 @@ impl Shared {
                 self.params.slots[i]
                     .value
                     .as_ptr()
+                    ._internal_modulate_value(0.0);
+                self.params.slots[i]
+                    .value
+                    .as_ptr()
                     ._internal_set_normalized_value(*value);
             }
         }
@@ -375,9 +443,20 @@ impl Shared {
             self.params
                 .host_clock
                 .as_ptr()
+                ._internal_modulate_value(0.0);
+            self.params
+                .host_clock
+                .as_ptr()
                 ._internal_set_normalized_value(state.host_clock as u8 as f32);
         }
+        for (i, value) in state.slot_values.iter().enumerate() {
+            self.gesture_values[i].store(value.to_bits(), Ordering::Relaxed);
+            self.flushed_values[i].store(value.to_bits(), Ordering::Relaxed);
+            self.flushed_modulation[i].store(0, Ordering::Relaxed);
+        }
+        self.value_notify.store(0, Ordering::Release);
         self.gestures.store(0, Ordering::Release);
+        self.modulation_notify.store(0, Ordering::Release);
         self.cc_notify.store(0, Ordering::Release);
         self.committed.store(epoch * 2, Ordering::SeqCst);
         Ok(())
@@ -518,7 +597,7 @@ impl NiceEguiApp for RackApp {
                                             &self.shared.params.slots[i].value,
                                             value,
                                         );
-                                        self.shared.gestures.fetch_or(1 << i, Ordering::Release);
+                                        self.shared.gesture(i, value);
                                         if !response.dragged() {
                                             setter.end_set_parameter(
                                                 &self.shared.params.slots[i].value,
@@ -526,6 +605,7 @@ impl NiceEguiApp for RackApp {
                                         }
                                     }
                                     if response.drag_stopped() {
+                                        self.active_gestures[i] = false;
                                         setter
                                             .end_set_parameter(&self.shared.params.slots[i].value);
                                     }
@@ -549,7 +629,7 @@ impl NiceEguiApp for RackApp {
                                         );
                                         setter
                                             .end_set_parameter(&self.shared.params.slots[i].value);
-                                        self.shared.gestures.fetch_or(1 << i, Ordering::Release);
+                                        self.shared.gesture(i, value);
                                     }
                                 }
                             }
@@ -572,7 +652,7 @@ impl NiceEguiApp for RackApp {
                         self.active_gestures[i] = true;
                     }
                     setter.set_parameter(&self.shared.params.slots[i].value, value);
-                    self.shared.gestures.fetch_or(1 << i, Ordering::Release);
+                    self.shared.gesture(i, value);
                 }
             }
             if self.active_gestures[i] && !ui.input(|input| input.pointer.any_down()) {
@@ -668,6 +748,11 @@ impl Default for Instrument {
             midi_overflow: AtomicBool::new(false),
             event_drops: AtomicU64::new(0),
             gestures: AtomicU32::new(0),
+            gesture_values: std::array::from_fn(|i| AtomicU32::new(initial_values[i].to_bits())),
+            flushed_values: std::array::from_fn(|i| AtomicU32::new(initial_values[i].to_bits())),
+            value_notify: AtomicU32::new(0),
+            flushed_modulation: std::array::from_fn(|_| AtomicU32::new(0)),
+            modulation_notify: AtomicU32::new(0),
             cc_notify: AtomicU32::new(0),
             start_reset: AtomicBool::new(false),
             tail_samples: AtomicU64::new(tail::samples(&kabl_standalone::default_patch(), 48000.0)),
@@ -722,7 +807,7 @@ impl Default for Instrument {
                                             .as_ptr()
                                             ._internal_set_normalized_value(value);
                                     }
-                                    worker_shared.gestures.fetch_or(1 << i, Ordering::Release);
+                                    worker_shared.gesture(i, value);
                                     worker_shared.cc_notify.fetch_or(1 << i, Ordering::Release);
                                 }
                             }
@@ -797,7 +882,7 @@ impl Instrument {
             let mode = self.shared.params.host_clock.value();
             for (i, value) in values.iter_mut().enumerate() {
                 if gestures & (1 << i) != 0 {
-                    *value = self.shared.params.slots[i].value.unmodulated_plain_value();
+                    *value = f32::from_bits(self.shared.gesture_values[i].load(Ordering::Acquire));
                 }
             }
             if self.shared.committed.load(Ordering::SeqCst) == expected {
@@ -806,6 +891,25 @@ impl Instrument {
             }
         }
         self.shared.gestures.fetch_or(gestures, Ordering::Release);
+        (0, [0.0; automation::SLOTS])
+    }
+    fn live_flush(&mut self, modulation: bool) -> (u32, [f32; automation::SLOTS]) {
+        let (notify, source) = if modulation {
+            (
+                &self.shared.modulation_notify,
+                &self.shared.flushed_modulation,
+            )
+        } else {
+            (&self.shared.value_notify, &self.shared.flushed_values)
+        };
+        let mask = notify.swap(0, Ordering::Acquire);
+        let expected = self.session.as_ref().map(|s| s.epoch * 2);
+        let epoch = self.shared.committed.load(Ordering::SeqCst);
+        let values = std::array::from_fn(|i| f32::from_bits(source[i].load(Ordering::Acquire)));
+        if expected == Some(epoch) && self.shared.committed.load(Ordering::SeqCst) == epoch {
+            return (mask, values);
+        }
+        notify.fetch_or(mask, Ordering::Release);
         (0, [0.0; automation::SLOTS])
     }
     fn render(&mut self, left: &mut [f32], right: &mut [f32]) {
@@ -989,11 +1093,23 @@ impl Plugin for Instrument {
         let frames = self.shared.host_frames.load(Ordering::Relaxed) as usize;
         let (gestures, gesture_values) = self.live_params();
         let host_clock = self.session.as_ref().is_some_and(|s| s.host_clock);
+        let mut raw_values = 0;
+        let mut raw_modulation = 0;
         for _ in 0..4096 {
             let Ok((offset, event)) = self.events.pop() else {
                 break;
             };
             if offset == 0 {
+                if let schedule::Event::Value {
+                    slot, modulation, ..
+                } = event
+                {
+                    if modulation {
+                        raw_modulation |= 1 << slot;
+                    } else {
+                        raw_values |= 1 << slot;
+                    }
+                }
                 if let schedule::Event::Position(position) = event {
                     if host_clock && position.playing {
                         let discontinuity =
@@ -1017,6 +1133,21 @@ impl Plugin for Instrument {
             }
             self.schedule
                 .push(self.timeline.now() + offset as u64, event);
+        }
+        for (modulation, raw) in [(false, raw_values), (true, raw_modulation)] {
+            let (mask, values) = self.live_flush(modulation);
+            for (i, value) in values.iter().enumerate() {
+                if mask & !raw & (1 << i) != 0 {
+                    self.schedule.push(
+                        self.timeline.now(),
+                        schedule::Event::Value {
+                            slot: i,
+                            value: *value,
+                            modulation,
+                        },
+                    );
+                }
+            }
         }
         for (i, value) in gesture_values.iter().enumerate() {
             if gestures & (1 << i) != 0 {

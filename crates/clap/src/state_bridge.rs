@@ -71,6 +71,12 @@ struct Outer {
     events: UnsafeCell<rtrb::Producer<(u32, crate::schedule::Event)>>,
     start: unsafe extern "C" fn(*const clap_plugin) -> bool,
     cc_open: UnsafeCell<u32>,
+    params: clap_plugin_params,
+    flush: unsafe extern "C" fn(
+        *const clap_plugin,
+        *const clap_input_events,
+        *const clap_output_events,
+    ),
 }
 static DESCRIPTOR: OnceLock<PluginDescriptor> = OnceLock::new();
 fn bridge<'a>(plugin: *const clap_plugin) -> Option<&'a Bridge> {
@@ -133,6 +139,8 @@ unsafe extern "C" fn create(
             *id = info.id;
         }
     }
+    let mut bounded_params = *parameters;
+    bounded_params.flush = Some(flush_bridge);
     let mut outer = Box::new(Outer {
         plugin: original,
         bridge: Bridge {
@@ -148,6 +156,8 @@ unsafe extern "C" fn create(
         events: UnsafeCell::new(events),
         start: original.start_processing.expect("start processing"),
         cc_open: UnsafeCell::new(0),
+        params: bounded_params,
+        flush: parameters.flush.expect("parameter flush"),
     });
     outer.plugin.on_main_thread = Some(on_main_bridge);
     outer.plugin.get_extension = Some(get_extension_bridge);
@@ -169,6 +179,8 @@ unsafe extern "C" fn get_extension_bridge(
     };
     if unsafe { CStr::from_ptr(id) } == CLAP_EXT_STATE {
         &STATE as *const _ as *const c_void
+    } else if unsafe { CStr::from_ptr(id) } == CLAP_EXT_PARAMS {
+        unsafe { &(*plugin.cast::<Outer>()).params as *const _ as *const c_void }
     } else if unsafe { CStr::from_ptr(id) } == CLAP_EXT_NOTE_PORTS {
         &NOTE_PORTS as *const _ as *const c_void
     } else {
@@ -243,6 +255,81 @@ unsafe extern "C" fn filtered_get(
     } else {
         ptr::null()
     }
+}
+// CLAP flush is serialized with process; inactive flush runs on main. Keep only bounded
+// native parameter input and retain exact slot values until the next processing callback.
+unsafe extern "C" fn flush_bridge(
+    plugin: *const clap_plugin,
+    input: *const clap_input_events,
+    output: *const clap_output_events,
+) {
+    let outer = unsafe { &*plugin.cast::<Outer>() };
+    let shared = &outer.bridge.shared;
+    let mut parameters = ParamEvents {
+        events: [ptr::null(); MAX_PARAMS],
+        len: 0,
+    };
+    if let Some(input) = unsafe { input.as_ref() } {
+        if let (Some(size), Some(get)) = (input.size, input.get) {
+            let count = unsafe { size(input) };
+            for index in 0..count.min(MAX_HOST_EVENTS) {
+                let event = unsafe { get(input, index) };
+                let Some(header) = (unsafe { event.as_ref() }) else {
+                    continue;
+                };
+                let bytes = match header.type_ {
+                    CLAP_EVENT_PARAM_VALUE => std::mem::size_of::<clap_event_param_value>(),
+                    CLAP_EVENT_PARAM_MOD => std::mem::size_of::<clap_event_param_mod>(),
+                    _ => continue,
+                };
+                if header.space_id == CLAP_CORE_EVENT_SPACE_ID && header.size as usize >= bytes {
+                    let id = unsafe { (*event.cast::<clap_event_param_value>()).param_id };
+                    if outer.param_ids.contains(&id) {
+                        unsafe { parameters.push(event) };
+                    }
+                }
+            }
+            shared.event_drops.fetch_add(
+                u64::from(count > MAX_HOST_EVENTS),
+                std::sync::atomic::Ordering::Relaxed,
+            );
+        }
+    }
+    for &event in &parameters.events[..parameters.len] {
+        let id = unsafe { (*event.cast::<clap_event_param_value>()).param_id };
+        if let Some(slot) = outer.param_ids[1..17]
+            .iter()
+            .position(|&candidate| candidate == id)
+        {
+            if unsafe { (*event).type_ == CLAP_EVENT_PARAM_VALUE } {
+                let value = unsafe { (*event.cast::<clap_event_param_value>()).value as f32 };
+                if value.is_finite() {
+                    shared.flushed_values[slot].store(
+                        value.clamp(0.0, 1.0).to_bits(),
+                        std::sync::atomic::Ordering::Relaxed,
+                    );
+                    shared
+                        .value_notify
+                        .fetch_or(1 << slot, std::sync::atomic::Ordering::Release);
+                }
+            } else {
+                let value = unsafe { (*event.cast::<clap_event_param_mod>()).amount as f32 };
+                if value.is_finite() {
+                    shared.flushed_modulation[slot]
+                        .store(value.to_bits(), std::sync::atomic::Ordering::Relaxed);
+                    shared
+                        .modulation_notify
+                        .fetch_or(1 << slot, std::sync::atomic::Ordering::Release);
+                }
+            }
+        }
+    }
+    let filtered = clap_input_events {
+        ctx: (&mut parameters as *mut ParamEvents).cast(),
+        size: Some(filtered_size),
+        get: Some(filtered_get),
+    };
+    unsafe { (outer.flush)(plugin, &filtered, output) };
 }
 unsafe extern "C" fn process_bridge(
     plugin: *const clap_plugin,
@@ -684,6 +771,7 @@ mod tests {
             assert!(p.init.unwrap()(plugin));
             let shared = &(*plugin.cast::<Outer>()).bridge.shared;
             shared.stop.store(true, Ordering::Release);
+
             assert!(p.activate.unwrap()(plugin, 48000.0, 1, 4096));
             assert!(p.start_processing.unwrap()(plugin));
             let params = &*(p.get_extension.unwrap()(plugin, CLAP_EXT_PARAMS.as_ptr())
@@ -809,6 +897,22 @@ mod tests {
                 left.iter().copied().map(f32::abs).fold(0.0, f32::max)
             );
             // Normal host note, then saturated gain automation + monophonic modulation.
+            let original_fixture = shared.snapshot();
+            let mut fixture = shared.snapshot();
+            fixture.patch.cables.remove(&5); // Isolate VCA base from additive envelope CV.
+            fixture
+                .patch
+                .modules
+                .get_mut(&5)
+                .unwrap()
+                .params
+                .insert("gain".into(), 0.5);
+            for i in 0..crate::automation::SLOTS {
+                fixture.slot_values[i] = fixture.lanes[i].target.as_ref().map_or(0.0, |target| {
+                    crate::automation::normalized(&fixture.patch, target)
+                });
+            }
+            shared.load(fixture).unwrap();
             p.reset.unwrap()(plugin);
             events.push(clap_event_midi {
                 header: clap_event_header {
@@ -826,6 +930,133 @@ mod tests {
             });
             let baseline = left;
             assert!(baseline.iter().any(|sample| sample.abs() > 0.001));
+            events.clear();
+            let slot = shared
+                .control
+                .lock()
+                .unwrap()
+                .lanes
+                .iter()
+                .position(|lane| {
+                    lane.target
+                        .as_ref()
+                        .is_some_and(|t| t.kind == "vca" && t.param == "gain")
+                })
+                .unwrap();
+            let slot_id = (*plugin.cast::<Outer>()).param_ids[slot + 1];
+            let mut flushed = clap_event_param_value {
+                header: clap_event_header {
+                    size: std::mem::size_of::<clap_event_param_value>() as u32,
+                    time: 0,
+                    space_id: CLAP_CORE_EVENT_SPACE_ID,
+                    type_: CLAP_EVENT_PARAM_VALUE,
+                    flags: 0,
+                },
+                param_id: slot_id,
+                cookie: ptr::null_mut(),
+                note_id: -1,
+                port_index: -1,
+                channel: -1,
+                key: -1,
+                value: 0.0,
+            };
+            let mut pointers = vec![&flushed.header as *const clap_event_header];
+            let flush_input = clap_input_events {
+                ctx: (&mut pointers as *mut Vec<*const clap_event_header>).cast(),
+                size: Some(pointer_size),
+                get: Some(pointer_get),
+            };
+            assert_no_alloc(|| params.flush.unwrap()(plugin, &flush_input, ptr::null()));
+            // No process PARAM_VALUE echo or reactivation: the held note must become silent.
+            for _ in 0..40 {
+                assert_no_alloc(|| {
+                    p.process.unwrap()(plugin, &process);
+                });
+            }
+            assert!(left.iter().all(|s| s.abs() < 1e-6));
+            flushed.value = 1.0;
+            assert_no_alloc(|| params.flush.unwrap()(plugin, &flush_input, ptr::null()));
+            let mut flushed_mod = clap_event_param_mod {
+                header: clap_event_header {
+                    size: std::mem::size_of::<clap_event_param_mod>() as u32,
+                    time: 0,
+                    space_id: CLAP_CORE_EVENT_SPACE_ID,
+                    type_: CLAP_EVENT_PARAM_MOD,
+                    flags: 0,
+                },
+                param_id: slot_id,
+                cookie: ptr::null_mut(),
+                note_id: -1,
+                port_index: -1,
+                channel: -1,
+                key: -1,
+                amount: -1.0,
+            };
+            pointers[0] = &flushed_mod.header;
+            assert_no_alloc(|| params.flush.unwrap()(plugin, &flush_input, ptr::null()));
+            for _ in 0..40 {
+                assert_no_alloc(|| {
+                    p.process.unwrap()(plugin, &process);
+                });
+            }
+            assert!(left.iter().all(|s| s.abs() < 1e-6));
+            // An older flush must not overwrite newer process events at sample zero.
+            p.reset.unwrap()(plugin);
+            flushed.value = 0.0;
+            pointers[0] = &flushed.header;
+            assert_no_alloc(|| params.flush.unwrap()(plugin, &flush_input, ptr::null()));
+            let mut newer = flushed;
+            newer.value = 0.5;
+            let mut newer_modulation = flushed_mod;
+            newer_modulation.amount = 0.0;
+            let note = clap_event_midi {
+                header: clap_event_header {
+                    size: std::mem::size_of::<clap_event_midi>() as u32,
+                    time: 0,
+                    space_id: CLAP_CORE_EVENT_SPACE_ID,
+                    type_: CLAP_EVENT_MIDI,
+                    flags: 0,
+                },
+                port_index: 0,
+                data: [0x90, 60, 100],
+            };
+            let mut newer_events = vec![
+                &newer.header as *const clap_event_header,
+                &newer_modulation.header,
+                &note.header,
+            ];
+            let newer_input = clap_input_events {
+                ctx: (&mut newer_events as *mut Vec<*const clap_event_header>).cast(),
+                size: Some(pointer_size),
+                get: Some(pointer_get),
+            };
+            process.in_events = &newer_input;
+            assert_no_alloc(|| {
+                p.process.unwrap()(plugin, &process);
+            });
+            assert!(left
+                .iter()
+                .zip(baseline)
+                .all(|(&v, reference)| (v - reference).abs() < 1e-6));
+            process.in_events = &input;
+            flushed_mod.amount = 0.0;
+            std::hint::black_box(&flushed_mod);
+            assert_no_alloc(|| params.flush.unwrap()(plugin, &flush_input, ptr::null()));
+            events.push(clap_event_midi {
+                header: clap_event_header {
+                    size: std::mem::size_of::<clap_event_midi>() as u32,
+                    time: 0,
+                    space_id: CLAP_CORE_EVENT_SPACE_ID,
+                    type_: CLAP_EVENT_MIDI,
+                    flags: 0,
+                },
+                port_index: 0,
+                data: [0x90, 60, 100],
+            });
+
+            flushed.value = 0.5;
+            pointers[0] = &flushed.header;
+            assert_no_alloc(|| params.flush.unwrap()(plugin, &flush_input, ptr::null()));
             p.reset.unwrap()(plugin);
             let values: Vec<_> = (0..257)
                 .map(|index| clap_event_param_value {
@@ -888,6 +1119,7 @@ mod tests {
             events.clear();
             process.in_events = &input;
             assert_no_alloc(|| p.reset.unwrap()(plugin));
+            shared.load(original_fixture).unwrap();
             p.stop_processing.unwrap()(plugin);
             p.deactivate.unwrap()(plugin);
             assert!(p.activate.unwrap()(plugin, 96000.0, 1, 4096));

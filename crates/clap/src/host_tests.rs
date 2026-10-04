@@ -222,7 +222,7 @@ fn live_mode_and_values_wait_for_complete_scene_publication() {
             .as_ptr()
             ._internal_set_normalized_value(0.9);
     }
-    p.shared.gestures.store(1, Ordering::Release);
+    p.shared.gesture(0, 0.9);
     let (gestures, _) = assert_no_alloc(|| p.live_params());
     assert_eq!(gestures, 0);
     assert!(!p.session.as_ref().unwrap().host_clock);
@@ -309,6 +309,117 @@ fn rejected_browser_load_keeps_previous_automation_bank() {
     assert!(c.pump());
     assert!(c.lanes.iter().all(|lane| lane.target.is_none()));
     drop(c);
-    let (_, fresh) = p.session.as_mut().unwrap().banks.pop().unwrap();
-    assert!(fresh);
+    p.accept_loads();
+    assert!(p.session.as_ref().unwrap().bank.iter().all(Option::is_none));
+}
+
+#[test]
+fn queued_old_banks_cannot_change_fresh_browser_document() {
+    let mut p = tests::instrument();
+    let mut c = p.shared.control.lock().unwrap();
+    c.lanes.fill(automation::Lane::default());
+    c.bank_dirty = true;
+    c.pump(); // Queue an old unassignment without processing it.
+    let mut fresh = c.patch.clone();
+    fresh
+        .modules
+        .get_mut(&5)
+        .unwrap()
+        .params
+        .insert("gain".into(), 0.25);
+    fresh.cables.remove(&5);
+    c.editor = PatchEditor::seed_from(&fresh);
+    c.view.loaded = true;
+    assert!(c.pump());
+    drop(c);
+    assert_no_alloc(|| p.accept_loads());
+    let collector = Collector::new();
+    let mut reference = PatchEngine::new(&collector.handle(), &fresh, 48000.0, VOICES).unwrap();
+    let note = MidiEvent::parse(Source::Host, &[0x90, 60, 100]).unwrap();
+    let session: &mut Session = p.session.as_mut().unwrap();
+    session.engine.key_at(note, 0);
+    reference.key_at(note, 0);
+    for _ in 0..100 {
+        let mut left = [0.0; 64];
+        let mut right = [0.0; 64];
+        let mut expected = [0.0; 64];
+        let mut expected_right = [0.0; 64];
+        assert_no_alloc(|| {
+            session
+                .engine
+                .drain(&mut session.rx, kabl_ui::control::QUEUE, &session.feedback);
+            while let Ok((bank, fresh)) = session.banks.pop() {
+                automation::replace_bank(&mut session.engine, &mut session.bank, bank, fresh);
+            }
+            session.engine.process_block(&mut left, &mut right);
+            reference.process_block(&mut expected, &mut expected_right);
+        });
+        assert_eq!(left, expected);
+        assert_eq!(right, expected_right);
+    }
+}
+#[test]
+fn requested_rack_value_does_not_wait_for_native_host_echo() {
+    let mut p = tests::instrument();
+    let native = p.shared.params.slots[0].value.unmodulated_plain_value();
+    p.shared.gesture(0, 0.91);
+    let (mask, values) = assert_no_alloc(|| p.live_params());
+    assert_eq!(mask, 1);
+    assert_eq!(values[0], 0.91);
+    assert_eq!(
+        p.shared.params.slots[0].value.unmodulated_plain_value(),
+        native
+    );
+    assert_eq!(p.live_params().0, 0);
+}
+
+#[test]
+fn state_load_replaces_pending_exact_values_even_if_old_mask_is_retried() {
+    let mut p = tests::instrument();
+    p.shared.gesture(0, 0.91);
+    p.shared.flushed_values[0].store(0.92f32.to_bits(), Ordering::Relaxed);
+    p.shared.value_notify.store(1, Ordering::Release);
+    p.shared.flushed_modulation[0].store(0.5f32.to_bits(), Ordering::Relaxed);
+    p.shared.modulation_notify.store(1, Ordering::Release);
+    let gesture = p.shared.gestures.swap(0, Ordering::Acquire);
+    let value = p.shared.value_notify.swap(0, Ordering::Acquire);
+    let modulation = p.shared.modulation_notify.swap(0, Ordering::Acquire);
+    let mut loaded = p.shared.snapshot();
+    loaded.slot_values[0] = 0.2;
+    p.shared.load(loaded).unwrap();
+    // Force old audio callback's retry after main thread has completed replacement.
+    p.shared.gestures.fetch_or(gesture, Ordering::Release);
+    p.shared.value_notify.fetch_or(value, Ordering::Release);
+    p.shared
+        .modulation_notify
+        .fetch_or(modulation, Ordering::Release);
+    assert_no_alloc(|| p.accept_loads());
+    assert_eq!(p.live_params().1[0], 0.2);
+    assert_eq!(p.live_flush(false).1[0], 0.2);
+    assert_eq!(p.live_flush(true).1[0], 0.0);
+}
+
+#[test]
+fn state_recall_clears_native_modulation_before_restoring_saved_bases() {
+    let mut p = tests::instrument();
+    unsafe {
+        p.shared.params.gain.as_ptr()._internal_modulate_value(-1.0);
+        p.shared.params.slots[0]
+            .value
+            .as_ptr()
+            ._internal_modulate_value(-1.0);
+    }
+    let mut state = p.shared.snapshot();
+    state.output_gain = 0.5;
+    state.slot_values[0] = 0.25;
+    p.shared.load(state).unwrap();
+    assert_eq!(p.shared.params.gain.value(), 0.5);
+    assert_eq!(p.shared.params.gain.unmodulated_plain_value(), 0.5);
+    assert_eq!(p.shared.params.slots[0].value.value(), 0.25);
+    assert_eq!(
+        p.shared.params.slots[0].value.unmodulated_plain_value(),
+        0.25
+    );
+    assert_no_alloc(|| p.accept_loads());
+    assert_eq!(p.session.as_ref().unwrap().gain, 0.5);
 }
