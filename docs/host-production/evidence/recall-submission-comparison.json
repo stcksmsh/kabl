@@ -1,0 +1,213 @@
+{
+  "files": [
+    "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-owner-test/projects/arrangement.rpp",
+    "scratch/host/recalled.rpp"
+  ],
+  "states_equal": true,
+  "instances": [
+    {
+      "modules": 15,
+      "cables": 30,
+      "output_gain": 0.45,
+      "host_clock": true,
+      "lanes": [
+        {
+          "target": {
+            "module": 1,
+            "kind": "macro",
+            "param": "m1"
+          },
+          "retired": false
+        },
+        {
+          "target": {
+            "module": 1,
+            "kind": "macro",
+            "param": "m2"
+          },
+          "retired": false
+        },
+        {
+          "target": {
+            "module": 1,
+            "kind": "macro",
+            "param": "m3"
+          },
+          "retired": false
+        },
+        {
+          "target": {
+            "module": 1,
+            "kind": "macro",
+            "param": "m4"
+          },
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        }
+      ],
+      "slot_values": [
+        0.4,
+        0.3,
+        0.3,
+        0.4,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "modules": 11,
+      "cables": 13,
+      "output_gain": 0.6,
+      "host_clock": true,
+      "lanes": [
+        {
+          "target": {
+            "module": 3,
+            "kind": "macro",
+            "param": "m1"
+          },
+          "retired": false
+        },
+        {
+          "target": {
+            "module": 40,
+            "kind": "vca",
+            "param": "gain"
+          },
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        }
+      ],
+      "slot_values": [
+        0.4,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ]
+}

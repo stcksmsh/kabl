@@ -1,0 +1,13 @@
+tracks=2 audio=1
+SRATE=true 48000
+BSIZE=true 256
+MODE=true JACK
+play=1 audio=1
+tempo set=150 time=0.96533333333333
+seek=8
+loop=8..9
+loop position=8.9439999999999
+stop=0
+Free=1.0
+Free delayed=0.0
+complete=1

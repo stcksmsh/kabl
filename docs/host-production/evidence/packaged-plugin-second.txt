@@ -1,0 +1,4 @@
+741b91600000-741b918c4000 r--p 00000000 103:07 23234038                  /home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-owner-test/plugins/kabl.clap
+741b918c4000-741b91ede000 r-xp 002c3000 103:07 23234038                  /home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-owner-test/plugins/kabl.clap
+741b91ede000-741b91f20000 r--p 008dc000 103:07 23234038                  /home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-owner-test/plugins/kabl.clap
+741b91f20000-741b91f22000 rw-p 0091d000 103:07 23234038                  /home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-owner-test/plugins/kabl.clap

@@ -1,0 +1,37 @@
+{
+  "product_head": "133fdb89ac56a396db0c7c961c74067782b34efb",
+  "binary_sha256": "17cfcc408aacf341971ed5dfc35ddd6356445d16273c9c7610b16cef7c4770ee",
+  "mutable_dirs": [
+    "profile",
+    "runs"
+  ],
+  "excluded_final_metadata": [
+    "submission.json"
+  ],
+  "files": {
+    "README.txt": "493aa6d544d3ecb34b2f0bdaeb7e0866781e52f39b35498b5d6afba42f60d70c",
+    "docs/CHECKLIST.md": "e4c1c637411f059ae611fb5eb5568b8393da19f1dc54f9e6113a145e91f13bf7",
+    "docs/README.md": "d0a7e28e6e00117d1f3db7eff1a9efe7b51639b7f58086d4fd92e41df892d293",
+    "docs/REPORT.md": "33fdd7d134c6d75fe3e1bfb075495f688f28c65889a2ded0f690a53e467c7fa2",
+    "docs/REVIEW.md": "73b919190026de0201e4bb040885c034471f2bb79d4913982ac209c250340e92",
+    "docs/design.md": "03ea2d04747555726ed45398b074a0b94572551696dcbb3aa2ef426704cb5728",
+    "launch.sh": "d26a0a262cfa8919bb4e92c1ef88272ee11415d462b4404579135885e42514bd",
+    "media/arrangement.flac": "f0b6dfb281aef3eb4cdff81e6118a31acbfc35499e5201a29d1af914875ea4ab",
+    "media/arrangement.wav": "37f3bb182439bb8db2c27865e5fdd3a712b93ebcbf14ddf3fcb5bcd545c8107d",
+    "media/cc-button-result.png": "4bbfa5295d62cc3cb931c45919dfe4e8def43aa3ef371e478540a856fa7bd418",
+    "media/rack-write.png": "5fe71268b0871d0c212b9ca922e3af2a15b4ffdc49e5a28c0685af3b993d67ec",
+    "media/ui-dark-1280x800.png": "5eec3831f5453716e5b26798d758291874ad734da511840ae09b62a2349ba3c3",
+    "media/ui-dark-1440x900.png": "30673b6b389a1a6df30205748d81c3b2ea9d21448f7605329b94efd72c0ff449",
+    "media/ui-light-1280x800.png": "5afacdea6c976c36aad2e57578e551b6e89aa46532f7f85d7499848887ebcb06",
+    "media/ui-light-1440x900.png": "48e815a425f2df6120c1e31a496a041d5c5321d566422505e0131c5014672f17",
+    "media/walkthrough.mp4": "2c3d27d945f1e002f8c5a01423ba15ec28e16305dbd20d597938dff92d10c03c",
+    "nice-plug-LICENSE": "7088dc1293488d86744ee81349fcc2fb6550345dcf4ad676b5984774e08fc1d7",
+    "plugins/kabl.clap": "17cfcc408aacf341971ed5dfc35ddd6356445d16273c9c7610b16cef7c4770ee",
+    "projects/arrangement.rpp": "d29a035128193e4dbb1911497f342e03fa3d919f96a096f6fb74a8843f389cb1",
+    "render-policy.sh": "155cdc9a7863e1ebbf29afdee5dbf5a7ce1ba217e9637fc92bc9ac74f6698298",
+    "scripts/compare-renders.py": "633073c64e1e4e869deff22a133c603f4386db76c569e90ba0be18cac7b3f4a5",
+    "scripts/recall.lua": "66b3af44205a62c318ca54a35070ae44444acbc597ebcb428a2ff1ddf8b9dc9c",
+    "scripts/render.lua": "922c0c75e2b509829bf42144c2e8522f16d1905e6be6064c4b18291960b1573b",
+    "scripts/serial-repeat.lua": "adc98e7d9f9f03647d1ba25d688b553af2b865804254b69a37cb194ade4c3ad3"
+  }
+}

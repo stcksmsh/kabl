@@ -2799,3 +2799,13 @@ counters and physical latency remain distinct. Owner acceptance and render engin
 ## D08 context checkpoint — 2026-10-04
 
 User authorized D08 and requested durable handover before clearing context. Stable automation/state and initial Host scheduling implemented; acceptance remains incomplete. Retain ordinary render failures and explicitly label provisional serial warm-up policy. Resume details and unresolved risks: `host-production/HANDOVER.md`. No final reviewer, PR, merge or owner approval yet.
+
+## 2026-10-04 — D08 stable automation, host epochs and render policy
+
+Sixteen fixed native lanes persist module ID/kind/parameter identity; pins/macros lead candidates, deletion retires instead of hijacking automation, explicit remapping restores latest document bases. Host playback overlays DSP without patch undo edits. Bank restore payloads carry current accepted bases across coalescing/backpressure; complete browser sessions replace old queues. Rejected graph-index/layout identities and silent reuse.
+
+Host owns clock phase and MIDI/devices; Free/standalone/old D07 remain unchanged. Supported initial bars are4/4, events use existing64frame Timeline. Play/seek/loop establish Host reset epochs; stop releases notes and retains tails, explicit reset clears transients. A processing thread restart alone is not a new Host epoch. Rejected per-note oscillator resets and Free sound changes.
+
+Actual initialized device-closed/no-anticipation rendering matches after one explicitly retained full warm-up per fresh process; ordinary repeats still differ. Earlier constant120/position0 driver failures came from starting Lua before REAPER applied project/audio setup. Rejected reporting a provisional wrong-init comparison as final acceptance. Final source-free bundle maps production binary outside checkout and recalls complete embedded states without factory files. Scripted/virtual input stays labeled; owner checks stay pending.
+
+Independent review found scene/bank ordering, GUI native atomic delay, flush delivery/precedence, duplicate ends, pending retry and native modulation recall bugs; focused fixes and realistic queued/saturation/exported regressions added. Pinned nice-plug still takes a callback Mutex. Allocation guards plus no added locks do not satisfy whole-plugin lock freedom; unsafe bypass/broad framework rewrite rejected, acceptance remains incomplete. Dense two-instance open-editor backend errors are retained separately from callback timing and physical xruns/latency.

@@ -1,9 +1,8 @@
 # Status
 
-## D08 authorized implementation checkpoint — 2026-10-04
+## D08 draft submission — 2026-10-04
 
-D08 implementing; acceptance incomplete; owner approval pending. Branch `codex/d08-host-production`, isolated worktree `.worktrees/d08`; no PR or merge. Resume from [host-production/HANDOVER.md](host-production/HANDOVER.md), original request and BRIEF. Latest plugin tests 14/0, strict plugin Clippy and release build pass. Ordinary repeated renders still differ; matching serial policy provisional. Real host transport driver needs repair before tempo/seek/loop acceptance. Durable raw checkpoint at `/home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-checkpoint`. User checkout and `.ai/` untouched. Older no-D08 statements below are superseded by explicit authorization.
-
+Engineering: submitted as draft; acceptance incomplete. Owner review: pending. Branch `codex/d08-host-production`; product tested/reviewed/packaged `133fdb89ac56a396db0c7c961c74067782b34efb`. [host-production/REPORT.md](host-production/REPORT.md) indexes README, design, REVIEW, CHECKLIST, final verification and raw provenance. Stable16lanes + Host/Free, genuine native gesture recording/replay, closed-editor virtual CC/buttons and complete source-free recall verified. Four completed final36s renders match under explicit initialized/device-closed/no-anticipation/full-warm-up policy; ordinary repetitions still differ. Workspace610/0/22, strict plugin Clippy/release pass, validator35success/9skips. Fresh independent reviewer correctness findings fixed/rechecked; inherited nice-plug callback Mutex remains strict no-lock acceptance failure. Dense94-module two-instance open-editor case reports2REAPER backend errors on Dummy-Driver; physical latency/controller/listening/feel remain pending. Durable owner bundle: `/home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-owner-test`, run `./launch.sh`. Final raw archive: sibling `d08-final-evidence`; original `d08-checkpoint` retained. No merge, D09, global install or messages to other chats. Root user files, existing worktrees and .ai untouched. PR metadata is recorded in host-production/evidence/submission.json; exact final submitted SHA is recorded in owner bundle/submission.json.
 
 ## D07 draft closeout — 2026-10-04
 

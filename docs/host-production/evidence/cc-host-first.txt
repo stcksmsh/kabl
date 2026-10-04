@@ -1,0 +1,10 @@
+source=REAPER virtual keyboard queue; no physical controller; both editors closed
+1.5222059680018 CC 20 0
+2.0014290660001 CC 20 51
+2.5196430420001 CC 20 90
+3.0018726590024 CC 21 0
+3.5175076760024 CC 21 127
+4.003341566 CC 21 0
+4.5307124080027 CC 20 30
+slot settled=0.23622047901154 points=11
+clock opened only after all messages and state save
