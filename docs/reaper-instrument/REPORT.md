@@ -161,3 +161,59 @@ outside-checkout installable bundle/relocated project, finish README/design/CHEC
 final-head checks, obtain final independent acceptance/package recheck, update HANDOFF/STATUS/
 decisions and submit PR. No PR exists yet; no merge or D08 work authorized. Owner listening,
 physical-controller feel and acceptance remain pending.
+
+## 2026-10-04 closeout: draft submission, acceptance incomplete
+
+Starting continuation head: `0af399f` (original prerequisite base `91777165`). Final product
+and tested/reviewed source: `ff11434c6502d2cce5a3894544bec10f5ceea6d6`, on
+`codex/d07-reaper-instrument`. Product increments: `7d111f4` satisfies strict Rust 1.93
+Clippy for asynchronous browser save; `ff11434` fixes actual embedded toolbar overlap by
+placing Save/Save As and Perform/Routing on a separate row. No D08 changes or merge.
+
+Engineering is submitted as a draft with incomplete acceptance. Owner review remains
+pending. The user's time-limited closeout request stops further diagnosis in this run;
+the following gaps must not be relabeled as completion.
+
+| Criterion | Result | Evidence/provenance |
+|---|---|---|
+| Final workspace checks | Pass: 597 passed, 0 failed, 22 ignored; strict Clippy and release build exit 0 | evidence/final-{summary.json,workspace-tests.txt,workspace-clippy.txt,release-build.txt}; ff11434 |
+| Final CLAP validator | 35 success, 9 explicit skips, no failures/crashes | evidence/validator-final{.json,-stderr.txt}; ff11434 |
+| Complete recall, independent gains, browser/routing edits | Pass in prior actual host; final relocated states exactly equal | host/reopen logs; evidence/package-final-state-comparison.json |
+| Outside-checkout final binary/package | Pass: missing factory path, gains 0.4/0.55, 52-second stereo render, saved complete states | evidence/package-final-{check.txt,manifest.json,state-comparison.json} |
+| Virtual MIDI and editor cycles | Virtual recording and ten lifecycle transitions/readback pass | Existing c9541bc host logs/videos; no physical controller; no uninterrupted-audio claim from transport flags alone |
+| Repeated render | Fail/unresolved: fresh-process and offline/online policies differ | evidence/render-{fresh,process}-comparison.json; earlier failure preserved |
+| Performance | Eight 12-second real-host cases at negotiated 48 kHz/256; editor-open requested, not handle-verified | evidence/host-timing.json; product 7d111f4; DSP unchanged at ff11434, final toolbar not benchmarked |
+| Backend/device | Cumulative device error 26 stable during the sampled light-case window; REAPER node error 0 | evidence/pipewire-measurement-window.txt; does not cover every case or physical latency |
+| Real knob Undo | Actual cutoff 20 kHz → 1.26 kHz → Undo 20 kHz observed | scratch/host/undo-1280-{edited,restored}.png; 7d111f4 widgets unchanged |
+| Owner sound/controller/feel | Pending | CHECKLIST.md |
+
+Measurements exclude instances with fewer than 1,000 callbacks from the steady-case summary
+(startup/shutdown rows remain raw). Per-instance means are 0.124–0.162 ms for light sounds,
+0.346–0.426 ms for dense sounds; worst observed callback across all cases is 2.265132 ms.
+The 48 kHz/256 buffer interval is 5.333333 ms. These are wall-clock callback durations with
+clock/atomic overhead, not physical latency or proof of long-run stability. No historical
+freeze cause was inferred. Measurement proxy never replaces the packaged product.
+
+Actual environment: ThinkBook16, i7-13700H (20 logical CPUs), Linux 7.0.0-34-generic,
+Rust 1.93.0, REAPER 7.75/linux-x86_64, PipeWire/JACK negotiated 48 kHz/256 during new
+measurements. Previous musical/live proofs used 48 kHz/128. Raw renders and failed runs
+remain in scratch; listening copies and silent operation videos remain clearly labeled.
+
+Fresh reviewer `/root/final_review` rechecked ff11434, reported no new substantive source
+finding and independently ran 24 plugin/UI library tests successfully. REVIEW.md records
+its acceptance limitations. Later final package/validator refresh changes no product source.
+
+Persistent owner bundle:
+`/home/stcksmsh/.codex/visualizations/2026/10/03/01a10304-4ddb-7850-bdcf-4509411a23d5/d07-owner-test`.
+Launch `./launch.sh`; no global install was performed. See README.md and CHECKLIST.md.
+The complete two-instance MIDI project, offline/live listening copies and silent operation
+videos are present. The final packaged binary manifest names ff11434. Earlier /tmp test
+bundle is disposable and is not the durable handoff. `.ai/` and user checkout remain untouched.
+
+Next action: diagnose render reset/pre-roll timing with a confirmed complete render and
+bounded callback telemetry, then establish a repeatable policy. Refresh editor-open timing
+with actual GUI-handle verification and complete remaining owner/controller acceptance.
+The timing proxy's optional trace run did not produce a verified complete render and is not
+used as successful diagnosis. Stop at D07; no merge or D08 authorization.
+
+Final toolbar visually verified at 1280×800 in A-light/A-dark: evidence/screenshots/final-1280-{light,dark}.png. Save/Save As and Perform/Routing no longer overlap. Earlier 1440×900 evidence predates this toolbar change; a refreshed final-head 1440 view remains pending.

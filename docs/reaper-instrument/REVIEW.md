@@ -43,3 +43,22 @@ snapshots, with the two distinct module/cable/gain combinations retained. It cor
 host-control, ten-cycle and virtual-recording logs and validator 35-success/9-skip results.
 This was a source/evidence checkpoint, not final D07 acceptance. The reviewer's subsequent
 turn ended at the account usage limit; final package/remaining evidence review is pending.
+
+## Final source and acceptance recheck — 2026-10-04
+
+Fresh read-only `/root/final_review` inspected exact final product
+`ff11434c6502d2cce5a3894544bec10f5ceea6d6`. It found no new substantive source defect.
+The final toolbar change separates document/action controls into a second row with a
+64-pixel panel; handlers and sound/state behavior are unchanged. Reviewer independently
+reran plugin and UI library tests: 24 passed, zero failed.
+
+Acceptance remains incomplete: independently corroborated repeat-render failure
+(4,915,615 differing samples, maximum absolute difference 0.24531); editor-open timing
+cases request opening without recording verified handles; physical controller, round-trip
+latency and owner sound/feel remain pending. The ten-cycle log alone proves transitions,
+transport and readback, not uninterrupted audio across every transition. Reviewer judged
+a draft PR appropriate. Prior sound/state evidence is reusable for the toolbar-only change
+with exact provenance; final binary/package/validator and actual toolbar views were refreshed
+by the implementer afterward and are recorded separately in REPORT.md. No owner approval.
+
+Final reviewer evidence recheck at ff11434 independently counted 597/0/22 workspace tests, 35 validator successes/9 skips, checked final package gain/render logs and exact decoded-state equality, and visually inspected both final 1280 theme screenshots: Save, Save As, Perform and Routing are distinct. It found no new substantive finding and supported draft submission. Final 1440 refresh, repeat render, verified editor-open timing, physical controller/latency and owner review remain open.

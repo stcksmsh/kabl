@@ -2770,3 +2770,18 @@ start D06" instructions). Engineering rationale only; owner review pending. Desi
 - **Verification toolchain.** The laptop has Rust 1.93, whose Clippy flags a pre-existing
   collapsible `else if` in `browser.rs` at the baseline too; strict Clippy was run with the
   1.98.1 toolchain D05 used (installed per user with rustup, default unchanged).
+
+## 2026-10-04 — D07 draft closeout and render-policy limit
+
+The final instrument remains on the dedicated D07 branch. Final source ff11434 has a
+separate editor document/action row because actual 1180-pixel embedding overlapped Save,
+Save As, Perform and Routing. Existing browser interactions pass; sound/state handlers
+are unchanged. Full automation slots and Host/Free synchronization stay in D08.
+
+Explicit CLAP reset clears transient DSP, but tested REAPER offline/online and fresh-process
+render policies do not yield identical PCM. Free oscillators advance through silent processing;
+host pre-roll/reset timing is plausible but unproven. We preserve failed comparisons and submit
+a draft with this engineering gap rather than claim deterministic host render acceptance.
+Final package recall and validator evidence identify the final binary; old sound/state evidence
+is reused only where the toolbar change cannot affect it. Owner sound/controller acceptance is
+still pending. No global installation, merge or D08 work was performed.

@@ -1,0 +1,5 @@
+REAPER 7.75/linux-x86_64
+factory=/home/stcksmsh/.codex/visualizations/2026/10/03/01a10304-4ddb-7850-bdcf-4509411a23d5/d07-owner-test/unavailable-factory
+track=0 name=CLAPi: kabl (stcksmsh) gain=0.40000000596046
+track=1 name=CLAPi: kabl (stcksmsh) gain=0.55000001192093
+render completed

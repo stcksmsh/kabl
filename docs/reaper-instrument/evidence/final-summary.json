@@ -1,0 +1,15 @@
+{
+  "product_head": "ff11434",
+  "workspace_tests": {
+    "passed": 597,
+    "failed": 0,
+    "ignored": 22
+  },
+  "clippy_exit": 0,
+  "release_build_exit": 0,
+  "validator_head": "ff11434",
+  "validator": {
+    "success": 35,
+    "skipped": 9
+  }
+}

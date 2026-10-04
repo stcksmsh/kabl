@@ -1,0 +1,17 @@
+local root=assert(os.getenv('KABL_PACKAGE_ROOT'))
+assert(reaper.CountTracks(0)==2)
+local f=assert(io.open(root..'/package-check.txt','w'))
+f:write('REAPER ',reaper.GetAppVersion(),'\nfactory=',assert(os.getenv('KABL_FACTORY_DIR')),'\n')
+for i=0,1 do
+ local tr=reaper.GetTrack(0,i)
+ local ok,name=reaper.TrackFX_GetFXName(tr,0,'');assert(ok and name:find('kabl'))
+ local gain=reaper.TrackFX_GetParamNormalized(tr,0,0)
+ assert(math.abs(gain-(i==0 and 0.4 or 0.55))<0.000001,'wrong gain')
+ f:write('track=',i,' name=',name,' gain=',gain,'\n')
+ reaper.TrackFX_Show(tr,0,2)
+end
+reaper.GetSetProjectInfo_String(0,'RENDER_FILE',root..'/media',true)
+reaper.GetSetProjectInfo_String(0,'RENDER_PATTERN','final-relocated-render',true)
+reaper.Main_OnCommand(42230,0)
+f:write('render completed\n');f:close()
+reaper.Main_SaveProjectEx(0,root..'/projects/final-relocated-reopened.rpp',0)

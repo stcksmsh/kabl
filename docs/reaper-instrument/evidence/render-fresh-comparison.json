@@ -1,0 +1,10 @@
+{
+  "first": "d07-fresh.wav",
+  "second": "d07-fresh-second.wav",
+  "format_equal": true,
+  "pcm_equal": false,
+  "first_bytes": 19968000,
+  "second_bytes": 19968000,
+  "first_sha256": "538679c0d0fa7fa79bb1b377db93eb70736375d7933439ebbcff53b95ea1e144",
+  "second_sha256": "a5ab1abb3565c37c7ed69a6e5c0fd66bc6798fe9e6fae3632bf531e940b5423f"
+}

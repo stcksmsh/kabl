@@ -1,0 +1,58 @@
+[
+  {
+    "case": "light-1-closed",
+    "completed": true,
+    "exit": 0,
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\n",
+    "callbacks": "1,6,1706746,393610,400000\n0,2292,283701448,439025,200000\n"
+  },
+  {
+    "case": "light-1-open",
+    "completed": true,
+    "exit": 0,
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\n",
+    "callbacks": "1,46,14398181,456087,460000\n0,2324,316765256,287223,230000\n"
+  },
+  {
+    "case": "light-2-closed",
+    "completed": true,
+    "exit": 0,
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\n",
+    "callbacks": "1,2285,319366595,455547,240000\n0,2287,308311657,443634,230000\n"
+  },
+  {
+    "case": "light-2-open",
+    "completed": true,
+    "exit": 0,
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\n",
+    "callbacks": "1,2320,376645023,2133437,410000\n0,2316,364182999,2265132,270000\n"
+  },
+  {
+    "case": "dense-1-closed",
+    "completed": true,
+    "exit": 0,
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\n",
+    "callbacks": "1,9,3230910,450754,460000\n0,2282,852122955,983093,620000\n"
+  },
+  {
+    "case": "dense-1-open",
+    "completed": true,
+    "exit": 0,
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\n",
+    "callbacks": "1,47,14670047,513933,520000\n0,2312,985030735,2173586,740000\n"
+  },
+  {
+    "case": "dense-2-closed",
+    "completed": true,
+    "exit": 0,
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\n",
+    "callbacks": "1,2280,820341600,1292498,590000\n0,2282,789261099,1080725,550000\n"
+  },
+  {
+    "case": "dense-2-open",
+    "completed": true,
+    "exit": 0,
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\n",
+    "callbacks": "1,2316,937798428,911970,670000\n0,2312,900599545,1422500,690000\n"
+  }
+]
