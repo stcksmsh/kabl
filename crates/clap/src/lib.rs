@@ -335,6 +335,8 @@ impl Shared {
         c.view.launches.clear();
         c.view.transport.clear();
         c.view.takeover.clear();
+        c.view.button_rearm = true;
+        c.view.learn = None;
         c.view.doc = None;
         c.epoch = epoch;
         self.tail_samples
@@ -1018,6 +1020,15 @@ impl Plugin for Instrument {
         self.shared
             .event_drops
             .fetch_add(self.schedule.dropped - dropped_before, Ordering::Relaxed);
+        // Host lanes may open a silent route or extend a release/effect beyond document bases.
+        // A mapped instrument stays active; legacy unassigned projects keep finite-tail logic.
+        if self
+            .session
+            .as_ref()
+            .is_some_and(|s| s.bank.iter().any(Option::is_some))
+        {
+            return ProcessStatus::KeepAlive;
+        }
         match self.shared.tail_samples.load(Ordering::Relaxed) {
             samples if samples >= u32::MAX as u64 => ProcessStatus::KeepAlive,
             samples => ProcessStatus::Tail(samples as u32),

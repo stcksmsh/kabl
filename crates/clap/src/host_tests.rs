@@ -30,8 +30,13 @@ fn stable_lanes_legacy_state_and_atomic_rejection() {
     }
     let legacy = SoundState::decode(&serde_json::to_vec(&json).unwrap()).unwrap();
     assert!(!legacy.host_clock && legacy.lanes.iter().all(|l| l.target.is_none()));
+    {
+        let mut c = p.shared.control.lock().unwrap();
+        c.view.learn = Some((1, "m1".into()));
+    }
     p.shared.load(legacy).unwrap();
     let mut c = p.shared.control.lock().unwrap();
+    assert!(c.view.learn.is_none());
     let target = automation::candidates(c.editor.state())[0].clone();
     c.lanes[0].target = Some(target.clone());
     c.editor

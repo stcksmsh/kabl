@@ -738,6 +738,14 @@ mod tests {
             assert_no_alloc(|| {
                 assert_ne!(p.process.unwrap()(plugin, &process), CLAP_PROCESS_ERROR);
             });
+            let tail =
+                &*(p.get_extension.unwrap()(plugin, clap_sys::ext::tail::CLAP_EXT_TAIL.as_ptr())
+                    .cast::<clap_sys::ext::tail::clap_plugin_tail>());
+            assert_eq!(
+                tail.get.unwrap()(plugin),
+                u32::MAX,
+                "Mapped automation must not truncate tails"
+            );
             events.clear();
             let mut probe = OutputProbe {
                 reject: CLAP_EVENT_PARAM_GESTURE_BEGIN,
