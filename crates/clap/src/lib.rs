@@ -736,7 +736,7 @@ impl Default for Instrument {
             timeline: Timeline::new(),
             rate: 48000.0,
             worker: Some(worker),
-            editor_state: EguiState::from_size(LogicalSize::new(1180.0, 740.0), 1.0),
+            editor_state: EguiState::from_size(LogicalSize::new(1180.0, 680.0), 1.0),
             repaint: RepaintNotifier::new(),
         }
     }

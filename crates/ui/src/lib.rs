@@ -1800,7 +1800,15 @@ fn draw_transport(
             },
             0.0,
         ),
-        ("restart", "Restart", half + 8.0),
+        (
+            "restart",
+            if ui_state.host_clock {
+                "Synced"
+            } else {
+                "Restart"
+            },
+            half + 8.0,
+        ),
     ];
     for (key, label, dx) in buttons {
         let b = xf.r(Rect::from_min_size(
@@ -1808,7 +1816,15 @@ fn draw_transport(
             vec2(half, r.height()),
         ));
         ui_state.record(format!("{key}:{id}"), b);
-        let resp = ui.interact(b, Id::new(("kabl-transport", key, id)), Sense::click());
+        let resp = ui.interact(
+            b,
+            Id::new(("kabl-transport", key, id)),
+            if ui_state.host_clock {
+                Sense::hover()
+            } else {
+                Sense::click()
+            },
+        );
         let lit = key == "run" && running;
         painter.rect_filled(
             b,
