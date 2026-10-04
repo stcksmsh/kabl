@@ -4,7 +4,7 @@
   "binary_sha256": "17cfcc408aacf341971ed5dfc35ddd6356445d16273c9c7610b16cef7c4770ee",
   "owner_bundle": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-owner-test",
   "raw_archive": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-final-evidence",
-  "raw_manifest_sha256": "4c1677140af6166ca9a51db856996d8cdab8964030baa7f383345f25953608c5",
+  "raw_manifest_sha256": "8cec10f3f4835d5fe9c93524d1a779c0f956fd47ad88e20fb418b69d52c94f5c",
   "immutable_first_checkpoint": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-checkpoint",
   "accepted_final_evidence": {
     "submission-verification.json": "edb45a496104410b611ba4346ea1153fda7171ff6f335da1359934aca6ed47af",
@@ -29,19 +29,20 @@
     "transport-submission.csv": "12d611a52a49eacb950c3cf9d11dcbf9869ff47a981dd5d5f3cf39a84d2c48ed",
     "host-measurements.json": "ec1edea11a3a0c431e73c04fcc96a85c57e3472507b2c4f8e1e314309c8458fb",
     "timing-summary.json": "9921069b063812bc00f09c27e2b4fc49020171c8f1867ea76255ff0e72c1633b",
-    "owner-bundle-manifest.json": "e540878c675edfd0847a7c50a8709c1b8fcc9375efd9ad6c5111af32d9bbd9a5"
+    "owner-bundle-manifest.json": "c25118e82cdad432224baf246ee01c86ab0f08bdfed6bc1d37ea9da959731cf5"
   },
   "harness_sha256": {
+    ".gitignore": "32dae3052f331ee34d628ef535709b301259a45df7c7522c4d35dcf49873f00b",
     "capture-ui.lua": "1bcd38c77d6245211ddc3a7c6e5af2bfa355933c3de535bc86ea674cadaa52a7",
     "cc-closed.lua": "cb3cbca4fdb975650398da6b7db90bfa05883a5f5916c95fd27e9c602a604cc6",
     "compare-renders.py": "633073c64e1e4e869deff22a133c603f4386db76c569e90ba0be18cac7b3f4a5",
     "diagnostic.lua": "70e236535acceea6245b0f7691b6939387c35b4e5aff68dfad7f79201af6c6ae",
-    "make-bundle.py": "7731d24a94dffbab515b69631abfbc70df7e4f2747c0f2352b930e7a4946d591",
+    "make-bundle.py": "c54b2764cf41abbaeea7635178196959c74c3e2e328c05611d0edfc2886de94d",
     "make-cc-probe.py": "8bf09c87427e0f09ee5ec694e7e96116423a33dddf9d3db805ccf6e3ec7271f2",
     "make-project.py": "1b311d99b80f9752c8a9470bd56770f68845c4e2fdcab811ce6d3d715adb8ea4",
     "measure-host.lua": "3f01b02e0af3ad88333783406edd71e0226b2757a25f377765b4c13facdb5644",
     "prepare-host.lua": "1ae3723e3f68781e7451046622c577d4ddbbc3257218ad0ef5860bb323c174c5",
-    "recall.lua": "66b3af44205a62c318ca54a35070ae44444acbc597ebcb428a2ff1ddf8b9dc9c",
+    "recall.lua": "8f363ac27be9318ba32f95ec6ac01d1cd244b820f05f54ddc48a00c5eb821716",
     "record-rack.lua": "b177cb6ebf67502836fb5bf4c6a800bd08af8e4f14106410f042240d5d0a14b3",
     "render.lua": "922c0c75e2b509829bf42144c2e8522f16d1905e6be6064c4b18291960b1573b",
     "repeat.lua": "385b982583ebfb5e4c963defdc3d71d6927b5ebfc8a823ae50c609b3fbb9a956",
@@ -94,5 +95,6 @@
       3
     ]
   },
-  "historical_evidence": "Other evidence files preserve internal increments/failed drivers and are not final-head acceptance. Previous measurement entries were moved to *-head62addcb raw dirs and host-measurements-head62addcb.json. First-driver mixed dense/light and missing-item failures are not accepted. render-musical-metrics.json is reused only because final accepted PCM equals render26 byte-for-byte. Old record6point/.4045 driver is superseded; rack-record-submission-host is genuine final9point recording. Raw archive retains all42full WAVs, warm-ups and representative failed host drivers."
+  "historical_evidence": "Other evidence files preserve internal increments/failed drivers and are not final-head acceptance. Previous measurement entries were moved to *-head62addcb raw dirs and host-measurements-head62addcb.json. First-driver mixed dense/light and missing-item failures are not accepted. render-musical-metrics.json is reused only because final accepted PCM equals render26 byte-for-byte. Old record6point/.4045 driver is superseded; rack-record-submission-host is genuine final9point recording. Raw archive retains all42full WAVs, warm-ups and representative failed host drivers.",
+  "portable_project_sha256": "ea0da5a559ab8b242bcfcef329c74595b323bae53a7b97c4a204af4c10ed7136"
 }

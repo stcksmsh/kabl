@@ -5,7 +5,7 @@ from pathlib import Path
 repo=Path(__file__).resolve().parents[3];out=Path(sys.argv[1]).resolve();out.mkdir(parents=True,exist_ok=False)
 for name in ('plugins','projects','media','profile','profile/empty-vst','scripts','runs'): (out/name).mkdir(exist_ok=True)
 shutil.copy2(repo/'target/release/libkabl_clap.so',out/'plugins/kabl.clap')
-shutil.copy2(repo/'scratch/host/recalled.rpp',out/'projects/arrangement.rpp')
+shutil.copy2(repo/'docs/host-production/projects/arrangement.rpp',out/'projects/arrangement.rpp')
 for name in ('render.lua','serial-repeat.lua','compare-renders.py','recall.lua'): shutil.copy2(repo/'docs/host-production/scripts'/name,out/'scripts'/name)
 for source in (repo/'docs/host-production/media').iterdir():
     if source.is_file(): shutil.copy2(source,out/'media'/source.name)
