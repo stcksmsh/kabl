@@ -10,6 +10,12 @@ pub struct SoundState {
     pub version: u32,
     pub patch: PatchState,
     pub output_gain: f32,
+    #[serde(default)]
+    pub lanes: [crate::automation::Lane; crate::automation::SLOTS],
+    #[serde(default)]
+    pub slot_values: [f32; crate::automation::SLOTS],
+    #[serde(default)]
+    pub host_clock: bool,
 }
 impl SoundState {
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
@@ -21,11 +27,33 @@ impl SoundState {
         Ok(state)
     }
     pub fn validate(&self) -> Result<(), String> {
-        if self.version != 1 {
+        if !matches!(self.version, 1 | 2) {
             return Err("Unsupported sound state version".into());
         }
         if !self.output_gain.is_finite() || !(0.0..=1.0).contains(&self.output_gain) {
             return Err("Invalid output gain".into());
+        }
+        if self.version == 1
+            && (self.host_clock
+                || self.lanes.iter().any(|l| l.target.is_some() || l.retired)
+                || self.slot_values.iter().any(|&v| v != 0.0))
+        {
+            return Err("Version 1 cannot contain D08 settings".into());
+        }
+        for (i, lane) in self.lanes.iter().enumerate() {
+            if !self.slot_values[i].is_finite() || !(0.0..=1.0).contains(&self.slot_values[i]) {
+                return Err("Invalid automation value".into());
+            }
+            if let Some(target) = &lane.target {
+                if lane.retired
+                    || crate::automation::resolve(&self.patch, target).is_none()
+                    || self.lanes[..i]
+                        .iter()
+                        .any(|l| l.target.as_ref() == Some(target))
+                {
+                    return Err("Invalid automation mapping".into());
+                }
+            }
         }
         validate_patch(&self.patch)
     }

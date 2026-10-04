@@ -1005,6 +1005,27 @@ impl PatchEngine {
     /// document compiled from an older revision: `active` and `incoming` (ramped when playing)
     /// and `pending` (set, it has not started). A graph of a document a Load replaced takes
     /// nothing. Returns whether it resolved in any of them. No allocation.
+    /// Host playback is transient, independent of document revision and undo history.
+    pub fn automate(&mut self, slot: usize, target: crate::runtime::RuntimeTarget, value: f32) {
+        self.active.automate(slot, target, value);
+        if let Some((g, _)) = &mut self.incoming {
+            g.automate(slot, target, value);
+        }
+        if let Some(g) = &mut self.pending {
+            g.automate(slot, target, value);
+        }
+    }
+
+    pub fn host_clock(&mut self, position: Option<(f64, f64, bool)>) {
+        self.active.host_clock(position);
+        if let Some((g, _)) = &mut self.incoming {
+            g.host_clock(position);
+        }
+        if let Some(g) = &mut self.pending {
+            g.host_clock(position);
+        }
+    }
+
     pub fn set(&mut self, s: &ParamSet) -> bool {
         let mut hit = false;
         let fresh_rev = self.fresh_rev;

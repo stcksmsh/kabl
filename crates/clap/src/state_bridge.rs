@@ -2,12 +2,21 @@
 //! owns GUI/lifecycle/parameter events; its non-atomic state loader is never used.
 use super::{Instrument, Shared};
 use crate::sound_state::{SoundState, MAX_STATE_BYTES};
+use nice_plug::prelude::Param;
 use std::cell::{RefCell, UnsafeCell};
 use std::sync::Weak;
-type Capture = (Weak<Shared>, rtrb::Producer<(u32, [u8; 3])>);
+type Capture = (
+    Weak<Shared>,
+    rtrb::Producer<(u32, [u8; 3])>,
+    rtrb::Producer<(u32, crate::schedule::Event)>,
+);
 thread_local! { static CAPTURE: RefCell<Option<Capture>> = const { RefCell::new(None) }; }
-pub(super) fn capture(shared: &Arc<Shared>, midi: rtrb::Producer<(u32, [u8; 3])>) {
-    CAPTURE.with(|c| *c.borrow_mut() = Some((Arc::downgrade(shared), midi)));
+pub(super) fn capture(
+    shared: &Arc<Shared>,
+    midi: rtrb::Producer<(u32, [u8; 3])>,
+    events: rtrb::Producer<(u32, crate::schedule::Event)>,
+) {
+    CAPTURE.with(|c| *c.borrow_mut() = Some((Arc::downgrade(shared), midi, events)));
 }
 use clap_sys::{
     entry::clap_plugin_entry,
@@ -58,7 +67,8 @@ struct Outer {
     bridge: Bridge,
     process: unsafe extern "C" fn(*const clap_plugin, *const clap_process) -> clap_process_status,
     midi: UnsafeCell<rtrb::Producer<(u32, [u8; 3])>>,
-    gain_id: u32,
+    param_ids: [u32; 18],
+    events: UnsafeCell<rtrb::Producer<(u32, crate::schedule::Event)>>,
 }
 static DESCRIPTOR: OnceLock<PluginDescriptor> = OnceLock::new();
 fn bridge<'a>(plugin: *const clap_plugin) -> Option<&'a Bridge> {
@@ -100,7 +110,7 @@ unsafe extern "C" fn create(
     else {
         return ptr::null();
     };
-    let (shared, midi) = CAPTURE
+    let (shared, midi, events) = CAPTURE
         .with(|c| c.borrow_mut().take())
         .expect("instance capture");
     let shared = shared.upgrade().expect("live instance");
@@ -114,6 +124,13 @@ unsafe extern "C" fn create(
     if !unsafe { parameters.get_info.expect("gain info")(&original, 0, &mut gain) } {
         return ptr::null();
     }
+    let mut param_ids = [u32::MAX; 18];
+    for (index, id) in param_ids.iter_mut().enumerate() {
+        let mut info: clap_param_info = unsafe { std::mem::zeroed() };
+        if unsafe { parameters.get_info.unwrap()(&original, index as u32, &mut info) } {
+            *id = info.id;
+        }
+    }
     let mut outer = Box::new(Outer {
         plugin: original,
         bridge: Bridge {
@@ -125,7 +142,8 @@ unsafe extern "C" fn create(
         },
         process,
         midi: UnsafeCell::new(midi),
-        gain_id: gain.id,
+        param_ids,
+        events: UnsafeCell::new(events),
     });
     outer.plugin.on_main_thread = Some(on_main_bridge);
     outer.plugin.get_extension = Some(get_extension_bridge);
@@ -168,27 +186,27 @@ struct ParamEvents {
 }
 impl ParamEvents {
     unsafe fn push(&mut self, event: *const clap_event_header) {
-        // Preserve ordinary automation. On saturation retain the final value and modulation
-        // separately, in timestamp order, so the single host control always converges.
-        if self.len < MAX_PARAMS - 2 {
+        // Reserve final value/modulation for every exposed parameter. Earlier events retain
+        // order; saturation coalesces only matching identity and event type.
+        const RESERVED: usize = 36;
+        if self.len < MAX_PARAMS - RESERVED {
             self.events[self.len] = event;
             self.len += 1;
             return;
         }
-        let kind = unsafe { (*event).type_ };
-        let index = (MAX_PARAMS - 2..self.len)
-            .find(|&index| unsafe { (*self.events[index]).type_ == kind });
-        if let Some(index) = index {
+        let key = |e: *const clap_event_header| unsafe {
+            ((*e).type_, (*e.cast::<clap_event_param_value>()).param_id)
+        };
+        if let Some(index) =
+            (MAX_PARAMS - RESERVED..self.len).find(|&i| key(self.events[i]) == key(event))
+        {
             self.events[index] = event;
-        } else {
+        } else if self.len < MAX_PARAMS {
             self.events[self.len] = event;
             self.len += 1;
         }
-        if self.len == MAX_PARAMS
-            && unsafe { (*self.events[MAX_PARAMS - 2]).time > (*self.events[MAX_PARAMS - 1]).time }
-        {
-            self.events.swap(MAX_PARAMS - 2, MAX_PARAMS - 1);
-        }
+        self.events[MAX_PARAMS - RESERVED..self.len]
+            .sort_unstable_by_key(|e| unsafe { (**e).time });
     }
 }
 unsafe extern "C" fn filtered_size(list: *const clap_input_events) -> u32 {
@@ -218,6 +236,9 @@ unsafe extern "C" fn process_bridge(
     shared
         .host_frames
         .store(input.frames_count, std::sync::atomic::Ordering::Relaxed);
+    let host_events = unsafe { &mut *outer.events.get() };
+    let position = crate::schedule::Position::from_clap(unsafe { input.transport.as_ref() });
+    let _ = host_events.push((0, crate::schedule::Event::Position(position)));
     let mut parameters = ParamEvents {
         events: [ptr::null(); MAX_PARAMS],
         len: 0,
@@ -258,12 +279,22 @@ unsafe extern "C" fn process_bridge(
                             } else {
                                 unsafe { (*event.cast::<clap_event_param_mod>()).param_id }
                             };
-                            if id == outer.gain_id {
+                            if outer.param_ids.contains(&id) {
                                 unsafe {
                                     parameters.push(event);
                                 }
                             }
                         }
+                    }
+                    CLAP_EVENT_TRANSPORT
+                        if header.size as usize >= std::mem::size_of::<clap_event_transport>()
+                            && header.time < input.frames_count =>
+                    {
+                        let position = crate::schedule::Position::from_clap(Some(unsafe {
+                            &*event.cast::<clap_event_transport>()
+                        }));
+                        let _ = host_events
+                            .push((header.time, crate::schedule::Event::Position(position)));
                     }
                     _ => {}
                 }
@@ -273,6 +304,87 @@ unsafe extern "C" fn process_bridge(
     shared
         .midi_overflow
         .store(overflow, std::sync::atomic::Ordering::Relaxed);
+    for &event in &parameters.events[..parameters.len] {
+        let id = unsafe { (*event.cast::<clap_event_param_value>()).param_id };
+        if let Some(slot) = outer.param_ids[1..17]
+            .iter()
+            .position(|&candidate| candidate == id)
+        {
+            let modulation = unsafe { (*event).type_ == CLAP_EVENT_PARAM_MOD };
+            let value = if modulation {
+                unsafe { (*event.cast::<clap_event_param_mod>()).amount }
+            } else {
+                unsafe { (*event.cast::<clap_event_param_value>()).value }
+            };
+            let _ = host_events.push((
+                unsafe { (*event).time },
+                crate::schedule::Event::Value {
+                    slot,
+                    value: value as f32,
+                    modulation,
+                },
+            ));
+        }
+    }
+    // Mapped physical/virtual CC gestures record with the editor closed. UI gestures already
+    // go through the framework setter. Failed output pushes retain their notification.
+    let notifications = shared
+        .cc_notify
+        .swap(0, std::sync::atomic::Ordering::Acquire);
+    if let Some(output) = unsafe { input.out_events.as_ref() } {
+        if let Some(push) = output.try_push {
+            for i in 0..crate::automation::SLOTS {
+                if notifications & (1 << i) == 0 {
+                    continue;
+                }
+                let mut gesture = clap_event_param_gesture {
+                    header: clap_event_header {
+                        size: std::mem::size_of::<clap_event_param_gesture>() as u32,
+                        time: 0,
+                        space_id: CLAP_CORE_EVENT_SPACE_ID,
+                        type_: CLAP_EVENT_PARAM_GESTURE_BEGIN,
+                        flags: CLAP_EVENT_IS_LIVE,
+                    },
+                    param_id: outer.param_ids[i + 1],
+                };
+                let value = clap_event_param_value {
+                    header: clap_event_header {
+                        size: std::mem::size_of::<clap_event_param_value>() as u32,
+                        type_: CLAP_EVENT_PARAM_VALUE,
+                        ..gesture.header
+                    },
+                    param_id: gesture.param_id,
+                    cookie: ptr::null_mut(),
+                    note_id: -1,
+                    port_index: -1,
+                    channel: -1,
+                    key: -1,
+                    value: shared.params.slots[i].value.unmodulated_plain_value() as f64,
+                };
+                unsafe {
+                    push(output, &gesture.header);
+                }
+                let accepted = unsafe { push(output, &value.header) };
+                gesture.header.type_ = CLAP_EVENT_PARAM_GESTURE_END;
+                unsafe {
+                    push(output, &gesture.header);
+                }
+                if !accepted {
+                    shared
+                        .cc_notify
+                        .fetch_or(1 << i, std::sync::atomic::Ordering::Release);
+                }
+            }
+        } else {
+            shared
+                .cc_notify
+                .fetch_or(notifications, std::sync::atomic::Ordering::Release);
+        }
+    } else {
+        shared
+            .cc_notify
+            .fetch_or(notifications, std::sync::atomic::Ordering::Release);
+    }
     let filtered = clap_input_events {
         ctx: (&mut parameters as *mut ParamEvents).cast(),
         size: Some(filtered_size),
@@ -519,7 +631,7 @@ mod tests {
                 .cast::<clap_plugin_params>());
             let mut info: clap_param_info = std::mem::zeroed();
             assert!(params.get_info.unwrap()(plugin, 0, &mut info));
-            assert_eq!(params.count.unwrap()(plugin), 1);
+            assert_eq!(params.count.unwrap()(plugin), 18);
             let mut value = 0.0;
             assert!(params.get_value.unwrap()(plugin, info.id, &mut value));
             assert_eq!(value, 1.0);

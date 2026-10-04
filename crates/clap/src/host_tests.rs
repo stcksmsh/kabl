@@ -1,0 +1,157 @@
+use super::*;
+use assert_no_alloc::assert_no_alloc;
+use kabl_core::Vec2;
+
+#[test]
+fn stable_lanes_legacy_state_and_atomic_rejection() {
+    let p = Instrument::default();
+    let ids: Vec<_> = p
+        .shared
+        .params
+        .param_map()
+        .into_iter()
+        .map(|(id, _, _)| id)
+        .collect();
+    assert_eq!(ids[0], "output_gain");
+    assert_eq!(
+        &ids[1..17],
+        &(1..=16).map(|i| format!("slot_{i}")).collect::<Vec<_>>()
+    );
+    assert_eq!(ids[17], "host_clock");
+    let original = serde_json::to_vec(&p.shared.snapshot()).unwrap();
+    let mut invalid = p.shared.snapshot();
+    invalid.lanes[1] = invalid.lanes[0].clone();
+    assert!(p.shared.load(invalid).is_err());
+    assert_eq!(serde_json::to_vec(&p.shared.snapshot()).unwrap(), original);
+    let mut json: serde_json::Value = serde_json::from_slice(&original).unwrap();
+    json["version"] = 1.into();
+    for key in ["lanes", "slot_values", "host_clock"] {
+        json.as_object_mut().unwrap().remove(key);
+    }
+    let legacy = SoundState::decode(&serde_json::to_vec(&json).unwrap()).unwrap();
+    assert!(!legacy.host_clock && legacy.lanes.iter().all(|l| l.target.is_none()));
+    p.shared.load(legacy).unwrap();
+    let mut c = p.shared.control.lock().unwrap();
+    let target = automation::candidates(c.editor.state())[0].clone();
+    c.lanes[0].target = Some(target.clone());
+    c.editor
+        .move_module(target.module, Vec2 { x: 800.0, y: 400.0 });
+    c.pump();
+    assert_eq!(c.lanes[0].target, Some(target.clone()));
+    c.editor.remove_module(target.module);
+    c.pump();
+    assert!(c.lanes[0].target.is_none() && c.lanes[0].retired);
+    c.editor.undo();
+    c.pump();
+    assert!(c.lanes[0].target.is_none() && c.lanes[0].retired);
+}
+
+fn scheduled_render(partitions: &[usize]) -> Vec<f32> {
+    let patch = kabl_standalone::default_patch();
+    let collector = Collector::new();
+    let mut engine = PatchEngine::new(&collector.handle(), &patch, 48000.0, VOICES).unwrap();
+    let target = automation::Target {
+        module: 3,
+        kind: "filter.svf".into(),
+        param: "cutoff_hz".into(),
+    };
+    let mut bank = [None; automation::SLOTS];
+    bank[0] = Some(automation::resolve(&patch, &target).unwrap());
+    let mut values = [0.0; automation::SLOTS];
+    values[0] = 0.4;
+    let mut schedule = schedule::Schedule::new(values);
+    schedule.mode(true);
+    let position = |seconds, beats, tempo, playing| {
+        schedule::Event::Position(schedule::Position {
+            seconds,
+            beats,
+            tempo,
+            playing,
+            valid: true,
+        })
+    };
+    schedule.push(0, position(0.0, 0.0, 120.0, true));
+    schedule.push(48000, position(1.0, 2.0, 140.0, true));
+    schedule.push(72000, position(1.5, 19.0 / 6.0, 140.0, false));
+    // Intentionally inserted out of order: raw lists are merged without allocation.
+    schedule.push(
+        63,
+        schedule::Event::Value {
+            slot: 0,
+            value: 0.9,
+            modulation: false,
+        },
+    );
+    schedule.push(
+        12000,
+        schedule::Event::Value {
+            slot: 0,
+            value: -0.1,
+            modulation: true,
+        },
+    );
+    let mut timeline = Timeline::new();
+    let total = 96000;
+    for (at, bytes) in [
+        (0, [0x90, 60, 100]),
+        (10000, [0x90, 67, 100]),
+        (60000, [0x80, 60, 0]),
+        (70000, [0x80, 67, 0]),
+    ] {
+        timeline.push(at, total, MidiEvent::parse(Source::Host, &bytes).unwrap());
+    }
+    let mut left = vec![0.0; total];
+    let mut right = vec![0.0; total];
+    let mut at = 0;
+    let mut index = 0;
+    while at < total {
+        let n = partitions[index % partitions.len()].min(total - at);
+        assert_no_alloc(|| {
+            timeline.render(
+                &mut engine,
+                &mut left[at..at + n],
+                &mut right[at..at + n],
+                |engine, start| schedule.block(engine, start, &bank, 48000.0),
+            )
+        });
+        at += n;
+        index += 1;
+    }
+    assert_eq!(engine.keys().0, 0);
+    assert!(left.iter().any(|v| v.abs() > 0.001));
+    left
+}
+#[test]
+fn host_automation_tempo_stop_schedule_is_partition_independent_and_realtime_safe() {
+    let reference = scheduled_render(&[256]);
+    for partitions in [&[1][..], &[63, 65, 127, 512][..]] {
+        assert_eq!(reference, scheduled_render(partitions));
+    }
+}
+
+#[test]
+fn missing_transport_stops_host_clocks_but_free_clock_keeps_running() {
+    let mut patch = kabl_standalone::default_patch();
+    patch.modules.insert(
+        20,
+        kabl_core::ModuleState {
+            kind: "clock".into(),
+            pos: Vec2::default(),
+            params: Default::default(),
+        },
+    );
+    let collector = Collector::new();
+    let mut engine = PatchEngine::new(&collector.handle(), &patch, 48000.0, VOICES).unwrap();
+    let mut schedule = schedule::Schedule::new([0.0; automation::SLOTS]);
+    let mut running = false;
+    engine.clocks(|_, run| running = run);
+    assert!(running);
+    schedule.mode(true);
+    assert_no_alloc(|| schedule.block(&mut engine, 0, &[None; automation::SLOTS], 48000.0));
+    engine.clocks(|_, run| running = run);
+    assert!(!running);
+    schedule.mode(false);
+    assert_no_alloc(|| schedule.block(&mut engine, 64, &[None; automation::SLOTS], 48000.0));
+    engine.clocks(|_, run| running = run);
+    assert!(running);
+}
