@@ -3,7 +3,7 @@
 ## D07 draft closeout — 2026-10-04
 
 Engineering: submitted as draft; acceptance incomplete. Owner review: pending.
-Branch `codex/d07-reaper-instrument`; final tested/reviewed product `ff11434`.
+Branch `codex/d07-reaper-instrument`; draft [PR #10](https://github.com/stcksmsh/kabl/pull/10); final tested/reviewed product `ff11434`.
 Record: [reaper-instrument/REPORT.md](reaper-instrument/REPORT.md), README, design,
 REVIEW and owner CHECKLIST. Final workspace 597/0/22, strict Clippy and release build
 pass; final validator 35 success/9 skips. Real relocated bundle loads distinct complete

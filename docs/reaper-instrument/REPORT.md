@@ -217,3 +217,5 @@ The timing proxy's optional trace run did not produce a verified complete render
 used as successful diagnosis. Stop at D07; no merge or D08 authorization.
 
 Final toolbar visually verified at 1280×800 in A-light/A-dark: evidence/screenshots/final-1280-{light,dark}.png. Save/Save As and Perform/Routing no longer overlap. Earlier 1440×900 evidence predates this toolbar change; a refreshed final-head 1440 view remains pending.
+
+Submitted draft PR: https://github.com/stcksmsh/kabl/pull/10. Initial submitted evidence head: `894d83592721bae1a1415f82166109d489b19517`; subsequent PR-link commit is documentation only. Tested/reviewed product stays `ff11434c6502d2cce5a3894544bec10f5ceea6d6`. Scratch REAPER was closed after final evidence.
