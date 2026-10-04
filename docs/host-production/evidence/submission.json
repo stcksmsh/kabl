@@ -1,0 +1,13 @@
+{
+  "pr": "https://github.com/stcksmsh/kabl/pull/11",
+  "branch": "codex/d08-host-production",
+  "starting_head": "c6bb8ccdab50dfe91a2b1f002d8c2766351697fc",
+  "source_evidence_snapshot_head": "df4dbf315b50168c7d48393e1110531c2661d4cb",
+  "tested_reviewed_packaged_product_head": "133fdb89ac56a396db0c7c961c74067782b34efb",
+  "binary_sha256": "17cfcc408aacf341971ed5dfc35ddd6356445d16273c9c7610b16cef7c4770ee",
+  "engineering_status": "submitted as draft; acceptance incomplete",
+  "owner_review": "pending",
+  "merge_status": "not merged",
+  "final_submitted_head_record": "owner bundle/submission.json, written after final metadata commit; GitHub PR head is authoritative",
+  "owner_bundle": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-owner-test"
+}

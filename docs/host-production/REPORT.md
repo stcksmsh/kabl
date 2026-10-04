@@ -9,6 +9,7 @@ Engineering: **submitted as draft; acceptance incomplete**. Owner review: **pend
 - Starting/base: `c6bb8ccdab50dfe91a2b1f002d8c2766351697fc` (D07 PR#10 merge), refreshed origin/master unchanged before continuation.
 - Tested/reviewed/packaged product: `133fdb89ac56a396db0c7c961c74067782b34efb`.
 - Production plugin SHA256: `17cfcc408aacf341971ed5dfc35ddd6356445d16273c9c7610b16cef7c4770ee`.
+- Draft PR: [#11](https://github.com/stcksmsh/kabl/pull/11). Source/evidence snapshot: `df4dbf315b50168c7d48393e1110531c2661d4cb`; following submission metadata commit changes no product.
 - Submitted head/PR: PR metadata is recorded in evidence/submission.json; exact final submitted SHA is recorded in owner bundle/submission.json after the last metadata commit. GitHub PR head is authoritative; these commits change no product source.
 - Branch: `codex/d08-host-production`, isolated `/home/stcksmsh/Programming/Github/kabl/.worktrees/d08` (physical path under `/secondary/Programming/Github/kabl`). Normal push, no history rewrite.
 - ThinkBook16/Linux7.0.0-34-generic x86_64; Rust/Cargo1.93.0; REAPER7.75; Xvfb/metacity. Actual JACK48kHz/256frames, period5.333ms. PipeWire Dummy-Driver; scripted X11 and REAPER virtual MIDI. No physical controller or physical latency claim.
