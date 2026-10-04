@@ -57,7 +57,7 @@ const EMPTY: (u64, Event) = (
     }),
 );
 pub struct Schedule {
-    queue: [(u64, Event); 2048],
+    queue: [(u64, Event); 4096],
     head: usize,
     len: usize,
     anchor: Option<(u64, Position)>,
@@ -70,7 +70,7 @@ pub struct Schedule {
 impl Schedule {
     pub fn new(values: [f32; SLOTS]) -> Self {
         Self {
-            queue: [EMPTY; 2048],
+            queue: [EMPTY; 4096],
             head: 0,
             len: 0,
             anchor: None,

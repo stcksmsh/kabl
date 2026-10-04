@@ -3,7 +3,9 @@
 use kabl_core::PatchState;
 use serde::{Deserialize, Serialize};
 
-pub const MAX_STATE_BYTES: usize = 2 * 1024 * 1024;
+// Keep the D07 patch bound unchanged; reserve bounded space for the new envelope.
+pub const MAX_STATE_BYTES: usize = 2 * 1024 * 1024 + 8192;
+const MAX_PATCH_BYTES: usize = 2 * 1024 * 1024 - 1024;
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SoundState {
@@ -112,7 +114,7 @@ pub fn validate_patch(p: &PatchState) -> Result<(), String> {
     if serde_json::to_vec(p)
         .map_err(|error| error.to_string())?
         .len()
-        > MAX_STATE_BYTES - 1024
+        > MAX_PATCH_BYTES
     {
         return Err("Patch serialized size limit".into());
     }

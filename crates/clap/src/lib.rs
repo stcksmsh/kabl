@@ -283,6 +283,7 @@ struct Shared {
     tail_samples: AtomicU64,
     host_frames: AtomicU32,
     midi_overflow: AtomicBool,
+    event_drops: AtomicU64,
     gestures: AtomicU32,
     cc_notify: AtomicU32,
     start_reset: AtomicBool,
@@ -416,6 +417,7 @@ impl NiceEguiApp for RackApp {
                 .as_ref()
                 .map(|t| automation::normalized(c.editor.state(), t))
         });
+        c.view.host_clock = self.shared.params.host_clock.value();
         let candidates = automation::candidates(c.editor.state());
         ui.horizontal(|ui| {
             let old = self.shared.params.host_clock.value();
@@ -473,6 +475,43 @@ impl NiceEguiApp for RackApp {
                                         }
                                     });
                             });
+                            if c.lanes[i].target.is_some() {
+                                let mut value =
+                                    self.shared.params.slots[i].value.unmodulated_plain_value();
+                                let response = ui.add(
+                                    egui::Slider::new(&mut value, 0.0..=1.0).text("Host value"),
+                                );
+                                if let Some(gui) = &self.gui {
+                                    let setter = gui.param_setter();
+                                    if response.drag_started() {
+                                        self.active_gestures[i] = true;
+                                        setter.begin_set_parameter(
+                                            &self.shared.params.slots[i].value,
+                                        );
+                                    }
+                                    if response.changed() {
+                                        if !response.dragged() {
+                                            setter.begin_set_parameter(
+                                                &self.shared.params.slots[i].value,
+                                            );
+                                        }
+                                        setter.set_parameter(
+                                            &self.shared.params.slots[i].value,
+                                            value,
+                                        );
+                                        self.shared.gestures.fetch_or(1 << i, Ordering::Release);
+                                        if !response.dragged() {
+                                            setter.end_set_parameter(
+                                                &self.shared.params.slots[i].value,
+                                            );
+                                        }
+                                    }
+                                    if response.drag_stopped() {
+                                        setter
+                                            .end_set_parameter(&self.shared.params.slots[i].value);
+                                    }
+                                }
+                            }
                             if c.lanes[i].target != old_target {
                                 c.lanes[i].retired = false;
                                 c.bank_dirty = true;
@@ -607,12 +646,13 @@ impl Default for Instrument {
             audio_clock: AtomicU64::new(0),
             host_frames: AtomicU32::new(0),
             midi_overflow: AtomicBool::new(false),
+            event_drops: AtomicU64::new(0),
             gestures: AtomicU32::new(0),
             cc_notify: AtomicU32::new(0),
             start_reset: AtomicBool::new(false),
             tail_samples: AtomicU64::new(tail::samples(&kabl_standalone::default_patch(), 48000.0)),
         });
-        let (event_tx, events) = rtrb::RingBuffer::new(2048);
+        let (event_tx, events) = rtrb::RingBuffer::new(4096);
         state_bridge::capture(&shared, midi_tx, event_tx);
         let worker_shared = shared.clone();
         let worker = std::thread::Builder::new()
@@ -622,6 +662,11 @@ impl Default for Instrument {
                 while !worker_shared.stop.load(Ordering::Acquire) {
                     {
                         let mut c = worker_shared.control.lock().unwrap();
+                        let dropped = worker_shared.event_drops.swap(0, Ordering::Relaxed);
+                        if dropped > 0 {
+                            c.view.last_message =
+                                Some(format!("Host event limit: {dropped} events dropped"));
+                        }
                         let mut events = Vec::new();
                         for _ in 0..256 {
                             if let Ok(cc) = c.cc.pop() {
@@ -636,6 +681,7 @@ impl Default for Instrument {
                                 .as_ref()
                                 .map(|t| automation::normalized(c.editor.state(), t))
                         });
+                        c.view.host_clock = worker_shared.params.host_clock.value();
                         let Control { editor, view, .. } = &mut *c;
                         kabl_ui::perform::apply_cc(
                             editor,
@@ -899,20 +945,7 @@ impl Plugin for Instrument {
         // Raw CLAP MIDI bypasses the framework's unbounded VecDeque. The outer callback
         // gives full host-buffer offsets; Timeline retains them across automation subblocks.
         let frames = self.shared.host_frames.load(Ordering::Relaxed) as usize;
-        let gestures = self.shared.gestures.swap(0, Ordering::Acquire);
-        for i in 0..automation::SLOTS {
-            if gestures & (1 << i) != 0 {
-                self.schedule.push(
-                    self.timeline.now(),
-                    schedule::Event::Value {
-                        slot: i,
-                        value: self.shared.params.slots[i].value.unmodulated_plain_value(),
-                        modulation: false,
-                    },
-                );
-            }
-        }
-        for _ in 0..2048 {
+        for _ in 0..4096 {
             let Ok((offset, event)) = self.events.pop() else {
                 break;
             };
@@ -941,6 +974,19 @@ impl Plugin for Instrument {
             self.schedule
                 .push(self.timeline.now() + offset as u64, event);
         }
+        let gestures = self.shared.gestures.swap(0, Ordering::Acquire);
+        for i in 0..automation::SLOTS {
+            if gestures & (1 << i) != 0 {
+                self.schedule.push(
+                    self.timeline.now(),
+                    schedule::Event::Value {
+                        slot: i,
+                        value: self.shared.params.slots[i].value.unmodulated_plain_value(),
+                        modulation: false,
+                    },
+                );
+            }
+        }
         for _ in 0..1024 {
             let Ok((offset, bytes)) = self.midi.pop() else {
                 break;
@@ -963,11 +1009,15 @@ impl Plugin for Instrument {
         }
         // Only bounded parameter events reach the wrapper. No native-note dialect advertised.
         while context.next_event().is_some() {}
+        let dropped_before = self.schedule.dropped;
         let channels = buffer.as_slice();
         if channels.len() >= 2 {
             let (left, right) = channels.split_at_mut(1);
             self.render(left[0], right[0]);
         }
+        self.shared
+            .event_drops
+            .fetch_add(self.schedule.dropped - dropped_before, Ordering::Relaxed);
         match self.shared.tail_samples.load(Ordering::Relaxed) {
             samples if samples >= u32::MAX as u64 => ProcessStatus::KeepAlive,
             samples => ProcessStatus::Tail(samples as u32),

@@ -70,6 +70,7 @@ struct Outer {
     param_ids: [u32; 18],
     events: UnsafeCell<rtrb::Producer<(u32, crate::schedule::Event)>>,
     start: unsafe extern "C" fn(*const clap_plugin) -> bool,
+    cc_open: UnsafeCell<u32>,
 }
 static DESCRIPTOR: OnceLock<PluginDescriptor> = OnceLock::new();
 fn bridge<'a>(plugin: *const clap_plugin) -> Option<&'a Bridge> {
@@ -146,6 +147,7 @@ unsafe extern "C" fn create(
         param_ids,
         events: UnsafeCell::new(events),
         start: original.start_processing.expect("start processing"),
+        cc_open: UnsafeCell::new(0),
     });
     outer.plugin.on_main_thread = Some(on_main_bridge);
     outer.plugin.get_extension = Some(get_extension_bridge);
@@ -257,7 +259,11 @@ unsafe extern "C" fn process_bridge(
         .store(input.frames_count, std::sync::atomic::Ordering::Relaxed);
     let host_events = unsafe { &mut *outer.events.get() };
     let position = crate::schedule::Position::from_clap(unsafe { input.transport.as_ref() });
-    let _ = host_events.push((0, crate::schedule::Event::Position(position)));
+    let mut event_drops = u64::from(
+        host_events
+            .push((0, crate::schedule::Event::Position(position)))
+            .is_err(),
+    );
     let mut parameters = ParamEvents {
         events: [ptr::null(); MAX_PARAMS],
         len: 0,
@@ -312,8 +318,11 @@ unsafe extern "C" fn process_bridge(
                         let position = crate::schedule::Position::from_clap(Some(unsafe {
                             &*event.cast::<clap_event_transport>()
                         }));
-                        let _ = host_events
-                            .push((header.time, crate::schedule::Event::Position(position)));
+                        event_drops += u64::from(
+                            host_events
+                                .push((header.time, crate::schedule::Event::Position(position)))
+                                .is_err(),
+                        );
                     }
                     _ => {}
                 }
@@ -335,21 +344,30 @@ unsafe extern "C" fn process_bridge(
             } else {
                 unsafe { (*event.cast::<clap_event_param_value>()).value }
             };
-            let _ = host_events.push((
-                unsafe { (*event).time },
-                crate::schedule::Event::Value {
-                    slot,
-                    value: value as f32,
-                    modulation,
-                },
-            ));
+            event_drops += u64::from(
+                host_events
+                    .push((
+                        unsafe { (*event).time },
+                        crate::schedule::Event::Value {
+                            slot,
+                            value: value as f32,
+                            modulation,
+                        },
+                    ))
+                    .is_err(),
+            );
         }
     }
+    shared.event_drops.fetch_add(
+        event_drops + u64::from(overflow),
+        std::sync::atomic::Ordering::Relaxed,
+    );
     // Mapped physical/virtual CC gestures record with the editor closed. UI gestures already
     // go through the framework setter. Failed output pushes retain their notification.
     let notifications = shared
         .cc_notify
         .swap(0, std::sync::atomic::Ordering::Acquire);
+    let mut remaining = notifications;
     if let Some(output) = unsafe { input.out_events.as_ref() } {
         if let Some(push) = output.try_push {
             for i in 0..crate::automation::SLOTS {
@@ -380,30 +398,27 @@ unsafe extern "C" fn process_bridge(
                     key: -1,
                     value: shared.params.slots[i].value.unmodulated_plain_value() as f64,
                 };
-                unsafe {
-                    push(output, &gesture.header);
+                let open = unsafe { &mut *outer.cc_open.get() };
+                let bit = 1 << i;
+                let began = *open & bit != 0 || unsafe { push(output, &gesture.header) };
+                if began {
+                    *open |= bit;
                 }
-                let accepted = unsafe { push(output, &value.header) };
+                let accepted = began && unsafe { push(output, &value.header) };
                 gesture.header.type_ = CLAP_EVENT_PARAM_GESTURE_END;
-                unsafe {
-                    push(output, &gesture.header);
+                let ended = accepted && unsafe { push(output, &gesture.header) };
+                if ended {
+                    *open &= !bit;
                 }
-                if !accepted {
-                    shared
-                        .cc_notify
-                        .fetch_or(1 << i, std::sync::atomic::Ordering::Release);
+                if ended {
+                    remaining &= !bit;
                 }
             }
-        } else {
-            shared
-                .cc_notify
-                .fetch_or(notifications, std::sync::atomic::Ordering::Release);
         }
-    } else {
-        shared
-            .cc_notify
-            .fetch_or(notifications, std::sync::atomic::Ordering::Release);
     }
+    shared
+        .cc_notify
+        .fetch_or(remaining, std::sync::atomic::Ordering::Release);
     let filtered = clap_input_events {
         ctx: (&mut parameters as *mut ParamEvents).cast(),
         size: Some(filtered_size),
@@ -601,6 +616,29 @@ mod tests {
     use clap_sys::ext::params::{clap_param_info, clap_plugin_params};
     use std::sync::atomic::Ordering;
 
+    struct OutputProbe {
+        reject: u16,
+        begins: u32,
+        values: u32,
+        ends: u32,
+    }
+    unsafe extern "C" fn probe_push(
+        list: *const clap_output_events,
+        event: *const clap_event_header,
+    ) -> bool {
+        let probe = unsafe { &mut *((*list).ctx.cast::<OutputProbe>()) };
+        let kind = unsafe { (*event).type_ };
+        if kind == probe.reject {
+            return false;
+        }
+        match kind {
+            CLAP_EVENT_PARAM_GESTURE_BEGIN => probe.begins += 1,
+            CLAP_EVENT_PARAM_VALUE => probe.values += 1,
+            CLAP_EVENT_PARAM_GESTURE_END => probe.ends += 1,
+            _ => {}
+        }
+        true
+    }
     unsafe extern "C" fn event_size(list: *const clap_input_events) -> u32 {
         unsafe { (&*((*list).ctx.cast::<Vec<clap_event_midi>>())).len() as u32 }
     }
@@ -701,6 +739,37 @@ mod tests {
                 assert_ne!(p.process.unwrap()(plugin, &process), CLAP_PROCESS_ERROR);
             });
             events.clear();
+            let mut probe = OutputProbe {
+                reject: CLAP_EVENT_PARAM_GESTURE_BEGIN,
+                begins: 0,
+                values: 0,
+                ends: 0,
+            };
+            let output_events = clap_output_events {
+                ctx: (&mut probe as *mut OutputProbe).cast(),
+                try_push: Some(probe_push),
+            };
+            process.out_events = &output_events;
+            shared.cc_notify.store(1, Ordering::Release);
+            for rejected in [
+                CLAP_EVENT_PARAM_GESTURE_BEGIN,
+                CLAP_EVENT_PARAM_VALUE,
+                CLAP_EVENT_PARAM_GESTURE_END,
+                u16::MAX,
+            ] {
+                probe.reject = rejected;
+                assert_no_alloc(|| {
+                    p.process.unwrap()(plugin, &process);
+                });
+                assert_eq!(
+                    shared.cc_notify.load(Ordering::Acquire),
+                    u32::from(rejected != u16::MAX)
+                );
+            }
+            assert_eq!(probe.begins, 1);
+            assert_eq!(probe.ends, 1);
+            assert_eq!(probe.values, 2);
+            process.out_events = ptr::null();
             process.frames_count = 4096;
             for _ in 0..40 {
                 assert_no_alloc(|| {

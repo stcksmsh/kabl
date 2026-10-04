@@ -425,6 +425,10 @@ fn learn_button(
 
 /// Runs a button's action: a launch, a cancel or a transport command (runtime only).
 fn fire(editor: &PatchEditor, ui_state: &mut UiState, id: ModuleId, action: &str) {
+    if ui_state.host_clock && matches!(action, "run" | "restart") {
+        ui_state.last_message = Some("Host clock: use REAPER transport or switch to Free".into());
+        return;
+    }
     let state = editor.state();
     let result = match action.split_once('.') {
         Some(("bank", b)) => b
@@ -1176,7 +1180,10 @@ fn transport_card(
     ui.horizontal(|ui| {
         let big =
             |t: &str| egui::Button::new(RichText::new(t).size(14.0)).min_size([64.0, 28.0].into());
-        let r = ui.add(big(if running { "Stop" } else { "Run" }));
+        let r = ui.add_enabled(
+            !ui_state.host_clock,
+            big(if running { "Stop" } else { "Run" }),
+        );
         ui_state.record(format!("prun:{id}"), r.rect);
         if r.clicked() {
             ui_state.transport.push((
@@ -1188,12 +1195,15 @@ fn transport_card(
                 },
             ));
         }
-        let r = ui.add(big("Restart"));
+        let r = ui.add_enabled(!ui_state.host_clock, big("Restart"));
         ui_state.record(format!("prestart:{id}"), r.rect);
         if r.clicked() {
             ui_state.transport.push((id, Transport::Restart));
         }
     });
+    if ui_state.host_clock {
+        ui.label("Host clock: transport controlled by REAPER");
+    }
     let state = RichText::new(if running { "● running" } else { "stopped" }).small();
     ui.label(if running {
         state.color(th.gate)
@@ -1296,6 +1306,23 @@ pub type TakeoverMap = HashMap<(ModuleId, String), Takeover>;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn host_clock_blocks_rack_and_midi_transport_only() {
+        let editor = PatchEditor::new();
+        let mut view = UiState {
+            host_clock: true,
+            ..UiState::default()
+        };
+        fire(&editor, &mut view, 1, "run");
+        fire(&editor, &mut view, 1, "restart");
+        assert!(view.transport.is_empty());
+        fire(&editor, &mut view, 1, "cancel");
+        assert_eq!(view.launches.len(), 1);
+        view.host_clock = false;
+        fire(&editor, &mut view, 1, "run");
+        assert_eq!(view.transport.len(), 1);
+    }
 
     #[test]
     fn takeover_waits_for_the_hardware_to_reach_the_value() {

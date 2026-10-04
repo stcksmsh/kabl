@@ -164,6 +164,8 @@ pub struct UiState {
     bank_revealed: Option<(ModuleId, String)>,
     /// Each clock's run state as the audio thread last reported it; absent means running.
     pub clock_running: HashMap<ModuleId, bool>,
+    /// Host owns clock transport in the plugin; standalone defaults to Free.
+    pub host_clock: bool,
     /// Transport commands for `main.rs` to send to the audio thread. Runtime only: never in the
     /// op log, so undo and reload can't replay them.
     pub transport: Vec<(ModuleId, Transport)>,
@@ -286,6 +288,7 @@ impl Default for UiState {
             button_rearm: true,
             bank_revealed: None,
             clock_running: HashMap::new(),
+            host_clock: false,
             transport: Vec::new(),
             delay_status: HashMap::new(),
             lfo_status: HashMap::new(),
@@ -1786,7 +1789,17 @@ fn draw_transport(
     let running = ui_state.clock_running.get(&id).copied().unwrap_or(true);
     let half = (r.width() - 8.0) / 2.0;
     let buttons = [
-        ("run", if running { "Stop" } else { "Run" }, 0.0),
+        (
+            "run",
+            if ui_state.host_clock {
+                "Host"
+            } else if running {
+                "Stop"
+            } else {
+                "Run"
+            },
+            0.0,
+        ),
         ("restart", "Restart", half + 8.0),
     ];
     for (key, label, dx) in buttons {
@@ -1831,13 +1844,17 @@ fn draw_transport(
             th.plate_ink,
             false,
         );
-        let resp = resp.on_hover_text(match key {
-            "run" if running => "Stop the clock: gates go low, envelopes release",
-            "run" => "Start the clock on the next step",
-            _ if running => "Restart every pattern on step 1 now (sends a pulse on reset)",
-            _ => "Start on step 1 when the clock runs again",
+        let resp = resp.on_hover_text(if ui_state.host_clock {
+            "Host clock: use REAPER transport or switch to Free"
+        } else {
+            match key {
+                "run" if running => "Stop the clock: gates go low, envelopes release",
+                "run" => "Start the clock on the next step",
+                _ if running => "Restart every pattern on step 1 now (sends a pulse on reset)",
+                _ => "Start on step 1 when the clock runs again",
+            }
         });
-        if resp.clicked() {
+        if resp.clicked() && !ui_state.host_clock {
             let t = match key {
                 "run" if running => Transport::Stop,
                 "run" => Transport::Run,
