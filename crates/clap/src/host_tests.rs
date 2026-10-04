@@ -155,3 +155,46 @@ fn missing_transport_stops_host_clocks_but_free_clock_keeps_running() {
     engine.clocks(|_, run| running = run);
     assert!(running);
 }
+
+#[test]
+fn unassigning_a_lane_restores_its_document_base_without_allocations() {
+    let mut patch = kabl_standalone::default_patch();
+    patch
+        .modules
+        .get_mut(&5)
+        .unwrap()
+        .params
+        .insert("gain".into(), 1.0);
+    patch.cables.remove(&5);
+    let collector = Collector::new();
+    let mut engine = PatchEngine::new(&collector.handle(), &patch, 48000.0, VOICES).unwrap();
+    let resolved = automation::resolve(
+        &patch,
+        &automation::Target {
+            module: 5,
+            kind: "vca".into(),
+            param: "gain".into(),
+        },
+    )
+    .unwrap();
+    let mut bank = [None; automation::SLOTS];
+    bank[0] = Some(resolved);
+    engine.key_at(MidiEvent::parse(Source::Host, &[0x90, 60, 100]).unwrap(), 0);
+    engine.automate(0, resolved.target, 0.0);
+    let mut left = [0.0; 64];
+    let mut right = [0.0; 64];
+    for _ in 0..100 {
+        assert_no_alloc(|| engine.process_block(&mut left, &mut right));
+    }
+    assert!(left.iter().all(|v| v.abs() < 1e-6));
+    assert_no_alloc(|| automation::replace_bank(&mut engine, &mut bank, [None; automation::SLOTS]));
+    let mut peak = 0.0f32;
+    for _ in 0..100 {
+        assert_no_alloc(|| engine.process_block(&mut left, &mut right));
+        peak = left.iter().fold(peak, |max, v| max.max(v.abs()));
+    }
+    assert!(
+        peak > 0.001,
+        "Unassigned target must recover its base: {peak}"
+    );
+}

@@ -787,7 +787,7 @@ impl Instrument {
             .drain(&mut s.rx, kabl_ui::control::QUEUE, &s.feedback);
         for _ in 0..4 {
             if let Ok(bank) = s.banks.pop() {
-                s.bank = bank;
+                automation::replace_bank(&mut s.engine, &mut s.bank, bank);
             } else {
                 break;
             }
@@ -928,7 +928,7 @@ impl Plugin for Instrument {
             self.shared.params.slots[i].value.unmodulated_plain_value()
         }));
         self.raw_position = None;
-        for _ in 0..2048 {
+        for _ in 0..4096 {
             if self.events.pop().is_err() {
                 break;
             }

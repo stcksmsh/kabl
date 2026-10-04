@@ -23,6 +23,7 @@ pub struct Lane {
 pub struct Resolved {
     pub target: RuntimeTarget,
     pub param: &'static ParamInfo,
+    pub base: f32,
 }
 pub type Bank = [Option<Resolved>; SLOTS];
 pub fn resolve(patch: &PatchState, target: &Target) -> Option<Resolved> {
@@ -46,6 +47,7 @@ pub fn resolve(patch: &PatchState, target: &Target) -> Option<Resolved> {
             index: index as u16,
         },
         param,
+        base: kabl_ui::routing::base_value(patch, target.module, param),
     })
 }
 pub fn bank(patch: &PatchState, lanes: &[Lane; SLOTS]) -> Bank {
@@ -98,4 +100,20 @@ pub fn normalized(patch: &PatchState, target: &Target) -> f32 {
         r.param
             .to_norm(kabl_ui::routing::base_value(patch, target.module, r.param))
     })
+}
+
+/// Removing or moving a lane restores the former target's document base.
+pub fn replace_bank(
+    engine: &mut kabl_engine::patch_engine::PatchEngine,
+    current: &mut Bank,
+    next: Bank,
+) {
+    for (i, previous) in current.iter().enumerate() {
+        if let Some(previous) = previous {
+            if next[i].is_none_or(|new| new.target != previous.target) {
+                engine.automate(i, previous.target, previous.base);
+            }
+        }
+    }
+    *current = next;
 }
