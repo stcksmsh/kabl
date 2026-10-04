@@ -368,10 +368,11 @@ unsafe extern "C" fn process_bridge(
         .cc_notify
         .swap(0, std::sync::atomic::Ordering::Acquire);
     let mut remaining = notifications;
+    let pending = notifications | unsafe { *outer.cc_open.get() };
     if let Some(output) = unsafe { input.out_events.as_ref() } {
         if let Some(push) = output.try_push {
             for i in 0..crate::automation::SLOTS {
-                if notifications & (1 << i) == 0 {
+                if pending & (1 << i) == 0 {
                     continue;
                 }
                 let mut gesture = clap_event_param_gesture {
@@ -404,7 +405,8 @@ unsafe extern "C" fn process_bridge(
                 if began {
                     *open |= bit;
                 }
-                let accepted = began && unsafe { push(output, &value.header) };
+                let accepted =
+                    began && (notifications & bit == 0 || unsafe { push(output, &value.header) });
                 gesture.header.type_ = CLAP_EVENT_PARAM_GESTURE_END;
                 let ended = accepted && unsafe { push(output, &gesture.header) };
                 if ended {
@@ -777,6 +779,23 @@ mod tests {
             assert_eq!(probe.begins, 1);
             assert_eq!(probe.ends, 1);
             assert_eq!(probe.values, 2);
+            probe = OutputProbe {
+                reject: CLAP_EVENT_PARAM_GESTURE_END,
+                begins: 0,
+                values: 0,
+                ends: 0,
+            };
+            shared.cc_notify.store(1, Ordering::Release);
+            assert_no_alloc(|| {
+                p.process.unwrap()(plugin, &process);
+            });
+            // A state load discards stale controller values, but an accepted begin still needs end.
+            shared.cc_notify.store(0, Ordering::Release);
+            probe.reject = u16::MAX;
+            assert_no_alloc(|| {
+                p.process.unwrap()(plugin, &process);
+            });
+            assert_eq!((probe.begins, probe.values, probe.ends), (1, 1, 1));
             process.out_events = ptr::null();
             process.frames_count = 4096;
             for _ in 0..40 {
