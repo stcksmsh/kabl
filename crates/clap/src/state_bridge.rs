@@ -69,6 +69,7 @@ struct Outer {
     midi: UnsafeCell<rtrb::Producer<(u32, [u8; 3])>>,
     param_ids: [u32; 18],
     events: UnsafeCell<rtrb::Producer<(u32, crate::schedule::Event)>>,
+    start: unsafe extern "C" fn(*const clap_plugin) -> bool,
 }
 static DESCRIPTOR: OnceLock<PluginDescriptor> = OnceLock::new();
 fn bridge<'a>(plugin: *const clap_plugin) -> Option<&'a Bridge> {
@@ -144,11 +145,13 @@ unsafe extern "C" fn create(
         midi: UnsafeCell::new(midi),
         param_ids,
         events: UnsafeCell::new(events),
+        start: original.start_processing.expect("start processing"),
     });
     outer.plugin.on_main_thread = Some(on_main_bridge);
     outer.plugin.get_extension = Some(get_extension_bridge);
     outer.plugin.destroy = Some(destroy_bridge);
     outer.plugin.process = Some(process_bridge);
+    outer.plugin.start_processing = Some(start_bridge);
     let _ = Arc::into_raw(wrapper); // Released by the delegated destroy callback.
     Box::into_raw(outer).cast()
 }
@@ -176,6 +179,22 @@ unsafe extern "C" fn destroy_bridge(plugin: *const clap_plugin) {
         unsafe { (outer.bridge.destroy)(plugin) };
         drop(outer);
     }
+}
+
+unsafe extern "C" fn start_bridge(plugin: *const clap_plugin) -> bool {
+    let outer = unsafe { &*plugin.cast::<Outer>() };
+    outer
+        .bridge
+        .shared
+        .start_reset
+        .store(true, std::sync::atomic::Ordering::Relaxed);
+    let result = unsafe { (outer.start)(plugin) };
+    outer
+        .bridge
+        .shared
+        .start_reset
+        .store(false, std::sync::atomic::Ordering::Relaxed);
+    result
 }
 
 const MAX_HOST_EVENTS: u32 = 2048;

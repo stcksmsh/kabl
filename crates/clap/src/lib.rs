@@ -285,6 +285,7 @@ struct Shared {
     midi_overflow: AtomicBool,
     gestures: AtomicU32,
     cc_notify: AtomicU32,
+    start_reset: AtomicBool,
 }
 
 impl Shared {
@@ -608,6 +609,7 @@ impl Default for Instrument {
             midi_overflow: AtomicBool::new(false),
             gestures: AtomicU32::new(0),
             cc_notify: AtomicU32::new(0),
+            start_reset: AtomicBool::new(false),
             tail_samples: AtomicU64::new(tail::samples(&kabl_standalone::default_patch(), 48000.0)),
         });
         let (event_tx, events) = rtrb::RingBuffer::new(2048);
@@ -852,6 +854,17 @@ impl Plugin for Instrument {
         true
     }
     fn reset(&mut self) {
+        // The framework calls reset on every start_processing, including restarts during
+        // REAPER's render pre-roll. Transport, not a thread restart, defines a Host epoch.
+        // Dedicated CLAP reset still always clears DSP and transient ownership.
+        if self.shared.start_reset.load(Ordering::Relaxed)
+            && self.shared.params.host_clock.value()
+            && self
+                .raw_position
+                .is_some_and(|(position, _)| position.playing)
+        {
+            return;
+        }
         self.accept_loads();
         if let Some(s) = &mut self.session {
             let s: &mut Session = s;
