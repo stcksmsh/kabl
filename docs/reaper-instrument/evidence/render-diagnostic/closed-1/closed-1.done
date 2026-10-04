@@ -1,0 +1,5 @@
+policy=device-closed
+seconds=2.7847969720001
+bytes=19968744
+audio_before=1
+audio_after_render=0

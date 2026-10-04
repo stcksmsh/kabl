@@ -1,5 +1,21 @@
 # Status
 
+## D07 draft closeout — 2026-10-04
+
+Engineering: submitted as draft; acceptance incomplete. Owner review: pending.
+Branch `codex/d07-reaper-instrument`; draft [PR #10](https://github.com/stcksmsh/kabl/pull/10); final tested/reviewed product `ff11434`.
+Record: [reaper-instrument/REPORT.md](reaper-instrument/REPORT.md), README, design,
+REVIEW and owner CHECKLIST. Final workspace 597/0/22, strict Clippy and release build
+pass; final validator 35 success/9 skips. Real relocated bundle loads distinct complete
+states and renders outside checkout with the factory path unavailable. Repeated REAPER
+renders still differ. Refreshed eight timing cases verify actual GUI handles at start/6/end;
+callback totals include startup/teardown. Final1440 theme views and durable failed WAVs added.
+Reset/pre-roll differences observed; sole cause and repeatable policy remain unresolved.
+Physical controller, latency and owner sound/feel remain pending. No merge or D08.
+Persistent bundle: `/home/stcksmsh/.codex/visualizations/2026/10/03/01a10304-4ddb-7850-bdcf-4509411a23d5/d07-owner-test`.
+Launch its `./launch.sh`. User checkout and `.ai/` are untouched.
+
+
 **Read this first.** Unlike `decisions.md` (append-only rationale log) and `benchmarks.md`
 (append-only numbers log), this file is overwritten to reflect the current state of the project.
 If you're a human or an agent picking this up cold, this is where you find out what's real,

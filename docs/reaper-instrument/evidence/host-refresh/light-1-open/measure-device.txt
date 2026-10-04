@@ -1,0 +1,5 @@
+SRATE=true 48000
+BSIZE=true 256
+MODE=true JACK
+duration=12.003042496
+GUI_checks=3

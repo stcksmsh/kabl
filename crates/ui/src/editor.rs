@@ -83,7 +83,43 @@ impl PatchEditor {
                 0,
                 Source::User,
             );
+            for (name, &value) in &c.params {
+                editor.log.append(
+                    Op::SetParam {
+                        target: ParamTarget::Cable {
+                            id,
+                            param: name.clone(),
+                        },
+                        value,
+                    },
+                    0,
+                    Source::User,
+                );
+            }
+            if !c.steps.is_empty() {
+                editor.log.append(
+                    Op::SetCablePattern {
+                        id,
+                        steps: c.steps.clone(),
+                    },
+                    0,
+                    Source::User,
+                );
+            }
             editor.next_cable_id = editor.next_cable_id.max(id + 1);
+        }
+        for (&id, labels) in &patch.labels {
+            for (key, text) in labels {
+                editor.log.append(
+                    Op::SetLabel {
+                        id,
+                        key: key.clone(),
+                        text: Some(text.clone()),
+                    },
+                    0,
+                    Source::User,
+                );
+            }
         }
         editor.dirty = false; // seeding isn't a user edit -- nothing needs a swap for it yet.
         editor

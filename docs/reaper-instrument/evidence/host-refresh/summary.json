@@ -1,0 +1,278 @@
+[
+  {
+    "case": "light-1-closed",
+    "completed": true,
+    "exit": 0,
+    "means_ms": [
+      0.12413863830715532
+    ],
+    "counts": [
+      2292
+    ],
+    "maximum_ms": [
+      0.320797
+    ],
+    "arrival_span_seconds": [
+      12.175341846
+    ],
+    "arrival_max_ms": [
+      26.389041
+    ],
+    "backend_errors": {
+      "ALSA output": {
+        "first": 0,
+        "last": 1,
+        "delta": 1
+      },
+      "REAPER": {
+        "first": 0,
+        "last": 0,
+        "delta": 0
+      }
+    }
+  },
+  {
+    "case": "light-1-open",
+    "completed": true,
+    "exit": 0,
+    "means_ms": [
+      0.13449260414866032
+    ],
+    "counts": [
+      2314
+    ],
+    "maximum_ms": [
+      0.435254
+    ],
+    "arrival_span_seconds": [
+      12.154713614
+    ],
+    "arrival_max_ms": [
+      31.992808
+    ],
+    "backend_errors": {
+      "ALSA output": {
+        "first": 0,
+        "last": 1,
+        "delta": 1
+      },
+      "REAPER": {
+        "first": 0,
+        "last": 0,
+        "delta": 0
+      }
+    }
+  },
+  {
+    "case": "light-2-closed",
+    "completed": true,
+    "exit": 0,
+    "means_ms": [
+      0.12661730607783123,
+      0.12283081754692274
+    ],
+    "counts": [
+      2287,
+      2291
+    ],
+    "maximum_ms": [
+      0.430528,
+      0.269578
+    ],
+    "arrival_span_seconds": [
+      12.181187213,
+      12.181268123
+    ],
+    "arrival_max_ms": [
+      26.683824,
+      31.637661
+    ],
+    "backend_errors": {
+      "ALSA output": {
+        "first": 0,
+        "last": 1,
+        "delta": 1
+      },
+      "REAPER": {
+        "first": 0,
+        "last": 0,
+        "delta": 0
+      }
+    }
+  },
+  {
+    "case": "light-2-open",
+    "completed": true,
+    "exit": 0,
+    "means_ms": [
+      0.15941673390928726,
+      0.15179549372565987
+    ],
+    "counts": [
+      2315,
+      2311
+    ],
+    "maximum_ms": [
+      0.475168,
+      0.524446
+    ],
+    "arrival_span_seconds": [
+      12.159976579,
+      12.160081309
+    ],
+    "arrival_max_ms": [
+      32.051358,
+      53.394979
+    ],
+    "backend_errors": {
+      "ALSA output": {
+        "first": 0,
+        "last": 1,
+        "delta": 1
+      },
+      "REAPER": {
+        "first": 0,
+        "last": 0,
+        "delta": 0
+      }
+    }
+  },
+  {
+    "case": "dense-1-closed",
+    "completed": true,
+    "exit": 0,
+    "means_ms": [
+      0.3238954605263158
+    ],
+    "counts": [
+      2280
+    ],
+    "maximum_ms": [
+      0.547934
+    ],
+    "arrival_span_seconds": [
+      12.128115833
+    ],
+    "arrival_max_ms": [
+      20.797503
+    ],
+    "backend_errors": {
+      "ALSA output": {
+        "first": 0,
+        "last": 1,
+        "delta": 1
+      },
+      "REAPER": {
+        "first": 0,
+        "last": 0,
+        "delta": 0
+      }
+    }
+  },
+  {
+    "case": "dense-1-open",
+    "completed": true,
+    "exit": 0,
+    "means_ms": [
+      0.3600915454152249
+    ],
+    "counts": [
+      2312
+    ],
+    "maximum_ms": [
+      1.005238
+    ],
+    "arrival_span_seconds": [
+      12.149447988
+    ],
+    "arrival_max_ms": [
+      37.431412
+    ],
+    "backend_errors": {
+      "ALSA output": {
+        "first": 0,
+        "last": 1,
+        "delta": 1
+      },
+      "REAPER": {
+        "first": 0,
+        "last": 0,
+        "delta": 0
+      }
+    }
+  },
+  {
+    "case": "dense-2-closed",
+    "completed": true,
+    "exit": 0,
+    "means_ms": [
+      0.37280931754385965,
+      0.3584311455501973
+    ],
+    "counts": [
+      2280,
+      2281
+    ],
+    "maximum_ms": [
+      0.666898,
+      0.656241
+    ],
+    "arrival_span_seconds": [
+      12.138499372,
+      12.13856001
+    ],
+    "arrival_max_ms": [
+      25.348087,
+      25.649758
+    ],
+    "backend_errors": {
+      "ALSA output": {
+        "first": 0,
+        "last": 1,
+        "delta": 1
+      },
+      "REAPER": {
+        "first": 0,
+        "last": 0,
+        "delta": 0
+      }
+    }
+  },
+  {
+    "case": "dense-2-open",
+    "completed": true,
+    "exit": 0,
+    "means_ms": [
+      0.46131518230897006,
+      0.45288617277268944
+    ],
+    "counts": [
+      2408,
+      2402
+    ],
+    "maximum_ms": [
+      3.602444,
+      3.077477
+    ],
+    "arrival_span_seconds": [
+      12.661161811,
+      12.661292738
+    ],
+    "arrival_max_ms": [
+      40.410053,
+      64.188876
+    ],
+    "backend_errors": {
+      "ALSA output": {
+        "first": 0,
+        "last": 1,
+        "delta": 1
+      },
+      "REAPER": {
+        "first": 0,
+        "last": 0,
+        "delta": 0
+      }
+    }
+  }
+]

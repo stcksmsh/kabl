@@ -1,0 +1,8 @@
+{
+  "case": "fresh-1",
+  "policy": "fresh-process",
+  "completed": true,
+  "exit": -15,
+  "marker": "",
+  "trace": null
+}

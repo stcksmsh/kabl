@@ -1,0 +1,71 @@
+   Compiling serde v1.0.229
+   Compiling zerocopy v0.8.57
+   Compiling getrandom v0.4.3
+    Checking fastrand v2.5.0
+   Compiling getrandom v0.3.4
+   Compiling zerocopy-derive v0.8.57
+   Compiling crossbeam-deque v0.8.8
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d07/crates/standalone)
+    Checking regex-syntax v0.8.11
+   Compiling rayon-core v1.13.0
+   Compiling alloca v0.4.0
+    Checking clap_lex v1.1.1
+    Checking plotters-backend v0.3.7
+    Checking anstyle v1.0.14
+    Checking ciborium-io v0.2.2
+    Checking itertools v0.13.0
+    Checking cast v0.3.0
+    Checking same-file v1.0.6
+    Checking page_size v0.6.0
+    Checking anes v0.1.6
+    Checking oorandom v11.1.5
+    Checking wait-timeout v0.2.1
+    Checking quick-error v1.2.3
+    Checking walkdir v2.5.0
+    Checking bit-vec v0.8.0
+    Checking fnv v1.0.7
+    Checking unarray v0.1.4
+    Checking kabl-modules v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d07/crates/modules)
+    Checking clap_builder v4.6.7
+    Checking plotters-svg v0.3.7
+    Checking tempfile v3.27.0
+    Checking plotters v0.3.7
+    Checking bit-set v0.8.0
+    Checking rand_core v0.9.5
+    Checking crossbeam v0.8.5
+    Checking rand_xorshift v0.4.0
+    Checking rand v0.9.5
+    Checking rusty-fork v0.3.1
+    Checking kabl-pedals v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d07/crates/pedals)
+    Checking kabl-cables v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d07/crates/cables)
+    Checking kabl-learn v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d07/crates/learn)
+    Checking rayon v1.12.0
+    Checking kabl-core v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d07/crates/core)
+    Checking tinytemplate v1.2.1
+    Checking nice-plug-core v0.2.0 (https://github.com/Circuit-Stitch/nice-plug.git?rev=263b16877d0b0ad30921868338a6df46eadc9a46#263b1687)
+    Checking criterion-plot v0.8.2
+    Checking clap v4.6.7
+    Checking regex-automata v0.4.18
+    Checking nice-plug v0.2.3 (https://github.com/Circuit-Stitch/nice-plug.git?rev=263b16877d0b0ad30921868338a6df46eadc9a46#263b1687)
+    Checking kabl-engine v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d07/crates/engine)
+    Checking regex v1.13.1
+    Checking ahash v0.8.12
+    Checking half v2.7.1
+    Checking ppv-lite86 v0.2.21
+    Checking epaint v0.35.0
+    Checking winit v0.30.13
+    Checking ciborium-ll v0.2.2
+    Checking rand_chacha v0.9.0
+    Checking ciborium v0.2.2
+    Checking proptest v1.11.0
+    Checking criterion v0.8.2
+    Checking egui v0.35.0
+    Checking glutin-winit v0.5.0
+    Checking egui_glow v0.35.0
+    Checking egui-winit v0.35.0
+    Checking egui-baseview v0.7.0 (https://codeberg.org/RustAudio/egui-baseview.git?rev=07c89cdb1eca83d65c470e1fd8dd252f53f41097#07c89cdb)
+    Checking eframe v0.35.0
+    Checking nice-plug-egui v0.3.0 (https://github.com/Circuit-Stitch/nice-plug.git?rev=263b16877d0b0ad30921868338a6df46eadc9a46#263b1687)
+    Checking kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d07/crates/ui)
+    Checking kabl-clap v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d07/crates/clap)
+    Finished `dev` profile [optimized + debuginfo] target(s) in 14.11s

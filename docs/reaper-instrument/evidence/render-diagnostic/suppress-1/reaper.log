@@ -1,0 +1,13 @@
+reaper: activating running instance...done
+reaper: opening project '' with flags 52... done
+jack: created client
+jack: setting TIME_CRITICAL = 57
+jack: activated client
+jack: deactivated client
+jack: close client
+jack: created client
+jack: jack_client_real_time_priority() returned error: -6
+jack: non-realtime threads
+jack: activated client
+jack: deactivated client
+jack: close client

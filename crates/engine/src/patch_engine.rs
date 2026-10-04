@@ -168,6 +168,28 @@ const NO_LAUNCH: PendingLaunch = PendingLaunch {
 };
 
 impl PatchEngine {
+    /// Audio-thread host reset: retain the newest accepted graph/values; clear voices,
+    /// launches, previews, feedback and effects. Retired graphs go to basedrop.
+    pub fn reset(&mut self) {
+        if let Some((incoming, _)) = self.incoming.take() {
+            self.active = incoming;
+        }
+        if let Some(pending) = self.pending.take() {
+            self.active = pending;
+        }
+        self.active.reset();
+        self.launches.fill(None);
+        self.deferred_launches.fill(None);
+        self.deferred_preview = None;
+        self.held_preview = 0;
+        self.preview_blocks = 0;
+        self.keyboards = Default::default();
+        self.synced = None;
+        self.rendered = 0;
+        self.report = None;
+        self.sync_keyboards();
+    }
+
     /// Control-thread call: compiles `patch` and wraps it for deferred drop. Allocates.
     pub fn new(
         handle: &Handle,
@@ -495,6 +517,11 @@ impl PatchEngine {
     }
 
     /// Audio-thread call: the last finished measurement window, if one is waiting.
+    /// Current audio sample clock; control hosts use it to age queued probe reports.
+    pub fn rendered_samples(&self) -> u64 {
+        self.rendered
+    }
+
     pub fn take_probe_report(&mut self) -> Option<ProbeReport> {
         self.report.take()
     }

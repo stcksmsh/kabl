@@ -1,0 +1,33 @@
+{
+  "files": [
+    "scratch/host/after-cycles.rpp",
+    "/home/stcksmsh/.codex/visualizations/2026/10/03/01a10304-4ddb-7850-bdcf-4509411a23d5/d07-owner-test/projects/final-relocated-reopened.rpp"
+  ],
+  "states_equal": true,
+  "instances": [
+    [
+      {
+        "modules": 6,
+        "cables": 6,
+        "gain": 0.4
+      },
+      {
+        "modules": 15,
+        "cables": 30,
+        "gain": 0.55
+      }
+    ],
+    [
+      {
+        "modules": 6,
+        "cables": 6,
+        "gain": 0.4
+      },
+      {
+        "modules": 15,
+        "cables": 30,
+        "gain": 0.55
+      }
+    ]
+  ]
+}

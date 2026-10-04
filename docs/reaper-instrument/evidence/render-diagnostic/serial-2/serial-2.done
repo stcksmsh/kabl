@@ -1,0 +1,5 @@
+policy=serial-offline
+seconds=3.6222893019999
+bytes=19968744
+audio_before=1
+audio_after_render=0

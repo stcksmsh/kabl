@@ -1,0 +1,5 @@
+policy=no-render-restart
+seconds=2.8019361669999
+bytes=19968744
+audio_before=1
+audio_after_render=1

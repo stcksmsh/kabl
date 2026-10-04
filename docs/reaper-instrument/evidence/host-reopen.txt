@@ -1,0 +1,3 @@
+REAPER 7.75/linux-x86_64 tracks=2
+track 0 fx=CLAPi: kabl (stcksmsh) gain=0.40000000596046
+track 1 fx=CLAPi: kabl (stcksmsh) gain=0.55000001192093

@@ -1,0 +1,10 @@
+{
+  "policy": "fresh REAPER process -renderproject, same saved complete state, 48 kHz/256 request",
+  "pcm_equal": false,
+  "sha256": [
+    "adb5e82daac398c10f62f5c8c98d8b10f6d33a91983d6c52f6d133b854ed4681",
+    "990958961e933449844c3232c628cff0a6528a01df1734c3ea3139a2956295a7"
+  ],
+  "different_samples": 4915615,
+  "max_abs_difference": 0.2453106939792633
+}

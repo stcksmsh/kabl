@@ -1,0 +1,8 @@
+local dir=assert(os.getenv('KABL_D07_HOST'))
+reaper.OnStopButton()
+reaper.Main_SaveProjectEx(0,dir..'/edited.rpp',0)
+local f=assert(io.open(dir..'/edited-info.txt','w'))
+f:write('tracks=',reaper.CountTracks(0),'\n')
+local track=reaper.GetTrack(0,0)
+f:write('gain=',reaper.TrackFX_GetParamNormalized(track,0,0),'\n')
+f:close()

@@ -544,7 +544,7 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
         }
     }
     egui::Panel::top("kabl-toolbar")
-        .exact_size(40.0)
+        .exact_size(64.0)
         .show(ui, |ui| toolbar(editor, ui_state, ui));
     if ui_state.browser_open {
         egui::Panel::left("kabl-browser")
@@ -673,7 +673,7 @@ fn tool(ui: &mut egui::Ui, ui_state: &mut UiState, key: &str, label: &str, on: b
 }
 
 fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
-    ui.horizontal_centered(|ui| {
+    ui.horizontal(|ui| {
         ui.label(egui::RichText::new("kabl").strong().size(17.0));
         let open = ui_state.browser_open;
         if tool(ui, ui_state, "browser", "Sounds", open) {
@@ -795,7 +795,8 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) 
             });
         });
         ui_state.record("view-menu".into(), menu.response.rect);
-        ui.separator();
+    });
+    ui.horizontal(|ui| {
         browser::toolbar(editor, ui_state, ui);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let open = ui_state.drawer_open;
