@@ -423,3 +423,70 @@ fn state_recall_clears_native_modulation_before_restoring_saved_bases() {
     assert_no_alloc(|| p.accept_loads());
     assert_eq!(p.session.as_ref().unwrap().gain, 0.5);
 }
+
+#[test]
+fn queued_unassignment_cannot_overwrite_later_document_base_edit() {
+    let mut p = tests::instrument();
+    let mut state = p.shared.snapshot();
+    state.patch.cables.remove(&5);
+    state
+        .patch
+        .modules
+        .get_mut(&5)
+        .unwrap()
+        .params
+        .insert("gain".into(), 0.5);
+    p.shared.load(state).unwrap();
+    p.accept_loads();
+    let mut c = p.shared.control.lock().unwrap();
+    for lane in &mut c.lanes {
+        if lane
+            .target
+            .as_ref()
+            .is_some_and(|t| t.module == 5 && t.param == "gain")
+        {
+            *lane = automation::Lane::default();
+        }
+    }
+    c.bank_dirty = true;
+    c.pump();
+    c.editor.set_param(5, "gain", 0.25);
+    assert!(c.pump());
+    let fresh = c.patch.clone();
+    drop(c);
+    let collector = Collector::new();
+    let mut reference = PatchEngine::new(&collector.handle(), &fresh, 48000.0, VOICES).unwrap();
+    let note = MidiEvent::parse(Source::Host, &[0x90, 60, 100]).unwrap();
+    p.session.as_mut().unwrap().engine.key_at(note, 0);
+    reference.key_at(note, 0);
+    for _ in 0..100 {
+        let mut left = [0.0; 64];
+        let mut right = [0.0; 64];
+        assert_no_alloc(|| p.render(&mut left, &mut right));
+    }
+    let mut expected = [0.0; 64];
+    let mut expected_right = [0.0; 64];
+    let mut reference_timeline = Timeline::new();
+    for _ in 0..100 {
+        reference_timeline.render(
+            &mut reference,
+            &mut expected,
+            &mut expected_right,
+            |_, _| {},
+        );
+    }
+    let mut left = [0.0; 64];
+    let mut right = [0.0; 64];
+    p.render(&mut left, &mut right);
+    reference_timeline.render(
+        &mut reference,
+        &mut expected,
+        &mut expected_right,
+        |_, _| {},
+    );
+    let gain = p.shared.params.gain.value();
+    assert!(left
+        .iter()
+        .zip(expected)
+        .all(|(&v, e)| (v - e * gain).abs() < 1e-6));
+}

@@ -927,8 +927,6 @@ impl Instrument {
                 s.gain = gain;
             }
         }
-        s.engine
-            .drain(&mut s.rx, kabl_ui::control::QUEUE, &s.feedback);
         for _ in 0..4 {
             if let Ok((bank, fresh)) = s.banks.pop() {
                 automation::replace_bank(&mut s.engine, &mut s.bank, bank, fresh);
@@ -936,6 +934,10 @@ impl Instrument {
                 break;
             }
         }
+        // Lane removal restores old bases first; later document edits/graphs retain their
+        // normal FIFO precedence. Mapped overlays are reapplied after document delivery.
+        s.engine
+            .drain(&mut s.rx, kabl_ui::control::QUEUE, &s.feedback);
         self.schedule.mode(s.host_clock);
         let schedule = &mut self.schedule;
         let bank = &s.bank;
