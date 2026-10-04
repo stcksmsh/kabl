@@ -1,0 +1,18 @@
+{
+  "files": [
+    "scratch/closeout/serial-1/serial-1.wav",
+    "scratch/closeout/serial-2/serial-2.wav"
+  ],
+  "format": "52 s / 48 kHz / stereo float32",
+  "pcm_equal": false,
+  "pcm_sha256": [
+    "bd5abee61c13f74c1f957adddada7886364fe9441243ab040d77c70548a7c051",
+    "e1dd9a7a32f26c8842adf7185a824c65c01b8e2db78635327f9e50d958a5c232"
+  ],
+  "different_samples": [
+    4915249
+  ],
+  "maximum_abs_difference": [
+    0.2427147552371025
+  ]
+}

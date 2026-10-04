@@ -1,0 +1,17 @@
+{
+  "product_head": "ff11434c6502d2cce5a3894544bec10f5ceea6d6",
+  "files": {
+    "scratch/host/after-cycles.rpp": "2033b8eb006b605ada2ca0bf46818f94861dd2bbb81472f715185f49b62aac37",
+    "target/release/libkabl_clap.so": "998020860c7cb6f027fa74462ed4cbd0afa02d52167ebe40fdc6111e36d21bd4",
+    "scratch/closeout/proxy/kabl.clap": "82412b2e5e8bad4ebba540b093ce2c07ace5c61adc64b2979806e576d0e7f8a7"
+  },
+  "trace_kinds": {
+    "1": "explicit reset",
+    "2": "start_processing (framework resets)",
+    "3": "first MIDI note since reset/start; value sample offset",
+    "4": "offline render mode",
+    "5": "realtime render mode"
+  },
+  "trace_frames": "cumulative, not reset-relative",
+  "raw_wavs": "scratch/closeout/<case>/<case>.wav; retained failed evidence"
+}

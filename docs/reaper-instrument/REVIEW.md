@@ -62,3 +62,29 @@ with exact provenance; final binary/package/validator and actual toolbar views w
 by the implementer afterward and are recorded separately in REPORT.md. No owner approval.
 
 Final reviewer evidence recheck at ff11434 independently counted 597/0/22 workspace tests, 35 validator successes/9 skips, checked final package gain/render logs and exact decoded-state equality, and visually inspected both final 1280 theme screenshots: Save, Save As, Perform and Routing are distinct. It found no new substantive finding and supported draft submission. Final 1440 refresh, repeat render, verified editor-open timing, physical controller/latency and owner review remain open.
+
+## 2026-10-04 independent diagnostic/package recheck
+
+Reviewer `/root/closeout_review` received exact merged base91777165cadba5ce81a1d7fdbc4de78563f95ca4,
+product ff11434c6502d2cce5a3894544bec10f5ceea6d6, initial submitted dd8fa7f70040ba0df3d1d2018cd377cefeeab733,
+focused script diff, contracts and raw evidence. No product source change/new source defect.
+Reviewer checked trace ABI against pinned CLAP/nice-plug and independently reproduced serial
+PCM failure (4,915,249 samples; maximum0.2427147552371025). Suppressed mode forwarding
+retains second starts: no causal resolution or product override justified.
+
+P2 timing-scope finding: lifetime callback counts include startup/teardown. Disposition:
+REPORT/README explicitly separate playback duration and callback arrival span; raw rows retained.
+P2 runner-validation finding: unchecked results could be published. Disposition: retain per-case
+JSON then assert completion/exit, callbacks, actual GUI checks and negotiated rate/buffer/mode.
+All recorded cases complete/exit0 with three real GUI checks. Backend observation disposition:
+inactive0→active1 device counters remain distinct from REAPER0 and physical latency.
+
+Reviewer independently verifies all21 durable package manifest files, packaged/current binary
+identity SHA256998020860c7cb6f027fa74462ed4cbd0afa02d52167ebe40fdc6111e36d21bd4 and valid
+unchanged-product relocated complete recall evidence. Final case/theme/document recheck follows.
+Engineering remains incomplete for repeated-render acceptance; owner acceptance pending.
+
+Final reviewer recheck: all eight cases complete/exit0 at48kHz/256/JACK; three actual GUI
+checks and distinct two-instance handles verified. Seven durable WAV hashes match. Final1440
+A-light/A-dark controls are distinct/readable; final1280 remains valid. P2 dispositions
+accepted; no new substantive finding. Draft submission supported, engineering incomplete.

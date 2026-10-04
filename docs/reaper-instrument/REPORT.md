@@ -219,3 +219,79 @@ used as successful diagnosis. Stop at D07; no merge or D08 authorization.
 Final toolbar visually verified at 1280×800 in A-light/A-dark: evidence/screenshots/final-1280-{light,dark}.png. Save/Save As and Perform/Routing no longer overlap. Earlier 1440×900 evidence predates this toolbar change; a refreshed final-head 1440 view remains pending.
 
 Submitted draft PR: https://github.com/stcksmsh/kabl/pull/10. Initial submitted evidence head: `894d83592721bae1a1415f82166109d489b19517`; subsequent PR-link commit is documentation only. Tested/reviewed product stays `ff11434c6502d2cce5a3894544bec10f5ceea6d6`. Scratch REAPER was closed after final evidence.
+
+## 2026-10-04 bounded diagnostic and measurement refresh
+
+Product remains `ff11434c6502d2cce5a3894544bec10f5ceea6d6`; initial submitted head was
+`dd8fa7f70040ba0df3d1d2018cd377cefeeab733`. Base remains merged master
+`91777165cadba5ce81a1d7fdbc4de78563f95ca4`. This continuation changes evidence/scripts
+and documentation only. Engineering remains incomplete; PR remains open draft and unmerged.
+Owner acceptance remains pending. No D08 work or `.ai` changes.
+
+### Render diagnosis: failure retained
+
+All valid runs use the identical saved `scratch/host/after-cycles.rpp` and final binary;
+SHA256 provenance is in `evidence/render-diagnostic/provenance.json`. The new runner verifies
+synchronous render return, atomic completion marker, clean host exit and exact decoded
+52-second/48-kHz/stereo float32 payload. A marker publication race invalidated fresh-1;
+its WAV/log remain retained and it is excluded from passing completion claims.
+Fresh-2/3 complete but differ in 4,914,929 samples (maximum absolute difference 0.18606399).
+Serial-1/2 additionally close the audio device, recreate instances and disable track buffering
+and anticipative FX; both complete but differ in 4,915,249 samples (maximum 0.2427147552371025).
+Device-closed alone has one completed exploratory run, not a repeatability result.
+
+Fixed-capacity callback telemetry observes reset/start positions and first MIDI note offsets.
+The pinned framework resets DSP during start_processing. For serial runs, the second start
+occurs at cumulative frame 8960 vs 4352. This establishes differing reset/pre-roll sequences,
+not that timing alone explains the PCM. The framework requests restart when render mode
+changes; a diagnostic proxy suppressing that forwarding still observes second starts.
+That hypothesis is insufficient; no product render-mode override was introduced.
+
+Declared policies fresh-process and serial-offline both FAIL repeatability. No repeatable host
+policy is established. Preserving free-running DSP while finding a reliable host reset boundary
+remains the next engineering investigation. Resetting phase at transport/MIDI boundaries would
+change product behavior and needs a precise separate decision; it is not silently adopted here.
+Raw failed PCM now also resides durably in `d07-closeout-evidence` beside the owner bundle;
+`evidence/render-diagnostic/durable-wavs.json` indexes absolute paths and hashes.
+
+### Refreshed real-host measurement
+
+Eight final-product light/dense × one/two instances × open/closed cases complete with exit0.
+Playback durations are 12.001–12.030 seconds. Negotiation is 48 kHz/256 frames/JACK.
+Actual floating GUI handles are verified at start, ~6 seconds and end; two-open cases have
+separate handles. Inactive/closed instances have nil handles. Selected light/dense graph is
+copied into both tracks with unique FX IDs; measured-project.rpp is retained per case.
+Raw callbacks/device/GUI/PipeWire files and summary live in `evidence/host-refresh/`,
+with the complete runner output in `evidence/host-timing-refresh.json`.
+
+Callback totals span instance lifetime including startup/teardown, not precisely the playback
+window. Active rows have 2280–2408 callbacks; arrival spans are 12.128–12.661 seconds.
+Rows below1000 remain raw and are excluded from active-instance summaries. Light mean
+execution is 0.122831–0.159417 ms; dense 0.323895–0.461315 ms. Worst execution is
+3.602444 ms vs nominal buffer interval 5.333333 ms. Maximum callback arrival interval is
+64.188876 ms; arrival gaps include lifecycle transitions and cannot be called execution xruns.
+Proxy calibration: 100000 noop calls, added67.471 ns/call on this run. Execution timing
+includes its clock edge; lookup/arrival bookkeeping/atomics contribute separate proxy overhead.
+Calibration is one local short microbenchmark, not a precision hardware latency measurement.
+
+Per-case PipeWire snapshots cover the whole run. Device counter goes 0 while inactive to1
+on activation, then remains1 in active snapshots; REAPER remains0. Raw first/last/delta are
+retained separately. No assertion of xrun-free physical playback, uninterrupted cycle audio,
+physical latency or long-duration stability follows from these short observations.
+
+### Final views, package and checks
+
+Final 1440×900 A-light/A-dark: `evidence/screenshots/final-1440-{light,dark}.png`.
+The same ff11434 packaged binary is used; final1280 views remain valid. No visual redesign.
+Product binary, saved state and package contents are unchanged; no bundle rebuild is needed.
+Fresh independent manifest recheck validates all21 files and binary equality with target:
+SHA256 `998020860c7cb6f027fa74462ed4cbd0afa02d52167ebe40fdc6111e36d21bd4`.
+Complete relocated recall evidence remains valid for unchanged product (6/6/gain0.4 and
+15/30/gain0.55, unavailable factory directory, outside-source render).
+Prior final workspace597 passed/0 failed/22 ignored, strict Clippy/release and validator35
+success/9 skips retain exact product provenance. New Python scripts compile; strict C11
+`-Wall -Wextra -Werror` proxy build and `git diff --check` pass. No full suite repeated because
+product source did not change. Independent review dispositions are in REVIEW.md.
+
+Next action: resolve repeat-render acceptance on D07, then obtain Kosta's listening,
+physical-controller/latency/feel and hands-on host acceptance. Submission is not completion.

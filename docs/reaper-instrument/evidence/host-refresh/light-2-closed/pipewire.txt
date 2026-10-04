@@ -1,0 +1,134 @@
+S   ID  QUANT   RATE    WAIT    BUSY   W/Q   B/Q  ERR FORMAT           NAME 
+C   29      0      0    ---     ---   ---   ---     0                  Dummy-Driver
+C   30      0      0    ---     ---   ---   ---     0                  Freewheel-Driver
+C   43      0      0    ---     ---   ---   ---     0                  Midi-Bridge
+C   51      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.0
+C   53      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.2
+C   55      0      0    ---     ---   ---   ---     0                  alsa_output.pci-0000_00_1f.3.analog-stereo
+C   56      0      0    ---     ---   ---   ---     0                  alsa_input.pci-0000_00_1f.3.analog-stereo
+S   ID  QUANT   RATE    WAIT    BUSY   W/Q   B/Q  ERR FORMAT           NAME 
+R   29    256  48000  19.8us   0.4us  0.00  0.00    0                  Dummy-Driver
+R   79    256  48000   8.1us   9.0us  0.00  0.00    0                   + REAPER
+S   30      0      0    ---     ---   ---   ---     0                  Freewheel-Driver
+S   43      0      0    ---     ---   ---   ---     0                  Midi-Bridge
+S   51      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.0
+S   53      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.2
+I   55    256  48000   1.5us   2.1us  0.00  0.00    1    S32LE 2 48000 alsa_output.pci-0000_00_1f.3.analog-stereo
+S   56      0      0    ---     ---   ---   ---     0                  alsa_input.pci-0000_00_1f.3.analog-stereo
+S   ID  QUANT   RATE    WAIT    BUSY   W/Q   B/Q  ERR FORMAT           NAME 
+I   29    256  48000  19.8us   0.4us  0.00  0.00    0                  Dummy-Driver
+S   30      0      0    ---     ---   ---   ---     0                  Freewheel-Driver
+S   43      0      0    ---     ---   ---   ---     0                  Midi-Bridge
+S   51      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.0
+S   53      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.2
+R   55    256  48000 119.0us  24.3us  0.02  0.00    1    S32LE 2 48000 alsa_output.pci-0000_00_1f.3.analog-stereo
+R   79    256  48000  15.0us 100.1us  0.00  0.02    0                   + REAPER
+S   56      0      0    ---     ---   ---   ---     0                  alsa_input.pci-0000_00_1f.3.analog-stereo
+S   ID  QUANT   RATE    WAIT    BUSY   W/Q   B/Q  ERR FORMAT           NAME 
+I   29    256  48000  19.8us   0.4us  0.00  0.00    0                  Dummy-Driver
+S   30      0      0    ---     ---   ---   ---     0                  Freewheel-Driver
+S   43      0      0    ---     ---   ---   ---     0                  Midi-Bridge
+S   51      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.0
+S   53      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.2
+R   55    256  48000 176.7us   4.1us  0.03  0.00    1    S32LE 2 48000 alsa_output.pci-0000_00_1f.3.analog-stereo
+R   79    256  48000   3.3us 167.7us  0.00  0.03    0                   + REAPER
+S   56      0      0    ---     ---   ---   ---     0                  alsa_input.pci-0000_00_1f.3.analog-stereo
+S   ID  QUANT   RATE    WAIT    BUSY   W/Q   B/Q  ERR FORMAT           NAME 
+I   29    256  48000  19.8us   0.4us  0.00  0.00    0                  Dummy-Driver
+S   30      0      0    ---     ---   ---   ---     0                  Freewheel-Driver
+S   43      0      0    ---     ---   ---   ---     0                  Midi-Bridge
+S   51      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.0
+S   53      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.2
+R   55    256  48000 224.5us   2.4us  0.04  0.00    1    S32LE 2 48000 alsa_output.pci-0000_00_1f.3.analog-stereo
+R   79    256  48000  27.8us 193.8us  0.01  0.04    0                   + REAPER
+S   56      0      0    ---     ---   ---   ---     0                  alsa_input.pci-0000_00_1f.3.analog-stereo
+S   ID  QUANT   RATE    WAIT    BUSY   W/Q   B/Q  ERR FORMAT           NAME 
+I   29    256  48000  19.8us   0.4us  0.00  0.00    0                  Dummy-Driver
+S   30      0      0    ---     ---   ---   ---     0                  Freewheel-Driver
+S   43      0      0    ---     ---   ---   ---     0                  Midi-Bridge
+S   51      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.0
+S   53      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.2
+R   55    256  48000 178.0us   2.5us  0.03  0.00    1    S32LE 2 48000 alsa_output.pci-0000_00_1f.3.analog-stereo
+R   79    256  48000  11.4us 160.7us  0.00  0.03    0                   + REAPER
+S   56      0      0    ---     ---   ---   ---     0                  alsa_input.pci-0000_00_1f.3.analog-stereo
+S   ID  QUANT   RATE    WAIT    BUSY   W/Q   B/Q  ERR FORMAT           NAME 
+I   29    256  48000  19.8us   0.4us  0.00  0.00    0                  Dummy-Driver
+S   30      0      0    ---     ---   ---   ---     0                  Freewheel-Driver
+S   43      0      0    ---     ---   ---   ---     0                  Midi-Bridge
+S   51      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.0
+S   53      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.2
+R   55    256  48000 169.4us   3.3us  0.03  0.00    1    S32LE 2 48000 alsa_output.pci-0000_00_1f.3.analog-stereo
+R   79    256  48000   2.9us 163.3us  0.00  0.03    0                   + REAPER
+S   56      0      0    ---     ---   ---   ---     0                  alsa_input.pci-0000_00_1f.3.analog-stereo
+S   ID  QUANT   RATE    WAIT    BUSY   W/Q   B/Q  ERR FORMAT           NAME 
+I   29    256  48000  19.8us   0.4us  0.00  0.00    0                  Dummy-Driver
+S   30      0      0    ---     ---   ---   ---     0                  Freewheel-Driver
+S   43      0      0    ---     ---   ---   ---     0                  Midi-Bridge
+S   51      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.0
+S   53      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.2
+R   55    256  48000 221.2us   3.7us  0.04  0.00    1    S32LE 2 48000 alsa_output.pci-0000_00_1f.3.analog-stereo
+R   79    256  48000  28.3us 189.4us  0.01  0.04    0                   + REAPER
+S   56      0      0    ---     ---   ---   ---     0                  alsa_input.pci-0000_00_1f.3.analog-stereo
+S   ID  QUANT   RATE    WAIT    BUSY   W/Q   B/Q  ERR FORMAT           NAME 
+I   29    256  48000  19.8us   0.4us  0.00  0.00    0                  Dummy-Driver
+S   30      0      0    ---     ---   ---   ---     0                  Freewheel-Driver
+S   43      0      0    ---     ---   ---   ---     0                  Midi-Bridge
+S   51      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.0
+S   53      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.2
+R   55    256  48000 162.4us   3.0us  0.03  0.00    1    S32LE 2 48000 alsa_output.pci-0000_00_1f.3.analog-stereo
+R   79    256  48000   3.0us 155.9us  0.00  0.03    0                   + REAPER
+S   56      0      0    ---     ---   ---   ---     0                  alsa_input.pci-0000_00_1f.3.analog-stereo
+S   ID  QUANT   RATE    WAIT    BUSY   W/Q   B/Q  ERR FORMAT           NAME 
+I   29    256  48000  19.8us   0.4us  0.00  0.00    0                  Dummy-Driver
+S   30      0      0    ---     ---   ---   ---     0                  Freewheel-Driver
+S   43      0      0    ---     ---   ---   ---     0                  Midi-Bridge
+S   51      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.0
+S   53      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.2
+R   55    256  48000 321.0us   3.3us  0.06  0.00    1    S32LE 2 48000 alsa_output.pci-0000_00_1f.3.analog-stereo
+R   79    256  48000  35.8us 281.8us  0.01  0.05    0                   + REAPER
+S   56      0      0    ---     ---   ---   ---     0                  alsa_input.pci-0000_00_1f.3.analog-stereo
+S   ID  QUANT   RATE    WAIT    BUSY   W/Q   B/Q  ERR FORMAT           NAME 
+I   29    256  48000  19.8us   0.4us  0.00  0.00    0                  Dummy-Driver
+S   30      0      0    ---     ---   ---   ---     0                  Freewheel-Driver
+S   43      0      0    ---     ---   ---   ---     0                  Midi-Bridge
+S   51      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.0
+S   53      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.2
+R   55    256  48000 203.5us   3.3us  0.04  0.00    1    S32LE 2 48000 alsa_output.pci-0000_00_1f.3.analog-stereo
+R   79    256  48000  32.3us 168.5us  0.01  0.03    0                   + REAPER
+S   56      0      0    ---     ---   ---   ---     0                  alsa_input.pci-0000_00_1f.3.analog-stereo
+S   ID  QUANT   RATE    WAIT    BUSY   W/Q   B/Q  ERR FORMAT           NAME 
+I   29    256  48000  19.8us   0.4us  0.00  0.00    0                  Dummy-Driver
+S   30      0      0    ---     ---   ---   ---     0                  Freewheel-Driver
+S   43      0      0    ---     ---   ---   ---     0                  Midi-Bridge
+S   51      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.0
+S   53      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.2
+R   55    256  48000 174.2us   8.1us  0.03  0.00    1    S32LE 2 48000 alsa_output.pci-0000_00_1f.3.analog-stereo
+R   79    256  48000   4.1us 165.2us  0.00  0.03    0                   + REAPER
+S   56      0      0    ---     ---   ---   ---     0                  alsa_input.pci-0000_00_1f.3.analog-stereo
+S   ID  QUANT   RATE    WAIT    BUSY   W/Q   B/Q  ERR FORMAT           NAME 
+I   29    256  48000  19.8us   0.4us  0.00  0.00    0                  Dummy-Driver
+S   30      0      0    ---     ---   ---   ---     0                  Freewheel-Driver
+S   43      0      0    ---     ---   ---   ---     0                  Midi-Bridge
+S   51      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.0
+S   53      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.2
+R   55    256  48000 155.6us   7.0us  0.03  0.00    1    S32LE 2 48000 alsa_output.pci-0000_00_1f.3.analog-stereo
+R   79    256  48000   3.2us 148.5us  0.00  0.03    0                   + REAPER
+S   56      0      0    ---     ---   ---   ---     0                  alsa_input.pci-0000_00_1f.3.analog-stereo
+S   ID  QUANT   RATE    WAIT    BUSY   W/Q   B/Q  ERR FORMAT           NAME 
+I   29    256  48000  19.8us   0.4us  0.00  0.00    0                  Dummy-Driver
+S   30      0      0    ---     ---   ---   ---     0                  Freewheel-Driver
+S   43      0      0    ---     ---   ---   ---     0                  Midi-Bridge
+S   51      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.0
+S   53      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.2
+R   55    256  48000 221.4us   4.1us  0.04  0.00    1    S32LE 2 48000 alsa_output.pci-0000_00_1f.3.analog-stereo
+R   79    256  48000   3.6us 214.7us  0.00  0.04    0                   + REAPER
+S   56      0      0    ---     ---   ---   ---     0                  alsa_input.pci-0000_00_1f.3.analog-stereo
+S   ID  QUANT   RATE    WAIT    BUSY   W/Q   B/Q  ERR FORMAT           NAME 
+I   29    256  48000  19.8us   0.4us  0.00  0.00    0                  Dummy-Driver
+S   30      0      0    ---     ---   ---   ---     0                  Freewheel-Driver
+S   43      0      0    ---     ---   ---   ---     0                  Midi-Bridge
+S   51      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.0
+S   53      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_6_1.2
+R   55    256  48000 190.7us   4.3us  0.04  0.00    1    S32LE 2 48000 alsa_output.pci-0000_00_1f.3.analog-stereo
+R   79    256  48000  19.2us 168.6us  0.00  0.03    0                   + REAPER
+S   56      0      0    ---     ---   ---   ---     0                  alsa_input.pci-0000_00_1f.3.analog-stereo

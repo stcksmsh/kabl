@@ -31,9 +31,9 @@ The original musical render is active above -60 dB RMS from 0.5 to 30.5 seconds,
 
 ## Reproducibility and limits
 
-Free oscillator/LFO DSP advances during silent processing. Explicit CLAP reset clears transient DSP and MIDI history while preserving the sound. A fresh REAPER process or offline/online toggle is not evidence that reset occurred immediately before render frame zero. Both tested host policies produced different PCM; failures and hashes are preserved. Host pre-roll/reset timing is a plausible cause, not an established diagnosis. Bit-exact REAPER render reproduction remains an engineering gap.
+Free oscillator/LFO DSP advances during silent processing. Explicit CLAP reset clears transient DSP and MIDI history while preserving the sound. A fresh REAPER process or offline/online toggle is not evidence that reset occurred immediately before render frame zero. Both tested host policies produced different PCM; failures and hashes are preserved. Bounded telemetry establishes differing start/reset/pre-roll sequences; sole PCM cause remains unproven. Fresh-process and serial-offline policies both fail. Bit-exact REAPER render reproduction remains an engineering gap.
 
-Measurements use a separate fixed-storage timing proxy around the actual exported CLAP process callback. This proxy is never shipped as the instrument. Results include clock/atomic overhead, startup and shutdown calls; callback time, backend errors and physical latency are distinct. The 12-second cases cover light/dense sounds, one/two instances and editor open/closed requests at negotiated 48 kHz/256. They are short observations, not a long-running stability guarantee. Physical round-trip latency and controller feel remain unmeasured.
+Measurements use a separate fixed-storage timing proxy around the actual exported CLAP process callback. This proxy is never shipped as the instrument. Results include clock/atomic overhead, startup and shutdown calls; callback time, backend errors and physical latency are distinct. The 12-second cases cover light/dense sounds, one/two instances and editor open/closed cases with actual floating handles verified at start, six seconds and end at negotiated 48 kHz/256. They are short observations, not a long-running stability guarantee. Physical round-trip latency and controller feel remain unmeasured.
 
 ## Dependencies and sources
 

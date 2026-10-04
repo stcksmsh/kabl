@@ -1,0 +1,66 @@
+[
+  {
+    "case": "light-1-closed",
+    "completed": true,
+    "exit": 0,
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.001279809\nGUI_checks=3\n",
+    "callbacks": "1,13,4190879,482105,490000,3328,256,256,12,229777,3588229,11293273\n0,2292,284525759,320797,200000,586752,256,256,2291,77683,26389041,12175341846\n",
+    "gui_handles": "check=0 track=0 expected=false handle=nil\ncheck=0 track=1 expected=false handle=nil\ncheck=1 track=0 expected=false handle=nil\ncheck=1 track=1 expected=false handle=nil\ncheck=2 track=0 expected=false handle=nil\ncheck=2 track=1 expected=false handle=nil\n"
+  },
+  {
+    "case": "light-1-open",
+    "completed": true,
+    "exit": 0,
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.003042496\nGUI_checks=3\n",
+    "callbacks": "1,47,13792010,442607,450000,12032,256,256,46,227998,5240031,42429331\n0,2314,311215886,435254,220000,592384,256,256,2313,93600,31992808,12154713614\n",
+    "gui_handles": "check=0 track=0 expected=true handle=userdata: 0x268b9990\ncheck=0 track=1 expected=false handle=nil\ncheck=1 track=0 expected=true handle=userdata: 0x268b9990\ncheck=1 track=1 expected=false handle=nil\ncheck=2 track=0 expected=true handle=userdata: 0x268b9990\ncheck=2 track=1 expected=false handle=nil\n"
+  },
+  {
+    "case": "light-2-closed",
+    "completed": true,
+    "exit": 0,
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.001055219\nGUI_checks=3\n",
+    "callbacks": "1,2287,289573779,430528,210000,585472,256,256,2286,135469,26683824,12181187213\n0,2291,281405403,269578,200000,586496,256,256,2290,98071,31637661,12181268123\n",
+    "gui_handles": "check=0 track=0 expected=false handle=nil\ncheck=0 track=1 expected=false handle=nil\ncheck=1 track=0 expected=false handle=nil\ncheck=1 track=1 expected=false handle=nil\ncheck=2 track=0 expected=false handle=nil\ncheck=2 track=1 expected=false handle=nil\n"
+  },
+  {
+    "case": "light-2-open",
+    "completed": true,
+    "exit": 0,
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.002900438\nGUI_checks=3\n",
+    "callbacks": "1,2315,369049739,475168,290000,592640,256,256,2314,144993,32051358,12159976579\n0,2311,350799386,524446,250000,591616,256,256,2310,85033,53394979,12160081309\n",
+    "gui_handles": "check=0 track=0 expected=true handle=userdata: 0x315d0110\ncheck=0 track=1 expected=true handle=userdata: 0x30d54bf0\ncheck=1 track=0 expected=true handle=userdata: 0x315d0110\ncheck=1 track=1 expected=true handle=userdata: 0x30d54bf0\ncheck=2 track=0 expected=true handle=userdata: 0x315d0110\ncheck=2 track=1 expected=true handle=userdata: 0x30d54bf0\n"
+  },
+  {
+    "case": "dense-1-closed",
+    "completed": true,
+    "exit": 0,
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.023362425\nGUI_checks=3\n",
+    "callbacks": "1,9,2713489,409475,410000,2304,256,256,8,273651,3248091,5949961\n0,2280,738481650,547934,470000,583680,256,256,2279,155766,20797503,12128115833\n",
+    "gui_handles": "check=0 track=0 expected=false handle=nil\ncheck=0 track=1 expected=false handle=nil\ncheck=1 track=0 expected=false handle=nil\ncheck=1 track=1 expected=false handle=nil\ncheck=2 track=0 expected=false handle=nil\ncheck=2 track=1 expected=false handle=nil\n"
+  },
+  {
+    "case": "dense-1-open",
+    "completed": true,
+    "exit": 0,
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.018309267\nGUI_checks=3\n",
+    "callbacks": "1,47,15061196,458872,460000,12032,256,256,46,256150,5339047,42548672\n0,2312,832531653,1005238,530000,591872,256,256,2311,99140,37431412,12149447988\n",
+    "gui_handles": "check=0 track=0 expected=true handle=userdata: 0xe36be00\ncheck=0 track=1 expected=false handle=nil\ncheck=1 track=0 expected=true handle=userdata: 0xe36be00\ncheck=1 track=1 expected=false handle=nil\ncheck=2 track=0 expected=true handle=userdata: 0xe36be00\ncheck=2 track=1 expected=false handle=nil\n"
+  },
+  {
+    "case": "dense-2-closed",
+    "completed": true,
+    "exit": 0,
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.019686109\nGUI_checks=3\n",
+    "callbacks": "1,2280,850005244,666898,500000,583680,256,256,2279,244909,25348087,12138499372\n0,2281,817581443,656241,490000,583936,256,256,2280,101683,25649758,12138560010\n",
+    "gui_handles": "check=0 track=0 expected=false handle=nil\ncheck=0 track=1 expected=false handle=nil\ncheck=1 track=0 expected=false handle=nil\ncheck=1 track=1 expected=false handle=nil\ncheck=2 track=0 expected=false handle=nil\ncheck=2 track=1 expected=false handle=nil\n"
+  },
+  {
+    "case": "dense-2-open",
+    "completed": true,
+    "exit": 0,
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.030488566\nGUI_checks=3\n",
+    "callbacks": "1,2408,1110846959,3602444,760000,616448,256,256,2407,243079,40410053,12661161811\n0,2402,1087832587,3077477,760000,614912,256,256,2401,162342,64188876,12661292738\n",
+    "gui_handles": "check=0 track=0 expected=true handle=userdata: 0x195b12c0\ncheck=0 track=1 expected=true handle=userdata: 0x18ef11f0\ncheck=1 track=0 expected=true handle=userdata: 0x195b12c0\ncheck=1 track=1 expected=true handle=userdata: 0x18ef11f0\ncheck=2 track=0 expected=true handle=userdata: 0x195b12c0\ncheck=2 track=1 expected=true handle=userdata: 0x18ef11f0\n"
+  }
+]

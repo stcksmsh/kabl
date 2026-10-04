@@ -2785,3 +2785,12 @@ a draft with this engineering gap rather than claim deterministic host render ac
 Final package recall and validator evidence identify the final binary; old sound/state evidence
 is reused only where the toolbar change cannot affect it. Owner sound/controller acceptance is
 still pending. No global installation, merge or D08 work was performed.
+
+## 2026-10-04 — D07 reset telemetry and unchanged product
+
+Fresh-process and serial-offline completed renders still differ. Bounded telemetry establishes
+differing start/reset/pre-roll sequences; suppressing framework render-mode forwarding retains
+second starts, so restart causality remains unproven. Do not bypass framework render behavior
+or add transport/phase synchronization on this evidence. Keep ff11434 product and draft PR.
+Final GUI/performance evidence is refreshed; callback lifetime, playback duration, backend
+counters and physical latency remain distinct. Owner acceptance and render engineering remain open.

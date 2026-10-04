@@ -15,3 +15,5 @@ Start the persistent package with `./launch.sh`; use a copy of the project for e
 - [ ] Report listening/controller observations and any changes requested.
 
 Optional normal install: copy `plugins/kabl.clap` into `~/.clap` only after checking for an existing file, then rescan REAPER. To uninstall, remove that exact copied file. Close scratch REAPER before deleting its package directory. The agent has made no global installation or configuration change.
+
+Engineering refresh: actual GUI handles and final1440 themes verified. Repeated render acceptance remains unresolved; owner boxes remain pending. See REPORT latest closeout.

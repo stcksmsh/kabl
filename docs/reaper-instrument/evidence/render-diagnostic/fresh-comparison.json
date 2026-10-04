@@ -1,0 +1,18 @@
+{
+  "files": [
+    "scratch/closeout/fresh-2/fresh-2.wav",
+    "scratch/closeout/fresh-3/fresh-3.wav"
+  ],
+  "format": "52 s / 48 kHz / stereo float32",
+  "pcm_equal": false,
+  "pcm_sha256": [
+    "d428543bc26101f108da55f61a7d9274174c2596d4ebb37f0623d41ead2856b0",
+    "17bb352cd50082b0617c86f40ccaa98b831f014c3c8893a6283d4a959d3554de"
+  ],
+  "different_samples": [
+    4914929
+  ],
+  "maximum_abs_difference": [
+    0.1860639899969101
+  ]
+}
