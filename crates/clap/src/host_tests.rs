@@ -203,3 +203,36 @@ fn unassigning_a_lane_restores_its_document_base_without_allocations() {
         "Unassigned target must recover its base: {peak}"
     );
 }
+
+#[test]
+fn live_mode_and_values_wait_for_complete_scene_publication() {
+    let mut p = tests::instrument();
+    let expected = p.session.as_ref().unwrap().epoch * 2;
+    p.shared.committed.store(expected + 1, Ordering::SeqCst);
+    unsafe {
+        p.shared
+            .params
+            .host_clock
+            .as_ptr()
+            ._internal_set_normalized_value(1.0);
+        p.shared.params.slots[0]
+            .value
+            .as_ptr()
+            ._internal_set_normalized_value(0.9);
+    }
+    p.shared.gestures.store(1, Ordering::Release);
+    let (gestures, _) = assert_no_alloc(|| p.live_params());
+    assert_eq!(gestures, 0);
+    assert!(!p.session.as_ref().unwrap().host_clock);
+    assert_eq!(p.shared.gestures.load(Ordering::Acquire), 1);
+    // A completed new epoch must not leak into the old session either.
+    p.shared.committed.store(expected + 2, Ordering::SeqCst);
+    assert_eq!(assert_no_alloc(|| p.live_params()).0, 0);
+    assert!(!p.session.as_ref().unwrap().host_clock);
+    p.shared.committed.store(expected, Ordering::SeqCst);
+    let state = p.shared.snapshot();
+    p.shared.load(state).unwrap();
+    assert_no_alloc(|| p.accept_loads());
+    assert!(p.session.as_ref().unwrap().host_clock);
+    assert!((p.session.as_ref().unwrap().slot_values[0] - 0.9).abs() < 1e-6);
+}

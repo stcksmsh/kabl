@@ -70,6 +70,8 @@ struct Session {
     feedback: Arc<Feedback>,
     epoch: u64,
     gain: f32,
+    host_clock: bool,
+    slot_values: [f32; automation::SLOTS],
     cc: rtrb::Producer<(u8, u8, u8)>,
     reports: rtrb::Producer<RuntimeReport>,
     bank: automation::Bank,
@@ -258,6 +260,8 @@ fn prepare(
                 feedback,
                 epoch,
                 gain,
+                host_clock: false,
+                slot_values: [0.0; automation::SLOTS],
                 cc: cc_tx,
                 reports: reports_tx,
                 bank: [None; automation::SLOTS],
@@ -316,6 +320,8 @@ impl Shared {
         let (mut session, delivery, cc, reports, banks) =
             prepare(&state.patch, c.rate, &c.handle, epoch, state.output_gain)?;
         session.bank = automation::bank(&state.patch, &state.lanes);
+        session.host_clock = state.host_clock;
+        session.slot_values = state.slot_values;
         let editor = PatchEditor::seed_from(&state.patch);
         c.tx.push(session)
             .map_err(|_| "State queue full".to_string())?;
@@ -362,6 +368,8 @@ impl Shared {
                 .as_ptr()
                 ._internal_set_normalized_value(state.host_clock as u8 as f32);
         }
+        self.gestures.store(0, Ordering::Release);
+        self.cc_notify.store(0, Ordering::Release);
         self.committed.store(epoch * 2, Ordering::SeqCst);
         Ok(())
     }
@@ -765,10 +773,30 @@ impl Instrument {
             self.session = self.pending.take();
             self.timeline.reset();
             self.raw_position = None;
-            self.schedule = schedule::Schedule::new(std::array::from_fn(|i| {
-                self.shared.params.slots[i].value.unmodulated_plain_value()
-            }));
+            self.schedule = schedule::Schedule::new(self.session.as_ref().unwrap().slot_values);
         }
+    }
+    fn live_params(&mut self) -> (u32, [f32; automation::SLOTS]) {
+        let gestures = self.shared.gestures.swap(0, Ordering::Acquire);
+        let mut values = [0.0; automation::SLOTS];
+        let Some(session) = &mut self.session else {
+            return (0, values);
+        };
+        let expected = session.epoch * 2;
+        if self.shared.committed.load(Ordering::SeqCst) == expected {
+            let mode = self.shared.params.host_clock.value();
+            for (i, value) in values.iter_mut().enumerate() {
+                if gestures & (1 << i) != 0 {
+                    *value = self.shared.params.slots[i].value.unmodulated_plain_value();
+                }
+            }
+            if self.shared.committed.load(Ordering::SeqCst) == expected {
+                session.host_clock = mode;
+                return (gestures, values);
+            }
+        }
+        self.shared.gestures.fetch_or(gestures, Ordering::Release);
+        (0, [0.0; automation::SLOTS])
     }
     fn render(&mut self, left: &mut [f32], right: &mut [f32]) {
         let Some(s) = &mut self.session else {
@@ -794,7 +822,7 @@ impl Instrument {
                 break;
             }
         }
-        self.schedule.mode(self.shared.params.host_clock.value());
+        self.schedule.mode(s.host_clock);
         let schedule = &mut self.schedule;
         let bank = &s.bank;
         let rate = self.rate;
@@ -875,6 +903,9 @@ impl Plugin for Instrument {
             return false;
         };
         session.bank = automation::bank(&c.patch, &c.lanes);
+        session.host_clock = self.shared.params.host_clock.value();
+        session.slot_values =
+            std::array::from_fn(|i| self.shared.params.slots[i].value.unmodulated_plain_value());
         c.banks = banks;
         c.bank_dirty = false;
         c.rate = config.sample_rate;
@@ -906,7 +937,7 @@ impl Plugin for Instrument {
         // REAPER's render pre-roll. Transport, not a thread restart, defines a Host epoch.
         // Dedicated CLAP reset still always clears DSP and transient ownership.
         if self.shared.start_reset.load(Ordering::Relaxed)
-            && self.shared.params.host_clock.value()
+            && self.session.as_ref().is_some_and(|s| s.host_clock)
             && self
                 .raw_position
                 .is_some_and(|(position, _)| position.playing)
@@ -926,9 +957,7 @@ impl Plugin for Instrument {
                 break;
             }
         }
-        self.schedule = schedule::Schedule::new(std::array::from_fn(|i| {
-            self.shared.params.slots[i].value.unmodulated_plain_value()
-        }));
+        self.schedule.clear_time();
         self.raw_position = None;
         for _ in 0..4096 {
             if self.events.pop().is_err() {
@@ -947,13 +976,15 @@ impl Plugin for Instrument {
         // Raw CLAP MIDI bypasses the framework's unbounded VecDeque. The outer callback
         // gives full host-buffer offsets; Timeline retains them across automation subblocks.
         let frames = self.shared.host_frames.load(Ordering::Relaxed) as usize;
+        let (gestures, gesture_values) = self.live_params();
+        let host_clock = self.session.as_ref().is_some_and(|s| s.host_clock);
         for _ in 0..4096 {
             let Ok((offset, event)) = self.events.pop() else {
                 break;
             };
             if offset == 0 {
                 if let schedule::Event::Position(position) = event {
-                    if self.shared.params.host_clock.value() && position.playing {
+                    if host_clock && position.playing {
                         let discontinuity =
                             self.raw_position.is_none_or(|(previous, previous_frames)| {
                                 !previous.playing
@@ -976,14 +1007,13 @@ impl Plugin for Instrument {
             self.schedule
                 .push(self.timeline.now() + offset as u64, event);
         }
-        let gestures = self.shared.gestures.swap(0, Ordering::Acquire);
-        for i in 0..automation::SLOTS {
+        for (i, value) in gesture_values.iter().enumerate() {
             if gestures & (1 << i) != 0 {
                 self.schedule.push(
                     self.timeline.now(),
                     schedule::Event::Value {
                         slot: i,
-                        value: self.shared.params.slots[i].value.unmodulated_plain_value(),
+                        value: *value,
                         modulation: false,
                     },
                 );
@@ -1117,7 +1147,7 @@ mod tests {
     #[global_allocator]
     static ALLOC: AllocDisabler = AllocDisabler;
 
-    fn instrument() -> Instrument {
+    pub(super) fn instrument() -> Instrument {
         let mut p = Instrument::default();
         p.shared.stop.store(true, Ordering::Release);
         p.worker.take().unwrap().join().unwrap();
