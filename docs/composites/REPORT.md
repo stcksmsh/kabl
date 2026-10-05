@@ -2,7 +2,7 @@
 
 ## Disposition
 
-Engineering: final verification complete for the agreed chronological project Undo scope; draft submission for Kosta's review. Kosta explicitly resolved the history choice: independent instance state is required; separate per-instance histories are not. Final reviewer disposition is recorded in REVIEW. Merged: no. Owner review/approval: pending. No merge, D10 work or messages to other chats occurred.
+Engineering: final verification complete for the agreed chronological project Undo scope; draft [PR #12](https://github.com/stcksmsh/kabl/pull/12) submitted for Kosta's review. Kosta explicitly resolved the history choice: independent instance state is required; separate per-instance histories are not. Final reviewer disposition is recorded in REVIEW. Merged: no. Owner review/approval: pending. No merge, D10 work or messages to other chats occurred.
 
 The dependency gate passed before product edits. Live PR #11 was merged at f870b3c4316b9ea819d35344de09f6b7d24c59ca; fetched master equalled that commit, with no intervening changes. Updated repaired D08 contracts replaced historical pre-repair references. D08 tested/reviewed/packaged f7157619836075d0d7704e59be5d66e6224890b1; submitted eb22ce7db9be63831f54e97d7308dbff42b3238f. Strict-profile R6 is closed within its declared assumptions; earlier hardware and production-beta gaps remain.
 

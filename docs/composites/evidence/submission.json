@@ -1,0 +1,15 @@
+{
+  "draft_pr": "https://github.com/stcksmsh/kabl/pull/12",
+  "initial_submitted_head": "5130106a6b41eae1a10d339b2f1ab3a9ad250e0f",
+  "starting_head": "f870b3c4316b9ea819d35344de09f6b7d24c59ca",
+  "tested_head": "2c3d8319911a90c5960f9e02baa8dfd27c01de8f",
+  "reviewed_head": "2c3d8319911a90c5960f9e02baa8dfd27c01de8f",
+  "runtime_product_head": "a337f2c1eae867671f9deabadfa10f681de2bb26",
+  "packaged_head": "a337f2c1eae867671f9deabadfa10f681de2bb26",
+  "engineering_complete": true,
+  "merged": false,
+  "owner_approved": false,
+  "history_choice": "Kosta selected chronological project Undo; separate per-instance histories not required",
+  "exact_final_submitted_head_receipt": "/home/stcksmsh/.codex/visualizations/2026/10/05/01a10979-ac89-7a01-bd38-576bb907cce1/d09-owner-test/submission.json",
+  "provenance": "Final submission metadata commit follows initial PR head. Exact final SHA is recorded outside Git to avoid self-referential commit hashes; product source is unchanged from packaged head."
+}
