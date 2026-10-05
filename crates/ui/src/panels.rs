@@ -126,8 +126,20 @@ pub fn editor(editor: &mut PatchEditor, view: &mut UiState, ctx: &egui::Context)
             ..View::default()
         };
     }
-    view.panels.textures.retain(|(id,dark),(old,_,_)| {
-        editor.state().composites.get(id).and_then(|c|c.panel.as_ref()).and_then(|p|if *dark {p.dark.as_ref()}else{p.light.as_ref()}).is_some_and(|art|art==old)
+    view.panels.textures.retain(|(id, dark), (old, _, _)| {
+        editor
+            .state()
+            .composites
+            .get(id)
+            .and_then(|c| c.panel.as_ref())
+            .and_then(|p| {
+                if *dark {
+                    p.dark.as_ref()
+                } else {
+                    p.light.as_ref()
+                }
+            })
+            .is_some_and(|art| art == old)
     });
     if let Some(id) = view.panels.selected {
         let Some(c) = editor.state().composites.get(&id).cloned() else {
