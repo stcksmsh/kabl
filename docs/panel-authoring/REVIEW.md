@@ -74,4 +74,14 @@ At artifact head 495c1ba, the media directory contains selected screenshots but 
 
 **Requested correction:** Add a curated video recorded from the real task-owned application workflow, identify scripted input and originating production head, and include it in the owner bundle/manifest. Do not substitute a slideshow or generated mockup for a real application capture.
 
-**Disposition:** Open at this artifact checkpoint. Source review passes; engineering artifact completion remains pending this correction. Owner approval and merge remain separate. Hardware/listening/controller/physical latency/feel, ordinary-render nondeterminism and dense backend/performance limitations remain explicitly pending in REPORT/CHECKLIST.
+**Disposition:** Resolved in artifact repair `12f593256e06f4eb3be093ffd0deba1c5131b74a`; the missing-video finding was open at the 495c1ba checkpoint. Final repair verification is recorded below. Owner approval and merge remain separate. Hardware/listening/controller/physical latency/feel, ordinary-render nondeterminism and dense backend/performance limitations remain explicitly pending in REPORT/CHECKLIST.
+
+## Final video repair and bundle recheck
+
+**PASS at artifact head `12f593256e06f4eb3be093ffd0deba1c5131b74a`.** Direct diff from 495c1ba contains the walkthrough video, its script/provenance and document updates; production/test source is unchanged from `25f20ae8547bc367403414467040a8475cffa34f`. D10-R1 and D10-R2 are both resolved. No remaining actionable finding within the reviewed scope.
+
+Independent ffprobe verification confirms a complete H.264 MP4, **1440×900**, **509 frames**, **21.208333 seconds**. The reviewer extracted and inspected actual frames at 10, 13, 16 and 20 seconds: the real Design window contains the edited label Tone, the applied face shows Tone, chronological Undo restores Brightness, and Public controls displays the original exposed controls and ports. The saved checkpoint independently contains Brightness. The script records the task-owned real release application via X11; evidence identifies scripted input, no recorded audio, actual production head and release binary hash. This is UI workflow evidence, not listening or physical-input proof.
+
+The refreshed bundle manifest names 12f5932 and independently validates **64 files with zero hash mismatches**, including the same walkthrough MP4. The prior release binary hashes, complete host recall/native replay, owner limits and source dispositions remain unchanged. After committing this review, the implementer must refresh the bundled review/manifest and record the final submitted documentation head; that receipt must preserve the distinct built/tested/reviewed heads.
+
+Engineering review is complete for the agreed D10 scope. Owner material/listening/controller/physical latency/feel and production-beta acceptance remain pending; ordinary-render nondeterminism and dense backend/performance limits remain open. No merge or owner approval is implied.

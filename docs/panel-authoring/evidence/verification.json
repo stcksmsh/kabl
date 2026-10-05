@@ -22,5 +22,6 @@
   "host_release_head": "ca8b504a7d35e1aeee7398ea622feda4bf747b95",
   "owner_acceptance": "pending",
   "submitted_head": "recorded after push in external submission.json",
-  "reviewed_head": "see REVIEW.md; final recheck pending"
+  "reviewed_head": "12f593256e06f4eb3be093ffd0deba1c5131b74a",
+  "independent_review": "PASS; D10-R1 and D10-R2 resolved, source and final artifact recheck"
 }
