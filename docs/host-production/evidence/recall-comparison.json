@@ -1,0 +1,33 @@
+{
+  "files": [
+    "scratch/host/d08-arrangement.rpp",
+    "scratch/host/recalled.rpp"
+  ],
+  "states_equal": true,
+  "instances": [
+    [
+      {
+        "modules": 15,
+        "cables": 30,
+        "gain": 0.45
+      },
+      {
+        "modules": 11,
+        "cables": 13,
+        "gain": 0.6
+      }
+    ],
+    [
+      {
+        "modules": 15,
+        "cables": 30,
+        "gain": 0.45
+      },
+      {
+        "modules": 11,
+        "cables": 13,
+        "gain": 0.6
+      }
+    ]
+  ]
+}

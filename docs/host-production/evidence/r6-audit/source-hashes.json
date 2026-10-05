@@ -1,0 +1,13 @@
+{
+  "/secondary/Programming/Github/kabl/.worktrees/d08/Cargo.lock": "d7be295fc306ffc10baff09534062ca02ba6a4baa63a44805018a5a5a8355eab",
+  "/secondary/Programming/Github/kabl/.worktrees/d08/crates/clap/src/lib.rs": "68e905817a9be38e800ef53ed352c194a530c59b76a5a8e9a9655f06450cf5ef",
+  "/secondary/Programming/Github/kabl/.worktrees/d08/crates/clap/src/state_bridge.rs": "b228a8a6a1d8dcc8d70a5fb8fad2fcbcdd59cec2d83ccd05a0751ae9af697866",
+  "/home/stcksmsh/.cargo/git/checkouts/nice-plug-cc55f1f1bcef5b66/263b168/crates/nice-plug/src/wrapper/clap/wrapper.rs": "bb07f88b3e8662db76d2a86be473acdea1310b33d1444693129076b206ceae4d",
+  "/home/stcksmsh/.cargo/git/checkouts/nice-plug-cc55f1f1bcef5b66/263b168/crates/nice-plug/src/wrapper/clap/context.rs": "bf0bf59d2213208a2e4f375e30fdbb2cabf1745250857fab48e5557210048311",
+  "/home/stcksmsh/.cargo/git/checkouts/nice-plug-cc55f1f1bcef5b66/263b168/crates/nice-plug-core/src/audio_setup.rs": "bd8623c49896aa400447a402c73db1daca4b1a6235a96fe9ffca24f5a5130a2e",
+  "/home/stcksmsh/.cargo/git/checkouts/nice-plug-cc55f1f1bcef5b66/263b168/crates/nice-plug-core/src/plugin.rs": "cef2d2595be5bd93f5a3fb6b1675684ce083b79deaf74a51c5b4ad0a3229d8f8",
+  "/home/stcksmsh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-utils-0.8.23/src/atomic/atomic_cell.rs": "bbce08eac8a92cb8fc04b5db3ebac0270197a175dae4bcebf808d71c48136825",
+  "/home/stcksmsh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-utils-0.8.23/src/atomic/seq_lock.rs": "27182e6b87a9db73c5f6831759f8625f9fcdec3c2828204c444aef04f427735a",
+  "/home/stcksmsh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.17/src/flavors/zero.rs": "397d1a312c7ed0bb6e22d3240bc85f5d47b6d042bd7f4d3c8d61499673b553b5",
+  "/home/stcksmsh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-queue-0.3.14/src/array_queue.rs": "29eb637c1666101e3cc37d2098c42bed6d0e109c33f75605a408faf00519e7b4"
+}

@@ -80,6 +80,7 @@ const MAX_BLOCK_TICKS: usize = 4;
 pub struct Clock {
     /// f64: in f32 the phase sum drifts by about one sample per pulse at 48 kHz.
     phase: f64,
+    host: Option<(f64, f64, bool)>,
     sample_rate: f32,
     running: bool,
     /// Restart pending: `reset` rises with the next pulse a (re)start begins.
@@ -101,6 +102,7 @@ impl Clock {
     pub fn new() -> Self {
         Clock {
             phase: 0.0,
+            host: None,
             sample_rate: 48000.0,
             running: true,
             armed: false,
@@ -111,6 +113,15 @@ impl Clock {
             ticks: 0,
             block_ticks: [(0, 0, 0); MAX_BLOCK_TICKS],
             n_block_ticks: 0,
+        }
+    }
+
+    /// Host supplies quarter-note position at each engine block. Free mode passes None.
+    pub fn host(&mut self, position: Option<(f64, f64, bool)>) {
+        self.host = position;
+        if let Some((beats, _, playing)) = position {
+            self.running = playing;
+            self.phase = (beats * PULSES_PER_BEAT).rem_euclid(1.0);
         }
     }
 
@@ -177,7 +188,10 @@ impl Module for Clock {
 
     #[inline]
     fn process(&mut self, io: &mut ProcessIo) {
-        let inc = io.param(0).at(0) as f64 / 60.0 * PULSES_PER_BEAT / self.sample_rate as f64;
+        let bpm = self
+            .host
+            .map_or(io.param(0).at(0) as f64, |(_, bpm, _)| bpm);
+        let inc = bpm / 60.0 * PULSES_PER_BEAT / self.sample_rate as f64;
         let n = io.block_len();
         // Yields (gate, reset) per sample from the stored state. Run once per output:
         // `ProcessIo` lends one output buffer at a time.

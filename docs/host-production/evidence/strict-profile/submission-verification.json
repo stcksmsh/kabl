@@ -1,0 +1,34 @@
+{
+  "product_head": "f7157619836075d0d7704e59be5d66e6224890b1",
+  "binary_sha256": "3baa8ee3cc0f2f99e1823e0a741d7301713098f99e92dc84f7556b8d0483aca4",
+  "workspace_totals": {
+    "passed": 612,
+    "failed": 0,
+    "ignored": 22
+  },
+  "plugin_tests": 25,
+  "framework_primitive_tests": 4,
+  "strict_clippy": "pass (workspace all targets; -D warnings)",
+  "release_build": "pass",
+  "validator_totals": {
+    "success": 35,
+    "skipped": 9
+  },
+  "logs": {
+    "atomic-cell.txt": "942dc04165ff10b279f807234e4d7d034bb620f5e7e7061b6731e2002a353a10",
+    "clippy.txt": "af938b5887bd6b3d102bebb468dd730e50d6034b947584d99ef2e2e857bc084e",
+    "framework-probe.txt": "04ded81ee510b1c0ce6474901ca1ff3d2ec0af560cc0082154d277a116a1bb44",
+    "lifecycle-comparison.json": "950b01ff468cfe884f26c64050440a96cd98fb7e25faf88d54c838cd965c4513",
+    "ordinary-render-comparison.json": "2caedf62c9c712c79a92ef954e70c377111e66a0bb59385df2e80fa5c57ce7b1",
+    "probe-build.jsonl": "7f4e0fe97d16267e6337a755baddcea50e2a94a0d9687c7effd347e83c31470e",
+    "probe-build.txt": "9a5b05b2e5e807bb2ad7a7b7412054960ba339216bb4845d49977a12bbaed7e3",
+    "probe-command.json": "fe2cd59e30b3d99a944229e3d346e79c26061545003f090e34ac0372799be158",
+    "recall-comparison.json": "fbe78b0210fa90ba67aecdbeb78b55476333f12a71da518ad219dd7310accfbd",
+    "release-build.txt": "85ed6634aad42eb80f439f5667f62f44ffb1629ae46333c54778554406ed26b1",
+    "render-comparison.json": "5b72241f21f8d9a6b02e8b34cb0348ae47f86ac35cb576f8ef814787572f5b7c",
+    "strict-framework-tests.txt": "ef854c1f31eea68864fcf9cd658d7d27b0a8e8db469a5923db22eec42df49c07",
+    "validator.json": "01b47d0ecc6bc910da67adf5ec46e5210f1b61336ee19990ca3a70f71bc9ac57",
+    "validator.txt": "f844441452f11a7dd45809db4db453476ef583526efd951d25f7026ef1e26da2",
+    "workspace-tests.txt": "770a69613ce33b060eb854925af11d323d8ed64eb6ebee06b09eb062d8d89fb2"
+  }
+}

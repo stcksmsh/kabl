@@ -1,0 +1,5 @@
+AudioIOLayout: size=120 align=8 lock_free=false
+Option<BufferConfig>: size=20 align=4 lock_free=false
+ProcessStatus: size=24 align=8 lock_free=false
+ProcessMode: size=1 align=1 lock_free=true
+R6 FAIL: callback-facing AtomicCell types use fallback locks

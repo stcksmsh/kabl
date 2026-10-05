@@ -1,0 +1,9 @@
+
+running 4 tests
+test tests::saturation_and_rejected_head_preserve_complete_gestures ... ok
+test tests::paused_producer_does_not_block_consumer ... ok
+test tests::phases_and_overlap_fail_without_waiting ... ok
+test tests::replenishment_cannot_extend_callback_budget ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

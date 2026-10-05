@@ -17,6 +17,9 @@ Other working documents:
 - `docs/confusions.md` — beginner confusions, lesson source material.
 - `docs/benchmarks.md` — measured performance history, append-only.
 
+D08 strict CLAP repair is recorded in [host-production/REPORT.md](docs/host-production/REPORT.md).
+Owner review remains pending; PR #11 is unmerged.
+
 ## Workspace
 
 ```

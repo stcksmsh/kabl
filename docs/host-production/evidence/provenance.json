@@ -1,0 +1,100 @@
+{
+  "starting_head": "c6bb8ccdab50dfe91a2b1f002d8c2766351697fc",
+  "tested_reviewed_packaged_product_head": "133fdb89ac56a396db0c7c961c74067782b34efb",
+  "binary_sha256": "17cfcc408aacf341971ed5dfc35ddd6356445d16273c9c7610b16cef7c4770ee",
+  "owner_bundle": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-owner-test",
+  "raw_archive": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-final-evidence",
+  "raw_manifest_sha256": "8cec10f3f4835d5fe9c93524d1a779c0f956fd47ad88e20fb418b69d52c94f5c",
+  "immutable_first_checkpoint": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-checkpoint",
+  "accepted_final_evidence": {
+    "submission-verification.json": "edb45a496104410b611ba4346ea1153fda7171ff6f335da1359934aca6ed47af",
+    "workspace-tests-submission.txt": "a721546d6f1996936d64061b494d31a1b43972362a254a2857dbe63633797b28",
+    "reviewer-backpressure-tests.txt": "69754ff8862951e9fa470b5c51fffd9c577d85fc8c82270590ceccd3d275b2d9",
+    "reviewer-backpressure-clippy.txt": "a16bd31ef5c2a40ce827add86e6dae6c99273a8734e8ea827b85e71d4c1ffe07",
+    "reviewer-backpressure-build.txt": "0f8b6f84018e1e847b75a1f2adbeac4dae9c14ffd5f16820be23bfe19f1fe17d",
+    "validator-submission.json": "6028335aa4cf0a0b2d371f4b56ab2fcd56ed3e66c3c2ed1325f954728dd631f7",
+    "render-submission-policy.json": "0af096a2c9d544d415818bc9583e9abf581b0aa6d433551d12eb760348212145",
+    "render-all-outside-checkout.json": "6f7f26ba136abb53d755fc51d1345dbcfcafa611b3b1bad031da32d54a8aff66",
+    "packaged-submission-first.txt": "6d4c2cb3806f80f330477a54a765a8231ca91d0bda04c37e4e7886be296a5510",
+    "packaged-submission-second.txt": "5af7ecf5fe8138eddef07391e4264ce034f1b7179fd7716b65fe46e48d5fd7d8",
+    "portable-host-cwd.txt": "fc09fb56be7ee9d4f5af065fb700c1584b00bd738585988c76a1315440ee6b7e",
+    "portable-mapped-plugin.txt": "42ab7f26cf588e2b607f01b8e7e6842f9dd2a17a271135e1d1c7b6f7474efc61",
+    "portable-recall-host.txt": "6e385598eb34d1f5bb7b01cb103251869406f6970ed8681a9c47fe4ce9254f27",
+    "recall-submission-host.txt": "6e385598eb34d1f5bb7b01cb103251869406f6970ed8681a9c47fe4ce9254f27",
+    "recall-submission-comparison.json": "0e278f1b8d9672c9df423b2d582cf26cc3bb617df5b071042826573ae1d358cd",
+    "rack-record-submission-host.txt": "c6fb844f85dcc231f882f804724790a14e740d4dc7affc76b0be02d37944058d",
+    "replay-submission-host.txt": "4274844ae1060b8c6fd45a98cd262ecc6e6fe74d8c1427a021e3ada6cdd2bdd5",
+    "cc-submission-host.txt": "614048ea8fc77c0ab8e96aca0b8bf52d783d9ce9396b3ccf2498d6134c25b488",
+    "transport-submission-host.txt": "91b65f26d48d6c4aedce4254da1c33f95e2c54f883ca7c9fe73e05326834224c",
+    "transport-submission.csv": "12d611a52a49eacb950c3cf9d11dcbf9869ff47a981dd5d5f3cf39a84d2c48ed",
+    "host-measurements.json": "ec1edea11a3a0c431e73c04fcc96a85c57e3472507b2c4f8e1e314309c8458fb",
+    "timing-summary.json": "9921069b063812bc00f09c27e2b4fc49020171c8f1867ea76255ff0e72c1633b",
+    "owner-bundle-manifest.json": "c25118e82cdad432224baf246ee01c86ab0f08bdfed6bc1d37ea9da959731cf5"
+  },
+  "harness_sha256": {
+    ".gitignore": "32dae3052f331ee34d628ef535709b301259a45df7c7522c4d35dcf49873f00b",
+    "capture-ui.lua": "1bcd38c77d6245211ddc3a7c6e5af2bfa355933c3de535bc86ea674cadaa52a7",
+    "cc-closed.lua": "cb3cbca4fdb975650398da6b7db90bfa05883a5f5916c95fd27e9c602a604cc6",
+    "compare-renders.py": "633073c64e1e4e869deff22a133c603f4386db76c569e90ba0be18cac7b3f4a5",
+    "diagnostic.lua": "70e236535acceea6245b0f7691b6939387c35b4e5aff68dfad7f79201af6c6ae",
+    "make-bundle.py": "c54b2764cf41abbaeea7635178196959c74c3e2e328c05611d0edfc2886de94d",
+    "make-cc-probe.py": "8bf09c87427e0f09ee5ec694e7e96116423a33dddf9d3db805ccf6e3ec7271f2",
+    "make-project.py": "1b311d99b80f9752c8a9470bd56770f68845c4e2fdcab811ce6d3d715adb8ea4",
+    "measure-host.lua": "3f01b02e0af3ad88333783406edd71e0226b2757a25f377765b4c13facdb5644",
+    "prepare-host.lua": "1ae3723e3f68781e7451046622c577d4ddbbc3257218ad0ef5860bb323c174c5",
+    "recall.lua": "8f363ac27be9318ba32f95ec6ac01d1cd244b820f05f54ddc48a00c5eb821716",
+    "record-rack.lua": "b177cb6ebf67502836fb5bf4c6a800bd08af8e4f14106410f042240d5d0a14b3",
+    "render.lua": "922c0c75e2b509829bf42144c2e8522f16d1905e6be6064c4b18291960b1573b",
+    "repeat.lua": "385b982583ebfb5e4c963defdc3d71d6927b5ebfc8a823ae50c609b3fbb9a956",
+    "replay-automation.lua": "9d5fe1ab9eaf9c4b2b67f28017909cdca376085515733f81a71181985d6369ed",
+    "run-host.py": "c762b8ffd38ee28ea93d3b1e79d5ffa72fafb92340c00593bb5ff70c8256e70e",
+    "run-measurements.py": "d6efc5f066252ec4fd1e1e437781002f1fbf7695c180556ef906c4f4cd2a431a",
+    "serial-repeat.lua": "adc98e7d9f9f03647d1ba25d688b553af2b865804254b69a37cb194ade4c3ad3",
+    "summarize-measurements.py": "13340fb7d1d8621de56fa323aadb82b2d3d4a660404b2aaab5dae4826f0a37db",
+    "timing-proxy.c": "d6a1842fb680ed87694fc7801dc20b6ba3c14219c5cf3a7a8c8431a80fb12d91",
+    "transport.lua": "964ccb44b467722ee196f7651a22b9d698638aebf8abbeff22fdcec0d7342abc"
+  },
+  "media_sha256": {
+    "README.md": "9bd4148412aa92b65522173e4fe66de0f159e2776a74f1e5ac7729449e08d394",
+    "arrangement.flac": "f0b6dfb281aef3eb4cdff81e6118a31acbfc35499e5201a29d1af914875ea4ab",
+    "cc-button-result.png": "4bbfa5295d62cc3cb931c45919dfe4e8def43aa3ef371e478540a856fa7bd418",
+    "rack-write.png": "5fe71268b0871d0c212b9ca922e3af2a15b4ffdc49e5a28c0685af3b993d67ec",
+    "ui-dark-1280x800.png": "5eec3831f5453716e5b26798d758291874ad734da511840ae09b62a2349ba3c3",
+    "ui-dark-1440x900.png": "30673b6b389a1a6df30205748d81c3b2ea9d21448f7605329b94efd72c0ff449",
+    "ui-light-1280x800.png": "5afacdea6c976c36aad2e57578e551b6e89aa46532f7f85d7499848887ebcb06",
+    "ui-light-1440x900.png": "48e815a425f2df6120c1e31a496a041d5c5321d566422505e0131c5014672f17",
+    "walkthrough.mp4": "2c3d27d945f1e002f8c5a01423ba15ec28e16305dbd20d597938dff92d10c03c"
+  },
+  "render_policy": {
+    "completed_final_groups": [
+      [
+        37,
+        38,
+        39
+      ],
+      [
+        40,
+        41,
+        42
+      ]
+    ],
+    "retained_warmups": [
+      37,
+      40
+    ],
+    "accepted": [
+      38,
+      39,
+      41,
+      42
+    ],
+    "pcm_sha256": "c535792b70919e23b5f8b1f25dd92333f397b6bcbb5e9c3ccb2e5bb1c7e2cb7b",
+    "extra_all_outside_checkout_group": [
+      1,
+      2,
+      3
+    ]
+  },
+  "historical_evidence": "Other evidence files preserve internal increments/failed drivers and are not final-head acceptance. Previous measurement entries were moved to *-head62addcb raw dirs and host-measurements-head62addcb.json. First-driver mixed dense/light and missing-item failures are not accepted. render-musical-metrics.json is reused only because final accepted PCM equals render26 byte-for-byte. Old record6point/.4045 driver is superseded; rack-record-submission-host is genuine final9point recording. Raw archive retains all42full WAVs, warm-ups and representative failed host drivers.",
+  "portable_project_sha256": "ea0da5a559ab8b242bcfcef329c74595b323bae53a7b97c4a204af4c10ed7136"
+}

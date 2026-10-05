@@ -1,0 +1,27 @@
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d08/crates/standalone)
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d08/crates/ui)
+   Compiling kabl-clap v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d08/crates/clap)
+error[E0599]: no method named `unmodulated_plain_value` found for struct `nice_plug::prelude::FloatParam` in the current scope
+   --> crates/clap/src/state_bridge.rs:312:57
+    |
+312 |                     value: shared.params.slots[i].value.unmodulated_plain_value() as f64,
+    |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+   ::: /home/stcksmsh/.cargo/git/checkouts/nice-plug-cc55f1f1bcef5b66/263b168/crates/nice-plug-core/src/params.rs:111:8
+    |
+111 |     fn unmodulated_plain_value(&self) -> Self::Plain;
+    |        ----------------------- the method is available for `nice_plug::prelude::FloatParam` here
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: trait `Param` which provides `unmodulated_plain_value` is implemented but not in scope; perhaps you want to import it
+    |
+  3 + use nice_plug::prelude::Param;
+    |
+help: there is a method `modulated_plain_value` with a similar name
+    |
+312 -                     value: shared.params.slots[i].value.unmodulated_plain_value() as f64,
+312 +                     value: shared.params.slots[i].value.modulated_plain_value() as f64,
+    |
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `kabl-clap` (lib test) due to 1 previous error

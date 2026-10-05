@@ -1,4 +1,6 @@
 //! Production instrument. REAPER owns audio/MIDI; no device backend is started here.
+mod automation;
+mod schedule;
 mod sound_state;
 mod state_bridge;
 mod tail;
@@ -8,19 +10,19 @@ use kabl_engine::{
     keyboard::{MidiEvent, Source},
     patch_engine::PatchEngine,
     runtime::{Feedback, ToAudio},
-    timeline::{Timeline, LATENCY},
+    timeline::{LATENCY, Timeline},
 };
-use kabl_ui::{control::Delivery, PatchEditor, UiState};
+use kabl_ui::{PatchEditor, UiState, control::Delivery};
 use nice_plug::{context::gui::GuiContext, editor::dpi::LogicalSize, prelude::*};
 use nice_plug_egui::{
-    create_egui_editor, EguiEditor, EguiNiceSettings, EguiState, NiceEguiApp, RepaintNotifier,
+    EguiEditor, EguiNiceSettings, EguiState, NiceEguiApp, RepaintNotifier, create_egui_editor,
 };
 use sound_state::SoundState;
 use std::{
     num::NonZeroU32,
     sync::{
-        atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
         Arc, Mutex,
+        atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     },
     thread::JoinHandle,
 };
@@ -31,6 +33,7 @@ type PreparedSession = (
     Delivery,
     rtrb::Consumer<(u8, u8, u8)>,
     rtrb::Consumer<RuntimeReport>,
+    rtrb::Producer<(automation::Bank, automation::Bank)>,
 );
 // Fixed 256-slot queue (~140 KiB). Inline probe snapshots keep audio allocation-free.
 #[allow(clippy::large_enum_variant)]
@@ -44,9 +47,19 @@ enum RuntimeReport {
 }
 
 #[derive(Params)]
+struct SlotParam {
+    #[id = "slot"]
+    value: FloatParam,
+}
+
+#[derive(Params)]
 struct InstrumentParams {
     #[id = "output_gain"]
     gain: FloatParam,
+    #[nested(array, group = "Automation")]
+    slots: [SlotParam; automation::SLOTS],
+    #[id = "host_clock"]
+    host_clock: BoolParam,
 }
 
 /// A state load replaces this entire session, including the old command queue. Destruction
@@ -57,8 +70,12 @@ struct Session {
     feedback: Arc<Feedback>,
     epoch: u64,
     gain: f32,
+    host_clock: bool,
+    slot_values: [f32; automation::SLOTS],
     cc: rtrb::Producer<(u8, u8, u8)>,
     reports: rtrb::Producer<RuntimeReport>,
+    bank: automation::Bank,
+    banks: rtrb::Consumer<(automation::Bank, automation::Bank)>,
 }
 
 struct Control {
@@ -73,6 +90,10 @@ struct Control {
     epoch: u64,
     cc: rtrb::Consumer<(u8, u8, u8)>,
     reports: rtrb::Consumer<RuntimeReport>,
+    lanes: [automation::Lane; automation::SLOTS],
+    banks: rtrb::Producer<(automation::Bank, automation::Bank)>,
+    bank_dirty: bool,
+    published_bank: automation::Bank,
     // Last: all queued Owned values and Handles must drop before collector storage.
     collector: CollectorGuard,
 }
@@ -150,6 +171,60 @@ impl Control {
         self.view.inspect.reset_audio_session(0.0);
     }
     fn pump(&mut self) -> bool {
+        if self.view.loaded {
+            // A browser document owns new queues too. Old bank/base updates must never
+            // cross into reused module identities, even when audio was paused.
+            if self.tx.slots() == 0 {
+                self.view.last_message = Some("State queue full; previous sound retained".into());
+                return false;
+            }
+            let prepared = prepare(
+                self.editor.state(),
+                self.rate,
+                &self.handle,
+                self.epoch,
+                1.0,
+            );
+            let (mut session, delivery, cc, reports, banks) = match prepared {
+                Ok(prepared) => prepared,
+                Err(error) => {
+                    self.view.last_message = Some(error);
+                    return false;
+                }
+            };
+            if self.view.load_stopped {
+                for (&id, module) in &self.editor.state().modules {
+                    if module.kind == "clock" {
+                        session
+                            .engine
+                            .transport(id, kabl_modules::builtins::Transport::Stop);
+                    }
+                }
+            }
+            self.tx.push(session).expect("checked state queue capacity");
+            self.delivery = delivery;
+            self.cc = cc;
+            self.reports = reports;
+            self.banks = banks;
+            self.bank_dirty = false;
+            self.published_bank = [None; automation::SLOTS];
+            for lane in &mut self.lanes {
+                lane.retired |= lane.target.is_some();
+                lane.target = None;
+            }
+            self.patch = self.editor.state().clone();
+            self.editor.take_dirty();
+            self.rejected = None;
+            self.clear_reports();
+            self.view.loaded = false;
+            self.view.load_stopped = false;
+            self.view.launches.clear();
+            self.view.transport.clear();
+            self.view.takeover.clear();
+            self.view.button_rearm = true;
+            self.view.learn = None;
+            return true;
+        }
         let changed = self.patch != *self.editor.state();
         if changed && self.rejected.as_ref() != Some(self.editor.state()) {
             if let Err(error) = sound_state::validate_patch(self.editor.state()) {
@@ -185,7 +260,17 @@ impl Control {
         }
         if changed {
             self.patch = self.editor.state().clone();
+            automation::retire_missing(&self.patch, &mut self.lanes);
+            self.bank_dirty = true;
             self.rejected = None;
+        }
+        if self.bank_dirty {
+            let next = automation::bank(&self.patch, &self.lanes);
+            let restored = automation::release_bases(&self.patch, self.published_bank);
+            if self.banks.push((next, restored)).is_ok() {
+                self.bank_dirty = false;
+                self.published_bank = next;
+            }
         }
         changed
     }
@@ -213,6 +298,7 @@ fn prepare(
     );
     let (cc_tx, cc_rx) = rtrb::RingBuffer::new(256);
     let (reports_tx, reports_rx) = rtrb::RingBuffer::new(256);
+    let (banks_tx, banks_rx) = rtrb::RingBuffer::new(4);
     Ok((
         Owned::new(
             handle,
@@ -222,13 +308,18 @@ fn prepare(
                 feedback,
                 epoch,
                 gain,
+                host_clock: false,
+                slot_values: [0.0; automation::SLOTS],
                 cc: cc_tx,
                 reports: reports_tx,
+                bank: [None; automation::SLOTS],
+                banks: banks_rx,
             },
         ),
         delivery,
         cc_rx,
         reports_rx,
+        banks_tx,
     ))
 }
 
@@ -236,7 +327,9 @@ struct Shared {
     control: Mutex<Control>,
     params: Arc<InstrumentParams>,
     /// Published after the complete transaction (queue, document, parameter) is ready.
-    committed: AtomicU64,
+    committed: Arc<AtomicU64>,
+    native_epoch: AtomicU64,
+    recalled: [AtomicU32; 18],
     stop: AtomicBool,
     host: AtomicU64,
     dirty: AtomicBool,
@@ -244,15 +337,74 @@ struct Shared {
     tail_samples: AtomicU64,
     host_frames: AtomicU32,
     midi_overflow: AtomicBool,
+    event_drops: AtomicU64,
+    gestures: AtomicU32,
+    gesture_values: [AtomicU32; automation::SLOTS],
+    flushed_values: [AtomicU32; automation::SLOTS],
+    value_notify: AtomicU32,
+    flushed_modulation: [AtomicU32; automation::SLOTS],
+    modulation_notify: AtomicU32,
+    cc_notify: AtomicU32,
+    cc_epochs: [AtomicU64; automation::SLOTS],
+    cc_values: [AtomicU32; automation::SLOTS],
+    start_reset: AtomicBool,
 }
 
 impl Shared {
+    fn gesture(&self, slot: usize, value: f32) {
+        self.gesture_values[slot].store(value.to_bits(), Ordering::Relaxed);
+        self.gestures.fetch_or(1 << slot, Ordering::Release);
+    }
+    fn native_ptr(&self, index: usize) -> nice_plug::prelude::ParamPtr {
+        match index {
+            0 => self.params.gain.as_ptr(),
+            17 => self.params.host_clock.as_ptr(),
+            i => self.params.slots[i - 1].value.as_ptr(),
+        }
+    }
+    // Main/editor observations use the complete recalled publication until the serialized
+    // callback has updated every native cache. State load never writes those caches.
+    fn native_value(&self, index: usize, modulated: bool) -> f32 {
+        let epoch = self.committed.load(Ordering::SeqCst);
+        if epoch != self.native_epoch.load(Ordering::Acquire) {
+            return f32::from_bits(self.recalled[index].load(Ordering::Acquire));
+        }
+        unsafe {
+            if modulated {
+                self.native_ptr(index).modulated_normalized_value()
+            } else {
+                self.native_ptr(index).unmodulated_normalized_value()
+            }
+        }
+    }
+    // Called only under serialized CLAP callback ownership. One snapshot attempt, no retry.
+    fn apply_recall(&self) {
+        let epoch = self.committed.load(Ordering::SeqCst);
+        if !epoch.is_multiple_of(2) || epoch == self.native_epoch.load(Ordering::Acquire) {
+            return;
+        }
+        let values: [f32; 18] =
+            std::array::from_fn(|i| f32::from_bits(self.recalled[i].load(Ordering::Acquire)));
+        if self.committed.load(Ordering::SeqCst) != epoch {
+            return;
+        }
+        for (i, value) in values.into_iter().enumerate() {
+            unsafe {
+                self.native_ptr(i)._internal_modulate_value(0.0);
+                self.native_ptr(i)._internal_set_normalized_value(value);
+            }
+        }
+        self.native_epoch.store(epoch, Ordering::Release);
+    }
     fn snapshot(&self) -> SoundState {
         let c = self.control.lock().unwrap();
         SoundState {
-            version: 1,
+            version: 2,
             patch: c.patch.clone(),
-            output_gain: self.params.gain.unmodulated_plain_value(),
+            output_gain: self.native_value(0, false),
+            lanes: c.lanes.clone(),
+            slot_values: std::array::from_fn(|i| self.native_value(i + 1, false)),
+            host_clock: self.native_value(17, false) >= 0.5,
         }
     }
 
@@ -265,8 +417,12 @@ impl Shared {
             return Err("State queue full; previous sound retained".into());
         }
         let epoch = c.epoch + 1;
-        let (session, delivery, cc, reports) =
+        let (mut session, delivery, cc, reports, banks) =
             prepare(&state.patch, c.rate, &c.handle, epoch, state.output_gain)?;
+        session.bank = automation::bank(&state.patch, &state.lanes);
+        let published_bank = session.bank;
+        session.host_clock = state.host_clock;
+        session.slot_values = state.slot_values;
         let editor = PatchEditor::seed_from(&state.patch);
         c.tx.push(session)
             .map_err(|_| "State queue full".to_string())?;
@@ -274,26 +430,40 @@ impl Shared {
         c.delivery = delivery;
         c.cc = cc;
         c.reports = reports;
+        c.banks = banks;
+        c.lanes = state.lanes;
+        c.bank_dirty = false;
+        c.published_bank = published_bank;
         c.clear_reports();
         c.patch = state.patch;
         c.editor = editor;
         c.rejected = None;
         // Keep library and view preferences; discard commands, keys and CC pickup.
         c.view.loaded = false;
+        c.view.load_stopped = false;
         c.view.launches.clear();
         c.view.transport.clear();
         c.view.takeover.clear();
+        c.view.button_rearm = true;
+        c.view.learn = None;
         c.view.doc = None;
         c.epoch = epoch;
         self.tail_samples
             .store(tail::samples(&c.patch, c.rate), Ordering::Relaxed);
-        // No wrapper persistent-field loader or activation here. Pointer remains alive via Arc.
-        unsafe {
-            self.params
-                .gain
-                .as_ptr()
-                ._internal_set_normalized_value(state.output_gain);
+        self.recalled[0].store(state.output_gain.to_bits(), Ordering::Relaxed);
+        for (i, value) in state.slot_values.iter().enumerate() {
+            self.recalled[i + 1].store(value.to_bits(), Ordering::Relaxed);
         }
+        self.recalled[17].store((state.host_clock as u8 as f32).to_bits(), Ordering::Relaxed);
+        for (i, value) in state.slot_values.iter().enumerate() {
+            self.gesture_values[i].store(value.to_bits(), Ordering::Relaxed);
+            self.flushed_values[i].store(value.to_bits(), Ordering::Relaxed);
+            self.flushed_modulation[i].store(0, Ordering::Relaxed);
+        }
+        self.value_notify.store(0, Ordering::Release);
+        self.gestures.store(0, Ordering::Release);
+        self.modulation_notify.store(0, Ordering::Release);
+        self.cc_notify.store(0, Ordering::Release);
         self.committed.store(epoch * 2, Ordering::SeqCst);
         Ok(())
     }
@@ -302,6 +472,7 @@ impl Shared {
 pub struct RackApp {
     shared: Arc<Shared>,
     gui: Option<GuiContext>,
+    active_gestures: [bool; automation::SLOTS],
 }
 impl NiceEguiApp for RackApp {
     fn build(
@@ -314,10 +485,22 @@ impl NiceEguiApp for RackApp {
         Ok(())
     }
     fn editor_closed(&mut self) {
+        if let Some(gui) = &self.gui {
+            for (i, active) in self.active_gestures.iter_mut().enumerate() {
+                if *active {
+                    gui.param_setter()
+                        .end_set_parameter(&self.shared.params.slots[i].value);
+                    *active = false;
+                }
+            }
+        }
         self.gui = None;
     }
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut nice_plug_egui::Frame) {
-        let old = self.shared.params.gain.unmodulated_plain_value();
+        let old = {
+            let _control = self.shared.control.lock().unwrap();
+            self.shared.native_value(0, false)
+        };
         let mut gain = old;
         ui.horizontal(|ui| {
             ui.label("kabl");
@@ -335,8 +518,159 @@ impl NiceEguiApp for RackApp {
         if c.view.library.is_none() {
             c.view.library = Some(kabl_ui::browser::open_library());
         }
+        let before: [Option<f32>; automation::SLOTS] = std::array::from_fn(|i| {
+            c.lanes[i]
+                .target
+                .as_ref()
+                .map(|t| automation::normalized(c.editor.state(), t))
+        });
+        c.view.host_clock = self.shared.native_value(17, false) >= 0.5;
+        let candidates = automation::candidates(c.editor.state());
+        ui.horizontal(|ui| {
+            let old = self.shared.native_value(17, false) >= 0.5;
+            let mut host = old;
+            ui.checkbox(&mut host, "Host clock (off = Free)");
+            if host != old {
+                if let Some(gui) = &self.gui {
+                    let setter = gui.param_setter();
+                    setter.begin_set_parameter(&self.shared.params.host_clock);
+                    setter.set_parameter(&self.shared.params.host_clock, host);
+                    setter.end_set_parameter(&self.shared.params.host_clock);
+                }
+            }
+            ui.menu_button("Automation slots", |ui| {
+                ui.set_min_width(420.0);
+                egui::ScrollArea::vertical()
+                    .max_height(470.0)
+                    .show(ui, |ui| {
+                        for i in 0..automation::SLOTS {
+                            let old_target = c.lanes[i].target.clone();
+                            let label = old_target.as_ref().map_or_else(
+                                || {
+                                    if c.lanes[i].retired {
+                                        "Unassigned (deleted)".into()
+                                    } else {
+                                        "Unassigned".into()
+                                    }
+                                },
+                                |t| format!("{} #{} · {}", t.kind, t.module, t.param),
+                            );
+                            ui.horizontal(|ui| {
+                                ui.label(format!("Slot {}", i + 1));
+                                egui::ComboBox::from_id_salt(("host_slot", i))
+                                    .selected_text(label)
+                                    .show_ui(ui, |ui| {
+                                        ui.selectable_value(
+                                            &mut c.lanes[i].target,
+                                            None,
+                                            "Unassigned",
+                                        );
+                                        for target in &candidates {
+                                            if c.lanes.iter().enumerate().any(|(j, l)| {
+                                                j != i && l.target.as_ref() == Some(target)
+                                            }) {
+                                                continue;
+                                            }
+                                            ui.selectable_value(
+                                                &mut c.lanes[i].target,
+                                                Some(target.clone()),
+                                                format!(
+                                                    "{} #{} · {}",
+                                                    target.kind, target.module, target.param
+                                                ),
+                                            );
+                                        }
+                                    });
+                            });
+                            if c.lanes[i].target.is_some() {
+                                let mut value = self.shared.native_value(i + 1, false);
+                                let response = ui.add(
+                                    egui::Slider::new(&mut value, 0.0..=1.0).text("Host value"),
+                                );
+                                if let Some(gui) = &self.gui {
+                                    let setter = gui.param_setter();
+                                    if response.drag_started() {
+                                        self.active_gestures[i] = true;
+                                        setter.begin_set_parameter(
+                                            &self.shared.params.slots[i].value,
+                                        );
+                                    }
+                                    if response.changed() {
+                                        if !response.dragged() {
+                                            setter.begin_set_parameter(
+                                                &self.shared.params.slots[i].value,
+                                            );
+                                        }
+                                        setter.set_parameter(
+                                            &self.shared.params.slots[i].value,
+                                            value,
+                                        );
+                                        self.shared.gesture(i, value);
+                                        if !response.dragged() {
+                                            setter.end_set_parameter(
+                                                &self.shared.params.slots[i].value,
+                                            );
+                                        }
+                                    }
+                                    if response.drag_stopped() {
+                                        self.active_gestures[i] = false;
+                                        setter
+                                            .end_set_parameter(&self.shared.params.slots[i].value);
+                                    }
+                                }
+                            }
+                            if c.lanes[i].target != old_target {
+                                c.lanes[i].retired = false;
+                                c.bank_dirty = true;
+                                self.shared.dirty.store(true, Ordering::Release);
+                                state_bridge::request_main(&self.shared);
+                                if let Some(target) = &c.lanes[i].target {
+                                    let value = automation::normalized(c.editor.state(), target);
+                                    if let Some(gui) = &self.gui {
+                                        let setter = gui.param_setter();
+                                        setter.begin_set_parameter(
+                                            &self.shared.params.slots[i].value,
+                                        );
+                                        setter.set_parameter(
+                                            &self.shared.params.slots[i].value,
+                                            value,
+                                        );
+                                        setter
+                                            .end_set_parameter(&self.shared.params.slots[i].value);
+                                        self.shared.gesture(i, value);
+                                    }
+                                }
+                            }
+                        }
+                    });
+            });
+        });
         let Control { editor, view, .. } = &mut *c;
         kabl_ui::show(editor, view, ui);
+        for (i, previous) in before.iter().enumerate() {
+            let after = c.lanes[i]
+                .target
+                .as_ref()
+                .map(|t| automation::normalized(c.editor.state(), t));
+            if after != *previous {
+                if let (Some(value), Some(gui)) = (after, &self.gui) {
+                    let setter = gui.param_setter();
+                    if !self.active_gestures[i] {
+                        setter.begin_set_parameter(&self.shared.params.slots[i].value);
+                        self.active_gestures[i] = true;
+                    }
+                    setter.set_parameter(&self.shared.params.slots[i].value, value);
+                    self.shared.gesture(i, value);
+                }
+            }
+            if self.active_gestures[i] && !ui.input(|input| input.pointer.any_down()) {
+                if let Some(gui) = &self.gui {
+                    gui.param_setter()
+                        .end_set_parameter(&self.shared.params.slots[i].value);
+                }
+                self.active_gestures[i] = false;
+            }
+        }
         // Delivery/compile/retry and collection run on the control worker, also when closed.
         ui.ctx()
             .request_repaint_after(std::time::Duration::from_millis(16));
@@ -347,6 +681,9 @@ pub struct Instrument {
     shared: Arc<Shared>,
     loads: rtrb::Consumer<Owned<Session>>,
     midi: rtrb::Consumer<(u32, [u8; 3])>,
+    events: rtrb::Consumer<(u32, schedule::Event)>,
+    schedule: schedule::Schedule,
+    raw_position: Option<(schedule::Position, usize)>,
     pending: Option<Owned<Session>>,
     session: Option<Owned<Session>>,
     timeline: Timeline,
@@ -358,9 +695,22 @@ pub struct Instrument {
 impl Default for Instrument {
     fn default() -> Self {
         let patch = kabl_standalone::default_patch();
+        let candidates = automation::candidates(&patch);
+        let lanes: [automation::Lane; automation::SLOTS] =
+            std::array::from_fn(|i| automation::Lane {
+                target: candidates.get(i).cloned(),
+                retired: false,
+            });
+        let published_bank = automation::bank(&patch, &lanes);
+        let initial_values = std::array::from_fn(|i| {
+            lanes[i]
+                .target
+                .as_ref()
+                .map_or(0.0, |t| automation::normalized(&patch, t))
+        });
         let collector = Collector::new();
         let handle = collector.handle();
-        let (_, delivery, cc, reports) =
+        let (_, delivery, cc, reports, banks) =
             prepare(&patch, 48000.0, &handle, 0, 1.0).expect("factory patch");
         let (tx, loads) = rtrb::RingBuffer::new(2);
         let (midi_tx, midi) = rtrb::RingBuffer::new(1024);
@@ -378,6 +728,10 @@ impl Default for Instrument {
                 epoch: 0,
                 cc,
                 reports,
+                lanes,
+                banks,
+                bank_dirty: true,
+                published_bank,
             }),
             params: Arc::new(InstrumentParams {
                 gain: FloatParam::new(
@@ -385,17 +739,45 @@ impl Default for Instrument {
                     1.0,
                     FloatRange::Linear { min: 0.0, max: 1.0 },
                 ),
+                slots: std::array::from_fn(|i| SlotParam {
+                    value: FloatParam::new(
+                        format!("Slot {}", i + 1),
+                        initial_values[i],
+                        FloatRange::Linear { min: 0.0, max: 1.0 },
+                    ),
+                }),
+                host_clock: BoolParam::new("Host clock", false),
             }),
-            committed: AtomicU64::new(0),
+            committed: Arc::new(AtomicU64::new(0)),
+            native_epoch: AtomicU64::new(0),
+            recalled: std::array::from_fn(|i| {
+                AtomicU32::new(match i {
+                    0 => 1.0_f32.to_bits(),
+                    17 => 0,
+                    i => initial_values[i - 1].to_bits(),
+                })
+            }),
             stop: AtomicBool::new(false),
             host: AtomicU64::new(0),
             dirty: AtomicBool::new(false),
             audio_clock: AtomicU64::new(0),
             host_frames: AtomicU32::new(0),
             midi_overflow: AtomicBool::new(false),
+            event_drops: AtomicU64::new(0),
+            gestures: AtomicU32::new(0),
+            gesture_values: std::array::from_fn(|i| AtomicU32::new(initial_values[i].to_bits())),
+            flushed_values: std::array::from_fn(|i| AtomicU32::new(initial_values[i].to_bits())),
+            value_notify: AtomicU32::new(0),
+            flushed_modulation: std::array::from_fn(|_| AtomicU32::new(0)),
+            modulation_notify: AtomicU32::new(0),
+            cc_notify: AtomicU32::new(0),
+            cc_epochs: std::array::from_fn(|_| AtomicU64::new(0)),
+            cc_values: std::array::from_fn(|i| AtomicU32::new(initial_values[i].to_bits())),
+            start_reset: AtomicBool::new(false),
             tail_samples: AtomicU64::new(tail::samples(&kabl_standalone::default_patch(), 48000.0)),
         });
-        state_bridge::capture(&shared, midi_tx);
+        let (event_tx, events) = rtrb::RingBuffer::new(4096);
+        state_bridge::capture(&shared, midi_tx, event_tx);
         let worker_shared = shared.clone();
         let worker = std::thread::Builder::new()
             .name("kabl-plugin-control".into())
@@ -404,6 +786,11 @@ impl Default for Instrument {
                 while !worker_shared.stop.load(Ordering::Acquire) {
                     {
                         let mut c = worker_shared.control.lock().unwrap();
+                        let dropped = worker_shared.event_drops.swap(0, Ordering::Relaxed);
+                        if dropped > 0 {
+                            c.view.last_message =
+                                Some(format!("Host event limit: {dropped} events dropped"));
+                        }
                         let mut events = Vec::new();
                         for _ in 0..256 {
                             if let Ok(cc) = c.cc.pop() {
@@ -412,6 +799,13 @@ impl Default for Instrument {
                                 break;
                             }
                         }
+                        let before: [Option<f32>; automation::SLOTS] = std::array::from_fn(|i| {
+                            c.lanes[i]
+                                .target
+                                .as_ref()
+                                .map(|t| automation::normalized(c.editor.state(), t))
+                        });
+                        c.view.host_clock = worker_shared.native_value(17, false) >= 0.5;
                         let Control { editor, view, .. } = &mut *c;
                         kabl_ui::perform::apply_cc(
                             editor,
@@ -419,6 +813,22 @@ impl Default for Instrument {
                             &events,
                             start.elapsed().as_secs_f64(),
                         );
+                        for (i, previous) in before.iter().enumerate() {
+                            let after = c.lanes[i]
+                                .target
+                                .as_ref()
+                                .map(|t| automation::normalized(c.editor.state(), t));
+                            if after != *previous {
+                                if let Some(value) = after {
+                                    worker_shared.gesture(i, value);
+                                    worker_shared.cc_values[i]
+                                        .store(value.to_bits(), Ordering::Release);
+                                    worker_shared.cc_epochs[i]
+                                        .store(c.epoch * 2, Ordering::Release);
+                                    worker_shared.cc_notify.fetch_or(1 << i, Ordering::Release);
+                                }
+                            }
+                        }
                         c.receive_reports(
                             start.elapsed().as_secs_f64(),
                             worker_shared.audio_clock.load(Ordering::Relaxed),
@@ -440,12 +850,15 @@ impl Default for Instrument {
             shared,
             loads,
             midi,
+            events,
+            schedule: schedule::Schedule::new(initial_values),
+            raw_position: None,
             pending: None,
             session: None,
             timeline: Timeline::new(),
             rate: 48000.0,
             worker: Some(worker),
-            editor_state: EguiState::from_size(LogicalSize::new(1180.0, 740.0), 1.0),
+            editor_state: EguiState::from_size(LogicalSize::new(1180.0, 680.0), 1.0),
             repaint: RepaintNotifier::new(),
         }
     }
@@ -471,7 +884,54 @@ impl Instrument {
             }
             self.session = self.pending.take();
             self.timeline.reset();
+            self.raw_position = None;
+            self.schedule = schedule::Schedule::new(self.session.as_ref().unwrap().slot_values);
         }
+    }
+    fn live_params(&mut self) -> (u32, [f32; automation::SLOTS]) {
+        let gestures = self.shared.gestures.swap(0, Ordering::Acquire);
+        let mut values = [0.0; automation::SLOTS];
+        let Some(session) = &mut self.session else {
+            return (0, values);
+        };
+        let expected = session.epoch * 2;
+        if self.shared.committed.load(Ordering::SeqCst) == expected
+            && self.shared.native_epoch.load(Ordering::Acquire) == expected
+        {
+            let mode = self.shared.native_value(17, false) >= 0.5;
+            for (i, value) in values.iter_mut().enumerate() {
+                if gestures & (1 << i) != 0 {
+                    *value = f32::from_bits(self.shared.gesture_values[i].load(Ordering::Acquire));
+                }
+            }
+            if self.shared.committed.load(Ordering::SeqCst) == expected
+                && self.shared.native_epoch.load(Ordering::Acquire) == expected
+            {
+                session.host_clock = mode;
+                return (gestures, values);
+            }
+        }
+        self.shared.gestures.fetch_or(gestures, Ordering::Release);
+        (0, [0.0; automation::SLOTS])
+    }
+    fn live_flush(&mut self, modulation: bool) -> (u32, [f32; automation::SLOTS]) {
+        let (notify, source) = if modulation {
+            (
+                &self.shared.modulation_notify,
+                &self.shared.flushed_modulation,
+            )
+        } else {
+            (&self.shared.value_notify, &self.shared.flushed_values)
+        };
+        let mask = notify.swap(0, Ordering::Acquire);
+        let expected = self.session.as_ref().map(|s| s.epoch * 2);
+        let epoch = self.shared.committed.load(Ordering::SeqCst);
+        let values = std::array::from_fn(|i| f32::from_bits(source[i].load(Ordering::Acquire)));
+        if expected == Some(epoch) && self.shared.committed.load(Ordering::SeqCst) == epoch {
+            return (mask, values);
+        }
+        notify.fetch_or(mask, Ordering::Release);
+        (0, [0.0; automation::SLOTS])
     }
     fn render(&mut self, left: &mut [f32], right: &mut [f32]) {
         let Some(s) = &mut self.session else {
@@ -482,15 +942,31 @@ impl Instrument {
         let s: &mut Session = s;
         // A state transaction in flight must not apply its new parameter to the old graph.
         let epoch = self.shared.committed.load(Ordering::SeqCst);
-        if epoch == s.epoch * 2 {
+        if epoch == s.epoch * 2 && self.shared.native_epoch.load(Ordering::Acquire) == epoch {
             let gain = self.shared.params.gain.value();
             if self.shared.committed.load(Ordering::SeqCst) == epoch {
                 s.gain = gain;
             }
         }
+        for _ in 0..4 {
+            if let Ok((bank, restored)) = s.banks.pop() {
+                automation::replace_bank(&mut s.engine, &mut s.bank, bank, restored);
+            } else {
+                break;
+            }
+        }
+        // Lane removal restores old bases first; later document edits/graphs retain their
+        // normal FIFO precedence. Mapped overlays are reapplied after document delivery.
         s.engine
             .drain(&mut s.rx, kabl_ui::control::QUEUE, &s.feedback);
-        self.timeline.render(&mut s.engine, left, right, |_, _| {});
+        self.schedule.mode(s.host_clock);
+        let schedule = &mut self.schedule;
+        let bank = &s.bank;
+        let rate = self.rate;
+        self.timeline
+            .render(&mut s.engine, left, right, |engine, start| {
+                schedule.block(engine, start, bank, rate);
+            });
         self.shared
             .audio_clock
             .store(s.engine.rendered_samples(), Ordering::Relaxed);
@@ -542,6 +1018,7 @@ impl Plugin for Instrument {
             RackApp {
                 shared: self.shared.clone(),
                 gui: None,
+                active_gestures: [false; automation::SLOTS],
             },
         )
     }
@@ -556,12 +1033,19 @@ impl Plugin for Instrument {
         }
         let mut c = self.shared.control.lock().unwrap();
         let epoch = c.epoch;
-        let gain = self.shared.params.gain.unmodulated_plain_value();
-        let Ok((session, delivery, cc, reports)) =
+        let gain = self.shared.native_value(0, false);
+        let Ok((mut session, delivery, cc, reports, banks)) =
             prepare(&c.patch, config.sample_rate, &c.handle, epoch, gain)
         else {
             return false;
         };
+        session.bank = automation::bank(&c.patch, &c.lanes);
+        let published_bank = session.bank;
+        session.host_clock = self.shared.native_value(17, false) >= 0.5;
+        session.slot_values = std::array::from_fn(|i| self.shared.native_value(i + 1, false));
+        c.banks = banks;
+        c.bank_dirty = false;
+        c.published_bank = published_bank;
         c.rate = config.sample_rate;
         self.shared
             .tail_samples
@@ -579,10 +1063,26 @@ impl Plugin for Instrument {
         }
         c.collector.collect();
         self.timeline.reset();
+        self.schedule = schedule::Schedule::new(std::array::from_fn(|i| {
+            self.shared.native_value(i + 1, false)
+        }));
+        self.raw_position = None;
         context.set_latency_samples(LATENCY as u32);
         true
     }
     fn reset(&mut self) {
+        self.shared.apply_recall();
+        // The framework calls reset on every start_processing, including restarts during
+        // REAPER's render pre-roll. Transport, not a thread restart, defines a Host epoch.
+        // Dedicated CLAP reset still always clears DSP and transient ownership.
+        if self.shared.start_reset.load(Ordering::Relaxed)
+            && self.session.as_ref().is_some_and(|s| s.host_clock)
+            && self
+                .raw_position
+                .is_some_and(|(position, _)| position.playing)
+        {
+            return;
+        }
         self.accept_loads();
         if let Some(s) = &mut self.session {
             let s: &mut Session = s;
@@ -593,6 +1093,13 @@ impl Plugin for Instrument {
         self.timeline.reset();
         for _ in 0..1024 {
             if self.midi.pop().is_err() {
+                break;
+            }
+        }
+        self.schedule.clear_time();
+        self.raw_position = None;
+        for _ in 0..4096 {
+            if self.events.pop().is_err() {
                 break;
             }
         }
@@ -608,6 +1115,76 @@ impl Plugin for Instrument {
         // Raw CLAP MIDI bypasses the framework's unbounded VecDeque. The outer callback
         // gives full host-buffer offsets; Timeline retains them across automation subblocks.
         let frames = self.shared.host_frames.load(Ordering::Relaxed) as usize;
+        let (gestures, gesture_values) = self.live_params();
+        let host_clock = self.session.as_ref().is_some_and(|s| s.host_clock);
+        let mut raw_values = 0;
+        let mut raw_modulation = 0;
+        for _ in 0..4096 {
+            let Ok((offset, event)) = self.events.pop() else {
+                break;
+            };
+            if offset == 0 {
+                if let schedule::Event::Value {
+                    slot, modulation, ..
+                } = event
+                {
+                    if modulation {
+                        raw_modulation |= 1 << slot;
+                    } else {
+                        raw_values |= 1 << slot;
+                    }
+                }
+                if let schedule::Event::Position(position) = event {
+                    if host_clock && position.playing {
+                        let discontinuity =
+                            self.raw_position.is_none_or(|(previous, previous_frames)| {
+                                !previous.playing
+                                    || ((position.seconds - previous.seconds) * self.rate as f64
+                                        - previous_frames as f64)
+                                        .abs()
+                                        > 2.0
+                            });
+                        if discontinuity {
+                            if let Some(session) = &mut self.session {
+                                session.engine.reset();
+                            }
+                            self.timeline.reset();
+                            self.schedule.clear_time();
+                        }
+                    }
+                    self.raw_position = Some((position, frames));
+                }
+            }
+            self.schedule
+                .push(self.timeline.now() + offset as u64, event);
+        }
+        for (modulation, raw) in [(false, raw_values), (true, raw_modulation)] {
+            let (mask, values) = self.live_flush(modulation);
+            for (i, value) in values.iter().enumerate() {
+                if mask & !raw & (1 << i) != 0 {
+                    self.schedule.push(
+                        self.timeline.now(),
+                        schedule::Event::Value {
+                            slot: i,
+                            value: *value,
+                            modulation,
+                        },
+                    );
+                }
+            }
+        }
+        for (i, value) in gesture_values.iter().enumerate() {
+            if gestures & (1 << i) != 0 {
+                self.schedule.push(
+                    self.timeline.now(),
+                    schedule::Event::Value {
+                        slot: i,
+                        value: *value,
+                        modulation: false,
+                    },
+                );
+            }
+        }
         for _ in 0..1024 {
             let Ok((offset, bytes)) = self.midi.pop() else {
                 break;
@@ -630,10 +1207,23 @@ impl Plugin for Instrument {
         }
         // Only bounded parameter events reach the wrapper. No native-note dialect advertised.
         while context.next_event().is_some() {}
+        let dropped_before = self.schedule.dropped;
         let channels = buffer.as_slice();
         if channels.len() >= 2 {
             let (left, right) = channels.split_at_mut(1);
             self.render(left[0], right[0]);
+        }
+        self.shared
+            .event_drops
+            .fetch_add(self.schedule.dropped - dropped_before, Ordering::Relaxed);
+        // Host lanes may open a silent route or extend a release/effect beyond document bases.
+        // A mapped instrument stays active; legacy unassigned projects keep finite-tail logic.
+        if self
+            .session
+            .as_ref()
+            .is_some_and(|s| s.bank.iter().any(Option::is_some))
+        {
+            return ProcessStatus::KeepAlive;
         }
         match self.shared.tail_samples.load(Ordering::Relaxed) {
             samples if samples >= u32::MAX as u64 => ProcessStatus::KeepAlive,
@@ -709,6 +1299,9 @@ fn midi_event(event: NoteEvent<()>) -> Option<MidiEvent> {
     MidiEvent::parse(Source::Host, &bytes)
 }
 impl ClapPlugin for Instrument {
+    fn strict_state_epoch(&self) -> Option<Arc<AtomicU64>> {
+        Some(self.shared.committed.clone())
+    }
     const CLAP_ID: &'static str = "dev.stcksmsh.kabl";
     const CLAP_DESCRIPTION: Option<&'static str> = Some("kabl modular instrument");
     const CLAP_MANUAL_URL: Option<&'static str> = None;
@@ -719,17 +1312,18 @@ impl ClapPlugin for Instrument {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_no_alloc::{assert_no_alloc, AllocDisabler};
+    use assert_no_alloc::{AllocDisabler, assert_no_alloc};
     #[global_allocator]
     static ALLOC: AllocDisabler = AllocDisabler;
 
-    fn instrument() -> Instrument {
+    pub(super) fn instrument() -> Instrument {
         let mut p = Instrument::default();
         p.shared.stop.store(true, Ordering::Release);
         p.worker.take().unwrap().join().unwrap();
         let mut c = p.shared.control.lock().unwrap();
-        let (session, delivery, cc, reports) =
+        let (session, delivery, cc, reports, banks) =
             prepare(&c.patch, 48000.0, &c.handle, 0, 1.0).unwrap();
+        c.banks = banks;
         c.delivery = delivery;
         c.cc = cc;
         c.reports = reports;
@@ -837,14 +1431,15 @@ mod tests {
         }
         let state = p.shared.snapshot();
         p.shared.load(state).unwrap();
-        assert!(p
-            .shared
-            .control
-            .lock()
-            .unwrap()
-            .view
-            .clock_running
-            .is_empty());
+        assert!(
+            p.shared
+                .control
+                .lock()
+                .unwrap()
+                .view
+                .clock_running
+                .is_empty()
+        );
     }
     #[test]
     fn tail_covers_long_effects_and_keeps_ungated_racks_alive() {
@@ -936,7 +1531,7 @@ mod tests {
         }
         assert!(SoundState::decode(&vec![b' '; sound_state::MAX_STATE_BYTES + 1]).is_err());
         let mut state = p.shared.snapshot();
-        state.version = 2;
+        state.version = 3;
         assert!(p.shared.load(state).is_err());
         let mut state = p.shared.snapshot();
         state
@@ -1038,3 +1633,6 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod host_tests;

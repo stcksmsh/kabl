@@ -162,3 +162,20 @@ at once every 40th (compiled outside the timing). Worst observed callback, µs. 
 
 One delay: about +11 µs median per 256 frames steady; about +80 µs per swap that carries it
 (1.5 MB line copy). Pi 4 unmeasured.
+
+## 2026-10-05 — D08 strict CLAP refresh
+
+Product `f7157619836075d0d7704e59be5d66e6224890b1`, binary `3baa8ee3cc0f2f99e1823e0a741d7301713098f99e92dc84f7556b8d0483aca4`. JACK48k/256, Xvfb, PipeWire Dummy-Driver;12s scripted MIDI per case. External proxy process intervals only.
+
+| Case | Process p99 upper µs per active instance | Process max µs per active instance | Backend ERR max |
+| --- | --- | --- | --- |
+| light-1-closed | 170.0 | 442.52 | 0 |
+| light-1-open | 190.0 | 412.9 | 0 |
+| light-2-closed | 190.0, 180.0 | 394.19, 394.98 | 0 |
+| light-2-open | 210.0, 210.0 | 1927.54, 428.83 | 0 |
+| dense-1-closed | 1730.0 | 2027.54 | 0 |
+| dense-1-open | 2030.0 | 2708.06 | 0 |
+| dense-2-closed | 1780.0, 1760.0 | 2677.4, 2104.53 | 0 |
+| dense-2-open | 2540.0, 2460.0 | 4969.91, 5491.27 | 2 |
+
+Dense two-open backend ERR2 remains; physical xruns and latency unmeasured. P99 bins10µs; arrivals include startup/teardown and are not execution time. Raw strict-profile timing-summary.json retains scopes.

@@ -1,0 +1,90 @@
+[
+  {
+    "case": "light-1-closed",
+    "product_head": "62addcbcb8bbcff62276ef0f0f67b4fd942d39c0",
+    "binary_sha256": "bbcb15d5de1d09c15ef61c0a3a333d0a4f12792eaa3f111d8eef15652fa0a86a",
+    "patch": "init-keyboard (6 modules/7 cables)",
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.021339034\nGUI_checks=3\n",
+    "gui_handles": "check=0 track=0 expected=false handle=nil\ncheck=0 track=1 expected=false handle=nil\ncheck=1 track=0 expected=false handle=nil\ncheck=1 track=1 expected=false handle=nil\ncheck=2 track=0 expected=false handle=nil\ncheck=2 track=1 expected=false handle=nil\n",
+    "callback_csv": "1,11,12603251,1609430,1610000,2816,256,256,10,1021911,4194114,15514964\n0,2489,222108294,196747,160000,637184,256,256,2488,72452,100512215,13258633871\n",
+    "reaper_pid": 316292,
+    "raw_dir": "/secondary/Programming/Github/kabl/.worktrees/d08/scratch/measure/light-1-closed"
+  },
+  {
+    "case": "light-1-open",
+    "product_head": "62addcbcb8bbcff62276ef0f0f67b4fd942d39c0",
+    "binary_sha256": "bbcb15d5de1d09c15ef61c0a3a333d0a4f12792eaa3f111d8eef15652fa0a86a",
+    "patch": "init-keyboard (6 modules/7 cables)",
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.004209737999\nGUI_checks=3\n",
+    "gui_handles": "check=0 track=0 expected=true handle=userdata: 0xaa2ee90\ncheck=0 track=1 expected=false handle=nil\ncheck=1 track=0 expected=true handle=userdata: 0xaa2ee90\ncheck=1 track=1 expected=false handle=nil\ncheck=2 track=0 expected=true handle=userdata: 0xaa2ee90\ncheck=2 track=1 expected=false handle=nil\n",
+    "callback_csv": "1,8,12201394,1649104,1650000,2048,256,256,7,1322687,5838445,15870302\n0,2489,252106589,205965,170000,637184,256,256,2488,85049,104707872,13268981778\n",
+    "reaper_pid": 316597,
+    "raw_dir": "/secondary/Programming/Github/kabl/.worktrees/d08/scratch/measure/light-1-open"
+  },
+  {
+    "case": "light-2-closed",
+    "product_head": "62addcbcb8bbcff62276ef0f0f67b4fd942d39c0",
+    "binary_sha256": "bbcb15d5de1d09c15ef61c0a3a333d0a4f12792eaa3f111d8eef15652fa0a86a",
+    "patch": "init-keyboard (6 modules/7 cables)",
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.029510681998\nGUI_checks=3\n",
+    "gui_handles": "check=0 track=0 expected=false handle=nil\ncheck=0 track=1 expected=false handle=nil\ncheck=1 track=0 expected=false handle=nil\ncheck=1 track=1 expected=false handle=nil\ncheck=2 track=0 expected=false handle=nil\ncheck=2 track=1 expected=false handle=nil\n",
+    "callback_csv": "1,2488,3156633141,1712178,1670000,636928,256,256,2487,967750,64153888,13268881185\n0,2490,288194905,305911,180000,637440,256,256,2489,57076,143616186,13268999334\n",
+    "reaper_pid": 316964,
+    "raw_dir": "/secondary/Programming/Github/kabl/.worktrees/d08/scratch/measure/light-2-closed"
+  },
+  {
+    "case": "light-2-open",
+    "product_head": "62addcbcb8bbcff62276ef0f0f67b4fd942d39c0",
+    "binary_sha256": "bbcb15d5de1d09c15ef61c0a3a333d0a4f12792eaa3f111d8eef15652fa0a86a",
+    "patch": "init-keyboard (6 modules/7 cables)",
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.027213437999\nGUI_checks=3\n",
+    "gui_handles": "check=0 track=0 expected=true handle=userdata: 0x2f457e20\ncheck=0 track=1 expected=true handle=userdata: 0x2d4257f0\ncheck=1 track=0 expected=true handle=userdata: 0x2f457e20\ncheck=1 track=1 expected=true handle=userdata: 0x2d4257f0\ncheck=2 track=0 expected=true handle=userdata: 0x2f457e20\ncheck=2 track=1 expected=true handle=userdata: 0x2d4257f0\n",
+    "callback_csv": "1,2490,3492087356,4884511,2220000,637440,256,256,2489,969765,22463571,13268877953\n0,2490,327928921,359167,220000,637440,256,256,2489,78848,74370112,13269053957\n",
+    "reaper_pid": 317282,
+    "raw_dir": "/secondary/Programming/Github/kabl/.worktrees/d08/scratch/measure/light-2-open"
+  },
+  {
+    "case": "dense-1-closed",
+    "product_head": "62addcbcb8bbcff62276ef0f0f67b4fd942d39c0",
+    "binary_sha256": "bbcb15d5de1d09c15ef61c0a3a333d0a4f12792eaa3f111d8eef15652fa0a86a",
+    "patch": "sound-palette (94 modules/156 cables)",
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.015508875\nGUI_checks=3\n",
+    "gui_handles": "check=0 track=0 expected=false handle=nil\ncheck=0 track=1 expected=false handle=nil\ncheck=1 track=0 expected=false handle=nil\ncheck=1 track=1 expected=false handle=nil\ncheck=2 track=0 expected=false handle=nil\ncheck=2 track=1 expected=false handle=nil\n",
+    "callback_csv": "0,21,2111954,161231,170000,5376,256,256,20,57413,2044637,10977909\n1,39,39200761,1662311,1670000,9984,256,256,38,851528,4895694,44183958\n2,2469,2672953935,1826771,1660000,632064,256,256,2468,907529,202803427,13253564308\n",
+    "reaper_pid": 318429,
+    "raw_dir": "/secondary/Programming/Github/kabl/.worktrees/d08/scratch/measure/dense-1-closed"
+  },
+  {
+    "case": "dense-1-open",
+    "product_head": "62addcbcb8bbcff62276ef0f0f67b4fd942d39c0",
+    "binary_sha256": "bbcb15d5de1d09c15ef61c0a3a333d0a4f12792eaa3f111d8eef15652fa0a86a",
+    "patch": "sound-palette (94 modules/156 cables)",
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.028712853997\nGUI_checks=3\n",
+    "gui_handles": "check=0 track=0 expected=true handle=userdata: 0x125b3280\ncheck=0 track=1 expected=false handle=nil\ncheck=1 track=0 expected=true handle=userdata: 0x125b3280\ncheck=1 track=1 expected=false handle=nil\ncheck=2 track=0 expected=true handle=userdata: 0x125b3280\ncheck=2 track=1 expected=false handle=nil\n",
+    "callback_csv": "0,18,2519580,168289,170000,4608,256,256,17,140509,2214551,11017159\n1,42,46061078,1674867,1680000,10752,256,256,41,935057,5999022,51467914\n2,2471,2981438143,1948330,1860000,632576,256,256,2470,885567,202634897,13247866014\n",
+    "reaper_pid": 318814,
+    "raw_dir": "/secondary/Programming/Github/kabl/.worktrees/d08/scratch/measure/dense-1-open"
+  },
+  {
+    "case": "dense-2-closed",
+    "product_head": "62addcbcb8bbcff62276ef0f0f67b4fd942d39c0",
+    "binary_sha256": "bbcb15d5de1d09c15ef61c0a3a333d0a4f12792eaa3f111d8eef15652fa0a86a",
+    "patch": "sound-palette (94 modules/156 cables)",
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.019374625997\nGUI_checks=3\n",
+    "gui_handles": "check=0 track=0 expected=false handle=nil\ncheck=0 track=1 expected=false handle=nil\ncheck=1 track=0 expected=false handle=nil\ncheck=1 track=1 expected=false handle=nil\ncheck=2 track=0 expected=false handle=nil\ncheck=2 track=1 expected=false handle=nil\n",
+    "callback_csv": "0,14,1280312,147268,150000,3584,256,256,13,77313,2358345,8926743\n1,2485,3108996697,1875586,1670000,636160,256,256,2484,867770,154049241,13242088705\n2,2471,2955080903,1982106,1660000,632576,256,256,2470,842730,187256664,13226848195\n",
+    "reaper_pid": 319220,
+    "raw_dir": "/secondary/Programming/Github/kabl/.worktrees/d08/scratch/measure/dense-2-closed"
+  },
+  {
+    "case": "dense-2-open",
+    "product_head": "62addcbcb8bbcff62276ef0f0f67b4fd942d39c0",
+    "binary_sha256": "bbcb15d5de1d09c15ef61c0a3a333d0a4f12792eaa3f111d8eef15652fa0a86a",
+    "patch": "sound-palette (94 modules/156 cables)",
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.016807128999\nGUI_checks=3\n",
+    "gui_handles": "check=0 track=0 expected=true handle=userdata: 0x320fee00\ncheck=0 track=1 expected=true handle=userdata: 0x32d8c8e0\ncheck=1 track=0 expected=true handle=userdata: 0x320fee00\ncheck=1 track=1 expected=true handle=userdata: 0x32d8c8e0\ncheck=2 track=0 expected=true handle=userdata: 0x320fee00\ncheck=2 track=1 expected=true handle=userdata: 0x32d8c8e0\n",
+    "callback_csv": "0,30,2970555,223469,230000,7680,256,256,29,64759,1846790,17380682\n1,2535,3992881592,5347884,2640000,648960,256,256,2534,786303,202783752,13508969864\n2,2505,3992122919,5134179,2640000,641280,256,256,2504,783248,202792359,13485134708\n",
+    "reaper_pid": 319552,
+    "raw_dir": "/secondary/Programming/Github/kabl/.worktrees/d08/scratch/measure/dense-2-open"
+  }
+]

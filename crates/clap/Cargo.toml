@@ -14,7 +14,7 @@ kabl-core = { path = "../core" }
 kabl-engine = { path = "../engine" }
 kabl-ui = { path = "../ui" }
 kabl-standalone = { path = "../standalone" }
-nice-plug = { git = "https://github.com/Circuit-Stitch/nice-plug.git", rev = "263b16877d0b0ad30921868338a6df46eadc9a46", default-features = false, features = ["editor"] }
+nice-plug = { git = "https://github.com/Circuit-Stitch/nice-plug.git", rev = "263b16877d0b0ad30921868338a6df46eadc9a46", default-features = false, features = ["editor", "strict-clap"] }
 nice-plug-egui = { git = "https://github.com/Circuit-Stitch/nice-plug.git", rev = "263b16877d0b0ad30921868338a6df46eadc9a46" }
 egui = "=0.35.0"
 basedrop = "=0.1.3"

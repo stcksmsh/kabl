@@ -1,0 +1,13 @@
+[
+  "rustc",
+  "--edition=2021",
+  "/secondary/Programming/Github/kabl/.worktrees/d08/docs/host-production/scripts/rt-framework-probe.rs",
+  "-L",
+  "dependency=/secondary/Programming/Github/kabl/.worktrees/d08/target/debug/deps",
+  "--extern",
+  "crossbeam_utils=/secondary/Programming/Github/kabl/.worktrees/d08/target/debug/deps/libcrossbeam_utils-4cf67b564d89f9ad.rlib",
+  "--extern",
+  "nice_plug=/secondary/Programming/Github/kabl/.worktrees/d08/target/debug/deps/libnice_plug-99b2429e97f1ea8a.rlib",
+  "-o",
+  "/secondary/Programming/Github/kabl/.worktrees/d08/scratch/r6-audit/rt-framework-probe"
+]

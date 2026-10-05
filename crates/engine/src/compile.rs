@@ -490,6 +490,7 @@ pub struct CompiledPatch {
     /// Its capacity, set at compile, is every rampable target of the graph, so any number of
     /// targets can ramp at once and a push never allocates.
     ramps: Vec<Ramp>,
+    automation: [Option<(RuntimeTarget, f32)>; 16],
     /// Blocks a ramp takes (`RAMP_MS`).
     ramp_blocks: u16,
 }
@@ -1280,6 +1281,7 @@ fn compile_inner(
         started: false,
         param_slots,
         route_slots,
+        automation: [None; 16],
         ramps: Vec::with_capacity(rampable),
         ramp_blocks: ((RAMP_MS / 1000.0 * sample_rate / BLOCK as f32).round() as u16).max(1),
     })
@@ -1298,8 +1300,26 @@ impl CompiledPatch {
         for buffer in &mut self.buffers {
             buffer.fill(0.0);
         }
+        self.automation.fill(None);
         self.started = false;
         self.tap.reset_window();
+    }
+
+    /// Host clock affects all clocks without changing document tempo or Free-mode state.
+    pub fn host_clock(&mut self, position: Option<(f64, f64, bool)>) {
+        for module in &mut self.modules {
+            if let Some(clock) = module.as_any_mut().downcast_mut::<Clock>() {
+                clock.host(position);
+            }
+        }
+    }
+
+    /// Reapply overlays to new graphs; unchanged values must not restart smoothing ramps.
+    pub fn automate(&mut self, slot: usize, target: RuntimeTarget, value: f32) {
+        if self.automation[slot] != Some((target, value)) {
+            self.set_runtime(target, value, self.started);
+            self.automation[slot] = Some((target, value));
+        }
     }
 
     pub fn sample_rate(&self) -> f32 {
@@ -1778,6 +1798,11 @@ impl CompiledPatch {
     /// else is set now. A target already ramping starts
     /// again from where it is. Returns whether the target resolved. No allocation.
     pub fn set_runtime(&mut self, target: RuntimeTarget, value: f32, ramp: bool) -> bool {
+        for cached in &mut self.automation {
+            if cached.is_some_and(|(t, _)| t == target) {
+                *cached = None;
+            }
+        }
         let (on, from, to) = match target {
             RuntimeTarget::Param { id, kind, index } => {
                 let lo = self

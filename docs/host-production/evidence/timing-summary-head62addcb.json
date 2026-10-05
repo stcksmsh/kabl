@@ -1,0 +1,142 @@
+[
+  {
+    "case": "dense-1-closed",
+    "active_instances": [
+      {
+        "callbacks": 2469,
+        "mean_us": 1082.61,
+        "max_us": 1826.77,
+        "p99_upper_us": 1660.0,
+        "arrival_max_ms": 202.803427
+      }
+    ],
+    "task_reaper_node_error_max": 0,
+    "period_us": 5333.333333333333
+  },
+  {
+    "case": "dense-1-open",
+    "active_instances": [
+      {
+        "callbacks": 2471,
+        "mean_us": 1206.57,
+        "max_us": 1948.33,
+        "p99_upper_us": 1860.0,
+        "arrival_max_ms": 202.634897
+      }
+    ],
+    "task_reaper_node_error_max": 0,
+    "period_us": 5333.333333333333
+  },
+  {
+    "case": "dense-2-closed",
+    "active_instances": [
+      {
+        "callbacks": 2485,
+        "mean_us": 1251.11,
+        "max_us": 1875.59,
+        "p99_upper_us": 1670.0,
+        "arrival_max_ms": 154.049241
+      },
+      {
+        "callbacks": 2471,
+        "mean_us": 1195.9,
+        "max_us": 1982.11,
+        "p99_upper_us": 1660.0,
+        "arrival_max_ms": 187.256664
+      }
+    ],
+    "task_reaper_node_error_max": 0,
+    "period_us": 5333.333333333333
+  },
+  {
+    "case": "dense-2-open",
+    "active_instances": [
+      {
+        "callbacks": 2535,
+        "mean_us": 1575.1,
+        "max_us": 5347.88,
+        "p99_upper_us": 2640.0,
+        "arrival_max_ms": 202.783752
+      },
+      {
+        "callbacks": 2505,
+        "mean_us": 1593.66,
+        "max_us": 5134.18,
+        "p99_upper_us": 2640.0,
+        "arrival_max_ms": 202.792359
+      }
+    ],
+    "task_reaper_node_error_max": 2,
+    "period_us": 5333.333333333333
+  },
+  {
+    "case": "light-1-closed",
+    "active_instances": [
+      {
+        "callbacks": 2491,
+        "mean_us": 86.17,
+        "max_us": 205.55,
+        "p99_upper_us": 160.0,
+        "arrival_max_ms": 46.985134
+      }
+    ],
+    "task_reaper_node_error_max": 0,
+    "period_us": 5333.333333333333
+  },
+  {
+    "case": "light-1-open",
+    "active_instances": [
+      {
+        "callbacks": 2490,
+        "mean_us": 100.23,
+        "max_us": 225.96,
+        "p99_upper_us": 170.0,
+        "arrival_max_ms": 100.435339
+      }
+    ],
+    "task_reaper_node_error_max": 0,
+    "period_us": 5333.333333333333
+  },
+  {
+    "case": "light-2-closed",
+    "active_instances": [
+      {
+        "callbacks": 2480,
+        "mean_us": 93.66,
+        "max_us": 181.93,
+        "p99_upper_us": 160.0,
+        "arrival_max_ms": 197.23349
+      },
+      {
+        "callbacks": 2490,
+        "mean_us": 86.5,
+        "max_us": 198.15,
+        "p99_upper_us": 160.0,
+        "arrival_max_ms": 53.477741
+      }
+    ],
+    "task_reaper_node_error_max": 0,
+    "period_us": 5333.333333333333
+  },
+  {
+    "case": "light-2-open",
+    "active_instances": [
+      {
+        "callbacks": 2503,
+        "mean_us": 119.31,
+        "max_us": 233.19,
+        "p99_upper_us": 190.0,
+        "arrival_max_ms": 202.764718
+      },
+      {
+        "callbacks": 2537,
+        "mean_us": 113.93,
+        "max_us": 1171.72,
+        "p99_upper_us": 190.0,
+        "arrival_max_ms": 159.74062
+      }
+    ],
+    "task_reaper_node_error_max": 0,
+    "period_us": 5333.333333333333
+  }
+]

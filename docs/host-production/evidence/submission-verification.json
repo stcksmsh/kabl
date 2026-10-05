@@ -1,0 +1,23 @@
+{
+  "product_head": "133fdb89ac56a396db0c7c961c74067782b34efb",
+  "binary_sha256": "17cfcc408aacf341971ed5dfc35ddd6356445d16273c9c7610b16cef7c4770ee",
+  "workspace_totals": {
+    "passed": 610,
+    "failed": 0,
+    "ignored": 22
+  },
+  "validator_totals": {
+    "success": 35,
+    "skipped": 9
+  },
+  "plugin_tests": 23,
+  "strict_clippy": "pass",
+  "release_build": "pass",
+  "logs": {
+    "workspace-tests-submission.txt": "a721546d6f1996936d64061b494d31a1b43972362a254a2857dbe63633797b28",
+    "validator-submission.json": "6028335aa4cf0a0b2d371f4b56ab2fcd56ed3e66c3c2ed1325f954728dd631f7",
+    "reviewer-backpressure-tests.txt": "69754ff8862951e9fa470b5c51fffd9c577d85fc8c82270590ceccd3d275b2d9",
+    "reviewer-backpressure-clippy.txt": "a16bd31ef5c2a40ce827add86e6dae6c99273a8734e8ea827b85e71d4c1ffe07",
+    "reviewer-backpressure-build.txt": "0f8b6f84018e1e847b75a1f2adbeac4dae9c14ffd5f16820be23bfe19f1fe17d"
+  }
+}

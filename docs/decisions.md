@@ -2794,3 +2794,43 @@ second starts, so restart causality remains unproven. Do not bypass framework re
 or add transport/phase synchronization on this evidence. Keep ff11434 product and draft PR.
 Final GUI/performance evidence is refreshed; callback lifetime, playback duration, backend
 counters and physical latency remain distinct. Owner acceptance and render engineering remain open.
+
+
+## D08 context checkpoint — 2026-10-04
+
+User authorized D08 and requested durable handover before clearing context. Stable automation/state and initial Host scheduling implemented; acceptance remains incomplete. Retain ordinary render failures and explicitly label provisional serial warm-up policy. Resume details and unresolved risks: `host-production/HANDOVER.md`. No final reviewer, PR, merge or owner approval yet.
+
+## 2026-10-04 — D08 stable automation, host epochs and render policy
+
+Sixteen fixed native lanes persist module ID/kind/parameter identity; pins/macros lead candidates, deletion retires instead of hijacking automation, explicit remapping restores latest document bases. Host playback overlays DSP without patch undo edits. Bank restore payloads carry current accepted bases across coalescing/backpressure; complete browser sessions replace old queues. Rejected graph-index/layout identities and silent reuse.
+
+Host owns clock phase and MIDI/devices; Free/standalone/old D07 remain unchanged. Supported initial bars are4/4, events use existing64frame Timeline. Play/seek/loop establish Host reset epochs; stop releases notes and retains tails, explicit reset clears transients. A processing thread restart alone is not a new Host epoch. Rejected per-note oscillator resets and Free sound changes.
+
+Actual initialized device-closed/no-anticipation rendering matches after one explicitly retained full warm-up per fresh process; ordinary repeats still differ. Earlier constant120/position0 driver failures came from starting Lua before REAPER applied project/audio setup. Rejected reporting a provisional wrong-init comparison as final acceptance. Final source-free bundle maps production binary outside checkout and recalls complete embedded states without factory files. Scripted/virtual input stays labeled; owner checks stay pending.
+
+Independent review found scene/bank ordering, GUI native atomic delay, flush delivery/precedence, duplicate ends, pending retry and native modulation recall bugs; focused fixes and realistic queued/saturation/exported regressions added. Pinned nice-plug still takes a callback Mutex. Allocation guards plus no added locks do not satisfy whole-plugin lock freedom; unsafe bypass/broad framework rewrite rejected, acceptance remains incomplete. Dense two-instance open-editor backend errors are retained separately from callback timing and physical xruns/latency.
+
+
+## D08 R6 framework boundary investigation — 2026-10-05
+
+The authorized R6 repair investigation found that removing P's mutex alone would leave callback AtomicCell fallback spin locks, an unconditional mutex-backed zero-capacity state poll, retrying native parameter/task queues and an output drain without a fixed budget. Main-thread track-info notifications also compete for P. No unsafe bypass, cache patch or incomplete mutex substitution was shipped. Product remains133fdb89; R6 and engineering acceptance remain incomplete. Preferred alternative is a reproducibly pinned, ISC-licensed strict CLAP profile replacing ownership and handoffs together; a dedicated wrapper is larger and assumes editor/ABI/platform maintenance. Exact source coverage, impact and verification obligations are in host-production/RT-OWNERSHIP.md. Existing owner and render/timing limits remain unchanged.
+
+## 2026-10-05 — D08 strict CLAP profile and callback-owned native cache
+
+Use a retained ISC nice-plug snapshot at exact upstream263b16877d0b0ad30921868338a6df46eadc9a46,
+with an opt-in Kabl strict CLAP profile. Checked exclusive plugin/lifecycle ownership,
+activation snapshots, scalar tail publication and fixed-budget SPSC output remove the
+whole-callback mutex/fallback-lock/state-rendezvous/retrying-queue paths. Generic unsupported
+state/task routes reject explicitly; the existing transactional state bridge remains.
+A dedicated wrapper would inherit substantially more GUI/ABI maintenance. A mutex-only
+change leaves other callback failures, and callback spin/retry replacements are rejected.
+
+Native parameter caches are written only by serialized callbacks. State load publishes
+complete recalled controls, with canonical pending getters/editor/state snapshots and
+cache epochs guarding DSP gain/mode. Epoch checks alone before native setters were unsafe:
+load could commit between check and write. A main-thread native lease would require audio
+input deferral or rejection; separate recall publication avoids callback waits and normal
+load failures. CC values have separate exact payloads and epochs. GUI producer overflow
+is retained off audio to preserve accepted gestures, trading potentially growing producer
+memory for bounded callback work. Carry the reproducible vendor patch/manifests and repeat
+the documented audit and host evidence on upstream changes. No owner approval is inferred.

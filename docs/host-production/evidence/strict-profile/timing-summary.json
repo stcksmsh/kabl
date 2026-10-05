@@ -1,0 +1,314 @@
+[
+  {
+    "case": "light-1-closed",
+    "product_head": "f7157619836075d0d7704e59be5d66e6224890b1",
+    "binary_sha256": "3baa8ee3cc0f2f99e1823e0a741d7301713098f99e92dc84f7556b8d0483aca4",
+    "active_instances": [
+      {
+        "instance": 0,
+        "callbacks": 2483,
+        "mean_us": 93.72,
+        "max_us": 442.52,
+        "p99_upper_us": 170.0,
+        "arrival_max_ms": 84.280464
+      }
+    ],
+    "startup_teardown_instances": [
+      {
+        "instance": 1,
+        "callbacks": 8,
+        "mean_us": 1540.06,
+        "max_us": 1763.41,
+        "p99_upper_us": 1770.0,
+        "arrival_max_ms": 1.966212
+      },
+      {
+        "instance": 2,
+        "callbacks": 41,
+        "mean_us": 114.29,
+        "max_us": 196.13,
+        "p99_upper_us": 200.0,
+        "arrival_max_ms": 4.89605
+      }
+    ],
+    "observed_reaper_nodes_error_max": {
+      "67": 0
+    },
+    "task_reaper_node_error_max": 0,
+    "period_us": 5333.333333333333,
+    "arrival_scope": "whole callback lifetime including startup/teardown; not callback execution or physical latency"
+  },
+  {
+    "case": "light-1-open",
+    "product_head": "f7157619836075d0d7704e59be5d66e6224890b1",
+    "binary_sha256": "3baa8ee3cc0f2f99e1823e0a741d7301713098f99e92dc84f7556b8d0483aca4",
+    "active_instances": [
+      {
+        "instance": 0,
+        "callbacks": 2491,
+        "mean_us": 106.58,
+        "max_us": 412.9,
+        "p99_upper_us": 190.0,
+        "arrival_max_ms": 99.32006
+      }
+    ],
+    "startup_teardown_instances": [
+      {
+        "instance": 1,
+        "callbacks": 11,
+        "mean_us": 1029.82,
+        "max_us": 1590.64,
+        "p99_upper_us": 1600.0,
+        "arrival_max_ms": 2.264623
+      },
+      {
+        "instance": 2,
+        "callbacks": 36,
+        "mean_us": 107.37,
+        "max_us": 241.15,
+        "p99_upper_us": 250.0,
+        "arrival_max_ms": 4.900322
+      }
+    ],
+    "observed_reaper_nodes_error_max": {
+      "67": 0
+    },
+    "task_reaper_node_error_max": 0,
+    "period_us": 5333.333333333333,
+    "arrival_scope": "whole callback lifetime including startup/teardown; not callback execution or physical latency"
+  },
+  {
+    "case": "light-2-closed",
+    "product_head": "f7157619836075d0d7704e59be5d66e6224890b1",
+    "binary_sha256": "3baa8ee3cc0f2f99e1823e0a741d7301713098f99e92dc84f7556b8d0483aca4",
+    "active_instances": [
+      {
+        "instance": 2,
+        "callbacks": 2484,
+        "mean_us": 99.23,
+        "max_us": 394.19,
+        "p99_upper_us": 190.0,
+        "arrival_max_ms": 196.860823
+      },
+      {
+        "instance": 0,
+        "callbacks": 2491,
+        "mean_us": 94.65,
+        "max_us": 394.98,
+        "p99_upper_us": 180.0,
+        "arrival_max_ms": 79.671217
+      }
+    ],
+    "startup_teardown_instances": [
+      {
+        "instance": 1,
+        "callbacks": 7,
+        "mean_us": 1618.76,
+        "max_us": 1836.22,
+        "p99_upper_us": 1840.0,
+        "arrival_max_ms": 2.04168
+      }
+    ],
+    "observed_reaper_nodes_error_max": {
+      "67": 0
+    },
+    "task_reaper_node_error_max": 0,
+    "period_us": 5333.333333333333,
+    "arrival_scope": "whole callback lifetime including startup/teardown; not callback execution or physical latency"
+  },
+  {
+    "case": "light-2-open",
+    "product_head": "f7157619836075d0d7704e59be5d66e6224890b1",
+    "binary_sha256": "3baa8ee3cc0f2f99e1823e0a741d7301713098f99e92dc84f7556b8d0483aca4",
+    "active_instances": [
+      {
+        "instance": 2,
+        "callbacks": 2529,
+        "mean_us": 123.51,
+        "max_us": 1927.54,
+        "p99_upper_us": 210.0,
+        "arrival_max_ms": 154.4574
+      },
+      {
+        "instance": 0,
+        "callbacks": 2538,
+        "mean_us": 116.95,
+        "max_us": 428.83,
+        "p99_upper_us": 210.0,
+        "arrival_max_ms": 90.188475
+      }
+    ],
+    "startup_teardown_instances": [
+      {
+        "instance": 1,
+        "callbacks": 9,
+        "mean_us": 1220.15,
+        "max_us": 1887.38,
+        "p99_upper_us": 1890.0,
+        "arrival_max_ms": 2.093596
+      }
+    ],
+    "observed_reaper_nodes_error_max": {
+      "67": 0
+    },
+    "task_reaper_node_error_max": 0,
+    "period_us": 5333.333333333333,
+    "arrival_scope": "whole callback lifetime including startup/teardown; not callback execution or physical latency"
+  },
+  {
+    "case": "dense-1-closed",
+    "product_head": "f7157619836075d0d7704e59be5d66e6224890b1",
+    "binary_sha256": "3baa8ee3cc0f2f99e1823e0a741d7301713098f99e92dc84f7556b8d0483aca4",
+    "active_instances": [
+      {
+        "instance": 2,
+        "callbacks": 2455,
+        "mean_us": 1092.06,
+        "max_us": 2027.54,
+        "p99_upper_us": 1730.0,
+        "arrival_max_ms": 202.580862
+      }
+    ],
+    "startup_teardown_instances": [
+      {
+        "instance": 0,
+        "callbacks": 31,
+        "mean_us": 106.48,
+        "max_us": 233.48,
+        "p99_upper_us": 240.0,
+        "arrival_max_ms": 1.992772
+      },
+      {
+        "instance": 1,
+        "callbacks": 47,
+        "mean_us": 1178.98,
+        "max_us": 1743.1,
+        "p99_upper_us": 1750.0,
+        "arrival_max_ms": 3.244097
+      }
+    ],
+    "observed_reaper_nodes_error_max": {
+      "67": 0
+    },
+    "task_reaper_node_error_max": 0,
+    "period_us": 5333.333333333333,
+    "arrival_scope": "whole callback lifetime including startup/teardown; not callback execution or physical latency"
+  },
+  {
+    "case": "dense-1-open",
+    "product_head": "f7157619836075d0d7704e59be5d66e6224890b1",
+    "binary_sha256": "3baa8ee3cc0f2f99e1823e0a741d7301713098f99e92dc84f7556b8d0483aca4",
+    "active_instances": [
+      {
+        "instance": 2,
+        "callbacks": 2520,
+        "mean_us": 1301.95,
+        "max_us": 2708.06,
+        "p99_upper_us": 2030.0,
+        "arrival_max_ms": 165.699481
+      }
+    ],
+    "startup_teardown_instances": [
+      {
+        "instance": 0,
+        "callbacks": 18,
+        "mean_us": 109.27,
+        "max_us": 221.07,
+        "p99_upper_us": 230.0,
+        "arrival_max_ms": 2.815179
+      },
+      {
+        "instance": 1,
+        "callbacks": 43,
+        "mean_us": 1172.75,
+        "max_us": 1776.78,
+        "p99_upper_us": 1780.0,
+        "arrival_max_ms": 5.158036
+      }
+    ],
+    "observed_reaper_nodes_error_max": {
+      "67": 0
+    },
+    "task_reaper_node_error_max": 0,
+    "period_us": 5333.333333333333,
+    "arrival_scope": "whole callback lifetime including startup/teardown; not callback execution or physical latency"
+  },
+  {
+    "case": "dense-2-closed",
+    "product_head": "f7157619836075d0d7704e59be5d66e6224890b1",
+    "binary_sha256": "3baa8ee3cc0f2f99e1823e0a741d7301713098f99e92dc84f7556b8d0483aca4",
+    "active_instances": [
+      {
+        "instance": 1,
+        "callbacks": 2481,
+        "mean_us": 1211.82,
+        "max_us": 2677.4,
+        "p99_upper_us": 1780.0,
+        "arrival_max_ms": 131.03387
+      },
+      {
+        "instance": 2,
+        "callbacks": 2458,
+        "mean_us": 1149.68,
+        "max_us": 2104.53,
+        "p99_upper_us": 1760.0,
+        "arrival_max_ms": 180.848436
+      }
+    ],
+    "startup_teardown_instances": [
+      {
+        "instance": 0,
+        "callbacks": 23,
+        "mean_us": 117.24,
+        "max_us": 242.44,
+        "p99_upper_us": 250.0,
+        "arrival_max_ms": 2.971775
+      }
+    ],
+    "observed_reaper_nodes_error_max": {
+      "67": 0
+    },
+    "task_reaper_node_error_max": 0,
+    "period_us": 5333.333333333333,
+    "arrival_scope": "whole callback lifetime including startup/teardown; not callback execution or physical latency"
+  },
+  {
+    "case": "dense-2-open",
+    "product_head": "f7157619836075d0d7704e59be5d66e6224890b1",
+    "binary_sha256": "3baa8ee3cc0f2f99e1823e0a741d7301713098f99e92dc84f7556b8d0483aca4",
+    "active_instances": [
+      {
+        "instance": 1,
+        "callbacks": 2533,
+        "mean_us": 1576.62,
+        "max_us": 4969.91,
+        "p99_upper_us": 2540.0,
+        "arrival_max_ms": 200.337858
+      },
+      {
+        "instance": 2,
+        "callbacks": 2505,
+        "mean_us": 1565.05,
+        "max_us": 5491.27,
+        "p99_upper_us": 2460.0,
+        "arrival_max_ms": 202.674328
+      }
+    ],
+    "startup_teardown_instances": [
+      {
+        "instance": 0,
+        "callbacks": 28,
+        "mean_us": 105.78,
+        "max_us": 255.78,
+        "p99_upper_us": 260.0,
+        "arrival_max_ms": 2.039048
+      }
+    ],
+    "observed_reaper_nodes_error_max": {
+      "67": 2
+    },
+    "task_reaper_node_error_max": 2,
+    "period_us": 5333.333333333333,
+    "arrival_scope": "whole callback lifetime including startup/teardown; not callback execution or physical latency"
+  }
+]

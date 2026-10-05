@@ -1,0 +1,23 @@
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d08/crates/standalone)
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d08/crates/ui)
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.99s
+     Running unittests src/lib.rs (target/debug/deps/kabl_ui-11a40c11c0b4d222)
+
+running 14 tests
+test help::tests::every_builtin_param_has_help ... ok
+test help::tests::range_text_uses_units_and_step_names ... ok
+test help::tests::sequencer_bank_params_share_their_slot_help ... ok
+test perform::tests::takeover_waits_for_the_hardware_to_reach_the_value ... ok
+test perform::tests::host_clock_blocks_rack_and_midi_transport_only ... ok
+test rack::tests::a_skin_places_face_controls_where_its_art_says ... ok
+test rack::tests::midi_in_face_shows_keys_mode_and_glide_with_room_for_their_names ... ok
+test rack::tests::snapping_picks_the_nearest_row_and_unit ... ok
+test tests::port_labels_read_like_panel_text ... ok
+test routing::tests::pitch_labels_match_the_played_semitone ... ok
+test rack::tests::float_expansion_moves_nothing ... ok
+test rack::tests::rows_pack_without_overlap_and_keep_stored_order ... ok
+test rack::tests::controls_stay_inside_their_panel_and_apart ... ok
+test rack::tests::push_expansion_is_reversible_and_never_moves_the_face ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

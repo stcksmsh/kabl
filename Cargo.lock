@@ -2138,7 +2138,6 @@ dependencies = [
 [[package]]
 name = "nice-log"
 version = "0.3.1"
-source = "git+https://github.com/Circuit-Stitch/nice-plug.git?rev=263b16877d0b0ad30921868338a6df46eadc9a46#263b16877d0b0ad30921868338a6df46eadc9a46"
 dependencies = [
  "tracing-appender",
  "windows",
@@ -2147,7 +2146,6 @@ dependencies = [
 [[package]]
 name = "nice-plug"
 version = "0.2.3"
-source = "git+https://github.com/Circuit-Stitch/nice-plug.git?rev=263b16877d0b0ad30921868338a6df46eadc9a46#263b16877d0b0ad30921868338a6df46eadc9a46"
 dependencies = [
  "anyhow",
  "anymap3",
@@ -2165,6 +2163,7 @@ dependencies = [
  "objc2 0.6.4",
  "parking_lot",
  "raw-window-handle",
+ "rtrb",
  "serde_json",
  "thiserror 2.0.20",
  "tracing",
@@ -2174,7 +2173,6 @@ dependencies = [
 [[package]]
 name = "nice-plug-core"
 version = "0.2.0"
-source = "git+https://github.com/Circuit-Stitch/nice-plug.git?rev=263b16877d0b0ad30921868338a6df46eadc9a46#263b16877d0b0ad30921868338a6df46eadc9a46"
 dependencies = [
  "atomic_float",
  "atomic_refcell",
@@ -2193,7 +2191,6 @@ dependencies = [
 [[package]]
 name = "nice-plug-derive"
 version = "0.1.2"
-source = "git+https://github.com/Circuit-Stitch/nice-plug.git?rev=263b16877d0b0ad30921868338a6df46eadc9a46#263b16877d0b0ad30921868338a6df46eadc9a46"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2203,7 +2200,6 @@ dependencies = [
 [[package]]
 name = "nice-plug-egui"
 version = "0.3.0"
-source = "git+https://github.com/Circuit-Stitch/nice-plug.git?rev=263b16877d0b0ad30921868338a6df46eadc9a46#263b16877d0b0ad30921868338a6df46eadc9a46"
 dependencies = [
  "crossbeam",
  "egui",

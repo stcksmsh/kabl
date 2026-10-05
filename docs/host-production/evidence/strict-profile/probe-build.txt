@@ -1,0 +1,4 @@
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d08/crates/standalone)
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d08/crates/ui)
+   Compiling kabl-clap v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d08/crates/clap)
+    Finished `dev` profile [optimized + debuginfo] target(s) in 3.08s
