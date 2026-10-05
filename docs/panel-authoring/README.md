@@ -8,6 +8,8 @@ Export complete package writes a new local JSON file containing the graph, inter
 
 The voice and stereo-effect examples in examples/ were authored through production GUI controls using scripted X11 input. Their original SVG/PNG artwork is in examples/art/. Reproduce artwork with `python3 docs/panel-authoring/scripts/art.py`, build the app/example with `cargo build -p kabl-ui --bin kabl-ui --example panel_seed`, then run scripts/workflow.py and scripts/capture.py in a private X11 environment. The capture scripts own only their private display/profile and never automate the owner's desktop.
 
+The curated real release walkthrough is [media/walkthrough.mp4](media/walkthrough.mp4), recorded with scripted private X11 input; it demonstrates theme changes, Design preview, label Apply, chronological Undo and public fallback. Reproduce it with scripts/walkthrough.py and the owner bundle path.
+
 See design.md for identity/state/asset contracts, REPORT.md for exact heads and acceptance dispositions, REVIEW.md for independent findings and CHECKLIST.md for owner checks. Evidence is real application output, not the earlier design mockups. Engineering verification, merge and owner approval remain separate.
 
 ## Licenses and provenance

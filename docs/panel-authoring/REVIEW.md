@@ -57,3 +57,21 @@ undo exact=true
 ```
 
 The added regression exercises placed knob and jack metadata, validates the deleted document, saves/reloads it, then checks complete-state equality after Undo and Redo. The source recheck resolves D10-R1; it does not accept unfinished GUI/native scaling/host/bundle evidence or owner checks.
+
+## Final source and artifact recheck
+
+Reviewed artifact head: `495c1ba8d4646d44bf2e4a87c754da8d5baf7943`. Product/test head: `25f20ae8547bc367403414467040a8475cffa34f`. Built production source: `ca8b504a7d35e1aeee7398ea622feda4bf747b95`. The reviewer directly compared source changes after the source repair pass: only the empty-rack test fixture initialization changes; production behavior and binaries are unchanged. D10-R1 remains resolved.
+
+Independent artifact checks confirmed all **63 owner-bundle manifest files**, with **zero hash mismatches**, and both release binary hashes match verification.json. The bundle manifest names the actual reviewed artifact head. Raw workspace log totals independently sum to **634 passed, 0 failed, 22 ignored**. Clippy and release logs finish successfully; validator JSON records **35 successes and 9 declared skips**, with no failure. These final broad checks are implementer-run evidence, inspected independently; they are not relabeled as reviewer reruns.
+
+The reviewer inspected representative real application authoring, both theme/size, dense rack, portable release, native 1.5-scale and fallback screenshots. Public labels, values, selector choices, help and fallback controls remain readable within the captured views. Reproduction scripts use private X11 displays and real production widgets; screenshots are application output, not the generated material reference. The private native scale capture has the recorded physical 1920×1200 size for logical 1280×800.
+
+Both raw host recall files (normal and relocated-bundle runs) independently decode to two complete f32-normalized states equal to the bundled arrangement, including two embedded panels. Each native replay records nine observations; maximum absolute errors are **0.00453125** and **0.00453126**, below the declared **0.025** tolerance. The relocated host mapping explicitly identifies the plugin inside the portable bundle. Launch scripts derive bundled paths from their own location; no source checkout/artwork/library lookup is needed for the embedded projects.
+
+### D10-R2 — P2: required walkthrough video missing
+
+At artifact head 495c1ba, the media directory contains selected screenshots but no walkthrough video. `docs/product-research/AGENT-WORKFLOW.md`, “Batch evidence package,” requires “A walkthrough video and selected screenshots.” The existing scripts and screenshots support the underlying operations, but do not satisfy that explicit artifact requirement.
+
+**Requested correction:** Add a curated video recorded from the real task-owned application workflow, identify scripted input and originating production head, and include it in the owner bundle/manifest. Do not substitute a slideshow or generated mockup for a real application capture.
+
+**Disposition:** Open at this artifact checkpoint. Source review passes; engineering artifact completion remains pending this correction. Owner approval and merge remain separate. Hardware/listening/controller/physical latency/feel, ordinary-render nondeterminism and dense backend/performance limitations remain explicitly pending in REPORT/CHECKLIST.
