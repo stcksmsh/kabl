@@ -452,3 +452,42 @@ fn clearing_last_leaf_label_preserves_ownership_and_public_ids() {
     e.undo();
     assert_eq!(e.state().composites[&id], composite);
 }
+
+#[test]
+fn packed_faces_and_copied_binding_labels_identify_correct_leaves() {
+    let mut e = voice();
+    // Packed rack allows every raw position to match; cards must still avoid ungrouped leaves.
+    for id in e.state().modules.keys().copied().collect::<Vec<_>>() {
+        e.move_module(id, Vec2 { x: 24.0, y: 10.0 });
+    }
+    let id = group(&mut e);
+    let lay = kabl_ui::rack::layout(e.state(), &kabl_ui::rack::View::default());
+    let faces = composites::faces(e.state(), &BTreeSet::new(), &lay);
+    let card = faces[&id];
+    for module in &lay.mods {
+        if !composites::hidden(e.state(), &BTreeSet::new(), module.id) {
+            assert!(!card.shrink(0.1).intersects(module.rect));
+        }
+    }
+    let copy = composites::duplicate(&mut e, id).unwrap();
+    for exposure in e.state().composites[&copy].ports.values() {
+        assert_eq!(exposure.label, composites::binding_label(&exposure.target));
+    }
+    let pkg = composites::package(e.state(), id).unwrap();
+    let mut value = serde_json::to_value(&pkg).unwrap();
+    let leaf = *pkg.patch.modules.keys().next().unwrap();
+    value["patch"]["labels"] = serde_json::json!({leaf.to_string(): {"name": "first"}});
+    let bytes = serde_json::to_string(&value).unwrap().replace(
+        "\"name\":\"first\"",
+        "\"name\":\"first\",\"name\":\"second\"",
+    );
+    let before = e.state().clone();
+    let entries = e.log().entries().len();
+    let ids = e.reserved_ids();
+    assert!(composites::decode(bytes.as_bytes())
+        .unwrap_err()
+        .contains("Duplicate"));
+    assert_eq!(e.state(), &before);
+    assert_eq!(e.log().entries().len(), entries);
+    assert_eq!(e.reserved_ids(), ids);
+}

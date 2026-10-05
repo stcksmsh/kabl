@@ -718,7 +718,7 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) 
             });
         if tool(ui, ui_state, "add", "Add", false) {
             // At the end of the first row.
-            let lay = rack::layout(editor.state(), &ui_state.view());
+            let lay = composite_layout(editor.state(), ui_state);
             let x = lay
                 .mods
                 .iter()
@@ -772,7 +772,7 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) 
             ui_state.zoom_about(ui_state.zoom * 1.2, c);
         }
         if tool(ui, ui_state, "zoom:fit", "Fit", false) {
-            let lay = rack::layout(editor.state(), &ui_state.view());
+            let lay = composite_layout(editor.state(), ui_state);
             ui_state.frame_world(lay.bounds.expand(4.0), 1.5);
         }
         let focus_target = ui_state
@@ -783,7 +783,7 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) 
         let r = ui.add_enabled(focus_target.is_some(), egui::Button::new("Focus"));
         ui_state.record("zoom:focus".into(), r.rect);
         if r.on_hover_text("Zoom to the selected module").clicked() {
-            let lay = rack::layout(editor.state(), &ui_state.view());
+            let lay = composite_layout(editor.state(), ui_state);
             if let Some(world) = focus_target.and_then(|id| lay.get(id)).map(|m| m.full()) {
                 // Readable: at least 100 % unless the module is wider than the canvas.
                 let fit = (ui_state.canvas.width() - 48.0) / world.width();
@@ -1122,7 +1122,7 @@ struct Drawn {
 fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, th: &Theme) {
     let canvas = ui.max_rect();
     let now = ui.input(|i| i.time);
-    let lay = rack::layout(editor.state(), &ui_state.view());
+    let lay = composite_layout(editor.state(), ui_state);
     if !ui_state.fitted {
         // First frame: the whole patch, never above 100 %.
         ui_state.canvas = canvas;
@@ -1157,7 +1157,7 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             }
         }
     }
-    let lay = rack::layout(editor.state(), &ui_state.view());
+    let lay = composite_layout(editor.state(), ui_state);
     if let Some(id) = ui_state.reveal.take() {
         if let Some(m) = lay.get(id) {
             let t = ui_state.xf().r(m.full());
@@ -1217,7 +1217,7 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     }
     draw_composites(editor, ui_state, ui, xf, &mut drawn);
     for m in &lay.mods {
-        if composite_hidden(editor.state(), &ui_state.composites.open, m.id) {
+        if composites::hidden(editor.state(), &ui_state.composites.open, m.id) {
             continue;
         }
         draw_module(editor, ui_state, ui, &painter, th, xf, m, now, &mut drawn);
@@ -3403,10 +3403,12 @@ fn port_color(th: &Theme, editor: &PatchEditor, from: &PortRef) -> Color32 {
         .map_or(th.cv, |p| th.signal(p.port_type))
 }
 
-fn composite_hidden(p: &PatchState, open: &BTreeSet<u64>, leaf: u64) -> bool {
-    p.composites
-        .keys()
-        .any(|id| !open.contains(id) && kabl_core::composite::leaves(p, *id).contains(&leaf))
+fn composite_layout(p: &PatchState, view: &UiState) -> rack::Layout {
+    let mut lay = rack::layout(p, &view.view());
+    for rect in composites::faces(p, &view.composites.open, &lay).values() {
+        lay.bounds = lay.bounds.union(*rect);
+    }
+    lay
 }
 fn draw_composites(
     editor: &mut PatchEditor,
@@ -3416,29 +3418,10 @@ fn draw_composites(
     drawn: &mut Drawn,
 ) {
     let snapshot = editor.state().clone();
-    for (&id, c) in &snapshot.composites {
-        let mut parent = c.parent;
-        let mut hidden = false;
-        for _ in 0..8 {
-            let Some(id) = parent else {
-                break;
-            };
-            if !view.composites.open.contains(&id) {
-                hidden = true;
-                break;
-            }
-            parent = snapshot.composites.get(&id).and_then(|c| c.parent);
-        }
-        if hidden {
-            continue;
-        }
-        if view.composites.open.contains(&id) {
-            continue;
-        }
-        let rect = xf.r(Rect::from_min_size(
-            pos2(c.pos.x, c.pos.y),
-            vec2(240.0, PANEL_H),
-        ));
+    let lay = rack::layout(&snapshot, &view.view());
+    for (id, face) in composites::faces(&snapshot, &view.composites.open, &lay) {
+        let c = &snapshot.composites[&id];
+        let rect = xf.r(face);
         ui.scope_builder(
             egui::UiBuilder::new()
                 .max_rect(rect)

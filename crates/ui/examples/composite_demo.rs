@@ -62,6 +62,7 @@ fn main() {
         e.set_param(id, &format!("pin.{param}"), e.state().modules.len() as f32);
         e.set_label(id, &format!("pin.{param}"), Some(name.into()));
     }
+    kabl_core::save(&root.join("flat-voice"), e.log()).unwrap();
     let flat = e.state().clone();
     let members = flat
         .modules

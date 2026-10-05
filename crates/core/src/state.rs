@@ -41,9 +41,25 @@ pub struct PatchState {
     #[serde(
         default,
         skip_serializing_if = "BTreeMap::is_empty",
-        deserialize_with = "crate::composite::unique_map"
+        deserialize_with = "unique_labels"
     )]
     pub labels: BTreeMap<ModuleId, BTreeMap<String, String>>,
+}
+
+fn unique_labels<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<BTreeMap<ModuleId, BTreeMap<String, String>>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(transparent)]
+    struct Labels(
+        #[serde(deserialize_with = "crate::composite::unique_map")] BTreeMap<String, String>,
+    );
+    crate::composite::unique_map::<D, ModuleId, Labels>(d).map(|labels| {
+        labels
+            .into_iter()
+            .map(|(id, labels)| (id, labels.0))
+            .collect()
+    })
 }
 
 impl PatchState {
