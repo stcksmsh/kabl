@@ -23,6 +23,7 @@ pub enum FormatError {
     Json(serde_json::Error),
     Toml(String),
     UnknownSchemaVersion(u32),
+    Composite(String),
 }
 
 impl From<io::Error> for FormatError {
@@ -82,5 +83,6 @@ pub fn load(dir: &Path) -> Result<PatchLog, FormatError> {
     if meta.schema_version < 4 && !log.state().composites.is_empty() {
         return Err(FormatError::UnknownSchemaVersion(4));
     }
+    crate::composite::validate(log.state()).map_err(FormatError::Composite)?;
     Ok(log)
 }

@@ -121,11 +121,18 @@ impl PatchEditor {
                 );
             }
         }
-        for (&id, c) in &patch.composites {
+        // Seed the complete ownership tree atomically: Undo must not orphan children.
+        if !patch.composites.is_empty() {
             editor.log.append(
-                Op::SetComposite {
-                    id,
-                    value: Some(c.clone()),
+                Op::Group {
+                    ops: patch
+                        .composites
+                        .iter()
+                        .map(|(&id, c)| Op::SetComposite {
+                            id,
+                            value: Some(c.clone()),
+                        })
+                        .collect(),
                 },
                 0,
                 Source::User,

@@ -546,3 +546,27 @@ fn cue_clock_dependencies_preserve_external_ids_or_require_inclusion() {
         1.0
     );
 }
+
+#[test]
+fn malformed_project_load_and_seeded_nested_undo_are_atomic() {
+    let mut e = voice();
+    let child = group(&mut e);
+    composites::encapsulate(&mut e, BTreeSet::new(), BTreeSet::from([child]), "Parent").unwrap();
+    let p = e.state().clone();
+    let mut seeded = PatchEditor::seed_from(&p);
+    assert!(seeded.undo());
+    assert!(seeded.state().composites.is_empty());
+    assert_eq!(seeded.state().modules, p.modules);
+    assert!(seeded.redo());
+    assert_eq!(seeded.state(), &p);
+    let mut broken = p.composites[&child].clone();
+    broken.members.insert(999);
+    e.restore_to(vec![kabl_core::Op::SetComposite {
+        id: child,
+        value: Some(broken),
+    }]);
+    let dir = tempfile::tempdir().unwrap();
+    save(dir.path(), e.log()).unwrap();
+    assert!(format!("{:?}", load(dir.path()).unwrap_err())
+        .contains("missing or multiply owned module 999"));
+}
