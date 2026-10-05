@@ -491,3 +491,58 @@ fn packed_faces_and_copied_binding_labels_identify_correct_leaves() {
     assert_eq!(e.log().entries().len(), entries);
     assert_eq!(e.reserved_ids(), ids);
 }
+
+#[test]
+fn cue_clock_dependencies_preserve_external_ids_or_require_inclusion() {
+    let mut e = voice();
+    let clock = e.add_module("clock", Vec2 { x: 24.0, y: 750.0 });
+    let seq = e.add_module("seq", Vec2 { x: 270.0, y: 750.0 });
+    let cues = e.add_module("cues", Vec2 { x: 24.0, y: 1120.0 });
+    e.set_param(cues, "cue0.clock", clock as f32);
+    e.set_param(cues, &format!("cue0.seq.{seq}"), 1.0);
+    let root = composites::encapsulate(
+        &mut e,
+        BTreeSet::from([cues]),
+        BTreeSet::new(),
+        "Cue controller",
+    )
+    .unwrap();
+    let copy = composites::duplicate(&mut e, root).unwrap();
+    let leaf = *e.state().composites[&copy].members.iter().next().unwrap();
+    assert_eq!(e.state().modules[&leaf].params["cue0.clock"], clock as f32);
+    assert_eq!(
+        e.state().modules[&leaf].params[&format!("cue0.seq.{seq}")],
+        1.0
+    );
+    assert!(composites::package(e.state(), root)
+        .unwrap_err()
+        .contains("include referenced module"));
+    let closed = composites::encapsulate(
+        &mut e,
+        BTreeSet::from([clock, seq]),
+        BTreeSet::from([root]),
+        "Portable cues",
+    )
+    .unwrap();
+    let pkg = composites::package(e.state(), closed).unwrap();
+    let mut destination = voice();
+    let inserted = composites::insert(&mut destination, &pkg).unwrap();
+    let leaves = kabl_core::composite::leaves(destination.state(), inserted);
+    let find = |kind| {
+        *leaves
+            .iter()
+            .find(|id| destination.state().modules[id].kind == kind)
+            .unwrap()
+    };
+    let fresh_clock = find("clock");
+    let fresh_seq = find("seq");
+    let fresh_cues = find("cues");
+    assert_eq!(
+        destination.state().modules[&fresh_cues].params["cue0.clock"],
+        fresh_clock as f32
+    );
+    assert_eq!(
+        destination.state().modules[&fresh_cues].params[&format!("cue0.seq.{fresh_seq}")],
+        1.0
+    );
+}

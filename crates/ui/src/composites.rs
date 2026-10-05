@@ -7,7 +7,8 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
 };
-const MAX_BYTES: usize = 2 * 1024 * 1024 - 1024;
+// Leave room for complete host-state lanes, native bases and envelope fields.
+const MAX_BYTES: usize = 2 * 1024 * 1024 - 16 * 1024;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Package {
