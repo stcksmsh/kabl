@@ -1,0 +1,154 @@
+{
+  "schema": 1,
+  "root": 2,
+  "patch": {
+    "composites": {
+      "2": {
+        "name": "Stereo chorus room",
+        "help": "Open internals to inspect the real modules and routes. Editing affects this instance only.",
+        "definition": {
+          "id": "kabl-31-1791227534474581132-2",
+          "version": 0
+        },
+        "parent": null,
+        "members": [
+          7,
+          8
+        ],
+        "pos": {
+          "x": 240.0,
+          "y": 780.0
+        },
+        "ports": {
+          "1": {
+            "label": "in_l · #7",
+            "target": {
+              "Module": {
+                "id": 7,
+                "port": "in_l"
+              }
+            }
+          },
+          "2": {
+            "label": "in_r · #7",
+            "target": {
+              "Module": {
+                "id": 7,
+                "port": "in_r"
+              }
+            }
+          },
+          "3": {
+            "label": "left · #8",
+            "target": {
+              "Module": {
+                "id": 8,
+                "port": "left"
+              }
+            }
+          },
+          "4": {
+            "label": "right · #8",
+            "target": {
+              "Module": {
+                "id": 8,
+                "port": "right"
+              }
+            }
+          }
+        },
+        "controls": {
+          "5": {
+            "label": "Motion",
+            "target": {
+              "Param": {
+                "id": 7,
+                "param": "depth"
+              }
+            }
+          },
+          "6": {
+            "label": "Room mix",
+            "target": {
+              "Param": {
+                "id": 7,
+                "param": "mix"
+              }
+            }
+          },
+          "7": {
+            "label": "Room time",
+            "target": {
+              "Param": {
+                "id": 8,
+                "param": "decay_s"
+              }
+            }
+          },
+          "8": {
+            "label": "mix · #8",
+            "target": {
+              "Param": {
+                "id": 8,
+                "param": "mix"
+              }
+            }
+          }
+        },
+        "next_interface": 9
+      }
+    },
+    "modules": {
+      "7": {
+        "kind": "chorus",
+        "pos": {
+          "x": 240.0,
+          "y": 780.0
+        },
+        "params": {}
+      },
+      "8": {
+        "kind": "reverb",
+        "pos": {
+          "x": 480.0,
+          "y": 780.0
+        },
+        "params": {}
+      }
+    },
+    "cables": {
+      "10": {
+        "from": {
+          "Module": {
+            "id": 7,
+            "port": "left"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 8,
+            "port": "in_l"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "11": {
+        "from": {
+          "Module": {
+            "id": 7,
+            "port": "right"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 8,
+            "port": "in_r"
+          }
+        },
+        "params": {},
+        "steps": []
+      }
+    }
+  }
+}

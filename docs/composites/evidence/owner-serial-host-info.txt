@@ -1,0 +1,5 @@
+project=/home/stcksmsh/.codex/visualizations/2026/10/05/01a10979-ac89-7a01-bd38-576bb907cce1/d09-owner-test/projects/arrangement.rpp
+tempo 0 0 120
+tempo 1 8 140
+tempo 2 16.571428571429 100
+audio=0

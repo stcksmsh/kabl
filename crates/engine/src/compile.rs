@@ -95,6 +95,7 @@ pub const DEFAULT_ROUTE_AMOUNT: f32 = 0.25;
 
 #[derive(Debug)]
 pub enum CompileError {
+    Composite(String),
     UnknownKind {
         id: ModuleId,
         kind: String,
@@ -136,6 +137,7 @@ pub enum CompileError {
 impl fmt::Display for CompileError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            CompileError::Composite(message) => f.write_str(message),
             CompileError::UnknownKind { id, kind } => {
                 write!(f, "module {id} has unknown kind \"{kind}\"")
             }
@@ -624,6 +626,7 @@ fn compile_inner(
     voice_count: usize,
     single_instance: bool,
 ) -> Result<CompiledPatch, CompileError> {
+    validate_composites(patch).map_err(CompileError::Composite)?;
     struct ModuleMeta {
         kind: String,
         info: &'static ModuleInfo,
@@ -2143,4 +2146,27 @@ pub fn carry_state(old: &mut CompiledPatch, new_patch: &mut CompiledPatch) {
             new_patch.buffers[new_buf] = old.buffers[old_buf];
         }
     }
+}
+
+/// Control-thread flattening validation. Leaves are already materialized in document ID order.
+pub fn validate_composites(patch: &PatchState) -> Result<(), String> {
+    kabl_core::composite::validate(patch)?;
+    for (&id, c) in &patch.composites {
+        for e in c.ports.values().chain(c.controls.values()) {
+            let m = &patch.modules[&e.target.module_id()];
+            let info = registry::info_for(&m.kind)
+                .ok_or_else(|| format!("Composite {id}: missing built-in {}", m.kind))?;
+            let valid = match &e.target {
+                PortRef::Module { port, .. } => info.ports.iter().any(|p| p.name == port),
+                PortRef::Param { param, .. } => info.params.iter().any(|p| p.name == param),
+            };
+            if !valid {
+                return Err(format!(
+                    "Composite {id}: missing interface target {:?}",
+                    e.target
+                ));
+            }
+        }
+    }
+    Ok(())
 }

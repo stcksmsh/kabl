@@ -1,5 +1,13 @@
 # Status
 
+## D09 draft submission — 2026-10-05
+
+Engineering: complete for the agreed scope; draft [PR #12](https://github.com/stcksmsh/kabl/pull/12) on `codex/d09-composites` for owner review. Kosta selected chronological project Undo with independent instance state; separate per-instance histories are not required. Runtime tested/reviewed/packaged head a337f2c1eae867671f9deabadfa10f681de2bb26; final history/workspace validation 2c3d8319911a90c5960f9e02baa8dfd27c01de8f. Final PR/submitted SHA are recorded by the submission receipt. Not merged or owner-approved.
+
+D08 PR #11 is verified merged at f870b3c4316b9ea819d35344de09f6b7d24c59ca; prior statements below that it remains open are historical. Isolated `.worktrees/d09`; root master, .ai and other worktrees preserved. [composites/REPORT.md](composites/REPORT.md) and [composites/REVIEW.md](composites/REVIEW.md) index exact heads, reviewer fixes, examples and source-free owner artifacts. Workspace625/0/22 and 12 focused composites pass. Existing release/validator35/9, real widgets, both sizes/themes and REAPER recall/render/playback are reused unchanged with provenance. Earlier physical/controller/listening/feel/latency and D08 ordinary-render/dense-backend limits remain pending. No D10 work.
+
+## Earlier records (historical dispositions)
+
 ## D08 strict CLAP repair — 2026-10-05
 
 Engineering complete; strict-profile repair submitted for owner review. Owner review pending. PR #11 remains draft and unmerged. No D09/D10.

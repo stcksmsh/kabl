@@ -1,0 +1,13 @@
+{
+  "retained_archive": "/home/stcksmsh/.codex/visualizations/2026/10/05/01a10979-ac89-7a01-bd38-576bb907cce1/d09-evidence",
+  "not_counted_as_pass": [
+    "Initial workspace/plugin unknown-version test still used v3; v3 now valid, fixed assertion to v4.",
+    "Initial egui test used pre-egui35 panel API; corrected root Ui.",
+    "Initial strict Clippy found formatting/items-after-test issues; fixed only D09 files.",
+    "Initial host fixture compared decimal JSON spellings rather than f32 bits; Rust equality and canonical f32 comparison now used.",
+    "First UI capture input used wrong window offset/stale hitfile; corrected client-relative input and exact client captures.",
+    "Reused D08 replay script expected recorded project values, not original arrangement envelopes.",
+    "Anticipative REAPER playback exceeded .025 normalized-value tolerance; accepted declared serial/non-anticipative playback.",
+    "Extended 25s replay attempts failed to complete; nil-item harness error fixed. Final accepted probe checks active song range2/6/13s only; no new Free-transition claim."
+  ]
+}

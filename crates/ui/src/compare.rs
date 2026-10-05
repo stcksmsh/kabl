@@ -217,6 +217,23 @@ pub fn diff(from: &PatchState, to: &PatchState) -> Option<Vec<Op>> {
             );
         }
     }
+    for id in from
+        .composites
+        .keys()
+        .chain(to.composites.keys())
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>()
+    {
+        if s.composites.get(&id) != to.composites.get(&id) {
+            push(
+                &mut s,
+                Op::SetComposite {
+                    id,
+                    value: to.composites.get(&id).cloned(),
+                },
+            );
+        }
+    }
     (&s == to).then_some(ops)
 }
 

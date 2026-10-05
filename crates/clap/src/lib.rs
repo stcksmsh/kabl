@@ -399,7 +399,7 @@ impl Shared {
     fn snapshot(&self) -> SoundState {
         let c = self.control.lock().unwrap();
         SoundState {
-            version: 2,
+            version: if c.patch.composites.is_empty() { 2 } else { 3 },
             patch: c.patch.clone(),
             output_gain: self.native_value(0, false),
             lanes: c.lanes.clone(),
@@ -1531,7 +1531,7 @@ mod tests {
         }
         assert!(SoundState::decode(&vec![b' '; sound_state::MAX_STATE_BYTES + 1]).is_err());
         let mut state = p.shared.snapshot();
-        state.version = 3;
+        state.version = 4;
         assert!(p.shared.load(state).is_err());
         let mut state = p.shared.snapshot();
         state

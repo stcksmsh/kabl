@@ -1,0 +1,476 @@
+{
+  "composites": {
+    "1": {
+      "name": "Workflow voice",
+      "help": "Open internals to inspect the real modules and routes. Editing affects this instance only.",
+      "definition": {
+        "id": "kabl-83703-1791227565657573262-1",
+        "version": 0
+      },
+      "parent": null,
+      "members": [
+        2,
+        3,
+        4,
+        5
+      ],
+      "pos": {
+        "x": 240.0,
+        "y": 40.0
+      },
+      "ports": {
+        "1": {
+          "label": "pitch · #2",
+          "target": {
+            "Module": {
+              "id": 2,
+              "port": "pitch"
+            }
+          }
+        },
+        "2": {
+          "label": "gate · #4",
+          "target": {
+            "Module": {
+              "id": 4,
+              "port": "gate"
+            }
+          }
+        },
+        "3": {
+          "label": "out · #5",
+          "target": {
+            "Module": {
+              "id": 5,
+              "port": "out"
+            }
+          }
+        }
+      },
+      "controls": {
+        "4": {
+          "label": "Brightness",
+          "target": {
+            "Param": {
+              "id": 3,
+              "param": "cutoff_hz"
+            }
+          }
+        },
+        "5": {
+          "label": "Resonance",
+          "target": {
+            "Param": {
+              "id": 3,
+              "param": "resonance"
+            }
+          }
+        },
+        "6": {
+          "label": "Attack",
+          "target": {
+            "Param": {
+              "id": 4,
+              "param": "attack_ms"
+            }
+          }
+        },
+        "7": {
+          "label": "Release",
+          "target": {
+            "Param": {
+              "id": 4,
+              "param": "release_ms"
+            }
+          }
+        }
+      },
+      "next_interface": 8
+    },
+    "2": {
+      "name": "Workflow voice",
+      "help": "Open internals to inspect the real modules and routes. Editing affects this instance only.",
+      "definition": {
+        "id": "kabl-83703-1791227565657573262-1",
+        "version": 0
+      },
+      "parent": null,
+      "members": [
+        7,
+        8,
+        9,
+        10
+      ],
+      "pos": {
+        "x": 240.0,
+        "y": 560.0
+      },
+      "ports": {
+        "1": {
+          "label": "pitch · #7",
+          "target": {
+            "Module": {
+              "id": 7,
+              "port": "pitch"
+            }
+          }
+        },
+        "2": {
+          "label": "gate · #9",
+          "target": {
+            "Module": {
+              "id": 9,
+              "port": "gate"
+            }
+          }
+        },
+        "3": {
+          "label": "out · #10",
+          "target": {
+            "Module": {
+              "id": 10,
+              "port": "out"
+            }
+          }
+        }
+      },
+      "controls": {
+        "4": {
+          "label": "Brightness",
+          "target": {
+            "Param": {
+              "id": 8,
+              "param": "cutoff_hz"
+            }
+          }
+        },
+        "5": {
+          "label": "Resonance",
+          "target": {
+            "Param": {
+              "id": 8,
+              "param": "resonance"
+            }
+          }
+        },
+        "6": {
+          "label": "Attack",
+          "target": {
+            "Param": {
+              "id": 9,
+              "param": "attack_ms"
+            }
+          }
+        },
+        "7": {
+          "label": "Release",
+          "target": {
+            "Param": {
+              "id": 9,
+              "param": "release_ms"
+            }
+          }
+        }
+      },
+      "next_interface": 8
+    }
+  },
+  "modules": {
+    "1": {
+      "kind": "midi.in",
+      "pos": {
+        "x": 40.0,
+        "y": 40.0
+      },
+      "params": {}
+    },
+    "2": {
+      "kind": "osc.va",
+      "pos": {
+        "x": 240.0,
+        "y": 40.0
+      },
+      "params": {
+        "base_hz": 261.63,
+        "waveform": 2.0
+      }
+    },
+    "3": {
+      "kind": "filter.svf",
+      "pos": {
+        "x": 440.0,
+        "y": 40.0
+      },
+      "params": {
+        "cutoff_hz": 130.0,
+        "pin.cutoff_hz": 6.0,
+        "pin.resonance": 6.0,
+        "resonance": 0.2
+      }
+    },
+    "4": {
+      "kind": "env.adsr",
+      "pos": {
+        "x": 240.0,
+        "y": 220.0
+      },
+      "params": {
+        "attack_ms": 5.0,
+        "decay_ms": 120.0,
+        "pin.attack_ms": 6.0,
+        "pin.release_ms": 6.0,
+        "release_ms": 250.0,
+        "sustain": 0.6
+      }
+    },
+    "5": {
+      "kind": "vca",
+      "pos": {
+        "x": 640.0,
+        "y": 40.0
+      },
+      "params": {
+        "exponential": 0.0,
+        "gain": 0.0
+      }
+    },
+    "6": {
+      "kind": "out",
+      "pos": {
+        "x": 840.0,
+        "y": 40.0
+      },
+      "params": {}
+    },
+    "7": {
+      "kind": "osc.va",
+      "pos": {
+        "x": 240.0,
+        "y": 560.0
+      },
+      "params": {
+        "base_hz": 261.63,
+        "waveform": 2.0
+      }
+    },
+    "8": {
+      "kind": "filter.svf",
+      "pos": {
+        "x": 440.0,
+        "y": 560.0
+      },
+      "params": {
+        "cutoff_hz": 3000.0,
+        "pin.cutoff_hz": 7.0,
+        "pin.resonance": 8.0,
+        "resonance": 0.2
+      }
+    },
+    "9": {
+      "kind": "env.adsr",
+      "pos": {
+        "x": 240.0,
+        "y": 740.0
+      },
+      "params": {
+        "attack_ms": 5.0,
+        "decay_ms": 120.0,
+        "pin.attack_ms": 9.0,
+        "pin.release_ms": 10.0,
+        "release_ms": 250.0,
+        "sustain": 0.6
+      }
+    },
+    "10": {
+      "kind": "vca",
+      "pos": {
+        "x": 640.0,
+        "y": 560.0
+      },
+      "params": {
+        "exponential": 0.0,
+        "gain": 0.0
+      }
+    }
+  },
+  "cables": {
+    "1": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "pitch"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 2,
+          "port": "pitch"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "2": {
+      "from": {
+        "Module": {
+          "id": 2,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 3,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "3": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "gate"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 4,
+          "port": "gate"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "4": {
+      "from": {
+        "Module": {
+          "id": 3,
+          "port": "lp"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 5,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "5": {
+      "from": {
+        "Module": {
+          "id": 4,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 5,
+          "port": "cv"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "6": {
+      "from": {
+        "Module": {
+          "id": 5,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 6,
+          "port": "left"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "7": {
+      "from": {
+        "Module": {
+          "id": 5,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 6,
+          "port": "right"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "8": {
+      "from": {
+        "Module": {
+          "id": 7,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 8,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "9": {
+      "from": {
+        "Module": {
+          "id": 8,
+          "port": "lp"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 10,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "10": {
+      "from": {
+        "Module": {
+          "id": 9,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 10,
+          "port": "cv"
+        }
+      },
+      "params": {},
+      "steps": []
+    }
+  },
+  "labels": {
+    "3": {
+      "pin.cutoff_hz": "Brightness",
+      "pin.resonance": "Resonance"
+    },
+    "4": {
+      "pin.attack_ms": "Attack",
+      "pin.release_ms": "Release"
+    },
+    "8": {
+      "pin.cutoff_hz": "Brightness",
+      "pin.resonance": "Resonance"
+    },
+    "9": {
+      "pin.attack_ms": "Attack",
+      "pin.release_ms": "Release"
+    }
+  }
+}

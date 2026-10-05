@@ -1,0 +1,10 @@
+{
+  "product_head": "22b8b8bf6b5c712a8461d34d149aa7e106c0b64f",
+  "complete_states_equal_f32": true,
+  "instances": 2,
+  "composites": [
+    1,
+    1
+  ],
+  "library": "unavailable-factory; definitions embedded"
+}
