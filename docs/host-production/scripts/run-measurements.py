@@ -12,12 +12,13 @@ def replace(match):
     raw=json.dumps(state,separators=(',',':')).encode();encoded=base64.b64encode(len(raw).to_bytes(8,'little')+raw).decode()
     return '<STATE\n'+''.join('          '+line+'\n' for line in textwrap.wrap(encoded,120))+'        >'
 project=repo/'scratch/host/measurement-fixture.rpp';project.write_text(re.sub(r'<STATE\s+(.*?)\s*>',replace,source,flags=re.S))
-evidence=repo/'docs/host-production/evidence/host-measurements.json'
+evidence=Path(os.environ.get('D08_MEASURE_EVIDENCE', str(repo/'docs/host-production/evidence/host-measurements.json')))
+evidence.parent.mkdir(parents=True,exist_ok=True)
 results=json.loads(evidence.read_text()) if evidence.exists() else []
 for kind,count,opened in itertools.product(('light','dense'),(1,2),(0,1)):
     case=f'{kind}-{count}-'+('open' if opened else 'closed')
     if any(r['case']==case for r in results): continue
-    out=repo/'scratch/measure'/case
+    out=Path(os.environ.get('D08_MEASURE_ROOT',str(repo/'scratch/measure')))/case
     if out.exists(): out.rename(out.with_name(case+'-failed-'+str(int(time.time()))))
     out.mkdir(parents=True,exist_ok=False)
     env=dict(os.environ,D08_HOST=str(out),D08_PROXY='1',D08_TRACE='callbacks.csv',D08_MEASURE_KIND=kind,D08_MEASURE_COUNT=str(count),D08_MEASURE_OPEN=str(opened))

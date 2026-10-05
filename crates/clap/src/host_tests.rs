@@ -399,6 +399,7 @@ fn state_load_replaces_pending_exact_values_even_if_old_mask_is_retried() {
     p.shared
         .modulation_notify
         .fetch_or(modulation, Ordering::Release);
+    assert_no_alloc(|| p.shared.apply_recall());
     assert_no_alloc(|| p.accept_loads());
     assert_eq!(p.live_params().1[0], 0.2);
     assert_eq!(p.live_flush(false).1[0], 0.2);
@@ -419,6 +420,9 @@ fn state_recall_clears_native_modulation_before_restoring_saved_bases() {
     state.output_gain = 0.5;
     state.slot_values[0] = 0.25;
     p.shared.load(state).unwrap();
+    assert_eq!(p.shared.native_value(0, true), 0.5);
+    assert_eq!(p.shared.native_value(1, true), 0.25);
+    assert_no_alloc(|| p.shared.apply_recall());
     assert_eq!(p.shared.params.gain.value(), 0.5);
     assert_eq!(p.shared.params.gain.unmodulated_plain_value(), 0.5);
     assert_eq!(p.shared.params.slots[0].value.value(), 0.25);
@@ -513,8 +517,50 @@ fn unassignment_base_edit(saturated: bool) {
         |_, _| {},
     );
     let gain = p.shared.params.gain.value();
-    assert!(left
-        .iter()
-        .zip(expected)
-        .all(|(&v, e)| (v - e * gain).abs() < 1e-6));
+    assert!(
+        left.iter()
+            .zip(expected)
+            .all(|(&v, e)| (v - e * gain).abs() < 1e-6)
+    );
+}
+
+#[test]
+fn recall_after_native_sync_cannot_be_overwritten_by_old_callback() {
+    let mut p = tests::instrument();
+    assert_no_alloc(|| p.shared.apply_recall());
+    let mut recalled = p.shared.snapshot();
+    recalled.output_gain = 0.61;
+    recalled.host_clock = true;
+    recalled.slot_values = [0.37; automation::SLOTS];
+    let barriers = std::sync::Barrier::new(2);
+    let shared = p.shared.clone();
+    std::thread::scope(|scope| {
+        let paused = scope.spawn(|| {
+            // Old callback has synchronized native caches, then producer commits recall.
+            barriers.wait();
+            barriers.wait();
+            assert_no_alloc(|| unsafe {
+                shared.native_ptr(0)._internal_set_normalized_value(0.2);
+                shared.native_ptr(17)._internal_set_normalized_value(0.0);
+                shared.native_ptr(1)._internal_set_normalized_value(0.9);
+            });
+        });
+        barriers.wait();
+        p.shared.load(recalled).unwrap();
+        barriers.wait();
+        paused.join().unwrap();
+    });
+    let observed = p.shared.snapshot();
+    assert_eq!(observed.output_gain, 0.61);
+    assert!(observed.host_clock);
+    assert_eq!(observed.slot_values, [0.37; automation::SLOTS]);
+    assert_no_alloc(|| p.accept_loads());
+    assert_eq!(p.live_params().0, 0);
+    assert_eq!(p.session.as_ref().unwrap().gain, 0.61);
+    assert!(p.session.as_ref().unwrap().host_clock);
+    assert_no_alloc(|| p.shared.apply_recall());
+    assert_eq!(p.shared.params.gain.value(), 0.61);
+    assert!(p.shared.params.host_clock.value());
+    assert_eq!(p.shared.params.slots[0].value.value(), 0.37);
+    assert_eq!(p.shared.native_epoch.load(Ordering::Acquire), 2);
 }

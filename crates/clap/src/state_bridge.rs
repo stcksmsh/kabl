@@ -1,8 +1,7 @@
 //! CLAP entry: production transactional state and MIDI-only dialect. The pinned wrapper
 //! owns GUI/lifecycle/parameter events; its non-atomic state loader is never used.
 use super::{Instrument, Shared};
-use crate::sound_state::{SoundState, MAX_STATE_BYTES};
-use nice_plug::prelude::Param;
+use crate::sound_state::{MAX_STATE_BYTES, SoundState};
 use std::cell::{RefCell, UnsafeCell};
 use std::sync::Weak;
 type Capture = (
@@ -23,19 +22,19 @@ use clap_sys::{
     events::*,
     ext::{
         note_ports::{
-            clap_note_port_info, clap_plugin_note_ports, CLAP_EXT_NOTE_PORTS,
-            CLAP_NOTE_DIALECT_MIDI,
+            CLAP_EXT_NOTE_PORTS, CLAP_NOTE_DIALECT_MIDI, clap_note_port_info,
+            clap_plugin_note_ports,
         },
         params::{
-            clap_host_params, clap_param_info, clap_plugin_params, CLAP_EXT_PARAMS,
-            CLAP_PARAM_RESCAN_VALUES,
+            CLAP_EXT_PARAMS, CLAP_PARAM_RESCAN_VALUES, clap_host_params, clap_param_info,
+            clap_plugin_params,
         },
-        state::{clap_host_state, clap_plugin_state, CLAP_EXT_STATE},
+        state::{CLAP_EXT_STATE, clap_host_state, clap_plugin_state},
     },
-    factory::plugin_factory::{clap_plugin_factory, CLAP_PLUGIN_FACTORY_ID},
+    factory::plugin_factory::{CLAP_PLUGIN_FACTORY_ID, clap_plugin_factory},
     host::clap_host,
     plugin::{clap_plugin, clap_plugin_descriptor},
-    process::{clap_process, clap_process_status, CLAP_PROCESS_ERROR},
+    process::{CLAP_PROCESS_ERROR, clap_process, clap_process_status},
     stream::{clap_istream, clap_ostream},
     version::CLAP_VERSION,
 };
@@ -44,7 +43,7 @@ use nice_plug::wrapper::{
     setup_logger,
 };
 use std::{
-    ffi::{c_char, c_void, CStr},
+    ffi::{CStr, c_char, c_void},
     ptr,
     sync::{Arc, OnceLock},
 };
@@ -64,12 +63,14 @@ struct Bridge {
 #[repr(C)]
 struct Outer {
     plugin: clap_plugin,
+    callback: nice_plug::wrapper::clap::strict::Owner<()>,
     bridge: Bridge,
     process: unsafe extern "C" fn(*const clap_plugin, *const clap_process) -> clap_process_status,
     midi: UnsafeCell<rtrb::Producer<(u32, [u8; 3])>>,
     param_ids: [u32; 18],
     events: UnsafeCell<rtrb::Producer<(u32, crate::schedule::Event)>>,
     start: unsafe extern "C" fn(*const clap_plugin) -> bool,
+    reset: unsafe extern "C" fn(*const clap_plugin),
     cc_open: UnsafeCell<u32>,
     params: clap_plugin_params,
     flush: unsafe extern "C" fn(
@@ -141,8 +142,10 @@ unsafe extern "C" fn create(
     }
     let mut bounded_params = *parameters;
     bounded_params.flush = Some(flush_bridge);
+    bounded_params.get_value = Some(get_value_bridge);
     let mut outer = Box::new(Outer {
         plugin: original,
+        callback: nice_plug::wrapper::clap::strict::Owner::new(()),
         bridge: Bridge {
             get_extension,
             destroy,
@@ -155,6 +158,7 @@ unsafe extern "C" fn create(
         param_ids,
         events: UnsafeCell::new(events),
         start: original.start_processing.expect("start processing"),
+        reset: original.reset.expect("reset"),
         cc_open: UnsafeCell::new(0),
         params: bounded_params,
         flush: parameters.flush.expect("parameter flush"),
@@ -164,6 +168,7 @@ unsafe extern "C" fn create(
     outer.plugin.destroy = Some(destroy_bridge);
     outer.plugin.process = Some(process_bridge);
     outer.plugin.start_processing = Some(start_bridge);
+    outer.plugin.reset = Some(reset_bridge);
     let _ = Arc::into_raw(wrapper); // Released by the delegated destroy callback.
     Box::into_raw(outer).cast()
 }
@@ -195,8 +200,41 @@ unsafe extern "C" fn destroy_bridge(plugin: *const clap_plugin) {
     }
 }
 
+unsafe extern "C" fn get_value_bridge(
+    plugin: *const clap_plugin,
+    id: u32,
+    value: *mut f64,
+) -> bool {
+    let Some(outer) = (unsafe { plugin.cast::<Outer>().as_ref() }) else {
+        return false;
+    };
+    let Some(value) = (unsafe { value.as_mut() }) else {
+        return false;
+    };
+    let Some(index) = outer
+        .param_ids
+        .iter()
+        .position(|&candidate| candidate == id)
+    else {
+        return false;
+    };
+    *value = outer.bridge.shared.native_value(index, true) as f64;
+    true
+}
+unsafe extern "C" fn reset_bridge(plugin: *const clap_plugin) {
+    let outer = unsafe { &*plugin.cast::<Outer>() };
+    let Some(_callback) = outer.callback.try_borrow_mut() else {
+        return;
+    };
+    outer.bridge.shared.apply_recall();
+    unsafe { (outer.reset)(plugin) };
+}
 unsafe extern "C" fn start_bridge(plugin: *const clap_plugin) -> bool {
     let outer = unsafe { &*plugin.cast::<Outer>() };
+    let Some(_callback) = outer.callback.try_borrow_mut() else {
+        return false;
+    };
+    outer.bridge.shared.apply_recall();
     outer
         .bridge
         .shared
@@ -264,7 +302,11 @@ unsafe extern "C" fn flush_bridge(
     output: *const clap_output_events,
 ) {
     let outer = unsafe { &*plugin.cast::<Outer>() };
+    let Some(_callback) = outer.callback.try_borrow_mut() else {
+        return;
+    };
     let shared = &outer.bridge.shared;
+    shared.apply_recall();
     let mut parameters = ParamEvents {
         events: [ptr::null(); MAX_PARAMS],
         len: 0,
@@ -339,8 +381,12 @@ unsafe extern "C" fn process_bridge(
         return CLAP_PROCESS_ERROR;
     }
     let outer = unsafe { &*plugin.cast::<Outer>() };
+    let Some(_callback) = outer.callback.try_borrow_mut() else {
+        return CLAP_PROCESS_ERROR;
+    };
     let input = unsafe { &*process };
     let shared = &outer.bridge.shared;
+    shared.apply_recall();
     shared
         .host_frames
         .store(input.frames_count, std::sync::atomic::Ordering::Relaxed);
@@ -462,6 +508,36 @@ unsafe extern "C" fn process_bridge(
                 if pending & (1 << i) == 0 {
                     continue;
                 }
+                let bit = 1 << i;
+                let epoch = shared.committed.load(std::sync::atomic::Ordering::SeqCst);
+                let event_epoch = shared.cc_epochs[i].load(std::sync::atomic::Ordering::Acquire);
+                let stale = event_epoch != epoch || !epoch.is_multiple_of(2);
+                if stale {
+                    remaining &= !bit;
+                    if unsafe { *outer.cc_open.get() } & bit == 0 {
+                        continue;
+                    }
+                } else if notifications & bit != 0
+                    && epoch
+                        != shared
+                            .native_epoch
+                            .load(std::sync::atomic::Ordering::Acquire)
+                {
+                    continue; // Recall not synchronized yet: retain exact pending value.
+                }
+                let exact =
+                    f32::from_bits(shared.cc_values[i].load(std::sync::atomic::Ordering::Acquire));
+                if !stale && shared.committed.load(std::sync::atomic::Ordering::SeqCst) != epoch {
+                    continue;
+                }
+                let send_value = !stale && notifications & bit != 0;
+                if send_value {
+                    unsafe {
+                        shared
+                            .native_ptr(i + 1)
+                            ._internal_set_normalized_value(exact);
+                    }
+                }
                 let mut gesture = clap_event_param_gesture {
                     header: clap_event_header {
                         size: std::mem::size_of::<clap_event_param_gesture>() as u32,
@@ -484,16 +560,14 @@ unsafe extern "C" fn process_bridge(
                     port_index: -1,
                     channel: -1,
                     key: -1,
-                    value: shared.params.slots[i].value.unmodulated_plain_value() as f64,
+                    value: exact as f64,
                 };
                 let open = unsafe { &mut *outer.cc_open.get() };
-                let bit = 1 << i;
                 let began = *open & bit != 0 || unsafe { push(output, &gesture.header) };
                 if began {
                     *open |= bit;
                 }
-                let accepted =
-                    began && (notifications & bit == 0 || unsafe { push(output, &value.header) });
+                let accepted = began && (!send_value || unsafe { push(output, &value.header) });
                 gesture.header.type_ = CLAP_EVENT_PARAM_GESTURE_END;
                 let ended = accepted && unsafe { push(output, &gesture.header) };
                 if ended {
@@ -773,7 +847,12 @@ mod tests {
             shared.stop.store(true, Ordering::Release);
 
             assert!(p.activate.unwrap()(plugin, 48000.0, 1, 4096));
-            assert!(p.start_processing.unwrap()(plugin));
+            assert_no_alloc(|| {
+                assert!(p.start_processing.unwrap()(plugin));
+            });
+            assert_no_alloc(|| {
+                assert!(!p.start_processing.unwrap()(plugin));
+            });
             let params = &*(p.get_extension.unwrap()(plugin, CLAP_EXT_PARAMS.as_ptr())
                 .cast::<clap_plugin_params>());
             let mut info: clap_param_info = std::mem::zeroed();
@@ -848,6 +927,79 @@ mod tests {
                 try_push: Some(probe_push),
             };
             process.out_events = &output_events;
+            // The strict framework keeps saturated gestures ordered and retires stale values
+            // across the same complete-state epoch that protects the DSP/session publication.
+            let wrapper = &*p.plugin_data.cast::<Wrapper<Instrument>>();
+            use nice_plug::wrapper::clap::OutputParamEvent;
+            let before_handoff = shared.snapshot();
+            let mut unsupported =
+                serde_json::from_value(serde_json::json!({"params": {}, "fields": {}})).unwrap();
+            assert!(!wrapper.set_state_inner(&mut unsupported));
+            assert_eq!(
+                serde_json::to_vec(&shared.snapshot()).unwrap(),
+                serde_json::to_vec(&before_handoff).unwrap()
+            );
+            for _ in 0..684 {
+                wrapper.queue_parameter_event(OutputParamEvent::BeginGesture {
+                    param_hash: info.id,
+                });
+                wrapper.queue_parameter_event(OutputParamEvent::SetValue {
+                    param_hash: info.id,
+                    clap_plain_value: 0.2,
+                });
+                wrapper.queue_parameter_event(OutputParamEvent::EndGesture {
+                    param_hash: info.id,
+                });
+            }
+            let mut recalled = shared.snapshot();
+            recalled.output_gain = 0.61;
+            shared.load(recalled).unwrap();
+            assert_no_alloc(|| p.reset.unwrap()(plugin));
+            probe.reject = u16::MAX;
+            assert_no_alloc(|| {
+                p.process.unwrap()(plugin, &process);
+            });
+            assert_eq!(probe.begins, 683); // Fixed 2048-record budget, including retired values.
+            assert_eq!(probe.ends, 682);
+            assert_eq!(probe.values, 0);
+            p.on_main_thread.unwrap()(plugin); // Overflow pump remains off audio.
+            assert_no_alloc(|| params.flush.unwrap()(plugin, &input, &output_events));
+            assert_eq!((probe.begins, probe.values, probe.ends), (684, 0, 684));
+            assert!(params.get_value.unwrap()(plugin, info.id, &mut value));
+            assert!(
+                (value - 0.61).abs() < 1e-6,
+                "old queued values must not overwrite recall"
+            );
+            // Failed host pushes retain the next complete gesture, not a detached End.
+            wrapper.queue_parameter_event(OutputParamEvent::BeginGesture {
+                param_hash: info.id,
+            });
+            wrapper.queue_parameter_event(OutputParamEvent::SetValue {
+                param_hash: info.id,
+                clap_plain_value: 0.7,
+            });
+            wrapper.queue_parameter_event(OutputParamEvent::EndGesture {
+                param_hash: info.id,
+            });
+            probe.begins = 0;
+            probe.values = 0;
+            probe.ends = 0;
+            for rejected in [
+                CLAP_EVENT_PARAM_GESTURE_BEGIN,
+                CLAP_EVENT_PARAM_VALUE,
+                CLAP_EVENT_PARAM_GESTURE_END,
+                u16::MAX,
+            ] {
+                probe.reject = rejected;
+                assert_no_alloc(|| params.flush.unwrap()(plugin, &input, &output_events));
+            }
+            assert_eq!((probe.begins, probe.values, probe.ends), (1, 1, 1));
+            shared.load(before_handoff).unwrap();
+            assert_no_alloc(|| p.reset.unwrap()(plugin));
+            probe.begins = 0;
+            probe.values = 0;
+            probe.ends = 0;
+            shared.cc_epochs[0].store(shared.committed.load(Ordering::Acquire), Ordering::Release);
             shared.cc_notify.store(1, Ordering::Release);
             for rejected in [
                 CLAP_EVENT_PARAM_GESTURE_BEGIN,
@@ -873,12 +1025,17 @@ mod tests {
                 values: 0,
                 ends: 0,
             };
+            shared.cc_epochs[0].store(shared.committed.load(Ordering::Acquire), Ordering::Release);
             shared.cc_notify.store(1, Ordering::Release);
             assert_no_alloc(|| {
                 p.process.unwrap()(plugin, &process);
             });
             // A state load discards stale controller values, but an accepted begin still needs end.
-            shared.cc_notify.store(0, Ordering::Release);
+            let recalled = shared.snapshot();
+            shared.load(recalled).unwrap();
+            // Old callback can retry its consumed mask after publication. Epoch retires its
+            // value, but the already accepted Begin must still receive exactly one End.
+            shared.cc_notify.fetch_or(1, Ordering::Release);
             probe.reject = u16::MAX;
             assert_no_alloc(|| {
                 p.process.unwrap()(plugin, &process);
@@ -1034,10 +1191,11 @@ mod tests {
             assert_no_alloc(|| {
                 p.process.unwrap()(plugin, &process);
             });
-            assert!(left
-                .iter()
-                .zip(baseline)
-                .all(|(&v, reference)| (v - reference).abs() < 1e-6));
+            assert!(
+                left.iter()
+                    .zip(baseline)
+                    .all(|(&v, reference)| (v - reference).abs() < 1e-6)
+            );
             process.in_events = &input;
             flushed_mod.amount = 0.0;
             std::hint::black_box(&flushed_mod);
@@ -1120,7 +1278,10 @@ mod tests {
             process.in_events = &input;
             assert_no_alloc(|| p.reset.unwrap()(plugin));
             shared.load(original_fixture).unwrap();
-            p.stop_processing.unwrap()(plugin);
+            assert_no_alloc(|| p.stop_processing.unwrap()(plugin));
+            assert_no_alloc(|| {
+                assert_eq!(p.process.unwrap()(plugin, &process), CLAP_PROCESS_ERROR);
+            });
             p.deactivate.unwrap()(plugin);
             assert!(p.activate.unwrap()(plugin, 96000.0, 1, 4096));
             assert!(p.start_processing.unwrap()(plugin));
@@ -1129,6 +1290,114 @@ mod tests {
             });
             assert!(left.iter().all(|&sample| sample == 0.0));
             p.stop_processing.unwrap()(plugin);
+            p.deactivate.unwrap()(plugin);
+            p.destroy.unwrap()(plugin);
+        }
+    }
+    #[test]
+    fn main_track_notification_can_pause_while_audio_owns_plugin() {
+        use clap_sys::ext::track_info::*;
+        use std::sync::{Barrier, atomic::AtomicBool};
+        struct TrackHost {
+            pause: AtomicBool,
+            barrier: Barrier,
+        }
+        unsafe extern "C" fn get(host: *const clap_host, info: *mut clap_track_info) -> bool {
+            let test = unsafe { &*((*host).host_data.cast::<TrackHost>()) };
+            if test.pause.load(Ordering::Acquire) {
+                test.barrier.wait();
+                test.barrier.wait();
+            }
+            unsafe {
+                (*info).flags = CLAP_TRACK_INFO_HAS_TRACK_NAME;
+                (*info).name[0] = b'x' as c_char;
+            }
+            true
+        }
+        static TRACK: clap_host_track_info = clap_host_track_info { get: Some(get) };
+        unsafe extern "C" fn extension(_: *const clap_host, id: *const c_char) -> *const c_void {
+            if unsafe { CStr::from_ptr(id) } == CLAP_EXT_TRACK_INFO {
+                (&TRACK as *const clap_host_track_info).cast()
+            } else {
+                ptr::null()
+            }
+        }
+        let test = TrackHost {
+            pause: AtomicBool::new(false),
+            barrier: Barrier::new(2),
+        };
+        let host = clap_host {
+            clap_version: CLAP_VERSION,
+            host_data: (&test as *const TrackHost).cast_mut().cast(),
+            name: c"track host".as_ptr(),
+            vendor: c"kabl".as_ptr(),
+            url: c"".as_ptr(),
+            version: c"1".as_ptr(),
+            get_extension: Some(extension),
+            request_restart: Some(host_request),
+            request_process: Some(host_request),
+            request_callback: Some(host_request),
+        };
+        unsafe {
+            let plugin = create(&FACTORY, &host, descriptor().clap_id().as_ptr());
+            let p = &*plugin;
+            assert!(p.init.unwrap()(plugin));
+            (&*plugin.cast::<Outer>())
+                .bridge
+                .shared
+                .stop
+                .store(true, Ordering::Release);
+            assert!(p.activate.unwrap()(plugin, 48000.0, 1, 256));
+            assert!(!p.activate.unwrap()(plugin, 48000.0, 1, 256));
+            assert_no_alloc(|| assert!(p.start_processing.unwrap()(plugin)));
+            let track = &*(p.get_extension.unwrap()(plugin, CLAP_EXT_TRACK_INFO.as_ptr())
+                .cast::<clap_plugin_track_info>());
+            test.pause.store(true, Ordering::Release);
+            let address = plugin as usize;
+            std::thread::scope(|scope| {
+                scope.spawn(|| {
+                    test.barrier.wait();
+                    let plugin = address as *const clap_plugin;
+                    let mut left = [0.0f32; 256];
+                    let mut right = [0.0f32; 256];
+                    let mut channels = [left.as_mut_ptr(), right.as_mut_ptr()];
+                    let mut output = clap_audio_buffer {
+                        data32: channels.as_mut_ptr(),
+                        data64: ptr::null_mut(),
+                        channel_count: 2,
+                        latency: 0,
+                        constant_mask: 0,
+                    };
+                    let mut events = Vec::new();
+                    let input = clap_input_events {
+                        ctx: (&mut events as *mut Vec<clap_event_midi>).cast(),
+                        size: Some(event_size),
+                        get: Some(event_get),
+                    };
+                    let process = clap_process {
+                        steady_time: 0,
+                        frames_count: 256,
+                        transport: ptr::null(),
+                        audio_inputs: ptr::null(),
+                        audio_outputs: &mut output,
+                        audio_inputs_count: 0,
+                        audio_outputs_count: 1,
+                        in_events: &input,
+                        out_events: ptr::null(),
+                    };
+                    for _ in 0..64 {
+                        assert_no_alloc(|| {
+                            assert_ne!(
+                                (*plugin).process.unwrap()(plugin, &process),
+                                CLAP_PROCESS_ERROR
+                            )
+                        });
+                    }
+                    test.barrier.wait();
+                });
+                track.changed.unwrap()(plugin);
+            });
+            assert_no_alloc(|| p.stop_processing.unwrap()(plugin));
             p.deactivate.unwrap()(plugin);
             p.destroy.unwrap()(plugin);
         }

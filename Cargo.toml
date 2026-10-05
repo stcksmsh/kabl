@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["crates/*"]
+exclude = ["vendor/nice-plug"]
 
 [workspace.package]
 version = "0.1.0"
@@ -13,3 +14,10 @@ lto = true
 
 [profile.dev]
 opt-level = 1
+
+[patch."https://github.com/Circuit-Stitch/nice-plug.git"]
+nice-plug = { path = "vendor/nice-plug/crates/nice-plug" }
+nice-plug-core = { path = "vendor/nice-plug/crates/nice-plug-core" }
+nice-plug-derive = { path = "vendor/nice-plug/crates/nice-plug-derive" }
+nice-log = { path = "vendor/nice-plug/crates/nice-log" }
+nice-plug-egui = { path = "vendor/nice-plug/crates/nice-plug-egui" }
