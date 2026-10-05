@@ -1,6 +1,6 @@
 # Reusable, inspectable composites — D09
 
-Product checkpoint: `a337f2c1eae867671f9deabadfa10f681de2bb26`. Source recheck passes; acceptance and submission remain pending Kosta's history choice. Engineering is not complete, this branch is not merged, and owner approval has not occurred. See [REPORT](REPORT.md), [REVIEW](REVIEW.md), [acceptance matrix](ACCEPTANCE.md) and [owner checklist](CHECKLIST.md).
+Product checkpoint: `a337f2c1eae867671f9deabadfa10f681de2bb26`. Kosta selected chronological project Undo; independent instance state is required, separate per-instance histories are not. Final history validation is at `2c3d8319911a90c5960f9e02baa8dfd27c01de8f`. Runtime binaries remain exactly those already verified at the product head. Final independent disposition and draft submission are recorded in REPORT/REVIEW. This branch is not merged or owner-approved. See [REPORT](REPORT.md), [REVIEW](REVIEW.md), [acceptance matrix](ACCEPTANCE.md) and [owner checklist](CHECKLIST.md).
 
 ## Workflow
 
@@ -10,9 +10,9 @@ Duplicate creates fresh group, leaf and internal cable IDs below the existing ra
 
 Instance edits affect only its embedded graph. Publish a new immutable version writes a standalone library package beneath the existing user library's `composites/<definition-id>/vN.json`. Insert explicitly chooses a version and creates independent embedded leaves. Publishing, updating or removing library files never changes an existing song. A song does not resolve a library entry on load.
 
-## History choice still required
+## Chronological project Undo
 
-Current production widgets demonstrate chronological project Undo/Redo. The latest project action is undone regardless of which instance is open. This is not a separate history for each instance. Kosta was asked to choose that smallest behavior or separate per-instance Undo with rules for shared-route conflicts. No answer has been assumed; BRIEF and A03 remain explicitly unresolved. Host recall embeds sound state, not a persistent undo stack; standalone save retains its applied project log.
+Kosta explicitly selected the existing chronological project Undo on 5 October 2026. Undo reverses the latest project transaction regardless of which instance is open; Redo reapplies it. Independent instance state is required; separate per-instance Undo histories are not. A focused A/B/A edit sequence proves that values remain isolated and Undo/Redo follows chronology after standalone save/reload. Host recall embeds sound state, not a persistent undo stack; standalone save retains its applied project log.
 
 ## Evidence and reproduction
 

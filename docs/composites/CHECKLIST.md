@@ -1,12 +1,12 @@
 # D09 owner checklist
 
-All owner checks remain unchecked. Product and evidence heads are in REPORT/verification.json. Start with the source-free owner bundle README; keep earlier D08 hardware/listening dispositions separate.
+All hands-on owner checks remain unchecked. The product choice below is checked from Kosta’s explicit instruction. Product and evidence heads are in REPORT/verification.json. Start with the source-free owner bundle README; keep earlier D08 hardware/listening dispositions separate.
 
-- [ ] Choose chronological project Undo or separate per-instance Undo; record the exact expected behavior for interleaved edits.
+- [x] Product choice: chronological project Undo; independent instance state required; separate per-instance histories not required (Kosta, 5 October 2026).
 - [ ] Open flat-voice, select oscillator/filter/envelope/VCA in Composites, name and encapsulate. Sound and external route IDs remain unchanged.
 - [ ] Open internals and find original leaves. Change a leaf and public alias; both operate on the same parameter.
 - [ ] Duplicate. Patch the new boundary manually; change its tone and confirm original stays unchanged. Check fresh pin positions and the explained CC/button/native assignment omissions.
-- [ ] Exercise the agreed Undo semantics across edits to both instances. Save, quit and reload; embedded state and standalone applied history remain exact.
+- [ ] Edit A, edit B, then edit A again. Undo must reverse A’s latest edit, then B’s edit, then A’s first edit; Redo follows the same project chronology. Save, quit and reload; embedded state and standalone applied history remain exact.
 - [ ] Open stereo effect, inspect both channels and tails. Compare flat/grouped audible examples without normalization.
 - [ ] Expose, rename and remove an unused control/port. IDs remain fixed; removing a connected boundary is refused with an explanation.
 - [ ] Publish v1, edit instance, publish v2. Existing song/copy remains unchanged; remove library copies and reopen song.

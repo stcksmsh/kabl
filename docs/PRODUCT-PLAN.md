@@ -245,7 +245,7 @@ Acceptance: record/play automation, close/reopen, change layout without retarget
 
 ### D09 — Reusable, inspectable composite modules
 
-Implementation checkpoint 2026-10-05: common workflow source reviewed at `a337f2c1eae867671f9deabadfa10f681de2bb26` on `codex/d09-composites`. Engineering completion/submission pending Kosta's explicit history semantics choice; owner review pending; not merged. [Composite report](composites/REPORT.md) and [acceptance](composites/ACCEPTANCE.md) preserve that dependency and earlier hardware checks.
+Draft submission 2026-10-05: reusable/inspectable composite workflow verified on `codex/d09-composites`; runtime/package a337f2c1eae867671f9deabadfa10f681de2bb26, final history validation 2c3d8319911a90c5960f9e02baa8dfd27c01de8f. Kosta selected chronological project Undo with independent instance state; separate histories are not required. Owner review pending; not merged. [Composite report](composites/REPORT.md) and [acceptance](composites/ACCEPTANCE.md) preserve exact evidence provenance and earlier hardware checks.
 
 Outcome: select an existing voice/effect, expose a small interface, use two copies independently and open either to understand it.
 

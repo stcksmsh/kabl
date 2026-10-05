@@ -1,0 +1,21 @@
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d09/crates/standalone)
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d09/crates/ui)
+    Finished `test` profile [optimized + debuginfo] target(s) in 1.50s
+     Running tests/composites.rs (target/debug/deps/composites-ea1bb948cc2779fc)
+
+running 12 tests
+test clearing_last_leaf_label_preserves_ownership_and_public_ids ... ok
+test encapsulate_sound_graph_identity_history_and_save ... ok
+test historical_ids_and_deletion_undo_never_alias ... ok
+test packed_faces_and_copied_binding_labels_identify_correct_leaves ... ok
+test malformed_project_load_and_seeded_nested_undo_are_atomic ... ok
+test duplicates_private_graph_and_stable_interfaces ... ok
+test cue_clock_dependencies_preserve_external_ids_or_require_inclusion ... ok
+test chronological_project_undo_keeps_interleaved_instance_state_independent ... ok
+test malformed_recursion_limits_and_missing_dependencies_are_atomic ... ok
+test publish_immutable_versions_embedded_recall_and_controller_omissions ... ok
+test real_widgets_open_and_edit_aliases_at_both_sizes_and_themes ... ok
+test exact_pcm_voice_stereo_effect_feedback_and_no_callback_allocation ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+

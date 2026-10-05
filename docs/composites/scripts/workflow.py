@@ -51,7 +51,7 @@ try:
   cutoffs.append(saved['modules'][leaf]['params'].get('cutoff_hz',3000))
  assert cutoffs[0]!=cutoffs[1],cutoffs
  shutil.copytree(patch,repo/'docs/composites/examples/workflow',dirs_exist_ok=True)
- (repo/'docs/composites/evidence/workflow.json').write_text(json.dumps({'actions':['select 4 leaves','encapsulate','duplicate','edit original public alias','project Undo/Redo','open original','open copy','save'],'disjoint_leaves':True,'cutoffs':cutoffs,'history':'chronological project Undo demonstration; owner decision still pending'},indent=2)+'\n')
+ (repo/'docs/composites/evidence/workflow.json').write_text(json.dumps({'actions':['select 4 leaves','encapsulate','duplicate','edit original public alias','project Undo/Redo','open original','open copy','save'],'disjoint_leaves':True,'cutoffs':cutoffs,'history':'chronological project Undo demonstration; selected by Kosta for D09'},indent=2)+'\n')
  print('Real widgets encapsulated, duplicated, edited, Undo/Redo, opened both instances and saved; independent cutoff values:',cutoffs)
 finally:
  if video:video.send_signal(2);video.wait(timeout=5)

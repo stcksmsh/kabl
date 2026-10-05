@@ -3,22 +3,22 @@
   "current_origin_master": "f870b3c4316b9ea819d35344de09f6b7d24c59ca",
   "brief_head": "36b7a36f32056d13bafa0d5d5fe7011bb4a4d385",
   "product_head": "a337f2c1eae867671f9deabadfa10f681de2bb26",
-  "tested_head": "a337f2c1eae867671f9deabadfa10f681de2bb26",
-  "reviewed_head": "a337f2c1eae867671f9deabadfa10f681de2bb26",
+  "tested_head": "2c3d8319911a90c5960f9e02baa8dfd27c01de8f",
+  "reviewed_head": "2c3d8319911a90c5960f9e02baa8dfd27c01de8f",
   "packaged_head": "a337f2c1eae867671f9deabadfa10f681de2bb26",
   "submitted_head": null,
   "draft_pr": null,
-  "engineering_complete": false,
+  "engineering_complete": true,
   "merged": false,
   "owner_approved": false,
-  "dependency": "Kosta required Undo semantics disposition still pending",
+  "dependency": null,
   "workspace": [
-    624,
+    625,
     0,
     22
   ],
   "focused_composites": [
-    11,
+    12,
     0
   ],
   "plugin_tests": [
@@ -46,7 +46,7 @@
   "reused_D08_index": "docs/host-production/evidence/strict-profile/index.json",
   "raw_archive": "/home/stcksmsh/.codex/visualizations/2026/10/05/01a10979-ac89-7a01-bd38-576bb907cce1/d09-evidence",
   "owner_bundle": "/home/stcksmsh/.codex/visualizations/2026/10/05/01a10979-ac89-7a01-bd38-576bb907cce1/d09-owner-test",
-  "owner_manifest_sha256": "2936bd3fecec263ecc66f67b63c5e785c7182d9b67669da0c77ff62f6cdab4a4",
+  "owner_manifest_sha256": "af80d71275097ec11be603f0898807355ab30da8b4ecbda408fd067e4a496101",
   "artifacts": {
     "capture-app-final.txt": "985492c19c73a88193d1a46c051dbc7b3ae9ced48e754b46e797a43245db87a6",
     "clippy-final-owned.txt": "74b7db58914737dd1ff6c1487aed601f1a3831ec954bfb5e0620a324e5da09de",
@@ -72,6 +72,12 @@
     "validator-final-owned.txt": "61e8f0f5cbebe630d91b4366463598a5621e52fcf2154fd173ee6d583b605461",
     "workflow-run.txt": "b92438e83afc6dff51ebfba7e46bd6bf2a593c6d683cc9a4cc38757568878862",
     "workflow.json": "10ea3f9707d05eaf3ae35293fe15065a367c472c914d51fb92bc1bb5b1f59b0e",
-    "workspace-final-owned.txt": "db5d3dd04b22430e37d48c096e069f259abf9264bff8c75b3a234b24698062c3"
-  }
+    "workspace-final-owned.txt": "db5d3dd04b22430e37d48c096e069f259abf9264bff8c75b3a234b24698062c3",
+    "history-focused.txt": "18097122e25d12042eca011ffe17bbe0db8fcb50299f6c4ac4aa479f87a0201c",
+    "workspace-submission.txt": "ea335ca9e3a3c106baecad8936a75253d5c9ce36ccf67219cb78553ade763607",
+    "clippy-submission.txt": "1677bbcae914fd69af5422d2116c8644c4e05417f51f7d74ab462cc9a339f61c"
+  },
+  "history_choice": "Kosta explicitly selected chronological project Undo; independent state required; no per-instance histories required",
+  "final_review": "PASS at 2c3d8319911a90c5960f9e02baa8dfd27c01de8f",
+  "runtime_source_unchanged_from_packaged_head": true
 }
