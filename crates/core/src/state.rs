@@ -8,6 +8,7 @@ use crate::op::{CableId, ModuleId, Op, ParamTarget, PortRef, Vec2};
 pub struct ModuleState {
     pub kind: String,
     pub pos: Vec2,
+    #[serde(deserialize_with = "crate::composite::unique_map")]
     pub params: BTreeMap<String, f32>,
 }
 
@@ -15,6 +16,7 @@ pub struct ModuleState {
 pub struct CableState {
     pub from: PortRef,
     pub to: PortRef,
+    #[serde(deserialize_with = "crate::composite::unique_map")]
     pub params: BTreeMap<String, f32>,
     pub steps: Vec<f32>,
 }
@@ -25,10 +27,22 @@ pub struct CableState {
 /// simplifications".
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PatchState {
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        deserialize_with = "crate::composite::unique_map"
+    )]
+    pub composites: BTreeMap<crate::CompositeId, crate::Composite>,
+    #[serde(deserialize_with = "crate::composite::unique_map")]
     pub modules: BTreeMap<ModuleId, ModuleState>,
+    #[serde(deserialize_with = "crate::composite::unique_map")]
     pub cables: BTreeMap<CableId, CableState>,
     /// Text labels per module (`Op::SetLabel`). Absent in files from before schema v3.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        deserialize_with = "crate::composite::unique_map"
+    )]
     pub labels: BTreeMap<ModuleId, BTreeMap<String, String>>,
 }
 
@@ -43,6 +57,10 @@ impl PatchState {
     /// module comes back with its params and cables, a removed cable with its settings.
     pub fn inverse_for(&self, op: &Op) -> Op {
         match op {
+            Op::SetComposite { id, .. } => Op::SetComposite {
+                id: *id,
+                value: self.composites.get(id).cloned(),
+            },
             Op::AddModule { id, .. } => Op::RemoveModule { id: *id },
             Op::RemoveModule { id } => {
                 let Some(m) = self.modules.get(id) else {
@@ -72,6 +90,19 @@ impl PatchState {
                 for (&cid, c) in &self.cables {
                     if c.from.module_id() == *id || c.to.module_id() == *id {
                         ops.extend(cable_restore_ops(cid, c));
+                    }
+                }
+                for (&cid, c) in &self.composites {
+                    if c.members.contains(id)
+                        || c.controls
+                            .values()
+                            .chain(c.ports.values())
+                            .any(|e| e.target.module_id() == *id)
+                    {
+                        ops.push(Op::SetComposite {
+                            id: cid,
+                            value: Some(c.clone()),
+                        });
                     }
                 }
                 Op::Group { ops }
@@ -150,6 +181,13 @@ impl PatchState {
 
     pub fn apply(&mut self, op: &Op) {
         match op {
+            Op::SetComposite { id, value } => {
+                if let Some(c) = value {
+                    self.composites.insert(*id, c.clone());
+                } else {
+                    self.composites.remove(id);
+                }
+            }
             Op::AddModule { id, kind, pos } => {
                 self.modules.insert(
                     *id,
@@ -163,6 +201,11 @@ impl PatchState {
             Op::RemoveModule { id } => {
                 self.modules.remove(id);
                 self.labels.remove(id);
+                for c in self.composites.values_mut() {
+                    c.members.remove(id);
+                    c.controls.retain(|_, e| e.target.module_id() != *id);
+                    c.ports.retain(|_, e| e.target.module_id() != *id);
+                }
                 // No dangling cables: a cable to or from a removed module goes with it.
                 self.cables
                     .retain(|_, c| c.from.module_id() != *id && c.to.module_id() != *id);

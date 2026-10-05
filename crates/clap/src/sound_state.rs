@@ -29,7 +29,7 @@ impl SoundState {
         Ok(state)
     }
     pub fn validate(&self) -> Result<(), String> {
-        if !matches!(self.version, 1 | 2) {
+        if !matches!(self.version, 1..=3) {
             return Err("Unsupported sound state version".into());
         }
         if !self.output_gain.is_finite() || !(0.0..=1.0).contains(&self.output_gain) {
@@ -41,6 +41,9 @@ impl SoundState {
                 || self.slot_values.iter().any(|&v| v != 0.0))
         {
             return Err("Version 1 cannot contain D08 settings".into());
+        }
+        if self.version < 3 && !self.patch.composites.is_empty() {
+            return Err("Composite state requires version 3".into());
         }
         for (i, lane) in self.lanes.iter().enumerate() {
             if !self.slot_values[i].is_finite() || !(0.0..=1.0).contains(&self.slot_values[i]) {
@@ -61,6 +64,7 @@ impl SoundState {
     }
 }
 pub fn validate_patch(p: &PatchState) -> Result<(), String> {
+    kabl_engine::compile::validate_composites(p)?;
     if p.modules.len() > 128 || p.cables.len() > 512 || p.labels.len() > 128 {
         return Err("Patch graph limit".into());
     }

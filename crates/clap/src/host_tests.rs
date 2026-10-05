@@ -517,11 +517,10 @@ fn unassignment_base_edit(saturated: bool) {
         |_, _| {},
     );
     let gain = p.shared.params.gain.value();
-    assert!(
-        left.iter()
-            .zip(expected)
-            .all(|(&v, e)| (v - e * gain).abs() < 1e-6)
-    );
+    assert!(left
+        .iter()
+        .zip(expected)
+        .all(|(&v, e)| (v - e * gain).abs() < 1e-6));
 }
 
 #[test]
@@ -563,4 +562,40 @@ fn recall_after_native_sync_cannot_be_overwritten_by_old_callback() {
     assert!(p.shared.params.host_clock.value());
     assert_eq!(p.shared.params.slots[0].value.value(), 0.37);
     assert_eq!(p.shared.native_epoch.load(Ordering::Acquire), 2);
+}
+
+#[test]
+fn composite_embedded_state_preserves_lanes_and_rejects_legacy_envelope_atomically() {
+    let p = tests::instrument();
+    let mut state = p.shared.snapshot();
+    let original = state.patch.clone();
+    let lanes = state.lanes.clone();
+    let mut editor = kabl_ui::PatchEditor::seed_from(&state.patch);
+    let members = state
+        .patch
+        .modules
+        .iter()
+        .filter(|(_, m)| m.kind != "out" && m.kind != "midi.in")
+        .map(|(&id, _)| id)
+        .collect();
+    kabl_ui::composites::encapsulate(
+        &mut editor,
+        members,
+        std::collections::BTreeSet::new(),
+        "Host composite",
+    )
+    .unwrap();
+    state.patch = editor.state().clone();
+    state.version = 3;
+    assert_eq!(state.patch.modules, original.modules);
+    assert_eq!(state.patch.cables, original.cables);
+    p.shared.load(state).unwrap();
+    let recalled = p.shared.snapshot();
+    assert_eq!(recalled.lanes, lanes);
+    assert!(!recalled.patch.composites.is_empty());
+    let before = serde_json::to_vec(&recalled).unwrap();
+    let mut invalid = recalled;
+    invalid.version = 2;
+    assert!(p.shared.load(invalid).is_err());
+    assert_eq!(serde_json::to_vec(&p.shared.snapshot()).unwrap(), before);
 }

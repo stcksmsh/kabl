@@ -2834,3 +2834,13 @@ load failures. CC values have separate exact payloads and epochs. GUI producer o
 is retained off audio to preserve accepted gestures, trading potentially growing producer
 memory for bounded callback work. Carry the reproducible vendor patch/manifests and repeat
 the documented audit and host evidence on upstream changes. No owner approval is inferred.
+
+## 2026-10-05 — D09 identity-preserving composite projection (implementation)
+
+Composites own private sets of existing leaf module IDs and a bounded parent tree. Public controls/ports are stable numbered aliases of real leaf targets; editable labels and instance identity are separate. The compiler validates ownership/interfaces and compiles the same flat graph in the same ID order. This preserves deterministic feedback back edges, voice reachability, runtime targets, cues, pins and native lanes without a recursive engine or duplicated mutable graph.
+
+`Op::SetComposite` replaces exact typed instance metadata with an exact inverse. Core schema 4 carries it through log replay, seeding and comparison. Host state version 3 permits composites; versions 1/2 remain supported for legacy flat sounds and reject active composite metadata. Grouping and interface edits do not rebuild audio. Projects embed complete leaves and metadata, never a live library path. Immutable package versions create independent instances; publishing never updates other songs automatically.
+
+Duplicates allocate fresh IDs above live and historical reservations, copy pins with fresh order positions, omit CC/button mappings and native assignments, and leave boundary cables unpatched. Same-document external cue/clock references remain unchanged; portable export refuses unresolved dependencies and asks users to include the referenced modules. Packages validate complete candidates before one undoable transaction; failed candidates do not change history or ID counters. Nesting stops at eight levels; signal feedback remains legal, definition ancestry recursion does not.
+
+History semantics remain an explicit owner choice between chronological project Undo and separate per-instance Undo. No per-instance history acceptance is inferred from disjoint graph identities. This decision will be completed before submission.

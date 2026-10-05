@@ -121,6 +121,16 @@ impl PatchEditor {
                 );
             }
         }
+        for (&id, c) in &patch.composites {
+            editor.log.append(
+                Op::SetComposite {
+                    id,
+                    value: Some(c.clone()),
+                },
+                0,
+                Source::User,
+            );
+        }
         editor.dirty = false; // seeding isn't a user edit -- nothing needs a swap for it yet.
         editor
     }
@@ -139,6 +149,32 @@ impl PatchEditor {
             dirty: false,
             instance: next_instance(),
         }
+    }
+
+    /// High-water marks include removed objects retained by Undo/Redo, not only live state.
+    pub fn reserved_ids(&self) -> (ModuleId, CableId) {
+        fn visit(op: &Op, module: &mut u64, cable: &mut u64) {
+            match op {
+                Op::AddModule { id, .. } | Op::RemoveModule { id } => {
+                    *module = (*module).max(id.saturating_add(1))
+                }
+                Op::Connect { id, .. } | Op::Disconnect { id } => {
+                    *cable = (*cable).max(id.saturating_add(1))
+                }
+                Op::Group { ops } => {
+                    for op in ops {
+                        visit(op, module, cable);
+                    }
+                }
+                _ => {}
+            }
+        }
+        let (mut module, mut cable) = (self.next_module_id, self.next_cable_id);
+        for entry in self.log.all_entries() {
+            visit(&entry.op, &mut module, &mut cable);
+            visit(&entry.inverse, &mut module, &mut cable);
+        }
+        (module, cable)
     }
 
     /// Identifies this editor: opening another sound builds a new one, so view state tied to
@@ -197,6 +233,7 @@ impl PatchEditor {
     /// exactly the same error path a corrupt saved file would hit; the editor doesn't need its
     /// own separate validation layer duplicating that.
     pub fn add_module(&mut self, kind: &str, pos: Vec2) -> ModuleId {
+        self.next_module_id = self.reserved_ids().0;
         let id = self.next_module_id;
         self.next_module_id += 1;
         self.append(Op::AddModule {
@@ -315,6 +352,7 @@ impl PatchEditor {
     /// A jack input holds one cable: connecting into an occupied jack replaces the old cable,
     /// and the replacement undoes as one step. Param destinations (routes) accumulate.
     pub fn connect(&mut self, from: PortRef, to: PortRef) -> CableId {
+        self.next_cable_id = self.reserved_ids().1;
         let id = self.next_cable_id;
         self.next_cable_id += 1;
         let mut ops: Vec<Op> = Vec::new();
@@ -450,6 +488,7 @@ impl PatchEditor {
                     }
                 }
             }
+            self.next_cable_id = self.reserved_ids().1;
             let id = self.next_cable_id;
             self.next_cable_id += 1;
             ops.push(Op::Connect { id, from, to });
@@ -489,9 +528,11 @@ impl PatchEditor {
 /// face controls or annotating the log is presentation/history only and must not rebuild audio.
 pub fn affects_audio(op: &Op) -> bool {
     match op {
-        Op::MoveModule { .. } | Op::Annotate { .. } | Op::Snapshot { .. } | Op::SetLabel { .. } => {
-            false
-        }
+        Op::SetComposite { .. }
+        | Op::MoveModule { .. }
+        | Op::Annotate { .. }
+        | Op::Snapshot { .. }
+        | Op::SetLabel { .. } => false,
         Op::SetParam {
             target: ParamTarget::Module { param, .. },
             ..

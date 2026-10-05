@@ -8,9 +8,9 @@ use crate::log::PatchLog;
 use crate::op::Entry;
 
 /// v2 adds `PortRef::Param` (modulation routes), `Op::UnsetParam` and `Op::Group`; v3 adds
-/// `Op::SetLabel`. Each is a strict superset of the one before, so older files load unchanged;
+/// `Op::SetLabel`; v4 adds `Op::SetComposite`. Each is a strict superset of the one before, so older files load unchanged;
 /// there is nothing to migrate.
-pub const CURRENT_SCHEMA_VERSION: u32 = 3;
+pub const CURRENT_SCHEMA_VERSION: u32 = 4;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Meta {
@@ -78,6 +78,9 @@ pub fn load(dir: &Path) -> Result<PatchLog, FormatError> {
         }
         let entry: Entry = serde_json::from_str(line)?;
         log.append_entry_raw(entry);
+    }
+    if meta.schema_version < 4 && !log.state().composites.is_empty() {
+        return Err(FormatError::UnknownSchemaVersion(4));
     }
     Ok(log)
 }

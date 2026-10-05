@@ -42,6 +42,11 @@ impl ParamTarget {
 /// Do not add variants without a `docs/decisions.md` entry (foundational decision, section 4.1).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Op {
+    /// Exact instance metadata replacement; leaves keep their own identities. Schema v4.
+    SetComposite {
+        id: crate::CompositeId,
+        value: Option<crate::Composite>,
+    },
     AddModule {
         id: ModuleId,
         kind: String,

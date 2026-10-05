@@ -14,6 +14,7 @@
 pub mod banks;
 pub mod browser;
 pub mod compare;
+pub mod composites;
 pub mod control;
 pub mod cues;
 pub mod editor;
@@ -96,6 +97,7 @@ impl Xf {
 
 /// Interaction and view state that is not part of the patch.
 pub struct UiState {
+    pub composites: composites::View,
     pub selected_kind: String,
     pub selected_module: Option<ModuleId>,
     pending_output: Option<PortRef>,
@@ -249,6 +251,7 @@ struct Moving {
 impl Default for UiState {
     fn default() -> Self {
         UiState {
+            composites: composites::View::default(),
             selected_kind: PatchEditor::known_kinds()
                 .first()
                 .copied()
@@ -459,6 +462,7 @@ impl UiState {
 /// Draws the rack editor for one frame and applies user edits to `editor` directly. Call once
 /// per frame from `eframe::App::ui`.
 pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
+    composites::panel(editor, ui_state, ui.ctx());
     browser::frame_input(editor, ui_state, ui);
     ui_state.validate(editor);
     ui_state.explain.validate(editor);
@@ -681,6 +685,28 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) 
         let open = ui_state.browser_open;
         if tool(ui, ui_state, "browser", "Sounds", open) {
             ui_state.browser_open = !open;
+        }
+        if tool(
+            ui,
+            ui_state,
+            "composites",
+            "Composites",
+            ui_state.composites.panel,
+        ) {
+            ui_state.composites.panel = !ui_state.composites.panel;
+        }
+        if !ui_state.composites.open.is_empty()
+            && tool(
+                ui,
+                ui_state,
+                "composite:close-all",
+                "Close internals",
+                false,
+            )
+        {
+            ui_state.composites.open.clear();
+            ui_state.selected_module = None;
+            ui_state.inspected = None;
         }
         egui::ComboBox::from_id_salt("kind")
             .width(90.0)
@@ -1178,7 +1204,22 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
 
     let mut drawn = Drawn::default();
     ui_state.deferred.clear();
+    if let Some(leaf) = ui_state
+        .reveal
+        .or(ui_state.selected_module)
+        .or_else(|| ui_state.inspected.as_ref().map(|(id, _)| *id))
+    {
+        for &id in editor.state().composites.keys() {
+            if kabl_core::composite::leaves(editor.state(), id).contains(&leaf) {
+                ui_state.composites.open.insert(id);
+            }
+        }
+    }
+    draw_composites(editor, ui_state, ui, xf, &mut drawn);
     for m in &lay.mods {
+        if composite_hidden(editor.state(), &ui_state.composites.open, m.id) {
+            continue;
+        }
         draw_module(editor, ui_state, ui, &painter, th, xf, m, now, &mut drawn);
     }
     // Floating areas' visible screen rects, for drop targeting.
@@ -3360,6 +3401,154 @@ fn port_color(th: &Theme, editor: &PatchEditor, from: &PortRef) -> Color32 {
                 .find(|p| p.name == port && p.direction == PortDirection::Output)
         })
         .map_or(th.cv, |p| th.signal(p.port_type))
+}
+
+fn composite_hidden(p: &PatchState, open: &BTreeSet<u64>, leaf: u64) -> bool {
+    p.composites
+        .keys()
+        .any(|id| !open.contains(id) && kabl_core::composite::leaves(p, *id).contains(&leaf))
+}
+fn draw_composites(
+    editor: &mut PatchEditor,
+    view: &mut UiState,
+    ui: &mut egui::Ui,
+    xf: Xf,
+    drawn: &mut Drawn,
+) {
+    let snapshot = editor.state().clone();
+    for (&id, c) in &snapshot.composites {
+        let mut parent = c.parent;
+        let mut hidden = false;
+        for _ in 0..8 {
+            let Some(id) = parent else {
+                break;
+            };
+            if !view.composites.open.contains(&id) {
+                hidden = true;
+                break;
+            }
+            parent = snapshot.composites.get(&id).and_then(|c| c.parent);
+        }
+        if hidden {
+            continue;
+        }
+        if view.composites.open.contains(&id) {
+            continue;
+        }
+        let rect = xf.r(Rect::from_min_size(
+            pos2(c.pos.x, c.pos.y),
+            vec2(240.0, PANEL_H),
+        ));
+        ui.scope_builder(
+            egui::UiBuilder::new()
+                .max_rect(rect)
+                .id_salt(("composite-face", id)),
+            |ui| {
+                egui::Frame::group(ui.style()).show(ui, |ui| {
+                    ui.set_width((rect.width() - 16.0).max(120.0));
+                    ui.set_max_height(rect.height() - 16.0);
+                    ui.spacing_mut().slider_width = (rect.width() - 92.0).max(20.0);
+                    ui.set_clip_rect(ui.clip_rect().intersect(rect.expand(4.0)));
+                    ui.label(egui::RichText::new(format!("{} · #{id}", c.name)).strong());
+                    let r = ui.button("Open internals / edit this instance");
+                    view.record(format!("composite:{id}:open"), r.rect);
+                    if r.clicked() {
+                        view.composites.open.insert(id);
+                    }
+                    egui::ScrollArea::vertical()
+                        .max_height((rect.height() - 80.0).max(100.0))
+                        .show(ui, |ui| {
+                            for (&key, e) in &c.ports {
+                                let dir = composites::direction(&snapshot, &e.target)
+                                    .unwrap_or(PortDirection::Input);
+                                let label = if dir == PortDirection::Output {
+                                    format!("OUT {}", e.label)
+                                } else {
+                                    format!("IN {}", e.label)
+                                };
+                                let r = ui.button(label);
+                                if !ui.clip_rect().intersects(r.rect) {
+                                    continue;
+                                }
+                                view.record(format!("composite:{id}:port:{key}"), r.rect);
+                                match &e.target {
+                                    PortRef::Module { id, port } => {
+                                        drawn
+                                            .ports
+                                            .insert((*id, dir, port.clone()), r.rect.center());
+                                        view.record(
+                                            format!(
+                                                "{}:{id}.{port}",
+                                                if dir == PortDirection::Output {
+                                                    "out"
+                                                } else {
+                                                    "in"
+                                                }
+                                            ),
+                                            r.rect,
+                                        );
+                                    }
+                                    PortRef::Param { id, param } => {
+                                        view.record(format!("knob:{id}.{param}"), r.rect);
+                                        for (&cid, cable) in &snapshot.cables {
+                                            if cable.to == e.target {
+                                                drawn.plugs.push((cid, r.rect.center()));
+                                            }
+                                        }
+                                    }
+                                }
+                                if r.clicked() {
+                                    if dir == PortDirection::Output {
+                                        view.pending_output = Some(e.target.clone());
+                                        view.last_message =
+                                            Some("Choose an input to connect this output.".into());
+                                    } else if let Some(from) = view.pending_output.take() {
+                                        editor.connect(from, e.target.clone());
+                                    }
+                                }
+                                r.context_menu(|ui| {
+                                    if ui.button("Inspect bound module").clicked() {
+                                        view.composites.open.insert(id);
+                                        view.selected_module = Some(e.target.module_id());
+                                        view.reveal = Some(e.target.module_id());
+                                        view.drawer_open = true;
+                                        ui.close();
+                                    }
+                                });
+                            }
+                            for (&key, e) in &c.controls {
+                                if let PortRef::Param { id: leaf, param } = &e.target {
+                                    if let Some(info) =
+                                        registry::info_for(&snapshot.modules[leaf].kind)
+                                    {
+                                        if let Some(param) =
+                                            info.params.iter().find(|p| p.name == param)
+                                        {
+                                            ui.label(&e.label);
+                                            perform::param_editor(
+                                                editor,
+                                                view,
+                                                ui,
+                                                *leaf,
+                                                param,
+                                                false,
+                                                Some(format!("composite:{id}:control:{key}")),
+                                            );
+                                            if ui.small_button("Reveal target / routes").clicked() {
+                                                view.composites.open.insert(id);
+                                                view.inspected = Some((*leaf, param.name.into()));
+                                                view.reveal = Some(*leaf);
+                                                view.drawer_open = true;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                });
+            },
+        );
+    }
 }
 
 #[cfg(test)]
