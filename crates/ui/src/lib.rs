@@ -3943,8 +3943,10 @@ mod tests {
 
     #[test]
     fn empty_rack_fit_keeps_import_coordinates_finite() {
-        let mut view = super::UiState::default();
-        view.canvas = egui::Rect::from_min_size(egui::pos2(0., 60.), egui::vec2(1280., 700.));
+        let mut view = super::UiState {
+            canvas: egui::Rect::from_min_size(egui::pos2(0., 60.), egui::vec2(1280., 700.)),
+            ..Default::default()
+        };
         view.frame_world(egui::Rect::NOTHING, 1.5);
         assert!(view.pan.is_finite());
         assert!(view.zoom.is_finite());
