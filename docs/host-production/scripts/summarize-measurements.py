@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Separate execution histograms, lifecycle arrival gaps and observed backend errors."""
-import json
+import json, os
 from pathlib import Path
 repo = Path(__file__).resolve().parents[3]
 results = []
-for entry in json.loads((repo/'docs/host-production/evidence/host-measurements.json').read_text()):
+for entry in json.loads(Path(os.environ.get('D08_MEASURE_EVIDENCE',str(repo/'docs/host-production/evidence/host-measurements.json'))).read_text()):
     active=[]; inactive=[]
     for line in entry['callback_csv'].splitlines():
         row=list(map(int,line.split(',')))
@@ -16,5 +16,5 @@ for entry in json.loads((repo/'docs/host-production/evidence/host-measurements.j
         if len(fields)>9 and fields[-1]=='REAPER' and fields[1].isdigit() and fields[8].isdigit():
             nodes[fields[1]]=max(nodes.get(fields[1],0),int(fields[8]))
     results.append({'case':entry['case'],'product_head':entry['product_head'],'binary_sha256':entry['binary_sha256'],'active_instances':active,'startup_teardown_instances':inactive,'observed_reaper_nodes_error_max':nodes,'task_reaper_node_error_max':max(nodes.values(),default=0),'period_us':256/48000*1e6,'arrival_scope':'whole callback lifetime including startup/teardown; not callback execution or physical latency'})
-(repo/'docs/host-production/evidence/timing-summary.json').write_text(json.dumps(results,indent=2)+'\n')
+Path(os.environ.get('D08_TIMING_SUMMARY',str(repo/'docs/host-production/evidence/timing-summary.json'))).write_text(json.dumps(results,indent=2)+'\n')
 for result in results: print(result['case'],[x['p99_upper_us'] for x in result['active_instances']],result['task_reaper_node_error_max'])

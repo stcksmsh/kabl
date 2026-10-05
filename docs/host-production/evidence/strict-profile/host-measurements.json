@@ -1,0 +1,122 @@
+[
+  {
+    "verified_module_counts": [
+      6,
+      6
+    ],
+    "case": "light-1-closed",
+    "product_head": "f7157619836075d0d7704e59be5d66e6224890b1",
+    "binary_sha256": "3baa8ee3cc0f2f99e1823e0a741d7301713098f99e92dc84f7556b8d0483aca4",
+    "patch": "init-keyboard (6 modules/7 cables)",
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.022392406\nGUI_checks=3\n",
+    "gui_handles": "check=0 track=0 expected=false handle=nil\ncheck=0 track=1 expected=false handle=nil\ncheck=1 track=0 expected=false handle=nil\ncheck=1 track=1 expected=false handle=nil\ncheck=2 track=0 expected=false handle=nil\ncheck=2 track=1 expected=false handle=nil\n",
+    "callback_csv": "1,8,12320482,1763410,1770000,2048,256,256,7,926457,1966212,11594842\n2,41,4685743,196131,200000,10496,256,256,40,76842,4896050,32432881\n0,2483,232705305,442518,170000,635648,256,256,2482,79149,84280464,13226724169\n",
+    "reaper_pid": 100563,
+    "raw_dir": "/secondary/Programming/Github/kabl/.worktrees/d08/scratch/strict-host/measure/light-1-closed"
+  },
+  {
+    "verified_module_counts": [
+      6,
+      6
+    ],
+    "case": "light-1-open",
+    "product_head": "f7157619836075d0d7704e59be5d66e6224890b1",
+    "binary_sha256": "3baa8ee3cc0f2f99e1823e0a741d7301713098f99e92dc84f7556b8d0483aca4",
+    "patch": "init-keyboard (6 modules/7 cables)",
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.014373262\nGUI_checks=3\n",
+    "gui_handles": "check=0 track=0 expected=true handle=userdata: 0x17808fe0\ncheck=0 track=1 expected=false handle=nil\ncheck=1 track=0 expected=true handle=userdata: 0x17808fe0\ncheck=1 track=1 expected=false handle=nil\ncheck=2 track=0 expected=true handle=userdata: 0x17808fe0\ncheck=2 track=1 expected=false handle=nil\n",
+    "callback_csv": "1,11,11328014,1590640,1600000,2816,256,256,10,931553,2264623,12320769\n2,36,3865299,241152,250000,9216,256,256,35,68475,4900322,27397796\n0,2491,265479943,412905,190000,637696,256,256,2490,96654,99320060,13268926155\n",
+    "reaper_pid": 101049,
+    "raw_dir": "/secondary/Programming/Github/kabl/.worktrees/d08/scratch/strict-host/measure/light-1-open"
+  },
+  {
+    "verified_module_counts": [
+      6,
+      6
+    ],
+    "case": "light-2-closed",
+    "product_head": "f7157619836075d0d7704e59be5d66e6224890b1",
+    "binary_sha256": "3baa8ee3cc0f2f99e1823e0a741d7301713098f99e92dc84f7556b8d0483aca4",
+    "patch": "init-keyboard (6 modules/7 cables)",
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.015627268\nGUI_checks=3\n",
+    "gui_handles": "check=0 track=0 expected=false handle=nil\ncheck=0 track=1 expected=false handle=nil\ncheck=1 track=0 expected=false handle=nil\ncheck=1 track=1 expected=false handle=nil\ncheck=2 track=0 expected=false handle=nil\ncheck=2 track=1 expected=false handle=nil\n",
+    "callback_csv": "1,7,11331291,1836223,1840000,1792,256,256,6,1374393,2041680,10314213\n2,2484,246491296,394192,190000,635904,256,256,2483,68489,196860823,13253193766\n0,2491,235763213,394979,180000,637696,256,256,2490,73357,79671217,13269007340\n",
+    "reaper_pid": 101413,
+    "raw_dir": "/secondary/Programming/Github/kabl/.worktrees/d08/scratch/strict-host/measure/light-2-closed"
+  },
+  {
+    "verified_module_counts": [
+      6,
+      6
+    ],
+    "case": "light-2-open",
+    "product_head": "f7157619836075d0d7704e59be5d66e6224890b1",
+    "binary_sha256": "3baa8ee3cc0f2f99e1823e0a741d7301713098f99e92dc84f7556b8d0483aca4",
+    "patch": "init-keyboard (6 modules/7 cables)",
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.025302951\nGUI_checks=3\n",
+    "gui_handles": "check=0 track=0 expected=true handle=userdata: 0x3c938a80\ncheck=0 track=1 expected=true handle=userdata: 0x3d913ca0\ncheck=1 track=0 expected=true handle=userdata: 0x3c938a80\ncheck=1 track=1 expected=true handle=userdata: 0x3d913ca0\ncheck=2 track=0 expected=true handle=userdata: 0x3c938a80\ncheck=2 track=1 expected=true handle=userdata: 0x3d913ca0\n",
+    "callback_csv": "1,9,10981381,1887378,1890000,2304,256,256,8,1029422,2093596,10807701\n2,2529,312358908,1927542,210000,647424,256,256,2528,68130,154457400,13498560201\n0,2538,296827031,428832,210000,649728,256,256,2537,76471,90188475,13519596569\n",
+    "reaper_pid": 101768,
+    "raw_dir": "/secondary/Programming/Github/kabl/.worktrees/d08/scratch/strict-host/measure/light-2-open"
+  },
+  {
+    "verified_module_counts": [
+      94,
+      94
+    ],
+    "case": "dense-1-closed",
+    "product_head": "f7157619836075d0d7704e59be5d66e6224890b1",
+    "binary_sha256": "3baa8ee3cc0f2f99e1823e0a741d7301713098f99e92dc84f7556b8d0483aca4",
+    "patch": "sound-palette (94 modules/156 cables)",
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.007449218\nGUI_checks=3\n",
+    "gui_handles": "check=0 track=0 expected=false handle=nil\ncheck=0 track=1 expected=false handle=nil\ncheck=1 track=0 expected=false handle=nil\ncheck=1 track=1 expected=false handle=nil\ncheck=2 track=0 expected=false handle=nil\ncheck=2 track=1 expected=false handle=nil\n",
+    "callback_csv": "0,31,3300963,233476,240000,7936,256,256,30,73269,1992772,17535246\n1,47,55412067,1743096,1750000,12032,256,256,46,835180,3244097,60483624\n2,2455,2681014085,2027542,1730000,628480,256,256,2454,820512,202580862,13221297893\n",
+    "reaper_pid": 102202,
+    "raw_dir": "/secondary/Programming/Github/kabl/.worktrees/d08/scratch/strict-host/measure/dense-1-closed"
+  },
+  {
+    "verified_module_counts": [
+      94,
+      94
+    ],
+    "case": "dense-1-open",
+    "product_head": "f7157619836075d0d7704e59be5d66e6224890b1",
+    "binary_sha256": "3baa8ee3cc0f2f99e1823e0a741d7301713098f99e92dc84f7556b8d0483aca4",
+    "patch": "sound-palette (94 modules/156 cables)",
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.022924255\nGUI_checks=3\n",
+    "gui_handles": "check=0 track=0 expected=true handle=userdata: 0x359ce310\ncheck=0 track=1 expected=false handle=nil\ncheck=1 track=0 expected=true handle=userdata: 0x359ce310\ncheck=1 track=1 expected=false handle=nil\ncheck=2 track=0 expected=true handle=userdata: 0x359ce310\ncheck=2 track=1 expected=false handle=nil\n",
+    "callback_csv": "0,18,1966884,221075,230000,4608,256,256,17,72772,2815179,10834187\n1,43,50428100,1776776,1780000,11008,256,256,42,942063,5158036,53810687\n2,2520,3280906661,2708062,2030000,645120,256,256,2519,951280,165699481,13503970401\n",
+    "reaper_pid": 102708,
+    "raw_dir": "/secondary/Programming/Github/kabl/.worktrees/d08/scratch/strict-host/measure/dense-1-open"
+  },
+  {
+    "verified_module_counts": [
+      94,
+      94
+    ],
+    "case": "dense-2-closed",
+    "product_head": "f7157619836075d0d7704e59be5d66e6224890b1",
+    "binary_sha256": "3baa8ee3cc0f2f99e1823e0a741d7301713098f99e92dc84f7556b8d0483aca4",
+    "patch": "sound-palette (94 modules/156 cables)",
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.002487663\nGUI_checks=3\n",
+    "gui_handles": "check=0 track=0 expected=false handle=nil\ncheck=0 track=1 expected=false handle=nil\ncheck=1 track=0 expected=false handle=nil\ncheck=1 track=1 expected=false handle=nil\ncheck=2 track=0 expected=false handle=nil\ncheck=2 track=1 expected=false handle=nil\n",
+    "callback_csv": "0,23,2696620,242445,250000,5888,256,256,22,65212,2971775,11350633\n1,2481,3006521520,2677398,1780000,635136,256,256,2480,874726,131033870,13220844464\n2,2458,2825919458,2104535,1760000,629248,256,256,2457,879976,180848436,13200496811\n",
+    "reaper_pid": 103230,
+    "raw_dir": "/secondary/Programming/Github/kabl/.worktrees/d08/scratch/strict-host/measure/dense-2-closed"
+  },
+  {
+    "verified_module_counts": [
+      94,
+      94
+    ],
+    "case": "dense-2-open",
+    "product_head": "f7157619836075d0d7704e59be5d66e6224890b1",
+    "binary_sha256": "3baa8ee3cc0f2f99e1823e0a741d7301713098f99e92dc84f7556b8d0483aca4",
+    "patch": "sound-palette (94 modules/156 cables)",
+    "device": "SRATE=true 48000\nBSIZE=true 256\nMODE=true JACK\nduration=12.007036274001\nGUI_checks=3\n",
+    "gui_handles": "check=0 track=0 expected=true handle=userdata: 0xde6eef0\ncheck=0 track=1 expected=true handle=userdata: 0xe0d76a0\ncheck=1 track=0 expected=true handle=userdata: 0xde6eef0\ncheck=1 track=1 expected=true handle=userdata: 0xe0d76a0\ncheck=2 track=0 expected=true handle=userdata: 0xde6eef0\ncheck=2 track=1 expected=true handle=userdata: 0xe0d76a0\n",
+    "callback_csv": "0,28,2961819,255776,260000,7168,256,256,27,71777,2039048,16118794\n1,2533,3993581604,4969907,2540000,648448,256,256,2532,913703,200337858,13498143872\n2,2505,3920445710,5491267,2460000,641280,256,256,2504,866810,202674328,13477190075\n",
+    "reaper_pid": 103691,
+    "raw_dir": "/secondary/Programming/Github/kabl/.worktrees/d08/scratch/strict-host/measure/dense-2-open"
+  }
+]

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Create source-free Linux owner bundle with complete embedded project state."""
-import hashlib, json, shutil, subprocess, sys
+import hashlib, json, shutil, subprocess, sys, os
 from pathlib import Path
 repo=Path(__file__).resolve().parents[3];out=Path(sys.argv[1]).resolve();out.mkdir(parents=True,exist_ok=False)
 for name in ('plugins','projects','media','profile','profile/empty-vst','scripts','runs'): (out/name).mkdir(exist_ok=True)
@@ -13,7 +13,12 @@ render=Path(sys.argv[2]).resolve() if len(sys.argv)>2 else repo/'scratch/host/d0
 shutil.copy2(render,out/'media/arrangement.wav')
 (out/'docs').mkdir()
 for name in ('README.md','design.md','REPORT.md','REVIEW.md','CHECKLIST.md','RT-OWNERSHIP.md'):
-    shutil.copy2(repo/'docs/host-production'/name,out/'docs'/name)
+    text=(repo/'docs/host-production'/name).read_text()
+    (out/'docs'/name).write_text(text.replace('(../../vendor/', '(../vendor/'))
+shutil.copytree(repo/'docs/host-production/evidence/strict-profile',out/'docs/evidence/strict-profile')
+(out/'vendor/nice-plug').mkdir(parents=True)
+for name in ('LICENSE','STRICT-PROFILE.md','STRICT-PROFILE.patch','UPSTREAM-SHA256.json','SOURCE-SHA256.json'):
+    shutil.copy2(repo/'vendor/nice-plug'/name,out/'vendor/nice-plug'/name)
 (out/'profile/reaper.ini').write_text('[reaper]\nlinux_audio_mode=0\nlinux_audio_srate=48000\nlinux_audio_bsize=256\nvstpath64='+str(out/'profile/empty-vst')+'\n')
 (out/'launch.sh').write_text('''#!/bin/sh
 set -eu
@@ -33,9 +38,10 @@ exec "$root/launch.sh" "$root/scripts/serial-repeat.lua"
 (out/'README.txt').write_text('''D08 Linux x86_64 owner test, REAPER 7.75 + PipeWire JACK.
 Run ./launch.sh from any directory. Uses isolated profile and packaged production CLAP.
 No source checkout, build toolchain, factory library or external media is required.
-R6 remains unresolved: the framework callback mutex, fallback spin locks and retrying handoffs
-prevent strict whole-callback real-time acceptance. No repair or acceptance waiver was shipped.
-Read docs/RT-OWNERSHIP.md for source evidence, concrete alternatives and maintenance impact.
+R6 is repaired for the declared Kabl strict CLAP profile: checked exclusive ownership,
+activation snapshots, scalar publication and bounded callback handoffs. Read docs/RT-OWNERSHIP.md
+for exact audit coverage, host lifecycle assumptions and vendor maintenance obligations.
+Off-audio producer backlog can grow when a host permanently rejects output. Owner approval remains pending.
 Project embeds played virtual/scripted MIDI and Host-synchronized sequence, complete states,
 stable mappings, tempo changes and automation. No physical controller evidence is claimed.
 
@@ -62,8 +68,8 @@ there. Never overwrite an existing plugin without preserving it. Optional uninst
 and remove ONLY that installed ~/.clap/kabl.clap. For isolated usage, close scratch REAPER and
 remove this bundle directory. No global installation or user profile modification was performed.
 ''')
-shutil.copy2(Path('/home/stcksmsh/.cargo/git/checkouts/nice-plug-cc55f1f1bcef5b66/263b168/LICENSE'),out/'nice-plug-LICENSE')
-verification=json.loads((repo/'docs/host-production/evidence/submission-verification.json').read_text())
+shutil.copy2(repo/'vendor/nice-plug/LICENSE',out/'nice-plug-LICENSE')
+verification=json.loads(Path(os.environ.get('D08_VERIFICATION',str(repo/'docs/host-production/evidence/strict-profile/submission-verification.json'))).read_text())
 assert hashlib.sha256((out/'plugins/kabl.clap').read_bytes()).hexdigest()==verification['binary_sha256'],'binary differs from tested product'
 manifest={'product_head':verification['product_head'],'binary_sha256':verification['binary_sha256'],'mutable_dirs':['profile','runs'],'files':{str(p.relative_to(out)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(out.rglob('*')) if p.is_file() and p.relative_to(out).parts[0] not in ('profile','runs')}}
 (out/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n');print(out)

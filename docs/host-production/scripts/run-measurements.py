@@ -31,5 +31,5 @@ for kind,count,opened in itertools.product(('light','dense'),(1,2),(0,1)):
     entry={'verified_module_counts':[len(s['patch']['modules']) for s in states],'case':case,'product_head':subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip(),'binary_sha256':hashlib.sha256((repo/'target/release/libkabl_clap.so').read_bytes()).hexdigest(),'patch': 'init-keyboard (6 modules/7 cables)' if kind=='light' else 'sound-palette (94 modules/156 cables)','device':(out/'measure-device.txt').read_text(),'gui_handles':(out/'gui-handles.txt').read_text(),'callback_csv':(out/'callbacks.csv').read_text(),'reaper_pid':int((out/'reaper-pid.txt').read_text()),'raw_dir':str(out)}
     assert all(v in entry['device'] for v in ('GUI_checks=3','SRATE=true 48000','BSIZE=true 256','MODE=true JACK'))
     results.append(entry)
-    (repo/'docs/host-production/evidence/host-measurements.json').write_text(json.dumps(results,indent=2)+'\n')
+    evidence.write_text(json.dumps(results,indent=2)+'\n')
     print(case+' complete',flush=True)

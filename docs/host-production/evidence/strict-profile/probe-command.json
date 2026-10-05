@@ -1,0 +1,21 @@
+[
+  "rustc",
+  "--edition=2021",
+  "/secondary/Programming/Github/kabl/.worktrees/d08/docs/host-production/scripts/rt-framework-probe.rs",
+  "-L",
+  "dependency=/secondary/Programming/Github/kabl/.worktrees/d08/target/debug/deps",
+  "--extern",
+  "parking_lot=/secondary/Programming/Github/kabl/.worktrees/d08/target/debug/deps/libparking_lot-7ce6dfb1301f558b.rlib",
+  "--extern",
+  "crossbeam_utils=/secondary/Programming/Github/kabl/.worktrees/d08/target/debug/deps/libcrossbeam_utils-4cf67b564d89f9ad.rlib",
+  "--extern",
+  "rtrb=/secondary/Programming/Github/kabl/.worktrees/d08/target/debug/deps/librtrb-9a8a673155fcca47.rlib",
+  "--extern",
+  "atomic_refcell=/secondary/Programming/Github/kabl/.worktrees/d08/target/debug/deps/libatomic_refcell-e1f2f742fd9204b4.rlib",
+  "--extern",
+  "nice_plug_core=/secondary/Programming/Github/kabl/.worktrees/d08/target/debug/deps/libnice_plug_core-4b5bb314d6787355.rlib",
+  "--extern",
+  "nice_plug=/secondary/Programming/Github/kabl/.worktrees/d08/target/debug/deps/libnice_plug-04a729f7b42462c5.rlib",
+  "-o",
+  "/secondary/Programming/Github/kabl/.worktrees/d08/scratch/strict-profile-product/rt-framework-probe"
+]

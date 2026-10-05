@@ -1,0 +1,6 @@
+AudioIOLayout: size=120 align=8 lock_free=false
+Option<BufferConfig>: size=20 align=4 lock_free=false
+ProcessStatus: size=24 align=8 lock_free=false
+ProcessMode: size=1 align=1 lock_free=true
+Above: retained negative controls, not the repaired callback storage.
+Repaired profile primitives PASS: native scalar atomics, snapshots, checked ownership, saturation/rejection ordering.
