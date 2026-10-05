@@ -1,0 +1,15 @@
+{
+  "PR": "https://github.com/stcksmsh/kabl/pull/13",
+  "draft": true,
+  "branch": "codex/d10-panel-authoring",
+  "remote": "origin",
+  "starting_master": "db33f6a2a9c0274e272d702142ad5d63d39271a6",
+  "tested_product_head": "25f20ae8547bc367403414467040a8475cffa34f",
+  "release_source_head": "ca8b504a7d35e1aeee7398ea622feda4bf747b95",
+  "final_independent_artifact_head": "12f593256e06f4eb3be093ffd0deba1c5131b74a",
+  "submitted_head": "exact final SHA in external owner bundle submission.json",
+  "engineering": "complete for authorized scope; both findings resolved",
+  "owner_acceptance": "pending",
+  "merged": false,
+  "D11": "not started"
+}
