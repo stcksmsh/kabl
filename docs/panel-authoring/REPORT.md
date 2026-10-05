@@ -1,0 +1,39 @@
+# D10 engineering report
+
+D10 adds portable, editable composite faces and the selected continuous sectional satin finish. Engineering verification is complete except final independent artifact recheck, which is tracked in REVIEW.md. Owner acceptance remains pending. No merge or D11 work is authorized. This report describes actual application evidence; the earlier generated material reference is design inspiration only.
+
+## Product and evidence provenance
+
+Starting master is db33f6a2a9c0274e272d702142ad5d63d39271a6, verified as the D09 merge. The isolated branch is codex/d10-panel-authoring. Final product source/test head is 25f20ae (full SHA in evidence/verification.json). Release binaries were built at ca8b504a7d35e1aeee7398ea622feda4bf747b95; the subsequent commit only changes a test fixture's initialization to satisfy Clippy. Binary hashes, exact tested/build/GUI heads, environment and validator results are recorded in evidence/verification.json. Final submitted and packaged documentation heads are recorded in the external owner bundle's submission.json after push; documentation-only commits do not alter these binaries.
+
+The main GUI authoring captures originate at ffb9929bb5b23b9fa629c48f31888e8b3a38db3f. The final portability/native scaling/dense/browser captures use the repaired ca8b504 production code. The intervening product fixes preserve rendered geometry: empty-rack Fit now stays finite and deleting an internal leaf prunes obsolete placements. The fresh independent reviewer found the deletion failure, reproduced it and verified its repair. REVIEW.md preserves the finding and final disposition rather than erasing it.
+
+## Implemented behavior
+
+Design edits separate light/dark embedded PNGs, rack width, stable public-ID placement, footprint and labels. Numeric coordinates keep the editor small and inspectable. Apply is one chronological project transaction; reload/default/cancel have explicit behavior. Preview shows the applied face. Every exposed control and port remains accessible through Public controls/help, including partial and missing-art faces. UI-native knobs, selectors and jacks target original D09 leaf identities; moving or renaming a face cannot remap automation.
+
+Complete packages carry exact graph, metadata, help and images. Import validates the full candidate before changing document, history or counters. Export refuses overwriting existing files. PNG bounds, decoded dimensions and aggregate current-document decode budget are enforced alongside footprint, overlap, binding kind, selector capacity and safe local image names. Malformed input is rejected atomically. Old composites without panel metadata still load. A placed leaf removed inside the composite removes its obsolete placement and preserves exact Undo/Redo.
+
+Sectional built-ins and composite artwork use restrained terracotta, sage, mauve and warm neutral surfaces, shallow satin grain, fine edges and recessed dark controls. Labels and values remain editable native text. IBM Plex Sans/Mono use bundled OFL fonts. Native routing, hover/focus/modulation/bypass behavior remains available. Geometry is shared across themes and coordinate transforms; no synthesis or callback ownership changes were made. Assets and textures are decoded, prepared and retired on UI/control threads, outside D08 strict callback paths.
+
+## Checks and real application evidence
+
+- Full workspace: 634 passed, 0 failed, 22 ignored. Strict workspace/all-target Clippy and release build pass. Existing vendor warnings remain unchanged. CLAP validator: 35 success, 9 declared capability skips, 0 failures. The failed sandbox-only validator process-signaling probe is retained separately; the unrestricted task-owned probe passes.
+- Focused tests cover atomic malformed/unsafe/oversized input, old/missing-art/partial faces, complete save/package/history round trips, deleting placed controls and jacks, aggregate decoded image budget, shared geometry across zoom and native scale, stable native targets, and 500 guarded exact-PCM blocks with no panel-induced audio allocation. Existing D09 composite tests pass.
+- scripts/workflow.py drove the real standalone GUI to import both original PNGs, place and size knobs/selectors/jacks, label them, Apply, preview, export, Undo/Redo, save and fully restart. Voice and stereo-effect examples and authoring screenshots are retained under examples/ and media/. The seed creates the unchanged D09 graphs and exposed interface; it does not author the panel metadata.
+- scripts/capture.py imported both exported packages through the real GUI into an empty fresh profile, saved, removed its source package copies and fully restarted. Both themes and 1440×900/1280×800 captures, a real knob drag and Undo, zoom behavior, dense routing and browser captures are retained. Native X11/egui scaling is actually 1.5 pixels per point: logical 1280×800, physical 1920×1200. This is software backend evidence, not a physical display or controller test.
+- scripts/host-fixture.py retains the D09 a337f2c1eae867671f9deabadfa10f681de2bb26 arrangement's leaves, cables, lane targets and bases, adding only panel metadata. scripts/run-host.py starts a separate REAPER 7.75 process/display/profile with source library copies removed and unavailable factory paths. Both complete recalled f32 states match exactly, embedded images survive, and closed-editor native automation matches envelope evaluations at 2, 6 and 13 seconds within 0.025 normalized tolerance. No existing host process is messaged. evidence/host-recall.json, native-replay.txt, mapped-plugin.txt and recalled.rpp retain the observations.
+
+Dense/browser pictures document existing usability and remaining backend pressure. They do not close dense-editor performance acceptance. The current sound-browser filtered list is retained; a new tile browser is not introduced by this implementation.
+
+## Owner artifacts and licenses
+
+The portable Linux x86_64 bundle is /home/stcksmsh/.codex/visualizations/2026/10/04/01a10711-8087-7782-9c2b-0f726c115470/d10-owner-test. launch.sh opens the embedded portable project; optional voice or stereo-effect selects the individual example. launch-reaper.sh starts a new REAPER instance with the included profile/project and plugin. No original checkout, artwork, factory or library path is needed. manifest.json records every bundled file's SHA256 and packaged head. Source-free bundle checks are recorded in evidence/bundle-check.json.
+
+Original SVG/PNG examples are created by scripts/art.py and follow the repository's MIT OR Apache-2.0 license. Embedded IBM Plex fonts use OFL-1.1, with their notice in crates/ui/assets/FONT-LICENSE.txt and the bundle. nice-plug remains the retained ISC snapshot; its license and STRICT-PROFILE.md are included. No external reference image or generated material render is reused as a product asset.
+
+## Dispositions and remaining limits
+
+The independent P1 deletion finding is repaired and independently reproduced as valid after restart with exact Undo. Fresh-profile empty-rack Fit is repaired and regression-tested. The validator sandbox signaling failure was an infrastructure limitation, not a plugin defect. Failed probes and originating evidence remain retained.
+
+Owner review of material quality, musical listening, physical MIDI/controller use, latency/feel, physical xruns and production-beta acceptance remains pending. Existing ordinary-render nondeterminism remains open; D10 does not change DSP/host timing or claim new deterministic ordinary renders. Earlier dense two-editor backend errors and performance limits remain open. No exhaustive framework, host or machine-code audit is claimed by this panel diff. Current-document image memory is bounded; undo history and off-audio producer backlogs retain their existing growth characteristics. Kosta's unchecked comparison and play-test actions are in CHECKLIST.md.

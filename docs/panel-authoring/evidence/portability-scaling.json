@@ -1,0 +1,17 @@
+{
+  "fresh_profile": true,
+  "source_packages_removed_before_restart": true,
+  "embedded_artwork": true,
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "logical_sizes": [
+    "1440x900",
+    "1280x800"
+  ],
+  "native_pixels_per_point": 1.5,
+  "physical_scaled_size": "1920x1200",
+  "zoom_gesture_no_internal_reveal": true,
+  "input": "scripted X11, not physical hardware"
+}
