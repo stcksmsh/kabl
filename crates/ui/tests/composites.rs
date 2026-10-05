@@ -570,3 +570,45 @@ fn malformed_project_load_and_seeded_nested_undo_are_atomic() {
     assert!(format!("{:?}", load(dir.path()).unwrap_err())
         .contains("missing or multiply owned module 999"));
 }
+
+#[test]
+fn chronological_project_undo_keeps_interleaved_instance_state_independent() {
+    let mut e = voice();
+    let a = group(&mut e);
+    let b = composites::duplicate(&mut e, a).unwrap();
+    let filter = |group| {
+        *kabl_core::composite::leaves(e.state(), group)
+            .iter()
+            .find(|id| e.state().modules[id].kind == "filter.svf")
+            .unwrap()
+    };
+    let (a_filter, b_filter) = (filter(a), filter(b));
+    let before = e.state().clone();
+    e.set_param(a_filter, "cutoff_hz", 800.0);
+    let after_a = e.state().clone();
+    assert_eq!(after_a.modules[&b_filter], before.modules[&b_filter]);
+    e.set_param(b_filter, "cutoff_hz", 1200.0);
+    let after_b = e.state().clone();
+    assert_eq!(after_b.modules[&a_filter], after_a.modules[&a_filter]);
+    e.set_param(a_filter, "cutoff_hz", 1000.0);
+    let after_a2 = e.state().clone();
+    assert_eq!(after_a2.modules[&b_filter], after_b.modules[&b_filter]);
+    assert_eq!(after_a2.composites, before.composites);
+    assert_eq!(after_a2.cables, before.cables);
+    // Loading retains the same chronological project history, not one stack per instance.
+    let dir = tempfile::tempdir().unwrap();
+    save(dir.path(), e.log()).unwrap();
+    let mut restored = PatchEditor::from_log(load(dir.path()).unwrap());
+    assert!(restored.undo());
+    assert_eq!(restored.state(), &after_b);
+    assert!(restored.undo());
+    assert_eq!(restored.state(), &after_a);
+    assert!(restored.undo());
+    assert_eq!(restored.state(), &before);
+    assert!(restored.redo());
+    assert_eq!(restored.state(), &after_a);
+    assert!(restored.redo());
+    assert_eq!(restored.state(), &after_b);
+    assert!(restored.redo());
+    assert_eq!(restored.state(), &after_a2);
+}

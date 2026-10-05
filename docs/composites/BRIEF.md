@@ -12,7 +12,7 @@ The resumed planning design and acceptance matrix accompany this brief. Kosta ad
 
 ## Explicit history decision
 
-Chronological project Undo and separate per-instance Undo are different requirements. Kosta was presented the smallest concrete choice before product edits: chronological project Undo with isolated instance edits, versus per-instance Undo preserving newer other-instance edits and enforcing shared-route conflicts. The choice is pending. Independent graph/interface/validation implementation proceeds under authorization; no weaker history acceptance is assumed. Finalize this section and relevant acceptance before history-specific implementation and submission. This brief fixes the common implementation scope; its history disposition is explicitly unresolved.
+Kosta selected chronological project Undo on 5 October 2026: “Independent instance state is required; separate per-instance undo histories are not required.” D09 uses the existing chronological project log. Undo reverses the latest project transaction regardless of which instance is open; Redo reapplies it. Interleaved edits to A and B remain isolated in state, while their actions share one chronological history. Standalone save/reload preserves the applied project log. Host recall preserves complete sound state, not a persistent Undo stack. This choice finalizes the history scope; no selective per-instance Undo or shared-route conflict policy is required.
 
 ## Reading and reconciliation
 
