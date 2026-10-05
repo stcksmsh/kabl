@@ -1,5 +1,9 @@
 # D08 — Host production
 
+## R6 investigation update — 2026-10-05
+
+R6 remains unresolved. A safe full correction is possible but requires a broader CLAP ownership/handoff redesign than deleting the reported mutex. [RT-OWNERSHIP](RT-OWNERSHIP.md) contains source coverage, compiled fallback-lock evidence, concrete correction alternatives and maintenance impact. No production code, dependency, parameter identity, state format or callback behavior changed in this investigation. Engineering is not complete. Updated documentation/evidence bundle: sibling `d08-r6-owner-test` under the durable artifact root below; original bundle and failures remain retained. See evidence/r6-audit/index.json for fresh checks and production render/recall evidence; historical timing/native automation/transport retains its original provenance.
+
 D08 adds stable REAPER automation and an explicit Host clock to the production CLAP instrument. Engineering is submitted for review with acceptance limitations; Kosta's owner review remains pending. D07 Output gain identity and version-1 project recall remain compatible. No merge or D09 work is authorized by this record.
 
 Product source: `133fdb89ac56a396db0c7c961c74067782b34efb`. Base: `c6bb8ccdab50dfe91a2b1f002d8c2766351697fc`. Full acceptance, verification and head provenance: [REPORT](REPORT.md), [design](design.md), [REVIEW](REVIEW.md), [owner checklist](CHECKLIST.md).

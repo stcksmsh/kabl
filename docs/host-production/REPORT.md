@@ -1,5 +1,13 @@
 # D08 submission report — 2026-10-04
 
+## R6 repair investigation — 2026-10-05
+
+The authorized investigation found that a mutex-only correction cannot satisfy the whole-callback requirement. No product change was shipped. R6 remains **failed**, and engineering remains **submitted as draft; acceptance incomplete**. This is an alternative/impact return under the repair brief's broader-redesign stop condition, not a completed repair or waiver. [RT-OWNERSHIP](RT-OWNERSHIP.md) records every plugin-object caller found, competing main-thread track notifications, the unconditional mutex-backed state-channel poll, three measured AtomicCell fallback locks, and retrying parameter/task queues with an unbudgeted drain. It proposes a pinned, ISC-licensed strict CLAP framework profile or a larger dedicated wrapper, including compatibility and maintenance costs.
+
+Production source remains133fdb89ac56a396db0c7c961c74067782b34efb; rebuilt binary SHA256 remains17cfcc408aacf341971ed5dfc35ddd6356445d16273c9c7610b16cef7c4770ee. Workspace checks rerun610/0/22, strict plugin Clippy/release pass, validator35success/9skips. The compiled ownership probe exits2 as expected and explicitly reports failed acceptance, not a successful no-lock test. Additional fresh-process unwrapped production render/recall evidence is indexed in evidence/r6-audit/index.json. Baseline automation/CC/transport/screenshots/timings are reused unchanged with source/binary provenance; no callback behavior changed, so no new timing claim or new lifecycle repair regression is claimed. All prior warm-ups, failures and raw archives remain preserved.
+
+Fresh independent reviewer `/root/d08_r6_review` independently confirms the broader callback-boundary scope and unresolved disposition; final committed artifact recheck is recorded in the new owner bundle's submission.json. Owner review remains pending; no merge or D09. The updated portable owner bundle is the sibling d08-r6-owner-test; old d08-owner-test remains preserved.
+
 Outcome: production CLAP in a two-track REAPER arrangement with stable native automation, Host/Free synchronization and an explicit repeatable full-render policy.
 
 Engineering: **submitted as draft; acceptance incomplete**. Owner review: **pending**. Not merged, no D09, no owner sound/controller/production-beta acceptance. The inherited framework callback mutex is a strict acceptance failure, not a passed allocation test.
@@ -31,7 +39,7 @@ Engineering: **submitted as draft; acceptance incomplete**. Owner review: **pend
 | Old D07/standalone/undo contracts | Pass automated; no Free sound change | v1 identity/migration, full workspace610/0/22; standalone ui Host flag defaultfalse |
 | Atomic invalid state + transient cleanup | Pass automated/exported | malformed/fullqueue rejection; pending epoch retries; native modulation recall; source lifetime reset tests |
 | No callback allocation/free; bounded work; deferred collection | Pass guarded covered paths | exported/explicit-schedule allocation guards, fixed rings/limits, basedrop collection |
-| Whole callback no locks | **Fail inherited framework** | independent R6; nice-plug process/start/reset Mutex |
+| Whole callback no locks | **Fail inherited framework** | R6; Mutex + fallback SeqLocks + state-channel mutex + retrying/unbudgeted handoffs; RT-OWNERSHIP.md |
 | Short played + sequenced multi-track piece | Pass actual scripted arrangement | owner projects/arrangement.rpp; media/arrangement audio; virtual input honestly labeled |
 | Portable Linux profile/factory-unavailable recall | Pass actual relocated owner binary | packaged-submission-first/second.txt mapped path; recall equality; source-free bundle manifest |
 |1440×900/1280×800 light/dark | Pass real refreshed captures | media/ui-*.png, verified floating handle; full1180×680 rack fits host chrome |

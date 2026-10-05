@@ -1,0 +1,68 @@
+{
+  "date": "2026-10-05",
+  "investigation_start_head": "a77804dd1c73f2fcb8e291fb9ebce5553bbeb988",
+  "product_head": "133fdb89ac56a396db0c7c961c74067782b34efb",
+  "binary_sha256": "17cfcc408aacf341971ed5dfc35ddd6356445d16273c9c7610b16cef7c4770ee",
+  "production_source_or_dependency_changes": false,
+  "r6": "failed; broader CLAP ownership/handoff redesign required; no repair shipped",
+  "workspace_totals": {
+    "passed": 610,
+    "failed": 0,
+    "ignored": 22
+  },
+  "strict_plugin_clippy": "pass",
+  "release_build": "pass",
+  "validator_totals": {
+    "success": 35,
+    "skipped": 9
+  },
+  "framework_probe_exit": 2,
+  "render_policy": {
+    "fresh_processes": 2,
+    "full_renders": 6,
+    "retained_warmups": [
+      "render-first/d08-render-1.wav",
+      "render-second/d08-render-1.wav"
+    ],
+    "accepted": [
+      "render-first/d08-render-2.wav",
+      "render-first/d08-render-3.wav",
+      "render-second/d08-render-2.wav",
+      "render-second/d08-render-3.wav"
+    ],
+    "comparison": "render-comparison.json",
+    "production_plugin": "scratch/host/plugins/kabl.clap; unwrapped; mapped paths retained"
+  },
+  "restart_recall": {
+    "comparison": "recall-comparison.json",
+    "complete_states_equal": true,
+    "host_log": "recall/recall-host.txt"
+  },
+  "fresh_automation_cc_transport_timings": false,
+  "reused_evidence": {
+    "reason": "Production tree and binary byte-identical; no affected callback behavior was changed. No new measurements claimed.",
+    "source": "docs/host-production/evidence/provenance.json and submission-verification.json",
+    "durable_baseline": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-final-evidence",
+    "limits": [
+      "ordinary-render nondeterminism unresolved",
+      "dense two-instance open-editor backend ERR max2 retained",
+      "Dummy backend does not establish physical xruns/latency"
+    ]
+  },
+  "durable_archive": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-r6-evidence",
+  "archive_manifest_sha256": "cc543f1c9ae65856d4f0f2d63639db4b3fe79847ea6e5216adc0297cbcb9c7db",
+  "updated_owner_bundle": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10707-3ccc-73d2-b3af-ee17bddde50b/d08-r6-owner-test",
+  "reviewer": "/root/d08_r6_review",
+  "review_disposition": "source feasibility confirms unresolved R6; committed artifact recheck recorded outside static manifest in owner bundle submission.json",
+  "commands": [
+    "cargo test --workspace",
+    "cargo clippy -p kabl-clap --all-targets -- -D warnings",
+    "cargo build -p kabl-clap --release",
+    "clap-validator validate --json scratch/host/plugins/kabl.clap",
+    "python3 docs/host-production/scripts/run-rt-framework-probe.py scratch/r6-audit",
+    "D08_HOST=$PWD/scratch/r6-audit/render-first python3 docs/host-production/scripts/run-host.py docs/host-production/scripts/serial-repeat.lua docs/host-production/projects/arrangement.rpp serial.done",
+    "same serial-repeat invocation with render-second output directory",
+    "D08_HOST=$PWD/scratch/r6-audit/recall python3 docs/host-production/scripts/run-host.py docs/host-production/scripts/recall.lua docs/host-production/projects/arrangement.rpp recall.done",
+    "python3 docs/host-production/scripts/compare-recall.py docs/host-production/projects/arrangement.rpp scratch/r6-audit/recall/recalled.rpp"
+  ]
+}

@@ -12,7 +12,7 @@ for source in (repo/'docs/host-production/media').iterdir():
 render=Path(sys.argv[2]).resolve() if len(sys.argv)>2 else repo/'scratch/host/d08-render-38.wav'
 shutil.copy2(render,out/'media/arrangement.wav')
 (out/'docs').mkdir()
-for name in ('README.md','design.md','REPORT.md','REVIEW.md','CHECKLIST.md'):
+for name in ('README.md','design.md','REPORT.md','REVIEW.md','CHECKLIST.md','RT-OWNERSHIP.md'):
     shutil.copy2(repo/'docs/host-production'/name,out/'docs'/name)
 (out/'profile/reaper.ini').write_text('[reaper]\nlinux_audio_mode=0\nlinux_audio_srate=48000\nlinux_audio_bsize=256\nvstpath64='+str(out/'profile/empty-vst')+'\n')
 (out/'launch.sh').write_text('''#!/bin/sh
@@ -33,6 +33,9 @@ exec "$root/launch.sh" "$root/scripts/serial-repeat.lua"
 (out/'README.txt').write_text('''D08 Linux x86_64 owner test, REAPER 7.75 + PipeWire JACK.
 Run ./launch.sh from any directory. Uses isolated profile and packaged production CLAP.
 No source checkout, build toolchain, factory library or external media is required.
+R6 remains unresolved: the framework callback mutex, fallback spin locks and retrying handoffs
+prevent strict whole-callback real-time acceptance. No repair or acceptance waiver was shipped.
+Read docs/RT-OWNERSHIP.md for source evidence, concrete alternatives and maintenance impact.
 Project embeds played virtual/scripted MIDI and Host-synchronized sequence, complete states,
 stable mappings, tempo changes and automation. No physical controller evidence is claimed.
 

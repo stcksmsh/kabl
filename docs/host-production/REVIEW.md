@@ -1,5 +1,11 @@
 # D08 independent review
 
+## R6 fresh independent investigation review — 2026-10-05
+
+Reviewer `/root/d08_r6_review` is fresh for this investigation and read-only. Product remains133fdb89ac56a396db0c7c961c74067782b34efb; investigation begins at submitteda77804dd1c73f2fcb8e291fb9ebce5553bbeb988. Direct pinned framework/Crossbeam source review confirms that mutex-only repair cannot meet acceptance: competing main-thread track-info callbacks, unconditional zero-capacity try_recv mutex, large AtomicCell fallback SeqLocks, native task/output queue retries and unbudgeted output drain also require correction. params.flush reaches configuration/output/notification paths and belongs in the redesign scope. Safe full correction is possible in principle but remains unimplemented. Preferred strict CLAP framework profile and larger dedicated-wrapper alternatives are recorded in [RT-OWNERSHIP](RT-OWNERSHIP.md).
+
+No product code or dependency changed; no new ownership/lifecycle implementation was available to review or test. R6 remains P1 **unresolved acceptance failure**. The reviewer did not independently rerun builds/host drivers, perform an exhaustive DSP audit, prove proposed replacement safety or approve owner checks. Final committed documentation/probe/raw-artifact recheck at the actual submission head is recorded in the new owner bundle's submission.json; this does not change the reviewed product head or waive R6. Original review below remains historical product evidence.
+
 Reviewer: fresh read-only subagent `/root/d08_review`, explicitly required by Kosta's authorization. Base `c6bb8ccdab50dfe91a2b1f002d8c2766351697fc`. Initial reviewed product `333156d3daa5f78751efa7f466ea3e708d587b99`; rechecks `a64a2e243a57c55c84f7ad8f76c2e06630302314`, `c199347add575ffd975e815b959195d0572721a0`, final source `133fdb89ac56a396db0c7c961c74067782b34efb`.
 
 ## Findings and dispositions

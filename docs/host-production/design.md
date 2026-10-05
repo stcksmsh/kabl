@@ -1,5 +1,9 @@
 # D08 design and contracts
 
+## R6 boundary finding — 2026-10-05
+
+The no-lock failure covers more than P's parking_lot::Mutex: large callback-facing AtomicCell values fall back to SeqLock, process unconditionally polls a mutex-backed zero-capacity state channel, and native parameter/task queues retry with unbounded output draining. Main-thread track notifications are a competing P caller. [RT-OWNERSHIP](RT-OWNERSHIP.md) records all traced callers and exact coverage. The existing design remains unchanged; no unsafe aliasing or partial lock substitution was introduced. A strict CLAP profile must replace ownership and handoffs together, preserving transactional state, editor independence and gesture order. This remains unimplemented and prevents engineering-complete acceptance.
+
 ## Stable automation
 
 The bank is fixed at 16. Native `output_gain` remains first and unchanged; slot identities are `slot_1` through `slot_16`, followed by `host_clock`. REAPER native indices are gain0, slots1–16, Host17 (Bypass/Wet/Delta are host additions). Target identity is module ID + kind + parameter name; compiled indices and panel positions are never persistent identities. Only continuous runtime-class controls qualify; stepped/structural controls require document edits.

@@ -1,0 +1,215 @@
+{
+  "files": [
+    "docs/host-production/projects/arrangement.rpp",
+    "scratch/r6-audit/recall/recalled.rpp"
+  ],
+  "states_equal": true,
+  "complete_state_sha256": [
+    "898d12fe167693b5afc894d57b2929095b30955d23a9f3689f3102c1d768d613",
+    "06153bef3a87905859247483a711160101fd19c2b13cca26fa08bfa173f0a689"
+  ],
+  "instances": [
+    {
+      "modules": 15,
+      "output_gain": 0.45,
+      "host_clock": true,
+      "lanes": [
+        {
+          "target": {
+            "module": 1,
+            "kind": "macro",
+            "param": "m1"
+          },
+          "retired": false
+        },
+        {
+          "target": {
+            "module": 1,
+            "kind": "macro",
+            "param": "m2"
+          },
+          "retired": false
+        },
+        {
+          "target": {
+            "module": 1,
+            "kind": "macro",
+            "param": "m3"
+          },
+          "retired": false
+        },
+        {
+          "target": {
+            "module": 1,
+            "kind": "macro",
+            "param": "m4"
+          },
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        }
+      ],
+      "slot_values": [
+        0.4,
+        0.3,
+        0.3,
+        0.4,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "modules": 11,
+      "output_gain": 0.6,
+      "host_clock": true,
+      "lanes": [
+        {
+          "target": {
+            "module": 3,
+            "kind": "macro",
+            "param": "m1"
+          },
+          "retired": false
+        },
+        {
+          "target": {
+            "module": 40,
+            "kind": "vca",
+            "param": "gain"
+          },
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        },
+        {
+          "target": null,
+          "retired": false
+        }
+      ],
+      "slot_values": [
+        0.4,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ]
+}
