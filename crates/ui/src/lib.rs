@@ -404,6 +404,17 @@ impl UiState {
     /// Zooms so `world` fits the canvas (at most `max_zoom`), left-aligned, centred vertically
     /// when there is room.
     fn frame_world(&mut self, world: Rect, max_zoom: f32) {
+        if !world.min.x.is_finite()
+            || !world.min.y.is_finite()
+            || !world.max.x.is_finite()
+            || !world.max.y.is_finite()
+            || world.width() <= 0.0
+            || world.height() <= 0.0
+        {
+            self.zoom = 1.0_f32.min(max_zoom).max(MIN_ZOOM);
+            self.pan = vec2(12.0, 12.0);
+            return;
+        }
         let c = self.canvas.shrink(12.0);
         let z = (c.width() / world.width())
             .min(c.height() / world.height())
@@ -3929,6 +3940,16 @@ fn register_face_port(
 #[cfg(test)]
 mod tests {
     use super::port_label;
+
+    #[test]
+    fn empty_rack_fit_keeps_import_coordinates_finite() {
+        let mut view = super::UiState::default();
+        view.canvas = egui::Rect::from_min_size(egui::pos2(0., 60.), egui::vec2(1280., 700.));
+        view.frame_world(egui::Rect::NOTHING, 1.5);
+        assert!(view.pan.is_finite());
+        assert!(view.zoom.is_finite());
+        assert!(view.xf().p(egui::pos2(12., 10.)).is_finite());
+    }
 
     #[test]
     fn authored_geometry_round_trips_zoom_and_desktop_scale() {

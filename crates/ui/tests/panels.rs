@@ -229,3 +229,63 @@ fn aggregate_art_budget_is_checked_before_document_mutation() {
         .unwrap_err()
         .contains("8 megapixels"));
 }
+
+#[test]
+fn deleting_placed_leaf_prunes_metadata_and_undo_restores_complete_face() {
+    let (mut e, id, key) = fixture();
+    let leaf = e.state().composites[&id].controls[&key].target.module_id();
+    composites::add_exposure(
+        &mut e,
+        id,
+        PortRef::Module {
+            id: leaf,
+            port: "in".into(),
+        },
+        false,
+    )
+    .unwrap();
+    let jack = *e.state().composites[&id]
+        .ports
+        .iter()
+        .find(|(_, x)| x.target.module_id() == leaf)
+        .unwrap()
+        .0;
+    let mut c = e.state().composites[&id].clone();
+    c.panel = Some(Box::new(panel(key)));
+    c.panel.as_mut().unwrap().placements.insert(
+        jack,
+        Placement {
+            kind: Kind::Jack,
+            x: 12.,
+            y: 232.,
+            width: 64.,
+            height: 58.,
+        },
+    );
+    composites::set(&mut e, id, c).unwrap();
+    let before = e.state().clone();
+    let leaf = before.composites[&id].controls[&key].target.module_id();
+    e.edit(vec![kabl_core::Op::RemoveModule { id: leaf }]);
+    assert!(!e.state().composites[&id]
+        .panel
+        .as_ref()
+        .unwrap()
+        .placements
+        .contains_key(&key));
+    assert!(!e.state().composites[&id]
+        .panel
+        .as_ref()
+        .unwrap()
+        .placements
+        .contains_key(&jack));
+    composites::validate(e.state()).unwrap();
+    let deleted = e.state().clone();
+    let dir = tempfile::tempdir().unwrap();
+    kabl_core::save(dir.path(), e.log()).unwrap();
+    let mut restored = PatchEditor::from_log(kabl_core::load(dir.path()).unwrap());
+    assert_eq!(restored.state(), &deleted);
+    restored.undo();
+    assert_eq!(restored.state(), &before);
+    restored.redo();
+    assert_eq!(restored.state(), &deleted);
+}
