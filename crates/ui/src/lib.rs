@@ -22,6 +22,7 @@ pub mod explain;
 pub mod help;
 pub mod inspect;
 pub mod library;
+pub mod panels;
 pub mod perform;
 pub mod rack;
 pub mod recipes;
@@ -180,6 +181,7 @@ pub struct UiState {
     pub loaded: bool,
     /// A-dark when true, A-light otherwise.
     pub dark: bool,
+    pub panels: panels::View,
     pub zoom: f32,
     /// Screen offset of the rack origin from the canvas' top-left.
     pub pan: EguiVec2,
@@ -297,6 +299,7 @@ impl Default for UiState {
             lfo_status: HashMap::new(),
             loaded: false,
             dark: false,
+            panels: panels::View::default(),
             zoom: 1.0,
             pan: EguiVec2::ZERO,
             drawer_open: true,
@@ -463,6 +466,7 @@ impl UiState {
 /// per frame from `eframe::App::ui`.
 pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
     composites::panel(editor, ui_state, ui.ctx());
+    panels::editor(editor, ui_state, ui.ctx());
     browser::frame_input(editor, ui_state, ui);
     ui_state.validate(editor);
     ui_state.explain.validate(editor);
@@ -1096,7 +1100,8 @@ fn inspected_extent(
     lay: &Layout,
 ) -> Option<(Rect, (ModuleId, String, usize))> {
     let (id, p) = ui_state.inspected.as_ref()?;
-    let geo = lay.get(*id)?.ctl(p)?.geo;
+    let geo = authored_control_geo(editor.state(), ui_state, lay, *id, p)
+        .or_else(|| lay.get(*id)?.ctl(p).map(|c| c.geo))?;
     let n = routing::routes_into(editor.state(), *id, p).len();
     let r = match geo {
         Geo::Knob { c, r } if n > 0 => geo.bounds().union(Rect::from_center_size(
@@ -1147,13 +1152,15 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     if ui_state.inspected != ui_state.last_inspected {
         ui_state.last_inspected = ui_state.inspected.clone();
         if let Some((id, p)) = &ui_state.inspected {
-            if let Some(h) = lay
-                .get(*id)
-                .and_then(|m| m.hidden.iter().find(|h| h.name == p))
-            {
-                ui_state.expanded.insert(*id);
-                ui_state.flash = Some((*id, h.name, now));
-                ui_state.reveal = Some(*id);
+            if authored_control_geo(editor.state(), ui_state, &lay, *id, p).is_none() {
+                if let Some(h) = lay
+                    .get(*id)
+                    .and_then(|m| m.hidden.iter().find(|h| h.name == p))
+                {
+                    ui_state.expanded.insert(*id);
+                    ui_state.flash = Some((*id, h.name, now));
+                    ui_state.reveal = Some(*id);
+                }
             }
         }
     }
@@ -1210,7 +1217,12 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         .or_else(|| ui_state.inspected.as_ref().map(|(id, _)| *id))
     {
         for &id in editor.state().composites.keys() {
-            if kabl_core::composite::leaves(editor.state(), id).contains(&leaf) {
+            let on_face = ui_state.inspected.as_ref().is_some_and(|(target, param)| {
+                *target == leaf
+                    && authored_control_geo(editor.state(), ui_state, &lay, *target, param)
+                        .is_some()
+            });
+            if !on_face && kabl_core::composite::leaves(editor.state(), id).contains(&leaf) {
                 ui_state.composites.open.insert(id);
             }
         }
@@ -1355,6 +1367,8 @@ fn draw_module(
     now: f64,
     drawn: &mut Drawn,
 ) {
+    let sectional = theme::panel_theme(th.dark, m.info.kind);
+    let th = if m.skin.is_none() { &sectional } else { th };
     let z = xf.zoom;
     let rect = xf.r(m.rect);
     let face = xf.r(m.face);
@@ -1415,21 +1429,7 @@ fn draw_module(
             tint,
         );
     } else {
-        // Brushed texture: faint horizontal strokes.
-        let step = (4.0 * z).max(3.0);
-        let mut y = rect.top() + step;
-        let tex = if th.dark {
-            Color32::from_white_alpha(6)
-        } else {
-            Color32::from_black_alpha(7)
-        };
-        while y < rect.bottom() {
-            painter.line_segment(
-                [pos2(rect.left(), y), pos2(rect.right(), y)],
-                Stroke::new(1.0, tex),
-            );
-            y += step;
-        }
+        theme::satin(painter, rect, th);
     }
     painter.rect_stroke(
         rect,
@@ -1623,7 +1623,15 @@ fn draw_module(
         }
     }
     if let Some(p) = m.plate {
-        painter.rect_filled(xf.r(p), CornerRadius::same(6), th.plate);
+        if skin.is_some() {
+            painter.rect_filled(xf.r(p), CornerRadius::same(6), th.plate);
+        } else {
+            let r = xf.r(p);
+            painter.line_segment(
+                [r.left_top(), r.right_top()],
+                Stroke::new(0.8, th.panel_edge),
+            );
+        }
     }
 
     let look = Look { z, ink, ink2 };
@@ -2822,7 +2830,7 @@ fn draw_jacks(
         drawn
             .ports
             .insert((m.id, port.direction, port.name.to_string()), c);
-        let on_plate = m.plate.is_some_and(|p| p.contains(j.c));
+        let on_plate = m.skin.is_some() && m.plate.is_some_and(|p| p.contains(j.c));
         let ink = if on_plate {
             th.plate_ink
         } else if on_art {
@@ -3410,6 +3418,46 @@ fn composite_layout(p: &PatchState, view: &UiState) -> rack::Layout {
     }
     lay
 }
+/// Shared world geometry for drawing, focus/reveal and zoomed hit tests.
+fn authored_control_geo(
+    p: &PatchState,
+    v: &UiState,
+    lay: &Layout,
+    leaf: ModuleId,
+    param: &str,
+) -> Option<Geo> {
+    let target = PortRef::Param {
+        id: leaf,
+        param: param.into(),
+    };
+    for (id, face) in composites::faces(p, &v.composites.open, lay) {
+        let c = &p.composites[&id];
+        let Some(panel) = &c.panel else { continue };
+        for (&key, e) in &c.controls {
+            if e.target != target {
+                continue;
+            };
+            let Some(place) = panel.placements.get(&key) else {
+                continue;
+            };
+            return Some(panel_control_geo(face, place));
+        }
+    }
+    None
+}
+fn panel_control_geo(face: Rect, p: &kabl_core::panel::Placement) -> Geo {
+    let r = Rect::from_min_size(face.min + vec2(p.x, p.y), vec2(p.width, p.height));
+    match p.kind {
+        kabl_core::panel::Kind::Knob => Geo::Knob {
+            c: pos2(r.center().x, r.top() + 56.0),
+            r: ((p.width - 32.0) / 2.0).clamp(17.0, 32.0),
+        },
+        _ => Geo::Select {
+            rect: Rect::from_min_max(r.min + vec2(2.0, 27.0), r.max - vec2(2.0, 5.0)),
+        },
+    }
+}
+
 fn draw_composites(
     editor: &mut PatchEditor,
     view: &mut UiState,
@@ -3422,6 +3470,10 @@ fn draw_composites(
     for (id, face) in composites::faces(&snapshot, &view.composites.open, &lay) {
         let c = &snapshot.composites[&id];
         let rect = xf.r(face);
+        if c.panel.is_some() {
+            draw_authored_face(editor, view, ui, xf, drawn, id, c, face);
+            continue;
+        }
         ui.scope_builder(
             egui::UiBuilder::new()
                 .max_rect(rect)
@@ -3433,6 +3485,11 @@ fn draw_composites(
                     ui.spacing_mut().slider_width = (rect.width() - 92.0).max(20.0);
                     ui.set_clip_rect(ui.clip_rect().intersect(rect.expand(4.0)));
                     ui.label(egui::RichText::new(format!("{} · #{id}", c.name)).strong());
+                    let r = ui.small_button("Design face");
+                    view.record(format!("composite:{id}:design"), r.rect);
+                    if r.clicked() {
+                        panels::open(view, id, c);
+                    }
                     let r = ui.button("Open internals / edit this instance");
                     view.record(format!("composite:{id}:open"), r.rect);
                     if r.clicked() {
@@ -3534,9 +3591,373 @@ fn draw_composites(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+fn draw_authored_face(
+    editor: &mut PatchEditor,
+    view: &mut UiState,
+    ui: &mut egui::Ui,
+    xf: Xf,
+    drawn: &mut Drawn,
+    id: kabl_core::CompositeId,
+    c: &kabl_core::Composite,
+    face: Rect,
+) {
+    use kabl_core::panel::Kind;
+    let panel = c.panel.as_ref().unwrap();
+    let mut th = theme::panel_theme(view.dark, "filter.svf");
+    let rect = xf.r(face);
+    let z = xf.zoom;
+    let painter = ui.painter_at(rect.intersect(ui.clip_rect()));
+    theme::satin(&painter, rect, &th);
+    let art = if view.dark { &panel.dark } else { &panel.light };
+    let mut missing = art.is_none();
+    if let Some(art) = art {
+        let key = (id, view.dark);
+        let changed = view
+            .panels
+            .textures
+            .get(&key)
+            .is_none_or(|(old, _, _)| old != art);
+        if changed {
+            view.panels.textures.remove(&key);
+            match panels::decode_art(art) {
+                Ok(image) => {
+                    let size = [image.width() as usize, image.height() as usize];
+                    let tex = ui.ctx().load_texture(
+                        format!("panel-{id}-{}", view.dark),
+                        egui::ColorImage::from_rgba_unmultiplied(size, image.as_raw()),
+                        egui::TextureOptions::LINEAR,
+                    );
+                    let pixel = image.get_pixel(0, 0).0;
+                    let tone = Color32::from_rgb(pixel[0], pixel[1], pixel[2]);
+                    view.panels.textures.insert(key, (art.clone(), tex, tone));
+                }
+                Err(_) => missing = true,
+            }
+        }
+        if let Some((_, tex, tone)) = view.panels.textures.get(&key) {
+            th.panel = *tone;
+            let linear = |v: u8| {
+                let x = v as f32 / 255.0;
+                if x <= 0.04045 {
+                    x / 12.92
+                } else {
+                    ((x + 0.055) / 1.055).powf(2.4)
+                }
+            };
+            let luminance =
+                0.2126 * linear(tone.r()) + 0.7152 * linear(tone.g()) + 0.0722 * linear(tone.b());
+            th.ink = if luminance > 0.179 {
+                Color32::BLACK
+            } else {
+                Color32::WHITE
+            };
+            th.ink2 = th.ink;
+            painter.image(
+                tex.id(),
+                rect,
+                Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0)),
+                Color32::WHITE,
+            );
+        }
+    }
+    // A quiet printed header/footer also provide guaranteed contrast over arbitrary art.
+    let header = xf.r(Rect::from_min_size(face.min, vec2(panel.width, 60.0)));
+    painter.rect_filled(header, 0.0, th.panel);
+    let title = if c.name.chars().count() > 32 {
+        format!("{}…", c.name.chars().take(31).collect::<String>())
+    } else {
+        c.name.clone()
+    };
+    text(
+        &painter,
+        header.left_top() + vec2(12.0, 17.0) * z,
+        egui::Align2::LEFT_CENTER,
+        &title.to_uppercase(),
+        15.0 * z,
+        th.ink,
+        false,
+    );
+    let open = Rect::from_min_size(
+        header.left_top() + vec2(10.0, 31.0) * z,
+        vec2(112.0, 23.0) * z,
+    );
+    let r = ui.interact(open, Id::new(("face-internals", id)), Sense::click());
+    view.record(format!("composite:{id}:open"), open);
+    text(
+        &painter,
+        open.center(),
+        egui::Align2::CENTER_CENTER,
+        "Inspect internals",
+        11.0 * z,
+        th.ink2,
+        false,
+    );
+    if r.clicked() {
+        view.composites.open.insert(id);
+    }
+    let edit = Rect::from_min_size(
+        pos2(header.right() - 66.0 * z, header.top() + 31.0 * z),
+        vec2(56.0, 23.0) * z,
+    );
+    let r = ui.interact(edit, Id::new(("face-design", id)), Sense::click());
+    view.record(format!("composite:{id}:design"), edit);
+    text(
+        &painter,
+        edit.center(),
+        egui::Align2::CENTER_CENTER,
+        "Design",
+        11.0 * z,
+        th.ink2,
+        false,
+    );
+    if r.clicked() {
+        panels::open(view, id, c);
+    }
+    let fallback = xf.r(Rect::from_min_size(
+        pos2(face.left() + 8.0, face.bottom() - 28.0),
+        vec2(panel.width - 16.0, 22.0),
+    ));
+    painter.rect_filled(fallback, 3.0, th.panel);
+    let r = ui.interact(fallback, Id::new(("face-fallback", id)), Sense::click());
+    view.record(format!("composite:{id}:fallback"), fallback);
+    text(
+        &painter,
+        fallback.center(),
+        egui::Align2::CENTER_CENTER,
+        if missing {
+            "No artwork · Public controls / repair"
+        } else {
+            "Public controls / help"
+        },
+        11.0 * z,
+        th.ink,
+        false,
+    );
+    if r.clicked() {
+        view.panels.fallback = Some(id);
+    }
+    for (&key, e) in &c.ports {
+        if !panel.placements.contains_key(&key) {
+            register_face_port(
+                drawn,
+                &e.target,
+                composites::direction(editor.state(), &e.target).unwrap_or(PortDirection::Input),
+                fallback.center(),
+                editor.state(),
+            );
+        }
+    }
+    for (&key, p) in &panel.placements {
+        let footprint = Rect::from_min_size(face.min + vec2(p.x, p.y), vec2(p.width, p.height));
+        let screen = xf.r(footprint);
+        let local = ui.new_child(egui::UiBuilder::new().max_rect(screen).id_salt((
+            "face-control",
+            id,
+            key,
+        )));
+        let mut local = local;
+        local.set_clip_rect(ui.clip_rect().intersect(rect));
+        if p.kind == Kind::Jack {
+            let Some(e) = c.ports.get(&key) else { continue };
+            let dir =
+                composites::direction(editor.state(), &e.target).unwrap_or(PortDirection::Input);
+            let center = pos2(screen.center().x, screen.bottom() - 19.0 * z);
+            let resp = local.interact(
+                Rect::from_center_size(center, vec2(30.0, 30.0) * z),
+                Id::new(("face-port", id, key)),
+                Sense::click_and_drag(),
+            );
+            view.record(format!("composite:{id}:port:{key}"), resp.rect);
+            painter.circle_filled(center, 13.0 * z, th.skirt);
+            painter.circle_stroke(center, 11.0 * z, Stroke::new(1.0 * z, th.nut_edge));
+            painter.circle_filled(center, 7.0 * z, th.hole_c);
+            if resp.hovered() || resp.has_focus() {
+                painter.circle_stroke(center, 15.0 * z, Stroke::new(1.5, th.sel));
+            }
+            register_face_port(drawn, &e.target, dir, center, editor.state());
+            match &e.target {
+                PortRef::Module { id: leaf, port } => view.record(
+                    format!(
+                        "{}:{leaf}.{port}",
+                        if dir == PortDirection::Output {
+                            "out"
+                        } else {
+                            "in"
+                        }
+                    ),
+                    resp.rect,
+                ),
+                PortRef::Param { id: leaf, param } => {
+                    view.record(format!("knob:{leaf}.{param}"), resp.rect)
+                }
+            }
+            if resp.clicked() {
+                if dir == PortDirection::Output {
+                    view.pending_output = Some(e.target.clone());
+                } else if let Some(from) = view.pending_output.take() {
+                    editor.connect(from, e.target.clone());
+                }
+            }
+            if resp.drag_started() && dir == PortDirection::Output {
+                view.port_drag = Some(e.target.clone());
+            }
+            if resp.drag_stopped() {
+                if let Some(from) = view.port_drag.take() {
+                    drawn.drop_at = resp.interact_pointer_pos().map(|at| (from, at));
+                }
+            }
+            face_label(
+                &painter,
+                Rect::from_min_size(screen.min, vec2(screen.width(), 22.0 * z)),
+                &format!(
+                    "{} {}",
+                    if dir == PortDirection::Output {
+                        "OUT"
+                    } else {
+                        "IN"
+                    },
+                    e.label
+                ),
+                z,
+                &th,
+            );
+            resp.on_hover_text(format!("{} · {:?}", e.label, e.target));
+        } else {
+            let Some(e) = c.controls.get(&key) else {
+                continue;
+            };
+            let PortRef::Param { id: leaf, param } = &e.target else {
+                continue;
+            };
+            let Some(info) = registry::info_for(&editor.state().modules[leaf].kind) else {
+                continue;
+            };
+            let Some(param) = info.params.iter().find(|p| p.name == param) else {
+                continue;
+            };
+            let look = Look {
+                z,
+                ink: th.ink,
+                ink2: th.ink2,
+            };
+            // Contrast plates guarantee labels and values remain usable over any supplied image.
+            if p.kind == Kind::Knob {
+                let value = Rect::from_min_size(
+                    screen.min + vec2(0.0, 83.0) * z,
+                    vec2(screen.width(), 24.0 * z),
+                );
+                painter.rect_filled(value, 2.0, th.panel);
+            }
+            let plugs = match panel_control_geo(face, p) {
+                Geo::Knob { c: cen, r } => routing::param_knob(
+                    editor,
+                    view,
+                    &mut local,
+                    &painter,
+                    *leaf,
+                    param,
+                    xf.p(cen),
+                    r,
+                    look,
+                ),
+                Geo::Select { rect } => routing::stepped_selector(
+                    editor,
+                    view,
+                    &mut local,
+                    &painter,
+                    *leaf,
+                    info.kind,
+                    param,
+                    xf.r(rect),
+                    look,
+                ),
+            };
+            drawn.plugs.extend(plugs);
+            view.record(format!("composite:{id}:control:{key}"), screen);
+            face_label(
+                &painter,
+                Rect::from_min_size(screen.min, vec2(screen.width(), 22.0 * z)),
+                &e.label,
+                z,
+                &th,
+            );
+        }
+    }
+}
+fn face_label(p: &egui::Painter, r: Rect, label: &str, z: f32, th: &Theme) {
+    p.rect_filled(r, 2.0, th.panel);
+    let mut job = egui::text::LayoutJob::simple_singleline(
+        label.into(),
+        egui::FontId::proportional(12.0 * z),
+        th.ink,
+    );
+    job.wrap.max_width = r.width() - 4.0 * z;
+    job.wrap.max_rows = 1;
+    job.wrap.break_anywhere = true;
+    let galley = p.layout_job(job);
+    p.galley(
+        pos2(
+            r.center().x - galley.size().x / 2.0,
+            r.center().y - galley.size().y / 2.0,
+        ),
+        galley,
+        th.ink,
+    );
+}
+fn register_face_port(
+    drawn: &mut Drawn,
+    target: &PortRef,
+    dir: PortDirection,
+    at: Pos2,
+    state: &PatchState,
+) {
+    match target {
+        PortRef::Module { id, port } => {
+            drawn.ports.insert((*id, dir, port.clone()), at);
+        }
+        PortRef::Param { .. } => {
+            for (&cid, c) in &state.cables {
+                if &c.to == target {
+                    drawn.plugs.push((cid, at));
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::port_label;
+
+    #[test]
+    fn authored_geometry_round_trips_zoom_and_desktop_scale() {
+        let face = egui::Rect::from_min_size(egui::pos2(230., 380.), egui::vec2(420., 340.));
+        let placement = kabl_core::panel::Placement {
+            kind: kabl_core::panel::Kind::Knob,
+            x: 112.,
+            y: 72.,
+            width: 84.,
+            height: 110.,
+        };
+        let super::Geo::Knob { c, r } = super::panel_control_geo(face, &placement) else {
+            panic!("knob")
+        };
+        assert_eq!(c, egui::pos2(384., 508.));
+        assert_eq!(r, 26.);
+        for zoom in [0.25, 0.82, 1., 1.25, 2.] {
+            for scale in [1., 1.25, 1.5, 2.] {
+                let xf = super::Xf {
+                    origin: egui::pos2(31., 63.),
+                    zoom,
+                };
+                let physical = xf.p(c) * scale;
+                let hit = physical / scale;
+                assert!(xf.inv(hit).distance(c) < 0.001);
+                assert!(xf.r(super::Geo::Knob { c, r }.bounds()).contains(hit));
+            }
+        }
+    }
 
     #[test]
     fn port_labels_read_like_panel_text() {
