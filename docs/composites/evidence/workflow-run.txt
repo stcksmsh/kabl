@@ -1,0 +1,1 @@
+Real widgets encapsulated, duplicated, edited, Undo/Redo, opened both instances and saved; independent cutoff values: [130.0, 3000.0]

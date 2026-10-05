@@ -1,0 +1,2 @@
+# Preserve actual REAPER recall bytes for evidence hashes.
+evidence/*.rpp -text

@@ -1,5 +1,13 @@
 # Status
 
+## D09 implementation checkpoint — 2026-10-05
+
+Engineering: implementing; source recheck passes at `a337f2c1eae867671f9deabadfa10f681de2bb26`, required owner Undo semantics choice pending. Not submitted, merged or owner-approved. D08 PR #11 is now verified merged at f870b3c4316b9ea819d35344de09f6b7d24c59ca; prior statements below that it remains open are historical. Isolated branch `codex/d09-composites`, checkout `.worktrees/d09`; stale root, .ai and other worktrees preserved.
+
+[composites/REPORT.md](composites/REPORT.md) records workflow, exact heads, tests/evidence, reviewer fixes, portable examples and source-free owner bundle. Workspace624/0/22 and 11 focused composites pass; actual widgets, both sizes/themes and real REAPER recall/render/playback have bounded evidence. Full A03 history acceptance remains unresolved; current project Undo is chronological. No D10 work. Earlier physical/controller/listening/feel/latency and D08 ordinary-render/dense-backend limits remain pending and preserved.
+
+## Earlier records (historical dispositions)
+
 ## D08 strict CLAP repair — 2026-10-05
 
 Engineering complete; strict-profile repair submitted for owner review. Owner review pending. PR #11 remains draft and unmerged. No D09/D10.

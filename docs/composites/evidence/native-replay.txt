@@ -1,0 +1,10 @@
+track=0 slot=1 time=2.016 expected=0.526 actual=0.5286653637886
+track=1 slot=1 time=2.016 expected=0.526 actual=0.5286653637886
+track=1 slot=2 time=2.016 expected=1 actual=1
+track=0 slot=1 time=6.0053333333334 expected=0.44946666666666 actual=0.44520208239555
+track=1 slot=1 time=6.0053333333334 expected=0.44946666666666 actual=0.44520208239555
+track=1 slot=2 time=6.0053333333334 expected=1 actual=1
+track=0 slot=1 time=13.024 expected=0.66040000000003 actual=0.65666848421097
+track=1 slot=1 time=13.024 expected=0.66040000000003 actual=0.65666848421097
+track=1 slot=2 time=13.024 expected=1 actual=1
+Both editors closed; continuous controls and Host sequence mode verified. Free transition beyond project end was not accepted as new evidence.

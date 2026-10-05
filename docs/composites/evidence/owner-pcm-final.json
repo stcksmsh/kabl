@@ -1,0 +1,22 @@
+{
+  "files": [
+    "scratch/owner-host/d08-render-8.wav",
+    "scratch/owner-host/d08-render-9.wav",
+    "scratch/host/d08-render-2.wav"
+  ],
+  "format": "36 s / 48 kHz / stereo float32",
+  "pcm_equal": true,
+  "pcm_sha256": [
+    "c535792b70919e23b5f8b1f25dd92333f397b6bcbb5e9c3ccb2e5bb1c7e2cb7b",
+    "c535792b70919e23b5f8b1f25dd92333f397b6bcbb5e9c3ccb2e5bb1c7e2cb7b",
+    "c535792b70919e23b5f8b1f25dd92333f397b6bcbb5e9c3ccb2e5bb1c7e2cb7b"
+  ],
+  "different_samples": [
+    0,
+    0
+  ],
+  "maximum_abs_difference": [
+    0.0,
+    0.0
+  ]
+}

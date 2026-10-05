@@ -1,0 +1,18 @@
+{
+  "actions": [
+    "select 4 leaves",
+    "encapsulate",
+    "duplicate",
+    "edit original public alias",
+    "project Undo/Redo",
+    "open original",
+    "open copy",
+    "save"
+  ],
+  "disjoint_leaves": true,
+  "cutoffs": [
+    130.0,
+    3000.0
+  ],
+  "history": "chronological project Undo demonstration; owner decision still pending"
+}

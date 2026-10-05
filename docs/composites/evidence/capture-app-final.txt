@@ -1,0 +1,1 @@
+Actual application screenshots captured; scripted X11 input, no owner approval.

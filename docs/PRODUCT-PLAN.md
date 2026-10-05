@@ -245,6 +245,8 @@ Acceptance: record/play automation, close/reopen, change layout without retarget
 
 ### D09 — Reusable, inspectable composite modules
 
+Implementation checkpoint 2026-10-05: common workflow source reviewed at `a337f2c1eae867671f9deabadfa10f681de2bb26` on `codex/d09-composites`. Engineering completion/submission pending Kosta's explicit history semantics choice; owner review pending; not merged. [Composite report](composites/REPORT.md) and [acceptance](composites/ACCEPTANCE.md) preserve that dependency and earlier hardware checks.
+
 Outcome: select an existing voice/effect, expose a small interface, use two copies independently and open either to understand it.
 
 Scope: composite definition with stable exposed port/control IDs, internal graph, instance identity, documentation and bounded nesting. Recommend flattening at compile time into the existing graph schedule; avoid a recursive engine per composite unless profiling and semantics require it. Name the interface and expose musical controls using existing routing semantics.
