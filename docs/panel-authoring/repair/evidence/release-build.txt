@@ -1,0 +1,22 @@
+   Compiling tracing-core v0.1.36
+   Compiling syn v2.0.119
+   Compiling x11rb v0.13.2
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/standalone)
+   Compiling egui_glow v0.35.0
+   Compiling tracing v0.1.44
+   Compiling calloop v0.14.4
+   Compiling calloop-wayland-source v0.4.1
+   Compiling smithay-client-toolkit v0.20.0
+   Compiling thiserror-impl v1.0.69
+   Compiling arboard v3.6.1
+   Compiling thiserror v1.0.69
+   Compiling calloop v0.13.0
+   Compiling smithay-clipboard v0.7.3
+   Compiling calloop-wayland-source v0.3.0
+   Compiling smithay-client-toolkit v0.19.2
+   Compiling winit v0.30.13
+   Compiling egui-winit v0.35.0
+   Compiling glutin-winit v0.5.0
+   Compiling eframe v0.35.0
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/ui)
+    Finished `release` profile [optimized] target(s) in 1m 54s

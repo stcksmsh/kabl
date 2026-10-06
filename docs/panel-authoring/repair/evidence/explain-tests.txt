@@ -1,0 +1,44 @@
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/standalone)
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/ui)
+    Finished `test` profile [optimized + debuginfo] target(s) in 10.50s
+     Running tests/explain.rs (target/debug/deps/explain-9096fbfea1bbbe3d)
+
+running 20 tests
+test a_legacy_mixer_level_route_is_explained_on_channel_1 ... ok
+test write_help_coverage ... ignored
+test transport_acts_on_sequencers_behind_a_divider ... ok
+test base_and_modulation_are_told_apart_with_units ... ok
+test signal_jack_destinations_list_one_bounded_hop ... ok
+test every_factory_card_gets_specific_help ... ok
+test signal_paths_come_from_cables_and_stay_bounded ... ok
+test edits_from_perform_and_rack_are_one_state_while_explained ... ok
+test inline_help_is_opt_in_and_changes_nothing ... ok
+test a_direct_pin_to_an_off_face_control_reveals_it ... ok
+test a_macro_without_routes_says_so_and_duplicate_labels_stay_distinct ... ok
+test a_save_dialog_over_an_explanation_keeps_escape_and_the_document ... ok
+test the_explanation_follows_route_edits_and_undo ... ok
+test a_direct_pin_reaches_its_exact_parameter ... ok
+test edits_through_the_card_and_the_rack_agree_while_explained ... ok
+test a_card_rename_commits_when_you_click_elsewhere ... ok
+test escape_with_a_menu_open_closes_only_the_menu ... ok
+test module_removal_and_patch_replacement_invalidate_safely ... ok
+test a_macro_card_lists_its_real_destinations_and_reveals_an_off_face_one ... FAILED
+test escape_and_text_fields_keep_their_priority ... ok
+
+failures:
+
+---- a_macro_card_lists_its_real_destinations_and_reveals_an_off_face_one stdout ----
+
+thread 'a_macro_card_lists_its_real_destinations_and_reveals_an_off_face_one' (442) panicked at crates/ui/tests/explain.rs:212:9:
+assertion `left == right` failed
+  left: Some((7, "drive_db"))
+ right: None
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_macro_card_lists_its_real_destinations_and_reveals_an_off_face_one
+
+test result: FAILED. 18 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+error: test failed, to rerun pass `-p kabl-ui --test explain`

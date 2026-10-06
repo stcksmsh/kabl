@@ -18,7 +18,7 @@ sp.run([str(repo/'target/debug/examples/panel_seed'),'--state',str(patch/'checkp
 (root/'hits.txt').unlink(missing_ok=True)
 env=dict(os.environ,DISPLAY=':126',XDG_RUNTIME_DIR='/run/user/1000',KABL_FACTORY_DIR=str(repo/'patches'),KABL_USER_DIR=str(root/'library'),KABL_HITS_FILE=str(root/'hits.txt'))
 log=open(root/'run.log','w');x=sp.Popen(['Xvfb',':126','-screen','0','1600x1000x24','-nolisten','tcp'],stdout=log,stderr=log);time.sleep(.5);wm=sp.Popen(['metacity','--sm-disable'],env=env,stdout=log,stderr=log);time.sleep(.5)
-app=sp.Popen([str(binary),'--patch',str(patch),'--size','1440x900','--no-rt'],env=env,stdout=log,stderr=log);video=None;steps=[]
+app=sp.Popen([str(binary),'--patch',str(patch),'--size','1440x900','--no-rt'],env=env,stdout=log,stderr=log);video=None;steps=[];proofs={}
 def run(args):return sp.check_output(args,env=env,text=True)
 def hits():
  try:return {v[0]:list(map(float,v[1:])) for v in map(str.split,(root/'hits.txt').read_text().splitlines()) if len(v)==5}
@@ -56,19 +56,19 @@ try:
  click('composite:1:open');time.sleep(1)
  if mode=='after':
   click('composite:4:open');click('subpatch:back');click('subpatch:back')
-  click('edit-face:20');click('face:20:waveform');click('face:down:20:base_hz');click('face:apply');click('save')
+  click('edit-face:20');click('face:20:waveform');click('face:20:pw');click('face:down:20:base_hz');click('face:down:20:base_hz');click('face:apply');click('save')
   click('toggle:20');click('more:close')
-  a,b,c,d=hits()['module:20'];drag_at(round(a+15),round(b+18),100,150,True);steps.append('Escape cancels native item drag')
+  a,b,c,d=hits()['module:20'];drag_at(round(a+15),round(b+18),100,150,True);steps.append('Escape cancels native item drag');click('save');proofs['cancelled_native_position']=json.loads((patch/'checkpoint.json').read_text())['modules']['20']['pos']
   # Default-card title uses the same selection/drop behavior.
-  a,b,c,d=hits()['composite:3:body'];drag_at(round(a+13),round(b+14),280,-260);steps.append('default composite title crosses occupied row');run(['xdotool','key','ctrl+z']);time.sleep(.6)
+  default_before=json.loads((patch/'checkpoint.json').read_text());a,b,c,d=hits()['composite:3:body'];drag_at(round(a+13),round(b+14),280,-260);steps.append('default composite title crosses occupied row');click('save');default_after=json.loads((patch/'checkpoint.json').read_text());assert default_after['composites']['3']['pos']!=default_before['composites']['3']['pos'];assert all(default_after['modules'][str(i)]['pos']==default_before['modules'][str(i)]['pos'] for i in range(31,35));proofs['default_drop_pos']=default_after['composites']['3']['pos'];run(['xdotool','key','ctrl+z']);time.sleep(.6)
   # Edge scroll reveals a new destination row without decorative minimum rows.
-  a,b,c,d=hits()['module:24'];px,py=round(a+13),round(b+14);run(['xdotool','mousemove','--window',wid,str(px),str(py),'mousedown','1']);time.sleep(.2)
+  click('save');edge_before=json.loads((patch/'checkpoint.json').read_text());a,b,c,d=hits()['module:24'];px,py=round(a+13),round(b+14);run(['xdotool','mousemove','--window',wid,str(px),str(py),'mousedown','1']);time.sleep(.2)
   for n in range(1,13):run(['xdotool','mousemove','--window',wid,str(px),str(round(py+(865-py)*n/12))]);time.sleep(.085)
-  time.sleep(2.5);run(['xdotool','mouseup','1']);time.sleep(.8);steps.append('edge scroll/drop reaches extra row');run(['xdotool','key','ctrl+z']);time.sleep(.6);click('zoom:fit')
+  time.sleep(2.5);run(['xdotool','mouseup','1']);time.sleep(.8);steps.append('edge scroll/drop reaches extra row');click('save');edge_after=json.loads((patch/'checkpoint.json').read_text());assert edge_after['modules']['24']['pos']['y']>=1120;proofs['edge_drop_pos']=edge_after['modules']['24']['pos'];run(['xdotool','key','ctrl+z']);time.sleep(.6);click('zoom:fit')
   click('theme:dark');click('browser');time.sleep(1);click('browser')
  click('save');time.sleep(1)
  video.send_signal(2);video.wait(timeout=10);assert video.returncode in (0,255)
- (repo/f'docs/panel-authoring/repair/evidence/{mode}-interaction.json').write_text(json.dumps({'binary':str(binary),'sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'input':'scripted X11, not owner/hardware proof','steps':steps,'size':'1440x900'},indent=2)+'\n')
+ (repo/f'docs/panel-authoring/repair/evidence/{mode}-interaction.json').write_text(json.dumps({'binary':str(binary),'sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'input':'scripted X11, not owner/hardware proof','steps':steps,'saved_state_proofs':proofs,'size':'1440x900'},indent=2)+'\n')
 finally:
  if video and video.poll() is None:video.send_signal(2);video.wait(timeout=10)
  if app.poll() is None:app.terminate();app.wait(timeout=8)

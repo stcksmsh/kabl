@@ -1,8 +1,10 @@
 # Composite panel authoring
 
-Give a D09 composite a portable instrument face while preserving its real controls and routing. Open Composites, expand the instance tools, and choose Design instrument face; a default card also has Design face, and an authored face has Design. Import separate light/dark PNGs, set rack width, and place exposed IDs as knobs, selectors or jacks. Coordinates and sizes describe the complete printed footprint, not just the knob cap.
+Current owner disposition: **changes requested** after hands-on use. The [hands-on repair package](repair/README.md) and [repair report](repair/REPORT.md) supersede interaction/theme and normal-launch claims below. Earlier evidence and owner bundle remain preserved.
 
-Edit labels, then Apply panel / Undoable. Validation reports overlap, dimensions, asset limits or a wrong binding without changing the project. Preview light/dark switches the applied face. Reload saved face discards draft changes; Use default face is Undoable. Inspect internals always reaches the real modules and routes. Public controls/help reaches every exposed parameter even when artwork is missing or a control is unplaced.
+Give a D09 composite a portable instrument face while preserving its real controls and routing. Open Composites, expand the instance tools, and choose Edit face; default cards and authored faces also have Edit face. Import separate light/dark PNGs, set rack width, and place exposed IDs as knobs, selectors or jacks. Coordinates and sizes describe the complete printed footprint, not just the knob cap.
+
+Edit labels, then Apply panel / Undoable. Validation reports overlap, dimensions, asset limits or a wrong binding without changing the project. Preview light/dark switches the applied face. Reload saved face discards draft changes; Use default face is Undoable. Inspect internals always reaches the real modules and routes. More controls/help reaches every exposed parameter even when artwork is missing or a control is unplaced.
 
 Export complete package writes a new local JSON file containing the graph, interface, help, panel metadata and both images. Composites → Import package file loads it as a fresh independent instance. No original image paths are required. Publish a new immutable version uses the existing library mechanism; publishing never updates saved songs or existing instances. D09 duplicate rules still omit external cables and controller/native assignments while retaining fresh private state and pin positions.
 

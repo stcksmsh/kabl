@@ -1,0 +1,15 @@
+{
+  "binary": "/secondary/Programming/Github/kabl/.worktrees/d10/scratch/d10-repair/before-kabl-ui",
+  "sha256": "90e5022aaf81f935d023f138c38fa1d5d789bffff2ddec8f5c25f446c54e6bff",
+  "input": "scripted X11, not owner/hardware proof",
+  "steps": [
+    "theme:light",
+    "authored title drag across occupied neighbours",
+    "native title drag across occupied neighbours",
+    "toggle:20",
+    "toggle:20",
+    "composite:1:open",
+    "save"
+  ],
+  "size": "1440x900"
+}

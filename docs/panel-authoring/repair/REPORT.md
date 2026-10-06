@@ -1,0 +1,40 @@
+# D10 hands-on repair report
+
+Owner disposition remains **changes requested**. Kosta must review the repaired UI before owner acceptance can change. PR #13 remains the existing draft repair submission; it is not merged, and no D11 launch is authorized. The previous owner bundle, evidence, projects and libraries remain intact.
+
+## Exact provenance
+
+Pickup and previous submitted head: d702174b41c54cb5361643582f92c118cd4f1232. Production repair source, release build and independent source review: **5f7622a1aa9f44746e1f9d7a33a3c3ec3f9f8730**. Later documentation, test-strengthening and evidence changes do not alter production source. Final submitted/tested/artifact/package heads and binary hashes are recorded in evidence/verification.json and the external bundle's submission.json after submission; this avoids a self-referential commit hash. The worktree stays `/secondary/Programming/Github/kabl/.worktrees/d10`, branch codex/d10-panel-authoring.
+
+The old 25f20ae test head, ca8b504 release source and d702174 submission remain historical. The before video uses the retained old release binary; the repaired video and viewport checks use the exact repair debug binary. Production owner and host verification use the new release binary/plugin. Evidence files identify the binary hashes rather than treating a documentation head as rebuilt code.
+
+## Repairs
+
+All three item types now select and move through one body gesture. Lifted copies follow the original grab freely; committed neighbours stay still during the drag, the original item leaves a placeholder and the preview gives a legal insertion slot. Packing commits only on drop as one chronological Group. Escape cancels. Composites update only their own position, preserving leaf layout, graph identities and instance ownership. Edge scrolling exposes extra rows only when needed.
+
+Inspect internals opens the existing rack in a dedicated scope. It shows only direct instance internals, nested faces and explicit boundary bindings. Breadcrumbs and Back restore saved outer camera/selection/inspection without a second automatic pan. First entry fits the saved contents. External clocks and cues are described without duplicating outside modules. Add respects composite widths and direct scope ownership.
+
+More controls is a blocking, scrollable modal using the original knobs, selectors, jacks and routing. Existing cables remain visible in the focused context. Outer layout and camera remain unchanged. Escape, Close and backdrop clicks close without operating the rack underneath. Standard keyboard/exact value editors expose every focused setting. Authored public fallback uses the same modal behaviour.
+
+Native Edit face now appears directly on the face and in its existing menu. Normal visibility and order persist per instance, with Apply/Undo and defaults. Reorder uses existing knob/selector rows; arbitrary cross-kind geometry is excluded. Hidden controls remain in More. Parameter IDs, native lanes, pins, controllers, routes and embedded definitions are preserved. Additional saved metadata is bounded before commit.
+
+Light now uses warm pale workspace/chrome and dark text in the rack, browser, drawers, authoring, focused views, subpatches, menus and dialogs. Dark keeps charcoal surfaces with clearer muted sectional faces. Geometry and behaviour match. Original V3 material, assets and recessed controls remain; no reference image or generated render becomes a shipped asset.
+
+The new normal launcher uses bundled factory presets/resources and normal/preserved owner library discovery. It does not point at unavailable factory paths or force an empty profile. The explicit launch-portability-test.sh remains isolated and unavailable. Both standalone and REAPER launchers point at the bundled release files, and previous owner files are never overwritten.
+
+## Verification and evidence
+
+- Workspace at production head: 646 passed, 0 failed, 22 ignored, with the final full run serialized. Initial default-thread run hit the unchanged process-wide heap counter in stream_error_overflow (8 live blocks versus expected 5 during recovery). The isolated unchanged repeat and complete serialized run pass. No audio source/test contract was weakened; the original failure is retained in workspace-tests-attempt1.txt.
+- Strict workspace/all-target Clippy and explicit standalone plus plugin release builds pass; existing nice-plug warnings remain unchanged. Official CLAP validator returns 35 successes, 9 declared capability skips and no failures.
+- Focused regressions exercise real native/default/authored gesture ownership, free grab, destination packing including front insertion, cancellation/Undo, own composite position, edge scrolling, nested Back and scoped Add, unchanged More geometry/camera, modal click ownership/cables, native visibility/order persistence and both theme surfaces. The strengthened reorder check verifies actual left/right knob geometry as well as saved metadata.
+- Real before/after videos show pointer motion and the repaired workflows, with scripted input labelled honestly. Saved-state assertions confirm default composite drop to row 1 without internal position changes, Escape retains native position and edge drop reaches y2230 before Undo restores the example. Binary/action records are in before-interaction.json and after-interaction.json.
+- Both themes at 1440×900 and 1280×800 are captured for rack, More, internals, nested scope, Edit face and Sounds. Saved hit rectangles prove More and Back preserve the outer scene. Full restart preserves hidden-control visibility/order. Native 150% scaling exercises real selectors and knobs without changing module/composite positions. See viewport-checks.json and media/.
+- An initial target-filtered build left the old plugin in place; that validator/host probe is retained separately as before-plugin-rebuild evidence and is not credited as repaired-plugin verification. The explicit plugin --lib release build produced a new hash; validator and private host checks were rerun.
+- Private REAPER loads two saved instances with actual GUI-saved native face metadata, after removing the task-owned source packages/art and setting unavailable factory/library paths. Complete recalled state compares exactly at f32; existing native lanes replay at 2, 6 and 13 seconds with the original 0.025 tolerance. The host fixture checks that all nonpresentation parameters, graph, positions, composites, lanes and slot bases remain unchanged. See host-fixture.json and host/.
+- The separate relocated owner bundle checks all manifest hashes, maps its own release standalone/plugin, displays populated factory Sounds on normal startup and no factory cards on its explicit unavailable startup. Embedded authored faces recall through both. Relocated REAPER repeats complete state/native replay with unavailable libraries. See bundle-check.json and bundle-host/.
+
+Independent source review passes at the exact production head, with all four findings fixed; REVIEW.md records each. Source review, real application evidence, package validation, merge and owner approval remain separate dispositions.
+
+## Remaining limits
+
+Owner material, interaction feel and musical usability remain for Kosta to judge. Physical controller/listening/latency and hardware xrun checks remain open. Private X11 captures use software input/rendering and report late callbacks/xruns under test load; they do not certify real-time performance or a physical monitor/backend. Ordinary-render nondeterminism, dense-editor/backend limits and production-beta hygiene remain inherited D08 concerns. Existing asset, nesting, fixed-height rack and bounded package limits remain in force. No new synthesis, dependency, marketplace, migration or D11 work is included.

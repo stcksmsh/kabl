@@ -1,5 +1,7 @@
 # Kosta's D10 checks
 
+Current owner disposition: **changes requested** after hands-on use. The [hands-on repair package](repair/README.md) and [repair report](repair/REPORT.md) supersede interaction/theme and normal-launch claims below. Earlier evidence and owner bundle remain preserved.
+
 Owner review remains pending. These actions are deliberately unchecked until Kosta reports results.
 
 - [ ] Launch the portable bundle's standalone script. Compare terracotta voice and sage stereo faces against the selected satin material reference.

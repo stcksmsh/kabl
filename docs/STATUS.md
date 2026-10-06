@@ -1,5 +1,7 @@
 # Status
 
+D10 hands-on repair remains on draft PR #13, unmerged. Owner disposition: changes requested. Exact repair/source/package evidence is indexed in [panel-authoring/repair/REPORT.md](panel-authoring/repair/REPORT.md). Previous owner files and evidence remain preserved; no D11 launch is authorized.
+
 ## D10 panel authoring — 2026-10-06
 
 Engineering verification: workspace 634 passed / 0 failed / 22 ignored, strict workspace/all-target Clippy, release build and CLAP validator 35 success / 9 capability skips pass. Portable composite faces preserve stable D09 exposed IDs, chronological project Undo, embedded exact graph/art snapshots and immutable library semantics. The selected V3 sectional satin finish now covers built-ins and relevant chrome. Real GUI voice/stereo examples, both themes/sizes, actual 150% native scaling, fresh-profile source removal/restart and REAPER complete recall/native automation are recorded in [panel-authoring/REPORT.md](panel-authoring/REPORT.md). Final independent source/artifact recheck passes at 12f593256e06f4eb3be093ffd0deba1c5131b74a; both findings are resolved. Submitted as draft [PR #13](https://github.com/stcksmsh/kabl/pull/13) on codex/d10-panel-authoring; no owner approval or merge is implied.

@@ -257,7 +257,9 @@ Acceptance: encapsulate/open/duplicate/undo/save/reload; sound matches the origi
 
 ### D10 — Custom panel authoring and sharing
 
-Implementation verified 2026-10-06 on codex/d10-panel-authoring. Real GUI/package/scaling and source-free REAPER evidence, independent review, exact heads and owner limits are indexed in [panel-authoring/REPORT.md](panel-authoring/REPORT.md). Draft submission is separate from owner approval or merge.
+Hands-on repair 2026-10-06: owner disposition is changes requested. Shared item dragging, scoped internals, focused controls, native face visibility/order, warm light chrome and factory-enabled normal packaging are repaired on the existing D10 PR; [repair report](panel-authoring/repair/REPORT.md) records exact validation and pending owner review. No merge or D11 launch is authorized.
+
+Earlier implementation verified 2026-10-06 on codex/d10-panel-authoring. Real GUI/package/scaling and source-free REAPER evidence, independent review, exact heads and owner limits are indexed in [panel-authoring/REPORT.md](panel-authoring/REPORT.md). Draft submission is separate from owner approval or merge.
 
 Outcome: a user gives a composite its own instrument face and shares a complete, working package.
 

@@ -1,5 +1,7 @@
 # D10 engineering report
 
+Current owner disposition: **changes requested** after hands-on use. The [hands-on repair package](repair/README.md) and [repair report](repair/REPORT.md) supersede interaction/theme and normal-launch claims below. Earlier evidence and owner bundle remain preserved.
+
 D10 adds portable, editable composite faces and the selected continuous sectional satin finish. Engineering verification and final independent source/artifact recheck pass. Both findings are resolved in REVIEW.md. Submitted as draft [PR #13](https://github.com/stcksmsh/kabl/pull/13), branch codex/d10-panel-authoring, pushed to origin. Owner acceptance remains pending. No merge or D11 work is authorized. This report describes actual application evidence; the earlier generated material reference is design inspiration only.
 
 ## Product and evidence provenance

@@ -1,0 +1,157 @@
+The XKEYBOARD keymap compiler (xkbcomp) reports:
+> Warning:          Could not resolve keysym XF86CameraAccessEnable
+> Warning:          Could not resolve keysym XF86CameraAccessDisable
+> Warning:          Could not resolve keysym XF86CameraAccessToggle
+> Warning:          Could not resolve keysym XF86NextElement
+> Warning:          Could not resolve keysym XF86PreviousElement
+> Warning:          Could not resolve keysym XF86AutopilotEngageToggle
+> Warning:          Could not resolve keysym XF86MarkWaypoint
+> Warning:          Could not resolve keysym XF86Sos
+> Warning:          Could not resolve keysym XF86NavChart
+> Warning:          Could not resolve keysym XF86FishingChart
+> Warning:          Could not resolve keysym XF86SingleRangeRadar
+> Warning:          Could not resolve keysym XF86DualRangeRadar
+> Warning:          Could not resolve keysym XF86RadarOverlay
+> Warning:          Could not resolve keysym XF86TraditionalSonar
+> Warning:          Could not resolve keysym XF86ClearvuSonar
+> Warning:          Could not resolve keysym XF86SidevuSonar
+> Warning:          Could not resolve keysym XF86NavInfo
+Errors from xkbcomp are not fatal to the X server
+kabl-ui: start kabl-ui 0.1.0 (commit 5f7622a1aa9f+modified) level=INFO log=/secondary/Programming/Github/kabl/.worktrees/d10/scratch/d10-repair/capture/library/logs/kabl.log
+kabl-ui: factory sounds: /secondary/Programming/Github/kabl/.worktrees/d10/patches; your sounds: /secondary/Programming/Github/kabl/.worktrees/d10/scratch/d10-repair/capture/library/sounds
+kabl-ui: no MIDI input matched None
+kabl-ui: backend=Alsa requested rate=None frames=None rt=false
+kabl-ui: device=Some("Default Audio Device") rate=48000 channels=2 buffer=Default
+kabl-ui: error setting XSETTINGS; Xft options won't reload automatically
+kabl-ui: XRandR reported that the display's 0mm in size, which is certifiably insane
+kabl-ui: Widget rect [[1080.0 64.0] - [1440.0 876.0]] changed id between passes: prev ids: ["08EB", "F3A9"], new ids: ["289D", "D790"]
+kabl-ui: Widget rect [[1088.0 66.0] - [1150.1 89.0]] changed id between passes: prev ids: ["7BA6"], new ids: ["FA82"]
+kabl-ui: Widget rect [[1088.0 66.0] - [1432.0 89.0]] changed id between passes: prev ids: ["EBBA"], new ids: ["0F39"]
+kabl-ui: Widget rect [[1088.0 66.0] - [1432.0 874.0]] changed id between passes: prev ids: ["D90B"], new ids: ["EE6A"]
+kabl-ui: Widget rect [[1088.0 92.0] - [1140.7 111.0]] changed id between passes: prev ids: ["D608"], new ids: ["76F0"]
+kabl-ui: Widget rect [[1088.0 92.0] - [1258.3 111.0]] changed id between passes: prev ids: ["7CCB"], new ids: ["DEDE"]
+kabl-ui: Widget rect [[1088.0 114.0] - [1208.2 131.0]] changed id between passes: prev ids: ["76AA", "47DF", "320B", "6CB3"], new ids: ["E777", "35F5", "6364", "243E"]
+kabl-ui: Widget rect [[1148.7 92.0] - [1209.7 111.0]] changed id between passes: prev ids: ["8C37"], new ids: ["8C88"]
+kabl-ui: Widget rect [[1217.7 92.0] - [1258.3 111.0]] changed id between passes: prev ids: ["C9FB"], new ids: ["2C07"]
+kabl-ui: Widget rect [[1339.0 66.0] - [1432.0 89.0]] changed id between passes: prev ids: ["6288"], new ids: ["99E6"]
+kabl-ui: Widget rect [[1339.0 68.0] - [1383.7 87.0]] changed id between passes: prev ids: ["54BB"], new ids: ["7DD5"]
+kabl-ui: Widget rect [[1391.7 68.0] - [1432.0 87.0]] changed id between passes: prev ids: ["99B4"], new ids: ["B986"]
+kabl-ui: Widget rect [[1080.0 64.0] - [1440.0 876.0]] changed id between passes: prev ids: ["289D", "D790"], new ids: ["08EB", "F3A9"]
+kabl-ui: Widget rect [[1088.0 66.0] - [1150.1 89.0]] changed id between passes: prev ids: ["FA82"], new ids: ["7BA6"]
+kabl-ui: Widget rect [[1088.0 66.0] - [1432.0 89.0]] changed id between passes: prev ids: ["0F39"], new ids: ["EBBA"]
+kabl-ui: Widget rect [[1088.0 66.0] - [1432.0 874.0]] changed id between passes: prev ids: ["EE6A"], new ids: ["D90B"]
+kabl-ui: Widget rect [[1088.0 92.0] - [1140.7 111.0]] changed id between passes: prev ids: ["76F0"], new ids: ["D608"]
+kabl-ui: Widget rect [[1088.0 92.0] - [1258.3 111.0]] changed id between passes: prev ids: ["DEDE"], new ids: ["7CCB"]
+kabl-ui: Widget rect [[1088.0 114.0] - [1208.2 131.0]] changed id between passes: prev ids: ["E777", "35F5", "6364", "243E"], new ids: ["76AA", "47DF", "320B", "6CB3"]
+kabl-ui: Widget rect [[1148.7 92.0] - [1209.7 111.0]] changed id between passes: prev ids: ["8C88"], new ids: ["8C37"]
+kabl-ui: Widget rect [[1217.7 92.0] - [1258.3 111.0]] changed id between passes: prev ids: ["2C07"], new ids: ["C9FB"]
+kabl-ui: Widget rect [[1339.0 66.0] - [1432.0 89.0]] changed id between passes: prev ids: ["99E6"], new ids: ["6288"]
+kabl-ui: Widget rect [[1339.0 68.0] - [1383.7 87.0]] changed id between passes: prev ids: ["7DD5"], new ids: ["54BB"]
+kabl-ui: Widget rect [[1391.7 68.0] - [1432.0 87.0]] changed id between passes: prev ids: ["B986"], new ids: ["99B4"]
+kabl-ui: Widget rect [[1080.0 64.0] - [1440.0 876.0]] changed id between passes: prev ids: ["08EB", "F3A9"], new ids: ["289D", "D790"]
+kabl-ui: Widget rect [[1088.0 66.0] - [1150.1 89.0]] changed id between passes: prev ids: ["7BA6"], new ids: ["FA82"]
+kabl-ui: Widget rect [[1088.0 66.0] - [1432.0 89.0]] changed id between passes: prev ids: ["EBBA"], new ids: ["0F39"]
+kabl-ui: Widget rect [[1088.0 66.0] - [1432.0 874.0]] changed id between passes: prev ids: ["D90B"], new ids: ["EE6A"]
+kabl-ui: Widget rect [[1088.0 92.0] - [1140.7 111.0]] changed id between passes: prev ids: ["D608"], new ids: ["76F0"]
+kabl-ui: Widget rect [[1088.0 92.0] - [1258.3 111.0]] changed id between passes: prev ids: ["7CCB"], new ids: ["DEDE"]
+kabl-ui: Widget rect [[1088.0 114.0] - [1208.2 131.0]] changed id between passes: prev ids: ["76AA", "47DF", "320B", "6CB3"], new ids: ["E777", "35F5", "6364", "243E"]
+kabl-ui: Widget rect [[1148.7 92.0] - [1209.7 111.0]] changed id between passes: prev ids: ["8C37"], new ids: ["8C88"]
+kabl-ui: Widget rect [[1217.7 92.0] - [1258.3 111.0]] changed id between passes: prev ids: ["C9FB"], new ids: ["2C07"]
+kabl-ui: Widget rect [[1339.0 66.0] - [1432.0 89.0]] changed id between passes: prev ids: ["6288"], new ids: ["99E6"]
+kabl-ui: Widget rect [[1339.0 68.0] - [1383.7 87.0]] changed id between passes: prev ids: ["54BB"], new ids: ["7DD5"]
+kabl-ui: Widget rect [[1391.7 68.0] - [1432.0 87.0]] changed id between passes: prev ids: ["99B4"], new ids: ["B986"]
+kabl-ui: Widget rect [[1080.0 64.0] - [1440.0 876.0]] changed id between passes: prev ids: ["289D", "D790"], new ids: ["08EB", "F3A9"]
+kabl-ui: Widget rect [[1088.0 66.0] - [1150.1 89.0]] changed id between passes: prev ids: ["FA82"], new ids: ["7BA6"]
+kabl-ui: Widget rect [[1088.0 66.0] - [1432.0 89.0]] changed id between passes: prev ids: ["0F39"], new ids: ["EBBA"]
+kabl-ui: Widget rect [[1088.0 66.0] - [1432.0 874.0]] changed id between passes: prev ids: ["EE6A"], new ids: ["D90B"]
+kabl-ui: Widget rect [[1088.0 92.0] - [1140.7 111.0]] changed id between passes: prev ids: ["76F0"], new ids: ["D608"]
+kabl-ui: Widget rect [[1088.0 92.0] - [1258.3 111.0]] changed id between passes: prev ids: ["DEDE"], new ids: ["7CCB"]
+kabl-ui: Widget rect [[1088.0 114.0] - [1208.2 131.0]] changed id between passes: prev ids: ["E777", "35F5", "6364", "243E"], new ids: ["76AA", "47DF", "320B", "6CB3"]
+kabl-ui: Widget rect [[1148.7 92.0] - [1209.7 111.0]] changed id between passes: prev ids: ["8C88"], new ids: ["8C37"]
+kabl-ui: Widget rect [[1217.7 92.0] - [1258.3 111.0]] changed id between passes: prev ids: ["2C07"], new ids: ["C9FB"]
+kabl-ui: Widget rect [[1339.0 66.0] - [1432.0 89.0]] changed id between passes: prev ids: ["99E6"], new ids: ["6288"]
+kabl-ui: Widget rect [[1339.0 68.0] - [1383.7 87.0]] changed id between passes: prev ids: ["7DD5"], new ids: ["54BB"]
+kabl-ui: Widget rect [[1391.7 68.0] - [1432.0 87.0]] changed id between passes: prev ids: ["B986"], new ids: ["99B4"]
+kabl-ui: save ok origin=folder
+kabl-ui: start kabl-ui 0.1.0 (commit 5f7622a1aa9f+modified) level=INFO log=/secondary/Programming/Github/kabl/.worktrees/d10/scratch/d10-repair/capture/library/logs/kabl.log
+kabl-ui: factory sounds: /secondary/Programming/Github/kabl/.worktrees/d10/patches; your sounds: /secondary/Programming/Github/kabl/.worktrees/d10/scratch/d10-repair/capture/library/sounds
+kabl-ui: no MIDI input matched None
+kabl-ui: backend=Alsa requested rate=None frames=None rt=false
+kabl-ui: device=Some("Default Audio Device") rate=48000 channels=2 buffer=Default
+kabl-ui: error setting XSETTINGS; Xft options won't reload automatically
+kabl-ui: XRandR reported that the display's 0mm in size, which is certifiably insane
+kabl-ui: Widget rect [[920.0 64.0] - [1280.0 776.0]] changed id between passes: prev ids: ["08EB", "F3A9"], new ids: ["289D", "D790"]
+kabl-ui: Widget rect [[928.0 66.0] - [990.1 89.0]] changed id between passes: prev ids: ["7BA6"], new ids: ["FA82"]
+kabl-ui: Widget rect [[928.0 66.0] - [1272.0 89.0]] changed id between passes: prev ids: ["EBBA"], new ids: ["0F39"]
+kabl-ui: Widget rect [[928.0 66.0] - [1272.0 774.0]] changed id between passes: prev ids: ["D90B"], new ids: ["EE6A"]
+kabl-ui: Widget rect [[928.0 92.0] - [980.7 111.0]] changed id between passes: prev ids: ["D608"], new ids: ["76F0"]
+kabl-ui: Widget rect [[928.0 92.0] - [1098.3 111.0]] changed id between passes: prev ids: ["7CCB"], new ids: ["DEDE"]
+kabl-ui: Widget rect [[928.0 114.0] - [1048.2 131.0]] changed id between passes: prev ids: ["76AA", "47DF", "320B", "6CB3"], new ids: ["E777", "35F5", "6364", "243E"]
+kabl-ui: Widget rect [[988.7 92.0] - [1049.7 111.0]] changed id between passes: prev ids: ["8C37"], new ids: ["8C88"]
+kabl-ui: Widget rect [[1057.7 92.0] - [1098.3 111.0]] changed id between passes: prev ids: ["C9FB"], new ids: ["2C07"]
+kabl-ui: Widget rect [[1179.0 66.0] - [1272.0 89.0]] changed id between passes: prev ids: ["6288"], new ids: ["99E6"]
+kabl-ui: Widget rect [[1179.0 68.0] - [1223.7 87.0]] changed id between passes: prev ids: ["54BB"], new ids: ["7DD5"]
+kabl-ui: Widget rect [[1231.7 68.0] - [1272.0 87.0]] changed id between passes: prev ids: ["99B4"], new ids: ["B986"]
+kabl-ui: Widget rect [[920.0 64.0] - [1280.0 776.0]] changed id between passes: prev ids: ["289D", "D790"], new ids: ["08EB", "F3A9"]
+kabl-ui: Widget rect [[928.0 66.0] - [990.1 89.0]] changed id between passes: prev ids: ["FA82"], new ids: ["7BA6"]
+kabl-ui: Widget rect [[928.0 66.0] - [1272.0 89.0]] changed id between passes: prev ids: ["0F39"], new ids: ["EBBA"]
+kabl-ui: Widget rect [[928.0 66.0] - [1272.0 774.0]] changed id between passes: prev ids: ["EE6A"], new ids: ["D90B"]
+kabl-ui: Widget rect [[928.0 92.0] - [980.7 111.0]] changed id between passes: prev ids: ["76F0"], new ids: ["D608"]
+kabl-ui: Widget rect [[928.0 92.0] - [1098.3 111.0]] changed id between passes: prev ids: ["DEDE"], new ids: ["7CCB"]
+kabl-ui: Widget rect [[928.0 114.0] - [1048.2 131.0]] changed id between passes: prev ids: ["E777", "35F5", "6364", "243E"], new ids: ["76AA", "47DF", "320B", "6CB3"]
+kabl-ui: Widget rect [[988.7 92.0] - [1049.7 111.0]] changed id between passes: prev ids: ["8C88"], new ids: ["8C37"]
+kabl-ui: Widget rect [[1057.7 92.0] - [1098.3 111.0]] changed id between passes: prev ids: ["2C07"], new ids: ["C9FB"]
+kabl-ui: Widget rect [[1179.0 66.0] - [1272.0 89.0]] changed id between passes: prev ids: ["99E6"], new ids: ["6288"]
+kabl-ui: Widget rect [[1179.0 68.0] - [1223.7 87.0]] changed id between passes: prev ids: ["7DD5"], new ids: ["54BB"]
+kabl-ui: Widget rect [[1231.7 68.0] - [1272.0 87.0]] changed id between passes: prev ids: ["B986"], new ids: ["99B4"]
+kabl-ui: Widget rect [[920.0 64.0] - [1280.0 776.0]] changed id between passes: prev ids: ["08EB", "F3A9"], new ids: ["289D", "D790"]
+kabl-ui: Widget rect [[928.0 66.0] - [990.1 89.0]] changed id between passes: prev ids: ["7BA6"], new ids: ["FA82"]
+kabl-ui: Widget rect [[928.0 66.0] - [1272.0 89.0]] changed id between passes: prev ids: ["EBBA"], new ids: ["0F39"]
+kabl-ui: Widget rect [[928.0 66.0] - [1272.0 774.0]] changed id between passes: prev ids: ["D90B"], new ids: ["EE6A"]
+kabl-ui: Widget rect [[928.0 92.0] - [980.7 111.0]] changed id between passes: prev ids: ["D608"], new ids: ["76F0"]
+kabl-ui: Widget rect [[928.0 92.0] - [1098.3 111.0]] changed id between passes: prev ids: ["7CCB"], new ids: ["DEDE"]
+kabl-ui: Widget rect [[928.0 114.0] - [1048.2 131.0]] changed id between passes: prev ids: ["76AA", "47DF", "320B", "6CB3"], new ids: ["E777", "35F5", "6364", "243E"]
+kabl-ui: Widget rect [[988.7 92.0] - [1049.7 111.0]] changed id between passes: prev ids: ["8C37"], new ids: ["8C88"]
+kabl-ui: Widget rect [[1057.7 92.0] - [1098.3 111.0]] changed id between passes: prev ids: ["C9FB"], new ids: ["2C07"]
+kabl-ui: Widget rect [[1179.0 66.0] - [1272.0 89.0]] changed id between passes: prev ids: ["6288"], new ids: ["99E6"]
+kabl-ui: Widget rect [[1179.0 68.0] - [1223.7 87.0]] changed id between passes: prev ids: ["54BB"], new ids: ["7DD5"]
+kabl-ui: Widget rect [[1231.7 68.0] - [1272.0 87.0]] changed id between passes: prev ids: ["99B4"], new ids: ["B986"]
+kabl-ui: Widget rect [[920.0 64.0] - [1280.0 776.0]] changed id between passes: prev ids: ["289D", "D790"], new ids: ["08EB", "F3A9"]
+kabl-ui: Widget rect [[928.0 66.0] - [990.1 89.0]] changed id between passes: prev ids: ["FA82"], new ids: ["7BA6"]
+kabl-ui: Widget rect [[928.0 66.0] - [1272.0 89.0]] changed id between passes: prev ids: ["0F39"], new ids: ["EBBA"]
+kabl-ui: Widget rect [[928.0 66.0] - [1272.0 774.0]] changed id between passes: prev ids: ["EE6A"], new ids: ["D90B"]
+kabl-ui: Widget rect [[928.0 92.0] - [980.7 111.0]] changed id between passes: prev ids: ["76F0"], new ids: ["D608"]
+kabl-ui: Widget rect [[928.0 92.0] - [1098.3 111.0]] changed id between passes: prev ids: ["DEDE"], new ids: ["7CCB"]
+kabl-ui: Widget rect [[928.0 114.0] - [1048.2 131.0]] changed id between passes: prev ids: ["E777", "35F5", "6364", "243E"], new ids: ["76AA", "47DF", "320B", "6CB3"]
+kabl-ui: Widget rect [[988.7 92.0] - [1049.7 111.0]] changed id between passes: prev ids: ["8C88"], new ids: ["8C37"]
+kabl-ui: Widget rect [[1057.7 92.0] - [1098.3 111.0]] changed id between passes: prev ids: ["2C07"], new ids: ["C9FB"]
+kabl-ui: Widget rect [[1179.0 66.0] - [1272.0 89.0]] changed id between passes: prev ids: ["99E6"], new ids: ["6288"]
+kabl-ui: Widget rect [[1179.0 68.0] - [1223.7 87.0]] changed id between passes: prev ids: ["7DD5"], new ids: ["54BB"]
+kabl-ui: Widget rect [[1231.7 68.0] - [1272.0 87.0]] changed id between passes: prev ids: ["B986"], new ids: ["99B4"]
+kabl-ui: save ok origin=folder
+kabl-ui: start kabl-ui 0.1.0 (commit 5f7622a1aa9f+modified) level=INFO log=/secondary/Programming/Github/kabl/.worktrees/d10/scratch/d10-repair/capture/library/logs/kabl.log
+kabl-ui: factory sounds: /secondary/Programming/Github/kabl/.worktrees/d10/patches; your sounds: /secondary/Programming/Github/kabl/.worktrees/d10/scratch/d10-repair/capture/library/sounds
+kabl-ui: no MIDI input matched None
+kabl-ui: backend=Alsa requested rate=None frames=None rt=false
+kabl-ui: device=Some("Default Audio Device") rate=48000 channels=2 buffer=Default
+kabl-ui: error setting XSETTINGS; Xft options won't reload automatically
+kabl-ui: save ok origin=folder
+The XKEYBOARD keymap compiler (xkbcomp) reports:
+> Warning:          Could not resolve keysym XF86CameraAccessEnable
+> Warning:          Could not resolve keysym XF86CameraAccessDisable
+> Warning:          Could not resolve keysym XF86CameraAccessToggle
+> Warning:          Could not resolve keysym XF86NextElement
+> Warning:          Could not resolve keysym XF86PreviousElement
+> Warning:          Could not resolve keysym XF86AutopilotEngageToggle
+> Warning:          Could not resolve keysym XF86MarkWaypoint
+> Warning:          Could not resolve keysym XF86Sos
+> Warning:          Could not resolve keysym XF86NavChart
+> Warning:          Could not resolve keysym XF86FishingChart
+> Warning:          Could not resolve keysym XF86SingleRangeRadar
+> Warning:          Could not resolve keysym XF86DualRangeRadar
+> Warning:          Could not resolve keysym XF86RadarOverlay
+> Warning:          Could not resolve keysym XF86TraditionalSonar
+> Warning:          Could not resolve keysym XF86ClearvuSonar
+> Warning:          Could not resolve keysym XF86SidevuSonar
+> Warning:          Could not resolve keysym XF86NavInfo
+Errors from xkbcomp are not fatal to the X server

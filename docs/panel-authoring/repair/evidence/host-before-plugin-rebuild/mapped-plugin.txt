@@ -1,0 +1,4 @@
+7b1e19c00000-7b1e19ed3000 r--p 00000000 103:01 11425849                  /secondary/Programming/Github/kabl/.worktrees/d10/scratch/d10-repair/host/plugins/kabl.clap
+7b1e19ed3000-7b1e1a599000 r-xp 002d2000 103:01 11425849                  /secondary/Programming/Github/kabl/.worktrees/d10/scratch/d10-repair/host/plugins/kabl.clap
+7b1e1a599000-7b1e1a5dc000 r--p 00997000 103:01 11425849                  /secondary/Programming/Github/kabl/.worktrees/d10/scratch/d10-repair/host/plugins/kabl.clap
+7b1e1a5dc000-7b1e1a5de000 rw-p 009d9000 103:01 11425849                  /secondary/Programming/Github/kabl/.worktrees/d10/scratch/d10-repair/host/plugins/kabl.clap

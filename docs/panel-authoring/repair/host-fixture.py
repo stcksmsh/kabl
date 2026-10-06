@@ -18,5 +18,8 @@ def replace(m):
 project=re.sub(r'<STATE\s+(.*?)\s*>',replace,source.read_text(),flags=re.S);assert len(expected)==2
 (host/'d10-arrangement.rpp').write_text(project);(host/'expected.json').write_text(json.dumps(expected,indent=2)+'\n')
 shutil.copy2(repo/'scratch/d10-host/profile/reaper.ini',host/'profile/reaper.ini');shutil.copy2(repo/'target/release/libkabl_clap.so',host/'plugins/kabl.clap')
+(host/'source-library').mkdir(exist_ok=True)
+for name in ['voice.json','stereo-effect.json']:shutil.copy2(repo/f'docs/panel-authoring/examples/{name}',host/'source-library'/name)
+shutil.copytree(repo/'docs/panel-authoring/examples/art',host/'source-library/art',dirs_exist_ok=True)
 (repo/'docs/panel-authoring/repair/evidence/host-fixture.json').write_text(json.dumps({'source':str(source),'actual_UI_saved_face':face,'instances':2,'all_nonpresentation_params_graph_composites_lanes_bases_unchanged':True},indent=2)+'\n')
 print('Private REAPER fixture retains exact graph/native identities and actual saved UI visibility/order')

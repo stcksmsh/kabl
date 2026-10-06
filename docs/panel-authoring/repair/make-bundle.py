@@ -49,6 +49,7 @@ Read docs/repair/REPORT.md and CHECKLIST.md. Owner disposition remains changes r
 
 Fonts: OFL-1.1 (docs/FONT-LICENSE.txt). Original art/code: MIT OR Apache-2.0; nice-plug: ISC. No generated or reference image was imported as a product asset. Existing project art remains embedded and unchanged.
 ''')
-head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip()
-manifest={'product_head':head,'platform':'Linux x86_64','factory_sounds':len(list((root/'factory').rglob('sound.toml'))),'normal_factory':'factory','normal_user_library':'explicit environment, prior owner resources, or normal app discovery','explicit_unavailable_test':'launch-portability-test.sh','files':{str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.rglob('*')) if p.is_file() and p.name!='manifest.json'}}
+head=(repo/'docs/panel-authoring/repair/evidence/product-head.txt').read_text().strip()
+artifact_head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip()
+manifest={'product_head':head,'artifact_head':artifact_head,'platform':'Linux x86_64','factory_sounds':len(list((root/'factory').rglob('sound.toml'))),'normal_factory':'factory','normal_user_library':'explicit environment, prior owner resources, or normal app discovery','explicit_unavailable_test':'launch-portability-test.sh','files':{str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.rglob('*')) if p.is_file() and p.name!='manifest.json'}}
 (root/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n');print(root)

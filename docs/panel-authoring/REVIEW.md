@@ -1,5 +1,7 @@
 # Independent D10 review
 
+Current owner disposition: **changes requested** after hands-on use. The [hands-on repair package](repair/README.md) and [repair report](repair/REPORT.md) supersede interaction/theme and normal-launch claims below. Earlier evidence and owner bundle remain preserved.
+
 Reviewer: fresh subagent `/root/d10_review`. Base: `db33f6a2a9c0274e272d702142ad5d63d39271a6`. Initial reviewed product head: `ffb9929bb5b23b9fa629c48f31888e8b3a38db3f`. The working tree also contains the implementer's uncommitted empty-rack Fit repair in `crates/ui/src/lib.rs`; that repair was read and its focused regression passed. This is an initial source review, not final engineering acceptance. Final product-head and evidence recheck remain required.
 
 ## Findings

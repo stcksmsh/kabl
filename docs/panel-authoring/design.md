@@ -1,5 +1,7 @@
 # D10 panel design and compatibility
 
+Current owner disposition: **changes requested** after hands-on use. The [hands-on repair package](repair/README.md) and [repair report](repair/REPORT.md) supersede interaction/theme and normal-launch claims below. Earlier evidence and owner bundle remain preserved.
+
 ## Representation and identity
 
 An optional boxed Panel lives on each D09 Composite. The box keeps the existing operation enum compact; serialization is an ordinary optional object. Older composites omit it and load with their original face. Each placement is keyed by an immutable exposed interface ID, never a label, coordinate or array position. Its kind is knob, selector or jack; its footprint includes printed labels and values. Bindings remain the original PortRef aliases. Renaming and moving presentation never rewrite leaf IDs, pins, cues, CC keys, cables or native automation lanes.
