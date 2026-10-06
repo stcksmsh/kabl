@@ -773,9 +773,17 @@ mod tests {
             .position(|p| p.name == "waveform")
             .unwrap();
         visible[i] = false;
+        let pulse = info.params.iter().position(|p| p.name == "pw").unwrap();
+        visible[pulse] = true;
+        let original = rack::layout(&before, &rack::View::default())
+            .get(a)
+            .unwrap()
+            .ctl("base_hz")
+            .unwrap()
+            .geo;
         v.choose = Some((a, visible));
         let mut order = rack::control_order(&before.modules[&a], info);
-        order.swap(0, 1);
+        order.swap(0, pulse);
         v.face_order = Some(order.clone());
         for _ in 0..3 {
             frame(&ctx, &mut e, &mut v, vec![]);
@@ -783,6 +791,13 @@ mod tests {
         click(&ctx, &mut e, &mut v, "face:apply");
         assert!(!rack::primary_set(&e.state().modules[&a], info)[i]);
         assert_eq!(rack::control_order(&e.state().modules[&a], info), order);
+        let placed = rack::layout(e.state(), &rack::View::default());
+        let module = placed.get(a).unwrap();
+        assert_ne!(module.ctl("base_hz").unwrap().geo, original);
+        assert!(
+            module.ctl("pw").unwrap().geo.label_pos().x
+                < module.ctl("base_hz").unwrap().geo.label_pos().x
+        );
         assert!(kabl_engine::runtime::runtime_changes(&before, e.state())
             .unwrap()
             .is_empty());

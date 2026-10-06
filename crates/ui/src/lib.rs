@@ -3634,7 +3634,7 @@ fn draw_default_face(
                 if r.clicked() {
                     panels::open(view, id, c);
                 }
-                let r = ui.button("Open internals / edit this instance");
+                let r = ui.button("Inspect internals");
                 view.record(format!("composite:{id}:open"), r.rect);
                 if r.clicked() {
                     view.enter_composite(editor.state(), id);
