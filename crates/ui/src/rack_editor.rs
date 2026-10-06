@@ -521,7 +521,7 @@ pub(crate) fn edit_face(editor: &mut PatchEditor, view: &mut UiState, ctx: &egui
         .unwrap_or_else(|| rack::control_order(m, info));
     let mut done = false;
     let mut cancel = false;
-    egui::Window::new(format!("Edit face · {}",info.name)).id(Id::new("native-edit-face")).default_width(420.).vscroll(true).show(ctx,|ui|{
+    egui::Window::new(format!("Edit face · {}",info.name)).id(Id::new("native-edit-face")).default_width(420.).default_height(280.).max_height(ctx.content_rect().height()-100.).default_pos(ctx.content_rect().center()-vec2(210.,180.)).collapsible(false).vscroll(true).show(ctx,|ui|{
         ui.label("Normally visible controls. Hidden controls remain in More controls. Order applies within knob/selector rows.");
         for n in 0..order.len() {
             let index=order[n];let p=&info.params[index];if rack::face_name(info,p.name)!=p.name {continue;}
