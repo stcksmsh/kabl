@@ -1,0 +1,204 @@
+{
+  "production_source_head": "35eed79956dd702e0a62cd80be534d5c34dc9632",
+  "full_workspace_tested_head": "35eed79956dd702e0a62cd80be534d5c34dc9632",
+  "independent_reviewed_product_head": "35eed79956dd702e0a62cd80be534d5c34dc9632",
+  "release_build_source_head": "35eed79956dd702e0a62cd80be534d5c34dc9632",
+  "previous_submitted_head": "d0d47955515b7038992c57b552a86b2fe915d494",
+  "previous_repair_product_head": "5f7622a1aa9f44746e1f9d7a33a3c3ec3f9f8730",
+  "workspace": {
+    "passed": 651,
+    "failed": 0,
+    "ignored": 22,
+    "suites": 100
+  },
+  "workspace_command": "cargo test --workspace -- --test-threads=1",
+  "clippy": "cargo clippy --workspace --all-targets -- -D warnings passed; 21 existing vendor warnings unchanged",
+  "build_commands": [
+    "cargo build --release -p kabl-ui --bin kabl-ui",
+    "cargo build --release -p kabl-clap --lib",
+    "cargo build -p kabl-ui --bin kabl-ui"
+  ],
+  "binaries": {
+    "target/release/kabl-ui": "df17c9046ca9ee1622508d7720437e7eef7175443d3c4ec821138b15b92ac75f",
+    "target/release/libkabl_clap.so": "f474f2662e9eff7380801f27da9e9e03e93d1ded38210766672407bc5563cb0d",
+    "scratch/d10-final/final-kabl-ui": "c6f9650f36d558a2f0ecf11c79fab7ca6d44a0630faf5bb87d5545e8331aecc1"
+  },
+  "source_review": "passed; fresh reviewer independently ran 16 focused tests at actual product head",
+  "real_input": "Scripted private X11; not owner or physical hardware acceptance.",
+  "reused_evidence": [
+    {
+      "path": "../evidence/viewport-checks.json",
+      "head": "5f7622a1aa9f44746e1f9d7a33a3c3ec3f9f8730",
+      "scope": "Earlier accepted theme/subpatch/Back/visibility/full-restart/native-ID cases. New sizing/wheel/insertion cases are separate current final evidence."
+    },
+    {
+      "path": "../evidence/host-fixture.json",
+      "head": "d0d47955515b7038992c57b552a86b2fe915d494",
+      "production_head": "5f7622a1aa9f44746e1f9d7a33a3c3ec3f9f8730",
+      "scope": "Unchanged saved GUI face visibility/order fixture and expected full f32 host state; final release bundled plugin recall is repeated."
+    }
+  ],
+  "build_identity_note": "Git build metadata can include +modified because documentation/evidence is tracked. Production crate sources match committed product head; no crate edits follow freeze.",
+  "owner_disposition": "changes requested",
+  "merge_disposition": "existing draft PR #13; no merge authorized",
+  "content_bank": "Separate follow-up in PRODUCT-PLAN.md; not implemented or launched.",
+  "hardware_limits": [
+    "Hardware/listening/controller/latency/feel/xrun checks pending",
+    "Ordinary-render nondeterminism and dense-editor/backend limits remain inherited"
+  ],
+  "submitted_head": "External bundle submission.json records exact pushed/artifact head after submission.",
+  "final_logs": [
+    "workspace.txt",
+    "clippy.txt",
+    "ui-release.txt",
+    "plugin-release.txt",
+    "debug-build.txt",
+    "validator.json",
+    "source-review.json",
+    "interaction.json",
+    "exercise.txt",
+    "bundle-check.json",
+    "bundle-host/host-recall.json",
+    "artifact-review.json"
+  ],
+  "validator": {
+    "success": 35,
+    "skipped": 9
+  },
+  "interaction": {
+    "status": "passed",
+    "binary_sha256": "c6f9650f36d558a2f0ecf11c79fab7ca6d44a0630faf5bb87d5545e8331aecc1",
+    "cases": [
+      {
+        "logical_size": "1440x900",
+        "native_scale": 1.0,
+        "closed_dialog": [
+          491.0,
+          48.0,
+          962.0,
+          419.0
+        ],
+        "expanded_dialog": [
+          491.0,
+          48.0,
+          962.0,
+          551.0
+        ],
+        "stable_origin": true,
+        "exact_entry_base_hz": 250,
+        "genuine_overflow_body_scrolled_with_Close_fixed": true,
+        "rack_unchanged_by_sections": true,
+        "default_child_motion_parent_stationary": true,
+        "top_bottom_boundary_parent_stationary": true,
+        "child_blocks_modifier_zoom": true,
+        "authored_more_parent_stationary": true,
+        "menu_parent_stationary": true,
+        "outside_rack_pan_and_modifier_zoom": true,
+        "preview": [
+          897.0,
+          92.0,
+          1044.0,
+          330.0
+        ],
+        "committed": [
+          897.0,
+          92.0,
+          1044.0,
+          330.0
+        ],
+        "preview_matches_committed": true
+      },
+      {
+        "logical_size": "1280x800",
+        "native_scale": 1.0,
+        "closed_dialog": [
+          411.0,
+          48.0,
+          882.0,
+          419.0
+        ],
+        "expanded_dialog": [
+          411.0,
+          48.0,
+          882.0,
+          551.0
+        ],
+        "stable_origin": true,
+        "exact_entry_base_hz": 250,
+        "genuine_overflow_body_scrolled_with_Close_fixed": true,
+        "rack_unchanged_by_sections": true,
+        "default_child_motion_parent_stationary": true,
+        "top_bottom_boundary_parent_stationary": true,
+        "child_blocks_modifier_zoom": true,
+        "authored_more_parent_stationary": true,
+        "menu_parent_stationary": true,
+        "outside_rack_pan_and_modifier_zoom": true,
+        "preview": [
+          763.0,
+          99.0,
+          888.0,
+          301.0
+        ],
+        "committed": [
+          763.0,
+          99.0,
+          888.0,
+          301.0
+        ],
+        "preview_matches_committed": true
+      },
+      {
+        "logical_size": "1280x800",
+        "native_scale": 1.5,
+        "closed_dialog": [
+          411.0,
+          48.0,
+          883.0,
+          419.0
+        ],
+        "expanded_dialog": [
+          411.0,
+          48.0,
+          883.0,
+          549.0
+        ],
+        "stable_origin": true,
+        "exact_entry_base_hz": 250,
+        "genuine_overflow_body_scrolled_with_Close_fixed": true,
+        "rack_unchanged_by_sections": true,
+        "default_child_motion_parent_stationary": true,
+        "top_bottom_boundary_parent_stationary": true,
+        "child_blocks_modifier_zoom": true,
+        "authored_more_parent_stationary": true,
+        "menu_parent_stationary": true,
+        "outside_rack_pan_and_modifier_zoom": true,
+        "preview": [
+          763.0,
+          99.0,
+          888.0,
+          301.0
+        ],
+        "committed": [
+          763.0,
+          99.0,
+          888.0,
+          301.0
+        ],
+        "preview_matches_committed": true
+      }
+    ],
+    "video": "../media/final-interactions.mp4",
+    "input": "Scripted private X11 input; not owner or physical hardware acceptance."
+  },
+  "package": {
+    "status": "passed",
+    "bundle": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10711-8087-7782-9c2b-0f726c115470/d10-final-owner-test",
+    "normal_factory_sounds": 19,
+    "unavailable_factory_sounds": 0,
+    "manifest_hashes_passed": true,
+    "complete_REAPER_f32_state_native_replay_passed": true,
+    "independent_artifact_review": "passed at cdf15b7f1632fa912a285c0aeea975eb4c559cd6 with reviewed new-bundle profile correction",
+    "old_owner_bundles_projects_libraries": "untouched",
+    "cold_scan_attempt": "Initial private host startup scanned global VSTs and reached only the2s replay before55s deadline. Retained separately. Correct Linux vstpath in new profile [reaper] points to bundle-owned empty directory; unchanged55s/full-state/native0.025 checks then passed."
+  }
+}

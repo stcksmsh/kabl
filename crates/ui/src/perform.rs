@@ -10,6 +10,7 @@
 //! 1.5 steps of 127, or by crossing it). Any other change to the value (mouse, undo, load)
 //! drops the pickup again, so the next turn never jumps.
 
+use crate::wheel::OwnedScroll;
 use std::collections::HashMap;
 
 use egui::RichText;
@@ -704,7 +705,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         egui::ScrollArea::vertical()
             .id_salt("perform-cards")
             .auto_shrink([false, false])
-            .show(ui, |ui| {
+            .show_owned(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
                     for (i, pin) in all.iter().enumerate().filter(|(_, p)| p.key != TRANSPORT) {

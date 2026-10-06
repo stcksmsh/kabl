@@ -1,0 +1,11 @@
+REAPER=7.75/linux-x86_64
+track=0 slot=1 time=2.0266666666667 expected=0.52666666666667 actual=0.52933204174042
+track=1 slot=1 time=2.0266666666667 expected=0.52666666666667 actual=0.52933204174042
+track=1 slot=2 time=2.0266666666667 expected=1 actual=1
+track=0 slot=1 time=6.0213333333334 expected=0.44786666666666 actual=0.44360208511353
+track=1 slot=1 time=6.0213333333334 expected=0.44786666666666 actual=0.44360208511353
+track=1 slot=2 time=6.0213333333334 expected=1 actual=1
+track=0 slot=1 time=13.029333333333 expected=0.65993333333337 actual=0.65620183944702
+track=1 slot=1 time=13.029333333333 expected=0.65993333333337 actual=0.65620183944702
+track=1 slot=2 time=13.029333333333 expected=1 actual=1
+closed-editor automation passed

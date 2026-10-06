@@ -1,0 +1,4 @@
+760360c00000-760360ed6000 r--p 00000000 103:07 23360093                  /home/stcksmsh/.codex/visualizations/2026/10/04/01a10711-8087-7782-9c2b-0f726c115470/d10-repair-owner-test/plugins/kabl.clap
+760360ed6000-7603615bc000 r-xp 002d5000 103:07 23360093                  /home/stcksmsh/.codex/visualizations/2026/10/04/01a10711-8087-7782-9c2b-0f726c115470/d10-repair-owner-test/plugins/kabl.clap
+7603615bc000-760361600000 r--p 009ba000 103:07 23360093                  /home/stcksmsh/.codex/visualizations/2026/10/04/01a10711-8087-7782-9c2b-0f726c115470/d10-repair-owner-test/plugins/kabl.clap
+760361600000-760361602000 rw-p 009fd000 103:07 23360093                  /home/stcksmsh/.codex/visualizations/2026/10/04/01a10711-8087-7782-9c2b-0f726c115470/d10-repair-owner-test/plugins/kabl.clap

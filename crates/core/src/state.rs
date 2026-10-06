@@ -221,6 +221,11 @@ impl PatchState {
                     c.members.remove(id);
                     c.controls.retain(|_, e| e.target.module_id() != *id);
                     c.ports.retain(|_, e| e.target.module_id() != *id);
+                    if let Some(panel) = &mut c.panel {
+                        panel.placements.retain(|key, _| {
+                            c.controls.contains_key(key) || c.ports.contains_key(key)
+                        });
+                    }
                 }
                 // No dangling cables: a cable to or from a removed module goes with it.
                 self.cables

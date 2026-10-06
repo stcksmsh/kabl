@@ -1,0 +1,15 @@
+{
+  "start_date": "2026-10-05",
+  "verification_date": "2026-10-06",
+  "os": "Linux 7.0.0-34-generic x86_64",
+  "rustc": "1.93.0 (254b59607 2026-01-19)",
+  "cargo": "1.93.0 (083ac5135 2025-12-15)",
+  "GUI": "X11 / private Xvfb / metacity / egui 0.35 glow",
+  "standalone_audio": "ALSA Default Audio Device, 48000 Hz stereo, default buffer, RT off; software evidence only",
+  "scaled_native_backend": "WINIT_X11_SCALE_FACTOR=1.5, actual egui pixels_per_point=1.5",
+  "input": "scripted xdotool and scripted REAPER MIDI/native automation",
+  "hardware_owner_checks": "pending",
+  "root_checkout": "preserved stale master c41420ca557121ad0ce3dcaf4bbdf514d681f73c",
+  "task_checkout": "/secondary/Programming/Github/kabl/.worktrees/d10",
+  "starting_master": "db33f6a2a9c0274e272d702142ad5d63d39271a6"
+}

@@ -65,6 +65,7 @@ impl SoundState {
 }
 pub fn validate_patch(p: &PatchState) -> Result<(), String> {
     kabl_engine::compile::validate_composites(p)?;
+    kabl_ui::panels::validate(p)?;
     if p.modules.len() > 128 || p.cables.len() > 512 || p.labels.len() > 128 {
         return Err("Patch graph limit".into());
     }
@@ -123,4 +124,113 @@ pub fn validate_patch(p: &PatchState) -> Result<(), String> {
         return Err("Patch serialized size limit".into());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod panel_tests {
+    use super::*;
+    #[test]
+    fn artwork_and_panel_edits_recall_without_changing_native_identity() {
+        let mut e = kabl_ui::PatchEditor::seed_from(&kabl_standalone::default_patch());
+        let id = kabl_ui::composites::encapsulate(
+            &mut e,
+            std::collections::BTreeSet::from([2, 3, 4, 5]),
+            Default::default(),
+            "Voice",
+        )
+        .unwrap();
+        kabl_ui::composites::add_exposure(
+            &mut e,
+            id,
+            kabl_core::PortRef::Param {
+                id: 3,
+                param: "cutoff_hz".into(),
+            },
+            true,
+        )
+        .unwrap();
+        let mut c = e.state().composites[&id].clone();
+        let key = *c.controls.keys().next().unwrap();
+        let mut panel = kabl_core::panel::Panel::default();
+        panel.light = Some(kabl_core::panel::Artwork {
+            name: "voice.png".into(),
+            png: include_bytes!("../../../docs/panel-authoring/examples/art/voice-light.png")
+                .to_vec(),
+        });
+        panel.placements.insert(
+            key,
+            kabl_core::panel::Placement {
+                kind: kabl_core::panel::Kind::Knob,
+                x: 12.,
+                y: 72.,
+                width: 84.,
+                height: 110.,
+            },
+        );
+        c.panel = Some(Box::new(panel));
+        kabl_ui::composites::set(&mut e, id, c).unwrap();
+        let mut state = SoundState {
+            version: 3,
+            patch: e.state().clone(),
+            output_gain: 0.4,
+            lanes: Default::default(),
+            slot_values: [0.; crate::automation::SLOTS],
+            host_clock: false,
+        };
+        let target = crate::automation::Target {
+            module: 3,
+            kind: "filter.svf".into(),
+            param: "cutoff_hz".into(),
+        };
+        state.lanes[0].target = Some(target.clone());
+        let original = serde_json::to_vec(&state).unwrap();
+        let recalled = SoundState::decode(&original).unwrap();
+        assert_eq!(state.patch, recalled.patch);
+        assert_eq!(state.lanes, recalled.lanes);
+        let before = crate::automation::resolve(&state.patch, &target)
+            .unwrap()
+            .target;
+        state
+            .patch
+            .composites
+            .get_mut(&id)
+            .unwrap()
+            .controls
+            .get_mut(&key)
+            .unwrap()
+            .label = "Warmth".into();
+        state
+            .patch
+            .composites
+            .get_mut(&id)
+            .unwrap()
+            .panel
+            .as_mut()
+            .unwrap()
+            .placements
+            .get_mut(&key)
+            .unwrap()
+            .x = 112.;
+        state.validate().unwrap();
+        assert_eq!(
+            crate::automation::resolve(&state.patch, &target)
+                .unwrap()
+                .target,
+            before
+        );
+        state
+            .patch
+            .composites
+            .get_mut(&id)
+            .unwrap()
+            .panel
+            .as_mut()
+            .unwrap()
+            .light
+            .as_mut()
+            .unwrap()
+            .png
+            .truncate(33);
+        assert!(SoundState::decode(&serde_json::to_vec(&state).unwrap()).is_err());
+    }
 }

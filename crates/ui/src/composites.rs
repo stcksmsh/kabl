@@ -64,6 +64,7 @@ pub fn validate(p: &PatchState) -> Result<(), String> {
         return Err("Composite label/cable data limit".into());
     }
     kabl_engine::compile::validate_composites(p)?;
+    crate::panels::validate(p)?;
     // Presentation clock/cue references do not enter the compiler's graph.
     for (&id, m) in &p.modules {
         for (key, value) in &m.params {
@@ -188,7 +189,7 @@ pub fn encapsulate(
         .find_map(|m| p.modules.get(m))
         .map(|m| m.pos)
         .ok_or("Missing selected module")?;
-    let mut c=Composite{name:name.trim().into(),help:"Open internals to inspect the real modules and routes. Editing affects this instance only.".into(),definition:definition(id),parent:None,members,pos,ports:BTreeMap::new(),controls:BTreeMap::new(),next_interface:1};
+    let mut c=Composite{name:name.trim().into(),help:"Open internals to inspect the real modules and routes. Editing affects this instance only.".into(),definition:definition(id),parent:None,members,pos,ports:BTreeMap::new(),controls:BTreeMap::new(),next_interface:1,panel:None};
     for cable in p.cables.values() {
         let a = all.contains(&cable.from.module_id());
         let b = all.contains(&cable.to.module_id());
@@ -280,6 +281,9 @@ pub fn remove_exposure(
         }
     }
     map.remove(&key);
+    if let Some(panel) = &mut c.panel {
+        panel.placements.remove(&key);
+    }
     set(editor, id, c)
 }
 fn snapshot(p: &PatchState, root: CompositeId) -> Result<Package, String> {
@@ -568,7 +572,10 @@ pub fn faces(
         let pos = crate::rack::snap(egui::pos2(c.pos.x, c.pos.y));
         let mut rect = egui::Rect::from_min_size(
             egui::pos2(pos.x, pos.y),
-            egui::vec2(240.0, crate::rack::PANEL_H),
+            egui::vec2(
+                c.panel.as_ref().map_or(240.0, |p| p.width),
+                crate::rack::PANEL_H,
+            ),
         );
         loop {
             let next = occupied
@@ -652,13 +659,12 @@ pub fn panel(editor: &mut PatchEditor, view: &mut crate::UiState, ctx: &egui::Co
             for (&id, c) in &state.composites {
                 let r = ui.push_id(id, |ui| {
                     ui.collapsing(format!("{} · instance #{id}", c.name), |ui| {
+                        if ui.button("Edit face").clicked() { crate::panels::open(view,id,c); }
                         ui.label(&c.help);
                         ui.label(format!("Embedded definition {} v{}", c.definition.id, c.definition.version));
                         ui.horizontal(|ui| {
-                            if ui.button("Open internals").clicked() { view.composites.open.insert(id); }
-                            if ui.button("Close").clicked() {
-                                view.composites.open.remove(&id); view.selected_module = None; view.inspected = None;
-                            }
+                            if ui.button("Open internals").clicked() { view.enter_composite(editor.state(),id); }
+                            if ui.button("Close").clicked() && view.scope==Some(id) {view.back();}
                             let r = ui.button("Duplicate");
                             view.record(format!("composite:{id}:duplicate"), r.rect);
                             if r.clicked() {
@@ -729,12 +735,20 @@ pub fn panel(editor: &mut PatchEditor, view: &mut crate::UiState, ctx: &egui::Co
                 });
                 view.record(format!("composite:{id}:tools"), r.inner.rect);
             }
+            ui.separator();
+            ui.label("Import complete portable package (definition, panel, artwork and help)");
+            let r=ui.text_edit_singleline(&mut view.panels.path);view.record("package:path".into(),r.rect);
+            let r=ui.button("Import package file");view.record("package:import".into(),r.rect);
+            if r.clicked() {
+                let result=crate::panels::read_package(Path::new(&view.panels.path)).and_then(|pkg|insert(editor,&pkg));
+                view.last_message=Some(match result {Ok(id)=>format!("Imported independent instance #{id}"),Err(e)=>e});
+            }
             ui.separator(); ui.label("Insert a library version as an independent embedded instance");
             let root = view.library.as_ref().map(|l| l.user_root.clone()).unwrap_or_else(crate::library::default_user_root);
             for path in entries(&root) {
                 let label = path.strip_prefix(&root).unwrap_or(&path).display().to_string();
                 if ui.button(label).clicked() {
-                    let result = std::fs::read(&path).map_err(|e| e.to_string()).and_then(|b| decode(&b)).and_then(|p| insert(editor, &p));
+                    let result = crate::panels::read_package(&path).and_then(|p| insert(editor, &p));
                     view.last_message = Some(match result {
                         Ok(id) => format!("Inserted instance #{id}; external cables and controller mappings omitted."),
                         Err(e) => e,

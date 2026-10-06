@@ -1,0 +1,34 @@
+{
+  "binary": "/secondary/Programming/Github/kabl/.worktrees/d10/scratch/d10-repair/final-kabl-ui",
+  "sha256": "4a5c420523c7c0ae65b2a53bbd7f1ec116a4ed9880cb2ceca14d5a65876d8337",
+  "input": "scripted X11, not owner/hardware proof",
+  "screens": [
+    {
+      "logical_size": "1440x900",
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "more_neighbours_camera_equal": true,
+      "nested_back_equal": true,
+      "hidden_waveform_accessible": true,
+      "factory_browser_populated": true,
+      "full_restart_visibility": true
+    },
+    {
+      "logical_size": "1280x800",
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "more_neighbours_camera_equal": true,
+      "nested_back_equal": true,
+      "hidden_waveform_accessible": true,
+      "factory_browser_populated": true,
+      "full_restart_visibility": true
+    }
+  ],
+  "native_scale": 1.5,
+  "native_selector_knob_changed_original_ids": true,
+  "internal_and_outer_positions_preserved": true
+}

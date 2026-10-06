@@ -12,3 +12,5 @@ pub use op::{CableId, Entry, ModuleId, Op, ParamTarget, PortRef, Source, Vec2};
 pub use state::{CableState, ModuleState, PatchState};
 
 pub use composite::{Composite, CompositeId, Definition, Exposure};
+
+pub mod panel;

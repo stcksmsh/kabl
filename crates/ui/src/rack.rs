@@ -181,7 +181,7 @@ impl Placed {
     pub fn full(&self) -> Rect {
         self.adv.map_or(self.rect, |a| self.rect.union(a))
     }
-    fn translate(&mut self, d: egui::Vec2) {
+    pub(crate) fn translate(&mut self, d: egui::Vec2) {
         self.rect = self.rect.translate(d);
         self.face = self.face.translate(d);
         self.adv = self.adv.map(|r| r.translate(d));
@@ -227,6 +227,7 @@ pub struct View<'a> {
 }
 
 pub struct Layout {
+    pub faces: std::collections::BTreeMap<kabl_core::CompositeId, Rect>,
     pub mods: Vec<Placed>,
     pub bounds: Rect,
     pub rows: usize,
@@ -275,6 +276,30 @@ pub fn layout(state: &PatchState, v: &View) -> Layout {
             .map(|p| visible(info, p.name, bank))
             .collect();
         let mut pl = place_local(id, info, &primary, &shown, expanded, choosing, skin);
+        let order = control_order(m, info);
+        // Reassign existing same-kind face slots; no parameter identity or jack position changes.
+        for stepped in [false, true] {
+            let slots: Vec<_> = pl
+                .ctls
+                .iter()
+                .filter(|c| c.primary && (c.param.taper == Taper::Stepped) == stepped)
+                .map(|c| c.geo)
+                .collect();
+            let mut ordered: Vec<_> = pl
+                .ctls
+                .iter_mut()
+                .filter(|c| c.primary && (c.param.taper == Taper::Stepped) == stepped)
+                .collect();
+            ordered.sort_by_key(|c| {
+                order
+                    .iter()
+                    .position(|&i| info.params[i].name == c.param.name)
+                    .unwrap_or(usize::MAX)
+            });
+            for (c, geo) in ordered.into_iter().zip(slots) {
+                c.geo = geo;
+            }
+        }
         if v.float && pl.adv.is_some() && !choosing {
             pl.overlay = true;
             pl.rect = pl.face;
@@ -302,7 +327,12 @@ pub fn layout(state: &PatchState, v: &View) -> Layout {
         bounds = bounds.union(pl.full());
         mods.push(pl);
     }
-    Layout { mods, bounds, rows }
+    Layout {
+        mods,
+        bounds,
+        rows,
+        faces: Default::default(),
+    }
 }
 
 /// Wide enough for the longest option in 11.5 px mono on every segment.
@@ -730,6 +760,24 @@ fn midi_in_face(
         });
     }
     decor
+}
+
+/// Stable per-instance presentation order, shared by all sequencer banks.
+pub fn control_order(m: &ModuleState, info: &ModuleInfo) -> Vec<usize> {
+    let mut order: Vec<_> = (0..info.params.len()).collect();
+    order.sort_by(|&a, &b| {
+        let rank = |i: usize| {
+            m.params
+                .get(&format!(
+                    "face.order.{}",
+                    face_name(info, info.params[i].name)
+                ))
+                .copied()
+                .unwrap_or(i as f32)
+        };
+        rank(a).total_cmp(&rank(b)).then(a.cmp(&b))
+    });
+    order
 }
 
 #[cfg(test)]

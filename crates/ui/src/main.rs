@@ -1306,7 +1306,9 @@ impl CompileNotice {
             }
         }
         if phase == AudioPhase::Running
-            && self.awaiting_rev.is_some_and(|rev| Feedback::get(&delivery.feedback.applied_rev) >= rev)
+            && self
+                .awaiting_rev
+                .is_some_and(|rev| Feedback::get(&delivery.feedback.applied_rev) >= rev)
         {
             *status = "audio running · current graph installed".into();
             self.awaiting_rev = None;
@@ -1948,7 +1950,7 @@ impl eframe::App for App {
         }
         // Scripted real-input runs (xdotool) read the drawn targets from here.
         if let Some(path) = &self.hits_file {
-            let text: String = ui_state
+            let mut text: String = ui_state
                 .hits
                 .iter()
                 .map(|(k, r)| {
@@ -1958,6 +1960,10 @@ impl eframe::App for App {
                     )
                 })
                 .collect();
+            text.insert_str(
+                0,
+                &format!("# pixels_per_point {}\n", ui.ctx().pixels_per_point()),
+            );
             if text != self.hits_written {
                 let _ = std::fs::write(path, &text);
                 self.hits_written = text;
@@ -2025,7 +2031,10 @@ impl eframe::App for App {
         }
         // A compile happened (here or on the control thread): the inspector checks whether
         // its readings still describe the patch.
-        if self.compile_notice.observe(self.phase, &mut self.audio.status, delivery) {
+        if self
+            .compile_notice
+            .observe(self.phase, &mut self.audio.status, delivery)
+        {
             ui_state.inspect.rebuilt(
                 delivery.generation,
                 delivery.compile_error.clone(),
@@ -2364,7 +2373,10 @@ mod recovery_tests {
         let ccs: Vec<(u8, u8, u8)> = std::iter::from_fn(|| cc_rx.pop().ok().map(|c| c.0)).collect();
         assert_eq!(ccs, [(2, 1, 99), (2, 74, 10)]);
         midi.disconnect();
-        assert!(notes_rx.pop().is_err(), "nothing was connected: nothing to end");
+        assert!(
+            notes_rx.pop().is_err(),
+            "nothing was connected: nothing to end"
+        );
         midi.port = Some("kabl-player".into());
         midi.disconnect();
         assert_eq!(
@@ -2379,8 +2391,12 @@ mod recovery_tests {
         let collector = basedrop::Collector::new();
         let (tx, _rx) = rtrb::RingBuffer::new(control::QUEUE);
         let mut delivery = Delivery::new(
-            Some(tx), collector.handle(), Arc::new(Feedback::default()),
-            48000.0, 8, Some(&patch),
+            Some(tx),
+            collector.handle(),
+            Arc::new(Feedback::default()),
+            48000.0,
+            8,
+            Some(&patch),
         );
         delivery.async_compile = true;
         delivery.compile_delay_ms = 80;
@@ -2388,14 +2404,20 @@ mod recovery_tests {
         let mut notice = CompileNotice::new(&delivery);
         let mut status = "audio running · current graph installed".to_string();
         editor.add_module("no-such-module", kabl_core::Vec2 { x: 0.0, y: 0.0 });
-        assert_eq!(delivery.sync(editor.state(), false, false), control::Outcome::Compiled);
+        assert_eq!(
+            delivery.sync(editor.state(), false, false),
+            control::Outcome::Compiled
+        );
         assert!(notice.observe(AudioPhase::Running, &mut status, &delivery));
         assert!(status.contains("compiling"));
         assert!(notice.error.is_none(), "the worker has not finished yet");
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
         while delivery.compile_error.is_none() {
             delivery.flush();
-            assert!(std::time::Instant::now() < deadline, "compile failure timed out");
+            assert!(
+                std::time::Instant::now() < deadline,
+                "compile failure timed out"
+            );
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
         assert!(notice.observe(AudioPhase::Running, &mut status, &delivery));
@@ -2404,44 +2426,71 @@ mod recovery_tests {
         assert!(!notice.observe(AudioPhase::Running, &mut status, &delivery));
 
         editor.undo();
-        assert_eq!(delivery.sync(editor.state(), false, false), control::Outcome::Compiled);
-        assert!(delivery.compile_error.is_some(), "failure remains visible while compiling");
+        assert_eq!(
+            delivery.sync(editor.state(), false, false),
+            control::Outcome::Compiled
+        );
+        assert!(
+            delivery.compile_error.is_some(),
+            "failure remains visible while compiling"
+        );
         assert!(notice.observe(AudioPhase::Running, &mut status, &delivery));
         assert!(status.contains("recompile failed"));
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
         while delivery.compile_error.is_some() {
             delivery.flush();
-            assert!(std::time::Instant::now() < deadline, "compile repair timed out");
+            assert!(
+                std::time::Instant::now() < deadline,
+                "compile repair timed out"
+            );
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
         assert!(notice.observe(AudioPhase::Running, &mut status, &delivery));
         assert!(notice.error.is_none());
-        assert!(status.contains("queued"), "must not claim playback before callback ack");
+        assert!(
+            status.contains("queued"),
+            "must not claim playback before callback ack"
+        );
         assert!(!notice.observe(AudioPhase::Running, &mut status, &delivery));
         assert!(status.contains("queued"));
-        delivery.feedback.applied_rev.store(delivery.rev(), Ordering::Relaxed);
+        delivery
+            .feedback
+            .applied_rev
+            .store(delivery.rev(), Ordering::Relaxed);
         assert!(!notice.observe(AudioPhase::Running, &mut status, &delivery));
         assert!(status.contains("installed"));
 
         // A failed retry leaves an actionable status even when a later edit compiles.
         editor.add_module("no-such-module", kabl_core::Vec2 { x: 0.0, y: 0.0 });
-        assert_eq!(delivery.sync(editor.state(), false, false), control::Outcome::Compiled);
+        assert_eq!(
+            delivery.sync(editor.state(), false, false),
+            control::Outcome::Compiled
+        );
         status = "document cannot play: invalid graph; edit to repair, then Retry".into();
         assert!(notice.observe(AudioPhase::Failed, &mut status, &delivery));
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
         while delivery.compile_error.is_none() {
             delivery.flush();
-            assert!(std::time::Instant::now() < deadline, "retry compile failure timed out");
+            assert!(
+                std::time::Instant::now() < deadline,
+                "retry compile failure timed out"
+            );
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
         assert!(notice.observe(AudioPhase::Failed, &mut status, &delivery));
         editor.undo();
-        assert_eq!(delivery.sync(editor.state(), false, false), control::Outcome::Compiled);
+        assert_eq!(
+            delivery.sync(editor.state(), false, false),
+            control::Outcome::Compiled
+        );
         notice.observe(AudioPhase::Failed, &mut status, &delivery);
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
         while delivery.compile_error.is_some() {
             delivery.flush();
-            assert!(std::time::Instant::now() < deadline, "retry repair timed out");
+            assert!(
+                std::time::Instant::now() < deadline,
+                "retry repair timed out"
+            );
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
         assert!(notice.observe(AudioPhase::Failed, &mut status, &delivery));
@@ -2766,7 +2815,11 @@ mod recovery_tests {
             }))
             .unwrap();
         // D06: expression through the timeline's queue in the same warmed callbacks.
-        for e in [KeyEvent::Bend(12000), KeyEvent::Wheel(90), KeyEvent::Sustain(true)] {
+        for e in [
+            KeyEvent::Bend(12000),
+            KeyEvent::Wheel(90),
+            KeyEvent::Sustain(true),
+        ] {
             notes.push(note_now(e)).unwrap();
         }
         std::thread::sleep(std::time::Duration::from_millis(300));

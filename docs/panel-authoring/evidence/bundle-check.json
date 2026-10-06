@@ -1,0 +1,10 @@
+{
+  "bundle": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10711-8087-7782-9c2b-0f726c115470/d10-owner-test",
+  "manifest_hashes_passed": true,
+  "standalone_release_window": true,
+  "both_embedded_faces_hit_targets": true,
+  "plugin_mapped_from_bundle": true,
+  "complete_REAPER_state_and_native_replay_passed": true,
+  "unavailable_factory_library": true,
+  "input": "scripted private X11, not owner hardware"
+}

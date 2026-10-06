@@ -1,0 +1,115 @@
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/standalone)
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/ui)
+    Finished `test` profile [optimized + debuginfo] target(s) in 12.40s
+     Running unittests src/lib.rs (target/debug/deps/kabl_ui-11a40c11c0b4d222)
+
+running 27 tests
+test help::tests::every_builtin_param_has_help ... ok
+test help::tests::range_text_uses_units_and_step_names ... ok
+test perform::tests::takeover_waits_for_the_hardware_to_reach_the_value ... ok
+test help::tests::sequencer_bank_params_share_their_slot_help ... ok
+test perform::tests::host_clock_blocks_rack_and_midi_transport_only ... ok
+test rack::tests::a_skin_places_face_controls_where_its_art_says ... ok
+test rack::tests::midi_in_face_shows_keys_mode_and_glide_with_room_for_their_names ... ok
+test rack::tests::rows_pack_without_overlap_and_keep_stored_order ... ok
+test rack::tests::snapping_picks_the_nearest_row_and_unit ... ok
+test rack_editor::tests::dropped_composite_moves_only_own_position_one_undo ... ok
+test rack::tests::float_expansion_moves_nothing ... ok
+test rack_editor::tests::insertion_is_legal_stable_and_matches_committed_layout ... ok
+test rack_editor::tests::light_and_dark_apply_to_drawers_dialogs_and_workspace ... ok
+test rack_editor::tests::more_and_edit_drafts_never_reflow_outer_rack ... ok
+test rack::tests::push_expansion_is_reversible_and_never_moves_the_face ... ok
+test tests::empty_rack_fit_keeps_import_coordinates_finite ... ok
+test tests::port_labels_read_like_panel_text ... ok
+test rack_editor::tests::nested_back_restores_each_camera_selection_and_saved_leaf_positions ... ok
+test rack::tests::controls_stay_inside_their_panel_and_apart ... ok
+test routing::tests::pitch_labels_match_the_played_semitone ... ok
+test tests::authored_geometry_round_trips_zoom_and_desktop_scale ... ok
+test rack_editor::tests::nested_navigation_and_scoped_add_restore_outer_view ... ok
+test rack_editor::tests::add_appends_after_composites_and_preserves_existing_position ... ok
+test rack_editor::tests::visibility_order_apply_persists_and_undo_keeps_ids ... ok
+test rack_editor::tests::actual_knob_owns_pointer_and_escape_cancels_item ... ok
+test rack_editor::tests::edge_scroll_reaches_new_rows_without_editing_until_drop ... ok
+test rack_editor::tests::real_composite_body_lifts_freely_drop_and_cancel_preserve_internals ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/explain.rs (target/debug/deps/explain-9096fbfea1bbbe3d)
+
+running 20 tests
+test a_legacy_mixer_level_route_is_explained_on_channel_1 ... ok
+test write_help_coverage ... ignored
+test base_and_modulation_are_told_apart_with_units ... ok
+test transport_acts_on_sequencers_behind_a_divider ... ok
+test signal_jack_destinations_list_one_bounded_hop ... ok
+test signal_paths_come_from_cables_and_stay_bounded ... ok
+test every_factory_card_gets_specific_help ... ok
+test edits_through_the_card_and_the_rack_agree_while_explained ... ok
+test inline_help_is_opt_in_and_changes_nothing ... ok
+test escape_with_a_menu_open_closes_only_the_menu ... ok
+test a_macro_without_routes_says_so_and_duplicate_labels_stay_distinct ... ok
+test the_explanation_follows_route_edits_and_undo ... ok
+test edits_from_perform_and_rack_are_one_state_while_explained ... ok
+test a_save_dialog_over_an_explanation_keeps_escape_and_the_document ... ok
+test a_card_rename_commits_when_you_click_elsewhere ... ok
+test a_direct_pin_to_an_off_face_control_reveals_it ... ok
+test a_direct_pin_reaches_its_exact_parameter ... ok
+test escape_and_text_fields_keep_their_priority ... ok
+test module_removal_and_patch_replacement_invalidate_safely ... ok
+test a_macro_card_lists_its_real_destinations_and_reveals_an_off_face_one ... ok
+
+test result: ok. 19 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running tests/interaction.rs (target/debug/deps/interaction-6716addfc2e444ed)
+
+running 34 tests
+test closeout_scenario_script ... ignored
+test dump_hit_targets_for_real_input_runs ... ignored
+test clicking_a_route_cable_selects_it_and_never_deletes ... ok
+test a_route_to_an_off_face_control_docks_on_the_toggle_and_selecting_it_reveals ... ok
+test face_params_do_not_change_the_sound ... ok
+test focused_controls_own_pointer_and_closing_click_does_not_touch_rack ... ok
+test focused_view_keeps_existing_native_jack_and_parameter_cables ... FAILED
+test envelope_timing_selector_sets_and_undoes ... ok
+test choosing_primary_controls_is_one_undo_step_saved_and_never_rebuilds_audio ... ok
+test cable_views_keep_positions_and_routes ... ok
+test every_control_of_the_reference_patch_is_on_screen_left_of_the_drawer ... ok
+test base_value_entry_in_the_drawer ... ok
+test selecting_a_source_does_not_move_the_drawer_rows ... ok
+test write_crowded_patch ... ignored
+test collapsed_rings_are_display_only_and_open_the_lanes ... ok
+test opening_the_drawer_keeps_the_inspected_control_reachable ... ok
+test inspecting_a_single_source_knob_selects_it_automatically ... ok
+test invert_bypass_remove_through_the_drawer ... ok
+test focused_controls_preserve_neighbours_and_camera ... ok
+test a_fast_body_drag_to_the_range_end_cancels_and_undoes_cleanly ... ok
+test four_sources_each_selectable_and_edited_alone ... ok
+test transpose_is_an_advanced_control ... ok
+test delay_controls_and_a_fresh_load ... ok
+test transport_buttons_send_commands_not_edits ... ok
+test escape_cancels_body_ring_and_dot_drags_without_undo_entries ... ok
+test single_source_dot_and_removal_never_reassigns ... ok
+test dragging_an_lfo_onto_a_knob_creates_and_selects_one_route ... ok
+test zoom_and_pan_keep_every_knob_gesture_and_scale_hit_regions ... ok
+test a_jack_cable_is_removed_by_pulling_its_plug_never_by_a_click ... ok
+test two_sources_ring_edits_only_the_selected_one ... ok
+test source_lanes_select_and_edit_each_route_on_the_knob ... ok
+test shift_drags_ten_times_finer_on_body_ring_and_dot ... ok
+test view_changes_never_touch_the_patch_or_the_audio ... ok
+test source_lanes_of_a_knob_at_the_canvas_edge_pan_fully_into_view_and_stay_draggable ... ok
+
+failures:
+
+---- focused_view_keeps_existing_native_jack_and_parameter_cables stdout ----
+
+thread 'focused_view_keeps_existing_native_jack_and_parameter_cables' (776) panicked at crates/ui/tests/interaction.rs:942:64:
+assertion failed: t.ui.hits.contains_key(&format!("cable:{cable}"))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    focused_view_keeps_existing_native_jack_and_parameter_cables
+
+test result: FAILED. 30 passed; 1 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.59s
+
+error: test failed, to rerun pass `-p kabl-ui --test interaction`

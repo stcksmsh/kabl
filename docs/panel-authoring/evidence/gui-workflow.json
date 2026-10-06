@@ -1,0 +1,146 @@
+[
+  {
+    "example": "voice",
+    "GUI_actions": [
+      "import light/dark PNG",
+      "set width420",
+      "place/bind exposed IDs",
+      "size/position",
+      "apply",
+      "preview",
+      "export",
+      "Undo/Redo",
+      "save"
+    ],
+    "placements": {
+      "1": {
+        "kind": "jack",
+        "x": 12.0,
+        "y": 244.0,
+        "width": 84.0,
+        "height": 58.0
+      },
+      "2": {
+        "kind": "jack",
+        "x": 112.0,
+        "y": 244.0,
+        "width": 84.0,
+        "height": 58.0
+      },
+      "3": {
+        "kind": "jack",
+        "x": 212.0,
+        "y": 244.0,
+        "width": 84.0,
+        "height": 58.0
+      },
+      "4": {
+        "kind": "knob",
+        "x": 12.0,
+        "y": 72.0,
+        "width": 84.0,
+        "height": 110.0
+      },
+      "5": {
+        "kind": "knob",
+        "x": 112.0,
+        "y": 72.0,
+        "width": 84.0,
+        "height": 110.0
+      },
+      "6": {
+        "kind": "knob",
+        "x": 212.0,
+        "y": 72.0,
+        "width": 84.0,
+        "height": 110.0
+      },
+      "7": {
+        "kind": "knob",
+        "x": 312.0,
+        "y": 72.0,
+        "width": 84.0,
+        "height": 110.0
+      },
+      "8": {
+        "kind": "selector",
+        "x": 12.0,
+        "y": 184.0,
+        "width": 390.0,
+        "height": 55.0
+      }
+    }
+  },
+  {
+    "example": "stereo-effect",
+    "GUI_actions": [
+      "import light/dark PNG",
+      "set width420",
+      "place/bind exposed IDs",
+      "size/position",
+      "apply",
+      "preview",
+      "export",
+      "Undo/Redo",
+      "save"
+    ],
+    "placements": {
+      "1": {
+        "kind": "jack",
+        "x": 12.0,
+        "y": 244.0,
+        "width": 84.0,
+        "height": 58.0
+      },
+      "2": {
+        "kind": "jack",
+        "x": 112.0,
+        "y": 244.0,
+        "width": 84.0,
+        "height": 58.0
+      },
+      "3": {
+        "kind": "jack",
+        "x": 212.0,
+        "y": 244.0,
+        "width": 84.0,
+        "height": 58.0
+      },
+      "4": {
+        "kind": "jack",
+        "x": 312.0,
+        "y": 244.0,
+        "width": 84.0,
+        "height": 58.0
+      },
+      "5": {
+        "kind": "knob",
+        "x": 12.0,
+        "y": 72.0,
+        "width": 84.0,
+        "height": 110.0
+      },
+      "6": {
+        "kind": "knob",
+        "x": 112.0,
+        "y": 72.0,
+        "width": 84.0,
+        "height": 110.0
+      },
+      "7": {
+        "kind": "knob",
+        "x": 212.0,
+        "y": 72.0,
+        "width": 84.0,
+        "height": 110.0
+      },
+      "8": {
+        "kind": "knob",
+        "x": 312.0,
+        "y": 72.0,
+        "width": 84.0,
+        "height": 110.0
+      }
+    }
+  }
+]

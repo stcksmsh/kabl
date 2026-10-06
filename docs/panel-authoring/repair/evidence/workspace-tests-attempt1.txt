@@ -1,0 +1,974 @@
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/standalone)
+warning: unused import: `CLAP_EVENT_NOTE_END`
+ --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:4:28
+  |
+4 |     CLAP_EVENT_NOTE_CHOKE, CLAP_EVENT_NOTE_END, CLAP_EVENT_NOTE_EXPRESSION, CLAP_EVENT_NOTE_OFF,
+  |                            ^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `crossbeam::queue::ArrayQueue`
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:68:5
+   |
+68 | use crossbeam::queue::ArrayQueue;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::thread`
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:92:5
+   |
+92 | use std::thread;
+   |     ^^^^^^^^^^^
+
+warning: unused import: `TASK_QUEUE_CAPACITY`
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:101:74
+    |
+101 | use crate::event_loop::{BackgroundThread, EventLoop, MainThreadExecutor, TASK_QUEUE_CAPACITY};
+    |                                                                          ^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::midi::MidiResult`
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:102:5
+    |
+102 | use crate::midi::MidiResult;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `write_stream`
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:108:47
+    |
+108 | use crate::wrapper::clap::util::{read_stream, write_stream};
+    |                                               ^^^^^^^^^^^^
+
+warning: unused import: `clamp_output_event_timing`
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:112:31
+    |
+112 |     clamp_input_event_timing, clamp_output_event_timing, hash_param_id, process_wrapper, strlcpy,
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `nice_plug_core::midi::sysex::SysExMessage`
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:75:5
+   |
+75 | use nice_plug_core::midi::sysex::SysExMessage;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `host_latency`
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:513:22
+    |
+513 |                 Some(host_latency) => {
+    |                      ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_host_latency`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `total_buffer_len`
+    --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:1202:9
+     |
+1202 |         total_buffer_len: usize,
+     |         ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_total_buffer_len`
+
+warning: function `write_stream` is never used
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/util.rs:149:8
+    |
+149 | pub fn write_stream(stream: &clap_ostream, slice: &[u8]) -> bool {
+    |        ^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `output_events_guard` is never read
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/context.rs:50:16
+   |
+47 | pub(crate) struct WrapperProcessContext<'a, P: ClapPlugin> {
+   |                   --------------------- field in this struct
+...
+50 |     pub(super) output_events_guard: AtomicRefMut<'a, VecDeque<PluginNoteEvent<P>>>,
+   |                ^^^^^^^^^^^^^^^^^^^
+
+warning: fields `params` and `param_id_to_hash` are never read
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:169:5
+    |
+148 | pub struct Wrapper<P: ClapPlugin> {
+    |            ------- fields in this struct
+...
+169 |     params: Arc<dyn Params>,
+    |     ^^^^^^
+...
+277 |     param_id_to_hash: HashMap<String, u32>,
+    |     ^^^^^^^^^^^^^^^^
+
+warning: function `make_params_iter` is never used
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/state.rs:15:15
+   |
+15 | pub(crate) fn make_params_iter<'a>(
+   |               ^^^^^^^^^^^^^^^^
+
+warning: function `make_params_getter` is never used
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/state.rs:27:15
+   |
+27 | pub(crate) fn make_params_getter<'a>(
+   |               ^^^^^^^^^^^^^^^^^^
+
+warning: function `serialize_object` is never used
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/state.rs:43:22
+   |
+43 | pub(crate) unsafe fn serialize_object<'a, P: Plugin>(
+   |                      ^^^^^^^^^^^^^^^^
+
+warning: function `serialize_json` is never used
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/state.rs:94:22
+   |
+94 | pub(crate) unsafe fn serialize_json<'a, P: Plugin>(
+   |                      ^^^^^^^^^^^^^^
+
+warning: function `deserialize_object` is never used
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/state.rs:134:22
+    |
+134 | pub(crate) unsafe fn deserialize_object<P: Plugin>(
+    |                      ^^^^^^^^^^^^^^^^^^
+
+warning: function `clamp_output_event_timing` is never used
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/util.rs:85:8
+   |
+85 | pub fn clamp_output_event_timing(timing: u32, total_buffer_len: u32) -> u32 {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `is_main_thread` is never used
+  --> vendor/nice-plug/crates/nice-plug/src/event_loop.rs:70:8
+   |
+42 | pub(crate) trait EventLoop<T, E>
+   |                  --------- method in this trait
+...
+70 |     fn is_main_thread(&self) -> bool;
+   |        ^^^^^^^^^^^^^^
+
+warning: struct `LinuxEventLoop` is never constructed
+  --> vendor/nice-plug/crates/nice-plug/src/event_loop/linux.rs:13:19
+   |
+13 | pub(crate) struct LinuxEventLoop<T, E> {
+   |                   ^^^^^^^^^^^^^^
+
+warning: `nice-plug` (lib) generated 21 warnings (run `cargo fix --lib -p nice-plug` to apply 9 suggestions)
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/ui)
+   Compiling kabl-clap v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/clap)
+    Finished `test` profile [optimized + debuginfo] target(s) in 21.54s
+     Running unittests src/lib.rs (target/debug/deps/kabl_cables-14b06f267b2135d4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/kabl_clap-2ffa9316f266c237)
+
+running 27 tests
+test host_tests::missing_transport_stops_host_clocks_but_free_clock_keeps_running ... ok
+test tests::collector_storage_is_released_after_retired_values_and_handles ... ok
+test tests::host_midi_keeps_channel_source_bend_wheel_and_release ... ok
+test host_tests::composite_embedded_state_preserves_lanes_and_rejects_legacy_envelope_atomically ... ok
+test host_tests::live_mode_and_values_wait_for_complete_scene_publication ... ok
+test host_tests::state_recall_clears_native_modulation_before_restoring_saved_bases ... ok
+test host_tests::rejected_browser_load_keeps_previous_automation_bank ... ok
+test host_tests::requested_rack_value_does_not_wait_for_native_host_echo ... ok
+test tests::identity_overflow_is_rejected_before_state_mutation ... ok
+test tests::tail_covers_long_effects_and_keeps_ungated_racks_alive ... ok
+test tests::edits_preserve_metadata_and_reject_invalid_documents_until_repaired ... ok
+test host_tests::state_load_replaces_pending_exact_values_even_if_old_mask_is_retried ... ok
+test tests::runtime_reports_update_closed_editor_and_are_cleared_on_load ... ok
+test tests::state_rejection_is_atomic_even_when_queue_is_full ... ok
+test host_tests::stable_lanes_legacy_state_and_atomic_rejection ... ok
+test host_tests::fresh_browser_load_does_not_restore_old_bases_into_reused_module_ids ... ok
+test sound_state::panel_tests::artwork_and_panel_edits_recall_without_changing_native_identity ... ok
+test host_tests::unassigning_a_lane_restores_its_document_base_without_allocations ... ok
+test host_tests::recall_after_native_sync_cannot_be_overwritten_by_old_callback ... ok
+test tests::state_decode_bounds_version_truncation_and_nonfinite ... ok
+test host_tests::queued_old_banks_cannot_change_fresh_browser_document ... ok
+test state_bridge::tests::main_track_notification_can_pause_while_audio_owns_plugin ... ok
+test host_tests::queued_unassignment_cannot_overwrite_later_document_base_edit ... ok
+test tests::state_load_replaces_old_commands_and_callback_ownership_without_allocations ... ok
+test tests::reset_repeats_sound_clears_sustain_and_is_allocation_free ... ok
+test host_tests::host_automation_tempo_stop_schedule_is_partition_independent_and_realtime_safe ... ok
+test state_bridge::tests::exported_callback_is_bounded_under_raw_midi_flood_and_lifecycle_reset ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+     Running unittests src/lib.rs (target/debug/deps/kabl_core-702c306d8e308ac1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/legacy_format.rs (target/debug/deps/legacy_format-fe6f44b0a16d6114)
+
+running 3 tests
+test v1_history_undoes_to_empty_exactly ... ok
+test v1_fixtures_load_to_their_saved_checkpoint ... ok
+test resaving_a_v1_patch_writes_the_current_version_that_loads_identically ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/log_unit.rs (target/debug/deps/log_unit-fcc481db0c69167b)
+
+running 6 tests
+test set_param_outside_window_does_not_coalesce ... ok
+test discard_last_reverts_and_leaves_no_redo ... ok
+test undo_of_remove_module_restores_position_and_params ... ok
+test consecutive_set_param_within_window_coalesces ... ok
+test labels_set_undo_and_come_back_with_their_module ... ok
+test save_and_load_round_trips_the_full_log ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/replay_proptest.rs (target/debug/deps/replay_proptest-b219a4a8e04eae25)
+
+running 2 tests
+test replay_matches_incremental_state ... ok
+test undo_redo_roundtrip ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src/lib.rs (target/debug/deps/kabl_engine-26abb5287079d47d)
+
+running 1 test
+test probe::tests::one_sample_pulses_count_and_a_held_gate_is_not_an_edge ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/compile.rs (target/debug/deps/compile-61d5270e674e3808)
+
+running 13 tests
+test unknown_module_kind_is_a_compile_error ... ok
+test unconnected_input_defaults_to_silence ... ok
+test cycle_compiles_with_implicit_one_block_delay ... ok
+test buffer_pool_reuses_slots_instead_of_one_per_port ... ok
+test averaging_n_identical_voices_reproduces_a_single_voice_exactly ... ok
+test recompile_carries_over_a_cycles_delay_buffer_memory ... ok
+test voice_count_does_not_change_loudness_for_identical_voices ... ok
+test buffer_pool_size_scales_with_the_widest_point_in_the_schedule_not_total_modules ... ok
+test only_midi_driven_voice_modules_are_instanced_per_voice ... ok
+test recompile_carries_over_oscillator_phase_and_filter_state ... ok
+test coalesced_buffers_still_produce_bit_exact_output_vs_a_reference_render ... ok
+test sequence_patch_plays_every_step ... ok
+test compiler_built_chord_plays_and_releases_like_patch_demo_did ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/compile_rt_safety.rs (target/debug/deps/compile_rt_safety-828973dab31df0f6)
+
+running 1 test
+test process_block_does_not_allocate ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/composition.rs (target/debug/deps/composition-cc68627cfb7694f3)
+
+running 1 test
+test every_section_has_headroom_and_lands_on_the_bar ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.10s
+
+     Running tests/dyn_dispatch_spike.rs (target/debug/deps/dyn_dispatch_spike-d9834d86fdac2f82)
+
+running 1 test
+test dyn_dispatch_matches_static_dispatch_bit_exact ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/echo.rs (target/debug/deps/echo-a914711d56b7331e)
+
+running 7 tests
+test write_listening_clips ... ignored
+test saved_patch_has_no_audio_history ... ok
+test the_engine_reports_the_lock_state ... ok
+test echo_tail_survives_stop_and_live_edits ... ok
+test a_fresh_load_starts_with_empty_delay_lines ... ok
+test a_delay_edit_keeps_the_tail_and_two_delays_stay_apart ... ok
+test echo_mix_has_headroom_and_no_loudness_jump ... ok
+
+test result: ok. 6 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.01s
+
+     Running tests/env_timing.rs (target/debug/deps/env_timing-4649343bd05d018e)
+
+running 8 tests
+test key_trigger_release_uses_the_release_captured_at_note_on ... ok
+test key_trigger_keeps_the_attack_captured_at_note_on_across_a_live_edit ... ok
+test key_trigger_retrigger_captures_fresh_values ... ok
+test continuous_follows_the_edited_attack_from_the_current_level ... ok
+test switching_to_key_trigger_mid_note_captures_at_the_switch ... ok
+test continuous_release_uses_the_current_release ... ok
+test key_trigger_with_an_lfo_on_attack_equals_the_value_captured_at_note_on ... ok
+test many_live_edits_during_a_held_note_never_retrigger ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/expression.rs (target/debug/deps/expression-3de1e4db32355382)
+
+running 14 tests
+test bend_center_and_endpoints_are_exact ... ok
+test a_voice_takes_at_most_its_bound_of_changes_and_a_release_always_lands ... ok
+test reset_controllers_centers_bend_zeroes_the_wheel_and_lifts_the_pedal ... ok
+test a_stolen_note_s_release_never_ends_the_note_that_took_its_voice ... ok
+test notes_off_and_a_lost_source_end_only_their_own_notes ... ok
+test bend_moves_held_notes_by_the_range_from_its_own_sample ... ok
+test sustain_holds_only_its_own_channel_and_same_keys_on_two_channels_are_two_voices ... ok
+test bend_adds_after_a_mono_glide_and_the_glide_ignores_it ... ok
+test the_wheel_is_one_value_on_every_voice_even_with_no_note ... ok
+test two_keyboards_on_channels_play_apart_and_all_layers_by_default ... ok
+test a_note_held_across_a_routing_change_is_released_by_its_own_off ... ok
+test expression_and_routing_do_not_allocate ... ok
+test deleting_or_replacing_a_keyboard_leaves_no_note_or_bend_behind ... ok
+test the_wheel_routed_to_a_cutoff_changes_the_sound ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/interlocking.rs (target/debug/deps/interlocking-bf2ada94606023d1)
+
+running 5 tests
+test transport_through_the_engine_and_through_a_fade ... ok
+test bpm_change_keeps_the_step_it_is_on ... ok
+test restart_is_not_replayed_by_a_graph_swap ... ok
+test unrelated_live_edits_keep_the_musical_position ... ok
+test both_layers_are_audible_and_the_mix_has_headroom ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.83s
+
+     Running tests/keyboard.rs (target/debug/deps/keyboard-796cc1c34bf8d2cf)
+
+running 19 tests
+test legato_restarts_only_a_new_phrase ... ok
+test low_and_high_priority ... ok
+test mono_repeated_key_is_release_then_press ... ok
+test all_notes_off_and_mode_changes_release_and_forget ... ok
+test mono_glide_always_and_legato_only ... ok
+test mono_last_priority_returns_to_held_notes_and_retriggers ... ok
+test mono_pedal_keeps_the_last_note_and_the_next_key_is_a_new_phrase ... ok
+test poly_glide_always_follows_each_voice_from_its_last_note ... ok
+test poly_repeated_note_restarts_on_its_own_voice ... ok
+test poly_takes_the_voice_released_longest_ago ... ok
+test poly_steals_pedal_held_voices_before_keys_that_are_down ... ok
+test poly_pedal_holds_released_keys_until_it_comes_up ... ok
+test raw_midi_parses_to_key_events ... ok
+test deleting_the_midi_in_releases_its_voices ... ok
+test legato_glide_is_a_straight_line_of_the_set_time_and_mono_dips_the_gate ... ok
+test a_glide_time_change_applies_to_the_glide_in_progress ... ok
+test a_mode_change_releases_and_load_starts_fresh ... ok
+test keys_survive_live_edits_even_overlapping_ones_and_never_stick ... ok
+test keyboard_settings_never_touch_a_sequencer_chain ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/launch.rs (target/debug/deps/launch-bc47273af5e52e60)
+
+running 10 tests
+test restart_lands_a_pending_launch_on_the_restart_pulse ... ok
+test a_launch_while_stopped_selects_without_a_note ... ok
+test deleting_the_reference_clock_drops_its_launches ... ok
+test stop_turns_a_pending_launch_into_a_selection_played_from_run ... ok
+test next_step_and_now ... ok
+test next_bar_starts_each_sequencer_on_its_first_edge_at_or_after_the_bar ... ok
+test load_drops_pending_launches_and_starts_on_the_startup_bank ... ok
+test a_live_swap_keeps_the_pending_launch_and_never_replays_it ... ok
+test a_new_launch_replaces_the_pending_one_and_cancel_drops_it ... ok
+test every_block_boundary_offset_lands_on_the_bar_sample ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/legacy_sound.rs (target/debug/deps/legacy_sound-037fd89e8554b03d)
+
+running 1 test
+test v1_patches_render_bit_exact_to_the_baseline ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/live_edit.rs (target/debug/deps/live_edit-eebf1e6a73ad8a60)
+
+running 10 tests
+test every_midi_in_receives_notes_whatever_its_id ... ok
+test a_queued_graph_does_not_revive_a_note_released_while_it_waited ... ok
+test note_on_during_a_crossfade_reaches_the_incoming_graph ... ok
+test note_off_during_a_crossfade_reaches_the_incoming_graph ... ok
+test a_queued_graph_plays_a_note_started_while_it_waited ... ok
+test swap_queue_bounds_holds_newest_and_drains_without_alloc ... ok
+test without_collect_retired_graphs_accumulate ... ok
+test overlapping_swaps_and_notes_never_leave_a_wrong_gate ... ok
+test retired_graphs_are_reclaimed_by_collect ... ok
+test reference_patch_audio_thread_paths_do_not_allocate ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/melody.rs (target/debug/deps/melody-a90f835ee4f2f00f)
+
+running 1 test
+test twinkle_twinkle_opening_phrase_plays_as_a_sequence_of_distinct_notes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/modulation.rs (target/debug/deps/modulation-de75856e35c1e95e)
+
+running 15 tests
+test a_route_to_an_unknown_param_is_a_compile_error ... ok
+test routes_sum_before_a_single_clamp ... ok
+test stepped_param_moves_by_whole_options ... ok
+test bypassed_route_contributes_nothing_and_keeps_its_settings ... ok
+test mixer_channel_levels_are_separate_params ... ok
+test each_voice_gets_its_own_source_value ... ok
+test result_clamps_at_the_param_limit ... ok
+test pitch_source_scales_by_its_nominal_full_scale ... ok
+test inverted_route_subtracts ... ok
+test bipolar_source_adds_amount_in_knob_travel ... ok
+test unipolar_source_is_not_treated_as_bipolar ... ok
+test exponential_param_is_modulated_in_log_space ... ok
+test absent_amount_uses_the_default_quarter_travel ... ok
+test legacy_mixer_level_still_sets_every_channel_and_routes_reach_channel_one ... ok
+test feedback_route_compiles_with_a_one_block_delay ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/patch_engine_overlapping_swap.rs (target/debug/deps/patch_engine_overlapping_swap-e974b7228051d3d3)
+
+running 1 test
+test a_second_swap_queued_mid_crossfade_is_not_dropped_and_does_not_click ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/patch_engine_swap.rs (target/debug/deps/patch_engine_swap-27dd870054bdafd0)
+
+running 1 test
+test patch_engine_swaps_the_real_compiler_with_no_click_and_no_alloc ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/patch_integration.rs (target/debug/deps/patch_integration-24f49ba25879cfc2)
+
+running 1 test
+test chord_through_real_modules_renders_clean_sustain_and_release ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/performance.rs (target/debug/deps/performance-b848deb4531a27f7)
+
+running 8 tests
+test write_listening_clips ... ignored
+test two_reverbs_keep_separate_histories ... ok
+test a_fresh_load_starts_with_empty_effects ... ok
+test step_velocity_is_audible_and_flat_velocity_is_even ... ok
+test reverb_and_echo_tails_survive_stop_and_live_edits ... ok
+test a_reverb_edit_mid_tail_has_no_dip ... ok
+test chords_on_the_lead_keep_headroom ... ok
+test layers_balance_and_the_mix_has_headroom ... ok
+
+test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 3.36s
+
+     Running tests/preview.rs (target/debug/deps/preview-08fee00317dd896f)
+
+running 10 tests
+test mono_preview_and_controller_share_the_held_list ... ok
+test all_notes_off_ends_a_preview ... ok
+test preview_does_not_allocate ... ok
+test a_controller_release_never_cuts_a_preview_key ... ok
+test stop_and_a_new_preview_release_the_old_one ... ok
+test a_preview_never_releases_a_controller_key ... ok
+test the_pedal_holds_a_released_preview_like_any_key ... ok
+test a_preview_releases_itself_after_its_duration ... ok
+test load_starts_over_and_the_next_preview_works ... ok
+test a_preview_is_capped_whatever_the_ui_asks ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/probe.rs (target/debug/deps/probe-9c75aa53e1ffaccf)
+
+running 9 tests
+test the_tap_reads_each_module_output_before_its_buffer_is_reused ... ok
+test a_wiring_change_mid_window_starts_the_measurement_over ... ok
+test swaps_name_the_graph_and_a_missing_target_says_so ... ok
+test clock_edges_match_its_rate ... ok
+test overlapping_swaps_report_the_newest_graph_and_never_go_back ... ok
+test voices_are_separate_lanes_and_gate_edges_and_pitch_are_exact ... ok
+test a_knob_being_turned_does_not_stop_the_measurement ... ok
+test the_audio_thread_path_never_allocates_with_the_tap_on ... ok
+test inspection_on_or_off_renders_the_same_samples ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.57s
+
+     Running tests/runtime_controls.rs (target/debug/deps/runtime_controls-f36b2f713479193b)
+
+running 9 tests
+test write_classification ... ignored
+test only_continuous_unsmoothed_values_ramp ... ok
+test only_runtime_values_are_runtime_changes ... ok
+test stale_and_reused_targets_are_rejected ... ok
+test a_playing_graph_ramps_and_lands_exactly ... ok
+test every_voice_lane_takes_the_value ... ok
+test draining_is_bounded_ordered_and_allocation_free ... ok
+test values_and_graphs_keep_revision_order ... ok
+test a_set_value_renders_like_a_compile_of_it ... ok
+
+test result: ok. 8 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/single_instance.rs (target/debug/deps/single_instance-ff5c6e602eeb0d96)
+
+running 6 tests
+test only_what_midi_reaches_is_per_voice ... ok
+test voices_stay_independent ... ok
+test adding_midi_influence_while_playing_matches_the_reference ... ok
+test overlapping_transition_swaps_stay_finite_and_converge ... ok
+test removing_midi_influence_continues_voice_zero_and_converges ... ok
+test single_instance_matches_per_voice_on_every_graph_shape ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+     Running tests/sound_palette.rs (target/debug/deps/sound_palette-6c2ab506132000fa)
+
+running 6 tests
+test single_instance_noise_plays_the_lane_zero_stream ... ok
+test old_patches_are_unchanged_by_the_new_params ... ok
+test each_voice_plays_its_own_noise_stream ... ok
+test save_reload_undo_and_a_fresh_load ... ok
+test effect_histories_stay_with_their_own_instance ... ok
+test self_swaps_are_null_with_every_new_module ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.45s
+
+     Running tests/spike_s1_swap.rs (target/debug/deps/spike_s1_swap-f0b896f74978107e)
+
+running 2 tests
+test owned_drop_is_deferred_until_collect ... ok
+test spike_s1_swap_no_click_and_no_alloc ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/spike_s2_potato.rs (target/debug/deps/spike_s2_potato-b22e0c485f0fffc8)
+
+running 1 test
+test optimized_converges_to_naive_once_settled ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/spike_s3_simd_voices.rs (target/debug/deps/spike_s3_simd_voices-b57e963e29bc317c)
+
+running 1 test
+test simd_matches_scalar ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/timeline.rs (target/debug/deps/timeline-05dda74c769e8d06)
+
+running 8 tests
+test a_note_sounds_from_its_own_sample ... ok
+test late_out_of_range_and_overflowing_events_never_strand_a_note ... ok
+test the_adapter_does_not_allocate ... ok
+test a_restart_replays_identically ... ok
+test a_synth_with_feedback_noise_wheel_and_a_routing_change_is_partition_independent ... ok
+test other_sample_rates_are_partition_independent ... ok
+test sequences_effects_and_tails_are_partition_independent ... ok
+test factory_voices_are_partition_independent ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.33s
+
+     Running tests/voice_allocator.rs (target/debug/deps/voice_allocator-781dd0178d19e420)
+
+running 9 tests
+test note_off_on_an_unknown_note_is_a_no_op ... ok
+test repeated_note_on_for_the_same_note_reuses_its_voice ... ok
+test note_off_on_a_stolen_note_does_not_disturb_the_voice_that_stole_it ... ok
+test freed_voice_is_reused_before_stealing ... ok
+test all_voices_busy_steals_the_oldest ... ok
+test fresh_notes_fill_voices_lowest_index_first ... ok
+test repeated_note_on_refreshes_age_so_it_is_not_stolen_next ... ok
+test stealing_continues_in_oldest_first_order ... ok
+test allocator_routes_note_on_to_the_correct_compiled_voice ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/kabl_learn-6f1425cdd04438b0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/kabl_modules-0ad6feefd8e2dc2e)
+
+running 1 test
+test builtins::drive::tests::adaa_of_the_curve_matches_its_mean_over_the_segment ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/chorus_drive.rs (target/debug/deps/chorus_drive-9011257b6bb9b3ef)
+
+running 10 tests
+test drive_default_and_zero_drive_pass_the_input_exactly ... ok
+test chorus_mix_zero_is_the_dry_input_exactly ... ok
+test chorus_carries_its_lines_and_phase ... ok
+test drive_engages_and_changes_without_steps ... ok
+test drive_latency_is_half_a_sample ... ok
+test drive_keeps_full_scale_and_adds_no_dc ... ok
+test chorus_modulation_and_control_changes_are_continuous ... ok
+test chorus_keeps_the_dry_image_and_adds_width_only_where_asked ... ok
+test drive_aliases_less_than_the_naive_curve ... ok
+test chorus_adds_no_dc_and_its_wet_signal_is_flat ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/delay.rs (target/debug/deps/delay-c33344ea474c4bf9)
+
+running 13 tests
+test impulse_echo_lands_on_the_delay_time ... ok
+test ping_pong_alternates_left_and_right ... ok
+test sync_locks_after_two_agreeing_intervals ... ok
+test repeats_decay_by_the_feedback_and_darken ... ok
+test mix_endpoints_are_exactly_dry_and_exactly_wet ... ok
+test carry_from_copies_history_and_ignores_other_kinds ... ok
+test echo_timing_holds_at_other_sample_rates ... ok
+test mode_switch_mid_tail_is_smooth ... ok
+test stop_holds_the_time_and_restart_does_not_read_the_gap_as_tempo ... ok
+test block_size_does_not_change_the_output ... ok
+test time_changes_glide_without_clicks ... ok
+test synced_echo_lands_on_the_clock ... ok
+test maximum_feedback_stays_finite_and_bounded ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running tests/dsp_extensions.rs (target/debug/deps/dsp_extensions-2cbcedadc4ceb834)
+
+running 6 tests
+test full_adsr_goes_through_all_four_stages_and_back_to_idle ... ok
+test full_lfo_sample_and_hold_changes_only_once_per_cycle ... ok
+test svf_multi_outputs_satisfy_the_hp_bp_lp_identity ... ok
+test svf_lowpass_attenuates_high_frequency_more_than_low_frequency ... ok
+test svf_multi_lowpass_matches_existing_lowpass_only_path ... ok
+test full_lfo_waveforms_stay_in_range_and_differ ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/env_adsr.rs (target/debug/deps/env_adsr-67620d8cdf58ab2c)
+
+running 3 tests
+test reset_returns_to_idle_at_zero ... ok
+test save_and_load_state_continues_from_the_same_level_and_stage ... ok
+test reaches_sustain_level_and_releases_to_zero ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/filter_svf.rs (target/debug/deps/filter_svf-8112f47c73f5b2a4)
+
+running 3 tests
+test per_sample_cv_path_matches_scalar_path_when_cv_is_actually_constant ... ok
+test fast_path_scalar_cv_matches_reference_svf_lowpass ... ok
+test reset_clears_filter_state ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/gain.rs (target/debug/deps/gain-ca38eea8de29c904)
+
+running 3 tests
+test state_carries_the_smoothed_gain ... ok
+test default_is_exactly_unity_and_db_scales ... ok
+test changes_glide_without_steps ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ladder.rs (target/debug/deps/ladder-e672ab37eb6ca9c9)
+
+running 7 tests
+test state_carries_across_a_swap ... ok
+test drive_adds_harmonics_without_running_away ... ok
+test resonance_peaks_at_cutoff_and_compensation_holds_the_pass_band ... ok
+test response_is_24_db_per_octave_with_minus_12_at_cutoff ... ok
+test full_resonance_self_oscillates_near_cutoff_at_a_bounded_level ... ok
+test musical_modulation_keeps_the_level_near_full_scale ... ok
+test stays_bounded_under_extreme_input_and_modulation ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/lfo.rs (target/debug/deps/lfo-1ee7d3f7e5ae4d86)
+
+running 3 tests
+test reset_zeroes_phase_so_output_restarts_from_the_same_point ... ok
+test save_and_load_state_continues_identically ... ok
+test all_five_waveform_selections_produce_finite_bounded_output ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/lfo_sync.rs (target/debug/deps/lfo_sync-582b24900a1392ea)
+
+running 7 tests
+test free_mode_is_the_old_lfo ... ok
+test no_clock_runs_at_the_free_rate_while_acquiring ... ok
+test square_edges_stay_hard ... ok
+test carried_state_continues_exactly ... ok
+test the_reset_input_jumps_to_the_phase_control_only_when_patched ... ok
+test locks_to_one_bar_cycles_aligned_to_the_reset_and_glides_in ... ok
+test clock_stop_holds_the_tempo_and_a_gap_is_not_tempo ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/macros.rs (target/debug/deps/macros-8f3b1bb105533e43)
+
+running 1 test
+test outputs_start_at_the_knob_and_glide_to_changes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/mixer_out_midi_in.rs (target/debug/deps/mixer_out_midi_in-6a5ed0ba4851805d)
+
+running 3 tests
+test mixer_sums_four_inputs_with_per_channel_levels ... ok
+test out_module_copies_left_and_right_into_readable_buffers ... ok
+test midi_in_note_on_off_drives_gate_pitch_velocity ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/noise.rs (target/debug/deps/noise-e74e5d3747acb005)
+
+running 6 tests
+test carry_continues_the_stream_and_never_copies_another_lane ... ok
+test level_glides ... ok
+test a_seed_is_reproducible ... ok
+test seeds_give_independent_streams ... ok
+test both_colours_have_the_same_level_and_no_dc ... ok
+test white_is_flat_and_pink_falls_3_db_per_octave ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s
+
+     Running tests/osc_palette.rs (target/debug/deps/osc_palette-f4a19f32ed62044f)
+
+running 9 tests
+test carry_from_continues_every_unison_oscillator ... ok
+test modulated_pulse_width_stays_band_limited ... ok
+test fine_tuning_is_in_cents ... ok
+test hard_sync_is_band_limited ... ok
+test pulse_width_sets_the_duty_cycle_without_dc ... ok
+test unison_count_changes_fade_and_keep_the_first_oscillator ... ok
+test unison_alias_level_matches_one_oscillator ... ok
+test unison_keeps_its_level_across_counts ... ok
+test saw_and_pulse_alias_far_less_than_naive ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/osc_va.rs (target/debug/deps/osc_va-6420cbac1727352c)
+
+running 12 tests
+test buffer_pitch_input_is_read_per_sample ... ok
+test hard_sync_resets_phase_on_next_rising_edge ... ok
+test triangle_waveform_is_smooth_and_bounded ... ok
+test square_waveform_stays_in_range_and_has_correct_period ... ok
+test save_and_load_state_round_trips_sync_edge_flag ... ok
+test sine_waveform_matches_direct_full_osc_usage ... ok
+test triangle_waveform_matches_direct_full_osc_usage ... ok
+test matches_direct_saw_usage_at_zero_pitch ... ok
+test pitch_input_shifts_frequency_by_semitones ... ok
+test square_waveform_matches_direct_full_osc_usage ... ok
+test reset_returns_to_phase_zero ... ok
+test save_and_load_state_round_trips_phase ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/registry.rs (target/debug/deps/registry-c96fe9df1172e120)
+
+running 5 tests
+test creates_every_known_kind ... ok
+test all_infos_covers_exactly_the_known_kinds ... ok
+test from_norm_stays_inside_every_param_range ... ok
+test info_for_matches_the_built_instance ... ok
+test unknown_kind_returns_none_not_a_panic ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/reverb.rs (target/debug/deps/reverb-67fd14c3cb3fdf06)
+
+running 9 tests
+test a_left_source_stays_left_and_width_zero_is_mono ... ok
+test mix_endpoints_are_exactly_dry_and_exactly_wet ... ok
+test carry_from_copies_the_whole_history ... ok
+test short_space_setting_dies_quickly ... ok
+test block_size_does_not_change_the_output ... ok
+test damping_darkens_the_tail ... ok
+test control_changes_mid_tail_are_smooth ... ok
+test longest_decay_on_loud_noise_stays_finite_and_bounded ... ok
+test decay_time_follows_the_decay_knob ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.66s
+
+     Running tests/seq.rs (target/debug/deps/seq-d7061bfa93944bf5)
+
+running 4 tests
+test reset_just_after_a_tick_plays_step_one ... ok
+test length_loops_the_first_steps ... ok
+test reset_restarts_the_pattern_on_the_next_tick ... ok
+test clock_steps_the_pattern_and_rests_on_off_steps ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/seq_banks.rs (target/debug/deps/seq_banks-410a5dbf64ff115d)
+
+running 12 tests
+test bank_a_keeps_the_historic_names_and_indices ... ok
+test startup_bank_is_read_by_a_fresh_instance ... ok
+test reset_restarts_on_the_directions_start_step ... ok
+test an_armed_bank_starts_on_the_first_edge_at_or_after_the_offset ... ok
+test pendulum_of_one_and_two_steps ... ok
+test a_rejected_step_is_a_rest_and_keeps_its_time ... ok
+test editing_an_inactive_bank_changes_nothing_audible ... ok
+test carried_state_keeps_bank_arm_heading_and_stream ... ok
+test a_reset_replays_the_same_decisions ... ok
+test directions_play_their_documented_order ... ok
+test changing_a_probability_does_not_shift_the_stream ... ok
+test probability_is_reproducible_and_seeded_per_module ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/skin.rs (target/debug/deps/skin-ed33af35a90c676a)
+
+running 2 tests
+test every_skin_background_image_decodes_as_a_valid_png ... ok
+test every_skin_controls_id_matches_a_real_port_or_param_and_covers_all_of_them ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/transport.rs (target/debug/deps/transport-b5432612343286db)
+
+running 17 tests
+test reset_input_restarts_the_divider_count ... ok
+test stop_between_pulses_and_run_plays_the_next_step_once ... ok
+test stop_during_a_pulse_drops_the_gate_and_run_plays_the_next_step_once ... ok
+test clock_is_a_half_duty_16th_note_and_runs_from_load ... ok
+test clock_mode_is_the_default_and_unchanged ... ok
+test run_and_stop_are_idempotent ... ok
+test full_length_gates_retrigger_with_one_low_sample ... ok
+test restart_while_stopped_waits_for_run_and_starts_on_step_one ... ok
+test a_second_restart_before_run_is_one_restart ... ok
+test rests_stay_silent_and_velocity_follows_the_step ... ok
+test length_mode_gates_last_their_share_of_the_measured_step ... ok
+test division_change_commits_on_the_next_edge_without_glitches ... ok
+test stop_lets_the_gate_finish_and_run_does_not_stretch_it ... ok
+test a_tempo_change_is_followed_from_the_next_edge ... ok
+test restart_while_running_lines_up_both_patterns_on_step_one ... ok
+test division_passes_every_nth_pulse_at_full_width_first_pulse_first ... ok
+test block_size_does_not_change_timing ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+     Running tests/vca_ringmod.rs (target/debug/deps/vca_ringmod-6974577d096e48bc)
+
+running 3 tests
+test ringmod_multiplies_its_two_inputs ... ok
+test vca_exponential_response_curves_below_linear ... ok
+test vca_linear_gain_scales_input_exactly ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/kabl_pedals-6dd9106bcc9e754c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/kabl_standalone-a1a3289e8bce6b92)
+
+running 4 tests
+test applog::tests::levels_parse_and_unknown_is_info ... ok
+test applog::tests::utc_formats_known_instants ... ok
+test applog::tests::an_unwritable_directory_counts_failures_and_never_panics ... ok
+test applog::tests::rotation_keeps_the_cap ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (target/debug/deps/kabl-87ec691b9bc1c154)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/applog_full_disk.rs (target/debug/deps/applog_full_disk-240d1da034d5b4b9)
+
+running 1 test
+test: line 0
+test: line 1
+test: line 2
+test: line 3
+test: line 4
+test: line 5
+test: line 6
+test: line 7
+test: line 8
+test: line 9
+test a_full_disk_is_counted_and_reported ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+     Running tests/applog_levels.rs (target/debug/deps/applog_levels-62abbdd711c50e62)
+
+running 1 test
+test: e1
+test: w1
+test: i1 id=3
+test info_default_suppresses_debug_and_trace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/applog_stalled_sink.rs (target/debug/deps/applog_stalled_sink-7b1ca57fa75c059e)
+
+running 1 test
+test a_stalled_sink_drops_and_counts_without_blocking ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+     Running tests/lib_logic.rs (target/debug/deps/lib_logic-d27d52bc37802e5f)
+
+running 13 tests
+test non_note_messages_resolve_to_none ... ok
+test explicit_note_off_status_resolves ... ok
+test note_on_resolves_to_a_voice_and_correct_pitch ... ok
+test note_on_pitch_is_relative_to_midi_note_60 ... ok
+test note_off_for_an_unheld_note_resolves_to_none ... ok
+test apply_voice_event_does_not_allocate ... ok
+test apply_voice_event_reaches_the_correct_compiled_voice ... ok
+test note_on_with_zero_velocity_is_a_note_off ... ok
+test ring_buffer_overflow_panics_rather_than_silently_dropping - should panic ... ok
+test ring_buffer_push_and_pop_do_not_allocate ... ok
+test ring_buffer_wraps_around_capacity ... ok
+test ring_buffer_round_trips_samples_in_order ... ok
+test default_patch_compiles_and_plays ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/persistence.rs (target/debug/deps/persistence-7d6fd8c7839b8451)
+
+running 4 tests
+test default_patch_has_params_worth_round_tripping ... ok
+test default_patch_round_trips_through_save_and_load_exactly ... ok
+test loaded_log_preserves_undo_history_not_just_a_snapshot ... ok
+test a_loaded_patch_compiles_and_plays_identically_to_the_original ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/rt_with_logging.rs (target/debug/deps/rt_with_logging-5254ede9c192e363)
+
+running 1 test
+test audio_side_paths_do_not_allocate_with_trace_logging ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/stream_error_line.rs (target/debug/deps/stream_error_line-24f2e8a1992b9f89)
+
+running 1 test
+test the_last_delivered_message_carries_its_age ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/stream_error_overflow.rs (target/debug/deps/stream_error_overflow-d4d5f7f8288ac55b)
+
+running 1 test
+test paused_consumer_keeps_ownership_bounded_and_recovers ... FAILED
+
+failures:
+
+---- paused_consumer_keeps_ownership_bounded_and_recovers stdout ----
+
+thread 'paused_consumer_keeps_ownership_bounded_and_recovers' (4561) panicked at crates/standalone/tests/stream_error_overflow.rs:151:5:
+assertion `left == right` failed
+  left: 8
+ right: 5
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    paused_consumer_keeps_ownership_bounded_and_recovers
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p kabl-standalone --test stream_error_overflow`

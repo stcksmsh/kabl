@@ -1,0 +1,102 @@
+{
+  "baseline": "d702174b41c54cb5361643582f92c118cd4f1232",
+  "production_source_head": "5f7622a1aa9f44746e1f9d7a33a3c3ec3f9f8730",
+  "full_workspace_tested_head": "5f7622a1aa9f44746e1f9d7a33a3c3ec3f9f8730",
+  "independent_reviewed_product_head": "5f7622a1aa9f44746e1f9d7a33a3c3ec3f9f8730",
+  "release_build_source_head": "5f7622a1aa9f44746e1f9d7a33a3c3ec3f9f8730",
+  "workspace": {
+    "passed": 646,
+    "failed": 0,
+    "ignored": 22
+  },
+  "workspace_command": "cargo test --workspace -- --test-threads=1",
+  "initial_failure": "Unchanged process-wide allocation counter: stream_error_overflow recovery live blocks 8 vs5; isolated repeat and complete serialized run passed. Original log retained.",
+  "clippy": "cargo clippy --workspace --all-targets -- -D warnings passed; existing vendor warnings unchanged",
+  "build_commands": [
+    "cargo build --release -p kabl-ui --bin kabl-ui",
+    "cargo build --release -p kabl-clap --lib"
+  ],
+  "validator": {
+    "success": 35,
+    "skipped": 9
+  },
+  "binaries": {
+    "target/release/kabl-ui": "e4141e06b4af3a00cc61a24e5ad3e0ad74cf4a2a1909afb9c9289f629dd225f9",
+    "target/release/libkabl_clap.so": "82469a0bc8d980e46a809017b95870839ed804db3071c937db77d9919e426d3b",
+    "scratch/d10-repair/final-kabl-ui": "4a5c420523c7c0ae65b2a53bbd7f1ec116a4ed9880cb2ceca14d5a65876d8337"
+  },
+  "real_input": "scripted private X11; not owner or hardware evidence",
+  "viewport": {
+    "binary": "/secondary/Programming/Github/kabl/.worktrees/d10/scratch/d10-repair/final-kabl-ui",
+    "sha256": "4a5c420523c7c0ae65b2a53bbd7f1ec116a4ed9880cb2ceca14d5a65876d8337",
+    "input": "scripted X11, not owner/hardware proof",
+    "screens": [
+      {
+        "logical_size": "1440x900",
+        "themes": [
+          "light",
+          "dark"
+        ],
+        "more_neighbours_camera_equal": true,
+        "nested_back_equal": true,
+        "hidden_waveform_accessible": true,
+        "factory_browser_populated": true,
+        "full_restart_visibility": true
+      },
+      {
+        "logical_size": "1280x800",
+        "themes": [
+          "light",
+          "dark"
+        ],
+        "more_neighbours_camera_equal": true,
+        "nested_back_equal": true,
+        "hidden_waveform_accessible": true,
+        "factory_browser_populated": true,
+        "full_restart_visibility": true
+      }
+    ],
+    "native_scale": 1.5,
+    "native_selector_knob_changed_original_ids": true,
+    "internal_and_outer_positions_preserved": true
+  },
+  "host": {
+    "instances": 2,
+    "complete_f32_state_equal": true,
+    "panel_art_embedded": true,
+    "source_library_removed": true,
+    "native_lanes_unchanged": true,
+    "closed_editor_replay_times": [
+      2,
+      6,
+      13
+    ],
+    "native_tolerance": 0.025,
+    "input": "scripted MIDI/automation, not physical hardware"
+  },
+  "owner_disposition": "changes requested",
+  "merge_disposition": "unmerged draft PR #13",
+  "package": {
+    "status": "passed",
+    "bundle": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10711-8087-7782-9c2b-0f726c115470/d10-repair-owner-test",
+    "evidence": "bundle-check.json",
+    "normal_factory_sounds": 19,
+    "unavailable_factory_sounds": 0,
+    "relocated_REAPER_state_native_replay_passed": true,
+    "previous_owner_bundle_untouched": true
+  },
+  "submitted_head": "recorded after push in external submission.json",
+  "test_strengthening": "Final product includes visible same-kind Pulse width/Frequency geometry, persistence and Undo regression; passed at final head.",
+  "final_logs": [
+    "workspace-final.txt",
+    "clippy-final.txt",
+    "ui-release-final.txt",
+    "plugin-release-final.txt",
+    "debug-build-final.txt",
+    "validator.json",
+    "host/host-recall.json",
+    "bundle-check.json",
+    "bundle-flow.txt"
+  ],
+  "build_identity_note": "Build scripts mark tracked documentation changes as +modified. Production crate sources match the committed product head; no crate edits followed final commit."
+}

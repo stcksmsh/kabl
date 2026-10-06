@@ -1,0 +1,1 @@
+Both sizes/themes, nested Back, More, factory browser and native scaling passed

@@ -207,7 +207,8 @@ fn a_macro_card_lists_its_real_destinations_and_reveals_an_off_face_one() {
             "route row hidden at {w}x{hgt}: {row:?}"
         );
         h.unchanged_since(&before);
-        // Back: the view before Show, the card again.
+        // Close focused controls, then Back restores the explanation view.
+        h.click("more:close");
         h.click("explain-back");
         assert_eq!(h.ui.inspected, None);
         assert!(
@@ -692,6 +693,7 @@ fn a_direct_pin_to_an_off_face_control_reveals_it() {
     assert!(h.ui.expanded.contains(&2));
     assert!(h.ui.hits.contains_key("knob:2.glide_ms"));
     h.unchanged_since(&before);
+    h.click("more:close");
     h.click("explain-back");
     assert!(!h.ui.expanded.contains(&2));
     h.unchanged_since(&before);
@@ -800,6 +802,8 @@ fn a_save_dialog_over_an_explanation_keeps_escape_and_the_document() {
     let before = h.snapshot();
     h.click("pexplain:1.m1");
     h.click("explain-dest:29");
+    // Focused controls own pointer input. Close before using underlying toolbar.
+    h.click("more:close");
     h.click("save-as");
     assert!(h.ui.browser.dialog.is_some(), "Save As opened");
     h.key(Key::Escape);

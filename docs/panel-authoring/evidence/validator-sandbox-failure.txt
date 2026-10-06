@@ -1,0 +1,6 @@
+[2m    7[0m[2mms[0m [1;31mERROR[0m thread '<unnamed>' panicked at 'bad error on write fd: Operation not permitted (os error 1). This is a bug in the validator': /home/stcksmsh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wait-timeout-0.2.1/src/unix.rs:233. Set RUST_BACKTRACE=1 for a backtrace. [2;3mpanic[0m
+[2m    8[0m[2mms[0m [1;31mERROR[0m thread '<unnamed>' panicked at 'bad error on write fd: Operation not permitted (os error 1). This is a bug in the validator': /home/stcksmsh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wait-timeout-0.2.1/src/unix.rs:233. Set RUST_BACKTRACE=1 for a backtrace. [2;3mpanic[0m
+[2m    8[0m[2mms[0m [1;31mERROR[0m thread '<unnamed>' panicked at 'panic in a function that cannot unwind. This is a bug in the validator': /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:225. Set RUST_BACKTRACE=1 for a backtrace. [2;3mpanic[0m
+thread caused non-unwinding panic. aborting.
+[2m    8[0m[2mms[0m [1;31mERROR[0m thread '<unnamed>' panicked at 'panic in a function that cannot unwind. This is a bug in the validator': /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:225. Set RUST_BACKTRACE=1 for a backtrace. [2;3mpanic[0m
+thread caused non-unwinding panic. aborting.

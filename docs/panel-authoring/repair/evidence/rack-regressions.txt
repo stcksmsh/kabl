@@ -1,0 +1,47 @@
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/standalone)
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/ui)
+warning: unused variable: `m`
+   --> crates/ui/src/rack_editor.rs:158:15
+    |
+158 |     for (&mid,m) in &p.modules {
+    |               ^ help: if this is intentional, prefix it with an underscore: `_m`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `kabl-ui` (lib test) generated 1 warning (run `cargo fix --lib -p kabl-ui --tests` to apply 1 suggestion)
+    Finished `test` profile [optimized + debuginfo] target(s) in 6.39s
+     Running unittests src/lib.rs (target/debug/deps/kabl_ui-11a40c11c0b4d222)
+
+running 10 tests
+test rack_editor::tests::light_and_dark_apply_to_drawers_dialogs_and_workspace ... ok
+test rack_editor::tests::dropped_composite_moves_only_own_position_one_undo ... ok
+test rack_editor::tests::insertion_is_legal_stable_and_matches_committed_layout ... ok
+test rack_editor::tests::more_and_edit_drafts_never_reflow_outer_rack ... ok
+test rack_editor::tests::nested_back_restores_each_camera_selection_and_saved_leaf_positions ... FAILED
+test rack_editor::tests::nested_navigation_and_scoped_add_restore_outer_view ... ok
+test rack_editor::tests::real_composite_body_lifts_freely_drop_and_cancel_preserve_internals ... FAILED
+test rack_editor::tests::visibility_order_apply_persists_and_undo_keeps_ids ... ok
+test rack_editor::tests::actual_knob_owns_pointer_and_escape_cancels_item ... ok
+test rack_editor::tests::edge_scroll_reaches_new_rows_without_editing_until_drop ... ok
+
+failures:
+
+---- rack_editor::tests::nested_back_restores_each_camera_selection_and_saved_leaf_positions stdout ----
+
+thread 'rack_editor::tests::nested_back_restores_each_camera_selection_and_saved_leaf_positions' (320) panicked at crates/ui/src/rack_editor.rs:329:99:
+called `Result::unwrap()` on an `Err` value: "Selection contains an owned leaf; select its composite instead"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- rack_editor::tests::real_composite_body_lifts_freely_drop_and_cancel_preserve_internals stdout ----
+
+thread 'rack_editor::tests::real_composite_body_lifts_freely_drop_and_cancel_preserve_internals' (322) panicked at crates/ui/src/rack_editor.rs:318:38:
+called `Option::unwrap()` on a `None` value
+
+
+failures:
+    rack_editor::tests::nested_back_restores_each_camera_selection_and_saved_leaf_positions
+    rack_editor::tests::real_composite_body_lifts_freely_drop_and_cancel_preserve_internals
+
+test result: FAILED. 8 passed; 2 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.07s
+
+error: test failed, to rerun pass `-p kabl-ui --lib`

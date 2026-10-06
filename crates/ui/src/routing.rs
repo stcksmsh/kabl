@@ -621,21 +621,19 @@ pub(crate) fn param_knob(
     let hot = resp.hovered() || resp.dragged() || inspected;
     painter.circle_filled(center, rs + 1.5 * z, th.skirt);
     painter.circle_filled(center, rs * 0.84, th.knob);
-    painter.circle_filled(
-        center + EguiVec2::new(-0.25, -0.3) * rs,
-        rs * 0.35,
-        th.knob_hi.gamma_multiply(0.35),
+    painter.circle_stroke(
+        center,
+        rs * 0.84,
+        Stroke::new(0.8 * z, th.knob_hi.lerp_to_gamma(th.knob, 0.5)),
     );
-    if th.dark {
-        // Knurled light-metal cap.
-        for i in 0..24 {
-            let a = i as f32 / 24.0 * std::f32::consts::TAU;
-            let dir = EguiVec2::new(a.cos(), a.sin());
-            painter.line_segment(
-                [center + dir * rs * 0.74, center + dir * rs * 0.84],
-                Stroke::new(1.0, th.knob.lerp_to_gamma(Color32::BLACK, 0.3)),
-            );
-        }
+    // Fine grip marks and a restrained upper rim: matte hardware, no glossy highlight blob.
+    for i in 0..24 {
+        let a = i as f32 / 24.0 * std::f32::consts::TAU;
+        let dir = EguiVec2::new(a.cos(), a.sin());
+        painter.line_segment(
+            [center + dir * rs * 0.73, center + dir * rs * 0.82],
+            Stroke::new(0.6 * z, th.knob_hi.lerp_to_gamma(th.knob, 0.65)),
+        );
     }
     if hot {
         painter.circle_stroke(center, rs + 1.5 * z, Stroke::new(1.2 * z, th.sel));

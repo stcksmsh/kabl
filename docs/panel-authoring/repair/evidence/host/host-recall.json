@@ -1,0 +1,14 @@
+{
+  "instances": 2,
+  "complete_f32_state_equal": true,
+  "panel_art_embedded": true,
+  "source_library_removed": true,
+  "native_lanes_unchanged": true,
+  "closed_editor_replay_times": [
+    2,
+    6,
+    13
+  ],
+  "native_tolerance": 0.025,
+  "input": "scripted MIDI/automation, not physical hardware"
+}

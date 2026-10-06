@@ -31,6 +31,8 @@ pub struct Composite {
     #[serde(deserialize_with = "unique_map")]
     pub controls: BTreeMap<u64, Exposure>,
     pub next_interface: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub panel: Option<Box<crate::panel::Panel>>,
 }
 
 /// Reject repeated semantic keys, including differently spelled numeric IDs.
@@ -90,6 +92,7 @@ pub fn validate(p: &PatchState) -> Result<(), String> {
         return Err("Composite count limit (128)".into());
     }
     let mut owned = BTreeSet::new();
+    let mut artwork_pixels = 0u64;
     for (&id, c) in &p.composites {
         if id == u64::MAX
             || c.name.is_empty()
@@ -150,6 +153,20 @@ pub fn validate(p: &PatchState) -> Result<(), String> {
                 || !members.contains(&e.target.module_id())
             {
                 return Err(format!("Composite {id}: invalid public binding {key}"));
+            }
+        }
+        if let Some(panel) = &c.panel {
+            panel.validate(c)?;
+            for art in [&panel.light, &panel.dark].into_iter().flatten() {
+                artwork_pixels +=
+                    u64::from(u32::from_be_bytes(art.png[16..20].try_into().unwrap()))
+                        * u64::from(u32::from_be_bytes(art.png[20..24].try_into().unwrap()));
+                if artwork_pixels > 8 * 1024 * 1024 {
+                    return Err(
+                        "Document artwork limit: 8 megapixels across both themes (32 MiB decoded)"
+                            .into(),
+                    );
+                }
             }
         }
         if c.controls

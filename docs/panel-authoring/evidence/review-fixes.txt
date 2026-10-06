@@ -1,0 +1,39 @@
+   Compiling kabl-core v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/core)
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/standalone)
+   Compiling kabl-engine v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/engine)
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/ui)
+    Finished `test` profile [optimized + debuginfo] target(s) in 7.13s
+     Running unittests src/lib.rs (target/debug/deps/kabl_ui-11a40c11c0b4d222)
+
+running 16 tests
+test help::tests::every_builtin_param_has_help ... ok
+test help::tests::range_text_uses_units_and_step_names ... ok
+test help::tests::sequencer_bank_params_share_their_slot_help ... ok
+test perform::tests::host_clock_blocks_rack_and_midi_transport_only ... ok
+test perform::tests::takeover_waits_for_the_hardware_to_reach_the_value ... ok
+test rack::tests::a_skin_places_face_controls_where_its_art_says ... ok
+test rack::tests::midi_in_face_shows_keys_mode_and_glide_with_room_for_their_names ... ok
+test rack::tests::rows_pack_without_overlap_and_keep_stored_order ... ok
+test rack::tests::snapping_picks_the_nearest_row_and_unit ... ok
+test routing::tests::pitch_labels_match_the_played_semitone ... ok
+test rack::tests::float_expansion_moves_nothing ... ok
+test tests::authored_geometry_round_trips_zoom_and_desktop_scale ... ok
+test tests::empty_rack_fit_keeps_import_coordinates_finite ... ok
+test tests::port_labels_read_like_panel_text ... ok
+test rack::tests::controls_stay_inside_their_panel_and_apart ... ok
+test rack::tests::push_expansion_is_reversible_and_never_moves_the_face ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/panels.rs (target/debug/deps/panels-81725002c3349931)
+
+running 6 tests
+test old_composites_missing_art_and_unplaced_public_controls_remain_valid ... ok
+test deleting_placed_leaf_prunes_metadata_and_undo_restores_complete_face ... ok
+test unsafe_assets_bindings_overlap_and_dimensions_fail_atomically ... ok
+test edits_preserve_ids_sound_history_and_source_free_packages ... ok
+test aggregate_art_budget_is_checked_before_document_mutation ... ok
+test panel_art_never_enters_audio_processing_or_changes_pcm ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+

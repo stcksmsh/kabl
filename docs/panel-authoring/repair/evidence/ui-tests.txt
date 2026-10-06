@@ -1,0 +1,292 @@
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/standalone)
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/ui)
+    Finished `test` profile [optimized + debuginfo] target(s) in 13.32s
+     Running unittests src/lib.rs (target/debug/deps/kabl_ui-11a40c11c0b4d222)
+
+running 23 tests
+test help::tests::every_builtin_param_has_help ... ok
+test help::tests::range_text_uses_units_and_step_names ... ok
+test help::tests::sequencer_bank_params_share_their_slot_help ... ok
+test perform::tests::takeover_waits_for_the_hardware_to_reach_the_value ... ok
+test perform::tests::host_clock_blocks_rack_and_midi_transport_only ... ok
+test rack::tests::a_skin_places_face_controls_where_its_art_says ... ok
+test rack::tests::midi_in_face_shows_keys_mode_and_glide_with_room_for_their_names ... ok
+test rack::tests::snapping_picks_the_nearest_row_and_unit ... ok
+test rack::tests::rows_pack_without_overlap_and_keep_stored_order ... ok
+test rack_editor::tests::dropped_composite_moves_only_own_position_one_undo ... ok
+test rack::tests::float_expansion_moves_nothing ... ok
+test rack_editor::tests::light_and_dark_apply_to_drawers_dialogs_and_workspace ... ok
+test rack_editor::tests::insertion_is_legal_stable_and_matches_committed_layout ... ok
+test routing::tests::pitch_labels_match_the_played_semitone ... ok
+test tests::authored_geometry_round_trips_zoom_and_desktop_scale ... ok
+test rack_editor::tests::more_and_edit_drafts_never_reflow_outer_rack ... ok
+test tests::empty_rack_fit_keeps_import_coordinates_finite ... ok
+test rack_editor::tests::nested_navigation_and_scoped_add_restore_outer_view ... ok
+test tests::port_labels_read_like_panel_text ... ok
+test rack::tests::push_expansion_is_reversible_and_never_moves_the_face ... ok
+test rack::tests::controls_stay_inside_their_panel_and_apart ... ok
+test rack_editor::tests::visibility_order_apply_persists_and_undo_keeps_ids ... ok
+test rack_editor::tests::actual_knob_and_selector_own_pointer_and_escape_cancels_item ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running unittests src/main.rs (target/debug/deps/kabl_ui-bafda816992b0be1)
+
+running 9 tests
+test recovery_tests::actual_backend_repeated_reopen_and_fault ... ignored, set ALSA_CONFIG_PATH to an ALSA null PCM and run explicitly
+test recovery_tests::actual_callback_fault_sticks_and_mutes ... ignored, set ALSA_CONFIG_PATH to an ALSA null PCM and run explicitly
+test recovery_tests::cc_to_callback_during_delayed_save_and_open ... ignored, set ALSA_CONFIG_PATH to an ALSA null PCM and run explicitly
+test recovery_tests::production_callback_warmed_path_has_no_alloc_or_dealloc ... ignored, set ALSA_CONFIG_PATH to an ALSA null PCM and run explicitly
+test recovery_tests::callback_failure_sticks_and_xrun_alone_does_not_fail ... ok
+test recovery_tests::stale_callback_cannot_reopen_a_failed_or_revised_gate ... ok
+test recovery_tests::midi_messages_reach_the_wheel_and_the_mappings ... ok
+test recovery_tests::retry_boundary_discards_only_earlier_cc_arrivals ... ok
+test recovery_tests::delayed_compile_failure_and_repair_update_the_visible_notice ... ok
+
+test result: ok. 5 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running tests/banks.rs (target/debug/deps/banks-96b290b8892425bb)
+
+running 10 tests
+test editing_an_inactive_bank_writes_only_that_banks_param ... ok
+test launch_settings_never_rebuild_audio ... ok
+test an_old_patch_is_bank_a_with_its_targets_unchanged ... ok
+test face_choices_are_shared_by_every_bank ... ok
+test copy_and_clear_are_one_undo_step_each_and_restore_exactly ... ok
+test names_startup_and_launch_settings_save_and_load ... ok
+test play_sends_a_runtime_launch_on_the_patched_clock ... ok
+test queued_state_shows_cancel_which_sends_a_cancel ... ok
+test inspecting_an_off_bank_target_reveals_it_without_launching ... ok
+test the_edit_tab_changes_the_face_only ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running tests/browser.rs (target/debug/deps/browser-698eb2f11c291d52)
+
+running 19 tests
+test save_to_folder_is_staged_too ... ok
+test missing_recents_and_bad_patches_are_explained ... ok
+test browsing_never_makes_sound_or_loads ... ok
+test losing_window_focus_stops_a_preview ... ok
+test quit_with_unsaved_changes_asks ... ok
+test save_from_the_question_then_continues ... ok
+test a_failed_folder_save_leaves_the_saved_folder_unchanged ... ok
+test open_a_voice_and_audition_it ... ok
+test rename_through_the_browser ... ok
+test a_failed_save_keeps_the_work_and_the_question ... ok
+test edit_save_as_reopen_and_the_factory_file_stays ... ok
+test cancel_after_a_collision_keeps_the_other_sound ... ok
+test save_as_onto_a_taken_name_offers_replace ... ok
+test unsaved_edits_ask_and_cancel_keeps_them_exactly ... ok
+test replace_never_targets_a_sound_after_the_name_changed ... ok
+test a_piece_opens_stopped_and_starts_explicitly ... ok
+test every_control_is_reachable_at_both_sizes ... ok
+test delayed_open_preserves_an_edit_accepted_while_reading ... ok
+test delayed_save_commits_a_snapshot_without_hiding_a_later_edit ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.70s
+
+     Running tests/composites.rs (target/debug/deps/composites-ea1bb948cc2779fc)
+
+running 12 tests
+test clearing_last_leaf_label_preserves_ownership_and_public_ids ... ok
+test packed_faces_and_copied_binding_labels_identify_correct_leaves ... ok
+test duplicates_private_graph_and_stable_interfaces ... ok
+test encapsulate_sound_graph_identity_history_and_save ... ok
+test historical_ids_and_deletion_undo_never_alias ... ok
+test malformed_project_load_and_seeded_nested_undo_are_atomic ... ok
+test publish_immutable_versions_embedded_recall_and_controller_omissions ... ok
+test malformed_recursion_limits_and_missing_dependencies_are_atomic ... ok
+test cue_clock_dependencies_preserve_external_ids_or_require_inclusion ... ok
+test chronological_project_undo_keeps_interleaved_instance_state_independent ... ok
+test real_widgets_open_and_edit_aliases_at_both_sizes_and_themes ... ok
+test exact_pcm_voice_stereo_effect_feedback_and_no_callback_allocation ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s
+
+     Running tests/composition.rs (target/debug/deps/composition-b8751e81e079a0c2)
+
+running 2 tests
+test write_composition_patch ... ignored
+test committed_composition_patch_matches_the_builder ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/cues.rs (target/debug/deps/cues-7fab39a06a7a8202)
+
+running 8 tests
+test a_cue_shows_queued_only_when_all_its_banks_are_coming ... ok
+test cue_definitions_are_saved_undoable_edits_without_audio_rebuilds ... ok
+test launching_a_cue_is_one_runtime_command_with_every_target ... ok
+test macros_are_named_pinned_and_learnable_like_any_knob ... ok
+test a_reconnect_cannot_fire_an_action ... ok
+test deleting_a_referenced_module_leaves_valid_cues_and_undo_restores_them ... ok
+test buttons_and_continuous_mappings_take_a_cc_from_each_other ... ok
+test a_midi_button_fires_once_per_press_and_never_takes_over ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running tests/echo.rs (target/debug/deps/echo-8183c320411fbd81)
+
+running 4 tests
+test interlocking::write_interlocking_patch ... ignored
+test write_echo_patch ... ignored
+test interlocking::committed_patch_matches_the_builder ... ok
+test committed_echo_patch_matches_the_builder ... ok
+
+test result: ok. 2 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/editor_and_ui.rs (target/debug/deps/editor_and_ui-5a7b21369fae10fa)
+
+running 20 tests
+test connect_and_disconnect_round_trip ... ok
+test from_log_preserves_state_and_is_not_dirty ... ok
+test add_module_appears_in_state ... ok
+test ids_assigned_after_from_log_do_not_collide ... ok
+test ids_assigned_after_seeding_do_not_collide_with_seeded_ids ... ok
+test known_kinds_is_the_full_registry ... ok
+test mark_dirty_sets_the_flag_without_an_op ... ok
+test move_module_updates_position ... ok
+test mutations_set_the_dirty_flag_and_take_dirty_clears_it ... ok
+test redo_with_nothing_to_redo_is_a_no_op ... ok
+test remove_module_removes_it_and_its_cables ... ok
+test seed_from_is_undoable_back_to_empty ... ok
+test seed_from_reproduces_the_source_patch_exactly ... ok
+test set_param_updates_state ... ok
+test seeding_does_not_mark_the_editor_dirty ... ok
+test undo_redo_round_trips_add_module ... ok
+test save_and_load_round_trip_through_a_real_file ... ok
+test undo_with_nothing_to_undo_is_a_no_op ... ok
+test show_with_a_selected_module_renders_its_param_panel_without_panicking ... ok
+test show_runs_without_panicking_across_several_frames ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/editor_undo.rs (target/debug/deps/editor_undo-71e2b0e4975e3396)
+
+running 8 tests
+test deleting_a_module_takes_its_cables_and_undo_restores_everything ... ok
+test knobs_accept_several_routes ... ok
+test layout_edits_do_not_rebuild_audio ... ok
+test repatching_an_occupied_jack_replaces_and_undoes_as_one_step ... ok
+test route_amount_drag_edits_only_that_route ... ok
+test undo_of_a_first_param_edit_restores_the_default_not_zero ... ok
+test save_load_preserves_routes_timing_and_undo ... ok
+test a_slow_drag_is_one_undo_step ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+     Running tests/explain.rs (target/debug/deps/explain-9096fbfea1bbbe3d)
+
+running 20 tests
+test a_legacy_mixer_level_route_is_explained_on_channel_1 ... ok
+test write_help_coverage ... ignored
+test transport_acts_on_sequencers_behind_a_divider ... ok
+test base_and_modulation_are_told_apart_with_units ... ok
+test signal_jack_destinations_list_one_bounded_hop ... ok
+test every_factory_card_gets_specific_help ... ok
+test signal_paths_come_from_cables_and_stay_bounded ... ok
+test edits_through_the_card_and_the_rack_agree_while_explained ... ok
+test a_direct_pin_reaches_its_exact_parameter ... ok
+test edits_from_perform_and_rack_are_one_state_while_explained ... ok
+test a_direct_pin_to_an_off_face_control_reveals_it ... ok
+test the_explanation_follows_route_edits_and_undo ... ok
+test a_save_dialog_over_an_explanation_keeps_escape_and_the_document ... ok
+test inline_help_is_opt_in_and_changes_nothing ... ok
+test a_macro_without_routes_says_so_and_duplicate_labels_stay_distinct ... ok
+test escape_with_a_menu_open_closes_only_the_menu ... ok
+test module_removal_and_patch_replacement_invalidate_safely ... ok
+test a_card_rename_commits_when_you_click_elsewhere ... ok
+test escape_and_text_fields_keep_their_priority ... ok
+test a_macro_card_lists_its_real_destinations_and_reveals_an_off_face_one ... ok
+
+test result: ok. 19 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+     Running tests/expressive.rs (target/debug/deps/expressive-9d783dfb7a25728f)
+
+running 4 tests
+test write_expressive_patches ... ignored, writes patches/expressive
+test write_gate_probe ... ignored, writes docs/midi-timing/fixtures/gate-probe
+test committed_expressive_patches_match_their_builders ... ok
+test bend_channel_and_wheel_route_persist_and_undo ... ok
+
+test result: ok. 2 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/interaction.rs (target/debug/deps/interaction-6716addfc2e444ed)
+
+running 33 tests
+test closeout_scenario_script ... ignored
+test dump_hit_targets_for_real_input_runs ... ignored
+test face_params_do_not_change_the_sound ... ok
+test floating_expansion_owns_its_area_and_moves_nothing ... FAILED
+test clicking_a_route_cable_selects_it_and_never_deletes ... ok
+test collapsed_rings_are_display_only_and_open_the_lanes ... ok
+test push_expansion_moves_neighbours_and_collapses_back_exactly ... FAILED
+test opening_the_drawer_keeps_the_inspected_control_reachable ... ok
+test every_control_of_the_reference_patch_is_on_screen_left_of_the_drawer ... ok
+test envelope_timing_selector_sets_and_undoes ... ok
+test cable_views_keep_positions_and_routes ... ok
+test choosing_primary_controls_is_one_undo_step_saved_and_never_rebuilds_audio ... FAILED
+test write_crowded_patch ... ignored
+test base_value_entry_in_the_drawer ... ok
+test selecting_a_source_does_not_move_the_drawer_rows ... ok
+test dragging_an_lfo_onto_a_knob_creates_and_selects_one_route ... ok
+test inspecting_a_single_source_knob_selects_it_automatically ... ok
+test delay_controls_and_a_fresh_load ... FAILED
+test a_route_to_an_off_face_control_docks_on_the_toggle_and_selecting_it_reveals ... ok
+test invert_bypass_remove_through_the_drawer ... ok
+test transpose_is_an_advanced_control ... FAILED
+test four_sources_each_selectable_and_edited_alone ... ok
+test transport_buttons_send_commands_not_edits ... ok
+test escape_cancels_body_ring_and_dot_drags_without_undo_entries ... ok
+test a_jack_cable_is_removed_by_pulling_its_plug_never_by_a_click ... ok
+test two_sources_ring_edits_only_the_selected_one ... ok
+test shift_drags_ten_times_finer_on_body_ring_and_dot ... ok
+test single_source_dot_and_removal_never_reassigns ... ok
+test a_fast_body_drag_to_the_range_end_cancels_and_undoes_cleanly ... ok
+test view_changes_never_touch_the_patch_or_the_audio ... ok
+test source_lanes_select_and_edit_each_route_on_the_knob ... ok
+test source_lanes_of_a_knob_at_the_canvas_edge_pan_fully_into_view_and_stay_draggable ... ok
+test zoom_and_pan_keep_every_knob_gesture_and_scale_hit_regions ... ok
+
+failures:
+
+---- floating_expansion_owns_its_area_and_moves_nothing stdout ----
+
+thread 'floating_expansion_owns_its_area_and_moves_nothing' (1897) panicked at crates/ui/tests/interaction.rs:945:26:
+no entry found for key
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- push_expansion_moves_neighbours_and_collapses_back_exactly stdout ----
+
+thread 'push_expansion_moves_neighbours_and_collapses_back_exactly' (1902) panicked at crates/ui/tests/interaction.rs:909:13:
+1440x900 pushed
+
+---- choosing_primary_controls_is_one_undo_step_saved_and_never_rebuilds_audio stdout ----
+
+thread 'choosing_primary_controls_is_one_undo_step_saved_and_never_rebuilds_audio' (1888) panicked at crates/ui/tests/interaction.rs:74:32:
+no hit target pin:5.exponential
+
+---- delay_controls_and_a_fresh_load stdout ----
+
+thread 'delay_controls_and_a_fresh_load' (1891) panicked at crates/ui/tests/interaction.rs:1371:5:
+assertion `left == right` failed
+  left: (Some(1.0), Some(2.0))
+ right: (Some(0.0), Some(2.0))
+
+---- transpose_is_an_advanced_control stdout ----
+
+thread 'transpose_is_an_advanced_control' (1909) panicked at crates/ui/tests/interaction.rs:1335:44:
+called `Option::unwrap()` on a `None` value
+
+
+failures:
+    choosing_primary_controls_is_one_undo_step_saved_and_never_rebuilds_audio
+    delay_controls_and_a_fresh_load
+    floating_expansion_owns_its_area_and_moves_nothing
+    push_expansion_moves_neighbours_and_collapses_back_exactly
+    transpose_is_an_advanced_control
+
+test result: FAILED. 25 passed; 5 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.52s
+
+error: test failed, to rerun pass `-p kabl-ui --test interaction`

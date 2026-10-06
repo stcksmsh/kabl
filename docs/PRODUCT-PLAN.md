@@ -245,7 +245,7 @@ Acceptance: record/play automation, close/reopen, change layout without retarget
 
 ### D09 — Reusable, inspectable composite modules
 
-Draft submission 2026-10-05: reusable/inspectable composite workflow verified on `codex/d09-composites`; runtime/package a337f2c1eae867671f9deabadfa10f681de2bb26, final history validation 2c3d8319911a90c5960f9e02baa8dfd27c01de8f. Kosta selected chronological project Undo with independent instance state; separate histories are not required. Owner review pending; not merged. [Composite report](composites/REPORT.md) and [acceptance](composites/ACCEPTANCE.md) preserve exact evidence provenance and earlier hardware checks.
+Draft submission 2026-10-05: reusable/inspectable composite workflow verified on `codex/d09-composites`; runtime/package a337f2c1eae867671f9deabadfa10f681de2bb26, final history validation 2c3d8319911a90c5960f9e02baa8dfd27c01de8f. Kosta selected chronological project Undo with independent instance state; separate histories are not required. Merged at db33f6a2a9c0274e272d702142ad5d63d39271a6, verified at D10 pickup; owner hands-on acceptance remains pending. [Composite report](composites/REPORT.md) and [acceptance](composites/ACCEPTANCE.md) preserve exact evidence provenance and earlier hardware checks.
 
 Outcome: select an existing voice/effect, expose a small interface, use two copies independently and open either to understand it.
 
@@ -253,13 +253,21 @@ Scope: composite definition with stable exposed port/control IDs, internal graph
 
 Define embedded snapshots versus library definitions before coding. Recommendation: a song embeds the exact definition/version it used; publishing an update never changes existing songs automatically. “Edit this instance” and “publish a new version” are distinct actions. Graph cycles and voices still follow the engine's rules; grouping is not a magic change of rate.
 
-Acceptance: encapsulate/open/duplicate/undo/save/reload; sound matches the original flat patch; two instances have independent histories; external routes, cues, pins and host automation retain identity; no extra latency from grouping. Reject recursive definitions and explain missing dependencies. Use one voice and one stereo effect as the examples, not a general-purpose language project.
+Acceptance: encapsulate/open/duplicate/undo/save/reload; sound matches the original flat patch; two instances have independent state with chronological project Undo; external routes, cues, pins and host automation retain identity; no extra latency from grouping. Reject recursive definitions and explain missing dependencies. Use one voice and one stereo effect as the examples, not a general-purpose language project.
 
 ### D10 — Custom panel authoring and sharing
 
+Final interaction repair requested 2026-10-06: More must grow with exact-entry content, wheel gestures must belong exclusively to the hovered child or uncovered rack, and occupied-row insertion previews must stay above stationary panels/cables. These fixes remain on PR #13; owner disposition stays changes requested until Kosta reviews them.
+
+Separate follow-up requested by Kosta: a curated preset and sequence bank, a searchable Sequences category, and useful Perform setups. Record and scope this content/browser work separately after D10 review; it is not authorized content-bank production in this final repair. No D11 launch is implied.
+
+Hands-on repair 2026-10-06: owner disposition is changes requested. Shared item dragging, scoped internals, focused controls, native face visibility/order, warm light chrome and factory-enabled normal packaging are repaired on the existing D10 PR; [repair report](panel-authoring/repair/REPORT.md) records exact validation and pending owner review. No merge or D11 launch is authorized.
+
+Earlier implementation verified 2026-10-06 on codex/d10-panel-authoring. Real GUI/package/scaling and source-free REAPER evidence, independent review, exact heads and owner limits are indexed in [panel-authoring/REPORT.md](panel-authoring/REPORT.md). Draft submission is separate from owner approval or merge.
+
 Outcome: a user gives a composite its own instrument face and shares a complete, working package.
 
-Scope: import separate light/dark images, place and size knobs/selectors/jacks, set panel width within rack constraints, label controls, preview both themes, and export/import assets plus definition and metadata. Begin with current rack height; arbitrary multi-row geometry is a later design decision. Built-ins retain their approved default skins.
+Scope: import separate light/dark images, place and size knobs/selectors/jacks, set panel width within rack constraints, label controls, preview both themes, and export/import assets plus definition and metadata. Begin with current rack height; arbitrary multi-row geometry is a later design decision. Kosta authorized the selected V3 continuous sectional satin finish for built-ins and relevant chrome in this D10 batch. Geometry, musical behavior, help and routing remain intact; generated material studies are inspiration, not shipped assets.
 
 Use the same exposed control IDs as D09. Provide accessible fallback controls when artwork is absent or unsuitable; all public parameters remain reachable. Validate bindings, control bounds/overlap, image size and package paths. Help/explain belongs to the package so a beautiful panel can still teach.
 

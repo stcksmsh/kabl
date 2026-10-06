@@ -1,0 +1,27 @@
+{
+  "starting_master": "db33f6a2a9c0274e272d702142ad5d63d39271a6",
+  "product_head": "25f20ae8547bc367403414467040a8475cffa34f",
+  "workspace": {
+    "passed": 634,
+    "failed": 0,
+    "ignored": 22
+  },
+  "clippy": "workspace/all-targets -D warnings passed; existing vendor warnings retained",
+  "release_build_head": "ca8b504a7d35e1aeee7398ea622feda4bf747b95",
+  "post_build_change": "25f20ae changes test fixture initialization only, no production source",
+  "validator": {
+    "success": 35,
+    "skipped": 9
+  },
+  "binaries": {
+    "target/release/kabl-ui": "90e5022aaf81f935d023f138c38fa1d5d789bffff2ddec8f5c25f446c54e6bff",
+    "target/release/libkabl_clap.so": "b97b57105126ece4fa500116b11e5d3b4dca7c7e80d7d7edb37daef21e302570"
+  },
+  "gui_authoring_head": "ffb9929bb5b23b9fa629c48f31888e8b3a38db3f",
+  "gui_portability_head": "ca8b504a7d35e1aeee7398ea622feda4bf747b95",
+  "host_release_head": "ca8b504a7d35e1aeee7398ea622feda4bf747b95",
+  "owner_acceptance": "pending",
+  "submitted_head": "recorded after push in external submission.json",
+  "reviewed_head": "12f593256e06f4eb3be093ffd0deba1c5131b74a",
+  "independent_review": "PASS; D10-R1 and D10-R2 resolved, source and final artifact recheck"
+}

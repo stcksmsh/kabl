@@ -1,0 +1,171 @@
+    Checking kabl-core v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/core)
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/standalone)
+    Checking ahash v0.8.12
+    Checking half v2.7.1
+    Checking regex-automata v0.4.18
+    Checking clap v4.6.7
+    Checking ppv-lite86 v0.2.21
+warning: unused import: `CLAP_EVENT_NOTE_END`
+ --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:4:28
+  |
+4 |     CLAP_EVENT_NOTE_CHOKE, CLAP_EVENT_NOTE_END, CLAP_EVENT_NOTE_EXPRESSION, CLAP_EVENT_NOTE_OFF,
+  |                            ^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `crossbeam::queue::ArrayQueue`
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:68:5
+   |
+68 | use crossbeam::queue::ArrayQueue;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::thread`
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:92:5
+   |
+92 | use std::thread;
+   |     ^^^^^^^^^^^
+
+warning: unused import: `TASK_QUEUE_CAPACITY`
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:101:74
+    |
+101 | use crate::event_loop::{BackgroundThread, EventLoop, MainThreadExecutor, TASK_QUEUE_CAPACITY};
+    |                                                                          ^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::midi::MidiResult`
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:102:5
+    |
+102 | use crate::midi::MidiResult;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `write_stream`
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:108:47
+    |
+108 | use crate::wrapper::clap::util::{read_stream, write_stream};
+    |                                               ^^^^^^^^^^^^
+
+warning: unused import: `clamp_output_event_timing`
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:112:31
+    |
+112 |     clamp_input_event_timing, clamp_output_event_timing, hash_param_id, process_wrapper, strlcpy,
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `nice_plug_core::midi::sysex::SysExMessage`
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:75:5
+   |
+75 | use nice_plug_core::midi::sysex::SysExMessage;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `host_latency`
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:513:22
+    |
+513 |                 Some(host_latency) => {
+    |                      ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_host_latency`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `total_buffer_len`
+    --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:1202:9
+     |
+1202 |         total_buffer_len: usize,
+     |         ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_total_buffer_len`
+
+warning: function `write_stream` is never used
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/util.rs:149:8
+    |
+149 | pub fn write_stream(stream: &clap_ostream, slice: &[u8]) -> bool {
+    |        ^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `output_events_guard` is never read
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/context.rs:50:16
+   |
+47 | pub(crate) struct WrapperProcessContext<'a, P: ClapPlugin> {
+   |                   --------------------- field in this struct
+...
+50 |     pub(super) output_events_guard: AtomicRefMut<'a, VecDeque<PluginNoteEvent<P>>>,
+   |                ^^^^^^^^^^^^^^^^^^^
+
+warning: fields `params` and `param_id_to_hash` are never read
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:169:5
+    |
+148 | pub struct Wrapper<P: ClapPlugin> {
+    |            ------- fields in this struct
+...
+169 |     params: Arc<dyn Params>,
+    |     ^^^^^^
+...
+277 |     param_id_to_hash: HashMap<String, u32>,
+    |     ^^^^^^^^^^^^^^^^
+
+warning: function `make_params_iter` is never used
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/state.rs:15:15
+   |
+15 | pub(crate) fn make_params_iter<'a>(
+   |               ^^^^^^^^^^^^^^^^
+
+warning: function `make_params_getter` is never used
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/state.rs:27:15
+   |
+27 | pub(crate) fn make_params_getter<'a>(
+   |               ^^^^^^^^^^^^^^^^^^
+
+warning: function `serialize_object` is never used
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/state.rs:43:22
+   |
+43 | pub(crate) unsafe fn serialize_object<'a, P: Plugin>(
+   |                      ^^^^^^^^^^^^^^^^
+
+warning: function `serialize_json` is never used
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/state.rs:94:22
+   |
+94 | pub(crate) unsafe fn serialize_json<'a, P: Plugin>(
+   |                      ^^^^^^^^^^^^^^
+
+warning: function `deserialize_object` is never used
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/state.rs:134:22
+    |
+134 | pub(crate) unsafe fn deserialize_object<P: Plugin>(
+    |                      ^^^^^^^^^^^^^^^^^^
+
+warning: function `clamp_output_event_timing` is never used
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/util.rs:85:8
+   |
+85 | pub fn clamp_output_event_timing(timing: u32, total_buffer_len: u32) -> u32 {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `is_main_thread` is never used
+  --> vendor/nice-plug/crates/nice-plug/src/event_loop.rs:70:8
+   |
+42 | pub(crate) trait EventLoop<T, E>
+   |                  --------- method in this trait
+...
+70 |     fn is_main_thread(&self) -> bool;
+   |        ^^^^^^^^^^^^^^
+
+warning: struct `LinuxEventLoop` is never constructed
+  --> vendor/nice-plug/crates/nice-plug/src/event_loop/linux.rs:13:19
+   |
+13 | pub(crate) struct LinuxEventLoop<T, E> {
+   |                   ^^^^^^^^^^^^^^
+
+warning: `nice-plug` (lib) generated 21 warnings (run `cargo clippy --fix --lib -p nice-plug` to apply 9 suggestions)
+    Checking epaint v0.35.0
+    Checking winit v0.30.13
+    Checking ciborium-ll v0.2.2
+    Checking rand_chacha v0.9.0
+    Checking ciborium v0.2.2
+    Checking proptest v1.11.0
+    Checking kabl-engine v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/engine)
+    Checking egui v0.35.0
+    Checking regex v1.13.1
+    Checking criterion v0.8.2
+    Checking glutin-winit v0.5.0
+    Checking egui_glow v0.35.0
+    Checking egui-winit v0.35.0
+    Checking egui-baseview v0.7.0 (https://codeberg.org/RustAudio/egui-baseview.git?rev=07c89cdb1eca83d65c470e1fd8dd252f53f41097#07c89cdb)
+    Checking eframe v0.35.0
+    Checking nice-plug-egui v0.3.0 (/secondary/Programming/Github/kabl/.worktrees/d10/vendor/nice-plug/crates/nice-plug-egui)
+    Checking kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/ui)
+    Checking kabl-clap v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/clap)
+    Finished `dev` profile [optimized + debuginfo] target(s) in 5.59s

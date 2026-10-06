@@ -1,0 +1,64 @@
+{
+  "binary": "/secondary/Programming/Github/kabl/.worktrees/d10/scratch/d10-repair/final-kabl-ui",
+  "sha256": "4a5c420523c7c0ae65b2a53bbd7f1ec116a4ed9880cb2ceca14d5a65876d8337",
+  "input": "scripted X11, not owner/hardware proof",
+  "steps": [
+    "theme:light",
+    "authored title drag across occupied neighbours",
+    "native title drag across occupied neighbours",
+    "toggle:20",
+    "more:close",
+    "native knob gesture retains item position",
+    "sel:1.waveform.1",
+    "authored selector and knob address original internal targets",
+    "native jack drag creates modulation route without item drag",
+    "composite:1:open",
+    "composite:4:open",
+    "subpatch:back",
+    "subpatch:back",
+    "edit-face:20",
+    "face:20:waveform",
+    "face:20:pw",
+    "face:down:20:base_hz",
+    "face:down:20:base_hz",
+    "face:apply",
+    "save",
+    "toggle:20",
+    "more:close",
+    "Escape cancels native item drag",
+    "save",
+    "default composite title crosses occupied row",
+    "save",
+    "save",
+    "edge scroll/drop reaches extra row",
+    "save",
+    "zoom:fit",
+    "theme:dark",
+    "browser",
+    "browser",
+    "save"
+  ],
+  "saved_state_proofs": {
+    "cancelled_native_position": {
+      "x": 120.0,
+      "y": 10.0
+    },
+    "default_drop_pos": {
+      "x": 444.0,
+      "y": 380.0
+    },
+    "edge_drop_pos": {
+      "x": 660.0,
+      "y": 2230.0
+    }
+  },
+  "size": "1440x900",
+  "capture_raster_size": [
+    1600,
+    1000
+  ],
+  "client_window_size": [
+    1440,
+    900
+  ]
+}

@@ -1,0 +1,4 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/standalone)
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/ui)
+    Finished `dev` profile [optimized + debuginfo] target(s) in 2.50s

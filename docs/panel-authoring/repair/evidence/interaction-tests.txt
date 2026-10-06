@@ -1,0 +1,16 @@
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/standalone)
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/d10/crates/ui)
+    Finished `test` profile [optimized + debuginfo] target(s) in 7.20s
+     Running unittests src/lib.rs (target/debug/deps/kabl_ui-11a40c11c0b4d222)
+
+running 7 tests
+test rack_editor::tests::light_and_dark_apply_to_drawers_dialogs_and_workspace ... ok
+test rack_editor::tests::dropped_composite_moves_only_own_position_one_undo ... ok
+test rack_editor::tests::insertion_is_legal_stable_and_matches_committed_layout ... ok
+test rack_editor::tests::nested_navigation_and_scoped_add_restore_outer_view ... ok
+test rack_editor::tests::more_and_edit_drafts_never_reflow_outer_rack ... ok
+test rack_editor::tests::actual_knob_and_selector_own_pointer_and_escape_cancels_item ... ok
+test rack_editor::tests::visibility_order_apply_persists_and_undo_keeps_ids ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.07s
+

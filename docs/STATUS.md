@@ -1,5 +1,22 @@
 # Status
 
+## D10 final interaction submission — 2026-10-06
+
+Kosta likes the other repaired UI, but owner acceptance remains **changes requested** until More sizing, exclusive wheel ownership and occupied insertion visibility are reviewed. Production source/tested/reviewed/build head is 35eed79956dd702e0a62cd80be534d5c34dc9632; exact submitted/package artifact head is recorded in the new bundle submission.json. [Final repair evidence](panel-authoring/repair/final/README.md) records current checks separately from earlier provenance. Existing draft PR #13, isolated owned .worktrees/d10, no merge or D11 launch.
+
+New owner bundle: /home/stcksmsh/.codex/visualizations/2026/10/04/01a10711-8087-7782-9c2b-0f726c115470/d10-final-owner-test. Earlier bundles/projects/libraries, root checkout, .ai, other worktrees and existing host sessions are preserved. Curated presets/sequences, searchable Sequences and Perform setups are recorded as a separate follow-up in PRODUCT-PLAN.md; no content production here. Physical hardware/listening/latency/feel and inherited ordinary-render/dense-editor/backend limits remain pending.
+
+
+D10 hands-on repair remains on draft PR #13, unmerged. Owner disposition: changes requested. Exact repair/source/package evidence is indexed in [panel-authoring/repair/REPORT.md](panel-authoring/repair/REPORT.md). Previous owner files and evidence remain preserved; no D11 launch is authorized.
+
+## D10 panel authoring — 2026-10-06
+
+Engineering verification: workspace 634 passed / 0 failed / 22 ignored, strict workspace/all-target Clippy, release build and CLAP validator 35 success / 9 capability skips pass. Portable composite faces preserve stable D09 exposed IDs, chronological project Undo, embedded exact graph/art snapshots and immutable library semantics. The selected V3 sectional satin finish now covers built-ins and relevant chrome. Real GUI voice/stereo examples, both themes/sizes, actual 150% native scaling, fresh-profile source removal/restart and REAPER complete recall/native automation are recorded in [panel-authoring/REPORT.md](panel-authoring/REPORT.md). Final independent source/artifact recheck passes at 12f593256e06f4eb3be093ffd0deba1c5131b74a; both findings are resolved. Submitted as draft [PR #13](https://github.com/stcksmsh/kabl/pull/13) on codex/d10-panel-authoring; no owner approval or merge is implied.
+
+Starting verified master is D09 merge db33f6a2a9c0274e272d702142ad5d63d39271a6. D09 PR #12 is merged; prior statements below that it remains unmerged are historical. Final D10 product/test head 25f20ae8547bc367403414467040a8475cffa34f, release build ca8b504a7d35e1aeee7398ea622feda4bf747b95; subsequent source change is test-only Clippy initialization. Exact submitted, reviewed and packaged heads live in the report/review and external submission receipt. Isolated .worktrees/d10 leaves root master, .ai, D08/D09 worktrees and existing host sessions untouched. No other-chat messages or D11 work.
+
+Owner bundle: /home/stcksmsh/.codex/visualizations/2026/10/04/01a10711-8087-7782-9c2b-0f726c115470/d10-owner-test. Original SVG/PNG examples are MIT OR Apache-2.0; IBM Plex fonts are OFL-1.1; retained nice-plug is ISC. Owner material judgment, physical controller/listening/latency/feel and production-beta acceptance remain pending. D08 ordinary-render nondeterminism and dense-editor backend/performance limits remain open.
+
 ## D09 draft submission — 2026-10-05
 
 Engineering: complete for the agreed scope; draft [PR #12](https://github.com/stcksmsh/kabl/pull/12) on `codex/d09-composites` for owner review. Kosta selected chronological project Undo with independent instance state; separate per-instance histories are not required. Runtime tested/reviewed/packaged head a337f2c1eae867671f9deabadfa10f681de2bb26; final history/workspace validation 2c3d8319911a90c5960f9e02baa8dfd27c01de8f. Final PR/submitted SHA are recorded by the submission receipt. Not merged or owner-approved.

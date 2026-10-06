@@ -1,0 +1,12 @@
+{
+  "source": "/secondary/Programming/Github/kabl/.worktrees/d10/scratch/d10-host/d10-arrangement.rpp",
+  "actual_UI_saved_face": {
+    "face.order.base_hz": 2.0,
+    "face.order.pw": 1.0,
+    "face.order.waveform": 0.0,
+    "face.pw": 1.0,
+    "face.waveform": 0.0
+  },
+  "instances": 2,
+  "all_nonpresentation_params_graph_composites_lanes_bases_unchanged": true
+}
