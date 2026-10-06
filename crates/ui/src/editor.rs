@@ -251,6 +251,36 @@ impl PatchEditor {
         id
     }
 
+    /// Add in a scoped rack without temporarily creating an outside module. One Undo.
+    pub fn add_module_in_scope(
+        &mut self,
+        kind: &str,
+        pos: Vec2,
+        scope: Option<kabl_core::CompositeId>,
+    ) -> ModuleId {
+        let Some(scope) = scope.filter(|id| self.state().composites.contains_key(id)) else {
+            return self.add_module(kind, pos);
+        };
+        let id = self.reserved_ids().0;
+        self.next_module_id = id + 1;
+        let mut group = self.state().composites[&scope].clone();
+        group.members.insert(id);
+        self.append(Op::Group {
+            ops: vec![
+                Op::AddModule {
+                    id,
+                    kind: kind.into(),
+                    pos,
+                },
+                Op::SetComposite {
+                    id: scope,
+                    value: Some(group),
+                },
+            ],
+        });
+        id
+    }
+
     /// Removes a module with its cables, and the cue and launch settings that name it, as one
     /// undo step (undo restores those references with it).
     pub fn remove_module(&mut self, id: ModuleId) {

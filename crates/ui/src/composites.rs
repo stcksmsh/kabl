@@ -659,14 +659,12 @@ pub fn panel(editor: &mut PatchEditor, view: &mut crate::UiState, ctx: &egui::Co
             for (&id, c) in &state.composites {
                 let r = ui.push_id(id, |ui| {
                     ui.collapsing(format!("{} · instance #{id}", c.name), |ui| {
-                        if ui.button("Design instrument face").clicked() { crate::panels::open(view,id,c); }
+                        if ui.button("Edit face").clicked() { crate::panels::open(view,id,c); }
                         ui.label(&c.help);
                         ui.label(format!("Embedded definition {} v{}", c.definition.id, c.definition.version));
                         ui.horizontal(|ui| {
-                            if ui.button("Open internals").clicked() { view.composites.open.insert(id); }
-                            if ui.button("Close").clicked() {
-                                view.composites.open.remove(&id); view.selected_module = None; view.inspected = None;
-                            }
+                            if ui.button("Open internals").clicked() { view.enter_composite(editor.state(),id); }
+                            if ui.button("Close").clicked() && view.scope==Some(id) {view.back();}
                             let r = ui.button("Duplicate");
                             view.record(format!("composite:{id}:duplicate"), r.rect);
                             if r.clicked() {

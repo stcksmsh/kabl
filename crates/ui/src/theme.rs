@@ -82,10 +82,10 @@ pub fn theme(dark: bool) -> Theme {
     } else {
         Theme {
             dark,
-            chrome: hex("#252a2b"),
-            ctext: hex("#f1ece2"),
-            rack: hex("#171c1d"),
-            rail: hex("#59605f"),
+            chrome: hex("#eee9df"),
+            ctext: hex("#302b26"),
+            rack: hex("#dfd9cd"),
+            rail: hex("#c5bfb3"),
             rail_hi: hex("#bdb8ae"),
             hole: hex("#2a2826"),
             panel: hex("#e8e2d4"),
@@ -112,7 +112,7 @@ pub fn theme(dark: bool) -> Theme {
             audio: hex("#e0962b"),
             cv: hex("#23a597"),
             gate: hex("#8d67d6"),
-            btn: hex("#3a3733"),
+            btn: hex("#ddd6c8"),
         }
     }
 }
@@ -127,14 +127,23 @@ impl Theme {
         }
     }
 
-    /// Chrome (toolbar, drawer, menus) for this theme. Both themes keep dark chrome, as designed.
+    /// Matching material, distinct warm light and graphite dark UI surfaces.
     pub fn visuals(&self) -> egui::Visuals {
-        let mut v = egui::Visuals::dark();
+        let mut v = if self.dark {
+            egui::Visuals::dark()
+        } else {
+            egui::Visuals::light()
+        };
         v.panel_fill = self.chrome;
         v.window_fill = self.chrome;
-        v.extreme_bg_color = if self.dark { self.rack } else { hex("#1f1d1b") };
+        v.extreme_bg_color = self.rack;
+        v.faint_bg_color = self.btn;
+        v.widgets.noninteractive.bg_fill = self.chrome;
+        v.widgets.inactive.bg_fill = self.btn;
+        v.widgets.hovered.bg_fill = self.btn.gamma_multiply(if self.dark { 1.2 } else { 0.96 });
+        v.widgets.active.bg_fill = hex(if self.dark { "#355580" } else { "#c1d3e9" });
         v.override_text_color = Some(self.ctext);
-        v.selection.bg_fill = self.sel;
+        v.selection.bg_fill = hex(if self.dark { "#355580" } else { "#c1d3e9" });
         v
     }
 }
@@ -171,10 +180,10 @@ pub fn install_fonts(ctx: &egui::Context) {
 pub fn panel_theme(dark: bool, kind: &str) -> Theme {
     let mut t = theme(dark);
     let (light, night) = match kind {
-        "osc.va" | "osc" | "noise" => ("#cf947c", "#795344"),
-        "filter.svf" | "filter" => ("#a8b99d", "#52654f"),
-        "env.adsr" | "lfo" => ("#b8afca", "#63576e"),
-        "vca" | "mix" => ("#c4b891", "#6f6246"),
+        "osc.va" | "osc" | "noise" => ("#cf947c", "#926958"),
+        "filter.svf" | "filter" => ("#a8b99d", "#62735c"),
+        "env.adsr" | "lfo" => ("#b8afca", "#71617d"),
+        "vca" | "mix" => ("#c4b891", "#7b6c52"),
         "midi.in" | "midi" | "clock" | "seq" | "cues" => ("#a6babc", "#4b6469"),
         _ => ("#d6ccbc", "#696157"),
     };

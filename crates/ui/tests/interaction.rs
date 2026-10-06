@@ -112,7 +112,9 @@ impl H {
         self.move_to(p);
         self.button(true);
         self.button(false);
-        self.frame();
+        for _ in 0..3 {
+            self.frame();
+        } // Let centered modal sizing and layer removal settle.
     }
 
     fn drag(&mut self, from: Pos2, to: Pos2) {
@@ -856,10 +858,10 @@ fn choosing_primary_controls_is_one_undo_step_saved_and_never_rebuilds_audio() {
     t.rclick(&format!("module:{VCA}"));
     t.click("menu:choose");
     let entries = t.undo_depth();
-    t.click(&format!("pin:{VCA}.exponential"));
-    t.click(&format!("pin:{VCA}.gain"));
+    t.click(&format!("face:{VCA}:exponential"));
+    t.click(&format!("face:{VCA}:gain"));
     assert_eq!(t.undo_depth(), entries, "pins are pending until Done");
-    t.click(&format!("done:{VCA}"));
+    t.click("face:apply");
     assert_eq!(t.undo_depth(), entries + 1, "one step");
     assert_eq!(t.face(VCA, "exponential"), Some(1.0));
     assert_eq!(t.face(VCA, "gain"), Some(0.0));
@@ -891,74 +893,99 @@ fn choosing_primary_controls_is_one_undo_step_saved_and_never_rebuilds_audio() {
     // Escape in choose mode discards the pending choice.
     t.rclick(&format!("module:{VCA}"));
     t.click("menu:choose");
-    t.click(&format!("pin:{VCA}.gain"));
+    t.click(&format!("face:{VCA}:gain"));
     t.key(Key::Escape, Modifiers::NONE);
     assert_eq!(t.face(VCA, "gain"), Some(0.0));
     assert!(t.ui.choose.is_none());
 }
 
 #[test]
-fn push_expansion_moves_neighbours_and_collapses_back_exactly() {
+fn focused_controls_preserve_neighbours_and_camera() {
     for (w, h) in sizes() {
         let mut t = H::new(w, h);
         let out = t.ui.hits[&format!("module:{OUTPUT}")];
-        let gain = t.ui.hits[&format!("knob:{VCA}.gain")];
-        let jack = t.ui.hits[&format!("in:{VCA}.cv")];
+        let pan = t.ui.pan;
+        let zoom = t.ui.zoom;
+        let state = t.editor.state().clone();
         for _ in 0..3 {
             t.click(&format!("toggle:{VCA}"));
-            assert!(
-                t.ui.hits[&format!("module:{OUTPUT}")].min.x > out.min.x + 50.0,
-                "{w}x{h} pushed"
-            );
-            assert_eq!(
-                t.ui.hits[&format!("knob:{VCA}.gain")],
-                gain,
-                "face control stays"
-            );
-            assert_eq!(t.ui.hits[&format!("in:{VCA}.cv")], jack, "jack stays");
-            // The expanded area is fully on screen (reachable).
-            let sel = t.ui.hits[&format!("sel:{VCA}.exponential.1")];
-            assert!(sel.max.x < w - kabl_ui::DRAWER_W, "{w}x{h} {sel:?}");
-            t.click(&format!("toggle:{VCA}"));
-            assert_eq!(
-                t.ui.hits[&format!("module:{OUTPUT}")],
-                out,
-                "{w}x{h} no drift"
-            );
+            assert_eq!(t.ui.hits[&format!("module:{OUTPUT}")], out);
+            assert_eq!((t.ui.pan, t.ui.zoom), (pan, zoom));
+            let selector = t.ui.hits[&format!("sel:{VCA}.exponential.1")];
+            assert!(egui::Rect::from_min_size(Pos2::ZERO, t.size).contains_rect(selector));
+            t.click("more:close");
+            assert_eq!(t.ui.hits[&format!("module:{OUTPUT}")], out);
+            assert_eq!(t.editor.state(), &state);
         }
     }
 }
 
 #[test]
-fn floating_expansion_owns_its_area_and_moves_nothing() {
-    let mut t = H::new(1440.0, 900.0);
-    t.ui.float_expansion = true;
-    t.frame();
+fn focused_controls_own_pointer_and_closing_click_does_not_touch_rack() {
+    let mut t = H::new(1440., 900.);
+    let before = t.editor.state().clone();
     let out = t.ui.hits[&format!("module:{OUTPUT}")];
-    let out_pos = t.editor.state().modules[&OUTPUT].pos;
     t.click(&format!("toggle:{VCA}"));
-    assert_eq!(
-        t.ui.hits[&format!("module:{OUTPUT}")],
-        out,
-        "float pushes nothing"
-    );
-    let float = t.ui.hits[&format!("float:{VCA}")];
-    assert!(float.intersects(out), "the area covers the neighbour");
-    // A drag on the float where it covers Output neither moves nor selects Output.
-    let p = float.intersect(out).center();
-    t.drag(p, p + egui::vec2(60.0, 40.0));
-    assert_eq!(t.editor.state().modules[&OUTPUT].pos, out_pos);
-    assert_ne!(t.ui.selected_module, Some(OUTPUT));
-    // Its own controls work.
+    assert!(t.ui.hits.contains_key(&format!("more:{VCA}:body")));
     t.click(&format!("sel:{VCA}.exponential.1"));
-    assert_eq!(t.param(VCA, "exponential"), Some(1.0));
-    // A cable dropped on the float lands on the float's control, not the one under it.
-    let from = t.at(&format!("out:{FAST_LFO}.out"));
+    assert_eq!(t.param(VCA, "exponential"), Some(1.));
+    // Native jacks/knobs inside the focus retain the real cable gesture.
+    let from = t.at(&format!("out:{VCA}.out"));
     let to = t.at(&format!("knob:{VCA}.exponential"));
     t.drag(from, to);
     assert_eq!(t.routes(VCA, "exponential").len(), 1);
-    t.click(&format!("toggle:{VCA}"));
+    let selected = t.ui.selected_module;
+    let pos = t.editor.state().modules[&OUTPUT].pos;
+    let backdrop = egui::pos2(out.left() + 3., out.top() + 3.);
+    assert!(!t.ui.hits["more:dialog"].contains(backdrop));
+    t.move_to(backdrop);
+    t.button(true);
+    t.button(false);
+    for _ in 0..3 {
+        t.frame();
+    } // Closing click is consumed by the backdrop.
+    assert!(t.ui.expanded.is_empty());
+    assert_eq!(t.ui.selected_module, selected);
+    assert_eq!(t.editor.state().modules[&OUTPUT].pos, pos);
     assert_eq!(t.ui.hits[&format!("module:{OUTPUT}")], out);
+    assert_eq!(t.editor.state().modules[&OUTPUT], before.modules[&OUTPUT]);
+}
+
+#[test]
+fn focused_view_keeps_existing_native_jack_and_parameter_cables() {
+    let mut t = H::new(1440., 900.);
+    let route = t.editor.connect_route(
+        kabl_core::PortRef::Module {
+            id: FAST_LFO,
+            port: "out".into(),
+        },
+        VCA,
+        "exponential",
+    );
+    let cable = t.editor.connect(
+        kabl_core::PortRef::Module {
+            id: VCA,
+            port: "out".into(),
+        },
+        kabl_core::PortRef::Module {
+            id: OUTPUT,
+            port: "left".into(),
+        },
+    );
+    for _ in 0..3 {
+        t.frame();
+    }
+    let before = t.editor.state().clone();
+    t.click(&format!("toggle:{VCA}"));
+    assert!(t.ui.hits.contains_key(&format!("route:{route}")));
+    assert!(t.ui.hits.contains_key(&format!("cable:{cable}")));
+    assert!(t.ui.hits["more:dialog"].contains(t.at(&format!("out:{VCA}.out"))));
+    t.key(Key::Escape, Modifiers::NONE);
+    for _ in 0..3 {
+        t.frame();
+    }
+    assert!(t.ui.expanded.is_empty());
+    assert_eq!(t.editor.state(), &before);
 }
 
 #[test]
@@ -1378,6 +1405,7 @@ fn delay_controls_and_a_fresh_load() {
         .join("../../patches/echo")
         .display()
         .to_string();
+    t.click("more:close");
     // The advanced folder Load, in the browser; the edits above are unsaved, so it asks.
     let user = tempfile::tempdir().unwrap();
     t.ui.library = Some(kabl_ui::library::Library::open(

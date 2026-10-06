@@ -1,6 +1,13 @@
 //! Seeds D09 graph/examples plus a stable waveform exposure for real GUI authoring. Does not add panel metadata.
 fn main() {
     let args: Vec<_> = std::env::args().collect();
+    if args[1] == "--state" {
+        let state: kabl_core::PatchState =
+            serde_json::from_slice(&std::fs::read(&args[2]).unwrap()).unwrap();
+        let e = kabl_ui::PatchEditor::seed_from(&state);
+        kabl_core::save(std::path::Path::new(&args[3]), e.log()).unwrap();
+        return;
+    }
     if args[1] == "--empty" {
         let e = kabl_ui::PatchEditor::seed_from(&Default::default());
         kabl_core::save(std::path::Path::new(&args[2]), e.log()).unwrap();
