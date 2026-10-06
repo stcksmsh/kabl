@@ -4,7 +4,7 @@ Owner disposition remains **changes requested**. Kosta must review the repaired 
 
 ## Exact provenance
 
-Pickup and previous submitted head: d702174b41c54cb5361643582f92c118cd4f1232. Production repair source, release build and independent source review: **5f7622a1aa9f44746e1f9d7a33a3c3ec3f9f8730**. Later documentation, test-strengthening and evidence changes do not alter production source. Final submitted/tested/artifact/package heads and binary hashes are recorded in evidence/verification.json and the external bundle's submission.json after submission; this avoids a self-referential commit hash. The worktree stays `/secondary/Programming/Github/kabl/.worktrees/d10`, branch codex/d10-panel-authoring.
+Pickup and previous submitted head: d702174b41c54cb5361643582f92c118cd4f1232. Production repair source, release build and independent source review: **5f7622a1aa9f44746e1f9d7a33a3c3ec3f9f8730**. Later documentation and evidence changes do not alter production source. Final submitted/tested/artifact/package heads and binary hashes are recorded in evidence/verification.json and the external bundle's submission.json after submission; this avoids a self-referential commit hash. The worktree stays `/secondary/Programming/Github/kabl/.worktrees/d10`, branch codex/d10-panel-authoring.
 
 The old 25f20ae test head, ca8b504 release source and d702174 submission remain historical. The before video uses the retained old release binary; the repaired video and viewport checks use the exact repair debug binary. Production owner and host verification use the new release binary/plugin. Evidence files identify the binary hashes rather than treating a documentation head as rebuilt code.
 

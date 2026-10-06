@@ -68,7 +68,7 @@ try:
   click('theme:dark');click('browser');time.sleep(1);click('browser')
  click('save');time.sleep(1)
  video.send_signal(2);video.wait(timeout=10);assert video.returncode in (0,255)
- (repo/f'docs/panel-authoring/repair/evidence/{mode}-interaction.json').write_text(json.dumps({'binary':str(binary),'sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'input':'scripted X11, not owner/hardware proof','steps':steps,'saved_state_proofs':proofs,'size':'1440x900'},indent=2)+'\n')
+ (repo/f'docs/panel-authoring/repair/evidence/{mode}-interaction.json').write_text(json.dumps({'binary':str(binary),'sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'input':'scripted X11, not owner/hardware proof','steps':steps,'saved_state_proofs':proofs,'size':'1440x900','capture_raster_size':[1600,1000],'client_window_size':[1440,900]},indent=2)+'\n')
 finally:
  if video and video.poll() is None:video.send_signal(2);video.wait(timeout=10)
  if app.poll() is None:app.terminate();app.wait(timeout=8)

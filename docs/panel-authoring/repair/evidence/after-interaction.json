@@ -52,5 +52,13 @@
       "y": 2230.0
     }
   },
-  "size": "1440x900"
+  "size": "1440x900",
+  "capture_raster_size": [
+    1600,
+    1000
+  ],
+  "client_window_size": [
+    1440,
+    900
+  ]
 }

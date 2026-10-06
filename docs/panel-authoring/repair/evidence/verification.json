@@ -76,7 +76,15 @@
   },
   "owner_disposition": "changes requested",
   "merge_disposition": "unmerged draft PR #13",
-  "package": "pending separate relocated bundle check",
+  "package": {
+    "status": "passed",
+    "bundle": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10711-8087-7782-9c2b-0f726c115470/d10-repair-owner-test",
+    "evidence": "bundle-check.json",
+    "normal_factory_sounds": 19,
+    "unavailable_factory_sounds": 0,
+    "relocated_REAPER_state_native_replay_passed": true,
+    "previous_owner_bundle_untouched": true
+  },
   "submitted_head": "recorded after push in external submission.json",
   "test_strengthening": "Final product includes visible same-kind Pulse width/Frequency geometry, persistence and Undo regression; passed at final head.",
   "final_logs": [
@@ -86,7 +94,9 @@
     "plugin-release-final.txt",
     "debug-build-final.txt",
     "validator.json",
-    "host/host-recall.json"
+    "host/host-recall.json",
+    "bundle-check.json",
+    "bundle-flow.txt"
   ],
   "build_identity_note": "Build scripts mark tracked documentation changes as +modified. Production crate sources match the committed product head; no crate edits followed final commit."
 }

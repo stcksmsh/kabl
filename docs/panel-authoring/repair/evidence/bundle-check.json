@@ -1,0 +1,43 @@
+{
+  "bundle": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10711-8087-7782-9c2b-0f726c115470/d10-repair-owner-test",
+  "product_head": "5f7622a1aa9f44746e1f9d7a33a3c3ec3f9f8730",
+  "manifest_hashes_passed": true,
+  "factory_sounds": 19,
+  "standalone": [
+    {
+      "mode": "normal",
+      "factory_card_hits": [
+        "sound:factory:composition",
+        "sound:factory:crowded",
+        "sound:factory:echo",
+        "sound:factory:expressive/lead",
+        "sound:factory:expressive/split",
+        "sound:factory:init-keyboard",
+        "sound:factory:interlocking",
+        "sound:factory:palette/bass",
+        "sound:factory:palette/breath",
+        "sound:factory:palette/lead",
+        "sound:factory:palette/pad",
+        "sound:factory:palette/perc",
+        "sound:factory:palette/strings",
+        "sound:factory:performance",
+        "sound:factory:recipes/filter-movement",
+        "sound:factory:recipes/pluck-to-pad",
+        "sound:factory:reference",
+        "sound:factory:sequence",
+        "sound:factory:sound-palette"
+      ],
+      "embedded_faces_recalled": true,
+      "mapped_binary": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10711-8087-7782-9c2b-0f726c115470/d10-repair-owner-test/bin/kabl-ui"
+    },
+    {
+      "mode": "unavailable",
+      "factory_card_hits": [],
+      "embedded_faces_recalled": true,
+      "mapped_binary": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10711-8087-7782-9c2b-0f726c115470/d10-repair-owner-test/bin/kabl-ui"
+    }
+  ],
+  "complete_REAPER_state_native_replay_passed": true,
+  "unavailable_factory_library_host": true,
+  "input": "scripted private X11; not physical owner acceptance"
+}

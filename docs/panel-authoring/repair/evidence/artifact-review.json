@@ -1,0 +1,11 @@
+{
+  "reviewer": "/root/d10_repair_review",
+  "status": "pass",
+  "production_head": "5f7622a1aa9f44746e1f9d7a33a3c3ec3f9f8730",
+  "artifact_head_reviewed": "88ca98e61bd022fc01fff502e2ed01a57f0c6d74",
+  "manifest_hashes_checked": 204,
+  "production_delta": false,
+  "actionable_findings": [],
+  "subsequent_changes": "Package status correction, documentation/video size metadata and final proof files only; bundled docs/manifest refreshed without changing binaries or projects.",
+  "owner_disposition": "changes requested"
+}
