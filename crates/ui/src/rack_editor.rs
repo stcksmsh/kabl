@@ -526,7 +526,7 @@ pub(crate) fn edit_face(editor: &mut PatchEditor, view: &mut UiState, ctx: &egui
         for n in 0..order.len() {
             let index=order[n];let p=&info.params[index];if rack::face_name(info,p.name)!=p.name {continue;}
             ui.horizontal(|ui|{
-                let r=ui.checkbox(&mut visible[index],p.name);view.record(format!("face:{id}:{}",p.name),r.rect);
+                let r=ui.checkbox(&mut visible[index],routing::param_label(p));view.record(format!("face:{id}:{}",p.name),r.rect);
                 let r=ui.add_enabled(n>0,egui::Button::new("↑"));view.record(format!("face:up:{id}:{}",p.name),r.rect);if r.clicked(){order.swap(n,n-1);}
                 let r=ui.add_enabled(n+1<order.len(),egui::Button::new("↓"));view.record(format!("face:down:{id}:{}",p.name),r.rect);if r.clicked(){order.swap(n,n+1);}
             });
