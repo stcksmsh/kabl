@@ -26,6 +26,8 @@ pub mod panels;
 pub mod perform;
 pub mod rack;
 mod rack_editor;
+mod wheel;
+use wheel::OwnedScroll;
 pub mod recipes;
 pub mod record;
 pub mod routing;
@@ -514,6 +516,7 @@ impl UiState {
 /// Draws the rack editor for one frame and applies user edits to `editor` directly. Call once
 /// per frame from `eframe::App::ui`.
 pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
+    wheel::begin(ui.ctx());
     ui.ctx().set_visuals(theme(ui_state.dark).visuals());
     composites::panel(editor, ui_state, ui.ctx());
     panels::editor(editor, ui_state, ui.ctx());
@@ -683,7 +686,7 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                     egui::ScrollArea::vertical()
                         .id_salt("kabl-recipes")
                         .max_height(h)
-                        .show(ui, |ui| {
+                        .show_owned(ui, |ui| {
                             ui.set_max_width(DRAWER_W - 24.0);
                             egui::Frame::group(ui.style()).show(ui, |ui| {
                                 recipes::panel(editor, ui_state, ui, now);
@@ -697,12 +700,12 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                     egui::ScrollArea::vertical()
                         .id_salt("kabl-explain")
                         .max_height(h)
-                        .show(ui, |ui| {
+                        .show_owned(ui, |ui| {
                             ui.set_max_width(DRAWER_W - 24.0);
                             explain::panel(editor, ui_state, ui);
                         });
                 }
-                egui::ScrollArea::vertical().show(ui, |ui| {
+                egui::ScrollArea::vertical().show_owned(ui, |ui| {
                     // Rows wrap instead of widening the drawer over the rack.
                     ui.set_max_width(DRAWER_W - 24.0);
                     if ui_state.inspect.open {
@@ -1253,23 +1256,6 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         }
     }
 
-    // Wheel pans, Ctrl+wheel / pinch zooms about the pointer.
-    let pointer = ui.input(|i| i.pointer.hover_pos());
-    if let Some(p) = pointer.filter(|p| {
-        canvas.contains(*p)
-            && ui_state.expanded.is_empty()
-            && ui_state.panels.fallback.is_none()
-            && ui_state.panels.selected.is_none()
-            && ui_state.choose.is_none()
-            && ui_state.moving.is_none()
-    }) {
-        let (scroll, zd) = ui.input(|i| (i.smooth_scroll_delta, i.zoom_delta()));
-        if zd != 1.0 {
-            ui_state.zoom_about(ui_state.zoom * zd, p);
-        } else if scroll != EguiVec2::ZERO {
-            ui_state.pan += scroll;
-        }
-    }
     let bg = ui.interact(canvas, Id::new("kabl-canvas-bg"), Sense::click_and_drag());
     if bg.dragged()
         && ui_state.port_drag.is_none()
@@ -1298,39 +1284,6 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     let xf = ui_state.xf();
     let painter = ui.painter_at(canvas);
     draw_rails(&painter, th, xf, canvas, lay.rows.max(1));
-    if let Some(mv) = &ui_state.moving {
-        let plan = rack_editor::drop_plan(&lay, mv.item, pos2(mv.live.x, mv.live.y), mv.width);
-        if let Some((_, r)) = plan.iter().find(|(i, _)| *i == mv.item) {
-            let screen = xf.r(*r);
-            ui_state.record("rack:drop-preview".into(), screen);
-            painter.rect_filled(screen, 3., th.sel.gamma_multiply(0.15));
-            painter.rect_stroke(
-                screen,
-                3.,
-                Stroke::new(2., th.sel),
-                egui::StrokeKind::Inside,
-            );
-        }
-        let next = Rect::from_min_size(
-            pos2(rack::RACK_X, rack::row_y(lay.rows)),
-            vec2(600., PANEL_H),
-        );
-        painter.rect_stroke(
-            xf.r(next),
-            3.,
-            Stroke::new(1., th.rail_hi),
-            egui::StrokeKind::Inside,
-        );
-        text(
-            &painter,
-            xf.p(next.left_top() + vec2(12., 22.)),
-            egui::Align2::LEFT_TOP,
-            "Drop into next row · drag near edge to scroll",
-            12. * xf.zoom,
-            th.ctext,
-            false,
-        );
-    }
 
     let focused_at_frame_start = !ui_state.expanded.is_empty();
     let lifted_at_frame_start = ui_state.moving.is_some();
@@ -1402,6 +1355,40 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             );
             painter.extend(std::mem::take(&mut ui_state.deferred));
         }
+    }
+
+    if let Some(mv) = &ui_state.moving {
+        let plan = rack_editor::drop_plan(&lay, mv.item, pos2(mv.live.x, mv.live.y), mv.width);
+        if let Some((_, r)) = plan.iter().find(|(i, _)| *i == mv.item) {
+            let screen = xf.r(*r);
+            ui_state.record("rack:drop-preview".into(), screen);
+            painter.rect_filled(screen, 3., th.sel.gamma_multiply(0.15));
+            painter.rect_stroke(
+                screen,
+                3.,
+                Stroke::new(2., th.sel),
+                egui::StrokeKind::Inside,
+            );
+        }
+        let next = Rect::from_min_size(
+            pos2(rack::RACK_X, rack::row_y(lay.rows)),
+            vec2(600., PANEL_H),
+        );
+        painter.rect_stroke(
+            xf.r(next),
+            3.,
+            Stroke::new(1., th.rail_hi),
+            egui::StrokeKind::Inside,
+        );
+        text(
+            &painter,
+            xf.p(next.left_top() + vec2(12., 22.)),
+            egui::Align2::LEFT_TOP,
+            "Drop into next row · drag near edge to scroll",
+            12. * xf.zoom,
+            th.ctext,
+            false,
+        );
     }
 
     if let Some(mv) = ui_state.moving.as_ref().filter(|_| lifted_at_frame_start) {
@@ -1507,6 +1494,29 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     if ui_state.flash.is_some_and(|(_, _, t)| now - t < 1.6) {
         ui.ctx()
             .request_repaint_after(std::time::Duration::from_millis(100));
+    }
+    // Children and menus consume first; only an uncovered rack receives the remainder.
+    // Wheel pans, Ctrl+wheel / pinch zooms about the pointer.
+    let pointer = ui.input(|i| i.pointer.hover_pos());
+    if let Some(p) = pointer.filter(|p| {
+        canvas.contains(*p)
+            && ui.rect_contains_pointer(canvas)
+            && !wheel::claimed(ui.ctx())
+            && ui_state.expanded.is_empty()
+            && ui_state.panels.fallback.is_none()
+            && ui_state.panels.selected.is_none()
+            && ui_state.choose.is_none()
+            && ui_state.moving.is_none()
+    }) {
+        let (scroll, zd) = ui.input(|i| (i.smooth_scroll_delta, i.zoom_delta()));
+        if zd != 1.0 {
+            ui_state.zoom_about(ui_state.zoom * zd, p);
+            ui.ctx().request_repaint();
+        } else if scroll != EguiVec2::ZERO {
+            ui_state.pan += scroll;
+            ui.input_mut(|i| i.smooth_scroll_delta = EguiVec2::ZERO);
+            ui.ctx().request_repaint();
+        }
     }
 }
 
@@ -3641,7 +3651,7 @@ fn draw_default_face(
                 }
                 egui::ScrollArea::vertical()
                     .max_height((rect.height() - 80.0).max(100.0))
-                    .show(ui, |ui| {
+                    .show_owned(ui, |ui| {
                         for (&key, e) in &c.ports {
                             let dir = composites::direction(snapshot, &e.target)
                                 .unwrap_or(PortDirection::Input);

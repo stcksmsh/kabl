@@ -1,4 +1,5 @@
 //! Composite face authoring and asset preparation. Called only on UI/control threads.
+use crate::wheel::OwnedScroll;
 use crate::{composites, PatchEditor, UiState};
 use kabl_core::{
     panel::{Artwork, Kind, Panel, Placement},
@@ -233,7 +234,10 @@ pub fn editor(editor: &mut PatchEditor, view: &mut UiState, ctx: &egui::Context)
             return;
         };
         let mut close = false;
-        let modal = egui::Modal::new(egui::Id::new("panel-fallback")).show(ctx, |ui| {
+        let modal = egui::Modal::new(egui::Id::new("panel-fallback"))
+            .area(crate::rack_editor::focused_area(ctx, egui::Id::new("panel-fallback"), 480.))
+            .show(ctx, |ui| {
+            crate::rack_editor::focused_height(ui);
             ui.set_width(480.0_f32.min(ctx.content_rect().width() - 60.));
             ui.horizontal(|ui| {
                 ui.heading(format!("More controls · {}", c.name));
@@ -242,8 +246,8 @@ pub fn editor(editor: &mut PatchEditor, view: &mut UiState, ctx: &egui::Context)
                 close = r.clicked();
             });
             egui::ScrollArea::vertical()
-                .max_height(ctx.content_rect().height() - 200.)
-                .show(ui, |ui| {
+                .max_height(ui.available_height())
+                .show_owned(ui, |ui| {
                     ui.label(&c.help);
                     ui.label(
                         "All exposed controls remain available regardless of artwork or placement.",

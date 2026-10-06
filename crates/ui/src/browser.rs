@@ -10,6 +10,7 @@
 //!   Keyboard sounds sound only from **Play**; pieces open stopped and run from **Start**.
 //! - A failed open or save changes nothing in the editor.
 
+use crate::wheel::OwnedScroll;
 use egui::{Color32, RichText};
 use kabl_core::{PatchLog, PatchState};
 use kabl_engine::patch_engine::{Command, MAX_PREVIEW_NOTES, MAX_PREVIEW_SECS};
@@ -1020,7 +1021,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     egui::ScrollArea::vertical()
         .max_height(list_h)
         .auto_shrink([false, false])
-        .show(ui, |ui| {
+        .show_owned(ui, |ui| {
             let mut last_origin = None;
             let narrowed =
                 !ui_state.browser.query.trim().is_empty() || ui_state.browser.category.is_some();

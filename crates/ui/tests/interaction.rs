@@ -936,7 +936,21 @@ fn focused_controls_own_pointer_and_closing_click_does_not_touch_rack() {
     assert_eq!(t.routes(VCA, "exponential").len(), 1);
     let selected = t.ui.selected_module;
     let pos = t.editor.state().modules[&OUTPUT].pos;
-    let backdrop = egui::pos2(out.left() + 3., out.top() + 3.);
+    let dialog = t.ui.hits["more:dialog"];
+    let backdrop =
+        t.ui.hits
+            .iter()
+            .filter(|(key, _)| key.starts_with("module:"))
+            .flat_map(|(_, rect)| {
+                [
+                    rect.left_top() + egui::vec2(3., 3.),
+                    rect.right_bottom() - egui::vec2(3., 3.),
+                ]
+            })
+            .find(|p| {
+                p.x >= 0. && p.x < t.size.x && p.y > 100. && p.y < t.size.y && !dialog.contains(*p)
+            })
+            .expect("rack target outside growing dialog");
     assert!(!t.ui.hits["more:dialog"].contains(backdrop));
     t.move_to(backdrop);
     t.button(true);

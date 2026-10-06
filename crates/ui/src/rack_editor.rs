@@ -383,6 +383,23 @@ fn external_dependencies(p: &PatchState, id: CompositeId) -> Vec<String> {
     deps.into_iter().collect()
 }
 
+/// Keep a stable top-left origin; Area's previous content size must not cap new content.
+pub(crate) fn focused_area(ctx: &egui::Context, id: Id, width: f32) -> egui::Area {
+    let bounds = ctx.content_rect().shrink(12.);
+    let pos = egui::AreaState::load(ctx, id)
+        .map(|s| s.left_top_pos())
+        .unwrap_or(pos2(bounds.center().x - width * 0.5, bounds.top() + 36.));
+    egui::Area::new(id)
+        .kind(egui::UiKind::Modal)
+        .order(egui::Order::Foreground)
+        .sense(Sense::hover())
+        .fixed_pos(pos)
+        .constrain_to(bounds)
+}
+pub(crate) fn focused_height(ui: &mut egui::Ui) {
+    ui.set_max_height((ui.ctx().content_rect().bottom() - ui.min_rect().top() - 24.).max(64.));
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn more(
     editor: &mut PatchEditor,
@@ -427,75 +444,84 @@ pub(crate) fn more(
     }
     let ctx = ui.ctx().clone();
     let mut close = false;
-    let modal = egui::Modal::new(Id::new("more-controls")).show(&ctx, |ui| {
-        let z = xf.zoom.clamp(0.85, 1.0);
-        ui.set_width((m.full().width() * z + 24.).min(ctx.content_rect().width() - 80.));
-        ui.horizontal(|ui| {
-            ui.heading(format!("More controls · {}", info.name));
-            let r = ui.button("Close");
-            view.record("more:close".into(), r.rect);
-            close = r.clicked();
-        });
-        ui.label("Original knobs, selectors, jacks and routing. Rack layout stays unchanged.");
-        egui::ScrollArea::both()
-            .max_height(ctx.content_rect().height() - 180.)
-            .show(ui, |ui| {
-                let (_, space) = ui.allocate_space(m.full().size() * z);
-                view.record(format!("more:{id}:body"), space.intersect(ui.clip_rect()));
-                let focus = Xf {
-                    origin: space.min - m.full().min.to_vec2() * z,
-                    zoom: z,
-                };
-                let painter = ui.painter_at(space.intersect(ui.clip_rect()));
-                let material = theme::panel_theme(th.dark, info.kind);
-                let mut own = Drawn::default();
-                let now = ui.input(|i| i.time);
-                draw_module(editor, view, ui, &painter, th, focus, &m, now, &mut own);
-                if let Some(adv) = m.adv {
-                    theme::satin(&painter, focus.r(adv), &material);
-                }
-                let look = Look {
-                    z,
-                    ink: material.ink,
-                    ink2: material.ink2,
-                };
-                for c in m.ctls.iter().filter(|c| !c.primary) {
-                    draw_control(
-                        editor, view, ui, &painter, &material, focus, &m, c, look, false, now,
-                        &mut own,
-                    );
-                }
-                let mut both = Drawn {
-                    ports: drawn.ports.clone(),
-                    plugs: own.plugs.clone(),
-                    drop_at: None,
-                };
-                both.ports.extend(own.ports.clone());
-                draw_cables(editor, view, ui, &painter, th, xf, scene, &both, Some(id));
-                painter.extend(std::mem::take(&mut view.deferred));
-                drawn.ports.extend(own.ports);
-                drawn.plugs.extend(own.plugs);
-                if own.drop_at.is_some() {
-                    drawn.drop_at = own.drop_at;
-                }
-                egui::CollapsingHeader::new("Keyboard / exact value entry").show(ui, |ui| {
-                    for c in &m.ctls {
-                        ui.horizontal(|ui| {
-                            ui.label(routing::param_label(c.param));
-                            perform::param_editor(
-                                editor,
-                                view,
-                                ui,
-                                id,
-                                c.param,
-                                false,
-                                Some(format!("more:value:{id}:{}", c.param.name)),
-                            );
-                        });
-                    }
-                });
+    let width =
+        (m.full().width() * xf.zoom.clamp(0.85, 1.0) + 24.).min(ctx.content_rect().width() - 80.);
+    let modal = egui::Modal::new(Id::new("more-controls"))
+        .area(focused_area(&ctx, Id::new("more-controls"), width))
+        .show(&ctx, |ui| {
+            focused_height(ui);
+            let z = xf.zoom.clamp(0.85, 1.0);
+            ui.set_width(width);
+            ui.horizontal(|ui| {
+                ui.heading(format!("More controls · {}", info.name));
+                let r = ui.button("Close");
+                view.record("more:close".into(), r.rect);
+                close = r.clicked();
             });
-    });
+            ui.label("Original knobs, selectors, jacks and routing. Rack layout stays unchanged.");
+            egui::ScrollArea::both()
+                .max_height(ui.available_height())
+                .show_owned(ui, |ui| {
+                    let (_, space) = ui.allocate_space(m.full().size() * z);
+                    view.record(format!("more:{id}:body"), space.intersect(ui.clip_rect()));
+                    let focus = Xf {
+                        origin: space.min - m.full().min.to_vec2() * z,
+                        zoom: z,
+                    };
+                    let painter = ui.painter_at(space.intersect(ui.clip_rect()));
+                    let material = theme::panel_theme(th.dark, info.kind);
+                    let mut own = Drawn::default();
+                    let now = ui.input(|i| i.time);
+                    draw_module(editor, view, ui, &painter, th, focus, &m, now, &mut own);
+                    if let Some(adv) = m.adv {
+                        theme::satin(&painter, focus.r(adv), &material);
+                    }
+                    let look = Look {
+                        z,
+                        ink: material.ink,
+                        ink2: material.ink2,
+                    };
+                    for c in m.ctls.iter().filter(|c| !c.primary) {
+                        draw_control(
+                            editor, view, ui, &painter, &material, focus, &m, c, look, false, now,
+                            &mut own,
+                        );
+                    }
+                    let mut both = Drawn {
+                        ports: drawn.ports.clone(),
+                        plugs: own.plugs.clone(),
+                        drop_at: None,
+                    };
+                    both.ports.extend(own.ports.clone());
+                    draw_cables(editor, view, ui, &painter, th, xf, scene, &both, Some(id));
+                    painter.extend(std::mem::take(&mut view.deferred));
+                    drawn.ports.extend(own.ports);
+                    drawn.plugs.extend(own.plugs);
+                    if own.drop_at.is_some() {
+                        drawn.drop_at = own.drop_at;
+                    }
+                    let entry = egui::CollapsingHeader::new("Keyboard / exact value entry").show(
+                        ui,
+                        |ui| {
+                            for c in &m.ctls {
+                                ui.horizontal(|ui| {
+                                    ui.label(routing::param_label(c.param));
+                                    perform::param_editor(
+                                        editor,
+                                        view,
+                                        ui,
+                                        id,
+                                        c.param,
+                                        false,
+                                        Some(format!("more:value:{id}:{}", c.param.name)),
+                                    );
+                                });
+                            }
+                        },
+                    );
+                    view.record("more:exact".into(), entry.header_response.rect);
+                });
+        });
     view.record("more:dialog".into(), modal.response.rect);
     if close || (modal.should_close() && view.drag.is_none()) {
         view.expanded.clear();
@@ -594,19 +620,33 @@ mod tests {
         v.validate(&e);
         (e, v, a, c)
     }
-    fn frame(ctx: &egui::Context, e: &mut PatchEditor, v: &mut UiState, events: Vec<egui::Event>) {
+    fn frame(
+        ctx: &egui::Context,
+        e: &mut PatchEditor,
+        v: &mut UiState,
+        events: Vec<egui::Event>,
+    ) -> egui::FullOutput {
+        frame_size(ctx, e, v, events, vec2(1440., 900.))
+    }
+    fn frame_size(
+        ctx: &egui::Context,
+        e: &mut PatchEditor,
+        v: &mut UiState,
+        events: Vec<egui::Event>,
+        size: EguiVec2,
+    ) -> egui::FullOutput {
         ctx.begin_pass(egui::RawInput {
-            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1440., 900.))),
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
             events,
             ..Default::default()
         });
         let mut root = egui::Ui::new(
             ctx.clone(),
             Id::new("repair-test"),
-            egui::UiBuilder::new().max_rect(Rect::from_min_size(Pos2::ZERO, vec2(1440., 900.))),
+            egui::UiBuilder::new().max_rect(Rect::from_min_size(Pos2::ZERO, size)),
         );
         show(e, v, &mut root);
-        let _ = ctx.end_pass();
+        ctx.end_pass()
     }
     fn button(p: Pos2, down: bool) -> egui::Event {
         egui::Event::PointerButton {
@@ -627,6 +667,248 @@ mod tests {
         frame(ctx, e, v, vec![button(p, false)]);
         frame(ctx, e, v, vec![]);
     }
+    #[test]
+    fn real_default_child_wheel_never_pans_rack_but_outside_pan_and_zoom_work() {
+        let (mut e, mut v, _, composite) = fixture();
+        let mut c = e.state().composites[&composite].clone();
+        let leaf = *c.members.first().unwrap();
+        for key in 1..=20 {
+            c.controls.insert(
+                key,
+                kabl_core::composite::Exposure {
+                    label: format!("Control {key}"),
+                    target: PortRef::Param {
+                        id: leaf,
+                        param: "cutoff_hz".into(),
+                    },
+                },
+            );
+        }
+        e.restore_to(vec![Op::SetComposite {
+            id: composite,
+            value: Some(c),
+        }]);
+        let ctx = egui::Context::default();
+        for _ in 0..4 {
+            frame(&ctx, &mut e, &mut v, vec![]);
+        }
+        let p = v.hits[&format!("composite:{composite}:control:1")].center();
+        let initial = (v.pan, v.zoom);
+        let before = v.hits[&format!("composite:{composite}:control:1")];
+        let event = |delta, modifiers| egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Point,
+            delta: vec2(0., delta),
+            phase: egui::TouchPhase::Move,
+            modifiers,
+        };
+        frame(&ctx, &mut e, &mut v, vec![egui::Event::PointerMoved(p)]);
+        frame(
+            &ctx,
+            &mut e,
+            &mut v,
+            vec![event(-80., egui::Modifiers::NONE)],
+        );
+        frame(&ctx, &mut e, &mut v, vec![]);
+        assert_ne!(v.hits[&format!("composite:{composite}:control:1")], before);
+        assert_eq!((v.pan, v.zoom), initial);
+        for _ in 0..12 {
+            frame(
+                &ctx,
+                &mut e,
+                &mut v,
+                vec![event(-500., egui::Modifiers::NONE)],
+            );
+        }
+        assert_eq!((v.pan, v.zoom), initial, "child bottom boundary owns wheel");
+        frame(
+            &ctx,
+            &mut e,
+            &mut v,
+            vec![event(-80., egui::Modifiers::CTRL)],
+        );
+        assert_eq!((v.pan, v.zoom), initial, "child owns modifier wheel");
+        let outside = v.canvas.right_top() + vec2(-20., 30.);
+        frame(
+            &ctx,
+            &mut e,
+            &mut v,
+            vec![egui::Event::PointerMoved(outside)],
+        );
+        frame(
+            &ctx,
+            &mut e,
+            &mut v,
+            vec![event(-80., egui::Modifiers::NONE)],
+        );
+        assert_ne!(v.pan, initial.0);
+        frame(
+            &ctx,
+            &mut e,
+            &mut v,
+            vec![event(80., egui::Modifiers::CTRL)],
+        );
+        assert_ne!(v.zoom, initial.1);
+    }
+
+    #[test]
+    fn focused_content_grows_then_scrolls_only_at_viewport_bound() {
+        for size in [vec2(1440., 900.), vec2(1280., 800.)] {
+            let (mut e, mut v, id, _) = fixture();
+            let ctx = egui::Context::default();
+            v.expanded.insert(id);
+            for _ in 0..5 {
+                frame_size(&ctx, &mut e, &mut v, vec![], size);
+            }
+            let before = v.hits["more:dialog"];
+            let rack = (v.pan, v.zoom, v.selected_module, v.selected_composite);
+            let p = v.hits["more:exact"].center();
+            frame_size(
+                &ctx,
+                &mut e,
+                &mut v,
+                vec![egui::Event::PointerMoved(p), button(p, true)],
+                size,
+            );
+            frame_size(&ctx, &mut e, &mut v, vec![button(p, false)], size);
+            for _ in 0..8 {
+                frame_size(&ctx, &mut e, &mut v, vec![], size);
+            }
+            let expanded = v.hits["more:dialog"];
+            assert!(
+                expanded.height() > before.height() + 60.,
+                "{before:?} vs {expanded:?}"
+            );
+            assert_eq!(expanded.min, before.min);
+            assert!(expanded.bottom() <= size.y - 8.);
+            assert!(expanded.contains_rect(v.hits["more:close"]));
+            assert_eq!(
+                rack,
+                (v.pan, v.zoom, v.selected_module, v.selected_composite)
+            );
+        }
+    }
+
+    #[test]
+    fn genuinely_tall_exact_content_is_bounded_and_last_entry_scrolls_into_reach() {
+        let (mut e, mut v, _, _) = fixture();
+        let id = e.add_module("seq", Vec2 { x: 600., y: 10. });
+        let ctx = egui::Context::default();
+        let size = vec2(1280., 800.);
+        v.expanded.insert(id);
+        for _ in 0..5 {
+            frame_size(&ctx, &mut e, &mut v, vec![], size);
+        }
+        let p = v.hits["more:exact"].center();
+        frame_size(
+            &ctx,
+            &mut e,
+            &mut v,
+            vec![egui::Event::PointerMoved(p), button(p, true)],
+            size,
+        );
+        frame_size(&ctx, &mut e, &mut v, vec![button(p, false)], size);
+        for _ in 0..8 {
+            frame_size(&ctx, &mut e, &mut v, vec![], size);
+        }
+        let dialog = v.hits["more:dialog"];
+        assert!(dialog.bottom() <= size.y - 8.);
+        let prefix = format!("more:value:{id}:");
+        let last = v
+            .hits
+            .iter()
+            .filter(|(k, _)| k.starts_with(&prefix))
+            .max_by(|(_, a), (_, b)| a.bottom().total_cmp(&b.bottom()))
+            .map(|(k, r)| (k.clone(), *r))
+            .unwrap();
+        assert!(
+            last.1.bottom() > dialog.bottom(),
+            "tall content genuinely needs scrolling"
+        );
+        let camera = (v.pan, v.zoom);
+        let p = pos2(dialog.left() + 30., dialog.bottom() - 40.);
+        frame_size(
+            &ctx,
+            &mut e,
+            &mut v,
+            vec![egui::Event::PointerMoved(p)],
+            size,
+        );
+        frame_size(
+            &ctx,
+            &mut e,
+            &mut v,
+            vec![egui::Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Point,
+                delta: vec2(0., -5000.),
+                phase: egui::TouchPhase::Move,
+                modifiers: egui::Modifiers::NONE,
+            }],
+            size,
+        );
+        for _ in 0..3 {
+            frame_size(&ctx, &mut e, &mut v, vec![], size);
+        }
+        assert!(
+            v.hits["more:dialog"].contains_rect(v.hits[&last.0]),
+            "dialog {:?}, last {:?}",
+            v.hits["more:dialog"],
+            v.hits[&last.0]
+        );
+        assert!(v.hits["more:dialog"].contains_rect(v.hits["more:close"]));
+        assert_eq!((v.pan, v.zoom), camera);
+    }
+
+    #[test]
+    fn occupied_insertion_is_drawn_above_stationary_panel_below_ghost_and_matches_drop() {
+        let (mut e, mut v, id, _) = fixture();
+        let ctx = egui::Context::default();
+        for _ in 0..3 {
+            frame(&ctx, &mut e, &mut v, vec![]);
+        }
+        let before = e.state().clone();
+        let p = v.hits[&format!("module:{id}")].left_top() + vec2(15., 20.);
+        frame(
+            &ctx,
+            &mut e,
+            &mut v,
+            vec![egui::Event::PointerMoved(p), button(p, true)],
+        );
+        let to = p + vec2(210., 25.);
+        let mut output = frame(&ctx, &mut e, &mut v, vec![egui::Event::PointerMoved(to)]);
+        for _ in 0..3 {
+            output = frame(&ctx, &mut e, &mut v, vec![egui::Event::PointerMoved(to)]);
+        }
+        let preview = v.hits["rack:drop-preview"];
+        let sel = theme(v.dark).sel;
+        let index = output.shapes.iter().position(|s| matches!(&s.shape, egui::epaint::Shape::Rect(r) if r.rect == preview && r.stroke.width == 2. && r.stroke.color == sel)).expect("visible insertion stroke");
+        let neighbour = composite_layout(e.state(), &v)
+            .faces
+            .values()
+            .next()
+            .copied()
+            .unwrap();
+        let neighbour = v.xf().r(neighbour);
+        assert!(preview.intersects(neighbour), "occupied destination");
+        let stationary = output.shapes.iter().position(|s| matches!(&s.shape, egui::epaint::Shape::Text(t) if t.galley.text().contains("Voice · #"))).expect("stationary panel");
+        assert!(index > stationary, "preview painted over stationary panel");
+        let live = v.moving.as_ref().unwrap();
+        let ghost = v.xf().r(Rect::from_min_size(
+            pos2(live.live.x, live.live.y),
+            vec2(live.width, PANEL_H),
+        ));
+        let lifted = output
+            .shapes
+            .iter()
+            .rposition(|s| matches!(&s.shape, egui::epaint::Shape::Rect(r) if r.rect == ghost))
+            .expect("foreground ghost");
+        assert!(lifted > index, "ghost stays above insertion");
+        frame(&ctx, &mut e, &mut v, vec![button(to, false)]);
+        let placed = composite_layout(e.state(), &v);
+        assert_eq!(v.xf().r(placed.get(id).unwrap().face), preview);
+        e.undo();
+        assert_eq!(e.state(), &before);
+    }
+
     #[test]
     fn dropped_composite_moves_only_own_position_one_undo() {
         let (mut e, v, _, id) = fixture();
