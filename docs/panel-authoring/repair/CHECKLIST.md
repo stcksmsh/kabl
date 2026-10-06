@@ -1,5 +1,17 @@
 # Kosta's repaired UI checks
 
+## Final retest priorities
+
+Owner disposition is **changes requested** until Kosta reviews these fixes. Use the new d10-final-owner-test bundle and compare [real scripted video](final/media/final-interactions.mp4); previous working projects and libraries are untouched.
+
+- Open native More and Keyboard / exact value entry. Confirm the window grows and shrinks in place when content fits, with readable labels and original exact-entry values.
+- Use a tall module and smaller/native-scaled viewport. Confirm only genuinely overflowing content scrolls, with Close fixed and the last setting reachable.
+- Wheel Default voice #3 through its top/bottom boundaries. Confirm only inner contents move; rack, parent and camera stay still. Check authored Public controls and nested menus too.
+- Wheel outside the child on uncovered rack. Confirm ordinary pan and modifier zoom still work, alongside existing control/keyboard gestures.
+- Drag over occupied panels and between neighbours. Confirm the visible insertion rectangle sits above stationary panels/cables and below the lift, and exactly matches final position/width. Check Escape, edge scrolling and one Undo per drop.
+
+The preset/sequence bank, searchable Sequences category and Perform setups remain a separate follow-up. Hardware/listening/latency/feel and inherited render/performance limits remain pending; engineering checks do not approve owner interaction quality.
+
 Owner disposition is **changes requested**. These boxes remain unchecked until Kosta reports hands-on results.
 
 - [ ] Run the new normal launch.sh. Confirm Sounds has factory presets; confirm your own library edits remain available. Keep the previous bundle/project intact.

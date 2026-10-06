@@ -1,5 +1,13 @@
 # Interaction and material repair
 
+## Final interaction adjustment
+
+More now measures available height from the viewport rather than the modal's previous size. Its top-left origin stays stable; one capped scroll body contains the native face and exact-entry section, with Close above it. Authored Public controls shares the viewport/position policy.
+
+Owned scroll regions consume leftover smooth wheel delta at boundaries using exact allocated, clipped, topmost bounds. The rack reads remaining input after children and menus. Modifier zoom is available on uncovered rack, while an inner scroll region owns wheel gestures under its pointer. Keyboard and original native control code remain intact.
+
+Insertion is a presentation layer after stationary panels/cables/badges and before the lifted ghost. Both the preview and drop still use the existing drop plan, so this correction changes visibility rather than accepted drag geometry or packing semantics.
+
 The rack uses one visible scene containing native modules and direct child composite faces. Root excludes owned leaves; a subpatch shows only its direct members and direct child faces. Composite movement updates its own position and leaves all stored leaf positions untouched. The existing editor and flat synthesis graph remain the source of sound and chronological history.
 
 Each item body shares selection and drag ownership. Controls, jacks and buttons register their own gestures; the default card title disables selectable text so title drag reaches the item. A drag records the original displayed rectangle, width and exact pointer offset. The document stays unchanged while a disabled foreground copy follows the pointer freely, with reduced opacity and a small shadow. The original scene leaves a faint placeholder. A legal preview inserts at neighbour centres, retaining gaps where possible and shifting only the destination row when needed. Drop writes the resolved positions as one Group; Escape suppresses the drop. Stored horizontal positions and scene coordinates use the same rule, avoiding the six-point preview/drop drift found in independent review. Edge scrolling moves only the camera and the new-row destination appears only during dragging.

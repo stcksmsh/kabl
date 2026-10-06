@@ -1,0 +1,125 @@
+{
+  "binary": "/secondary/Programming/Github/kabl/.worktrees/d10/scratch/d10-final/final-kabl-ui",
+  "sha256": "c6f9650f36d558a2f0ecf11c79fab7ca6d44a0630faf5bb87d5545e8331aecc1",
+  "input": "Scripted private X11 input; not owner or physical hardware acceptance.",
+  "video": "1600x1000 private surface contains complete 1440x900 client",
+  "cases": [
+    {
+      "logical_size": "1440x900",
+      "native_scale": 1.0,
+      "closed_dialog": [
+        491.0,
+        48.0,
+        962.0,
+        419.0
+      ],
+      "expanded_dialog": [
+        491.0,
+        48.0,
+        962.0,
+        551.0
+      ],
+      "stable_origin": true,
+      "exact_entry_base_hz": 250,
+      "genuine_overflow_body_scrolled_with_Close_fixed": true,
+      "rack_unchanged_by_sections": true,
+      "default_child_motion_parent_stationary": true,
+      "top_bottom_boundary_parent_stationary": true,
+      "child_blocks_modifier_zoom": true,
+      "authored_more_parent_stationary": true,
+      "menu_parent_stationary": true,
+      "outside_rack_pan_and_modifier_zoom": true,
+      "preview": [
+        897.0,
+        92.0,
+        1044.0,
+        330.0
+      ],
+      "committed": [
+        897.0,
+        92.0,
+        1044.0,
+        330.0
+      ],
+      "preview_matches_committed": true
+    },
+    {
+      "logical_size": "1280x800",
+      "native_scale": 1.0,
+      "closed_dialog": [
+        411.0,
+        48.0,
+        882.0,
+        419.0
+      ],
+      "expanded_dialog": [
+        411.0,
+        48.0,
+        882.0,
+        551.0
+      ],
+      "stable_origin": true,
+      "exact_entry_base_hz": 250,
+      "genuine_overflow_body_scrolled_with_Close_fixed": true,
+      "rack_unchanged_by_sections": true,
+      "default_child_motion_parent_stationary": true,
+      "top_bottom_boundary_parent_stationary": true,
+      "child_blocks_modifier_zoom": true,
+      "authored_more_parent_stationary": true,
+      "menu_parent_stationary": true,
+      "outside_rack_pan_and_modifier_zoom": true,
+      "preview": [
+        763.0,
+        99.0,
+        888.0,
+        301.0
+      ],
+      "committed": [
+        763.0,
+        99.0,
+        888.0,
+        301.0
+      ],
+      "preview_matches_committed": true
+    },
+    {
+      "logical_size": "1280x800",
+      "native_scale": 1.5,
+      "closed_dialog": [
+        411.0,
+        48.0,
+        883.0,
+        419.0
+      ],
+      "expanded_dialog": [
+        411.0,
+        48.0,
+        883.0,
+        549.0
+      ],
+      "stable_origin": true,
+      "exact_entry_base_hz": 250,
+      "genuine_overflow_body_scrolled_with_Close_fixed": true,
+      "rack_unchanged_by_sections": true,
+      "default_child_motion_parent_stationary": true,
+      "top_bottom_boundary_parent_stationary": true,
+      "child_blocks_modifier_zoom": true,
+      "authored_more_parent_stationary": true,
+      "menu_parent_stationary": true,
+      "outside_rack_pan_and_modifier_zoom": true,
+      "preview": [
+        763.0,
+        99.0,
+        888.0,
+        301.0
+      ],
+      "committed": [
+        763.0,
+        99.0,
+        888.0,
+        301.0
+      ],
+      "preview_matches_committed": true
+    }
+  ]
+}

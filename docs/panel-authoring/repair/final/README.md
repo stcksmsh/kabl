@@ -1,0 +1,15 @@
+# Final D10 interaction repair
+
+Kosta likes the other repaired UI, but owner acceptance remains **changes requested** until these final interactions are reviewed. This submission fixes More sizing, exclusive wheel ownership and occupied-row insertion visibility on existing PR #13. No merge, content-bank production or D11 launch is authorized.
+
+Production source, tested and independent source-reviewed head is `35eed79956dd702e0a62cd80be534d5c34dc9632`. Final submitted and packaged artifact heads are recorded in the new owner bundle's submission.json; documentation/evidence commits do not change production source. The previous submissions and owner bundles remain intact.
+
+Watch [final-interactions.mp4](media/final-interactions.mp4). This is real application output with scripted input on a private X11 display, not owner or physical-hardware evidence. It shows More growing and shrinking without shifting its origin, original exact entry, genuinely tall sequencer content scrolling at the viewport cap with Close fixed, Default voice scrolling through both boundaries while the rack stays stationary, authored Public controls, a native context menu and Pin to Perform submenu, uncovered rack pan/modifier zoom, and an insertion over occupied neighbours followed by the exact matching drop and Undo.
+
+The video captures a 1600×1000 private surface containing the complete 1440×900 client. Matching cases run at 1280×800 and native 1.5 scaling (1280×800 logical, 1920×1200 raster). Fit-case captures show the complete expanded controls without scrolling; overflow captures use an existing native sequencer added only to the task-owned test fixture. Both themes remain unchanged. Binary hashes, actual dialog rectangles, drop preview/commit rectangles and case results are in evidence/interaction.json. exercise.py owns only its private display/profile/project copies.
+
+The new `d10-final-owner-test` bundle uses final release binaries, ships 19 factory Sounds, keeps unavailable-library verification in an explicit launcher and preserves earlier owner projects/libraries. Its normal launcher respects KABL_USER_DIR and otherwise checks prior bundle resource directories before normal application discovery. No owner library contents are copied or replaced.
+
+Read the parent [REPORT](../REPORT.md), [REVIEW](../REVIEW.md) and [CHECKLIST](../CHECKLIST.md). evidence/verification.json names authoritative final checks and exact reused evidence. Earlier development probes are not final acceptance evidence. Source review, engineering verification, owner approval and merge are separate dispositions.
+
+The curated preset/sequence bank, searchable Sequences category and useful Perform setups are recorded as a separate follow-up in docs/PRODUCT-PLAN.md. This repair does not implement that content work. Hardware listening, physical controller/latency/feel/xruns, ordinary-render nondeterminism and dense-editor/backend limits remain pending.

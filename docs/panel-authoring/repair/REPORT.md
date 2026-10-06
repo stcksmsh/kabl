@@ -1,5 +1,19 @@
 # D10 hands-on repair report
 
+## Final retest repair — 2026-10-06
+
+Current production source is **35eed79956dd702e0a62cd80be534d5c34dc9632**, following submission d0d47955515b7038992c57b552a86b2fe915d494 and first repair product 5f7622a1aa9f44746e1f9d7a33a3c3ec3f9f8730. Read [final evidence](final/README.md) and final/evidence/verification.json for current checks. Earlier sections below preserve the first repair's exact provenance.
+
+More inherited the previous Area height as its available layout height. A stable top-left modal origin and an explicit remaining viewport height now allow the single scrolling body to grow with expanded sections. Content that fits does not need scrolling; genuinely tall content caps at viewport bounds and scrolls once. Close stays outside that body. The helper is shared by native More and authored Public controls. Section transitions preserve rack geometry, camera and selection.
+
+Rack wheel panning previously ran before children could consume input, and egui scroll areas leave residual wheel delta at a boundary. A shared owned-scroll wrapper delegates normal egui behavior, then consumes the hovered region's remainder even at its boundary. Exact allocated bounds, clipping and layer hit testing prevent hidden children or surrounding padding from stealing input. All explicit app scroll areas use this path. The rack handles remaining wheel/pinch only after child rendering and only on its uncovered canvas. Modifier wheel inside a scroll child stays with that child; modifier zoom and ordinary pan work on uncovered rack. Existing native/custom controls and keyboard entry paths remain unchanged.
+
+The insertion indicator was painted before stationary panels and cables, which covered it. It now paints after stationary panel/cable/badge output and before the foreground lifted ghost. The indicator uses the same drop_plan rectangle as commit; no snapping, packing, pointer-grab, cancellation, edge-scroll or Undo behavior was redesigned.
+
+Five focused regressions cover fit-content growth at both sizes, genuine tall-content scrolling with reachable last entry/Close, nested scroll motion and both boundaries, a real default-face child versus rack pan/modifier zoom, and output-shape order plus preview/drop/Undo geometry. A fresh independent reviewer passes affected source and all 16 focused tests at the exact product head. Actual scripted cases additionally cover native 1.5 scaling, original parsed exact entry, default/authored composites, native/nested menus and occupied insertion. Unaffected earlier theme/navigation/visibility/native-lane proofs are reused only at their recorded heads, not relabeled as new owner approval.
+
+A fresh final owner bundle preserves both older bundles and owner resources. The curated preset/sequence bank, searchable Sequences category and useful Perform setups are separate product follow-up records; no content bank is produced here. Owner disposition remains **changes requested**. Hardware/listening/latency/feel and inherited render/performance limits remain open.
+
 Owner disposition remains **changes requested**. Kosta must review the repaired UI before owner acceptance can change. PR #13 remains the existing draft repair submission; it is not merged, and no D11 launch is authorized. The previous owner bundle, evidence, projects and libraries remain intact.
 
 ## Exact provenance

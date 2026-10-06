@@ -257,6 +257,10 @@ Acceptance: encapsulate/open/duplicate/undo/save/reload; sound matches the origi
 
 ### D10 — Custom panel authoring and sharing
 
+Final interaction repair requested 2026-10-06: More must grow with exact-entry content, wheel gestures must belong exclusively to the hovered child or uncovered rack, and occupied-row insertion previews must stay above stationary panels/cables. These fixes remain on PR #13; owner disposition stays changes requested until Kosta reviews them.
+
+Separate follow-up requested by Kosta: a curated preset and sequence bank, a searchable Sequences category, and useful Perform setups. Record and scope this content/browser work separately after D10 review; it is not authorized content-bank production in this final repair. No D11 launch is implied.
+
 Hands-on repair 2026-10-06: owner disposition is changes requested. Shared item dragging, scoped internals, focused controls, native face visibility/order, warm light chrome and factory-enabled normal packaging are repaired on the existing D10 PR; [repair report](panel-authoring/repair/REPORT.md) records exact validation and pending owner review. No merge or D11 launch is authorized.
 
 Earlier implementation verified 2026-10-06 on codex/d10-panel-authoring. Real GUI/package/scaling and source-free REAPER evidence, independent review, exact heads and owner limits are indexed in [panel-authoring/REPORT.md](panel-authoring/REPORT.md). Draft submission is separate from owner approval or merge.

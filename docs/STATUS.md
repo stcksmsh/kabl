@@ -1,5 +1,12 @@
 # Status
 
+## D10 final interaction submission — 2026-10-06
+
+Kosta likes the other repaired UI, but owner acceptance remains **changes requested** until More sizing, exclusive wheel ownership and occupied insertion visibility are reviewed. Production source/tested/reviewed/build head is 35eed79956dd702e0a62cd80be534d5c34dc9632; exact submitted/package artifact head is recorded in the new bundle submission.json. [Final repair evidence](panel-authoring/repair/final/README.md) records current checks separately from earlier provenance. Existing draft PR #13, isolated owned .worktrees/d10, no merge or D11 launch.
+
+New owner bundle: /home/stcksmsh/.codex/visualizations/2026/10/04/01a10711-8087-7782-9c2b-0f726c115470/d10-final-owner-test. Earlier bundles/projects/libraries, root checkout, .ai, other worktrees and existing host sessions are preserved. Curated presets/sequences, searchable Sequences and Perform setups are recorded as a separate follow-up in PRODUCT-PLAN.md; no content production here. Physical hardware/listening/latency/feel and inherited ordinary-render/dense-editor/backend limits remain pending.
+
+
 D10 hands-on repair remains on draft PR #13, unmerged. Owner disposition: changes requested. Exact repair/source/package evidence is indexed in [panel-authoring/repair/REPORT.md](panel-authoring/repair/REPORT.md). Previous owner files and evidence remain preserved; no D11 launch is authorized.
 
 ## D10 panel authoring — 2026-10-06

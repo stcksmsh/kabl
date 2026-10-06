@@ -1,5 +1,7 @@
 # D10 hands-on repair
 
+Current final interaction repair: [final/README.md](final/README.md). More sizing, wheel ownership and occupied insertion now have separate current evidence; earlier evidence below remains historical. Owner acceptance stays changes requested.
+
 Kosta requested this repair after using the first D10 bundle. Owner disposition is **changes requested** until Kosta reviews the repaired interactions and finish. Earlier engineering checks, screenshots and bundle remain historical evidence; they do not approve this repair.
 
 Start with [REPORT.md](REPORT.md), [REVIEW.md](REVIEW.md) and [CHECKLIST.md](CHECKLIST.md). [design.md](design.md) explains the shared UI paths and preserved identity contracts. All images and videos here are real application output driven by scripted input on private X11 displays, not design mockups or owner/hardware evidence.
