@@ -1,0 +1,26 @@
+{
+  "reviewer": "/root/d10_final_review",
+  "status": "pass",
+  "production_head": "35eed79956dd702e0a62cd80be534d5c34dc9632",
+  "artifact_head_reviewed": "cdf15b7f1632fa912a285c0aeea975eb4c559cd6",
+  "manifest_hashes_checked": 259,
+  "profile_correction": "Reviewed proper [reaper] Linux vstpath/vstpath64 pointing to new bundle-owned empty directory. Manifest includes corrected profile bytes. Only documentation/generation script records follow.",
+  "old_manifest_files_preserved": {
+    "d10-owner-test": 13,
+    "d10-repair-owner-test": 16
+  },
+  "frozen_video_sha256_matches": true,
+  "viewport_scale_cases": 3,
+  "normal_factory_sounds": 19,
+  "unavailable_factory_sounds": 0,
+  "full_two_instance_f32_state_equal": true,
+  "closed_editor_replay_times": [
+    2,
+    6,
+    13
+  ],
+  "native_tolerance": 0.025,
+  "actionable_findings": [],
+  "after_review": "Final docs/evidence and static manifest refresh only; no product binary/project change.",
+  "owner_disposition": "changes requested"
+}

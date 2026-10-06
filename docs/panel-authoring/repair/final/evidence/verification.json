@@ -191,7 +191,14 @@
     "input": "Scripted private X11 input; not owner or physical hardware acceptance."
   },
   "package": {
-    "status": "pending separate relocated check",
-    "bundle": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10711-8087-7782-9c2b-0f726c115470/d10-final-owner-test"
+    "status": "passed",
+    "bundle": "/home/stcksmsh/.codex/visualizations/2026/10/04/01a10711-8087-7782-9c2b-0f726c115470/d10-final-owner-test",
+    "normal_factory_sounds": 19,
+    "unavailable_factory_sounds": 0,
+    "manifest_hashes_passed": true,
+    "complete_REAPER_f32_state_native_replay_passed": true,
+    "independent_artifact_review": "passed at cdf15b7f1632fa912a285c0aeea975eb4c559cd6 with reviewed new-bundle profile correction",
+    "old_owner_bundles_projects_libraries": "untouched",
+    "cold_scan_attempt": "Initial private host startup scanned global VSTs and reached only the2s replay before55s deadline. Retained separately. Correct Linux vstpath in new profile [reaper] points to bundle-owned empty directory; unchanged55s/full-state/native0.025 checks then passed."
   }
 }
