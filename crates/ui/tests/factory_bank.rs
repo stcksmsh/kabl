@@ -76,6 +76,9 @@ fn purpose_filters_preserve_legacy_metadata_and_user_saves() {
     let keys = lib.get("factory:palette/keys").unwrap().clone();
     assert!(keys.matches("sounds pluck bright"));
     assert!(!keys.matches("sequences"));
+    let piece = lib.get("factory:sound-palette").unwrap();
+    assert!(piece.matches("104bpm"));
+    assert!(!piece.matches("112bpm"));
     let log = lib.read(&keys.id).unwrap();
     let user = lib
         .save(
