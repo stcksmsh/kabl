@@ -79,6 +79,24 @@ impl H {
     }
 
     fn click(&mut self, key: &str) {
+        let previous_query = self.ui.browser.query.clone();
+        if let Some(id) = key
+            .strip_prefix("sound:")
+            .or_else(|| key.strip_prefix("fav:"))
+        {
+            self.ui.browser.query = self
+                .ui
+                .library
+                .as_ref()
+                .unwrap()
+                .get(id)
+                .unwrap()
+                .meta
+                .name
+                .clone();
+            self.frame();
+            self.frame();
+        }
         let p = self
             .ui
             .hits
@@ -98,6 +116,11 @@ impl H {
             self.frame();
         }
         self.frame();
+        if key.starts_with("sound:") || key.starts_with("fav:") {
+            self.ui.browser.query = previous_query;
+            self.frame();
+            self.frame();
+        }
     }
 
     fn key(&mut self, key: Key, modifiers: Modifiers) {

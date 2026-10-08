@@ -300,15 +300,27 @@ fn the_engine_reports_the_lock_state() {
     assert_eq!(status(&e).0, DelayLock::Held);
 }
 
-/// Saved patches hold configuration only: the committed demo is a few kilobytes of op log.
+/// Saved patches hold configuration only, even as editable banks grow the op log.
 #[test]
 fn saved_patch_has_no_audio_history() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/echo");
-    let bytes: u64 = std::fs::read_dir(&dir)
+    let mut files: Vec<_> = std::fs::read_dir(&dir)
         .unwrap()
-        .map(|f| f.unwrap().metadata().unwrap().len())
-        .sum();
-    assert!(bytes < 64 * 1024, "{bytes} bytes");
+        .map(|f| f.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    files.sort();
+    assert_eq!(
+        files,
+        ["checkpoint.json", "log.jsonl", "meta.toml", "sound.toml"]
+    );
+    let saved = kabl_core::load(&dir).unwrap();
+    let collector = Collector::new();
+    let mut engine = PatchEngine::new(&collector.handle(), saved.state(), SR, VOICES).unwrap();
+    let (mut left, mut right) = ([0.0; BLOCK], [0.0; BLOCK]);
+    for _ in 0..SEC {
+        engine.process_block(&mut left, &mut right);
+    }
+    assert_eq!(kabl_core::load(&dir).unwrap().state(), saved.state());
 }
 
 /// Not a check: writes 10 s A/B listening clips of the demo to `target/echo-clips/*.wav`

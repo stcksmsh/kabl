@@ -101,3 +101,4 @@
 {"seq":100,"t_ms":1790267300453,"op":{"SetLabel":{"id":6,"key":"pin.release_ms","text":"Release"}},"inverse":{"SetLabel":{"id":6,"key":"pin.release_ms","text":null}},"source":"User"}
 {"seq":101,"t_ms":1790267300453,"op":{"SetLabel":{"id":9,"key":"pin.gain_db","text":"Level"}},"inverse":{"SetLabel":{"id":9,"key":"pin.gain_db","text":null}},"source":"User"}
 {"seq":102,"t_ms":1790267300453,"op":{"SetLabel":{"id":1,"key":"pin.mode","text":"Keys"}},"inverse":{"SetLabel":{"id":1,"key":"pin.mode","text":null}},"source":"User"}
+{"seq":103,"t_ms":1791470250050,"op":{"SetLabel":{"id":15,"key":"guide","text":"Hold E3-G3-B3-E4; overlap the next chord. Bright opens the tone, Ensemble widens detuning, Bow softens attack, Space adds room. Velocity shapes volume; CC20-23 control macros."}},"inverse":{"SetLabel":{"id":15,"key":"guide","text":null}},"source":"User"}

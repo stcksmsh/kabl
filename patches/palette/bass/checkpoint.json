@@ -634,6 +634,7 @@
       "pin.bpm": "Tempo"
     },
     "2": {
+      "guide": "Open stopped. Run starts the E-minor pulse at 112 BPM. Bass banks: A Line, B Lift, C Hold, D Rest; launch on the next bar. Cutoff, Resonance, Accent and Drive shape the pulse. Stop releases the voice.",
       "name.m1": "Cutoff",
       "name.m2": "Resonance",
       "name.m3": "Accent",

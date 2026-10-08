@@ -1243,6 +1243,10 @@ const PATCHES: [(&str, Builder, bool); 7] = [
     ("sound-palette", piece_patch, true),
 ];
 
+#[allow(dead_code)]
+#[path = "support/factory_bank.rs"]
+mod factory_bank;
+
 fn patch_dir(name: &str) -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../patches")
@@ -1267,7 +1271,8 @@ fn write_palette_patches() {
 fn committed_palette_patches_match_their_builders() {
     for (name, build, _) in PATCHES {
         let saved = kabl_core::load(&patch_dir(name)).unwrap();
-        let built = build();
+        let mut built = build();
+        factory_bank::attach_guide(&mut built, name);
         assert_eq!(saved.state(), built.state(), "{name}");
         let st = saved.state();
         for m in st.modules.values() {

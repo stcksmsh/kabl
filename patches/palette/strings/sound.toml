@@ -5,7 +5,10 @@ tags = [
     "chorus",
     "poly",
     "evolving",
+    "curated",
+    "strings",
+    "ensemble",
 ]
-description = "Animated ensemble strings: two detuned saws, slow bow envelope, vibrato, stereo chorus."
+description = "Hold E3-G3-B3-E4; overlap the next chord. Bright opens the tone, Ensemble widens detuning, Bow softens attack, Space adds room. Velocity shapes volume; CC20-23 control macros."
 keys = true
 sequence = false

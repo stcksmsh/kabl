@@ -459,6 +459,14 @@ pub fn replace_patch(editor: &mut PatchEditor, ui: &mut UiState, log: PatchLog) 
     ui.launches.push(Command::PreviewStop);
     ui.browser.preview_until = None;
     *editor = PatchEditor::from_log(log);
+    if editor
+        .state()
+        .modules
+        .keys()
+        .any(|&id| editor.state().label(id, "guide").is_some())
+    {
+        ui.perform_open = true;
+    }
     // A Load replaces a live patch; the audio host only rebuilds on `take_dirty`.
     editor.mark_dirty();
     ui.loaded = true;
@@ -534,7 +542,7 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
                     let Some(e) = e else { return };
                     replace_patch(editor, ui, log);
                     log::info!(target: "doc", "open ok origin={} editor={}", origin_kind(&id), editor.instance());
-                    ui.load_stopped = e.meta.sequence;
+                    ui.load_stopped = Meta::play_of(editor.state()).1;
                     ui.doc = Some(Doc {
                         name: e.meta.name.clone(),
                         origin: DocOrigin::Library(id),
@@ -921,7 +929,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     }
     let r = ui.add(
         egui::TextEdit::singleline(&mut ui_state.browser.query)
-            .hint_text("Search name, category, tag")
+            .hint_text("Search name, purpose, mood, tempo")
             .desired_width(f32::INFINITY),
     );
     hit(ui_state, "search", &r);
@@ -953,9 +961,15 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         let r = egui::ComboBox::from_id_salt("browser-category")
             .selected_text(current)
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut ui_state.browser.category, None, "Any");
+                let r = ui.selectable_value(&mut ui_state.browser.category, None, "Any");
+                hit(ui_state, "category:Any", &r);
                 for c in CATEGORIES {
-                    ui.selectable_value(&mut ui_state.browser.category, Some(c.to_string()), *c);
+                    let r = ui.selectable_value(
+                        &mut ui_state.browser.category,
+                        Some(c.to_string()),
+                        *c,
+                    );
+                    hit(ui_state, &format!("category:{c}"), &r);
                 }
             });
         hit(ui_state, "category", &r.response);
@@ -966,7 +980,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     let b = &ui_state.browser;
     let visible = |e: &&Entry| {
         e.matches(&b.query)
-            && b.category.as_ref().is_none_or(|c| &e.meta.category == c)
+            && b.category.as_ref().is_none_or(|c| e.meta.in_category(c))
             && match b.filter {
                 Filter::All | Filter::Recent => true,
                 Filter::Favorites => lib.prefs.favorites.contains(&e.id),
@@ -1162,14 +1176,13 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                 badge(ui, &e.meta);
             });
             if !e.meta.description.is_empty() {
-                ui.label(RichText::new(&e.meta.description).small());
+                ui.add(egui::Label::new(RichText::new(&e.meta.description).small()).truncate())
+                    .on_hover_text(&e.meta.description);
             }
             if !e.meta.tags.is_empty() {
-                ui.label(
-                    RichText::new(format!("tags: {}", e.meta.tags.join(", ")))
-                        .small()
-                        .weak(),
-                );
+                let tags = format!("tags: {}", e.meta.tags.join(", "));
+                ui.add(egui::Label::new(RichText::new(&tags).small().weak()).truncate())
+                    .on_hover_text(tags);
             }
         }
         None => {

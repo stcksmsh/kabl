@@ -84,3 +84,4 @@
 {"seq":83,"t_ms":1790267300454,"op":{"SetLabel":{"id":13,"key":"pin.width","text":"Width"}},"inverse":{"SetLabel":{"id":13,"key":"pin.width","text":null}},"source":"User"}
 {"seq":84,"t_ms":1790267300454,"op":{"SetLabel":{"id":10,"key":"pin.gain_db","text":"Level"}},"inverse":{"SetLabel":{"id":10,"key":"pin.gain_db","text":null}},"source":"User"}
 {"seq":85,"t_ms":1790267300454,"op":{"SetLabel":{"id":2,"key":"pin.mode","text":"Keys"}},"inverse":{"SetLabel":{"id":2,"key":"pin.mode","text":null}},"source":"User"}
+{"seq":86,"t_ms":1791470250051,"op":{"SetLabel":{"id":1,"key":"guide","text":"Hold one low note or a wide chord. Breath adds noise, Gust sets motion, Color changes the breath band, Space adds room. Use sparse notes and let the tail decay; CC20-23 control macros."}},"inverse":{"SetLabel":{"id":1,"key":"guide","text":null}},"source":"User"}

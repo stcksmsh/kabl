@@ -26,7 +26,7 @@ fn port(id: ModuleId, port: &str) -> PortRef {
 }
 
 pub fn echo() -> PatchEditor {
-    let mut e = interlocking::interlocking();
+    let mut e = interlocking::interlocking_base();
     for (id, kind) in [
         (CLOCK, "clock"),
         (LFO, "lfo"),
@@ -87,8 +87,16 @@ pub fn echo() -> PatchEditor {
         e.set_param(MIXER, ch, v);
         e.set_param(mixer_r, ch, v);
     }
+    factory_controls::prepare(&mut e, true);
+    factory_bank::attach_guide(&mut e, "echo");
     e
 }
+
+#[path = "support/factory_controls.rs"]
+mod factory_controls;
+#[allow(dead_code)]
+#[path = "support/factory_bank.rs"]
+mod factory_bank;
 
 /// Not a check: writes `patches/echo`.
 /// `cargo test -p kabl-ui --test echo write_echo_patch -- --ignored` (the name filter keeps the

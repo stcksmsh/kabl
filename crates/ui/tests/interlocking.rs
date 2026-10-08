@@ -5,6 +5,12 @@
 use kabl_core::{ModuleId, PortRef, Vec2};
 use kabl_ui::PatchEditor;
 
+#[path = "support/factory_controls.rs"]
+mod factory_controls;
+#[allow(dead_code)]
+#[path = "support/factory_bank.rs"]
+mod factory_bank;
+
 fn port(id: ModuleId, port: &str) -> PortRef {
     PortRef::Module {
         id,
@@ -20,6 +26,13 @@ fn at(x: f32, row: usize) -> Vec2 {
 }
 
 pub fn interlocking() -> PatchEditor {
+    let mut e = interlocking_base();
+    factory_controls::prepare(&mut e, false);
+    factory_bank::attach_guide(&mut e, "interlocking");
+    e
+}
+
+pub fn interlocking_base() -> PatchEditor {
     let mut e = PatchEditor::new();
     let clock = e.add_module("clock", at(24.0, 0));
     let div = e.add_module("clock.div", at(174.0, 0));

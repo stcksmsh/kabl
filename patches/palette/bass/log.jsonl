@@ -168,3 +168,4 @@
 {"seq":167,"t_ms":1790267300454,"op":{"SetLabel":{"id":3,"key":"pin.transpose","text":"Transpose"}},"inverse":{"SetLabel":{"id":3,"key":"pin.transpose","text":null}},"source":"User"}
 {"seq":168,"t_ms":1790267300454,"op":{"SetLabel":{"id":1,"key":"pin.bpm","text":"Tempo"}},"inverse":{"SetLabel":{"id":1,"key":"pin.bpm","text":null}},"source":"User"}
 {"seq":169,"t_ms":1790267300454,"op":{"SetLabel":{"id":12,"key":"pin.gain_db","text":"Level"}},"inverse":{"SetLabel":{"id":12,"key":"pin.gain_db","text":null}},"source":"User"}
+{"seq":170,"t_ms":1791470250051,"op":{"SetLabel":{"id":2,"key":"guide","text":"Open stopped. Run starts the E-minor pulse at 112 BPM. Bass banks: A Line, B Lift, C Hold, D Rest; launch on the next bar. Cutoff, Resonance, Accent and Drive shape the pulse. Stop releases the voice."}},"inverse":{"SetLabel":{"id":2,"key":"guide","text":null}},"source":"User"}

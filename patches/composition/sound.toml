@@ -6,7 +6,13 @@ tags = [
     "cues",
     "evolving",
     "keyboard",
+    "curated",
+    "performance",
+    "112bpm",
+    "e",
+    "minor",
+    "sections",
 ]
-description = "Interlocking sequences that move through sections: pattern banks, cues, a synced LFO and macros."
+description = "Open stopped. Run, then launch Intro, Main, Variation, Breakdown or Return cues on the next bar. Energy, Motion, Space and Glow shape the three layers. Play a single E4-B4 lead over them. CC40-44 launch cues; CC46 toggles Run."
 keys = true
 sequence = true

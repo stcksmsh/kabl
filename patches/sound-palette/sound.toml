@@ -5,7 +5,14 @@ tags = [
     "layers",
     "cues",
     "keyboard",
+    "curated",
+    "performance",
+    "112bpm",
+    "e",
+    "minor",
+    "layered",
+    "sections",
 ]
-description = "The palette voices together: sequenced bass and percussion with section cues, and four keyboard layers on faders."
+description = "Run starts bass and percussion; play E3-B3-E4-G4 for keyboard layers. Launch Air, Pulse, Groove, Lift or Break cues; use layer faders before adding lead. Energy, Motion, Bright and Space vary the arrangement. Stop releases sequences; All notes off clears held keys."
 keys = true
 sequence = true

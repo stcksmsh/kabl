@@ -3,7 +3,12 @@ category = "Piece"
 tags = [
     "sequenced",
     "polyrhythm",
+    "curated",
+    "interlocking arpeggio",
+    "116bpm",
+    "e",
+    "minor",
 ]
-description = "A 7-step bass on 16ths against a 5-step lead on 8ths from one clock."
+description = "Run starts 7-step bass against 5-step arp at 116 BPM in E minor. Launch Pulse, Lift, Sparse or Rest on either bank card. Glow opens tone, Motion speeds the drift, Length sustains notes, Air sharpens the arp."
 keys = false
 sequence = true

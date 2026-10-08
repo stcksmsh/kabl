@@ -723,6 +723,7 @@
       "pin.rate_hz": "Chorus rate"
     },
     "15": {
+      "guide": "Hold E3-G3-B3-E4; overlap the next chord. Bright opens the tone, Ensemble widens detuning, Bow softens attack, Space adds room. Velocity shapes volume; CC20-23 control macros.",
       "name.m1": "Bright",
       "name.m2": "Ensemble",
       "name.m3": "Bow",

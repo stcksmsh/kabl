@@ -109,3 +109,4 @@
 {"seq":108,"t_ms":1790267300453,"op":{"SetLabel":{"id":8,"key":"pin.release_ms","text":"Release"}},"inverse":{"SetLabel":{"id":8,"key":"pin.release_ms","text":null}},"source":"User"}
 {"seq":109,"t_ms":1790267300453,"op":{"SetLabel":{"id":10,"key":"pin.gain_db","text":"Level"}},"inverse":{"SetLabel":{"id":10,"key":"pin.gain_db","text":null}},"source":"User"}
 {"seq":110,"t_ms":1790267300453,"op":{"SetLabel":{"id":2,"key":"pin.mode","text":"Keys"}},"inverse":{"SetLabel":{"id":2,"key":"pin.mode","text":null}},"source":"User"}
+{"seq":111,"t_ms":1791470250050,"op":{"SetLabel":{"id":1,"key":"guide","text":"Hold E3-B3-E4-G4 for at least four seconds. Warmth opens the filter, Evolve deepens motion, Air adds breath, Space adds echo and room. Leave time for the release; CC20-23 control macros."}},"inverse":{"SetLabel":{"id":1,"key":"guide","text":null}},"source":"User"}
