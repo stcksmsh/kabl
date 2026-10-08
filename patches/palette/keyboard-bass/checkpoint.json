@@ -90,7 +90,7 @@
         "y": 750.0
       },
       "params": {
-        "gain_db": -5.0,
+        "gain_db": 7.0,
         "pin.gain_db": 6.0
       }
     },

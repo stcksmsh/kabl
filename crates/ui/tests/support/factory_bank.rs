@@ -94,7 +94,7 @@ pub fn keyboard(bass: bool) -> PatchEditor {
         reverb,
         &[("decay_s", if bass { 0.6 } else { 1.5 }), ("mix", 5.0)],
     );
-    set(&mut e, gain, &[("gain_db", -5.0)]);
+    set(&mut e, gain, &[("gain_db", if bass { 7.0 } else { 3.0 })]);
     let remove: Vec<_> = e
         .state()
         .cables
