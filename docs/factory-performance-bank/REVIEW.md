@@ -12,7 +12,7 @@ I inspected the runtime browser/library/Perform diff, authored builders and bind
 
 2. **[P2] Sound Palette's guide and tempo tag contradict its starting graph.** `crates/ui/tests/support/factory_bank.rs:18` says Run starts bass and percussion and tags the piece `112bpm`. The actual builder has a 104 BPM clock (`crates/ui/tests/sound_palette.rs:1065`) and all four sequencers begin on Rest (`:1080`). Run alone does not start audible sequence playback. Correct the guide to request an appropriate cue after Run, preserve the atmospheric startup, and replace the stale tempo tag in both metadata and embedded guidance where applicable.
 
-Both findings are content/verification issues, not native parameter identity or callback-ownership regressions. Final approval requires their resolution and a recheck at the resulting actual product/content head.
+Both findings are content/verification issues, not native parameter identity or callback-ownership regressions. They were resolved and independently rechecked below.
 
 ## Other Review Results
 
@@ -30,4 +30,14 @@ Owner listening, musical usefulness, controller feel, physical latency/xruns and
 
 ## Final Recheck
 
-Pending fixes, refreshed evidence and final owner bundle.
+Final reviewed product/content head: `07c723fd4983366696a99b1b9d4e7069c636434b`. The first correction landed at `79d71beaeaebe3054adcdfb4cd75e7da7fe61342`; its documentation/artifact checkpoint was `0f78c512218462b048a28ae91bc936b14f1202fe`. Runtime source/binaries remain at `160b3c2b20b8eb1437756f9dd7f090b8acacc0f2`; the intervening changes affect authored content, tests and evidence, not runtime implementation.
+
+Finding 1 is resolved. The long render now applies 25 real runtime layer/send parameter changes at 2/12/24/36/48 seconds. Strings, Pad and Lead receive positive mixer levels overlapping subsequent keyboard phrases; cues still operate actual editable sequencer banks. The schedule is declared in README.md. Refreshed performance metrics record 25 layer changes, 24 macro changes, peak -5.9308 dBFS, RMS -23.9706 dBFS and final-second RMS -95.6128 dBFS. The refreshed preview and editable project accompany the evidence. This establishes the missing gesture coverage, not listening approval.
+
+Finding 2 is resolved. The saved guide accurately describes Rest startup, Run followed by cue selection, keyboard-layer faders and 104 BPM. Metadata now contains only the authored 104 BPM tag, not 112 BPM. The writer removes obsolete BPM tags before applying the authored tempo; the focused regression test asserts positive 104 BPM and negative 112 BPM search results. The initial repair had left the old tag alongside the new one; the final head explicitly corrects that incomplete repair.
+
+Final owner bundle reviewed: `/home/stcksmsh/.codex/visualizations/2026/10/08/01a11be1-c6f3-7fe2-b4e6-f33210e9ea62/factory-bank-owner-test`. At recheck its manifest product/packaged head is `07c723fd4983366696a99b1b9d4e7069c636434b`; its initial packaged checkpoint is retained separately. I independently hashed its 196 immutable payload files against the manifest: zero mismatches. Mutable host/profile/log directories are excluded from immutable payload hashes, as owner launches legitimately change them.
+
+The final portable receipt identifies that actual owner bundle, outside-checkout working directory and successful normal populated browse/open plus separate unavailable-factory complete-state opening/save. REAPER initial/full-restart mapped-plugin receipts identify this owner bundle's `plugins/kabl.clap`; complete f32 state equality and closed-editor native replay remain successful. Final workspace/Clippy logs and verification receipt identify the corrected content head: 653 passes, zero failures, 24 ignored utilities and completed Clippy. The review is based on inspection of those retained execution receipts, not a second reviewer-run full test suite.
+
+No unresolved actionable findings remain within the reviewed engineering/content scope. Final submission may update documentation/receipt heads and copy this review into the same new owner bundle; runtime binaries, factory definitions and audio payload must remain identical to the reviewed content. Listening, hardware and inherited limitations above remain pending or unchanged. This is independent engineering review clearance for draft submission, not merge or owner approval.

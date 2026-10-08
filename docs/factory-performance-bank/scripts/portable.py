@@ -41,7 +41,7 @@ try:
             click('sound:factory:palette/keys');click('open')
             assert any(k.startswith('pcard:') for k in hits())
         else:
-            click('perform')
+            if not any(k.startswith('pcard:') for k in hits()): click('perform')
             assert any(k.startswith('pcue:') for k in hits())
             assert not (bundle/'unavailable-factory').exists()
             click('save');time.sleep(.5)

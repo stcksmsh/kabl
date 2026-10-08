@@ -53,5 +53,7 @@ System requirements: existing Linux audio/GUI runtime libraries and an installed
 head=sp.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip()
 product=sp.check_output(['git','log','-1','--format=%H','--','crates','patches'],cwd=repo,text=True).strip()
 manifest={'starting_head':'23075cd713884903a8985c88ab43bd1817477308','product_head':product,'runtime_build_head':'160b3c2b20b8eb1437756f9dd7f090b8acacc0f2','packaged_head':head,'factory_entries':len(list((root/'factory').rglob('sound.toml'))),'platform':'Linux x86_64','normal_factory':'factory','normal_user_library':'explicit KABL_USER_DIR or normal native/XDG discovery','portability_test':'separate launch-portability-test.sh','files':{str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.rglob('*')) if p.is_file()}}
+manifest['mutable_profile_directories']=['profile','portability-test-profile']
+manifest['files']={name:digest for name,digest in manifest['files'].items() if Path(name).parts[0] not in manifest['mutable_profile_directories']}
 (root/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 print(root)

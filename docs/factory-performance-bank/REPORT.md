@@ -6,7 +6,7 @@ Engineering checks pass for the authorized content scope. Independent review is 
 
 Verified starting origin/master: `23075cd713884903a8985c88ab43bd1817477308`, merged D10 PR #13. No newer master changes were present at pickup. Isolated branch: `codex/factory-performance-bank`; checkout: `/home/stcksmsh/Programming/Github/kabl/.worktrees/factory-performance-bank`. Root master, `.ai`, prior worktrees, owner libraries and existing REAPER sessions were preserved. Private displays, task-owned profiles and separate host processes were used.
 
-Runtime build/source: `160b3c2b20b8eb1437756f9dd7f090b8acacc0f2`. Final authored content/test source: `79d71beaeaebe3054adcdfb4cd75e7da7fe61342`. Later source changes are test-only Clippy fixes, authored factory gain and review repairs to the performance gesture score/guide, not runtime changes. Reviewed head is in REVIEW.md. Exact submitted/packaged heads live in external `manifest.json` and `submission.json`; a commit cannot contain its own final hash. `evidence/verification.json` records binary hashes and checks.
+Runtime build/source: `160b3c2b20b8eb1437756f9dd7f090b8acacc0f2`. Final authored content/test source: `07c723fd4983366696a99b1b9d4e7069c636434b`. Later source changes are test-only Clippy fixes, authored factory gain and review repairs to the performance gesture score/guide/tempo metadata, not runtime changes. Reviewed head is in REVIEW.md. Exact submitted/packaged heads live in external `manifest.json` and `submission.json`; a commit cannot contain its own final hash. `evidence/verification.json` records binary hashes and checks.
 
 ## Inventory and Acceptance
 
@@ -45,6 +45,8 @@ Independent review found two P2 content issues: the initial long take left Strin
 Owner bundle: `/home/stcksmsh/.codex/visualizations/2026/10/08/01a11be1-c6f3-7fe2-b4e6-f33210e9ea62/factory-bank-owner-test`. `./launch.sh` provides bundled factory discovery and preserves explicit KABL_USER_DIR or normal native/XDG user-library behavior. `./launch-reaper.sh` uses installed REAPER, a private profile and local plugin. `./launch-portability-test.sh` is the separate unavailable-library check. Existing Linux GUI/audio libraries and installed REAPER are external requirements. No global plugin install or previous bundle replacement.
 
 Original synthesis follows workspace MIT OR Apache-2.0; font and nice-plug notices are bundled. Remove the bundle to remove its artifacts, not normal user libraries.
+
+The immutable manifest covers binaries, definitions, projects, documentation and audio. Private REAPER and portability-test profiles are writable runtime state, explicitly excluded from immutable hashes. Repeated launches respect persisted view preferences. Final documentation/metadata refresh of this batch's own new bundle preserves its initial packaged identity and never replaces earlier owner bundles; final submission receipt names the exact refreshed head.
 
 Ordinary host-render nondeterminism, declared full warm-up render policy, dense-editor/backend limits and strict CLAP lifecycle/profile assumptions remain inherited. New host evidence proves recall/replay, not deterministic rendering or physical latency. Prior strict-profile evidence remains at `docs/host-production/evidence/strict-profile/`, product `f7157619836075d0d7704e59be5d66e6224890b1`, not relabeled as fresh measurements. D10 evidence is inherited only for untouched behavior; affected browser/Perform frames are refreshed.
 

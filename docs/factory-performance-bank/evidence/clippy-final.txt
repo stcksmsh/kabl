@@ -146,4 +146,4 @@ warning: struct `LinuxEventLoop` is never constructed
 warning: `nice-plug` (lib) generated 21 warnings (run `cargo clippy --fix --lib -p nice-plug` to apply 9 suggestions)
     Checking kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/crates/ui)
     Checking kabl-clap v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/crates/clap)
-    Finished `dev` profile [optimized] target(s) in 2.65s
+    Finished `dev` profile [optimized] target(s) in 8.45s
