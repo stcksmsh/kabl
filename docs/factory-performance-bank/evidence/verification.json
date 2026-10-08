@@ -1,0 +1,52 @@
+{
+  "starting_head": "23075cd713884903a8985c88ab43bd1817477308",
+  "runtime_build_head": "160b3c2b20b8eb1437756f9dd7f090b8acacc0f2",
+  "tested_content_head": "79d71beaeaebe3054adcdfb4cd75e7da7fe61342",
+  "evidence_checkpoint_head": "79d71beaeaebe3054adcdfb4cd75e7da7fe61342",
+  "runtime_source_unchanged_after_build": true,
+  "binary_sha256": {
+    "target/release/kabl-ui": "eb3de41d1bf0102e3ee92e50520696bac811c7b101c3220abb325815624516d7",
+    "target/release/libkabl_clap.so": "80933e3d9f7959c47d77df5a3629ed4723a35086a0faba0fa2035b24693b2d57"
+  },
+  "workspace": {
+    "passed": 653,
+    "failed": 0,
+    "ignored": 24
+  },
+  "validator": {
+    "success": 35,
+    "skipped": 9
+  },
+  "clippy": "workspace/all-target -D warnings passed",
+  "release": "standalone and CLAP passed at runtime_build_head",
+  "curated_entries": 12,
+  "gui_browser_loads": 24,
+  "audio": "12 normal + 12 all-macros-one, 24 seconds each; one editable 72-second performance",
+  "evidence_sha256": {
+    "audio/metrics.json": "1d6af875198b81175ca7c605483cb942b5e587261caba5c9093a1b496be199e2",
+    "audio/performance-metrics.json": "3200b29763312920d7a55a455bf6a77a80ab02f3e69cbafef2c72fc9641e3cba",
+    "audio/previews.json": "f3388db56dc3f6735312f548816827445a2f789e742712442677296ed0591731",
+    "audio-render.txt": "c0ab100530ea98b42f13ab4e88f8629ad72a30e16e4f0b5a486980d3d32c695b",
+    "clippy-final.txt": "2b78ed9d86490f0607a28edaf9a25db31abcec012e128e05bfe290316bf61f8f",
+    "clippy.txt": "ef8bd58cae6b54405d2d57c9e249ef52cc594a55dfc9ca33e8506cb8d1814337",
+    "focused-final.txt": "f09dab6cafead81733bc4f54cd630c3a8d14adf661276d9c558264a454538471",
+    "focused.txt": "51dd4682aa73c450e7e7c585c4a9661adfc11b3d0aeea25e9e938468bfa0f390",
+    "gui.json": "f0725db40606cde88e315103fa84fa98c82df246f63cf2616b5a25126b80ed5b",
+    "host/arrangement.rpp": "dd52077db1ee2f2de2da4ca4dd7196ae8121b1eed2309546149a8066be031da8",
+    "host/full-restart-mapped-plugin.txt": "eefc8663ac553f3be4b1c3d15f09614a587d850bd256f61b1ed9d964a2015b72",
+    "host/full-restart-native-replay.txt": "34447fb1c792baa2d00771f90f2b2c772d888efc33c575d611a5f21d05e83619",
+    "host/initial-mapped-plugin.txt": "77f08b438bb9aa5729f87355ce589d9e6bc52585419767c52c03ea3e992f79de",
+    "host/initial-native-replay.txt": "d5bb97d54eab7476a2de400b9660b3c548c92a513f3249e9d7636242627d9a3f",
+    "host/recall.json": "e8389988fe0de9014b600010284afa666034b18b408660f23253d7126538708c",
+    "host/run.txt": "40c39fb006ad57be1f7592625de709953ffd823c45c8ccbf827d79824c17ca24",
+    "portable.json": "91f033d12590922cffc5544f8ec33f93f1f1f6cffa60d6ba2c078df3c0e0499a",
+    "release.txt": "a74ef1a153d2b806dfedf7c13cfc00925de93cdb94406a29cbe0549f33884e2b",
+    "validator.json": "9eb9d7db8bb3302a078d456383131a3230d66aa834796c6721b3f79f9fc015c4",
+    "validator.txt": "7945ed43b36d1573734668088d78f33ba1439bbd572e6356bdda9ab468d61bd1",
+    "workspace-final.txt": "862e7dcfc0aa729ecb334ffccfafe038116b229aeac7537bd25774a5b96367df",
+    "workspace.txt": "e9efccce0b994541e1d79bbd9f8a8b0ce6d4ab86586d2da123830d82a3adae91",
+    "writer-final.txt": "e99348a5d70c49289e0015e252202a3763c84ae95218139d11aa67bff29ccf75"
+  },
+  "owner_acceptance": "listening, physical controller, physical latency/xruns and production-beta pending",
+  "inherited_limits": "ordinary-render nondeterminism, warm-up policy, dense-editor/backend limits and strict-profile assumptions unchanged"
+}

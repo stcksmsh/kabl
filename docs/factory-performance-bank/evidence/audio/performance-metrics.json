@@ -1,9 +1,10 @@
 {
-  "active_seconds_above_minus50_dbfs": 61.949333333333335,
+  "active_seconds_above_minus50_dbfs": 61.925333333333334,
   "duration_seconds": 72,
-  "last_second_rms_dbfs": -125.24920109558835,
+  "last_second_rms_dbfs": -95.61284844201204,
+  "layer_changes": 25,
   "macro_changes": 24,
-  "peak_dbfs": -6.362157553588855,
-  "rms_dbfs": -24.089068590407013,
+  "peak_dbfs": -5.930783912917334,
+  "rms_dbfs": -23.97057600230175,
   "stop_second": 64
 }

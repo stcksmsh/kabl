@@ -48,6 +48,8 @@ Audio is synthesized through the production compiler/engine with scripted notes 
 
 The 72-second `editable-performance` uses the actual Sound Palette graph, keyboard layers, bass/percussion sequencers, section cues and macro changes. Cue requests occur at 2/12/24/36/48 s, on next-bar boundaries. Additional key phrases start at 21/29/37/45/53 s and release at 25/33/41/49/57 s. Stop at 64 s leaves an eight-second tail. The complete editable patch accompanies the take; reproduction uses real sequencers and commands. This demonstrates several instrument voices and transitions inside one complete performance, rather than swapping prerecorded audio.
 
+The long take explicitly changes Breath/Strings/Pad/Lead faders at each cue request: 2 s = 0.8/0/0/0; 12 s = 0.3/0.55/0/0; 24 s = 0.15/0.3/0.55/0; 36 s = 0/0.25/0.35/0.5; 48 s = 0.5/0.2/0.3/0. Lead echo send is 0.2 during Lift and zero otherwise. These runtime gestures make shared Strings, Pad and Singing Lead voices audible, not merely present in the graph. The saved patch remains fully editable; the test records the complete gesture score.
+
 See `audio/` for previews, `evidence/audio/` for peak/RMS/activity/tail results, and the reproduction test for the exact event schedule. The silent GUI walkthrough is separate from audio. Source structure and audible preview files establish distinct candidate roles; metrics do not establish musical usefulness or listening approval. Kosta's listening and controller review remain pending.
 
 ## Delivery and Limits

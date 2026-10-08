@@ -6,7 +6,7 @@ Engineering checks pass for the authorized content scope. Independent review is 
 
 Verified starting origin/master: `23075cd713884903a8985c88ab43bd1817477308`, merged D10 PR #13. No newer master changes were present at pickup. Isolated branch: `codex/factory-performance-bank`; checkout: `/home/stcksmsh/Programming/Github/kabl/.worktrees/factory-performance-bank`. Root master, `.ai`, prior worktrees, owner libraries and existing REAPER sessions were preserved. Private displays, task-owned profiles and separate host processes were used.
 
-Runtime build/source: `160b3c2b20b8eb1437756f9dd7f090b8acacc0f2`. Final authored content/test source: `f5dd27af82f08474700a7c45a5a3ef033a13003c`. Later source changes are test-only Clippy fixes and authored factory gain, not runtime changes. Reviewed head is in REVIEW.md. Exact submitted/packaged heads live in external `manifest.json` and `submission.json`; a commit cannot contain its own final hash. `evidence/verification.json` records binary hashes and checks.
+Runtime build/source: `160b3c2b20b8eb1437756f9dd7f090b8acacc0f2`. Final authored content/test source: `79d71beaeaebe3054adcdfb4cd75e7da7fe61342`. Later source changes are test-only Clippy fixes, authored factory gain and review repairs to the performance gesture score/guide, not runtime changes. Reviewed head is in REVIEW.md. Exact submitted/packaged heads live in external `manifest.json` and `submission.json`; a commit cannot contain its own final hash. `evidence/verification.json` records binary hashes and checks.
 
 ## Inventory and Acceptance
 
@@ -37,6 +37,8 @@ Audio uses eight voices, 48 kHz and real 64-frame engine blocks. Twelve normal a
 The 72-second Sound Palette take uses the same bass, lead, pad, strings and breath builders as several curated entries, plus percussion. Editable sequencers, real cues, phrases and macros produce transitions; no baked audio. `performance-project/` embeds the starting graph and the render test preserves the gesture schedule. Distinct structures/roles establish candidate purpose, not owner listening approval.
 
 Initial probes had fixture mistakes: a slider click did not change a value and a host envelope initial value differed from its recalled base. Final GUI uses numeric editing and asserts an actual change; host initial values now agree. Gain analysis found new keyboard voices too quiet; authored bass/keys gain was raised and all audio evidence refreshed.
+
+Independent review found two P2 content issues: the initial long take left Strings/Pad/Lead muted, and Sound Palette's guide/tempo contradicted its Rest/104 BPM startup. The repaired take includes 25 explicit runtime layer/send changes; the guide now requires a cue after Run and uses the true tempo. Audio and affected GUI/portable evidence are refreshed. Workspace-wide formatting check also reports pre-existing style differences in untouched files; no blanket formatting changes were made. Strict Clippy and scoped tests remain the engineering gates.
 
 ## Delivery and Limits
 

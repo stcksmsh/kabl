@@ -1,4 +1,4 @@
-7799ba200000-7799ba4d7000 r--p 00000000 103:01 12611534                  /secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/scratch/factory-bank/host/plugins/kabl.clap
-7799ba4d7000-7799babbf000 r-xp 002d6000 103:01 12611534                  /secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/scratch/factory-bank/host/plugins/kabl.clap
-7799babbf000-7799bac02000 r--p 009bd000 103:01 12611534                  /secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/scratch/factory-bank/host/plugins/kabl.clap
-7799bac02000-7799bac04000 rw-p 009ff000 103:01 12611534                  /secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/scratch/factory-bank/host/plugins/kabl.clap
+7f6f06a00000-7f6f06cd7000 r--p 00000000 103:07 23240991                  /home/stcksmsh/.codex/visualizations/2026/10/08/01a11be1-c6f3-7fe2-b4e6-f33210e9ea62/factory-bank-review-candidate/plugins/kabl.clap
+7f6f06cd7000-7f6f073bf000 r-xp 002d6000 103:07 23240991                  /home/stcksmsh/.codex/visualizations/2026/10/08/01a11be1-c6f3-7fe2-b4e6-f33210e9ea62/factory-bank-review-candidate/plugins/kabl.clap
+7f6f073bf000-7f6f07402000 r--p 009bd000 103:07 23240991                  /home/stcksmsh/.codex/visualizations/2026/10/08/01a11be1-c6f3-7fe2-b4e6-f33210e9ea62/factory-bank-review-candidate/plugins/kabl.clap
+7f6f07402000-7f6f07404000 rw-p 009ff000 103:07 23240991                  /home/stcksmsh/.codex/visualizations/2026/10/08/01a11be1-c6f3-7fe2-b4e6-f33210e9ea62/factory-bank-review-candidate/plugins/kabl.clap
