@@ -92,11 +92,7 @@ pub fn echo() -> PatchEditor {
     e
 }
 
-#[path = "support/factory_controls.rs"]
-mod factory_controls;
-#[allow(dead_code)]
-#[path = "support/factory_bank.rs"]
-mod factory_bank;
+use interlocking::{factory_bank, factory_controls};
 
 /// Not a check: writes `patches/echo`.
 /// `cargo test -p kabl-ui --test echo write_echo_patch -- --ignored` (the name filter keeps the

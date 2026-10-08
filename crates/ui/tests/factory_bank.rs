@@ -241,7 +241,7 @@ fn render(state: &PatchState, keys: bool, secs: usize, hot: bool) -> (Vec<f32>, 
         if keys
             && t < stop * 48000
             && [1, 5, 13, 21, 29, 37, 45, 53].contains(&(t / 48000))
-            && t % 48000 == 0
+            && t.is_multiple_of(48000)
         {
             for note in if state
                 .modules
@@ -261,13 +261,13 @@ fn render(state: &PatchState, keys: bool, secs: usize, hot: bool) -> (Vec<f32>, 
                 engine.key(KeyEvent::On { note, velocity: 90 });
             }
         }
-        if keys && [4, 9, 17, 25, 33, 41, 49, 57].contains(&(t / 48000)) && t % 48000 == 0 {
+        if keys && [4, 9, 17, 25, 33, 41, 49, 57].contains(&(t / 48000)) && t.is_multiple_of(48000) {
             engine.key(KeyEvent::AllOff);
         }
         if t == 6 * 48000 && !seqs.is_empty() {
             engine.launch(&Launch::new(clocks[0], Timing::NextBar, &seqs));
         }
-        if secs > 24 && t % 48000 == 0 && [2, 12, 24, 36, 48].contains(&(t / 48000)) {
+        if secs > 24 && t.is_multiple_of(48000) && [2, 12, 24, 36, 48].contains(&(t / 48000)) {
             if let Some((&id, _)) = state.modules.iter().find(|(_, m)| m.kind == "cues") {
                 let cue = [2, 12, 24, 36, 48]
                     .iter()
@@ -281,7 +281,7 @@ fn render(state: &PatchState, keys: bool, secs: usize, hot: bool) -> (Vec<f32>, 
                 }
             }
         }
-        if t % 48000 == 0 && [3, 7, 19, 31, 43, 55].contains(&(t / 48000)) {
+        if t.is_multiple_of(48000) && [3, 7, 19, 31, 43, 55].contains(&(t / 48000)) {
             for (&id, m) in &state.modules {
                 if m.kind == "macro" {
                     for n in 1..=4 {
