@@ -1,0 +1,10 @@
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/crates/standalone)
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/crates/ui)
+    Finished `test` profile [optimized] target(s) in 1.20s
+     Running tests/factory_bank.rs (target/debug/deps/factory_bank-e0b82c9fb2e315a2)
+
+running 1 test
+test write_bank ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.02s
+

@@ -1,0 +1,242 @@
+{
+  "composition": {
+    "all_macros_one": {
+      "active_seconds_above_minus50_dbfs": 20.74,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -59.91742352565352,
+      "macro_changes": 12,
+      "peak_dbfs": -1.391968329828931,
+      "rms_dbfs": -16.710963041824783,
+      "stop_second": 16
+    },
+    "normal": {
+      "active_seconds_above_minus50_dbfs": 18.561333333333334,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -80.28978806704797,
+      "macro_changes": 12,
+      "peak_dbfs": -3.820866358835959,
+      "rms_dbfs": -19.050346247207518,
+      "stop_second": 16
+    }
+  },
+  "echo": {
+    "all_macros_one": {
+      "active_seconds_above_minus50_dbfs": 17.818666666666665,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -93.49218622571519,
+      "macro_changes": 12,
+      "peak_dbfs": -5.586535052665033,
+      "rms_dbfs": -20.20157842449556,
+      "stop_second": 16
+    },
+    "normal": {
+      "active_seconds_above_minus50_dbfs": 16.904,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -122.08072745808198,
+      "macro_changes": 12,
+      "peak_dbfs": -6.292693844997597,
+      "rms_dbfs": -21.015956997633303,
+      "stop_second": 16
+    }
+  },
+  "interlocking": {
+    "all_macros_one": {
+      "active_seconds_above_minus50_dbfs": 16.605333333333334,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -240.0,
+      "macro_changes": 12,
+      "peak_dbfs": -7.147522283519714,
+      "rms_dbfs": -19.575937688893678,
+      "stop_second": 16
+    },
+    "normal": {
+      "active_seconds_above_minus50_dbfs": 16.017333333333333,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -240.0,
+      "macro_changes": 12,
+      "peak_dbfs": -7.2450008406558,
+      "rms_dbfs": -20.450584672469745,
+      "stop_second": 16
+    }
+  },
+  "palette/bass": {
+    "all_macros_one": {
+      "active_seconds_above_minus50_dbfs": 15.538666666666666,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -240.0,
+      "macro_changes": 12,
+      "peak_dbfs": -5.647963444959627,
+      "rms_dbfs": -13.437587109799003,
+      "stop_second": 16
+    },
+    "normal": {
+      "active_seconds_above_minus50_dbfs": 15.417333333333334,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -240.0,
+      "macro_changes": 12,
+      "peak_dbfs": -6.075979463922724,
+      "rms_dbfs": -15.820304783745836,
+      "stop_second": 16
+    }
+  },
+  "palette/breath": {
+    "all_macros_one": {
+      "active_seconds_above_minus50_dbfs": 21.606666666666666,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -53.49730916091584,
+      "macro_changes": 12,
+      "peak_dbfs": -2.3254397029763556,
+      "rms_dbfs": -19.119164852370403,
+      "stop_second": 16
+    },
+    "normal": {
+      "active_seconds_above_minus50_dbfs": 20.109333333333332,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -62.20067552177841,
+      "macro_changes": 12,
+      "peak_dbfs": -5.285009957422536,
+      "rms_dbfs": -23.273035732496474,
+      "stop_second": 16
+    }
+  },
+  "palette/keyboard-bass": {
+    "all_macros_one": {
+      "active_seconds_above_minus50_dbfs": 11.425333333333333,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -240.0,
+      "macro_changes": 12,
+      "peak_dbfs": -10.347953581755586,
+      "rms_dbfs": -21.996842653935936,
+      "stop_second": 16
+    },
+    "normal": {
+      "active_seconds_above_minus50_dbfs": 11.196,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -240.0,
+      "macro_changes": 12,
+      "peak_dbfs": -12.109933235722796,
+      "rms_dbfs": -22.644768936618163,
+      "stop_second": 16
+    }
+  },
+  "palette/keys": {
+    "all_macros_one": {
+      "active_seconds_above_minus50_dbfs": 9.322666666666667,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -240.0,
+      "macro_changes": 12,
+      "peak_dbfs": -7.782687840712167,
+      "rms_dbfs": -28.745345558076473,
+      "stop_second": 16
+    },
+    "normal": {
+      "active_seconds_above_minus50_dbfs": 5.968,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -240.0,
+      "macro_changes": 12,
+      "peak_dbfs": -7.645397288297609,
+      "rms_dbfs": -30.880174643031168,
+      "stop_second": 16
+    }
+  },
+  "palette/lead": {
+    "all_macros_one": {
+      "active_seconds_above_minus50_dbfs": 16.869333333333334,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -124.19798041978858,
+      "macro_changes": 12,
+      "peak_dbfs": -7.1393270230383425,
+      "rms_dbfs": -21.419281545957304,
+      "stop_second": 16
+    },
+    "normal": {
+      "active_seconds_above_minus50_dbfs": 15.493333333333334,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -153.19994538122725,
+      "macro_changes": 12,
+      "peak_dbfs": -7.457814670169953,
+      "rms_dbfs": -21.086356380785784,
+      "stop_second": 16
+    }
+  },
+  "palette/pad": {
+    "all_macros_one": {
+      "active_seconds_above_minus50_dbfs": 22.946666666666665,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -38.92114338219626,
+      "macro_changes": 12,
+      "peak_dbfs": -4.811711211322304,
+      "rms_dbfs": -21.617166451473313,
+      "stop_second": 16
+    },
+    "normal": {
+      "active_seconds_above_minus50_dbfs": 22.937333333333335,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -42.1459959756711,
+      "macro_changes": 12,
+      "peak_dbfs": -6.5056313145084035,
+      "rms_dbfs": -23.402858482103852,
+      "stop_second": 16
+    }
+  },
+  "palette/progression": {
+    "all_macros_one": {
+      "active_seconds_above_minus50_dbfs": 22.9,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -33.60972169936845,
+      "macro_changes": 12,
+      "peak_dbfs": -4.78308616439443,
+      "rms_dbfs": -21.75185101730929,
+      "stop_second": 16
+    },
+    "normal": {
+      "active_seconds_above_minus50_dbfs": 21.765333333333334,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -51.6545314579216,
+      "macro_changes": 12,
+      "peak_dbfs": -7.255878608137868,
+      "rms_dbfs": -23.681118944661613,
+      "stop_second": 16
+    }
+  },
+  "palette/strings": {
+    "all_macros_one": {
+      "active_seconds_above_minus50_dbfs": 22.974666666666668,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -41.404125532160336,
+      "macro_changes": 12,
+      "peak_dbfs": -5.07229193887764,
+      "rms_dbfs": -21.8679936919966,
+      "stop_second": 16
+    },
+    "normal": {
+      "active_seconds_above_minus50_dbfs": 19.314666666666668,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -70.60108037453372,
+      "macro_changes": 12,
+      "peak_dbfs": -5.964239922164827,
+      "rms_dbfs": -23.07492999272543,
+      "stop_second": 16
+    }
+  },
+  "sound-palette": {
+    "all_macros_one": {
+      "active_seconds_above_minus50_dbfs": 17.741333333333333,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -74.16773598729884,
+      "macro_changes": 12,
+      "peak_dbfs": -5.9941474984924215,
+      "rms_dbfs": -21.474718191724605,
+      "stop_second": 16
+    },
+    "normal": {
+      "active_seconds_above_minus50_dbfs": 16.842666666666666,
+      "duration_seconds": 24,
+      "last_second_rms_dbfs": -80.79176430563713,
+      "macro_changes": 12,
+      "peak_dbfs": -6.460257328247096,
+      "rms_dbfs": -25.288563630346196,
+      "stop_second": 16
+    }
+  }
+}

@@ -111,10 +111,15 @@ try:
                     capture(f'{size}-{directory.replace("/","-")}-{theme}.png')
             if directory=='palette/keys' and size=='1440x900':
                 macro=next(key for key,value in state['modules'].items() if value['kind']=='macro')
-                click('pslider:'+macro+'.m1')
+                a,b,c,d=hits()['pslider:'+macro+'.m1']
+                run(['xdotool','mousemove','--window',wid,str(round(c-18)),str(round((b+d)/2)),'click','--repeat','2','--delay','120','1'])
+                time.sleep(.3)
+                run(['xdotool','key','ctrl+a']);run(['xdotool','type','--clearmodifiers','0.65']);run(['xdotool','key','Return'])
+                time.sleep(.5)
                 click('save-as'); click('dlg:name')
                 run(['xdotool','key','ctrl+a']);run(['xdotool','type','--clearmodifiers','Bank Recall'])
                 click('dlg:save');time.sleep(.6)
+                if 'dlg:replace' in hits(): click('dlg:replace');time.sleep(.6)
                 saved_state=json.loads((saved_dir/'checkpoint.json').read_text())
                 assert saved_state['modules'][macro]['params']['m1'] != state['modules'][macro]['params']['m1']
             cases.append({'size':size,'factory_id':'factory:'+directory,'browser_open':True,'Perform_cards':len([k for k in hits() if k.startswith('pcard:')]),'transport_or_audition_exercised':True})

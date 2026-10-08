@@ -1,0 +1,51 @@
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/crates/standalone)
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/crates/ui)
+    Finished `test` profile [optimized] target(s) in 2.15s
+     Running tests/browser.rs (target/debug/deps/browser-b86c0e3ca81c9aa6)
+
+running 19 tests
+test save_to_folder_is_staged_too ... ok
+test missing_recents_and_bad_patches_are_explained ... ok
+test quit_with_unsaved_changes_asks ... ok
+test losing_window_focus_stops_a_preview ... ok
+test open_a_voice_and_audition_it ... ok
+test save_from_the_question_then_continues ... ok
+test a_failed_folder_save_leaves_the_saved_folder_unchanged ... ok
+test browsing_never_makes_sound_or_loads ... ok
+test cancel_after_a_collision_keeps_the_other_sound ... ok
+test save_as_onto_a_taken_name_offers_replace ... ok
+test rename_through_the_browser ... ok
+test a_piece_opens_stopped_and_starts_explicitly ... ok
+test a_failed_save_keeps_the_work_and_the_question ... ok
+test replace_never_targets_a_sound_after_the_name_changed ... ok
+test edit_save_as_reopen_and_the_factory_file_stays ... ok
+test every_control_is_reachable_at_both_sizes ... ok
+test unsaved_edits_ask_and_cancel_keeps_them_exactly ... ok
+test delayed_open_preserves_an_edit_accepted_while_reading ... ok
+test delayed_save_commits_a_snapshot_without_hiding_a_later_edit ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.77s
+
+     Running tests/factory_bank.rs (target/debug/deps/factory_bank-e0b82c9fb2e315a2)
+
+running 4 tests
+test render_bank ... ignored, renders every entry, checks headroom, writes metrics and WAV previews
+test write_bank ... ignored, writes three original factory graphs and curated metadata
+test purpose_filters_preserve_legacy_metadata_and_user_saves ... ok
+test every_entry_opens_stopped_has_real_controls_and_recalls_complete_state ... FAILED
+
+failures:
+
+---- every_entry_opens_stopped_has_real_controls_and_recalls_complete_state stdout ----
+
+thread 'every_entry_opens_stopped_has_real_controls_and_recalls_complete_state' (579) panicked at crates/ui/tests/factory_bank.rs:193:13:
+assertion failed: pins.iter().any(|p| p.key == "banks")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    every_entry_opens_stopped_has_real_controls_and_recalls_complete_state
+
+test result: FAILED. 1 passed; 1 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `-p kabl-ui --test factory_bank`

@@ -1,0 +1,4 @@
+7799ba200000-7799ba4d7000 r--p 00000000 103:01 12611534                  /secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/scratch/factory-bank/host/plugins/kabl.clap
+7799ba4d7000-7799babbf000 r-xp 002d6000 103:01 12611534                  /secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/scratch/factory-bank/host/plugins/kabl.clap
+7799babbf000-7799bac02000 r--p 009bd000 103:01 12611534                  /secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/scratch/factory-bank/host/plugins/kabl.clap
+7799bac02000-7799bac04000 rw-p 009ff000 103:01 12611534                  /secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/scratch/factory-bank/host/plugins/kabl.clap

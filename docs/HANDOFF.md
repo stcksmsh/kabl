@@ -1,5 +1,9 @@
 # Handoff — for the next blank-context agent
 
+## Factory performance bank — 2026-10-08
+
+D10 PR #13 is verified merged at `23075cd713884903a8985c88ab43bd1817477308`; older unmerged text is historical. Authorized bank: isolated `codex/factory-performance-bank`. [Report](factory-performance-bank/REPORT.md), [inventory/reproduction](factory-performance-bank/README.md), [independent review](factory-performance-bank/REVIEW.md) and [owner checklist](factory-performance-bank/CHECKLIST.md) are the pickup contract. Twelve curated entries, all 22 factory entries preserved, populated normal bundle and separate unavailable-library verification. Exact heads belong to report/external receipts. No merge or owner approval; listening/controller/latency/xruns/beta remain pending and render/warm-up/backend limits unchanged. Root, `.ai`, prior worktrees/libraries and host sessions were preserved. Stop after draft submission; no later batch or other-chat messages.
+
 ## D10 final interaction submission — 2026-10-06
 
 Kosta likes the other repaired UI, but owner acceptance remains **changes requested** until More sizing, exclusive wheel ownership and occupied insertion visibility are reviewed. Production source/tested/reviewed/build head is 35eed79956dd702e0a62cd80be534d5c34dc9632; exact submitted/package artifact head is recorded in the new bundle submission.json. [Final repair evidence](panel-authoring/repair/final/README.md) records current checks separately from earlier provenance. Existing draft PR #13, isolated owned .worktrees/d10, no merge or D11 launch.

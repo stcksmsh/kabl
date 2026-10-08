@@ -23,7 +23,7 @@ def replace(match):
     raw=base64.b64decode(''.join(match[1].split()))
     state=json.loads(raw[8:])
     patch=json.loads((repo/'patches'/paths[len(expected)]/'checkpoint.json').read_text())
-    patch.setdefault('composites',{})
+    if not patch.get('composites'): patch.pop('composites',None)
     macro=int(next(key for key,value in patch['modules'].items() if value['kind']=='macro'))
     state['patch']=patch; state['version']=2; state['host_clock']=True; state['output_gain']=.4
     state['lanes']=[{'retired':False,'target':{'kind':'macro','module':macro,'param':f'm{i+1}'}} if i<4 else {'retired':False,'target':None} for i in range(16)]
@@ -34,7 +34,13 @@ def replace(match):
     return '<STATE\n'+''.join('          '+line+'\n' for line in textwrap.wrap(encoded,120))+'        >'
 project=re.sub(r'<STATE\s+(.*?)\s*>',replace,source,flags=re.S)
 assert len(expected)==2
+# Match initial native envelope values to the recalled macro bases; later points vary them.
+project=re.sub(r'(<PARMENV[^\n]*\n.*?\n\s*PT 0 )[^ ]+',r'\g<1>0.3',project,flags=re.S)
 project=project.replace('D08 played lead · virtual/scripted MIDI','Glass Keys - virtual/scripted MIDI').replace('D08 Host sequence · seeded probability','Slow Horizons - editable real sequencer')
+if 'KABL_BANK_PROJECT' in os.environ:
+    project=Path(os.environ['KABL_BANK_PROJECT']).read_text()
+    expected=[json.loads(base64.b64decode(''.join(chunk.split()))[8:]) for chunk in re.findall(r'<STATE\s+(.*?)\s*>',project,re.S)]
+    assert len(expected)==2
 project_path=scratch/'arrangement.rpp'
 project_path.write_text(project)
 (scratch/'expected.json').write_text(json.dumps(expected,indent=2)+'\n')
@@ -54,7 +60,7 @@ def f32(value):
 try:
     for phase in ['initial','full-restart']:
         (scratch/'done').unlink(missing_ok=True)
-        app=sp.Popen(['pw-jack','/usr/local/bin/reaper','-newinst','-nosplash','-cfgfile',str(scratch/'profile/reaper.ini'),str(project_path),str(repo/'docs/panel-authoring/scripts/host.lua')],env=env,cwd=scratch,stdout=log,stderr=log)
+        app=sp.Popen(['pw-jack','/usr/local/bin/reaper','-newinst','-nosplash','-cfgfile',str(scratch/'profile/reaper.ini'),str(project_path),str(repo/'docs/panel-authoring/scripts/host.lua')],env=env,cwd=Path(os.environ.get('KABL_BANK_CWD',scratch)),stdout=log,stderr=log)
         end=time.monotonic()+55
         while time.monotonic()<end and not (scratch/'done').exists() and app.poll() is None: time.sleep(.25)
         assert (scratch/'done').exists(), 'Host completion missing; inspect retained run.txt'
