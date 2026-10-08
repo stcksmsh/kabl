@@ -226,6 +226,7 @@ fn render(state: &PatchState, keys: bool, secs: usize, hot: bool) -> (Vec<f32>, 
     let (mut l, mut r) = ([0.0; BLOCK], [0.0; BLOCK]);
     let mut active_windows = 0;
     let mut macro_changes = 0;
+    let mut layer_changes = 0;
     for b in 0..secs * 48000 / BLOCK {
         let t = b * BLOCK;
         if t == 0 {
@@ -268,6 +269,40 @@ fn render(state: &PatchState, keys: bool, secs: usize, hot: bool) -> (Vec<f32>, 
             engine.launch(&Launch::new(clocks[0], Timing::NextBar, &seqs));
         }
         if secs > 24 && t.is_multiple_of(48000) && [2, 12, 24, 36, 48].contains(&(t / 48000)) {
+            let section = [2, 12, 24, 36, 48]
+                .iter()
+                .position(|s| *s == t / 48000)
+                .unwrap();
+            let levels = [
+                [0.8, 0.0, 0.0, 0.0],
+                [0.3, 0.55, 0.0, 0.0],
+                [0.15, 0.3, 0.55, 0.0],
+                [0.0, 0.25, 0.35, 0.5],
+                [0.5, 0.2, 0.3, 0.0],
+            ][section];
+            assert_eq!(state.modules[&81].kind, "mixer");
+            for (index, value) in levels.into_iter().enumerate() {
+                assert!(engine.set(&kabl_engine::runtime::ParamSet {
+                    rev: t as u64 + 1,
+                    target: kabl_engine::runtime::RuntimeTarget::Param {
+                        id: 81,
+                        kind: "mixer",
+                        index: index as u16,
+                    },
+                    value,
+                }));
+                layer_changes += 1;
+            }
+            assert!(engine.set(&kabl_engine::runtime::ParamSet {
+                rev: t as u64 + 1,
+                target: kabl_engine::runtime::RuntimeTarget::Param {
+                    id: 82,
+                    kind: "mixer",
+                    index: 0,
+                },
+                value: if section == 3 { 0.2 } else { 0.0 },
+            }));
+            layer_changes += 1;
             if let Some((&id, _)) = state.modules.iter().find(|(_, m)| m.kind == "cues") {
                 let cue = [2, 12, 24, 36, 48]
                     .iter()
@@ -328,7 +363,7 @@ fn render(state: &PatchState, keys: bool, secs: usize, hot: bool) -> (Vec<f32>, 
         |v: &[f32]| (v.iter().map(|s| (*s as f64).powi(2)).sum::<f64>() / v.len() as f64).sqrt();
     let db = |v: f64| 20.0 * v.max(1e-12).log10();
     let peak = samples.iter().fold(0.0_f32, |a, b| a.max(b.abs()));
-    let metrics = serde_json::json!({"peak_dbfs":db(peak as f64), "rms_dbfs":db(rms(&samples)), "last_second_rms_dbfs":db(rms(&samples[samples.len()-96000..])), "active_seconds_above_minus50_dbfs": active_windows as f64 * BLOCK as f64 / 48000.0, "stop_second":stop,"duration_seconds":secs,"macro_changes":macro_changes});
+    let metrics = serde_json::json!({"peak_dbfs":db(peak as f64), "rms_dbfs":db(rms(&samples)), "last_second_rms_dbfs":db(rms(&samples[samples.len()-96000..])), "active_seconds_above_minus50_dbfs": active_windows as f64 * BLOCK as f64 / 48000.0, "stop_second":stop,"duration_seconds":secs,"macro_changes":macro_changes,"layer_changes":layer_changes});
     assert!(
         rms(&samples[..96000]) < 0.000001,
         "Stopped load must remain silent"

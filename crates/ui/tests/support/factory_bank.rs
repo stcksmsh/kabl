@@ -15,7 +15,7 @@ pub const INVENTORY: &[(&str, &str, &str, &str)] = &[
     ("echo", "probabilistic motion", "116bpm e minor probability echo", "Run starts probabilistic E-minor motion at 116 BPM. Pulse and Lift keep the first step certain; Sparse uses 45% ghost notes; Rest mutes. Launch both bank cards for sections. Glow, Motion, Length and Echo shape variation."),
     ("palette/progression", "atmospheric progression", "72bpm e minor slow evolving", "Run starts slow minor harmony at 72 BPM, one chord every two beats. Banks: Home, Lift, Descent, Rest; launch on the next bar. Glow opens tone, Motion speeds drift, Bloom lengthens release, Space adds room. Stop leaves a soft tail."),
     ("composition", "performance", "112bpm e minor evolving sections", "Open stopped. Run, then launch Intro, Main, Variation, Breakdown or Return cues on the next bar. Energy, Motion, Space and Glow shape the three layers. Play a single E4-B4 lead over them. CC40-44 launch cues; CC46 toggles Run."),
-    ("sound-palette", "performance", "112bpm e minor layered sections", "Run starts bass and percussion; play E3-B3-E4-G4 for keyboard layers. Launch Air, Pulse, Groove, Lift or Break cues; use layer faders before adding lead. Energy, Motion, Bright and Space vary the arrangement. Stop releases sequences; All notes off clears held keys."),
+    ("sound-palette", "performance", "104bpm e minor layered sections", "Open stopped in Rest at 104 BPM. Run, then launch Pulse, Groove or Lift for bass and percussion; Air and Break are sparse. Play E3-B3-E4-G4 for keyboard layers; raise Strings, Pad or Lead faders to add voices. Energy, Motion, Bright and Space vary sections. Stop releases sequences; All notes off clears held keys."),
 ];
 
 fn at(x: f32, row: usize) -> Vec2 {

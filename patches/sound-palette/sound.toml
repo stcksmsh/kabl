@@ -12,7 +12,8 @@ tags = [
     "minor",
     "layered",
     "sections",
+    "104bpm",
 ]
-description = "Run starts bass and percussion; play E3-B3-E4-G4 for keyboard layers. Launch Air, Pulse, Groove, Lift or Break cues; use layer faders before adding lead. Energy, Motion, Bright and Space vary the arrangement. Stop releases sequences; All notes off clears held keys."
+description = "Open stopped in Rest at 104 BPM. Run, then launch Pulse, Groove or Lift for bass and percussion; Air and Break are sparse. Play E3-B3-E4-G4 for keyboard layers; raise Strings, Pad or Lead faders to add voices. Energy, Motion, Bright and Space vary sections. Stop releases sequences; All notes off clears held keys."
 keys = true
 sequence = true
