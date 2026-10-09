@@ -41,7 +41,7 @@ pub fn validate(p: &PatchState) -> Result<(), String> {
                     .any(|(k, v)| k.len() > 128 || !v.is_finite())
         })
         || p.cables.values().any(|c| {
-            c.params.len() > 32
+            c.params.len() > kabl_cables::MAX_CABLE_PARAMS
                 || c.steps.len() > 256
                 || c.params.values().chain(&c.steps).any(|v| !v.is_finite())
         })

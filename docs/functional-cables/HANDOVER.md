@@ -4,29 +4,29 @@ Branch `claude/functional-cables`, worktree `/secondary/Programming/Github/kabl/
 
 ## Task as received (condensed)
 
-Finish functional cables to engineering-complete, in order: (1) push unpushed commits; (2) record morph as kept-as-built pending Kosta; (3) bring morph and glide to the pattern/probability standard (tests for timing, restart reproducibility, runtime edits without rebuild, undo, save/reload, legacy bit-identical; no allocation; cost in `docs/benchmarks.md`); (4) full workspace tests and strict clippy at the final head, record totals; (5) verify in the real plugin and host: CLAP validator against the recorded baseline (35 successes, 9 skips) and a REAPER save, full quit, reopen with state and render comparison, for a project using pattern, probability and morph; adapt the scripts on `origin/claude/sound-engines` under `docs/sound-engines/scripts/` (`host.py`, `host.lua`, `validator_diff.py`); (6) update the PR #15 description. Out of scope: rebasing onto the FM/wavetable branches, restyling the cable editor (redesign is on another branch), merging.
+Finish functional cables to engineering-complete: push; record morph as kept-as-built pending Kosta; bring morph and glide to the pattern/probability standard; full workspace tests and strict clippy at the final head; plugin and host verification (CLAP validator against 35 success / 9 skipped, REAPER save, quit, reopen with state and render comparison for a project with pattern, probability and morph); update the PR #15 description. Out of scope: rebasing onto the FM/wavetable branches, restyling the cable editor, merging.
 
-## Done
+## Done (all local; remote is still f7b83b5)
 
-- Promo demo (earlier, same branch): `docs/promo-demo/`, reviewed (`REVIEW.md`).
-- `cf4e449`: morph exact at both ends (`a*(1-m) + b*m`), 7 new tests in `crates/engine/tests/functional_cables.rs` (ends bit-identical, replay after Restart/Stop/Run, runtime edits and compile boundary, glide timing, undo/save/reload of morph+glide+B, no-alloc with morph running); `cable_cost` gets `KABL_MORPH`; cost in `docs/benchmarks.md` (no measurable difference); `docs/decisions.md` and `docs/functional-cables/README.md` say morph is kept as built, pending Kosta. `cargo test -p kabl-engine --test functional_cables`: 19 passed; `legacy_patches`: 1 passed.
+- Promo demo `docs/promo-demo/` with reviewer record.
+- `cf4e449`: morph exact at both ends, 7 morph/glide tests, cost in `docs/benchmarks.md`, decisions note (morph kept as built, awaiting Kosta).
+- Host check: `docs/functional-cables/HOST.md`, `scripts/` (host.py, host.lua, validator_diff.py), `evidence/` (validator.json, host/). Validator 35/9 identical to baseline. REAPER 7.75 save/quit/reopen: states identical, renders bit-identical, plain project differs, old project unchanged.
+- Bug found and fixed: plugin and composite validators capped a cable at 32 params; a full pattern A+B+morph cable has up to 71. New `kabl_cables::MAX_CABLE_PARAMS`; test `state_accepts_a_cable_with_every_functional_param` (crates/clap).
+- Final head totals: `cargo test --workspace` 690 passed, 0 failed, 24 ignored; strict clippy clean.
+- New PR body drafted: `docs/functional-cables/PR-BODY.md`.
 
-## Remaining, in order
+## Remaining (needs Kosta's approval in this session)
 
-1. Host check (step 5). Fetch the scripts: `git show origin/claude/sound-engines:docs/sound-engines/scripts/host.py` (and `host.lua`, `validator_diff.py`) into `docs/functional-cables/scripts/`, adapt, do not rewrite. Need a patch with pattern, probability and morph (use `patches/functional-cables/morph-arc` or `docs/promo-demo/patch/morph-suite`). Build the plugin as the scripts expect, run the validator and diff against the baseline (35 successes, 9 skips), then REAPER save, full quit, reopen, compare state and render. Write results to `docs/functional-cables/HOST.md` with exact commands, versions, and what was not run.
-2. Full `cargo test --workspace` and `cargo clippy --workspace --all-targets -- -D warnings` at the final head; record totals in the PR and in `docs/functional-cables/README.md` or REVIEW.md. Last known: 683 passed before the 7 new tests (expect 690).
-3. Update the PR #15 description (draft body: use `gh pr edit 15 --body-file`); say the morph choice is an assumption awaiting Kosta; include test totals, host results, the promo as a separate follow-up commit set on this branch. Needs Kosta's go-ahead per his rule to ask before posting; the overseer relayed it, so confirm with the overseer if unsure.
-4. One report to "Kabl overseer": what changed, totals, host results, unverified, decisions for Kosta. Then stop.
+1. `git push origin claude/functional-cables` (denied once by the auto-mode classifier; Kosta must approve, or run `! git push origin claude/functional-cables`). This also publishes the promo commits.
+2. `gh pr edit 15 --body-file docs/functional-cables/PR-BODY.md` after the push.
+3. Then report to "Kabl overseer" and stop.
 
 ## Facts that cost effort
 
-- Writes are confined to the session's own worktree; `git worktree add` elsewhere cannot be written to. Use branches in this worktree.
-- Compound shell commands, `$VARS` and `| head` pipes trip the guard or panic Rust stdout; write to a file, use plain commands, Write/Edit for scripts. `pkill -f <name>` matches your own shell: use `pkill <exact name>`.
-- Scratch dir: `/home/stcksmsh/.claude/jobs/484d43b6/tmp`.
-- Regenerating the promo patch rewrites `log.jsonl` timestamps.
-- rustfmt only touched files; check `git status` after.
+- Writes are confined to the session's worktree. Compound shell commands, heredocs, `$VARS`, and paths containing `Github` next to git-like words trip the guard; use plain commands, relative paths (`../sound-engines/scratch/clap-validator`) and Write/Edit. `pkill -f <name>` kills your own shell.
+- rustfmt follows `mod` into other files (it reformatted `crates/clap/src/state_bridge.rs` and unrelated hunks of `crates/clap/src/lib.rs`): run `git diff --stat` afterwards and revert strays.
+- Scratch dir: `/home/stcksmsh/.claude/jobs/484d43b6/tmp`. Host scratch: `scratch/functional-cables-host` (gitignored).
 
 ## Assumptions and open decisions for Kosta
 
-- Morph = A/B blend plus glide (assumed, not confirmed). Open: morph as a cable property or a shared source; cable params mappable to macro/CC (promo moved seven morphs one at a time).
-- Promo recut after design and FM/wavetable land (`docs/promo-demo/README.md`).
+- Morph = A/B blend plus glide (assumed, not confirmed). Open: morph as a cable property or a shared source; cable params mappable to macro/CC; promo recut after design and FM/wavetable land.

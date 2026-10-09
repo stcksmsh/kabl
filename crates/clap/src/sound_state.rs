@@ -99,7 +99,7 @@ pub fn validate_patch(p: &PatchState) -> Result<(), String> {
         }
     }
     for c in p.cables.values() {
-        if c.params.len() > 32
+        if c.params.len() > kabl_cables::MAX_CABLE_PARAMS
             || c.steps.len() > 256
             || c.params
                 .iter()

@@ -26,6 +26,9 @@ pub const B_LENGTH: usize = GLIDE + 1;
 pub const B_LEVEL0: usize = B_LENGTH + 1;
 pub const B_CHANCE0: usize = B_LEVEL0 + MAX_STEPS;
 pub const SLOTS: usize = B_CHANCE0 + MAX_STEPS;
+/// Most params a stored cable can have: every slot, plus `amount` and `bypass`. State and
+/// composite validators bound a cable by this, so a full pattern A, pattern B and morph load.
+pub const MAX_CABLE_PARAMS: usize = SLOTS + 2;
 
 /// Param name of runtime slot `slot`: `length`, `prob`, `s1..`, `r1..`, `morph`, `glide_ms`,
 /// then pattern B as `b.length`, `b.s1..`, `b.r1..`.

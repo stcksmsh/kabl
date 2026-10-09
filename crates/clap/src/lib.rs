@@ -1543,6 +1543,39 @@ mod tests {
             .insert("base_hz".into(), f32::INFINITY);
         assert!(p.shared.load(state).is_err());
     }
+    /// A cable with a full pattern A, pattern B and morph (every slot, plus amount and bypass)
+    /// is a valid project; one param more is not. A cap of 32 once rejected such a project on
+    /// reload in a host.
+    #[test]
+    fn state_accepts_a_cable_with_every_functional_param() {
+        let p = instrument();
+        let cable = *p.shared.snapshot().patch.cables.keys().next().unwrap();
+        let with = |n: usize| {
+            let mut state = p.shared.snapshot();
+            let params = &mut state.patch.cables.get_mut(&cable).unwrap().params;
+            for slot in 0..kabl_cables::SLOTS {
+                params.insert(kabl_cables::slot_name(slot), 0.5);
+            }
+            params.insert("amount".into(), 1.0);
+            params.insert("bypass".into(), 0.0);
+            let mut extra = 0;
+            while params.len() < n {
+                params.insert(format!("x{extra}"), 0.0);
+                extra += 1;
+            }
+            state
+        };
+        let full = with(kabl_cables::MAX_CABLE_PARAMS);
+        assert_eq!(
+            full.patch.cables[&cable].params.len(),
+            kabl_cables::MAX_CABLE_PARAMS
+        );
+        let bytes = serde_json::to_vec(&full).unwrap();
+        assert!(SoundState::decode(&bytes).is_ok());
+        assert!(p.shared.load(full).is_ok());
+        let over = serde_json::to_vec(&with(kabl_cables::MAX_CABLE_PARAMS + 1)).unwrap();
+        assert!(SoundState::decode(&over).is_err());
+    }
     fn audio(p: &mut Instrument, frames: usize, note: bool) -> Vec<f32> {
         let mut left = vec![0.0; frames];
         let mut right = vec![0.0; frames];

@@ -1757,6 +1757,7 @@ dependencies = [
  "basedrop",
  "clap-sys",
  "egui",
+ "kabl-cables",
  "kabl-core",
  "kabl-engine",
  "kabl-modules",
