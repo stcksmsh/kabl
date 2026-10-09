@@ -249,21 +249,21 @@ fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
     }
     e.set_param(bass, "waveform", 2.0);
     e.set_param(bass, "base_hz", 220.0);
-    e.set_param(bass_filter, "cutoff_hz", 110.0);
-    e.set_param(bass_filter, "resonance", 0.6);
+    e.set_param(bass_filter, "cutoff_hz", 220.0);
+    e.set_param(bass_filter, "resonance", 0.45);
     e.set_param(bass_env, "attack_ms", 4.0);
     e.set_param(bass_env, "decay_ms", 260.0);
     e.set_param(bass_env, "sustain", 0.4);
     e.set_param(bass_env, "release_ms", 160.0);
     e.set_param(bass_vca, "gain", 0.0);
-    e.set_param(drive, "drive_db", 14.0);
+    e.set_param(drive, "drive_db", 18.0);
     e.set_param(drive, "mix", 100.0);
-    e.set_param(drive, "trim_db", -4.0);
+    e.set_param(drive, "trim_db", -7.0);
     e.set_param(knob, "m1", 1.0);
     e.set_param(noise, "color", 0.0);
-    e.set_param(hat_filter, "cutoff_hz", 7000.0);
+    e.set_param(hat_filter, "cutoff_hz", 3500.0);
     e.set_param(hat_filter, "resonance", 0.2);
-    e.set_param(hat_gain, "gain_db", 14.0);
+    e.set_param(hat_gain, "gain_db", 8.0);
     // Pad: open fifths over the chord root, detuned unison, under a slowly moving filter.
     for (osc, hz) in [(pad_a, 329.63), (pad_b, 440.0), (pad_c, 659.25)] {
         e.set_param(osc, "waveform", 2.0);
@@ -280,13 +280,13 @@ fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
     }
     e.set_param(rhythm, "level1", 1.0);
     e.set_param(rhythm, "level2", 0.7);
-    e.set_param(bus, "level1", 0.3);
+    e.set_param(bus, "level1", 0.24);
     e.set_param(bus, "level2", 0.7);
-    e.set_param(bus, "level3", 0.13);
-    e.set_param(bus, "level4", 0.13);
-    e.set_param(master, "level1", 0.5);
+    e.set_param(bus, "level3", 0.11);
+    e.set_param(bus, "level4", 0.11);
+    e.set_param(master, "level1", 1.0);
     e.set_param(master, "level2", 1.0);
-    e.set_param(master, "level3", 0.5);
+    e.set_param(master, "level3", 0.8);
     e.set_param(verb, "decay_s", 5.0);
     e.set_param(verb, "mix", 30.0);
 
@@ -386,7 +386,7 @@ fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
     // Pad gate. A: held, breathing. B: a sixteen-step chop.
     let c = e.connect(jack(pad_filter, "out"), jack(master, "in2"));
     let a: Vec<f32> = (1..=16)
-        .map(|k| if k % 4 == 1 { 0.55 } else { 0.45 })
+        .map(|k| if k % 4 == 1 { 0.85 } else { 0.7 })
         .collect();
     let on = [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1].map(|v| v as f32);
     let p = pattern(&a, &on, &[], &[], 45.0, 0.0);
