@@ -178,29 +178,47 @@ impl Node {
         if let Some(t) = current {
             self.level = self.settings.level_at(self.seed, t);
         }
-        let mut next = 0;
-        for (i, (o, &x)) in out.iter_mut().zip(src).enumerate() {
+        let n = out.len().min(src.len());
+        let (mut i, mut next) = (0, 0);
+        while i < n {
             while next < ticks.len() && ticks[next].2 as usize <= i {
                 self.level = self.settings.level_at(self.seed, ticks[next].1);
                 next += 1;
             }
+            // The level is constant up to the next pulse.
+            let end = ticks.get(next).map_or(n, |t| (t.2 as usize).min(n));
             if !self.started {
-                (self.gain, self.held, self.started) = (self.level, x, true);
+                (self.gain, self.held, self.started) = (self.level, src[i], true);
             }
-            *o = match self.carry {
-                Carry::Scale => x * self.level,
+            let (src, out) = (&src[i..end], &mut out[i..end]);
+            match self.carry {
+                Carry::Scale => {
+                    for (o, &x) in out.iter_mut().zip(src) {
+                        *o = x * self.level;
+                    }
+                }
                 Carry::Audio => {
-                    let d = self.level - self.gain;
-                    self.gain += d.clamp(-self.slew, self.slew);
-                    x * self.gain
+                    let mut k = 0;
+                    while k < out.len() && self.gain != self.level {
+                        let d = self.level - self.gain;
+                        self.gain += d.clamp(-self.slew, self.slew);
+                        out[k] = src[k] * self.gain;
+                        k += 1;
+                    }
+                    for (o, &x) in out[k..].iter_mut().zip(&src[k..]) {
+                        *o = x * self.gain;
+                    }
                 }
                 Carry::Hold => {
                     if self.level >= 0.5 {
-                        self.held = x;
+                        out.copy_from_slice(src);
+                        self.held = src.last().copied().unwrap_or(self.held);
+                    } else {
+                        out.fill(self.held);
                     }
-                    self.held
                 }
-            };
+            }
+            i = end;
         }
     }
 }

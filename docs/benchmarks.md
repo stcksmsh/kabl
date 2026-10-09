@@ -179,3 +179,16 @@ Product `f7157619836075d0d7704e59be5d66e6224890b1`, binary `3baa8ee3cc0f2f99e182
 | dense-2-open | 2540.0, 2460.0 | 4969.91, 5491.27 | 2 |
 
 Dense two-open backend ERR2 remains; physical xruns and latency unmeasured. P99 bins10µs; arrivals include startup/teardown and are not execution time. Raw strict-profile timing-summary.json retains scopes.
+
+## 2026-10-09 — Functional cables
+
+`taskset -c 2 ./target/release/examples/cable_cost <patch>` (`crates/engine/examples/cable_cost.rs`), commit of this PR, i7-13700H, rustc 1.93.0, 48 kHz, 64-sample blocks, 8 voices, 40 000 blocks per run, fastest of 9 runs (the machine was shared with other builds; medians are printed too and run up to 2× higher on the dense patch). Offline `process_block` time, no audio device. Pi 4 unmeasured.
+
+| Case | Plain | Functional | Difference |
+|---|---|---|---|
+| Minimal (clock, lfo, out), one cable, length 8 | 946–1 051 ns/block | 920–1 090 ns/block | within noise (−24…+39 ns) |
+| `patches/sequence`, all 9 jack cables (length 8, chance 80 %) | 5 375–5 662 ns | 7 320–7 516 ns | +1.9 µs: about 210 ns per cable |
+| `patches/composition`, all 57 jack cables (113 nodes with voice lanes) | 43 472–47 667 ns | 60 415–66 005 ns | +17–18 µs: about 300 ns per cable, 1.3 % of the 1 333 µs block budget |
+| `patches/composition`, same cables but every step open and never rejected | 43 235 ns | 48 264 ns | +5 µs: about 45 ns per node, 88 ns per cable |
+
+The node itself costs tens of nanoseconds (one 64-sample copy and a multiply or slew). The rest of the difference with real gating is downstream: a closed step feeds silence to filters and delays and changes what they compute. A plain cable costs nothing (no node). Making every jack cable of the densest shipped patch functional is far beyond real use; ten functional cables is under 1 % of the budget.

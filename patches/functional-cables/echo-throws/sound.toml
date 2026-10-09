@@ -1,0 +1,11 @@
+name = "Echo Throws"
+category = "Piece"
+tags = [
+    "sequenced",
+    "functional cables",
+    "probability",
+    "112bpm",
+]
+description = "A self-playing arpeggio. The cable from the voice to the delay opens on three of eight steps and passes 60 % of the time, so echoes are thrown at the notes by chance. The pitch cable moves to a new note 70 % of the time and otherwise holds the last one. Right-click a cable, Pattern, to edit."
+keys = false
+sequence = true

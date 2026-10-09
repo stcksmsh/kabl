@@ -1,35 +1,10 @@
-//! Every patch shipped under `patches/` and the schema-v1 fixtures render bit-identically to
-//! the build before functional cables (hashes in `golden/legacy_hashes.txt`, made at 2195de0).
-//! Regenerate only for an intended sound change: `KABL_BLESS=1 cargo test -p kabl-engine --test
-//! legacy_patches`.
+//! Every patch that shipped before functional cables (listed in `golden/legacy_hashes.txt`,
+//! rendered at 2195de0: `patches/` and the schema-v1 fixtures) still renders bit-identically.
+//! Patches added later are not listed and not checked here.
 
-use std::fmt::Write as _;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use kabl_engine::compile::compile;
-
-fn patch_dirs() -> Vec<PathBuf> {
-    fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
-        if dir.join("meta.toml").exists() {
-            out.push(dir.to_path_buf());
-        }
-        let mut subs: Vec<_> = std::fs::read_dir(dir)
-            .unwrap()
-            .flatten()
-            .map(|e| e.path())
-            .filter(|p| p.is_dir())
-            .collect();
-        subs.sort();
-        for s in subs {
-            walk(&s, out);
-        }
-    }
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-    let mut out = Vec::new();
-    walk(&root.join("../patches"), &mut out);
-    walk(&root.join("core/tests/fixtures"), &mut out);
-    out
-}
 
 /// FNV-1a over the f32 bit patterns of 400 blocks: a chord on three voices, released at 250.
 fn render_hash(dir: &Path) -> Option<u64> {
@@ -60,24 +35,13 @@ fn render_hash(dir: &Path) -> Option<u64> {
 #[test]
 fn shipped_patches_sound_unchanged() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let mut now = String::new();
-    for d in patch_dirs() {
-        let rel = d
-            .canonicalize()
-            .unwrap()
-            .strip_prefix(repo.canonicalize().unwrap())
-            .unwrap()
-            .to_string_lossy()
-            .into_owned();
-        match render_hash(&d) {
-            Some(h) => writeln!(now, "{rel} {h:016x}").unwrap(),
-            None => writeln!(now, "{rel} unloadable").unwrap(),
-        }
-    }
     let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/legacy_hashes.txt");
-    if std::env::var_os("KABL_BLESS").is_some() {
-        std::fs::write(&golden, &now).unwrap();
-        return;
+    let text = std::fs::read_to_string(golden).unwrap();
+    assert!(text.lines().count() >= 24);
+    for line in text.lines() {
+        let (name, want) = line.split_once(' ').unwrap();
+        let got =
+            render_hash(&repo.join(name)).map_or("unloadable".to_string(), |h| format!("{h:016x}"));
+        assert_eq!(got, want, "{name} no longer renders as before");
     }
-    assert_eq!(now, std::fs::read_to_string(golden).unwrap());
 }
