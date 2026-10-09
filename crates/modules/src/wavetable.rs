@@ -17,6 +17,8 @@ pub const FRAME: usize = 2048;
 pub const MAX_FRAMES: usize = 64;
 const MAX_HARMONICS: usize = FRAME / 4;
 pub const LEVELS: usize = 10;
+/// Longest frame `import_wav` resamples (the resampling costs frame length x 512).
+pub const MAX_FRAME_SAMPLES: usize = 32768;
 /// Largest .wav accepted by `import_wav` (bytes).
 pub const MAX_IMPORT_BYTES: usize = 32 * 1024 * 1024;
 
@@ -28,6 +30,8 @@ pub enum TableError {
     TooShort,
     TooLarge,
     TooManyFrames(usize),
+    /// A frame (or a whole file taken as one cycle) longer than `MAX_FRAME_SAMPLES`.
+    FrameTooLong(usize),
     Silent,
     NotFinite,
     NotCanonical,
@@ -44,6 +48,10 @@ impl std::fmt::Display for TableError {
             TableError::TooManyFrames(n) => {
                 write!(f, "{n} frames; a table holds at most {MAX_FRAMES}")
             }
+            TableError::FrameTooLong(n) => write!(
+                f,
+                "a {n}-sample frame; use a multiple of 2048 samples, or one cycle of at most {MAX_FRAME_SAMPLES}"
+            ),
             TableError::Silent => write!(f, "the table is silent"),
             TableError::NotFinite => write!(f, "contains NaN or infinite samples"),
             TableError::NotCanonical => {
@@ -136,7 +144,13 @@ impl WaveTable {
     pub fn read(&self, level: usize, pos: f32, phase: f32) -> f32 {
         let lv = &self.levels[level];
         let stride = lv.len + 1;
-        let fpos = pos.clamp(0.0, 1.0) * (self.frames - 1) as f32;
+        // NaN (a NaN on a CV input) reads the first frame.
+        let pos = if pos.is_nan() {
+            0.0
+        } else {
+            pos.clamp(0.0, 1.0)
+        };
+        let fpos = pos * (self.frames - 1) as f32;
         let f0 = fpos as usize;
         let fr = fpos - f0 as f32;
         let f1 = (f0 + 1).min(self.frames - 1);
@@ -156,11 +170,17 @@ impl WaveTable {
     /// The table from canonical bytes (what `import_wav` returns), shared with every other
     /// caller that decoded the same bytes.
     pub fn from_canonical_cached(bytes: &[u8]) -> Result<Arc<WaveTable>, TableError> {
-        static CACHE: OnceLock<Mutex<HashMap<u64, Weak<WaveTable>>>> = OnceLock::new();
+        type Key = (usize, u64, u64);
+        static CACHE: OnceLock<Mutex<HashMap<Key, Weak<WaveTable>>>> = OnceLock::new();
         use std::hash::{Hash, Hasher};
-        let mut h = std::collections::hash_map::DefaultHasher::new();
-        bytes.hash(&mut h);
-        let key = h.finish();
+        // Length plus two differently seeded hashes: a wrong-table hit needs all three to collide.
+        let hash = |salt: u8| {
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            salt.hash(&mut h);
+            bytes.hash(&mut h);
+            h.finish()
+        };
+        let key = (bytes.len(), hash(0), hash(1));
         let mut cache = CACHE.get_or_init(Default::default).lock().unwrap();
         if let Some(t) = cache.get(&key).and_then(Weak::upgrade) {
             return Ok(t);
@@ -365,6 +385,9 @@ pub fn import_wav(bytes: &[u8]) -> Result<Vec<u8>, TableError> {
         _ if n >= FRAME && n % FRAME == 0 => FRAME,
         _ => n,
     };
+    if frame_len > MAX_FRAME_SAMPLES {
+        return Err(TableError::FrameTooLong(frame_len));
+    }
     let count = n / frame_len;
     if count > MAX_FRAMES {
         return Err(TableError::TooManyFrames(count));
@@ -384,6 +407,43 @@ pub fn import_wav(bytes: &[u8]) -> Result<Vec<u8>, TableError> {
         .map(|f| f.iter().map(|&v| (v / peak * 0.98) as f32).collect())
         .collect();
     Ok(canonical_wav(&frames))
+}
+
+/// A table name safe to embed (`kabl_core::Table::validate`): the file name with anything but
+/// letters, digits, `-`, `_` and `.` replaced, at most 80 bytes.
+pub fn table_name(file_name: &str) -> String {
+    let mut name: String = file_name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || "-_.".contains(c) {
+                c
+            } else {
+                '_'
+            }
+        })
+        .take(80)
+        .collect();
+    if name.is_empty() || name == "." || name == ".." {
+        name = "table.wav".into();
+    }
+    name
+}
+
+/// Reads and imports a .wav file: `(embeddable name, canonical bytes)`. Control thread only.
+pub fn import_file(path: &std::path::Path) -> Result<(String, Vec<u8>), String> {
+    let shown = path.display();
+    let len = std::fs::metadata(path)
+        .map_err(|e| format!("{shown}: {e}"))?
+        .len();
+    if len > MAX_IMPORT_BYTES as u64 {
+        return Err(format!("{shown}: {}", TableError::TooLarge));
+    }
+    let bytes = std::fs::read(path).map_err(|e| format!("{shown}: {e}"))?;
+    let canonical = import_wav(&bytes).map_err(|e| format!("{shown}: {e}"))?;
+    let file = path
+        .file_name()
+        .map_or(String::new(), |f| f.to_string_lossy().into_owned());
+    Ok((table_name(&file), canonical))
 }
 
 /// Canonical bytes for `frames` (each `FRAME` samples in -1..1).

@@ -250,6 +250,27 @@ impl PatchEditor {
         self.append(Op::SetTable { slot, value: table });
     }
 
+    /// Imports .wav bytes into wavetable slot `slot` (1-8) as one undo step. Refuses, leaving
+    /// the patch unchanged, a file that is not a usable wavetable or would push the saved
+    /// patch past the size every host project and browser document is held to.
+    pub fn import_table(&mut self, slot: u64, name: &str, wav: &[u8]) -> Result<(), String> {
+        let table = kabl_core::Table {
+            name: kabl_modules::wavetable::table_name(name),
+            wav: kabl_modules::wavetable::import_wav(wav).map_err(|e| e.to_string())?,
+        };
+        let mut candidate = self.state().clone();
+        candidate.tables.insert(slot, table.clone());
+        kabl_core::composite::validate(&candidate)?;
+        let size = serde_json::to_vec(&candidate)
+            .map_err(|e| e.to_string())?
+            .len();
+        if size > 2 * 1024 * 1024 - 16 * 1024 {
+            return Err("The sound would be too large to save with this table".into());
+        }
+        self.set_table(slot, Some(table));
+        Ok(())
+    }
+
     /// Adds a module of `kind` at `pos`. `kind` isn't validated against the registry here — an
     /// unknown kind produces a patch `compile()` will reject with `CompileError::UnknownKind`,
     /// exactly the same error path a corrupt saved file would hit; the editor doesn't need its

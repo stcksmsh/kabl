@@ -1,0 +1,12 @@
+name = "Glass Bells"
+category = "Keys"
+tags = [
+    "fm",
+    "bell",
+    "poly",
+    "inharmonic",
+    "ringing",
+]
+description = "Two inharmonic FM pairs that ring and fade on their own, whatever the key does. Short notes are enough; leave room for the tails."
+keys = true
+sequence = false

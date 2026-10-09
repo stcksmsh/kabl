@@ -3,7 +3,7 @@
 
 mod common;
 use common::*;
-use kabl_modules::builtins::{OscFm, FEEDBACK_MAX_RAD};
+use kabl_modules::builtins::OscFm;
 
 /// One block of a modulator->carrier pair. `fc` and `fm` are the operators' `base_hz` at pitch 0
 /// (ratio 1), so the pair is exactly where the test says whatever the ratio params.
@@ -86,7 +86,7 @@ fn unmodulated_operator_is_a_clean_sine_at_the_ratio_frequency() {
         let peak = (0..p.len()).max_by(|&a, &b| p[a].total_cmp(&p[b])).unwrap();
         let hz = peak as f64 * SR as f64 / x.len() as f64;
         assert!(
-            (hz - want as f64).abs() < 3.0,
+            (hz - want).abs() < 3.0,
             "ratio {ratio} fine {fine}: {hz} Hz, want {want}"
         );
         let (_, total) = alias_db(&x, hz as f32, SR, 20000.0);
@@ -95,13 +95,12 @@ fn unmodulated_operator_is_a_clean_sine_at_the_ratio_frequency() {
 }
 
 #[test]
-fn zero_index_ignores_the_pm_input() {
+fn zero_index_leaves_a_clean_sine_whatever_the_pm_input_carries() {
     let (mut m, mut c) = pair(1000.0, 370.0, 0.0, 0.0, true);
-    let with = run(&mut m, &mut c, 4096);
-    let mut alone = Rig::new("osc.fm", &[("base_hz", 1000.0), ("index", 0.0)], SR);
-    let without = alone.render(4096, 0, |_, _| 0.0);
-    // The same sine, one filter latency apart in phase alignment is not allowed: bit-equal.
-    assert_eq!(with, without);
+    let x = run(&mut m, &mut c, 4096 + 16384)[4096..].to_vec();
+    let (_, total) = alias_db(&x, 1000.0, SR, 20000.0);
+    assert!(total < -80.0, "{total} dB");
+    assert!((peak(&x) - 1.0).abs() < 0.01);
 }
 
 #[test]
@@ -116,6 +115,31 @@ fn sidebands_follow_the_bessel_functions() {
                 (got - want).abs() < 0.01 + 0.02 * want,
                 "I={index} k={k}: {got:.4}, J = {want:.4}"
             );
+        }
+    }
+}
+
+#[test]
+fn one_to_one_pair_matches_zero_latency_fm_at_every_pitch_and_has_no_dc() {
+    // sin(t + I sin t) has harmonic n of amplitude |J(n-1)(I) + (-1)^n J(n+1)(I)|. The operators'
+    // internal latency must not shift the modulator's phase against the carrier's, or the low
+    // harmonics (where positive and negative sidebands overlap) would change with pitch and the
+    // wave would gain a DC offset.
+    for hz in [130.8f32, 261.6, 523.3, 1046.5, 1568.0] {
+        for index in [1.0f32, 2.5] {
+            let x = fm(hz, hz, index, 0.0, true);
+            let dc = x.iter().sum::<f32>() / x.len() as f32;
+            assert!(dc.abs() < 0.004, "{hz} Hz I={index}: DC {dc}");
+            for n in 1..=5 {
+                let sign = if n % 2 == 0 { 1.0 } else { -1.0 };
+                let want =
+                    (bessel_j(n - 1, index as f64) + sign * bessel_j(n + 1, index as f64)).abs();
+                let got = line(&x, hz * n as f32);
+                assert!(
+                    (got - want).abs() < 0.012,
+                    "{hz} Hz I={index} harmonic {n}: {got:.4}, ideal {want:.4}"
+                );
+            }
         }
     }
 }
@@ -167,7 +191,6 @@ fn feedback_brightens_and_stays_bounded_and_periodic() {
         total < -80.0,
         "feedback at 440 Hz: {total:.1} dB (not periodic or aliased)"
     );
-    assert!(FEEDBACK_MAX_RAD <= 2.0);
 }
 
 #[test]
@@ -191,7 +214,8 @@ fn extreme_settings_never_produce_nan_or_runaway() {
     }
     // A NaN on the inputs cannot poison the operator for good.
     let nan = [f32::NAN; BLOCK];
-    c.block(&[&nan, &nan]);
+    let bad = c.block(&[&nan, &nan]);
+    assert!(bad[0].iter().all(|v| v.is_finite()));
     let after = c.block(&[&pitch, &[0.0; BLOCK]])[0];
     assert!(after.iter().all(|v| v.is_finite()));
 }
@@ -220,5 +244,32 @@ fn level_scales_the_output() {
     let b = half.render(2048, 0, |_, _| 0.0);
     for (x, y) in a.iter().zip(&b) {
         assert!((x * 0.5 - y).abs() < 1e-6);
+    }
+}
+
+/// Not a check: the alias table in docs/sound-engines/README.md.
+/// `cargo test -p kabl-modules --test fm print_alias_table -- --ignored --nocapture`
+#[test]
+#[ignore]
+fn print_alias_table() {
+    println!("carrier Hz  modulator Hz  index  feedback | plain-rate dB | 2x dB   (non-harmonic power below 20 kHz)");
+    for &(fc, fm_hz, idx, fb) in &[
+        (440.3, 440.3, 8.0, 0.0),
+        (997.3, 997.3, 8.0, 0.0),
+        (2113.7, 2113.7, 8.0, 0.0),
+        (1471.1, 2942.2, 5.0, 0.0),
+        (3331.3, 3331.3, 10.0, 0.0),
+        (883.7, 2651.1, 12.0, 0.0),
+        (2113.7, 2113.7, 16.0, 0.0),
+        (440.3, 440.3, 0.0, 1.0),
+        (1760.3, 1760.3, 0.0, 0.5),
+        (1760.3, 1760.3, 0.0, 1.0),
+    ] {
+        let db = |os| alias_db(&fm(fc, fm_hz, idx, fb, os), fc, SR, 20000.0).1;
+        println!(
+            "{fc:10.1} {fm_hz:13.1} {idx:6.1} {fb:9.2} | {:13.1} | {:6.1}",
+            db(false),
+            db(true)
+        );
     }
 }

@@ -317,9 +317,16 @@ fn missing_user_table_plays_the_factory_table() {
 }
 
 #[test]
+fn nan_position_input_reads_the_first_frame_not_nan() {
+    let t = wavetable::factory(5);
+    assert_eq!(t.read(0, f32::NAN, 0.3), t.read(0, 0.0, 0.3));
+}
+
+#[test]
 fn nan_pitch_does_not_poison_the_phase() {
     let mut r = Rig::new("osc.wt", &[], SR);
-    r.block(&[&[f32::NAN; BLOCK]]);
+    let bad = r.block(&[&[f32::NAN; BLOCK]]);
+    assert!(bad[0].iter().all(|v| v.is_finite()));
     let x = r.block(&[&[0.0; BLOCK]])[0];
     assert!(x.iter().all(|v| v.is_finite()));
 }
@@ -469,6 +476,16 @@ fn import_errors_are_specific() {
             &[]
         )),
         Err(TableError::TooManyFrames(65))
+    );
+    // One cycle too long to resample in reasonable time, and a clm frame length that is too long.
+    assert_eq!(
+        wavetable::import_wav(&wav(1, 16, 1, &vec![0.5; 100_000], &[])),
+        Err(TableError::FrameTooLong(100_000))
+    );
+    let clm = b"<!>50000 10000000 wavetable (test)".to_vec();
+    assert_eq!(
+        wavetable::import_wav(&wav(1, 16, 1, &vec![0.5; 100_000], &[(b"clm ", clm)])),
+        Err(TableError::FrameTooLong(50_000))
     );
     let mut huge = ok.clone();
     huge.resize(wavetable::MAX_IMPORT_BYTES + 1, 0);

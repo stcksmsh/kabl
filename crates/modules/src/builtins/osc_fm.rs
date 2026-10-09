@@ -144,6 +144,13 @@ pub const RATIO_LABELS: [&str; 33] = [
 pub const FEEDBACK_MAX_RAD: f32 = 2.0;
 
 const TAPS: usize = 33;
+/// Samples a signal is late after one operator: 2 for the `pm` interpolation, 8 for the
+/// filter (16 taps at the doubled rate). A modulated operator runs its own phase this much
+/// behind, so it lines up with the late modulation and a 1:1 pair keeps the spectrum of the
+/// ideal zero-latency pair at every pitch.
+const HOP: f32 = 10.0;
+/// The `modulated` estimate settles over about this long, so the phase shift never clicks.
+const MODULATED_TAU_S: f32 = 0.02;
 
 /// Kaiser-windowed sinc low-pass at the base-rate Nyquist (a quarter of the 2x rate): 17.5 kHz
 /// passband and 30.5 kHz stop band at 48 kHz, over 70 dB down, unity gain at DC.
@@ -192,6 +199,8 @@ struct Core {
     level: f32,
     index: f32,
     feedback: f32,
+    /// How much of the time the `pm` input has carried signal, 0..1 (smoothed); see `HOP`.
+    modulated: f32,
 }
 
 pub struct OscFm {
@@ -213,6 +222,7 @@ impl OscFm {
                 level: -1.0,
                 index: -1.0,
                 feedback: -1.0,
+                modulated: 0.0,
             },
             sample_rate: 48000.0,
             taps: lowpass(),
@@ -281,18 +291,29 @@ impl Module for OscFm {
         );
         let (mut level, mut index, mut fb) = (c.level, c.index, c.feedback);
         let sr = self.sample_rate;
+        let hop = if self.oversample { HOP } else { 0.0 };
+        let has_signal = match pm {
+            crate::io::Signal::Scalar(v) => v != 0.0,
+            crate::io::Signal::Buffer(b) => b[..n].iter().any(|v| v.abs() > 1e-4),
+        };
+        let target = if has_signal { 1.0 } else { 0.0 };
+        let k_mod = 1.0 - (-1.0 / (MODULATED_TAU_S * sr)).exp();
+        let mut modulated = c.modulated;
         let out = &mut io.output(OUT)[..n];
         for (i, o) in out.iter_mut().enumerate() {
             level += dl;
             index += di;
             fb += df;
+            modulated += (target - modulated) * k_mod;
             let dt = base_hz.at(i) * 2f32.powf(pitch.at(i) / 12.0) * mult
                 / sr
                 / if self.oversample { 2.0 } else { 1.0 };
             let p0 = pm.at(i);
+            // Cycles of lag, from the 1x phase increment (`dt` is per internal sample).
+            let lag = -hop * modulated * dt * if self.oversample { 2.0 } else { 1.0 };
             let step = |c: &mut Core, m: f32| -> f32 {
                 let fbk = fb * FEEDBACK_MAX_RAD * 0.5 * (c.y1 + c.y2);
-                let y = sin_cycles(c.phase + (index * m + fbk) * (1.0 / TAU));
+                let y = sin_cycles(c.phase + lag + (index * m + fbk) * (1.0 / TAU));
                 c.y2 = c.y1;
                 c.y1 = y;
                 c.phase += dt;
@@ -315,11 +336,13 @@ impl Module for OscFm {
                 step(c, p0)
             };
             c.pm = [p0, c.pm[0], c.pm[1], c.pm[2], c.pm[3]];
-            *o = level * y;
+            // A NaN on an input must not reach the buffers downstream modules read.
+            *o = if y.is_finite() { level * y } else { 0.0 };
         }
         c.level = level_t;
         c.index = index_t;
         c.feedback = fb_t;
+        c.modulated = modulated;
         if !c.phase.is_finite() {
             c.phase = 0.0;
         }

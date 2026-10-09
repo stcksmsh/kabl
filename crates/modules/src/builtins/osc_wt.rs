@@ -185,6 +185,9 @@ impl Module for OscWt {
         let fine = 2f32.powf(io.param(FINE_PARAM).at(0) / 1200.0);
         let user = io.param(USER_PARAM).at(0).round() > 0.0;
         let n = io.block_len();
+        if n == 0 {
+            return;
+        }
         let sr = self.sample_rate;
 
         let table: &WaveTable = match (&self.user, user) {
@@ -200,7 +203,7 @@ impl Module for OscWt {
             crate::io::Signal::Scalar(v) => v,
             crate::io::Signal::Buffer(b) => b[..n].iter().fold(f32::MIN, |m, &v| m.max(v)),
         };
-        let dt_max = base_hz.at(0).max(base_hz.at(n - 1)) * 2f32.powf(top / 12.0) * fine / sr;
+        let dt_max = base_hz.at(0) * 2f32.powf(top / 12.0) * fine / sr;
         let level = table.level_for(dt_max);
 
         let out = &mut io.output(OUT)[..n];
@@ -209,6 +212,7 @@ impl Module for OscWt {
         for (i, o) in out.iter_mut().enumerate() {
             position += step;
             let dt = base_hz.at(i) * 2f32.powf(pitch.at(i) / 12.0) * fine / sr;
+            let dt = if dt.is_finite() { dt } else { 0.0 };
             *o = table.read(level, position + pos_in.at(i) * depth, phase);
             phase += dt;
             phase -= phase.floor();
