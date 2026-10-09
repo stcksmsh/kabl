@@ -52,7 +52,7 @@ const fn g(
 }
 
 /// The piece. Bars 0-4: intro (a sparse arp, a held pad). 4-31 build. 31-38 peak. 38-45 break.
-/// 45-53 return. 53-70 outro.
+/// 45-53 return (snaps in on the downbeat of bar 45). 53-70 outro.
 const GESTURES: [Gesture; 12] = [
     g(
         "echo",
@@ -80,12 +80,12 @@ const GESTURES: [Gesture; 12] = [
         "bass filter: shut to a busy five against four",
     ),
     g(
-        "hats",
+        "bells",
         0.0,
         1.0,
         23.0,
         25.5,
-        "hats: none to a chancy sixteen",
+        "bells: none to a chancy sixteen",
     ),
     g("pad", 0.0, 1.0, 28.0, 31.0, "pad: held to chopped"),
     g(
@@ -96,14 +96,21 @@ const GESTURES: [Gesture; 12] = [
         39.0,
         "break: the band cut to two stabs, the echoes ring",
     ),
-    g("bus", 0.0, 1.0, 45.0, 46.5, "return: everything back"),
+    g(
+        "bus",
+        0.0,
+        1.0,
+        44.6,
+        45.0,
+        "return: everything back on the downbeat",
+    ),
     g("pad", 1.0, 0.0, 53.0, 54.5, "pad: back to held"),
     g("bass", 1.0, 0.0, 56.5, 58.5, "bass: out"),
-    g("hats", 1.0, 0.0, 60.5, 62.0, "hats: out"),
+    g("bells", 1.0, 0.0, 60.5, 62.0, "bells: out"),
     g("arp", 1.0, 0.0, 64.0, 65.5, "arp: thins out"),
 ];
 
-const CABLES: [&str; 7] = ["echo", "arp", "bass", "filter", "hats", "pad", "bus"];
+const CABLES: [&str; 7] = ["echo", "arp", "bass", "filter", "bells", "pad", "bus"];
 
 /// A cable's morph (0..1) at `bar`, from the gestures.
 fn morph_at(cable: &str, bar: f32) -> f32 {
@@ -196,9 +203,9 @@ fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
     let bass_vca = e.add_module("vca", at(1020.0, 300.0));
     let drive = e.add_module("drive", at(1220.0, 300.0));
     let knob = e.add_module("macro", at(620.0, 560.0));
-    let noise = e.add_module("noise", at(420.0, 560.0));
-    let hat_filter = e.add_module("filter.svf", at(820.0, 560.0));
-    let hat_gain = e.add_module("gain", at(1020.0, 560.0));
+    let bell = e.add_module("osc.va", at(420.0, 560.0));
+    let bell_env = e.add_module("env.adsr", at(820.0, 560.0));
+    let bell_vca = e.add_module("vca", at(1020.0, 560.0));
     let pad_a = e.add_module("osc.va", at(20.0, 820.0));
     let pad_b = e.add_module("osc.va", at(220.0, 820.0));
     let pad_c = e.add_module("osc.va", at(420.0, 820.0));
@@ -266,10 +273,14 @@ fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
     e.set_param(drive, "mix", 100.0);
     e.set_param(drive, "trim_db", -2.0);
     e.set_param(knob, "m1", 1.0);
-    e.set_param(noise, "color", 0.0);
-    e.set_param(hat_filter, "cutoff_hz", 2000.0);
-    e.set_param(hat_filter, "resonance", 0.85);
-    e.set_param(hat_gain, "gain_db", 16.0);
+    // Bells: a triangle two octaves above the arp, following its notes, with a short decay.
+    e.set_param(bell, "waveform", 1.0);
+    e.set_param(bell, "base_hz", 1046.5);
+    e.set_param(bell_env, "attack_ms", 1.0);
+    e.set_param(bell_env, "decay_ms", 120.0);
+    e.set_param(bell_env, "sustain", 0.0);
+    e.set_param(bell_env, "release_ms", 80.0);
+    e.set_param(bell_vca, "gain", 0.0);
     // Pad: open fifths over the chord root, detuned unison, under a slowly moving filter.
     for (osc, hz) in [(pad_a, 329.63), (pad_b, 440.0), (pad_c, 659.25)] {
         e.set_param(osc, "waveform", 2.0);
@@ -286,7 +297,7 @@ fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
     }
     e.set_param(rhythm, "level1", 1.0);
     e.set_param(rhythm, "level2", 0.7);
-    e.set_param(bus, "level1", 0.16);
+    e.set_param(bus, "level1", 0.19);
     e.set_param(bus, "level2", 0.7);
     e.set_param(bus, "level3", 0.11);
     e.set_param(bus, "level4", 0.11);
@@ -363,10 +374,13 @@ fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
     );
     cable_params(&mut e, c, &p);
     ids.insert("filter", c);
-    // Hats: filtered noise gated by a cable. A: nothing. B: sixteen steps, some by chance.
-    e.connect(jack(noise, "out"), jack(hat_filter, "in"));
-    e.connect(jack(hat_filter, "bp"), jack(hat_gain, "in"));
-    let c = e.connect(jack(hat_gain, "out"), jack(rhythm, "in2"));
+    // Bells: struck on every sixteenth, a cable decides which are heard. A: none. B: sixteen
+    // steps, some by chance.
+    e.connect(jack(clock, "gate"), jack(bell_env, "gate"));
+    e.connect(jack(arp_seq, "pitch"), jack(bell, "pitch"));
+    e.connect(jack(bell, "out"), jack(bell_vca, "in"));
+    e.connect(jack(bell_env, "out"), jack(bell_vca, "cv"));
+    let c = e.connect(jack(bell_vca, "out"), jack(rhythm, "in2"));
     let b = [
         1.0, 0.0, 0.6, 0.0, 1.0, 0.0, 0.6, 0.35, 1.0, 0.0, 0.6, 0.0, 1.0, 0.6, 0.6, 0.35,
     ];
@@ -380,7 +394,7 @@ fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
     ];
     let p = pattern(&[0.0; 16], &b, &[], &chance, 3.0, 0.0);
     cable_params(&mut e, c, &p);
-    ids.insert("hats", c);
+    ids.insert("bells", c);
     e.connect(jack(rhythm, "out"), jack(master, "in1"));
     // Pad, transposed with the chords.
     for osc in [pad_a, pad_b, pad_c] {
@@ -401,12 +415,12 @@ fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
     let p = pattern(&a, &on, &[], &[], 45.0, 0.0);
     cable_params(&mut e, c, &p);
     ids.insert("pad", c);
-    // The whole dry band (`master`: bass, hats, pad, arp) passes the bus cable; the echoes join
+    // The whole dry band (`master`: bass, bells, pad, arp) passes the bus cable; the echoes join
     // after it. A: two stabs a bar, the echoes ring between them. B: open.
     let c = e.connect(jack(master, "out"), jack(bus, "in1"));
     let mut a = [0.0; 16];
     a[0] = 1.0;
-    a[8] = 0.9;
+    a[8] = 0.5;
     let p = pattern(&a, &[1.0; 16], &[(9, 75.0)], &[], 5.0, 1.0);
     cable_params(&mut e, c, &p);
     ids.insert("bus", c);
