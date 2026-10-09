@@ -28,6 +28,26 @@ fn factory() -> PathBuf {
 /// Every factory sound: (dir, name, category, tags, description).
 const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
     (
+        "functional-cables/echo-throws",
+        "Echo Throws",
+        "Piece",
+        &["sequenced", "functional cables", "probability", "112bpm"],
+        "A self-playing arpeggio. The cable from the voice to the delay opens on three of eight \
+         steps and passes 60 % of the time, so echoes are thrown at the notes by chance. The \
+         pitch cable moves to a new note 70 % of the time and otherwise holds the last one. \
+         Right-click a cable, Pattern, to edit.",
+    ),
+    (
+        "functional-cables/five-against-eight",
+        "Five Against Eight",
+        "Piece",
+        &["sequenced", "functional cables", "polymeter", "104bpm"],
+        "An 8-step bass line. A 5-step pattern on the modulation route into the filter cutoff \
+         moves the tone against it, so the two realign only every 40 steps, and one cutoff step \
+         passes 70 % of the time. A 16-step pattern on the pad's cable chops it into a gate. \
+         Open a cable's Pattern editor to change either.",
+    ),
+    (
         "palette/keyboard-bass",
         "Round Keyboard Bass",
         "Bass",
