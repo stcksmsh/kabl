@@ -51,6 +51,7 @@ fn time(kind_chain: &[&str], set: &[(&str, f32)], tweak: impl Fn(&mut dyn Module
         let mut feed;
         let mut outs: Vec<[f32; BLOCK]> = vec![[0.0; BLOCK]; infos.len()];
         let pitch = [3.0f32; BLOCK];
+        let ones = [1.0f32; BLOCK];
         let start = Instant::now();
         for _ in 0..blocks {
             feed = [0.0; BLOCK];
@@ -62,6 +63,7 @@ fn time(kind_chain: &[&str], set: &[(&str, f32)], tweak: impl Fn(&mut dyn Module
                     .map(|p| match p.name {
                         "pitch" => Signal::Buffer(&pitch),
                         "pm" | "in" => Signal::Buffer(&feed),
+                        "gate" | "velocity" => Signal::Buffer(&ones),
                         _ => Signal::Buffer(&[0.0; BLOCK]),
                     })
                     .collect();
@@ -82,6 +84,21 @@ fn time(kind_chain: &[&str], set: &[(&str, f32)], tweak: impl Fn(&mut dyn Module
     best.sort_by(|a, b| a.total_cmp(b));
     best[best.len() / 2]
 }
+
+const CHAIN4: [(&str, f32); 2] = [("level3", 0.5), ("level4", 0.4)];
+const CHAIN6: [(&str, f32); 4] = [
+    ("level3", 0.5),
+    ("level4", 0.4),
+    ("level5", 0.3),
+    ("level6", 0.2),
+];
+const CHAIN6_4X: [(&str, f32); 5] = [
+    ("level3", 0.5),
+    ("level4", 0.4),
+    ("level5", 0.3),
+    ("level6", 0.2),
+    ("oversample", 1.0),
+];
 
 fn main() {
     let plain = |m: &mut dyn Module| {
@@ -119,6 +136,30 @@ fn main() {
         (
             "four-operator chain, 2x",
             time(&["osc.fm", "osc.fm", "osc.fm", "osc.fm"], &[], |_| {}),
+        ),
+        (
+            "osc.fm operator, 4x",
+            time(&["osc.fm"], &[("oversample", 1.0)], |_| {}),
+        ),
+        (
+            "osc.fm6, 2x, 1 op sounding",
+            time(&["osc.fm6"], &[("algorithm", 7.0), ("level2", 0.0)], |_| {}),
+        ),
+        (
+            "osc.fm6, 2x, 2 ops (default)",
+            time(&["osc.fm6"], &[], |_| {}),
+        ),
+        (
+            "osc.fm6, 2x, 4-op chain",
+            time(&["osc.fm6"], &CHAIN4, |_| {}),
+        ),
+        (
+            "osc.fm6, 2x, 6-op chain",
+            time(&["osc.fm6"], &CHAIN6, |_| {}),
+        ),
+        (
+            "osc.fm6, 4x, 6-op chain",
+            time(&["osc.fm6"], &CHAIN6_4X, |_| {}),
         ),
     ];
     println!(

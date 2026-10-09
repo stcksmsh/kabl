@@ -137,14 +137,38 @@ pub struct Algorithm {
 }
 
 pub const ALGORITHMS: [Algorithm; 8] = [
-    Algorithm { mods: [1 << 1, 1 << 2, 1 << 3, 1 << 4, 1 << 5, 0], carriers: 0b000001 },
-    Algorithm { mods: [1 << 1, 0, 1 << 3, 0, 1 << 5, 0], carriers: 0b010101 },
-    Algorithm { mods: [1 << 1, 1 << 2, 0, 1 << 4, 1 << 5, 0], carriers: 0b001001 },
-    Algorithm { mods: [1 << 1, 0, 1 << 3, 1 << 4, 1 << 5, 0], carriers: 0b000101 },
-    Algorithm { mods: [0b111110, 0, 0, 0, 0, 0], carriers: 0b000001 },
-    Algorithm { mods: [1 << 5, 1 << 5, 1 << 5, 1 << 5, 1 << 5, 0], carriers: 0b011111 },
-    Algorithm { mods: [(1 << 1) | (1 << 2), 1 << 3, 1 << 4, 1 << 5, 0, 0], carriers: 0b000001 },
-    Algorithm { mods: [0; OPS], carriers: 0b111111 },
+    Algorithm {
+        mods: [1 << 1, 1 << 2, 1 << 3, 1 << 4, 1 << 5, 0],
+        carriers: 0b000001,
+    },
+    Algorithm {
+        mods: [1 << 1, 0, 1 << 3, 0, 1 << 5, 0],
+        carriers: 0b010101,
+    },
+    Algorithm {
+        mods: [1 << 1, 1 << 2, 0, 1 << 4, 1 << 5, 0],
+        carriers: 0b001001,
+    },
+    Algorithm {
+        mods: [1 << 1, 0, 1 << 3, 1 << 4, 1 << 5, 0],
+        carriers: 0b000101,
+    },
+    Algorithm {
+        mods: [0b111110, 0, 0, 0, 0, 0],
+        carriers: 0b000001,
+    },
+    Algorithm {
+        mods: [1 << 5, 1 << 5, 1 << 5, 1 << 5, 1 << 5, 0],
+        carriers: 0b011111,
+    },
+    Algorithm {
+        mods: [(1 << 1) | (1 << 2), 1 << 3, 1 << 4, 1 << 5, 0, 0],
+        carriers: 0b000001,
+    },
+    Algorithm {
+        mods: [0; OPS],
+        carriers: 0b111111,
+    },
 ];
 
 const TAPS: usize = 33;
@@ -257,7 +281,11 @@ impl Module for OscFm6 {
         let fb_t = io.param(FEEDBACK).at(0);
         let index_t = io.param(INDEX).at(0);
         let master = 2f32.powf(io.param(FINE).at(0) / 1200.0);
-        let want = if io.param(OVERSAMPLE).at(0) >= 0.5 { 4 } else { 2 };
+        let want = if io.param(OVERSAMPLE).at(0) >= 0.5 {
+            4
+        } else {
+            2
+        };
         let n = io.block_len();
         let sr = self.sample_rate;
         let c = &mut self.c;
@@ -296,19 +324,18 @@ impl Module for OscFm6 {
 
         let out = &mut io.output(OUT)[..n];
         for (i, o) in out.iter_mut().enumerate() {
-            for k in 0..OPS {
-                c.level[k] += step_l[k];
+            for (l, d) in c.level.iter_mut().zip(&step_l) {
+                *l += d;
             }
             c.index += step_i;
             c.feedback += step_f;
 
             let g = gate.at(i);
             if g > 0.5 && c.last_gate <= 0.5 {
-                for k in 0..OPS {
-                    c.phase[k] = 0.0;
-                    c.stage[k] = ATTACKING;
-                    c.velocity[k] = (1.0 - vel[k]) + vel[k] * velocity.at(i);
-                }
+                c.phase = [0.0; OPS];
+                c.stage = [ATTACKING; OPS];
+                let v = velocity.at(i);
+                c.velocity = vel.map(|s| (1.0 - s) + s * v);
                 c.y1 = 0.0;
                 c.y2 = 0.0;
             } else if g <= 0.5 && c.last_gate > 0.5 {
@@ -357,8 +384,8 @@ impl Module for OscFm6 {
                 c.line = [0.0; TAPS4];
                 c.y1 = 0.0;
                 c.y2 = 0.0;
-                for k in 0..OPS {
-                    c.phase[k] = (c.phase[k] + dt1 * ratio[k]).fract();
+                for (p, r) in c.phase.iter_mut().zip(&ratio) {
+                    *p = (*p + dt1 * r).fract();
                 }
                 *o = 0.0;
                 c.ring.push(0.0);
@@ -383,7 +410,11 @@ impl Module for OscFm6 {
                             m += op[bits.trailing_zeros() as usize];
                             bits &= bits - 1;
                         }
-                        let fbt = if k == OPS - 1 { fb * 0.5 * (c.y1 + c.y2) } else { 0.0 };
+                        let fbt = if k == OPS - 1 {
+                            fb * 0.5 * (c.y1 + c.y2)
+                        } else {
+                            0.0
+                        };
                         op[k] = amp[k] * (c.phase[k] * TAU + m * depth + fbt).sin();
                     }
                     c.phase[k] += inc[k];
@@ -452,6 +483,7 @@ impl Module for OscFm6 {
     fn carry_from(&mut self, old: &dyn Module) {
         if let Some(o) = old.as_any().downcast_ref::<OscFm6>() {
             self.c = o.c;
+            self.factor = o.factor;
         }
     }
 }

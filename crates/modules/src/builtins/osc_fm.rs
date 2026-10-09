@@ -20,11 +20,11 @@
 
 use std::f32::consts::TAU;
 
+use crate::fmdsp::{lowpass, weights4};
 use crate::info::{
     Category, ModuleInfo, ParamInfo, PortDirection, PortInfo, PortType, QualitySupport, Rate, Taper,
 };
 use crate::io::ProcessIo;
-use crate::fmdsp::{lowpass, weights4};
 use crate::module::{Module, QualityConfig, StateReader, StateWriter};
 use crate::view::{ModuleView, Ring};
 
@@ -292,11 +292,12 @@ impl Module for OscFm {
         let (mut level, mut index, mut fb) = (c.level, c.index, c.feedback);
         let sr = self.sample_rate;
         if !self.plain {
-            let want = if io.param_count() > OVERSAMPLE_PARAM && io.param(OVERSAMPLE_PARAM).at(0) >= 0.5 {
-                4
-            } else {
-                2
-            };
+            let want =
+                if io.param_count() > OVERSAMPLE_PARAM && io.param(OVERSAMPLE_PARAM).at(0) >= 0.5 {
+                    4
+                } else {
+                    2
+                };
             if want != self.factor {
                 self.factor = want;
                 c.line = [0.0; TAPS4];
@@ -416,6 +417,9 @@ impl Module for OscFm {
     fn carry_from(&mut self, old: &dyn Module) {
         if let Some(o) = old.as_any().downcast_ref::<OscFm>() {
             self.c = o.c;
+            if !self.plain && !o.plain {
+                self.factor = o.factor;
+            }
         }
     }
 }

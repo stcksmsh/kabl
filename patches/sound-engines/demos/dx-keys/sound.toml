@@ -1,0 +1,12 @@
+name = "DX Keys"
+category = "Keys"
+tags = [
+    "fm",
+    "electric piano",
+    "poly",
+    "six operators",
+    "dx",
+]
+description = "Six-operator FM electric piano in three modulator/carrier pairs: a mellow body, a bright tine that is gone in a tenth of a second, and a detuned shimmer. Every operator has its own envelope and velocity response, so play soft and hard."
+keys = true
+sequence = false

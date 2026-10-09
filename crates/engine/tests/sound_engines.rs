@@ -382,3 +382,78 @@ fn runtime_param_edits_never_need_a_compile_except_the_table_choice() {
         "a new table needs a compile"
     );
 }
+
+/// midi.in -> osc.fm6 (gate, velocity) -> vca/env -> out.
+fn fm6_patch(over: f32) -> PatchState {
+    let mut p = PatchState::new();
+    p.modules.insert(1, module("midi.in", &[]));
+    p.modules.insert(
+        2,
+        module(
+            "osc.fm6",
+            &[
+                ("algorithm", 6.0),
+                ("level3", 0.5),
+                ("level4", 0.4),
+                ("level5", 0.3),
+                ("level6", 0.2),
+                ("feedback", 0.3),
+                ("oversample", over),
+            ],
+        ),
+    );
+    p.modules.insert(4, module("out", &[]));
+    p.cables.insert(1, cable((1, "pitch"), (2, "pitch")));
+    p.cables.insert(2, cable((1, "gate"), (2, "gate")));
+    p.cables.insert(3, cable((1, "velocity"), (2, "velocity")));
+    gate_to_out(&mut p, 2);
+    p
+}
+
+#[test]
+fn fm6_voices_are_independent_and_sum() {
+    let p = fm6_patch(0.0);
+    let solo = |notes: &[(usize, f32)]| {
+        let mut c = compile(&p, SR, 8).unwrap();
+        render(&mut c, notes, 200)
+    };
+    let a = solo(&[(0, 0.0)]);
+    let b = solo(&[(3, 7.0)]);
+    let both = solo(&[(0, 0.0), (3, 7.0)]);
+    assert!(a.iter().any(|v| v.abs() > 0.05) && b.iter().any(|v| v.abs() > 0.05));
+    let sum: Vec<f32> = a.iter().zip(&b).map(|(x, y)| x + y).collect();
+    assert!(max_diff(&both, &sum) < 1e-4, "{}", max_diff(&both, &sum));
+}
+
+#[test]
+fn eight_fm6_voices_allocate_nothing_at_2x_and_4x() {
+    for over in [0.0, 1.0] {
+        let mut c = compile(&fm6_patch(over), SR, 8).unwrap();
+        let notes: Vec<(usize, f32)> = (0..8).map(|v| (v, v as f32 * 3.0 - 12.0)).collect();
+        let out = render(&mut c, &notes, 400);
+        assert!(out.iter().all(|v| v.is_finite()));
+        assert!(out.iter().any(|v| v.abs() > 0.05));
+    }
+}
+
+#[test]
+fn fm6_levels_apply_in_place_but_algorithm_and_rate_need_a_compile() {
+    use kabl_engine::runtime::{runtime_changes, RuntimeTarget};
+    let base = fm6_patch(0.0);
+    let edit = |param: &str, v: f32| {
+        let mut e = base.clone();
+        e.modules
+            .get_mut(&2)
+            .unwrap()
+            .params
+            .insert(param.into(), v);
+        runtime_changes(&base, &e)
+    };
+    for (param, v) in [("level2", 0.9), ("index", 1.5), ("feedback", 0.8)] {
+        let c = edit(param, v).unwrap_or_else(|| panic!("{param} should apply in place"));
+        assert!(matches!(c[0].0, RuntimeTarget::Param { id: 2, .. }));
+    }
+    for (param, v) in [("algorithm", 2.0), ("oversample", 1.0)] {
+        assert!(edit(param, v).is_none(), "{param} needs a compile");
+    }
+}

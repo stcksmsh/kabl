@@ -522,6 +522,12 @@ pub fn init_factory() {
     factory(0);
 }
 
+/// Raw frames of factory table `i`, for drawing the current table in an interface (control thread
+/// only: it decodes). User tables decode the same way with `decode_canonical`.
+pub fn factory_frames(i: usize) -> Vec<Vec<f32>> {
+    decode_canonical(FACTORY_BYTES[i.min(FACTORY_COUNT - 1)]).unwrap_or_default()
+}
+
 pub fn factory(i: usize) -> &'static WaveTable {
     static TABLES: OnceLock<Vec<WaveTable>> = OnceLock::new();
     let all = TABLES.get_or_init(|| {
