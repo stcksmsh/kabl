@@ -127,7 +127,10 @@ fn a_route_gets_a_pattern_from_its_row_and_undo_takes_it_back() {
 
     t.drag_by(&format!("fn-length:{route}"), 40.0);
     let len = t.cable_param(route, "length").expect("length stored");
-    assert!(len >= 1.0, "dragging the steps value turns the pattern on: {len}");
+    assert!(
+        len >= 1.0,
+        "dragging the steps value turns the pattern on: {len}"
+    );
     t.frame();
     assert!(
         t.ui.hits.contains_key(&format!("fn-level:{route}:0")),

@@ -1037,11 +1037,8 @@ fn compile_inner(
         let empty = Vec::new();
         let incoming = cables_by_dest.get(&id).unwrap_or(&empty);
         // Clocks are scheduled first, so the reference clock (lowest id) exists by now.
-        let clock_index = reference_clock.and_then(|cid| {
-            module_origin
-                .iter()
-                .position(|&o| o == (cid, None))
-        });
+        let clock_index =
+            reference_clock.and_then(|cid| module_origin.iter().position(|&o| o == (cid, None)));
         // Resolve every incoming cable's source port once (validates names too).
         let mut sources = Vec::with_capacity(incoming.len());
         for cable in incoming {
@@ -1103,7 +1100,13 @@ fn compile_inner(
                             PortType::Pitch => Carry::Hold,
                             _ => Carry::Scale,
                         };
-                        InputSource::Buffer(w.through_cable(c, buf, carry, clock_index, sample_rate))
+                        InputSource::Buffer(w.through_cable(
+                            c,
+                            buf,
+                            carry,
+                            clock_index,
+                            sample_rate,
+                        ))
                     }
                 });
             }

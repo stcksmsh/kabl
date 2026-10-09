@@ -10,7 +10,8 @@ use std::collections::BTreeMap;
 use assert_no_alloc::{assert_no_alloc, AllocDisabler};
 use kabl_cables::{seed_of, Settings};
 use kabl_core::{
-    CableState, Op, ParamTarget, PatchLog, PatchState, PortRef, Source, Vec2, CURRENT_SCHEMA_VERSION,
+    CableState, Op, ParamTarget, PatchLog, PatchState, PortRef, Source, Vec2,
+    CURRENT_SCHEMA_VERSION,
 };
 use kabl_engine::compile::{compile, CompiledPatch};
 use kabl_engine::graph::BLOCK;
@@ -54,13 +55,13 @@ fn jack(from: (u64, &str), to: (u64, &str), kv: &[(&str, f32)]) -> CableState {
 fn probe(cable: &[(&str, f32)]) -> PatchState {
     let mut p = PatchState::new();
     p.modules.insert(CLOCK, module("clock", &[("bpm", 300.0)]));
-    p.modules.insert(
-        LFO,
-        module("lfo", &[("rate_hz", 0.01), ("waveform", 3.0)]),
-    );
+    p.modules
+        .insert(LFO, module("lfo", &[("rate_hz", 0.01), ("waveform", 3.0)]));
     p.modules.insert(OUT, module("out", &[]));
-    p.cables.insert(CABLE, jack((LFO, "out"), (OUT, "left"), cable));
-    p.cables.insert(2, jack((CLOCK, "gate"), (OUT, "right"), &[]));
+    p.cables
+        .insert(CABLE, jack((LFO, "out"), (OUT, "left"), cable));
+    p.cables
+        .insert(2, jack((CLOCK, "gate"), (OUT, "right"), &[]));
     p
 }
 
@@ -186,7 +187,10 @@ fn probability_is_reproducible_and_restarts_replay_it() {
     let (first, second) = (at(0..700), at(750..1450));
     assert_eq!(first[..10], second[..10]);
     let open = first.iter().filter(|&&x| x > 0.0).count();
-    assert!(open > 0 && open < first.len(), "some pulses pass, some do not");
+    assert!(
+        open > 0 && open < first.len(),
+        "some pulses pass, some do not"
+    );
 }
 
 #[test]
@@ -194,16 +198,15 @@ fn route_pattern_gates_the_modulation_amount() {
     // lfo +1 -> vca.gain route (amount 0.5): gain follows the pattern at block rate.
     let mut p = PatchState::new();
     p.modules.insert(CLOCK, module("clock", &[("bpm", 300.0)]));
-    p.modules.insert(
-        LFO,
-        module("lfo", &[("rate_hz", 0.01), ("waveform", 3.0)]),
-    );
+    p.modules
+        .insert(LFO, module("lfo", &[("rate_hz", 0.01), ("waveform", 3.0)]));
     p.modules.insert(4, module("midi.in", &[]));
     p.modules.insert(5, module("vca", &[("gain", 0.0)]));
     p.modules.insert(OUT, module("out", &[]));
     p.cables.insert(10, jack((4, "gate"), (5, "in"), &[]));
     p.cables.insert(11, jack((5, "out"), (OUT, "left"), &[]));
-    p.cables.insert(12, jack((CLOCK, "gate"), (OUT, "right"), &[]));
+    p.cables
+        .insert(12, jack((CLOCK, "gate"), (OUT, "right"), &[]));
     p.cables.insert(
         CABLE,
         CableState {
@@ -245,7 +248,13 @@ fn runtime_edit_changes_the_next_pulse_in_place() {
     let changes = runtime_changes(&a, &b).expect("edit of a functional cable is runtime");
     assert_eq!(
         changes,
-        vec![(RuntimeTarget::Cable { cable: CABLE, slot: 3 }, 0.0)]
+        vec![(
+            RuntimeTarget::Cable {
+                cable: CABLE,
+                slot: 3
+            },
+            0.0
+        )]
     );
 
     let mut c = compile(&a, SR, 1).unwrap();
@@ -262,7 +271,7 @@ fn runtime_edit_changes_the_next_pulse_in_place() {
     let (l1, _) = render(&mut c, 300, |_, _| {});
     let (l2, _) = render(&mut d, 300, |_, _| {});
     assert_eq!(first_diff(&l1, &l2), None);
-    assert!(l1.iter().any(|&x| x == 0.0) && l1.iter().any(|&x| x == 1.0));
+    assert!(l1.contains(&0.0) && l1.contains(&1.0));
 }
 
 #[test]
@@ -329,28 +338,58 @@ fn audio_path_does_not_allocate_even_while_edited() {
 
 fn cable_ops() -> Vec<Op> {
     let mut ops = vec![
-        Op::AddModule { id: CLOCK, kind: "clock".into(), pos: Vec2::default() },
-        Op::AddModule { id: LFO, kind: "lfo".into(), pos: Vec2::default() },
-        Op::AddModule { id: OUT, kind: "out".into(), pos: Vec2::default() },
+        Op::AddModule {
+            id: CLOCK,
+            kind: "clock".into(),
+            pos: Vec2::default(),
+        },
+        Op::AddModule {
+            id: LFO,
+            kind: "lfo".into(),
+            pos: Vec2::default(),
+        },
+        Op::AddModule {
+            id: OUT,
+            kind: "out".into(),
+            pos: Vec2::default(),
+        },
         Op::Connect {
             id: CABLE,
-            from: PortRef::Module { id: LFO, port: "out".into() },
-            to: PortRef::Module { id: OUT, port: "left".into() },
+            from: PortRef::Module {
+                id: LFO,
+                port: "out".into(),
+            },
+            to: PortRef::Module {
+                id: OUT,
+                port: "left".into(),
+            },
         },
         Op::Connect {
             id: 2,
-            from: PortRef::Module { id: CLOCK, port: "gate".into() },
-            to: PortRef::Module { id: OUT, port: "right".into() },
+            from: PortRef::Module {
+                id: CLOCK,
+                port: "gate".into(),
+            },
+            to: PortRef::Module {
+                id: OUT,
+                port: "right".into(),
+            },
         },
     ];
     for (k, v) in [("rate_hz", 0.01), ("waveform", 3.0)] {
         ops.push(Op::SetParam {
-            target: ParamTarget::Module { id: LFO, param: k.into() },
+            target: ParamTarget::Module {
+                id: LFO,
+                param: k.into(),
+            },
             value: v,
         });
     }
     ops.push(Op::SetParam {
-        target: ParamTarget::Module { id: CLOCK, param: "bpm".into() },
+        target: ParamTarget::Module {
+            id: CLOCK,
+            param: "bpm".into(),
+        },
         value: 300.0,
     });
     ops
@@ -358,7 +397,10 @@ fn cable_ops() -> Vec<Op> {
 
 fn set_cable(k: &str, v: f32) -> Op {
     Op::SetParam {
-        target: ParamTarget::Cable { id: CABLE, param: k.into() },
+        target: ParamTarget::Cable {
+            id: CABLE,
+            param: k.into(),
+        },
         value: v,
     }
 }
@@ -385,7 +427,11 @@ fn undo_save_and_reload_recall_the_cable() {
     assert!(log.undo());
     assert!(log.undo());
     assert!(log.undo());
-    assert_eq!(log.state(), &plain, "undo removes the params, not zeroes them");
+    assert_eq!(
+        log.state(),
+        &plain,
+        "undo removes the params, not zeroes them"
+    );
     assert!(log.redo() && log.redo() && log.redo());
     assert_eq!(log.state(), &functional);
 

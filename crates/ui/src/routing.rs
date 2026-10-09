@@ -1342,7 +1342,10 @@ pub(crate) fn functional_mark(painter: &egui::Painter, at: Pos2, zoom: f32, colo
     for (i, h) in [2.0, 1.0, 3.0].into_iter().enumerate() {
         let x = at.x + (i as f32 - 1.0) * u * 1.6;
         painter.rect_filled(
-            Rect::from_min_max(Pos2::new(x - u * 0.5, at.y - h * u), Pos2::new(x + u * 0.5, at.y)),
+            Rect::from_min_max(
+                Pos2::new(x - u * 0.5, at.y - h * u),
+                Pos2::new(x + u * 0.5, at.y),
+            ),
             0.0,
             color,
         );
@@ -1409,7 +1412,13 @@ pub(crate) fn cable_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: 
             egui::DragValue::new(&mut len)
                 .range(0.0..=kabl_cables::MAX_STEPS as f32)
                 .speed(0.1)
-                .custom_formatter(|v, _| if v < 1.0 { "off".into() } else { format!("{v:.0}") }),
+                .custom_formatter(|v, _| {
+                    if v < 1.0 {
+                        "off".into()
+                    } else {
+                        format!("{v:.0}")
+                    }
+                }),
         );
         ui_state.record(format!("fn-length:{cable}"), resp.rect);
         if resp.changed() {

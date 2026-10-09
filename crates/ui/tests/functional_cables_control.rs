@@ -79,7 +79,11 @@ fn first_pattern_compiles_then_edits_play_in_place() {
         audio(&mut engine, &mut d, 8);
     }
     assert_eq!(d.counts.graphs, graphs, "pattern edits build no graph");
-    assert_eq!(Feedback::get(&fb.unresolved), 0, "every value found its cable node");
+    assert_eq!(
+        Feedback::get(&fb.unresolved),
+        0,
+        "every value found its cable node"
+    );
 
     assert!(editor.undo());
     assert!(matches!(
