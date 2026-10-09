@@ -871,7 +871,9 @@ pub fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
     let r = ui
         .add_sized(
             [140.0, 20.0],
-            egui::Label::new(kit::rich(st, Role::Body, Tone::Text, text)).selectable(false).truncate(),
+            egui::Label::new(kit::rich(st, Role::Body, Tone::Text, text))
+                .selectable(false)
+                .truncate(),
         )
         .tip(
             st,
@@ -885,7 +887,12 @@ pub fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
         );
     hit(ui_state, "doc-name", &r);
     let r = ui
-        .add(kit::Button::new(st, "Save").small().icon(Ic::Save).enabled(!io_busy(ui_state)))
+        .add(
+            kit::Button::new(st, "Save")
+                .small()
+                .icon(Ic::Save)
+                .enabled(!io_busy(ui_state)),
+        )
         .tip(st, "Ctrl+S");
     hit(ui_state, "save", &r);
     if r.clicked() {
@@ -909,24 +916,66 @@ fn badge(ui: &mut egui::Ui, st: &Style, e: &Meta) {
 }
 
 /// One sound as a card row: star, name, category, play-kind tag. Returns (row, star) responses.
-fn sound_row(ui: &mut egui::Ui, st: &Style, e: &Entry, fav: bool, sel: bool) -> (egui::Response, egui::Response) {
+fn sound_row(
+    ui: &mut egui::Ui,
+    st: &Style,
+    e: &Entry,
+    fav: bool,
+    sel: bool,
+) -> (egui::Response, egui::Response) {
     let w = ui.available_width();
     let (rect, row) = ui.allocate_exact_size(vec2(w, st.metrics.row_h), Sense::click());
-    let hover = ui.ctx().animate_bool_with_time(row.id.with("hover"), row.hovered(), Style::secs(st.motion.hover));
+    let hover = ui.ctx().animate_bool_with_time(
+        row.id.with("hover"),
+        row.hovered(),
+        Style::secs(st.motion.hover),
+    );
     kit::row_bg(ui, st, rect, sel, hover);
-    let star_rect = egui::Rect::from_center_size(rect.left_center() + vec2(st.sp(3) + 4.0, 0.0), vec2(st.metrics.control_h, st.metrics.control_h));
+    let star_rect = egui::Rect::from_center_size(
+        rect.left_center() + vec2(st.sp(3) + 4.0, 0.0),
+        vec2(st.metrics.control_h, st.metrics.control_h),
+    );
     let star = ui.interact(star_rect, row.id.with("star"), Sense::click());
-    let ink = if fav { st.roles.warn } else if star.hovered() { st.roles.text } else { st.roles.text3 };
-    kit::icon(ui.painter(), if fav { Ic::StarFill } else { Ic::Star }, star_rect.center(), st.metrics.icon + 2.0, ink);
+    let ink = if fav {
+        st.roles.warn
+    } else if star.hovered() {
+        st.roles.text
+    } else {
+        st.roles.text3
+    };
+    kit::icon(
+        ui.painter(),
+        if fav { Ic::StarFill } else { Ic::Star },
+        star_rect.center(),
+        st.metrics.icon + 2.0,
+        ink,
+    );
     let x = star_rect.right() + st.sp(1);
     let right_pad = 78.0;
     let name = kit::fit_text(ui, st, &e.meta.name, rect.right() - right_pad - x);
-    let g = ui.painter().layout_no_wrap(name, st.font(Role::Body), st.roles.text);
-    ui.painter().galley(egui::pos2(x, rect.top() + st.sp(2)), g, st.roles.text);
-    let cat = if e.meta.category.is_empty() { "Uncategorized" } else { &e.meta.category };
-    let g = ui.painter().layout_no_wrap(cat.to_string(), st.font(Role::Caption), st.roles.text2);
-    ui.painter().galley(egui::pos2(x, rect.bottom() - st.sp(2) - g.size().y), g, st.roles.text2);
-    let mut tag_ui = ui.new_child(egui::UiBuilder::new().max_rect(rect.shrink2(vec2(st.sp(2), 0.0))).layout(egui::Layout::right_to_left(egui::Align::Center)));
+    let g = ui
+        .painter()
+        .layout_no_wrap(name, st.font(Role::Body), st.roles.text);
+    ui.painter()
+        .galley(egui::pos2(x, rect.top() + st.sp(2)), g, st.roles.text);
+    let cat = if e.meta.category.is_empty() {
+        "Uncategorized"
+    } else {
+        &e.meta.category
+    };
+    let g = ui
+        .painter()
+        .layout_no_wrap(cat.to_string(), st.font(Role::Caption), st.roles.text2);
+    ui.painter().galley(
+        egui::pos2(x, rect.bottom() - st.sp(2) - g.size().y),
+        g,
+        st.roles.text2,
+    );
+    let mut tag_ui = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(rect.shrink2(vec2(st.sp(2), 0.0)))
+            .layout(egui::Layout::right_to_left(egui::Align::Center)),
+    );
     badge(&mut tag_ui, st, &e.meta);
     (row, star)
 }
@@ -936,7 +985,13 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     let st = ui_state.style.clone();
     let st = &*st;
     if io_busy(ui_state) {
-        kit::paragraph(ui, st, Role::Body, Tone::Text2, "Reading or saving a sound… editing remains available.");
+        kit::paragraph(
+            ui,
+            st,
+            Role::Body,
+            Tone::Text2,
+            "Reading or saving a sound… editing remains available.",
+        );
         return;
     }
     ui.horizontal(|ui| {
@@ -958,10 +1013,23 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     });
     kit::gap(ui, st, 1);
     if ui_state.library.is_none() {
-        kit::label(ui, st, Role::Body, Tone::Text2, "The sound library isn't available.");
+        kit::label(
+            ui,
+            st,
+            Role::Body,
+            Tone::Text2,
+            "The sound library isn't available.",
+        );
         return;
     }
-    let r = kit::field(ui, st, &mut ui_state.browser.query, "Search name, purpose, mood, tempo", Some(Ic::Search), None);
+    let r = kit::field(
+        ui,
+        st,
+        &mut ui_state.browser.query,
+        "Search name, purpose, mood, tempo",
+        Some(Ic::Search),
+        None,
+    );
     hit(ui_state, "search", &r);
     kit::gap(ui, st, 1);
     ui.horizontal_wrapped(|ui| {
@@ -972,7 +1040,9 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             (Filter::Factory, "factory", "Factory"),
             (Filter::User, "user", "Your Sounds"),
         ] {
-            let mut btn = kit::Button::new(st, label).small().selected(ui_state.browser.filter == f);
+            let mut btn = kit::Button::new(st, label)
+                .small()
+                .selected(ui_state.browser.filter == f);
             if f == Filter::Favorites {
                 btn = btn.icon(Ic::Star);
             }
@@ -990,20 +1060,28 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             .category
             .clone()
             .unwrap_or_else(|| "Any".into());
-        let r = kit::dropdown(ui, st, "browser-category", &current, ui.available_width(), |ui| {
-            let r = kit::menu_item(ui, st, "Any", ui_state.browser.category.is_none());
-            hit(ui_state, "category:Any", &r);
-            if r.clicked() {
-                ui_state.browser.category = None;
-            }
-            for c in CATEGORIES {
-                let r = kit::menu_item(ui, st, c, ui_state.browser.category.as_deref() == Some(*c));
-                hit(ui_state, &format!("category:{c}"), &r);
+        let r = kit::dropdown(
+            ui,
+            st,
+            "browser-category",
+            &current,
+            ui.available_width(),
+            |ui| {
+                let r = kit::menu_item(ui, st, "Any", ui_state.browser.category.is_none());
+                hit(ui_state, "category:Any", &r);
                 if r.clicked() {
-                    ui_state.browser.category = Some(c.to_string());
+                    ui_state.browser.category = None;
                 }
-            }
-        });
+                for c in CATEGORIES {
+                    let r =
+                        kit::menu_item(ui, st, c, ui_state.browser.category.as_deref() == Some(*c));
+                    hit(ui_state, &format!("category:{c}"), &r);
+                    if r.clicked() {
+                        ui_state.browser.category = Some(c.to_string());
+                    }
+                }
+            },
+        );
         hit(ui_state, "category", &r);
     });
     kit::gap(ui, st, 1);
@@ -1074,14 +1152,26 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             let narrowed =
                 !ui_state.browser.query.trim().is_empty() || ui_state.browser.category.is_some();
             if rows.is_empty() && narrowed {
-                kit::label(ui, st, Role::Body, Tone::Text3, "No sound matches the search or category.");
+                kit::label(
+                    ui,
+                    st,
+                    Role::Body,
+                    Tone::Text3,
+                    "No sound matches the search or category.",
+                );
             } else if rows.is_empty() {
-                kit::paragraph(ui, st, Role::Body, Tone::Text3, match filter {
-                    Filter::Favorites => "No favorites yet: click ☆ next to a sound.",
-                    Filter::Recent => "Nothing opened yet.",
-                    Filter::User => "No sounds of yours yet: Save As puts them here.",
-                    _ => "No sound matches.",
-                });
+                kit::paragraph(
+                    ui,
+                    st,
+                    Role::Body,
+                    Tone::Text3,
+                    match filter {
+                        Filter::Favorites => "No favorites yet: click ☆ next to a sound.",
+                        Filter::Recent => "Nothing opened yet.",
+                        Filter::User => "No sounds of yours yet: Save As puts them here.",
+                        _ => "No sound matches.",
+                    },
+                );
             }
             for row in &rows {
                 match row {
@@ -1089,15 +1179,26 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                         if filter != Filter::Recent && last_origin != Some(e.origin) {
                             last_origin = Some(e.origin);
                             kit::gap(ui, st, 1);
-                            kit::section(ui, st, match e.origin {
-                                Origin::Factory => "Factory",
-                                Origin::User => "Your Sounds",
-                            });
+                            kit::section(
+                                ui,
+                                st,
+                                match e.origin {
+                                    Origin::Factory => "Factory",
+                                    Origin::User => "Your Sounds",
+                                },
+                            );
                         }
                         let fav = favorites.contains(&e.id);
                         let sel = ui_state.browser.selected.as_deref() == Some(&e.id);
                         let (row, star) = sound_row(ui, st, e, fav, sel);
-                        let star = star.tip(st, if fav { "Remove from favorites" } else { "Add to favorites" });
+                        let star = star.tip(
+                            st,
+                            if fav {
+                                "Remove from favorites"
+                            } else {
+                                "Add to favorites"
+                            },
+                        );
                         ui_state.record(format!("fav:{}", e.id), star.rect);
                         ui_state.record(format!("sound:{}", e.id), row.rect);
                         if star.clicked() {
@@ -1111,11 +1212,12 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                     }
                     Err(id) => {
                         ui.horizontal(|ui| {
-                            kit::label(ui, st, Role::Body, Tone::Text3, format!("{id}: not found")).tip(
-                                st,
-                                "Removed or renamed outside kabl. Forget drops it from \
+                            kit::label(ui, st, Role::Body, Tone::Text3, format!("{id}: not found"))
+                                .tip(
+                                    st,
+                                    "Removed or renamed outside kabl. Forget drops it from \
                                  favorites and recents.",
-                            );
+                                );
                             let r = ui.add(kit::Button::new(st, "Forget").small());
                             ui_state.record(format!("forget:{id}"), r.rect);
                             if r.clicked() {
@@ -1127,7 +1229,13 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             }
             if filter == Filter::All && !has_user && ui_state.browser.query.is_empty() {
                 kit::section(ui, st, "Your Sounds");
-                kit::label(ui, st, Role::Body, Tone::Text3, "None yet: Save As puts your sounds here.");
+                kit::label(
+                    ui,
+                    st,
+                    Role::Body,
+                    Tone::Text3,
+                    "None yet: Save As puts your sounds here.",
+                );
             }
         });
     if let Some(id) = toggle {
@@ -1157,7 +1265,9 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             ui.horizontal(|ui| {
                 kit::label_truncated(ui, st, Role::H3, Tone::Text, &e.meta.name);
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let r = ui.add(kit::Button::new(st, "Open").primary()).tip(st, "Load into the rack");
+                    let r = ui
+                        .add(kit::Button::new(st, "Open").primary())
+                        .tip(st, "Load into the rack");
                     hit(ui_state, "open", &r);
                     if r.clicked() {
                         open = Some(e.id.clone());
@@ -1197,7 +1307,8 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                 badge(ui, st, &e.meta);
             });
             if !e.meta.description.is_empty() {
-                kit::label_truncated(ui, st, Role::Caption, Tone::Text2, &e.meta.description).tip(st, &e.meta.description);
+                kit::label_truncated(ui, st, Role::Caption, Tone::Text2, &e.meta.description)
+                    .tip(st, &e.meta.description);
             }
             if !e.meta.tags.is_empty() {
                 let tags = format!("tags: {}", e.meta.tags.join(", "));
@@ -1205,7 +1316,13 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             }
         }
         None => {
-            kit::paragraph(ui, st, Role::Body, Tone::Text3, "Click a sound to see it; Open (or double-click) loads it.");
+            kit::paragraph(
+                ui,
+                st,
+                Role::Body,
+                Tone::Text3,
+                "Click a sound to see it; Open (or double-click) loads it.",
+            );
         }
     }
     if let Some(id) = open {
@@ -1220,7 +1337,11 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     kit::rule(ui, st);
     kit::gap(ui, st, 1);
     let open_f = ui_state.browser.folder_open;
-    let header = ui.add(kit::Button::new(st, "Patch folder (advanced)").ghost().icon(if open_f { Ic::Down } else { Ic::Right }));
+    let header = ui.add(
+        kit::Button::new(st, "Patch folder (advanced)")
+            .ghost()
+            .icon(if open_f { Ic::Down } else { Ic::Right }),
+    );
     if header.clicked() {
         ui_state.browser.folder_open = !open_f;
     }
@@ -1300,13 +1421,21 @@ fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui:
         .as_ref()
         .map_or(String::new(), |d| d.name.clone());
     kit::section(ui, st, "Audition");
-    kit::label_truncated(ui, st, Role::Body, Tone::Text, format!("In the rack: {name}"));
+    kit::label_truncated(
+        ui,
+        st,
+        Role::Body,
+        Tone::Text,
+        format!("In the rack: {name}"),
+    );
     let (keys, sequence) = Meta::play_of(editor.state());
     if keys {
         let mut chord_hits = Vec::new();
         let a = &mut ui_state.browser.audition;
         ui.horizontal(|ui| {
-            let r = ui.add(kit::Button::new(st, "−8").small()).tip(st, "An octave down");
+            let r = ui
+                .add(kit::Button::new(st, "−8").small())
+                .tip(st, "An octave down");
             chord_hits.push(("note-down".to_string(), r.rect));
             if r.clicked() {
                 a.note = a.note.saturating_sub(12).max(24);
@@ -1319,7 +1448,9 @@ fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui:
                 }
             });
             chord_hits.push(("note".to_string(), r.rect));
-            let r = ui.add(kit::Button::new(st, "+8").small()).tip(st, "An octave up");
+            let r = ui
+                .add(kit::Button::new(st, "+8").small())
+                .tip(st, "An octave up");
             chord_hits.push(("note-up".to_string(), r.rect));
             if r.clicked() {
                 a.note = (a.note + 12).min(96);
@@ -1327,7 +1458,11 @@ fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui:
         });
         ui.horizontal(|ui| {
             for c in [Chord::Single, Chord::Major, Chord::Minor] {
-                let r = ui.add(kit::Button::new(st, c.label()).small().selected(a.chord == c));
+                let r = ui.add(
+                    kit::Button::new(st, c.label())
+                        .small()
+                        .selected(a.chord == c),
+                );
                 chord_hits.push((format!("chord:{}", c.label()), r.rect));
                 if r.clicked() {
                     a.chord = c;
@@ -1376,14 +1511,20 @@ fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui:
             ui_state.record(k, r);
         }
         ui.horizontal(|ui| {
-            let r = ui.add(kit::Button::new(st, label).icon(Ic::Play).primary()).tip(st, &help);
+            let r = ui
+                .add(kit::Button::new(st, label).icon(Ic::Play).primary())
+                .tip(st, &help);
             hit(ui_state, "play", &r);
             if r.clicked() {
                 ui_state.launches.push(cmd);
                 let now = ui.input(|i| i.time);
                 ui_state.browser.preview_until = Some(now + secs);
             }
-            let r = ui.add(kit::Button::new(st, "Stop").icon(Ic::Stop).enabled(ui_state.browser.preview_until.is_some()));
+            let r = ui.add(
+                kit::Button::new(st, "Stop")
+                    .icon(Ic::Stop)
+                    .enabled(ui_state.browser.preview_until.is_some()),
+            );
             hit(ui_state, "stop-preview", &r);
             if r.clicked() {
                 ui_state.launches.push(Command::PreviewStop);
@@ -1409,7 +1550,12 @@ fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui:
             .iter()
             .any(|id| ui_state.clock_running.get(id).copied().unwrap_or(true));
         ui.horizontal(|ui| {
-            let r = ui.add(kit::Button::new(st, "Start").icon(Ic::Play).primary().enabled(!running));
+            let r = ui.add(
+                kit::Button::new(st, "Start")
+                    .icon(Ic::Play)
+                    .primary()
+                    .enabled(!running),
+            );
             hit(ui_state, "start", &r);
             if r.clicked() {
                 ui_state
@@ -1428,7 +1574,11 @@ fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui:
                 st,
                 Role::Caption,
                 if running { Tone::Accent } else { Tone::Text2 },
-                if running { "sequence running" } else { "sequence stopped" },
+                if running {
+                    "sequence running"
+                } else {
+                    "sequence stopped"
+                },
             );
         });
         kit::paragraph(
@@ -1440,7 +1590,13 @@ fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui:
         );
     }
     if !keys && !sequence {
-        kit::paragraph(ui, st, Role::Body, Tone::Text3, "This sound has no keyboard input and no clock: nothing to audition.");
+        kit::paragraph(
+            ui,
+            st,
+            Role::Body,
+            Tone::Text3,
+            "This sound has no keyboard input and no clock: nothing to audition.",
+        );
     }
 }
 
@@ -1520,10 +1676,20 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
             let mut cancel = false;
             kit::modal(ctx, st, "dlg-save-as", 380.0, |ui| {
                 kit::dialog_title(ui, st, "Save As");
-                kit::paragraph(ui, st, Role::Body, Tone::Text2, "Saves a copy in Your Sounds. Factory sounds stay as they are.");
+                kit::paragraph(
+                    ui,
+                    st,
+                    Role::Body,
+                    Tone::Text2,
+                    "Saves a copy in Your Sounds. Factory sounds stay as they are.",
+                );
                 kit::gap(ui, st, 2);
                 ui.horizontal(|ui| {
-                    ui.add_sized([72.0, st.metrics.field_h], egui::Label::new(kit::rich(st, Role::Label, Tone::Text2, "Name")).selectable(false));
+                    ui.add_sized(
+                        [72.0, st.metrics.field_h],
+                        egui::Label::new(kit::rich(st, Role::Label, Tone::Text2, "Name"))
+                            .selectable(false),
+                    );
                     let r = kit::field(ui, st, &mut name, "", None, Some(280.0));
                     hit(ui_state, "dlg:name", &r);
                     if r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
@@ -1541,7 +1707,11 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
                     error = None;
                 }
                 ui.horizontal(|ui| {
-                    ui.add_sized([72.0, st.metrics.field_h], egui::Label::new(kit::rich(st, Role::Label, Tone::Text2, "Category")).selectable(false));
+                    ui.add_sized(
+                        [72.0, st.metrics.field_h],
+                        egui::Label::new(kit::rich(st, Role::Label, Tone::Text2, "Category"))
+                            .selectable(false),
+                    );
                     let cur = category.clone();
                     kit::dropdown(ui, st, "dlg-category", &cur, 200.0, |ui| {
                         for c in CATEGORIES {
@@ -1552,7 +1722,11 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
                     });
                 });
                 ui.horizontal(|ui| {
-                    ui.add_sized([72.0, st.metrics.field_h], egui::Label::new(kit::rich(st, Role::Label, Tone::Text2, "Tags")).selectable(false));
+                    ui.add_sized(
+                        [72.0, st.metrics.field_h],
+                        egui::Label::new(kit::rich(st, Role::Label, Tone::Text2, "Tags"))
+                            .selectable(false),
+                    );
                     kit::field(ui, st, &mut tags, "comma separated", None, Some(280.0));
                 });
                 if let Some(e) = &error {

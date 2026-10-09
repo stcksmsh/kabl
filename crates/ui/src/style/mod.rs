@@ -48,9 +48,35 @@ macro_rules! roles {
 }
 
 roles!(
-    bg, surface, raised, inset, line, line2, text, text2, text3, accent, on_accent, accent_soft,
-    focus, audio, cv, gate, good, warn, bad, rack, rail, hole, disp_bg, disp_grid, disp_trace,
-    disp_text, knob, knob_hi, knob_ink,
+    bg,
+    surface,
+    raised,
+    inset,
+    line,
+    line2,
+    text,
+    text2,
+    text3,
+    accent,
+    on_accent,
+    accent_soft,
+    focus,
+    audio,
+    cv,
+    gate,
+    good,
+    warn,
+    bad,
+    rack,
+    rail,
+    hole,
+    disp_bg,
+    disp_grid,
+    disp_trace,
+    disp_text,
+    knob,
+    knob_hi,
+    knob_ink,
 );
 
 /// One module-section colour family.
@@ -468,7 +494,14 @@ mod tests {
             let a = builtin_a(dark);
             let text = toml::to_string(&a).unwrap();
             let back: Style = toml::from_str(&text).unwrap();
-            assert_eq!(Style { metrics: Metrics::default(), fonts_ready: false, ..back }, a);
+            assert_eq!(
+                Style {
+                    metrics: Metrics::default(),
+                    fonts_ready: false,
+                    ..back
+                },
+                a
+            );
         }
     }
 
@@ -477,9 +510,22 @@ mod tests {
         for dark in [false, true] {
             let a = builtin_a(dark);
             for (n, fg, bg, min) in a.contrast_pairs() {
-                assert!(contrast(fg, bg) >= min, "{} {n}: {:.2}", a.id, contrast(fg, bg));
+                assert!(
+                    contrast(fg, bg) >= min,
+                    "{} {n}: {:.2}",
+                    a.id,
+                    contrast(fg, bg)
+                );
             }
-            for r in [Role::Display, Role::Title, Role::H3, Role::Body, Role::Label, Role::Value, Role::Caption] {
+            for r in [
+                Role::Display,
+                Role::Title,
+                Role::H3,
+                Role::Body,
+                Role::Label,
+                Role::Value,
+                Role::Caption,
+            ] {
                 assert!(a.font(r).size >= TEXT_FLOOR);
             }
             assert!(a.section_font().size >= TEXT_FLOOR);

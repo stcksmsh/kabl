@@ -705,7 +705,11 @@ pub fn meter_ui(ui: &mut egui::Ui, st: &crate::style::Style, meter: &mut Meter) 
         egui::pos2(bars.right() + 4.0, rect.top() + 2.0),
         egui::vec2(44.0, 16.0),
     );
-    p.rect_filled(clip, st.radii.sm.min(3.0), if meter.clip { r.bad } else { r.inset });
+    p.rect_filled(
+        clip,
+        st.radii.sm.min(3.0),
+        if meter.clip { r.bad } else { r.inset },
+    );
     p.text(
         clip.center(),
         egui::Align2::CENTER_CENTER,

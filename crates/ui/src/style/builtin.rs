@@ -9,11 +9,20 @@ fn h(s: &str) -> Color32 {
 }
 
 fn sect(base: &str, ink: &str, ink2: &str) -> Section {
-    Section { base: h(base), ink: h(ink), ink2: h(ink2) }
+    Section {
+        base: h(base),
+        ink: h(ink),
+        ink2: h(ink2),
+    }
 }
 
 fn role(font: Font, size: f32) -> TypeRole {
-    TypeRole { font, size, caps: false, tracking: 0.0 }
+    TypeRole {
+        font,
+        size,
+        caps: false,
+        tracking: 0.0,
+    }
 }
 
 pub fn builtin_a(dark: bool) -> Style {
@@ -33,12 +42,28 @@ pub fn builtin_a(dark: bool) -> Style {
             label: role(Font::SansMedium, 12.0),
             value: role(Font::MonoMedium, 12.0),
             caption: role(Font::Sans, 11.0),
-            section: TypeRole { font: Font::SansSemibold, size: 11.0, caps: true, tracking: 1.0 },
+            section: TypeRole {
+                font: Font::SansSemibold,
+                size: 11.0,
+                caps: true,
+                tracking: 1.0,
+            },
         },
         space: [2.0, 4.0, 8.0, 12.0, 16.0, 24.0, 32.0, 48.0],
-        radii: Radii { sm: 4.0, md: 8.0, lg: 12.0 },
+        radii: Radii {
+            sm: 4.0,
+            md: 8.0,
+            lg: 12.0,
+        },
         shadows,
-        motion: Motion { hover: 90.0, press: 60.0, drawer: 220.0, view: 180.0, glide: 120.0, pulse: 1200.0 },
+        motion: Motion {
+            hover: 90.0,
+            press: 60.0,
+            drawer: 220.0,
+            view: 180.0,
+            glide: 120.0,
+            pulse: 1200.0,
+        },
         slots: Slots {
             face: FaceSlots {
                 material: FaceMaterial::Satin,
@@ -60,9 +85,20 @@ pub fn builtin_a(dark: bool) -> Style {
             },
             selector: SelectorRecipe::InsetPill,
             jack: JackRecipe::Nut,
-            cable: CableSlots { recipe: CableRecipe::Rope, width: 4.6, sag: 46.0, glow: 0.0, dimmed: 0.22 },
+            cable: CableSlots {
+                recipe: CableRecipe::Rope,
+                width: 4.6,
+                sag: 46.0,
+                glow: 0.0,
+                dimmed: 0.22,
+            },
             plug: PlugRecipe::Cap,
-            display: DisplaySlots { frame: DisplayFrame::Glass, trace: DisplayTrace::SoftGlow, glow: 0.45, fill: 0.3 },
+            display: DisplaySlots {
+                frame: DisplayFrame::Glass,
+                trace: DisplayTrace::SoftGlow,
+                glow: 0.45,
+                fill: 0.3,
+            },
             controls: ControlSlots {
                 button: Shape::Rounded,
                 chip: Shape::Rounded,
@@ -74,7 +110,10 @@ pub fn builtin_a(dark: bool) -> Style {
                 popover_shadow: 2,
                 row: BrowserRows::Cards,
             },
-            chrome: ChromeSlots { view_switch: ViewSwitch::Segmented, navigator: Navigator::Left },
+            chrome: ChromeSlots {
+                view_switch: ViewSwitch::Segmented,
+                navigator: Navigator::Left,
+            },
             icons: Icons::Stroke,
         },
         metrics: Metrics::default(),
@@ -123,9 +162,21 @@ fn light_parts() -> (Roles, Sections, [Shadow; 3]) {
             fx: sect("#d9cfbf", "#2a2318", "#4d4535"),
         },
         [
-            Shadow { dy: 1.0, blur: 3.0, alpha: 28 },
-            Shadow { dy: 4.0, blur: 12.0, alpha: 38 },
-            Shadow { dy: 12.0, blur: 32.0, alpha: 56 },
+            Shadow {
+                dy: 1.0,
+                blur: 3.0,
+                alpha: 28,
+            },
+            Shadow {
+                dy: 4.0,
+                blur: 12.0,
+                alpha: 38,
+            },
+            Shadow {
+                dy: 12.0,
+                blur: 32.0,
+                alpha: 56,
+            },
         ],
     )
 }
@@ -172,9 +223,21 @@ fn dark_parts() -> (Roles, Sections, [Shadow; 3]) {
             fx: sect("#5d564c", "#f8f1e6", "#e0d8ca"),
         },
         [
-            Shadow { dy: 1.0, blur: 3.0, alpha: 90 },
-            Shadow { dy: 4.0, blur: 12.0, alpha: 110 },
-            Shadow { dy: 12.0, blur: 32.0, alpha: 150 },
+            Shadow {
+                dy: 1.0,
+                blur: 3.0,
+                alpha: 90,
+            },
+            Shadow {
+                dy: 4.0,
+                blur: 12.0,
+                alpha: 110,
+            },
+            Shadow {
+                dy: 12.0,
+                blur: 32.0,
+                alpha: 150,
+            },
         ],
     )
 }

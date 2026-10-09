@@ -89,3 +89,22 @@ Committed and pushed on `claude/widget-set`. `cargo test -p kabl-ui` (debug): **
 - Strict clippy and rustfmt on touched files.
 - Draft PR #18 exists; overseer report not sent.
 - Out of scope, still stock: module faces, drawer bodies (explain, inspect, compare, recipes, param panel), Perform panel, seq/cue combo boxes, Composites windows.
+
+## Checkpoint 3 (verified)
+
+- Tests (debug): 276 passed, 0 failed, 21 ignored. `cargo clippy -p kabl-ui --lib --bins -- -D warnings` clean. rustfmt run on touched files.
+- Captures (real app, Xvfb): `media/widget-set/` at 1440x900, 1280x800 (light/dark: rack-sounds, diagnostics, save-as) and one scaled (1.5) light.
+- Frame time AFTER (release, same bench as BEFORE):
+
+```
+simple  1440x900 light median 908 us  p95 1277 max 1640   (before 762)
+dense   1440x900 light median 6628 us p95 8326 max 10883  (before 4642)
+simple  1440x900 dark  median 635 us  p95 902  max 1463   (before 512)
+dense   1440x900 dark  median 5785 us p95 8036 max 12005  (before 4627)
+simple  1280x800 light median 564 us  p95 740  max 997    (before 496)
+dense   1280x800 light median 4439 us p95 4761 max 5522   (before 4135)
+simple  1280x800 dark  median 529 us  p95 571  max 924    (before 503)
+dense   1280x800 dark  median 4369 us p95 4749 max 5779   (before 3689)
+```
+
+Departures from the A mockups: no side rail; no Rack|Perform switch (Perform stays a toggle chip); no prev/next sound arrows in the doc name; doc name is a plain label beside small Save buttons; no patch-folder row visible at 1280x800 with Perform open; the rack, faces, knobs, Perform panel and drawer bodies are unchanged (out of scope).

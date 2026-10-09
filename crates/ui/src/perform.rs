@@ -1279,7 +1279,14 @@ pub fn module_menu(
                     ui.close();
                 }
                 if map.is_some() {
-                    let r = crate::kit::menu_item_tone(ui, st, "Clear mapping", false, crate::kit::Tone::Text2, true);
+                    let r = crate::kit::menu_item_tone(
+                        ui,
+                        st,
+                        "Clear mapping",
+                        false,
+                        crate::kit::Tone::Text2,
+                        true,
+                    );
                     ui_state.record(format!("menu:button-clear:{action}"), r.rect);
                     if r.clicked() {
                         editor.set_presentation(&[(id, format!("{BTN_PREFIX}{action}"), None)]);

@@ -20,8 +20,8 @@ pub mod cues;
 pub mod editor;
 pub mod explain;
 pub mod help;
-pub mod kit;
 pub mod inspect;
+pub mod kit;
 pub mod library;
 pub mod panels;
 pub mod perform;
@@ -46,9 +46,9 @@ use kabl_modules::builtins::{seq, DelayLock, LfoSync, Transport};
 use kabl_modules::info::PortDirection;
 use kabl_modules::registry;
 use kit::Tip;
-use style::Style;
 use rack::{Decor, Geo, Layout, Placed, JACK_R, PANEL_H};
 use routing::Look;
+use style::Style;
 use theme::{theme, Theme};
 
 /// Width of the routing drawer (right).
@@ -527,7 +527,10 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     theme::ensure_fonts(ui.ctx());
     let ready = theme::fonts_ready(ui.ctx());
     if ui_state.style.dark != ui_state.dark || ui_state.style.fonts_ready != ready {
-        ui_state.style = std::sync::Arc::new(Style { fonts_ready: ready, ..style::builtin_a(ui_state.dark) });
+        ui_state.style = std::sync::Arc::new(Style {
+            fonts_ready: ready,
+            ..style::builtin_a(ui_state.dark)
+        });
     }
     let st = ui_state.style.clone();
     kit::apply(ui.ctx(), &st);
@@ -690,7 +693,10 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                         ui_state.recipes.open = !on;
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if kit::icon_button(ui, &st, kit::Ic::Close, false, true).tip(&st, "Close the drawer").clicked() {
+                        if kit::icon_button(ui, &st, kit::Ic::Close, false, true)
+                            .tip(&st, "Close the drawer")
+                            .clicked()
+                        {
                             ui_state.drawer_open = false;
                         }
                     });
@@ -749,24 +755,49 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     ui_state.hits = std::mem::take(&mut ui_state.frame_hits);
 }
 
-fn tool(ui: &mut egui::Ui, st: &Style, ui_state: &mut UiState, key: &str, label: &str, on: bool) -> bool {
+fn tool(
+    ui: &mut egui::Ui,
+    st: &Style,
+    ui_state: &mut UiState,
+    key: &str,
+    label: &str,
+    on: bool,
+) -> bool {
     let r = ui.add(kit::Button::new(st, label).selected(on));
     ui_state.record(key.to_string(), r.rect);
     r.clicked()
 }
 
-fn tool_small(ui: &mut egui::Ui, st: &Style, ui_state: &mut UiState, key: &str, label: &str, on: bool) -> bool {
+fn tool_small(
+    ui: &mut egui::Ui,
+    st: &Style,
+    ui_state: &mut UiState,
+    key: &str,
+    label: &str,
+    on: bool,
+) -> bool {
     let r = ui.add(kit::Button::new(st, label).small().selected(on));
     ui_state.record(key.to_string(), r.rect);
     r.clicked()
 }
 
 fn vsep(ui: &mut egui::Ui, st: &Style) {
-    let (r, _) = ui.allocate_exact_size(egui::vec2(1.0, st.metrics.control_h - 8.0), egui::Sense::hover());
+    let (r, _) = ui.allocate_exact_size(
+        egui::vec2(1.0, st.metrics.control_h - 8.0),
+        egui::Sense::hover(),
+    );
     ui.painter().rect_filled(r, 0.0, st.roles.line2);
 }
 
-fn tool_icon(ui: &mut egui::Ui, st: &Style, ui_state: &mut UiState, key: &str, ic: kit::Ic, tip: &str, enabled: bool) -> bool {
+fn tool_icon(
+    ui: &mut egui::Ui,
+    st: &Style,
+    ui_state: &mut UiState,
+    key: &str,
+    ic: kit::Ic,
+    tip: &str,
+    enabled: bool,
+) -> bool {
     let r = kit::icon_button(ui, st, ic, false, enabled).tip(st, tip);
     ui_state.record(key.to_string(), r.rect);
     r.clicked()
@@ -784,13 +815,20 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
             ui_state.composites.panel = !on;
         }
         let kinds = PatchEditor::known_kinds();
-        kit::dropdown(ui, st, "kind", &ui_state.selected_kind.clone(), 110.0, |ui| {
-            for kind in kinds {
-                if kit::menu_item(ui, st, kind, ui_state.selected_kind == *kind).clicked() {
-                    ui_state.selected_kind = kind.to_string();
+        kit::dropdown(
+            ui,
+            st,
+            "kind",
+            &ui_state.selected_kind.clone(),
+            110.0,
+            |ui| {
+                for kind in kinds {
+                    if kit::menu_item(ui, st, kind, ui_state.selected_kind == *kind).clicked() {
+                        ui_state.selected_kind = kind.to_string();
+                    }
                 }
-            }
-        });
+            },
+        );
         if tool(ui, st, ui_state, "add", "Add", false) {
             // At the end of the first row.
             let lay = composite_layout(editor.state(), ui_state);
@@ -808,11 +846,13 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
             ui_state.reveal = Some(id);
         }
         vsep(ui, st);
-        let r = kit::icon_button(ui, st, kit::Ic::Undo, false, editor.can_undo()).tip(st, "Undo (Ctrl+Z)");
+        let r = kit::icon_button(ui, st, kit::Ic::Undo, false, editor.can_undo())
+            .tip(st, "Undo (Ctrl+Z)");
         if r.clicked() {
             editor.undo();
         }
-        let r = kit::icon_button(ui, st, kit::Ic::Redo, false, editor.can_redo()).tip(st, "Redo (Ctrl+Shift+Z)");
+        let r = kit::icon_button(ui, st, kit::Ic::Redo, false, editor.can_redo())
+            .tip(st, "Redo (Ctrl+Shift+Z)");
         if r.clicked() {
             editor.redo();
         }
@@ -833,11 +873,21 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
         });
         vsep(ui, st);
         let c = ui_state.canvas.center();
-        if tool_icon(ui, st, ui_state, "zoom:out", kit::Ic::Minus, "Zoom out", true) {
+        if tool_icon(
+            ui,
+            st,
+            ui_state,
+            "zoom:out",
+            kit::Ic::Minus,
+            "Zoom out",
+            true,
+        ) {
             ui_state.zoom_about(ui_state.zoom / 1.2, c);
         }
         let pct = format!("{:.0}%", ui_state.zoom * 100.0);
-        let r = ui.add(kit::Button::new(st, pct).ghost().min_width(48.0)).tip(st, "Zoom to 100%");
+        let r = ui
+            .add(kit::Button::new(st, pct).ghost().min_width(48.0))
+            .tip(st, "Zoom to 100%");
         ui_state.record("zoom:100".into(), r.rect);
         if r.clicked() {
             ui_state.zoom_about(1.0, c);
@@ -845,7 +895,9 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
         if tool_icon(ui, st, ui_state, "zoom:in", kit::Ic::Plus, "Zoom in", true) {
             ui_state.zoom_about(ui_state.zoom * 1.2, c);
         }
-        let r = ui.add(kit::Button::new(st, "Fit").icon(kit::Ic::Fit)).tip(st, "Fit the whole patch");
+        let r = ui
+            .add(kit::Button::new(st, "Fit").icon(kit::Ic::Fit))
+            .tip(st, "Fit the whole patch");
         ui_state.record("zoom:fit".into(), r.rect);
         if r.clicked() {
             let lay = composite_layout(editor.state(), ui_state);
@@ -857,7 +909,11 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
             .map(|(id, _)| *id)
             .or(ui_state.selected_module);
         let r = ui
-            .add(kit::Button::new(st, "Focus").icon(kit::Ic::Focus).enabled(focus_target.is_some()))
+            .add(
+                kit::Button::new(st, "Focus")
+                    .icon(kit::Ic::Focus)
+                    .enabled(focus_target.is_some()),
+            )
             .tip(st, "Zoom to the selected module");
         ui_state.record("zoom:focus".into(), r.rect);
         if r.clicked() {
@@ -888,7 +944,13 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
         });
         vsep(ui, st);
         let menu = kit::menu_button(ui, st, "View", |ui| {
-            kit::paragraph(ui, st, style::Role::Caption, kit::Tone::Text2, "More controls opens a focused view; rack layout stays fixed.");
+            kit::paragraph(
+                ui,
+                st,
+                style::Role::Caption,
+                kit::Tone::Text2,
+                "More controls opens a focused view; rack layout stays fixed.",
+            );
             kit::gap(ui, st, 1);
             kit::rule(ui, st);
             kit::gap(ui, st, 1);
@@ -920,11 +982,18 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
 
             if let Some(rec) = ui_state.recorder.as_ref().filter(|r| r.recording()) {
                 let t = rec.elapsed() as u64;
-                kit::label(ui, st, style::Role::Label, kit::Tone::Bad, format!("● REC {:02}:{:02}", t / 60, t % 60));
+                kit::label(
+                    ui,
+                    st,
+                    style::Role::Label,
+                    kit::Tone::Bad,
+                    format!("● REC {:02}:{:02}", t / 60, t % 60),
+                );
             }
             if let Some(msg) = &ui_state.last_message {
                 // Truncated to the room left, never over the tools.
-                kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, msg).on_hover_text(msg);
+                kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, msg)
+                    .on_hover_text(msg);
             }
         });
     });
@@ -1985,7 +2054,13 @@ fn draw_module(
 fn module_menu(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, m: &Placed) {
     let st = ui_state.style.clone();
     let st = &*st;
-    kit::label(ui, st, style::Role::H3, kit::Tone::Text, format!("{} #{}", m.info.name, m.id));
+    kit::label(
+        ui,
+        st,
+        style::Role::H3,
+        kit::Tone::Text,
+        format!("{} #{}", m.info.name, m.id),
+    );
     kit::menu_rule(ui, st);
     fn item(ui: &mut egui::Ui, ui_state: &mut UiState, key: &str, label: &str) -> bool {
         let st = ui_state.style.clone();
@@ -2747,11 +2822,22 @@ fn bank_menu(
 ) {
     let st = ui_state.style.clone();
     let st = &*st;
-    kit::label(ui, st, style::Role::H3, kit::Tone::Text, format!("Bank {}", banks::title(editor.state(), id, b)));
+    kit::label(
+        ui,
+        st,
+        style::Role::H3,
+        kit::Tone::Text,
+        format!("Bank {}", banks::title(editor.state(), id, b)),
+    );
     kit::menu_rule(ui, st);
     kit::submenu(ui, st, "Copy to", |ui| {
         for to in (0..seq::BANKS).filter(|&to| to != b) {
-            let r = kit::menu_item(ui, st, &format!("Bank {}", banks::title(editor.state(), id, to)), false);
+            let r = kit::menu_item(
+                ui,
+                st,
+                &format!("Bank {}", banks::title(editor.state(), id, to)),
+                false,
+            );
             ui_state.record(format!("menu:bank-copy.{to}"), r.rect);
             if r.clicked() {
                 banks::copy(editor, id, b, to);
@@ -2772,10 +2858,20 @@ fn bank_menu(
         ui.close();
     }
     let startup = banks::startup(editor.state(), id) == b;
-    let r = kit::menu_item_tone(ui, st, "Set as startup bank", false, kit::Tone::Text, !startup);
+    let r = kit::menu_item_tone(
+        ui,
+        st,
+        "Set as startup bank",
+        false,
+        kit::Tone::Text,
+        !startup,
+    );
     ui_state.record("menu:bank-startup".into(), r.rect);
-    if r.tip(st, "The bank a Load starts on; does not change what is playing")
-        .clicked()
+    if r.tip(
+        st,
+        "The bank a Load starts on; does not change what is playing",
+    )
+    .clicked()
     {
         editor.set_param(id, "bank", b as f32);
         ui.close();
@@ -3746,7 +3842,8 @@ fn draw_default_face(
                             }
                             let st = view.style.clone();
                             kit::context_menu(&r, &st, |ui| {
-                                if kit::menu_item(ui, &st, "Inspect bound module", false).clicked() {
+                                if kit::menu_item(ui, &st, "Inspect bound module", false).clicked()
+                                {
                                     let leaf = e.target.module_id();
                                     let owner = editor
                                         .state()

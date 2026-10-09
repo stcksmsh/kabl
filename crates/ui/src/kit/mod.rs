@@ -46,7 +46,11 @@ pub fn tone(st: &Style, t: Tone) -> Color32 {
 /// Styled rich text for a role, with caps applied when the role asks for it.
 pub fn rich(st: &Style, role: Role, t: Tone, s: impl AsRef<str>) -> RichText {
     let tr = st.type_role(role);
-    let text = if tr.caps { s.as_ref().to_uppercase() } else { s.as_ref().to_string() };
+    let text = if tr.caps {
+        s.as_ref().to_uppercase()
+    } else {
+        s.as_ref().to_string()
+    };
     RichText::new(text).font(st.font(role)).color(tone(st, t))
 }
 
@@ -56,19 +60,37 @@ pub fn label(ui: &mut Ui, st: &Style, role: Role, t: Tone, s: impl AsRef<str>) -
 }
 
 /// A label that truncates with an ellipsis to the space left.
-pub fn label_truncated(ui: &mut Ui, st: &Style, role: Role, t: Tone, s: impl AsRef<str>) -> Response {
-    ui.add(egui::Label::new(rich(st, role, t, s)).selectable(false).truncate())
+pub fn label_truncated(
+    ui: &mut Ui,
+    st: &Style,
+    role: Role,
+    t: Tone,
+    s: impl AsRef<str>,
+) -> Response {
+    ui.add(
+        egui::Label::new(rich(st, role, t, s))
+            .selectable(false)
+            .truncate(),
+    )
 }
 
 /// A wrapping paragraph.
 pub fn paragraph(ui: &mut Ui, st: &Style, role: Role, t: Tone, s: impl AsRef<str>) -> Response {
-    ui.add(egui::Label::new(rich(st, role, t, s)).selectable(false).wrap())
+    ui.add(
+        egui::Label::new(rich(st, role, t, s))
+            .selectable(false)
+            .wrap(),
+    )
 }
 
 /// Section heading: the theme's `section` type role (caps, tracked).
 pub fn section(ui: &mut Ui, st: &Style, s: impl AsRef<str>) -> Response {
     let tr = &st.types.section;
-    let text = if tr.caps { s.as_ref().to_uppercase() } else { s.as_ref().to_string() };
+    let text = if tr.caps {
+        s.as_ref().to_uppercase()
+    } else {
+        s.as_ref().to_string()
+    };
     let mut job = egui::text::LayoutJob::default();
     job.append(
         &text,
@@ -85,7 +107,8 @@ pub fn section(ui: &mut Ui, st: &Style, s: impl AsRef<str>) -> Response {
 
 /// Hairline rule across the available width.
 pub fn rule(ui: &mut Ui, st: &Style) {
-    let (r, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 1.0), egui::Sense::hover());
+    let (r, _) =
+        ui.allocate_exact_size(egui::vec2(ui.available_width(), 1.0), egui::Sense::hover());
     ui.painter().rect_filled(r, 0.0, st.roles.line);
 }
 
