@@ -99,6 +99,8 @@ pub fn param_class(kind: &str, name: &str) -> ParamClass {
         ("midi.in", "mode" | "priority" | "glide") => ParamClass::Structural,
         // The compiler picks the table (a slot's decoded wavetable); a change swaps graphs.
         ("osc.wt", "table" | "user") => ParamClass::Structural,
+        // Changing the internal rate or the routing mid-note would click; a new graph crossfades.
+        ("osc.fm", "oversample") | ("osc.fm6", "oversample" | "algorithm") => ParamClass::Structural,
         _ => ParamClass::Runtime,
     }
 }
@@ -123,6 +125,7 @@ pub fn smoothed_by_module(kind: &str, name: &str) -> bool {
         "osc.va" => name == "pw",
         "osc.fm" => matches!(name, "level" | "index" | "feedback"),
         "osc.wt" => name == "position",
+        "osc.fm6" => name == "index" || name == "feedback" || name.starts_with("level"),
         _ => false,
     }
 }

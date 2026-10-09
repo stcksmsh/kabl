@@ -4,6 +4,7 @@
 //! allocates, formats or waits for it.
 
 use kabl_core::ModuleId;
+use kabl_modules::ModuleView;
 
 use crate::graph::BLOCK;
 
@@ -93,6 +94,10 @@ pub struct ProbeReport {
     /// Compiled per voice.
     pub voiced: bool,
     pub lane: [LaneStats; PROBE_LANES],
+    /// What the measured module can show of its most active voice (`ModuleView`): an
+    /// oscillator's table position and one cycle of its output. `valid` is false for modules
+    /// with nothing to show.
+    pub view: ModuleView,
 }
 
 /// The tap inside one graph: which instances it reads and what it has gathered.

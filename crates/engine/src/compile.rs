@@ -66,6 +66,7 @@ use kabl_modules::builtins::{
     Transport,
 };
 use kabl_modules::module::{QualityConfig, QualityTier};
+use kabl_modules::ModuleView;
 use kabl_modules::{
     registry, Module, ModuleInfo, ParamInfo, PortDirection, ProcessIo, Rate, Signal, StateBuf,
 };
@@ -1796,6 +1797,15 @@ impl CompiledPatch {
             lanes_total: tap.total.min(u16::MAX as usize) as u16,
             voiced: tap.voiced,
             lane: tap.acc,
+            view: {
+                // The voice that was loudest in this window.
+                let mut view = ModuleView::default();
+                let loudest = (0..tap.n).max_by(|&a, &b| tap.acc[a].peak.total_cmp(&tap.acc[b].peak));
+                if let (true, Some(lane)) = (tap.found, loudest) {
+                    self.modules[tap.modules[lane] as usize].view(&mut view);
+                }
+                view
+            },
         };
         tap.reset_window();
         Some(report)

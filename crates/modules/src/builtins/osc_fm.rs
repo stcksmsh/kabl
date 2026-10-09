@@ -24,7 +24,9 @@ use crate::info::{
     Category, ModuleInfo, ParamInfo, PortDirection, PortInfo, PortType, QualitySupport, Rate, Taper,
 };
 use crate::io::ProcessIo;
+use crate::fmdsp::{lowpass, weights4};
 use crate::module::{Module, QualityConfig, StateReader, StateWriter};
+use crate::view::{ModuleView, Ring};
 
 const PORTS: &[PortInfo] = &[
     PortInfo {
@@ -101,6 +103,16 @@ const PARAMS: &[ParamInfo] = &[
         taper: Taper::Linear,
         smoothing_ms: 0.0,
     },
+    // Internal rate: 0 = 2x (the default), 1 = 4x (twice the cost, cleaner at extreme index).
+    ParamInfo {
+        name: "oversample",
+        min: 0.0,
+        max: 1.0,
+        default: 0.0,
+        unit: "",
+        taper: Taper::Stepped,
+        smoothing_ms: 0.0,
+    },
 ];
 
 pub static OSC_FM_INFO: ModuleInfo = ModuleInfo {
@@ -120,7 +132,7 @@ pub static OSC_FM_INFO: ModuleInfo = ModuleInfo {
     },
     skin: None,
     width_units: 6,
-    advanced: &["base_hz", "fine"],
+    advanced: &["base_hz", "fine", "oversample"],
 };
 
 const PITCH_IN: usize = 0;
@@ -132,6 +144,7 @@ const FINE_PARAM: usize = 2;
 const LEVEL_PARAM: usize = 3;
 const INDEX_PARAM: usize = 4;
 const FEEDBACK_PARAM: usize = 5;
+const OVERSAMPLE_PARAM: usize = 6;
 
 /// Names for the `ratio` choices: 0 is one half, then the integers.
 pub const RATIO_LABELS: [&str; 33] = [
@@ -144,40 +157,14 @@ pub const RATIO_LABELS: [&str; 33] = [
 pub const FEEDBACK_MAX_RAD: f32 = 2.0;
 
 const TAPS: usize = 33;
+const TAPS4: usize = 65;
 /// Samples a signal is late after one operator: 2 for the `pm` interpolation, 8 for the
-/// filter (16 taps at the doubled rate). A modulated operator runs its own phase this much
-/// behind, so it lines up with the late modulation and a 1:1 pair keeps the spectrum of the
-/// ideal zero-latency pair at every pitch.
+/// filter (16 taps at the doubled rate, 32 at four times). A modulated operator runs its own
+/// phase this much behind, so it lines up with the late modulation and a 1:1 pair keeps the
+/// spectrum of the ideal zero-latency pair at every pitch.
 const HOP: f32 = 10.0;
 /// The `modulated` estimate settles over about this long, so the phase shift never clicks.
 const MODULATED_TAU_S: f32 = 0.02;
-
-/// Kaiser-windowed sinc low-pass at the base-rate Nyquist (a quarter of the 2x rate): 17.5 kHz
-/// passband and 30.5 kHz stop band at 48 kHz, over 70 dB down, unity gain at DC.
-fn lowpass() -> [f32; TAPS] {
-    fn bessel_i0(x: f64) -> f64 {
-        let (mut sum, mut term) = (1.0, 1.0);
-        for k in 1..40 {
-            term *= (x / (2.0 * k as f64)).powi(2);
-            sum += term;
-        }
-        sum
-    }
-    let mid = (TAPS / 2) as f64;
-    let mut h = [0.0f64; TAPS];
-    for (i, v) in h.iter_mut().enumerate() {
-        let x = i as f64 - mid;
-        let sinc = if x == 0.0 {
-            0.5
-        } else {
-            (std::f64::consts::FRAC_PI_2 * x).sin() / (std::f64::consts::PI * x)
-        };
-        let r = x / mid;
-        *v = sinc * bessel_i0(7.0 * (1.0 - r * r).max(0.0).sqrt()) / bessel_i0(7.0);
-    }
-    let total: f64 = h.iter().sum();
-    h.map(|v| (v / total) as f32)
-}
 
 /// The sine of `x` cycles.
 #[inline]
@@ -194,20 +181,27 @@ struct Core {
     /// The last five `pm` input samples, newest first.
     pm: [f32; 5],
     /// The 2x-rate samples the filter still needs, newest first.
-    line: [f32; TAPS],
+    line: [f32; TAPS4],
     /// level, index and feedback at the end of the last block; negative before the first.
     level: f32,
     index: f32,
     feedback: f32,
     /// How much of the time the `pm` input has carried signal, 0..1 (smoothed); see `HOP`.
     modulated: f32,
+    /// For `view`: the last outputs and the phase step per sample.
+    ring: Ring,
+    dt1: f32,
 }
 
 pub struct OscFm {
     c: Core,
     sample_rate: f32,
     taps: [f32; TAPS],
-    oversample: bool,
+    taps4: [f32; TAPS4],
+    w4: [[f32; 6]; 4],
+    /// 1 (measurement only), 2 (default) or 4.
+    factor: usize,
+    plain: bool,
 }
 
 impl OscFm {
@@ -218,21 +212,27 @@ impl OscFm {
                 y1: 0.0,
                 y2: 0.0,
                 pm: [0.0; 5],
-                line: [0.0; TAPS],
+                line: [0.0; TAPS4],
                 level: -1.0,
                 index: -1.0,
                 feedback: -1.0,
                 modulated: 0.0,
+                ring: Ring::default(),
+                dt1: 0.0,
             },
             sample_rate: 48000.0,
-            taps: lowpass(),
-            oversample: true,
+            taps: lowpass(2),
+            taps4: lowpass(4),
+            w4: weights4(),
+            factor: 2,
+            plain: false,
         }
     }
 
     /// Off runs the operator at the plain sample rate (the measurement baseline).
     pub fn set_oversample(&mut self, on: bool) {
-        self.oversample = on;
+        self.plain = !on;
+        self.factor = if on { 2 } else { 1 };
     }
 }
 
@@ -291,7 +291,20 @@ impl Module for OscFm {
         );
         let (mut level, mut index, mut fb) = (c.level, c.index, c.feedback);
         let sr = self.sample_rate;
-        let hop = if self.oversample { HOP } else { 0.0 };
+        if !self.plain {
+            let want = if io.param_count() > OVERSAMPLE_PARAM && io.param(OVERSAMPLE_PARAM).at(0) >= 0.5 {
+                4
+            } else {
+                2
+            };
+            if want != self.factor {
+                self.factor = want;
+                c.line = [0.0; TAPS4];
+            }
+        }
+        let factor = self.factor;
+        let factor_f = factor as f32;
+        let hop = if factor > 1 { HOP } else { 0.0 };
         let has_signal = match pm {
             crate::io::Signal::Scalar(v) => v != 0.0,
             crate::io::Signal::Buffer(b) => b[..n].iter().any(|v| v.abs() > 1e-4),
@@ -305,12 +318,11 @@ impl Module for OscFm {
             index += di;
             fb += df;
             modulated += (target - modulated) * k_mod;
-            let dt = base_hz.at(i) * 2f32.powf(pitch.at(i) / 12.0) * mult
-                / sr
-                / if self.oversample { 2.0 } else { 1.0 };
+            let dt = base_hz.at(i) * 2f32.powf(pitch.at(i) / 12.0) * mult / sr / factor_f;
+            c.dt1 = dt * factor_f;
             let p0 = pm.at(i);
             // Cycles of lag, from the 1x phase increment (`dt` is per internal sample).
-            let lag = -hop * modulated * dt * if self.oversample { 2.0 } else { 1.0 };
+            let lag = -hop * modulated * dt * factor_f;
             let step = |c: &mut Core, m: f32| -> f32 {
                 let fbk = fb * FEEDBACK_MAX_RAD * 0.5 * (c.y1 + c.y2);
                 let y = sin_cycles(c.phase + lag + (index * m + fbk) * (1.0 / TAU));
@@ -320,7 +332,17 @@ impl Module for OscFm {
                 c.phase -= c.phase.floor();
                 y
             };
-            let y = if self.oversample {
+            let y = if factor == 4 {
+                // Quarter points of the same interval, then its newer sample.
+                let [x4, x3, x2, x1, x0] = c.pm;
+                c.line.copy_within(0..TAPS4 - 4, 4);
+                for k in 0..4 {
+                    let w = &self.w4[k];
+                    let m = w[0] * x0 + w[1] * x1 + w[2] * x2 + w[3] * x3 + w[4] * x4 + w[5] * p0;
+                    c.line[3 - k] = step(c, m);
+                }
+                self.taps4.iter().zip(&c.line).map(|(h, x)| h * x).sum()
+            } else if factor == 2 {
                 // The modulation arrives two input samples late: its midpoint is interpolated
                 // between the older pair of the last six (6-point Lagrange), then the pair's
                 // newer sample itself.
@@ -338,6 +360,7 @@ impl Module for OscFm {
             c.pm = [p0, c.pm[0], c.pm[1], c.pm[2], c.pm[3]];
             // A NaN on an input must not reach the buffers downstream modules read.
             *o = if y.is_finite() { level * y } else { 0.0 };
+            c.ring.push(*o);
         }
         c.level = level_t;
         c.index = index_t;
@@ -354,15 +377,22 @@ impl Module for OscFm {
             c.y1 = 0.0;
             c.y2 = 0.0;
             c.pm = [0.0; 5];
-            c.line = [0.0; TAPS];
+            c.line = [0.0; TAPS4];
+        }
+    }
+
+    fn view(&self, out: &mut ModuleView) {
+        out.valid = self.c.dt1 > 0.0;
+        if out.valid {
+            self.c.ring.cycle(1.0 / self.c.dt1, &mut out.cycle);
         }
     }
 
     fn reset(&mut self) {
-        let (sr, os) = (self.sample_rate, self.oversample);
+        let (sr, plain) = (self.sample_rate, self.plain);
         *self = OscFm::new();
         self.sample_rate = sr;
-        self.oversample = os;
+        self.set_oversample(!plain);
     }
 
     fn save_state(&self, out: &mut dyn StateWriter) {
