@@ -163,12 +163,19 @@ pub fn install_fonts(ctx: &egui::Context) {
         fonts.families.entry(family).or_default().insert(0, name.into());
     }
     ctx.set_fonts(fonts);
-    ctx.data_mut(|d| d.insert_temp(egui::Id::new("kabl-fonts"), true));
+    let pass = ctx.cumulative_pass_nr();
+    ctx.data_mut(|d| d.insert_temp(egui::Id::new("kabl-fonts"), pass));
+}
+
+/// egui applies new fonts at the next pass: true once that has happened.
+pub fn fonts_ready(ctx: &egui::Context) -> bool {
+    let pass = ctx.cumulative_pass_nr();
+    ctx.data(|d| d.get_temp::<u64>(egui::Id::new("kabl-fonts"))).is_some_and(|p| pass > p)
 }
 
 /// Fonts for hosts that never called [`install_fonts`] (the plugin editor): once per context.
 pub fn ensure_fonts(ctx: &egui::Context) {
-    if ctx.data(|d| d.get_temp::<bool>(egui::Id::new("kabl-fonts"))).is_none() {
+    if ctx.data(|d| d.get_temp::<u64>(egui::Id::new("kabl-fonts"))).is_none() {
         install_fonts(ctx);
     }
 }

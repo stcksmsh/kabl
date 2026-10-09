@@ -45,6 +45,8 @@ use kabl_engine::patch_engine::Command;
 use kabl_modules::builtins::{seq, DelayLock, LfoSync, Transport};
 use kabl_modules::info::PortDirection;
 use kabl_modules::registry;
+use kit::Tip;
+use style::Style;
 use rack::{Decor, Geo, Layout, Placed, JACK_R, PANEL_H};
 use routing::Look;
 use theme::{theme, Theme};
@@ -523,8 +525,9 @@ impl UiState {
 pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
     wheel::begin(ui.ctx());
     theme::ensure_fonts(ui.ctx());
-    if ui_state.style.dark != ui_state.dark {
-        ui_state.style = std::sync::Arc::new(style::builtin_a(ui_state.dark));
+    let ready = theme::fonts_ready(ui.ctx());
+    if ui_state.style.dark != ui_state.dark || ui_state.style.fonts_ready != ready {
+        ui_state.style = std::sync::Arc::new(Style { fonts_ready: ready, ..style::builtin_a(ui_state.dark) });
     }
     let st = ui_state.style.clone();
     kit::apply(ui.ctx(), &st);
@@ -621,12 +624,14 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
         }
     }
     egui::Panel::top("kabl-toolbar")
-        .exact_size(64.0)
-        .show(ui, |ui| toolbar(editor, ui_state, ui));
+        .exact_size(st.metrics.toolbar_h)
+        .frame(kit::bar_frame(&st))
+        .show(ui, |ui| toolbar(editor, ui_state, ui, &st));
     if ui_state.browser_open {
         egui::Panel::left("kabl-browser")
             .exact_size(browser::PANEL_W)
             .resizable(false)
+            .frame(kit::panel_frame(&st))
             .show(ui, |ui| browser::panel(editor, ui_state, ui));
     }
 
@@ -638,34 +643,30 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                 perform::PANEL_H
             })
             .resizable(false)
+            .frame(kit::panel_frame(&st))
             .show(ui, |ui| perform::panel(editor, ui_state, ui));
     }
     if ui_state.drawer_open {
         egui::Panel::right("kabl-params")
             .exact_size(DRAWER_W)
             .resizable(false)
+            .frame(kit::panel_frame(&st))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.heading("Routing");
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button("Close").clicked() {
-                            ui_state.drawer_open = false;
-                        }
-                        let on = ui_state.explain.help;
-                        let r = ui
-                            .add(egui::Button::selectable(on, "? Help"))
-                            .on_hover_text("Show what each module and control does");
-                        ui_state.record("help".into(), r.rect);
-                        if r.clicked() {
-                            ui_state.explain.help = !on;
-                        }
-                    });
-                });
-                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = st.sp(1);
+                    kit::label(ui, &st, style::Role::Title, kit::Tone::Text, "Routing");
+                    let on = ui_state.explain.help;
+                    let r = ui
+                        .add(kit::Button::new(&st, "Help").small().selected(on))
+                        .tip(&st, "Show what each module and control does");
+                    ui_state.record("help".into(), r.rect);
+                    if r.clicked() {
+                        ui_state.explain.help = !on;
+                    }
                     let on = ui_state.inspect.open;
                     let r = ui
-                        .add(egui::Button::selectable(on, "Inspect"))
-                        .on_hover_text("Measure one output and ask why there is no sound");
+                        .add(kit::Button::new(&st, "Inspect").small().selected(on))
+                        .tip(&st, "Measure one output and ask why there is no sound");
                     ui_state.record("inspect-open".into(), r.rect);
                     if r.clicked() {
                         ui_state.inspect.open = !on;
@@ -673,8 +674,8 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                     }
                     let on = ui_state.compare.open;
                     let r = ui
-                        .add(egui::Button::selectable(on, "Compare"))
-                        .on_hover_text("Keep a reference copy of the patch and restore it");
+                        .add(kit::Button::new(&st, "Compare").small().selected(on))
+                        .tip(&st, "Keep a reference copy of the patch and restore it");
                     ui_state.record("compare-open".into(), r.rect);
                     if r.clicked() {
                         ui_state.compare.open = !on;
@@ -682,12 +683,17 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                     }
                     let on = ui_state.recipes.open;
                     let r = ui
-                        .add(egui::Button::selectable(on, "Learn"))
-                        .on_hover_text("Three short listening recipes (optional)");
+                        .add(kit::Button::new(&st, "Learn").small().selected(on))
+                        .tip(&st, "Three short listening recipes (optional)");
                     ui_state.record("learn-open".into(), r.rect);
                     if r.clicked() {
                         ui_state.recipes.open = !on;
                     }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if kit::icon_button(ui, &st, kit::Ic::Close, false, true).tip(&st, "Close the drawer").clicked() {
+                            ui_state.drawer_open = false;
+                        }
+                    });
                 });
                 if ui_state.recipes.open {
                     // Above the drawer's scrolling content, so Show (which scrolls the drawer
@@ -735,7 +741,7 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     }
 
     egui::CentralPanel::default()
-        .frame(egui::Frame::NONE.fill(th.rack))
+        .frame(egui::Frame::NONE.fill(st.roles.rack))
         .show(ui, |ui| show_rack(editor, ui_state, ui, &th));
     browser::dialogs(editor, ui_state, ui.ctx());
     ui_state.explain.typing =
@@ -743,37 +749,43 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     ui_state.hits = std::mem::take(&mut ui_state.frame_hits);
 }
 
-fn tool(ui: &mut egui::Ui, ui_state: &mut UiState, key: &str, label: &str, on: bool) -> bool {
-    let r = ui.add(egui::Button::selectable(on, label));
+fn tool(ui: &mut egui::Ui, st: &Style, ui_state: &mut UiState, key: &str, label: &str, on: bool) -> bool {
+    let r = ui.add(kit::Button::new(st, label).selected(on));
     ui_state.record(key.to_string(), r.rect);
     r.clicked()
 }
 
-fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
+fn vsep(ui: &mut egui::Ui, st: &Style) {
+    let (r, _) = ui.allocate_exact_size(egui::vec2(1.0, st.metrics.control_h - 8.0), egui::Sense::hover());
+    ui.painter().rect_filled(r, 0.0, st.roles.line2);
+}
+
+fn tool_icon(ui: &mut egui::Ui, st: &Style, ui_state: &mut UiState, key: &str, ic: kit::Ic, tip: &str, enabled: bool) -> bool {
+    let r = kit::icon_button(ui, st, ic, false, enabled).tip(st, tip);
+    ui_state.record(key.to_string(), r.rect);
+    r.clicked()
+}
+
+fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new("kabl").strong().size(17.0));
+        kit::label(ui, st, style::Role::Title, kit::Tone::Text, "kabl");
         let open = ui_state.browser_open;
-        if tool(ui, ui_state, "browser", "Sounds", open) {
+        if tool(ui, st, ui_state, "browser", "Sounds", open) {
             ui_state.browser_open = !open;
         }
-        if tool(
-            ui,
-            ui_state,
-            "composites",
-            "Composites",
-            ui_state.composites.panel,
-        ) {
-            ui_state.composites.panel = !ui_state.composites.panel;
+        let on = ui_state.composites.panel;
+        if tool(ui, st, ui_state, "composites", "Composites", on) {
+            ui_state.composites.panel = !on;
         }
-        egui::ComboBox::from_id_salt("kind")
-            .width(90.0)
-            .selected_text(ui_state.selected_kind.clone())
-            .show_ui(ui, |ui| {
-                for kind in PatchEditor::known_kinds() {
-                    ui.selectable_value(&mut ui_state.selected_kind, kind.to_string(), *kind);
+        let kinds = PatchEditor::known_kinds();
+        kit::dropdown(ui, st, "kind", &ui_state.selected_kind.clone(), 110.0, |ui| {
+            for kind in kinds {
+                if kit::menu_item(ui, st, kind, ui_state.selected_kind == *kind).clicked() {
+                    ui_state.selected_kind = kind.to_string();
                 }
-            });
-        if tool(ui, ui_state, "add", "Add", false) {
+            }
+        });
+        if tool(ui, st, ui_state, "add", "Add", false) {
             // At the end of the first row.
             let lay = composite_layout(editor.state(), ui_state);
             let x = rack_editor::items(&lay)
@@ -789,49 +801,47 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) 
             ui_state.selected_module = Some(id);
             ui_state.reveal = Some(id);
         }
-        ui.separator();
-        if ui
-            .add_enabled(editor.can_undo(), egui::Button::new("Undo"))
-            .clicked()
-        {
+        vsep(ui, st);
+        let r = kit::icon_button(ui, st, kit::Ic::Undo, false, editor.can_undo()).tip(st, "Undo (Ctrl+Z)");
+        if r.clicked() {
             editor.undo();
         }
-        if ui
-            .add_enabled(editor.can_redo(), egui::Button::new("Redo"))
-            .clicked()
-        {
+        let r = kit::icon_button(ui, st, kit::Ic::Redo, false, editor.can_redo()).tip(st, "Redo (Ctrl+Shift+Z)");
+        if r.clicked() {
             editor.redo();
         }
-        ui.separator();
-        ui.label("Cables");
-        for (mode, label) in [
-            (CableView::All, "All"),
-            (CableView::Focus, "Focus"),
-            (CableView::Hidden, "Hidden"),
-        ] {
-            if tool(
-                ui,
-                ui_state,
-                &format!("view:{label}"),
-                label,
-                ui_state.cable_view == mode,
-            ) {
-                ui_state.cable_view = mode;
+        vsep(ui, st);
+        kit::label(ui, st, style::Role::Label, kit::Tone::Text2, "Cables");
+        kit::segmented(ui, st, |ui| {
+            for (mode, label) in [
+                (CableView::All, "All"),
+                (CableView::Focus, "Focus"),
+                (CableView::Hidden, "Hidden"),
+            ] {
+                let r = kit::seg(ui, st, label, ui_state.cable_view == mode);
+                ui_state.record(format!("view:{label}"), r.rect);
+                if r.clicked() {
+                    ui_state.cable_view = mode;
+                }
             }
-        }
-        ui.separator();
+        });
+        vsep(ui, st);
         let c = ui_state.canvas.center();
-        if tool(ui, ui_state, "zoom:out", "−", false) {
+        if tool_icon(ui, st, ui_state, "zoom:out", kit::Ic::Minus, "Zoom out", true) {
             ui_state.zoom_about(ui_state.zoom / 1.2, c);
         }
         let pct = format!("{:.0}%", ui_state.zoom * 100.0);
-        if tool(ui, ui_state, "zoom:100", &pct, false) {
+        let r = ui.add(kit::Button::new(st, pct).ghost().min_width(48.0)).tip(st, "Zoom to 100%");
+        ui_state.record("zoom:100".into(), r.rect);
+        if r.clicked() {
             ui_state.zoom_about(1.0, c);
         }
-        if tool(ui, ui_state, "zoom:in", "+", false) {
+        if tool_icon(ui, st, ui_state, "zoom:in", kit::Ic::Plus, "Zoom in", true) {
             ui_state.zoom_about(ui_state.zoom * 1.2, c);
         }
-        if tool(ui, ui_state, "zoom:fit", "Fit", false) {
+        let r = ui.add(kit::Button::new(st, "Fit").icon(kit::Ic::Fit)).tip(st, "Fit the whole patch");
+        ui_state.record("zoom:fit".into(), r.rect);
+        if r.clicked() {
             let lay = composite_layout(editor.state(), ui_state);
             ui_state.frame_world(lay.bounds.expand(4.0), 1.5);
         }
@@ -840,9 +850,11 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) 
             .as_ref()
             .map(|(id, _)| *id)
             .or(ui_state.selected_module);
-        let r = ui.add_enabled(focus_target.is_some(), egui::Button::new("Focus"));
+        let r = ui
+            .add(kit::Button::new(st, "Focus").icon(kit::Ic::Focus).enabled(focus_target.is_some()))
+            .tip(st, "Zoom to the selected module");
         ui_state.record("zoom:focus".into(), r.rect);
-        if r.on_hover_text("Zoom to the selected module").clicked() {
+        if r.clicked() {
             let lay = composite_layout(editor.state(), ui_state);
             if let Some(world) = focus_target.and_then(|id| lay.get(id)).map(|m| m.full()) {
                 // Readable: at least 100 % unless the module is wider than the canvas.
@@ -855,56 +867,58 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) 
                 ui_state.pan += d;
             }
         }
-        ui.separator();
-        if tool(ui, ui_state, "theme:light", "A-light", !ui_state.dark) {
-            ui_state.dark = false;
-        }
-        if tool(ui, ui_state, "theme:dark", "A-dark", ui_state.dark) {
-            ui_state.dark = true;
-        }
-        ui.separator();
-        let menu = ui.menu_button("View", |ui| {
-            ui.label("More controls opens a focused view; rack layout stays fixed.");
-            ui.separator();
-            let r = ui.checkbox(&mut ui_state.skins, "Illustrated skins");
+        vsep(ui, st);
+        kit::segmented(ui, st, |ui| {
+            let r = kit::seg(ui, st, "A-light", !ui_state.dark);
+            ui_state.record("theme:light".into(), r.rect);
+            if r.clicked() {
+                ui_state.dark = false;
+            }
+            let r = kit::seg(ui, st, "A-dark", ui_state.dark);
+            ui_state.record("theme:dark".into(), r.rect);
+            if r.clicked() {
+                ui_state.dark = true;
+            }
+        });
+        vsep(ui, st);
+        let menu = kit::menu_button(ui, st, "View", |ui| {
+            kit::paragraph(ui, st, style::Role::Caption, kit::Tone::Text2, "More controls opens a focused view; rack layout stays fixed.");
+            kit::gap(ui, st, 1);
+            kit::rule(ui, st);
+            kit::gap(ui, st, 1);
+            let r = kit::toggle(ui, st, &mut ui_state.skins, "Illustrated skins");
             ui_state.record("menu:skins".into(), r.rect);
             ui.add_enabled_ui(ui_state.skins, |ui| {
                 let mut on_art = ui_state.skin_labels_on_art.unwrap_or(false);
-                let r = ui
-                    .checkbox(&mut on_art, "Preview labels_on_art")
-                    .on_hover_text("A skin maker's flag; off = theme plates (default)");
+                let r = kit::toggle(ui, st, &mut on_art, "Preview labels_on_art")
+                    .tip(st, "A skin maker's flag; off = theme plates (default)");
                 ui_state.record("menu:labels-on-art".into(), r.rect);
                 if r.changed() {
                     ui_state.skin_labels_on_art = on_art.then_some(true);
                 }
             });
         });
-        ui_state.record("view-menu".into(), menu.response.rect);
+        ui_state.record("view-menu".into(), menu.rect);
     });
     ui.horizontal(|ui| {
-        browser::toolbar(editor, ui_state, ui);
+        browser::toolbar(editor, ui_state, ui, st);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let open = ui_state.drawer_open;
-            if tool(ui, ui_state, "routing", "Routing", open) {
+            if tool(ui, st, ui_state, "routing", "Routing", open) {
                 ui_state.drawer_open = !open;
             }
             let open = ui_state.perform_open;
-            if tool(ui, ui_state, "perform", "Perform", open) {
+            if tool(ui, st, ui_state, "perform", "Perform", open) {
                 ui_state.perform_open = !open;
             }
 
             if let Some(rec) = ui_state.recorder.as_ref().filter(|r| r.recording()) {
                 let t = rec.elapsed() as u64;
-                ui.label(
-                    egui::RichText::new(format!("● REC {:02}:{:02}", t / 60, t % 60))
-                        .color(Color32::from_rgb(220, 60, 50))
-                        .strong(),
-                );
+                kit::label(ui, st, style::Role::Label, kit::Tone::Bad, format!("● REC {:02}:{:02}", t / 60, t % 60));
             }
             if let Some(msg) = &ui_state.last_message {
                 // Truncated to the room left, never over the tools.
-                ui.add(egui::Label::new(egui::RichText::new(msg).small()).truncate())
-                    .on_hover_text(msg);
+                kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, msg).on_hover_text(msg);
             }
         });
     });

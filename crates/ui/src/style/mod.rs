@@ -86,10 +86,14 @@ pub enum Font {
 }
 
 impl Font {
-    pub fn family(self) -> FontFamily {
+    /// `ready` is false until egui has applied the installed font set; until then the plain
+    /// families stand in.
+    pub fn family(self, ready: bool) -> FontFamily {
         match self {
             Font::Sans => FontFamily::Proportional,
             Font::Mono => FontFamily::Monospace,
+            Font::SansMedium | Font::SansSemibold if !ready => FontFamily::Proportional,
+            Font::MonoMedium if !ready => FontFamily::Monospace,
             Font::SansMedium => FontFamily::Name("kabl-sans-medium".into()),
             Font::SansSemibold => FontFamily::Name("kabl-sans-semibold".into()),
             Font::MonoMedium => FontFamily::Name("kabl-mono-medium".into()),
@@ -319,6 +323,9 @@ pub struct Style {
     pub slots: Slots,
     #[serde(skip)]
     pub metrics: Metrics,
+    /// The custom font families are live in egui (set by `show`, not themable).
+    #[serde(skip)]
+    pub fonts_ready: bool,
 }
 
 impl Style {
@@ -337,12 +344,12 @@ impl Style {
     /// The font for a role, never below [`TEXT_FLOOR`].
     pub fn font(&self, r: Role) -> FontId {
         let t = self.type_role(r);
-        FontId::new(t.size.max(TEXT_FLOOR), t.font.family())
+        FontId::new(t.size.max(TEXT_FLOOR), t.font.family(self.fonts_ready))
     }
 
     pub fn section_font(&self) -> FontId {
         let t = &self.types.section;
-        FontId::new(t.size.max(TEXT_FLOOR), t.font.family())
+        FontId::new(t.size.max(TEXT_FLOOR), t.font.family(self.fonts_ready))
     }
 
     /// Spacing step by index into the scale (clamped).
@@ -461,7 +468,7 @@ mod tests {
             let a = builtin_a(dark);
             let text = toml::to_string(&a).unwrap();
             let back: Style = toml::from_str(&text).unwrap();
-            assert_eq!(Style { metrics: Metrics::default(), ..back }, a);
+            assert_eq!(Style { metrics: Metrics::default(), fonts_ready: false, ..back }, a);
         }
     }
 

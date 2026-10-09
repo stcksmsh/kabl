@@ -41,7 +41,7 @@ pub fn shadow(ui: &Ui, st: &Style, rect: Rect, radius: f32, level: usize) {
 
 /// Side panels (Sounds, Routing, Perform).
 pub fn panel_frame(st: &Style) -> Frame {
-    Frame::new().fill(st.roles.surface).inner_margin(Margin::same(st.sp(3) as i8))
+    Frame::new().fill(st.roles.surface).inner_margin(Margin::symmetric(st.sp(3) as i8, st.sp(2) as i8))
 }
 
 /// Toolbar and status bar.
@@ -249,22 +249,18 @@ pub fn apply(ctx: &Context, st: &Style) {
     v.error_fg_color = r.bad;
     let cr = CornerRadius::same((st.radii.sm + 1.0) as u8);
     v.widgets.noninteractive.bg_fill = r.surface;
-    v.widgets.noninteractive.bg_stroke = Stroke::new(1.0, r.line);
-    v.widgets.noninteractive.fg_stroke = Stroke::new(1.0, r.text2);
+    v.widgets.noninteractive.bg_stroke.color = r.line;
+    v.widgets.noninteractive.fg_stroke.color = r.text2;
     for (w, fill) in [(&mut v.widgets.inactive, r.inset), (&mut v.widgets.hovered, mix(r.inset, r.raised, 0.5)), (&mut v.widgets.active, r.accent_soft), (&mut v.widgets.open, r.inset)] {
         w.bg_fill = fill;
         w.weak_bg_fill = fill;
         w.corner_radius = cr;
-        w.bg_stroke = Stroke::new(1.0, r.line);
-        w.fg_stroke = Stroke::new(1.0, r.text);
+        w.bg_stroke.color = r.line;
+        w.fg_stroke.color = r.text;
     }
     v.widgets.noninteractive.corner_radius = cr;
     ctx.set_visuals(v);
     ctx.global_style_mut(|s| {
-        s.spacing.scroll = egui::style::ScrollStyle {
-            bar_width: st.metrics.scroll_w,
-            floating: true,
-            ..egui::style::ScrollStyle::floating()
-        };
+        s.spacing.scroll = egui::style::ScrollStyle { bar_width: st.metrics.scroll_w, ..egui::style::ScrollStyle::floating() };
     });
 }

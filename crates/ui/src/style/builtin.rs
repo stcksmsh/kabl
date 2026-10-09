@@ -19,6 +19,7 @@ fn role(font: Font, size: f32) -> TypeRole {
 pub fn builtin_a(dark: bool) -> Style {
     let (roles, sections, shadows) = if dark { dark_parts() } else { light_parts() };
     Style {
+        fonts_ready: false,
         id: BUILTIN_A_ID.into(),
         name: "Satin Studio".into(),
         dark,
