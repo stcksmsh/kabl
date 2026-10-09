@@ -243,7 +243,7 @@ fn morph_arc() -> PatchEditor {
     e.set_param(arp_env, "release_ms", 140.0);
     e.set_param(arp_vca, "gain", 0.0);
     e.set_param(delay, "sync", 3.0);
-    e.set_param(delay, "feedback", 52.0);
+    e.set_param(delay, "feedback", 58.0);
     e.set_param(delay, "mix", 100.0);
     e.set_param(delay, "tone_hz", 3000.0);
     e.set_param(delay, "mode", 1.0);
@@ -279,10 +279,10 @@ fn morph_arc() -> PatchEditor {
     }
     e.set_param(bus, "level1", 0.35);
     e.set_param(bus, "level2", 0.5);
-    e.set_param(bus, "level3", 0.3);
-    e.set_param(bus, "level4", 0.3);
-    e.set_param(master, "level1", 0.7);
-    e.set_param(master, "level2", 0.4);
+    e.set_param(bus, "level3", 0.5);
+    e.set_param(bus, "level4", 0.5);
+    e.set_param(master, "level1", 0.5);
+    e.set_param(master, "level2", 0.3);
     e.set_param(verb, "decay_s", 5.0);
     e.set_param(verb, "mix", 30.0);
 
@@ -304,9 +304,11 @@ fn morph_arc() -> PatchEditor {
         p.push((format!("s{k}"), 0.0));
     }
     for k in 1..=8 {
-        p.push((format!("b.s{k}"), 0.75));
-        p.push((format!("b.r{k}"), 85.0));
+        p.push((format!("b.s{k}"), 1.0));
+        p.push((format!("b.r{k}"), 90.0));
     }
+    p.push(("r1".into(), 60.0));
+    p.push(("s1".into(), 0.5));
     p.push(("morph".into(), 0.3));
     let p: Vec<(&str, f32)> = p.iter().map(|(k, v)| (k.as_str(), *v)).collect();
     cable_params(&mut e, send, &p);
@@ -372,7 +374,7 @@ fn morph_arc() -> PatchEditor {
 fn morph_at(which: usize, bar: f32) -> f32 {
     let ramp = |a: f32, b: f32| ((bar - a) / (b - a)).clamp(0.0, 1.0);
     match which {
-        0 => ramp(4.0, 12.0) - ramp(18.0, 24.0),
+        0 => ramp(4.0, 9.0) - ramp(18.0, 24.0),
         1 => ramp(8.0, 16.0) - ramp(20.0, 24.0),
         _ => ramp(12.0, 18.0) - ramp(21.0, 24.0),
     }
