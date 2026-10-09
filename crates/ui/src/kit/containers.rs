@@ -41,7 +41,7 @@ pub fn shadow(ui: &Ui, st: &Style, rect: Rect, radius: f32, level: usize) {
 
 /// Side panels (Sounds, Routing, Perform).
 pub fn panel_frame(st: &Style) -> Frame {
-    Frame::new().fill(st.roles.surface).inner_margin(Margin::symmetric(st.sp(3) as i8, st.sp(2) as i8))
+    Frame::new().fill(st.roles.surface).inner_margin(Margin::symmetric(st.sp(3) as i8, st.sp(1) as i8))
 }
 
 /// Toolbar and status bar.

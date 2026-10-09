@@ -263,7 +263,7 @@ pub fn toggle(ui: &mut Ui, st: &Style, on: &mut bool, text: &str) -> Response {
 pub fn slider(ui: &mut Ui, st: &Style, value: &mut f64, range: std::ops::RangeInclusive<f64>, step: Option<f64>, readout: &str) -> Response {
     let enabled = ui.is_enabled();
     let readout_w = ui.painter().layout_no_wrap("000.00 ms".into(), st.font(Role::Value), Color32::WHITE).size().x;
-    let w = ui.available_width().max(60.0);
+    let w = (ui.available_width() - ui.spacing().item_spacing.x).max(60.0);
     let (rect, mut resp) = ui.allocate_exact_size(vec2(w, st.metrics.slider_h), if enabled { Sense::click_and_drag() } else { Sense::hover() });
     let track_r = Rect::from_min_max(rect.min, pos2(rect.right() - readout_w - st.sp(2), rect.max.y));
     let (lo, hi) = (*range.start(), *range.end());
@@ -339,6 +339,7 @@ pub fn field(ui: &mut Ui, st: &Style, text: &mut String, hint: &str, lead: Optio
         .text_color(st.roles.text)
         .hint_text(hint_text)
         .margin(Margin::symmetric(0, vpad as i8))
+        .vertical_align(egui::Align::Center)
         .desired_width(inner.width());
     let resp = ui.put(inner, edit);
     let focused = resp.has_focus();

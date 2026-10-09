@@ -871,7 +871,7 @@ pub fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
     let r = ui
         .add_sized(
             [140.0, 20.0],
-            egui::Label::new(kit::rich(st, Role::H3, Tone::Text, text)).selectable(false).truncate(),
+            egui::Label::new(kit::rich(st, Role::Body, Tone::Text, text)).selectable(false).truncate(),
         )
         .tip(
             st,
@@ -885,13 +885,13 @@ pub fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
         );
     hit(ui_state, "doc-name", &r);
     let r = ui
-        .add(kit::Button::new(st, "Save").icon(Ic::Save).enabled(!io_busy(ui_state)))
+        .add(kit::Button::new(st, "Save").small().icon(Ic::Save).enabled(!io_busy(ui_state)))
         .tip(st, "Ctrl+S");
     hit(ui_state, "save", &r);
     if r.clicked() {
         save(editor, ui_state, None);
     }
-    let r = ui.add(kit::Button::new(st, "Save As"));
+    let r = ui.add(kit::Button::new(st, "Save As").small());
     hit(ui_state, "save-as", &r);
     if r.clicked() {
         open_save_as(ui_state, None);
@@ -967,12 +967,16 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     ui.horizontal_wrapped(|ui| {
         for (f, key, label) in [
             (Filter::All, "all", "All"),
-            (Filter::Favorites, "favorites", "★ Favorites"),
+            (Filter::Favorites, "favorites", "Favorites"),
             (Filter::Recent, "recent", "Recent"),
             (Filter::Factory, "factory", "Factory"),
             (Filter::User, "user", "Your Sounds"),
         ] {
-            let r = ui.add(kit::Button::new(st, label).small().selected(ui_state.browser.filter == f));
+            let mut btn = kit::Button::new(st, label).small().selected(ui_state.browser.filter == f);
+            if f == Filter::Favorites {
+                btn = btn.icon(Ic::Star);
+            }
+            let r = ui.add(btn);
             hit(ui_state, &format!("filter:{key}"), &r);
             if r.clicked() {
                 ui_state.browser.filter = f;
@@ -1058,7 +1062,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     let has_user = lib.entries.iter().any(|e| e.origin == Origin::User);
     let filter = b.filter;
 
-    let list_h = (ui.available_height() - 410.0).max(120.0);
+    let list_h = (ui.available_height() - 440.0).max(120.0);
     let mut open = None;
     let mut toggle = None;
     let mut forget = None;
@@ -1320,6 +1324,8 @@ fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui:
             if r.clicked() {
                 a.note = (a.note + 12).min(96);
             }
+        });
+        ui.horizontal(|ui| {
             for c in [Chord::Single, Chord::Major, Chord::Minor] {
                 let r = ui.add(kit::Button::new(st, c.label()).small().selected(a.chord == c));
                 chord_hits.push((format!("chord:{}", c.label()), r.rect));
@@ -1517,7 +1523,7 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
                 kit::paragraph(ui, st, Role::Body, Tone::Text2, "Saves a copy in Your Sounds. Factory sounds stay as they are.");
                 kit::gap(ui, st, 2);
                 ui.horizontal(|ui| {
-                    kit::label(ui, st, Role::Label, Tone::Text2, "Name");
+                    ui.add_sized([72.0, st.metrics.field_h], egui::Label::new(kit::rich(st, Role::Label, Tone::Text2, "Name")).selectable(false));
                     let r = kit::field(ui, st, &mut name, "", None, Some(280.0));
                     hit(ui_state, "dlg:name", &r);
                     if r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
@@ -1535,7 +1541,7 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
                     error = None;
                 }
                 ui.horizontal(|ui| {
-                    kit::label(ui, st, Role::Label, Tone::Text2, "Category");
+                    ui.add_sized([72.0, st.metrics.field_h], egui::Label::new(kit::rich(st, Role::Label, Tone::Text2, "Category")).selectable(false));
                     let cur = category.clone();
                     kit::dropdown(ui, st, "dlg-category", &cur, 200.0, |ui| {
                         for c in CATEGORIES {
@@ -1546,7 +1552,7 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
                     });
                 });
                 ui.horizontal(|ui| {
-                    kit::label(ui, st, Role::Label, Tone::Text2, "Tags");
+                    ui.add_sized([72.0, st.metrics.field_h], egui::Label::new(kit::rich(st, Role::Label, Tone::Text2, "Tags")).selectable(false));
                     kit::field(ui, st, &mut tags, "comma separated", None, Some(280.0));
                 });
                 if let Some(e) = &error {

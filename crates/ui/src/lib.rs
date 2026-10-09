@@ -755,6 +755,12 @@ fn tool(ui: &mut egui::Ui, st: &Style, ui_state: &mut UiState, key: &str, label:
     r.clicked()
 }
 
+fn tool_small(ui: &mut egui::Ui, st: &Style, ui_state: &mut UiState, key: &str, label: &str, on: bool) -> bool {
+    let r = ui.add(kit::Button::new(st, label).small().selected(on));
+    ui_state.record(key.to_string(), r.rect);
+    r.clicked()
+}
+
 fn vsep(ui: &mut egui::Ui, st: &Style) {
     let (r, _) = ui.allocate_exact_size(egui::vec2(1.0, st.metrics.control_h - 8.0), egui::Sense::hover());
     ui.painter().rect_filled(r, 0.0, st.roles.line2);
@@ -904,11 +910,11 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
         browser::toolbar(editor, ui_state, ui, st);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let open = ui_state.drawer_open;
-            if tool(ui, st, ui_state, "routing", "Routing", open) {
+            if tool_small(ui, st, ui_state, "routing", "Routing", open) {
                 ui_state.drawer_open = !open;
             }
             let open = ui_state.perform_open;
-            if tool(ui, st, ui_state, "perform", "Perform", open) {
+            if tool_small(ui, st, ui_state, "perform", "Perform", open) {
                 ui_state.perform_open = !open;
             }
 

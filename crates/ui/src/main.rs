@@ -1758,7 +1758,7 @@ impl eframe::App for App {
         let st = ui_state.style.clone();
         let st = &*st;
         egui::Panel::bottom("kabl-status")
-            .exact_size(st.metrics.status_h + 2.0 * st.sp(2))
+            .exact_size(st.metrics.status_h + 2.0 * st.sp(1))
             .frame(kit::bar_frame(st))
             .show(ui, |ui| {
             ui.horizontal(|ui| {

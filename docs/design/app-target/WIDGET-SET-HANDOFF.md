@@ -69,3 +69,23 @@ dense   1280x800 dark  median 3689 us p95 4302 max 4699
 ```
 
 The untracked bench copy in the design-target worktree was deleted.
+
+## Checkpoint 2 (chrome wired)
+
+Committed and pushed on `claude/widget-set`. `cargo test -p kabl-ui` (debug): **276 passed, 0 failed, 21 ignored** (baseline 273 plus the 3 style tests).
+
+### Done
+- `lib.rs`: toolbar (rows, `tool`/`tool_small`/`tool_icon`, kind dropdown, segmented cables and theme, View menu with toggles), panel frames, Routing drawer header (one row: title, Help, Inspect, Compare, Learn, close icon), module/bank/cable context menus, rack fill from `st.roles.rack`.
+- `browser.rs`: toolbar items, header, `kit::field` search, filter chips, category dropdown, card rows (`sound_row`), selected-sound block, audition (two rows of chips, `kit::slider`, Play primary), patch-folder disclosure (`Browser.folder_open`), all four dialogs on `kit::modal`.
+- `main.rs`: status bar (meter from `Style`, audio status, output dropdown, Retry, Log, Diagnostics popover holding phase/session, waiting changes, output settings, last take, timing).
+- `perform.rs::module_menu`: Pin / MIDI submenus use `kit::submenu`.
+- Fonts: `Style.fonts_ready` falls back to plain families until egui applies the installed fonts (fixes a first-frame panic in tests).
+- Layout facts: `toolbar_h` stays 64 (row 2 uses small 24 px buttons); `bar_frame` vertical margin `sp(1)`; browser list reserve is `available_height - 440`.
+
+### Not done
+- Side rail (deferred: would change canvas size assumptions).
+- Captures: release binary builds; scripts in the job tmp dir (`cap/run.sh`, `drive.py` + Xvfb + openbox) worked once. First capture found and fixed: clipped toolbar row 2, tofu star glyph, slider readout overflow, audition chip overflow, field text alignment. Needs a re-run at 1440x900, 1280x800 light/dark and a scaled display (`WINIT_X11_SCALE_FACTOR=1.5`), compared with `media/a-satin/*rack-sounds*`.
+- Frame times after (`cargo run --release -p kabl-ui --example bench_chrome`).
+- Strict clippy and rustfmt on touched files.
+- Draft PR #18 exists; overseer report not sent.
+- Out of scope, still stock: module faces, drawer bodies (explain, inspect, compare, recipes, param panel), Perform panel, seq/cue combo boxes, Composites windows.
