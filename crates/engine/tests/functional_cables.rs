@@ -336,6 +336,171 @@ fn audio_path_does_not_allocate_even_while_edited() {
     assert!(c.left().iter().all(|x| x.is_finite()));
 }
 
+// Morph and glide: the same contract as pattern and probability.
+
+const A: &[(&str, f32)] = &[("length", 3.0), ("s2", 0.0), ("r3", 60.0)];
+const B: &[(&str, f32)] = &[
+    ("length", 4.0),
+    ("s1", 0.5),
+    ("s3", 0.2),
+    ("r2", 40.0),
+    ("r4", 70.0),
+];
+
+/// The probe with pattern A, pattern B (as `b.*`) and a morph.
+fn morphed(morph: f32) -> PatchState {
+    let mut p = probe(A);
+    let cable = &mut p.cables.get_mut(&CABLE).unwrap().params;
+    for (k, v) in B {
+        cable.insert(format!("b.{k}"), *v);
+    }
+    cable.insert("morph".into(), morph);
+    p
+}
+
+fn left_of(p: &PatchState, blocks: usize) -> Vec<f32> {
+    render(&mut compile(p, SR, 1).unwrap(), blocks, |_, _| {}).0
+}
+
+#[test]
+fn morph_ends_are_the_plain_patterns_bit_for_bit() {
+    assert_eq!(left_of(&morphed(0.0), 600), left_of(&probe(A), 600));
+    assert_eq!(left_of(&morphed(1.0), 600), left_of(&probe(B), 600));
+    let (m, r) = render(&mut compile(&morphed(0.4), SR, 1).unwrap(), 600, |_, _| {});
+    assert_ne!(m, left_of(&probe(A), 600));
+    assert_ne!(m, left_of(&probe(B), 600));
+    assert_eq!(first_diff(&m, &expected(&morphed(0.4), &r, &[])), None);
+}
+
+#[test]
+fn morph_replays_after_restart_stop_and_run() {
+    let p = morphed(0.5);
+    let run = || {
+        render(&mut compile(&p, SR, 1).unwrap(), 2400, |c, b| match b {
+            700 => c.transport(CLOCK, Transport::Restart),
+            1301 => c.transport(CLOCK, Transport::Stop),
+            1700 => c.transport(CLOCK, Transport::Run),
+            2000 => c.transport(CLOCK, Transport::Restart),
+            _ => {}
+        })
+    };
+    let (l, r) = run();
+    assert_eq!(first_diff(&l, &run().0), None, "two renders are identical");
+    let restarts = [700 * BLOCK, 2000 * BLOCK];
+    assert_eq!(first_diff(&l, &expected(&p, &r, &restarts)), None);
+}
+
+#[test]
+fn morph_glide_and_pattern_b_edits_are_runtime_values() {
+    let a = morphed(0.0);
+    let mut b = morphed(0.8);
+    let cable = &mut b.cables.get_mut(&CABLE).unwrap().params;
+    cable.insert("glide_ms".into(), 20.0);
+    cable.insert("b.s3".into(), 0.9);
+    let changes = runtime_changes(&a, &b).expect("edit of a functional cable is runtime");
+    let slots: Vec<usize> = changes
+        .iter()
+        .map(|(t, _)| match t {
+            RuntimeTarget::Cable { cable, slot } if *cable == CABLE => *slot as usize,
+            other => panic!("unexpected target {other:?}"),
+        })
+        .collect();
+    for slot in [
+        kabl_cables::MORPH,
+        kabl_cables::GLIDE,
+        kabl_cables::B_LEVEL0 + 2,
+    ] {
+        assert!(slots.contains(&slot), "slot {slot} in {slots:?}");
+    }
+    let mut c = compile(&a, SR, 1).unwrap();
+    let counts = c.profile_counts();
+    render(&mut c, 10, |_, _| {});
+    for (t, v) in changes {
+        assert!(c.set_runtime(t, v, true));
+    }
+    assert_eq!(c.profile_counts(), counts, "no rebuild");
+    assert_eq!(c.ramps(), 0);
+    // From the second pulse after the edit (and past the glide) it sounds like a graph
+    // compiled from `b`.
+    let mut d = compile(&b, SR, 1).unwrap();
+    render(&mut d, 10, |_, _| {});
+    let from = 2 * 2400 + 1200;
+    let (l1, _) = render(&mut c, 400, |_, _| {});
+    let (l2, _) = render(&mut d, 400, |_, _| {});
+    assert_eq!(first_diff(&l1[from..], &l2[from..]), None);
+    assert_ne!(l1, left_of(&a, 410)[640..].to_vec());
+
+    // Gaining a morph is a compile for a plain cable, free for a functional one.
+    let plain = probe(&[("amount", 0.3)]);
+    let mut with_morph = plain.clone();
+    with_morph
+        .cables
+        .get_mut(&CABLE)
+        .unwrap()
+        .params
+        .insert("morph".into(), 0.5);
+    assert_eq!(runtime_changes(&plain, &with_morph), None);
+    assert_eq!(runtime_changes(&with_morph, &plain), None);
+}
+
+#[test]
+fn glide_slews_each_step_over_glide_ms() {
+    for glide in [10.0, 20.0] {
+        let p = probe(&[("length", 2.0), ("s2", 0.0), ("glide_ms", glide)]);
+        let (l, r) = render(&mut compile(&p, SR, 1).unwrap(), 400, |_, _| {});
+        let pulses: Vec<usize> = (0..r.len())
+            .filter(|&i| r[i] > 0.5 && (i == 0 || r[i - 1] <= 0.5))
+            .collect();
+        let n = (glide * 0.001 * SR) as usize;
+        // Tick 1 closes (a ramp down), tick 2 opens again (a ramp up), both linear in n samples.
+        for k in [0, n / 4, n / 2, n - 1] {
+            let down = l[pulses[1] + k];
+            let up = l[pulses[2] + k];
+            let want = (k + 1) as f32 / n as f32;
+            assert!((down - (1.0 - want)).abs() < 1e-3, "down {k}: {down}");
+            assert!((up - want).abs() < 1e-3, "up {k}: {up}");
+        }
+        assert_eq!(l[pulses[1] + n + 5], 0.0);
+        assert_eq!(l[pulses[2] + n + 5], 1.0);
+    }
+}
+
+#[test]
+fn audio_path_does_not_allocate_with_morph_and_glide_running() {
+    let mut p = morphed(0.5);
+    p.cables
+        .get_mut(&CABLE)
+        .unwrap()
+        .params
+        .insert("glide_ms".into(), 15.0);
+    let mut c = compile(&p, SR, 1).unwrap();
+    for b in 0..400 {
+        assert_no_alloc(|| {
+            if b % 3 == 0 {
+                let m = (b % 11) as f32 / 10.0;
+                c.set_runtime(
+                    RuntimeTarget::Cable {
+                        cable: CABLE,
+                        slot: kabl_cables::MORPH as u8,
+                    },
+                    m,
+                    false,
+                );
+                c.set_runtime(
+                    RuntimeTarget::Cable {
+                        cable: CABLE,
+                        slot: kabl_cables::GLIDE as u8,
+                    },
+                    (b % 40) as f32,
+                    false,
+                );
+            }
+            c.process_block();
+        });
+    }
+    assert!(c.left().iter().all(|x| x.is_finite()));
+}
+
 fn cable_ops() -> Vec<Op> {
     let mut ops = vec![
         Op::AddModule {
@@ -444,6 +609,54 @@ fn undo_save_and_reload_recall_the_cable() {
     assert_eq!(back.state(), &functional);
     assert_eq!(render_state(back.state()), sound, "recall sounds the same");
     // The reloaded log keeps its history: undo still works.
+    let mut back = back;
+    assert!(back.undo());
+}
+
+#[test]
+fn undo_save_and_reload_recall_morph_glide_and_pattern_b() {
+    let mut log = PatchLog::new();
+    for op in cable_ops() {
+        log.append_new(op, 0, Source::User);
+    }
+    let edits = [
+        ("length", 4.0),
+        ("s2", 0.0),
+        ("b.length", 3.0),
+        ("b.s2", 0.3),
+        ("b.r3", 50.0),
+        ("glide_ms", 15.0),
+        ("morph", 0.6),
+    ];
+    for (k, v) in edits.iter().take(2) {
+        log.append_new(set_cable(k, *v), 0, Source::User);
+    }
+    let a_only = log.state().clone();
+    for (k, v) in edits.iter().skip(2) {
+        log.append_new(set_cable(k, *v), 0, Source::User);
+    }
+    let morphed = log.state().clone();
+    let sound = render_state(&morphed);
+    assert_ne!(sound, render_state(&a_only));
+
+    for _ in 2..edits.len() {
+        assert!(log.undo());
+    }
+    assert_eq!(
+        log.state(),
+        &a_only,
+        "undo removes the params, not zeroes them"
+    );
+    for _ in 2..edits.len() {
+        assert!(log.redo());
+    }
+    assert_eq!(log.state(), &morphed);
+
+    let dir = tempfile::tempdir().unwrap();
+    kabl_core::save(dir.path(), &log).unwrap();
+    let back = kabl_core::load(dir.path()).unwrap();
+    assert_eq!(back.state(), &morphed);
+    assert_eq!(render_state(back.state()), sound, "recall sounds the same");
     let mut back = back;
     assert!(back.undo());
 }

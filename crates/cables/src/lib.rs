@@ -162,8 +162,9 @@ impl Settings {
         if self.morph > 0.0 {
             let kb = (tick % self.len_b.max(1) as u64) as usize;
             let m = self.morph;
-            p += (self.prob * self.chance_b[kb] - p) * m;
-            level += (self.level_b[kb] - level) * m;
+            // a * (1 - m) + b * m is exact at both ends: morph 1 is pattern B alone, bit for bit.
+            p = p * (1.0 - m) + self.prob * self.chance_b[kb] * m;
+            level = level * (1.0 - m) + self.level_b[kb] * m;
         }
         if draw(seed, tick) < p {
             level

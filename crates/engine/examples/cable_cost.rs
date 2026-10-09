@@ -4,6 +4,9 @@
 //!
 //!     taskset -c 2 cargo run --release -p kabl-engine --example cable_cost -- patches/composition
 //!
+//! `KABL_MORPH=1` adds pattern B (5 steps), morph 0.5 and 20 ms glide to every functional cable;
+//! `KABL_IDENTITY=1` makes every step open and never rejected.
+//!
 //! Arguments: patch folder (default patches/composition), blocks per run (default 40000).
 
 use std::time::Instant;
@@ -45,10 +48,20 @@ fn functional(p: &PatchState) -> (PatchState, usize) {
                 80.0
             };
             c.params.insert("prob".into(), prob);
+            morph_params(&mut c.params);
             n += 1;
         }
     }
     (q, n)
+}
+
+/// With `KABL_MORPH` set: a second pattern of five steps, half a morph and 20 ms of glide.
+fn morph_params(params: &mut std::collections::BTreeMap<String, f32>) {
+    if std::env::var_os("KABL_MORPH").is_some() {
+        for (k, v) in [("b.length", 5.0), ("morph", 0.5), ("glide_ms", 20.0)] {
+            params.insert(k.into(), v);
+        }
+    }
 }
 
 fn play(c: &mut CompiledPatch) {
@@ -112,6 +125,7 @@ fn main() {
         .unwrap()
         .params
         .insert("length".into(), 8.0);
+    morph_params(&mut min.cables.get_mut(&1).unwrap().params);
     let b = report("minimal: one functional cable", &min, 1, blocks);
     println!("node alone {:+.0} ns/block", b - a);
 }

@@ -192,3 +192,14 @@ Dense two-open backend ERR2 remains; physical xruns and latency unmeasured. P99 
 | `patches/composition`, same cables but every step open and never rejected | 43 235 ns | 48 264 ns | +5 µs: about 45 ns per node, 88 ns per cable |
 
 The node itself costs tens of nanoseconds (one 64-sample copy and a multiply or slew). The rest of the difference with real gating is downstream: a closed step feeds silence to filters and delays and changes what they compute. A plain cable costs nothing (no node). Making every jack cable of the densest shipped patch functional is far beyond real use; ten functional cables is under 1 % of the budget.
+
+### Morph and glide
+
+Same tool and machine (`KABL_MORPH=1 taskset -c 2 ./target/release/examples/cable_cost patches/composition`), one run of 9 on 2026-10-10 at the head of the morph-standard commit (a36e63c plus the test and blend-exactness change). `KABL_MORPH=1` gives every functional cable a second pattern of 5 steps, a morph of 0.5 and 20 ms of glide, so each pulse blends two steps and every level change slews.
+
+| Case | Pattern only | Pattern, pattern B, morph 0.5, glide 20 ms |
+|---|---|---|
+| `patches/composition`, 57 jack cables, difference to plain | +16 494 ns/block (289 ns per cable) | +15 473 ns/block (271 ns per cable) |
+| Minimal, one cable, node alone | +11 ns/block | +17 ns/block |
+
+Morph and glide add nothing measurable: the blend is two table reads and a multiply at each pulse (not per sample), and glide only changes the slew rate of the existing audio path. The difference between the columns is inside run-to-run noise (the plain baseline moved 44 015 to 44 057 ns). The morph and glide edits are runtime values and `audio_path_does_not_allocate_with_morph_and_glide_running` asserts no allocation while they change.

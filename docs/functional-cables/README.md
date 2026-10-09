@@ -17,7 +17,7 @@ A cable that carries a pattern or a chance below 100 % shows three small bars on
 
 The clips were not listened to by the agent that made them (it has no ears); they were checked for level, determinism and difference from the plain version only.
 
-## Morph (prototype, awaiting Kosta)
+## Morph and glide (kept as built, awaiting Kosta's confirmation)
 
 The repository never says what morph is, so this is a prototype of the three candidates that were put to Kosta, built so they can be heard side by side. Kosta has not chosen; none of this is a decision.
 
