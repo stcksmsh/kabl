@@ -297,7 +297,7 @@ fn morph_arc() -> PatchEditor {
     e.connect(jack(arp_filter, "lp"), jack(arp_vca, "in"));
     e.connect(jack(arp_env, "out"), jack(arp_vca, "cv"));
     e.connect(jack(arp_vca, "out"), jack(bus, "in1"));
-    // Echo send. A: one throw per bar. B: every step, at a lower level, mostly.
+    // Echo send. A: one throw per eight-step cycle. B: every step, at a lower level, mostly.
     let send = e.connect(jack(arp_vca, "out"), jack(delay, "in"));
     let mut p: Vec<(String, f32)> = vec![("length".into(), 8.0), ("b.length".into(), 8.0)];
     for k in 2..=8 {

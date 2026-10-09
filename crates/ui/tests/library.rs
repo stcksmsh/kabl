@@ -40,7 +40,7 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
             "minor",
         ],
         "A slow A-minor piece that plays by itself. Three cables each hold two patterns, A and \
-         B, and a morph between them: the delay send (one throw per bar to every step), the \
+         B, and a morph between them: the delay send (one throw per eight-step arp cycle to every step), the \
          pad's gate (a breathing hold to a sixteen-step chop) and the bass filter (four even \
          steps to five uneven ones). Open a cable's Pattern editor and move Morph A to B.",
     ),
