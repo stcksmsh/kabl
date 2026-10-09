@@ -243,7 +243,7 @@ fn morph_arc() -> PatchEditor {
     e.set_param(arp_env, "release_ms", 140.0);
     e.set_param(arp_vca, "gain", 0.0);
     e.set_param(delay, "sync", 3.0);
-    e.set_param(delay, "feedback", 58.0);
+    e.set_param(delay, "feedback", 64.0);
     e.set_param(delay, "mix", 100.0);
     e.set_param(delay, "tone_hz", 3000.0);
     e.set_param(delay, "mode", 1.0);
@@ -279,8 +279,8 @@ fn morph_arc() -> PatchEditor {
     }
     e.set_param(bus, "level1", 0.35);
     e.set_param(bus, "level2", 0.7);
-    e.set_param(bus, "level3", 0.5);
-    e.set_param(bus, "level4", 0.5);
+    e.set_param(bus, "level3", 0.6);
+    e.set_param(bus, "level4", 0.6);
     e.set_param(master, "level1", 0.36);
     e.set_param(master, "level2", 0.58);
     e.set_param(verb, "decay_s", 5.0);
@@ -320,7 +320,20 @@ fn morph_arc() -> PatchEditor {
     e.connect(jack(bass, "out"), jack(bass_filter, "in"));
     e.connect(jack(bass_filter, "out"), jack(bass_vca, "in"));
     e.connect(jack(bass_env, "out"), jack(bass_vca, "cv"));
-    e.connect(jack(bass_vca, "out"), jack(bus, "in2"));
+    // Bass level. A: a quiet bass. B: the full bass.
+    let level = e.connect(jack(bass_vca, "out"), jack(bus, "in2"));
+    let mut p: Vec<(String, f32)> = vec![
+        ("length".into(), 4.0),
+        ("b.length".into(), 4.0),
+        ("glide_ms".into(), 20.0),
+        ("morph".into(), 0.3),
+    ];
+    for k in 1..=4 {
+        p.push((format!("s{k}"), 0.4));
+        p.push((format!("b.s{k}"), 1.0));
+    }
+    let p: Vec<(&str, f32)> = p.iter().map(|(k, v)| (k.as_str(), *v)).collect();
+    cable_params(&mut e, level, &p);
     // Pad.
     e.connect(jack(pad_a, "out"), jack(pad_mix, "in1"));
     e.connect(jack(pad_b, "out"), jack(pad_mix, "in2"));
@@ -337,7 +350,7 @@ fn morph_arc() -> PatchEditor {
         ("morph".into(), 0.3),
     ];
     for k in 1..=16 {
-        p.push((format!("s{k}"), if k % 4 == 1 { 1.0 } else { 0.8 }));
+        p.push((format!("s{k}"), if k % 4 == 1 { 0.55 } else { 0.45 }));
         let on = [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1][k - 1];
         p.push((format!("b.s{k}"), on as f32));
     }
@@ -375,7 +388,7 @@ fn morph_at(which: usize, bar: f32) -> f32 {
     let ramp = |a: f32, b: f32| ((bar - a) / (b - a)).clamp(0.0, 1.0);
     match which {
         0 => ramp(4.0, 9.0) - ramp(18.0, 24.0),
-        1 => ramp(8.0, 16.0) - ramp(20.0, 24.0),
+        2 => ramp(8.0, 16.0) - ramp(20.0, 24.0),
         _ => ramp(12.0, 18.0) - ramp(21.0, 24.0),
     }
 }
@@ -388,7 +401,7 @@ fn render_morph(state: &kabl_core::PatchState) -> Vec<f32> {
         .filter(|(_, c)| c.params.contains_key("morph"))
         .map(|(&id, _)| id)
         .collect();
-    assert_eq!(cables.len(), 3);
+    assert_eq!(cables.len(), 4);
     let mut c = compile(state, SR, 4).expect("morph piece compiles");
     let bar_s = 16.0 * 60.0 / (100.0 * 4.0);
     let blocks = (24.0 * bar_s * SR) as usize / BLOCK;
