@@ -7,9 +7,9 @@
     "arp": {"id": 17, "kind": "jack"},
     "bass": {"id": 30, "kind": "jack"},
     "filter": {"id": 31, "kind": "route"},
-    "bells": {"id": 36, "kind": "jack"},
-    "pad": {"id": 46, "kind": "jack"},
-    "bus": {"id": 47, "kind": "jack"}
+    "bells": {"id": 37, "kind": "jack"},
+    "pad": {"id": 47, "kind": "jack"},
+    "bus": {"id": 48, "kind": "jack"}
   },
   "gestures": [
     {"cable": "echo", "from": 0, "to": 1, "start_bar": 4, "end_bar": 7, "what": "echoes: one throw per cycle to every step"},
@@ -18,8 +18,8 @@
     {"cable": "filter", "from": 0, "to": 1, "start_bar": 17, "end_bar": 21, "what": "bass filter: shut to a busy five against four"},
     {"cable": "bells", "from": 0, "to": 1, "start_bar": 23, "end_bar": 25.5, "what": "bells: none to a chancy sixteen"},
     {"cable": "pad", "from": 0, "to": 1, "start_bar": 28, "end_bar": 31, "what": "pad: held to chopped"},
-    {"cable": "bus", "from": 1, "to": 0, "start_bar": 38, "end_bar": 39, "what": "break: the band cut to two stabs, the echoes ring"},
-    {"cable": "bus", "from": 0, "to": 1, "start_bar": 44.6, "end_bar": 45, "what": "return: everything back on the downbeat"},
+    {"cable": "bus", "from": 1, "to": 0, "start_bar": 35.6, "end_bar": 36, "what": "break: the band cut to two stabs on the phrase, the echoes ring"},
+    {"cable": "bus", "from": 0, "to": 1, "start_bar": 43.6, "end_bar": 44, "what": "return: everything back on the downbeat of the phrase"},
     {"cable": "pad", "from": 1, "to": 0, "start_bar": 53, "end_bar": 54.5, "what": "pad: back to held"},
     {"cable": "bass", "from": 1, "to": 0, "start_bar": 56.5, "end_bar": 58.5, "what": "bass: out"},
     {"cable": "bells", "from": 1, "to": 0, "start_bar": 60.5, "end_bar": 62, "what": "bells: out"},

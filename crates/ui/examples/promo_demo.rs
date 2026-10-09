@@ -51,8 +51,8 @@ const fn g(
     }
 }
 
-/// The piece. Bars 0-4: intro (a sparse arp, a held pad). 4-31 build. 31-38 peak. 38-45 break.
-/// 45-53 return (snaps in on the downbeat of bar 45). 53-70 outro.
+/// The piece. Bars 0-4: intro (a sparse arp, a held pad). 4-31 build. 31-36 peak. 36-44 break.
+/// 44-53 return (snaps in on the downbeat of bar 44). 53-70 outro.
 const GESTURES: [Gesture; 12] = [
     g(
         "echo",
@@ -92,17 +92,17 @@ const GESTURES: [Gesture; 12] = [
         "bus",
         1.0,
         0.0,
-        38.0,
-        39.0,
-        "break: the band cut to two stabs, the echoes ring",
+        35.6,
+        36.0,
+        "break: the band cut to two stabs on the phrase, the echoes ring",
     ),
     g(
         "bus",
         0.0,
         1.0,
-        44.6,
-        45.0,
-        "return: everything back on the downbeat",
+        43.6,
+        44.0,
+        "return: everything back on the downbeat of the phrase",
     ),
     g("pad", 1.0, 0.0, 53.0, 54.5, "pad: back to held"),
     g("bass", 1.0, 0.0, 56.5, 58.5, "bass: out"),
@@ -206,6 +206,7 @@ fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
     let bell = e.add_module("osc.va", at(420.0, 560.0));
     let bell_env = e.add_module("env.adsr", at(820.0, 560.0));
     let bell_vca = e.add_module("vca", at(1020.0, 560.0));
+    let bell_gain = e.add_module("gain", at(1120.0, 560.0));
     let pad_a = e.add_module("osc.va", at(20.0, 820.0));
     let pad_b = e.add_module("osc.va", at(220.0, 820.0));
     let pad_c = e.add_module("osc.va", at(420.0, 820.0));
@@ -273,14 +274,15 @@ fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
     e.set_param(drive, "mix", 100.0);
     e.set_param(drive, "trim_db", -2.0);
     e.set_param(knob, "m1", 1.0);
-    // Bells: a triangle two octaves above the arp, following its notes, with a short decay.
-    e.set_param(bell, "waveform", 1.0);
-    e.set_param(bell, "base_hz", 1046.5);
+    // Bells: a bright stab on the chord root (A5), with a short decay.
+    e.set_param(bell, "waveform", 2.0);
+    e.set_param(bell, "base_hz", 880.0);
     e.set_param(bell_env, "attack_ms", 1.0);
-    e.set_param(bell_env, "decay_ms", 120.0);
+    e.set_param(bell_env, "decay_ms", 180.0);
     e.set_param(bell_env, "sustain", 0.0);
     e.set_param(bell_env, "release_ms", 80.0);
     e.set_param(bell_vca, "gain", 0.0);
+    e.set_param(bell_gain, "gain_db", 4.0);
     // Pad: open fifths over the chord root, detuned unison, under a slowly moving filter.
     for (osc, hz) in [(pad_a, 329.63), (pad_b, 440.0), (pad_c, 659.25)] {
         e.set_param(osc, "waveform", 2.0);
@@ -296,8 +298,8 @@ fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
         e.set_param(pad_mix, &format!("level{}", k + 1), v);
     }
     e.set_param(rhythm, "level1", 1.0);
-    e.set_param(rhythm, "level2", 0.7);
-    e.set_param(bus, "level1", 0.19);
+    e.set_param(rhythm, "level2", 1.0);
+    e.set_param(bus, "level1", 0.145);
     e.set_param(bus, "level2", 0.7);
     e.set_param(bus, "level3", 0.11);
     e.set_param(bus, "level4", 0.11);
@@ -377,21 +379,15 @@ fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
     // Bells: struck on every sixteenth, a cable decides which are heard. A: none. B: sixteen
     // steps, some by chance.
     e.connect(jack(clock, "gate"), jack(bell_env, "gate"));
-    e.connect(jack(arp_seq, "pitch"), jack(bell, "pitch"));
+    e.connect(jack(chords, "pitch"), jack(bell, "pitch"));
     e.connect(jack(bell, "out"), jack(bell_vca, "in"));
     e.connect(jack(bell_env, "out"), jack(bell_vca, "cv"));
-    let c = e.connect(jack(bell_vca, "out"), jack(rhythm, "in2"));
+    e.connect(jack(bell_vca, "out"), jack(bell_gain, "in"));
+    let c = e.connect(jack(bell_gain, "out"), jack(rhythm, "in2"));
     let b = [
-        1.0, 0.0, 0.6, 0.0, 1.0, 0.0, 0.6, 0.35, 1.0, 0.0, 0.6, 0.0, 1.0, 0.6, 0.6, 0.35,
+        1.0, 0.0, 0.0, 0.8, 0.0, 0.0, 1.0, 0.0, 0.0, 0.8, 0.0, 0.6, 0.0, 0.0, 1.0, 0.0,
     ];
-    let chance = [
-        (3, 60.0),
-        (7, 70.0),
-        (8, 50.0),
-        (11, 60.0),
-        (14, 70.0),
-        (16, 50.0),
-    ];
+    let chance = [(4, 70.0), (10, 70.0), (12, 50.0)];
     let p = pattern(&[0.0; 16], &b, &[], &chance, 3.0, 0.0);
     cable_params(&mut e, c, &p);
     ids.insert("bells", c);
