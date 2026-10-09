@@ -20,6 +20,7 @@ pub mod cues;
 pub mod editor;
 pub mod explain;
 pub mod help;
+pub mod kit;
 pub mod inspect;
 pub mod library;
 pub mod panels;
@@ -31,6 +32,7 @@ use wheel::OwnedScroll;
 pub mod recipes;
 pub mod record;
 pub mod routing;
+pub mod style;
 pub mod theme;
 
 pub use editor::PatchEditor;
@@ -189,6 +191,8 @@ pub struct UiState {
     pub loaded: bool,
     /// A-dark when true, A-light otherwise.
     pub dark: bool,
+    /// The active theme, rebuilt when `dark` flips.
+    pub style: std::sync::Arc<style::Style>,
     pub panels: panels::View,
     pub zoom: f32,
     /// Screen offset of the rack origin from the canvas' top-left.
@@ -313,6 +317,7 @@ impl Default for UiState {
             lfo_status: HashMap::new(),
             loaded: false,
             dark: false,
+            style: std::sync::Arc::new(style::builtin_a(false)),
             panels: panels::View::default(),
             zoom: 1.0,
             pan: EguiVec2::ZERO,
@@ -517,7 +522,12 @@ impl UiState {
 /// per frame from `eframe::App::ui`.
 pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
     wheel::begin(ui.ctx());
-    ui.ctx().set_visuals(theme(ui_state.dark).visuals());
+    theme::ensure_fonts(ui.ctx());
+    if ui_state.style.dark != ui_state.dark {
+        ui_state.style = std::sync::Arc::new(style::builtin_a(ui_state.dark));
+    }
+    let st = ui_state.style.clone();
+    kit::apply(ui.ctx(), &st);
     composites::panel(editor, ui_state, ui.ctx());
     panels::editor(editor, ui_state, ui.ctx());
     rack_editor::edit_face(editor, ui_state, ui.ctx());
