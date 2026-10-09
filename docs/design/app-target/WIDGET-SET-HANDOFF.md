@@ -54,3 +54,18 @@ Build the theme model in code (slot structure from THEMING.md, A light/dark buil
 ## Addendum
 
 The "before" bench run (design-target worktree) writes to `/tmp/claude-1000/-secondary-Programming-Github-kabl--worktrees-design-target/4129379d-ce4b-4c8b-a7f7-dbffc0122a92/tasks/bgswjkkr4.output`; copy its numbers here if present, else rerun. Draft PR for this branch: #18 (base claude/design-target).
+
+### Frame-time BEFORE (master UI, release, `bench_chrome`, browser + drawer open, 300 frames incl. tessellation)
+
+```
+simple  1440x900 light median 762 us  p95 795  max 847
+dense   1440x900 light median 4642 us p95 5037 max 5261
+simple  1440x900 dark  median 512 us  p95 540  max 560
+dense   1440x900 dark  median 4627 us p95 5377 max 5819
+simple  1280x800 light median 496 us  p95 532  max 565
+dense   1280x800 light median 4135 us p95 4924 max 5296
+simple  1280x800 dark  median 503 us  p95 540  max 582
+dense   1280x800 dark  median 3689 us p95 4302 max 4699
+```
+
+The untracked bench copy in the design-target worktree was deleted.
