@@ -8,9 +8,11 @@ use crate::log::PatchLog;
 use crate::op::Entry;
 
 /// v2 adds `PortRef::Param` (modulation routes), `Op::UnsetParam` and `Op::Group`; v3 adds
-/// `Op::SetLabel`; v4 adds `Op::SetComposite`. Each is a strict superset of the one before, so older files load unchanged;
-/// there is nothing to migrate.
-pub const CURRENT_SCHEMA_VERSION: u32 = 4;
+/// `Op::SetLabel`; v4 adds `Op::SetComposite`; v5 gives cable params a meaning for functional
+/// cables (`length`, `s1..`, `prob`, `r1..`; see the `kabl-cables` crate). Each is a strict
+/// superset of the one before, so older files load unchanged; there is nothing to migrate. An
+/// older build refuses a v5 file instead of playing its functional cables as plain ones.
+pub const CURRENT_SCHEMA_VERSION: u32 = 5;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Meta {

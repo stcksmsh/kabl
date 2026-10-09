@@ -60,13 +60,15 @@
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt;
 
+use kabl_cables::{Carry, Node as CableNode, Settings as CableSettings};
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
 use kabl_modules::builtins::{
     Change, Clock, Delay, DelayLock, KeySettings, Lfo, LfoSync, MidiIn, Noise, Seq, Transport,
 };
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::{
-    registry, Module, ModuleInfo, ParamInfo, PortDirection, ProcessIo, Rate, Signal, StateBuf,
+    registry, Module, ModuleInfo, ParamInfo, PortDirection, PortType, ProcessIo, Rate, Signal,
+    StateBuf,
 };
 
 use crate::graph::BLOCK;
@@ -208,6 +210,15 @@ enum Step {
     /// call. Placed at the end of the schedule so this block's own `Step::Process` reads (earlier
     /// in `steps`) still see last block's value.
     CopyToDelay { src: BufIdx, dest: BufIdx },
+    /// A functional cable (`kabl_cables`): `src` through the pattern and probability of the
+    /// patch's reference clock (module instance `clock`) into `out`, which the cable's reader
+    /// takes instead of `src`.
+    Cable {
+        clock: usize,
+        src: BufIdx,
+        out: BufIdx,
+        node: Box<CableNode>,
+    },
 }
 
 /// A `ParamSlot::modi` for a param no route modulates.
@@ -379,6 +390,11 @@ fn coalesce_buffers(
                 first_def[*dest] = step_idx;
                 last_use[*dest] = last_use[*dest].max(step_idx);
             }
+            Step::Cable { src, out, .. } => {
+                last_use[*src] = last_use[*src].max(step_idx);
+                first_def[*out] = step_idx;
+                last_use[*out] = last_use[*out].max(step_idx);
+            }
         }
     }
 
@@ -488,6 +504,8 @@ pub struct CompiledPatch {
     param_slots: Vec<ParamSlot>,
     /// Every compiled route, sorted by (cable, step).
     route_slots: Vec<RouteSlot>,
+    /// `(cable, step)` of every functional-cable node, sorted.
+    cable_steps: Vec<(CableId, u32)>,
     /// Runtime values moving toward their target, one per target (`runtime.rs`, smoothing).
     /// Its capacity, set at compile, is every rampable target of the graph, so any number of
     /// targets can ramp at once and a push never allocates.
@@ -529,6 +547,8 @@ struct CableInfo {
     /// a delay buffer instead of this block's live value, and it's excluded from the
     /// topo-ordering graph. See module doc.
     delayed: bool,
+    /// Pattern and probability, when the cable is functional.
+    settings: Option<CableSettings>,
 }
 
 /// A route with `bypass` set contributes nothing and is left out of the compiled graph; its
@@ -552,12 +572,38 @@ struct Wiring {
     voice_count: usize,
     live: BufMaps,
     delay: BufMaps,
+    /// `(cable, step)` of every functional-cable node, for runtime values.
+    cable_steps: Vec<(CableId, u32)>,
 }
 
 impl Wiring {
     fn new_buf(&mut self) -> BufIdx {
         self.buffers.push([0.0; BLOCK]);
         self.buffers.len() - 1
+    }
+
+    /// `src` as the reader of cable `c` sees it: through the cable's node when it is functional
+    /// and the patch has a clock to lock to, else unchanged.
+    fn through_cable(
+        &mut self,
+        c: &CableInfo,
+        src: BufIdx,
+        carry: Carry,
+        clock: Option<usize>,
+        sample_rate: f32,
+    ) -> BufIdx {
+        let (Some(settings), Some(clock)) = (c.settings, clock) else {
+            return src;
+        };
+        let out = self.new_buf();
+        self.cable_steps.push((c.cable, self.steps.len() as u32));
+        self.steps.push(Step::Cable {
+            clock,
+            src,
+            out,
+            node: Box::new(CableNode::new(settings, c.cable, carry, sample_rate)),
+        });
+        out
     }
 
     /// The buffer a reader in `lane` sees for source output `(from_id, out_idx)`. Voice → voice
@@ -762,6 +808,8 @@ fn compile_inner(
             from_port: from_port.clone(),
             to,
             delayed,
+            settings: kabl_cables::is_functional(&cstate.params)
+                .then(|| CableSettings::from_params(&cstate.params)),
         });
     }
 
@@ -873,6 +921,7 @@ fn compile_inner(
         voice_count,
         live: BufMaps::default(),
         delay: BufMaps::default(),
+        cable_steps: Vec::new(),
     };
     let silence_buf = w.new_buf();
 
@@ -908,6 +957,10 @@ fn compile_inner(
         }
     }
 
+    let reference_clock = metas
+        .iter()
+        .find(|(_, m)| m.kind == "clock")
+        .map(|(&id, _)| id);
     let mut param_slots: Vec<ParamSlot> = Vec::new();
     let mut route_slots: Vec<RouteSlot> = Vec::new();
     let mut modules: Vec<Box<dyn Module>> = Vec::new();
@@ -983,6 +1036,12 @@ fn compile_inner(
 
         let empty = Vec::new();
         let incoming = cables_by_dest.get(&id).unwrap_or(&empty);
+        // Clocks are scheduled first, so the reference clock (lowest id) exists by now.
+        let clock_index = reference_clock.and_then(|cid| {
+            module_origin
+                .iter()
+                .position(|&o| o == (cid, None))
+        });
         // Resolve every incoming cable's source port once (validates names too).
         let mut sources = Vec::with_capacity(incoming.len());
         for cable in incoming {
@@ -1012,7 +1071,12 @@ fn compile_inner(
                 .port_type;
             let (lo, hi) = port_type.nominal_range();
             let full_scale = lo.abs().max(hi.abs());
-            sources.push((src_out_idx, voiced.contains(&cable.from_id), full_scale));
+            sources.push((
+                src_out_idx,
+                voiced.contains(&cable.from_id),
+                full_scale,
+                port_type,
+            ));
         }
 
         for lane in 0..n_lanes {
@@ -1024,16 +1088,22 @@ fn compile_inner(
                 lane_inputs.push(match found {
                     None => InputSource::Silence,
                     Some(k) => {
-                        let (src_out_idx, src_is_voice, _) = sources[k];
+                        let (src_out_idx, src_is_voice, _, port_type) = sources[k];
                         let c = &incoming[k];
-                        InputSource::Buffer(w.source_buf(
+                        let buf = w.source_buf(
                             c.from_id,
                             src_out_idx,
                             src_is_voice,
                             is_voice,
                             lane,
                             c.delayed,
-                        ))
+                        );
+                        let carry = match port_type {
+                            PortType::Audio => Carry::Audio,
+                            PortType::Pitch => Carry::Hold,
+                            _ => Carry::Scale,
+                        };
+                        InputSource::Buffer(w.through_cable(c, buf, carry, clock_index, sample_rate))
                     }
                 });
             }
@@ -1044,7 +1114,7 @@ fn compile_inner(
                 let CableTo::Param { index, amount } = c.to else {
                     continue;
                 };
-                let (src_out_idx, src_is_voice, full_scale) = sources[k];
+                let (src_out_idx, src_is_voice, full_scale, port_type) = sources[k];
                 let buf = w.source_buf(
                     c.from_id,
                     src_out_idx,
@@ -1053,6 +1123,12 @@ fn compile_inner(
                     lane,
                     c.delayed,
                 );
+                let carry = if port_type == PortType::Pitch {
+                    Carry::Hold
+                } else {
+                    Carry::Scale
+                };
+                let buf = w.through_cable(c, buf, carry, clock_index, sample_rate);
                 let route = (buf, amount / full_scale);
                 let m = match mods.iter().position(|m| m.index == index) {
                     Some(k) => k,
@@ -1149,6 +1225,7 @@ fn compile_inner(
         mut steps,
         live,
         delay,
+        mut cable_steps,
         ..
     } = w;
     let voice_output_buf = live.voice;
@@ -1241,6 +1318,10 @@ fn compile_inner(
                 *src = remap[*src];
                 *dest = remap[*dest];
             }
+            Step::Cable { src, out, .. } => {
+                *src = remap[*src];
+                *out = remap[*out];
+            }
         }
     }
     out_left = remap[out_left];
@@ -1251,6 +1332,7 @@ fn compile_inner(
     let buffers = vec![[0.0; BLOCK]; physical_count];
     param_slots.sort_by_key(|p| (p.id, p.index, p.step));
     route_slots.sort_by_key(|r| (r.cable, r.step));
+    cable_steps.sort_unstable();
     // One ramp per target: distinct ramped params and distinct routes.
     let rampable = param_slots
         .iter()
@@ -1284,6 +1366,7 @@ fn compile_inner(
         started: false,
         param_slots,
         route_slots,
+        cable_steps,
         automation: [None; 16],
         ramps: Vec::with_capacity(rampable),
         ramp_blocks: ((RAMP_MS / 1000.0 * sample_rate / BLOCK as f32).round() as u16).max(1),
@@ -1621,6 +1704,27 @@ impl CompiledPatch {
                 Step::CopyToDelay { src, dest } => {
                     self.buffers[*dest] = self.buffers[*src];
                 }
+                Step::Cable {
+                    clock,
+                    src,
+                    out,
+                    node,
+                } => {
+                    let input = self.buffers[*src];
+                    match self.modules[*clock].as_any().downcast_ref::<Clock>() {
+                        Some(c) => {
+                            let ticks = c.block_ticks();
+                            // The pulse in effect at the block's first sample: the one before
+                            // the first this block starts, else the latest started.
+                            let current = match ticks.first() {
+                                Some(&(_, tick, _)) => tick.checked_sub(1),
+                                None => c.next_tick().1.checked_sub(1),
+                            };
+                            node.process(&input, &mut self.buffers[*out], current, ticks);
+                        }
+                        None => self.buffers[*out] = input,
+                    }
+                }
             }
         }
     }
@@ -1801,12 +1905,25 @@ impl CompiledPatch {
     /// else is set now. A target already ramping starts
     /// again from where it is. Returns whether the target resolved. No allocation.
     pub fn set_runtime(&mut self, target: RuntimeTarget, value: f32, ramp: bool) -> bool {
+        if let RuntimeTarget::Cable { cable, slot } = target {
+            // Pattern data is read when a pulse plays, like sequencer steps: set, never ramped.
+            let lo = self.cable_steps.partition_point(|s| s.0 < cable);
+            let mut found = false;
+            for &(_, step) in self.cable_steps[lo..].iter().take_while(|s| s.0 == cable) {
+                if let Step::Cable { node, .. } = &mut self.steps[step as usize] {
+                    node.settings.set(slot as usize, value);
+                    found = true;
+                }
+            }
+            return found;
+        }
         for cached in &mut self.automation {
             if cached.is_some_and(|(t, _)| t == target) {
                 *cached = None;
             }
         }
         let (on, from, to) = match target {
+            RuntimeTarget::Cable { .. } => return false,
             RuntimeTarget::Param { id, kind, index } => {
                 let lo = self
                     .param_slots

@@ -35,6 +35,8 @@ pub enum RuntimeTarget {
     },
     /// The signed amount of the route `cable`.
     Route { cable: CableId },
+    /// Slot `slot` (`kabl_cables::slot_name`) of the functional cable `cable`.
+    Cable { cable: CableId, slot: u8 },
 }
 
 /// One runtime value: `target` becomes `value` at document revision `rev`.
@@ -178,6 +180,28 @@ pub fn runtime_changes(old: &PatchState, new: &PatchState) -> Option<Vec<(Runtim
     for ((&id, a), (&id2, b)) in old.cables.iter().zip(&new.cables) {
         if id != id2 || a.from != b.from || a.to != b.to || bypassed(a) != bypassed(b) {
             return None;
+        }
+        // A cable gains or loses its node by compiling; edits of a functional cable apply in place.
+        let functional = kabl_cables::is_functional(&b.params);
+        if functional != kabl_cables::is_functional(&a.params) {
+            return None;
+        }
+        if functional && !bypassed(b) {
+            for slot in 0..kabl_cables::SLOTS {
+                let (x, y) = (
+                    kabl_cables::slot_value(&a.params, slot),
+                    kabl_cables::slot_value(&b.params, slot),
+                );
+                if x.to_bits() != y.to_bits() {
+                    out.push((
+                        RuntimeTarget::Cable {
+                            cable: id,
+                            slot: slot as u8,
+                        },
+                        y,
+                    ));
+                }
+            }
         }
         if !matches!(b.to, PortRef::Param { .. }) || bypassed(b) {
             continue;
