@@ -133,6 +133,8 @@ pub struct UiState {
     /// cleared when that route disappears, and only set by an explicit pick or by inspecting a
     /// knob that has exactly one route.
     pub selected_route: Option<CableId>,
+    /// The cable whose pattern and probability the drawer edits (`routing::cable_panel`).
+    pub cable_fn: Option<CableId>,
     /// Output jack being dragged toward a knob or input.
     port_drag: Option<PortRef>,
     /// Jack cable whose plug is being pulled out of its input (moved or removed on release).
@@ -287,6 +289,7 @@ impl Default for UiState {
             cable_view: CableView::All,
             inspected: None,
             selected_route: None,
+            cable_fn: None,
             port_drag: None,
             unplug: None,
             drag: None,
@@ -719,6 +722,7 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                         });
                     }
                     show_param_panel(editor, ui_state, ui);
+                    routing::cable_panel(editor, ui_state, ui);
                     routing::drawer(editor, ui_state, ui);
                 });
             });
@@ -3463,7 +3467,16 @@ fn draw_cables(
                 painter.circle_stroke(mid, 7.0, Stroke::new(1.5, th.sel));
             }
             let resp = resp.on_hover_text("Drag its plug out of the input to move or remove it");
+            if routing::is_functional(c) {
+                routing::functional_mark(painter, pts[pts.len() / 3], z, th.sel);
+            }
             resp.context_menu(|ui| {
+                let r = ui.button("Pattern & probability...");
+                ui_state.record("menu:cable-pattern".into(), r.rect);
+                if r.clicked() {
+                    ui_state.cable_fn = Some(*cable_id);
+                    ui.close();
+                }
                 let r = ui.button("Remove cable");
                 ui_state.record("menu:remove-cable".into(), r.rect);
                 if r.clicked() {
@@ -3501,6 +3514,9 @@ fn draw_cables(
             bypass,
         );
         let mid = pts[pts.len() / 2];
+        if routing::is_functional(c) {
+            routing::functional_mark(painter, pts[pts.len() / 3], z, th.sel);
+        }
         let hit = Rect::from_center_size(mid, EguiVec2::splat(12.0));
         ui_state.record(format!("route:{cable_id}"), hit);
         let resp = ui.interact(hit, Id::new(("kabl-route", *cable_id)), Sense::click());

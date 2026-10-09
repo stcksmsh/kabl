@@ -1840,6 +1840,7 @@ dependencies = [
  "egui",
  "hound",
  "image",
+ "kabl-cables",
  "kabl-core",
  "kabl-engine",
  "kabl-modules",
