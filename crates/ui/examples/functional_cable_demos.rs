@@ -232,7 +232,8 @@ fn write_wav(path: &Path, samples: &[f32]) {
     w.finalize().unwrap();
 }
 
-const DEMOS: [(&str, fn() -> PatchEditor); 2] = [
+type Demo = (&'static str, fn() -> PatchEditor);
+const DEMOS: [Demo; 2] = [
     ("echo-throws", echo_throws),
     ("five-against-eight", five_against_eight),
 ];

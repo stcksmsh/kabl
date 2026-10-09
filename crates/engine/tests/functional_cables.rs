@@ -462,3 +462,48 @@ fn a_cable_removed_and_restored_keeps_its_pattern() {
     assert!(log.undo());
     assert_eq!(log.state(), &before);
 }
+
+#[test]
+fn voice_rate_cable_gates_every_lane_and_takes_runtime_edits() {
+    let mut p = PatchState::new();
+    p.modules.insert(CLOCK, module("clock", &[("bpm", 300.0)]));
+    p.modules.insert(4, module("midi.in", &[]));
+    p.modules.insert(OUT, module("out", &[]));
+    p.cables.insert(
+        CABLE,
+        jack((4, "gate"), (OUT, "left"), &[("length", 2.0), ("s2", 0.0)]),
+    );
+    let mut c = compile(&p, SR, 4).unwrap();
+    c.note_on(0, 0.0, 1.0);
+    c.note_on(1, 4.0, 1.0);
+    let (l, _) = render(&mut c, 120, |_, _| {});
+    // Pulse 0 open, pulse 1 closed (2400 samples each); sample well inside each.
+    assert!(
+        l[1200] > 0.1 && l[2400 + 1200] == 0.0,
+        "{} {}",
+        l[1200],
+        l[3600]
+    );
+    assert!(c.set_runtime(
+        RuntimeTarget::Cable {
+            cable: CABLE,
+            slot: 3
+        },
+        1.0,
+        true
+    ));
+    let (l, _) = render(&mut c, 120, |_, _| {});
+    assert!(
+        l[2400 + 1200] > 0.1 && l[1200] > 0.1,
+        "every lane took the edit"
+    );
+    assert!(!c.set_runtime(RuntimeTarget::Cable { cable: 99, slot: 3 }, 1.0, true));
+    assert!(c.set_runtime(
+        RuntimeTarget::Cable {
+            cable: CABLE,
+            slot: 255
+        },
+        1.0,
+        true
+    ));
+}

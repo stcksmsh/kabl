@@ -106,6 +106,9 @@ impl Settings {
 
     /// Sets runtime slot `slot`. No allocation.
     pub fn set(&mut self, slot: usize, v: f32) {
+        if slot >= SLOTS {
+            return;
+        }
         let v = clamp_slot(slot, v);
         match slot {
             0 => self.len = v as u8,

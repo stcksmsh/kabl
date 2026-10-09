@@ -1718,7 +1718,9 @@ impl CompiledPatch {
                         Some(c) => {
                             let ticks = c.block_ticks();
                             // The pulse in effect at the block's first sample: the one before
-                            // the first this block starts, else the latest started.
+                            // the first this block starts, else the latest started. A new epoch
+                            // starts at tick 0 (`Clock::process`), so `checked_sub` gives `None`
+                            // there and the node keeps the old epoch's level until that pulse.
                             let current = match ticks.first() {
                                 Some(&(_, tick, _)) => tick.checked_sub(1),
                                 None => c.next_tick().1.checked_sub(1),
