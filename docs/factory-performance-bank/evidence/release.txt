@@ -1,0 +1,388 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling cfg-if v1.0.5
+   Compiling bitflags v2.13.2
+   Compiling once_cell v1.21.4
+   Compiling pkg-config v0.3.34
+   Compiling log v0.4.34
+   Compiling libc v0.2.189
+   Compiling smallvec v1.16.1
+   Compiling rustix v1.1.5
+   Compiling syn v3.0.6
+   Compiling linux-raw-sys v0.12.1
+   Compiling libloading v0.8.9
+   Compiling dlib v0.5.3
+   Compiling wayland-sys v0.31.11
+   Compiling find-msvc-tools v0.1.13
+   Compiling shlex v2.0.1
+   Compiling syn v2.0.119
+   Compiling cc v1.4.7
+   Compiling autocfg v1.5.1
+   Compiling wayland-backend v0.3.17
+   Compiling synstructure v0.14.0
+   Compiling bytemuck_derive v1.12.1
+   Compiling downcast-rs v1.2.1
+   Compiling scoped-tls v1.0.1
+   Compiling memchr v2.8.3
+   Compiling bytemuck v1.25.2
+   Compiling zerofrom-derive v0.1.8
+   Compiling quick-xml v0.41.0
+   Compiling tracing-core v0.1.36
+   Compiling wayland-client v0.31.15
+   Compiling wayland-scanner v0.31.11
+   Compiling zerofrom v0.1.8
+   Compiling yoke-derive v0.8.3
+   Compiling num-traits v0.2.19
+   Compiling stable_deref_trait v1.2.1
+   Compiling thiserror v2.0.20
+   Compiling yoke v0.8.3
+   Compiling thiserror-impl v2.0.20
+   Compiling xcursor v0.3.11
+   Compiling tracing-attributes v0.1.31
+   Compiling polling v3.11.0
+   Compiling zerovec-derive v0.11.6
+   Compiling slab v0.4.12
+   Compiling pin-project-lite v0.2.17
+   Compiling displaydoc v0.2.7
+   Compiling tracing v0.1.44
+   Compiling zerovec v0.11.8
+   Compiling serde_core v1.0.229
+   Compiling parking_lot_core v0.9.12
+   Compiling zerocopy v0.8.57
+   Compiling getrandom v0.3.4
+   Compiling khronos_api v3.1.0
+   Compiling version_check v0.9.5
+   Compiling scopeguard v1.2.0
+   Compiling arrayvec v0.7.8
+   Compiling ahash v0.8.12
+   Compiling lock_api v0.4.14
+   Compiling polycool v0.4.0
+   Compiling wayland-protocols v0.32.13
+   Compiling gethostname v1.1.0
+   Compiling x11-dl v2.21.0
+   Compiling simd-adler32 v0.3.10
+   Compiling percent-encoding v2.3.2
+   Compiling xkeysym v0.2.1
+   Compiling x11rb-protocol v0.13.2
+   Compiling as-raw-xcb-connection v1.0.1
+   Compiling cfg_aliases v0.2.2
+   Compiling parking_lot v0.12.5
+   Compiling kurbo v0.13.1
+   Compiling tinystr v0.8.4
+   Compiling euclid v0.22.14
+   Compiling color v0.3.3
+   Compiling font-types v0.11.3
+   Compiling litemap v0.8.3
+   Compiling raw-window-handle v0.6.2
+   Compiling foldhash v0.2.0
+   Compiling linebender_resource_handle v0.1.1
+   Compiling crossbeam-utils v0.8.23
+   Compiling writeable v0.6.4
+   Compiling adler2 v2.0.1
+   Compiling xml-rs v0.8.29
+   Compiling icu_locale_core v2.3.0
+   Compiling gl_generator v0.14.0
+   Compiling peniko v0.6.1
+   Compiling hashbrown v0.17.1
+   Compiling x11rb v0.13.2
+   Compiling read-fonts v0.39.2
+   Compiling guillotiere v0.7.0
+   Compiling potential_utf v0.1.6
+   Compiling zerotrie v0.2.5
+   Compiling unicode-general-category v1.1.0
+   Compiling utf8_iter v1.0.4
+   Compiling fearless_simd v0.4.1
+   Compiling zmij v1.0.23
+   Compiling rustix v0.38.44
+   Compiling thiserror v1.0.69
+   Compiling icu_properties_data v2.3.0
+   Compiling dpi v0.1.2
+   Compiling icu_normalizer_data v2.3.0
+   Compiling icu_collections v2.3.0
+   Compiling vello_common v0.0.9
+   Compiling icu_provider v2.3.1
+   Compiling calloop v0.14.4
+   Compiling thiserror-impl v1.0.69
+   Compiling emath v0.35.0
+   Compiling crc32fast v1.5.2
+   Compiling linux-raw-sys v0.4.15
+   Compiling cursor-icon v1.2.0
+   Compiling serde_json v1.0.151
+   Compiling serde v1.0.229
+   Compiling wayland-csd-frame v0.3.0
+   Compiling ecolor v0.35.0
+   Compiling vello_cpu v0.0.9
+   Compiling skrifa v0.42.1
+   Compiling harfrust v0.7.0
+   Compiling miniz_oxide v0.8.9
+   Compiling wayland-protocols-wlr v0.3.12
+   Compiling xkbcommon-dl v0.4.2
+   Compiling wayland-cursor v0.31.14
+   Compiling serde_derive v1.0.229
+   Compiling memmap2 v0.9.11
+   Compiling self_cell v1.3.0
+   Compiling nohash-hasher v0.2.0
+   Compiling either v1.18.0
+   Compiling unicode-segmentation v1.13.3
+   Compiling profiling v1.0.18
+   Compiling itoa v1.0.18
+   Compiling uuid v1.26.1
+   Compiling epaint_default_fonts v0.35.0
+   Compiling epaint v0.35.0
+   Compiling accesskit v0.24.1
+   Compiling itertools v0.14.0
+   Compiling icu_normalizer v2.3.0
+   Compiling icu_properties v2.3.0
+   Compiling calloop v0.13.0
+   Compiling miniz_oxide v0.9.1
+   Compiling memoffset v0.9.1
+   Compiling alsa-sys v0.4.0
+   Compiling smithay-client-toolkit v0.19.2
+   Compiling flate2 v1.1.10
+   Compiling calloop-wayland-source v0.3.0
+   Compiling idna_adapter v1.2.2
+   Compiling egui v0.35.0
+   Compiling glutin_glx_sys v0.6.1
+   Compiling glutin_egl_sys v0.7.1
+   Compiling winit v0.30.13
+   Compiling fdeflate v0.3.7
+   Compiling pxfm v0.1.30
+   Compiling winnow v1.0.4
+   Compiling smithay-client-toolkit v0.20.0
+   Compiling toml_parser v1.1.3+spec-1.1.0
+   Compiling moxcms v0.8.1
+   Compiling png v0.18.1
+   Compiling idna v1.1.0
+   Compiling calloop-wayland-source v0.4.1
+   Compiling wayland-protocols-experimental v20250721.0.1
+   Compiling wayland-protocols-plasma v0.3.12
+   Compiling wayland-protocols-misc v0.3.12
+   Compiling glutin v0.32.3
+   Compiling toml_datetime v1.1.1+spec-1.1.0
+   Compiling serde_spanned v1.1.1
+   Compiling form_urlencoded v1.2.2
+   Compiling libdbus-sys v0.2.7
+   Compiling byteorder-lite v0.1.0
+   Compiling crossbeam-epoch v0.9.21
+   Compiling syn v1.0.109
+   Compiling toml_writer v1.1.2+spec-1.1.0
+   Compiling glow v0.17.0
+   Compiling smol_str v0.2.2
+   Compiling egui_glow v0.35.0
+   Compiling toml v1.1.6+spec-1.1.0
+   Compiling image v0.25.10
+   Compiling url v2.5.8
+   Compiling alsa v0.11.0
+   Compiling crossbeam-channel v0.5.17
+   Compiling glutin-winit v0.5.0
+   Compiling safe_arch v1.2.0
+   Compiling lazy_static v1.5.0
+   Compiling midir v0.11.0
+   Compiling crossbeam-deque v0.8.8
+   Compiling rtrb v0.4.0
+   Compiling cpal v0.18.2
+   Compiling sharded-slab v0.1.7
+   Compiling wide v1.7.1
+   Compiling smithay-clipboard v0.7.3
+   Compiling arboard v3.6.1
+   Compiling webbrowser v1.2.4
+   Compiling kabl-core v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/crates/core)
+   Compiling is-docker v0.2.0
+   Compiling thread_local v1.1.10
+   Compiling num-conv v0.2.2
+   Compiling powerfmt v0.2.0
+   Compiling dasp_sample v0.11.0
+   Compiling litrs v1.0.0
+   Compiling object v0.37.3
+   Compiling web-time v1.1.0
+   Compiling deranged v0.5.8
+   Compiling kabl-modules v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/crates/modules)
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/crates/standalone)
+   Compiling time-core v0.1.9
+   Compiling basedrop v0.1.3
+   Compiling kabl-engine v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/crates/engine)
+   Compiling time v0.3.55
+   Compiling nice-plug-derive v0.1.2 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/vendor/nice-plug/crates/nice-plug-derive)
+   Compiling egui-winit v0.35.0
+   Compiling document-features v0.2.12
+   Compiling tracing-subscriber v0.3.23
+   Compiling is-wsl v0.4.0
+   Compiling dbus v0.9.12
+   Compiling crossbeam-queue v0.3.14
+   Compiling x11-clipboard v0.9.3
+   Compiling keyboard-types v0.8.3
+   Compiling symlink v0.1.0
+   Compiling anyhow v1.0.104
+   Compiling hound v3.5.1
+   Compiling static_assertions v1.1.0
+   Compiling atomic_float v1.1.0
+   Compiling atomic_refcell v0.1.14
+   Compiling gimli v0.32.3
+   Compiling midi-consts v0.1.0
+   Compiling nice-plug-core v0.2.0 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/vendor/nice-plug/crates/nice-plug-core)
+   Compiling eframe v0.35.0
+   Compiling addr2line v0.25.1
+   Compiling baseview v0.3.0 (https://github.com/RustAudio/baseview.git?rev=f106a5190f3a5861cacba7cab9ceb4f9532ebdfe#f106a519)
+   Compiling copypasta v0.10.2
+   Compiling tracing-appender v0.2.5
+   Compiling audio_thread_priority v0.38.0
+   Compiling crossbeam v0.8.5
+   Compiling open v5.4.4
+   Compiling rustc-demangle v0.1.28
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/crates/ui)
+   Compiling egui-baseview v0.7.0 (https://codeberg.org/RustAudio/egui-baseview.git?rev=07c89cdb1eca83d65c470e1fd8dd252f53f41097#07c89cdb)
+   Compiling nice-log v0.3.1 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/vendor/nice-plug/crates/nice-log)
+   Compiling backtrace v0.3.76
+   Compiling clap-sys v0.5.0
+   Compiling fragile v2.1.0
+   Compiling anymap3 v1.1.0
+   Compiling nice-plug v0.2.3 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/vendor/nice-plug/crates/nice-plug)
+warning: unused import: `CLAP_EVENT_NOTE_END`
+ --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:4:28
+  |
+4 |     CLAP_EVENT_NOTE_CHOKE, CLAP_EVENT_NOTE_END, CLAP_EVENT_NOTE_EXPRESSION, CLAP_EVENT_NOTE_OFF,
+  |                            ^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `crossbeam::queue::ArrayQueue`
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:68:5
+   |
+68 | use crossbeam::queue::ArrayQueue;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::thread`
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:92:5
+   |
+92 | use std::thread;
+   |     ^^^^^^^^^^^
+
+warning: unused import: `TASK_QUEUE_CAPACITY`
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:101:74
+    |
+101 | use crate::event_loop::{BackgroundThread, EventLoop, MainThreadExecutor, TASK_QUEUE_CAPACITY};
+    |                                                                          ^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::midi::MidiResult`
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:102:5
+    |
+102 | use crate::midi::MidiResult;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `write_stream`
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:108:47
+    |
+108 | use crate::wrapper::clap::util::{read_stream, write_stream};
+    |                                               ^^^^^^^^^^^^
+
+warning: unused import: `clamp_output_event_timing`
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:112:31
+    |
+112 |     clamp_input_event_timing, clamp_output_event_timing, hash_param_id, process_wrapper, strlcpy,
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `nice_plug_core::midi::sysex::SysExMessage`
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:75:5
+   |
+75 | use nice_plug_core::midi::sysex::SysExMessage;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `host_latency`
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:513:22
+    |
+513 |                 Some(host_latency) => {
+    |                      ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_host_latency`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `total_buffer_len`
+    --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:1202:9
+     |
+1202 |         total_buffer_len: usize,
+     |         ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_total_buffer_len`
+
+warning: function `write_stream` is never used
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/util.rs:149:8
+    |
+149 | pub fn write_stream(stream: &clap_ostream, slice: &[u8]) -> bool {
+    |        ^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `output_events_guard` is never read
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/context.rs:50:16
+   |
+47 | pub(crate) struct WrapperProcessContext<'a, P: ClapPlugin> {
+   |                   --------------------- field in this struct
+...
+50 |     pub(super) output_events_guard: AtomicRefMut<'a, VecDeque<PluginNoteEvent<P>>>,
+   |                ^^^^^^^^^^^^^^^^^^^
+
+warning: fields `params` and `param_id_to_hash` are never read
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs:169:5
+    |
+148 | pub struct Wrapper<P: ClapPlugin> {
+    |            ------- fields in this struct
+...
+169 |     params: Arc<dyn Params>,
+    |     ^^^^^^
+...
+277 |     param_id_to_hash: HashMap<String, u32>,
+    |     ^^^^^^^^^^^^^^^^
+
+warning: function `make_params_iter` is never used
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/state.rs:15:15
+   |
+15 | pub(crate) fn make_params_iter<'a>(
+   |               ^^^^^^^^^^^^^^^^
+
+warning: function `make_params_getter` is never used
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/state.rs:27:15
+   |
+27 | pub(crate) fn make_params_getter<'a>(
+   |               ^^^^^^^^^^^^^^^^^^
+
+warning: function `serialize_object` is never used
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/state.rs:43:22
+   |
+43 | pub(crate) unsafe fn serialize_object<'a, P: Plugin>(
+   |                      ^^^^^^^^^^^^^^^^
+
+warning: function `serialize_json` is never used
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/state.rs:94:22
+   |
+94 | pub(crate) unsafe fn serialize_json<'a, P: Plugin>(
+   |                      ^^^^^^^^^^^^^^
+
+warning: function `deserialize_object` is never used
+   --> vendor/nice-plug/crates/nice-plug/src/wrapper/state.rs:134:22
+    |
+134 | pub(crate) unsafe fn deserialize_object<P: Plugin>(
+    |                      ^^^^^^^^^^^^^^^^^^
+
+warning: function `clamp_output_event_timing` is never used
+  --> vendor/nice-plug/crates/nice-plug/src/wrapper/util.rs:85:8
+   |
+85 | pub fn clamp_output_event_timing(timing: u32, total_buffer_len: u32) -> u32 {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `is_main_thread` is never used
+  --> vendor/nice-plug/crates/nice-plug/src/event_loop.rs:70:8
+   |
+42 | pub(crate) trait EventLoop<T, E>
+   |                  --------- method in this trait
+...
+70 |     fn is_main_thread(&self) -> bool;
+   |        ^^^^^^^^^^^^^^
+
+warning: struct `LinuxEventLoop` is never constructed
+  --> vendor/nice-plug/crates/nice-plug/src/event_loop/linux.rs:13:19
+   |
+13 | pub(crate) struct LinuxEventLoop<T, E> {
+   |                   ^^^^^^^^^^^^^^
+
+warning: `nice-plug` (lib) generated 21 warnings (run `cargo fix --lib -p nice-plug` to apply 9 suggestions)
+   Compiling nice-plug-egui v0.3.0 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/vendor/nice-plug/crates/nice-plug-egui)
+   Compiling kabl-clap v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/crates/clap)
+    Finished `release` profile [optimized] target(s) in 3m 31s

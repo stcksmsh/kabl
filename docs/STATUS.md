@@ -1,5 +1,9 @@
 # Status
 
+## Factory performance bank — 2026-10-08
+
+D10 PR #13 is verified merged at `23075cd713884903a8985c88ab43bd1817477308`; earlier unmerged statements below are historical. The authorized curated bank on isolated `codex/factory-performance-bank` contains six sounds, four sequences and two performances, with purpose filters and prepared controls. [Report](factory-performance-bank/REPORT.md) records exact heads, audio/UI/host proof, independent review and portable receipts. Draft submission is not merge or owner approval. Listening/controller/physical latency/xruns/beta remain pending. Ordinary-render nondeterminism, warm-up policy and dense-editor/backend limits are inherited. No D11/custom-code work or other-chat messages.
+
 ## D10 final interaction submission — 2026-10-06
 
 Kosta likes the other repaired UI, but owner acceptance remains **changes requested** until More sizing, exclusive wheel ownership and occupied insertion visibility are reviewed. Production source/tested/reviewed/build head is 35eed79956dd702e0a62cd80be534d5c34dc9632; exact submitted/package artifact head is recorded in the new bundle submission.json. [Final repair evidence](panel-authoring/repair/final/README.md) records current checks separately from earlier provenance. Existing draft PR #13, isolated owned .worktrees/d10, no merge or D11 launch.

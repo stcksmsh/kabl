@@ -14,6 +14,10 @@ use kabl_ui::library::{self, LibError, Library, Meta, Origin, CATEGORIES};
 use kabl_ui::perform::PIN_PREFIX;
 use kabl_ui::PatchEditor;
 
+#[allow(dead_code)]
+#[path = "support/factory_bank.rs"]
+mod factory_bank;
+
 fn factory() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../patches")
@@ -23,6 +27,27 @@ fn factory() -> PathBuf {
 
 /// Every factory sound: (dir, name, category, tags, description).
 const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
+    (
+        "palette/keyboard-bass",
+        "Round Keyboard Bass",
+        "Bass",
+        &["mono", "keyboard"],
+        "A playable bass with shaped attack.",
+    ),
+    (
+        "palette/keys",
+        "Glass Keys",
+        "Keys",
+        &["poly", "pluck"],
+        "Velocity-sensitive plucked keys.",
+    ),
+    (
+        "palette/progression",
+        "Slow Horizons",
+        "Pad",
+        &["sequence", "minor"],
+        "Editable slow harmony with four banks.",
+    ),
     (
         "init-keyboard",
         "Init Keyboard",
@@ -256,6 +281,7 @@ fn write_factory_library() {
         )
         .unwrap();
     }
+    factory_bank::write_metadata(&root);
 }
 
 fn open(user: &Path) -> Library {

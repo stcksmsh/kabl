@@ -7,7 +7,11 @@
         "y": 10.0
       },
       "params": {
-        "bpm": 116.0
+        "bpm": 116.0,
+        "btn.restart": 47.0,
+        "btn.run": 46.0,
+        "pin.bpm": 7.0,
+        "pin.transport": 0.0
       }
     },
     "2": {
@@ -27,6 +31,57 @@
         "y": 10.0
       },
       "params": {
+        "b.g1": 1.0,
+        "b.g2": 1.0,
+        "b.g3": 1.0,
+        "b.g4": 1.0,
+        "b.g5": 1.0,
+        "b.g6": 1.0,
+        "b.g7": 1.0,
+        "b.g8": 1.0,
+        "b.length": 7.0,
+        "b.p1": 11.0,
+        "b.p2": 23.0,
+        "b.p3": 18.0,
+        "b.p4": 11.0,
+        "b.p5": 21.0,
+        "b.p6": 14.0,
+        "b.p7": 16.0,
+        "b.p8": 11.0,
+        "c.g1": 1.0,
+        "c.g2": 0.0,
+        "c.g3": 0.0,
+        "c.g4": 1.0,
+        "c.g5": 0.0,
+        "c.g6": 0.0,
+        "c.g7": 1.0,
+        "c.g8": 0.0,
+        "c.length": 7.0,
+        "c.p1": 4.0,
+        "c.p2": 16.0,
+        "c.p3": 11.0,
+        "c.p4": 4.0,
+        "c.p5": 14.0,
+        "c.p6": 7.0,
+        "c.p7": 9.0,
+        "c.p8": 4.0,
+        "d.g1": 0.0,
+        "d.g2": 0.0,
+        "d.g3": 0.0,
+        "d.g4": 0.0,
+        "d.g5": 0.0,
+        "d.g6": 0.0,
+        "d.g7": 0.0,
+        "d.g8": 0.0,
+        "d.length": 7.0,
+        "d.p1": 4.0,
+        "d.p2": 16.0,
+        "d.p3": 11.0,
+        "d.p4": 4.0,
+        "d.p5": 14.0,
+        "d.p6": 7.0,
+        "d.p7": 9.0,
+        "d.p8": 4.0,
         "length": 7.0,
         "p1": 4.0,
         "p2": 16.0,
@@ -35,6 +90,7 @@
         "p5": 14.0,
         "p6": 7.0,
         "p7": 9.0,
+        "pin.banks": 5.0,
         "transpose": -24.0
       }
     },
@@ -45,13 +101,65 @@
         "y": 380.0
       },
       "params": {
+        "b.g1": 1.0,
+        "b.g2": 1.0,
+        "b.g3": 1.0,
+        "b.g4": 1.0,
+        "b.g5": 1.0,
+        "b.g6": 1.0,
+        "b.g7": 1.0,
+        "b.g8": 1.0,
+        "b.length": 5.0,
+        "b.p1": 11.0,
+        "b.p2": 14.0,
+        "b.p3": 18.0,
+        "b.p4": 16.0,
+        "b.p5": 21.0,
+        "b.p6": 11.0,
+        "b.p7": 14.0,
+        "b.p8": 18.0,
+        "c.g1": 1.0,
+        "c.g2": 0.0,
+        "c.g3": 0.0,
+        "c.g4": 1.0,
+        "c.g5": 0.0,
+        "c.g6": 0.0,
+        "c.g7": 1.0,
+        "c.g8": 0.0,
+        "c.length": 5.0,
+        "c.p1": 4.0,
+        "c.p2": 7.0,
+        "c.p3": 11.0,
+        "c.p4": 9.0,
+        "c.p5": 14.0,
+        "c.p6": 4.0,
+        "c.p7": 7.0,
+        "c.p8": 11.0,
+        "d.g1": 0.0,
+        "d.g2": 0.0,
+        "d.g3": 0.0,
+        "d.g4": 0.0,
+        "d.g5": 0.0,
+        "d.g6": 0.0,
+        "d.g7": 0.0,
+        "d.g8": 0.0,
+        "d.length": 5.0,
+        "d.p1": 4.0,
+        "d.p2": 7.0,
+        "d.p3": 11.0,
+        "d.p4": 9.0,
+        "d.p5": 14.0,
+        "d.p6": 4.0,
+        "d.p7": 7.0,
+        "d.p8": 11.0,
         "g4": 0.0,
         "length": 5.0,
         "p1": 4.0,
         "p2": 7.0,
         "p3": 11.0,
         "p4": 9.0,
-        "p5": 14.0
+        "p5": 14.0,
+        "pin.banks": 6.0
       }
     },
     "5": {
@@ -170,6 +278,27 @@
       },
       "params": {
         "gain": 0.0
+      }
+    },
+    "16": {
+      "kind": "macro",
+      "pos": {
+        "x": 24.0,
+        "y": 1490.0
+      },
+      "params": {
+        "cc.m1": 20.0,
+        "cc.m2": 21.0,
+        "cc.m3": 22.0,
+        "cc.m4": 23.0,
+        "m1": 0.3,
+        "m2": 0.3,
+        "m3": 0.3,
+        "m4": 0.3,
+        "pin.m1": 1.0,
+        "pin.m2": 2.0,
+        "pin.m3": 3.0,
+        "pin.m4": 4.0
       }
     }
   },
@@ -547,6 +676,135 @@
       },
       "params": {},
       "steps": []
+    },
+    "24": {
+      "from": {
+        "Module": {
+          "id": 16,
+          "port": "m1"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 9,
+          "param": "cutoff_hz"
+        }
+      },
+      "params": {
+        "amount": 0.18
+      },
+      "steps": []
+    },
+    "25": {
+      "from": {
+        "Module": {
+          "id": 16,
+          "port": "m1"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 13,
+          "param": "cutoff_hz"
+        }
+      },
+      "params": {
+        "amount": 0.12
+      },
+      "steps": []
+    },
+    "26": {
+      "from": {
+        "Module": {
+          "id": 16,
+          "port": "m2"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 5,
+          "param": "rate_hz"
+        }
+      },
+      "params": {
+        "amount": 0.02
+      },
+      "steps": []
+    },
+    "27": {
+      "from": {
+        "Module": {
+          "id": 16,
+          "port": "m3"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 10,
+          "param": "decay_ms"
+        }
+      },
+      "params": {
+        "amount": 0.06
+      },
+      "steps": []
+    },
+    "28": {
+      "from": {
+        "Module": {
+          "id": 16,
+          "port": "m3"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 14,
+          "param": "release_ms"
+        }
+      },
+      "params": {
+        "amount": 0.04
+      },
+      "steps": []
+    },
+    "29": {
+      "from": {
+        "Module": {
+          "id": 16,
+          "port": "m4"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 13,
+          "param": "resonance"
+        }
+      },
+      "params": {
+        "amount": 0.14
+      },
+      "steps": []
+    }
+  },
+  "labels": {
+    "3": {
+      "bank.a": "Pulse",
+      "bank.b": "Lift",
+      "bank.c": "Sparse",
+      "bank.d": "Rest"
+    },
+    "4": {
+      "bank.a": "Pulse",
+      "bank.b": "Lift",
+      "bank.c": "Sparse",
+      "bank.d": "Rest"
+    },
+    "16": {
+      "guide": "Run starts 7-step bass against 5-step arp at 116 BPM in E minor. Launch Pulse, Lift, Sparse or Rest on either bank card. Glow opens tone, Motion speeds the drift, Length sustains notes, Air sharpens the arp.",
+      "name.m1": "Glow",
+      "name.m2": "Motion",
+      "name.m3": "Length",
+      "name.m4": "Air"
     }
   }
 }

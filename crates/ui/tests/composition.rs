@@ -15,6 +15,9 @@ use kabl_core::{ModuleId, PortRef, Vec2};
 use kabl_engine::patch_engine::Timing;
 use kabl_ui::perform::{BANKS, BTN_PREFIX, CC_PREFIX, CUE_PADS, PIN_PREFIX, TRANSPORT};
 use kabl_ui::{banks, cues, PatchEditor};
+#[allow(dead_code)]
+#[path = "support/factory_bank.rs"]
+mod factory_bank;
 
 fn port(id: ModuleId, port: &str) -> PortRef {
     PortRef::Module {
@@ -440,6 +443,27 @@ pub fn composition() -> PatchEditor {
             e.set_label(id, &format!("{PIN_PREFIX}{key}"), Some(label.to_string()));
         }
     }
+    // A held pad releases after Stop and stays silent on a stopped browser load.
+    let pad_env = e.add_module("env.adsr", at(24.0, 5));
+    let pad_vca = e.add_module("vca", at(294.0, 5));
+    set(&mut e, pad_env, "attack_ms", 350.0);
+    set(&mut e, pad_env, "decay_ms", 1200.0);
+    set(&mut e, pad_env, "sustain", 0.75);
+    set(&mut e, pad_env, "release_ms", 1200.0);
+    set(&mut e, pad_vca, "gain", 0.0);
+    let old_pad = e
+        .state()
+        .cables
+        .iter()
+        .find(|(_, c)| c.to == port(atmos, "in2"))
+        .map(|(&id, _)| id)
+        .unwrap();
+    e.disconnect(old_pad);
+    e.connect(port(clock, "gate"), port(pad_env, "gate"));
+    e.connect(port(pad_env, "out"), port(pad_vca, "cv"));
+    e.connect(port(pad_filt, "lp"), port(pad_vca, "in"));
+    e.connect(port(pad_vca, "out"), port(atmos, "in2"));
+    factory_bank::attach_guide(&mut e, "composition");
     e
 }
 
@@ -459,7 +483,9 @@ fn write_composition_patch() {
 fn committed_composition_patch_matches_the_builder() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/composition");
     let saved = kabl_core::load(&dir).unwrap();
-    assert_eq!(saved.state(), composition().state());
+    let mut built = composition();
+    factory_bank::attach_guide(&mut built, "composition");
+    assert_eq!(saved.state(), built.state());
     for m in saved.state().modules.values() {
         let info = kabl_modules::registry::info_for(&m.kind).unwrap();
         for p in info.params {

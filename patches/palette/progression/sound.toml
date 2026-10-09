@@ -1,0 +1,15 @@
+name = "Slow Horizons"
+category = "Pad"
+tags = [
+    "sequence",
+    "minor",
+    "curated",
+    "atmospheric progression",
+    "72bpm",
+    "e",
+    "slow",
+    "evolving",
+]
+description = "Run starts slow minor harmony at 72 BPM, one chord every two beats. Banks: Home, Lift, Descent, Rest; launch on the next bar. Glow opens tone, Motion speeds drift, Bloom lengthens release, Space adds room. Stop leaves a soft tail."
+keys = false
+sequence = true

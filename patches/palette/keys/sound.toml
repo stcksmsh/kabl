@@ -1,0 +1,12 @@
+name = "Glass Keys"
+category = "Keys"
+tags = [
+    "curated",
+    "pluck keys",
+    "poly",
+    "bright",
+    "keyboard",
+]
+description = "Play E3-B3-E4-G4, then release. Tone brightens; Weight emphasizes the attack; Shape lengthens decay; Room adds ambience. Velocity shapes volume; bend +/-2 semitones. CC20-23 control macros."
+keys = true
+sequence = false

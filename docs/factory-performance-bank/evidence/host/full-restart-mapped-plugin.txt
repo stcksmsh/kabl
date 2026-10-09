@@ -1,0 +1,4 @@
+7909fca00000-7909fccd7000 r--p 00000000 103:07 23241231                  /home/stcksmsh/.codex/visualizations/2026/10/08/01a11be1-c6f3-7fe2-b4e6-f33210e9ea62/factory-bank-owner-test/plugins/kabl.clap
+7909fccd7000-7909fd3bf000 r-xp 002d6000 103:07 23241231                  /home/stcksmsh/.codex/visualizations/2026/10/08/01a11be1-c6f3-7fe2-b4e6-f33210e9ea62/factory-bank-owner-test/plugins/kabl.clap
+7909fd3bf000-7909fd402000 r--p 009bd000 103:07 23241231                  /home/stcksmsh/.codex/visualizations/2026/10/08/01a11be1-c6f3-7fe2-b4e6-f33210e9ea62/factory-bank-owner-test/plugins/kabl.clap
+7909fd402000-7909fd404000 rw-p 009ff000 103:07 23241231                  /home/stcksmsh/.codex/visualizations/2026/10/08/01a11be1-c6f3-7fe2-b4e6-f33210e9ea62/factory-bank-owner-test/plugins/kabl.clap

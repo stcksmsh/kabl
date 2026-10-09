@@ -1,0 +1,175 @@
+{
+  "binary_sha256": "eb3de41d1bf0102e3ee92e50520696bac811c7b101c3220abb325815624516d7",
+  "standalone_edit_save_full_restart_complete_state_equal": true,
+  "input": "Scripted private X11 input; actual application frames, not owner or physical-controller acceptance. Video is silent; audio evidence is separate.",
+  "cases": [
+    {
+      "size": "1440x900",
+      "factory_id": "factory:palette/keyboard-bass",
+      "browser_open": true,
+      "Perform_cards": 6,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1440x900",
+      "factory_id": "factory:palette/lead",
+      "browser_open": true,
+      "Perform_cards": 8,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1440x900",
+      "factory_id": "factory:palette/keys",
+      "browser_open": true,
+      "Perform_cards": 6,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1440x900",
+      "factory_id": "factory:palette/pad",
+      "browser_open": true,
+      "Perform_cards": 8,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1440x900",
+      "factory_id": "factory:palette/strings",
+      "browser_open": true,
+      "Perform_cards": 8,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1440x900",
+      "factory_id": "factory:palette/breath",
+      "browser_open": true,
+      "Perform_cards": 7,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1440x900",
+      "factory_id": "factory:palette/bass",
+      "browser_open": true,
+      "Perform_cards": 9,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1440x900",
+      "factory_id": "factory:interlocking",
+      "browser_open": true,
+      "Perform_cards": 8,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1440x900",
+      "factory_id": "factory:echo",
+      "browser_open": true,
+      "Perform_cards": 8,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1440x900",
+      "factory_id": "factory:palette/progression",
+      "browser_open": true,
+      "Perform_cards": 7,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1440x900",
+      "factory_id": "factory:composition",
+      "browser_open": true,
+      "Perform_cards": 11,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1440x900",
+      "factory_id": "factory:sound-palette",
+      "browser_open": true,
+      "Perform_cards": 12,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1280x800",
+      "factory_id": "factory:palette/keyboard-bass",
+      "browser_open": true,
+      "Perform_cards": 6,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1280x800",
+      "factory_id": "factory:palette/lead",
+      "browser_open": true,
+      "Perform_cards": 8,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1280x800",
+      "factory_id": "factory:palette/keys",
+      "browser_open": true,
+      "Perform_cards": 6,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1280x800",
+      "factory_id": "factory:palette/pad",
+      "browser_open": true,
+      "Perform_cards": 8,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1280x800",
+      "factory_id": "factory:palette/strings",
+      "browser_open": true,
+      "Perform_cards": 8,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1280x800",
+      "factory_id": "factory:palette/breath",
+      "browser_open": true,
+      "Perform_cards": 7,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1280x800",
+      "factory_id": "factory:palette/bass",
+      "browser_open": true,
+      "Perform_cards": 9,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1280x800",
+      "factory_id": "factory:interlocking",
+      "browser_open": true,
+      "Perform_cards": 8,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1280x800",
+      "factory_id": "factory:echo",
+      "browser_open": true,
+      "Perform_cards": 8,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1280x800",
+      "factory_id": "factory:palette/progression",
+      "browser_open": true,
+      "Perform_cards": 7,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1280x800",
+      "factory_id": "factory:composition",
+      "browser_open": true,
+      "Perform_cards": 11,
+      "transport_or_audition_exercised": true
+    },
+    {
+      "size": "1280x800",
+      "factory_id": "factory:sound-palette",
+      "browser_open": true,
+      "Perform_cards": 12,
+      "transport_or_audition_exercised": true
+    }
+  ]
+}

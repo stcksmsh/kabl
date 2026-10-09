@@ -1,0 +1,12 @@
+name = "Round Keyboard Bass"
+category = "Bass"
+tags = [
+    "curated",
+    "bass",
+    "mono",
+    "dark",
+    "keyboard",
+]
+description = "Play C2-C3, single notes. Tone opens the filter; Weight adds resonance; Shape lengthens decay; Room adds a short space. Bend +/-2 semitones. CC20-23 control macros."
+keys = true
+sequence = false

@@ -598,6 +598,14 @@ pub fn rename_pin(editor: &mut PatchEditor, id: ModuleId, key: &str, text: &str)
 /// wrapped in rows. Transport cards stay in a column at the left.
 pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
     let th = crate::theme::theme(ui_state.dark);
+    if let Some(guide) = editor
+        .state()
+        .modules
+        .keys()
+        .find_map(|&id| editor.state().label(id, "guide"))
+    {
+        ui.label(RichText::new(guide).small());
+    }
     ui.horizontal(|ui| {
         ui.heading("Perform");
         ui.separator();

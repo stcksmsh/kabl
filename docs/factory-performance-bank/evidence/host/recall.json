@@ -1,0 +1,21 @@
+{
+  "factory_ids": [
+    "factory:palette/keys",
+    "factory:palette/progression"
+  ],
+  "phases": [
+    "initial",
+    "full-restart"
+  ],
+  "complete_f32_state_equal": true,
+  "guides_pins_banks_embedded": true,
+  "factory_unavailable": true,
+  "native_closed_editor_times": [
+    2,
+    6,
+    13
+  ],
+  "native_tolerance": 0.025,
+  "plugin_sha256": "80933e3d9f7959c47d77df5a3629ed4723a35086a0faba0fa2035b24693b2d57",
+  "input": "Scripted MIDI/native automation in private REAPER; not owner listening or physical-controller acceptance. This is recall/replay proof, not deterministic-render evidence."
+}

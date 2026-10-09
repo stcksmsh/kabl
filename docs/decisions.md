@@ -1,5 +1,9 @@
 # Decisions
 
+## 2026-10-08 — Curated Factory Performance Bank
+
+Reuse nine established entries and add only keyboard bass, keys and slow progression. Purpose filters derive from complete graph capabilities while preserving existing role metadata and IDs. Embedded guides use native Perform text; existing macros, pins, banks and cues remain authoritative. Load stops real clocks and replaces note ownership. Composition gates its formerly constant pad; old saved projects retain their embedded state. Complete-state portability and normal populated factory launch are distinct checks. New synthesis/assets are original; no new DSP runtime or dependency. Scripted audio/UI/host verification is not owner listening/controller/physical latency approval, and inherited render/warm-up/backend limits remain open.
+
 Every non-trivial choice + the alternative rejected. Newest last.
 
 ## 2026-09-21 — Workspace layout

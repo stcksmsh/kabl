@@ -1,0 +1,10 @@
+{
+  "bundle": "/home/stcksmsh/.codex/visualizations/2026/10/08/01a11be1-c6f3-7fe2-b4e6-f33210e9ea62/factory-bank-owner-test",
+  "packaged_head": "07c723fd4983366696a99b1b9d4e7069c636434b",
+  "runtime_build_head": "160b3c2b20b8eb1437756f9dd7f090b8acacc0f2",
+  "manifest_hashes_verified": true,
+  "normal_bundled_factory_browse_open": true,
+  "unavailable_factory_complete_state_equal_after_save": true,
+  "working_directory": "/home/stcksmsh/.codex/visualizations/2026/10/08/01a11be1-c6f3-7fe2-b4e6-f33210e9ea62/factory-bank-owner-test",
+  "input": "Scripted private-display real standalone input; no physical or owner acceptance."
+}

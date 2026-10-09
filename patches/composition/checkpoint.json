@@ -628,6 +628,29 @@
         "y": 1490.0
       },
       "params": {}
+    },
+    "40": {
+      "kind": "env.adsr",
+      "pos": {
+        "x": 24.0,
+        "y": 1860.0
+      },
+      "params": {
+        "attack_ms": 350.0,
+        "decay_ms": 1200.0,
+        "release_ms": 1200.0,
+        "sustain": 0.75
+      }
+    },
+    "41": {
+      "kind": "vca",
+      "pos": {
+        "x": 294.0,
+        "y": 1860.0
+      },
+      "params": {
+        "gain": 0.0
+      }
     }
   },
   "cables": {
@@ -1367,22 +1390,6 @@
       "params": {},
       "steps": []
     },
-    "46": {
-      "from": {
-        "Module": {
-          "id": 23,
-          "port": "lp"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 31,
-          "port": "in2"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
     "47": {
       "from": {
         "Module": {
@@ -1836,6 +1843,70 @@
         "amount": 0.1
       },
       "steps": []
+    },
+    "74": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "gate"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 40,
+          "port": "gate"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "75": {
+      "from": {
+        "Module": {
+          "id": 40,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 41,
+          "port": "cv"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "76": {
+      "from": {
+        "Module": {
+          "id": 23,
+          "port": "lp"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 41,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "77": {
+      "from": {
+        "Module": {
+          "id": 41,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 31,
+          "port": "in2"
+        }
+      },
+      "params": {},
+      "steps": []
     }
   },
   "labels": {
@@ -1847,6 +1918,7 @@
       "cue5": "Return"
     },
     "3": {
+      "guide": "Open stopped. Run, then launch Intro, Main, Variation, Breakdown or Return cues on the next bar. Energy, Motion, Space and Glow shape the three layers. Play a single E4-B4 lead over them. CC40-44 launch cues; CC46 toggles Run.",
       "name.m1": "Energy",
       "name.m2": "Motion",
       "name.m3": "Space",

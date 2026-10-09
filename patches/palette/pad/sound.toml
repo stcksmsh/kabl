@@ -6,7 +6,10 @@ tags = [
     "poly",
     "evolving",
     "echo",
+    "curated",
+    "pad",
+    "atmospheric",
 ]
-description = "Warm evolving pad: slow pulse-width motion, a breathing driven ladder filter, echo and a big room."
+description = "Hold E3-B3-E4-G4 for at least four seconds. Warmth opens the filter, Evolve deepens motion, Air adds breath, Space adds echo and room. Leave time for the release; CC20-23 control macros."
 keys = true
 sequence = false

@@ -1,0 +1,31 @@
+   Compiling kabl-standalone v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/crates/standalone)
+   Compiling kabl-ui v0.1.0 (/secondary/Programming/Github/kabl/.worktrees/factory-performance-bank/crates/ui)
+    Finished `test` profile [optimized] target(s) in 1.56s
+     Running tests/echo.rs (target/debug/deps/echo-ded48cee144a1bf3)
+
+running 4 tests
+test interlocking::write_interlocking_patch ... ignored
+test write_echo_patch ... ignored
+test interlocking::committed_patch_matches_the_builder ... ok
+test committed_echo_patch_matches_the_builder ... ok
+
+test result: ok. 2 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/factory_bank.rs (target/debug/deps/factory_bank-e0b82c9fb2e315a2)
+
+running 4 tests
+test render_bank ... ignored, renders every entry, checks headroom, writes metrics and WAV previews
+test write_bank ... ignored, writes three original factory graphs and curated metadata
+test purpose_filters_preserve_legacy_metadata_and_user_saves ... ok
+test every_entry_opens_stopped_has_real_controls_and_recalls_complete_state ... ok
+
+test result: ok. 2 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/interlocking.rs (target/debug/deps/interlocking-cffc4034ec1eb587)
+
+running 2 tests
+test write_interlocking_patch ... ignored
+test committed_patch_matches_the_builder ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -5,7 +5,10 @@ tags = [
     "legato",
     "glide",
     "bright",
+    "curated",
+    "lead",
+    "expressive",
 ]
-description = "Singing mono lead: legato glide between overlapping notes, a synced vowel on each attack, drive and ping-pong echo."
+description = "Overlap E4-G4-B4 for legato glide. Tone brightens, Vibrato adds motion, Bite adds drive, Echo adds repeats. Bend +/-2 semitones; CC20-23 control macros."
 keys = true
 sequence = false

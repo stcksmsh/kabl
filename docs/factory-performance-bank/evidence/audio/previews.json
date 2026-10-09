@@ -1,0 +1,83 @@
+{
+  "input": "Scripted notes/runtime macros and real editable sequencer/cue launches through the production engine. No reference recordings, normalization or limiter. AAC previews are lossy; measurements describe original float WAV.",
+  "files": [
+    {
+      "name": "composition",
+      "original_float_wav_sha256": "f55dd12cb91ce9ace72c831ab766a155991c97ae0999a67856510f5768b8c175",
+      "preview_sha256": "1e9e9782fa25b2afbb6096feb185ab35142386e93d7952cefd77c13dbee1bd3a",
+      "duration_seconds": 24.0
+    },
+    {
+      "name": "echo",
+      "original_float_wav_sha256": "771d23800d8398b815dc25e52660d784f9385a9724c3ec20e9c803b3e2ddb2d1",
+      "preview_sha256": "53b42e885c9e75213cbb58f46a01e466d450b3ecbfc597e8f8d09132ca940fd4",
+      "duration_seconds": 24.0
+    },
+    {
+      "name": "editable-performance",
+      "original_float_wav_sha256": "3aa5c199aae21dec5006d6687a0c0c6c27eebb5eeec3ca5518e240bc8879b323",
+      "preview_sha256": "3c8101baa2b93e215714c1d2f58d8576a6eef9c2f956e263b666710699670cad",
+      "duration_seconds": 72.0
+    },
+    {
+      "name": "interlocking",
+      "original_float_wav_sha256": "100fd853a65b337d7f9388db328223e0ae0c9761b6b7e1508b92c850d825a541",
+      "preview_sha256": "7fb4e88834d6b000ffd3f917e10ab22fb28cd31462f7d68548f84250c9ea1362",
+      "duration_seconds": 24.0
+    },
+    {
+      "name": "palette-bass",
+      "original_float_wav_sha256": "b63078e85566f2ee4e8bbc25559d4b61528ab8c900b5154011861d5c65436fa3",
+      "preview_sha256": "ff1d5ec91fad9addc5f2dd275071dc10eacebde760716ffea371a0771934af5e",
+      "duration_seconds": 24.0
+    },
+    {
+      "name": "palette-breath",
+      "original_float_wav_sha256": "6a93361c33199a00190abe35760c16884a977166c6bd81561c5c752c74929c0e",
+      "preview_sha256": "a31e0dbdca25b15a762594b8a53b2127efc053185f2dbebe22db6bdffa0e6304",
+      "duration_seconds": 24.0
+    },
+    {
+      "name": "palette-keyboard-bass",
+      "original_float_wav_sha256": "5c5bebe56d6e07468787df514a26b4e090791aaa4f1ef96de8b21c0ae03c0b03",
+      "preview_sha256": "0dc61b489e41231a5ded41ef1e83079ee708d2041b03c2dc53515a3946879444",
+      "duration_seconds": 24.0
+    },
+    {
+      "name": "palette-keys",
+      "original_float_wav_sha256": "8db4e3970f743daabb0d438849b5539bfbe291d51379ad0627d403a4ee7575fa",
+      "preview_sha256": "2c729227633a5a2694d61fdd5cba710d0b96e112acfb330d4a2aef393d1f73a1",
+      "duration_seconds": 24.0
+    },
+    {
+      "name": "palette-lead",
+      "original_float_wav_sha256": "04a7d7c895affa0bb4718d80800a77a5e997cc7350ee6525deb2ab2ea80aac59",
+      "preview_sha256": "272e3e3ad44819bcc5a958d1588ffc6550eeddb76ed88236aba6b4e581f05870",
+      "duration_seconds": 24.0
+    },
+    {
+      "name": "palette-pad",
+      "original_float_wav_sha256": "980048e81614690b225073e5f9595fee6d1b57e89aaa9f4b90fe0d0909b75715",
+      "preview_sha256": "edc231c1183b2b3dee042b6c9e1e45ee9fea6f89826d9aaef3d7830a461038f1",
+      "duration_seconds": 24.0
+    },
+    {
+      "name": "palette-progression",
+      "original_float_wav_sha256": "dba375d84892e948749c60f7a49c909929c47c7177d72b26d2b02fabeae4e070",
+      "preview_sha256": "0d97bec99690104ab7b003b474913097dfcf1814c45b38fb2a0a67c688a29f28",
+      "duration_seconds": 24.0
+    },
+    {
+      "name": "palette-strings",
+      "original_float_wav_sha256": "ee357e109d77a1ee0067b3766ef66d6da764e49f5d5a4c38d53e6beedf43a95b",
+      "preview_sha256": "084adf5c82cf74f6ce70212a0b51180364c3140a634b2736a6ec7120b5b767fc",
+      "duration_seconds": 24.0
+    },
+    {
+      "name": "sound-palette",
+      "original_float_wav_sha256": "e13c54821ddc20bd6c31771588a74de19121ff38ea70bf93d94b3045c866db74",
+      "preview_sha256": "1fcc0b449786f8bf1c4df0c2e1aeb7fb7f62a1c2cb1547290ec56e9d24011f0b",
+      "duration_seconds": 24.0
+    }
+  ]
+}

@@ -27,9 +27,13 @@ pub const MAX_NAME: usize = 60;
 
 /// The category vocabulary, in browser order.
 pub const CATEGORIES: &[&str] = &[
+    "Sounds",
+    "Sequences",
+    "Performances",
     "Basic",
     "Bass",
     "Lead",
+    "Keys",
     "Pad",
     "Strings",
     "Wind",
@@ -59,6 +63,19 @@ pub struct Meta {
 }
 
 impl Meta {
+    /// Broad musical purpose, including metadata written before purpose filters existed.
+    pub fn content_type(&self) -> &'static str {
+        match (self.keys, self.sequence) {
+            (true, true) => "Performances",
+            (_, true) => "Sequences",
+            _ => "Sounds",
+        }
+    }
+
+    pub fn in_category(&self, category: &str) -> bool {
+        self.category == category || self.content_type() == category
+    }
+
     /// How a patch plays, read from its modules.
     pub fn play_of(state: &PatchState) -> (bool, bool) {
         let has = |k: &str| state.modules.values().any(|m| m.kind == k);
@@ -79,11 +96,12 @@ impl Entry {
     /// description.
     pub fn matches(&self, query: &str) -> bool {
         let hay = format!(
-            "{} {} {} {}",
+            "{} {} {} {} {}",
             self.meta.name,
             self.meta.category,
             self.meta.tags.join(" "),
-            self.meta.description
+            self.meta.description,
+            self.meta.content_type()
         )
         .to_lowercase();
         query
@@ -247,6 +265,10 @@ fn read_meta(dir: &Path, fallback_name: &str, notes: &mut Vec<String>) -> Meta {
     };
     if meta.name.trim().is_empty() {
         meta.name = fallback_name.to_string();
+    }
+    // Older metadata may omit play flags; the complete graph remains authoritative.
+    if let Ok(log) = kabl_core::load(dir) {
+        (meta.keys, meta.sequence) = Meta::play_of(log.state());
     }
     meta
 }

@@ -4,7 +4,13 @@ tags = [
     "sequenced",
     "echo",
     "delay",
+    "curated",
+    "probabilistic motion",
+    "116bpm",
+    "e",
+    "minor",
+    "probability",
 ]
-description = "A sequence through the clock-synced echo."
+description = "Run starts probabilistic E-minor motion at 116 BPM. Pulse and Lift keep the first step certain; Sparse uses 45% ghost notes; Rest mutes. Launch both bank cards for sections. Glow, Motion, Length and Echo shape variation."
 keys = false
 sequence = true

@@ -1,5 +1,9 @@
 # kabl — product direction and sequential delivery plan
 
+## Authorized Factory Bank Update — 2026-10-08
+
+Kosta explicitly authorized the curated factory sound/sequence/performance batch after D10 PR #13 merged at `23075cd713884903a8985c88ab43bd1817477308`. [Factory-bank report](factory-performance-bank/REPORT.md) records twelve entries, prepared Perform controls, proof and draft submission. This authorizes only this batch, not D11/custom DSP or the rest of this historical proposal. Listening, physical controller/latency/xruns and beta approval remain pending; engineering, merge and owner dispositions are separate.
+
 Date: 2026-09-25. Repository audit: `master` at `c1def5361d66caeee477b2be5c737c7e343552f3`.
 
 **Status: researched proposal, not authorization to implement every batch.** Kosta requested this plan and confirmed the priorities below. He has not approved the proposed delivery order or the pending Composition and Sound Palette batches. A planning commit is not product approval.

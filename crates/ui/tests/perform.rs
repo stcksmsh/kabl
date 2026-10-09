@@ -26,9 +26,25 @@ struct H {
 impl H {
     fn new(w: f32, h: f32) -> Self {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/echo");
+        let mut editor = PatchEditor::from_log(kabl_core::load(&dir).expect("patch"));
+        // These pin-authoring tests start from an unprepared view of the real graph.
+        let changes: Vec<_> = editor
+            .state()
+            .modules
+            .iter()
+            .flat_map(|(&id, m)| {
+                m.params
+                    .keys()
+                    .filter(|key| {
+                        key.starts_with("pin.") || key.starts_with("cc.") || key.starts_with("btn.")
+                    })
+                    .map(move |key| (id, key.clone(), None))
+            })
+            .collect();
+        editor.set_presentation(&changes);
         let mut h = H {
             ctx: egui::Context::default(),
-            editor: PatchEditor::from_log(kabl_core::load(&dir).expect("patch")),
+            editor,
             ui: UiState::default(),
             size: egui::vec2(w, h),
             events: Vec::new(),
