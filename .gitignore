@@ -5,3 +5,4 @@ docs/design/build/
 /recordings/
 
 /scratch/
+!crates/modules/assets/wavetables/*.wav
