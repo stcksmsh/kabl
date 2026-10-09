@@ -17,12 +17,14 @@ A cable that carries a pattern or a chance below 100 % shows three small bars on
 
 The clips were not listened to by the agent that made them (it has no ears); they were checked for level, determinism and difference from the plain version only.
 
-## Morph is open
+## Morph (prototype, awaiting Kosta)
 
-The repository never says what morph is. Candidates, each with one musical example:
+The repository never says what morph is, so this is a prototype of the three candidates that were put to Kosta, built so they can be heard side by side. Kosta has not chosen; none of this is a decision.
 
-1. **Glide between steps.** A morph amount turns the hard step-to-step jumps of the levels into a ramp over the pulse (0 = today's steps, 1 = a straight-line sweep to the next level). Example: the Five Against Eight cutoff pattern as a lopsided wobble instead of five jumps. Small: one number per cable, no new data. Only useful for CV and routes; on audio it is a slow fade.
-2. **A/B pattern blend.** A cable holds two patterns and a morph knob (0..1, mappable to a macro or CC) crossfades their levels and chances. Example: a gate on a pad moves from a sparse pattern to a dense one while a build is played by hand. Needs a second set of settings per cable (34 more values) and a place for the knob.
-3. **Timed transition.** Morph is a move from one stored setting of the cable to another over N bars of the clock. Example: the echo send fades from 20 % chance to 100 % chance across eight bars, then back. Needs a transition clock per cable or a link to the timeline; it also asks what undo and save recall mean in the middle of a transition.
+- **A/B blend (candidate 2).** A cable holds a second pattern B (`b.length`, `b.s1..`, `b.r1..`) and `morph` 0..1. Each pulse draws once; the pass chance and the level are the mix of the A step and the B step (each pattern keeps its own length, so a morph between 4 and 5 steps is a polymeter morph). Morph 0 is exactly the old behaviour.
+- **Glide (candidate 1).** `glide_ms` slews the level between steps instead of jumping (audio always slews 1 ms at least).
+- **Timed transition (candidate 3).** No new machinery: morph is a runtime value, so any ramp over bars (here `render_morph` in the demo example, in the app a macro or CC route once params are mappable) is the transition.
 
-Recommendation: 2, because it is the only one that is played live and the macro and CC mapping already exist; 1 composes with it later. This is a product choice for Kosta.
+`morph-arc.mp3` (58 s, 24 bars): a slow A-minor piece. The delay send, the pad's gate and the bass filter each hold an A pattern (sparse) and a B pattern (busy), and their morphs move on separate schedules (echo bars 4-12 up, 18-24 down; pad 8-16 up, 20-24 down; bass 12-18 up, 21-24 down). The saved patch `patches/functional-cables/morph-arc` sits at morph 0.3; in the app, open a cable's Pattern editor and move "Morph A to B".
+
+Not decided: whether blending chances this way sounds like a real in-between to a person, and whether morph should be a cable property at all or a separate source that several cables follow.

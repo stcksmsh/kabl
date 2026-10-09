@@ -1438,35 +1438,110 @@ pub(crate) fn cable_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: 
             set(editor, 1, prob, &resp);
         }
     });
-    for k in 0..get(0) as usize {
-        ui.horizontal(|ui| {
-            ui.label(format!("{:>2}", k + 1));
-            let mut level = get(2 + k) * 100.0;
-            let resp = ui.add(
-                egui::DragValue::new(&mut level)
-                    .range(0.0..=100.0)
-                    .speed(0.5)
-                    .suffix(" % level")
-                    .max_decimals(0),
-            );
-            ui_state.record(format!("fn-level:{cable}:{k}"), resp.rect);
-            if resp.changed() {
-                set(editor, 2 + k, level / 100.0, &resp);
-            }
-            let mut chance = get(2 + kabl_cables::MAX_STEPS + k);
-            let resp = ui.add(
-                egui::DragValue::new(&mut chance)
-                    .range(0.0..=100.0)
-                    .speed(0.5)
-                    .suffix(" % chance")
-                    .max_decimals(0),
-            );
-            ui_state.record(format!("fn-chance:{cable}:{k}"), resp.rect);
-            if resp.changed() {
-                set(editor, 2 + kabl_cables::MAX_STEPS + k, chance, &resp);
-            }
-        });
-    }
+    let rows = |ui: &mut egui::Ui,
+                editor: &mut PatchEditor,
+                ui_state: &mut UiState,
+                tag: &str,
+                len: usize,
+                level0: usize,
+                chance0: usize| {
+        for k in 0..len {
+            ui.horizontal(|ui| {
+                ui.label(format!("{:>2}", k + 1));
+                let mut level = get(level0 + k) * 100.0;
+                let resp = ui.add(
+                    egui::DragValue::new(&mut level)
+                        .range(0.0..=100.0)
+                        .speed(0.5)
+                        .suffix(" % level")
+                        .max_decimals(0),
+                );
+                ui_state.record(format!("fn-level{tag}:{cable}:{k}"), resp.rect);
+                if resp.changed() {
+                    set(editor, level0 + k, level / 100.0, &resp);
+                }
+                let mut chance = get(chance0 + k);
+                let resp = ui.add(
+                    egui::DragValue::new(&mut chance)
+                        .range(0.0..=100.0)
+                        .speed(0.5)
+                        .suffix(" % chance")
+                        .max_decimals(0),
+                );
+                ui_state.record(format!("fn-chance{tag}:{cable}:{k}"), resp.rect);
+                if resp.changed() {
+                    set(editor, chance0 + k, chance, &resp);
+                }
+            });
+        }
+    };
+    rows(
+        ui,
+        editor,
+        ui_state,
+        "",
+        get(0) as usize,
+        kabl_cables::LEVEL0,
+        kabl_cables::CHANCE0,
+    );
+    ui.separator();
+    ui.horizontal(|ui| {
+        ui.label("Morph A to B");
+        let mut morph = get(kabl_cables::MORPH) * 100.0;
+        let resp = ui.add(
+            egui::DragValue::new(&mut morph)
+                .range(0.0..=100.0)
+                .speed(0.5)
+                .suffix(" %")
+                .max_decimals(0),
+        );
+        ui_state.record(format!("fn-morph:{cable}"), resp.rect);
+        if resp.changed() {
+            set(editor, kabl_cables::MORPH, morph / 100.0, &resp);
+        }
+        ui.label("Glide");
+        let mut glide = get(kabl_cables::GLIDE);
+        let resp = ui.add(
+            egui::DragValue::new(&mut glide)
+                .range(0.0..=2000.0)
+                .speed(1.0)
+                .suffix(" ms")
+                .max_decimals(0),
+        );
+        ui_state.record(format!("fn-glide:{cable}"), resp.rect);
+        if resp.changed() {
+            set(editor, kabl_cables::GLIDE, glide, &resp);
+        }
+    });
+    ui.horizontal(|ui| {
+        ui.label("Pattern B steps");
+        let mut len = get(kabl_cables::B_LENGTH);
+        let resp = ui.add(
+            egui::DragValue::new(&mut len)
+                .range(0.0..=kabl_cables::MAX_STEPS as f32)
+                .speed(0.1)
+                .custom_formatter(|v, _| {
+                    if v < 1.0 {
+                        "off".into()
+                    } else {
+                        format!("{v:.0}")
+                    }
+                }),
+        );
+        ui_state.record(format!("fn-b-length:{cable}"), resp.rect);
+        if resp.changed() {
+            set(editor, kabl_cables::B_LENGTH, len.round(), &resp);
+        }
+    });
+    rows(
+        ui,
+        editor,
+        ui_state,
+        "-b",
+        get(kabl_cables::B_LENGTH) as usize,
+        kabl_cables::B_LEVEL0,
+        kabl_cables::B_CHANCE0,
+    );
 }
 
 #[cfg(test)]

@@ -15,24 +15,42 @@ pub const MAX_STEPS: usize = 16;
 pub const LENGTH: &str = "length";
 /// Whole-cable pass probability, percent (absent = 100).
 pub const PROB: &str = "prob";
-/// Runtime slots: 0 length, 1 prob, 2.. step levels, then step probabilities.
-pub const SLOTS: usize = 2 + 2 * MAX_STEPS;
+/// Runtime slots: 0 length, 1 prob, step levels, step chances, then the morph slots.
+pub const LEVEL0: usize = 2;
+pub const CHANCE0: usize = LEVEL0 + MAX_STEPS;
+/// 0..1: how far the cable is from pattern A (0) to pattern B (1).
+pub const MORPH: usize = CHANCE0 + MAX_STEPS;
+/// Level glide in ms (0 = steps jump; audio always slews 1 ms at least).
+pub const GLIDE: usize = MORPH + 1;
+pub const B_LENGTH: usize = GLIDE + 1;
+pub const B_LEVEL0: usize = B_LENGTH + 1;
+pub const B_CHANCE0: usize = B_LEVEL0 + MAX_STEPS;
+pub const SLOTS: usize = B_CHANCE0 + MAX_STEPS;
 
-/// Param name of runtime slot `slot`: `length`, `prob`, `s1..`, `r1..`.
+/// Param name of runtime slot `slot`: `length`, `prob`, `s1..`, `r1..`, `morph`, `glide_ms`,
+/// then pattern B as `b.length`, `b.s1..`, `b.r1..`.
 pub fn slot_name(slot: usize) -> String {
     match slot {
         0 => LENGTH.into(),
         1 => PROB.into(),
-        s if s < 2 + MAX_STEPS => format!("s{}", s - 1),
-        s => format!("r{}", s - 1 - MAX_STEPS),
+        s if s < CHANCE0 => format!("s{}", s - LEVEL0 + 1),
+        s if s < MORPH => format!("r{}", s - CHANCE0 + 1),
+        MORPH => "morph".into(),
+        GLIDE => "glide_ms".into(),
+        B_LENGTH => "b.length".into(),
+        s if s < B_CHANCE0 => format!("b.s{}", s - B_LEVEL0 + 1),
+        s => format!("b.r{}", s - B_CHANCE0 + 1),
     }
+}
+
+fn is_level(slot: usize) -> bool {
+    (LEVEL0..CHANCE0).contains(&slot) || (B_LEVEL0..B_CHANCE0).contains(&slot)
 }
 
 fn slot_default(slot: usize) -> f32 {
     match slot {
-        0 => 0.0,
-        1 => 100.0,
-        s if s < 2 + MAX_STEPS => 1.0,
+        0 | MORPH | GLIDE | B_LENGTH => 0.0,
+        s if is_level(s) => 1.0,
         _ => 100.0,
     }
 }
@@ -42,9 +60,10 @@ fn clamp_slot(slot: usize, v: f32) -> f32 {
         return slot_default(slot);
     }
     match slot {
-        0 => v.round().clamp(0.0, MAX_STEPS as f32),
-        1 => v.clamp(0.0, 100.0),
-        s if s < 2 + MAX_STEPS => v.clamp(0.0, 1.0),
+        0 | B_LENGTH => v.round().clamp(0.0, MAX_STEPS as f32),
+        MORPH => v.clamp(0.0, 1.0),
+        GLIDE => v.clamp(0.0, 2000.0),
+        s if is_level(s) => v.clamp(0.0, 1.0),
         _ => v.clamp(0.0, 100.0),
     }
 }
@@ -56,10 +75,10 @@ pub fn slot_value(params: &BTreeMap<String, f32>, slot: usize) -> f32 {
         .map_or(slot_default(slot), |&v| clamp_slot(slot, v))
 }
 
-/// A cable with a pattern or a pass probability below 100 % has a node in the compiled graph;
+/// A cable with a pattern, a pass probability below 100 % or a morph above 0 has a node in the compiled graph;
 /// any other cable is a plain connection exactly as before.
 pub fn is_functional(params: &BTreeMap<String, f32>) -> bool {
-    slot_value(params, 0) >= 1.0 || slot_value(params, 1) < 100.0
+    slot_value(params, 0) >= 1.0 || slot_value(params, 1) < 100.0 || slot_value(params, MORPH) > 0.0
 }
 
 /// A cable's seed from its id.
@@ -85,18 +104,28 @@ pub const SLEW_MS: f32 = 1.0;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Settings {
     len: u8,
+    len_b: u8,
     prob: f32,
+    morph: f32,
+    glide_ms: f32,
     level: [f32; MAX_STEPS],
     chance: [f32; MAX_STEPS],
+    level_b: [f32; MAX_STEPS],
+    chance_b: [f32; MAX_STEPS],
 }
 
 impl Settings {
     pub fn from_params(params: &BTreeMap<String, f32>) -> Self {
         let mut s = Settings {
             len: 0,
+            len_b: 0,
             prob: 1.0,
+            morph: 0.0,
+            glide_ms: 0.0,
             level: [1.0; MAX_STEPS],
             chance: [1.0; MAX_STEPS],
+            level_b: [1.0; MAX_STEPS],
+            chance_b: [1.0; MAX_STEPS],
         };
         for slot in 0..SLOTS {
             s.set(slot, slot_value(params, slot));
@@ -113,18 +142,31 @@ impl Settings {
         match slot {
             0 => self.len = v as u8,
             1 => self.prob = v / 100.0,
-            s if s < 2 + MAX_STEPS => self.level[s - 2] = v,
-            s => self.chance[s - 2 - MAX_STEPS] = v / 100.0,
+            MORPH => self.morph = v,
+            GLIDE => self.glide_ms = v,
+            B_LENGTH => self.len_b = v as u8,
+            s if s < CHANCE0 => self.level[s - LEVEL0] = v,
+            s if s < MORPH => self.chance[s - CHANCE0] = v / 100.0,
+            s if s < B_CHANCE0 => self.level_b[s - B_LEVEL0] = v,
+            s => self.chance_b[s - B_CHANCE0] = v / 100.0,
         }
     }
 
     /// The level the cable has from pulse `tick` on: the step's level, or 0 when it is
-    /// rejected. A cable with only a probability is a one-step pattern at level 1.
+    /// rejected. A cable with only a probability is a one-step pattern at level 1. With a
+    /// morph above 0 pattern B plays beside A at its own length: the pass chance and the level
+    /// are the blend of the two steps, drawn once, so a half morph is a real in-between.
     pub fn level_at(&self, seed: u32, tick: u64) -> f32 {
         let k = (tick % self.len.max(1) as u64) as usize;
-        let p = self.prob * self.chance[k];
+        let (mut p, mut level) = (self.prob * self.chance[k], self.level[k]);
+        if self.morph > 0.0 {
+            let kb = (tick % self.len_b.max(1) as u64) as usize;
+            let m = self.morph;
+            p += (self.prob * self.chance_b[kb] - p) * m;
+            level += (self.level_b[kb] - level) * m;
+        }
         if draw(seed, tick) < p {
-            self.level[k]
+            level
         } else {
             0.0
         }
@@ -147,6 +189,7 @@ pub struct Node {
     seed: u32,
     carry: Carry,
     slew: f32,
+    sample_rate: f32,
     level: f32,
     gain: f32,
     held: f32,
@@ -160,6 +203,7 @@ impl Node {
             seed: seed_of(cable),
             carry,
             slew: 1.0 / (SLEW_MS * 0.001 * sample_rate).max(1.0),
+            sample_rate,
             level: 1.0,
             gain: 1.0,
             held: 0.0,
@@ -194,17 +238,24 @@ impl Node {
                 (self.gain, self.held, self.started) = (self.level, src[i], true);
             }
             let (src, out) = (&src[i..end], &mut out[i..end]);
+            let glide = self.settings.glide_ms;
+            let slew = if glide > 0.0 {
+                1.0 / (glide * 0.001 * self.sample_rate).max(1.0)
+            } else {
+                self.slew
+            };
             match self.carry {
-                Carry::Scale => {
+                Carry::Scale if glide <= 0.0 => {
+                    self.gain = self.level;
                     for (o, &x) in out.iter_mut().zip(src) {
                         *o = x * self.level;
                     }
                 }
-                Carry::Audio => {
+                Carry::Scale | Carry::Audio => {
                     let mut k = 0;
                     while k < out.len() && self.gain != self.level {
                         let d = self.level - self.gain;
-                        self.gain += d.clamp(-self.slew, self.slew);
+                        self.gain += d.clamp(-slew, slew);
                         out[k] = src[k] * self.gain;
                         k += 1;
                     }
@@ -310,6 +361,66 @@ mod tests {
         n.process(&src, &mut out, None, &[(0, 0, 0), (0, 1, 10)]);
         assert_eq!(out[9], 9.0);
         assert!(out[10..].iter().all(|&x| x == 9.0));
+    }
+
+    #[test]
+    fn morph_blends_two_patterns_of_different_lengths() {
+        let base = [
+            ("length", 2.0),
+            ("s2", 0.0),
+            ("b.length", 3.0),
+            ("b.s1", 0.5),
+        ];
+        let at = |m: f32| {
+            let mut kv = base.to_vec();
+            kv.push(("morph", m));
+            Settings::from_params(&params(&kv))
+        };
+        let (a, half, b) = (at(0.0), at(0.5), at(1.0));
+        // Morph 0 is pattern A alone, morph 1 is pattern B alone.
+        let a_only = Settings::from_params(&params(&base[..2]));
+        assert!((0..60).all(|t| a.level_at(1, t) == a_only.level_at(1, t)));
+        assert_eq!(b.level_at(1, 0), 0.5);
+        assert_eq!(b.level_at(1, 1), 1.0);
+        // Halfway the levels are the mean of the two steps.
+        assert_eq!(half.level_at(1, 1), 0.5);
+        assert_eq!(half.level_at(1, 3), 0.25); // A step 2 is 0, B step 1 is 0.5
+        assert!(is_functional(&params(&[("morph", 0.1)])));
+    }
+
+    #[test]
+    fn morph_blends_chances_so_the_middle_is_in_between() {
+        let at =
+            |m: f32| Settings::from_params(&params(&[("r1", 0.0), ("b.r1", 100.0), ("morph", m)]));
+        let open = |s: &Settings| (0..4000).filter(|&t| s.level_at(5, t) > 0.0).count();
+        assert_eq!(open(&at(0.0)), 0);
+        assert_eq!(open(&at(1.0)), 4000);
+        let mid = open(&at(0.5));
+        assert!(
+            (1800..2200).contains(&mid),
+            "{mid} of 4000 open at half morph"
+        );
+        let (q, r) = (open(&at(0.25)), open(&at(0.75)));
+        assert!(q < mid && mid < r);
+    }
+
+    #[test]
+    fn glide_ramps_a_cv_level_instead_of_stepping() {
+        let mut n = node(
+            &[("length", 2.0), ("s2", 0.0), ("glide_ms", 1.0)],
+            Carry::Scale,
+        );
+        let (src, mut out) = ([1.0; 64], [0.0; 64]);
+        n.process(&src, &mut out, None, &[(0, 0, 0), (0, 1, 8)]);
+        assert_eq!(out[7], 1.0);
+        assert!(
+            out[8] > 0.9 && out[8] < 1.0,
+            "ramp starts at the pulse sample"
+        );
+        assert_eq!(out[63], 0.0);
+        let mut hard = node(&[("length", 2.0), ("s2", 0.0)], Carry::Scale);
+        hard.process(&src, &mut out, None, &[(0, 0, 0), (0, 1, 8)]);
+        assert_eq!(out[8], 0.0);
     }
 
     #[test]
