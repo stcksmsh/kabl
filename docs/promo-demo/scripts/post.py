@@ -6,9 +6,9 @@ final mp4.
     post.py TIMELINE RENDER.wav RECORDING.mp4 DRIVE.log FFMPEG_START_EPOCH OUT.mp4 WORKDIR
 
 Bar 0 is the moment of the clock-Restart click (the line `click <restart target>` in the drive
-log, plus the click's own glide). The check: the whole-band cable snaps shut at the break and
-open at the return, so the recorded audio's loudness steps there; where the steps are measured
-against where the timeline says they are is printed, not corrected.
+log, plus a constant, `restart_latency_s`). That estimate is then corrected by the lag at which
+the recorded audio's loudness envelope best matches the offline render's (searched within
++-1.5 s); the correlation is printed, and below 0.5 the script stops instead of guessing.
 """
 import json
 import subprocess
@@ -19,6 +19,7 @@ import numpy as np
 
 timeline_path, render_path, rec_path, log_path, ff_start, out_path, work = sys.argv[1:8]
 tl = json.load(open(timeline_path))
+# targets.json sits next to scripts/ (two path components up from this file).
 targets = json.load(open(sys.argv[0].rsplit("/", 2)[0] + "/targets.json"))
 bar = tl["bar_seconds"]
 
@@ -55,7 +56,9 @@ for lag in lags:
     corr.append(np.corrcoef(seg, ref[: len(seg)])[0, 1] if len(seg) > 0.95 * n and i >= 0 else -1)
 best = lags[int(np.argmax(corr))] * 0.1
 print(f"envelope correlation {max(corr):.3f} at {best:+.1f} s from the drive-log estimate "
-      f"(at the estimate: {corr[15]:.3f})")
+      f"(at the estimate: {corr[list(lags).index(0)]:.3f})")
+if max(corr) < 0.5:
+    sys.exit("the recorded audio does not match the render (recording too short or silent?)")
 t0 += best
 # The video starts half a second before bar 0 (the app start-up before it is cut).
 trim = max(t0 - 0.5, 0.0)

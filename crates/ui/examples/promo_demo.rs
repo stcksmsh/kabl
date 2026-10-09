@@ -4,7 +4,7 @@
 //!
 //! ```sh
 //! cargo run --release -p kabl-ui --example promo_demo -- write docs/promo-demo/patch/morph-suite docs/promo-demo/timeline.json
-//! cargo run --release -p kabl-ui --example promo_demo -- render out.wav
+//! cargo run --release -p kabl-ui --example promo_demo -- render out.wav   # renders twice: asserts determinism
 //! ```
 
 use std::collections::HashMap;
@@ -584,7 +584,6 @@ fn main() {
             for name in CABLES.iter().filter(|n| **n != "bus") {
                 show(&format!("{name} B"), run(&[name]));
             }
-            show("bass B", run(&["bass"]));
             show("bass+filter B", run(&["bass", "filter"]));
             show("all B", run(&CABLES));
         }

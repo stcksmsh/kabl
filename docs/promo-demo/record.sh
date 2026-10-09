@@ -15,7 +15,7 @@ mkdir -p "$OUT"
 
 cargo build --release -p kabl-ui --bin kabl-ui --example promo_demo
 DEMO=target/release/examples/promo_demo
-$DEMO write $PATCH docs/promo-demo/timeline.json
+$DEMO write "$PATCH" docs/promo-demo/timeline.json
 $DEMO render "$OUT/render.wav" > "$OUT/render-levels.txt"
 head -1 "$OUT/render-levels.txt"
 ffmpeg -loglevel error -y -i "$OUT/render.wav" -b:a 160k docs/promo-demo/morph-suite-audio.mp3
@@ -34,10 +34,11 @@ ffmpeg -loglevel error -y -thread_queue_size 1024 -f x11grab -draw_mouse 1 -fram
   -video_size $SIZE -i "$DISPLAY+0,0" -thread_queue_size 1024 -f pulse -i kabl_rec.monitor \
   -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p -c:a aac -b:a 160k "$OUT/recording.mp4" &
 REC=$!
+trap 'kill $XVFB $REC 2>/dev/null || true' EXIT
 KABL_USER_DIR="$OUT/user" PIPEWIRE_NODE=kabl_rec KABL_DRIVE_LOG="$OUT/drive.log" \
   KABL_APP_LOG="$OUT/app.log" KABL_STATS_FILE="$OUT/stats.txt" \
   KABL_ARGS="--rate 48000 --frames 256" \
-  python3 docs/rack-migration/drive.py "$OUT/drive.txt" $SIZE "$OUT/shots" $PATCH
+  python3 docs/rack-migration/drive.py "$OUT/drive.txt" $SIZE "$OUT/shots" "$PATCH"
 kill -INT $REC
 wait $REC || true
 

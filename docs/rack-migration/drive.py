@@ -203,7 +203,8 @@ try:
             # Press where the pointer is, move DX points right (negative = left) in a straight
             # line over SECONDS of wall-clock time, release. Pair with `aim` and `wait`.
             dx, secs = round(float(a[0]) * scale), float(a[1])
-            loc = subprocess.run(["xdotool", "getmouselocation", "--shell"], capture_output=True, text=True).stdout
+            loc = subprocess.run(["xdotool", "getmouselocation", "--shell"], capture_output=True, text=True,
+                                 check=True).stdout
             cur = dict(l.split("=") for l in loc.split())
             ax, ay = int(cur["X"]), int(cur["Y"])
             x("mousedown", 1)
