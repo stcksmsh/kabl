@@ -256,7 +256,7 @@ fn morph_arc() -> PatchEditor {
     e.set_param(bass, "waveform", 2.0);
     e.set_param(bass, "base_hz", 130.81);
     e.set_param(bass_filter, "cutoff_hz", 380.0);
-    e.set_param(bass_filter, "resonance", 0.3);
+    e.set_param(bass_filter, "resonance", 0.5);
     e.set_param(bass_env, "attack_ms", 4.0);
     e.set_param(bass_env, "decay_ms", 300.0);
     e.set_param(bass_env, "sustain", 0.5);
@@ -278,11 +278,11 @@ fn morph_arc() -> PatchEditor {
         e.set_param(pad_mix, &format!("level{}", k + 1), v);
     }
     e.set_param(bus, "level1", 0.35);
-    e.set_param(bus, "level2", 0.5);
+    e.set_param(bus, "level2", 0.7);
     e.set_param(bus, "level3", 0.5);
     e.set_param(bus, "level4", 0.5);
-    e.set_param(master, "level1", 0.5);
-    e.set_param(master, "level2", 0.3);
+    e.set_param(master, "level1", 0.36);
+    e.set_param(master, "level2", 0.58);
     e.set_param(verb, "decay_s", 5.0);
     e.set_param(verb, "mix", 30.0);
 
@@ -346,7 +346,7 @@ fn morph_arc() -> PatchEditor {
     // Bass filter: A is four even steps against the four-note bass, B is five uneven steps
     // against it. The glide makes the cutoff move instead of jump.
     let sweep = e.connect_route(jack(knob, "m1"), bass_filter, "cutoff_hz");
-    e.set_route_amount(sweep, 0.55, true);
+    e.set_route_amount(sweep, 0.8, true);
     let mut p: Vec<(String, f32)> = vec![
         ("length".into(), 4.0),
         ("b.length".into(), 5.0),
@@ -354,9 +354,9 @@ fn morph_arc() -> PatchEditor {
         ("morph".into(), 0.3),
     ];
     for k in 1..=4 {
-        p.push((format!("s{k}"), 0.3));
+        p.push((format!("s{k}"), 0.15));
     }
-    for (k, v) in [1.0, 0.2, 0.7, 0.35, 0.9].into_iter().enumerate() {
+    for (k, v) in [1.0, 0.05, 0.8, 0.3, 1.0].into_iter().enumerate() {
         p.push((format!("b.s{}", k + 1), v));
     }
     p.push(("b.r2".into(), 70.0));
