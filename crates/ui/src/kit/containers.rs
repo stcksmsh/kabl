@@ -167,6 +167,24 @@ pub fn menu_button<R>(ui: &mut Ui, st: &Style, text: &str, content: impl FnOnce(
     resp
 }
 
+/// A menu row that opens a nested menu.
+pub fn submenu<R>(ui: &mut Ui, st: &Style, text: &str, content: impl FnOnce(&mut Ui) -> R) -> Response {
+    let resp = menu_item(ui, st, text, false);
+    icon(ui.painter(), Ic::Right, pos2(resp.rect.right() - st.sp(3), resp.rect.center().y), st.metrics.icon, st.roles.text2);
+    Popup::menu(&resp).frame(popover_frame(st)).close_behavior(PopupCloseBehavior::CloseOnClickOutside).width(240.0).show(|ui| {
+        ui.spacing_mut().item_spacing.y = 1.0;
+        content(ui)
+    });
+    resp
+}
+
+/// Hairline between menu groups.
+pub fn menu_rule(ui: &mut Ui, st: &Style) {
+    super::gap(ui, st, 1);
+    super::rule(ui, st);
+    super::gap(ui, st, 1);
+}
+
 /// Right-click menu on `resp`.
 pub fn context_menu<R>(resp: &Response, st: &Style, content: impl FnOnce(&mut Ui) -> R) {
     Popup::context_menu(resp).frame(popover_frame(st)).close_behavior(PopupCloseBehavior::CloseOnClick).width(220.0).show(|ui| {

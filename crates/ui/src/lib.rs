@@ -1621,7 +1621,10 @@ fn draw_module(
 
     if ui.layer_id().order != egui::Order::Foreground {
         let body = rack_editor::body(ui_state, ui, rack_editor::Item::Module(m.id), m.face, xf);
-        body.context_menu(|ui| module_menu(editor, ui_state, ui, m));
+        {
+            let st = ui_state.style.clone();
+            kit::context_menu(&body, &st, |ui| module_menu(editor, ui_state, ui, m));
+        }
     }
     let skin = m.skin;
     let on_art = skin.is_some_and(|s| ui_state.skin_labels_on_art.unwrap_or(s.labels_on_art));
@@ -1974,9 +1977,13 @@ fn draw_module(
 }
 
 fn module_menu(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, m: &Placed) {
-    ui.label(egui::RichText::new(format!("{} #{}", m.info.name, m.id)).strong());
+    let st = ui_state.style.clone();
+    let st = &*st;
+    kit::label(ui, st, style::Role::H3, kit::Tone::Text, format!("{} #{}", m.info.name, m.id));
+    kit::menu_rule(ui, st);
     fn item(ui: &mut egui::Ui, ui_state: &mut UiState, key: &str, label: &str) -> bool {
-        let r = ui.button(label);
+        let st = ui_state.style.clone();
+        let r = kit::menu_item(ui, &st, label, false);
         ui_state.record(format!("menu:{key}"), r.rect);
         r.clicked()
     }
@@ -2053,9 +2060,9 @@ fn module_menu(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
             ui.close();
         }
     }
-    ui.separator();
+    kit::menu_rule(ui, st);
     perform::module_menu(editor, ui_state, ui, m.id, m.info);
-    ui.separator();
+    kit::menu_rule(ui, st);
     if item(ui, ui_state, "remove", "Remove module") {
         editor.remove_module(m.id);
         ui.close();
@@ -2271,7 +2278,10 @@ fn draw_banks(
         if resp.clicked() {
             ui_state.edit_bank.insert(id, b);
         }
-        resp.context_menu(|ui| bank_menu(editor, ui_state, ui, id, b));
+        {
+            let st = ui_state.style.clone();
+            kit::context_menu(&resp, &st, |ui| bank_menu(editor, ui_state, ui, id, b));
+        }
 
         // PLAY button.
         let pbtn = xf.r(Rect::from_min_size(
@@ -2729,10 +2739,13 @@ fn bank_menu(
     id: ModuleId,
     b: usize,
 ) {
-    ui.label(egui::RichText::new(format!("Bank {}", banks::title(editor.state(), id, b))).strong());
-    ui.menu_button("Copy to", |ui| {
+    let st = ui_state.style.clone();
+    let st = &*st;
+    kit::label(ui, st, style::Role::H3, kit::Tone::Text, format!("Bank {}", banks::title(editor.state(), id, b)));
+    kit::menu_rule(ui, st);
+    kit::submenu(ui, st, "Copy to", |ui| {
         for to in (0..seq::BANKS).filter(|&to| to != b) {
-            let r = ui.button(format!("Bank {}", banks::title(editor.state(), id, to)));
+            let r = kit::menu_item(ui, st, &format!("Bank {}", banks::title(editor.state(), id, to)), false);
             ui_state.record(format!("menu:bank-copy.{to}"), r.rect);
             if r.clicked() {
                 banks::copy(editor, id, b, to);
@@ -2746,23 +2759,23 @@ fn bank_menu(
             }
         }
     });
-    let r = ui.button("Clear");
+    let r = kit::menu_item(ui, st, "Clear", false);
     ui_state.record("menu:bank-clear".into(), r.rect);
     if r.clicked() {
         banks::clear(editor, id, b);
         ui.close();
     }
     let startup = banks::startup(editor.state(), id) == b;
-    let r = ui.add_enabled(!startup, egui::Button::new("Set as startup bank"));
+    let r = kit::menu_item_tone(ui, st, "Set as startup bank", false, kit::Tone::Text, !startup);
     ui_state.record("menu:bank-startup".into(), r.rect);
-    if r.on_hover_text("The bank a Load starts on; does not change what is playing")
+    if r.tip(st, "The bank a Load starts on; does not change what is playing")
         .clicked()
     {
         editor.set_param(id, "bank", b as f32);
         ui.close();
     }
-    ui.separator();
-    ui.label("Name");
+    kit::menu_rule(ui, st);
+    kit::label(ui, st, style::Role::Label, kit::Tone::Text2, "Name");
     let stored = editor
         .state()
         .label(id, &banks::name_key(b))
@@ -2772,9 +2785,9 @@ fn bank_menu(
         Some((i, k, t)) if (i, k) == (id, b) => t,
         _ => stored,
     };
-    let r = ui.add(egui::TextEdit::singleline(&mut t).desired_width(120.0));
+    let r = kit::field(ui, st, &mut t, "", None, Some(160.0));
     ui_state.record("menu:bank-name".into(), r.rect);
-    let commit = r.lost_focus() || ui.button("Rename").clicked();
+    let commit = r.lost_focus() || ui.add(kit::Button::new(st, "Rename")).clicked();
     if commit {
         banks::rename(editor, id, b, &t);
     } else {
@@ -3487,8 +3500,9 @@ fn draw_cables(
                 painter.circle_stroke(mid, 7.0, Stroke::new(1.5, th.sel));
             }
             let resp = resp.on_hover_text("Drag its plug out of the input to move or remove it");
-            resp.context_menu(|ui| {
-                let r = ui.button("Remove cable");
+            let st = ui_state.style.clone();
+            kit::context_menu(&resp, &st, |ui| {
+                let r = kit::menu_item(ui, &st, "Remove cable", false);
                 ui_state.record("menu:remove-cable".into(), r.rect);
                 if r.clicked() {
                     editor.disconnect(*cable_id);
@@ -3724,8 +3738,9 @@ fn draw_default_face(
                                     editor.connect(from, e.target.clone());
                                 }
                             }
-                            r.context_menu(|ui| {
-                                if ui.button("Inspect bound module").clicked() {
+                            let st = view.style.clone();
+                            kit::context_menu(&r, &st, |ui| {
+                                if kit::menu_item(ui, &st, "Inspect bound module", false).clicked() {
                                     let leaf = e.target.module_id();
                                     let owner = editor
                                         .state()

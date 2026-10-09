@@ -1231,7 +1231,9 @@ pub fn module_menu(
 ) {
     let edit = ui_state.edit_bank_of(editor.state(), id);
     let shown = |p: &&ParamInfo| crate::rack::visible(info, p.name, edit);
-    let r = ui.menu_button("Pin to Perform", |ui| {
+    let st = ui_state.style.clone();
+    let st = &*st;
+    let r = crate::kit::submenu(ui, st, "Pin to Perform", |ui| {
         let special = match info.kind {
             "clock" => Some((TRANSPORT, "Transport (Run/Stop, Restart)")),
             "seq" => Some((BANKS, "Bank launch buttons")),
@@ -1240,7 +1242,7 @@ pub fn module_menu(
         };
         if let Some((key, text)) = special {
             let mut on = is_pinned(editor.state(), id, key);
-            let r = ui.checkbox(&mut on, text);
+            let r = crate::kit::toggle(ui, st, &mut on, text);
             ui_state.record(format!("menu:pin:{key}"), r.rect);
             if r.clicked() {
                 toggle_pin(editor, id, key);
@@ -1250,7 +1252,7 @@ pub fn module_menu(
         }
         for p in info.params.iter().filter(shown) {
             let mut on = is_pinned(editor.state(), id, p.name);
-            let r = ui.checkbox(&mut on, routing::param_label(p));
+            let r = crate::kit::toggle(ui, st, &mut on, &routing::param_label(p));
             ui_state.record(format!("menu:pin:{}", p.name), r.rect);
             if r.clicked() {
                 toggle_pin(editor, id, p.name);
@@ -1259,17 +1261,17 @@ pub fn module_menu(
             }
         }
     });
-    ui_state.record("menu:pin".into(), r.response.rect);
+    ui_state.record("menu:pin".into(), r.rect);
     let actions = button_actions(editor.state(), id);
     if !actions.is_empty() {
-        let r = ui.menu_button("MIDI button", |ui| {
+        let r = crate::kit::submenu(ui, st, "MIDI button", |ui| {
             for (action, label) in actions {
                 let map = button_mapping(editor.state(), id, &action);
                 let text = match map {
                     Some(m) => format!("{label}  ({})", cc_text(m)),
                     None => label,
                 };
-                let r = ui.button(text);
+                let r = crate::kit::menu_item(ui, st, &text, false);
                 ui_state.record(format!("menu:button:{action}"), r.rect);
                 if r.clicked() {
                     ui_state.learn = Some((id, format!("{BTN_PREFIX}{action}")));
@@ -1277,7 +1279,7 @@ pub fn module_menu(
                     ui.close();
                 }
                 if map.is_some() {
-                    let r = ui.small_button("  ✕ clear");
+                    let r = crate::kit::menu_item_tone(ui, st, "Clear mapping", false, crate::kit::Tone::Text2, true);
                     ui_state.record(format!("menu:button-clear:{action}"), r.rect);
                     if r.clicked() {
                         editor.set_presentation(&[(id, format!("{BTN_PREFIX}{action}"), None)]);
@@ -1286,16 +1288,16 @@ pub fn module_menu(
                 }
             }
         });
-        ui_state.record("menu:button".into(), r.response.rect);
+        ui_state.record("menu:button".into(), r.rect);
     }
     if info.params.iter().any(learnable) {
-        let r = ui.menu_button("MIDI learn", |ui| {
+        let r = crate::kit::submenu(ui, st, "MIDI learn", |ui| {
             for p in info.params.iter().filter(shown).filter(|p| learnable(p)) {
                 let text = match mapping(editor.state(), id, p.name) {
                     Some(m) => format!("{}  ({})", routing::target_label(p), cc_text(m)),
                     None => routing::target_label(p),
                 };
-                let r = ui.button(text);
+                let r = crate::kit::menu_item(ui, st, &text, false);
                 ui_state.record(format!("menu:learn:{}", p.name), r.rect);
                 if r.clicked() {
                     ui_state.learn = Some((id, p.name.to_string()));
@@ -1305,7 +1307,7 @@ pub fn module_menu(
                 }
             }
         });
-        ui_state.record("menu:learn".into(), r.response.rect);
+        ui_state.record("menu:learn".into(), r.rect);
     }
 }
 
