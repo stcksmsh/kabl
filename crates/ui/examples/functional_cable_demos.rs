@@ -255,12 +255,12 @@ fn morph_arc() -> PatchEditor {
     e.set_param(bass_seq, "g2", 0.0);
     e.set_param(bass, "waveform", 2.0);
     e.set_param(bass, "base_hz", 130.81);
-    e.set_param(bass_filter, "cutoff_hz", 380.0);
-    e.set_param(bass_filter, "resonance", 0.5);
+    e.set_param(bass_filter, "cutoff_hz", 220.0);
+    e.set_param(bass_filter, "resonance", 0.6);
     e.set_param(bass_env, "attack_ms", 4.0);
     e.set_param(bass_env, "decay_ms", 300.0);
     e.set_param(bass_env, "sustain", 0.5);
-    e.set_param(bass_env, "release_ms", 120.0);
+    e.set_param(bass_env, "release_ms", 260.0);
     e.set_param(bass_vca, "gain", 0.0);
     e.set_param(knob, "m1", 1.0);
     // Pad: A2, E3, C4 with detuned unison, under a slowly moving filter.
@@ -346,15 +346,15 @@ fn morph_arc() -> PatchEditor {
     // Bass filter: A is four even steps against the four-note bass, B is five uneven steps
     // against it. The glide makes the cutoff move instead of jump.
     let sweep = e.connect_route(jack(knob, "m1"), bass_filter, "cutoff_hz");
-    e.set_route_amount(sweep, 0.8, true);
+    e.set_route_amount(sweep, 1.0, true);
     let mut p: Vec<(String, f32)> = vec![
         ("length".into(), 4.0),
         ("b.length".into(), 5.0),
-        ("glide_ms".into(), 90.0),
+        ("glide_ms".into(), 30.0),
         ("morph".into(), 0.3),
     ];
     for k in 1..=4 {
-        p.push((format!("s{k}"), 0.15));
+        p.push((format!("s{k}"), 0.08));
     }
     for (k, v) in [1.0, 0.05, 0.8, 0.3, 1.0].into_iter().enumerate() {
         p.push((format!("b.s{}", k + 1), v));
