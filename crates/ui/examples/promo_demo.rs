@@ -189,6 +189,8 @@ fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
     let delay = e.add_module("delay", at(1220.0, 20.0));
     let bass_seq = e.add_module("seq", at(220.0, 560.0));
     let bass = e.add_module("osc.va", at(420.0, 300.0));
+    let bass2 = e.add_module("osc.va", at(420.0, 430.0));
+    let bass_mix = e.add_module("mixer", at(520.0, 430.0));
     let bass_filter = e.add_module("filter.ladder", at(620.0, 300.0));
     let bass_env = e.add_module("env.adsr", at(820.0, 300.0));
     let bass_vca = e.add_module("vca", at(1020.0, 300.0));
@@ -249,21 +251,25 @@ fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
     }
     e.set_param(bass, "waveform", 2.0);
     e.set_param(bass, "base_hz", 220.0);
+    e.set_param(bass2, "waveform", 2.0);
+    e.set_param(bass2, "base_hz", 440.0);
+    e.set_param(bass_mix, "level1", 1.0);
+    e.set_param(bass_mix, "level2", 0.8);
     e.set_param(bass_filter, "cutoff_hz", 220.0);
     e.set_param(bass_filter, "resonance", 0.45);
     e.set_param(bass_env, "attack_ms", 4.0);
-    e.set_param(bass_env, "decay_ms", 260.0);
-    e.set_param(bass_env, "sustain", 0.4);
+    e.set_param(bass_env, "decay_ms", 400.0);
+    e.set_param(bass_env, "sustain", 0.7);
     e.set_param(bass_env, "release_ms", 160.0);
     e.set_param(bass_vca, "gain", 0.0);
     e.set_param(drive, "drive_db", 18.0);
     e.set_param(drive, "mix", 100.0);
-    e.set_param(drive, "trim_db", -7.0);
+    e.set_param(drive, "trim_db", -2.0);
     e.set_param(knob, "m1", 1.0);
     e.set_param(noise, "color", 0.0);
-    e.set_param(hat_filter, "cutoff_hz", 3500.0);
-    e.set_param(hat_filter, "resonance", 0.2);
-    e.set_param(hat_gain, "gain_db", 8.0);
+    e.set_param(hat_filter, "cutoff_hz", 2000.0);
+    e.set_param(hat_filter, "resonance", 0.85);
+    e.set_param(hat_gain, "gain_db", 16.0);
     // Pad: open fifths over the chord root, detuned unison, under a slowly moving filter.
     for (osc, hz) in [(pad_a, 329.63), (pad_b, 440.0), (pad_c, 659.25)] {
         e.set_param(osc, "waveform", 2.0);
@@ -280,7 +286,7 @@ fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
     }
     e.set_param(rhythm, "level1", 1.0);
     e.set_param(rhythm, "level2", 0.7);
-    e.set_param(bus, "level1", 0.24);
+    e.set_param(bus, "level1", 0.16);
     e.set_param(bus, "level2", 0.7);
     e.set_param(bus, "level3", 0.11);
     e.set_param(bus, "level4", 0.11);
@@ -332,7 +338,10 @@ fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
     // Bass.
     e.connect(jack(chords, "pitch"), jack(bass, "pitch"));
     e.connect(jack(bass_seq, "gate"), jack(bass_env, "gate"));
-    e.connect(jack(bass, "out"), jack(bass_filter, "in"));
+    e.connect(jack(chords, "pitch"), jack(bass2, "pitch"));
+    e.connect(jack(bass, "out"), jack(bass_mix, "in1"));
+    e.connect(jack(bass2, "out"), jack(bass_mix, "in2"));
+    e.connect(jack(bass_mix, "out"), jack(bass_filter, "in"));
     e.connect(jack(bass_filter, "out"), jack(bass_vca, "in"));
     e.connect(jack(bass_env, "out"), jack(bass_vca, "cv"));
     e.connect(jack(bass_vca, "out"), jack(drive, "in"));
@@ -356,7 +365,7 @@ fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
     ids.insert("filter", c);
     // Hats: filtered noise gated by a cable. A: nothing. B: sixteen steps, some by chance.
     e.connect(jack(noise, "out"), jack(hat_filter, "in"));
-    e.connect(jack(hat_filter, "hp"), jack(hat_gain, "in"));
+    e.connect(jack(hat_filter, "bp"), jack(hat_gain, "in"));
     let c = e.connect(jack(hat_gain, "out"), jack(rhythm, "in2"));
     let b = [
         1.0, 0.0, 0.6, 0.0, 1.0, 0.0, 0.6, 0.35, 1.0, 0.0, 0.6, 0.0, 1.0, 0.6, 0.6, 0.35,

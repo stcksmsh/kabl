@@ -5,11 +5,11 @@
   "cables": {
     "echo": {"id": 18, "kind": "jack"},
     "arp": {"id": 17, "kind": "jack"},
-    "bass": {"id": 27, "kind": "jack"},
-    "filter": {"id": 28, "kind": "route"},
-    "hats": {"id": 31, "kind": "jack"},
-    "pad": {"id": 41, "kind": "jack"},
-    "bus": {"id": 42, "kind": "jack"}
+    "bass": {"id": 30, "kind": "jack"},
+    "filter": {"id": 31, "kind": "route"},
+    "hats": {"id": 34, "kind": "jack"},
+    "pad": {"id": 44, "kind": "jack"},
+    "bus": {"id": 45, "kind": "jack"}
   },
   "gestures": [
     {"cable": "echo", "from": 0, "to": 1, "start_bar": 4, "end_bar": 7, "what": "echoes: one throw per cycle to every step"},
