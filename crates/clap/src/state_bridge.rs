@@ -1,7 +1,7 @@
 //! CLAP entry: production transactional state and MIDI-only dialect. The pinned wrapper
 //! owns GUI/lifecycle/parameter events; its non-atomic state loader is never used.
 use super::{Instrument, Shared};
-use crate::sound_state::{MAX_STATE_BYTES, SoundState};
+use crate::sound_state::{SoundState, MAX_STATE_BYTES};
 use std::cell::{RefCell, UnsafeCell};
 use std::sync::Weak;
 type Capture = (
@@ -22,19 +22,19 @@ use clap_sys::{
     events::*,
     ext::{
         note_ports::{
-            CLAP_EXT_NOTE_PORTS, CLAP_NOTE_DIALECT_MIDI, clap_note_port_info,
-            clap_plugin_note_ports,
+            clap_note_port_info, clap_plugin_note_ports, CLAP_EXT_NOTE_PORTS,
+            CLAP_NOTE_DIALECT_MIDI,
         },
         params::{
-            CLAP_EXT_PARAMS, CLAP_PARAM_RESCAN_VALUES, clap_host_params, clap_param_info,
-            clap_plugin_params,
+            clap_host_params, clap_param_info, clap_plugin_params, CLAP_EXT_PARAMS,
+            CLAP_PARAM_RESCAN_VALUES,
         },
-        state::{CLAP_EXT_STATE, clap_host_state, clap_plugin_state},
+        state::{clap_host_state, clap_plugin_state, CLAP_EXT_STATE},
     },
-    factory::plugin_factory::{CLAP_PLUGIN_FACTORY_ID, clap_plugin_factory},
+    factory::plugin_factory::{clap_plugin_factory, CLAP_PLUGIN_FACTORY_ID},
     host::clap_host,
     plugin::{clap_plugin, clap_plugin_descriptor},
-    process::{CLAP_PROCESS_ERROR, clap_process, clap_process_status},
+    process::{clap_process, clap_process_status, CLAP_PROCESS_ERROR},
     stream::{clap_istream, clap_ostream},
     version::CLAP_VERSION,
 };
@@ -43,7 +43,7 @@ use nice_plug::wrapper::{
     setup_logger,
 };
 use std::{
-    ffi::{CStr, c_char, c_void},
+    ffi::{c_char, c_void, CStr},
     ptr,
     sync::{Arc, OnceLock},
 };
@@ -1191,11 +1191,10 @@ mod tests {
             assert_no_alloc(|| {
                 p.process.unwrap()(plugin, &process);
             });
-            assert!(
-                left.iter()
-                    .zip(baseline)
-                    .all(|(&v, reference)| (v - reference).abs() < 1e-6)
-            );
+            assert!(left
+                .iter()
+                .zip(baseline)
+                .all(|(&v, reference)| (v - reference).abs() < 1e-6));
             process.in_events = &input;
             flushed_mod.amount = 0.0;
             std::hint::black_box(&flushed_mod);
@@ -1297,7 +1296,7 @@ mod tests {
     #[test]
     fn main_track_notification_can_pause_while_audio_owns_plugin() {
         use clap_sys::ext::track_info::*;
-        use std::sync::{Barrier, atomic::AtomicBool};
+        use std::sync::{atomic::AtomicBool, Barrier};
         struct TrackHost {
             pause: AtomicBool,
             barrier: Barrier,

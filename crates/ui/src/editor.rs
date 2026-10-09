@@ -48,6 +48,16 @@ impl PatchEditor {
     /// about.
     pub fn seed_from(patch: &PatchState) -> Self {
         let mut editor = Self::new();
+        for (&slot, t) in &patch.tables {
+            editor.log.append(
+                Op::SetTable {
+                    slot,
+                    value: Some(t.clone()),
+                },
+                0,
+                Source::User,
+            );
+        }
         for (&id, m) in &patch.modules {
             editor.log.append(
                 Op::AddModule {
@@ -233,6 +243,11 @@ impl PatchEditor {
     fn append(&mut self, op: Op) {
         self.dirty |= affects_audio(&op);
         self.log.append(op, now_ms(), Source::User);
+    }
+
+    /// Embeds `table` in wavetable slot `slot` (1-8), or empties the slot. One undo step.
+    pub fn set_table(&mut self, slot: u64, table: Option<kabl_core::Table>) {
+        self.append(Op::SetTable { slot, value: table });
     }
 
     /// Adds a module of `kind` at `pos`. `kind` isn't validated against the registry here — an

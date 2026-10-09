@@ -39,6 +39,45 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
             "Spread of the unison oscillators, lowest to highest, in cents. Needs Unison 2 or \
              more."
         }
+        ("osc.fm", "base_hz") => {
+            "Tuning: the frequency played at pitch 0 (C4 = 261.63 Hz), before Ratio and Fine."
+        }
+        ("osc.fm", "ratio") => {
+            "Frequency multiple of this operator: x1 plays the note itself, x2 an octave up. \
+             Whole ratios sound pitched; Fine moves off them for bells and metal."
+        }
+        ("osc.fm", "fine") => {
+            "Detunes Ratio in cents (up to half an octave either way): x3 minus 231 cents is \
+             a ratio of 2.62, a bell."
+        }
+        ("osc.fm", "level") => {
+            "Output level. On an operator that feeds another, this sets how bright the other \
+             sounds; patch an envelope here to make the brightness fade."
+        }
+        ("osc.fm", "index") => {
+            "How far the signal on the pm jack bends this operator's phase: more is brighter and \
+             more complex. Needs a cable on pm."
+        }
+        ("osc.fm", "feedback") => {
+            "Feeds the operator back into itself: from a pure sine toward a bright saw-like buzz."
+        }
+        ("osc.wt", "base_hz") => {
+            "Tuning: the frequency played at pitch 0 (C4 = 261.63 Hz). With a keyboard or \
+             sequencer on the pitch jack, every note is shifted by the same ratio."
+        }
+        ("osc.wt", "table") => "Which built-in wavetable to play. Ignored while User is on.",
+        ("osc.wt", "position") => {
+            "Where in the table to read: the table is a row of waveforms, and this slides \
+             smoothly from the first to the last. Modulate it to make the sound move."
+        }
+        ("osc.wt", "pos_mod") => {
+            "How far a cable on the pos jack moves Position (1 = whole table)."
+        }
+        ("osc.wt", "fine") => "Fine tuning in cents (100 cents = one semitone).",
+        ("osc.wt", "user") => {
+            "OFF plays the built-in Table. 1–8 plays the wavetable saved in that slot of this \
+             sound; it travels with the sound."
+        }
         ("filter.svf", "cutoff_hz") | ("filter.ladder", "cutoff_hz") => {
             "Cutoff: where the filter starts removing frequencies. Lower is darker and softer, \
              higher is brighter."
@@ -169,6 +208,12 @@ pub fn port_help(kind: &str, port: &str) -> Option<&'static str> {
         ("vca", "in") => "The signal to be made louder or quieter.",
         ("osc.va", "pitch") => "Pitch in semitones from the Frequency setting.",
         ("osc.va", "sync") => "Restarts the wave on each rising edge (hard sync).",
+        ("osc.fm" | "osc.wt", "pitch") => "Pitch in semitones from the Frequency setting.",
+        ("osc.fm", "pm") => {
+            "Phase modulation: the signal here bends this operator's phase by Index. Patch \
+             another operator's out here."
+        }
+        ("osc.wt", "pos") => "Moves Position at audio rate: an LFO or envelope sweeps the table.",
         ("filter.svf" | "filter.ladder", "cutoff_cv") => {
             "Moves the cutoff exponentially: +1 is one octave up."
         }

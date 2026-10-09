@@ -10,19 +10,19 @@ use kabl_engine::{
     keyboard::{MidiEvent, Source},
     patch_engine::PatchEngine,
     runtime::{Feedback, ToAudio},
-    timeline::{LATENCY, Timeline},
+    timeline::{Timeline, LATENCY},
 };
-use kabl_ui::{PatchEditor, UiState, control::Delivery};
+use kabl_ui::{control::Delivery, PatchEditor, UiState};
 use nice_plug::{context::gui::GuiContext, editor::dpi::LogicalSize, prelude::*};
 use nice_plug_egui::{
-    EguiEditor, EguiNiceSettings, EguiState, NiceEguiApp, RepaintNotifier, create_egui_editor,
+    create_egui_editor, EguiEditor, EguiNiceSettings, EguiState, NiceEguiApp, RepaintNotifier,
 };
 use sound_state::SoundState;
 use std::{
     num::NonZeroU32,
     sync::{
-        Arc, Mutex,
         atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
+        Arc, Mutex,
     },
     thread::JoinHandle,
 };
@@ -1312,7 +1312,7 @@ impl ClapPlugin for Instrument {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_no_alloc::{AllocDisabler, assert_no_alloc};
+    use assert_no_alloc::{assert_no_alloc, AllocDisabler};
     #[global_allocator]
     static ALLOC: AllocDisabler = AllocDisabler;
 
@@ -1431,15 +1431,14 @@ mod tests {
         }
         let state = p.shared.snapshot();
         p.shared.load(state).unwrap();
-        assert!(
-            p.shared
-                .control
-                .lock()
-                .unwrap()
-                .view
-                .clock_running
-                .is_empty()
-        );
+        assert!(p
+            .shared
+            .control
+            .lock()
+            .unwrap()
+            .view
+            .clock_running
+            .is_empty());
     }
     #[test]
     fn tail_covers_long_effects_and_keeps_ungated_racks_alive() {
