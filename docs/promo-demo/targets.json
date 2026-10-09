@@ -1,0 +1,23 @@
+{
+  "_comment": "The only UI-specific part of the promo drive script. Keys are hit-target names the app reports (KABL_HITS_FILE, UiState::hits); {id} is the cable id from timeline.json. After a UI redesign, update these names (and the timings below) and re-run docs/promo-demo/record.sh.",
+  "fit_view": "zoom:fit",
+  "restart": "restart:1",
+  "open": {
+    "jack": [
+      ["rclick", "cable:{id}"],
+      ["click", "menu:cable-pattern"]
+    ],
+    "route": [
+      ["click", "route:{id}"],
+      ["click", "pattern:{id}"]
+    ]
+  },
+  "morph": "fn-morph:{id}",
+  "morph_points_per_unit": 200,
+  "timing": {
+    "settle_s": 3.0,
+    "restart_at_s": 8.0,
+    "restart_latency_s": 0.1,
+    "open_lead_s": 4.5
+  }
+}

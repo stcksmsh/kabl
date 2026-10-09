@@ -110,6 +110,16 @@ const GESTURES: [Gesture; 12] = [
     g("arp", 1.0, 0.0, 64.0, 65.5, "arp: thins out"),
 ];
 
+/// Section names and their first bars, for the captions.
+const SECTIONS: [(&str, f32); 6] = [
+    ("Intro", 0.0),
+    ("Build", 4.0),
+    ("Peak", 31.0),
+    ("Break", 36.0),
+    ("Return", 44.0),
+    ("Outro", 53.0),
+];
+
 const CABLES: [&str; 7] = ["echo", "arp", "bass", "filter", "bells", "pad", "bus"];
 
 /// A cable's morph (0..1) at `bar`, from the gestures.
@@ -132,8 +142,12 @@ fn jack(id: u64, port: &str) -> PortRef {
     }
 }
 
-fn at(x: f32, y: f32) -> Vec2 {
-    Vec2 { x, y }
+/// Rack position: row `r` (the rack snaps to rows 370 apart), module `k` of the row from the left.
+fn row(r: usize, k: usize) -> Vec2 {
+    Vec2 {
+        x: 30.0 + 200.0 * k as f32,
+        y: 10.0 + 370.0 * r as f32,
+    }
 }
 
 fn cable_params(e: &mut PatchEditor, cable: CableId, params: &[(String, f32)]) {
@@ -184,41 +198,41 @@ fn pattern(
 fn build() -> (PatchEditor, HashMap<&'static str, CableId>) {
     let mut e = PatchEditor::new();
     let mut ids = HashMap::new();
-    let clock = e.add_module("clock", at(20.0, 20.0));
-    let div8 = e.add_module("clock.div", at(20.0, 160.0));
-    let div2 = e.add_module("clock.div", at(20.0, 300.0));
-    let chords = e.add_module("seq", at(220.0, 20.0));
-    let arp_seq = e.add_module("seq", at(220.0, 300.0));
-    let arp = e.add_module("osc.va", at(420.0, 20.0));
-    let arp_filter = e.add_module("filter.svf", at(620.0, 20.0));
-    let arp_env = e.add_module("env.adsr", at(820.0, 20.0));
-    let arp_vca = e.add_module("vca", at(1020.0, 20.0));
-    let delay = e.add_module("delay", at(1220.0, 20.0));
-    let bass_seq = e.add_module("seq", at(220.0, 560.0));
-    let bass = e.add_module("osc.va", at(420.0, 300.0));
-    let bass2 = e.add_module("osc.va", at(420.0, 430.0));
-    let bass_mix = e.add_module("mixer", at(520.0, 430.0));
-    let bass_filter = e.add_module("filter.ladder", at(620.0, 300.0));
-    let bass_env = e.add_module("env.adsr", at(820.0, 300.0));
-    let bass_vca = e.add_module("vca", at(1020.0, 300.0));
-    let drive = e.add_module("drive", at(1220.0, 300.0));
-    let knob = e.add_module("macro", at(620.0, 560.0));
-    let bell = e.add_module("osc.va", at(420.0, 560.0));
-    let bell_env = e.add_module("env.adsr", at(820.0, 560.0));
-    let bell_vca = e.add_module("vca", at(1020.0, 560.0));
-    let bell_gain = e.add_module("gain", at(1120.0, 560.0));
-    let pad_a = e.add_module("osc.va", at(20.0, 820.0));
-    let pad_b = e.add_module("osc.va", at(220.0, 820.0));
-    let pad_c = e.add_module("osc.va", at(420.0, 820.0));
-    let pad_mix = e.add_module("mixer", at(620.0, 820.0));
-    let pad_filter = e.add_module("filter.ladder", at(820.0, 820.0));
-    let slow = e.add_module("lfo", at(1020.0, 820.0));
-    let rhythm = e.add_module("mixer", at(1220.0, 560.0));
-    let bus = e.add_module("mixer", at(1420.0, 160.0));
-    let master = e.add_module("mixer", at(1420.0, 420.0));
-    let chorus = e.add_module("chorus", at(1420.0, 680.0));
-    let verb = e.add_module("reverb", at(1620.0, 160.0));
-    let out = e.add_module("out", at(1620.0, 420.0));
+    let clock = e.add_module("clock", row(0, 0));
+    let div8 = e.add_module("clock.div", row(0, 1));
+    let div2 = e.add_module("clock.div", row(0, 2));
+    let chords = e.add_module("seq", row(0, 3));
+    let arp_seq = e.add_module("seq", row(0, 4));
+    let arp = e.add_module("osc.va", row(0, 5));
+    let arp_filter = e.add_module("filter.svf", row(0, 6));
+    let arp_env = e.add_module("env.adsr", row(0, 7));
+    let arp_vca = e.add_module("vca", row(0, 8));
+    let delay = e.add_module("delay", row(3, 5));
+    let bass_seq = e.add_module("seq", row(1, 0));
+    let bass = e.add_module("osc.va", row(1, 1));
+    let bass2 = e.add_module("osc.va", row(1, 2));
+    let bass_mix = e.add_module("mixer", row(1, 3));
+    let bass_filter = e.add_module("filter.ladder", row(1, 4));
+    let bass_env = e.add_module("env.adsr", row(1, 5));
+    let bass_vca = e.add_module("vca", row(1, 6));
+    let drive = e.add_module("drive", row(1, 7));
+    let knob = e.add_module("macro", row(1, 8));
+    let bell = e.add_module("osc.va", row(2, 0));
+    let bell_env = e.add_module("env.adsr", row(2, 1));
+    let bell_vca = e.add_module("vca", row(2, 2));
+    let bell_gain = e.add_module("gain", row(2, 3));
+    let pad_a = e.add_module("osc.va", row(2, 4));
+    let pad_b = e.add_module("osc.va", row(2, 5));
+    let pad_c = e.add_module("osc.va", row(2, 6));
+    let pad_mix = e.add_module("mixer", row(2, 7));
+    let pad_filter = e.add_module("filter.ladder", row(2, 8));
+    let slow = e.add_module("lfo", row(2, 9));
+    let rhythm = e.add_module("mixer", row(2, 10));
+    let bus = e.add_module("mixer", row(3, 1));
+    let master = e.add_module("mixer", row(3, 0));
+    let chorus = e.add_module("chorus", row(3, 2));
+    let verb = e.add_module("reverb", row(3, 3));
+    let out = e.add_module("out", row(3, 4));
 
     e.set_param(clock, "bpm", BPM);
     e.set_param(div8, "div", 8.0);
@@ -490,16 +504,21 @@ fn timeline_json(ids: &HashMap<&'static str, CableId>) -> String {
             )
         })
         .collect();
+    let sections: Vec<String> = SECTIONS
+        .iter()
+        .map(|(n, b)| format!("    {{\"name\": \"{n}\", \"bar\": {b}}}"))
+        .collect();
     format!(
-        "{{\n  \"bpm\": {BPM},\n  \"bar_seconds\": {BAR_S},\n  \"bars\": {BARS},\n  \"cables\": {{\n{}\n  }},\n  \"gestures\": [\n{}\n  ]\n}}\n",
+        "{{\n  \"bpm\": {BPM},\n  \"bar_seconds\": {BAR_S},\n  \"bars\": {BARS},\n  \"cables\": {{\n{}\n  }},\n  \"gestures\": [\n{}\n  ],\n  \"sections\": [\n{}\n  ]\n}}\n",
         cables.join(",\n"),
-        gestures.join(",\n")
+        gestures.join(",\n"),
+        sections.join(",\n")
     )
 }
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let (mut e, ids) = build();
+    let (e, ids) = build();
     match args.get(1).map(String::as_str) {
         Some("write") => {
             kabl_core::save(Path::new(&args[2]), e.log()).expect("save");

@@ -24,5 +24,13 @@
     {"cable": "bass", "from": 1, "to": 0, "start_bar": 56.5, "end_bar": 58.5, "what": "bass: out"},
     {"cable": "bells", "from": 1, "to": 0, "start_bar": 60.5, "end_bar": 62, "what": "bells: out"},
     {"cable": "arp", "from": 1, "to": 0, "start_bar": 64, "end_bar": 65.5, "what": "arp: thins out"}
+  ],
+  "sections": [
+    {"name": "Intro", "bar": 0},
+    {"name": "Build", "bar": 4},
+    {"name": "Peak", "bar": 31},
+    {"name": "Break", "bar": 36},
+    {"name": "Return", "bar": 44},
+    {"name": "Outro", "bar": 53}
   ]
 }
