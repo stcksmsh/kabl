@@ -156,10 +156,39 @@ tine-keys 115 µs (8.6 %), glass-bells 235 µs (17.7 %, a 7 s reverb and four op
 vowel-drift 113 µs, imported-morph 72 µs; the palette's strings 126 µs and pad 135 µs for
 comparison.
 
+## Verified in the CLAP plugin and a real host (2026-10-09)
+
+Release plugin from PR head (sha256 `5d1e2a24…58e6`), CLAP validator 0.4.1, REAPER 7.75 on a
+private Xvfb display and profile, PipeWire. Scripts: `docs/sound-engines/scripts/host.py` and
+`host.lua` (the method of `docs/factory-performance-bank/scripts/host.py` and
+`docs/host-production/scripts/render.lua`), `validator_diff.py`. Evidence:
+`docs/sound-engines/evidence/` (`validator.json`, `host/result.json`, the saved projects, the
+mapped-plugin paths, REAPER's FX listing).
+
+- **Validator:** 35 success, 9 skipped, no failures. The same 44 tests as the recorded baseline
+  (`docs/reaper-instrument/evidence/validator-final.json`), no status changed.
+- **New project, save, full quit, reopen:** a two-track project, track 1 the imported-morph demo
+  (`osc.wt` on a user table + `osc.fm`), track 2 tine-keys (`osc.fm`). The table was imported from
+  a real .wav with the `wavetable_import` example and the .wav deleted before REAPER started. The
+  plugin loaded on both tracks. After REAPER saved, quit completely and reopened what it had
+  saved, the plugin states were equal (float32-normalised JSON) at all three points: written,
+  saved, saved after reopen. State 1 is version 4 and carries the table `host-sweep.wav` in slot 1;
+  state 2 is version 2.
+- **Renders:** 24 s offline master-mix renders by REAPER: finite, active every second, peak
+  0.258, RMS 0.073. The render after the reopen is bit-identical to the one before it. The same
+  project with the table removed from the state differs from it by 66 % of RMS (spectrum cosine
+  0.90), so the imported table is what plays in the host.
+- **Older project:** the two-track project the factory-bank batch saved with the previous build
+  (version 2 states, automation envelopes). Opened by this build, its saved plugin state equals
+  the original, and its 24 s render is bit-identical to the render by the baseline plugin (the
+  binary recorded in `docs/factory-performance-bank/evidence/host/recall.json`, sha256 `80933e3d…2b57`,
+  `crates/` identical to origin/master) and to a second baseline render.
+
 ## What is not verified
 
-- How anything sounds. Every number above is a measurement; none is a judgement.
-- The CLAP plugin in a real host (the state round-trip is tested through the plugin's own
-  `Instrument`, and the strict CLAP validator was not rerun).
+- How anything sounds. Every number above is a measurement; none is a judgement. The renders
+  are not listening.
+- Physical latency, xruns, a controller, a host other than REAPER, the editor (the host runs
+  had it closed; there is no table UI to try).
 - Three-operator chains and deeper keep a small pitch-dependent phase error (above).
 - Hardware (Pi 4) cost.
