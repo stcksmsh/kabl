@@ -235,7 +235,7 @@ fn morph_arc() -> PatchEditor {
         e.set_param(arp_seq, &format!("p{}", k + 1), p);
     }
     e.set_param(arp, "waveform", 2.0);
-    e.set_param(arp_filter, "cutoff_hz", 2600.0);
+    e.set_param(arp_filter, "cutoff_hz", 4200.0);
     e.set_param(arp_filter, "resonance", 0.25);
     e.set_param(arp_env, "attack_ms", 2.0);
     e.set_param(arp_env, "decay_ms", 190.0);
@@ -247,15 +247,15 @@ fn morph_arc() -> PatchEditor {
     e.set_param(delay, "mix", 100.0);
     e.set_param(delay, "tone_hz", 3000.0);
     e.set_param(delay, "mode", 1.0);
-    // Bass: four steps, C2 = 0.
+    // Bass: four steps, C3 = 0 (an octave up so small speakers carry it).
     e.set_param(bass_seq, "length", 4.0);
     for (k, p) in [-3.0, -3.0, 0.0, -5.0].into_iter().enumerate() {
         e.set_param(bass_seq, &format!("p{}", k + 1), p);
     }
     e.set_param(bass_seq, "g2", 0.0);
     e.set_param(bass, "waveform", 2.0);
-    e.set_param(bass, "base_hz", 65.41);
-    e.set_param(bass_filter, "cutoff_hz", 140.0);
+    e.set_param(bass, "base_hz", 130.81);
+    e.set_param(bass_filter, "cutoff_hz", 380.0);
     e.set_param(bass_filter, "resonance", 0.3);
     e.set_param(bass_env, "attack_ms", 4.0);
     e.set_param(bass_env, "decay_ms", 300.0);
@@ -264,13 +264,13 @@ fn morph_arc() -> PatchEditor {
     e.set_param(bass_vca, "gain", 0.0);
     e.set_param(knob, "m1", 1.0);
     // Pad: A2, E3, C4 with detuned unison, under a slowly moving filter.
-    for (osc, hz) in [(pad_a, 110.0), (pad_b, 164.81), (pad_c, 261.63)] {
+    for (osc, hz) in [(pad_a, 220.0), (pad_b, 329.63), (pad_c, 523.25)] {
         e.set_param(osc, "waveform", 2.0);
         e.set_param(osc, "base_hz", hz);
         e.set_param(osc, "unison", 3.0);
         e.set_param(osc, "detune", 14.0);
     }
-    e.set_param(pad_filter, "cutoff_hz", 900.0);
+    e.set_param(pad_filter, "cutoff_hz", 1800.0);
     e.set_param(pad_filter, "resonance", 0.15);
     e.set_param(slow, "rate_hz", 0.07);
     e.set_param(slow, "waveform", 1.0);
@@ -304,7 +304,7 @@ fn morph_arc() -> PatchEditor {
         p.push((format!("s{k}"), 0.0));
     }
     for k in 1..=8 {
-        p.push((format!("b.s{k}"), 0.55));
+        p.push((format!("b.s{k}"), 0.75));
         p.push((format!("b.r{k}"), 85.0));
     }
     p.push(("morph".into(), 0.3));
