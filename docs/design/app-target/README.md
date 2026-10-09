@@ -19,7 +19,7 @@ Decided by Kosta and kept in all three directions: the Eurorack rack stays; the 
 
 ## Where to look
 
-Each direction folder under [`media/`](media/) holds the same set at `1440x900` and `1280x800`, light and dark (seven scenes x 2 sizes x 2 themes = 28 PNG per direction), plus `motion.mp4` (about 19 s at 30 fps, 1280x800).
+Each direction folder under [`media/`](media/) holds the same set at `1440x900` and `1280x800`, light and dark (seven scenes x 2 sizes x 2 themes = 28 WebP images per direction), plus `motion.mp4` (about 19 s at 30 fps, 1280x800).
 
 | Scene file | What it shows |
 |---|---|
@@ -32,6 +32,8 @@ Each direction folder under [`media/`](media/) holds the same set at `1440x900` 
 | `components` | Replacements for stock widgets: buttons, chips, fields, lists, tooltip, menu, dialog, dropdown, toast, empty state, status bar, diagnostics popover |
 
 Recordings (`media/<direction>/motion.mp4`): rack with moving scope, filter, envelope, LFO and cable beads; Perform with a cue queued then launched and step lanes running; Composition with focus moving between modules; face close-up; wavetable; step cable. A uses the light theme, B and C the dark theme.
+
+Theming design note (proposal, decisions for Kosta): [`THEMING.md`](THEMING.md).
 
 Supporting documents: [`tokens-a-satin.md`](tokens-a-satin.md), [`tokens-b-lacquer.md`](tokens-b-lacquer.md), [`tokens-c-silkscreen.md`](tokens-c-silkscreen.md) (colours, face families, type scale, spacing, radii, shadows, motion; generated from the same tables the renderer uses), [`stock-widget-inventory.md`](stock-widget-inventory.md), [`contrast-check.txt`](contrast-check.txt).
 
@@ -74,7 +76,7 @@ If polish matters more than continuity, choose B and accept the glow cost.
 ## Verification
 
 Done:
-- All 84 stills and three recordings were rendered by the example under Xvfb (software GL) at both sizes and themes. I reviewed full-size captures of every scene in at least one direction and theme, and contact sheets of the rest at both sizes, and fixed the defects I saw: overlapping labels, cut-off segmented labels, cable text collisions, hidden knob pointer in C dark, colliding diagnostics popover.
+- All 84 stills (stored as quality-92 WebP re-encodes of the framebuffer PNGs, to keep the repository small) and three recordings were rendered by the example under Xvfb (software GL) at both sizes and themes. I reviewed full-size captures of every scene in at least one direction and theme, and contact sheets of the rest at both sizes, and fixed the defects I saw: overlapping labels, cut-off segmented labels, cable text collisions, hidden knob pointer in C dark, colliding diagnostics popover.
 - `app_target check` computes WCAG contrast for text, face ink, displays and accent pairs in every direction and theme: 0 failures (text 4.5, hints and non-text 3.0). See `contrast-check.txt`. Cables are not text; they carry a dark edge (A, C) or glow (B), so they are not contrast-checked against the rack.
 - No text below 11 px in the renderer (`Xf::fs` clamps).
 
