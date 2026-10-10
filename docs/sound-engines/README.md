@@ -7,6 +7,9 @@ voice-rate, take `pitch` like `osc.va`, and appear in the add-module palette and
 plugin without further wiring. Status: engineering verified (below); **listening is
 Kosta's call**, nothing here has been heard by a person.
 
+The utility modules (quantizer, sample and hold, slew, logic, random and more) are in
+`docs/sound-engines/utilities.md`.
+
 Decisions and reasons: `docs/decisions.md`, "Sound engines: FM and wavetable" and "Sound
 engines 2: six-operator FM, 4x, display data". Factory table
 sources and licences: `crates/modules/assets/wavetables/PROVENANCE.md`.

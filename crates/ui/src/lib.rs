@@ -2868,6 +2868,23 @@ fn draw_decor(editor: &PatchEditor, p: &egui::Painter, th: &Theme, xf: Xf, m: &P
             ];
             p.add(egui::Shape::line(pts, Stroke::new(1.6 * z, th.display_ink)));
         }
+        Decor::Operators(r) => {
+            for (i, b) in rack::fm6_blocks(r).into_iter().enumerate() {
+                p.rect_stroke(
+                    xf.r(b),
+                    CornerRadius::same(5),
+                    Stroke::new(1.0, th.tick),
+                    egui::StrokeKind::Inside,
+                );
+                p.text(
+                    xf.p(b.left_top() + vec2(8.0, 9.0)),
+                    egui::Align2::LEFT_CENTER,
+                    format!("Op {}", i + 1),
+                    egui::FontId::proportional(11.5 * z),
+                    th.ink2,
+                );
+            }
+        }
         Decor::None | Decor::Transport(_) | Decor::Status(_) | Decor::Banks(_) | Decor::Cues(_) => {
         }
     }

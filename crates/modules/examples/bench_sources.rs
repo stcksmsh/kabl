@@ -12,7 +12,14 @@ use std::time::Instant;
 
 const SR: f32 = 48000.0;
 const BLOCK: usize = 64;
-const SECONDS: usize = 2;
+/// Seconds of audio per run and runs per row; `BENCH_FAST=1` uses 1 s and 5 runs (new rows only need a rough number).
+fn plan() -> (usize, usize) {
+    if std::env::var_os("BENCH_FAST").is_some() {
+        (1, 5)
+    } else {
+        (2, 15)
+    }
+}
 
 fn quality() -> QualityConfig {
     QualityConfig {
@@ -21,7 +28,7 @@ fn quality() -> QualityConfig {
 }
 
 /// Runs `ops` modules in a chain (each module's first output into the next one's `feed` input,
-/// if it has one) for `SECONDS` and returns nanoseconds per sample of the whole chain.
+/// if it has one) for a few seconds and returns nanoseconds per sample of the whole chain.
 fn time(kind_chain: &[&str], set: &[(&str, f32)], tweak: impl Fn(&mut dyn Module)) -> f64 {
     let mut modules: Vec<Box<dyn Module>> = kind_chain
         .iter()
@@ -45,13 +52,15 @@ fn time(kind_chain: &[&str], set: &[(&str, f32)], tweak: impl Fn(&mut dyn Module
                 .collect()
         })
         .collect();
-    let blocks = SECONDS * SR as usize / BLOCK;
+    let (seconds, runs) = plan();
+    let blocks = seconds * SR as usize / BLOCK;
     let mut best = Vec::new();
-    for _ in 0..15 {
+    for _ in 0..runs {
         let mut feed;
         let mut outs: Vec<[f32; BLOCK]> = vec![[0.0; BLOCK]; infos.len()];
         let pitch = [3.0f32; BLOCK];
         let ones = [1.0f32; BLOCK];
+        let square: [f32; BLOCK] = std::array::from_fn(|i| (i < BLOCK / 2) as u8 as f32);
         let start = Instant::now();
         for _ in 0..blocks {
             feed = [0.0; BLOCK];
@@ -64,16 +73,23 @@ fn time(kind_chain: &[&str], set: &[(&str, f32)], tweak: impl Fn(&mut dyn Module
                         "pitch" => Signal::Buffer(&pitch),
                         "pm" | "in" => Signal::Buffer(&feed),
                         "gate" | "velocity" => Signal::Buffer(&ones),
+                        "clock" | "a" | "b" => Signal::Buffer(&square),
                         _ => Signal::Buffer(&[0.0; BLOCK]),
                     })
                     .collect();
                 let ps: Vec<Signal> = params[k].iter().map(|&v| Signal::Scalar(v)).collect();
-                let mut out = [0.0f32; BLOCK];
+                let n_out = infos[k]
+                    .ports
+                    .iter()
+                    .filter(|p| p.direction == kabl_modules::PortDirection::Output)
+                    .count();
+                let mut bufs = vec![[0.0f32; BLOCK]; n_out.max(1)];
                 {
-                    let mut refs: Vec<&mut [f32]> = vec![&mut out[..]];
+                    let mut refs: Vec<&mut [f32]> = bufs.iter_mut().map(|b| &mut b[..]).collect();
                     let mut io = ProcessIo::new(&ins, &mut refs, &ps, BLOCK);
                     m.process(&mut io);
                 }
+                let out = bufs[0];
                 outs[k] = out;
                 feed = out;
             }
@@ -162,6 +178,32 @@ fn main() {
             time(&["osc.fm6"], &CHAIN6_4X, |_| {}),
         ),
     ];
+    let rows: Vec<(&str, f64)> = rows
+        .into_iter()
+        .chain([
+            (
+                "quantizer (major), steady input",
+                time(&["quantizer"], &[], |_| {}),
+            ),
+            ("noise (for the row below)", time(&["noise"], &[], |_| {})),
+            (
+                "noise -> quantizer, new input every sample",
+                time(&["noise", "quantizer"], &[], |_| {}),
+            ),
+            ("sample.hold", time(&["sample.hold"], &[], |_| {})),
+            ("slew", time(&["slew"], &[], |_| {})),
+            ("attenuverter", time(&["attenuverter"], &[], |_| {})),
+            ("logic (4 outputs)", time(&["logic"], &[], |_| {})),
+            ("comparator", time(&["comparator"], &[], |_| {})),
+            ("crossfade", time(&["crossfade"], &[], |_| {})),
+            ("pan", time(&["pan"], &[], |_| {})),
+            ("random", time(&["random"], &[], |_| {})),
+            (
+                "random, loop of 8, 50% change",
+                time(&["random"], &[("length", 8.0), ("change", 50.0)], |_| {}),
+            ),
+        ])
+        .collect();
     println!(
         "{:<34} {:>10} {:>14}",
         "source", "ns/sample", "% core / voice"

@@ -456,6 +456,7 @@ fn write_classification() {
                 Taper::Linear => "linear",
                 Taper::Exponential => "exponential",
                 Taper::Stepped => "stepped",
+                Taper::Cubic => "cubic",
             };
             let (class, how, why) = match param_class(kind, p.name) {
                 ParamClass::Structural => {
