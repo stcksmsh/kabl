@@ -8,10 +8,20 @@ use kabl_modules::builtins::OscFm;
 /// One block of a modulator->carrier pair. `fc` and `fm` are the operators' `base_hz` at pitch 0
 /// (ratio 1), so the pair is exactly where the test says whatever the ratio params.
 fn pair(fc: f32, fm: f32, index: f32, feedback: f32, oversample: bool) -> (Rig, Rig) {
-    let mut m = Rig::new("osc.fm", &[("base_hz", fm)], SR);
+    pair_x(fc, fm, index, feedback, oversample, 0.0)
+}
+
+/// `x4` = 1 selects the 4x internal rate (the `oversample` param) instead of the default 2x.
+fn pair_x(fc: f32, fm: f32, index: f32, feedback: f32, oversample: bool, x4: f32) -> (Rig, Rig) {
+    let mut m = Rig::new("osc.fm", &[("base_hz", fm), ("oversample", x4)], SR);
     let mut c = Rig::new(
         "osc.fm",
-        &[("base_hz", fc), ("index", index), ("feedback", feedback)],
+        &[
+            ("base_hz", fc),
+            ("index", index),
+            ("feedback", feedback),
+            ("oversample", x4),
+        ],
         SR,
     );
     for r in [&mut m, &mut c] {
@@ -34,6 +44,11 @@ fn run(m: &mut Rig, c: &mut Rig, len: usize) -> Vec<f32> {
 
 fn fm(fc: f32, fm_hz: f32, index: f32, feedback: f32, oversample: bool) -> Vec<f32> {
     let (mut m, mut c) = pair(fc, fm_hz, index, feedback, oversample);
+    run(&mut m, &mut c, 4096 + 16384)[4096..].to_vec()
+}
+
+fn fm4(fc: f32, fm_hz: f32, index: f32, feedback: f32) -> Vec<f32> {
+    let (mut m, mut c) = pair_x(fc, fm_hz, index, feedback, true, 1.0);
     run(&mut m, &mut c, 4096 + 16384)[4096..].to_vec()
 }
 
@@ -166,6 +181,34 @@ fn oversampling_removes_the_alias_the_plain_rate_makes() {
 }
 
 #[test]
+fn four_x_keeps_the_spectrum_and_cleans_bright_feedback() {
+    // Same sidebands at 4x as at 2x where 2x is clean, at every pitch (the quarter-point phase
+    // interpolation keeps modulator and carrier aligned).
+    for hz in [130.8f32, 523.3, 1046.5] {
+        let (a, b) = (fm(hz, hz, 2.5, 0.0, true), fm4(hz, hz, 2.5, 0.0));
+        for n in 1..=5 {
+            let (x, y) = (line(&a, hz * n as f32), line(&b, hz * n as f32));
+            assert!(
+                (x - y).abs() < 0.012,
+                "{hz} Hz harmonic {n}: 2x {x:.4}, 4x {y:.4}"
+            );
+        }
+    }
+    // Full feedback at 1.76 kHz is bright enough to fold back at 2x (-49.9 dB total); 4x gains
+    // about 8 dB. Phase-modulated pairs gain nothing: their floor is the interpolation of the pm
+    // input, which runs at the plain rate whatever the internal rate (see README).
+    let (two, four) = (
+        fm(1760.3, 1760.3, 0.0, 1.0, true),
+        fm4(1760.3, 1760.3, 0.0, 1.0),
+    );
+    let (a, b) = (
+        alias_db(&two, 1760.3, SR, 20000.0).1,
+        alias_db(&four, 1760.3, SR, 20000.0).1,
+    );
+    assert!(b < a - 5.0, "2x {a:.1} dB, 4x {b:.1} dB");
+}
+
+#[test]
 fn extreme_index_is_bounded_not_clean() {
     // Index 10 at 3.3 kHz puts sidebands out to 40 kHz: 2x folds some back. Pin what we measure
     // (-51.7 dB total, plain rate -4.6 dB) so a regression shows, and the limit is written down.
@@ -252,7 +295,7 @@ fn level_scales_the_output() {
 #[test]
 #[ignore]
 fn print_alias_table() {
-    println!("carrier Hz  modulator Hz  index  feedback | plain-rate dB | 2x dB   (non-harmonic power below 20 kHz)");
+    println!("carrier Hz  modulator Hz  index  feedback | plain-rate dB | 2x dB | 4x dB   (non-harmonic power below 20 kHz)");
     for &(fc, fm_hz, idx, fb) in &[
         (440.3, 440.3, 8.0, 0.0),
         (997.3, 997.3, 8.0, 0.0),
@@ -266,8 +309,9 @@ fn print_alias_table() {
         (1760.3, 1760.3, 0.0, 1.0),
     ] {
         let db = |os| alias_db(&fm(fc, fm_hz, idx, fb, os), fc, SR, 20000.0).1;
+        let db4 = alias_db(&fm4(fc, fm_hz, idx, fb), fc, SR, 20000.0).1;
         println!(
-            "{fc:10.1} {fm_hz:13.1} {idx:6.1} {fb:9.2} | {:13.1} | {:6.1}",
+            "{fc:10.1} {fm_hz:13.1} {idx:6.1} {fb:9.2} | {:13.1} | {:6.1} | {db4:6.1}",
             db(false),
             db(true)
         );

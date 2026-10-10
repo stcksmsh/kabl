@@ -417,3 +417,51 @@ fn a_wiring_change_mid_window_starts_the_measurement_over() {
     assert_eq!(r1.generation, 2);
     assert_eq!(r1.lane[0].peak, 0.0, "old level carried: {:?}", r1.lane[0]);
 }
+
+/// midi.in -> `kind` -> VCA/ADSR -> Output, the source with `params`.
+fn voice_of(kind: &str, params: &[(&str, f32)]) -> PatchState {
+    let mut p = keys();
+    p.modules.insert(2, module(kind, params));
+    if kind == "osc.fm6" {
+        p.cables.insert(7, cable(1, "gate", 2, "gate"));
+    }
+    p
+}
+
+#[test]
+fn the_report_carries_the_display_data_of_the_loudest_voice_without_allocating() {
+    for (kind, params) in [
+        ("osc.fm6", vec![("base_hz", 261.63), ("algorithm", 7.0)]),
+        ("osc.wt", vec![("position", 0.4)]),
+        ("osc.fm", vec![]),
+    ] {
+        let (_c, mut e) = engine(&voice_of(kind, &params), 8);
+        e.inspect(Some(target(1, 2, 0, kind)));
+        // A gated voice has nothing to show before its first note; free-running ones always do.
+        let idle = next_report(&mut e, 100).view.valid;
+        assert_eq!(idle, kind != "osc.fm6", "{kind} idle");
+        e.key(KeyEvent::On {
+            note: 60,
+            velocity: 100,
+        });
+        let (mut l, mut r) = ([0.0; BLOCK], [0.0; BLOCK]);
+        for _ in 0..100 {
+            assert_no_alloc(|| e.process_block(&mut l, &mut r));
+        }
+        let rep = loop {
+            assert_no_alloc(|| e.process_block(&mut l, &mut r));
+            if let Some(rep) = e.take_probe_report() {
+                break rep;
+            }
+        };
+        assert!(rep.view.valid, "{kind}");
+        if kind == "osc.wt" {
+            assert!((rep.view.position - 0.4).abs() < 1e-3);
+        }
+        let peak = rep.view.cycle.iter().fold(0.0f32, |m, v| m.max(v.abs()));
+        assert!(
+            peak > 0.1 && rep.view.cycle.iter().all(|v| v.is_finite()),
+            "{kind}"
+        );
+    }
+}

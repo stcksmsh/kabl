@@ -15,6 +15,7 @@ use crate::info::{
 };
 use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig, StateReader, StateWriter};
+use crate::view::{ModuleView, Ring};
 use crate::wavetable::{self, WaveTable};
 
 const PORTS: &[PortInfo] = &[
@@ -130,6 +131,10 @@ pub struct OscWt {
     position: f32,
     sample_rate: f32,
     user: Option<Arc<WaveTable>>,
+    /// For `view`: the last outputs, the phase step and the position read last.
+    ring: Ring,
+    dt: f32,
+    shown: f32,
 }
 
 impl OscWt {
@@ -142,6 +147,9 @@ impl OscWt {
             position: -1.0,
             sample_rate: 48000.0,
             user: None,
+            ring: Ring::default(),
+            dt: 0.0,
+            shown: 0.0,
         }
     }
 
@@ -213,13 +221,25 @@ impl Module for OscWt {
             position += step;
             let dt = base_hz.at(i) * 2f32.powf(pitch.at(i) / 12.0) * fine / sr;
             let dt = if dt.is_finite() { dt } else { 0.0 };
-            *o = table.read(level, position + pos_in.at(i) * depth, phase);
+            let at = position + pos_in.at(i) * depth;
+            *o = table.read(level, at, phase);
+            self.ring.push(*o);
+            self.shown = at;
+            self.dt = dt;
             phase += dt;
             phase -= phase.floor();
         }
         self.position = target;
         // A NaN pitch must not poison the phase for good.
         self.phase = if phase.is_finite() { phase } else { 0.0 };
+    }
+
+    fn view(&self, out: &mut ModuleView) {
+        out.valid = self.dt > 0.0;
+        out.position = if self.shown.is_nan() { 0.0 } else { self.shown.clamp(0.0, 1.0) };
+        if out.valid {
+            self.ring.cycle(1.0 / self.dt, &mut out.cycle);
+        }
     }
 
     fn reset(&mut self) {
@@ -244,6 +264,7 @@ impl Module for OscWt {
         if let Some(o) = old.as_any().downcast_ref::<OscWt>() {
             self.phase = o.phase;
             self.position = o.position;
+            self.ring = o.ring;
         }
     }
 }

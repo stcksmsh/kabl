@@ -566,12 +566,12 @@ fn place_local(
             }
             let total: usize = face_sels
                 .iter()
-                .map(|&i| options(info, &info.params[i]).0)
+                .map(|&i| options(info, &info.params[i]).0.max(8))
                 .sum();
             let mut x = 14.0;
             for &i in &face_sels {
                 let avail = fw - 28.0 - 10.0 * (face_sels.len() as f32 - 1.0);
-                let w = avail * options(info, &info.params[i]).0 as f32 / total as f32;
+                let w = avail * options(info, &info.params[i]).0.max(8) as f32 / total as f32;
                 let rect =
                     Rect::from_min_size(pos2(x, sels_top.unwrap_or(y) + 26.0), vec2(w, 28.0));
                 ctls.push(Ctl {

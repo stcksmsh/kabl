@@ -216,3 +216,30 @@ Whole patches, eight voices sounding, `process_block` (budget 1333 us per block)
 
 Pi 4 unmeasured. glass-bells is dominated by a 7 s reverb and four operators per voice.
 
+
+## 2026-10-09 — Sound engines 2: osc.fm6 and 4x
+
+`cargo build --release -p kabl-modules --example bench_sources` then
+`taskset -c N target/release/examples/bench_sources`, 48 kHz, 64-sample blocks. The machine was under
+heavy load from other jobs (load average 50 to 100), so each row is the minimum of three runs on
+different cores; two of the three runs agreed within 4 %. The `osc.va` reference measured 9.2 ns
+here against 12.9 ns in the table above, so compare rows inside one table only.
+
+| source, one voice | ns/sample | % of one core |
+|---|---|---|
+| osc.va saw (reference) | 9.2 | 0.04 |
+| osc.wt, one frame | 10.8 | 0.05 |
+| osc.wt, between two frames | 11.8 | 0.06 |
+| osc.fm operator, plain rate | 17.2 | 0.08 |
+| osc.fm operator, 2x (default) | 33.0 | 0.16 |
+| osc.fm operator, 4x | 69.7 | 0.33 |
+| four-operator chain of osc.fm, 2x | 132.3 | 0.64 |
+| osc.fm6, 1 operator sounding | 50.1 | 0.24 |
+| osc.fm6, 2 operators (default patch) | 63.0 | 0.30 |
+| osc.fm6, 4-operator chain, 2x | 95.6 | 0.46 |
+| osc.fm6, 6-operator chain, 2x | 135.7 | 0.65 |
+| osc.fm6, 6-operator chain, 4x | 259.1 | 1.24 |
+
+4x costs about twice 2x on both modules. `osc.fm6` is a fixed cost of about 40 ns plus about 17 ns
+per sounding operator. Whole-patch timings of the new demos are not measured (the load made block
+times meaningless).

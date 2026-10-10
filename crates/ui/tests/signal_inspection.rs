@@ -163,6 +163,7 @@ fn report(t: &ProbeTarget, generation: u64, seq: u64, lane: LaneStats) -> ProbeR
         lanes_total: 1,
         voiced: false,
         lane: lanes,
+        view: Default::default(),
     }
 }
 

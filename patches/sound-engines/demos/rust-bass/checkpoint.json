@@ -1,0 +1,233 @@
+{
+  "modules": {
+    "1": {
+      "kind": "midi.in",
+      "pos": {
+        "x": 24.0,
+        "y": 20.0
+      },
+      "params": {}
+    },
+    "2": {
+      "kind": "osc.fm6",
+      "pos": {
+        "x": 214.0,
+        "y": 20.0
+      },
+      "params": {
+        "algorithm": 3.0,
+        "attack1": 0.5,
+        "attack2": 0.5,
+        "attack3": 0.5,
+        "attack4": 0.5,
+        "attack5": 0.5,
+        "attack6": 0.5,
+        "decay1": 900.0,
+        "decay2": 220.0,
+        "decay3": 700.0,
+        "decay4": 500.0,
+        "decay5": 400.0,
+        "decay6": 300.0,
+        "feedback": 0.45,
+        "fine1": 0.0,
+        "fine2": 0.0,
+        "fine3": 3.0,
+        "fine4": 0.0,
+        "fine5": 0.0,
+        "fine6": 0.0,
+        "index": 0.25,
+        "level1": 1.0,
+        "level2": 0.8,
+        "level3": 0.5,
+        "level4": 0.6,
+        "level5": 0.5,
+        "level6": 0.9,
+        "ratio1": 1.0,
+        "ratio2": 1.0,
+        "ratio3": 1.0,
+        "ratio4": 2.0,
+        "ratio5": 1.0,
+        "ratio6": 1.0,
+        "release1": 120.0,
+        "release2": 80.0,
+        "release3": 120.0,
+        "release4": 100.0,
+        "release5": 100.0,
+        "release6": 100.0,
+        "sustain1": 0.8,
+        "sustain2": 0.1,
+        "sustain3": 0.55,
+        "sustain4": 0.3,
+        "sustain5": 0.2,
+        "sustain6": 0.25,
+        "vel1": 0.2,
+        "vel2": 0.7,
+        "vel3": 0.3,
+        "vel4": 0.5,
+        "vel5": 0.5,
+        "vel6": 0.6
+      }
+    },
+    "3": {
+      "kind": "gain",
+      "pos": {
+        "x": 404.0,
+        "y": 20.0
+      },
+      "params": {
+        "gain_db": 11.0
+      }
+    },
+    "4": {
+      "kind": "chorus",
+      "pos": {
+        "x": 594.0,
+        "y": 20.0
+      },
+      "params": {
+        "depth": 20.0,
+        "mix": 18.0,
+        "rate_hz": 0.4,
+        "width": 100.0
+      }
+    },
+    "5": {
+      "kind": "out",
+      "pos": {
+        "x": 784.0,
+        "y": 20.0
+      },
+      "params": {}
+    }
+  },
+  "cables": {
+    "1": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "pitch"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 2,
+          "port": "pitch"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "2": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "gate"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 2,
+          "port": "gate"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "3": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "velocity"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 2,
+          "port": "velocity"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "4": {
+      "from": {
+        "Module": {
+          "id": 2,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 3,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "5": {
+      "from": {
+        "Module": {
+          "id": 3,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 4,
+          "port": "in_l"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "6": {
+      "from": {
+        "Module": {
+          "id": 3,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 4,
+          "port": "in_r"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "7": {
+      "from": {
+        "Module": {
+          "id": 4,
+          "port": "left"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 5,
+          "port": "left"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "8": {
+      "from": {
+        "Module": {
+          "id": 4,
+          "port": "right"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 5,
+          "port": "right"
+        }
+      },
+      "params": {},
+      "steps": []
+    }
+  }
+}

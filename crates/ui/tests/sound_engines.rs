@@ -10,6 +10,14 @@
 //! - `imported-morph`: a .wav imported into the patch (a resonance sweep, 24 frames), its
 //!   position swept by the envelope on every note, over an FM sub with feedback.
 //!
+//! Four more use the six-operator voice and an enveloped wavetable sweep:
+//!
+//! - `dx-keys`: six-operator electric piano, three modulator/carrier pairs, per-operator
+//!   envelopes and velocity (no envelope modules at all).
+//! - `iron-bell`: six-operator bell, three inharmonic pairs that ring for seconds.
+//! - `rising-pad`: two wavetable oscillators whose positions the note's envelope sweeps open.
+//! - `rust-bass`: six-operator bass, a punchy pair beside a four-operator growl with feedback.
+//!
 //! Rewrite the patches with
 //! `cargo test -p kabl-ui --test sound_engines write_engine_patches -- --ignored`
 //! and the audio clips (`target/sound-engines/*.wav`) with `write_engine_renders`.
@@ -58,6 +66,27 @@ impl Rack {
         self.col += 190.0;
         for &(name, v) in params {
             self.e.set_param(id, name, v);
+        }
+        id
+    }
+    /// An `osc.fm6` with `ops[k]` = (ratio, fine ct, level, attack ms, decay ms, sustain, release
+    /// ms, velocity sensitivity) for operator k + 1.
+    fn fm6(&mut self, algorithm: f32, index: f32, feedback: f32, ops: [[f32; 8]; 6]) -> ModuleId {
+        let id = self.add(
+            "osc.fm6",
+            &[
+                ("algorithm", algorithm),
+                ("index", index),
+                ("feedback", feedback),
+            ],
+        );
+        for (k, op) in ops.iter().enumerate() {
+            let names = [
+                "ratio", "fine", "level", "attack", "decay", "sustain", "release", "vel",
+            ];
+            for (name, &v) in names.iter().zip(op) {
+                self.e.set_param(id, &format!("{name}{}", k + 1), v);
+            }
         }
         id
     }
@@ -362,6 +391,212 @@ fn imported_morph() -> PatchEditor {
     r.e
 }
 
+/// midi.in -> `voice` (pitch, gate, velocity) -> gain -> chorus -> out. The voice's own
+/// operator envelopes shape every note, so there is no VCA.
+fn fm6_chain(r: &mut Rack, m: ModuleId, voice: ModuleId, gain_db: f32, chorus: &[(&str, f32)]) {
+    r.wire(m, "pitch", voice, "pitch");
+    r.wire(m, "gate", voice, "gate");
+    r.wire(m, "velocity", voice, "velocity");
+    let gain = r.add("gain", &[("gain_db", gain_db)]);
+    let fx = r.add("chorus", chorus);
+    let out = r.add("out", &[]);
+    r.wire(voice, "out", gain, "in");
+    r.wire(gain, "out", fx, "in_l");
+    r.wire(gain, "out", fx, "in_r");
+    r.wire(fx, "left", out, "left");
+    r.wire(fx, "right", out, "right");
+}
+
+fn dx_keys() -> PatchEditor {
+    let mut r = Rack::new();
+    let m = r.add("midi.in", &[]);
+    // Algorithm 1: 2 into 1, 4 into 3, 6 into 5. Pair 1 is the body (a mellow ratio 1 bend),
+    // pair 2 adds the bright tine (ratio 14, gone in a tenth of a second), pair 3 a soft
+    // detuned shimmer.
+    // ratio, fine, level, attack, decay, sustain, release, velocity
+    let voice = r.fm6(
+        1.0,
+        0.3,
+        0.0,
+        [
+            [1.0, 0.0, 1.0, 1.0, 2600.0, 0.1, 260.0, 0.35],
+            [1.0, 0.0, 0.9, 1.0, 700.0, 0.06, 200.0, 0.8],
+            [1.0, 6.0, 0.7, 1.0, 3000.0, 0.1, 260.0, 0.35],
+            [14.0, 0.0, 0.5, 0.5, 90.0, 0.0, 60.0, 0.9],
+            [1.0, -5.0, 0.4, 1.0, 3400.0, 0.1, 260.0, 0.3],
+            [1.0, 0.0, 0.6, 1.0, 1400.0, 0.05, 200.0, 0.6],
+        ],
+    );
+    fm6_chain(
+        &mut r,
+        m,
+        voice,
+        7.0,
+        &[
+            ("rate_hz", 0.7),
+            ("depth", 35.0),
+            ("mix", 30.0),
+            ("width", 100.0),
+        ],
+    );
+    r.e
+}
+
+fn iron_bell() -> PatchEditor {
+    let mut r = Rack::new();
+    let m = r.add("midi.in", &[]);
+    // Algorithm 1 again, three inharmonic pairs: 1 : 3.5, 2 : 5.04 and 3.1 : 8.9. Carriers
+    // ring 4 to 7 seconds; each modulator fades faster, so the bell darkens as it rings.
+    let voice = r.fm6(
+        1.0,
+        0.3,
+        0.0,
+        [
+            [1.0, 0.0, 1.0, 0.5, 7000.0, 0.0, 3500.0, 0.0],
+            [4.0, -231.0, 0.9, 0.5, 2600.0, 0.0, 1200.0, 0.15],
+            [2.0, 4.0, 0.55, 0.5, 4200.0, 0.0, 2200.0, 0.0],
+            [5.0, 14.0, 0.8, 0.5, 1200.0, 0.0, 600.0, 0.15],
+            [3.0, 100.0, 0.3, 0.5, 2000.0, 0.0, 1200.0, 0.0],
+            [9.0, -20.0, 0.6, 0.5, 500.0, 0.0, 300.0, 0.2],
+        ],
+    );
+    r.wire(m, "pitch", voice, "pitch");
+    r.wire(m, "gate", voice, "gate");
+    r.wire(m, "velocity", voice, "velocity");
+    let reverb = r.add(
+        "reverb",
+        &[
+            ("decay_s", 7.0),
+            ("damp_hz", 7000.0),
+            ("mix", 38.0),
+            ("width", 100.0),
+        ],
+    );
+    let gain = r.add("gain", &[("gain_db", 9.5)]);
+    let out = r.add("out", &[]);
+    r.wire(voice, "out", gain, "in");
+    r.wire(gain, "out", reverb, "in_l");
+    r.wire(gain, "out", reverb, "in_r");
+    r.wire(reverb, "left", out, "left");
+    r.wire(reverb, "right", out, "right");
+    r.e
+}
+
+fn rising_pad() -> PatchEditor {
+    let mut r = Rack::new();
+    let m = r.add("midi.in", &[]);
+    // Table 3 = Glass Bell (a sine to a bright bell spectrum), 4 = Digital Hollow. The note's envelope (slow attack, long
+    // decay to a high sustain) is routed to both positions, so every held chord opens up
+    // from a dull sine-ish tone to the full spectrum, at a different pace in each oscillator.
+    let a = r.add(
+        "osc.wt",
+        &[
+            ("table", 3.0),
+            ("position", 0.0),
+            ("pos_mod", 1.0),
+            ("fine", -6.0),
+        ],
+    );
+    let b = r.add(
+        "osc.wt",
+        &[
+            ("table", 4.0),
+            ("position", 0.1),
+            ("pos_mod", 1.0),
+            ("fine", 6.0),
+        ],
+    );
+    r.next_row();
+    let sweep = r.add("env.adsr", &adsr(3200.0, 4200.0, 0.75, 2600.0));
+    let amp = r.add("env.adsr", &adsr(1800.0, 900.0, 0.9, 2800.0));
+    let mix = r.add("mixer", &[("level1", 1.0), ("level2", 0.7)]);
+    let filter = r.add(
+        "filter.ladder",
+        &[
+            ("cutoff_hz", 4200.0),
+            ("resonance", 0.15),
+            ("drive_db", 0.0),
+        ],
+    );
+    r.next_row();
+    let vca = r.add("vca", &[("gain", 0.0)]);
+    let gain = r.add("gain", &[("gain_db", 4.0)]);
+    let chorus = r.add(
+        "chorus",
+        &[
+            ("rate_hz", 0.25),
+            ("depth", 60.0),
+            ("mix", 42.0),
+            ("width", 100.0),
+        ],
+    );
+    let reverb = r.add(
+        "reverb",
+        &[
+            ("decay_s", 6.0),
+            ("damp_hz", 5500.0),
+            ("mix", 30.0),
+            ("width", 100.0),
+        ],
+    );
+    let out = r.add("out", &[]);
+    for osc in [a, b] {
+        r.wire(m, "pitch", osc, "pitch");
+    }
+    r.wire(a, "out", mix, "in1");
+    r.wire(b, "out", mix, "in2");
+    r.wire(mix, "out", filter, "in");
+    r.wire(filter, "out", vca, "in");
+    r.wire(m, "gate", sweep, "gate");
+    r.wire(m, "gate", amp, "gate");
+    r.wire(amp, "out", vca, "cv");
+    r.wire(vca, "out", gain, "in");
+    r.wire(gain, "out", chorus, "in_l");
+    r.wire(gain, "out", chorus, "in_r");
+    r.wire(chorus, "left", reverb, "in_l");
+    r.wire(chorus, "right", reverb, "in_r");
+    r.wire(reverb, "left", out, "left");
+    r.wire(reverb, "right", out, "right");
+    r.route(sweep, "out", a, "position", 0.9);
+    r.route(sweep, "out", b, "position", 0.6);
+    r.route(m, "velocity", a, "position", 0.1);
+    r.route(sweep, "out", filter, "cutoff_hz", 0.1);
+    r.e
+}
+
+fn rust_bass() -> PatchEditor {
+    let mut r = Rack::new();
+    let m = r.add("midi.in", &[]);
+    // Algorithm 3: 2 into 1, and 6 into 5 into 4 into 3. The first pair is the punch (a ratio 1
+    // bend that dies in 200 ms), the second a four-operator growl; operator 6 feeds itself.
+    let voice = r.fm6(
+        3.0,
+        0.25,
+        0.45,
+        [
+            [1.0, 0.0, 1.0, 0.5, 900.0, 0.8, 120.0, 0.2],
+            [1.0, 0.0, 0.8, 0.5, 220.0, 0.1, 80.0, 0.7],
+            [1.0, 3.0, 0.5, 0.5, 700.0, 0.55, 120.0, 0.3],
+            [2.0, 0.0, 0.6, 0.5, 500.0, 0.3, 100.0, 0.5],
+            [1.0, 0.0, 0.5, 0.5, 400.0, 0.2, 100.0, 0.5],
+            [1.0, 0.0, 0.9, 0.5, 300.0, 0.25, 100.0, 0.6],
+        ],
+    );
+    fm6_chain(
+        &mut r,
+        m,
+        voice,
+        11.0,
+        &[
+            ("rate_hz", 0.4),
+            ("depth", 20.0),
+            ("mix", 18.0),
+            ("width", 100.0),
+        ],
+    );
+    r.e
+}
+
 /// (time s, note, on)
 type Events = Vec<(f32, u8, bool)>;
 
@@ -435,7 +670,7 @@ fn morph_phrase() -> Events {
 type Build = fn() -> PatchEditor;
 /// (directory, builder, phrase, seconds, browser name, category, tags, description)
 #[allow(clippy::type_complexity)]
-const PATCHES: [(&str, Build, fn() -> Events, f32, &str, &str, &[&str], &str); 4] = [
+const PATCHES: [(&str, Build, fn() -> Events, f32, &str, &str, &[&str], &str); 8] = [
     (
         "tine-keys",
         tine_keys,
@@ -475,6 +710,46 @@ const PATCHES: [(&str, Build, fn() -> Events, f32, &str, &str, &[&str], &str); 4
         "Bass",
         &["wavetable", "imported", "fm", "bass", "poly"],
         "A wavetable imported into the sound (a resonance sweep that travels up the harmonics) over an FM sub. Each note sweeps the table; harder notes sweep further. The table travels inside the saved sound.",
+    ),
+    (
+        "dx-keys",
+        dx_keys,
+        tine_phrase,
+        10.0,
+        "DX Keys",
+        "Keys",
+        &["fm", "electric piano", "poly", "six operators", "dx"],
+        "Six-operator FM electric piano in three modulator/carrier pairs: a mellow body, a bright tine that is gone in a tenth of a second, and a detuned shimmer. Every operator has its own envelope and velocity response, so play soft and hard.",
+    ),
+    (
+        "iron-bell",
+        iron_bell,
+        bell_phrase,
+        13.0,
+        "Iron Bell",
+        "Keys",
+        &["fm", "bell", "poly", "six operators", "ringing"],
+        "Three inharmonic FM pairs in one voice that ring for several seconds and darken as they fade. Short notes are enough; leave room for the tails.",
+    ),
+    (
+        "rising-pad",
+        rising_pad,
+        drift_phrase,
+        16.0,
+        "Rising Pad",
+        "Pad",
+        &["wavetable", "pad", "poly", "evolving", "sweep"],
+        "Two wavetable oscillators whose positions the note's own envelope sweeps open: every chord rises from a dull tone to the full spectrum over a few seconds. Hold chords for at least six seconds.",
+    ),
+    (
+        "rust-bass",
+        rust_bass,
+        morph_phrase,
+        10.0,
+        "Rust Bass",
+        "Bass",
+        &["fm", "bass", "poly", "six operators", "growl"],
+        "A punchy two-operator pair beside a four-operator chain with feedback: a clean attack, then a gritty growl that settles. Harder notes growl more.",
     ),
 ];
 
@@ -582,7 +857,7 @@ fn committed_engine_patches_match_builders_and_play() {
         assert!(
             st.modules
                 .values()
-                .any(|m| m.kind == "osc.fm" || m.kind == "osc.wt"),
+                .any(|m| matches!(m.kind.as_str(), "osc.fm" | "osc.fm6" | "osc.wt")),
             "{dir}"
         );
         for m in st.modules.values() {
