@@ -167,3 +167,55 @@ fn a_jack_cable_opens_the_editor_from_its_menu() {
     t.click(&format!("fn-close:{jack}"));
     assert_eq!(t.ui.cable_fn, None);
 }
+
+#[test]
+fn a_source_is_added_set_and_removed_for_a_cables_morph_from_its_editor() {
+    let mut t = H::new();
+    let jack = *t
+        .editor
+        .state()
+        .cables
+        .iter()
+        .find(|(_, c)| matches!(c.to, PortRef::Module { .. }))
+        .map(|(id, _)| id)
+        .expect("a jack cable");
+    let routes = |t: &H| -> Vec<CableId> {
+        t.editor
+            .state()
+            .cables
+            .iter()
+            .filter(|(_, c)| matches!(&c.to, PortRef::CableParam { cable, param } if *cable == jack && param == "morph"))
+            .map(|(&id, _)| id)
+            .collect()
+    };
+    t.click_with(&format!("cable:{jack}"), PointerButton::Secondary);
+    t.click("menu:cable-pattern");
+    assert!(routes(&t).is_empty());
+
+    t.click(&format!("croute-add:{jack}:morph"));
+    let source = t
+        .ui
+        .hits
+        .keys()
+        .find(|k| k.starts_with(&format!("croute-source:{jack}:morph:")))
+        .expect("the chooser lists the patch's outputs")
+        .clone();
+    t.click(&source);
+    let route = *routes(&t).first().expect("the route was added");
+    assert_eq!(t.cable_param(route, "amount"), None, "engine default amount");
+
+    t.drag_by(&format!("croute-amount:{route}"), 40.0);
+    assert!(t.cable_param(route, "amount").is_some_and(|a| a > 0.25));
+    t.click(&format!("croute-invert:{route}"));
+    assert!(t.cable_param(route, "amount").is_some_and(|a| a < 0.0));
+    kabl_engine::compile::compile(t.editor.state(), 48000.0, 1)
+        .expect("the patch with a route into a cable compiles");
+
+    // The routing drawer lists it with the others.
+    t.frame();
+    assert!(t.ui.hits.contains_key(&format!("croute-remove:{route}")));
+    t.click(&format!("croute-remove:{route}"));
+    assert!(routes(&t).is_empty());
+    t.editor.undo();
+    assert_eq!(routes(&t), vec![route], "undo brings the route back");
+}

@@ -724,6 +724,7 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                     show_param_panel(editor, ui_state, ui);
                     routing::cable_panel(editor, ui_state, ui);
                     routing::drawer(editor, ui_state, ui);
+                    routing::cable_routes(editor, ui_state, ui);
                 });
             });
     }
