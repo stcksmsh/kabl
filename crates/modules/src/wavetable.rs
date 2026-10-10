@@ -487,7 +487,9 @@ pub fn decode_canonical(bytes: &[u8]) -> Result<Vec<Vec<f32>>, TableError> {
     }
     Ok(wav
         .samples
-        .chunks_exact(FRAME)
+        .as_chunks::<FRAME>()
+        .0
+        .iter()
         .map(|f| f.iter().map(|&v| v as f32).collect())
         .collect())
 }

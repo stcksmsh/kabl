@@ -17,7 +17,9 @@ cd "$(dirname "$0")/../.."
 VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
 NAME="kabl-$VERSION-linux-$(uname -m)"
 OUT=${OUT:-target/dist}
-cargo build --release -p kabl-ui --bin kabl-ui -p kabl-clap
+# Two invocations: with one, --bin applies to every -p and silently drops the plugin's cdylib.
+cargo build --release -p kabl-ui --bin kabl-ui
+cargo build --release -p kabl-clap
 rm -rf "$OUT/$NAME" "$OUT/$NAME.tar.gz"
 mkdir -p "$OUT/$NAME/bin" "$OUT/$NAME/lib/clap" "$OUT/$NAME/share/kabl" "$OUT/$NAME/share/applications"
 cp target/release/kabl-ui "$OUT/$NAME/bin/"
