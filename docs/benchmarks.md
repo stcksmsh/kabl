@@ -203,3 +203,14 @@ Same tool and machine (`KABL_MORPH=1 taskset -c 2 ./target/release/examples/cabl
 | Minimal, one cable, node alone | +11 ns/block | +17 ns/block |
 
 Morph and glide add nothing measurable: the blend is two table reads and a multiply at each pulse (not per sample), and glide only changes the slew rate of the existing audio path. The difference between the columns is inside run-to-run noise (the plain baseline moved 44 015 to 44 057 ns). The morph and glide edits are runtime values and `audio_path_does_not_allocate_with_morph_and_glide_running` asserts no allocation while they change.
+
+### Routes into cable parameters
+
+2026-10-10, the commit that adds `PortRef::CableParam`. Same tool and machine as above, with the new switch: `KABL_MORPH=1 KABL_ROUTES=1 taskset -c 2 ./target/release/examples/cable_cost patches/composition`. `KABL_ROUTES=1` routes one macro (amount 0.5) into the morph of every functional jack cable (57 routes), and in the minimal patch swaps a jack from a second lfo for a route from it into the cable's morph. One run of 9, fastest. The machine was shared: the plain baseline moved between 44 000 and 63 000 ns/block across runs, so read the differences with that spread.
+
+| Case | Without routes | With routes | Difference |
+|---|---|---|---|
+| `patches/composition`, 57 functional cables with morph and glide | 73 949 ns/block (cables +18 008 over plain) | 79 358 ns/block | about +5 µs, 95 ns per route (a −55 ns result in another run: inside the noise) |
+| Minimal, one cable, an lfo to `out.right` as a jack against the same lfo as a route into morph | 1 529 ns/block | 1 535 ns/block | +6 ns |
+
+A route costs a source buffer read per pulse (not per sample) plus one 64-sample copy in its cable's step, and nothing when the cable has none. Fifty-seven routes, one in every functional cable of the densest shipped patch, are well under 0.5 % of the 1 333 µs block budget. The audio path stays allocation-free while an amount is edited (`audio_path_does_not_allocate_with_routes_running_and_edited`).

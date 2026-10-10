@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 
 use assert_no_alloc::{assert_no_alloc, AllocDisabler};
 use kabl_cables::{seed_of, Mods, Settings, MORPH};
-use kabl_core::{CableState, Op, ParamTarget, PatchLog, PatchState, PortRef, Source, Vec2};
+use kabl_core::{CableId, CableState, Op, ParamTarget, PatchLog, PatchState, PortRef, Source, Vec2};
 use kabl_engine::compile::{compile, CompiledPatch};
 use kabl_engine::graph::BLOCK;
 use kabl_engine::runtime::{runtime_changes, RuntimeTarget};
@@ -615,4 +615,43 @@ fn audio_path_does_not_allocate_with_routes_running_and_edited() {
         });
     }
     assert!(c.left().iter().all(|x| x.is_finite()));
+}
+
+#[test]
+fn the_macro_morph_demo_patch_loads_and_its_macro_changes_the_sound() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../patches/functional-cables/macro-morph");
+    let log = kabl_core::load(&dir).expect("the demo patch loads");
+    let state = log.state();
+    let routes: Vec<CableId> = state
+        .cables
+        .iter()
+        .filter(|(_, c)| matches!(&c.to, PortRef::CableParam { param, .. } if param == "morph"))
+        .map(|(&id, _)| id)
+        .collect();
+    assert_eq!(routes.len(), 3, "one macro, three morphs");
+    let knob = *state
+        .modules
+        .iter()
+        .find(|(_, m)| m.kind == "macro")
+        .map(|(id, _)| id)
+        .unwrap();
+    let run = |m1: f32| {
+        let mut c = compile(state, SR, 4).unwrap();
+        let depths: Vec<f32> = routes.iter().map(|&r| c.route_amount(r).unwrap()).collect();
+        assert_eq!(depths, vec![1.0, 0.5, -1.0], "three depths, one negative");
+        let target = RuntimeTarget::Param {
+            id: knob,
+            kind: "macro",
+            index: 0,
+        };
+        render(&mut c, 3000, |c, _| {
+            c.set_runtime(target, m1, false);
+        })
+        .0
+    };
+    let (low, high) = (run(0.0), run(1.0));
+    assert!(low.iter().chain(&high).all(|x| x.is_finite()));
+    assert_ne!(low, high, "the macro moves the cables");
+    assert_eq!(low, run(0.0), "and the render repeats");
 }

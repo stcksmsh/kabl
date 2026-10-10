@@ -5,7 +5,8 @@
 //!     taskset -c 2 cargo run --release -p kabl-engine --example cable_cost -- patches/composition
 //!
 //! `KABL_MORPH=1` adds pattern B (5 steps), morph 0.5 and 20 ms glide to every functional cable;
-//! `KABL_IDENTITY=1` makes every step open and never rejected.
+//! `KABL_IDENTITY=1` makes every step open and never rejected; `KABL_ROUTES=1` also routes one
+//! macro into the morph of every functional cable and one lfo into the minimal patch's cable.
 //!
 //! Arguments: patch folder (default patches/composition), blocks per run (default 40000).
 
@@ -64,6 +65,46 @@ fn morph_params(params: &mut std::collections::BTreeMap<String, f32>) {
     }
 }
 
+/// `p` with one macro routed into the morph of every jack cable, at amount 0.5.
+fn routed(p: &PatchState) -> PatchState {
+    let mut q = p.clone();
+    let knob = q.modules.keys().max().unwrap() + 1;
+    q.modules.insert(
+        knob,
+        kabl_core::ModuleState {
+            kind: "macro".into(),
+            pos: kabl_core::Vec2::default(),
+            params: Default::default(),
+        },
+    );
+    let mut next = q.cables.keys().max().unwrap() + 1;
+    let targets: Vec<u64> = p
+        .cables
+        .iter()
+        .filter(|(_, c)| matches!(c.to, PortRef::Module { .. }))
+        .map(|(&id, _)| id)
+        .collect();
+    for cable in targets {
+        q.cables.insert(
+            next,
+            kabl_core::CableState {
+                from: PortRef::Module {
+                    id: knob,
+                    port: "m1".into(),
+                },
+                to: PortRef::CableParam {
+                    cable,
+                    param: "morph".into(),
+                },
+                params: [("amount".to_string(), 0.5)].into(),
+                steps: vec![],
+            },
+        );
+        next += 1;
+    }
+    q
+}
+
 fn play(c: &mut CompiledPatch) {
     for (v, s) in [(0, 0.0), (1, 4.0), (2, 7.0), (3, 12.0)] {
         c.note_on(v, s, 0.8);
@@ -95,6 +136,17 @@ fn main() {
         (with - plain) / n as f64,
         (with - plain) / 1_333_333.0 * 100.0
     );
+
+    if std::env::var_os("KABL_ROUTES").is_some() {
+        let r = routed(&fun);
+        let n_routes = r.cables.len() - fun.cables.len();
+        let with_routes = report("plus a macro route per morph", &r, 8, blocks);
+        println!(
+            "routes {:+.0} ns/block = {:+.0} ns per route over {n_routes} routes",
+            with_routes - with,
+            (with_routes - with) / n_routes as f64
+        );
+    }
 
     // One lfo -> out cable and a clock: the node alone.
     let mut min = PatchState::new();
@@ -128,4 +180,41 @@ fn main() {
     morph_params(&mut min.cables.get_mut(&1).unwrap().params);
     let b = report("minimal: one functional cable", &min, 1, blocks);
     println!("node alone {:+.0} ns/block", b - a);
+    if std::env::var_os("KABL_ROUTES").is_some() {
+        min.modules.insert(
+            4,
+            kabl_core::ModuleState {
+                kind: "lfo".into(),
+                pos: kabl_core::Vec2::default(),
+                params: Default::default(),
+            },
+        );
+        let lfo_cable = |to: PortRef| kabl_core::CableState {
+            from: PortRef::Module {
+                id: 4,
+                port: "out".into(),
+            },
+            to,
+            params: Default::default(),
+            steps: vec![],
+        };
+        // The same lfo, first as a plain cable to the other output, then as a route.
+        min.cables.insert(
+            2,
+            lfo_cable(PortRef::Module {
+                id: 3,
+                port: "right".into(),
+            }),
+        );
+        let lfo = report("minimal: plus an lfo to out.right", &min, 1, blocks);
+        min.cables.insert(
+            2,
+            lfo_cable(PortRef::CableParam {
+                cable: 1,
+                param: "morph".into(),
+            }),
+        );
+        let c = report("minimal: plus a route into morph", &min, 1, blocks);
+        println!("the route instead of the jack {:+.0} ns/block", c - lfo);
+    }
 }
