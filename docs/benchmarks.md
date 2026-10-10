@@ -243,3 +243,32 @@ here against 12.9 ns in the table above, so compare rows inside one table only.
 4x costs about twice 2x on both modules. `osc.fm6` is a fixed cost of about 40 ns plus about 17 ns
 per sounding operator. Whole-patch timings of the new demos are not measured (the load made block
 times meaningless).
+
+## 2026-10-10 — Utility modules
+
+`cargo build --release -p kabl-modules --example bench_sources` then
+`BENCH_FAST=1 taskset -c N target/release/examples/bench_sources` (1 s of audio, median of 5 runs
+per row), 48 kHz, 64-sample blocks, minimum of three runs on different cores (machine quiet; the
+three agreed within 4 % apart from one outlier). The harness feeds each module a steady input and
+a square clock, and allocates a small output vector per block, so the rows overstate the cost of a
+very cheap module by a few ns; compare rows inside this table only (`osc.va` saw measured 10.8 ns).
+
+| module, one voice | ns/sample | % of one core |
+|---|---|---|
+| osc.va saw (reference) | 10.8 | 0.05 |
+| attenuverter | 1.0 | 0.00 |
+| comparator | 2.0 | 0.01 |
+| quantizer, steady input | 2.7 | 0.01 |
+| sample.hold | 2.8 | 0.01 |
+| logic (four outputs) | 3.0 | 0.01 |
+| random (free-running) | 3.6 | 0.02 |
+| random, loop of 8, 50 % change | 3.4 | 0.02 |
+| slew | 6.3 | 0.03 |
+| crossfade | 8.5 | 0.04 |
+| pan | 10.2 | 0.05 |
+| quantizer, a new input every sample (noise → quantizer, minus noise 4.3) | 14.7 | 0.07 |
+
+All nine together are about 52 ns, a quarter of one percent of a core per voice, about the cost of one
+`osc.fm` operator. `crossfade` and `pan` cost most (a sine and cosine per sample at the
+equal-power law). The quantizer's note search is two bit scans; its first version was a loop of
+13 and about three times slower.

@@ -1,0 +1,4 @@
+73bf57e00000-73bf5816d000 r--p 00000000 103:01 14087821                  /secondary/Programming/Github/kabl/.worktrees/sound-engines-2/scratch/sound-engines-host-3/plugins-base/kabl.clap
+73bf5816d000-73bf58877000 r-xp 0036c000 103:01 14087821                  /secondary/Programming/Github/kabl/.worktrees/sound-engines-2/scratch/sound-engines-host-3/plugins-base/kabl.clap
+73bf58877000-73bf588bc000 r--p 00a75000 103:01 14087821                  /secondary/Programming/Github/kabl/.worktrees/sound-engines-2/scratch/sound-engines-host-3/plugins-base/kabl.clap
+73bf588bc000-73bf588be000 rw-p 00ab9000 103:01 14087821                  /secondary/Programming/Github/kabl/.worktrees/sound-engines-2/scratch/sound-engines-host-3/plugins-base/kabl.clap
