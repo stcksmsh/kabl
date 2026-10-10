@@ -13,3 +13,6 @@ print('tests only in new     :', [k for k in ns if k not in bs])
 print('tests only in baseline:', [k for k in bs if k not in ns])
 print('status changed        :', [(k, bs[k], ns[k]) for k in ns if k in bs and ns[k] != bs[k]])
 print('failures in new       :', [r for r in new if r['status']['code'] not in ('success', 'skipped')])
+# Exit 1 on any added/removed/changed test or failure, so CI can gate on it.
+sys.exit(int(ns.keys() != bs.keys() or ns != bs
+             or any(r['status']['code'] not in ('success', 'skipped') for r in new)))

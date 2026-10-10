@@ -77,14 +77,14 @@ fn routed(p: &PatchState) -> PatchState {
             params: Default::default(),
         },
     );
-    let mut next = q.cables.keys().max().unwrap() + 1;
+    let first = q.cables.keys().max().unwrap() + 1;
     let targets: Vec<u64> = p
         .cables
         .iter()
         .filter(|(_, c)| matches!(c.to, PortRef::Module { .. }))
         .map(|(&id, _)| id)
         .collect();
-    for cable in targets {
+    for (next, cable) in (first..).zip(targets) {
         q.cables.insert(
             next,
             kabl_core::CableState {
@@ -100,7 +100,6 @@ fn routed(p: &PatchState) -> PatchState {
                 steps: vec![],
             },
         );
-        next += 1;
     }
     q
 }

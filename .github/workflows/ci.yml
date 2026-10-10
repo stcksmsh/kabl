@@ -1,0 +1,87 @@
+name: CI
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  CARGO_TERM_COLOR: always
+  APT_DEPS: libasound2-dev libxkbcommon-dev libxkbcommon-x11-0 libdbus-1-dev libgl1-mesa-dri xvfb
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: System libraries
+        run: sudo apt-get update && sudo apt-get install -y $APT_DEPS
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Clippy, warnings are errors
+        # Every target except the app_target example; see the script for why.
+        run: .github/scripts/clippy.sh
+
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: System libraries
+        run: sudo apt-get update && sudo apt-get install -y $APT_DEPS
+      - name: Workspace tests
+        run: cargo test --workspace
+
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: System libraries
+        run: sudo apt-get update && sudo apt-get install -y $APT_DEPS
+      - name: Build the Linux package
+        run: packaging/linux/package.sh
+      - name: CLAP validator against the baseline
+        # The validator build the baseline was recorded with (docs/factory-performance-bank).
+        run: |
+          cargo install --locked --git https://github.com/free-audio/clap-validator --rev 152b982 clap-validator
+          clap-validator validate --json target/release/libkabl_clap.so > target/validator.json
+          python3 docs/sound-engines/scripts/validator_diff.py target/validator.json docs/factory-performance-bank/evidence/validator.json
+      - name: Install into a scratch prefix, launch, validate the installed plugin, uninstall
+        run: |
+          set -euo pipefail
+          tar -xzf target/dist/kabl-*-linux-*.tar.gz -C "$RUNNER_TEMP"
+          pkg=$(echo "$RUNNER_TEMP"/kabl-*-linux-*/)
+          "$pkg/install.sh" --prefix "$RUNNER_TEMP/prefix" --clap-dir "$RUNNER_TEMP/clap"
+          test -x "$RUNNER_TEMP/prefix/bin/kabl-ui"
+          test -f "$RUNNER_TEMP/prefix/share/applications/kabl.desktop"
+          test -f "$RUNNER_TEMP/prefix/share/icons/hicolor/256x256/apps/kabl.png"
+          printf 'pcm.!default { type null }\nctl.!default { type hw card 0 }\n' > "$RUNNER_TEMP/alsa.conf"
+          # The window must stay up for 15 s: timeout exits 124 when it had to kill a live app.
+          code=0
+          ALSA_CONFIG_PATH="$RUNNER_TEMP/alsa.conf" KABL_USER_DIR="$RUNNER_TEMP/user" \
+            WINIT_UNIX_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 \
+            xvfb-run -a timeout 15 "$RUNNER_TEMP/prefix/bin/kabl-ui" --no-rt || code=$?
+          test "$code" = 124
+          clap-validator validate --json "$RUNNER_TEMP/clap/kabl.clap" > "$RUNNER_TEMP/installed.json"
+          sed -i "s|$RUNNER_TEMP/clap/kabl.clap|target/release/libkabl_clap.so|g" "$RUNNER_TEMP/installed.json"
+          python3 docs/sound-engines/scripts/validator_diff.py "$RUNNER_TEMP/installed.json" docs/factory-performance-bank/evidence/validator.json
+          "$pkg/install.sh" --uninstall --prefix "$RUNNER_TEMP/prefix" --clap-dir "$RUNNER_TEMP/clap"
+          test ! -e "$RUNNER_TEMP/prefix/bin/kabl-ui"
+          test ! -e "$RUNNER_TEMP/clap/kabl.clap"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kabl-linux-package
+          path: target/dist/*.tar.gz
+          if-no-files-found: error
