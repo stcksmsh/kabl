@@ -40,6 +40,8 @@ pub(crate) struct Look {
     pub z: f32,
     pub ink: Color32,
     pub ink2: Color32,
+    /// Room for a value readout under the control, world units.
+    pub slot: f32,
 }
 
 /// One modulation route into a param, as the UI needs it.
@@ -308,14 +310,7 @@ pub fn parse_value(p: &ParamInfo, text: &str) -> Option<f32> {
     v.is_finite().then(|| v.clamp(p.min, p.max))
 }
 
-/// Angle (radians from 12 o'clock, clockwise) of knob travel `n` on a 270° scale.
-fn travel_angle(n: f32) -> f32 {
-    (-135.0 + n.clamp(0.0, 1.0) * 270.0).to_radians()
-}
-
-fn on_circle(center: Pos2, radius: f32, angle: f32) -> Pos2 {
-    center + EguiVec2::new(angle.sin(), -angle.cos()) * radius
-}
+use crate::kit::face::{on_circle, travel_angle};
 
 fn arc(painter: &egui::Painter, center: Pos2, radius: f32, n0: f32, n1: f32, stroke: Stroke) {
     let (a0, a1) = (travel_angle(n0.min(n1)), travel_angle(n0.max(n1)));
@@ -466,13 +461,6 @@ pub fn short_name(kind: &str) -> &'static str {
     }
 }
 
-fn two_tone_arc(p: &egui::Painter, c: Pos2, r: f32, n0: f32, n1: f32, col: Color32, w: f32) {
-    let outline = col.lerp_to_gamma(Color32::BLACK, 0.45);
-    let outline = Color32::from_rgba_unmultiplied(outline.r(), outline.g(), outline.b(), col.a());
-    arc(p, c, r, n0, n1, Stroke::new(w + 2.5, outline));
-    arc(p, c, r, n0, n1, Stroke::new(w, col));
-}
-
 /// Text drawn after the cables (values, pills, badges), so a cable never hides a value.
 fn defer_text(
     ui_state: &mut UiState,
@@ -500,7 +488,7 @@ fn defer_pill(
     edge: Color32,
     z: f32,
 ) {
-    let th = theme(ui_state.dark);
+    let th = theme(&ui_state.style);
     let galley =
         painter.layout_no_wrap(text.to_string(), egui::FontId::monospace(11.5 * z), th.ink);
     let size = EguiVec2::new((galley.size().x + 12.0 * z).max(44.0 * z), 20.0 * z);
@@ -530,7 +518,7 @@ pub(crate) fn defer_badge(
     col: Color32,
     z: f32,
 ) {
-    let th = theme(ui_state.dark);
+    let th = theme(&ui_state.style);
     let galley =
         painter.layout_no_wrap(text.to_string(), egui::FontId::proportional(10.5 * z), col);
     let rect = Rect::from_center_size(center, EguiVec2::new(galley.size().x + 12.0 * z, 15.0 * z));
@@ -563,7 +551,7 @@ pub(crate) fn param_knob(
     r: f32,
     look: Look,
 ) -> Vec<(CableId, Pos2)> {
-    let th = theme(ui_state.dark);
+    let th = theme(&ui_state.style);
     let z = look.z;
     let base = base_value(editor.state(), id, param);
     let routes = routes_into(editor.state(), id, param.name);
@@ -649,44 +637,19 @@ pub(crate) fn param_knob(
     let base_n = param.to_norm(base);
     let routes = routes_into(editor.state(), id, param.name);
 
-    // Scale, skirt, cap, pointer at the base value (the A / A-dark knob).
-    for i in 0..=10 {
-        let a = travel_angle(i as f32 / 10.0);
-        painter.line_segment(
-            [
-                on_circle(center, rs + 4.0 * z, a),
-                on_circle(center, rs + 7.5 * z, a),
-            ],
-            Stroke::new(1.2 * z, th.tick),
-        );
-    }
+    // Scale, body and value marker from the theme's knob recipe.
     let hot = resp.hovered() || resp.dragged() || inspected;
-    painter.circle_filled(center, rs + 1.5 * z, th.skirt);
-    painter.circle_filled(center, rs * 0.84, th.knob);
-    painter.circle_stroke(
-        center,
-        rs * 0.84,
-        Stroke::new(0.8 * z, th.knob_hi.lerp_to_gamma(th.knob, 0.5)),
-    );
-    // Fine grip marks and a restrained upper rim: matte hardware, no glossy highlight blob.
-    for i in 0..24 {
-        let a = i as f32 / 24.0 * std::f32::consts::TAU;
-        let dir = EguiVec2::new(a.cos(), a.sin());
-        painter.line_segment(
-            [center + dir * rs * 0.73, center + dir * rs * 0.82],
-            Stroke::new(0.6 * z, th.knob_hi.lerp_to_gamma(th.knob, 0.65)),
-        );
-    }
-    if hot {
-        painter.circle_stroke(center, rs + 1.5 * z, Stroke::new(1.2 * z, th.sel));
-    }
-    let a = travel_angle(base_n);
-    painter.line_segment(
-        [
-            on_circle(center, rs * 0.2, a),
-            on_circle(center, rs * 0.78, a),
-        ],
-        Stroke::new(2.6 * z, th.pointer),
+    crate::kit::face::knob(
+        painter,
+        &ui_state.style,
+        &crate::kit::face::Knob {
+            c: center,
+            rs,
+            z,
+            value: base_n,
+            hot,
+        },
+        th.tick,
     );
 
     // Collapsed knob with several sources: one thin ring per source (display only; pressing
@@ -740,18 +703,15 @@ pub(crate) fn param_knob(
                     painter.line_segment([p0, p1], Stroke::new(2.5 * z, th.cv));
                 }
             }
-            two_tone_arc(
+            crate::kit::face::mod_range(
                 painter,
+                &ui_state.style,
                 center,
                 rr,
                 lo.clamp(0.0, 1.0),
-                hi.clamp(0.0, 1.0).max(lo.clamp(0.0, 1.0) + 0.004),
-                if strong {
-                    th.cv
-                } else {
-                    th.cv.gamma_multiply(0.75)
-                },
-                if strong { 4.0 } else { 3.0 } * z,
+                hi.clamp(0.0, 1.0),
+                strong,
+                z,
             );
         } else {
             let (lo, hi) = combined_span(
@@ -824,25 +784,32 @@ pub(crate) fn param_knob(
     }
 
     // Label above, value below (a pill with a coloured edge when modulated).
-    painter.text(
-        center - EguiVec2::new(0.0, 47.0 * z),
-        egui::Align2::CENTER_CENTER,
-        crate::macro_name(editor.state(), id, param.name).unwrap_or_else(|| param_label(param)),
-        egui::FontId::proportional(12.5 * z),
-        look.ink,
-    );
-    let value = fmt_value(param, base);
-    let vpos = center + EguiVec2::new(0.0, 38.0 * z);
-    if routes.is_empty() {
-        defer_text(
-            ui_state,
-            painter,
-            vpos,
+    if let Some(font) = crate::kit::face::face_font(&ui_state.style, crate::style::Role::Label, z) {
+        painter.text(
+            center - EguiVec2::new(0.0, (r + 21.0) * z),
             egui::Align2::CENTER_CENTER,
-            &value,
-            egui::FontId::monospace(11.5 * z),
+            crate::macro_name(editor.state(), id, param.name)
+                .unwrap_or_else(|| param_label(param)),
+            font,
             look.ink,
         );
+    }
+    let value = fmt_value(param, base);
+    let vpos = center + EguiVec2::new(0.0, (r + 14.0) * z);
+    if routes.is_empty() {
+        if let Some(g) = crate::kit::face::readout(
+            painter,
+            &ui_state.style,
+            &value,
+            z,
+            look.slot * z - 4.0,
+            look.ink,
+        ) {
+            let rect = egui::Align2::CENTER_CENTER.anchor_size(vpos, g.size());
+            ui_state
+                .deferred
+                .push(egui::Shape::galley(rect.min, g, look.ink));
+        }
     } else {
         let edge = if routes.iter().any(|rt| !rt.bypass) {
             th.cv
@@ -1112,7 +1079,7 @@ pub(crate) fn stepped_selector(
     look: Look,
 ) -> Vec<(CableId, Pos2)> {
     debug_assert_eq!(param.taper, Taper::Stepped);
-    let th = theme(ui_state.dark);
+    let th = theme(&ui_state.style);
     let z = look.z;
     let value = base_value(editor.state(), id, param).round();
     let n = (param.max - param.min).round() as usize + 1;
@@ -1120,13 +1087,15 @@ pub(crate) fn stepped_selector(
     let key = format!("{id}.{}", param.name);
     ui_state.record(format!("knob:{key}"), rect);
     let routes = routes_into(editor.state(), id, param.name);
-    painter.text(
-        egui::pos2(rect.center().x, rect.top() - 13.0 * z),
-        egui::Align2::CENTER_CENTER,
-        param_label(param),
-        egui::FontId::proportional(12.5 * z),
-        look.ink,
-    );
+    if let Some(font) = crate::kit::face::face_font(&ui_state.style, crate::style::Role::Label, z) {
+        painter.text(
+            egui::pos2(rect.center().x, rect.top() - 13.0 * z),
+            egui::Align2::CENTER_CENTER,
+            param_label(param),
+            font,
+            look.ink,
+        );
+    }
     let text_of = |k: usize| {
         labels
             .and_then(|l| l.get(k).copied())
@@ -1139,7 +1108,7 @@ pub(crate) fn stepped_selector(
         .map(|k| text_of(k).chars().count())
         .max()
         .unwrap_or(1);
-    if w < (6.9 * longest as f32 + 2.0) * z {
+    if w < (7.2 * longest as f32 + 2.0) * z {
         let cur = ((value - param.min).max(0.0) as usize).min(n - 1);
         let opened = ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
             egui::ComboBox::from_id_salt(("kabl-sel", id, param.name))
@@ -1181,13 +1150,17 @@ pub(crate) fn stepped_selector(
                 egui::StrokeKind::Inside,
             );
         }
-        painter.text(
-            r.center(),
-            egui::Align2::CENTER_CENTER,
-            text_of(k),
-            egui::FontId::monospace(11.5 * z),
-            if on { th.seg_on_text } else { look.ink2 },
-        );
+        if let Some(font) =
+            crate::kit::face::face_font(&ui_state.style, crate::style::Role::Value, z)
+        {
+            painter.text(
+                r.center(),
+                egui::Align2::CENTER_CENTER,
+                text_of(k),
+                font,
+                if on { th.seg_on_text } else { look.ink2 },
+            );
+        }
         if resp.clicked() {
             inspect(ui_state, &routes, id, param.name);
             if !on {
@@ -1206,7 +1179,7 @@ fn selector_plug(
     routes: &[RouteView],
     rect: Rect,
 ) -> Vec<(CableId, Pos2)> {
-    let th = theme(ui_state.dark);
+    let th = theme(&ui_state.style);
     let z = look.z;
     let plug = Pos2::new(rect.center().x, rect.max.y + 6.0 * z);
     if !routes.is_empty() {

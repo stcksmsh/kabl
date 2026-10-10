@@ -2,6 +2,7 @@
 //! the same values the `rev2_proto` example draws with), and the chrome/fonts that go with them.
 
 use egui::Color32;
+use crate::style::{mix, Style};
 use kabl_modules::PortType;
 
 pub struct Theme {
@@ -39,82 +40,49 @@ pub struct Theme {
     pub btn: Color32,
 }
 
-fn hex(s: &str) -> Color32 {
-    Color32::from_hex(s).expect("valid colour")
+/// The rack's palette, read from the theme: face colours come from the section families, the
+/// rest from the colour roles. One mapping, so a second theme restyles every face.
+pub fn theme(st: &Style) -> Theme {
+    let r = &st.roles;
+    let dark = st.dark;
+    Theme {
+        dark,
+        chrome: r.bg,
+        ctext: r.text,
+        rack: r.rack,
+        rail: r.rail,
+        rail_hi: r.text3,
+        hole: r.hole,
+        panel: r.surface,
+        panel_edge: r.line2,
+        ink: r.text,
+        ink2: r.text2,
+        plate: mix(r.knob, r.hole, 0.5),
+        plate_ink: r.knob_ink,
+        knob: r.knob,
+        knob_hi: r.knob_hi,
+        pointer: r.knob_ink,
+        skirt: mix(r.knob, r.knob_hi, 0.25),
+        tick: r.text2,
+        nut: mix(r.knob, r.knob_hi, 0.35),
+        nut_edge: mix(r.knob, r.knob_hi, 0.8),
+        hole_c: r.hole,
+        display: r.disp_bg,
+        display_ink: r.disp_trace,
+        seg_bg: r.inset,
+        seg_on: r.text,
+        seg_on_text: r.surface,
+        sel: r.focus,
+        warn: r.warn,
+        audio: r.audio,
+        cv: r.cv,
+        gate: r.gate,
+        btn: mix(r.inset, r.raised, 0.4),
+    }
 }
 
-pub fn theme(dark: bool) -> Theme {
-    if dark {
-        Theme {
-            dark,
-            chrome: hex("#1b2021"),
-            ctext: hex("#efe8da"),
-            rack: hex("#101516"),
-            rail: hex("#3f4748"),
-            rail_hi: hex("#8c877e"),
-            hole: hex("#161513"),
-            panel: hex("#2f2c28"),
-            panel_edge: hex("#4d4943"),
-            ink: hex("#efe8da"),
-            ink2: hex("#b2a893"),
-            plate: hex("#191816"),
-            plate_ink: hex("#efe8da"),
-            knob: hex("#292c2b"),
-            knob_hi: hex("#666a66"),
-            pointer: hex("#f0e8da"),
-            skirt: hex("#242724"),
-            tick: hex("#8d8475"),
-            nut: hex("#302f2c"),
-            nut_edge: hex("#67635c"),
-            hole_c: hex("#080807"),
-            display: hex("#141311"),
-            display_ink: hex("#f1cf94"),
-            seg_bg: hex("#23211e"),
-            seg_on: hex("#e9dcc0"),
-            seg_on_text: hex("#1b1916"),
-            sel: hex("#5a9bff"),
-            warn: hex("#f1b75a"),
-            audio: hex("#f0a640"),
-            cv: hex("#35c2b1"),
-            gate: hex("#a687ee"),
-            btn: hex("#2c2a27"),
-        }
-    } else {
-        Theme {
-            dark,
-            chrome: hex("#eee9df"),
-            ctext: hex("#302b26"),
-            rack: hex("#dfd9cd"),
-            rail: hex("#c5bfb3"),
-            rail_hi: hex("#bdb8ae"),
-            hole: hex("#2a2826"),
-            panel: hex("#e8e2d4"),
-            panel_edge: hex("#b9b2a2"),
-            ink: hex("#2a2520"),
-            ink2: hex("#5d564c"),
-            plate: hex("#2f2b27"),
-            plate_ink: hex("#f1ece2"),
-            knob: hex("#2a2826"),
-            knob_hi: hex("#57524b"),
-            pointer: hex("#f4efe6"),
-            skirt: hex("#514f49"),
-            tick: hex("#6b6357"),
-            nut: hex("#55534e"),
-            nut_edge: hex("#8b877f"),
-            hole_c: hex("#121110"),
-            display: hex("#23211e"),
-            display_ink: hex("#efe6d2"),
-            seg_bg: hex("#d8d1c1"),
-            seg_on: hex("#2a2520"),
-            seg_on_text: hex("#f4efe6"),
-            sel: hex("#2a6ae0"),
-            warn: hex("#b0661a"),
-            audio: hex("#e0962b"),
-            cv: hex("#23a597"),
-            gate: hex("#8d67d6"),
-            btn: hex("#ddd6c8"),
-        }
-    }
+fn hex(s: &str) -> Color32 {
+    Color32::from_hex(s).expect("valid colour")
 }
 
 impl Theme {
@@ -212,20 +180,14 @@ pub fn ensure_fonts(ctx: &egui::Context) {
 }
 
 /// Original sectional palettes. Geometry, identities and sound remain unchanged.
-pub fn panel_theme(dark: bool, kind: &str) -> Theme {
-    let mut t = theme(dark);
-    let (light, night) = match kind {
-        "osc.va" | "osc.fm" | "osc.fm6" | "osc.wt" | "osc" | "noise" => ("#cf947c", "#926958"),
-        "filter.svf" | "filter" => ("#a8b99d", "#62735c"),
-        "env.adsr" | "lfo" => ("#b8afca", "#71617d"),
-        "vca" | "mix" => ("#c4b891", "#7b6c52"),
-        "midi.in" | "midi" | "clock" | "seq" | "cues" => ("#a6babc", "#4b6469"),
-        _ => ("#d6ccbc", "#696157"),
-    };
-    t.panel = hex(if dark { night } else { light });
+/// The palette of one module's face: its section family over the rack palette.
+pub fn panel_theme(st: &Style, kind: &str) -> Theme {
+    let mut t = theme(st);
+    let sec = st.section_of(kind);
+    t.panel = sec.base;
     t.panel_edge = t.panel.lerp_to_gamma(Color32::BLACK, 0.3);
-    t.ink = hex(if dark { "#fff4e6" } else { "#292721" });
-    t.ink2 = hex(if dark { "#e8dfd2" } else { "#49443b" });
+    t.ink = sec.ink;
+    t.ink2 = sec.ink2;
     t.tick = t.ink2;
     t
 }

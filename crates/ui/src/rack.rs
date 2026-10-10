@@ -24,6 +24,12 @@ pub const RACK_X: f32 = 24.0;
 pub const R_LARGE: f32 = 22.0;
 pub const R_SMALL: f32 = 17.0;
 pub const JACK_R: f32 = 13.0;
+/// Jack rows sit low on the face so the middle is free for a live display.
+pub const JACK_Y: f32 = 296.0;
+/// The input row of a face whose jacks need two rows.
+pub const IN_ROW_Y: f32 = 248.0;
+const DISPLAY_TOP: f32 = 54.0;
+const DISPLAY_H: f32 = 52.0;
 
 /// Stored-param prefix for the per-instance face choice: `face.<param>` = 1 on the face, 0 off
 /// it, absent = the module's default. Presentation metadata in the patch; the compiler only reads
@@ -85,13 +91,13 @@ pub enum Geo {
 impl Geo {
     pub fn label_pos(&self) -> Pos2 {
         match *self {
-            Geo::Knob { c, .. } => c - vec2(0.0, 47.0),
+            Geo::Knob { c, r } => c - vec2(0.0, r + 21.0),
             Geo::Select { rect } => pos2(rect.center().x, rect.top() - 13.0),
         }
     }
     pub fn value_pos(&self) -> Pos2 {
         match *self {
-            Geo::Knob { c, .. } => c + vec2(0.0, 38.0),
+            Geo::Knob { c, r } => c + vec2(0.0, r + 14.0),
             Geo::Select { rect } => rect.center(),
         }
     }
@@ -99,7 +105,7 @@ impl Geo {
     pub fn bounds(&self) -> Rect {
         match *self {
             Geo::Knob { c, r } => {
-                Rect::from_min_max(c - vec2(r + 11.0, 56.0), c + vec2(r + 11.0, 49.0))
+                Rect::from_min_max(c - vec2(r + 11.0, r + 29.0), c + vec2(r + 11.0, r + 22.0))
             }
             Geo::Select { rect } => {
                 rect.union(Rect::from_center_size(self.label_pos(), vec2(40.0, 16.0)))
@@ -132,7 +138,8 @@ pub enum Decor {
     None,
     Keys(Rect),
     Speaker(Pos2),
-    Envelope(Rect),
+    /// A live display: the module kind says what it draws.
+    Display(Rect),
     /// The clock's Run/Stop and Restart buttons.
     Transport(Rect),
     /// Left end of the delay's sync readout line (left of the output plate).
@@ -174,6 +181,22 @@ impl Placed {
     pub fn ctl(&self, param: &str) -> Option<&Ctl> {
         self.ctls.iter().find(|c| c.param.name == param)
     }
+    /// Width a value readout under knob `c` can use: the distance to the nearest knob in
+    /// the same row, at most a knob pitch.
+    pub fn slot_width(&self, c: &Ctl) -> f32 {
+        let Geo::Knob { c: at, .. } = c.geo else {
+            return 76.0;
+        };
+        self.ctls
+            .iter()
+            .filter(|o| o.param.name != c.param.name)
+            .filter_map(|o| match o.geo {
+                Geo::Knob { c: p, .. } if (p.y - at.y).abs() < 24.0 => Some((p.x - at.x).abs()),
+                _ => None,
+            })
+            .fold(76.0, f32::min)
+    }
+
     pub fn jack(&self, port: &str, dir: PortDirection) -> Option<&Jack> {
         self.jacks
             .iter()
@@ -205,7 +228,7 @@ impl Placed {
             Decor::None => Decor::None,
             Decor::Keys(r) => Decor::Keys(r.translate(d)),
             Decor::Speaker(c) => Decor::Speaker(c + d),
-            Decor::Envelope(r) => Decor::Envelope(r.translate(d)),
+            Decor::Display(r) => Decor::Display(r.translate(d)),
             Decor::Transport(r) => Decor::Transport(r.translate(d)),
             Decor::Status(c) => Decor::Status(c + d),
             Decor::Banks(r) => Decor::Banks(r.translate(d)),
@@ -479,14 +502,14 @@ fn place_local(
             for (x, &port) in spread(ins.len(), fw).into_iter().zip(&ins) {
                 jacks.push(Jack {
                     port,
-                    c: pos2(x, 212.0),
+                    c: pos2(x, IN_ROW_Y),
                     label_right: false,
                 });
             }
             for (x, &port) in spread(outs.len(), fw).into_iter().zip(&outs) {
                 jacks.push(Jack {
                     port,
-                    c: pos2(x, 290.0),
+                    c: pos2(x, JACK_Y),
                     label_right: false,
                 });
             }
@@ -495,7 +518,7 @@ fn place_local(
             for (x, port) in spread(all.len(), fw).into_iter().zip(all) {
                 jacks.push(Jack {
                     port,
-                    c: pos2(x, 272.0),
+                    c: pos2(x, JACK_Y),
                     label_right: false,
                 });
             }
@@ -505,20 +528,7 @@ fn place_local(
             .map(|j| j.c.y - if j.label_right { 18.0 } else { 36.0 })
             .fold(PANEL_H, f32::min);
 
-        // Knob row, then selector row, from the top; the module's picture (envelope display)
-        // only when both still fit above the jacks.
-        let block = |start: f32| {
-            let mut y = start;
-            if !face_knobs.is_empty() {
-                y += 110.0;
-            }
-            if !face_sels.is_empty() {
-                y += 62.0;
-            }
-            y
-        };
-        let mut y = 52.0;
-        let mut sels_top = None;
+        let mut y = 60.0;
         match info.kind {
             "out" => decor = Decor::Speaker(pos2(fw / 2.0, 112.0)),
             "delay" => decor = Decor::Status(pos2(14.0, 228.0)),
@@ -537,16 +547,20 @@ fn place_local(
                     vec2(fw - 24.0, 32.0),
                 ))
             }
-            "env.adsr" if block(108.0) <= room => {
-                decor =
-                    Decor::Envelope(Rect::from_min_size(pos2(16.0, 54.0), vec2(fw - 32.0, 54.0)));
-                y = 108.0;
-            }
-            // No room for the picture and a selector row under the knobs: the selectors take
-            // the picture's place, so the knobs stay exactly where they are with the picture.
-            "env.adsr" if !face_knobs.is_empty() && block(52.0) <= room => {
-                sels_top = Some(52.0);
-                y = 108.0;
+            // The picture goes above the knobs when the knobs, the selectors and the jacks
+            // still fit under it; else the module keeps its plain layout.
+            "osc.va" | "osc.wt" | "osc.fm" | "filter.svf" | "filter.ladder" | "lfo"
+            | "env.adsr"
+                if DISPLAY_TOP + DISPLAY_H - 3.0
+                    + if face_knobs.is_empty() { 0.0 } else { 110.0 }
+                    + if face_sels.is_empty() { 0.0 } else { 46.0 }
+                    <= room + 8.0 =>
+            {
+                decor = Decor::Display(Rect::from_min_size(
+                    pos2(16.0, DISPLAY_TOP),
+                    vec2(fw - 32.0, DISPLAY_H),
+                ));
+                y = DISPLAY_TOP + DISPLAY_H - 3.0;
             }
             _ => {}
         }
@@ -590,8 +604,7 @@ fn place_local(
             for &i in &face_sels {
                 let avail = fw - 28.0 - 10.0 * (face_sels.len() as f32 - 1.0);
                 let w = avail * options(info, &info.params[i]).0.max(8) as f32 / total as f32;
-                let rect =
-                    Rect::from_min_size(pos2(x, sels_top.unwrap_or(y) + 26.0), vec2(w, 28.0));
+                let rect = Rect::from_min_size(pos2(x, y + 18.0), vec2(w, 28.0));
                 ctls.push(Ctl {
                     param: &info.params[i],
                     primary: true,
@@ -689,7 +702,7 @@ fn place_local(
             jacks
                 .iter()
                 .filter(|j| j.port.direction == PortDirection::Output)
-                .map(|j| Rect::from_min_max(j.c - vec2(30.0, 53.0), j.c + vec2(30.0, 23.0)))
+                .map(|j| Rect::from_min_max(j.c - vec2(30.0, 38.0), j.c + vec2(30.0, 24.0)))
                 .reduce(|a, b| a.union(b))
         })
         .flatten();
@@ -780,6 +793,8 @@ fn midi_in_face(
     decor
 }
 
+const FM6_H: f32 = 214.0;
+
 /// The six-operator FM voice. A header band holds the jacks, feedback, index and the algorithm
 /// choice; under it one framed block per operator: ratio across the top, then fine, level and
 /// velocity, then the four envelope knobs. Other chosen controls go to the advanced area.
@@ -791,7 +806,7 @@ fn fm6_face(
     off_face: &mut Vec<usize>,
 ) -> Decor {
     const TOP: f32 = 100.0;
-    let blocks = fm6_blocks(Rect::from_min_size(pos2(10.0, TOP), vec2(fw - 20.0, 238.0)));
+    let blocks = fm6_blocks(Rect::from_min_size(pos2(10.0, TOP), vec2(fw - 20.0, FM6_H)));
     for &i in controls {
         let name = info.params[i].name;
         let op = name
@@ -803,8 +818,8 @@ fn fm6_face(
         let base = op.map_or(name, |_| &name[..name.len() - 1]);
         let b = blocks[op.unwrap_or(0)];
         let (bx, bw) = (b.left(), b.width());
-        let row1 = |k: usize| pos2(bx + bw * (k as f32 + 0.5) / 3.0, TOP + 92.0);
-        let row2 = |k: usize| pos2(bx + 26.0 + (bw - 52.0) * k as f32 / 3.0, TOP + 188.0);
+        let row1 = |k: usize| pos2(bx + bw * (k as f32 + 0.5) / 3.0, TOP + 87.0);
+        let row2 = |k: usize| pos2(bx + bw * (k as f32 + 0.5) / 4.0, TOP + 171.0);
         let geo = match (op, base) {
             (Some(_), "ratio") => Geo::Select {
                 rect: Rect::from_min_size(pos2(bx + 10.0, TOP + 20.0), vec2(bw - 20.0, 20.0)),
@@ -838,11 +853,11 @@ fn fm6_face(
                 r: R_SMALL,
             },
             (None, "feedback") => Geo::Knob {
-                c: pos2(390.0, 50.0),
+                c: pos2(430.0, 60.0),
                 r: R_SMALL,
             },
             (None, "index") => Geo::Knob {
-                c: pos2(450.0, 50.0),
+                c: pos2(490.0, 60.0),
                 r: R_SMALL,
             },
             (None, "algorithm") => Geo::Select {
@@ -860,7 +875,7 @@ fn fm6_face(
         });
     }
     off_face.sort_unstable();
-    Decor::Operators(Rect::from_min_size(pos2(10.0, TOP), vec2(fw - 20.0, 238.0)))
+    Decor::Operators(Rect::from_min_size(pos2(10.0, TOP), vec2(fw - 20.0, FM6_H)))
 }
 
 /// The six operator blocks inside `r`. A wider gap down the middle keeps the face caption
