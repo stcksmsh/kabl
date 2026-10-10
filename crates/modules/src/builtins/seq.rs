@@ -17,6 +17,16 @@
 //! stream). A rejected step is a rest. The stream is seeded from the module id (`seed`) and
 //! reseeded on every reset edge.
 //!
+//! Ratchets (`k1..k8`, 1..4, per step): the step plays that many evenly spaced notes inside its
+//! own length. Each note is a gate of the same shape as the step's would be (half the sub-step
+//! in CLOCK mode, `gate_len` of it in LENGTH mode) with the step's pitch and velocity, so a
+//! ratchet of 3 at 120 bpm 16ths is a 16th-note triplet roll. The step length is predicted from
+//! the interval two clock edges back (the same position in a swung pair), the first step after a
+//! load plays plain until two intervals are known, and a clock edge always ends the step, so a
+//! slowing clock can only cut the last note short. Probability decides the whole step: one draw
+//! per advance, either every note of the ratchet plays or none. A rest (gate off) stays a rest.
+//! Old patches have no `k` params and read the default, 1: no ratchet.
+//!
 //! Gate timing (`gate_mode`, per bank):
 //! - CLOCK (default, the original behaviour): `gate` follows the clock pulse while the step is
 //!   on, so consecutive on-steps retrigger an envelope.
@@ -97,6 +107,18 @@ const fn stepped(name: &'static str, max: f32, default: f32) -> ParamInfo {
     }
 }
 
+const fn ratchet(name: &'static str) -> ParamInfo {
+    ParamInfo {
+        name,
+        min: 1.0,
+        max: 4.0,
+        default: 1.0,
+        unit: "x",
+        taper: Taper::Stepped,
+        smoothing_ms: 0.0,
+    }
+}
+
 const fn percent(name: &'static str, min: f32, default: f32) -> ParamInfo {
     ParamInfo {
         name,
@@ -162,12 +184,23 @@ macro_rules! bank {
             percent(concat!($pre, "r6"), 0.0, 100.0),
             percent(concat!($pre, "r7"), 0.0, 100.0),
             percent(concat!($pre, "r8"), 0.0, 100.0),
+            ratchet(concat!($pre, "k1")),
+            ratchet(concat!($pre, "k2")),
+            ratchet(concat!($pre, "k3")),
+            ratchet(concat!($pre, "k4")),
+            ratchet(concat!($pre, "k5")),
+            ratchet(concat!($pre, "k6")),
+            ratchet(concat!($pre, "k7")),
+            ratchet(concat!($pre, "k8")),
         ]
     };
 }
 
-/// Params per bank, in slot order.
-pub const SLOTS: usize = 35;
+/// Params per bank, in slot order. The first `OLD_SLOTS` are laid out as they always were; the
+/// ratchets (slots `S_RATCH..`) come after every other param so no older index moves.
+pub const SLOTS: usize = 43;
+const OLD_SLOTS: usize = 35;
+const S_RATCH: usize = OLD_SLOTS;
 const S_GATE: usize = STEPS;
 const S_LENGTH: usize = 2 * STEPS;
 const S_VEL: usize = 2 * STEPS + 1;
@@ -181,21 +214,31 @@ const C: [ParamInfo; SLOTS] = bank!("c.");
 const D: [ParamInfo; SLOTS] = bank!("d.");
 
 const TRANSPOSE_PARAM: usize = S_LENGTH + 1;
-const DIRECTION_PARAM: usize = SLOTS + 1;
-const BANK_PARAM: usize = SLOTS + 2;
-const BANK_B: usize = SLOTS + 3;
+const DIRECTION_PARAM: usize = OLD_SLOTS + 1;
+const BANK_PARAM: usize = OLD_SLOTS + 2;
+const BANK_B: usize = OLD_SLOTS + 3;
+/// Bank `b`'s ratchets start at `RATCH_BASE + b * STEPS`.
+const RATCH_BASE: usize = BANK_B + 3 * OLD_SLOTS;
 
 /// Bank A's first 28 params keep their historic order and indices (`p1..p8`, `g1..g8`,
 /// `length`, `transpose`, `v1..v8`, `gate_len`, `gate_mode`); then `r1..r8`, `direction`,
 /// `bank`, and banks B, C, D in slot order. `param_index` relies on this layout.
-const PARAMS: [ParamInfo; SLOTS + 3 + 3 * SLOTS] = {
-    let mut out = [A[0]; SLOTS + 3 + 3 * SLOTS];
+const PARAMS: [ParamInfo; RATCH_BASE + BANKS * STEPS] = {
+    let mut out = [A[0]; RATCH_BASE + BANKS * STEPS];
     let mut i = 0;
-    while i < SLOTS {
+    while i < OLD_SLOTS {
         out[if i <= S_LENGTH { i } else { i + 1 }] = A[i];
         out[BANK_B + i] = B[i];
-        out[BANK_B + SLOTS + i] = C[i];
-        out[BANK_B + 2 * SLOTS + i] = D[i];
+        out[BANK_B + OLD_SLOTS + i] = C[i];
+        out[BANK_B + 2 * OLD_SLOTS + i] = D[i];
+        i += 1;
+    }
+    i = 0;
+    while i < STEPS {
+        out[RATCH_BASE + i] = A[S_RATCH + i];
+        out[RATCH_BASE + STEPS + i] = B[S_RATCH + i];
+        out[RATCH_BASE + 2 * STEPS + i] = C[S_RATCH + i];
+        out[RATCH_BASE + 3 * STEPS + i] = D[S_RATCH + i];
         i += 1;
     }
     out[TRANSPOSE_PARAM] = pitch("transpose", 0.0);
@@ -207,14 +250,16 @@ const PARAMS: [ParamInfo; SLOTS + 3 + 3 * SLOTS] = {
 
 /// Index in `SEQ_INFO.params` of `slot` in `bank`.
 pub const fn param_index(bank: usize, slot: usize) -> usize {
-    if bank == 0 {
+    if slot >= S_RATCH {
+        RATCH_BASE + bank * STEPS + (slot - S_RATCH)
+    } else if bank == 0 {
         if slot <= S_LENGTH {
             slot
         } else {
             slot + 1
         }
     } else {
-        BANK_B + (bank - 1) * SLOTS + slot
+        BANK_B + (bank - 1) * OLD_SLOTS + slot
     }
 }
 
@@ -254,7 +299,7 @@ pub fn cleared(slot: usize) -> f32 {
 
 const ADVANCED: &[&str] = &{
     // Everything but bank A's pitches and gates; the face shows the edit bank's in their place.
-    let mut out = [""; 3 * SLOTS + 3 + SLOTS - 2 * STEPS];
+    let mut out = [""; PARAMS.len() - S_LENGTH];
     let mut n = 0;
     let mut i = 0;
     while i < PARAMS.len() {
@@ -376,6 +421,9 @@ struct St {
     period: f32,
     /// The last measured interval, accepted or not; 0 = none.
     cand: f32,
+    /// The last two clock intervals in samples (`iv[0]` the newer); 0 = not known yet. The step
+    /// now playing is as long as the interval two edges back (see the module docs, ratchets).
+    iv: [f32; 2],
 }
 
 pub struct Seq {
@@ -421,6 +469,7 @@ impl Seq {
                 since: 0,
                 period: 0.0,
                 cand: 0.0,
+                iv: [0.0; 2],
             },
         }
     }
@@ -474,6 +523,26 @@ fn accept(s: &mut St, interval: f32) {
     s.cand = interval;
 }
 
+/// How long the step now playing is, in samples: the interval two edges back, else the last one
+/// (a straight clock gives both alike). 0 until an interval is known. An interval more than
+/// four times the last one (the long gap across a Stop) is not trusted.
+pub(crate) fn step_len(iv: &[f32; 2]) -> f32 {
+    if iv[1] > 0.0 && iv[1] <= 4.0 * iv[0] && iv[0] <= 4.0 * iv[1] {
+        iv[1]
+    } else {
+        iv[0]
+    }
+}
+
+/// Whether the gate of a step that `n` notes share is high `since` samples into the step, which
+/// is `len` samples long: note `j` starts at `j * len / n` and lasts `width` (0..1) of its slot,
+/// always dropping at least one sample before the next so a note retriggers.
+pub(crate) fn ratchet_gate(since: f32, len: f32, n: f32, width: f32) -> bool {
+    let sub = len / n;
+    let (j, at) = ((since / sub).floor(), since % sub);
+    j < n && at < (width * sub).min(sub - 1.0).max(1.0)
+}
+
 /// One bank's values for a block.
 #[derive(Clone, Copy)]
 struct Bank {
@@ -481,6 +550,7 @@ struct Bank {
     gates: [bool; STEPS],
     velocities: [f32; STEPS],
     probs: [f32; STEPS],
+    ratchets: [u8; STEPS],
     length: usize,
     timed: bool,
     gate_len: f32,
@@ -510,6 +580,7 @@ impl Module for Seq {
             gates: std::array::from_fn(|k| p(io, b, S_GATE + k) >= 0.5),
             velocities: std::array::from_fn(|k| (p(io, b, S_VEL + k) / 100.0).clamp(0.0, 1.0)),
             probs: std::array::from_fn(|k| p(io, b, S_PROB + k)),
+            ratchets: std::array::from_fn(|k| (p(io, b, S_RATCH + k).round() as u8).clamp(1, 4)),
             length: (p(io, b, S_LENGTH).round() as usize).clamp(1, STEPS),
             timed: p(io, b, S_GATE_MODE) >= 0.5,
             gate_len: (p(io, b, S_GATE_LEN) / 100.0).clamp(0.01, 1.0),
@@ -544,6 +615,7 @@ impl Module for Seq {
                     s.play = draw < banks[s.bank as usize].probs[s.step];
                     if s.seen_edge {
                         accept(s, s.since as f32);
+                        s.iv = [s.since as f32, s.iv[0]];
                     }
                     (s.seen_edge, s.since) = (true, 0);
                 }
@@ -569,7 +641,16 @@ impl Module for Seq {
                 }
                 let b = &banks[s.bank as usize];
                 let on = b.gates[s.step] && s.play;
-                s.gate_high = if b.timed && s.period > 0.0 {
+                let ratchets = b.ratchets[s.step] as f32;
+                let step_len = step_len(&s.iv);
+                s.gate_high = if ratchets > 1.0 && step_len > 0.0 {
+                    on && ratchet_gate(
+                        s.since as f32,
+                        step_len,
+                        ratchets,
+                        if b.timed { b.gate_len } else { 0.5 },
+                    ) && !(edge && s.gate_high)
+                } else if b.timed && s.period > 0.0 {
                     let len = (b.gate_len * s.period).max(2.0);
                     on && (s.since as f32) < len && !(edge && s.gate_high)
                 } else {
@@ -615,6 +696,8 @@ impl Module for Seq {
         out.write_f32("since", s.since as f32);
         out.write_f32("period", s.period);
         out.write_f32("cand", s.cand);
+        out.write_f32("iv0", s.iv[0]);
+        out.write_f32("iv1", s.iv[1]);
     }
 
     fn load_state(&mut self, r: &dyn StateReader) {
@@ -644,6 +727,11 @@ impl Module for Seq {
         }
         if let Some(v) = r.read_f32("cand") {
             s.cand = v;
+        }
+        for (k, i) in [("iv0", 0), ("iv1", 1)] {
+            if let Some(v) = r.read_f32(k) {
+                s.iv[i] = v;
+            }
         }
     }
 

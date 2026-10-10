@@ -331,6 +331,10 @@ impl PatchEngine {
             let id = kb.id;
             kb.midi(e, &mut |a| act(active, incoming, id, a, offset));
         }
+        active.for_each_arp(|a| arp_key(a, e.event));
+        if let Some((g, _)) = incoming.as_mut() {
+            g.for_each_arp(|a| arp_key(a, e.event));
+        }
     }
 
     /// Keys physically down (the most any keyboard holds) and voices sounding (all keyboards).
@@ -910,6 +914,17 @@ fn window_blocks(sample_rate: f32) -> u32 {
 
 fn bit(note: u8) -> u128 {
     1u128 << (note & 0x7F)
+}
+
+/// Every arpeggiator hears every key, whatever its source or channel.
+fn arp_key(a: &mut kabl_modules::builtins::Arp, e: KeyEvent) {
+    match e {
+        KeyEvent::On { note, velocity } => a.note_on(note, velocity),
+        KeyEvent::Off { note } => a.note_off(note),
+        KeyEvent::Sustain(down) => a.sustain(down),
+        KeyEvent::AllOff | KeyEvent::NotesOff | KeyEvent::SourceLost => a.clear(),
+        _ => {}
+    }
 }
 
 /// A keyboard action in every running graph, at `offset` of the next block.

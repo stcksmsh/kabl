@@ -63,8 +63,8 @@ use std::fmt;
 use kabl_cables::{Carry, Node as CableNode, Settings as CableSettings};
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
 use kabl_modules::builtins::{
-    Change, Clock, Delay, DelayLock, KeySettings, Lfo, LfoSync, MidiIn, Noise, OscWt, Random, Seq,
-    Transport,
+    Arp, Change, Clock, Delay, DelayLock, KeySettings, Lfo, LfoSync, MidiIn, Noise, OscWt, Random,
+    Seq, Transport,
 };
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::ModuleView;
@@ -1379,6 +1379,9 @@ fn compile_inner(
             if let Some(seq) = instance.as_any_mut().downcast_mut::<Seq>() {
                 seq.seed(id);
             }
+            if let Some(arp) = instance.as_any_mut().downcast_mut::<Arp>() {
+                arp.seed(id);
+            }
             if let Some(noise) = instance.as_any_mut().downcast_mut::<Noise>() {
                 noise.seed(id, lane);
             }
@@ -1764,6 +1767,15 @@ impl CompiledPatch {
         }
     }
 
+    /// Audio thread: runs `f` on every `arp` module. No allocation.
+    pub fn for_each_arp(&mut self, mut f: impl FnMut(&mut Arp)) {
+        for m in &mut self.modules {
+            if let Some(a) = m.as_any_mut().downcast_mut::<Arp>() {
+                f(a);
+            }
+        }
+    }
+
     /// Audio thread: runs `f` on every `seq` module. No allocation.
     pub fn for_each_seq(&mut self, mut f: impl FnMut(&mut Seq)) {
         for m in &mut self.modules {
@@ -2125,7 +2137,8 @@ impl CompiledPatch {
             view: {
                 // The voice that was loudest in this window.
                 let mut view = ModuleView::default();
-                let loudest = (0..tap.n).max_by(|&a, &b| tap.acc[a].peak.total_cmp(&tap.acc[b].peak));
+                let loudest =
+                    (0..tap.n).max_by(|&a, &b| tap.acc[a].peak.total_cmp(&tap.acc[b].peak));
                 if let (true, Some(lane)) = (tap.found, loudest) {
                     self.modules[tap.modules[lane] as usize].view(&mut view);
                 }
