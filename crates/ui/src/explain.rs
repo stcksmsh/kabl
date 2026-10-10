@@ -306,10 +306,11 @@ pub fn outgoing(state: &PatchState, from: ModuleId, port: &str) -> Vec<Dest> {
                 None => Reach::Unknown(param.clone()),
             },
             PortRef::Module { port, .. } => Reach::Jack(port.clone()),
+            PortRef::CableParam { param, .. } => Reach::Unknown(param.clone()),
         };
         out.push(Dest {
             cable,
-            to: c.to.module_id(),
+            to: state.end_module(cable).unwrap_or_default(),
             reach,
             via: None,
         });

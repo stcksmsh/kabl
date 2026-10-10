@@ -1,0 +1,6 @@
+name = "Macro Morph"
+category = "Piece"
+tags = ["sequenced", "functional cables", "morph", "macro", "120bpm"]
+description = "Three gate cables, each with a pattern A and a pattern B, and one macro (m1) routed into all three morphs at +100 %, +50 % and -100 %. Raise the macro: the bass and the middle voice fill in, the high voice thins out. Open a cable's Pattern editor to see its source and change its depth."
+keys = false
+sequence = true

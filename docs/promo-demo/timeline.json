@@ -1,0 +1,36 @@
+{
+  "bpm": 100,
+  "bar_seconds": 2.4,
+  "bars": 70,
+  "cables": {
+    "echo": {"id": 18, "kind": "jack"},
+    "arp": {"id": 17, "kind": "jack"},
+    "bass": {"id": 30, "kind": "jack"},
+    "filter": {"id": 31, "kind": "route"},
+    "bells": {"id": 37, "kind": "jack"},
+    "pad": {"id": 47, "kind": "jack"},
+    "bus": {"id": 48, "kind": "jack"}
+  },
+  "gestures": [
+    {"cable": "echo", "from": 0, "to": 1, "start_bar": 4, "end_bar": 7, "what": "echoes: one throw per cycle to every step"},
+    {"cable": "arp", "from": 0, "to": 1, "start_bar": 9, "end_bar": 11, "what": "arp: sparse and chancy to every note"},
+    {"cable": "bass", "from": 0, "to": 1, "start_bar": 13, "end_bar": 15, "what": "bass: silent to full"},
+    {"cable": "filter", "from": 0, "to": 1, "start_bar": 17, "end_bar": 21, "what": "bass filter: shut to a busy five against four"},
+    {"cable": "bells", "from": 0, "to": 1, "start_bar": 23, "end_bar": 25.5, "what": "bells: none to a chancy sixteen"},
+    {"cable": "pad", "from": 0, "to": 1, "start_bar": 28, "end_bar": 31, "what": "pad: held to chopped"},
+    {"cable": "bus", "from": 1, "to": 0, "start_bar": 35.6, "end_bar": 36, "what": "break: the band cut to two stabs on the phrase, the echoes ring"},
+    {"cable": "bus", "from": 0, "to": 1, "start_bar": 43.6, "end_bar": 44, "what": "return: everything back on the downbeat of the phrase"},
+    {"cable": "pad", "from": 1, "to": 0, "start_bar": 53, "end_bar": 54.5, "what": "pad: back to held"},
+    {"cable": "bass", "from": 1, "to": 0, "start_bar": 56.5, "end_bar": 58.5, "what": "bass: out"},
+    {"cable": "bells", "from": 1, "to": 0, "start_bar": 60.5, "end_bar": 62, "what": "bells: out"},
+    {"cable": "arp", "from": 1, "to": 0, "start_bar": 64, "end_bar": 65.5, "what": "arp: thins out"}
+  ],
+  "sections": [
+    {"name": "Intro", "bar": 0},
+    {"name": "Build", "bar": 4},
+    {"name": "Peak", "bar": 31},
+    {"name": "Break", "bar": 36},
+    {"name": "Return", "bar": 44},
+    {"name": "Outro", "bar": 53}
+  ]
+}

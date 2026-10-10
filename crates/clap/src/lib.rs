@@ -1483,7 +1483,7 @@ mod tests {
             .insert("gain".into(), 1.0);
         assert_eq!(tail::samples(&ungated, 48000.0), u64::MAX);
         let mut modulation = kabl_standalone::default_patch();
-        modulation.cables.retain(|_, c| c.to.module_id() != 6);
+        modulation.cables.retain(|_, c| c.to.module_id() != Some(6));
         modulation.cables.insert(
             100,
             kabl_core::CableState {
@@ -1547,6 +1547,71 @@ mod tests {
             .params
             .insert("base_hz".into(), f32::INFINITY);
         assert!(p.shared.load(state).is_err());
+    }
+    /// A cable with a full pattern A, pattern B and morph (every slot, plus amount and bypass)
+    /// is a valid project; one param more is not. A cap of 32 once rejected such a project on
+    /// reload in a host.
+    #[test]
+    fn state_accepts_a_cable_with_every_functional_param() {
+        let p = instrument();
+        let cable = *p.shared.snapshot().patch.cables.keys().next().unwrap();
+        let with = |n: usize| {
+            let mut state = p.shared.snapshot();
+            let params = &mut state.patch.cables.get_mut(&cable).unwrap().params;
+            for slot in 0..kabl_cables::SLOTS {
+                params.insert(kabl_cables::slot_name(slot), 0.5);
+            }
+            params.insert("amount".into(), 1.0);
+            params.insert("bypass".into(), 0.0);
+            let mut extra = 0;
+            while params.len() < n {
+                params.insert(format!("x{extra}"), 0.0);
+                extra += 1;
+            }
+            state
+        };
+        let full = with(kabl_cables::MAX_CABLE_PARAMS);
+        assert_eq!(
+            full.patch.cables[&cable].params.len(),
+            kabl_cables::MAX_CABLE_PARAMS
+        );
+        let bytes = serde_json::to_vec(&full).unwrap();
+        assert!(SoundState::decode(&bytes).is_ok());
+        assert!(p.shared.load(full).is_ok());
+        let over = serde_json::to_vec(&with(kabl_cables::MAX_CABLE_PARAMS + 1)).unwrap();
+        assert!(SoundState::decode(&over).is_err());
+    }
+    /// A project holding routes into cables' morphs and a host lane on the macro that drives
+    /// them recalls exactly (the host automation of that lane is `scripts/host_routes.py`).
+    #[test]
+    fn state_carries_routes_into_cables_and_a_macro_lane() {
+        let p = instrument();
+        let mut state = p.shared.snapshot();
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../patches/functional-cables/macro-morph");
+        state.patch = kabl_core::load(&dir).unwrap().state().clone();
+        let knob = *state
+            .patch
+            .modules
+            .iter()
+            .find(|(_, m)| m.kind == "macro")
+            .unwrap()
+            .0;
+        state.lanes = std::array::from_fn(|_| automation::Lane::default());
+        state.lanes[0].target = Some(automation::Target {
+            module: knob,
+            kind: "macro".into(),
+            param: "m1".into(),
+        });
+        let back = SoundState::decode(&serde_json::to_vec(&state).unwrap()).unwrap();
+        assert_eq!(back.patch, state.patch);
+        assert_eq!(back.lanes[0].target, state.lanes[0].target);
+        assert!(back
+            .patch
+            .cables
+            .values()
+            .any(|c| matches!(c.to, kabl_core::PortRef::CableParam { .. })));
+        assert!(p.shared.load(back).is_ok());
     }
     fn audio(p: &mut Instrument, frames: usize, note: bool) -> Vec<f32> {
         let mut left = vec![0.0; frames];

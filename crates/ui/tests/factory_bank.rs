@@ -178,7 +178,7 @@ fn every_entry_opens_stopped_has_real_controls_and_recalls_complete_state() {
                             id,
                             port: key.clone()
                         }
-                        && state.modules.contains_key(&c.to.module_id())),
+                        && c.to.module_id().is_some_and(|m| state.modules.contains_key(&m))),
                     "{dir}: macro route"
                 );
             }

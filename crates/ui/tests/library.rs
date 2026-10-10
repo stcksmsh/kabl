@@ -28,6 +28,50 @@ fn factory() -> PathBuf {
 /// Every factory sound: (dir, name, category, tags, description).
 const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
     (
+        "functional-cables/morph-arc",
+        "Morph Arc",
+        "Piece",
+        &[
+            "sequenced",
+            "functional cables",
+            "morph",
+            "100bpm",
+            "a",
+            "minor",
+        ],
+        "A slow A-minor piece that plays by itself. Four cables each hold two patterns, A and \
+         B, and a morph between them: the delay send (one throw per eight-step arp cycle to every step), the \
+         pad's gate (a breathing hold to a sixteen-step chop) and the bass filter (four even \
+         steps to five uneven ones) and the bass level (quiet to full). Open a cable's Pattern editor and move Morph A to B.",
+    ),
+    (
+        "functional-cables/macro-morph",
+        "Macro Morph",
+        "Piece",
+        &["sequenced", "functional cables", "morph", "macro", "120bpm"],
+        "Three gate cables, each with a pattern A and a pattern B, and one macro (m1) routed into all three morphs at +100 %, +50 % and -100 %. Raise the macro: the bass and the middle voice fill in, the high voice thins out. Open a cable's Pattern editor to see its source and change its depth.",
+    ),
+    (
+        "functional-cables/echo-throws",
+        "Echo Throws",
+        "Piece",
+        &["sequenced", "functional cables", "probability", "112bpm"],
+        "A self-playing arpeggio. The cable from the voice to the delay opens on three of eight \
+         steps and passes 60 % of the time, so echoes are thrown at the notes by chance. The \
+         pitch cable moves to a new note 70 % of the time and otherwise holds the last one. \
+         Right-click a cable, Pattern, to edit.",
+    ),
+    (
+        "functional-cables/five-against-eight",
+        "Five Against Eight",
+        "Piece",
+        &["sequenced", "functional cables", "polymeter", "104bpm"],
+        "An 8-step bass line. A 5-step pattern on the modulation route into the filter cutoff \
+         moves the tone against it, so the two realign only every 40 steps, and one cutoff step \
+         passes 70 % of the time. A 16-step pattern on the pad's cable chops it into a gate. \
+         Open a cable's Pattern editor to change either.",
+    ),
+    (
         "palette/keyboard-bass",
         "Round Keyboard Bass",
         "Bass",

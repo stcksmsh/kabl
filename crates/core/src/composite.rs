@@ -159,7 +159,7 @@ pub fn validate(p: &PatchState) -> Result<(), String> {
                 || key >= c.next_interface
                 || e.label.is_empty()
                 || e.label.len() > 128
-                || !members.contains(&e.target.module_id())
+                || !e.target.module_id().is_some_and(|m| members.contains(&m))
             {
                 return Err(format!("Composite {id}: invalid public binding {key}"));
             }
