@@ -73,9 +73,9 @@ use kabl_modules::{
     StateBuf,
 };
 
+use crate::facetap::{FaceReport, FaceTaps, FaceTargets, NO_SLOT};
 use crate::graph::BLOCK;
 use crate::keyboard::Action;
-use crate::facetap::{FaceReport, FaceTargets, FaceTaps, NO_SLOT};
 use crate::probe::{ProbeReport, ProbeStatus, ProbeTarget, Tap, PROBE_LANES};
 use crate::runtime::RuntimeTarget;
 
@@ -2102,15 +2102,19 @@ impl CompiledPatch {
     /// number of instances, no allocation: called on the audio thread when the targets or the
     /// measured graph change, never per block.
     pub fn set_faces(&mut self, targets: Option<FaceTargets>) {
-        let it = self.module_origin.iter().zip(&self.modules).map(|(&(id, _), m)| {
-            let info = m.info();
-            let outputs = info
-                .ports
-                .iter()
-                .filter(|p| p.direction == PortDirection::Output)
-                .count();
-            (id, info.kind, outputs)
-        });
+        let it = self
+            .module_origin
+            .iter()
+            .zip(&self.modules)
+            .map(|(&(id, _), m)| {
+                let info = m.info();
+                let outputs = info
+                    .ports
+                    .iter()
+                    .filter(|p| p.direction == PortDirection::Output)
+                    .count();
+                (id, info.kind, outputs)
+            });
         self.faces.set(targets, it);
     }
 
@@ -2170,7 +2174,8 @@ impl CompiledPatch {
             view: {
                 // The voice that was loudest in this window.
                 let mut view = ModuleView::default();
-                let loudest = (0..tap.n).max_by(|&a, &b| tap.acc[a].peak.total_cmp(&tap.acc[b].peak));
+                let loudest =
+                    (0..tap.n).max_by(|&a, &b| tap.acc[a].peak.total_cmp(&tap.acc[b].peak));
                 if let (true, Some(lane)) = (tap.found, loudest) {
                     self.modules[tap.modules[lane] as usize].view(&mut view);
                 }

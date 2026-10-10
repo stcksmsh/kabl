@@ -788,8 +788,7 @@ pub(crate) fn param_knob(
         painter.text(
             center - EguiVec2::new(0.0, (r + 21.0) * z),
             egui::Align2::CENTER_CENTER,
-            crate::macro_name(editor.state(), id, param.name)
-                .unwrap_or_else(|| param_label(param)),
+            crate::macro_name(editor.state(), id, param.name).unwrap_or_else(|| param_label(param)),
             font,
             look.ink,
         );

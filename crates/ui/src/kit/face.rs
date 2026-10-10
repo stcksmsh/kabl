@@ -72,11 +72,7 @@ pub fn surface(p: &Painter, st: &Style, rect: Rect, base: Color32, edge: Color32
     p.add(Shape::mesh(mesh));
     if f.material == FaceMaterial::Lacquer && f.gloss > 0.0 {
         let band = Rect::from_min_size(rect.min, vec2(rect.width(), rect.height() * 0.36));
-        p.rect_filled(
-            band,
-            cr,
-            Color32::from_white_alpha((f.gloss * 255.0) as u8),
-        );
+        p.rect_filled(band, cr, Color32::from_white_alpha((f.gloss * 255.0) as u8));
     }
     if f.grain > 0.0 && z >= 0.5 {
         let a = (f.grain * 100.0) as u8;
@@ -146,13 +142,9 @@ pub fn title(
     let mut rect = Rect::NOTHING;
     if let Some(font) = title_font(st, z) {
         rect = match st.slots.face.title {
-            FaceTitle::Centered => p.text(
-                pos2(cx, y),
-                egui::Align2::CENTER_CENTER,
-                name,
-                font,
-                ink,
-            ),
+            FaceTitle::Centered => {
+                p.text(pos2(cx, y), egui::Align2::CENTER_CENTER, name, font, ink)
+            }
             FaceTitle::LeftDot => {
                 p.circle_filled(pos2(face.left() + 22.0 * z, y), 4.0 * z, st.roles.accent);
                 p.text(
@@ -245,7 +237,11 @@ pub fn knob(p: &Painter, st: &Style, k: &Knob, tick: Color32) {
     let rim = alpha(mix(r.knob_hi, r.knob, 0.5), 255);
     match ks.body {
         KnobBody::Cap => {
-            p.circle_filled(c + vec2(0.0, 1.6 * z), rs + 1.5 * z, alpha(Color32::BLACK, 50));
+            p.circle_filled(
+                c + vec2(0.0, 1.6 * z),
+                rs + 1.5 * z,
+                alpha(Color32::BLACK, 50),
+            );
             p.circle_filled(c, rs + 1.5 * z, skirt);
             p.circle_filled(c, rs * 0.84, r.knob);
             p.circle_stroke(c, rs * 0.84, Stroke::new((0.8 * z).max(0.8), rim));
@@ -259,7 +255,11 @@ pub fn knob(p: &Painter, st: &Style, k: &Knob, tick: Color32) {
             }
         }
         KnobBody::Glass => {
-            p.circle_filled(c + vec2(0.0, 1.6 * z), rs + 1.0 * z, alpha(Color32::BLACK, 50));
+            p.circle_filled(
+                c + vec2(0.0, 1.6 * z),
+                rs + 1.0 * z,
+                alpha(Color32::BLACK, 50),
+            );
             p.circle_filled(c, rs, r.knob);
             p.circle_filled(
                 c + vec2(-rs * 0.15, -rs * 0.2),
@@ -274,11 +274,7 @@ pub fn knob(p: &Painter, st: &Style, k: &Knob, tick: Color32) {
         }
     }
     if k.hot {
-        p.circle_stroke(
-            c,
-            rs + 1.5 * z,
-            Stroke::new((1.2 * z).max(1.2), r.focus),
-        );
+        p.circle_stroke(c, rs + 1.5 * z, Stroke::new((1.2 * z).max(1.2), r.focus));
     }
     let a = travel_angle(k.value);
     let w = (2.6 * z).max(1.6);
@@ -309,7 +305,16 @@ pub fn knob(p: &Painter, st: &Style, k: &Knob, tick: Color32) {
 
 /// The reachable range of a modulated knob, `lo..hi` in knob travel, at ring radius `rr`.
 /// `strong` is the inspected or selected knob.
-pub fn mod_range(p: &Painter, st: &Style, c: Pos2, rr: f32, lo: f32, hi: f32, strong: bool, z: f32) {
+pub fn mod_range(
+    p: &Painter,
+    st: &Style,
+    c: Pos2,
+    rr: f32,
+    lo: f32,
+    hi: f32,
+    strong: bool,
+    z: f32,
+) {
     let col = if strong {
         st.roles.cv
     } else {
@@ -433,17 +438,30 @@ pub fn display_frame(p: &Painter, st: &Style, rect: Rect, z: f32) {
             p.rect_filled(rect, cr, r.disp_bg);
             let sh = Rect::from_min_size(rect.min, vec2(rect.width(), (6.0 * z).max(2.0)));
             p.rect_filled(sh, cr, alpha(Color32::BLACK, 70));
-            p.rect_stroke(rect, cr, Stroke::new(1.0, alpha(Color32::BLACK, 120)), StrokeKind::Inside);
+            p.rect_stroke(
+                rect,
+                cr,
+                Stroke::new(1.0, alpha(Color32::BLACK, 120)),
+                StrokeKind::Inside,
+            );
         }
         DisplayFrame::Neon => {
             p.rect_filled(rect, cr, r.disp_bg);
             p.rect_stroke(
                 rect.expand(1.5),
                 cr,
-                Stroke::new(3.0, alpha(r.disp_trace, (70.0 * st.slots.display.glow) as u8)),
+                Stroke::new(
+                    3.0,
+                    alpha(r.disp_trace, (70.0 * st.slots.display.glow) as u8),
+                ),
                 StrokeKind::Outside,
             );
-            p.rect_stroke(rect, cr, Stroke::new(1.0, alpha(r.disp_trace, 150)), StrokeKind::Inside);
+            p.rect_stroke(
+                rect,
+                cr,
+                Stroke::new(1.0, alpha(r.disp_trace, 150)),
+                StrokeKind::Inside,
+            );
         }
         DisplayFrame::Paper => {
             p.rect_filled(rect, cr, mix(r.disp_bg, Color32::WHITE, 0.82));

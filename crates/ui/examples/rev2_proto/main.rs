@@ -26,9 +26,20 @@ use std::collections::HashMap;
 
 pub enum Gesture {
     None,
-    Base { ctl: CtlRef, before: Patch },
-    Depth { route: usize, before: Patch },
-    Wire { from: JackRef, before: Patch, moved_route: Option<Route>, unplugged: bool },
+    Base {
+        ctl: CtlRef,
+        before: Patch,
+    },
+    Depth {
+        route: usize,
+        before: Patch,
+    },
+    Wire {
+        from: JackRef,
+        before: Patch,
+        moved_route: Option<Route>,
+        unplugged: bool,
+    },
     Pan,
 }
 
@@ -150,7 +161,10 @@ impl App {
     }
 
     pub fn xf(&self) -> Xf {
-        Xf { origin: self.canvas.min + self.pan, zoom: self.zoom }
+        Xf {
+            origin: self.canvas.min + self.pan,
+            zoom: self.zoom,
+        }
     }
 
     /// Auto-Focus (a comparison option) turns All into Focus on the expanded module.
@@ -170,7 +184,11 @@ impl App {
     fn relayout(&mut self) {
         self.geo.expanded.resize(self.patch.modules.len(), false);
         self.geo.wrap_w = self.canvas.width().max(400.0) / self.zoom;
-        if self.geo.selected_route.is_some_and(|r| r >= self.patch.routes.len()) {
+        if self
+            .geo
+            .selected_route
+            .is_some_and(|r| r >= self.patch.routes.len())
+        {
             self.geo.selected_route = None;
         }
         self.layout = geom::layout(&self.patch, &self.geo);
@@ -210,7 +228,9 @@ impl App {
     fn cancel_gesture(&mut self) {
         let g = std::mem::replace(&mut self.gesture, Gesture::None);
         match g {
-            Gesture::Base { before, .. } | Gesture::Depth { before, .. } | Gesture::Wire { before, .. } => {
+            Gesture::Base { before, .. }
+            | Gesture::Depth { before, .. }
+            | Gesture::Wire { before, .. } => {
                 self.patch = before;
                 self.set_toast("Cancelled".into());
             }
@@ -220,11 +240,18 @@ impl App {
     }
 
     fn ctl_name(&self, c: CtlRef) -> String {
-        format!("{} {}", self.patch.module_label(c.m), self.patch.ctl_def(c).label)
+        format!(
+            "{} {}",
+            self.patch.module_label(c.m),
+            self.patch.ctl_def(c).label
+        )
     }
 
     fn value_str(&self, c: CtlRef) -> String {
-        model::fmt_value(&self.patch.ctl_def(c).spec, self.patch.modules[c.m].values[c.c])
+        model::fmt_value(
+            &self.patch.ctl_def(c).spec,
+            self.patch.modules[c.m].values[c.c],
+        )
     }
 
     /// `swings 0.45 – 142 ms` for a knob with active routes, in destination units.
@@ -235,7 +262,11 @@ impl App {
         }
         let base = self.patch.modules[c.m].values[c.c];
         let (lo, hi) = self.patch.mod_span(c, false);
-        let clamp = if base + lo < 0.0 || base + hi > 1.0 { " (clamped)" } else { "" };
+        let clamp = if base + lo < 0.0 || base + hi > 1.0 {
+            " (clamped)"
+        } else {
+            ""
+        };
         Some(format!(
             "swings {} – {}{clamp}",
             model::fmt_value(&spec, (base + lo).clamp(0.0, 1.0)),
@@ -251,7 +282,12 @@ impl App {
         self.geo.expanded[m] = e;
         if e {
             // Flash modulated controls that were hidden, so a route is never silently hidden.
-            if let Some(r) = self.patch.routes.iter().find(|r| r.dst.m == m && !self.patch.modules[m].primary[r.dst.c]) {
+            if let Some(r) = self
+                .patch
+                .routes
+                .iter()
+                .find(|r| r.dst.m == m && !self.patch.modules[m].primary[r.dst.c])
+            {
                 self.flash = Some((FlashTarget::Ctl(r.dst), self.now));
             }
         }
@@ -284,7 +320,9 @@ impl App {
     fn fit(&mut self) {
         self.relayout();
         let b = self.layout.bounds.expand(12.0);
-        let z = (self.canvas.width() / b.width()).min(self.canvas.height() / b.height()).clamp(0.4, 2.0);
+        let z = (self.canvas.width() / b.width())
+            .min(self.canvas.height() / b.height())
+            .clamp(0.4, 2.0);
         self.zoom = z;
         self.pan = -b.min.to_vec2() * z;
     }
@@ -310,7 +348,11 @@ impl App {
 
     fn bypass(&mut self, ri: usize) {
         let r = self.patch.routes[ri];
-        let label = format!("{} {}", if r.bypass { "Enable" } else { "Bypass" }, self.patch.route_label(&r));
+        let label = format!(
+            "{} {}",
+            if r.bypass { "Enable" } else { "Bypass" },
+            self.patch.route_label(&r)
+        );
         self.edit(label, |p| p.routes[ri].bypass = !p.routes[ri].bypass);
     }
 
@@ -346,7 +388,10 @@ impl App {
                 i.pointer.delta(),
                 i.modifiers,
                 // egui reports a double-click within 0.6 s of an earlier click as a triple.
-                i.pointer.button_double_clicked(egui::PointerButton::Primary) || i.pointer.button_triple_clicked(egui::PointerButton::Primary),
+                i.pointer
+                    .button_double_clicked(egui::PointerButton::Primary)
+                    || i.pointer
+                        .button_triple_clicked(egui::PointerButton::Primary),
                 i.pointer.secondary_pressed(),
                 i.smooth_scroll_delta,
                 i.key_pressed(Key::Escape),
@@ -355,7 +400,11 @@ impl App {
         self.pointer = pos;
         let over = resp.contains_pointer();
         let world = pos.map(|p| self.xf().inv(p));
-        self.hover = if over { world.and_then(|w| geom::hit_test(&self.regions, w)) } else { None };
+        self.hover = if over {
+            world.and_then(|w| geom::hit_test(&self.regions, w))
+        } else {
+            None
+        };
 
         if esc && self.entry.is_none() {
             if !matches!(self.gesture, Gesture::None) {
@@ -375,7 +424,10 @@ impl App {
         }
         if over && scroll != Vec2::ZERO {
             if mods.command {
-                self.zoom_about((scroll.y / 400.0).exp(), pos.unwrap_or(self.canvas.center()));
+                self.zoom_about(
+                    (scroll.y / 400.0).exp(),
+                    pos.unwrap_or(self.canvas.center()),
+                );
             } else {
                 self.pan += scroll;
             }
@@ -384,7 +436,11 @@ impl App {
             // A press on the rack outside the entry field cancels the entry.
             self.entry = None;
         } else if pressed && over {
-            self.press = Some(Press { hit: self.hover, origin: pos.unwrap_or_default(), started: false });
+            self.press = Some(Press {
+                hit: self.hover,
+                origin: pos.unwrap_or_default(),
+                started: false,
+            });
         }
         let fine = if mods.shift { 0.1 } else { 1.0 };
         let mut delta = delta;
@@ -398,10 +454,12 @@ impl App {
                 let before = self.patch.clone();
                 self.gesture = match hit {
                     Some(Hit::Knob(c) | Hit::Pill(c)) => Gesture::Base { ctl: c, before },
-                    Some(Hit::Ring(c)) => match geom::depth_route(&self.patch, c, self.geo.selected_route) {
-                        Some(route) => Gesture::Depth { route, before },
-                        None => Gesture::Base { ctl: c, before },
-                    },
+                    Some(Hit::Ring(c)) => {
+                        match geom::depth_route(&self.patch, c, self.geo.selected_route) {
+                            Some(route) => Gesture::Depth { route, before },
+                            None => Gesture::Base { ctl: c, before },
+                        }
+                    }
                     Some(Hit::Handle(route)) => Gesture::Depth { route, before },
                     Some(Hit::Jack(j)) => {
                         let jd = self.patch.jack_def(j);
@@ -409,20 +467,42 @@ impl App {
                             if let Some(ci) = self.patch.has_input_cable(j) {
                                 // Pick up the patched cable end (rack behaviour).
                                 let from = self.patch.cables.remove(ci).from;
-                                Gesture::Wire { from, before, moved_route: None, unplugged: true }
+                                Gesture::Wire {
+                                    from,
+                                    before,
+                                    moved_route: None,
+                                    unplugged: true,
+                                }
                             } else {
-                                Gesture::Wire { from: j, before, moved_route: None, unplugged: false }
+                                Gesture::Wire {
+                                    from: j,
+                                    before,
+                                    moved_route: None,
+                                    unplugged: false,
+                                }
                             }
                         } else {
-                            Gesture::Wire { from: j, before, moved_route: None, unplugged: false }
+                            Gesture::Wire {
+                                from: j,
+                                before,
+                                moved_route: None,
+                                unplugged: false,
+                            }
                         }
                     }
                     Some(Hit::Plug(ri)) => {
                         let r = self.patch.routes.remove(ri);
                         self.geo.selected_route = None;
-                        Gesture::Wire { from: r.src, before, moved_route: Some(r), unplugged: true }
+                        Gesture::Wire {
+                            from: r.src,
+                            before,
+                            moved_route: Some(r),
+                            unplugged: true,
+                        }
                     }
-                    Some(Hit::Seg(..) | Hit::Toggle(_) | Hit::Done(_) | Hit::Pin(_)) => Gesture::None,
+                    Some(Hit::Seg(..) | Hit::Toggle(_) | Hit::Done(_) | Hit::Pin(_)) => {
+                        Gesture::None
+                    }
                     _ => Gesture::Pan,
                 };
                 if let Gesture::Depth { route, .. } = self.gesture {
@@ -453,10 +533,19 @@ impl App {
                 }
                 Gesture::Depth { route, before } => {
                     let r = self.patch.routes[route];
-                    let label = format!("Depth {} {:+.0} %", self.patch.route_label(&r), r.amount * 100.0);
+                    let label = format!(
+                        "Depth {} {:+.0} %",
+                        self.patch.route_label(&r),
+                        r.amount * 100.0
+                    );
                     self.commit(before, label);
                 }
-                Gesture::Wire { from, before, moved_route, unplugged } => {
+                Gesture::Wire {
+                    from,
+                    before,
+                    moved_route,
+                    unplugged,
+                } => {
                     self.drop_wire(from, before, moved_route, unplugged, mods.alt);
                 }
                 Gesture::Pan => {}
@@ -470,7 +559,8 @@ impl App {
         if dbl && over {
             let target = match self.hover {
                 Some(Hit::Knob(c) | Hit::Pill(c)) => Some(EntryTarget::Base(c)),
-                Some(Hit::Ring(c)) => geom::depth_route(&self.patch, c, self.geo.selected_route).map(EntryTarget::Amount),
+                Some(Hit::Ring(c)) => geom::depth_route(&self.patch, c, self.geo.selected_route)
+                    .map(EntryTarget::Amount),
                 Some(Hit::Plug(r) | Hit::Handle(r)) => Some(EntryTarget::Amount(r)),
                 _ => None,
             };
@@ -486,19 +576,46 @@ impl App {
             EntryTarget::Amount(r) => format!("{:+.0} %", self.patch.routes[r].amount * 100.0),
         };
         // Empty field with the current value as the hint: typing replaces it.
-        self.entry = Some(Entry { target, text: String::new(), current, pos: at + vec2(12.0, 12.0), focused: false, error: false });
+        self.entry = Some(Entry {
+            target,
+            text: String::new(),
+            current,
+            pos: at + vec2(12.0, 12.0),
+            focused: false,
+            error: false,
+        });
     }
 
-    fn drop_wire(&mut self, from: JackRef, before: Patch, moved: Option<Route>, unplugged: bool, alt: bool) {
+    fn drop_wire(
+        &mut self,
+        from: JackRef,
+        before: Patch,
+        moved: Option<Route>,
+        unplugged: bool,
+        alt: bool,
+    ) {
         let from_out = self.patch.jack_def(from).out;
         let label = match self.hover {
             Some(Hit::Knob(c) | Hit::Ring(c) | Hit::Pill(c)) if from_out && c.m != usize::MAX => {
-                let amount = moved.map(|r| r.amount).unwrap_or(if alt { 0.0 } else { model::DEFAULT_DROP_AMOUNT });
-                let r = Route { src: from, dst: c, amount, bypass: moved.is_some_and(|r| r.bypass) };
+                let amount = moved.map(|r| r.amount).unwrap_or(if alt {
+                    0.0
+                } else {
+                    model::DEFAULT_DROP_AMOUNT
+                });
+                let r = Route {
+                    src: from,
+                    dst: c,
+                    amount,
+                    bypass: moved.is_some_and(|r| r.bypass),
+                };
                 self.patch.routes.push(r);
                 self.geo.selected_route = Some(self.patch.routes.len() - 1);
                 self.selected = Some(from.m);
-                Some(format!("Modulate {} ({:+.0} %)", self.patch.route_label(&r), amount * 100.0))
+                Some(format!(
+                    "Modulate {} ({:+.0} %)",
+                    self.patch.route_label(&r),
+                    amount * 100.0
+                ))
             }
             Some(Hit::Jack(j)) if j.m != from.m && self.patch.jack_def(j).out != from_out => {
                 let (out, inp) = if from_out { (from, j) } else { (j, from) };
@@ -508,7 +625,15 @@ impl App {
                 }
                 let c = model::Cable { from: out, to: inp };
                 self.patch.cables.push(c);
-                Some(format!("{} {}", if replaced.is_some() { "Replace" } else { "Connect" }, self.patch.cable_label(&c)))
+                Some(format!(
+                    "{} {}",
+                    if replaced.is_some() {
+                        "Replace"
+                    } else {
+                        "Connect"
+                    },
+                    self.patch.cable_label(&c)
+                ))
             }
             _ if moved.is_some() => Some(format!("Remove {}", before.route_label(&moved.unwrap()))),
             _ if unplugged => Some("Unplug cable".to_string()),
@@ -553,7 +678,9 @@ impl App {
             Some(Hit::Seg(c, s)) => {
                 self.selected = Some(c.m);
                 if self.patch.modules[c.m].values[c.c] != s as f32 {
-                    let Spec::Select { options, .. } = self.patch.ctl_def(c).spec else { return };
+                    let Spec::Select { options, .. } = self.patch.ctl_def(c).spec else {
+                        return;
+                    };
                     let label = format!("Set {} {}", self.ctl_name(c), options[s]);
                     self.edit(label, |p| p.modules[c.m].values[c.c] = s as f32);
                 }
@@ -593,7 +720,11 @@ impl App {
             }
             ui.separator();
             ui.label("Cables");
-            for (k, l, c) in [("cables.all", "All", Cables::All), ("cables.focus", "Focus", Cables::Focus), ("cables.hidden", "Hidden", Cables::Hidden)] {
+            for (k, l, c) in [
+                ("cables.all", "All", Cables::All),
+                ("cables.focus", "Focus", Cables::Focus),
+                ("cables.hidden", "Hidden", Cables::Hidden),
+            ] {
                 if tb(ui, rects, k, l, self.geo.cables == c, true) {
                     self.geo.cables = c;
                 }
@@ -604,7 +735,14 @@ impl App {
                 let c = self.canvas.center();
                 self.zoom_about(1.0 / 1.2, c);
             }
-            if tb(ui, rects, "zoom.100", &format!("{:.0}%", self.zoom * 100.0), false, true) {
+            if tb(
+                ui,
+                rects,
+                "zoom.100",
+                &format!("{:.0}%", self.zoom * 100.0),
+                false,
+                true,
+            ) {
                 self.zoom = 1.0;
                 self.pan = Vec2::ZERO;
             }
@@ -623,10 +761,24 @@ impl App {
                 self.dark = true;
             }
             ui.separator();
-            if tb(ui, rects, "patch.reference", "Reference", self.patch_choice == PatchChoice::Reference, true) {
+            if tb(
+                ui,
+                rects,
+                "patch.reference",
+                "Reference",
+                self.patch_choice == PatchChoice::Reference,
+                true,
+            ) {
                 self.load_patch(PatchChoice::Reference);
             }
-            if tb(ui, rects, "patch.crowded", "Crowded", self.patch_choice == PatchChoice::Crowded, true) {
+            if tb(
+                ui,
+                rects,
+                "patch.crowded",
+                "Crowded",
+                self.patch_choice == PatchChoice::Crowded,
+                true,
+            ) {
                 self.load_patch(PatchChoice::Crowded);
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -639,21 +791,54 @@ impl App {
 
     fn compare_bar(&mut self, ui: &mut egui::Ui, rects: &mut HashMap<String, Rect>) {
         ui.horizontal_centered(|ui| {
-            ui.label(egui::RichText::new("PROTOTYPE").strong().color(Color32::WHITE).background_color(draw::hex("#c2412d")));
+            ui.label(
+                egui::RichText::new("PROTOTYPE")
+                    .strong()
+                    .color(Color32::WHITE)
+                    .background_color(draw::hex("#c2412d")),
+            );
             ui.label(egui::RichText::new("Compare:").strong());
             ui.label("Hidden layout");
-            if tb(ui, rects, "layout.rack", "Stable rack", self.geo.hidden_layout == HiddenLayout::StableRack, true) {
+            if tb(
+                ui,
+                rects,
+                "layout.rack",
+                "Stable rack",
+                self.geo.hidden_layout == HiddenLayout::StableRack,
+                true,
+            ) {
                 self.geo.hidden_layout = HiddenLayout::StableRack;
             }
-            if tb(ui, rects, "layout.compact", "Compact synth", self.geo.hidden_layout == HiddenLayout::CompactSynth, true) {
+            if tb(
+                ui,
+                rects,
+                "layout.compact",
+                "Compact synth",
+                self.geo.hidden_layout == HiddenLayout::CompactSynth,
+                true,
+            ) {
                 self.geo.hidden_layout = HiddenLayout::CompactSynth;
             }
             ui.separator();
             ui.label("Expand");
-            if tb(ui, rects, "exp.push", "Push", self.geo.expansion == Expansion::Push, true) {
+            if tb(
+                ui,
+                rects,
+                "exp.push",
+                "Push",
+                self.geo.expansion == Expansion::Push,
+                true,
+            ) {
                 self.geo.expansion = Expansion::Push;
             }
-            if tb(ui, rects, "exp.float", "Float", self.geo.expansion == Expansion::Float, true) {
+            if tb(
+                ui,
+                rects,
+                "exp.float",
+                "Float",
+                self.geo.expansion == Expansion::Float,
+                true,
+            ) {
                 self.geo.expansion = Expansion::Float;
             }
             if tb(ui, rects, "autofocus", "auto-Focus", self.auto_focus, true) {
@@ -661,17 +846,35 @@ impl App {
             }
             ui.separator();
             ui.label("Depth");
-            for (k, l, d) in [("depth.ring", "Ring", DepthGesture::RingBand), ("depth.handle", "Handle", DepthGesture::PeakHandle), ("depth.inspector", "Inspector", DepthGesture::InspectorOnly)] {
+            for (k, l, d) in [
+                ("depth.ring", "Ring", DepthGesture::RingBand),
+                ("depth.handle", "Handle", DepthGesture::PeakHandle),
+                ("depth.inspector", "Inspector", DepthGesture::InspectorOnly),
+            ] {
                 if tb(ui, rects, k, l, self.geo.depth == d, true) {
                     self.geo.depth = d;
                 }
             }
             ui.separator();
             ui.label("Skin");
-            if tb(ui, rects, "skin.plates", "Plates", !self.labels_on_art, true) {
+            if tb(
+                ui,
+                rects,
+                "skin.plates",
+                "Plates",
+                !self.labels_on_art,
+                true,
+            ) {
                 self.labels_on_art = false;
             }
-            if tb(ui, rects, "skin.art", "labels_on_art", self.labels_on_art, true) {
+            if tb(
+                ui,
+                rects,
+                "skin.art",
+                "labels_on_art",
+                self.labels_on_art,
+                true,
+            ) {
                 self.labels_on_art = true;
             }
             ui.separator();
@@ -702,16 +905,42 @@ impl App {
                 .geo
                 .selected_route
                 .and_then(|r| self.patch.routes.get(r).map(|r| r.src))
-                .or_else(|| self.selected.and_then(|m| self.patch.routes.iter().find(|r| r.src.m == m).map(|r| r.src)));
+                .or_else(|| {
+                    self.selected.and_then(|m| {
+                        self.patch
+                            .routes
+                            .iter()
+                            .find(|r| r.src.m == m)
+                            .map(|r| r.src)
+                    })
+                });
             if let Some(src) = src.filter(|_| self.inspect.is_none()) {
-                let routes: Vec<usize> = (0..self.patch.routes.len()).filter(|&i| self.patch.routes[i].src == src).collect();
-                ui.label(egui::RichText::new(format!("SELECTED SOURCE · {} {} · {} routes", self.patch.module_label(src.m), self.patch.jack_def(src).label.to_lowercase(), routes.len())).small().strong());
+                let routes: Vec<usize> = (0..self.patch.routes.len())
+                    .filter(|&i| self.patch.routes[i].src == src)
+                    .collect();
+                ui.label(
+                    egui::RichText::new(format!(
+                        "SELECTED SOURCE · {} {} · {} routes",
+                        self.patch.module_label(src.m),
+                        self.patch.jack_def(src).label.to_lowercase(),
+                        routes.len()
+                    ))
+                    .small()
+                    .strong(),
+                );
                 for ri in routes {
                     self.route_card(ui, rects, ri);
                 }
                 ui.add_space(8.0);
             }
-            ui.label(egui::RichText::new(format!("ALL CONNECTIONS · {}", self.patch.cables.len() + self.patch.routes.len())).small().strong());
+            ui.label(
+                egui::RichText::new(format!(
+                    "ALL CONNECTIONS · {}",
+                    self.patch.cables.len() + self.patch.routes.len()
+                ))
+                .small()
+                .strong(),
+            );
             let th = theme(self.dark);
             for c in self.patch.cables.clone() {
                 let col = th.sig(self.patch.jack_def(c.from).sig);
@@ -723,10 +952,25 @@ impl App {
             for ri in 0..self.patch.routes.len() {
                 let r = self.patch.routes[ri];
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new("▌").color(if r.bypass { Color32::GRAY } else { th.cv }));
+                    ui.label(egui::RichText::new("▌").color(if r.bypass {
+                        Color32::GRAY
+                    } else {
+                        th.cv
+                    }));
                     let sel = self.geo.selected_route == Some(ri);
-                    let resp = ui.selectable_label(sel, format!("{}  {:+.0} %{}", self.patch.route_label(&r), r.amount * 100.0, if r.bypass { " · bypassed" } else { "" }));
-                    rects.insert(format!("row.{}", script::route_key(&self.patch, &r)), resp.rect);
+                    let resp = ui.selectable_label(
+                        sel,
+                        format!(
+                            "{}  {:+.0} %{}",
+                            self.patch.route_label(&r),
+                            r.amount * 100.0,
+                            if r.bypass { " · bypassed" } else { "" }
+                        ),
+                    );
+                    rects.insert(
+                        format!("row.{}", script::route_key(&self.patch, &r)),
+                        resp.rect,
+                    );
                     if resp.clicked() {
                         self.geo.selected_route = Some(ri);
                         self.selected = Some(r.src.m);
@@ -735,14 +979,22 @@ impl App {
                 });
             }
             ui.add_space(8.0);
-            ui.label(egui::RichText::new("+ NEW ROUTE (works in every cable mode)").small().strong());
+            ui.label(
+                egui::RichText::new("+ NEW ROUTE (works in every cable mode)")
+                    .small()
+                    .strong(),
+            );
             self.new_route_ui(ui, rects);
         });
     }
 
     fn inspector(&mut self, ui: &mut egui::Ui, rects: &mut HashMap<String, Rect>, c: CtlRef) {
         let th = theme(self.dark);
-        ui.label(egui::RichText::new(format!("DESTINATION · {}", self.ctl_name(c))).small().strong());
+        ui.label(
+            egui::RichText::new(format!("DESTINATION · {}", self.ctl_name(c)))
+                .small()
+                .strong(),
+        );
         ui.horizontal(|ui| {
             ui.label(format!("Base {}", self.value_str(c)));
             if tb(ui, rects, "inspector.reset", "Reset", false, true) {
@@ -768,21 +1020,58 @@ impl App {
         let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), h), Sense::hover());
         let p = ui.painter();
         let x = |t: f32| rect.left() + 6.0 + (rect.width() - 12.0) * t.clamp(0.0, 1.0);
-        p.line_segment([pos2(x(0.0), rect.top() + 12.0), pos2(x(1.0), rect.top() + 12.0)], egui::Stroke::new(2.0, Color32::from_gray(90)));
+        p.line_segment(
+            [
+                pos2(x(0.0), rect.top() + 12.0),
+                pos2(x(1.0), rect.top() + 12.0),
+            ],
+            egui::Stroke::new(2.0, Color32::from_gray(90)),
+        );
         let base = self.patch.modules[c.m].values[c.c];
         let (lo, hi) = self.patch.mod_span(c, false);
-        p.line_segment([pos2(x(base + lo), rect.top() + 12.0), pos2(x(base + hi), rect.top() + 12.0)], egui::Stroke::new(7.0, th.cv));
-        p.add(egui::Shape::convex_polygon(vec![pos2(x(base), rect.top() + 17.0), pos2(x(base) - 6.0, rect.top() + 27.0), pos2(x(base) + 6.0, rect.top() + 27.0)], Color32::WHITE, egui::Stroke::NONE));
+        p.line_segment(
+            [
+                pos2(x(base + lo), rect.top() + 12.0),
+                pos2(x(base + hi), rect.top() + 12.0),
+            ],
+            egui::Stroke::new(7.0, th.cv),
+        );
+        p.add(egui::Shape::convex_polygon(
+            vec![
+                pos2(x(base), rect.top() + 17.0),
+                pos2(x(base) - 6.0, rect.top() + 27.0),
+                pos2(x(base) + 6.0, rect.top() + 27.0),
+            ],
+            Color32::WHITE,
+            egui::Stroke::NONE,
+        ));
         for (k, &ri) in routes.iter().enumerate() {
             let (a, b) = self.patch.route_span(&self.patch.routes[ri]);
             let y = rect.top() + 32.0 + 8.0 * k as f32;
-            let col = if self.patch.routes[ri].bypass { Color32::GRAY } else { th.cv.lerp_to_gamma(Color32::WHITE, 0.25 * k as f32) };
-            p.line_segment([pos2(x(base + a), y), pos2(x(base + b), y)], egui::Stroke::new(2.0, col));
+            let col = if self.patch.routes[ri].bypass {
+                Color32::GRAY
+            } else {
+                th.cv.lerp_to_gamma(Color32::WHITE, 0.25 * k as f32)
+            };
+            p.line_segment(
+                [pos2(x(base + a), y), pos2(x(base + b), y)],
+                egui::Stroke::new(2.0, col),
+            );
             for e in [a, b] {
-                p.line_segment([pos2(x(base + e), y - 3.0), pos2(x(base + e), y + 3.0)], egui::Stroke::new(2.0, col));
+                p.line_segment(
+                    [pos2(x(base + e), y - 3.0), pos2(x(base + e), y + 3.0)],
+                    egui::Stroke::new(2.0, col),
+                );
             }
         }
-        ui.label(egui::RichText::new(format!("{} source{}", routes.len(), if routes.len() == 1 { "" } else { "s" })).small());
+        ui.label(
+            egui::RichText::new(format!(
+                "{} source{}",
+                routes.len(),
+                if routes.len() == 1 { "" } else { "s" }
+            ))
+            .small(),
+        );
         for ri in routes {
             self.route_card(ui, rects, ri);
         }
@@ -797,18 +1086,45 @@ impl App {
         let sel = self.geo.selected_route == Some(ri);
         let th = theme(self.dark);
         egui::Frame::group(ui.style())
-            .stroke(egui::Stroke::new(if sel { 2.0 } else { 1.0 }, if sel { th.cv } else { Color32::from_gray(80) }))
+            .stroke(egui::Stroke::new(
+                if sel { 2.0 } else { 1.0 },
+                if sel { th.cv } else { Color32::from_gray(80) },
+            ))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.label(egui::RichText::new(self.patch.route_label(&r)).strong());
                 let dst_def = self.patch.ctl_def(r.dst);
-                let rate = if self.patch.modules[r.dst.m].kind == Kind::Adsr || matches!(dst_def.spec, Spec::Select { .. }) || self.patch.modules[r.dst.m].kind == Kind::Lfo { " · block rate" } else { "" };
-                let feedback = if r.src.m == r.dst.m { " · 1-block delay (feedback)" } else { "" };
-                let pol = if self.patch.source_bipolar(r.src) { "bipolar source" } else { "unipolar source" };
-                ui.label(egui::RichText::new(format!("{pol} · per voice{rate}{feedback}")).small().weak());
+                let rate = if self.patch.modules[r.dst.m].kind == Kind::Adsr
+                    || matches!(dst_def.spec, Spec::Select { .. })
+                    || self.patch.modules[r.dst.m].kind == Kind::Lfo
+                {
+                    " · block rate"
+                } else {
+                    ""
+                };
+                let feedback = if r.src.m == r.dst.m {
+                    " · 1-block delay (feedback)"
+                } else {
+                    ""
+                };
+                let pol = if self.patch.source_bipolar(r.src) {
+                    "bipolar source"
+                } else {
+                    "unipolar source"
+                };
+                ui.label(
+                    egui::RichText::new(format!("{pol} · per voice{rate}{feedback}"))
+                        .small()
+                        .weak(),
+                );
                 ui.spacing_mut().slider_width = 170.0;
                 let mut pct = r.amount * 100.0;
-                let resp = ui.add(egui::Slider::new(&mut pct, -100.0..=100.0).suffix(" %").text("Amount").fixed_decimals(0));
+                let resp = ui.add(
+                    egui::Slider::new(&mut pct, -100.0..=100.0)
+                        .suffix(" %")
+                        .text("Amount")
+                        .fixed_decimals(0),
+                );
                 rects.insert(format!("card.amount.{key}"), resp.rect);
                 if resp.changed() {
                     if self.slider_before.as_ref().is_none_or(|(i, _)| *i != ri) {
@@ -819,7 +1135,11 @@ impl App {
                 if !resp.dragged() && !resp.has_focus() {
                     if let Some((i, before)) = self.slider_before.take() {
                         if i == ri {
-                            let label = format!("Depth {} {:+.0} %", self.patch.route_label(&self.patch.routes[ri]), self.patch.routes[ri].amount * 100.0);
+                            let label = format!(
+                                "Depth {} {:+.0} %",
+                                self.patch.route_label(&self.patch.routes[ri]),
+                                self.patch.routes[ri].amount * 100.0
+                            );
                             self.commit(before, label);
                         } else {
                             self.slider_before = Some((i, before));
@@ -842,19 +1162,51 @@ impl App {
                     );
                 }
                 if r.bypass {
-                    ui.label(egui::RichText::new("Bypassed: no effect, amount kept").small().color(Color32::GRAY));
+                    ui.label(
+                        egui::RichText::new("Bypassed: no effect, amount kept")
+                            .small()
+                            .color(Color32::GRAY),
+                    );
                 }
                 ui.horizontal(|ui| {
-                    if tb(ui, rects, &format!("card.invert.{key}"), "Invert", false, true) {
+                    if tb(
+                        ui,
+                        rects,
+                        &format!("card.invert.{key}"),
+                        "Invert",
+                        false,
+                        true,
+                    ) {
                         self.invert(ri);
                     }
-                    if tb(ui, rects, &format!("card.bypass.{key}"), "Bypass", r.bypass, true) {
+                    if tb(
+                        ui,
+                        rects,
+                        &format!("card.bypass.{key}"),
+                        "Bypass",
+                        r.bypass,
+                        true,
+                    ) {
                         self.bypass(ri);
                     }
-                    if tb(ui, rects, &format!("card.remove.{key}"), "Remove", false, true) {
+                    if tb(
+                        ui,
+                        rects,
+                        &format!("card.remove.{key}"),
+                        "Remove",
+                        false,
+                        true,
+                    ) {
                         self.remove_route(ri);
                     }
-                    if tb(ui, rects, &format!("card.locate.{key}"), "Locate", false, true) {
+                    if tb(
+                        ui,
+                        rects,
+                        &format!("card.locate.{key}"),
+                        "Locate",
+                        false,
+                        true,
+                    ) {
                         self.locate(r.dst);
                     }
                 });
@@ -863,32 +1215,70 @@ impl App {
 
     fn new_route_ui(&mut self, ui: &mut egui::Ui, rects: &mut HashMap<String, Rect>) {
         let srcs: Vec<JackRef> = (0..self.patch.modules.len())
-            .flat_map(|m| (0..self.patch.modules[m].def().jacks.len()).map(move |j| JackRef { m, j }))
+            .flat_map(|m| {
+                (0..self.patch.modules[m].def().jacks.len()).map(move |j| JackRef { m, j })
+            })
             .filter(|j| self.patch.jack_def(*j).out)
             .collect();
         let dsts: Vec<CtlRef> = (0..self.patch.modules.len())
-            .flat_map(|m| (0..self.patch.modules[m].def().controls.len()).map(move |c| CtlRef { m, c }))
+            .flat_map(|m| {
+                (0..self.patch.modules[m].def().controls.len()).map(move |c| CtlRef { m, c })
+            })
             .collect();
-        let name_src = |p: &Patch, j: JackRef| format!("{} {}", p.module_label(j.m), p.jack_def(j).label.to_lowercase());
-        let name_dst = |p: &Patch, c: CtlRef| {
-            format!("{} {}{}", p.module_label(c.m), p.ctl_def(c).label, if p.modules[c.m].primary[c.c] { "" } else { " (hidden)" })
+        let name_src = |p: &Patch, j: JackRef| {
+            format!(
+                "{} {}",
+                p.module_label(j.m),
+                p.jack_def(j).label.to_lowercase()
+            )
         };
-        let cur_s = self.new_route.0.map(|j| name_src(&self.patch, j)).unwrap_or("source…".into());
-        let cur_d = self.new_route.1.map(|c| name_dst(&self.patch, c)).unwrap_or("destination…".into());
-        egui::ComboBox::from_id_salt("nr_src").selected_text(cur_s).show_ui(ui, |ui| {
-            for j in &srcs {
-                ui.selectable_value(&mut self.new_route.0, Some(*j), name_src(&self.patch, *j));
-            }
-        });
-        egui::ComboBox::from_id_salt("nr_dst").selected_text(cur_d).show_ui(ui, |ui| {
-            for c in &dsts {
-                ui.selectable_value(&mut self.new_route.1, Some(*c), name_dst(&self.patch, *c));
-            }
-        });
+        let name_dst = |p: &Patch, c: CtlRef| {
+            format!(
+                "{} {}{}",
+                p.module_label(c.m),
+                p.ctl_def(c).label,
+                if p.modules[c.m].primary[c.c] {
+                    ""
+                } else {
+                    " (hidden)"
+                }
+            )
+        };
+        let cur_s = self
+            .new_route
+            .0
+            .map(|j| name_src(&self.patch, j))
+            .unwrap_or("source…".into());
+        let cur_d = self
+            .new_route
+            .1
+            .map(|c| name_dst(&self.patch, c))
+            .unwrap_or("destination…".into());
+        egui::ComboBox::from_id_salt("nr_src")
+            .selected_text(cur_s)
+            .show_ui(ui, |ui| {
+                for j in &srcs {
+                    ui.selectable_value(&mut self.new_route.0, Some(*j), name_src(&self.patch, *j));
+                }
+            });
+        egui::ComboBox::from_id_salt("nr_dst")
+            .selected_text(cur_d)
+            .show_ui(ui, |ui| {
+                for c in &dsts {
+                    ui.selectable_value(&mut self.new_route.1, Some(*c), name_dst(&self.patch, *c));
+                }
+            });
         let ok = matches!(self.new_route, (Some(_), Some(_)));
         if tb(ui, rects, "newroute.add", "Add route (+25 %)", false, ok) {
-            let (Some(src), Some(dst)) = self.new_route else { return };
-            let r = Route { src, dst, amount: model::DEFAULT_DROP_AMOUNT, bypass: false };
+            let (Some(src), Some(dst)) = self.new_route else {
+                return;
+            };
+            let r = Route {
+                src,
+                dst,
+                amount: model::DEFAULT_DROP_AMOUNT,
+                bypass: false,
+            };
             let label = format!("Modulate {} (+25 %)", self.patch.route_label(&r));
             self.edit(label, |p| p.routes.push(r));
             self.geo.selected_route = Some(self.patch.routes.len() - 1);
@@ -899,38 +1289,60 @@ impl App {
         let Some(e) = self.entry.as_mut() else { return };
         let mut close = false;
         let mut commit = false;
-        egui::Area::new(egui::Id::new("entry")).fixed_pos(e.pos).order(egui::Order::Foreground).show(ctx, |ui| {
-            egui::Frame::popup(ui.style()).show(ui, |ui| {
-                let hint = match e.target {
-                    EntryTarget::Base(_) => "value, e.g. 12 ms · 1.2k · 2 s",
-                    EntryTarget::Amount(_) => "amount, e.g. +40 % · -25",
-                };
-                ui.label(egui::RichText::new(hint).small());
-                let resp = ui.add(egui::TextEdit::singleline(&mut e.text).hint_text(e.current.as_str()).desired_width(160.0).id(egui::Id::new("entry_text")));
-                if !e.focused {
-                    resp.request_focus();
-                    e.focused = true;
-                }
-                if e.error {
-                    ui.label(egui::RichText::new("not understood").small().color(Color32::from_rgb(255, 120, 100)));
-                }
-                if ui.input(|i| i.key_pressed(Key::Escape)) {
-                    close = true;
-                } else if ui.input(|i| i.key_pressed(Key::Enter)) {
-                    commit = true;
-                }
+        egui::Area::new(egui::Id::new("entry"))
+            .fixed_pos(e.pos)
+            .order(egui::Order::Foreground)
+            .show(ctx, |ui| {
+                egui::Frame::popup(ui.style()).show(ui, |ui| {
+                    let hint = match e.target {
+                        EntryTarget::Base(_) => "value, e.g. 12 ms · 1.2k · 2 s",
+                        EntryTarget::Amount(_) => "amount, e.g. +40 % · -25",
+                    };
+                    ui.label(egui::RichText::new(hint).small());
+                    let resp = ui.add(
+                        egui::TextEdit::singleline(&mut e.text)
+                            .hint_text(e.current.as_str())
+                            .desired_width(160.0)
+                            .id(egui::Id::new("entry_text")),
+                    );
+                    if !e.focused {
+                        resp.request_focus();
+                        e.focused = true;
+                    }
+                    if e.error {
+                        ui.label(
+                            egui::RichText::new("not understood")
+                                .small()
+                                .color(Color32::from_rgb(255, 120, 100)),
+                        );
+                    }
+                    if ui.input(|i| i.key_pressed(Key::Escape)) {
+                        close = true;
+                    } else if ui.input(|i| i.key_pressed(Key::Enter)) {
+                        commit = true;
+                    }
+                });
             });
-        });
         if commit {
             let e = self.entry.as_ref().unwrap();
             let (target, text) = (e.target, e.text.clone());
             let ok = match target {
-                EntryTarget::Base(c) => model::parse_value(&self.patch.ctl_def(c).spec, &text).map(|t| {
-                    let label = format!("Set {} {}", self.ctl_name(c), model::fmt_value(&self.patch.ctl_def(c).spec, t));
-                    self.edit(label, |p| p.modules[c.m].values[c.c] = t);
-                }),
+                EntryTarget::Base(c) => {
+                    model::parse_value(&self.patch.ctl_def(c).spec, &text).map(|t| {
+                        let label = format!(
+                            "Set {} {}",
+                            self.ctl_name(c),
+                            model::fmt_value(&self.patch.ctl_def(c).spec, t)
+                        );
+                        self.edit(label, |p| p.modules[c.m].values[c.c] = t);
+                    })
+                }
                 EntryTarget::Amount(r) => model::parse_amount(&text).map(|a| {
-                    let label = format!("Depth {} {:+.0} %", self.patch.route_label(&self.patch.routes[r]), a * 100.0);
+                    let label = format!(
+                        "Depth {} {:+.0} %",
+                        self.patch.route_label(&self.patch.routes[r]),
+                        a * 100.0
+                    );
                     self.edit(label, |p| p.routes[r].amount = a);
                 }),
             };
@@ -963,18 +1375,31 @@ impl App {
                     ui.close();
                 }
                 let prim = self.patch.modules[c.m].primary[c.c];
-                if mb(ui, rects, "menu.pin", if prim { "Remove from face" } else { "Pin to face (primary)" }) {
+                if mb(
+                    ui,
+                    rects,
+                    "menu.pin",
+                    if prim {
+                        "Remove from face"
+                    } else {
+                        "Pin to face (primary)"
+                    },
+                ) {
                     self.set_primary(c, !prim);
                     ui.close();
                 }
-                if self.patch.routes_to(c).next().is_some() && mb(ui, rects, "menu.unmod", "Remove all modulation") {
+                if self.patch.routes_to(c).next().is_some()
+                    && mb(ui, rects, "menu.unmod", "Remove all modulation")
+                {
                     let label = format!("Remove modulation on {}", self.ctl_name(c));
                     self.edit(label, |p| p.routes.retain(|r| r.dst != c));
                     ui.close();
                 }
             }
             Hit::Plug(r) | Hit::Handle(r) => {
-                ui.label(egui::RichText::new(self.patch.route_label(&self.patch.routes[r])).strong());
+                ui.label(
+                    egui::RichText::new(self.patch.route_label(&self.patch.routes[r])).strong(),
+                );
                 if mb(ui, rects, "menu.invert", "Invert") {
                     self.invert(r);
                     ui.close();
@@ -994,19 +1419,48 @@ impl App {
                     self.geo.choose = Some(m);
                     ui.close();
                 }
-                if mb(ui, rects, "menu.resetprimary", "Reset primary to module default") {
-                    let d: Vec<bool> = self.patch.modules[m].def().controls.iter().map(|c| c.primary).collect();
-                    self.edit("Reset primary controls".into(), |p| p.modules[m].primary = d);
+                if mb(
+                    ui,
+                    rects,
+                    "menu.resetprimary",
+                    "Reset primary to module default",
+                ) {
+                    let d: Vec<bool> = self.patch.modules[m]
+                        .def()
+                        .controls
+                        .iter()
+                        .map(|c| c.primary)
+                        .collect();
+                    self.edit("Reset primary controls".into(), |p| {
+                        p.modules[m].primary = d
+                    });
                     ui.close();
                 }
-                if self.patch.modules[m].hidden_count() > 0 && mb(ui, rects, "menu.expand", if self.geo.expanded[m] { "Collapse" } else { "Expand" }) {
+                if self.patch.modules[m].hidden_count() > 0
+                    && mb(
+                        ui,
+                        rects,
+                        "menu.expand",
+                        if self.geo.expanded[m] {
+                            "Collapse"
+                        } else {
+                            "Expand"
+                        },
+                    )
+                {
                     self.toggle_expand(m);
                     ui.close();
                 }
             }
             Hit::Jack(j) => {
-                ui.label(format!("{} {}", self.patch.module_label(j.m), self.patch.jack_def(j).label));
-                ui.label(egui::RichText::new("Drag to connect; drag onto a knob to modulate").small());
+                ui.label(format!(
+                    "{} {}",
+                    self.patch.module_label(j.m),
+                    self.patch.jack_def(j).label
+                ));
+                ui.label(
+                    egui::RichText::new("Drag to connect; drag onto a knob to modulate").small(),
+                );
             }
         }
     }
@@ -1090,7 +1544,14 @@ fn mb(ui: &mut egui::Ui, rects: &mut HashMap<String, Rect>, key: &str, label: &s
 }
 
 /// Toolbar-style button that records its rect for the script driver.
-fn tb(ui: &mut egui::Ui, rects: &mut HashMap<String, Rect>, key: &str, label: &str, on: bool, enabled: bool) -> bool {
+fn tb(
+    ui: &mut egui::Ui,
+    rects: &mut HashMap<String, Rect>,
+    key: &str,
+    label: &str,
+    on: bool,
+    enabled: bool,
+) -> bool {
     let resp = ui.add_enabled(enabled, egui::Button::selectable(on, label));
     rects.insert(key.to_string(), resp.rect);
     resp.clicked()
@@ -1119,7 +1580,8 @@ impl eframe::App for App {
 
         // Redo first: egui's logical key match lets Ctrl+Z also match Ctrl+Shift+Z.
         let (redo, undo) = ctx.input_mut(|i| {
-            let redo = i.consume_key(egui::Modifiers::COMMAND | egui::Modifiers::SHIFT, Key::Z) || i.consume_key(egui::Modifiers::COMMAND, Key::Y);
+            let redo = i.consume_key(egui::Modifiers::COMMAND | egui::Modifiers::SHIFT, Key::Z)
+                || i.consume_key(egui::Modifiers::COMMAND, Key::Y);
             (redo, i.consume_key(egui::Modifiers::COMMAND, Key::Z))
         });
         if self.entry.is_none() {
@@ -1130,30 +1592,50 @@ impl eframe::App for App {
             }
         }
 
-        egui::Panel::top("toolbar").exact_size(44.0).show(ui, |ui| self.toolbar(ui, &mut rects));
-        egui::Panel::bottom("compare").exact_size(34.0).show(ui, |ui| self.compare_bar(ui, &mut rects));
+        egui::Panel::top("toolbar")
+            .exact_size(44.0)
+            .show(ui, |ui| self.toolbar(ui, &mut rects));
+        egui::Panel::bottom("compare")
+            .exact_size(34.0)
+            .show(ui, |ui| self.compare_bar(ui, &mut rects));
         if self.drawer {
-            egui::Panel::right("drawer").exact_size(336.0).resizable(false).show(ui, |ui| self.drawer_ui(ui, &mut rects));
+            egui::Panel::right("drawer")
+                .exact_size(336.0)
+                .resizable(false)
+                .show(ui, |ui| self.drawer_ui(ui, &mut rects));
         }
-        egui::CentralPanel::default().frame(egui::Frame::NONE.fill(th.rack)).show(ui, |ui| {
-            self.canvas = ui.max_rect();
-            self.relayout();
-            let resp = ui.allocate_rect(self.canvas, Sense::click_and_drag());
-            self.canvas_input(ui, &resp);
-            self.relayout();
-            let painter = ui.painter_at(self.canvas);
-            draw::canvas(self, &painter);
-            self.tooltip(&painter);
-            if let Some((t, at)) = &self.toast {
-                if self.now - at < 3.0 {
-                    let g = painter.layout_no_wrap(t.clone(), egui::FontId::proportional(13.0), Color32::WHITE);
-                    let r = Rect::from_center_size(pos2(self.canvas.center().x, self.canvas.bottom() - 28.0), g.size() + vec2(24.0, 12.0));
-                    painter.rect_filled(r, CornerRadius::same(6), Color32::from_black_alpha(220));
-                    painter.galley(r.center() - g.size() / 2.0, g, Color32::WHITE);
+        egui::CentralPanel::default()
+            .frame(egui::Frame::NONE.fill(th.rack))
+            .show(ui, |ui| {
+                self.canvas = ui.max_rect();
+                self.relayout();
+                let resp = ui.allocate_rect(self.canvas, Sense::click_and_drag());
+                self.canvas_input(ui, &resp);
+                self.relayout();
+                let painter = ui.painter_at(self.canvas);
+                draw::canvas(self, &painter);
+                self.tooltip(&painter);
+                if let Some((t, at)) = &self.toast {
+                    if self.now - at < 3.0 {
+                        let g = painter.layout_no_wrap(
+                            t.clone(),
+                            egui::FontId::proportional(13.0),
+                            Color32::WHITE,
+                        );
+                        let r = Rect::from_center_size(
+                            pos2(self.canvas.center().x, self.canvas.bottom() - 28.0),
+                            g.size() + vec2(24.0, 12.0),
+                        );
+                        painter.rect_filled(
+                            r,
+                            CornerRadius::same(6),
+                            Color32::from_black_alpha(220),
+                        );
+                        painter.galley(r.center() - g.size() / 2.0, g, Color32::WHITE);
+                    }
                 }
-            }
-            resp.context_menu(|ui| self.context_menu(ui, &mut rects));
-        });
+                resp.context_menu(|ui| self.context_menu(ui, &mut rects));
+            });
         self.entry_ui(&ctx);
         if self.ab_open {
             self.ab_window(&ctx, &mut rects);
@@ -1169,13 +1651,22 @@ impl App {
     fn tooltip(&self, p: &egui::Painter) {
         let Some(pos) = self.pointer else { return };
         let lines: Vec<String> = match (&self.gesture, self.hover) {
-            (Gesture::Wire { from, .. }, Some(Hit::Knob(c) | Hit::Ring(c) | Hit::Pill(c))) if self.patch.jack_def(*from).out => {
-                vec![format!("Release to modulate {} (+25 %)", self.ctl_name(c)), "Alt-release: +0 %".into()]
+            (Gesture::Wire { from, .. }, Some(Hit::Knob(c) | Hit::Ring(c) | Hit::Pill(c)))
+                if self.patch.jack_def(*from).out =>
+            {
+                vec![
+                    format!("Release to modulate {} (+25 %)", self.ctl_name(c)),
+                    "Alt-release: +0 %".into(),
+                ]
             }
             (Gesture::Wire { .. }, _) => vec!["Drop on a jack or a knob · Esc cancels".into()],
             (Gesture::Depth { route, .. }, _) => {
                 let r = self.patch.routes[*route];
-                let mut v = vec![format!("{:+.0} % · {}", r.amount * 100.0, self.patch.route_label(&r))];
+                let mut v = vec![format!(
+                    "{:+.0} % · {}",
+                    r.amount * 100.0,
+                    self.patch.route_label(&r)
+                )];
                 v.extend(self.swing_str(r.dst));
                 v.push("Shift = fine · Esc cancels".into());
                 v
@@ -1185,11 +1676,22 @@ impl App {
                 v.extend(self.swing_str(*ctl));
                 v
             }
-            (Gesture::None, Some(Hit::Ring(c))) => vec![format!("Drag: depth of {}", self.ctl_name(c)), "Click: inspect".into()],
-            (Gesture::None, Some(Hit::Handle(r))) => vec![format!("Drag: depth {:+.0} %", self.patch.routes[r].amount * 100.0)],
+            (Gesture::None, Some(Hit::Ring(c))) => vec![
+                format!("Drag: depth of {}", self.ctl_name(c)),
+                "Click: inspect".into(),
+            ],
+            (Gesture::None, Some(Hit::Handle(r))) => vec![format!(
+                "Drag: depth {:+.0} %",
+                self.patch.routes[r].amount * 100.0
+            )],
             (Gesture::None, Some(Hit::Plug(r))) => {
                 let rt = self.patch.routes[r];
-                vec![format!("{} {:+.0} %{}", self.patch.route_label(&rt), rt.amount * 100.0, if rt.bypass { " · bypassed" } else { "" })]
+                vec![format!(
+                    "{} {:+.0} %{}",
+                    self.patch.route_label(&rt),
+                    rt.amount * 100.0,
+                    if rt.bypass { " · bypassed" } else { "" }
+                )]
             }
             (Gesture::None, Some(Hit::Toggle(m))) => {
                 let hidden: Vec<String> = self
@@ -1213,8 +1715,15 @@ impl App {
         let text = lines.join("\n");
         let g = p.layout_no_wrap(text, egui::FontId::proportional(12.5), Color32::WHITE);
         let r = Rect::from_min_size(pos + vec2(16.0, 18.0), g.size() + vec2(14.0, 10.0));
-        let r = r.translate(vec2((self.canvas.right() - r.right()).min(0.0), (self.canvas.bottom() - r.bottom()).min(0.0)));
-        p.rect_filled(r, CornerRadius::same(5), Color32::from_rgba_unmultiplied(20, 20, 22, 235));
+        let r = r.translate(vec2(
+            (self.canvas.right() - r.right()).min(0.0),
+            (self.canvas.bottom() - r.bottom()).min(0.0),
+        ));
+        p.rect_filled(
+            r,
+            CornerRadius::same(5),
+            Color32::from_rgba_unmultiplied(20, 20, 22, 235),
+        );
         p.galley(r.min + vec2(7.0, 5.0), g, Color32::WHITE);
     }
 }
@@ -1225,14 +1734,39 @@ fn install_fonts(ctx: &egui::Context) {
     let mut fonts = egui::FontDefinitions::default();
     let dir = "/usr/share/fonts/truetype";
     let load = [
-        ("plex-sans", format!("{dir}/ibm-plex/IBMPlexSans-Regular.ttf"), egui::FontFamily::Proportional, 0),
-        ("plex-mono", format!("{dir}/ibm-plex/IBMPlexMono-Regular.ttf"), egui::FontFamily::Monospace, 0),
-        ("dejavu", format!("{dir}/dejavu/DejaVuSans.ttf"), egui::FontFamily::Proportional, 1),
-        ("dejavu", format!("{dir}/dejavu/DejaVuSans.ttf"), egui::FontFamily::Monospace, 1),
+        (
+            "plex-sans",
+            format!("{dir}/ibm-plex/IBMPlexSans-Regular.ttf"),
+            egui::FontFamily::Proportional,
+            0,
+        ),
+        (
+            "plex-mono",
+            format!("{dir}/ibm-plex/IBMPlexMono-Regular.ttf"),
+            egui::FontFamily::Monospace,
+            0,
+        ),
+        (
+            "dejavu",
+            format!("{dir}/dejavu/DejaVuSans.ttf"),
+            egui::FontFamily::Proportional,
+            1,
+        ),
+        (
+            "dejavu",
+            format!("{dir}/dejavu/DejaVuSans.ttf"),
+            egui::FontFamily::Monospace,
+            1,
+        ),
     ];
     for (name, path, family, at) in load {
-        let Ok(bytes) = std::fs::read(&path) else { continue };
-        fonts.font_data.entry(name.to_string()).or_insert_with(|| std::sync::Arc::new(egui::FontData::from_owned(bytes)));
+        let Ok(bytes) = std::fs::read(&path) else {
+            continue;
+        };
+        fonts
+            .font_data
+            .entry(name.to_string())
+            .or_insert_with(|| std::sync::Arc::new(egui::FontData::from_owned(bytes)));
         let list = fonts.families.entry(family).or_default();
         list.insert(at.min(list.len()), name.to_string());
     }
@@ -1241,16 +1775,33 @@ fn install_fonts(ctx: &egui::Context) {
 
 fn main() -> eframe::Result<()> {
     let args: Vec<String> = std::env::args().collect();
-    let arg = |k: &str| args.iter().position(|a| a == k).and_then(|i| args.get(i + 1)).cloned();
+    let arg = |k: &str| {
+        args.iter()
+            .position(|a| a == k)
+            .and_then(|i| args.get(i + 1))
+            .cloned()
+    };
     let (w, h) = arg("--size")
-        .and_then(|s| s.split_once('x').map(|(a, b)| (a.parse().ok(), b.parse().ok())))
+        .and_then(|s| {
+            s.split_once('x')
+                .map(|(a, b)| (a.parse().ok(), b.parse().ok()))
+        })
         .and_then(|(a, b)| Some((a?, b?)))
         .unwrap_or((1440.0, 900.0));
     let dark = args.iter().any(|a| a == "--dark");
-    let script = arg("--script").map(|path| script::Script::load(&path, arg("--shots").unwrap_or("target/rev2-proto/shots".into())).expect("readable script"));
+    let script = arg("--script").map(|path| {
+        script::Script::load(
+            &path,
+            arg("--shots").unwrap_or("target/rev2-proto/shots".into()),
+        )
+        .expect("readable script")
+    });
     let ppp: Option<f32> = arg("--ppp").and_then(|s| s.parse().ok());
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([w, h]).with_min_inner_size([1024.0, 700.0]).with_title("kabl · revision-2 prototype"),
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([w, h])
+            .with_min_inner_size([1024.0, 700.0])
+            .with_title("kabl · revision-2 prototype"),
         ..Default::default()
     };
     eframe::run_native(

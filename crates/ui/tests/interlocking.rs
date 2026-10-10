@@ -5,11 +5,11 @@
 use kabl_core::{ModuleId, PortRef, Vec2};
 use kabl_ui::PatchEditor;
 
-#[path = "support/factory_controls.rs"]
-pub mod factory_controls;
 #[allow(dead_code)]
 #[path = "support/factory_bank.rs"]
 pub mod factory_bank;
+#[path = "support/factory_controls.rs"]
+pub mod factory_controls;
 
 fn port(id: ModuleId, port: &str) -> PortRef {
     PortRef::Module {

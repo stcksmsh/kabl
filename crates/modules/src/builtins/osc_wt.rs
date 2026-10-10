@@ -236,7 +236,11 @@ impl Module for OscWt {
 
     fn view(&self, out: &mut ModuleView) {
         out.valid = self.dt > 0.0;
-        out.position = if self.shown.is_nan() { 0.0 } else { self.shown.clamp(0.0, 1.0) };
+        out.position = if self.shown.is_nan() {
+            0.0
+        } else {
+            self.shown.clamp(0.0, 1.0)
+        };
         if out.valid {
             self.ring.cycle(1.0 / self.dt, &mut out.cycle);
         }

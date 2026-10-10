@@ -32,9 +32,9 @@ use basedrop::{Handle, Owned};
 use kabl_core::PatchState;
 
 use crate::compile::{carry_state, compile, CompileError, CompiledPatch, PendingLaunch};
+use crate::facetap::{FaceReport, FaceTargets};
 use crate::graph::BLOCK;
 use crate::keyboard::{Action, KeyEvent, Keyboard, MidiEvent, Source};
-use crate::facetap::{FaceReport, FaceTargets};
 use crate::probe::{ProbeReport, ProbeTarget, WINDOW_SECS};
 use crate::runtime::{Feedback, ParamSet, ToAudio};
 use crate::swap::CROSSFADE_MS;

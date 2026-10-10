@@ -20,8 +20,13 @@ fn info_default_suppresses_debug_and_trace() {
     let lines: Vec<&str> = text.lines().collect();
     assert_eq!(lines.len(), 3, "{text}");
     // Session IDs can contain these substrings; check message suffixes only.
-    assert!(!lines.iter().any(|line| line.ends_with(" d1") || line.ends_with(" t1")));
-    assert!(!text.contains("third-party"), "other crates' INFO is capped at WARN");
+    assert!(!lines
+        .iter()
+        .any(|line| line.ends_with(" d1") || line.ends_with(" t1")));
+    assert!(
+        !text.contains("third-party"),
+        "other crates' INFO is capped at WARN"
+    );
     let l = lines[2];
     assert!(l.contains(" INFO  [doc] session="), "{l}");
     assert!(l.contains(&format!("session={} i1 id=3", h.session)), "{l}");

@@ -259,7 +259,11 @@ fn scope(
             1.5,
             alpha(face::trace_color(st), 150),
         );
-        p.circle_filled(pos2(x, bar.center().y), (3.0 * z).max(2.5), st.roles.disp_text);
+        p.circle_filled(
+            pos2(x, bar.center().y),
+            (3.0 * z).max(2.5),
+            st.roles.disp_text,
+        );
     }
 }
 
@@ -314,26 +318,36 @@ fn filter(
     let (f_lo, f_hi) = (20.0f32, 20000.0f32);
     let fx = |f: f32| (f / f_lo).ln() / (f_hi / f_lo).ln();
     let ladder = m.info.kind == "filter.ladder";
-    let k = if ladder { 4.4 * res.clamp(0.0, 1.0) } else { 2.0 - 2.0 * res.clamp(0.0, 0.95) };
+    let k = if ladder {
+        4.4 * res.clamp(0.0, 1.0)
+    } else {
+        2.0 - 2.0 * res.clamp(0.0, 0.95)
+    };
     let ymap = |db: f32| ((db + 40.0) / 64.0 * 2.0 - 1.0).clamp(-1.0, 1.0);
     let sr = 48000.0f32;
     let g = (std::f32::consts::PI * cutoff / sr).tan();
     let outs: &[usize] = if ladder { &[0] } else { &[0, 1, 2] };
     let patched = |port: &str| {
-        state.cables.values().any(|c| {
-            matches!(&c.from, PortRef::Module { id, port: q } if *id == m.id && q == port)
-        })
+        state
+            .cables
+            .values()
+            .any(|c| matches!(&c.from, PortRef::Module { id, port: q } if *id == m.id && q == port))
     };
     for &o in outs {
         let port = ["lp", "bp", "hp"][o];
-        let strong = ladder || patched(port) || (o == 0 && !["lp", "bp", "hp"].iter().any(|q| patched(q)));
+        let strong =
+            ladder || patched(port) || (o == 0 && !["lp", "bp", "hp"].iter().any(|q| patched(q)));
         if d != Detail::Full && !strong {
             continue;
         }
         let pts = plot(r, 80, |x| {
             let f = f_lo * (f_hi / f_lo).powf(x);
             let w = (std::f32::consts::PI * f / sr).tan() / g;
-            ymap(if ladder { ladder_db(w, k) } else { svf_db(o, w, k) })
+            ymap(if ladder {
+                ladder_db(w, k)
+            } else {
+                svf_db(o, w, k)
+            })
         });
         if strong {
             paint(p, st, pts, z, d, (o == 0).then_some(r.bottom()));
@@ -403,9 +417,15 @@ fn envelope(
     let level = t.last.clamp(0.0, 1.0);
     let at = match t.view.position.round() as i32 {
         1 => Some((x1 * level, level)),
-        2 => Some((x1 + (x2 - x1) * ((1.0 - level) / (1.0 - s).max(0.01)).clamp(0.0, 1.0), level)),
+        2 => Some((
+            x1 + (x2 - x1) * ((1.0 - level) / (1.0 - s).max(0.01)).clamp(0.0, 1.0),
+            level,
+        )),
         3 => Some((x2 + 1.0, s)),
-        4 => Some((x3 + (total - x3) * (1.0 - level / s.max(0.01)).clamp(0.0, 1.0), level)),
+        4 => Some((
+            x3 + (total - x3) * (1.0 - level / s.max(0.01)).clamp(0.0, 1.0),
+            level,
+        )),
         _ => None,
     };
     if let Some((x, y)) = at {

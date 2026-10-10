@@ -1,8 +1,8 @@
 //! A-light / A-dark: the approved revision-2 palettes (`docs/design/revision-2/render2.py`,
 //! the same values the `rev2_proto` example draws with), and the chrome/fonts that go with them.
 
-use egui::Color32;
 use crate::style::{mix, Style};
+use egui::Color32;
 use kabl_modules::PortType;
 
 pub struct Theme {

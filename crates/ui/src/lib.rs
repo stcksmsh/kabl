@@ -16,8 +16,8 @@ pub mod browser;
 pub mod compare;
 pub mod composites;
 pub mod control;
-pub mod displays;
 pub mod cues;
+pub mod displays;
 pub mod editor;
 pub mod explain;
 pub mod help;
@@ -3231,19 +3231,25 @@ fn draw_jacks(
         .values()
         .flat_map(|c| {
             let out = match &c.from {
-                PortRef::Module { id, port } if *id == m.id => Some((PortDirection::Output, port.as_str())),
+                PortRef::Module { id, port } if *id == m.id => {
+                    Some((PortDirection::Output, port.as_str()))
+                }
                 _ => None,
             };
             let inn = match &c.to {
-                PortRef::Module { id, port } if *id == m.id => Some((PortDirection::Input, port.as_str())),
+                PortRef::Module { id, port } if *id == m.id => {
+                    Some((PortDirection::Input, port.as_str()))
+                }
                 _ => None,
             };
             [out, inn]
         })
         .flatten()
         .collect();
-    let cabled: Vec<(PortDirection, String)> =
-        cabled.into_iter().map(|(d, p)| (d, p.to_string())).collect();
+    let cabled: Vec<(PortDirection, String)> = cabled
+        .into_iter()
+        .map(|(d, p)| (d, p.to_string()))
+        .collect();
     for j in &m.jacks {
         let c = xf.p(j.c);
         let port = j.port;
