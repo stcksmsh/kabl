@@ -219,7 +219,7 @@ pub fn composition(cx: &Cx, d: &Ctxs, size: egui::Vec2, focus: u32) {
         num += 1;
         let peer = if inbound { c.from.clone() } else { c.to.clone() };
         let end = if inbound { pts[0] } else { *pts.last().unwrap() };
-        let badge = end + vec2(0.0, if inbound { 15.0 } else { 15.0 });
+        let badge = end + vec2(0.0, 15.0);
         cx.p.circle_filled(badge, 8.0, k.accent);
         cx.text(badge, Align2::CENTER_CENTER, &num.to_string(), 11.0, "sans-semi", k.on_accent);
         let me_port = if inbound { c.to.1.clone() } else { c.from.1.clone() };

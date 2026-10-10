@@ -84,6 +84,7 @@ pub fn knob(cx: &Cx, c: Pos2, r: f32, n: f32, m: Option<ModVis>, f: &Face, hot: 
 }
 
 impl Cx<'_> {
+    #[allow(clippy::too_many_arguments)]
     pub fn glow_arc(&self, c: Pos2, r: f32, a0: f32, a1: f32, w: f32, col: Color32, strength: f32) {
         if (a1 - a0).abs() < 1e-3 {
             return;
@@ -284,7 +285,7 @@ pub fn field(cx: &Cx, r: Rect, ph: &str, val: &str, focused: bool) {
     cx.rr(r, k.r_sm + 1.0, k.inset);
     cx.rr_stroke(r, k.r_sm + 1.0, if focused { 2.0 } else { 1.0 }, if focused { k.focus } else { k.line });
     icon(cx.p, Ic::Search, pos2(r.left() + 16.0, r.center().y), 14.0, k.text2);
-    let fam = if k.dir == Dir::C { "sans" } else { "sans" };
+    let fam = "sans";
     if val.is_empty() {
         cx.text(pos2(r.left() + 30.0, r.center().y), Align2::LEFT_CENTER, ph, 13.0, fam, k.text3);
     } else {
