@@ -76,6 +76,9 @@ pub enum Taper {
     /// Whole-number choices from `min` to `max` (waveform, mode switches). Linear travel,
     /// rounded to the nearest option.
     Stepped,
+    /// Cubic travel about the middle of the range: fine steps near the centre, coarse at the
+    /// ends. For wide signed ranges whose useful values sit close to zero.
+    Cubic,
 }
 
 impl ParamInfo {
@@ -85,6 +88,10 @@ impl ParamInfo {
         let n = match self.taper {
             Taper::Exponential => (value / self.min).ln() / (self.max / self.min).ln(),
             Taper::Linear | Taper::Stepped => (value - self.min) / (self.max - self.min),
+            Taper::Cubic => {
+                let half = (self.max - self.min) / 2.0;
+                ((value - self.min - half) / half).cbrt() / 2.0 + 0.5
+            }
         };
         if n.is_finite() {
             n.clamp(0.0, 1.0)
@@ -104,6 +111,10 @@ impl ParamInfo {
             }
             Taper::Linear => self.min + (self.max - self.min) * n,
             Taper::Stepped => (self.min + (self.max - self.min) * n).round(),
+            Taper::Cubic => {
+                let half = (self.max - self.min) / 2.0;
+                self.min + half + half * (2.0 * n - 1.0).powi(3)
+            }
         }
     }
 }

@@ -180,6 +180,41 @@ Product `f7157619836075d0d7704e59be5d66e6224890b1`, binary `3baa8ee3cc0f2f99e182
 
 Dense two-open backend ERR2 remains; physical xruns and latency unmeasured. P99 bins10µs; arrivals include startup/teardown and are not execution time. Raw strict-profile timing-summary.json retains scopes.
 
+## 2026-10-09 — Functional cables
+
+`taskset -c 2 ./target/release/examples/cable_cost <patch>` (`crates/engine/examples/cable_cost.rs`), commit of this PR, i7-13700H, rustc 1.93.0, 48 kHz, 64-sample blocks, 8 voices, 40 000 blocks per run, fastest of 9 runs (the machine was shared with other builds; medians are printed too and run up to 2× higher on the dense patch). Offline `process_block` time, no audio device. Pi 4 unmeasured.
+
+| Case | Plain | Functional | Difference |
+|---|---|---|---|
+| Minimal (clock, lfo, out), one cable, length 8 | 946–1 051 ns/block | 920–1 090 ns/block | within noise (−24…+39 ns) |
+| `patches/sequence`, all 9 jack cables (length 8, chance 80 %) | 5 375–5 662 ns | 7 320–7 516 ns | +1.9 µs: about 210 ns per cable |
+| `patches/composition`, all 57 jack cables (113 nodes with voice lanes) | 43 472–47 667 ns | 60 415–66 005 ns | +17–18 µs: about 300 ns per cable, 1.3 % of the 1 333 µs block budget |
+| `patches/composition`, same cables but every step open and never rejected | 43 235 ns | 48 264 ns | +5 µs: about 45 ns per node, 88 ns per cable |
+
+The node itself costs tens of nanoseconds (one 64-sample copy and a multiply or slew). The rest of the difference with real gating is downstream: a closed step feeds silence to filters and delays and changes what they compute. A plain cable costs nothing (no node). Making every jack cable of the densest shipped patch functional is far beyond real use; ten functional cables is under 1 % of the budget.
+
+### Morph and glide
+
+Same tool and machine (`KABL_MORPH=1 taskset -c 2 ./target/release/examples/cable_cost patches/composition`), one run of 9 on 2026-10-10 at the head of the morph-standard commit (a36e63c plus the test and blend-exactness change). `KABL_MORPH=1` gives every functional cable a second pattern of 5 steps, a morph of 0.5 and 20 ms of glide, so each pulse blends two steps and every level change slews.
+
+| Case | Pattern only | Pattern, pattern B, morph 0.5, glide 20 ms |
+|---|---|---|
+| `patches/composition`, 57 jack cables, difference to plain | +16 494 ns/block (289 ns per cable) | +15 473 ns/block (271 ns per cable) |
+| Minimal, one cable, node alone | +11 ns/block | +17 ns/block |
+
+Morph and glide add nothing measurable: the blend is two table reads and a multiply at each pulse (not per sample), and glide only changes the slew rate of the existing audio path. The difference between the columns is inside run-to-run noise (the plain baseline moved 44 015 to 44 057 ns). The morph and glide edits are runtime values and `audio_path_does_not_allocate_with_morph_and_glide_running` asserts no allocation while they change.
+
+### Routes into cable parameters
+
+2026-10-10, the commit that adds `PortRef::CableParam`. Same tool and machine as above, with the new switch: `KABL_MORPH=1 KABL_ROUTES=1 taskset -c 2 ./target/release/examples/cable_cost patches/composition`. `KABL_ROUTES=1` routes one macro (amount 0.5) into the morph of every functional jack cable (57 routes), and in the minimal patch swaps a jack from a second lfo for a route from it into the cable's morph. One run of 9, fastest. The machine was shared: the plain baseline moved between 44 000 and 63 000 ns/block across runs, so read the differences with that spread.
+
+| Case | Without routes | With routes | Difference |
+|---|---|---|---|
+| `patches/composition`, 57 functional cables with morph and glide | 73 949 ns/block (cables +18 008 over plain) | 79 358 ns/block | about +5 µs, 95 ns per route (a −55 ns result in another run: inside the noise) |
+| Minimal, one cable, an lfo to `out.right` as a jack against the same lfo as a route into morph | 1 529 ns/block | 1 535 ns/block | +6 ns |
+
+A route costs a source buffer read per pulse (not per sample) plus one 64-sample copy in its cable's step, and nothing when the cable has none. Fifty-seven routes, one in every functional cable of the densest shipped patch, are well under 0.5 % of the 1 333 µs block budget. The audio path stays allocation-free while an amount is edited (`audio_path_does_not_allocate_with_routes_running_and_edited`).
+
 ## 2026-10-09 — Sound engines: osc.fm and osc.wt
 
 `cargo run --release -p kabl-modules --example bench_sources` and
@@ -243,3 +278,32 @@ here against 12.9 ns in the table above, so compare rows inside one table only.
 4x costs about twice 2x on both modules. `osc.fm6` is a fixed cost of about 40 ns plus about 17 ns
 per sounding operator. Whole-patch timings of the new demos are not measured (the load made block
 times meaningless).
+
+## 2026-10-10 — Utility modules
+
+`cargo build --release -p kabl-modules --example bench_sources` then
+`BENCH_FAST=1 taskset -c N target/release/examples/bench_sources` (1 s of audio, median of 5 runs
+per row), 48 kHz, 64-sample blocks, minimum of three runs on different cores (machine quiet; the
+three agreed within 4 % apart from one outlier). The harness feeds each module a steady input and
+a square clock, and allocates a small output vector per block, so the rows overstate the cost of a
+very cheap module by a few ns; compare rows inside this table only (`osc.va` saw measured 10.8 ns).
+
+| module, one voice | ns/sample | % of one core |
+|---|---|---|
+| osc.va saw (reference) | 10.8 | 0.05 |
+| attenuverter | 1.0 | 0.00 |
+| comparator | 2.0 | 0.01 |
+| quantizer, steady input | 2.7 | 0.01 |
+| sample.hold | 2.8 | 0.01 |
+| logic (four outputs) | 3.0 | 0.01 |
+| random (free-running) | 3.6 | 0.02 |
+| random, loop of 8, 50 % change | 3.4 | 0.02 |
+| slew | 6.3 | 0.03 |
+| crossfade | 8.5 | 0.04 |
+| pan | 10.2 | 0.05 |
+| quantizer, a new input every sample (noise → quantizer, minus noise 4.3) | 14.7 | 0.07 |
+
+All nine together are about 52 ns, a quarter of one percent of a core per voice, about the cost of one
+`osc.fm` operator. `crossfade` and `pan` cost most (a sine and cosine per sample at the
+equal-power law). The quantizer's note search is two bit scans; its first version was a loop of
+13 and about three times slower.

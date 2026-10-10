@@ -56,7 +56,7 @@ fn finite_route(
     let finite = !routes.is_empty()
         && routes
             .iter()
-            .all(|c| finite_route(p, c.from.module_id(), visiting, memo));
+            .all(|c| c.from.module_id().is_some_and(|f| finite_route(p, f, visiting, memo)));
     visiting.remove(&id);
     memo.insert(id, finite);
     finite

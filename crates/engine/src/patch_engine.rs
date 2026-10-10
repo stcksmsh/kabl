@@ -761,7 +761,7 @@ impl PatchEngine {
     }
 
     /// Audio-thread call: `CompiledPatch::clocks` of the graph fading in, else the active one.
-    pub fn clocks(&self, f: impl FnMut(kabl_core::ModuleId, bool)) {
+    pub fn clocks(&self, f: impl FnMut(kabl_core::ModuleId, bool, f64)) {
         match &self.incoming {
             Some((g, _)) => g.clocks(f),
             None => self.active.clocks(f),

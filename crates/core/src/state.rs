@@ -114,17 +114,13 @@ impl PatchState {
                         text: Some(text.clone()),
                     });
                 }
-                for (&cid, c) in &self.cables {
-                    if c.from.module_id() == *id || c.to.module_id() == *id {
-                        ops.extend(cable_restore_ops(cid, c));
-                    }
-                }
+                ops.extend(self.removed_cable_ops(op));
                 for (&cid, c) in &self.composites {
                     if c.members.contains(id)
                         || c.controls
                             .values()
                             .chain(c.ports.values())
-                            .any(|e| e.target.module_id() == *id)
+                            .any(|e| e.target.module_id() == Some(*id))
                     {
                         ops.push(Op::SetComposite {
                             id: cid,
@@ -141,12 +137,8 @@ impl PatchState {
                 },
                 None => Op::Disconnect { id: *id },
             },
-            Op::Disconnect { id } => Op::Group {
-                ops: self
-                    .cables
-                    .get(id)
-                    .map(|c| cable_restore_ops(*id, c))
-                    .unwrap_or_default(),
+            Op::Disconnect { .. } => Op::Group {
+                ops: self.removed_cable_ops(op),
             },
             Op::SetParam { target, .. } | Op::UnsetParam { target } => match self.param(target) {
                 Some(old) => Op::SetParam {
@@ -195,6 +187,46 @@ impl PatchState {
         }
     }
 
+    /// The module cable `id` ends on: its own destination or, for a route into a cable's
+    /// parameter, where that cable ends. `None` when the cable is missing or the routes loop.
+    pub fn end_module(&self, id: CableId) -> Option<ModuleId> {
+        let mut cur = id;
+        for _ in 0..=self.cables.len() {
+            match &self.cables.get(&cur)?.to {
+                PortRef::CableParam { cable, .. } => cur = *cable,
+                to => return to.module_id(),
+            }
+        }
+        None
+    }
+
+    /// Ops that put back every cable `op` (a `RemoveModule` or `Disconnect`) removes from this
+    /// state, the routes into a removed cable's parameters included.
+    fn removed_cable_ops(&self, op: &Op) -> Vec<Op> {
+        let mut after = self.clone();
+        after.apply(op);
+        self.cables
+            .iter()
+            .filter(|(id, _)| !after.cables.contains_key(id))
+            .flat_map(|(&id, c)| cable_restore_ops(id, c))
+            .collect()
+    }
+
+    /// A route into a cable's parameter goes with that cable (no dangling routes), and so does a
+    /// route into such a route.
+    fn prune_cable_routes(&mut self) {
+        loop {
+            let before = self.cables.len();
+            let ids: std::collections::BTreeSet<CableId> = self.cables.keys().copied().collect();
+            self.cables.retain(
+                |_, c| !matches!(&c.to, PortRef::CableParam { cable, .. } if !ids.contains(cable)),
+            );
+            if self.cables.len() == before {
+                return;
+            }
+        }
+    }
+
     pub fn label(&self, id: ModuleId, key: &str) -> Option<&str> {
         self.labels.get(&id)?.get(key).map(String::as_str)
     }
@@ -237,8 +269,8 @@ impl PatchState {
                 self.labels.remove(id);
                 for c in self.composites.values_mut() {
                     c.members.remove(id);
-                    c.controls.retain(|_, e| e.target.module_id() != *id);
-                    c.ports.retain(|_, e| e.target.module_id() != *id);
+                    c.controls.retain(|_, e| e.target.module_id() != Some(*id));
+                    c.ports.retain(|_, e| e.target.module_id() != Some(*id));
                     if let Some(panel) = &mut c.panel {
                         panel.placements.retain(|key, _| {
                             c.controls.contains_key(key) || c.ports.contains_key(key)
@@ -246,8 +278,10 @@ impl PatchState {
                     }
                 }
                 // No dangling cables: a cable to or from a removed module goes with it.
-                self.cables
-                    .retain(|_, c| c.from.module_id() != *id && c.to.module_id() != *id);
+                self.cables.retain(|_, c| {
+                    c.from.module_id() != Some(*id) && c.to.module_id() != Some(*id)
+                });
+                self.prune_cable_routes();
             }
             Op::Connect { id, from, to } => {
                 self.cables.insert(
@@ -262,6 +296,7 @@ impl PatchState {
             }
             Op::Disconnect { id } => {
                 self.cables.remove(id);
+                self.prune_cable_routes();
             }
             Op::SetParam { target, value } => match target {
                 ParamTarget::Module { id, param } => {

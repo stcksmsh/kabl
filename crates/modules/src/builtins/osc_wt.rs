@@ -110,7 +110,7 @@ pub static OSC_WT_INFO: ModuleInfo = ModuleInfo {
         interpolation: true,
     },
     skin: None,
-    width_units: 6,
+    width_units: 8,
     advanced: &["pos_mod", "fine", "user"],
 };
 

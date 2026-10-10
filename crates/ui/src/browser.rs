@@ -479,6 +479,7 @@ pub fn replace_patch(editor: &mut PatchEditor, ui: &mut UiState, log: PatchLog) 
     ui.seq_banks.clear();
     ui.seq_steps.clear();
     ui.clock_running.clear();
+    ui.clock_pos.clear();
     ui.lfo_status.clear();
     ui.edit_bank.clear();
     ui.selected_module = None;

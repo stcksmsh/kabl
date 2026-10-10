@@ -67,7 +67,7 @@ fn deleting_a_module_takes_its_cables_and_undo_restores_everything() {
         after
             .cables
             .values()
-            .all(|c| c.from.module_id() != env && c.to.module_id() != env),
+            .all(|c| c.from.module_id() != Some(env) && c.to.module_id() != Some(env)),
         "no dangling cables"
     );
     assert!(after.cables.values().any(|c| c.to == out(vca, "in")));

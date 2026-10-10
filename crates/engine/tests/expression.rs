@@ -284,7 +284,7 @@ fn deleting_or_replacing_a_keyboard_leaves_no_note_or_bend_behind() {
     block(&mut e);
     let mut gone = p.clone();
     gone.modules.remove(&2);
-    gone.cables.retain(|_, c| c.from.module_id() != 2);
+    gone.cables.retain(|_, c| c.from.module_id() != Some(2));
     let g = e.build_swap(&h, &gone).unwrap();
     e.receive_swap(g);
     assert_eq!(e.expression(2), None);

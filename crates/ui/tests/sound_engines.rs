@@ -18,6 +18,15 @@
 //! - `rising-pad`: two wavetable oscillators whose positions the note's envelope sweeps open.
 //! - `rust-bass`: six-operator bass, a punchy pair beside a four-operator growl with feedback.
 //!
+//! Three more play by themselves (no keyboard) and show what the utility modules add:
+//!
+//! - `scale-walk`: a random loop of 16 values that slowly changes, held to D dorian by the
+//!   quantizer, with the envelope triggered only when the note changes.
+//! - `clock-logic`: two divided clocks through logic (xor steps a bass line, and plays a bell,
+//!   which a slow LFO through a comparator gates again).
+//! - `stepped-sweep`: sampled noise smoothed by slew moves the filter cutoff, the blend of two
+//!   oscillators and the pan, each at its own pace.
+//!
 //! Rewrite the patches with
 //! `cargo test -p kabl-ui --test sound_engines write_engine_patches -- --ignored`
 //! and the audio clips (`target/sound-engines/*.wav`) with `write_engine_renders`.
@@ -597,6 +606,230 @@ fn rust_bass() -> PatchEditor {
     r.e
 }
 
+fn scale_walk() -> PatchEditor {
+    let mut r = Rack::new();
+    // 16th notes at 96 BPM. The random loop (16 values, 8 % of them replaced each time round)
+    // is quantized to D dorian two octaves wide; the quantizer's trigger plays the envelope, so
+    // a repeated note rings on instead of retriggering.
+    let clock = r.add("clock", &[("bpm", 96.0)]);
+    let rnd = r.add(
+        "random",
+        &[("length", 16.0), ("change", 8.0), ("range", 12.0)],
+    );
+    let quant = r.add(
+        "quantizer",
+        &[("scale", 4.0), ("root", 2.0), ("transpose", -12.0)],
+    );
+    r.next_row();
+    let osc = r.add(
+        "osc.va",
+        &[("waveform", 2.0), ("unison", 3.0), ("detune", 14.0)],
+    );
+    let env = r.add("env.adsr", &adsr(2.0, 320.0, 0.0, 380.0));
+    let filter = r.add(
+        "filter.ladder",
+        &[("cutoff_hz", 700.0), ("resonance", 0.3), ("drive_db", 0.0)],
+    );
+    let vca = r.add("vca", &[("gain", 0.0)]);
+    let trim = r.add("gain", &[("gain_db", -6.0)]);
+    r.next_row();
+    let delay = r.add(
+        "delay",
+        &[
+            ("sync", 0.0),
+            ("time_ms", 469.0),
+            ("feedback", 45.0),
+            ("mix", 38.0),
+            ("mode", 1.0),
+        ],
+    );
+    let reverb = r.add(
+        "reverb",
+        &[
+            ("decay_s", 4.0),
+            ("damp_hz", 5000.0),
+            ("mix", 25.0),
+            ("width", 100.0),
+        ],
+    );
+    let out = r.add("out", &[]);
+    r.wire(clock, "gate", rnd, "clock");
+    r.wire(rnd, "out", quant, "in");
+    r.wire(quant, "out", osc, "pitch");
+    r.wire(quant, "trig", env, "gate");
+    r.wire(osc, "out", filter, "in");
+    r.wire(filter, "out", vca, "in");
+    r.wire(env, "out", vca, "cv");
+    r.wire(vca, "out", trim, "in");
+    r.wire(trim, "out", delay, "in");
+    r.wire(delay, "left", reverb, "in_l");
+    r.wire(delay, "right", reverb, "in_r");
+    r.wire(reverb, "left", out, "left");
+    r.wire(reverb, "right", out, "right");
+    r.route(env, "out", filter, "cutoff_hz", 0.35);
+    r.e
+}
+
+fn clock_logic() -> PatchEditor {
+    let mut r = Rack::new();
+    // One clock, divided by 3 and by 4. xor of the two fires where exactly one ticks (a busy
+    // 12-step pattern): it steps the random loop and plays the bass. and fires only on every
+    // twelfth tick, and then only while a slow LFO through a comparator is high: the bell.
+    let clock = r.add("clock", &[("bpm", 120.0)]);
+    let d3 = r.add("clock.div", &[("div", 3.0)]);
+    let d4 = r.add("clock.div", &[("div", 4.0)]);
+    let both = r.add("logic", &[]);
+    let lfo = r.add("lfo", &[("rate_hz", 0.11), ("waveform", 1.0)]);
+    let comp = r.add("comparator", &[("threshold", -0.2)]);
+    let gated = r.add("logic", &[]);
+    r.next_row();
+    let rnd = r.add("random", &[("length", 8.0), ("range", 12.0)]);
+    let quant = r.add("quantizer", &[("scale", 9.0), ("root", 9.0)]);
+    let low = r.add("attenuverter", &[("amount", 1.0), ("offset", -24.0)]);
+    let high = r.add("attenuverter", &[("amount", 1.0), ("offset", 12.0)]);
+    r.next_row();
+    let bass = r.add("osc.va", &[("waveform", 2.0)]);
+    let env_b = r.add("env.adsr", &adsr(2.0, 160.0, 0.0, 120.0));
+    let vca_b = r.add("vca", &[("gain", 0.0)]);
+    let bell = r.add("osc.fm6", &[("algorithm", 1.0), ("index", 0.3)]);
+    r.next_row();
+    let mix = r.add("mixer", &[("level1", 0.35), ("level2", 0.3)]);
+    let reverb = r.add(
+        "reverb",
+        &[
+            ("decay_s", 6.0),
+            ("damp_hz", 6500.0),
+            ("mix", 30.0),
+            ("width", 100.0),
+        ],
+    );
+    let out = r.add("out", &[]);
+    // Bell operators, as iron-bell: three inharmonic pairs, long carriers, fading modulators.
+    let ops: [[f32; 8]; 6] = [
+        [1.0, 0.0, 1.0, 0.5, 5000.0, 0.0, 2500.0, 0.0],
+        [4.0, -231.0, 0.9, 0.5, 1800.0, 0.0, 900.0, 0.0],
+        [2.0, 4.0, 0.55, 0.5, 3200.0, 0.0, 1600.0, 0.0],
+        [5.0, 14.0, 0.8, 0.5, 900.0, 0.0, 450.0, 0.0],
+        [3.0, 100.0, 0.3, 0.5, 1500.0, 0.0, 900.0, 0.0],
+        [9.0, -20.0, 0.6, 0.5, 400.0, 0.0, 250.0, 0.0],
+    ];
+    let names = [
+        "ratio", "fine", "level", "attack", "decay", "sustain", "release", "vel",
+    ];
+    for (k, op) in ops.iter().enumerate() {
+        for (name, &v) in names.iter().zip(op) {
+            r.e.set_param(bell, &format!("{name}{}", k + 1), v);
+        }
+    }
+    r.wire(clock, "gate", d3, "clock");
+    r.wire(clock, "gate", d4, "clock");
+    r.wire(clock, "reset", d3, "reset");
+    r.wire(clock, "reset", d4, "reset");
+    r.wire(d3, "gate", both, "a");
+    r.wire(d4, "gate", both, "b");
+    r.wire(lfo, "out", comp, "in");
+    r.wire(both, "and", gated, "a");
+    r.wire(comp, "out", gated, "b");
+    r.wire(both, "xor", rnd, "clock");
+    r.wire(clock, "reset", rnd, "reset");
+    r.wire(rnd, "out", quant, "in");
+    r.wire(quant, "out", low, "in");
+    r.wire(quant, "out", high, "in");
+    r.wire(low, "out", bass, "pitch");
+    r.wire(both, "xor", env_b, "gate");
+    r.wire(bass, "out", vca_b, "in");
+    r.wire(env_b, "out", vca_b, "cv");
+    r.wire(high, "out", bell, "pitch");
+    r.wire(gated, "and", bell, "gate");
+    r.wire(vca_b, "out", mix, "in1");
+    r.wire(bell, "out", mix, "in2");
+    r.wire(mix, "out", reverb, "in_l");
+    r.wire(mix, "out", reverb, "in_r");
+    r.wire(reverb, "left", out, "left");
+    r.wire(reverb, "right", out, "right");
+    r.e
+}
+
+fn stepped_sweep() -> PatchEditor {
+    let mut r = Rack::new();
+    // Three sample-and-hold lanes of noise on divided clocks, each smoothed by a slew: one
+    // opens the filter, one blends a saw drone into a vowel table, one pans the result.
+    let clock = r.add("clock", &[("bpm", 72.0)]);
+    let d4 = r.add("clock.div", &[("div", 4.0)]);
+    let d6 = r.add("clock.div", &[("div", 6.0)]);
+    let d8 = r.add("clock.div", &[("div", 8.0)]);
+    let noise = r.add("noise", &[("color", 0.0), ("level_db", 0.0)]);
+    r.next_row();
+    let sh_f = r.add("sample.hold", &[]);
+    let sh_b = r.add("sample.hold", &[]);
+    let sh_p = r.add("sample.hold", &[]);
+    let sl_f = r.add("slew", &[("rise_ms", 900.0), ("fall_ms", 900.0)]);
+    let sl_b = r.add("slew", &[("rise_ms", 1500.0), ("fall_ms", 1500.0)]);
+    let sl_p = r.add("slew", &[("rise_ms", 2200.0), ("fall_ms", 2200.0)]);
+    r.next_row();
+    let to_unit = r.add("attenuverter", &[("amount", 0.5), ("offset", 0.5)]);
+    let saw = r.add(
+        "osc.va",
+        &[
+            ("waveform", 2.0),
+            ("base_hz", 55.0),
+            ("unison", 3.0),
+            ("detune", 9.0),
+        ],
+    );
+    let vowel = r.add(
+        "osc.wt",
+        &[
+            ("table", 2.0),
+            ("base_hz", 110.0),
+            ("position", 0.4),
+            ("fine", 6.0),
+        ],
+    );
+    let blend = r.add("crossfade", &[("mix", 0.0), ("curve", 1.0)]);
+    r.next_row();
+    let filter = r.add(
+        "filter.ladder",
+        &[("cutoff_hz", 450.0), ("resonance", 0.4), ("drive_db", 0.0)],
+    );
+    let pan = r.add("pan", &[("pan", 0.0)]);
+    let gain = r.add("gain", &[("gain_db", -6.0)]);
+    let reverb = r.add(
+        "reverb",
+        &[
+            ("decay_s", 5.5),
+            ("damp_hz", 4500.0),
+            ("mix", 28.0),
+            ("width", 100.0),
+        ],
+    );
+    let out = r.add("out", &[]);
+    r.wire(clock, "gate", d4, "clock");
+    r.wire(clock, "gate", d6, "clock");
+    r.wire(clock, "gate", d8, "clock");
+    for (sh, d) in [(sh_f, d4), (sh_b, d6), (sh_p, d8)] {
+        r.wire(noise, "out", sh, "in");
+        r.wire(d, "gate", sh, "clock");
+    }
+    r.wire(sh_f, "out", sl_f, "in");
+    r.wire(sh_b, "out", sl_b, "in");
+    r.wire(sh_p, "out", sl_p, "in");
+    r.wire(sl_b, "out", to_unit, "in");
+    r.wire(to_unit, "out", blend, "fade");
+    r.wire(saw, "out", blend, "a");
+    r.wire(vowel, "out", blend, "b");
+    r.wire(blend, "out", gain, "in");
+    r.wire(gain, "out", filter, "in");
+    r.wire(filter, "out", pan, "in");
+    r.wire(sl_p, "out", pan, "pan");
+    r.wire(pan, "left", reverb, "in_l");
+    r.wire(pan, "right", reverb, "in_r");
+    r.wire(reverb, "left", out, "left");
+    r.wire(reverb, "right", out, "right");
+    r.route(sl_f, "out", filter, "cutoff_hz", 0.6);
+    r.e
+}
+
 /// (time s, note, on)
 type Events = Vec<(f32, u8, bool)>;
 
@@ -604,6 +837,10 @@ fn notes(list: &[(u8, f32, f32)]) -> Events {
     list.iter()
         .flat_map(|&(n, a, b)| [(a, n, true), (b, n, false)])
         .collect()
+}
+
+fn no_keys() -> Events {
+    Vec::new()
 }
 
 fn tine_phrase() -> Events {
@@ -670,7 +907,7 @@ fn morph_phrase() -> Events {
 type Build = fn() -> PatchEditor;
 /// (directory, builder, phrase, seconds, browser name, category, tags, description)
 #[allow(clippy::type_complexity)]
-const PATCHES: [(&str, Build, fn() -> Events, f32, &str, &str, &[&str], &str); 8] = [
+const PATCHES: [(&str, Build, fn() -> Events, f32, &str, &str, &[&str], &str); 11] = [
     (
         "tine-keys",
         tine_keys,
@@ -751,6 +988,36 @@ const PATCHES: [(&str, Build, fn() -> Events, f32, &str, &str, &[&str], &str); 8
         &["fm", "bass", "poly", "six operators", "growl"],
         "A punchy two-operator pair beside a four-operator chain with feedback: a clean attack, then a gritty growl that settles. Harder notes growl more.",
     ),
+    (
+        "scale-walk",
+        scale_walk,
+        no_keys,
+        24.0,
+        "Scale Walk",
+        "Sequence",
+        &["random", "quantizer", "sequence", "self-playing", "evolving"],
+        "A random loop of sixteen notes held to D dorian that slowly changes as it comes round, plays itself. The envelope fires only when the note changes, so a repeated note rings on. Try another scale or root on the quantizer, or more Change on the random.",
+    ),
+    (
+        "clock-logic",
+        clock_logic,
+        no_keys,
+        30.0,
+        "Clock Logic",
+        "Sequence",
+        &["logic", "clock", "polyrhythm", "self-playing", "bell"],
+        "One clock divided by 3 and by 4 and combined by logic: xor steps a random bass line, and plays a bell on every twelfth tick while a slow LFO through a comparator allows it. Change a divider to change the whole rhythm.",
+    ),
+    (
+        "stepped-sweep",
+        stepped_sweep,
+        no_keys,
+        30.0,
+        "Stepped Sweep",
+        "Pad",
+        &["sample and hold", "slew", "drone", "self-playing", "evolving"],
+        "A drone whose filter, oscillator blend and stereo position each follow sampled noise on their own clock, smoothed by a slew so they glide. Longer slew times make it calmer; a shorter one steps.",
+    ),
 ];
 
 fn patch_dir(name: &str) -> std::path::PathBuf {
@@ -759,11 +1026,12 @@ fn patch_dir(name: &str) -> std::path::PathBuf {
         .join(name)
 }
 
-fn sound_toml(name: &str, category: &str, tags: &[&str], description: &str) -> String {
+fn sound_toml(name: &str, category: &str, tags: &[&str], description: &str, keys: bool) -> String {
     let tags: Vec<String> = tags.iter().map(|t| format!("    \"{t}\",\n")).collect();
     format!(
-        "name = \"{name}\"\ncategory = \"{category}\"\ntags = [\n{}]\ndescription = \"{description}\"\nkeys = true\nsequence = false\n",
-        tags.concat()
+        "name = \"{name}\"\ncategory = \"{category}\"\ntags = [\n{}]\ndescription = \"{description}\"\nkeys = {keys}\nsequence = {}\n",
+        tags.concat(),
+        !keys
     )
 }
 
@@ -772,13 +1040,13 @@ fn sound_toml(name: &str, category: &str, tags: &[&str], description: &str) -> S
 #[test]
 #[ignore]
 fn write_engine_patches() {
-    for (dir, build, _, _, name, category, tags, description) in PATCHES {
+    for (dir, build, events, _, name, category, tags, description) in PATCHES {
         let path = patch_dir(dir);
         let _ = std::fs::remove_dir_all(&path);
         kabl_core::save(&path, build().log()).unwrap();
         std::fs::write(
             path.join("sound.toml"),
-            sound_toml(name, category, tags, description),
+            sound_toml(name, category, tags, description, !events().is_empty()),
         )
         .unwrap();
     }
@@ -855,9 +1123,10 @@ fn committed_engine_patches_match_builders_and_play() {
         assert_eq!(saved.state(), built.state(), "{dir}");
         let st = saved.state();
         assert!(
-            st.modules
-                .values()
-                .any(|m| matches!(m.kind.as_str(), "osc.fm" | "osc.fm6" | "osc.wt")),
+            st.modules.values().any(|m| matches!(
+                m.kind.as_str(),
+                "osc.fm" | "osc.fm6" | "osc.wt" | "random" | "quantizer" | "sample.hold" | "logic"
+            )),
             "{dir}"
         );
         for m in st.modules.values() {

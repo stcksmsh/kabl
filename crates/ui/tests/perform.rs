@@ -640,3 +640,93 @@ fn a_macro_knob_edits_the_real_parameter_with_one_undo_step() {
     h.editor.undo();
     assert_eq!(h.value(MACROS, "m1"), before);
 }
+
+#[test]
+fn the_full_view_takes_the_drawer_unless_pinned_and_gives_it_back() {
+    let mut h = H::new(1440.0, 900.0);
+    h.ui.perform_open = false;
+    h.ui.drawer_open = true;
+    h.frame();
+    h.pin(CLOCK, TRANSPORT);
+    h.click("perform");
+    assert!(
+        !h.ui.drawer_open,
+        "entering the full view closes the drawer"
+    );
+    h.click("rack");
+    assert!(h.ui.drawer_open, "back in the rack it returns");
+
+    // Pinned from inside Perform: the drawer comes back and stays through the trip.
+    h.click("perform");
+    assert!(!h.ui.drawer_open);
+    h.click("drawer-pin");
+    assert!(h.ui.drawer_pinned && h.ui.drawer_open);
+    h.click("rack");
+    assert!(h.ui.drawer_open);
+    h.click("perform");
+    assert!(h.ui.drawer_open, "a pinned drawer stays open");
+    h.click("rack");
+    assert!(h.ui.drawer_open);
+
+    // A drawer the user closed stays closed, and one opened inside Perform stays open.
+    h.ui.drawer_pinned = false;
+    h.click("routing");
+    assert!(!h.ui.drawer_open);
+    h.click("perform");
+    h.click("routing");
+    assert!(h.ui.drawer_open, "opened by hand inside Perform");
+    h.click("rack");
+    assert!(h.ui.drawer_open);
+}
+
+#[test]
+fn scenes_and_macros_use_the_width_at_every_size() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/composition");
+    for (w, hgt) in [(1280.0, 800.0), (1440.0, 900.0)] {
+        let mut h = H::new(w, hgt);
+        h.editor = PatchEditor::from_log(kabl_core::load(&dir).unwrap());
+        h.ui.perform_open = true;
+        h.ui.perform_tall = true;
+        h.ui.drawer_open = false;
+        for _ in 0..4 {
+            h.frame();
+        }
+        let right = w - 44.0;
+        let scenes =
+            h.ui.hits
+                .iter()
+                .find(|(k, _)| k.ends_with(".cues"))
+                .map(|(_, r)| *r)
+                .expect("scenes card");
+        assert!(
+            right - scenes.right() < 30.0,
+            "{w}: scenes end at {}",
+            scenes.right()
+        );
+        // The bank cards of the second row also reach the right edge.
+        let last =
+            h.ui.hits
+                .iter()
+                .filter(|(k, _)| k.starts_with("pcard:") && k.ends_with(".banks"))
+                .map(|(_, r)| r.right())
+                .fold(0.0, f32::max);
+        assert!(right - last < 30.0, "{w}: banks end at {last}");
+        // Pads read from a distance, and the first control row stays above the fold.
+        assert!(
+            scenes.height() >= 150.0,
+            "{w}: scene row {}",
+            scenes.height()
+        );
+        let ctrl_bottom = h
+            .ui
+            .hits
+            .iter()
+            .filter(|(k, _)| k.starts_with("pcard:") && !k.ends_with(".banks") && !k.contains(".m"))
+            .map(|(_, r)| r.bottom())
+            .fold(0.0, f32::max);
+        assert!(
+            ctrl_bottom <= hgt - 20.0,
+            "{w}: controls end at {ctrl_bottom}"
+        );
+    }
+}

@@ -129,6 +129,20 @@ impl Clock {
         self.running
     }
 
+    /// Position in pulses (16ths) since the last Restart or the load, counted as launch
+    /// boundaries are: pulse `ticks - 1` is playing, `phase` is how far into it. Frozen while
+    /// stopped. Follows the host's transport in host mode, because the pulses do.
+    pub fn position(&self) -> f64 {
+        // Between a phase wrap and the sample that starts the next pulse, that pulse counts.
+        let pending = self.running && !self.gate_high && self.phase < 0.5;
+        let pulse = if pending {
+            self.ticks
+        } else {
+            self.ticks.saturating_sub(1)
+        };
+        pulse as f64 + self.phase
+    }
+
     /// `(epoch, tick)` of the next pulse to start.
     pub fn next_tick(&self) -> (u32, u64) {
         (self.epoch, self.ticks)

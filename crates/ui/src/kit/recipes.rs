@@ -204,17 +204,24 @@ pub fn pad(
             ink2,
         );
     }
-    let cy = rect.center().y + if sub.is_some() { -6.0 } else { 0.0 };
+    // Tall pads read from a distance: the title steps up a role.
+    let role = if size.y >= 96.0 {
+        Role::Title
+    } else {
+        Role::H3
+    };
+    let cy = rect.center().y + if sub.is_some() { -size.y * 0.07 } else { 0.0 };
     let avail = rect.width() - st.sp(2) * 2.0;
-    let mut tr = p.layout(title.to_string(), st.font(Role::H3), ink, f32::INFINITY);
+    let mut tr = p.layout(title.to_string(), st.font(role), ink, f32::INFINITY);
     if tr.size().x > avail {
         tr = p.layout(title.to_string(), st.font(Role::Label), ink, avail);
     }
-    let tpos = pos2(rect.center().x - tr.size().x / 2.0, cy - tr.size().y / 2.0);
+    let th = tr.size().y;
+    let tpos = pos2(rect.center().x - tr.size().x / 2.0, cy - th / 2.0);
     p.galley(tpos, tr, ink);
     if let Some(s) = sub {
         p.text(
-            pos2(rect.center().x, cy + 14.0),
+            pos2(rect.center().x, cy + th / 2.0 + st.sp(2)),
             egui::Align2::CENTER_CENTER,
             s.to_uppercase(),
             st.font(Role::Caption),
@@ -289,6 +296,27 @@ pub fn step_lane(
                 Stroke::new(1.5, tone(st, Tone::Text)),
                 egui::StrokeKind::Inside,
             );
+        }
+    }
+}
+
+/// A bar as four beat segments: the beats played are filled, the current one fills as it goes.
+/// `beats` is the position in the bar, 0..4.
+pub fn bar_meter(ui: &mut Ui, st: &Style, size: egui::Vec2, beats: f32) {
+    let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
+    let gap = st.sp(1);
+    let w = (rect.width() - gap * 3.0) / 4.0;
+    for i in 0..4 {
+        let seg = Rect::from_min_size(
+            pos2(rect.left() + i as f32 * (w + gap), rect.top()),
+            vec2(w, size.y),
+        );
+        ui.painter().rect_filled(seg, size.y / 2.0, st.roles.line2);
+        let f = (beats - i as f32).clamp(0.0, 1.0);
+        if f > 0.0 {
+            let fill = Rect::from_min_size(seg.min, vec2(w * f, size.y));
+            ui.painter()
+                .rect_filled(fill, size.y / 2.0, st.roles.accent);
         }
     }
 }

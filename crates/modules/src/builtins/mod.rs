@@ -3,9 +3,11 @@
 //! - `osc.va`: saw waveform only, no hard sync.
 //! - `lfo`: all 5 waveforms, no sync (brief itself defers "sync" — no clock exists yet, v3).
 
+mod attenuverter;
 mod chorus;
 mod clock;
 mod clock_div;
+mod crossfade;
 mod cues;
 mod delay;
 mod drive;
@@ -14,6 +16,7 @@ mod filter_ladder;
 mod filter_svf;
 mod gain;
 mod lfo;
+mod logic;
 mod macros;
 mod midi_in;
 mod mixer;
@@ -23,9 +26,13 @@ mod osc_fm6;
 mod osc_va;
 mod osc_wt;
 mod out;
+mod quantizer;
+mod random;
 mod reverb;
 mod ringmod;
+mod sample_hold;
 pub mod seq;
+mod slew;
 mod vca;
 
 pub use chorus::{Chorus, CHORUS_INFO};
@@ -52,3 +59,10 @@ pub use reverb::{Reverb, REVERB_INFO};
 pub use ringmod::{RingMod, RINGMOD_INFO};
 pub use seq::{Direction, Seq, SEQ_INFO};
 pub use vca::{Vca, VCA_INFO};
+pub use attenuverter::{Attenuverter, ATTENUVERTER_INFO};
+pub use crossfade::{Crossfade, Pan, CROSSFADE_INFO, PAN_INFO};
+pub use logic::{Comparator, Logic, COMPARATOR_INFO, LOGIC_INFO};
+pub use quantizer::{snap, Quantizer, QUANTIZER_INFO, SCALE_LABELS};
+pub use random::{Random, BIPOLAR_LABELS, RANDOM_INFO};
+pub use sample_hold::{SampleHold, MODE_LABELS as HOLD_MODE_LABELS, SAMPLE_HOLD_INFO};
+pub use slew::{Slew, MODE_LABELS as SLEW_MODE_LABELS, SLEW_INFO};

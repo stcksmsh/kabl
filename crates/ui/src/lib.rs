@@ -138,6 +138,8 @@ pub struct UiState {
     /// cleared when that route disappears, and only set by an explicit pick or by inspecting a
     /// knob that has exactly one route.
     pub selected_route: Option<CableId>,
+    /// The cable whose pattern and probability the drawer edits (`routing::cable_panel`).
+    pub cable_fn: Option<CableId>,
     /// Output jack being dragged toward a knob or input.
     port_drag: Option<PortRef>,
     /// Jack cable whose plug is being pulled out of its input (moved or removed on release).
@@ -180,6 +182,8 @@ pub struct UiState {
     bank_revealed: Option<(ModuleId, String)>,
     /// Each clock's run state as the audio thread last reported it; absent means running.
     pub clock_running: HashMap<ModuleId, bool>,
+    /// Each clock's position in 16ths since its last restart, as the audio thread reports it.
+    pub clock_pos: HashMap<ModuleId, f64>,
     /// Host owns clock transport in the plugin; standalone defaults to Free.
     pub host_clock: bool,
     /// Transport commands for `main.rs` to send to the audio thread. Runtime only: never in the
@@ -201,6 +205,11 @@ pub struct UiState {
     /// Screen offset of the rack origin from the canvas' top-left.
     pub pan: EguiVec2,
     pub drawer_open: bool,
+    /// The user pinned the drawer: entering the full Perform view leaves it open.
+    pub drawer_pinned: bool,
+    /// Perform closed the drawer on entry; leaving the full view reopens it.
+    drawer_auto_closed: bool,
+    perform_full_seen: bool,
     /// Modules showing their advanced controls. View only: never saved, never undone.
     pub expanded: BTreeSet<ModuleId>,
     /// Advanced controls float over the neighbours instead of pushing them (setting).
@@ -294,6 +303,7 @@ impl Default for UiState {
             cable_view: CableView::All,
             inspected: None,
             selected_route: None,
+            cable_fn: None,
             port_drag: None,
             unplug: None,
             drag: None,
@@ -314,6 +324,7 @@ impl Default for UiState {
             button_rearm: true,
             bank_revealed: None,
             clock_running: HashMap::new(),
+            clock_pos: HashMap::new(),
             host_clock: false,
             transport: Vec::new(),
             delay_status: HashMap::new(),
@@ -325,6 +336,9 @@ impl Default for UiState {
             zoom: 1.0,
             pan: EguiVec2::ZERO,
             drawer_open: true,
+            drawer_pinned: false,
+            drawer_auto_closed: false,
+            perform_full_seen: false,
             expanded: BTreeSet::new(),
             float_expansion: false,
             skins: true,
@@ -645,6 +659,16 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     }
 
     let perform_full = ui_state.perform_open && ui_state.perform_tall;
+    // The drawer gives its 360 px to the Perform view unless pinned, and comes back with the rack.
+    if perform_full != ui_state.perform_full_seen {
+        ui_state.perform_full_seen = perform_full;
+        if perform_full && ui_state.drawer_open && !ui_state.drawer_pinned {
+            ui_state.drawer_open = false;
+            ui_state.drawer_auto_closed = true;
+        } else if !perform_full && std::mem::take(&mut ui_state.drawer_auto_closed) {
+            ui_state.drawer_open = true;
+        }
+    }
     if ui_state.perform_open && !perform_full {
         egui::Panel::bottom("kabl-perform")
             .exact_size(perform::PANEL_H)
@@ -744,7 +768,9 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                         });
                     }
                     show_param_panel(editor, ui_state, ui);
+                    routing::cable_panel(editor, ui_state, ui);
                     routing::drawer(editor, ui_state, ui);
+                    routing::cable_routes(editor, ui_state, ui);
                 });
             });
     }
@@ -848,6 +874,7 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
             let open = ui_state.drawer_open;
             if tool(ui, st, ui_state, "routing", "Routing", open) {
                 ui_state.drawer_open = !open;
+                ui_state.drawer_auto_closed = false;
             }
             let open = ui_state.browser_open;
             if tool(ui, st, ui_state, "browser", "Sounds", open) {
@@ -3029,6 +3056,23 @@ fn draw_decor(editor: &PatchEditor, p: &egui::Painter, th: &Theme, xf: Xf, m: &P
             ];
             p.add(egui::Shape::line(pts, Stroke::new(1.6 * z, th.display_ink)));
         }
+        Decor::Operators(r) => {
+            for (i, b) in rack::fm6_blocks(r).into_iter().enumerate() {
+                p.rect_stroke(
+                    xf.r(b),
+                    CornerRadius::same(5),
+                    Stroke::new(1.0, th.tick),
+                    egui::StrokeKind::Inside,
+                );
+                p.text(
+                    xf.p(b.left_top() + vec2(8.0, 9.0)),
+                    egui::Align2::LEFT_CENTER,
+                    format!("Op {}", i + 1),
+                    egui::FontId::proportional(11.5 * z),
+                    th.ink2,
+                );
+            }
+        }
         Decor::None | Decor::Transport(_) | Decor::Status(_) | Decor::Banks(_) | Decor::Cues(_) => {
         }
     }
@@ -3169,9 +3213,9 @@ fn jack_badge(
         PortDirection::Output => {
             let dests: Vec<ModuleId> = state
                 .cables
-                .values()
-                .filter(|c| c.from == here)
-                .map(|c| c.to.module_id())
+                .iter()
+                .filter(|(_, c)| c.from == here)
+                .filter_map(|(&id, _)| state.end_module(id))
                 .collect();
             match dests.as_slice() {
                 [] => None,
@@ -3186,7 +3230,7 @@ fn jack_badge(
             .cables
             .values()
             .find(|c| c.to == here)
-            .map(|c| format!("< {}", name(c.from.module_id()))),
+            .map(|c| format!("< {}", name(c.from.module_id().unwrap_or_default()))),
     }
 }
 
@@ -3605,7 +3649,8 @@ fn draw_cables(
         .collect();
     {
         for (cable_id, c) in &cables {
-            if only.is_some_and(|id| c.from.module_id() != id && c.to.module_id() != id) {
+            if only.is_some_and(|id| c.from.module_id() != Some(id) && c.to.module_id() != Some(id))
+            {
                 continue;
             }
             if ui_state.unplug == Some(*cable_id) {
@@ -3618,7 +3663,10 @@ fn draw_cables(
                 continue;
             };
             let col = port_color(th, editor, &c.from);
-            let alpha = alpha_for(c.from.module_id(), c.to.module_id());
+            let alpha = alpha_for(
+                c.from.module_id().unwrap_or_default(),
+                c.to.module_id().unwrap_or_default(),
+            );
             let pts = cable_path(painter, a, b, col, 5.5 * z, alpha, false);
             // Removing is explicit: pull the plug out of its input, or right-click the cable.
             let mid = pts[pts.len() / 2];
@@ -3629,8 +3677,17 @@ fn draw_cables(
                 painter.circle_stroke(mid, 7.0, Stroke::new(1.5, th.sel));
             }
             let resp = resp.on_hover_text("Drag its plug out of the input to move or remove it");
+            if routing::is_functional(c) {
+                routing::functional_mark(painter, pts[pts.len() / 3], z, th.sel);
+            }
             let st = ui_state.style.clone();
             kit::context_menu(&resp, &st, |ui| {
+                let r = kit::menu_item(ui, &st, "Pattern & probability...", false);
+                ui_state.record("menu:cable-pattern".into(), r.rect);
+                if r.clicked() {
+                    ui_state.cable_fn = Some(*cable_id);
+                    ui.close();
+                }
                 let r = kit::menu_item(ui, &st, "Remove cable", false);
                 ui_state.record("menu:remove-cable".into(), r.rect);
                 if r.clicked() {
@@ -3644,7 +3701,7 @@ fn draw_cables(
         let Some((_, c)) = cables.iter().find(|(id, _)| id == cable_id) else {
             continue;
         };
-        if only.is_some_and(|id| c.to.module_id() != id) {
+        if only.is_some_and(|id| c.to.module_id() != Some(id)) {
             continue;
         }
         let Some(&a) = port_ref_pos(&drawn.ports, &c.from, PortDirection::Output) else {
@@ -3655,9 +3712,11 @@ fn draw_cables(
             (PortRef::Param { id, param }, Some((iid, ip))) if id == iid && param == ip);
         let strong = ui_state.selected_route == Some(*cable_id)
             || inspected
-            || focus == Some(c.from.module_id());
-        let alpha =
-            alpha_for(c.from.module_id(), c.to.module_id()) * if strong { 1.0 } else { 0.72 };
+            || (focus.is_some() && focus == c.from.module_id());
+        let alpha = alpha_for(
+            c.from.module_id().unwrap_or_default(),
+            c.to.module_id().unwrap_or_default(),
+        ) * if strong { 1.0 } else { 0.72 };
         let pts = cable_path(
             painter,
             a,
@@ -3668,6 +3727,9 @@ fn draw_cables(
             bypass,
         );
         let mid = pts[pts.len() / 2];
+        if routing::is_functional(c) {
+            routing::functional_mark(painter, pts[pts.len() / 3], z, th.sel);
+        }
         let hit = Rect::from_center_size(mid, EguiVec2::splat(12.0));
         ui_state.record(format!("route:{cable_id}"), hit);
         let resp = ui.interact(hit, Id::new(("kabl-route", *cable_id)), Sense::click());
@@ -3849,6 +3911,7 @@ fn draw_default_face(
                                         r.rect,
                                     );
                                 }
+                                PortRef::CableParam { .. } => {}
                                 PortRef::Param { id, param } => {
                                     view.record(format!("knob:{id}.{param}"), r.rect);
                                     for (&cid, cable) in &snapshot.cables {
@@ -3871,7 +3934,7 @@ fn draw_default_face(
                             kit::context_menu(&r, &st, |ui| {
                                 if kit::menu_item(ui, &st, "Inspect bound module", false).clicked()
                                 {
-                                    let leaf = e.target.module_id();
+                                    let leaf = e.target.module_id().unwrap_or_default();
                                     let owner = editor
                                         .state()
                                         .composites
@@ -3880,7 +3943,7 @@ fn draw_default_face(
                                         .map_or(id, |(&id, _)| id);
                                     view.enter_composite(editor.state(), owner);
                                     view.selected_module = Some(leaf);
-                                    view.reveal = Some(e.target.module_id());
+                                    view.reveal = Some(leaf);
                                     view.drawer_open = true;
                                     ui.close();
                                 }
@@ -4119,6 +4182,7 @@ fn draw_authored_face(
                 PortRef::Param { id: leaf, param } => {
                     view.record(format!("knob:{leaf}.{param}"), resp.rect)
                 }
+                PortRef::CableParam { .. } => {}
             }
             if resp.clicked() {
                 if dir == PortDirection::Output {
@@ -4251,6 +4315,8 @@ fn register_face_port(
                 }
             }
         }
+        // A cable's own parameter has no face port: its routes live in the pattern editor.
+        PortRef::CableParam { .. } => {}
     }
 }
 

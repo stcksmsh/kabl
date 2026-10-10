@@ -49,7 +49,7 @@ fn main() {
         let mut q = p.clone();
         q.modules.remove(&(midi as ModuleId));
         q.cables
-            .retain(|_, c| c.from.module_id() != midi && c.to.module_id() != midi);
+            .retain(|_, c| c.from.module_id() != Some(midi) && c.to.module_id() != Some(midi));
         println!("without the {name} layer's voices: {:.0} µs", median(&q));
     }
     for (name, ids) in [
@@ -64,7 +64,7 @@ fn main() {
         for id in ids {
             q.modules.remove(id);
             q.cables
-                .retain(|_, c| c.from.module_id() != *id && c.to.module_id() != *id);
+                .retain(|_, c| c.from.module_id() != Some(*id) && c.to.module_id() != Some(*id));
         }
         println!("without the {name}: {:.0} µs", median(&q));
     }

@@ -392,6 +392,28 @@ impl PatchEditor {
         )
     }
 
+    /// Adds a route from output `from` into parameter `param` (`prob`, `morph` or `glide_ms`) of
+    /// cable `cable`, at the engine's default amount and not bypassed. It cannot close a loop:
+    /// the new route has nothing routed into it. A missing cable, or a param a route cannot
+    /// move, adds nothing.
+    pub fn connect_cable_route(
+        &mut self,
+        from: PortRef,
+        cable: CableId,
+        param: &str,
+    ) -> Option<CableId> {
+        if !self.log.state().cables.contains_key(&cable) || kabl_cables::mod_slot(param).is_none() {
+            return None;
+        }
+        Some(self.connect(
+            from,
+            PortRef::CableParam {
+                cable,
+                param: param.to_string(),
+            },
+        ))
+    }
+
     /// Sets a route's signed amount (fraction of knob travel, -1..1). `first` as in
     /// `set_param_gesture`; a single click-edit passes `true`.
     pub fn set_route_amount(&mut self, cable: CableId, amount: f32, first: bool) {

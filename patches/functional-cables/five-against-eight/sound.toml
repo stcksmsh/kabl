@@ -1,0 +1,11 @@
+name = "Five Against Eight"
+category = "Piece"
+tags = [
+    "sequenced",
+    "functional cables",
+    "polymeter",
+    "104bpm",
+]
+description = "An 8-step bass line. A 5-step pattern on the modulation route into the filter cutoff moves the tone against it, so the two realign only every 40 steps, and one cutoff step passes 70 % of the time. A 16-step pattern on the pad's cable chops it into a gate. Open a cable's Pattern editor to change either."
+keys = false
+sequence = true
