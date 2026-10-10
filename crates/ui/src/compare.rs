@@ -217,6 +217,23 @@ pub fn diff(from: &PatchState, to: &PatchState) -> Option<Vec<Op>> {
             );
         }
     }
+    for slot in from
+        .tables
+        .keys()
+        .chain(to.tables.keys())
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>()
+    {
+        if s.tables.get(&slot) != to.tables.get(&slot) {
+            push(
+                &mut s,
+                Op::SetTable {
+                    slot,
+                    value: to.tables.get(&slot).cloned(),
+                },
+            );
+        }
+    }
     for id in from
         .composites
         .keys()

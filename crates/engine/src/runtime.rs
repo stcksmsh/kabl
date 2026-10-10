@@ -97,6 +97,8 @@ pub enum ParamClass {
 pub fn param_class(kind: &str, name: &str) -> ParamClass {
     match (kind, name) {
         ("midi.in", "mode" | "priority" | "glide") => ParamClass::Structural,
+        // The compiler picks the table (a slot's decoded wavetable); a change swaps graphs.
+        ("osc.wt", "table" | "user") => ParamClass::Structural,
         _ => ParamClass::Runtime,
     }
 }
@@ -119,6 +121,8 @@ pub fn smoothed_by_module(kind: &str, name: &str) -> bool {
         "reverb" => true,
         "noise" => name == "level_db",
         "osc.va" => name == "pw",
+        "osc.fm" => matches!(name, "level" | "index" | "feedback"),
+        "osc.wt" => name == "position",
         _ => false,
     }
 }
@@ -145,7 +149,10 @@ fn bypassed(c: &kabl_core::CableState) -> bool {
 /// labels, positions, a jack cable's params, a bypassed route's amount) are ignored. The
 /// comparison is bitwise, so a value that did not change sends nothing.
 pub fn runtime_changes(old: &PatchState, new: &PatchState) -> Option<Vec<(RuntimeTarget, f32)>> {
-    if old.modules.len() != new.modules.len() || old.cables.len() != new.cables.len() {
+    if old.modules.len() != new.modules.len()
+        || old.cables.len() != new.cables.len()
+        || old.tables != new.tables
+    {
         return None;
     }
     let mut out = Vec::new();

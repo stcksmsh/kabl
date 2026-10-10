@@ -1,0 +1,12 @@
+name = "Imported Morph"
+category = "Bass"
+tags = [
+    "wavetable",
+    "imported",
+    "fm",
+    "bass",
+    "poly",
+]
+description = "A wavetable imported into the sound (a resonance sweep that travels up the harmonics) over an FM sub. Each note sweeps the table; harder notes sweep further. The table travels inside the saved sound."
+keys = true
+sequence = false

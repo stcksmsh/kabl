@@ -179,3 +179,40 @@ Product `f7157619836075d0d7704e59be5d66e6224890b1`, binary `3baa8ee3cc0f2f99e182
 | dense-2-open | 2540.0, 2460.0 | 4969.91, 5491.27 | 2 |
 
 Dense two-open backend ERR2 remains; physical xruns and latency unmeasured. P99 bins10µs; arrivals include startup/teardown and are not execution time. Raw strict-profile timing-summary.json retains scopes.
+
+## 2026-10-09 — Sound engines: osc.fm and osc.wt
+
+`cargo run --release -p kabl-modules --example bench_sources` and
+`cargo build --release -p kabl-engine --example bench_patches` then
+`taskset -c 2 target/release/examples/bench_patches PATCH_DIR...`; i7-13700H, 48 kHz, 64-sample
+blocks, `taskset -c 2`. Details and the aliasing measurements: `docs/sound-engines/README.md`.
+
+One voice of each source, module alone (median of 15 runs of 2 s):
+
+| source | ns/sample | % of one core |
+|---|---|---|
+| osc.va saw (reference) | 12.9 | 0.06 |
+| osc.va saw, unison 4 | 22.2 | 0.11 |
+| osc.wt, one frame | 13.5 | 0.06 |
+| osc.wt, between two frames | 14.4 | 0.07 |
+| osc.fm, plain rate | 22.3 | 0.11 |
+| osc.fm, 2x (shipped) | 43.0 | 0.21 |
+| osc.fm, 2x, feedback | 43.1 | 0.21 |
+| two-operator stack, 2x | 82.4 | 0.40 |
+| four-operator chain, 2x | 160.9 | 0.77 |
+
+Whole patches, eight voices sounding, `process_block` (budget 1333 us per block):
+
+| patch | median us | p99.9 us | % budget |
+|---|---|---|---|
+| sound-engines/tine-keys | 115.0 | 196.9 | 8.6 |
+| sound-engines/glass-bells | 235.3 | 507.2 | 17.7 |
+| sound-engines/vowel-drift | 112.8 | 163.5 | 8.5 |
+| sound-engines/imported-morph | 71.7 | 101.6 | 5.4 |
+| palette/strings | 126.0 | 169.7 | 9.4 |
+| palette/pad | 134.9 | 185.0 | 10.1 |
+| palette/lead | 113.1 | 204.0 | 8.5 |
+| palette/bass | 15.4 | 27.5 | 1.2 |
+
+Pi 4 unmeasured. glass-bells is dominated by a 7 s reverb and four operators per voice.
+

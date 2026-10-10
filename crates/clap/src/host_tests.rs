@@ -599,3 +599,51 @@ fn composite_embedded_state_preserves_lanes_and_rejects_legacy_envelope_atomical
     assert!(p.shared.load(invalid).is_err());
     assert_eq!(serde_json::to_vec(&p.shared.snapshot()).unwrap(), before);
 }
+
+/// A wavetable patch saved by the plugin and reopened in a fresh instance (a host project
+/// reopen) plays the same: tables ride in the state, not in any file.
+#[test]
+fn wavetable_state_survives_a_host_project_reopen() {
+    let p = tests::instrument();
+    let mut state = p.shared.snapshot();
+    let wav = kabl_modules::wavetable::import_wav(&{
+        let mut b =
+            b"RIFF\0\0\0\0WAVEfmt \x10\0\0\0\x01\0\x01\0\x44\xac\0\0\x88\x58\x01\0\x02\0\x10\0data"
+                .to_vec();
+        b.extend(1200u32.to_le_bytes());
+        for i in 0..600 {
+            b.extend((((i as f32 * 0.05).sin() * 20000.0) as i16).to_le_bytes());
+        }
+        b
+    })
+    .unwrap();
+    state.patch.tables.insert(
+        2,
+        kabl_core::Table {
+            name: "mine.wav".into(),
+            wav,
+        },
+    );
+    let id = state.patch.modules.keys().max().unwrap() + 1;
+    state.patch.modules.insert(
+        id,
+        kabl_core::ModuleState {
+            kind: "osc.wt".into(),
+            pos: Vec2 { x: 0., y: 0. },
+            params: [("user".to_string(), 2.0)].into(),
+        },
+    );
+    state.version = 4;
+    p.shared.load(state).unwrap();
+
+    let saved = serde_json::to_vec(&p.shared.snapshot()).unwrap();
+    let reopened = tests::instrument();
+    reopened
+        .shared
+        .load(SoundState::decode(&saved).unwrap())
+        .unwrap();
+    let again = reopened.shared.snapshot();
+    assert_eq!(again.version, 4);
+    assert_eq!(again.patch.tables[&2].name, "mine.wav");
+    assert_eq!(serde_json::to_vec(&again).unwrap(), saved);
+}

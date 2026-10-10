@@ -174,6 +174,9 @@ pub fn step_labels(kind: &str, param: &str) -> Option<&'static [&'static str]> {
         ("lfo", "waveform") => &["SIN", "TRI", "SAW", "SQR", "S&H"],
         ("osc.va", "waveform") => &["SIN", "TRI", "SAW", "SQR"],
         ("noise", "color") => &["WHITE", "PINK"],
+        ("osc.fm", "ratio") => &kabl_modules::builtins::RATIO_LABELS,
+        ("osc.wt", "table") => &kabl_modules::wavetable::FACTORY_NAMES,
+        ("osc.wt", "user") => &["OFF", "1", "2", "3", "4", "5", "6", "7", "8"],
         ("vca", "exponential") => &["LIN", "EXP"],
         ("seq", g) if g.starts_with('g') && g.len() == 2 => &["OFF", "ON"],
         ("delay", "sync") => &["FREE", "1/16", "1/8", "1/8D", "1/4"],
@@ -409,6 +412,8 @@ pub fn short_name(kind: &str) -> &'static str {
     match kind {
         "midi.in" => "MIDI",
         "osc.va" => "Osc",
+        "osc.fm" => "FM",
+        "osc.wt" => "Wave",
         "filter.svf" => "Filter",
         "env.adsr" => "ADSR",
         "lfo" => "LFO",

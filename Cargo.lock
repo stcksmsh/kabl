@@ -1791,6 +1791,7 @@ dependencies = [
  "kabl-core",
  "kabl-modules",
  "rtrb",
+ "serde_json",
  "tempfile",
  "wide",
 ]

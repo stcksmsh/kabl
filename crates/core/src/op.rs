@@ -47,6 +47,11 @@ pub enum Op {
         id: crate::CompositeId,
         value: Option<crate::Composite>,
     },
+    /// Fills (`Some`) or empties (`None`) embedded wavetable slot `slot`. Schema v5.
+    SetTable {
+        slot: u64,
+        value: Option<crate::Table>,
+    },
     AddModule {
         id: ModuleId,
         kind: String,

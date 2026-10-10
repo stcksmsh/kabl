@@ -91,6 +91,15 @@ pub fn validate(p: &PatchState) -> Result<(), String> {
     if p.composites.len() > 128 {
         return Err("Composite count limit (128)".into());
     }
+    for (&slot, t) in &p.tables {
+        if !(1..=crate::table::MAX_TABLES).contains(&slot) {
+            return Err(format!(
+                "Table slot {slot}: slots are 1-{}",
+                crate::table::MAX_TABLES
+            ));
+        }
+        t.validate()?;
+    }
     let mut owned = BTreeSet::new();
     let mut artwork_pixels = 0u64;
     for (&id, c) in &p.composites {

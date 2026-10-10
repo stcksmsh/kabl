@@ -8,9 +8,9 @@ use crate::log::PatchLog;
 use crate::op::Entry;
 
 /// v2 adds `PortRef::Param` (modulation routes), `Op::UnsetParam` and `Op::Group`; v3 adds
-/// `Op::SetLabel`; v4 adds `Op::SetComposite`. Each is a strict superset of the one before, so older files load unchanged;
+/// `Op::SetLabel`; v4 adds `Op::SetComposite`; v5 adds `Op::SetTable`. Each is a strict superset of the one before, so older files load unchanged;
 /// there is nothing to migrate.
-pub const CURRENT_SCHEMA_VERSION: u32 = 4;
+pub const CURRENT_SCHEMA_VERSION: u32 = 5;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Meta {
@@ -82,6 +82,9 @@ pub fn load(dir: &Path) -> Result<PatchLog, FormatError> {
     }
     if meta.schema_version < 4 && !log.state().composites.is_empty() {
         return Err(FormatError::UnknownSchemaVersion(4));
+    }
+    if meta.schema_version < 5 && !log.state().tables.is_empty() {
+        return Err(FormatError::UnknownSchemaVersion(5));
     }
     crate::composite::validate(log.state()).map_err(FormatError::Composite)?;
     Ok(log)

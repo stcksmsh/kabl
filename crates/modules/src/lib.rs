@@ -10,6 +10,7 @@ pub mod io;
 pub mod module;
 pub mod registry;
 pub mod skin;
+pub mod wavetable;
 
 pub use info::{
     Category, LessonId, ModuleInfo, ParamInfo, PortDirection, PortInfo, PortType, QualitySupport,
