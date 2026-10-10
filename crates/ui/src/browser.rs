@@ -893,7 +893,6 @@ pub fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
     let r = ui
         .add(
             kit::Button::new(st, "Save")
-                .small()
                 .icon(Ic::Save)
                 .enabled(!io_busy(ui_state)),
         )
@@ -902,7 +901,7 @@ pub fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
     if r.clicked() {
         save(editor, ui_state, None);
     }
-    let r = ui.add(kit::Button::new(st, "Save As").small());
+    let r = ui.add(kit::Button::new(st, "Save As"));
     hit(ui_state, "save-as", &r);
     if r.clicked() {
         open_save_as(ui_state, None);
@@ -1027,7 +1026,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         return;
     }
     let body_h = ui.available_height();
-    egui::ScrollArea::vertical()
+    let body = egui::ScrollArea::vertical()
         .id_salt("kabl-browser-body")
         .auto_shrink([false, false])
         .show_owned(ui, |ui| {
@@ -1153,7 +1152,9 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             let has_user = lib.entries.iter().any(|e| e.origin == Origin::User);
             let filter = b.filter;
 
-            let list_h = (body_h - 520.0).max(120.0);
+            // The panel body scrolls, so the list takes the room and the audition block sits
+            // below it, reached by scrolling when the window is short.
+            let list_h = (body_h - 330.0).max(300.0);
             let mut open = None;
             let mut toggle = None;
             let mut forget = None;
@@ -1438,6 +1439,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                 kit::paragraph(ui, st, Role::Caption, Tone::Warn, n);
             }
         });
+    ui_state.record("browser-body".into(), body.inner_rect);
 }
 
 /// Audition for keyboard sounds, Start/Stop for pieces: always the sound in the rack.

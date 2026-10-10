@@ -1229,6 +1229,7 @@ mod tests {
         }
         let face = layout(e.state(), &v).faces[&id];
         let before = e.state().composites[&id].pos;
+        click(&ctx, &mut e, &mut v, "add-menu");
         click(&ctx, &mut e, &mut v, "add");
         assert_eq!(layout(e.state(), &v).faces[&id], face);
         assert_eq!(e.state().composites[&id].pos, before);

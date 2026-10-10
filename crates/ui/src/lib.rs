@@ -630,6 +630,11 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
         .exact_size(st.metrics.toolbar_h)
         .frame(kit::bar_frame(&st))
         .show(ui, |ui| toolbar(editor, ui_state, ui, &st));
+    egui::Panel::right("kabl-rail")
+        .exact_size(st.metrics.rail_w)
+        .resizable(false)
+        .frame(kit::panel_frame(&st).inner_margin(egui::Margin::symmetric(0, st.sp(2) as i8)))
+        .show(ui, |ui| rail(editor, ui_state, ui, &st));
     if ui_state.browser_open {
         egui::Panel::left("kabl-browser")
             .exact_size(browser::PANEL_W)
@@ -768,19 +773,6 @@ fn tool(
     r.clicked()
 }
 
-fn tool_small(
-    ui: &mut egui::Ui,
-    st: &Style,
-    ui_state: &mut UiState,
-    key: &str,
-    label: &str,
-    on: bool,
-) -> bool {
-    let r = ui.add(kit::Button::new(st, label).small().selected(on));
-    ui_state.record(key.to_string(), r.rect);
-    r.clicked()
-}
-
 fn vsep(ui: &mut egui::Ui, st: &Style) {
     let (r, _) = ui.allocate_exact_size(
         egui::vec2(1.0, st.metrics.control_h - 8.0),
@@ -804,49 +796,13 @@ fn tool_icon(
 }
 
 fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
-    // 28 + 24 px rows plus the bar's margins fit the 64 px panel only without a row gap.
-    ui.spacing_mut().item_spacing.y = 0.0;
-    ui.horizontal(|ui| {
+    ui.horizontal_centered(|ui| {
         kit::label(ui, st, style::Role::Title, kit::Tone::Text, "kabl");
-        let open = ui_state.browser_open;
-        if tool(ui, st, ui_state, "browser", "Sounds", open) {
-            ui_state.browser_open = !open;
+        let open = ui_state.perform_open;
+        if tool(ui, st, ui_state, "perform", "Perform", open) {
+            ui_state.perform_open = !open;
         }
-        let on = ui_state.composites.panel;
-        if tool(ui, st, ui_state, "composites", "Composites", on) {
-            ui_state.composites.panel = !on;
-        }
-        let kinds = PatchEditor::known_kinds();
-        kit::dropdown(
-            ui,
-            st,
-            "kind",
-            &ui_state.selected_kind.clone(),
-            110.0,
-            |ui| {
-                for kind in kinds {
-                    if kit::menu_item(ui, st, kind, ui_state.selected_kind == *kind).clicked() {
-                        ui_state.selected_kind = kind.to_string();
-                    }
-                }
-            },
-        );
-        if tool(ui, st, ui_state, "add", "Add", false) {
-            // At the end of the first row.
-            let lay = composite_layout(editor.state(), ui_state);
-            let x = rack_editor::items(&lay)
-                .into_iter()
-                .filter(|(_, r)| rack::row_of(r.top()) == 0)
-                .map(|(_, r)| r.right())
-                .fold(rack::RACK_X, f32::max);
-            let id = editor.add_module_in_scope(
-                &ui_state.selected_kind,
-                Vec2 { x, y: rack::ROW_Y0 },
-                ui_state.scope,
-            );
-            ui_state.selected_module = Some(id);
-            ui_state.reveal = Some(id);
-        }
+        browser::toolbar(editor, ui_state, ui, st);
         vsep(ui, st);
         let r = kit::icon_button(ui, st, kit::Ic::Undo, false, editor.can_undo())
             .tip(st, "Undo (Ctrl+Z)");
@@ -873,115 +829,15 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
                 }
             }
         });
-        vsep(ui, st);
-        let c = ui_state.canvas.center();
-        if tool_icon(
-            ui,
-            st,
-            ui_state,
-            "zoom:out",
-            kit::Ic::Minus,
-            "Zoom out",
-            true,
-        ) {
-            ui_state.zoom_about(ui_state.zoom / 1.2, c);
-        }
-        let pct = format!("{:.0}%", ui_state.zoom * 100.0);
-        let r = ui
-            .add(kit::Button::new(st, pct).ghost().min_width(48.0))
-            .tip(st, "Zoom to 100%");
-        ui_state.record("zoom:100".into(), r.rect);
-        if r.clicked() {
-            ui_state.zoom_about(1.0, c);
-        }
-        if tool_icon(ui, st, ui_state, "zoom:in", kit::Ic::Plus, "Zoom in", true) {
-            ui_state.zoom_about(ui_state.zoom * 1.2, c);
-        }
-        let r = ui
-            .add(kit::Button::new(st, "Fit").icon(kit::Ic::Fit))
-            .tip(st, "Fit the whole patch");
-        ui_state.record("zoom:fit".into(), r.rect);
-        if r.clicked() {
-            let lay = composite_layout(editor.state(), ui_state);
-            ui_state.frame_world(lay.bounds.expand(4.0), 1.5);
-        }
-        let focus_target = ui_state
-            .inspected
-            .as_ref()
-            .map(|(id, _)| *id)
-            .or(ui_state.selected_module);
-        let r = ui
-            .add(
-                kit::Button::new(st, "Focus")
-                    .icon(kit::Ic::Focus)
-                    .enabled(focus_target.is_some()),
-            )
-            .tip(st, "Zoom to the selected module");
-        ui_state.record("zoom:focus".into(), r.rect);
-        if r.clicked() {
-            let lay = composite_layout(editor.state(), ui_state);
-            if let Some(world) = focus_target.and_then(|id| lay.get(id)).map(|m| m.full()) {
-                // Readable: at least 100 % unless the module is wider than the canvas.
-                let fit = (ui_state.canvas.width() - 48.0) / world.width();
-                ui_state.frame_world(
-                    world.expand(24.0),
-                    fit.clamp(MIN_ZOOM, 1.25).max(fit.min(1.0)),
-                );
-                let d = ui_state.canvas.center() - ui_state.xf().r(world).center();
-                ui_state.pan += d;
-            }
-        }
-        vsep(ui, st);
-        kit::segmented(ui, st, |ui| {
-            let r = kit::seg(ui, st, "A-light", !ui_state.dark);
-            ui_state.record("theme:light".into(), r.rect);
-            if r.clicked() {
-                ui_state.dark = false;
-            }
-            let r = kit::seg(ui, st, "A-dark", ui_state.dark);
-            ui_state.record("theme:dark".into(), r.rect);
-            if r.clicked() {
-                ui_state.dark = true;
-            }
-        });
-        vsep(ui, st);
-        let menu = kit::menu_button(ui, st, "View", |ui| {
-            kit::paragraph(
-                ui,
-                st,
-                style::Role::Caption,
-                kit::Tone::Text2,
-                "More controls opens a focused view; rack layout stays fixed.",
-            );
-            kit::gap(ui, st, 1);
-            kit::rule(ui, st);
-            kit::gap(ui, st, 1);
-            let r = kit::toggle(ui, st, &mut ui_state.skins, "Illustrated skins");
-            ui_state.record("menu:skins".into(), r.rect);
-            ui.add_enabled_ui(ui_state.skins, |ui| {
-                let mut on_art = ui_state.skin_labels_on_art.unwrap_or(false);
-                let r = kit::toggle(ui, st, &mut on_art, "Preview labels_on_art")
-                    .tip(st, "A skin maker's flag; off = theme plates (default)");
-                ui_state.record("menu:labels-on-art".into(), r.rect);
-                if r.changed() {
-                    ui_state.skin_labels_on_art = on_art.then_some(true);
-                }
-            });
-        });
-        ui_state.record("view-menu".into(), menu.rect);
-    });
-    ui.horizontal(|ui| {
-        browser::toolbar(editor, ui_state, ui, st);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let open = ui_state.drawer_open;
-            if tool_small(ui, st, ui_state, "routing", "Routing", open) {
+            if tool(ui, st, ui_state, "routing", "Routing", open) {
                 ui_state.drawer_open = !open;
             }
-            let open = ui_state.perform_open;
-            if tool_small(ui, st, ui_state, "perform", "Perform", open) {
-                ui_state.perform_open = !open;
+            let open = ui_state.browser_open;
+            if tool(ui, st, ui_state, "browser", "Sounds", open) {
+                ui_state.browser_open = !open;
             }
-
             if let Some(rec) = ui_state.recorder.as_ref().filter(|r| r.recording()) {
                 let t = rec.elapsed() as u64;
                 kit::label(
@@ -997,6 +853,168 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
                 kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, msg)
                     .on_hover_text(msg);
             }
+        });
+    });
+}
+
+/// The side rail: composites, add module, zoom, and the view and theme settings.
+fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
+    ui.vertical_centered(|ui| {
+        ui.spacing_mut().item_spacing.y = st.sp(1);
+        let on = ui_state.composites.panel;
+        let r = kit::icon_button(ui, st, kit::Ic::Link, on, true).tip(st, "Composites");
+        ui_state.record("composites".into(), r.rect);
+        if r.clicked() {
+            ui_state.composites.panel = !on;
+        }
+        let r = kit::icon_menu(ui, st, kit::Ic::Plus, |ui| {
+            let kinds = PatchEditor::known_kinds();
+            kit::dropdown(
+                ui,
+                st,
+                "kind",
+                &ui_state.selected_kind.clone(),
+                228.0,
+                |ui| {
+                    for kind in kinds {
+                        if kit::menu_item(ui, st, kind, ui_state.selected_kind == *kind).clicked() {
+                            ui_state.selected_kind = kind.to_string();
+                        }
+                    }
+                },
+            );
+            kit::gap(ui, st, 1);
+            let r = ui.add(kit::Button::new(st, "Add module").primary());
+            ui_state.record("add".into(), r.rect);
+            if r.clicked() {
+                // At the end of the first row.
+                let lay = composite_layout(editor.state(), ui_state);
+                let x = rack_editor::items(&lay)
+                    .into_iter()
+                    .filter(|(_, r)| rack::row_of(r.top()) == 0)
+                    .map(|(_, r)| r.right())
+                    .fold(rack::RACK_X, f32::max);
+                let id = editor.add_module_in_scope(
+                    &ui_state.selected_kind,
+                    Vec2 { x, y: rack::ROW_Y0 },
+                    ui_state.scope,
+                );
+                ui_state.selected_module = Some(id);
+                ui_state.reveal = Some(id);
+                ui.close();
+            }
+        })
+        .tip(st, "Add a module");
+        ui_state.record("add-menu".into(), r.rect);
+        kit::rule(ui, st);
+        let c = ui_state.canvas.center();
+        if tool_icon(
+            ui,
+            st,
+            ui_state,
+            "zoom:in",
+            kit::Ic::Plus,
+            "Zoom in",
+            true,
+        ) {
+            ui_state.zoom_about(ui_state.zoom * 1.2, c);
+        }
+        let pct = format!("{:.0}%", ui_state.zoom * 100.0);
+        let r = ui
+            .add(kit::Button::new(st, pct).ghost().small())
+            .tip(st, "Zoom to 100%");
+        ui_state.record("zoom:100".into(), r.rect);
+        if r.clicked() {
+            ui_state.zoom_about(1.0, c);
+        }
+        if tool_icon(
+            ui,
+            st,
+            ui_state,
+            "zoom:out",
+            kit::Ic::Minus,
+            "Zoom out",
+            true,
+        ) {
+            ui_state.zoom_about(ui_state.zoom / 1.2, c);
+        }
+        if tool_icon(
+            ui,
+            st,
+            ui_state,
+            "zoom:fit",
+            kit::Ic::Fit,
+            "Fit the whole patch",
+            true,
+        ) {
+            let lay = composite_layout(editor.state(), ui_state);
+            ui_state.frame_world(lay.bounds.expand(4.0), 1.5);
+        }
+        let focus_target = ui_state
+            .inspected
+            .as_ref()
+            .map(|(id, _)| *id)
+            .or(ui_state.selected_module);
+        if tool_icon(
+            ui,
+            st,
+            ui_state,
+            "zoom:focus",
+            kit::Ic::Focus,
+            "Zoom to the selected module",
+            focus_target.is_some(),
+        ) {
+            let lay = composite_layout(editor.state(), ui_state);
+            if let Some(world) = focus_target.and_then(|id| lay.get(id)).map(|m| m.full()) {
+                // Readable: at least 100 % unless the module is wider than the canvas.
+                let fit = (ui_state.canvas.width() - 48.0) / world.width();
+                ui_state.frame_world(
+                    world.expand(24.0),
+                    fit.clamp(MIN_ZOOM, 1.25).max(fit.min(1.0)),
+                );
+                let d = ui_state.canvas.center() - ui_state.xf().r(world).center();
+                ui_state.pan += d;
+            }
+        }
+        ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
+            let menu = kit::icon_menu(ui, st, kit::Ic::Gear, |ui| {
+                kit::segmented(ui, st, |ui| {
+                    let r = kit::seg(ui, st, "A-light", !ui_state.dark);
+                    ui_state.record("theme:light".into(), r.rect);
+                    if r.clicked() {
+                        ui_state.dark = false;
+                    }
+                    let r = kit::seg(ui, st, "A-dark", ui_state.dark);
+                    ui_state.record("theme:dark".into(), r.rect);
+                    if r.clicked() {
+                        ui_state.dark = true;
+                    }
+                });
+                kit::gap(ui, st, 1);
+                kit::rule(ui, st);
+                kit::gap(ui, st, 1);
+                kit::paragraph(
+                    ui,
+                    st,
+                    style::Role::Caption,
+                    kit::Tone::Text2,
+                    "More controls opens a focused view; rack layout stays fixed.",
+                );
+                kit::gap(ui, st, 1);
+                let r = kit::toggle(ui, st, &mut ui_state.skins, "Illustrated skins");
+                ui_state.record("menu:skins".into(), r.rect);
+                ui.add_enabled_ui(ui_state.skins, |ui| {
+                    let mut on_art = ui_state.skin_labels_on_art.unwrap_or(false);
+                    let r = kit::toggle(ui, st, &mut on_art, "Preview labels_on_art")
+                        .tip(st, "A skin maker's flag; off = theme plates (default)");
+                    ui_state.record("menu:labels-on-art".into(), r.rect);
+                    if r.changed() {
+                        ui_state.skin_labels_on_art = on_art.then_some(true);
+                    }
+                });
+            })
+            .tip(st, "Theme and view settings");
+            ui_state.record("view-menu".into(), menu.rect);
         });
     });
 }

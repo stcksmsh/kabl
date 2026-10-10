@@ -323,7 +323,7 @@ impl Default for Metrics {
             field_h: 30.0,
             row_h: 44.0,
             icon: 14.0,
-            toolbar_h: 64.0,
+            toolbar_h: 48.0,
             status_h: 30.0,
             rail_w: 44.0,
             slider_h: 20.0,

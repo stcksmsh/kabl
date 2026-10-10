@@ -275,6 +275,22 @@ pub fn menu_button<R>(
     resp
 }
 
+/// An icon button that opens a popover of widgets.
+pub fn icon_menu<R>(
+    ui: &mut Ui,
+    st: &Style,
+    ic: Ic,
+    content: impl FnOnce(&mut Ui) -> R,
+) -> Response {
+    let resp = super::icon_button(ui, st, ic, false, true);
+    Popup::menu(&resp)
+        .frame(popover_frame(st))
+        .close_behavior(PopupCloseBehavior::CloseOnClickOutside)
+        .width(260.0)
+        .show(|ui| content(ui));
+    resp
+}
+
 /// A menu row that opens a nested menu.
 pub fn submenu<R>(
     ui: &mut Ui,

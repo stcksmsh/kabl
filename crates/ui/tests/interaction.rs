@@ -78,7 +78,7 @@ impl H {
     /// A point on bare rack: inside the canvas, outside every module and cable target.
     fn empty_rack(&self) -> Pos2 {
         let busy = |p: Pos2| self.ui.hits.values().any(|r| r.expand(4.0).contains(p));
-        let right = self.size.x - kabl_ui::DRAWER_W - 10.0;
+        let right = self.size.x - (kabl_ui::DRAWER_W + kabl_ui::style::Metrics::default().rail_w) - 10.0;
         (0..40)
             .flat_map(|i| (0..30).map(move |j| (i, j)))
             .map(|(i, j)| {
@@ -185,7 +185,7 @@ fn every_control_of_the_reference_patch_is_on_screen_left_of_the_drawer() {
         for (key, r) in &harness.ui.hits {
             if key.starts_with("knob:") || key.starts_with("out:") || key.starts_with("in:") {
                 assert!(
-                    r.max.x < w - kabl_ui::DRAWER_W && r.max.y < h - 30.0 && r.min.y > 40.0,
+                    r.max.x < w - (kabl_ui::DRAWER_W + kabl_ui::style::Metrics::default().rail_w) && r.max.y < h - 30.0 && r.min.y > 40.0,
                     "{w}x{h}: {key} at {r:?}"
                 );
             }
@@ -1103,13 +1103,16 @@ fn view_changes_never_touch_the_patch_or_the_audio() {
     let _ = t.editor.take_dirty();
     let state = t.editor.state().clone();
     let depth = t.undo_depth();
+    // The theme switch lives in the rail's settings popover.
     for key in [
+        "view-menu",
         "theme:dark",
         "view:Hidden",
         "zoom:in",
         "zoom:out",
         "zoom:fit",
         "view:Focus",
+        "view-menu",
         "theme:light",
         "zoom:100",
     ] {
@@ -1164,7 +1167,7 @@ fn opening_the_drawer_keeps_the_inspected_control_reachable() {
     t.click("routing"); // open
     t.frame();
     let r = t.ui.hits[&format!("knob:{FILTER}.cutoff_hz")];
-    assert!(r.max.x < 1280.0 - kabl_ui::DRAWER_W, "{r:?}");
+    assert!(r.max.x < 1280.0 - (kabl_ui::DRAWER_W + kabl_ui::style::Metrics::default().rail_w), "{r:?}");
 }
 
 /// Not a check: writes `patches/crowded` (15 modules on three rows, jack cables and knob routes
@@ -1302,7 +1305,7 @@ fn a_jack_cable_is_removed_by_pulling_its_plug_never_by_a_click() {
 #[test]
 fn source_lanes_of_a_knob_at_the_canvas_edge_pan_fully_into_view_and_stay_draggable() {
     for (w, h) in sizes() {
-        let right = w - kabl_ui::DRAWER_W;
+        let right = w - (kabl_ui::DRAWER_W + kabl_ui::style::Metrics::default().rail_w);
         // Corners of the canvas: next to the drawer, and at the bottom left.
         for target in [egui::pos2(right - 20.0, 60.0), egui::pos2(20.0, h - 40.0)] {
             let mut t = H::new(w, h);
@@ -1429,6 +1432,22 @@ fn delay_controls_and_a_fresh_load() {
     t.ui.browser_open = true;
     t.frame();
     t.click("folder-header");
+    // The panel body scrolls: wheel it (over the search field) until Load is on screen.
+    let at = t.at("search");
+    for _ in 0..10 {
+        t.events.push(Event::PointerMoved(at));
+        t.frame();
+        t.events.push(Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Point,
+            delta: egui::vec2(0.0, -200.0),
+            phase: egui::TouchPhase::Move,
+            modifiers: Modifiers::NONE,
+        });
+        t.frame();
+    }
+    for _ in 0..8 {
+        t.frame();
+    }
     t.click("load");
     assert!(!t.ui.loaded, "asks before replacing unsaved edits");
     t.click("dlg:discard");
