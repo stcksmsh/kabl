@@ -181,3 +181,41 @@ fn ratchets_follow_a_swung_clock() {
         assert_eq!(inside, 2, "step {w:?}");
     }
 }
+
+/// The position report (what Perform's beat readout and queued-pad progress read) follows the
+/// swung pulses: pulse k starts exactly when the position reaches k, and a pair's end, hence every
+/// beat, stays on the straight grid.
+#[test]
+fn the_reported_position_agrees_with_the_swung_pulses() {
+    for swing in [0.0f32, 58.0, 100.0] {
+        let (bpm, s) = (120.0f64, swing as f64 / 200.0);
+        let inc = bpm / 60.0 * 4.0 / SR as f64;
+        let mut r = Rig::new("clock", &[("bpm", bpm as f32), ("swing", swing)], SR);
+        let mut samples = 0usize;
+        let mut last = 0.0f64;
+        for _ in 0..(SR as usize * 10 / BLOCK) {
+            let _ = r.block(&[]);
+            samples += BLOCK;
+            let got = r.m.as_any().downcast_ref::<Clock>().unwrap().position();
+            // Straight time in pulses, mapped through the pair like the pulses are.
+            let u = samples as f64 * inc;
+            let (k, v) = ((u / 2.0).floor(), u % 2.0);
+            let want = 2.0 * k
+                + if v < 1.0 + s {
+                    v / (1.0 + s)
+                } else {
+                    1.0 + (v - 1.0 - s) / (1.0 - s)
+                };
+            assert!(
+                (got - want).abs() < 2.0 * inc / (1.0 - s).min(1.0),
+                "swing {swing} at {samples}: reported {got}, pulses say {want}"
+            );
+            assert!(got >= last, "swing {swing}: position went back");
+            last = got;
+            // Every second pulse's start, a whole beat pair, is on the straight grid.
+            if u % 2.0 < inc * BLOCK as f64 {
+                assert!((got % 2.0).min(2.0 - got % 2.0) < 0.05, "swing {swing}: {got}");
+            }
+        }
+    }
+}
