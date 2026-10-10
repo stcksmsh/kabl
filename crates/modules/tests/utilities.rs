@@ -7,6 +7,23 @@ use kabl_modules::builtins::Random;
 use kabl_modules::module::{StateReader, StateWriter};
 use std::collections::HashMap;
 
+#[test]
+fn attenuverter_knob_is_cubic_and_round_trips() {
+    let info = kabl_modules::registry::info_for("attenuverter").unwrap();
+    for p in info.params {
+        assert_eq!(p.from_norm(0.5), 0.0, "{}", p.name);
+        for v in [-24.0f32, -12.0, -1.0, -0.1, 0.0, 0.5, 1.0, 12.0, 24.0] {
+            assert!(
+                (p.from_norm(p.to_norm(v)) - v).abs() < 1e-3,
+                "{} {v}",
+                p.name
+            );
+        }
+        // Fine near unity: a 1 % step of travel moves the value by less than 1.
+        assert!(p.from_norm(p.to_norm(1.0) + 0.01) - 1.0 < 1.0, "{}", p.name);
+    }
+}
+
 /// A gate that is high for `high` samples of every `period`.
 fn pulses(period: usize, high: usize) -> impl Fn(usize) -> f32 {
     move |n| if n % period < high { 1.0 } else { 0.0 }

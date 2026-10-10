@@ -1,0 +1,9 @@
+# As face.txt for a module wider than the opening view (osc.fm6): Fit shows it whole at 100%.
+sleep 1
+click routing
+click zoom:fit
+sleep 1
+shot light
+click theme:dark
+sleep 0.5
+shot dark

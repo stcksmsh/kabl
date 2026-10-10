@@ -171,7 +171,9 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
             "The notes that are allowed. Major and Minor are the everyday scales; Pentatonic and \
              Blues have fewer notes and are hard to play wrong; Chromatic allows every note."
         }
-        ("quantizer", "root") => "The scale's home note, in semitones above C: 0 is C, 2 is D, 9 is A.",
+        ("quantizer", "root") => {
+            "The scale's home note, in semitones above C: 0 is C, 2 is D, 9 is A."
+        }
         ("quantizer", "transpose") => {
             "Moves the result up or down in whole semitones, after the pitch has been snapped."
         }
@@ -200,12 +202,16 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
             "A dead band around the threshold. Wider stops a slow or noisy signal from \
              flickering the gate on and off."
         }
-        ("crossfade", "mix") => "The blend: 0 is all of A, 1 is all of B. The fade input adds to it.",
+        ("crossfade", "mix") => {
+            "The blend: 0 is all of A, 1 is all of B. The fade input adds to it."
+        }
         ("crossfade", "curve") => {
             "0 is exact for control signals. 1 keeps two different sounds at an even loudness \
              through the middle."
         }
-        ("pan", "pan") => "Left to right: -1 is all left, 0 centre, 1 all right. The pan input adds to it.",
+        ("pan", "pan") => {
+            "Left to right: -1 is all left, 0 centre, 1 all right. The pan input adds to it."
+        }
         ("random", "length") => {
             "0 gives a new value every tick, never repeating. 1 to 16 makes a loop of that many \
              values that comes round again."
@@ -328,9 +334,13 @@ pub fn port_help(kind: &str, port: &str) -> Option<&'static str> {
         ("seq", "reset") => "Jumps back to the first step.",
         ("quantizer", "in") => "The pitch to snap to the scale.",
         ("quantizer", "out") => "The pitch, moved onto the nearest note of the scale.",
-        ("quantizer", "trig") => "A short pulse each time the note changes: patch it to an envelope's gate.",
+        ("quantizer", "trig") => {
+            "A short pulse each time the note changes: patch it to an envelope's gate."
+        }
         ("sample.hold", "in") => "The signal to take values from: noise, an LFO, a sequence.",
-        ("sample.hold", "clock") => "Each rising edge takes a new value (Sample), or holds it (Track, when low).",
+        ("sample.hold", "clock") => {
+            "Each rising edge takes a new value (Sample), or holds it (Track, when low)."
+        }
         ("slew", "in") => "The signal to smooth.",
         ("attenuverter", "in") => "The signal to scale and shift.",
         ("logic", "a" | "b") => "A gate input: high from 0.5 up.",
@@ -405,6 +415,7 @@ pub fn range_text(kind: &str, p: &ParamInfo) -> String {
     }
     let taper = match p.taper {
         Taper::Exponential => "exponential",
+        Taper::Cubic => "fine near the centre",
         _ => "linear",
     };
     let unit = if p.unit.is_empty() { " (no unit)" } else { "" };

@@ -83,7 +83,7 @@ pub static CROSSFADE_INFO: ModuleInfo = ModuleInfo {
     params: CROSSFADE_PARAMS,
     quality: NO_QUALITY,
     skin: None,
-    width_units: 5,
+    width_units: 6,
     advanced: &["curve"],
 };
 

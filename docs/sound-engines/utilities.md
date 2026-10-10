@@ -13,7 +13,7 @@ semitones from C4, as `midi.in` and `seq` give it.
 | Quantizer (`quantizer`) | in (pitch) → out (pitch), trig (gate) | `scale`, `root`, `transpose` (advanced) | snaps a pitch to the nearest note of a scale; `trig` pulses (5 ms) when the note changes |
 | Sample & Hold (`sample.hold`) | in, clock → out | `mode` SAMPLE / TRACK | SAMPLE takes `in` at each rising clock edge and holds; TRACK follows `in` while the clock is high and holds when it falls |
 | Slew (`slew`) | in → out | `rise_ms`, `fall_ms`, `mode` SLEW / FOLLOW | one-pole smoother with separate rise and fall; FOLLOW rectifies first (an envelope follower) |
-| Attenuverter (`attenuverter`) | in → out | `amount` (−24 to 24), `offset` (−24 to 24) | `in × amount + offset` |
+| Attenuverter (`attenuverter`) | in → out | `amount` (−24 to 24), `offset` (−24 to 24), both on a cubic knob (fine near the centre) | `in × amount + offset` |
 | Logic (`logic`) | a, b → and, or, xor, not | none | gate logic; `not` is the opposite of `a` |
 | Comparator (`comparator`) | in → out (gate) | `threshold`, `hysteresis` (advanced) | gate high while `in` is above the threshold, with a dead band |
 | Crossfade (`crossfade`) | a, b, fade → out | `mix`, `curve` (advanced) | blends `a` into `b`; `fade` adds to `mix`; `curve` 0 linear to 1 equal power |
@@ -172,8 +172,8 @@ between 0.73 and 0.88.
 ## Not verified
 
 - How anything sounds: no one has listened. The numbers are measurements.
-- The editor was not opened. Help text, short names and step labels are checked by the unit
-  tests that every param has help and the face-layout test, not by looking at a face.
+- Faces and help were checked in the running editor, see [faces.md](faces.md). Help text, short names and step labels are also checked by the unit
+  tests that every param has help and the face-layout test.
 - Strict clippy fails on origin/master in `crates/ui/examples/app_target` (unused items from
   the design batch); the rest of the workspace is clean and this change adds nothing.
 - Pi 4 cost; physical latency; a host other than REAPER.

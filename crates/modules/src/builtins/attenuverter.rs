@@ -30,7 +30,7 @@ const PARAMS: &[ParamInfo] = &[
         max: 24.0,
         default: 1.0,
         unit: "x",
-        taper: Taper::Linear,
+        taper: Taper::Cubic,
         smoothing_ms: 0.0,
     },
     ParamInfo {
@@ -39,7 +39,7 @@ const PARAMS: &[ParamInfo] = &[
         max: 24.0,
         default: 0.0,
         unit: "",
-        taper: Taper::Linear,
+        taper: Taper::Cubic,
         smoothing_ms: 0.0,
     },
 ];

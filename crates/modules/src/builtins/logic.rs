@@ -157,7 +157,7 @@ pub static COMPARATOR_INFO: ModuleInfo = ModuleInfo {
     params: COMPARATOR_PARAMS,
     quality: NO_QUALITY,
     skin: None,
-    width_units: 5,
+    width_units: 6,
     advanced: &["hysteresis"],
 };
 
