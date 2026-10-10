@@ -25,6 +25,7 @@ pub mod kit;
 pub mod library;
 pub mod panels;
 pub mod perform;
+mod perform_view;
 pub mod rack;
 mod rack_editor;
 mod wheel;
@@ -181,6 +182,8 @@ pub struct UiState {
     bank_revealed: Option<(ModuleId, String)>,
     /// Each clock's run state as the audio thread last reported it; absent means running.
     pub clock_running: HashMap<ModuleId, bool>,
+    /// Each clock's position in 16ths since its last restart, as the audio thread reports it.
+    pub clock_pos: HashMap<ModuleId, f64>,
     /// Host owns clock transport in the plugin; standalone defaults to Free.
     pub host_clock: bool,
     /// Transport commands for `main.rs` to send to the audio thread. Runtime only: never in the
@@ -202,6 +205,11 @@ pub struct UiState {
     /// Screen offset of the rack origin from the canvas' top-left.
     pub pan: EguiVec2,
     pub drawer_open: bool,
+    /// The user pinned the drawer: entering the full Perform view leaves it open.
+    pub drawer_pinned: bool,
+    /// Perform closed the drawer on entry; leaving the full view reopens it.
+    drawer_auto_closed: bool,
+    perform_full_seen: bool,
     /// Modules showing their advanced controls. View only: never saved, never undone.
     pub expanded: BTreeSet<ModuleId>,
     /// Advanced controls float over the neighbours instead of pushing them (setting).
@@ -316,6 +324,7 @@ impl Default for UiState {
             button_rearm: true,
             bank_revealed: None,
             clock_running: HashMap::new(),
+            clock_pos: HashMap::new(),
             host_clock: false,
             transport: Vec::new(),
             delay_status: HashMap::new(),
@@ -327,6 +336,9 @@ impl Default for UiState {
             zoom: 1.0,
             pan: EguiVec2::ZERO,
             drawer_open: true,
+            drawer_pinned: false,
+            drawer_auto_closed: false,
+            perform_full_seen: false,
             expanded: BTreeSet::new(),
             float_expansion: false,
             skins: true,
@@ -646,16 +658,23 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
             .show(ui, |ui| browser::panel(editor, ui_state, ui));
     }
 
-    if ui_state.perform_open {
+    let perform_full = ui_state.perform_open && ui_state.perform_tall;
+    // The drawer gives its 360 px to the Perform view unless pinned, and comes back with the rack.
+    if perform_full != ui_state.perform_full_seen {
+        ui_state.perform_full_seen = perform_full;
+        if perform_full && ui_state.drawer_open && !ui_state.drawer_pinned {
+            ui_state.drawer_open = false;
+            ui_state.drawer_auto_closed = true;
+        } else if !perform_full && std::mem::take(&mut ui_state.drawer_auto_closed) {
+            ui_state.drawer_open = true;
+        }
+    }
+    if ui_state.perform_open && !perform_full {
         egui::Panel::bottom("kabl-perform")
-            .exact_size(if ui_state.perform_tall {
-                perform::PANEL_TALL_H
-            } else {
-                perform::PANEL_H
-            })
+            .exact_size(perform::PANEL_H)
             .resizable(false)
             .frame(kit::panel_frame(&st))
-            .show(ui, |ui| perform::panel(editor, ui_state, ui));
+            .show(ui, |ui| perform_view::panel(editor, ui_state, ui));
     }
     if ui_state.drawer_open {
         egui::Panel::right("kabl-params")
@@ -756,9 +775,15 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
             });
     }
 
-    egui::CentralPanel::default()
-        .frame(egui::Frame::NONE.fill(st.roles.rack))
-        .show(ui, |ui| show_rack(editor, ui_state, ui, &th));
+    if perform_full {
+        egui::CentralPanel::default()
+            .frame(kit::panel_frame(&st))
+            .show(ui, |ui| perform_view::panel(editor, ui_state, ui));
+    } else {
+        egui::CentralPanel::default()
+            .frame(egui::Frame::NONE.fill(st.roles.rack))
+            .show(ui, |ui| show_rack(editor, ui_state, ui, &th));
+    }
     browser::dialogs(editor, ui_state, ui.ctx());
     ui_state.explain.typing =
         ui.ctx().egui_wants_keyboard_input() || egui::Popup::is_any_open(ui.ctx());
@@ -803,10 +828,21 @@ fn tool_icon(
 fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
     ui.horizontal_centered(|ui| {
         kit::logo(ui, st, 30.0);
-        let open = ui_state.perform_open;
-        if tool(ui, st, ui_state, "perform", "Perform", open) {
-            ui_state.perform_open = !open;
-        }
+        kit::segmented(ui, st, |ui| {
+            let open = ui_state.perform_open;
+            let r = kit::seg(ui, st, "Rack", !open);
+            ui_state.record("rack".into(), r.rect);
+            if r.clicked() {
+                ui_state.perform_open = false;
+            }
+            let r = kit::seg(ui, st, "Perform", open);
+            ui_state.record("perform".into(), r.rect);
+            if r.clicked() {
+                // The switch opens Perform as a view; "Show rack" in its header docks it.
+                ui_state.perform_open = true;
+                ui_state.perform_tall = true;
+            }
+        });
         browser::toolbar(editor, ui_state, ui, st);
         vsep(ui, st);
         let r = kit::icon_button(ui, st, kit::Ic::Undo, false, editor.can_undo())
@@ -838,6 +874,7 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
             let open = ui_state.drawer_open;
             if tool(ui, st, ui_state, "routing", "Routing", open) {
                 ui_state.drawer_open = !open;
+                ui_state.drawer_auto_closed = false;
             }
             let open = ui_state.browser_open;
             if tool(ui, st, ui_state, "browser", "Sounds", open) {
@@ -3612,9 +3649,8 @@ fn draw_cables(
         .collect();
     {
         for (cable_id, c) in &cables {
-            if only.is_some_and(|id| {
-                c.from.module_id() != Some(id) && c.to.module_id() != Some(id)
-            }) {
+            if only.is_some_and(|id| c.from.module_id() != Some(id) && c.to.module_id() != Some(id))
+            {
                 continue;
             }
             if ui_state.unplug == Some(*cable_id) {

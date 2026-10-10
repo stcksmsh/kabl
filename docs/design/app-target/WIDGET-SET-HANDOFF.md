@@ -146,3 +146,8 @@ Branch rebased onto `origin/master` (bb70204: PR #16, #17, #19 merged); PR #18 r
 - The scaled (1.5) run is one capture at light; dark scaled not looked at.
 - Plugin on other hosts and the Wayland path.
 - Real MIDI/audio devices (captures run without them).
+
+## Checkpoint 6 (merged with master for #15 and #20)
+
+`origin/master` (dfe0ef6: functional cables, utility modules and faces) is merged into `claude/widget-set` as a merge commit; PR #18 is mergeable. One conflicted file, `crates/ui/src/lib.rs`, two hunks: the cable context menu (kit menu with master's "Pattern & probability..." item, `menu:cable-pattern`, and the three-bar `routing::functional_mark` on patterned wires) and the output-port menu (`module_id().unwrap_or_default()`). The cable editor and its route lists (`routing::cable_panel`, `cable_routes`) are stock code inside the kit drawer; captures in `media/widget-set/cables/`. osc.fm6 and the quantizer in the kit chrome: `media/widget-set/utilities/`. `routing::stepped_selector`'s dropdown fallback stays a stock ComboBox (it sits in the zoom-scaled face; a fixed-height kit dropdown would overflow at low zoom).
+Verification: `cargo test --workspace` 819 passed, 0 failed, 28 ignored; strict clippy clean for the whole workspace (the app_target fix from the Perform branch is cherry-picked here).

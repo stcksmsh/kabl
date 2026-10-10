@@ -1711,11 +1711,11 @@ impl CompiledPatch {
         }
     }
 
-    /// Calls `f(id, running)` for every `clock` module. No allocation.
-    pub fn clocks(&self, mut f: impl FnMut(ModuleId, bool)) {
+    /// Calls `f(id, running, position in 16ths)` for every `clock` module. No allocation.
+    pub fn clocks(&self, mut f: impl FnMut(ModuleId, bool, f64)) {
         for (m, &(id, _)) in self.modules.iter().zip(&self.module_origin) {
             if let Some(c) = m.as_any().downcast_ref::<Clock>() {
-                f(id, c.running());
+                f(id, c.running(), c.position());
             }
         }
     }

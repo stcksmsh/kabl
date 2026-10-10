@@ -125,7 +125,7 @@ struct AudioHost {
     /// callback.
     steps_rx: Option<rtrb::Consumer<SeqReport>>,
     /// Each clock's run state, published by the audio callback.
-    clocks_rx: Option<rtrb::Consumer<(ModuleId, bool)>>,
+    clocks_rx: Option<rtrb::Consumer<(ModuleId, bool, f64)>>,
     /// Each LFO's sync state, published by the audio callback.
     lfos_rx: Option<rtrb::Consumer<(ModuleId, LfoSync)>>,
     /// Each delay's lock state and target time, published by the audio callback.
@@ -570,7 +570,7 @@ impl AudioHost {
             .and_then(|v| v.parse().ok());
 
         let (mut steps_tx, steps_rx) = rtrb::RingBuffer::<SeqReport>::new(256);
-        let (mut clocks_tx, clocks_rx) = rtrb::RingBuffer::<(ModuleId, bool)>::new(64);
+        let (mut clocks_tx, clocks_rx) = rtrb::RingBuffer::<(ModuleId, bool, f64)>::new(64);
         let (mut delays_tx, delays_rx) = rtrb::RingBuffer::<(ModuleId, DelayLock, f32)>::new(64);
         let (mut lfos_tx, lfos_rx) = rtrb::RingBuffer::<(ModuleId, LfoSync)>::new(128);
 
@@ -671,8 +671,8 @@ impl AudioHost {
                 engine.seqs(|id, step, bank, queued| {
                     let _ = steps_tx.push((id, step, bank, queued));
                 });
-                engine.clocks(|id, running| {
-                    let _ = clocks_tx.push((id, running));
+                engine.clocks(|id, running, pos| {
+                    let _ = clocks_tx.push((id, running, pos));
                 });
                 engine.delays(|id, lock, ms| {
                     let _ = delays_tx.push((id, lock, ms));
@@ -1486,6 +1486,7 @@ impl App {
         core.ui.launches.clear();
         core.ui.transport.clear();
         core.ui.clock_running.clear();
+        core.ui.clock_pos.clear();
         core.ui.seq_steps.clear();
         core.ui.seq_banks.clear();
         core.ui.delay_status.clear();
@@ -1874,8 +1875,9 @@ impl eframe::App for App {
             }
         }
         if let Some(rx) = self.audio.clocks_rx.as_mut() {
-            while let Ok((id, running)) = rx.pop() {
+            while let Ok((id, running, pos)) = rx.pop() {
                 ui_state.clock_running.insert(id, running);
+                ui_state.clock_pos.insert(id, pos);
             }
         }
         if let Some(pick) = ui_state.midi_select.take() {

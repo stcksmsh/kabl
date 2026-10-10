@@ -17,8 +17,6 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use egui::RichText;
-
 const IDLE: u8 = 0;
 const REC: u8 = 1;
 /// Asked to stop; the audio thread answers by setting `IDLE` on its next callback.
@@ -460,10 +458,17 @@ fn clock(s: f32) -> String {
 
 /// The recorder row: Record/Stop, elapsed time, the take's file, the destination folder and
 /// the last take. Long names are truncated (hover shows them whole), so the buttons stay put.
-pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, th: &crate::theme::Theme) {
-    let red = egui::Color32::from_rgb(220, 60, 50);
+pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, st: &crate::style::Style) {
+    use crate::kit::{self, Tone};
+    use crate::style::Role;
     let Some(rec) = ui_state.recorder.as_mut() else {
-        ui.label(RichText::new("Recording needs an audio device.").color(th.ink2));
+        kit::label(
+            ui,
+            st,
+            Role::Label,
+            Tone::Text2,
+            "Recording needs an audio device.",
+        );
         return;
     };
     let mut hits = Vec::new();
@@ -478,41 +483,47 @@ pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, th: &crate::th
         )
     };
     if let Some(path) = rec.path().map(Path::to_path_buf) {
-        let r = ui
-            .add(egui::Button::new(RichText::new("■ Stop").strong()).min_size([84.0, 0.0].into()));
+        let r = ui.add(
+            kit::Button::new(st, "Stop")
+                .icon(kit::Ic::Stop)
+                .min_width(84.0),
+        );
         hits.push(("rec-stop".to_string(), r.rect));
         if r.clicked() {
             message = rec.stop().map(|o| describe(&o));
         }
-        let r = ui.label(
-            RichText::new(format!("● REC {}", clock(rec.elapsed())))
-                .color(red)
-                .strong()
-                .monospace(),
+        let r = kit::label(
+            ui,
+            st,
+            Role::Value,
+            Tone::Bad,
+            format!("● REC {}", clock(rec.elapsed())),
         );
         hits.push(("rec-time".to_string(), r.rect));
         let lost = rec.lost();
         if lost > 0 {
-            ui.label(
-                RichText::new(format!("{lost} frames lost: incomplete"))
-                    .color(red)
-                    .strong(),
+            kit::label(
+                ui,
+                st,
+                Role::Label,
+                Tone::Bad,
+                format!("{lost} frames lost: incomplete"),
             );
         }
-        let r = ui
-            .add(
-                egui::Label::new(
-                    RichText::new(format!("→ {}", name(&path)))
-                        .small()
-                        .monospace(),
-                )
-                .truncate(),
-            )
-            .on_hover_text(path.display().to_string());
+        let r = kit::label_truncated(
+            ui,
+            st,
+            Role::Caption,
+            Tone::Text2,
+            format!("→ {}", name(&path)),
+        )
+        .on_hover_text(path.display().to_string());
         hits.push(("rec-dest".to_string(), r.rect));
     } else {
         let r = ui.add(
-            egui::Button::new(RichText::new("● Record").strong()).min_size([84.0, 0.0].into()),
+            kit::Button::new(st, "Record")
+                .icon(kit::Ic::Rec)
+                .min_width(84.0),
         );
         hits.push(("rec-start".to_string(), r.rect));
         if r.clicked() {
@@ -520,12 +531,18 @@ pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, th: &crate::th
                 message = Some(e);
             }
         }
-        ui.label("to");
-        let r = ui
-            .add(egui::TextEdit::singleline(&mut rec.dir).desired_width(140.0))
-            .on_hover_text("Folder for new takes (created if missing)");
+        kit::label(ui, st, Role::Label, Tone::Text2, "to");
+        let r = kit::field(
+            ui,
+            st,
+            &mut rec.dir,
+            "Folder for new takes",
+            None,
+            Some(150.0),
+        )
+        .on_hover_text("Folder for new takes (created if missing)");
         hits.push(("rec-dir".to_string(), r.rect));
-        let r = ui.small_button("Open folder");
+        let r = ui.add(kit::Button::new(st, "Open folder").small());
         hits.push(("rec-open".to_string(), r.rect));
         if r.clicked() {
             let dir = std::path::PathBuf::from(&rec.dir);
@@ -544,7 +561,6 @@ pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, th: &crate::th
                 }
                 Outcome::Failed(_) => (None, false),
             };
-            ui.separator();
             let text = match &o {
                 Outcome::Complete { path, frames } => {
                     format!("Last take: {} ({frames} frames)", name(path))
@@ -558,13 +574,17 @@ pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, th: &crate::th
                 ),
                 Outcome::Failed(e) => format!("Recording failed: {e}"),
             };
-            let t = RichText::new(text).small();
-            let r = ui
-                .add(egui::Label::new(if ok { t } else { t.color(red) }).truncate())
-                .on_hover_text(describe(&o));
+            let r = kit::label_truncated(
+                ui,
+                st,
+                Role::Caption,
+                if ok { Tone::Text2 } else { Tone::Bad },
+                text,
+            )
+            .on_hover_text(describe(&o));
             hits.push(("rec-last".to_string(), r.rect));
             if let Some(p) = path {
-                let r = ui.small_button("Copy path");
+                let r = ui.add(kit::Button::new(st, "Copy path").small());
                 hits.push(("rec-copy".to_string(), r.rect));
                 if r.clicked() {
                     ui.ctx().copy_text(p.display().to_string());
