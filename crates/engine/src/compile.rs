@@ -585,7 +585,11 @@ fn cable_dests(patch: &PatchState) -> Result<BTreeMap<CableId, ModuleId>, Compil
         let (mut cur, mut path) = (id, vec![id]);
         let dest = loop {
             let c = &patch.cables[&cur];
-            let PortRef::CableParam { cable: target, param } = &c.to else {
+            let PortRef::CableParam {
+                cable: target,
+                param,
+            } = &c.to
+            else {
                 break c.to.module_id();
             };
             let fail = |reason: String| Err(CompileError::CableRoute { cable: cur, reason });
@@ -1046,8 +1050,7 @@ fn compile_inner(
                     continue;
                 }
                 let mut consumers = live.iter().filter(|c| c.0 == id).peekable();
-                if consumers.peek().is_some() && consumers.all(|c| voiced.contains(&c.1))
-                {
+                if consumers.peek().is_some() && consumers.all(|c| voiced.contains(&c.1)) {
                     voiced.insert(id);
                 }
             }
@@ -2490,11 +2493,7 @@ pub fn validate_composites(patch: &PatchState) -> Result<(), String> {
     kabl_core::composite::validate(patch)?;
     for (&id, c) in &patch.composites {
         for e in c.ports.values().chain(c.controls.values()) {
-            let Some(m) = e
-                .target
-                .module_id()
-                .and_then(|id| patch.modules.get(&id))
-            else {
+            let Some(m) = e.target.module_id().and_then(|id| patch.modules.get(&id)) else {
                 return Err(format!(
                     "Composite {id}: missing interface target {:?}",
                     e.target

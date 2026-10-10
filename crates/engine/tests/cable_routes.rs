@@ -9,7 +9,9 @@ use std::collections::BTreeMap;
 
 use assert_no_alloc::{assert_no_alloc, AllocDisabler};
 use kabl_cables::{seed_of, Mods, Settings, MORPH};
-use kabl_core::{CableId, CableState, Op, ParamTarget, PatchLog, PatchState, PortRef, Source, Vec2};
+use kabl_core::{
+    CableId, CableState, Op, ParamTarget, PatchLog, PatchState, PortRef, Source, Vec2,
+};
 use kabl_engine::compile::{compile, CompiledPatch};
 use kabl_engine::graph::BLOCK;
 use kabl_engine::runtime::{runtime_changes, RuntimeTarget};
@@ -271,7 +273,11 @@ fn one_macro_moves_three_cables_at_different_depths_and_signs() {
     let (routed, stored) = (three_cables(true), three_cables(false));
     let (l, r) = render(&mut compile(&routed, SR, 1).unwrap(), 800, |_, _| {});
     let (want, want_r) = render(&mut compile(&stored, SR, 1).unwrap(), 800, |_, _| {});
-    assert_eq!(first_diff(&l, &want), None, "same sound as three stored morphs");
+    assert_eq!(
+        first_diff(&l, &want),
+        None,
+        "same sound as three stored morphs"
+    );
     assert_eq!(r, want_r);
     assert!(l.iter().any(|&x| x != 0.0));
     // Each depth is its own runtime value: a change reaches one cable and rebuilds nothing.
@@ -299,10 +305,7 @@ fn the_amount_is_a_runtime_value_not_a_rebuild() {
     for (t, v) in changes {
         assert!(c.set_runtime(t, v, false));
     }
-    assert_eq!(
-        render(&mut c, 600, |_, _| {}).0,
-        left_of(&probe(0.25), 600)
-    );
+    assert_eq!(render(&mut c, 600, |_, _| {}).0, left_of(&probe(0.25), 600));
     // A base edit of a cable whose only life is a route into it is in place too.
     let mut plain = probe(0.0);
     plain.cables.get_mut(&CABLE).unwrap().params.clear();
@@ -389,8 +392,12 @@ fn a_route_may_carry_a_pattern_and_be_moved_by_another_route() {
     assert_ne!(l, left_of(&with_macro(1.0, 1.0), 600));
     // With m2 at 1.0 route 11 closes route 10 for good: the morph stays at its stored 0.
     let mut shut = p.clone();
-    shut.modules.insert(MACRO, module("macro", &[("m1", 1.0), ("m2", 1.0)]));
-    assert_eq!(left_of(&shut, 600)[3 * 2400..], left_of(&probe(0.0), 600)[3 * 2400..]);
+    shut.modules
+        .insert(MACRO, module("macro", &[("m1", 1.0), ("m2", 1.0)]));
+    assert_eq!(
+        left_of(&shut, 600)[3 * 2400..],
+        left_of(&probe(0.0), 600)[3 * 2400..]
+    );
 }
 
 fn compile_error(p: &PatchState) -> String {
@@ -407,7 +414,10 @@ fn the_nesting_rule_names_the_fix() {
     p.cables
         .insert(ROUTE, route((MACRO, "m1"), ROUTE, "morph", 1.0));
     let e = compile_error(&p);
-    assert!(e.contains("route 10") && e.contains("cannot modulate itself"), "{e}");
+    assert!(
+        e.contains("route 10") && e.contains("cannot modulate itself"),
+        "{e}"
+    );
     // Two routes that move each other.
     let mut p = with_macro(0.5, 1.0);
     p.cables
@@ -415,12 +425,16 @@ fn the_nesting_rule_names_the_fix() {
     p.cables
         .insert(11, route((MACRO, "m2"), ROUTE, "prob", 1.0));
     let e = compile_error(&p);
-    assert!(e.contains("cable 10 -> cable 11") && e.contains("loop"), "{e}");
+    assert!(
+        e.contains("cable 10 -> cable 11") && e.contains("loop"),
+        "{e}"
+    );
     // A longer ring: 10 -> 11 -> 12 -> 10.
     p.cables
         .insert(ROUTE, route((MACRO, "m1"), 11, "prob", 1.0));
     p.cables.insert(11, route((MACRO, "m2"), 12, "prob", 1.0));
-    p.cables.insert(12, route((MACRO, "m3"), ROUTE, "prob", 1.0));
+    p.cables
+        .insert(12, route((MACRO, "m3"), ROUTE, "prob", 1.0));
     let e = compile_error(&p);
     assert!(e.contains("cable 10 -> cable 11 -> cable 12"), "{e}");
     // A param a route cannot move, and a cable that is not there.
@@ -497,7 +511,12 @@ fn ops() -> Vec<Op> {
     for (k, v) in B {
         ops.push(set(CABLE, &format!("b.{k}"), *v));
     }
-    for (id, k, v) in [(CLOCK, "bpm", 300.0), (LFO, "rate_hz", 0.01), (LFO, "waveform", 3.0), (MACRO, "m1", 0.6)] {
+    for (id, k, v) in [
+        (CLOCK, "bpm", 300.0),
+        (LFO, "rate_hz", 0.01),
+        (LFO, "waveform", 3.0),
+        (MACRO, "m1", 0.6),
+    ] {
         ops.push(Op::SetParam {
             target: ParamTarget::Module {
                 id,
@@ -520,7 +539,10 @@ fn undo_save_and_reload_keep_routes_into_cables() {
 
     // Removing the cable takes the route into it along, and undo brings both back.
     log.append_new(Op::Disconnect { id: CABLE }, 0, Source::User);
-    assert!(!log.state().cables.contains_key(&ROUTE), "no dangling route");
+    assert!(
+        !log.state().cables.contains_key(&ROUTE),
+        "no dangling route"
+    );
     assert!(log.undo());
     assert_eq!(log.state(), &full, "undo restores the route exactly");
     // So does removing the source module of the cable.
@@ -567,7 +589,11 @@ fn a_chain_goes_with_the_cable_it_hangs_from() {
     );
     let full = log.state().clone();
     log.append_new(Op::Disconnect { id: CABLE }, 0, Source::User);
-    assert!(log.state().cables.keys().all(|id| *id != ROUTE && *id != 11));
+    assert!(log
+        .state()
+        .cables
+        .keys()
+        .all(|id| *id != ROUTE && *id != 11));
     assert!(log.undo());
     assert_eq!(log.state(), &full);
 }
@@ -578,9 +604,19 @@ fn files_saved_before_cable_routes_load_and_render_unchanged() {
     // model that has always defined a cable's output (`Settings::level_at` per pulse).
     let mut log = PatchLog::new();
     for op in ops() {
-        if !matches!(&op, Op::Connect { to: PortRef::CableParam { .. }, .. })
-            && !matches!(&op, Op::SetParam { target: ParamTarget::Cable { id: ROUTE, .. }, .. })
-        {
+        if !matches!(
+            &op,
+            Op::Connect {
+                to: PortRef::CableParam { .. },
+                ..
+            }
+        ) && !matches!(
+            &op,
+            Op::SetParam {
+                target: ParamTarget::Cable { id: ROUTE, .. },
+                ..
+            }
+        ) {
             log.append_new(op, 0, Source::User);
         }
     }

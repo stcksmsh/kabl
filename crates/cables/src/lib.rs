@@ -526,8 +526,14 @@ mod tests {
             ..Mods::default()
         };
         n.process_mod(&src, &mut out, None, &[(0, 0, 10), (0, 1, 30)], mods_at);
-        assert!(out[..30].iter().all(|&x| x == 1.0), "no pulse at 20: no change");
-        assert!(out[30..].iter().all(|&x| x == 0.0), "the pulse at 30 reads it");
+        assert!(
+            out[..30].iter().all(|&x| x == 1.0),
+            "no pulse at 20: no change"
+        );
+        assert!(
+            out[30..].iter().all(|&x| x == 0.0),
+            "the pulse at 30 reads it"
+        );
         // The next block starts inside that pulse and keeps what the pulse read.
         n.process_mod(&src, &mut out, Some(1), &[], |_| Mods::default());
         assert!(out.iter().all(|&x| x == 0.0));

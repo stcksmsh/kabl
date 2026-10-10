@@ -45,6 +45,13 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
          steps to five uneven ones) and the bass level (quiet to full). Open a cable's Pattern editor and move Morph A to B.",
     ),
     (
+        "functional-cables/macro-morph",
+        "Macro Morph",
+        "Piece",
+        &["sequenced", "functional cables", "morph", "macro", "120bpm"],
+        "Three gate cables, each with a pattern A and a pattern B, and one macro (m1) routed into all three morphs at +100 %, +50 % and -100 %. Raise the macro: the bass and the middle voice fill in, the high voice thins out. Open a cable's Pattern editor to see its source and change its depth.",
+    ),
+    (
         "functional-cables/echo-throws",
         "Echo Throws",
         "Piece",

@@ -88,7 +88,17 @@ fn build() -> (PatchEditor, ModuleId, [CableId; 3]) {
     e.set_param(mix, "level3", 0.25);
 
     // (name, wave, base_hz, decay ms, pattern A, pattern B, chances in A, base morph, depth)
-    type Voice = (&'static str, f32, f32, f32, Vec<f32>, Vec<f32>, Vec<(usize, f32)>, f32, f32);
+    type Voice = (
+        &'static str,
+        f32,
+        f32,
+        f32,
+        Vec<f32>,
+        Vec<f32>,
+        Vec<(usize, f32)>,
+        f32,
+        f32,
+    );
     let voices: [Voice; 3] = [
         (
             "bass",
@@ -96,7 +106,9 @@ fn build() -> (PatchEditor, ModuleId, [CableId; 3]) {
             55.0,
             260.0,
             vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
-            vec![1.0, 0.0, 0.6, 1.0, 0.0, 0.8, 0.0, 1.0, 1.0, 0.0, 0.6, 0.0, 0.0, 1.0, 0.0, 0.8],
+            vec![
+                1.0, 0.0, 0.6, 1.0, 0.0, 0.8, 0.0, 1.0, 1.0, 0.0, 0.6, 0.0, 0.0, 1.0, 0.0, 0.8,
+            ],
             vec![],
             0.0,
             1.0,
@@ -117,7 +129,9 @@ fn build() -> (PatchEditor, ModuleId, [CableId; 3]) {
             2.0,
             880.0,
             70.0,
-            vec![1.0, 0.5, 0.0, 0.0, 0.7, 0.0, 0.0, 0.5, 1.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.7, 0.0],
+            vec![
+                1.0, 0.5, 0.0, 0.0, 0.7, 0.0, 0.0, 0.5, 1.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.7, 0.0,
+            ],
             vec![1.0, 1.0, 1.0, 0.0, 1.0],
             vec![(1, 80.0), (9, 60.0)],
             1.0,
@@ -154,19 +168,40 @@ fn build() -> (PatchEditor, ModuleId, [CableId; 3]) {
     (e, knob, routes)
 }
 
+/// The macro as `docs/functional-cables/scripts/host_routes.py` automates it in REAPER, by
+/// seconds: 0 until 4 s, up to 1 at 14 s, held to 18 s, down to 0 at 23 s.
+fn host_knob_at(sec: f32) -> f32 {
+    match sec {
+        t if t < 4.0 => 0.0,
+        t if t < 14.0 => (t - 4.0) / 10.0,
+        t if t < 18.0 => 1.0,
+        t if t < 23.0 => 1.0 - (t - 18.0) / 5.0,
+        _ => 0.0,
+    }
+}
+
 fn render(state: &kabl_core::PatchState, knob: ModuleId) -> Vec<f32> {
+    render_with(state, knob, BARS * BAR_S, |sec| knob_at(sec / BAR_S))
+}
+
+fn render_with(
+    state: &kabl_core::PatchState,
+    knob: ModuleId,
+    seconds: f32,
+    value: impl Fn(f32) -> f32,
+) -> Vec<f32> {
     let mut c = compile(state, SR, 4).expect("the demo compiles");
-    let blocks = (BARS * BAR_S * SR) as usize / BLOCK;
+    let blocks = (seconds * SR) as usize / BLOCK;
     let mut out = Vec::with_capacity(blocks * BLOCK * 2);
     for b in 0..blocks {
-        let bar = (b * BLOCK) as f32 / SR / BAR_S;
+        let sec = (b * BLOCK) as f32 / SR;
         c.set_runtime(
             RuntimeTarget::Param {
                 id: knob,
                 kind: "macro",
                 index: 0,
             },
-            knob_at(bar),
+            value(sec),
             false,
         );
         c.process_block();
@@ -224,6 +259,12 @@ fn main() {
                 println!("bar {k:2}: macro {:.2} rms {rms:.3}", knob_at(k as f32));
             }
         }
-        _ => eprintln!("usage: cable_routes_demo write <patch dir> | render <out.wav>"),
+        Some("render-host") => {
+            let clip = render_with(e.log().state(), knob, 24.0, host_knob_at);
+            write_wav(Path::new(&args[2]), &clip);
+        }
+        _ => eprintln!(
+            "usage: cable_routes_demo write <patch dir> | render <out.wav> | render-host <out.wav>"
+        ),
     }
 }

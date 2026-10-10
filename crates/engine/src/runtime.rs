@@ -193,8 +193,9 @@ pub fn runtime_changes(old: &PatchState, new: &PatchState) -> Option<Vec<(Runtim
         }
         // A cable gains or loses its node by compiling; edits of a cable with a node apply in
         // place.
-        let has_node =
-            |c: &kabl_core::CableState| kabl_cables::is_functional(&c.params) || targeted.contains(&id);
+        let has_node = |c: &kabl_core::CableState| {
+            kabl_cables::is_functional(&c.params) || targeted.contains(&id)
+        };
         if has_node(a) != has_node(b) {
             return None;
         }

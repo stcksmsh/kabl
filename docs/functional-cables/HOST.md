@@ -22,9 +22,21 @@ Command: `cargo build --release -p kabl-clap && python3 docs/functional-cables/s
 - The cables matter in the host: the same project with every functional-cable param removed renders differently (relative difference 1.80, spectrum cosine 0.62, envelope correlation 0.25).
 - An old project (saved by an earlier build, state version 2) opened and saved by this build comes back with an identical state.
 
+## REAPER with a macro driving cable morphs under host automation (routes into cable parameters, schema v6)
+
+2026-10-10, build with `PortRef::CableParam`, release `libkabl_clap.so` sha256 `6bd246dbc2638bc9890e83ce1b5c6344c94dd3489d09b90865488b59ab846735`, same machine and method (`scripts/host_routes.py`, evidence in `evidence/host-routes/`). CLAP validator: 35 success, 9 skipped, no difference to the baseline (`evidence/validator.json`).
+
+- Project: track 1 is `patches/functional-cables/macro-morph`: macro m1 has a route into the morph of each of three pattern cables (+100 %, +50 %, -100 %); host automation lane 1 of the plugin is bound to that macro and the project holds a recorded automation envelope on it (0 until 4 s, up to 1 at 14 s, held to 18 s, down to 0 at 23 s). Track 2 is Morph Arc.
+- Saved, REAPER quit completely, reopened, saved again: every state identical as float32, including the three routes (`routes_in_saved_project`) and the lane binding (`lane1_target`). The renders before and after the reopen are bit-identical (relative difference 0.0, spectrum cosine 1.0, envelope correlation 1.0; peak 0.287, 24 of 24 seconds active, finite).
+- The automation does something: the same project with the envelope removed renders differently (relative difference 0.54, spectrum cosine 0.84, envelope correlation 0.49).
+- Against the engine: the offline engine render of the same patch with the macro following the same envelope (`cable_routes_demo render-host`) has per-second loudness envelope correlation 0.91 and spectrum cosine 0.83 with the host render. This is a sanity check, not equality: REAPER delivers the automation in its own steps, the plugin applies output gain 0.4 and the project mixes a second track, so the level differs (relative difference 2.26) and the pulses are not sample-aligned.
+- An old project (state version 2) opened and saved by this build comes back with an identical state.
+
+Not verified in the host: the automation applied to the right pulse sample (that is the engine test `a_moving_source_is_read_at_each_pulse_sample`, not a host measurement); another host.
+
 ## Not verified
 
 - Another host (Bitwig, Ardour, a real DAW on another OS) and macOS/Windows.
-- Morph moved by host automation: no cable param is a host parameter yet, so the project holds morph at its saved value; morph in motion is covered by the engine tests and the promo recording of the standalone app, not by this host run.
+- Morph moved by host automation in the first run above (no cable param is a host parameter): the second section covers it through a macro.
 - Human listening of the rendered files, a GUI session in the host (the plugin editor was not opened), real-time performance in the host, and the Pi-class machine.
 - Render equality with the previous build for the old project (the baseline plugin was not run this time; the engine's golden hashes cover old patches bit for bit).

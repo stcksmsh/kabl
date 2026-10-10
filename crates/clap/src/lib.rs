@@ -1576,6 +1576,38 @@ mod tests {
         let over = serde_json::to_vec(&with(kabl_cables::MAX_CABLE_PARAMS + 1)).unwrap();
         assert!(SoundState::decode(&over).is_err());
     }
+    /// A project holding routes into cables' morphs and a host lane on the macro that drives
+    /// them recalls exactly (the host automation of that lane is `scripts/host_routes.py`).
+    #[test]
+    fn state_carries_routes_into_cables_and_a_macro_lane() {
+        let p = instrument();
+        let mut state = p.shared.snapshot();
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../patches/functional-cables/macro-morph");
+        state.patch = kabl_core::load(&dir).unwrap().state().clone();
+        let knob = *state
+            .patch
+            .modules
+            .iter()
+            .find(|(_, m)| m.kind == "macro")
+            .unwrap()
+            .0;
+        state.lanes = std::array::from_fn(|_| automation::Lane::default());
+        state.lanes[0].target = Some(automation::Target {
+            module: knob,
+            kind: "macro".into(),
+            param: "m1".into(),
+        });
+        let back = SoundState::decode(&serde_json::to_vec(&state).unwrap()).unwrap();
+        assert_eq!(back.patch, state.patch);
+        assert_eq!(back.lanes[0].target, state.lanes[0].target);
+        assert!(back
+            .patch
+            .cables
+            .values()
+            .any(|c| matches!(c.to, kabl_core::PortRef::CableParam { .. })));
+        assert!(p.shared.load(back).is_ok());
+    }
     fn audio(p: &mut Instrument, frames: usize, note: bool) -> Vec<f32> {
         let mut left = vec![0.0; frames];
         let mut right = vec![0.0; frames];

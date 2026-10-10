@@ -193,16 +193,19 @@ fn a_source_is_added_set_and_removed_for_a_cables_morph_from_its_editor() {
     assert!(routes(&t).is_empty());
 
     t.click(&format!("croute-add:{jack}:morph"));
-    let source = t
-        .ui
-        .hits
-        .keys()
-        .find(|k| k.starts_with(&format!("croute-source:{jack}:morph:")))
-        .expect("the chooser lists the patch's outputs")
-        .clone();
+    let source =
+        t.ui.hits
+            .keys()
+            .find(|k| k.starts_with(&format!("croute-source:{jack}:morph:")))
+            .expect("the chooser lists the patch's outputs")
+            .clone();
     t.click(&source);
     let route = *routes(&t).first().expect("the route was added");
-    assert_eq!(t.cable_param(route, "amount"), None, "engine default amount");
+    assert_eq!(
+        t.cable_param(route, "amount"),
+        None,
+        "engine default amount"
+    );
 
     t.drag_by(&format!("croute-amount:{route}"), 40.0);
     assert!(t.cable_param(route, "amount").is_some_and(|a| a > 0.25));
