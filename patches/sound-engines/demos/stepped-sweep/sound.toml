@@ -1,0 +1,12 @@
+name = "Stepped Sweep"
+category = "Pad"
+tags = [
+    "sample and hold",
+    "slew",
+    "drone",
+    "self-playing",
+    "evolving",
+]
+description = "A drone whose filter, oscillator blend and stereo position each follow sampled noise on their own clock, smoothed by a slew so they glide. Longer slew times make it calmer; a shorter one steps."
+keys = false
+sequence = true

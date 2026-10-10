@@ -167,6 +167,58 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
         }
         ("mixer", p) if p.starts_with("level") => "Level of this channel into the mix, 0–1.",
         ("clock", "bpm") => "Tempo in beats per minute. The clock ticks four times per beat.",
+        ("quantizer", "scale") => {
+            "The notes that are allowed. Major and Minor are the everyday scales; Pentatonic and \
+             Blues have fewer notes and are hard to play wrong; Chromatic allows every note."
+        }
+        ("quantizer", "root") => "The scale's home note, in semitones above C: 0 is C, 2 is D, 9 is A.",
+        ("quantizer", "transpose") => {
+            "Moves the result up or down in whole semitones, after the pitch has been snapped."
+        }
+        ("sample.hold", "mode") => {
+            "Sample keeps the value from the moment of each tick. Track follows the signal while \
+             the clock is high and holds the last value when it goes low."
+        }
+        ("slew", "rise_ms") => {
+            "How long the output takes to climb to a higher value. 0.1 ms passes the signal \
+             as it is."
+        }
+        ("slew", "fall_ms") => {
+            "How long the output takes to drop to a lower value. 0.1 ms passes the signal as it is."
+        }
+        ("slew", "mode") => {
+            "Slew smooths the signal. Follow first turns it into its size (ignoring up and \
+             down), so Rise and Fall become the attack and release of a loudness follower."
+        }
+        ("attenuverter", "amount") => {
+            "Multiplies the signal: 1 leaves it, under 1 makes it smaller, negative flips it \
+             upside down, up to 24 times bigger."
+        }
+        ("attenuverter", "offset") => "Added after scaling: moves the whole signal up or down.",
+        ("comparator", "threshold") => "The level the signal has to pass for the gate to go high.",
+        ("comparator", "hysteresis") => {
+            "A dead band around the threshold. Wider stops a slow or noisy signal from \
+             flickering the gate on and off."
+        }
+        ("crossfade", "mix") => "The blend: 0 is all of A, 1 is all of B. The fade input adds to it.",
+        ("crossfade", "curve") => {
+            "0 is exact for control signals. 1 keeps two different sounds at an even loudness \
+             through the middle."
+        }
+        ("pan", "pan") => "Left to right: -1 is all left, 0 centre, 1 all right. The pan input adds to it.",
+        ("random", "length") => {
+            "0 gives a new value every tick, never repeating. 1 to 16 makes a loop of that many \
+             values that comes round again."
+        }
+        ("random", "change") => {
+            "In a loop, the chance that each value is replaced by a new one as it comes round: \
+             0 keeps the loop exactly, higher lets it drift."
+        }
+        ("random", "bipolar") => "Uni gives values from 0 up; Bi gives values on both sides of 0.",
+        ("random", "range") => {
+            "How big the values are: 1 gives up to 1; for pitch use 12 or more, so the values \
+             span octaves."
+        }
         ("clock.div", "div") => "Passes every Nth tick: 2 halves the speed, 4 quarters it.",
         ("seq", s) if s.len() == 2 && s.starts_with('p') => {
             "Pitch of this step in semitones from the reference note."
@@ -274,6 +326,26 @@ pub fn port_help(kind: &str, port: &str) -> Option<&'static str> {
         ("lfo", "reset") => "Restarts the wave at Phase.",
         ("seq", "clock") => "Each rising edge plays the next step.",
         ("seq", "reset") => "Jumps back to the first step.",
+        ("quantizer", "in") => "The pitch to snap to the scale.",
+        ("quantizer", "out") => "The pitch, moved onto the nearest note of the scale.",
+        ("quantizer", "trig") => "A short pulse each time the note changes: patch it to an envelope's gate.",
+        ("sample.hold", "in") => "The signal to take values from: noise, an LFO, a sequence.",
+        ("sample.hold", "clock") => "Each rising edge takes a new value (Sample), or holds it (Track, when low).",
+        ("slew", "in") => "The signal to smooth.",
+        ("attenuverter", "in") => "The signal to scale and shift.",
+        ("logic", "a" | "b") => "A gate input: high from 0.5 up.",
+        ("logic", "and") => "High while both A and B are high.",
+        ("logic", "or") => "High while A or B (or both) is high.",
+        ("logic", "xor") => "High while exactly one of A and B is high.",
+        ("logic", "not") => "High while A is low.",
+        ("comparator", "in") => "The signal to compare with the threshold.",
+        ("comparator", "out") => "High while the signal is above the threshold.",
+        ("crossfade", "a" | "b") => "One of the two signals to blend.",
+        ("crossfade", "fade") => "Adds to Mix: an LFO or envelope here moves the blend.",
+        ("pan", "in") => "The mono signal to place.",
+        ("pan", "pan") => "Adds to Pan: an LFO here sweeps the sound across the stereo field.",
+        ("random", "clock") => "Each rising edge picks the next value.",
+        ("random", "reset") => "A rising edge returns to the start: the same values come again.",
         ("clock.div", "clock") => "The clock to divide.",
         ("mixer", p) if p.starts_with("in") => "One channel of the mix.",
         ("out", _) => "Reaches your speakers or headphones.",
