@@ -32,6 +32,7 @@ pub enum Ic {
     Warn,
     Check,
     Rec,
+    More,
 }
 
 fn arc(c: Pos2, r: f32, a0: f32, a1: f32) -> Vec<Pos2> {
@@ -135,6 +136,11 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
                 );
             }
             p.circle_stroke(c, 5.4 * u, st);
+        }
+        Ic::More => {
+            for dx in [-4.5, 0.0, 4.5] {
+                p.circle_filled(q(dx, 0.0), 1.2 * u, col);
+            }
         }
         Ic::Down => line(&[(-4.0, -2.0), (0.0, 2.0), (4.0, -2.0)]),
         Ic::Right => line(&[(-2.0, -4.0), (2.0, 0.0), (-2.0, 4.0)]),

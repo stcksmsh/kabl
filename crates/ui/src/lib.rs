@@ -25,6 +25,7 @@ pub mod kit;
 pub mod library;
 pub mod panels;
 pub mod perform;
+mod perform_view;
 pub mod rack;
 mod rack_editor;
 mod wheel;
@@ -646,16 +647,13 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
             .show(ui, |ui| browser::panel(editor, ui_state, ui));
     }
 
-    if ui_state.perform_open {
+    let perform_full = ui_state.perform_open && ui_state.perform_tall;
+    if ui_state.perform_open && !perform_full {
         egui::Panel::bottom("kabl-perform")
-            .exact_size(if ui_state.perform_tall {
-                perform::PANEL_TALL_H
-            } else {
-                perform::PANEL_H
-            })
+            .exact_size(perform::PANEL_H)
             .resizable(false)
             .frame(kit::panel_frame(&st))
-            .show(ui, |ui| perform::panel(editor, ui_state, ui));
+            .show(ui, |ui| perform_view::panel(editor, ui_state, ui));
     }
     if ui_state.drawer_open {
         egui::Panel::right("kabl-params")
@@ -756,9 +754,15 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
             });
     }
 
-    egui::CentralPanel::default()
-        .frame(egui::Frame::NONE.fill(st.roles.rack))
-        .show(ui, |ui| show_rack(editor, ui_state, ui, &th));
+    if perform_full {
+        egui::CentralPanel::default()
+            .frame(kit::panel_frame(&st))
+            .show(ui, |ui| perform_view::panel(editor, ui_state, ui));
+    } else {
+        egui::CentralPanel::default()
+            .frame(egui::Frame::NONE.fill(st.roles.rack))
+            .show(ui, |ui| show_rack(editor, ui_state, ui, &th));
+    }
     browser::dialogs(editor, ui_state, ui.ctx());
     ui_state.explain.typing =
         ui.ctx().egui_wants_keyboard_input() || egui::Popup::is_any_open(ui.ctx());
@@ -803,10 +807,21 @@ fn tool_icon(
 fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
     ui.horizontal_centered(|ui| {
         kit::logo(ui, st, 30.0);
-        let open = ui_state.perform_open;
-        if tool(ui, st, ui_state, "perform", "Perform", open) {
-            ui_state.perform_open = !open;
-        }
+        kit::segmented(ui, st, |ui| {
+            let open = ui_state.perform_open;
+            let r = kit::seg(ui, st, "Rack", !open);
+            ui_state.record("rack".into(), r.rect);
+            if r.clicked() {
+                ui_state.perform_open = false;
+            }
+            let r = kit::seg(ui, st, "Perform", open);
+            ui_state.record("perform".into(), r.rect);
+            if r.clicked() {
+                // The switch opens Perform as a view; "Show rack" in its header docks it.
+                ui_state.perform_open = true;
+                ui_state.perform_tall = true;
+            }
+        });
         browser::toolbar(editor, ui_state, ui, st);
         vsep(ui, st);
         let r = kit::icon_button(ui, st, kit::Ic::Undo, false, editor.can_undo())

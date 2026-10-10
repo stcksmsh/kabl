@@ -8,10 +8,12 @@
 mod containers;
 mod controls;
 mod icons;
+mod recipes;
 
 pub use containers::*;
 pub use controls::*;
 pub use icons::{icon, Ic};
+pub use recipes::*;
 
 /// The kabl logo (Kosta's artwork, `assets/logo`), tinted from the theme's text colour.
 pub fn logo(ui: &mut egui::Ui, st: &crate::style::Style, height: f32) -> egui::Response {
