@@ -1,0 +1,4 @@
+75eb31400000-75eb316d7000 r--p 00000000 103:01 13431175                  /secondary/Programming/Github/kabl/.worktrees/functional-cables/scratch/functional-cables-host/plugin/kabl.clap
+75eb316d7000-75eb31dbc000 r-xp 002d6000 103:01 13431175                  /secondary/Programming/Github/kabl/.worktrees/functional-cables/scratch/functional-cables-host/plugin/kabl.clap
+75eb31dbc000-75eb31dff000 r--p 009ba000 103:01 13431175                  /secondary/Programming/Github/kabl/.worktrees/functional-cables/scratch/functional-cables-host/plugin/kabl.clap
+75eb31dff000-75eb31e01000 rw-p 009fc000 103:01 13431175                  /secondary/Programming/Github/kabl/.worktrees/functional-cables/scratch/functional-cables-host/plugin/kabl.clap

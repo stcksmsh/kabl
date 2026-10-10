@@ -11,18 +11,28 @@ pub struct Vec2 {
 
 /// One end of a cable. `Module` is a signal jack. `Param` is a parameter knob as a modulation
 /// destination: a cable into it is a modulation route whose settings (`amount`, `bypass`) live
-/// in the cable's params. Schema v2; v1 files only contain `Module`.
+/// in the cable's params. Schema v2; v1 files only contain `Module`. `CableParam` is a
+/// parameter of another cable (its morph, probability or glide) as a modulation destination:
+/// the route is itself a cable and keeps its own `amount` and `bypass`. Schema v7.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum PortRef {
     Module { id: ModuleId, port: String },
     Param { id: ModuleId, param: String },
+    CableParam { cable: CableId, param: String },
 }
 
 impl PortRef {
-    pub fn module_id(&self) -> ModuleId {
+    /// The module this end sits on; `None` for a cable parameter, which belongs to a cable.
+    pub fn module_id(&self) -> Option<ModuleId> {
         match self {
-            PortRef::Module { id, .. } | PortRef::Param { id, .. } => *id,
+            PortRef::Module { id, .. } | PortRef::Param { id, .. } => Some(*id),
+            PortRef::CableParam { .. } => None,
         }
+    }
+
+    /// Whether this end is a modulation destination (a module param or a cable param).
+    pub fn is_route(&self) -> bool {
+        !matches!(self, PortRef::Module { .. })
     }
 }
 
