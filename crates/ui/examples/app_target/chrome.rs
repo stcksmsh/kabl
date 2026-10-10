@@ -66,6 +66,7 @@ pub fn section_label(cx: &Cx, pos: egui::Pos2, s: &str) {
     cx.caps(pos, Align2::LEFT_CENTER, s, sz, f, k.text2, if k.dir == Dir::C { 0.9 } else { 1.0 });
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn toolbar(cx: &Cx, r: Rect, view: &str, patch: &str, dirty: bool, zoom: &str, panes: (bool, bool), cable_mode: usize) {
     let k = cx.k;
     cx.p.rect_filled(r, 0.0, if k.dir == Dir::B { k.bg } else { k.surface });
@@ -129,7 +130,7 @@ pub fn toolbar(cx: &Cx, r: Rect, view: &str, patch: &str, dirty: bool, zoom: &st
     let nx = x + if k.dir == Dir::B { 14.0 } else { 6.0 };
     let nav = Rect::from_min_size(pos2(nx, cy - 17.0), vec2(nav_w, 34.0));
     let rad = if k.dir == Dir::B { 17.0 } else { k.r_md };
-    cx.rr(nav, rad, if k.dir == Dir::B { k.inset } else { k.inset });
+    cx.rr(nav, rad, k.inset);
     cx.rr_stroke(nav, rad, 1.0, k.line);
     let chev = |x: f32, dir: f32| {
         cx.p.add(egui::Shape::line(vec![pos2(x - 3.0 * dir, cy - 5.0), pos2(x + 3.0 * dir, cy), pos2(x - 3.0 * dir, cy + 5.0)], egui::Stroke::new(1.6, k.text2)));
@@ -282,7 +283,7 @@ pub fn browser(cx: &Cx, r: Rect, sel: usize, hover: usize, query: &str) {
         let fav = if s.fav { Ic::StarFill } else { Ic::Star };
         icon(cx.p, fav, pos2(rr.left() + 18.0, cy), 14.0, if s.fav { k.audio } else { a(sc, 150) });
         let nf = if k.dir == Dir::C { "cond-semi" } else { "sans-semi" };
-        let ns = if k.dir == Dir::C { 14.0 } else { 14.0 };
+        let ns = 14.0;
         let nm = if k.dir == Dir::C { s.name.to_uppercase() } else { s.name.to_string() };
         if k.dir == Dir::C {
             let nm = cx.fit(&nm, ns, nf, rr.width() - 36.0 - 84.0);
@@ -299,7 +300,7 @@ pub fn browser(cx: &Cx, r: Rect, sel: usize, hover: usize, query: &str) {
             let pr = Rect::from_min_size(pos2(rr.right() - cw - 10.0, cy - 10.0), vec2(cw, 20.0));
             cx.rr(pr, if k.dir == Dir::B { 10.0 } else { 4.0 }, a(c, if k.dark { 90 } else { 170 }));
             cx.p.circle_filled(pos2(pr.left() + 9.0, cy), 3.0, if k.dark { mix(c, Color32::WHITE, 0.5) } else { mix(c, Color32::BLACK, 0.5) });
-            cx.text(pos2(pr.left() + 16.0, cy), Align2::LEFT_CENTER, s.cat, 12.0, "sans-med", if k.dark { k.text } else { k.text });
+            cx.text(pos2(pr.left() + 16.0, cy), Align2::LEFT_CENTER, s.cat, 12.0, "sans-med", k.text);
         }
         y += row_h + if k.dir == Dir::C { 0.0 } else { 3.0 };
     }

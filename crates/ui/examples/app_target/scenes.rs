@@ -60,7 +60,6 @@ pub fn draw(cx: &Cx, d: &Ctxs, size: egui::Vec2, scene: Scene) {
         Scene::Wavetable => crate::closeup::wavetable(cx, d, size),
         Scene::StepCable => crate::closeup::step_cable(cx, d, size),
         Scene::Components => crate::closeup::components(cx, size),
-        _ => {}
     }
 }
 

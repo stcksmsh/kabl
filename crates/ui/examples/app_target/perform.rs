@@ -107,6 +107,7 @@ fn chips_row(cx: &Cx, origin: Pos2, labels: &[&str], playing: usize, queued: Opt
     x
 }
 
+#[allow(clippy::too_many_arguments)]
 fn macro_knob(cx: &Cx, c: Pos2, r: f32, name: &str, n: f32, m: Option<ModVis>, cc: u32, dest: &str, shown: &str) {
     let k = cx.k;
     let f = Face { base: k.surface, ink: k.text, ink2: k.text2 };
@@ -151,7 +152,7 @@ pub fn perform(cx: &Cx, size: egui::Vec2) {
         let on = beat as usize == i;
         let p = pos2(inner.right() - 54.0 + i as f32 * 16.0, inner.top() + 44.0);
         if on {
-            cx.glow_dot(p, 4.0, if k.dir == Dir::C { k.accent } else { k.accent }, 0.9);
+            cx.glow_dot(p, 4.0, k.accent, 0.9);
         } else {
             cx.p.circle_filled(p, 4.0, k.line2.gamma_multiply(0.6));
         }

@@ -11,11 +11,15 @@ use crate::widgets::*;
 use egui::{pos2, vec2, Align2, Color32, Pos2, Rect, Shape, Stroke};
 use std::collections::BTreeMap;
 
-fn find<'a>(rk: &'a Rack, id: u32) -> &'a kabl_ui::rack::Placed {
+/// A placed module's rect and its jack anchors.
+type Anchored = (Rect, BTreeMap<(String, bool), Pos2>);
+
+fn find(rk: &Rack, id: u32) -> &kabl_ui::rack::Placed {
     rk.lay.mods.iter().find(|m| m.id as u32 == id).unwrap()
 }
 
 /// Draw a real module at an arbitrary origin; returns its jack positions in world space.
+#[allow(clippy::too_many_arguments)]
 fn put(cx: &Cx, xf: Xf, rk: &Rack, id: u32, org: Pos2, tweak: &dyn Fn(&mut BTreeMap<String, f32>), sel: bool, sweep: f32, conn: &dyn Fn(&str, bool) -> bool) -> (Rect, BTreeMap<(String, bool), Pos2>) {
     let pl = find(rk, id);
     let mut params = rk.st.modules[&(id as _)].params.clone();
@@ -60,7 +64,7 @@ pub fn faces(cx: &Cx, d: &Ctxs, size: egui::Vec2) {
     let y0 = 76.0;
     let xf = Xf { s: 1.0, o: vec2(0.0, 0.0) };
     let mut x = x0;
-    let mut pos: BTreeMap<u32, (Rect, BTreeMap<(String, bool), Pos2>)> = BTreeMap::new();
+    let mut pos: BTreeMap<u32, Anchored> = BTreeMap::new();
     let conns = [(2u32, "out", true), (3, "in", false), (3, "cutoff_cv", false), (7, "out", true), (4, "out", true), (5, "cv", false)];
     let conn = |id: u32| move |p: &str, o: bool| conns.iter().any(|c| c.0 == id && c.1 == p && c.2 == o);
     for (id, _) in ids {
@@ -359,7 +363,6 @@ pub fn step_cable(cx: &Cx, d: &Ctxs, size: egui::Vec2) {
     plug(cx, xf.p(p0), k.gate, 1.0);
     plug(cx, xf.p(p1), k.gate, 1.0);
     let mid_t = 0.5;
-    let mid = along(&pts, mid_t);
     let tether_t = 0.28;
     let tp = along(&pts, tether_t);
     // Pulses: one per 16th at 112 bpm; each is gated by the pattern, then thinned by the probability.
@@ -404,9 +407,9 @@ pub fn step_cable(cx: &Cx, d: &Ctxs, size: egui::Vec2) {
     cx.rr_stroke(cr, if k.dir == Dir::C { 3.0 } else { 9.0 }, if k.dir == Dir::C { 2.0 } else { 1.5 }, k.gate);
     let lane = Rect::from_min_size(cr.min + vec2(8.0, 7.0), vec2(cw - 16.0, 22.0));
     let cur = ((cx.t / step_len) as usize) % 16;
-    for i in 0..16 {
+    for (i, &step) in steps.iter().enumerate().take(16) {
         let w = lane.width() / 16.0;
-        let bh = (steps[i] * lane.height()).max(2.0);
+        let bh = (step * lane.height()).max(2.0);
         let r = Rect::from_min_max(pos2(lane.left() + i as f32 * w + 0.6, lane.bottom() - bh), pos2(lane.left() + (i as f32 + 1.0) * w - 0.6, lane.bottom()));
         cx.rr(r, 1.0, if steps[i] > 0.0 { a(k.gate, if i == cur { 255 } else { 190 }) } else { a(k.text3, 90) });
     }
@@ -433,10 +436,10 @@ pub fn step_cable(cx: &Cx, d: &Ctxs, size: egui::Vec2) {
     cx.text(pos2(ins.right() - 16.0, y), Align2::RIGHT_CENTER, "16 steps · ◂ rotate ▸", 11.5, "sans", k.text2);
     y += 18.0;
     let bw = (ins.width() - 32.0 - 7.0 * 5.0) / 8.0;
-    for i in 0..16 {
+    for (i, &step) in steps.iter().enumerate().take(16) {
         let (rx, ry) = ((i % 8) as f32, (i / 8) as f32);
         let r = Rect::from_min_size(pos2(x0 + rx * (bw + 5.0), y + ry * 52.0), vec2(bw, 46.0));
-        let on = steps[i] > 0.0;
+        let on = step > 0.0;
         cx.rr(r, k.r_sm + 1.0, k.inset);
         cx.rr_stroke(r, k.r_sm + 1.0, if i == cur { 2.0 } else { 1.0 }, if i == cur { k.accent } else { k.line });
         if on {
