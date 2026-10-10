@@ -70,6 +70,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         }
         v
     };
+    let avail = ui.available_width() - 14.0;
     egui::ScrollArea::vertical()
         .id_salt("perform-cards")
         .auto_shrink([false, false])
@@ -82,7 +83,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                         transport_card(editor, ui_state, ui, &st, pin, i, n);
                     }
                     for (i, pin) in all.iter().enumerate().filter(|(_, p)| p.key == CUE_PADS) {
-                        cues_card(editor, ui_state, ui, &st, pin, i, n);
+                        cues_card(editor, ui_state, ui, &st, pin, i, n, avail);
                     }
                     for id in macro_mods {
                         let mine: Vec<(usize, &Pin)> = all
@@ -497,6 +498,7 @@ fn transport_card(
     after_card(ui, ui_state, st, pin, rect);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn cues_card(
     editor: &mut PatchEditor,
     ui_state: &mut UiState,
@@ -505,6 +507,7 @@ fn cues_card(
     pin: &Pin,
     index: usize,
     count: usize,
+    avail: f32,
 ) {
     let key = format!("{}.{}", pin.id, pin.key);
     let id = pin.id;
@@ -512,7 +515,15 @@ fn cues_card(
     // One row up to five cues (the usual set), else rows of four.
     let per_row = if all.len() <= 5 { all.len().max(4) } else { 4 };
     let rows = all.len().div_ceil(per_row).max(1);
-    let w = per_row as f32 * (PAD_W + st.sp(1)) + 84.0 + st.sp(2) + 28.0;
+    // Pads shrink (down to 80 px) so the scenes sit beside the transport when the view is narrow.
+    let fixed = 84.0 + st.sp(2) + 28.0;
+    let side = avail - TRANSPORT_W - st.sp(2) - fixed;
+    let pad_w = if side >= per_row as f32 * (88.0 + st.sp(1)) {
+        (side / per_row as f32 - st.sp(1)).clamp(88.0, PAD_W)
+    } else {
+        PAD_W
+    };
+    let w = per_row as f32 * (pad_w + st.sp(1)) + fixed;
     let h = 64.0 + rows as f32 * (PAD_H + st.sp(1));
     let rect = shell(ui, ui_state, st, &key, vec2(w, h), |ui, ui_state| {
         let who = "Scenes".to_string();
@@ -576,7 +587,7 @@ fn cues_card(
                             let r = kit::pad(
                                 ui,
                                 st,
-                                vec2(PAD_W, PAD_H),
+                                vec2(pad_w, PAD_H),
                                 &c.name,
                                 tag.as_deref(),
                                 sub,
@@ -663,12 +674,12 @@ fn macros_card(
 ) {
     let w = pins.len() as f32 * (TILE_W + st.sp(1)) + st.sp(3) * 2.0;
     let key = format!("{}.macros", pins[0].1.id);
-    ui.allocate_ui_with_layout(vec2(w, 252.0), Layout::top_down(egui::Align::Min), |ui| {
+    ui.allocate_ui_with_layout(vec2(w, 236.0), Layout::top_down(egui::Align::Min), |ui| {
         let f = kit::card_frame(st);
         let m = f.inner_margin.sum();
         f.show(ui, |ui| {
             ui.set_width(w - m.x);
-            ui.set_min_height(252.0 - m.y);
+            ui.set_min_height(236.0 - m.y);
             kit::section(ui, st, "Macros");
             kit::label(
                 ui,
@@ -703,7 +714,7 @@ fn macro_tile(
     };
     let rect = ui
         .allocate_ui_with_layout(
-            vec2(TILE_W, 214.0),
+            vec2(TILE_W, 198.0),
             Layout::top_down(egui::Align::Center),
             |ui| {
                 ui.set_width(TILE_W);

@@ -18,11 +18,12 @@ Redesign Perform on the widget kit: A's tokens, B's layout and value arcs (scene
 - Gestures: `continuing()` in `perform_view.rs` keeps one undo step per press for sliders and knobs.
 - Tooling: capture scripts in the job tmp dir (`cap/perf.sh`, `run1.sh`, `host/start.sh` for REAPER). Never `pkill`; touch `host/run/quit`.
 
-## Remaining
-1. Captures: Composition, Echo Sequence, Init Keyboard at 1440x900 and 1280x800, light and dark, plus plugin (REAPER, 1180x680). Look at each, fix.
-2. Frame times: `bench_chrome` with Perform open on `patches/composition` (add a Perform-open case to the bench).
-3. Full workspace tests + strict clippy totals; rustfmt touched files.
-4. Update this file, push, draft PR (base claude/widget-set), one report.
+## Final state (task complete, report sent)
+- Verification at the final head: `cargo test --workspace` 730 passed, 0 failed, 28 ignored; `cargo clippy --workspace --all-targets -- -D warnings` clean (the app_target errors are fixed in their own commit). New tests: the toolbar switch and Show rack; a macro knob edits the real parameter with one undo step.
+- Captures: `media/perform/` (Composition, Echo Sequence, Init Keyboard at 1440x900 and 1280x800, light and dark; one docked capture) and `media/perform/plugin/` (REAPER, 1180x680 editor, light, dark, docked).
+- Frame times (release `bench_chrome`, median us, Routing drawer open, Perform open on `patches/composition`): full view 1440x900 756 light / 650 dark, 1280x800 647 / 637; docked under the rack 1440x900 3547 / 3416, 1280x800 3183 / 3095. Dense rack alone for reference: 5459 / 5949 and 2981 / 3014.
+- Where the old controls went: record, folder and MIDI in stay in the view header (kit field, buttons, dropdown); All notes off and Learn banner (with Cancel learn) in the header; Taller/Shorter is now Full view / Show rack; pin menu (Rename, Move left, Move right, Unpin) behind the ... button on each card; Explain behind ?; per-pin MIDI learn is the CC tag button (Learn / CC n . ch), Clear beside it, soft-takeover shown as "live" or an arrow with the target percentage; direction, transpose and other selectors are segmented controls, levels and the rest are kit sliders.
+- Not built (needs engine work): bar and beat readout, pad progress to the launch point.
 
 ## Open decisions for Kosta
 - Default of the Perform switch: full view (built) or docked under the rack.

@@ -13,16 +13,22 @@ fn patches() -> std::path::PathBuf {
 }
 
 fn dense() -> PatchState {
-    kabl_core::load(&patches().join("composition")).unwrap().state().clone()
+    kabl_core::load(&patches().join("composition"))
+        .unwrap()
+        .state()
+        .clone()
 }
 
-fn run(name: &str, state: &PatchState, w: f32, h: f32, dark: bool, frames: usize) {
+/// `perform`: 0 closed, 1 the full Perform view, 2 Perform docked under the rack.
+fn run(name: &str, state: &PatchState, w: f32, h: f32, dark: bool, frames: usize, perform: u8) {
     let user = tempfile::tempdir().unwrap();
     let ctx = egui::Context::default();
     let mut editor = PatchEditor::seed_from(state);
     let mut ui = UiState::default();
     ui.browser_open = true;
     ui.drawer_open = true;
+    ui.perform_open = perform > 0;
+    ui.perform_tall = perform == 1;
     ui.dark = dark;
     ui.library = Some(Library::open(Some(patches()), user.path().to_path_buf()));
     let size = egui::vec2(w, h);
@@ -60,13 +66,18 @@ fn run(name: &str, state: &PatchState, w: f32, h: f32, dark: bool, frames: usize
 }
 
 fn main() {
-    let frames = std::env::args().nth(1).and_then(|s| s.parse().ok()).unwrap_or(300);
+    let frames = std::env::args()
+        .nth(1)
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(300);
     let simple = kabl_standalone::default_patch();
     let dense = dense();
     for (w, h) in [(1440.0, 900.0), (1280.0, 800.0)] {
         for dark in [false, true] {
-            run("simple", &simple, w, h, dark, frames);
-            run("dense", &dense, w, h, dark, frames);
+            run("simple", &simple, w, h, dark, frames, 0);
+            run("dense", &dense, w, h, dark, frames, 0);
+            run("d-perf", &dense, w, h, dark, frames, 1);
+            run("d-dock", &dense, w, h, dark, frames, 2);
         }
     }
 }

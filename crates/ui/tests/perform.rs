@@ -591,3 +591,52 @@ fn the_demo_controls_fit_together_at_1280() {
         }
     }
 }
+
+#[test]
+fn the_toolbar_switch_opens_perform_as_a_view_and_show_rack_docks_it() {
+    let mut h = H::new(1280.0, 800.0);
+    h.ui.perform_open = false;
+    h.frame();
+    h.pin(CLOCK, TRANSPORT);
+    h.click("perform");
+    assert!(h.ui.perform_open && h.ui.perform_tall, "Perform is a view");
+    assert!(h.ui.hits.contains_key("pcard:1.transport"));
+    assert!(
+        !h.ui.hits.keys().any(|k| k.starts_with("knob:")),
+        "the rack is hidden in the view"
+    );
+    h.click("perform-size");
+    assert!(
+        h.ui.perform_open && !h.ui.perform_tall,
+        "docked under the rack"
+    );
+    assert!(
+        h.ui.hits.keys().any(|k| k.starts_with("knob:")),
+        "rack and Perform together"
+    );
+    assert!(h.ui.hits.contains_key("pcard:1.transport"));
+    h.click("rack");
+    assert!(!h.ui.perform_open);
+}
+
+#[test]
+fn a_macro_knob_edits_the_real_parameter_with_one_undo_step() {
+    const MACROS: u64 = 18;
+    let mut h = H::new(1440.0, 900.0);
+    h.ui.perform_tall = true;
+    h.pin(MACROS, "m1");
+    let before = h.value(MACROS, "m1");
+    let r = h.rect(&format!("pslider:{MACROS}.m1"));
+    let entries = h.editor.log().entries().len();
+    h.move_to(r.center());
+    h.button(true);
+    for k in 1..8 {
+        h.move_to(r.center() + egui::vec2(0.0, -6.0 * k as f32));
+    }
+    h.button(false);
+    let after = h.value(MACROS, "m1");
+    assert!(after > before, "dragging up raises the macro");
+    assert_eq!(h.editor.log().entries().len(), entries + 1, "one undo step");
+    h.editor.undo();
+    assert_eq!(h.value(MACROS, "m1"), before);
+}
