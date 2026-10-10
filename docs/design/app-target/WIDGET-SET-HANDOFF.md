@@ -108,3 +108,13 @@ dense   1280x800 dark  median 4369 us p95 4749 max 5779   (before 3689)
 ```
 
 Departures from the A mockups: no side rail; no Rack|Perform switch (Perform stays a toggle chip); no prev/next sound arrows in the doc name; doc name is a plain label beside small Save buttons; no patch-folder row visible at 1280x800 with Perform open; the rack, faces, knobs, Perform panel and drawer bodies are unchanged (out of scope).
+
+## Checkpoint 4 (overseer review fixes)
+
+- Toolbar row 2 was clipped at 64 px: row gap now 0 (28 + 24 px rows + 8 px margins). Verified in a fresh capture.
+- Doc name is a framed control (inset fill, border, 160 px).
+- Sounds panel body is a vertical scroll area, so "Patch folder (advanced)" stays reachable at any height; the duplicate audition help paragraph is gone (the Play tooltip carries it); list height is `body_h - 520`.
+- Short list at 1280x800 (about 2.5 rows, min 120 px) is a trade-off: the existing test `every_control_is_reachable_at_both_sizes` needs every control on screen without scrolling. Decision for Kosta: relax that test to allow scrolling and give the list more room.
+- Box glyphs in the Perform panel are egui's painted checkboxes (stock, unchanged from master), not missing font glyphs.
+- Captures with Composition/Echo open Perform and Routing by themselves (the app opens them for pieces); that is app behaviour.
+- Tests 276 passed, 0 failed, 21 ignored; clippy clean.

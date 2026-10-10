@@ -804,6 +804,8 @@ fn tool_icon(
 }
 
 fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
+    // 28 + 24 px rows plus the bar's margins fit the 64 px panel only without a row gap.
+    ui.spacing_mut().item_spacing.y = 0.0;
     ui.horizontal(|ui| {
         kit::label(ui, st, style::Role::Title, kit::Tone::Text, "kabl");
         let open = ui_state.browser_open;

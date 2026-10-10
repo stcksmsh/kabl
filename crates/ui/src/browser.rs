@@ -868,23 +868,27 @@ pub fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
         Some(DocOrigin::Library(id)) if id.starts_with("factory:")
     );
     let text = format!("{}{name}", if modified { "● " } else { "" });
-    let r = ui
-        .add_sized(
-            [140.0, 20.0],
-            egui::Label::new(kit::rich(st, Role::Body, Tone::Text, text))
-                .selectable(false)
-                .truncate(),
-        )
-        .tip(
-            st,
-            &if modified {
-                format!("{name}: unsaved changes")
-            } else if factory {
-                format!("{name}: factory sound (Save makes your own copy)")
-            } else {
-                name.clone()
-            },
-        );
+    let tip = if modified {
+        format!("{name}: unsaved changes")
+    } else if factory {
+        format!("{name}: factory sound (Save makes your own copy)")
+    } else {
+        name.clone()
+    };
+    let r = egui::Frame::new()
+        .fill(st.roles.inset)
+        .stroke(egui::Stroke::new(1.0, st.roles.line))
+        .corner_radius(egui::CornerRadius::same(
+            st.shape_radius(st.slots.controls.field, st.metrics.small_h) as u8,
+        ))
+        .inner_margin(egui::Margin::symmetric(st.sp(2) as i8, 2))
+        .show(ui, |ui| {
+            ui.set_width(160.0);
+            kit::label_truncated(ui, st, Role::Body, Tone::Text, text);
+        })
+        .response
+        .interact(Sense::hover())
+        .tip(st, &tip);
     hit(ui_state, "doc-name", &r);
     let r = ui
         .add(
@@ -1022,394 +1026,418 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         );
         return;
     }
-    let r = kit::field(
-        ui,
-        st,
-        &mut ui_state.browser.query,
-        "Search name, purpose, mood, tempo",
-        Some(Ic::Search),
-        None,
-    );
-    hit(ui_state, "search", &r);
-    kit::gap(ui, st, 1);
-    ui.horizontal_wrapped(|ui| {
-        for (f, key, label) in [
-            (Filter::All, "all", "All"),
-            (Filter::Favorites, "favorites", "Favorites"),
-            (Filter::Recent, "recent", "Recent"),
-            (Filter::Factory, "factory", "Factory"),
-            (Filter::User, "user", "Your Sounds"),
-        ] {
-            let mut btn = kit::Button::new(st, label)
-                .small()
-                .selected(ui_state.browser.filter == f);
-            if f == Filter::Favorites {
-                btn = btn.icon(Ic::Star);
-            }
-            let r = ui.add(btn);
-            hit(ui_state, &format!("filter:{key}"), &r);
-            if r.clicked() {
-                ui_state.browser.filter = f;
-            }
-        }
-    });
-    ui.horizontal(|ui| {
-        kit::label(ui, st, Role::Label, Tone::Text2, "Category");
-        let current = ui_state
-            .browser
-            .category
-            .clone()
-            .unwrap_or_else(|| "Any".into());
-        let r = kit::dropdown(
-            ui,
-            st,
-            "browser-category",
-            &current,
-            ui.available_width(),
-            |ui| {
-                let r = kit::menu_item(ui, st, "Any", ui_state.browser.category.is_none());
-                hit(ui_state, "category:Any", &r);
-                if r.clicked() {
-                    ui_state.browser.category = None;
-                }
-                for c in CATEGORIES {
-                    let r =
-                        kit::menu_item(ui, st, c, ui_state.browser.category.as_deref() == Some(*c));
-                    hit(ui_state, &format!("category:{c}"), &r);
-                    if r.clicked() {
-                        ui_state.browser.category = Some(c.to_string());
-                    }
-                }
-            },
-        );
-        hit(ui_state, "category", &r);
-    });
-    kit::gap(ui, st, 1);
-    kit::rule(ui, st);
-    kit::gap(ui, st, 1);
-
-    let lib = ui_state.library.as_ref().unwrap();
-    let b = &ui_state.browser;
-    let visible = |e: &&Entry| {
-        e.matches(&b.query)
-            && b.category.as_ref().is_none_or(|c| e.meta.in_category(c))
-            && match b.filter {
-                Filter::All | Filter::Recent => true,
-                Filter::Favorites => lib.prefs.favorites.contains(&e.id),
-                Filter::Factory => e.origin == Origin::Factory,
-                Filter::User => e.origin == Origin::User,
-            }
-    };
-    // Recent lists in recency order, including sounds that have gone missing.
-    let rows: Vec<Result<Entry, String>> = match b.filter {
-        Filter::Recent => lib
-            .prefs
-            .recents
-            .iter()
-            .filter_map(|id| match lib.get(id) {
-                Some(e) => visible(&e).then(|| Ok(e.clone())),
-                None => Some(Err(id.clone())),
-            })
-            .collect(),
-        Filter::Favorites => {
-            let mut v: Vec<_> = lib
-                .entries
-                .iter()
-                .filter(visible)
-                .cloned()
-                .map(Ok)
-                .collect();
-            v.extend(
-                lib.prefs
-                    .favorites
-                    .iter()
-                    .filter(|id| lib.get(id).is_none())
-                    .map(|id| Err(id.clone())),
-            );
-            v
-        }
-        _ => lib
-            .entries
-            .iter()
-            .filter(visible)
-            .cloned()
-            .map(Ok)
-            .collect(),
-    };
-    let favorites = lib.prefs.favorites.clone();
-    let has_user = lib.entries.iter().any(|e| e.origin == Origin::User);
-    let filter = b.filter;
-
-    let list_h = (ui.available_height() - 440.0).max(120.0);
-    let mut open = None;
-    let mut toggle = None;
-    let mut forget = None;
+    let body_h = ui.available_height();
     egui::ScrollArea::vertical()
-        .max_height(list_h)
+        .id_salt("kabl-browser-body")
         .auto_shrink([false, false])
         .show_owned(ui, |ui| {
-            let mut last_origin = None;
-            let narrowed =
-                !ui_state.browser.query.trim().is_empty() || ui_state.browser.category.is_some();
-            if rows.is_empty() && narrowed {
-                kit::label(
+            let r = kit::field(
+                ui,
+                st,
+                &mut ui_state.browser.query,
+                "Search name, purpose, mood, tempo",
+                Some(Ic::Search),
+                None,
+            );
+            hit(ui_state, "search", &r);
+            kit::gap(ui, st, 1);
+            ui.horizontal_wrapped(|ui| {
+                for (f, key, label) in [
+                    (Filter::All, "all", "All"),
+                    (Filter::Favorites, "favorites", "Favorites"),
+                    (Filter::Recent, "recent", "Recent"),
+                    (Filter::Factory, "factory", "Factory"),
+                    (Filter::User, "user", "Your Sounds"),
+                ] {
+                    let mut btn = kit::Button::new(st, label)
+                        .small()
+                        .selected(ui_state.browser.filter == f);
+                    if f == Filter::Favorites {
+                        btn = btn.icon(Ic::Star);
+                    }
+                    let r = ui.add(btn);
+                    hit(ui_state, &format!("filter:{key}"), &r);
+                    if r.clicked() {
+                        ui_state.browser.filter = f;
+                    }
+                }
+            });
+            ui.horizontal(|ui| {
+                kit::label(ui, st, Role::Label, Tone::Text2, "Category");
+                let current = ui_state
+                    .browser
+                    .category
+                    .clone()
+                    .unwrap_or_else(|| "Any".into());
+                let r = kit::dropdown(
                     ui,
                     st,
-                    Role::Body,
-                    Tone::Text3,
-                    "No sound matches the search or category.",
-                );
-            } else if rows.is_empty() {
-                kit::paragraph(
-                    ui,
-                    st,
-                    Role::Body,
-                    Tone::Text3,
-                    match filter {
-                        Filter::Favorites => "No favorites yet: click ☆ next to a sound.",
-                        Filter::Recent => "Nothing opened yet.",
-                        Filter::User => "No sounds of yours yet: Save As puts them here.",
-                        _ => "No sound matches.",
-                    },
-                );
-            }
-            for row in &rows {
-                match row {
-                    Ok(e) => {
-                        if filter != Filter::Recent && last_origin != Some(e.origin) {
-                            last_origin = Some(e.origin);
-                            kit::gap(ui, st, 1);
-                            kit::section(
+                    "browser-category",
+                    &current,
+                    ui.available_width(),
+                    |ui| {
+                        let r = kit::menu_item(ui, st, "Any", ui_state.browser.category.is_none());
+                        hit(ui_state, "category:Any", &r);
+                        if r.clicked() {
+                            ui_state.browser.category = None;
+                        }
+                        for c in CATEGORIES {
+                            let r = kit::menu_item(
                                 ui,
                                 st,
+                                c,
+                                ui_state.browser.category.as_deref() == Some(*c),
+                            );
+                            hit(ui_state, &format!("category:{c}"), &r);
+                            if r.clicked() {
+                                ui_state.browser.category = Some(c.to_string());
+                            }
+                        }
+                    },
+                );
+                hit(ui_state, "category", &r);
+            });
+            kit::gap(ui, st, 1);
+            kit::rule(ui, st);
+            kit::gap(ui, st, 1);
+
+            let lib = ui_state.library.as_ref().unwrap();
+            let b = &ui_state.browser;
+            let visible = |e: &&Entry| {
+                e.matches(&b.query)
+                    && b.category.as_ref().is_none_or(|c| e.meta.in_category(c))
+                    && match b.filter {
+                        Filter::All | Filter::Recent => true,
+                        Filter::Favorites => lib.prefs.favorites.contains(&e.id),
+                        Filter::Factory => e.origin == Origin::Factory,
+                        Filter::User => e.origin == Origin::User,
+                    }
+            };
+            // Recent lists in recency order, including sounds that have gone missing.
+            let rows: Vec<Result<Entry, String>> = match b.filter {
+                Filter::Recent => lib
+                    .prefs
+                    .recents
+                    .iter()
+                    .filter_map(|id| match lib.get(id) {
+                        Some(e) => visible(&e).then(|| Ok(e.clone())),
+                        None => Some(Err(id.clone())),
+                    })
+                    .collect(),
+                Filter::Favorites => {
+                    let mut v: Vec<_> = lib
+                        .entries
+                        .iter()
+                        .filter(visible)
+                        .cloned()
+                        .map(Ok)
+                        .collect();
+                    v.extend(
+                        lib.prefs
+                            .favorites
+                            .iter()
+                            .filter(|id| lib.get(id).is_none())
+                            .map(|id| Err(id.clone())),
+                    );
+                    v
+                }
+                _ => lib
+                    .entries
+                    .iter()
+                    .filter(visible)
+                    .cloned()
+                    .map(Ok)
+                    .collect(),
+            };
+            let favorites = lib.prefs.favorites.clone();
+            let has_user = lib.entries.iter().any(|e| e.origin == Origin::User);
+            let filter = b.filter;
+
+            let list_h = (body_h - 520.0).max(120.0);
+            let mut open = None;
+            let mut toggle = None;
+            let mut forget = None;
+            egui::ScrollArea::vertical()
+                .max_height(list_h)
+                .auto_shrink([false, false])
+                .show_owned(ui, |ui| {
+                    let mut last_origin = None;
+                    let narrowed = !ui_state.browser.query.trim().is_empty()
+                        || ui_state.browser.category.is_some();
+                    if rows.is_empty() && narrowed {
+                        kit::label(
+                            ui,
+                            st,
+                            Role::Body,
+                            Tone::Text3,
+                            "No sound matches the search or category.",
+                        );
+                    } else if rows.is_empty() {
+                        kit::paragraph(
+                            ui,
+                            st,
+                            Role::Body,
+                            Tone::Text3,
+                            match filter {
+                                Filter::Favorites => "No favorites yet: click ☆ next to a sound.",
+                                Filter::Recent => "Nothing opened yet.",
+                                Filter::User => "No sounds of yours yet: Save As puts them here.",
+                                _ => "No sound matches.",
+                            },
+                        );
+                    }
+                    for row in &rows {
+                        match row {
+                            Ok(e) => {
+                                if filter != Filter::Recent && last_origin != Some(e.origin) {
+                                    last_origin = Some(e.origin);
+                                    kit::gap(ui, st, 1);
+                                    kit::section(
+                                        ui,
+                                        st,
+                                        match e.origin {
+                                            Origin::Factory => "Factory",
+                                            Origin::User => "Your Sounds",
+                                        },
+                                    );
+                                }
+                                let fav = favorites.contains(&e.id);
+                                let sel = ui_state.browser.selected.as_deref() == Some(&e.id);
+                                let (row, star) = sound_row(ui, st, e, fav, sel);
+                                let star = star.tip(
+                                    st,
+                                    if fav {
+                                        "Remove from favorites"
+                                    } else {
+                                        "Add to favorites"
+                                    },
+                                );
+                                ui_state.record(format!("fav:{}", e.id), star.rect);
+                                ui_state.record(format!("sound:{}", e.id), row.rect);
+                                if star.clicked() {
+                                    toggle = Some(e.id.clone());
+                                } else if row.clicked() {
+                                    ui_state.browser.selected = Some(e.id.clone());
+                                }
+                                if row.double_clicked() {
+                                    open = Some(e.id.clone());
+                                }
+                            }
+                            Err(id) => {
+                                ui.horizontal(|ui| {
+                                    kit::label(
+                                        ui,
+                                        st,
+                                        Role::Body,
+                                        Tone::Text3,
+                                        format!("{id}: not found"),
+                                    )
+                                    .tip(
+                                        st,
+                                        "Removed or renamed outside kabl. Forget drops it from \
+                                 favorites and recents.",
+                                    );
+                                    let r = ui.add(kit::Button::new(st, "Forget").small());
+                                    ui_state.record(format!("forget:{id}"), r.rect);
+                                    if r.clicked() {
+                                        forget = Some(id.clone());
+                                    }
+                                });
+                            }
+                        }
+                    }
+                    if filter == Filter::All && !has_user && ui_state.browser.query.is_empty() {
+                        kit::section(ui, st, "Your Sounds");
+                        kit::label(
+                            ui,
+                            st,
+                            Role::Body,
+                            Tone::Text3,
+                            "None yet: Save As puts your sounds here.",
+                        );
+                    }
+                });
+            if let Some(id) = toggle {
+                let note = ui_state.library.as_mut().unwrap().toggle_favorite(&id);
+                if let Some(n) = note {
+                    message(ui_state, n);
+                }
+            }
+            if let Some(id) = forget {
+                let note = ui_state.library.as_mut().unwrap().forget(&id);
+                if let Some(n) = note {
+                    message(ui_state, n);
+                }
+            }
+            kit::gap(ui, st, 1);
+            kit::rule(ui, st);
+            kit::gap(ui, st, 1);
+
+            // The selected sound.
+            let selected = ui_state
+                .browser
+                .selected
+                .clone()
+                .and_then(|id| ui_state.library.as_ref().unwrap().get(&id).cloned());
+            match &selected {
+                Some(e) => {
+                    ui.horizontal(|ui| {
+                        kit::label_truncated(ui, st, Role::H3, Tone::Text, &e.meta.name);
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            let r = ui
+                                .add(kit::Button::new(st, "Open").primary())
+                                .tip(st, "Load into the rack");
+                            hit(ui_state, "open", &r);
+                            if r.clicked() {
+                                open = Some(e.id.clone());
+                            }
+                            if e.origin == Origin::User {
+                                let r = ui.add(kit::Button::new(st, "Rename"));
+                                hit(ui_state, "rename", &r);
+                                if r.clicked() {
+                                    ui_state.browser.dialog = Some(Dialog::Rename {
+                                        id: e.id.clone(),
+                                        name: e.meta.name.clone(),
+                                        error: None,
+                                    });
+                                }
+                            }
+                        });
+                    });
+                    ui.horizontal(|ui| {
+                        kit::label(
+                            ui,
+                            st,
+                            Role::Caption,
+                            Tone::Text2,
+                            format!(
+                                "{} · {}",
+                                if e.meta.category.is_empty() {
+                                    "Uncategorized"
+                                } else {
+                                    &e.meta.category
+                                },
                                 match e.origin {
                                     Origin::Factory => "Factory",
                                     Origin::User => "Your Sounds",
-                                },
-                            );
-                        }
-                        let fav = favorites.contains(&e.id);
-                        let sel = ui_state.browser.selected.as_deref() == Some(&e.id);
-                        let (row, star) = sound_row(ui, st, e, fav, sel);
-                        let star = star.tip(
-                            st,
-                            if fav {
-                                "Remove from favorites"
-                            } else {
-                                "Add to favorites"
-                            },
+                                }
+                            ),
                         );
-                        ui_state.record(format!("fav:{}", e.id), star.rect);
-                        ui_state.record(format!("sound:{}", e.id), row.rect);
-                        if star.clicked() {
-                            toggle = Some(e.id.clone());
-                        } else if row.clicked() {
-                            ui_state.browser.selected = Some(e.id.clone());
-                        }
-                        if row.double_clicked() {
-                            open = Some(e.id.clone());
-                        }
+                        badge(ui, st, &e.meta);
+                    });
+                    if !e.meta.description.is_empty() {
+                        kit::label_truncated(
+                            ui,
+                            st,
+                            Role::Caption,
+                            Tone::Text2,
+                            &e.meta.description,
+                        )
+                        .tip(st, &e.meta.description);
                     }
-                    Err(id) => {
-                        ui.horizontal(|ui| {
-                            kit::label(ui, st, Role::Body, Tone::Text3, format!("{id}: not found"))
-                                .tip(
-                                    st,
-                                    "Removed or renamed outside kabl. Forget drops it from \
-                                 favorites and recents.",
-                                );
-                            let r = ui.add(kit::Button::new(st, "Forget").small());
-                            ui_state.record(format!("forget:{id}"), r.rect);
-                            if r.clicked() {
-                                forget = Some(id.clone());
-                            }
-                        });
+                    if !e.meta.tags.is_empty() {
+                        let tags = format!("tags: {}", e.meta.tags.join(", "));
+                        kit::label_truncated(ui, st, Role::Caption, Tone::Text3, &tags)
+                            .tip(st, &tags);
                     }
                 }
+                None => {
+                    kit::paragraph(
+                        ui,
+                        st,
+                        Role::Body,
+                        Tone::Text3,
+                        "Click a sound to see it; Open (or double-click) loads it.",
+                    );
+                }
             }
-            if filter == Filter::All && !has_user && ui_state.browser.query.is_empty() {
-                kit::section(ui, st, "Your Sounds");
-                kit::label(
-                    ui,
-                    st,
-                    Role::Body,
-                    Tone::Text3,
-                    "None yet: Save As puts your sounds here.",
-                );
+            if let Some(id) = open {
+                request(editor, ui_state, Pending::Open(id));
+            }
+            kit::gap(ui, st, 1);
+            kit::rule(ui, st);
+            kit::gap(ui, st, 1);
+            play_section(editor, ui_state, ui);
+
+            kit::gap(ui, st, 1);
+            kit::rule(ui, st);
+            kit::gap(ui, st, 1);
+            let open_f = ui_state.browser.folder_open;
+            let header = ui.add(
+                kit::Button::new(st, "Patch folder (advanced)")
+                    .ghost()
+                    .icon(if open_f { Ic::Down } else { Ic::Right }),
+            );
+            if header.clicked() {
+                ui_state.browser.folder_open = !open_f;
+            }
+            hit(ui_state, "folder-header", &header);
+            if open_f {
+                {
+                    let r = kit::field(ui, st, &mut ui_state.browser.folder, "", None, None);
+                    hit(ui_state, "patch-path", &r);
+                    ui.horizontal(|ui| {
+                        let r = ui.add(kit::Button::new(st, "Load folder"));
+                        hit(ui_state, "load", &r);
+                        if r.clicked() {
+                            let p = ui_state.browser.folder.clone();
+                            request(editor, ui_state, Pending::OpenFolder(p));
+                        }
+                        let r = ui.add(kit::Button::new(st, "Save to folder"));
+                        hit(ui_state, "save-folder", &r);
+                        if r.clicked() {
+                            let p = ui_state.browser.folder.clone();
+                            let path = std::path::Path::new(&p);
+                            let text = if ui_state
+                                .library
+                                .as_ref()
+                                .is_some_and(|l| l.is_factory_path(path))
+                            {
+                                "that folder is a factory sound: choose another folder, or Save As"
+                                    .into()
+                            } else if ui_state.browser.async_io {
+                                start_io(editor, ui_state, IoRequest::SaveFolder(p.clone()));
+                                "saving folder in background".into()
+                            } else {
+                                match crate::library::save_folder(path, editor.log()) {
+                                    Ok(()) => {
+                                        let name = path
+                                            .file_name()
+                                            .map_or(p.clone(), |n| n.to_string_lossy().to_string());
+                                        ui_state.doc = Some(Doc::new(
+                                            &name,
+                                            DocOrigin::Folder(p.clone()),
+                                            editor.state(),
+                                        ));
+                                        format!("saved to {p}")
+                                    }
+                                    Err(err) => save_failed(&err),
+                                }
+                            };
+                            message(ui_state, text);
+                        }
+                    });
+                    let lib = ui_state.library.as_ref().unwrap();
+                    kit::paragraph(
+                        ui,
+                        st,
+                        Role::Caption,
+                        Tone::Text3,
+                        format!(
+                            "Your sounds: {}\nFactory: {}",
+                            lib.sounds_dir().display(),
+                            lib.factory_dir
+                                .as_ref()
+                                .map_or("not found".into(), |d| d.display().to_string())
+                        ),
+                    );
+                }
+            }
+            let notes = ui_state.library.as_ref().unwrap().notes.clone();
+            for n in notes {
+                kit::paragraph(ui, st, Role::Caption, Tone::Warn, n);
             }
         });
-    if let Some(id) = toggle {
-        let note = ui_state.library.as_mut().unwrap().toggle_favorite(&id);
-        if let Some(n) = note {
-            message(ui_state, n);
-        }
-    }
-    if let Some(id) = forget {
-        let note = ui_state.library.as_mut().unwrap().forget(&id);
-        if let Some(n) = note {
-            message(ui_state, n);
-        }
-    }
-    kit::gap(ui, st, 1);
-    kit::rule(ui, st);
-    kit::gap(ui, st, 1);
-
-    // The selected sound.
-    let selected = ui_state
-        .browser
-        .selected
-        .clone()
-        .and_then(|id| ui_state.library.as_ref().unwrap().get(&id).cloned());
-    match &selected {
-        Some(e) => {
-            ui.horizontal(|ui| {
-                kit::label_truncated(ui, st, Role::H3, Tone::Text, &e.meta.name);
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let r = ui
-                        .add(kit::Button::new(st, "Open").primary())
-                        .tip(st, "Load into the rack");
-                    hit(ui_state, "open", &r);
-                    if r.clicked() {
-                        open = Some(e.id.clone());
-                    }
-                    if e.origin == Origin::User {
-                        let r = ui.add(kit::Button::new(st, "Rename"));
-                        hit(ui_state, "rename", &r);
-                        if r.clicked() {
-                            ui_state.browser.dialog = Some(Dialog::Rename {
-                                id: e.id.clone(),
-                                name: e.meta.name.clone(),
-                                error: None,
-                            });
-                        }
-                    }
-                });
-            });
-            ui.horizontal(|ui| {
-                kit::label(
-                    ui,
-                    st,
-                    Role::Caption,
-                    Tone::Text2,
-                    format!(
-                        "{} · {}",
-                        if e.meta.category.is_empty() {
-                            "Uncategorized"
-                        } else {
-                            &e.meta.category
-                        },
-                        match e.origin {
-                            Origin::Factory => "Factory",
-                            Origin::User => "Your Sounds",
-                        }
-                    ),
-                );
-                badge(ui, st, &e.meta);
-            });
-            if !e.meta.description.is_empty() {
-                kit::label_truncated(ui, st, Role::Caption, Tone::Text2, &e.meta.description)
-                    .tip(st, &e.meta.description);
-            }
-            if !e.meta.tags.is_empty() {
-                let tags = format!("tags: {}", e.meta.tags.join(", "));
-                kit::label_truncated(ui, st, Role::Caption, Tone::Text3, &tags).tip(st, &tags);
-            }
-        }
-        None => {
-            kit::paragraph(
-                ui,
-                st,
-                Role::Body,
-                Tone::Text3,
-                "Click a sound to see it; Open (or double-click) loads it.",
-            );
-        }
-    }
-    if let Some(id) = open {
-        request(editor, ui_state, Pending::Open(id));
-    }
-    kit::gap(ui, st, 1);
-    kit::rule(ui, st);
-    kit::gap(ui, st, 1);
-    play_section(editor, ui_state, ui);
-
-    kit::gap(ui, st, 1);
-    kit::rule(ui, st);
-    kit::gap(ui, st, 1);
-    let open_f = ui_state.browser.folder_open;
-    let header = ui.add(
-        kit::Button::new(st, "Patch folder (advanced)")
-            .ghost()
-            .icon(if open_f { Ic::Down } else { Ic::Right }),
-    );
-    if header.clicked() {
-        ui_state.browser.folder_open = !open_f;
-    }
-    hit(ui_state, "folder-header", &header);
-    if open_f {
-        {
-            let r = kit::field(ui, st, &mut ui_state.browser.folder, "", None, None);
-            hit(ui_state, "patch-path", &r);
-            ui.horizontal(|ui| {
-                let r = ui.add(kit::Button::new(st, "Load folder"));
-                hit(ui_state, "load", &r);
-                if r.clicked() {
-                    let p = ui_state.browser.folder.clone();
-                    request(editor, ui_state, Pending::OpenFolder(p));
-                }
-                let r = ui.add(kit::Button::new(st, "Save to folder"));
-                hit(ui_state, "save-folder", &r);
-                if r.clicked() {
-                    let p = ui_state.browser.folder.clone();
-                    let path = std::path::Path::new(&p);
-                    let text = if ui_state
-                        .library
-                        .as_ref()
-                        .is_some_and(|l| l.is_factory_path(path))
-                    {
-                        "that folder is a factory sound: choose another folder, or Save As".into()
-                    } else if ui_state.browser.async_io {
-                        start_io(editor, ui_state, IoRequest::SaveFolder(p.clone()));
-                        "saving folder in background".into()
-                    } else {
-                        match crate::library::save_folder(path, editor.log()) {
-                            Ok(()) => {
-                                let name = path
-                                    .file_name()
-                                    .map_or(p.clone(), |n| n.to_string_lossy().to_string());
-                                ui_state.doc = Some(Doc::new(
-                                    &name,
-                                    DocOrigin::Folder(p.clone()),
-                                    editor.state(),
-                                ));
-                                format!("saved to {p}")
-                            }
-                            Err(err) => save_failed(&err),
-                        }
-                    };
-                    message(ui_state, text);
-                }
-            });
-            let lib = ui_state.library.as_ref().unwrap();
-            kit::paragraph(
-                ui,
-                st,
-                Role::Caption,
-                Tone::Text3,
-                format!(
-                    "Your sounds: {}\nFactory: {}",
-                    lib.sounds_dir().display(),
-                    lib.factory_dir
-                        .as_ref()
-                        .map_or("not found".into(), |d| d.display().to_string())
-                ),
-            );
-        }
-    }
-    let notes = ui_state.library.as_ref().unwrap().notes.clone();
-    for n in notes {
-        kit::paragraph(ui, st, Role::Caption, Tone::Warn, n);
-    }
 }
 
 /// Audition for keyboard sounds, Start/Stop for pieces: always the sound in the rack.
@@ -1536,7 +1564,6 @@ fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui:
                     .request_repaint_after(std::time::Duration::from_millis(100));
             }
         });
-        kit::paragraph(ui, st, Role::Caption, Tone::Text3, help);
     }
     if sequence {
         let clocks: Vec<_> = editor
