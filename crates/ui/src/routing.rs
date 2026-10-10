@@ -227,11 +227,12 @@ pub fn param_label(p: &ParamInfo) -> String {
             return format!("Prob {k}");
         }
         if let Some(k) = slot.strip_prefix('k').filter(|k| k.len() == 1) {
-            return format!("Ratchet {k}");
+            return format!("Ratch {k}");
         }
         match slot {
             "bank" => return "Startup".into(),
             "direction" => return "Direction".into(),
+            "gate_len" => return "Gate len".into(),
             _ => slot,
         }
     } else {
@@ -296,6 +297,7 @@ pub fn fmt_value(p: &ParamInfo, v: f32) -> String {
         "dB" => format!("{:+.1} dB", v + 0.0),
         "°" => format!("{v:.0}°"),
         "ct" => format!("{:+.0} ct", v.round() + 0.0),
+        "x" => format!("{}X", v.round()),
         _ => format!("{v:.2}"),
     }
 }

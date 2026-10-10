@@ -1,0 +1,16 @@
+# A module's more-controls dialog (the sequencer's ratchet knobs), light then dark, at 100%.
+sleep 1
+click routing
+sleep 0.5
+click module:1
+sleep 0.5
+click toggle:1
+sleep 1
+shot light
+click more:close
+sleep 0.5
+click theme:dark
+sleep 0.5
+click toggle:1
+sleep 1
+shot dark
