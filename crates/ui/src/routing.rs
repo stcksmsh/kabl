@@ -1385,9 +1385,9 @@ pub(crate) fn cable_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: 
     ui.horizontal_wrapped(|ui| {
         let port = match &c.from {
             PortRef::Module { port, .. } => port.as_str(),
-            PortRef::Param { param, .. } => param.as_str(),
+            PortRef::Param { param, .. } | PortRef::CableParam { param, .. } => param.as_str(),
         };
-        let from = source_label(editor.state(), c.from.module_id(), port);
+        let from = source_label(editor.state(), c.from.module_id().unwrap_or_default(), port);
         ui.heading(format!("Cable #{cable}: {from}"));
         let r = ui.small_button("Close");
         ui_state.record(format!("fn-close:{cable}"), r.rect);

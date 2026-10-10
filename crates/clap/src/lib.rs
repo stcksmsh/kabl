@@ -1478,7 +1478,7 @@ mod tests {
             .insert("gain".into(), 1.0);
         assert_eq!(tail::samples(&ungated, 48000.0), u64::MAX);
         let mut modulation = kabl_standalone::default_patch();
-        modulation.cables.retain(|_, c| c.to.module_id() != 6);
+        modulation.cables.retain(|_, c| c.to.module_id() != Some(6));
         modulation.cables.insert(
             100,
             kabl_core::CableState {

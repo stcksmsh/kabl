@@ -686,16 +686,16 @@ pub fn diagnose(state: &PatchState, focus: Option<ModuleId>, cx: &Context) -> Di
         path_modules = state
             .cables
             .values()
-            .filter(|c| c.to.module_id() == out && matches!(c.to, PortRef::Module { .. }))
-            .map(|c| c.from.module_id())
+            .filter(|c| c.to.module_id() == Some(out) && matches!(c.to, PortRef::Module { .. }))
+            .filter_map(|c| c.from.module_id())
             .collect();
     }
 
     // Unconnected gate inputs on the path and one hop into it (an envelope on a VCA's cv).
     let mut near: BTreeSet<ModuleId> = path_modules.iter().copied().collect();
     for &m in &path_modules {
-        for c in state.cables.values().filter(|c| c.to.module_id() == m) {
-            near.insert(c.from.module_id());
+        for c in state.cables.values().filter(|c| c.to.module_id() == Some(m)) {
+            near.extend(c.from.module_id());
         }
     }
     let mut open_gates = Vec::new();
@@ -780,7 +780,7 @@ pub fn diagnose(state: &PatchState, focus: Option<ModuleId>, cx: &Context) -> Di
     for (&id, m) in &state.modules {
         if m.kind == "clock"
             && cx.clock_running.get(&id) == Some(&false)
-            && state.cables.values().any(|c| c.from.module_id() == id)
+            && state.cables.values().any(|c| c.from.module_id() == Some(id))
         {
             d.facts.push(format!(
                 "{} is stopped (transport): what it drives gets no new steps.",
@@ -967,7 +967,7 @@ fn idle_audio_outputs(state: &PatchState, except: ModuleId) -> Vec<(ModuleId, St
         let Some(info) = registry::info_for(&m.kind) else {
             continue;
         };
-        if state.cables.values().any(|c| c.from.module_id() == id) {
+        if state.cables.values().any(|c| c.from.module_id() == Some(id)) {
             continue;
         }
         if let Some(p) = outputs(info).find(|p| p.port_type == PortType::Audio) {

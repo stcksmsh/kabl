@@ -190,10 +190,16 @@ pub fn encapsulate(
         .map(|m| m.pos)
         .ok_or("Missing selected module")?;
     let mut c=Composite{name:name.trim().into(),help:"Open internals to inspect the real modules and routes. Editing affects this instance only.".into(),definition:definition(id),parent:None,members,pos,ports:BTreeMap::new(),controls:BTreeMap::new(),next_interface:1,panel:None};
-    for cable in p.cables.values() {
-        let a = all.contains(&cable.from.module_id());
-        let b = all.contains(&cable.to.module_id());
+    for (cid, cable) in &p.cables {
+        let a = cable.from.module_id().is_some_and(|m| all.contains(&m));
+        let b = p.end_module(*cid).is_some_and(|m| all.contains(&m));
         if a != b {
+            if matches!(cable.to, PortRef::CableParam { .. }) {
+                return Err(format!(
+                    "Route {cid} moves a cable parameter across the group boundary. Move the \
+                     route's source or the cable it moves into the group, or remove the route."
+                ));
+            }
             let target = if a { &cable.from } else { &cable.to };
             expose(&mut c, target.clone(), binding_label(target), false)?;
         }
@@ -228,6 +234,7 @@ pub fn binding_label(t: &PortRef) -> String {
     match t {
         PortRef::Module { id, port } => format!("{port} · #{id}"),
         PortRef::Param { id, param } => format!("{param} · #{id}"),
+        PortRef::CableParam { cable, param } => format!("{param} · cable #{cable}"),
     }
 }
 pub fn set(editor: &mut PatchEditor, id: CompositeId, c: Composite) -> Result<(), String> {
@@ -270,9 +277,11 @@ pub fn remove_exposure(
     if !control {
         if let Some(e) = map.get(&key) {
             let owned = kabl_core::composite::leaves(editor.state(), id);
-            if editor.state().cables.values().any(|c| {
+            let state = editor.state();
+            if state.cables.iter().any(|(cid, c)| {
                 (c.from == e.target || c.to == e.target)
-                    && owned.contains(&c.from.module_id()) != owned.contains(&c.to.module_id())
+                    && c.from.module_id().is_some_and(|m| owned.contains(&m))
+                        != state.end_module(*cid).is_some_and(|m| owned.contains(&m))
             }) {
                 return Err(
                     "Boundary port is connected; disconnect its external routes first".into(),
@@ -295,9 +304,16 @@ fn snapshot(p: &PatchState, root: CompositeId) -> Result<Package, String> {
     let mut snapshot = p.clone();
     snapshot.modules.retain(|id, _| leaves.contains(id));
     snapshot.labels.retain(|id, _| leaves.contains(id));
-    snapshot
+    let keep: Vec<kabl_core::CableId> = snapshot
         .cables
-        .retain(|_, c| leaves.contains(&c.from.module_id()) && leaves.contains(&c.to.module_id()));
+        .iter()
+        .filter(|(&id, c)| {
+            c.from.module_id().is_some_and(|m| leaves.contains(&m))
+                && snapshot.end_module(id).is_some_and(|m| leaves.contains(&m))
+        })
+        .map(|(&id, _)| id)
+        .collect();
+    snapshot.cables.retain(|id, _| keep.contains(id));
     snapshot.composites.retain(|id, _| groups.contains(id));
     snapshot.composites.get_mut(&root).unwrap().parent = None;
     Ok(Package {
@@ -366,6 +382,7 @@ fn insert_inner(
                 id: modules[id],
                 param: param.clone(),
             },
+            PortRef::CableParam { .. } => t.clone(),
         }
     };
     let mut p = editor.state().clone();
@@ -528,7 +545,7 @@ pub fn entries(root: &Path) -> Vec<std::path::PathBuf> {
 }
 pub fn direction(p: &PatchState, t: &PortRef) -> Option<PortDirection> {
     match t {
-        PortRef::Param { .. } => Some(PortDirection::Input),
+        PortRef::Param { .. } | PortRef::CableParam { .. } => Some(PortDirection::Input),
         PortRef::Module { id, port } => registry::info_for(&p.modules.get(id)?.kind)?
             .ports
             .iter()

@@ -177,16 +177,28 @@ pub fn runtime_changes(old: &PatchState, new: &PatchState) -> Option<Vec<(Runtim
             ));
         }
     }
+    // Cables a live route moves the parameters of have a node whatever their own settings.
+    let targeted: std::collections::BTreeSet<CableId> = new
+        .cables
+        .values()
+        .filter(|c| !bypassed(c))
+        .filter_map(|c| match &c.to {
+            PortRef::CableParam { cable, .. } => Some(*cable),
+            _ => None,
+        })
+        .collect();
     for ((&id, a), (&id2, b)) in old.cables.iter().zip(&new.cables) {
         if id != id2 || a.from != b.from || a.to != b.to || bypassed(a) != bypassed(b) {
             return None;
         }
-        // A cable gains or loses its node by compiling; edits of a functional cable apply in place.
-        let functional = kabl_cables::is_functional(&b.params);
-        if functional != kabl_cables::is_functional(&a.params) {
+        // A cable gains or loses its node by compiling; edits of a cable with a node apply in
+        // place.
+        let has_node =
+            |c: &kabl_core::CableState| kabl_cables::is_functional(&c.params) || targeted.contains(&id);
+        if has_node(a) != has_node(b) {
             return None;
         }
-        if functional && !bypassed(b) {
+        if has_node(b) && !bypassed(b) {
             for slot in 0..kabl_cables::SLOTS {
                 let (x, y) = (
                     kabl_cables::slot_value(&a.params, slot),
@@ -203,7 +215,7 @@ pub fn runtime_changes(old: &PatchState, new: &PatchState) -> Option<Vec<(Runtim
                 }
             }
         }
-        if !matches!(b.to, PortRef::Param { .. }) || bypassed(b) {
+        if !b.to.is_route() || bypassed(b) {
             continue;
         }
         let amount = |c: &kabl_core::CableState| {

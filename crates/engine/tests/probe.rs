@@ -216,7 +216,7 @@ fn swaps_name_the_graph_and_a_missing_target_says_so() {
     let mut p = chain();
     p.modules.remove(&2);
     p.cables
-        .retain(|_, c| c.from.module_id() != 2 && c.to.module_id() != 2);
+        .retain(|_, c| c.from.module_id() != Some(2) && c.to.module_id() != Some(2));
     let mut g = e.build_swap(&h, &p).unwrap();
     g.generation = 8;
     e.receive_swap(g);
@@ -227,7 +227,7 @@ fn swaps_name_the_graph_and_a_missing_target_says_so() {
     let mut p = chain();
     p.modules.insert(2, module("macro", &[]));
     p.cables
-        .retain(|_, c| c.to.module_id() != 2 && c.from.module_id() != 2);
+        .retain(|_, c| c.to.module_id() != Some(2) && c.from.module_id() != Some(2));
     let mut g = e.build_swap(&h, &p).unwrap();
     g.generation = 9;
     e.receive_swap(g);

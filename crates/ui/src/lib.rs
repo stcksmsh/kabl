@@ -3007,9 +3007,9 @@ fn jack_badge(
         PortDirection::Output => {
             let dests: Vec<ModuleId> = state
                 .cables
-                .values()
-                .filter(|c| c.from == here)
-                .map(|c| c.to.module_id())
+                .iter()
+                .filter(|(_, c)| c.from == here)
+                .filter_map(|(&id, _)| state.end_module(id))
                 .collect();
             match dests.as_slice() {
                 [] => None,
@@ -3024,7 +3024,7 @@ fn jack_badge(
             .cables
             .values()
             .find(|c| c.to == here)
-            .map(|c| format!("< {}", name(c.from.module_id()))),
+            .map(|c| format!("< {}", name(c.from.module_id().unwrap_or_default()))),
     }
 }
 
@@ -3443,7 +3443,9 @@ fn draw_cables(
         .collect();
     {
         for (cable_id, c) in &cables {
-            if only.is_some_and(|id| c.from.module_id() != id && c.to.module_id() != id) {
+            if only.is_some_and(|id| {
+                c.from.module_id() != Some(id) && c.to.module_id() != Some(id)
+            }) {
                 continue;
             }
             if ui_state.unplug == Some(*cable_id) {
@@ -3456,7 +3458,10 @@ fn draw_cables(
                 continue;
             };
             let col = port_color(th, editor, &c.from);
-            let alpha = alpha_for(c.from.module_id(), c.to.module_id());
+            let alpha = alpha_for(
+                c.from.module_id().unwrap_or_default(),
+                c.to.module_id().unwrap_or_default(),
+            );
             let pts = cable_path(painter, a, b, col, 5.5 * z, alpha, false);
             // Removing is explicit: pull the plug out of its input, or right-click the cable.
             let mid = pts[pts.len() / 2];
@@ -3490,7 +3495,7 @@ fn draw_cables(
         let Some((_, c)) = cables.iter().find(|(id, _)| id == cable_id) else {
             continue;
         };
-        if only.is_some_and(|id| c.to.module_id() != id) {
+        if only.is_some_and(|id| c.to.module_id() != Some(id)) {
             continue;
         }
         let Some(&a) = port_ref_pos(&drawn.ports, &c.from, PortDirection::Output) else {
@@ -3501,9 +3506,11 @@ fn draw_cables(
             (PortRef::Param { id, param }, Some((iid, ip))) if id == iid && param == ip);
         let strong = ui_state.selected_route == Some(*cable_id)
             || inspected
-            || focus == Some(c.from.module_id());
-        let alpha =
-            alpha_for(c.from.module_id(), c.to.module_id()) * if strong { 1.0 } else { 0.72 };
+            || (focus.is_some() && focus == c.from.module_id());
+        let alpha = alpha_for(
+            c.from.module_id().unwrap_or_default(),
+            c.to.module_id().unwrap_or_default(),
+        ) * if strong { 1.0 } else { 0.72 };
         let pts = cable_path(
             painter,
             a,
@@ -3698,6 +3705,7 @@ fn draw_default_face(
                                         r.rect,
                                     );
                                 }
+                                PortRef::CableParam { .. } => {}
                                 PortRef::Param { id, param } => {
                                     view.record(format!("knob:{id}.{param}"), r.rect);
                                     for (&cid, cable) in &snapshot.cables {
@@ -3718,7 +3726,7 @@ fn draw_default_face(
                             }
                             r.context_menu(|ui| {
                                 if ui.button("Inspect bound module").clicked() {
-                                    let leaf = e.target.module_id();
+                                    let leaf = e.target.module_id().unwrap_or_default();
                                     let owner = editor
                                         .state()
                                         .composites
@@ -3727,7 +3735,7 @@ fn draw_default_face(
                                         .map_or(id, |(&id, _)| id);
                                     view.enter_composite(editor.state(), owner);
                                     view.selected_module = Some(leaf);
-                                    view.reveal = Some(e.target.module_id());
+                                    view.reveal = Some(leaf);
                                     view.drawer_open = true;
                                     ui.close();
                                 }
@@ -3966,6 +3974,7 @@ fn draw_authored_face(
                 PortRef::Param { id: leaf, param } => {
                     view.record(format!("knob:{leaf}.{param}"), resp.rect)
                 }
+                PortRef::CableParam { .. } => {}
             }
             if resp.clicked() {
                 if dir == PortDirection::Output {
@@ -4098,6 +4107,8 @@ fn register_face_port(
                 }
             }
         }
+        // A cable's own parameter has no face port: its routes live in the pattern editor.
+        PortRef::CableParam { .. } => {}
     }
 }
 

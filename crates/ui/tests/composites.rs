@@ -55,7 +55,7 @@ fn duplicates_private_graph_and_stable_interfaces() {
         .state()
         .cables
         .values()
-        .all(|c| !b.contains(&c.from.module_id()) || b.contains(&c.to.module_id())));
+        .all(|c| !b.contains(&c.from.module_id().unwrap()) || b.contains(&c.to.module_id().unwrap())));
     let leaf = *b
         .iter()
         .find(|id| e.state().modules[id].kind == "filter.svf")
@@ -226,7 +226,7 @@ fn exact_pcm_voice_stereo_effect_feedback_and_no_callback_allocation() {
     let src = original
         .cables
         .values()
-        .find(|c| c.to.module_id() == out)
+        .find(|c| c.to.module_id() == Some(out))
         .unwrap()
         .from
         .clone();

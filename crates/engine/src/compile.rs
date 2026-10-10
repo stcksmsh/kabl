@@ -112,6 +112,12 @@ pub enum CompileError {
         id: ModuleId,
         param: String,
     },
+    /// A route into a cable's parameter that cannot be compiled: it names a cable or a param
+    /// that does not exist, targets its own parameters, or closes a loop of such routes.
+    CableRoute {
+        cable: CableId,
+        reason: String,
+    },
     /// A cable references a module id that isn't in the patch.
     MissingModule {
         cable: CableId,
@@ -148,6 +154,9 @@ impl fmt::Display for CompileError {
             }
             CompileError::UnknownParam { id, param } => {
                 write!(f, "module {id} has no param named \"{param}\"")
+            }
+            CompileError::CableRoute { cable, reason } => {
+                write!(f, "route {cable} into a cable parameter: {reason}")
             }
             CompileError::MissingModule { cable, id } => {
                 write!(f, "cable {cable} references missing module {id}")
@@ -218,7 +227,19 @@ enum Step {
         src: BufIdx,
         out: BufIdx,
         node: Box<CableNode>,
+        /// Routes into this cable's probability, morph or glide, read at each pulse.
+        mods: Vec<CableMod>,
     },
+}
+
+/// One route into a parameter of a functional cable: `src` times `scale` is added to the
+/// parameter's slot (in its own unit) at each pulse. `scale` is the signed amount times the
+/// slot's range over the source's full scale, so an amount means the same thing as for a module
+/// param: a fraction of the destination's travel.
+struct CableMod {
+    slot: usize,
+    src: BufIdx,
+    scale: f32,
 }
 
 /// A `ParamSlot::modi` for a param no route modulates.
@@ -313,13 +334,17 @@ fn write_param(
 /// full scale, as the compiler does) or `Norm(scale)`. No allocation.
 fn write_route(steps: &mut [Step], slots: &[RouteSlot], lo: u32, hi: u32, v: Val) {
     for slot in &slots[lo as usize..hi as usize] {
-        let Step::Process { mods, .. } = &mut steps[slot.step as usize] else {
-            continue;
-        };
-        mods[slot.modi as usize].routes[slot.route as usize].1 = match v {
+        let scale = match v {
             Val::Exact(amount) => amount / slot.full_scale,
             Val::Norm(scale) => scale,
         };
+        match &mut steps[slot.step as usize] {
+            Step::Process { mods, .. } => {
+                mods[slot.modi as usize].routes[slot.route as usize].1 = scale
+            }
+            Step::Cable { mods, .. } => mods[slot.modi as usize].scale = scale,
+            _ => {}
+        }
     }
 }
 
@@ -390,7 +415,10 @@ fn coalesce_buffers(
                 first_def[*dest] = step_idx;
                 last_use[*dest] = last_use[*dest].max(step_idx);
             }
-            Step::Cable { src, out, .. } => {
+            Step::Cable { src, out, mods, .. } => {
+                for m in mods {
+                    last_use[m.src] = last_use[m.src].max(step_idx);
+                }
                 last_use[*src] = last_use[*src].max(step_idx);
                 first_def[*out] = step_idx;
                 last_use[*out] = last_use[*out].max(step_idx);
@@ -536,6 +564,76 @@ enum CableTo {
         index: usize,
         amount: f32,
     },
+    /// Modulation route into a parameter (`slot`) of another cable.
+    CableParam {
+        target: CableId,
+        slot: usize,
+        amount: f32,
+    },
+}
+
+/// The module each compiled cable ends on for scheduling: its own destination, or, for a route
+/// into a cable's parameter, where that cable ends. A cable missing from the result is not
+/// compiled: a bypassed route, or a route into one. Rejects what cannot compile, with the fix:
+/// an unknown cable or param, a route into its own parameters, a loop of routes.
+fn cable_dests(patch: &PatchState) -> Result<BTreeMap<CableId, ModuleId>, CompileError> {
+    let mut dests = BTreeMap::new();
+    for (&id, first) in &patch.cables {
+        if route_bypassed(first) {
+            continue;
+        }
+        let (mut cur, mut path) = (id, vec![id]);
+        let dest = loop {
+            let c = &patch.cables[&cur];
+            let PortRef::CableParam { cable: target, param } = &c.to else {
+                break c.to.module_id();
+            };
+            let fail = |reason: String| Err(CompileError::CableRoute { cable: cur, reason });
+            if kabl_cables::mod_slot(param).is_none() {
+                return fail(format!(
+                    "\"{param}\" is not a parameter a route can move. Route into \"prob\", \
+                     \"morph\" or \"glide_ms\", or remove this route."
+                ));
+            }
+            if *target == cur {
+                return fail(format!(
+                    "it targets its own \"{param}\"; a route cannot modulate itself. Point it \
+                     at another cable or remove it."
+                ));
+            }
+            if path.contains(target) {
+                let from = path.iter().position(|p| p == target).unwrap_or(0);
+                let ring: Vec<String> = path[from..].iter().map(|c| format!("cable {c}")).collect();
+                return fail(format!(
+                    "{} modulate each other in a loop. Remove or redirect one of these routes.",
+                    ring.join(" -> ")
+                ));
+            }
+            let Some(next) = patch.cables.get(target) else {
+                return fail(format!(
+                    "it targets cable {target}, which is not in the patch. Remove this route."
+                ));
+            };
+            if route_bypassed(next) {
+                break None;
+            }
+            (cur, path) = (*target, [path, vec![*target]].concat());
+        };
+        if let Some(dest) = dest {
+            dests.insert(id, dest);
+        }
+    }
+    Ok(dests)
+}
+
+/// How many cables a route into cable parameters is chained through before it reaches a plain
+/// cable: 0 for a plain cable. A route runs after the routes that move its own parameters.
+fn route_depth(patch: &PatchState, mut id: CableId) -> usize {
+    let mut depth = 0;
+    while let Some(PortRef::CableParam { cable, .. }) = patch.cables.get(&id).map(|c| &c.to) {
+        (id, depth) = (*cable, depth + 1);
+    }
+    depth
 }
 
 struct CableInfo {
@@ -554,7 +652,7 @@ struct CableInfo {
 /// A route with `bypass` set contributes nothing and is left out of the compiled graph; its
 /// settings stay in the patch.
 fn route_bypassed(c: &kabl_core::CableState) -> bool {
-    matches!(c.to, PortRef::Param { .. }) && c.params.get("bypass").is_some_and(|&b| b >= 0.5)
+    c.to.is_route() && c.params.get("bypass").is_some_and(|&b| b >= 0.5)
 }
 
 #[derive(Default)]
@@ -574,6 +672,8 @@ struct Wiring {
     delay: BufMaps,
     /// `(cable, step)` of every functional-cable node, for runtime values.
     cable_steps: Vec<(CableId, u32)>,
+    /// Route slots of the routes into functional cables' parameters.
+    cable_route_slots: Vec<RouteSlot>,
 }
 
 impl Wiring {
@@ -591,17 +691,29 @@ impl Wiring {
         carry: Carry,
         clock: Option<usize>,
         sample_rate: f32,
+        mods: Vec<(CableId, f32, CableMod)>,
     ) -> BufIdx {
         let (Some(settings), Some(clock)) = (c.settings, clock) else {
             return src;
         };
         let out = self.new_buf();
-        self.cable_steps.push((c.cable, self.steps.len() as u32));
+        let step = self.steps.len() as u32;
+        self.cable_steps.push((c.cable, step));
+        for (k, &(cable, full_scale, _)) in mods.iter().enumerate() {
+            self.cable_route_slots.push(RouteSlot {
+                cable,
+                step,
+                modi: k as u32,
+                route: 0,
+                full_scale,
+            });
+        }
         self.steps.push(Step::Cable {
             clock,
             src,
             out,
             node: Box::new(CableNode::new(settings, c.cable, carry, sample_rate)),
+            mods: mods.into_iter().map(|m| m.2).collect(),
         });
         out
     }
@@ -693,6 +805,18 @@ fn compile_inner(
         );
     }
 
+    let dests = cable_dests(patch)?;
+    // Cables a live route moves the parameters of: they get a node even with no pattern.
+    let modulated: std::collections::BTreeSet<CableId> = patch
+        .cables
+        .iter()
+        .filter(|(id, _)| dests.contains_key(id))
+        .filter_map(|(_, c)| match &c.to {
+            PortRef::CableParam { cable, .. } => Some(*cable),
+            _ => None,
+        })
+        .collect();
+
     // Brief section 7.1: find a feedback-arc set via DFS over the cable graph (cable-id order —
     // `patch.cables` is a `BTreeMap`, so this is deterministic) so a cycle gets an implicit
     // 1-block delay instead of failing to compile. Any cycle must contain at least one DFS back
@@ -704,7 +828,9 @@ fn compile_inner(
         if route_bypassed(cstate) {
             continue;
         }
-        let (from_id, to_id) = (cstate.from.module_id(), cstate.to.module_id());
+        let (Some(from_id), Some(&to_id)) = (cstate.from.module_id(), dests.get(&cable_id)) else {
+            continue;
+        };
         for id in [from_id, to_id] {
             if !metas.contains_key(&id) {
                 return Err(CompileError::MissingModule {
@@ -769,12 +895,27 @@ fn compile_inner(
         } = &cstate.from
         else {
             return Err(CompileError::UnknownPort {
-                id: cstate.from.module_id(),
+                id: cstate.from.module_id().unwrap_or_default(),
                 kind: "source",
                 port: "<param used as a cable source>".into(),
             });
         };
+        let Some(&dest) = dests.get(&cable_id) else {
+            continue;
+        };
         let (to_id, to) = match &cstate.to {
+            PortRef::CableParam { cable, param } => (
+                dest,
+                CableTo::CableParam {
+                    target: *cable,
+                    slot: kabl_cables::mod_slot(param).expect("checked by cable_dests"),
+                    amount: cstate
+                        .params
+                        .get("amount")
+                        .copied()
+                        .unwrap_or(DEFAULT_ROUTE_AMOUNT),
+                },
+            ),
             PortRef::Module { id, port } => (*id, CableTo::Port(port.clone())),
             PortRef::Param { id, param } => {
                 let info = metas[id].info;
@@ -808,7 +949,7 @@ fn compile_inner(
             from_port: from_port.clone(),
             to,
             delayed,
-            settings: kabl_cables::is_functional(&cstate.params)
+            settings: (kabl_cables::is_functional(&cstate.params) || modulated.contains(&cable_id))
                 .then(|| CableSettings::from_params(&cstate.params)),
         });
     }
@@ -857,8 +998,10 @@ fn compile_inner(
         .collect();
     loop {
         let before = voiced.len();
-        for c in patch.cables.values().filter(|c| !route_bypassed(c)) {
-            let (from, to) = (c.from.module_id(), c.to.module_id());
+        for (id, c) in patch.cables.iter().filter(|(_, c)| !route_bypassed(c)) {
+            let (Some(from), Some(&to)) = (c.from.module_id(), dests.get(id)) else {
+                continue;
+            };
             if voiced.contains(&from) && metas[&to].info.rate == Rate::Voice {
                 voiced.insert(to);
             }
@@ -874,10 +1017,11 @@ fn compile_inner(
     // chain that also feeds anything unvoiced stays one instance (lane 0), so that path keeps
     // its level instead of becoming a voice average of independent streams.
     if single_instance {
-        let live: Vec<&kabl_core::CableState> = patch
+        let live: Vec<(ModuleId, ModuleId)> = patch
             .cables
-            .values()
-            .filter(|c| !route_bypassed(c))
+            .iter()
+            .filter(|(_, c)| !route_bypassed(c))
+            .filter_map(|(id, c)| Some((c.from.module_id()?, *dests.get(id)?)))
             .collect();
         let mut noisy: std::collections::BTreeSet<ModuleId> = metas
             .iter()
@@ -886,8 +1030,7 @@ fn compile_inner(
             .collect();
         loop {
             let before = noisy.len();
-            for c in &live {
-                let (from, to) = (c.from.module_id(), c.to.module_id());
+            for &(from, to) in &live {
                 if noisy.contains(&from) && metas[&to].info.rate == Rate::Voice {
                     noisy.insert(to);
                 }
@@ -902,9 +1045,8 @@ fn compile_inner(
                 if voiced.contains(&id) {
                     continue;
                 }
-                let mut consumers = live.iter().filter(|c| c.from.module_id() == id).peekable();
-                if consumers.peek().is_some()
-                    && consumers.all(|c| voiced.contains(&c.to.module_id()))
+                let mut consumers = live.iter().filter(|c| c.0 == id).peekable();
+                if consumers.peek().is_some() && consumers.all(|c| voiced.contains(&c.1))
                 {
                     voiced.insert(id);
                 }
@@ -922,6 +1064,7 @@ fn compile_inner(
         live: BufMaps::default(),
         delay: BufMaps::default(),
         cable_steps: Vec::new(),
+        cable_route_slots: Vec::new(),
     };
     let silence_buf = w.new_buf();
 
@@ -1077,6 +1220,50 @@ fn compile_inner(
         }
 
         for lane in 0..n_lanes {
+            // Routes into cable parameters first, deepest chain first, so a cable's own routes
+            // are wired before the cable that reads them.
+            let mut cable_mods: BTreeMap<CableId, Vec<(CableId, f32, CableMod)>> = BTreeMap::new();
+            let mut routed: Vec<usize> = (0..incoming.len())
+                .filter(|&k| matches!(incoming[k].to, CableTo::CableParam { .. }))
+                .collect();
+            routed.sort_by_key(|&k| std::cmp::Reverse(route_depth(patch, incoming[k].cable)));
+            for k in routed {
+                let c = &incoming[k];
+                let CableTo::CableParam {
+                    target,
+                    slot,
+                    amount,
+                } = c.to
+                else {
+                    continue;
+                };
+                let (src_out_idx, src_is_voice, full_scale, port_type) = sources[k];
+                let buf = w.source_buf(
+                    c.from_id,
+                    src_out_idx,
+                    src_is_voice,
+                    is_voice,
+                    lane,
+                    c.delayed,
+                );
+                let carry = if port_type == PortType::Pitch {
+                    Carry::Hold
+                } else {
+                    Carry::Scale
+                };
+                let own = cable_mods.remove(&c.cable).unwrap_or_default();
+                let src = w.through_cable(c, buf, carry, clock_index, sample_rate, own);
+                let range = kabl_cables::mod_range(slot);
+                cable_mods.entry(target).or_default().push((
+                    c.cable,
+                    full_scale / range,
+                    CableMod {
+                        slot,
+                        src,
+                        scale: amount * range / full_scale,
+                    },
+                ));
+            }
             let mut lane_inputs = Vec::with_capacity(input_ports.len());
             for port in &input_ports {
                 let found = incoming
@@ -1100,12 +1287,14 @@ fn compile_inner(
                             PortType::Pitch => Carry::Hold,
                             _ => Carry::Scale,
                         };
+                        let own = cable_mods.remove(&c.cable).unwrap_or_default();
                         InputSource::Buffer(w.through_cable(
                             c,
                             buf,
                             carry,
                             clock_index,
                             sample_rate,
+                            own,
                         ))
                     }
                 });
@@ -1131,7 +1320,8 @@ fn compile_inner(
                 } else {
                     Carry::Scale
                 };
-                let buf = w.through_cable(c, buf, carry, clock_index, sample_rate);
+                let own = cable_mods.remove(&c.cable).unwrap_or_default();
+                let buf = w.through_cable(c, buf, carry, clock_index, sample_rate, own);
                 let route = (buf, amount / full_scale);
                 let m = match mods.iter().position(|m| m.index == index) {
                     Some(k) => k,
@@ -1229,8 +1419,10 @@ fn compile_inner(
         live,
         delay,
         mut cable_steps,
+        cable_route_slots,
         ..
     } = w;
+    route_slots.extend(cable_route_slots);
     let voice_output_buf = live.voice;
     let global_output_buf = live.global;
     let voice_delay_buf = delay.voice;
@@ -1321,7 +1513,10 @@ fn compile_inner(
                 *src = remap[*src];
                 *dest = remap[*dest];
             }
-            Step::Cable { src, out, .. } => {
+            Step::Cable { src, out, mods, .. } => {
+                for m in mods.iter_mut() {
+                    m.src = remap[m.src];
+                }
                 *src = remap[*src];
                 *out = remap[*out];
             }
@@ -1712,6 +1907,7 @@ impl CompiledPatch {
                     src,
                     out,
                     node,
+                    mods,
                 } => {
                     let input = self.buffers[*src];
                     match self.modules[*clock].as_any().downcast_ref::<Clock>() {
@@ -1725,7 +1921,21 @@ impl CompiledPatch {
                                 Some(&(_, tick, _)) => tick.checked_sub(1),
                                 None => c.next_tick().1.checked_sub(1),
                             };
-                            node.process(&input, &mut self.buffers[*out], current, ticks);
+                            if mods.is_empty() {
+                                node.process(&input, &mut self.buffers[*out], current, ticks);
+                            } else {
+                                // Each pulse reads its routes at its own sample.
+                                let mut o = self.buffers[*out];
+                                let bufs = &self.buffers;
+                                node.process_mod(&input, &mut o, current, ticks, |i| {
+                                    let mut m = kabl_cables::Mods::default();
+                                    for r in mods.iter() {
+                                        m.add(r.slot, r.scale * bufs[r.src][i]);
+                                    }
+                                    m
+                                });
+                                self.buffers[*out] = o;
+                            }
                         }
                         None => self.buffers[*out] = input,
                     }
@@ -1996,10 +2206,13 @@ impl CompiledPatch {
                     return true;
                 }
                 let slot = self.route_slots[lo];
-                let Step::Process { mods, .. } = &self.steps[slot.step as usize] else {
-                    return false;
+                let now = match &self.steps[slot.step as usize] {
+                    Step::Process { mods, .. } => {
+                        mods[slot.modi as usize].routes[slot.route as usize].1
+                    }
+                    Step::Cable { mods, .. } => mods[slot.modi as usize].scale,
+                    _ => return false,
                 };
-                let now = mods[slot.modi as usize].routes[slot.route as usize].1;
                 (on, now, value / slot.full_scale)
             }
         };
@@ -2113,10 +2326,12 @@ impl CompiledPatch {
     /// compiled. For tests and evidence.
     pub fn route_amount(&self, cable: CableId) -> Option<f32> {
         let slot = self.route_slots.iter().find(|s| s.cable == cable)?;
-        let Step::Process { mods, .. } = &self.steps[slot.step as usize] else {
-            return None;
+        let scale = match &self.steps[slot.step as usize] {
+            Step::Process { mods, .. } => mods[slot.modi as usize].routes[slot.route as usize].1,
+            Step::Cable { mods, .. } => mods[slot.modi as usize].scale,
+            _ => return None,
         };
-        Some(mods[slot.modi as usize].routes[slot.route as usize].1 * slot.full_scale)
+        Some(scale * slot.full_scale)
     }
 
     /// Runtime values still ramping.
@@ -2275,12 +2490,22 @@ pub fn validate_composites(patch: &PatchState) -> Result<(), String> {
     kabl_core::composite::validate(patch)?;
     for (&id, c) in &patch.composites {
         for e in c.ports.values().chain(c.controls.values()) {
-            let m = &patch.modules[&e.target.module_id()];
+            let Some(m) = e
+                .target
+                .module_id()
+                .and_then(|id| patch.modules.get(&id))
+            else {
+                return Err(format!(
+                    "Composite {id}: missing interface target {:?}",
+                    e.target
+                ));
+            };
             let info = registry::info_for(&m.kind)
                 .ok_or_else(|| format!("Composite {id}: missing built-in {}", m.kind))?;
             let valid = match &e.target {
                 PortRef::Module { port, .. } => info.ports.iter().any(|p| p.name == port),
                 PortRef::Param { param, .. } => info.params.iter().any(|p| p.name == param),
+                PortRef::CableParam { .. } => false,
             };
             if !valid {
                 return Err(format!(

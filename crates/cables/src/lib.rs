@@ -30,7 +30,31 @@ pub const SLOTS: usize = B_CHANCE0 + MAX_STEPS;
 /// composite validators bound a cable by this, so a full pattern A, pattern B and morph load.
 pub const MAX_CABLE_PARAMS: usize = SLOTS + 2;
 
-/// Param name of runtime slot `slot`: `length`, `prob`, `s1..`, `r1..`, `morph`, `glide_ms`,
+/// The cable params a modulation route can move, by the name a route's destination carries
+/// (`PortRef::CableParam`): the whole-cable probability, the A/B morph and the glide.
+pub const MOD_PARAMS: [&str; 3] = [PROB, "morph", "glide_ms"];
+
+/// The runtime slot a route destination names, if a route can move it.
+pub fn mod_slot(param: &str) -> Option<usize> {
+    match param {
+        PROB => Some(1),
+        "morph" => Some(MORPH),
+        "glide_ms" => Some(GLIDE),
+        _ => None,
+    }
+}
+
+/// Travel of a modulatable slot: a route's amount 1.0 moves the value by this much (a full-scale
+/// source at amount 1 sweeps the whole range, as for a module param).
+pub fn mod_range(slot: usize) -> f32 {
+    match slot {
+        1 => 100.0,
+        MORPH => 1.0,
+        _ => 2000.0,
+    }
+}
+
+/// Param name of runtime slot `slot`:`length`, `prob`, `s1..`, `r1..`, `morph`, `glide_ms`,
 /// then pattern B as `b.length`, `b.s1..`, `b.r1..`.
 pub fn slot_name(slot: usize) -> String {
     match slot {
@@ -104,6 +128,27 @@ pub enum Carry {
 /// Declick slew of `Carry::Audio`, ms for a full 0..1 swing.
 pub const SLEW_MS: f32 = 1.0;
 
+/// What routes add to the modulatable slots at a pulse, in each slot's own unit (percent, 0..1,
+/// ms). Zero for a cable nothing modulates.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Mods {
+    pub prob: f32,
+    pub morph: f32,
+    pub glide: f32,
+}
+
+impl Mods {
+    /// Adds `delta` to slot `slot` (one of `MOD_PARAMS`'s); other slots are ignored.
+    pub fn add(&mut self, slot: usize, delta: f32) {
+        match slot {
+            1 => self.prob += delta,
+            MORPH => self.morph += delta,
+            GLIDE => self.glide += delta,
+            _ => {}
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Settings {
     len: u8,
@@ -160,13 +205,30 @@ impl Settings {
     /// morph above 0 pattern B plays beside A at its own length: the pass chance and the level
     /// are the blend of the two steps, drawn once, so a half morph is a real in-between.
     pub fn level_at(&self, seed: u32, tick: u64) -> f32 {
+        self.level_with(seed, tick, self.prob, self.morph)
+    }
+
+    /// `level_at` with the routes' contribution at this pulse added to the probability and the
+    /// morph (clamped to their ranges). Zero `mods` is `level_at` bit for bit.
+    pub fn level_at_mod(&self, seed: u32, tick: u64, mods: Mods) -> f32 {
+        let prob = (self.prob + mods.prob / 100.0).clamp(0.0, 1.0);
+        let morph = (self.morph + mods.morph).clamp(0.0, 1.0);
+        self.level_with(seed, tick, prob, morph)
+    }
+
+    /// The glide in ms with the routes' contribution added.
+    pub fn glide_with(&self, mods: Mods) -> f32 {
+        (self.glide_ms + mods.glide).clamp(0.0, 2000.0)
+    }
+
+    fn level_with(&self, seed: u32, tick: u64, prob: f32, morph: f32) -> f32 {
         let k = (tick % self.len.max(1) as u64) as usize;
-        let (mut p, mut level) = (self.prob * self.chance[k], self.level[k]);
-        if self.morph > 0.0 {
+        let (mut p, mut level) = (prob * self.chance[k], self.level[k]);
+        if morph > 0.0 {
             let kb = (tick % self.len_b.max(1) as u64) as usize;
-            let m = self.morph;
+            let m = morph;
             // a * (1 - m) + b * m is exact at both ends: morph 1 is pattern B alone, bit for bit.
-            p = p * (1.0 - m) + self.prob * self.chance_b[kb] * m;
+            p = p * (1.0 - m) + prob * self.chance_b[kb] * m;
             level = level * (1.0 - m) + self.level_b[kb] * m;
         }
         if draw(seed, tick) < p {
@@ -198,6 +260,9 @@ pub struct Node {
     gain: f32,
     held: f32,
     started: bool,
+    /// What the routes added at the latest pulse, held until the next one.
+    mods: Mods,
+    mods_read: bool,
 }
 
 impl Node {
@@ -212,6 +277,8 @@ impl Node {
             gain: 1.0,
             held: 0.0,
             started: false,
+            mods: Mods::default(),
+            mods_read: false,
         }
     }
 
@@ -226,14 +293,36 @@ impl Node {
         current: Option<u64>,
         ticks: &[(u32, u64, u32)],
     ) {
+        self.process_mod(src, out, current, ticks, |_| Mods::default());
+    }
+
+    /// `process` for a cable whose probability, morph or glide routes move: `mods_at(i)` is
+    /// what the routes add at block sample `i`. It is read at each pulse's own sample, so a
+    /// pulse sees the modulation exactly there and keeps it until the next pulse (a pulse
+    /// already running at the block start keeps the value its own pulse read; a fresh node
+    /// reads sample 0).
+    pub fn process_mod(
+        &mut self,
+        src: &[f32],
+        out: &mut [f32],
+        current: Option<u64>,
+        ticks: &[(u32, u64, u32)],
+        mods_at: impl Fn(usize) -> Mods,
+    ) {
+        if !self.mods_read {
+            (self.mods, self.mods_read) = (mods_at(0), true);
+        }
         if let Some(t) = current {
-            self.level = self.settings.level_at(self.seed, t);
+            self.level = self.settings.level_at_mod(self.seed, t, self.mods);
         }
         let n = out.len().min(src.len());
         let (mut i, mut next) = (0, 0);
         while i < n {
             while next < ticks.len() && ticks[next].2 as usize <= i {
-                self.level = self.settings.level_at(self.seed, ticks[next].1);
+                self.mods = mods_at(ticks[next].2 as usize);
+                self.level = self
+                    .settings
+                    .level_at_mod(self.seed, ticks[next].1, self.mods);
                 next += 1;
             }
             // The level is constant up to the next pulse.
@@ -242,7 +331,7 @@ impl Node {
                 (self.gain, self.held, self.started) = (self.level, src[i], true);
             }
             let (src, out) = (&src[i..end], &mut out[i..end]);
-            let glide = self.settings.glide_ms;
+            let glide = self.settings.glide_with(self.mods);
             let slew = if glide > 0.0 {
                 1.0 / (glide * 0.001 * self.sample_rate).max(1.0)
             } else {
@@ -425,6 +514,29 @@ mod tests {
         let mut hard = node(&[("length", 2.0), ("s2", 0.0)], Carry::Scale);
         hard.process(&src, &mut out, None, &[(0, 0, 0), (0, 1, 8)]);
         assert_eq!(out[8], 0.0);
+    }
+
+    #[test]
+    fn routes_are_read_at_each_pulse_sample_and_held_between_pulses() {
+        let mut n = node(&[], Carry::Scale);
+        let (src, mut out) = ([1.0; 64], [9.0; 64]);
+        // The source drops the probability by 100 % from sample 20 on; pulses at 10 and 30.
+        let mods_at = |i: usize| Mods {
+            prob: if i >= 20 { -100.0 } else { 0.0 },
+            ..Mods::default()
+        };
+        n.process_mod(&src, &mut out, None, &[(0, 0, 10), (0, 1, 30)], mods_at);
+        assert!(out[..30].iter().all(|&x| x == 1.0), "no pulse at 20: no change");
+        assert!(out[30..].iter().all(|&x| x == 0.0), "the pulse at 30 reads it");
+        // The next block starts inside that pulse and keeps what the pulse read.
+        n.process_mod(&src, &mut out, Some(1), &[], |_| Mods::default());
+        assert!(out.iter().all(|&x| x == 0.0));
+    }
+
+    #[test]
+    fn zero_mods_are_the_plain_level_bit_for_bit() {
+        let s = Settings::from_params(&params(&[("length", 5.0), ("prob", 70.0), ("morph", 0.3)]));
+        assert!((0..500).all(|t| s.level_at(2, t) == s.level_at_mod(2, t, Mods::default())));
     }
 
     #[test]
