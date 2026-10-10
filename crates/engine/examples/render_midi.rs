@@ -75,13 +75,7 @@ fn main() {
             batch.push(((script[next].0 - host) as usize, script[next].1));
             next += 1;
         }
-        timeline.process(
-            &mut engine,
-            &mut left[..n],
-            &mut right[..n],
-            &batch,
-            |_, _| {},
-        );
+        timeline.process(&mut engine, &mut left[..n], &mut right[..n], &batch, |_, _| {});
         for i in 0..n {
             samples.push(left[i]);
             samples.push(right[i]);

@@ -49,9 +49,6 @@ fn resaving_a_v1_patch_writes_the_current_version_that_loads_identically() {
     let dir = tempfile::tempdir().unwrap();
     save(dir.path(), &log).unwrap();
     let meta = std::fs::read_to_string(dir.path().join("meta.toml")).unwrap();
-    assert!(meta.contains(&format!(
-        "schema_version = {}",
-        kabl_core::CURRENT_SCHEMA_VERSION
-    )));
+    assert!(meta.contains(&format!("schema_version = {}", kabl_core::CURRENT_SCHEMA_VERSION)));
     assert_eq!(load(dir.path()).unwrap().state(), log.state());
 }

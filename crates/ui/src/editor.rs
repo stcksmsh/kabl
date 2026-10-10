@@ -402,7 +402,8 @@ impl PatchEditor {
         cable: CableId,
         param: &str,
     ) -> Option<CableId> {
-        if !self.log.state().cables.contains_key(&cable) || kabl_cables::mod_slot(param).is_none() {
+        if !self.log.state().cables.contains_key(&cable) || kabl_cables::mod_slot(param).is_none()
+        {
             return None;
         }
         Some(self.connect(

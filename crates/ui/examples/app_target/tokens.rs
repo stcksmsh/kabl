@@ -51,14 +51,7 @@ pub enum Sect {
 }
 
 impl Sect {
-    pub const ALL: [Sect; 6] = [
-        Sect::Osc,
-        Sect::Filter,
-        Sect::Mod,
-        Sect::Amp,
-        Sect::Timing,
-        Sect::Fx,
-    ];
+    pub const ALL: [Sect; 6] = [Sect::Osc, Sect::Filter, Sect::Mod, Sect::Amp, Sect::Timing, Sect::Fx];
     pub fn name(self) -> &'static str {
         match self {
             Sect::Osc => "oscillator / noise",
@@ -174,12 +167,7 @@ impl Tok {
         }
     }
     pub fn type_scale(&self) -> Vec<TypeStep> {
-        let s = |name, size, fam, role| TypeStep {
-            name,
-            size,
-            fam,
-            role,
-        };
+        let s = |name, size, fam, role| TypeStep { name, size, fam, role };
         match self.dir {
             Dir::A => vec![
                 s("display", 28.0, "sans-semi", "Perform: tempo, bar counter"),
@@ -188,66 +176,32 @@ impl Tok {
                 s("body", 13.0, "sans", "Lists, inputs, help"),
                 s("label", 12.0, "sans-med", "Control labels, tabs"),
                 s("value", 12.0, "mono-med", "Numeric readouts"),
-                s(
-                    "caption",
-                    11.0,
-                    "sans",
-                    "Secondary text; floor for any text",
-                ),
+                s("caption", 11.0, "sans", "Secondary text; floor for any text"),
             ],
             Dir::B => vec![
                 s("display", 30.0, "mono-med", "Perform: tempo, bar counter"),
                 s("title", 20.0, "sans-semi", "Preset name, panel heading"),
                 s("h3", 15.0, "sans-semi", "Card heading, module name"),
                 s("body", 13.0, "sans", "Lists, inputs, help"),
-                s(
-                    "label",
-                    11.5,
-                    "sans-semi",
-                    "Control labels (caps, +0.6 px tracking)",
-                ),
+                s("label", 11.5, "sans-semi", "Control labels (caps, +0.6 px tracking)"),
                 s("value", 12.0, "mono-med", "Numeric readouts"),
-                s(
-                    "caption",
-                    11.0,
-                    "sans",
-                    "Secondary text; floor for any text",
-                ),
+                s("caption", 11.0, "sans", "Secondary text; floor for any text"),
             ],
             Dir::C => vec![
                 s("display", 32.0, "cond-semi", "Perform: tempo, bar counter"),
-                s(
-                    "title",
-                    20.0,
-                    "cond-semi",
-                    "Panel heading, patch name (caps)",
-                ),
+                s("title", 20.0, "cond-semi", "Panel heading, patch name (caps)"),
                 s("h3", 15.0, "cond-semi", "Module name (caps)"),
                 s("body", 13.0, "sans", "Lists, inputs, help"),
-                s(
-                    "label",
-                    12.0,
-                    "cond-semi",
-                    "Control labels (caps, +0.5 px tracking)",
-                ),
+                s("label", 12.0, "cond-semi", "Control labels (caps, +0.5 px tracking)"),
                 s("value", 12.0, "mono-med", "Numeric readouts"),
-                s(
-                    "caption",
-                    11.0,
-                    "cond-med",
-                    "Secondary text; floor for any text",
-                ),
+                s("caption", 11.0, "cond-med", "Secondary text; floor for any text"),
             ],
         }
     }
 }
 
 pub fn tok(dir: Dir, dark: bool) -> Tok {
-    let f = |b: &str, i: &str, i2: &str| Face {
-        base: h(b),
-        ink: h(i),
-        ink2: h(i2),
-    };
+    let f = |b: &str, i: &str, i2: &str| Face { base: h(b), ink: h(i), ink2: h(i2) };
     let sh = |dy, blur, alpha| Shadow { dy, blur, alpha };
     match (dir, dark) {
         (Dir::A, false) => Tok {
@@ -294,14 +248,7 @@ pub fn tok(dir: Dir, dark: bool) -> Tok {
             r_md: 8.0,
             r_lg: 12.0,
             sh: [sh(1.0, 3.0, 28), sh(4.0, 12.0, 38), sh(12.0, 32.0, 56)],
-            motion: Motion {
-                hover_ms: 90,
-                press_ms: 60,
-                drawer_ms: 220,
-                view_ms: 180,
-                glide_ms: 120,
-                pulse_ms: 1200,
-            },
+            motion: Motion { hover_ms: 90, press_ms: 60, drawer_ms: 220, view_ms: 180, glide_ms: 120, pulse_ms: 1200 },
         },
         (Dir::A, true) => Tok {
             dir,
@@ -347,14 +294,7 @@ pub fn tok(dir: Dir, dark: bool) -> Tok {
             r_md: 8.0,
             r_lg: 12.0,
             sh: [sh(1.0, 3.0, 90), sh(4.0, 12.0, 110), sh(12.0, 32.0, 150)],
-            motion: Motion {
-                hover_ms: 90,
-                press_ms: 60,
-                drawer_ms: 220,
-                view_ms: 180,
-                glide_ms: 120,
-                pulse_ms: 1200,
-            },
+            motion: Motion { hover_ms: 90, press_ms: 60, drawer_ms: 220, view_ms: 180, glide_ms: 120, pulse_ms: 1200 },
         },
         (Dir::B, true) => Tok {
             dir,
@@ -400,14 +340,7 @@ pub fn tok(dir: Dir, dark: bool) -> Tok {
             r_md: 10.0,
             r_lg: 16.0,
             sh: [sh(1.0, 4.0, 120), sh(6.0, 18.0, 150), sh(16.0, 40.0, 190)],
-            motion: Motion {
-                hover_ms: 120,
-                press_ms: 80,
-                drawer_ms: 260,
-                view_ms: 220,
-                glide_ms: 160,
-                pulse_ms: 900,
-            },
+            motion: Motion { hover_ms: 120, press_ms: 80, drawer_ms: 260, view_ms: 220, glide_ms: 160, pulse_ms: 900 },
         },
         (Dir::B, false) => Tok {
             dir,
@@ -453,14 +386,7 @@ pub fn tok(dir: Dir, dark: bool) -> Tok {
             r_md: 10.0,
             r_lg: 16.0,
             sh: [sh(1.0, 3.0, 26), sh(6.0, 16.0, 36), sh(16.0, 36.0, 56)],
-            motion: Motion {
-                hover_ms: 120,
-                press_ms: 80,
-                drawer_ms: 260,
-                view_ms: 220,
-                glide_ms: 160,
-                pulse_ms: 900,
-            },
+            motion: Motion { hover_ms: 120, press_ms: 80, drawer_ms: 260, view_ms: 220, glide_ms: 160, pulse_ms: 900 },
         },
         (Dir::C, false) => Tok {
             dir,
@@ -506,14 +432,7 @@ pub fn tok(dir: Dir, dark: bool) -> Tok {
             r_md: 4.0,
             r_lg: 6.0,
             sh: [sh(0.0, 0.0, 0), sh(2.0, 6.0, 22), sh(8.0, 20.0, 40)],
-            motion: Motion {
-                hover_ms: 60,
-                press_ms: 40,
-                drawer_ms: 160,
-                view_ms: 120,
-                glide_ms: 90,
-                pulse_ms: 800,
-            },
+            motion: Motion { hover_ms: 60, press_ms: 40, drawer_ms: 160, view_ms: 120, glide_ms: 90, pulse_ms: 800 },
         },
         (Dir::C, true) => Tok {
             dir,
@@ -559,14 +478,7 @@ pub fn tok(dir: Dir, dark: bool) -> Tok {
             r_md: 4.0,
             r_lg: 6.0,
             sh: [sh(0.0, 0.0, 0), sh(2.0, 6.0, 100), sh(8.0, 20.0, 160)],
-            motion: Motion {
-                hover_ms: 60,
-                press_ms: 40,
-                drawer_ms: 160,
-                view_ms: 120,
-                glide_ms: 90,
-                pulse_ms: 800,
-            },
+            motion: Motion { hover_ms: 60, press_ms: 40, drawer_ms: 160, view_ms: 120, glide_ms: 90, pulse_ms: 800 },
         },
     }
 }

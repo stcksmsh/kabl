@@ -233,8 +233,7 @@ pub fn write_metadata(root: &Path) {
         let mut meta: Meta = toml::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         meta.description = (*guide).into();
         if let Some(tempo) = tags.split_whitespace().find(|tag| tag.ends_with("bpm")) {
-            meta.tags
-                .retain(|tag| !tag.ends_with("bpm") || tag == tempo);
+            meta.tags.retain(|tag| !tag.ends_with("bpm") || tag == tempo);
         }
         for tag in std::iter::once("curated")
             .chain(std::iter::once(*role))

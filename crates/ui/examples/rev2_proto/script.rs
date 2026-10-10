@@ -115,13 +115,7 @@ impl Script {
                     let path = self.shot_dir.join(format!("{name}.png"));
                     let [w, h] = image.size;
                     let buf: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
-                    match image::save_buffer(
-                        &path,
-                        &buf,
-                        w as u32,
-                        h as u32,
-                        image::ExtendedColorType::Rgba8,
-                    ) {
+                    match image::save_buffer(&path, &buf, w as u32, h as u32, image::ExtendedColorType::Rgba8) {
                         Ok(()) => self.log.push(format!("SHOT  {} ({w}×{h})", path.display())),
                         Err(e) => {
                             self.fails += 1;
@@ -175,10 +169,7 @@ impl Script {
         let p = &app.patch;
         let xf = app.xf();
         let world = |want: &dyn Fn(&Hit) -> bool| {
-            app.regions
-                .iter()
-                .find(|r| want(&r.hit))
-                .map(|r| xf.p(r.area.center()))
+            app.regions.iter().find(|r| want(&r.hit)).map(|r| xf.p(r.area.center()))
         };
         let pos = if let Some(k) = t.strip_prefix("@ui:") {
             app.ui_rects.get(k).map(|r| r.center())
@@ -186,23 +177,15 @@ impl Script {
             // A canvas point with nothing under it (bare rack), scanning from the bottom right.
             let c = app.canvas;
             (0..400).find_map(|i| {
-                let s = pos2(
-                    c.right() - 20.0 - (i % 20) as f32 * 30.0,
-                    c.bottom() - 20.0 - (i / 20) as f32 * 30.0,
-                );
-                geom::hit_test(&app.regions, xf.inv(s))
-                    .is_none()
-                    .then_some(s)
+                let s = pos2(c.right() - 20.0 - (i % 20) as f32 * 30.0, c.bottom() - 20.0 - (i / 20) as f32 * 30.0);
+                geom::hit_test(&app.regions, xf.inv(s)).is_none().then_some(s)
             })
         } else if let Some((kind, name)) = t.strip_prefix('@').and_then(|s| s.split_once(':')) {
             match kind {
                 "knob" | "ring" | "pill" | "pin" => {
                     let c = find_ctl(p, name)?;
                     world(&|h| match (kind, h) {
-                        ("knob", Hit::Knob(x))
-                        | ("ring", Hit::Ring(x))
-                        | ("pill", Hit::Pill(x))
-                        | ("pin", Hit::Pin(x)) => *x == c,
+                        ("knob", Hit::Knob(x)) | ("ring", Hit::Ring(x)) | ("pill", Hit::Pill(x)) | ("pin", Hit::Pin(x)) => *x == c,
                         _ => false,
                     })
                 }
@@ -226,9 +209,7 @@ impl Script {
                 "toggle" | "done" | "header" => {
                     let m = find_mod(p, name)?;
                     world(&|h| match (kind, h) {
-                        ("toggle", Hit::Toggle(x))
-                        | ("done", Hit::Done(x))
-                        | ("header", Hit::Header(x)) => *x == m,
+                        ("toggle", Hit::Toggle(x)) | ("done", Hit::Done(x)) | ("header", Hit::Header(x)) => *x == m,
                         _ => false,
                     })
                 }
@@ -242,12 +223,7 @@ impl Script {
     }
 
     fn button(&self, pos: Pos2, button: PointerButton, pressed: bool) -> Event {
-        Event::PointerButton {
-            pos,
-            button,
-            pressed,
-            modifiers: self.mods,
-        }
+        Event::PointerButton { pos, button, pressed, modifiers: self.mods }
     }
 
     fn set_mods(&mut self, words: &[&str]) {
@@ -300,11 +276,7 @@ impl Script {
             "click" | "rclick" | "dblclick" => {
                 let p = need!(tgt(self, 1), w[1]);
                 self.set_mods(&w[2..]);
-                let b = if w[0] == "rclick" {
-                    PointerButton::Secondary
-                } else {
-                    PointerButton::Primary
-                };
+                let b = if w[0] == "rclick" { PointerButton::Secondary } else { PointerButton::Primary };
                 // Longer than egui's double-click window, so separate clicks stay separate.
                 self.until = self.now + 0.35;
                 self.queue.push_back(vec![Event::PointerMoved(p)]);
@@ -321,8 +293,7 @@ impl Script {
                 let p = need!(tgt(self, 1), w[1]);
                 self.set_mods(&w[2..]);
                 self.queue.push_back(vec![Event::PointerMoved(p)]);
-                self.queue
-                    .push_back(vec![self.button(p, PointerButton::Primary, true)]);
+                self.queue.push_back(vec![self.button(p, PointerButton::Primary, true)]);
                 true
             }
             "moveby" => {
@@ -330,8 +301,7 @@ impl Script {
                 self.set_mods(&w[3..]);
                 let start = self.pos;
                 for i in 1..=8 {
-                    self.queue
-                        .push_back(vec![Event::PointerMoved(start + d * i as f32 / 8.0)]);
+                    self.queue.push_back(vec![Event::PointerMoved(start + d * i as f32 / 8.0)]);
                 }
                 self.queue.push_back(vec![]);
                 true
@@ -340,8 +310,7 @@ impl Script {
                 let b = need!(tgt(self, 1), w[1]);
                 let a = self.pos;
                 for i in 1..=8 {
-                    self.queue
-                        .push_back(vec![Event::PointerMoved(a + (b - a) * i as f32 / 8.0)]);
+                    self.queue.push_back(vec![Event::PointerMoved(a + (b - a) * i as f32 / 8.0)]);
                 }
                 self.queue.push_back(vec![]);
                 true
@@ -349,8 +318,7 @@ impl Script {
             "release" => {
                 self.set_mods(&w[1..]);
                 let p = self.pos;
-                self.queue
-                    .push_back(vec![self.button(p, PointerButton::Primary, false)]);
+                self.queue.push_back(vec![self.button(p, PointerButton::Primary, false)]);
                 self.queue.push_back(vec![]);
                 self.queue.push_back(vec![]);
                 self.set_mods(&[]);
@@ -361,22 +329,16 @@ impl Script {
                 let (b, rest) = if w[0] == "drag" {
                     (need!(tgt(self, 2), w[2]), 3)
                 } else {
-                    (
-                        a + vec2(w[2].parse().unwrap_or(0.0), w[3].parse().unwrap_or(0.0)),
-                        4,
-                    )
+                    (a + vec2(w[2].parse().unwrap_or(0.0), w[3].parse().unwrap_or(0.0)), 4)
                 };
                 self.set_mods(&w[rest..]);
                 self.queue.push_back(vec![Event::PointerMoved(a)]);
-                self.queue
-                    .push_back(vec![self.button(a, PointerButton::Primary, true)]);
+                self.queue.push_back(vec![self.button(a, PointerButton::Primary, true)]);
                 for i in 1..=10 {
-                    self.queue
-                        .push_back(vec![Event::PointerMoved(a + (b - a) * i as f32 / 10.0)]);
+                    self.queue.push_back(vec![Event::PointerMoved(a + (b - a) * i as f32 / 10.0)]);
                 }
                 self.queue.push_back(vec![]);
-                self.queue
-                    .push_back(vec![self.button(b, PointerButton::Primary, false)]);
+                self.queue.push_back(vec![self.button(b, PointerButton::Primary, false)]);
                 self.queue.push_back(vec![]);
                 self.queue.push_back(vec![]);
                 true
@@ -385,20 +347,8 @@ impl Script {
                 let key = need!(Key::from_name(w[1]), w[1]);
                 self.set_mods(&w[2..]);
                 let m = self.mods;
-                self.queue.push_back(vec![Event::Key {
-                    key,
-                    physical_key: None,
-                    pressed: true,
-                    repeat: false,
-                    modifiers: m,
-                }]);
-                self.queue.push_back(vec![Event::Key {
-                    key,
-                    physical_key: None,
-                    pressed: false,
-                    repeat: false,
-                    modifiers: m,
-                }]);
+                self.queue.push_back(vec![Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers: m }]);
+                self.queue.push_back(vec![Event::Key { key, physical_key: None, pressed: false, repeat: false, modifiers: m }]);
                 self.queue.push_back(vec![]);
                 self.queue.push_back(vec![]);
                 true
@@ -409,13 +359,7 @@ impl Script {
             }
             "type" => {
                 let text = line[5..].to_string();
-                self.queue.push_back(vec![Event::Key {
-                    key: Key::A,
-                    physical_key: None,
-                    pressed: true,
-                    repeat: false,
-                    modifiers: Modifiers::COMMAND,
-                }]);
+                self.queue.push_back(vec![Event::Key { key: Key::A, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::COMMAND }]);
                 self.queue.push_back(vec![Event::Text(text)]);
                 self.queue.push_back(vec![]);
                 true
@@ -481,22 +425,14 @@ impl Script {
                     Some(Hit::Handle(r)) if p.routes[r].dst == c => "own handle".to_string(),
                     Some(Hit::Ring(_)) => "NEIGHBOUR ring".to_string(),
                     Some(Hit::Knob(_)) => "NEIGHBOUR body".to_string(),
-                    Some(h) => format!("{h:?}")
-                        .split('(')
-                        .next()
-                        .unwrap_or("?")
-                        .to_string(),
+                    Some(h) => format!("{h:?}").split('(').next().unwrap_or("?").to_string(),
                     None => "nothing".to_string(),
                 };
                 *arc.entry(key).or_default() += 1;
             }
         }
         let pct = |k: &str| 100.0 * *arc.get(k).unwrap_or(&0) as f32 / arc_n as f32;
-        let summary = arc
-            .iter()
-            .map(|(k, v)| format!("{k} {:.0}%", 100.0 * *v as f32 / arc_n as f32))
-            .collect::<Vec<_>>()
-            .join(", ");
+        let summary = arc.iter().map(|(k, v)| format!("{k} {:.0}%", 100.0 * *v as f32 / arc_n as f32)).collect::<Vec<_>>().join(", ");
         let msg = format!(
             "probe {} ({:?}, r {r}): cap {}/{} hit own knob; drawn arc: {summary}",
             p.ctl_def(c).id,
@@ -524,23 +460,14 @@ impl Script {
                     ("present", r) => check(r.is_some(), format!("{r:?}")),
                     ("amount", Some(r)) => {
                         let a = p.routes[r].amount;
-                        check(
-                            (a - f(4).unwrap_or(0.0)).abs() <= f(5).unwrap_or(0.005),
-                            format!("{a:.3}"),
-                        )
+                        check((a - f(4).unwrap_or(0.0)).abs() <= f(5).unwrap_or(0.005), format!("{a:.3}"))
                     }
-                    ("bypass", Some(r)) => check(
-                        p.routes[r].bypass.to_string() == w[4],
-                        p.routes[r].bypass.to_string(),
-                    ),
+                    ("bypass", Some(r)) => check(p.routes[r].bypass.to_string() == w[4], p.routes[r].bypass.to_string()),
                     (_, None) => (false, "route missing".into()),
                     _ => (false, "bad expect".into()),
                 }
             }
-            "routes" => check(
-                p.routes.len() == w[1].parse().unwrap_or(usize::MAX),
-                p.routes.len().to_string(),
-            ),
+            "routes" => check(p.routes.len() == w[1].parse().unwrap_or(usize::MAX), p.routes.len().to_string()),
             "value" => match find_ctl(p, w[1]) {
                 Some(c) => {
                     let v = model::to_value(&p.ctl_def(c).spec, p.modules[c.m].values[c.c]);
@@ -551,10 +478,7 @@ impl Script {
                 None => (false, "no control".into()),
             },
             "primary" => match find_ctl(p, w[1]) {
-                Some(c) => check(
-                    p.modules[c.m].primary[c.c].to_string() == w[2],
-                    p.modules[c.m].primary[c.c].to_string(),
-                ),
+                Some(c) => check(p.modules[c.m].primary[c.c].to_string() == w[2], p.modules[c.m].primary[c.c].to_string()),
                 None => (false, "no control".into()),
             },
             "visible" => match find_ctl(p, w[1]) {
@@ -565,33 +489,17 @@ impl Script {
                 None => (false, "no control".into()),
             },
             "expanded" => match find_mod(p, w[1]) {
-                Some(m) => check(
-                    app.geo.expanded[m].to_string() == w[2],
-                    app.geo.expanded[m].to_string(),
-                ),
+                Some(m) => check(app.geo.expanded[m].to_string() == w[2], app.geo.expanded[m].to_string()),
                 None => (false, "no module".into()),
             },
-            "cables" => check(
-                format!("{:?}", app.effective_cables().0) == w[1],
-                format!("{:?}", app.effective_cables().0),
-            ),
+            "cables" => check(format!("{:?}", app.effective_cables().0) == w[1], format!("{:?}", app.effective_cables().0)),
             "selected" => {
                 let want = find_mod(p, w[1]);
-                check(
-                    app.selected == want,
-                    format!("{:?}", app.selected.map(|m| mod_key(p, m))),
-                )
+                check(app.selected == want, format!("{:?}", app.selected.map(|m| mod_key(p, m))))
             }
             "inspect" => {
-                let want = if w[1] == "none" {
-                    None
-                } else {
-                    find_ctl(p, w[1])
-                };
-                check(
-                    app.inspect == want,
-                    format!("{:?}", app.inspect.map(|c| p.ctl_def(c).id)),
-                )
+                let want = if w[1] == "none" { None } else { find_ctl(p, w[1]) };
+                check(app.inspect == want, format!("{:?}", app.inspect.map(|c| p.ctl_def(c).id)))
             }
             "hit" => match self.target(app, w[1]) {
                 Some(s) => {
@@ -615,10 +523,7 @@ impl Script {
                 None => (false, "no mark".into()),
             },
             "same" => match &self.mark {
-                Some((pm, sel, ins)) => check(
-                    *pm == app.patch && *sel == app.selected && *ins == app.inspect,
-                    "patch/selection differ".into(),
-                ),
+                Some((pm, sel, ins)) => check(*pm == app.patch && *sel == app.selected && *ins == app.inspect, "patch/selection differ".into()),
                 None => (false, "no mark".into()),
             },
             "nooverlap" => {
@@ -633,9 +538,7 @@ impl Script {
                     let area = a.adv.map_or(a.rect, |x| a.rect.union(x));
                     for g in a.ctls.iter().flatten() {
                         let r = match *g {
-                            geom::CtlGeo::Knob { c, r } => {
-                                egui::Rect::from_center_size(c, vec2(2.0 * r, 2.0 * r))
-                            }
+                            geom::CtlGeo::Knob { c, r } => egui::Rect::from_center_size(c, vec2(2.0 * r, 2.0 * r)),
                             geom::CtlGeo::Select { rect } => rect,
                         };
                         if !area.contains_rect(r) {
@@ -652,10 +555,7 @@ impl Script {
                 }
                 None => (false, "no module".into()),
             },
-            "zoom" => check(
-                (app.zoom - f(1).unwrap_or(1.0)).abs() < 0.02,
-                format!("{:.2}", app.zoom),
-            ),
+            "zoom" => check((app.zoom - f(1).unwrap_or(1.0)).abs() < 0.02, format!("{:.2}", app.zoom)),
             _ => (false, "unknown expect".into()),
         };
         let msg = format!("{} → {got}", &line[7..]);
@@ -669,9 +569,6 @@ impl Script {
 
 impl App {
     pub fn toast_text(&self) -> String {
-        self.toast
-            .as_ref()
-            .map(|(s, _)| s.clone())
-            .unwrap_or_default()
+        self.toast.as_ref().map(|(s, _)| s.clone()).unwrap_or_default()
     }
 }

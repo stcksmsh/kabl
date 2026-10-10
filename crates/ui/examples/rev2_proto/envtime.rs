@@ -39,13 +39,8 @@ pub struct Scenario {
 }
 
 pub fn lfo_wave(idx: usize) -> LfoWaveform {
-    [
-        LfoWaveform::Sine,
-        LfoWaveform::Triangle,
-        LfoWaveform::Saw,
-        LfoWaveform::Square,
-        LfoWaveform::SampleAndHold,
-    ][idx.min(4)]
+    [LfoWaveform::Sine, LfoWaveform::Triangle, LfoWaveform::Saw, LfoWaveform::Square, LfoWaveform::SampleAndHold]
+        [idx.min(4)]
 }
 
 impl Scenario {
@@ -60,15 +55,7 @@ impl Scenario {
             lfo_hz,
             lfo_wave: lfo_wave(wave),
             amount,
-            notes: (0..8)
-                .map(|i| {
-                    (
-                        0.1 + i as f32 * 0.5,
-                        0.35,
-                        [45, 52, 57, 60, 64, 60, 57, 52][i],
-                    )
-                })
-                .collect(),
+            notes: (0..8).map(|i| (0.1 + i as f32 * 0.5, 0.35, [45, 52, 57, 60, 64, 60, 57, 52][i])).collect(),
             seconds: 4.4,
         }
     }
@@ -84,9 +71,7 @@ impl Scenario {
             lfo_hz: 2.3,
             lfo_wave: LfoWaveform::Sine,
             amount: 0.3,
-            notes: (0..4)
-                .map(|i| (0.1 + i as f32 * 2.0, 1.5, [45, 48, 52, 43][i]))
-                .collect(),
+            notes: (0..4).map(|i| (0.1 + i as f32 * 2.0, 1.5, [45, 48, 52, 43][i])).collect(),
             seconds: 8.6,
         }
     }
@@ -141,9 +126,7 @@ pub fn render(sc: &Scenario, policy: Policy) -> Render {
         }
         lfo_now = lfo.next(sc.lfo_hz, SR, sc.lfo_wave);
         let e = env.next(gate);
-        let hz = note
-            .map(|(_, _, m)| 440.0 * 2f32.powf((*m as f32 - 69.0) / 12.0))
-            .unwrap_or(110.0);
+        let hz = note.map(|(_, _, m)| 440.0 * 2f32.powf((*m as f32 - 69.0) / 12.0)).unwrap_or(110.0);
         let s = svf.process_with_coeffs(osc.next(hz, SR, OscWaveform::Saw), &coeffs);
         out_env.push(e);
         out_audio.push(0.5 * s * e);
@@ -153,18 +136,10 @@ pub fn render(sc: &Scenario, policy: Policy) -> Render {
         .iter()
         .map(|(s, l, _)| {
             let (a, b) = ((s * SR) as usize, (((s + l) * SR) as usize).min(n));
-            out_env[a..b]
-                .iter()
-                .position(|&e| e >= 0.9)
-                .map(|k| k as f32 / SR)
+            out_env[a..b].iter().position(|&e| e >= 0.9).map(|k| k as f32 / SR)
         })
         .collect();
-    Render {
-        env: out_env,
-        audio: out_audio,
-        attack_used,
-        rise_90,
-    }
+    Render { env: out_env, audio: out_audio, attack_used, rise_90 }
 }
 
 pub fn rms_diff(a: &[f32], b: &[f32]) -> f32 {
@@ -205,17 +180,11 @@ mod tests {
         let a2 = render(&sc, Policy::Continuous);
         assert_eq!(a1.audio, a2.audio, "render must be deterministic");
         let b = render(&sc, Policy::StageStart);
-        assert!(
-            rms_diff(&a1.env, &b.env) > 1e-3,
-            "policies should differ on the slow pad"
-        );
+        assert!(rms_diff(&a1.env, &b.env) > 1e-3, "policies should differ on the slow pad");
         // Zero amount: policies must be identical.
         let mut z = sc.clone();
         z.amount = 0.0;
-        assert_eq!(
-            render(&z, Policy::Continuous).env,
-            render(&z, Policy::StageStart).env
-        );
+        assert_eq!(render(&z, Policy::Continuous).env, render(&z, Policy::StageStart).env);
     }
 
     #[test]

@@ -102,9 +102,7 @@ pub fn param_class(kind: &str, name: &str) -> ParamClass {
         // The compiler picks the table (a slot's decoded wavetable); a change swaps graphs.
         ("osc.wt", "table" | "user") => ParamClass::Structural,
         // Changing the internal rate or the routing mid-note would click; a new graph crossfades.
-        ("osc.fm", "oversample") | ("osc.fm6", "oversample" | "algorithm") => {
-            ParamClass::Structural
-        }
+        ("osc.fm", "oversample") | ("osc.fm6", "oversample" | "algorithm") => ParamClass::Structural,
         _ => ParamClass::Runtime,
     }
 }

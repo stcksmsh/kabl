@@ -122,8 +122,7 @@ pub fn gate_probe() -> PatchEditor {
 #[test]
 #[ignore = "writes docs/midi-timing/fixtures/gate-probe"]
 fn write_gate_probe() {
-    let dir =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/midi-timing/fixtures/gate-probe");
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/midi-timing/fixtures/gate-probe");
     kabl_core::save(&dir, gate_probe().log()).unwrap();
 }
 

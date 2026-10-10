@@ -642,7 +642,7 @@ impl Module for Seq {
                 let b = &banks[s.bank as usize];
                 let on = b.gates[s.step] && s.play;
                 let ratchets = b.ratchets[s.step] as f32;
-                let step_len = step_len(&s.iv);
+                let step_len = if ratchets > 1.0 { step_len(&s.iv) } else { 0.0 };
                 s.gate_high = if ratchets > 1.0 && step_len > 0.0 {
                     on && ratchet_gate(
                         s.since as f32,

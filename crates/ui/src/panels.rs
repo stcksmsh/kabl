@@ -235,73 +235,68 @@ pub fn editor(editor: &mut PatchEditor, view: &mut UiState, ctx: &egui::Context)
         };
         let mut close = false;
         let modal = egui::Modal::new(egui::Id::new("panel-fallback"))
-            .area(crate::rack_editor::focused_area(
-                ctx,
-                egui::Id::new("panel-fallback"),
-                480.,
-            ))
+            .area(crate::rack_editor::focused_area(ctx, egui::Id::new("panel-fallback"), 480.))
             .show(ctx, |ui| {
-                crate::rack_editor::focused_height(ui);
-                ui.set_width(480.0_f32.min(ctx.content_rect().width() - 60.));
-                ui.horizontal(|ui| {
-                    ui.heading(format!("More controls · {}", c.name));
-                    let r = ui.button("Close");
-                    view.record("more:close".into(), r.rect);
-                    close = r.clicked();
-                });
-                egui::ScrollArea::vertical()
-                    .max_height(ui.available_height())
-                    .show_owned(ui, |ui| {
-                        ui.label(&c.help);
-                        ui.label(
+            crate::rack_editor::focused_height(ui);
+            ui.set_width(480.0_f32.min(ctx.content_rect().width() - 60.));
+            ui.horizontal(|ui| {
+                ui.heading(format!("More controls · {}", c.name));
+                let r = ui.button("Close");
+                view.record("more:close".into(), r.rect);
+                close = r.clicked();
+            });
+            egui::ScrollArea::vertical()
+                .max_height(ui.available_height())
+                .show_owned(ui, |ui| {
+                    ui.label(&c.help);
+                    ui.label(
                         "All exposed controls remain available regardless of artwork or placement.",
                     );
-                        for (&key, e) in &c.controls {
-                            if let PortRef::Param { id: leaf, param } = &e.target {
-                                if let Some(p) =
-                                    registry::info_for(&editor.state().modules[leaf].kind)
-                                        .and_then(|i| i.params.iter().find(|p| p.name == param))
-                                {
-                                    ui.label(&e.label);
-                                    crate::perform::param_editor(
-                                        editor,
-                                        view,
-                                        ui,
-                                        *leaf,
-                                        p,
-                                        false,
-                                        Some(format!("fallback:{id}:{key}")),
-                                    );
-                                }
+                    for (&key, e) in &c.controls {
+                        if let PortRef::Param { id: leaf, param } = &e.target {
+                            if let Some(p) = registry::info_for(&editor.state().modules[leaf].kind)
+                                .and_then(|i| i.params.iter().find(|p| p.name == param))
+                            {
+                                ui.label(&e.label);
+                                crate::perform::param_editor(
+                                    editor,
+                                    view,
+                                    ui,
+                                    *leaf,
+                                    p,
+                                    false,
+                                    Some(format!("fallback:{id}:{key}")),
+                                );
                             }
                         }
-                        for (&key, e) in &c.ports {
-                            let dir = composites::direction(editor.state(), &e.target)
-                                .unwrap_or(kabl_modules::PortDirection::Input);
-                            let r = ui.button(format!(
-                                "{} · {}",
-                                if dir == kabl_modules::PortDirection::Output {
-                                    "OUT"
-                                } else {
-                                    "IN"
-                                },
-                                e.label
-                            ));
-                            view.record(format!("fallback:{id}:port:{key}"), r.rect);
-                            if r.clicked() {
-                                if dir == kabl_modules::PortDirection::Output {
-                                    view.pending_output = Some(e.target.clone());
-                                } else if let Some(from) = view.pending_output.take() {
-                                    editor.connect(from, e.target.clone());
-                                }
+                    }
+                    for (&key, e) in &c.ports {
+                        let dir = composites::direction(editor.state(), &e.target)
+                            .unwrap_or(kabl_modules::PortDirection::Input);
+                        let r = ui.button(format!(
+                            "{} · {}",
+                            if dir == kabl_modules::PortDirection::Output {
+                                "OUT"
+                            } else {
+                                "IN"
+                            },
+                            e.label
+                        ));
+                        view.record(format!("fallback:{id}:port:{key}"), r.rect);
+                        if r.clicked() {
+                            if dir == kabl_modules::PortDirection::Output {
+                                view.pending_output = Some(e.target.clone());
+                            } else if let Some(from) = view.pending_output.take() {
+                                editor.connect(from, e.target.clone());
                             }
                         }
-                        if ui.button("Inspect internals / all routes").clicked() {
-                            view.enter_composite(editor.state(), id);
-                            close = true;
-                        }
-                    });
-            });
+                    }
+                    if ui.button("Inspect internals / all routes").clicked() {
+                        view.enter_composite(editor.state(), id);
+                        close = true;
+                    }
+                });
+        });
         if close || modal.should_close() {
             view.panels.fallback = None;
             view.last_inspected = view.inspected.clone();

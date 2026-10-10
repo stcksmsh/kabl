@@ -1,10 +1,7 @@
 //! Painter primitives shared by every direction: fonts, text, gradients, arcs, glow, icons.
 use crate::tokens::Tok;
 use egui::epaint::{Mesh, Shadow as EShadow};
-use egui::{
-    pos2, vec2, Align2, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId,
-    Painter, Pos2, Rect, Shape, Stroke, StrokeKind, Vec2,
-};
+use egui::{pos2, vec2, Align2, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Painter, Pos2, Rect, Shape, Stroke, StrokeKind, Vec2};
 use std::f32::consts::{PI, TAU};
 
 /// Everything a scene needs to draw one frame.
@@ -28,35 +25,20 @@ pub fn install_fonts(ctx: &egui::Context) {
     let faces: [(&str, &[u8]); 7] = [
         ("sans", include_bytes!("fonts/IBMPlexSans-Regular.ttf")),
         ("sans-med", include_bytes!("fonts/IBMPlexSans-Medium.ttf")),
-        (
-            "sans-semi",
-            include_bytes!("fonts/IBMPlexSans-SemiBold.ttf"),
-        ),
-        (
-            "cond-semi",
-            include_bytes!("fonts/IBMPlexSansCondensed-SemiBold.ttf"),
-        ),
-        (
-            "cond-med",
-            include_bytes!("fonts/IBMPlexSansCondensed-Medium.ttf"),
-        ),
+        ("sans-semi", include_bytes!("fonts/IBMPlexSans-SemiBold.ttf")),
+        ("cond-semi", include_bytes!("fonts/IBMPlexSansCondensed-SemiBold.ttf")),
+        ("cond-med", include_bytes!("fonts/IBMPlexSansCondensed-Medium.ttf")),
         ("mono", include_bytes!("fonts/IBMPlexMono-Regular.ttf")),
         ("mono-med", include_bytes!("fonts/IBMPlexMono-Medium.ttf")),
     ];
     for (name, bytes) in faces {
-        fd.font_data.insert(
-            name.into(),
-            std::sync::Arc::new(FontData::from_static(bytes)),
-        );
+        fd.font_data.insert(name.into(), std::sync::Arc::new(FontData::from_static(bytes)));
         let family = match name {
             "sans" => FontFamily::Proportional,
             "mono" => FontFamily::Monospace,
             n => FontFamily::Name(n.into()),
         };
-        fd.families
-            .entry(family)
-            .or_default()
-            .insert(0, name.into());
+        fd.families.entry(family).or_default().insert(0, name.into());
     }
     ctx.set_fonts(fd);
 }
@@ -72,11 +54,7 @@ pub fn mix(x: Color32, y: Color32, t: f32) -> Color32 {
 pub fn lum(c: Color32) -> f32 {
     let f = |v: u8| {
         let v = v as f32 / 255.0;
-        if v <= 0.03928 {
-            v / 12.92
-        } else {
-            ((v + 0.055) / 1.055).powf(2.4)
-        }
+        if v <= 0.03928 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
     };
     0.2126 * f(c.r()) + 0.7152 * f(c.g()) + 0.0722 * f(c.b())
 }
@@ -101,10 +79,7 @@ impl Cx<'_> {
     }
 
     pub fn width(&self, s: &str, size: f32, f: &str) -> f32 {
-        self.p
-            .layout_no_wrap(s.to_string(), FontId::new(size, fam(f)), Color32::WHITE)
-            .size()
-            .x
+        self.p.layout_no_wrap(s.to_string(), FontId::new(size, fam(f)), Color32::WHITE).size().x
     }
 
     /// Text clipped with an ellipsis to `maxw`.
@@ -124,21 +99,9 @@ impl Cx<'_> {
     }
 
     /// Letter-spaced upper-case label.
-    pub fn caps(
-        &self,
-        pos: Pos2,
-        al: Align2,
-        s: &str,
-        size: f32,
-        f: &str,
-        c: Color32,
-        track: f32,
-    ) -> f32 {
+    pub fn caps(&self, pos: Pos2, al: Align2, s: &str, size: f32, f: &str, c: Color32, track: f32) -> f32 {
         let s = s.to_uppercase();
-        let ws: Vec<f32> = s
-            .chars()
-            .map(|ch| self.width(&ch.to_string(), size, f))
-            .collect();
+        let ws: Vec<f32> = s.chars().map(|ch| self.width(&ch.to_string(), size, f)).collect();
         let total: f32 = ws.iter().sum::<f32>() + track * (ws.len().saturating_sub(1)) as f32;
         let x0 = match al.x() {
             egui::Align::Min => pos.x,
@@ -147,13 +110,7 @@ impl Cx<'_> {
         };
         let mut x = x0;
         for (ch, w) in s.chars().zip(&ws) {
-            self.p.text(
-                pos2(x, pos.y),
-                Align2([egui::Align::Min, al.y()]),
-                ch,
-                FontId::new(size, fam(f)),
-                c,
-            );
+            self.p.text(pos2(x, pos.y), Align2([egui::Align::Min, al.y()]), ch, FontId::new(size, fam(f)), c);
             x += w + track;
         }
         total
@@ -164,12 +121,7 @@ impl Cx<'_> {
         if s.alpha == 0 {
             return;
         }
-        let sh = EShadow {
-            offset: [0, s.dy as i8],
-            blur: s.blur as u8,
-            spread: 0,
-            color: Color32::from_black_alpha(s.alpha),
-        };
+        let sh = EShadow { offset: [0, s.dy as i8], blur: s.blur as u8, spread: 0, color: Color32::from_black_alpha(s.alpha) };
         self.p.add(sh.as_shape(r, CornerRadius::same(rad as u8)));
     }
 
@@ -188,10 +140,7 @@ impl Cx<'_> {
         }
         self.p.add(Shape::mesh(m));
         // Mesh edges are not anti-aliased, so ring them.
-        self.p.add(Shape::closed_line(
-            pts,
-            Stroke::new(1.0, mix(top, bot, 0.5)),
-        ));
+        self.p.add(Shape::closed_line(pts, Stroke::new(1.0, mix(top, bot, 0.5))));
     }
 
     pub fn rr(&self, r: Rect, rad: f32, fill: Color32) {
@@ -199,37 +148,27 @@ impl Cx<'_> {
     }
 
     pub fn rr_stroke(&self, r: Rect, rad: f32, w: f32, c: Color32) {
-        self.p.rect_stroke(
-            r,
-            CornerRadius::same(rad as u8),
-            Stroke::new(w, c),
-            StrokeKind::Inside,
-        );
+        self.p.rect_stroke(r, CornerRadius::same(rad as u8), Stroke::new(w, c), StrokeKind::Inside);
     }
 
     pub fn arc(&self, c: Pos2, r: f32, a0: f32, a1: f32, w: f32, col: Color32) {
         if (a1 - a0).abs() < 1e-3 {
             return;
         }
-        self.p
-            .add(Shape::line(arc_pts(c, r, a0, a1), Stroke::new(w, col)));
+        self.p.add(Shape::line(arc_pts(c, r, a0, a1), Stroke::new(w, col)));
     }
 
     /// Soft halo: wider, fainter strokes under the line.
     pub fn glow_line(&self, pts: Vec<Pos2>, w: f32, col: Color32, strength: f32) {
         for (m, al) in [(3.4, 0.10), (2.2, 0.18), (1.5, 0.30)] {
-            self.p.add(Shape::line(
-                pts.clone(),
-                Stroke::new(w * m, a(col, (255.0 * al * strength) as u8)),
-            ));
+            self.p.add(Shape::line(pts.clone(), Stroke::new(w * m, a(col, (255.0 * al * strength) as u8))));
         }
         self.p.add(Shape::line(pts, Stroke::new(w, col)));
     }
 
     pub fn glow_dot(&self, c: Pos2, r: f32, col: Color32, strength: f32) {
         for (m, al) in [(3.0, 0.08), (2.2, 0.14), (1.6, 0.26)] {
-            self.p
-                .circle_filled(c, r * m, a(col, (255.0 * al * strength) as u8));
+            self.p.circle_filled(c, r * m, a(col, (255.0 * al * strength) as u8));
         }
         self.p.circle_filled(c, r, col);
     }
@@ -287,10 +226,7 @@ pub fn cable_pts(p0: Pos2, p1: Pos2, sag: f32) -> Vec<Pos2> {
         .map(|i| {
             let t = i as f32 / 40.0;
             let u = 1.0 - t;
-            let q = p0.to_vec2() * u * u * u
-                + c0.to_vec2() * 3.0 * u * u * t
-                + c1.to_vec2() * 3.0 * u * t * t
-                + p1.to_vec2() * t * t * t;
+            let q = p0.to_vec2() * u * u * u + c0.to_vec2() * 3.0 * u * u * t + c1.to_vec2() * 3.0 * u * t * t + p1.to_vec2() * t * t * t;
             q.to_pos2()
         })
         .collect()
@@ -349,11 +285,7 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, s: f32, col: Color32) {
     };
     match ic {
         Ic::Play => {
-            p.add(Shape::convex_polygon(
-                vec![q(-4.0, -6.0), q(6.0, 0.0), q(-4.0, 6.0)],
-                col,
-                Stroke::NONE,
-            ));
+            p.add(Shape::convex_polygon(vec![q(-4.0, -6.0), q(6.0, 0.0), q(-4.0, 6.0)], col, Stroke::NONE));
         }
         Ic::Stop => {
             p.rect_filled(Rect::from_center_size(c, vec2(10.0, 10.0) * u), 1.5, col);
@@ -371,14 +303,7 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, s: f32, col: Color32) {
                 .collect();
             let s0 = pts[0];
             p.add(Shape::line(pts, st));
-            p.add(Shape::line(
-                vec![
-                    s0 + vec2(-3.2 * f, -0.5) * u,
-                    s0 + vec2(0.0, 3.4 * u),
-                    s0 + vec2(3.2 * f * u, -0.5 * u),
-                ],
-                st,
-            ));
+            p.add(Shape::line(vec![s0 + vec2(-3.2 * f, -0.5) * u, s0 + vec2(0.0, 3.4 * u), s0 + vec2(3.2 * f * u, -0.5 * u)], st));
         }
         Ic::Search => {
             p.circle_stroke(q(-1.5, -1.5), 4.6 * u, st);
@@ -405,24 +330,14 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, s: f32, col: Color32) {
         Ic::Minus => line(&[(-6.0, 0.0), (6.0, 0.0)]),
         Ic::Fit => {
             for (sx, sy) in [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)] {
-                line(&[
-                    (sx * 7.0, sy * 3.0),
-                    (sx * 7.0, sy * 7.0),
-                    (sx * 3.0, sy * 7.0),
-                ]);
+                line(&[(sx * 7.0, sy * 3.0), (sx * 7.0, sy * 7.0), (sx * 3.0, sy * 7.0)]);
             }
         }
         Ic::Gear => {
             p.circle_stroke(c, 2.8 * u, st);
             for i in 0..8 {
                 let a = i as f32 * TAU / 8.0;
-                p.line_segment(
-                    [
-                        c + vec2(a.cos(), a.sin()) * 5.2 * u,
-                        c + vec2(a.cos(), a.sin()) * 7.2 * u,
-                    ],
-                    Stroke::new(w * 1.5, col),
-                );
+                p.line_segment([c + vec2(a.cos(), a.sin()) * 5.2 * u, c + vec2(a.cos(), a.sin()) * 7.2 * u], Stroke::new(w * 1.5, col));
             }
             p.circle_stroke(c, 5.4 * u, st);
         }
@@ -433,69 +348,25 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, s: f32, col: Color32) {
             line(&[(4.5, -4.5), (-4.5, 4.5)]);
         }
         Ic::Folder => {
-            p.add(Shape::closed_line(
-                vec![
-                    q(-7.0, -4.0),
-                    q(-2.0, -4.0),
-                    q(0.0, -2.0),
-                    q(7.0, -2.0),
-                    q(7.0, 5.0),
-                    q(-7.0, 5.0),
-                ],
-                st,
-            ));
+            p.add(Shape::closed_line(vec![q(-7.0, -4.0), q(-2.0, -4.0), q(0.0, -2.0), q(7.0, -2.0), q(7.0, 5.0), q(-7.0, 5.0)], st));
         }
         Ic::Cable => {
             p.circle_stroke(q(-5.0, -4.0), 2.2 * u, st);
             p.circle_stroke(q(5.0, 4.0), 2.2 * u, st);
-            p.add(Shape::line(
-                cable_pts(q(-5.0, -2.0), q(5.0, 2.0), 5.0 * u),
-                st,
-            ));
+            p.add(Shape::line(cable_pts(q(-5.0, -2.0), q(5.0, 2.0), 5.0 * u), st));
         }
         Ic::Eye => {
-            p.add(Shape::line(
-                arc_pts(q(0.0, 5.0), 9.0 * u, PI * 1.2, PI * 1.8),
-                st,
-            ));
-            p.add(Shape::line(
-                arc_pts(q(0.0, -5.0), 9.0 * u, PI * 0.2, PI * 0.8),
-                st,
-            ));
+            p.add(Shape::line(arc_pts(q(0.0, 5.0), 9.0 * u, PI * 1.2, PI * 1.8), st));
+            p.add(Shape::line(arc_pts(q(0.0, -5.0), 9.0 * u, PI * 0.2, PI * 0.8), st));
             p.circle_filled(c, 2.2 * u, col);
         }
         Ic::Bolt => {
-            p.add(Shape::convex_polygon(
-                vec![
-                    q(1.0, -7.0),
-                    q(-5.0, 1.0),
-                    q(-0.5, 1.0),
-                    q(-1.0, 7.0),
-                    q(5.0, -1.5),
-                    q(0.5, -1.5),
-                ],
-                col,
-                Stroke::NONE,
-            ));
+            p.add(Shape::convex_polygon(vec![q(1.0, -7.0), q(-5.0, 1.0), q(-0.5, 1.0), q(-1.0, 7.0), q(5.0, -1.5), q(0.5, -1.5)], col, Stroke::NONE));
         }
         Ic::Save => {
-            p.add(Shape::closed_line(
-                vec![
-                    q(-6.0, -6.0),
-                    q(4.0, -6.0),
-                    q(6.0, -4.0),
-                    q(6.0, 6.0),
-                    q(-6.0, 6.0),
-                ],
-                st,
-            ));
+            p.add(Shape::closed_line(vec![q(-6.0, -6.0), q(4.0, -6.0), q(6.0, -4.0), q(6.0, 6.0), q(-6.0, 6.0)], st));
             line(&[(-3.0, -6.0), (-3.0, -2.0), (2.0, -2.0), (2.0, -6.0)]);
-            p.rect_stroke(
-                Rect::from_center_size(q(0.0, 3.5), vec2(7.0, 4.0) * u),
-                0.0,
-                st,
-                StrokeKind::Middle,
-            );
+            p.rect_stroke(Rect::from_center_size(q(0.0, 3.5), vec2(7.0, 4.0) * u), 0.0, st, StrokeKind::Middle);
         }
         Ic::Dots => {
             for dx in [-5.0, 0.0, 5.0] {
@@ -511,44 +382,22 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, s: f32, col: Color32) {
             p.circle_stroke(q(3.0, 0.0), 3.6 * u, st);
         }
         Ic::Panel => {
-            p.rect_stroke(
-                Rect::from_center_size(c, vec2(14.0, 12.0) * u),
-                2.0,
-                st,
-                StrokeKind::Middle,
-            );
+            p.rect_stroke(Rect::from_center_size(c, vec2(14.0, 12.0) * u), 2.0, st, StrokeKind::Middle);
             line(&[(3.0, -6.0), (3.0, 6.0)]);
         }
         Ic::Learn => {
-            p.add(Shape::closed_line(
-                vec![q(-7.0, -2.0), q(0.0, -6.0), q(7.0, -2.0), q(0.0, 2.0)],
-                st,
-            ));
+            p.add(Shape::closed_line(vec![q(-7.0, -2.0), q(0.0, -6.0), q(7.0, -2.0), q(0.0, 2.0)], st));
             line(&[(-4.0, 0.5), (-4.0, 4.5), (0.0, 6.5), (4.0, 4.5), (4.0, 0.5)]);
         }
         Ic::Warn => {
-            p.add(Shape::closed_line(
-                vec![q(0.0, -7.0), q(7.0, 6.0), q(-7.0, 6.0)],
-                st,
-            ));
+            p.add(Shape::closed_line(vec![q(0.0, -7.0), q(7.0, 6.0), q(-7.0, 6.0)], st));
             line(&[(0.0, -2.0), (0.0, 2.0)]);
             p.circle_filled(q(0.0, 4.2), 0.9 * u, col);
         }
         Ic::Check => line(&[(-5.0, 0.0), (-1.5, 4.0), (5.5, -4.0)]),
         Ic::Dice => {
-            p.rect_stroke(
-                Rect::from_center_size(c, vec2(13.0, 13.0) * u),
-                3.0,
-                st,
-                StrokeKind::Middle,
-            );
-            for (x, y) in [
-                (-3.0, -3.0),
-                (3.0, 3.0),
-                (0.0, 0.0),
-                (3.0, -3.0),
-                (-3.0, 3.0),
-            ] {
+            p.rect_stroke(Rect::from_center_size(c, vec2(13.0, 13.0) * u), 3.0, st, StrokeKind::Middle);
+            for (x, y) in [(-3.0, -3.0), (3.0, 3.0), (0.0, 0.0), (3.0, -3.0), (-3.0, 3.0)] {
                 p.circle_filled(q(x, y), 1.0 * u, col);
             }
         }

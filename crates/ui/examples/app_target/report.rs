@@ -7,8 +7,7 @@ pub fn check() {
         for dark in [false, true] {
             let k = tok(dir, dark);
             let mut rows: Vec<(String, f32, f32)> = vec![];
-            let mut add =
-                |n: &str, fg, bg, min: f32| rows.push((n.to_string(), contrast(fg, bg), min));
+            let mut add = |n: &str, fg, bg, min: f32| rows.push((n.to_string(), contrast(fg, bg), min));
             add("text/surface", k.text, k.surface, 4.5);
             add("text/bg", k.text, k.bg, 4.5);
             add("text2/surface", k.text2, k.surface, 4.5);
@@ -26,11 +25,7 @@ pub fn check() {
             }
             println!("== {} {}", dir.title(), if dark { "dark" } else { "light" });
             for (n, c, m) in rows {
-                let verdict = if c >= m {
-                    "ok".to_string()
-                } else {
-                    format!("FAIL (min {m})")
-                };
+                let verdict = if c >= m { "ok".to_string() } else { format!("FAIL (min {m})") };
                 println!("  {:<42} {:>5.2}  {}", n, c, verdict);
             }
         }
@@ -85,21 +80,12 @@ pub fn tokens_md() {
             println!("\n### Module face families\n\n| section | base | ink | ink2 | ink/base contrast |\n|---|---|---|---|---|");
             for s in Sect::ALL {
                 let f = k.sect(s);
-                println!(
-                    "| {} | `{}` | `{}` | `{}` | {:.1} |",
-                    s.name(),
-                    hex(f.base),
-                    hex(f.ink),
-                    hex(f.ink2),
-                    contrast(f.ink, f.base)
-                );
+                println!("| {} | `{}` | `{}` | `{}` | {:.1} |", s.name(), hex(f.base), hex(f.ink), hex(f.ink2), contrast(f.ink, f.base));
             }
             println!();
         }
         let k = tok(dir, false);
-        println!(
-            "## Type scale (IBM Plex, OFL-1.1)\n\n| step | size | face | role |\n|---|---|---|---|"
-        );
+        println!("## Type scale (IBM Plex, OFL-1.1)\n\n| step | size | face | role |\n|---|---|---|---|");
         for t in k.type_scale() {
             let fam = match t.fam {
                 "sans" => "Plex Sans Regular",
@@ -114,30 +100,12 @@ pub fn tokens_md() {
         }
         println!("\nNo text below 11 px at any zoom; faces keep an 11 px floor when the rack is zoomed out.\n");
         println!("## Spacing, radii, shadows, motion\n");
-        println!(
-            "Spacing scale (px): {}\n",
-            SPACING
-                .iter()
-                .map(|s| format!("{s}"))
-                .collect::<Vec<_>>()
-                .join(" · ")
-        );
-        println!(
-            "Radii: small {} · medium {} · large {} px\n",
-            k.r_sm, k.r_md, k.r_lg
-        );
-        println!(
-            "| shadow | offset y | blur | alpha (light) | alpha (dark) |\n|---|---|---|---|---|"
-        );
+        println!("Spacing scale (px): {}\n", SPACING.iter().map(|s| format!("{s}")).collect::<Vec<_>>().join(" · "));
+        println!("Radii: small {} · medium {} · large {} px\n", k.r_sm, k.r_md, k.r_lg);
+        println!("| shadow | offset y | blur | alpha (light) | alpha (dark) |\n|---|---|---|---|---|");
         let kd = tok(dir, true);
-        for (i, n) in ["sm (controls)", "md (cards, faces)", "lg (popovers)"]
-            .iter()
-            .enumerate()
-        {
-            println!(
-                "| {n} | {} | {} | {} | {} |",
-                k.sh[i].dy, k.sh[i].blur, k.sh[i].alpha, kd.sh[i].alpha
-            );
+        for (i, n) in ["sm (controls)", "md (cards, faces)", "lg (popovers)"].iter().enumerate() {
+            println!("| {n} | {} | {} | {} | {} |", k.sh[i].dy, k.sh[i].blur, k.sh[i].alpha, kd.sh[i].alpha);
         }
         let m = k.motion;
         println!("\n| motion | duration | easing |\n|---|---|---|");
@@ -145,10 +113,7 @@ pub fn tokens_md() {
         println!("| press | {} ms | linear |", m.press_ms);
         println!("| drawer / popover | {} ms | ease-out cubic |", m.drawer_ms);
         println!("| view switch | {} ms | ease-out cubic |", m.view_ms);
-        println!(
-            "| value glide (knob, display) | {} ms | ease-out cubic |",
-            m.glide_ms
-        );
+        println!("| value glide (knob, display) | {} ms | ease-out cubic |", m.glide_ms);
         println!("| cue / beat pulse | {} ms | triangle |", m.pulse_ms);
         println!("| displays (scope, curves, rings) | every frame, display refresh | n/a |");
         println!("| cable signal beads | 90 px/s | linear |\n");

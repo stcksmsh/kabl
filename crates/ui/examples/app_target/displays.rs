@@ -19,12 +19,7 @@ pub fn frame(cx: &Cx, r: Rect, grid: (usize, usize)) -> Rect {
     }
     cx.rr(r, rad, k.disp_bg);
     if k.dir == Dir::A {
-        cx.grad(
-            Rect::from_min_size(r.min, vec2(r.width(), 9.0)),
-            rad,
-            Color32::from_black_alpha(90),
-            Color32::from_black_alpha(0),
-        );
+        cx.grad(Rect::from_min_size(r.min, vec2(r.width(), 9.0)), rad, Color32::from_black_alpha(90), Color32::from_black_alpha(0));
     }
     let inner = r.shrink2(vec2(6.0, 6.0));
     let gc = a(k.disp_grid, if k.dir == Dir::C { 255 } else { 190 });
@@ -109,12 +104,7 @@ pub fn scope(cx: &Cx, r: Rect, kind: usize, cycles: f32) {
     let k = cx.k;
     let p = frame(cx, r, (8, 4));
     let mid = p.center().y;
-    cx.line(
-        pos2(p.left(), mid),
-        pos2(p.right(), mid),
-        1.0,
-        a(k.disp_grid, 255),
-    );
+    cx.line(pos2(p.left(), mid), pos2(p.right(), mid), 1.0, a(k.disp_grid, 255));
     let amp = p.height() * 0.42 * (0.78 + 0.22 * (cx.t * 0.9).sin());
     let cyc = cycles + 0.35 * (cx.t * 0.5).sin();
     let n = p.width() as usize;
@@ -149,23 +139,16 @@ pub fn lfo_view(cx: &Cx, r: Rect, kind: usize, hz: f32) {
             kk => wave(kk, ph),
         }
     };
-    let pts: Vec<Pos2> = (0..=n)
-        .map(|i| {
-            let x = i as f32 / n as f32;
-            pos2(p.left() + x * p.width(), mid - sh(x * cyc) * amp)
-        })
-        .collect();
+    let pts: Vec<Pos2> = (0..=n).map(|i| {
+        let x = i as f32 / n as f32;
+        pos2(p.left() + x * p.width(), mid - sh(x * cyc) * amp)
+    }).collect();
     fill_under(cx, &pts, mid, k.cv, 60);
     trace(cx, pts, k.cv, 1.8);
     let ph = (cx.t * hz).fract() * cyc;
     let xx = ph / cyc;
     let dot = pos2(p.left() + xx * p.width(), mid - sh(ph) * amp);
-    cx.line(
-        pos2(dot.x, p.top()),
-        pos2(dot.x, p.bottom()),
-        1.0,
-        a(k.cv, 90),
-    );
+    cx.line(pos2(dot.x, p.top()), pos2(dot.x, p.bottom()), 1.0, a(k.cv, 90));
     cx.glow_dot(dot, 3.0, Color32::WHITE, 0.7);
 }
 
@@ -203,18 +186,12 @@ pub fn env_value(e: &Adsr, x: f32) -> f32 {
 pub fn env_view(cx: &Cx, r: Rect, e: &Adsr) {
     let k = cx.k;
     let p = frame(cx, r, (6, 2));
-    let plot = Rect::from_min_max(
-        pos2(p.left() + 2.0, p.top() + 4.0),
-        pos2(p.right() - 2.0, p.bottom() - 14.0),
-    );
+    let plot = Rect::from_min_max(pos2(p.left() + 2.0, p.top() + 4.0), pos2(p.right() - 2.0, p.bottom() - 14.0));
     let n = plot.width() as usize;
     let pts: Vec<Pos2> = (0..=n)
         .map(|i| {
             let x = i as f32 / n as f32;
-            pos2(
-                plot.left() + x * plot.width(),
-                plot.bottom() - env_value(e, x) * plot.height(),
-            )
+            pos2(plot.left() + x * plot.width(), plot.bottom() - env_value(e, x) * plot.height())
         })
         .collect();
     fill_under(cx, &pts, plot.bottom(), k.disp_trace, 80);
@@ -230,46 +207,16 @@ pub fn env_view(cx: &Cx, r: Rect, e: &Adsr) {
     for i in 0..4 {
         let x0 = plot.left() + edges[i] * plot.width();
         if i > 0 {
-            cx.line(
-                pos2(x0, plot.top()),
-                pos2(x0, plot.bottom() + 2.0),
-                1.0,
-                a(k.disp_grid, 255),
-            );
+            cx.line(pos2(x0, plot.top()), pos2(x0, plot.bottom() + 2.0), 1.0, a(k.disp_grid, 255));
         }
         let xm = plot.left() + (edges[i] + edges[i + 1]) / 2.0 * plot.width();
         let on = i == stage;
-        cx.text(
-            pos2(xm, p.bottom() - 2.0),
-            Align2::CENTER_BOTTOM,
-            names[i],
-            10.5,
-            "sans-semi",
-            if on {
-                k.disp_trace
-            } else {
-                a(k.disp_text, 150)
-            },
-        );
+        cx.text(pos2(xm, p.bottom() - 2.0), Align2::CENTER_BOTTOM, names[i], 10.5, "sans-semi", if on { k.disp_trace } else { a(k.disp_text, 150) });
     }
     let px = plot.left() + pos * plot.width();
     let v = env_value(e, pos);
-    cx.line(
-        pos2(px, plot.top()),
-        pos2(px, plot.bottom()),
-        1.0,
-        a(k.disp_trace, 110),
-    );
-    cx.glow_dot(
-        pos2(px, plot.bottom() - v * plot.height()),
-        3.2,
-        if k.dir == Dir::C {
-            k.accent
-        } else {
-            Color32::WHITE
-        },
-        0.8,
-    );
+    cx.line(pos2(px, plot.top()), pos2(px, plot.bottom()), 1.0, a(k.disp_trace, 110));
+    cx.glow_dot(pos2(px, plot.bottom() - v * plot.height()), 3.2, if k.dir == Dir::C { k.accent } else { Color32::WHITE }, 0.8);
 }
 
 fn svf_db(f: f32, fc: f32, q: f32, mode: usize) -> f32 {
@@ -308,22 +255,8 @@ pub fn filter_view(cx: &Cx, r: Rect, cutoff: f32, res: f32, sweep: f32, mode: us
         let out_db = resp(f, fc);
         let oh = (h * 10f32.powf(out_db.min(6.0) / 20.0)).min(plot.height() * 0.95);
         let w = plot.width() / cols as f32 * 0.7;
-        cx.p.rect_filled(
-            Rect::from_min_max(
-                pos2(x - w / 2.0, plot.bottom() - h),
-                pos2(x + w / 2.0, plot.bottom()),
-            ),
-            0.0,
-            a(k.disp_text, 30),
-        );
-        cx.p.rect_filled(
-            Rect::from_min_max(
-                pos2(x - w / 2.0, plot.bottom() - oh),
-                pos2(x + w / 2.0, plot.bottom()),
-            ),
-            0.0,
-            a(k.disp_trace, if k.dir == Dir::C { 70 } else { 55 }),
-        );
+        cx.p.rect_filled(Rect::from_min_max(pos2(x - w / 2.0, plot.bottom() - h), pos2(x + w / 2.0, plot.bottom())), 0.0, a(k.disp_text, 30));
+        cx.p.rect_filled(Rect::from_min_max(pos2(x - w / 2.0, plot.bottom() - oh), pos2(x + w / 2.0, plot.bottom())), 0.0, a(k.disp_trace, if k.dir == Dir::C { 70 } else { 55 }));
     }
     // Swept extremes and live curve.
     let n = plot.width() as usize;
@@ -336,31 +269,14 @@ pub fn filter_view(cx: &Cx, r: Rect, cutoff: f32, res: f32, sweep: f32, mode: us
             .collect()
     };
     for s in [-1.0f32, 1.0] {
-        cx.p.add(Shape::line(
-            curve(cutoff * 2f32.powf(sweep * s)),
-            Stroke::new(1.0, a(k.disp_text, 70)),
-        ));
+        cx.p.add(Shape::line(curve(cutoff * 2f32.powf(sweep * s)), Stroke::new(1.0, a(k.disp_text, 70))));
     }
     let pts = curve(fc);
     fill_under(cx, &pts, plot.bottom(), k.disp_trace, 60);
     trace(cx, pts, k.disp_trace, 2.0);
     let x = fx(fc).clamp(plot.left(), plot.right());
-    cx.line(
-        pos2(x, plot.top()),
-        pos2(x, plot.bottom()),
-        1.0,
-        a(k.disp_trace, 120),
-    );
-    cx.glow_dot(
-        pos2(x, ydb(resp(fc, fc))),
-        3.2,
-        if k.dir == Dir::C {
-            k.accent
-        } else {
-            Color32::WHITE
-        },
-        0.8,
-    );
+    cx.line(pos2(x, plot.top()), pos2(x, plot.bottom()), 1.0, a(k.disp_trace, 120));
+    cx.glow_dot(pos2(x, ydb(resp(fc, fc))), 3.2, if k.dir == Dir::C { k.accent } else { Color32::WHITE }, 0.8);
 }
 
 fn wt_frame(m: f32, ph: f32, warp: f32) -> f32 {
@@ -370,15 +286,7 @@ fn wt_frame(m: f32, ph: f32, warp: f32) -> f32 {
     let mut s = 0.0;
     for h in 1..=hmax {
         let hf = h as f32;
-        let w = if m < 0.6 {
-            1.0 / hf
-        } else {
-            if h % 2 == 1 {
-                1.0 / hf
-            } else {
-                0.15 / hf
-            }
-        };
+        let w = if m < 0.6 { 1.0 / hf } else { if h % 2 == 1 { 1.0 / hf } else { 0.15 / hf } };
         let fade = if h == hmax { (m * 14.0).fract() } else { 1.0 };
         s += (ph * TAU * hf + 0.4 * hf * m).sin() * w * fade;
     }
@@ -400,55 +308,27 @@ pub fn wavetable_view(cx: &Cx, r: Rect, pos: f32, warp: f32, frames: usize) {
         let m = fi as f32 / (frames - 1) as f32;
         let off = depth * (1.0 - m);
         let lit = (fi as f32 - cur).abs();
-        let pts: Vec<Pos2> = (0..=n)
-            .map(|i| {
-                let x = i as f32 / n as f32;
-                pos2(
-                    base.x + off.x + x * wdt,
-                    base.y + off.y - wt_frame(m, x, warp) * amp,
-                )
-            })
-            .collect();
+        let pts: Vec<Pos2> = (0..=n).map(|i| {
+            let x = i as f32 / n as f32;
+            pos2(base.x + off.x + x * wdt, base.y + off.y - wt_frame(m, x, warp) * amp)
+        }).collect();
         if lit < 0.5 {
             continue;
         }
         let near = (1.0 - lit / frames as f32).powi(2);
-        let col = if k.dir == Dir::C {
-            k.disp_text
-        } else {
-            k.disp_trace
-        };
-        cx.p.add(Shape::line(
-            pts,
-            Stroke::new(1.1, a(col, (40.0 + 80.0 * near) as u8)),
-        ));
+        let col = if k.dir == Dir::C { k.disp_text } else { k.disp_trace };
+        cx.p.add(Shape::line(pts, Stroke::new(1.1, a(col, (40.0 + 80.0 * near) as u8))));
     }
     let m = pos;
     let off = depth * (1.0 - m);
-    let pts: Vec<Pos2> = (0..=n)
-        .map(|i| {
-            let x = i as f32 / n as f32;
-            pos2(
-                base.x + off.x + x * wdt,
-                base.y + off.y - wt_frame(m, x, warp) * amp,
-            )
-        })
-        .collect();
+    let pts: Vec<Pos2> = (0..=n).map(|i| {
+        let x = i as f32 / n as f32;
+        pos2(base.x + off.x + x * wdt, base.y + off.y - wt_frame(m, x, warp) * amp)
+    }).collect();
     fill_under(cx, &pts, base.y + off.y + amp * 0.2, k.disp_trace, 70);
-    let col = if k.dir == Dir::C {
-        k.accent
-    } else {
-        k.disp_trace
-    };
+    let col = if k.dir == Dir::C { k.accent } else { k.disp_trace };
     trace(cx, pts, col, 2.3);
-    cx.text(
-        pos2(p.right() - 2.0, p.top() + 2.0),
-        Align2::RIGHT_TOP,
-        &format!("frame {:02}/{}", cur.round() as usize + 1, frames),
-        10.5,
-        "mono-med",
-        a(k.disp_text, 200),
-    );
+    cx.text(pos2(p.right() - 2.0, p.top() + 2.0), Align2::RIGHT_TOP, &format!("frame {:02}/{}", cur.round() as usize + 1, frames), 10.5, "mono-med", a(k.disp_text, 200));
 }
 
 /// Flat single-cycle wave of the current frame with a phase dot.
@@ -458,12 +338,10 @@ pub fn wt_cycle(cx: &Cx, r: Rect, pos: f32, warp: f32) {
     let mid = p.center().y;
     let n = p.width() as usize;
     let amp = p.height() * 0.4;
-    let pts: Vec<Pos2> = (0..=n)
-        .map(|i| {
-            let x = i as f32 / n as f32;
-            pos2(p.left() + x * p.width(), mid - wt_frame(pos, x, warp) * amp)
-        })
-        .collect();
+    let pts: Vec<Pos2> = (0..=n).map(|i| {
+        let x = i as f32 / n as f32;
+        pos2(p.left() + x * p.width(), mid - wt_frame(pos, x, warp) * amp)
+    }).collect();
     trace(cx, pts, k.disp_trace, 1.8);
 }
 
@@ -478,27 +356,11 @@ pub fn step_lane(cx: &Cx, r: Rect, vals: &[f32], probs: &[f32], playing: usize, 
         let on = vals[i] > 0.0;
         let h = (vals[i].max(0.08)) * r.height();
         let bar = Rect::from_min_max(pos2(x, r.bottom() - h), pos2(x + w, r.bottom()));
-        cx.rr(
-            Rect::from_min_max(pos2(x, r.top()), pos2(x + w, r.bottom())),
-            2.0,
-            a(k.disp_grid, 255),
-        );
+        cx.rr(Rect::from_min_max(pos2(x, r.top()), pos2(x + w, r.bottom())), 2.0, a(k.disp_grid, 255));
         let al = (80.0 + 175.0 * probs[i]) as u8;
         cx.rr(bar, 2.0, if on { a(col, al) } else { a(k.text3, 90) });
         if i == playing {
-            cx.rr_stroke(
-                Rect::from_min_max(
-                    pos2(x - 1.0, r.top() - 1.0),
-                    pos2(x + w + 1.0, r.bottom() + 1.0),
-                ),
-                3.0,
-                1.6,
-                if k.dir == Dir::C {
-                    k.accent
-                } else {
-                    Color32::WHITE
-                },
-            );
+            cx.rr_stroke(Rect::from_min_max(pos2(x - 1.0, r.top() - 1.0), pos2(x + w + 1.0, r.bottom() + 1.0)), 3.0, 1.6, if k.dir == Dir::C { k.accent } else { Color32::WHITE });
         }
     }
 }

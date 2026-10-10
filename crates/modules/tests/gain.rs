@@ -19,13 +19,7 @@ fn run(g: &mut Gain, input: &[f32], db: impl Fn(usize) -> f32) -> Vec<f32> {
 
 fn gain() -> Gain {
     let mut g = Gain::new();
-    g.prepare(
-        48000.0,
-        64,
-        &QualityConfig {
-            tier: QualityTier::Live,
-        },
-    );
+    g.prepare(48000.0, 64, &QualityConfig { tier: QualityTier::Live });
     g
 }
 

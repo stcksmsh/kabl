@@ -178,9 +178,7 @@ fn every_entry_opens_stopped_has_real_controls_and_recalls_complete_state() {
                             id,
                             port: key.clone()
                         }
-                        && c.to
-                            .module_id()
-                            .is_some_and(|m| state.modules.contains_key(&m))),
+                        && c.to.module_id().is_some_and(|m| state.modules.contains_key(&m))),
                     "{dir}: macro route"
                 );
             }
@@ -195,10 +193,7 @@ fn every_entry_opens_stopped_has_real_controls_and_recalls_complete_state() {
         assert_eq!(ui.load_stopped, seq);
         if seq {
             assert!(pins.iter().any(|p| p.key == "transport"));
-            assert!(
-                pins.iter().any(|p| p.key == "banks" || p.key == "cues"),
-                "{dir}: launch workflow"
-            );
+            assert!(pins.iter().any(|p| p.key == "banks" || p.key == "cues"), "{dir}: launch workflow");
         }
         if ui.doc.as_ref().unwrap().meta.content_type() == "Performances" {
             assert!(pins.iter().any(|p| p.key == "cues"));
@@ -270,8 +265,7 @@ fn render(state: &PatchState, keys: bool, secs: usize, hot: bool) -> (Vec<f32>, 
                 engine.key(KeyEvent::On { note, velocity: 90 });
             }
         }
-        if keys && [4, 9, 17, 25, 33, 41, 49, 57].contains(&(t / 48000)) && t.is_multiple_of(48000)
-        {
+        if keys && [4, 9, 17, 25, 33, 41, 49, 57].contains(&(t / 48000)) && t.is_multiple_of(48000) {
             engine.key(KeyEvent::AllOff);
         }
         if t == 6 * 48000 && !seqs.is_empty() {

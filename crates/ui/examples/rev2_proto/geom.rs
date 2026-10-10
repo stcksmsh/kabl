@@ -244,12 +244,10 @@ fn place_local(p: &Patch, i: usize, expanded: bool, compact: bool, choosing: boo
     let m = &p.modules[i];
     let d = m.def();
     let n = d.controls.len();
-    let prim_knobs: Vec<usize> = (0..n)
-        .filter(|&c| m.primary[c] && matches!(d.controls[c].spec, Spec::Knob { .. }))
-        .collect();
-    let prim_sels: Vec<usize> = (0..n)
-        .filter(|&c| m.primary[c] && matches!(d.controls[c].spec, Spec::Select { .. }))
-        .collect();
+    let prim_knobs: Vec<usize> =
+        (0..n).filter(|&c| m.primary[c] && matches!(d.controls[c].spec, Spec::Knob { .. })).collect();
+    let prim_sels: Vec<usize> =
+        (0..n).filter(|&c| m.primary[c] && matches!(d.controls[c].spec, Spec::Select { .. })).collect();
     let mut fw = face_wu(m.kind, prim_knobs.len()) as f32 * UNIT;
     if compact && n == 0 {
         fw = 5.0 * UNIT;
@@ -267,19 +265,14 @@ fn place_local(p: &Patch, i: usize, expanded: bool, compact: bool, choosing: boo
             2 => fw * (idx as f32 + 0.5) / 2.0,
             _ => 36.0 + idx as f32 * (fw - 72.0) / (k as f32 - 1.0),
         };
-        ctls[c] = Some(CtlGeo::Knob {
-            c: pos2(x, knob_y),
-            r,
-        });
+        ctls[c] = Some(CtlGeo::Knob { c: pos2(x, knob_y), r });
     }
     let total_opts: usize = prim_sels.iter().map(|&c| opts(d.controls[c].spec)).sum();
     let mut x = 14.0;
     for &c in &prim_sels {
         let avail = fw - 28.0 - 10.0 * (prim_sels.len() as f32 - 1.0);
         let w = avail * opts(d.controls[c].spec) as f32 / total_opts as f32;
-        ctls[c] = Some(CtlGeo::Select {
-            rect: Rect::from_min_size(pos2(x, sel_y), vec2(w, 28.0)),
-        });
+        ctls[c] = Some(CtlGeo::Select { rect: Rect::from_min_size(pos2(x, sel_y), vec2(w, 28.0)) });
         x += w + 10.0;
     }
 
@@ -288,28 +281,15 @@ fn place_local(p: &Patch, i: usize, expanded: bool, compact: bool, choosing: boo
     let mut adv = None;
     let mut preview = None;
     if expanded && !hidden.is_empty() {
-        let hk: Vec<usize> = hidden
-            .iter()
-            .copied()
-            .filter(|&c| matches!(d.controls[c].spec, Spec::Knob { .. }))
-            .collect();
-        let hs: Vec<usize> = hidden
-            .iter()
-            .copied()
-            .filter(|&c| matches!(d.controls[c].spec, Spec::Select { .. }))
-            .collect();
+        let hk: Vec<usize> =
+            hidden.iter().copied().filter(|&c| matches!(d.controls[c].spec, Spec::Knob { .. })).collect();
+        let hs: Vec<usize> =
+            hidden.iter().copied().filter(|&c| matches!(d.controls[c].spec, Spec::Select { .. })).collect();
         let cols = hk.len().min(5);
-        let sel_row_w: f32 = hs
-            .iter()
-            .map(|&c| sel_width(options_of(d.controls[c].spec)))
-            .sum::<f32>()
+        let sel_row_w: f32 = hs.iter().map(|&c| sel_width(options_of(d.controls[c].spec))).sum::<f32>()
             + 12.0 * hs.len().saturating_sub(1) as f32
             + 28.0;
-        let knob_w = if cols > 0 {
-            60.0 + 76.0 * (cols as f32 - 1.0)
-        } else {
-            0.0
-        };
+        let knob_w = if cols > 0 { 60.0 + 76.0 * (cols as f32 - 1.0) } else { 0.0 };
         let aw = (knob_w.max(sel_row_w.min(13.0 * UNIT)).max(5.0 * UNIT) / UNIT).ceil() * UNIT;
         let mut y = knob_y;
         for (idx, &c) in hk.iter().enumerate() {
@@ -318,16 +298,9 @@ fn place_local(p: &Patch, i: usize, expanded: bool, compact: bool, choosing: boo
             }
             let col = idx % 5;
             let x0 = (aw - 76.0 * (cols as f32 - 1.0)) / 2.0;
-            ctls[c] = Some(CtlGeo::Knob {
-                c: pos2(fw + x0 + 76.0 * col as f32, y),
-                r: R_SMALL,
-            });
+            ctls[c] = Some(CtlGeo::Knob { c: pos2(fw + x0 + 76.0 * col as f32, y), r: R_SMALL });
         }
-        let mut sy = if hk.is_empty() {
-            knob_y - 20.0
-        } else {
-            y + 76.0
-        };
+        let mut sy = if hk.is_empty() { knob_y - 20.0 } else { y + 76.0 };
         let mut sx = 14.0;
         for &c in &hs {
             let w = sel_width(options_of(d.controls[c].spec));
@@ -335,24 +308,17 @@ fn place_local(p: &Patch, i: usize, expanded: bool, compact: bool, choosing: boo
                 sx = 14.0;
                 sy += 60.0;
             }
-            ctls[c] = Some(CtlGeo::Select {
-                rect: Rect::from_min_size(pos2(fw + sx, sy), vec2(w, 28.0)),
-            });
+            ctls[c] =
+                Some(CtlGeo::Select { rect: Rect::from_min_size(pos2(fw + sx, sy), vec2(w, 28.0)) });
             sx += w + 12.0;
         }
         let h = if compact { COMPACT_H } else { PANEL_H };
         if m.kind == Kind::Lfo {
             // Mock output preview: beside the last selector row when there is room, else below.
             if aw - 14.0 - sx >= 150.0 {
-                preview = Some(Rect::from_min_size(
-                    pos2(fw + sx, sy - 16.0),
-                    vec2(aw - 14.0 - sx, 60.0),
-                ));
+                preview = Some(Rect::from_min_size(pos2(fw + sx, sy - 16.0), vec2(aw - 14.0 - sx, 60.0)));
             } else if sy + 44.0 + 64.0 < h - 8.0 {
-                preview = Some(Rect::from_min_size(
-                    pos2(fw + 14.0, sy + 44.0),
-                    vec2(aw - 28.0, 64.0),
-                ));
+                preview = Some(Rect::from_min_size(pos2(fw + 14.0, sy + 44.0), vec2(aw - 28.0, 64.0)));
             }
         }
         adv = Some(Rect::from_min_size(pos2(fw, 0.0), vec2(aw, h)));
@@ -530,18 +496,9 @@ pub fn regions(p: &Patch, v: &ViewGeo, l: &Layout) -> Vec<Region> {
             let Some(g) = g else { continue };
             let cref = CtlRef { m: mi, c };
             let layer = u8::from(pl.overlay && !m.primary[c]);
-            let reg = |hit, area, prio| Region {
-                hit,
-                area,
-                layer,
-                prio,
-            };
+            let reg = |hit, area, prio| Region { hit, area, layer, prio };
             if v.choose == Some(mi) {
-                out.push(reg(
-                    Hit::Pin(cref),
-                    Area::Box(g.pin_rect(d.controls[c].label)),
-                    0,
-                ));
+                out.push(reg(Hit::Pin(cref), Area::Box(g.pin_rect(d.controls[c].label)), 0));
             }
             match *g {
                 CtlGeo::Knob { c: cen, r } => {
@@ -550,34 +507,18 @@ pub fn regions(p: &Patch, v: &ViewGeo, l: &Layout) -> Vec<Region> {
                     out.push(reg(Hit::Pill(cref), Area::Box(g.pill_rect(&text)), 3));
                     for (k, &ri) in routes.iter().enumerate().take(3) {
                         let _ = hidden;
-                        out.push(reg(
-                            Hit::Plug(ri),
-                            Area::Circle(plug_pos(cen, r, k, routes.len()), 7.0),
-                            1,
-                        ));
+                        out.push(reg(Hit::Plug(ri), Area::Circle(plug_pos(cen, r, k, routes.len()), 7.0), 1));
                     }
                     let routed = !routes.is_empty();
                     match v.depth {
                         DepthGesture::RingBand if routed => {
-                            out.push(reg(
-                                Hit::Knob(cref),
-                                Area::Circle(cen, r + BODY_R_ROUTED),
-                                4,
-                            ));
-                            out.push(reg(
-                                Hit::Ring(cref),
-                                Area::Annulus(cen, r + RING_R0, r + RING_R1),
-                                7,
-                            ));
+                            out.push(reg(Hit::Knob(cref), Area::Circle(cen, r + BODY_R_ROUTED), 4));
+                            out.push(reg(Hit::Ring(cref), Area::Annulus(cen, r + RING_R0, r + RING_R1), 7));
                         }
                         DepthGesture::PeakHandle if routed => {
                             if let Some(ri) = depth_route(p, cref, v.selected_route) {
                                 let base = m.values[c];
-                                let tip = polar(
-                                    cen,
-                                    r + 11.0,
-                                    (base + p.routes[ri].amount).clamp(0.0, 1.0),
-                                );
+                                let tip = polar(cen, r + 11.0, (base + p.routes[ri].amount).clamp(0.0, 1.0));
                                 out.push(reg(Hit::Handle(ri), Area::Circle(tip, HANDLE_R), 2));
                             }
                             out.push(reg(Hit::Knob(cref), Area::Circle(cen, r + BODY_R_FREE), 4));
@@ -589,10 +530,7 @@ pub fn regions(p: &Patch, v: &ViewGeo, l: &Layout) -> Vec<Region> {
                     let n = opts(d.controls[c].spec);
                     for s in 0..n {
                         let w = rect.width() / n as f32;
-                        let r = Rect::from_min_size(
-                            pos2(rect.left() + w * s as f32, rect.top()),
-                            vec2(w, rect.height()),
-                        );
+                        let r = Rect::from_min_size(pos2(rect.left() + w * s as f32, rect.top()), vec2(w, rect.height()));
                         out.push(reg(Hit::Seg(cref, s), Area::Box(r), 4));
                     }
                 }
@@ -605,28 +543,13 @@ pub fn regions(p: &Patch, v: &ViewGeo, l: &Layout) -> Vec<Region> {
                 // 32×32 target around a 26 px socket.
                 Area::Box(r.expand(3.0))
             };
-            out.push(Region {
-                hit: Hit::Jack(JackRef { m: mi, j }),
-                area,
-                layer: 0,
-                prio: 5,
-            });
+            out.push(Region { hit: Hit::Jack(JackRef { m: mi, j }), area, layer: 0, prio: 5 });
         }
         if let Some(t) = pl.toggle {
-            out.push(Region {
-                hit: Hit::Toggle(mi),
-                area: Area::Box(t),
-                layer: 0,
-                prio: 0,
-            });
+            out.push(Region { hit: Hit::Toggle(mi), area: Area::Box(t), layer: 0, prio: 0 });
         }
         if let Some(t) = pl.done {
-            out.push(Region {
-                hit: Hit::Done(mi),
-                area: Area::Box(t),
-                layer: 0,
-                prio: 0,
-            });
+            out.push(Region { hit: Hit::Done(mi), area: Area::Box(t), layer: 0, prio: 0 });
         }
         let face = Rect::from_min_size(pl.rect.min, vec2(pl.face_w, pl.rect.height()));
         out.push(Region {
@@ -635,20 +558,10 @@ pub fn regions(p: &Patch, v: &ViewGeo, l: &Layout) -> Vec<Region> {
             layer: 0,
             prio: 8,
         });
-        out.push(Region {
-            hit: Hit::Panel(mi),
-            area: Area::Box(face),
-            layer: 0,
-            prio: 9,
-        });
+        out.push(Region { hit: Hit::Panel(mi), area: Area::Box(face), layer: 0, prio: 9 });
         if let Some(a) = pl.adv {
             let layer = u8::from(pl.overlay);
-            out.push(Region {
-                hit: Hit::Panel(mi),
-                area: Area::Box(a),
-                layer,
-                prio: 9,
-            });
+            out.push(Region { hit: Hit::Panel(mi), area: Area::Box(a), layer, prio: 9 });
         }
     }
     out
@@ -699,23 +612,9 @@ mod tests {
         let mut p = reference_patch();
         let lfo = p.find(Kind::Lfo, 0);
         let env = p.find(Kind::Adsr, 0);
-        p.routes.push(Route {
-            src: p.jack(lfo, "out"),
-            dst: p.ctl(env, "attack_ms"),
-            amount: 0.25,
-            bypass: false,
-        });
-        p.routes.push(Route {
-            src: p.jack(lfo, "out"),
-            dst: p.ctl(env, "decay_ms"),
-            amount: 0.25,
-            bypass: false,
-        });
-        for depth in [
-            DepthGesture::RingBand,
-            DepthGesture::PeakHandle,
-            DepthGesture::InspectorOnly,
-        ] {
+        p.routes.push(Route { src: p.jack(lfo, "out"), dst: p.ctl(env, "attack_ms"), amount: 0.25, bypass: false });
+        p.routes.push(Route { src: p.jack(lfo, "out"), dst: p.ctl(env, "decay_ms"), amount: 0.25, bypass: false });
+        for depth in [DepthGesture::RingBand, DepthGesture::PeakHandle, DepthGesture::InspectorOnly] {
             let mut v = view(&p);
             v.depth = depth;
             let l = layout(&p, &v);
@@ -724,12 +623,7 @@ mod tests {
                 if matches!(r.hit, Hit::Panel(_) | Hit::Header(_)) {
                     continue;
                 }
-                assert_eq!(
-                    hit_test(&regs, r.area.center()),
-                    Some(r.hit),
-                    "{depth:?} {:?}",
-                    r.hit
-                );
+                assert_eq!(hit_test(&regs, r.area.center()), Some(r.hit), "{depth:?} {:?}", r.hit);
             }
         }
     }
@@ -752,10 +646,7 @@ mod tests {
             })
             .collect();
         for (i, a) in rects.iter().enumerate() {
-            assert!(
-                l.mods[lfo].rect.contains_rect(*a),
-                "control {i} outside panel"
-            );
+            assert!(l.mods[lfo].rect.contains_rect(*a), "control {i} outside panel");
             for b in &rects[i + 1..] {
                 assert!(!a.intersects(*b), "{a:?} overlaps {b:?}");
             }

@@ -1,18 +1,14 @@
 //! Offline D05 baseline at 48 kHz, four 64-frame blocks per callback, eight voices.
+use std::time::Instant;
 use basedrop::Collector;
 use kabl_engine::compile::compile;
 use kabl_engine::graph::BLOCK;
 use kabl_engine::keyboard::KeyEvent;
 use kabl_engine::patch_engine::PatchEngine;
-use std::time::Instant;
 
 fn main() {
     const CALLBACKS: usize = 1200;
-    for dir in [
-        "patches/init-keyboard",
-        "patches/sound-palette",
-        "patches/composition",
-    ] {
+    for dir in ["patches/init-keyboard", "patches/sound-palette", "patches/composition"] {
         let patch = kabl_core::load(std::path::Path::new(dir)).unwrap();
         let state = patch.state();
         let graph = compile(state, 48_000.0, 8).unwrap();
@@ -24,19 +20,11 @@ fn main() {
             let (mut l, mut r) = ([0f32; BLOCK], [0f32; BLOCK]);
             for n in 0..CALLBACKS {
                 if n % 188 == 0 {
-                    for note in [48, 55, 60, 64] {
-                        e.key(KeyEvent::On { note, velocity: 90 });
-                    }
-                } else if n % 188 == 150 {
-                    e.key(KeyEvent::AllOff);
-                }
+                    for note in [48, 55, 60, 64] { e.key(KeyEvent::On { note, velocity: 90 }); }
+                } else if n % 188 == 150 { e.key(KeyEvent::AllOff); }
                 let start = Instant::now();
-                for _ in 0..4 {
-                    e.process_block(&mut l, &mut r);
-                }
-                if run > 0 {
-                    times.push(start.elapsed().as_nanos() as u64);
-                }
+                for _ in 0..4 { e.process_block(&mut l, &mut r); }
+                if run > 0 { times.push(start.elapsed().as_nanos() as u64); }
             }
         }
         times.sort_unstable();

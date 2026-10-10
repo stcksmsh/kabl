@@ -54,11 +54,9 @@ fn finite_route(
     let routes: Vec<_> = p.cables.values().filter(|c| matches!(&c.to,
         PortRef::Module { id: target, port } if *target == id && matches!(port.as_str(), "in" | "in_l" | "in_r" | "left" | "right" | "a" | "b" | "c" | "d" | "in1" | "in2" | "in3" | "in4"))) .collect();
     let finite = !routes.is_empty()
-        && routes.iter().all(|c| {
-            c.from
-                .module_id()
-                .is_some_and(|f| finite_route(p, f, visiting, memo))
-        });
+        && routes
+            .iter()
+            .all(|c| c.from.module_id().is_some_and(|f| finite_route(p, f, visiting, memo)));
     visiting.remove(&id);
     memo.insert(id, finite);
     finite

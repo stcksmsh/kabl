@@ -3,10 +3,7 @@
 use crate::geom::{self, Area, Cables, CtlGeo, DepthGesture, Hit, Placed, JACK_R, PANEL_H, ROW_Y};
 use crate::model::{fmt_value, to_value, CtlRef, JackRef, Kind, Patch, Route, Sig, Spec};
 use crate::{App, Gesture};
-use egui::{
-    pos2, vec2, Align2, Color32, CornerRadius, FontId, Painter, Pos2, Rect, Shape, Stroke,
-    StrokeKind,
-};
+use egui::{pos2, vec2, Align2, Color32, CornerRadius, FontId, Painter, Pos2, Rect, Shape, Stroke, StrokeKind};
 
 pub struct Theme {
     pub dark: bool,
@@ -160,17 +157,12 @@ fn darken(c: Color32, f: f32) -> Color32 {
 
 fn arc_points(c: Pos2, r: f32, t0: f32, t1: f32) -> Vec<Pos2> {
     let n = (((t1 - t0).abs() * 48.0).ceil() as usize).max(2);
-    (0..=n)
-        .map(|i| geom::polar(c, r, t0 + (t1 - t0) * i as f32 / n as f32))
-        .collect()
+    (0..=n).map(|i| geom::polar(c, r, t0 + (t1 - t0) * i as f32 / n as f32)).collect()
 }
 
 fn two_tone_arc(p: &Painter, c: Pos2, r: f32, t0: f32, t1: f32, col: Color32, w: f32, alpha: f32) {
     let pts = arc_points(c, r, t0, t1.max(t0 + 0.004));
-    p.add(Shape::line(
-        pts.clone(),
-        Stroke::new(w + 2.5, darken(col, 0.45).gamma_multiply(alpha)),
-    ));
+    p.add(Shape::line(pts.clone(), Stroke::new(w + 2.5, darken(col, 0.45).gamma_multiply(alpha))));
     p.add(Shape::line(pts, Stroke::new(w, col.gamma_multiply(alpha))));
 }
 
@@ -178,31 +170,14 @@ fn dashed(p: &Painter, pts: &[Pos2], stroke: Stroke, dash: f32, gap: f32) {
     p.extend(Shape::dashed_line(pts, stroke, dash, gap));
 }
 
-fn text(
-    p: &Painter,
-    pos: Pos2,
-    align: Align2,
-    s: &str,
-    size: f32,
-    col: Color32,
-    mono: bool,
-) -> Rect {
-    let f = if mono {
-        FontId::monospace(size)
-    } else {
-        FontId::proportional(size)
-    };
+fn text(p: &Painter, pos: Pos2, align: Align2, s: &str, size: f32, col: Color32, mono: bool) -> Rect {
+    let f = if mono { FontId::monospace(size) } else { FontId::proportional(size) };
     p.text(pos, align, s, f, col)
 }
 
 fn pill(p: &Painter, rect: Rect, s: &str, edge: Color32, fill: Color32, ink: Color32, size: f32) {
     p.rect_filled(rect, CornerRadius::same((rect.height() / 2.0) as u8), fill);
-    p.rect_stroke(
-        rect,
-        CornerRadius::same((rect.height() / 2.0) as u8),
-        Stroke::new(1.6, edge),
-        StrokeKind::Inside,
-    );
+    p.rect_stroke(rect, CornerRadius::same((rect.height() / 2.0) as u8), Stroke::new(1.6, edge), StrokeKind::Inside);
     text(p, rect.center(), Align2::CENTER_CENTER, s, size, ink, true);
 }
 
@@ -210,12 +185,7 @@ pub fn badge(p: &Painter, center: Pos2, s: &str, col: Color32, th: &Theme, z: f3
     let g = p.layout_no_wrap(s.to_string(), FontId::proportional(10.5 * z), col);
     let rect = Rect::from_center_size(center, vec2(g.size().x + 12.0 * z, 15.0 * z));
     p.rect_filled(rect, CornerRadius::same((7.0 * z) as u8), th.panel);
-    p.rect_stroke(
-        rect,
-        CornerRadius::same((7.0 * z) as u8),
-        Stroke::new(1.3 * z, col),
-        StrokeKind::Inside,
-    );
+    p.rect_stroke(rect, CornerRadius::same((7.0 * z) as u8), Stroke::new(1.3 * z, col), StrokeKind::Inside);
     p.galley(rect.center() - g.size() / 2.0, g, col);
     rect
 }
@@ -231,10 +201,7 @@ pub fn canvas(app: &App, p: &Painter) {
     if !compact {
         for &y in &ROW_Y {
             for ry in [y - 8.0, y + PANEL_H] {
-                let r = Rect::from_min_max(
-                    pos2(app.canvas.left(), xf.p(pos2(0.0, ry)).y),
-                    pos2(app.canvas.right(), xf.p(pos2(0.0, ry + 8.0)).y),
-                );
+                let r = Rect::from_min_max(pos2(app.canvas.left(), xf.p(pos2(0.0, ry)).y), pos2(app.canvas.right(), xf.p(pos2(0.0, ry + 8.0)).y));
                 p.rect_filled(r, CornerRadius::ZERO, th.rail);
                 p.line_segment([r.left_top(), r.right_top()], Stroke::new(1.0, th.rail_hi));
                 let mut x = xf.p(pos2(0.0, 0.0)).x.rem_euclid(xf.s(30.0)) + app.canvas.left();
@@ -257,16 +224,7 @@ pub fn canvas(app: &App, p: &Painter) {
     }
     // Pills and hidden-mode badges sit above cables.
     for (mi, pl) in app.layout.mods.iter().enumerate() {
-        draw_pills(
-            app,
-            p,
-            &th,
-            xf,
-            mi,
-            pl,
-            cables == Cables::Hidden,
-            Some(false),
-        );
+        draw_pills(app, p, &th, xf, mi, pl, cables == Cables::Hidden, Some(false));
     }
     // Floating advanced areas over neighbours, then the leads and pills inside them.
     for (mi, pl) in app.layout.mods.iter().enumerate() {
@@ -279,16 +237,7 @@ pub fn canvas(app: &App, p: &Painter) {
     }
     for (mi, pl) in app.layout.mods.iter().enumerate() {
         if pl.overlay {
-            draw_pills(
-                app,
-                p,
-                &th,
-                xf,
-                mi,
-                pl,
-                cables == Cables::Hidden,
-                Some(true),
-            );
+            draw_pills(app, p, &th, xf, mi, pl, cables == Cables::Hidden, Some(true));
         }
     }
 
@@ -306,24 +255,14 @@ pub fn canvas(app: &App, p: &Painter) {
             }
             for (j, jd) in app.patch.modules[mi].def().jacks.iter().enumerate() {
                 if jd.out != from_out {
-                    p.circle_stroke(
-                        xf.p(pl.jack_center(j)),
-                        xf.s(JACK_R + 5.0),
-                        Stroke::new(1.5, th.sel.gamma_multiply(0.7)),
-                    );
+                    p.circle_stroke(xf.p(pl.jack_center(j)), xf.s(JACK_R + 5.0), Stroke::new(1.5, th.sel.gamma_multiply(0.7)));
                 }
             }
             if from_out {
                 for g in pl.ctls.iter().flatten() {
                     if let CtlGeo::Knob { c, r } = *g {
                         let pts = arc_points(xf.p(c), xf.s(r + 11.0), 0.0, 1.0);
-                        dashed(
-                            p,
-                            &pts,
-                            Stroke::new(1.6, th.sel.gamma_multiply(0.8)),
-                            4.0,
-                            3.0,
-                        );
+                        dashed(p, &pts, Stroke::new(1.6, th.sel.gamma_multiply(0.8)), 4.0, 3.0);
                     }
                 }
             }
@@ -374,11 +313,7 @@ fn draw_module(app: &App, p: &Painter, th: &Theme, xf: Xf, mi: usize, pl: &Place
     let rect = xf.r(panel_rect(pl, overlay));
     let skin = m.kind == Kind::Ensemble;
     if overlay {
-        p.rect_filled(
-            rect.translate(vec2(6.0, 8.0) * z),
-            CornerRadius::same(6),
-            Color32::from_black_alpha(110),
-        );
+        p.rect_filled(rect.translate(vec2(6.0, 8.0) * z), CornerRadius::same(6), Color32::from_black_alpha(110));
     }
     p.rect_filled(rect, CornerRadius::same(3), th.panel);
     if skin {
@@ -387,191 +322,79 @@ fn draw_module(app: &App, p: &Painter, th: &Theme, xf: Xf, mi: usize, pl: &Place
         // Brushed texture: faint horizontal strokes.
         let step = (4.0 * z).max(3.0);
         let mut y = rect.top() + step;
-        let tex = if th.dark {
-            Color32::from_white_alpha(6)
-        } else {
-            Color32::from_black_alpha(7)
-        };
+        let tex = if th.dark { Color32::from_white_alpha(6) } else { Color32::from_black_alpha(7) };
         while y < rect.bottom() {
-            p.line_segment(
-                [pos2(rect.left(), y), pos2(rect.right(), y)],
-                Stroke::new(1.0, tex),
-            );
+            p.line_segment([pos2(rect.left(), y), pos2(rect.right(), y)], Stroke::new(1.0, tex));
             y += step;
         }
     }
-    p.rect_stroke(
-        rect,
-        CornerRadius::same(3),
-        Stroke::new(1.0, th.panel_edge),
-        StrokeKind::Inside,
-    );
+    p.rect_stroke(rect, CornerRadius::same(3), Stroke::new(1.0, th.panel_edge), StrokeKind::Inside);
     if overlay || pl.adv.is_some() {
         // Engraved divider between face and advanced area.
         let x = xf.p(pos2(pl.rect.left() + pl.face_w, 0.0)).x;
         let y0 = rect.top() + 12.0 * z;
-        p.line_segment(
-            [pos2(x, y0), pos2(x, rect.bottom() - 12.0 * z)],
-            Stroke::new(1.5, darken(th.panel_edge, 0.2)),
-        );
+        p.line_segment([pos2(x, y0), pos2(x, rect.bottom() - 12.0 * z)], Stroke::new(1.5, darken(th.panel_edge, 0.2)));
     }
     if overlay {
-        text(
-            p,
-            rect.left_top() + vec2(10.0, 8.0) * z,
-            Align2::LEFT_TOP,
-            "advanced · floating over neighbours",
-            10.0 * z,
-            th.ink2,
-            false,
-        );
+        text(p, rect.left_top() + vec2(10.0, 8.0) * z, Align2::LEFT_TOP, "advanced · floating over neighbours", 10.0 * z, th.ink2, false);
         draw_controls(app, p, th, xf, mi, pl, Some(true));
         return;
     }
     if !pl.compact {
         for (sx, sy) in [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)] {
-            let c = pos2(
-                rect.left() + 9.0 * z + sx * (rect.width() - 18.0 * z),
-                rect.top() + 9.0 * z + sy * (rect.height() - 18.0 * z),
-            );
+            let c = pos2(rect.left() + 9.0 * z + sx * (rect.width() - 18.0 * z), rect.top() + 9.0 * z + sy * (rect.height() - 18.0 * z));
             p.circle_filled(c, 3.5 * z, th.nut);
             p.circle_stroke(c, 3.5 * z, Stroke::new(1.0, th.nut_edge));
         }
     }
-    let face = xf.r(Rect::from_min_size(
-        pl.rect.min,
-        vec2(pl.face_w, pl.rect.height()),
-    ));
+    let face = xf.r(Rect::from_min_size(pl.rect.min, vec2(pl.face_w, pl.rect.height())));
     let on_art = skin && app.labels_on_art;
     let ink = if on_art { skin_ink(th.dark) } else { th.ink };
     let ink2 = if on_art { skin_ink(th.dark) } else { th.ink2 };
     if skin && !on_art {
-        let hdr = Rect::from_center_size(
-            pos2(face.center().x, face.top() + 33.0 * z),
-            vec2(150.0 * z, 38.0 * z),
-        );
+        let hdr = Rect::from_center_size(pos2(face.center().x, face.top() + 33.0 * z), vec2(150.0 * z, 38.0 * z));
         p.rect_filled(hdr, CornerRadius::same(4), th.panel.gamma_multiply(0.96));
     }
     let choosing = app.geo.choose == Some(mi);
     if pl.compact {
-        text(
-            p,
-            pos2(face.center().x, face.top() + 18.0 * z),
-            Align2::CENTER_CENTER,
-            d.name,
-            14.0 * z,
-            ink,
-            false,
-        );
+        text(p, pos2(face.center().x, face.top() + 18.0 * z), Align2::CENTER_CENTER, d.name, 14.0 * z, ink, false);
     } else {
-        text(
-            p,
-            pos2(face.center().x, face.top() + 26.0 * z),
-            Align2::CENTER_CENTER,
-            d.name,
-            15.0 * z,
-            ink,
-            false,
-        );
+        text(p, pos2(face.center().x, face.top() + 26.0 * z), Align2::CENTER_CENTER, d.name, 15.0 * z, ink, false);
         let tag = if choosing {
-            let nk = (0..d.controls.len())
-                .filter(|&c| m.primary[c] && matches!(d.controls[c].spec, Spec::Knob { .. }))
-                .count();
+            let nk = (0..d.controls.len()).filter(|&c| m.primary[c] && matches!(d.controls[c].spec, Spec::Knob { .. })).count();
             format!("choose primary · face {}u", geom::face_wu(m.kind, nk))
         } else {
             d.tag.to_string()
         };
-        text(
-            p,
-            pos2(face.center().x, face.top() + 43.0 * z),
-            Align2::CENTER_CENTER,
-            &tag,
-            11.0 * z,
-            ink2,
-            true,
-        );
+        text(p, pos2(face.center().x, face.top() + 43.0 * z), Align2::CENTER_CENTER, &tag, 11.0 * z, ink2, true);
     }
     if app.selected == Some(mi) {
-        p.rect_stroke(
-            rect.expand(1.0),
-            CornerRadius::same(4),
-            Stroke::new(2.5, th.sel),
-            StrokeKind::Outside,
-        );
+        p.rect_stroke(rect.expand(1.0), CornerRadius::same(4), Stroke::new(2.5, th.sel), StrokeKind::Outside);
     }
     if !pl.compact {
         draw_decor(app, p, th, xf, mi, pl);
     }
-    draw_controls(
-        app,
-        p,
-        th,
-        xf,
-        mi,
-        pl,
-        if pl.overlay { Some(false) } else { None },
-    );
+    draw_controls(app, p, th, xf, mi, pl, if pl.overlay { Some(false) } else { None });
     draw_jacks(app, p, th, xf, mi, pl);
     if let Some(t) = pl.toggle {
         let r = xf.r(t);
         let expanded = app.geo.is_expanded(mi);
-        let label = if expanded {
-            "Less".to_string()
-        } else {
-            format!("+{}", m.hidden_count())
-        };
-        p.rect_filled(
-            r,
-            CornerRadius::same(4),
-            if th.dark { th.btn } else { th.plate },
-        );
-        text(
-            p,
-            r.center(),
-            Align2::CENTER_CENTER,
-            &label,
-            12.0 * z,
-            th.plate_ink,
-            false,
-        );
+        let label = if expanded { "Less".to_string() } else { format!("+{}", m.hidden_count()) };
+        p.rect_filled(r, CornerRadius::same(4), if th.dark { th.btn } else { th.plate });
+        text(p, r.center(), Align2::CENTER_CENTER, &label, 12.0 * z, th.plate_ink, false);
         // A route to a control hidden by collapse docks here; never silently hidden.
-        let hidden_routed: Vec<&Route> = app
-            .patch
-            .routes
-            .iter()
-            .filter(|r| r.dst.m == mi && pl.ctls[r.dst.c].is_none())
-            .collect();
+        let hidden_routed: Vec<&Route> = app.patch.routes.iter().filter(|r| r.dst.m == mi && pl.ctls[r.dst.c].is_none()).collect();
         if !hidden_routed.is_empty() {
-            p.rect_stroke(
-                r.expand(3.0 * z),
-                CornerRadius::same(6),
-                Stroke::new(2.5 * z, th.cv),
-                StrokeKind::Outside,
-            );
+            p.rect_stroke(r.expand(3.0 * z), CornerRadius::same(6), Stroke::new(2.5 * z, th.cv), StrokeKind::Outside);
             if app.geo.cables == Cables::Hidden {
-                badge(
-                    p,
-                    pos2(r.center().x - 6.0 * z, r.bottom() + 12.0 * z),
-                    &format!("◆ {} hidden", hidden_routed.len()),
-                    th.cv,
-                    th,
-                    z,
-                );
+                badge(p, pos2(r.center().x - 6.0 * z, r.bottom() + 12.0 * z), &format!("◆ {} hidden", hidden_routed.len()), th.cv, th, z);
             }
         }
     }
     if let Some(dn) = pl.done {
         let r = xf.r(dn);
         p.rect_filled(r, CornerRadius::same(4), th.sel);
-        text(
-            p,
-            r.center(),
-            Align2::CENTER_CENTER,
-            "Done",
-            12.0 * z,
-            Color32::WHITE,
-            false,
-        );
+        text(p, r.center(), Align2::CENTER_CENTER, "Done", 12.0 * z, Color32::WHITE, false);
     }
     if skin {
         draw_skin_extras(app, p, th, xf, pl);
@@ -601,13 +424,7 @@ pub fn skin_color(dark: bool, f: f32) -> Color32 {
 }
 
 fn moon(rect: Rect) -> (Pos2, f32) {
-    (
-        pos2(
-            rect.right() - rect.width() * 0.26,
-            rect.top() + rect.height() * 0.2,
-        ),
-        rect.width() * 0.09,
-    )
+    (pos2(rect.right() - rect.width() * 0.26, rect.top() + rect.height() * 0.2), rect.width() * 0.09)
 }
 
 fn moon_color(dark: bool) -> Color32 {
@@ -647,13 +464,7 @@ fn draw_skin_art(p: &Painter, rect: Rect, dark: bool) {
     let n = 40;
     for i in 0..n {
         let f0 = i as f32 / n as f32;
-        let r = Rect::from_min_max(
-            pos2(rect.left(), rect.top() + rect.height() * f0),
-            pos2(
-                rect.right(),
-                rect.top() + rect.height() * (f0 + 1.0 / n as f32) + 1.0,
-            ),
-        );
+        let r = Rect::from_min_max(pos2(rect.left(), rect.top() + rect.height() * f0), pos2(rect.right(), rect.top() + rect.height() * (f0 + 1.0 / n as f32) + 1.0));
         p.rect_filled(r, CornerRadius::ZERO, skin_color(dark, f0));
     }
     let (mc, mr) = moon(rect);
@@ -669,11 +480,7 @@ fn draw_skin_art(p: &Painter, rect: Rect, dark: bool) {
     for w in hills.windows(2) {
         let (a, b) = (w[0], w[1]);
         if a.y < rect.bottom() && b.y < rect.bottom() {
-            p.add(Shape::convex_polygon(
-                vec![a, b, pos2(b.x, rect.bottom()), pos2(a.x, rect.bottom())],
-                hill,
-                Stroke::NONE,
-            ));
+            p.add(Shape::convex_polygon(vec![a, b, pos2(b.x, rect.bottom()), pos2(a.x, rect.bottom())], hill, Stroke::NONE));
         }
     }
 }
@@ -682,32 +489,13 @@ fn draw_skin_art(p: &Painter, rect: Rect, dark: bool) {
 fn draw_skin_extras(app: &App, p: &Painter, th: &Theme, xf: Xf, pl: &Placed) {
     let z = xf.zoom;
     let r = xf.r(pl.rect);
-    text(
-        p,
-        pos2(r.center().x, r.bottom() - 10.0 * z),
-        Align2::CENTER_CENTER,
-        "PLACEHOLDER ART",
-        9.0 * z,
-        Color32::from_white_alpha(170),
-        true,
-    );
+    text(p, pos2(r.center().x, r.bottom() - 10.0 * z), Align2::CENTER_CENTER, "PLACEHOLDER ART", 9.0 * z, Color32::from_white_alpha(170), true);
     if app.labels_on_art {
         let worst = skin_label_contrast(th.dark, pl);
         if worst < 4.5 {
-            let b = Rect::from_min_size(
-                r.left_top() + vec2(8.0, 50.0) * z,
-                vec2(r.width() - 16.0 * z, 17.0 * z),
-            );
+            let b = Rect::from_min_size(r.left_top() + vec2(8.0, 50.0) * z, vec2(r.width() - 16.0 * z, 17.0 * z));
             p.rect_filled(b, CornerRadius::same(3), hex("#7a1d12"));
-            text(
-                p,
-                b.center(),
-                Align2::CENTER_CENTER,
-                &format!("⚠ label contrast {worst:.1}:1 < 4.5 (loader warns · rec)"),
-                9.5 * z,
-                Color32::WHITE,
-                false,
-            );
+            text(p, b.center(), Align2::CENTER_CENTER, &format!("⚠ label contrast {worst:.1}:1 < 4.5 (loader warns · rec)"), 9.5 * z, Color32::WHITE, false);
         }
     }
 }
@@ -741,20 +529,10 @@ pub fn skin_label_contrast(dark: bool, pl: &Placed) -> f32 {
         };
         [lab, val]
     });
-    let jacks = pl
-        .jacks
-        .iter()
-        .map(|j| Rect::from_center_size(j.center() - vec2(0.0, 24.0), vec2(20.0, 14.0)));
+    let jacks = pl.jacks.iter().map(|j| Rect::from_center_size(j.center() - vec2(0.0, 24.0), vec2(20.0, 14.0)));
     boxes
         .chain(jacks)
-        .flat_map(|b| {
-            (0..15).map(move |i| {
-                pos2(
-                    b.left() + b.width() * (i % 5) as f32 / 4.0,
-                    b.top() + b.height() * (i / 5) as f32 / 2.0,
-                )
-            })
-        })
+        .flat_map(|b| (0..15).map(move |i| pos2(b.left() + b.width() * (i % 5) as f32 / 4.0, b.top() + b.height() * (i / 5) as f32 / 2.0)))
         .map(|pt| contrast(ink, art_at(pl.rect, pt, dark)))
         .fold(f32::MAX, f32::min)
 }
@@ -766,36 +544,19 @@ fn draw_decor(app: &App, p: &Painter, th: &Theme, xf: Xf, mi: usize, pl: &Placed
     let fw = pl.face_w;
     match m.kind {
         Kind::Midi => {
-            let r = xf.r(Rect::from_min_size(
-                o + vec2(12.0, 70.0),
-                vec2(fw - 24.0, 64.0),
-            ));
+            let r = xf.r(Rect::from_min_size(o + vec2(12.0, 70.0), vec2(fw - 24.0, 64.0)));
             let n = 7;
             let w = r.width() / n as f32;
             for i in 0..n {
-                let k = Rect::from_min_size(
-                    pos2(r.left() + w * i as f32, r.top()),
-                    vec2(w - 1.0, r.height()),
-                );
+                let k = Rect::from_min_size(pos2(r.left() + w * i as f32, r.top()), vec2(w - 1.0, r.height()));
                 p.rect_filled(k, CornerRadius::same(2), hex("#f2eee6"));
-                p.rect_stroke(
-                    k,
-                    CornerRadius::same(2),
-                    Stroke::new(1.0, th.tick),
-                    StrokeKind::Inside,
-                );
+                p.rect_stroke(k, CornerRadius::same(2), Stroke::new(1.0, th.tick), StrokeKind::Inside);
             }
             for i in [0, 1, 3, 4, 5] {
-                let k = Rect::from_min_size(
-                    pos2(r.left() + w * (i as f32 + 0.68), r.top()),
-                    vec2(w * 0.62, r.height() * 0.6),
-                );
+                let k = Rect::from_min_size(pos2(r.left() + w * (i as f32 + 0.68), r.top()), vec2(w * 0.62, r.height() * 0.6));
                 p.rect_filled(k, CornerRadius::same(1), hex("#2a2826"));
             }
-            let plate = xf.r(Rect::from_min_size(
-                o + vec2(10.0, 182.0),
-                vec2(fw - 20.0, 144.0),
-            ));
+            let plate = xf.r(Rect::from_min_size(o + vec2(10.0, 182.0), vec2(fw - 20.0, 144.0)));
             p.rect_filled(plate, CornerRadius::same(6), th.plate);
         }
         Kind::Out => {
@@ -805,10 +566,7 @@ fn draw_decor(app: &App, p: &Painter, th: &Theme, xf: Xf, mi: usize, pl: &Placed
             }
         }
         Kind::Adsr => {
-            let r = xf.r(Rect::from_min_size(
-                o + vec2(16.0, 54.0),
-                vec2(fw - 32.0, 54.0),
-            ));
+            let r = xf.r(Rect::from_min_size(o + vec2(16.0, 54.0), vec2(fw - 32.0, 54.0)));
             p.rect_filled(r, CornerRadius::same(3), th.display);
             let v = |id: &str| {
                 let c = app.patch.ctl(mi, id).c;
@@ -823,13 +581,7 @@ fn draw_decor(app: &App, p: &Painter, th: &Theme, xf: Xf, mi: usize, pl: &Placed
             let x1 = wlog(a);
             let x2 = x1 + wlog(d);
             let x3 = x2 + 2.0;
-            let pts = vec![
-                pos2(sx(0.0), sy(0.0)),
-                pos2(sx(x1), sy(1.0)),
-                pos2(sx(x2), sy(s)),
-                pos2(sx(x3), sy(s)),
-                pos2(sx(total), sy(0.0)),
-            ];
+            let pts = vec![pos2(sx(0.0), sy(0.0)), pos2(sx(x1), sy(1.0)), pos2(sx(x2), sy(s)), pos2(sx(x3), sy(s)), pos2(sx(total), sy(0.0))];
             p.add(Shape::line(pts, Stroke::new(1.6 * z, th.display_ink)));
         }
         _ => {}
@@ -851,25 +603,13 @@ fn draw_decor(app: &App, p: &Painter, th: &Theme, xf: Xf, mi: usize, pl: &Placed
     }
 }
 
-fn draw_controls(
-    app: &App,
-    p: &Painter,
-    th: &Theme,
-    xf: Xf,
-    mi: usize,
-    pl: &Placed,
-    only_adv: Option<bool>,
-) {
+fn draw_controls(app: &App, p: &Painter, th: &Theme, xf: Xf, mi: usize, pl: &Placed, only_adv: Option<bool>) {
     let m = &app.patch.modules[mi];
     let d = m.def();
     let z = xf.zoom;
     let skin = m.kind == Kind::Ensemble;
     let on_art = skin && app.labels_on_art;
-    let (ink, ink2) = if on_art {
-        (skin_ink(th.dark), skin_ink(th.dark))
-    } else {
-        (th.ink, th.ink2)
-    };
+    let (ink, ink2) = if on_art { (skin_ink(th.dark), skin_ink(th.dark)) } else { (th.ink, th.ink2) };
     for (c, g) in pl.ctls.iter().enumerate() {
         let Some(g) = g else { continue };
         if let Some(adv) = only_adv {
@@ -882,51 +622,22 @@ fn draw_controls(
         if skin && !on_art {
             // Theme plate behind each control group: contrast never depends on the art.
             let plate = match *g {
-                CtlGeo::Knob { c, r } => {
-                    Rect::from_min_max(c + vec2(-r - 14.0, -58.0), c + vec2(r + 14.0, 50.0))
-                }
-                CtlGeo::Select { rect } => rect
-                    .expand2(vec2(6.0, 6.0))
-                    .union(Rect::from_center_size(g.label_pos(), vec2(40.0, 16.0))),
+                CtlGeo::Knob { c, r } => Rect::from_min_max(c + vec2(-r - 14.0, -58.0), c + vec2(r + 14.0, 50.0)),
+                CtlGeo::Select { rect } => rect.expand2(vec2(6.0, 6.0)).union(Rect::from_center_size(g.label_pos(), vec2(40.0, 16.0))),
             };
-            p.rect_filled(
-                xf.r(plate),
-                CornerRadius::same(5),
-                th.panel.gamma_multiply(0.96),
-            );
+            p.rect_filled(xf.r(plate), CornerRadius::same(5), th.panel.gamma_multiply(0.96));
         }
         let lp = xf.p(g.label_pos());
-        let lr = text(
-            p,
-            lp,
-            Align2::CENTER_CENTER,
-            def.label,
-            12.5 * z,
-            ink,
-            false,
-        );
+        let lr = text(p, lp, Align2::CENTER_CENTER, def.label, 12.5 * z, ink, false);
         if def.conceptual {
-            diamond(
-                p,
-                pos2(lr.right() + 6.0 * z, lr.center().y),
-                th.concept,
-                3.5 * z,
-            );
+            diamond(p, pos2(lr.right() + 6.0 * z, lr.center().y), th.concept, 3.5 * z);
         }
         if app.geo.choose == Some(mi) {
             let pr = xf.r(g.pin_rect(def.label));
             let on = m.primary[c];
             p.circle_filled(pr.center(), 7.5 * z, if on { th.sel } else { th.panel });
             p.circle_stroke(pr.center(), 7.5 * z, Stroke::new(1.6, th.sel));
-            text(
-                p,
-                pr.center(),
-                Align2::CENTER_CENTER,
-                "📌",
-                9.0 * z,
-                if on { Color32::WHITE } else { th.sel },
-                false,
-            );
+            text(p, pr.center(), Align2::CENTER_CENTER, "📌", 9.0 * z, if on { Color32::WHITE } else { th.sel }, false);
         }
         let flash = app.flash_on(cref);
         match *g {
@@ -937,30 +648,17 @@ fn draw_controls(
                 }
             }
             CtlGeo::Select { rect } => {
-                let Spec::Select { options, .. } = def.spec else {
-                    unreachable!()
-                };
+                let Spec::Select { options, .. } = def.spec else { unreachable!() };
                 let rr = xf.r(rect);
                 p.rect_filled(rr, CornerRadius::same(4), th.seg_bg);
                 let w = rr.width() / options.len() as f32;
                 let cur = m.values[c] as usize;
                 for (i, o) in options.iter().enumerate() {
-                    let sr = Rect::from_min_size(
-                        pos2(rr.left() + w * i as f32, rr.top()),
-                        vec2(w, rr.height()),
-                    );
+                    let sr = Rect::from_min_size(pos2(rr.left() + w * i as f32, rr.top()), vec2(w, rr.height()));
                     if i == cur {
                         p.rect_filled(sr.shrink(2.0 * z), CornerRadius::same(3), th.seg_on);
                     }
-                    text(
-                        p,
-                        sr.center(),
-                        Align2::CENTER_CENTER,
-                        o,
-                        11.5 * z,
-                        if i == cur { th.seg_on_text } else { ink2 },
-                        true,
-                    );
+                    text(p, sr.center(), Align2::CENTER_CENTER, o, 11.5 * z, if i == cur { th.seg_on_text } else { ink2 }, true);
                 }
                 // Modulated selector: bracket under the reachable options (whole steps).
                 let routes: Vec<(usize, &Route)> = app.patch.routes_to(cref).collect();
@@ -972,28 +670,15 @@ fn draw_controls(
                     let y = rr.bottom() + 4.0 * z;
                     let x0 = rr.left() + w * a + 3.0;
                     let x1 = rr.left() + w * (b + 1.0) - 3.0;
-                    let col = if routes.iter().all(|(_, r)| r.bypass) {
-                        th.ink2
-                    } else {
-                        th.cv
-                    };
+                    let col = if routes.iter().all(|(_, r)| r.bypass) { th.ink2 } else { th.cv };
                     p.line_segment([pos2(x0, y), pos2(x1, y)], Stroke::new(3.0 * z, col));
                     for (k, _) in routes.iter().enumerate().take(3) {
-                        let pp = pos2(
-                            rr.center().x
-                                + (k as f32 - (routes.len().min(3) as f32 - 1.0) / 2.0) * 15.0 * z,
-                            rr.bottom() + 10.0 * z,
-                        );
+                        let pp = pos2(rr.center().x + (k as f32 - (routes.len().min(3) as f32 - 1.0) / 2.0) * 15.0 * z, rr.bottom() + 10.0 * z);
                         p.circle_filled(pp, 3.4 * z, col);
                     }
                 }
                 if flash {
-                    p.rect_stroke(
-                        rr.expand(5.0 * z),
-                        CornerRadius::same(6),
-                        Stroke::new(3.0 * z, th.sel),
-                        StrokeKind::Outside,
-                    );
+                    p.rect_stroke(rr.expand(5.0 * z), CornerRadius::same(6), Stroke::new(3.0 * z, th.sel), StrokeKind::Outside);
                 }
             }
         }
@@ -1006,16 +691,7 @@ fn draw_controls(
 }
 
 fn diamond(p: &Painter, c: Pos2, col: Color32, s: f32) {
-    p.add(Shape::convex_polygon(
-        vec![
-            c + vec2(0.0, -s),
-            c + vec2(s, 0.0),
-            c + vec2(0.0, s),
-            c + vec2(-s, 0.0),
-        ],
-        col,
-        Stroke::NONE,
-    ));
+    p.add(Shape::convex_polygon(vec![c + vec2(0.0, -s), c + vec2(s, 0.0), c + vec2(0.0, s), c + vec2(-s, 0.0)], col, Stroke::NONE));
 }
 
 fn draw_knob(app: &App, p: &Painter, th: &Theme, xf: Xf, cref: CtlRef, cen: Pos2, r: f32) {
@@ -1026,39 +702,20 @@ fn draw_knob(app: &App, p: &Painter, th: &Theme, xf: Xf, cref: CtlRef, cen: Pos2
     let base = m.values[cref.c];
     for i in 0..=10 {
         let t = i as f32 / 10.0;
-        p.line_segment(
-            [
-                geom::polar(c, rs + 4.0 * z, t),
-                geom::polar(c, rs + 7.5 * z, t),
-            ],
-            Stroke::new(1.2 * z, th.tick),
-        );
+        p.line_segment([geom::polar(c, rs + 4.0 * z, t), geom::polar(c, rs + 7.5 * z, t)], Stroke::new(1.2 * z, th.tick));
     }
     p.circle_filled(c, rs + 1.5 * z, th.skirt);
     p.circle_filled(c, rs * 0.84, th.knob);
-    p.circle_filled(
-        c + vec2(-0.25, -0.3) * rs,
-        rs * 0.35,
-        th.knob_hi.gamma_multiply(0.35),
-    );
+    p.circle_filled(c + vec2(-0.25, -0.3) * rs, rs * 0.35, th.knob_hi.gamma_multiply(0.35));
     if th.dark {
         // Knurled light-metal cap (A-dark takes B's material).
         for i in 0..24 {
             let a = i as f32 / 24.0 * std::f32::consts::TAU;
             let dir = vec2(a.cos(), a.sin());
-            p.line_segment(
-                [c + dir * rs * 0.74, c + dir * rs * 0.84],
-                Stroke::new(1.0, darken(th.knob, 0.3)),
-            );
+            p.line_segment([c + dir * rs * 0.74, c + dir * rs * 0.84], Stroke::new(1.0, darken(th.knob, 0.3)));
         }
     }
-    p.line_segment(
-        [
-            c + (geom::polar(c, 1.0, base) - c) * rs * 0.2,
-            geom::polar(c, rs * 0.78, base),
-        ],
-        Stroke::new(2.6 * z, th.pointer),
-    );
+    p.line_segment([c + (geom::polar(c, 1.0, base) - c) * rs * 0.2, geom::polar(c, rs * 0.78, base)], Stroke::new(2.6 * z, th.pointer));
 
     let routes: Vec<(usize, &Route)> = app.patch.routes_to(cref).collect();
     if routes.is_empty() {
@@ -1068,47 +725,21 @@ fn draw_knob(app: &App, p: &Painter, th: &Theme, xf: Xf, cref: CtlRef, cen: Pos2
     let rr = rs + 11.0 * z;
     let inspected = app.inspect == Some(cref);
     let depth_drag = matches!(app.gesture, Gesture::Depth { route, .. } if app.patch.routes.get(route).is_some_and(|r| r.dst == cref));
-    let strong = inspected
-        || depth_drag
-        || routes
-            .iter()
-            .any(|(i, r)| Some(r.src.m) == app.selected || Some(*i) == app.geo.selected_route);
+    let strong = inspected || depth_drag || routes.iter().any(|(i, r)| Some(r.src.m) == app.selected || Some(*i) == app.geo.selected_route);
     let active: Vec<&(usize, &Route)> = routes.iter().filter(|(_, r)| !r.bypass).collect();
     if !active.is_empty() {
         let (lo, hi) = app.patch.mod_span(cref, false);
         let (l, h) = (base + lo, base + hi);
         for (beyond, lim) in [(l < 0.0, 0.0), (h > 1.0, 1.0)] {
             if beyond {
-                let (t0, t1) = if lim == 0.0 {
-                    (l.max(-0.12), 0.0)
-                } else {
-                    (1.0, h.min(1.12))
-                };
-                dashed(
-                    p,
-                    &arc_points(c, rr, t0, t1),
-                    Stroke::new(2.0 * z, col.gamma_multiply(0.7)),
-                    3.0 * z,
-                    3.0 * z,
-                );
-                let (a, b) = (
-                    geom::polar(c, rs + 5.0 * z, lim),
-                    geom::polar(c, rs + 17.0 * z, lim),
-                );
+                let (t0, t1) = if lim == 0.0 { (l.max(-0.12), 0.0) } else { (1.0, h.min(1.12)) };
+                dashed(p, &arc_points(c, rr, t0, t1), Stroke::new(2.0 * z, col.gamma_multiply(0.7)), 3.0 * z, 3.0 * z);
+                let (a, b) = (geom::polar(c, rs + 5.0 * z, lim), geom::polar(c, rs + 17.0 * z, lim));
                 p.line_segment([a, b], Stroke::new(4.5 * z, darken(col, 0.45)));
                 p.line_segment([a, b], Stroke::new(2.5 * z, col));
             }
         }
-        two_tone_arc(
-            p,
-            c,
-            rr,
-            l.max(0.0),
-            h.min(1.0),
-            col,
-            if strong { 4.0 * z } else { 3.0 * z },
-            if strong { 1.0 } else { 0.75 },
-        );
+        two_tone_arc(p, c, rr, l.max(0.0), h.min(1.0), col, if strong { 4.0 * z } else { 3.0 * z }, if strong { 1.0 } else { 0.75 });
         if active.len() == 1 {
             let tip = geom::polar(c, rr, (base + active[0].1.amount).clamp(0.0, 1.0));
             p.circle_filled(tip, 4.2 * z, th.panel);
@@ -1117,28 +748,13 @@ fn draw_knob(app: &App, p: &Painter, th: &Theme, xf: Xf, cref: CtlRef, cen: Pos2
         }
     } else {
         let (lo, hi) = app.patch.mod_span(cref, true);
-        dashed(
-            p,
-            &arc_points(c, rr, (base + lo).max(0.0), (base + hi).min(1.0)),
-            Stroke::new(2.0 * z, th.ink2),
-            4.0 * z,
-            3.0 * z,
-        );
+        dashed(p, &arc_points(c, rr, (base + lo).max(0.0), (base + hi).min(1.0)), Stroke::new(2.0 * z, th.ink2), 4.0 * z, 3.0 * z);
     }
     if inspected && routes.len() > 1 {
         for (i, (_, r)) in routes.iter().enumerate() {
             let (a, b) = app.patch.route_span(r);
             let lane = col.lerp_to_gamma(Color32::WHITE, 0.25 * i as f32);
-            two_tone_arc(
-                p,
-                c,
-                rr + (7.0 + 6.0 * i as f32) * z,
-                (base + a).max(0.0),
-                (base + b).min(1.0),
-                if r.bypass { th.ink2 } else { lane },
-                2.0 * z,
-                1.0,
-            );
+            two_tone_arc(p, c, rr + (7.0 + 6.0 * i as f32) * z, (base + a).max(0.0), (base + b).min(1.0), if r.bypass { th.ink2 } else { lane }, 2.0 * z, 1.0);
         }
     }
     // Depth handle: the explicit alternative always shows it; the ring variant shows it while
@@ -1148,49 +764,23 @@ fn draw_knob(app: &App, p: &Painter, th: &Theme, xf: Xf, cref: CtlRef, cen: Pos2
         if let Some(ri) = geom::depth_route(&app.patch, cref, app.geo.selected_route) {
             let tip = geom::polar(c, rr, (base + app.patch.routes[ri].amount).clamp(0.0, 1.0));
             p.circle_filled(tip, if depth_drag { 7.0 } else { 5.5 } * z, Color32::WHITE);
-            p.circle_stroke(
-                tip,
-                if depth_drag { 7.0 } else { 5.5 } * z,
-                Stroke::new(2.5 * z, th.sel),
-            );
+            p.circle_stroke(tip, if depth_drag { 7.0 } else { 5.5 } * z, Stroke::new(2.5 * z, th.sel));
         }
     }
-    if app.geo.depth == DepthGesture::RingBand
-        && matches!(app.hover, Some(Hit::Ring(h)) if h == cref)
-        && !depth_drag
-    {
-        p.circle_stroke(
-            c,
-            rs + geom::RING_R0 * z,
-            Stroke::new(1.0, th.sel.gamma_multiply(0.5)),
-        );
-        p.circle_stroke(
-            c,
-            rs + geom::RING_R1 * z,
-            Stroke::new(1.0, th.sel.gamma_multiply(0.5)),
-        );
+    if app.geo.depth == DepthGesture::RingBand && matches!(app.hover, Some(Hit::Ring(h)) if h == cref) && !depth_drag {
+        p.circle_stroke(c, rs + geom::RING_R0 * z, Stroke::new(1.0, th.sel.gamma_multiply(0.5)));
+        p.circle_stroke(c, rs + geom::RING_R1 * z, Stroke::new(1.0, th.sel.gamma_multiply(0.5)));
     }
 }
 
 /// `overlay_pass`: Some(true) draws only a floating area's controls, Some(false) everything else.
-fn draw_pills(
-    app: &App,
-    p: &Painter,
-    th: &Theme,
-    xf: Xf,
-    mi: usize,
-    pl: &Placed,
-    hidden: bool,
-    overlay_pass: Option<bool>,
-) {
+fn draw_pills(app: &App, p: &Painter, th: &Theme, xf: Xf, mi: usize, pl: &Placed, hidden: bool, overlay_pass: Option<bool>) {
     let m = &app.patch.modules[mi];
     let d = m.def();
     let z = xf.zoom;
     let on_art = m.kind == Kind::Ensemble && app.labels_on_art;
     for (c, g) in pl.ctls.iter().enumerate() {
-        let Some(CtlGeo::Knob { c: cen, r }) = *g else {
-            continue;
-        };
+        let Some(CtlGeo::Knob { c: cen, r }) = *g else { continue };
         if overlay_pass.is_some_and(|o| o != (pl.overlay && !m.primary[c])) {
             continue;
         }
@@ -1200,15 +790,7 @@ fn draw_pills(
         let pr = xf.r(g.as_ref().unwrap().pill_rect(&value));
         if routes.is_empty() {
             let ink = if on_art { skin_ink(th.dark) } else { th.ink };
-            text(
-                p,
-                pr.center(),
-                Align2::CENTER_CENTER,
-                &value,
-                11.5 * z,
-                ink,
-                true,
-            );
+            text(p, pr.center(), Align2::CENTER_CENTER, &value, 11.5 * z, ink, true);
             continue;
         }
         let active = routes.iter().any(|(_, r)| !r.bypass);
@@ -1216,15 +798,7 @@ fn draw_pills(
         if routes.len() > 3 {
             // The 3rd plug position is shared by every further route.
             let third = xf.p(geom::plug_pos(cen, r, 2, routes.len()));
-            text(
-                p,
-                third + vec2(9.0, 0.0) * z,
-                Align2::LEFT_CENTER,
-                &format!("+{}", routes.len() - 2),
-                10.0 * z,
-                pc,
-                false,
-            );
+            text(p, third + vec2(9.0, 0.0) * z, Align2::LEFT_CENTER, &format!("+{}", routes.len() - 2), 10.0 * z, pc, false);
         }
         if hidden {
             for (k, _) in routes.iter().enumerate().take(3) {
@@ -1232,11 +806,7 @@ fn draw_pills(
                 p.circle_filled(sp, 5.0 * z, darken(pc, 0.45));
                 p.circle_filled(sp, 3.4 * z, pc);
             }
-            let s = if routes.len() == 1 {
-                format!("← {}", app.patch.module_label(routes[0].1.src.m))
-            } else {
-                format!("← {} mods", routes.len())
-            };
+            let s = if routes.len() == 1 { format!("← {}", app.patch.module_label(routes[0].1.src.m)) } else { format!("← {} mods", routes.len()) };
             badge(p, badge_pos(app, pl, mi, c, pr, &s, xf), &s, pc, th, z);
         }
         pill(p, pr, &value, pc, th.panel, th.ink, 11.5 * z);
@@ -1248,11 +818,7 @@ fn draw_pills(
             if let Some(s) = jack_badge(&app.patch, jr) {
                 let c = xf.p(pl.jack_center(j));
                 let col = th.sig(jd.sig);
-                let at = if jd.label_right {
-                    c + vec2(0.0, 22.0) * z
-                } else {
-                    c + vec2(0.0, 23.0) * z
-                };
+                let at = if jd.label_right { c + vec2(0.0, 22.0) * z } else { c + vec2(0.0, 23.0) * z };
                 badge(p, at, &s, col, th, z);
             }
         }
@@ -1272,10 +838,7 @@ fn badge_pos(app: &App, pl: &Placed, mi: usize, own: usize, pill: Rect, s: &str,
         .filter(|(c, _)| *c != own)
         .filter_map(|(c, g)| g.map(|g| (c, g)))
         .flat_map(|(c, g)| {
-            let lab = Rect::from_center_size(
-                g.label_pos(),
-                vec2(d.controls[c].label.chars().count() as f32 * 7.0, 16.0),
-            );
+            let lab = Rect::from_center_size(g.label_pos(), vec2(d.controls[c].label.chars().count() as f32 * 7.0, 16.0));
             let body = match g {
                 CtlGeo::Select { rect } => rect,
                 CtlGeo::Knob { c, r } => Rect::from_center_size(c, vec2(2.0 * r, 2.0 * r)),
@@ -1295,22 +858,14 @@ fn badge_pos(app: &App, pl: &Placed, mi: usize, own: usize, pill: Rect, s: &str,
         let r = Rect::from_center_size(c, vec2(bw, 15.0 * z));
         panel.contains_rect(r) && !obstacles.iter().any(|o| o.intersects(r))
     };
-    [below, right, left]
-        .into_iter()
-        .find(|c| fits(*c))
-        .unwrap_or(below)
+    [below, right, left].into_iter().find(|c| fits(*c)).unwrap_or(below)
 }
 
 /// `← MIDI`, `→ Filter`, `→ 2 routes`; None when unconnected.
 pub fn jack_badge(p: &Patch, jr: JackRef) -> Option<String> {
     let jd = p.jack_def(jr);
     if jd.out {
-        let mut dests: Vec<usize> = p
-            .cables
-            .iter()
-            .filter(|c| c.from == jr)
-            .map(|c| c.to.m)
-            .collect();
+        let mut dests: Vec<usize> = p.cables.iter().filter(|c| c.from == jr).map(|c| c.to.m).collect();
         dests.extend(p.routes.iter().filter(|r| r.src == jr).map(|r| r.dst.m));
         match dests.len() {
             0 => None,
@@ -1325,10 +880,7 @@ pub fn jack_badge(p: &Patch, jr: JackRef) -> Option<String> {
             }
         }
     } else {
-        p.cables
-            .iter()
-            .find(|c| c.to == jr)
-            .map(|c| format!("← {}", p.module_label(c.from.m)))
+        p.cables.iter().find(|c| c.to == jr).map(|c| format!("← {}", p.module_label(c.from.m)))
     }
 }
 
@@ -1342,77 +894,30 @@ fn draw_jacks(app: &App, p: &Painter, th: &Theme, xf: Xf, mi: usize, pl: &Placed
         let connected = jack_badge(&app.patch, jr).is_some();
         if pl.compact {
             let r = xf.r(pl.jacks[j]);
-            p.rect_filled(
-                r,
-                CornerRadius::same(4),
-                if th.dark { th.plate } else { th.seg_bg },
-            );
-            p.rect_filled(
-                Rect::from_min_size(r.min, vec2(3.0 * z, r.height())),
-                CornerRadius::same(1),
-                col,
-            );
+            p.rect_filled(r, CornerRadius::same(4), if th.dark { th.plate } else { th.seg_bg });
+            p.rect_filled(Rect::from_min_size(r.min, vec2(3.0 * z, r.height())), CornerRadius::same(1), col);
             let s = match jack_badge(&app.patch, jr) {
                 Some(b) => format!("{} {b}", jd.label),
                 None => jd.label.to_string(),
             };
             let ink = if th.dark { th.plate_ink } else { th.ink };
-            let g = p.layout_no_wrap(
-                s,
-                FontId::proportional(10.5 * z),
-                if connected { ink } else { th.ink2 },
-            );
+            let g = p.layout_no_wrap(s, FontId::proportional(10.5 * z), if connected { ink } else { th.ink2 });
             let clip = p.with_clip_rect(r.shrink(2.0));
-            clip.galley(
-                pos2(r.left() + 7.0 * z, r.center().y - g.size().y / 2.0),
-                g,
-                ink,
-            );
+            clip.galley(pos2(r.left() + 7.0 * z, r.center().y - g.size().y / 2.0), g, ink);
             continue;
         }
         let c = xf.p(pl.jack_center(j));
         let on_plate = jd.out && m.kind != Kind::Ensemble;
-        let lab_ink = if on_plate || m.kind == Kind::Midi {
-            th.plate_ink
-        } else if skin && app.labels_on_art {
-            skin_ink(th.dark)
-        } else {
-            th.ink
-        };
+        let lab_ink = if on_plate || m.kind == Kind::Midi { th.plate_ink } else if skin && app.labels_on_art { skin_ink(th.dark) } else { th.ink };
         if skin && !app.labels_on_art {
-            p.rect_filled(
-                Rect::from_center_size(c + vec2(0.0, -10.0) * z, vec2(40.0, 52.0) * z),
-                CornerRadius::same(5),
-                th.panel.gamma_multiply(0.96),
-            );
+            p.rect_filled(Rect::from_center_size(c + vec2(0.0, -10.0) * z, vec2(40.0, 52.0) * z), CornerRadius::same(5), th.panel.gamma_multiply(0.96));
         }
         if jd.label_right {
-            text(
-                p,
-                c + vec2(20.0 * z, 0.0),
-                Align2::LEFT_CENTER,
-                jd.label,
-                12.5 * z,
-                lab_ink,
-                false,
-            );
+            text(p, c + vec2(20.0 * z, 0.0), Align2::LEFT_CENTER, jd.label, 12.5 * z, lab_ink, false);
         } else {
-            let lr = text(
-                p,
-                c + vec2(0.0, -24.0 * z),
-                Align2::CENTER_CENTER,
-                jd.label,
-                12.5 * z,
-                lab_ink,
-                false,
-            );
+            let lr = text(p, c + vec2(0.0, -24.0 * z), Align2::CENTER_CENTER, jd.label, 12.5 * z, lab_ink, false);
             if jd.conceptual {
-                diamond(
-                    p,
-                    pos2(lr.right() + 6.0 * z, lr.center().y),
-                    th.concept,
-                    3.5 * z,
-                );
+                diamond(p, pos2(lr.right() + 6.0 * z, lr.center().y), th.concept, 3.5 * z);
             }
         }
         p.circle_filled(c, xf.s(JACK_R), th.nut);
@@ -1431,26 +936,13 @@ fn cable_path(p: &Painter, a: Pos2, b: Pos2, col: Color32, w: f32, alpha: f32, b
         .map(|i| {
             let t = i as f32 / 40.0;
             let u = 1.0 - t;
-            (a.to_vec2() * u * u * u
-                + c1.to_vec2() * 3.0 * u * u * t
-                + c2.to_vec2() * 3.0 * u * t * t
-                + b.to_vec2() * t * t * t)
-                .to_pos2()
+            (a.to_vec2() * u * u * u + c1.to_vec2() * 3.0 * u * u * t + c2.to_vec2() * 3.0 * u * t * t + b.to_vec2() * t * t * t).to_pos2()
         })
         .collect();
     if bypass {
-        dashed(
-            p,
-            &pts,
-            Stroke::new(w, Color32::from_gray(140).gamma_multiply(alpha)),
-            7.0,
-            5.0,
-        );
+        dashed(p, &pts, Stroke::new(w, Color32::from_gray(140).gamma_multiply(alpha)), 7.0, 5.0);
     } else {
-        p.add(Shape::line(
-            pts.clone(),
-            Stroke::new(w + 2.0, Color32::from_black_alpha((90.0 * alpha) as u8)),
-        ));
+        p.add(Shape::line(pts.clone(), Stroke::new(w + 2.0, Color32::from_black_alpha((90.0 * alpha) as u8))));
         p.add(Shape::line(pts, Stroke::new(w, col.gamma_multiply(alpha))));
     }
     for e in [a, b] {
@@ -1465,32 +957,15 @@ pub fn route_end(app: &App, ri: usize) -> Option<Pos2> {
     let pl = &app.layout.mods[r.dst.m];
     match pl.ctls[r.dst.c] {
         Some(CtlGeo::Knob { c, r: rad }) => {
-            let idx = app
-                .patch
-                .routes_to(r.dst)
-                .position(|(i, _)| i == ri)
-                .unwrap_or(0);
-            Some(geom::plug_pos(
-                c,
-                rad,
-                idx,
-                app.patch.routes_to(r.dst).count(),
-            ))
+            let idx = app.patch.routes_to(r.dst).position(|(i, _)| i == ri).unwrap_or(0);
+            Some(geom::plug_pos(c, rad, idx, app.patch.routes_to(r.dst).count()))
         }
         Some(CtlGeo::Select { rect }) => Some(pos2(rect.center().x, rect.bottom() + 10.0)),
         None => pl.toggle.map(|t| t.center()),
     }
 }
 
-fn draw_cables(
-    app: &App,
-    p: &Painter,
-    th: &Theme,
-    xf: Xf,
-    focus: Option<usize>,
-    mode: Cables,
-    overlay_pass: bool,
-) {
+fn draw_cables(app: &App, p: &Painter, th: &Theme, xf: Xf, focus: Option<usize>, mode: Cables, overlay_pass: bool) {
     let z = xf.zoom;
     let in_overlay = |ri: usize| {
         let r = app.patch.routes[ri];
@@ -1513,23 +988,11 @@ fn draw_cables(
         if in_overlay(ri) != overlay_pass {
             continue;
         }
-        let Some(end) = route_end(app, ri) else {
-            continue;
-        };
+        let Some(end) = route_end(app, ri) else { continue };
         let a = xf.p(app.layout.mods[r.src.m].jack_center(r.src.j));
-        let strong = app.geo.selected_route == Some(ri)
-            || app.inspect == Some(r.dst)
-            || app.selected == Some(r.src.m);
+        let strong = app.geo.selected_route == Some(ri) || app.inspect == Some(r.dst) || app.selected == Some(r.src.m);
         let alpha = alpha_for(r.src.m, r.dst.m) * if strong { 1.0 } else { 0.72 };
-        cable_path(
-            p,
-            a,
-            xf.p(end),
-            th.sig(app.patch.jack_def(r.src).sig),
-            4.0 * z,
-            alpha,
-            r.bypass,
-        );
+        cable_path(p, a, xf.p(end), th.sig(app.patch.jack_def(r.src).sig), 4.0 * z, alpha, r.bypass);
     }
 }
 
@@ -1542,13 +1005,7 @@ fn draw_lfo_preview(app: &App, p: &Painter, th: &Theme, xf: Xf, mi: usize, pr: R
         let c = app.patch.ctl(mi, id).c;
         to_value(&m.def().controls[c].spec, m.values[c])
     };
-    let (wave, amp, off, phase, fade) = (
-        v("waveform") as usize,
-        v("amp"),
-        v("offset"),
-        v("phase") / 360.0,
-        v("fade_ms"),
-    );
+    let (wave, amp, off, phase, fade) = (v("waveform") as usize, v("amp"), v("offset"), v("phase") / 360.0, v("fade_ms"));
     let uni = v("polarity") >= 1.0;
     let n = 120;
     let pts: Vec<Pos2> = (0..=n)
@@ -1559,13 +1016,7 @@ fn draw_lfo_preview(app: &App, p: &Painter, th: &Theme, xf: Xf, mi: usize, pr: R
                 0 => (ph * std::f32::consts::TAU).sin(),
                 1 => 1.0 - 4.0 * (ph - 0.5).abs(),
                 2 => 2.0 * ph - 1.0,
-                3 => {
-                    if ph < 0.5 {
-                        1.0
-                    } else {
-                        -1.0
-                    }
-                }
+                3 => if ph < 0.5 { 1.0 } else { -1.0 },
                 _ => [0.3, -0.7, 0.9, -0.2][((x * 2.0 + phase) as usize) % 4],
             };
             let s = if uni { (s + 1.0) / 2.0 } else { s };
@@ -1573,26 +1024,12 @@ fn draw_lfo_preview(app: &App, p: &Painter, th: &Theme, xf: Xf, mi: usize, pr: R
             let secs = x * 2.0 / v("rate_hz").max(0.01);
             let f = (secs * 1000.0 / fade.max(1.0)).min(1.0);
             let y = (off + amp * f * s).clamp(-1.0, 1.0);
-            pos2(
-                r.left() + r.width() * x,
-                r.center().y - y * (r.height() / 2.0 - 6.0 * z),
-            )
+            pos2(r.left() + r.width() * x, r.center().y - y * (r.height() / 2.0 - 6.0 * z))
         })
         .collect();
-    p.line_segment(
-        [pos2(r.left(), r.center().y), pos2(r.right(), r.center().y)],
-        Stroke::new(1.0, th.display_ink.gamma_multiply(0.2)),
-    );
+    p.line_segment([pos2(r.left(), r.center().y), pos2(r.right(), r.center().y)], Stroke::new(1.0, th.display_ink.gamma_multiply(0.2)));
     p.add(Shape::line(pts, Stroke::new(1.6 * z, th.display_ink)));
-    text(
-        p,
-        r.left_top() + vec2(4.0, 3.0) * z,
-        Align2::LEFT_TOP,
-        "PREVIEW · from params · not audio",
-        9.0 * z,
-        th.concept,
-        true,
-    );
+    text(p, r.left_top() + vec2(4.0, 3.0) * z, Align2::LEFT_TOP, "PREVIEW · from params · not audio", 9.0 * z, th.concept, true);
 }
 
 // ------------------------------------------------------------------------------ envelope A/B plot
@@ -1604,26 +1041,14 @@ pub fn env_plot(p: &Painter, rect: Rect, a: &[f32], b: &[f32], seconds: f32, th:
         let pts: Vec<Pos2> = (0..n)
             .map(|x| {
                 let i = x * sig.len() / n;
-                pos2(
-                    rect.left() + x as f32,
-                    rect.bottom() - 4.0 - (rect.height() - 8.0) * sig[i.min(sig.len() - 1)],
-                )
+                pos2(rect.left() + x as f32, rect.bottom() - 4.0 - (rect.height() - 8.0) * sig[i.min(sig.len() - 1)])
             })
             .collect();
         p.add(Shape::line(pts, Stroke::new(1.4, col)));
     }
     for s in 0..=(seconds as usize) {
         let x = rect.left() + rect.width() * s as f32 / seconds;
-        p.line_segment(
-            [pos2(x, rect.bottom() - 4.0), pos2(x, rect.bottom())],
-            Stroke::new(1.0, th.display_ink.gamma_multiply(0.5)),
-        );
-        p.text(
-            pos2(x + 2.0, rect.bottom() - 2.0),
-            Align2::LEFT_BOTTOM,
-            format!("{s}s"),
-            FontId::monospace(9.0),
-            th.display_ink.gamma_multiply(0.6),
-        );
+        p.line_segment([pos2(x, rect.bottom() - 4.0), pos2(x, rect.bottom())], Stroke::new(1.0, th.display_ink.gamma_multiply(0.5)));
+        p.text(pos2(x + 2.0, rect.bottom() - 2.0), Align2::LEFT_BOTTOM, format!("{s}s"), FontId::monospace(9.0), th.display_ink.gamma_multiply(0.6));
     }
 }
