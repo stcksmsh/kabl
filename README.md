@@ -11,6 +11,8 @@ the CLAP validator). Linux is the supported platform for 1.0.
 
 <p align="center"><img src="docs/design/app-target/media/widget-set/1280x800-dark-rack-sounds.webp" alt="The kabl rack with the Sounds browser open" width="800"></p>
 
+<p align="center"><img src="docs/design/app-target/media/perform/composition-1280x800-dark.webp" alt="The Perform view with scenes, macros and bank cards" width="800"></p>
+
 ## What is in it
 
 - **Modules (24 kinds):** analog-style, FM (two-operator and six-operator) and wavetable
