@@ -139,6 +139,8 @@ pub enum Decor {
     Status(Pos2),
     /// The sequencer's header strip: EDIT tabs on the left, PLAY buttons on the right.
     Banks(Rect),
+    /// The FM voice's six operator blocks, side by side.
+    Operators(Rect),
     /// The cue buttons (two rows of four) and Cancel.
     Cues(Rect),
 }
@@ -208,6 +210,7 @@ impl Placed {
             Decor::Status(c) => Decor::Status(c + d),
             Decor::Banks(r) => Decor::Banks(r.translate(d)),
             Decor::Cues(r) => Decor::Cues(r.translate(d)),
+            Decor::Operators(r) => Decor::Operators(r.translate(d)),
         };
     }
 }
@@ -382,7 +385,7 @@ fn place_local(
     let base_w = info.width_units as f32 * UNIT;
     let fw = match skin {
         Some(s) => ((s.panel_size.0 / UNIT).round() * UNIT).max(base_w),
-        None if face_knobs.len() >= 3 => {
+        None if face_knobs.len() >= 3 && info.kind != "osc.fm6" => {
             base_w.max(((72.0 + 56.0 * (face_knobs.len() as f32 - 1.0)) / UNIT).ceil() * UNIT)
         }
         None => base_w,
@@ -451,10 +454,20 @@ fn place_local(
         // Jacks first: they anchor the bottom of the face and never move.
         let column = info.kind == "out";
         let ports = ins.len() + outs.len();
+        let fm6 = info.kind == "osc.fm6";
         // A wide panel (the sequencer) keeps one row, clear of its selector row.
         let two_rows =
             !column && ports > 3 && !(ports == 4 && fw >= 240.0) && fw < 100.0 * ports as f32;
-        if column {
+        if fm6 {
+            // Top left, above the operators.
+            for (k, &port) in ins.iter().chain(&outs).enumerate() {
+                jacks.push(Jack {
+                    port,
+                    c: pos2(36.0 + 56.0 * k as f32, 60.0),
+                    label_right: false,
+                });
+            }
+        } else if column {
             for (i, &port) in ins.iter().enumerate() {
                 jacks.push(Jack {
                     port,
@@ -539,6 +552,11 @@ fn place_local(
         }
         if info.kind == "midi.in" {
             decor = midi_in_face(info, &face_knobs, &face_sels, fw, &mut ctls, &mut off_face);
+        } else if info.kind == "osc.fm6" {
+            let all: Vec<usize> = (0..info.params.len())
+                .filter(|i| face_knobs.contains(i) || face_sels.contains(i))
+                .collect();
+            decor = fm6_face(info, &all, fw, &mut ctls, &mut off_face);
         } else {
             let n = face_knobs.len();
             for (k, &i) in face_knobs.iter().enumerate() {
@@ -762,6 +780,99 @@ fn midi_in_face(
     decor
 }
 
+/// The six-operator FM voice. A header band holds the jacks, feedback, index and the algorithm
+/// choice; under it one framed block per operator: ratio across the top, then fine, level and
+/// velocity, then the four envelope knobs. Other chosen controls go to the advanced area.
+fn fm6_face(
+    info: &'static ModuleInfo,
+    controls: &[usize],
+    fw: f32,
+    ctls: &mut Vec<Ctl>,
+    off_face: &mut Vec<usize>,
+) -> Decor {
+    const TOP: f32 = 100.0;
+    let blocks = fm6_blocks(Rect::from_min_size(pos2(10.0, TOP), vec2(fw - 20.0, 238.0)));
+    for &i in controls {
+        let name = info.params[i].name;
+        let op = name
+            .chars()
+            .last()
+            .and_then(|c| c.to_digit(10))
+            .filter(|d| (1..=6).contains(d))
+            .map(|d| d as usize - 1);
+        let base = op.map_or(name, |_| &name[..name.len() - 1]);
+        let b = blocks[op.unwrap_or(0)];
+        let (bx, bw) = (b.left(), b.width());
+        let row1 = |k: usize| pos2(bx + bw * (k as f32 + 0.5) / 3.0, TOP + 92.0);
+        let row2 = |k: usize| pos2(bx + 26.0 + (bw - 52.0) * k as f32 / 3.0, TOP + 188.0);
+        let geo = match (op, base) {
+            (Some(_), "ratio") => Geo::Select {
+                rect: Rect::from_min_size(pos2(bx + 10.0, TOP + 20.0), vec2(bw - 20.0, 20.0)),
+            },
+            (Some(_), "fine") => Geo::Knob {
+                c: row1(0),
+                r: R_SMALL,
+            },
+            (Some(_), "level") => Geo::Knob {
+                c: row1(1),
+                r: R_SMALL,
+            },
+            (Some(_), "vel") => Geo::Knob {
+                c: row1(2),
+                r: R_SMALL,
+            },
+            (Some(_), "attack") => Geo::Knob {
+                c: row2(0),
+                r: R_SMALL,
+            },
+            (Some(_), "decay") => Geo::Knob {
+                c: row2(1),
+                r: R_SMALL,
+            },
+            (Some(_), "sustain") => Geo::Knob {
+                c: row2(2),
+                r: R_SMALL,
+            },
+            (Some(_), "release") => Geo::Knob {
+                c: row2(3),
+                r: R_SMALL,
+            },
+            (None, "feedback") => Geo::Knob {
+                c: pos2(390.0, 50.0),
+                r: R_SMALL,
+            },
+            (None, "index") => Geo::Knob {
+                c: pos2(450.0, 50.0),
+                r: R_SMALL,
+            },
+            (None, "algorithm") => Geo::Select {
+                rect: Rect::from_min_size(pos2(fw - 400.0, 40.0), vec2(220.0, 28.0)),
+            },
+            _ => {
+                off_face.push(i);
+                continue;
+            }
+        };
+        ctls.push(Ctl {
+            param: &info.params[i],
+            primary: true,
+            geo,
+        });
+    }
+    off_face.sort_unstable();
+    Decor::Operators(Rect::from_min_size(pos2(10.0, TOP), vec2(fw - 20.0, 238.0)))
+}
+
+/// The six operator blocks inside `r`. A wider gap down the middle keeps the face caption
+/// clear of the controls.
+pub fn fm6_blocks(r: Rect) -> [Rect; 6] {
+    let w = (r.width() - 55.0) / 6.0;
+    std::array::from_fn(|i| {
+        let x = r.left() + i as f32 * (w + 3.0) + if i >= 3 { 40.0 } else { 0.0 };
+        Rect::from_min_size(pos2(x, r.top()), vec2(w, r.height()))
+    })
+}
+
 /// Stable per-instance presentation order, shared by all sequencer banks.
 pub fn control_order(m: &ModuleState, info: &ModuleInfo) -> Vec<usize> {
     let mut order: Vec<_> = (0..info.params.len()).collect();
@@ -929,7 +1040,17 @@ mod tests {
                 let l = layout(&q, &v);
                 for m in &l.mods {
                     let area = m.full();
-                    let mut boxes: Vec<Rect> = m.ctls.iter().map(|c| c.geo.bounds()).collect();
+                    // The FM voice packs six envelopes into one row: its knob boxes are the
+                    // drawn label and value, without the usual padding.
+                    let dense = m.info.kind == "osc.fm6";
+                    let mut boxes: Vec<Rect> = m
+                        .ctls
+                        .iter()
+                        .map(|c| match c.geo {
+                            Geo::Knob { .. } if dense => c.geo.bounds().shrink2(vec2(8.0, 6.0)),
+                            _ => c.geo.bounds(),
+                        })
+                        .collect();
                     boxes.extend(
                         m.jacks.iter().map(|j| {
                             Rect::from_center_size(j.c - vec2(0.0, 10.0), vec2(26.0, 46.0))

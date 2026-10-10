@@ -1,0 +1,8 @@
+# Capture one module face, light then dark, routing panel closed. Narrow modules open at 100%.
+sleep 1
+click routing
+sleep 1
+shot light
+click theme:dark
+sleep 0.5
+shot dark

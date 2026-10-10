@@ -63,7 +63,7 @@ use std::fmt;
 use kabl_cables::{Carry, Node as CableNode, Settings as CableSettings};
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
 use kabl_modules::builtins::{
-    Change, Clock, Delay, DelayLock, KeySettings, Lfo, LfoSync, MidiIn, Noise, OscWt, Seq,
+    Change, Clock, Delay, DelayLock, KeySettings, Lfo, LfoSync, MidiIn, Noise, OscWt, Random, Seq,
     Transport,
 };
 use kabl_modules::module::{QualityConfig, QualityTier};
@@ -1381,6 +1381,9 @@ fn compile_inner(
             }
             if let Some(noise) = instance.as_any_mut().downcast_mut::<Noise>() {
                 noise.seed(id, lane);
+            }
+            if let Some(random) = instance.as_any_mut().downcast_mut::<Random>() {
+                random.seed(id, lane);
             }
             if let Some(midi) = instance.as_any_mut().downcast_mut::<MidiIn>() {
                 midi.configure(&params);

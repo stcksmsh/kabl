@@ -1,0 +1,12 @@
+name = "Clock Logic"
+category = "Sequence"
+tags = [
+    "logic",
+    "clock",
+    "polyrhythm",
+    "self-playing",
+    "bell",
+]
+description = "One clock divided by 3 and by 4 and combined by logic: xor steps a random bass line, and plays a bell on every twelfth tick while a slow LFO through a comparator allows it. Change a divider to change the whole rhythm."
+keys = false
+sequence = true

@@ -1,0 +1,12 @@
+name = "Scale Walk"
+category = "Sequence"
+tags = [
+    "random",
+    "quantizer",
+    "sequence",
+    "self-playing",
+    "evolving",
+]
+description = "A random loop of sixteen notes held to D dorian that slowly changes as it comes round, plays itself. The envelope fires only when the note changes, so a repeated note rings on. Try another scale or root on the quantizer, or more Change on the random."
+keys = false
+sequence = true

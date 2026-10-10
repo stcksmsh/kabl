@@ -178,6 +178,13 @@ pub fn step_labels(kind: &str, param: &str) -> Option<&'static [&'static str]> {
         ("osc.fm6", r) if r.starts_with("ratio") => &kabl_modules::builtins::RATIO_LABELS,
         ("osc.fm6", "algorithm") => &kabl_modules::builtins::ALGORITHM_LABELS,
         ("osc.fm" | "osc.fm6", "oversample") => &["2X", "4X"],
+        ("quantizer", "scale") => &kabl_modules::builtins::SCALE_LABELS,
+        ("quantizer", "root") => &[
+            "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+        ],
+        ("sample.hold", "mode") => &kabl_modules::builtins::HOLD_MODE_LABELS,
+        ("slew", "mode") => &kabl_modules::builtins::SLEW_MODE_LABELS,
+        ("random", "bipolar") => &kabl_modules::builtins::BIPOLAR_LABELS,
         ("osc.wt", "table") => &kabl_modules::wavetable::FACTORY_NAMES,
         ("osc.wt", "user") => &["OFF", "1", "2", "3", "4", "5", "6", "7", "8"],
         ("vca", "exponential") => &["LIN", "EXP"],
@@ -233,6 +240,23 @@ pub fn param_label(p: &ParamInfo) -> String {
         "predelay_ms" => return "Pre-delay".into(),
         "glide_ms" => return "Glide time".into(),
         n if n.starts_with("level") && n.len() > 5 => return format!("Level {}", &n[5..]),
+        // The FM voice's per-operator controls: short, so six envelopes fit a row.
+        n if n.len() > 3 && n.ends_with(|c: char| ('1'..='6').contains(&c)) => {
+            let (base, op) = n.split_at(n.len() - 1);
+            let short = match base {
+                "ratio" => "Ratio",
+                "fine" => "Fine",
+                "vel" => "Vel",
+                "attack" => "Att",
+                "decay" => "Dec",
+                "sustain" => "Sus",
+                "release" => "Rel",
+                _ => "",
+            };
+            if !short.is_empty() {
+                return format!("{short} {op}");
+            }
+        }
         _ => {}
     }
     let base = name
@@ -417,6 +441,15 @@ pub fn short_name(kind: &str) -> &'static str {
         "osc.va" => "Osc",
         "osc.fm" => "FM",
         "osc.fm6" => "FM6",
+        "quantizer" => "Quant",
+        "sample.hold" => "S&H",
+        "slew" => "Slew",
+        "attenuverter" => "Atten",
+        "logic" => "Logic",
+        "comparator" => "Comp",
+        "crossfade" => "Xfade",
+        "pan" => "Pan",
+        "random" => "Rand",
         "osc.wt" => "Wave",
         "filter.svf" => "Filter",
         "env.adsr" => "ADSR",
@@ -1094,8 +1127,41 @@ pub(crate) fn stepped_selector(
         egui::FontId::proportional(12.5 * z),
         look.ink,
     );
-    painter.rect_filled(rect, 4.0 * z, th.seg_bg);
+    let text_of = |k: usize| {
+        labels
+            .and_then(|l| l.get(k).copied())
+            .map_or(format!("{}", param.min + k as f32), str::to_string)
+    };
     let w = rect.width() / n as f32;
+    // Segments too narrow for the longest option would draw their labels over each other: a
+    // dropdown of the same options instead, whatever the module.
+    let longest = (0..n)
+        .map(|k| text_of(k).chars().count())
+        .max()
+        .unwrap_or(1);
+    if w < (6.9 * longest as f32 + 2.0) * z {
+        let cur = ((value - param.min).max(0.0) as usize).min(n - 1);
+        let opened = ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+            egui::ComboBox::from_id_salt(("kabl-sel", id, param.name))
+                .width(rect.width() - 24.0)
+                .selected_text(egui::RichText::new(text_of(cur)).monospace())
+                .show_ui(ui, |ui| {
+                    for k in 0..n {
+                        if ui.selectable_label(k == cur, text_of(k)).clicked() {
+                            inspect(ui_state, &routes, id, param.name);
+                            editor.set_param(id, param.name, param.min + k as f32);
+                        }
+                    }
+                })
+                .response
+        });
+        // Opening the list inspects the control, as picking a segment does.
+        if opened.inner.clicked() {
+            inspect(ui_state, &routes, id, param.name);
+        }
+        return selector_plug(ui_state, painter, look, &routes, rect);
+    }
+    painter.rect_filled(rect, 4.0 * z, th.seg_bg);
     for k in 0..n {
         let opt = param.min + k as f32;
         let r = Rect::from_min_size(
@@ -1115,13 +1181,10 @@ pub(crate) fn stepped_selector(
                 egui::StrokeKind::Inside,
             );
         }
-        let text = labels
-            .and_then(|l| l.get(k).copied())
-            .map_or(format!("{}", param.min + k as f32), str::to_string);
         painter.text(
             r.center(),
             egui::Align2::CENTER_CENTER,
-            text,
+            text_of(k),
             egui::FontId::monospace(11.5 * z),
             if on { th.seg_on_text } else { look.ink2 },
         );
@@ -1132,6 +1195,19 @@ pub(crate) fn stepped_selector(
             }
         }
     }
+    selector_plug(ui_state, painter, look, &routes, rect)
+}
+
+/// A selector's route plug and "< N mods" badge, below its rect.
+fn selector_plug(
+    ui_state: &mut UiState,
+    painter: &egui::Painter,
+    look: Look,
+    routes: &[RouteView],
+    rect: Rect,
+) -> Vec<(CableId, Pos2)> {
+    let th = theme(ui_state.dark);
+    let z = look.z;
     let plug = Pos2::new(rect.center().x, rect.max.y + 6.0 * z);
     if !routes.is_empty() {
         let col = if routes.iter().all(|r| r.bypass) {

@@ -1,0 +1,11 @@
+# The module's Explain page and the Help overlay, in the running editor.
+sleep 1
+click module:1
+sleep 0.5
+click explain-module:1
+sleep 0.7
+shot explain
+key Escape
+click help
+sleep 0.7
+shot help
