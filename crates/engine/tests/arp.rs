@@ -113,7 +113,10 @@ fn panic_clears_the_chord() {
 
 #[test]
 fn keys_and_ticks_allocate_nothing() {
-    let (_c, mut e) = engine(&patch(&[("swing", 60.0)], &[("mode", 4.0), ("ratchet", 3.0)]));
+    let (_c, mut e) = engine(&patch(
+        &[("swing", 60.0)],
+        &[("mode", 4.0), ("ratchet", 3.0)],
+    ));
     let (mut l, mut r) = ([0.0; BLOCK], [0.0; BLOCK]);
     assert_no_alloc(|| {
         for i in 0..2000 {
@@ -188,7 +191,9 @@ fn an_old_sequencer_patch_has_no_ratchets() {
     let state = kabl_core::load(&dir).unwrap().state().clone();
     let seq = state.modules.values().find(|m| m.kind == "seq").unwrap();
     assert!(
-        !seq.params.keys().any(|k| k.contains('k') && k.len() <= 4 && k != "bank"),
+        !seq.params
+            .keys()
+            .any(|k| k.contains('k') && k.len() <= 4 && k != "bank"),
         "the stored file knows nothing of ratchets"
     );
     let info = kabl_modules::registry::info_for("seq").unwrap();
