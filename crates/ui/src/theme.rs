@@ -151,18 +151,34 @@ impl Theme {
 /// Portable IBM Plex typography; OFL-1.1 and reserved name notice in assets/FONT-LICENSE.txt.
 pub fn install_fonts(ctx: &egui::Context) {
     let mut fonts = egui::FontDefinitions::default();
-    for (name, bytes, family) in [
+    let faces: [(&str, &[u8], egui::FontFamily); 5] = [
         (
             "plex-sans",
-            include_bytes!("../assets/IBMPlexSans-Regular.ttf").as_slice(),
+            include_bytes!("../assets/IBMPlexSans-Regular.ttf"),
             egui::FontFamily::Proportional,
         ),
         (
             "plex-mono",
-            include_bytes!("../assets/IBMPlexMono-Regular.ttf").as_slice(),
+            include_bytes!("../assets/IBMPlexMono-Regular.ttf"),
             egui::FontFamily::Monospace,
         ),
-    ] {
+        (
+            "plex-sans-medium",
+            include_bytes!("../assets/IBMPlexSans-Medium.ttf"),
+            egui::FontFamily::Name("kabl-sans-medium".into()),
+        ),
+        (
+            "plex-sans-semibold",
+            include_bytes!("../assets/IBMPlexSans-SemiBold.ttf"),
+            egui::FontFamily::Name("kabl-sans-semibold".into()),
+        ),
+        (
+            "plex-mono-medium",
+            include_bytes!("../assets/IBMPlexMono-Medium.ttf"),
+            egui::FontFamily::Name("kabl-mono-medium".into()),
+        ),
+    ];
+    for (name, bytes, family) in faces {
         fonts.font_data.insert(
             name.into(),
             std::sync::Arc::new(egui::FontData::from_static(bytes)),
@@ -174,6 +190,25 @@ pub fn install_fonts(ctx: &egui::Context) {
             .insert(0, name.into());
     }
     ctx.set_fonts(fonts);
+    let pass = ctx.cumulative_pass_nr();
+    ctx.data_mut(|d| d.insert_temp(egui::Id::new("kabl-fonts"), pass));
+}
+
+/// egui applies new fonts at the next pass: true once that has happened.
+pub fn fonts_ready(ctx: &egui::Context) -> bool {
+    let pass = ctx.cumulative_pass_nr();
+    ctx.data(|d| d.get_temp::<u64>(egui::Id::new("kabl-fonts")))
+        .is_some_and(|p| pass > p)
+}
+
+/// Fonts for hosts that never called [`install_fonts`] (the plugin editor): once per context.
+pub fn ensure_fonts(ctx: &egui::Context) {
+    if ctx
+        .data(|d| d.get_temp::<u64>(egui::Id::new("kabl-fonts")))
+        .is_none()
+    {
+        install_fonts(ctx);
+    }
 }
 
 /// Original sectional palettes. Geometry, identities and sound remain unchanged.

@@ -97,6 +97,16 @@ impl H {
             self.frame();
             self.frame();
         }
+        // Controls in the scrolling panel body are scrolled to first, as a user would.
+        if let (Some(b), Some(r)) = (self.ui.hits.get("browser-body"), self.ui.hits.get(key)) {
+            if r.left() >= b.left()
+                && r.right() <= b.right()
+                && !b.contains_rect(*r)
+                && !["new", "browser-close"].contains(&key)
+            {
+                scroll_body_to(self, key);
+            }
+        }
         let p = self
             .ui
             .hits
@@ -632,6 +642,45 @@ fn missing_recents_and_bad_patches_are_explained() {
     assert_eq!(prefs.recents, ["factory:palette/pad"]);
 }
 
+/// Brings `key` into the visible part of the Sounds panel body by scrolling it.
+fn scroll_into_view(t: &mut H, key: &str) {
+    if !scroll_body_to(t, key) {
+        panic!("{key} cannot be scrolled into view: {:?}", t.ui.hits[key]);
+    }
+}
+
+fn scroll_body_to(t: &mut H, key: &str) -> bool {
+    for _ in 0..40 {
+        let body = t.ui.hits["browser-body"];
+        let r = t.ui.hits[key];
+        if body.contains_rect(r) {
+            // Let the scroll animation settle before anyone clicks.
+            for _ in 0..8 {
+                t.frame();
+            }
+            return t.ui.hits["browser-body"].contains_rect(t.ui.hits[key]);
+        }
+        // A spot outside the nested sound list, which owns the wheel while hovered.
+        let at = ["search", "category", "play"]
+            .iter()
+            .filter_map(|k| t.ui.hits.get(*k).copied())
+            .find(|k| body.contains_rect(*k))
+            .map_or(body.center(), |k| k.center());
+        t.pointer = at;
+        t.events.push(Event::PointerMoved(at));
+        t.frame();
+        t.events.push(Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Point,
+            delta: egui::vec2(0.0, if r.top() < body.top() { 80.0 } else { -80.0 }),
+            phase: egui::TouchPhase::Move,
+            modifiers: Modifiers::NONE,
+        });
+        t.frame();
+        t.frame();
+    }
+    false
+}
+
 #[test]
 fn every_control_is_reachable_at_both_sizes() {
     for (w, h) in [(1440.0, 900.0), (1280.0, 800.0)] {
@@ -639,20 +688,9 @@ fn every_control_is_reachable_at_both_sizes() {
         t.ui.perform_open = true;
         t.open("factory:composition");
         let screen = Rect::from_min_size(Pos2::ZERO, egui::vec2(w, h));
+        // The toolbar and the panel header never scroll.
         for key in [
-            "browser",
-            "save",
-            "save-as",
-            "doc-name",
-            "search",
-            "new",
-            "open",
-            "play",
-            "start",
-            "category",
-            "routing",
-            "perform",
-            "folder-header",
+            "browser", "save", "save-as", "doc-name", "routing", "perform", "new",
         ] {
             let r = t.ui.hits.get(key).unwrap_or_else(|| panic!("{w}: {key}"));
             assert!(
@@ -670,6 +708,25 @@ fn every_control_is_reachable_at_both_sizes() {
                     !t.ui.hits[*a].intersects(t.ui.hits[*b]),
                     "{w}: {a} overlaps {b}"
                 );
+            }
+        }
+        // The panel body scrolls: every control there can be brought on screen and operated.
+        for key in [
+            "search",
+            "category",
+            "open",
+            "play",
+            "start",
+            "folder-header",
+        ] {
+            assert!(t.has(key), "{w}: {key} is drawn");
+            scroll_into_view(&mut t, key);
+            assert!(screen.contains_rect(t.ui.hits[key]), "{w}×{h}: {key}");
+            if key == "folder-header" {
+                let open = t.ui.browser.folder_open;
+                t.click(key);
+                assert_ne!(t.ui.browser.folder_open, open, "{w}×{h}: folder toggles");
+                t.click(key);
             }
         }
     }

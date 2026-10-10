@@ -114,7 +114,7 @@ pub fn scope(cx: &Cx, r: Rect, kind: usize, cycles: f32) {
                 let x = i as f32 / n as f32;
                 let mut y = wave(kind, x * cyc - lag * 2.0);
                 if kind == 2 || kind == 3 {
-                    y = y * 0.92;
+                    y *= 0.92;
                 }
                 pos2(p.left() + x * p.width(), mid - y * amp)
             })
@@ -286,7 +286,7 @@ fn wt_frame(m: f32, ph: f32, warp: f32) -> f32 {
     let mut s = 0.0;
     for h in 1..=hmax {
         let hf = h as f32;
-        let w = if m < 0.6 { 1.0 / hf } else { if h % 2 == 1 { 1.0 / hf } else { 0.15 / hf } };
+        let w = if m < 0.6 || h % 2 == 1 { 1.0 / hf } else { 0.15 / hf };
         let fade = if h == hmax { (m * 14.0).fract() } else { 1.0 };
         s += (ph * TAU * hf + 0.4 * hf * m).sin() * w * fade;
     }
