@@ -1,0 +1,138 @@
+== A · Satin Studio light
+  text/surface                               13.09  ok
+  text/bg                                    11.62  ok
+  text2/surface                               6.62  ok
+  text2/inset                                 5.20  ok
+  text3/surface (hint)                        3.32  ok
+  on_accent/accent                            4.74  ok
+  accent/surface (non-text)                   4.35  ok
+  disp_text/disp_bg                          12.46  ok
+  disp_trace/disp_bg                          8.29  ok
+  knob_ink/knob                              12.49  ok
+  face ink/oscillator / noise                 6.93  ok
+  face ink2/oscillator / noise                5.74  ok
+  face ink/filter                             7.65  ok
+  face ink2/filter                            4.70  ok
+  face ink/envelope / LFO                     8.16  ok
+  face ink2/envelope / LFO                    5.09  ok
+  face ink/VCA / mix / output                 8.13  ok
+  face ink2/VCA / mix / output                6.32  ok
+  face ink/clock / sequencer / MIDI           8.05  ok
+  face ink2/clock / sequencer / MIDI          4.89  ok
+  face ink/effects / other                   10.08  ok
+  face ink2/effects / other                   6.14  ok
+== A · Satin Studio dark
+  text/surface                               13.91  ok
+  text/bg                                    15.07  ok
+  text2/surface                               7.81  ok
+  text2/inset                                 8.81  ok
+  text3/surface (hint)                        3.83  ok
+  on_accent/accent                            8.08  ok
+  accent/surface (non-text)                   7.94  ok
+  disp_text/disp_bg                          15.28  ok
+  disp_trace/disp_bg                         10.97  ok
+  knob_ink/knob                              14.52  ok
+  face ink/oscillator / noise                 5.48  ok
+  face ink2/oscillator / noise                5.12  ok
+  face ink/filter                             5.89  ok
+  face ink2/filter                            4.85  ok
+  face ink/envelope / LFO                     6.24  ok
+  face ink2/envelope / LFO                    5.01  ok
+  face ink/VCA / mix / output                 5.87  ok
+  face ink2/VCA / mix / output                4.74  ok
+  face ink/clock / sequencer / MIDI           7.00  ok
+  face ink2/clock / sequencer / MIDI          5.62  ok
+  face ink/effects / other                    6.45  ok
+  face ink2/effects / other                   5.12  ok
+== B · Lacquer & Light light
+  text/surface                               16.22  ok
+  text/bg                                    14.44  ok
+  text2/surface                               7.70  ok
+  text2/inset                                 6.35  ok
+  text3/surface (hint)                        3.51  ok
+  on_accent/accent                            6.21  ok
+  accent/surface (non-text)                   5.74  ok
+  disp_text/disp_bg                          15.76  ok
+  disp_trace/disp_bg                         13.08  ok
+  knob_ink/knob                              14.98  ok
+  face ink/oscillator / noise                 8.99  ok
+  face ink2/oscillator / noise                6.37  ok
+  face ink/filter                             9.70  ok
+  face ink2/filter                            5.92  ok
+  face ink/envelope / LFO                     9.92  ok
+  face ink2/envelope / LFO                    6.38  ok
+  face ink/VCA / mix / output                10.68  ok
+  face ink2/VCA / mix / output                6.44  ok
+  face ink/clock / sequencer / MIDI           9.55  ok
+  face ink2/clock / sequencer / MIDI          5.79  ok
+  face ink/effects / other                   11.73  ok
+  face ink2/effects / other                   7.30  ok
+== B · Lacquer & Light dark
+  text/surface                               15.44  ok
+  text/bg                                    16.63  ok
+  text2/surface                               7.80  ok
+  text2/inset                                 8.62  ok
+  text3/surface (hint)                        3.79  ok
+  on_accent/accent                            6.45  ok
+  accent/surface (non-text)                   6.01  ok
+  disp_text/disp_bg                          16.46  ok
+  disp_trace/disp_bg                         14.23  ok
+  knob_ink/knob                              16.74  ok
+  face ink/oscillator / noise                 6.54  ok
+  face ink2/oscillator / noise                5.32  ok
+  face ink/filter                             5.65  ok
+  face ink2/filter                            4.59  ok
+  face ink/envelope / LFO                     6.38  ok
+  face ink2/envelope / LFO                    4.99  ok
+  face ink/VCA / mix / output                 5.09  ok
+  face ink2/VCA / mix / output                4.84  ok
+  face ink/clock / sequencer / MIDI           6.35  ok
+  face ink2/clock / sequencer / MIDI          5.16  ok
+  face ink/effects / other                    6.41  ok
+  face ink2/effects / other                   5.02  ok
+== C · Silkscreen light
+  text/surface                               18.55  ok
+  text/bg                                    15.97  ok
+  text2/surface                               7.89  ok
+  text2/inset                                 6.20  ok
+  text3/surface (hint)                        3.63  ok
+  on_accent/accent                            4.82  ok
+  accent/surface (non-text)                   4.82  ok
+  disp_text/disp_bg                          17.80  ok
+  disp_trace/disp_bg                         17.80  ok
+  knob_ink/knob                              18.25  ok
+  face ink/oscillator / noise                 9.37  ok
+  face ink2/oscillator / noise                6.06  ok
+  face ink/filter                            11.52  ok
+  face ink2/filter                            7.44  ok
+  face ink/envelope / LFO                    10.65  ok
+  face ink2/envelope / LFO                    6.88  ok
+  face ink/VCA / mix / output                13.04  ok
+  face ink2/VCA / mix / output                8.42  ok
+  face ink/clock / sequencer / MIDI          11.47  ok
+  face ink2/clock / sequencer / MIDI          7.41  ok
+  face ink/effects / other                   13.46  ok
+  face ink2/effects / other                   8.69  ok
+== C · Silkscreen dark
+  text/surface                               15.42  ok
+  text/bg                                    16.72  ok
+  text2/surface                               7.69  ok
+  text2/inset                                 8.69  ok
+  text3/surface (hint)                        3.78  ok
+  on_accent/accent                            6.94  ok
+  accent/surface (non-text)                   6.16  ok
+  disp_text/disp_bg                          17.52  ok
+  disp_trace/disp_bg                         17.52  ok
+  knob_ink/knob                              17.10  ok
+  face ink/oscillator / noise                 6.18  ok
+  face ink2/oscillator / noise                4.94  ok
+  face ink/filter                             7.77  ok
+  face ink2/filter                            5.87  ok
+  face ink/envelope / LFO                     6.21  ok
+  face ink2/envelope / LFO                    4.90  ok
+  face ink/VCA / mix / output                 9.10  ok
+  face ink2/VCA / mix / output                6.78  ok
+  face ink/clock / sequencer / MIDI           6.41  ok
+  face ink2/clock / sequencer / MIDI          4.62  ok
+  face ink/effects / other                    6.46  ok
+  face ink2/effects / other                   4.88  ok
