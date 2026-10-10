@@ -19,7 +19,7 @@ The clips were not listened to by the agent that made them (it has no ears); the
 
 ## Morph and glide (kept as built, awaiting Kosta's confirmation)
 
-The repository never says what morph is, so this is a prototype of the three candidates that were put to Kosta, built so they can be heard side by side. Kosta has not chosen; none of this is a decision.
+The repository never says what morph is. Three candidates were put to Kosta and prototyped. He worked with the blend and glide on Morph Arc and the promo and said it works, but has not named a choice, so the blend and glide are kept as built on an assumption he has not confirmed (`docs/decisions.md`). Timed transition is not a feature of its own.
 
 - **A/B blend (candidate 2).** A cable holds a second pattern B (`b.length`, `b.s1..`, `b.r1..`) and `morph` 0..1. Each pulse draws once; the pass chance and the level are the mix of the A step and the B step (each pattern keeps its own length, so a morph between 4 and 5 steps is a polymeter morph). Morph 0 is exactly the old behaviour.
 - **Glide (candidate 1).** `glide_ms` slews the level between steps instead of jumping (audio always slews 1 ms at least).
@@ -27,4 +27,16 @@ The repository never says what morph is, so this is a prototype of the three can
 
 `morph-arc.mp3` (58 s, 24 bars): a slow A-minor piece (bass and pad voiced high enough for small speakers). The delay send, the pad gate, the bass filter and the bass level each hold an A pattern (sparse, soft) and a B pattern (busy, loud), and their morphs move on separate schedules (echo bars 4-9 up, 18-24 down; pad 8-16 up, 20-24 down; bass 12-18 up, 21-24 down). The saved patch `patches/functional-cables/morph-arc` sits at morph 0.3; in the app, open a cable's Pattern editor and move "Morph A to B".
 
-Not decided: whether blending chances this way sounds like a real in-between to a person, and whether morph should be a cable property at all or a separate source that several cables follow.
+Not decided: whether morph should be a cable property or a separate source that several cables follow, and whether cable params should be mappable to a macro or CC (today a morph can only be moved from the cable's own editor, one cable at a time).
+
+Morph and glide meet the same standard as pattern and probability: exact at both ends (morph 0 is the cable without it, morph 1 is pattern B alone, bit for bit), replay after Restart, runtime edits without a rebuild, undo and save/reload, no allocation, cost in `docs/benchmarks.md`.
+
+## Promo: Morph Suite
+
+A 2:48 piece built from Morph Arc, played by the real app and recorded with its own audio: `docs/promo-demo/morph-suite-promo.mp4` (video, 1920x1080), `docs/promo-demo/morph-suite-audio.mp3` (the same piece rendered offline). Seven cables each hold a pattern A and B and a morph, moved by hand in the pattern editor through intro, build, peak, break, return and outro. One command, `docs/promo-demo/record.sh`, rebuilds and re-records it, so it can be redone after the interface redesign (only `docs/promo-demo/targets.json` should need changes). Details, environment and limits: `docs/promo-demo/README.md`. Kosta chose the audio; he has not watched the video.
+
+## Verification
+
+- Tests, cost and review: see `REVIEW.md` and `docs/benchmarks.md`. At the final head: `cargo test --workspace` 690 passed, 0 failed, 24 ignored; strict clippy clean.
+- Plugin and host: `HOST.md`. CLAP validator 35 success / 9 skipped as the baseline; a REAPER project with pattern, probability and morph saved, fully quit, reopened and saved again keeps every state and renders bit-identically. This found and fixed a cap of 32 params per cable in the plugin's state validator (a full cable has up to 71).
+- Not verified: other hosts and systems, morph under host automation, the plugin editor in a host, Pi-class timing.
