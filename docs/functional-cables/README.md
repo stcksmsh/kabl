@@ -37,7 +37,7 @@ A modulation route can target a cable's own parameter: its Chance (`prob`), Morp
 
 Use: open a cable's Pattern editor (right-click the cable, or "Pattern" on a route row). Under Chance, Morph and Glide a "moved by" list shows the sources routed into that parameter, each with an amount (-100..100 % of the parameter's travel), Invert, Bypass, Pattern and Remove, and "Add source" lists every module output. The routing drawer lists all of these routes, with the cable and parameter each moves, under the routes into knobs. The route is itself a cable, so it can carry a pattern of its own.
 
-Rule (enforced by the compiler, with a message that says what to change): a route must not target its own parameters, and routes into cable parameters must not form a loop; a chain (a route into a route's chance) is fine. Reasoning and rejected alternatives: `docs/decisions.md`, "Routes into a cable's own parameters". Schema v6; files saved before load and render bit-identically.
+Rule (enforced by the compiler, with a message that says what to change): a route must not target its own parameters, and routes into cable parameters must not form a loop; a chain (a route into a route's chance) is fine. Reasoning and rejected alternatives: `docs/decisions.md`, "Routes into a cable's own parameters". Schema 7 (5 is master's wavetables, 6 is patterns); files saved before load and render bit-identically.
 
 What you hear: the three parameters are read at each clock pulse, at the pulse's exact sample, and held until the next pulse. Changing an amount is a runtime value (no rebuild; ramped 15 ms in a playing graph). Adding, removing or bypassing a route compiles (the crossfaded swap).
 

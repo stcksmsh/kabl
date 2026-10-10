@@ -22,7 +22,7 @@ Command: `cargo build --release -p kabl-clap && python3 docs/functional-cables/s
 - The cables matter in the host: the same project with every functional-cable param removed renders differently (relative difference 1.80, spectrum cosine 0.62, envelope correlation 0.25).
 - An old project (saved by an earlier build, state version 2) opened and saved by this build comes back with an identical state.
 
-## REAPER with a macro driving cable morphs under host automation (routes into cable parameters, schema v6)
+## REAPER with a macro driving cable morphs under host automation (routes into cable parameters, schema 7)
 
 2026-10-10, build with `PortRef::CableParam`, release `libkabl_clap.so` sha256 `6bd246dbc2638bc9890e83ce1b5c6344c94dd3489d09b90865488b59ab846735`, same machine and method (`scripts/host_routes.py`, evidence in `evidence/host-routes/`). CLAP validator: 35 success, 9 skipped, no difference to the baseline (`evidence/validator.json`).
 
@@ -40,3 +40,7 @@ Not verified in the host: the automation applied to the right pulse sample (that
 - Morph moved by host automation in the first run above (no cable param is a host parameter): the second section covers it through a macro.
 - Human listening of the rendered files, a GUI session in the host (the plugin editor was not opened), real-time performance in the host, and the Pi-class machine.
 - Render equality with the previous build for the old project (the baseline plugin was not run this time; the engine's golden hashes cover old patches bit for bit).
+
+## Re-run after merging master (schema 5 = tables, 6 = patterns, 7 = routes)
+
+2026-10-10, merge head with master's wavetable and FM work, release `libkabl_clap.so` sha256 `09cb481d5a6d1f770e35add379da3863f321d9f126b880f7d767eff003fedd49`, same machine and method (`scripts/host_routes.py`, evidence in `evidence/host-routes/`). CLAP validator: 35 success, 9 skipped, no difference to the baseline. REAPER 7.75, macro under the recorded automation envelope: saved, REAPER quit, reopened, saved: states identical, render relative difference 0.0; without the envelope the render differs (relative difference 0.54); the three routes into cable morph are in the saved project; the old project comes back unchanged. Loudness envelope against the engine's own render of the same automation: correlation 0.905 (previous run 0.91; correlation, not equality).
