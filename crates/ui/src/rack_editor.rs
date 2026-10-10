@@ -469,7 +469,7 @@ pub(crate) fn more(
                         zoom: z,
                     };
                     let painter = ui.painter_at(space.intersect(ui.clip_rect()));
-                    let material = theme::panel_theme(th.dark, info.kind);
+                    let material = theme::panel_theme(&view.style, info.kind);
                     let mut own = Drawn::default();
                     let now = ui.input(|i| i.time);
                     draw_module(editor, view, ui, &painter, th, focus, &m, now, &mut own);
@@ -480,6 +480,7 @@ pub(crate) fn more(
                         z,
                         ink: material.ink,
                         ink2: material.ink2,
+                        slot: 76.0,
                     };
                     for c in m.ctls.iter().filter(|c| !c.primary) {
                         draw_control(
@@ -879,7 +880,7 @@ mod tests {
             output = frame(&ctx, &mut e, &mut v, vec![egui::Event::PointerMoved(to)]);
         }
         let preview = v.hits["rack:drop-preview"];
-        let sel = theme(v.dark).sel;
+        let sel = theme(&v.style).sel;
         let index = output.shapes.iter().position(|s| matches!(&s.shape, egui::epaint::Shape::Rect(r) if r.rect == preview && r.stroke.width == 2. && r.stroke.color == sel)).expect("visible insertion stroke");
         let neighbour = composite_layout(e.state(), &v)
             .faces
@@ -1244,8 +1245,8 @@ mod tests {
     }
     #[test]
     fn light_and_dark_apply_to_drawers_dialogs_and_workspace() {
-        let light = theme(false);
-        let dark = theme(true);
+        let light = theme(&crate::style::builtin_a(false));
+        let dark = theme(&crate::style::builtin_a(true));
         assert!(light.chrome.r() > 200 && light.rack.r() > 200 && light.ctext.r() < 80);
         assert!(dark.chrome.r() < 60 && dark.ctext.r() > 200);
         for t in [light, dark] {

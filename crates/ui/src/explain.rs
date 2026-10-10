@@ -613,7 +613,7 @@ pub(crate) fn panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui:
     let Some(subject) = ui_state.explain.subject.clone() else {
         return;
     };
-    let th = crate::theme::theme(ui_state.dark);
+    let th = crate::theme::theme(&ui_state.style);
     let now = ui.input(|i| i.time);
     let state = editor.state();
     let frame = egui::Frame::group(ui.style())

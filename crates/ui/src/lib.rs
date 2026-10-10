@@ -17,6 +17,7 @@ pub mod compare;
 pub mod composites;
 pub mod control;
 pub mod cues;
+pub mod displays;
 pub mod editor;
 pub mod explain;
 pub mod help;
@@ -184,6 +185,8 @@ pub struct UiState {
     pub clock_running: HashMap<ModuleId, bool>,
     /// Each clock's position in 16ths since its last restart, as the audio thread reports it.
     pub clock_pos: HashMap<ModuleId, f64>,
+    /// What the engine's face taps last reported, for the live displays.
+    pub live: displays::Live,
     /// Host owns clock transport in the plugin; standalone defaults to Free.
     pub host_clock: bool,
     /// Transport commands for `main.rs` to send to the audio thread. Runtime only: never in the
@@ -325,6 +328,7 @@ impl Default for UiState {
             bank_revealed: None,
             clock_running: HashMap::new(),
             clock_pos: HashMap::new(),
+            live: displays::Live::default(),
             host_clock: false,
             transport: Vec::new(),
             delay_status: HashMap::new(),
@@ -583,7 +587,7 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
         .filter(|(_, m)| m.kind == "seq")
         .map(|(&id, _)| (id, ui_state.edit_bank_of(editor.state(), id)))
         .collect();
-    let th = theme(ui_state.dark);
+    let th = theme(&ui_state.style);
     // Escape mid-drag cancels it: revert the gesture's edit and leave no undo entry. The drag
     // stays captured (and inert) until the button is released. Otherwise Escape leaves choose
     // mode without changing the face.
@@ -1457,7 +1461,7 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             theme::satin(
                 &painter,
                 xf.r(m.face),
-                &theme::panel_theme(th.dark, m.info.kind),
+                &theme::panel_theme(&ui_state.style, m.info.kind),
             );
             text(
                 &painter,
@@ -1741,7 +1745,7 @@ fn draw_module(
     now: f64,
     drawn: &mut Drawn,
 ) {
-    let sectional = theme::panel_theme(th.dark, m.info.kind);
+    let sectional = theme::panel_theme(&ui_state.style, m.info.kind);
     let th = if m.skin.is_none() { &sectional } else { th };
     let z = xf.zoom;
     let rect = xf.r(m.rect);
@@ -1757,25 +1761,27 @@ fn draw_module(
     }
     let skin = m.skin;
     let on_art = skin.is_some_and(|s| ui_state.skin_labels_on_art.unwrap_or(s.labels_on_art));
-    painter.rect_filled(rect, CornerRadius::same(3), th.panel);
+    let st = ui_state.style.clone();
     if let Some((tex, tint)) =
         skin.and_then(|s| skin_texture(ui, &mut ui_state.image_cache, m.info.kind, s, th.dark))
     {
+        painter.rect_filled(rect, CornerRadius::same(3), th.panel);
         painter.image(
             tex,
             face,
             Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0)),
             tint,
         );
+        painter.rect_stroke(
+            rect,
+            CornerRadius::same(3),
+            Stroke::new(1.0, th.panel_edge),
+            egui::StrokeKind::Inside,
+        );
+        kit::face::hardware(painter, &st, rect, z);
     } else {
-        theme::satin(painter, rect, th);
+        kit::face::surface(painter, &st, rect, th.panel, th.panel_edge, z);
     }
-    painter.rect_stroke(
-        rect,
-        CornerRadius::same(3),
-        Stroke::new(1.0, th.panel_edge),
-        egui::StrokeKind::Inside,
-    );
     if m.adv.is_some() && !m.overlay {
         // Engraved divider between the face and the advanced area.
         let x = face.right();
@@ -1786,14 +1792,6 @@ fn draw_module(
             ],
             Stroke::new(1.5, th.panel_edge.lerp_to_gamma(Color32::BLACK, 0.2)),
         );
-    }
-    for (sx, sy) in [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)] {
-        let c = pos2(
-            rect.left() + 9.0 * z + sx * (rect.width() - 18.0 * z),
-            rect.top() + 9.0 * z + sy * (rect.height() - 18.0 * z),
-        );
-        painter.circle_filled(c, 3.5 * z, th.nut);
-        painter.circle_stroke(c, 3.5 * z, Stroke::new(1.0, th.nut_edge));
     }
     let (ink, ink2) = match skin {
         Some(s) if on_art => {
@@ -1812,31 +1810,22 @@ fn draw_module(
     }
     let choice = ui_state.choose.clone();
     let choosing = choice.as_ref().filter(|(id, _)| *id == m.id);
-    text(
-        painter,
-        pos2(face.center().x, face.top() + 26.0 * z),
-        egui::Align2::CENTER_CENTER,
-        m.info.name,
-        15.0 * z,
-        ink,
-        false,
-    );
     if !m.info.params.is_empty() {
-        let edit = Rect::from_min_size(
-            pos2(face.center().x - 35. * z, face.bottom() - 24. * z),
-            vec2(70., 16.) * z,
+        let edit = Rect::from_center_size(
+            pos2(face.center().x, face.bottom() - 11. * z),
+            vec2(64., 16.) * z,
         );
         let r = ui.interact(edit, Id::new(("native-edit-face", m.id)), Sense::click());
         ui_state.record(format!("edit-face:{}", m.id), edit);
-        text(
-            painter,
-            edit.center(),
-            egui::Align2::CENTER_CENTER,
-            "Edit face",
-            9. * z,
-            ink2,
-            false,
-        );
+        if let Some(font) = kit::face::face_font(&st, style::Role::Caption, z) {
+            painter.text(
+                edit.center(),
+                egui::Align2::CENTER_CENTER,
+                "Edit face",
+                font,
+                if r.hovered() { ink } else { ink2 },
+            );
+        }
         if r.clicked() {
             ui_state.choose = Some((
                 m.id,
@@ -1897,15 +1886,7 @@ fn draw_module(
         }
         None => format!("{} · #{}", m.info.kind, m.id),
     };
-    text(
-        painter,
-        pos2(face.center().x, face.top() + 43.0 * z),
-        egui::Align2::CENTER_CENTER,
-        &tag,
-        11.0 * z,
-        ink2,
-        true,
-    );
+    kit::face::title(painter, &st, face, z, m.info.name, &tag, ink, ink2);
     if ui_state.selected_module == Some(m.id) {
         painter.rect_stroke(
             rect.expand(1.0),
@@ -1915,7 +1896,15 @@ fn draw_module(
         );
     }
     if skin.is_none() {
-        draw_decor(editor, painter, th, xf, m);
+        draw_decor(painter, th, xf, m);
+        let scope = match m.decor {
+            Decor::Display(r) => Some(r),
+            Decor::Operators(_) => Some(displays::fm6_scope(m.face)),
+            _ => None,
+        };
+        if let Some(r) = scope {
+            displays::draw(editor.state(), &st, &ui_state.live, now, painter, xf, m, r);
+        }
     }
     if let Decor::Keys(r) = m.decor {
         // The voice settings this MIDI In gives the chain it drives, including the ones off
@@ -1999,7 +1988,12 @@ fn draw_module(
         }
     }
 
-    let look = Look { z, ink, ink2 };
+    let look = Look {
+        z,
+        ink,
+        ink2,
+        slot: 76.0,
+    };
     let plates = skin.is_some() && !on_art;
     for c in m.ctls.iter().filter(|c| c.primary || !m.overlay) {
         draw_control(
@@ -2988,7 +2982,7 @@ fn midi_in_summary(state: &kabl_core::PatchState, m: &Placed) -> (String, String
     (s, format!("bend {} · {channel}", fmt("bend")))
 }
 
-fn draw_decor(editor: &PatchEditor, p: &egui::Painter, th: &Theme, xf: Xf, m: &Placed) {
+fn draw_decor(p: &egui::Painter, th: &Theme, xf: Xf, m: &Placed) {
     let z = xf.zoom;
     match m.decor {
         Decor::Keys(r) => {
@@ -3030,32 +3024,6 @@ fn draw_decor(editor: &PatchEditor, p: &egui::Painter, th: &Theme, xf: Xf, m: &P
                 p.circle_stroke(c, r * z, Stroke::new(1.2, th.ink2));
             }
         }
-        Decor::Envelope(r) => {
-            // Drawn from the knob values (not telemetry).
-            let r = xf.r(r);
-            p.rect_filled(r, CornerRadius::same(3), th.display);
-            let v = |name: &str| {
-                m.info
-                    .params
-                    .iter()
-                    .find(|q| q.name == name)
-                    .map_or(0.0, |q| routing::base_value(editor.state(), m.id, q))
-            };
-            let (a, d, s, rel) = (v("attack_ms"), v("decay_ms"), v("sustain"), v("release_ms"));
-            let wlog = |ms: f32| (1.0 + ms.max(0.1)).ln();
-            let total = wlog(a) + wlog(d) + wlog(rel) + 2.0;
-            let sx = |x: f32| r.left() + 6.0 * z + (r.width() - 12.0 * z) * x / total;
-            let sy = |y: f32| r.bottom() - 6.0 * z - (r.height() - 12.0 * z) * y;
-            let (x1, x2) = (wlog(a), wlog(a) + wlog(d));
-            let pts = vec![
-                pos2(sx(0.0), sy(0.0)),
-                pos2(sx(x1), sy(1.0)),
-                pos2(sx(x2), sy(s)),
-                pos2(sx(x2 + 2.0), sy(s)),
-                pos2(sx(total), sy(0.0)),
-            ];
-            p.add(egui::Shape::line(pts, Stroke::new(1.6 * z, th.display_ink)));
-        }
         Decor::Operators(r) => {
             for (i, b) in rack::fm6_blocks(r).into_iter().enumerate() {
                 p.rect_stroke(
@@ -3073,8 +3041,12 @@ fn draw_decor(editor: &PatchEditor, p: &egui::Painter, th: &Theme, xf: Xf, m: &P
                 );
             }
         }
-        Decor::None | Decor::Transport(_) | Decor::Status(_) | Decor::Banks(_) | Decor::Cues(_) => {
-        }
+        Decor::None
+        | Decor::Display(_)
+        | Decor::Transport(_)
+        | Decor::Status(_)
+        | Decor::Banks(_)
+        | Decor::Cues(_) => {}
     }
 }
 
@@ -3094,6 +3066,10 @@ fn draw_control(
     drawn: &mut Drawn,
 ) {
     let z = xf.zoom;
+    let look = Look {
+        slot: m.slot_width(c),
+        ..look
+    };
     if plates {
         // Theme plate behind each control group: contrast never depends on the art.
         let plate = match c.geo {
@@ -3247,6 +3223,33 @@ fn draw_jacks(
     drawn: &mut Drawn,
 ) {
     let z = xf.zoom;
+    let st = ui_state.style.clone();
+    // Ports of this module that carry a cable, drawn with the signal's colour as a rim.
+    let cabled: Vec<(PortDirection, &str)> = editor
+        .state()
+        .cables
+        .values()
+        .flat_map(|c| {
+            let out = match &c.from {
+                PortRef::Module { id, port } if *id == m.id => {
+                    Some((PortDirection::Output, port.as_str()))
+                }
+                _ => None,
+            };
+            let inn = match &c.to {
+                PortRef::Module { id, port } if *id == m.id => {
+                    Some((PortDirection::Input, port.as_str()))
+                }
+                _ => None,
+            };
+            [out, inn]
+        })
+        .flatten()
+        .collect();
+    let cabled: Vec<(PortDirection, String)> = cabled
+        .into_iter()
+        .map(|(d, p)| (d, p.to_string()))
+        .collect();
     for j in &m.jacks {
         let c = xf.p(j.c);
         let port = j.port;
@@ -3271,26 +3274,24 @@ fn draw_jacks(
         }
         let label =
             macro_name(editor.state(), m.id, port.name).unwrap_or_else(|| port_label(port.name));
-        if j.label_right {
-            text(
-                painter,
-                c + vec2(20.0 * z, 0.0),
-                egui::Align2::LEFT_CENTER,
-                &label,
-                12.5 * z,
-                ink,
-                false,
-            );
-        } else {
-            text(
-                painter,
-                c - vec2(0.0, 24.0 * z),
-                egui::Align2::CENTER_CENTER,
-                &label,
-                12.5 * z,
-                ink,
-                false,
-            );
+        if let Some(font) = kit::face::face_font(&st, style::Role::Label, z) {
+            if j.label_right {
+                painter.text(
+                    c + vec2(20.0 * z, 0.0),
+                    egui::Align2::LEFT_CENTER,
+                    &label,
+                    font,
+                    ink,
+                );
+            } else {
+                painter.text(
+                    c - vec2(0.0, 24.0 * z),
+                    egui::Align2::CENTER_CENTER,
+                    &label,
+                    font,
+                    ink,
+                );
+            }
         }
         let hit = Rect::from_center_size(c, EguiVec2::splat(((JACK_R + 3.0) * 2.0 * z).max(20.0)));
         let dir_key = match port.direction {
@@ -3308,8 +3309,20 @@ fn draw_jacks(
             id: m.id,
             port: port.name.to_string(),
         };
-        painter.circle_filled(c, JACK_R * z, th.nut);
-        painter.circle_stroke(c, JACK_R * z, Stroke::new(1.0, th.nut_edge));
+        let hot = resp.hovered() || ui_state.pending_output.as_ref() == Some(&this_ref);
+        let patched = cabled
+            .iter()
+            .any(|(d, p)| *d == port.direction && p == port.name);
+        kit::face::jack(
+            painter,
+            &st,
+            c,
+            JACK_R * z,
+            z,
+            th.signal(port.port_type),
+            patched,
+            hot,
+        );
         let badge = (ui_state.cable_view == CableView::Hidden)
             .then(|| jack_badge(editor, m.id, port.name, port.direction))
             .flatten();
@@ -3319,10 +3332,6 @@ fn draw_jacks(
                 (JACK_R - 2.0) * z,
                 Stroke::new(3.0 * z, th.signal(port.port_type)),
             );
-        }
-        painter.circle_filled(c, 7.0 * z, th.hole_c);
-        if resp.hovered() || ui_state.pending_output.as_ref() == Some(&this_ref) {
-            painter.circle_stroke(c, (JACK_R + 3.0) * z, Stroke::new(1.5, th.sel));
         }
         if let Some(b) = badge {
             routing::defer_badge(
@@ -3824,14 +3833,14 @@ fn draw_composites(
             .is_some_and(|mv| mv.item == rack_editor::Item::Composite(id) && !mv.cancelled)
         {
             ui.painter()
-                .rect_filled(rect, 3., theme(view.dark).panel.linear_multiply(0.20));
+                .rect_filled(rect, 3., theme(&view.style).panel.linear_multiply(0.20));
             continue;
         }
         if view.selected_composite == Some(id) {
             ui.painter().rect_stroke(
                 rect.expand(2.),
                 3.,
-                Stroke::new(2., theme(view.dark).sel),
+                Stroke::new(2., theme(&view.style).sel),
                 egui::StrokeKind::Outside,
             );
         }
@@ -3995,7 +4004,7 @@ fn draw_authored_face(
 ) {
     use kabl_core::panel::Kind;
     let panel = c.panel.as_ref().unwrap();
-    let mut th = theme::panel_theme(view.dark, "filter.svf");
+    let mut th = theme::panel_theme(&view.style, "filter.svf");
     let rect = xf.r(face);
     let z = xf.zoom;
     let painter = ui.painter_at(rect.intersect(ui.clip_rect()));
@@ -4232,6 +4241,7 @@ fn draw_authored_face(
                 z,
                 ink: th.ink,
                 ink2: th.ink2,
+                slot: 76.0,
             };
             // Contrast plates guarantee labels and values remain usable over any supplied image.
             if p.kind == Kind::Knob {

@@ -33,7 +33,7 @@ pub(crate) fn round_points(r: Rect, rad: f32) -> Vec<Pos2> {
     v
 }
 
-fn eshadow(st: &Style, level: usize) -> egui::epaint::Shadow {
+pub(crate) fn eshadow(st: &Style, level: usize) -> egui::epaint::Shadow {
     let s = st.shadows[level.min(2)];
     egui::epaint::Shadow {
         offset: [0, s.dy as i8],
