@@ -185,6 +185,16 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
              starts a new chord; pressing while others are held adds to it."
         }
         ("arp", "ratchet") => "Plays each note this many times, evenly spaced, inside its step.",
+        ("arp", "channel") => {
+            "Which MIDI channel's keys it plays: ALL, or one channel, 1 to 16. Keys on other \
+             channels are ignored here (midi.in has its own channel setting)."
+        }
+        ("arp", "rate") => {
+            "How often a note plays, counted in pulses of the clock patched into it (a clock \
+             module pulses in 16ths): 1/16 plays on every pulse, 1/8 on every second, and so on \
+             up to one bar. Leave it at 1/16 when the clock you patch in is already slowed \
+             by clock.div; the two multiply."
+        }
         ("clock", "bpm") => "Tempo in beats per minute. The clock ticks four times per beat.",
         ("quantizer", "scale") => {
             "The notes that are allowed. Major and Minor are the everyday scales; Pentatonic and \
@@ -405,7 +415,8 @@ pub fn module_note(kind: &str) -> Option<&'static str> {
         "arp" => {
             "Works from the keys you play: it hears the keyboard directly, so it needs no cable \
              from midi.in. Patch its pitch and gate to a voice instead of (or beside) midi.in. \
-             Drive it from a clock; run that clock through clock.div for slower notes."
+             Drive it from a clock: its rate setting slows the notes (1/16 = every pulse), \
+             and clock.div in front of it slows them further."
         }
         "midi.in" => {
             "Its settings apply to the voices this keyboard drives, not to other keyboards. \

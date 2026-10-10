@@ -251,3 +251,43 @@ fn the_state_carries_to_a_new_graph() {
         3
     );
 }
+
+#[test]
+fn rate_plays_every_nth_clock_pulse() {
+    // 1/8 (every second pulse): a note, then a pulse with no gate.
+    let mut h = Harness::new(&[("rate", 1.0)]);
+    h.on(&CHORD);
+    let got = h.steps(8);
+    let want = [Some(0), None, Some(4), None, Some(7), None, Some(0), None];
+    assert_eq!(got, want);
+    // 1/4: one note in four pulses.
+    let mut h = Harness::new(&[("rate", 3.0)]);
+    h.on(&CHORD);
+    let got = h.steps(9);
+    // The gate is half a step long, so it spans two pulses once the step is known.
+    assert!(got[1..4].iter().all(|x| x.is_none()), "{got:?}");
+    assert_eq!(got[0], Some(0));
+    assert_eq!(got[4], Some(4));
+    assert_eq!(got[8], Some(7));
+}
+
+#[test]
+fn a_new_chord_after_silence_plays_on_the_next_pulse_at_any_rate() {
+    let mut h = Harness::new(&[("rate", 4.0)]);
+    h.on(&[60]);
+    let _ = h.steps(3);
+    h.off(&[60]);
+    let _ = h.steps(3);
+    h.on(&[64]);
+    assert_eq!(h.steps(1), [Some(4)], "not up to eight pulses late");
+}
+
+#[test]
+fn channel_selects_which_events_it_hears() {
+    let mut h = Harness::new(&[("channel", 3.0)]);
+    let _ = h.steps(1);
+    assert!(h.arp().hears(2) && !h.arp().hears(0) && !h.arp().hears(15));
+    let mut h = Harness::new(&[]);
+    let _ = h.steps(1);
+    assert!((0..16).all(|c| h.arp().hears(c)), "default hears all");
+}

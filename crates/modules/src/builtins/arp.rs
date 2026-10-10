@@ -107,7 +107,24 @@ const PARAMS: &[ParamInfo] = &[
     // OFF, ON.
     stepped("latch", 0.0, 1.0, 0.0),
     stepped("ratchet", 1.0, 4.0, 1.0),
+    // 0 = ALL, else the one MIDI channel (1..16) whose keys it plays. Appended: a patch saved
+    // before this param reads the default, ALL, as it behaved.
+    ParamInfo {
+        name: "channel",
+        min: 0.0,
+        max: 16.0,
+        default: 0.0,
+        unit: "ch",
+        taper: Taper::Linear,
+        smoothing_ms: 0.0,
+    },
+    // How many clock pulses make one step: see `RATE_PULSES`. Default 1 = every pulse, as before.
+    stepped("rate", 0.0, (RATE_PULSES.len() - 1) as f32, 0.0),
 ];
+
+/// Clock pulses per arpeggiator step for each `rate` setting. The clock module pulses are 16ths,
+/// so these read 1/16, 1/8, dotted 1/8, 1/4, 1/2 and one bar.
+const RATE_PULSES: [u32; 6] = [1, 2, 3, 4, 8, 16];
 
 pub static ARP_INFO: ModuleInfo = ModuleInfo {
     kind: "arp",
@@ -144,6 +161,8 @@ struct Held {
     pedal: bool,
     /// `latch` as of the last block.
     latch: bool,
+    /// MIDI channel heard, 0..=15; `None` = all.
+    channel: Option<u8>,
 }
 
 fn bit(note: u8) -> u128 {
@@ -316,6 +335,10 @@ struct St {
     gate_high: bool,
     seen_edge: bool,
     since: u32,
+    /// Clock pulses seen since the last step; a step plays when it is 0.
+    phase: u32,
+    /// The clock pulse now high is a step (the fallback gate before two intervals are known).
+    stepping: bool,
     /// The last two clock intervals, samples; 0 = unknown.
     iv: [f32; 2],
 }
@@ -358,6 +381,8 @@ impl Arp {
                 gate_high: false,
                 seen_edge: false,
                 since: 0,
+                phase: 0,
+                stepping: false,
                 iv: [0.0; 2],
             },
             held: Held {
@@ -367,6 +392,7 @@ impl Arp {
                 sus: 0,
                 pedal: false,
                 latch: false,
+                channel: None,
             },
         }
     }
@@ -397,6 +423,11 @@ impl Arp {
                 self.held.release_unheld();
             }
         }
+    }
+
+    /// Whether a key event on MIDI channel `ch` (0..=15) is for this arpeggiator.
+    pub fn hears(&self, ch: u8) -> bool {
+        self.held.channel.is_none_or(|c| c == ch & 0x0F)
     }
 
     /// Audio thread: forget every key, the pedal and the latch (panic, notes off).
@@ -437,6 +468,16 @@ impl Module for Arp {
         let width = (io.param(2).at(0) / 100.0).clamp(0.01, 1.0);
         let latch = io.param(3).at(0) >= 0.5;
         let ratchets = io.param(4).at(0).round().clamp(1.0, 4.0);
+        let channel = match io.param(5).at(0).round() as i32 {
+            c @ 1..=16 => Some(c as u8 - 1),
+            _ => None,
+        };
+        if channel != self.held.channel {
+            // Keys held on another channel would never be released.
+            self.held.channel = channel;
+            self.clear();
+        }
+        let pulses = RATE_PULSES[(io.param(6).at(0).round().max(0.0) as usize).min(RATE_PULSES.len() - 1)];
         if latch != self.held.latch {
             self.held.latch = latch;
             if !latch {
@@ -450,7 +491,13 @@ impl Module for Arp {
         let walk = move || {
             (0..n).scan(start, move |s, i| {
                 let c = clock.at(i) > 0.0;
-                let edge = c && !s.clock_high;
+                let pulse = c && !s.clock_high;
+                // Every `pulses`-th pulse is a step; a silent pattern waits for none.
+                let edge = pulse && s.phase == 0;
+                if pulse {
+                    s.stepping = edge;
+                    s.phase = (s.phase + 1) % pulses;
+                }
                 s.since = s.since.saturating_add(1);
                 // Pitch and velocity change only on the edge, in the sample the edge is seen.
                 let step = |s: &mut St, held: &Held| {
@@ -480,14 +527,16 @@ impl Module for Arp {
                 if r && !s.reset_high {
                     s.rng = scramble(s.seed);
                     s.restart = true;
+                    s.phase = 0;
                     if c {
+                        s.phase = 1 % pulses;
                         // Mid-pulse: this pulse's note restarts on the first note.
                         step(s, &held);
                     }
                 }
                 // Keys let go between edges silence the note at once; none held, no note.
                 if held.n == 0 {
-                    (s.play, s.restart) = (false, true);
+                    (s.play, s.restart, s.phase) = (false, true, 0);
                 }
                 let on = s.play;
                 let len = step_len(&s.iv);
@@ -495,7 +544,7 @@ impl Module for Arp {
                     on && ratchet_gate(s.since as f32, len, ratchets, width)
                         && !(edge && s.gate_high)
                 } else {
-                    on && c
+                    on && c && s.stepping
                 };
                 (s.clock_high, s.reset_high) = (c, r);
                 Some(*s)

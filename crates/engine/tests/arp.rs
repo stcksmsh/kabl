@@ -206,3 +206,28 @@ fn an_old_sequencer_patch_has_no_ratchets() {
     let x = render(&mut e, 48000);
     assert!(rms(&x) > 0.001);
 }
+
+fn on_ch(e: &mut PatchEngine, ch: u8, note: u8) {
+    use kabl_engine::keyboard::{MidiEvent, Source};
+    let ev = KeyEvent::On {
+        note,
+        velocity: 100,
+    };
+    e.key_at(MidiEvent::new(Source::Controller, ch, ev), 0);
+}
+
+#[test]
+fn a_channel_setting_hears_only_that_channel_and_the_default_hears_all() {
+    // Channel 3 (index 2): a key on channel 1 is ignored, one on channel 3 plays.
+    let (_c, mut e) = engine(&patch(&[], &[("channel", 3.0)]));
+    on_ch(&mut e, 0, 60);
+    assert!(rms(&render(&mut e, 24000)) < 1e-6, "channel 1 ignored");
+    on_ch(&mut e, 2, 64);
+    assert!(rms(&render(&mut e, 24000)) > 0.01, "channel 3 plays");
+    // The default, and a patch stored without the param, take every channel.
+    for params in [&[][..], &[("channel", 0.0)][..]] {
+        let (_c, mut e) = engine(&patch(&[], params));
+        on_ch(&mut e, 9, 60);
+        assert!(rms(&render(&mut e, 24000)) > 0.01, "{params:?}");
+    }
+}

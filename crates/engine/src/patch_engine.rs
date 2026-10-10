@@ -331,9 +331,9 @@ impl PatchEngine {
             let id = kb.id;
             kb.midi(e, &mut |a| act(active, incoming, id, a, offset));
         }
-        active.for_each_arp(|a| arp_key(a, e.event));
+        active.for_each_arp(|a| arp_key(a, e));
         if let Some((g, _)) = incoming.as_mut() {
-            g.for_each_arp(|a| arp_key(a, e.event));
+            g.for_each_arp(|a| arp_key(a, e));
         }
     }
 
@@ -916,12 +916,13 @@ fn bit(note: u8) -> u128 {
     1u128 << (note & 0x7F)
 }
 
-/// Every arpeggiator hears every key, whatever its source or channel.
-fn arp_key(a: &mut kabl_modules::builtins::Arp, e: KeyEvent) {
-    match e {
-        KeyEvent::On { note, velocity } => a.note_on(note, velocity),
-        KeyEvent::Off { note } => a.note_off(note),
-        KeyEvent::Sustain(down) => a.sustain(down),
+/// Every arpeggiator hears every source; its `channel` param picks the MIDI channel (default all).
+fn arp_key(a: &mut kabl_modules::builtins::Arp, e: MidiEvent) {
+    let heard = a.hears(e.channel);
+    match e.event {
+        KeyEvent::On { note, velocity } if heard => a.note_on(note, velocity),
+        KeyEvent::Off { note } if heard => a.note_off(note),
+        KeyEvent::Sustain(down) if heard => a.sustain(down),
         KeyEvent::AllOff | KeyEvent::NotesOff | KeyEvent::SourceLost => a.clear(),
         _ => {}
     }

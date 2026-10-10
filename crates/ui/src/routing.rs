@@ -194,6 +194,7 @@ pub fn step_labels(kind: &str, param: &str) -> Option<&'static [&'static str]> {
         ("arp", "octaves") => &["1", "2", "3", "4"],
         ("arp", "latch") => &["OFF", "ON"],
         ("arp", "ratchet") => &["1X", "2X", "3X", "4X"],
+        ("arp", "rate") => &["1/16", "1/8", "1/8D", "1/4", "1/2", "BAR"],
         ("delay", "sync") => &["FREE", "1/16", "1/8", "1/8D", "1/4"],
         ("delay", "mode") => &["MONO", "PING"],
         ("seq", "gate_mode") => &["CLOCK", "LENGTH"],
