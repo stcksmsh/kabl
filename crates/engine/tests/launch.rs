@@ -396,7 +396,9 @@ fn load_drops_pending_launches_and_starts_on_the_startup_bank() {
 fn deleting_the_reference_clock_drops_its_launches() {
     let mut no_clock = patch("pitch");
     no_clock.modules.remove(&CLOCK);
-    no_clock.cables.retain(|_, c| c.from.module_id() != Some(CLOCK));
+    no_clock
+        .cables
+        .retain(|_, c| c.from.module_id() != Some(CLOCK));
     let r = run(
         &patch("pitch"),
         block_of(tick(10)),

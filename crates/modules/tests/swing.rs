@@ -214,7 +214,10 @@ fn the_reported_position_agrees_with_the_swung_pulses() {
             last = got;
             // Every second pulse's start, a whole beat pair, is on the straight grid.
             if u % 2.0 < inc * BLOCK as f64 {
-                assert!((got % 2.0).min(2.0 - got % 2.0) < 0.05, "swing {swing}: {got}");
+                assert!(
+                    (got % 2.0).min(2.0 - got % 2.0) < 0.05,
+                    "swing {swing}: {got}"
+                );
             }
         }
     }

@@ -477,7 +477,8 @@ impl Module for Arp {
             self.held.channel = channel;
             self.clear();
         }
-        let pulses = RATE_PULSES[(io.param(6).at(0).round().max(0.0) as usize).min(RATE_PULSES.len() - 1)];
+        let pulses =
+            RATE_PULSES[(io.param(6).at(0).round().max(0.0) as usize).min(RATE_PULSES.len() - 1)];
         if latch != self.held.latch {
             self.held.latch = latch;
             if !latch {
