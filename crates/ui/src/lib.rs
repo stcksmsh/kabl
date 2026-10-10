@@ -3461,9 +3461,8 @@ fn draw_cables(
         .collect();
     {
         for (cable_id, c) in &cables {
-            if only.is_some_and(|id| {
-                c.from.module_id() != Some(id) && c.to.module_id() != Some(id)
-            }) {
+            if only.is_some_and(|id| c.from.module_id() != Some(id) && c.to.module_id() != Some(id))
+            {
                 continue;
             }
             if ui_state.unplug == Some(*cable_id) {

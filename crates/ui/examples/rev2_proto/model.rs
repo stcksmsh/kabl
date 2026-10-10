@@ -93,7 +93,14 @@ const fn knob(
     CtlDef {
         id,
         label,
-        spec: Spec::Knob { min, max, taper, unit, default, large },
+        spec: Spec::Knob {
+            min,
+            max,
+            taper,
+            unit,
+            default,
+            large,
+        },
         conceptual,
         primary,
     }
@@ -107,7 +114,13 @@ const fn select(
     conceptual: bool,
     primary: bool,
 ) -> CtlDef {
-    CtlDef { id, label, spec: Spec::Select { options, default }, conceptual, primary }
+    CtlDef {
+        id,
+        label,
+        spec: Spec::Select { options, default },
+        conceptual,
+        primary,
+    }
 }
 
 const fn jack(
@@ -118,11 +131,29 @@ const fn jack(
     x: f32,
     y: f32,
 ) -> JackDef {
-    JackDef { id, label, out, sig, conceptual: false, x, y, label_right: false }
+    JackDef {
+        id,
+        label,
+        out,
+        sig,
+        conceptual: false,
+        x,
+        y,
+        label_right: false,
+    }
 }
 
 const fn jack_r(id: &'static str, label: &'static str, out: bool, sig: Sig, y: f32) -> JackDef {
-    JackDef { id, label, out, sig, conceptual: false, x: 40.0, y, label_right: true }
+    JackDef {
+        id,
+        label,
+        out,
+        sig,
+        conceptual: false,
+        x: 40.0,
+        y,
+        label_right: true,
+    }
 }
 
 use Taper::{Exp, Lin};
@@ -133,8 +164,26 @@ static OSC: KindDef = KindDef {
     base_wu: 7,
     knob_y: 112.0,
     controls: &[
-        knob("base_hz", "Frequency", 20.0, 20000.0, Exp, "Hz", 261.63, true, false, true),
-        select("waveform", "Waveform", &["SIN", "TRI", "SAW", "SQR"], 2, false, true),
+        knob(
+            "base_hz",
+            "Frequency",
+            20.0,
+            20000.0,
+            Exp,
+            "Hz",
+            261.63,
+            true,
+            false,
+            true,
+        ),
+        select(
+            "waveform",
+            "Waveform",
+            &["SIN", "TRI", "SAW", "SQR"],
+            2,
+            false,
+            true,
+        ),
     ],
     jacks: &[
         jack("pitch", "Pitch", false, Sig::Pitch, 40.0, 272.0),
@@ -150,16 +199,51 @@ static LFO: KindDef = KindDef {
     base_wu: 7,
     knob_y: 112.0,
     controls: &[
-        knob("rate_hz", "Rate", 0.01, 100.0, Exp, "Hz", 0.8, true, false, true),
-        select("waveform", "Waveform", &["SIN", "TRI", "SAW", "SQR", "S&H"], 1, false, true),
-        knob("fine", "Fine", -10.0, 10.0, Lin, "%", 0.0, false, true, false),
-        knob("phase", "Phase", 0.0, 360.0, Lin, "°", 0.0, false, true, false),
-        knob("fade_ms", "Fade-in", 1.0, 10000.0, Exp, "ms", 1200.0, false, true, false),
-        knob("amp", "Amplitude", 0.0, 1.0, Lin, "", 1.0, false, true, false),
-        knob("offset", "Offset", -1.0, 1.0, Lin, "±", 0.0, false, true, false),
+        knob(
+            "rate_hz", "Rate", 0.01, 100.0, Exp, "Hz", 0.8, true, false, true,
+        ),
+        select(
+            "waveform",
+            "Waveform",
+            &["SIN", "TRI", "SAW", "SQR", "S&H"],
+            1,
+            false,
+            true,
+        ),
+        knob(
+            "fine", "Fine", -10.0, 10.0, Lin, "%", 0.0, false, true, false,
+        ),
+        knob(
+            "phase", "Phase", 0.0, 360.0, Lin, "°", 0.0, false, true, false,
+        ),
+        knob(
+            "fade_ms", "Fade-in", 1.0, 10000.0, Exp, "ms", 1200.0, false, true, false,
+        ),
+        knob(
+            "amp",
+            "Amplitude",
+            0.0,
+            1.0,
+            Lin,
+            "",
+            1.0,
+            false,
+            true,
+            false,
+        ),
+        knob(
+            "offset", "Offset", -1.0, 1.0, Lin, "±", 0.0, false, true, false,
+        ),
         select("sync", "Sync", &["FREE", "TEMPO"], 0, true, false),
         select("polarity", "Polarity", &["BI", "UNI"], 0, true, false),
-        select("trigger", "Trigger", &["FREE", "NOTE", "ONCE"], 1, true, false),
+        select(
+            "trigger",
+            "Trigger",
+            &["FREE", "NOTE", "ONCE"],
+            1,
+            true,
+            false,
+        ),
         select("scope", "Scope", &["VOICE", "GLOBAL"], 0, true, false),
     ],
     jacks: &[
@@ -184,8 +268,30 @@ static FILTER: KindDef = KindDef {
     base_wu: 7,
     knob_y: 112.0,
     controls: &[
-        knob("cutoff_hz", "Cutoff", 20.0, 20000.0, Exp, "Hz", 1200.0, true, false, true),
-        knob("resonance", "Resonance", 0.0, 0.95, Lin, "", 0.35, false, false, true),
+        knob(
+            "cutoff_hz",
+            "Cutoff",
+            20.0,
+            20000.0,
+            Exp,
+            "Hz",
+            1200.0,
+            true,
+            false,
+            true,
+        ),
+        knob(
+            "resonance",
+            "Resonance",
+            0.0,
+            0.95,
+            Lin,
+            "",
+            0.35,
+            false,
+            false,
+            true,
+        ),
     ],
     jacks: &[
         jack("in", "In", false, Sig::Audio, 0.0, 212.0),
@@ -216,10 +322,36 @@ static ADSR: KindDef = KindDef {
     base_wu: 8,
     knob_y: 168.0,
     controls: &[
-        knob("attack_ms", "Attack", 0.1, 10000.0, Exp, "ms", 8.0, false, false, true),
-        knob("decay_ms", "Decay", 0.1, 10000.0, Exp, "ms", 240.0, false, false, true),
-        knob("sustain", "Sustain", 0.0, 1.0, Lin, "", 0.6, false, false, true),
-        knob("release_ms", "Release", 0.1, 10000.0, Exp, "ms", 420.0, false, false, true),
+        knob(
+            "attack_ms",
+            "Attack",
+            0.1,
+            10000.0,
+            Exp,
+            "ms",
+            8.0,
+            false,
+            false,
+            true,
+        ),
+        knob(
+            "decay_ms", "Decay", 0.1, 10000.0, Exp, "ms", 240.0, false, false, true,
+        ),
+        knob(
+            "sustain", "Sustain", 0.0, 1.0, Lin, "", 0.6, false, false, true,
+        ),
+        knob(
+            "release_ms",
+            "Release",
+            0.1,
+            10000.0,
+            Exp,
+            "ms",
+            420.0,
+            false,
+            false,
+            true,
+        ),
     ],
     jacks: &[
         jack("gate", "Gate", false, Sig::Gate, 60.0, 272.0),
@@ -264,8 +396,12 @@ static ENSEMBLE: KindDef = KindDef {
     base_wu: 7,
     knob_y: 120.0,
     controls: &[
-        knob("rate", "Rate", 0.05, 10.0, Exp, "Hz", 0.6, false, false, true),
-        knob("depth", "Depth", 0.0, 1.0, Lin, "", 0.45, false, false, true),
+        knob(
+            "rate", "Rate", 0.05, 10.0, Exp, "Hz", 0.6, false, false, true,
+        ),
+        knob(
+            "depth", "Depth", 0.0, 1.0, Lin, "", 0.45, false, false, true,
+        ),
         knob("mix", "Mix", 0.0, 1.0, Lin, "", 0.7, false, false, true),
         select("mode", "Mode", &["I", "II", "I+II"], 2, false, true),
     ],
@@ -294,7 +430,12 @@ pub fn def(kind: Kind) -> &'static KindDef {
 
 pub fn to_value(spec: &Spec, t: f32) -> f32 {
     match *spec {
-        Spec::Knob { min, max, taper: Taper::Exp, .. } => min * (max / min).powf(t.clamp(0.0, 1.0)),
+        Spec::Knob {
+            min,
+            max,
+            taper: Taper::Exp,
+            ..
+        } => min * (max / min).powf(t.clamp(0.0, 1.0)),
         Spec::Knob { min, max, .. } => min + (max - min) * t.clamp(0.0, 1.0),
         Spec::Select { options, .. } => (t.round() as usize).min(options.len() - 1) as f32,
     }
@@ -302,9 +443,12 @@ pub fn to_value(spec: &Spec, t: f32) -> f32 {
 
 pub fn to_t(spec: &Spec, v: f32) -> f32 {
     match *spec {
-        Spec::Knob { min, max, taper: Taper::Exp, .. } => {
-            ((v.max(min) / min).ln() / (max / min).ln()).clamp(0.0, 1.0)
-        }
+        Spec::Knob {
+            min,
+            max,
+            taper: Taper::Exp,
+            ..
+        } => ((v.max(min) / min).ln() / (max / min).ln()).clamp(0.0, 1.0),
         Spec::Knob { min, max, .. } => ((v - min) / (max - min)).clamp(0.0, 1.0),
         Spec::Select { .. } => v,
     }
@@ -350,7 +494,9 @@ pub fn parse_value(spec: &Spec, text: &str) -> Option<f32> {
             .position(|o| o.to_lowercase() == s)
             .map(|i| i as f32);
     }
-    let Spec::Knob { unit, min, max, .. } = *spec else { unreachable!() };
+    let Spec::Knob { unit, min, max, .. } = *spec else {
+        unreachable!()
+    };
     let num_end = s
         .find(|c: char| !(c.is_ascii_digit() || c == '.' || c == '-' || c == '+' || c == 'e'))
         .unwrap_or(s.len());
@@ -470,12 +616,22 @@ impl Patch {
     }
 
     pub fn jack(&self, m: usize, id: &str) -> JackRef {
-        let j = self.modules[m].def().jacks.iter().position(|j| j.id == id).expect("jack");
+        let j = self.modules[m]
+            .def()
+            .jacks
+            .iter()
+            .position(|j| j.id == id)
+            .expect("jack");
         JackRef { m, j }
     }
 
     pub fn ctl(&self, m: usize, id: &str) -> CtlRef {
-        let c = self.modules[m].def().controls.iter().position(|c| c.id == id).expect("control");
+        let c = self.modules[m]
+            .def()
+            .controls
+            .iter()
+            .position(|c| c.id == id)
+            .expect("control");
         CtlRef { m, c }
     }
 
@@ -488,14 +644,22 @@ impl Patch {
     }
 
     pub fn routes_to(&self, dst: CtlRef) -> impl Iterator<Item = (usize, &Route)> {
-        self.routes.iter().enumerate().filter(move |(_, r)| r.dst == dst)
+        self.routes
+            .iter()
+            .enumerate()
+            .filter(move |(_, r)| r.dst == dst)
     }
 
     pub fn source_bipolar(&self, src: JackRef) -> bool {
         let m = &self.modules[src.m];
         if m.kind == Kind::Lfo {
             // Polarity ◆ (BI/UNI) decides it.
-            let c = m.def().controls.iter().position(|c| c.id == "polarity").unwrap();
+            let c = m
+                .def()
+                .controls
+                .iter()
+                .position(|c| c.id == "polarity")
+                .unwrap();
             return m.values[c] < 0.5;
         }
         m.def().bipolar_out
@@ -580,7 +744,11 @@ pub fn reference_patch() -> Patch {
         Module::new(Kind::Vca, 1),
         Module::new(Kind::Out, 1),
     ];
-    let mut p = Patch { modules: mods, cables: vec![], routes: vec![] };
+    let mut p = Patch {
+        modules: mods,
+        cables: vec![],
+        routes: vec![],
+    };
     let (osc, lfo, fil, midi, env, vca, out) = (
         p.find(Kind::Osc, 0),
         p.find(Kind::Lfo, 0),
@@ -626,14 +794,25 @@ pub fn crowded_patch() -> Patch {
     ] {
         p.modules.push(Module::new(kind, row));
     }
-    let (lfo1, lfo2, lfo3) = (p.find(Kind::Lfo, 0), p.find(Kind::Lfo, 1), p.find(Kind::Lfo, 2));
+    let (lfo1, lfo2, lfo3) = (
+        p.find(Kind::Lfo, 0),
+        p.find(Kind::Lfo, 1),
+        p.find(Kind::Lfo, 2),
+    );
     let (osc1, osc2) = (p.find(Kind::Osc, 0), p.find(Kind::Osc, 1));
     let (f1, f2) = (p.find(Kind::Filter, 0), p.find(Kind::Filter, 1));
     let (e1, e2) = (p.find(Kind::Adsr, 0), p.find(Kind::Adsr, 1));
-    let (v2, midi, ens) = (p.find(Kind::Vca, 1), p.find(Kind::Midi, 0), p.find(Kind::Ensemble, 0));
+    let (v2, midi, ens) = (
+        p.find(Kind::Vca, 1),
+        p.find(Kind::Midi, 0),
+        p.find(Kind::Ensemble, 0),
+    );
     let out = p.find(Kind::Out, 0);
     let add = |p: &mut Patch, a: (usize, &str), b: (usize, &str)| {
-        let cable = Cable { from: p.jack(a.0, a.1), to: p.jack(b.0, b.1) };
+        let cable = Cable {
+            from: p.jack(a.0, a.1),
+            to: p.jack(b.0, b.1),
+        };
         p.cables.push(cable);
     };
     add(&mut p, (midi, "pitch"), (osc2, "pitch"));
@@ -644,7 +823,12 @@ pub fn crowded_patch() -> Patch {
     add(&mut p, (v2, "out"), (ens, "in"));
     let _ = out;
     let route = |p: &mut Patch, s: (usize, &str), d: (usize, &str), amount: f32| {
-        let r = Route { src: p.jack(s.0, s.1), dst: p.ctl(d.0, d.1), amount, bypass: false };
+        let r = Route {
+            src: p.jack(s.0, s.1),
+            dst: p.ctl(d.0, d.1),
+            amount,
+            bypass: false,
+        };
         p.routes.push(r);
     };
     route(&mut p, (lfo1, "out"), (e1, "attack_ms"), 0.25);

@@ -127,7 +127,7 @@ pub static ARP_INFO: ModuleInfo = ModuleInfo {
         interpolation: false,
     },
     skin: None,
-    width_units: 8,
+    width_units: 17,
     advanced: &[],
 };
 

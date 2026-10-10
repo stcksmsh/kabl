@@ -189,6 +189,11 @@ pub fn step_labels(kind: &str, param: &str) -> Option<&'static [&'static str]> {
         ("osc.wt", "user") => &["OFF", "1", "2", "3", "4", "5", "6", "7", "8"],
         ("vca", "exponential") => &["LIN", "EXP"],
         ("seq", g) if g.starts_with('g') && g.len() == 2 => &["OFF", "ON"],
+        ("seq", k) if k.starts_with('k') && k.len() == 2 => &["1X", "2X", "3X", "4X"],
+        ("arp", "mode") => &["UP", "DOWN", "UP-DN", "PLAYED", "RANDOM"],
+        ("arp", "octaves") => &["1", "2", "3", "4"],
+        ("arp", "latch") => &["OFF", "ON"],
+        ("arp", "ratchet") => &["1X", "2X", "3X", "4X"],
         ("delay", "sync") => &["FREE", "1/16", "1/8", "1/8D", "1/4"],
         ("delay", "mode") => &["MONO", "PING"],
         ("seq", "gate_mode") => &["CLOCK", "LENGTH"],
@@ -221,6 +226,9 @@ pub fn param_label(p: &ParamInfo) -> String {
         if let Some(k) = slot.strip_prefix('r').filter(|k| k.len() == 1) {
             return format!("Prob {k}");
         }
+        if let Some(k) = slot.strip_prefix('k').filter(|k| k.len() == 1) {
+            return format!("Ratchet {k}");
+        }
         match slot {
             "bank" => return "Startup".into(),
             "direction" => return "Direction".into(),
@@ -234,6 +242,7 @@ pub fn param_label(p: &ParamInfo) -> String {
         "exponential" => return "Response".into(),
         "div" => return "Divide by".into(),
         "gate_len" => return "Gate length".into(),
+        "octaves" => return "Octaves".into(),
         "gate_mode" => return "Gate".into(),
         "damp_hz" => return "Damping".into(),
         "pw" => return "Pulse width".into(),

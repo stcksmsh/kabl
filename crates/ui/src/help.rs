@@ -166,6 +166,25 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
             "LIN follows the CV directly; EXP squares it, so fades sound more natural."
         }
         ("mixer", p) if p.starts_with("level") => "Level of this channel into the mix, 0–1.",
+        ("clock", "swing") => {
+            "Delays every second tick, so the second 16th of each pair lands late: 0 is \
+             straight, about 67 % a triplet shuffle, 100 % as late as it goes. Everything on \
+             this clock swings together."
+        }
+        ("arp", "mode") => {
+            "Order the held keys are played: up, down, up and down, the order you pressed \
+             them, or at random."
+        }
+        ("arp", "octaves") => "How many octaves the held keys are repeated over, 1 to 4.",
+        ("arp", "gate_len") => {
+            "How long each note is held, as % of a step. 100 % still lets go for an instant so \
+             the next note restarts."
+        }
+        ("arp", "latch") => {
+            "ON keeps the notes playing after you let go. Pressing a key with nothing held \
+             starts a new chord; pressing while others are held adds to it."
+        }
+        ("arp", "ratchet") => "Plays each note this many times, evenly spaced, inside its step.",
         ("clock", "bpm") => "Tempo in beats per minute. The clock ticks four times per beat.",
         ("quantizer", "scale") => {
             "The notes that are allowed. Major and Minor are the everyday scales; Pentatonic and \
@@ -237,6 +256,10 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
         }
         ("seq", s) if s.len() == 2 && s.starts_with('r') => {
             "Chance that this step plays each time round; the rest of the time it is a rest."
+        }
+        ("seq", s) if s.len() == 2 && s.starts_with('k') => {
+            "Ratchet: plays this step 1 to 4 times, evenly spaced inside the step. A rest stays \
+             a rest; Prob decides all the repeats together."
         }
         ("seq", "length") => "How many steps the pattern plays before it loops (1–8).",
         ("seq", "transpose") => "Shifts every step by whole semitones.",
@@ -330,6 +353,11 @@ pub fn port_help(kind: &str, port: &str) -> Option<&'static str> {
         ("env.adsr", "gate") => "Starts the envelope while high, releases it when low.",
         ("lfo" | "delay", "clock") => "A clock for Sync to follow.",
         ("lfo", "reset") => "Restarts the wave at Phase.",
+        ("arp", "clock") => "Each rising edge plays the next note of the held keys.",
+        ("arp", "reset") => "A rising edge starts the pattern over on its first note.",
+        ("arp", "gate") => "High while a note sounds: patch it to an envelope's gate.",
+        ("arp", "pitch") => "The note being played: patch it to an oscillator's pitch.",
+        ("arp", "velocity") => "How hard the key for this note was pressed, 0 to 1.",
         ("seq", "clock") => "Each rising edge plays the next step.",
         ("seq", "reset") => "Jumps back to the first step.",
         ("quantizer", "in") => "The pitch to snap to the scale.",
@@ -373,6 +401,11 @@ pub fn module_note(kind: &str) -> Option<&'static str> {
         "ringmod" => {
             "In several factory sounds a macro feeds one input and an LFO the other, so the \
              macro sets how much the LFO moves its destinations."
+        }
+        "arp" => {
+            "Works from the keys you play: it hears the keyboard directly, so it needs no cable \
+             from midi.in. Patch its pitch and gate to a voice instead of (or beside) midi.in. \
+             Drive it from a clock; run that clock through clock.div for slower notes."
         }
         "midi.in" => {
             "Its settings apply to the voices this keyboard drives, not to other keyboards. \

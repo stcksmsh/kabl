@@ -83,7 +83,7 @@ pub type BufIdx = usize;
 /// `process_block`'s per-step input scratch is a fixed-size stack array sized to these, not a
 /// `Vec`, so building it every block doesn't allocate; params live in a per-step vector built at
 /// compile time. Set to the largest count any of the known built-ins actually has (`mixer`: 4
-/// inputs; `seq`: 143 params) — `compile()` checks every module against these bounds and
+/// inputs; `seq`: 175 params) — `compile()` checks every module against these bounds and
 /// returns `CompileError::TooManyPorts` rather than silently truncating if a future built-in
 /// needs more.
 const MAX_INPUTS: usize = 4;
@@ -91,7 +91,7 @@ const MAX_INPUTS: usize = 4;
 /// outputs is the largest). Bump alongside a new match arm if a module ever needs more, not just
 /// this constant.
 const MAX_OUTPUTS: usize = 4;
-const MAX_PARAMS: usize = 143;
+const MAX_PARAMS: usize = 175;
 
 /// Route amount when a `PortRef::Param` cable has no stored `amount` (+25 % of knob travel, the
 /// UI's default on drop). A stored value always wins.

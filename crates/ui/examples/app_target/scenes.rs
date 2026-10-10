@@ -17,7 +17,15 @@ pub enum Scene {
 }
 
 impl Scene {
-    pub const ALL: [Scene; 7] = [Scene::Rack, Scene::Perform, Scene::Composition, Scene::Faces, Scene::Wavetable, Scene::StepCable, Scene::Components];
+    pub const ALL: [Scene; 7] = [
+        Scene::Rack,
+        Scene::Perform,
+        Scene::Composition,
+        Scene::Faces,
+        Scene::Wavetable,
+        Scene::StepCable,
+        Scene::Components,
+    ];
     pub fn slug(self) -> &'static str {
         match self {
             Scene::Rack => "rack-sounds",
@@ -30,7 +38,9 @@ impl Scene {
         }
     }
     pub fn parse(s: &str) -> Option<Scene> {
-        Scene::ALL.into_iter().find(|x| x.slug() == s || x.slug().starts_with(s))
+        Scene::ALL
+            .into_iter()
+            .find(|x| x.slug() == s || x.slug().starts_with(s))
     }
 }
 
@@ -41,7 +51,10 @@ pub struct Ctxs {
 
 impl Ctxs {
     pub fn new() -> Self {
-        Ctxs { reference: Rack::new(load("reference")), comp: Rack::new(load("composition")) }
+        Ctxs {
+            reference: Rack::new(load("reference")),
+            comp: Rack::new(load("composition")),
+        }
     }
 }
 
@@ -53,7 +66,11 @@ pub fn draw(cx: &Cx, d: &Ctxs, size: egui::Vec2, scene: Scene) {
         Scene::Perform => crate::perform::perform(cx, size),
         Scene::Composition => {
             let ids = [6u32, 7, 10, 36];
-            let f = if cx.t >= 50.0 { ids[((cx.t - 50.0) / 0.9) as usize % 4] } else { 6 };
+            let f = if cx.t >= 50.0 {
+                ids[((cx.t - 50.0) / 0.9) as usize % 4]
+            } else {
+                6
+            };
             crate::composition::composition(cx, d, size, f)
         }
         Scene::Faces => crate::closeup::faces(cx, d, size),
@@ -85,16 +102,39 @@ fn rack_scene(cx: &Cx, d: &Ctxs, size: egui::Vec2) {
     let xf = fit(world, ar.center, vec2(10.0, 6.0), 1.0);
     rk.rails(cx, xf, world.left(), world.right());
     rk.draw(cx, xf, Some(3), true, 1.0, true);
-    toolbar(cx, ar.toolbar, "Rack", "Evolving Pad", true, &format!("{:.0}%", xf.s * 100.0), (true, false), 1);
+    toolbar(
+        cx,
+        ar.toolbar,
+        "Rack",
+        "Evolving Pad",
+        true,
+        &format!("{:.0}%", xf.s * 100.0),
+        (true, false),
+        1,
+    );
     browser(cx, ar.left.unwrap(), 2, 4, "");
     rail(cx, ar.right, 1);
-    status(cx, ar.status, (0.62 + 0.1 * (cx.t * 3.0).sin(), 0.55 + 0.1 * (cx.t * 2.7).sin()));
+    status(
+        cx,
+        ar.status,
+        (
+            0.62 + 0.1 * (cx.t * 3.0).sin(),
+            0.55 + 0.1 * (cx.t * 2.7).sin(),
+        ),
+    );
 }
 
 /// Recording script: (scene, time) per frame. Composition runs on t >= 50 so focus cycles.
 pub fn timeline(fps: f32) -> Vec<(Scene, f32)> {
     let mut v = vec![];
-    for (scene, secs, t0) in [(Scene::Rack, 3.5, 0.0), (Scene::Perform, 3.5, 1.2), (Scene::Composition, 3.6, 50.0), (Scene::Faces, 2.5, 0.0), (Scene::Wavetable, 2.5, 0.0), (Scene::StepCable, 3.0, 0.0)] {
+    for (scene, secs, t0) in [
+        (Scene::Rack, 3.5, 0.0),
+        (Scene::Perform, 3.5, 1.2),
+        (Scene::Composition, 3.6, 50.0),
+        (Scene::Faces, 2.5, 0.0),
+        (Scene::Wavetable, 2.5, 0.0),
+        (Scene::StepCable, 3.0, 0.0),
+    ] {
         for i in 0..(secs * fps) as usize {
             v.push((scene, t0 + i as f32 / fps));
         }
