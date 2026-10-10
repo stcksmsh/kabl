@@ -1,0 +1,43 @@
+{
+ "plugin_sha256": "a7ed4e5f82960657621e2ae750659600a5b1596d9c5de5816f7b407a0dd25b52",
+ "baseline_sha256": "c9fa11b88ee006e7acadd74e0534b45781a0bcac982852cdb53377903293f3de",
+ "all3_states_identical_across_save_quit_reopen": true,
+ "all3": {
+  "finite": true,
+  "peak": 0.2902009189128876,
+  "rms": 0.06690193712711334,
+  "reopen_render_bit_identical": true,
+  "sha256": "39fe69bd75e6b0226334b0750b35d3a70c95298f4aa2618214e20bdedd6a6e14"
+ },
+ "swing_full": {
+  "label": "swing 0-20 s, the project tempo map",
+  "n": 160,
+  "median_offset_ms": -0.07,
+  "max_dev_from_median_ms": 0.82,
+  "swing_effect_ms": 43.6
+ },
+ "swing_jump": {
+  "label": "swing, render from 8.2 s",
+  "n": 90,
+  "median_offset_ms": 0.0,
+  "max_dev_from_median_ms": 0.64,
+  "swing_effect_ms": 43.6
+ },
+ "arp_full": {
+  "label": "arp 0-20 s, the project tempo map",
+  "n": 117,
+  "median_offset_ms": 0.07,
+  "max_dev_from_median_ms": 1.64,
+  "swing_effect_ms": 44.6
+ },
+ "arp_jump": {
+  "label": "arp, render from 8.2 s",
+  "n": 87,
+  "median_offset_ms": 0.14,
+  "max_dev_from_median_ms": 1.29,
+  "swing_effect_ms": 44.6
+ },
+ "old_state_identical_new_plugin": true,
+ "old_render_bit_identical_to_baseline": true,
+ "old_render_sha256": "24d8729a51d1153422a59adb784e659ccecdb45a70dde241c9db044adc20e421"
+}
