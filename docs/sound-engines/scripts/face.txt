@@ -3,6 +3,9 @@ sleep 1
 click routing
 sleep 1
 shot light
+click view-menu
+sleep 0.5
 click theme:dark
+key Escape
 sleep 0.5
 shot dark

@@ -19,9 +19,11 @@ Held keys in, `pitch`, `gate` and `velocity` out, one note per rising edge on `c
 | `gate_len` | 1 to 100 %: how much of the step the gate is high |
 | `latch` | OFF, ON: the chord stays after release |
 | `ratchet` | 1X to 4X: each note repeated that many times inside its step |
+| `channel` | ALL (default) or MIDI channel 1 to 16: whose keys it plays |
+| `rate` | 1/16 (default), 1/8, 1/8D, 1/4, 1/2, BAR: one note per 1, 2, 3, 4, 8 or 16 clock pulses |
 
-It hears the keyboard directly (every key event of every source and channel), so it needs no
-cable from `midi.in`; patch `arp.pitch` and `arp.gate` where `midi.in`'s would go. Global rate,
+It hears the keyboard directly (every source; every channel unless `channel` picks one), so it needs
+no cable from `midi.in`; patch `arp.pitch` and `arp.gate` where `midi.in`'s would go. Global rate,
 like `seq`: every voice of a voice-rate chain it feeds plays the same note. `midi.in`, the keyboard
 rules and voice allocation are untouched, so a chord can sound through `midi.in` and be
 arpeggiated at the same time.
@@ -46,9 +48,20 @@ What it does, defined:
 - **Gate length** follows the step: as long as the clock interval two edges back (so a swung clock
   gives each note its own length). The first step after a load follows the clock pulse. 100 % still
   drops the gate for one sample so the next note retriggers.
+- **Channel**: `channel` is a knob that reads ALL at 0 and "ch 1" to "ch 16" above it, the same
+  control `midi.in` has. Changing it forgets the held keys (a key held on the old channel would
+  never see its release). Key off and pedal events follow the same filter; panic and notes-off
+  always clear. A patch saved before the param existed reads ALL, so it plays as it did.
+- **Rate**: counts pulses of the clock patched into `clock` and plays on every Nth, starting
+  with the first after a reset or after silence. The default 1/16 plays on every pulse, as
+  before. The labels assume the clock module's 16ths; they multiply with a `clock.div` or any
+  other clock patched in (a clock slowed to 1/8 and a rate of 1/8 give quarter notes), so leave
+  the rate at 1/16 when the patched clock is already the speed you want. The help text of the
+  rate control says so. The gate length follows the step, so a slower rate holds the note longer.
+  There is no internal clock: with nothing patched into `clock` it stays silent, as before.
 - Limits: 16 keys held; key events land at the start of the block they arrive in and the pattern
   takes them at the next clock edge; the held keys are the player's and are not saved in the sound.
-  For slower notes put `clock.div` in front of `clock`.
+  For rates beyond the list put `clock.div` in front of `clock`.
 
 ## swing (on clock)
 
@@ -60,7 +73,10 @@ It is on the clock, not on each consumer, so everything stepping on that clock s
 amount: a `seq`, an `arp`, a `random`, a delay locked to it, a patterned cable and a hi-hat
 triggered straight from `gate`. A consumer given `clock.div` skips the delayed pulses and plays
 straight (swing is a property of 16ths; divide by 2 and you hear straight 8ths). The `reset`
-output and the pulse count are unchanged. Sample-exact in free running (the pulse phase is an
+output and the pulse count are unchanged. The clock's position report (`Clock::position`, what
+Perform's beat readout and queued-pad progress read) is in the same swung time: pulse k starts
+exactly when it reaches k, and every pair's end, so every beat, is on the straight grid
+(`the_reported_position_agrees_with_the_swung_pulses`, swing 0, 58 and 100). Sample-exact in free running (the pulse phase is an
 `f64` advanced per sample); in a host the pair half and phase are found from the host's beat
 position every block, so a loop, a locate and a tempo change land where running there would.
 Side effect: the clock's `gate` is high for the first half of its pulse, so the long pulse's gate is
@@ -107,17 +123,17 @@ selector row); the ratchet knobs read "1X" to "4X" (they read "1.00" first); the
 
 ## Checks
 
-- `crates/modules/tests/arp.rs` (11): every mode and octave order, played order, one key and none,
+- `crates/modules/tests/arp.rs` (14): every mode and octave order, played order, one key and none,
   key added and released mid-pattern, release at once and restart on the next chord, latch and
   its replacement rule, pedal, seeded random (same seed same render, other seed other line, covers
-  the span), gate length and ratchet counts, reset, carry.
-- `crates/modules/tests/swing.rs` (8): the straight clock unchanged, swing delay to the sample at
-  0/50/100 %, pulse count unchanged, host position mapping, ratchet edges to the sample, rest and
+  the span), gate length and ratchet counts, reset, carry, rate (every Nth pulse, restart after silence), the channel filter.
+- `crates/modules/tests/swing.rs` (9): the straight clock unchanged, swing delay to the sample at
+  0/50/100 %, pulse count unchanged, the position report against the swung pulses, host position mapping, ratchet edges to the sample, rest and
   probability composition over 40 passes, ratchets inside a swung clock's long and short steps.
-- `crates/engine/tests/arp.rs` (6): keys reach the arp through the engine, release is immediate,
+- `crates/engine/tests/arp.rs` (7): keys reach the arp through the engine, release is immediate,
   panic clears, no allocation across keys and ticks with swing and ratchets, a random render is
   bit-identical twice, swing moves every arpeggio note (3000/9000 samples), an old sequencer patch
-  has no ratchets.
+  has no ratchets, the channel filter through the engine (ALL by default and when stored without the param).
 - `crates/ui/tests/arp_demos.rs` (3 + 2 writers): demos match their builders, parameters in range,
   compile, finite and in level, the swing clip changes with swing and keeps its energy.
 - Golden renders of all committed patches unchanged (`crates/engine/tests/golden_renders.rs`).

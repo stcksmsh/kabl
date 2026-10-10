@@ -16,7 +16,9 @@ Why: the only way to get moving notes was the eight-step `seq`, programmed by ha
 
 **Found by testing, fixed.** `Clock` indexed its second param unconditionally and panicked for the callers that wire only the first (`tests/seq.rs`, `lfo_sync.rs`, `patch_demo.rs`): it now checks `param_count`. Seq ratchet timing first computed the step length every sample (the plain `seq` cost 11 % more); now only for a ratcheted step (34.7 against 35.5 ns). The first drawer layout put "Gate length" and "Ratchet 1" labels on top of each other: "Gate len", "Ratch 1".
 
-**Not done.** A per-repeat probability; a rate or division on the arpeggiator (use `clock.div`); swing on the `delay`'s own tempo sync (it follows the clock's gate edges it is given); a real REAPER transport loop (a render from mid-project stands in for the jump); listening.
+**Not done.** A per-repeat probability; an internal clock for the arpeggiator (it divides the clock patched into it, see below); swing on the `delay`'s own tempo sync (it follows the clock's gate edges it is given); a real REAPER transport loop (a render from mid-project stands in for the jump); listening.
+
+**Channel and rate on the arpeggiator (owner's decision after review).** `channel` (ALL, or 1 to 16) is a knob on the face, as on `midi.in`, because 17 options do not fit a selector; the engine filters key events per arpeggiator (`arp_key`) and changing the channel forgets the held keys so nothing sticks. `rate` (1/16, 1/8, 1/8D, 1/4, 1/2, BAR) divides the clock patched in by 1, 2, 3, 4, 8 or 16 pulses. Both are appended params, so stored patches read ALL and 1/16 and play as before. Read "a patched clock takes priority" as: there is no internal clock, the patched clock is always the source and the rate only slows it, so a clock already divided by `clock.div` needs rate 1/16 (the help text says so). If an internal tempo was meant, it needs a project tempo the engine does not have; that is a separate change.
 
 ## 2026-10-10 — Utility modules: quantizer, sample.hold, slew, attenuverter, logic, comparator, crossfade, pan, random
 
