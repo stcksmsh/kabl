@@ -39,7 +39,7 @@ type PreparedSession = (
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Copy)]
 enum RuntimeReport {
-    Clock(u64, bool),
+    Clock(u64, bool, f64),
     Seq(u64, usize, usize, Option<usize>),
     Delay(u64, kabl_modules::builtins::DelayLock, f32),
     Lfo(u64, kabl_modules::builtins::LfoSync),
@@ -141,8 +141,9 @@ impl Control {
                 break;
             };
             match report {
-                RuntimeReport::Clock(id, running) => {
+                RuntimeReport::Clock(id, running, pos) => {
                     self.view.clock_running.insert(id, running);
+                    self.view.clock_pos.insert(id, pos);
                 }
                 RuntimeReport::Seq(id, step, bank, queued) => {
                     self.view.seq_steps.insert(id, step);
@@ -977,8 +978,8 @@ impl Instrument {
             .audio_clock
             .store(s.engine.rendered_samples(), Ordering::Relaxed);
         let reports = &mut s.reports;
-        s.engine.clocks(|id, running| {
-            let _ = reports.push(RuntimeReport::Clock(id, running));
+        s.engine.clocks(|id, running, pos| {
+            let _ = reports.push(RuntimeReport::Clock(id, running, pos));
         });
         s.engine.seqs(|id, step, bank, queued| {
             let _ = reports.push(RuntimeReport::Seq(id, step, bank, queued));

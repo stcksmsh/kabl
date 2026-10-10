@@ -240,7 +240,7 @@ impl Delivery {
         g.fresh = fresh;
         if stopped {
             let mut clocks = Vec::new();
-            g.clocks(|id, _| clocks.push(id));
+            g.clocks(|id, _, _| clocks.push(id));
             for id in clocks {
                 g.transport(id, Transport::Stop);
             }
@@ -275,7 +275,7 @@ impl Delivery {
                         graph.fresh = request.fresh;
                         if request.stopped {
                             let mut clocks = Vec::new();
-                            graph.clocks(|id, _| clocks.push(id));
+                            graph.clocks(|id, _, _| clocks.push(id));
                             for id in clocks {
                                 graph.transport(id, Transport::Stop);
                             }

@@ -149,15 +149,15 @@ fn missing_transport_stops_host_clocks_but_free_clock_keeps_running() {
     let mut engine = PatchEngine::new(&collector.handle(), &patch, 48000.0, VOICES).unwrap();
     let mut schedule = schedule::Schedule::new([0.0; automation::SLOTS]);
     let mut running = false;
-    engine.clocks(|_, run| running = run);
+    engine.clocks(|_, run, _| running = run);
     assert!(running);
     schedule.mode(true);
     assert_no_alloc(|| schedule.block(&mut engine, 0, &[None; automation::SLOTS], 48000.0));
-    engine.clocks(|_, run| running = run);
+    engine.clocks(|_, run, _| running = run);
     assert!(!running);
     schedule.mode(false);
     assert_no_alloc(|| schedule.block(&mut engine, 64, &[None; automation::SLOTS], 48000.0));
-    engine.clocks(|_, run| running = run);
+    engine.clocks(|_, run, _| running = run);
     assert!(running);
 }
 

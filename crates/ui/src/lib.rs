@@ -182,6 +182,8 @@ pub struct UiState {
     bank_revealed: Option<(ModuleId, String)>,
     /// Each clock's run state as the audio thread last reported it; absent means running.
     pub clock_running: HashMap<ModuleId, bool>,
+    /// Each clock's position in 16ths since its last restart, as the audio thread reports it.
+    pub clock_pos: HashMap<ModuleId, f64>,
     /// Host owns clock transport in the plugin; standalone defaults to Free.
     pub host_clock: bool,
     /// Transport commands for `main.rs` to send to the audio thread. Runtime only: never in the
@@ -203,6 +205,11 @@ pub struct UiState {
     /// Screen offset of the rack origin from the canvas' top-left.
     pub pan: EguiVec2,
     pub drawer_open: bool,
+    /// The user pinned the drawer: entering the full Perform view leaves it open.
+    pub drawer_pinned: bool,
+    /// Perform closed the drawer on entry; leaving the full view reopens it.
+    drawer_auto_closed: bool,
+    perform_full_seen: bool,
     /// Modules showing their advanced controls. View only: never saved, never undone.
     pub expanded: BTreeSet<ModuleId>,
     /// Advanced controls float over the neighbours instead of pushing them (setting).
@@ -317,6 +324,7 @@ impl Default for UiState {
             button_rearm: true,
             bank_revealed: None,
             clock_running: HashMap::new(),
+            clock_pos: HashMap::new(),
             host_clock: false,
             transport: Vec::new(),
             delay_status: HashMap::new(),
@@ -328,6 +336,9 @@ impl Default for UiState {
             zoom: 1.0,
             pan: EguiVec2::ZERO,
             drawer_open: true,
+            drawer_pinned: false,
+            drawer_auto_closed: false,
+            perform_full_seen: false,
             expanded: BTreeSet::new(),
             float_expansion: false,
             skins: true,
@@ -648,6 +659,16 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     }
 
     let perform_full = ui_state.perform_open && ui_state.perform_tall;
+    // The drawer gives its 360 px to the Perform view unless pinned, and comes back with the rack.
+    if perform_full != ui_state.perform_full_seen {
+        ui_state.perform_full_seen = perform_full;
+        if perform_full && ui_state.drawer_open && !ui_state.drawer_pinned {
+            ui_state.drawer_open = false;
+            ui_state.drawer_auto_closed = true;
+        } else if !perform_full && std::mem::take(&mut ui_state.drawer_auto_closed) {
+            ui_state.drawer_open = true;
+        }
+    }
     if ui_state.perform_open && !perform_full {
         egui::Panel::bottom("kabl-perform")
             .exact_size(perform::PANEL_H)
@@ -662,8 +683,25 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
             .frame(kit::panel_frame(&st))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = st.sp(1);
                     kit::label(ui, &st, style::Role::Title, kit::Tone::Text, "Routing");
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if kit::icon_button(ui, &st, kit::Ic::Close, false, true)
+                            .tip(&st, "Close the drawer")
+                            .clicked()
+                        {
+                            ui_state.drawer_open = false;
+                        }
+                        let on = ui_state.drawer_pinned;
+                        let r = kit::icon_button(ui, &st, kit::Ic::Pin, on, true)
+                            .tip(&st, "Keep the drawer open in the Perform view");
+                        ui_state.record("drawer-pin".into(), r.rect);
+                        if r.clicked() {
+                            ui_state.drawer_pinned = !on;
+                        }
+                    });
+                });
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = st.sp(1);
                     let on = ui_state.explain.help;
                     let r = ui
                         .add(kit::Button::new(&st, "Help").small().selected(on))
@@ -698,14 +736,6 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                     if r.clicked() {
                         ui_state.recipes.open = !on;
                     }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if kit::icon_button(ui, &st, kit::Ic::Close, false, true)
-                            .tip(&st, "Close the drawer")
-                            .clicked()
-                        {
-                            ui_state.drawer_open = false;
-                        }
-                    });
                 });
                 if ui_state.recipes.open {
                     // Above the drawer's scrolling content, so Show (which scrolls the drawer
@@ -853,6 +883,7 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
             let open = ui_state.drawer_open;
             if tool(ui, st, ui_state, "routing", "Routing", open) {
                 ui_state.drawer_open = !open;
+                ui_state.drawer_auto_closed = false;
             }
             let open = ui_state.browser_open;
             if tool(ui, st, ui_state, "browser", "Sounds", open) {
