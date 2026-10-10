@@ -439,7 +439,7 @@ fn midi_buttons_and_pickup_work_without_a_frame_and_the_ui_catches_up() {
     h.settle();
     let running = |h: &mut H| {
         let mut r = None;
-        h.engine.clocks(|id, run| {
+        h.engine.clocks(|id, run, _| {
             if id == CLOCK {
                 r = Some(run);
             }
@@ -714,7 +714,7 @@ fn a_coalesced_edit_keeps_its_place_before_a_command() {
 
 fn clock_running(h: &H) -> Option<bool> {
     let mut running = None;
-    h.engine.clocks(|id, run| {
+    h.engine.clocks(|id, run, _| {
         if id == CLOCK {
             running = Some(run)
         }

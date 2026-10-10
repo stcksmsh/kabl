@@ -560,6 +560,8 @@ fn the_demo_controls_fit_together_at_1280() {
     for (w, hgt) in sizes() {
         let mut h = H::new(w, hgt);
         h.editor = PatchEditor::from_log(kabl_core::load(&dir).unwrap());
+        // The full Perform view: the dense layout needs the whole window, not a docked strip.
+        h.ui.perform_tall = true;
         let (rec, tap) = kabl_ui::record::pair(48000);
         h.ui.recorder = Some(rec);
         std::mem::forget(tap);
@@ -587,8 +589,144 @@ fn the_demo_controls_fit_together_at_1280() {
         ] {
             assert!(screen.contains_rect(h.rect(k)), "{w}: {k}");
         }
-        // The rack keeps a usable height.
-        let rack_h = rects.iter().map(|r| r.top()).fold(f32::MAX, f32::min) - 40.0;
-        assert!(rack_h > 350.0, "{w}: rack {rack_h}");
+    }
+}
+
+#[test]
+fn the_toolbar_switch_opens_perform_as_a_view_and_show_rack_docks_it() {
+    let mut h = H::new(1280.0, 800.0);
+    h.ui.perform_open = false;
+    h.frame();
+    h.pin(CLOCK, TRANSPORT);
+    h.click("perform");
+    assert!(h.ui.perform_open && h.ui.perform_tall, "Perform is a view");
+    assert!(h.ui.hits.contains_key("pcard:1.transport"));
+    assert!(
+        !h.ui.hits.keys().any(|k| k.starts_with("knob:")),
+        "the rack is hidden in the view"
+    );
+    h.click("perform-size");
+    assert!(
+        h.ui.perform_open && !h.ui.perform_tall,
+        "docked under the rack"
+    );
+    assert!(
+        h.ui.hits.keys().any(|k| k.starts_with("knob:")),
+        "rack and Perform together"
+    );
+    assert!(h.ui.hits.contains_key("pcard:1.transport"));
+    h.click("rack");
+    assert!(!h.ui.perform_open);
+}
+
+#[test]
+fn a_macro_knob_edits_the_real_parameter_with_one_undo_step() {
+    const MACROS: u64 = 18;
+    let mut h = H::new(1440.0, 900.0);
+    h.ui.perform_tall = true;
+    h.pin(MACROS, "m1");
+    let before = h.value(MACROS, "m1");
+    let r = h.rect(&format!("pslider:{MACROS}.m1"));
+    let entries = h.editor.log().entries().len();
+    h.move_to(r.center());
+    h.button(true);
+    for k in 1..8 {
+        h.move_to(r.center() + egui::vec2(0.0, -6.0 * k as f32));
+    }
+    h.button(false);
+    let after = h.value(MACROS, "m1");
+    assert!(after > before, "dragging up raises the macro");
+    assert_eq!(h.editor.log().entries().len(), entries + 1, "one undo step");
+    h.editor.undo();
+    assert_eq!(h.value(MACROS, "m1"), before);
+}
+
+#[test]
+fn the_full_view_takes_the_drawer_unless_pinned_and_gives_it_back() {
+    let mut h = H::new(1440.0, 900.0);
+    h.ui.perform_open = false;
+    h.ui.drawer_open = true;
+    h.frame();
+    h.pin(CLOCK, TRANSPORT);
+    h.click("perform");
+    assert!(
+        !h.ui.drawer_open,
+        "entering the full view closes the drawer"
+    );
+    h.click("rack");
+    assert!(h.ui.drawer_open, "back in the rack it returns");
+
+    // Pinned from inside Perform: the drawer comes back and stays through the trip.
+    h.click("perform");
+    assert!(!h.ui.drawer_open);
+    h.click("drawer-pin");
+    assert!(h.ui.drawer_pinned && h.ui.drawer_open);
+    h.click("rack");
+    assert!(h.ui.drawer_open);
+    h.click("perform");
+    assert!(h.ui.drawer_open, "a pinned drawer stays open");
+    h.click("rack");
+    assert!(h.ui.drawer_open);
+
+    // A drawer the user closed stays closed, and one opened inside Perform stays open.
+    h.ui.drawer_pinned = false;
+    h.click("routing");
+    assert!(!h.ui.drawer_open);
+    h.click("perform");
+    h.click("routing");
+    assert!(h.ui.drawer_open, "opened by hand inside Perform");
+    h.click("rack");
+    assert!(h.ui.drawer_open);
+}
+
+#[test]
+fn scenes_and_macros_use_the_width_at_every_size() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/composition");
+    for (w, hgt) in [(1280.0, 800.0), (1440.0, 900.0)] {
+        let mut h = H::new(w, hgt);
+        h.editor = PatchEditor::from_log(kabl_core::load(&dir).unwrap());
+        h.ui.perform_open = true;
+        h.ui.perform_tall = true;
+        h.ui.drawer_open = false;
+        for _ in 0..4 {
+            h.frame();
+        }
+        let right = w - 44.0;
+        let scenes =
+            h.ui.hits
+                .iter()
+                .find(|(k, _)| k.ends_with(".cues"))
+                .map(|(_, r)| *r)
+                .expect("scenes card");
+        assert!(
+            right - scenes.right() < 30.0,
+            "{w}: scenes end at {}",
+            scenes.right()
+        );
+        // The bank cards of the second row also reach the right edge.
+        let last =
+            h.ui.hits
+                .iter()
+                .filter(|(k, _)| k.starts_with("pcard:") && k.ends_with(".banks"))
+                .map(|(_, r)| r.right())
+                .fold(0.0, f32::max);
+        assert!(right - last < 30.0, "{w}: banks end at {last}");
+        // Pads read from a distance, and the first control row stays above the fold.
+        assert!(
+            scenes.height() >= 150.0,
+            "{w}: scene row {}",
+            scenes.height()
+        );
+        let ctrl_bottom = h
+            .ui
+            .hits
+            .iter()
+            .filter(|(k, _)| k.starts_with("pcard:") && !k.ends_with(".banks") && !k.contains(".m"))
+            .map(|(_, r)| r.bottom())
+            .fold(0.0, f32::max);
+        assert!(
+            ctrl_bottom <= hgt - 20.0,
+            "{w}: controls end at {ctrl_bottom}"
+        );
     }
 }
