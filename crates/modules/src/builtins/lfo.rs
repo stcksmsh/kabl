@@ -26,6 +26,7 @@ use crate::info::{
 };
 use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig, StateReader, StateWriter};
+use crate::view::ModuleView;
 
 const PORTS: &[PortInfo] = &[
     PortInfo {
@@ -289,6 +290,12 @@ impl Module for Lfo {
             Some(_) if self.error.abs() > 0.01 => LfoSync::Acquiring,
             Some(_) => LfoSync::Synced,
         };
+    }
+
+    /// The phase, 0..1 through the cycle, for the face's moving dot.
+    fn view(&self, out: &mut ModuleView) {
+        out.valid = true;
+        out.position = self.phase as f32;
     }
 
     fn reset(&mut self) {

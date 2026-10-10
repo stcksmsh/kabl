@@ -75,6 +75,7 @@ use kabl_modules::{
 
 use crate::graph::BLOCK;
 use crate::keyboard::Action;
+use crate::facetap::{FaceReport, FaceTargets, FaceTaps, NO_SLOT};
 use crate::probe::{ProbeReport, ProbeStatus, ProbeTarget, Tap, PROBE_LANES};
 use crate::runtime::RuntimeTarget;
 
@@ -520,6 +521,8 @@ pub struct CompiledPatch {
     pub generation: u64,
     /// The selected-signal tap (`probe.rs`); inactive unless `PatchEngine` sets a target.
     tap: Tap,
+    /// The face-display taps (`facetap.rs`); inactive unless `PatchEngine` sets targets.
+    faces: FaceTaps,
     /// Modules (with kinds) and cable endpoints of the source patch: equal between two
     /// graphs when only values changed. A measurement window only continues across a swap
     /// that keeps it.
@@ -1558,6 +1561,7 @@ fn compile_inner(
             .collect::<std::collections::BTreeSet<_>>()
             .len();
 
+    let instances = modules.len();
     Ok(CompiledPatch {
         modules,
         midi_ins,
@@ -1573,6 +1577,7 @@ fn compile_inner(
         output: out_module,
         generation: 0,
         tap: Tap::default(),
+        faces: FaceTaps::new(instances),
         topology: topology_of(patch),
         rev: 0,
         started: false,
@@ -1601,6 +1606,7 @@ impl CompiledPatch {
         self.automation.fill(None);
         self.started = false;
         self.tap.reset_window();
+        self.faces.reset_window();
     }
 
     /// Host clock affects all clocks without changing document tempo or Free-mode state.
@@ -1886,6 +1892,14 @@ impl CompiledPatch {
                             }
                         }
                     }
+                    if self.faces.active() {
+                        let slot = self.faces.slot_of(*module_index);
+                        if slot != NO_SLOT {
+                            if let Some(&b) = output_bufs.get(self.faces.port_of(slot)) {
+                                self.faces.feed(slot, *module_index, &self.buffers[b]);
+                            }
+                        }
+                    }
                     if !launches.is_empty() {
                         arm_launches(
                             &mut self.modules,
@@ -2082,6 +2096,37 @@ impl CompiledPatch {
             t.blocks = o.blocks;
             t.fading = true;
         }
+    }
+
+    /// Points the face taps at `targets` (`None`: off) and starts a new window. Linear in the
+    /// number of instances, no allocation: called on the audio thread when the targets or the
+    /// measured graph change, never per block.
+    pub fn set_faces(&mut self, targets: Option<FaceTargets>) {
+        let it = self.module_origin.iter().zip(&self.modules).map(|(&(id, _), m)| {
+            let info = m.info();
+            let outputs = info
+                .ports
+                .iter()
+                .filter(|p| p.direction == PortDirection::Output)
+                .count();
+            (id, info.kind, outputs)
+        });
+        self.faces.set(targets, it);
+    }
+
+    /// Continues `old`'s open face window in this graph when only values changed. No allocation.
+    pub fn continue_faces_from(&mut self, old: &CompiledPatch) {
+        let same = old.topology == self.topology;
+        self.faces.continue_from(&old.faces, same);
+    }
+
+    /// After a block: counts it into the face window and, once it has `window_blocks` blocks,
+    /// returns its report. No allocation.
+    pub fn faces_block_end(&mut self, window_blocks: u32, fading: bool) -> Option<FaceReport> {
+        let generation = self.generation;
+        let modules = &self.modules;
+        self.faces
+            .block_end(window_blocks, fading, generation, |i, v| modules[i].view(v))
     }
 
     /// The tap's target, if any.

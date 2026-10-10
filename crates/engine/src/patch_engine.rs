@@ -34,6 +34,7 @@ use kabl_core::PatchState;
 use crate::compile::{carry_state, compile, CompileError, CompiledPatch, PendingLaunch};
 use crate::graph::BLOCK;
 use crate::keyboard::{Action, KeyEvent, Keyboard, MidiEvent, Source};
+use crate::facetap::{FaceReport, FaceTargets};
 use crate::probe::{ProbeReport, ProbeTarget, WINDOW_SECS};
 use crate::runtime::{Feedback, ParamSet, ToAudio};
 use crate::swap::CROSSFADE_MS;
@@ -74,6 +75,9 @@ pub struct PatchEngine {
     probe: Option<ProbeTarget>,
     probe_window: u32,
     probe_seq: u64,
+    /// The outputs the face displays read, measured in the same graph as the probe.
+    faces: Option<FaceTargets>,
+    face_report: Option<FaceReport>,
     /// Samples rendered since this engine started (reports carry it as their time).
     rendered: u64,
     /// `rendered` when the keyboards last matched the graph (`sync_once`).
@@ -158,6 +162,8 @@ pub enum Command {
     PreviewStop,
     /// Measure this output (`None`: stop measuring). View only: no effect on the sound.
     Inspect(Option<ProbeTarget>),
+    /// Read these outputs for the live displays on module faces (`None`: stop). View only.
+    Faces(Option<FaceTargets>),
 }
 
 const NO_LAUNCH: PendingLaunch = PendingLaunch {
@@ -214,6 +220,8 @@ impl PatchEngine {
             probe: None,
             probe_window: 1,
             probe_seq: 0,
+            faces: None,
+            face_report: None,
             rendered: 0,
             synced: None,
             report: None,
@@ -244,6 +252,8 @@ impl PatchEngine {
             probe: None,
             probe_window: 1,
             probe_seq: 0,
+            faces: None,
+            face_report: None,
             rendered: 0,
             synced: None,
             report: None,
@@ -501,6 +511,30 @@ impl PatchEngine {
             new.continue_probe_from(&self.active);
             self.active.set_probe(None);
         }
+        if self.faces.is_some() {
+            new.set_faces(self.faces);
+            new.continue_faces_from(&self.active);
+            self.active.set_faces(None);
+        }
+    }
+
+    /// Audio-thread call: read `targets` for the face displays from now on (`None`: stop).
+    /// No allocation.
+    pub fn face_taps(&mut self, targets: Option<FaceTargets>) {
+        self.faces = targets;
+        self.face_report = None;
+        match self.incoming.as_mut() {
+            Some((g, _)) => {
+                self.active.set_faces(None);
+                g.set_faces(targets);
+            }
+            None => self.active.set_faces(targets),
+        }
+    }
+
+    /// Audio-thread call: the last finished face window, if one is waiting.
+    pub fn take_face_report(&mut self) -> Option<FaceReport> {
+        self.face_report.take()
     }
 
     /// Audio-thread call: measure `target` from now on (`None`: stop). No allocation.
@@ -693,6 +727,7 @@ impl PatchEngine {
                 self.preview_stop();
             }
             Command::Inspect(t) => self.inspect(*t),
+            Command::Faces(t) => self.face_taps(*t),
         }
     }
 
@@ -865,6 +900,19 @@ impl PatchEngine {
                 r.end_sample = self.rendered;
                 self.report = Some(r);
                 self.probe_seq += 1;
+            }
+        }
+
+        if self.faces.is_some() {
+            let fading = self.incoming.is_some();
+            let g: &mut CompiledPatch = match self.incoming.as_mut() {
+                Some((g, _)) => g,
+                None => &mut self.active,
+            };
+            // Twice as often as the probe: a scope that updates at 40 Hz looks live.
+            if let Some(mut r) = g.faces_block_end((self.probe_window / 2).max(1), fading) {
+                r.end_sample = self.rendered;
+                self.face_report = Some(r);
             }
         }
 
