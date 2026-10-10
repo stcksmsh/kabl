@@ -797,7 +797,7 @@ fn tool_icon(
 
 fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
     ui.horizontal_centered(|ui| {
-        kit::label(ui, st, style::Role::Title, kit::Tone::Text, "kabl");
+        kit::logo(ui, st, 18.0);
         let open = ui_state.perform_open;
         if tool(ui, st, ui_state, "perform", "Perform", open) {
             ui_state.perform_open = !open;

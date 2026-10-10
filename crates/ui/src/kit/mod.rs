@@ -13,6 +13,31 @@ pub use containers::*;
 pub use controls::*;
 pub use icons::{icon, Ic};
 
+/// The kabl wordmark (Kosta's artwork, `assets/logo`), tinted from the theme's text colour.
+pub fn logo(ui: &mut egui::Ui, st: &crate::style::Style, height: f32) -> egui::Response {
+    let id = egui::Id::new("kabl-logo-wordmark");
+    let tex = ui.ctx().data(|d| d.get_temp::<egui::TextureHandle>(id));
+    let tex = tex.unwrap_or_else(|| {
+        let img = image::load_from_memory(include_bytes!("../../assets/logo/kabl-wordmark-mask.png"))
+            .expect("bundled logo")
+            .to_rgba8();
+        let size = [img.width() as usize, img.height() as usize];
+        let tex = ui.ctx().load_texture(
+            "kabl-logo",
+            egui::ColorImage::from_rgba_unmultiplied(size, img.as_raw()),
+            egui::TextureOptions::LINEAR,
+        );
+        ui.ctx().data_mut(|d| d.insert_temp(id, tex.clone()));
+        tex
+    });
+    let s = tex.size_vec2();
+    ui.add(
+        egui::Image::new(&tex)
+            .tint(st.roles.text)
+            .fit_to_exact_size(egui::vec2(height * s.x / s.y, height)),
+    )
+}
+
 use crate::style::{alpha, Role, Style};
 use egui::{Color32, Response, RichText, Ui};
 
