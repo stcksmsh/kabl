@@ -118,3 +118,31 @@ Departures from the A mockups: no side rail; no Rack|Perform switch (Perform sta
 - Box glyphs in the Perform panel are egui's painted checkboxes (stock, unchanged from master), not missing font glyphs.
 - Captures with Composition/Echo open Perform and Routing by themselves (the app opens them for pieces); that is app behaviour.
 - Tests 276 passed, 0 failed, 21 ignored; clippy clean.
+
+## Checkpoint 5 (task A complete, rebased on master)
+
+Branch rebased onto `origin/master` (bb70204: PR #16, #17, #19 merged); PR #18 retargeted to master.
+
+- Toolbar is one 48 px row: logo, Perform toggle, doc name, Save, Save As, undo/redo, Cables All/Focus/Hidden, then Sounds and Routing on the right (last message and REC indicator truncate to the room left).
+- 44 px right rail (`rail()` in `lib.rs`): Composites toggle, Add module popover (kind dropdown + Add), zoom +, %, -, Fit, Focus, and at the bottom a settings popover (A-light/A-dark and the View toggles). Hit keys unchanged except `add-menu` (opens the Add popover) and `view-menu` (now the gear). `kit::icon_menu` is the new popover-button widget.
+- Sounds list height is `body_h - 330` (min 300); audition and patch folder sit below it in the scrolling panel body. `browser-body` is recorded so tests can scroll to controls. `every_control_is_reachable_at_both_sizes` now scrolls panel-body controls into view and operates them; the toolbar/header keys must still be on screen unscrolled. The test harness `click` scrolls the body first.
+- Canvas-size tests subtract the rail width (`Metrics::default().rail_w`).
+- Logo: Kosta's SVGs under `crates/ui/assets/logo/` (README there). The wide lockup, rendered white to a PNG mask and tinted from `roles.text`, is used at 30 px height (`kit::logo`); the small mark SVG is stored, unused.
+- Verification at this head: `cargo test --workspace` 728 passed, 0 failed, 28 ignored. Strict clippy (`-D warnings`) clean for all lib, bin, test and example targets except `crates/ui/examples/app_target/*`, which already fails on master (mockup renderer from PR #16, not touched here). Plugin editor checked in REAPER 7.75 under Xvfb: media/widget-set/plugin/.
+- Plugin: editor is fixed at 1180x680 logical (resizing the host window does not resize it), so 1440x900 and 1280x800 apply to the standalone only. No status bar in the plugin (standalone `main.rs` only): audio and device state belong to the host; the last message and REC indicator are in the toolbar. Light and dark both render; Sounds panel opens; settings popover works.
+- Frame times after (release, `bench_chrome`, browser + drawer open): simple 1440x900 light 507 us, dark 514; dense 1440x900 light 4464, dark 4865; simple 1280x800 light 522, dark 498; dense 1280x800 light 2919, dark 2901. (Before: see above. Not optimised; that follows Perform.)
+- osc.fm6 face (PR #19): the Algorithm and Ratio selector strips draw overlapping labels at 100% zoom. The same overlap appears on a master build (bb70204), so it is not from this branch. Face is wider than the canvas at the 50% minimum zoom.
+
+### Departures from the A mockups (rack-sounds scenes)
+- No Rack|Perform segmented control: Perform stays a toggle chip (bottom panel, not a view switch).
+- No prev/next arrows beside the document name.
+- Rail icons differ: mockup shows panel, routing, composites, learn; ours holds composites, add, zoom, settings (Sounds and Routing stay in the toolbar; Learn stays in the Routing drawer header).
+- At 1280x800 the Audition block is below the fold of the Sounds panel (scroll); the mockup fits list and audition together. Audition is not a bordered card; Note/Major/Minor chips and the extra rows differ from the mockup's Note/Chord pair.
+- Wide lockup in the toolbar is 90x30 px: the plugs are small details at that size.
+- Rack, faces, knobs, Perform panel, drawer bodies are unchanged (out of scope).
+- The standalone status bar has no MIDI device line (the mockup shows "MIDI · KeyLab 49" and a voice count).
+
+### Unverified
+- The scaled (1.5) run is one capture at light; dark scaled not looked at.
+- Plugin on other hosts and the Wayland path.
+- Real MIDI/audio devices (captures run without them).
