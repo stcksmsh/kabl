@@ -665,11 +665,11 @@ impl Meter {
 }
 
 /// Two bars (L, R), −60..0 dBFS, the peak hold, and a CLIP light. Click resets.
-pub fn meter_ui(ui: &mut egui::Ui, meter: &mut Meter) -> egui::Response {
+pub fn meter_ui(ui: &mut egui::Ui, st: &crate::style::Style, meter: &mut Meter) -> egui::Response {
+    let r = &st.roles;
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(132.0, 20.0), egui::Sense::click());
     let p = ui.painter();
     let bars = egui::Rect::from_min_size(rect.min, egui::vec2(84.0, rect.height()));
-    let bg = ui.visuals().extreme_bg_color;
     let to_x = |v: f32| {
         let db = if v > 0.0 { 20.0 * v.log10() } else { -120.0 };
         bars.left() + bars.width() * ((db + 60.0) / 60.0).clamp(0.0, 1.0)
@@ -680,18 +680,18 @@ pub fn meter_ui(ui: &mut egui::Ui, meter: &mut Meter) -> egui::Response {
             egui::pos2(bars.left(), y0),
             egui::pos2(bars.right(), y0 + 7.0),
         );
-        p.rect_filled(track, 2.0, bg);
+        p.rect_filled(track, st.radii.sm.min(3.0), r.inset);
         let x = to_x(v);
         let color = if v >= 1.0 {
-            egui::Color32::from_rgb(220, 60, 50)
+            r.bad
         } else if v >= 10f32.powf(-6.0 / 20.0) {
-            egui::Color32::from_rgb(220, 170, 50)
+            r.warn
         } else {
-            egui::Color32::from_rgb(90, 190, 110)
+            r.good
         };
         p.rect_filled(
             egui::Rect::from_min_max(track.min, egui::pos2(x, track.bottom())),
-            2.0,
+            st.radii.sm.min(3.0),
             color,
         );
     }
@@ -699,38 +699,32 @@ pub fn meter_ui(ui: &mut egui::Ui, meter: &mut Meter) -> egui::Response {
     let x6 = to_x(10f32.powf(-6.0 / 20.0));
     p.line_segment(
         [egui::pos2(x6, bars.top()), egui::pos2(x6, bars.bottom())],
-        egui::Stroke::new(1.0, ui.visuals().weak_text_color()),
+        egui::Stroke::new(1.0, r.text3),
     );
     let clip = egui::Rect::from_min_size(
         egui::pos2(bars.right() + 4.0, rect.top() + 2.0),
-        egui::vec2(40.0, 16.0),
+        egui::vec2(44.0, 16.0),
     );
     p.rect_filled(
         clip,
-        3.0,
-        if meter.clip {
-            egui::Color32::from_rgb(220, 60, 50)
-        } else {
-            bg
-        },
+        st.radii.sm.min(3.0),
+        if meter.clip { r.bad } else { r.inset },
     );
     p.text(
         clip.center(),
         egui::Align2::CENTER_CENTER,
         if meter.nonfinite { "NaN" } else { "CLIP" },
-        egui::FontId::proportional(10.0),
-        if meter.clip {
-            egui::Color32::WHITE
-        } else {
-            ui.visuals().weak_text_color()
-        },
+        st.font(crate::style::Role::Caption),
+        if meter.clip { r.on_accent } else { r.text3 },
     );
     let max = meter
         .max_db
         .map_or("no signal".to_string(), |m| format!("{m:+.1} dBFS"));
-    let resp = resp.on_hover_text(format!(
-        "Final output, measured: peak since reset {max}. Click to reset the clip light."
-    ));
+    let resp = crate::kit::Tip::tip(
+        resp,
+        st,
+        &format!("Final output, measured: peak since reset {max}. Click to reset the clip light."),
+    );
     if resp.clicked() {
         *meter = Meter::default();
     }

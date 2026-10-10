@@ -5,7 +5,7 @@ use crate::prim::*;
 use crate::tokens::{Dir, Face};
 use crate::widgets::*;
 use egui::{pos2, vec2, Align2, Color32, Pos2, Rect, Shape, Stroke};
-use kabl_modules::{registry, ModuleInfo, ParamInfo, PortDirection, Taper};
+use kabl_modules::{ModuleInfo, ParamInfo, PortDirection, Taper};
 use kabl_ui::rack::{Decor, Geo, Placed};
 use std::collections::BTreeMap;
 
@@ -46,6 +46,7 @@ pub struct Geom {
     pub jacks: Vec<JackG>,
     pub display: Option<Rect>,
     pub plate: Option<Rect>,
+    #[allow(dead_code)]
     pub decor: Option<(Decor, Rect)>,
 }
 
@@ -295,7 +296,7 @@ pub fn draw_face(cx: &Cx, xf: Xf, f: &FaceIn) {
         knob(cx, c, rr, n, mv, &face, f.hot == Some(kg.name));
         let lab = label(cx, &kabl_ui::routing::param_label(p));
         cx.text(c - vec2(0.0, rr + (if mv.is_some() { 27.0 } else { 20.0 }) * xf.s.max(0.9)), Align2::CENTER_CENTER, &lab, xf.fs(11.0), lab_font(k.dir), face.ink2);
-        cx.text(c + vec2(0.0, rr + 15.0 * xf.s.max(0.9)), Align2::CENTER_CENTER, &shown, xf.fs(12.0), "mono-med", if mv.is_some() && k.dir != Dir::C { face.ink } else { face.ink });
+        cx.text(c + vec2(0.0, rr + 15.0 * xf.s.max(0.9)), Align2::CENTER_CENTER, &shown, xf.fs(12.0), "mono-med", face.ink);
     }
     // Jacks.
     for jg in &g.jacks {
@@ -389,12 +390,6 @@ fn keys(cx: &Cx, r: Rect, face: &Face) {
         let kr = Rect::from_min_size(pos2(r.left() + (i as f32 + 0.68) * w, r.top() + 1.0), vec2(w * 0.64, r.height() * 0.58));
         cx.rr(kr, 1.0, face.ink);
     }
-}
-
-/// One-line helper for scenes that need a face for a kind in a given state.
-pub fn face_for<'a>(kind: &'a str, id: u32, params: &'a BTreeMap<String, f32>, pl: &Placed, origin: Pos2, conn: &'a dyn Fn(&str, bool) -> bool) -> Option<FaceIn<'a>> {
-    let info = registry::info_for(kind)?;
-    Some(FaceIn { id, kind, info, params, geom: geom(kind, pl), origin, conn, selected: false, sweep: 0.0, hot: None, name: None })
 }
 
 pub fn _shape(_: Shape) {}

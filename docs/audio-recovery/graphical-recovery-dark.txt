@@ -1,5 +1,8 @@
 # Installed release package, ALSA null PCM, Xvfb. Select the dark theme before retry.
+# The theme switch lives in the rail's settings popover (gear, key view-menu).
+click view-menu
 click theme:dark
+key Escape
 sleep 2
 shot 01-stalled
 click audio-retry

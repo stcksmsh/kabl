@@ -38,6 +38,8 @@ use kabl_engine::runtime::{Feedback, ToAudio};
 use kabl_modules::builtins::{DelayLock, LfoSync};
 use kabl_standalone::{default_patch, RingBuffer, DEFAULT_VOICE_COUNT};
 use kabl_ui::control::{self, Delivery};
+use kabl_ui::kit::{self, Tip, Tone};
+use kabl_ui::style::Role;
 use kabl_ui::{record, show, PatchEditor, UiState};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -1753,62 +1755,89 @@ impl eframe::App for App {
         }) {
             ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
         }
-        egui::Panel::bottom("kabl-status").show(ui, |ui| {
+        let st = ui_state.style.clone();
+        let st = &*st;
+        egui::Panel::bottom("kabl-status")
+            .exact_size(st.metrics.status_h + 2.0 * st.sp(1))
+            .frame(kit::bar_frame(st))
+            .show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label("Out");
-                kabl_ui::record::meter_ui(ui, &mut ui_state.meter);
-                ui.separator();
-                ui.label(&self.audio.status);
-                ui.label(format!("{:?} · session {}", self.phase, self.session));
-                if !self.audio.settings.is_empty() {
-                    ui.label("Output settings").on_hover_text(&self.audio.settings);
-                }
-                if let Some(last) = ui_state.recorder.as_ref().and_then(|r| r.last.as_ref())
-                    .or(self.record_last.as_ref()) {
-                    ui.label("Last take").on_hover_text(record::describe(last));
-                }
-                let chosen = self.request.device.as_ref().map_or("System default".to_string(),
-                    |(i, name)| format!("{i}: {name}"));
-                egui::ComboBox::from_id_salt("audio-output").selected_text(chosen).width(150.0)
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut self.request.device, None, "System default");
+                kit::label(ui, st, Role::Label, Tone::Text2, "Out");
+                kabl_ui::record::meter_ui(ui, st, &mut ui_state.meter);
+                kit::label_truncated(ui, st, Role::Caption, Tone::Text2, &self.audio.status)
+                    .on_hover_text(&self.audio.status);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    // Requested but not yet with the audio thread (it is not taking messages).
+                    let waiting = delivery.pending();
+                    let diag = ui.add(kit::Button::new(st, if waiting > 0 && self.audio.timing.is_some() { "Diagnostics •" } else { "Diagnostics" }).ghost().small());
+                    ui_state.record("diagnostics".into(), diag.rect);
+                    egui::Popup::from_toggle_button_response(&diag)
+                        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+                        .frame(kit::popover_frame(st))
+                        .width(320.0)
+                        .show(|ui| {
+                            let row = |ui: &mut egui::Ui, k: &str, v: String| {
+                                ui.horizontal(|ui| {
+                                    kit::label(ui, st, Role::Caption, Tone::Text2, k);
+                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                        kit::label(ui, st, Role::Value, Tone::Text, v);
+                                    });
+                                });
+                            };
+                            kit::section(ui, st, "Diagnostics");
+                            row(ui, "Audio", format!("{:?} · session {}", self.phase, self.session));
+                            if waiting > 0 && self.audio.timing.is_some() {
+                                row(ui, "Waiting for audio", format!("{waiting} change(s)"));
+                            }
+                            if !self.audio.settings.is_empty() {
+                                kit::paragraph(ui, st, Role::Caption, Tone::Text2, &self.audio.settings);
+                            }
+                            if let Some(last) = ui_state.recorder.as_ref().and_then(|r| r.last.as_ref())
+                                .or(self.record_last.as_ref()) {
+                                row(ui, "Last take", record::describe(last));
+                            }
+                            if let Some(t) = &self.audio.timing {
+                                let (short, full) = t.summary(self.audio.sample_rate);
+                                kit::gap(ui, st, 1);
+                                kit::rule(ui, st);
+                                kit::gap(ui, st, 1);
+                                kit::paragraph(ui, st, Role::Value, Tone::Text, short);
+                                kit::paragraph(ui, st, Role::Caption, Tone::Text3, full);
+                            }
+                        });
+                    if let Some(log) = &self.log {
+                        let problem = self.health.log_problem.clone();
+                        let text = if problem.is_some() { "Log ⚠" } else { "Log" };
+                        let r = ui.add(kit::Button::new(st, text).ghost().small()).tip(st, &format!(
+                            "{}\nLevel {} (KABL_LOG or --log-level to change). Click to copy the path.",
+                            problem.unwrap_or_else(|| log.path.display().to_string()),
+                            log.level
+                        ));
+                        ui_state.record("log-path".into(), r.rect);
+                        if r.clicked() {
+                            ui.ctx().copy_text(log.path.display().to_string());
+                            ui_state.last_message =
+                                Some(format!("log path copied: {}", log.path.display()));
+                        }
+                    }
+                    let r = ui.add(kit::Button::new(st, "Retry audio").small().enabled(self.retry.is_none()))
+                        .tip(st, "Restarts stream; live notes and tails end, clocks stop, and a recording becomes a partial take");
+                    ui_state.record("audio-retry".into(), r.rect);
+                    retry_clicked = r.clicked();
+                    let chosen = self.request.device.as_ref().map_or("System default".to_string(),
+                        |(i, name)| format!("{i}: {name}"));
+                    kit::dropdown(ui, st, "audio-output", &chosen, 190.0, |ui| {
+                        if kit::menu_item(ui, st, "System default", self.request.device.is_none()).clicked() {
+                            self.request.device = None;
+                        }
                         for (i, name) in &self.outputs {
-                            ui.selectable_value(&mut self.request.device, Some((*i, name.clone())),
-                                format!("{i}: {name}"));
+                            let dev = Some((*i, name.clone()));
+                            if kit::menu_item(ui, st, &format!("{i}: {name}"), self.request.device == dev).clicked() {
+                                self.request.device = dev;
+                            }
                         }
                     });
-                let r = ui.add_enabled(self.retry.is_none(), egui::Button::new("Retry audio"))
-                    .on_hover_text("Restarts stream; live notes and tails end, clocks stop, and a recording becomes a partial take");
-                ui_state.record("audio-retry".into(), r.rect);
-                retry_clicked = r.clicked();
-                // Requested but not yet with the audio thread (it is not taking messages).
-                let waiting = delivery.pending();
-                if waiting > 0 && self.audio.timing.is_some() {
-                    ui.separator();
-                    ui.label(format!("{waiting} change(s) waiting for audio"));
-                }
-                if let Some(log) = &self.log {
-                    ui.separator();
-                    let problem = self.health.log_problem.clone();
-                    let text = if problem.is_some() { "Log ⚠" } else { "Log" };
-                    let r = ui.small_button(text).on_hover_text(format!(
-                        "{}\nLevel {} (KABL_LOG or --log-level to change). Click to copy the path.",
-                        problem.unwrap_or_else(|| log.path.display().to_string()),
-                        log.level
-                    ));
-                    ui_state.record("log-path".into(), r.rect);
-                    if r.clicked() {
-                        ui.ctx().copy_text(log.path.display().to_string());
-                        ui_state.last_message =
-                            Some(format!("log path copied: {}", log.path.display()));
-                    }
-                }
-                if let Some(t) = &self.audio.timing {
-                    ui.separator();
-                    let (short, full) = t.summary(self.audio.sample_rate);
-                    ui.add(egui::Label::new(egui::RichText::new(short).small()).truncate())
-                        .on_hover_text(full);
-                }
+                });
             });
         });
         // Measurements for the inspector: only the newest few matter.

@@ -1,7 +1,7 @@
 //! Painter primitives shared by every direction: fonts, text, gradients, arcs, glow, icons.
 use crate::tokens::Tok;
 use egui::epaint::{Mesh, Shadow as EShadow};
-use egui::{pos2, vec2, Align2, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Painter, Pos2, Rect, Shape, Stroke, StrokeKind, Vec2};
+use egui::{pos2, vec2, Align2, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Painter, Pos2, Rect, Shape, Stroke, StrokeKind};
 use std::f32::consts::{PI, TAU};
 
 /// Everything a scene needs to draw one frame.
@@ -64,11 +64,6 @@ pub fn contrast(x: Color32, y: Color32) -> f32 {
     (l1.max(l2) + 0.05) / (l1.min(l2) + 0.05)
 }
 
-pub fn ease(t: f32) -> f32 {
-    let t = t.clamp(0.0, 1.0);
-    1.0 - (1.0 - t).powi(3)
-}
-
 pub fn tri(t: f32) -> f32 {
     (t - t.floor() - 0.5).abs() * 4.0 - 1.0
 }
@@ -99,6 +94,7 @@ impl Cx<'_> {
     }
 
     /// Letter-spaced upper-case label.
+    #[allow(clippy::too_many_arguments)]
     pub fn caps(&self, pos: Pos2, al: Align2, s: &str, size: f32, f: &str, c: Color32, track: f32) -> f32 {
         let s = s.to_uppercase();
         let ws: Vec<f32> = s.chars().map(|ch| self.width(&ch.to_string(), size, f)).collect();
@@ -243,6 +239,7 @@ pub fn poly_len(pts: &[Pos2]) -> f32 {
 }
 
 #[derive(Clone, Copy)]
+#[allow(dead_code)]
 pub enum Ic {
     Play,
     Stop,
@@ -404,6 +401,3 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, s: f32, col: Color32) {
     }
 }
 
-pub fn v2(x: f32, y: f32) -> Vec2 {
-    vec2(x, y)
-}
