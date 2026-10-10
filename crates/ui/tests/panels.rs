@@ -233,7 +233,10 @@ fn aggregate_art_budget_is_checked_before_document_mutation() {
 #[test]
 fn deleting_placed_leaf_prunes_metadata_and_undo_restores_complete_face() {
     let (mut e, id, key) = fixture();
-    let leaf = e.state().composites[&id].controls[&key].target.module_id().unwrap();
+    let leaf = e.state().composites[&id].controls[&key]
+        .target
+        .module_id()
+        .unwrap();
     composites::add_exposure(
         &mut e,
         id,
@@ -264,7 +267,10 @@ fn deleting_placed_leaf_prunes_metadata_and_undo_restores_complete_face() {
     );
     composites::set(&mut e, id, c).unwrap();
     let before = e.state().clone();
-    let leaf = before.composites[&id].controls[&key].target.module_id().unwrap();
+    let leaf = before.composites[&id].controls[&key]
+        .target
+        .module_id()
+        .unwrap();
     e.edit(vec![kabl_core::Op::RemoveModule { id: leaf }]);
     assert!(!e.state().composites[&id]
         .panel

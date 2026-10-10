@@ -2125,7 +2125,8 @@ impl CompiledPatch {
             view: {
                 // The voice that was loudest in this window.
                 let mut view = ModuleView::default();
-                let loudest = (0..tap.n).max_by(|&a, &b| tap.acc[a].peak.total_cmp(&tap.acc[b].peak));
+                let loudest =
+                    (0..tap.n).max_by(|&a, &b| tap.acc[a].peak.total_cmp(&tap.acc[b].peak));
                 if let (true, Some(lane)) = (tap.found, loudest) {
                     self.modules[tap.modules[lane] as usize].view(&mut view);
                 }

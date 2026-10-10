@@ -20,5 +20,5 @@ pub use info::{
 };
 pub use io::{ProcessIo, Signal};
 pub use module::{Module, QualityConfig, QualityTier, StateBuf, StateReader, StateWriter};
-pub use view::{ModuleView, VIEW_CYCLE};
 pub use skin::{ControlKind, ControlSkin, ModuleSkin};
+pub use view::{ModuleView, VIEW_CYCLE};

@@ -51,11 +51,9 @@ fn duplicates_private_graph_and_stable_interfaces() {
     for (&cid, c) in &original.cables {
         assert_eq!(e.state().cables.get(&cid), Some(c));
     }
-    assert!(e
-        .state()
-        .cables
-        .values()
-        .all(|c| !b.contains(&c.from.module_id().unwrap()) || b.contains(&c.to.module_id().unwrap())));
+    assert!(e.state().cables.values().all(
+        |c| !b.contains(&c.from.module_id().unwrap()) || b.contains(&c.to.module_id().unwrap())
+    ));
     let leaf = *b
         .iter()
         .find(|id| e.state().modules[id].kind == "filter.svf")
