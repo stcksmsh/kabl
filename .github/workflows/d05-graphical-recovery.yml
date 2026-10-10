@@ -2,8 +2,6 @@ name: D05 graphical recovery evidence
 on:
   pull_request:
     branches: [master]
-  push:
-    branches: [codex/d05-audio-recovery]
   workflow_dispatch:
 jobs:
   recovery:
@@ -27,8 +25,8 @@ jobs:
           pcm.!default { type null }
           ctl.!default { type hw card 0 }
           EOF
-          tar -xzf target/dist/kabl-0.1.0-linux-x86_64.tar.gz -C target/d05-graphical
-          export KABL_BIN="$PWD/target/d05-graphical/kabl-0.1.0-linux-x86_64/bin/kabl-ui"
+          tar -xzf target/dist/kabl-*-linux-*.tar.gz -C target/d05-graphical
+          export KABL_BIN=$(echo "$PWD"/target/d05-graphical/kabl-*-linux-*/bin/kabl-ui)
           export ALSA_CONFIG_PATH="$PWD/target/d05-graphical/alsa-null.conf"
           export KABL_AUDIO_FAULT=stall KABL_AUDIO_FAULT_AFTER=30
           export KABL_AUDIO_RETRY_DELAY_MS=600 KABL_COMPILE_DELAY_MS=400

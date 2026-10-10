@@ -1,0 +1,11 @@
+name = "Arp Chord"
+category = "Keys"
+tags = [
+    "arpeggiator",
+    "poly",
+    "delay",
+    "ambient",
+]
+description = "Hold a chord and the arpeggiator plays it up and down across three octaves, a note per clock tick, with a ping-pong delay. Change the mode, the octave range or the gate length; turn on Latch to take your hands off."
+keys = true
+sequence = false

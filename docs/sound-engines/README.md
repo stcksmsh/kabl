@@ -9,6 +9,7 @@ Kosta's call**, nothing here has been heard by a person.
 
 The utility modules (quantizer, sample and hold, slew, logic, random and more) are in
 `docs/sound-engines/utilities.md`.
+The arpeggiator, clock swing and sequencer ratchets are in `docs/sound-engines/rhythm.md`.
 
 Decisions and reasons: `docs/decisions.md`, "Sound engines: FM and wavetable" and "Sound
 engines 2: six-operator FM, 4x, display data". Factory table

@@ -8,7 +8,7 @@ import os
 import sys
 
 KINDS = ["osc.fm", "osc.fm6", "osc.wt", "quantizer", "sample.hold", "slew", "attenuverter",
-         "logic", "comparator", "crossfade", "pan", "random"]
+         "logic", "comparator", "crossfade", "pan", "random", "arp", "clock", "seq"]
 
 out = sys.argv[1]
 for kind in KINDS:

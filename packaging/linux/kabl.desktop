@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=kabl
+GenericName=Modular synthesizer
+Comment=A legible modular synthesizer
+Exec=kabl-ui
+Icon=kabl
+Terminal=false
+Categories=AudioVideo;Audio;Midi;Music;
+Keywords=synthesizer;synth;modular;midi;audio;
+StartupWMClass=kabl

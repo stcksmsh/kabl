@@ -1799,19 +1799,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "kabl-learn"
-version = "0.1.0"
-
-[[package]]
 name = "kabl-modules"
 version = "0.1.0"
 dependencies = [
  "image",
 ]
-
-[[package]]
-name = "kabl-pedals"
-version = "0.1.0"
 
 [[package]]
 name = "kabl-standalone"

@@ -1,0 +1,12 @@
+name = "Ratchet Roll"
+category = "Sequence"
+tags = [
+    "ratchet",
+    "probability",
+    "lead",
+    "self-playing",
+    "evolving",
+]
+description = "A lead whose third, sixth and eighth steps repeat two, three and four times inside their step, with some steps left to chance. A ratcheted step plays all its repeats or none. Open the sequencer's more controls to change the ratchets."
+keys = false
+sequence = true

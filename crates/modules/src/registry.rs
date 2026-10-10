@@ -17,9 +17,9 @@
 //! know is expected to happen eventually (missing pedal, older schema), not a bug to crash on.
 
 use crate::builtins::{
-    Attenuverter, Comparator, Crossfade, Logic, Pan, Quantizer, Random, SampleHold, Slew,
-    ATTENUVERTER_INFO, COMPARATOR_INFO, CROSSFADE_INFO, LOGIC_INFO, PAN_INFO, QUANTIZER_INFO,
-    RANDOM_INFO, SAMPLE_HOLD_INFO, SLEW_INFO,
+    Arp, Attenuverter, Comparator, Crossfade, Logic, Pan, Quantizer, Random, SampleHold, Slew,
+    ARP_INFO, ATTENUVERTER_INFO, COMPARATOR_INFO, CROSSFADE_INFO, LOGIC_INFO, PAN_INFO,
+    QUANTIZER_INFO, RANDOM_INFO, SAMPLE_HOLD_INFO, SLEW_INFO,
 };
 use crate::builtins::{
     Chorus, Cues, Drive, FilterLadder, Macro, Noise, CHORUS_INFO, CUES_INFO, DRIVE_INFO,
@@ -64,6 +64,7 @@ pub const KNOWN_KINDS: &[&str] = &[
     "osc.fm",
     "osc.wt",
     "osc.fm6",
+    "arp",
     "attenuverter",
     "comparator",
     "crossfade",
@@ -102,6 +103,7 @@ pub fn create(kind: &str) -> Option<Box<dyn Module>> {
         "osc.fm" => Box::new(OscFm::new()),
         "osc.wt" => Box::new(OscWt::new()),
         "osc.fm6" => Box::new(OscFm6::new()),
+        "arp" => Box::new(Arp::new()),
         "attenuverter" => Box::new(Attenuverter::new()),
         "comparator" => Box::new(Comparator::new()),
         "crossfade" => Box::new(Crossfade::new()),
@@ -117,7 +119,7 @@ pub fn create(kind: &str) -> Option<Box<dyn Module>> {
 
 /// `ModuleInfo` for every known kind, in the same order as `KNOWN_KINDS` — what a catalog UI
 /// (not built) would enumerate.
-static ALL_INFOS: [&ModuleInfo; 33] = [
+static ALL_INFOS: [&ModuleInfo; 34] = [
     &OSC_VA_INFO,
     &FILTER_SVF_INFO,
     &ENV_ADSR_INFO,
@@ -142,6 +144,7 @@ static ALL_INFOS: [&ModuleInfo; 33] = [
     &OSC_FM_INFO,
     &OSC_WT_INFO,
     &OSC_FM6_INFO,
+    &ARP_INFO,
     &ATTENUVERTER_INFO,
     &COMPARATOR_INFO,
     &CROSSFADE_INFO,

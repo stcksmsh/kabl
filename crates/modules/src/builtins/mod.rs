@@ -3,6 +3,7 @@
 //! - `osc.va`: saw waveform only, no hard sync.
 //! - `lfo`: all 5 waveforms, no sync (brief itself defers "sync" — no clock exists yet, v3).
 
+mod arp;
 mod attenuverter;
 mod chorus;
 mod clock;
@@ -35,6 +36,7 @@ pub mod seq;
 mod slew;
 mod vca;
 
+pub use arp::{Arp, ARP_INFO, MAX_NOTES};
 pub use attenuverter::{Attenuverter, ATTENUVERTER_INFO};
 pub use chorus::{Chorus, CHORUS_INFO};
 pub use clock::{Clock, Transport, CLOCK_INFO};

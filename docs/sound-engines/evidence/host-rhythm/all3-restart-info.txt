@@ -1,0 +1,5 @@
+REAPER=7.75/linux-x86_64
+tempo_markers=3
+track=0 fx_count=1 fx=CLAPi: kabl (stcksmsh) offline=false params=21
+track=1 fx_count=1 fx=CLAPi: kabl (stcksmsh) offline=false params=21
+track=2 fx_count=1 fx=CLAPi: kabl (stcksmsh) offline=false params=21

@@ -1,0 +1,12 @@
+name = "Swing Seq"
+category = "Sequence"
+tags = [
+    "swing",
+    "clock",
+    "bass",
+    "self-playing",
+    "groove",
+]
+description = "A bass line and a hi-hat on one clock. The clock's Swing delays every second 16th, so both swing together; set Swing to 0 to hear it straight."
+keys = false
+sequence = true
