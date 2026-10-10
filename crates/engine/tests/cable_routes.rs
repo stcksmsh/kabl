@@ -600,7 +600,7 @@ fn a_chain_goes_with_the_cable_it_hangs_from() {
 
 #[test]
 fn files_saved_before_cable_routes_load_and_render_unchanged() {
-    // A v5 file: the log format is the same, only `meta.toml` says 5. Its render must equal the
+    // A v6 file: the log format is the same, only `meta.toml` says 6. Its render must equal the
     // model that has always defined a cable's output (`Settings::level_at` per pulse).
     let mut log = PatchLog::new();
     for op in ops() {
@@ -625,10 +625,10 @@ fn files_saved_before_cable_routes_load_and_render_unchanged() {
     let meta = std::fs::read_to_string(dir.path().join("meta.toml")).unwrap();
     std::fs::write(
         dir.path().join("meta.toml"),
-        meta.replace("schema_version = 6", "schema_version = 5"),
+        meta.replace("schema_version = 7", "schema_version = 6"),
     )
     .unwrap();
-    let back = kabl_core::load(dir.path()).expect("a v5 file loads");
+    let back = kabl_core::load(dir.path()).expect("a v6 file loads");
     assert_eq!(back.state(), log.state());
     let (l, r) = render(&mut compile(back.state(), SR, 1).unwrap(), 600, |_, _| {});
     let want = expected_mod(back.state(), &r, &[], |_| Mods::default());

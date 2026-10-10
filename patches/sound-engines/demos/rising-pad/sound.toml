@@ -1,0 +1,12 @@
+name = "Rising Pad"
+category = "Pad"
+tags = [
+    "wavetable",
+    "pad",
+    "poly",
+    "evolving",
+    "sweep",
+]
+description = "Two wavetable oscillators whose positions the note's own envelope sweeps open: every chord rises from a dull tone to the full spectrum over a few seconds. Hold chords for at least six seconds."
+keys = true
+sequence = false

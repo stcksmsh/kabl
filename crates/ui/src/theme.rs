@@ -180,7 +180,7 @@ pub fn install_fonts(ctx: &egui::Context) {
 pub fn panel_theme(dark: bool, kind: &str) -> Theme {
     let mut t = theme(dark);
     let (light, night) = match kind {
-        "osc.va" | "osc" | "noise" => ("#cf947c", "#926958"),
+        "osc.va" | "osc.fm" | "osc.fm6" | "osc.wt" | "osc" | "noise" => ("#cf947c", "#926958"),
         "filter.svf" | "filter" => ("#a8b99d", "#62735c"),
         "env.adsr" | "lfo" => ("#b8afca", "#71617d"),
         "vca" | "mix" => ("#c4b891", "#7b6c52"),

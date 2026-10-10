@@ -1,0 +1,12 @@
+name = "Tine Keys"
+category = "Keys"
+tags = [
+    "fm",
+    "electric piano",
+    "poly",
+    "bright",
+    "dx",
+]
+description = "FM electric piano: a body operator and a short bright tine operator bend one carrier. Play medium and hard: velocity brightens it. Low chords bark, high notes bell."
+keys = true
+sequence = false

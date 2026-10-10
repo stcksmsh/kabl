@@ -29,7 +29,7 @@ impl SoundState {
         Ok(state)
     }
     pub fn validate(&self) -> Result<(), String> {
-        if !matches!(self.version, 1..=3) {
+        if !matches!(self.version, 1..=4) {
             return Err("Unsupported sound state version".into());
         }
         if !self.output_gain.is_finite() || !(0.0..=1.0).contains(&self.output_gain) {
@@ -44,6 +44,10 @@ impl SoundState {
         }
         if self.version < 3 && !self.patch.composites.is_empty() {
             return Err("Composite state requires version 3".into());
+        }
+        // Older builds read versions up to 3 and would drop embedded tables silently.
+        if self.version < 4 && !self.patch.tables.is_empty() {
+            return Err("Wavetable state requires version 4".into());
         }
         for (i, lane) in self.lanes.iter().enumerate() {
             if !self.slot_values[i].is_finite() || !(0.0..=1.0).contains(&self.slot_values[i]) {
@@ -124,6 +128,72 @@ pub fn validate_patch(p: &PatchState) -> Result<(), String> {
         return Err("Patch serialized size limit".into());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod table_tests {
+    use super::*;
+
+    fn state(version: u32) -> SoundState {
+        let mut patch = kabl_standalone::default_patch();
+        patch.tables.insert(
+            1,
+            kabl_core::Table {
+                name: "t.wav".into(),
+                wav: kabl_modules::wavetable::import_wav(&{
+                    let mut b = b"RIFF\0\0\0\0WAVEfmt \x10\0\0\0\x01\0\x01\0\x44\xac\0\0\x88\x58\x01\0\x02\0\x10\0data".to_vec();
+                    b.extend(1200u32.to_le_bytes());
+                    for i in 0..600 {
+                        b.extend((((i as f32 * 0.07).sin() * 20000.0) as i16).to_le_bytes());
+                    }
+                    b
+                })
+                .unwrap(),
+            },
+        );
+        SoundState {
+            version,
+            patch,
+            output_gain: 0.5,
+            lanes: Default::default(),
+            slot_values: [0.; crate::automation::SLOTS],
+            host_clock: false,
+        }
+    }
+
+    #[test]
+    fn embedded_tables_survive_a_host_project_round_trip() {
+        let s = state(4);
+        let bytes = serde_json::to_vec(&s).unwrap();
+        let back = SoundState::decode(&bytes).unwrap();
+        assert_eq!(back.patch.tables, s.patch.tables);
+        assert_eq!(back.patch, s.patch);
+    }
+
+    #[test]
+    fn tables_need_version_4_and_older_builds_refuse_them() {
+        for v in [1, 2, 3] {
+            assert!(state(v).validate().is_err(), "version {v}");
+        }
+        assert!(state(4).validate().is_ok());
+        assert!(state(5).validate().is_err());
+    }
+
+    #[test]
+    fn a_patch_over_the_size_limit_is_refused() {
+        let mut s = state(4);
+        let big = s.patch.tables[&1].clone();
+        let mut huge = big.clone();
+        huge.wav = {
+            let mut w = big.wav.clone();
+            w.resize(kabl_core::table::MAX_TABLE_BYTES, 1);
+            w
+        };
+        for slot in 1..=8 {
+            s.patch.tables.insert(slot, huge.clone());
+        }
+        assert!(s.validate().is_err());
+    }
 }
 
 #[cfg(test)]

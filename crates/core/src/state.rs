@@ -33,6 +33,13 @@ pub struct PatchState {
         deserialize_with = "crate::composite::unique_map"
     )]
     pub composites: BTreeMap<crate::CompositeId, crate::Composite>,
+    /// Embedded user wavetables by slot (`Op::SetTable`). Absent in files from before schema v5.
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        deserialize_with = "crate::composite::unique_map"
+    )]
+    pub tables: BTreeMap<u64, crate::Table>,
     #[serde(deserialize_with = "crate::composite::unique_map")]
     pub modules: BTreeMap<ModuleId, ModuleState>,
     #[serde(deserialize_with = "crate::composite::unique_map")]
@@ -76,6 +83,10 @@ impl PatchState {
             Op::SetComposite { id, .. } => Op::SetComposite {
                 id: *id,
                 value: self.composites.get(id).cloned(),
+            },
+            Op::SetTable { slot, .. } => Op::SetTable {
+                slot: *slot,
+                value: self.tables.get(slot).cloned(),
             },
             Op::AddModule { id, .. } => Op::RemoveModule { id: *id },
             Op::RemoveModule { id } => {
@@ -234,6 +245,13 @@ impl PatchState {
                     self.composites.insert(*id, c.clone());
                 } else {
                     self.composites.remove(id);
+                }
+            }
+            Op::SetTable { slot, value } => {
+                if let Some(t) = value {
+                    self.tables.insert(*slot, t.clone());
+                } else {
+                    self.tables.remove(slot);
                 }
             }
             Op::AddModule { id, kind, pos } => {

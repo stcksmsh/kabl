@@ -48,6 +48,16 @@ impl PatchEditor {
     /// about.
     pub fn seed_from(patch: &PatchState) -> Self {
         let mut editor = Self::new();
+        for (&slot, t) in &patch.tables {
+            editor.log.append(
+                Op::SetTable {
+                    slot,
+                    value: Some(t.clone()),
+                },
+                0,
+                Source::User,
+            );
+        }
         for (&id, m) in &patch.modules {
             editor.log.append(
                 Op::AddModule {
@@ -233,6 +243,32 @@ impl PatchEditor {
     fn append(&mut self, op: Op) {
         self.dirty |= affects_audio(&op);
         self.log.append(op, now_ms(), Source::User);
+    }
+
+    /// Embeds `table` in wavetable slot `slot` (1-8), or empties the slot. One undo step.
+    pub fn set_table(&mut self, slot: u64, table: Option<kabl_core::Table>) {
+        self.append(Op::SetTable { slot, value: table });
+    }
+
+    /// Imports .wav bytes into wavetable slot `slot` (1-8) as one undo step. Refuses, leaving
+    /// the patch unchanged, a file that is not a usable wavetable or would push the saved
+    /// patch past the size every host project and browser document is held to.
+    pub fn import_table(&mut self, slot: u64, name: &str, wav: &[u8]) -> Result<(), String> {
+        let table = kabl_core::Table {
+            name: kabl_modules::wavetable::table_name(name),
+            wav: kabl_modules::wavetable::import_wav(wav).map_err(|e| e.to_string())?,
+        };
+        let mut candidate = self.state().clone();
+        candidate.tables.insert(slot, table.clone());
+        kabl_core::composite::validate(&candidate)?;
+        let size = serde_json::to_vec(&candidate)
+            .map_err(|e| e.to_string())?
+            .len();
+        if size > 2 * 1024 * 1024 - 16 * 1024 {
+            return Err("The sound would be too large to save with this table".into());
+        }
+        self.set_table(slot, Some(table));
+        Ok(())
     }
 
     /// Adds a module of `kind` at `pos`. `kind` isn't validated against the registry here — an

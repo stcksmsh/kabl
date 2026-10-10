@@ -1,0 +1,12 @@
+name = "Vowel Drift"
+category = "Pad"
+tags = [
+    "wavetable",
+    "pad",
+    "poly",
+    "evolving",
+    "vocal",
+]
+description = "Two wavetable oscillators (Vowels and Choir) sweep their tables on slow, unrelated LFOs, so held chords keep changing. Hold chords for at least six seconds."
+keys = true
+sequence = false

@@ -11,6 +11,7 @@
 
 use crate::info::ModuleInfo;
 use crate::io::ProcessIo;
+use crate::view::ModuleView;
 
 /// Brief section 7's three tiers. Per-lever user overrides ("plus user overrides per lever")
 /// aren't modeled yet — no UI exists to set them, and no module needs to honour them until one
@@ -130,6 +131,9 @@ pub trait Module: Send + std::any::Any {
     /// State too big for `StateBuf` (a delay's audio history), copied from `old`, the same kind
     /// in the playing graph, after `load_state`. Audio thread: no allocation.
     fn carry_from(&mut self, _old: &dyn Module) {}
+    /// What an interface can draw of this voice (see `view.rs`); `out.valid` stays false for
+    /// modules with nothing to show. Audio thread: no allocation.
+    fn view(&self, _out: &mut ModuleView) {}
 
     fn as_any(&self) -> &dyn std::any::Any;
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;

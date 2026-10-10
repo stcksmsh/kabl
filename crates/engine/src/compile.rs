@@ -63,9 +63,11 @@ use std::fmt;
 use kabl_cables::{Carry, Node as CableNode, Settings as CableSettings};
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
 use kabl_modules::builtins::{
-    Change, Clock, Delay, DelayLock, KeySettings, Lfo, LfoSync, MidiIn, Noise, Seq, Transport,
+    Change, Clock, Delay, DelayLock, KeySettings, Lfo, LfoSync, MidiIn, Noise, OscWt, Seq,
+    Transport,
 };
 use kabl_modules::module::{QualityConfig, QualityTier};
+use kabl_modules::ModuleView;
 use kabl_modules::{
     registry, Module, ModuleInfo, ParamInfo, PortDirection, PortType, ProcessIo, Rate, Signal,
     StateBuf,
@@ -1383,6 +1385,12 @@ fn compile_inner(
             if let Some(midi) = instance.as_any_mut().downcast_mut::<MidiIn>() {
                 midi.configure(&params);
             }
+            if let Some(wt) = instance.as_any_mut().downcast_mut::<OscWt>() {
+                let slot = params[OscWt::USER_PARAM].round() as u64;
+                wt.set_user(patch.tables.get(&slot).and_then(|t| {
+                    kabl_modules::wavetable::WaveTable::from_canonical_cached(&t.wav).ok()
+                }));
+            }
             let module_index = modules.len();
             modules.push(instance);
             module_origin.push((id, if is_voice { Some(lane) } else { None }));
@@ -2111,6 +2119,15 @@ impl CompiledPatch {
             lanes_total: tap.total.min(u16::MAX as usize) as u16,
             voiced: tap.voiced,
             lane: tap.acc,
+            view: {
+                // The voice that was loudest in this window.
+                let mut view = ModuleView::default();
+                let loudest = (0..tap.n).max_by(|&a, &b| tap.acc[a].peak.total_cmp(&tap.acc[b].peak));
+                if let (true, Some(lane)) = (tap.found, loudest) {
+                    self.modules[tap.modules[lane] as usize].view(&mut view);
+                }
+                view
+            },
         };
         tap.reset_window();
         Some(report)

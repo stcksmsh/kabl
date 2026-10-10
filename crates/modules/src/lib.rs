@@ -5,11 +5,14 @@
 
 pub mod builtins;
 pub mod dsp;
+mod fmdsp;
 pub mod info;
 pub mod io;
 pub mod module;
 pub mod registry;
 pub mod skin;
+pub mod view;
+pub mod wavetable;
 
 pub use info::{
     Category, LessonId, ModuleInfo, ParamInfo, PortDirection, PortInfo, PortType, QualitySupport,
@@ -17,4 +20,5 @@ pub use info::{
 };
 pub use io::{ProcessIo, Signal};
 pub use module::{Module, QualityConfig, QualityTier, StateBuf, StateReader, StateWriter};
+pub use view::{ModuleView, VIEW_CYCLE};
 pub use skin::{ControlKind, ControlSkin, ModuleSkin};

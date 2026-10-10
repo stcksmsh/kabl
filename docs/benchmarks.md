@@ -214,3 +214,67 @@ Morph and glide add nothing measurable: the blend is two table reads and a multi
 | Minimal, one cable, an lfo to `out.right` as a jack against the same lfo as a route into morph | 1 529 ns/block | 1 535 ns/block | +6 ns |
 
 A route costs a source buffer read per pulse (not per sample) plus one 64-sample copy in its cable's step, and nothing when the cable has none. Fifty-seven routes, one in every functional cable of the densest shipped patch, are well under 0.5 % of the 1 333 µs block budget. The audio path stays allocation-free while an amount is edited (`audio_path_does_not_allocate_with_routes_running_and_edited`).
+
+## 2026-10-09 — Sound engines: osc.fm and osc.wt
+
+`cargo run --release -p kabl-modules --example bench_sources` and
+`cargo build --release -p kabl-engine --example bench_patches` then
+`taskset -c 2 target/release/examples/bench_patches PATCH_DIR...`; i7-13700H, 48 kHz, 64-sample
+blocks, `taskset -c 2`. Details and the aliasing measurements: `docs/sound-engines/README.md`.
+
+One voice of each source, module alone (median of 15 runs of 2 s):
+
+| source | ns/sample | % of one core |
+|---|---|---|
+| osc.va saw (reference) | 12.9 | 0.06 |
+| osc.va saw, unison 4 | 22.2 | 0.11 |
+| osc.wt, one frame | 13.5 | 0.06 |
+| osc.wt, between two frames | 14.4 | 0.07 |
+| osc.fm, plain rate | 22.3 | 0.11 |
+| osc.fm, 2x (shipped) | 43.0 | 0.21 |
+| osc.fm, 2x, feedback | 43.1 | 0.21 |
+| two-operator stack, 2x | 82.4 | 0.40 |
+| four-operator chain, 2x | 160.9 | 0.77 |
+
+Whole patches, eight voices sounding, `process_block` (budget 1333 us per block):
+
+| patch | median us | p99.9 us | % budget |
+|---|---|---|---|
+| sound-engines/tine-keys | 115.0 | 196.9 | 8.6 |
+| sound-engines/glass-bells | 235.3 | 507.2 | 17.7 |
+| sound-engines/vowel-drift | 112.8 | 163.5 | 8.5 |
+| sound-engines/imported-morph | 71.7 | 101.6 | 5.4 |
+| palette/strings | 126.0 | 169.7 | 9.4 |
+| palette/pad | 134.9 | 185.0 | 10.1 |
+| palette/lead | 113.1 | 204.0 | 8.5 |
+| palette/bass | 15.4 | 27.5 | 1.2 |
+
+Pi 4 unmeasured. glass-bells is dominated by a 7 s reverb and four operators per voice.
+
+
+## 2026-10-09 — Sound engines 2: osc.fm6 and 4x
+
+`cargo build --release -p kabl-modules --example bench_sources` then
+`taskset -c N target/release/examples/bench_sources`, 48 kHz, 64-sample blocks. The machine was under
+heavy load from other jobs (load average 50 to 100), so each row is the minimum of three runs on
+different cores; two of the three runs agreed within 4 %. The `osc.va` reference measured 9.2 ns
+here against 12.9 ns in the table above, so compare rows inside one table only.
+
+| source, one voice | ns/sample | % of one core |
+|---|---|---|
+| osc.va saw (reference) | 9.2 | 0.04 |
+| osc.wt, one frame | 10.8 | 0.05 |
+| osc.wt, between two frames | 11.8 | 0.06 |
+| osc.fm operator, plain rate | 17.2 | 0.08 |
+| osc.fm operator, 2x (default) | 33.0 | 0.16 |
+| osc.fm operator, 4x | 69.7 | 0.33 |
+| four-operator chain of osc.fm, 2x | 132.3 | 0.64 |
+| osc.fm6, 1 operator sounding | 50.1 | 0.24 |
+| osc.fm6, 2 operators (default patch) | 63.0 | 0.30 |
+| osc.fm6, 4-operator chain, 2x | 95.6 | 0.46 |
+| osc.fm6, 6-operator chain, 2x | 135.7 | 0.65 |
+| osc.fm6, 6-operator chain, 4x | 259.1 | 1.24 |
+
+4x costs about twice 2x on both modules. `osc.fm6` is a fixed cost of about 40 ns plus about 17 ns
+per sounding operator. Whole-patch timings of the new demos are not measured (the load made block
+times meaningless).

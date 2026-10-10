@@ -1,0 +1,12 @@
+name = "Rust Bass"
+category = "Bass"
+tags = [
+    "fm",
+    "bass",
+    "poly",
+    "six operators",
+    "growl",
+]
+description = "A punchy two-operator pair beside a four-operator chain with feedback: a clean attack, then a gritty growl that settles. Harder notes growl more."
+keys = true
+sequence = false

@@ -604,7 +604,7 @@ fn undo_save_and_reload_recall_the_cable() {
     kabl_core::save(dir.path(), &log).unwrap();
     let meta = std::fs::read_to_string(dir.path().join("meta.toml")).unwrap();
     assert!(meta.contains(&format!("schema_version = {CURRENT_SCHEMA_VERSION}")));
-    assert_eq!(CURRENT_SCHEMA_VERSION, 6);
+    assert_eq!(CURRENT_SCHEMA_VERSION, 7);
     let back = kabl_core::load(dir.path()).unwrap();
     assert_eq!(back.state(), &functional);
     assert_eq!(render_state(back.state()), sound, "recall sounds the same");

@@ -1,0 +1,12 @@
+name = "Iron Bell"
+category = "Keys"
+tags = [
+    "fm",
+    "bell",
+    "poly",
+    "six operators",
+    "ringing",
+]
+description = "Three inharmonic FM pairs in one voice that ring for several seconds and darken as they fade. Short notes are enough; leave room for the tails."
+keys = true
+sequence = false

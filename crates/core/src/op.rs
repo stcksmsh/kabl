@@ -13,7 +13,7 @@ pub struct Vec2 {
 /// destination: a cable into it is a modulation route whose settings (`amount`, `bypass`) live
 /// in the cable's params. Schema v2; v1 files only contain `Module`. `CableParam` is a
 /// parameter of another cable (its morph, probability or glide) as a modulation destination:
-/// the route is itself a cable and keeps its own `amount` and `bypass`. Schema v6.
+/// the route is itself a cable and keeps its own `amount` and `bypass`. Schema v7.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum PortRef {
     Module { id: ModuleId, port: String },
@@ -56,6 +56,11 @@ pub enum Op {
     SetComposite {
         id: crate::CompositeId,
         value: Option<crate::Composite>,
+    },
+    /// Fills (`Some`) or empties (`None`) embedded wavetable slot `slot`. Schema v5.
+    SetTable {
+        slot: u64,
+        value: Option<crate::Table>,
     },
     AddModule {
         id: ModuleId,
