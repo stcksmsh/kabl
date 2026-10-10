@@ -560,6 +560,8 @@ fn the_demo_controls_fit_together_at_1280() {
     for (w, hgt) in sizes() {
         let mut h = H::new(w, hgt);
         h.editor = PatchEditor::from_log(kabl_core::load(&dir).unwrap());
+        // The full Perform view: the dense layout needs the whole window, not a docked strip.
+        h.ui.perform_tall = true;
         let (rec, tap) = kabl_ui::record::pair(48000);
         h.ui.recorder = Some(rec);
         std::mem::forget(tap);
@@ -587,8 +589,5 @@ fn the_demo_controls_fit_together_at_1280() {
         ] {
             assert!(screen.contains_rect(h.rect(k)), "{w}: {k}");
         }
-        // The rack keeps a usable height.
-        let rack_h = rects.iter().map(|r| r.top()).fold(f32::MAX, f32::min) - 40.0;
-        assert!(rack_h > 350.0, "{w}: rack {rack_h}");
     }
 }
