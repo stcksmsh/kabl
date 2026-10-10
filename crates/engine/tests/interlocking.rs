@@ -86,7 +86,7 @@ fn trace(e: &PatchEngine) -> (usize, usize, bool) {
         LEAD => l = s,
         _ => {}
     });
-    e.clocks(|id, run| {
+    e.clocks(|id, run, _| {
         if id == CLOCK {
             r = run
         }
