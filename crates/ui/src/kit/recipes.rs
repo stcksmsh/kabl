@@ -205,12 +205,11 @@ pub fn pad(
         );
     }
     let cy = rect.center().y + if sub.is_some() { -6.0 } else { 0.0 };
-    let tr = p.layout(
-        title.to_string(),
-        st.font(Role::H3),
-        ink,
-        rect.width() - st.sp(2) * 2.0,
-    );
+    let avail = rect.width() - st.sp(2) * 2.0;
+    let mut tr = p.layout(title.to_string(), st.font(Role::H3), ink, f32::INFINITY);
+    if tr.size().x > avail {
+        tr = p.layout(title.to_string(), st.font(Role::Label), ink, avail);
+    }
     let tpos = pos2(rect.center().x - tr.size().x / 2.0, cy - tr.size().y / 2.0);
     p.galley(tpos, tr, ink);
     if let Some(s) = sub {
