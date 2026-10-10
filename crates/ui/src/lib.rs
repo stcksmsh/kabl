@@ -908,15 +908,7 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
         ui_state.record("add-menu".into(), r.rect);
         kit::rule(ui, st);
         let c = ui_state.canvas.center();
-        if tool_icon(
-            ui,
-            st,
-            ui_state,
-            "zoom:in",
-            kit::Ic::Plus,
-            "Zoom in",
-            true,
-        ) {
+        if tool_icon(ui, st, ui_state, "zoom:in", kit::Ic::Plus, "Zoom in", true) {
             ui_state.zoom_about(ui_state.zoom * 1.2, c);
         }
         let pct = format!("{:.0}%", ui_state.zoom * 100.0);

@@ -18,9 +18,10 @@ pub fn logo(ui: &mut egui::Ui, st: &crate::style::Style, height: f32) -> egui::R
     let id = egui::Id::new("kabl-logo-wordmark");
     let tex = ui.ctx().data(|d| d.get_temp::<egui::TextureHandle>(id));
     let tex = tex.unwrap_or_else(|| {
-        let img = image::load_from_memory(include_bytes!("../../assets/logo/kabl-wordmark-mask.png"))
-            .expect("bundled logo")
-            .to_rgba8();
+        let img =
+            image::load_from_memory(include_bytes!("../../assets/logo/kabl-wordmark-mask.png"))
+                .expect("bundled logo")
+                .to_rgba8();
         let size = [img.width() as usize, img.height() as usize];
         let tex = ui.ctx().load_texture(
             "kabl-logo",

@@ -78,7 +78,8 @@ impl H {
     /// A point on bare rack: inside the canvas, outside every module and cable target.
     fn empty_rack(&self) -> Pos2 {
         let busy = |p: Pos2| self.ui.hits.values().any(|r| r.expand(4.0).contains(p));
-        let right = self.size.x - (kabl_ui::DRAWER_W + kabl_ui::style::Metrics::default().rail_w) - 10.0;
+        let right =
+            self.size.x - (kabl_ui::DRAWER_W + kabl_ui::style::Metrics::default().rail_w) - 10.0;
         (0..40)
             .flat_map(|i| (0..30).map(move |j| (i, j)))
             .map(|(i, j)| {
@@ -185,7 +186,9 @@ fn every_control_of_the_reference_patch_is_on_screen_left_of_the_drawer() {
         for (key, r) in &harness.ui.hits {
             if key.starts_with("knob:") || key.starts_with("out:") || key.starts_with("in:") {
                 assert!(
-                    r.max.x < w - (kabl_ui::DRAWER_W + kabl_ui::style::Metrics::default().rail_w) && r.max.y < h - 30.0 && r.min.y > 40.0,
+                    r.max.x < w - (kabl_ui::DRAWER_W + kabl_ui::style::Metrics::default().rail_w)
+                        && r.max.y < h - 30.0
+                        && r.min.y > 40.0,
                     "{w}x{h}: {key} at {r:?}"
                 );
             }
@@ -1167,7 +1170,10 @@ fn opening_the_drawer_keeps_the_inspected_control_reachable() {
     t.click("routing"); // open
     t.frame();
     let r = t.ui.hits[&format!("knob:{FILTER}.cutoff_hz")];
-    assert!(r.max.x < 1280.0 - (kabl_ui::DRAWER_W + kabl_ui::style::Metrics::default().rail_w), "{r:?}");
+    assert!(
+        r.max.x < 1280.0 - (kabl_ui::DRAWER_W + kabl_ui::style::Metrics::default().rail_w),
+        "{r:?}"
+    );
 }
 
 /// Not a check: writes `patches/crowded` (15 modules on three rows, jack cables and knob routes

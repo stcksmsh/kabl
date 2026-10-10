@@ -711,18 +711,22 @@ fn every_control_is_reachable_at_both_sizes() {
             }
         }
         // The panel body scrolls: every control there can be brought on screen and operated.
-        for key in ["search", "category", "open", "play", "start", "folder-header"] {
+        for key in [
+            "search",
+            "category",
+            "open",
+            "play",
+            "start",
+            "folder-header",
+        ] {
             assert!(t.has(key), "{w}: {key} is drawn");
             scroll_into_view(&mut t, key);
             assert!(screen.contains_rect(t.ui.hits[key]), "{w}×{h}: {key}");
-            match key {
-                "folder-header" => {
-                    let open = t.ui.browser.folder_open;
-                    t.click(key);
-                    assert_ne!(t.ui.browser.folder_open, open, "{w}×{h}: folder toggles");
-                    t.click(key);
-                }
-                _ => {}
+            if key == "folder-header" {
+                let open = t.ui.browser.folder_open;
+                t.click(key);
+                assert_ne!(t.ui.browser.folder_open, open, "{w}×{h}: folder toggles");
+                t.click(key);
             }
         }
     }
