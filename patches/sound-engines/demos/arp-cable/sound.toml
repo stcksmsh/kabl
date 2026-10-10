@@ -1,0 +1,12 @@
+name = "Arp Cable"
+category = "Keys"
+tags = [
+    "arpeggiator",
+    "cable pattern",
+    "random",
+    "delay",
+    "evolving",
+]
+description = "A random arpeggio of the chord you hold, gated by a six-step cable that runs against the 16ths and thrown to a delay by a four-step cable that happens seven times in ten. Hold a chord and let it run."
+keys = true
+sequence = false

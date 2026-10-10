@@ -307,3 +307,25 @@ All nine together are about 52 ns, a quarter of one percent of a core per voice,
 `osc.fm` operator. `crossfade` and `pan` cost most (a sine and cosine per sample at the
 equal-power law). The quantizer's note search is two bit scans; its first version was a loop of
 13 and about three times slower.
+
+## 2026-10-10 — Rhythm: arpeggiator, swing, ratchets
+
+Same harness and method as "Utility modules" (`BENCH_FAST=1 taskset -c 5 target/release/examples/bench_sources`,
+48 kHz, 64-sample blocks, median of 5 runs per row, three runs; compare rows inside this table
+only). `seq` and `clock` rows also measured on a build of origin/master with the same harness.
+
+| module, one instance | ns/sample | % of one core |
+|---|---|---|
+| clock, straight | 5.0 | 0.02 |
+| clock, swing 58 | 5.0 | 0.02 |
+| seq (origin/master 35.5) | 34.7 | 0.17 |
+| seq, every step ratcheted 4x | 45.0 | 0.22 |
+| arp, up, 4 keys held | 39 | 0.19 |
+| arp, random, 4 octaves, ratchet 3 | 43 | 0.21 |
+
+The ratchet params cost nothing on a plain `seq` (the first version computed the step length for
+every sample and was 11 % slower; now it is computed only for a ratcheted step). The harness gives
+`seq` a different clock than the engine, so its absolute numbers are mostly the three passes over the
+block that `seq` and `arp` make (one per output); both are global modules, run once whatever the
+voice count. The `clock` row reads lower than origin/master's 8.3 ns on the same harness; not
+investigated.

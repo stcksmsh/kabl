@@ -375,7 +375,10 @@ fn place_local(
     choosing: bool,
     skin: Option<&'static ModuleSkin>,
 ) -> Placed {
-    let knob = |p: &ParamInfo| p.taper != Taper::Stepped;
+    // A step's ratchet count is a four-position knob: eight selectors would not fit the drawer.
+    let knob = |p: &ParamInfo| {
+        p.taper != Taper::Stepped || (info.kind == "seq" && seq::slot_name(p.name).starts_with('k'))
+    };
     let face_knobs: Vec<usize> = (0..info.params.len())
         .filter(|&i| shown[i] && primary[i] && knob(&info.params[i]))
         .collect();
@@ -613,17 +616,24 @@ fn place_local(
             .collect();
         // The sequencer: a velocity row (then gate length) and a probability row (then
         // transpose), one knob per step.
-        let per_row = if info.kind == "seq" { 9 } else { 5 };
+        // Two rows of 13: velocities, gate length and ratchets 1-4 above probabilities,
+        // transpose and ratchets 5-8.
+        let per_row = if info.kind == "seq" { 13 } else { 5 };
+        // Knob spacing: the sequencer's 13 columns are packed closer.
+        let pitch = if info.kind == "seq" { 57.0 } else { 76.0 };
         if info.kind == "seq" {
             hk.sort_by_key(|&i| {
                 let slot = seq::slot_name(info.params[i].name);
-                let row = match slot.as_bytes()[0] {
-                    b'v' => 0,
-                    b'g' => 1,
-                    b'r' => 2,
-                    _ => 3,
+                let d = slot.as_bytes().get(1).map_or(0, |c| (c - b'0') as usize);
+                let (row, col) = match slot.as_bytes()[0] {
+                    b'v' => (0, d),
+                    b'g' => (0, 9),
+                    b'k' if d <= 4 => (0, 9 + d),
+                    b'r' => (1, d),
+                    b'k' => (1, 9 + d),
+                    _ => (1, 9),
                 };
-                (row, i)
+                (row, col, i)
             });
         }
         let hs: Vec<usize> = off_face
@@ -640,7 +650,7 @@ fn place_local(
             + 12.0 * hs.len().saturating_sub(1) as f32
             + 28.0;
         let knob_w = if cols > 0 {
-            60.0 + 76.0 * (cols as f32 - 1.0)
+            60.0 + pitch * (cols as f32 - 1.0)
         } else {
             0.0
         };
@@ -650,8 +660,8 @@ fn place_local(
             if k > 0 && k % per_row == 0 {
                 y += 110.0;
             }
-            let x0 = (aw - 76.0 * (cols as f32 - 1.0)) / 2.0;
-            let c = pos2(fw + x0 + 76.0 * (k % per_row) as f32, y);
+            let x0 = (aw - pitch * (cols as f32 - 1.0)) / 2.0;
+            let c = pos2(fw + x0 + pitch * (k % per_row) as f32, y);
             ctls.push(Ctl {
                 param: &info.params[i],
                 primary: false,

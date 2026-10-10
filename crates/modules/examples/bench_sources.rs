@@ -116,6 +116,25 @@ const CHAIN6_4X: [(&str, f32); 5] = [
     ("oversample", 1.0),
 ];
 
+const RATCHET4: [(&str, f32); 8] = [
+    ("k1", 4.0),
+    ("k2", 4.0),
+    ("k3", 4.0),
+    ("k4", 4.0),
+    ("k5", 4.0),
+    ("k6", 4.0),
+    ("k7", 4.0),
+    ("k8", 4.0),
+];
+
+fn hold_chord(m: &mut dyn Module) {
+    if let Some(arp) = m.as_any_mut().downcast_mut::<kabl_modules::builtins::Arp>() {
+        for n in [50, 53, 57, 60] {
+            arp.note_on(n, 100);
+        }
+    }
+}
+
 fn main() {
     let plain = |m: &mut dyn Module| {
         if let Some(fm) = m.as_any_mut().downcast_mut::<OscFm>() {
@@ -201,6 +220,25 @@ fn main() {
             (
                 "random, loop of 8, 50% change",
                 time(&["random"], &[("length", 8.0), ("change", 50.0)], |_| {}),
+            ),
+            ("clock, straight", time(&["clock"], &[], |_| {})),
+            (
+                "clock, swing 58",
+                time(&["clock"], &[("swing", 58.0)], |_| {}),
+            ),
+            ("seq", time(&["seq"], &[], |_| {})),
+            (
+                "seq, every step ratcheted 4x",
+                time(&["seq"], &RATCHET4, |_| {}),
+            ),
+            ("arp, up, 4 keys", time(&["arp"], &[], hold_chord)),
+            (
+                "arp, random, 4 octaves, ratchet 3",
+                time(
+                    &["arp"],
+                    &[("mode", 4.0), ("octaves", 4.0), ("ratchet", 3.0)],
+                    hold_chord,
+                ),
             ),
         ])
         .collect();

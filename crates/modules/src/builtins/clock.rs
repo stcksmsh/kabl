@@ -8,6 +8,16 @@
 //! that a (re)start begins and lasts that pulse, so a sequencer or divider patched to both
 //! outputs lands on step 1 exactly on that tick. Running, that pulse starts now (after one low
 //! sample if `gate` was high, so the edge is clean); stopped, it waits for Run.
+//!
+//! Swing (`swing`, 0..100 %) delays every second pulse. Each pair of pulses keeps its length;
+//! the first pulse of the pair stretches to `1 + s` pulses and the second shrinks to `1 - s`,
+//! with `s = swing / 200`. 0 % is straight, about 67 % is the triplet shuffle (a 2:1 pair), 100 %
+//! puts the second pulse three quarters of the way in. The shift is made here, in the clock's
+//! own pulses, so everything that steps on this clock (`seq`, `random`, `clock.div` patched
+//! 1:1, an arpeggiator, a patterned cable) swings together by the same amount, and the pulse
+//! count, the tempo and `reset` are unchanged. A divided clock skips the delayed pulses and so
+//! comes out straight. In a host the pair is found from the host's beat position each block, so
+//! swing follows transport jumps, loops and tempo changes like the rest of the clock.
 
 use crate::info::{
     Category, ModuleInfo, ParamInfo, PortDirection, PortInfo, PortType, QualitySupport, Rate, Taper,
@@ -28,22 +38,33 @@ const PORTS: &[PortInfo] = &[
     },
 ];
 
-const PARAMS: &[ParamInfo] = &[ParamInfo {
-    name: "bpm",
-    min: 20.0,
-    max: 300.0,
-    default: 120.0,
-    unit: "bpm",
-    taper: Taper::Linear,
-    smoothing_ms: 0.0,
-}];
+const PARAMS: &[ParamInfo] = &[
+    ParamInfo {
+        name: "bpm",
+        min: 20.0,
+        max: 300.0,
+        default: 120.0,
+        unit: "bpm",
+        taper: Taper::Linear,
+        smoothing_ms: 0.0,
+    },
+    ParamInfo {
+        name: "swing",
+        min: 0.0,
+        max: 100.0,
+        default: 0.0,
+        unit: "%",
+        taper: Taper::Linear,
+        smoothing_ms: 0.0,
+    },
+];
 
 pub static CLOCK_INFO: ModuleInfo = ModuleInfo {
     kind: "clock",
     name: "Clock",
     category: Category::Sequencer,
     rate: Rate::Global,
-    explain: "Ticks four times per beat at the tempo you set; sequencers step on each tick. Restart sends a pulse on reset.",
+    explain: "Ticks four times per beat at the tempo you set; sequencers step on each tick. Swing delays every second tick, so everything on this clock swings together. Restart sends a pulse on reset.",
     lesson: None,
     requires: &[],
     ports: PORTS,
@@ -80,6 +101,10 @@ const MAX_BLOCK_TICKS: usize = 4;
 pub struct Clock {
     /// f64: in f32 the phase sum drifts by about one sample per pulse at 48 kHz.
     phase: f64,
+    /// The pulse being played is the delayed one of its pair.
+    odd: bool,
+    /// Swing of the last block, as `s` (see the module docs); a host position is mapped with it.
+    swing: f64,
     host: Option<(f64, f64, bool)>,
     sample_rate: f32,
     running: bool,
@@ -102,6 +127,8 @@ impl Clock {
     pub fn new() -> Self {
         Clock {
             phase: 0.0,
+            odd: false,
+            swing: 0.0,
             host: None,
             sample_rate: 48000.0,
             running: true,
@@ -119,10 +146,25 @@ impl Clock {
     /// Host supplies quarter-note position at each engine block. Free mode passes None.
     pub fn host(&mut self, position: Option<(f64, f64, bool)>) {
         self.host = position;
-        if let Some((beats, _, playing)) = position {
+        if let Some((_, _, playing)) = position {
             self.running = playing;
-            self.phase = (beats * PULSES_PER_BEAT).rem_euclid(1.0);
+            self.locate();
         }
+    }
+
+    /// Puts the pulse phase and the pair half where the host's beat position says, for the
+    /// current swing.
+    fn locate(&mut self) {
+        let Some((beats, _, _)) = self.host else {
+            return;
+        };
+        let u = (beats * PULSES_PER_BEAT).rem_euclid(2.0);
+        let first = 1.0 + self.swing;
+        (self.odd, self.phase) = if u < first {
+            (false, u / first)
+        } else {
+            (true, (u - first) / (1.0 - self.swing))
+        };
     }
 
     pub fn running(&self) -> bool {
@@ -159,7 +201,7 @@ impl Clock {
             Transport::Stop => self.running = false,
             Transport::Run if !self.running => {
                 self.running = true;
-                self.phase = 0.0;
+                (self.phase, self.odd) = (0.0, false);
             }
             Transport::Run => {}
             Transport::Toggle => self.command(if self.running {
@@ -171,7 +213,7 @@ impl Clock {
                 self.armed = true;
                 if self.running {
                     self.gap = self.gate_high;
-                    self.phase = 0.0;
+                    (self.phase, self.odd) = (0.0, false);
                 }
             }
         }
@@ -206,6 +248,15 @@ impl Module for Clock {
             .host
             .map_or(io.param(0).at(0) as f64, |(_, bpm, _)| bpm);
         let inc = bpm / 60.0 * PULSES_PER_BEAT / self.sample_rate as f64;
+        let swing = if io.param_count() > 1 {
+            (io.param(1).at(0) as f64 / 200.0).clamp(0.0, 0.5)
+        } else {
+            0.0
+        };
+        if swing != self.swing {
+            self.swing = swing;
+            self.locate();
+        }
         let n = io.block_len();
         // Yields (gate, reset) per sample from the stored state. Run once per output:
         // `ProcessIo` lends one output buffer at a time.
@@ -227,9 +278,14 @@ impl Module for Clock {
                     }
                     st.reset_high &= g;
                     st.gate_high = g;
-                    st.phase += inc;
+                    st.phase += if st.odd {
+                        inc / (1.0 - st.swing)
+                    } else {
+                        inc / (1.0 + st.swing)
+                    };
                     if st.phase >= 1.0 - EPS {
                         st.phase -= 1.0;
+                        st.odd = !st.odd;
                     }
                     started
                 };
@@ -264,8 +320,10 @@ impl Module for Clock {
         let hi = self.phase as f32;
         out.write_f32("phase", hi);
         out.write_f32("phase_lo", (self.phase - hi as f64) as f32);
+        out.write_f32("swing", self.swing as f32);
         for (k, v) in [
             ("running", self.running),
+            ("odd", self.odd),
             ("armed", self.armed),
             ("gap", self.gap),
             ("reset_high", self.reset_high),
@@ -276,11 +334,13 @@ impl Module for Clock {
     }
 
     fn load_state(&mut self, s: &dyn StateReader) {
+        self.swing = s.read_f32("swing").unwrap_or(0.0) as f64;
         if let Some(p) = s.read_f32("phase") {
             self.phase = p as f64 + s.read_f32("phase_lo").unwrap_or(0.0) as f64;
         }
         for (k, v) in [
             ("running", &mut self.running),
+            ("odd", &mut self.odd),
             ("armed", &mut self.armed),
             ("gap", &mut self.gap),
             ("reset_high", &mut self.reset_high),
