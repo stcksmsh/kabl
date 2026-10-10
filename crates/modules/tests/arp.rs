@@ -291,3 +291,97 @@ fn channel_selects_which_events_it_hears() {
     let _ = h.steps(1);
     assert!((0..16).all(|c| h.arp().hears(c)), "default hears all");
 }
+
+// Moving from one chord to the next, the ways a player does it. A hole is a step with no gate.
+// The rules (also in docs/sound-engines/rhythm.md): while any key is held, or latched, or held by
+// the pedal, every clock step plays a note and the pattern carries on in time; only a moment with
+// nothing held leaves steps silent, and the first step after it plays the new chord's first note.
+
+fn holes(v: &[Option<i32>]) -> usize {
+    v.iter().filter(|x| x.is_none()).count()
+}
+
+#[test]
+fn overlapping_chords_leave_no_hole_and_carry_on_in_time() {
+    for latch in [0.0, 1.0] {
+        let mut h = Harness::new(&[("mode", 0.0), ("latch", latch)]);
+        h.on(&[60, 64, 67]);
+        let a = h.steps(3);
+        // New chord down while the old one is still held, then the old one up.
+        h.on(&[62, 65, 69]);
+        h.off(&[60, 64, 67]);
+        let b = h.steps(6);
+        assert_eq!(holes(&a), 0);
+        assert_eq!(holes(&b), 0, "latch {latch}: {b:?}");
+        if latch == 0.0 {
+            // UP carries on from 7 (G): the next of the new chord above it is A (9), then it
+            // wraps to D, F, A.
+            assert_eq!(pitches(b), [9, 2, 5, 9, 2, 5]);
+        }
+    }
+}
+
+#[test]
+fn a_simultaneous_swap_leaves_no_hole() {
+    let mut h = Harness::new(&[("mode", 2.0)]);
+    h.on(&[60, 64, 67]);
+    let _ = h.steps(2);
+    // Both land in one block: the old keys come up as the new ones go down.
+    h.off(&[60, 64, 67]);
+    h.on(&[62, 65, 69]);
+    let b = h.steps(6);
+    assert_eq!(holes(&b), 0, "{b:?}");
+    assert!(
+        b.iter().all(|x| [2, 5, 9].contains(&x.unwrap())),
+        "only the new chord plays: {b:?}"
+    );
+}
+
+#[test]
+fn a_full_release_is_silent_only_while_nothing_is_held_and_the_next_chord_starts_on_the_next_step()
+{
+    let mut h = Harness::new(&[]);
+    h.on(&[60, 64, 67]);
+    let _ = h.steps(3);
+    h.off(&[60, 64, 67]);
+    let gap = h.steps(2);
+    assert_eq!(holes(&gap), 2, "nothing held, nothing plays");
+    h.on(&[62, 65, 69]);
+    // The very next step plays the new chord's first note, not one step later.
+    assert_eq!(pitches(h.steps(3)), [2, 5, 9]);
+}
+
+#[test]
+fn latch_bridges_a_release_and_a_new_press_replaces_the_chord() {
+    let mut h = Harness::new(&[("latch", 1.0)]);
+    h.on(&[60, 64, 67]);
+    let _ = h.steps(2);
+    h.off(&[60, 64, 67]);
+    assert_eq!(holes(&h.steps(3)), 0, "latched chord keeps playing");
+    h.on(&[62, 65, 69]);
+    let b = h.steps(6);
+    assert_eq!(holes(&b), 0);
+    assert!(b.iter().all(|x| [2, 5, 9].contains(&x.unwrap())), "{b:?}");
+}
+
+#[test]
+fn the_pedal_bridges_a_release_and_the_new_chord_joins_what_it_holds() {
+    let mut h = Harness::new(&[]);
+    h.arp().sustain(true);
+    h.on(&[60, 64, 67]);
+    let _ = h.steps(2);
+    h.off(&[60, 64, 67]);
+    assert_eq!(holes(&h.steps(3)), 0, "pedal holds the chord");
+    h.on(&[62]);
+    let b = pitches(h.steps(8));
+    assert!(
+        b.contains(&2) && b.contains(&0),
+        "the held chord and the new key: {b:?}"
+    );
+    // Pedal up with the new key still down: only the new key is left, still no hole.
+    h.arp().sustain(false);
+    assert_eq!(pitches(h.steps(3)), [2, 2, 2]);
+    // Pedal up with nothing down: silence.
+    h.off(&[62]);
+    assert_eq!(holes(&h.steps(2)), 2);
+}

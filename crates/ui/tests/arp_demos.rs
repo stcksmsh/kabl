@@ -132,16 +132,18 @@ fn arp_chord() -> PatchEditor {
     r.e
 }
 
+/// A player moving from one chord to the next: the new keys go down before the old ones come up,
+/// so the arpeggio carries on in time.
 fn chord_phrase() -> Events {
     notes(&[
-        (50, 0.3, 8.0),
-        (53, 0.3, 8.0),
-        (57, 0.3, 8.0),
-        (60, 0.3, 8.0),
-        (46, 8.3, 16.0),
-        (50, 8.3, 16.0),
-        (53, 8.3, 16.0),
-        (57, 8.3, 16.0),
+        (50, 0.3, 8.05),
+        (53, 0.3, 8.05),
+        (57, 0.3, 8.05),
+        (60, 0.3, 8.05),
+        (46, 7.95, 15.0),
+        (50, 7.95, 15.0),
+        (53, 7.95, 15.0),
+        (57, 7.95, 15.0),
     ])
 }
 
@@ -335,10 +337,10 @@ fn no_keys() -> Events {
 
 fn cable_phrase() -> Events {
     notes(&[
-        (57, 0.3, 14.0),
-        (60, 0.3, 14.0),
-        (64, 0.3, 14.0),
-        (67, 0.3, 14.0),
+        (57, 0.3, 18.0),
+        (60, 0.3, 18.0),
+        (64, 0.3, 18.0),
+        (67, 0.3, 18.0),
     ])
 }
 
@@ -580,4 +582,27 @@ fn swing_changes_the_swing_demo_and_nothing_else_does() {
     let (_, a) = peak_rms(&straight);
     let (_, b) = peak_rms(&swung);
     assert!((a / b - 1.0).abs() < 0.15, "{a} vs {b}");
+}
+
+/// RMS of `audio` (stereo, interleaved) over `from..to` seconds.
+fn window_rms(audio: &[f32], from: f32, to: f32) -> f32 {
+    let s = &audio[(from * SR) as usize * 2..(to * SR) as usize * 2];
+    (s.iter().map(|v| v * v).sum::<f32>() / s.len() as f32).sqrt()
+}
+
+/// The chord change of `arp-chord` plays on without a hole, and `arp-cable` is still sounding
+/// near its end (its keys are held to 18 s and the delay rings out).
+#[test]
+fn the_chord_change_has_no_hole_and_the_cable_demo_plays_to_the_end() {
+    let st = arp_chord().state().clone();
+    let audio = render(&st, &chord_phrase(), 16.0);
+    let steady = window_rms(&audio, 6.0, 7.5);
+    for t in [7.6f32, 7.8, 8.0, 8.2, 8.4] {
+        let w = window_rms(&audio, t, t + 0.2);
+        assert!(w > 0.5 * steady, "hole at {t}: {w} against {steady}");
+    }
+    let st = arp_cable().state().clone();
+    let audio = render(&st, &cable_phrase(), 20.0);
+    let body = window_rms(&audio, 10.0, 12.0);
+    assert!(window_rms(&audio, 16.0, 17.0) > 0.5 * body);
 }

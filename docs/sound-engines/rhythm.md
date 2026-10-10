@@ -48,6 +48,15 @@ What it does, defined:
 - **Gate length** follows the step: as long as the clock interval two edges back (so a swung clock
   gives each note its own length). The first step after a load follows the clock pulse. 100 % still
   drops the gate for one sample so the next note retriggers.
+- **Changing chords** (tested one way at a time, `modules/tests/arp.rs`): while any key is held,
+  latched or held by the pedal, every clock step plays a note and the pattern carries on in time.
+  Overlapping (new keys down before the old come up) and a simultaneous swap leave no hole: UP,
+  DOWN and UP-DN carry on from the pitch last played, in the new chord. A full release is silent for
+  exactly the time nothing is held, and the first step after a new press plays the new chord's
+  first note, not one step later. With latch the old chord keeps playing after release and a press
+  with nothing down replaces it; a press while keys are down adds. With the pedal the released
+  keys stay and a new key joins them until the pedal comes up. A player who lifts every key before
+  pressing the next chord therefore hears the gap they play; the demo moves with overlap.
 - **Channel**: `channel` is a knob that reads ALL at 0 and "ch 1" to "ch 16" above it, the same
   control `midi.in` has. Changing it forgets the held keys (a key held on the old channel would
   never see its release). Key off and pedal events follow the same filter; panic and notes-off
@@ -107,10 +116,10 @@ Built through the real editor (`crates/ui/tests/arp_demos.rs`; rewrite with `wri
 
 | patch | clip | what it shows |
 |---|---|---|
-| `arp-chord` | `audio/arp-chord.m4a` (16 s) | hold a Dm7 then a Bbmaj7: up and down over three octaves with a ping-pong delay |
+| `arp-chord` | `audio/arp-chord.m4a` (16 s) | hold a Dm7, move to a Bbmaj7 with the new keys down before the old come up (no hole): up and down over three octaves with a ping-pong delay |
 | `swing-seq` | `audio/swing-seq.m4a` (16 s) | one bass line and hat on one clock: 8 s straight, then 8 s with swing 58 |
 | `ratchet-roll` | `audio/ratchet-roll.m4a` (20 s) | steps 3, 6, 8 ratcheted 2, 3, 4 times, steps 2, 5, 7 left to chance, a little swing |
-| `arp-cable` | `audio/arp-cable.m4a` (20 s) | a random arpeggio gated by a six-step cable running against the 16ths and thrown to a delay by a four-step cable at 70 % |
+| `arp-cable` | `audio/arp-cable.m4a` (20 s) | a random arpeggio gated by a six-step cable running against the 16ths and thrown to a delay by a four-step cable at 70 %; keys held to 18 s, the delay rings out to the end |
 
 ## Faces
 
@@ -123,10 +132,10 @@ selector row); the ratchet knobs read "1X" to "4X" (they read "1.00" first); the
 
 ## Checks
 
-- `crates/modules/tests/arp.rs` (14): every mode and octave order, played order, one key and none,
+- `crates/modules/tests/arp.rs` (19): every mode and octave order, played order, one key and none,
   key added and released mid-pattern, release at once and restart on the next chord, latch and
   its replacement rule, pedal, seeded random (same seed same render, other seed other line, covers
-  the span), gate length and ratchet counts, reset, carry, rate (every Nth pulse, restart after silence), the channel filter.
+  the span), gate length and ratchet counts, reset, carry, rate (every Nth pulse, restart after silence), the channel filter, and the ways a chord changes (overlap, swap, full release, latch, pedal).
 - `crates/modules/tests/swing.rs` (9): the straight clock unchanged, swing delay to the sample at
   0/50/100 %, pulse count unchanged, the position report against the swung pulses, host position mapping, ratchet edges to the sample, rest and
   probability composition over 40 passes, ratchets inside a swung clock's long and short steps.
@@ -134,8 +143,9 @@ selector row); the ratchet knobs read "1X" to "4X" (they read "1.00" first); the
   panic clears, no allocation across keys and ticks with swing and ratchets, a random render is
   bit-identical twice, swing moves every arpeggio note (3000/9000 samples), an old sequencer patch
   has no ratchets, the channel filter through the engine (ALL by default and when stored without the param).
-- `crates/ui/tests/arp_demos.rs` (3 + 2 writers): demos match their builders, parameters in range,
-  compile, finite and in level, the swing clip changes with swing and keeps its energy.
+- `crates/ui/tests/arp_demos.rs` (4 + 2 writers): demos match their builders, parameters in range,
+  compile, finite and in level, the swing clip changes with swing and keeps its energy, the chord
+  change has no hole and the cable clip is still sounding at 16 s.
 - Golden renders of all committed patches unchanged (`crates/engine/tests/golden_renders.rs`).
 - CLAP validator 0.4.1: 35 success, 9 skipped, the same 44 tests and statuses as the baseline
   (`evidence/validator-rhythm.json` against `evidence/validator-util.json`).
