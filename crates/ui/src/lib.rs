@@ -683,25 +683,8 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
             .frame(kit::panel_frame(&st))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    kit::label(ui, &st, style::Role::Title, kit::Tone::Text, "Routing");
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if kit::icon_button(ui, &st, kit::Ic::Close, false, true)
-                            .tip(&st, "Close the drawer")
-                            .clicked()
-                        {
-                            ui_state.drawer_open = false;
-                        }
-                        let on = ui_state.drawer_pinned;
-                        let r = kit::icon_button(ui, &st, kit::Ic::Pin, on, true)
-                            .tip(&st, "Keep the drawer open in the Perform view");
-                        ui_state.record("drawer-pin".into(), r.rect);
-                        if r.clicked() {
-                            ui_state.drawer_pinned = !on;
-                        }
-                    });
-                });
-                ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = st.sp(1);
+                    kit::label(ui, &st, style::Role::Title, kit::Tone::Text, "Routing");
                     let on = ui_state.explain.help;
                     let r = ui
                         .add(kit::Button::new(&st, "Help").small().selected(on))
@@ -736,6 +719,14 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                     if r.clicked() {
                         ui_state.recipes.open = !on;
                     }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if kit::icon_button(ui, &st, kit::Ic::Close, false, true)
+                            .tip(&st, "Close the drawer")
+                            .clicked()
+                        {
+                            ui_state.drawer_open = false;
+                        }
+                    });
                 });
                 if ui_state.recipes.open {
                     // Above the drawer's scrolling content, so Show (which scrolls the drawer
@@ -3658,9 +3649,8 @@ fn draw_cables(
         .collect();
     {
         for (cable_id, c) in &cables {
-            if only.is_some_and(|id| {
-                c.from.module_id() != Some(id) && c.to.module_id() != Some(id)
-            }) {
+            if only.is_some_and(|id| c.from.module_id() != Some(id) && c.to.module_id() != Some(id))
+            {
                 continue;
             }
             if ui_state.unplug == Some(*cable_id) {

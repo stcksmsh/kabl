@@ -20,6 +20,8 @@ use crate::{routing, PatchEditor, UiState};
 const TRANSPORT_W: f32 = 290.0;
 /// Narrowest a macro tile and a bank card get before the row wraps.
 const TILE_MIN: f32 = 128.0;
+/// A macro tile's width when its card is not stretched.
+const TILE_W: f32 = 156.0;
 const BANK_MIN: f32 = 230.0;
 const CTRL_W: f32 = 250.0;
 /// A bank card weighs this many macro tiles when the row shares out spare width.
@@ -33,7 +35,7 @@ const FIXED_H: f32 = 64.0 + 168.0 + 132.0 + 32.0;
 fn split(avail: f32, gap: f32, items: &[(f32, f32)]) -> Vec<f32> {
     let mins: f32 = items.iter().map(|i| i.0).sum();
     let spare = avail - mins - gap * items.len().saturating_sub(1) as f32;
-    let total: f32 = items.iter().map(|i| i.1).sum();
+    let total: f32 = items.iter().map(|i| i.1).sum::<f32>().max(f32::EPSILON);
     items
         .iter()
         .map(|&(min, w)| {
@@ -94,7 +96,8 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     let g = st.sp(2);
     // Half a pixel short, so a row that sums to the full width does not wrap on rounding.
     let avail = ui.available_width() - 14.0 - 0.5;
-    let var = (ui.available_height() - FIXED_H).max(0.0);
+    // A little under, so the last row clears the status bar and a scrollbar gutter.
+    let var = (ui.available_height() - FIXED_H - 16.0).max(0.0);
     let pad_h = (var * 0.57).clamp(84.0, 140.0);
     let knob = (var * 0.43).clamp(64.0, 110.0);
     let row1_h = 64.0 + pad_h;
@@ -140,18 +143,35 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         - g * cues.len().saturating_sub(1) as f32)
         .max(0.0);
     // Macro row: macros and sequences share the width.
-    let mut items: Vec<(f32, f32)> = tiles
-        .iter()
-        .map(|t| {
-            let n = t.len() as f32;
-            (n * TILE_MIN + (n - 1.0) * st.sp(1) + st.sp(3) * 2.0, n)
-        })
-        .collect();
+    // With no scenes the transport joins this row at its own width.
+    // Macros that have no sequences beside them keep their own width, and the controls flow
+    // next to them, which is what the docked strip needs.
+    let spread = !banks.is_empty();
+    let lead = if cues.is_empty() && spread {
+        transports.len()
+    } else {
+        0
+    };
+    let mut items: Vec<(f32, f32)> = vec![(TRANSPORT_W, 0.0); lead];
+    items.extend(tiles.iter().map(|t| {
+        let n = t.len() as f32;
+        let tile = if spread { TILE_MIN } else { TILE_W };
+        (
+            n * tile + (n - 1.0) * st.sp(1) + st.sp(3) * 2.0,
+            if spread { n } else { 0.0 },
+        )
+    }));
     items.extend(banks.iter().map(|_| (BANK_MIN, BANK_WEIGHT)));
     let widths = split(avail, g, &items);
     // Controls: whole columns of at least CTRL_W, all the same width.
-    let cols = (((avail + g) / (CTRL_W + g)) as usize).max(1);
-    let ctrl_w = (avail - g * (cols - 1) as f32) / cols as f32;
+    let cols = (((avail + g) / (CTRL_W + g)) as usize).clamp(1, controls.len().max(1));
+    // A transport beside bare controls keeps the plain card width so they flow together.
+    let alone = (cues.is_empty() && lead == 0 && !transports.is_empty()) || !spread;
+    let ctrl_w = if alone {
+        CTRL_W
+    } else {
+        ((avail - g * (cols - 1) as f32) / cols as f32).min(CTRL_W * 1.6)
+    };
 
     egui::ScrollArea::vertical()
         .id_salt("perform-cards")
@@ -161,17 +181,13 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                 Layout::left_to_right(egui::Align::Min).with_main_wrap(true),
                 |ui| {
                     ui.spacing_mut().item_spacing = vec2(g, g);
-                    for &(i, pin) in &transports {
-                        transport_card(
-                            editor,
-                            ui_state,
-                            ui,
-                            &st,
-                            pin,
-                            i,
-                            n,
-                            vec2(transport_w, row1_h),
-                        );
+                    for (k, &(i, pin)) in transports.iter().enumerate() {
+                        let size = if lead > 0 {
+                            vec2(widths[k], row2_h)
+                        } else {
+                            vec2(transport_w, row1_h)
+                        };
+                        transport_card(editor, ui_state, ui, &st, pin, i, n, size);
                     }
                     for &(i, pin) in &cues {
                         cues_card(
@@ -186,10 +202,11 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                             pad_h,
                         );
                     }
-                    for (mine, &w) in tiles.iter().zip(&widths) {
+                    for (mine, &w) in tiles.iter().zip(&widths[lead..]) {
                         macros_card(editor, ui_state, ui, &st, mine, n, vec2(w, row2_h), knob);
                     }
-                    for (k, (&(i, pin), &w)) in banks.iter().zip(&widths[tiles.len()..]).enumerate()
+                    for (k, (&(i, pin), &w)) in
+                        banks.iter().zip(&widths[lead + tiles.len()..]).enumerate()
                     {
                         // One hue per sequencer, from the theme's signal colours.
                         let hue = [st.roles.audio, st.roles.cv, st.roles.gate][k % 3];
@@ -247,6 +264,24 @@ fn header(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, s
             ui_state.record("perform-size".into(), r.rect);
             if r.clicked() {
                 ui_state.perform_tall = !full;
+            }
+            let pinned = ui_state.drawer_pinned;
+            let r = ui
+                .add(
+                    kit::Button::new(st, "Keep Routing open")
+                        .icon(Ic::Pin)
+                        .selected(pinned),
+                )
+                .tip(
+                    st,
+                    "The Routing drawer is closed on entering Perform to give it the room; \
+                     pin it to keep it open",
+                );
+            ui_state.record("drawer-pin".into(), r.rect);
+            if r.clicked() {
+                ui_state.drawer_pinned = !pinned;
+                ui_state.drawer_open |= !pinned;
+                ui_state.drawer_auto_closed = false;
             }
             let r = ui.add(kit::Button::new(st, "All notes off")).tip(
                 st,
@@ -566,14 +601,12 @@ fn transport_card(
             });
             let room = vec2(ui.available_width(), 40.0);
             ui.allocate_ui_with_layout(room, Layout::top_down(egui::Align::Max), |ui| {
-                ui.vertical(|ui| {
-                    let (bar, beat) = pos.map_or(("--".into(), "--".into()), |p| {
-                        let (b, beat, _) = bar_beat(p);
-                        (b.to_string(), beat.to_string())
-                    });
-                    kit::label(ui, st, Role::Value, Tone::Text, format!("BAR {bar}"));
-                    kit::label(ui, st, Role::Value, Tone::Text2, format!("BEAT {beat}"));
+                let (bar, beat) = pos.map_or(("--".into(), "--".into()), |p| {
+                    let (b, beat, _) = bar_beat(p);
+                    (b.to_string(), beat.to_string())
                 });
+                kit::label(ui, st, Role::Value, Tone::Text, format!("BAR {bar}"));
+                kit::label(ui, st, Role::Value, Tone::Text2, format!("BEAT {beat}"));
             });
         });
         let w = ui.available_width();
@@ -1210,4 +1243,30 @@ fn banks_card(
         );
     });
     after_card(ui, ui_state, st, pin, rect);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_row_shares_spare_width_by_weight_and_keeps_minimums_when_short() {
+        let w = split(1000.0, 10.0, &[(100.0, 0.0), (200.0, 1.0), (200.0, 3.0)]);
+        assert_eq!(w[0], 100.0, "weight 0 stays fixed");
+        assert!((w.iter().sum::<f32>() + 20.0 - 1000.0).abs() < 0.01);
+        assert!(w[2] - 200.0 > 2.9 * (w[1] - 200.0));
+        assert_eq!(
+            split(300.0, 10.0, &[(200.0, 1.0), (200.0, 1.0)]),
+            [200.0, 200.0]
+        );
+    }
+
+    #[test]
+    fn position_in_sixteenths_gives_bar_beat_and_place_in_the_bar() {
+        assert_eq!(bar_beat(0.0), (1, 1, 0.0));
+        assert_eq!(bar_beat(5.0), (1, 2, 1.25));
+        assert_eq!(bar_beat(16.0), (2, 1, 0.0));
+        assert_eq!(bar_beat(31.9).0, 2);
+        assert_eq!(bar_beat(31.9).1, 4);
+    }
 }
