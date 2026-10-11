@@ -305,6 +305,7 @@ pub fn knob(p: &Painter, st: &Style, k: &Knob, tick: Color32) {
 
 /// The reachable range of a modulated knob, `lo..hi` in knob travel, at ring radius `rr`.
 /// `strong` is the inspected or selected knob.
+#[allow(clippy::too_many_arguments)]
 pub fn mod_range(
     p: &Painter,
     st: &Style,

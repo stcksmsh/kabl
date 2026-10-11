@@ -106,7 +106,8 @@ impl Wants {
             want.clear();
         }
         self.active = !want.is_empty();
-        let changed = self.sent.as_ref().map(|(w, _)| w) != Some(&want);
+        let before = self.sent.as_ref().map_or(&[][..], |(w, _)| w.as_slice());
+        let changed = before != want.as_slice();
         let stale = self
             .sent
             .as_ref()
@@ -230,6 +231,7 @@ fn param(state: &PatchState, m: &Placed, name: &str) -> f32 {
 }
 
 /// Draws the display of `m` in `r` (world units).
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn draw(
     state: &PatchState,
     st: &Style,
