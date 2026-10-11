@@ -1062,10 +1062,14 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Contex
     let st = ui_state.style.clone();
     let now = ctx.input(|i| i.time);
     let mut open = true;
+    let below_toolbar = ui_state
+        .hits
+        .get("rack")
+        .map_or(56.0, |r| r.bottom() + 10.0);
     egui::Window::new("Wavetable editor")
         .id(egui::Id::new("wt-editor"))
-        // Below the toolbar (Save, the view switch), inside the window.
-        .default_pos(pos2(24.0, 56.0))
+        // Below the toolbar (Save, the view switch), wherever the host puts it.
+        .default_pos(pos2(24.0, below_toolbar))
         .open(&mut open)
         .frame(kit::popover_frame(&st))
         .collapsible(false)

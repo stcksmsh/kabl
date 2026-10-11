@@ -507,7 +507,11 @@ fn the_editor_opens_below_the_toolbar_and_inside_a_1180_by_680_window() {
         }
     }
     let top = h.rect("wt:path").top();
-    assert!(top > 56.0, "editor starts at {top}, over the toolbar");
+    let toolbar = h.rect("rack").bottom();
+    assert!(
+        top > toolbar,
+        "editor starts at {top}, over the toolbar ({toolbar})"
+    );
 }
 
 // ---- Clips for listening (not checks): `cargo test -p kabl-ui --test wavetable_editor
