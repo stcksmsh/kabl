@@ -55,6 +55,8 @@ pub struct View {
     last_commit: f64,
     last_pt: Option<(usize, f32)>,
     audition: bool,
+    /// A drag of the position slider is in progress (its undo step is open).
+    pos_open: bool,
 }
 
 /// Opens the editor on `module`'s table: its embedded table, or an editable copy of its factory
@@ -467,6 +469,7 @@ fn body(
     ui.horizontal(|ui| {
         let r = kit::field(ui, st, &mut v.path, "Path to a .wav file", None, Some(420.0));
         ui_state.record("wt:path".into(), r.rect);
+        ui.add_space(st.sp(1));
         if button(ui, st, ui_state, "import", "Import", !v.path.trim().is_empty()) {
             v.read_file();
         }
@@ -629,6 +632,27 @@ fn body(
             v.apply(editor, |v| r.for_each(|k| ed::fade_edges(&mut v.frames[k], FADE)));
         }
     });
+    // The module's own position, to sweep the frames while auditioning.
+    if let Some(id) = v.module {
+        let target = kabl_core::ParamTarget::Module {
+            id,
+            param: "position".into(),
+        };
+        let mut pos = f64::from(editor.state().param(&target).unwrap_or(0.0));
+        ui.horizontal(|ui| {
+            kit::label(ui, st, Role::Caption, Tone::Text3, "Position");
+            let readout = format!("{pos:.2}");
+            let r = kit::slider(ui, st, &mut pos, 0.0..=1.0, None, &readout);
+            ui_state.record("wt:position".into(), r.rect);
+            if r.changed() {
+                editor.set_param_gesture(target, pos as f32, !v.pos_open);
+                v.pos_open = true;
+            }
+            if !r.dragged() {
+                v.pos_open = false;
+            }
+        });
+    }
     ui.horizontal_wrapped(|ui| {
         kit::label(ui, st, Role::Caption, Tone::Text3, "Shift-click a second frame, then fill between:");
         ui.add(egui::DragValue::new(&mut v.steps).range(1..=16).suffix(" new"));

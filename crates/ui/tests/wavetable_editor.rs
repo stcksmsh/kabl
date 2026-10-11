@@ -23,6 +23,10 @@ impl H {
     fn new() -> Self {
         let mut editor = PatchEditor::new();
         let wt = editor.add_module("osc.wt", Vec2 { x: 24.0, y: 20.0 });
+        Self::with(editor, wt)
+    }
+
+    fn with(editor: PatchEditor, wt: u64) -> Self {
         let mut h = H {
             ctx: egui::Context::default(),
             editor,
@@ -374,4 +378,146 @@ fn an_edited_table_survives_save_and_reload() {
         wavetable::decode_canonical(&back.state().tables[&1].wav).unwrap(),
         before
     );
+}
+
+// ---- Clips for listening (not checks): `cargo test -p kabl-ui --test wavetable_editor
+// write_clips -- --ignored` writes target/wt-clips/*.wav. Each table is made through the editor
+// window with real pointer input, then played by the committed `imported-morph` patch with its
+// envelope slowed so one held note sweeps the whole table.
+
+impl H {
+    /// A pen stroke through `points` (fractions of the pen view), one gesture.
+    fn stroke(&mut self, points: &[(f32, f32)]) {
+        let r = self.rect("wt:wave");
+        let at = |(x, y): (f32, f32)| Pos2::new(r.left() + r.width() * x, r.top() + r.height() * y);
+        self.move_to(at(points[0]));
+        self.button(true);
+        for p in &points[1..] {
+            self.t += 0.05;
+            self.move_to(at(*p));
+        }
+        self.button(false);
+        self.settle();
+    }
+
+    fn open_direct(&mut self) {
+        kabl_ui::tables::open(&self.editor, &mut self.ui, self.wt);
+        self.settle();
+    }
+
+    /// Down to one frame, ready to draw on.
+    fn one_frame(&mut self) {
+        while self.ui.tables.frames() > 1 {
+            self.click("wt:delete");
+        }
+    }
+}
+
+fn clip_patch() -> PatchEditor {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../patches/sound-engines/demos/imported-morph");
+    let mut st = kabl_core::load(&dir).unwrap().state().clone();
+    st.tables.clear();
+    for m in st.modules.values_mut().filter(|m| m.kind == "env.adsr") {
+        m.params.insert("attack_ms".into(), 3500.0);
+        m.params.insert("decay_ms".into(), 100.0);
+        m.params.insert("sustain".into(), 1.0);
+        m.params.insert("release_ms".into(), 400.0);
+    }
+    PatchEditor::seed_from(&st)
+}
+
+fn render_clip(editor: &PatchEditor, name: &str, note: u8) {
+    use kabl_engine::graph::BLOCK;
+    use kabl_engine::keyboard::KeyEvent;
+    use kabl_engine::patch_engine::PatchEngine;
+    const SR: f32 = 48000.0;
+    let collector = basedrop::Collector::new();
+    let mut e = PatchEngine::new(&collector.handle(), editor.state(), SR, 8).unwrap();
+    let (mut l, mut r) = ([0f32; BLOCK], [0f32; BLOCK]);
+    let spec = hound::WavSpec {
+        channels: 2,
+        sample_rate: SR as u32,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/wt-clips");
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut w = hound::WavWriter::create(dir.join(format!("{name}.wav")), spec).unwrap();
+    for b in 0..(5.0 * SR) as usize / BLOCK {
+        if b == 0 {
+            e.key(KeyEvent::On { note, velocity: 100 });
+        }
+        if b == (4.0 * SR) as usize / BLOCK {
+            e.key(KeyEvent::Off { note });
+        }
+        e.process_block(&mut l, &mut r);
+        for (a, c) in l.iter().zip(&r) {
+            for v in [a, c] {
+                w.write_sample((v.clamp(-1.0, 1.0) * 32767.0) as i16).unwrap();
+            }
+        }
+    }
+    w.finalize().unwrap();
+}
+
+#[test]
+#[ignore]
+fn write_clips() {
+    // 1. A computed 16-frame table imported through the window: a band of harmonics sweeps up.
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("sweep-16.wav");
+    let samples: Vec<f32> = (0..16 * FRAME)
+        .map(|i| {
+            let (f, s) = (i / FRAME, i % FRAME);
+            let centre = 2.0 + 24.0 * f as f32 / 15.0;
+            let x = std::f32::consts::TAU * s as f32 / FRAME as f32;
+            (1..64)
+                .map(|h| (h as f32 * x).sin() / h as f32 * (-((h as f32 - centre) / 2.5).powi(2)).exp())
+                .sum::<f32>()
+        })
+        .collect();
+    let peak = samples.iter().fold(0.0f32, |m, v| m.max(v.abs()));
+    let samples: Vec<f32> = samples.iter().map(|v| v / peak * 0.9).collect();
+    std::fs::write(&file, wav(&samples)).unwrap();
+    let mut h = H::with(clip_patch(), 2);
+    h.open_direct();
+    h.type_path(file.to_str().unwrap());
+    h.click("wt:import");
+    h.click("wt:use");
+    render_clip(&h.editor, "1-imported-sweep", 48);
+
+    // 2. A table drawn in the editor: a hand-drawn shape, a second shape, then harmonic bars.
+    let mut h = H::with(clip_patch(), 2);
+    h.open_direct();
+    h.one_frame();
+    h.stroke(&[(0.0, 0.5), (0.1, 0.1), (0.3, 0.1), (0.4, 0.5), (0.5, 0.9), (0.7, 0.9), (0.8, 0.5), (1.0, 0.5)]);
+    h.click("wt:insert");
+    h.stroke(&[(0.0, 0.5), (0.02, 0.1), (0.06, 0.9), (0.1, 0.2), (0.14, 0.8), (0.2, 0.3), (0.3, 0.7), (0.5, 0.5), (1.0, 0.5)]);
+    h.click("wt:insert");
+    h.click("wt:tab-bars");
+    let bars = h.rect("wt:bars");
+    for (k, y) in [(0, 0.1), (2, 0.25), (4, 0.15), (6, 0.3), (8, 0.4)] {
+        let p = Pos2::new(bars.left() + bars.width() / 64.0 * (k as f32 + 0.5), bars.top() + bars.height() * y);
+        h.drag(p, p + egui::vec2(0.0, 1.0));
+    }
+    assert_eq!(h.ui.tables.frames(), 3);
+    render_clip(&h.editor, "2-drawn-table", 48);
+
+    // 3. Morph: two drawn frames, six frames morphed between them.
+    let mut h = H::with(clip_patch(), 2);
+    h.open_direct();
+    h.one_frame();
+    h.stroke(&[(0.0, 0.5), (0.25, 0.1), (0.5, 0.5), (0.75, 0.9), (1.0, 0.5)]);
+    h.click("wt:insert");
+    h.stroke(&[(0.0, 0.5), (0.04, 0.05), (0.08, 0.95), (0.12, 0.05), (0.16, 0.95), (0.25, 0.5), (1.0, 0.5)]);
+    let stack = h.rect("wt:stack");
+    h.move_to(Pos2::new(stack.center().x, stack.bottom() - 4.0));
+    h.button(true);
+    h.button(false);
+    h.settle();
+    h.shift_click(Pos2::new(stack.center().x, stack.top() + 4.0));
+    h.click("wt:morph");
+    assert!(h.ui.tables.frames() >= 6, "{}", h.ui.tables.frames());
+    render_clip(&h.editor, "3-morph-filled", 48);
 }

@@ -274,14 +274,18 @@ impl PatchEditor {
             name: kabl_modules::wavetable::table_name(name),
             wav,
         };
-        let mut candidate = self.state().clone();
-        candidate.tables.insert(slot, table.clone());
-        kabl_core::composite::validate(&candidate)?;
-        let size = serde_json::to_vec(&candidate)
-            .map_err(|e| e.to_string())?
-            .len();
-        if size > 2 * 1024 * 1024 - 16 * 1024 {
-            return Err("The sound would be too large to save with this table".into());
+        // A continuing write replaces a table of the same frame count a first write already
+        // checked, so only the first pays for validating and sizing the whole patch.
+        if first {
+            let mut candidate = self.state().clone();
+            candidate.tables.insert(slot, table.clone());
+            kabl_core::composite::validate(&candidate)?;
+            let size = serde_json::to_vec(&candidate)
+                .map_err(|e| e.to_string())?
+                .len();
+            if size > 2 * 1024 * 1024 - 16 * 1024 {
+                return Err("The sound would be too large to save with this table".into());
+            }
         }
         let mut op = Op::SetTable {
             slot,
