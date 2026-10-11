@@ -33,6 +33,7 @@ use kabl_core::PatchState;
 
 use crate::compile::{carry_state, compile, CompileError, CompiledPatch, PendingLaunch};
 use crate::graph::BLOCK;
+use crate::morph::{MacroTarget, Morphs, Pending, MAX_DRIVEN, MAX_MACRO_TARGETS};
 use crate::keyboard::{Action, KeyEvent, Keyboard, MidiEvent, Source};
 use crate::probe::{ProbeReport, ProbeTarget, WINDOW_SECS};
 use crate::runtime::{Feedback, ParamSet, ToAudio};
@@ -59,6 +60,8 @@ pub struct PatchEngine {
     deferred_launches: [Option<PendingLaunch>; MAX_PENDING],
     /// A preview requested for that fresh document waits until it alone is active.
     deferred_preview: Option<Command>,
+    /// Cue macro morphs, outside the graphs for the same reason (`morph.rs`).
+    morphs: Morphs,
     /// `launches` packed, for `process_block_with`.
     packed: [PendingLaunch; MAX_PENDING],
     /// One keyboard per `midi.in` of the playing graph, outside the graphs like the launches
@@ -117,6 +120,10 @@ pub struct Launch {
     pub timing: Timing,
     pub targets: [(kabl_core::ModuleId, u8); MAX_TARGETS],
     pub count: usize,
+    /// Macro targets of the cue, and the morph length in pulses (16ths; 0 = jump).
+    pub macros: [MacroTarget; MAX_MACRO_TARGETS],
+    pub macro_count: usize,
+    pub morph_pulses: f32,
 }
 
 impl Launch {
@@ -133,7 +140,22 @@ impl Launch {
             timing,
             targets: t,
             count,
+            macros: [MacroTarget {
+                id: 0,
+                index: 0,
+                value: 0.0,
+            }; MAX_MACRO_TARGETS],
+            macro_count: 0,
+            morph_pulses: 0.0,
         }
+    }
+
+    /// Adds the macro targets of the cue (at most `MAX_MACRO_TARGETS`) and the morph length.
+    pub fn with_macros(mut self, macros: &[MacroTarget], morph_pulses: f32) -> Self {
+        self.macro_count = macros.len().min(MAX_MACRO_TARGETS);
+        self.macros[..self.macro_count].copy_from_slice(&macros[..self.macro_count]);
+        self.morph_pulses = morph_pulses.max(0.0);
+        self
     }
 }
 
@@ -180,6 +202,7 @@ impl PatchEngine {
         self.active.reset();
         self.launches.fill(None);
         self.deferred_launches.fill(None);
+        self.morphs.clear();
         self.deferred_preview = None;
         self.held_preview = 0;
         self.preview_blocks = 0;
@@ -207,6 +230,7 @@ impl PatchEngine {
             launches: [None; MAX_PENDING],
             deferred_launches: [None; MAX_PENDING],
             deferred_preview: None,
+            morphs: Morphs::default(),
             packed: [NO_LAUNCH; MAX_PENDING],
             keyboards: Default::default(),
             held_preview: 0,
@@ -237,6 +261,7 @@ impl PatchEngine {
             launches: [None; MAX_PENDING],
             deferred_launches: [None; MAX_PENDING],
             deferred_preview: None,
+            morphs: Morphs::default(),
             packed: [NO_LAUNCH; MAX_PENDING],
             keyboards: Default::default(),
             held_preview: 0,
@@ -480,6 +505,7 @@ impl PatchEngine {
         if explicit_load {
             self.launches = [None; MAX_PENDING];
             self.deferred_launches = [None; MAX_PENDING];
+            self.morphs.clear();
             self.deferred_preview = None;
             self.preview_stop();
         }
@@ -637,6 +663,17 @@ impl PatchEngine {
             Timing::NextStep => Some((epoch, next)),
             Timing::NextBar => Some((epoch, next.div_ceil(BAR_TICKS) * BAR_TICKS)),
         };
+        // A cue waiting behind a fresh Load is not playing yet: its macros are not scheduled.
+        if !self.pending.as_ref().is_some_and(|g| g.fresh) {
+            for &target in &l.macros[..l.macro_count.min(MAX_MACRO_TARGETS)] {
+                self.morphs.schedule(Pending {
+                    target,
+                    pulses: l.morph_pulses,
+                    clock: l.clock,
+                    at,
+                });
+            }
+        }
         for &(seq, bank) in &l.targets[..l.count.min(MAX_TARGETS)] {
             self.cancel(Some(seq));
             match at {
@@ -703,6 +740,9 @@ impl PatchEngine {
     /// Audio-thread call: drops the pending launch and the arm of sequencer `seq`, or of every
     /// sequencer. No allocation.
     pub fn cancel(&mut self, seq: Option<kabl_core::ModuleId>) {
+        if seq.is_none() {
+            self.morphs.cancel_pending();
+        }
         for slot in self.launches.iter_mut() {
             if slot.is_some_and(|l| seq.is_none_or(|s| s == l.seq)) {
                 *slot = None;
@@ -765,6 +805,34 @@ impl PatchEngine {
     }
 
     /// Audio-thread call: `CompiledPatch::clocks` of the graph fading in, else the active one.
+    /// Audio-thread call: `f(macro module, output index, value, target, progress)` for every
+    /// macro a cue is driving or holds.
+    pub fn morphs(&self, f: impl FnMut(kabl_core::ModuleId, u8, f32, f32, f32)) {
+        self.morphs.report(f);
+    }
+
+    /// Starts and moves the cue morphs and writes the values into every graph. No allocation.
+    fn drive_morphs(&mut self) {
+        let mut out = [(crate::runtime::RuntimeTarget::Route { cable: 0 }, 0.0); MAX_DRIVEN];
+        let graph = match &self.incoming {
+            Some((g, _)) => g,
+            None => &self.active,
+        };
+        let n = self.morphs.step(graph, &mut out);
+        for &(t, v) in &out[..n] {
+            let mut hit = self.active.drive_runtime(t, v);
+            if let Some((g, _)) = &mut self.incoming {
+                hit |= g.drive_runtime(t, v);
+            }
+            if let Some(g) = &mut self.pending {
+                hit |= g.drive_runtime(t, v);
+            }
+            if !hit {
+                self.morphs.release(t);
+            }
+        }
+    }
+
     pub fn clocks(&self, f: impl FnMut(kabl_core::ModuleId, bool, f64)) {
         match &self.incoming {
             Some((g, _)) => g.clocks(f),
@@ -788,6 +856,7 @@ impl PatchEngine {
         // Settings changed by a runtime value (mode, channel) apply before this block, not
         // only at the next key.
         self.sync_once();
+        self.drive_morphs();
         if self.preview_blocks > 0 {
             self.preview_blocks -= 1;
             if self.preview_blocks == 0 {
@@ -1023,12 +1092,15 @@ impl PatchEngine {
     /// nothing. Returns whether it resolved in any of them. No allocation.
     /// Host playback is transient, independent of document revision and undo history.
     pub fn automate(&mut self, slot: usize, target: crate::runtime::RuntimeTarget, value: f32) {
-        self.active.automate(slot, target, value);
+        let mut changed = self.active.automate(slot, target, value);
         if let Some((g, _)) = &mut self.incoming {
-            g.automate(slot, target, value);
+            changed |= g.automate(slot, target, value);
         }
         if let Some(g) = &mut self.pending {
-            g.automate(slot, target, value);
+            changed |= g.automate(slot, target, value);
+        }
+        if changed {
+            self.morphs.release(target);
         }
     }
 
@@ -1057,6 +1129,9 @@ impl PatchEngine {
         }
         if let Some(g) = self.pending.as_mut() {
             apply(g);
+        }
+        if hit {
+            self.morphs.release(s.target);
         }
         hit
     }
