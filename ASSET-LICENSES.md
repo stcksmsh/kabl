@@ -12,7 +12,7 @@ documents and artwork themselves, and to copies and adaptations of them.
 | Material | Where | Licence |
 |---|---|---|
 | Name "kabl" and the logo: `kabl-logo.svg`, `kabl-mark.svg`, `kabl-logo-mask.png`, `kabl-lockup.svg` and the icon PNGs/SVG derived from them | `crates/ui/assets/logo/`, `packaging/linux/logo/` | **All rights reserved.** Not covered by GPL-3.0. Kabl's owner permits only: copying the files unchanged together with the kabl source or an unmodified kabl binary, and fair reference to kabl. A fork must replace them. See `TRADEMARKS.md`. |
-| Factory patches | `patches/` | CC BY-SA 4.0 (proposal, owner to confirm). Attribution line: "kabl factory patches by <OWNER NAME>". |
+| Factory patches | `patches/` | CC BY-SA 4.0 (proposal, owner to confirm). Attribution line: "kabl factory patches by Kosta Vukićević". |
 | Wavetables `saw-square`, `harmonic-sweep`, `vowels`, `glass-bell`, `digital-hollow` | `crates/modules/assets/wavetables/` | computed by `build.py`; same licence as the code (GPL-3.0-or-later) |
 | Wavetables `epiano`, `organ`, `choir` | same | derived from Adventure Kid Waveforms by Kristoffer Ekstrand, CC0 1.0 (`PROVENANCE.md`); the derived files are offered under the code licence, the CC0 source stays CC0 |
 | IBM Plex Sans and Mono | `crates/ui/assets/*.ttf`, `crates/ui/examples/app_target/fonts/` | SIL OFL 1.1, Copyright 2017-2018 IBM Corp., Reserved Font Name "Plex"; text in `crates/ui/assets/FONT-LICENSE.txt` |

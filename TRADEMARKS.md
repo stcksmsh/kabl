@@ -24,7 +24,7 @@ copyright and are not under the GPL (`ASSET-LICENSES.md`).
 ## A fork must
 
 - Use another name and its own logo.
-- Keep the attribution "Based on kabl by <OWNER NAME>, https://github.com/stcksmsh/kabl" in its
+- Keep the attribution "Based on kabl by Kosta Vukićević, https://github.com/stcksmsh/kabl" in its
   README and in its About or credits screen (`COPYRIGHT`, term (b)).
 - Mark itself as modified (`COPYRIGHT`, term (c)).
 
