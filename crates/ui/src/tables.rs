@@ -24,6 +24,9 @@ const COMMIT_EVERY: f64 = 0.12;
 /// Samples faded at each end by "Fade edges".
 const FADE: usize = 128;
 
+/// Frames of a table, shared.
+type Frames = Arc<Vec<Vec<f32>>>;
+
 struct Pending {
     bytes: Vec<u8>,
     name: String,
@@ -32,7 +35,7 @@ struct Pending {
     /// The whole file as one cycle, when it is short enough to offer ("Whole file").
     whole: Option<usize>,
     /// The frames the import would make (shared, so drawing them each frame copies nothing).
-    result: Result<(Arc<Vec<Vec<f32>>>, ImportInfo), String>,
+    result: Result<(Frames, ImportInfo), String>,
 }
 
 #[derive(Default)]
