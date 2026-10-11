@@ -166,7 +166,9 @@ impl H {
 }
 
 fn wav(samples: &[f32]) -> Vec<u8> {
-    let mut b = b"RIFF\0\0\0\0WAVEfmt \x10\0\0\0\x01\0\x01\0\x44\xac\0\0\x88\x58\x01\0\x02\0\x10\0data".to_vec();
+    let mut b =
+        b"RIFF\0\0\0\0WAVEfmt \x10\0\0\0\x01\0\x01\0\x44\xac\0\0\x88\x58\x01\0\x02\0\x10\0data"
+            .to_vec();
     b.extend((samples.len() as u32 * 2).to_le_bytes());
     for &v in samples {
         b.extend(((v * 32767.0) as i16).to_le_bytes());
@@ -337,8 +339,14 @@ fn broken_files_give_an_error_and_change_nothing() {
         h.type_path(p.to_str().unwrap());
         h.click("wt:import");
         // Either refused at once, or shown as a preview that cannot be used.
-        assert!(h.ui.tables.pending_frames().is_none(), "{name} was accepted");
-        assert!(h.editor.state().tables.is_empty(), "{name} changed the patch");
+        assert!(
+            h.ui.tables.pending_frames().is_none(),
+            "{name} was accepted"
+        );
+        assert!(
+            h.editor.state().tables.is_empty(),
+            "{name} changed the patch"
+        );
     }
     // Missing file, and a directory.
     for p in [dir.path().join("missing.wav"), dir.path().to_path_buf()] {
@@ -446,7 +454,10 @@ fn render_clip(editor: &PatchEditor, name: &str, note: u8) {
     let mut w = hound::WavWriter::create(dir.join(format!("{name}.wav")), spec).unwrap();
     for b in 0..(5.0 * SR) as usize / BLOCK {
         if b == 0 {
-            e.key(KeyEvent::On { note, velocity: 100 });
+            e.key(KeyEvent::On {
+                note,
+                velocity: 100,
+            });
         }
         if b == (4.0 * SR) as usize / BLOCK {
             e.key(KeyEvent::Off { note });
@@ -454,7 +465,8 @@ fn render_clip(editor: &PatchEditor, name: &str, note: u8) {
         e.process_block(&mut l, &mut r);
         for (a, c) in l.iter().zip(&r) {
             for v in [a, c] {
-                w.write_sample((v.clamp(-1.0, 1.0) * 32767.0) as i16).unwrap();
+                w.write_sample((v.clamp(-1.0, 1.0) * 32767.0) as i16)
+                    .unwrap();
             }
         }
     }
@@ -473,7 +485,9 @@ fn write_clips() {
             let centre = 2.0 + 24.0 * f as f32 / 15.0;
             let x = std::f32::consts::TAU * s as f32 / FRAME as f32;
             (1..64)
-                .map(|h| (h as f32 * x).sin() / h as f32 * (-((h as f32 - centre) / 2.5).powi(2)).exp())
+                .map(|h| {
+                    (h as f32 * x).sin() / h as f32 * (-((h as f32 - centre) / 2.5).powi(2)).exp()
+                })
                 .sum::<f32>()
         })
         .collect();
@@ -491,14 +505,36 @@ fn write_clips() {
     let mut h = H::with(clip_patch(), 2);
     h.open_direct();
     h.one_frame();
-    h.stroke(&[(0.0, 0.5), (0.1, 0.1), (0.3, 0.1), (0.4, 0.5), (0.5, 0.9), (0.7, 0.9), (0.8, 0.5), (1.0, 0.5)]);
+    h.stroke(&[
+        (0.0, 0.5),
+        (0.1, 0.1),
+        (0.3, 0.1),
+        (0.4, 0.5),
+        (0.5, 0.9),
+        (0.7, 0.9),
+        (0.8, 0.5),
+        (1.0, 0.5),
+    ]);
     h.click("wt:insert");
-    h.stroke(&[(0.0, 0.5), (0.02, 0.1), (0.06, 0.9), (0.1, 0.2), (0.14, 0.8), (0.2, 0.3), (0.3, 0.7), (0.5, 0.5), (1.0, 0.5)]);
+    h.stroke(&[
+        (0.0, 0.5),
+        (0.02, 0.1),
+        (0.06, 0.9),
+        (0.1, 0.2),
+        (0.14, 0.8),
+        (0.2, 0.3),
+        (0.3, 0.7),
+        (0.5, 0.5),
+        (1.0, 0.5),
+    ]);
     h.click("wt:insert");
     h.click("wt:tab-bars");
     let bars = h.rect("wt:bars");
     for (k, y) in [(0, 0.1), (2, 0.25), (4, 0.15), (6, 0.3), (8, 0.4)] {
-        let p = Pos2::new(bars.left() + bars.width() / 64.0 * (k as f32 + 0.5), bars.top() + bars.height() * y);
+        let p = Pos2::new(
+            bars.left() + bars.width() / 64.0 * (k as f32 + 0.5),
+            bars.top() + bars.height() * y,
+        );
         h.drag(p, p + egui::vec2(0.0, 1.0));
     }
     assert_eq!(h.ui.tables.frames(), 3);
@@ -510,7 +546,15 @@ fn write_clips() {
     h.one_frame();
     h.stroke(&[(0.0, 0.5), (0.25, 0.1), (0.5, 0.5), (0.75, 0.9), (1.0, 0.5)]);
     h.click("wt:insert");
-    h.stroke(&[(0.0, 0.5), (0.04, 0.05), (0.08, 0.95), (0.12, 0.05), (0.16, 0.95), (0.25, 0.5), (1.0, 0.5)]);
+    h.stroke(&[
+        (0.0, 0.5),
+        (0.04, 0.05),
+        (0.08, 0.95),
+        (0.12, 0.05),
+        (0.16, 0.95),
+        (0.25, 0.5),
+        (1.0, 0.5),
+    ]);
     let stack = h.rect("wt:stack");
     h.move_to(Pos2::new(stack.center().x, stack.bottom() - 4.0));
     h.button(true);

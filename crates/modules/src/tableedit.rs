@@ -140,10 +140,7 @@ pub fn fit(frames: &mut [Vec<f32>]) -> bool {
     if p <= 1.0 {
         return false;
     }
-    frames
-        .iter_mut()
-        .flatten()
-        .for_each(|v| *v *= PEAK / p);
+    frames.iter_mut().flatten().for_each(|v| *v *= PEAK / p);
     true
 }
 

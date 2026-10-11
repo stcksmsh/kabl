@@ -153,8 +153,14 @@ fn fill_between_steps_from_one_frame_to_the_other() {
         ed::fill_between(&mut t, 0, 3, spectral);
         let a: Vec<f32> = t.iter().map(|f| ed::harmonics(f)[0]).collect();
         let c: Vec<f32> = t.iter().map(|f| ed::harmonics(f)[2]).collect();
-        assert!(a[0] > 0.49 && a[1] < a[0] && a[2] < a[1] && a[3] < 0.01, "{a:?}");
-        assert!(c[3] > 0.49 && c[2] < c[3] && c[1] < c[2] && c[0] < 0.01, "{c:?}");
+        assert!(
+            a[0] > 0.49 && a[1] < a[0] && a[2] < a[1] && a[3] < 0.01,
+            "{a:?}"
+        );
+        assert!(
+            c[3] > 0.49 && c[2] < c[3] && c[1] < c[2] && c[0] < 0.01,
+            "{c:?}"
+        );
         // Ends untouched.
         assert_eq!(t[0], unit(1));
         assert_eq!(t[3], unit(3));
@@ -177,7 +183,10 @@ fn spectral_morph_of_a_shifted_harmonic_keeps_its_level() {
         .collect();
     let lin = ed::harmonics(&ed::interpolate(&a, &b, 0.5))[0];
     let spec = ed::harmonics(&ed::morph(&a, &b, 0.5))[0];
-    assert!((lin - 0.5 * 0.7071).abs() < 0.01, "{lin}");
+    assert!(
+        (lin - 0.5 * std::f32::consts::FRAC_1_SQRT_2).abs() < 0.01,
+        "{lin}"
+    );
     assert!((spec - 0.5).abs() < 0.01, "{spec}");
 }
 

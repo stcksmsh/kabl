@@ -68,7 +68,9 @@ fn keys(t: Table) -> PatchState {
 }
 
 fn steepest(x: &[f32]) -> f32 {
-    x.windows(2).map(|w| (w[1] - w[0]).abs()).fold(0.0, f32::max)
+    x.windows(2)
+        .map(|w| (w[1] - w[0]).abs())
+        .fold(0.0, f32::max)
 }
 
 #[test]

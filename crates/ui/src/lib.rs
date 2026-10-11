@@ -1897,26 +1897,6 @@ fn draw_module(
             ui_state.expanded.clear();
         }
     }
-    if m.info.kind == "osc.wt" && z >= 0.7 {
-        let edit = Rect::from_center_size(
-            pos2(face.center().x + 72. * z, face.bottom() - 11. * z),
-            vec2(72., 16.) * z,
-        );
-        let r = ui.interact(edit, Id::new(("wt-edit-table", m.id)), Sense::click());
-        ui_state.record(format!("edit-table:{}", m.id), edit);
-        if let Some(font) = kit::face::face_font(&st, style::Role::Caption, z) {
-            painter.text(
-                edit.center(),
-                egui::Align2::CENTER_CENTER,
-                "Edit table",
-                font,
-                if r.hovered() { ink } else { ink2 },
-            );
-        }
-        if r.clicked() {
-            tables::open(editor, ui_state, m.id);
-        }
-    }
     let tag = match choosing {
         Some((_, set)) => {
             let n = set.iter().filter(|on| **on).count();
@@ -1989,6 +1969,40 @@ fn draw_module(
                 ui_state.wants.display(m.id, m.info.kind);
             }
             displays::draw(editor.state(), &st, &ui_state.live, now, painter, xf, m, r);
+            if m.info.kind == "osc.wt" && z >= 0.45 {
+                // A chip in the display's corner opens the table editor.
+                let d = xf.r(r);
+                let chip = Rect::from_min_size(
+                    pos2(d.right() - 30. * z - 3., d.top() + 3.),
+                    vec2(30., 13.) * z,
+                );
+                let hit = ui.interact(chip, Id::new(("wt-edit-table", m.id)), Sense::click());
+                ui_state.record(format!("edit-table:{}", m.id), chip);
+                let (back, ink) = (st.roles.disp_bg, st.roles.disp_text);
+                painter.rect_filled(
+                    chip,
+                    3.,
+                    style::alpha(back, if hit.hovered() { 255 } else { 190 }),
+                );
+                painter.rect_stroke(
+                    chip,
+                    3.,
+                    Stroke::new(1., kit::face::trace_color(&st)),
+                    egui::StrokeKind::Inside,
+                );
+                if let Some(font) = kit::face::face_font(&st, style::Role::Caption, z) {
+                    painter.text(
+                        chip.center(),
+                        egui::Align2::CENTER_CENTER,
+                        "Edit",
+                        font,
+                        ink,
+                    );
+                }
+                if hit.clicked() {
+                    tables::open(editor, ui_state, m.id);
+                }
+            }
         }
     }
     if let Decor::Keys(r) = m.decor {

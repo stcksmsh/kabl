@@ -16,6 +16,7 @@ use kabl_modules::wavetable::{
     self, Detected, ImportInfo, FACTORY_COUNT, FACTORY_NAMES, FRAME, FRAME_CHOICES, MAX_FRAMES,
     MAX_FRAME_SAMPLES,
 };
+use std::sync::Arc;
 
 /// Seconds between table writes while a stroke is down: each write is one compile and
 /// crossfade, and the table's mipmaps are rebuilt for it.
@@ -28,7 +29,10 @@ struct Pending {
     name: String,
     /// `None`: detect the frame length.
     choice: Option<usize>,
-    result: Result<(Vec<Vec<f32>>, ImportInfo), String>,
+    /// The whole file as one cycle, when it is short enough to offer ("Whole file").
+    whole: Option<usize>,
+    /// The frames the import would make (shared, so drawing them each frame copies nothing).
+    result: Result<(Arc<Vec<Vec<f32>>>, ImportInfo), String>,
 }
 
 #[derive(Default)]
@@ -66,7 +70,13 @@ pub fn open(editor: &PatchEditor, ui: &mut UiState, module: ModuleId) {
     let Some(m) = state.modules.get(&module) else {
         return;
     };
-    let user = m.params.get("user").copied().unwrap_or(0.0).round().max(0.0) as u64;
+    let user = m
+        .params
+        .get("user")
+        .copied()
+        .unwrap_or(0.0)
+        .round()
+        .max(0.0) as u64;
     let slot = if (1..=MAX_TABLES).contains(&user) {
         user
     } else if let Some(s) = (1..=MAX_TABLES).find(|s| !state.tables.contains_key(s)) {
@@ -106,7 +116,9 @@ impl View {
     /// Frames the pending import would make, if one is waiting for "Use as table".
     pub fn pending_frames(&self) -> Option<usize> {
         match &self.pending {
-            Some(Pending { result: Ok((f, _)), .. }) => Some(f.len()),
+            Some(Pending {
+                result: Ok((f, _)), ..
+            }) => Some(f.len()),
             _ => None,
         }
     }
@@ -115,7 +127,9 @@ impl View {
         self.module
             .and_then(|id| editor.state().modules.get(&id))
             .and_then(|m| m.params.get("table"))
-            .map_or(0, |&t| t.round().clamp(0.0, (FACTORY_COUNT - 1) as f32) as usize)
+            .map_or(0, |&t| {
+                t.round().clamp(0.0, (FACTORY_COUNT - 1) as f32) as usize
+            })
     }
 
     /// (Re)reads the working copy from the patch, or from the factory table when the slot is empty.
@@ -137,7 +151,9 @@ impl View {
             self.frames = vec![ed::sine()];
         }
         self.sel = self.sel.min(self.frames.len() - 1);
-        self.mark = self.mark.filter(|&m| m < self.frames.len() && m != self.sel);
+        self.mark = self
+            .mark
+            .filter(|&m| m < self.frames.len() && m != self.sel);
         self.dirty = false;
     }
 
@@ -168,7 +184,9 @@ impl View {
     fn apply(&mut self, editor: &mut PatchEditor, f: impl FnOnce(&mut Self)) {
         f(self);
         self.sel = self.sel.min(self.frames.len() - 1);
-        self.mark = self.mark.filter(|&m| m < self.frames.len() && m != self.sel);
+        self.mark = self
+            .mark
+            .filter(|&m| m < self.frames.len() && m != self.sel);
         self.commit(editor, true);
         self.stroke_open = false;
     }
@@ -222,6 +240,7 @@ impl View {
                     bytes,
                     name: wavetable::table_name(&file),
                     choice: None,
+                    whole: None,
                     result: Err(String::new()),
                 };
                 p.refresh();
@@ -242,9 +261,12 @@ impl Pending {
             .map_err(|e| e.to_string())
             .and_then(|(wav, info)| {
                 wavetable::decode_canonical(&wav)
-                    .map(|f| (f, info))
+                    .map(|f| (Arc::new(f), info))
                     .map_err(|e| e.to_string())
             });
+        if let (None, Ok((_, info))) = (self.whole, &self.result) {
+            self.whole = (info.samples <= MAX_FRAME_SAMPLES).then_some(info.samples);
+        }
     }
 
     fn text(info: &ImportInfo) -> String {
@@ -300,7 +322,12 @@ fn stack(
     let step = (inner.height() - amp * 2.0).max(1.0) / n.max(2) as f32;
     let skew = inner.width() * 0.22 / n.max(2) as f32;
     let wave_w = inner.width() * 0.76;
-    let base = |k: usize| pos2(inner.left() + skew * k as f32, inner.bottom() - amp - step * k as f32);
+    let base = |k: usize| {
+        pos2(
+            inner.left() + skew * k as f32,
+            inner.bottom() - amp - step * k as f32,
+        )
+    };
     let lane = |k: usize| {
         let b = base(k);
         Rect::from_min_size(pos2(b.x, b.y - amp), vec2(wave_w, amp * 2.0))
@@ -358,22 +385,28 @@ fn wave(
         let (i0, v0) = v.last_pt.unwrap_or((idx, val));
         let (lo, hi) = (i0.min(idx), i0.max(idx));
         let f = &mut v.frames[v.sel];
-        for i in lo..=hi {
+        for (k, s) in f[lo..=hi].iter_mut().enumerate() {
             let t = if hi == lo {
                 1.0
             } else if i0 <= idx {
-                (i - lo) as f32 / (hi - lo) as f32
+                k as f32 / (hi - lo) as f32
             } else {
-                (hi - i) as f32 / (hi - lo) as f32
+                (hi - lo - k) as f32 / (hi - lo) as f32
             };
-            f[i] = v0 + (val - v0) * t;
+            *s = v0 + (val - v0) * t;
         }
         v.last_pt = Some((idx, val));
         v.dirty = true;
     }
     v.pen(editor, down, now);
     let f = &v.frames[v.sel];
-    kit::face::trace(&p, st, cycle_pts(rect.shrink2(vec2(0.0, 6.0)), f, 512), 1.0, None);
+    kit::face::trace(
+        &p,
+        st,
+        cycle_pts(rect.shrink2(vec2(0.0, 6.0)), f, 512),
+        1.0,
+        None,
+    );
 }
 
 fn bars(
@@ -438,7 +471,12 @@ fn body(
             st,
             Role::H3,
             Tone::Text,
-            format!("{} · {n} frame{} · slot {}", v.name, if n == 1 { "" } else { "s" }, v.slot),
+            format!(
+                "{} · {n} frame{} · slot {}",
+                v.name,
+                if n == 1 { "" } else { "s" },
+                v.slot
+            ),
         );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if button(ui, st, ui_state, "redo", "Redo", true) {
@@ -459,7 +497,8 @@ fn body(
                         count: 1,
                         velocity: 100,
                         blocks: (MAX_PREVIEW_SECS * ui_state.sample_rate
-                            / kabl_engine::graph::BLOCK as f32) as u32,
+                            / kabl_engine::graph::BLOCK as f32)
+                            as u32,
                     });
                 }
                 v.audition = !v.audition;
@@ -467,10 +506,24 @@ fn body(
         });
     });
     ui.horizontal(|ui| {
-        let r = kit::field(ui, st, &mut v.path, "Path to a .wav file", None, Some(420.0));
+        let r = kit::field(
+            ui,
+            st,
+            &mut v.path,
+            "Path to a .wav file",
+            None,
+            Some(420.0),
+        );
         ui_state.record("wt:path".into(), r.rect);
         ui.add_space(st.sp(1));
-        if button(ui, st, ui_state, "import", "Import", !v.path.trim().is_empty()) {
+        if button(
+            ui,
+            st,
+            ui_state,
+            "import",
+            "Import",
+            !v.path.trim().is_empty(),
+        ) {
             v.read_file();
         }
     });
@@ -479,7 +532,7 @@ fn body(
     }
     let mut use_pending = false;
     let mut cancel = false;
-    let mut preview: Option<Vec<Vec<f32>>> = None;
+    let mut preview: Option<Arc<Vec<Vec<f32>>>> = None;
     if let Some(pd) = &mut v.pending {
         match &pd.result {
             Ok((frames, info)) => {
@@ -493,16 +546,13 @@ fn body(
                         "Could be one long cycle instead: pick the frame size below.",
                     );
                 }
-                preview = Some(frames.clone());
+                preview = Some(Arc::clone(frames));
             }
             Err(e) => {
                 kit::label(ui, st, Role::Caption, Tone::Bad, e);
             }
         }
-        let whole = wavetable::import_wav_with(&pd.bytes, None)
-            .ok()
-            .map(|(_, i)| i.samples)
-            .filter(|&s| s <= MAX_FRAME_SAMPLES);
+        let whole = pd.whole;
         let mut choice = pd.choice;
         ui.horizontal(|ui| {
             kit::label(ui, st, Role::Caption, Tone::Text3, "Frame size");
@@ -534,7 +584,12 @@ fn body(
         }
         ui.horizontal(|ui| {
             let ok = pd.result.is_ok();
-            let r = ui.add(Button::new(st, "Use as table").primary().small().enabled(ok));
+            let r = ui.add(
+                Button::new(st, "Use as table")
+                    .primary()
+                    .small()
+                    .enabled(ok),
+            );
             ui_state.record("wt:use".into(), r.rect);
             use_pending = r.clicked();
             cancel = button(ui, st, ui_state, "cancel", "Cancel", true);
@@ -548,7 +603,7 @@ fn body(
         }) = v.pending.take()
         {
             v.apply(editor, |v| {
-                v.frames = frames;
+                v.frames = Arc::try_unwrap(frames).unwrap_or_else(|shared| (*shared).clone());
                 v.name = name;
                 v.sel = 0;
                 v.mark = None;
@@ -559,9 +614,17 @@ fn body(
     }
 
     ui.add_space(st.sp(1));
-    let shown = preview.as_deref().unwrap_or(&v.frames).to_vec();
     ui.horizontal_top(|ui| {
-        stack(ui, st, ui_state, v, &shown, vec2(300.0, 300.0), preview.is_some());
+        let size = vec2(300.0, 300.0);
+        match &preview {
+            Some(frames) => stack(ui, st, ui_state, v, frames, size, true),
+            None => {
+                // The stack reads only the selection from `v`: lend it the frames by value.
+                let frames = std::mem::take(&mut v.frames);
+                stack(ui, st, ui_state, v, &frames, size, false);
+                v.frames = frames;
+            }
+        }
         ui.vertical(|ui| {
             kit::segmented(ui, st, |ui| {
                 let r = kit::seg(ui, st, "Draw", !v.bars);
@@ -614,7 +677,14 @@ fn body(
             v.apply(editor, |v| v.frames.swap(sel, sel - 1));
             v.sel -= 1;
         }
-        if button(ui, st, ui_state, "right", "Move later", editing && sel + 1 < n) {
+        if button(
+            ui,
+            st,
+            ui_state,
+            "right",
+            "Move later",
+            editing && sel + 1 < n,
+        ) {
             v.apply(editor, |v| v.frames.swap(sel, sel + 1));
             v.sel += 1;
         }
@@ -629,7 +699,9 @@ fn body(
         }
         if button(ui, st, ui_state, "fade", "Fade edges", editing) {
             let r = v.range();
-            v.apply(editor, |v| r.for_each(|k| ed::fade_edges(&mut v.frames[k], FADE)));
+            v.apply(editor, |v| {
+                r.for_each(|k| ed::fade_edges(&mut v.frames[k], FADE))
+            });
         }
     });
     // The module's own position, to sweep the frames while auditioning.
@@ -654,11 +726,24 @@ fn body(
         });
     }
     ui.horizontal_wrapped(|ui| {
-        kit::label(ui, st, Role::Caption, Tone::Text3, "Shift-click a second frame, then fill between:");
-        ui.add(egui::DragValue::new(&mut v.steps).range(1..=16).suffix(" new"));
+        kit::label(
+            ui,
+            st,
+            Role::Caption,
+            Tone::Text3,
+            "Shift-click a second frame, then fill between:",
+        );
+        ui.add(
+            egui::DragValue::new(&mut v.steps)
+                .range(1..=16)
+                .suffix(" new"),
+        );
         for (key, text, spectral) in [("interp", "Interpolate", false), ("morph", "Morph", true)] {
             if button(ui, st, ui_state, key, text, editing && can_morph) {
-                let (a, b) = (v.sel.min(v.mark.unwrap_or(0)), v.sel.max(v.mark.unwrap_or(0)));
+                let (a, b) = (
+                    v.sel.min(v.mark.unwrap_or(0)),
+                    v.sel.max(v.mark.unwrap_or(0)),
+                );
                 let steps = v.steps;
                 v.apply(editor, |v| {
                     // Adjacent frames: make room for `steps` new ones between them.
