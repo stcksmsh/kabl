@@ -54,7 +54,13 @@ bench, clip paths, CI run link on the final head. Open a separate draft PR to ma
   real-time priority granted, screenshots in `evidence/standalone/<name>-wet/running.png`, logs beside them.
   Gotcha: pick an Xvfb display number other sessions do not use (96 collided; 143/144 fine).
 
-## Remaining, in order
+## Status: finished (2026-10-11)
+
+README, decisions.md and STATUS.md entries written; origin/master merge was a no-op; one clippy fix (`as_chunks`);
+CI green on PR #25; workspace tests 888 passed, 0 failed, 31 ignored. Only the final report and Kosta's listening
+remain. The list below is the history of what was left at the second checkpoint.
+
+## Remaining at the second checkpoint (all done)
 
 1. Look at the recaptured `faces/eq/light.png` and `faces/filter.formant/light.png`; if fine, done with faces.
 4. Docs: `docs/effects-filters/README.md` (per module: ports, params, method, measured numbers, "listen for" line)
