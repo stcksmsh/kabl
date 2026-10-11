@@ -10,6 +10,8 @@ use std::collections::HashMap;
 
 use egui::{pos2, vec2, Pos2, Rect, Stroke};
 use kabl_core::{ModuleId, PatchState, PortRef};
+use kabl_engine::facetap::{FaceTarget, FaceTargets, MAX_FACE_TAPS};
+use kabl_engine::patch_engine::Command;
 use kabl_modules::{registry, ModuleView, PortDirection};
 
 use crate::kit::face;
@@ -36,10 +38,120 @@ pub struct Live {
     pub taps: HashMap<(ModuleId, u8), LiveTap>,
 }
 
+/// The face-tap targets this frame's drawing asked for, and what was last sent.
+#[derive(Default)]
+pub struct Wants {
+    asked: Vec<FaceTarget>,
+    sent: Option<(Vec<FaceTarget>, f64)>,
+    token: u64,
+    /// Targets are active: the faces repaint while audio runs.
+    pub active: bool,
+}
+
+/// Re-send an unchanged set this often, in case the queue dropped the command.
+const RESEND_SECS: f64 = 2.0;
+
+impl Wants {
+    /// A visible module's own display reads its output 0 and view.
+    pub fn display(&mut self, id: ModuleId, kind: &'static str) {
+        self.asked.push(FaceTarget {
+            module: id,
+            port: 0,
+            kind,
+            view: true,
+        });
+    }
+
+    /// A visible knob's route source.
+    pub fn source(&mut self, state: &PatchState, id: ModuleId, port: &str) {
+        let Some(m) = state.modules.get(&id) else {
+            return;
+        };
+        let Some(info) = registry::info_for(&m.kind) else {
+            return;
+        };
+        let Some(index) = info
+            .ports
+            .iter()
+            .filter(|p| p.direction == PortDirection::Output)
+            .position(|p| p.name == port)
+        else {
+            return;
+        };
+        self.asked.push(FaceTarget {
+            module: id,
+            port: index as u8,
+            kind: info.kind,
+            view: false,
+        });
+    }
+
+    /// End of frame: the command that changes what the engine reads, if any. Nothing is read
+    /// while audio is off or nothing with a display is on screen.
+    pub fn frame(&mut self, audio: bool, now: f64) -> Option<Command> {
+        let mut want: Vec<FaceTarget> = Vec::new();
+        let mut asked = std::mem::take(&mut self.asked);
+        asked.sort_by_key(|t| !t.view);
+        for t in asked {
+            if let Some(w) = want
+                .iter_mut()
+                .find(|w| w.module == t.module && w.port == t.port)
+            {
+                w.view |= t.view;
+            } else if want.len() < MAX_FACE_TAPS {
+                want.push(t);
+            }
+        }
+        if !audio {
+            want.clear();
+        }
+        self.active = !want.is_empty();
+        let changed = self.sent.as_ref().map(|(w, _)| w) != Some(&want);
+        let stale = self
+            .sent
+            .as_ref()
+            .is_some_and(|(w, at)| !w.is_empty() && now - at > RESEND_SECS);
+        if !changed && !stale {
+            return None;
+        }
+        if changed {
+            self.token += 1;
+        }
+        let cmd = Command::Faces((!want.is_empty()).then(|| FaceTargets::new(self.token, &want)));
+        self.sent = Some((want, now));
+        Some(cmd)
+    }
+}
+
 /// Reports older than this are not drawn as live.
 const STALE_SECS: f64 = 0.6;
 
 impl Live {
+    /// Takes one face-tap report.
+    pub fn accept(&mut self, r: &kabl_engine::facetap::FaceReport, now: f64) {
+        for e in &r.entries[..r.n as usize] {
+            if !e.found {
+                self.taps.remove(&(e.module, e.port));
+                continue;
+            }
+            let view = ModuleView {
+                valid: e.view_valid,
+                position: e.position,
+                cycle: e.cycle_f32(),
+            };
+            self.taps.insert(
+                (e.module, e.port),
+                LiveTap {
+                    last: e.last,
+                    min: e.min,
+                    max: e.max,
+                    view,
+                    at: now,
+                },
+            );
+        }
+    }
+
     pub fn tap(&self, id: ModuleId, port: u8, now: f64) -> Option<&LiveTap> {
         self.taps
             .get(&(id, port))

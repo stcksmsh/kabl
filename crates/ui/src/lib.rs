@@ -187,6 +187,7 @@ pub struct UiState {
     pub clock_pos: HashMap<ModuleId, f64>,
     /// What the engine's face taps last reported, for the live displays.
     pub live: displays::Live,
+    pub wants: displays::Wants,
     /// Host owns clock transport in the plugin; standalone defaults to Free.
     pub host_clock: bool,
     /// Transport commands for `main.rs` to send to the audio thread. Runtime only: never in the
@@ -329,6 +330,7 @@ impl Default for UiState {
             clock_running: HashMap::new(),
             clock_pos: HashMap::new(),
             live: displays::Live::default(),
+            wants: displays::Wants::default(),
             host_clock: false,
             transport: Vec::new(),
             delay_status: HashMap::new(),
@@ -564,6 +566,14 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     let now = ui.input(|i| i.time);
     if let Some(c) = ui_state.inspect.frame(editor, ui_state.drawer_open, now) {
         ui_state.launches.push(c);
+    }
+    let audio = ui_state.inspect.audio;
+    if let Some(c) = ui_state.wants.frame(audio, now) {
+        ui_state.launches.push(c);
+    }
+    if ui_state.wants.active {
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_millis(33));
     }
     // Inspecting a control in another bank (a route, a pin, a CC mapping) shows that bank on
     // the face. It never launches it.
@@ -1903,6 +1913,9 @@ fn draw_module(
             _ => None,
         };
         if let Some(r) = scope {
+            if painter.clip_rect().intersects(face) {
+                ui_state.wants.display(m.id, m.info.kind);
+            }
             displays::draw(editor.state(), &st, &ui_state.live, now, painter, xf, m, r);
         }
     }

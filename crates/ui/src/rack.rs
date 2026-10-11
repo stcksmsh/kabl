@@ -1076,6 +1076,9 @@ mod tests {
                             _ => c.geo.bounds(),
                         })
                         .collect();
+                    if let Decor::Display(r) = m.decor {
+                        boxes.push(r);
+                    }
                     boxes.extend(
                         m.jacks.iter().map(|j| {
                             Rect::from_center_size(j.c - vec2(0.0, 10.0), vec2(26.0, 46.0))

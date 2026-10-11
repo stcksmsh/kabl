@@ -568,6 +568,13 @@ pub(crate) fn param_knob(
     let base = base_value(editor.state(), id, param);
     let routes = routes_into(editor.state(), id, param.name);
     let base_n = param.to_norm(base);
+    if painter.clip_rect().contains(center) {
+        for rt in routes.iter().filter(|r| !r.bypass) {
+            ui_state
+                .wants
+                .source(editor.state(), rt.from_id, &rt.from_port);
+        }
+    }
     let key = format!("{id}.{}", param.name);
     let inspected = ui_state.inspected.as_ref() == Some(&(id, param.name.to_string()));
 
@@ -773,6 +780,16 @@ pub(crate) fn param_knob(
                 Stroke::new(2.4 * z, color.lerp_to_gamma(Color32::BLACK, 0.45)),
             );
             painter.circle_filled(tip, 2.2 * z, color);
+        }
+    }
+
+    // Where the modulation puts the knob right now, from the sources' live values.
+    if !routes.is_empty() {
+        let now = ui.input(|i| i.time);
+        if let Some(n) =
+            crate::displays::modulated_norm(&ui_state.live, editor.state(), &routes, base_n, now)
+        {
+            crate::kit::face::live_dot(painter, &ui_state.style, center, rr, n, z);
         }
     }
 
