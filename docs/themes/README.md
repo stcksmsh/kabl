@@ -13,6 +13,23 @@ The file format, the limits and what a theme cannot change are in `docs/design/a
 
 A theme file is treated as untrusted: it is capped at 64 KiB, every value is checked, and a bad value is replaced by the base theme's value with a message. A mode whose text would be hard to read (under 3:1 contrast) is ignored as a whole.
 
+## Captures
+
+`media/` has Satin Studio (left) and Lacquer and Light (right) side by side at 1440x900, light and dark: `simple-*` (reference patch), `dense-*` (Composition), `closeup-*` (FM voice with displays at 100%), `perform-*`, `pattern-*` (cable pattern editor). `effect-faces-<theme>-<mode>.webp` are contact sheets of the nine effect faces. `plugin-1180-*` are the CLAP editor in REAPER 7.75 (theme restored from `settings.toml`, then switched through the menu). `example-midnight-rose-*` is `example/midnight-rose.toml` loaded from the themes folder. The effect faces under `docs/effects-filters/faces/` are re-taken in Satin Studio, light and dark.
+
+## Frame time
+
+`KABL_BENCH_THEME=<id> cargo run --release -p kabl-ui --example bench_chrome 300 live` (dense Composition, 1440x900, rack only, displays animating, audio on; GPU not included). Switching a theme rebuilds one `Style` once; nothing is added per frame beyond a tab flag lookup and one contrast comparison per module palette.
+
+| theme, mode | median | p95 | max |
+|---|---|---|---|
+| Satin Studio light | 4.6 to 5.3 ms | 4.8 to 5.7 | 5.1 to 7.0 |
+| Satin Studio dark | 5.4 to 5.6 ms | 5.7 to 5.9 | 6.3 to 6.5 |
+| Lacquer and Light light | 4.2 to 4.3 ms | 4.5 | 4.7 to 5.1 |
+| Lacquer and Light dark | 4.5 ms | 4.8 to 5.1 | 5.2 to 8.9 |
+
+Three runs each, machine under moderate load (load average 3 to 5); heavily loaded runs earlier showed 10 to 14 ms medians for both themes alike.
+
 ## Capture tooling
 
 All scripts need `target/release/kabl-ui`, Xvfb and xdotool, and run from the repository root. `KABL_THEME=ID[:dark|light]` starts kabl in a theme without changing the remembered choice, so no menu clicking is involved.
