@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 /// Face text smaller than this on screen is left out: it would be noise, and the 11 px floor
 /// would make it collide with its neighbours.
-pub const HIDE_BELOW: f32 = 9.0;
+pub const HIDE_BELOW: f32 = 9.5;
 
 /// The font of a type role at zoom `z`, never below the 11 px floor; `None` when the scaled text
 /// is too small to read.
@@ -140,7 +140,15 @@ pub fn title(
     let cx = face.center().x;
     let y = face.top() + 26.0 * z;
     let mut rect = Rect::NOTHING;
-    if let Some(font) = title_font(st, z) {
+    if let Some(mut font) = title_font(st, z) {
+        // Keep clear of the "+N" chip on the right: a long name steps down a size.
+        let w = p
+            .layout_no_wrap(name.to_string(), font.clone(), ink)
+            .size()
+            .x;
+        if w > face.width() - 100.0 * z {
+            font.size = (font.size * 0.8).max(TEXT_FLOOR);
+        }
         rect = match st.slots.face.title {
             FaceTitle::Centered => {
                 p.text(pos2(cx, y), egui::Align2::CENTER_CENTER, name, font, ink)
