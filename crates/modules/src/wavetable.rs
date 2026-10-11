@@ -193,7 +193,7 @@ impl WaveTable {
 }
 
 /// Complex radix-2 FFT, in place. The inverse includes the 1/n factor.
-fn fft(re: &mut [f64], im: &mut [f64], inverse: bool) {
+pub(crate) fn fft(re: &mut [f64], im: &mut [f64], inverse: bool) {
     let n = re.len();
     let mut j = 0;
     for i in 1..n {
@@ -342,48 +342,104 @@ fn parse_wav(b: &[u8]) -> Result<Wav, TableError> {
 }
 
 /// One cycle of any length resampled to `FRAME` samples, band-limited to 512 harmonics, DC
-/// removed.
+/// removed. A power-of-two cycle goes through one FFT; any other length through a direct DFT
+/// (`import_wav_with` limits how much of those it accepts).
 fn resample_cycle(cycle: &[f64]) -> Vec<f64> {
     let n = cycle.len();
     let h_max = (n / 2).saturating_sub(1).min(MAX_HARMONICS);
-    let cos: Vec<f64> = (0..n)
-        .map(|k| (2.0 * std::f64::consts::PI * k as f64 / n as f64).cos())
-        .collect();
-    let sin: Vec<f64> = (0..n)
-        .map(|k| (2.0 * std::f64::consts::PI * k as f64 / n as f64).sin())
-        .collect();
     let mut re = vec![0.0; FRAME];
     let mut im = vec![0.0; FRAME];
-    for h in 1..=h_max {
-        let (mut a, mut b) = (0.0, 0.0);
-        for (i, &x) in cycle.iter().enumerate() {
-            let k = (h * i) % n;
-            a += x * cos[k];
-            b -= x * sin[k];
+    let scale = FRAME as f64 / n as f64;
+    if n.is_power_of_two() {
+        let mut a = cycle.to_vec();
+        let mut b = vec![0.0; n];
+        fft(&mut a, &mut b, false);
+        for h in 1..=h_max {
+            (re[h], im[h]) = (a[h] * scale, b[h] * scale);
+            (re[FRAME - h], im[FRAME - h]) = (re[h], -im[h]);
         }
-        re[h] = a / n as f64 * FRAME as f64;
-        im[h] = b / n as f64 * FRAME as f64;
-        re[FRAME - h] = re[h];
-        im[FRAME - h] = -im[h];
+    } else {
+        let cos: Vec<f64> = (0..n)
+            .map(|k| (2.0 * std::f64::consts::PI * k as f64 / n as f64).cos())
+            .collect();
+        let sin: Vec<f64> = (0..n)
+            .map(|k| (2.0 * std::f64::consts::PI * k as f64 / n as f64).sin())
+            .collect();
+        for h in 1..=h_max {
+            let (mut a, mut b) = (0.0, 0.0);
+            for (i, &x) in cycle.iter().enumerate() {
+                let k = (h * i) % n;
+                a += x * cos[k];
+                b -= x * sin[k];
+            }
+            re[h] = a * scale;
+            im[h] = b * scale;
+            re[FRAME - h] = re[h];
+            im[FRAME - h] = -im[h];
+        }
     }
     fft(&mut re, &mut im, true);
     re
 }
 
-/// Reads any supported .wav into canonical table bytes: 1-64 frames of 2048 samples, 16-bit
-/// mono, peak-normalised. A `clm ` chunk (Serum convention) names the frame length; without
-/// one, a file whose length is a multiple of 2048 is that many frames and anything else is one
-/// cycle, resampled. Pure computation: no I/O, no state.
-pub fn import_wav(bytes: &[u8]) -> Result<Vec<u8>, TableError> {
+/// How `import_wav_with` chose the frame length.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Detected {
+    /// A `clm ` chunk (Serum, Vital) named it.
+    Clm,
+    /// No chunk; the file is a multiple of 2048 samples.
+    Multiple,
+    /// No chunk and not a multiple of 2048: the whole file is one cycle.
+    Cycle,
+    /// The caller named it.
+    Chosen,
+}
+
+/// What an import did: for showing the user, so a wrong guess is visible and can be corrected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ImportInfo {
+    /// Samples (channels averaged) in the file.
+    pub samples: usize,
+    pub frame_len: usize,
+    pub frames: usize,
+    pub detected: Detected,
+    /// Samples left over after the last whole frame (dropped; only with a chosen length).
+    pub dropped: usize,
+}
+
+impl ImportInfo {
+    /// True when another reading is plausible: a multiple of 2048 with no `clm ` chunk might be
+    /// one long cycle rather than several frames.
+    pub fn ambiguous(&self) -> bool {
+        self.detected == Detected::Multiple && self.frames > 1
+    }
+}
+
+/// Frame lengths the interface offers to correct a wrong guess.
+pub const FRAME_CHOICES: [usize; 7] = [256, 512, 1024, 2048, 4096, 8192, 16384];
+/// A non-power-of-two frame length costs a direct DFT; this many samples in all is the most
+/// one import accepts that way (about 33 million multiply-adds).
+const MAX_DFT_SAMPLES: usize = 65536;
+
+/// `import_wav` with the frame length either detected (`None`) or chosen (`Some(len)`: the file is
+/// cut into whole frames of `len` samples, a shorter tail is dropped), plus a report.
+pub fn import_wav_with(
+    bytes: &[u8],
+    frame_len: Option<usize>,
+) -> Result<(Vec<u8>, ImportInfo), TableError> {
     let wav = parse_wav(bytes)?;
     let n = wav.samples.len();
     if n < 16 {
         return Err(TableError::TooShort);
     }
-    let frame_len = match wav.frame_len {
-        Some(f) if (16..=n).contains(&f) && n % f == 0 => f,
-        _ if n >= FRAME && n % FRAME == 0 => FRAME,
-        _ => n,
+    let (frame_len, detected) = match frame_len {
+        Some(f) if (16..=n).contains(&f) => (f, Detected::Chosen),
+        Some(_) => return Err(TableError::TooShort),
+        None => match wav.frame_len {
+            Some(f) if (16..=n).contains(&f) && n % f == 0 => (f, Detected::Clm),
+            _ if n >= FRAME && n % FRAME == 0 => (FRAME, Detected::Multiple),
+            _ => (n, Detected::Cycle),
+        },
     };
     if frame_len > MAX_FRAME_SAMPLES {
         return Err(TableError::FrameTooLong(frame_len));
@@ -391,6 +447,11 @@ pub fn import_wav(bytes: &[u8]) -> Result<Vec<u8>, TableError> {
     let count = n / frame_len;
     if count > MAX_FRAMES {
         return Err(TableError::TooManyFrames(count));
+    }
+    if !frame_len.is_power_of_two() && count * frame_len > MAX_DFT_SAMPLES {
+        return Err(TableError::Unsupported(format!(
+            "{count} frames of {frame_len} samples; use a power-of-two frame length"
+        )));
     }
     let frames: Vec<Vec<f64>> = wav
         .samples
@@ -401,12 +462,26 @@ pub fn import_wav(bytes: &[u8]) -> Result<Vec<u8>, TableError> {
     if peak < 1e-9 {
         return Err(TableError::Silent);
     }
-    let _ = (wav.bits, wav.channels);
     let frames: Vec<Vec<f32>> = frames
         .iter()
         .map(|f| f.iter().map(|&v| (v / peak * 0.98) as f32).collect())
         .collect();
-    Ok(canonical_wav(&frames))
+    let info = ImportInfo {
+        samples: n,
+        frame_len,
+        frames: count,
+        detected,
+        dropped: n - count * frame_len,
+    };
+    Ok((canonical_wav(&frames), info))
+}
+
+/// Reads any supported .wav into canonical table bytes: 1-64 frames of 2048 samples, 16-bit
+/// mono, peak-normalised. A `clm ` chunk (Serum convention) names the frame length; without
+/// one, a file whose length is a multiple of 2048 is that many frames and anything else is one
+/// cycle, resampled. Pure computation: no I/O, no state.
+pub fn import_wav(bytes: &[u8]) -> Result<Vec<u8>, TableError> {
+    import_wav_with(bytes, None).map(|(wav, _)| wav)
 }
 
 /// A table name safe to embed (`kabl_core::Table::validate`): the file name with anything but
