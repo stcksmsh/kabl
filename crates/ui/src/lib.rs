@@ -11,6 +11,7 @@
 //! choice that is saved with the patch is each module's face (primary controls), stored as
 //! `face.*` params that the compiler never reads (`rack::FACE_PREFIX`).
 
+pub mod about;
 pub mod banks;
 pub mod browser;
 pub mod compare;
@@ -181,6 +182,8 @@ pub struct UiState {
     pub selected_route: Option<CableId>,
     /// The cable whose pattern and probability the drawer edits (`routing::cable_panel`).
     pub cable_fn: Option<CableId>,
+    /// The About box.
+    pub about: about::About,
     /// Output jack being dragged toward a knob or input.
     port_drag: Option<PortRef>,
     /// Jack cable whose plug is being pulled out of its input (moved or removed on release).
@@ -354,6 +357,7 @@ impl Default for UiState {
             inspected: None,
             selected_route: None,
             cable_fn: None,
+            about: about::About::default(),
             port_drag: None,
             unplug: None,
             drag: None,
@@ -604,6 +608,7 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     let st = ui_state.style.clone();
     kit::apply(ui.ctx(), &st);
     composites::panel(editor, ui_state, ui.ctx());
+    about::show(ui.ctx(), ui_state);
     panels::editor(editor, ui_state, ui.ctx());
     rack_editor::edit_face(editor, ui_state, ui.ctx());
     browser::frame_input(editor, ui_state, ui);
@@ -1108,6 +1113,14 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
                         ui_state.skin_labels_on_art = on_art.then_some(true);
                     }
                 });
+                kit::gap(ui, st, 1);
+                kit::rule(ui, st);
+                let r = kit::menu_item(ui, st, "About kabl...", false);
+                ui_state.record("menu:about".into(), r.rect);
+                if r.clicked() {
+                    ui_state.about.open = true;
+                    ui.close();
+                }
             })
             .tip(st, "Theme and view settings");
             ui_state.record("view-menu".into(), menu.rect);
