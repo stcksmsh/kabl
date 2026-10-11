@@ -306,6 +306,20 @@ pub fn standing(cue: &Cue, bank_of: &dyn Fn(ModuleId) -> (usize, Option<usize>))
     (all && !waiting, all && waiting)
 }
 
+/// `standing` for the drawn cues: a cue with no sequencer has no banks to show it playing, so
+/// it counts as active once it was the last one launched (`last`).
+pub fn standing_now(
+    cue: &Cue,
+    bank_of: &dyn Fn(ModuleId) -> (usize, Option<usize>),
+    last: Option<usize>,
+) -> (bool, bool) {
+    if cue.targets.is_empty() {
+        (last == Some(cue.n), false)
+    } else {
+        standing(cue, bank_of)
+    }
+}
+
 /// Ops removing every cue and launch-setting reference to module `removed` (a sequencer's cue
 /// entries, a cue's or a sequencer's reference clock), for deleting it in the same undo step.
 pub fn references_to(state: &PatchState, removed: ModuleId) -> Vec<Op> {

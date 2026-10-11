@@ -71,3 +71,32 @@ fn factory_frames_decode_for_drawing() {
             .all(|f| f.len() == wavetable::FRAME && f.iter().all(|v| v.is_finite())));
     }
 }
+
+#[test]
+fn lfo_shows_its_phase() {
+    let mut r = Rig::new("lfo", &[("rate_hz", 1.0)], SR);
+    r.render(12000, 0, |_, _| 0.0);
+    let v = view(&r);
+    assert!(v.valid);
+    assert!((v.position - 0.25).abs() < 0.01, "{}", v.position);
+}
+
+#[test]
+fn envelope_shows_its_stage() {
+    let params = [
+        ("attack_ms", 10.0),
+        // A short decay: a long one stops within f32 rounding of the sustain level and the
+        // stage stays Decay (the level, the output, is right either way).
+        ("decay_ms", 5.0),
+        ("sustain", 0.5),
+        ("release_ms", 400.0),
+    ];
+    let mut r = Rig::new("env.adsr", &params, SR);
+    assert_eq!(view(&r).position, 0.0, "idle");
+    r.render(240, 0, |_, _| 1.0);
+    assert_eq!(view(&r).position, 1.0, "attack");
+    r.render(240000, 0, |_, _| 1.0);
+    assert_eq!(view(&r).position, 3.0, "sustain");
+    r.render(2400, 0, |_, _| 0.0);
+    assert_eq!(view(&r).position, 4.0, "release");
+}

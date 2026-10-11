@@ -10,3 +10,6 @@ license.workspace = true
 # Only to verify a skin's embedded PNG actually decodes (crates/modules/tests/skin.rs) -- the
 # crate itself stays UI-framework/image-library-agnostic, see skin.rs's module doc.
 image = { version = "0.25", default-features = false, features = ["png"] }
+# Proves the audio path of the effects allocates nothing (crates/modules/tests/effects.rs); the
+# engine, ui and clap crates already depend on it.
+assert_no_alloc = "1.1.2"

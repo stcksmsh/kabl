@@ -1,0 +1,8 @@
+kabl-ui: start kabl-ui 0.1.0 (commit 964e8ca70668) level=INFO log=/home/stcksmsh/.local/state/kabl/logs/kabl.log
+kabl-ui: factory sounds: /secondary/Programming/Github/kabl/.worktrees/sound-engines-2/patches; your sounds: /home/stcksmsh/.local/share/kabl/sounds
+kabl-ui: no MIDI input matched None
+kabl-ui: backend=Alsa requested rate=None frames=None rt=true
+kabl-ui: device=Some("Default Audio Device") rate=48000 channels=2 buffer=Default
+kabl-ui: error setting XSETTINGS; Xft options won't reload automatically
+kabl-ui: XRandR reported that the display's 0mm in size, which is certifiably insane
+kabl-ui: real-time priority granted

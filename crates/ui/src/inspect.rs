@@ -947,9 +947,11 @@ pub fn diagnose(state: &PatchState, focus: Option<ModuleId>, cx: &Context) -> Di
 /// (checked on its own) need nothing here.
 pub fn needed_inputs(kind: &str) -> &'static [&'static [&'static str]] {
     match kind {
-        "vca" | "filter.svf" | "filter.ladder" | "delay" | "drive" | "gain" => &[&["in"]],
+        "vca" | "filter.svf" | "filter.ladder" | "filter.comb" | "filter.formant" | "delay"
+        | "drive" | "gain" => &[&["in"]],
         "mixer" => &[&["in1", "in2", "in3", "in4"]],
-        "reverb" | "chorus" => &[&["in_l", "in_r"]],
+        "reverb" | "chorus" | "phaser" | "flanger" | "compressor" | "eq" | "limiter"
+        | "bitcrusher" => &[&["in_l", "in_r"]],
         "ringmod" => &[&["a"], &["b"]],
         _ => &[],
     }

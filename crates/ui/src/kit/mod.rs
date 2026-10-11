@@ -7,6 +7,7 @@
 
 mod containers;
 mod controls;
+pub mod face;
 mod icons;
 mod recipes;
 

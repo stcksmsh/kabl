@@ -97,6 +97,12 @@ try:
         click('perform-size', 1)
         click(verse)
         time.sleep(4.0)
+    # The rack face of the cues module, a macro-only cue playing.
+    theme('light')
+    click(verse)
+    time.sleep(3.0)
+    click('perform-size', 1)  # dock Perform under the rack: the rack shows again
+    shot('07-light-rack-cues-face.png')
 finally:
     if app:
         app.terminate()

@@ -395,3 +395,20 @@ fn deleting_a_macro_module_drops_its_cue_targets_and_undo_restores_them() {
         vec![(m, 0, 0.3)]
     );
 }
+
+#[test]
+fn a_cue_without_sequencers_is_playing_once_launched() {
+    let cue = cues::Cue {
+        n: 2,
+        name: "x".into(),
+        clock: Some(CLOCK),
+        timing: Timing::NextBar,
+        targets: Vec::new(),
+        macros: vec![(9, 0, 0.5)],
+        morph_beats: 0.0,
+    };
+    let now = |_: ModuleId| (0, None);
+    assert_eq!(cues::standing_now(&cue, &now, None), (false, false));
+    assert_eq!(cues::standing_now(&cue, &now, Some(1)), (false, false));
+    assert_eq!(cues::standing_now(&cue, &now, Some(2)), (true, false));
+}

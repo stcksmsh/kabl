@@ -5,11 +5,11 @@ directory (`python3 -I build.py CACHE_DIR`). Nothing here comes from Surge XT or
 
 | File | Name in kabl | Frames | Source | Licence |
 |---|---|---|---|---|
-| `saw-square.wav` | Saw to Square | 16 | computed by `build.py`: even harmonics faded out of a saw | MIT OR Apache-2.0 (original) |
-| `harmonic-sweep.wav` | Harmonic Sweep | 32 | computed: sine growing to a 32-harmonic saw, one harmonic per frame | MIT OR Apache-2.0 (original) |
-| `vowels.wav` | Vowels | 16 | computed: a/e/i/o/u by formant envelopes (Peterson & Barney 1952 average male formant frequencies, facts not expression) on a 110 Hz source | MIT OR Apache-2.0 (original) |
-| `glass-bell.wav` | Glass Bell | 16 | computed: 1:3 phase modulation, index 0 to 7 | MIT OR Apache-2.0 (original) |
-| `digital-hollow.wav` | Digital Hollow | 16 | computed: saw with a moving comb on its harmonics | MIT OR Apache-2.0 (original) |
+| `saw-square.wav` | Saw to Square | 16 | computed by `build.py`: even harmonics faded out of a saw | GPL-3.0-or-later (original) |
+| `harmonic-sweep.wav` | Harmonic Sweep | 32 | computed: sine growing to a 32-harmonic saw, one harmonic per frame | GPL-3.0-or-later (original) |
+| `vowels.wav` | Vowels | 16 | computed: a/e/i/o/u by formant envelopes (Peterson & Barney 1952 average male formant frequencies, facts not expression) on a 110 Hz source | GPL-3.0-or-later (original) |
+| `glass-bell.wav` | Glass Bell | 16 | computed: 1:3 phase modulation, index 0 to 7 | GPL-3.0-or-later (original) |
+| `digital-hollow.wav` | Digital Hollow | 16 | computed: saw with a moving comb on its harmonics | GPL-3.0-or-later (original) |
 | `epiano.wav` | Electric Piano | 16 | Adventure Kid Waveforms, folder `AKWF/AKWF_epiano`, cycles 1, 6, 11, 15, 20, 25, 30, 35, 39, 44, 49, 54, 59, 63, 68, 73 | CC0 1.0 |
 | `organ.wav` | Organ | 16 | Adventure Kid Waveforms, folder `AKWF/AKWF_eorgan`, cycles 1, 11, 21, 32, 42, 52, 62, 72, 83, 93, 103, 113, 123, 134, 144, 154 | CC0 1.0 |
 | `choir.wav` | Choir | 16 | Adventure Kid Waveforms, folder `AKWF/AKWF_hvoice`, cycles 1, 8, 15, 22, 28, 35, 42, 49, 56, 63, 70, 77, 83, 90, 97, 104 | CC0 1.0 |

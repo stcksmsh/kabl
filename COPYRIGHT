@@ -1,0 +1,31 @@
+kabl
+Copyright (C) 2026 <OWNER NAME: Kosta to confirm the exact name to print>
+
+kabl is free software: you can redistribute it and/or modify it under the terms of the GNU
+General Public License as published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+kabl is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even
+the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+Public License (the file LICENSE) for more details.
+
+Additional terms under section 7 of the GNU General Public License version 3
+---------------------------------------------------------------------------
+These terms apply to the kabl source code and to binaries built from it. They are limited to what
+section 7 permits. A recipient may remove any further restriction, as section 7 says, but not
+these.
+
+(b) Attribution. A copy or modified version must keep this notice, the file LICENSE and the
+    copyright lines of the files, and must say, in its README and in any About or credits screen
+    the program has: "Based on kabl by <OWNER NAME>, https://github.com/stcksmsh/kabl".
+(c) Modified versions must be marked as such and must not be presented as the original kabl. The
+    modified version needs a name that is not "kabl" and not confusingly similar to it.
+(d) The names of the copyright holder and of the author may not be used to promote a modified
+    version without written permission.
+(e) No right is granted under trademark law to use the name "kabl" or the kabl logo. See
+    TRADEMARKS.md.
+
+The factory patches, the logo and the documentation are not covered by the licence of the code.
+See ASSET-LICENSES.md.
+
+Music made with kabl belongs to the person who made it. This licence puts no condition on it.

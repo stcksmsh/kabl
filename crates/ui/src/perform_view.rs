@@ -704,13 +704,7 @@ fn cues_card(
         };
         let standing: Vec<(bool, bool)> = all
             .iter()
-            .map(|c| {
-                if c.targets.is_empty() {
-                    (ui_state.last_cue.get(&id) == Some(&c.n), false)
-                } else {
-                    crate::cues::standing(c, &bank_of)
-                }
-            })
+            .map(|c| crate::cues::standing_now(c, &bank_of, ui_state.last_cue.get(&id).copied()))
             .collect();
         let current = all.iter().zip(&standing).find(|(_, s)| s.0).map(|(c, _)| c);
         let any_queued = standing.iter().any(|s| s.1);
@@ -1078,7 +1072,7 @@ fn midi_row(
                 let arrow = match t.hw {
                     Some(h) if h < at => "↑",
                     Some(_) => "↓",
-                    None => "→",
+                    None => "↔",
                 };
                 (
                     format!("{arrow} {:.0}%", at * 100.0),

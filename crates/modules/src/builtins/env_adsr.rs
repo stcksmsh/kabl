@@ -25,6 +25,7 @@ use crate::info::{
 };
 use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig, StateReader, StateWriter};
+use crate::view::ModuleView;
 
 const PORTS: &[PortInfo] = &[
     PortInfo {
@@ -193,6 +194,13 @@ impl Module for EnvAdsr {
             }
             *sample = self.env.next(g);
         }
+    }
+
+    /// The stage the envelope is in (0 idle, 1 attack, 2 decay, 3 sustain, 4 release), for the
+    /// face's playhead.
+    fn view(&self, out: &mut ModuleView) {
+        out.valid = true;
+        out.position = f32::from(self.env.stage.to_u8());
     }
 
     fn reset(&mut self) {

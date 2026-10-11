@@ -32,6 +32,7 @@ fn note_now(event: KeyEvent) -> Note {
         MidiEvent::new(Source::Controller, 0, event),
     )
 }
+use kabl_engine::facetap::FaceReport;
 use kabl_engine::patch_engine::PatchEngine;
 use kabl_engine::probe::ProbeReport;
 use kabl_engine::runtime::{Feedback, ToAudio};
@@ -137,6 +138,7 @@ struct AudioHost {
     timing: Option<Arc<CallbackTiming>>,
     /// Selected-signal measurements from the audio callback (D03).
     probe_rx: Option<rtrb::Consumer<ProbeReport>>,
+    face_rx: Option<rtrb::Consumer<FaceReport>>,
     /// Stream errors except bare xruns, moved out of the error callback unformatted (it runs
     /// on the audio thread); logged here. Declared after `_stream` so the stream (and the
     /// producer in its error callback) goes first on teardown: queued errors are then freed
@@ -423,6 +425,7 @@ impl AudioHost {
             recorder: None,
             timing: None,
             probe_rx: None,
+            face_rx: None,
             faults_rx: None,
             applied_rx: None,
             _stream: None,
@@ -546,6 +549,7 @@ impl AudioHost {
         engine.active_mut().generation = 1;
         engine.active_mut().rev = 1;
         let (mut probe_tx, probe_rx) = rtrb::RingBuffer::<ProbeReport>::new(8);
+        let (mut face_tx, face_rx) = rtrb::RingBuffer::<FaceReport>::new(4);
         let (mut faults_tx, faults_rx) =
             rtrb::RingBuffer::<cpal::Error>::new(kabl_standalone::STREAM_ERROR_QUEUE);
 
@@ -694,6 +698,9 @@ impl AudioHost {
                 if let Some(r) = engine.take_probe_report() {
                     let _ = probe_tx.push(r);
                 }
+                if let Some(r) = engine.take_face_report() {
+                    let _ = face_tx.push(r);
+                }
 
                 let want = audio_gate.load(Ordering::Relaxed);
                 if want != 0 && want != u64::MAX {
@@ -795,6 +802,7 @@ impl AudioHost {
             recorder: stream.is_some().then_some(recorder),
             timing: stream.is_some().then_some(timing),
             probe_rx: stream.is_some().then_some(probe_rx),
+            face_rx: stream.is_some().then_some(face_rx),
             faults_rx: stream.is_some().then_some(faults_rx),
             applied_rx: (stream.is_some() && measure).then_some(applied_rx),
             _stream: stream,
@@ -1865,6 +1873,11 @@ impl eframe::App for App {
                 let age =
                     played.saturating_sub(r.end_sample) as f64 / self.audio.sample_rate as f64;
                 ui_state.inspect.accept(r, now, age);
+            }
+        }
+        if let Some(rx) = self.audio.face_rx.as_mut() {
+            while let Ok(r) = rx.pop() {
+                ui_state.live.accept(&r, now);
             }
         }
         self.log_health();

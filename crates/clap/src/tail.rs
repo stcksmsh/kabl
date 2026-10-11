@@ -46,7 +46,21 @@ fn finite_route(
     };
     if !matches!(
         module.kind.as_str(),
-        "out" | "gain" | "mixer" | "vca" | "delay" | "reverb" | "chorus" | "drive" | "ringmod"
+        "out"
+            | "gain"
+            | "mixer"
+            | "vca"
+            | "delay"
+            | "reverb"
+            | "chorus"
+            | "drive"
+            | "ringmod"
+            | "phaser"
+            | "flanger"
+            | "compressor"
+            | "eq"
+            | "limiter"
+            | "bitcrusher"
     ) {
         visiting.remove(&id);
         return false;

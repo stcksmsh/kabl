@@ -35,7 +35,8 @@ type PreparedSession = (
     rtrb::Consumer<RuntimeReport>,
     rtrb::Producer<(automation::Bank, automation::Bank)>,
 );
-// Fixed 256-slot queue (~140 KiB). Inline probe snapshots keep audio allocation-free.
+// Fixed 256-slot queue (about 640 KiB, allocated once). Inline probe and face snapshots keep
+// audio allocation-free.
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Copy)]
 enum RuntimeReport {
@@ -45,6 +46,7 @@ enum RuntimeReport {
     Lfo(u64, kabl_modules::builtins::LfoSync),
     Morph(u64, u8, f32, f32, f32),
     Probe(kabl_engine::probe::ProbeReport),
+    Faces(kabl_engine::facetap::FaceReport),
 }
 
 #[derive(Params)]
@@ -171,6 +173,7 @@ impl Control {
                         sample_clock.saturating_sub(report.end_sample) as f64 / self.rate as f64;
                     self.view.inspect.accept(report, now, age);
                 }
+                RuntimeReport::Faces(report) => self.view.live.accept(&report, now),
             }
         }
     }
@@ -181,6 +184,7 @@ impl Control {
         self.view.delay_status.clear();
         self.view.lfo_status.clear();
         self.view.macro_live.clear();
+        self.view.live.taps.clear();
         self.view.inspect.reset_audio_session(0.0);
     }
     fn pump(&mut self) -> bool {
@@ -1007,6 +1011,9 @@ impl Instrument {
         });
         if let Some(report) = s.engine.take_probe_report() {
             let _ = reports.push(RuntimeReport::Probe(report));
+        }
+        if let Some(report) = s.engine.take_face_report() {
+            let _ = reports.push(RuntimeReport::Faces(report));
         }
         for (l, r) in left.iter_mut().zip(right) {
             *l *= s.gain;
