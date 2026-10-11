@@ -2211,6 +2211,7 @@ fn main() -> eframe::Result<()> {
         log::warn!(target: "app", "unknown log level {w:?}: using info");
     }
     let mut ui_state = UiState::default();
+    ui_state.use_user_prefs();
     let library = kabl_ui::browser::open_library();
     log::info!(
         target: "library",
