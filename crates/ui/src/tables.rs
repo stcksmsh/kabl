@@ -16,7 +16,8 @@ use kabl_modules::wavetable::{
     self, Detected, ImportInfo, FACTORY_COUNT, FACTORY_NAMES, FRAME, FRAME_CHOICES, MAX_FRAMES,
     MAX_FRAME_SAMPLES,
 };
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
+use std::sync::{mpsc, Arc};
 
 /// Seconds between table writes while a stroke is down: each write is one compile and
 /// crossfade, and the table's mipmaps are rebuilt for it.
@@ -26,6 +27,97 @@ const FADE: usize = 128;
 
 /// Frames of a table, shared.
 type Frames = Arc<Vec<Vec<f32>>>;
+
+/// Rows the file browser shows for one folder (a folder with more is cut, and says so).
+const MAX_ENTRIES: usize = 2000;
+/// Directory entries one listing looks at before it gives up (a folder of millions of files).
+const MAX_SCANNED: usize = 100_000;
+
+/// One row of the file browser: a folder, or a .wav file.
+struct Entry {
+    name: String,
+    dir: bool,
+}
+
+/// A folder's rows (and whether the list was cut), or why it could not be read.
+type Listing = Result<(Vec<Entry>, bool), String>;
+
+/// The file browser: one folder, listed on a thread of its own so a slow or huge folder (a
+/// network share) never holds the interface or, in a plugin, the host's window.
+struct Browse {
+    dir: PathBuf,
+    rx: Option<mpsc::Receiver<Listing>>,
+    listing: Option<Listing>,
+}
+
+impl Browse {
+    fn new(dir: PathBuf) -> Self {
+        let (tx, rx) = mpsc::channel();
+        let there = dir.clone();
+        std::thread::spawn(move || {
+            let _ = tx.send(list(&there));
+        });
+        Browse {
+            dir,
+            rx: Some(rx),
+            listing: None,
+        }
+    }
+
+    fn poll(&mut self) {
+        let Some(rx) = &self.rx else { return };
+        match rx.try_recv() {
+            Ok(l) => self.listing = Some(l),
+            Err(mpsc::TryRecvError::Empty) => return,
+            Err(mpsc::TryRecvError::Disconnected) => {
+                self.listing = Some(Err("the folder could not be read".into()))
+            }
+        }
+        self.rx = None;
+    }
+}
+
+/// Folders first, then .wav files, each by name without regard to case; hidden names left out.
+fn list(dir: &Path) -> Listing {
+    let mut rows = Vec::new();
+    let mut cut = false;
+    for (seen, entry) in std::fs::read_dir(dir)
+        .map_err(|e| e.to_string())?
+        .flatten()
+        .enumerate()
+    {
+        if seen >= MAX_SCANNED {
+            cut = true;
+            break;
+        }
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name.starts_with('.') {
+            continue;
+        }
+        let Ok(meta) = std::fs::metadata(entry.path()) else {
+            continue;
+        };
+        let wav = Path::new(&name)
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("wav"));
+        if meta.is_dir() || (meta.is_file() && wav) {
+            if rows.len() >= MAX_ENTRIES {
+                cut = true;
+                break;
+            }
+            rows.push(Entry {
+                name,
+                dir: meta.is_dir(),
+            });
+        }
+    }
+    rows.sort_by_key(|e| (!e.dir, e.name.to_lowercase()));
+    Ok((rows, cut))
+}
+
+fn home() -> Option<PathBuf> {
+    std::env::var_os("HOME").map(PathBuf::from)
+}
 
 struct Pending {
     bytes: Vec<u8>,
@@ -55,6 +147,9 @@ pub struct View {
     path: String,
     error: Option<String>,
     pending: Option<Pending>,
+    /// The folder of the last file picked or browsed, kept while the application runs.
+    last_dir: Option<PathBuf>,
+    browse: Option<Browse>,
     /// A stroke is down and its undo step is open.
     stroke_open: bool,
     /// The working copy has edits not yet written to the patch.
@@ -95,6 +190,7 @@ pub fn open(editor: &PatchEditor, ui: &mut UiState, module: ModuleId) {
         module: Some(module),
         slot,
         steps: 4,
+        last_dir: ui.tables.last_dir.take(),
         ..View::default()
     };
     ui.tables.load(editor);
@@ -221,9 +317,9 @@ impl View {
 
     fn read_file(&mut self) {
         use std::io::Read;
-        let path = std::path::Path::new(self.path.trim());
+        let path = PathBuf::from(self.path.trim());
         let read = || -> Result<Vec<u8>, String> {
-            let file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+            let file = std::fs::File::open(&path).map_err(|e| e.to_string())?;
             let meta = file.metadata().map_err(|e| e.to_string())?;
             if !meta.is_file() {
                 return Err("not a file".into());
@@ -236,25 +332,49 @@ impl View {
         };
         match read() {
             Ok(bytes) => {
+                if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
+                    self.last_dir = Some(dir.to_path_buf());
+                }
                 let file = path
                     .file_name()
                     .map_or(String::new(), |f| f.to_string_lossy().into_owned());
-                let mut p = Pending {
-                    bytes,
-                    name: wavetable::table_name(&file),
-                    choice: None,
-                    whole: None,
-                    result: Err(String::new()),
-                };
-                p.refresh();
-                self.error = None;
-                self.pending = Some(p);
+                self.start_pending(bytes, &file);
             }
             Err(e) => {
                 self.pending = None;
                 self.error = Some(format!("{}: {e}", path.display()));
             }
         }
+    }
+
+    /// Previews `bytes` (a file's contents) as an import named after `file`.
+    fn start_pending(&mut self, bytes: Vec<u8>, file: &str) {
+        let mut p = Pending {
+            bytes,
+            name: wavetable::table_name(file),
+            choice: None,
+            whole: None,
+            result: Err(String::new()),
+        };
+        p.refresh();
+        self.error = None;
+        self.pending = Some(p);
+    }
+
+    /// Opens the browser in the folder last used, else the path field's folder, else home.
+    fn start_browse(&mut self) {
+        let from_path = Path::new(self.path.trim())
+            .parent()
+            .filter(|d| d.is_dir())
+            .map(Path::to_path_buf);
+        let dir = self
+            .last_dir
+            .clone()
+            .filter(|d| d.is_dir())
+            .or(from_path)
+            .or_else(home)
+            .unwrap_or_else(|| PathBuf::from("/"));
+        self.browse = Some(Browse::new(dir));
     }
 }
 
@@ -459,6 +579,141 @@ fn button(
     r.clicked()
 }
 
+/// The stack of frames beside the pen or bars (the import preview while one is pending).
+fn main_area(
+    ui: &mut egui::Ui,
+    st: &Style,
+    ui_state: &mut UiState,
+    editor: &mut PatchEditor,
+    v: &mut View,
+    preview: &Option<Frames>,
+    now: f64,
+) {
+    ui.horizontal_top(|ui| {
+        let size = vec2(300.0, 280.0);
+        match &preview {
+            Some(frames) => stack(ui, st, ui_state, v, frames, size, true),
+            None => {
+                // The stack reads only the selection from `v`: lend it the frames by value.
+                let frames = std::mem::take(&mut v.frames);
+                stack(ui, st, ui_state, v, &frames, size, false);
+                v.frames = frames;
+            }
+        }
+        ui.vertical(|ui| {
+            kit::segmented(ui, st, |ui| {
+                let r = kit::seg(ui, st, "Draw", !v.bars);
+                ui_state.record("wt:tab-draw".into(), r.rect);
+                if r.clicked() {
+                    v.bars = false;
+                }
+                let r = kit::seg(ui, st, "Harmonics", v.bars);
+                ui_state.record("wt:tab-bars".into(), r.rect);
+                if r.clicked() {
+                    v.bars = true;
+                }
+            });
+            let size = vec2(440.0, 248.0);
+            if preview.is_some() {
+                kit::label(ui, st, Role::Body, Tone::Text2, "Previewing the import.");
+            } else if v.bars {
+                bars(ui, st, ui_state, editor, v, size, now);
+            } else {
+                wave(ui, st, ui_state, editor, v, size, now);
+            }
+        });
+    });
+}
+
+/// The folder list that replaces the main area while browsing for a file.
+fn browser(ui: &mut egui::Ui, st: &Style, ui_state: &mut UiState, v: &mut View) {
+    let Some(b) = &mut v.browse else { return };
+    b.poll();
+    if b.rx.is_some() {
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_millis(30));
+    }
+    let (mut go, mut pick, mut close) = (None::<PathBuf>, None::<String>, false);
+    ui.horizontal(|ui| {
+        if button(ui, st, ui_state, "up", "Up", b.dir.parent().is_some()) {
+            go = b.dir.parent().map(Path::to_path_buf);
+        }
+        if button(ui, st, ui_state, "home", "Home", home().is_some()) {
+            go = home();
+        }
+        if button(ui, st, ui_state, "browse-close", "Close", true) {
+            close = true;
+        }
+        kit::label_truncated(
+            ui,
+            st,
+            Role::Caption,
+            Tone::Text2,
+            b.dir.display().to_string(),
+        );
+    });
+    let height = 280.0;
+    egui::ScrollArea::vertical()
+        .id_salt("wt-browse")
+        .max_height(height)
+        .auto_shrink([false, false])
+        .show(ui, |ui| match &b.listing {
+            None => {
+                kit::label(ui, st, Role::Body, Tone::Text2, "Reading the folder...");
+            }
+            Some(Err(e)) => {
+                kit::label(ui, st, Role::Body, Tone::Bad, e);
+            }
+            Some(Ok((rows, cut))) => {
+                if rows.is_empty() {
+                    kit::label(
+                        ui,
+                        st,
+                        Role::Body,
+                        Tone::Text2,
+                        "No folders or .wav files here.",
+                    );
+                }
+                for e in rows {
+                    let text = if e.dir {
+                        format!("{}/", e.name)
+                    } else {
+                        e.name.clone()
+                    };
+                    let r = kit::menu_item(ui, st, &text, false);
+                    let key = if e.dir { "dir" } else { "file" };
+                    ui_state.record(format!("wt:{key}:{}", e.name), r.rect);
+                    if r.clicked() {
+                        if e.dir {
+                            go = Some(b.dir.join(&e.name));
+                        } else {
+                            pick = Some(b.dir.join(&e.name).to_string_lossy().into_owned());
+                        }
+                    }
+                }
+                if *cut {
+                    kit::label(
+                        ui,
+                        st,
+                        Role::Caption,
+                        Tone::Warn,
+                        "The list is cut: type the path instead.",
+                    );
+                }
+            }
+        });
+    if let Some(dir) = go {
+        v.last_dir = Some(dir.clone());
+        v.browse = Some(Browse::new(dir));
+    } else if let Some(path) = pick {
+        v.path = path;
+        v.browse = None;
+        v.read_file();
+    } else if close {
+        v.browse = None;
+    }
+}
+
 fn body(
     ui: &mut egui::Ui,
     st: &Style,
@@ -519,6 +774,13 @@ fn body(
         );
         ui_state.record("wt:path".into(), r.rect);
         ui.add_space(st.sp(1));
+        if button(ui, st, ui_state, "browse", "Browse", true) {
+            if v.browse.is_some() {
+                v.browse = None;
+            } else {
+                v.start_browse();
+            }
+        }
         if button(
             ui,
             st,
@@ -617,40 +879,11 @@ fn body(
     }
 
     ui.add_space(st.sp(1));
-    ui.horizontal_top(|ui| {
-        let size = vec2(300.0, 300.0);
-        match &preview {
-            Some(frames) => stack(ui, st, ui_state, v, frames, size, true),
-            None => {
-                // The stack reads only the selection from `v`: lend it the frames by value.
-                let frames = std::mem::take(&mut v.frames);
-                stack(ui, st, ui_state, v, &frames, size, false);
-                v.frames = frames;
-            }
-        }
-        ui.vertical(|ui| {
-            kit::segmented(ui, st, |ui| {
-                let r = kit::seg(ui, st, "Draw", !v.bars);
-                ui_state.record("wt:tab-draw".into(), r.rect);
-                if r.clicked() {
-                    v.bars = false;
-                }
-                let r = kit::seg(ui, st, "Harmonics", v.bars);
-                ui_state.record("wt:tab-bars".into(), r.rect);
-                if r.clicked() {
-                    v.bars = true;
-                }
-            });
-            let size = vec2(440.0, 268.0);
-            if preview.is_some() {
-                kit::label(ui, st, Role::Body, Tone::Text2, "Previewing the import.");
-            } else if v.bars {
-                bars(ui, st, ui_state, editor, v, size, now);
-            } else {
-                wave(ui, st, ui_state, editor, v, size, now);
-            }
-        });
-    });
+    if v.browse.is_some() {
+        browser(ui, st, ui_state, v);
+    } else {
+        main_area(ui, st, ui_state, editor, v, &preview, now);
+    }
 
     ui.add_space(st.sp(1));
     let (sel, room, can_morph) = (
@@ -767,7 +1000,49 @@ fn body(
 }
 
 /// The editor window, if one is open. Call once per frame.
+/// A .wav dropped on the editor window, or on an `osc.wt` display (which opens the editor for
+/// that module), is previewed as an import. Other files are ignored. Needs a host that passes
+/// file drops to the application: the standalone window does.
+fn dropped(editor: &PatchEditor, ui_state: &mut UiState, ctx: &egui::Context) {
+    let files = ctx.input(|i| i.raw.dropped_files.clone());
+    let wav = |name: &str| {
+        Path::new(name)
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("wav"))
+    };
+    let Some(file) = files.into_iter().find(|f| {
+        f.path
+            .as_ref()
+            .map_or_else(|| wav(&f.name), |p| wav(&p.to_string_lossy()))
+    }) else {
+        return;
+    };
+    if ui_state.tables.module.is_none() {
+        let at = ctx.input(|i| i.pointer.hover_pos().or(i.pointer.latest_pos()));
+        let target = at.and_then(|at| {
+            ui_state.hits.iter().find_map(|(k, r)| {
+                let id = k.strip_prefix("wt-display:")?.parse::<ModuleId>().ok()?;
+                r.contains(at).then_some(id)
+            })
+        });
+        let Some(id) = target else { return };
+        open(editor, ui_state, id);
+    }
+    let v = &mut ui_state.tables;
+    match (file.path, file.bytes) {
+        (Some(path), _) => {
+            v.path = path.to_string_lossy().into_owned();
+            v.read_file();
+        }
+        (None, Some(bytes)) if bytes.len() <= wavetable::MAX_IMPORT_BYTES => {
+            v.start_pending(bytes.to_vec(), &file.name)
+        }
+        _ => v.error = Some("The dropped file could not be read".into()),
+    }
+}
+
 pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Context) {
+    dropped(editor, ui_state, ctx);
     let Some(id) = ui_state.tables.module else {
         return;
     };
@@ -789,6 +1064,8 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Contex
     let mut open = true;
     egui::Window::new("Wavetable editor")
         .id(egui::Id::new("wt-editor"))
+        // Below the toolbar (Save, the view switch), inside the window.
+        .default_pos(pos2(24.0, 56.0))
         .open(&mut open)
         .frame(kit::popover_frame(&st))
         .collapsible(false)
@@ -799,5 +1076,11 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Contex
     }
     if open {
         ui_state.tables = v;
+    } else {
+        // Closed: forget the table, remember the folder.
+        ui_state.tables = View {
+            last_dir: v.last_dir.take(),
+            ..View::default()
+        };
     }
 }

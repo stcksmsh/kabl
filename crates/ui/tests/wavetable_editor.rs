@@ -17,6 +17,7 @@ struct H {
     t: f64,
     pointer: Pos2,
     wt: u64,
+    drops: Vec<std::path::PathBuf>,
 }
 
 impl H {
@@ -37,6 +38,7 @@ impl H {
             t: 0.0,
             pointer: Pos2::ZERO,
             wt,
+            drops: Vec::new(),
         };
         h.frame();
         h.frame();
@@ -49,6 +51,13 @@ impl H {
             events: std::mem::take(&mut self.events),
             modifiers: self.modifiers,
             time: Some(self.t),
+            dropped_files: std::mem::take(&mut self.drops)
+                .into_iter()
+                .map(|p| egui::DroppedFile {
+                    path: Some(p),
+                    ..Default::default()
+                })
+                .collect(),
             ..Default::default()
         };
         self.t += 1.0 / 60.0;
@@ -386,6 +395,119 @@ fn an_edited_table_survives_save_and_reload() {
         wavetable::decode_canonical(&back.state().tables[&1].wav).unwrap(),
         before
     );
+}
+
+/// Frames until the browser has listed its folder (the listing runs on a thread).
+fn wait_for(h: &mut H, key: &str) {
+    for _ in 0..200 {
+        h.settle();
+        if h.ui.hits.contains_key(key) {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    panic!("no {key} in the browser");
+}
+
+#[test]
+fn browsing_lists_folders_and_wavs_only_and_picks_a_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let sub = dir.path().join("Tables");
+    std::fs::create_dir(&sub).unwrap();
+    std::fs::write(sub.join("one.WAV"), wav(&sines(4))).unwrap();
+    std::fs::write(sub.join("notes.txt"), b"hello").unwrap();
+    std::fs::write(sub.join(".hidden.wav"), wav(&sines(1))).unwrap();
+    std::fs::write(dir.path().join("top.wav"), wav(&sines(2))).unwrap();
+    let mut h = H::new();
+    h.open_editor();
+    // Starts in the folder of the path field.
+    h.type_path(dir.path().join("x.wav").to_str().unwrap());
+    h.click("wt:browse");
+    wait_for(&mut h, "wt:dir:Tables");
+    assert!(h.ui.hits.contains_key("wt:file:top.wav"));
+    // Into the folder: only the .wav (any case) is listed.
+    h.click("wt:dir:Tables");
+    wait_for(&mut h, "wt:file:one.WAV");
+    assert!(!h.ui.hits.contains_key("wt:file:notes.txt"));
+    assert!(!h.ui.hits.contains_key("wt:file:.hidden.wav"));
+    // Up, and into it again, then pick: the preview shows 4 frames and the browser closes.
+    h.click("wt:up");
+    wait_for(&mut h, "wt:dir:Tables");
+    h.click("wt:dir:Tables");
+    wait_for(&mut h, "wt:file:one.WAV");
+    h.click("wt:file:one.WAV");
+    assert_eq!(h.ui.tables.pending_frames(), Some(4));
+    assert!(!h.ui.hits.contains_key("wt:file:one.WAV"));
+    assert!(h.editor.state().tables.is_empty());
+    // The folder is remembered: reopening the editor and browsing starts there.
+    h.open_direct();
+    h.click("wt:browse");
+    wait_for(&mut h, "wt:file:one.WAV");
+}
+
+#[test]
+fn browsing_an_unreadable_folder_says_so() {
+    let mut h = H::new();
+    h.open_editor();
+    h.type_path("/nonexistent-folder-for-kabl/x.wav");
+    h.click("wt:browse");
+    // Falls back to the home folder (or the root): the listing still arrives, nothing crashes.
+    for _ in 0..50 {
+        h.settle();
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    assert!(h.ui.hits.contains_key("wt:up"));
+    h.click("wt:browse-close");
+    assert!(h.ui.hits.contains_key("wt:wave"));
+}
+
+#[test]
+fn a_dropped_wav_is_previewed_in_the_editor_and_on_a_display() {
+    let dir = tempfile::tempdir().unwrap();
+    let good = dir.path().join("drop.wav");
+    std::fs::write(&good, wav(&sines(3))).unwrap();
+    let other = dir.path().join("drop.txt");
+    std::fs::write(&other, b"not audio").unwrap();
+    let mut h = H::new();
+    // On the display with no editor open: the editor opens on that module with the preview.
+    let at = h.rect(&format!("wt-display:{}", h.wt)).center();
+    h.move_to(at);
+    h.drops.push(good.clone());
+    h.settle();
+    assert_eq!(h.ui.tables.pending_frames(), Some(3));
+    // Other files are ignored.
+    h.drops.push(other);
+    h.settle();
+    assert_eq!(h.ui.tables.pending_frames(), Some(3));
+    // Dropped away from any display with no editor: nothing opens.
+    let mut h = H::new();
+    h.move_to(Pos2::new(5.0, 5.0));
+    h.drops.push(good);
+    h.settle();
+    assert!(h.ui.tables.pending_frames().is_none());
+    assert!(!h.ui.hits.contains_key("wt:wave"));
+}
+
+#[test]
+fn the_editor_opens_below_the_toolbar_and_inside_a_1180_by_680_window() {
+    let mut h = H::new();
+    h.size = egui::vec2(1180.0, 680.0);
+    h.settle();
+    h.open_editor();
+    // With an import preview (the tallest layout).
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("a.wav");
+    std::fs::write(&file, wav(&sines(8))).unwrap();
+    h.type_path(file.to_str().unwrap());
+    h.click("wt:import");
+    let screen = Rect::from_min_size(Pos2::ZERO, h.size);
+    for (key, r) in &h.ui.hits {
+        if key.starts_with("wt:") && !key.starts_with("wt-") {
+            assert!(screen.contains_rect(*r), "{key} {r:?} leaves the window");
+        }
+    }
+    let top = h.rect("wt:path").top();
+    assert!(top > 56.0, "editor starts at {top}, over the toolbar");
 }
 
 // ---- Clips for listening (not checks): `cargo test -p kabl-ui --test wavetable_editor

@@ -1978,6 +1978,7 @@ fn draw_module(
                 );
                 let hit = ui.interact(chip, Id::new(("wt-edit-table", m.id)), Sense::click());
                 ui_state.record(format!("edit-table:{}", m.id), chip);
+                ui_state.record(format!("wt-display:{}", m.id), d);
                 let (back, ink) = (st.roles.disp_bg, st.roles.disp_text);
                 painter.rect_filled(
                     chip,
