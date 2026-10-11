@@ -22,6 +22,11 @@ use crate::builtins::{
     QUANTIZER_INFO, RANDOM_INFO, SAMPLE_HOLD_INFO, SLEW_INFO,
 };
 use crate::builtins::{
+    Bitcrusher, Compressor, Eq, FilterComb, FilterFormant, Flanger, Limiter, Phaser,
+    BITCRUSHER_INFO, COMPRESSOR_INFO, EQ_INFO, FILTER_COMB_INFO, FILTER_FORMANT_INFO, FLANGER_INFO,
+    LIMITER_INFO, PHASER_INFO,
+};
+use crate::builtins::{
     Chorus, Cues, Drive, FilterLadder, Macro, Noise, CHORUS_INFO, CUES_INFO, DRIVE_INFO,
     FILTER_LADDER_INFO, MACRO_INFO, NOISE_INFO,
 };
@@ -74,6 +79,14 @@ pub const KNOWN_KINDS: &[&str] = &[
     "random",
     "sample.hold",
     "slew",
+    "phaser",
+    "flanger",
+    "compressor",
+    "eq",
+    "limiter",
+    "bitcrusher",
+    "filter.comb",
+    "filter.formant",
 ];
 
 /// Builds a fresh instance of `kind`, or `None` if `kind` isn't a known built-in.
@@ -113,13 +126,21 @@ pub fn create(kind: &str) -> Option<Box<dyn Module>> {
         "random" => Box::new(Random::new()),
         "sample.hold" => Box::new(SampleHold::new()),
         "slew" => Box::new(Slew::new()),
+        "phaser" => Box::new(Phaser::new()),
+        "flanger" => Box::new(Flanger::new()),
+        "compressor" => Box::new(Compressor::new()),
+        "eq" => Box::new(Eq::new()),
+        "limiter" => Box::new(Limiter::new()),
+        "bitcrusher" => Box::new(Bitcrusher::new()),
+        "filter.comb" => Box::new(FilterComb::new()),
+        "filter.formant" => Box::new(FilterFormant::new()),
         _ => return None,
     })
 }
 
 /// `ModuleInfo` for every known kind, in the same order as `KNOWN_KINDS` — what a catalog UI
 /// (not built) would enumerate.
-static ALL_INFOS: [&ModuleInfo; 34] = [
+static ALL_INFOS: [&ModuleInfo; 42] = [
     &OSC_VA_INFO,
     &FILTER_SVF_INFO,
     &ENV_ADSR_INFO,
@@ -154,6 +175,14 @@ static ALL_INFOS: [&ModuleInfo; 34] = [
     &RANDOM_INFO,
     &SAMPLE_HOLD_INFO,
     &SLEW_INFO,
+    &PHASER_INFO,
+    &FLANGER_INFO,
+    &COMPRESSOR_INFO,
+    &EQ_INFO,
+    &LIMITER_INFO,
+    &BITCRUSHER_INFO,
+    &FILTER_COMB_INFO,
+    &FILTER_FORMANT_INFO,
 ];
 
 pub fn all_infos() -> &'static [&'static ModuleInfo] {

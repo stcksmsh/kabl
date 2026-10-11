@@ -474,6 +474,14 @@ pub fn short_name(kind: &str) -> &'static str {
         "filter.ladder" => "Ladder",
         "chorus" => "Chorus",
         "drive" => "Drive",
+        "phaser" => "Phaser",
+        "flanger" => "Flanger",
+        "compressor" => "Compr",
+        "eq" => "EQ",
+        "limiter" => "Limit",
+        "bitcrusher" => "Crush",
+        "filter.comb" => "Comb",
+        "filter.formant" => "Formant",
         _ => "?",
     }
 }
