@@ -125,7 +125,9 @@ pub fn hardware(p: &Painter, st: &Style, rect: Rect, z: f32) {
     }
 }
 
-/// The module's name and its tag line. Returns the name's rect.
+/// The module's name and its tag line. Returns the name's rect. `avoid` is the screen rects of
+/// face content (jacks and their labels, knobs, displays): a left-aligned title that would
+/// touch any of them is set centred instead, as the centred recipes are.
 #[allow(clippy::too_many_arguments)]
 pub fn title(
     p: &Painter,
@@ -136,10 +138,33 @@ pub fn title(
     tag: &str,
     ink: Color32,
     ink2: Color32,
+    avoid: &[Rect],
 ) -> Rect {
     let cx = face.center().x;
     let y = face.top() + 26.0 * z;
     let mut rect = Rect::NOTHING;
+    let left = st.slots.face.title == FaceTitle::LeftDot && {
+        let x0 = face.left() + 32.0 * z;
+        let size = |text: &str, font: Option<FontId>| {
+            font.map_or(egui::Vec2::ZERO, |f| {
+                p.layout_no_wrap(text.to_string(), f, ink).size()
+            })
+        };
+        let n = size(name, title_font(st, z));
+        let t = size(tag, face_font(st, Role::Caption, z));
+        let name_r = Rect::from_min_size(pos2(x0, y - n.y / 2.0), n);
+        let tag_r = Rect::from_min_size(pos2(x0, face.top() + 43.0 * z - t.y / 2.0), t);
+        // Too wide for the room right of the dot: centre it, as the centred recipes do.
+        name_r.max.x <= face.right() - 6.0 * z
+            && tag_r.max.x <= face.right() - 6.0 * z
+            && !avoid
+                .iter()
+                .any(|a| a.intersects(name_r) || a.intersects(tag_r))
+    };
+    let kind = match st.slots.face.title {
+        FaceTitle::LeftDot if !left => FaceTitle::Centered,
+        k => k,
+    };
     if let Some(mut font) = title_font(st, z) {
         // Keep clear of the "+N" chip on the right: a long name steps down a size.
         let w = p
@@ -149,7 +174,7 @@ pub fn title(
         if w > face.width() - 100.0 * z {
             font.size = (font.size * 0.8).max(TEXT_FLOOR);
         }
-        rect = match st.slots.face.title {
+        rect = match kind {
             FaceTitle::Centered => {
                 p.text(pos2(cx, y), egui::Align2::CENTER_CENTER, name, font, ink)
             }
@@ -184,7 +209,7 @@ pub fn title(
     }
     if let Some(font) = face_font(st, Role::Caption, z) {
         let at = pos2(cx, face.top() + 43.0 * z);
-        match st.slots.face.title {
+        match kind {
             FaceTitle::LeftDot => {
                 p.text(
                     pos2(face.left() + 32.0 * z, at.y),

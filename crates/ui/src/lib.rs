@@ -2031,7 +2031,31 @@ fn draw_module(
         }
         None => format!("{} · #{}", m.info.kind, m.id),
     };
-    kit::face::title(painter, &st, face, z, m.info.name, &tag, ink, ink2);
+    // What a left-aligned title must not touch: control labels, jacks with labels, displays.
+    let mut avoid: Vec<Rect> = m
+        .ctls
+        .iter()
+        .map(|c| {
+            let b = c.geo.bounds();
+            b.expand2(vec2(4.0, 0.0))
+        })
+        .chain(
+            m.jacks
+                .iter()
+                .map(|j| Rect::from_center_size(j.c, vec2(48.0, 20.0)).translate(vec2(0.0, -14.0))),
+        )
+        .collect();
+    if let Decor::Keys(r)
+    | Decor::Display(r)
+    | Decor::Transport(r)
+    | Decor::Banks(r)
+    | Decor::Operators(r)
+    | Decor::Cues(r) = m.decor
+    {
+        avoid.push(r);
+    }
+    let avoid: Vec<Rect> = avoid.into_iter().map(|r| xf.r(r)).collect();
+    kit::face::title(painter, &st, face, z, m.info.name, &tag, ink, ink2, &avoid);
     if ui_state.selected_module == Some(m.id) {
         painter.rect_stroke(
             rect.expand(1.0),

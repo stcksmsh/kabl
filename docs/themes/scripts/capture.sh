@@ -21,7 +21,7 @@ Xvfb :$n -screen 0 1600x1000x24 >/dev/null 2>&1 &
 xvfb=$!
 sleep 2
 for t in $themes; do
-    for mode in light dark; do
+    for mode in ${MODES:-light dark}; do
         DISPLAY=:$n KABL_CONFIG_DIR=$cfg KABL_THEME=$t:$mode \
             python3 docs/rack-migration/drive.py "$script" "$size" "$out/$t-$mode" "$patch"
     done
