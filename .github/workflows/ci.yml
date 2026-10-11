@@ -29,6 +29,22 @@ jobs:
         # Every target except the app_target example; see the script for why.
         run: .github/scripts/clippy.sh
 
+  licenses:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Allow-list check (deny.toml)
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check licenses
+      - name: Third-party notices match Cargo.lock
+        run: |
+          cargo fetch --locked
+          python3 -I packaging/gen-notices.py > "$RUNNER_TEMP/notices.md"
+          diff THIRD-PARTY-NOTICES.md "$RUNNER_TEMP/notices.md" || { echo "Regenerate: python3 -I packaging/gen-notices.py > THIRD-PARTY-NOTICES.md"; exit 1; }
+
   test:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
