@@ -86,6 +86,29 @@ pub fn open(editor: &PatchEditor, ui: &mut UiState, module: ModuleId) {
 }
 
 impl View {
+    /// The last import or write error shown in the window.
+    pub fn error(&self) -> Option<&str> {
+        self.error.as_deref()
+    }
+
+    /// The selected frame.
+    pub fn selected(&self) -> usize {
+        self.sel
+    }
+
+    /// Frames in the working copy.
+    pub fn frames(&self) -> usize {
+        self.frames.len()
+    }
+
+    /// Frames the pending import would make, if one is waiting for "Use as table".
+    pub fn pending_frames(&self) -> Option<usize> {
+        match &self.pending {
+            Some(Pending { result: Ok((f, _)), .. }) => Some(f.len()),
+            _ => None,
+        }
+    }
+
     fn factory_index(&self, editor: &PatchEditor) -> usize {
         self.module
             .and_then(|id| editor.state().modules.get(&id))
@@ -442,7 +465,8 @@ fn body(
         });
     });
     ui.horizontal(|ui| {
-        kit::field(ui, st, &mut v.path, "Path to a .wav file", None, Some(420.0));
+        let r = kit::field(ui, st, &mut v.path, "Path to a .wav file", None, Some(420.0));
+        ui_state.record("wt:path".into(), r.rect);
         if button(ui, st, ui_state, "import", "Import", !v.path.trim().is_empty()) {
             v.read_file();
         }
@@ -480,16 +504,22 @@ fn body(
         ui.horizontal(|ui| {
             kit::label(ui, st, Role::Caption, Tone::Text3, "Frame size");
             kit::segmented(ui, st, |ui| {
-                if kit::seg(ui, st, "Auto", choice.is_none()).clicked() {
+                let r = kit::seg(ui, st, "Auto", choice.is_none());
+                ui_state.record("wt:size-auto".into(), r.rect);
+                if r.clicked() {
                     choice = None;
                 }
                 for &c in &FRAME_CHOICES {
-                    if kit::seg(ui, st, &c.to_string(), choice == Some(c)).clicked() {
+                    let r = kit::seg(ui, st, &c.to_string(), choice == Some(c));
+                    ui_state.record(format!("wt:size-{c}"), r.rect);
+                    if r.clicked() {
                         choice = Some(c);
                     }
                 }
                 if let Some(s) = whole {
-                    if kit::seg(ui, st, "Whole file", choice == Some(s)).clicked() {
+                    let r = kit::seg(ui, st, "Whole file", choice == Some(s));
+                    ui_state.record("wt:size-whole".into(), r.rect);
+                    if r.clicked() {
                         choice = Some(s);
                     }
                 }
@@ -531,10 +561,14 @@ fn body(
         stack(ui, st, ui_state, v, &shown, vec2(300.0, 300.0), preview.is_some());
         ui.vertical(|ui| {
             kit::segmented(ui, st, |ui| {
-                if kit::seg(ui, st, "Draw", !v.bars).clicked() {
+                let r = kit::seg(ui, st, "Draw", !v.bars);
+                ui_state.record("wt:tab-draw".into(), r.rect);
+                if r.clicked() {
                     v.bars = false;
                 }
-                if kit::seg(ui, st, "Harmonics", v.bars).clicked() {
+                let r = kit::seg(ui, st, "Harmonics", v.bars);
+                ui_state.record("wt:tab-bars".into(), r.rect);
+                if r.clicked() {
                     v.bars = true;
                 }
             });
