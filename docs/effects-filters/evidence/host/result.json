@@ -1,0 +1,15 @@
+{
+ "plugin_sha256": "4e3c6177993d046e1991ef01eb148521c185fd96f204e057399106d6197f3273",
+ "baseline_sha256": "be738d7eff2985249c47b43f01554c429ed72b43d408be413960e9db872dd59b",
+ "states_identical_across_save_quit_reopen": true,
+ "wet": {
+  "finite": true,
+  "peak": 0.989513099193573,
+  "rms": 0.3047262132167816,
+  "reopen_render_bit_identical": true
+ },
+ "wet_vs_dry_relative_difference_rms": 0.21,
+ "old_state_identical_new_plugin": true,
+ "old_render_bit_identical_to_baseline": true,
+ "old_render_sha256": "24d8729a51d1153422a59adb784e659ccecdb45a70dde241c9db044adc20e421"
+}

@@ -2,6 +2,11 @@
 //! resonance CV"). Wraps `dsp::Svf`, exposing all three simultaneous outputs (see `dsp::
 //! SvfOutputs`'s doc: no extra cost, the topology computes all three from the same recurrence).
 //!
+//! **Notch.** The fourth output, `notch`, is `lp + hp` (= input − 2R·bp): a band-stop that
+//! removes the cutoff frequency exactly at any resonance, with the skirts narrowing as resonance
+//! rises. It is an added output port of this module, not a separate one, since the SVF already
+//! computes both halves; saved patches never reference it, so they load unchanged.
+//!
 //! Cutoff and resonance are each a param (the knob's base value) plus an optional CV input port
 //! that modulates it — same pattern `osc.va` used for pitch: `cutoff_cv` is 1V/oct-style
 //! (exponential: `cutoff = cutoff_hz_param * 2^cv`), `resonance_cv` is linear (additive, then
@@ -50,6 +55,11 @@ const PORTS: &[PortInfo] = &[
     },
     PortInfo {
         name: "hp",
+        port_type: PortType::Audio,
+        direction: PortDirection::Output,
+    },
+    PortInfo {
+        name: "notch",
         port_type: PortType::Audio,
         direction: PortDirection::Output,
     },
@@ -102,6 +112,7 @@ const RESONANCE_CV: usize = 2;
 const LP: usize = 0;
 const BP: usize = 1;
 const HP: usize = 2;
+const NOTCH: usize = 3;
 const CUTOFF_HZ_PARAM: usize = 0;
 const RESONANCE_PARAM: usize = 1;
 
@@ -149,6 +160,8 @@ impl Module for FilterSvf {
         let cutoff_param = io.param(CUTOFF_HZ_PARAM);
         let resonance_param = io.param(RESONANCE_PARAM);
         let block_len = io.block_len();
+        // A hand-wired caller may supply only lp, bp and hp.
+        let notch = io.output_count() > NOTCH;
         let sample_rate = self.sample_rate;
 
         if cutoff_cv.is_scalar()
@@ -166,6 +179,9 @@ impl Module for FilterSvf {
                 io.output(LP)[i] = out.lowpass;
                 io.output(BP)[i] = out.bandpass;
                 io.output(HP)[i] = out.highpass;
+                if notch {
+                    io.output(NOTCH)[i] = out.lowpass + out.highpass;
+                }
             }
         } else {
             let svf = &mut self.svf;
@@ -176,6 +192,9 @@ impl Module for FilterSvf {
                 io.output(LP)[i] = out.lowpass;
                 io.output(BP)[i] = out.bandpass;
                 io.output(HP)[i] = out.highpass;
+                if notch {
+                    io.output(NOTCH)[i] = out.lowpass + out.highpass;
+                }
             }
         }
     }

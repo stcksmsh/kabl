@@ -326,6 +326,67 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
             "Which MIDI channel plays this keyboard. ALL takes every channel, so every \
              keyboard in the patch plays together; 1–16 lets two keyboards be played apart."
         }
+        ("phaser", "stages") => {
+            "How many all-pass stages: two per notch, so more stages give a richer, deeper sweep."
+        }
+        ("phaser", "rate_hz") => "Speed of the sweep: slow and lazy to fast and wobbly.",
+        ("phaser", "depth") => "How far the notches travel up and down.",
+        ("phaser", "feedback") => {
+            "Sends the result back in: more makes the notches sharp and whistling. Negative \
+             values give a hollower tone."
+        }
+        ("phaser", "mix") => "Phased level against the dry sound. 50 % is the deepest.",
+        ("flanger", "rate_hz") => "Speed of the sweep.",
+        ("flanger", "depth") => "How far the delay moves: more is a wider whoosh.",
+        ("flanger", "feedback") => {
+            "Sends the delayed sound back in. Positive rings brightly; negative is hollow and thinner in the bass."
+        }
+        ("flanger", "mix") => "Flanged level against the dry sound. 50 % is the deepest.",
+        ("compressor", "threshold_db") => {
+            "The level where it starts turning the sound down: lower catches more."
+        }
+        ("compressor", "ratio") => {
+            "How hard it turns down what is over the threshold: 2 is gentle, 20 is almost a limiter."
+        }
+        ("compressor", "attack_ms") => {
+            "How fast it clamps down on a loud start: slow lets the first hit through."
+        }
+        ("compressor", "release_ms") => "How fast it lets go once the sound is quieter again.",
+        ("compressor", "knee_db") => {
+            "How gradually it starts: 0 is an abrupt corner, higher eases in around the threshold."
+        }
+        ("compressor", "makeup_db") => "Level added after it, to win back what it turned down.",
+        ("eq", "low_hz") => "Where the low shelf starts: everything below is boosted or cut.",
+        ("eq", "low_db") => "Boost or cut of the lows: weight and warmth.",
+        ("eq", "mid1_hz") => "Centre of the lower bell.",
+        ("eq", "mid1_db") => "Boost or cut at the lower bell's centre.",
+        ("eq", "mid1_q") => "Width of the lower bell: low is broad, high is narrow.",
+        ("eq", "mid2_hz") => "Centre of the upper bell.",
+        ("eq", "mid2_db") => "Boost or cut at the upper bell's centre.",
+        ("eq", "mid2_q") => "Width of the upper bell: low is broad, high is narrow.",
+        ("eq", "high_hz") => "Where the high shelf starts: everything above is boosted or cut.",
+        ("eq", "high_db") => "Boost or cut of the highs: air and brightness.",
+        ("limiter", "gain_db") => "Pushes the sound up into the ceiling: louder, more limited.",
+        ("limiter", "ceiling_db") => "The level nothing gets past.",
+        ("limiter", "release_ms") => "How fast the volume comes back after a peak.",
+        ("bitcrusher", "bits") => "Loudness steps kept: fewer is rougher and noisier.",
+        ("bitcrusher", "downsample") => {
+            "Keeps one sample in this many: higher is grittier, with ringing high tones."
+        }
+        ("bitcrusher", "mix") => "Crushed level against the clean sound.",
+        ("filter.comb", "freq_hz") => {
+            "The note it rings at when pitch is 0 (C4 = 261.63 Hz). With a keyboard on the \
+             pitch jack, every note shifts it by the same ratio."
+        }
+        ("filter.comb", "feedback") => {
+            "How long it rings. Negative gives only the odd harmonics: hollow, an octave lower."
+        }
+        ("filter.comb", "damp") => "Darkens the ringing as it dies away, like a string.",
+        ("filter.formant", "vowel") => "Morphs through the vowels a, e, i, o, u.",
+        ("filter.formant", "shift_st") => {
+            "Moves every formant up or down in semitones: a smaller or larger mouth."
+        }
+        ("filter.formant", "q") => "Sharpness of the vowel peaks: higher is more pronounced.",
         _ => return None,
     })
 }
@@ -360,6 +421,14 @@ pub fn port_help(kind: &str, port: &str) -> Option<&'static str> {
         ("filter.svf", "lp") => "Low-pass: keeps lows.",
         ("filter.svf", "bp") => "Band-pass: keeps a band around the cutoff.",
         ("filter.svf", "hp") => "High-pass: keeps highs.",
+        ("compressor", "sc") => {
+            "Sidechain: when patched, this sound (not the input) decides how much to turn down."
+        }
+        ("compressor", "gr") => "How many dB it is turning down right now (0 = none).",
+        ("filter.comb", "in") => "The sound to ring: a click, a noise burst or a held tone.",
+        ("filter.comb", "pitch") => "Pitch in semitones from the Frequency setting.",
+        ("filter.formant", "in") => "A buzzy or noisy sound to give a vowel to.",
+        ("filter.svf", "notch") => "Notch: removes a band around the cutoff and keeps the rest.",
         ("env.adsr", "gate") => "Starts the envelope while high, releases it when low.",
         ("lfo" | "delay", "clock") => "A clock for Sync to follow.",
         ("lfo", "reset") => "Restarts the wave at Phase.",
