@@ -9,10 +9,9 @@ name = "kabl-ui"
 path = "src/main.rs"
 
 [dependencies]
-egui = "0.35"
+egui = { version = "0.35", default-features = false }
 eframe = { version = "0.35", default-features = false, features = [
     "glow",
-    "default_fonts",
     "x11",
     "wayland",
 ] }
@@ -35,4 +34,5 @@ kabl-standalone = { path = "../standalone" }
 
 [dev-dependencies]
 tempfile = "3.27.0"
+skrifa = "=0.42.1"
 assert_no_alloc = "1.1.2"

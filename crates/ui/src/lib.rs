@@ -36,6 +36,8 @@ pub mod record;
 pub mod routing;
 pub mod style;
 pub mod theme;
+#[cfg(test)]
+mod theme_tests;
 
 pub use editor::PatchEditor;
 
@@ -1013,7 +1015,7 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
                     st,
                     style::Role::Label,
                     kit::Tone::Bad,
-                    format!("● REC {:02}:{:02}", t / 60, t % 60),
+                    format!("• REC {:02}:{:02}", t / 60, t % 60),
                 );
             }
             if let Some(msg) = &ui_state.last_message {
@@ -1320,7 +1322,7 @@ fn seq_panel(
         ))
         .small(),
     );
-    ui.menu_button(format!("Bank {} ▾", seq::BANK_NAMES[edit]), |ui| {
+    ui.menu_button(format!("Bank {} ↓", seq::BANK_NAMES[edit]), |ui| {
         bank_menu(editor, ui_state, ui, id, edit)
     });
     let (mut pick, mut tpick) = (None, None);
@@ -1592,10 +1594,14 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             continue;
         }
         if ui_state.expanded.contains(&m.id) {
-            theme::satin(
+            let pt = theme::panel_theme(&ui_state.style, m.info.kind);
+            kit::face::surface(
                 &painter,
+                &ui_state.style,
                 xf.r(m.face),
-                &theme::panel_theme(&ui_state.style, m.info.kind),
+                pt.panel,
+                pt.panel_edge,
+                xf.zoom,
             );
             text(
                 &painter,
@@ -4227,7 +4233,7 @@ fn draw_authored_face(
     let rect = xf.r(face);
     let z = xf.zoom;
     let painter = ui.painter_at(rect.intersect(ui.clip_rect()));
-    theme::satin(&painter, rect, &th);
+    kit::face::surface(&painter, &view.style, rect, th.panel, th.panel_edge, z);
     let art = if view.dark { &panel.dark } else { &panel.light };
     let mut missing = art.is_none();
     if let Some(art) = art {

@@ -535,7 +535,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         });
     }
     ui.horizontal(|ui| {
-        let b = ui.add_enabled(a.step > 0, egui::Button::new("◀ Previous"));
+        let b = ui.add_enabled(a.step > 0, egui::Button::new("← Previous"));
         ui_state.record("recipe-prev".into(), b.rect);
         if b.clicked() {
             step_to(ui_state, a.step - 1);
@@ -543,9 +543,9 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         let b = ui.add_enabled(
             a.step < n,
             egui::Button::new(if a.step + 1 == n {
-                "Try on your own ▶"
+                "Try on your own →"
             } else {
-                "Next ▶"
+                "Next →"
             }),
         );
         ui_state.record("recipe-next".into(), b.rect);

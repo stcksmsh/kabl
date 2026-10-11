@@ -1101,6 +1101,28 @@ fn zoom_and_pan_keep_every_knob_gesture_and_scale_hit_regions() {
 }
 
 #[test]
+fn theme_switch_applies_live_is_remembered_and_never_touches_the_patch() {
+    let mut t = H::new(1280.0, 800.0);
+    let dir = tempfile::tempdir().unwrap();
+    t.ui.prefs_dir = Some(dir.path().to_owned());
+    let state = t.editor.state().clone();
+    t.click("view-menu");
+    t.click("theme-id:kabl.lacquer");
+    t.frame();
+    assert_eq!(t.ui.style.id, "kabl.lacquer");
+    t.click("theme:dark");
+    t.frame();
+    assert!(t.ui.style.dark);
+    assert_eq!(t.ui.style.id, "kabl.lacquer");
+    let p = kabl_ui::style::Prefs::load(dir.path());
+    assert_eq!((p.theme.as_str(), p.dark), ("kabl.lacquer", true));
+    t.click("theme-id:kabl.satin");
+    t.frame();
+    assert_eq!(t.ui.style.id, "kabl.satin");
+    assert_eq!(t.editor.state(), &state);
+}
+
+#[test]
 fn view_changes_never_touch_the_patch_or_the_audio() {
     let mut t = H::new(1280.0, 800.0);
     let _ = t.editor.take_dirty();

@@ -627,7 +627,7 @@ pub(crate) fn panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui:
             ui.label(RichText::new("Explain").strong().color(th.cv));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let r = ui
-                    .small_button("✕")
+                    .small_button("×")
                     .on_hover_text("Close the explanation (Esc)");
                 ui_state.record("explain-close".into(), r.rect);
                 if r.clicked() {
@@ -696,7 +696,7 @@ fn show_button(
     let r = ui
         .add(egui::Button::selectable(
             selected,
-            if selected { "● Shown" } else { "Show" },
+            if selected { "• Shown" } else { "Show" },
         ))
         .on_hover_text("Bring it into view in the rack (no change to the sound)");
     ui_state.record(hit, r.rect);
