@@ -513,6 +513,17 @@ mod tests {
     }
 
     #[test]
+    fn the_documented_example_theme_loads_clean() {
+        let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/themes/example/midnight-rose.toml");
+        let t = parse(&std::fs::read_to_string(p).unwrap(), &themes()).unwrap();
+        assert!(t.notes.is_empty(), "{:?}", t.notes);
+        assert_eq!(t.dark.slots.knob.body, super::super::KnobBody::Cap);
+        assert_eq!(t.dark.slots.knob.scale, super::super::KnobScale::TrackArc);
+        assert_ne!(t.light, builtin_b(false));
+    }
+
+    #[test]
     fn prefs_round_trip_and_bad_file_gives_default() {
         let d = tempfile::tempdir().unwrap();
         assert_eq!(Prefs::load(d.path()), Prefs::default());

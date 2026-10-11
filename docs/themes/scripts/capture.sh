@@ -12,6 +12,11 @@ out=${4:?outdir}
 n=${5:-231}
 themes=${THEMES:-"kabl.satin kabl.lacquer"}
 cfg=$(mktemp -d)
+# THEME_FILES="a.toml b.toml" installs user themes into the throwaway config folder.
+if [ -n "$THEME_FILES" ]; then
+    mkdir "$cfg/themes"
+    cp $THEME_FILES "$cfg/themes/"
+fi
 Xvfb :$n -screen 0 1600x1000x24 >/dev/null 2>&1 &
 xvfb=$!
 sleep 2

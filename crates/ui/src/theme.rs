@@ -45,6 +45,7 @@ pub struct Theme {
 pub fn theme(st: &Style) -> Theme {
     let r = &st.roles;
     let dark = st.dark;
+    let accent_pill = st.slots.selector == crate::style::SelectorRecipe::AccentPill;
     Theme {
         dark,
         chrome: r.bg,
@@ -70,8 +71,8 @@ pub fn theme(st: &Style) -> Theme {
         display: r.disp_bg,
         display_ink: r.disp_trace,
         seg_bg: r.inset,
-        seg_on: r.text,
-        seg_on_text: r.surface,
+        seg_on: if accent_pill { r.accent } else { r.text },
+        seg_on_text: if accent_pill { r.on_accent } else { r.surface },
         sel: r.focus,
         warn: r.warn,
         audio: r.audio,

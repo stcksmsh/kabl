@@ -1,0 +1,41 @@
+# Example user theme. Copy to <config>/kabl/themes/ (see docs/themes/README.md).
+# Everything not named here comes from the theme named by `extends`.
+id = "example.midnight-rose"
+name = "Midnight Rose"
+author = "kabl example"
+version = "1.0.0"
+extends = "kabl.lacquer"      # a built-in: kabl.satin or kabl.lacquer (default kabl.satin)
+ui_api = 1
+
+[dark.roles]
+accent = "#ff7aa2"
+on_accent = "#2a0a14"
+accent_soft = "#4a1d2c"
+focus = "#ffa3c0"
+disp_trace = "#ff9ec0"
+disp_text = "#ffe0ea"
+
+[dark.sections.osc]
+base = "#7a3350"
+ink = "#fff1f5"
+ink2 = "#f6d3de"
+
+[dark.slots.knob]            # recipe choices: this knob mixes a cap body with a glowing arc
+body = "cap"
+scale = "track-arc"
+value = "line"
+modulation = "arc-glow"
+glow = 0.8
+
+[dark.slots.cable]
+recipe = "glow"
+width = 5.0
+
+[dark.slots.face]
+gloss = 0.1
+hardware = "screws"
+
+[light.roles]
+accent = "#c2185b"
+accent_soft = "#f8d7e4"
+focus = "#c2185b"

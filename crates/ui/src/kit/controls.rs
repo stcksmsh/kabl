@@ -302,6 +302,25 @@ pub fn segmented<R>(ui: &mut Ui, st: &Style, add: impl FnOnce(&mut Ui) -> R) -> 
         .inner
 }
 
+fn tabs_flag() -> egui::Id {
+    egui::Id::new("kabl-view-switch-tabs")
+}
+
+/// The Rack / Perform switch: a segmented control, or plain tabs when the theme says so.
+pub fn view_switch<R>(ui: &mut Ui, st: &Style, add: impl FnOnce(&mut Ui) -> R) -> R {
+    if st.slots.chrome.view_switch != crate::style::ViewSwitch::Tabs {
+        return segmented(ui, st, add);
+    }
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = st.sp(2);
+        ui.data_mut(|d| d.insert_temp(tabs_flag(), true));
+        let r = add(ui);
+        ui.data_mut(|d| d.remove::<bool>(tabs_flag()));
+        r
+    })
+    .inner
+}
+
 /// One item of a segmented control.
 pub fn seg(ui: &mut Ui, st: &Style, text: &str, selected: bool) -> Response {
     seg_enabled(ui, st, text, selected, true)
@@ -331,7 +350,13 @@ pub fn seg_enabled(ui: &mut Ui, st: &Style, text: &str, selected: bool, enabled:
     );
     let r = &st.roles;
     let radius = st.shape_radius(st.slots.controls.chip, h);
-    if selected {
+    if ui.data(|d| d.get_temp::<bool>(tabs_flag())).unwrap_or(false) {
+        // `chrome.view_switch = tabs`: no pill; the selected tab gets an accent underline.
+        if selected {
+            let bar = Rect::from_min_max(rect.left_bottom() - vec2(0.0, 2.0), rect.right_bottom());
+            fill_rr(ui, bar, 1.0, r.accent, 0.0);
+        }
+    } else if selected {
         crate::kit::shadow(ui, st, rect, radius, 0);
         fill_rr(ui, rect, radius, r.raised, 0.0);
     } else if hover > 0.0 {
