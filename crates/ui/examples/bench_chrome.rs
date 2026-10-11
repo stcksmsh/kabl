@@ -1,6 +1,8 @@
 //! UI frame time of `kabl_ui::show` (build, layout, tessellation; no GPU) on a simple and a
 //! dense patch, with the Sounds browser and Routing drawer open.
-//! `cargo run --release -p kabl-ui --example bench_chrome [frames]`
+//! `cargo run --release -p kabl-ui --example bench_chrome [frames] [live]`
+//! With `live`: rack only (no browser, drawer), audio running, and every module's face taps
+//! report new made-up values each frame, so every display and modulated knob animates.
 use egui::{Pos2, RawInput, Rect};
 use kabl_core::PatchState;
 use kabl_ui::library::Library;
@@ -20,13 +22,30 @@ fn dense() -> PatchState {
 }
 
 /// `perform`: 0 closed, 1 the full Perform view, 2 Perform docked under the rack.
-fn run(name: &str, state: &PatchState, w: f32, h: f32, dark: bool, frames: usize, perform: u8) {
+#[allow(clippy::too_many_arguments)]
+fn run(
+    name: &str,
+    state: &PatchState,
+    w: f32,
+    h: f32,
+    dark: bool,
+    frames: usize,
+    perform: u8,
+    live: bool,
+) {
     let user = tempfile::tempdir().unwrap();
     let ctx = egui::Context::default();
     let mut editor = PatchEditor::seed_from(state);
     let mut ui = UiState::default();
-    ui.browser_open = true;
-    ui.drawer_open = true;
+    ui.browser_open = !live;
+    ui.drawer_open = !live;
+    ui.inspect.audio = live;
+    if let Some(z) = std::env::var("KABL_BENCH_ZOOM")
+        .ok()
+        .and_then(|s| s.parse().ok())
+    {
+        ui.zoom = z;
+    }
     ui.perform_open = perform > 0;
     ui.perform_tall = perform == 1;
     ui.dark = dark;
@@ -40,6 +59,36 @@ fn run(name: &str, state: &PatchState, w: f32, h: f32, dark: bool, frames: usize
             focused: true,
             ..Default::default()
         };
+        if live {
+            let now = i as f64 / 60.0;
+            for (&id, m) in &state.modules {
+                for port in 0..3u8 {
+                    let ph = (now * 0.7).fract() as f32;
+                    let mut view = kabl_modules::ModuleView {
+                        valid: true,
+                        position: if m.kind == "env.adsr" {
+                            1.0 + (now % 3.0).floor() as f32
+                        } else {
+                            ph
+                        },
+                        ..Default::default()
+                    };
+                    for (k, c) in view.cycle.iter_mut().enumerate() {
+                        *c = (std::f32::consts::TAU * (k as f32 / 128.0 + ph)).sin();
+                    }
+                    ui.live.taps.insert(
+                        (id, port),
+                        kabl_ui::displays::LiveTap {
+                            last: (now * 2.0).sin() as f32 * 0.5 + 0.5,
+                            min: 0.0,
+                            max: 1.0,
+                            view,
+                            at: now,
+                        },
+                    );
+                }
+            }
+        }
         let t = Instant::now();
         ctx.begin_pass(raw);
         let mut root = egui::Ui::new(
@@ -70,14 +119,17 @@ fn main() {
         .nth(1)
         .and_then(|s| s.parse().ok())
         .unwrap_or(300);
+    let live = std::env::args().nth(2).as_deref() == Some("live");
     let simple = kabl_standalone::default_patch();
     let dense = dense();
     for (w, h) in [(1440.0, 900.0), (1280.0, 800.0)] {
         for dark in [false, true] {
-            run("simple", &simple, w, h, dark, frames, 0);
-            run("dense", &dense, w, h, dark, frames, 0);
-            run("d-perf", &dense, w, h, dark, frames, 1);
-            run("d-dock", &dense, w, h, dark, frames, 2);
+            run("simple", &simple, w, h, dark, frames, 0, live);
+            run("dense", &dense, w, h, dark, frames, 0, live);
+            if !live {
+                run("d-perf", &dense, w, h, dark, frames, 1, false);
+                run("d-dock", &dense, w, h, dark, frames, 2, false);
+            }
         }
     }
 }
