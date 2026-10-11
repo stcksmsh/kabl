@@ -317,3 +317,28 @@ fn a_morph_survives_a_recompile_and_holds_after_it_ends() {
     assert_eq!(r.value(0), 0.9);
     assert!((heard(&mut r) - 0.9).abs() < 1e-3);
 }
+
+#[test]
+fn a_steady_host_value_does_not_fight_a_morph_but_a_new_one_wins() {
+    let mut r = Rig::new();
+    r.e.automate(0, t(0), 0.3);
+    r.run(2);
+    r.launch(&[(0, 1.0)], 16.0, Timing::NextBar);
+    r.run_to_bar(0);
+    // The host sends its unchanged lane value every block, through a recompile too.
+    for b in 0..BAR_BLOCKS / 2 {
+        r.e.automate(0, t(0), 0.3);
+        if b == 100 {
+            let g = kabl_engine::compile::compile(&patch(), SR, 8).unwrap();
+            let mut g = basedrop::Owned::new(&r._c.handle(), g);
+            g.rev = 7;
+            r.e.receive_swap(g);
+        }
+        r.run(1);
+    }
+    let v = r.value(0);
+    assert!(v > 0.5 && v < 0.7, "the morph went on: {v}");
+    r.e.automate(0, t(0), 0.45);
+    r.run(BAR_BLOCKS);
+    assert_eq!(r.value(0), 0.45, "a new host value ends it");
+}

@@ -1616,13 +1616,11 @@ impl CompiledPatch {
     }
 
     /// Reapply overlays to new graphs; unchanged values must not restart smoothing ramps.
-    pub fn automate(&mut self, slot: usize, target: RuntimeTarget, value: f32) -> bool {
-        let changed = self.automation[slot] != Some((target, value));
-        if changed {
+    pub fn automate(&mut self, slot: usize, target: RuntimeTarget, value: f32) {
+        if self.automation[slot] != Some((target, value)) {
             self.set_runtime(target, value, self.started);
             self.automation[slot] = Some((target, value));
         }
-        changed
     }
 
     /// The stored base value of a param target, as the module reads it now.

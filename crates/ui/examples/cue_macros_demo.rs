@@ -14,7 +14,7 @@ use basedrop::Collector;
 use kabl_core::{ModuleId, PortRef, Vec2};
 use kabl_engine::graph::BLOCK;
 use kabl_engine::patch_engine::{Command, PatchEngine, Timing};
-use kabl_ui::perform::{CC_PREFIX, CUE_PADS, PIN_PREFIX, TRANSPORT};
+use kabl_ui::perform::{BTN_PREFIX, CC_PREFIX, CUE_PADS, PIN_PREFIX, TRANSPORT};
 use kabl_ui::{cues, PatchEditor};
 
 const SR: f32 = 48000.0;
@@ -141,6 +141,10 @@ fn build() -> (PatchEditor, ModuleId) {
             let cc: f32 = 19.0 + k.parse::<f32>().unwrap();
             changes.push((*id, format!("{CC_PREFIX}{key}"), Some(cc)));
         }
+    }
+    // CC 40-43 launch the four cues, so a controller (or a host's MIDI track) can play the piece.
+    for (n, cc) in (1..=CUES.len()).zip(40..) {
+        changes.push((cue, format!("{BTN_PREFIX}cue.{n}"), Some(cc as f32)));
     }
     e.set_presentation(&changes);
     (e, cue)

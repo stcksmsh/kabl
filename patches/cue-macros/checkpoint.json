@@ -152,6 +152,10 @@
         "y": 20.0
       },
       "params": {
+        "btn.cue.1": 40.0,
+        "btn.cue.2": 41.0,
+        "btn.cue.3": 42.0,
+        "btn.cue.4": 43.0,
         "cue1.clock": 1.0,
         "cue1.macro.12.0": 0.1,
         "cue1.macro.12.1": 0.05,

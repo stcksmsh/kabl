@@ -62,6 +62,8 @@ pub struct PatchEngine {
     deferred_preview: Option<Command>,
     /// Cue macro morphs, outside the graphs for the same reason (`morph.rs`).
     morphs: Morphs,
+    /// The last host value of each automation lane, to tell a new one from a repeat.
+    automated: [Option<(crate::runtime::RuntimeTarget, f32)>; 16],
     /// `launches` packed, for `process_block_with`.
     packed: [PendingLaunch; MAX_PENDING],
     /// One keyboard per `midi.in` of the playing graph, outside the graphs like the launches
@@ -203,6 +205,7 @@ impl PatchEngine {
         self.launches.fill(None);
         self.deferred_launches.fill(None);
         self.morphs.clear();
+        self.automated = [None; 16];
         self.deferred_preview = None;
         self.held_preview = 0;
         self.preview_blocks = 0;
@@ -231,6 +234,7 @@ impl PatchEngine {
             deferred_launches: [None; MAX_PENDING],
             deferred_preview: None,
             morphs: Morphs::default(),
+            automated: [None; 16],
             packed: [NO_LAUNCH; MAX_PENDING],
             keyboards: Default::default(),
             held_preview: 0,
@@ -262,6 +266,7 @@ impl PatchEngine {
             deferred_launches: [None; MAX_PENDING],
             deferred_preview: None,
             morphs: Morphs::default(),
+            automated: [None; 16],
             packed: [NO_LAUNCH; MAX_PENDING],
             keyboards: Default::default(),
             held_preview: 0,
@@ -1092,14 +1097,17 @@ impl PatchEngine {
     /// nothing. Returns whether it resolved in any of them. No allocation.
     /// Host playback is transient, independent of document revision and undo history.
     pub fn automate(&mut self, slot: usize, target: crate::runtime::RuntimeTarget, value: f32) {
-        let mut changed = self.active.automate(slot, target, value);
+        self.active.automate(slot, target, value);
         if let Some((g, _)) = &mut self.incoming {
-            changed |= g.automate(slot, target, value);
+            g.automate(slot, target, value);
         }
         if let Some(g) = &mut self.pending {
-            changed |= g.automate(slot, target, value);
+            g.automate(slot, target, value);
         }
-        if changed {
+        // Only a new host value takes a macro from a cue: the host sends the same one every
+        // block, and a recompiled graph sees it again.
+        if self.automated[slot] != Some((target, value)) {
+            self.automated[slot] = Some((target, value));
             self.morphs.release(target);
         }
     }
