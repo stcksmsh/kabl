@@ -3,8 +3,13 @@
 //! bar), `cue<N>.seq.<id>` (bank per sequencer; absent = that sequencer keeps playing), and a
 //! label `cue<N>` for its name. Editing a cue is an ordinary undoable edit; launching one is a
 //! runtime command. See docs/composition-batch/design.md.
+//!
+//! A cue can also move macros: `cue<N>.macro.<id>.<k>` (macro module `id`, output `k` = 0..3)
+//! holds the value that macro heads to, absent = left where it is, and `cue<N>.morph` the
+//! morph length in beats (absent or 0 = jump). The engine moves them (`kabl_engine::morph`).
 
 use kabl_core::{ModuleId, Op, ParamTarget, PatchState};
+use kabl_engine::morph::{MacroTarget, MAX_MACRO_TARGETS};
 use kabl_engine::patch_engine::{Command, Launch, Timing, MAX_TARGETS};
 use kabl_modules::builtins::CUES;
 
@@ -20,7 +25,16 @@ pub struct Cue {
     pub timing: Timing,
     /// (sequencer, bank) for sequencers that still exist.
     pub targets: Vec<(ModuleId, usize)>,
+    /// (macro module, output 0..3, value 0..1) for macros that still exist.
+    pub macros: Vec<(ModuleId, u8, f32)>,
+    /// Morph length in beats; 0 = jump.
+    pub morph_beats: f32,
 }
+
+/// Pulses (16ths) in a beat.
+pub const PULSES_PER_BEAT: f32 = 4.0;
+/// Longest morph the editor offers, in beats (four bars).
+pub const MAX_MORPH_BEATS: f32 = 16.0;
 
 fn key(n: usize, rest: &str) -> String {
     format!("cue{n}.{rest}")
@@ -57,8 +71,25 @@ pub fn cues(state: &PatchState, id: ModuleId) -> Vec<Cue> {
                     exists(seq, "seq").then_some((seq, v.round().clamp(0.0, 3.0) as usize))
                 })
                 .collect();
+            let mprefix = key(n, "macro.");
+            let macros = m
+                .params
+                .range(mprefix.clone()..)
+                .take_while(|(k, _)| k.starts_with(&mprefix))
+                .filter_map(|(k, &v)| {
+                    let (module, out) = k[mprefix.len()..].split_once('.')?;
+                    let (module, out): (ModuleId, u8) = (module.parse().ok()?, out.parse().ok()?);
+                    (out < kabl_modules::builtins::MACROS as u8 && exists(module, "macro"))
+                        .then_some((module, out, v.clamp(0.0, 1.0)))
+                })
+                .collect();
             Cue {
                 n,
+                macros,
+                morph_beats: m
+                    .params
+                    .get(&key(n, "morph"))
+                    .map_or(0.0, |v| v.clamp(0.0, MAX_MORPH_BEATS)),
                 name: state
                     .label(id, &label_key(n))
                     .map_or_else(|| format!("Cue {n}"), str::to_string),
@@ -143,6 +174,55 @@ pub fn set_target(
     )]);
 }
 
+/// Target of macro `k` of module `module` in cue `n`; `None` = the cue leaves it alone.
+pub fn set_macro(
+    editor: &mut PatchEditor,
+    id: ModuleId,
+    n: usize,
+    module: ModuleId,
+    k: u8,
+    value: Option<f32>,
+) {
+    editor.edit(vec![set(
+        id,
+        key(n, &format!("macro.{module}.{k}")),
+        value.map(|v| v.clamp(0.0, 1.0)),
+    )]);
+}
+
+/// Morph length of cue `n` in beats (0 = jump).
+pub fn set_morph(editor: &mut PatchEditor, id: ModuleId, n: usize, beats: f32) {
+    let beats = beats.clamp(0.0, MAX_MORPH_BEATS);
+    editor.edit(vec![set(id, key(n, "morph"), (beats > 0.0).then_some(beats))]);
+}
+
+/// "Store current": cue `n` takes the value of every macro as `now` gives it, one undo step.
+/// Targets of macros that no longer exist are kept out.
+pub fn store_macros(
+    editor: &mut PatchEditor,
+    id: ModuleId,
+    n: usize,
+    now: &dyn Fn(ModuleId, u8) -> f32,
+) {
+    let ops: Vec<Op> = editor
+        .state()
+        .modules
+        .iter()
+        .filter(|(_, m)| m.kind == "macro")
+        .flat_map(|(&module, _)| {
+            (0..kabl_modules::builtins::MACROS as u8).map(move |k| (module, k))
+        })
+        .map(|(module, k)| {
+            set(
+                id,
+                key(n, &format!("macro.{module}.{k}")),
+                Some(now(module, k).clamp(0.0, 1.0)),
+            )
+        })
+        .collect();
+    editor.edit(ops);
+}
+
 pub fn set_clock(editor: &mut PatchEditor, id: ModuleId, n: usize, clock: ModuleId) {
     editor.edit(vec![set(id, key(n, "clock"), Some(clock as f32))]);
 }
@@ -180,8 +260,8 @@ pub fn launch(
     let clock = cue
         .clock
         .ok_or_else(|| format!("{}: choose a reference clock first", cue.name))?;
-    if cue.targets.is_empty() {
-        return Err(format!("{}: no sequencer is set", cue.name));
+    if cue.targets.is_empty() && cue.macros.is_empty() {
+        return Err(format!("{}: nothing is set, no sequencer or macro", cue.name));
     }
     let targets: Vec<(ModuleId, u8)> = cue
         .targets
@@ -189,7 +269,16 @@ pub fn launch(
         .take(MAX_TARGETS)
         .map(|&(s, b)| (s, b as u8))
         .collect();
-    out.push(Command::Launch(Launch::new(clock, cue.timing, &targets)));
+    let macros: Vec<MacroTarget> = cue
+        .macros
+        .iter()
+        .take(MAX_MACRO_TARGETS)
+        .map(|&(id, index, value)| MacroTarget { id, index, value })
+        .collect();
+    out.push(Command::Launch(
+        Launch::new(clock, cue.timing, &targets)
+            .with_macros(&macros, cue.morph_beats * PULSES_PER_BEAT),
+    ));
     Ok(())
 }
 
@@ -215,11 +304,14 @@ pub fn standing(cue: &Cue, bank_of: &dyn Fn(ModuleId) -> (usize, Option<usize>))
 pub fn references_to(state: &PatchState, removed: ModuleId) -> Vec<Op> {
     let mut ops = Vec::new();
     let seq_suffix = format!(".seq.{removed}");
+    let macro_part = format!(".macro.{removed}.");
     for (&id, m) in &state.modules {
         for (k, &v) in &m.params {
             let refers = match m.kind.as_str() {
                 "cues" => {
-                    k.ends_with(&seq_suffix) || (k.ends_with(".clock") && v as ModuleId == removed)
+                    k.ends_with(&seq_suffix)
+                        || k.contains(&macro_part)
+                        || (k.ends_with(".clock") && v as ModuleId == removed)
                 }
                 "seq" => k == crate::banks::LAUNCH_CLOCK && v as ModuleId == removed,
                 _ => false,

@@ -430,7 +430,11 @@ fn fire(editor: &PatchEditor, ui_state: &mut UiState, id: ModuleId, action: &str
         Some(("cue", n)) => n
             .parse()
             .map_err(|_| "bad action".to_string())
-            .and_then(|n| crate::cues::launch(&mut ui_state.launches, state, id, n)),
+            .and_then(|n| {
+                crate::cues::launch(&mut ui_state.launches, state, id, n)?;
+                ui_state.last_cue.insert(id, n);
+                Ok(())
+            }),
         _ => {
             match action {
                 "cancel" => ui_state

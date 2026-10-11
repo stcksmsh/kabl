@@ -104,6 +104,34 @@ impl Xf {
     }
 }
 
+/// One macro a cue drives: where it is, where it is heading and how far along (0..=1; 1 =
+/// arrived, held there).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MacroLive {
+    pub value: f32,
+    pub to: f32,
+    pub progress: f32,
+}
+
+impl UiState {
+    /// What the audio thread says about macro `k` of `id`, while its reports keep coming.
+    pub fn live_macro(&self, id: ModuleId, k: u8) -> Option<MacroLive> {
+        let (m, at) = self.macro_live.get(&(id, k))?;
+        (at.elapsed() < std::time::Duration::from_millis(400)).then_some(*m)
+    }
+
+    /// Where macro `k` of `id` is now: the cue's morph if one is driving it, else the knob.
+    pub fn macro_now(&self, state: &PatchState, id: ModuleId, k: u8) -> f32 {
+        self.live_macro(id, k).map_or_else(
+            || {
+                let p = &kabl_modules::builtins::MACRO_INFO.params[k as usize];
+                routing::base_value(state, id, p)
+            },
+            |m| m.value,
+        )
+    }
+}
+
 /// Interaction and view state that is not part of the patch.
 pub struct UiState {
     pub composites: composites::View,
@@ -184,6 +212,12 @@ pub struct UiState {
     pub clock_running: HashMap<ModuleId, bool>,
     /// Each clock's position in 16ths since its last restart, as the audio thread reports it.
     pub clock_pos: HashMap<ModuleId, f64>,
+    /// Macros a cue is moving or holding, as the audio thread reports them: `(macro module,
+    /// output)` to what was last reported and when. The stored knob value is the hand's.
+    pub macro_live: HashMap<(ModuleId, u8), (MacroLive, std::time::Instant)>,
+    /// The cue last launched on each `cues` module: the one a macro-only cue (no sequencer to
+    /// show it playing) counts as current, and the one "Store macros" writes to.
+    pub last_cue: HashMap<ModuleId, usize>,
     /// Host owns clock transport in the plugin; standalone defaults to Free.
     pub host_clock: bool,
     /// Transport commands for `main.rs` to send to the audio thread. Runtime only: never in the
@@ -325,6 +359,8 @@ impl Default for UiState {
             bank_revealed: None,
             clock_running: HashMap::new(),
             clock_pos: HashMap::new(),
+            macro_live: HashMap::new(),
+            last_cue: HashMap::new(),
             host_clock: false,
             transport: Vec::new(),
             delay_status: HashMap::new(),
@@ -2701,8 +2737,11 @@ fn draw_cues(
         }
     }
     if let Some(n) = launch {
-        if let Err(e) = cues::launch(&mut ui_state.launches, editor.state(), id, n) {
-            ui_state.last_message = Some(e);
+        match cues::launch(&mut ui_state.launches, editor.state(), id, n) {
+            Ok(()) => {
+                ui_state.last_cue.insert(id, n);
+            }
+            Err(e) => ui_state.last_message = Some(e),
         }
     }
 }
@@ -2744,7 +2783,16 @@ fn cues_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::U
         Timing(usize, kabl_engine::patch_engine::Timing),
         Target(usize, ModuleId, Option<usize>),
         Rename(usize, String),
+        Macro(usize, ModuleId, u8, Option<f32>),
+        Morph(usize, f32),
+        StoreMacros(usize),
     }
+    let macro_mods: Vec<ModuleId> = state
+        .modules
+        .iter()
+        .filter(|(_, m)| m.kind == "macro")
+        .map(|(&c, _)| c)
+        .collect();
     let mut edit = None;
     for c in &all {
         ui.separator();
@@ -2830,6 +2878,60 @@ fn cues_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::U
                 }
             });
         }
+        if !macro_mods.is_empty() {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(egui::RichText::new("Macros").small());
+                for &mm in &macro_mods {
+                    for k in 0..kabl_modules::builtins::MACROS as u8 {
+                        let set = c.macros.iter().find(|t| (t.0, t.1) == (mm, k)).map(|t| t.2);
+                        let name = state
+                            .label(mm, &format!("name.m{}", k + 1))
+                            .map_or_else(|| format!("m{}", k + 1), str::to_string);
+                        let r = ui
+                            .selectable_label(set.is_some(), name)
+                            .on_hover_text("Tick to set a target for this macro; unticked leaves it");
+                        ui_state.record(format!("cue-macro:{id}.{}.{mm}.{k}", c.n), r.rect);
+                        if r.clicked() {
+                            let v = set.is_none().then(|| ui_state.macro_now(state, mm, k));
+                            edit = Some(Edit::Macro(c.n, mm, k, v));
+                        }
+                        if let Some(mut v) = set {
+                            let d = ui.add(
+                                egui::DragValue::new(&mut v)
+                                    .range(0.0..=1.0)
+                                    .speed(0.005)
+                                    .fixed_decimals(2),
+                            );
+                            ui_state.record(format!("cue-macro-value:{id}.{}.{mm}.{k}", c.n), d.rect);
+                            if d.changed() {
+                                edit = Some(Edit::Macro(c.n, mm, k, Some(v)));
+                            }
+                        }
+                    }
+                }
+            });
+            ui.horizontal(|ui| {
+                let mut beats = c.morph_beats;
+                ui.label(egui::RichText::new("Morph").small());
+                let d = ui.add(
+                    egui::DragValue::new(&mut beats)
+                        .range(0.0..=cues::MAX_MORPH_BEATS)
+                        .speed(0.1)
+                        .fixed_decimals(1)
+                        .suffix(" beats"),
+                );
+                ui_state.record(format!("cue-morph:{id}.{}", c.n), d.rect);
+                d.on_hover_text("Time the macros take to reach this cue's values, on the clock; 0 jumps");
+                if beats != c.morph_beats {
+                    edit = Some(Edit::Morph(c.n, beats));
+                }
+                let r = ui.small_button("Store macros");
+                ui_state.record(format!("cue-store-macros:{id}.{}", c.n), r.rect);
+                if r.on_hover_text("Set every macro to where it is now").clicked() {
+                    edit = Some(Edit::StoreMacros(c.n));
+                }
+            });
+        }
     }
     ui.separator();
     let r = ui.add_enabled(
@@ -2862,6 +2964,12 @@ fn cues_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::U
         Some(Edit::Timing(n, t)) => cues::set_timing(editor, id, n, t),
         Some(Edit::Target(n, s, b)) => cues::set_target(editor, id, n, s, b),
         Some(Edit::Rename(n, t)) => cues::rename(editor, id, n, &t),
+        Some(Edit::Macro(n, m, k, v)) => cues::set_macro(editor, id, n, m, k, v),
+        Some(Edit::Morph(n, b)) => cues::set_morph(editor, id, n, b),
+        Some(Edit::StoreMacros(n)) => {
+            let state = editor.state().clone();
+            cues::store_macros(editor, id, n, &|m, k| ui_state.macro_now(&state, m, k));
+        }
         None => {}
     }
 }

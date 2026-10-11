@@ -43,6 +43,7 @@ enum RuntimeReport {
     Seq(u64, usize, usize, Option<usize>),
     Delay(u64, kabl_modules::builtins::DelayLock, f32),
     Lfo(u64, kabl_modules::builtins::LfoSync),
+    Morph(u64, u8, f32, f32, f32),
     Probe(kabl_engine::probe::ProbeReport),
 }
 
@@ -155,6 +156,16 @@ impl Control {
                 RuntimeReport::Lfo(id, sync) => {
                     self.view.lfo_status.insert(id, sync);
                 }
+                RuntimeReport::Morph(id, k, value, to, progress) => {
+                    let live = kabl_ui::MacroLive {
+                        value,
+                        to,
+                        progress,
+                    };
+                    self.view
+                        .macro_live
+                        .insert((id, k), (live, std::time::Instant::now()));
+                }
                 RuntimeReport::Probe(report) => {
                     let age =
                         sample_clock.saturating_sub(report.end_sample) as f64 / self.rate as f64;
@@ -169,6 +180,7 @@ impl Control {
         self.view.seq_banks.clear();
         self.view.delay_status.clear();
         self.view.lfo_status.clear();
+        self.view.macro_live.clear();
         self.view.inspect.reset_audio_session(0.0);
     }
     fn pump(&mut self) -> bool {
@@ -989,6 +1001,9 @@ impl Instrument {
         });
         s.engine.lfos(|id, sync| {
             let _ = reports.push(RuntimeReport::Lfo(id, sync));
+        });
+        s.engine.morphs(|id, k, value, to, progress| {
+            let _ = reports.push(RuntimeReport::Morph(id, k, value, to, progress));
         });
         if let Some(report) = s.engine.take_probe_report() {
             let _ = reports.push(RuntimeReport::Probe(report));
