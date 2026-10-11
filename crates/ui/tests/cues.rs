@@ -313,7 +313,10 @@ fn cue_macro_targets_are_saved_undoable_edits_without_audio_rebuilds() {
     let _ = std::fs::remove_dir_all(&dir);
 
     cues::set_macro(&mut h.editor, h.cues, n, m, 1, None);
-    assert_eq!(cues::cues(h.editor.state(), h.cues)[0].macros, vec![(m, 0, 0.25)]);
+    assert_eq!(
+        cues::cues(h.editor.state(), h.cues)[0].macros,
+        vec![(m, 0, 0.25)]
+    );
     cues::set_morph(&mut h.editor, h.cues, n, 0.0);
     assert_eq!(cues::cues(h.editor.state(), h.cues)[0].morph_beats, 0.0);
     for _ in 0..5 {
@@ -364,7 +367,10 @@ fn a_launch_carries_the_macro_targets_and_the_morph_in_pulses() {
         [Command::Launch(l)] => {
             assert_eq!(l.count, 0, "a cue of macros only has no sequencer");
             assert_eq!(l.macro_count, 1);
-            assert_eq!((l.macros[0].id, l.macros[0].index, l.macros[0].value), (m, 2, 0.4));
+            assert_eq!(
+                (l.macros[0].id, l.macros[0].index, l.macros[0].value),
+                (m, 2, 0.4)
+            );
             assert_eq!(l.morph_pulses, 8.0);
         }
         other => panic!("{other:?}"),
@@ -384,5 +390,8 @@ fn deleting_a_macro_module_drops_its_cue_targets_and_undo_restores_them() {
         .keys()
         .any(|k| k.contains(".macro.")));
     h.editor.undo();
-    assert_eq!(cues::cues(h.editor.state(), h.cues)[0].macros, vec![(m, 0, 0.3)]);
+    assert_eq!(
+        cues::cues(h.editor.state(), h.cues)[0].macros,
+        vec![(m, 0, 0.3)]
+    );
 }

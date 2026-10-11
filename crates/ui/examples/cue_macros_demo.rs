@@ -132,10 +132,7 @@ fn build() -> (PatchEditor, ModuleId) {
         cues::set_morph(&mut e, cue, n, beats);
     }
 
-    let mut pins = vec![
-        (clock, TRANSPORT.to_string()),
-        (cue, CUE_PADS.to_string()),
-    ];
+    let mut pins = vec![(clock, TRANSPORT.to_string()), (cue, CUE_PADS.to_string())];
     pins.extend((1..=3).map(|k| (knob, format!("m{k}"))));
     let mut changes = Vec::new();
     for (i, (id, key)) in pins.iter().enumerate() {

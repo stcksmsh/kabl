@@ -2899,9 +2899,9 @@ fn cues_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::U
                         let name = state
                             .label(mm, &format!("name.m{}", k + 1))
                             .map_or_else(|| format!("m{}", k + 1), str::to_string);
-                        let r = ui
-                            .selectable_label(set.is_some(), name)
-                            .on_hover_text("Tick to set a target for this macro; unticked leaves it");
+                        let r = ui.selectable_label(set.is_some(), name).on_hover_text(
+                            "Tick to set a target for this macro; unticked leaves it",
+                        );
                         ui_state.record(format!("cue-macro:{id}.{}.{mm}.{k}", c.n), r.rect);
                         if r.clicked() {
                             let v = set.is_none().then(|| ui_state.macro_now(state, mm, k));
@@ -2914,7 +2914,8 @@ fn cues_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::U
                                     .speed(0.005)
                                     .fixed_decimals(2),
                             );
-                            ui_state.record(format!("cue-macro-value:{id}.{}.{mm}.{k}", c.n), d.rect);
+                            ui_state
+                                .record(format!("cue-macro-value:{id}.{}.{mm}.{k}", c.n), d.rect);
                             if d.changed() {
                                 edit = Some(Edit::Macro(c.n, mm, k, Some(v)));
                             }
@@ -2933,13 +2934,17 @@ fn cues_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::U
                         .suffix(" beats"),
                 );
                 ui_state.record(format!("cue-morph:{id}.{}", c.n), d.rect);
-                d.on_hover_text("Time the macros take to reach this cue's values, on the clock; 0 jumps");
+                d.on_hover_text(
+                    "Time the macros take to reach this cue's values, on the clock; 0 jumps",
+                );
                 if beats != c.morph_beats {
                     edit = Some(Edit::Morph(c.n, beats));
                 }
                 let r = ui.small_button("Store macros");
                 ui_state.record(format!("cue-store-macros:{id}.{}", c.n), r.rect);
-                if r.on_hover_text("Set every macro to where it is now").clicked() {
+                if r.on_hover_text("Set every macro to where it is now")
+                    .clicked()
+                {
                     edit = Some(Edit::StoreMacros(c.n));
                 }
             });

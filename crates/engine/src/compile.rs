@@ -1633,7 +1633,10 @@ impl CompiledPatch {
         let lo = self
             .param_slots
             .partition_point(|s| (s.id, s.index) < (id, index));
-        let slot = *self.param_slots.get(lo).filter(|s| (s.id, s.index) == (id, index))?;
+        let slot = *self
+            .param_slots
+            .get(lo)
+            .filter(|s| (s.id, s.index) == (id, index))?;
         let Step::Process {
             module_index,
             params,

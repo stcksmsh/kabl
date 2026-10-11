@@ -193,7 +193,11 @@ pub fn set_macro(
 /// Morph length of cue `n` in beats (0 = jump).
 pub fn set_morph(editor: &mut PatchEditor, id: ModuleId, n: usize, beats: f32) {
     let beats = beats.clamp(0.0, MAX_MORPH_BEATS);
-    editor.edit(vec![set(id, key(n, "morph"), (beats > 0.0).then_some(beats))]);
+    editor.edit(vec![set(
+        id,
+        key(n, "morph"),
+        (beats > 0.0).then_some(beats),
+    )]);
 }
 
 /// "Store current": cue `n` takes the value of every macro as `now` gives it, one undo step.
@@ -261,7 +265,10 @@ pub fn launch(
         .clock
         .ok_or_else(|| format!("{}: choose a reference clock first", cue.name))?;
     if cue.targets.is_empty() && cue.macros.is_empty() {
-        return Err(format!("{}: nothing is set, no sequencer or macro", cue.name));
+        return Err(format!(
+            "{}: nothing is set, no sequencer or macro",
+            cue.name
+        ));
     }
     let targets: Vec<(ModuleId, u8)> = cue
         .targets

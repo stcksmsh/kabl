@@ -99,7 +99,12 @@ impl Morphs {
 
     /// A write to macro `index` of `id` from outside (hand, MIDI, host): its morph ends here.
     pub fn release(&mut self, t: RuntimeTarget) {
-        let RuntimeTarget::Param { id, kind: "macro", index } = t else {
+        let RuntimeTarget::Param {
+            id,
+            kind: "macro",
+            index,
+        } = t
+        else {
             return;
         };
         for d in self.driven.iter_mut() {

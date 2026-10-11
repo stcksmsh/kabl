@@ -34,8 +34,7 @@ fn module(kind: &str, params: &[(&str, f32)]) -> ModuleState {
 /// clock, macro (m1 = 0.2, m2 = 0.7) with m1 and m2 as the left and right output.
 fn patch() -> PatchState {
     let mut p = PatchState::new();
-    p.modules
-        .insert(CLOCK, module("clock", &[("bpm", 120.0)]));
+    p.modules.insert(CLOCK, module("clock", &[("bpm", 120.0)]));
     p.modules
         .insert(MACRO, module("macro", &[("m1", 0.2), ("m2", 0.7)]));
     p.modules.insert(OUT, module("out", &[]));
@@ -96,9 +95,9 @@ impl Rig {
         let mut worst: f32 = 0.0;
         for _ in 0..blocks {
             assert_no_alloc(|| self.e.process_block(&mut l, &mut r));
-            for i in 0..BLOCK {
-                worst = worst.max((l[i] - self.last.0).abs());
-                self.last.0 = l[i];
+            for &x in &l {
+                worst = worst.max((x - self.last.0).abs());
+                self.last.0 = x;
             }
             self.last.1 = r[BLOCK - 1];
         }
@@ -106,7 +105,7 @@ impl Rig {
     }
 
     /// Runs to the start of the next bar, plus `extra` blocks.
-    fn to_bar(&mut self, extra: usize) {
+    fn run_to_bar(&mut self, extra: usize) {
         let mut pos = 0.0;
         self.e.clocks(|_, _, p| pos = p);
         let left = (16.0 - pos.rem_euclid(16.0)) * 6000.0 / BLOCK as f64;
@@ -123,7 +122,10 @@ impl Rig {
             })
             .collect();
         let l = Launch::new(CLOCK, timing, &[]).with_macros(&ms, pulses);
-        assert_no_alloc(|| self.e.command(&kabl_engine::patch_engine::Command::Launch(l)));
+        assert_no_alloc(|| {
+            self.e
+                .command(&kabl_engine::patch_engine::Command::Launch(l))
+        });
     }
 
     fn value(&mut self, index: u16) -> f32 {
@@ -152,7 +154,7 @@ fn lands_on_the_bar_and_jumps_with_zero_length() {
     r.launch(&[(0, 0.9)], 0.0, Timing::NextBar);
     r.run(BAR_BLOCKS / 2);
     assert_eq!(r.value(0), 0.2, "still waiting for the bar");
-    r.to_bar(2);
+    r.run_to_bar(2);
     assert_eq!(r.value(0), 0.9);
     assert!((heard(&mut r) - 0.9).abs() < 1e-3);
 }
@@ -161,7 +163,7 @@ fn lands_on_the_bar_and_jumps_with_zero_length() {
 fn macro_without_a_target_is_left_alone() {
     let mut r = Rig::new();
     r.launch(&[(0, 0.9)], 16.0, Timing::NextBar);
-    r.to_bar(0);
+    r.run_to_bar(0);
     r.run(BAR_BLOCKS + 20);
     assert_eq!(r.value(1), 0.7);
     assert!((r.last.1 - 0.7).abs() < 1e-4);
@@ -171,7 +173,7 @@ fn macro_without_a_target_is_left_alone() {
 fn morph_follows_the_clock_and_has_no_steps() {
     let mut r = Rig::new();
     r.launch(&[(0, 0.8)], 16.0, Timing::NextBar);
-    r.to_bar(0);
+    r.run_to_bar(0);
     let mut worst: f32 = 0.0;
     let mut prev = 0.2;
     // Half a bar in: half way.
@@ -193,7 +195,7 @@ fn morph_follows_the_clock_and_has_no_steps() {
 fn next_cue_before_the_end_starts_from_where_the_macro_is() {
     let mut r = Rig::new();
     r.launch(&[(0, 1.0)], 16.0, Timing::NextBar);
-    r.to_bar(0);
+    r.run_to_bar(0);
     r.run(BAR_BLOCKS / 4);
     r.launch(&[(0, 0.0)], 0.0, Timing::Now);
     r.run(1);
@@ -202,7 +204,7 @@ fn next_cue_before_the_end_starts_from_where_the_macro_is() {
     assert_eq!(r.value(0), 0.0, "the old morph is gone");
     // A second morph that lands half way through the first starts from where it had got to.
     r.launch(&[(0, 1.0)], 16.0, Timing::NextBar);
-    r.to_bar(0);
+    r.run_to_bar(0);
     r.run(BAR_BLOCKS / 2);
     r.launch(&[(0, 0.0)], 16.0, Timing::NextStep);
     r.run(PULSE_BLOCKS + 5);
@@ -219,14 +221,14 @@ fn next_cue_before_the_end_starts_from_where_the_macro_is() {
 fn a_hand_wins_and_the_next_cue_takes_over_again() {
     let mut r = Rig::new();
     r.launch(&[(0, 1.0)], 16.0, Timing::NextBar);
-    r.to_bar(0);
+    r.run_to_bar(0);
     r.run(BAR_BLOCKS / 4);
     r.set(0, 0.1);
     r.run(BAR_BLOCKS);
     assert_eq!(r.value(0), 0.1, "the morph ended at the grab");
     r.e.morphs(|_, _, _, _, _| panic!("nothing is driven after a grab"));
     r.launch(&[(0, 0.6)], 0.0, Timing::NextBar);
-    r.to_bar(2);
+    r.run_to_bar(2);
     assert_eq!(r.value(0), 0.6);
 }
 
@@ -234,14 +236,14 @@ fn a_hand_wins_and_the_next_cue_takes_over_again() {
 fn host_automation_wins_like_a_hand() {
     let mut r = Rig::new();
     r.launch(&[(0, 1.0)], 16.0, Timing::NextBar);
-    r.to_bar(0);
+    r.run_to_bar(0);
     r.run(BAR_BLOCKS / 4);
     r.e.automate(0, t(0), 0.3);
     r.run(BAR_BLOCKS);
     assert_eq!(r.value(0), 0.3);
     // A cue morph does not make a steady host value take the macro back.
     r.launch(&[(0, 0.9)], 0.0, Timing::NextBar);
-    r.to_bar(2);
+    r.run_to_bar(2);
     r.e.automate(0, t(0), 0.3);
     r.run(3);
     assert_eq!(r.value(0), 0.9);
@@ -251,7 +253,7 @@ fn host_automation_wins_like_a_hand() {
 fn stop_freezes_run_resumes_restart_finishes() {
     let mut r = Rig::new();
     r.launch(&[(0, 1.0)], 16.0, Timing::NextBar);
-    r.to_bar(0);
+    r.run_to_bar(0);
     r.run(BAR_BLOCKS / 4);
     r.e.transport(CLOCK, Transport::Stop);
     r.run(2);
@@ -280,7 +282,7 @@ fn cue_on_a_stopped_clock_jumps() {
 fn tempo_change_stretches_the_morph() {
     let mut r = Rig::new();
     r.launch(&[(0, 1.0)], 16.0, Timing::NextBar);
-    r.to_bar(0);
+    r.run_to_bar(0);
     r.run(BAR_BLOCKS / 4);
     let s = ParamSet {
         rev: 1,
@@ -303,11 +305,10 @@ fn tempo_change_stretches_the_morph() {
 fn a_morph_survives_a_recompile_and_holds_after_it_ends() {
     let mut r = Rig::new();
     r.launch(&[(0, 0.9)], 0.0, Timing::NextBar);
-    r.to_bar(2);
+    r.run_to_bar(2);
     // An edit elsewhere compiles a new graph with the document's macro value (0.2).
     let mut p = patch();
-    p.modules
-        .insert(99, module("gain", &[("gain", 0.5)]));
+    p.modules.insert(99, module("gain", &[("gain", 0.5)]));
     let g = kabl_engine::compile::compile(&p, SR, 8).unwrap();
     let mut g = basedrop::Owned::new(&r._c.handle(), g);
     g.rev = 5;

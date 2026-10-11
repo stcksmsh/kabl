@@ -782,12 +782,7 @@ fn cues_card(
                             .tip(st, &hover);
                             ui_state.record(format!("pcue:{id}.{}", c.n), r.rect);
                             if r.clicked() {
-                                match crate::cues::launch(
-                                    &mut ui_state.launches,
-                                    &state,
-                                    id,
-                                    c.n,
-                                ) {
+                                match crate::cues::launch(&mut ui_state.launches, &state, id, c.n) {
                                     Ok(()) => {
                                         ui_state.last_cue.insert(id, c.n);
                                     }
@@ -975,7 +970,11 @@ fn macro_tile(
                         st,
                         Role::Caption,
                         Tone::Accent,
-                        format!("→ {} · {:.0}%", routing::fmt_value(p, m.to), m.progress * 100.0),
+                        format!(
+                            "→ {} · {:.0}%",
+                            routing::fmt_value(p, m.to),
+                            m.progress * 100.0
+                        ),
                     )
                     .tip(st, "A cue is moving this macro; turn it to take over");
                     ui.ctx()
