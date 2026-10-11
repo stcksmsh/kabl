@@ -137,6 +137,32 @@ impl PatchLog {
             }
         }
 
+        // A table edit gesture (a pen stroke) rewrites its first entry, so the log holds one
+        // table per gesture rather than one per frame of it. The entry may be a `Group` whose
+        // first op is the table (the edit that also pointed a module at the slot).
+        if let (Op::SetTable { slot, value }, Some(window)) = (&op, window) {
+            if let Some(last) = self.entries.last_mut() {
+                if last.source == source && t_ms.saturating_sub(last.t_ms) <= window {
+                    let first = match &mut last.op {
+                        Op::Group { ops } => ops.first_mut(),
+                        other => Some(other),
+                    };
+                    if let Some(Op::SetTable {
+                        slot: last_slot,
+                        value: last_value,
+                    }) = first
+                    {
+                        if last_slot == slot {
+                            last_value.clone_from(value);
+                            last.t_ms = t_ms;
+                            self.state.apply(&op);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
         let inverse = self.state.inverse_for(&op);
         self.state.apply(&op);
         let seq = self.next_seq;

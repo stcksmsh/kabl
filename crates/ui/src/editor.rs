@@ -254,9 +254,25 @@ impl PatchEditor {
     /// the patch unchanged, a file that is not a usable wavetable or would push the saved
     /// patch past the size every host project and browser document is held to.
     pub fn import_table(&mut self, slot: u64, name: &str, wav: &[u8]) -> Result<(), String> {
+        let wav = kabl_modules::wavetable::import_wav(wav).map_err(|e| e.to_string())?;
+        self.put_table(slot, name, wav, true, None)
+    }
+
+    /// Embeds canonical table bytes in `slot`, refusing (patch unchanged) a table that would
+    /// push the saved patch past the size limit. `first` starts an undo step; `false` rewrites
+    /// the step the last call started, so a pen stroke is one step however often it commits.
+    /// `bind` (with `first`) points that module's `user` param at the slot in the same step.
+    pub fn put_table(
+        &mut self,
+        slot: u64,
+        name: &str,
+        wav: Vec<u8>,
+        first: bool,
+        bind: Option<ModuleId>,
+    ) -> Result<(), String> {
         let table = kabl_core::Table {
             name: kabl_modules::wavetable::table_name(name),
-            wav: kabl_modules::wavetable::import_wav(wav).map_err(|e| e.to_string())?,
+            wav,
         };
         let mut candidate = self.state().clone();
         candidate.tables.insert(slot, table.clone());
@@ -267,7 +283,30 @@ impl PatchEditor {
         if size > 2 * 1024 * 1024 - 16 * 1024 {
             return Err("The sound would be too large to save with this table".into());
         }
-        self.set_table(slot, Some(table));
+        let mut op = Op::SetTable {
+            slot,
+            value: Some(table),
+        };
+        if let (Some(id), true) = (bind, first) {
+            op = Op::Group {
+                ops: vec![
+                    op,
+                    Op::SetParam {
+                        target: ParamTarget::Module {
+                            id,
+                            param: "user".into(),
+                        },
+                        value: slot as f32,
+                    },
+                ],
+            };
+        }
+        self.dirty = true;
+        if first {
+            self.log.append_new(op, now_ms(), Source::User);
+        } else {
+            self.log.append_continuing(op, now_ms(), Source::User);
+        }
         Ok(())
     }
 
