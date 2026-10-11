@@ -14,6 +14,9 @@ Polish module faces and give them live displays (bar: Vital / Arturia Pigments).
 - Audio cost of 15 face taps on Composition (`KABL_BENCH_FACES=1 ... bench_composition`): median 216 -> 233 us of a 5333 us budget; p99.9 807 -> 828 us.
 - Plugin in REAPER 7.75 (real host, `host/start.sh`): editor renders at 1180x680 with live displays; `media/faces/plugin-editor-1180x680-50pct.webp`.
 
+## Final numbers (head after this commit)
+Workspace tests 872 passed, 0 failed, 30 ignored; strict clippy clean; fmt clean; master already merged. Quiet-machine bench (dense Composition 1440x900 light, displays live, rack only, 3 runs): median 4.0 to 4.8 ms, p95 4.8 to 5.2 ms, max 5.3 to 6.0 ms. Earlier noisy runs reached max 15.6 ms.
+
 ## Captures (docs/design/app-target/media/faces/)
 `<scene>-<size>-<light|dark>.webp` for scene simple, composition, fm6, wt at 1440x900 and 1280x800; `plugin-editor-1180x680-50pct`, `arp-73pct`, `seq-ratchet-drawer`, `authored-panel-voice` (composite with authored panel), `live-reference`, `live-composition-100pct`, `faces-live-composition.mp4` (about 25 s, composition playing at 100%: filter curve and cutoff dot, envelope playhead, LFO dots, knob live dots). Not every capture was re-looked at after the final title tweak; look at the matrix again before reporting.
 
