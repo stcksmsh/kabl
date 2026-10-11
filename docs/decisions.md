@@ -1,5 +1,25 @@
 # Decisions
 
+## 2026-10-11 — Effects and filters for 1.0
+
+Why: the rack had chorus, drive, delay, reverb and three filters. A modulation effect, dynamics, tone shaping, lo-fi and the tuned and vocal filters were missing before presets and lessons are built on the module set. Eight modules and one output; summary, numbers and clips in `docs/effects-filters/README.md`. No schema bump: new kinds are new registry entries, and saved patches and the factory bank load and render as before (REAPER check: old project bit-identical to the build before this batch).
+
+**EQ shape: low shelf, two bells (frequency, gain, Q), high shelf.** Cut filters stay `filter.svf` and `filter.ladder`; an EQ with its own high-pass and low-pass would duplicate them. Four bands cover tone shaping and a surgical cut or boost; more bands would be a different (parametric, display-driven) module. The bands are TPT state-variable filters (Simper), not cookbook biquads: the biquad blew up under random per-sample modulation in the test suite, and the TPT form stays bounded when frequency, gain or Q is cabled at audio rate. Cost: about 41 ns per sample.
+
+**Notch: a fourth output `notch` on `filter.svf`, not a module.** The state-variable filter already computes both halves (low-pass plus high-pass is the notch), so a module would repeat the filter to print one sum. The output exists only when the instance has more than three output buffers, because hand-wired tests (and nothing else) supply three; a patch that does not use it pays one add. Cost to users: none, and a sweepable notch already follows the SVF's cutoff and resonance.
+
+**Limiter: no lookahead.** A lookahead limiter delays its signal. The plugin reports one fixed latency to the host (`set_latency_samples`, the timeline's constant); there is no per-patch latency reporting, so a delayed limiter inside a patch would shift the sound against the host timeline and any dry path. The brief allowed lookahead only if latency reporting works end to end, and it does not. Instead: instant attack, a one-pole release, and a final clamp to the ceiling so no sample exceeds it at any input level. The price is distortion on the peaks of a very hard-driven limiter; a compressor in front keeps it clean. Revisit when per-patch latency reporting exists.
+
+**Compressor sidechain and meter.** `sc` is an audio input; when it is not patched it reads as a held scalar, so the module falls back to its internal detector rather than treating silence as the detector. `gr` is an output carrying the smoothed reduction in dB (0 or more), usable as a meter or as modulation. Detection is stereo-linked (the larger side), smoothing is in the dB domain after a quadratic soft knee.
+
+**Comb and formant filters are modules of their own.** The comb needs a pitch input and a delay line of one period with Hermite reads, so the pitch stays exact (measured to 0.00 cents by the echo centroid; autocorrelation was biased); it shares nothing with the SVF. The formant filter is five parallel band-passes from a published tenor vowel table; it is not a mode of an SVF because it has no cutoff.
+
+**Modulation without zipper noise.** Every cutoff-like or time-varying parameter is read per sample (cable at audio rate) and glides 20 ms when set by a knob. The new kinds are registered in `runtime::smoothed_by_module`, so the module smooths scalar edits itself and follows cables as buffers. A parameter whose steps are the effect (bit depth, downsample) is not smoothed.
+
+**Faces.** Basic generic faces, local to the new modules: the EQ's band controls got explicit labels in `param_label` (frequency and gain would otherwise both read "Low", "Mid1", ...), and the formant filter's title is short enough to clear the hidden-parameter badge. The shared face code is otherwise untouched (faces are being reworked on PR #24).
+
+**Not done.** Oversampling beyond what exists, live displays, presets, and any change to the sound of an existing module.
+
 ## 2026-10-10 — Rhythm: arpeggiator, swing and ratchets
 
 Why: the only way to get moving notes was the eight-step `seq`, programmed by hand, and the two things that make a sequence feel alive (swing, repeated notes) did not exist. A preset bank and guided lessons will be built on this. Full description: `docs/sound-engines/rhythm.md`.

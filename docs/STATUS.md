@@ -1,5 +1,9 @@
 # Status
 
+## Effects and filters — 2026-10-11
+
+Draft PR #25 (`claude/effects`): phaser, flanger, compressor, EQ, limiter, bitcrusher, comb and formant filters, and a notch output on `filter.svf`. [README](effects-filters/README.md) has ports, parameters, CPU, host evidence and one clip per module; decisions in `decisions.md`. No schema bump. Nobody has listened to the clips yet.
+
 ## Factory performance bank — 2026-10-08
 
 D10 PR #13 is verified merged at `23075cd713884903a8985c88ab43bd1817477308`; earlier unmerged statements below are historical. The authorized curated bank on isolated `codex/factory-performance-bank` contains six sounds, four sequences and two performances, with purpose filters and prepared controls. [Report](factory-performance-bank/REPORT.md) records exact heads, audio/UI/host proof, independent review and portable receipts. Draft submission is not merge or owner approval. Listening/controller/physical latency/xruns/beta remain pending. Ordinary-render nondeterminism, warm-up policy and dense-editor/backend limits are inherited. No D11/custom-code work or other-chat messages.
