@@ -1181,7 +1181,9 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                             Role::Body,
                             Tone::Text3,
                             match filter {
-                                Filter::Favorites => "No favorites yet: click the star next to a sound.",
+                                Filter::Favorites => {
+                                    "No favorites yet: click the star next to a sound."
+                                }
                                 Filter::Recent => "Nothing opened yet.",
                                 Filter::User => "No sounds of yours yet: Save As puts them here.",
                                 _ => "No sound matches.",

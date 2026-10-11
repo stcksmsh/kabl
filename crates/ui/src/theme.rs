@@ -1,7 +1,7 @@
 //! A-light / A-dark: the approved revision-2 palettes (`docs/design/revision-2/render2.py`,
 //! the same values the `rev2_proto` example draws with), and the chrome/fonts that go with them.
 
-use crate::style::{mix, Style};
+use crate::style::{contrast, mix, Style};
 use egui::Color32;
 use kabl_modules::PortType;
 
@@ -33,6 +33,8 @@ pub struct Theme {
     pub seg_on: Color32,
     pub seg_on_text: Color32,
     pub sel: Color32,
+    /// Text or mark drawn on a `sel` fill.
+    pub sel_ink: Color32,
     pub warn: Color32,
     pub audio: Color32,
     pub cv: Color32,
@@ -74,6 +76,11 @@ pub fn theme(st: &Style) -> Theme {
         seg_on: if accent_pill { r.accent } else { r.text },
         seg_on_text: if accent_pill { r.on_accent } else { r.surface },
         sel: r.focus,
+        sel_ink: if contrast(r.on_accent, r.focus) >= contrast(r.text, r.focus) {
+            r.on_accent
+        } else {
+            r.text
+        },
         warn: r.warn,
         audio: r.audio,
         cv: r.cv,
@@ -192,4 +199,3 @@ pub fn panel_theme(st: &Style, kind: &str) -> Theme {
     t.tick = t.ink2;
     t
 }
-

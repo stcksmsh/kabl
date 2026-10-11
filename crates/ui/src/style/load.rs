@@ -155,8 +155,10 @@ pub fn parse(text: &str, known: &Themes) -> Result<Theme, String> {
 
     let mut notes = Vec::new();
     for k in doc.keys() {
-        if !["id", "name", "extends", "author", "version", "license", "ui_api", "light", "dark"]
-            .contains(&k.as_str())
+        if ![
+            "id", "name", "extends", "author", "version", "license", "ui_api", "light", "dark",
+        ]
+        .contains(&k.as_str())
         {
             notes.push(format!("unknown key `{k}` ignored"));
         }
@@ -223,7 +225,9 @@ fn overlay(base: &Style, over: &toml::Table, mode: &str, notes: &mut Vec<String>
             return base.clone();
         }
         if c < min {
-            notes.push(format!("{mode}: {n} is {c:.1}:1, below the {min:.1} target"));
+            notes.push(format!(
+                "{mode}: {n} is {c:.1}:1, below the {min:.1} target"
+            ));
         }
     }
     s
@@ -293,18 +297,74 @@ fn clamp(s: &mut Style, base: &Style, mode: &str, notes: &mut Vec<String>) {
         ("section", &mut s.types.section, &b.types.section),
     ];
     for (name, t, bt) in types {
-        num(&mut t.size, TEXT_FLOOR, 40.0, bt.size, &format!("type.{name}.size"), mode, notes);
-        num(&mut t.tracking, -2.0, 8.0, bt.tracking, &format!("type.{name}.tracking"), mode, notes);
+        num(
+            &mut t.size,
+            TEXT_FLOOR,
+            40.0,
+            bt.size,
+            &format!("type.{name}.size"),
+            mode,
+            notes,
+        );
+        num(
+            &mut t.tracking,
+            -2.0,
+            8.0,
+            bt.tracking,
+            &format!("type.{name}.tracking"),
+            mode,
+            notes,
+        );
     }
     for (i, v) in s.space.iter_mut().enumerate() {
         num(v, 0.0, 64.0, b.space[i], "space", mode, notes);
     }
-    num(&mut s.radii.sm, 0.0, 24.0, b.radii.sm, "radii.sm", mode, notes);
-    num(&mut s.radii.md, 0.0, 24.0, b.radii.md, "radii.md", mode, notes);
-    num(&mut s.radii.lg, 0.0, 24.0, b.radii.lg, "radii.lg", mode, notes);
+    num(
+        &mut s.radii.sm,
+        0.0,
+        24.0,
+        b.radii.sm,
+        "radii.sm",
+        mode,
+        notes,
+    );
+    num(
+        &mut s.radii.md,
+        0.0,
+        24.0,
+        b.radii.md,
+        "radii.md",
+        mode,
+        notes,
+    );
+    num(
+        &mut s.radii.lg,
+        0.0,
+        24.0,
+        b.radii.lg,
+        "radii.lg",
+        mode,
+        notes,
+    );
     for (i, sh) in s.shadows.iter_mut().enumerate() {
-        num(&mut sh.dy, -48.0, 48.0, b.shadows[i].dy, "shadows.dy", mode, notes);
-        num(&mut sh.blur, 0.0, 48.0, b.shadows[i].blur, "shadows.blur", mode, notes);
+        num(
+            &mut sh.dy,
+            -48.0,
+            48.0,
+            b.shadows[i].dy,
+            "shadows.dy",
+            mode,
+            notes,
+        );
+        num(
+            &mut sh.blur,
+            0.0,
+            48.0,
+            b.shadows[i].blur,
+            "shadows.blur",
+            mode,
+            notes,
+        );
     }
     let m = &mut s.motion;
     for (v, d, what) in [
@@ -328,14 +388,50 @@ fn clamp(s: &mut Style, base: &Style, mode: &str, notes: &mut Vec<String>) {
         (&mut sl.cable.dimmed, bl.cable.dimmed, "cable.dimmed"),
         (&mut sl.display.glow, bl.display.glow, "display.glow"),
         (&mut sl.display.fill, bl.display.fill, "display.fill"),
-        (&mut sl.controls.gradient, bl.controls.gradient, "controls.gradient"),
+        (
+            &mut sl.controls.gradient,
+            bl.controls.gradient,
+            "controls.gradient",
+        ),
     ] {
         num(v, 0.0, 1.0, d, what, mode, notes);
     }
-    num(&mut sl.cable.width, 1.0, 12.0, bl.cable.width, "cable.width", mode, notes);
-    num(&mut sl.cable.sag, 0.0, 200.0, bl.cable.sag, "cable.sag", mode, notes);
-    num(&mut sl.controls.outline, 0.0, 4.0, bl.controls.outline, "controls.outline", mode, notes);
-    num(&mut sl.controls.focus_ring, 0.0, 6.0, bl.controls.focus_ring, "controls.focus_ring", mode, notes);
+    num(
+        &mut sl.cable.width,
+        1.0,
+        12.0,
+        bl.cable.width,
+        "cable.width",
+        mode,
+        notes,
+    );
+    num(
+        &mut sl.cable.sag,
+        0.0,
+        200.0,
+        bl.cable.sag,
+        "cable.sag",
+        mode,
+        notes,
+    );
+    num(
+        &mut sl.controls.outline,
+        0.0,
+        4.0,
+        bl.controls.outline,
+        "controls.outline",
+        mode,
+        notes,
+    );
+    num(
+        &mut sl.controls.focus_ring,
+        0.0,
+        6.0,
+        bl.controls.focus_ring,
+        "controls.focus_ring",
+        mode,
+        notes,
+    );
     sl.face.shadow = sl.face.shadow.min(2);
     sl.controls.card_shadow = sl.controls.card_shadow.min(2);
     sl.controls.popover_shadow = sl.controls.popover_shadow.min(2);
@@ -351,7 +447,9 @@ fn clamp(s: &mut Style, base: &Style, mode: &str, notes: &mut Vec<String>) {
     ] {
         if c.a() != 255 {
             *c = d;
-            notes.push(format!("{mode}: roles.{what} must be opaque, base value used"));
+            notes.push(format!(
+                "{mode}: roles.{what} must be opaque, base value used"
+            ));
         }
     }
 }
@@ -446,7 +544,13 @@ mod tests {
         assert_eq!(t.light.slots.knob.glow, 1.0);
         assert_eq!(t.light.radii.sm, 24.0);
         let n = t.notes.join("\n");
-        for want in ["roles.bg", "roles.mystery", "knob.body", "knob.glow", "radii.sm"] {
+        for want in [
+            "roles.bg",
+            "roles.mystery",
+            "knob.body",
+            "knob.glow",
+            "radii.sm",
+        ] {
             assert!(n.contains(want), "{want} not in {n}");
         }
     }
@@ -466,7 +570,10 @@ mod tests {
                 ..builtin_a(false)
             }
         );
-        assert!(t.notes.iter().any(|n| n.contains("whole light mode ignored")));
+        assert!(t
+            .notes
+            .iter()
+            .any(|n| n.contains("whole light mode ignored")));
     }
 
     #[test]

@@ -23,10 +23,19 @@ fn embedded_fonts_cover_every_character_the_interface_draws() {
     assert!(chars.len() > 10, "scan found too few characters");
     let fonts: [(&str, &[u8]); 5] = [
         ("sans", include_bytes!("../assets/IBMPlexSans-Regular.ttf")),
-        ("sans-medium", include_bytes!("../assets/IBMPlexSans-Medium.ttf")),
-        ("sans-semibold", include_bytes!("../assets/IBMPlexSans-SemiBold.ttf")),
+        (
+            "sans-medium",
+            include_bytes!("../assets/IBMPlexSans-Medium.ttf"),
+        ),
+        (
+            "sans-semibold",
+            include_bytes!("../assets/IBMPlexSans-SemiBold.ttf"),
+        ),
         ("mono", include_bytes!("../assets/IBMPlexMono-Regular.ttf")),
-        ("mono-medium", include_bytes!("../assets/IBMPlexMono-Medium.ttf")),
+        (
+            "mono-medium",
+            include_bytes!("../assets/IBMPlexMono-Medium.ttf"),
+        ),
     ];
     for (name, bytes) in fonts {
         let map = FontRef::new(bytes).unwrap().charmap();

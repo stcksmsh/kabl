@@ -350,7 +350,10 @@ pub fn seg_enabled(ui: &mut Ui, st: &Style, text: &str, selected: bool, enabled:
     );
     let r = &st.roles;
     let radius = st.shape_radius(st.slots.controls.chip, h);
-    if ui.data(|d| d.get_temp::<bool>(tabs_flag())).unwrap_or(false) {
+    if ui
+        .data(|d| d.get_temp::<bool>(tabs_flag()))
+        .unwrap_or(false)
+    {
         // `chrome.view_switch = tabs`: no pill; the selected tab gets an accent underline.
         if selected {
             let bar = Rect::from_min_max(rect.left_bottom() - vec2(0.0, 2.0), rect.right_bottom());

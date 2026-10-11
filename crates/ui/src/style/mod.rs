@@ -541,7 +541,7 @@ mod tests {
                 .chain(a.mark_pairs())
                 // Known shortfall of both light themes, accepted by design: cables carry a
                 // dark under-stroke over the pale rack.
-                .filter(|&(n, ..)| !(!dark && ["audio on rack", "cv on rack"].contains(&n)))
+                .filter(|&(n, ..)| dark || !["audio on rack", "cv on rack"].contains(&n))
                 .filter(|&(_, fg, bg, min)| contrast(fg, bg) < min)
                 .map(|(n, fg, bg, min)| format!("{n}: {:.2} < {min}", contrast(fg, bg)))
                 .collect();

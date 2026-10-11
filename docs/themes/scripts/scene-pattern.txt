@@ -1,0 +1,7 @@
+# The cable pattern editor (a route with a step pattern).
+sleep 3
+click route:9
+sleep 1
+click pattern:9
+sleep 1.5
+shot shot

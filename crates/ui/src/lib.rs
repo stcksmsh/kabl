@@ -1160,7 +1160,12 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
                         ui_state.theme.clone_from(&t.id);
                     }
                 }
-                let notes = ui_state.theme_notes.iter().take(4).cloned().collect::<Vec<_>>();
+                let notes = ui_state
+                    .theme_notes
+                    .iter()
+                    .take(4)
+                    .cloned()
+                    .collect::<Vec<_>>();
                 for n in notes {
                     kit::paragraph(ui, st, style::Role::Caption, kit::Tone::Text2, &n);
                 }
@@ -2231,7 +2236,7 @@ fn draw_module(
             egui::Align2::CENTER_CENTER,
             "Done",
             12.0 * z,
-            Color32::WHITE,
+            th.sel_ink,
             false,
         );
         if resp.clicked() {
@@ -2511,7 +2516,7 @@ fn draw_banks(
             egui::Align2::CENTER_CENTER,
             seq::BANK_NAMES[b],
             12.0 * z,
-            if on { Color32::WHITE } else { th.plate_ink },
+            if on { th.sel_ink } else { th.plate_ink },
             false,
         );
         // Routes into this bank's controls while another bank is on the face plug in here.
@@ -2596,7 +2601,7 @@ fn draw_banks(
             egui::Align2::CENTER_CENTER,
             seq::BANK_NAMES[b],
             12.0 * z,
-            if lit { Color32::WHITE } else { th.plate_ink },
+            if lit { th.sel_ink } else { th.plate_ink },
             false,
         );
         let timing = banks::timing(editor.state(), id);
@@ -2714,7 +2719,7 @@ fn pad(
         egui::Align2::CENTER_CENTER,
         label,
         12.5 * z,
-        if lit { Color32::WHITE } else { th.plate_ink },
+        if lit { th.sel_ink } else { th.plate_ink },
         false,
     );
     resp
@@ -3374,11 +3379,7 @@ fn draw_control(
     });
     painter.circle_filled(pr.center(), 7.5 * z, if on { th.sel } else { th.panel });
     painter.circle_stroke(pr.center(), 7.5 * z, Stroke::new(1.6, th.sel));
-    painter.circle_filled(
-        pr.center(),
-        2.5 * z,
-        if on { Color32::WHITE } else { th.sel },
-    );
+    painter.circle_filled(pr.center(), 2.5 * z, if on { th.sel_ink } else { th.sel });
     if resp.clicked() {
         if let Some((_, set)) = ui_state.choose.as_mut() {
             // Every bank of a sequencer shares the slot's choice.

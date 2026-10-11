@@ -1,0 +1,4 @@
+sleep 3
+click route:9
+sleep 1
+shot probe
