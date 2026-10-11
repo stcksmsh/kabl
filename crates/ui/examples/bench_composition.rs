@@ -76,6 +76,27 @@ fn main() {
         }
         t.elapsed()
     };
+    if std::env::var_os("KABL_BENCH_FACES").is_some() {
+        // 16 face taps on the composition's oscillators, filters, envelopes and LFOs.
+        let t: Vec<_> = p
+            .modules
+            .iter()
+            .filter_map(|(&id, m)| {
+                let kind = kabl_modules::registry::info_for(&m.kind)?.kind;
+                matches!(kind, "osc.va" | "filter.svf" | "env.adsr" | "lfo").then_some(
+                    kabl_engine::facetap::FaceTarget {
+                        module: id,
+                        port: 0,
+                        kind,
+                        view: true,
+                    },
+                )
+            })
+            .take(16)
+            .collect();
+        println!("face taps on: {}", t.len());
+        e.face_taps(Some(kabl_engine::facetap::FaceTargets::new(1, &t)));
+    }
     e.note_on(0, 7.0, 0.9);
     // Warm up: fill the delay and reverb with signal.
     for _ in 0..(5.0 * sr) as usize / frames {
