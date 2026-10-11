@@ -1629,6 +1629,42 @@ impl CompiledPatch {
         }
     }
 
+    /// The stored base value of a param target, as the module reads it now.
+    pub fn runtime_value(&self, target: RuntimeTarget) -> Option<f32> {
+        let RuntimeTarget::Param { id, kind, index } = target else {
+            return None;
+        };
+        let lo = self
+            .param_slots
+            .partition_point(|s| (s.id, s.index) < (id, index));
+        let slot = *self
+            .param_slots
+            .get(lo)
+            .filter(|s| (s.id, s.index) == (id, index))?;
+        let Step::Process {
+            module_index,
+            params,
+            mods,
+            ..
+        } = &self.steps[slot.step as usize]
+        else {
+            return None;
+        };
+        let info = self.modules[*module_index].info();
+        if info.kind != kind {
+            return None;
+        }
+        let p = &info.params[index as usize];
+        Some(if slot.modi != NO_MOD {
+            p.from_norm(mods[slot.modi as usize].base_norm)
+        } else {
+            match params[index as usize] {
+                Signal::Scalar(v) => v,
+                Signal::Buffer(b) => b[0],
+            }
+        })
+    }
+
     pub fn sample_rate(&self) -> f32 {
         self.sample_rate
     }
@@ -2205,6 +2241,22 @@ impl CompiledPatch {
     /// else is set now. A target already ramping starts
     /// again from where it is. Returns whether the target resolved. No allocation.
     pub fn set_runtime(&mut self, target: RuntimeTarget, value: f32, ramp: bool) -> bool {
+        self.set_runtime_with(target, value, ramp, true)
+    }
+
+    /// A value the engine itself drives (a cue's macro morph): set now, and the host-automation
+    /// overlay of the target stays as it is, so a steady host value does not take it back.
+    pub fn drive_runtime(&mut self, target: RuntimeTarget, value: f32) -> bool {
+        self.set_runtime_with(target, value, false, false)
+    }
+
+    fn set_runtime_with(
+        &mut self,
+        target: RuntimeTarget,
+        value: f32,
+        ramp: bool,
+        forget_automation: bool,
+    ) -> bool {
         if let RuntimeTarget::Cable { cable, slot } = target {
             // Pattern data is read when a pulse plays, like sequencer steps: set, never ramped.
             let lo = self.cable_steps.partition_point(|s| s.0 < cable);
@@ -2217,9 +2269,11 @@ impl CompiledPatch {
             }
             return found;
         }
-        for cached in &mut self.automation {
-            if cached.is_some_and(|(t, _)| t == target) {
-                *cached = None;
+        if forget_automation {
+            for cached in &mut self.automation {
+                if cached.is_some_and(|(t, _)| t == target) {
+                    *cached = None;
+                }
             }
         }
         let (on, from, to) = match target {

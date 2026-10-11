@@ -241,7 +241,7 @@ pub fn apply_cc(
         sync_takeover(editor, ui_state);
         for (id, p) in mapped(editor.state(), ch, cc) {
             let key = (id, p.name.to_string());
-            let base = routing::base_value(editor.state(), id, p);
+            let base = ui_state.param_now(editor.state(), id, p);
             let t = ui_state.takeover.entry(key.clone()).or_default();
             let was = t.picked;
             let at = p.to_norm(base);
@@ -430,7 +430,11 @@ fn fire(editor: &PatchEditor, ui_state: &mut UiState, id: ModuleId, action: &str
         Some(("cue", n)) => n
             .parse()
             .map_err(|_| "bad action".to_string())
-            .and_then(|n| crate::cues::launch(&mut ui_state.launches, state, id, n)),
+            .and_then(|n| {
+                crate::cues::launch(&mut ui_state.launches, state, id, n)?;
+                ui_state.last_cue.insert(id, n);
+                Ok(())
+            }),
         _ => {
             match action {
                 "cancel" => ui_state

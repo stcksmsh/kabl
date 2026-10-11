@@ -7,6 +7,7 @@ pub mod dyn_dispatch_spike;
 pub mod facetap;
 pub mod graph;
 pub mod keyboard;
+pub mod morph;
 pub mod patch_demo;
 pub mod patch_engine;
 pub mod potato;

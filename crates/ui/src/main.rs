@@ -110,6 +110,8 @@ const CHUNK: usize = 256;
 
 /// (sequencer, step, playing bank, queued bank).
 type SeqReport = (ModuleId, usize, usize, Option<usize>);
+/// Macro module, output, value, target, progress of a macro a cue drives.
+type MorphReport = (ModuleId, u8, f32, f32, f32);
 
 /// Owns everything audio-related: the swap queue's producer, the stream, the MIDI connection,
 /// and the `basedrop` collector that frees retired graphs. Lives inside `App`.
@@ -129,6 +131,7 @@ struct AudioHost {
     clocks_rx: Option<rtrb::Consumer<(ModuleId, bool, f64)>>,
     /// Each LFO's sync state, published by the audio callback.
     lfos_rx: Option<rtrb::Consumer<(ModuleId, LfoSync)>>,
+    morphs_rx: Option<rtrb::Consumer<MorphReport>>,
     /// Each delay's lock state and target time, published by the audio callback.
     delays_rx: Option<rtrb::Consumer<(ModuleId, DelayLock, f32)>>,
     recorder: Option<record::Recorder>,
@@ -418,6 +421,7 @@ impl AudioHost {
             clocks_rx: None,
             delays_rx: None,
             lfos_rx: None,
+            morphs_rx: None,
             recorder: None,
             timing: None,
             probe_rx: None,
@@ -577,6 +581,7 @@ impl AudioHost {
         let (mut clocks_tx, clocks_rx) = rtrb::RingBuffer::<(ModuleId, bool, f64)>::new(64);
         let (mut delays_tx, delays_rx) = rtrb::RingBuffer::<(ModuleId, DelayLock, f32)>::new(64);
         let (mut lfos_tx, lfos_rx) = rtrb::RingBuffer::<(ModuleId, LfoSync)>::new(128);
+        let (mut morphs_tx, morphs_rx) = rtrb::RingBuffer::<MorphReport>::new(64);
 
         let mut left_ring = RingBuffer::new(RING_CAPACITY);
         let mut right_ring = RingBuffer::new(RING_CAPACITY);
@@ -684,6 +689,9 @@ impl AudioHost {
                 engine.lfos(|id, sync| {
                     let _ = lfos_tx.push((id, sync));
                 });
+                engine.morphs(|id, k, v, to, p| {
+                    let _ = morphs_tx.push((id, k, v, to, p));
+                });
                 let (held, sounding) = engine.keys();
                 keys.store(pack_keys(held, sounding), Ordering::Relaxed);
                 // Full (UI not drawing): this window is dropped; the UI counts the gap.
@@ -790,6 +798,7 @@ impl AudioHost {
             clocks_rx: Some(clocks_rx),
             delays_rx: Some(delays_rx),
             lfos_rx: Some(lfos_rx),
+            morphs_rx: Some(morphs_rx),
             recorder: stream.is_some().then_some(recorder),
             timing: stream.is_some().then_some(timing),
             probe_rx: stream.is_some().then_some(probe_rx),
@@ -1974,6 +1983,18 @@ impl eframe::App for App {
         if let Some(rx) = self.audio.delays_rx.as_mut() {
             while let Ok((id, lock, ms)) = rx.pop() {
                 ui_state.delay_status.insert(id, (lock, ms));
+            }
+        }
+        if let Some(rx) = self.audio.morphs_rx.as_mut() {
+            while let Ok((id, k, value, to, progress)) = rx.pop() {
+                let live = kabl_ui::MacroLive {
+                    value,
+                    to,
+                    progress,
+                };
+                ui_state
+                    .macro_live
+                    .insert((id, k), (live, std::time::Instant::now()));
             }
         }
         if let Some(rx) = self.audio.lfos_rx.as_mut() {

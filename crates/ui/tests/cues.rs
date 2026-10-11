@@ -253,6 +253,8 @@ fn a_cue_shows_queued_only_when_all_its_banks_are_coming() {
         clock: Some(CLOCK),
         timing: Timing::NextBar,
         targets,
+        macros: Vec::new(),
+        morph_beats: 0.0,
     };
     // Bass queued B, arp queued B: Main (B, B) is queued, Return (B, C) is not.
     let now = |_: ModuleId| (0, Some(1));
@@ -276,4 +278,137 @@ fn a_cue_shows_queued_only_when_all_its_banks_are_coming() {
         cues::standing(&cue(vec![(BASS, 1), (ARP, 1)]), &now),
         (false, true)
     );
+}
+
+/// A macro module with a cue on the performance patch.
+fn with_macro(h: &mut H) -> ModuleId {
+    let m = h.editor.add_module("macro", Vec2 { x: 30.0, y: 380.0 });
+    perform::toggle_pin(&mut h.editor, m, "m1");
+    perform::toggle_pin(&mut h.editor, m, "m2");
+    m
+}
+
+#[test]
+fn cue_macro_targets_are_saved_undoable_edits_without_audio_rebuilds() {
+    let mut h = H::new();
+    let m = with_macro(&mut h);
+    let n = h.add_cue("Verse", Some(1), None);
+    h.editor.take_dirty();
+    let before = h.editor.state().clone();
+    cues::set_macro(&mut h.editor, h.cues, n, m, 0, Some(0.25));
+    cues::set_macro(&mut h.editor, h.cues, n, m, 1, Some(0.9));
+    cues::set_morph(&mut h.editor, h.cues, n, 8.0);
+    assert!(!h.editor.is_dirty(), "cue edits never rebuild audio");
+    let c = &cues::cues(h.editor.state(), h.cues)[0];
+    assert_eq!(c.macros, vec![(m, 0, 0.25), (m, 1, 0.9)]);
+    assert_eq!(c.morph_beats, 8.0);
+
+    let dir = std::env::temp_dir().join(format!("kabl-cue-macros-{}", std::process::id()));
+    kabl_core::save(&dir, h.editor.log()).unwrap();
+    let back = kabl_core::load(&dir).unwrap();
+    assert_eq!(
+        cues::cues(back.state(), h.cues),
+        cues::cues(h.editor.state(), h.cues)
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+
+    cues::set_macro(&mut h.editor, h.cues, n, m, 1, None);
+    assert_eq!(
+        cues::cues(h.editor.state(), h.cues)[0].macros,
+        vec![(m, 0, 0.25)]
+    );
+    cues::set_morph(&mut h.editor, h.cues, n, 0.0);
+    assert_eq!(cues::cues(h.editor.state(), h.cues)[0].morph_beats, 0.0);
+    for _ in 0..5 {
+        h.editor.undo();
+    }
+    assert_eq!(*h.editor.state(), before);
+}
+
+#[test]
+fn store_current_takes_every_macro_as_it_is_now_live_or_at_rest() {
+    let mut h = H::new();
+    let m = with_macro(&mut h);
+    let n = h.add_cue("Chorus", Some(2), None);
+    let state = h.editor.state().clone();
+    // m1 is being moved by a cue (live 0.6); the rest sit at their knobs.
+    h.ui.macro_live.insert(
+        (m, 0),
+        (
+            kabl_ui::MacroLive {
+                value: 0.6,
+                to: 1.0,
+                progress: 0.5,
+            },
+            std::time::Instant::now(),
+        ),
+    );
+    cues::store_macros(&mut h.editor, h.cues, n, &|id, k| {
+        h.ui.macro_now(&state, id, k)
+    });
+    let c = &cues::cues(h.editor.state(), h.cues)[0];
+    assert_eq!(c.macros.len(), 4);
+    assert_eq!(c.macros[0], (m, 0, 0.6));
+    assert!(c.macros[1..].iter().all(|t| t.2 == 0.0));
+    h.frame(); // Perform draws a macro that is on its way without trouble
+}
+
+#[test]
+fn a_launch_carries_the_macro_targets_and_the_morph_in_pulses() {
+    let mut h = H::new();
+    let m = with_macro(&mut h);
+    let n = h.add_cue("Drop", None, None);
+    // Nothing set at all: refused, as before.
+    assert!(cues::launch(&mut h.ui.launches, h.editor.state(), h.cues, n).is_err());
+    cues::set_macro(&mut h.editor, h.cues, n, m, 2, Some(0.4));
+    cues::set_morph(&mut h.editor, h.cues, n, 2.0);
+    cues::launch(&mut h.ui.launches, h.editor.state(), h.cues, n).unwrap();
+    match h.ui.launches.as_slice() {
+        [Command::Launch(l)] => {
+            assert_eq!(l.count, 0, "a cue of macros only has no sequencer");
+            assert_eq!(l.macro_count, 1);
+            assert_eq!(
+                (l.macros[0].id, l.macros[0].index, l.macros[0].value),
+                (m, 2, 0.4)
+            );
+            assert_eq!(l.morph_pulses, 8.0);
+        }
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn deleting_a_macro_module_drops_its_cue_targets_and_undo_restores_them() {
+    let mut h = H::new();
+    let m = with_macro(&mut h);
+    let n = h.add_cue("Verse", Some(1), None);
+    cues::set_macro(&mut h.editor, h.cues, n, m, 0, Some(0.3));
+    h.editor.remove_module(m);
+    assert!(cues::cues(h.editor.state(), h.cues)[0].macros.is_empty());
+    assert!(!h.editor.state().modules[&h.cues]
+        .params
+        .keys()
+        .any(|k| k.contains(".macro.")));
+    h.editor.undo();
+    assert_eq!(
+        cues::cues(h.editor.state(), h.cues)[0].macros,
+        vec![(m, 0, 0.3)]
+    );
+}
+
+#[test]
+fn a_cue_without_sequencers_is_playing_once_launched() {
+    let cue = cues::Cue {
+        n: 2,
+        name: "x".into(),
+        clock: Some(CLOCK),
+        timing: Timing::NextBar,
+        targets: Vec::new(),
+        macros: vec![(9, 0, 0.5)],
+        morph_beats: 0.0,
+    };
+    let now = |_: ModuleId| (0, None);
+    assert_eq!(cues::standing_now(&cue, &now, None), (false, false));
+    assert_eq!(cues::standing_now(&cue, &now, Some(1)), (false, false));
+    assert_eq!(cues::standing_now(&cue, &now, Some(2)), (true, false));
 }

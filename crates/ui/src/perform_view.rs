@@ -673,7 +673,7 @@ fn cues_card(
     // One row up to five cues (the usual set), else rows of four.
     let per_row = if all.len() <= 5 { all.len().max(4) } else { 4 };
     // The pads share the width left beside the Cancel button.
-    let fixed = 84.0 + st.sp(2) + st.sp(3) * 2.0 + 4.0;
+    let fixed = 84.0 + 110.0 + st.sp(1) + st.sp(2) + st.sp(3) * 2.0 + 4.0;
     let pad_w = ((size.x - fixed) / per_row as f32 - st.sp(1)).max(80.0);
     let rows = all.len().div_ceil(per_row).max(1);
     // Rows share the height the row was given.
@@ -704,8 +704,9 @@ fn cues_card(
         };
         let standing: Vec<(bool, bool)> = all
             .iter()
-            .map(|c| crate::cues::standing(c, &bank_of))
+            .map(|c| crate::cues::standing_now(c, &bank_of, ui_state.last_cue.get(&id).copied()))
             .collect();
+        let current = all.iter().zip(&standing).find(|(_, s)| s.0).map(|(c, _)| c);
         let any_queued = standing.iter().any(|s| s.1);
         if all.is_empty() {
             kit::label(
@@ -736,14 +737,32 @@ fn cues_card(
                                 (PadState::Playing, Some("playing"))
                             } else if queued {
                                 (PadState::Queued, Some("next bar"))
+                            } else if !c.macros.is_empty() {
+                                (PadState::Idle, Some("sets macros"))
                             } else {
                                 (PadState::Idle, None)
                             };
-                            // A queued pad fills toward the bar line it launches on.
+                            // A queued pad fills toward the bar line it launches on; a playing
+                            // one fills as its macros arrive.
                             let progress = (queued && !active)
                                 .then(|| c.clock.and_then(|k| ui_state.clock_pos.get(&k)))
                                 .flatten()
-                                .map(|&p| p.rem_euclid(16.0) as f32 / 16.0);
+                                .map(|&p| p.rem_euclid(16.0) as f32 / 16.0)
+                                .or_else(|| {
+                                    active
+                                        .then(|| {
+                                            c.macros
+                                                .iter()
+                                                .filter_map(|&(m, k, to)| {
+                                                    ui_state
+                                                        .live_macro(m, k)
+                                                        .filter(|l| l.progress < 1.0 && l.to == to)
+                                                })
+                                                .map(|l| l.progress)
+                                                .reduce(f32::min)
+                                        })
+                                        .flatten()
+                                });
                             let r = kit::pad(
                                 ui,
                                 st,
@@ -757,10 +776,11 @@ fn cues_card(
                             .tip(st, &hover);
                             ui_state.record(format!("pcue:{id}.{}", c.n), r.rect);
                             if r.clicked() {
-                                if let Err(e) =
-                                    crate::cues::launch(&mut ui_state.launches, &state, id, c.n)
-                                {
-                                    ui_state.last_message = Some(e);
+                                match crate::cues::launch(&mut ui_state.launches, &state, id, c.n) {
+                                    Ok(()) => {
+                                        ui_state.last_cue.insert(id, c.n);
+                                    }
+                                    Err(e) => ui_state.last_message = Some(e),
                                 }
                             }
                         }
@@ -776,6 +796,25 @@ fn cues_card(
                 .tip(st, "Drop the queued cue");
             if any_queued {
                 ui_state.record(format!("pcue-cancel:{id}"), r.rect);
+            }
+            // "Store current": the playing cue takes the macros where they are now.
+            let store = ui
+                .add(
+                    kit::Button::new(st, "Store macros")
+                        .min_width(110.0)
+                        .enabled(current.is_some()),
+                )
+                .tip(
+                    st,
+                    &current.map_or_else(
+                        || "Launch a cue first: it takes the macro positions".to_string(),
+                        |c| format!("Save the macro positions into {}", c.name),
+                    ),
+                );
+            ui_state.record(format!("pcue-store:{id}"), store.rect);
+            if let (true, Some(c)) = (store.clicked(), current) {
+                let now = |m, k| ui_state.macro_now(&state, m, k);
+                crate::cues::store_macros(editor, id, c.n, &now);
             }
             if r.clicked() {
                 for c in all.iter().zip(&standing).filter(|(_, s)| s.1) {
@@ -896,11 +935,22 @@ fn macro_tile(
                     false,
                     None,
                 );
-                let cur = routing::base_value(editor.state(), pin.id, p);
-                let (resp, new) = kit::arc_knob(ui, st, p.to_norm(cur), knob, None);
+                // A cue may be moving this macro: show it where it is, with where it is heading
+                // as the knob's range. A hand on the knob ends the morph (the engine does the
+                // same when the value arrives).
+                let k = p.name.as_bytes()[1] - b'1';
+                let live = ui_state.live_macro(pin.id, k);
+                let heading = live.filter(|m| m.progress < 1.0);
+                let cur = live.map_or_else(
+                    || routing::base_value(editor.state(), pin.id, p),
+                    |m| m.value,
+                );
+                let span = heading.map(|m| (p.to_norm(m.value), p.to_norm(m.to)));
+                let (resp, new) = kit::arc_knob(ui, st, p.to_norm(cur), knob, span);
                 ui_state.record(format!("pslider:{key}"), resp.rect);
                 let continuing = continuing(ui, &resp);
                 if let Some(v) = new {
+                    ui_state.macro_live.remove(&(pin.id, k));
                     let target = ParamTarget::Module {
                         id: pin.id,
                         param: p.name.into(),
@@ -908,6 +958,22 @@ fn macro_tile(
                     editor.set_param_gesture(target, p.from_norm(v), !continuing);
                 }
                 kit::label(ui, st, Role::Value, Tone::Text, routing::fmt_value(p, cur));
+                if let Some(m) = heading {
+                    kit::label(
+                        ui,
+                        st,
+                        Role::Caption,
+                        Tone::Accent,
+                        format!(
+                            "→ {} · {:.0}%",
+                            routing::fmt_value(p, m.to),
+                            m.progress * 100.0
+                        ),
+                    )
+                    .tip(st, "A cue is moving this macro; turn it to take over");
+                    ui.ctx()
+                        .request_repaint_after(std::time::Duration::from_millis(30));
+                }
                 let moves = macro_moves(editor.state(), pin.id, p.name);
                 let text = match moves.len() {
                     0 => "moves nothing yet".to_string(),
@@ -995,7 +1061,7 @@ fn midi_row(
                 .get(&(id, p.name.to_string()))
                 .copied()
                 .unwrap_or_default();
-            let at = p.to_norm(routing::base_value(editor.state(), id, p));
+            let at = p.to_norm(ui_state.param_now(editor.state(), id, p));
             let (text, tone, tip) = if t.picked {
                 (
                     "live".to_string(),
@@ -1006,7 +1072,7 @@ fn midi_row(
                 let arrow = match t.hw {
                     Some(h) if h < at => "↑",
                     Some(_) => "↓",
-                    None => "→",
+                    None => "↔",
                 };
                 (
                     format!("{arrow} {:.0}%", at * 100.0),

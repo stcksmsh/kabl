@@ -1,0 +1,4 @@
+77a1e2800000-77a1e2c57000 r--p 00000000 103:01 13409591                  /secondary/Programming/Github/kabl/.worktrees/functional-cables/scratch/cue-macros-host/plugin/kabl.clap
+77a1e2c57000-77a1e33a9000 r-xp 00456000 103:01 13409591                  /secondary/Programming/Github/kabl/.worktrees/functional-cables/scratch/cue-macros-host/plugin/kabl.clap
+77a1e33a9000-77a1e33f3000 r--p 00ba7000 103:01 13409591                  /secondary/Programming/Github/kabl/.worktrees/functional-cables/scratch/cue-macros-host/plugin/kabl.clap
+77a1e33f3000-77a1e33f5000 rw-p 00bf0000 103:01 13409591                  /secondary/Programming/Github/kabl/.worktrees/functional-cables/scratch/cue-macros-host/plugin/kabl.clap
