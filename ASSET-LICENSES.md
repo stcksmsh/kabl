@@ -1,19 +1,25 @@
-# Licences of bundled assets
+# Licences of non-code material
 
-Source code: `MIT OR Apache-2.0` (`LICENSE-MIT`, `LICENSE-APACHE`). Dependency licences:
-`THIRD-PARTY-NOTICES.md` (regenerate with `python3 -I packaging/gen-notices.py > THIRD-PARTY-NOTICES.md`).
-This file covers what is not Rust code.
+Source code: GPL-3.0-or-later, see `LICENSE` and `COPYRIGHT`. Dependency licences:
+`THIRD-PARTY-NOTICES.md`, generated from `Cargo.lock` and checked in CI. This file covers the
+rest. Audit and sources: `docs/licensing/AUDIT.md`.
 
-| Asset | Where | Licence | Status |
-|---|---|---|---|
-| IBM Plex Sans Regular, IBM Plex Mono Regular (UI fonts, embedded in the binary) | `crates/ui/assets/*.ttf` | SIL Open Font License 1.1, Copyright 2017-2018 IBM Corp., Reserved Font Name "Plex". Full text in `crates/ui/assets/FONT-LICENSE.txt`. | established |
-| egui default fonts (Ubuntu-Light, Hack, Noto Emoji, emoji-icon-font), embedded via `epaint_default_fonts` | dependency | OFL-1.1, Ubuntu Font Licence 1.0, MIT; texts in `THIRD-PARTY-NOTICES.md` | established |
-| Factory wavetables `saw-square`, `harmonic-sweep`, `vowels`, `glass-bell`, `digital-hollow` | `crates/modules/assets/wavetables/` | computed by `build.py`, original work, `MIT OR Apache-2.0` | established (`PROVENANCE.md`) |
-| Factory wavetables `epiano`, `organ`, `choir` | same | derived from Adventure Kid Waveforms (AKWF) by Kristoffer Ekstrand, CC0 1.0; checked 2026-10-09, see `PROVENANCE.md` | established |
-| Logo and icon (`logo.svg`, `logo_small.svg`; copies in `packaging/linux/logo/`) | `packaging/linux/logo/` | none declared in the repository | **unclear: owner (Kosta) to state** |
-| Factory patches | `patches/` | none declared in the repository; the patch files carry no licence or author field | **unclear: owner to state** (presumably the project licence) |
-| Documentation text and screenshots | `docs/` | none declared | **unclear: owner to state** |
+Copyright of all kabl-made material below is held by the owner named in `COPYRIGHT`. Music made
+with kabl, including with the factory patches, belongs to the person who made it. No licence
+here puts a condition on that audio. The conditions below apply to the patch files, wavetables,
+documents and artwork themselves, and to copies and adaptations of them.
 
-Until the owner states a licence for the logo, the patches and the documentation, nothing here
-grants one beyond what the owner has already published. The release tarball carries the logo
-as the application icon and the patches as factory sounds, so this should be settled before 1.0.
+| Material | Where | Licence |
+|---|---|---|
+| Name "kabl" and the logo: `kabl-logo.svg`, `kabl-mark.svg`, `kabl-logo-mask.png`, `kabl-lockup.svg` and the icon PNGs/SVG derived from them | `crates/ui/assets/logo/`, `packaging/linux/logo/` | **All rights reserved.** Not covered by GPL-3.0. Kabl's owner permits only: copying the files unchanged together with the kabl source or an unmodified kabl binary, and fair reference to kabl. A fork must replace them. See `TRADEMARKS.md`. |
+| Factory patches | `patches/` | CC BY-SA 4.0 (proposal, owner to confirm). Attribution line: "kabl factory patches by <OWNER NAME>". |
+| Wavetables `saw-square`, `harmonic-sweep`, `vowels`, `glass-bell`, `digital-hollow` | `crates/modules/assets/wavetables/` | computed by `build.py`; same licence as the code (GPL-3.0-or-later) |
+| Wavetables `epiano`, `organ`, `choir` | same | derived from Adventure Kid Waveforms by Kristoffer Ekstrand, CC0 1.0 (`PROVENANCE.md`); the derived files are offered under the code licence, the CC0 source stays CC0 |
+| IBM Plex Sans and Mono | `crates/ui/assets/*.ttf`, `crates/ui/examples/app_target/fonts/` | SIL OFL 1.1, Copyright 2017-2018 IBM Corp., Reserved Font Name "Plex"; text in `crates/ui/assets/FONT-LICENSE.txt` |
+| egui default fonts (Ubuntu-Light, Hack, Noto Emoji, emoji-icon-font), embedded via `epaint_default_fonts` | dependency | UFL 1.0, Bitstream Vera/Hack terms, OFL 1.1, MIT; texts in `THIRD-PARTY-NOTICES.md`. Open point: UFL 1.0 and GPL-3.0 (`AUDIT.md`, P1) |
+| Documentation text, design mockups, screenshots, clips, demo audio and video | `docs/` | CC BY-SA 4.0 (proposal, owner to confirm), except `docs/promo-demo` audio and video, which are all rights reserved until the owner decides |
+| Scripts, tests, fixtures, REAPER projects | everywhere | GPL-3.0-or-later |
+
+Nothing in the repository is taken from Surge XT, Vital or any other synthesizer's data.
+
+Items marked "proposal" are not final.

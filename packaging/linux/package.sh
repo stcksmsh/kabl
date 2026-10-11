@@ -7,7 +7,7 @@
 #     share/kabl/patches/...               factory sounds (found relative to bin/)
 #     share/applications/kabl.desktop, share/icons/hicolor/...
 #     install.sh                           installs (and --uninstall removes) under ~/.local and ~/.clap
-#     LICENSE-*, THIRD-PARTY-NOTICES.md, ASSET-LICENSES.md, README.txt
+#     LICENSE, COPYRIGHT, TRADEMARKS.md, THIRD-PARTY-NOTICES.md, ASSET-LICENSES.md, README.txt
 #
 # and kabl-<version>-linux-<arch>.tar.gz next to it, in $OUT (default target/dist).
 # Extract anywhere and run bin/kabl-ui, or run ./install.sh. Nothing is read from the source
@@ -28,12 +28,13 @@ cp packaging/linux/kabl.desktop "$OUT/$NAME/share/applications/"
 mkdir "$OUT/$NAME/share/icons"
 cp -r packaging/linux/logo/hicolor "$OUT/$NAME/share/icons/hicolor"
 cp packaging/linux/install.sh "$OUT/$NAME/"
-cp LICENSE-MIT LICENSE-APACHE THIRD-PARTY-NOTICES.md ASSET-LICENSES.md "$OUT/$NAME/"
+cp LICENSE COPYRIGHT TRADEMARKS.md THIRD-PARTY-NOTICES.md ASSET-LICENSES.md "$OUT/$NAME/"
 cp -r patches "$OUT/$NAME/share/kabl/patches"
 cat > "$OUT/$NAME/README.txt" <<TXT
 kabl $VERSION (Linux, $(uname -m)), built from $(git rev-parse --short HEAD 2>/dev/null || echo unknown).
-License: MIT OR Apache-2.0 (LICENSE-MIT, LICENSE-APACHE; third parties and assets:
-THIRD-PARTY-NOTICES.md, ASSET-LICENSES.md).
+License: GPL-3.0-or-later (LICENSE; owner and notice: COPYRIGHT; name and logo: TRADEMARKS.md;
+third parties and assets: THIRD-PARTY-NOTICES.md, ASSET-LICENSES.md).
+Source code for this exact build: https://github.com/stcksmsh/kabl, commit $(git rev-parse HEAD 2>/dev/null || echo unknown).
 
 Install:    ./install.sh                   standalone and desktop entry under ~/.local,
                                            CLAP plugin as ~/.clap/kabl.clap

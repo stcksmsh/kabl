@@ -82,8 +82,10 @@ the plugin framework (ISC), see `vendor/nice-plug/STRICT-PROFILE.md`.
 
 ## Licence
 
-Source code: MIT OR Apache-2.0, at your option ([`LICENSE-MIT`](LICENSE-MIT),
-[`LICENSE-APACHE`](LICENSE-APACHE)). Dependency licences are in
-[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md). Fonts, wavetables, the logo and the factory
-patches are covered in [`ASSET-LICENSES.md`](ASSET-LICENSES.md); the logo and patch licences are
-not yet declared there.
+Source code: GPL-3.0-or-later ([`LICENSE`](LICENSE), owner and additional terms in
+[`COPYRIGHT`](COPYRIGHT)). The name "kabl" and the logo are reserved
+([`TRADEMARKS.md`](TRADEMARKS.md)); a fork needs its own name and says "Based on kabl". Music you
+make with kabl is yours, with no conditions. Dependency licences:
+[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md). Fonts, wavetables, logo, patches and docs:
+[`ASSET-LICENSES.md`](ASSET-LICENSES.md). Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md). Audit:
+[`docs/licensing/AUDIT.md`](docs/licensing/AUDIT.md).
