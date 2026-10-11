@@ -1825,7 +1825,7 @@ impl eframe::App for App {
                         });
                     if let Some(log) = &self.log {
                         let problem = self.health.log_problem.clone();
-                        let text = if problem.is_some() { "Log ⚠" } else { "Log" };
+                        let text = if problem.is_some() { "Log !" } else { "Log" };
                         let r = ui.add(kit::Button::new(st, text).ghost().small()).tip(st, &format!(
                             "{}\nLevel {} (KABL_LOG or --log-level to change). Click to copy the path.",
                             problem.unwrap_or_else(|| log.path.display().to_string()),
@@ -2211,6 +2211,7 @@ fn main() -> eframe::Result<()> {
         log::warn!(target: "app", "unknown log level {w:?}: using info");
     }
     let mut ui_state = UiState::default();
+    ui_state.use_user_prefs();
     let library = kabl_ui::browser::open_library();
     log::info!(
         target: "library",

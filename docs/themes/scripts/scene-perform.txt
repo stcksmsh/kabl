@@ -1,0 +1,4 @@
+sleep 3
+click perform
+sleep 2
+shot shot

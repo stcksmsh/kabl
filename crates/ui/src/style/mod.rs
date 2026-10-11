@@ -6,8 +6,10 @@
 //! sizes live in [`Metrics`] and are not themable.
 
 mod builtin;
+mod load;
 
-pub use builtin::{builtin_a, BUILTIN_A_ID};
+pub use builtin::{builtin_a, builtin_b, BUILTIN_A_ID, BUILTIN_B_ID};
+pub use load::{config_dir, themes_dir, Prefs, Theme, Themes};
 
 use egui::{Color32, FontFamily, FontId};
 use serde::{Deserialize, Serialize};
@@ -482,6 +484,22 @@ impl Style {
     }
 }
 
+impl Style {
+    /// Essential non-text marks and the surface each sits on (WCAG 1.4.11, 3:1).
+    pub fn mark_pairs(&self) -> Vec<(&'static str, Color32, Color32, f32)> {
+        let r = &self.roles;
+        vec![
+            ("accent on surface", r.accent, r.surface, 3.0),
+            ("focus on surface", r.focus, r.surface, 3.0),
+            ("disp_trace on disp_bg", r.disp_trace, r.disp_bg, 3.0),
+            ("knob_ink on knob", r.knob_ink, r.knob, 3.0),
+            ("audio on rack", r.audio, r.rack, 3.0),
+            ("cv on rack", r.cv, r.rack, 3.0),
+            ("gate on rack", r.gate, r.rack, 3.0),
+        ]
+    }
+}
+
 fn leak(s: String) -> &'static str {
     Box::leak(s.into_boxed_str())
 }
@@ -491,9 +509,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn builtin_a_round_trips_through_toml() {
-        for dark in [false, true] {
-            let a = builtin_a(dark);
+    fn builtins_round_trip_through_toml() {
+        for (f, dark) in [builtin_a, builtin_b]
+            .into_iter()
+            .flat_map(|f| [(f, false), (f, true)])
+        {
+            let a = f(dark);
             let text = toml::to_string(&a).unwrap();
             let back: Style = toml::from_str(&text).unwrap();
             assert_eq!(
@@ -508,17 +529,23 @@ mod tests {
     }
 
     #[test]
-    fn builtin_a_is_legible_and_above_the_floor() {
-        for dark in [false, true] {
-            let a = builtin_a(dark);
-            for (n, fg, bg, min) in a.contrast_pairs() {
-                assert!(
-                    contrast(fg, bg) >= min,
-                    "{} {n}: {:.2}",
-                    a.id,
-                    contrast(fg, bg)
-                );
-            }
+    fn builtins_are_legible_and_above_the_floor() {
+        for (f, dark) in [builtin_a, builtin_b]
+            .into_iter()
+            .flat_map(|f| [(f, false), (f, true)])
+        {
+            let a = f(dark);
+            let bad: Vec<_> = a
+                .contrast_pairs()
+                .into_iter()
+                .chain(a.mark_pairs())
+                // Known shortfall of both light themes, accepted by design: cables carry a
+                // dark under-stroke over the pale rack.
+                .filter(|&(n, ..)| dark || !["audio on rack", "cv on rack"].contains(&n))
+                .filter(|&(_, fg, bg, min)| contrast(fg, bg) < min)
+                .map(|(n, fg, bg, min)| format!("{n}: {:.2} < {min}", contrast(fg, bg)))
+                .collect();
+            assert!(bad.is_empty(), "{} dark={dark}: {bad:?}", a.id);
             for r in [
                 Role::Display,
                 Role::Title,

@@ -1,0 +1,9 @@
+# Pick Lacquer and Light, dark, through the settings menu (real clicks), for the persistence check.
+sleep 2
+click view-menu
+sleep 0.5
+click theme-id:kabl.lacquer
+sleep 0.5
+click theme:dark
+sleep 1
+shot picked

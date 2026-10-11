@@ -1,0 +1,6 @@
+sleep 3
+click routing
+sleep 1
+click zoom:fit
+sleep 2
+shot shot

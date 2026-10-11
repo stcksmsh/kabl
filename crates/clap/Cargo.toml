@@ -17,7 +17,7 @@ kabl-cables = { path = "../cables" }
 kabl-standalone = { path = "../standalone" }
 nice-plug = { git = "https://github.com/Circuit-Stitch/nice-plug.git", rev = "263b16877d0b0ad30921868338a6df46eadc9a46", default-features = false, features = ["editor", "strict-clap"] }
 nice-plug-egui = { git = "https://github.com/Circuit-Stitch/nice-plug.git", rev = "263b16877d0b0ad30921868338a6df46eadc9a46" }
-egui = "=0.35.0"
+egui = { version = "=0.35.0", default-features = false }
 basedrop = "=0.1.3"
 rtrb = "=0.4.0"
 serde = { version = "1", features = ["derive"] }

@@ -1,0 +1,5 @@
+# One module face at 100%, routing panel closed. The theme comes from KABL_THEME.
+sleep 1
+click routing
+sleep 1
+shot face

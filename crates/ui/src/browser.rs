@@ -868,7 +868,7 @@ pub fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
         ui_state.doc.as_ref().map(|d| &d.origin),
         Some(DocOrigin::Library(id)) if id.starts_with("factory:")
     );
-    let text = format!("{}{name}", if modified { "● " } else { "" });
+    let text = format!("{}{name}", if modified { "• " } else { "" });
     let tip = if modified {
         format!("{name}: unsaved changes")
     } else if factory {
@@ -1181,7 +1181,9 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                             Role::Body,
                             Tone::Text3,
                             match filter {
-                                Filter::Favorites => "No favorites yet: click ☆ next to a sound.",
+                                Filter::Favorites => {
+                                    "No favorites yet: click the star next to a sound."
+                                }
                                 Filter::Recent => "Nothing opened yet.",
                                 Filter::User => "No sounds of yours yet: Save As puts them here.",
                                 _ => "No sound matches.",

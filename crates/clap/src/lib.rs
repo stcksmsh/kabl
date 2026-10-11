@@ -740,7 +740,11 @@ impl Default for Instrument {
         let shared = Arc::new(Shared {
             control: Mutex::new(Control {
                 editor: PatchEditor::seed_from(&patch),
-                view: UiState::default(),
+                view: {
+                    let mut v = UiState::default();
+                    v.use_user_prefs();
+                    v
+                },
                 patch,
                 rejected: None,
                 delivery,

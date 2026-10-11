@@ -1,7 +1,7 @@
 //! A-light / A-dark: the approved revision-2 palettes (`docs/design/revision-2/render2.py`,
 //! the same values the `rev2_proto` example draws with), and the chrome/fonts that go with them.
 
-use crate::style::{mix, Style};
+use crate::style::{contrast, mix, Style};
 use egui::Color32;
 use kabl_modules::PortType;
 
@@ -33,6 +33,8 @@ pub struct Theme {
     pub seg_on: Color32,
     pub seg_on_text: Color32,
     pub sel: Color32,
+    /// Text or mark drawn on a `sel` fill.
+    pub sel_ink: Color32,
     pub warn: Color32,
     pub audio: Color32,
     pub cv: Color32,
@@ -45,6 +47,7 @@ pub struct Theme {
 pub fn theme(st: &Style) -> Theme {
     let r = &st.roles;
     let dark = st.dark;
+    let accent_pill = st.slots.selector == crate::style::SelectorRecipe::AccentPill;
     Theme {
         dark,
         chrome: r.bg,
@@ -70,9 +73,14 @@ pub fn theme(st: &Style) -> Theme {
         display: r.disp_bg,
         display_ink: r.disp_trace,
         seg_bg: r.inset,
-        seg_on: r.text,
-        seg_on_text: r.surface,
+        seg_on: if accent_pill { r.accent } else { r.text },
+        seg_on_text: if accent_pill { r.on_accent } else { r.surface },
         sel: r.focus,
+        sel_ink: if contrast(r.on_accent, r.focus) >= contrast(r.text, r.focus) {
+            r.on_accent
+        } else {
+            r.text
+        },
         warn: r.warn,
         audio: r.audio,
         cv: r.cv,
@@ -190,44 +198,4 @@ pub fn panel_theme(st: &Style, kind: &str) -> Theme {
     t.ink2 = sec.ink2;
     t.tick = t.ink2;
     t
-}
-
-/// Satin coating with shared light direction, subtle grain and restrained edge depth.
-/// Original procedural art: no external texture or bitmap labels.
-pub fn satin(p: &egui::Painter, r: egui::Rect, t: &Theme) {
-    use egui::{pos2, Color32, Stroke};
-    let mut mesh = egui::Mesh::default();
-    let top = t
-        .panel
-        .lerp_to_gamma(Color32::WHITE, if t.dark { 0.045 } else { 0.08 });
-    let bottom = t.panel.lerp_to_gamma(Color32::BLACK, 0.065);
-    mesh.colored_vertex(r.left_top(), top);
-    mesh.colored_vertex(r.right_top(), top);
-    mesh.colored_vertex(r.right_bottom(), bottom);
-    mesh.colored_vertex(r.left_bottom(), bottom);
-    mesh.add_triangle(0, 1, 2);
-    mesh.add_triangle(0, 2, 3);
-    p.add(egui::Shape::mesh(mesh));
-    // Sparse low-alpha grain remains subordinate to editable text at every zoom.
-    let mut y = r.top() + 2.0;
-    while y < r.bottom() {
-        p.line_segment(
-            [pos2(r.left() + 1.0, y), pos2(r.right() - 1.0, y)],
-            Stroke::new(0.5, Color32::from_white_alpha(2)),
-        );
-        y += 3.7;
-    }
-    p.rect_stroke(
-        r,
-        egui::CornerRadius::same(2),
-        Stroke::new(1.0, t.panel_edge),
-        egui::StrokeKind::Inside,
-    );
-    p.line_segment(
-        [
-            r.left_top() + egui::vec2(1.0, 1.0),
-            r.right_top() + egui::vec2(-1.0, 1.0),
-        ],
-        Stroke::new(1.0, Color32::from_white_alpha(38)),
-    );
 }
