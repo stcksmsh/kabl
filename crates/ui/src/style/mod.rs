@@ -248,10 +248,28 @@ pub struct KnobSlots {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CableSlots {
     pub recipe: CableRecipe,
+    /// Width of a lit cable (hovered, selected, pinned by Focus), in rack units.
     pub width: f32,
+    /// Width of a resting cable.
+    #[serde(default = "default_rest_width")]
+    pub rest_width: f32,
+    /// Opacity of a resting cable, 0..=1. The drawing keeps the colour legible at this opacity.
+    #[serde(default = "default_rest_alpha")]
+    pub rest_alpha: f32,
+    /// Base sag of the hanging curve, in rack units.
     pub sag: f32,
+    /// Halo of a lit cable, 0 for none.
     pub glow: f32,
+    /// Opacity of the other cables while Focus pins one module's cables.
     pub dimmed: f32,
+}
+
+fn default_rest_width() -> f32 {
+    3.0
+}
+
+fn default_rest_alpha() -> f32 {
+    0.85
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

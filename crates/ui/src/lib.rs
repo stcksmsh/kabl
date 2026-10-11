@@ -11,8 +11,10 @@
 //! choice that is saved with the patch is each module's face (primary controls), stored as
 //! `face.*` params that the compiler never reads (`rack::FACE_PREFIX`).
 
+pub mod about;
 pub mod banks;
 pub mod browser;
+mod cable_look;
 pub mod compare;
 pub mod composites;
 pub mod control;
@@ -181,6 +183,8 @@ pub struct UiState {
     pub selected_route: Option<CableId>,
     /// The cable whose pattern and probability the drawer edits (`routing::cable_panel`).
     pub cable_fn: Option<CableId>,
+    /// The About box.
+    pub about: about::About,
     /// Output jack being dragged toward a knob or input.
     port_drag: Option<PortRef>,
     /// Jack cable whose plug is being pulled out of its input (moved or removed on release).
@@ -354,6 +358,7 @@ impl Default for UiState {
             inspected: None,
             selected_route: None,
             cable_fn: None,
+            about: about::About::default(),
             port_drag: None,
             unplug: None,
             drag: None,
@@ -604,6 +609,7 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     let st = ui_state.style.clone();
     kit::apply(ui.ctx(), &st);
     composites::panel(editor, ui_state, ui.ctx());
+    about::show(ui.ctx(), ui_state);
     panels::editor(editor, ui_state, ui.ctx());
     rack_editor::edit_face(editor, ui_state, ui.ctx());
     browser::frame_input(editor, ui_state, ui);
@@ -1108,6 +1114,14 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
                         ui_state.skin_labels_on_art = on_art.then_some(true);
                     }
                 });
+                kit::gap(ui, st, 1);
+                kit::rule(ui, st);
+                let r = kit::menu_item(ui, st, "About kabl...", false);
+                ui_state.record("menu:about".into(), r.rect);
+                if r.clicked() {
+                    ui_state.about.open = true;
+                    ui.close();
+                }
             })
             .tip(st, "Theme and view settings");
             ui_state.record("view-menu".into(), menu.rect);
@@ -1505,6 +1519,9 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     let mut drawn = Drawn::default();
     ui_state.deferred.clear();
     draw_composites(editor, ui_state, ui, xf, &mut drawn);
+    let faces_from = ui
+        .ctx()
+        .graphics(|g| g.get(painter.layer_id()).map_or(0, |l| l.next_idx().0));
     for m in &lay.mods {
         if ui_state
             .moving
@@ -1543,7 +1560,19 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         .collect();
 
     let deferred = std::mem::take(&mut ui_state.deferred);
-    draw_cables(editor, ui_state, ui, &painter, th, xf, &lay, &drawn, None);
+    // Cables lie on the face material but under everything drawn on it: titles, readouts,
+    // knobs, displays, jacks. Lift those above the cables, then put the plugs on top.
+    let faces: Vec<Rect> = lay.mods.iter().map(|m| xf.r(m.face)).collect();
+    let lifted = lift_foreground(ui, &painter, &faces, faces_from);
+    let plugs = draw_cables(editor, ui_state, ui, &painter, th, xf, &lay, &drawn, None);
+    let layer = painter.layer_id();
+    ui.ctx().graphics_mut(|g| {
+        let list = g.entry(layer);
+        for (clip, shape) in lifted {
+            list.add(clip, shape);
+        }
+    });
+    painter.extend(plugs);
     painter.extend(deferred);
     // Hidden modulated controls: the lead docks on the `+N` button, which says so.
     for m in &lay.mods {
@@ -3663,7 +3692,7 @@ fn draw_port_drag(
             Id::new("kabl-port-drag"),
         ))
         .with_clip_rect(ui_state.canvas);
-    cable_path(&top, a, b, th.sel, 4.0 * ui_state.zoom, 1.0, false);
+    cable_path(&top, &ui_state.style, a, b, th.sel, ui_state.zoom);
     let hot = target_at(ui_state, b, floats);
     for (key, r) in &ui_state.frame_hits {
         if key.starts_with("knob:") || key.starts_with("in:") {
@@ -3714,63 +3743,79 @@ fn port_ref_pos<'a>(
     ports.get(&(*id, direction, port.clone()))
 }
 
-/// A hanging patch cable: a cubic with both handles pulled down, sagging more when longer.
-fn cable_points(a: Pos2, b: Pos2, z: f32) -> Vec<Pos2> {
-    let sag = 30.0 * z + 0.25 * (b - a).length();
-    let (c1, c2) = (a + vec2(0.0, sag), b + vec2(0.0, sag));
-    (0..=40)
-        .map(|i| {
-            let t = i as f32 / 40.0;
-            let u = 1.0 - t;
-            (a.to_vec2() * u * u * u
-                + c1.to_vec2() * 3.0 * u * u * t
-                + c2.to_vec2() * 3.0 * u * t * t
-                + b.to_vec2() * t * t * t)
-                .to_pos2()
-        })
-        .collect()
+/// Moves every shape drawn since shape index `from` that is not a face's own background out of
+/// the paint list and returns it in order, so the caller can paint it again above the cables.
+fn lift_foreground(
+    ui: &egui::Ui,
+    painter: &egui::Painter,
+    faces: &[Rect],
+    from: usize,
+) -> Vec<(Rect, egui::Shape)> {
+    let mut out = Vec::new();
+    ui.ctx().graphics_mut(|g| {
+        let list = g.entry(painter.layer_id());
+        for i in from..list.next_idx().0 {
+            list.mutate_shape(egui::layers::ShapeIdx(i), |cs| {
+                let r = cs.shape.visual_bounding_rect();
+                let background = faces
+                    .iter()
+                    .any(|f| r.width() >= 0.9 * f.width() && r.height() >= 0.9 * f.height());
+                if !background && !matches!(cs.shape, egui::Shape::Noop) {
+                    out.push((
+                        cs.clip_rect,
+                        std::mem::replace(&mut cs.shape, egui::Shape::Noop),
+                    ));
+                }
+            });
+        }
+    });
+    out
 }
 
+/// A cable drawn straight into `p`, in the theme's lit width: the one in the hand while a plug
+/// is dragged, which is always fully visible.
 fn cable_path(
     p: &egui::Painter,
+    st: &Style,
     a: Pos2,
     b: Pos2,
     col: Color32,
-    w: f32,
-    alpha: f32,
-    bypass: bool,
+    zoom: f32,
 ) -> Vec<Pos2> {
-    let pts = cable_points(a, b, w / 5.5);
-    if bypass {
-        p.extend(egui::Shape::dashed_line(
-            &pts,
-            Stroke::new(w, Color32::from_gray(140).gamma_multiply(alpha)),
-            7.0,
-            5.0,
-        ));
-    } else {
-        p.add(egui::Shape::line(
-            pts.clone(),
-            Stroke::new(w + 2.0, Color32::from_black_alpha((90.0 * alpha) as u8)),
-        ));
-        p.add(egui::Shape::line(
-            pts.clone(),
-            Stroke::new(w, col.gamma_multiply(alpha)),
-        ));
-    }
-    for e in [a, b] {
-        p.circle_filled(
-            e,
-            w * 1.35,
-            col.lerp_to_gamma(Color32::BLACK, 0.35)
-                .gamma_multiply(alpha),
-        );
-        p.circle_filled(e, w * 0.9, col.gamma_multiply(alpha));
-    }
+    let pts = cable_look::points(a, b, zoom, st.slots.cable.sag);
+    let mut caps = Vec::new();
+    cable_look::paint(
+        p,
+        &mut caps,
+        st,
+        &pts,
+        col,
+        st.slots.cable.width * zoom,
+        1.0,
+        0.35,
+        false,
+        1.0,
+    );
+    p.extend(caps);
     pts
 }
 
+/// One cable to draw this frame.
+struct Run<'a> {
+    id: CableId,
+    c: &'a kabl_core::CableState,
+    /// A route lead into a knob rather than a jack-to-jack cable.
+    route: bool,
+    pts: Vec<Pos2>,
+}
+
 /// Jack cables and route leads. `only`: just the leads into that module's floating area.
+///
+/// Cables rest thin and slightly faint, in a colour kept legible on every face. A cable lights
+/// (full width, full opacity, halo) when its module is hovered or selected, when one of its
+/// jacks is hovered, when the pointer is on it, or when it is the selected route. Focus pins the
+/// selected module's cables lit and dims the rest, whatever the pointer does. Returns the plugs
+/// and marks, which the caller paints above the faces; the rope itself lies beneath them.
 #[allow(clippy::too_many_arguments)]
 fn draw_cables(
     editor: &mut PatchEditor,
@@ -3779,73 +3824,65 @@ fn draw_cables(
     painter: &egui::Painter,
     th: &Theme,
     xf: Xf,
-    _lay: &Layout,
+    lay: &Layout,
     drawn: &Drawn,
     only: Option<ModuleId>,
-) {
+) -> Vec<egui::Shape> {
+    let mut top = Vec::new();
     if ui_state.cable_view == CableView::Hidden {
-        return;
+        return top;
     }
     let z = xf.zoom;
-    let focus = ui_state.selected_module;
-    let view = ui_state.cable_view;
-    let alpha_for = |a: ModuleId, b: ModuleId| match view {
-        CableView::Focus if focus != Some(a) && focus != Some(b) => 0.12,
-        _ => 1.0,
-    };
+    let st = ui_state.style.clone();
+    let slots = st.slots.cable.clone();
+    let ctx = ui.ctx().clone();
+    let pinned = ui_state.cable_view == CableView::Focus;
+    let selected = ui_state.selected_module;
+    // Hover lights cables only while no button is down, so a drag never flickers the rack.
+    let pointer = ctx
+        .input(|i| {
+            (!i.pointer.any_down())
+                .then(|| i.pointer.hover_pos())
+                .flatten()
+        })
+        .filter(|p| ui_state.canvas.contains(*p));
+    let hover_module = pointer.and_then(|p| {
+        lay.mods
+            .iter()
+            .find(|m| xf.r(m.face).contains(p))
+            .map(|m| m.id)
+    });
+    let hot_port = pointer.and_then(|p| {
+        drawn
+            .ports
+            .iter()
+            .find(|(_, &pos)| (pos - p).length() <= JACK_R * z * 1.4)
+            .map(|(k, _)| k.clone())
+    });
     let cables: Vec<(CableId, kabl_core::CableState)> = editor
         .state()
         .cables
         .iter()
         .map(|(&id, c)| (id, c.clone()))
         .collect();
-    {
-        for (cable_id, c) in &cables {
-            if only.is_some_and(|id| c.from.module_id() != Some(id) && c.to.module_id() != Some(id))
-            {
-                continue;
-            }
-            if ui_state.unplug == Some(*cable_id) {
-                continue; // in the hand, drawn to the pointer
-            }
-            let (Some(&a), Some(&b)) = (
-                port_ref_pos(&drawn.ports, &c.from, PortDirection::Output),
-                port_ref_pos(&drawn.ports, &c.to, PortDirection::Input),
-            ) else {
-                continue;
-            };
-            let col = port_color(th, editor, &c.from);
-            let alpha = alpha_for(
-                c.from.module_id().unwrap_or_default(),
-                c.to.module_id().unwrap_or_default(),
-            );
-            let pts = cable_path(painter, a, b, col, 5.5 * z, alpha, false);
-            // Removing is explicit: pull the plug out of its input, or right-click the cable.
-            let mid = pts[pts.len() / 2];
-            let hit = Rect::from_center_size(mid, EguiVec2::splat(12.0));
-            ui_state.record(format!("cable:{cable_id}"), hit);
-            let resp = ui.interact(hit, Id::new(("kabl-cable", *cable_id)), Sense::click());
-            if resp.hovered() {
-                painter.circle_stroke(mid, 7.0, Stroke::new(1.5, th.sel));
-            }
-            let resp = resp.on_hover_text("Drag its plug out of the input to move or remove it");
-            if routing::is_functional(c) {
-                routing::functional_mark(painter, pts[pts.len() / 3], z, th.sel);
-            }
-            let st = ui_state.style.clone();
-            kit::context_menu(&resp, &st, |ui| {
-                let r = kit::menu_item(ui, &st, "Pattern & probability...", false);
-                ui_state.record("menu:cable-pattern".into(), r.rect);
-                if r.clicked() {
-                    ui_state.cable_fn = Some(*cable_id);
-                    ui.close();
-                }
-                let r = kit::menu_item(ui, &st, "Remove cable", false);
-                ui_state.record("menu:remove-cable".into(), r.rect);
-                if r.clicked() {
-                    editor.disconnect(*cable_id);
-                    ui.close();
-                }
+    let mut runs: Vec<Run> = Vec::new();
+    for (cable_id, c) in &cables {
+        if only.is_some_and(|id| c.from.module_id() != Some(id) && c.to.module_id() != Some(id)) {
+            continue;
+        }
+        if ui_state.unplug == Some(*cable_id) {
+            continue; // in the hand, drawn to the pointer
+        }
+        let Some(&a) = port_ref_pos(&drawn.ports, &c.from, PortDirection::Output) else {
+            continue;
+        };
+        if let Some(&b) = port_ref_pos(&drawn.ports, &c.to, PortDirection::Input) {
+            let pts = cable_look::points(a, b, z, slots.sag);
+            runs.push(Run {
+                id: *cable_id,
+                c,
+                route: false,
+                pts,
             });
         }
     }
@@ -3859,41 +3896,126 @@ fn draw_cables(
         let Some(&a) = port_ref_pos(&drawn.ports, &c.from, PortDirection::Output) else {
             continue;
         };
-        let bypass = c.params.get("bypass").is_some_and(|&b| b >= 0.5);
-        let inspected = matches!((&c.to, &ui_state.inspected),
+        let pts = cable_look::points(a, *pos, z, slots.sag);
+        runs.push(Run {
+            id: *cable_id,
+            c,
+            route: true,
+            pts,
+        });
+    }
+    // The cable under the pointer, if several, the nearest.
+    let reach = (slots.width * z * 0.5).max(6.0);
+    let hover_cable = pointer.and_then(|p| {
+        runs.iter()
+            .map(|r| (r.id, cable_look::distance_to(&r.pts, p)))
+            .filter(|&(_, d)| d <= reach)
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(id, _)| id)
+    });
+    let lit_of = |r: &Run| -> bool {
+        let touches =
+            |m: Option<ModuleId>| m.is_some() && (m == selected || (!pinned && m == hover_module));
+        let (from, to) = (r.c.from.module_id(), r.c.to.module_id());
+        let inspected = matches!((&r.c.to, &ui_state.inspected),
             (PortRef::Param { id, param }, Some((iid, ip))) if id == iid && param == ip);
-        let strong = ui_state.selected_route == Some(*cable_id)
+        let jack = |dir: PortDirection, p: &PortRef| match (p, &hot_port) {
+            (PortRef::Module { id, port }, Some((hid, hdir, hport))) => {
+                id == hid && dir == *hdir && port == hport
+            }
+            _ => false,
+        };
+        touches(from)
+            || touches(to)
+            || ui_state.selected_route == Some(r.id)
             || inspected
-            || (focus.is_some() && focus == c.from.module_id());
-        let alpha = alpha_for(
-            c.from.module_id().unwrap_or_default(),
-            c.to.module_id().unwrap_or_default(),
-        ) * if strong { 1.0 } else { 0.72 };
-        let pts = cable_path(
-            painter,
-            a,
-            *pos,
-            cable_color(*cable_id),
-            4.0 * z,
-            alpha,
-            bypass,
+            || (!pinned
+                && (hover_cable == Some(r.id)
+                    || jack(PortDirection::Output, &r.c.from)
+                    || jack(PortDirection::Input, &r.c.to)))
+    };
+    let lit: Vec<bool> = runs.iter().map(&lit_of).collect();
+    let dim_others = pinned && selected.is_some();
+    let secs = 0.12;
+    // Resting cables first, lit ones on top.
+    let mut order: Vec<usize> = (0..runs.len()).collect();
+    order.sort_by_key(|&i| lit[i]);
+    for i in order {
+        let r = &runs[i];
+        let on = lit[i];
+        let kind = if r.route { 0.75 } else { 1.0 };
+        let t = ctx.animate_bool_with_time(Id::new(("kabl-cable-lit", r.id)), on, secs);
+        let alpha_to = if on {
+            1.0
+        } else if dim_others {
+            slots.dimmed
+        } else {
+            slots.rest_alpha
+        };
+        let alpha =
+            ctx.animate_value_with_time(Id::new(("kabl-cable-alpha", r.id)), alpha_to, secs);
+        let w = ((slots.rest_width + (slots.width - slots.rest_width) * t) * kind * z).max(2.0);
+        let base = if r.route {
+            cable_color(r.id)
+        } else {
+            port_color(th, editor, &r.c.from)
+        };
+        let (col, rest_casing) = cable_look::resting(&ctx, &st, base, slots.rest_alpha);
+        let casing = (rest_casing * (alpha / slots.rest_alpha).min(1.0) * (1.0 + 0.8 * t)).min(1.0);
+        let bypass = r.route && r.c.params.get("bypass").is_some_and(|&b| b >= 0.5);
+        cable_look::paint(
+            painter, &mut top, &st, &r.pts, col, w, alpha, casing, bypass, t,
         );
-        let mid = pts[pts.len() / 2];
-        if routing::is_functional(c) {
-            routing::functional_mark(painter, pts[pts.len() / 3], z, th.sel);
+        let mid = r.pts[r.pts.len() / 2];
+        if routing::is_functional(r.c) {
+            top.extend(routing::functional_mark(
+                r.pts[r.pts.len() / 3],
+                z,
+                th.sel,
+                th.panel.gamma_multiply(0.85),
+            ));
         }
         let hit = Rect::from_center_size(mid, EguiVec2::splat(12.0));
-        ui_state.record(format!("route:{cable_id}"), hit);
-        let resp = ui.interact(hit, Id::new(("kabl-route", *cable_id)), Sense::click());
-        if resp.clicked() {
-            // Clicking a route selects it (never deletes: removal is explicit in the drawer).
-            if let PortRef::Param { id, param } = &c.to {
-                ui_state.selected_module = Some(*id);
-                ui_state.inspected = Some((*id, param.clone()));
-                ui_state.selected_route = Some(*cable_id);
+        if r.route {
+            ui_state.record(format!("route:{}", r.id), hit);
+            let resp = ui.interact(hit, Id::new(("kabl-route", r.id)), Sense::click());
+            if resp.clicked() {
+                // Clicking a route selects it (never deletes: removal is explicit in the drawer).
+                if let PortRef::Param { id, param } = &r.c.to {
+                    ui_state.selected_module = Some(*id);
+                    ui_state.inspected = Some((*id, param.clone()));
+                    ui_state.selected_route = Some(r.id);
+                }
             }
+            continue;
         }
+        ui_state.record(format!("cable:{}", r.id), hit);
+        let resp = ui.interact(hit, Id::new(("kabl-cable", r.id)), Sense::click());
+        if resp.hovered() {
+            top.push(egui::Shape::circle_stroke(
+                mid,
+                7.0,
+                Stroke::new(1.5, th.sel),
+            ));
+        }
+        let resp = resp.on_hover_text("Drag its plug out of the input to move or remove it");
+        let cable_id = r.id;
+        kit::context_menu(&resp, &st, |ui| {
+            let m = kit::menu_item(ui, &st, "Pattern & probability...", false);
+            ui_state.record("menu:cable-pattern".into(), m.rect);
+            if m.clicked() {
+                ui_state.cable_fn = Some(cable_id);
+                ui.close();
+            }
+            let m = kit::menu_item(ui, &st, "Remove cable", false);
+            ui_state.record("menu:remove-cable".into(), m.rect);
+            if m.clicked() {
+                editor.disconnect(cable_id);
+                ui.close();
+            }
+        });
     }
+    top
 }
 
 fn port_color(th: &Theme, editor: &PatchEditor, from: &PortRef) -> Color32 {

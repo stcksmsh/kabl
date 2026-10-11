@@ -50,8 +50,10 @@ This is the list of things that actually differ between A and B today.
 | `knob.mod` | `arc-dot`, `arc-glow`, `segment` | offset from rim, width, glow, dot size | Recipe + dials |
 | `selector` | `inset-pill`, `accent-pill`, `outlined` | radius, padding | Recipe |
 | `jack` | `nut`, `glow-ring`, `donut` | ring width, glow | Recipe + dials |
-| `cable` | `rope` (shadow + highlight), `glow`, `outlined` | width, sag, glow, bead size/speed, dimmed alpha | Recipe + dials |
+| `cable` | `rope` (shadow + highlight), `glow`, `outlined` | width (lit), rest width, rest opacity, sag, glow (lit), dimmed alpha | Recipe + dials |
 | `plug` | `cap`, `ring`, `dot` | radius | Recipe |
+
+Cable drawing reads these slots (`cable_look.rs`): a cable rests at `rest_width` and `rest_alpha`, and lights to `width`, full opacity and `glow` when its module is hovered or selected, one of its jacks is hovered, the pointer is on it, or it is the selected route. Focus pins the selected module's cables lit and draws the rest at `dimmed`. Cables are painted on the face material and under everything drawn on a face (titles, readouts, knobs, displays, jacks); plugs stay on top. A theme must keep a resting cable at 3:1 or more against the rack and every section's face colour: the drawing adds a dark casing on light themes and lightens the colour on dark themes, and `cable_look::tests` checks the built-in themes. `rest_width` and `rest_alpha` are optional in a theme file (3.0 and 0.85).
 | `display.frame` | `glass` (inner shadow), `neon` (outer tint), `paper` | grid density, border width, glow | Recipe + dials |
 | `display.trace` | `soft-glow`, `strong-glow`, `crisp` | width, glow, fill alpha, playhead style | Recipe + dials |
 | `button`, `chip`, `field`, `slider`, `toggle`, `list-row`, `tag`, `card` | shape `rounded`, `pill`, `square`; fill `flat`, `gradient`; outline | radii/outline from tokens | Recipe |
