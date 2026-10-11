@@ -41,7 +41,7 @@ Cue movement is not sent back to the host as parameter changes (that would write
 - The cues do something in the host: the same project without the CC item renders differently (relative difference 1.12, envelope correlation 0.08). Per-second loudness: flat 0.018 until the Chorus lands (bar after 6 s), up to 0.046 by about 12 s, back to 0.02 after Verse 2.
 - Recorded host automation on macro m1 (flat, then a ramp over the Bridge): render differs (relative difference 0.33).
 - An old project opened and saved by this build comes back with an identical state. CLAP validator: not installed on this machine, so only CI runs it.
-- Not verified: other hosts, listening, the rack face of `cues`, which still reads "no cue matches what plays" for a macro-only cue (the face code is in Agent 1's files, left alone).
+- Not verified: other hosts, listening.
 
 ## For Kosta: the demo
 
@@ -55,3 +55,9 @@ Cue movement is not sent back to the host as parameter changes (that would write
 | 14 | Verse 2 | 1 bar | everything drains back to the dark, dry verse |
 
 Captures (standalone, 1280x800, its minimum size): `img/01..06`, light and dark, targets set and a morph part-way for Chorus and Bridge. `scripts/capture.py` makes them with real input. `img/host-*.png`: the plugin editor in REAPER.
+
+## After merging #24, #25, #27
+
+- The cues rack face says `playing: <cue>` for a launched macro-only cue and `no cue launched yet` before (`img/07-light-rack-cues-face.png`); Perform and the face share `cues::standing_now`.
+- The second figure beside Clear on a macro tile is the CC pickup target (where to move the controller), not morph progress. It now shows `↔ 71%` (arrow up or down once the controller has moved) while `→ 0.35 · 28%` under the value is the morph's destination and progress.
+- The morph and the live face displays share the report path in both hosts; the REAPER run was repeated on the merged build with the same results (states identical, renders identical, cues change the render by 1.12).
