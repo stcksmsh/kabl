@@ -250,6 +250,17 @@ pub fn param_label(p: &ParamInfo) -> String {
         "pw" => return "Pulse width".into(),
         "predelay_ms" => return "Pre-delay".into(),
         "glide_ms" => return "Glide time".into(),
+        // The EQ's band controls: the band alone would label frequency and gain alike.
+        "low_hz" => return "Low freq".into(),
+        "low_db" => return "Low gain".into(),
+        "mid1_hz" => return "Mid1 freq".into(),
+        "mid1_db" => return "Mid1 gain".into(),
+        "mid1_q" => return "Mid1 Q".into(),
+        "mid2_hz" => return "Mid2 freq".into(),
+        "mid2_db" => return "Mid2 gain".into(),
+        "mid2_q" => return "Mid2 Q".into(),
+        "high_hz" => return "High freq".into(),
+        "high_db" => return "High gain".into(),
         n if n.starts_with("level") && n.len() > 5 => return format!("Level {}", &n[5..]),
         // The FM voice's per-operator controls: short, so six envelopes fit a row.
         n if n.len() > 3 && n.ends_with(|c: char| ('1'..='6').contains(&c)) => {

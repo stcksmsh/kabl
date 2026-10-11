@@ -29,17 +29,34 @@ bench, clip paths, CI run link on the final head. Open a separate draft PR to ma
   `docs/effects-filters/scripts/make_demos.py` and 9 clips in `docs/effects-filters/audio/*.m4a`.
 - Workspace `cargo test` showed no failures; `cargo fmt --check` and `cargo clippy --workspace --all-targets -D warnings` clean.
 
+## Done since (second session, committed in the "wip: faces, CPU, host evidence" commit)
+
+- PR: draft https://github.com/stcksmsh/kabl/pull/25 (opened, CI not yet looked at).
+- Faces (item 1): `docs/effects-filters/scripts/{face_patches.py,capture_faces.sh}`, light captures in
+  `docs/effects-filters/faces/<kind>/light.png` (dark theme step fails: "no target theme:dark", same script as
+  sound-engines; light only). Fixes: EQ knob labels were ambiguous ("Low, Low, Mid1, Mid1...") -> explicit labels in
+  `crates/ui/src/routing.rs::param_label` ("Low freq", "Low gain", "Mid1 freq", ...); `filter.formant` title
+  "Formant Filter" overlapped the +1 badge -> renamed "Formant" in info. Recaptured after the fix; the
+  recaptured eq and formant PNGs have NOT been looked at yet. SVF face shows the Notch jack fine. Bitcrusher
+  downsample value reads "4X" (unit upper-cased by fmt_value); left alone.
+- CPU (item 2): `bench_palette_parts` does not enumerate kinds; added ignored test `cpu_per_module` in
+  `crates/modules/tests/effects.rs` (`cargo test --release -p kabl-modules --test effects cpu_per_module -- --ignored --nocapture`).
+  The test file's assert_no_alloc use is now `cfg(debug_assertions)` (the crate compiles to nothing in release).
+  ns/sample at 48 kHz, block 256, noise in: phaser 82.5, flanger 123.9, compressor 14.9, eq 41.3, limiter 12.4,
+  bitcrusher 9.9, filter.comb 44.4, filter.formant 14.3; references filter.svf 20.2, filter.ladder 60.7, chorus 64.1
+  (0.047 % to 0.595 % of one core).
+- Host (item 3): REAPER: `docs/effects-filters/scripts/host_effects.py` (needs `cargo build --release -p kabl-clap`,
+  `-p kabl-engine --example patch_json` (new, `crates/engine/examples/patch_json.rs`), demos from make_demos.py,
+  `SE_BASELINE_PLUGIN=scratch/baseline-master-libkabl_clap.so`). Result in `docs/effects-filters/evidence/host/result.json`:
+  9 tracks load; states identical across save/quit/reopen/save; reopened render bit-identical; wet finite, peak 0.9895,
+  rms 0.305, wet-vs-dry rel. diff 0.21; old factory-bank project state identical and render bit-identical to the
+  baseline build. Standalone: `scripts/standalone.sh` opens each wet demo in kabl-ui, 10 s, audio device opened,
+  real-time priority granted, screenshots in `evidence/standalone/<name>-wet/running.png`, logs beside them.
+  Gotcha: pick an Xvfb display number other sessions do not use (96 collided; 143/144 fine).
+
 ## Remaining, in order
 
-1. Faces: render each new module with the existing face capture (`docs/sound-engines/scripts/capture_faces.sh`
-   pattern) and confirm every control is legible; only fix new-module code. Mention SVF's new `notch` jack.
-2. CPU: `cargo run --release -p kabl-ui --example bench_palette_parts` (see how it lists chorus/drive); add the new
-   kinds if it enumerates by hand, record ns/sample or % per module in the README.
-3. Host: adapt `docs/sound-engines/scripts/host_util.py` (private Xvfb + REAPER profile, CLAP_PATH copy, project
-   built from patch states, render, quit, reopen) to the demo patches in `scratch/effects-demos/*-wet`; also run the
-   standalone with one demo patch. Build `cargo build --release -p kabl-clap`. Write evidence to
-   `docs/effects-filters/evidence/`. Old project (`docs/factory-performance-bank/evidence/host/arrangement.rpp`)
-   must still load and render the same.
+1. Look at the recaptured `faces/eq/light.png` and `faces/filter.formant/light.png`; if fine, done with faces.
 4. Docs: `docs/effects-filters/README.md` (per module: ports, params, method, measured numbers, "listen for" line)
    and a "Effects and filters" entry in `docs/decisions.md`; link from `docs/STATUS.md` if the sound-engines entry is there.
 5. After faces PR #24 lands: `git merge origin/master`, rerun tests; re-render clips if a sound-affecting fix landed.

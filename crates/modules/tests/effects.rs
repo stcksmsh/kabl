@@ -6,11 +6,18 @@
 mod common;
 use common::*;
 
+// assert_no_alloc compiles to nothing in release builds (its default), so the guard is debug-only.
+#[cfg(debug_assertions)]
 use assert_no_alloc::{assert_no_alloc, AllocDisabler};
+#[cfg(not(debug_assertions))]
+fn assert_no_alloc<T>(f: impl FnOnce() -> T) -> T {
+    f()
+}
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::{registry, Module, PortDirection, ProcessIo, Signal};
 use std::f32::consts::PI;
 
+#[cfg(debug_assertions)]
 #[global_allocator]
 static ALLOCATOR: AllocDisabler = AllocDisabler;
 
@@ -761,5 +768,37 @@ fn live_edit_carries_state_across() {
         let ya = a.run_mono(&x[3200..], 64);
         let yb = b.run_mono(&x[3200..], 64);
         assert_eq!(ya, yb, "{kind}");
+    }
+}
+
+/// CPU per module at 48 kHz, block 256, default params, noise in. Not asserted; run with
+/// `cargo test --release -p kabl-modules --test effects cpu_per_module -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn cpu_per_module() {
+    let x = noise(7, 256);
+    for kind in NEW_KINDS
+        .into_iter()
+        .chain(["filter.svf", "filter.ladder", "chorus"])
+    {
+        let mut d = Dut::new(kind, &[], 48000.0, 256);
+        let sig: Vec<Signal> = (0..d.n_in).map(|_| Signal::Buffer(&x)).collect();
+        let ps: Vec<Signal> = d.params.iter().map(|&v| Signal::Scalar(v)).collect();
+        let mut bufs = vec![vec![0f32; 256]; d.n_out];
+        let mut run = |n: usize| {
+            let t = std::time::Instant::now();
+            for _ in 0..n {
+                let mut refs: Vec<&mut [f32]> = bufs.iter_mut().map(|b| &mut b[..]).collect();
+                let mut io = ProcessIo::new(&sig, &mut refs, &ps, 256);
+                d.m.process(&mut io);
+            }
+            t.elapsed().as_secs_f64() / (n * 256) as f64 * 1e9
+        };
+        run(2000);
+        let ns = (0..5).map(|_| run(4000)).fold(f64::MAX, f64::min);
+        println!(
+            "{kind}: {ns:.1} ns/sample, {:.3} % of one core at 48 kHz",
+            ns * 48000.0 / 1e7
+        );
     }
 }

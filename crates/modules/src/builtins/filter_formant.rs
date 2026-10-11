@@ -40,7 +40,7 @@ const PARAMS: &[ParamInfo] = &[
 
 pub static FILTER_FORMANT_INFO: ModuleInfo = ModuleInfo {
     kind: "filter.formant",
-    name: "Formant Filter",
+    name: "Formant",
     category: Category::Filter,
     rate: Rate::Voice,
     explain: "Makes a sound speak: it shapes the tone like a mouth. Vowel morphs through a, e, i, o, u; shift makes the mouth smaller or larger.",
