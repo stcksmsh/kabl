@@ -1,0 +1,4 @@
+723904e00000-723905253000 r--p 00000000 103:01 13541202                  /secondary/Programming/Github/kabl/.worktrees/functional-cables/scratch/cue-macros-host/plugin/kabl.clap
+723905253000-723905994000 r-xp 00452000 103:01 13541202                  /secondary/Programming/Github/kabl/.worktrees/functional-cables/scratch/cue-macros-host/plugin/kabl.clap
+723905994000-7239059dd000 r--p 00b92000 103:01 13541202                  /secondary/Programming/Github/kabl/.worktrees/functional-cables/scratch/cue-macros-host/plugin/kabl.clap
+7239059dd000-7239059df000 rw-p 00bda000 103:01 13541202                  /secondary/Programming/Github/kabl/.worktrees/functional-cables/scratch/cue-macros-host/plugin/kabl.clap
