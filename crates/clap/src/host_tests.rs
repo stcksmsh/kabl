@@ -647,3 +647,39 @@ fn wavetable_state_survives_a_host_project_reopen() {
     assert_eq!(again.patch.tables[&2].name, "mine.wav");
     assert_eq!(serde_json::to_vec(&again).unwrap(), saved);
 }
+
+/// A patch that carries an embedded table sounds from its first note: the session `prepare`
+/// builds (what `activate` and a state load run) plays the table from the first block, and a
+/// note at the very start is heard.
+#[test]
+fn a_session_with_an_embedded_table_sounds_from_the_first_block() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../patches/sound-engines/demos/imported-morph");
+    let mut patch = kabl_core::load(&dir).unwrap().state().clone();
+    assert!(!patch.tables.is_empty());
+    for m in patch.modules.values_mut().filter(|m| m.kind == "env.adsr") {
+        m.params.insert("attack_ms".into(), 50.0);
+    }
+    let mut p = tests::instrument();
+    {
+        let c = p.shared.control.lock().unwrap();
+        let (session, ..) = prepare(&patch, 48000.0, &c.handle, 0, 1.0).unwrap();
+        p.session = Some(session);
+    }
+    let note = MidiEvent::parse(Source::Host, &[0x90, 48, 100]).unwrap();
+    let (mut left, mut right) = ([0.0f32; 128], [0.0f32; 128]);
+    let mut peaks = Vec::new();
+    for block in 0..400 {
+        if block == 0 {
+            p.timeline.push(0, 128, note);
+        }
+        p.render(&mut left, &mut right);
+        peaks.push(left.iter().fold(0.0f32, |m, v| m.max(v.abs())));
+    }
+    // About 0.17 s to 0.3 s after the note: audible.
+    assert!(
+        peaks[60..120].iter().any(|&v| v > 0.01),
+        "silent after the first note: {:?}",
+        &peaks[60..70]
+    );
+}

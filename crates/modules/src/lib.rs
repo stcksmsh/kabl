@@ -11,6 +11,7 @@ pub mod io;
 pub mod module;
 pub mod registry;
 pub mod skin;
+pub mod tableedit;
 pub mod view;
 pub mod wavetable;
 

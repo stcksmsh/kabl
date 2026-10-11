@@ -35,6 +35,7 @@ pub mod recipes;
 pub mod record;
 pub mod routing;
 pub mod style;
+pub mod tables;
 pub mod theme;
 #[cfg(test)]
 mod theme_tests;
@@ -262,6 +263,7 @@ pub struct UiState {
     /// The active style, rebuilt when `theme` or `dark` changes.
     pub style: std::sync::Arc<style::Style>,
     pub panels: panels::View,
+    pub tables: tables::View,
     pub zoom: f32,
     /// Screen offset of the rack origin from the canvas' top-left.
     pub pan: EguiVec2,
@@ -403,6 +405,7 @@ impl Default for UiState {
             prefs_saved: None,
             style: std::sync::Arc::new(style::builtin_a(false)),
             panels: panels::View::default(),
+            tables: tables::View::default(),
             zoom: 1.0,
             pan: EguiVec2::ZERO,
             drawer_open: true,
@@ -671,6 +674,7 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     kit::apply(ui.ctx(), &st);
     composites::panel(editor, ui_state, ui.ctx());
     panels::editor(editor, ui_state, ui.ctx());
+    tables::show(editor, ui_state, ui.ctx());
     rack_editor::edit_face(editor, ui_state, ui.ctx());
     browser::frame_input(editor, ui_state, ui);
     ui_state.validate(editor);
@@ -2076,6 +2080,41 @@ fn draw_module(
                 ui_state.wants.display(m.id, m.info.kind);
             }
             displays::draw(editor.state(), &st, &ui_state.live, now, painter, xf, m, r);
+            if m.info.kind == "osc.wt" && z >= 0.45 {
+                // A chip in the display's corner opens the table editor.
+                let d = xf.r(r);
+                let chip = Rect::from_min_size(
+                    pos2(d.right() - 30. * z - 3., d.top() + 3.),
+                    vec2(30., 13.) * z,
+                );
+                let hit = ui.interact(chip, Id::new(("wt-edit-table", m.id)), Sense::click());
+                ui_state.record(format!("edit-table:{}", m.id), chip);
+                ui_state.record(format!("wt-display:{}", m.id), d);
+                let (back, ink) = (st.roles.disp_bg, st.roles.disp_text);
+                painter.rect_filled(
+                    chip,
+                    3.,
+                    style::alpha(back, if hit.hovered() { 255 } else { 190 }),
+                );
+                painter.rect_stroke(
+                    chip,
+                    3.,
+                    Stroke::new(1., kit::face::trace_color(&st)),
+                    egui::StrokeKind::Inside,
+                );
+                if let Some(font) = kit::face::face_font(&st, style::Role::Caption, z) {
+                    painter.text(
+                        chip.center(),
+                        egui::Align2::CENTER_CENTER,
+                        "Edit",
+                        font,
+                        ink,
+                    );
+                }
+                if hit.clicked() {
+                    tables::open(editor, ui_state, m.id);
+                }
+            }
         }
     }
     if let Decor::Keys(r) = m.decor {

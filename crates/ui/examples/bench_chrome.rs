@@ -1,8 +1,11 @@
 //! UI frame time of `kabl_ui::show` (build, layout, tessellation; no GPU) on a simple and a
 //! dense patch, with the Sounds browser and Routing drawer open.
-//! `cargo run --release -p kabl-ui --example bench_chrome [frames] [live]`
+//! `cargo run --release -p kabl-ui --example bench_chrome [frames] [live] [editor|draw]`
 //! With `live`: rack only (no browser, drawer), audio running, and every module's face taps
 //! report new made-up values each frame, so every display and modulated knob animates.
+//! With `editor` (after `live`): the wavetable editor is open on the patch's first `osc.wt`
+//! (one is added when it has none). With `draw`: the same, and a pen stroke is down on the
+//! single-frame view, moving every frame, so tables are written during the measured frames.
 use egui::{Pos2, RawInput, Rect};
 use kabl_core::PatchState;
 use kabl_ui::library::Library;
@@ -32,6 +35,7 @@ fn run(
     frames: usize,
     perform: u8,
     live: bool,
+    edit: u8,
 ) {
     let user = tempfile::tempdir().unwrap();
     let ctx = egui::Context::default();
@@ -56,12 +60,42 @@ fn run(
     let size = egui::vec2(w, h);
     let mut times = Vec::with_capacity(frames);
     for i in 0..frames + 20 {
-        let raw = RawInput {
+        let mut raw = RawInput {
             screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
             time: Some(i as f64 / 60.0),
             focused: true,
             ..Default::default()
         };
+        if edit > 0 && i == 5 {
+            let wt = editor
+                .state()
+                .modules
+                .iter()
+                .find(|(_, m)| m.kind == "osc.wt")
+                .map(|(&id, _)| id)
+                .unwrap_or_else(|| {
+                    editor.add_module("osc.wt", kabl_core::Vec2 { x: 24.0, y: 20.0 })
+                });
+            kabl_ui::tables::open(&editor, &mut ui, wt);
+        }
+        if edit > 1 && i >= 18 {
+            if let Some(r) = ui.hits.get("wt:wave").copied() {
+                let at = r.center()
+                    + egui::vec2(
+                        (i as f32 * 0.7).sin() * r.width() * 0.4,
+                        (i as f32 * 0.31).sin() * r.height() * 0.4,
+                    );
+                raw.events.push(egui::Event::PointerMoved(at));
+                if i == 18 {
+                    raw.events.push(egui::Event::PointerButton {
+                        pos: at,
+                        button: egui::PointerButton::Primary,
+                        pressed: true,
+                        modifiers: Default::default(),
+                    });
+                }
+            }
+        }
         if live {
             let now = i as f64 / 60.0;
             for (&id, m) in &state.modules {
@@ -123,15 +157,20 @@ fn main() {
         .and_then(|s| s.parse().ok())
         .unwrap_or(300);
     let live = std::env::args().nth(2).as_deref() == Some("live");
+    let edit = match std::env::args().nth(3).as_deref() {
+        Some("editor") => 1,
+        Some("draw") => 2,
+        _ => 0,
+    };
     let simple = kabl_standalone::default_patch();
     let dense = dense();
     for (w, h) in [(1440.0, 900.0), (1280.0, 800.0)] {
         for dark in [false, true] {
-            run("simple", &simple, w, h, dark, frames, 0, live);
-            run("dense", &dense, w, h, dark, frames, 0, live);
+            run("simple", &simple, w, h, dark, frames, 0, live, edit);
+            run("dense", &dense, w, h, dark, frames, 0, live, edit);
             if !live {
-                run("d-perf", &dense, w, h, dark, frames, 1, false);
-                run("d-dock", &dense, w, h, dark, frames, 2, false);
+                run("d-perf", &dense, w, h, dark, frames, 1, false, 0);
+                run("d-dock", &dense, w, h, dark, frames, 2, false, 0);
             }
         }
     }
