@@ -120,6 +120,18 @@ impl UiState {
         (at.elapsed() < std::time::Duration::from_millis(400)).then_some(*m)
     }
 
+    /// Where param `p` of `id` is now: a macro a cue is driving reads as the cue moved it,
+    /// anything else as stored.
+    pub fn param_now(&self, state: &PatchState, id: ModuleId, p: &kabl_modules::ParamInfo) -> f32 {
+        let live = state
+            .modules
+            .get(&id)
+            .filter(|m| m.kind == "macro")
+            .and_then(|_| p.name.strip_prefix('m')?.parse::<u8>().ok())
+            .and_then(|k| self.live_macro(id, k.checked_sub(1)?));
+        live.map_or_else(|| routing::base_value(state, id, p), |m| m.value)
+    }
+
     /// Where macro `k` of `id` is now: the cue's morph if one is driving it, else the knob.
     pub fn macro_now(&self, state: &PatchState, id: ModuleId, k: u8) -> f32 {
         self.live_macro(id, k).map_or_else(

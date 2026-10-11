@@ -124,6 +124,8 @@ fn build() -> (PatchEditor, ModuleId) {
     for &(name, targets, beats, _) in &CUES {
         let n = cues::add(&mut e, cue, &|_| 0).expect("cue");
         cues::rename(&mut e, cue, n, name);
+        // The cues move macros only: the sequencer keeps playing through every section.
+        cues::set_target(&mut e, cue, n, seq, None);
         for (k, v) in targets.into_iter().enumerate() {
             cues::set_macro(&mut e, cue, n, knob, k as u8, Some(v));
         }

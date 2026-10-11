@@ -673,7 +673,7 @@ fn cues_card(
     // One row up to five cues (the usual set), else rows of four.
     let per_row = if all.len() <= 5 { all.len().max(4) } else { 4 };
     // The pads share the width left beside the Cancel button.
-    let fixed = 84.0 + st.sp(2) + st.sp(3) * 2.0 + 4.0;
+    let fixed = 84.0 + 110.0 + st.sp(1) + st.sp(2) + st.sp(3) * 2.0 + 4.0;
     let pad_w = ((size.x - fixed) / per_row as f32 - st.sp(1)).max(80.0);
     let rows = all.len().div_ceil(per_row).max(1);
     // Rows share the height the row was given.
@@ -1068,7 +1068,7 @@ fn midi_row(
                 .get(&(id, p.name.to_string()))
                 .copied()
                 .unwrap_or_default();
-            let at = p.to_norm(routing::base_value(editor.state(), id, p));
+            let at = p.to_norm(ui_state.param_now(editor.state(), id, p));
             let (text, tone, tip) = if t.picked {
                 (
                     "live".to_string(),

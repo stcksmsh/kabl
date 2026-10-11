@@ -241,7 +241,7 @@ pub fn apply_cc(
         sync_takeover(editor, ui_state);
         for (id, p) in mapped(editor.state(), ch, cc) {
             let key = (id, p.name.to_string());
-            let base = routing::base_value(editor.state(), id, p);
+            let base = ui_state.param_now(editor.state(), id, p);
             let t = ui_state.takeover.entry(key.clone()).or_default();
             let was = t.picked;
             let at = p.to_norm(base);
