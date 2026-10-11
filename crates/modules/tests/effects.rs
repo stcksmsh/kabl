@@ -153,7 +153,7 @@ fn welch(x: &[f32]) -> Vec<f64> {
     const N: usize = 8192;
     let mut acc = vec![0.0; N / 2 + 1];
     let mut k = 0;
-    for seg in x.chunks_exact(N) {
+    for seg in x.as_chunks::<N>().0 {
         for (a, p) in acc.iter_mut().zip(spectrum(seg)) {
             *a += p;
         }
