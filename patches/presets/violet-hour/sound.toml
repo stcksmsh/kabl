@@ -1,0 +1,12 @@
+name = "Violet Hour"
+category = "Pad"
+tags = [
+    "poly",
+    "supersaw",
+    "slow",
+    "80s",
+    "evolving",
+]
+description = "A wide supersaw pad in the M83 mould: two stacks of detuned saws an octave apart, a slow filter bloom, chorus, echo and a long room. Hold chords and let them breathe. Filter opens the bloom, Drive thickens the saws, Space is echo and room, Motion drifts the filter and the chorus."
+keys = true
+sequence = false

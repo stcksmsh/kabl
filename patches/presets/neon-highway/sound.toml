@@ -1,0 +1,12 @@
+name = "Neon Highway"
+category = "Lead"
+tags = [
+    "mono",
+    "legato",
+    "glide",
+    "bright",
+    "80s",
+]
+description = "A wide mono lead for late-night driving: a detuned saw stack and a pulse, a light drive, a ladder filter that opens with velocity, chorus, a dotted echo and a room. Legato notes glide. Filter brightens, Drive adds bite, Space adds echo and room, Motion adds vibrato."
+keys = true
+sequence = false
