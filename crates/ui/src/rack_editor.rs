@@ -474,7 +474,14 @@ pub(crate) fn more(
                     let now = ui.input(|i| i.time);
                     draw_module(editor, view, ui, &painter, th, focus, &m, now, &mut own);
                     if let Some(adv) = m.adv {
-                        theme::satin(&painter, focus.r(adv), &material);
+                        crate::kit::face::surface(
+                            &painter,
+                            &view.style,
+                            focus.r(adv),
+                            material.panel,
+                            material.panel_edge,
+                            focus.zoom,
+                        );
                     }
                     let look = Look {
                         z,

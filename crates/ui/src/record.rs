@@ -497,7 +497,7 @@ pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, st: &crate::st
             st,
             Role::Value,
             Tone::Bad,
-            format!("● REC {}", clock(rec.elapsed())),
+            format!("• REC {}", clock(rec.elapsed())),
         );
         hits.push(("rec-time".to_string(), r.rect));
         let lost = rec.lost();

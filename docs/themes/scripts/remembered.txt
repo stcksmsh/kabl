@@ -1,0 +1,3 @@
+# A fresh start with no KABL_THEME: the remembered choice should show.
+sleep 2
+shot remembered

@@ -1,6 +1,6 @@
 # kabl theming: design note
 
-Status: **proposal for Kosta's decision. Nothing is built.** Written after the design-target captures (README in this folder). A (Satin Studio) and B (Lacquer & Light) are treated as the first two built-in themes, and are the test of whether this system is expressive enough. A is the default unless Kosta says otherwise.
+Status: sections 1 to 12 are the original proposal. The theme model, loader, both built-in themes and in-app switching are **built**; section 13 describes what exists and where it departs from the sketch in section 4. A (Satin Studio) is the default; B (Lacquer & Light) is the second built-in.
 
 Principle: the interface is customisable and extensible by design, the way the engine is. A theme is a small package of parts that compose, not one fixed look and not a stylesheet bolted on afterwards.
 
@@ -294,3 +294,30 @@ What this does not do: the original PNG commit stays in the history of the PR br
 - Cost figures are estimates, not measurements. B's glow cost on the target laptop is unmeasured.
 - The interaction with D10 is read from `docs/panel-authoring/design.md` and `skin.rs`; I did not run the D10 authoring flow.
 - `ui_api`, the package layout and the bounds above are proposals and need Kosta's decisions (section 10) before a build brief is written.
+
+## 13. As built
+
+Code: `crates/ui/src/style/` (`mod.rs` the model, `builtin.rs` A and B, `load.rs` the loader and the remembered choice). Both built-ins are constructed in code from the same `Style` struct a theme file fills; a user theme goes through `load.rs`, which is the only way to read a file. (Section 8's "built-ins are embedded `theme.toml`" was not done: a compiled `Style` cannot be missing a key, and a unit test round-trips both built-ins through TOML.)
+
+**File format.** One `*.toml` file per theme in `<config>/kabl/themes/` (`$KABL_CONFIG_DIR/themes`, else `$XDG_CONFIG_HOME/kabl/themes`, else `~/.config/kabl/themes`). No zip or asset folder yet (no PNG assets in v1).
+
+```toml
+id = "example.midnight-rose"   # required; lowercase letters, digits . - _ ; at most 64
+name = "Midnight Rose"         # required; 1 to 48 characters
+extends = "kabl.lacquer"       # optional; a built-in id; default kabl.satin
+ui_api = 1                     # optional; a higher number only adds a "newer kabl" note
+author / version / license     # optional, informational
+
+[light.roles]   accent = "#c2185b"        # any role in 2.1; "#rrggbb" or "#rrggbbaa"
+[dark.sections.osc]   base = "#7a3350"    # section palettes: osc filter modulation amp timing fx
+[dark.slots.knob]   body = "cap"          # recipe choices and dials, same names as section 2.2
+[dark.types.label]  font = "sans-semibold" size = 11.5 caps = true
+```
+
+`[light]` and `[dark]` are overlays with exactly the shape of a serialised `Style` (`toml::to_string(&builtin_b(true))` prints the full list). A key that is not named keeps the value of the `extends` theme; a mode that is not given is the base theme's mode unchanged. `docs/themes/example/midnight-rose.toml` is a worked example (a test loads it). Fonts are chosen by role (`sans`, `sans-medium`, `sans-semibold`, `mono`, `mono-medium`); they name the embedded IBM Plex faces, and a theme cannot embed its own.
+
+**Validation (untrusted file).** Files over 64 KiB are refused; at most 64 files are read; invalid TOML, a missing or malformed `id` or `name`, or an unknown `extends` rejects the file with a message. Otherwise each value is applied on its own: an unknown key, a wrong type or an unknown recipe name keeps the base value and adds a message. Numbers are then clamped (type size 11 to 40 px, radii 0 to 24, spacing 0 to 64, shadow blur 0 to 48, motion 0 to 1200 ms, dials 0 to 1, cable width 1 to 12), non-finite numbers revert, and text roles (`text`, `text2`, `text3`, `on_accent`, `disp_text`, `knob_ink`) must be opaque. Every text pair in `Style::contrast_pairs` is checked: below 3.0:1 the whole light or dark mode is dropped (base values used) with a message; between 3.0 and 4.5 it is kept with a warning. A duplicate `id` is skipped. A theme cannot affect layout, hit areas, the 11 px text floor or the audio path. Messages go to the log and to the settings menu (first four).
+
+**Choice and persistence.** Settings menu (gear, bottom of the rail): Light or Dark, then the list of themes; applied on the next frame, no restart, no per-frame cost (the `Style` is rebuilt only when the choice changes). Remembered in `<config>/kabl/settings.toml` (`theme`, `dark`); a missing or invalid file means A light. The choice is global to the user: the standalone and every plugin instance read the same file when they start, because look is a personal preference (section 4); a running editor does not follow a change made in another instance until it is reopened. The patch file does not carry it. `KABL_THEME=ID`, `ID:dark` or `ID:light` starts a run in that theme without changing the remembered choice (capture scripts, bug reports).
+
+**Contrast results (tests in `style/mod.rs`).** All 8 text pairs of `contrast_pairs` and every section ink on base are at least 4.5:1 in A and B, light and dark. Essential marks (accent, focus, display trace, knob pointer on surface or body) are at least 3:1. Known exception, both themes light only: signal cables (audio, cv) on the rack are 1.6 to 2.3:1; cables are drawn with a dark under-stroke, so the mark does not rely on that pair. Outlines (`line2`) are 2.2 to 2.3:1 on surface in A, hairlines by design, and are not asserted.

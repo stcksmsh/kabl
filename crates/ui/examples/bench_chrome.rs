@@ -49,6 +49,9 @@ fn run(
     ui.perform_open = perform > 0;
     ui.perform_tall = perform == 1;
     ui.dark = dark;
+    if let Ok(id) = std::env::var("KABL_BENCH_THEME") {
+        ui.theme = id;
+    }
     ui.library = Some(Library::open(Some(patches()), user.path().to_path_buf()));
     let size = egui::vec2(w, h);
     let mut times = Vec::with_capacity(frames);

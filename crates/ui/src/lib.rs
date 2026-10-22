@@ -38,6 +38,8 @@ pub mod record;
 pub mod routing;
 pub mod style;
 pub mod theme;
+#[cfg(test)]
+mod theme_tests;
 
 pub use editor::PatchEditor;
 
@@ -250,9 +252,18 @@ pub struct UiState {
     /// The last rebuild request came from Load: `main.rs` sends that graph fresh (no state
     /// carry), then clears this.
     pub loaded: bool,
-    /// A-dark when true, A-light otherwise.
+    /// Dark mode of the chosen theme.
     pub dark: bool,
-    /// The active theme, rebuilt when `dark` flips.
+    /// Id of the chosen theme in `themes`.
+    pub theme: String,
+    /// Every theme the user can pick: the built-ins plus those in the themes folder.
+    pub themes: std::sync::Arc<style::Themes>,
+    /// Problems found while loading user themes, shown in the settings menu.
+    pub theme_notes: Vec<String>,
+    /// Where the choice is remembered; `None` (the default) never touches the disk.
+    pub prefs_dir: Option<std::path::PathBuf>,
+    prefs_saved: Option<style::Prefs>,
+    /// The active style, rebuilt when `theme` or `dark` changes.
     pub style: std::sync::Arc<style::Style>,
     pub panels: panels::View,
     pub zoom: f32,
@@ -390,6 +401,11 @@ impl Default for UiState {
             lfo_status: HashMap::new(),
             loaded: false,
             dark: false,
+            theme: style::BUILTIN_A_ID.into(),
+            themes: std::sync::Arc::default(),
+            theme_notes: Vec::new(),
+            prefs_dir: None,
+            prefs_saved: None,
             style: std::sync::Arc::new(style::builtin_a(false)),
             panels: panels::View::default(),
             zoom: 1.0,
@@ -589,6 +605,50 @@ impl UiState {
             .unwrap_or_else(|| banks::startup(state, id))
     }
 
+    /// Read the user themes folder and the remembered theme choice from the per-user config
+    /// folder (`style::config_dir`), and remember later changes there. The choice is global
+    /// to the user: the standalone and every plugin instance share it, because look is a
+    /// personal preference and songs do not carry it.
+    pub fn use_user_prefs(&mut self) {
+        let dir = style::config_dir();
+        let (themes, notes) = style::Themes::with_user_dir(&dir.join("themes"));
+        for n in &notes {
+            log::warn!("theme: {n}");
+        }
+        let mut p = style::Prefs::load(&dir);
+        // `KABL_THEME=ID` or `ID:dark` / `ID:light` starts in that theme without changing the
+        // remembered choice until the user picks one (capture scripts, bug reports).
+        if let Ok(v) = std::env::var("KABL_THEME") {
+            let (id, mode) = v.split_once(':').unwrap_or((&v, ""));
+            if themes.get(id).is_some() {
+                p.theme = id.into();
+                p.dark = mode == "dark" || (mode != "light" && p.dark);
+            } else {
+                log::warn!("KABL_THEME={v}: no such theme");
+            }
+        }
+        self.themes = std::sync::Arc::new(themes);
+        self.theme_notes = notes;
+        self.theme.clone_from(&p.theme);
+        self.dark = p.dark;
+        self.prefs_saved = Some(p);
+        self.prefs_dir = Some(dir);
+    }
+
+    fn save_prefs(&mut self) {
+        let Some(dir) = &self.prefs_dir else { return };
+        let p = style::Prefs {
+            theme: self.theme.clone(),
+            dark: self.dark,
+        };
+        if self.prefs_saved.as_ref() != Some(&p) {
+            if let Err(e) = p.save(dir) {
+                log::warn!("could not remember the theme in {}: {e}", dir.display());
+            }
+            self.prefs_saved = Some(p);
+        }
+    }
+
     fn flash_on(&self, id: ModuleId, param: &str, now: f64) -> bool {
         matches!(self.flash, Some((fid, p, t)) if fid == id && p == param && now - t < 1.5)
     }
@@ -600,11 +660,17 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     wheel::begin(ui.ctx());
     theme::ensure_fonts(ui.ctx());
     let ready = theme::fonts_ready(ui.ctx());
-    if ui_state.style.dark != ui_state.dark || ui_state.style.fonts_ready != ready {
+    if ui_state.style.dark != ui_state.dark
+        || ui_state.style.id != ui_state.theme
+        || ui_state.style.fonts_ready != ready
+    {
+        let th = ui_state.themes.resolve(&ui_state.theme);
         ui_state.style = std::sync::Arc::new(Style {
             fonts_ready: ready,
-            ..style::builtin_a(ui_state.dark)
+            ..th.style(ui_state.dark).clone()
         });
+        ui_state.theme = ui_state.style.id.clone();
+        ui_state.save_prefs();
     }
     let st = ui_state.style.clone();
     kit::apply(ui.ctx(), &st);
@@ -896,7 +962,7 @@ fn tool_icon(
 fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
     ui.horizontal_centered(|ui| {
         kit::logo(ui, st, 30.0);
-        kit::segmented(ui, st, |ui| {
+        kit::view_switch(ui, st, |ui| {
             let open = ui_state.perform_open;
             let r = kit::seg(ui, st, "Rack", !open);
             ui_state.record("rack".into(), r.rect);
@@ -955,7 +1021,7 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
                     st,
                     style::Role::Label,
                     kit::Tone::Bad,
-                    format!("● REC {:02}:{:02}", t / 60, t % 60),
+                    format!("• REC {:02}:{:02}", t / 60, t % 60),
                 );
             }
             if let Some(msg) = &ui_state.last_message {
@@ -1081,17 +1147,34 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
         ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
             let menu = kit::icon_menu(ui, st, kit::Ic::Gear, |ui| {
                 kit::segmented(ui, st, |ui| {
-                    let r = kit::seg(ui, st, "A-light", !ui_state.dark);
+                    let r = kit::seg(ui, st, "Light", !ui_state.dark);
                     ui_state.record("theme:light".into(), r.rect);
                     if r.clicked() {
                         ui_state.dark = false;
                     }
-                    let r = kit::seg(ui, st, "A-dark", ui_state.dark);
+                    let r = kit::seg(ui, st, "Dark", ui_state.dark);
                     ui_state.record("theme:dark".into(), r.rect);
                     if r.clicked() {
                         ui_state.dark = true;
                     }
                 });
+                let themes = ui_state.themes.clone();
+                for t in &themes.list {
+                    let r = kit::menu_item(ui, st, &t.name, t.id == st.id);
+                    ui_state.record(format!("theme-id:{}", t.id), r.rect);
+                    if r.clicked() {
+                        ui_state.theme.clone_from(&t.id);
+                    }
+                }
+                let notes = ui_state
+                    .theme_notes
+                    .iter()
+                    .take(4)
+                    .cloned()
+                    .collect::<Vec<_>>();
+                for n in notes {
+                    kit::paragraph(ui, st, style::Role::Caption, kit::Tone::Text2, &n);
+                }
                 kit::gap(ui, st, 1);
                 kit::rule(ui, st);
                 kit::gap(ui, st, 1);
@@ -1258,7 +1341,7 @@ fn seq_panel(
         ))
         .small(),
     );
-    ui.menu_button(format!("Bank {} ▾", seq::BANK_NAMES[edit]), |ui| {
+    ui.menu_button(format!("Bank {} ↓", seq::BANK_NAMES[edit]), |ui| {
         bank_menu(editor, ui_state, ui, id, edit)
     });
     let (mut pick, mut tpick) = (None, None);
@@ -1533,10 +1616,14 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             continue;
         }
         if ui_state.expanded.contains(&m.id) {
-            theme::satin(
+            let pt = theme::panel_theme(&ui_state.style, m.info.kind);
+            kit::face::surface(
                 &painter,
+                &ui_state.style,
                 xf.r(m.face),
-                &theme::panel_theme(&ui_state.style, m.info.kind),
+                pt.panel,
+                pt.panel_edge,
+                xf.zoom,
             );
             text(
                 &painter,
@@ -1973,7 +2060,31 @@ fn draw_module(
         }
         None => format!("{} · #{}", m.info.kind, m.id),
     };
-    kit::face::title(painter, &st, face, z, m.info.name, &tag, ink, ink2);
+    // What a left-aligned title must not touch: control labels, jacks with labels, displays.
+    let mut avoid: Vec<Rect> = m
+        .ctls
+        .iter()
+        .map(|c| {
+            let b = c.geo.bounds();
+            b.expand2(vec2(4.0, 0.0))
+        })
+        .chain(
+            m.jacks
+                .iter()
+                .map(|j| Rect::from_center_size(j.c, vec2(48.0, 20.0)).translate(vec2(0.0, -14.0))),
+        )
+        .collect();
+    if let Decor::Keys(r)
+    | Decor::Display(r)
+    | Decor::Transport(r)
+    | Decor::Banks(r)
+    | Decor::Operators(r)
+    | Decor::Cues(r) = m.decor
+    {
+        avoid.push(r);
+    }
+    let avoid: Vec<Rect> = avoid.into_iter().map(|r| xf.r(r)).collect();
+    kit::face::title(painter, &st, face, z, m.info.name, &tag, ink, ink2, &avoid);
     if ui_state.selected_module == Some(m.id) {
         painter.rect_stroke(
             rect.expand(1.0),
@@ -2178,7 +2289,7 @@ fn draw_module(
             egui::Align2::CENTER_CENTER,
             "Done",
             12.0 * z,
-            Color32::WHITE,
+            th.sel_ink,
             false,
         );
         if resp.clicked() {
@@ -2458,7 +2569,7 @@ fn draw_banks(
             egui::Align2::CENTER_CENTER,
             seq::BANK_NAMES[b],
             12.0 * z,
-            if on { Color32::WHITE } else { th.plate_ink },
+            if on { th.sel_ink } else { th.plate_ink },
             false,
         );
         // Routes into this bank's controls while another bank is on the face plug in here.
@@ -2543,7 +2654,7 @@ fn draw_banks(
             egui::Align2::CENTER_CENTER,
             seq::BANK_NAMES[b],
             12.0 * z,
-            if lit { Color32::WHITE } else { th.plate_ink },
+            if lit { th.sel_ink } else { th.plate_ink },
             false,
         );
         let timing = banks::timing(editor.state(), id);
@@ -2661,7 +2772,7 @@ fn pad(
         egui::Align2::CENTER_CENTER,
         label,
         12.5 * z,
-        if lit { Color32::WHITE } else { th.plate_ink },
+        if lit { th.sel_ink } else { th.plate_ink },
         false,
     );
     resp
@@ -3321,11 +3432,7 @@ fn draw_control(
     });
     painter.circle_filled(pr.center(), 7.5 * z, if on { th.sel } else { th.panel });
     painter.circle_stroke(pr.center(), 7.5 * z, Stroke::new(1.6, th.sel));
-    painter.circle_filled(
-        pr.center(),
-        2.5 * z,
-        if on { Color32::WHITE } else { th.sel },
-    );
+    painter.circle_filled(pr.center(), 2.5 * z, if on { th.sel_ink } else { th.sel });
     if resp.clicked() {
         if let Some((_, set)) = ui_state.choose.as_mut() {
             // Every bank of a sequencer shares the slot's choice.
@@ -4273,7 +4380,7 @@ fn draw_authored_face(
     let rect = xf.r(face);
     let z = xf.zoom;
     let painter = ui.painter_at(rect.intersect(ui.clip_rect()));
-    theme::satin(&painter, rect, &th);
+    kit::face::surface(&painter, &view.style, rect, th.panel, th.panel_edge, z);
     let art = if view.dark { &panel.dark } else { &panel.light };
     let mut missing = art.is_none();
     if let Some(art) = art {

@@ -1,0 +1,8 @@
+sleep 3
+click routing
+sleep 1
+click zoom:100
+sleep 1
+goto module:2 700 450
+sleep 1.5
+shot shot

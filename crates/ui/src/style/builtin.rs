@@ -243,3 +243,205 @@ fn dark_parts() -> (Roles, Sections, [Shadow; 3]) {
         ],
     )
 }
+
+/// Built-in theme B, "Lacquer and Light" (docs/design/app-target/tokens-b-lacquer.md).
+pub const BUILTIN_B_ID: &str = "kabl.lacquer";
+
+pub fn builtin_b(dark: bool) -> Style {
+    let (roles, sections, shadows) = if dark {
+        b_dark_parts()
+    } else {
+        b_light_parts()
+    };
+    let caps = |font, size, tracking| TypeRole {
+        font,
+        size,
+        caps: true,
+        tracking,
+    };
+    Style {
+        fonts_ready: false,
+        id: BUILTIN_B_ID.into(),
+        name: "Lacquer and Light".into(),
+        dark,
+        roles,
+        sections,
+        types: TypeScale {
+            display: role(Font::MonoMedium, 30.0),
+            title: role(Font::SansSemibold, 20.0),
+            h3: role(Font::SansSemibold, 15.0),
+            body: role(Font::Sans, 13.0),
+            label: caps(Font::SansSemibold, 11.5, 0.6),
+            value: role(Font::MonoMedium, 12.0),
+            caption: role(Font::Sans, 11.0),
+            section: caps(Font::SansSemibold, 11.0, 1.0),
+        },
+        space: [2.0, 4.0, 8.0, 12.0, 16.0, 24.0, 32.0, 48.0],
+        radii: Radii {
+            sm: 5.0,
+            md: 10.0,
+            lg: 16.0,
+        },
+        shadows,
+        motion: Motion {
+            hover: 120.0,
+            press: 80.0,
+            drawer: 260.0,
+            view: 220.0,
+            glide: 160.0,
+            pulse: 900.0,
+        },
+        slots: Slots {
+            face: FaceSlots {
+                material: FaceMaterial::Lacquer,
+                gradient: 0.28,
+                gloss: 0.24,
+                grain: 0.0,
+                hardware: FaceHardware::None,
+                title: FaceTitle::LeftDot,
+                out_plate: OutPlate::Dark,
+                shadow: 1,
+            },
+            rack: RackSurface::Plain,
+            knob: KnobSlots {
+                body: KnobBody::Glass,
+                scale: KnobScale::TrackArc,
+                value: KnobValue::Dot,
+                modulation: KnobMod::ArcGlow,
+                glow: 0.6,
+            },
+            selector: SelectorRecipe::AccentPill,
+            jack: JackRecipe::GlowRing,
+            cable: CableSlots {
+                recipe: CableRecipe::Glow,
+                width: 4.2,
+                sag: 46.0,
+                glow: 0.5,
+                dimmed: 0.22,
+            },
+            plug: PlugRecipe::Ring,
+            display: DisplaySlots {
+                frame: DisplayFrame::Neon,
+                trace: DisplayTrace::StrongGlow,
+                glow: 0.8,
+                fill: 0.35,
+            },
+            controls: ControlSlots {
+                button: Shape::Pill,
+                chip: Shape::Pill,
+                field: Shape::Rounded,
+                gradient: 0.6,
+                outline: 1.0,
+                focus_ring: 2.0,
+                card_shadow: 1,
+                popover_shadow: 2,
+                row: BrowserRows::Cards,
+            },
+            chrome: ChromeSlots {
+                view_switch: ViewSwitch::Tabs,
+                navigator: Navigator::Left,
+            },
+            icons: Icons::Stroke,
+        },
+        metrics: Metrics::default(),
+    }
+}
+
+fn b_shadows(alpha: [u8; 3]) -> [Shadow; 3] {
+    let s = |dy, blur, alpha| Shadow { dy, blur, alpha };
+    [
+        s(1.0, 3.0, alpha[0]),
+        s(6.0, 16.0, alpha[1]),
+        s(16.0, 36.0, alpha[2]),
+    ]
+}
+
+fn b_light_parts() -> (Roles, Sections, [Shadow; 3]) {
+    (
+        Roles {
+            bg: h("#e6e9f0"),
+            surface: h("#f4f6fa"),
+            raised: h("#ffffff"),
+            inset: h("#dce1ea"),
+            line: h("#c8cfdb"),
+            line2: h("#9aa3b5"),
+            text: h("#161922"),
+            text2: h("#464e60"),
+            text3: h("#7b8396"),
+            accent: h("#3b4fe0"),
+            on_accent: h("#ffffff"),
+            accent_soft: h("#dbe0fb"),
+            focus: h("#3b4fe0"),
+            audio: h("#e08a14"),
+            cv: h("#0f9d8a"),
+            gate: h("#7b4fd8"),
+            good: h("#1f8a4c"),
+            warn: h("#a8620f"),
+            bad: h("#c23030"),
+            rack: h("#cfd4df"),
+            rail: h("#b4bbcb"),
+            hole: h("#2c303a"),
+            disp_bg: h("#12141a"),
+            disp_grid: h("#262a35"),
+            disp_trace: h("#5ff0d6"),
+            disp_text: h("#d6f3f3"),
+            knob: h("#1c1f27"),
+            knob_hi: h("#5b6274"),
+            knob_ink: h("#f2f4fa"),
+        },
+        Sections {
+            osc: sect("#f0a791", "#2a110c", "#4d2a22"),
+            filter: sect("#aad3b8", "#0f2619", "#2c4a3a"),
+            modulation: sect("#c6baf0", "#1a1233", "#3d3262"),
+            amp: sect("#ebd28e", "#2b2108", "#524416"),
+            timing: sect("#a1d0e2", "#0c2530", "#26495a"),
+            fx: sect("#d9d2e4", "#1e1829", "#413a54"),
+        },
+        b_shadows([26, 36, 56]),
+    )
+}
+
+fn b_dark_parts() -> (Roles, Sections, [Shadow; 3]) {
+    (
+        Roles {
+            bg: h("#0d0e12"),
+            surface: h("#15171d"),
+            raised: h("#1e2129"),
+            inset: h("#090a0d"),
+            line: h("#292d38"),
+            line2: h("#434958"),
+            text: h("#eceef4"),
+            text2: h("#a5abbb"),
+            text3: h("#6c7388"),
+            accent: h("#7f8bff"),
+            on_accent: h("#0b0d1f"),
+            accent_soft: h("#24285a"),
+            focus: h("#9aa4ff"),
+            audio: h("#ffb454"),
+            cv: h("#3de0c8"),
+            gate: h("#b690ff"),
+            good: h("#5fe39a"),
+            warn: h("#ffc666"),
+            bad: h("#ff7a7a"),
+            rack: h("#08090c"),
+            rail: h("#2a2d36"),
+            hole: h("#030305"),
+            disp_bg: h("#07080b"),
+            disp_grid: h("#1d212a"),
+            disp_trace: h("#5ff0d6"),
+            disp_text: h("#cfeff0"),
+            knob: h("#12141a"),
+            knob_hi: h("#4a5060"),
+            knob_ink: h("#f2f4fa"),
+        },
+        Sections {
+            osc: sect("#8e4338", "#fff6ef", "#f1ddd2"),
+            filter: sect("#35705a", "#f2fff8", "#d3eadf"),
+            modulation: sect("#5b4ca3", "#f6f3ff", "#ddd6f4"),
+            amp: sect("#82672b", "#fff9e8", "#fcf3dc"),
+            timing: sect("#2b6377", "#effcff", "#cde7ef"),
+            fx: sect("#5d566b", "#f7f4fb", "#ded8e8"),
+        },
+        b_shadows([120, 150, 190]),
+    )
+}

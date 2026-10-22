@@ -7,9 +7,10 @@ import json
 import os
 import sys
 
-KINDS = ["phaser", "flanger", "compressor", "eq", "limiter", "bitcrusher", "filter.comb", "filter.formant",
+DEFAULT = ["phaser", "flanger", "compressor", "eq", "limiter", "bitcrusher", "filter.comb", "filter.formant",
          "filter.svf"]
 
+KINDS = os.environ.get("KINDS", " ".join(DEFAULT)).split()
 out = sys.argv[1]
 for kind in KINDS:
     d = os.path.join(out, kind)

@@ -1383,7 +1383,7 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
                 selected,
                 // Route colours are unreadable on the selection fill.
                 egui::RichText::new(label.clone()).color(if selected {
-                    Color32::WHITE
+                    ui_state.style.roles.text
                 } else if rt.bypass {
                     BYPASS_GREY
                 } else {
