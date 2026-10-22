@@ -15,9 +15,15 @@ const CALLBACKS: usize = 6000;
 const SWAP_EVERY: usize = 4;
 
 fn load(name: &str) -> PatchState {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../patches")
-        .join(name);
+    // KABL_BENCH_PATCH=DIR measures another patch (the nine-effects one).
+    let dir = std::env::var("KABL_BENCH_PATCH").map_or_else(
+        |_| {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../patches")
+                .join(name)
+        },
+        std::path::PathBuf::from,
+    );
     kabl_core::load(&dir).unwrap().state().clone()
 }
 
@@ -83,14 +89,28 @@ fn main() {
             .iter()
             .filter_map(|(&id, m)| {
                 let kind = kabl_modules::registry::info_for(&m.kind)?.kind;
-                matches!(kind, "osc.va" | "filter.svf" | "env.adsr" | "lfo").then_some(
-                    kabl_engine::facetap::FaceTarget {
-                        module: id,
-                        port: 0,
-                        kind,
-                        view: true,
-                    },
+                matches!(
+                    kind,
+                    "osc.va"
+                        | "filter.svf"
+                        | "env.adsr"
+                        | "lfo"
+                        | "phaser"
+                        | "flanger"
+                        | "compressor"
+                        | "eq"
+                        | "limiter"
+                        | "bitcrusher"
+                        | "filter.comb"
+                        | "filter.formant"
                 )
+                .then_some(kabl_engine::facetap::FaceTarget {
+                    module: id,
+                    // The compressor's display reads `gr`, output 2.
+                    port: if kind == "compressor" { 2 } else { 0 },
+                    kind,
+                    view: true,
+                })
             })
             .take(16)
             .collect();

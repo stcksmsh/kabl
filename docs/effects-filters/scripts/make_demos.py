@@ -163,7 +163,7 @@ DEMOS = {
     'phaser': with_stereo_fx('phaser', stages=6, rate_hz=0.35, depth=85, feedback=60, mix=55),
     'flanger': with_stereo_fx('flanger', rate_hz=0.18, depth=90, feedback=70, mix=50),
     'compressor': with_stereo_fx('compressor', threshold_db=-30, ratio=8, attack_ms=2, release_ms=250,
-                                 knee_db=6, makeup_db=5),
+                                 knee_db=6, makeup_db=16),
     'eq': eq,
     'limiter': with_stereo_fx('limiter', gain_db=18, ceiling_db=-6, release_ms=120),
     'bitcrusher': with_stereo_fx('bitcrusher', bits=4, downsample=8, mix=100),

@@ -106,7 +106,7 @@ impl Default for Compressor {
 
 /// Gain reduction in dB for input level `x_db` (≥ 0).
 #[inline]
-fn reduction(x_db: f32, thr: f32, ratio: f32, knee: f32) -> f32 {
+pub fn reduction(x_db: f32, thr: f32, ratio: f32, knee: f32) -> f32 {
     let over = x_db - thr;
     let slope = 1.0 - 1.0 / ratio.max(1.0);
     if 2.0 * over <= -knee {

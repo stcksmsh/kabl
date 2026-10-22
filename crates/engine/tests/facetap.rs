@@ -204,3 +204,71 @@ fn the_sound_is_the_same_with_taps_on_and_nothing_allocates_across_swaps() {
     assert!(some > 10, "{some} reports across swaps");
     assert!(off == on, "taps changed the output");
 }
+
+/// Macro → compressor → phaser → limiter → Output, so each effect has a signal to work on.
+fn effects() -> PatchState {
+    let mut p = PatchState::new();
+    p.modules.insert(1, module("macro", &[("m1", 0.6)]));
+    p.modules.insert(
+        2,
+        module(
+            "compressor",
+            &[("threshold_db", -30.0), ("ratio", 8.0), ("attack_ms", 1.0)],
+        ),
+    );
+    p.modules.insert(3, module("phaser", &[("rate_hz", 5.0)]));
+    p.modules.insert(
+        4,
+        module("limiter", &[("gain_db", 24.0), ("ceiling_db", -6.0)]),
+    );
+    p.modules.insert(5, module("out", &[]));
+    for (i, (a, b)) in [(1, 2), (2, 3), (3, 4)].into_iter().enumerate() {
+        let (fa, fb) = match a {
+            1 => ("m1", "in_l"),
+            _ => ("left", "in_l"),
+        };
+        p.cables.insert(i as u64 * 2, cable(a, fa, b, fb));
+    }
+    p.cables.insert(10, cable(4, "left", 5, "left"));
+    p
+}
+
+#[test]
+fn effect_faces_report_reduction_and_phase_and_leave_the_sound_alone() {
+    let targets = FaceTargets::new(
+        1,
+        &[
+            t(2, 2, "compressor", true),
+            t(3, 0, "phaser", true),
+            t(4, 0, "limiter", true),
+        ],
+    );
+    let (_c, mut e) = engine(&effects(), 1);
+    e.command(&Command::Faces(Some(targets)));
+    for _ in 0..20 {
+        next_report(&mut e);
+    }
+    let r = next_report(&mut e);
+    assert!(
+        r.entries[0].found && r.entries[0].max > 5.0,
+        "{:?}",
+        r.entries[0]
+    );
+    assert!(r.entries[1].view_valid && (0.0..1.0).contains(&r.entries[1].position));
+    assert!(r.entries[2].view_valid && r.entries[2].position > 1.0);
+    let render = |taps: bool| {
+        let (_c, mut e) = engine(&effects(), 1);
+        if taps {
+            e.command(&Command::Faces(Some(targets)));
+        }
+        let (mut l, mut r) = ([0.0; BLOCK], [0.0; BLOCK]);
+        let mut out = Vec::new();
+        for _ in 0..300 {
+            assert_no_alloc(|| e.process_block(&mut l, &mut r));
+            e.take_face_report();
+            out.extend_from_slice(&l);
+        }
+        out
+    };
+    assert!(render(false) == render(true), "taps changed the output");
+}

@@ -144,17 +144,26 @@ impl Default for FilterFormant {
     }
 }
 
-/// Fills in each band's coefficients for a vowel position, shift and sharpness.
-fn design(bands: &mut [Band; FORMANTS], vowel: f32, shift_st: f32, q: f32, sr: f32) {
+/// Each formant's (centre Hz, level dB, bandwidth Hz) at a vowel position and shift, before the
+/// converter limits and the sharpness `q`. The module's design and the face's curve both read it.
+pub fn formant_bands(vowel: f32, shift_st: f32) -> [(f32, f32, f32); FORMANTS] {
     let v = vowel.clamp(0.0, 4.0);
     let i = (v.floor() as usize).min(3);
     let t = v - i as f32;
     let ratio = (shift_st / 12.0).exp2();
-    for (b, (lo, hi)) in bands.iter_mut().zip(VOWELS[i].iter().zip(&VOWELS[i + 1])) {
+    let mut out = [(0.0, 0.0, 0.0); FORMANTS];
+    for (o, (lo, hi)) in out.iter_mut().zip(VOWELS[i].iter().zip(&VOWELS[i + 1])) {
         let f = (lo.0.ln() + (hi.0.ln() - lo.0.ln()) * t).exp() * ratio;
+        *o = (f, lo.1 + (hi.1 - lo.1) * t, lo.2 + (hi.2 - lo.2) * t);
+    }
+    out
+}
+
+/// Fills in each band's coefficients for a vowel position, shift and sharpness.
+fn design(bands: &mut [Band; FORMANTS], vowel: f32, shift_st: f32, q: f32, sr: f32) {
+    for (b, (f, db, bw)) in bands.iter_mut().zip(formant_bands(vowel, shift_st)) {
         let f = f.clamp(20.0, 0.45 * sr);
-        let level = ((lo.1 + (hi.1 - lo.1) * t) * NEPER_PER_DB).exp();
-        let bw = lo.2 + (hi.2 - lo.2) * t;
+        let level = (db * NEPER_PER_DB).exp();
         let k = (bw / f / q).clamp(0.02, 2.0);
         let g = (std::f32::consts::PI * f / sr).tan();
         let a1 = 1.0 / (1.0 + g * (g + k));

@@ -100,3 +100,58 @@ fn envelope_shows_its_stage() {
     r.render(2400, 0, |_, _| 0.0);
     assert_eq!(view(&r).position, 4.0, "release");
 }
+
+#[test]
+fn limiter_shows_its_gain_reduction() {
+    let mut r = Rig::new("limiter", &[("gain_db", 12.0), ("ceiling_db", -6.0)], SR);
+    r.render(12000, 0, |_, _| 0.5);
+    let v = view(&r);
+    assert!(v.valid);
+    assert!((v.position - 12.0).abs() < 0.3, "{}", v.position);
+    let mut quiet = Rig::new("limiter", &[("gain_db", 0.0), ("ceiling_db", -6.0)], SR);
+    quiet.render(12000, 0, |_, _| 0.1);
+    assert!(view(&quiet).position < 0.01);
+}
+
+#[test]
+fn phaser_and_flanger_show_their_lfo_phase() {
+    for kind in ["phaser", "flanger"] {
+        let mut r = Rig::new(kind, &[("rate_hz", 1.0)], SR);
+        r.render(12000, 0, |_, _| 0.0);
+        let v = view(&r);
+        assert!(v.valid, "{kind}");
+        assert!((v.position - 0.25).abs() < 0.01, "{kind} {}", v.position);
+    }
+}
+
+#[test]
+fn eq_curve_matches_what_the_module_does() {
+    use kabl_modules::builtins::band_response_db;
+    let mut r = Rig::new(
+        "eq",
+        &[("mid1_hz", 1000.0), ("mid1_db", 12.0), ("mid1_q", 1.0)],
+        SR,
+    );
+    for hz in [300.0f32, 1000.0, 2500.0] {
+        let x = r.render(24000, 0, |_, t| (TAU * hz * t as f32 / SR).sin());
+        let measured = 20.0 * (rms(&x[12000..]) / std::f32::consts::FRAC_1_SQRT_2).log10();
+        let want = band_response_db(1, 1000.0, 12.0, 1.0, SR, hz);
+        assert!(
+            (measured - want).abs() < 0.3,
+            "{hz} Hz: {measured} vs {want}"
+        );
+    }
+    assert!(band_response_db(0, 100.0, 6.0, 1.0, SR, 20.0) > 5.0);
+    assert!(band_response_db(3, 8000.0, 6.0, 1.0, SR, 20000.0) > 5.0);
+    assert!(band_response_db(1, 400.0, 0.0, 1.0, SR, 3000.0).abs() < 1e-3);
+}
+
+#[test]
+fn formant_bands_follow_the_vowel() {
+    use kabl_modules::builtins::formant_bands;
+    let a = formant_bands(0.0, 0.0);
+    assert!((a[0].0 - 650.0).abs() < 0.01 && a[0].1 == 0.0 && a[0].2 == 80.0);
+    let mid = formant_bands(0.5, 0.0);
+    assert!(mid[0].0 < 650.0 && mid[0].0 > 400.0);
+    assert!((formant_bands(0.0, 12.0)[0].0 - 1300.0).abs() < 0.1);
+}

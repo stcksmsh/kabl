@@ -13,6 +13,8 @@ use kabl_engine::compile::DEFAULT_ROUTE_AMOUNT;
 use kabl_modules::builtins::{seq, SEQ_INFO};
 use kabl_modules::{registry, ParamInfo, PortDirection, Taper};
 
+use crate::kit;
+use crate::style::Role;
 use crate::theme::theme;
 use crate::{cable_color, PatchEditor, UiState};
 
@@ -1477,199 +1479,8 @@ pub(crate) fn is_functional(c: &kabl_core::CableState) -> bool {
     kabl_cables::is_functional(&c.params)
 }
 
-/// The pattern and probability of the cable `ui_state.cable_fn` (opened from a cable's menu or
-/// a route row). Every value is an ordinary cable param edit: undo, save and the engine's
-/// in-place path see exactly what is shown.
-pub(crate) fn cable_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
-    let Some(cable) = ui_state.cable_fn else {
-        return;
-    };
-    let Some(c) = editor.state().cables.get(&cable).cloned() else {
-        ui_state.cable_fn = None;
-        return;
-    };
-    let has_clock = editor.state().modules.values().any(|m| m.kind == "clock");
-    let get = |slot| kabl_cables::slot_value(&c.params, slot);
-    let set = |editor: &mut PatchEditor, slot: usize, v: f32, resp: &egui::Response| {
-        let continuing = resp.dragged() && !resp.drag_started();
-        editor.set_param_gesture(
-            ParamTarget::Cable {
-                id: cable,
-                param: kabl_cables::slot_name(slot),
-            },
-            v,
-            !continuing,
-        );
-    };
-    ui.separator();
-    ui.horizontal_wrapped(|ui| {
-        let port = match &c.from {
-            PortRef::Module { port, .. } => port.as_str(),
-            PortRef::Param { param, .. } | PortRef::CableParam { param, .. } => param.as_str(),
-        };
-        let from = source_label(editor.state(), c.from.module_id().unwrap_or_default(), port);
-        ui.heading(format!("Cable #{cable}: {from}"));
-        let r = ui.small_button("Close");
-        ui_state.record(format!("fn-close:{cable}"), r.rect);
-        if r.clicked() {
-            ui_state.cable_fn = None;
-        }
-    });
-    ui.small(
-        "Steps advance on each pulse of the patch clock (a 16th note) and restart with it. \
-         A closed step passes nothing; a route is read every 64 samples. A source that moves \
-         Chance, Morph or Glide is read at each pulse, at the pulse's exact sample.",
-    );
-    if !has_clock {
-        ui.colored_label(
-            Color32::from_rgb(255, 200, 90),
-            "No Clock in this patch: the cable passes everything.",
-        );
-    }
-    ui.horizontal(|ui| {
-        ui.label("Steps");
-        let mut len = get(0);
-        let resp = ui.add(
-            egui::DragValue::new(&mut len)
-                .range(0.0..=kabl_cables::MAX_STEPS as f32)
-                .speed(0.1)
-                .custom_formatter(|v, _| {
-                    if v < 1.0 {
-                        "off".into()
-                    } else {
-                        format!("{v:.0}")
-                    }
-                }),
-        );
-        ui_state.record(format!("fn-length:{cable}"), resp.rect);
-        if resp.changed() {
-            set(editor, 0, len.round(), &resp);
-        }
-        ui.label("Chance");
-        let mut prob = get(1);
-        let resp = ui.add(
-            egui::DragValue::new(&mut prob)
-                .range(0.0..=100.0)
-                .speed(0.5)
-                .suffix(" %")
-                .max_decimals(0),
-        );
-        ui_state.record(format!("fn-prob:{cable}"), resp.rect);
-        if resp.changed() {
-            set(editor, 1, prob, &resp);
-        }
-    });
-    cable_param_routes(ui, editor, ui_state, cable, "prob");
-    let rows = |ui: &mut egui::Ui,
-                editor: &mut PatchEditor,
-                ui_state: &mut UiState,
-                tag: &str,
-                len: usize,
-                level0: usize,
-                chance0: usize| {
-        for k in 0..len {
-            ui.horizontal(|ui| {
-                ui.label(format!("{:>2}", k + 1));
-                let mut level = get(level0 + k) * 100.0;
-                let resp = ui.add(
-                    egui::DragValue::new(&mut level)
-                        .range(0.0..=100.0)
-                        .speed(0.5)
-                        .suffix(" % level")
-                        .max_decimals(0),
-                );
-                ui_state.record(format!("fn-level{tag}:{cable}:{k}"), resp.rect);
-                if resp.changed() {
-                    set(editor, level0 + k, level / 100.0, &resp);
-                }
-                let mut chance = get(chance0 + k);
-                let resp = ui.add(
-                    egui::DragValue::new(&mut chance)
-                        .range(0.0..=100.0)
-                        .speed(0.5)
-                        .suffix(" % chance")
-                        .max_decimals(0),
-                );
-                ui_state.record(format!("fn-chance{tag}:{cable}:{k}"), resp.rect);
-                if resp.changed() {
-                    set(editor, chance0 + k, chance, &resp);
-                }
-            });
-        }
-    };
-    rows(
-        ui,
-        editor,
-        ui_state,
-        "",
-        get(0) as usize,
-        kabl_cables::LEVEL0,
-        kabl_cables::CHANCE0,
-    );
-    ui.separator();
-    ui.horizontal(|ui| {
-        ui.label("Morph A to B");
-        let mut morph = get(kabl_cables::MORPH) * 100.0;
-        let resp = ui.add(
-            egui::DragValue::new(&mut morph)
-                .range(0.0..=100.0)
-                .speed(0.5)
-                .suffix(" %")
-                .max_decimals(0),
-        );
-        ui_state.record(format!("fn-morph:{cable}"), resp.rect);
-        if resp.changed() {
-            set(editor, kabl_cables::MORPH, morph / 100.0, &resp);
-        }
-        ui.label("Glide");
-        let mut glide = get(kabl_cables::GLIDE);
-        let resp = ui.add(
-            egui::DragValue::new(&mut glide)
-                .range(0.0..=2000.0)
-                .speed(1.0)
-                .suffix(" ms")
-                .max_decimals(0),
-        );
-        ui_state.record(format!("fn-glide:{cable}"), resp.rect);
-        if resp.changed() {
-            set(editor, kabl_cables::GLIDE, glide, &resp);
-        }
-    });
-    cable_param_routes(ui, editor, ui_state, cable, "morph");
-    cable_param_routes(ui, editor, ui_state, cable, "glide_ms");
-    ui.horizontal(|ui| {
-        ui.label("Pattern B steps");
-        let mut len = get(kabl_cables::B_LENGTH);
-        let resp = ui.add(
-            egui::DragValue::new(&mut len)
-                .range(0.0..=kabl_cables::MAX_STEPS as f32)
-                .speed(0.1)
-                .custom_formatter(|v, _| {
-                    if v < 1.0 {
-                        "off".into()
-                    } else {
-                        format!("{v:.0}")
-                    }
-                }),
-        );
-        ui_state.record(format!("fn-b-length:{cable}"), resp.rect);
-        if resp.changed() {
-            set(editor, kabl_cables::B_LENGTH, len.round(), &resp);
-        }
-    });
-    rows(
-        ui,
-        editor,
-        ui_state,
-        "-b",
-        get(kabl_cables::B_LENGTH) as usize,
-        kabl_cables::B_LEVEL0,
-        kabl_cables::B_CHANCE0,
-    );
-}
-
 /// What a cable's own parameter is called next to its value.
-fn cable_param_label(param: &str) -> &'static str {
+pub(crate) fn cable_param_label(param: &str) -> &'static str {
     match param {
         "prob" => "Chance",
         "morph" => "Morph",
@@ -1703,62 +1514,67 @@ fn cable_route_row(
         .copied()
         .unwrap_or(kabl_engine::compile::DEFAULT_ROUTE_AMOUNT);
     let bypass = c.params.get("bypass").is_some_and(|&b| b >= 0.5);
-    ui.horizontal_wrapped(|ui| {
-        let label = source_label(editor.state(), *id, port);
-        ui.label(egui::RichText::new(label).color(if bypass {
-            BYPASS_GREY
+    let st = ui_state.style.clone();
+    let label = source_label(editor.state(), *id, port);
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = st.sp(1);
+        let tone = if bypass {
+            kit::Tone::Text3
         } else {
-            cable_color(route)
-        }));
-        if target {
-            ui.label(format!(
-                "moves {} of cable #{cable}",
-                cable_param_label(param)
-            ));
-        }
-        let mut pct = amount * 100.0;
-        let resp = ui.add(
-            egui::DragValue::new(&mut pct)
-                .range(-100.0..=100.0)
-                .speed(0.5)
-                .suffix(" %")
-                .max_decimals(1),
-        );
-        ui_state.record(format!("croute-amount:{route}"), resp.rect);
-        if resp.changed() {
-            let continuing = resp.dragged() && !resp.drag_started();
-            editor.set_route_amount(route, pct / 100.0, !continuing);
-        }
-        let resp = ui.small_button("Invert");
-        ui_state.record(format!("croute-invert:{route}"), resp.rect);
-        if resp.clicked() {
-            editor.set_route_amount(route, -amount, true);
-        }
-        let mut off = bypass;
-        let resp = ui.checkbox(&mut off, "Bypass");
-        ui_state.record(format!("croute-bypass:{route}"), resp.rect);
-        if resp.changed() {
-            editor.set_route_bypass(route, off);
-        }
-        let resp = ui
-            .small_button("Pattern")
-            .on_hover_text("Step pattern and pass probability for this route");
-        ui_state.record(format!("croute-pattern:{route}"), resp.rect);
-        if resp.clicked() {
-            ui_state.cable_fn = Some(route);
-        }
-        let resp = ui.small_button("Remove");
-        ui_state.record(format!("croute-remove:{route}"), resp.rect);
-        if resp.clicked() {
-            *remove = Some(route);
-        }
+            kit::Tone::Text
+        };
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let resp = ui.add(kit::Button::new(&st, "Remove").ghost().small());
+            ui_state.record(format!("croute-remove:{route}"), resp.rect);
+            if resp.clicked() {
+                *remove = Some(route);
+            }
+            let resp = ui
+                .add(kit::Button::new(&st, "Pattern").ghost().small())
+                .on_hover_text("Step pattern and pass probability for this route");
+            ui_state.record(format!("croute-pattern:{route}"), resp.rect);
+            if resp.clicked() {
+                ui_state.cable_fn = Some(route);
+            }
+            let resp = ui.add(kit::Button::new(&st, "Invert").ghost().small());
+            ui_state.record(format!("croute-invert:{route}"), resp.rect);
+            if resp.clicked() {
+                editor.set_route_amount(route, -amount, true);
+            }
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                kit::label_truncated(ui, &st, Role::Label, tone, label);
+            });
+        });
     });
+    if target {
+        kit::label(
+            ui,
+            &st,
+            Role::Caption,
+            kit::Tone::Text2,
+            format!("moves {} of cable #{cable}", cable_param_label(param)),
+        );
+    }
+    let mut pct = (amount * 100.0) as f64;
+    let readout = format!("{pct:.1} %");
+    let resp = kit::slider(ui, &st, &mut pct, -100.0..=100.0, Some(0.5), &readout);
+    ui_state.record(format!("croute-amount:{route}"), resp.rect);
+    if resp.changed() {
+        let continuing = resp.dragged() && !resp.drag_started();
+        editor.set_route_amount(route, pct as f32 / 100.0, !continuing);
+    }
+    let mut off = bypass;
+    let resp = kit::toggle(ui, &st, &mut off, "Bypass");
+    ui_state.record(format!("croute-bypass:{route}"), resp.rect);
+    if resp.changed() {
+        editor.set_route_bypass(route, off);
+    }
 }
 
 /// The sources that move parameter `param` of cable `cable`: one row each, and a chooser that
 /// adds an output of any module as another. A wire cannot be dropped on a wire, so this is the
 /// way to route into a cable.
-fn cable_param_routes(
+pub(crate) fn cable_param_routes(
     ui: &mut egui::Ui,
     editor: &mut PatchEditor,
     ui_state: &mut UiState,
@@ -1773,10 +1589,17 @@ fn cable_param_routes(
         .map(|(&id, _)| id)
         .collect();
     let mut remove = None;
-    ui.horizontal_wrapped(|ui| {
-        ui.label(format!("{} moved by", cable_param_label(param)));
+    let st = ui_state.style.clone();
+    ui.horizontal(|ui| {
+        kit::label(
+            ui,
+            &st,
+            Role::Label,
+            kit::Tone::Text2,
+            format!("{} moved by", cable_param_label(param)),
+        );
         if routes.is_empty() {
-            ui.weak("nothing");
+            kit::label(ui, &st, Role::Label, kit::Tone::Text3, "nothing");
         }
     });
     for route in routes {
@@ -1809,11 +1632,15 @@ fn cable_param_routes(
             (source_label(state, id, port), r)
         })
         .collect();
-    let resp = egui::ComboBox::from_id_salt(("add-croute", cable, param.to_string()))
-        .selected_text("Add source")
-        .show_ui(ui, |ui| {
+    let resp = kit::dropdown(
+        ui,
+        &st,
+        ("add-croute", cable, param.to_string()),
+        "Add source",
+        160.0,
+        |ui| {
             for (label, from) in &outputs {
-                let r = ui.selectable_label(false, label);
+                let r = kit::menu_item(ui, &st, label, false);
                 if let PortRef::Module { id, port } = from {
                     ui_state.record(format!("croute-source:{cable}:{param}:{id}.{port}"), r.rect);
                 }
@@ -1821,8 +1648,9 @@ fn cable_param_routes(
                     add = Some(from.clone());
                 }
             }
-        });
-    ui_state.record(format!("croute-add:{cable}:{param}"), resp.response.rect);
+        },
+    );
+    ui_state.record(format!("croute-add:{cable}:{param}"), resp.rect);
     if let Some(from) = add {
         editor.connect_cable_route(from, cable, param);
     }

@@ -23,11 +23,15 @@ pub mod displays;
 pub mod editor;
 pub mod explain;
 pub mod filebrowser;
+mod fx_displays;
 pub mod help;
 pub mod inspect;
 pub mod kit;
 pub mod library;
 pub mod panels;
+mod pattern;
+#[cfg(test)]
+mod pattern_tests;
 pub mod perform;
 mod perform_view;
 pub mod rack;
@@ -935,7 +939,7 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                         });
                     }
                     show_param_panel(editor, ui_state, ui);
-                    routing::cable_panel(editor, ui_state, ui);
+                    pattern::panel(editor, ui_state, ui);
                     routing::drawer(editor, ui_state, ui);
                     routing::cable_routes(editor, ui_state, ui);
                 });
@@ -2136,6 +2140,7 @@ fn draw_module(
         if let Some(r) = scope {
             if painter.clip_rect().intersects(face) {
                 ui_state.wants.display(m.id, m.info.kind);
+                ui_state.wants.feeds(editor.state(), m.id, m.info.kind);
             }
             displays::draw(editor.state(), &st, &ui_state.live, now, painter, xf, m, r);
             if m.info.kind == "osc.wt" && z >= 0.45 {
@@ -4193,7 +4198,7 @@ fn draw_cables(
     top
 }
 
-fn port_color(th: &Theme, editor: &PatchEditor, from: &PortRef) -> Color32 {
+pub(crate) fn port_color(th: &Theme, editor: &PatchEditor, from: &PortRef) -> Color32 {
     let PortRef::Module { id, port } = from else {
         return th.cv;
     };
