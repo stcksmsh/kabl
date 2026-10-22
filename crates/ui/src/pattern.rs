@@ -183,19 +183,42 @@ fn step_grid(ui: &mut Ui, st: &Style, ui_state: &mut UiState, l: &Lane) -> Vec<E
                 );
             };
             num(
-                format!("{}", k + 1),
-                rect.top() + NUM_H / 2.0,
-                if now { Tone::Text } else { Tone::Text3 },
-            );
-            num(
                 if on {
                     format!("{:.0}", level * 100.0)
                 } else {
                     "off".into()
                 },
+                rect.top() + NUM_H / 2.0,
+                if now { Tone::Text } else { Tone::Text2 },
+            );
+            num(
+                format!("{chance:.0}"),
                 odd.bottom() + gap + NUM_H / 2.0,
                 if on { Tone::Text2 } else { Tone::Text3 },
             );
+        }
+        // The step under the pointer, named with its values.
+        if let Some(q) = ui
+            .input(|i| i.pointer.hover_pos())
+            .filter(|q| rect.contains(*q))
+        {
+            let k = first + step_at(q.x);
+            let tip = format!(
+                "Step {}: level {:.0} %, chance {:.0} %",
+                k + 1,
+                l.levels[k] * 100.0,
+                l.chances[k]
+            );
+            egui::Tooltip::always_open(
+                ui.ctx().clone(),
+                ui.layer_id(),
+                ui.id().with(("pattern-tip", l.cable, l.tag, row)),
+                egui::PopupAnchor::Pointer,
+            )
+            .gap(12.0)
+            .show(|ui| {
+                ui.label(tip);
+            });
         }
     }
     edits
