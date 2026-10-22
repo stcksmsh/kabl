@@ -29,7 +29,7 @@ log = (host / 'run.log').open('w')
 xvfb = sp.Popen(['Xvfb', disp, '-screen', '0', '1440x900x24', '-ac', '-nolisten', 'tcp'], stdout=log, stderr=log)
 time.sleep(1)
 reaper = sp.Popen(['pw-jack', '/usr/local/bin/reaper', '-newinst', '-nosplash', '-cfgfile', str(ini),
-                   str(project), str(Path(__file__).with_name('host-render.lua'))],
+                   str(project), str(Path(__file__).with_name(os.environ.get('KABL_LUA', 'host-render.lua')))],
                   env=env, cwd=str(repo), stdout=log, stderr=log)
 try:
     deadline = time.monotonic() + 90

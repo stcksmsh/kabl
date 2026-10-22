@@ -1271,6 +1271,23 @@ impl Plugin for Instrument {
             let (left, right) = channels.split_at_mut(1);
             self.render(left[0], right[0]);
         }
+        // Before the input port existed, anything a host mixed onto the track (audio items,
+        // sends) passed through an instrument that had no inputs. Keep that for every patch that
+        // does not take the input itself (`audio.in`), so existing projects sound the same.
+        if !self
+            .session
+            .as_ref()
+            .is_some_and(|s| s.engine.uses_audio_in())
+        {
+            if let Some(input) = aux.inputs.first_mut() {
+                let input = input.as_slice();
+                for (out, inp) in buffer.as_slice().iter_mut().zip(input.iter()) {
+                    for (o, i) in out.iter_mut().zip(inp.iter()) {
+                        *o += *i;
+                    }
+                }
+            }
+        }
         self.shared
             .event_drops
             .fetch_add(self.schedule.dropped - dropped_before, Ordering::Relaxed);

@@ -73,7 +73,7 @@ const PARAMS: &[ParamInfo] = &[
     param("attack_ms", 0.5, 50.0, 4.0, "ms", Taper::Exponential),
     param("release_ms", 5.0, 500.0, 40.0, "ms", Taper::Exponential),
     param("hf", 0.0, 1.0, 0.5, "", Taper::Linear),
-    param("drive_db", 0.0, 36.0, 12.0, "dB", Taper::Linear),
+    param("drive_db", 0.0, 36.0, 24.0, "dB", Taper::Linear),
     param("mix", 0.0, 1.0, 1.0, "", Taper::Linear),
 ];
 

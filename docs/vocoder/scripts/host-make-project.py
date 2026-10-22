@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Writes a REAPER project that holds kabl with a patch in its state, played by a MIDI chord.
 
-    python3 docs/vocoder/scripts/host-make-project.py OUT.rpp PATCH_DIR [--voice VOICE.wav [--dest N]]
+    python3 docs/vocoder/scripts/host-make-project.py OUT.rpp PATCH_DIR [--voice VOICE.wav [--dest N | --same-track]]
 
 PATCH_DIR is a patch folder with a checkpoint.json. With --voice a second track plays VOICE.wav
-and sends it to kabl on input channels N+1/N+2 (N = 2 is REAPER's sidechain pair, the default).
+and sends it to kabl on input channels N+1/N+2 (N = 0, the default: the plugin's input shows
+as pins 1/2 in REAPER). --same-track puts the voice on kabl's own track instead.
 """
 import base64, json, sys, textwrap
 from pathlib import Path
@@ -13,7 +14,8 @@ out = Path(sys.argv[1]).resolve()
 patch = json.loads((Path(sys.argv[2]) / 'checkpoint.json').read_text())
 args = sys.argv[3:]
 voice = Path(args[args.index('--voice') + 1]).resolve() if '--voice' in args else None
-dest = int(args[args.index('--dest') + 1]) if '--dest' in args else 2
+same_track = '--same-track' in args
+dest = int(args[args.index('--dest') + 1]) if '--dest' in args else 0
 
 lanes = [{'target': None, 'retired': False} for _ in range(16)]
 state = {'version': 2, 'patch': patch, 'output_gain': 0.6, 'lanes': lanes,
@@ -27,11 +29,19 @@ notes = [0x34, 0x3B, 0x40, 0x43]
 events = ''.join(f'        E {960 if i == 0 else 0} 90 {n:02x} 64\n' for i, n in enumerate(notes))
 events += ''.join(f'        E {17280 if i == 0 else 0} 80 {n:02x} 00\n' for i, n in enumerate(notes))
 
+same_item = f'''    <ITEM
+      POSITION 0
+      LENGTH 10
+      <SOURCE WAVE
+        FILE "{voice}"
+      >
+    >
+''' if voice and same_track else ''
 kabl_track = f'''  <TRACK
     NAME "kabl"
     VOLPAN 0.65 0 1 -1
     NCHAN 4
-{'    AUXRECV 0 0 1 0 0 0 0 0 %d -1:U 0 -1' % dest if voice else ''}
+{'    AUXRECV 0 0 1 0 0 0 0 0 %d -1:U 0 -1' % dest if voice and not same_track else ''}
     <FXCHAIN
       SHOW 0
       <CLAP "CLAPi: kabl (stcksmsh)" dev.stcksmsh.kabl ""
@@ -41,7 +51,7 @@ kabl_track = f'''  <TRACK
       >
       WAK 0 0
     >
-    <ITEM
+{same_item}    <ITEM
       POSITION 0
       LENGTH 10
       <SOURCE MIDI
@@ -63,7 +73,7 @@ voice_track = f'''  <TRACK
       >
     >
   >
-''' if voice else ''
+''' if voice and not same_track else ''
 
 out.write_text(f'''<REAPER_PROJECT 0.1 "7.75/linux-x86_64" 0
   TEMPO 120 4 4

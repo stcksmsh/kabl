@@ -319,6 +319,30 @@ fn run_noalloc(m: &mut dyn Module, p: &[f32], car: &[f32], md: &[f32]) {
 }
 
 #[test]
+#[ignore = "prints the cost per 64-sample block; run with --release"]
+fn cpu_at_32_bands() {
+    for sr in [48000.0, 96000.0, 192000.0] {
+        let (mut m, p) = vocoder(&[("bands", 32.0), ("hf", 0.5), ("shift_st", 3.0)], sr);
+        let car = saw(110.0, sr, 64);
+        let md = noise(2, 64, 0.4);
+        for _ in 0..200 {
+            run_noalloc(&mut *m, &p, &car, &md);
+        }
+        let blocks = 20000;
+        let t = std::time::Instant::now();
+        for _ in 0..blocks {
+            run_noalloc(&mut *m, &p, &car, &md);
+        }
+        let us = t.elapsed().as_secs_f64() * 1e6 / blocks as f64;
+        let budget = 64.0 / sr as f64 * 1e6;
+        println!(
+            "CPU {sr} Hz: {us:.1} us per 64-sample block, {:.1} % of the {budget:.0} us budget",
+            100.0 * us / budget
+        );
+    }
+}
+
+#[test]
 fn audio_in_passes_what_it_is_fed_and_sanitises_the_rest() {
     let mut a = AudioIn::new();
     a.prepare(SR, 64, &LIVE);

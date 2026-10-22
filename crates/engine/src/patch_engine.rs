@@ -896,6 +896,15 @@ impl PatchEngine {
     /// swap is in flight — the incoming graph too, blending with an equal-power curve. Stereo,
     /// unlike `swap::Engine::process_block` (S1's graph was mono).
     #[inline]
+    /// Some playing graph has an `audio.in` module: the host's input is consumed by the patch.
+    pub fn uses_audio_in(&self) -> bool {
+        self.active.has_audio_in()
+            || self
+                .incoming
+                .as_ref()
+                .is_some_and(|(g, _)| g.has_audio_in())
+    }
+
     /// The host's audio input for the next `process_block`, read by `audio.in` modules. Stays
     /// until replaced: a host with no input calls it with zeros, or not at all (silence).
     pub fn set_audio_in(&mut self, left: &[f32; BLOCK], right: &[f32; BLOCK]) {

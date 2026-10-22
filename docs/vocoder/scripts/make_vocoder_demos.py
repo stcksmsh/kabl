@@ -104,11 +104,11 @@ def robot_voice(bands=20, dry=False, self_playing=False):
         p.wire(g, 'out', out, 'left')
         p.wire(g, 'out', out, 'right')
         return p
-    voc = p.add('vocoder', bands=bands, hf=0.5, drive_db=18, release_ms=45)
+    voc = p.add('vocoder', bands=bands, hf=0.5, drive_db=30, release_ms=45)
     p.wire(car, 'out', voc, 'in_l')
     p.wire(car, 'out', voc, 'in_r')
     p.wire(mix, 'out', voc, 'mod')
-    finish(p, voc, -3.0, 2)
+    finish(p, voc, 5.0, 2)
     for k, i in enumerate((clock, pitch, q, vowel, buzz, form, syl, vca, noise, burst, nvca, mix)):
         place(p, i, 24 + 400 * (k % 4), 10 + 370 * (3 + k // 4))
     place(p, voc, 24 + 400 * 1, 10 + 370 * 2)
@@ -123,7 +123,7 @@ def live_voice():
     p.wire(car, 'out', voc, 'in_l')
     p.wire(car, 'out', voc, 'in_r')
     p.wire(ain, 'left', voc, 'mod')
-    finish(p, voc, 4.0, 2)
+    finish(p, voc, 8.5, 2)
     place(p, ain, 24, 10 + 370 * 2)
     place(p, voc, 24 + 400 * 1, 10 + 370 * 2)
     return p

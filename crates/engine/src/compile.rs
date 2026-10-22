@@ -2036,6 +2036,10 @@ impl CompiledPatch {
         }
     }
 
+    pub fn has_audio_in(&self) -> bool {
+        !self.audio_ins.is_empty()
+    }
+
     /// Hands this block's outside audio (the host's input) to every `audio.in`. No allocation.
     pub fn feed_audio(&mut self, left: &[f32; BLOCK], right: &[f32; BLOCK]) {
         for &index in &self.audio_ins {
