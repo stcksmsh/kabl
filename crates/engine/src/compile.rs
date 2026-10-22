@@ -63,8 +63,8 @@ use std::fmt;
 use kabl_cables::{Carry, Node as CableNode, Settings as CableSettings};
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
 use kabl_modules::builtins::{
-    Arp, Change, Clock, Delay, DelayLock, KeySettings, Lfo, LfoSync, MidiIn, Noise, OscWt, Random,
-    Seq, Transport,
+    Arp, AudioIn, Change, Clock, Delay, DelayLock, KeySettings, Lfo, LfoSync, MidiIn, Noise, OscWt,
+    Random, Seq, Transport,
 };
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::ModuleView;
@@ -497,6 +497,8 @@ pub struct CompiledPatch {
     /// `(module index, voice)` of every `midi.in` instance. Every `midi.in` in the patch
     /// receives every note, voice for voice (see `note_on`).
     midi_ins: Vec<(usize, usize)>,
+    /// Module index of every `audio.in` instance (global rate: one per module).
+    audio_ins: Vec<usize>,
     /// Parallel to `modules`: which `(ModuleId, voice index)` each instance came from — `None`
     /// voice index for global-rate modules. Used for state carry-over on recompile.
     module_origin: Vec<(ModuleId, Option<usize>)>,
@@ -1117,6 +1119,7 @@ fn compile_inner(
     let mut modules: Vec<Box<dyn Module>> = Vec::new();
     let mut module_origin: Vec<(ModuleId, Option<usize>)> = Vec::new();
     let mut midi_ins: Vec<(usize, usize)> = Vec::new();
+    let mut audio_ins: Vec<usize> = Vec::new();
     let mut out_left = silence_buf;
     let mut out_right = silence_buf;
     let mut out_module = None;
@@ -1406,6 +1409,9 @@ fn compile_inner(
             if meta.kind == "midi.in" {
                 midi_ins.push((module_index, lane));
             }
+            if meta.kind == "audio.in" {
+                audio_ins.push(module_index);
+            }
 
             let step = w.steps.len() as u32;
             for r in &mut route_slots[first_route..] {
@@ -1568,6 +1574,7 @@ fn compile_inner(
     Ok(CompiledPatch {
         modules,
         midi_ins,
+        audio_ins,
         module_origin,
         steps,
         buffers,
@@ -2025,6 +2032,15 @@ impl CompiledPatch {
                         None => self.buffers[*out] = input,
                     }
                 }
+            }
+        }
+    }
+
+    /// Hands this block's outside audio (the host's input) to every `audio.in`. No allocation.
+    pub fn feed_audio(&mut self, left: &[f32; BLOCK], right: &[f32; BLOCK]) {
+        for &index in &self.audio_ins {
+            if let Some(m) = self.modules[index].as_any_mut().downcast_mut::<AudioIn>() {
+                m.feed(left, right);
             }
         }
     }
