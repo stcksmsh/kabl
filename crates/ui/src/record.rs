@@ -108,6 +108,8 @@ pub struct Recorder {
     sample_rate: u32,
     /// Folder new takes go into.
     pub dir: String,
+    /// The remembered folder (settings) has been put in `dir`.
+    dir_remembered: bool,
     job: Option<Job>,
     pub last: Option<Outcome>,
     /// Failure injection for testing (`KABL_RECORD_FAIL_AFTER`): the writer reports a write
@@ -130,6 +132,7 @@ pub fn pair_sized(sample_rate: u32, frames: usize) -> (Recorder, Tap) {
             rx: Some(rx),
             sample_rate,
             dir: "recordings".into(),
+            dir_remembered: false,
             job: None,
             last: None,
             fail_after: None,
@@ -461,6 +464,7 @@ fn clock(s: f32) -> String {
 pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, st: &crate::style::Style) {
     use crate::kit::{self, Tone};
     use crate::style::Role;
+    let picked = crate::filebrowser::take(ui_state, crate::filebrowser::Purpose::RecordingsFolder);
     let Some(rec) = ui_state.recorder.as_mut() else {
         kit::label(
             ui,
@@ -473,6 +477,21 @@ pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, st: &crate::st
     };
     let mut hits = Vec::new();
     let mut message = None;
+    let mut browse = false;
+    let mut started = false;
+    // The folder of the last run, unless the user has chosen another in this one.
+    if !rec.dir_remembered {
+        rec.dir_remembered = true;
+        if let Some(d) = ui_state
+            .folders
+            .get(crate::filebrowser::Place::Recordings.key())
+        {
+            rec.dir = d.to_string_lossy().into_owned();
+        }
+    }
+    if let Some(p) = picked {
+        rec.dir = p.to_string_lossy().into_owned();
+    }
     if rec.failed() {
         message = rec.stop().map(|o| describe(&o));
     }
@@ -527,8 +546,9 @@ pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, st: &crate::st
         );
         hits.push(("rec-start".to_string(), r.rect));
         if r.clicked() {
-            if let Err(e) = rec.start() {
-                message = Some(e);
+            match rec.start() {
+                Err(e) => message = Some(e),
+                Ok(_) => started = true,
             }
         }
         kit::label(ui, st, Role::Label, Tone::Text2, "to");
@@ -542,6 +562,9 @@ pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, st: &crate::st
         )
         .on_hover_text("Folder for new takes (created if missing)");
         hits.push(("rec-dir".to_string(), r.rect));
+        let r = ui.add(kit::Button::new(st, "Browse").small());
+        hits.push(("rec-browse".to_string(), r.rect));
+        browse = r.clicked();
         let r = ui.add(kit::Button::new(st, "Open folder").small());
         hits.push(("rec-open".to_string(), r.rect));
         if r.clicked() {
@@ -600,6 +623,27 @@ pub fn controls(ui_state: &mut crate::UiState, ui: &mut egui::Ui, st: &crate::st
     }
     if message.is_some() {
         ui_state.last_message = message;
+    }
+    if started {
+        let dir = ui_state.recorder.as_ref().map(|r| PathBuf::from(&r.dir));
+        if let Some(d) = dir.filter(|d| d.is_dir()) {
+            ui_state.folders_remember(crate::filebrowser::Place::Recordings, &d);
+        }
+    }
+    if browse {
+        let hint = ui_state
+            .recorder
+            .as_ref()
+            .map_or(String::new(), |r| r.dir.clone());
+        crate::filebrowser::open(
+            ui_state,
+            crate::filebrowser::Purpose::RecordingsFolder,
+            "Folder for new takes",
+            crate::filebrowser::Mode::Folder,
+            crate::filebrowser::FOLDERS,
+            "",
+            &hint,
+        );
     }
 }
 

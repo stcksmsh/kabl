@@ -116,7 +116,7 @@
       },
       "params": {
         "cc.gain_db": 26.0,
-        "gain_db": 2.0,
+        "gain_db": 2.5,
         "pin.gain_db": 5.0
       }
     },

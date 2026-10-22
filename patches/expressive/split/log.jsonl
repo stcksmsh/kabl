@@ -49,3 +49,15 @@
 {"seq":48,"t_ms":1790619713104,"op":{"SetParam":{"target":{"Module":{"id":12,"param":"level2"}},"value":0.5}},"inverse":{"UnsetParam":{"target":{"Module":{"id":12,"param":"level2"}}}},"source":"User"}
 {"seq":49,"t_ms":1790619713104,"op":{"Connect":{"id":16,"from":{"Module":{"id":11,"port":"out"}},"to":{"Module":{"id":13,"port":"left"}}}},"inverse":{"Disconnect":{"id":16}},"source":"User"}
 {"seq":50,"t_ms":1790619713104,"op":{"Connect":{"id":17,"from":{"Module":{"id":12,"port":"out"}},"to":{"Module":{"id":13,"port":"right"}}}},"inverse":{"Disconnect":{"id":17}},"source":"User"}
+{"seq":51,"t_ms":1792678915393,"op":{"SetParam":{"target":{"Module":{"id":11,"param":"level1"}},"value":0.125}},"inverse":{"SetParam":{"target":{"Module":{"id":11,"param":"level1"}},"value":0.5}},"source":"User"}
+{"seq":52,"t_ms":1792678915393,"op":{"SetParam":{"target":{"Module":{"id":11,"param":"level2"}},"value":0.105}},"inverse":{"SetParam":{"target":{"Module":{"id":11,"param":"level2"}},"value":0.42}},"source":"User"}
+{"seq":53,"t_ms":1792678915393,"op":{"SetParam":{"target":{"Module":{"id":12,"param":"level1"}},"value":0.105}},"inverse":{"SetParam":{"target":{"Module":{"id":12,"param":"level1"}},"value":0.42}},"source":"User"}
+{"seq":54,"t_ms":1792678915393,"op":{"SetParam":{"target":{"Module":{"id":12,"param":"level2"}},"value":0.125}},"inverse":{"SetParam":{"target":{"Module":{"id":12,"param":"level2"}},"value":0.5}},"source":"User"}
+{"seq":55,"t_ms":1792679215225,"op":{"SetParam":{"target":{"Module":{"id":11,"param":"level1"}},"value":0.125}},"inverse":{"SetParam":{"target":{"Module":{"id":11,"param":"level1"}},"value":0.125}},"source":"User"}
+{"seq":56,"t_ms":1792679215225,"op":{"SetParam":{"target":{"Module":{"id":11,"param":"level2"}},"value":0.105}},"inverse":{"SetParam":{"target":{"Module":{"id":11,"param":"level2"}},"value":0.105}},"source":"User"}
+{"seq":57,"t_ms":1792679215225,"op":{"SetParam":{"target":{"Module":{"id":12,"param":"level1"}},"value":0.105}},"inverse":{"SetParam":{"target":{"Module":{"id":12,"param":"level1"}},"value":0.105}},"source":"User"}
+{"seq":58,"t_ms":1792679215225,"op":{"SetParam":{"target":{"Module":{"id":12,"param":"level2"}},"value":0.125}},"inverse":{"SetParam":{"target":{"Module":{"id":12,"param":"level2"}},"value":0.125}},"source":"User"}
+{"seq":59,"t_ms":1792679534819,"op":{"SetParam":{"target":{"Module":{"id":11,"param":"level1"}},"value":0.125}},"inverse":{"SetParam":{"target":{"Module":{"id":11,"param":"level1"}},"value":0.125}},"source":"User"}
+{"seq":60,"t_ms":1792679534819,"op":{"SetParam":{"target":{"Module":{"id":11,"param":"level2"}},"value":0.105}},"inverse":{"SetParam":{"target":{"Module":{"id":11,"param":"level2"}},"value":0.105}},"source":"User"}
+{"seq":61,"t_ms":1792679534819,"op":{"SetParam":{"target":{"Module":{"id":12,"param":"level1"}},"value":0.105}},"inverse":{"SetParam":{"target":{"Module":{"id":12,"param":"level1"}},"value":0.105}},"source":"User"}
+{"seq":62,"t_ms":1792679534819,"op":{"SetParam":{"target":{"Module":{"id":12,"param":"level2"}},"value":0.125}},"inverse":{"SetParam":{"target":{"Module":{"id":12,"param":"level2"}},"value":0.125}},"source":"User"}

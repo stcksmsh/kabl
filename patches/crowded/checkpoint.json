@@ -30,7 +30,12 @@
         "x": 600.0,
         "y": 10.0
       },
-      "params": {}
+      "params": {
+        "level1": 0.21,
+        "level2": 0.21,
+        "level3": 0.21,
+        "level4": 0.21
+      }
     },
     "5": {
       "kind": "ringmod",

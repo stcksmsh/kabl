@@ -63,6 +63,16 @@
         "release_ms": 120.0,
         "sustain": 0.0
       }
+    },
+    "7": {
+      "kind": "gain",
+      "pos": {
+        "x": 900.0,
+        "y": 10.0
+      },
+      "params": {
+        "gain_db": 6.5
+      }
     }
   },
   "cables": {
@@ -146,10 +156,26 @@
       "params": {},
       "steps": []
     },
-    "6": {
+    "8": {
       "from": {
         "Module": {
           "id": 4,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 7,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "9": {
+      "from": {
+        "Module": {
+          "id": 7,
           "port": "out"
         }
       },
@@ -162,10 +188,10 @@
       "params": {},
       "steps": []
     },
-    "7": {
+    "10": {
       "from": {
         "Module": {
-          "id": 4,
+          "id": 7,
           "port": "out"
         }
       },

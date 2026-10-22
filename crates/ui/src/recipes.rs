@@ -626,6 +626,13 @@ pub fn pluck_to_pad() -> PatchEditor {
             (6, "release_ms", "Release"),
         ],
     );
+    // The VCA only lowers a signal; this Gain after it brings the recipe to the factory level
+    // target (docs/factory-levels/README.md).
+    let gain = e.add_module("gain", at(0, 900.0));
+    e.set_param(gain, "gain_db", 6.5);
+    e.connect(port(4, "out"), port(gain, "in"));
+    e.connect(port(gain, "out"), port(5, "left"));
+    e.connect(port(gain, "out"), port(5, "right"));
     e
 }
 

@@ -1284,6 +1284,11 @@ fn write_crowded_patch() {
     ] {
         e.connect_route(port(a, ap), ids[b], param);
     }
+    // Factory level target (docs/factory-levels/README.md): the patch sums two oscillators and a
+    // ring modulator through resonant filters; the mixer levels bring its peaks under -1 dBFS.
+    for n in 1..=4 {
+        e.set_param(ids["mix"], &format!("level{n}"), 0.21);
+    }
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/crowded");
     kabl_core::save(&dir, e.log()).unwrap();
 }

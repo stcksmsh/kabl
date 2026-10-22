@@ -10,6 +10,7 @@
 //!   Keyboard sounds sound only from **Play**; pieces open stopped and run from **Start**.
 //! - A failed open or save changes nothing in the editor.
 
+use crate::filebrowser::{self, Mode, Purpose};
 use crate::kit::{self, Ic, Tip, Tone};
 use crate::style::{Role, Style};
 use crate::wheel::OwnedScroll;
@@ -714,6 +715,37 @@ pub fn save(editor: &mut PatchEditor, ui: &mut UiState, then: Option<Pending>) -
 
 /// What a failed save tells the user: the saved copy on disk is unchanged (every save path
 /// restores it on failure) unless restoring itself failed.
+/// Saves the patch to the folder `p` (not a factory sound), and says what happened.
+fn save_to_folder(editor: &mut PatchEditor, ui_state: &mut UiState, p: String) {
+    let path = std::path::Path::new(&p);
+    let text = if ui_state
+        .library
+        .as_ref()
+        .is_some_and(|l| l.is_factory_path(path))
+    {
+        "that folder is a factory sound: choose another folder, or Save As".into()
+    } else if ui_state.browser.async_io {
+        start_io(editor, ui_state, IoRequest::SaveFolder(p.clone()));
+        "saving folder in background".into()
+    } else {
+        match crate::library::save_folder(path, editor.log()) {
+            Ok(()) => {
+                let name = path
+                    .file_name()
+                    .map_or(p.clone(), |n| n.to_string_lossy().to_string());
+                ui_state.doc = Some(Doc::new(
+                    &name,
+                    DocOrigin::Folder(p.clone()),
+                    editor.state(),
+                ));
+                format!("saved to {p}")
+            }
+            Err(err) => save_failed(&err),
+        }
+    };
+    message(ui_state, text);
+}
+
 fn save_failed(e: &LibError) -> String {
     match e {
         LibError::Interrupted(_) => format!("save failed: {e}. Your edits are still here."),
@@ -1366,6 +1398,16 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             kit::gap(ui, st, 1);
             kit::rule(ui, st);
             kit::gap(ui, st, 1);
+            if let Some(p) = filebrowser::take(ui_state, Purpose::PatchLoad) {
+                let p = p.to_string_lossy().into_owned();
+                ui_state.browser.folder.clone_from(&p);
+                request(editor, ui_state, Pending::OpenFolder(p));
+            }
+            if let Some(p) = filebrowser::take(ui_state, Purpose::PatchSave) {
+                let p = p.to_string_lossy().into_owned();
+                ui_state.browser.folder.clone_from(&p);
+                save_to_folder(editor, ui_state, p);
+            }
             let open_f = ui_state.browser.folder_open;
             let header = ui.add(
                 kit::Button::new(st, "Patch folder (advanced)")
@@ -1391,34 +1433,41 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                         hit(ui_state, "save-folder", &r);
                         if r.clicked() {
                             let p = ui_state.browser.folder.clone();
-                            let path = std::path::Path::new(&p);
-                            let text = if ui_state
-                                .library
+                            save_to_folder(editor, ui_state, p);
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        let r = ui.add(kit::Button::new(st, "Browse to open"));
+                        hit(ui_state, "browse-load", &r);
+                        if r.clicked() {
+                            let hint = ui_state.browser.folder.clone();
+                            filebrowser::open(
+                                ui_state,
+                                Purpose::PatchLoad,
+                                "Open a patch folder",
+                                Mode::Folder,
+                                filebrowser::FOLDERS,
+                                "",
+                                &hint,
+                            );
+                        }
+                        let r = ui.add(kit::Button::new(st, "Browse to save"));
+                        hit(ui_state, "browse-save", &r);
+                        if r.clicked() {
+                            let hint = ui_state.browser.folder.clone();
+                            let name = ui_state
+                                .doc
                                 .as_ref()
-                                .is_some_and(|l| l.is_factory_path(path))
-                            {
-                                "that folder is a factory sound: choose another folder, or Save As"
-                                    .into()
-                            } else if ui_state.browser.async_io {
-                                start_io(editor, ui_state, IoRequest::SaveFolder(p.clone()));
-                                "saving folder in background".into()
-                            } else {
-                                match crate::library::save_folder(path, editor.log()) {
-                                    Ok(()) => {
-                                        let name = path
-                                            .file_name()
-                                            .map_or(p.clone(), |n| n.to_string_lossy().to_string());
-                                        ui_state.doc = Some(Doc::new(
-                                            &name,
-                                            DocOrigin::Folder(p.clone()),
-                                            editor.state(),
-                                        ));
-                                        format!("saved to {p}")
-                                    }
-                                    Err(err) => save_failed(&err),
-                                }
-                            };
-                            message(ui_state, text);
+                                .map_or(String::new(), |d| d.name.clone());
+                            filebrowser::open(
+                                ui_state,
+                                Purpose::PatchSave,
+                                "Save the patch to a folder",
+                                Mode::Save,
+                                filebrowser::FOLDERS,
+                                &name,
+                                &hint,
+                            );
                         }
                     });
                     let lib = ui_state.library.as_ref().unwrap();

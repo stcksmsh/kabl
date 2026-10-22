@@ -757,6 +757,8 @@ fn out_stereo(r: &mut Rack, l: (ModuleId, &str), rr: (ModuleId, &str)) -> Module
 pub fn strings_patch() -> PatchEditor {
     let mut r = Rack::new();
     let v = strings(&mut r, 0);
+    // Factory level target (docs/factory-levels/README.md); the piece keeps the layer's own gain.
+    r.set(v.gain, &[("gain_db", 7.5)]);
     r.row(2);
     let chorus = r.add(
         "chorus",
@@ -818,6 +820,7 @@ pub fn pad_patch() -> PatchEditor {
         ("Space", 0.4),
     ]);
     let v = pad(&mut r, 0, (m, "m2"));
+    r.set(v.gain, &[("gain_db", -1.5)]); // factory level target
     r.row(2);
     let chorus = r.add(
         "chorus",
@@ -938,7 +941,7 @@ pub fn bass_patch() -> PatchEditor {
     ]);
     let v = bass(&mut r, 0, clock);
     r.row(2);
-    let level = r.add("gain", &[("gain_db", -2.0)]);
+    let level = r.add("gain", &[("gain_db", -7.0)]);
     r.wire((v.drive, "out"), (level, "in"));
     out_stereo(&mut r, (level, "out"), (level, "out"));
     r.route((m, "m1"), v.filt, "cutoff_hz", 0.25);
@@ -970,6 +973,7 @@ pub fn breath_patch() -> PatchEditor {
         ("Space", 0.5),
     ]);
     let v = breath(&mut r, 0, (m, "m2"));
+    r.set(v.gain, &[("gain_db", 2.5)]); // factory level target
     r.row(2);
     let chorus = r.add(
         "chorus",

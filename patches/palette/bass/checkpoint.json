@@ -232,7 +232,7 @@
       },
       "params": {
         "cc.gain_db": 26.0,
-        "gain_db": -2.0,
+        "gain_db": -7.0,
         "pin.gain_db": 8.0
       }
     },

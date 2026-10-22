@@ -142,6 +142,9 @@ pub fn editor(editor: &mut PatchEditor, view: &mut UiState, ctx: &egui::Context)
             })
             .is_some_and(|art| art == old)
     });
+    if let Some(p) = crate::filebrowser::take(view, crate::filebrowser::Purpose::PanelArt) {
+        view.panels.path = p.to_string_lossy().into_owned();
+    }
     if let Some(id) = view.panels.selected {
         let Some(c) = editor.state().composites.get(&id).cloned() else {
             view.panels.selected = None;
@@ -159,7 +162,14 @@ pub fn editor(editor: &mut PatchEditor, view: &mut UiState, ctx: &egui::Context)
                 if button(ui,view,"panel:dark","Preview dark") { view.dark=true; }
             });
             ui.label("PNG import or complete package export path (local file)");
-            let r=ui.text_edit_singleline(&mut view.panels.path);view.record("panel:path".into(),r.rect);
+            ui.horizontal(|ui| {
+                let r=ui.text_edit_singleline(&mut view.panels.path);view.record("panel:path".into(),r.rect);
+                let r=ui.button("Browse");view.record("panel:browse".into(),r.rect);
+                if r.clicked() {
+                    let hint=view.panels.path.clone();
+                    crate::filebrowser::open(view,crate::filebrowser::Purpose::PanelArt,"Choose artwork",crate::filebrowser::Mode::Open,crate::filebrowser::IMAGE,"",&hint);
+                }
+            });
             ui.horizontal(|ui| {
                 for (dark,label) in [(false,"Import light PNG"),(true,"Import dark PNG")] {
                     if button(ui,view,if dark {"panel:import-dark"} else {"panel:import-light"},label) {

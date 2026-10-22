@@ -5,6 +5,7 @@
 //! compile-and-crossfade swap and undo, redo, save and the plugin state all work unchanged.
 //! Control thread only.
 
+use crate::filebrowser::{self, Event, FileBrowser, Mode, Place, WAV};
 use crate::kit::{self, Button, Tone};
 use crate::style::{alpha, Role, Style};
 use crate::{PatchEditor, UiState};
@@ -17,7 +18,7 @@ use kabl_modules::wavetable::{
     MAX_FRAME_SAMPLES,
 };
 use std::path::{Path, PathBuf};
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
 
 /// Seconds between table writes while a stroke is down: each write is one compile and
 /// crossfade, and the table's mipmaps are rebuilt for it.
@@ -27,97 +28,6 @@ const FADE: usize = 128;
 
 /// Frames of a table, shared.
 type Frames = Arc<Vec<Vec<f32>>>;
-
-/// Rows the file browser shows for one folder (a folder with more is cut, and says so).
-const MAX_ENTRIES: usize = 2000;
-/// Directory entries one listing looks at before it gives up (a folder of millions of files).
-const MAX_SCANNED: usize = 100_000;
-
-/// One row of the file browser: a folder, or a .wav file.
-struct Entry {
-    name: String,
-    dir: bool,
-}
-
-/// A folder's rows (and whether the list was cut), or why it could not be read.
-type Listing = Result<(Vec<Entry>, bool), String>;
-
-/// The file browser: one folder, listed on a thread of its own so a slow or huge folder (a
-/// network share) never holds the interface or, in a plugin, the host's window.
-struct Browse {
-    dir: PathBuf,
-    rx: Option<mpsc::Receiver<Listing>>,
-    listing: Option<Listing>,
-}
-
-impl Browse {
-    fn new(dir: PathBuf) -> Self {
-        let (tx, rx) = mpsc::channel();
-        let there = dir.clone();
-        std::thread::spawn(move || {
-            let _ = tx.send(list(&there));
-        });
-        Browse {
-            dir,
-            rx: Some(rx),
-            listing: None,
-        }
-    }
-
-    fn poll(&mut self) {
-        let Some(rx) = &self.rx else { return };
-        match rx.try_recv() {
-            Ok(l) => self.listing = Some(l),
-            Err(mpsc::TryRecvError::Empty) => return,
-            Err(mpsc::TryRecvError::Disconnected) => {
-                self.listing = Some(Err("the folder could not be read".into()))
-            }
-        }
-        self.rx = None;
-    }
-}
-
-/// Folders first, then .wav files, each by name without regard to case; hidden names left out.
-fn list(dir: &Path) -> Listing {
-    let mut rows = Vec::new();
-    let mut cut = false;
-    for (seen, entry) in std::fs::read_dir(dir)
-        .map_err(|e| e.to_string())?
-        .flatten()
-        .enumerate()
-    {
-        if seen >= MAX_SCANNED {
-            cut = true;
-            break;
-        }
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if name.starts_with('.') {
-            continue;
-        }
-        let Ok(meta) = std::fs::metadata(entry.path()) else {
-            continue;
-        };
-        let wav = Path::new(&name)
-            .extension()
-            .is_some_and(|e| e.eq_ignore_ascii_case("wav"));
-        if meta.is_dir() || (meta.is_file() && wav) {
-            if rows.len() >= MAX_ENTRIES {
-                cut = true;
-                break;
-            }
-            rows.push(Entry {
-                name,
-                dir: meta.is_dir(),
-            });
-        }
-    }
-    rows.sort_by_key(|e| (!e.dir, e.name.to_lowercase()));
-    Ok((rows, cut))
-}
-
-fn home() -> Option<PathBuf> {
-    std::env::var_os("HOME").map(PathBuf::from)
-}
 
 struct Pending {
     bytes: Vec<u8>,
@@ -147,9 +57,9 @@ pub struct View {
     path: String,
     error: Option<String>,
     pending: Option<Pending>,
-    /// The folder of the last file picked or browsed, kept while the application runs.
+    /// The folder of the file just imported by path, for `show` to remember.
     last_dir: Option<PathBuf>,
-    browse: Option<Browse>,
+    browse: Option<FileBrowser>,
     /// A stroke is down and its undo step is open.
     stroke_open: bool,
     /// The working copy has edits not yet written to the patch.
@@ -190,7 +100,6 @@ pub fn open(editor: &PatchEditor, ui: &mut UiState, module: ModuleId) {
         module: Some(module),
         slot,
         steps: 4,
-        last_dir: ui.tables.last_dir.take(),
         ..View::default()
     };
     ui.tables.load(editor);
@@ -362,19 +271,9 @@ impl View {
     }
 
     /// Opens the browser in the folder last used, else the path field's folder, else home.
-    fn start_browse(&mut self) {
-        let from_path = Path::new(self.path.trim())
-            .parent()
-            .filter(|d| d.is_dir())
-            .map(Path::to_path_buf);
-        let dir = self
-            .last_dir
-            .clone()
-            .filter(|d| d.is_dir())
-            .or(from_path)
-            .or_else(home)
-            .unwrap_or_else(|| PathBuf::from("/"));
-        self.browse = Some(Browse::new(dir));
+    fn start_browse(&mut self, ui_state: &UiState) {
+        let dir = filebrowser::start_dir(ui_state, Place::Wavetables, &self.path);
+        self.browse = Some(FileBrowser::new("wt", Mode::Open, WAV, dir, String::new()));
     }
 }
 
@@ -625,95 +524,6 @@ fn main_area(
     });
 }
 
-/// The folder list that replaces the main area while browsing for a file.
-fn browser(ui: &mut egui::Ui, st: &Style, ui_state: &mut UiState, v: &mut View) {
-    let Some(b) = &mut v.browse else { return };
-    b.poll();
-    if b.rx.is_some() {
-        ui.ctx()
-            .request_repaint_after(std::time::Duration::from_millis(30));
-    }
-    let (mut go, mut pick, mut close) = (None::<PathBuf>, None::<String>, false);
-    ui.horizontal(|ui| {
-        if button(ui, st, ui_state, "up", "Up", b.dir.parent().is_some()) {
-            go = b.dir.parent().map(Path::to_path_buf);
-        }
-        if button(ui, st, ui_state, "home", "Home", home().is_some()) {
-            go = home();
-        }
-        if button(ui, st, ui_state, "browse-close", "Close", true) {
-            close = true;
-        }
-        kit::label_truncated(
-            ui,
-            st,
-            Role::Caption,
-            Tone::Text2,
-            b.dir.display().to_string(),
-        );
-    });
-    let height = 280.0;
-    egui::ScrollArea::vertical()
-        .id_salt("wt-browse")
-        .max_height(height)
-        .auto_shrink([false, false])
-        .show(ui, |ui| match &b.listing {
-            None => {
-                kit::label(ui, st, Role::Body, Tone::Text2, "Reading the folder...");
-            }
-            Some(Err(e)) => {
-                kit::label(ui, st, Role::Body, Tone::Bad, e);
-            }
-            Some(Ok((rows, cut))) => {
-                if rows.is_empty() {
-                    kit::label(
-                        ui,
-                        st,
-                        Role::Body,
-                        Tone::Text2,
-                        "No folders or .wav files here.",
-                    );
-                }
-                for e in rows {
-                    let text = if e.dir {
-                        format!("{}/", e.name)
-                    } else {
-                        e.name.clone()
-                    };
-                    let r = kit::menu_item(ui, st, &text, false);
-                    let key = if e.dir { "dir" } else { "file" };
-                    ui_state.record(format!("wt:{key}:{}", e.name), r.rect);
-                    if r.clicked() {
-                        if e.dir {
-                            go = Some(b.dir.join(&e.name));
-                        } else {
-                            pick = Some(b.dir.join(&e.name).to_string_lossy().into_owned());
-                        }
-                    }
-                }
-                if *cut {
-                    kit::label(
-                        ui,
-                        st,
-                        Role::Caption,
-                        Tone::Warn,
-                        "The list is cut: type the path instead.",
-                    );
-                }
-            }
-        });
-    if let Some(dir) = go {
-        v.last_dir = Some(dir.clone());
-        v.browse = Some(Browse::new(dir));
-    } else if let Some(path) = pick {
-        v.path = path;
-        v.browse = None;
-        v.read_file();
-    } else if close {
-        v.browse = None;
-    }
-}
-
 fn body(
     ui: &mut egui::Ui,
     st: &Style,
@@ -778,7 +588,7 @@ fn body(
             if v.browse.is_some() {
                 v.browse = None;
             } else {
-                v.start_browse();
+                v.start_browse(ui_state);
             }
         }
         if button(
@@ -879,8 +689,19 @@ fn body(
     }
 
     ui.add_space(st.sp(1));
-    if v.browse.is_some() {
-        browser(ui, st, ui_state, v);
+    if let Some(b) = &mut v.browse {
+        let event = b.show(ui, st, ui_state);
+        let dir = b.dir.clone();
+        ui_state.folders_remember(Place::Wavetables, &dir);
+        match event {
+            Event::Pick(path) => {
+                v.path = path.to_string_lossy().into_owned();
+                v.browse = None;
+                v.read_file();
+            }
+            Event::Close => v.browse = None,
+            Event::None => {}
+        }
     } else {
         main_area(ui, st, ui_state, editor, v, &preview, now);
     }
@@ -1075,16 +896,16 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Contex
         .collapsible(false)
         .resizable(false)
         .show(ctx, |ui| body(ui, &st, ui_state, editor, &mut v, now));
+    if let Some(d) = v.last_dir.take() {
+        ui_state.folders_remember(Place::Wavetables, &d);
+    }
     if v.audition && !open {
         ui_state.launches.push(Command::PreviewStop);
     }
     if open {
         ui_state.tables = v;
     } else {
-        // Closed: forget the table, remember the folder.
-        ui_state.tables = View {
-            last_dir: v.last_dir.take(),
-            ..View::default()
-        };
+        // Closed: forget the table.
+        ui_state.tables = View::default();
     }
 }

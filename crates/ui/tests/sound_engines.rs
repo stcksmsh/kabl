@@ -131,7 +131,7 @@ fn tine_keys() -> PatchEditor {
     let mix = r.add("mixer", &[("level1", 1.0), ("level2", 0.55)]);
     r.next_row();
     let vca = r.add("vca", &[("gain", 0.0)]);
-    let gain = r.add("gain", &[("gain_db", 4.6)]);
+    let gain = r.add("gain", &[("gain_db", 3.1)]);
     let chorus = r.add(
         "chorus",
         &[
@@ -187,7 +187,7 @@ fn glass_bells() -> PatchEditor {
     let vca_a = r.add("vca", &[("gain", 0.0)]);
     let vca_b = r.add("vca", &[("gain", 0.0)]);
     let mix = r.add("mixer", &[("level1", 1.0), ("level2", 0.45)]);
-    let gain = r.add("gain", &[("gain_db", 0.0)]);
+    let gain = r.add("gain", &[("gain_db", -1.5)]);
     r.next_row();
     let reverb = r.add(
         "reverb",
@@ -368,7 +368,7 @@ fn imported_morph() -> PatchEditor {
         &[("drive_db", 9.0), ("trim_db", -6.0), ("mix", 70.0)],
     );
     let vca = r.add("vca", &[("gain", 0.0)]);
-    let gain = r.add("gain", &[("gain_db", 18.3)]);
+    let gain = r.add("gain", &[("gain_db", 6.3)]);
     r.next_row();
     let reverb = r.add(
         "reverb",
@@ -440,7 +440,7 @@ fn dx_keys() -> PatchEditor {
         &mut r,
         m,
         voice,
-        7.0,
+        5.3,
         &[
             ("rate_hz", 0.7),
             ("depth", 35.0),
@@ -481,7 +481,7 @@ fn iron_bell() -> PatchEditor {
             ("width", 100.0),
         ],
     );
-    let gain = r.add("gain", &[("gain_db", 9.5)]);
+    let gain = r.add("gain", &[("gain_db", 6.0)]);
     let out = r.add("out", &[]);
     r.wire(voice, "out", gain, "in");
     r.wire(gain, "out", reverb, "in_l");
@@ -595,7 +595,7 @@ fn rust_bass() -> PatchEditor {
         &mut r,
         m,
         voice,
-        11.0,
+        1.0,
         &[
             ("rate_hz", 0.4),
             ("depth", 20.0),

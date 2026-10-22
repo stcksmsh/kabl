@@ -475,6 +475,9 @@ fn clamp(s: &mut Style, base: &Style, mode: &str, notes: &mut Vec<String>) {
 pub struct Prefs {
     pub theme: String,
     pub dark: bool,
+    /// The folder last used per place (`wavetables`, `patches`, `recordings`, `art`).
+    #[serde(default)]
+    pub folders: std::collections::BTreeMap<String, PathBuf>,
 }
 
 impl Default for Prefs {
@@ -482,6 +485,7 @@ impl Default for Prefs {
         Prefs {
             theme: super::BUILTIN_A_ID.into(),
             dark: false,
+            folders: Default::default(),
         }
     }
 }
@@ -651,9 +655,18 @@ mod tests {
         let p = Prefs {
             theme: "kabl.lacquer".into(),
             dark: true,
+            folders: [("patches".to_string(), PathBuf::from("/tmp"))].into(),
         };
         p.save(d.path()).unwrap();
         assert_eq!(Prefs::load(d.path()), p);
+        // A file from before the folders were remembered still loads.
+        std::fs::write(
+            d.path().join("settings.toml"),
+            "theme = \"kabl.lacquer\"\ndark = true\n",
+        )
+        .unwrap();
+        assert_eq!(Prefs::load(d.path()).theme, "kabl.lacquer");
+        assert!(Prefs::load(d.path()).folders.is_empty());
         std::fs::write(d.path().join("settings.toml"), "theme = 4").unwrap();
         assert_eq!(Prefs::load(d.path()), Prefs::default());
     }

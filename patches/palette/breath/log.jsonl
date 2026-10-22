@@ -85,3 +85,7 @@
 {"seq":84,"t_ms":1790267300454,"op":{"SetLabel":{"id":10,"key":"pin.gain_db","text":"Level"}},"inverse":{"SetLabel":{"id":10,"key":"pin.gain_db","text":null}},"source":"User"}
 {"seq":85,"t_ms":1790267300454,"op":{"SetLabel":{"id":2,"key":"pin.mode","text":"Keys"}},"inverse":{"SetLabel":{"id":2,"key":"pin.mode","text":null}},"source":"User"}
 {"seq":86,"t_ms":1791470250051,"op":{"SetLabel":{"id":1,"key":"guide","text":"Hold one low note or a wide chord. Breath adds noise, Gust sets motion, Color changes the breath band, Space adds room. Use sparse notes and let the tail decay; CC20-23 control macros."}},"inverse":{"SetLabel":{"id":1,"key":"guide","text":null}},"source":"User"}
+{"seq":87,"t_ms":1792678915394,"op":{"SetParam":{"target":{"Module":{"id":10,"param":"gain_db"}},"value":5.0}},"inverse":{"SetParam":{"target":{"Module":{"id":10,"param":"gain_db"}},"value":2.0}},"source":"User"}
+{"seq":88,"t_ms":1792679215226,"op":{"SetParam":{"target":{"Module":{"id":10,"param":"gain_db"}},"value":5.0}},"inverse":{"SetParam":{"target":{"Module":{"id":10,"param":"gain_db"}},"value":5.0}},"source":"User"}
+{"seq":89,"t_ms":1792679534820,"op":{"SetParam":{"target":{"Module":{"id":10,"param":"gain_db"}},"value":5.0}},"inverse":{"SetParam":{"target":{"Module":{"id":10,"param":"gain_db"}},"value":5.0}},"source":"User"}
+{"seq":90,"t_ms":1792681812945,"op":{"SetParam":{"target":{"Module":{"id":10,"param":"gain_db"}},"value":2.5}},"inverse":{"SetParam":{"target":{"Module":{"id":10,"param":"gain_db"}},"value":5.0}},"source":"User"}
