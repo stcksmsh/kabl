@@ -21,6 +21,7 @@ use crate::builtins::{
     ARP_INFO, ATTENUVERTER_INFO, COMPARATOR_INFO, CROSSFADE_INFO, LOGIC_INFO, PAN_INFO,
     QUANTIZER_INFO, RANDOM_INFO, SAMPLE_HOLD_INFO, SLEW_INFO,
 };
+use crate::builtins::{AudioIn, Vocoder, AUDIO_IN_INFO, VOCODER_INFO};
 use crate::builtins::{
     Bitcrusher, Compressor, Eq, FilterComb, FilterFormant, Flanger, Limiter, Phaser,
     BITCRUSHER_INFO, COMPRESSOR_INFO, EQ_INFO, FILTER_COMB_INFO, FILTER_FORMANT_INFO, FLANGER_INFO,
@@ -87,6 +88,8 @@ pub const KNOWN_KINDS: &[&str] = &[
     "bitcrusher",
     "filter.comb",
     "filter.formant",
+    "vocoder",
+    "audio.in",
 ];
 
 /// Builds a fresh instance of `kind`, or `None` if `kind` isn't a known built-in.
@@ -134,13 +137,15 @@ pub fn create(kind: &str) -> Option<Box<dyn Module>> {
         "bitcrusher" => Box::new(Bitcrusher::new()),
         "filter.comb" => Box::new(FilterComb::new()),
         "filter.formant" => Box::new(FilterFormant::new()),
+        "vocoder" => Box::new(Vocoder::new()),
+        "audio.in" => Box::new(AudioIn::new()),
         _ => return None,
     })
 }
 
 /// `ModuleInfo` for every known kind, in the same order as `KNOWN_KINDS` — what a catalog UI
 /// (not built) would enumerate.
-static ALL_INFOS: [&ModuleInfo; 42] = [
+static ALL_INFOS: [&ModuleInfo; 44] = [
     &OSC_VA_INFO,
     &FILTER_SVF_INFO,
     &ENV_ADSR_INFO,
@@ -183,6 +188,8 @@ static ALL_INFOS: [&ModuleInfo; 42] = [
     &BITCRUSHER_INFO,
     &FILTER_COMB_INFO,
     &FILTER_FORMANT_INFO,
+    &VOCODER_INFO,
+    &AUDIO_IN_INFO,
 ];
 
 pub fn all_infos() -> &'static [&'static ModuleInfo] {

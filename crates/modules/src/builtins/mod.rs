@@ -5,6 +5,7 @@
 
 mod arp;
 mod attenuverter;
+mod audio_in;
 mod bitcrusher;
 mod chorus;
 mod clock;
@@ -44,9 +45,11 @@ mod sample_hold;
 pub mod seq;
 mod slew;
 mod vca;
+mod vocoder;
 
 pub use arp::{Arp, ARP_INFO, MAX_NOTES};
 pub use attenuverter::{Attenuverter, ATTENUVERTER_INFO};
+pub use audio_in::{AudioIn, AUDIO_IN_INFO};
 pub use bitcrusher::{Bitcrusher, BITCRUSHER_INFO};
 pub use chorus::{Chorus, CHORUS_INFO};
 pub use clock::{Clock, Transport, CLOCK_INFO};
@@ -85,3 +88,4 @@ pub use sample_hold::{SampleHold, MODE_LABELS as HOLD_MODE_LABELS, SAMPLE_HOLD_I
 pub use seq::{Direction, Seq, SEQ_INFO};
 pub use slew::{Slew, MODE_LABELS as SLEW_MODE_LABELS, SLEW_INFO};
 pub use vca::{Vca, VCA_INFO};
+pub use vocoder::{band_centers, Vocoder, MAX_BANDS, VOCODER_INFO};
