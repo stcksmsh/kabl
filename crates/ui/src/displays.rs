@@ -53,21 +53,20 @@ pub struct Wants {
 const RESEND_SECS: f64 = 2.0;
 
 impl Wants {
-    /// A visible module's own display reads its output 0 and view.
+    /// A visible module's own display reads its output 0 and view; the compressor's reads `gr`
+    /// (output 2), since the engine reads one output of each module instance.
     pub fn display(&mut self, id: ModuleId, kind: &'static str) {
         self.asked.push(FaceTarget {
             module: id,
-            port: 0,
+            port: if kind == "compressor" { 2 } else { 0 },
             kind,
             view: true,
         });
     }
 
-    /// What a display reads besides its own output: the compressor's reduction, the comb's
-    /// pitch cable.
+    /// What a display reads besides its own output: the comb's pitch cable.
     pub fn feeds(&mut self, state: &PatchState, id: ModuleId, kind: &'static str) {
         match kind {
-            "compressor" => self.source(state, id, "gr"),
             "filter.comb" => {
                 for c in state.cables.values() {
                     if let (PortRef::Module { id: f, port }, PortRef::Module { id: t, port: tp }) =
