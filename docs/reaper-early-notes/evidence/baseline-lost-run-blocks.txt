@@ -1,0 +1,24 @@
+['ev', '0.0000', 'activate rate=48000']
+['ev', '0.0001', 'save begin']
+['ev', '0.0003', 'load begin']
+['ev', '0.1450', 'load applied']
+['ev', '0.1450', 'load end']
+['ev', '0.1493', 'start_processing']
+proc wall=0.1494 pos 0.000..0.000 blocks=17 events=0
+['ev', '0.1556', 'save begin']
+proc wall=0.1573 pos 0.000..0.000 blocks=67 events=0
+['ev', '0.1925', 'save begin']
+['ev', '0.2011', 'reset']
+['ev', '0.2013', 'start_processing']
+proc wall=0.2014 pos 0.000..0.499 blocks=188 events=1
+proc wall=0.2316 pos 0.501..0.997 blocks=187 events=1
+proc wall=0.2581 pos 1.000..1.499 blocks=188 events=1
+proc wall=0.2872 pos 1.501..1.997 blocks=187 events=1
+proc wall=0.3155 pos 2.000..2.499 blocks=188 events=1
+proc wall=0.3392 pos 2.501..2.997 blocks=187 events=1
+proc wall=0.3713 pos 3.000..3.499 blocks=188 events=1
+proc wall=0.4059 pos 3.501..3.997 blocks=187 events=1
+proc wall=0.4367 pos 4.000..4.499 blocks=188 events=1
+proc wall=0.4642 pos 4.501..4.997 blocks=187 events=1
+proc wall=0.4941 pos 5.000..5.499 blocks=188 events=1
+proc wall=0.5246 pos 5.501..5.997 blocks=187 events=1

@@ -21,6 +21,7 @@ use clap_sys::{
     entry::clap_plugin_entry,
     events::*,
     ext::{
+        latency::{clap_plugin_latency, CLAP_EXT_LATENCY},
         note_ports::{
             clap_note_port_info, clap_plugin_note_ports, CLAP_EXT_NOTE_PORTS,
             CLAP_NOTE_DIALECT_MIDI,
@@ -29,6 +30,7 @@ use clap_sys::{
             clap_host_params, clap_param_info, clap_plugin_params, CLAP_EXT_PARAMS,
             CLAP_PARAM_RESCAN_VALUES,
         },
+        render::{clap_plugin_render, clap_plugin_render_mode, CLAP_EXT_RENDER},
         state::{clap_host_state, clap_plugin_state, CLAP_EXT_STATE},
     },
     factory::plugin_factory::{clap_plugin_factory, CLAP_PLUGIN_FACTORY_ID},
@@ -188,6 +190,10 @@ unsafe extern "C" fn get_extension_bridge(
         unsafe { &(*plugin.cast::<Outer>()).params as *const _ as *const c_void }
     } else if unsafe { CStr::from_ptr(id) } == CLAP_EXT_NOTE_PORTS {
         &NOTE_PORTS as *const _ as *const c_void
+    } else if unsafe { CStr::from_ptr(id) } == CLAP_EXT_RENDER {
+        &RENDER_EXT as *const _ as *const c_void
+    } else if unsafe { CStr::from_ptr(id) } == CLAP_EXT_LATENCY {
+        &LATENCY_EXT as *const _ as *const c_void
     } else {
         unsafe { (b.get_extension)(plugin, id) }
     }
@@ -737,6 +743,29 @@ unsafe extern "C" fn note_get(
     }
     true
 }
+// The latency is a constant of the engine, so it is answered here from the first query on.
+// Reporting it from `activate` instead made the wrapper tell the host "latency changed" inside
+// the first activation (its value starts at 0), and a host answers that with a restart.
+unsafe extern "C" fn latency_get(_: *const clap_plugin) -> u32 {
+    kabl_engine::timeline::LATENCY as u32
+}
+static LATENCY_EXT: clap_plugin_latency = clap_plugin_latency {
+    get: Some(latency_get),
+};
+// Offline and realtime sound the same, so a render-mode switch is accepted without a restart.
+// The wrapper's own handler asks the host to deactivate and activate the plugin when the mode
+// changes while it is active; REAPER does that when a render starts, and the restart skips the
+// start of the render, notes included.
+unsafe extern "C" fn render_hard_realtime(_: *const clap_plugin) -> bool {
+    false
+}
+unsafe extern "C" fn render_set(_: *const clap_plugin, _: clap_plugin_render_mode) -> bool {
+    true
+}
+static RENDER_EXT: clap_plugin_render = clap_plugin_render {
+    has_hard_realtime_requirement: Some(render_hard_realtime),
+    set: Some(render_set),
+};
 static NOTE_PORTS: clap_plugin_note_ports = clap_plugin_note_ports {
     count: Some(note_count),
     get: Some(note_get),
@@ -824,6 +853,57 @@ mod tests {
         ptr::null()
     }
     unsafe extern "C" fn host_request(_: *const clap_host) {}
+    static RESTARTS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    unsafe extern "C" fn host_restart(_: *const clap_host) {
+        RESTARTS.fetch_add(1, Ordering::SeqCst);
+    }
+    /// REAPER switches an active plugin to offline mode when a render starts and restarts it
+    /// when asked to; the restart skipped the start of the render, notes included. Neither a
+    /// render-mode switch nor an activation may ask the host to restart.
+    #[test]
+    fn render_mode_switch_and_activation_never_request_a_host_restart() {
+        use clap_sys::ext::render::{CLAP_RENDER_OFFLINE, CLAP_RENDER_REALTIME};
+        let host = clap_host {
+            clap_version: CLAP_VERSION,
+            host_data: ptr::null_mut(),
+            name: c"test host".as_ptr(),
+            vendor: c"kabl".as_ptr(),
+            url: c"".as_ptr(),
+            version: c"1".as_ptr(),
+            get_extension: Some(host_extension),
+            request_restart: Some(host_restart),
+            request_process: Some(host_request),
+            request_callback: Some(host_request),
+        };
+        unsafe {
+            let plugin = create(&FACTORY, &host, descriptor().clap_id().as_ptr());
+            assert!(!plugin.is_null());
+            let p = &*plugin;
+            assert!(p.init.unwrap()(plugin));
+            let shared = &(*plugin.cast::<Outer>()).bridge.shared;
+            shared.stop.store(true, Ordering::Release);
+            let render = &*(p.get_extension.unwrap()(plugin, CLAP_EXT_RENDER.as_ptr())
+                .cast::<clap_plugin_render>());
+            let latency = &*(p.get_extension.unwrap()(plugin, CLAP_EXT_LATENCY.as_ptr())
+                .cast::<clap_plugin_latency>());
+            // The host may ask before the first activation; the answer is already final.
+            let reported = latency.get.unwrap()(plugin);
+            assert_eq!(reported, kabl_engine::timeline::LATENCY as u32);
+
+            assert!(p.activate.unwrap()(plugin, 48000.0, 1, 4096));
+            assert!(p.start_processing.unwrap()(plugin));
+            assert!(render.set.unwrap()(plugin, CLAP_RENDER_OFFLINE));
+            assert!(render.set.unwrap()(plugin, CLAP_RENDER_REALTIME));
+            assert!(!render.has_hard_realtime_requirement.unwrap()(plugin));
+            p.stop_processing.unwrap()(plugin);
+            p.deactivate.unwrap()(plugin);
+            assert!(p.activate.unwrap()(plugin, 44100.0, 1, 512));
+            assert_eq!(latency.get.unwrap()(plugin), reported);
+            p.deactivate.unwrap()(plugin);
+            p.destroy.unwrap()(plugin);
+        }
+        assert_eq!(RESTARTS.load(Ordering::SeqCst), 0);
+    }
     #[test]
     fn exported_callback_is_bounded_under_raw_midi_flood_and_lifecycle_reset() {
         let host = clap_host {

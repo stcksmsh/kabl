@@ -1,0 +1,16 @@
+== plugin=v_00
+delay=0 state=8832B lost=0/5
+delay=0 state=41600B lost=2/5
+delay=0 state=128984B lost=4/5
+== plugin=v_00
+delay=2 state=8832B lost=0/5
+delay=2 state=41600B lost=0/5
+delay=2 state=128984B lost=0/5
+== plugin=both
+delay=0 state=8832B lost=0/5
+delay=0 state=41600B lost=0/5
+delay=0 state=128984B lost=0/5
+== plugin=both
+delay=2 state=8832B lost=0/5
+delay=2 state=41600B lost=0/5
+delay=2 state=128984B lost=0/5
