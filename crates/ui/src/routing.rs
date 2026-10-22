@@ -13,6 +13,8 @@ use kabl_engine::compile::DEFAULT_ROUTE_AMOUNT;
 use kabl_modules::builtins::{seq, SEQ_INFO};
 use kabl_modules::{registry, ParamInfo, PortDirection, Taper};
 
+use crate::kit;
+use crate::style::Role;
 use crate::theme::theme;
 use crate::{cable_color, PatchEditor, UiState};
 
@@ -1512,56 +1514,61 @@ fn cable_route_row(
         .copied()
         .unwrap_or(kabl_engine::compile::DEFAULT_ROUTE_AMOUNT);
     let bypass = c.params.get("bypass").is_some_and(|&b| b >= 0.5);
-    ui.horizontal_wrapped(|ui| {
-        let label = source_label(editor.state(), *id, port);
-        ui.label(egui::RichText::new(label).color(if bypass {
-            BYPASS_GREY
+    let st = ui_state.style.clone();
+    let label = source_label(editor.state(), *id, port);
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = st.sp(1);
+        let tone = if bypass {
+            kit::Tone::Text3
         } else {
-            cable_color(route)
-        }));
-        if target {
-            ui.label(format!(
-                "moves {} of cable #{cable}",
-                cable_param_label(param)
-            ));
-        }
-        let mut pct = amount * 100.0;
-        let resp = ui.add(
-            egui::DragValue::new(&mut pct)
-                .range(-100.0..=100.0)
-                .speed(0.5)
-                .suffix(" %")
-                .max_decimals(1),
-        );
-        ui_state.record(format!("croute-amount:{route}"), resp.rect);
-        if resp.changed() {
-            let continuing = resp.dragged() && !resp.drag_started();
-            editor.set_route_amount(route, pct / 100.0, !continuing);
-        }
-        let resp = ui.small_button("Invert");
-        ui_state.record(format!("croute-invert:{route}"), resp.rect);
-        if resp.clicked() {
-            editor.set_route_amount(route, -amount, true);
-        }
-        let mut off = bypass;
-        let resp = ui.checkbox(&mut off, "Bypass");
-        ui_state.record(format!("croute-bypass:{route}"), resp.rect);
-        if resp.changed() {
-            editor.set_route_bypass(route, off);
-        }
-        let resp = ui
-            .small_button("Pattern")
-            .on_hover_text("Step pattern and pass probability for this route");
-        ui_state.record(format!("croute-pattern:{route}"), resp.rect);
-        if resp.clicked() {
-            ui_state.cable_fn = Some(route);
-        }
-        let resp = ui.small_button("Remove");
-        ui_state.record(format!("croute-remove:{route}"), resp.rect);
-        if resp.clicked() {
-            *remove = Some(route);
-        }
+            kit::Tone::Text
+        };
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let resp = ui.add(kit::Button::new(&st, "Remove").ghost().small());
+            ui_state.record(format!("croute-remove:{route}"), resp.rect);
+            if resp.clicked() {
+                *remove = Some(route);
+            }
+            let resp = ui
+                .add(kit::Button::new(&st, "Pattern").ghost().small())
+                .on_hover_text("Step pattern and pass probability for this route");
+            ui_state.record(format!("croute-pattern:{route}"), resp.rect);
+            if resp.clicked() {
+                ui_state.cable_fn = Some(route);
+            }
+            let resp = ui.add(kit::Button::new(&st, "Invert").ghost().small());
+            ui_state.record(format!("croute-invert:{route}"), resp.rect);
+            if resp.clicked() {
+                editor.set_route_amount(route, -amount, true);
+            }
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                kit::label_truncated(ui, &st, Role::Label, tone, label);
+            });
+        });
     });
+    if target {
+        kit::label(
+            ui,
+            &st,
+            Role::Caption,
+            kit::Tone::Text2,
+            format!("moves {} of cable #{cable}", cable_param_label(param)),
+        );
+    }
+    let mut pct = (amount * 100.0) as f64;
+    let readout = format!("{pct:.1} %");
+    let resp = kit::slider(ui, &st, &mut pct, -100.0..=100.0, Some(0.5), &readout);
+    ui_state.record(format!("croute-amount:{route}"), resp.rect);
+    if resp.changed() {
+        let continuing = resp.dragged() && !resp.drag_started();
+        editor.set_route_amount(route, pct as f32 / 100.0, !continuing);
+    }
+    let mut off = bypass;
+    let resp = kit::toggle(ui, &st, &mut off, "Bypass");
+    ui_state.record(format!("croute-bypass:{route}"), resp.rect);
+    if resp.changed() {
+        editor.set_route_bypass(route, off);
+    }
 }
 
 /// The sources that move parameter `param` of cable `cable`: one row each, and a chooser that
@@ -1582,10 +1589,17 @@ pub(crate) fn cable_param_routes(
         .map(|(&id, _)| id)
         .collect();
     let mut remove = None;
-    ui.horizontal_wrapped(|ui| {
-        ui.label(format!("{} moved by", cable_param_label(param)));
+    let st = ui_state.style.clone();
+    ui.horizontal(|ui| {
+        kit::label(
+            ui,
+            &st,
+            Role::Label,
+            kit::Tone::Text2,
+            format!("{} moved by", cable_param_label(param)),
+        );
         if routes.is_empty() {
-            ui.weak("nothing");
+            kit::label(ui, &st, Role::Label, kit::Tone::Text3, "nothing");
         }
     });
     for route in routes {
@@ -1618,11 +1632,15 @@ pub(crate) fn cable_param_routes(
             (source_label(state, id, port), r)
         })
         .collect();
-    let resp = egui::ComboBox::from_id_salt(("add-croute", cable, param.to_string()))
-        .selected_text("Add source")
-        .show_ui(ui, |ui| {
+    let resp = kit::dropdown(
+        ui,
+        &st,
+        ("add-croute", cable, param.to_string()),
+        "Add source",
+        160.0,
+        |ui| {
             for (label, from) in &outputs {
-                let r = ui.selectable_label(false, label);
+                let r = kit::menu_item(ui, &st, label, false);
                 if let PortRef::Module { id, port } = from {
                     ui_state.record(format!("croute-source:{cable}:{param}:{id}.{port}"), r.rect);
                 }
@@ -1630,8 +1648,9 @@ pub(crate) fn cable_param_routes(
                     add = Some(from.clone());
                 }
             }
-        });
-    ui_state.record(format!("croute-add:{cable}:{param}"), resp.response.rect);
+        },
+    );
+    ui_state.record(format!("croute-add:{cable}:{param}"), resp.rect);
     if let Some(from) = add {
         editor.connect_cable_route(from, cable, param);
     }

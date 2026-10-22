@@ -163,7 +163,7 @@ fn step_grid(ui: &mut Ui, st: &Style, ui_state: &mut UiState, l: &Lane) -> Vec<E
             p.rect_filled(
                 Rect::from_min_max(pos2(odd.left(), odd.bottom() - ch), odd.max),
                 3.0,
-                alpha(l.hue, 150),
+                alpha(l.hue, if on { 150 } else { 60 }),
             );
             if now {
                 p.rect_stroke(

@@ -28,6 +28,8 @@ pub mod kit;
 pub mod library;
 pub mod panels;
 mod pattern;
+#[cfg(test)]
+mod pattern_tests;
 pub mod perform;
 mod perform_view;
 pub mod rack;

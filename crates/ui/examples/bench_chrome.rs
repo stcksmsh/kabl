@@ -1,6 +1,6 @@
 //! UI frame time of `kabl_ui::show` (build, layout, tessellation; no GPU) on a simple and a
 //! dense patch, with the Sounds browser and Routing drawer open.
-//! `cargo run --release -p kabl-ui --example bench_chrome [frames] [live] [editor|draw]`
+//! `cargo run --release -p kabl-ui --example bench_chrome [frames] [live] [editor|draw|pattern]`
 //! With `live`: rack only (no browser, drawer), audio running, and every module's face taps
 //! report new made-up values each frame, so every display and modulated knob animates.
 //! With `editor` (after `live`): the wavetable editor is open on the patch's first `osc.wt`
@@ -66,7 +66,7 @@ fn run(
             focused: true,
             ..Default::default()
         };
-        if edit > 0 && i == 5 {
+        if (edit == 1 || edit == 2) && i == 5 {
             let wt = editor
                 .state()
                 .modules
@@ -78,7 +78,21 @@ fn run(
                 });
             kabl_ui::tables::open(&editor, &mut ui, wt);
         }
-        if edit > 1 && i >= 18 {
+        if edit == 3 {
+            // The pattern editor in the Routing drawer, its playhead running with the clock.
+            ui.drawer_open = true;
+            ui.cable_fn = state
+                .cables
+                .iter()
+                .find(|(_, c)| kabl_cables::slot_value(&c.params, 0) >= 1.0)
+                .map(|(&id, _)| id);
+            for (&id, m) in &state.modules {
+                if m.kind == "clock" {
+                    ui.clock_pos.insert(id, i as f64 / 8.0);
+                }
+            }
+        }
+        if edit == 2 && i >= 18 {
             if let Some(r) = ui.hits.get("wt:wave").copied() {
                 let at = r.center()
                     + egui::vec2(
@@ -160,6 +174,7 @@ fn main() {
     let edit = match std::env::args().nth(3).as_deref() {
         Some("editor") => 1,
         Some("draw") => 2,
+        Some("pattern") => 3,
         _ => 0,
     };
     let simple = kabl_standalone::default_patch();
