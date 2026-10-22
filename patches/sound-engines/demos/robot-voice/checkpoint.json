@@ -196,7 +196,7 @@
       "params": {
         "bands": 20.0,
         "drive_db": 18.0,
-        "hf": 0.6,
+        "hf": 0.5,
         "release_ms": 45.0
       }
     },

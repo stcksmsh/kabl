@@ -26,8 +26,8 @@
 //! voice is within about 5 dB at 8 bands and at 32 (each band hears less of it, and there are more). Each envelope is capped at 16.
 //!
 //! **Unvoiced.** A vocoder loses consonants: `s`, `t`, `f` are noise, and a saw has no noise.
-//! `hf` mixes in white noise high-passed at 5 kHz, shaped by the follower of the modulator
-//! above 5 kHz (fixed 1 ms attack, 20 ms release), so hisses and clicks in the voice come
+//! `hf` mixes in white noise band-passed around 7 kHz (about 5 kHz wide), shaped by the
+//! follower of the modulator above 5 kHz (fixed 1 ms attack, 20 ms release), so hisses and clicks in the voice come
 //! through. Left and right get separate noise. The noise sounds only while the carrier does
 //! (a follower of the carrier's level, full from −34 dBFS): a voice with no synth under it is
 //! silent, not whispering.
@@ -107,9 +107,15 @@ const WIDEN: f32 = 1.55;
 const DETECT: f32 = 1.25;
 const ENV_MAX: f32 = 16.0;
 const INPUT_MAX: f32 = 16.0;
-/// The unvoiced path's high-pass corner and the gain that makes its noise unity RMS.
+/// The unvoiced path: the voice is followed above `HF_HZ`; the noise it shapes is a band
+/// around `HF_NOISE_HZ` (two cascaded band-passes of `k` = `HF_NOISE_K`, about 5 kHz wide), not
+/// everything up to Nyquist, and sits at `NOISE_REF` RMS at full envelope, about the level of a
+/// saw's upper harmonics, which are quiet.
 const HF_HZ: f32 = 5000.0;
-const HF_NOISE_NORM: f32 = 2.0;
+const HF_NOISE_HZ: f32 = 7000.0;
+const HF_NOISE_K: f32 = 1.1;
+const HF_NOISE_BW: f32 = 5000.0;
+const NOISE_REF: f32 = 0.06;
 const HF_ATTACK_MS: f32 = 1.0;
 const HF_RELEASE_MS: f32 = 20.0;
 const CAR_ATTACK_MS: f32 = 5.0;
@@ -344,6 +350,9 @@ impl Module for Vocoder {
         ];
         let kg = coef(GLIDE_TAU_S, sr / SUB as f32);
         let hp = tpt(HF_HZ.min(0.4 * sr), std::f32::consts::SQRT_2, sr);
+        let nbp = tpt(HF_NOISE_HZ.min(0.4 * sr), HF_NOISE_K, sr);
+        // Unit RMS after the band-pass: white noise is 0.577 RMS and the band takes its share.
+        let noise_gain = NOISE_REF * (0.5 * sr / HF_NOISE_BW).sqrt() / 0.577;
         let c = &mut self.c;
         let mut i0 = 0;
         while i0 < n {
@@ -401,8 +410,8 @@ impl Module for Vocoder {
                     let gate = (c.car_env * CAR_GATE).min(1.0);
                     for ch in 0..2 {
                         let w = white(&mut c.rng[ch]);
-                        let nz = cascade(&mut c.hf_noise[ch], &hp, w, hp_stage);
-                        wet[ch][j] += nz * c.hf_env * hf * gate * HF_NOISE_NORM;
+                        let nz = cascade(&mut c.hf_noise[ch], &nbp, w, stage);
+                        wet[ch][j] += nz * c.hf_env * hf * gate * noise_gain;
                     }
                 }
             }

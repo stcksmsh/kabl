@@ -104,7 +104,7 @@ def robot_voice(bands=20, dry=False, self_playing=False):
         p.wire(g, 'out', out, 'left')
         p.wire(g, 'out', out, 'right')
         return p
-    voc = p.add('vocoder', bands=bands, hf=0.6, drive_db=18, release_ms=45)
+    voc = p.add('vocoder', bands=bands, hf=0.5, drive_db=18, release_ms=45)
     p.wire(car, 'out', voc, 'in_l')
     p.wire(car, 'out', voc, 'in_r')
     p.wire(mix, 'out', voc, 'mod')
@@ -119,7 +119,7 @@ def live_voice():
     p = Patch()
     car = chord(p, 0)
     ain = p.add('audio.in', gain_db=0)
-    voc = p.add('vocoder', bands=24, hf=0.6, release_ms=45)
+    voc = p.add('vocoder', bands=24, hf=0.5, release_ms=45)
     p.wire(car, 'out', voc, 'in_l')
     p.wire(car, 'out', voc, 'in_r')
     p.wire(ain, 'left', voc, 'mod')

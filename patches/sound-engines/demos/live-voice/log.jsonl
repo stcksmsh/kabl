@@ -21,7 +21,7 @@
 {"seq":20,"t_ms":0,"op":{"SetParam":{"target":{"Module":{"id":6,"param":"gain_db"}},"value":0.0}},"inverse":{"UnsetParam":{"target":{"Module":{"id":6,"param":"gain_db"}}}},"source":"User"}
 {"seq":21,"t_ms":0,"op":{"AddModule":{"id":7,"kind":"vocoder","pos":{"x":424.0,"y":750.0}}},"inverse":{"RemoveModule":{"id":7}},"source":"User"}
 {"seq":22,"t_ms":0,"op":{"SetParam":{"target":{"Module":{"id":7,"param":"bands"}},"value":24.0}},"inverse":{"UnsetParam":{"target":{"Module":{"id":7,"param":"bands"}}}},"source":"User"}
-{"seq":23,"t_ms":0,"op":{"SetParam":{"target":{"Module":{"id":7,"param":"hf"}},"value":0.6}},"inverse":{"UnsetParam":{"target":{"Module":{"id":7,"param":"hf"}}}},"source":"User"}
+{"seq":23,"t_ms":0,"op":{"SetParam":{"target":{"Module":{"id":7,"param":"hf"}},"value":0.5}},"inverse":{"UnsetParam":{"target":{"Module":{"id":7,"param":"hf"}}}},"source":"User"}
 {"seq":24,"t_ms":0,"op":{"SetParam":{"target":{"Module":{"id":7,"param":"release_ms"}},"value":45.0}},"inverse":{"UnsetParam":{"target":{"Module":{"id":7,"param":"release_ms"}}}},"source":"User"}
 {"seq":25,"t_ms":0,"op":{"Connect":{"id":6,"from":{"Module":{"id":5,"port":"out"}},"to":{"Module":{"id":7,"port":"in_l"}}}},"inverse":{"Disconnect":{"id":6}},"source":"User"}
 {"seq":26,"t_ms":0,"op":{"Connect":{"id":7,"from":{"Module":{"id":5,"port":"out"}},"to":{"Module":{"id":7,"port":"in_r"}}}},"inverse":{"Disconnect":{"id":7}},"source":"User"}

@@ -72,7 +72,7 @@
 {"seq":71,"t_ms":0,"op":{"Connect":{"id":19,"from":{"Module":{"id":16,"port":"out"}},"to":{"Module":{"id":17,"port":"in2"}}}},"inverse":{"Disconnect":{"id":19}},"source":"User"}
 {"seq":72,"t_ms":0,"op":{"AddModule":{"id":18,"kind":"vocoder","pos":{"x":424.0,"y":750.0}}},"inverse":{"RemoveModule":{"id":18}},"source":"User"}
 {"seq":73,"t_ms":0,"op":{"SetParam":{"target":{"Module":{"id":18,"param":"bands"}},"value":20.0}},"inverse":{"UnsetParam":{"target":{"Module":{"id":18,"param":"bands"}}}},"source":"User"}
-{"seq":74,"t_ms":0,"op":{"SetParam":{"target":{"Module":{"id":18,"param":"hf"}},"value":0.6}},"inverse":{"UnsetParam":{"target":{"Module":{"id":18,"param":"hf"}}}},"source":"User"}
+{"seq":74,"t_ms":0,"op":{"SetParam":{"target":{"Module":{"id":18,"param":"hf"}},"value":0.5}},"inverse":{"UnsetParam":{"target":{"Module":{"id":18,"param":"hf"}}}},"source":"User"}
 {"seq":75,"t_ms":0,"op":{"SetParam":{"target":{"Module":{"id":18,"param":"drive_db"}},"value":18.0}},"inverse":{"UnsetParam":{"target":{"Module":{"id":18,"param":"drive_db"}}}},"source":"User"}
 {"seq":76,"t_ms":0,"op":{"SetParam":{"target":{"Module":{"id":18,"param":"release_ms"}},"value":45.0}},"inverse":{"UnsetParam":{"target":{"Module":{"id":18,"param":"release_ms"}}}},"source":"User"}
 {"seq":77,"t_ms":0,"op":{"Connect":{"id":20,"from":{"Module":{"id":5,"port":"out"}},"to":{"Module":{"id":18,"port":"in_l"}}}},"inverse":{"Disconnect":{"id":20}},"source":"User"}
