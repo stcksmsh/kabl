@@ -386,6 +386,11 @@ fn clamp(s: &mut Style, base: &Style, mode: &str, notes: &mut Vec<String>) {
         (&mut sl.knob.glow, bl.knob.glow, "knob.glow"),
         (&mut sl.cable.glow, bl.cable.glow, "cable.glow"),
         (&mut sl.cable.dimmed, bl.cable.dimmed, "cable.dimmed"),
+        (
+            &mut sl.cable.rest_alpha,
+            bl.cable.rest_alpha,
+            "cable.rest_alpha",
+        ),
         (&mut sl.display.glow, bl.display.glow, "display.glow"),
         (&mut sl.display.fill, bl.display.fill, "display.fill"),
         (
@@ -402,6 +407,15 @@ fn clamp(s: &mut Style, base: &Style, mode: &str, notes: &mut Vec<String>) {
         12.0,
         bl.cable.width,
         "cable.width",
+        mode,
+        notes,
+    );
+    num(
+        &mut sl.cable.rest_width,
+        1.0,
+        12.0,
+        bl.cable.rest_width,
+        "cable.rest_width",
         mode,
         notes,
     );

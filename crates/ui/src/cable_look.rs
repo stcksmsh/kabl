@@ -222,8 +222,12 @@ mod tests {
     /// in each built-in theme and mode: the edge on light themes, the lightened fill on dark.
     #[test]
     fn resting_cables_keep_contrast_on_every_builtin_surface() {
-        for dark in [false, true] {
-            let st = builtin_a(dark);
+        for (name, dark) in [("A", false), ("A", true), ("B", false), ("B", true)] {
+            let st = if name == "A" {
+                builtin_a(dark)
+            } else {
+                crate::style::builtin_b(dark)
+            };
             let th = crate::theme::theme(&st);
             let surf = surfaces(&st);
             let mut colours = vec![th.audio, th.cv, th.gate];
@@ -239,9 +243,9 @@ mod tests {
                     worst_contrast(Color32::BLACK, casing, &surf)
                 };
                 worst = worst.min(w);
-                assert!(w >= MIN_CONTRAST, "dark={dark} {c:?}: {w:.2}");
+                assert!(w >= MIN_CONTRAST, "{name} dark={dark} {c:?}: {w:.2}");
             }
-            println!("theme A dark={dark}: worst resting cable contrast {worst:.2}:1");
+            println!("theme {name} dark={dark}: worst resting cable contrast {worst:.2}:1");
         }
     }
 }
