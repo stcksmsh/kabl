@@ -1,0 +1,301 @@
+{
+  "modules": {
+    "1": {
+      "kind": "midi.in",
+      "pos": {
+        "x": 24.0,
+        "y": 10.0
+      },
+      "params": {}
+    },
+    "2": {
+      "kind": "osc.va",
+      "pos": {
+        "x": 424.0,
+        "y": 10.0
+      },
+      "params": {
+        "detune": 18.0,
+        "unison": 4.0,
+        "waveform": 2.0
+      }
+    },
+    "3": {
+      "kind": "env.adsr",
+      "pos": {
+        "x": 824.0,
+        "y": 10.0
+      },
+      "params": {
+        "attack_ms": 12.0,
+        "decay_ms": 300.0,
+        "release_ms": 260.0,
+        "sustain": 0.85
+      }
+    },
+    "4": {
+      "kind": "vca",
+      "pos": {
+        "x": 24.0,
+        "y": 380.0
+      },
+      "params": {
+        "gain": 0.0
+      }
+    },
+    "5": {
+      "kind": "gain",
+      "pos": {
+        "x": 424.0,
+        "y": 380.0
+      },
+      "params": {
+        "gain_db": -6.0
+      }
+    },
+    "6": {
+      "kind": "audio.in",
+      "pos": {
+        "x": 24.0,
+        "y": 750.0
+      },
+      "params": {
+        "gain_db": 0.0
+      }
+    },
+    "7": {
+      "kind": "vocoder",
+      "pos": {
+        "x": 424.0,
+        "y": 750.0
+      },
+      "params": {
+        "bands": 24.0,
+        "hf": 0.6,
+        "release_ms": 45.0
+      }
+    },
+    "8": {
+      "kind": "gain",
+      "pos": {
+        "x": 824.0,
+        "y": 750.0
+      },
+      "params": {
+        "gain_db": 7.5
+      }
+    },
+    "9": {
+      "kind": "gain",
+      "pos": {
+        "x": 824.0,
+        "y": 1120.0
+      },
+      "params": {
+        "gain_db": 7.5
+      }
+    },
+    "10": {
+      "kind": "out",
+      "pos": {
+        "x": 1224.0,
+        "y": 750.0
+      },
+      "params": {}
+    }
+  },
+  "cables": {
+    "1": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "pitch"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 2,
+          "port": "pitch"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "2": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "gate"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 3,
+          "port": "gate"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "3": {
+      "from": {
+        "Module": {
+          "id": 2,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 4,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "4": {
+      "from": {
+        "Module": {
+          "id": 3,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 4,
+          "port": "cv"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "5": {
+      "from": {
+        "Module": {
+          "id": 4,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 5,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "6": {
+      "from": {
+        "Module": {
+          "id": 5,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 7,
+          "port": "in_l"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "7": {
+      "from": {
+        "Module": {
+          "id": 5,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 7,
+          "port": "in_r"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "8": {
+      "from": {
+        "Module": {
+          "id": 6,
+          "port": "left"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 7,
+          "port": "mod"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "9": {
+      "from": {
+        "Module": {
+          "id": 7,
+          "port": "left"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 8,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "10": {
+      "from": {
+        "Module": {
+          "id": 7,
+          "port": "right"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 9,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "11": {
+      "from": {
+        "Module": {
+          "id": 8,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 10,
+          "port": "left"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "12": {
+      "from": {
+        "Module": {
+          "id": 9,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 10,
+          "port": "right"
+        }
+      },
+      "params": {},
+      "steps": []
+    }
+  }
+}

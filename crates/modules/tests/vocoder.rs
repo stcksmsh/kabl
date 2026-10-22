@@ -186,6 +186,13 @@ fn unvoiced_path_adds_hiss_only_with_a_hissing_voice() {
 }
 
 #[test]
+fn a_hissing_voice_with_no_synth_under_it_is_silent() {
+    let (mut m, p) = vocoder(&[("hf", 1.0)], SR);
+    let out = run(&mut *m, &p, &vec![0.0; N], Some(&noise(5, N, 0.3)), 64);
+    assert!(rms(&out[0]) < 1e-6 && rms(&out[1]) < 1e-6);
+}
+
+#[test]
 fn shifted_blocks_and_one_sample_blocks_agree() {
     let car = saw(110.0, SR, 8000);
     let md = noise(9, 8000, 0.4);

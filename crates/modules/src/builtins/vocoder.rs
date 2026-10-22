@@ -28,7 +28,9 @@
 //! **Unvoiced.** A vocoder loses consonants: `s`, `t`, `f` are noise, and a saw has no noise.
 //! `hf` mixes in white noise high-passed at 5 kHz, shaped by the follower of the modulator
 //! above 5 kHz (fixed 1 ms attack, 20 ms release), so hisses and clicks in the voice come
-//! through. Left and right get separate noise.
+//! through. Left and right get separate noise. The noise sounds only while the carrier does
+//! (a follower of the carrier's level, full from −34 dBFS): a voice with no synth under it is
+//! silent, not whispering.
 //!
 //! **Mix.** 0 is the carrier only, 1 the vocoded sound only. An unpatched `mod` is silence:
 //! the vocoded part is silent too.
@@ -71,7 +73,7 @@ const PARAMS: &[ParamInfo] = &[
     param("attack_ms", 0.5, 50.0, 4.0, "ms", Taper::Exponential),
     param("release_ms", 5.0, 500.0, 40.0, "ms", Taper::Exponential),
     param("hf", 0.0, 1.0, 0.5, "", Taper::Linear),
-    param("drive_db", 0.0, 36.0, 12.0, "dB", Taper::Linear),
+    param("drive_db", 0.0, 36.0, 24.0, "dB", Taper::Linear),
     param("mix", 0.0, 1.0, 1.0, "", Taper::Linear),
 ];
 
@@ -110,6 +112,9 @@ const HF_HZ: f32 = 5000.0;
 const HF_NOISE_NORM: f32 = 2.0;
 const HF_ATTACK_MS: f32 = 1.0;
 const HF_RELEASE_MS: f32 = 20.0;
+const CAR_ATTACK_MS: f32 = 5.0;
+const CAR_RELEASE_MS: f32 = 80.0;
+const CAR_GATE: f32 = 50.0;
 
 #[derive(Debug, Clone, Copy)]
 struct Band {
@@ -149,6 +154,8 @@ struct Core {
     hf_mod: [[f32; 2]; 2],
     hf_noise: [[[f32; 2]; 2]; 2],
     hf_env: f32,
+    /// Follower of the carrier's level: the unvoiced noise only sounds while the synth does.
+    car_env: f32,
     rng: [u32; 2],
     started: bool,
 }
@@ -176,6 +183,7 @@ impl Vocoder {
                 hf_mod: [[0.0; 2]; 2],
                 hf_noise: [[[0.0; 2]; 2]; 2],
                 hf_env: 0.0,
+                car_env: 0.0,
                 rng: [0x9E37_79B9, 0x85EB_CA6B],
                 started: false,
             },
@@ -380,15 +388,21 @@ impl Module for Vocoder {
             }
             if hf > 0.0 {
                 let (ka, kr) = (retention(HF_ATTACK_MS, sr), retention(HF_RELEASE_MS, sr));
+                let (ca, cr) = (retention(CAR_ATTACK_MS, sr), retention(CAR_RELEASE_MS, sr));
                 for j in 0..len {
                     let h = cascade(&mut c.hf_mod, &hp, x[2][j], hp_stage);
                     let a = h.abs() * det;
                     let k = if a > c.hf_env { ka } else { kr };
                     c.hf_env = flush((a + (c.hf_env - a) * k).min(ENV_MAX));
+                    let level = x[0][j].abs().max(x[1][j].abs());
+                    let k = if level > c.car_env { ca } else { cr };
+                    c.car_env = flush(level + (c.car_env - level) * k);
+                    // Full from -34 dBFS up: the noise follows the synth, not the voice alone.
+                    let gate = (c.car_env * CAR_GATE).min(1.0);
                     for ch in 0..2 {
                         let w = white(&mut c.rng[ch]);
                         let nz = cascade(&mut c.hf_noise[ch], &hp, w, hp_stage);
-                        wet[ch][j] += nz * c.hf_env * hf * HF_NOISE_NORM;
+                        wet[ch][j] += nz * c.hf_env * hf * gate * HF_NOISE_NORM;
                     }
                 }
             }

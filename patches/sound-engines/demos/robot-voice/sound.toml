@@ -1,0 +1,12 @@
+name = "Robot Voice"
+category = "Lead"
+tags = [
+    "vocoder",
+    "robot",
+    "poly",
+    "keyboard",
+    "vocal",
+]
+description = "A supersaw chord that speaks. The phrase plays itself: a buzz through the formant filter, a new vowel and a noise click on every tick. Hold chords; Bands is the detail, Shift moves the voice up or down, HF keeps the consonants."
+keys = true
+sequence = false
