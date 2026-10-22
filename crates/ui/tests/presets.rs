@@ -61,6 +61,12 @@ fn every_preset_keeps_to_the_brief() {
         );
         assert!(!meta.tags.is_empty(), "{name}: has tags");
         assert!(meta.description.len() > 60, "{name}: has a description");
+        for label in ["Filter", "Drive", "Space", "Motion"] {
+            assert!(
+                meta.description.contains(label),
+                "{name}: the description says what {label} does"
+            );
+        }
         seen += 1;
     }
     assert!(seen >= 8, "the pilot presets are there");

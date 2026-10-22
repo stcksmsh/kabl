@@ -88,7 +88,7 @@ impl Rack {
         let lfo = self.add("lfo", &[("rate_hz", rate_hz)]);
         let depth = self.add("vca", &[("gain", 0.0)]);
         self.wire(lfo, "out", depth, "in");
-        self.wire(knob, "m4", depth, "cv");
+        self.route(knob, "m4", depth, "gain", 1.0);
         depth
     }
     /// The last stage: a limiter just under the level target's ceiling, so no macro setting
@@ -617,7 +617,7 @@ fn chrome_chase() -> Rack {
     r.wire(pad_env, "out", pad_vca, "cv");
     r.wire(div, "gate", pump_env, "gate");
     r.wire(pump_env, "out", pump_depth, "in");
-    r.wire(knob, "m4", pump_depth, "cv");
+    r.route(knob, "m4", pump_depth, "gain", 1.0);
     r.wire(pump_depth, "out", pump_cv, "in");
     r.wire(pad_vca, "out", duck, "in");
     r.wire(pump_cv, "out", duck, "cv");
@@ -1041,7 +1041,7 @@ fn presets() -> Vec<Preset> {
             name: "Midnight Drop",
             category: "Piece",
             tags: &["sequenced", "cues", "build-up", "drop", "120bpm", "french touch"],
-            description: "A self-playing bass and lead with a hand-played voice on top, in four cues: Intro (dark and quiet), Build (the filter opens over four bars and the wobble rises), Drop (full and hard), Break (washed in space). Press Run, then launch the cues on the next bar with the pads or CC 40-43; turn a macro to take it over.",
+            description: "A self-playing bass and lead with a hand-played voice on top, in four cues: Intro (dark and quiet), Build (Filter opens over four bars and Motion rises), Drop (Drive up, full and hard), Break (washed in Space). Press Run, then launch the cues on the next bar with the pads or CC 40-43; turn a macro to take it over.",
             listen: "The filter opening through the Build, the Drop landing hard, and the Break draining into echo.",
             build: midnight_drop,
             phrase: drop_phrase,
@@ -1201,6 +1201,35 @@ fn main() {
                 let peak = l.iter().chain(&r).fold(0.0f32, |m, s| m.max(s.abs()));
                 println!("{:18} peak {peak:.3}  | {}", p.slug, p.listen);
             }
+        }
+        Some("phrases") => {
+            // For docs/presets/scripts/host.py: {slug: {secs, hits: [[t, note, velocity|0]], cues: [[cc, t]]}}.
+            let entries: Vec<String> = presets()
+                .iter()
+                .map(|p| {
+                    let hits: Vec<String> = (p.phrase)()
+                        .iter()
+                        .map(|h| format!("[{:.3},{},{}]", h.0, h.1, h.2.unwrap_or(0)))
+                        .collect();
+                    let cues: Vec<String> = if p.slug == "midnight-drop" {
+                        DROP_CUES
+                            .iter()
+                            .zip(40..)
+                            .map(|((_, _, _, at), cc)| format!("[{cc},{:.1}]", at + 1.0))
+                            .collect()
+                    } else {
+                        Vec::new()
+                    };
+                    format!(
+                        "\"{}\":{{\"secs\":{},\"hits\":[{}],\"cues\":[{}]}}",
+                        p.slug,
+                        p.secs,
+                        hits.join(","),
+                        cues.join(",")
+                    )
+                })
+                .collect();
+            std::fs::write(&args[2], format!("{{{}}}\n", entries.join(","))).unwrap();
         }
         Some("macros") => {
             // Peak and loudness (dBFS) with every macro at 0, at 1, and with only Space at 0.

@@ -125,7 +125,7 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "Midnight Drop",
         "Piece",
         &["sequenced", "cues", "build-up", "drop", "120bpm", "french touch"],
-        "A self-playing bass and lead with a hand-played voice on top, in four cues: Intro (dark and quiet), Build (the filter opens over four bars and the wobble rises), Drop (full and hard), Break (washed in space). Press Run, then launch the cues on the next bar with the pads or CC 40-43; turn a macro to take it over.",
+        "A self-playing bass and lead with a hand-played voice on top, in four cues: Intro (dark and quiet), Build (Filter opens over four bars and Motion rises), Drop (Drive up, full and hard), Break (washed in Space). Press Run, then launch the cues on the next bar with the pads or CC 40-43; turn a macro to take it over.",
     ),
     (
         "presets/android-choir",

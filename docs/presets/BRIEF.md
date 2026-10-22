@@ -43,7 +43,7 @@ Rules:
 - Names are exactly `Filter`, `Drive`, `Space`, `Motion` (labels `name.m1` to `name.m4`).
 - Every macro moves something audible over its whole range. A macro that has nothing to do in a preset still gets a small, honest effect on the nearest sound (a pad's Drive thickens the saws); do not leave a dead macro.
 - The macro value stored in the patch is the sound as designed. Cues and automation move it from there.
-- Motion depth is the LFO through a VCA that the macro opens (`lfo` to `vca.in`, macro `m4` to `vca.cv`, the VCA output as the route source), because a macro cannot scale a route's amount directly.
+- Motion depth is the LFO through a VCA that the macro opens (`lfo` to `vca.in`, a route from macro `m4` into the VCA's `gain`, the VCA output as the route source), because a macro cannot scale a route's amount directly. Use a route, not a plain cable, from the macro: the Perform panel lists what a macro moves from its routes and says "moves nothing yet" for a cable.
 
 ## Wet and dry: effects baked in, reachable on Space
 

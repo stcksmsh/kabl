@@ -202,12 +202,14 @@
         }
       },
       "to": {
-        "Module": {
+        "Param": {
           "id": 13,
-          "port": "cv"
+          "param": "gain"
         }
       },
-      "params": {},
+      "params": {
+        "amount": 1.0
+      },
       "steps": []
     },
     "3": {
