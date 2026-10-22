@@ -14,10 +14,15 @@ struct H {
     events: Vec<Event>,
     t: f64,
     pointer: Pos2,
+    size: egui::Vec2,
 }
 
 impl H {
     fn new() -> Self {
+        Self::sized(egui::vec2(1440.0, 900.0))
+    }
+
+    fn sized(size: egui::Vec2) -> Self {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/reference");
         let mut h = H {
             ctx: egui::Context::default(),
@@ -26,6 +31,7 @@ impl H {
             events: Vec::new(),
             t: 0.0,
             pointer: Pos2::ZERO,
+            size,
         };
         h.frame();
         h.frame();
@@ -33,7 +39,7 @@ impl H {
     }
 
     fn frame(&mut self) {
-        let size = egui::vec2(1440.0, 900.0);
+        let size = self.size;
         let raw = RawInput {
             screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
             events: std::mem::take(&mut self.events),
@@ -95,6 +101,16 @@ impl H {
         self.button(PointerButton::Primary, true);
         for i in 1..=6 {
             self.move_to(from + egui::vec2(dx * i as f32 / 6.0, 0.0));
+        }
+        self.button(PointerButton::Primary, false);
+        self.frame();
+    }
+
+    fn drag_between(&mut self, from: Pos2, to: Pos2) {
+        self.move_to(from);
+        self.button(PointerButton::Primary, true);
+        for i in 1..=6 {
+            self.move_to(from + (to - from) * (i as f32 / 6.0));
         }
         self.button(PointerButton::Primary, false);
         self.frame();
@@ -221,4 +237,126 @@ fn a_source_is_added_set_and_removed_for_a_cables_morph_from_its_editor() {
     assert!(routes(&t).is_empty());
     t.editor.undo();
     assert_eq!(routes(&t), vec![route], "undo brings the route back");
+}
+
+/// Opens the reference patch's first route-row pattern editor with a pattern of 4 or more steps.
+fn stepped_editor() -> (H, CableId) {
+    let mut t = H::new();
+    t.click(&format!("knob:{ENV}.attack_ms"));
+    let route = *t
+        .ui
+        .hits
+        .keys()
+        .find_map(|k| k.strip_prefix("pattern:"))
+        .map(|s| s.parse::<CableId>().unwrap())
+        .iter()
+        .next()
+        .expect("a route row has a Pattern button");
+    t.click(&format!("pattern:{route}"));
+    let r = t.ui.hits[&format!("fn-length:{route}")];
+    t.drag_between(r.left_center(), r.lerp_inside(egui::vec2(0.5, 0.5)));
+    assert!(t.cable_param(route, "length").is_some_and(|n| n >= 4.0));
+    t.frame();
+    (t, route)
+}
+
+#[test]
+fn clicking_a_step_switches_it_off_and_back_to_its_level() {
+    let (mut t, route) = stepped_editor();
+    t.drag_between(
+        t.ui.hits[&format!("fn-level:{route}:1")].lerp_inside(egui::vec2(0.5, 0.3)),
+        t.ui.hits[&format!("fn-level:{route}:1")].lerp_inside(egui::vec2(0.5, 0.5)),
+    );
+    let level = t.cable_param(route, "s2").expect("level stored");
+    assert!(
+        (level - 0.5).abs() < 0.06,
+        "dragged to half height: {level}"
+    );
+    t.click(&format!("fn-level:{route}:1"));
+    assert_eq!(t.cable_param(route, "s2"), Some(0.0));
+    t.click(&format!("fn-level:{route}:1"));
+    assert_eq!(t.cable_param(route, "s2"), Some(level));
+}
+
+#[test]
+fn dragging_across_steps_paints_their_levels_and_chances() {
+    let (mut t, route) = stepped_editor();
+    let first = t.ui.hits[&format!("fn-level:{route}:0")];
+    let last = t.ui.hits[&format!("fn-level:{route}:2")];
+    t.drag_between(
+        first.lerp_inside(egui::vec2(0.5, 0.25)),
+        last.lerp_inside(egui::vec2(0.5, 0.25)),
+    );
+    for s in ["s1", "s2", "s3"] {
+        let v = t.cable_param(route, s).expect("painted");
+        assert!((v - 0.75).abs() < 0.06, "{s} painted to 75 %: {v}");
+    }
+    assert_eq!(t.cable_param(route, "s4"), None, "step 4 untouched");
+    let odds = t.ui.hits[&format!("fn-chance:{route}:3")];
+    t.drag_between(
+        odds.lerp_inside(egui::vec2(0.5, 0.9)),
+        odds.lerp_inside(egui::vec2(0.5, 0.5)),
+    );
+    let chance = t.cable_param(route, "r4").expect("chance stored");
+    assert!(
+        (chance - 50.0).abs() < 12.0,
+        "chance dragged to half: {chance}"
+    );
+}
+
+#[test]
+fn one_step_undoes_by_itself() {
+    let (mut t, route) = stepped_editor();
+    let cell = t.ui.hits[&format!("fn-level:{route}:0")];
+    t.drag_between(
+        cell.lerp_inside(egui::vec2(0.5, 0.2)),
+        cell.lerp_inside(egui::vec2(0.5, 0.6)),
+    );
+    assert!(t.cable_param(route, "s1").is_some());
+    t.editor.undo();
+    assert_eq!(t.cable_param(route, "s1"), None);
+    assert!(t.cable_param(route, "length").is_some_and(|n| n >= 4.0));
+}
+
+#[test]
+fn the_step_grids_fit_the_drawer_at_the_maximum_step_count() {
+    for size in [egui::vec2(1440.0, 900.0), egui::vec2(1180.0, 680.0)] {
+        let mut t = H::sized(size);
+        t.click(&format!("knob:{ENV}.attack_ms"));
+        let route = *t
+            .ui
+            .hits
+            .keys()
+            .find_map(|k| k.strip_prefix("pattern:"))
+            .map(|s| s.parse::<CableId>().unwrap())
+            .iter()
+            .next()
+            .expect("a route row has a Pattern button");
+        t.click(&format!("pattern:{route}"));
+        for param in ["length", "b.length"] {
+            t.editor.set_param_gesture(
+                ParamTarget::Cable {
+                    id: route,
+                    param: param.into(),
+                },
+                kabl_cables::MAX_STEPS as f32,
+                true,
+            );
+        }
+        t.frame();
+        t.frame();
+        let edge = t.ui.hits[&format!("fn-prob:{route}")].right();
+        for tag in ["", "-b"] {
+            for k in [0, kabl_cables::MAX_STEPS - 1] {
+                for lane in ["level", "chance"] {
+                    let r = t.ui.hits[&format!("fn-{lane}{tag}:{route}:{k}")];
+                    assert!(
+                        r.right() <= edge + 0.5,
+                        "{size:?} {lane}{tag} step {k} ends at {} past the drawer edge {edge}",
+                        r.right()
+                    );
+                }
+            }
+        }
+    }
 }
