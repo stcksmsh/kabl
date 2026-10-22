@@ -26,15 +26,25 @@ def place(p, i, x, y):
             o['op']['AddModule']['pos'] = {'x': float(x), 'y': float(y)}
 
 
-def chord(p, row):
-    """midi.in -> supersaw -> envelope VCA -> gain. Returns (gain, ids)."""
-    kb = p.add('midi.in')
+def chord(p, row, self_playing=False):
+    """midi.in -> supersaw -> envelope VCA -> gain. Returns (gain, ids). `self_playing`: a clock
+    and a random loop in place of the keyboard, for captures that need no player."""
+    if self_playing:
+        ck = p.add('clock', bpm=52)
+        rnd = p.add('random', change=100, length=4, range=9)
+        kb = p.add('quantizer', root=4, scale=2, transpose=-12)
+        p.wire(ck, 'gate', rnd, 'clock')
+        p.wire(rnd, 'out', kb, 'in')
+        pitch, gate = 'out', 'trig'
+    else:
+        kb = p.add('midi.in')
+        pitch, gate = 'pitch', 'gate'
     osc = p.add('osc.va', waveform=2, unison=4, detune=18)
     env = p.add('env.adsr', attack_ms=12, decay_ms=300, sustain=0.85, release_ms=260)
     vca = p.add('vca', gain=0)
     g = p.add('gain', gain_db=-6)
-    p.wire(kb, 'pitch', osc, 'pitch')
-    p.wire(kb, 'gate', env, 'gate')
+    p.wire(kb, pitch, osc, 'pitch')
+    p.wire(kb, gate, env, 'gate')
     p.wire(osc, 'out', vca, 'in')
     p.wire(env, 'out', vca, 'cv')
     p.wire(vca, 'out', g, 'in')
@@ -56,10 +66,10 @@ def finish(p, voc, tail_gain_db, row):
     place(p, out, 24 + 400 * 3, 10 + 370 * row)
 
 
-def robot_voice(bands=20, dry=False):
+def robot_voice(bands=20, dry=False, self_playing=False):
     """dry: the modulator alone (the phrase, before the vocoder), for the clips."""
     p = Patch()
-    car = chord(p, 0)
+    car = chord(p, 0, self_playing)
     # The phrase: a buzz whose pitch and vowel wander on two random loops, one syllable per tick.
     clock = p.add('clock', bpm=104)
     pitch = p.add('random', change=100, length=16, range=7)
@@ -155,6 +165,7 @@ def clips(root):
     for n in (8, 12, 16, 24, 32):
         robot_voice(bands=n).save(root / f'phrase-{n}')
     live_voice().save(root / 'live')
+    robot_voice(self_playing=True).save(root / 'capture')
 
 
 if __name__ == '__main__':
