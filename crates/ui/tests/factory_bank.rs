@@ -228,55 +228,46 @@ fn rms(v: &[f32]) -> f64 {
     (v.iter().map(|s| (*s as f64).powi(2)).sum::<f64>() / v.len() as f64).sqrt()
 }
 
-/// A spoken-sounding input for patches with `audio.in`: a 120 Hz saw through two resonances that
-/// move from "ah" to "ee" to "oh" every 0.4 s, in syllables of 0.3 s with a click at the start,
-/// about -20 dBFS RMS. Silent for the first two seconds, so the stopped-load check still holds.
+/// A recorded voice for patches with `audio.in`: `docs/vocoder/audio/voice-espeak-16k.wav` (made
+/// with espeak-ng, see docs/vocoder/README.md), brought to 48 kHz by linear interpolation and
+/// scaled to -20 dBFS RMS over the samples that carry sound, then repeated with half a second
+/// between. It starts at two seconds, so the stopped-load check still holds.
 struct SyntheticVoice {
-    phase: f32,
-    bp: [[f32; 2]; 2],
-    rng: u32,
+    samples: Vec<f32>,
 }
 
 impl SyntheticVoice {
     fn new() -> Self {
-        SyntheticVoice {
-            phase: 0.0,
-            bp: [[0.0; 2]; 2],
-            rng: 0x1234_5678,
+        let path = root().join("../docs/vocoder/audio/voice-espeak-16k.wav");
+        let mut r = hound::WavReader::open(path).unwrap();
+        let src: Vec<f32> = r
+            .samples::<i16>()
+            .map(|s| s.unwrap() as f32 / 32768.0)
+            .collect();
+        let mut samples = Vec::with_capacity(src.len() * 3 + 24000);
+        for w in src.windows(2) {
+            for k in 0..3 {
+                samples.push(w[0] + (w[1] - w[0]) * k as f32 / 3.0);
+            }
         }
+        samples.extend(std::iter::repeat_n(0.0, 24000));
+        let (sum, n) = samples
+            .iter()
+            .filter(|s| s.abs() > 0.002)
+            .fold((0.0f64, 0usize), |(a, n), s| {
+                (a + (*s as f64).powi(2), n + 1)
+            });
+        let gain = 0.1 / (sum / n as f64).sqrt() as f32;
+        samples.iter_mut().for_each(|s| *s *= gain);
+        SyntheticVoice { samples }
     }
 
     fn block(&mut self, t: usize) -> ([f32; BLOCK], [f32; BLOCK]) {
-        const VOWELS: [[f32; 2]; 3] = [[700.0, 1200.0], [300.0, 2300.0], [450.0, 800.0]];
         let mut out = [0.0; BLOCK];
         for (i, o) in out.iter_mut().enumerate() {
-            let n = t + i;
-            let secs = n as f32 / 48000.0;
-            if secs < 2.0 {
-                continue;
+            if let Some(n) = (t + i).checked_sub(2 * 48000) {
+                *o = self.samples[n % self.samples.len()];
             }
-            let syllable = ((secs - 2.0) / 0.4) as usize;
-            let into = (secs - 2.0) % 0.4;
-            let formants = VOWELS[syllable % 3];
-            self.phase = (self.phase + 120.0 / 48000.0).fract();
-            let saw = 2.0 * self.phase - 1.0;
-            self.rng ^= self.rng << 13;
-            self.rng ^= self.rng >> 17;
-            self.rng ^= self.rng << 5;
-            let white = self.rng as f32 / u32::MAX as f32 * 2.0 - 1.0;
-            let mut y = 0.0;
-            for (b, f) in self.bp.iter_mut().zip(formants) {
-                // Two-pole resonator, bandwidth about f / 8.
-                let r = 1.0 - std::f32::consts::PI * f / 8.0 / 48000.0;
-                let w = std::f32::consts::TAU * f / 48000.0;
-                let v = (saw + if into < 0.03 { 4.0 * white } else { 0.0 }) * (1.0 - r)
-                    + 2.0 * r * w.cos() * b[0]
-                    - r * r * b[1];
-                b[1] = b[0];
-                b[0] = v;
-                y += v;
-            }
-            *o = if into < 0.3 { 0.079 * y } else { 0.0 };
         }
         (out, out)
     }
@@ -628,8 +619,8 @@ fn factory_levels_hold_the_target() {
     assert!(bad.is_empty(), "{}", bad.join("\n"));
 }
 
-/// The stand-in voice speaks at about -20 dBFS RMS while a syllable sounds (the level of a
-/// close-miked voice), so `audio.in` patches are levelled for a typical input.
+/// The stand-in voice speaks at -20 dBFS RMS while it sounds (about the level of a close-miked
+/// voice), so `audio.in` patches are levelled for a typical input.
 #[test]
 fn synthetic_voice_is_about_minus_20_dbfs() {
     let mut v = SyntheticVoice::new();
@@ -645,6 +636,9 @@ fn synthetic_voice_is_about_minus_20_dbfs() {
         }
     }
     let db = 20.0 * (sum / n as f64).sqrt().log10();
-    println!("synthetic voice {db:.1} dBFS");
+    println!(
+        "synthetic voice {db:.1} dBFS, peak {:.3}",
+        v.samples.iter().fold(0.0f32, |a, s| a.max(s.abs()))
+    );
     assert!((db + 20.0).abs() < 2.0, "{db:.1}");
 }

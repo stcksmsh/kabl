@@ -10,7 +10,7 @@ Add a vocoder for the Daft Punk robot voice. (1) `vocoder` module: carrier + mod
 - Engine: `PatchEngine::set_audio_in`, `CompiledPatch::feed_audio`, `tests/audio_in.rs`.
 - Standalone: `kabl-ui --input` opens default input (`crates/standalone/src/input.rs`); CLAP: optional second input port (`aux_input_ports`), queue in `Instrument`, fed in the timeline block hook.
 - Face display (`fx_displays.rs::vocoder`), help, routing names, `needed_inputs`.
-- Demos `patches/sound-engines/demos/{robot-voice,live-voice}` from `docs/vocoder/scripts/make_demos.py` (then `cargo run -p kabl-engine --example resave -- DIR` writes checkpoint.json); factory render feeds a synthetic voice to `audio.in` patches (`SyntheticVoice` in `crates/ui/tests/factory_bank.rs`).
+- Demos `patches/sound-engines/demos/{robot-voice,live-voice}` from `docs/vocoder/scripts/make_vocoder_demos.py` (then `cargo run -p kabl-engine --example resave -- DIR` writes checkpoint.json); factory render feeds a synthetic voice to `audio.in` patches (`SyntheticVoice` in `crates/ui/tests/factory_bank.rs`).
 - `render_midi --audio-in`, `docs/vocoder/scripts/make_clips.py`, voice `docs/vocoder/audio/voice-espeak.flac` (espeak-ng 1.51, en-us, self-generated).
 
 ## Remaining (in order)

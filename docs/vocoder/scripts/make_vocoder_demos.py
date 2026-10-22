@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Writes the two vocoder demo patches into patches/sound-engines/demos/.
 
-    python3 docs/vocoder/scripts/make_demos.py [OUTROOT]
+    python3 docs/vocoder/scripts/make_vocoder_demos.py [OUTROOT]
 
 robot-voice  A saw chord (play keys) spoken by a phrase that plays itself: a buzzing saw through
              the formant filter, its vowel stepping through a random loop, gated by a clock, with
@@ -113,7 +113,7 @@ def live_voice():
     p.wire(car, 'out', voc, 'in_l')
     p.wire(car, 'out', voc, 'in_r')
     p.wire(ain, 'left', voc, 'mod')
-    finish(p, voc, 7.5, 2)
+    finish(p, voc, 4.0, 2)
     place(p, ain, 24, 10 + 370 * 2)
     place(p, voc, 24 + 400 * 1, 10 + 370 * 2)
     return p

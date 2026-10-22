@@ -27,9 +27,9 @@
 {"seq":26,"t_ms":0,"op":{"Connect":{"id":7,"from":{"Module":{"id":5,"port":"out"}},"to":{"Module":{"id":7,"port":"in_r"}}}},"inverse":{"Disconnect":{"id":7}},"source":"User"}
 {"seq":27,"t_ms":0,"op":{"Connect":{"id":8,"from":{"Module":{"id":6,"port":"left"}},"to":{"Module":{"id":7,"port":"mod"}}}},"inverse":{"Disconnect":{"id":8}},"source":"User"}
 {"seq":28,"t_ms":0,"op":{"AddModule":{"id":8,"kind":"gain","pos":{"x":824.0,"y":750.0}}},"inverse":{"RemoveModule":{"id":8}},"source":"User"}
-{"seq":29,"t_ms":0,"op":{"SetParam":{"target":{"Module":{"id":8,"param":"gain_db"}},"value":7.5}},"inverse":{"UnsetParam":{"target":{"Module":{"id":8,"param":"gain_db"}}}},"source":"User"}
+{"seq":29,"t_ms":0,"op":{"SetParam":{"target":{"Module":{"id":8,"param":"gain_db"}},"value":4.0}},"inverse":{"UnsetParam":{"target":{"Module":{"id":8,"param":"gain_db"}}}},"source":"User"}
 {"seq":30,"t_ms":0,"op":{"AddModule":{"id":9,"kind":"gain","pos":{"x":824.0,"y":1120.0}}},"inverse":{"RemoveModule":{"id":9}},"source":"User"}
-{"seq":31,"t_ms":0,"op":{"SetParam":{"target":{"Module":{"id":9,"param":"gain_db"}},"value":7.5}},"inverse":{"UnsetParam":{"target":{"Module":{"id":9,"param":"gain_db"}}}},"source":"User"}
+{"seq":31,"t_ms":0,"op":{"SetParam":{"target":{"Module":{"id":9,"param":"gain_db"}},"value":4.0}},"inverse":{"UnsetParam":{"target":{"Module":{"id":9,"param":"gain_db"}}}},"source":"User"}
 {"seq":32,"t_ms":0,"op":{"AddModule":{"id":10,"kind":"out","pos":{"x":1224.0,"y":750.0}}},"inverse":{"RemoveModule":{"id":10}},"source":"User"}
 {"seq":33,"t_ms":0,"op":{"Connect":{"id":9,"from":{"Module":{"id":7,"port":"left"}},"to":{"Module":{"id":8,"port":"in"}}}},"inverse":{"Disconnect":{"id":9}},"source":"User"}
 {"seq":34,"t_ms":0,"op":{"Connect":{"id":10,"from":{"Module":{"id":7,"port":"right"}},"to":{"Module":{"id":9,"port":"in"}}}},"inverse":{"Disconnect":{"id":10}},"source":"User"}

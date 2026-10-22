@@ -7,7 +7,7 @@
 robot-phrase.m4a   8 s of the robot phrase on its own (the modulator), then the same 8 s spoken by
                    the supersaw chord.
 band-sweep.m4a     the same 4 s of phrase and chord at 8, 12, 16, 24 and 32 bands.
-live-voice.m4a     VOICE.wav (default: docs/vocoder/audio/voice-espeak.flac) alone, then through
+live-voice.m4a     VOICE.wav (default: docs/vocoder/audio/voice-espeak-16k.wav) alone, then through
                    the live-voice patch with two chords. Needs the voice at 48 kHz (sox converts).
 
 Needs sox and ffmpeg. Scratch files go to scratch/vocoder-clips/.
@@ -18,7 +18,7 @@ from pathlib import Path
 
 here = Path(__file__).resolve().parent
 sys.path.insert(0, str(here))
-import make_demos  # noqa: E402
+import make_vocoder_demos as make_demos  # noqa: E402
 
 repo = here.parents[2]
 SCR = repo / 'scratch/vocoder-clips'
@@ -84,7 +84,7 @@ def main():
         parts += [trim(w, SCR / f'p{n}t.wav', 0.5, 4), silence(0.4)]
     encode(parts, 'band-sweep')
 
-    voice = Path(sys.argv[1]) if len(sys.argv) > 1 else OUT / 'voice-espeak.flac'
+    voice = Path(sys.argv[1]) if len(sys.argv) > 1 else OUT / 'voice-espeak-16k.wav'
     v48 = SCR / 'voice48.wav'
     run('sox', voice, '-r', 48000, '-c', 1, '-b', 16, v48)
     secs = float(sp.check_output(['soxi', '-D', v48]).decode()) + 0.5
