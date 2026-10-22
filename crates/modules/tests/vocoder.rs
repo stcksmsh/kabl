@@ -68,7 +68,9 @@ fn saw(hz: f32, sr: f32, n: usize) -> Vec<f32> {
 }
 
 fn sine(hz: f32, sr: f32, n: usize, amp: f32) -> Vec<f32> {
-    (0..n).map(|i| amp * (TAU * hz * i as f32 / sr).sin()).collect()
+    (0..n)
+        .map(|i| amp * (TAU * hz * i as f32 / sr).sin())
+        .collect()
 }
 
 fn noise(seed: u32, n: usize, amp: f32) -> Vec<f32> {
@@ -113,13 +115,34 @@ fn a_tone_on_mod_picks_that_part_of_the_carrier() {
     // Saw at 100 Hz: a harmonic every 100 Hz. A 1 kHz voice should leave harmonic 10 well
     // above harmonic 30.
     let (mut m, p) = vocoder(&[("hf", 0.0), ("bands", 32.0)], SR);
-    let out = run(&mut *m, &p, &saw(100.0, SR, N), Some(&sine(1000.0, SR, N, 0.3)), 64);
-    let (lo, hi) = (power(&out[0][SKIP..], 1000.0, SR), power(&out[0][SKIP..], 3000.0, SR));
-    println!("1 kHz voice: harmonic 10 over harmonic 30 = {:.1} dB", db(lo, hi));
+    let out = run(
+        &mut *m,
+        &p,
+        &saw(100.0, SR, N),
+        Some(&sine(1000.0, SR, N, 0.3)),
+        64,
+    );
+    let (lo, hi) = (
+        power(&out[0][SKIP..], 1000.0, SR),
+        power(&out[0][SKIP..], 3000.0, SR),
+    );
+    println!(
+        "1 kHz voice: harmonic 10 over harmonic 30 = {:.1} dB",
+        db(lo, hi)
+    );
     assert!(db(lo, hi) > 20.0);
     // The same tone an octave up moves the peak.
-    let out = run(&mut *vocoder(&[("hf", 0.0), ("bands", 32.0)], SR).0, &p, &saw(100.0, SR, N), Some(&sine(2000.0, SR, N, 0.3)), 64);
-    let (a, b) = (power(&out[0][SKIP..], 1000.0, SR), power(&out[0][SKIP..], 2000.0, SR));
+    let out = run(
+        &mut *vocoder(&[("hf", 0.0), ("bands", 32.0)], SR).0,
+        &p,
+        &saw(100.0, SR, N),
+        Some(&sine(2000.0, SR, N, 0.3)),
+        64,
+    );
+    let (a, b) = (
+        power(&out[0][SKIP..], 1000.0, SR),
+        power(&out[0][SKIP..], 2000.0, SR),
+    );
     assert!(db(b, a) > 15.0, "{:.1}", db(b, a));
 }
 
@@ -129,7 +152,10 @@ fn shift_moves_the_voice() {
     let car = saw(100.0, SR, N);
     let (mut m, p) = vocoder(&[("hf", 0.0), ("bands", 32.0), ("shift_st", 12.0)], SR);
     let out = run(&mut *m, &p, &car, Some(&md), 64);
-    let (at1k, at2k) = (power(&out[0][SKIP..], 1000.0, SR), power(&out[0][SKIP..], 2000.0, SR));
+    let (at1k, at2k) = (
+        power(&out[0][SKIP..], 1000.0, SR),
+        power(&out[0][SKIP..], 2000.0, SR),
+    );
     println!("+12 st: 2 kHz over 1 kHz = {:.1} dB", db(at2k, at1k));
     assert!(db(at2k, at1k) > 15.0);
 }
@@ -153,7 +179,11 @@ fn output_follows_the_voice_level() {
             20.0 * rms(&car).log10(),
             20.0 * level(0.17, bands).log10()
         );
-        assert!((db(b * b, a * a) - 6.0).abs() < 0.5, "{bands} bands: {:.2} dB", db(b * b, a * a));
+        assert!(
+            (db(b * b, a * a) - 6.0).abs() < 0.5,
+            "{bands} bands: {:.2} dB",
+            db(b * b, a * a)
+        );
     }
 }
 
@@ -177,7 +207,10 @@ fn unvoiced_path_adds_hiss_only_with_a_hissing_voice() {
     let at8k = |md: &[f32], hf: f32| {
         let (mut m, p) = vocoder(&[("hf", hf), ("bands", 8.0)], SR);
         let o = run(&mut *m, &p, &car, Some(md), 64);
-        [7000.0, 8123.0, 9500.0, 11000.0].map(|f| power(&o[0][SKIP..], f, SR)).iter().sum::<f32>()
+        [7000.0, 8123.0, 9500.0, 11000.0]
+            .map(|f| power(&o[0][SKIP..], f, SR))
+            .iter()
+            .sum::<f32>()
     };
     let (off, on, quiet) = (at8k(&hiss, 0.0), at8k(&hiss, 1.0), at8k(&hum, 1.0));
     println!("energy above 7 kHz, hiss voice: hf 0 {off:.2e}, hf 1 {on:.2e}; hum voice, hf 1 {quiet:.2e}");
@@ -202,15 +235,38 @@ fn shifted_blocks_and_one_sample_blocks_agree() {
     };
     for block in [1, 7, 33] {
         let (mut m, p) = vocoder(&[("shift_st", 3.0)], SR);
-        assert_eq!(run(&mut *m, &p, &car, Some(&md), block), reference, "block {block}");
+        assert_eq!(
+            run(&mut *m, &p, &car, Some(&md), block),
+            reference,
+            "block {block}"
+        );
     }
 }
 
 #[test]
 fn extreme_settings_and_hostile_input_stay_finite() {
     let extremes: [&[(&str, f32)]; 2] = [
-        &[("bands", 8.0), ("low_hz", 400.0), ("high_hz", 3000.0), ("shift_st", -12.0), ("attack_ms", 0.5), ("release_ms", 5.0), ("drive_db", 0.0), ("spacing", 0.0)],
-        &[("bands", 32.0), ("low_hz", 60.0), ("high_hz", 16000.0), ("shift_st", 12.0), ("attack_ms", 50.0), ("release_ms", 500.0), ("drive_db", 36.0), ("spacing", 1.0), ("hf", 1.0)],
+        &[
+            ("bands", 8.0),
+            ("low_hz", 400.0),
+            ("high_hz", 3000.0),
+            ("shift_st", -12.0),
+            ("attack_ms", 0.5),
+            ("release_ms", 5.0),
+            ("drive_db", 0.0),
+            ("spacing", 0.0),
+        ],
+        &[
+            ("bands", 32.0),
+            ("low_hz", 60.0),
+            ("high_hz", 16000.0),
+            ("shift_st", 12.0),
+            ("attack_ms", 50.0),
+            ("release_ms", 500.0),
+            ("drive_db", 36.0),
+            ("spacing", 1.0),
+            ("hf", 1.0),
+        ],
     ];
     for sr in [44100.0, 48000.0, 96000.0, 192000.0] {
         for set in extremes {

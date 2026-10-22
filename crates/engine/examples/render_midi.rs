@@ -62,7 +62,9 @@ fn main() {
             hound::SampleFormat::Float => r.samples::<f32>().map(|s| s.unwrap()).collect(),
             hound::SampleFormat::Int => {
                 let scale = 1.0 / (1u64 << (spec.bits_per_sample - 1)) as f32;
-                r.samples::<i32>().map(|s| s.unwrap() as f32 * scale).collect()
+                r.samples::<i32>()
+                    .map(|s| s.unwrap() as f32 * scale)
+                    .collect()
             }
         };
         let ch = spec.channels as usize;
