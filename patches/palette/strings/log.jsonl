@@ -105,3 +105,4 @@
 {"seq":104,"t_ms":1792678915395,"op":{"SetParam":{"target":{"Module":{"id":9,"param":"gain_db"}},"value":8.0}},"inverse":{"SetParam":{"target":{"Module":{"id":9,"param":"gain_db"}},"value":5.0}},"source":"User"}
 {"seq":105,"t_ms":1792679215229,"op":{"SetParam":{"target":{"Module":{"id":9,"param":"gain_db"}},"value":8.0}},"inverse":{"SetParam":{"target":{"Module":{"id":9,"param":"gain_db"}},"value":8.0}},"source":"User"}
 {"seq":106,"t_ms":1792679534821,"op":{"SetParam":{"target":{"Module":{"id":9,"param":"gain_db"}},"value":8.0}},"inverse":{"SetParam":{"target":{"Module":{"id":9,"param":"gain_db"}},"value":8.0}},"source":"User"}
+{"seq":107,"t_ms":1792681812944,"op":{"SetParam":{"target":{"Module":{"id":9,"param":"gain_db"}},"value":7.5}},"inverse":{"SetParam":{"target":{"Module":{"id":9,"param":"gain_db"}},"value":8.0}},"source":"User"}

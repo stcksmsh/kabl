@@ -635,6 +635,9 @@ pub fn panel(editor: &mut PatchEditor, view: &mut crate::UiState, ctx: &egui::Co
     if !view.composites.panel {
         return;
     }
+    if let Some(p) = crate::filebrowser::take(view, crate::filebrowser::Purpose::Package) {
+        view.panels.path = p.to_string_lossy().into_owned();
+    }
     let mut open = true;
     egui::Window::new("Composites · instance tools")
         .open(&mut open).default_width(380.0).default_height(520.0).vscroll(true)
@@ -754,7 +757,14 @@ pub fn panel(editor: &mut PatchEditor, view: &mut crate::UiState, ctx: &egui::Co
             }
             ui.separator();
             ui.label("Import complete portable package (definition, panel, artwork and help)");
-            let r=ui.text_edit_singleline(&mut view.panels.path);view.record("package:path".into(),r.rect);
+            ui.horizontal(|ui| {
+                let r=ui.text_edit_singleline(&mut view.panels.path);view.record("package:path".into(),r.rect);
+                let r=ui.button("Browse");view.record("package:browse".into(),r.rect);
+                if r.clicked() {
+                    let hint=view.panels.path.clone();
+                    crate::filebrowser::open(view,crate::filebrowser::Purpose::Package,"Choose a package",crate::filebrowser::Mode::Open,crate::filebrowser::PACKAGE,"",&hint);
+                }
+            });
             let r=ui.button("Import package file");view.record("package:import".into(),r.rect);
             if r.clicked() {
                 let result=crate::panels::read_package(Path::new(&view.panels.path)).and_then(|pkg|insert(editor,&pkg));

@@ -22,6 +22,7 @@ pub mod cues;
 pub mod displays;
 pub mod editor;
 pub mod explain;
+pub mod filebrowser;
 pub mod help;
 pub mod inspect;
 pub mod kit;
@@ -268,6 +269,14 @@ pub struct UiState {
     pub style: std::sync::Arc<style::Style>,
     pub panels: panels::View,
     pub tables: tables::View,
+    /// The shared file browser window, while one is open (`filebrowser`).
+    pub files: Option<filebrowser::Request>,
+    /// What it picked, for the place that asked.
+    pub picked: Option<filebrowser::Picked>,
+    /// The folder last used per place, remembered in `settings.toml`.
+    pub folders: std::collections::BTreeMap<String, std::path::PathBuf>,
+    /// `folders` changed since it was last written to the settings file.
+    folders_dirty: bool,
     pub zoom: f32,
     /// Screen offset of the rack origin from the canvas' top-left.
     pub pan: EguiVec2,
@@ -411,6 +420,10 @@ impl Default for UiState {
             style: std::sync::Arc::new(style::builtin_a(false)),
             panels: panels::View::default(),
             tables: tables::View::default(),
+            files: None,
+            picked: None,
+            folders: std::collections::BTreeMap::new(),
+            folders_dirty: false,
             zoom: 1.0,
             pan: EguiVec2::ZERO,
             drawer_open: true,
@@ -634,6 +647,9 @@ impl UiState {
         self.theme_notes = notes;
         self.theme.clone_from(&p.theme);
         self.dark = p.dark;
+        // A remembered folder that is gone is dropped: its place starts in home again.
+        self.folders = p.folders.clone();
+        self.folders.retain(|_, d| d.is_dir());
         self.prefs_saved = Some(p);
         self.prefs_dir = Some(dir);
     }
@@ -643,12 +659,21 @@ impl UiState {
         let p = style::Prefs {
             theme: self.theme.clone(),
             dark: self.dark,
+            folders: self.folders.clone(),
         };
         if self.prefs_saved.as_ref() != Some(&p) {
             if let Err(e) = p.save(dir) {
                 log::warn!("could not remember the theme in {}: {e}", dir.display());
             }
             self.prefs_saved = Some(p);
+        }
+    }
+
+    /// Remembers `dir` as the last folder of `place`.
+    pub fn folders_remember(&mut self, place: filebrowser::Place, dir: &std::path::Path) {
+        if self.folders.get(place.key()).map(|d| d.as_path()) != Some(dir) {
+            self.folders.insert(place.key().into(), dir.to_path_buf());
+            self.folders_dirty = true;
         }
     }
 
@@ -675,12 +700,16 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
         ui_state.theme = ui_state.style.id.clone();
         ui_state.save_prefs();
     }
+    if std::mem::take(&mut ui_state.folders_dirty) {
+        ui_state.save_prefs();
+    }
     let st = ui_state.style.clone();
     kit::apply(ui.ctx(), &st);
     composites::panel(editor, ui_state, ui.ctx());
     about::show(ui.ctx(), ui_state);
     panels::editor(editor, ui_state, ui.ctx());
     tables::show(editor, ui_state, ui.ctx());
+    filebrowser::window(ui_state, ui.ctx());
     rack_editor::edit_face(editor, ui_state, ui.ctx());
     browser::frame_input(editor, ui_state, ui);
     ui_state.validate(editor);

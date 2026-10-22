@@ -94,7 +94,7 @@ pub fn keyboard(bass: bool) -> PatchEditor {
         reverb,
         &[("decay_s", if bass { 0.6 } else { 1.5 }), ("mix", 5.0)],
     );
-    set(&mut e, gain, &[("gain_db", if bass { 7.0 } else { 3.0 })]);
+    set(&mut e, gain, &[("gain_db", if bass { 7.0 } else { 8.5 })]);
     let remove: Vec<_> = e
         .state()
         .cables
@@ -146,7 +146,7 @@ pub fn progression() -> PatchEditor {
     set(
         &mut e,
         mix,
-        &[("level1", 0.13), ("level2", 0.11), ("level3", 0.1)],
+        &[("level1", 0.205), ("level2", 0.174), ("level3", 0.158)],
     );
     set(&mut e, filt, &[("cutoff_hz", 1000.0), ("resonance", 0.15)]);
     set(

@@ -95,7 +95,7 @@ pub fn split() -> PatchEditor {
     e.connect(port(bvca, "out"), port(mix_l, "in2"));
     e.connect(port(vca, "out"), port(mix_r, "in1"));
     e.connect(port(bvca, "out"), port(mix_r, "in2"));
-    for (m, keys_level, bass_level) in [(mix_l, 0.5, 0.42), (mix_r, 0.42, 0.5)] {
+    for (m, keys_level, bass_level) in [(mix_l, 0.125, 0.105), (mix_r, 0.105, 0.125)] {
         e.set_param(m, "level1", keys_level);
         e.set_param(m, "level2", bass_level);
     }
