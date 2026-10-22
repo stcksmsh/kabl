@@ -490,6 +490,8 @@ pub fn short_name(kind: &str) -> &'static str {
         "bitcrusher" => "Crush",
         "filter.comb" => "Comb",
         "filter.formant" => "Formant",
+        "vocoder" => "Vocoder",
+        "audio.in" => "Audio in",
         _ => "?",
     }
 }

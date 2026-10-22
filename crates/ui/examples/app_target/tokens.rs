@@ -71,7 +71,7 @@ impl Sect {
     }
     pub fn of(kind: &str) -> Sect {
         match kind {
-            "osc.va" | "osc.wt" | "noise" => Sect::Osc,
+            "osc.va" | "osc.wt" | "noise" | "audio.in" => Sect::Osc,
             "filter.svf" | "filter.ladder" | "filter.comb" | "filter.formant" => Sect::Filter,
             "env.adsr" | "lfo" | "macro" => Sect::Mod,
             "vca" | "mixer" | "gain" | "out" => Sect::Amp,
