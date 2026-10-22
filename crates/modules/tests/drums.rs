@@ -447,3 +447,16 @@ fn a_full_queue_and_a_late_offset_are_safe() {
     assert_eq!(peak(&note_block(&mut m, &ps, 64)[0]), 0.0);
     assert_eq!(note_block(&mut m, &ps, 64)[0][36], 1.0);
 }
+
+#[test]
+fn a_note_in_the_first_block_of_a_new_module_is_not_lost() {
+    let ps = vec![38.0, 0.0];
+    let mut m = MidiNote::new();
+    m.note_on(3, 9, 38, 100);
+    m.note_on(5, 9, 36, 100);
+    let o = note_block(&mut m, &ps, 64);
+    assert_eq!(o[0][3], 1.0);
+    // The other note was kept in the queue and dropped when the params were known.
+    assert_eq!(o[1][4], 100.0 / 127.0);
+    assert_eq!(o[1][63], 100.0 / 127.0);
+}

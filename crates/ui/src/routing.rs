@@ -252,6 +252,10 @@ pub fn param_label(p: &ParamInfo) -> String {
         "octaves" => return "Octaves".into(),
         "gate_mode" => return "Gate".into(),
         "damp_hz" => return "Damping".into(),
+        // The drums: the kick's two sweep knobs and the hat's two decays against its gate jacks.
+        "sweep_ms" => return "Fall".into(),
+        "closed_ms" => return "Tick".into(),
+        "open_ms" => return "Ring".into(),
         "pw" => return "Pulse width".into(),
         "predelay_ms" => return "Pre-delay".into(),
         "glide_ms" => return "Glide time".into(),

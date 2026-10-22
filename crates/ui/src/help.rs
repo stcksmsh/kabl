@@ -393,7 +393,7 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
         ("drum.kick" | "drum.tom", "sweep_st") => {
             "How far above Tune the pitch starts, in semitones. More sweep is a harder, clickier punch."
         }
-        ("drum.kick" | "drum.tom", "sweep_ms") => "How fast the pitch falls from the start to Tune.",
+        ("drum.kick" | "drum.tom", "sweep_ms") => "Fall: how fast the pitch drops from the start to Tune.",
         ("drum.kick" | "drum.tom", "decay_ms") => "How long the body rings out (time to fall 60 dB).",
         ("drum.kick" | "drum.tom", "click") => "A short burst of noise at the start, like a beater.",
         ("drum.kick" | "drum.tom", "tone") => "Closes or opens the top: low is round and dull, high is bright.",
@@ -419,8 +419,8 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
         ("drum.clap", "tone") => "The colour of the noise: low is thick, high is thin and sharp.",
         ("drum.hat", "tune_st") => "Shifts the metallic ring up or down in semitones.",
         ("drum.hat", "tone") => "Low cut of the metal: higher is thinner and sizzlier.",
-        ("drum.hat", "closed_ms") => "How long a closed hit rings.",
-        ("drum.hat", "open_ms") => "How long an open hit rings.",
+        ("drum.hat", "closed_ms") => "Tick: how long a closed hit rings.",
+        ("drum.hat", "open_ms") => "Ring: how long an open hit rings.",
         ("midi.note", "note") => {
             "The MIDI note number that fires this gate: 36 kick, 38 snare, 39 clap, 42 closed hat, 46 open hat, 45 tom."
         }

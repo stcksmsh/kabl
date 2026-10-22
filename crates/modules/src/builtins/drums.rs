@@ -156,6 +156,13 @@ fn max_hz(sr: f32) -> f32 {
     0.45 * sr
 }
 
+/// `x` limited to `lo..=hi`, a NaN becoming `lo` (`clamp` would pass the NaN on).
+#[allow(clippy::manual_clamp)]
+#[inline]
+fn bound(x: f32, lo: f32, hi: f32) -> f32 {
+    x.max(lo).min(hi)
+}
+
 #[inline]
 fn db(x: f32) -> f32 {
     10f32.powf(x / 20.0)
@@ -169,9 +176,9 @@ fn hit_gain(vel: Signal, accent: Signal, i: usize, sens: f32, accent_db: f32) ->
     let v = if vel.is_scalar() && v == 0.0 {
         1.0
     } else {
-        v.max(0.0).min(1.0)
+        bound(v, 0.0, 1.0)
     };
-    let a = accent.at(i).max(0.0).min(1.0);
+    let a = bound(accent.at(i), 0.0, 1.0);
     (1.0 - sens * (1.0 - v)) * db(accent_db * a)
 }
 
@@ -182,7 +189,7 @@ fn drive(x: f32, g: f32, norm: f32) -> f32 {
 }
 
 fn drive_consts(drive_db: f32) -> (f32, f32) {
-    let g = db(drive_db.max(0.0).min(36.0));
+    let g = db(bound(drive_db, 0.0, 36.0));
     (g, 1.0 / g.tanh())
 }
 
@@ -191,7 +198,7 @@ fn drive_consts(drive_db: f32) -> (f32, f32) {
 fn p(io: &ProcessIo, i: usize, lo: f32, hi: f32) -> f32 {
     let v = io.param(i).at(0);
     if v.is_finite() {
-        v.max(lo).min(hi)
+        v.clamp(lo, hi)
     } else {
         lo
     }
@@ -488,6 +495,8 @@ pub struct Snare {
     body: f32,
     noise: f32,
     hp: Svf,
+    /// One-pole low-pass state of the rattle.
+    nlp: f32,
     gain: f32,
     active: bool,
     age: u32,
@@ -506,6 +515,7 @@ impl Snare {
             body: 0.0,
             noise: 0.0,
             hp: Svf::new(),
+            nlp: 0.0,
             gain: 1.0,
             active: false,
             age: 0,
@@ -545,10 +555,13 @@ impl Module for Snare {
         let (body_ms, noise_ms) = snare_decays(p(io, S_DECAY, 5.0, 10000.0));
         let (kb, kn) = (t60(body_ms, sr), t60(noise_ms, sr));
         let kp = t60(12.0, sr);
-        let hp = SvfCoeffs::compute((1200.0 * 6f32.powf(tone)).min(max_hz(sr)), 0.3, sr);
+        // The rattle is band-limited: high-passed at Tone, rolled off three times higher.
+        let corner = 1200.0 * 6f32.powf(tone);
+        let hp = SvfCoeffs::compute(corner.min(max_hz(sr)), 0.3, sr);
+        let a_lp = 1.0 - (-TAU * (corner * 3.0).min(max_hz(sr)) / sr).exp();
         let (wb, wn) = (
             (snappy * std::f32::consts::FRAC_PI_2).cos() * 0.8,
-            (snappy * std::f32::consts::FRAC_PI_2).sin() * 1.3,
+            (snappy * std::f32::consts::FRAC_PI_2).sin() * 1.2,
         );
         let (g, norm) = drive_consts(p(io, S_DRIVE, 0.0, 36.0));
         let level = db(p(io, S_LEVEL, -60.0, 12.0));
@@ -575,11 +588,12 @@ impl Module for Snare {
             self.ph2 += f * 1.78 / sr;
             self.ph2 -= self.ph2.floor();
             let drum = ((TAU * self.ph1).sin() * 0.7 + (TAU * self.ph2).sin() * 0.3) * self.body;
-            let hiss = self
+            let band = self
                 .hp
                 .process_with_coeffs_multi(self.rng.white(), &hp)
-                .highpass
-                * self.noise;
+                .highpass;
+            self.nlp += a_lp * (band - self.nlp);
+            let hiss = self.nlp * self.noise;
             let x = drum * wb + hiss * wn;
             *o = self
                 .declick
@@ -591,6 +605,7 @@ impl Module for Snare {
             if self.noise < floor && self.body < floor {
                 self.active = false;
                 self.hp = Svf::new();
+                self.nlp = 0.0;
             }
         }
     }

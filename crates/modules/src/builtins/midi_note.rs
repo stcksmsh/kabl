@@ -82,6 +82,9 @@ pub static MIDI_NOTE_INFO: ModuleInfo = ModuleInfo {
 struct Hit {
     offset: u32,
     velocity: f32,
+    note: u8,
+    /// MIDI channel 0..=15.
+    ch: u8,
 }
 
 pub struct MidiNote {
@@ -91,9 +94,12 @@ pub struct MidiNote {
     /// Gate samples left.
     high: u32,
     velocity: f32,
-    /// The params last seen by `process`, for `note_on`.
+    /// The params last seen by `process`, so `note_on` keeps only its own notes. Before the
+    /// first `process` they are unknown and every note is kept (and checked there), so a note in
+    /// the first block of a new patch is not lost.
     note: u8,
     channel: u8,
+    known: bool,
     sample_rate: f32,
 }
 
@@ -103,12 +109,15 @@ impl MidiNote {
             queue: [Hit {
                 offset: 0,
                 velocity: 0.0,
+                note: 0,
+                ch: 0,
             }; QUEUE],
             n: 0,
             high: 0,
             velocity: 0.0,
             note: 36,
             channel: 0,
+            known: false,
             sample_rate: 48000.0,
         }
     }
@@ -116,21 +125,25 @@ impl MidiNote {
     /// Audio thread: a note-on on MIDI channel `ch` (0..=15) at `offset` samples into the next
     /// block. No allocation.
     pub fn note_on(&mut self, offset: usize, ch: u8, note: u8, velocity: u8) {
-        if note != self.note
-            || (self.channel != 0 && self.channel != (ch & 0x0F) + 1)
-            || self.n == QUEUE
-        {
+        if (self.known && !self.hears(note, ch)) || self.n == QUEUE {
             return;
         }
         let hit = Hit {
             offset: offset as u32,
             velocity: f32::from(velocity.min(127)) / 127.0,
+            note,
+            ch: ch & 0x0F,
         };
         // After every hit at or before this offset (arrival order within an offset).
         let at = self.queue[..self.n].partition_point(|h| h.offset <= hit.offset);
         self.queue.copy_within(at..self.n, at + 1);
         self.queue[at] = hit;
         self.n += 1;
+    }
+
+    /// Whether a note-on of `note` on channel `ch` (0..=15) is this module's.
+    fn hears(&self, note: u8, ch: u8) -> bool {
+        note == self.note && (self.channel == 0 || self.channel == (ch & 0x0F) + 1)
     }
 }
 
@@ -157,18 +170,22 @@ impl Module for MidiNote {
     #[inline]
     fn process(&mut self, io: &mut ProcessIo) {
         let n = io.block_len();
-        self.note = io.param(0).at(0).round().max(0.0).min(127.0) as u8;
-        self.channel = io.param(1).at(0).round().max(0.0).min(16.0) as u8;
+        self.note = io.param(0).at(0).round().clamp(0.0, 127.0) as u8;
+        self.channel = io.param(1).at(0).round().clamp(0.0, 16.0) as u8;
+        self.known = true;
         let pulse = ((PULSE_S * self.sample_rate) as u32).max(2);
         let mut next = 0;
         for i in 0..n {
             // A hit on this sample: a retrigger drops the gate for it, the pulse runs on after.
             let mut dip = false;
             while next < self.n && self.queue[next].offset as usize <= i {
-                dip |= self.high > 0;
-                self.high = pulse + u32::from(dip);
-                self.velocity = self.queue[next].velocity;
+                let h = self.queue[next];
                 next += 1;
+                if self.hears(h.note, h.ch) {
+                    dip |= self.high > 0;
+                    self.high = pulse + u32::from(dip);
+                    self.velocity = h.velocity;
+                }
             }
             io.output(0)[i] = f32::from(u8::from(self.high > 0 && !dip));
             io.output(1)[i] = self.velocity;
@@ -197,6 +214,7 @@ impl Module for MidiNote {
             self.velocity = o.velocity;
             self.note = o.note;
             self.channel = o.channel;
+            self.known = o.known;
         }
     }
 }
