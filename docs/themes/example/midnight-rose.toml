@@ -30,6 +30,7 @@ glow = 0.8
 [dark.slots.cable]
 recipe = "glow"
 width = 5.0
+rest_width = 3.0     # resting cables; rest_alpha = 0.85 is the opacity at rest
 
 [dark.slots.face]
 gloss = 0.1

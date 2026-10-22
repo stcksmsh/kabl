@@ -88,6 +88,8 @@ pub fn builtin_a(dark: bool) -> Style {
             cable: CableSlots {
                 recipe: CableRecipe::Rope,
                 width: 4.6,
+                rest_width: 3.0,
+                rest_alpha: 0.85,
                 sag: 46.0,
                 glow: 0.0,
                 dimmed: 0.22,
@@ -313,6 +315,8 @@ pub fn builtin_b(dark: bool) -> Style {
             cable: CableSlots {
                 recipe: CableRecipe::Glow,
                 width: 4.2,
+                rest_width: 2.8,
+                rest_alpha: 0.85,
                 sag: 46.0,
                 glow: 0.5,
                 dimmed: 0.22,

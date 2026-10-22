@@ -501,7 +501,9 @@ pub(crate) fn more(
                         drop_at: None,
                     };
                     both.ports.extend(own.ports.clone());
-                    draw_cables(editor, view, ui, &painter, th, xf, scene, &both, Some(id));
+                    let plugs =
+                        draw_cables(editor, view, ui, &painter, th, xf, scene, &both, Some(id));
+                    painter.extend(plugs);
                     painter.extend(std::mem::take(&mut view.deferred));
                     drawn.ports.extend(own.ports);
                     drawn.plugs.extend(own.plugs);

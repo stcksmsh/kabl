@@ -1440,21 +1440,36 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
     }
 }
 
-/// A functional cable's mark: three small bars at `at`, so a patterned or probabilistic cable
-/// reads differently from a plain one. Presentation is a placeholder for the design effort.
-pub(crate) fn functional_mark(painter: &egui::Painter, at: Pos2, zoom: f32, color: Color32) {
+/// A functional cable's mark: three small bars at `at` on a small backing plate, so a patterned
+/// or probabilistic cable reads differently from a plain one, resting or lit. Presentation is
+/// a placeholder for the design effort.
+pub(crate) fn functional_mark(
+    at: Pos2,
+    zoom: f32,
+    color: Color32,
+    backing: Color32,
+) -> Vec<egui::Shape> {
     let u = 2.0 * zoom.clamp(0.6, 1.5);
+    let mut shapes = vec![egui::Shape::rect_filled(
+        Rect::from_min_max(
+            Pos2::new(at.x - u * 2.6, at.y - u * 3.8),
+            Pos2::new(at.x + u * 2.6, at.y + u * 0.8),
+        ),
+        u,
+        backing,
+    )];
     for (i, h) in [2.0, 1.0, 3.0].into_iter().enumerate() {
         let x = at.x + (i as f32 - 1.0) * u * 1.6;
-        painter.rect_filled(
+        shapes.push(egui::Shape::rect_filled(
             Rect::from_min_max(
                 Pos2::new(x - u * 0.5, at.y - h * u),
                 Pos2::new(x + u * 0.5, at.y),
             ),
             0.0,
             color,
-        );
+        ));
     }
+    shapes
 }
 
 /// Whether `c` has a node in the engine: a pattern or a pass probability below 100 %.

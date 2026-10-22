@@ -1101,6 +1101,22 @@ fn zoom_and_pan_keep_every_knob_gesture_and_scale_hit_regions() {
 }
 
 #[test]
+fn about_opens_from_the_settings_menu_and_shows_the_notices() {
+    let mut t = H::new(1280.0, 800.0);
+    let state = t.editor.state().clone();
+    assert!(!t.ui.about.open);
+    t.click("view-menu");
+    t.click("menu:about");
+    assert!(t.ui.about.open);
+    t.click("about:notices");
+    t.click("about:notices");
+    t.click("about:close");
+    assert!(!t.ui.about.open);
+    assert_eq!(t.editor.state(), &state);
+    assert!(kabl_ui::about::version_line().contains(env!("CARGO_PKG_VERSION")));
+}
+
+#[test]
 fn theme_switch_applies_live_is_remembered_and_never_touches_the_patch() {
     let mut t = H::new(1280.0, 800.0);
     let dir = tempfile::tempdir().unwrap();
