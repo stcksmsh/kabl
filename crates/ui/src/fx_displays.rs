@@ -168,7 +168,8 @@ fn eq(
             .map(|(b, &(f, g, q))| band_response_db(b, f, g, q, SR, hz))
             .sum()
     };
-    let (axis, range) = ((20.0, 20000.0), (-20.0, 20.0));
+    // The bands reach +-18 dB; +-14 keeps ordinary settings readable, the rest clips.
+    let (axis, range) = ((20.0, 20000.0), (-14.0, 14.0));
     let mid = r.center().y;
     hline(p, st, r, mid);
     paint(

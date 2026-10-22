@@ -18,10 +18,10 @@ fn patches() -> std::path::PathBuf {
 }
 
 fn dense() -> PatchState {
-    kabl_core::load(&patches().join("composition"))
-        .unwrap()
-        .state()
-        .clone()
+    // KABL_BENCH_PATCH=DIR measures another patch (the nine-effects one) as "dense".
+    let dir = std::env::var("KABL_BENCH_PATCH")
+        .map_or_else(|_| patches().join("composition"), std::path::PathBuf::from);
+    kabl_core::load(&dir).unwrap().state().clone()
 }
 
 /// `perform`: 0 closed, 1 the full Perform view, 2 Perform docked under the rack.

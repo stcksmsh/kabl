@@ -66,19 +66,17 @@ impl Wants {
 
     /// What a display reads besides its own output: the comb's pitch cable.
     pub fn feeds(&mut self, state: &PatchState, id: ModuleId, kind: &'static str) {
-        match kind {
-            "filter.comb" => {
-                for c in state.cables.values() {
-                    if let (PortRef::Module { id: f, port }, PortRef::Module { id: t, port: tp }) =
-                        (&c.from, &c.to)
-                    {
-                        if *t == id && tp == "pitch" {
-                            self.source(state, *f, port);
-                        }
-                    }
+        if kind != "filter.comb" {
+            return;
+        }
+        for c in state.cables.values() {
+            if let (PortRef::Module { id: f, port }, PortRef::Module { id: t, port: tp }) =
+                (&c.from, &c.to)
+            {
+                if *t == id && tp == "pitch" {
+                    self.source(state, *f, port);
                 }
             }
-            _ => {}
         }
     }
 
