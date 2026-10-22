@@ -10,7 +10,7 @@ use kabl_engine::{
     keyboard::{MidiEvent, Source},
     patch_engine::PatchEngine,
     runtime::{Feedback, ToAudio},
-    timeline::{Timeline, LATENCY},
+    timeline::Timeline,
 };
 use kabl_ui::{control::Delivery, PatchEditor, UiState};
 use nice_plug::{context::gui::GuiContext, editor::dpi::LogicalSize, prelude::*};
@@ -1059,7 +1059,7 @@ impl Plugin for Instrument {
         &mut self,
         _layout: &AudioIOLayout,
         config: &BufferConfig,
-        context: &mut impl ActivateContext<Self>,
+        _context: &mut impl ActivateContext<Self>,
     ) -> bool {
         if !config.sample_rate.is_finite() || !(1000.0..=768000.0).contains(&config.sample_rate) {
             return false;
@@ -1100,7 +1100,6 @@ impl Plugin for Instrument {
             self.shared.native_value(i + 1, false)
         }));
         self.raw_position = None;
-        context.set_latency_samples(LATENCY as u32);
         true
     }
     fn reset(&mut self) {
