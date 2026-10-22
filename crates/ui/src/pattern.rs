@@ -256,7 +256,7 @@ fn slider_row(
         .inner;
     ui_state.record(key, resp.rect);
     resp.changed()
-        .then_some((v as f32, !(resp.dragged() && !resp.drag_started())))
+        .then_some((v as f32, !resp.dragged() || resp.drag_started()))
 }
 
 /// The pattern and probability of the cable `ui_state.cable_fn`, opened from a cable's menu or
@@ -307,19 +307,21 @@ pub(crate) fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut U
             format!("{from}  \u{2192}  {}", dest_label(editor, &c.to)),
         );
     });
-    if !ui_state.cable_fn.is_some_and(|id| id == cable) {
+    if ui_state.cable_fn != Some(cable) {
         return;
     }
     ui.add_space(st.sp(1));
-    kit::paragraph(
-        &mut *ui,
-        &st,
-        Role::Caption,
-        Tone::Text3,
-        "Steps advance on each pulse of the patch clock (a 16th note) and restart with it. \
-         Click a step to switch it on or off; drag a bar to set its level, drag across steps \
-         to paint. The lower bar is the chance the step passes.",
-    );
+    if ui_state.explain.help {
+        kit::paragraph(
+            &mut *ui,
+            &st,
+            Role::Caption,
+            Tone::Text3,
+            "Steps advance on each pulse of the patch clock (a 16th note) and restart with it. \
+             Click a step to switch it on or off; drag a bar to set its level, drag across \
+             steps to paint. The lower bar is the chance the step passes.",
+        );
+    }
     if !has_clock {
         kit::paragraph(
             &mut *ui,

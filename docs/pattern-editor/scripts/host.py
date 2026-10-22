@@ -64,6 +64,9 @@ try:
     (S / 'plugin').mkdir()
     (S / 'empty').mkdir()
     shutil.copy2(os.environ.get('PLUGIN', repo / 'target/release/libkabl_clap.so'), S / 'plugin/kabl.clap')
+    (S / 'cfg').mkdir()
+    theme, _, mode = os.environ.get('HOST_THEME', 'kabl.satin:light').partition(':')
+    (S / 'cfg/settings.toml').write_text(f'theme = "{theme}"\ndark = {"true" if mode == "dark" else "false"}\n')
     (S / 'profile').mkdir()
     (S / 'profile/reaper.ini').write_text(
         f'[reaper]\nvstpath={S}/empty\nvstpath64={S}/empty\nlinux_audio_bsize=256\n'
@@ -72,6 +75,23 @@ try:
                     str(S / 'profile/reaper.ini'), str(S / 'p.rpp'), str(Path(__file__).with_name('host.lua'))],
                    env=env, cwd=S, stdout=log, stderr=log)
     print('up', DISP, flush=True)
+    shot = os.environ.get('SHOT')  # PNG path: open the pattern editor, capture, and end
+    if shot:
+        def tool(*a):
+            sp.run(a, env=env, stdout=log, stderr=log)
+        time.sleep(14)
+        tool('wmctrl', '-c', 'About REAPER')
+        tool('wmctrl', '-c', 'REAPER New Version')
+        time.sleep(1)
+        # Select the ladder filter's cutoff, then open the pattern of the route into it.
+        for x_, y_ in ((748, 541), (877, 551)):
+            tool('xdotool', 'mousemove', str(x_), str(y_))
+            time.sleep(.5)
+            tool('xdotool', 'click', '1')
+            time.sleep(1.5)
+        time.sleep(2)
+        tool('import', '-window', 'root', '-crop', '1180x745+64+92', shot)
+        (S / 'quit').write_text('')
     while not (S / 'quit').exists() and app.poll() is None:
         time.sleep(.5)
     app.terminate()
