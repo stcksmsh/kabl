@@ -27,6 +27,7 @@ pub mod inspect;
 pub mod kit;
 pub mod library;
 pub mod panels;
+mod pattern;
 pub mod perform;
 mod perform_view;
 pub mod rack;
@@ -906,7 +907,7 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
                         });
                     }
                     show_param_panel(editor, ui_state, ui);
-                    routing::cable_panel(editor, ui_state, ui);
+                    pattern::panel(editor, ui_state, ui);
                     routing::drawer(editor, ui_state, ui);
                     routing::cable_routes(editor, ui_state, ui);
                 });
@@ -4164,7 +4165,7 @@ fn draw_cables(
     top
 }
 
-fn port_color(th: &Theme, editor: &PatchEditor, from: &PortRef) -> Color32 {
+pub(crate) fn port_color(th: &Theme, editor: &PatchEditor, from: &PortRef) -> Color32 {
     let PortRef::Module { id, port } = from else {
         return th.cv;
     };
