@@ -11,6 +11,7 @@ Live displays on the faces of the nine modules added with the effects batch (PR 
 | `flanger` | The comb at the current delay, the two ends of the sweep faint behind | LFO phase (`Module::view`), modulated depth, feedback, mix |
 | `filter.comb` | Response (peaks or notches by feedback sign, damping), marker at the fundamental | Modulated parameters and the cable into `pitch` |
 | `filter.formant` | Sum of the five formant band-passes, vowel letter, first two formants marked | Modulated vowel, shift, q |
+| `vocoder` | One bar per band on a log frequency axis, as tall as the voice is loud there; a tick under each bar where the synth's side of the band sits after Shift | The module's own band followers (`Module::view`), modulated bands, range, spacing and shift. Added with the vocoder (`docs/vocoder/`). |
 | `bitcrusher` | One wave as the module would hand it on: rounded to the bit depth, held for the downsample ratio, the original faint | Parameters only (no live data; the picture is the effect) |
 | `filter.svf` | Existing response display now draws the notch curve (low-pass plus high-pass) and treats a patched `notch` as the bright one | As before |
 

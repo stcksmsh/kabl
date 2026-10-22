@@ -69,7 +69,17 @@ impl AudioInput {
                     let _ = tx.push([l, frame.get(1).copied().unwrap_or(l)]);
                 }
             },
-            move |_| lost_cb.store(true, Ordering::Relaxed),
+            // On the audio thread: only the device going away counts, not an overrun.
+            move |err| {
+                if matches!(
+                    err.kind(),
+                    cpal::ErrorKind::DeviceNotAvailable
+                        | cpal::ErrorKind::StreamInvalidated
+                        | cpal::ErrorKind::DeviceChanged
+                ) {
+                    lost_cb.store(true, Ordering::Relaxed);
+                }
+            },
             None,
         );
         match stream.and_then(|s| s.play().map(|()| s)) {

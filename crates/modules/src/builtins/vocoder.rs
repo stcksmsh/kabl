@@ -377,6 +377,7 @@ impl Module for Vocoder {
             let mix = c.mix.next(p[9], i0, kg).clamp(0.0, 1.0);
 
             let mut x = [[0.0f32; SUB]; 3];
+            #[allow(clippy::needless_range_loop)]
             for j in 0..len {
                 x[0][j] = clean(in_l.at(i0 + j));
                 x[1][j] = clean(in_r.at(i0 + j));
@@ -389,9 +390,8 @@ impl Module for Vocoder {
                     let a = m.abs() * det;
                     let k = if a > b.env { att } else { rel };
                     b.env = flush((a + (b.env - a) * k).min(ENV_MAX));
-                    for ch in 0..2 {
-                        let y = cascade(&mut b.c[ch], &b.sy, x[ch][j], stage);
-                        wet[ch][j] += y * b.env;
+                    for (ch, w) in wet.iter_mut().enumerate() {
+                        w[j] += cascade(&mut b.c[ch], &b.sy, x[ch][j], stage) * b.env;
                     }
                 }
             }
@@ -408,10 +408,9 @@ impl Module for Vocoder {
                     c.car_env = flush(level + (c.car_env - level) * k);
                     // Full from -34 dBFS up: the noise follows the synth, not the voice alone.
                     let gate = (c.car_env * CAR_GATE).min(1.0);
-                    for ch in 0..2 {
-                        let w = white(&mut c.rng[ch]);
-                        let nz = cascade(&mut c.hf_noise[ch], &nbp, w, stage);
-                        wet[ch][j] += nz * c.hf_env * hf * gate * noise_gain;
+                    for (ch, w) in wet.iter_mut().enumerate() {
+                        let nz = cascade(&mut c.hf_noise[ch], &nbp, white(&mut c.rng[ch]), stage);
+                        w[j] += nz * c.hf_env * hf * gate * noise_gain;
                     }
                 }
             }
