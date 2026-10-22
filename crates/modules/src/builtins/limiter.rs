@@ -21,6 +21,7 @@ use super::fx::{coef, param, Glide, TimeCoef, NEPER_PER_DB, STEREO_IN, STEREO_OU
 use crate::info::{Category, ModuleInfo, ParamInfo, PortInfo, QualitySupport, Rate, Taper};
 use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig};
+use crate::view::ModuleView;
 
 const PORTS: &[PortInfo] = &[STEREO_IN[0], STEREO_IN[1], STEREO_OUT[0], STEREO_OUT[1]];
 
@@ -61,6 +62,8 @@ struct Core {
     /// Ceiling in dB and as a linear value, recomputed when the dB value changes.
     ceil_db: f32,
     ceil: f32,
+    /// Lowest gain over the last block, for the face's meter.
+    low: f32,
 }
 
 pub struct Limiter {
@@ -77,6 +80,7 @@ impl Limiter {
                 release: TimeCoef::new(),
                 ceil_db: f32::NAN,
                 ceil: 1.0,
+                low: 1.0,
             },
             sample_rate: 48000.0,
         }
@@ -113,6 +117,7 @@ impl Module for Limiter {
         let (gain, ceiling, release) = (io.param(0), io.param(1), io.param(2));
         let k = coef(GLIDE_TAU_S, sr);
         let c = &mut self.c;
+        let mut low = 1.0f32;
         for i in 0..n {
             let up = (c.gain.next(gain, i, k).clamp(0.0, 24.0) * NEPER_PER_DB).exp();
             let db = ceiling.at(i).clamp(-24.0, 0.0);
@@ -125,9 +130,17 @@ impl Module for Limiter {
             let a = c.release.get(release.at(i).clamp(10.0, 1000.0), sr);
             // Relax toward unity, but never above what this sample needs.
             c.g = (1.0 - (1.0 - c.g) * a).min(need);
+            low = low.min(c.g);
             io.output(0)[i] = (l * c.g).clamp(-c.ceil, c.ceil);
             io.output(1)[i] = (r * c.g).clamp(-c.ceil, c.ceil);
         }
+        c.low = low;
+    }
+
+    /// Gain reduction in dB over the last block (`position`, 0 or more).
+    fn view(&self, out: &mut ModuleView) {
+        out.valid = true;
+        out.position = -20.0 * self.c.low.max(1e-6).log10();
     }
 
     fn reset(&mut self) {
