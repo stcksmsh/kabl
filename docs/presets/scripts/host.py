@@ -146,7 +146,7 @@ try:
         diff = float(np.sqrt(((a['_m'][:n] - b['_m'][:n]) ** 2).mean()) / a['rms'])
         r.update(peak=round(a['peak'], 4), rms=round(a['rms'], 4), restart_relative_difference=round(diff, 5))
         assert diff < 1e-3, f'{slug}: render changed after reopen ({diff})'
-        if slug != 'midnight-drop':
+        if slug != 'basement-drop':
             (S / f'{slug}-nomidi.rpp').write_text(project(slug, False))
             run(f'{slug}-nomidi', S / f'{slug}-nomidi.rpp', secs)
             q = feats(S / f'render-{slug}-nomidi.wav')

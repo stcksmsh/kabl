@@ -22,9 +22,9 @@ scratch.mkdir(parents=True, exist_ok=True)
 disp = ':152'
 # slug -> notes of the chord (a single note for the mono presets)
 presets = {
-    'cherry-chainsaw': [40], 'neon-highway': [64], 'roller-disco': [52, 59, 62, 66],
-    'violet-hour': [52, 59, 64, 67], 'glass-elevator': [52, 59, 64, 67],
-    'chrome-chase': [52, 59, 64], 'midnight-drop': [64], 'android-choir': [52, 59, 64],
+    'gravel-pit': [40], 'parquet-loop': [52, 59, 62, 66], 'basement-drop': [64],
+    'glass-elevator': [52, 59, 64, 67], 'undertow': [28], 'salt-flat': [50, 57, 62, 65],
+    'boxwood': [60, 64, 67], 'neon-highway': [64],
 }
 env = dict(os.environ, DISPLAY=disp, WINIT_X11_SCALE_FACTOR='1', KABL_PLAYER='1', KABL_ARGS='--midi kabl-player',
            KABL_CAPTURE_WINDOW='1', KABL_USER_DIR=str(scratch / 'library'))

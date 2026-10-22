@@ -1,0 +1,12 @@
+name = "Boxwood"
+category = "Pluck"
+tags = [
+    "poly",
+    "mallet",
+    "fm",
+    "wooden",
+    "velocity",
+]
+description = "An FM mallet, like a wooden bar: a round body with a bright overtone that vanishes at once and a small click. Velocity brings out the overtone. Filter sets the FM brightness, Drive adds warmth, Space adds an echo and a medium room, Motion brings in the chorus."
+keys = true
+sequence = false

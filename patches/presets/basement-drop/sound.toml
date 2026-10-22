@@ -1,0 +1,14 @@
+name = "Basement Drop"
+category = "Piece"
+tags = [
+    "sequenced",
+    "cues",
+    "build-up",
+    "drop",
+    "124bpm",
+    "filter house",
+    "signature",
+]
+description = "A self-playing filter-house piece at 124 BPM with swing: a bass and a stab line that pump together, a resonant filter and a hand-played voice on top. Four cues: Intro (Filter shut, nearly dry), Build (Filter opens over four bars as Drive and Motion rise), Drop (Drive hard, Filter open), Break (Filter back down, a little Space). Press Run, then launch the cues with the pads or CC 40-43; turn a macro to take over."
+keys = true
+sequence = true

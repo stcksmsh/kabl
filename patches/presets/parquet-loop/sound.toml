@@ -1,0 +1,13 @@
+name = "Parquet Loop"
+category = "Keys"
+tags = [
+    "poly",
+    "filtered",
+    "phased",
+    "disco",
+    "122bpm",
+    "signature",
+]
+description = "Hold a chord and it becomes a filtered disco loop: saws and pulse into crunch, a resonant filter that closes on every beat (locked to the clock), a four-stage phaser and a compressor, at 122 BPM with swing. Press Run for the filter loop. Filter opens the cutoff, Drive adds crunch, Space adds a dotted echo and a tight room, Motion brings the phaser in."
+keys = true
+sequence = true

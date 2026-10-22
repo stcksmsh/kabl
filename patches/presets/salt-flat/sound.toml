@@ -1,0 +1,12 @@
+name = "Salt Flat"
+category = "Pad"
+tags = [
+    "poly",
+    "ambient",
+    "cinematic",
+    "slow",
+    "evolving",
+]
+description = "A slow, wide ambient pad: soft triangle stacks with a slow filter bloom, chorus, a long echo and a long room. Hold open chords and let them breathe. Filter opens the bloom, Drive adds a little saturation, Space is the echo and the room, Motion drifts the filter and the chorus."
+keys = true
+sequence = false

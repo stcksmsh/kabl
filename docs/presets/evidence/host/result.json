@@ -1,32 +1,24 @@
 {
  "plugin_sha256": "7d712b8bd9db45cac83b004186719e58ebeb53a9c9088bab813676af2850efdd",
- "cherry-chainsaw": {
+ "gravel-pit": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.0721,
-  "rms": 0.0339,
+  "peak": 0.197,
+  "rms": 0.0689,
   "restart_relative_difference": 0.0,
   "rms_without_midi": 0.0
  },
- "neon-highway": {
-  "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1042,
-  "rms": 0.0291,
-  "restart_relative_difference": 0.0,
-  "rms_without_midi": 0.0
- },
- "roller-disco": {
+ "parquet-loop": {
   "states_identical_across_save_quit_reopen": true,
   "peak": 0.2188,
-  "rms": 0.037,
+  "rms": 0.0693,
   "restart_relative_difference": 0.0,
   "rms_without_midi": 0.0
  },
- "violet-hour": {
+ "basement-drop": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.2049,
-  "rms": 0.0364,
-  "restart_relative_difference": 0.0,
-  "rms_without_midi": 0.0
+  "peak": 0.2188,
+  "rms": 0.1158,
+  "restart_relative_difference": 0.0
  },
  "glass-elevator": {
   "states_identical_across_save_quit_reopen": true,
@@ -35,23 +27,31 @@
   "restart_relative_difference": 0.0,
   "rms_without_midi": 0.0
  },
- "chrome-chase": {
+ "undertow": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1214,
-  "rms": 0.0308,
+  "peak": 0.0692,
+  "rms": 0.0348,
   "restart_relative_difference": 0.0,
   "rms_without_midi": 0.0
  },
- "midnight-drop": {
+ "salt-flat": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1298,
-  "rms": 0.0357,
-  "restart_relative_difference": 0.0
+  "peak": 0.2188,
+  "rms": 0.0447,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
  },
- "android-choir": {
+ "boxwood": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1351,
-  "rms": 0.0303,
+  "peak": 0.137,
+  "rms": 0.0179,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "neon-highway": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1042,
+  "rms": 0.0291,
   "restart_relative_difference": 0.0,
   "rms_without_midi": 0.0
  }
