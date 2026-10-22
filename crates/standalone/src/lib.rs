@@ -6,6 +6,7 @@
 //! tests for the standalone crate" (see `tests/` and the module docs below for what's proven).
 
 pub mod applog;
+pub mod input;
 
 /// Stream errors from the error callback to another thread (`stream_errors`). This bounds the
 /// errors whose ownership is outstanding at once; every error is also counted by kind.
