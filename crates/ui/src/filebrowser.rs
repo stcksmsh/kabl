@@ -523,6 +523,12 @@ pub fn window(ui_state: &mut UiState, ctx: &egui::Context) {
     ui_state.folders_remember(req.purpose.place(), &req.browser.dir);
     match event {
         Event::Pick(path) => {
+            // A patch is a folder: remember the folder it was in, not the patch itself.
+            if req.purpose == Purpose::PatchLoad {
+                if let Some(parent) = path.parent() {
+                    ui_state.folders_remember(Place::Patches, parent);
+                }
+            }
             ui_state.picked = Some(Picked {
                 purpose: req.purpose,
                 path,

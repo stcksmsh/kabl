@@ -1435,7 +1435,9 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                             let p = ui_state.browser.folder.clone();
                             save_to_folder(editor, ui_state, p);
                         }
-                        let r = ui.add(kit::Button::new(st, "Open..."));
+                    });
+                    ui.horizontal(|ui| {
+                        let r = ui.add(kit::Button::new(st, "Browse to open"));
                         hit(ui_state, "browse-load", &r);
                         if r.clicked() {
                             let hint = ui_state.browser.folder.clone();
@@ -1449,7 +1451,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                                 &hint,
                             );
                         }
-                        let r = ui.add(kit::Button::new(st, "Save to..."));
+                        let r = ui.add(kit::Button::new(st, "Browse to save"));
                         hit(ui_state, "browse-save", &r);
                         if r.clicked() {
                             let hint = ui_state.browser.folder.clone();

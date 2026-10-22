@@ -407,3 +407,25 @@ fn a_picked_image_reaches_the_panel_authoring_path_field() {
     h.settle();
     assert_eq!(h.ui.panels.path, dir.path().join("b.PNG").to_str().unwrap());
 }
+
+#[test]
+fn opening_a_patch_folder_remembers_the_folder_it_was_in() {
+    let dir = tree();
+    let mut h = H::new();
+    h.open(
+        Purpose::PatchLoad,
+        Mode::Folder,
+        filebrowser::FOLDERS,
+        "",
+        dir.path(),
+    );
+    h.wait_for("fb:dir:sub");
+    h.click("fb:dir:sub");
+    h.wait_for("fb:choose");
+    h.click("fb:choose");
+    assert_eq!(
+        filebrowser::take(&mut h.ui, Purpose::PatchLoad),
+        Some(dir.path().join("sub"))
+    );
+    assert_eq!(h.ui.folders.get("patches"), Some(&dir.path().to_path_buf()));
+}
