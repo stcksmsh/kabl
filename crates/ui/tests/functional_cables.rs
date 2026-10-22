@@ -14,10 +14,15 @@ struct H {
     events: Vec<Event>,
     t: f64,
     pointer: Pos2,
+    size: egui::Vec2,
 }
 
 impl H {
     fn new() -> Self {
+        Self::sized(egui::vec2(1440.0, 900.0))
+    }
+
+    fn sized(size: egui::Vec2) -> Self {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/reference");
         let mut h = H {
             ctx: egui::Context::default(),
@@ -26,6 +31,7 @@ impl H {
             events: Vec::new(),
             t: 0.0,
             pointer: Pos2::ZERO,
+            size,
         };
         h.frame();
         h.frame();
@@ -33,7 +39,7 @@ impl H {
     }
 
     fn frame(&mut self) {
-        let size = egui::vec2(1440.0, 900.0);
+        let size = self.size;
         let raw = RawInput {
             screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
             events: std::mem::take(&mut self.events),
@@ -310,4 +316,47 @@ fn one_step_undoes_by_itself() {
     t.editor.undo();
     assert_eq!(t.cable_param(route, "s1"), None);
     assert!(t.cable_param(route, "length").is_some_and(|n| n >= 4.0));
+}
+
+#[test]
+fn the_step_grids_fit_the_drawer_at_the_maximum_step_count() {
+    for size in [egui::vec2(1440.0, 900.0), egui::vec2(1180.0, 680.0)] {
+        let mut t = H::sized(size);
+        t.click(&format!("knob:{ENV}.attack_ms"));
+        let route = *t
+            .ui
+            .hits
+            .keys()
+            .find_map(|k| k.strip_prefix("pattern:"))
+            .map(|s| s.parse::<CableId>().unwrap())
+            .iter()
+            .next()
+            .expect("a route row has a Pattern button");
+        t.click(&format!("pattern:{route}"));
+        for param in ["length", "b.length"] {
+            t.editor.set_param_gesture(
+                ParamTarget::Cable {
+                    id: route,
+                    param: param.into(),
+                },
+                kabl_cables::MAX_STEPS as f32,
+                true,
+            );
+        }
+        t.frame();
+        t.frame();
+        let edge = t.ui.hits[&format!("fn-prob:{route}")].right();
+        for tag in ["", "-b"] {
+            for k in [0, kabl_cables::MAX_STEPS - 1] {
+                for lane in ["level", "chance"] {
+                    let r = t.ui.hits[&format!("fn-{lane}{tag}:{route}:{k}")];
+                    assert!(
+                        r.right() <= edge + 0.5,
+                        "{size:?} {lane}{tag} step {k} ends at {} past the drawer edge {edge}",
+                        r.right()
+                    );
+                }
+            }
+        }
+    }
 }

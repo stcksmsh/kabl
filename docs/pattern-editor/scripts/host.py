@@ -80,9 +80,10 @@ try:
         def tool(*a):
             sp.run(a, env=env, stdout=log, stderr=log)
         time.sleep(14)
-        tool('wmctrl', '-c', 'About REAPER')
-        tool('wmctrl', '-c', 'REAPER New Version')
-        time.sleep(1)
+        for _ in range(8):  # the update notice can arrive late: keep closing it
+            tool('wmctrl', '-c', 'About REAPER')
+            tool('wmctrl', '-c', 'REAPER New Version')
+            time.sleep(1.5)
         # Select the ladder filter's cutoff, then open the pattern of the route into it.
         for x_, y_ in ((748, 541), (877, 551)):
             tool('xdotool', 'mousemove', str(x_), str(y_))

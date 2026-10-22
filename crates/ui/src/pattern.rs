@@ -68,7 +68,11 @@ fn step_grid(ui: &mut Ui, st: &Style, ui_state: &mut UiState, l: &Lane) -> Vec<E
     let n = l.levels.len();
     let per_row = if n > 8 { n.div_ceil(2) } else { n };
     let gap = st.sp(1) * 0.75;
-    let w = ui.available_width();
+    // The drawer clips at its scroll area: never run past it, whatever the nominal width.
+    let w = ui
+        .available_width()
+        .min(ui.clip_rect().right() - ui.cursor().left())
+        - ui.spacing().item_spacing.x;
     let cw = (w - gap * (per_row as f32 - 1.0)) / per_row as f32;
     let mut edits = Vec::new();
     for row in 0..n.div_ceil(per_row) {
