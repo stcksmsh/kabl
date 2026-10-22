@@ -214,7 +214,26 @@ fn every_entry_opens_stopped_has_real_controls_and_recalls_complete_state() {
     }
 }
 
+/// `render_raw` plus the check that a stopped load is silent for the first second.
 fn render(state: &PatchState, keys: bool, secs: usize, hot: bool) -> (Vec<f32>, serde_json::Value) {
+    let (samples, metrics) = render_raw(state, keys, secs, hot);
+    assert!(
+        rms(&samples[..96000]) < 0.000001,
+        "Stopped load must remain silent"
+    );
+    (samples, metrics)
+}
+
+fn rms(v: &[f32]) -> f64 {
+    (v.iter().map(|s| (*s as f64).powi(2)).sum::<f64>() / v.len() as f64).sqrt()
+}
+
+fn render_raw(
+    state: &PatchState,
+    keys: bool,
+    secs: usize,
+    hot: bool,
+) -> (Vec<f32>, serde_json::Value) {
     let collector = basedrop::Collector::new();
     let mut engine = PatchEngine::new(&collector.handle(), state, 48000.0, 8).unwrap();
     let clocks: Vec<_> = state
@@ -368,15 +387,9 @@ fn render(state: &PatchState, keys: bool, secs: usize, hot: bool) -> (Vec<f32>, 
             active_windows += 1;
         }
     }
-    let rms =
-        |v: &[f32]| (v.iter().map(|s| (*s as f64).powi(2)).sum::<f64>() / v.len() as f64).sqrt();
     let db = |v: f64| 20.0 * v.max(1e-12).log10();
     let peak = samples.iter().fold(0.0_f32, |a, b| a.max(b.abs()));
     let metrics = serde_json::json!({"peak_dbfs":db(peak as f64), "rms_dbfs":db(rms(&samples)), "last_second_rms_dbfs":db(rms(&samples[samples.len()-96000..])), "active_seconds_above_minus50_dbfs": active_windows as f64 * BLOCK as f64 / 48000.0, "stop_second":stop,"duration_seconds":secs,"macro_changes":macro_changes,"layer_changes":layer_changes});
-    assert!(
-        rms(&samples[..96000]) < 0.000001,
-        "Stopped load must remain silent"
-    );
     (samples, metrics)
 }
 
@@ -450,4 +463,103 @@ fn render_bank() {
         serde_json::to_string_pretty(&metrics).unwrap(),
     )
     .unwrap();
+}
+
+/// Every factory patch directory (one holding a `checkpoint.json`), relative to `patches/`.
+fn all_factory_dirs() -> Vec<String> {
+    fn walk(base: &Path, dir: &Path, out: &mut Vec<String>) {
+        if dir.join("checkpoint.json").is_file() {
+            out.push(
+                dir.strip_prefix(base)
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+        }
+        let mut subs: Vec<_> = std::fs::read_dir(dir)
+            .unwrap()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.is_dir())
+            .collect();
+        subs.sort();
+        for s in subs {
+            walk(base, &s, out);
+        }
+    }
+    let mut out = Vec::new();
+    walk(&root(), &root(), &mut out);
+    out
+}
+
+/// Peak (dBFS) and loudness (dBFS RMS over the 100 ms blocks above -50 dBFS, so silent gaps
+/// and the stopped lead-in do not count) of one factory patch played its own demo way.
+fn level(dir: &str) -> (f64, f64) {
+    let log = kabl_core::load(&root().join(dir)).unwrap();
+    let meta: Meta =
+        toml::from_str(&std::fs::read_to_string(root().join(dir).join("sound.toml")).unwrap())
+            .unwrap();
+    let keys = Meta::play_of(log.state()).0 || meta.keys;
+    let (samples, _) = render_raw(log.state(), keys, 24, false);
+    let peak = samples.iter().fold(0.0_f32, |a, b| a.max(b.abs())) as f64;
+    let (mut sum, mut n) = (0.0_f64, 0usize);
+    for block in samples.chunks(9600) {
+        let ms = block.iter().map(|s| (*s as f64).powi(2)).sum::<f64>() / block.len() as f64;
+        if ms > 1e-5 {
+            sum += ms;
+            n += 1;
+        }
+    }
+    let db = |v: f64| 20.0 * v.max(1e-12).log10();
+    (db(peak), db((sum / n.max(1) as f64).sqrt()))
+}
+
+/// Levels of every factory patch, rendered on a thread each.
+fn levels() -> Vec<(String, f64, f64)> {
+    std::thread::scope(|s| {
+        let jobs: Vec<_> = all_factory_dirs()
+            .into_iter()
+            .map(|dir| {
+                s.spawn(move || {
+                    let (peak, loud) = level(&dir);
+                    (dir, peak, loud)
+                })
+            })
+            .collect();
+        jobs.into_iter().map(|j| j.join().unwrap()).collect()
+    })
+}
+
+#[test]
+#[ignore = "prints the level table of the whole factory bank"]
+fn level_table() {
+    for (dir, peak, loud) in levels() {
+        println!("LEVEL {dir:36} peak {peak:7.2}  loud {loud:7.2}");
+    }
+}
+
+/// The bank's level target (docs/factory-levels/README.md): no sample above `PEAK_CEILING`,
+/// loudness within `LOUD_WINDOW` of `LOUD_TARGET`.
+const PEAK_CEILING: f64 = -1.0;
+const LOUD_TARGET: f64 = -19.0;
+const LOUD_WINDOW: f64 = 5.5;
+
+#[test]
+fn factory_levels_hold_the_target() {
+    let mut bad = Vec::new();
+    for (dir, peak, loud) in levels() {
+        // The arpeggiator demos are silent without a held chord: nothing to measure.
+        if loud < -100.0 {
+            bad.push(format!("{dir}: silent"));
+        } else if peak > PEAK_CEILING {
+            bad.push(format!(
+                "{dir}: peak {peak:.2} dBFS clips (ceiling {PEAK_CEILING})"
+            ));
+        } else if (loud - LOUD_TARGET).abs() > LOUD_WINDOW {
+            bad.push(format!(
+                "{dir}: loudness {loud:.2} dBFS is outside {LOUD_TARGET} +- {LOUD_WINDOW}"
+            ));
+        }
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
 }

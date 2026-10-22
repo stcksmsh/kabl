@@ -75,3 +75,6 @@
 {"seq":74,"t_ms":1791558060269,"op":{"SetParam":{"target":{"Cable":{"id":23,"param":"amount"}},"value":1.0}},"inverse":{"UnsetParam":{"target":{"Cable":{"id":23,"param":"amount"}}}},"source":"User"}
 {"seq":75,"t_ms":1791558060269,"op":{"Connect":{"id":24,"from":{"Module":{"id":1,"port":"velocity"}},"to":{"Param":{"id":3,"param":"index"}}}},"inverse":{"Disconnect":{"id":24}},"source":"User"}
 {"seq":76,"t_ms":1791558060269,"op":{"SetParam":{"target":{"Cable":{"id":24,"param":"amount"}},"value":0.1}},"inverse":{"UnsetParam":{"target":{"Cable":{"id":24,"param":"amount"}}}},"source":"User"}
+{"seq":77,"t_ms":1792678915402,"op":{"SetParam":{"target":{"Module":{"id":13,"param":"gain_db"}},"value":-1.5}},"inverse":{"SetParam":{"target":{"Module":{"id":13,"param":"gain_db"}},"value":0.0}},"source":"User"}
+{"seq":78,"t_ms":1792679215235,"op":{"SetParam":{"target":{"Module":{"id":13,"param":"gain_db"}},"value":-1.5}},"inverse":{"SetParam":{"target":{"Module":{"id":13,"param":"gain_db"}},"value":-1.5}},"source":"User"}
+{"seq":79,"t_ms":1792679534826,"op":{"SetParam":{"target":{"Module":{"id":13,"param":"gain_db"}},"value":-1.5}},"inverse":{"SetParam":{"target":{"Module":{"id":13,"param":"gain_db"}},"value":-1.5}},"source":"User"}

@@ -67,3 +67,6 @@
 {"seq":66,"t_ms":1791578090320,"op":{"Connect":{"id":6,"from":{"Module":{"id":3,"port":"out"}},"to":{"Module":{"id":4,"port":"in_r"}}}},"inverse":{"Disconnect":{"id":6}},"source":"User"}
 {"seq":67,"t_ms":1791578090320,"op":{"Connect":{"id":7,"from":{"Module":{"id":4,"port":"left"}},"to":{"Module":{"id":5,"port":"left"}}}},"inverse":{"Disconnect":{"id":7}},"source":"User"}
 {"seq":68,"t_ms":1791578090320,"op":{"Connect":{"id":8,"from":{"Module":{"id":4,"port":"right"}},"to":{"Module":{"id":5,"port":"right"}}}},"inverse":{"Disconnect":{"id":8}},"source":"User"}
+{"seq":69,"t_ms":1792678915402,"op":{"SetParam":{"target":{"Module":{"id":3,"param":"gain_db"}},"value":5.3}},"inverse":{"SetParam":{"target":{"Module":{"id":3,"param":"gain_db"}},"value":7.0}},"source":"User"}
+{"seq":70,"t_ms":1792679215235,"op":{"SetParam":{"target":{"Module":{"id":3,"param":"gain_db"}},"value":5.3}},"inverse":{"SetParam":{"target":{"Module":{"id":3,"param":"gain_db"}},"value":5.3}},"source":"User"}
+{"seq":71,"t_ms":1792679534826,"op":{"SetParam":{"target":{"Module":{"id":3,"param":"gain_db"}},"value":5.3}},"inverse":{"SetParam":{"target":{"Module":{"id":3,"param":"gain_db"}},"value":5.3}},"source":"User"}
