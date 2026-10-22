@@ -1862,8 +1862,17 @@ impl CompiledPatch {
                         };
                     }
                     let mut input_signals = [Signal::Scalar(0.0); MAX_INPUTS];
-                    for (slot, data) in input_signals.iter_mut().zip(input_data.iter()) {
-                        *slot = Signal::Buffer(&data[..]);
+                    for ((slot, data), src) in input_signals
+                        .iter_mut()
+                        .zip(input_data.iter())
+                        .zip(inputs.iter())
+                    {
+                        // An unpatched input is a held zero, as `Signal` documents: modules
+                        // tell a patched sidechain from none by `is_scalar`.
+                        *slot = match src {
+                            InputSource::Silence => Signal::Scalar(0.0),
+                            InputSource::Buffer(_) => Signal::Buffer(&data[..]),
+                        };
                     }
                     let input_signals = &input_signals[..inputs.len()];
 
