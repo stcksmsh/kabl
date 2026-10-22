@@ -40,7 +40,7 @@ fn delay(w: f32) -> C {
 }
 
 /// The parameter as it is now: modulated by every route with a live source, else the stored value.
-fn live_param(state: &PatchState, live: &Live, now: f64, m: &Placed, name: &str) -> f32 {
+pub(crate) fn live_param(state: &PatchState, live: &Live, now: f64, m: &Placed, name: &str) -> f32 {
     let Some(q) = m.info.params.iter().find(|q| q.name == name) else {
         return 0.0;
     };
@@ -93,7 +93,7 @@ fn response(
     })
 }
 
-fn faint(st: &Style) -> egui::Color32 {
+pub(crate) fn faint(st: &Style) -> egui::Color32 {
     alpha(st.roles.disp_text, 55)
 }
 
@@ -104,7 +104,7 @@ fn hline(p: &egui::Painter, st: &Style, r: Rect, y: f32) {
     );
 }
 
-fn caption(p: &egui::Painter, st: &Style, z: f32, at: Pos2, align: Align2, s: &str) {
+pub(crate) fn caption(p: &egui::Painter, st: &Style, z: f32, at: Pos2, align: Align2, s: &str) {
     if let Some(font) = face::face_font(st, Role::Caption, z) {
         p.text(at, align, s, font, alpha(st.roles.disp_text, 200));
     }
@@ -130,6 +130,9 @@ pub(crate) fn draw(
         "filter.comb" => comb(state, st, live, now, p, m, r, z, d),
         "filter.formant" => formant(state, st, live, now, p, m, r, z, d),
         "bitcrusher" => bitcrusher(state, st, p, m, r, z, d),
+        k if k.starts_with("drum.") => {
+            crate::drum_displays::draw(state, st, live, now, p, m, r, z, d)
+        }
         _ => {}
     }
 }

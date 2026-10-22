@@ -257,7 +257,7 @@ pub static KICK_INFO: ModuleInfo = ModuleInfo {
     quality: NO_QUALITY,
     skin: None,
     width_units: 8,
-    advanced: &["vel_sens", "accent_db"],
+    advanced: &["level_db", "vel_sens", "accent_db"],
 };
 
 pub static TOM_INFO: ModuleInfo = ModuleInfo {
@@ -273,7 +273,7 @@ pub static TOM_INFO: ModuleInfo = ModuleInfo {
     quality: NO_QUALITY,
     skin: None,
     width_units: 8,
-    advanced: &["vel_sens", "accent_db"],
+    advanced: &["click", "level_db", "vel_sens", "accent_db"],
 };
 
 /// What the face draws for a kick or tom: frequency and amplitude at time `t` (s) after a hit.
@@ -469,7 +469,7 @@ pub static SNARE_INFO: ModuleInfo = ModuleInfo {
     quality: NO_QUALITY,
     skin: None,
     width_units: 8,
-    advanced: &["vel_sens", "accent_db"],
+    advanced: &["level_db", "vel_sens", "accent_db"],
 };
 
 /// The snare's decays in ms: (drum body, noise).
@@ -647,7 +647,7 @@ pub static CLAP_INFO: ModuleInfo = ModuleInfo {
     quality: NO_QUALITY,
     skin: None,
     width_units: 8,
-    advanced: &["vel_sens", "accent_db"],
+    advanced: &["level_db", "vel_sens", "accent_db"],
 };
 
 /// The clap envelope at `t` seconds after a hit, for the face: each of the `bursts - 1` short
@@ -826,7 +826,7 @@ pub static HAT_INFO: ModuleInfo = ModuleInfo {
     quality: NO_QUALITY,
     skin: None,
     width_units: 8,
-    advanced: &["vel_sens", "accent_db"],
+    advanced: &["level_db", "vel_sens", "accent_db"],
 };
 
 /// The 808's six square-wave frequencies (Hz), as measured from the circuit.

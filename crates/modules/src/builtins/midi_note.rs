@@ -42,8 +42,8 @@ const PARAMS: &[ParamInfo] = &[
         min: 0.0,
         max: 127.0,
         default: 36.0,
-        unit: "",
-        taper: Taper::Stepped,
+        unit: "note",
+        taper: Taper::Linear,
         smoothing_ms: 0.0,
     },
     // 0 = ALL, else MIDI channel 1..16.
@@ -52,8 +52,8 @@ const PARAMS: &[ParamInfo] = &[
         min: 0.0,
         max: 16.0,
         default: 0.0,
-        unit: "",
-        taper: Taper::Stepped,
+        unit: "ch",
+        taper: Taper::Linear,
         smoothing_ms: 0.0,
     },
 ];

@@ -554,7 +554,8 @@ fn place_local(
             // still fit under it; else the module keeps its plain layout.
             "osc.va" | "osc.wt" | "osc.fm" | "filter.svf" | "filter.ladder" | "lfo"
             | "env.adsr" | "phaser" | "flanger" | "compressor" | "eq" | "limiter"
-            | "bitcrusher" | "filter.comb" | "filter.formant"
+            | "bitcrusher" | "filter.comb" | "filter.formant" | "drum.kick" | "drum.snare"
+            | "drum.clap" | "drum.hat" | "drum.tom"
                 if DISPLAY_TOP + DISPLAY_H - 3.0
                     + if face_knobs.is_empty() { 0.0 } else { 110.0 }
                     + if face_sels.is_empty() { 0.0 } else { 46.0 }
