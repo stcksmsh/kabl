@@ -20,6 +20,7 @@ use super::fx::{blend, coef, flush, param, sin1, Glide, STEREO_IN, STEREO_OUT};
 use crate::info::{Category, ModuleInfo, ParamInfo, PortInfo, QualitySupport, Rate, Taper};
 use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig};
+use crate::view::ModuleView;
 
 const PORTS: &[PortInfo] = &[STEREO_IN[0], STEREO_IN[1], STEREO_OUT[0], STEREO_OUT[1]];
 
@@ -140,6 +141,12 @@ impl Module for Flanger {
             c.write = (c.write + 1) % len;
             c.phase = (c.phase + rate.at(i).clamp(0.02, 5.0) / sr).fract();
         }
+    }
+
+    /// The LFO phase, 0..1, for the face's sweep marker.
+    fn view(&self, out: &mut ModuleView) {
+        out.valid = true;
+        out.position = self.c.phase;
     }
 
     fn reset(&mut self) {

@@ -22,6 +22,7 @@ pub mod cues;
 pub mod displays;
 pub mod editor;
 pub mod explain;
+mod fx_displays;
 pub mod help;
 pub mod inspect;
 pub mod kit;
@@ -2107,6 +2108,7 @@ fn draw_module(
         if let Some(r) = scope {
             if painter.clip_rect().intersects(face) {
                 ui_state.wants.display(m.id, m.info.kind);
+                ui_state.wants.feeds(editor.state(), m.id, m.info.kind);
             }
             displays::draw(editor.state(), &st, &ui_state.live, now, painter, xf, m, r);
             if m.info.kind == "osc.wt" && z >= 0.45 {

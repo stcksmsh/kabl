@@ -14,6 +14,7 @@ use kabl_engine::facetap::{FaceTarget, FaceTargets, MAX_FACE_TAPS};
 use kabl_engine::patch_engine::Command;
 use kabl_modules::{registry, ModuleView, PortDirection};
 
+use crate::fx_displays;
 use crate::kit::face;
 use crate::rack::Placed;
 use crate::routing;
@@ -60,6 +61,26 @@ impl Wants {
             kind,
             view: true,
         });
+    }
+
+    /// What a display reads besides its own output: the compressor's reduction, the comb's
+    /// pitch cable.
+    pub fn feeds(&mut self, state: &PatchState, id: ModuleId, kind: &'static str) {
+        match kind {
+            "compressor" => self.source(state, id, "gr"),
+            "filter.comb" => {
+                for c in state.cables.values() {
+                    if let (PortRef::Module { id: f, port }, PortRef::Module { id: t, port: tp }) =
+                        (&c.from, &c.to)
+                    {
+                        if *t == id && tp == "pitch" {
+                            self.source(state, *f, port);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 
     /// A visible knob's route source.
@@ -168,6 +189,18 @@ impl Live {
         port: &str,
         now: f64,
     ) -> Option<f32> {
+        self.source_value(state, id, port, now)
+            .map(|(last, full)| last / full)
+    }
+
+    /// The newest sample of output `port` of module `id` and its port type's full scale.
+    pub fn source_value(
+        &self,
+        state: &PatchState,
+        id: ModuleId,
+        port: &str,
+        now: f64,
+    ) -> Option<(f32, f32)> {
         let info = registry::info_for(&state.modules.get(&id)?.kind)?;
         let (index, p) = info
             .ports
@@ -177,7 +210,7 @@ impl Live {
             .find(|(_, p)| p.name == port)?;
         let (lo, hi) = p.port_type.nominal_range();
         let full = lo.abs().max(hi.abs());
-        Some(self.tap(id, index as u8, now)?.last / full)
+        Some((self.tap(id, index as u8, now)?.last, full))
     }
 }
 
@@ -203,7 +236,7 @@ pub fn modulated_norm(
 
 /// How much of a display survives at this zoom.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Detail {
+pub(crate) enum Detail {
     /// Frame only: the face is too small for a picture to read.
     Frame,
     /// A plain trace, no glow, fill or playhead.
@@ -222,7 +255,7 @@ fn detail(z: f32) -> Detail {
 }
 
 /// The module's parameter `name` as the compiler reads it: stored value or default.
-fn param(state: &PatchState, m: &Placed, name: &str) -> f32 {
+pub(crate) fn param(state: &PatchState, m: &Placed, name: &str) -> f32 {
     m.info
         .params
         .iter()
@@ -256,12 +289,12 @@ pub(crate) fn draw(
         "filter.svf" | "filter.ladder" => filter(state, st, live, now, painter, m, inner, z, d),
         "env.adsr" => envelope(state, st, live, now, painter, m, inner, z, d),
         "lfo" => lfo(state, st, live, now, painter, m, inner, z, d),
-        _ => {}
+        _ => fx_displays::draw(state, st, live, now, painter, m, inner, z, d),
     }
 }
 
 /// A plotted function of `x` in 0..1 giving `y` in -1..1, across `r`.
-fn plot(r: Rect, n: usize, f: impl Fn(f32) -> f32) -> Vec<Pos2> {
+pub(crate) fn plot(r: Rect, n: usize, f: impl Fn(f32) -> f32) -> Vec<Pos2> {
     (0..=n)
         .map(|i| {
             let x = i as f32 / n as f32;
@@ -273,7 +306,14 @@ fn plot(r: Rect, n: usize, f: impl Fn(f32) -> f32) -> Vec<Pos2> {
         .collect()
 }
 
-fn paint(p: &egui::Painter, st: &Style, pts: Vec<Pos2>, z: f32, d: Detail, base: Option<f32>) {
+pub(crate) fn paint(
+    p: &egui::Painter,
+    st: &Style,
+    pts: Vec<Pos2>,
+    z: f32,
+    d: Detail,
+    base: Option<f32>,
+) {
     if d == Detail::Full {
         face::trace(p, st, pts, z, base);
     } else {
@@ -389,6 +429,7 @@ fn svf_db(out: usize, w: f32, k: f32) -> f32 {
     let num = match out {
         0 => 1.0,
         1 => w,
+        3 => (1.0 - w * w).abs(),
         _ => w * w,
     };
     20.0 * (num / den).log10()
@@ -440,7 +481,7 @@ fn filter(
     let ymap = |db: f32| ((db + 40.0) / 64.0 * 2.0 - 1.0).clamp(-1.0, 1.0);
     let sr = 48000.0f32;
     let g = (std::f32::consts::PI * cutoff / sr).tan();
-    let outs: &[usize] = if ladder { &[0] } else { &[0, 1, 2] };
+    let outs: &[usize] = if ladder { &[0] } else { &[0, 1, 2, 3] };
     let patched = |port: &str| {
         state
             .cables
@@ -448,9 +489,10 @@ fn filter(
             .any(|c| matches!(&c.from, PortRef::Module { id, port: q } if *id == m.id && q == port))
     };
     for &o in outs {
-        let port = ["lp", "bp", "hp"][o];
-        let strong =
-            ladder || patched(port) || (o == 0 && !["lp", "bp", "hp"].iter().any(|q| patched(q)));
+        let port = ["lp", "bp", "hp", "notch"][o];
+        let strong = ladder
+            || patched(port)
+            || (o == 0 && !["lp", "bp", "hp", "notch"].iter().any(|q| patched(q)));
         if d != Detail::Full && !strong {
             continue;
         }

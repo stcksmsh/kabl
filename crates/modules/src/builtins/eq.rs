@@ -97,6 +97,25 @@ fn design(kind: Kind, f: f32, db: f32, q: f32, sr: f32) -> [f64; 6] {
     [a1, g * a1, g * g * a1, m[0], m[1], m[2]]
 }
 
+const KINDS: [Kind; 4] = [Kind::LowShelf, Kind::Bell, Kind::Bell, Kind::HighShelf];
+
+/// |H| in dB at `hz` of band `band` (0 low shelf, 1 and 2 bells, 3 high shelf) set to `f`, `db`
+/// and `q`, from the coefficients the module itself runs: the face draws its curve from this.
+pub fn band_response_db(band: usize, f: f32, db: f32, q: f32, sr: f32, hz: f32) -> f32 {
+    let [a1, a2, _, m0, m1, m2] = design(KINDS[band.min(3)], f, db, q.clamp(0.2, 10.0), sr);
+    // Recover the prototype's g and k from the folded coefficients, then evaluate it at the
+    // warped frequency.
+    let g = a2 / a1;
+    let k = (1.0 / a1 - 1.0) / g - g;
+    let w = (std::f64::consts::PI * f64::from(hz) / f64::from(sr)).tan() / g;
+    let (dr, di) = (1.0 - w * w, k * w);
+    let n = dr * dr + di * di;
+    // (m1 jw + m2) / (dr + j di), plus m0.
+    let (nr, ni) = (m2, m1 * w);
+    let (re, im) = (m0 + (nr * dr + ni * di) / n, (ni * dr - nr * di) / n);
+    (10.0 * (re * re + im * im).max(1e-12).log10()) as f32
+}
+
 /// One band: its controls' glides, the coefficients they gave, and per-side filter state.
 #[derive(Debug, Clone, Copy)]
 struct Band {
@@ -173,7 +192,6 @@ impl Module for Eq {
 
     #[inline]
     fn process(&mut self, io: &mut ProcessIo) {
-        const KINDS: [Kind; 4] = [Kind::LowShelf, Kind::Bell, Kind::Bell, Kind::HighShelf];
         let n = io.block_len();
         let sr = self.sample_rate;
         let (in_l, in_r) = (io.input(0), io.input(1));
