@@ -65,7 +65,7 @@ const PORTS: &[PortInfo] = &[
 ];
 
 const PARAMS: &[ParamInfo] = &[
-    param("bands", 8.0, MAX_BANDS as f32, 16.0, "", Taper::Stepped),
+    param("bands", 8.0, MAX_BANDS as f32, 16.0, "bands", Taper::Linear),
     param("spacing", 0.0, 1.0, 0.0, "", Taper::Linear),
     param("low_hz", 60.0, 400.0, 120.0, "Hz", Taper::Exponential),
     param("high_hz", 3000.0, 16000.0, 9000.0, "Hz", Taper::Exponential),

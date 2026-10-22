@@ -56,7 +56,8 @@ def finish(p, voc, tail_gain_db, row):
     place(p, out, 24 + 400 * 3, 10 + 370 * row)
 
 
-def robot_voice():
+def robot_voice(bands=20, dry=False):
+    """dry: the modulator alone (the phrase, before the vocoder), for the clips."""
     p = Patch()
     car = chord(p, 0)
     # The phrase: a buzz whose pitch and vowel wander on two random loops, one syllable per tick.
@@ -86,7 +87,14 @@ def robot_voice():
     p.wire(burst, 'out', nvca, 'cv')
     p.wire(vca, 'out', mix, 'in1')
     p.wire(nvca, 'out', mix, 'in2')
-    voc = p.add('vocoder', bands=20, hf=0.6, drive_db=18, release_ms=45)
+    if dry:
+        g = p.add('gain', gain_db=-9)
+        out = p.add('out')
+        p.wire(mix, 'out', g, 'in')
+        p.wire(g, 'out', out, 'left')
+        p.wire(g, 'out', out, 'right')
+        return p
+    voc = p.add('vocoder', bands=bands, hf=0.6, drive_db=18, release_ms=45)
     p.wire(car, 'out', voc, 'in_l')
     p.wire(car, 'out', voc, 'in_r')
     p.wire(mix, 'out', voc, 'mod')
@@ -141,7 +149,18 @@ sequence = false
 '''),
 }
 
+def clips(root):
+    """Patch variants for the clips: the modulator alone, and the phrase at each band count."""
+    robot_voice(dry=True).save(root / 'phrase-dry')
+    for n in (8, 12, 16, 24, 32):
+        robot_voice(bands=n).save(root / f'phrase-{n}')
+    live_voice().save(root / 'live')
+
+
 if __name__ == '__main__':
+    if len(sys.argv) > 2 and sys.argv[1] == '--clips':
+        clips(Path(sys.argv[2]))
+        sys.exit()
     root = Path(sys.argv[1]) if len(sys.argv) > 1 else repo / 'patches/sound-engines/demos'
     for name, (build, toml) in DEMOS.items():
         d = root / name

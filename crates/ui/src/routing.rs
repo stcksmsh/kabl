@@ -314,6 +314,7 @@ pub fn fmt_value(p: &ParamInfo, v: f32) -> String {
         "°" => format!("{v:.0}°"),
         "ct" => format!("{:+.0} ct", v.round() + 0.0),
         "x" => format!("{}X", v.round()),
+        "bands" => format!("{}", v.round()),
         _ => format!("{v:.2}"),
     }
 }
