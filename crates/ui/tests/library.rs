@@ -28,6 +28,13 @@ fn factory() -> PathBuf {
 /// Every factory sound: (dir, name, category, tags, description).
 const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
     (
+        "grid-cues",
+        "Grid Cues",
+        "Piece",
+        &["sequenced", "cues", "drums", "drum grid", "124bpm"],
+        "A drum grid played by cues. Four cues (Intro, Groove, Fill, Break) each pick one of the grid's patterns, and the pattern changes on the next bar, so a piece moves from hats to a groove to a fill to a breakdown without a hand on the grid.",
+    ),
+    (
         "cue-macros",
         "Cue Macros",
         "Piece",

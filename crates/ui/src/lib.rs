@@ -3122,22 +3122,19 @@ fn cues_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::U
                 if r.on_hover_text("This cue leaves it playing").clicked() {
                     edit = Some(Edit::Target(c.n, s, None));
                 }
-                let (count, names) = if grid {
-                    (
-                        kabl_modules::builtins::PATTERN_NAMES.len(),
-                        &kabl_modules::builtins::PATTERN_NAMES[..],
-                    )
+                let names: &[&str] = if grid {
+                    &kabl_modules::builtins::PATTERN_NAMES
                 } else {
-                    (seq::BANKS, &seq::BANK_NAMES[..])
+                    &seq::BANK_NAMES
                 };
-                for b in 0..count {
+                for (b, &name) in names.iter().enumerate() {
                     let hover = if grid {
-                        format!("Pattern {}", names[b])
+                        format!("Pattern {name}")
                     } else {
                         banks::title(state, s, b)
                     };
                     let r = ui
-                        .selectable_label(current == Some(b), names[b])
+                        .selectable_label(current == Some(b), name)
                         .on_hover_text(hover);
                     ui_state.record(format!("cue-bank:{id}.{}.{s}.{b}", c.n), r.rect);
                     if r.clicked() {

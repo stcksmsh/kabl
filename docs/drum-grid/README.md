@@ -22,7 +22,7 @@ Before the grid, one beat needed one 8-step `seq` per drum, a clock and a cable 
 - **Four velocity levels (30, 55, 78, 100 %) and four chances (100, 75, 50, 25 %).** A grid is for quick programming; four levels is what a step button row on a drum machine gives.
 - **Polymeter.** Row `r` plays step `tick % len(r)`. Each row has a length of 1 to 16.
 - **Chance.** Every row draws once per clock edge, whatever its steps hold, so editing a chance never shifts the random stream. Seeded from the module id and reseeded on reset, so a loop with chance repeats exactly after a reset.
-- **Patterns A to D** are stored in the module. The face tabs set the `pattern` param; the `pattern` input adds to it. Not done: switching by cue (a cue launches `seq` banks only) and a chain arranger (out of scope).
+- **Patterns A to D** are stored in the module. The face tabs set the `pattern` param; the `pattern` input adds to it. A cue can switch the pattern on the next bar (see `docs/grid-cues`). Not done: a chain arranger (out of scope).
 - **Editor on the face.** The face is 22 units wide (660 px at 100 %), so 16 steps are about 36 px wide, enough for click and drag. No separate expanded editor.
 
 ## Editing

@@ -1929,15 +1929,12 @@ impl CompiledPatch {
     /// Audio thread: arms bank `bank` of the `seq`, or pattern `bank` of the `drum.grid`,
     /// `id`, from sample `from` of the next block. No allocation.
     pub fn arm_bank(&mut self, id: ModuleId, bank: usize, from: usize) {
-        match self.module_mut(id, None) {
-            Some(m) => {
-                if let Some(s) = m.as_any_mut().downcast_mut::<Seq>() {
-                    s.arm(bank, from);
-                } else if let Some(g) = m.as_any_mut().downcast_mut::<DrumGrid>() {
-                    g.arm(bank, from);
-                }
+        if let Some(m) = self.module_mut(id, None) {
+            if let Some(s) = m.as_any_mut().downcast_mut::<Seq>() {
+                s.arm(bank, from);
+            } else if let Some(g) = m.as_any_mut().downcast_mut::<DrumGrid>() {
+                g.arm(bank, from);
             }
-            None => {}
         }
     }
 
