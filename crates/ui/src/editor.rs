@@ -445,9 +445,7 @@ impl PatchEditor {
         cable: CableId,
         param: &str,
     ) -> Option<CableId> {
-        let Some(target) = self.log.state().cables.get(&cable) else {
-            return None;
-        };
+        let target = self.log.state().cables.get(&cable)?;
         let depth =
             param == kabl_engine::compile::DEPTH && matches!(target.to, PortRef::Param { .. });
         if !depth && kabl_cables::mod_slot(param).is_none() {
