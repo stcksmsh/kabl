@@ -161,19 +161,19 @@ pub fn draw(
             th.ink2,
         );
     }
-    for v in 0..4 {
+    for (v, level) in VELOCITY.iter().enumerate() {
         let b = Rect::from_min_size(pos2(bx + v as f32 * (bw + 3.0), hy), vec2(bw, HEAD_H));
-        let label = format!("{:.0}", VELOCITY[v] * 100.0);
+        let label = format!("{:.0}", level * 100.0);
         if button(ui, b, &format!("grid-vel:{id}.{v}"), v == bv, &label) {
             bv = v;
         }
     }
-    for c in 0..4 {
+    for (c, chance) in CHANCE.iter().enumerate() {
         let b = Rect::from_min_size(
             pos2(bx + (4 + c) as f32 * (bw + 3.0) + 8.0, hy),
             vec2(bw, HEAD_H),
         );
-        let label = format!("{}%", CHANCE[c]);
+        let label = format!("{}%", chance);
         if button(ui, b, &format!("grid-chance:{id}.{c}"), c == bc, &label) {
             bc = c;
         }

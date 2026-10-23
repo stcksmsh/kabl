@@ -490,8 +490,11 @@ fn place_local(
         let ports = ins.len() + outs.len();
         let fm6 = info.kind == "osc.fm6";
         // A wide panel (the sequencer) keeps one row, clear of its selector row.
-        let two_rows =
-            !column && ports > 3 && !(ports == 4 && fw >= 240.0) && fw < 100.0 * ports as f32;
+        let two_rows = !column
+            && ports > 3
+            && !(ports == 4 && fw >= 240.0)
+            && fw < 100.0 * ports as f32
+            && info.kind != "drum.grid";
         if fm6 {
             // Top left, above the operators.
             for (k, &port) in ins.iter().chain(&outs).enumerate() {
@@ -554,7 +557,7 @@ fn place_local(
             }
             "drum.grid" => {
                 decor = Decor::Grid(Rect::from_min_size(
-                    pos2(14.0, 46.0),
+                    pos2(14.0, DISPLAY_TOP + 6.0),
                     vec2(fw - 28.0, crate::drum_grid::HEIGHT),
                 ))
             }

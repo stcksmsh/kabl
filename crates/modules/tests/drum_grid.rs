@@ -196,3 +196,30 @@ fn voices_read_velocity_from_the_gate_level() {
     // A gate only just above the threshold is the softest hit, still audible.
     assert!(peak_of_hit(0.55) > 0.0);
 }
+
+#[cfg(debug_assertions)]
+#[global_allocator]
+static ALLOCATOR: assert_no_alloc::AllocDisabler = assert_no_alloc::AllocDisabler;
+
+#[test]
+fn processing_allocates_nothing() {
+    let mut g = Grid::new();
+    let n = 64 * STEP;
+    let clock: Vec<f32> = (0..n)
+        .map(|i| if i % STEP < 2 { 1.0 } else { 0.0 })
+        .collect();
+    let reset = vec![0.0f32; n];
+    let inputs = [
+        Signal::Buffer(&clock),
+        Signal::Buffer(&reset),
+        Signal::Scalar(0.4),
+    ];
+    let params: Vec<Signal> = g.params.iter().map(|&v| Signal::Scalar(v)).collect();
+    let mut bufs = vec![vec![0.0f32; n]; 8];
+    let mut outs: Vec<&mut [f32]> = bufs.iter_mut().map(|b| b.as_mut_slice()).collect();
+    let mut io = ProcessIo::new(&inputs, &mut outs, &params, n);
+    #[cfg(debug_assertions)]
+    assert_no_alloc::assert_no_alloc(|| g.m.process(&mut io));
+    #[cfg(not(debug_assertions))]
+    g.m.process(&mut io);
+}

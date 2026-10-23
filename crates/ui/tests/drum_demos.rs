@@ -113,7 +113,7 @@ fn twice(a: &[(usize, f32)]) -> Vec<(usize, f32)> {
 
 /// A house groove at 124 bpm, one bar of 16 steps on one `drum.grid`: kick on every beat, snare
 /// and clap on the second and fourth, open hats on the off-beats cut by closed hats. Pattern B
-/// adds a snare ghost note and a tom fill (the factory render plays pattern B too).
+/// adds a snare ghost note and a tom fill (pick it with the B tab or the pattern input).
 fn four_floor() -> PatchEditor {
     let mut r = Rack::new();
     let clock = r.add("clock", &[("bpm", 124.0)]);
@@ -363,6 +363,58 @@ fn write_wav(path: &std::path::Path, audio: &[f32]) {
     w.finalize().unwrap();
 }
 
+/// Writes `(step, velocity level, chance level)` triples into a row of pattern A.
+fn grid_levels(r: &mut Rack, grid: ModuleId, row: usize, steps: &[(usize, usize, usize)]) {
+    let params = kabl_modules::registry::info_for("drum.grid")
+        .unwrap()
+        .params;
+    let mut chunks = [0.0f32; 4];
+    for &(step, vel, chance) in steps {
+        chunks[step / 4] = with_code(chunks[step / 4], step % 4, make_code(vel, chance));
+    }
+    for (c, v) in chunks.into_iter().enumerate() {
+        r.e.set_param(grid, params[cell_index(0, row, c)].name, v);
+    }
+}
+
+/// The four-floor groove with the grid's velocity and chance in use: hats on every 16th at
+/// four velocities, ghost snares that play half the time or less.
+fn showcase() -> PatchEditor {
+    let mut r = Rack {
+        e: four_floor(),
+        col: 0.0,
+        row: 0.0,
+    };
+    let grid = 2;
+    let hats: Vec<_> = (0..16)
+        .filter(|s| s % 4 != 2)
+        .map(|s| (s, [3, 0, 1, 0][s % 4], 0))
+        .collect();
+    grid_levels(&mut r, grid, 3, &hats);
+    grid_levels(
+        &mut r,
+        grid,
+        4,
+        &[(2, 2, 0), (6, 2, 0), (10, 2, 0), (14, 2, 1)],
+    );
+    grid_levels(
+        &mut r,
+        grid,
+        1,
+        &[(4, 3, 0), (7, 0, 2), (10, 0, 2), (12, 3, 0), (15, 1, 1)],
+    );
+    r.e
+}
+
+/// Not a check: `target/drum-grid/beat.wav`, 16 seconds of `showcase`.
+#[test]
+#[ignore]
+fn write_clip() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/drum-grid");
+    std::fs::create_dir_all(&dir).unwrap();
+    write_wav(&dir.join("beat.wav"), &render(showcase().state(), 16.0));
+}
+
 /// Not a check: `target/drum-demos/*.wav`, 16 seconds each.
 #[test]
 #[ignore]
@@ -485,4 +537,18 @@ fn the_groove_hits_on_the_beat_and_the_second_bank_adds_the_fill() {
     ] {
         assert!(kinds.contains(&k), "{k}");
     }
+}
+
+/// Not a check: `target/drum-grid/state.json`, the four-floor patch as the plugin's `patch`
+/// state (for `docs/drum-grid/scripts/host_grid.py`).
+#[test]
+#[ignore]
+fn write_state_json() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/drum-grid");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("state.json"),
+        serde_json::to_string(showcase().state()).unwrap(),
+    )
+    .unwrap();
 }

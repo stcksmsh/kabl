@@ -37,3 +37,16 @@ Before the grid, one beat needed one 8-step `seq` per drum, a clock and a cable 
 
 - Playhead: the face reads the reference clock's position the way the cable pattern editor does, so a grid clocked by another clock shows the reference clock's position.
 - Limits: a gate follows the clock pulse, so a step is as long as the clock's pulse; chance and velocity cannot be set by a cable.
+
+## Evidence
+
+- Module tests: `crates/modules/tests/drum_grid.rs` (default beat, velocity in the gate level, chance rate and determinism, polymeter, reset, pattern param and input, voices reading the gate level, no allocation).
+- Demo: `patches/sound-engines/demos/four-floor` is now one clock, one grid, five voices (it was a clock and five sequencers). Pattern A is the groove, pattern B adds a snare ghost note and a tom fill. `crates/ui/tests/drum_demos.rs` builds it through `PatchEditor`. The pumping-kick demo is unchanged. The old lanes sent velocities of 1 to a percent param (about 1 %); with real velocities the kit mixer is at about 0.4 of the old level to keep the factory loudness (peak 0.61, rms 0.116).
+- Clip: `media/beat-velocity-chance.mp3`, 16 s: hats at four velocities, ghost snares that play half the time or less, an open hat at 75 % (`write_clip` in `drum_demos.rs`).
+- Captures: `media/grid-<A|B>-<light|dark>-1440x900.webp` and `-plugin-1180x680.webp` (the editor at the plugin's size), `grid-editing-while-playing.mp4`, `grid-edited-brush-and-chance.png`. Script: `scripts/capture.py`.
+- Frame time, `bench_chrome 300 live` on the four-floor patch (rack only, displays live): dense 1440x900 light median 1.7 ms, p95 2.5, max 3.5; dark median 2.7, p95 5.2, max 7.3. 1280x800: median 2.1 and 1.4, max 3.6 and 2.8.
+- REAPER 7.75: `scripts/host_grid.py` renders the patch from the CLAP plugin offline. Kick onsets sit on the 124 bpm beat grid within 10 samples of their median, the project saves and reopens with an equal state, the second render is bit-identical. Results in `evidence/host/`.
+
+## For agents
+
+Run every standalone, `kabl-ui` or REAPER with `PIPEWIRE_NODE=kabl_agents PULSE_SINK=kabl_agents`: that sink is silent. Check `pactl list short sink-inputs` after the start.
