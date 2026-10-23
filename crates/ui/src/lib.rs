@@ -21,6 +21,7 @@ pub mod control;
 pub mod cues;
 pub mod displays;
 mod drum_displays;
+mod drum_grid;
 pub mod editor;
 pub mod explain;
 pub mod filebrowser;
@@ -2117,6 +2118,7 @@ fn draw_module(
     | Decor::Transport(r)
     | Decor::Banks(r)
     | Decor::Operators(r)
+    | Decor::Grid(r)
     | Decor::Cues(r) = m.decor
     {
         avoid.push(r);
@@ -2202,6 +2204,9 @@ fn draw_module(
     }
     if let Decor::Cues(r) = m.decor {
         draw_cues(editor, ui_state, ui, painter, th, xf, m.id, r, now);
+    }
+    if let Decor::Grid(r) = m.decor {
+        drum_grid::draw(editor, ui_state, ui, painter, th, xf, m.id, r);
     }
     if let Decor::Banks(r) = m.decor {
         draw_banks(editor, ui_state, ui, painter, th, xf, m.id, r, now, drawn);
@@ -3403,6 +3408,7 @@ fn draw_decor(p: &egui::Painter, th: &Theme, xf: Xf, m: &Placed) {
         | Decor::Transport(_)
         | Decor::Status(_)
         | Decor::Banks(_)
+        | Decor::Grid(_)
         | Decor::Cues(_) => {}
     }
 }

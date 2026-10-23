@@ -31,9 +31,8 @@ use crate::builtins::{
     FILTER_LADDER_INFO, MACRO_INFO, NOISE_INFO,
 };
 use crate::builtins::{
-    Clap, DrumGrid, Hat, Kick, MidiNote, Snare, Tom, CLAP_INFO, DRUM_GRID_INFO, HAT_INFO, KICK_INFO,
-    MIDI_NOTE_INFO,
-    SNARE_INFO, TOM_INFO,
+    Clap, DrumGrid, Hat, Kick, MidiNote, Snare, Tom, CLAP_INFO, DRUM_GRID_INFO, HAT_INFO,
+    KICK_INFO, MIDI_NOTE_INFO, SNARE_INFO, TOM_INFO,
 };
 use crate::builtins::{
     Clock, ClockDiv, Delay, Out, Reverb, Seq, CLOCK_DIV_INFO, CLOCK_INFO, DELAY_INFO, OUT_INFO,

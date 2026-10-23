@@ -35,7 +35,9 @@ impl Grid {
     /// Runs `edges` clock edges in one block; `reset` and `pattern` are inputs of that block.
     fn run(&mut self, edges: usize, reset: &[f32], pattern: f32) -> Vec<Vec<f32>> {
         let n = edges * STEP;
-        let clock: Vec<f32> = (0..n).map(|i| if i % STEP < 2 { 1.0 } else { 0.0 }).collect();
+        let clock: Vec<f32> = (0..n)
+            .map(|i| if i % STEP < 2 { 1.0 } else { 0.0 })
+            .collect();
         let mut reset = reset.to_vec();
         reset.resize(n, 0.0);
         let inputs = [
@@ -165,14 +167,20 @@ fn peak_of_hit(gate_level: f32) -> f32 {
         },
     );
     let n = 4096;
-    let gate: Vec<f32> = (0..n).map(|i| if i < 480 { gate_level } else { 0.0 }).collect();
+    let gate: Vec<f32> = (0..n)
+        .map(|i| if i < 480 { gate_level } else { 0.0 })
+        .collect();
     let params: Vec<Signal> = k
         .info()
         .params
         .iter()
         .map(|p| Signal::Scalar(p.default))
         .collect();
-    let inputs = [Signal::Buffer(&gate), Signal::Scalar(0.0), Signal::Scalar(0.0)];
+    let inputs = [
+        Signal::Buffer(&gate),
+        Signal::Scalar(0.0),
+        Signal::Scalar(0.0),
+    ];
     let mut out = vec![0.0f32; n];
     let mut outs: Vec<&mut [f32]> = vec![out.as_mut_slice()];
     k.process(&mut ProcessIo::new(&inputs, &mut outs, &params, n));

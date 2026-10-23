@@ -312,7 +312,11 @@ impl DrumGrid {
     /// Plays the step at `self.tick` of the pattern `pat` in every row.
     fn fire(&mut self, io: &ProcessIo, pat: usize) {
         for r in 0..ROWS {
-            let len = io.param(LEN_BASE + r).at(0).round().clamp(1.0, STEPS as f32) as i64;
+            let len = io
+                .param(LEN_BASE + r)
+                .at(0)
+                .round()
+                .clamp(1.0, STEPS as f32) as i64;
             let step = (self.tick % len) as usize;
             let mut chunks = [0.0; CHUNKS];
             for (c, v) in chunks.iter_mut().enumerate() {

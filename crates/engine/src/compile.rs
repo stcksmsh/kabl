@@ -63,8 +63,8 @@ use std::fmt;
 use kabl_cables::{Carry, Node as CableNode, Settings as CableSettings};
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
 use kabl_modules::builtins::{
-    Arp, Change, Clock, Delay, DelayLock, DrumGrid, KeySettings, Lfo, LfoSync, MidiIn, MidiNote, Noise,
-    OscWt, Random, Seq, Transport,
+    Arp, Change, Clock, Delay, DelayLock, DrumGrid, KeySettings, Lfo, LfoSync, MidiIn, MidiNote,
+    Noise, OscWt, Random, Seq, Transport,
 };
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::ModuleView;
