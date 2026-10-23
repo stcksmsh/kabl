@@ -37,3 +37,21 @@ Start phases are fixed per oscillator (the original four, then golden-ratio step
 ## Face
 
 `osc.va` now has four jacks; its face keeps them in one row. Unison is a knob, so the sixteen steps do not widen the face; `curve`, `width`, `blend` and `restart` sit in the advanced area. The live display already shows the stack because it draws the output cycle.
+
+## Host and digest checks on current master
+
+- **Digest** (`render_digest`, every patch under `patches/` at merge of #37, #38 and #39: 55 patches, 19 of them with unison, including `presets/*`, the vocoder and the drum demos): branch against `origin/master` (master's `osc_va.rs` built in the same tree): **all 55 identical** (`evidence/digest-*-patches.txt`).
+- **REAPER 7.75, CLAP plugin, silent sink** (`scripts/host.py`, `evidence/host/result.json`): project `super` (palette/pad with every `osc.va` at unison 16, detune 30 ct, curve 60, beside palette/strings): saved, fully quit, reopened and saved: plugin state identical; the renders before and after reopen are bit-identical (same SHA-256), finite, peak 0.10, not silent. Project `old` (palette/pad and palette/strings, unison up to 4): the render with this plugin and with a plugin built from master's `osc_va.rs` is bit-identical (same SHA-256) and the saved state is identical. The supersaw render differs from the old one. During the runs `pactl list sink-inputs` showed no stream on any sink, so nothing reached the real output.
+
+## Is stereo width usable in a normal patch?
+
+Not without extra work. Every voice-rate module (filters, VCA, envelopes) has one audio input and one output, so a stereo `out`/`out_r` pair only survives if the user builds two parallel chains: two filters and two VCAs with the same cutoff, resonance and envelope cables, ending in `out.left` and `out.right`. That doubles the cost of those modules per voice and every control has to be cabled twice (macros can drive both).
+
+What a supersaw needs to be stereo in an ordinary patch, cheapest first:
+
+1. **A stereo pair composite** (no engine change): a composite "stereo voice" holding two filters and two VCAs with shared public controls, so the user drops in one module. Costs the same CPU as two chains; works with today's cables; its controls are the usual filter and VCA ones.
+2. **Stereo-capable filter and VCA** (a `filter.svf`/`vca` "stereo" mode with `in_r` and `out_r` ports): one module on the face, one set of controls, same CPU. Needs new ports on every module that sits between the oscillator and `out` (filter.svf, filter.ladder, vca, and the effects after them already have stereo in the chorus, delay and reverb).
+3. **A stereo cable type** (engine change): a cable that carries a pair, so any module without stereo support still accepts it by processing each channel with its own state. Most general, largest change (compile, cable drawing, every module's state doubling).
+4. **No per-oscillator width** (cheapest, but not width): a post-mix widener (chorus or a short decorrelator after the VCA). It spreads the whole voice, not the individual oscillators, so it does not give the supersaw's wide, moving image.
+
+My recommendation to put to Kosta: option 2 for filter.svf, filter.ladder and vca, because those three cover most supersaw patches and keep one module per stage. Option 1 is the quick route if the preset batch cannot wait.
