@@ -228,6 +228,51 @@ fn rms(v: &[f32]) -> f64 {
     (v.iter().map(|s| (*s as f64).powi(2)).sum::<f64>() / v.len() as f64).sqrt()
 }
 
+/// A recorded voice for patches with `audio.in`: `docs/vocoder/audio/voice-espeak-16k.wav` (made
+/// with espeak-ng, see docs/vocoder/README.md), brought to 48 kHz by linear interpolation and
+/// scaled to -20 dBFS RMS over the samples that carry sound, then repeated with half a second
+/// between. It starts at two seconds, so the stopped-load check still holds.
+struct SyntheticVoice {
+    samples: Vec<f32>,
+}
+
+impl SyntheticVoice {
+    fn new() -> Self {
+        let path = root().join("../docs/vocoder/audio/voice-espeak-16k.wav");
+        let mut r = hound::WavReader::open(path).unwrap();
+        let src: Vec<f32> = r
+            .samples::<i16>()
+            .map(|s| s.unwrap() as f32 / 32768.0)
+            .collect();
+        let mut samples = Vec::with_capacity(src.len() * 3 + 24000);
+        for w in src.windows(2) {
+            for k in 0..3 {
+                samples.push(w[0] + (w[1] - w[0]) * k as f32 / 3.0);
+            }
+        }
+        samples.extend(std::iter::repeat_n(0.0, 24000));
+        let (sum, n) = samples
+            .iter()
+            .filter(|s| s.abs() > 0.002)
+            .fold((0.0f64, 0usize), |(a, n), s| {
+                (a + (*s as f64).powi(2), n + 1)
+            });
+        let gain = 0.1 / (sum / n as f64).sqrt() as f32;
+        samples.iter_mut().for_each(|s| *s *= gain);
+        SyntheticVoice { samples }
+    }
+
+    fn block(&mut self, t: usize) -> ([f32; BLOCK], [f32; BLOCK]) {
+        let mut out = [0.0; BLOCK];
+        for (i, o) in out.iter_mut().enumerate() {
+            if let Some(n) = (t + i).checked_sub(2 * 48000) {
+                *o = self.samples[n % self.samples.len()];
+            }
+        }
+        (out, out)
+    }
+}
+
 fn render_raw(
     state: &PatchState,
     keys: bool,
@@ -249,6 +294,12 @@ fn render_raw(
         .map(|(&id, _)| (id, 1u8))
         .collect();
     let stop = secs - 8;
+    // Patches that take sound from outside are measured with a stand-in voice.
+    let mut voice = state
+        .modules
+        .values()
+        .any(|m| m.kind == "audio.in")
+        .then(SyntheticVoice::new);
     let mut samples = Vec::with_capacity(secs * 96000);
     let (mut l, mut r) = ([0.0; BLOCK], [0.0; BLOCK]);
     let mut active_windows = 0;
@@ -375,6 +426,10 @@ fn render_raw(
             for id in &clocks {
                 engine.transport(*id, Transport::Stop);
             }
+        }
+        if let Some(v) = voice.as_mut() {
+            let (il, ir) = v.block(t);
+            engine.set_audio_in(&il, &ir);
         }
         engine.process_block(&mut l, &mut r);
         let mut sum = 0.0;
@@ -597,4 +652,28 @@ fn factory_levels_hold_the_target() {
         }
     }
     assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
+
+/// The stand-in voice speaks at -20 dBFS RMS while it sounds (about the level of a close-miked
+/// voice), so `audio.in` patches are levelled for a typical input.
+#[test]
+fn synthetic_voice_is_about_minus_20_dbfs() {
+    let mut v = SyntheticVoice::new();
+    let mut sum = 0.0f64;
+    let mut n = 0usize;
+    for b in 0..(6 * 48000 / BLOCK) {
+        let (l, _) = v.block(b * BLOCK);
+        for s in l {
+            if s != 0.0 {
+                sum += (s as f64).powi(2);
+                n += 1;
+            }
+        }
+    }
+    let db = 20.0 * (sum / n as f64).sqrt().log10();
+    println!(
+        "synthetic voice {db:.1} dBFS, peak {:.3}",
+        v.samples.iter().fold(0.0f32, |a, s| a.max(s.abs()))
+    );
+    assert!((db + 20.0).abs() < 2.0, "{db:.1}");
 }

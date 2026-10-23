@@ -13,6 +13,8 @@ Loudness is the RMS of the 100 ms blocks above -50 dBFS (silent gaps and the sto
 
 `crowded` ("Crowded Rack", a study of dense cabling with resonant filters) is the reason the window is +-5.5 and not tighter: its peaks sit 22 dB over its loudness, so at -1.8 dBFS peak it is at -23.7 dBFS loudness. Patches with a normal crest (12 to 18 dB) should land within +-3 of the target.
 
+Patches with an `audio.in` module take sound from outside, and the factory render has no microphone, so they are rendered with a stand-in voice: `docs/vocoder/audio/voice-espeak-16k.wav` (made with espeak-ng), brought to 48 kHz and scaled to -20 dBFS RMS over the samples that carry sound, repeated with half a second between, starting at 2 s. That is about the level of a close-miked voice, so such a patch is levelled for a typical input; a louder or quieter voice moves the result with it, by the same amount, as the vocoder multiplies.
+
 ## How to level a new patch
 
 1. Render it: `cargo test --release -p kabl-ui --test factory_bank level_table -- --ignored --nocapture` prints `peak` and `loud` for every factory patch.
@@ -70,5 +72,7 @@ Levels only: `gain_db` of the Gain stage, mixer levels, or (pluck-to-pad) one ad
 | `sound-engines/demos/stepped-sweep` | -3.5 | -3.5 | -16.7 | -16.7 |
 | `sound-engines/demos/swing-seq` | -4.6 | -4.6 | -14.9 | -14.9 |
 | `sound-engines/demos/tine-keys` (changed) | -0.3 | -1.8 | -17.1 | -18.5 |
+| `sound-engines/demos/live-voice` (new) | | -1.9 | | -21.7 |
+| `sound-engines/demos/robot-voice` (new) | | -2.2 | | -20.0 |
 | `sound-engines/demos/vowel-drift` | -3.0 | -3.0 | -19.0 | -19.0 |
 | `sound-palette` | -6.5 | -6.5 | -23.8 | -23.8 |

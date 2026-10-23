@@ -9,7 +9,7 @@
 
 use egui::{pos2, vec2, Align2, Pos2, Rect, Stroke};
 use kabl_core::{ModuleId, PatchState, PortRef};
-use kabl_modules::builtins::{band_response_db, compressor_reduction, formant_bands};
+use kabl_modules::builtins::{band_centers, band_response_db, compressor_reduction, formant_bands};
 
 use crate::displays::{modulated_norm, paint, param, plot, Detail, Live};
 use crate::kit::face;
@@ -129,6 +129,7 @@ pub(crate) fn draw(
         "phaser" | "flanger" => sweep(state, st, live, now, p, m, r, z, d),
         "filter.comb" => comb(state, st, live, now, p, m, r, z, d),
         "filter.formant" => formant(state, st, live, now, p, m, r, z, d),
+        "vocoder" => vocoder(state, st, live, now, p, m, r, z, d),
         "bitcrusher" => bitcrusher(state, st, p, m, r, z, d),
         k if k.starts_with("drum.") => {
             crate::drum_displays::draw(state, st, live, now, p, m, r, z, d)
@@ -486,6 +487,74 @@ fn formant(
                 Stroke::new(1.0, alpha(st.roles.disp_text, 140)),
             );
         }
+    }
+}
+
+/// The vocoder's bands: one bar per band at its centre on a log frequency axis, as tall as the
+/// voice is loud there (the module's per-band envelope, from `Module::view`). With no live data
+/// the bars rest low, so the picture still shows where the bands sit. Under the bars, a tick per
+/// band where the synth's side of that band is after the formant shift.
+#[allow(clippy::too_many_arguments)]
+fn vocoder(
+    state: &PatchState,
+    st: &Style,
+    live: &Live,
+    now: f64,
+    p: &egui::Painter,
+    m: &Placed,
+    r: Rect,
+    z: f32,
+    d: Detail,
+) {
+    let n = (live_param(state, live, now, m, "bands").round() as usize).clamp(8, 32);
+    let low = live_param(state, live, now, m, "low_hz");
+    let high = live_param(state, live, now, m, "high_hz");
+    let spacing = live_param(state, live, now, m, "spacing");
+    let shift = live_param(state, live, now, m, "shift_st");
+    let centers = band_centers(n, low, high, spacing, SR);
+    let axis = (low * 0.8, high * 1.25);
+    let x_of = |hz: f32| r.left() + r.width() * log_x(hz.clamp(axis.0, axis.1), axis.0, axis.1);
+    let levels = live
+        .tap(m.id, 0, now)
+        .filter(|t| t.view.valid)
+        .map(|t| t.view.cycle);
+    let tick = if d == Detail::Full { 5.0 * z } else { 0.0 };
+    let body = Rect::from_min_max(r.min, pos2(r.right(), r.bottom() - tick));
+    let color = face::trace_color(st);
+    for i in 0..n {
+        let lo = if i == 0 {
+            centers[0] * 0.9
+        } else {
+            (centers[i - 1] * centers[i]).sqrt()
+        };
+        let hi = if i + 1 == n {
+            centers[i] * 1.1
+        } else {
+            (centers[i] * centers[i + 1]).sqrt()
+        };
+        let w = ((x_of(hi) - x_of(lo)) * 0.72).max(1.0);
+        let xc = x_of(centers[i]);
+        let level = levels.map_or(0.1, |c| c[i].clamp(0.0, 1.0)).max(0.04);
+        let bar = Rect::from_min_max(
+            pos2(xc - w * 0.5, body.bottom() - body.height() * level),
+            pos2(xc + w * 0.5, body.bottom()),
+        );
+        p.rect_filled(
+            bar,
+            0.0,
+            alpha(color, if levels.is_some() { 230 } else { 70 }),
+        );
+        if tick > 0.0 {
+            let x = x_of(centers[i] * (shift / 12.0).exp2());
+            p.line_segment(
+                [pos2(x, r.bottom() - tick), pos2(x, r.bottom())],
+                Stroke::new(1.0, alpha(st.roles.disp_text, 140)),
+            );
+        }
+    }
+    if d == Detail::Full {
+        let at = pos2(r.left() + 3.0 * z, r.top() + 2.0 * z);
+        caption(p, st, z, at, Align2::LEFT_TOP, &n.to_string());
     }
 }
 

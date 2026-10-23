@@ -240,12 +240,12 @@
         }
       },
       "status": {
-        "code": "skipped",
-        "details": "The plugin implements the 'audio-ports' extension but it does not have any input audio ports."
+        "code": "success",
+        "details": "The plugin took 1.49x longer to process denormals"
       },
       "duration": {
         "secs": 0,
-        "nanos": 9497800
+        "nanos": 151483914
       }
     },
     {
