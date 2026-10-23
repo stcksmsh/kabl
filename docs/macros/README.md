@@ -52,7 +52,21 @@ No bump. A depth route is an ordinary cable whose destination is `CableParam { c
 
 ## Proof that old patches are unchanged
 
-`cargo test --release -p kabl-ui --test factory_bank render_digest -- --ignored` renders every patch under `KABL_DIGEST_ROOT` for 24 s the way the bank render does and writes an FNV digest of the sample bits to `KABL_DIGEST`. Run on `origin/master` and on this branch, over `patches/` and over the `patches/` tree of `claude/presets-pilot`: see the result in the PR.
+`cargo test --release -p kabl-ui --test factory_bank render_digest -- --ignored` renders every patch under `KABL_DIGEST_ROOT` for 24 s the way the bank render does and writes an FNV digest of the sample bits to `KABL_DIGEST`. Run on `origin/master` and on this branch, over `patches/` and over the `patches/` tree of `claude/presets-pilot`: all 42 patches in `patches/` and all 50 in the pilot branch give bit-identical digests (`evidence/digest-*.txt`). Only `macros-eight` differs: it does not compile on master (unknown param `m5`).
+
+## Host check (REAPER 7.75, CLAP plugin)
+
+`python3 docs/macros/scripts/host.py` (method of `docs/functional-cables/scripts/host_routes.py`; evidence in `evidence/host/`). Track 1 is `patches/macros-eight` with host automation lane 1 bound to the **fifth** macro (`m5`, Delay) and a recorded envelope on it; track 2 is `cue-macros`.
+
+- Saved, REAPER quit completely, reopened, saved: both states identical as float32, including the lane-1 target (`m5`) and the route into a route's amount. The renders before and after the reopen are bit-identical (relative difference 0.0, spectrum cosine 1.0).
+- The automation does something: the same project without the envelope renders differently (relative difference 0.26, spectrum cosine 0.97).
+- A project saved by the previous build (state version 2) opens and saves unchanged.
+
+`media/plugin-perform-1180x680.png` is the plugin editor in REAPER at its default 1180 by 680 with the eight named macros in one row (`scripts/editor.py`). The standalone minimum window is 1280 by 800 (`media/standalone-perform-*.png`, light and dark).
+
+## Tests
+
+Workspace: 980 passed, 0 failed, 34 ignored. New: `route_depth.rs` (7), `macros_perform.rs` (1), plus additions to `macros.rs`, `cues.rs`, `functional_cables.rs`, `library.rs` and the clap `host_tests.rs`.
 
 ## Demo
 
@@ -60,13 +74,14 @@ No bump. A depth route is an ordinary cable whose destination is `CableParam { c
 
 ```sh
 cargo run -p kabl-ui --example macros_demo -- write patches/macros-eight
-cargo run --release -p kabl-ui --example macros_demo -- render patches/macros-eight clip.wav
+cargo run --release -p kabl-ui --example macros_demo -- render patches/macros-eight clip.wav   # prints the wobble per window
 ```
 
-`media/motion-scales-lfo-depth.wav` is 12 s: Motion 0 for 4 s, 0.5 for 4 s, 1.0 for 4 s. Listen for the filter wobble coming in. Measured: the lowest 50 ms RMS in each window falls 0.065, 0.015, 0.009 while the loudest stays at 0.21.
+`media/motion-scales-lfo-depth.mp3` is 12 s: Motion 0 for 4 s, 0.5 for 4 s, 1.0 for 4 s. Listen for the filter wobble coming in. Measured: the lowest 50 ms RMS in each window falls 0.065, 0.015, 0.009 while the loudest stays at 0.21.
 
 ## Known gaps
 
 - The routing drawer's "All sources" span ignores depth routes (it shows the stored amount).
+- A long macro name truncates in its tile ("Resonan..." at eight macros in 1180 px); the hover and the drawer show it in full.
 - Eight is a hard ceiling; a ninth needs a second macros module.
 - A route into a route that ends on a cable parameter (a cable's morph or chance) has no depth yet.

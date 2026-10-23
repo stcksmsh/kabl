@@ -8,7 +8,7 @@ Stored as params on the `cues` module, like the rest of a cue: `cue<N>.macro.<mo
 
 ## Engine (`crates/engine/src/morph.rs`)
 
-A launch carries up to 8 macro targets and the length in pulses. The engine starts each morph at the cue's boundary on its clock, then once per block writes `from + (to - from) * elapsed / length` into the macro's param. `elapsed` is the sum of the clock position's forward movement, so it is tempo-aware. Nothing allocates (tested under `assert_no_alloc`); a block's value step is smoothed by the macro's glide, so there is no zipper noise (test: no step above 1e-4 per sample over a 0.6 swing in a bar).
+A launch carries up to 16 macro targets and the length in pulses. The engine starts each morph at the cue's boundary on its clock, then once per block writes `from + (to - from) * elapsed / length` into the macro's param. `elapsed` is the sum of the clock position's forward movement, so it is tempo-aware. Nothing allocates (tested under `assert_no_alloc`); a block's value step is smoothed by the macro's glide, so there is no zipper noise (test: no step above 1e-4 per sample over a 0.6 swing in a bar).
 
 Decisions for the cases in the brief (each has a test in `crates/engine/tests/cue_macros.rs`):
 
