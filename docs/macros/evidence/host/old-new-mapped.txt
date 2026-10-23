@@ -1,0 +1,4 @@
+79311dc00000-79311e029000 r--p 00000000 103:01 13921960                  /secondary/Programming/Github/kabl/.worktrees/sound-engines-2/scratch/macros-host/plugin/kabl.clap
+79311e029000-79311e819000 r-xp 00428000 103:01 13921960                  /secondary/Programming/Github/kabl/.worktrees/sound-engines-2/scratch/macros-host/plugin/kabl.clap
+79311e819000-79311e866000 r--p 00c17000 103:01 13921960                  /secondary/Programming/Github/kabl/.worktrees/sound-engines-2/scratch/macros-host/plugin/kabl.clap
+79311e866000-79311e868000 rw-p 00c63000 103:01 13921960                  /secondary/Programming/Github/kabl/.worktrees/sound-engines-2/scratch/macros-host/plugin/kabl.clap

@@ -467,6 +467,10 @@ fn render_bank() {
 
 /// Every factory patch directory (one holding a `checkpoint.json`), relative to `patches/`.
 fn all_factory_dirs() -> Vec<String> {
+    dirs_under(&root())
+}
+
+fn dirs_under(base: &Path) -> Vec<String> {
     fn walk(base: &Path, dir: &Path, out: &mut Vec<String>) {
         if dir.join("checkpoint.json").is_file() {
             out.push(
@@ -488,8 +492,39 @@ fn all_factory_dirs() -> Vec<String> {
         }
     }
     let mut out = Vec::new();
-    walk(&root(), &root(), &mut out);
+    walk(base, base, &mut out);
     out
+}
+
+/// FNV-1a over the sample bits: equal digests mean bit-identical renders.
+fn digest(samples: &[f32]) -> u64 {
+    samples.iter().fold(0xcbf29ce484222325, |h, s| {
+        (h ^ s.to_bits() as u64).wrapping_mul(0x100000001b3)
+    })
+}
+
+#[test]
+#[ignore = "writes one render digest per patch under $KABL_DIGEST_ROOT (default patches/) to $KABL_DIGEST, to compare two builds"]
+fn render_digest() {
+    let Some(path) = std::env::var_os("KABL_DIGEST") else {
+        return;
+    };
+    let base = std::env::var_os("KABL_DIGEST_ROOT").map_or_else(root, PathBuf::from);
+    let mut out = String::new();
+    for dir in dirs_under(&base) {
+        let Ok(log) = kabl_core::load(&base.join(&dir)) else {
+            out += &format!("{dir} unloadable\n");
+            continue;
+        };
+        if kabl_engine::compile::compile(log.state(), 48000.0, 8).is_err() {
+            out += &format!("{dir} uncompilable\n");
+            continue;
+        }
+        let (keys, _) = Meta::play_of(log.state());
+        let (samples, _) = render_raw(log.state(), keys, 24, false);
+        out += &format!("{dir} {:016x}\n", digest(&samples));
+    }
+    std::fs::write(path, out).unwrap();
 }
 
 /// Peak (dBFS) and loudness (dBFS RMS over the 100 ms blocks above -50 dBFS, so silent gaps

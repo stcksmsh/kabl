@@ -683,3 +683,30 @@ fn a_session_with_an_embedded_table_sounds_from_the_first_block() {
         &peaks[60..70]
     );
 }
+
+#[test]
+fn all_eight_macros_are_automation_candidates() {
+    let mut patch = kabl_standalone::default_patch();
+    let m = patch.modules.keys().max().copied().unwrap_or(0) + 1;
+    patch.modules.insert(
+        m,
+        kabl_core::ModuleState {
+            kind: "macro".into(),
+            pos: Vec2 { x: 0.0, y: 0.0 },
+            params: Default::default(),
+        },
+    );
+    let macros: Vec<String> = automation::candidates(&patch)
+        .into_iter()
+        .filter(|t| t.module == m)
+        .map(|t| t.param)
+        .collect();
+    assert_eq!(macros.len(), 8);
+    assert!(macros.contains(&"m5".to_string()) && macros.contains(&"m8".to_string()));
+    let fifth = automation::Target {
+        module: m,
+        kind: "macro".into(),
+        param: "m5".into(),
+    };
+    assert!(automation::resolve(&patch, &fifth).is_some());
+}

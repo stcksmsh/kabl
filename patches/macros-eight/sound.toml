@@ -1,0 +1,6 @@
+name = "Eight Macros"
+category = "Piece"
+tags = ["pad", "macros", "performance", "drone"]
+description = "A drifting two-voice pad with eight named macros on the Perform page. Motion does not move a knob: it fades in a slow, gentle breath on the filter cutoff, from still to full. Run, then turn Motion."
+keys = false
+sequence = false
