@@ -12,14 +12,14 @@ Three carry the French-touch signature (tagged `signature`), five cover other ge
 |---|---|---|---|---|
 | Cinder Block | Bass | French touch, signature | mono, short off-beat notes, mod wheel opens the filter | **Bite** ladder cutoff; **Grit** drive stage; **Room** slapback and tight room (0.25); **Crush** bitcrusher mix |
 | Parquet Loop | Keys | disco, signature, 122 BPM swing | hold a chord, press Run: the filter closes on every beat; chord tones glide | **Cutoff** ladder cutoff; **Crunch** drive stage; **Space** dotted echo and tight room (0.25); **Glide** slide time |
-| Loading Dock | Piece | filter house, signature, 124 BPM swing | press Run; five cues; a hand-played voice on top | **Sweep** ladder cutoff; **Drive** drive stage and bitcrusher; **Wash** noise riser, echo and room (0.15); **Pump** how hard the kick ducks bass and stabs (the sidechain ratio) |
+| Loading Dock | Piece | filter house, signature, 124 BPM swing | press Run; five cues; a hand-played voice on top | **Sweep** ladder cutoff; **Drive** drive stage and bitcrusher; **Wash** noise riser, echo and room (0); **Pump** how hard the kick ducks bass and stabs (the sidechain ratio) |
 | Glass Elevator | Keys | pop | poly FM electric piano, velocity | **Tine** FM index and a lowpass; **Grit** drive stage; **Space** ping-pong echo and room (0.60); **Chorus** mix and rate |
 | Undertow | Bass | hip-hop, drum and bass | mono, legato glide, long low notes | **Cutoff** ladder cutoff; **Weight** drive stage; **Room** short room (0.30); **Beating** the two saws pull apart and the cutoff sweeps |
 | Salt Flat | Pad | ambient, cinematic | poly, slow, open chords | **Bloom** ladder cutoff; **Saturation** a little drive; **Space** long echo and a 9 s room (0.65); **Texture** the staticky layer (default 0 = clean) |
 | Boxwood | Pluck | mallet | poly FM mallet, velocity | **Brightness** FM index and a lowpass; **Warmth** a little drive; **Space** echo and a medium room (0.45); **Chorus** mix and rate |
 | Neon Highway | Lead | synthwave | mono, legato glide | **Cutoff** ladder cutoff; **Bite** drive stage; **Space** dotted echo and room (0.60); **Vibrato** vibrato depth |
 
-Loading Dock cues (CC 40-44, or the pads), as Sweep / Drive / Wash / Pump: Intro (0.12, 0.30, 0.15, 0.50), Build (0.90, 0.75, 0.65, 0.80, over 12 beats), Gap (0.08, 0.60, 0.85, 1.00, at once), Drop (0.78, 1.00, 0.10, 1.00, at once), Break (0.20, 0.25, 0.60, 0.30, over 4 beats). Cues set macros only; both sequencers play on.
+Loading Dock cues (CC 40-44, or the pads), as Sweep / Drive / Wash / Pump: Intro (0.12, 0.30, 0.00, 0.50), Build (0.90, 0.75, 0.65, 0.80, over 12 beats), Gap (0.08, 0.60, 0.85, 1.00, at once), Drop (0.78, 1.00, 0.10, 1.00, at once), Break (0.20, 0.25, 0.60, 0.30, over 4 beats). Cues set macros only; both sequencers play on.
 
 ## Round two: Kosta's verdict and what changed
 
@@ -39,6 +39,26 @@ On a macro, with a moderate stored value. The slide is a matter of taste (some p
 
 Clean. The preset is the bank's ambient pad: slow, wide and long; the static fights the idea of it, and the verdict calls the clean version "truly angelic". The grain is one move away (Texture up), and `salt-flat-textured.mp3` plays the same phrase at Texture 0.7.
 
+## Round three: the static, the glide and the first half second
+
+Kosta heard a static or fuzz in Cinder Block and in the clean Salt Flat, no glide in Parquet Loop and a strange noise in the first half second of Loading Dock. Each was tested with A/B renders (float WAV, `PP_SET` and `PP_SR` in `presets_pilot`, `scripts/clips.py` for the encoding).
+
+| Suspect | Test | Result |
+|---|---|---|
+| Limiter (instant attack, hard clamp) | Ceiling raised to 0 dB, null against the normal render | Idle in six presets (null -240 dB). Active in Salt Flat and Glass Elevator on 8 samples at the ceiling: null -62 dB and -54 dB. Not audible; not the cause. |
+| Aliasing | 48 kHz against 96 kHz render | Salt Flat: no change (above 8 kHz -53.9 against -53.1 dB). Cinder Block: 5 dB more content above 8 kHz at 48 kHz, all of it from the bitcrusher (without it, above 8 kHz is 18 dB lower). |
+| Reverb, chorus | Space macro at 0 | Reverb and chorus change the sound but add no hiss; the high band is -54 dB in Salt Flat either way. |
+| **The mp3 encoder** | Encode the WAV, decode, subtract | **At 192 kbps the encoding error is -46 dBFS RMS: 30 dB under the signal overall, 14 dB under it from 6 to 12 kHz and 7 dB from 12 kHz up.** That is broadband noise at the level of the pad's own high band. At 320 kbps the error is -72.5 dBFS (26 dB lower); VBR V0 is -62 dBFS. |
+| 16-bit step, denormals | 16-bit truncation is about -98 dBFS; tails decay to digital silence | Too quiet to matter. |
+
+**Cause: the clips were encoded at 192 kbps CBR**, and the error noise is what both presets share (Salt Flat is a dense wide pad, Cinder Block is bright and distorted). It is not a module or a preset problem. Fix in the render script: `scripts/clips.py` renders 32-bit float WAVs, encodes 320 kbps CBR, decodes each mp3 again and fails if the error is not at least 35 dB under the signal below 16 kHz or the peak moves by half a dB (at 320 kbps: Salt Flat 59 dB, Cinder Block 59 dB, Neon Highway 35.5 dB, the rest 42 to 57 dB). The limiter stays as it is.
+
+What stays by design: Cinder Block's bitcrusher (Crush stored at 0.3, so 18 % of the mix) adds 18 dB of inharmonic content above 8 kHz, 5 dB of it aliasing. That is the dirt Kosta liked and also "static" by definition. The Crush macro takes it out; if the default should be lower, 0.15 halves it.
+
+**Parquet Loop glide.** In poly mode a voice's first note never glides (`docs/sound-palette-batch/keyboard.md`: "each voice glides from the last pitch *it* played (a voice's first note does not glide)"), and the allocator gives a new note the free voice released longest ago. After load all eight voices are fresh, so the first eight notes (and the first chords) do not glide at all; after that each note slides in from whatever that voice played eight notes earlier. Measured on this patch with Glide at 1 (about 830 ms), an alternating C3 and C5 legato line: 200 ms after each note-on, notes 1 to 9 are already exactly on pitch (130.4 and 521.5 Hz); the first mid-slide reading is note 11 (265 Hz on its way from the C5 that voice played before). The preset's glide time is fine and the filter loop does not mask it. **This is a keyboard/allocator limitation, reported rather than worked around:** a poly glide that does what a player expects needs the allocator to take the voice whose last pitch is nearest the new note (or glide a fresh voice from the most recent pitch of any voice). A legato line is a mono preset today.
+
+**Loading Dock first half second.** The pink-noise riser entered before the drive, so even Wash 0.15 became a loud, steady hiss (about -22 dBFS) that the drive's saturation held up; before Run there is nothing else to hear, which is why it stood out in the first half second. Now the riser joins after the drive, and Wash is 0 at the Intro (and stored at 0), so the preset is silent until Run and the riser grows with the Build from nothing.
+
 ## Where a fifth macro would help
 
 The macros module holds four (`MAX_OUTPUTS` is 4 per module; `claude/macros` lifts it), so the pilot stays at four. A fifth would help here, and no more than that:
@@ -57,7 +77,7 @@ Dropped: Violet Hour, Chrome Chase and Android Choir. Harder reworks of the arpe
 ## What the pilot says about the brief
 
 - **Four fixed macros was wrong.** The first pilot held Filter, Drive, Space and Motion everywhere; Kosta's point is that the same four meanings are not what a sound needs. A bass wants Bite and Crush, a pad wants Texture, a piece wants Pump. The brief now says: each preset names its macros after what they do, four is typical, more is allowed but discouraged above four. Round two relabels all eight and swaps the fourth macro on five of them for something the sound actually owns (Crush, Glide, Pump, Texture and the renamed Motion ones).
-- **Wet by default works, with a genre-appropriate default.** Mixes are 0 on the modules and driven by the space macro, so the stored value is the designed wet amount and the macro at 0 is a usable dry sound in all eight. Defaults run from 0.15 (Loading Dock) to 0.65 (Salt Flat).
+- **Wet by default works, with a genre-appropriate default.** Mixes are 0 on the modules and driven by the space macro, so the stored value is the designed wet amount and the macro at 0 is a usable dry sound in all eight. Defaults run from 0 (Loading Dock, where Wash also brings in the riser) to 0.65 (Salt Flat).
 - **A limiter on the output is part of the recipe.** With macros up, three presets peaked over 0 dBFS in the first pilot. Every preset ends in a `limiter` at -1.5 dB.
 - **Heavy compression makes the gain stage insensitive.** Cinder Block and Loading Dock sit behind an 8:1 compressor; a trim gain changed their loudness by less than half a dB, so they are leveled with the compressor's makeup.
 - **Modulation amounts add in the knob's travel and can saturate.** In the first Gravel Pit the filter envelope plus the Filter macro pushed the cutoff to the top of its range on every note. Keep the sum of a cutoff's routes under 1 at their peaks. The same amounts, with a high resonance, were also what made it "wobbly".
@@ -76,7 +96,7 @@ Things kabl lacks that a preset wanted. Each is written down, not built.
 6. **No genre field.** Genre lives in the tags; the metadata would need a field (a schema change, so not done here).
 7. **Vocoder.** The voice presets gain it when the module lands.
 8. **Cue pieces are leveled at their first cue.** The level test renders a piece at its stored macro values (the Intro); the Drop is a few dB louder than that.
-9. **Poly glide is voice-by-voice.** A poly keys sound that glides like a legato line (the new note slides from the last note played, not from the voice that happened to be free) needs the allocator to prefer the voice that played the nearest pitch. Not changed here.
+9. **Poly glide is voice-by-voice and not on the first notes (see round three).** A poly keys sound that glides like a legato line (the new note slides from the last note played, not from the voice that happened to be free) needs the allocator to prefer the voice that played the nearest pitch. Not changed here.
 10. **Stepped parameters cannot be routed.** The glide mode (OFF, ALWAYS, LEGATO) is stepped, so a macro can set the glide time but not switch glide on; Glide at 0 is a 5 ms slide, not off.
 
 Changes outside the presets: `CATEGORIES` in `crates/ui/src/library.rs` gains **Groove**, **Voice** and **Pluck**. It is a list of names for the browser and Save As; the patch format is unchanged.
@@ -100,12 +120,13 @@ Clips are in `docs/presets/clips/`, one per preset, played the way it is meant t
 
 ## Evidence
 
-Regenerate with `presets_pilot` (`write`, `clips`, `macros`, `phrases`), `scripts/standalone.py` and `scripts/host.py`.
+Regenerate with `presets_pilot` (`write`, `clips`, `macros`, `phrases`; `PP_F32`, `PP_SR`, `PP_SET` and `PP_HITS` for A/B renders), `scripts/clips.py`, `scripts/standalone.py` and `scripts/host.py`.
 
 - **Levels** (`level_table`, 24 s render of each preset's own demonstration), peak / loudness in dBFS: Boxwood -2.2 / -20.3, Cinder Block -7.3 / -19.2, Glass Elevator -1.8 / -21.0, Loading Dock -7.3 / -18.3, Neon Highway -8.0 / -19.5, Parquet Loop -3.9 / -20.0, Salt Flat -1.5 / -19.9, Undertow -13.1 / -20.3. All within 2.0 dB of -19; `factory_levels_hold_the_target` passes.
 - **Macros at the extremes** (`presets_pilot macros`, cues not launched): with every macro at 0 or at 1 no preset exceeds -1.5 dBFS and all renders are finite.
 - **Salt Flat static** (measured on the clip, mixed to mono): without the shimmer voice the energy above 2 kHz falls 6.8 dB (-43.0 to -49.8 dBFS RMS) and the crest factor of that band rises from 5.3 to 14.8; chorus mix, unison spread and the reverb change it by a dB or less each. A pure sine instead of the triangle makes the high band tonal (spectral flatness 0.7 against 0.03).
 - **Glide** (Parquet Loop clip with Glide at 0.5 against 0): the renders are bit-identical until the first chord change (about 3.9 s), differ by about -20 dB from there.
+- **Clips** (`scripts/clips.py`): 320 kbps mp3 decoded against the float WAV, error 54 to 78 dBFS RMS, 35 to 59 dB under the signal below 16 kHz, peaks within 0.1 dB.
 - **Standalone** (`scripts/standalone.py`, release build, real audio device, real-time priority granted): all eight open, take MIDI from a virtual controller and stay running; Rack and Perform captures in `evidence/standalone/`.
 - **REAPER 7.75** (`scripts/host.py`, CLAP plugin, `evidence/host/result.json`): per preset a project with the plugin and a MIDI item playing the clip phrase (the piece also gets its five cue buttons). Saved, fully quit, reopened and saved: the plugin state is identical in all eight; the render after reopen equals the first (relative difference 0.0); every render is finite and not silent. Without the MIDI item the seven keyboard presets render silent (RMS 0.0); Loading Dock plays by itself with the transport running in the host. (Rebuild the plugin with `cargo build --release -p kabl-clap` first: a stale `libkabl_clap.so` loads a drum patch as the default sound.)
 - **Tests**: `every_preset_keeps_to_the_brief` (`crates/ui/tests/presets.rs`: one macro module, each named macro on CC 20 and up and pinned in order, play flags, category, tags, a description naming every macro), `every_factory_sound_is_discoverable_categorized_and_loads` and `factory_levels_hold_the_target` pass.

@@ -23,7 +23,15 @@ use kabl_ui::library::Meta;
 use kabl_ui::perform::{BTN_PREFIX, CC_PREFIX, CUE_PADS, PIN_PREFIX, TRANSPORT};
 use kabl_ui::{cues, PatchEditor};
 
-const SR: f32 = 48000.0;
+const SR_DEFAULT: f32 = 48000.0;
+
+/// The render rate: 48 kHz, or `PP_SR` for an A/B at another rate.
+fn sr() -> f32 {
+    std::env::var("PP_SR")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(SR_DEFAULT)
+}
 
 fn jack(id: ModuleId, port: &str) -> PortRef {
     PortRef::Module {
@@ -386,7 +394,7 @@ fn drum_lane(r: &mut Rack, on: &[usize]) -> ModuleId {
 
 /// (name, [Sweep, Drive, Wash, Pump] targets, morph in beats, launch time in the clip, s)
 const DROP_CUES: [(&str, [f32; 4], f32, f32); 5] = [
-    ("Intro", [0.12, 0.30, 0.15, 0.50], 0.0, 0.0),
+    ("Intro", [0.12, 0.30, 0.00, 0.50], 0.0, 0.0),
     ("Build", [0.90, 0.75, 0.65, 0.80], 12.0, 4.0),
     // The pre-drop suck: filter shut, the wash still ringing, the pump at full.
     ("Gap", [0.08, 0.60, 0.85, 1.00], 0.0, 10.0),
@@ -453,16 +461,14 @@ fn loading_dock() -> Rack {
     let play_vca = r.add("vca", &[("gain", 0.0)]);
     let mix = r.add(
         "mixer",
-        &[
-            ("level1", 0.55),
-            ("level2", 0.3),
-            ("level3", 0.35),
-            ("level4", 0.45),
-        ],
+        &[("level1", 0.55), ("level2", 0.3), ("level3", 0.35)],
     );
-    // The riser: pink noise the Wash macro lets in; the Sweep macro opens the filter over it.
+    // The riser: pink noise the Wash macro lets in, joining after the drive (the drive turned
+    // it into a loud, steady hiss even at a low Wash) and before the filter, which the Sweep
+    // macro opens over it.
     let noise = r.add("noise", &[("color", 1.0)]);
     let riser = r.add("vca", &[("gain", 0.0)]);
+    let post = r.add("mixer", &[("level1", 1.0), ("level2", 0.5)]);
     r.next_row();
     // Real drums (drum.kick and friends): a four-on-the-floor kick, a clap on the 2 and 4 and
     // open hats on the off-beats, each on a 2-beat sequencer lane. The kick also feeds the
@@ -534,7 +540,8 @@ fn loading_dock() -> Rack {
     r.wire(stab_vca, "out", mix, "in2");
     r.wire(play_vca, "out", mix, "in3");
     r.wire(mix, "out", drive, "in");
-    r.wire(drive, "out", lad, "in");
+    r.wire(drive, "out", post, "in1");
+    r.wire(post, "out", lad, "in");
     r.wire(lad, "out", trim, "in");
     r.wire_both(trim, "out", crush);
     r.stereo(crush, comp);
@@ -584,7 +591,7 @@ fn loading_dock() -> Rack {
 
     r.route(knob, "m4", duck, "ratio", 0.95);
     r.wire(noise, "out", riser, "in");
-    r.wire(riser, "out", mix, "in4");
+    r.wire(riser, "out", post, "in2");
     r.route(knob, "m3", riser, "gain", 0.9);
     r.route(knob, "m1", lad, "cutoff_hz", 0.65);
     r.route(knob, "m2", drive, "drive_db", 0.6);
@@ -1197,7 +1204,7 @@ fn presets() -> Vec<Preset> {
             name: "Loading Dock",
             category: "Piece",
             tags: &["sequenced", "cues", "drums", "drop", "124bpm", "filter house", "signature"],
-            description: "A self-playing filter-house piece at 124 BPM with swing: a four-on-the-floor kick with a clap and open hats, a bass and a stab line that duck hard to the kick through the compressor sidechain, a resonant filter, a noise riser and a hand-played voice on top. Five cues: Intro (filter shut, nearly dry), Build (the filter opens over three bars as the riser and the wash rise), Gap (everything shut but the wash), Drop (drive and pump at full), Break (back down, wet). Press Run, then launch the cues with the pads or CC 40-44; turn a macro to take over. Sweep opens the filter, Drive pushes the drive and the bitcrusher, Wash brings in the riser, the echo and the room, Pump sets how hard the kick ducks the bass and stabs.",
+            description: "A self-playing filter-house piece at 124 BPM with swing: a four-on-the-floor kick with a clap and open hats, a bass and a stab line that duck hard to the kick through the compressor sidechain, a resonant filter, a noise riser and a hand-played voice on top. Five cues: Intro (filter shut, dry, silent until Run), Build (the filter opens over three bars as the riser and the wash rise), Gap (everything shut but the wash), Drop (drive and pump at full), Break (back down, wet). Press Run, then launch the cues with the pads or CC 40-44; turn a macro to take over. Sweep opens the filter, Drive pushes the drive and the bitcrusher, Wash brings in the riser, the echo and the room, Pump sets how hard the kick ducks the bass and stabs.",
             listen: "The filter and riser rising through the Build, the gap, the Drop landing with the pump at full, and the Break pulling back to a dark loop.",
             build: loading_dock,
             phrase: drop_phrase,
@@ -1262,17 +1269,27 @@ fn presets() -> Vec<Preset> {
 }
 
 fn write_wav(path: &Path, left: &[f32], right: &[f32]) {
+    // `PP_F32` writes 32-bit float, for measuring without the 16-bit step.
+    let float = std::env::var("PP_F32").is_ok();
     let spec = hound::WavSpec {
         channels: 2,
-        sample_rate: SR as u32,
-        bits_per_sample: 16,
-        sample_format: hound::SampleFormat::Int,
+        sample_rate: sr() as u32,
+        bits_per_sample: if float { 32 } else { 16 },
+        sample_format: if float {
+            hound::SampleFormat::Float
+        } else {
+            hound::SampleFormat::Int
+        },
     };
     let mut w = hound::WavWriter::create(path, spec).unwrap();
     for (l, r) in left.iter().zip(right) {
         for s in [l, r] {
-            w.write_sample((s.clamp(-1.0, 1.0) * 32767.0) as i16)
-                .unwrap();
+            if float {
+                w.write_sample(*s).unwrap();
+            } else {
+                w.write_sample((s.clamp(-1.0, 1.0) * 32767.0) as i16)
+                    .unwrap();
+            }
         }
     }
     w.finalize().unwrap();
@@ -1287,7 +1304,34 @@ fn render(
     piece: bool,
 ) -> (Vec<f32>, Vec<f32>) {
     let collector = Collector::new();
-    let mut engine = PatchEngine::new(&collector.handle(), state, SR, 8).expect("compiles");
+    // `PP_SET="kind.param=value,..."` overrides a param on every module of that kind (A/B).
+    let mut state = state.clone();
+    for item in std::env::var("PP_SET").unwrap_or_default().split(',') {
+        if let Some((target, v)) = item.split_once('=') {
+            let (kind, param) = target.split_once('.').expect("kind.param");
+            for m in state.modules.values_mut().filter(|m| m.kind == kind) {
+                m.params.insert(param.into(), v.parse().expect("number"));
+            }
+        }
+    }
+    let state = &state;
+    // `PP_HITS="t:note:velocity;..."` (velocity 0 = key up) replaces the phrase.
+    let custom: Vec<Hit> = std::env::var("PP_HITS")
+        .unwrap_or_default()
+        .split(';')
+        .filter_map(|h| {
+            let mut f = h.split(':');
+            let (t, n, v): (f32, u8, u8) = (
+                f.next()?.parse().ok()?,
+                f.next()?.parse().ok()?,
+                f.next()?.parse().ok()?,
+            );
+            Some(Hit(t, n, (v > 0).then_some(v)))
+        })
+        .collect();
+    let hits = if custom.is_empty() { hits } else { &custom[..] };
+    let rate = sr();
+    let mut engine = PatchEngine::new(&collector.handle(), state, rate, 8).expect("compiles");
     let clocks: Vec<ModuleId> = state
         .modules
         .iter()
@@ -1301,11 +1345,11 @@ fn render(
         .map(|(&id, _)| id);
     let (mut left, mut right) = (Vec::new(), Vec::new());
     let (mut l, mut r) = ([0.0; BLOCK], [0.0; BLOCK]);
-    let blocks = (secs * SR) as usize / BLOCK;
+    let blocks = (secs * rate) as usize / BLOCK;
     let mut next_cue = 0;
     for b in 0..blocks {
-        let t0 = (b * BLOCK) as f32 / SR;
-        let t1 = t0 + BLOCK as f32 / SR;
+        let t0 = (b * BLOCK) as f32 / rate;
+        let t1 = t0 + BLOCK as f32 / rate;
         if b == 0 {
             for &c in &clocks {
                 engine.transport(c, Transport::Stop);

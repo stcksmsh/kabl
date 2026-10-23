@@ -18,377 +18,359 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Could not resolve keysym XF86NavInfo
 Errors from xkbcomp are not fatal to the X server
 
-(metacity:225958): metacity-WARNING **: 22:38:11.486: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:31:16.719: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:38:12.332: Window 0xa00004 (Default - Wine desktop) sets an MWM hint indicating it isn't resizable, but sets min size 1 x 1 and max size 2147483647 x 2147483647; this doesn't make much sense.
+(metacity:390157): metacity-WARNING **: 23:31:23.777: Window 0xa00004 (Default - Wine desktop) sets an MWM hint indicating it isn't resizable, but sets min size 1 x 1 and max size 2147483647 x 2147483647; this doesn't make much sense.
 
-(metacity:225958): metacity-WARNING **: 22:38:12.333: Window 0xa00004 (Default - Wine desktop) sets an MWM hint indicating it isn't resizable, but sets min size 1 x 1 and max size 2147483647 x 2147483647; this doesn't make much sense.
+(metacity:390157): metacity-WARNING **: 23:31:23.777: Window 0xa00004 (Default - Wine desktop) sets an MWM hint indicating it isn't resizable, but sets min size 1 x 1 and max size 2147483647 x 2147483647; this doesn't make much sense.
 
-(metacity:225958): metacity-WARNING **: 22:38:19.667: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400047 (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:31:28.534: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400059 (VST Plug-in Scan)
 
-(metacity:225958): metacity-WARNING **: 22:38:19.685: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400055 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:31:37.198: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:38:19.783: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400047 (cinder-block - REAPER v7.75 - )
+(metacity:390157): metacity-WARNING **: 23:31:47.597: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400076 (VST Plug-in Scan)
 
-(metacity:225958): metacity-WARNING **: 22:38:19.791: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400076 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:32:15.118: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:38:20.528: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400132 (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:32:19.128: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400093 (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:38:21.807: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400266 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:32:19.219: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000a1 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:38:22.545: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400047 (cinder-block - REAPER v7.75 - )
+(metacity:390157): metacity-WARNING **: 23:32:19.724: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400093 (cinder-block - REAPER v7.75 - )
 
-(metacity:225958): metacity-WARNING **: 22:38:22.823: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:32:19.790: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000c8 (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:38:22.895: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:32:20.796: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4001a8 (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:38:22.911: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:32:21.772: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40028b (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:38:23.009: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-cinder-block-init - REAP)
+(metacity:390157): metacity-WARNING **: 23:32:23.440: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400093 (cinder-block - REAPER v7.75 - )
 
-(metacity:225958): metacity-WARNING **: 22:38:23.016: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:32:24.250: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:38:23.742: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000fc (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:32:24.473: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:38:25.049: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:32:24.499: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400024 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:38:25.772: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-cinder-block-init - REAP)
+(metacity:390157): metacity-WARNING **: 23:32:24.604: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (saved-cinder-block-init - REAP)
 
-(metacity:225958): metacity-WARNING **: 22:38:26.154: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:32:24.619: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400046 (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:38:26.227: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:32:25.336: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000f9 (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:38:26.239: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:32:26.636: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40022d (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:38:26.352: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (cinder-block-nomidi - REAPER v)
+(metacity:390157): metacity-WARNING **: 23:32:27.969: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (saved-cinder-block-init - REAP)
 
-(metacity:225958): metacity-WARNING **: 22:38:26.360: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:32:28.698: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:38:27.076: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000fc (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:32:28.843: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:38:28.370: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:32:28.868: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:38:29.086: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (cinder-block-nomidi - REAPER v)
+(metacity:390157): metacity-WARNING **: 23:32:29.037: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (cinder-block-nomidi - REAPER v)
 
-(metacity:225958): metacity-WARNING **: 22:38:29.482: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:32:29.043: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40004f (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:38:29.571: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:32:29.721: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000f9 (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:38:29.582: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:32:31.049: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400236 (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:38:29.696: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (parquet-loop - REAPER v7.75 - )
+(metacity:390157): metacity-WARNING **: 23:32:31.948: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (cinder-block-nomidi - REAPER v)
 
-(metacity:225958): metacity-WARNING **: 22:38:29.709: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:32:32.553: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:38:30.475: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400105 (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:32:32.731: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:38:31.728: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:32:32.792: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400024 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:38:32.568: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (parquet-loop - REAPER v7.75 - )
+(metacity:390157): metacity-WARNING **: 23:32:32.990: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:38:32.788: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:32:33.704: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000fc (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:38:32.861: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:32:34.957: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40021e (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:38:32.877: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:32:36.497: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (parquet-loop - REAPER v7.75 - )
 
-(metacity:225958): metacity-WARNING **: 22:38:32.975: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-parquet-loop-init - REAP)
+(metacity:390157): metacity-WARNING **: 23:32:37.218: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:38:32.982: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:32:37.336: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:38:33.707: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000fc (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:32:37.352: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:38:35.000: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:32:37.493: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-parquet-loop-init - REAP)
 
-(metacity:225958): metacity-WARNING **: 22:38:35.846: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-parquet-loop-init - REAP)
+(metacity:390157): metacity-WARNING **: 23:32:37.499: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40004c (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:38:36.131: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:32:38.209: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000ff (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:38:36.208: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:32:39.527: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400233 (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:38:36.226: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:32:41.216: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-parquet-loop-init - REAP)
 
-(metacity:225958): metacity-WARNING **: 22:38:36.327: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (parquet-loop-nomidi - REAPER v)
+(metacity:390157): metacity-WARNING **: 23:32:41.689: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:38:36.338: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:32:41.879: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:38:37.087: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400105 (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:32:41.898: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:38:38.345: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:32:42.036: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (parquet-loop-nomidi - REAPER v)
 
-(metacity:225958): metacity-WARNING **: 22:38:39.260: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (parquet-loop-nomidi - REAPER v)
+(metacity:390157): metacity-WARNING **: 23:32:42.049: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40004c (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:38:39.760: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:32:42.798: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000ff (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:38:39.836: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:32:44.082: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400221 (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:38:39.858: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:32:45.834: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (parquet-loop-nomidi - REAPER v)
 
-(metacity:225958): metacity-WARNING **: 22:38:39.951: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (loading-dock - REAPER v7.75 - )
+(metacity:390157): metacity-WARNING **: 23:32:46.318: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:38:39.958: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:32:46.495: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:38:40.696: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400105 (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:32:46.520: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:38:41.968: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:32:46.651: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40004f (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:38:44.966: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (loading-dock - REAPER v7.75 - )
+(metacity:390157): metacity-WARNING **: 23:32:47.334: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000f9 (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:38:45.487: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:32:48.711: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400236 (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:38:45.561: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:32:58.396: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (loading-dock - REAPER v7.75 - )
 
-(metacity:225958): metacity-WARNING **: 22:38:45.578: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:32:58.974: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:38:45.679: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-loading-dock-init - REAP)
+(metacity:390157): metacity-WARNING **: 23:32:59.118: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:38:45.690: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:32:59.151: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400024 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:38:46.416: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400105 (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:32:59.257: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (saved-loading-dock-init - REAP)
 
-(metacity:225958): metacity-WARNING **: 22:38:47.722: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400242 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:32:59.280: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:38:50.695: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-loading-dock-init - REAP)
+(metacity:390157): metacity-WARNING **: 23:32:59.992: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000ff (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:38:51.259: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:33:01.292: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400233 (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:38:51.342: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:33:09.028: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (saved-loading-dock-init - REAP)
 
-(metacity:225958): metacity-WARNING **: 22:38:51.350: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:33:10.171: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:38:51.467: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (glass-elevator - REAPER v7.75 )
+(metacity:390157): metacity-WARNING **: 23:33:10.298: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:38:51.476: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:33:10.350: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400024 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:38:52.193: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000fc (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:33:10.464: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:38:53.489: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:33:11.197: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000fc (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:38:54.580: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (glass-elevator - REAPER v7.75 )
+(metacity:390157): metacity-WARNING **: 23:33:12.492: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:38:54.864: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:33:15.195: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (glass-elevator - REAPER v7.75 )
 
-(metacity:225958): metacity-WARNING **: 22:38:54.952: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:33:15.705: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:38:54.964: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:33:15.879: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:38:55.066: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-glass-elevator-init - RE)
+(metacity:390157): metacity-WARNING **: 23:33:15.908: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:38:55.074: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:33:16.118: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40004f (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:38:55.824: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400105 (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:33:16.850: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000f9 (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:38:57.108: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:33:18.113: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400224 (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:38:58.174: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-glass-elevator-init - RE)
+(metacity:390157): metacity-WARNING **: 23:33:25.012: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-glass-elevator-init - RE)
 
-(metacity:225958): metacity-WARNING **: 22:38:58.504: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:33:26.022: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:38:58.590: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:33:26.467: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:38:58.601: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:33:26.526: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400024 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:38:58.718: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (glass-elevator-nomidi - REAPER)
+(metacity:390157): metacity-WARNING **: 23:33:26.875: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:38:58.727: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:33:27.697: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400105 (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:38:59.453: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400105 (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:33:28.818: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40020c (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:39:00.738: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:33:30.736: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (glass-elevator-nomidi - REAPER)
 
-(metacity:225958): metacity-WARNING **: 22:39:01.474: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (glass-elevator-nomidi - REAPER)
+(metacity:390157): metacity-WARNING **: 23:33:31.260: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:39:01.836: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:33:31.401: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:39:01.915: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:33:31.433: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400024 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:39:01.932: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:33:31.599: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40004c (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:39:02.029: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (undertow - REAPER v7.75 - EVAL)
+(metacity:390157): metacity-WARNING **: 23:33:32.301: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000f6 (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:39:02.036: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:33:33.612: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40022a (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:39:02.772: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400105 (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:33:35.712: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (undertow - REAPER v7.75 - EVAL)
 
-(metacity:225958): metacity-WARNING **: 22:39:04.047: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:33:37.095: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:39:04.978: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (undertow - REAPER v7.75 - EVAL)
+(metacity:390157): metacity-WARNING **: 23:33:37.338: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:39:05.446: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:33:37.378: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400024 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:39:05.529: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:33:37.644: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40004c (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:39:05.541: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:33:38.404: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000ff (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:39:05.643: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-undertow-init - REAPER v)
+(metacity:390157): metacity-WARNING **: 23:33:39.650: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400218 (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:39:05.650: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:33:42.019: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (saved-undertow-init - REAPER v)
 
-(metacity:225958): metacity-WARNING **: 22:39:06.392: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400105 (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:33:42.701: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:39:07.664: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:33:42.865: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:39:08.608: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-undertow-init - REAPER v)
+(metacity:390157): metacity-WARNING **: 23:33:42.896: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400024 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:39:09.093: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:33:42.998: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (undertow-nomidi - REAPER v7.75)
 
-(metacity:225958): metacity-WARNING **: 22:39:09.166: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:33:43.016: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400046 (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:39:09.177: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:33:43.757: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000f9 (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:39:09.284: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (undertow-nomidi - REAPER v7.75)
+(metacity:390157): metacity-WARNING **: 23:33:45.044: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400224 (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:39:09.292: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:33:46.967: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (undertow-nomidi - REAPER v7.75)
 
-(metacity:225958): metacity-WARNING **: 22:39:10.016: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400105 (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:33:47.664: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:39:11.317: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:33:47.776: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:39:12.231: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (undertow-nomidi - REAPER v7.75)
+(metacity:390157): metacity-WARNING **: 23:33:47.801: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:39:12.712: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:33:47.964: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400052 (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:39:12.789: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:33:48.623: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000fc (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:39:12.809: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:33:50.009: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400242 (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:39:12.903: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (salt-flat - REAPER v7.75 - EVA)
+(metacity:390157): metacity-WARNING **: 23:33:53.179: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (salt-flat - REAPER v7.75 - EVA)
 
-(metacity:225958): metacity-WARNING **: 22:39:12.911: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:33:53.678: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:39:13.636: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400105 (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:33:53.802: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:39:14.940: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400242 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:33:53.840: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400024 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:39:16.404: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (salt-flat - REAPER v7.75 - EVA)
+(metacity:390157): metacity-WARNING **: 23:33:53.977: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40004c (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:39:16.623: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:33:54.693: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000ff (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:39:16.705: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:33:56.017: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40023c (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:39:16.715: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:33:58.955: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (saved-salt-flat-init - REAPER )
 
-(metacity:225958): metacity-WARNING **: 22:39:16.826: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-salt-flat-init - REAPER )
+(metacity:390157): metacity-WARNING **: 23:33:59.538: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:39:16.834: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:33:59.703: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:39:17.661: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400117 (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:33:59.726: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:39:18.865: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:33:59.850: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (salt-flat-nomidi - REAPER v7.7)
 
-(metacity:225958): metacity-WARNING **: 22:39:20.289: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-salt-flat-init - REAPER )
+(metacity:390157): metacity-WARNING **: 23:33:59.874: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:39:20.594: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:34:00.634: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400105 (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:39:20.670: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:34:01.904: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400227 (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:39:20.682: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:34:05.354: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (salt-flat-nomidi - REAPER v7.7)
 
-(metacity:225958): metacity-WARNING **: 22:39:20.791: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (salt-flat-nomidi - REAPER v7.7)
+(metacity:390157): metacity-WARNING **: 23:34:05.901: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:39:20.798: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:34:06.005: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:39:21.543: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400105 (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:34:06.046: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:39:22.819: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:34:06.158: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (boxwood - REAPER v7.75 - EVALU)
 
-(metacity:225958): metacity-WARNING **: 22:39:24.251: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (salt-flat-nomidi - REAPER v7.7)
+(metacity:390157): metacity-WARNING **: 23:34:06.164: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:39:24.508: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:34:06.873: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000fc (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:39:24.594: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:34:08.188: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400230 (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:39:24.608: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:34:09.654: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (boxwood - REAPER v7.75 - EVALU)
 
-(metacity:225958): metacity-WARNING **: 22:39:24.712: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (boxwood - REAPER v7.75 - EVALU)
+(metacity:390157): metacity-WARNING **: 23:34:10.244: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:39:24.720: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:34:10.541: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:39:25.456: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400105 (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:34:10.645: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400024 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:39:26.759: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400242 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:34:10.956: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40004c (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:39:27.510: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (boxwood - REAPER v7.75 - EVALU)
+(metacity:390157): metacity-WARNING **: 23:34:11.655: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000f6 (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:39:27.820: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:34:12.936: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400218 (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:39:27.904: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:34:14.464: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (saved-boxwood-init - REAPER v7)
 
-(metacity:225958): metacity-WARNING **: 22:39:27.915: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:34:15.138: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:39:28.024: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-boxwood-init - REAPER v7)
+(metacity:390157): metacity-WARNING **: 23:34:15.242: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:39:28.032: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:34:15.267: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400024 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:39:28.746: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000fc (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:34:15.405: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (boxwood-nomidi - REAPER v7.75 )
 
-(metacity:225958): metacity-WARNING **: 22:39:30.061: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:34:15.409: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40004c (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:39:30.796: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-boxwood-init - REAPER v7)
+(metacity:390157): metacity-WARNING **: 23:34:16.128: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000ff (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:39:31.144: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:34:17.445: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400233 (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:39:31.228: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:34:18.541: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (boxwood-nomidi - REAPER v7.75 )
 
-(metacity:225958): metacity-WARNING **: 22:39:31.239: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:34:18.989: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:39:31.341: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (boxwood-nomidi - REAPER v7.75 )
+(metacity:390157): metacity-WARNING **: 23:34:19.179: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:39:31.349: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:34:19.201: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400024 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:39:32.106: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400105 (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:34:19.384: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40004c (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:39:33.361: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:34:20.098: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000ff (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:39:33.923: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (boxwood-nomidi - REAPER v7.75 )
+(metacity:390157): metacity-WARNING **: 23:34:21.424: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40022a (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:39:34.166: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:34:24.279: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (neon-highway - REAPER v7.75 - )
 
-(metacity:225958): metacity-WARNING **: 22:39:34.238: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:34:24.822: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:39:34.252: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:34:24.945: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:39:34.353: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (neon-highway - REAPER v7.75 - )
+(metacity:390157): metacity-WARNING **: 23:34:24.971: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400024 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:39:34.360: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:34:25.123: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40004f (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:39:35.077: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000fc (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:34:25.869: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400102 (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:39:36.365: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400230 (Rendering to file...)
+(metacity:390157): metacity-WARNING **: 23:34:27.142: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400236 (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:39:37.142: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (neon-highway - REAPER v7.75 - )
+(metacity:390157): metacity-WARNING **: 23:34:28.651: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (saved-neon-highway-init - REAP)
 
-(metacity:225958): metacity-WARNING **: 22:39:37.497: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+(metacity:390157): metacity-WARNING **: 23:34:29.380: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
 
-(metacity:225958): metacity-WARNING **: 22:39:37.583: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
+(metacity:390157): metacity-WARNING **: 23:34:29.961: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (REAPER v7.75 - EVALUATION LICE)
 
-(metacity:225958): metacity-WARNING **: 22:39:37.594: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
+(metacity:390157): metacity-WARNING **: 23:34:29.981: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400024 (REAPER (loading))
 
-(metacity:225958): metacity-WARNING **: 22:39:37.704: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-neon-highway-init - REAP)
+(metacity:390157): metacity-WARNING **: 23:34:30.129: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40004f (About REAPER v7.75/linux-x86_6)
 
-(metacity:225958): metacity-WARNING **: 22:39:37.711: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
+(metacity:390157): metacity-WARNING **: 23:34:30.868: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40010b (REAPER New Version Notificatio)
 
-(metacity:225958): metacity-WARNING **: 22:39:38.435: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000fc (REAPER New Version Notificatio)
+(metacity:390157): metacity-WARNING **: 23:34:32.159: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400236 (Rendering to file...)
 
-(metacity:225958): metacity-WARNING **: 22:39:39.730: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
-
-(metacity:225958): metacity-WARNING **: 22:39:40.495: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (saved-neon-highway-init - REAP)
-
-(metacity:225958): metacity-WARNING **: 22:39:40.838: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
-
-(metacity:225958): metacity-WARNING **: 22:39:40.912: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (REAPER v7.75 - EVALUATION LICE)
-
-(metacity:225958): metacity-WARNING **: 22:39:40.925: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400028 (REAPER (loading))
-
-(metacity:225958): metacity-WARNING **: 22:39:41.037: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (neon-highway-nomidi - REAPER v)
-
-(metacity:225958): metacity-WARNING **: 22:39:41.044: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400049 (About REAPER v7.75/linux-x86_6)
-
-(metacity:225958): metacity-WARNING **: 22:39:41.781: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400105 (REAPER New Version Notificatio)
-
-(metacity:225958): metacity-WARNING **: 22:39:43.072: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400239 (Rendering to file...)
-
-(metacity:225958): metacity-WARNING **: 22:39:43.850: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40001a (neon-highway-nomidi - REAPER v)
+(metacity:390157): metacity-WARNING **: 23:34:34.584: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (neon-highway-nomidi - REAPER v)
 The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Could not resolve keysym XF86CameraAccessEnable
 > Warning:          Could not resolve keysym XF86CameraAccessDisable

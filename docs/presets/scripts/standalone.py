@@ -6,6 +6,7 @@ Rack and Perform views and the app's log, and fails if the app is not still runn
     cargo build --release -p kabl-ui --bins --examples
     python3 docs/presets/scripts/standalone.py
 
+Audio goes to the silent PipeWire sink kabl_agents (PIPEWIRE_NODE, PULSE_SINK); never the real output.
 Evidence goes to docs/presets/evidence/standalone/<slug>.{log,png}. Needs Xvfb, metacity,
 xdotool and ImageMagick; the player is target/release/examples/midi_player (ALSA sequencer).
 Run from the repo root.
@@ -26,7 +27,7 @@ presets = {
     'glass-elevator': [52, 59, 64, 67], 'undertow': [28], 'salt-flat': [50, 57, 62, 65],
     'boxwood': [60, 64, 67], 'neon-highway': [64],
 }
-env = dict(os.environ, DISPLAY=disp, WINIT_X11_SCALE_FACTOR='1', KABL_PLAYER='1', KABL_ARGS='--midi kabl-player',
+env = dict(os.environ, PIPEWIRE_NODE='kabl_agents', PULSE_SINK='kabl_agents', DISPLAY=disp, WINIT_X11_SCALE_FACTOR='1', KABL_PLAYER='1', KABL_ARGS='--midi kabl-player',
            KABL_CAPTURE_WINDOW='1', KABL_USER_DIR=str(scratch / 'library'))
 x = sp.Popen(['Xvfb', disp, '-screen', '0', '1600x1000x24', '-nolisten', 'tcp'], stdout=sp.DEVNULL, stderr=sp.DEVNULL)
 time.sleep(1)

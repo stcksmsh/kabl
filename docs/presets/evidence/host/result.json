@@ -16,7 +16,7 @@
  },
  "loading-dock": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.0756,
+  "peak": 0.0758,
   "rms": 0.0137,
   "restart_relative_difference": 0.0
  },

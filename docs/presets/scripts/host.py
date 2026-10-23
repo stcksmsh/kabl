@@ -85,7 +85,7 @@ def project(slug, with_midi):
 
 
 DISP = ':149'
-env0 = dict(os.environ, DISPLAY=DISP, XDG_RUNTIME_DIR='/run/user/1000', KABL_FACTORY_DIR=str(S / 'unavailable-factory'),
+env0 = dict(os.environ, PIPEWIRE_NODE='kabl_agents', PULSE_SINK='kabl_agents', DISPLAY=DISP, XDG_RUNTIME_DIR='/run/user/1000', KABL_FACTORY_DIR=str(S / 'unavailable-factory'),
             KABL_USER_DIR=str(S / 'unavailable-library'), KABL_SE_HOST=str(S))
 log = open(S / 'run.txt', 'w')
 x = sp.Popen(['Xvfb', DISP, '-screen', '0', '1440x900x24', '-nolisten', 'tcp'], stdout=log, stderr=log); time.sleep(.8)

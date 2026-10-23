@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+"""Renders the pilot clips (docs/presets/clips/*.mp3) and checks each against its WAV.
+
+    cargo build --release -p kabl-ui --example presets_pilot
+    python3 docs/presets/scripts/clips.py
+
+The engine renders 32-bit float WAVs (PP_F32), so there is no 16-bit step; ffmpeg encodes them
+at 320 kbps CBR; the script decodes every mp3 again and fails if the encoding error is
+less than 35 dB under the signal (RMS, below 16 kHz) or the decoded peak differs from the WAV's by more than 0.5 dB. At 192
+kbps the same clips carried an error near -46 dBFS (about 30 dB under the signal, 7 to 14 dB under
+it above 6 kHz), which reads as static on a dense pad. Run from the repo root.
+"""
+import os, struct, subprocess as sp, sys, tempfile
+from pathlib import Path
+import numpy as np
+
+repo = Path(__file__).resolve().parents[3]
+os.chdir(repo)
+tool = 'target/release/examples/presets_pilot'
+out = Path('docs/presets/clips')
+out.mkdir(parents=True, exist_ok=True)
+# (slug, clip name, PP_SET override): the extra clips show a macro moved
+extras = [('salt-flat', 'salt-flat-textured', 'macro.m4=0.7'), ('parquet-loop', 'parquet-loop-no-glide', 'macro.m4=0')]
+
+
+def pcm(path):
+    b = path.read_bytes(); at = 12; fmt = None
+    while at < len(b):
+        cid, size = b[at:at + 4], struct.unpack_from('<I', b, at + 4)[0]
+        if cid == b'fmt ': fmt = struct.unpack_from('<HHIIHH', b, at + 8)
+        if cid == b'data':
+            assert fmt[0] in (3, 65534) and fmt[5] == 32, fmt
+            return np.frombuffer(b[at + 8:at + 8 + size], '<f4').reshape(-1, fmt[1])
+        at += 8 + size + (size & 1)
+
+
+def encode_and_check(wav, mp3):
+    sp.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', wav, '-b:a', '320k', mp3], check=True)
+    dec = Path(str(wav) + '.dec.wav')
+    sp.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', mp3, '-f', 'wav', '-acodec', 'pcm_f32le', dec], check=True)
+    a, b = pcm(Path(wav)), pcm(dec)
+    n = min(len(a), len(b))
+    a, b = a[:n], b[:n]
+    # Judge the encoder where it works: below 16 kHz (it drops what is above).
+    keep = np.fft.rfftfreq(n, 1 / 48000) < 16000
+    lp = lambda x: np.fft.irfft(np.fft.rfft(x, axis=0) * keep[:, None], n, axis=0)
+    a_full = a
+    a, b = lp(a), lp(b)
+    err = 20 * np.log10(np.sqrt(((a - b) ** 2).mean()) + 1e-12)
+    peak = 20 * np.log10(np.abs(a_full).max() + 1e-12), 20 * np.log10(np.abs(b).max() + 1e-12)
+    snr = 20 * np.log10(np.sqrt((a ** 2).mean()) + 1e-12) - err
+    ok = snr > 35 and abs(peak[0] - peak[1]) < 0.5
+    print(f'{Path(mp3).name:26} error {err:6.1f} dBFS  snr {snr:5.1f} dB  peak {peak[0]:5.1f} -> {peak[1]:5.1f}  {"ok" if ok else "FAIL"}')
+    return ok
+
+
+good = True
+with tempfile.TemporaryDirectory() as tmp:
+    for slug, name, override in [(None, None, None)] + extras:
+        d = Path(tmp) / (name or 'main')
+        env = dict(os.environ, PP_F32='1')
+        if override:
+            env['PP_SET'] = override
+        sp.run([tool, 'clips', 'patches', str(d)], env=env, check=True, capture_output=True)
+        if name is None:
+            for wav in sorted(d.glob('*.wav')):
+                good &= encode_and_check(wav, out / (wav.stem + '.mp3'))
+        else:
+            good &= encode_and_check(d / (slug + '.wav'), out / (name + '.mp3'))
+sys.exit(0 if good else 1)
