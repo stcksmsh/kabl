@@ -26,8 +26,8 @@
 //! voice is within about 5 dB at 8 bands and at 32 (each band hears less of it, and there are more). Each envelope is capped at 16.
 //!
 //! **Unvoiced.** A vocoder loses consonants: `s`, `t`, `f` are noise, and a saw has no noise.
-//! `hf` mixes in white noise band-passed around 7 kHz (about 5 kHz wide), shaped by the
-//! follower of the modulator above 5 kHz (fixed 1 ms attack, 20 ms release), but only while the
+//! `hf` mixes in white noise band-passed around 5.5 kHz (about 2.5 kHz wide, 4 to 7.5 kHz; the sibilant range), shaped by the
+//! follower of the modulator above 5 kHz (fixed 3 ms attack, 35 ms release), but only while the
 //! voice is mostly above 5 kHz: the noise is closed while the high follower is under 15 % of
 //! high plus low and fully open from 40 %. Vowels, which have a little energy up there, and a
 //! microphone's floor stay clean; `s`, `t`, `f` open it. `hf` 0 skips the path (nothing added,
@@ -76,7 +76,7 @@ const PARAMS: &[ParamInfo] = &[
     param("shift_st", -12.0, 12.0, 0.0, "st", Taper::Linear),
     param("attack_ms", 0.5, 50.0, 4.0, "ms", Taper::Exponential),
     param("release_ms", 5.0, 500.0, 40.0, "ms", Taper::Exponential),
-    param("hf", 0.0, 1.0, 0.5, "", Taper::Linear),
+    param("hf", 0.0, 1.0, 0.35, "", Taper::Linear),
     param("drive_db", 0.0, 36.0, 18.0, "dB", Taper::Linear),
     param("mix", 0.0, 1.0, 1.0, "", Taper::Linear),
 ];
@@ -112,16 +112,16 @@ const DETECT: f32 = 1.25;
 const ENV_MAX: f32 = 16.0;
 const INPUT_MAX: f32 = 16.0;
 /// The unvoiced path: the voice is followed above `HF_HZ`; the noise it shapes is a band
-/// around `HF_NOISE_HZ` (two cascaded band-passes of `k` = `HF_NOISE_K`, about 5 kHz wide), not
+/// around `HF_NOISE_HZ` (two cascaded band-passes of `k` = `HF_NOISE_K`, about 2.5 kHz wide), not
 /// everything up to Nyquist, and sits at `NOISE_REF` RMS at full envelope, about the level of a
 /// saw's upper harmonics, which are quiet.
 const HF_HZ: f32 = 5000.0;
-const HF_NOISE_HZ: f32 = 7000.0;
-const HF_NOISE_K: f32 = 1.1;
-const HF_NOISE_BW: f32 = 5000.0;
+const HF_NOISE_HZ: f32 = 5500.0;
+const HF_NOISE_K: f32 = 0.55;
+const HF_NOISE_BW: f32 = 2500.0;
 const NOISE_REF: f32 = 0.12;
-const HF_ATTACK_MS: f32 = 1.0;
-const HF_RELEASE_MS: f32 = 20.0;
+const HF_ATTACK_MS: f32 = 3.0;
+const HF_RELEASE_MS: f32 = 35.0;
 /// The noise is closed while the voice's share above `HF_HZ` is under `UNVOICED_FROM` and fully
 /// open from `UNVOICED_FULL`.
 const UNVOICED_FROM: f32 = 0.15;

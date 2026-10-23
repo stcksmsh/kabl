@@ -11,7 +11,7 @@ A channel vocoder for the robot voice, and a way to bring a real voice into kabl
 | Bands | 8 to 32 (16) | Slices the voice is split into. More is clearer speech, fewer is more robotic. |
 | Shift | -12 to 12 st (0) | Moves the synth's side of the bands against the voice's: up is a smaller mouth, down a larger one. |
 | Attack, Release | 0.5 to 50 ms (4), 5 to 500 ms (40) | How fast a band opens and closes. Short release is crisp, long is smeared. |
-| Hf (face label: Hiss) | 0 to 1 (0.5) | Unvoiced path: hiss that opens only on `s`, `t`, `f` (when the voice is mostly above 5 kHz), shaped by the voice there. 0 is the clean vocoder, exactly. Sounds only while the synth does. Default 0.5 puts the hiss about 13 dB under the vocoded sound on the stand-in voice's consonants and about 18 dB under it on vowels (it was 11 dB under on vowels before the gate: the "static"). |
+| Hf (face label: Hiss) | 0 to 1 (0.35) | Unvoiced path: a soft hiss that opens only on `s`, `t`, `f` (when the voice is mostly above 5 kHz), shaped by the voice there. 0 is the clean vocoder, exactly. Sounds only while the synth does. The noise is a sibilant band, 4 to 7.5 kHz (centre 5.5 kHz; 95 % of its energy under 7.8 kHz, it was 7.7 kHz centre and 11.7 kHz before), with 3 ms attack and 35 ms release. On the stand-in voice's `s` it sits 19 dB under the vocoded vowels at 0.35 (16 dB under at 0.5 before the reshaping, brighter), 22 dB at the live-voice demo's 0.25. |
 | Drive | 0 to 36 dB (18) | Gain of the voice into the bands. The vocoder multiplies, so a quiet voice makes a quiet result. 18 rather than 24: 6 dB more headroom for a hot voice and 6 dB less microphone floor. The module's output peak with the -20 dBFS stand-in voice was 0.26 at 24, so nothing clipped; this is margin, not a fix for a fault. `live-voice` makes the 6 dB up in its output gain. |
 | Mix | 0 to 1 (1) | The synth alone to the vocoded sound alone. |
 | Spacing (advanced) | 0 to 1 (0) | 0: equal musical steps; 1: evenly spread, more bands at the top. |
@@ -57,7 +57,7 @@ Clips in `audio/` (FLAC from the float render, no processing; AAC 256 kb/s and M
 The clips were made and checked by measurement (levels, spectra, envelope correlation), not by ear: I cannot listen. What to listen for is what the design should give; judge it and tell me where it is wrong.
 
 - `robot-phrase.flac` (also `.m4a` 256 kb/s and `.mp3` 320 kb/s): 8 s of the phrase alone (a buzz through the vowel filter, one vowel per tick), a pause, then the same 8 s spoken by the chord. Clean: the phrase has no consonant noise by default. Listen for the same rhythm and vowel changes in the chord's pitches.
-- `robot-phrase-consonants.flac` (and `.m4a`, `.mp3`): the same with the source's consonants at full (Level 2 of the phrase's source mixer, default 0): a band-passed (3.5 kHz) noise puff, 30 ms, on every third syllable only. About 22 dB under the phrase; texture, off by default. The earlier version had a white-noise puff on every syllable, read as a hi-hat, and the robot voice's Hf pushed it further.
+- `robot-phrase-consonants.flac` (and `.m4a`, `.mp3`): the same with the source's consonants at full (Level 2 of the phrase's source mixer, default 0): a band-passed (4.5 kHz) noise puff, 8 ms attack and 45 ms decay, on every third syllable only, followed by the vocoder's own Hiss path. About 22 dB under the phrase; texture, off by default. The earlier version had a white-noise puff on every syllable, read as a hi-hat, and the robot voice's Hf pushed it further.
 - `band-sweep.flac` (and `.m4a`, `.mp3`): the same 4 s at 8, 12, 16, 24 and 32 bands, joined by 60 ms crossfades (five separate renders: the module is not swept live in this clip; `moving_any_parameter...` tests that). Listen for the vowel colour at 8 bands and how much of each syllable's shape appears as bands are added. Whether 24 and 32 are better or only different is the thing to judge; the default is 16 (20 in `robot-voice`).
 - `live-voice.flac` (and `.m4a`, `.mp3`): a voice alone, a pause, then through the live-voice patch with two chords (E minor, then C). Listen for whether the words stay readable under the chord change and whether the `s` and `t` sounds are too hissy (the Hf knob) or too weak.
 
@@ -77,7 +77,7 @@ Captures in `media/`: `A|B-light|dark-all50.webp` (the self-playing patch at 50 
 ## Known gaps
 
 - The standalone's missing-device and vanishing-device paths are covered by the silence and queue tests and by reading the error callback; an input device was not unplugged during a live run.
-- The unvoiced path is one band (5 to 12 kHz) with a fixed 5 kHz voice corner. A talkbox model, pitch correction and a sampler are out of scope.
+- The unvoiced path is one band (4 to 7.5 kHz) with a fixed 5 kHz voice corner. A talkbox model, pitch correction and a sampler are out of scope.
 - `audio.in` takes the host's block as it arrives: no resampling, so the standalone needs an input at the output's sample rate.
 - The vocoder is a global (not per-voice) effect, so a patch with two vocoders runs two banks; there is no input metering on `audio.in` yet.
 - Local clippy is rustc 1.93; CI's newer stable may flag more.

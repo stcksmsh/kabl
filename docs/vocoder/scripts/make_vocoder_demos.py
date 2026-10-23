@@ -81,7 +81,7 @@ def robot_voice(bands=20, dry=False, self_playing=False, consonants=0.0):
     syl = p.add('env.adsr', attack_ms=6, decay_ms=170, sustain=0.5, release_ms=70)
     vca = p.add('vca', gain=0)
     noise = p.add('noise', level_db=-15)
-    burst = p.add('env.adsr', attack_ms=4, decay_ms=30, sustain=0, release_ms=10)
+    burst = p.add('env.adsr', attack_ms=8, decay_ms=45, sustain=0, release_ms=10)
     nvca = p.add('vca', gain=0)
     mix = p.add('mixer', level1=1.0, level2=consonants)
     p.wire(clock, 'gate', pitch, 'clock')
@@ -102,12 +102,14 @@ def robot_voice(bands=20, dry=False, self_playing=False, consonants=0.0):
         # puff, and the noise is band-passed to where speech consonants sit. Added last so the
         # ids above hold.
         div = p.add('clock.div', div=3)
-        bp = p.add('filter.svf', cutoff_hz=3500, resonance=0.5)
+        bp = p.add('filter.svf', cutoff_hz=4500, resonance=0.4)
         p.wire(clock, 'gate', div, 'clock')
         p.wire(div, 'gate', burst, 'gate')
         p.wire(noise, 'out', bp, 'in')
-        p.wire(bp, 'bp', nvca, 'in')
-        return div, bp
+        bp2 = p.add('filter.svf', cutoff_hz=4500, resonance=0.4)
+        p.wire(bp, 'bp', bp2, 'in')
+        p.wire(bp2, 'bp', nvca, 'in')
+        return div, bp, bp2
 
     if dry:
         g = p.add('gain', gain_db=-9)
@@ -125,9 +127,10 @@ def robot_voice(bands=20, dry=False, self_playing=False, consonants=0.0):
     for k, i in enumerate((clock, pitch, q, vowel, buzz, form, syl, vca, noise, burst, nvca, mix)):
         place(p, i, 24 + 400 * (k % 4), 10 + 370 * (3 + k // 4))
     place(p, voc, 24 + 400 * 1, 10 + 370 * 2)
-    div, bp = consonant_path()
+    div, bp, bp2 = consonant_path()
     place(p, div, 24 + 400 * 3, 10 + 370 * 3)
     place(p, bp, 24 + 400 * 3, 10 + 370 * 4)
+    place(p, bp2, 24 + 400 * 3, 10 + 370 * 5)
     return p
 
 
@@ -135,7 +138,7 @@ def live_voice():
     p = Patch()
     car = chord(p, 0)
     ain = p.add('audio.in', gain_db=0)
-    voc = p.add('vocoder', bands=24, hf=0.5, release_ms=45)
+    voc = p.add('vocoder', bands=24, hf=0.25, release_ms=45)
     p.wire(car, 'out', voc, 'in_l')
     p.wire(car, 'out', voc, 'in_r')
     p.wire(ain, 'left', voc, 'mod')

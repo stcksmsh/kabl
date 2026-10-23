@@ -160,8 +160,8 @@
         "y": 1860.0
       },
       "params": {
-        "attack_ms": 4.0,
-        "decay_ms": 30.0,
+        "attack_ms": 8.0,
+        "decay_ms": 45.0,
         "release_ms": 10.0,
         "sustain": 0.0
       }
@@ -244,8 +244,19 @@
         "y": 1490.0
       },
       "params": {
-        "cutoff_hz": 3500.0,
-        "resonance": 0.5
+        "cutoff_hz": 4500.0,
+        "resonance": 0.4
+      }
+    },
+    "24": {
+      "kind": "filter.svf",
+      "pos": {
+        "x": 1224.0,
+        "y": 1860.0
+      },
+      "params": {
+        "cutoff_hz": 4500.0,
+        "resonance": 0.4
       }
     }
   },
@@ -688,6 +699,22 @@
       "from": {
         "Module": {
           "id": 23,
+          "port": "bp"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 24,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "29": {
+      "from": {
+        "Module": {
+          "id": 24,
           "port": "bp"
         }
       },

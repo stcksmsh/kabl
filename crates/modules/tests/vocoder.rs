@@ -368,6 +368,31 @@ fn a_voiced_voice_with_a_little_top_end_stays_clean() {
     assert!(rms(&with) > 1.5 * rms(&without), "a hiss gets none");
 }
 
+#[test]
+fn the_unvoiced_noise_is_a_sibilant_band_not_full_band_hiss() {
+    // A hissing voice, the noise layer alone (Hf 1 minus Hf 0). Power per 500 Hz step.
+    let car = saw(110.0, SR, N);
+    let hiss = noise(3, N, 0.1);
+    let go = |hf: f32| {
+        let (mut m, p) = vocoder(&[("hf", hf)], SR);
+        run(&mut *m, &p, &car, Some(&hiss), 64)[0][SKIP..].to_vec()
+    };
+    let layer: Vec<f32> = go(1.0).iter().zip(go(0.0)).map(|(a, b)| a - b).collect();
+    let band = |lo: usize, hi: usize| {
+        (lo..hi)
+            .step_by(500)
+            .map(|f| power(&layer, f as f32, SR))
+            .sum::<f32>()
+    };
+    let (core, below, above) = (band(4000, 7500), band(500, 3000), band(11000, 20000));
+    println!(
+        "noise layer: below 3 kHz {:.1} dB, above 11 kHz {:.1} dB under the 4 to 7.5 kHz core",
+        db(below, core),
+        db(above, core)
+    );
+    assert!(db(below, core) < -20.0 && db(above, core) < -20.0);
+}
+
 /// A steady broadband voice (60 tones, 150 Hz to 8 kHz, in every band), so any level change is
 /// the module's.
 fn sweep_voice(n: usize) -> Vec<f32> {
