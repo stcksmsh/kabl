@@ -288,7 +288,19 @@ pub struct DrumGrid {
     level: [f32; ROWS],
     rng: u32,
     seed: u32,
+    /// Pattern a cue switched to, `NONE` = follow the `pattern` param. A new value of the
+    /// param (a tab click, automation) takes the grid back: the hand wins.
+    cued: u8,
+    /// Cue switch waiting for the first clock edge at or after sample `armed_from` of a block.
+    armed: u8,
+    armed_from: u32,
+    /// The `pattern` param as last seen, to notice a hand edit.
+    seen_param: f32,
+    /// Pattern playing now, before the pattern input is added (for the cue display).
+    playing: u8,
 }
+
+const NONE: u8 = u8::MAX;
 
 impl DrumGrid {
     pub fn new() -> Self {
@@ -299,7 +311,37 @@ impl DrumGrid {
             level: [0.0; ROWS],
             rng: scramble(0),
             seed: 0,
+            cued: NONE,
+            armed: NONE,
+            armed_from: 0,
+            seen_param: -1.0,
+            playing: 0,
         }
+    }
+
+    /// Audio thread: switch to pattern `pat` on the first clock edge at or after sample `from`
+    /// of the next block processed. Replaces an earlier arm. No allocation.
+    pub fn arm(&mut self, pat: usize, from: usize) {
+        self.armed = pat.min(PATTERNS - 1) as u8;
+        self.armed_from = from as u32;
+    }
+
+    pub fn cancel(&mut self) {
+        self.armed = NONE;
+    }
+
+    pub fn armed(&self) -> Option<usize> {
+        (self.armed != NONE).then_some(self.armed as usize)
+    }
+
+    /// Pattern playing now (the `pattern` param or the cue's, without the pattern input).
+    pub fn pattern(&self) -> usize {
+        self.playing as usize
+    }
+
+    /// Step within the bar of 16.
+    pub fn step(&self) -> usize {
+        self.tick.max(0) as usize % STEPS
     }
 
     /// Seeds the chance stream (the compiler passes the module id). Only a fresh instance
@@ -360,7 +402,12 @@ impl Module for DrumGrid {
     fn process(&mut self, io: &mut ProcessIo) {
         let n = io.block_len();
         let (clock, reset, patcv) = (io.input(0), io.input(1), io.input(2));
-        let base = io.param(PATTERN_PARAM).at(0).round().clamp(0.0, 3.0) as usize;
+        let param = io.param(PATTERN_PARAM).at(0);
+        if param != self.seen_param {
+            self.seen_param = param;
+            self.cued = NONE;
+        }
+        let base = param.round().clamp(0.0, 3.0) as usize;
         for i in 0..n {
             let r_high = reset.at(i) > 0.5;
             let r_edge = r_high && !self.reset_high;
@@ -374,6 +421,15 @@ impl Module for DrumGrid {
             }
             if c_edge || (r_edge && c_high) {
                 self.tick = (self.tick + 1) % WRAP;
+                if self.armed != NONE && i as u32 >= self.armed_from {
+                    (self.cued, self.armed) = (self.armed, NONE);
+                }
+                let base = if self.cued == NONE {
+                    base
+                } else {
+                    self.cued as usize
+                };
+                self.playing = base as u8;
                 let pat = (base + (3.0 * patcv.at(i).clamp(0.0, 1.0)).round() as usize) % PATTERNS;
                 self.fire(io, pat);
             }
@@ -390,9 +446,15 @@ impl Module for DrumGrid {
 
     fn save_state(&self, out: &mut dyn StateWriter) {
         out.write_f32("tick", self.tick as f32);
+        out.write_f32("cued", self.cued as f32);
+        out.write_f32("armed", self.armed as f32);
+        out.write_f32("seen", self.seen_param);
     }
 
     fn load_state(&mut self, s: &dyn StateReader) {
         self.tick = s.read_f32("tick").map_or(-1, |t| t as i64);
+        self.cued = s.read_f32("cued").map_or(NONE, |v| v as u8);
+        self.armed = s.read_f32("armed").map_or(NONE, |v| v as u8);
+        self.seen_param = s.read_f32("seen").unwrap_or(-1.0);
     }
 }
