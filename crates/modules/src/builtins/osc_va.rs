@@ -411,14 +411,14 @@ impl Module for OscVa {
         };
         let mut weight = [0.0f32; MAX_UNISON];
         let mut power = 0.0f32;
-        for k in 0..count {
+        for (k, w) in weight.iter_mut().enumerate().take(count) {
             let x = position(count, k);
-            weight[k] = if x.abs() * ((count - 1).max(1) as f32) < 0.51 {
+            *w = if x.abs() * ((count - 1).max(1) as f32) < 0.51 {
                 w_centre
             } else {
                 w_side
             };
-            power += weight[k] * weight[k];
+            power += *w * *w;
         }
         let level = 1.0 / power.sqrt();
         for k in 0..MAX_UNISON {
