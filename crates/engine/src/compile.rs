@@ -88,15 +88,19 @@ pub type BufIdx = usize;
 /// returns `CompileError::TooManyPorts` rather than silently truncating if a future built-in
 /// needs more.
 const MAX_INPUTS: usize = 4;
-/// Output arity the audio-thread match in `process_block` handles directly (0–4; `macro`'s 4
+/// Output arity the audio-thread match in `process_block` handles directly (0–8; `macro`'s 8
 /// outputs is the largest). Bump alongside a new match arm if a module ever needs more, not just
 /// this constant.
-const MAX_OUTPUTS: usize = 4;
+const MAX_OUTPUTS: usize = 8;
 const MAX_PARAMS: usize = 175;
 
 /// Route amount when a `PortRef::Param` cable has no stored `amount` (+25 % of knob travel, the
 /// UI's default on drop). A stored value always wins.
 pub const DEFAULT_ROUTE_AMOUNT: f32 = 0.25;
+
+/// The destination name of a route into another route's amount (`PortRef::CableParam`): the
+/// depth of an LFO, envelope or macro routing. Only a route that ends on a knob has one.
+pub const DEPTH: &str = "amount";
 
 #[derive(Debug)]
 pub enum CompileError {
@@ -202,9 +206,19 @@ struct ParamMod {
     index: usize,
     info: ParamInfo,
     base_norm: f32,
-    /// (source buffer, signed amount / source full scale).
-    routes: Vec<(BufIdx, f32)>,
+    routes: Vec<Route>,
 }
+
+/// One modulation route into a param: `buf` times `scale` (signed amount / source full scale),
+/// where each `depth` entry (a route into this route's amount) adds `buffer[0] * scale` to the
+/// scale, in the same unit.
+struct Route {
+    buf: BufIdx,
+    scale: f32,
+    depth: Vec<(BufIdx, f32)>,
+}
+
+const NO_DEPTH: u32 = u32::MAX;
 
 enum Step {
     Process {
@@ -270,7 +284,26 @@ struct RouteSlot {
     step: u32,
     modi: u32,
     route: u32,
+    /// `NO_DEPTH`: the route's own amount. Else `routes[route].depth[depth]`, the amount of a
+    /// route into that route's amount.
+    depth: u32,
     full_scale: f32,
+}
+
+/// The scale a route slot writes: a param route's, one of its depth routes', or a cable route's.
+fn slot_scale<'a>(steps: &'a mut [Step], slot: &RouteSlot) -> Option<&'a mut f32> {
+    match &mut steps[slot.step as usize] {
+        Step::Process { mods, .. } => {
+            let r = &mut mods[slot.modi as usize].routes[slot.route as usize];
+            Some(if slot.depth == NO_DEPTH {
+                &mut r.scale
+            } else {
+                &mut r.depth[slot.depth as usize].1
+            })
+        }
+        Step::Cable { mods, .. } => Some(&mut mods[slot.modi as usize].scale),
+        _ => None,
+    }
 }
 
 /// Slots `lo..hi` of `param_slots` (a param) or `route_slots` (a route): one target.
@@ -341,12 +374,8 @@ fn write_route(steps: &mut [Step], slots: &[RouteSlot], lo: u32, hi: u32, v: Val
             Val::Exact(amount) => amount / slot.full_scale,
             Val::Norm(scale) => scale,
         };
-        match &mut steps[slot.step as usize] {
-            Step::Process { mods, .. } => {
-                mods[slot.modi as usize].routes[slot.route as usize].1 = scale
-            }
-            Step::Cable { mods, .. } => mods[slot.modi as usize].scale = scale,
-            _ => {}
+        if let Some(s) = slot_scale(steps, slot) {
+            *s = scale;
         }
     }
 }
@@ -398,8 +427,10 @@ fn coalesce_buffers(
                         last_use[*idx] = last_use[*idx].max(step_idx);
                     }
                 }
-                for &(idx, _) in mods.iter().flat_map(|m| &m.routes) {
-                    last_use[idx] = last_use[idx].max(step_idx);
+                for r in mods.iter().flat_map(|m| &m.routes) {
+                    for idx in std::iter::once(r.buf).chain(r.depth.iter().map(|d| d.0)) {
+                        last_use[idx] = last_use[idx].max(step_idx);
+                    }
                 }
                 for &out_idx in output_bufs {
                     first_def[out_idx] = step_idx;
@@ -569,6 +600,12 @@ enum CableTo {
         index: usize,
         amount: f32,
     },
+    /// Modulation route into the amount of another route (a route into a knob): adds
+    /// `source * amount` to that amount.
+    Depth {
+        target: CableId,
+        amount: f32,
+    },
     /// Modulation route into a parameter (`slot`) of another cable.
     CableParam {
         target: CableId,
@@ -598,10 +635,10 @@ fn cable_dests(patch: &PatchState) -> Result<BTreeMap<CableId, ModuleId>, Compil
                 break c.to.module_id();
             };
             let fail = |reason: String| Err(CompileError::CableRoute { cable: cur, reason });
-            if kabl_cables::mod_slot(param).is_none() {
+            if param != DEPTH && kabl_cables::mod_slot(param).is_none() {
                 return fail(format!(
                     "\"{param}\" is not a parameter a route can move. Route into \"prob\", \
-                     \"morph\" or \"glide_ms\", or remove this route."
+                     \"morph\", \"glide_ms\" or \"amount\", or remove this route."
                 ));
             }
             if *target == cur {
@@ -623,6 +660,12 @@ fn cable_dests(patch: &PatchState) -> Result<BTreeMap<CableId, ModuleId>, Compil
                     "it targets cable {target}, which is not in the patch. Remove this route."
                 ));
             };
+            if param == DEPTH && !matches!(next.to, PortRef::Param { .. }) {
+                return fail(format!(
+                    "cable {target} does not move a knob, so it has no amount to move. Route \
+                     into the amount of a route that ends on a knob, or remove this route."
+                ));
+            }
             if route_bypassed(next) {
                 break None;
             }
@@ -714,6 +757,7 @@ impl Wiring {
                 step,
                 modi: k as u32,
                 route: 0,
+                depth: NO_DEPTH,
                 full_scale,
             });
         }
@@ -821,7 +865,7 @@ fn compile_inner(
         .iter()
         .filter(|(id, _)| dests.contains_key(id))
         .filter_map(|(_, c)| match &c.to {
-            PortRef::CableParam { cable, .. } => Some(*cable),
+            PortRef::CableParam { cable, param } if param != DEPTH => Some(*cable),
             _ => None,
         })
         .collect();
@@ -913,6 +957,17 @@ fn compile_inner(
             continue;
         };
         let (to_id, to) = match &cstate.to {
+            PortRef::CableParam { cable, param } if param == DEPTH => (
+                dest,
+                CableTo::Depth {
+                    target: *cable,
+                    amount: cstate
+                        .params
+                        .get("amount")
+                        .copied()
+                        .unwrap_or(DEFAULT_ROUTE_AMOUNT),
+                },
+            ),
             PortRef::CableParam { cable, param } => (
                 dest,
                 CableTo::CableParam {
@@ -1232,11 +1287,40 @@ fn compile_inner(
             // are wired before the cable that reads them.
             let mut cable_mods: BTreeMap<CableId, Vec<(CableId, f32, CableMod)>> = BTreeMap::new();
             let mut routed: Vec<usize> = (0..incoming.len())
-                .filter(|&k| matches!(incoming[k].to, CableTo::CableParam { .. }))
+                .filter(|&k| {
+                    matches!(
+                        incoming[k].to,
+                        CableTo::CableParam { .. } | CableTo::Depth { .. }
+                    )
+                })
                 .collect();
             routed.sort_by_key(|&k| std::cmp::Reverse(route_depth(patch, incoming[k].cable)));
+            // Routes into a route's amount, by the route they move: (cable, source buffer,
+            // amount / source full scale, source full scale).
+            let mut depth_mods: BTreeMap<CableId, Vec<(CableId, BufIdx, f32, f32)>> =
+                BTreeMap::new();
             for k in routed {
                 let c = &incoming[k];
+                if let CableTo::Depth { target, amount } = c.to {
+                    let (src_out_idx, src_is_voice, full_scale, _) = sources[k];
+                    let buf = w.source_buf(
+                        c.from_id,
+                        src_out_idx,
+                        src_is_voice,
+                        is_voice,
+                        lane,
+                        c.delayed,
+                    );
+                    let own = cable_mods.remove(&c.cable).unwrap_or_default();
+                    let buf = w.through_cable(c, buf, Carry::Scale, clock_index, sample_rate, own);
+                    depth_mods.entry(target).or_default().push((
+                        c.cable,
+                        buf,
+                        amount / full_scale,
+                        full_scale,
+                    ));
+                    continue;
+                }
                 let CableTo::CableParam {
                     target,
                     slot,
@@ -1330,7 +1414,20 @@ fn compile_inner(
                 };
                 let own = cable_mods.remove(&c.cable).unwrap_or_default();
                 let buf = w.through_cable(c, buf, carry, clock_index, sample_rate, own);
-                let route = (buf, amount / full_scale);
+                let mut route = Route {
+                    buf,
+                    scale: amount / full_scale,
+                    depth: Vec::new(),
+                };
+                let depth_slots: Vec<(CableId, f32)> = depth_mods
+                    .remove(&c.cable)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|(cable, dbuf, scale, dfs)| {
+                        route.depth.push((dbuf, scale / full_scale));
+                        (cable, dfs * full_scale)
+                    })
+                    .collect();
                 let m = match mods.iter().position(|m| m.index == index) {
                     Some(k) => k,
                     None => {
@@ -1344,13 +1441,25 @@ fn compile_inner(
                         mods.len() - 1
                     }
                 };
+                let route_ix = mods[m].routes.len() as u32;
                 route_slots.push(RouteSlot {
                     cable: c.cable,
                     step: 0,
                     modi: m as u32,
-                    route: mods[m].routes.len() as u32,
+                    route: route_ix,
+                    depth: NO_DEPTH,
                     full_scale,
                 });
+                for (d, (cable, full_scale)) in depth_slots.into_iter().enumerate() {
+                    route_slots.push(RouteSlot {
+                        cable,
+                        step: 0,
+                        modi: m as u32,
+                        route: route_ix,
+                        depth: d as u32,
+                        full_scale,
+                    });
+                }
                 mods[m].routes.push(route);
             }
 
@@ -1517,7 +1626,10 @@ fn compile_inner(
                     }
                 }
                 for route in mods.iter_mut().flat_map(|m| m.routes.iter_mut()) {
-                    route.0 = remap[route.0];
+                    route.buf = remap[route.buf];
+                    for d in route.depth.iter_mut() {
+                        d.0 = remap[d.0];
+                    }
                 }
                 for out_idx in output_bufs.iter_mut() {
                     *out_idx = remap[*out_idx];
@@ -1880,8 +1992,12 @@ impl CompiledPatch {
                     // clamped once inside `from_norm`. A non-finite source leaves the base.
                     for m in mods.iter() {
                         let mut n = m.base_norm;
-                        for &(buf, scale) in &m.routes {
-                            n += self.buffers[buf][0] * scale;
+                        for r in &m.routes {
+                            let mut scale = r.scale;
+                            for &(buf, k) in &r.depth {
+                                scale += self.buffers[buf][0] * k;
+                            }
+                            n += self.buffers[r.buf][0] * scale;
                         }
                         if !n.is_finite() {
                             n = m.base_norm;
@@ -1932,6 +2048,46 @@ impl CompiledPatch {
                                 .get_disjoint_mut([a, b, c, d])
                                 .expect("disjoint");
                             let mut outputs = [&mut x[..], &mut y[..], &mut z[..], &mut w[..]];
+                            let mut io =
+                                ProcessIo::new(input_signals, &mut outputs, param_signals, BLOCK);
+                            self.modules[*module_index].process(&mut io);
+                        }
+                        &[a, b, c, d, e] => {
+                            let [x0, x1, x2, x3, x4] = self
+                                .buffers
+                                .get_disjoint_mut([a, b, c, d, e])
+                                .expect("disjoint");
+                            let mut outputs = [&mut x0[..], &mut x1[..], &mut x2[..], &mut x3[..], &mut x4[..]];
+                            let mut io =
+                                ProcessIo::new(input_signals, &mut outputs, param_signals, BLOCK);
+                            self.modules[*module_index].process(&mut io);
+                        }
+                        &[a, b, c, d, e, f] => {
+                            let [x0, x1, x2, x3, x4, x5] = self
+                                .buffers
+                                .get_disjoint_mut([a, b, c, d, e, f])
+                                .expect("disjoint");
+                            let mut outputs = [&mut x0[..], &mut x1[..], &mut x2[..], &mut x3[..], &mut x4[..], &mut x5[..]];
+                            let mut io =
+                                ProcessIo::new(input_signals, &mut outputs, param_signals, BLOCK);
+                            self.modules[*module_index].process(&mut io);
+                        }
+                        &[a, b, c, d, e, f, g] => {
+                            let [x0, x1, x2, x3, x4, x5, x6] = self
+                                .buffers
+                                .get_disjoint_mut([a, b, c, d, e, f, g])
+                                .expect("disjoint");
+                            let mut outputs = [&mut x0[..], &mut x1[..], &mut x2[..], &mut x3[..], &mut x4[..], &mut x5[..], &mut x6[..]];
+                            let mut io =
+                                ProcessIo::new(input_signals, &mut outputs, param_signals, BLOCK);
+                            self.modules[*module_index].process(&mut io);
+                        }
+                        &[a, b, c, d, e, f, g, h] => {
+                            let [x0, x1, x2, x3, x4, x5, x6, x7] = self
+                                .buffers
+                                .get_disjoint_mut([a, b, c, d, e, f, g, h])
+                                .expect("disjoint");
+                            let mut outputs = [&mut x0[..], &mut x1[..], &mut x2[..], &mut x3[..], &mut x4[..], &mut x5[..], &mut x6[..], &mut x7[..]];
                             let mut io =
                                 ProcessIo::new(input_signals, &mut outputs, param_signals, BLOCK);
                             self.modules[*module_index].process(&mut io);
@@ -2354,12 +2510,8 @@ impl CompiledPatch {
                     return true;
                 }
                 let slot = self.route_slots[lo];
-                let now = match &self.steps[slot.step as usize] {
-                    Step::Process { mods, .. } => {
-                        mods[slot.modi as usize].routes[slot.route as usize].1
-                    }
-                    Step::Cable { mods, .. } => mods[slot.modi as usize].scale,
-                    _ => return false,
+                let Some(&mut now) = slot_scale(&mut self.steps, &slot) else {
+                    return false;
                 };
                 (on, now, value / slot.full_scale)
             }
@@ -2475,7 +2627,14 @@ impl CompiledPatch {
     pub fn route_amount(&self, cable: CableId) -> Option<f32> {
         let slot = self.route_slots.iter().find(|s| s.cable == cable)?;
         let scale = match &self.steps[slot.step as usize] {
-            Step::Process { mods, .. } => mods[slot.modi as usize].routes[slot.route as usize].1,
+            Step::Process { mods, .. } => {
+                let r = &mods[slot.modi as usize].routes[slot.route as usize];
+                if slot.depth == NO_DEPTH {
+                    r.scale
+                } else {
+                    r.depth[slot.depth as usize].1
+                }
+            }
             Step::Cable { mods, .. } => mods[slot.modi as usize].scale,
             _ => return None,
         };
