@@ -20,6 +20,7 @@ pub mod composites;
 pub mod control;
 pub mod cues;
 pub mod displays;
+mod drum_displays;
 pub mod editor;
 pub mod explain;
 pub mod filebrowser;
