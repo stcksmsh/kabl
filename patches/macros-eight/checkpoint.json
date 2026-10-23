@@ -12,92 +12,68 @@
       }
     },
     "2": {
-      "kind": "seq",
-      "pos": {
-        "x": 200.0,
-        "y": 20.0
-      },
-      "params": {
-        "p1": -24.0,
-        "p2": -24.0,
-        "p3": -12.0,
-        "p4": -24.0,
-        "p5": -17.0,
-        "p6": -24.0,
-        "p7": -14.0,
-        "p8": -19.0
-      }
-    },
-    "3": {
       "kind": "osc.va",
       "pos": {
         "x": 20.0,
         "y": 300.0
       },
       "params": {
-        "unison": 3.0,
+        "base_hz": 110.0,
+        "detune": 6.0,
+        "unison": 4.0,
+        "waveform": 2.0
+      }
+    },
+    "3": {
+      "kind": "osc.va",
+      "pos": {
+        "x": 20.0,
+        "y": 560.0
+      },
+      "params": {
+        "base_hz": 164.81,
+        "detune": 6.0,
+        "unison": 4.0,
         "waveform": 2.0
       }
     },
     "4": {
-      "kind": "filter.ladder",
+      "kind": "mixer",
       "pos": {
         "x": 240.0,
         "y": 300.0
       },
       "params": {
-        "cutoff_hz": 220.0,
-        "resonance": 0.3
+        "level1": 0.07,
+        "level2": 0.0
       }
     },
     "5": {
-      "kind": "env.adsr",
+      "kind": "filter.ladder",
       "pos": {
         "x": 460.0,
         "y": 300.0
       },
       "params": {
-        "attack_ms": 3.0,
-        "decay_ms": 200.0,
-        "release_ms": 120.0,
-        "sustain": 0.4
+        "cutoff_hz": 700.0,
+        "resonance": 0.2
       }
     },
     "6": {
-      "kind": "vca",
-      "pos": {
-        "x": 660.0,
-        "y": 300.0
-      },
-      "params": {
-        "gain": 0.0
-      }
-    },
-    "7": {
       "kind": "lfo",
       "pos": {
-        "x": 240.0,
+        "x": 460.0,
         "y": 560.0
       },
       "params": {
-        "rate_hz": 3.0
+        "rate_hz": 0.2
       }
     },
-    "8": {
-      "kind": "mixer",
-      "pos": {
-        "x": 880.0,
-        "y": 160.0
-      },
-      "params": {
-        "level1": 0.25
-      }
-    },
-    "9": {
+    "7": {
       "kind": "delay",
       "pos": {
-        "x": 1060.0,
-        "y": 160.0
+        "x": 680.0,
+        "y": 300.0
       },
       "params": {
         "feedback": 40.0,
@@ -105,26 +81,26 @@
         "sync": 3.0
       }
     },
-    "10": {
+    "8": {
       "kind": "reverb",
       "pos": {
-        "x": 1240.0,
-        "y": 160.0
+        "x": 900.0,
+        "y": 300.0
       },
       "params": {
-        "decay_s": 4.0,
+        "decay_s": 5.0,
         "mix": 0.0
       }
     },
-    "11": {
+    "9": {
       "kind": "out",
       "pos": {
-        "x": 1420.0,
-        "y": 160.0
+        "x": 1120.0,
+        "y": 300.0
       },
       "params": {}
     },
-    "12": {
+    "10": {
       "kind": "macro",
       "pos": {
         "x": 460.0,
@@ -139,12 +115,12 @@
         "cc.m6": 25.0,
         "cc.m7": 26.0,
         "cc.m8": 27.0,
-        "m1": 0.2,
+        "m1": 0.5,
         "m2": 0.3,
         "m3": 0.4,
-        "m4": 0.2,
-        "m5": 0.0,
-        "m6": 0.1,
+        "m4": 0.5,
+        "m5": 0.1,
+        "m6": 0.3,
         "m7": 0.0,
         "m8": 0.5,
         "pin.m1": 1.0,
@@ -162,14 +138,14 @@
     "1": {
       "from": {
         "Module": {
-          "id": 1,
-          "port": "gate"
+          "id": 2,
+          "port": "out"
         }
       },
       "to": {
         "Module": {
-          "id": 2,
-          "port": "clock"
+          "id": 4,
+          "port": "in1"
         }
       },
       "params": {},
@@ -178,14 +154,14 @@
     "2": {
       "from": {
         "Module": {
-          "id": 1,
-          "port": "reset"
+          "id": 3,
+          "port": "out"
         }
       },
       "to": {
         "Module": {
-          "id": 2,
-          "port": "reset"
+          "id": 4,
+          "port": "in2"
         }
       },
       "params": {},
@@ -194,14 +170,14 @@
     "3": {
       "from": {
         "Module": {
-          "id": 2,
-          "port": "pitch"
+          "id": 4,
+          "port": "out"
         }
       },
       "to": {
         "Module": {
-          "id": 3,
-          "port": "pitch"
+          "id": 5,
+          "port": "in"
         }
       },
       "params": {},
@@ -210,14 +186,14 @@
     "4": {
       "from": {
         "Module": {
-          "id": 2,
-          "port": "gate"
+          "id": 5,
+          "port": "out"
         }
       },
       "to": {
         "Module": {
-          "id": 5,
-          "port": "gate"
+          "id": 7,
+          "port": "in"
         }
       },
       "params": {},
@@ -226,14 +202,14 @@
     "5": {
       "from": {
         "Module": {
-          "id": 3,
-          "port": "out"
+          "id": 1,
+          "port": "gate"
         }
       },
       "to": {
         "Module": {
-          "id": 4,
-          "port": "in"
+          "id": 7,
+          "port": "clock"
         }
       },
       "params": {},
@@ -242,14 +218,14 @@
     "6": {
       "from": {
         "Module": {
-          "id": 4,
-          "port": "out"
+          "id": 7,
+          "port": "left"
         }
       },
       "to": {
         "Module": {
-          "id": 6,
-          "port": "in"
+          "id": 8,
+          "port": "in_l"
         }
       },
       "params": {},
@@ -258,14 +234,14 @@
     "7": {
       "from": {
         "Module": {
-          "id": 5,
-          "port": "out"
+          "id": 7,
+          "port": "right"
         }
       },
       "to": {
         "Module": {
-          "id": 6,
-          "port": "cv"
+          "id": 8,
+          "port": "in_r"
         }
       },
       "params": {},
@@ -274,14 +250,14 @@
     "8": {
       "from": {
         "Module": {
-          "id": 6,
-          "port": "out"
+          "id": 8,
+          "port": "left"
         }
       },
       "to": {
         "Module": {
-          "id": 8,
-          "port": "in1"
+          "id": 9,
+          "port": "left"
         }
       },
       "params": {},
@@ -291,13 +267,13 @@
       "from": {
         "Module": {
           "id": 8,
-          "port": "out"
+          "port": "right"
         }
       },
       "to": {
         "Module": {
           "id": 9,
-          "port": "in"
+          "port": "right"
         }
       },
       "params": {},
@@ -306,130 +282,14 @@
     "10": {
       "from": {
         "Module": {
-          "id": 1,
-          "port": "gate"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 9,
-          "port": "clock"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "11": {
-      "from": {
-        "Module": {
-          "id": 9,
-          "port": "left"
-        }
-      },
-      "to": {
-        "Module": {
           "id": 10,
-          "port": "in_l"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "12": {
-      "from": {
-        "Module": {
-          "id": 9,
-          "port": "right"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 10,
-          "port": "in_r"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "13": {
-      "from": {
-        "Module": {
-          "id": 10,
-          "port": "left"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 11,
-          "port": "left"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "14": {
-      "from": {
-        "Module": {
-          "id": 10,
-          "port": "right"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 11,
-          "port": "right"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "15": {
-      "from": {
-        "Module": {
-          "id": 12,
           "port": "m1"
         }
       },
       "to": {
         "Param": {
-          "id": 4,
-          "param": "cutoff_hz"
-        }
-      },
-      "params": {
-        "amount": 0.7
-      },
-      "steps": []
-    },
-    "16": {
-      "from": {
-        "Module": {
-          "id": 12,
-          "port": "m2"
-        }
-      },
-      "to": {
-        "Param": {
-          "id": 4,
-          "param": "resonance"
-        }
-      },
-      "params": {
-        "amount": 0.45
-      },
-      "steps": []
-    },
-    "17": {
-      "from": {
-        "Module": {
-          "id": 12,
-          "port": "m3"
-        }
-      },
-      "to": {
-        "Param": {
           "id": 5,
-          "param": "decay_ms"
+          "param": "cutoff_hz"
         }
       },
       "params": {
@@ -437,11 +297,47 @@
       },
       "steps": []
     },
-    "18": {
+    "11": {
       "from": {
         "Module": {
-          "id": 12,
-          "port": "m4"
+          "id": 10,
+          "port": "m2"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 5,
+          "param": "resonance"
+        }
+      },
+      "params": {
+        "amount": 0.4
+      },
+      "steps": []
+    },
+    "12": {
+      "from": {
+        "Module": {
+          "id": 10,
+          "port": "m3"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 2,
+          "param": "detune"
+        }
+      },
+      "params": {
+        "amount": 0.6
+      },
+      "steps": []
+    },
+    "13": {
+      "from": {
+        "Module": {
+          "id": 10,
+          "port": "m3"
         }
       },
       "to": {
@@ -455,52 +351,70 @@
       },
       "steps": []
     },
-    "19": {
+    "14": {
       "from": {
         "Module": {
-          "id": 12,
+          "id": 10,
+          "port": "m4"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 4,
+          "param": "level2"
+        }
+      },
+      "params": {
+        "amount": 0.4
+      },
+      "steps": []
+    },
+    "15": {
+      "from": {
+        "Module": {
+          "id": 10,
           "port": "m5"
         }
       },
       "to": {
         "Param": {
-          "id": 9,
+          "id": 7,
           "param": "mix"
         }
       },
       "params": {
-        "amount": 0.45
+        "amount": 0.4
       },
       "steps": []
     },
-    "20": {
+    "16": {
       "from": {
         "Module": {
-          "id": 12,
+          "id": 10,
           "port": "m6"
         }
       },
       "to": {
         "Param": {
-          "id": 10,
+          "id": 8,
           "param": "mix"
         }
       },
       "params": {
-        "amount": 0.55
+        "amount": 0.5
       },
       "steps": []
     },
-    "21": {
+    "17": {
       "from": {
         "Module": {
-          "id": 12,
+          "id": 10,
           "port": "m8"
         }
       },
       "to": {
         "Param": {
-          "id": 8,
+          "id": 4,
           "param": "level1"
         }
       },
@@ -509,16 +423,16 @@
       },
       "steps": []
     },
-    "22": {
+    "18": {
       "from": {
         "Module": {
-          "id": 7,
+          "id": 6,
           "port": "out"
         }
       },
       "to": {
         "Param": {
-          "id": 4,
+          "id": 5,
           "param": "cutoff_hz"
         }
       },
@@ -527,31 +441,31 @@
       },
       "steps": []
     },
-    "23": {
+    "19": {
       "from": {
         "Module": {
-          "id": 12,
+          "id": 10,
           "port": "m7"
         }
       },
       "to": {
         "CableParam": {
-          "cable": 22,
+          "cable": 18,
           "param": "amount"
         }
       },
       "params": {
-        "amount": 0.6
+        "amount": 0.07
       },
       "steps": []
     }
   },
   "labels": {
-    "12": {
+    "10": {
       "name.m1": "Cutoff",
-      "name.m2": "Resonance",
-      "name.m3": "Decay",
-      "name.m4": "Detune",
+      "name.m2": "Reso",
+      "name.m3": "Detune",
+      "name.m4": "Fifth",
       "name.m5": "Delay",
       "name.m6": "Space",
       "name.m7": "Motion",

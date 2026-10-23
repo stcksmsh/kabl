@@ -38,8 +38,8 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "macros-eight",
         "Eight Macros",
         "Piece",
-        &["sequenced", "macros", "performance", "100bpm"],
-        "A self-playing bass line with eight named macros on the Perform page. Motion does not move a knob: it sets how deep an LFO wobbles the filter cutoff, from still to full. Run, then turn Motion.",
+        &["pad", "macros", "performance", "drone"],
+        "A drifting two-voice pad with eight named macros on the Perform page. Motion does not move a knob: it fades in a slow, gentle breath on the filter cutoff, from still to full. Run, then turn Motion.",
     ),
     (
         "functional-cables/morph-arc",

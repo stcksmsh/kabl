@@ -57,6 +57,94 @@ pub struct RouteView {
     pub bypass: bool,
     /// Source nominal range divided by its full scale: (-1, 1) bipolar, (0, 1) unipolar.
     pub src: (f32, f32),
+    /// Routes into this route's amount (a macro, LFO or envelope moving its depth).
+    pub depth: Vec<DepthView>,
+}
+
+/// One route into another route's amount.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DepthView {
+    pub cable: CableId,
+    pub from_id: ModuleId,
+    pub from_port: String,
+    /// Signed change of the route's amount per unit of normalized source.
+    pub amount: f32,
+    pub bypass: bool,
+    pub src: (f32, f32),
+}
+
+/// Nominal range of an output port divided by its full scale.
+fn source_range(state: &PatchState, id: ModuleId, port: &str) -> (f32, f32) {
+    state
+        .modules
+        .get(&id)
+        .and_then(|m| registry::info_for(&m.kind))
+        .and_then(|info| {
+            info.ports
+                .iter()
+                .find(|p| p.direction == PortDirection::Output && p.name == port)
+        })
+        .map(|p| {
+            let (lo, hi) = p.port_type.nominal_range();
+            let full = lo.abs().max(hi.abs());
+            (lo / full, hi / full)
+        })
+        .unwrap_or((-1.0, 1.0))
+}
+
+/// Routes into the amount of route `route`, in cable-id order.
+pub fn depth_into(state: &PatchState, route: CableId) -> Vec<DepthView> {
+    state
+        .cables
+        .iter()
+        .filter_map(|(&cable, c)| {
+            let (PortRef::CableParam { cable: t, param }, PortRef::Module { id, port }) =
+                (&c.to, &c.from)
+            else {
+                return None;
+            };
+            (*t == route && param == kabl_engine::compile::DEPTH).then(|| DepthView {
+                cable,
+                from_id: *id,
+                from_port: port.clone(),
+                amount: c
+                    .params
+                    .get("amount")
+                    .copied()
+                    .unwrap_or(DEFAULT_ROUTE_AMOUNT),
+                bypass: c.params.get("bypass").is_some_and(|&b| b >= 0.5),
+                src: source_range(state, *id, port),
+            })
+        })
+        .collect()
+}
+
+impl RouteView {
+    /// The route's amount with its depth routes at their lowest and highest.
+    pub fn amount_span(&self) -> (f32, f32) {
+        self.depth
+            .iter()
+            .filter(|d| !d.bypass)
+            .fold((self.amount, self.amount), |(lo, hi), d| {
+                let (a, b) = (d.amount * d.src.0, d.amount * d.src.1);
+                (lo + a.min(b), hi + a.max(b))
+            })
+    }
+
+    /// Lowest and highest knob travel the route adds, over its source range and its amount span.
+    fn contribution(&self) -> (f32, f32) {
+        let (a0, a1) = self.amount_span();
+        let c = [
+            a0 * self.src.0,
+            a0 * self.src.1,
+            a1 * self.src.0,
+            a1 * self.src.1,
+        ];
+        (
+            c.iter().copied().fold(f32::MAX, f32::min),
+            c.iter().copied().fold(f32::MIN, f32::max),
+        )
+    }
 }
 
 /// Every route into `(id, param)`, in cable-id order.
@@ -76,21 +164,7 @@ pub fn routes_into(state: &PatchState, id: ModuleId, param: &str) -> Vec<RouteVi
         else {
             continue;
         };
-        let src = state
-            .modules
-            .get(from_id)
-            .and_then(|m| registry::info_for(&m.kind))
-            .and_then(|info| {
-                info.ports
-                    .iter()
-                    .find(|p| p.direction == PortDirection::Output && p.name == from_port)
-            })
-            .map(|p| {
-                let (lo, hi) = p.port_type.nominal_range();
-                let full = lo.abs().max(hi.abs());
-                (lo / full, hi / full)
-            })
-            .unwrap_or((-1.0, 1.0));
+        let src = source_range(state, *from_id, from_port);
         out.push(RouteView {
             cable,
             from_id: *from_id,
@@ -102,6 +176,7 @@ pub fn routes_into(state: &PatchState, id: ModuleId, param: &str) -> Vec<RouteVi
                 .unwrap_or(DEFAULT_ROUTE_AMOUNT),
             bypass: c.params.get("bypass").is_some_and(|&b| b >= 0.5),
             src,
+            depth: depth_into(state, cable),
         });
     }
     out
@@ -131,20 +206,17 @@ pub fn reaches(state: &PatchState, id: ModuleId, stored: &str, param: &str) -> b
 
 /// Unclamped knob-travel span one route can add to `base_norm`: `(low, high)`.
 pub fn route_span(r: &RouteView, base_norm: f32) -> (f32, f32) {
-    let (a, b) = (
-        base_norm + r.amount * r.src.0,
-        base_norm + r.amount * r.src.1,
-    );
-    (a.min(b), a.max(b))
+    let (lo, hi) = r.contribution();
+    (base_norm + lo, base_norm + hi)
 }
 
 /// Unclamped span of every active (non-bypassed) route summed, as the engine sums them.
 pub fn combined_span(routes: &[RouteView], base_norm: f32) -> (f32, f32) {
     let (mut lo, mut hi) = (base_norm, base_norm);
     for r in routes.iter().filter(|r| !r.bypass) {
-        let (a, b) = (r.amount * r.src.0, r.amount * r.src.1);
-        lo += a.min(b);
-        hi += a.max(b);
+        let (a, b) = r.contribution();
+        lo += a;
+        hi += b;
     }
     (lo, hi)
 }
@@ -1695,6 +1767,32 @@ pub(crate) fn cable_routes(editor: &mut PatchEditor, ui_state: &mut UiState, ui:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A route whose amount a source moves shows the whole span the knob can reach.
+    #[test]
+    fn depth_routes_widen_the_span_a_route_can_reach() {
+        let mk = |depth: Vec<DepthView>| RouteView {
+            cable: 1,
+            from_id: 1,
+            from_port: "out".into(),
+            amount: 0.0,
+            bypass: false,
+            src: (-1.0, 1.0),
+            depth,
+        };
+        let d = |bypass| DepthView {
+            cable: 2,
+            from_id: 2,
+            from_port: "m1".into(),
+            amount: 0.5,
+            bypass,
+            src: (0.0, 1.0),
+        };
+        assert_eq!(combined_span(&[mk(vec![])], 0.5), (0.5, 0.5));
+        assert_eq!(combined_span(&[mk(vec![d(false)])], 0.5), (0.0, 1.0));
+        assert_eq!(combined_span(&[mk(vec![d(true)])], 0.5), (0.5, 0.5));
+        assert_eq!(route_span(&mk(vec![d(false)]), 0.5), (0.0, 1.0));
+    }
 
     /// The label shows the semitone the sequencer plays (it rounds), never "-0 st".
     #[test]

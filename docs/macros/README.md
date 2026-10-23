@@ -44,6 +44,8 @@ Compile rules (errors name the fix): the target must be a route that ends on a k
 
 No zipper noise: the macro itself glides over 20 ms and every route is evaluated once per 64-sample block, as before. A depth change moves the modulation by one small step per block, the same step size a macro moving a knob directly makes.
 
+What Perform and the drawer say: a macro tile whose route moves a depth reads "Depth: LFO to Ladder · Cutoff" instead of "moves nothing yet", and the drawer's "All sources" range and the knob's range arc include the span the depth routes add.
+
 In the UI: open a knob's drawer, select a route's row, and under the rows a "Depth moved by" list with "Add source" appears, with the same row widgets as a route into a cable parameter (amount, invert, bypass, pattern, remove).
 
 ## Schema
@@ -66,22 +68,21 @@ No bump. A depth route is an ordinary cable whose destination is `CableParam { c
 
 ## Tests
 
-Workspace: 980 passed, 0 failed, 34 ignored. New: `route_depth.rs` (7), `macros_perform.rs` (1), plus additions to `macros.rs`, `cues.rs`, `functional_cables.rs`, `library.rs` and the clap `host_tests.rs`.
+Workspace: 982 passed, 0 failed, 34 ignored. New: `route_depth.rs` (7), `macros_perform.rs` (1), plus additions to `macros.rs`, `cues.rs`, `functional_cables.rs`, `library.rs` and the clap `host_tests.rs`.
 
 ## Demo
 
-`patches/macros-eight` (Eight Macros): a self-playing bass with eight named macros pinned on Perform, CC 20 to 27. Motion (`m7`) is routed into the amount of an LFO's route into the filter cutoff.
+`patches/macros-eight` (Eight Macros, ships in the factory bank, level -19 dBFS like the rest): a drifting two-voice pad with eight named macros pinned on Perform, CC 20 to 27. Motion (`m7`) is routed into the amount of a slow LFO's route into the filter cutoff: at 0 the filter is still, at 1 it breathes about 0.7 octave either way every five seconds (0.2 Hz, depth 0.07 of knob travel).
 
 ```sh
 cargo run -p kabl-ui --example macros_demo -- write patches/macros-eight
 cargo run --release -p kabl-ui --example macros_demo -- render patches/macros-eight clip.wav   # prints the wobble per window
 ```
 
-`media/motion-scales-lfo-depth.mp3` is 12 s: Motion 0 for 4 s, 0.5 for 4 s, 1.0 for 4 s. Listen for the filter wobble coming in. Measured: the lowest 50 ms RMS in each window falls 0.065, 0.015, 0.009 while the loudest stays at 0.21.
+`media/motion-scales-lfo-depth.mp3` is 12 s: Motion 0 for 4 s, 0.5 for 4 s, 1.0 for 4 s. Listen for the slow breath coming in. Measured as brightness (rms of the first difference over rms, per 250 ms): range 0.070 to 0.117 at Motion 0 (the four-voice unison beats on its own), 0.078 to 0.142 at 0.5 and 0.071 to 0.134 at 1; the metric is crude, the clip is the evidence.
 
 ## Known gaps
 
-- The routing drawer's "All sources" span ignores depth routes (it shows the stored amount).
-- A long macro name truncates in its tile ("Resonan..." at eight macros in 1180 px); the hover and the drawer show it in full.
 - Eight is a hard ceiling; a ninth needs a second macros module.
+- Macro names: a tile title that does not fit is cut with an ellipsis, and its tooltip shows the full name, the source and the rename hint (type size stays at the theme's 15 px). The demo uses "Reso" so it fits at eight macros in 1180 px.
 - A route into a route that ends on a cable parameter (a cable's morph or chance) has no depth yet.
