@@ -206,7 +206,7 @@ fn cinder_block() -> Rack {
     let knob = macros(
         &mut r,
         ["Bite", "Grit", "Room", "Crush"],
-        [0.40, 0.60, 0.25, 0.30],
+        [0.40, 0.60, 0.25, 0.05],
     );
     let m = r.add("midi.in", &[("mode", 1.0), ("bend", 2.0)]);
     let saw = r.add(
