@@ -20,6 +20,7 @@ tool = 'target/release/examples/presets_pilot'
 out = Path('docs/presets/clips')
 out.mkdir(parents=True, exist_ok=True)
 # (slug, clip name, PP_SET override): the extra clips show a macro moved
+LOSSLESS = ('salt-flat', 'cinder-block')
 extras = [('salt-flat', 'salt-flat-textured', 'macro.m4=0.7'), ('parquet-loop', 'parquet-loop-no-glide', 'macro.m4=0')]
 
 
@@ -65,6 +66,8 @@ with tempfile.TemporaryDirectory() as tmp:
         if name is None:
             for wav in sorted(d.glob('*.wav')):
                 good &= encode_and_check(wav, out / (wav.stem + '.mp3'))
+                if wav.stem in LOSSLESS:  # for ears: the same float render, 24-bit FLAC
+                    sp.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', wav, '-c:a', 'flac', '-sample_fmt', 's32', '-bits_per_raw_sample', '24', out / (wav.stem + '.flac')], check=True)
         else:
             good &= encode_and_check(d / (slug + '.wav'), out / (name + '.mp3'))
 sys.exit(0 if good else 1)

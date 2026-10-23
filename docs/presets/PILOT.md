@@ -59,6 +59,13 @@ What stays by design: Cinder Block's bitcrusher (Crush stored at 0.3, so 18 % of
 
 **Loading Dock first half second.** The pink-noise riser entered before the drive, so even Wash 0.15 became a loud, steady hiss (about -22 dBFS) that the drive's saturation held up; before Run there is nothing else to hear, which is why it stood out in the first half second. Now the riser joins after the drive, and Wash is 0 at the Intro (and stored at 0), so the preset is silent until Run and the riser grows with the Build from nothing.
 
+### Defect note: poly glide (for the module fix)
+
+- **What:** `midi.in` with `glide` ALWAYS in POLY mode does not give a player a legato slide. A voice's first note never glides, and the allocator hands a new note the free voice that was released longest ago, so the pitch a note slides from is the one that voice played several notes earlier, unrelated to the note just played.
+- **Measured** (Parquet Loop, `glide_ms` driven to about 830 ms, alternating C3 and C5 played legato every 0.7 s, `PP_HITS` and `PP_SET=macro.m4=1`): 200 ms after each note-on, notes 1 to 9 are exactly on pitch (130.4 and 521.5 Hz); note 11 is mid-slide (265 Hz). All eight voices are fresh after load, so nothing glides until the pool has cycled.
+- **Expected:** a new note slides from the pitch a player just heard: the most recent note (or the nearest held one), also on a fresh voice.
+- **Fix to assign:** in the POLY allocator (`kabl_engine::keyboard`, rules in `docs/sound-palette-batch/keyboard.md`), glide a voice's first note from the last pitch any voice played, and prefer for a new note the free voice whose last pitch is nearest. Not worked around in the preset (no per-voice slew on pitch).
+
 ## Where a fifth macro would help
 
 The macros module holds four (`MAX_OUTPUTS` is 4 per module; `claude/macros` lifts it), so the pilot stays at four. A fifth would help here, and no more than that:
@@ -126,6 +133,7 @@ Regenerate with `presets_pilot` (`write`, `clips`, `macros`, `phrases`; `PP_F32`
 - **Macros at the extremes** (`presets_pilot macros`, cues not launched): with every macro at 0 or at 1 no preset exceeds -1.5 dBFS and all renders are finite.
 - **Salt Flat static** (measured on the clip, mixed to mono): without the shimmer voice the energy above 2 kHz falls 6.8 dB (-43.0 to -49.8 dBFS RMS) and the crest factor of that band rises from 5.3 to 14.8; chorus mix, unison spread and the reverb change it by a dB or less each. A pure sine instead of the triangle makes the high band tonal (spectral flatness 0.7 against 0.03).
 - **Glide** (Parquet Loop clip with Glide at 0.5 against 0): the renders are bit-identical until the first chord change (about 3.9 s), differ by about -20 dB from there.
+- **Lossless pair for listening:** `clips/salt-flat.flac` and `clips/cinder-block.flac` are 24-bit FLAC of the same float renders as the 320 kbps mp3s next to them.
 - **Clips** (`scripts/clips.py`): 320 kbps mp3 decoded against the float WAV, error 54 to 78 dBFS RMS, 35 to 59 dB under the signal below 16 kHz, peaks within 0.1 dB.
 - **Audio rule:** standalone and REAPER runs play into the silent PipeWire sink `kabl_agents` (`PIPEWIRE_NODE`, `PULSE_SINK` are set in both scripts); check `pactl list sink-inputs` after starting; prefer offline renders. The round-three host and standalone runs were made before this rule reached me and played on the real output.
 - **Standalone** (`scripts/standalone.py`, release build, real audio device, real-time priority granted): all eight open, take MIDI from a virtual controller and stay running; Rack and Perform captures in `evidence/standalone/`.
