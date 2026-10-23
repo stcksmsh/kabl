@@ -56,7 +56,12 @@ fn width_pans_the_stack_and_zero_is_mono() {
     let mono = osc(&set).render(9600, 0, |_, _| 0.0);
     let right = osc(&set).render(9600, 1, |_, _| 0.0);
     assert_eq!(mono, right);
-    let mut wide = osc(&[("base_hz", 220.0), ("unison", 8.0), ("detune", 30.0), ("width", 100.0)]);
+    let mut wide = osc(&[
+        ("base_hz", 220.0),
+        ("unison", 8.0),
+        ("detune", 30.0),
+        ("width", 100.0),
+    ]);
     let (mut l, mut r) = (Vec::new(), Vec::new());
     for _ in 0..300 {
         let b = wide.block(&[]);
@@ -66,7 +71,10 @@ fn width_pans_the_stack_and_zero_is_mono() {
     let diff: Vec<f32> = l.iter().zip(&r).map(|(a, b)| a - b).collect();
     assert!(rms(&diff) > 0.2 * rms(&l), "channels differ");
     let (dl, dr) = (db(rms(&l) as f64), db(rms(&r) as f64));
-    println!("width 100: left {dl:.1} dB, right {dr:.1} dB, mono {:.1} dB", db(rms(&mono) as f64));
+    println!(
+        "width 100: left {dl:.1} dB, right {dr:.1} dB, mono {:.1} dB",
+        db(rms(&mono) as f64)
+    );
     assert!((dl - dr).abs() < 2.5);
 }
 
@@ -105,7 +113,13 @@ fn every_setting_and_rate_is_finite() {
                 ("restart", 1.0),
             ];
             let mut r = Rig::new("osc.va", &set, sr);
-            let x = r.render(8192, 0, |k, i| if k == 0 { 36.0 } else { (i % 50 > 25) as u8 as f32 });
+            let x = r.render(8192, 0, |k, i| {
+                if k == 0 {
+                    36.0
+                } else {
+                    (i % 50 > 25) as u8 as f32
+                }
+            });
             assert!(x.iter().all(|v| v.is_finite()), "{sr} {count} {wave}");
         }
     }

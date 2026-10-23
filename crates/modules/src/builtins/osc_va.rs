@@ -180,7 +180,9 @@ pub static OSC_VA_INFO: ModuleInfo = ModuleInfo {
     },
     skin: None,
     width_units: 7,
-    advanced: &["pw", "fine", "unison", "detune", "curve", "width", "blend", "restart"],
+    advanced: &[
+        "pw", "fine", "unison", "detune", "curve", "width", "blend", "restart",
+    ],
 };
 
 const PITCH_IN: usize = 0;
@@ -434,7 +436,10 @@ impl Module for OscVa {
                 if width > 0.0 {
                     // Equal-power pan; the middle is unity in each channel.
                     let a = (position(count, k) * 2.0 * width + 1.0) * (PI * 0.25);
-                    pan[k] = (a.cos() * std::f32::consts::SQRT_2, a.sin() * std::f32::consts::SQRT_2);
+                    pan[k] = (
+                        a.cos() * std::f32::consts::SQRT_2,
+                        a.sin() * std::f32::consts::SQRT_2,
+                    );
                 }
             }
             if restart {
