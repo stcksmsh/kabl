@@ -613,7 +613,7 @@ fn formant_vowel_steps_on_a_cable_do_not_click() {
         .map(|i| 2.0 * ((i as f32 * 110.0 / SR) % 1.0) - 1.0)
         .collect();
     let run = |vowel: &dyn Fn(usize) -> f32| {
-        let v: Vec<f32> = (0..n).map(|i| vowel(i)).collect();
+        let v: Vec<f32> = (0..n).map(vowel).collect();
         let mut m = registry::create("filter.formant").unwrap();
         m.prepare(
             SR,
