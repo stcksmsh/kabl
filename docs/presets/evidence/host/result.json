@@ -1,0 +1,58 @@
+{
+ "plugin_sha256": "f3fbb4041d103c60ea89dfbf5818fd8d57fefb3de96b1365dbe979edd4e15e46",
+ "cinder-block": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.116,
+  "rms": 0.0277,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "parquet-loop": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.2083,
+  "rms": 0.0294,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "loading-dock": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0758,
+  "rms": 0.0137,
+  "restart_relative_difference": 0.0
+ },
+ "glass-elevator": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.2188,
+  "rms": 0.0235,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "undertow": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0498,
+  "rms": 0.0253,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "salt-flat": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.2188,
+  "rms": 0.0376,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "boxwood": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.137,
+  "rms": 0.0179,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "neon-highway": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1042,
+  "rms": 0.0291,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ }
+}

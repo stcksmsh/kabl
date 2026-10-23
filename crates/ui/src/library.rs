@@ -35,9 +35,12 @@ pub const CATEGORIES: &[&str] = &[
     "Lead",
     "Keys",
     "Pad",
+    "Pluck",
     "Strings",
     "Wind",
     "Percussion",
+    "Groove",
+    "Voice",
     "Piece",
     "Study",
 ];
