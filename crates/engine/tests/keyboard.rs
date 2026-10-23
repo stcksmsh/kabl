@@ -180,11 +180,7 @@ fn glides(k: &mut Keyboard, evs: &[(u64, KeyEvent)]) -> Vec<(i32, bool, Option<i
                 ..
             } = a
             {
-                v.push((
-                    pitch as i32 + 60,
-                    glide,
-                    glide_from.map(|f| f as i32 + 60),
-                ));
+                v.push((pitch as i32 + 60, glide, glide_from.map(|f| f as i32 + 60)));
             }
         });
     }
@@ -235,7 +231,7 @@ fn poly_glide_legato_only_glides_over_a_held_key() {
         g,
         vec![
             (60, false, None),
-            (64, true, Some(60)), // 60 still down
+            (64, true, Some(60)),  // 60 still down
             (67, false, Some(64)), // silence: no glide
             (69, true, Some(67)),
         ]
