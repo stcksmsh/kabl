@@ -360,3 +360,41 @@ fn the_step_grids_fit_the_drawer_at_the_maximum_step_count() {
         }
     }
 }
+
+#[test]
+fn a_routes_depth_gets_a_source_from_the_drawer_and_the_patch_still_compiles() {
+    let mut t = H::new();
+    let (route, id, param) = t
+        .editor
+        .state()
+        .cables
+        .iter()
+        .find_map(|(&r, c)| match &c.to {
+            PortRef::Param { id, param } => Some((r, *id, param.clone())),
+            _ => None,
+        })
+        .expect("a route into a knob");
+    t.ui.inspected = Some((id, param));
+    t.ui.selected_route = Some(route);
+    t.frame();
+    t.click(&format!("croute-add:{route}:amount"));
+    let source =
+        t.ui.hits
+            .keys()
+            .find(|k| k.starts_with(&format!("croute-source:{route}:amount:")))
+            .expect("the chooser lists the patch's outputs")
+            .clone();
+    t.click(&source);
+    let depth = t
+        .editor
+        .state()
+        .cables
+        .iter()
+        .find(|(_, c)| matches!(&c.to, PortRef::CableParam { cable, param } if *cable == route && param == "amount"))
+        .map(|(&id, _)| id)
+        .expect("the depth route was added");
+    kabl_engine::compile::compile(t.editor.state(), 48000.0, 1)
+        .expect("the patch with a depth route compiles");
+    t.click(&format!("croute-remove:{depth}"));
+    assert!(!t.editor.state().cables.contains_key(&depth));
+}

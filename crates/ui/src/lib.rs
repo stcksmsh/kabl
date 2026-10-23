@@ -3120,7 +3120,7 @@ fn cues_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::U
             ui.horizontal_wrapped(|ui| {
                 ui.label(egui::RichText::new("Macros").small());
                 for &mm in &macro_mods {
-                    for k in 0..kabl_modules::builtins::MACROS as u8 {
+                    for k in cues::active_macros(state, mm) {
                         let set = c.macros.iter().find(|t| (t.0, t.1) == (mm, k)).map(|t| t.2);
                         let name = state
                             .label(mm, &format!("name.m{}", k + 1))

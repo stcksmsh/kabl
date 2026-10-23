@@ -157,7 +157,8 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         let n = t.len() as f32;
         let tile = if spread { TILE_MIN } else { TILE_W };
         (
-            n * tile + (n - 1.0) * st.sp(1) + st.sp(3) * 2.0,
+            // Five or more macros share one row: the tiles narrow before the row wraps.
+            (n * tile + (n - 1.0) * st.sp(1) + st.sp(3) * 2.0).min(avail),
             if spread { n } else { 0.0 },
         )
     }));
@@ -483,7 +484,7 @@ fn pin_head(
                                 .selectable(false)
                                 .sense(Sense::click()),
                         )
-                        .tip(st, &format!("{source}\nDouble-click to rename"));
+                        .tip(st, &format!("{title}\n{source}\nDouble-click to rename"));
                     ui_state.record(format!("plabel:{key}"), r.rect);
                     if r.double_clicked() {
                         ui_state.renaming = Some((pin.id, pin.key.clone(), title.clone()));
@@ -832,35 +833,60 @@ fn cues_card(
 fn macro_moves(state: &kabl_core::PatchState, id: ModuleId, port: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for c in state.cables.values() {
-        let (PortRef::Module { id: from, port: p }, PortRef::Param { id: to, param }) =
-            (&c.from, &c.to)
-        else {
+        let PortRef::Module { id: from, port: p } = &c.from else {
             continue;
         };
         if *from != id || p != port {
             continue;
         }
-        let Some(m) = state.modules.get(to) else {
+        // A route into another route's amount: "Depth: LFO to Ladder · Cutoff".
+        if let PortRef::CableParam { cable, .. } = &c.to {
+            if let Some(PortRef::Param { id: to, param }) = state.cables.get(cable).map(|r| &r.to) {
+                let src = match state.cables.get(cable).map(|r| &r.from) {
+                    Some(PortRef::Module { id, .. }) => module_short(state, *id),
+                    _ => "?".into(),
+                };
+                let label = format!("Depth: {src} to {}", param_short(state, *to, param));
+                if !out.contains(&label) {
+                    out.push(label);
+                }
+            }
+            continue;
+        }
+        let PortRef::Param { id: to, param } = &c.to else {
             continue;
         };
-        let Some(info) = registry::info_for(&m.kind) else {
+        if !state.modules.contains_key(to) {
             continue;
-        };
-        let name = info
-            .params
-            .iter()
-            .find(|q| q.name == param)
-            .map_or(param.clone(), routing::target_label);
-        let short = match routing::short_name(&m.kind) {
-            "?" => info.name,
-            s => s,
-        };
-        let label = format!("{short} · {name}");
+        }
+        let label = param_short(state, *to, param);
         if !out.contains(&label) {
             out.push(label);
         }
     }
     out
+}
+
+/// "LFO", "Ladder": a module's short kind name.
+fn module_short(state: &kabl_core::PatchState, id: ModuleId) -> String {
+    let Some(m) = state.modules.get(&id) else {
+        return "?".into();
+    };
+    match (routing::short_name(&m.kind), registry::info_for(&m.kind)) {
+        ("?", Some(info)) => info.name.into(),
+        (s, _) => s.into(),
+    }
+}
+
+/// "Ladder · Cutoff": a module's short name and the label of one of its params.
+fn param_short(state: &kabl_core::PatchState, id: ModuleId, param: &str) -> String {
+    let name = state
+        .modules
+        .get(&id)
+        .and_then(|m| registry::info_for(&m.kind))
+        .and_then(|info| info.params.iter().find(|q| q.name == param))
+        .map_or(param.to_string(), routing::target_label);
+    format!("{} · {name}", module_short(state, id))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1334,5 +1360,27 @@ mod tests {
         assert_eq!(bar_beat(16.0), (2, 1, 0.0));
         assert_eq!(bar_beat(31.9).0, 2);
         assert_eq!(bar_beat(31.9).1, 4);
+    }
+
+    /// A macro whose only route moves another route's depth says what that depth is for.
+    #[test]
+    fn a_macro_that_drives_a_depth_says_what_it_moves() {
+        let dir =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/macros-eight");
+        let log = kabl_core::load(&dir).unwrap();
+        let state = log.state();
+        let id = state
+            .modules
+            .iter()
+            .find(|(_, m)| m.kind == "macro")
+            .map(|(&id, _)| id)
+            .unwrap();
+        let moves = macro_moves(state, id, "m7");
+        assert_eq!(moves.len(), 1, "{moves:?}");
+        assert!(
+            moves[0].starts_with("Depth: LFO to ") && moves[0].ends_with("Cutoff"),
+            "{moves:?}"
+        );
+        assert_eq!(macro_moves(state, id, "m1").len(), 1);
     }
 }

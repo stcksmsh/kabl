@@ -1,0 +1,13 @@
+sleep 3
+click perform
+sleep 2
+nudge 5 5
+sleep 1
+shot perform-dark-1180
+click view-menu
+sleep 0.5
+click theme:light
+key Escape
+sleep 1.5
+nudge 5 5
+shot perform-light-1180
