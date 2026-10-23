@@ -12,7 +12,7 @@ Three carry the French-touch signature (tagged `signature`), five cover other ge
 |---|---|---|---|---|
 | Cinder Block | Bass | French touch, signature | mono, short off-beat notes, mod wheel opens the filter | **Bite** ladder cutoff; **Grit** drive stage; **Room** slapback and tight room (0.25); **Crush** bitcrusher mix |
 | Parquet Loop | Keys | disco, signature, 122 BPM swing | hold a chord, press Run: the filter closes on every beat; chord tones glide | **Cutoff** ladder cutoff; **Crunch** drive stage; **Space** dotted echo and tight room (0.25); **Glide** slide time |
-| Loading Dock | Piece | filter house, signature, 124 BPM swing | press Run; five cues; a hand-played voice on top | **Sweep** ladder cutoff; **Drive** drive stage and bitcrusher; **Wash** noise riser, echo and room (0.15); **Pump** depth of the beat ducking bass and stabs |
+| Loading Dock | Piece | filter house, signature, 124 BPM swing | press Run; five cues; a hand-played voice on top | **Sweep** ladder cutoff; **Drive** drive stage and bitcrusher; **Wash** noise riser, echo and room (0.15); **Pump** how hard the kick ducks bass and stabs (the sidechain ratio) |
 | Glass Elevator | Keys | pop | poly FM electric piano, velocity | **Tine** FM index and a lowpass; **Grit** drive stage; **Space** ping-pong echo and room (0.60); **Chorus** mix and rate |
 | Undertow | Bass | hip-hop, drum and bass | mono, legato glide, long low notes | **Cutoff** ladder cutoff; **Weight** drive stage; **Room** short room (0.30); **Beating** the two saws pull apart and the cutoff sweeps |
 | Salt Flat | Pad | ambient, cinematic | poly, slow, open chords | **Bloom** ladder cutoff; **Saturation** a little drive; **Space** long echo and a 9 s room (0.65); **Texture** the staticky layer (default 0 = clean) |
@@ -27,7 +27,7 @@ Loading Dock cues (CC 40-44, or the pads), as Sweep / Drive / Wash / Pump: Intro
 |---|---|---|
 | Gravel Pit, now **Cinder Block** | Harsh, high, "wobbly" resonance, almost goofy; the sound underneath is decent. | The wobble was the Motion route: a 6.5 Hz LFO into the cutoff with the resonance at 0.5, on top of a filter envelope that swept through the resonance peak on every note. The LFO and its VCA are gone; resonance 0.5 to 0.3; the filter envelope amount 0.3 to 0.2. The dirt is untouched (18 dB of drive, the bitcrusher, the 8:1 compressor). Motion became **Crush**, so the bitcrusher has its own knob instead of riding on Drive. Renamed: a gravel pit is a place with movement; a cinder block is a blunt, grey, hard object. |
 | Parquet Loop | Interesting; expected a fluid transition between notes. | `midi.in` glide is ALWAYS, so every voice slides from the last pitch it played; change chord and the chord tones slide into the next ones. The time sits on a macro, **Glide** (5 ms at 0, about 65 ms stored, about 800 ms at 1). The phaser is now fixed at a working mix (it was the Motion macro). |
-| Basement Drop, now **Loading Dock** | Interesting but too tame; the name does not fit. | Harder everything: 20 dB of drive (was 14), the compressor at 8:1 and a lower threshold, bitcrusher up to 0.6 of its mix, a pump that ducks fully (the **Pump** macro, depth 0 to 1, and a longer 220 ms release) where it was a fixed 0.8, and a pink-noise riser let in by the **Wash** macro together with a longer echo and a 1.2 s room (these were 0.2 and 0.5 s). A fifth cue, **Gap**, sucks everything shut for a bar before the Drop. The Build is 12 beats (was 16) and lands a bar before the Drop. No drums yet (see "Real drums" below). Renamed: it is a warehouse-floor piece, not a basement. |
+| Basement Drop, now **Loading Dock** | Interesting but too tame; the name does not fit. | Harder everything: real drums from PR #38 (`drum.kick` four on the floor, `drum.clap` on the 2 and 4, `drum.hat` open on the off-beats), and the kick now feeds the `sc` input of a second compressor that ducks the whole music bus (threshold -34 dB, 1 ms attack, 220 ms release), so the pump is a real sidechain, not an envelope; the **Pump** macro is that compressor's ratio (1:1 at 0, about 19:1 at 1). Also 20 dB of drive (was 14), the first compressor at 8:1 and a lower threshold, bitcrusher up to 0.6 of its mix, and a pink-noise riser let in by the **Wash** macro together with a longer echo and a 1.2 s room (these were 0.2 and 0.5 s). A fifth cue, **Gap**, sucks everything shut for a bar before the Drop. The Build is 12 beats (was 16) and lands a bar before the Drop. Renamed: it is a warehouse-floor piece, not a basement. |
 | Salt Flat | A static or hiss layer; without it, "truly angelic"; Kosta likes both. | The source is the shimmer voice: a second triangle oscillator two octaves up, mixed in at 0.2. Removing it alone cuts the energy above 2 kHz by 7 dB and turns a flat, noise-like high band into sparse partials (spectral flatness 8-16 kHz is similar, but the crest factor of the high band goes from 5 to 15); the wide unison spread (12 cents) and the 45 % chorus smear add to it. They are now one control: **Texture** brings in the shimmer voice (0 to 0.3 of the mixer), the chorus mix (18 to 48 %) and the unison spread (4 to 14 cents). **Default 0 = clean**, the angelic version: the pad is a landscape and the static is an effect on top of it. Texture 0.7 is about the old sound. The slow cutoff drift stays, at a fixed depth. |
 | Glass Elevator, Undertow, Boxwood, Neon Highway | Good. | Sound unchanged; only the macros were renamed and relabelled. |
 
@@ -68,13 +68,13 @@ Dropped: Violet Hour, Chrome Chase and Android Choir. Harder reworks of the arpe
 
 Things kabl lacks that a preset wanted. Each is written down, not built.
 
-1. **No sidechain source.** The pump in Loading Dock is five modules (`clock.div`, an envelope, a VCA for depth, an attenuverter, a VCA to duck). `compressor` has an `sc` input, but nothing yet makes an audio trigger to feed it. Real sidechain pumping waits for the drum voices (kick into `sc`; PR #38).
+1. **Sidechain solved by the drum voices.** The first pilot's pump was five modules (a divider, an envelope, a VCA, an attenuverter, a VCA); the kick into the compressor's `sc` input replaces them. The kick sits beside the music (after the echo and room), so it is not ducked by itself. Cinder Block and Parquet Loop are not drummed; they would take a kick the same way.
 2. **A macro cannot scale a route or an LFO depth.** A fade-in LFO costs two modules (`lfo` into a VCA whose gain the macro routes). A macro target on a route's amount, or a depth knob on `lfo`, would make it one cable.
 3. **Unison is capped at four voices.** A true supersaw would sound bigger for fewer modules.
 4. **No stereo-in echo.** `delay` takes one input; the stereo chain taps the left side into it and adds its stereo output at the room.
 5. **The arpeggiator has no accent or pattern.**
 6. **No genre field.** Genre lives in the tags; the metadata would need a field (a schema change, so not done here).
-7. **Drums and vocoder.** Cinder Block, Parquet Loop and Loading Dock gain a kick and the real sidechain; the voice presets gain the vocoder. Not used here.
+7. **Vocoder.** The voice presets gain it when the module lands.
 8. **Cue pieces are leveled at their first cue.** The level test renders a piece at its stored macro values (the Intro); the Drop is a few dB louder than that.
 9. **Poly glide is voice-by-voice.** A poly keys sound that glides like a legato line (the new note slides from the last note played, not from the voice that happened to be free) needs the allocator to prefer the voice that played the nearest pitch. Not changed here.
 10. **Stepped parameters cannot be routed.** The glide mode (OFF, ALWAYS, LEGATO) is stepped, so a macro can set the glide time but not switch glide on; Glide at 0 is a 5 ms slide, not off.
@@ -89,7 +89,7 @@ Clips are in `docs/presets/clips/`, one per preset, played the way it is meant t
 |---|---|---|
 | `cinder-block.mp3` | No wobble, lower resonance, the dirt unchanged. | A steady, blunt bass with the filter snap on each note and nothing moving on its own. |
 | `parquet-loop.mp3` | Chord tones now slide into each other. | The filter closing on the beat; at the chord changes (about 3.9 s and 7.7 s) the tones slide instead of stepping. `parquet-loop-no-glide.mp3` is the same with Glide at 0. |
-| `loading-dock.mp3` | Harder pump, 20 dB of drive, the riser, the Gap cue. | The Build rising from about 4 s with the riser, the gap at about 11 s, the Drop at 12 s with the full pump, the Break from 20 s. |
+| `loading-dock.mp3` | Real kick, clap and hats; the kick sidechains the music; 20 dB of drive; the riser; the Gap cue. | The kick under everything, the music ducking on every beat (hardest in the Drop), the Build rising from about 4 s with the riser, the gap at about 11 s, the Drop at 12 s, the Break from 20 s. |
 | `glass-elevator.mp3` | Unchanged sound. | The tine on the attack against the mellow tail. |
 | `undertow.mp3` | Unchanged sound. | The slow beating and the weight of the sub; the glide on the overlapped notes. |
 | `salt-flat.mp3` | Clean by default (Texture 0). | The slow bloom of each chord and the long tail, with no static. `salt-flat-textured.mp3` is the same phrase at Texture 0.7. |
@@ -98,19 +98,15 @@ Clips are in `docs/presets/clips/`, one per preset, played the way it is meant t
 
 `img/sounds-pilot.png` and `img/sounds-pilot-selected.png` are from round one and show the old names; regenerate them from the Sounds browser when the names are final. `evidence/standalone/` has the standalone Rack and Perform views of every preset with a chord held.
 
-## Real drums
-
-Loading Dock wants a four-on-the-floor kick feeding the compressor's `sc` input (the real pump). The drum voices (kick, snare, clap, hat, tom, `midi.note`) are PR #38, which is not merged to master; this round does not use them. The preset has no drums.
-
 ## Evidence
 
 Regenerate with `presets_pilot` (`write`, `clips`, `macros`, `phrases`), `scripts/standalone.py` and `scripts/host.py`.
 
-- **Levels** (`level_table`, 24 s render of each preset's own demonstration), peak / loudness in dBFS: Boxwood -2.2 / -20.3, Cinder Block -7.3 / -19.2, Glass Elevator -1.8 / -21.0, Loading Dock -6.1 / -19.0, Neon Highway -8.0 / -19.5, Parquet Loop -3.9 / -20.0, Salt Flat -1.5 / -19.9, Undertow -13.1 / -20.3. All within 2.0 dB of -19; `factory_levels_hold_the_target` passes.
+- **Levels** (`level_table`, 24 s render of each preset's own demonstration), peak / loudness in dBFS: Boxwood -2.2 / -20.3, Cinder Block -7.3 / -19.2, Glass Elevator -1.8 / -21.0, Loading Dock -7.3 / -18.3, Neon Highway -8.0 / -19.5, Parquet Loop -3.9 / -20.0, Salt Flat -1.5 / -19.9, Undertow -13.1 / -20.3. All within 2.0 dB of -19; `factory_levels_hold_the_target` passes.
 - **Macros at the extremes** (`presets_pilot macros`, cues not launched): with every macro at 0 or at 1 no preset exceeds -1.5 dBFS and all renders are finite.
 - **Salt Flat static** (measured on the clip, mixed to mono): without the shimmer voice the energy above 2 kHz falls 6.8 dB (-43.0 to -49.8 dBFS RMS) and the crest factor of that band rises from 5.3 to 14.8; chorus mix, unison spread and the reverb change it by a dB or less each. A pure sine instead of the triangle makes the high band tonal (spectral flatness 0.7 against 0.03).
 - **Glide** (Parquet Loop clip with Glide at 0.5 against 0): the renders are bit-identical until the first chord change (about 3.9 s), differ by about -20 dB from there.
-- **Standalone** (`scripts/standalone.py`): see `evidence/standalone/` and the status line below.
-- **REAPER 7** (`scripts/host.py`, CLAP plugin, `evidence/host/result.json`): see the status line below.
+- **Standalone** (`scripts/standalone.py`, release build, real audio device, real-time priority granted): all eight open, take MIDI from a virtual controller and stay running; Rack and Perform captures in `evidence/standalone/`.
+- **REAPER 7.75** (`scripts/host.py`, CLAP plugin, `evidence/host/result.json`): per preset a project with the plugin and a MIDI item playing the clip phrase (the piece also gets its five cue buttons). Saved, fully quit, reopened and saved: the plugin state is identical in all eight; the render after reopen equals the first (relative difference 0.0); every render is finite and not silent. Without the MIDI item the seven keyboard presets render silent (RMS 0.0); Loading Dock plays by itself with the transport running in the host. (Rebuild the plugin with `cargo build --release -p kabl-clap` first: a stale `libkabl_clap.so` loads a drum patch as the default sound.)
 - **Tests**: `every_preset_keeps_to_the_brief` (`crates/ui/tests/presets.rs`: one macro module, each named macro on CC 20 and up and pinned in order, play flags, category, tags, a description naming every macro), `every_factory_sound_is_discoverable_categorized_and_loads` and `factory_levels_hold_the_target` pass.
 - **Not done**: nobody has listened to round two; other hosts; the CLAP validator and cargo-deny run in CI only.

@@ -191,29 +191,15 @@ fn space_tail(
     verb
 }
 
-/// The pump: every beat an envelope ducks whatever the returned attenuverter feeds (its `out`
-/// is the control for a VCA). Depth is macro 4 when `knob` is given, else fixed.
-fn pump(r: &mut Rack, clock: ModuleId, knob: Option<ModuleId>, fixed: f32) -> ModuleId {
-    let div = r.add("clock.div", &[("div", 4.0)]);
-    let env = r.add("env.adsr", &adsr(1.0, 220.0, 0.0, 30.0));
-    let depth = r.add("vca", &[("gain", fixed)]);
-    let cv = r.add("attenuverter", &[("amount", -1.0), ("offset", 1.0)]);
-    r.wire(clock, "gate", div, "clock");
-    r.wire(clock, "reset", div, "reset");
-    r.wire(div, "gate", env, "gate");
-    r.wire(env, "out", depth, "in");
-    if let Some(k) = knob {
-        r.route(k, "m4", depth, "gain", 1.0);
-    }
-    r.wire(depth, "out", cv, "in");
-    cv
-}
-
 // ---- 1. Cinder Block: blunt, compressed mono bass --------------------------------------------
 
 fn cinder_block() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, ["Bite", "Grit", "Room", "Crush"], [0.40, 0.60, 0.25, 0.30]);
+    let knob = macros(
+        &mut r,
+        ["Bite", "Grit", "Room", "Crush"],
+        [0.40, 0.60, 0.25, 0.30],
+    );
     let m = r.add("midi.in", &[("mode", 1.0), ("bend", 2.0)]);
     let saw = r.add(
         "osc.va",
@@ -386,6 +372,16 @@ fn parquet_loop() -> Rack {
     r
 }
 
+/// A sequencer lane for the drums: gates on the given 1-based steps of its 8 (two beats).
+fn drum_lane(r: &mut Rack, on: &[usize]) -> ModuleId {
+    let seq = r.add("seq", &[]);
+    for k in 1..=8 {
+        r.e.set_param(seq, &format!("g{k}"), f32::from(u8::from(on.contains(&k))));
+        r.e.set_param(seq, &format!("v{k}"), 0.9);
+    }
+    seq
+}
+
 // ---- 7. Loading Dock: filter-house piece with cues ------------------------------------------
 
 /// (name, [Sweep, Drive, Wash, Pump] targets, morph in beats, launch time in the clip, s)
@@ -400,11 +396,7 @@ const DROP_CUES: [(&str, [f32; 4], f32, f32); 5] = [
 
 fn loading_dock() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(
-        &mut r,
-        ["Sweep", "Drive", "Wash", "Pump"],
-        DROP_CUES[0].1,
-    );
+    let knob = macros(&mut r, ["Sweep", "Drive", "Wash", "Pump"], DROP_CUES[0].1);
     let cue = r.add("cues", &[]);
     let clock = r.add("clock", &[("bpm", 124.0), ("swing", 28.0)]);
     let bass_seq = r.add("seq", &[("length", 8.0), ("gate_len", 45.0)]);
@@ -471,8 +463,35 @@ fn loading_dock() -> Rack {
     // The riser: pink noise the Wash macro lets in; the Sweep macro opens the filter over it.
     let noise = r.add("noise", &[("color", 1.0)]);
     let riser = r.add("vca", &[("gain", 0.0)]);
-    let duck_cv = pump(&mut r, clock, Some(knob), 0.0);
-    let duck = r.add("vca", &[("gain", 0.0)]);
+    r.next_row();
+    // Real drums (drum.kick and friends): a four-on-the-floor kick, a clap on the 2 and 4 and
+    // open hats on the off-beats, each on a 2-beat sequencer lane. The kick also feeds the
+    // sidechain of the compressor that ducks the music: the Pump macro is that ratio.
+    let kick_seq = drum_lane(&mut r, &[1, 5]);
+    let clap_seq = drum_lane(&mut r, &[5]);
+    let hat_seq = drum_lane(&mut r, &[3, 7]);
+    let kick = r.add(
+        "drum.kick",
+        &[("level_db", -3.0), ("decay_ms", 300.0), ("drive_db", 10.0)],
+    );
+    let clap = r.add("drum.clap", &[("level_db", -9.0)]);
+    let hat = r.add("drum.hat", &[("level_db", -10.0)]);
+    let drums = r.add(
+        "mixer",
+        &[("level1", 0.45), ("level2", 0.2), ("level3", 0.15)],
+    );
+    let duck = r.add(
+        "compressor",
+        &[
+            ("threshold_db", -34.0),
+            ("ratio", 1.0),
+            ("attack_ms", 1.0),
+            ("release_ms", 220.0),
+            ("knee_db", 3.0),
+        ],
+    );
+    let mix_l = r.add("mixer", &[("level1", 1.0), ("level2", 1.0)]);
+    let mix_r = r.add("mixer", &[("level1", 1.0), ("level2", 1.0)]);
     r.next_row();
     let drive = r.add("drive", &[("drive_db", 20.0), ("trim_db", -9.0)]);
     let lad = r.add(
@@ -491,7 +510,7 @@ fn loading_dock() -> Rack {
             ("ratio", 8.0),
             ("attack_ms", 3.0),
             ("release_ms", 100.0),
-            ("makeup_db", 8.0),
+            ("makeup_db", 6.0),
         ],
     );
 
@@ -511,10 +530,7 @@ fn loading_dock() -> Rack {
     r.wire(m, "gate", play_env, "gate");
     r.wire(play, "out", play_vca, "in");
     r.wire(play_env, "out", play_vca, "cv");
-    // The pump ducks the bass and the stabs, not the hand-played voice.
-    r.wire(bass_vca, "out", duck, "in");
-    r.wire(duck_cv, "out", duck, "cv");
-    r.wire(duck, "out", mix, "in1");
+    r.wire(bass_vca, "out", mix, "in1");
     r.wire(stab_vca, "out", mix, "in2");
     r.wire(play_vca, "out", mix, "in3");
     r.wire(mix, "out", drive, "in");
@@ -522,10 +538,26 @@ fn loading_dock() -> Rack {
     r.wire(lad, "out", trim, "in");
     r.wire_both(trim, "out", crush);
     r.stereo(crush, comp);
+    r.wire(comp, "left", duck, "in_l");
+    r.wire(comp, "right", duck, "in_r");
+    r.wire(kick, "out", duck, "sc");
+    for (seq, voice, gate) in [
+        (kick_seq, kick, "gate"),
+        (clap_seq, clap, "gate"),
+        (hat_seq, hat, "open"),
+    ] {
+        r.wire(clock, "gate", seq, "clock");
+        r.wire(clock, "reset", seq, "reset");
+        r.wire(seq, "gate", voice, gate);
+        r.wire(seq, "velocity", voice, "velocity");
+    }
+    r.wire(kick, "out", drums, "in1");
+    r.wire(clap, "out", drums, "in2");
+    r.wire(hat, "out", drums, "in3");
     let tail = space_tail(
         &mut r,
         knob,
-        comp,
+        duck,
         &[
             ("sync", 3.0),
             ("time_ms", 360.0),
@@ -538,8 +570,19 @@ fn loading_dock() -> Rack {
         1.2,
         0.3,
     );
-    r.out_stereo(tail);
+    // The drums join after the echo and the room, then the limiter.
+    r.wire(tail, "left", mix_l, "in1");
+    r.wire(tail, "right", mix_r, "in1");
+    r.wire(drums, "out", mix_l, "in2");
+    r.wire(drums, "out", mix_r, "in2");
+    let limiter = r.add("limiter", &[("ceiling_db", -1.5), ("release_ms", 150.0)]);
+    let out = r.add("out", &[]);
+    r.wire(mix_l, "out", limiter, "in_l");
+    r.wire(mix_r, "out", limiter, "in_r");
+    r.wire(limiter, "left", out, "left");
+    r.wire(limiter, "right", out, "right");
 
+    r.route(knob, "m4", duck, "ratio", 0.95);
     r.wire(noise, "out", riser, "in");
     r.wire(riser, "out", mix, "in4");
     r.route(knob, "m3", riser, "gain", 0.9);
@@ -566,7 +609,11 @@ fn loading_dock() -> Rack {
 
 fn neon_highway() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, ["Cutoff", "Bite", "Space", "Vibrato"], [0.55, 0.40, 0.60, 0.35]);
+    let knob = macros(
+        &mut r,
+        ["Cutoff", "Bite", "Space", "Vibrato"],
+        [0.55, 0.40, 0.60, 0.35],
+    );
     let m = r.add(
         "midi.in",
         &[
@@ -641,7 +688,11 @@ fn neon_highway() -> Rack {
 
 fn glass_elevator() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, ["Tine", "Grit", "Space", "Chorus"], [0.60, 0.25, 0.60, 0.50]);
+    let knob = macros(
+        &mut r,
+        ["Tine", "Grit", "Space", "Chorus"],
+        [0.60, 0.25, 0.60, 0.50],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     // Algorithm 1 (2 into 1, 4 into 3, 6 into 5): a mellow body pair, a bright tine pair that
     // is gone in a tenth of a second, and a soft detuned shimmer.
@@ -831,7 +882,11 @@ fn glass_phrase() -> Vec<Hit> {
 
 fn undertow() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, ["Cutoff", "Weight", "Room", "Beating"], [0.45, 0.35, 0.30, 0.40]);
+    let knob = macros(
+        &mut r,
+        ["Cutoff", "Weight", "Room", "Beating"],
+        [0.45, 0.35, 0.30, 0.40],
+    );
     let m = r.add(
         "midi.in",
         &[
@@ -916,7 +971,11 @@ fn undertow() -> Rack {
 
 fn salt_flat() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, ["Bloom", "Saturation", "Space", "Texture"], [0.50, 0.20, 0.65, 0.0]);
+    let knob = macros(
+        &mut r,
+        ["Bloom", "Saturation", "Space", "Texture"],
+        [0.50, 0.20, 0.65, 0.0],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let a = r.add(
         "osc.va",
@@ -1000,7 +1059,11 @@ fn salt_flat() -> Rack {
 
 fn boxwood() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, ["Brightness", "Warmth", "Space", "Chorus"], [0.60, 0.20, 0.45, 0.40]);
+    let knob = macros(
+        &mut r,
+        ["Brightness", "Warmth", "Space", "Chorus"],
+        [0.60, 0.20, 0.45, 0.40],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let voice = r.add("osc.fm6", &[("algorithm", 1.0), ("index", 0.6)]);
     // ratio, fine, level, attack, decay, sustain, release, velocity: a wooden bar, a bright
@@ -1133,8 +1196,8 @@ fn presets() -> Vec<Preset> {
             slug: "loading-dock",
             name: "Loading Dock",
             category: "Piece",
-            tags: &["sequenced", "cues", "build-up", "drop", "124bpm", "filter house", "signature"],
-            description: "A self-playing filter-house piece at 124 BPM with swing: a bass and a stab line that duck hard under a pump, a resonant filter, a noise riser and a hand-played voice on top. Five cues: Intro (filter shut, nearly dry), Build (the filter opens over three bars as the riser and the wash rise), Gap (everything shut but the wash), Drop (drive and pump at full), Break (back down, wet). Press Run, then launch the cues with the pads or CC 40-44; turn a macro to take over. Sweep opens the filter, Drive pushes the drive and the bitcrusher, Wash brings in the riser, the echo and the room, Pump sets how deep the beat ducks the bass and stabs.",
+            tags: &["sequenced", "cues", "drums", "drop", "124bpm", "filter house", "signature"],
+            description: "A self-playing filter-house piece at 124 BPM with swing: a four-on-the-floor kick with a clap and open hats, a bass and a stab line that duck hard to the kick through the compressor sidechain, a resonant filter, a noise riser and a hand-played voice on top. Five cues: Intro (filter shut, nearly dry), Build (the filter opens over three bars as the riser and the wash rise), Gap (everything shut but the wash), Drop (drive and pump at full), Break (back down, wet). Press Run, then launch the cues with the pads or CC 40-44; turn a macro to take over. Sweep opens the filter, Drive pushes the drive and the bitcrusher, Wash brings in the riser, the echo and the room, Pump sets how hard the kick ducks the bass and stabs.",
             listen: "The filter and riser rising through the Build, the gap, the Drop landing with the pump at full, and the Break pulling back to a dark loop.",
             build: loading_dock,
             phrase: drop_phrase,
@@ -1321,18 +1384,8 @@ fn main() {
             for p in presets() {
                 let log = kabl_core::load(&Path::new(&args[2]).join("presets").join(p.slug))
                     .expect("load patch");
-                let (l, r) = render(
-                    log.state(),
-                    &(p.phrase)(),
-                    p.secs,
-                    p.slug == "loading-dock",
-                );
-                let (l2, _) = render(
-                    log.state(),
-                    &(p.phrase)(),
-                    p.secs,
-                    p.slug == "loading-dock",
-                );
+                let (l, r) = render(log.state(), &(p.phrase)(), p.secs, p.slug == "loading-dock");
+                let (l2, _) = render(log.state(), &(p.phrase)(), p.secs, p.slug == "loading-dock");
                 assert_eq!(l, l2, "{}: render is deterministic", p.slug);
                 write_wav(&out.join(format!("{}.wav", p.slug)), &l, &r);
                 let peak = l.iter().chain(&r).fold(0.0f32, |m, s| m.max(s.abs()));

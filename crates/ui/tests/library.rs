@@ -96,8 +96,8 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "presets/loading-dock",
         "Loading Dock",
         "Piece",
-        &["sequenced", "cues", "build-up", "drop", "124bpm", "filter house", "signature"],
-        "A self-playing filter-house piece at 124 BPM with swing: a bass and a stab line that duck hard under a pump, a resonant filter, a noise riser and a hand-played voice on top. Five cues: Intro (filter shut, nearly dry), Build (the filter opens over three bars as the riser and the wash rise), Gap (everything shut but the wash), Drop (drive and pump at full), Break (back down, wet). Press Run, then launch the cues with the pads or CC 40-44; turn a macro to take over. Sweep opens the filter, Drive pushes the drive and the bitcrusher, Wash brings in the riser, the echo and the room, Pump sets how deep the beat ducks the bass and stabs.",
+        &["sequenced", "cues", "drums", "drop", "124bpm", "filter house", "signature"],
+        "A self-playing filter-house piece at 124 BPM with swing: a four-on-the-floor kick with a clap and open hats, a bass and a stab line that duck hard to the kick through the compressor sidechain, a resonant filter, a noise riser and a hand-played voice on top. Five cues: Intro (filter shut, nearly dry), Build (the filter opens over three bars as the riser and the wash rise), Gap (everything shut but the wash), Drop (drive and pump at full), Break (back down, wet). Press Run, then launch the cues with the pads or CC 40-44; turn a macro to take over. Sweep opens the filter, Drive pushes the drive and the bitcrusher, Wash brings in the riser, the echo and the room, Pump sets how hard the kick ducks the bass and stabs.",
     ),
     (
         "presets/glass-elevator",
