@@ -1,4 +1,6 @@
-//! `macro`: four performance controls, `m1`..`m4` (0..1), each with its own CV output. A macro
+//! `macro`: up to eight performance controls, `m1`..`m8` (0..1), each with its own CV output.
+//! Four is the recommended number; `m5`..`m8` are there for a sound that needs more, and an
+//! unrouted, unpinned one costs a glide per block and nothing else. A macro
 //! reaches its destinations through ordinary modulation routes (signed amounts, several per
 //! output), so one move can shape many controls; the destinations keep their own base values.
 //! Names are labels (`name.m1`), presentation only. Outputs glide over 20 ms, so a MIDI CC or a
@@ -10,7 +12,9 @@ use crate::info::{
 use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig, StateReader, StateWriter};
 
-pub const MACROS: usize = 4;
+pub const MACROS: usize = 8;
+
+const NAMES: [&str; MACROS] = ["m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8"];
 
 const fn out(name: &'static str) -> PortInfo {
     PortInfo {
@@ -32,15 +36,33 @@ const fn knob(name: &'static str) -> ParamInfo {
     }
 }
 
-const PORTS: &[PortInfo] = &[out("m1"), out("m2"), out("m3"), out("m4")];
-const PARAMS: &[ParamInfo] = &[knob("m1"), knob("m2"), knob("m3"), knob("m4")];
+const PORTS: &[PortInfo] = &[
+    out("m1"),
+    out("m2"),
+    out("m3"),
+    out("m4"),
+    out("m5"),
+    out("m6"),
+    out("m7"),
+    out("m8"),
+];
+const PARAMS: &[ParamInfo] = &[
+    knob("m1"),
+    knob("m2"),
+    knob("m3"),
+    knob("m4"),
+    knob("m5"),
+    knob("m6"),
+    knob("m7"),
+    knob("m8"),
+];
 
 pub static MACRO_INFO: ModuleInfo = ModuleInfo {
     kind: "macro",
     name: "Macros",
     category: Category::Modulator,
     rate: Rate::Global,
-    explain: "Four named performance knobs. Route each one to as many controls as you like, \
+    explain: "Up to eight named performance knobs (four is plenty). Route each one to as many controls as you like, \
               with its own depth and direction, and play them from the Perform panel or MIDI.",
     lesson: None,
     requires: &[],
@@ -120,13 +142,13 @@ impl Module for Macro {
     }
 
     fn save_state(&self, out: &mut dyn StateWriter) {
-        for (k, v) in ["m1", "m2", "m3", "m4"].iter().zip(self.v) {
+        for (k, v) in NAMES.iter().zip(self.v) {
             out.write_f32(k, v);
         }
     }
 
     fn load_state(&mut self, s: &dyn StateReader) {
-        for (k, v) in ["m1", "m2", "m3", "m4"].iter().zip(self.v.iter_mut()) {
+        for (k, v) in NAMES.iter().zip(self.v.iter_mut()) {
             if let Some(x) = s.read_f32(k) {
                 *v = x;
             }

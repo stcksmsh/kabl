@@ -1,0 +1,100 @@
+{
+ "plugin_sha256": "9888cbb5d934015134bcd2d9cb33339c587ee2164a6b3a6df63f1c6f362ff102",
+ "states_identical_across_save_quit_reopen": true,
+ "lane1_target": {
+  "module": 10,
+  "kind": "macro",
+  "param": "m5"
+ },
+ "depth_routes_in_saved_project": {
+  "19": {
+   "CableParam": {
+    "cable": 18,
+    "param": "amount"
+   }
+  }
+ },
+ "new_initial": {
+  "frames": 1152000,
+  "finite": true,
+  "peak": 0.1843387931585312,
+  "rms": 0.038889940828084946,
+  "dc": 0.004217267967760563,
+  "active_seconds": 24,
+  "per_second_rms": [
+   0.0416,
+   0.0403,
+   0.0383,
+   0.0415,
+   0.0382,
+   0.0409,
+   0.0403,
+   0.0351,
+   0.0407,
+   0.0389,
+   0.036,
+   0.0386,
+   0.038,
+   0.037,
+   0.0377,
+   0.0372,
+   0.0383,
+   0.0375,
+   0.037,
+   0.0394,
+   0.0402,
+   0.0382,
+   0.0408,
+   0.0409
+  ]
+ },
+ "new_restart": {
+  "frames": 1152000,
+  "finite": true,
+  "peak": 0.1843387931585312,
+  "rms": 0.038889940828084946,
+  "dc": 0.004217267967760563,
+  "active_seconds": 24,
+  "per_second_rms": [
+   0.0416,
+   0.0403,
+   0.0383,
+   0.0415,
+   0.0382,
+   0.0409,
+   0.0403,
+   0.0351,
+   0.0407,
+   0.0389,
+   0.036,
+   0.0386,
+   0.038,
+   0.037,
+   0.0377,
+   0.0372,
+   0.0383,
+   0.0375,
+   0.037,
+   0.0394,
+   0.0402,
+   0.0382,
+   0.0408,
+   0.0409
+  ]
+ },
+ "new_initial_vs_restart": {
+  "relative_difference_rms": 0.0,
+  "spectrum_cosine": 1.0,
+  "envelope_correlation": 1.0
+ },
+ "automated_vs_still": {
+  "relative_difference_rms": 0.2711,
+  "spectrum_cosine": 0.96998,
+  "envelope_correlation": 0.89656
+ },
+ "old_project_versions": [
+  2,
+  2
+ ],
+ "old_state_identical_new_plugin": true
+}

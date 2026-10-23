@@ -21,7 +21,7 @@ use crate::compile::CompiledPatch;
 use crate::runtime::RuntimeTarget;
 
 /// Macro targets one launch can carry.
-pub const MAX_MACRO_TARGETS: usize = 8;
+pub const MAX_MACRO_TARGETS: usize = 16;
 /// Macros the engine drives at once.
 pub const MAX_DRIVEN: usize = 16;
 

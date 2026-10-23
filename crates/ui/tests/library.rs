@@ -35,6 +35,13 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "A self-playing bass line and pad. Four cues (Verse, Chorus, Bridge, Verse 2) each set the three macros to their own values and move there over a set number of beats: Verse dark and dry, Chorus open and wide, Bridge washed in space. Run, then launch the cues on the next bar; turn a macro to take it over.",
     ),
     (
+        "macros-eight",
+        "Eight Macros",
+        "Piece",
+        &["pad", "macros", "performance", "drone"],
+        "A drifting two-voice pad with eight named macros on the Perform page. Motion does not move a knob: it fades in a slow, gentle breath on the filter cutoff, from still to full. Run, then turn Motion.",
+    ),
+    (
         "functional-cables/morph-arc",
         "Morph Arc",
         "Piece",

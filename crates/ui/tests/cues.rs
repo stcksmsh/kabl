@@ -412,3 +412,22 @@ fn a_cue_without_sequencers_is_playing_once_launched() {
     assert_eq!(cues::standing_now(&cue, &now, Some(1)), (false, false));
     assert_eq!(cues::standing_now(&cue, &now, Some(2)), (true, false));
 }
+
+#[test]
+fn a_cue_offers_macros_five_to_eight_only_once_they_are_in_use() {
+    let mut h = H::new();
+    let m = with_macro(&mut h);
+    assert_eq!(cues::active_macros(h.editor.state(), m), vec![0, 1, 2, 3]);
+    perform::toggle_pin(&mut h.editor, m, "m6");
+    h.editor.set_label(m, "name.m8", Some("Wobble".to_string()));
+    assert_eq!(
+        cues::active_macros(h.editor.state(), m),
+        vec![0, 1, 2, 3, 5, 7]
+    );
+    let n = h.add_cue("Drop", None, None);
+    cues::set_macro(&mut h.editor, h.cues, n, m, 7, Some(0.7));
+    cues::store_macros(&mut h.editor, h.cues, n, &|_, _| 0.5);
+    let c = &cues::cues(h.editor.state(), h.cues)[0];
+    assert_eq!(c.macros.len(), 6);
+    assert!(c.macros.contains(&(m, 7, 0.5)));
+}
