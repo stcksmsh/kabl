@@ -63,7 +63,7 @@ use std::fmt;
 use kabl_cables::{Carry, Node as CableNode, Settings as CableSettings};
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
 use kabl_modules::builtins::{
-    Arp, Change, Clock, Delay, DelayLock, KeySettings, Lfo, LfoSync, MidiIn, MidiNote, Noise,
+    Arp, Change, Clock, Delay, DelayLock, DrumGrid, KeySettings, Lfo, LfoSync, MidiIn, MidiNote, Noise,
     OscWt, Random, Seq, Transport,
 };
 use kabl_modules::module::{QualityConfig, QualityTier};
@@ -1490,6 +1490,9 @@ fn compile_inner(
                 registry::create(&meta.kind).expect("kind already validated when building `metas`");
             if let Some(seq) = instance.as_any_mut().downcast_mut::<Seq>() {
                 seq.seed(id);
+            }
+            if let Some(g) = instance.as_any_mut().downcast_mut::<DrumGrid>() {
+                g.seed(id);
             }
             if let Some(arp) = instance.as_any_mut().downcast_mut::<Arp>() {
                 arp.seed(id);
