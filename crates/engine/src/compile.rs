@@ -63,8 +63,8 @@ use std::fmt;
 use kabl_cables::{Carry, Node as CableNode, Settings as CableSettings};
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
 use kabl_modules::builtins::{
-    Arp, Change, Clock, Delay, DelayLock, KeySettings, Lfo, LfoSync, MidiIn, Noise, OscWt, Random,
-    Seq, Transport,
+    Arp, Change, Clock, Delay, DelayLock, KeySettings, Lfo, LfoSync, MidiIn, MidiNote, Noise,
+    OscWt, Random, Seq, Transport,
 };
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::ModuleView;
@@ -1814,6 +1814,15 @@ impl CompiledPatch {
         for m in &mut self.modules {
             if let Some(a) = m.as_any_mut().downcast_mut::<Arp>() {
                 f(a);
+            }
+        }
+    }
+
+    /// Audio thread: runs `f` on every `midi.note` module. No allocation.
+    pub fn for_each_midi_note(&mut self, mut f: impl FnMut(&mut MidiNote)) {
+        for m in &mut self.modules {
+            if let Some(d) = m.as_any_mut().downcast_mut::<MidiNote>() {
+                f(d);
             }
         }
     }

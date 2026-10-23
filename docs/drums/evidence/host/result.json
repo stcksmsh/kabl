@@ -1,0 +1,94 @@
+{
+ "plugin_sha256": "4b30d5502bb1ea538ced03b95092561d94666143ab7ae21c846d9757d0c0c380",
+ "single": [
+  {
+   "note": 36,
+   "velocity": 100,
+   "expected_sample": 48000,
+   "first_sample_offset": 0,
+   "peak": 0.144,
+   "centroid_hz": 104
+  },
+  {
+   "note": 38,
+   "velocity": 100,
+   "expected_sample": 96000,
+   "first_sample_offset": 0,
+   "peak": 0.069,
+   "centroid_hz": 11793
+  },
+  {
+   "note": 39,
+   "velocity": 100,
+   "expected_sample": 144000,
+   "first_sample_offset": 0,
+   "peak": 0.067,
+   "centroid_hz": 4560
+  },
+  {
+   "note": 42,
+   "velocity": 100,
+   "expected_sample": 192000,
+   "first_sample_offset": 0,
+   "peak": 0.058,
+   "centroid_hz": 11114
+  },
+  {
+   "note": 46,
+   "velocity": 100,
+   "expected_sample": 240000,
+   "first_sample_offset": 0,
+   "peak": 0.069,
+   "centroid_hz": 11195
+  },
+  {
+   "note": 45,
+   "velocity": 100,
+   "expected_sample": 288000,
+   "first_sample_offset": 0,
+   "peak": 0.089,
+   "centroid_hz": 184
+  },
+  {
+   "note": 36,
+   "velocity": 127,
+   "expected_sample": 336000,
+   "first_sample_offset": 0,
+   "peak": 0.166,
+   "centroid_hz": 104
+  },
+  {
+   "note": 36,
+   "velocity": 30,
+   "expected_sample": 384000,
+   "first_sample_offset": 0,
+   "peak": 0.09,
+   "centroid_hz": 104
+  }
+ ],
+ "groove": {
+  "finite": true,
+  "peak": 0.2693089544773102,
+  "rms": 0.02214096114039421,
+  "kick_onset_offsets_samples": [
+   1576,
+   1582,
+   1576,
+   1581,
+   1576,
+   1585,
+   1576,
+   1582,
+   1576,
+   1585,
+   1576,
+   1585,
+   1576,
+   1582,
+   1576,
+   1596
+  ],
+  "kick_median_offset_samples": 1578,
+  "restart_render_bit_identical": true
+ }
+}

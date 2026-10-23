@@ -1,0 +1,12 @@
+name = "Four On The Floor"
+category = "Sequence"
+tags = [
+    "drums",
+    "house",
+    "groove",
+    "self-playing",
+    "kick",
+]
+description = "A house groove on one clock: kick on every beat, snare and clap on the second, open hats on the off-beats cut off by closed hats. Launch the second bank for the snare ghost note and a tom fill."
+keys = false
+sequence = true

@@ -14,6 +14,7 @@ mod crossfade;
 mod cues;
 mod delay;
 mod drive;
+mod drums;
 mod env_adsr;
 mod eq;
 mod filter_comb;
@@ -28,6 +29,7 @@ mod limiter;
 mod logic;
 mod macros;
 mod midi_in;
+mod midi_note;
 mod mixer;
 mod noise;
 mod osc_fm;
@@ -56,6 +58,10 @@ pub use crossfade::{Crossfade, Pan, CROSSFADE_INFO, PAN_INFO};
 pub use cues::{Cues, CUES, CUES_INFO};
 pub use delay::{Delay, DelayLock, DELAY_INFO};
 pub use drive::{drive_g, Drive, DRIVE_INFO};
+pub use drums::{
+    clap_curve, hat_corner_hz, snare_decays, thump_curve, Clap, Hat, Kick, Snare, Tom, CLAP_INFO,
+    HAT_INFO, KICK_INFO, SNARE_INFO, TOM_INFO,
+};
 pub use env_adsr::{EnvAdsr, ENV_ADSR_INFO};
 pub use eq::{band_response_db, Eq, EQ_INFO};
 pub use filter_comb::{FilterComb, FILTER_COMB_INFO};
@@ -69,6 +75,7 @@ pub use limiter::{Limiter, LIMITER_INFO};
 pub use logic::{Comparator, Logic, COMPARATOR_INFO, LOGIC_INFO};
 pub use macros::{Macro, MACROS, MACRO_INFO};
 pub use midi_in::{Change, KeySettings, MidiIn, MIDI_IN_INFO};
+pub use midi_note::{MidiNote, MIDI_NOTE_INFO};
 pub use mixer::{Mixer, LEGACY_LEVEL, MIXER_INFO};
 pub use noise::{Noise, NOISE_INFO};
 pub use osc_fm::{OscFm, FEEDBACK_MAX_RAD, OSC_FM_INFO, RATIO_LABELS};
