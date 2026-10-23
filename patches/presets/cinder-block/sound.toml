@@ -1,0 +1,12 @@
+name = "Cinder Block"
+category = "Bass"
+tags = [
+    "mono",
+    "distorted",
+    "compressed",
+    "french touch",
+    "signature",
+]
+description = "A blunt mono bass: two saws over a square sub, hit with 18 dB of drive, a filter that closes on every note and a compressor squeezing it flat. No wobble, just dirt. Play short, off-beat notes. Bite opens the filter (the mod wheel does too), Grit pushes the drive harder, Room adds a slapback and a tight room, Crush mixes in a bitcrusher."
+keys = true
+sequence = false

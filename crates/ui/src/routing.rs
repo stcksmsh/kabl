@@ -318,6 +318,7 @@ pub fn param_label(p: &ParamInfo) -> String {
     };
     match name {
         "base_hz" => return "Frequency".into(),
+        "hf" => return "Hiss".into(),
         "exponential" => return "Response".into(),
         "div" => return "Divide by".into(),
         "gate_len" => return "Gate length".into(),
@@ -391,6 +392,7 @@ pub fn fmt_value(p: &ParamInfo, v: f32) -> String {
         "°" => format!("{v:.0}°"),
         "ct" => format!("{:+.0} ct", v.round() + 0.0),
         "x" => format!("{}X", v.round()),
+        "bands" => format!("{}", v.round()),
         "note" => {
             const NAMES: [&str; 12] = [
                 "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
@@ -574,6 +576,8 @@ pub fn short_name(kind: &str) -> &'static str {
         "bitcrusher" => "Crush",
         "filter.comb" => "Comb",
         "filter.formant" => "Formant",
+        "vocoder" => "Vocoder",
+        "audio.in" => "Audio in",
         "drum.kick" => "Kick",
         "drum.snare" => "Snare",
         "drum.clap" => "Clap",

@@ -953,6 +953,7 @@ pub fn needed_inputs(kind: &str) -> &'static [&'static [&'static str]] {
         "reverb" | "chorus" | "phaser" | "flanger" | "compressor" | "eq" | "limiter"
         | "bitcrusher" => &[&["in_l", "in_r"]],
         "ringmod" => &[&["a"], &["b"]],
+        "vocoder" => &[&["in_l", "in_r"], &["mod"]],
         _ => &[],
     }
 }

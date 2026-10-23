@@ -602,6 +602,52 @@ fn svf_notch_removes_the_cutoff() {
     }
 }
 
+/// A stepping vowel on a cable (a random loop, a sequencer) arrives as a per-sample buffer: the
+/// filter must still glide to it, not jump the resonators. A held 110 Hz buzz, the vowel
+/// stepping a-u-a-i every 60 ms through the whole range; the largest second difference must stay
+/// within 1.15x that of the same buzz with the vowel held.
+#[test]
+fn formant_vowel_steps_on_a_cable_do_not_click() {
+    let n = 48000;
+    let buzz: Vec<f32> = (0..n)
+        .map(|i| 2.0 * ((i as f32 * 110.0 / SR) % 1.0) - 1.0)
+        .collect();
+    let run = |vowel: &dyn Fn(usize) -> f32| {
+        let v: Vec<f32> = (0..n).map(vowel).collect();
+        let mut m = registry::create("filter.formant").unwrap();
+        m.prepare(
+            SR,
+            64,
+            &QualityConfig {
+                tier: QualityTier::Live,
+            },
+        );
+        let (shift, q) = (Signal::Scalar(0.0), Signal::Scalar(1.2));
+        let mut out = Vec::new();
+        for t in (0..n).step_by(64) {
+            let ps = [Signal::Buffer(&v[t..t + 64]), shift, q];
+            let ins = [Signal::Buffer(&buzz[t..t + 64])];
+            let mut y = vec![0.0; 64];
+            {
+                let mut outs: [&mut [f32]; 1] = [&mut y];
+                m.process(&mut ProcessIo::new(&ins, &mut outs, &ps, 64));
+            }
+            out.extend(y);
+        }
+        out
+    };
+    let step = |y: &[f32]| {
+        y[4800..]
+            .windows(3)
+            .map(|w| (w[2] - 2.0 * w[1] + w[0]).abs())
+            .fold(0.0f32, f32::max)
+    };
+    let held = step(&run(&|_| 0.0));
+    let steps = step(&run(&|i| [0.0, 4.0, 0.0, 2.0][(i / 2880) % 4]));
+    println!("formant vowel steps: largest second difference {steps:.3} vs held {held:.3}");
+    assert!(steps < 1.15 * held, "vowel steps click: {steps} vs {held}");
+}
+
 // ---------------------------------------------------------------- safety
 
 /// Every param at its minimum, at its maximum, and alternating each block, on loud noise with a

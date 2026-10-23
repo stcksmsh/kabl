@@ -119,6 +119,10 @@ struct AudioHost {
     /// Dropped first (fields drop in declaration order): the audio thread stops before the
     /// queues it feeds are torn down.
     _stream: Option<cpal::Stream>,
+    /// The `--input` device, if asked for and open; dropped with the output stream.
+    _input: Option<cpal::Stream>,
+    /// The input device vanished while playing (its error callback fired).
+    input_lost: Option<Arc<AtomicBool>>,
     gate: Arc<AtomicU64>,
     sample_rate: f32,
     settings: String,
@@ -155,6 +159,8 @@ struct AudioRequest {
     realtime: bool,
     /// Exact enumerated output, with its name checked again before opening.
     device: Option<(usize, String)>,
+    /// Open the default audio input for `audio.in` modules (`--input`).
+    input: bool,
 }
 
 fn output_names() -> Vec<(usize, String)> {
@@ -429,6 +435,8 @@ impl AudioHost {
             faults_rx: None,
             applied_rx: None,
             _stream: None,
+            _input: None,
+            input_lost: None,
         }
     }
 
@@ -583,6 +591,16 @@ impl AudioHost {
         let (mut lfos_tx, lfos_rx) = rtrb::RingBuffer::<(ModuleId, LfoSync)>::new(128);
         let (mut morphs_tx, morphs_rx) = rtrb::RingBuffer::<MorphReport>::new(64);
 
+        let mut input = if request.input {
+            kabl_standalone::input::AudioInput::open(sample_rate as u32)
+        } else {
+            kabl_standalone::input::AudioInput::closed(String::new())
+        };
+        let input_stream = input.stream.take();
+        let input_lost = input.lost.clone();
+        let input_status = input.status.clone();
+        let mut input_rx = input.rx;
+        let take_input = request.input;
         let mut left_ring = RingBuffer::new(RING_CAPACITY);
         let mut right_ring = RingBuffer::new(RING_CAPACITY);
         // Boxed: its event queue is too big for the stack of the thread that builds it.
@@ -666,7 +684,13 @@ impl AudioHost {
                 while left_ring.available() < frames_needed {
                     let n = (frames_needed - left_ring.available()).min(CHUNK);
                     let (mut l, mut r) = ([0f32; CHUNK], [0f32; CHUNK]);
-                    timeline.render(&mut engine, &mut l[..n], &mut r[..n], |_, _| {});
+                    timeline.render(&mut engine, &mut l[..n], &mut r[..n], |e, _| {
+                        if take_input {
+                            let (mut il, mut ir) = ([0f32; BLOCK], [0f32; BLOCK]);
+                            kabl_standalone::input::take_block(&mut input_rx, &mut il, &mut ir);
+                            e.set_audio_in(&il, &ir);
+                        }
+                    });
                     left_ring.push_slice(&l[..n]);
                     right_ring.push_slice(&r[..n]);
                 }
@@ -786,11 +810,16 @@ impl AudioHost {
             gate,
             sample_rate,
             settings: format!(
-                "{} · {sample_rate} Hz · {channels} channels · requested buffer {:?}",
+                "{} · {sample_rate} Hz · {channels} channels · requested buffer {:?}{}",
                 device
                     .description()
                     .map_or("unknown output".into(), |d| d.name().to_string()),
-                stream_config.buffer_size
+                stream_config.buffer_size,
+                if take_input {
+                    format!(" · {input_status}")
+                } else {
+                    String::new()
+                }
             ),
             collector,
             status,
@@ -806,6 +835,8 @@ impl AudioHost {
             faults_rx: stream.is_some().then_some(faults_rx),
             applied_rx: (stream.is_some() && measure).then_some(applied_rx),
             _stream: stream,
+            _input: input_stream,
+            input_lost: take_input.then_some(input_lost),
         };
         (host, delivery)
     }
@@ -1638,6 +1669,15 @@ impl App {
     /// UI thread, every frame: logs what the audio side counted, rate-limited.
     fn log_health(&mut self) {
         let h = &mut self.health;
+        if self
+            .audio
+            .input_lost
+            .as_ref()
+            .is_some_and(|l| l.swap(false, Ordering::Relaxed))
+        {
+            log::warn!(target: "audio", "input device lost: audio.in is silent until Retry");
+            self.audio.status = "input device lost: audio.in is silent until Retry".into();
+        }
         if let Some(rx) = self.audio.faults_rx.as_mut() {
             while let Ok(e) = rx.pop() {
                 h.fault_text = Some((e.to_string(), std::time::Instant::now()));
@@ -2297,6 +2337,7 @@ fn main() -> eframe::Result<()> {
         frames: num("--frames"),
         realtime: !args.iter().any(|a| a == "--no-rt"),
         device: None,
+        input: args.iter().any(|a| a == "--input"),
     };
     let (mut audio, mut delivery) = AudioHost::start(
         editor.state(),
@@ -2599,6 +2640,7 @@ mod recovery_tests {
             frames: Some(256),
             realtime: false,
             device: None,
+            input: false,
         };
         let (mut host, mut delivery) = AudioHost::start(
             editor.state(),
@@ -2783,6 +2825,7 @@ mod recovery_tests {
             frames: Some(256),
             realtime: false,
             device: None,
+            input: false,
         };
         let keys = Arc::new(AtomicU64::new(0));
         let peaks = Arc::new(record::PeakTap::default());
@@ -2853,6 +2896,7 @@ mod recovery_tests {
             frames: Some(256),
             realtime: false,
             device: None,
+            input: false,
         };
         let (mut host, mut delivery) = AudioHost::start(
             &patch,
@@ -2911,6 +2955,7 @@ mod recovery_tests {
             frames: Some(256),
             realtime: false,
             device: None,
+            input: false,
         };
         let (mut host, delivery) = AudioHost::start(
             &patch,
