@@ -52,13 +52,16 @@ Both follow the factory level rule (`docs/factory-levels/README.md`) and pass `f
 
 ## Listen
 
-Clips in `audio/` (AAC), made by `scripts/make_clips.py` with the offline renderer (`render_midi`, which now takes `--audio-in FILE.wav`):
+Clips in `audio/` (FLAC from the float render, no processing; AAC 256 kb/s and MP3 320 kb/s for convenience), made by `scripts/make_clips.py` with the offline renderer (`render_midi`, which now takes `--audio-in FILE.wav`):
 
 The clips were made and checked by measurement (levels, spectra, envelope correlation), not by ear: I cannot listen. What to listen for is what the design should give; judge it and tell me where it is wrong.
 
-- `robot-phrase.m4a`: 8 s of the phrase alone (a buzz through the vowel filter with a soft noise puff on every step), a pause, then the same 8 s spoken by the chord. Listen for the same rhythm and vowel changes in the chord's pitches. The puffs are the consonants of the patch's design: white noise at -15 dB, 25 ms attack, 90 ms decay (it was a 0 ms attack burst, then 10 ms; both still read as clicks in the dry modulator, which has no other discontinuity: with the puffs muted its largest second difference is 0.5x its 20 ms level, with them 3.3x before this change and 2.3x after). Robot-voice Hf is 0.8 to keep the quieter puffs audible after the vocoder.
-- `band-sweep.m4a`: the same 4 s at 8, 12, 16, 24 and 32 bands, joined by 60 ms crossfades (five separate renders: the module is not swept live in this clip; `moving_any_parameter...` tests that). Listen for the vowel colour at 8 bands and how much of each syllable's shape appears as bands are added. Whether 24 and 32 are better or only different is the thing to judge; the default is 16 (20 in `robot-voice`).
-- `live-voice.m4a`: a voice alone, a pause, then through the live-voice patch with two chords (E minor, then C). Listen for whether the words stay readable under the chord change and whether the `s` and `t` sounds are too hissy (the Hf knob) or too weak.
+- `robot-phrase.flac` (also `.m4a` 256 kb/s and `.mp3` 320 kb/s): 8 s of the phrase alone (a buzz through the vowel filter, one vowel per tick), a pause, then the same 8 s spoken by the chord. Clean: the phrase has no consonant noise by default. Listen for the same rhythm and vowel changes in the chord's pitches.
+- `robot-phrase-consonants.flac` (and `.m4a`, `.mp3`): the same with the source's consonants at full (Level 2 of the phrase's source mixer, default 0): a band-passed (3.5 kHz) noise puff, 30 ms, on every third syllable only. About 22 dB under the phrase; texture, off by default. The earlier version had a white-noise puff on every syllable, read as a hi-hat, and the robot voice's Hf pushed it further.
+- `band-sweep.flac` (and `.m4a`, `.mp3`): the same 4 s at 8, 12, 16, 24 and 32 bands, joined by 60 ms crossfades (five separate renders: the module is not swept live in this clip; `moving_any_parameter...` tests that). Listen for the vowel colour at 8 bands and how much of each syllable's shape appears as bands are added. Whether 24 and 32 are better or only different is the thing to judge; the default is 16 (20 in `robot-voice`).
+- `live-voice.flac` (and `.m4a`, `.mp3`): a voice alone, a pause, then through the live-voice patch with two chords (E minor, then C). Listen for whether the words stay readable under the chord change and whether the `s` and `t` sounds are too hissy (the Hf knob) or too weak.
+
+Coding error against the float render (signal over error; all / 6 to 12 kHz / above 12 kHz): AAC 160 kb/s, which the clips used before, 43 / 14 / 7 dB, so the error was only 7 dB under the signal above 12 kHz and audible as grain; AAC 256 kb/s 49 / 30 / 17 dB; MP3 320 kb/s 73 / 36 / 21 dB; FLAC 122 dB (24-bit rounding). `make_clips.py` prints these.
 
 Envelope correlation between the voice and the vocoded clip over twelve bands from 150 Hz to 7 kHz averages 0.64 (log magnitude; speech and its pauses included).
 

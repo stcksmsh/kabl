@@ -7,6 +7,6 @@ tags = [
     "keyboard",
     "vocal",
 ]
-description = "A supersaw chord that speaks. The phrase plays itself: a buzz through the formant filter, a new vowel and a noise click on every tick. Hold chords; Bands is the detail, Shift moves the voice up or down, HF keeps the consonants."
+description = "A supersaw chord that speaks. The phrase plays itself: a buzz through the formant filter, a new vowel on every tick (the Level 2 knob of its source mixer adds soft consonant puffs, off by default). Hold chords; Bands is the detail, Shift moves the voice up or down, HF keeps the consonants."
 keys = true
 sequence = false

@@ -5,7 +5,7 @@
 
 robot-voice  A saw chord (play keys) spoken by a phrase that plays itself: a buzzing saw through
              the formant filter, its vowel stepping through a random loop, gated by a clock, with
-             a noise burst at the start of each syllable. No microphone needed.
+             an optional soft consonant puff on every third syllable (off by default). No microphone needed.
 live-voice   The same chord vocoded by whatever arrives on Audio in: a microphone in the
              standalone (kabl-ui --input), the host's audio input in the plugin.
 
@@ -66,8 +66,9 @@ def finish(p, voc, tail_gain_db, row):
     place(p, out, 24 + 400 * 3, 10 + 370 * row)
 
 
-def robot_voice(bands=20, dry=False, self_playing=False):
-    """dry: the modulator alone (the phrase, before the vocoder), for the clips."""
+def robot_voice(bands=20, dry=False, self_playing=False, consonants=0.0):
+    """dry: the modulator alone (the phrase, before the vocoder), for the clips. consonants: level of
+    the consonant puffs (Level 2 of the source mixer); 0, the default, is a clean phrase."""
     p = Patch()
     car = chord(p, 0, self_playing)
     # The phrase: a buzz whose pitch and vowel wander on two random loops, one syllable per tick.
@@ -80,9 +81,9 @@ def robot_voice(bands=20, dry=False, self_playing=False):
     syl = p.add('env.adsr', attack_ms=6, decay_ms=170, sustain=0.5, release_ms=70)
     vca = p.add('vca', gain=0)
     noise = p.add('noise', level_db=-15)
-    burst = p.add('env.adsr', attack_ms=25, decay_ms=90, sustain=0, release_ms=20)
+    burst = p.add('env.adsr', attack_ms=4, decay_ms=30, sustain=0, release_ms=10)
     nvca = p.add('vca', gain=0)
-    mix = p.add('mixer', level1=1.0, level2=0.5)
+    mix = p.add('mixer', level1=1.0, level2=consonants)
     p.wire(clock, 'gate', pitch, 'clock')
     p.wire(pitch, 'out', q, 'in')
     p.wire(clock, 'gate', vowel, 'clock')
@@ -92,19 +93,31 @@ def robot_voice(bands=20, dry=False, self_playing=False):
     p.wire(clock, 'gate', syl, 'gate')
     p.wire(form, 'out', vca, 'in')
     p.wire(syl, 'out', vca, 'cv')
-    p.wire(clock, 'gate', burst, 'gate')
-    p.wire(noise, 'out', nvca, 'in')
     p.wire(burst, 'out', nvca, 'cv')
     p.wire(vca, 'out', mix, 'in1')
     p.wire(nvca, 'out', mix, 'in2')
+
+    def consonant_path():
+        # A "j" before every third vowel, not a hat on every one: the clock divided by 3 fires the
+        # puff, and the noise is band-passed to where speech consonants sit. Added last so the
+        # ids above hold.
+        div = p.add('clock.div', div=3)
+        bp = p.add('filter.svf', cutoff_hz=3500, resonance=0.5)
+        p.wire(clock, 'gate', div, 'clock')
+        p.wire(div, 'gate', burst, 'gate')
+        p.wire(noise, 'out', bp, 'in')
+        p.wire(bp, 'bp', nvca, 'in')
+        return div, bp
+
     if dry:
         g = p.add('gain', gain_db=-9)
         out = p.add('out')
         p.wire(mix, 'out', g, 'in')
         p.wire(g, 'out', out, 'left')
         p.wire(g, 'out', out, 'right')
+        consonant_path()
         return p
-    voc = p.add('vocoder', bands=bands, hf=0.8, drive_db=30, release_ms=45)
+    voc = p.add('vocoder', bands=bands, drive_db=30, release_ms=45)
     p.wire(car, 'out', voc, 'in_l')
     p.wire(car, 'out', voc, 'in_r')
     p.wire(mix, 'out', voc, 'mod')
@@ -112,6 +125,9 @@ def robot_voice(bands=20, dry=False, self_playing=False):
     for k, i in enumerate((clock, pitch, q, vowel, buzz, form, syl, vca, noise, burst, nvca, mix)):
         place(p, i, 24 + 400 * (k % 4), 10 + 370 * (3 + k // 4))
     place(p, voc, 24 + 400 * 1, 10 + 370 * 2)
+    div, bp = consonant_path()
+    place(p, div, 24 + 400 * 3, 10 + 370 * 3)
+    place(p, bp, 24 + 400 * 3, 10 + 370 * 4)
     return p
 
 
@@ -139,7 +155,7 @@ tags = [
     "keyboard",
     "vocal",
 ]
-description = "A supersaw chord that speaks. The phrase plays itself: a buzz through the formant filter, a new vowel and a noise click on every tick. Hold chords; Bands is the detail, Shift moves the voice up or down, HF keeps the consonants."
+description = "A supersaw chord that speaks. The phrase plays itself: a buzz through the formant filter, a new vowel on every tick (the Level 2 knob of its source mixer adds soft consonant puffs, off by default). Hold chords; Bands is the detail, Shift moves the voice up or down, HF keeps the consonants."
 keys = true
 sequence = false
 '''),
@@ -162,6 +178,9 @@ sequence = false
 def clips(root):
     """Patch variants for the clips: the modulator alone, and the phrase at each band count."""
     robot_voice(dry=True).save(root / 'phrase-dry')
+    robot_voice().save(root / 'phrase-20')
+    robot_voice(dry=True, consonants=1.0).save(root / 'phrase-dry-cons')
+    robot_voice(consonants=1.0).save(root / 'phrase-cons')
     for n in (8, 12, 16, 24, 32):
         robot_voice(bands=n).save(root / f'phrase-{n}')
     live_voice().save(root / 'live')
