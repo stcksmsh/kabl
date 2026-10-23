@@ -150,7 +150,7 @@
         "y": 1860.0
       },
       "params": {
-        "level_db": -12.0
+        "level_db": -15.0
       }
     },
     "15": {
@@ -160,8 +160,8 @@
         "y": 1860.0
       },
       "params": {
-        "attack_ms": 10.0,
-        "decay_ms": 70.0,
+        "attack_ms": 25.0,
+        "decay_ms": 90.0,
         "release_ms": 20.0,
         "sustain": 0.0
       }
@@ -196,7 +196,7 @@
       "params": {
         "bands": 20.0,
         "drive_db": 30.0,
-        "hf": 0.4,
+        "hf": 0.8,
         "release_ms": 45.0
       }
     },
