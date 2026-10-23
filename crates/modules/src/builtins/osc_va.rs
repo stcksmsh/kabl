@@ -5,12 +5,20 @@
 //!
 //! Sound palette batch (docs/sound-palette-batch/README.md): pulse width (`pw`, 5–95 %, the
 //! square only, ramped per sample across each block so a modulated width never steps, DC
-//! removed so PWM doesn't thump), fine tuning (`fine`, ±100 cents), unison (`unison`, 1–4
-//! oscillators per voice, `detune` = spread from lowest to highest in cents, level 1/√N so the
-//! loudness of uncorrelated oscillators stays put, each oscillator fading in or out over 20 ms
-//! when the count changes), and band-limited hard sync (see `process`). Defaults (50 %, 0 ct,
-//! 1 oscillator) are the old oscillator sample for sample. The output stays one mono `out`:
-//! stereo width is the chorus's job, so every existing cable keeps its meaning.
+//! removed so PWM doesn't thump), fine tuning (`fine`, ±100 cents), unison (`unison`, 1–16
+//! oscillators per voice, `detune` = spread from lowest to highest in cents, each oscillator
+//! fading in or out over 20 ms when the count changes), and band-limited hard sync (see
+//! `process`). Defaults (50 %, 0 ct, 1 oscillator) are the old oscillator sample for sample.
+//!
+//! Unison shaping (all neutral at their defaults, so a stack of up to 4 plays as it always
+//! did): `curve` bends the detune distribution from even steps (0) toward outer oscillators
+//! detuned much more than inner ones (100, the JP-8000 supersaw's shape); `blend` weighs the
+//! centre oscillator(s) against the side ones (50 = equal); `width` pans the stack across the
+//! field. Level law: equal power, each oscillator at `weight / √(Σ weight²)`, so loudness
+//! stays put as the count or the blend changes. `out` is the whole stack when `width` is 0 and
+//! the left channel otherwise; `out_r` is the right channel (a copy of `out` at width 0).
+//! `restart` chooses what a `sync` edge does to a stack: 0 restarts every oscillator at phase 0
+//! (hard sync), 1 restarts each at its own start phase, so a retriggered stack never aligns.
 //!
 //! Waveform selection is a discrete choice represented as a stepped float param (`0..=3`,
 //! rounded in `process`) — same convention `lfo.rs` uses, and the same reasoning: `ParamInfo`
@@ -45,6 +53,11 @@ const PORTS: &[PortInfo] = &[
     },
     PortInfo {
         name: "out",
+        port_type: PortType::Audio,
+        direction: PortDirection::Output,
+    },
+    PortInfo {
+        name: "out_r",
         port_type: PortType::Audio,
         direction: PortDirection::Output,
     },
@@ -88,11 +101,11 @@ const PARAMS: &[ParamInfo] = &[
         taper: Taper::Linear,
         smoothing_ms: 0.0,
     },
-    // Oscillators per voice, 1 (the old oscillator) to 4.
+    // Oscillators per voice, 1 (the old oscillator) to 16.
     ParamInfo {
         name: "unison",
         min: 1.0,
-        max: 4.0,
+        max: 16.0,
         default: 1.0,
         unit: "",
         taper: Taper::Stepped,
@@ -106,6 +119,46 @@ const PARAMS: &[ParamInfo] = &[
         default: 15.0,
         unit: "ct",
         taper: Taper::Linear,
+        smoothing_ms: 0.0,
+    },
+    // Detune distribution: 0 even steps, 100 the outer oscillators far wider than the inner.
+    ParamInfo {
+        name: "curve",
+        min: 0.0,
+        max: 100.0,
+        default: 0.0,
+        unit: "%",
+        taper: Taper::Linear,
+        smoothing_ms: 0.0,
+    },
+    // Stereo width of the stack: 0 mono, 100 lowest hard left and highest hard right.
+    ParamInfo {
+        name: "width",
+        min: 0.0,
+        max: 100.0,
+        default: 0.0,
+        unit: "%",
+        taper: Taper::Linear,
+        smoothing_ms: 10.0,
+    },
+    // Centre against side oscillators: 0 centre only, 50 equal, 100 sides only.
+    ParamInfo {
+        name: "blend",
+        min: 0.0,
+        max: 100.0,
+        default: 50.0,
+        unit: "%",
+        taper: Taper::Linear,
+        smoothing_ms: 10.0,
+    },
+    // What a sync edge does to every oscillator: 0 restart at phase 0, 1 at its start phase.
+    ParamInfo {
+        name: "restart",
+        min: 0.0,
+        max: 1.0,
+        default: 0.0,
+        unit: "",
+        taper: Taper::Stepped,
         smoothing_ms: 0.0,
     },
 ];
@@ -127,7 +180,7 @@ pub static OSC_VA_INFO: ModuleInfo = ModuleInfo {
     },
     skin: None,
     width_units: 7,
-    advanced: &["pw", "fine", "unison", "detune"],
+    advanced: &["pw", "fine", "unison", "detune", "curve", "width", "blend", "restart"],
 };
 
 const PITCH_IN: usize = 0;
@@ -139,21 +192,41 @@ const PW_PARAM: usize = 2;
 const FINE_PARAM: usize = 3;
 const UNISON_PARAM: usize = 4;
 const DETUNE_PARAM: usize = 5;
+const CURVE_PARAM: usize = 6;
+const WIDTH_PARAM: usize = 7;
+const BLEND_PARAM: usize = 8;
+const RESTART_PARAM: usize = 9;
+const OUT_R: usize = 1;
 
-pub const MAX_UNISON: usize = 4;
+pub const MAX_UNISON: usize = 16;
+/// The stacks the first unison laid out by table; larger ones use even steps.
+const TABLED: usize = 4;
 
 /// Where each unison oscillator sits within the detune spread (−0.5 = lowest, +0.5 =
 /// highest), by count. Oscillator 0 alone plays at the centre, so one oscillator is the old
 /// oscillator.
-const SPREAD: [[f32; MAX_UNISON]; MAX_UNISON] = [
+const SPREAD: [[f32; TABLED]; TABLED] = [
     [0.0, 0.0, 0.0, 0.0],
     [-0.5, 0.5, 0.0, 0.0],
     [0.0, -0.5, 0.5, 0.0],
     [-1.0 / 6.0, -0.5, 0.5, 1.0 / 6.0],
 ];
 /// Starting phases of the unison oscillators: never aligned, so a new unison voice doesn't
-/// double the first cycle. Oscillator 0 starts at 0, as before.
-const START_PHASE: [f32; MAX_UNISON] = [0.0, 0.31, 0.62, 0.87];
+/// double the first cycle. Oscillator 0 starts at 0, as before; the first four are the
+/// original values, the rest step by the golden ratio (evenly spread whatever the count).
+const START_PHASE: [f32; MAX_UNISON] = [
+    0.0, 0.31, 0.62, 0.87, 0.472, 0.090, 0.708, 0.326, 0.944, 0.562, 0.180, 0.798, 0.416, 0.034,
+    0.652, 0.270,
+];
+
+/// Where oscillator `k` of `count` sits in the spread, −0.5 (lowest) to 0.5 (highest).
+fn position(count: usize, k: usize) -> f32 {
+    if count <= TABLED {
+        SPREAD[count - 1][k]
+    } else {
+        k as f32 / (count - 1) as f32 - 0.5
+    }
+}
 /// Unison oscillators fade in and out over this time constant when the count changes.
 const GAIN_TAU_S: f32 = 0.02;
 
@@ -303,21 +376,69 @@ impl Module for OscVa {
         let fine = io.param(FINE_PARAM).at(0);
         let count = (io.param(UNISON_PARAM).at(0).round() as usize).clamp(1, MAX_UNISON);
         let detune = io.param(DETUNE_PARAM).at(0);
+        // Params a hand-wired caller may leave out take their defaults.
+        let extra = |i: usize, default: f32| {
+            if i < io.param_count() {
+                io.param(i).at(0)
+            } else {
+                default
+            }
+        };
+        let curve = extra(CURVE_PARAM, 0.0).clamp(0.0, 100.0) / 100.0;
+        let width = extra(WIDTH_PARAM, 0.0).clamp(0.0, 100.0) / 100.0;
+        let blend = extra(BLEND_PARAM, 50.0).clamp(0.0, 100.0) / 100.0;
+        let restart = extra(RESTART_PARAM, 0.0) >= 0.5;
+        let stereo = io.output_count() > OUT_R;
         let n = io.block_len();
         let sr = self.sample_rate;
         let c = &mut self.c;
 
-        // Per-oscillator frequency ratio, per block. Exactly 1 for the old oscillator.
+        // Per-oscillator frequency ratio, level and pan, per block. Ratio exactly 1 for the old
+        // oscillator.
         let mut ratio = [1.0f32; MAX_UNISON];
         let mut target = [0.0f32; MAX_UNISON];
-        let level = 1.0 / (count as f32).sqrt();
+        let mut pan = [(1.0f32, 1.0f32); MAX_UNISON];
+        let mut start = [0.0f32; MAX_UNISON];
+        // Centre oscillators: the one (odd count) or two (even) nearest the middle. A stack of
+        // one or two has no side oscillators, so blend does nothing there.
+        let sides = count > 2;
+        let (w_centre, w_side) = if sides {
+            ((2.0 * (1.0 - blend)).min(1.0), (2.0 * blend).min(1.0))
+        } else {
+            (1.0, 1.0)
+        };
+        let mut weight = [0.0f32; MAX_UNISON];
+        let mut power = 0.0f32;
+        for k in 0..count {
+            let x = position(count, k);
+            weight[k] = if x.abs() * ((count - 1).max(1) as f32) < 0.51 {
+                w_centre
+            } else {
+                w_side
+            };
+            power += weight[k] * weight[k];
+        }
+        let level = 1.0 / power.sqrt();
         for k in 0..MAX_UNISON {
-            let cents = fine + SPREAD[count - 1][k] * detune;
+            let mut x = if k < count { position(count, k) } else { 0.0 };
+            if curve > 0.0 {
+                // Power curve: inner oscillators pulled toward the centre, the outermost stay.
+                x = x.signum() * 0.5 * (2.0 * x.abs()).powf(1.0 + 2.0 * curve);
+            }
+            let cents = fine + x * detune;
             if cents != 0.0 {
                 ratio[k] = 2f32.powf(cents / 1200.0);
             }
             if k < count {
-                target[k] = level;
+                target[k] = weight[k] * level;
+                if width > 0.0 {
+                    // Equal-power pan; the middle is unity in each channel.
+                    let a = (position(count, k) * 2.0 * width + 1.0) * (PI * 0.25);
+                    pan[k] = (a.cos() * std::f32::consts::SQRT_2, a.sin() * std::f32::consts::SQRT_2);
+                }
+            }
+            if restart {
+                start[k] = START_PHASE[k];
             }
         }
         if c.gain[0] < 0.0 {
@@ -329,10 +450,9 @@ impl Module for OscVa {
         let k_gain = 1.0 - (-1.0 / (GAIN_TAU_S * sr)).exp();
         let pw_step = (pw_target - c.pw) / n as f32;
 
-        let out = &mut io.output(OUT)[..n];
         let mut pw = c.pw;
         let mut prev_sync = c.last_sync;
-        for (i, o) in out.iter_mut().enumerate() {
+        for i in 0..n {
             pw += pw_step;
             let s = sync.at(i);
             let edge = s > 0.5 && prev_sync <= 0.5;
@@ -346,7 +466,7 @@ impl Module for OscVa {
             prev_sync = s;
             let freq = base_hz.at(i) * 2f32.powf(pitch.at(i) / 12.0);
 
-            let mut v = 0.0;
+            let (mut v, mut v_r) = (0.0, 0.0);
             for k in 0..MAX_UNISON {
                 let g = &mut c.gain[k];
                 if *g != target[k] {
@@ -358,29 +478,40 @@ impl Module for OscVa {
                 if *g == 0.0 {
                     continue;
                 }
-                let dt = freq * ratio[k] / sr;
+                // Above half the sample rate no band-limiting holds; keep the phase sane.
+                let dt = (freq * ratio[k] / sr).min(0.5);
                 let p = &mut c.phase[k];
+                let s0 = start[k];
                 let mut y = if edge {
-                    // Phase at the edge, one sample's (1 - f) back; restart from 0 there.
+                    // Phase at the edge, one sample's (1 - f) back; restart from `s0` there.
                     let at_edge = (*p - dt * (1.0 - f)).rem_euclid(1.0);
-                    let jump = naive(0.0, waveform, pw) - naive(at_edge, waveform, pw);
-                    *p = dt * (1.0 - f);
+                    let jump = naive(s0, waveform, pw) - naive(at_edge, waveform, pw);
+                    *p = s0 + dt * (1.0 - f);
                     naive(*p, waveform, pw) - 0.5 * f * f * jump - dc(waveform, pw)
                 } else {
                     sample(*p, dt, waveform, pw)
                 };
                 if let Some(fn_) = next {
                     let at_edge = (*p + dt * fn_).rem_euclid(1.0);
-                    let jump = naive(0.0, waveform, pw) - naive(at_edge, waveform, pw);
+                    let jump = naive(s0, waveform, pw) - naive(at_edge, waveform, pw);
                     y += 0.5 * (1.0 - fn_) * (1.0 - fn_) * jump;
                 }
                 *p += dt;
                 if *p >= 1.0 {
                     *p -= 1.0;
                 }
-                v += if *g == 1.0 { y } else { *g * y };
+                let y = if *g == 1.0 { y } else { *g * y };
+                if width > 0.0 {
+                    v += y * pan[k].0;
+                    v_r += y * pan[k].1;
+                } else {
+                    v += y;
+                }
             }
-            *o = v;
+            io.output(OUT)[i] = v;
+            if stereo {
+                io.output(OUT_R)[i] = if width > 0.0 { v_r } else { v };
+            }
         }
         c.pw = pw_target;
         c.last_sync = prev_sync;
