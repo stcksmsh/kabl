@@ -1,0 +1,6 @@
+name = "Eight Macros"
+category = "Piece"
+tags = ["sequenced", "macros", "performance", "100bpm"]
+description = "A self-playing bass line with eight named macros on the Perform page. Motion does not move a knob: it sets how deep an LFO wobbles the filter cutoff, from still to full. Run, then turn Motion."
+keys = false
+sequence = true
