@@ -245,6 +245,7 @@ pub fn param_label(p: &ParamInfo) -> String {
     };
     match name {
         "base_hz" => return "Frequency".into(),
+        "hf" => return "Hiss".into(),
         "exponential" => return "Response".into(),
         "div" => return "Divide by".into(),
         "gate_len" => return "Gate length".into(),

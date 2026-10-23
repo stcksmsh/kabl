@@ -79,8 +79,8 @@ def robot_voice(bands=20, dry=False, self_playing=False):
     form = p.add('filter.formant', vowel=2.0, q=1.2)
     syl = p.add('env.adsr', attack_ms=6, decay_ms=170, sustain=0.5, release_ms=70)
     vca = p.add('vca', gain=0)
-    noise = p.add('noise', level_db=-6)
-    burst = p.add('env.adsr', attack_ms=0, decay_ms=35, sustain=0, release_ms=20)
+    noise = p.add('noise', level_db=-12)
+    burst = p.add('env.adsr', attack_ms=10, decay_ms=70, sustain=0, release_ms=20)
     nvca = p.add('vca', gain=0)
     mix = p.add('mixer', level1=1.0, level2=0.5)
     p.wire(clock, 'gate', pitch, 'clock')
@@ -104,7 +104,7 @@ def robot_voice(bands=20, dry=False, self_playing=False):
         p.wire(g, 'out', out, 'left')
         p.wire(g, 'out', out, 'right')
         return p
-    voc = p.add('vocoder', bands=bands, hf=0.5, drive_db=30, release_ms=45)
+    voc = p.add('vocoder', bands=bands, hf=0.4, drive_db=30, release_ms=45)
     p.wire(car, 'out', voc, 'in_l')
     p.wire(car, 'out', voc, 'in_r')
     p.wire(mix, 'out', voc, 'mod')
@@ -123,7 +123,7 @@ def live_voice():
     p.wire(car, 'out', voc, 'in_l')
     p.wire(car, 'out', voc, 'in_r')
     p.wire(ain, 'left', voc, 'mod')
-    finish(p, voc, 8.5, 2)
+    finish(p, voc, 14.5, 2)
     place(p, ain, 24, 10 + 370 * 2)
     place(p, voc, 24 + 400 * 1, 10 + 370 * 2)
     return p

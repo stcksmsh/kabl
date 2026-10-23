@@ -78,11 +78,23 @@ def main():
         wet = render('phrase-20', ev, SCR / 'wet.wav', 9)
     encode([trim(dry, SCR / 'a.wav', 0.5, 8), silence(0.6), trim(wet, SCR / 'b.wav', 0.5, 8)], 'robot-phrase')
 
+    # Five separate renders joined by 60 ms crossfades: no silence, no fade to zero (a fade
+    # and a gap at every join sounded like a dropout every 4 s).
+    counts = (8, 12, 16, 24, 32)
     parts = []
-    for n in (8, 12, 16, 24, 32):
+    for n in counts:
         w = render(f'phrase-{n}', ev, SCR / f'p{n}.wav', 5)
-        parts += [trim(w, SCR / f'p{n}t.wav', 0.5, 4), silence(0.4)]
-    encode(parts, 'band-sweep')
+        t = SCR / f'p{n}t.wav'
+        run('sox', w, t, 'trim', 0.5, 4.06)
+        parts += ['-i', t]
+    steps = []
+    for i in range(1, len(counts)):
+        src = '[0]' if i == 1 else f'[x{i - 1}]'
+        dst = '' if i == len(counts) - 1 else f'[x{i}]'
+        steps.append(f'{src}[{i}]acrossfade=d=0.06:c1=tri:c2=tri{dst}')
+    wav = SCR / 'band-sweep.wav'
+    run('ffmpeg', '-y', '-loglevel', 'error', *parts, '-filter_complex', ';'.join(steps), wav)
+    run('ffmpeg', '-y', '-loglevel', 'error', '-i', wav, '-c:a', 'aac', '-b:a', '160k', OUT / 'band-sweep.m4a')
 
     voice = Path(sys.argv[1]) if len(sys.argv) > 1 else OUT / 'voice-espeak-16k.wav'
     v48 = SCR / 'voice48.wav'

@@ -11,8 +11,8 @@ A channel vocoder for the robot voice, and a way to bring a real voice into kabl
 | Bands | 8 to 32 (16) | Slices the voice is split into. More is clearer speech, fewer is more robotic. |
 | Shift | -12 to 12 st (0) | Moves the synth's side of the bands against the voice's: up is a smaller mouth, down a larger one. |
 | Attack, Release | 0.5 to 50 ms (4), 5 to 500 ms (40) | How fast a band opens and closes. Short release is crisp, long is smeared. |
-| Hf | 0 to 1 (0.5) | Unvoiced path: hiss shaped by the high end of the voice, so `s`, `t`, `f` survive. Sounds only while the synth does. |
-| Drive | 0 to 36 dB (24) | Gain of the voice into the bands. The vocoder multiplies, so a quiet voice makes a quiet result. |
+| Hf (face label: Hiss) | 0 to 1 (0.5) | Unvoiced path: hiss that opens only on `s`, `t`, `f` (when the voice is mostly above 5 kHz), shaped by the voice there. 0 is the clean vocoder, exactly. Sounds only while the synth does. Default 0.5 puts the hiss about 13 dB under the vocoded sound on the stand-in voice's consonants and about 18 dB under it on vowels (it was 11 dB under on vowels before the gate: the "static"). |
+| Drive | 0 to 36 dB (18) | Gain of the voice into the bands. The vocoder multiplies, so a quiet voice makes a quiet result. 18 rather than 24: 6 dB more headroom for a hot voice and 6 dB less microphone floor. The module's output peak with the -20 dBFS stand-in voice was 0.26 at 24, so nothing clipped; this is margin, not a fix for a fault. `live-voice` makes the 6 dB up in its output gain. |
 | Mix | 0 to 1 (1) | The synth alone to the vocoded sound alone. |
 | Spacing (advanced) | 0 to 1 (0) | 0: equal musical steps; 1: evenly spread, more bands at the top. |
 | Low, High (advanced) | 60 to 400 Hz (120), 3 to 16 kHz (9) | The range the bands cover. |
@@ -56,8 +56,8 @@ Clips in `audio/` (AAC), made by `scripts/make_clips.py` with the offline render
 
 The clips were made and checked by measurement (levels, spectra, envelope correlation), not by ear: I cannot listen. What to listen for is what the design should give; judge it and tell me where it is wrong.
 
-- `robot-phrase.m4a`: 8 s of the phrase alone (a buzz through the vowel filter with a click on every step), a pause, then the same 8 s spoken by the chord. Listen for the same rhythm and vowel changes in the chord's pitches, and the clicks coming through as a short hiss.
-- `band-sweep.m4a`: the same 4 s at 8, 12, 16, 24 and 32 bands. Listen for the vowel colour at 8 bands and how much of each syllable's shape appears as bands are added. Whether 24 and 32 are better or only different is the thing to judge; the default is 16 (20 in `robot-voice`).
+- `robot-phrase.m4a`: 8 s of the phrase alone (a buzz through the vowel filter with a soft noise puff on every step), a pause, then the same 8 s spoken by the chord. Listen for the same rhythm and vowel changes in the chord's pitches. The puffs are the consonants of the patch's design (10 ms attack, 70 ms decay); they used to be hard 0 ms bursts, which were the clicks.
+- `band-sweep.m4a`: the same 4 s at 8, 12, 16, 24 and 32 bands, joined by 60 ms crossfades (five separate renders: the module is not swept live in this clip; `moving_any_parameter...` tests that). Listen for the vowel colour at 8 bands and how much of each syllable's shape appears as bands are added. Whether 24 and 32 are better or only different is the thing to judge; the default is 16 (20 in `robot-voice`).
 - `live-voice.m4a`: a voice alone, a pause, then through the live-voice patch with two chords (E minor, then C). Listen for whether the words stay readable under the chord change and whether the `s` and `t` sounds are too hissy (the Hf knob) or too weak.
 
 Envelope correlation between the voice and the vocoded clip over twelve bands from 150 Hz to 7 kHz averages 0.64 (log magnitude; speech and its pauses included).
@@ -66,7 +66,7 @@ Captures in `media/`: `A|B-light|dark-all50.webp` (the self-playing patch at 50 
 
 ## Tests
 
-- `crates/modules/tests/vocoder.rs` (10 run, 1 ignored CPU print): a 1 kHz voice puts the carrier's 1 kHz harmonic 45 dB over its 3 kHz one; Shift moves the peak an octave; output follows the voice level (6 dB for 6 dB; bands 8 to 32 within 5 dB); no voice is silence and Mix 0 is the carrier exactly; the unvoiced path adds hiss only for a hissing voice, and only with a synth under it; block sizes 1, 7 and 33 give identical output to 64; extreme settings and NaN, infinity and 1e30 input stay finite at 44.1, 48, 96 and 192 kHz and recover; no allocation in `process`; `audio.in` passes what it is fed and sanitises the rest.
+- `crates/modules/tests/vocoder.rs` (12 run, 1 ignored CPU print): a 1 kHz voice puts the carrier's 1 kHz harmonic 45 dB over its 3 kHz one; Shift moves the peak an octave; output follows the voice level (6 dB for 6 dB; bands 8 to 32 within 5 dB); no voice is silence and Mix 0 is the carrier exactly; the unvoiced path adds hiss only for a hissing voice, and only with a synth under it; block sizes 1, 7 and 33 give identical output to 64; extreme settings and NaN, infinity and 1e30 input stay finite at 44.1, 48, 96 and 192 kHz and recover; no allocation in `process`; every parameter swept there and back while a saw is held under a steady broadband voice never drops a 512-sample block under 25 % of the running level (lowest measured 0.21, Drive; band count 0.65) and never steps harder than the steady run does; a vowel with a little top end gets no hiss from Hf while a hissing voice does (Hf 0 is exactly the clean vocoder); `audio.in` passes what it is fed and sanitises the rest.
 - `crates/engine/tests/audio_in.rs`: the host's block reaches the output, silence before a host feeds it.
 - `crates/standalone/src/input.rs`: a short or empty queue pads with silence, a backlog is trimmed to the newest frames, a closed input feeds silence.
 - `crates/ui/tests/factory_bank.rs`: the stand-in voice is -20 dBFS; the factory level test covers both demos.

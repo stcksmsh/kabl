@@ -343,6 +343,136 @@ fn cpu_at_32_bands() {
 }
 
 #[test]
+fn a_voiced_voice_with_a_little_top_end_stays_clean() {
+    // 200 Hz at 0.1 plus 6 kHz at 0.01: a vowel with a little energy above 5 kHz.
+    let voice: Vec<f32> = sine(200.0, SR, N, 0.1)
+        .iter()
+        .zip(sine(6000.0, SR, N, 0.01))
+        .map(|(a, b)| a + b)
+        .collect();
+    let car = saw(110.0, SR, N);
+    let go = |hf: f32| {
+        let (mut m, p) = vocoder(&[("hf", hf)], SR);
+        run(&mut *m, &p, &car, Some(&voice), 64)[0][SKIP..].to_vec()
+    };
+    let (off, on) = (go(0.0), go(1.0));
+    let diff: Vec<f32> = off.iter().zip(&on).map(|(a, b)| a - b).collect();
+    println!("hf 1 over hf 0: {:.1} dB", db(rms(&diff), rms(&off)));
+    assert!(rms(&diff) < 0.03 * rms(&off), "voiced speech gets hiss");
+    // A hissing voice does open it.
+    let hiss = noise(3, N, 0.1);
+    let (mut m, p) = vocoder(&[("hf", 1.0)], SR);
+    let with = run(&mut *m, &p, &car, Some(&hiss), 64)[0][SKIP..].to_vec();
+    let (mut m, p) = vocoder(&[("hf", 0.0)], SR);
+    let without = run(&mut *m, &p, &car, Some(&hiss), 64)[0][SKIP..].to_vec();
+    assert!(rms(&with) > 1.5 * rms(&without), "a hiss gets none");
+}
+
+/// A steady broadband voice (60 tones, 150 Hz to 8 kHz, in every band), so any level change is
+/// the module's.
+fn sweep_voice(n: usize) -> Vec<f32> {
+    (0..60)
+        .map(|k| {
+            sine(
+                150.0 * (8000.0f32 / 150.0).powf(k as f32 / 59.0),
+                SR,
+                n,
+                0.03,
+            )
+        })
+        .fold(vec![0.0; n], |a, s| {
+            a.iter().zip(&s).map(|(x, y)| x + y).collect()
+        })
+}
+
+/// Sweeps one parameter there and back over `secs` while a saw is held under a noise voice, in
+/// 64-sample blocks. Returns the left output.
+fn sweep(name: &str, secs: f32) -> Vec<f32> {
+    let (mut m, mut p) = vocoder(&[], SR);
+    let idx = m.info().params.iter().position(|q| q.name == name).unwrap();
+    let (lo, hi) = (m.info().params[idx].min, m.info().params[idx].max);
+    let n = (secs * SR) as usize;
+    let car = saw(110.0, SR, n);
+    let voice = sweep_voice(n);
+    let mut out = Vec::with_capacity(n);
+    let mut t = 0;
+    while t < n {
+        let len = 64.min(n - t);
+        // Triangle, 2 s there and back: crosses every integer band count.
+        let u = (t as f32 / SR / 2.0).fract();
+        let tri = if u < 0.5 { 2.0 * u } else { 2.0 - 2.0 * u };
+        p[idx] = lo + (hi - lo) * tri;
+        let ps: Vec<Signal> = p.iter().map(|&v| Signal::Scalar(v)).collect();
+        let c = Signal::Buffer(&car[t..t + len]);
+        let ins = [c, c, Signal::Buffer(&voice[t..t + len])];
+        let (mut l, mut r) = (vec![0.0; len], vec![0.0; len]);
+        {
+            let mut outs: [&mut [f32]; 2] = [&mut l, &mut r];
+            let mut io = ProcessIo::new(&ins, &mut outs, &ps, len);
+            m.process(&mut io);
+        }
+        out.extend(l);
+        t += len;
+    }
+    out
+}
+
+#[test]
+fn moving_any_parameter_while_sounding_does_not_drop_out_or_click() {
+    let names: Vec<&str> = registry::create("vocoder")
+        .unwrap()
+        .info()
+        .params
+        .iter()
+        .map(|p| p.name)
+        .collect();
+    // The same inputs with every parameter held at its default.
+    let steady = {
+        let (mut m, p) = vocoder(&[], SR);
+        let car = saw(110.0, SR, 8 * 48000);
+        let voice = sweep_voice(car.len());
+        max_step(&run(&mut *m, &p, &car, Some(&voice), 64)[0][SKIP..])
+    };
+    for name in names {
+        let all = sweep(name, 8.0);
+        let out = &all[SKIP..];
+        // Dropout: a 512-sample block (longer than a 110 Hz period) far below the mean block
+        // level of the last 0.5 s.
+        let blocks: Vec<f32> = out.chunks(512).map(rms).collect();
+        let win = 47;
+        let mut drop = f32::MAX;
+        for i in win..blocks.len() {
+            let level = blocks[i - win..i].iter().sum::<f32>() / win as f32;
+            drop = drop.min(blocks[i] / level.max(1e-9));
+        }
+        // Click: largest sample-to-sample step against the block's own RMS, not above the
+        // steadiest run's (the held saw has steps of its own).
+        let step = max_step(out);
+        println!("{name}: lowest block / level {drop:.2}, largest step / rms {step:.1} (steady {steady:.1})");
+        // Sweeping these to their quiet ends (no unvoiced noise, no drive, all dry) is a level
+        // change, not a dropout.
+        if !["hf", "drive_db", "mix"].contains(&name) {
+            assert!(drop > 0.25, "{name}: dropout, block at {drop} of the level");
+        }
+        assert!(
+            step < steady * 1.5,
+            "{name}: click, step {step} x block rms, steady run {steady}"
+        );
+    }
+}
+
+fn max_step(x: &[f32]) -> f32 {
+    let mut step = 0.0f32;
+    for ch in x.chunks(64) {
+        let r = rms(ch).max(1e-6);
+        for w in ch.windows(2) {
+            step = step.max((w[1] - w[0]).abs() / r);
+        }
+    }
+    step
+}
+
+#[test]
 fn audio_in_passes_what_it_is_fed_and_sanitises_the_rest() {
     let mut a = AudioIn::new();
     a.prepare(SR, 64, &LIVE);

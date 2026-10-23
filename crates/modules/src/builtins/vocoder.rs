@@ -27,8 +27,12 @@
 //!
 //! **Unvoiced.** A vocoder loses consonants: `s`, `t`, `f` are noise, and a saw has no noise.
 //! `hf` mixes in white noise band-passed around 7 kHz (about 5 kHz wide), shaped by the
-//! follower of the modulator above 5 kHz (fixed 1 ms attack, 20 ms release), so hisses and clicks in the voice come
-//! through. Left and right get separate noise. The noise sounds only while the carrier does
+//! follower of the modulator above 5 kHz (fixed 1 ms attack, 20 ms release), but only while the
+//! voice is mostly above 5 kHz: the noise is closed while the high follower is under 15 % of
+//! high plus low and fully open from 40 %. Vowels, which have a little energy up there, and a
+//! microphone's floor stay clean; `s`, `t`, `f` open it. `hf` 0 skips the path (nothing added,
+//! exactly the clean vocoder); `hf` glides like the other controls. Left and right get separate
+//! noise. The noise sounds only while the carrier does
 //! (a follower of the carrier's level, full from −34 dBFS): a voice with no synth under it is
 //! silent, not whispering.
 //!
@@ -73,7 +77,7 @@ const PARAMS: &[ParamInfo] = &[
     param("attack_ms", 0.5, 50.0, 4.0, "ms", Taper::Exponential),
     param("release_ms", 5.0, 500.0, 40.0, "ms", Taper::Exponential),
     param("hf", 0.0, 1.0, 0.5, "", Taper::Linear),
-    param("drive_db", 0.0, 36.0, 24.0, "dB", Taper::Linear),
+    param("drive_db", 0.0, 36.0, 18.0, "dB", Taper::Linear),
     param("mix", 0.0, 1.0, 1.0, "", Taper::Linear),
 ];
 
@@ -115,9 +119,13 @@ const HF_HZ: f32 = 5000.0;
 const HF_NOISE_HZ: f32 = 7000.0;
 const HF_NOISE_K: f32 = 1.1;
 const HF_NOISE_BW: f32 = 5000.0;
-const NOISE_REF: f32 = 0.06;
+const NOISE_REF: f32 = 0.12;
 const HF_ATTACK_MS: f32 = 1.0;
 const HF_RELEASE_MS: f32 = 20.0;
+/// The noise is closed while the voice's share above `HF_HZ` is under `UNVOICED_FROM` and fully
+/// open from `UNVOICED_FULL`.
+const UNVOICED_FROM: f32 = 0.15;
+const UNVOICED_FULL: f32 = 0.4;
 const CAR_ATTACK_MS: f32 = 5.0;
 const CAR_RELEASE_MS: f32 = 80.0;
 const CAR_GATE: f32 = 50.0;
@@ -151,6 +159,7 @@ struct Core {
     shift: Glide,
     drive: Glide,
     mix: Glide,
+    hf: Glide,
     attack: TimeCoef,
     release: TimeCoef,
     /// The settings the filters were last designed for.
@@ -160,6 +169,8 @@ struct Core {
     hf_mod: [[f32; 2]; 2],
     hf_noise: [[[f32; 2]; 2]; 2],
     hf_env: f32,
+    /// Follower of the voice below `HF_HZ`: the noise needs the voice to be mostly above it.
+    lf_env: f32,
     /// Follower of the carrier's level: the unvoiced noise only sounds while the synth does.
     car_env: f32,
     rng: [u32; 2],
@@ -183,12 +194,14 @@ impl Vocoder {
                 shift: Glide::default(),
                 drive: Glide::default(),
                 mix: Glide::default(),
+                hf: Glide::default(),
                 attack: TimeCoef::new(),
                 release: TimeCoef::new(),
                 key: [f32::NAN; 5],
                 hf_mod: [[0.0; 2]; 2],
                 hf_noise: [[[0.0; 2]; 2]; 2],
                 hf_env: 0.0,
+                lf_env: 0.0,
                 car_env: 0.0,
                 rng: [0x9E37_79B9, 0x85EB_CA6B],
                 started: false,
@@ -371,7 +384,7 @@ impl Module for Vocoder {
             }
             let att = c.attack.get(p[5].at(i0).clamp(0.5, 50.0), sr);
             let rel = c.release.get(p[6].at(i0).clamp(5.0, 500.0), sr);
-            let hf = p[7].at(i0).clamp(0.0, 1.0);
+            let hf = c.hf.next(p[7], i0, kg).clamp(0.0, 1.0);
             let drive = c.drive.next(p[8], i0, kg).clamp(0.0, 36.0);
             let det = DETECT * (drive * NEPER_PER_DB).exp() * (nb as f32 / 16.0).sqrt();
             let mix = c.mix.next(p[9], i0, kg).clamp(0.0, 1.0);
@@ -403,6 +416,14 @@ impl Module for Vocoder {
                     let a = h.abs() * det;
                     let k = if a > c.hf_env { ka } else { kr };
                     c.hf_env = flush((a + (c.hf_env - a) * k).min(ENV_MAX));
+                    let a = (x[2][j] - h).abs() * det;
+                    let k = if a > c.lf_env { ka } else { kr };
+                    c.lf_env = flush((a + (c.lf_env - a) * k).min(ENV_MAX));
+                    // Voiced speech has its energy below HF_HZ and a little above it; s, t, f
+                    // have it above. Only the second kind opens the noise.
+                    let share = c.hf_env / (c.hf_env + c.lf_env + 1e-6);
+                    let unvoiced =
+                        ((share - UNVOICED_FROM) / (UNVOICED_FULL - UNVOICED_FROM)).clamp(0.0, 1.0);
                     let level = x[0][j].abs().max(x[1][j].abs());
                     let k = if level > c.car_env { ca } else { cr };
                     c.car_env = flush(level + (c.car_env - level) * k);
@@ -410,7 +431,7 @@ impl Module for Vocoder {
                     let gate = (c.car_env * CAR_GATE).min(1.0);
                     for (ch, w) in wet.iter_mut().enumerate() {
                         let nz = cascade(&mut c.hf_noise[ch], &nbp, white(&mut c.rng[ch]), stage);
-                        w[j] += nz * c.hf_env * hf * gate * noise_gain;
+                        w[j] += nz * c.hf_env * unvoiced * hf * gate * noise_gain;
                     }
                 }
             }
