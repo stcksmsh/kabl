@@ -419,8 +419,7 @@ fn a_cue_offers_macros_five_to_eight_only_once_they_are_in_use() {
     let m = with_macro(&mut h);
     assert_eq!(cues::active_macros(h.editor.state(), m), vec![0, 1, 2, 3]);
     perform::toggle_pin(&mut h.editor, m, "m6");
-    h.editor
-        .set_label(m, "name.m8", Some("Wobble".to_string()));
+    h.editor.set_label(m, "name.m8", Some("Wobble".to_string()));
     assert_eq!(
         cues::active_macros(h.editor.state(), m),
         vec![0, 1, 2, 3, 5, 7]

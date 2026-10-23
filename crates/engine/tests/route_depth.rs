@@ -43,10 +43,7 @@ fn cable(from: PortRef, to: PortRef, amount: Option<f32>) -> CableState {
 }
 
 fn port(id: u64, p: &str) -> PortRef {
-    PortRef::Module {
-        id,
-        port: p.into(),
-    }
+    PortRef::Module { id, port: p.into() }
 }
 
 /// The probe with route `ROUTE` at `base`; the macro and its depth route are added by callers.

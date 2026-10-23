@@ -157,7 +157,8 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         let n = t.len() as f32;
         let tile = if spread { TILE_MIN } else { TILE_W };
         (
-            n * tile + (n - 1.0) * st.sp(1) + st.sp(3) * 2.0,
+            // Five or more macros share one row: the tiles narrow before the row wraps.
+            (n * tile + (n - 1.0) * st.sp(1) + st.sp(3) * 2.0).min(avail),
             if spread { n } else { 0.0 },
         )
     }));

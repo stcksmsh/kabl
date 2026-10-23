@@ -516,6 +516,10 @@ fn render_digest() {
             out += &format!("{dir} unloadable\n");
             continue;
         };
+        if kabl_engine::compile::compile(log.state(), 48000.0, 8).is_err() {
+            out += &format!("{dir} uncompilable\n");
+            continue;
+        }
         let (keys, _) = Meta::play_of(log.state());
         let (samples, _) = render_raw(log.state(), keys, 24, false);
         out += &format!("{dir} {:016x}\n", digest(&samples));

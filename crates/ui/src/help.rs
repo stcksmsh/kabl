@@ -295,7 +295,8 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
         ("gain", "gain_db") => "Level change in dB: 0 dB leaves it unchanged, −6 dB is about half.",
         ("macro", _) => {
             "A performance knob: it does nothing by itself. Each route from its output moves \
-             one destination by that route's depth and direction."
+             one destination by that route's depth and direction, or the depth of another \
+             route (open a route in the drawer and add a source to its depth)."
         }
         ("noise", "color") => "WHITE is bright hiss; PINK is softer, like wind or surf.",
         ("noise", "level_db") => "Output level of the noise.",
@@ -475,7 +476,8 @@ pub fn module_note(kind: &str) -> Option<&'static str> {
     Some(match kind {
         "macro" => {
             "A macro's own value is only a position, 0–1. What it changes is listed under its \
-             destinations: every route from its output, with its own depth and direction."
+             destinations: every route from its output, with its own depth and direction. \
+             Four is plenty; m5 to m8 are there for a sound that needs more."
         }
         "ringmod" => {
             "In several factory sounds a macro feeds one input and an LFO the other, so the \

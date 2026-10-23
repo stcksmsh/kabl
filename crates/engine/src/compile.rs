@@ -2057,7 +2057,13 @@ impl CompiledPatch {
                                 .buffers
                                 .get_disjoint_mut([a, b, c, d, e])
                                 .expect("disjoint");
-                            let mut outputs = [&mut x0[..], &mut x1[..], &mut x2[..], &mut x3[..], &mut x4[..]];
+                            let mut outputs = [
+                                &mut x0[..],
+                                &mut x1[..],
+                                &mut x2[..],
+                                &mut x3[..],
+                                &mut x4[..],
+                            ];
                             let mut io =
                                 ProcessIo::new(input_signals, &mut outputs, param_signals, BLOCK);
                             self.modules[*module_index].process(&mut io);
@@ -2067,7 +2073,14 @@ impl CompiledPatch {
                                 .buffers
                                 .get_disjoint_mut([a, b, c, d, e, f])
                                 .expect("disjoint");
-                            let mut outputs = [&mut x0[..], &mut x1[..], &mut x2[..], &mut x3[..], &mut x4[..], &mut x5[..]];
+                            let mut outputs = [
+                                &mut x0[..],
+                                &mut x1[..],
+                                &mut x2[..],
+                                &mut x3[..],
+                                &mut x4[..],
+                                &mut x5[..],
+                            ];
                             let mut io =
                                 ProcessIo::new(input_signals, &mut outputs, param_signals, BLOCK);
                             self.modules[*module_index].process(&mut io);
@@ -2077,7 +2090,15 @@ impl CompiledPatch {
                                 .buffers
                                 .get_disjoint_mut([a, b, c, d, e, f, g])
                                 .expect("disjoint");
-                            let mut outputs = [&mut x0[..], &mut x1[..], &mut x2[..], &mut x3[..], &mut x4[..], &mut x5[..], &mut x6[..]];
+                            let mut outputs = [
+                                &mut x0[..],
+                                &mut x1[..],
+                                &mut x2[..],
+                                &mut x3[..],
+                                &mut x4[..],
+                                &mut x5[..],
+                                &mut x6[..],
+                            ];
                             let mut io =
                                 ProcessIo::new(input_signals, &mut outputs, param_signals, BLOCK);
                             self.modules[*module_index].process(&mut io);
@@ -2087,7 +2108,16 @@ impl CompiledPatch {
                                 .buffers
                                 .get_disjoint_mut([a, b, c, d, e, f, g, h])
                                 .expect("disjoint");
-                            let mut outputs = [&mut x0[..], &mut x1[..], &mut x2[..], &mut x3[..], &mut x4[..], &mut x5[..], &mut x6[..], &mut x7[..]];
+                            let mut outputs = [
+                                &mut x0[..],
+                                &mut x1[..],
+                                &mut x2[..],
+                                &mut x3[..],
+                                &mut x4[..],
+                                &mut x5[..],
+                                &mut x6[..],
+                                &mut x7[..],
+                            ];
                             let mut io =
                                 ProcessIo::new(input_signals, &mut outputs, param_signals, BLOCK);
                             self.modules[*module_index].process(&mut io);

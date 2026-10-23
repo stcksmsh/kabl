@@ -29,10 +29,7 @@ fn outputs_start_at_the_knob_and_glide_to_changes() {
         },
     );
     let o = block(&mut m, [0.25, 0.5, 0.75, 1.0, 0.1, 0.2, 0.3, 0.4]);
-    assert_eq!(
-        o.map(|b| b[0]),
-        [0.25, 0.5, 0.75, 1.0, 0.1, 0.2, 0.3, 0.4]
-    );
+    assert_eq!(o.map(|b| b[0]), [0.25, 0.5, 0.75, 1.0, 0.1, 0.2, 0.3, 0.4]);
     // A jump to 1.0 on m1: no step, ~63 % after 20 ms, settled after 400 ms.
     let mut last = 0.25;
     let mut at_20ms = 0.0;
