@@ -85,6 +85,8 @@ pub struct PatchEngine {
     face_report: Option<FaceReport>,
     /// Samples rendered since this engine started (reports carry it as their time).
     rendered: u64,
+    /// The outside audio for the next block (`set_audio_in`); silence until a host sets it.
+    audio_in: [[f32; BLOCK]; 2],
     /// `rendered` when the keyboards last matched the graph (`sync_once`).
     synced: Option<u64>,
     /// The last finished window, until the callback takes it.
@@ -251,6 +253,7 @@ impl PatchEngine {
             faces: None,
             face_report: None,
             rendered: 0,
+            audio_in: [[0.0; BLOCK]; 2],
             synced: None,
             report: None,
             newest_rev: 0,
@@ -285,6 +288,7 @@ impl PatchEngine {
             faces: None,
             face_report: None,
             rendered: 0,
+            audio_in: [[0.0; BLOCK]; 2],
             synced: None,
             report: None,
             newest_rev: 0,
@@ -894,6 +898,21 @@ impl PatchEngine {
     /// swap is in flight — the incoming graph too, blending with an equal-power curve. Stereo,
     /// unlike `swap::Engine::process_block` (S1's graph was mono).
     #[inline]
+    /// Some playing graph has an `audio.in` module: the host's input is consumed by the patch.
+    pub fn uses_audio_in(&self) -> bool {
+        self.active.has_audio_in()
+            || self
+                .incoming
+                .as_ref()
+                .is_some_and(|(g, _)| g.has_audio_in())
+    }
+
+    /// The host's audio input for the next `process_block`, read by `audio.in` modules. Stays
+    /// until replaced: a host with no input calls it with zeros, or not at all (silence).
+    pub fn set_audio_in(&mut self, left: &[f32; BLOCK], right: &[f32; BLOCK]) {
+        self.audio_in = [*left, *right];
+    }
+
     pub fn process_block(&mut self, out_left: &mut [f32; BLOCK], out_right: &mut [f32; BLOCK]) {
         // Settings changed by a runtime value (mode, channel) apply before this block, not
         // only at the next key.
@@ -909,6 +928,11 @@ impl PatchEngine {
         for l in self.launches.iter().flatten() {
             self.packed[n] = *l;
             n += 1;
+        }
+        let [in_l, in_r] = &self.audio_in;
+        self.active.feed_audio(in_l, in_r);
+        if let Some((g, _)) = self.incoming.as_mut() {
+            g.feed_audio(in_l, in_r);
         }
         let launches = &self.packed[..n];
         // A fresh incoming document owns its launches. The outgoing graph can share ids,

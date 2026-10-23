@@ -124,7 +124,7 @@ pub fn smoothed_by_module(kind: &str, name: &str) -> bool {
         "gain" | "macro" | "drive" | "filter.ladder" => true,
         // Every continuous param of the 1.0 effects and filters is followed by the module itself.
         "phaser" | "flanger" | "compressor" | "eq" | "limiter" | "bitcrusher" | "filter.comb"
-        | "filter.formant" => true,
+        | "filter.formant" | "vocoder" | "audio.in" => true,
         "chorus" => matches!(name, "depth" | "mix" | "width"),
         "delay" => matches!(name, "time_ms" | "feedback" | "mix"),
         "reverb" => true,

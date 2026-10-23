@@ -197,10 +197,12 @@ impl Module for FilterFormant {
         let k = coef(GLIDE_TAU_S, sr);
         let c = &mut self.c;
         for i in 0..n {
+            // Glide even a cable-driven control (`held` true): a stepping source such as a random
+            // loop would otherwise jump the resonators and click.
             let key = [
-                c.vowel.next(vowel, i, k),
-                c.shift.next(shift, i, k).clamp(-12.0, 12.0),
-                c.q.next(qp, i, k).clamp(0.5, 4.0),
+                c.vowel.to(vowel.at(i), true, k),
+                c.shift.to(shift.at(i), true, k).clamp(-12.0, 12.0),
+                c.q.to(qp.at(i), true, k).clamp(0.5, 4.0),
             ];
             if c.key != key {
                 c.key = key;

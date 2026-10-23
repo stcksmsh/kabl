@@ -12,6 +12,9 @@
 //! is applied at the start of the next callback after it arrives (0–5.3 ms late at 48 kHz,
 //! varying with arrival phase), for listening comparisons only.
 //!
+//! `--audio-in FILE.wav` plays a 16-bit or float WAV (first two channels, at the render rate)
+//! into the patch's `audio.in` modules, from time 0.
+//!
 //! Active duration: 50 ms windows whose RMS (both channels) is above -50 dBFS.
 
 use basedrop::Collector;
@@ -51,6 +54,24 @@ fn main() {
     script.sort_by_key(|e| e.0);
     let end = script.last().map_or(0, |e| e.0) + (tail * rate) as u64 + LATENCY as u64;
 
+    // The outside audio: (left, right) frames, read from the WAV by the engine's block start.
+    let input: Option<(Vec<f32>, Vec<f32>)> = opt("--audio-in").map(|path| {
+        let mut r = hound::WavReader::open(path).expect("audio-in wav");
+        let spec = r.spec();
+        let all: Vec<f32> = match spec.sample_format {
+            hound::SampleFormat::Float => r.samples::<f32>().map(|s| s.unwrap()).collect(),
+            hound::SampleFormat::Int => {
+                let scale = 1.0 / (1u64 << (spec.bits_per_sample - 1)) as f32;
+                r.samples::<i32>()
+                    .map(|s| s.unwrap() as f32 * scale)
+                    .collect()
+            }
+        };
+        let ch = spec.channels as usize;
+        let side = |k: usize| all.chunks(ch).map(|f| f[k.min(ch - 1)]).collect();
+        (side(0), side(1))
+    });
+
     let log = kabl_core::load(std::path::Path::new(patch)).expect("patch");
     let collector = Collector::new();
     let mut engine = PatchEngine::new(&collector.handle(), log.state(), rate, 8).expect("compiles");
@@ -80,7 +101,18 @@ fn main() {
             &mut left[..n],
             &mut right[..n],
             &batch,
-            |_, _| {},
+            |engine, start| {
+                if let Some((l, r)) = &input {
+                    let block = |v: &Vec<f32>| {
+                        let mut b = [0f32; kabl_engine::graph::BLOCK];
+                        let from = (start as usize).min(v.len());
+                        let to = (from + b.len()).min(v.len());
+                        b[..to - from].copy_from_slice(&v[from..to]);
+                        b
+                    };
+                    engine.set_audio_in(&block(l), &block(r));
+                }
+            },
         );
         for i in 0..n {
             samples.push(left[i]);

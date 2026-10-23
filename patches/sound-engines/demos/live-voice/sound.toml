@@ -1,0 +1,13 @@
+name = "Live Voice"
+category = "Lead"
+tags = [
+    "vocoder",
+    "robot",
+    "poly",
+    "keyboard",
+    "vocal",
+    "audio input",
+]
+description = "Your voice, sung through a supersaw chord. Sound comes in on Audio in: start the standalone with --input, or route a track into the plugin's second input. Hold chords while you speak. Silent until something arrives on the input."
+keys = true
+sequence = false

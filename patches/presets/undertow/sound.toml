@@ -1,0 +1,13 @@
+name = "Undertow"
+category = "Bass"
+tags = [
+    "mono",
+    "reese",
+    "sub",
+    "glide",
+    "drum and bass",
+    "hip-hop",
+]
+description = "A reese sub bass: two saws a few cents apart beating slowly against each other over a sine an octave down, through a gentle drive and a low-pass filter, with a short glide between overlapped notes. Play long low notes. Cutoff opens the tone, Weight thickens it with drive, Room adds a short room, Beating widens the beating and sweeps the filter."
+keys = true
+sequence = false
