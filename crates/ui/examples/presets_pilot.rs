@@ -1309,7 +1309,7 @@ fn render(
     let mut state = state.clone();
     for item in std::env::var("PP_SET").unwrap_or_default().split(',') {
         if let Some((target, v)) = item.split_once('=') {
-            let (kind, param) = target.split_once('.').expect("kind.param");
+            let (kind, param) = target.rsplit_once('.').expect("kind.param");
             for m in state.modules.values_mut().filter(|m| m.kind == kind) {
                 m.params.insert(param.into(), v.parse().expect("number"));
             }
