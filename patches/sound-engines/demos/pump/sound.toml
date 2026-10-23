@@ -1,0 +1,12 @@
+name = "Kick Pump"
+category = "Sequence"
+tags = [
+    "drums",
+    "sidechain",
+    "compressor",
+    "pad",
+    "self-playing",
+]
+description = "A saw pad ducked by the kick: the kick's output goes to the compressor's sidechain input, so the pad breathes in time with every beat. Lower the threshold or raise the ratio for harder pumping."
+keys = false
+sequence = true

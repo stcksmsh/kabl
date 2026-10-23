@@ -398,6 +398,44 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
         ("vocoder", "drive_db") => "Gain of the voice into the bands. A quiet voice needs more; too much makes the result loud.",
         ("vocoder", "mix") => "The synth alone (0) to the vocoded sound alone (1).",
         ("audio.in", "gain_db") => "Gain of the incoming sound.",
+        ("drum.kick" | "drum.tom", "tune_hz") => {
+            "The pitch the drum settles on, in Hz. Lower is deeper and longer to hear."
+        }
+        ("drum.kick" | "drum.tom", "sweep_st") => {
+            "How far above Tune the pitch starts, in semitones. More sweep is a harder, clickier punch."
+        }
+        ("drum.kick" | "drum.tom", "sweep_ms") => "Fall: how fast the pitch drops from the start to Tune.",
+        ("drum.kick" | "drum.tom", "decay_ms") => "How long the body rings out (time to fall 60 dB).",
+        ("drum.kick" | "drum.tom", "click") => "A short burst of noise at the start, like a beater.",
+        ("drum.kick" | "drum.tom", "tone") => "Closes or opens the top: low is round and dull, high is bright.",
+        ("drum.kick" | "drum.tom" | "drum.snare", "drive_db") => {
+            "Pushes the drum into soft clipping: more weight and harmonics, same peak level."
+        }
+        ("drum.kick" | "drum.tom" | "drum.snare" | "drum.clap" | "drum.hat", "level_db") => {
+            "Output level of the drum."
+        }
+        ("drum.kick" | "drum.tom" | "drum.snare" | "drum.clap" | "drum.hat", "vel_sens") => {
+            "How much the velocity input changes the hit: 0 ignores it, 1 follows it fully."
+        }
+        ("drum.kick" | "drum.tom" | "drum.snare" | "drum.clap" | "drum.hat", "accent_db") => {
+            "How many dB louder a full accent makes the hit."
+        }
+        ("drum.snare", "tune_hz") => "The pitch of the drum shell under the rattle.",
+        ("drum.snare", "tone") => "Brightness of the noise: low is a fat snare, high a crisp one.",
+        ("drum.snare", "snappy") => "Balance between the drum tone (0) and the noise rattle (1).",
+        ("drum.snare", "decay_ms") => "How long the rattle rings; the drum tone is shorter.",
+        ("drum.clap", "bursts") => "How many hands: the quick noise bursts before the tail.",
+        ("drum.clap", "spread_ms") => "The gap between bursts: tight is one clap, wide is a crowd.",
+        ("drum.clap", "decay_ms") => "How long the tail after the last burst rings.",
+        ("drum.clap", "tone") => "The colour of the noise: low is thick, high is thin and sharp.",
+        ("drum.hat", "tune_st") => "Shifts the metallic ring up or down in semitones.",
+        ("drum.hat", "tone") => "Low cut of the metal: higher is thinner and sizzlier.",
+        ("drum.hat", "closed_ms") => "Tick: how long a closed hit rings.",
+        ("drum.hat", "open_ms") => "Ring: how long an open hit rings.",
+        ("midi.note", "note") => {
+            "The MIDI note number that fires this gate: 36 kick, 38 snare, 39 clap, 42 closed hat, 46 open hat, 45 tom."
+        }
+        ("midi.note", "channel") => "Which MIDI channel it listens to: ALL, or 1 to 16 (drums are 10).",
         _ => return None,
     })
 }
@@ -436,6 +474,23 @@ pub fn port_help(kind: &str, port: &str) -> Option<&'static str> {
             "Sidechain: when patched, this sound (not the input) decides how much to turn down."
         }
         ("compressor", "gr") => "How many dB it is turning down right now (0 = none).",
+        ("drum.kick" | "drum.tom" | "drum.snare" | "drum.clap", "gate") => {
+            "A rising edge fires the drum. Patch a sequencer, clock or MIDI Note gate here."
+        }
+        ("drum.hat", "closed") => {
+            "A rising edge plays a short closed hit, and cuts off an open one."
+        }
+        ("drum.hat", "open") => "A rising edge plays a long open hit.",
+        ("drum.kick" | "drum.tom" | "drum.snare" | "drum.clap" | "drum.hat", "accent") => {
+            "High on a hit makes it louder by Accent dB. Read when the drum fires."
+        }
+        ("drum.kick" | "drum.tom" | "drum.snare" | "drum.clap" | "drum.hat", "velocity") => {
+            "How hard the hit is, 0 to 1. Unpatched means full. Read when the drum fires."
+        }
+        ("midi.note", "gate") => "A short pulse on each press of the chosen note.",
+        ("midi.note", "velocity") => {
+            "How hard that note was pressed, 0 to 1, held until the next one."
+        }
         ("filter.comb", "in") => "The sound to ring: a click, a noise burst or a held tone.",
         ("filter.comb", "pitch") => "Pitch in semitones from the Frequency setting.",
         ("filter.formant", "in") => "A buzzy or noisy sound to give a vowel to.",

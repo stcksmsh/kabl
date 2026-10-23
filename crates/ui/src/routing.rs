@@ -194,6 +194,7 @@ pub fn step_labels(kind: &str, param: &str) -> Option<&'static [&'static str]> {
         ("vca", "exponential") => &["LIN", "EXP"],
         ("seq", g) if g.starts_with('g') && g.len() == 2 => &["OFF", "ON"],
         ("seq", k) if k.starts_with('k') && k.len() == 2 => &["1X", "2X", "3X", "4X"],
+        ("drum.clap", "bursts") => &["2", "3", "4", "5", "6"],
         ("arp", "mode") => &["UP", "DOWN", "UP-DN", "PLAYED", "RANDOM"],
         ("arp", "octaves") => &["1", "2", "3", "4"],
         ("arp", "latch") => &["OFF", "ON"],
@@ -252,6 +253,10 @@ pub fn param_label(p: &ParamInfo) -> String {
         "octaves" => return "Octaves".into(),
         "gate_mode" => return "Gate".into(),
         "damp_hz" => return "Damping".into(),
+        // The drums: the kick's two sweep knobs and the hat's two decays against its gate jacks.
+        "sweep_ms" => return "Fall".into(),
+        "closed_ms" => return "Tick".into(),
+        "open_ms" => return "Ring".into(),
         "pw" => return "Pulse width".into(),
         "predelay_ms" => return "Pre-delay".into(),
         "glide_ms" => return "Glide time".into(),
@@ -316,6 +321,13 @@ pub fn fmt_value(p: &ParamInfo, v: f32) -> String {
         "ct" => format!("{:+.0} ct", v.round() + 0.0),
         "x" => format!("{}X", v.round()),
         "bands" => format!("{}", v.round()),
+        "note" => {
+            const NAMES: [&str; 12] = [
+                "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+            ];
+            let n = v.round().clamp(0.0, 127.0) as usize;
+            format!("{n} {}{}", NAMES[n % 12], n as i32 / 12 - 1)
+        }
         _ => format!("{v:.2}"),
     }
 }
@@ -494,6 +506,12 @@ pub fn short_name(kind: &str) -> &'static str {
         "filter.formant" => "Formant",
         "vocoder" => "Vocoder",
         "audio.in" => "Audio in",
+        "drum.kick" => "Kick",
+        "drum.snare" => "Snare",
+        "drum.clap" => "Clap",
+        "drum.hat" => "Hat",
+        "drum.tom" => "Tom",
+        "midi.note" => "Note",
         _ => "?",
     }
 }
