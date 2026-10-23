@@ -14,7 +14,7 @@
         "m1": 0.5,
         "m2": 0.2,
         "m3": 0.65,
-        "m4": 0.5,
+        "m4": 0.0,
         "pin.m1": 0.0,
         "pin.m2": 1.0,
         "pin.m3": 2.0,
@@ -38,7 +38,7 @@
         "y": 20.0
       },
       "params": {
-        "detune": 12.0,
+        "detune": 4.0,
         "unison": 4.0,
         "waveform": 1.0
       }
@@ -63,7 +63,7 @@
       },
       "params": {
         "level1": 0.45,
-        "level2": 0.2
+        "level2": 0.0
       }
     },
     "6": {
@@ -142,7 +142,7 @@
       },
       "params": {
         "depth": 55.0,
-        "mix": 45.0,
+        "mix": 18.0,
         "rate_hz": 0.15
       }
     },
@@ -183,19 +183,9 @@
       }
     },
     "16": {
-      "kind": "vca",
-      "pos": {
-        "x": 974.0,
-        "y": 620.0
-      },
-      "params": {
-        "gain": 0.0
-      }
-    },
-    "17": {
       "kind": "limiter",
       "pos": {
-        "x": 1164.0,
+        "x": 974.0,
         "y": 620.0
       },
       "params": {
@@ -203,10 +193,10 @@
         "release_ms": 150.0
       }
     },
-    "18": {
+    "17": {
       "kind": "out",
       "pos": {
-        "x": 1354.0,
+        "x": 1164.0,
         "y": 620.0
       },
       "params": {}
@@ -214,40 +204,6 @@
   },
   "cables": {
     "1": {
-      "from": {
-        "Module": {
-          "id": 15,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 16,
-          "port": "in"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "2": {
-      "from": {
-        "Module": {
-          "id": 1,
-          "port": "m4"
-        }
-      },
-      "to": {
-        "Param": {
-          "id": 16,
-          "param": "gain"
-        }
-      },
-      "params": {
-        "amount": 1.0
-      },
-      "steps": []
-    },
-    "3": {
       "from": {
         "Module": {
           "id": 2,
@@ -263,7 +219,7 @@
       "params": {},
       "steps": []
     },
-    "4": {
+    "2": {
       "from": {
         "Module": {
           "id": 2,
@@ -279,7 +235,7 @@
       "params": {},
       "steps": []
     },
-    "5": {
+    "3": {
       "from": {
         "Module": {
           "id": 3,
@@ -295,7 +251,7 @@
       "params": {},
       "steps": []
     },
-    "6": {
+    "4": {
       "from": {
         "Module": {
           "id": 4,
@@ -311,7 +267,7 @@
       "params": {},
       "steps": []
     },
-    "7": {
+    "5": {
       "from": {
         "Module": {
           "id": 5,
@@ -327,7 +283,7 @@
       "params": {},
       "steps": []
     },
-    "8": {
+    "6": {
       "from": {
         "Module": {
           "id": 6,
@@ -343,7 +299,7 @@
       "params": {},
       "steps": []
     },
-    "9": {
+    "7": {
       "from": {
         "Module": {
           "id": 2,
@@ -359,7 +315,7 @@
       "params": {},
       "steps": []
     },
-    "10": {
+    "8": {
       "from": {
         "Module": {
           "id": 2,
@@ -375,7 +331,7 @@
       "params": {},
       "steps": []
     },
-    "11": {
+    "9": {
       "from": {
         "Module": {
           "id": 7,
@@ -391,7 +347,7 @@
       "params": {},
       "steps": []
     },
-    "12": {
+    "10": {
       "from": {
         "Module": {
           "id": 9,
@@ -407,7 +363,7 @@
       "params": {},
       "steps": []
     },
-    "13": {
+    "11": {
       "from": {
         "Module": {
           "id": 10,
@@ -423,7 +379,7 @@
       "params": {},
       "steps": []
     },
-    "14": {
+    "12": {
       "from": {
         "Module": {
           "id": 11,
@@ -439,7 +395,7 @@
       "params": {},
       "steps": []
     },
-    "15": {
+    "13": {
       "from": {
         "Module": {
           "id": 11,
@@ -455,7 +411,7 @@
       "params": {},
       "steps": []
     },
-    "16": {
+    "14": {
       "from": {
         "Module": {
           "id": 12,
@@ -471,7 +427,7 @@
       "params": {},
       "steps": []
     },
-    "19": {
+    "17": {
       "from": {
         "Module": {
           "id": 13,
@@ -481,6 +437,38 @@
       "to": {
         "Module": {
           "id": 14,
+          "port": "in_l"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "18": {
+      "from": {
+        "Module": {
+          "id": 13,
+          "port": "right"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 14,
+          "port": "in_r"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "19": {
+      "from": {
+        "Module": {
+          "id": 14,
+          "port": "left"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 16,
           "port": "in_l"
         }
       },
@@ -490,13 +478,13 @@
     "20": {
       "from": {
         "Module": {
-          "id": 13,
+          "id": 14,
           "port": "right"
         }
       },
       "to": {
         "Module": {
-          "id": 14,
+          "id": 16,
           "port": "in_r"
         }
       },
@@ -506,14 +494,14 @@
     "21": {
       "from": {
         "Module": {
-          "id": 14,
+          "id": 16,
           "port": "left"
         }
       },
       "to": {
         "Module": {
           "id": 17,
-          "port": "in_l"
+          "port": "left"
         }
       },
       "params": {},
@@ -522,52 +510,20 @@
     "22": {
       "from": {
         "Module": {
-          "id": 14,
+          "id": 16,
           "port": "right"
         }
       },
       "to": {
         "Module": {
           "id": 17,
-          "port": "in_r"
+          "port": "right"
         }
       },
       "params": {},
       "steps": []
     },
     "23": {
-      "from": {
-        "Module": {
-          "id": 17,
-          "port": "left"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 18,
-          "port": "left"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "24": {
-      "from": {
-        "Module": {
-          "id": 17,
-          "port": "right"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 18,
-          "port": "right"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "25": {
       "from": {
         "Module": {
           "id": 8,
@@ -585,7 +541,7 @@
       },
       "steps": []
     },
-    "26": {
+    "24": {
       "from": {
         "Module": {
           "id": 1,
@@ -603,7 +559,7 @@
       },
       "steps": []
     },
-    "27": {
+    "25": {
       "from": {
         "Module": {
           "id": 1,
@@ -621,7 +577,7 @@
       },
       "steps": []
     },
-    "28": {
+    "26": {
       "from": {
         "Module": {
           "id": 1,
@@ -639,7 +595,7 @@
       },
       "steps": []
     },
-    "29": {
+    "27": {
       "from": {
         "Module": {
           "id": 1,
@@ -657,10 +613,10 @@
       },
       "steps": []
     },
-    "30": {
+    "28": {
       "from": {
         "Module": {
-          "id": 16,
+          "id": 15,
           "port": "out"
         }
       },
@@ -668,6 +624,42 @@
         "Param": {
           "id": 7,
           "param": "cutoff_hz"
+        }
+      },
+      "params": {
+        "amount": 0.15
+      },
+      "steps": []
+    },
+    "29": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m4"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 5,
+          "param": "level2"
+        }
+      },
+      "params": {
+        "amount": 0.3
+      },
+      "steps": []
+    },
+    "30": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m4"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 12,
+          "param": "mix"
         }
       },
       "params": {
@@ -684,8 +676,8 @@
       },
       "to": {
         "Param": {
-          "id": 12,
-          "param": "rate_hz"
+          "id": 3,
+          "param": "detune"
         }
       },
       "params": {
@@ -696,10 +688,10 @@
   },
   "labels": {
     "1": {
-      "name.m1": "Filter",
-      "name.m2": "Drive",
+      "name.m1": "Bloom",
+      "name.m2": "Saturation",
       "name.m3": "Space",
-      "name.m4": "Motion"
+      "name.m4": "Texture"
     }
   }
 }

@@ -1,6 +1,6 @@
 //! The factory presets under `patches/presets/` keep to docs/presets/BRIEF.md: one macro
-//! module with the bank's four macros (Filter, Drive, Space, Motion) on CC 20-23, pinned in that
-//! order, a keyboard input, a category from the library vocabulary and a description. The level
+//! module whose macros are named for what they do (on CC 20 and up, pinned in order), a
+//! keyboard input, a category from the library vocabulary and a description. The level
 //! rule is `factory_levels_hold_the_target` in `factory_bank.rs`, which renders every patch.
 
 use std::path::Path;
@@ -28,15 +28,15 @@ fn every_preset_keeps_to_the_brief() {
             .collect();
         assert_eq!(macros.len(), 1, "{name}: exactly one macro module");
         let (&id, module) = macros[0];
-        for (k, label) in ["Filter", "Drive", "Space", "Motion"].iter().enumerate() {
+        // Each preset names its own macros after what they do: four is typical, more is
+        // discouraged, and the module holds four. Named ones come first, on CC 20 and up.
+        let named: Vec<String> = (1..=4)
+            .map_while(|k| state.labels[&id].get(&format!("name.m{k}")).cloned())
+            .collect();
+        assert!(!named.is_empty(), "{name}: has named macros");
+        for (k, label) in named.iter().enumerate() {
             let key = format!("m{}", k + 1);
-            assert_eq!(
-                state.labels[&id]
-                    .get(&format!("name.{key}"))
-                    .map(String::as_str),
-                Some(*label),
-                "{name}: macro {key} is {label}"
-            );
+            assert!(!label.trim().is_empty(), "{name}: macro {key} has a name");
             assert_eq!(
                 module.params.get(&format!("cc.{key}")),
                 Some(&(20.0 + k as f32)),
@@ -46,6 +46,10 @@ fn every_preset_keeps_to_the_brief() {
             assert!(
                 module.params.contains_key(&format!("pin.{key}")),
                 "{name}: {label} is pinned"
+            );
+            assert!(
+                meta.description.contains(label.as_str()),
+                "{name}: the description says what {label} does"
             );
         }
         assert!(meta.keys, "{name}: plays from MIDI");
@@ -61,12 +65,6 @@ fn every_preset_keeps_to_the_brief() {
         );
         assert!(!meta.tags.is_empty(), "{name}: has tags");
         assert!(meta.description.len() > 60, "{name}: has a description");
-        for label in ["Filter", "Drive", "Space", "Motion"] {
-            assert!(
-                meta.description.contains(label),
-                "{name}: the description says what {label} does"
-            );
-        }
         seen += 1;
     }
     assert!(seen >= 8, "the pilot presets are there");

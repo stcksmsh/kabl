@@ -7,7 +7,7 @@
 
 Same method as docs/cue-macros/scripts/host.py: a private Xvfb display and REAPER profile, one
 project per preset whose <STATE> chunk is written from patches/presets/<slug>, a MIDI item that
-plays the preset's clip phrase (and, for the piece, its cue buttons on CC 40-43), and
+plays the preset's clip phrase (and, for the piece, its cue buttons on CC 40-44), and
 docs/functional-cables/scripts/host.lua, which saves the project and renders the master mix
 with the host's own renderer. REAPER is quit completely and started again on the project it
 saved.
@@ -146,7 +146,7 @@ try:
         diff = float(np.sqrt(((a['_m'][:n] - b['_m'][:n]) ** 2).mean()) / a['rms'])
         r.update(peak=round(a['peak'], 4), rms=round(a['rms'], 4), restart_relative_difference=round(diff, 5))
         assert diff < 1e-3, f'{slug}: render changed after reopen ({diff})'
-        if slug != 'basement-drop':
+        if slug != 'loading-dock':
             (S / f'{slug}-nomidi.rpp').write_text(project(slug, False))
             run(f'{slug}-nomidi', S / f'{slug}-nomidi.rpp', secs)
             q = feats(S / f'render-{slug}-nomidi.wav')

@@ -549,10 +549,10 @@
   },
   "labels": {
     "1": {
-      "name.m1": "Filter",
-      "name.m2": "Drive",
+      "name.m1": "Brightness",
+      "name.m2": "Warmth",
       "name.m3": "Space",
-      "name.m4": "Motion"
+      "name.m4": "Chorus"
     }
   }
 }

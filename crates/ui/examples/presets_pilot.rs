@@ -7,9 +7,9 @@
 //! cargo run --release -p kabl-ui --example presets_pilot -- clips patches docs/presets/clips
 //! ```
 //!
-//! Every preset has the same four macros, in this order: Filter, Drive, Space, Motion
-//! (CC 20-23). Effect mixes are 0 on the module and driven by the Space macro, so a macro at 0
-//! is dry and the stored macro value is the baked-in wet amount.
+//! Every preset names its own macros after what they do for that sound (four in the pilot, on
+//! CC 20-23). Effect mixes are 0 on the module and driven by the space macro (m3), so that
+//! macro at 0 is dry and the stored macro value is the baked-in wet amount.
 
 use std::path::Path;
 
@@ -83,7 +83,7 @@ impl Rack {
         let cable = self.e.connect_route(jack(a, ap), b, param);
         self.e.set_route_amount(cable, amount, true);
     }
-    /// An LFO whose depth is the Motion macro: the LFO runs through a VCA the macro opens.
+    /// An LFO whose depth is macro 4: the LFO runs through a VCA the macro opens.
     fn motion(&mut self, knob: ModuleId, rate_hz: f32) -> ModuleId {
         let lfo = self.add("lfo", &[("rate_hz", rate_hz)]);
         let depth = self.add("vca", &[("gain", 0.0)]);
@@ -111,10 +111,10 @@ fn adsr(a: f32, d: f32, s: f32, r: f32) -> [(&'static str, f32); 4] {
     ]
 }
 
-/// The bank's four macros: Filter, Drive, Space, Motion, with their stored values and CC 20-23.
-fn macros(r: &mut Rack, values: [f32; 4]) -> ModuleId {
+/// A preset's four macros: the names it gives them and their stored values, on CC 20-23.
+fn macros(r: &mut Rack, names: [&str; 4], values: [f32; 4]) -> ModuleId {
     let knob = r.add("macro", &[]);
-    for (i, name) in ["Filter", "Drive", "Space", "Motion"].iter().enumerate() {
+    for (i, name) in names.iter().enumerate() {
         let key = format!("m{}", i + 1);
         r.e.set_label(knob, &format!("name.{key}"), Some((*name).into()));
         r.e.set_param(knob, &key, values[i]);
@@ -192,10 +192,10 @@ fn space_tail(
 }
 
 /// The pump: every beat an envelope ducks whatever the returned attenuverter feeds (its `out`
-/// is the control for a VCA). Depth is the Motion macro when `knob` is given, else fixed.
+/// is the control for a VCA). Depth is macro 4 when `knob` is given, else fixed.
 fn pump(r: &mut Rack, clock: ModuleId, knob: Option<ModuleId>, fixed: f32) -> ModuleId {
     let div = r.add("clock.div", &[("div", 4.0)]);
-    let env = r.add("env.adsr", &adsr(1.0, 170.0, 0.0, 30.0));
+    let env = r.add("env.adsr", &adsr(1.0, 220.0, 0.0, 30.0));
     let depth = r.add("vca", &[("gain", fixed)]);
     let cv = r.add("attenuverter", &[("amount", -1.0), ("offset", 1.0)]);
     r.wire(clock, "gate", div, "clock");
@@ -209,11 +209,11 @@ fn pump(r: &mut Rack, clock: ModuleId, knob: Option<ModuleId>, fixed: f32) -> Mo
     cv
 }
 
-// ---- 1. Gravel Pit: blunt, compressed mono bass ---------------------------------------------
+// ---- 1. Cinder Block: blunt, compressed mono bass --------------------------------------------
 
-fn gravel_pit() -> Rack {
+fn cinder_block() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, [0.40, 0.60, 0.25, 0.30]);
+    let knob = macros(&mut r, ["Bite", "Grit", "Room", "Crush"], [0.40, 0.60, 0.25, 0.30]);
     let m = r.add("midi.in", &[("mode", 1.0), ("bend", 2.0)]);
     let saw = r.add(
         "osc.va",
@@ -225,7 +225,7 @@ fn gravel_pit() -> Rack {
     let drive = r.add("drive", &[("drive_db", 18.0), ("trim_db", -9.0)]);
     let lad = r.add(
         "filter.ladder",
-        &[("cutoff_hz", 260.0), ("resonance", 0.5), ("drive_db", 8.0)],
+        &[("cutoff_hz", 260.0), ("resonance", 0.3), ("drive_db", 8.0)],
     );
     let fenv = r.add("env.adsr", &adsr(1.0, 150.0, 0.1, 80.0));
     let aenv = r.add("env.adsr", &adsr(1.0, 200.0, 0.75, 50.0));
@@ -247,7 +247,6 @@ fn gravel_pit() -> Rack {
             ("makeup_db", 9.0),
         ],
     );
-    let wobble = r.motion(knob, 6.5);
 
     r.wire(m, "pitch", saw, "pitch");
     r.wire(m, "pitch", sub, "pitch");
@@ -279,12 +278,11 @@ fn gravel_pit() -> Rack {
     );
     r.out_stereo(tail);
 
-    r.route(fenv, "out", lad, "cutoff_hz", 0.3);
+    r.route(fenv, "out", lad, "cutoff_hz", 0.2);
     r.route(m, "wheel", lad, "cutoff_hz", 0.25);
     r.route(knob, "m1", lad, "cutoff_hz", 0.5);
     r.route(knob, "m2", drive, "drive_db", 0.35);
-    r.route(knob, "m2", crush, "mix", 0.3);
-    r.route(wobble, "out", lad, "cutoff_hz", 0.25);
+    r.route(knob, "m4", crush, "mix", 0.6);
     perform(&mut r, knob, None, None);
     r
 }
@@ -293,9 +291,18 @@ fn gravel_pit() -> Rack {
 
 fn parquet_loop() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, [0.50, 0.45, 0.25, 0.55]);
+    let knob = macros(
+        &mut r,
+        ["Cutoff", "Crunch", "Space", "Glide"],
+        [0.50, 0.45, 0.25, 0.50],
+    );
     let clock = r.add("clock", &[("bpm", 122.0), ("swing", 25.0)]);
-    let m = r.add("midi.in", &[("bend", 2.0)]);
+    // Poly with glide on: each voice slides from the last pitch it played, so a chord change
+    // moves the chord tones into each other. The Glide macro sets the time; at 0 it is 5 ms.
+    let m = r.add(
+        "midi.in",
+        &[("glide", 1.0), ("glide_ms", 5.0), ("bend", 2.0)],
+    );
     let a = r.add(
         "osc.va",
         &[("waveform", 2.0), ("unison", 2.0), ("detune", 8.0)],
@@ -322,7 +329,7 @@ fn parquet_loop() -> Rack {
             ("rate_hz", 0.5),
             ("depth", 85.0),
             ("feedback", 60.0),
-            ("mix", 0.0),
+            ("mix", 45.0),
         ],
     );
     let comp = r.add(
@@ -374,25 +381,30 @@ fn parquet_loop() -> Rack {
     r.route(m, "velocity", lad, "cutoff_hz", 0.15);
     r.route(knob, "m1", lad, "cutoff_hz", 0.5);
     r.route(knob, "m2", drive, "drive_db", 0.4);
-    r.route(knob, "m4", phaser, "mix", 0.8);
-    r.route(knob, "m4", phaser, "rate_hz", 0.2);
+    r.route(knob, "m4", m, "glide_ms", 0.8);
     perform(&mut r, knob, Some(clock), None);
     r
 }
 
-// ---- 7. Basement Drop: filter-house piece with cues -----------------------------------------
+// ---- 7. Loading Dock: filter-house piece with cues ------------------------------------------
 
-/// (name, [Filter, Drive, Space, Motion] targets, morph in beats, launch time in the clip, s)
-const DROP_CUES: [(&str, [f32; 4], f32, f32); 4] = [
-    ("Intro", [0.12, 0.25, 0.15, 0.20], 0.0, 0.0),
-    ("Build", [0.85, 0.60, 0.30, 0.80], 16.0, 4.0),
-    ("Drop", [0.70, 0.90, 0.15, 0.50], 0.0, 12.0),
-    ("Break", [0.20, 0.20, 0.50, 0.30], 4.0, 20.0),
+/// (name, [Sweep, Drive, Wash, Pump] targets, morph in beats, launch time in the clip, s)
+const DROP_CUES: [(&str, [f32; 4], f32, f32); 5] = [
+    ("Intro", [0.12, 0.30, 0.15, 0.50], 0.0, 0.0),
+    ("Build", [0.90, 0.75, 0.65, 0.80], 12.0, 4.0),
+    // The pre-drop suck: filter shut, the wash still ringing, the pump at full.
+    ("Gap", [0.08, 0.60, 0.85, 1.00], 0.0, 10.0),
+    ("Drop", [0.78, 1.00, 0.10, 1.00], 0.0, 12.0),
+    ("Break", [0.20, 0.25, 0.60, 0.30], 4.0, 20.0),
 ];
 
-fn basement_drop() -> Rack {
+fn loading_dock() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, DROP_CUES[0].1);
+    let knob = macros(
+        &mut r,
+        ["Sweep", "Drive", "Wash", "Pump"],
+        DROP_CUES[0].1,
+    );
     let cue = r.add("cues", &[]);
     let clock = r.add("clock", &[("bpm", 124.0), ("swing", 28.0)]);
     let bass_seq = r.add("seq", &[("length", 8.0), ("gate_len", 45.0)]);
@@ -449,17 +461,25 @@ fn basement_drop() -> Rack {
     let play_vca = r.add("vca", &[("gain", 0.0)]);
     let mix = r.add(
         "mixer",
-        &[("level1", 0.55), ("level2", 0.3), ("level3", 0.35)],
+        &[
+            ("level1", 0.55),
+            ("level2", 0.3),
+            ("level3", 0.35),
+            ("level4", 0.45),
+        ],
     );
-    let duck_cv = pump(&mut r, clock, None, 0.8);
+    // The riser: pink noise the Wash macro lets in; the Sweep macro opens the filter over it.
+    let noise = r.add("noise", &[("color", 1.0)]);
+    let riser = r.add("vca", &[("gain", 0.0)]);
+    let duck_cv = pump(&mut r, clock, Some(knob), 0.0);
     let duck = r.add("vca", &[("gain", 0.0)]);
     r.next_row();
-    let drive = r.add("drive", &[("drive_db", 14.0), ("trim_db", -6.0)]);
+    let drive = r.add("drive", &[("drive_db", 20.0), ("trim_db", -9.0)]);
     let lad = r.add(
         "filter.ladder",
         &[("cutoff_hz", 170.0), ("resonance", 0.6), ("drive_db", 5.0)],
     );
-    let trim = r.add("gain", &[("gain_db", 6.5)]);
+    let trim = r.add("gain", &[("gain_db", 9.0)]);
     let crush = r.add(
         "bitcrusher",
         &[("bits", 9.0), ("downsample", 2.0), ("mix", 0.0)],
@@ -467,14 +487,13 @@ fn basement_drop() -> Rack {
     let comp = r.add(
         "compressor",
         &[
-            ("threshold_db", -24.0),
-            ("ratio", 6.0),
+            ("threshold_db", -26.0),
+            ("ratio", 8.0),
             ("attack_ms", 3.0),
             ("release_ms", 100.0),
-            ("makeup_db", 5.0),
+            ("makeup_db", 8.0),
         ],
     );
-    let shake = r.motion(knob, 2.0);
 
     r.wire(clock, "gate", bass_seq, "clock");
     r.wire(clock, "reset", bass_seq, "reset");
@@ -510,21 +529,23 @@ fn basement_drop() -> Rack {
         &[
             ("sync", 3.0),
             ("time_ms", 360.0),
-            ("feedback", 32.0),
+            ("feedback", 40.0),
             ("mix", 0.0),
             ("tone_hz", 4000.0),
         ],
         Some(clock),
-        0.2,
-        0.5,
-        0.15,
+        0.3,
+        1.2,
+        0.3,
     );
     r.out_stereo(tail);
 
+    r.wire(noise, "out", riser, "in");
+    r.wire(riser, "out", mix, "in4");
+    r.route(knob, "m3", riser, "gain", 0.9);
     r.route(knob, "m1", lad, "cutoff_hz", 0.65);
-    r.route(knob, "m2", drive, "drive_db", 0.45);
-    r.route(knob, "m2", crush, "mix", 0.4);
-    r.route(shake, "out", lad, "cutoff_hz", 0.2);
+    r.route(knob, "m2", drive, "drive_db", 0.6);
+    r.route(knob, "m2", crush, "mix", 0.6);
 
     for (name, targets, beats, _) in DROP_CUES {
         let n = cues::add(&mut r.e, cue, &|_| 0).expect("cue");
@@ -545,7 +566,7 @@ fn basement_drop() -> Rack {
 
 fn neon_highway() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, [0.55, 0.40, 0.60, 0.35]);
+    let knob = macros(&mut r, ["Cutoff", "Bite", "Space", "Vibrato"], [0.55, 0.40, 0.60, 0.35]);
     let m = r.add(
         "midi.in",
         &[
@@ -620,7 +641,7 @@ fn neon_highway() -> Rack {
 
 fn glass_elevator() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, [0.60, 0.25, 0.60, 0.50]);
+    let knob = macros(&mut r, ["Tine", "Grit", "Space", "Chorus"], [0.60, 0.25, 0.60, 0.50]);
     let m = r.add("midi.in", &[("bend", 2.0)]);
     // Algorithm 1 (2 into 1, 4 into 3, 6 into 5): a mellow body pair, a bright tine pair that
     // is gone in a tenth of a second, and a soft detuned shimmer.
@@ -810,7 +831,7 @@ fn glass_phrase() -> Vec<Hit> {
 
 fn undertow() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, [0.45, 0.35, 0.30, 0.40]);
+    let knob = macros(&mut r, ["Cutoff", "Weight", "Room", "Beating"], [0.45, 0.35, 0.30, 0.40]);
     let m = r.add(
         "midi.in",
         &[
@@ -884,7 +905,7 @@ fn undertow() -> Rack {
     r.route(knob, "m2", drive, "drive_db", 0.4);
     r.route(knob, "m3", verb, "mix", 0.25);
     r.route(sweep, "out", lad, "cutoff_hz", 0.3);
-    // Motion also pulls the two saws apart, so the beating speeds up.
+    // Beating also pulls the two saws apart, so the beating speeds up.
     r.route(knob, "m4", a, "fine", 0.08);
     r.route(knob, "m4", b, "fine", -0.08);
     perform(&mut r, knob, None, None);
@@ -895,18 +916,18 @@ fn undertow() -> Rack {
 
 fn salt_flat() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, [0.50, 0.20, 0.65, 0.50]);
+    let knob = macros(&mut r, ["Bloom", "Saturation", "Space", "Texture"], [0.50, 0.20, 0.65, 0.0]);
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let a = r.add(
         "osc.va",
-        &[("waveform", 1.0), ("unison", 4.0), ("detune", 12.0)],
+        &[("waveform", 1.0), ("unison", 4.0), ("detune", 4.0)],
     );
     let b = r.add(
         "osc.va",
         &[("base_hz", 523.25), ("waveform", 1.0), ("fine", 5.0)],
     );
     r.next_row();
-    let mix = r.add("mixer", &[("level1", 0.45), ("level2", 0.2)]);
+    let mix = r.add("mixer", &[("level1", 0.45), ("level2", 0.0)]);
     let drive = r.add("drive", &[("drive_db", 0.0), ("trim_db", 0.0)]);
     let lad = r.add(
         "filter.ladder",
@@ -919,7 +940,7 @@ fn salt_flat() -> Rack {
     let trim = r.add("gain", &[("gain_db", 8.0)]);
     let chorus = r.add(
         "chorus",
-        &[("rate_hz", 0.15), ("depth", 55.0), ("mix", 45.0)],
+        &[("rate_hz", 0.15), ("depth", 55.0), ("mix", 18.0)],
     );
     let delay = r.add(
         "delay",
@@ -939,7 +960,8 @@ fn salt_flat() -> Rack {
             ("predelay_ms", 40.0),
         ],
     );
-    let drift = r.motion(knob, 0.08);
+    // Slow filter drift at a fixed depth.
+    let drift = r.add("lfo", &[("rate_hz", 0.08)]);
 
     for o in [a, b] {
         r.wire(m, "pitch", o, "pitch");
@@ -965,8 +987,11 @@ fn salt_flat() -> Rack {
     r.route(knob, "m2", drive, "drive_db", 0.4);
     r.route(knob, "m3", delay, "mix", 0.3);
     r.route(knob, "m3", verb, "mix", 0.6);
-    r.route(drift, "out", lad, "cutoff_hz", 0.3);
-    r.route(knob, "m4", chorus, "rate_hz", 0.1);
+    r.route(drift, "out", lad, "cutoff_hz", 0.15);
+    // Texture: the shimmer layer, the chorus smear and the unison spread come in together.
+    r.route(knob, "m4", mix, "level2", 0.3);
+    r.route(knob, "m4", chorus, "mix", 0.3);
+    r.route(knob, "m4", a, "detune", 0.1);
     perform(&mut r, knob, None, None);
     r
 }
@@ -975,7 +1000,7 @@ fn salt_flat() -> Rack {
 
 fn boxwood() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, [0.60, 0.20, 0.45, 0.40]);
+    let knob = macros(&mut r, ["Brightness", "Warmth", "Space", "Chorus"], [0.60, 0.20, 0.45, 0.40]);
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let voice = r.add("osc.fm6", &[("algorithm", 1.0), ("index", 0.6)]);
     // ratio, fine, level, attack, decay, sustain, release, velocity: a wooden bar, a bright
@@ -1083,13 +1108,13 @@ fn boxwood_phrase() -> Vec<Hit> {
 fn presets() -> Vec<Preset> {
     vec![
         Preset {
-            slug: "gravel-pit",
-            name: "Gravel Pit",
+            slug: "cinder-block",
+            name: "Cinder Block",
             category: "Bass",
             tags: &["mono", "distorted", "compressed", "french touch", "signature"],
-            description: "A blunt mono bass: two saws over a square sub, hit with 18 dB of drive, a resonant ladder filter that snaps shut on every note and a compressor squeezing it flat. Play short, off-beat notes. Filter opens the tone, Drive adds crush on top of the grit, Space adds a slapback and a tight room, Motion adds a filter wobble; the mod wheel also opens the filter.",
-            listen: "The blunt, flattened attack and the snap of the filter on each short note; Drive adds crush on top.",
-            build: gravel_pit,
+            description: "A blunt mono bass: two saws over a square sub, hit with 18 dB of drive, a filter that closes on every note and a compressor squeezing it flat. No wobble, just dirt. Play short, off-beat notes. Bite opens the filter (the mod wheel does too), Grit pushes the drive harder, Room adds a slapback and a tight room, Crush mixes in a bitcrusher.",
+            listen: "The blunt, flattened attack and the dry, steady dirt: nothing moves on its own; Grit and Crush make it nastier.",
+            build: cinder_block,
             phrase: bass_phrase,
             secs: 9.0,
         },
@@ -1098,20 +1123,20 @@ fn presets() -> Vec<Preset> {
             name: "Parquet Loop",
             category: "Keys",
             tags: &["poly", "filtered", "phased", "disco", "122bpm", "signature"],
-            description: "Hold a chord and it becomes a filtered disco loop: saws and pulse into crunch, a resonant filter that closes on every beat (locked to the clock), a four-stage phaser and a compressor, at 122 BPM with swing. Press Run for the filter loop. Filter opens the cutoff, Drive adds crunch, Space adds a dotted echo and a tight room, Motion brings the phaser in.",
-            listen: "The filter closing on the beat under a held chord, and the phaser coming in as Motion goes up.",
+            description: "Hold a chord and it becomes a filtered disco loop: saws and pulse into crunch, a resonant filter that closes on every beat (locked to the clock), a four-stage phaser and a compressor, at 122 BPM with swing. Press Run for the filter loop. Notes slide into each other: change chords and the voices glide. Cutoff opens the filter, Crunch adds grit, Space adds a dotted echo and a tight room, Glide sets how long the slide takes (all the way down, notes just step).",
+            listen: "The filter closing on the beat under a held chord, and the chord tones sliding into the next chord; Glide down removes the slide.",
             build: parquet_loop,
             phrase: loop_phrase,
             secs: 10.0,
         },
         Preset {
-            slug: "basement-drop",
-            name: "Basement Drop",
+            slug: "loading-dock",
+            name: "Loading Dock",
             category: "Piece",
             tags: &["sequenced", "cues", "build-up", "drop", "124bpm", "filter house", "signature"],
-            description: "A self-playing filter-house piece at 124 BPM with swing: a bass and a stab line that pump together, a resonant filter and a hand-played voice on top. Four cues: Intro (Filter shut, nearly dry), Build (Filter opens over four bars as Drive and Motion rise), Drop (Drive hard, Filter open), Break (Filter back down, a little Space). Press Run, then launch the cues with the pads or CC 40-43; turn a macro to take over.",
-            listen: "The filter opening through the Build, the Drop landing hard, and the Break pulling back to a dark loop.",
-            build: basement_drop,
+            description: "A self-playing filter-house piece at 124 BPM with swing: a bass and a stab line that duck hard under a pump, a resonant filter, a noise riser and a hand-played voice on top. Five cues: Intro (filter shut, nearly dry), Build (the filter opens over three bars as the riser and the wash rise), Gap (everything shut but the wash), Drop (drive and pump at full), Break (back down, wet). Press Run, then launch the cues with the pads or CC 40-44; turn a macro to take over. Sweep opens the filter, Drive pushes the drive and the bitcrusher, Wash brings in the riser, the echo and the room, Pump sets how deep the beat ducks the bass and stabs.",
+            listen: "The filter and riser rising through the Build, the gap, the Drop landing with the pump at full, and the Break pulling back to a dark loop.",
+            build: loading_dock,
             phrase: drop_phrase,
             secs: 30.0,
         },
@@ -1120,8 +1145,8 @@ fn presets() -> Vec<Preset> {
             name: "Glass Elevator",
             category: "Keys",
             tags: &["poly", "fm", "electric piano", "bell", "pop"],
-            description: "A six-operator FM electric piano with a glassy tine that fades in a tenth of a second, over a mellow body. Velocity brightens it. Filter sets the FM brightness, Drive adds grit, Space adds ping-pong echo and room, Motion brings in the chorus.",
-            listen: "The tine on the attack against the mellow tail, and the way Filter opens the whole spectrum.",
+            description: "A six-operator FM electric piano with a glassy tine that fades in a tenth of a second, over a mellow body. Velocity brightens it. Tine sets the FM brightness, Grit adds grit, Space adds ping-pong echo and room, Chorus brings in the chorus.",
+            listen: "The tine on the attack against the mellow tail, and the way Tine opens the whole spectrum.",
             build: glass_elevator,
             phrase: glass_phrase,
             secs: 11.0,
@@ -1131,8 +1156,8 @@ fn presets() -> Vec<Preset> {
             name: "Undertow",
             category: "Bass",
             tags: &["mono", "reese", "sub", "glide", "drum and bass", "hip-hop"],
-            description: "A reese sub bass: two saws a few cents apart beating slowly against each other over a sine an octave down, through a gentle drive and a low-pass filter, with a short glide between overlapped notes. Play long low notes. Filter opens the tone, Drive thickens it, Space adds a short room, Motion widens the beating and sweeps the filter.",
-            listen: "The slow beating and the weight of the sub; raise Motion and the beating speeds up while the filter sweeps.",
+            description: "A reese sub bass: two saws a few cents apart beating slowly against each other over a sine an octave down, through a gentle drive and a low-pass filter, with a short glide between overlapped notes. Play long low notes. Cutoff opens the tone, Weight thickens it with drive, Room adds a short room, Beating widens the beating and sweeps the filter.",
+            listen: "The slow beating and the weight of the sub; raise Beating and it speeds up while the filter sweeps.",
             build: undertow,
             phrase: undertow_phrase,
             secs: 11.0,
@@ -1142,8 +1167,8 @@ fn presets() -> Vec<Preset> {
             name: "Salt Flat",
             category: "Pad",
             tags: &["poly", "ambient", "cinematic", "slow", "evolving"],
-            description: "A slow, wide ambient pad: soft triangle stacks with a slow filter bloom, chorus, a long echo and a long room. Hold open chords and let them breathe. Filter opens the bloom, Drive adds a little saturation, Space is the echo and the room, Motion drifts the filter and the chorus.",
-            listen: "The slow bloom of each chord and the long tail that carries into the next.",
+            description: "A slow, wide ambient pad: soft triangle stacks with a slow filter bloom, a light chorus, a long echo and a long room. Hold open chords and let them breathe. It starts clean. Bloom opens the filter, Saturation adds a little drive, Space is the echo and the room, Texture brings in a grainy, staticky layer: a high shimmer voice, a wider chorus and a looser unison.",
+            listen: "The slow bloom of each chord and the long tail that carries into the next; then raise Texture to about 0.7 for the grainy, staticky version.",
             build: salt_flat,
             phrase: salt_phrase,
             secs: 18.0,
@@ -1153,7 +1178,7 @@ fn presets() -> Vec<Preset> {
             name: "Boxwood",
             category: "Pluck",
             tags: &["poly", "mallet", "fm", "wooden", "velocity"],
-            description: "An FM mallet, like a wooden bar: a round body with a bright overtone that vanishes at once and a small click. Velocity brings out the overtone. Filter sets the FM brightness, Drive adds warmth, Space adds an echo and a medium room, Motion brings in the chorus.",
+            description: "An FM mallet, like a wooden bar: a round body with a bright overtone that vanishes at once and a small click. Velocity brings out the overtone. Brightness sets the FM brightness, Warmth adds warmth, Space adds an echo and a medium room, Chorus brings in the chorus.",
             listen: "The click and the wooden ring of each note, and the short bloom when Space is raised.",
             build: boxwood,
             phrase: boxwood_phrase,
@@ -1164,7 +1189,7 @@ fn presets() -> Vec<Preset> {
             name: "Neon Highway",
             category: "Lead",
             tags: &["mono", "legato", "glide", "bright", "synthwave", "80s"],
-            description: "A wide mono lead for late-night driving: a detuned saw stack and a pulse, a light drive, a ladder filter that opens with velocity, chorus, a dotted echo and a room. Legato notes glide. Filter brightens, Drive adds bite, Space adds echo and room, Motion adds vibrato.",
+            description: "A wide mono lead for late-night driving: a detuned saw stack and a pulse, a light drive, a ladder filter that opens with velocity, chorus, a dotted echo and a room. Legato notes glide. Cutoff brightens, Bite adds drive, Space adds echo and room, Vibrato adds vibrato.",
             listen: "The glide between overlapped notes and the echo trailing each phrase.",
             build: neon_highway,
             phrase: neon_phrase,
@@ -1300,13 +1325,13 @@ fn main() {
                     log.state(),
                     &(p.phrase)(),
                     p.secs,
-                    p.slug == "basement-drop",
+                    p.slug == "loading-dock",
                 );
                 let (l2, _) = render(
                     log.state(),
                     &(p.phrase)(),
                     p.secs,
-                    p.slug == "basement-drop",
+                    p.slug == "loading-dock",
                 );
                 assert_eq!(l, l2, "{}: render is deterministic", p.slug);
                 write_wav(&out.join(format!("{}.wav", p.slug)), &l, &r);
@@ -1323,7 +1348,7 @@ fn main() {
                         .iter()
                         .map(|h| format!("[{:.3},{},{}]", h.0, h.1, h.2.unwrap_or(0)))
                         .collect();
-                    let cues: Vec<String> = if p.slug == "basement-drop" {
+                    let cues: Vec<String> = if p.slug == "loading-dock" {
                         DROP_CUES
                             .iter()
                             .zip(40..)

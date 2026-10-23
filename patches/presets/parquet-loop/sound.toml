@@ -8,6 +8,6 @@ tags = [
     "122bpm",
     "signature",
 ]
-description = "Hold a chord and it becomes a filtered disco loop: saws and pulse into crunch, a resonant filter that closes on every beat (locked to the clock), a four-stage phaser and a compressor, at 122 BPM with swing. Press Run for the filter loop. Filter opens the cutoff, Drive adds crunch, Space adds a dotted echo and a tight room, Motion brings the phaser in."
+description = "Hold a chord and it becomes a filtered disco loop: saws and pulse into crunch, a resonant filter that closes on every beat (locked to the clock), a four-stage phaser and a compressor, at 122 BPM with swing. Press Run for the filter loop. Notes slide into each other: change chords and the voices glide. Cutoff opens the filter, Crunch adds grit, Space adds a dotted echo and a tight room, Glide sets how long the slide takes (all the way down, notes just step)."
 keys = true
 sequence = true

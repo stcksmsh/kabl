@@ -14,7 +14,7 @@
         "m1": 0.5,
         "m2": 0.45,
         "m3": 0.25,
-        "m4": 0.55,
+        "m4": 0.5,
         "pin.m1": 1.0,
         "pin.m2": 2.0,
         "pin.m3": 3.0,
@@ -40,7 +40,9 @@
         "y": 20.0
       },
       "params": {
-        "bend": 2.0
+        "bend": 2.0,
+        "glide": 1.0,
+        "glide_ms": 5.0
       }
     },
     "4": {
@@ -166,7 +168,7 @@
       "params": {
         "depth": 85.0,
         "feedback": 60.0,
-        "mix": 0.0,
+        "mix": 45.0,
         "rate_hz": 0.5,
         "stages": 4.0
       }
@@ -769,40 +771,22 @@
       },
       "to": {
         "Param": {
-          "id": 14,
-          "param": "mix"
+          "id": 3,
+          "param": "glide_ms"
         }
       },
       "params": {
         "amount": 0.8
       },
       "steps": []
-    },
-    "36": {
-      "from": {
-        "Module": {
-          "id": 1,
-          "port": "m4"
-        }
-      },
-      "to": {
-        "Param": {
-          "id": 14,
-          "param": "rate_hz"
-        }
-      },
-      "params": {
-        "amount": 0.2
-      },
-      "steps": []
     }
   },
   "labels": {
     "1": {
-      "name.m1": "Filter",
-      "name.m2": "Drive",
+      "name.m1": "Cutoff",
+      "name.m2": "Crunch",
       "name.m3": "Space",
-      "name.m4": "Motion"
+      "name.m4": "Glide"
     }
   }
 }

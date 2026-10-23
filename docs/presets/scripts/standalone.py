@@ -22,7 +22,7 @@ scratch.mkdir(parents=True, exist_ok=True)
 disp = ':152'
 # slug -> notes of the chord (a single note for the mono presets)
 presets = {
-    'gravel-pit': [40], 'parquet-loop': [52, 59, 62, 66], 'basement-drop': [64],
+    'cinder-block': [40], 'parquet-loop': [52, 59, 62, 66], 'loading-dock': [64],
     'glass-elevator': [52, 59, 64, 67], 'undertow': [28], 'salt-flat': [50, 57, 62, 65],
     'boxwood': [60, 64, 67], 'neon-highway': [64],
 }

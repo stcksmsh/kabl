@@ -7,6 +7,6 @@ tags = [
     "bell",
     "pop",
 ]
-description = "A six-operator FM electric piano with a glassy tine that fades in a tenth of a second, over a mellow body. Velocity brightens it. Filter sets the FM brightness, Drive adds grit, Space adds ping-pong echo and room, Motion brings in the chorus."
+description = "A six-operator FM electric piano with a glassy tine that fades in a tenth of a second, over a mellow body. Velocity brightens it. Tine sets the FM brightness, Grit adds grit, Space adds ping-pong echo and room, Chorus brings in the chorus."
 keys = true
 sequence = false

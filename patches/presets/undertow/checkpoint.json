@@ -733,10 +733,10 @@
   },
   "labels": {
     "1": {
-      "name.m1": "Filter",
-      "name.m2": "Drive",
-      "name.m3": "Space",
-      "name.m4": "Motion"
+      "name.m1": "Cutoff",
+      "name.m2": "Weight",
+      "name.m3": "Room",
+      "name.m4": "Beating"
     }
   }
 }
