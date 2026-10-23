@@ -1440,6 +1440,14 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
             ui_state.selected_route = None;
         }
     }
+    // The selected route's depth can itself be moved, by a macro, LFO or envelope.
+    if let Some(sel) = ui_state
+        .selected_route
+        .filter(|c| routes.iter().any(|r| r.cable == *c))
+    {
+        ui.separator();
+        cable_param_routes(ui, editor, ui_state, sel, kabl_engine::compile::DEPTH);
+    }
 }
 
 /// A functional cable's mark: three small bars at `at` on a small backing plate, so a patterned
@@ -1484,6 +1492,7 @@ pub(crate) fn cable_param_label(param: &str) -> &'static str {
     match param {
         "prob" => "Chance",
         "morph" => "Morph",
+        "amount" => "Depth",
         _ => "Glide",
     }
 }

@@ -4,7 +4,7 @@
 //! label `cue<N>` for its name. Editing a cue is an ordinary undoable edit; launching one is a
 //! runtime command. See docs/composition-batch/design.md.
 //!
-//! A cue can also move macros: `cue<N>.macro.<id>.<k>` (macro module `id`, output `k` = 0..3)
+//! A cue can also move macros: `cue<N>.macro.<id>.<k>` (macro module `id`, output `k` = 0..7)
 //! holds the value that macro heads to, absent = left where it is, and `cue<N>.morph` the
 //! morph length in beats (absent or 0 = jump). The engine moves them (`kabl_engine::morph`).
 
@@ -25,7 +25,7 @@ pub struct Cue {
     pub timing: Timing,
     /// (sequencer, bank) for sequencers that still exist.
     pub targets: Vec<(ModuleId, usize)>,
-    /// (macro module, output 0..3, value 0..1) for macros that still exist.
+    /// (macro module, output 0..7, value 0..1) for macros that still exist.
     pub macros: Vec<(ModuleId, u8, f32)>,
     /// Morph length in beats; 0 = jump.
     pub morph_beats: f32,
@@ -200,6 +200,23 @@ pub fn set_morph(editor: &mut PatchEditor, id: ModuleId, n: usize, beats: f32) {
     )]);
 }
 
+/// The macros of module `id` a cue offers: the first four, and any further one that is routed,
+/// pinned to Perform or named, so an unused `m5`..`m8` does not crowd the cue.
+pub fn active_macros(state: &PatchState, id: ModuleId) -> Vec<u8> {
+    (0..kabl_modules::builtins::MACROS as u8)
+        .filter(|&k| {
+            let port = format!("m{}", k + 1);
+            k < 4
+                || crate::perform::is_pinned(state, id, &port)
+                || state.label(id, &format!("name.{port}")).is_some()
+                || state.cables.values().any(|c| {
+                    matches!(&c.from, kabl_core::PortRef::Module { id: i, port: p }
+                        if *i == id && *p == port)
+                })
+        })
+        .collect()
+}
+
 /// "Store current": cue `n` takes the value of every macro as `now` gives it, one undo step.
 /// Targets of macros that no longer exist are kept out.
 pub fn store_macros(
@@ -214,7 +231,9 @@ pub fn store_macros(
         .iter()
         .filter(|(_, m)| m.kind == "macro")
         .flat_map(|(&module, _)| {
-            (0..kabl_modules::builtins::MACROS as u8).map(move |k| (module, k))
+            active_macros(editor.state(), module)
+                .into_iter()
+                .map(move |k| (module, k))
         })
         .map(|(module, k)| {
             set(

@@ -6,10 +6,9 @@ use kabl_modules::{Module, ProcessIo, Signal};
 
 const BLOCK: usize = 64;
 
-fn block(m: &mut Macro, knobs: [f32; 4]) -> [[f32; BLOCK]; 4] {
-    let mut o = [[0f32; BLOCK]; 4];
-    let [a, b, c, d] = &mut o;
-    let mut outs: [&mut [f32]; 4] = [a, b, c, d];
+fn block(m: &mut Macro, knobs: [f32; 8]) -> [[f32; BLOCK]; 8] {
+    let mut o = [[0f32; BLOCK]; 8];
+    let mut outs: [&mut [f32]; 8] = o.each_mut().map(|x| &mut x[..]);
     m.process(&mut ProcessIo::new(
         &[],
         &mut outs,
@@ -29,13 +28,16 @@ fn outputs_start_at_the_knob_and_glide_to_changes() {
             tier: QualityTier::Live,
         },
     );
-    let o = block(&mut m, [0.25, 0.5, 0.75, 1.0]);
-    assert_eq!([o[0][0], o[1][0], o[2][0], o[3][0]], [0.25, 0.5, 0.75, 1.0]);
+    let o = block(&mut m, [0.25, 0.5, 0.75, 1.0, 0.1, 0.2, 0.3, 0.4]);
+    assert_eq!(
+        o.map(|b| b[0]),
+        [0.25, 0.5, 0.75, 1.0, 0.1, 0.2, 0.3, 0.4]
+    );
     // A jump to 1.0 on m1: no step, ~63 % after 20 ms, settled after 400 ms.
     let mut last = 0.25;
     let mut at_20ms = 0.0;
     for b in 0..300 {
-        let o = block(&mut m, [1.0, 0.5, 0.75, 1.0]);
+        let o = block(&mut m, [1.0, 0.5, 0.75, 1.0, 0.1, 0.2, 0.3, 0.4]);
         for (i, &v) in o[0].iter().enumerate() {
             assert!(v - last < 0.01, "step {}", v - last);
             last = v;
