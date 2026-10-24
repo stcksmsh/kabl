@@ -8,7 +8,11 @@ use super::{pst, va};
 /// Tin Roof: a Wurlitzer-like electric piano, reedy and barking.
 fn tin_roof() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Tone", "Bark", "Room", "Chorus"], &[0.50, 0.40, 0.30, 0.40]);
+    let knob = macros(
+        &mut r,
+        &["Tone", "Bark", "Room", "Chorus"],
+        &[0.50, 0.40, 0.30, 0.40],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
         [1.0, 0.0, 1.0, 0.5, 1200.0, 0.22, 120.0, 0.3],
@@ -29,8 +33,16 @@ fn tin_roof() -> Rack {
             resonance: 0.1,
             cut_m1: 0.5,
             trim_db: 5.0,
-            chorus: Some((&[("rate_hz", 0.9), ("depth", 35.0), ("mix", 0.0)], Some(0.5))),
-            echo: &[("time_ms", 290.0), ("feedback", 25.0), ("mix", 0.0), ("tone_hz", 4000.0)],
+            chorus: Some((
+                &[("rate_hz", 0.9), ("depth", 35.0), ("mix", 0.0)],
+                Some(0.5),
+            )),
+            echo: &[
+                ("time_ms", 290.0),
+                ("feedback", 25.0),
+                ("mix", 0.0),
+                ("tone_hz", 4000.0),
+            ],
             echo_max: 0.15,
             room_decay: 1.2,
             room_max: 0.25,
@@ -62,7 +74,11 @@ fn kick_duck(r: &mut Rack, bpm: f32) -> (ModuleId, ModuleId) {
 /// Turnstile: a held chord that pumps against a kick you never hear.
 fn turnstile() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Cutoff", "Crunch", "Room", "Pump"], &[0.50, 0.50, 0.25, 0.65]);
+    let knob = macros(
+        &mut r,
+        &["Cutoff", "Crunch", "Room", "Pump"],
+        &[0.50, 0.50, 0.25, 0.65],
+    );
     let (clock, kick) = kick_duck(&mut r, 123.0);
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let v = va(
@@ -103,7 +119,13 @@ fn turnstile() -> Rack {
                 ("makeup_db", 4.0),
             ]),
             duck: Some((kick, Some(("ratio", 0.9)))),
-            echo: &[("sync", 3.0), ("time_ms", 370.0), ("feedback", 28.0), ("mix", 0.0), ("tone_hz", 3800.0)],
+            echo: &[
+                ("sync", 3.0),
+                ("time_ms", 370.0),
+                ("feedback", 28.0),
+                ("mix", 0.0),
+                ("tone_hz", 3800.0),
+            ],
             echo_max: 0.2,
             clock: Some(clock),
             room_decay: 0.6,
@@ -120,7 +142,11 @@ fn turnstile() -> Rack {
 /// Hand Bell: an inharmonic FM bell that rings for seconds.
 fn hand_bell() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Strike", "Grit", "Space", "Shimmer"], &[0.50, 0.15, 0.55, 0.40]);
+    let knob = macros(
+        &mut r,
+        &["Strike", "Grit", "Space", "Shimmer"],
+        &[0.50, 0.15, 0.55, 0.40],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     // Three inharmonic pairs, carrier and modulator: 1 : 3.5, 2 : 5.04, 3.1 : 8.9.
     let ops: [Op; 6] = [
@@ -141,8 +167,16 @@ fn hand_bell() -> Rack {
             cutoff: 7000.0,
             cut_m1: 0.3,
             trim_db: 9.0,
-            chorus: Some((&[("rate_hz", 0.3), ("depth", 45.0), ("mix", 0.0)], Some(0.5))),
-            echo: &[("time_ms", 520.0), ("feedback", 42.0), ("mix", 0.0), ("tone_hz", 5000.0)],
+            chorus: Some((
+                &[("rate_hz", 0.3), ("depth", 45.0), ("mix", 0.0)],
+                Some(0.5),
+            )),
+            echo: &[
+                ("time_ms", 520.0),
+                ("feedback", 42.0),
+                ("mix", 0.0),
+                ("tone_hz", 5000.0),
+            ],
             echo_max: 0.3,
             room_decay: 5.0,
             room_max: 0.4,
@@ -157,7 +191,11 @@ fn hand_bell() -> Rack {
 /// Corduroy: a funk clavinet, a pulse with a snapping filter.
 fn corduroy() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Cutoff", "Drive", "Room", "Phase"], &[0.50, 0.30, 0.25, 0.30]);
+    let knob = macros(
+        &mut r,
+        &["Cutoff", "Drive", "Room", "Phase"],
+        &[0.50, 0.30, 0.25, 0.30],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let v = va(
         &mut r,
@@ -188,7 +226,12 @@ fn corduroy() -> Rack {
                 ],
                 Some(("mix", 0.55)),
             )),
-            echo: &[("time_ms", 300.0), ("feedback", 22.0), ("mix", 0.0), ("tone_hz", 4000.0)],
+            echo: &[
+                ("time_ms", 300.0),
+                ("feedback", 22.0),
+                ("mix", 0.0),
+                ("tone_hz", 4000.0),
+            ],
             echo_max: 0.1,
             room_decay: 0.8,
             room_max: 0.2,
@@ -204,7 +247,11 @@ fn corduroy() -> Rack {
 /// Matinee: a wide detuned-saw keyboard with a soft filter and a big room.
 fn matinee() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Cutoff", "Warmth", "Space", "Width"], &[0.55, 0.25, 0.60, 0.50]);
+    let knob = macros(
+        &mut r,
+        &["Cutoff", "Warmth", "Space", "Width"],
+        &[0.55, 0.25, 0.60, 0.50],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let v = va(
         &mut r,
@@ -226,7 +273,12 @@ fn matinee() -> Rack {
             cut_m1: 0.5,
             trim_db: 6.0,
             chorus: Some((&[("rate_hz", 0.6), ("depth", 50.0), ("mix", 30.0)], None)),
-            echo: &[("time_ms", 430.0), ("feedback", 38.0), ("mix", 0.0), ("tone_hz", 3500.0)],
+            echo: &[
+                ("time_ms", 430.0),
+                ("feedback", 38.0),
+                ("mix", 0.0),
+                ("tone_hz", 3500.0),
+            ],
             echo_max: 0.3,
             room_decay: 3.5,
             room_max: 0.4,
@@ -243,7 +295,11 @@ fn matinee() -> Rack {
 /// Snowmelt: a soft, slow electric piano in a big room.
 fn snowmelt() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Tine", "Warmth", "Space", "Drift"], &[0.40, 0.20, 0.65, 0.50]);
+    let knob = macros(
+        &mut r,
+        &["Tine", "Warmth", "Space", "Drift"],
+        &[0.40, 0.20, 0.65, 0.50],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
         [1.0, 0.0, 1.0, 12.0, 3500.0, 0.2, 900.0, 0.2],
@@ -263,8 +319,16 @@ fn snowmelt() -> Rack {
             cutoff: 3200.0,
             cut_m1: 0.5,
             trim_db: 11.0,
-            chorus: Some((&[("rate_hz", 0.25), ("depth", 55.0), ("mix", 0.0)], Some(0.6))),
-            echo: &[("time_ms", 640.0), ("feedback", 45.0), ("mix", 0.0), ("tone_hz", 3500.0)],
+            chorus: Some((
+                &[("rate_hz", 0.25), ("depth", 55.0), ("mix", 0.0)],
+                Some(0.6),
+            )),
+            echo: &[
+                ("time_ms", 640.0),
+                ("feedback", 45.0),
+                ("mix", 0.0),
+                ("tone_hz", 3500.0),
+            ],
             echo_max: 0.3,
             room_decay: 6.0,
             room_max: 0.5,
@@ -280,13 +344,22 @@ fn snowmelt() -> Rack {
 /// Scaffold: a dark, wide stab for drum and bass.
 fn scaffold() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Cutoff", "Grit", "Room", "Length"], &[0.45, 0.55, 0.25, 0.35]);
+    let knob = macros(
+        &mut r,
+        &["Cutoff", "Grit", "Room", "Length"],
+        &[0.45, 0.55, 0.25, 0.35],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let v = va(
         &mut r,
         m,
         &[("waveform", 2.0), ("unison", 6.0), ("detune", 26.0)],
-        &[("waveform", 2.0), ("fine", -12.0), ("unison", 2.0), ("detune", 18.0)],
+        &[
+            ("waveform", 2.0),
+            ("fine", -12.0),
+            ("unison", 2.0),
+            ("detune", 18.0),
+        ],
         (0.45, 0.4),
         adsr(1.0, 230.0, 0.0, 110.0),
         adsr(1.0, 260.0, 0.1, 110.0),
@@ -318,7 +391,12 @@ fn scaffold() -> Rack {
                 ("release_ms", 120.0),
                 ("makeup_db", 4.0),
             ]),
-            echo: &[("time_ms", 258.0), ("feedback", 30.0), ("mix", 0.0), ("tone_hz", 3500.0)],
+            echo: &[
+                ("time_ms", 258.0),
+                ("feedback", 30.0),
+                ("mix", 0.0),
+                ("tone_hz", 3500.0),
+            ],
             echo_max: 0.2,
             room_decay: 0.9,
             room_max: 0.2,
@@ -335,7 +413,11 @@ fn scaffold() -> Rack {
 /// Brass Filament: a sustained, metallic, slightly unstable FM tone.
 fn brass_filament() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Strike", "Rust", "Space", "Warp"], &[0.45, 0.25, 0.45, 0.30]);
+    let knob = macros(
+        &mut r,
+        &["Strike", "Rust", "Space", "Warp"],
+        &[0.45, 0.25, 0.45, 0.30],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     // Algorithm 5: operator 6 modulates 1 to 5. Inharmonic ratios and a long fade.
     let ops: [Op; 6] = [
@@ -357,7 +439,12 @@ fn brass_filament() -> Rack {
             cut_m1: 0.4,
             trim_db: 7.0,
             chorus: Some((&[("rate_hz", 0.5), ("depth", 40.0), ("mix", 25.0)], None)),
-            echo: &[("time_ms", 360.0), ("feedback", 40.0), ("mix", 0.0), ("tone_hz", 4500.0)],
+            echo: &[
+                ("time_ms", 360.0),
+                ("feedback", 40.0),
+                ("mix", 0.0),
+                ("tone_hz", 4500.0),
+            ],
             echo_max: 0.25,
             room_decay: 3.0,
             room_max: 0.35,
@@ -373,7 +460,11 @@ fn brass_filament() -> Rack {
 /// Spinet: a bright harpsichord-like key with a buzzy pluck and no dynamics to speak of.
 fn spinet() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Tone", "Buzz", "Room", "Chorus"], &[0.50, 0.30, 0.35, 0.35]);
+    let knob = macros(
+        &mut r,
+        &["Tone", "Buzz", "Room", "Chorus"],
+        &[0.50, 0.30, 0.35, 0.35],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let v = va(
         &mut r,
@@ -394,8 +485,16 @@ fn spinet() -> Rack {
             resonance: 0.12,
             cut_m1: 0.45,
             trim_db: 9.0,
-            chorus: Some((&[("rate_hz", 0.7), ("depth", 30.0), ("mix", 0.0)], Some(0.5))),
-            echo: &[("time_ms", 330.0), ("feedback", 25.0), ("mix", 0.0), ("tone_hz", 5000.0)],
+            chorus: Some((
+                &[("rate_hz", 0.7), ("depth", 30.0), ("mix", 0.0)],
+                Some(0.5),
+            )),
+            echo: &[
+                ("time_ms", 330.0),
+                ("feedback", 25.0),
+                ("mix", 0.0),
+                ("tone_hz", 5000.0),
+            ],
             echo_max: 0.15,
             room_decay: 1.8,
             room_max: 0.35,
@@ -412,7 +511,11 @@ fn spinet() -> Rack {
 /// Willow: a soft harp.
 fn willow() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Pluck", "Warmth", "Space", "Stretch"], &[0.50, 0.15, 0.60, 0.45]);
+    let knob = macros(
+        &mut r,
+        &["Pluck", "Warmth", "Space", "Stretch"],
+        &[0.50, 0.15, 0.60, 0.45],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
         [1.0, 0.0, 1.0, 0.5, 1800.0, 0.0, 500.0, 0.25],
@@ -433,7 +536,12 @@ fn willow() -> Rack {
             cut_m1: 0.35,
             trim_db: 10.0,
             chorus: Some((&[("rate_hz", 0.35), ("depth", 35.0), ("mix", 18.0)], None)),
-            echo: &[("time_ms", 460.0), ("feedback", 40.0), ("mix", 0.0), ("tone_hz", 5000.0)],
+            echo: &[
+                ("time_ms", 460.0),
+                ("feedback", 40.0),
+                ("mix", 0.0),
+                ("tone_hz", 5000.0),
+            ],
             echo_max: 0.3,
             room_decay: 4.5,
             room_max: 0.45,
@@ -450,7 +558,11 @@ fn willow() -> Rack {
 /// Dry Creek: a nylon-string guitar pluck.
 fn dry_creek() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Pick", "Warmth", "Room", "Chorus"], &[0.50, 0.20, 0.40, 0.30]);
+    let knob = macros(
+        &mut r,
+        &["Pick", "Warmth", "Room", "Chorus"],
+        &[0.50, 0.20, 0.40, 0.30],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
         [1.0, 0.0, 1.0, 0.5, 900.0, 0.0, 120.0, 0.3],
@@ -470,8 +582,16 @@ fn dry_creek() -> Rack {
             cutoff: 4500.0,
             cut_m1: 0.45,
             trim_db: 11.0,
-            chorus: Some((&[("rate_hz", 0.5), ("depth", 30.0), ("mix", 0.0)], Some(0.5))),
-            echo: &[("time_ms", 310.0), ("feedback", 25.0), ("mix", 0.0), ("tone_hz", 4500.0)],
+            chorus: Some((
+                &[("rate_hz", 0.5), ("depth", 30.0), ("mix", 0.0)],
+                Some(0.5),
+            )),
+            echo: &[
+                ("time_ms", 310.0),
+                ("feedback", 25.0),
+                ("mix", 0.0),
+                ("tone_hz", 4500.0),
+            ],
             echo_max: 0.15,
             room_decay: 1.8,
             room_max: 0.35,
@@ -486,12 +606,21 @@ fn dry_creek() -> Rack {
 /// Gumdrop: a short, bouncy pop pluck.
 fn gumdrop() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Cutoff", "Drive", "Space", "Decay"], &[0.55, 0.20, 0.45, 0.40]);
+    let knob = macros(
+        &mut r,
+        &["Cutoff", "Drive", "Space", "Decay"],
+        &[0.55, 0.20, 0.45, 0.40],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let v = va(
         &mut r,
         m,
-        &[("waveform", 1.0), ("pw", 40.0), ("unison", 2.0), ("detune", 8.0)],
+        &[
+            ("waveform", 1.0),
+            ("pw", 40.0),
+            ("unison", 2.0),
+            ("detune", 8.0),
+        ],
         &[("waveform", 2.0), ("fine", 6.0)],
         (0.5, 0.3),
         adsr(0.5, 260.0, 0.0, 120.0),
@@ -508,7 +637,12 @@ fn gumdrop() -> Rack {
             cut_m1: 0.5,
             trim_db: 10.0,
             chorus: Some((&[("rate_hz", 0.6), ("depth", 35.0), ("mix", 25.0)], None)),
-            echo: &[("time_ms", 360.0), ("feedback", 32.0), ("mix", 0.0), ("tone_hz", 5000.0)],
+            echo: &[
+                ("time_ms", 360.0),
+                ("feedback", 32.0),
+                ("mix", 0.0),
+                ("tone_hz", 5000.0),
+            ],
             echo_max: 0.25,
             room_decay: 2.2,
             room_max: 0.3,
@@ -525,7 +659,11 @@ fn gumdrop() -> Rack {
 /// Cold Cut: a dark, short bell-pluck for trap.
 fn cold_cut() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Tone", "Dirt", "Room", "Decay"], &[0.40, 0.35, 0.30, 0.40]);
+    let knob = macros(
+        &mut r,
+        &["Tone", "Dirt", "Room", "Decay"],
+        &[0.40, 0.35, 0.30, 0.40],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
         [1.0, 0.0, 1.0, 0.5, 700.0, 0.0, 150.0, 0.3],
@@ -553,7 +691,12 @@ fn cold_cut() -> Rack {
                 ("release_ms", 100.0),
                 ("makeup_db", 3.0),
             ]),
-            echo: &[("time_ms", 290.0), ("feedback", 32.0), ("mix", 0.0), ("tone_hz", 3200.0)],
+            echo: &[
+                ("time_ms", 290.0),
+                ("feedback", 32.0),
+                ("mix", 0.0),
+                ("tone_hz", 3200.0),
+            ],
             echo_max: 0.2,
             room_decay: 1.3,
             room_max: 0.25,
@@ -570,12 +713,21 @@ fn cold_cut() -> Rack {
 /// Rivet Gun: a bright, phased, compressed staccato pluck.
 fn rivet_gun() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Cutoff", "Crunch", "Room", "Phase"], &[0.55, 0.50, 0.25, 0.45]);
+    let knob = macros(
+        &mut r,
+        &["Cutoff", "Crunch", "Room", "Phase"],
+        &[0.55, 0.50, 0.25, 0.45],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let v = va(
         &mut r,
         m,
-        &[("waveform", 1.0), ("pw", 30.0), ("unison", 3.0), ("detune", 14.0)],
+        &[
+            ("waveform", 1.0),
+            ("pw", 30.0),
+            ("unison", 3.0),
+            ("detune", 14.0),
+        ],
         &[("waveform", 2.0), ("fine", 7.0)],
         (0.5, 0.35),
         adsr(0.5, 120.0, 0.0, 40.0),
@@ -608,7 +760,12 @@ fn rivet_gun() -> Rack {
                 ("release_ms", 80.0),
                 ("makeup_db", 9.5),
             ]),
-            echo: &[("time_ms", 242.0), ("feedback", 26.0), ("mix", 0.0), ("tone_hz", 4000.0)],
+            echo: &[
+                ("time_ms", 242.0),
+                ("feedback", 26.0),
+                ("mix", 0.0),
+                ("tone_hz", 4000.0),
+            ],
             echo_max: 0.25,
             room_decay: 0.5,
             room_max: 0.12,
@@ -624,7 +781,11 @@ fn rivet_gun() -> Rack {
 /// Tuning Fork: tuned metal bars, soft and slightly detuned, with a slow wobble.
 fn tuning_fork() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Strike", "Warmth", "Space", "Wobble"], &[0.45, 0.15, 0.55, 0.40]);
+    let knob = macros(
+        &mut r,
+        &["Strike", "Warmth", "Space", "Wobble"],
+        &[0.45, 0.15, 0.55, 0.40],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     // Six added partials of a free bar: 1, 2.76, 5.4, 8.9 and two detuned doubles.
     let ops: [Op; 6] = [
@@ -645,8 +806,16 @@ fn tuning_fork() -> Rack {
             cutoff: 6000.0,
             cut_m1: 0.5,
             trim_db: 12.0,
-            chorus: Some((&[("rate_hz", 0.9), ("depth", 70.0), ("mix", 0.0)], Some(0.6))),
-            echo: &[("time_ms", 480.0), ("feedback", 42.0), ("mix", 0.0), ("tone_hz", 4800.0)],
+            chorus: Some((
+                &[("rate_hz", 0.9), ("depth", 70.0), ("mix", 0.0)],
+                Some(0.6),
+            )),
+            echo: &[
+                ("time_ms", 480.0),
+                ("feedback", 42.0),
+                ("mix", 0.0),
+                ("tone_hz", 4800.0),
+            ],
             echo_max: 0.3,
             room_decay: 4.0,
             room_max: 0.4,
@@ -690,7 +859,15 @@ fn turnstile_phrase() -> Vec<Hit> {
 }
 
 fn bell_phrase() -> Vec<Hit> {
-    let notes = [(0.0, 60u8), (1.3, 67), (2.1, 64), (3.8, 72), (4.6, 71), (6.5, 62), (8.0, 55)];
+    let notes = [
+        (0.0, 60u8),
+        (1.3, 67),
+        (2.1, 64),
+        (3.8, 72),
+        (4.6, 71),
+        (6.5, 62),
+        (8.0, 55),
+    ];
     line(&notes.map(|(t, n)| (t, 0.4, n, 88)))
 }
 
@@ -771,16 +948,28 @@ fn filament_phrase() -> Vec<Hit> {
 }
 
 fn spinet_phrase() -> Vec<Hit> {
-    let notes = [64u8, 67, 71, 74, 72, 69, 66, 64, 62, 66, 69, 74, 71, 67, 64, 59];
-    line(&notes.iter().enumerate().map(|(i, &n)| (i as f32 * 0.2, 0.16, n, 90)).collect::<Vec<_>>())
+    let notes = [
+        64u8, 67, 71, 74, 72, 69, 66, 64, 62, 66, 69, 74, 71, 67, 64, 59,
+    ];
+    line(
+        &notes
+            .iter()
+            .enumerate()
+            .map(|(i, &n)| (i as f32 * 0.2, 0.16, n, 90))
+            .collect::<Vec<_>>(),
+    )
 }
 
 fn willow_phrase() -> Vec<Hit> {
     // Arpeggiated chords, rolled up.
     let mut v = Vec::new();
-    for (k, chord) in [[48u8, 55, 60, 64, 67, 72], [45, 52, 57, 60, 64, 69], [41, 48, 53, 57, 60, 65]]
-        .iter()
-        .enumerate()
+    for (k, chord) in [
+        [48u8, 55, 60, 64, 67, 72],
+        [45, 52, 57, 60, 64, 69],
+        [41, 48, 53, 57, 60, 65],
+    ]
+    .iter()
+    .enumerate()
     {
         for (i, &n) in chord.iter().enumerate() {
             let t = k as f32 * 2.4 + i as f32 * 0.12;
@@ -792,8 +981,22 @@ fn willow_phrase() -> Vec<Hit> {
 
 fn creek_phrase() -> Vec<Hit> {
     let pat: [(f32, u8); 16] = [
-        (0.0, 45), (0.3, 52), (0.6, 57), (0.9, 60), (1.2, 64), (1.5, 60), (1.8, 57), (2.1, 52),
-        (2.4, 43), (2.7, 50), (3.0, 55), (3.3, 59), (3.6, 62), (3.9, 59), (4.2, 55), (4.5, 50),
+        (0.0, 45),
+        (0.3, 52),
+        (0.6, 57),
+        (0.9, 60),
+        (1.2, 64),
+        (1.5, 60),
+        (1.8, 57),
+        (2.1, 52),
+        (2.4, 43),
+        (2.7, 50),
+        (3.0, 55),
+        (3.3, 59),
+        (3.6, 62),
+        (3.9, 59),
+        (4.2, 55),
+        (4.5, 50),
     ];
     line(&pat.map(|(t, n)| (t, 0.25, n, 85)))
 }
@@ -802,8 +1005,18 @@ fn gumdrop_phrase() -> Vec<Hit> {
     // 110 BPM, a bouncing pop riff.
     let beat = 60.0 / 110.0;
     let riff: [(f32, u8); 12] = [
-        (0.0, 64), (0.5, 64), (1.0, 67), (1.5, 71), (2.0, 69), (2.5, 67), (3.0, 64),
-        (4.0, 62), (4.5, 62), (5.0, 66), (5.5, 69), (6.0, 67),
+        (0.0, 64),
+        (0.5, 64),
+        (1.0, 67),
+        (1.5, 71),
+        (2.0, 69),
+        (2.5, 67),
+        (3.0, 64),
+        (4.0, 62),
+        (4.5, 62),
+        (5.0, 66),
+        (5.5, 69),
+        (6.0, 67),
     ];
     line(&riff.map(|(b, n)| (b * beat, beat * 0.4, n, 92)))
 }
@@ -812,7 +1025,15 @@ fn cut_phrase() -> Vec<Hit> {
     // 140 BPM half-time: a minor figure with room to ring.
     let beat = 60.0 / 140.0;
     let riff: [(f32, u8); 9] = [
-        (0.0, 69), (1.5, 72), (3.0, 76), (4.0, 69), (5.5, 72), (6.0, 67), (8.0, 69), (9.5, 76), (11.0, 74),
+        (0.0, 69),
+        (1.5, 72),
+        (3.0, 76),
+        (4.0, 69),
+        (5.5, 72),
+        (6.0, 67),
+        (8.0, 69),
+        (9.5, 76),
+        (11.0, 74),
     ];
     line(&riff.map(|(b, n)| (b * beat, beat * 0.9, n, 95)))
 }
@@ -820,14 +1041,34 @@ fn cut_phrase() -> Vec<Hit> {
 fn rivet_phrase() -> Vec<Hit> {
     let s16 = 60.0 / 125.0 / 4.0;
     let pat: [(u32, u8, u8); 14] = [
-        (0, 64, 110), (2, 64, 90), (3, 71, 100), (6, 69, 100), (8, 64, 110), (10, 67, 90), (11, 71, 100), (14, 74, 100),
-        (16, 62, 110), (18, 62, 90), (19, 69, 100), (22, 67, 100), (24, 62, 110), (27, 66, 100),
+        (0, 64, 110),
+        (2, 64, 90),
+        (3, 71, 100),
+        (6, 69, 100),
+        (8, 64, 110),
+        (10, 67, 90),
+        (11, 71, 100),
+        (14, 74, 100),
+        (16, 62, 110),
+        (18, 62, 90),
+        (19, 69, 100),
+        (22, 67, 100),
+        (24, 62, 110),
+        (27, 66, 100),
     ];
     line(&pat.map(|(s, n, v)| (s as f32 * s16, s16 * 0.8, n, v)))
 }
 
 fn fork_phrase() -> Vec<Hit> {
-    let notes = [(0.0, 72u8), (1.0, 79), (2.2, 76), (3.5, 84), (5.0, 72), (5.6, 77), (7.0, 69)];
+    let notes = [
+        (0.0, 72u8),
+        (1.0, 79),
+        (2.2, 76),
+        (3.5, 84),
+        (5.0, 72),
+        (5.6, 77),
+        (7.0, 69),
+    ];
     line(&notes.map(|(t, n)| (t, 0.3, n, 85)))
 }
 

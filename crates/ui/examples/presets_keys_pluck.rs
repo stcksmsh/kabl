@@ -153,10 +153,21 @@ fn perform(r: &mut Rack, knob: ModuleId, clock: Option<ModuleId>, n: usize) {
 type Op = [f32; 8];
 
 /// An `osc.fm6` wired to a `midi.in`: algorithm, index, feedback and the six operator rows.
-fn fm(r: &mut Rack, m: ModuleId, algorithm: f32, index: f32, feedback: f32, ops: &[Op; 6]) -> ModuleId {
+fn fm(
+    r: &mut Rack,
+    m: ModuleId,
+    algorithm: f32,
+    index: f32,
+    feedback: f32,
+    ops: &[Op; 6],
+) -> ModuleId {
     let voice = r.add(
         "osc.fm6",
-        &[("algorithm", algorithm), ("index", index), ("feedback", feedback)],
+        &[
+            ("algorithm", algorithm),
+            ("index", index),
+            ("feedback", feedback),
+        ],
     );
     let names = [
         "ratio", "fine", "level", "attack", "decay", "sustain", "release", "vel",
@@ -205,9 +216,9 @@ struct Stages {
 
 fn post(r: &mut Rack, knob: ModuleId, src: ModuleId, p: &Post) -> Stages {
     r.next_row();
-    let drive = p.drive.map(|(db, trim, _)| {
-        r.add("drive", &[("drive_db", db), ("trim_db", trim)])
-    });
+    let drive = p
+        .drive
+        .map(|(db, trim, _)| r.add("drive", &[("drive_db", db), ("trim_db", trim)]));
     let lad = r.add(
         "filter.ladder",
         &[("cutoff_hz", p.cutoff), ("resonance", p.resonance)],
@@ -268,7 +279,16 @@ fn post(r: &mut Rack, knob: ModuleId, src: ModuleId, p: &Post) -> Stages {
         let id = r.add("chorus", &[("mix", 0.0)]);
         stage(r, &mut last, &mut first, id);
     }
-    let tail = space_tail(r, knob, last, p.echo, p.clock, p.echo_max, p.room_decay, p.room_max);
+    let tail = space_tail(
+        r,
+        knob,
+        last,
+        p.echo,
+        p.clock,
+        p.echo_max,
+        p.room_decay,
+        p.room_max,
+    );
     r.out_stereo(tail);
     Stages {
         drive,
@@ -383,11 +403,7 @@ fn write_wav(path: &Path, left: &[f32], right: &[f32]) {
 }
 
 /// Plays `hits` through the engine for `secs` seconds. A clocked patch runs from 0.5 s.
-fn render(
-    state: &kabl_core::PatchState,
-    hits: &[Hit],
-    secs: f32,
-) -> (Vec<f32>, Vec<f32>) {
+fn render(state: &kabl_core::PatchState, hits: &[Hit], secs: f32) -> (Vec<f32>, Vec<f32>) {
     let collector = Collector::new();
     // `PP_SET="kind.param=value,..."` overrides a param on every module of that kind (A/B).
     let mut state = state.clone();
@@ -497,7 +513,10 @@ fn main() {
             let out = Path::new(&args[3]);
             let only: Option<u8> = args.get(4).and_then(|g| g.parse().ok());
             std::fs::create_dir_all(out).unwrap();
-            for p in presets().into_iter().filter(|p| only.is_none_or(|g| p.group == g)) {
+            for p in presets()
+                .into_iter()
+                .filter(|p| only.is_none_or(|g| p.group == g))
+            {
                 let log = kabl_core::load(&Path::new(&args[2]).join("presets").join(p.slug))
                     .expect("load patch");
                 let (l, r) = render(log.state(), &(p.phrase)(), p.secs);
@@ -510,7 +529,10 @@ fn main() {
         }
         Some("levels") => {
             let only = args.get(3);
-            for p in presets().into_iter().filter(|p| only.is_none_or(|s| s == p.slug)) {
+            for p in presets()
+                .into_iter()
+                .filter(|p| only.is_none_or(|s| s == p.slug))
+            {
                 let log = kabl_core::load(&Path::new(&args[2]).join("presets").join(p.slug))
                     .expect("load patch");
                 let (peak, loud) = level(log.state());
@@ -522,7 +544,11 @@ fn main() {
             let db = |v: f32| 20.0 * v.max(1e-9).log10();
             for p in presets() {
                 let mut line = format!("{:16}", p.slug);
-                for (label, set) in [("all 0", Some(0.0)), ("all 1", Some(1.0)), ("no Space", None)] {
+                for (label, set) in [
+                    ("all 0", Some(0.0)),
+                    ("all 1", Some(1.0)),
+                    ("no Space", None),
+                ] {
                     let mut rack = (p.build)();
                     let knob = *rack
                         .e
@@ -546,7 +572,11 @@ fn main() {
                     let peak = l.iter().chain(&r).fold(0.0f32, |m, s| m.max(s.abs()));
                     let ms = l.iter().chain(&r).map(|s| s * s).sum::<f32>() / (2 * l.len()) as f32;
                     assert!(peak.is_finite(), "{}: finite", p.slug);
-                    line += &format!("  {label}: peak {:6.1} rms {:6.1} |", db(peak), db(ms.sqrt()));
+                    line += &format!(
+                        "  {label}: peak {:6.1} rms {:6.1} |",
+                        db(peak),
+                        db(ms.sqrt())
+                    );
                 }
                 println!("{line}");
             }
@@ -555,13 +585,26 @@ fn main() {
             // Each named macro alone at 0 and at 1 (the others as stored): the renders must differ.
             // Prints the difference as dB below the louder render's RMS; under -40 dB is flagged.
             let only = args.get(2);
-            for p in presets().into_iter().filter(|p| only.is_none_or(|s| s == p.slug)) {
+            for p in presets()
+                .into_iter()
+                .filter(|p| only.is_none_or(|s| s == p.slug))
+            {
                 let rack = (p.build)();
-                let knob = *rack.e.state().modules.iter().find(|(_, m)| m.kind == "macro").unwrap().0;
+                let knob = *rack
+                    .e
+                    .state()
+                    .modules
+                    .iter()
+                    .find(|(_, m)| m.kind == "macro")
+                    .unwrap()
+                    .0;
                 let mut line = format!("MOVES {:16}", p.slug);
                 for k in 1..=8 {
                     let key = format!("m{k}");
-                    let Some(name) = rack.e.state().labels[&knob].get(&format!("name.{key}")).cloned() else {
+                    let Some(name) = rack.e.state().labels[&knob]
+                        .get(&format!("name.{key}"))
+                        .cloned()
+                    else {
                         continue;
                     };
                     let at = |v: f32| {
@@ -570,7 +613,9 @@ fn main() {
                         render(r.e.state(), &(p.phrase)(), p.secs).0
                     };
                     let (a, b) = (at(0.0), at(1.0));
-                    let rms = |v: &[f32]| (v.iter().map(|s| s * s).sum::<f32>() / v.len().max(1) as f32).sqrt();
+                    let rms = |v: &[f32]| {
+                        (v.iter().map(|s| s * s).sum::<f32>() / v.len().max(1) as f32).sqrt()
+                    };
                     let d: Vec<f32> = a.iter().zip(&b).map(|(x, y)| x - y).collect();
                     let db = 20.0 * (rms(&d) / rms(&a).max(rms(&b)).max(1e-9)).max(1e-9).log10();
                     let flag = if db < -40.0 { " FLAT" } else { "" };
@@ -620,7 +665,10 @@ fn main() {
         Some("info") => {
             let info = kabl_modules::registry::info_for(&args[2]).expect("kind");
             for p in info.params {
-                println!("{:14} {:>9} .. {:<9} default {}", p.name, p.min, p.max, p.default);
+                println!(
+                    "{:14} {:>9} .. {:<9} default {}",
+                    p.name, p.min, p.max, p.default
+                );
             }
         }
         _ => eprintln!("usage: presets_keys_pluck write|clips|levels|macros|library|phrases|info"),
