@@ -8,6 +8,7 @@
 use kabl_core::{ModuleId, PatchState, PortRef, Vec2};
 use kabl_engine::graph::BLOCK;
 use kabl_engine::patch_engine::PatchEngine;
+use kabl_modules::builtins::{cell_index, make_code, with_code, VELOCITY};
 use kabl_ui::PatchEditor;
 
 const SR: f32 = 48000.0;
@@ -79,21 +80,46 @@ fn hit(r: &mut Rack, seq: ModuleId, voice: ModuleId, gate: &str) {
     r.wire(seq, "velocity", voice, "velocity");
 }
 
-/// A house groove at 124 bpm over two beats: kick on every beat, snare and clap on the second,
-/// open hats on the off-beats cut by closed hats, a tom fill in the second bank.
+/// Sets one pattern row of a `drum.grid` from `(step 0..16, velocity)` pairs, the velocity
+/// snapped to the nearest of the grid's four levels, always certain (chance 100 %).
+fn grid_row(r: &mut Rack, grid: ModuleId, pattern: usize, row: usize, steps: &[(usize, f32)]) {
+    let mut chunks = [0.0f32; 4];
+    for &(step, vel) in steps {
+        let level = (0..4)
+            .min_by(|&a, &b| {
+                (VELOCITY[a] - vel)
+                    .abs()
+                    .total_cmp(&(VELOCITY[b] - vel).abs())
+            })
+            .unwrap();
+        let c = step / 4;
+        chunks[c] = with_code(chunks[c], step % 4, make_code(level, 0));
+    }
+    let params = kabl_modules::registry::info_for("drum.grid")
+        .unwrap()
+        .params;
+    for (c, v) in chunks.into_iter().enumerate() {
+        r.e.set_param(grid, params[cell_index(pattern, row, c)].name, v);
+    }
+}
+
+/// The same `(step, velocity)` pairs again eight steps later.
+fn twice(a: &[(usize, f32)]) -> Vec<(usize, f32)> {
+    a.iter()
+        .copied()
+        .chain(a.iter().map(|&(s, v)| (s + 8, v)))
+        .collect()
+}
+
+/// A house groove at 124 bpm, one bar of 16 steps on one `drum.grid`: kick on every beat, snare
+/// and clap on the second and fourth, open hats on the off-beats cut by closed hats. Pattern B
+/// adds a snare ghost note and a tom fill (pick it with the B tab or the pattern input).
 fn four_floor() -> PatchEditor {
     let mut r = Rack::new();
     let clock = r.add("clock", &[("bpm", 124.0)]);
-    let kick_seq = lane(&mut r, &[(1, 1.0), (5, 0.95)], &[(1, 1.0), (5, 0.95)]);
-    let back_seq = lane(&mut r, &[(5, 1.0)], &[(5, 1.0), (8, 0.45)]);
-    let closed_seq = lane(
-        &mut r,
-        &[(1, 0.7), (2, 0.35), (4, 0.6), (5, 0.7), (6, 0.35), (8, 0.6)],
-        &[(1, 0.8), (2, 0.4), (4, 0.65), (5, 0.8), (6, 0.4), (8, 0.65)],
-    );
     r.next_row();
-    let open_seq = lane(&mut r, &[(3, 0.85), (7, 0.85)], &[(3, 0.9), (7, 0.9)]);
-    let tom_seq = lane(&mut r, &[], &[(6, 0.7), (7, 0.8)]);
+    let grid = r.add("drum.grid", &[]);
+    r.col += 360.0;
     let kick = r.add("drum.kick", &[("level_db", 0.0)]);
     let snare = r.add("drum.snare", &[("level_db", -6.0)]);
     r.next_row();
@@ -110,20 +136,43 @@ fn four_floor() -> PatchEditor {
         ],
     );
     r.next_row();
-    let fill = r.add("mixer", &[("level1", 1.0), ("level2", 0.7)]);
+    // The old lanes passed velocities of 1 to a percent param (about 1 %), so the kit was
+    // mixed hot-less; real velocities need about 0.4 of the old level to keep the factory loudness.
+    let fill = r.add("mixer", &[("level1", 0.42), ("level2", 0.3)]);
     let out = r.add("out", &[]);
-    for seq in [kick_seq, back_seq, closed_seq, open_seq, tom_seq] {
-        r.wire(clock, "gate", seq, "clock");
-        r.wire(clock, "reset", seq, "reset");
+    let kick_steps = [(0, 1.0), (4, 0.95), (8, 1.0), (12, 0.95)];
+    let back = [(4, 1.0), (12, 1.0)];
+    let closed = twice(&[(0, 0.7), (1, 0.35), (3, 0.6), (4, 0.7), (5, 0.35), (7, 0.6)]);
+    let open = twice(&[(2, 0.85), (6, 0.85)]);
+    for (pat, fill_bar) in [(0, false), (1, true)] {
+        let snare_steps: Vec<(usize, f32)> = if fill_bar {
+            back.iter()
+                .copied()
+                .chain([(7, 0.45), (15, 0.45)])
+                .collect()
+        } else {
+            back.to_vec()
+        };
+        let tom_steps: &[(usize, f32)] = if fill_bar {
+            &[(5, 0.7), (6, 0.8), (13, 0.7), (14, 0.8)]
+        } else {
+            &[]
+        };
+        grid_row(&mut r, grid, pat, 0, &kick_steps);
+        grid_row(&mut r, grid, pat, 1, &snare_steps);
+        grid_row(&mut r, grid, pat, 2, &back);
+        grid_row(&mut r, grid, pat, 3, &closed);
+        grid_row(&mut r, grid, pat, 4, &open);
+        grid_row(&mut r, grid, pat, 5, tom_steps);
     }
-    hit(&mut r, kick_seq, kick, "gate");
-    hit(&mut r, back_seq, snare, "gate");
-    r.wire(back_seq, "gate", clap, "gate");
-    r.wire(back_seq, "velocity", clap, "velocity");
-    r.wire(closed_seq, "gate", hat, "closed");
-    r.wire(closed_seq, "velocity", hat, "velocity");
-    r.wire(open_seq, "gate", hat, "open");
-    hit(&mut r, tom_seq, tom, "gate");
+    r.wire(clock, "gate", grid, "clock");
+    r.wire(clock, "reset", grid, "reset");
+    r.wire(grid, "kick", kick, "gate");
+    r.wire(grid, "snare", snare, "gate");
+    r.wire(grid, "clap", clap, "gate");
+    r.wire(grid, "chat", hat, "closed");
+    r.wire(grid, "ohat", hat, "open");
+    r.wire(grid, "tom", tom, "gate");
     r.wire(kick, "out", kit, "in1");
     r.wire(snare, "out", kit, "in2");
     r.wire(clap, "out", kit, "in3");
@@ -314,6 +363,58 @@ fn write_wav(path: &std::path::Path, audio: &[f32]) {
     w.finalize().unwrap();
 }
 
+/// Writes `(step, velocity level, chance level)` triples into a row of pattern A.
+fn grid_levels(r: &mut Rack, grid: ModuleId, row: usize, steps: &[(usize, usize, usize)]) {
+    let params = kabl_modules::registry::info_for("drum.grid")
+        .unwrap()
+        .params;
+    let mut chunks = [0.0f32; 4];
+    for &(step, vel, chance) in steps {
+        chunks[step / 4] = with_code(chunks[step / 4], step % 4, make_code(vel, chance));
+    }
+    for (c, v) in chunks.into_iter().enumerate() {
+        r.e.set_param(grid, params[cell_index(0, row, c)].name, v);
+    }
+}
+
+/// The four-floor groove with the grid's velocity and chance in use: hats on every 16th at
+/// four velocities, ghost snares that play half the time or less.
+fn showcase() -> PatchEditor {
+    let mut r = Rack {
+        e: four_floor(),
+        col: 0.0,
+        row: 0.0,
+    };
+    let grid = 2;
+    let hats: Vec<_> = (0..16)
+        .filter(|s| s % 4 != 2)
+        .map(|s| (s, [3, 0, 1, 0][s % 4], 0))
+        .collect();
+    grid_levels(&mut r, grid, 3, &hats);
+    grid_levels(
+        &mut r,
+        grid,
+        4,
+        &[(2, 2, 0), (6, 2, 0), (10, 2, 0), (14, 2, 1)],
+    );
+    grid_levels(
+        &mut r,
+        grid,
+        1,
+        &[(4, 3, 0), (7, 0, 2), (10, 0, 2), (12, 3, 0), (15, 1, 1)],
+    );
+    r.e
+}
+
+/// Not a check: `target/drum-grid/beat.wav`, 16 seconds of `showcase`.
+#[test]
+#[ignore]
+fn write_clip() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/drum-grid");
+    std::fs::create_dir_all(&dir).unwrap();
+    write_wav(&dir.join("beat.wav"), &render(showcase().state(), 16.0));
+}
+
 /// Not a check: `target/drum-demos/*.wav`, 16 seconds each.
 #[test]
 #[ignore]
@@ -436,4 +537,18 @@ fn the_groove_hits_on_the_beat_and_the_second_bank_adds_the_fill() {
     ] {
         assert!(kinds.contains(&k), "{k}");
     }
+}
+
+/// Not a check: `target/drum-grid/state.json`, the four-floor patch as the plugin's `patch`
+/// state (for `docs/drum-grid/scripts/host_grid.py`).
+#[test]
+#[ignore]
+fn write_state_json() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/drum-grid");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("state.json"),
+        serde_json::to_string(showcase().state()).unwrap(),
+    )
+    .unwrap();
 }

@@ -584,6 +584,7 @@ pub fn short_name(kind: &str) -> &'static str {
         "drum.hat" => "Hat",
         "drum.tom" => "Tom",
         "midi.note" => "Note",
+        "drum.grid" => "Grid",
         _ => "?",
     }
 }
