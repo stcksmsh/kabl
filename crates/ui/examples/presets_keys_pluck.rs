@@ -85,15 +85,6 @@ impl Rack {
         let cable = self.e.connect_route(jack(a, ap), b, param);
         self.e.set_route_amount(cable, amount, true);
     }
-    /// An LFO whose depth is macro `m`: the LFO runs through a VCA the macro opens. Returns the
-    /// VCA; route its `out` into whatever should move.
-    fn motion(&mut self, knob: ModuleId, m: &str, rate_hz: f32) -> ModuleId {
-        let lfo = self.add("lfo", &[("rate_hz", rate_hz)]);
-        let depth = self.add("vca", &[("gain", 0.0)]);
-        self.wire(lfo, "out", depth, "in");
-        self.route(knob, m, depth, "gain", 1.0);
-        depth
-    }
     /// The last stage: a limiter just under the level target's ceiling, then the output.
     fn out_stereo(&mut self, from: ModuleId) {
         let limiter = self.add("limiter", &[("ceiling_db", -1.5), ("release_ms", 150.0)]);
@@ -183,6 +174,9 @@ fn fm(
     voice
 }
 
+type PhaserSpec<'a> = (&'a [(&'static str, f32)], Option<(&'static str, f32)>);
+type ChorusSpec<'a> = (&'a [(&'static str, f32)], Option<f32>);
+
 /// Everything after the voice, the same for every preset: drive, ladder filter, trim, then the
 /// stereo stages (phaser, chorus, compressor), the echo and room, the limiter. m1 opens the
 /// filter, m2 pushes the drive, m3 is the space; the caller routes m4.
@@ -195,9 +189,9 @@ struct Post<'a> {
     cut_m1: f32,
     trim_db: f32,
     /// Phaser params, and an optional m4 route into one of its knobs (param, amount).
-    phaser: Option<(&'a [(&'static str, f32)], Option<(&'static str, f32)>)>,
+    phaser: Option<PhaserSpec<'a>>,
     /// Chorus params, and the share of m4 that opens its mix (None: the mix is as stored).
-    chorus: Option<(&'a [(&'static str, f32)], Option<f32>)>,
+    chorus: Option<ChorusSpec<'a>>,
     comp: Option<&'a [(&'static str, f32)]>,
     /// A module whose `out` feeds the compressor's sidechain, and an m4 route into one of its knobs.
     duck: Option<(ModuleId, Option<(&'static str, f32)>)>,
@@ -209,9 +203,7 @@ struct Post<'a> {
 }
 
 struct Stages {
-    drive: Option<ModuleId>,
     lad: ModuleId,
-    chorus: Option<ModuleId>,
 }
 
 fn post(r: &mut Rack, knob: ModuleId, src: ModuleId, p: &Post) -> Stages {
@@ -239,7 +231,6 @@ fn post(r: &mut Rack, knob: ModuleId, src: ModuleId, p: &Post) -> Stages {
     // Stereo chain: each stage takes the previous one's left and right.
     let mut last = trim;
     let mut first = true;
-    let mut chorus_id = None;
     let stage = |r: &mut Rack, last: &mut ModuleId, first: &mut bool, id: ModuleId| {
         if *first {
             r.wire_both(*last, "out", id);
@@ -262,7 +253,6 @@ fn post(r: &mut Rack, knob: ModuleId, src: ModuleId, p: &Post) -> Stages {
         if let Some(amt) = m4 {
             r.route(knob, "m4", id, "mix", amt);
         }
-        chorus_id = Some(id);
     }
     if let Some(cp) = p.comp {
         let id = r.add("compressor", cp);
@@ -290,11 +280,7 @@ fn post(r: &mut Rack, knob: ModuleId, src: ModuleId, p: &Post) -> Stages {
         p.room_max,
     );
     r.out_stereo(tail);
-    Stages {
-        drive,
-        lad,
-        chorus: chorus_id,
-    }
+    Stages { lad }
 }
 
 /// A short echo (a slapback, or tempo-synced when `clock` is given) and a room, both at mix 0

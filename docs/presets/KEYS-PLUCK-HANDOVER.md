@@ -1,34 +1,52 @@
-# Keys / Pluck presets: handover
+# Keys / Pluck presets, group 2: handover (branch `claude/presets-keys-pluck-2`)
 
-Branch `claude/presets-keys-pluck` (PR #46, draft; never merge). Report to the session "Kabl overseer". Stop when done.
+Group 1 (8 presets, Parquet Loop glide and legato clips, `host_glide.py`) is PR #46 on `claude/presets-keys-pluck`. This branch is group 2 on top of master. Report to the session "Kabl overseer", do not merge, stop when done.
 
-## Task as received
-1. Commit and push the previous agent's uncommitted work as WIP.
-2. Diagnose "no glide in Parquet Loop" (Glide 0.8, ALWAYS): pitch-track, trace Glide to ms, check poly and mono, confirm in REAPER on the `kabl_agents` sink.
-3. Fix an engine or renderer defect only if one exists. Do not continue to group 2 presets.
+## Task (condensed)
+Finish 15 keys and plucks: rename keys Copper Wire (slug clash with bass Copper Wire on master), level, register, tests, clips FLAC + 320k mp3, tour FLAC with start times, every macro moves the render, REAPER save/reopen check, standalone check. Run `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings` before every push.
 
 ## Done
-- `a1a8d98` WIP commit: group 2 start (15 preset definitions in `crates/ui/examples/presets_keys_pluck/group2.rs`, 14 new patch dirs, library entries), Parquet Loop legato and glide-demo clips, `clips.py` additions.
-- Glide diagnosis: no engine or renderer defect (below). Added `docs/presets/scripts/host_glide.py` and evidence in `docs/presets/evidence/host-glide/`.
-- `cargo test -p kabl-ui --test library`: 24 passed with the WIP.
+- Rename: keys Copper Wire is now Brass Filament (`brass-filament`); master's bass Copper Wire kept.
+- Generator `crates/ui/examples/presets_keys_pluck/group2.rs`; new check `presets_keys_pluck moves [slug]` (each macro alone at 0 and at 1, difference in dB below the louder render; under -40 dB prints FLAT). No preset is FLAT.
+- Level test (`levels`; band -19 +- 5.5 loud, peak <= -1.0): all 15 inside, loud -17.0 (Willow) to -20.9 (Spinet), peaks -1.5 to -5.3.
+- Tests: `cargo test -p kabl-ui --test library --test factory_bank` pass; fmt and clippy clean.
+- Clips and tour: `docs/presets/clips/keys-pluck/group2/` (FLAC + 320k mp3 per preset, mp3 checked against the float WAV; `tour.flac`, `tour.txt`).
+- REAPER (real CLAP, save, quit, reopen): `docs/presets/evidence/host-keys-pluck-2/`; all 15 states identical, restart renders equal, silent without MIDI.
+- Standalone (kabl_agents sink, real-time priority): `docs/presets/evidence/standalone-keys-pluck-2/`; 15 of 15 ok.
 
-## Glide finding
-- Cause: none found. The stored patch glides in the offline renderer and in real REAPER (CLAP plugin on `kabl_agents`).
-- Measured: constant-time linear slide in semitones, about 0.49 s for a 16-semitone leap (A3 from E2: 40.7 to 56.9 in 0.50 s; D4 from G2: 43.7 to 61.9 in 0.50 s). Offline FLAC and the REAPER render match within 0.5 semitone.
-- Chain: macro m4 stored 0.9, route amount 0.8 on `midi.in.glide_ms` (5..3000 ms, exponential): 0.72 of range gives 5 * 600^0.72 = about 500 ms. Matches the measurement. `midi.in.glide` stored 1 (ALWAYS).
-- Poly (`poly_on`, glide from nearest tone of the previous chord) and mono (legato clips) both slide. Same-key retrigger in POLY never glides, by design.
-- Off control (`macro.m4=0`): glide_ms is 5 ms, so notes step. That is the "Glide down" behaviour.
+## Tour start times (tour.flac)
+Tin Roof 0:00, Turnstile 0:14, Hand Bell 0:25, Corduroy 0:40, Matinee 0:50, Snowmelt 1:08, Scaffold 1:28, Brass Filament 1:38, Spinet 1:55, Willow 2:02, Dry Creek 2:14, Gumdrop 2:21, Cold Cut 2:28, Rivet Gun 2:38, Tuning Fork 2:44.
 
-## Remaining (not started, in order)
-1. Ask Kosta how he tested: which build, which preset copy, whether he moved the Glide knob down, and whether he played overlapping chords. If still silent for him, repeat with his exact MIDI.
-2. Group 2: render clips (`docs/presets/scripts/clips_keys_pluck.py`), listen, host check with `host.py`, tune. None done. Patches exist, sound unreviewed.
-3. Next command: `target/release/examples/presets_keys_pluck write <dir>` after `cargo build --release --examples -p kabl-ui`.
+## Presets (4 macros each, from code)
+- Tin Roof: Wurlitzer-like electric piano that barks harder when played harder. Tone, Bark, Room, Chorus.
+- Turnstile: driven, phased saw chord pumping against an internal four-on-the-floor kick, 123 BPM (signature). Cutoff, Crunch, Room, Pump.
+- Hand Bell: inharmonic FM bell, three operator pairs. Strike, Grit, Space, Shimmer.
+- Corduroy: funk clavinet, narrow pulse with a hard filter snap. Cutoff, Drive, Room, Phase.
+- Matinee: wide keyboard from seven detuned saws. Cutoff, Warmth, Space, Width.
+- Snowmelt: slow soft electric piano with drifting tuning. Tine, Warmth, Space, Drift.
+- Scaffold: dark wide drum and bass stab, eight saws, phaser, compressor. Cutoff, Grit, Room, Length.
+- Brass Filament: metallic FM tone that rings and wavers. Strike, Rust, Space, Warp.
+- Spinet: bright harpsichord-like key with a faint buzz. Tone, Buzz, Room, Chorus.
+- Willow: soft harp, quick pluck, long ring. Pluck, Warmth, Space, Stretch.
+- Dry Creek: nylon-string guitar pluck. Pick, Warmth, Room, Chorus.
+- Gumdrop: short bouncy pop pluck, resonant filter bounce. Cutoff, Drive, Space, Decay.
+- Cold Cut: dark short bell-pluck for trap. Tone, Dirt, Room, Decay.
+- Rivet Gun: bright staccato phased pluck, driven and squashed. Cutoff, Crunch, Room, Phase.
+- Tuning Fork: tuned metal bars, six free-bar partials. Strike, Warmth, Space, Wobble.
 
-## Facts that cost effort
-- `host_glide.py` needs `scratch/presets-phrases.json` with a `parquet-loop` entry (`secs`, `hits` as `[t, note, vel]`, `cues`). `GLIDE_M4=<0..1>` overrides macro m4. Needs a release `kabl-clap` build.
-- `PP_SET="macro.m4=0"` and `PP_HITS="t:note:vel;..."` override params and phrase in `presets_pilot`.
-- Autocorrelation pitch tracking reads the first note as an octave error; ignore note 0.
+## Measured flags
+- Level test loud/peak dBFS: Tin Roof -18.7/-4.6, Turnstile -19.1/-3.4, Hand Bell -19.0/-1.5, Corduroy -20.0/-2.8, Matinee -18.6/-5.3, Snowmelt -17.2/-1.5, Scaffold -20.5/-4.7, Brass Filament -19.1/-3.1, Spinet -20.9/-3.4, Willow -17.0/-2.2, Dry Creek -19.3/-1.8, Gumdrop -18.5/-4.3, Cold Cut -19.7/-1.5, Rivet Gun -19.8/-1.5, Tuning Fork -19.6/-1.5.
+- Clip peaks are lower (-1.5 Turnstile and Snowmelt to -10.0 Cold Cut): the clip phrases are sparse and soft.
+- Click scan (5 ms windows, share above 3 kHz over 0.7 at audible level): Hand Bell 36 windows (bright by design, inharmonic partials), Cold Cut 5 windows (metallic click by design); all others 0. Not judged by ear.
+- Weakest macro moves: Corduroy Cutoff -24.1 dB, Spinet Tone -21.8, Matinee Cutoff -18.7; the rest are -17 dB or stronger.
+- Phrase registers (MIDI): Tuning Fork 69-84 and Cold Cut 67-76 highest; Matinee, Snowmelt, Scaffold, Willow reach down to 41.
+- Nothing here is a listening verdict; Kosta has not heard group 2.
 
-## Working assumptions / open decisions
-- Assumption: Kosta heard a 0.5 s slide on a decaying pluck as no glide, or tested a different build. Unconfirmed.
-- Decision for Kosta: shorter default glide, or exponential (not linear) slide, if 0.5 s reads too weak.
+## Remaining
+1. Kosta listens to the group 2 clips and tour.
+2. Draft PR for this branch (overseer opens it if push to a PR is denied); after #46 merges, merge master into this branch.
+3. `cargo clean` when done.
+
+## Facts
+- `PH_OUT=... PH_PHRASES=... python3 docs/presets/scripts/host.py [slugs]`; phrases from `presets_keys_pluck phrases <file>`.
+- Compound shell commands can trip the worktree guard. A temp `git worktree add` with `CARGO_TARGET_DIR` set to this target dir avoids a second build.
