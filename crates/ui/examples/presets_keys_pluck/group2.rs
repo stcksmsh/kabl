@@ -332,8 +332,8 @@ fn scaffold() -> Rack {
     r
 }
 
-/// Copper Wire: a sustained, metallic, slightly unstable FM tone.
-fn copper_wire() -> Rack {
+/// Brass Filament: a sustained, metallic, slightly unstable FM tone.
+fn brass_filament() -> Rack {
     let mut r = Rack::new();
     let knob = macros(&mut r, &["Strike", "Rust", "Space", "Warp"], &[0.45, 0.25, 0.45, 0.30]);
     let m = r.add("midi.in", &[("bend", 2.0)]);
@@ -758,7 +758,7 @@ fn scaffold_phrase() -> Vec<Hit> {
     )
 }
 
-fn wire_phrase() -> Vec<Hit> {
+fn filament_phrase() -> Vec<Hit> {
     comp(
         60.0,
         90,
@@ -920,15 +920,15 @@ pub fn presets() -> Vec<Preset> {
             secs: 9.0,
         },
         Preset {
-            slug: "copper-wire",
-            name: "Copper Wire",
+            slug: "brass-filament",
+            name: "Brass Filament",
             category: "Keys",
             tags: &["poly", "fm", "metallic", "experimental"],
             description: "A metallic FM tone that rings and wavers: inharmonic partials, a little feedback and a slow fade. Play sparse two-note intervals. Strike sets the brightness, Rust adds drive, Space sets the echo and room, Warp feeds the sound back into itself.",
             listen: "The unstable, slightly out-of-tune shimmer; Warp up makes it harsher",
             group: 2,
-            build: copper_wire,
-            phrase: wire_phrase,
+            build: brass_filament,
+            phrase: filament_phrase,
             secs: 16.0,
         },
         Preset {

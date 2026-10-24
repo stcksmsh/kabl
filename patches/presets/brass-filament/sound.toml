@@ -1,0 +1,11 @@
+name = "Brass Filament"
+category = "Keys"
+tags = [
+    "poly",
+    "fm",
+    "metallic",
+    "experimental",
+]
+description = "A metallic FM tone that rings and wavers: inharmonic partials, a little feedback and a slow fade. Play sparse two-note intervals. Strike sets the brightness, Rust adds drive, Space sets the echo and room, Warp feeds the sound back into itself."
+keys = true
+sequence = false

@@ -551,6 +551,34 @@ fn main() {
                 println!("{line}");
             }
         }
+        Some("moves") => {
+            // Each named macro alone at 0 and at 1 (the others as stored): the renders must differ.
+            // Prints the difference as dB below the louder render's RMS; under -40 dB is flagged.
+            let only = args.get(2);
+            for p in presets().into_iter().filter(|p| only.is_none_or(|s| s == p.slug)) {
+                let rack = (p.build)();
+                let knob = *rack.e.state().modules.iter().find(|(_, m)| m.kind == "macro").unwrap().0;
+                let mut line = format!("MOVES {:16}", p.slug);
+                for k in 1..=8 {
+                    let key = format!("m{k}");
+                    let Some(name) = rack.e.state().labels[&knob].get(&format!("name.{key}")).cloned() else {
+                        continue;
+                    };
+                    let at = |v: f32| {
+                        let mut r = (p.build)();
+                        r.e.set_param(knob, &key, v);
+                        render(r.e.state(), &(p.phrase)(), p.secs).0
+                    };
+                    let (a, b) = (at(0.0), at(1.0));
+                    let rms = |v: &[f32]| (v.iter().map(|s| s * s).sum::<f32>() / v.len().max(1) as f32).sqrt();
+                    let d: Vec<f32> = a.iter().zip(&b).map(|(x, y)| x - y).collect();
+                    let db = 20.0 * (rms(&d) / rms(&a).max(rms(&b)).max(1e-9)).max(1e-9).log10();
+                    let flag = if db < -40.0 { " FLAT" } else { "" };
+                    line += &format!(" | {key} {name} {db:.1}{flag}");
+                }
+                println!("{line}");
+            }
+        }
         Some("library") => {
             // The FACTORY entries for crates/ui/tests/library.rs, one block, to stdout.
             for p in presets() {

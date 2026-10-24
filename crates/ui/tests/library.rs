@@ -255,8 +255,8 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "A dark, wide stab for drum and bass: eight detuned saws, a closing filter, a phaser and a compressor. Play short rolling chords. Cutoff opens the filter, Grit pushes the drive, Room sets a slapback and a tight room, Length stretches the stab.",
     ),
     (
-        "presets/copper-wire",
-        "Copper Wire",
+        "presets/brass-filament",
+        "Brass Filament",
         "Keys",
         &["poly", "fm", "metallic", "experimental"],
         "A metallic FM tone that rings and wavers: inharmonic partials, a little feedback and a slow fade. Play sparse two-note intervals. Strike sets the brightness, Rust adds drive, Space sets the echo and room, Warp feeds the sound back into itself.",
