@@ -730,17 +730,17 @@ fn acid_rain() -> Rack {
         ],
         midi: [2.0, 2.0, 55.0],
         oscs: vec![osc(2.0, 0, 0.6), osc(3.0, -1, 0.3)],
-        drive: [10.0, -5.0],
-        lad: [220.0, 0.40, 6.0],
-        fenv: [1.0, 220.0, 0.0, 100.0],
-        fenv_amt: 0.22,
+        drive: [7.0, -3.5],
+        lad: [220.0, 0.28, 2.0],
+        fenv: [6.0, 220.0, 0.0, 100.0],
+        fenv_amt: 0.16,
         wheel_amt: 0.3,
-        aenv: [1.0, 250.0, 0.7, 40.0],
+        aenv: [3.0, 250.0, 0.7, 40.0],
         trim_db: 9.0,
     });
-    v.r.route(v.m, "velocity", v.lad, "cutoff_hz", 0.06);
+    v.r.route(v.m, "velocity", v.lad, "cutoff_hz", 0.03);
     v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.45);
-    v.r.route(v.knob, "m2", v.lad, "resonance", 0.45);
+    v.r.route(v.knob, "m2", v.lad, "resonance", 0.35);
     v.r.route(v.knob, "m4", v.drive, "drive_db", 0.5);
     v.stage("compressor", &compressor(-24.0, 3.0, 5.0, 100.0, 4.0));
     v.finish("m3", &echo(352.0, 45.0, 4000.0), 0.4, (0.9, 0.2), None)
@@ -852,16 +852,16 @@ fn hot_wire() -> Rack {
         midi: [2.0, 2.0, 45.0],
         oscs: vec![osc(2.0, 0, 0.6), osc(3.0, 0, 0.3).pw(40.0).fine(4.0)],
         drive: [8.0, -4.0],
-        lad: [600.0, 0.38, 4.0],
-        fenv: [1.0, 200.0, 0.25, 120.0],
+        lad: [600.0, 0.32, 2.0],
+        fenv: [4.0, 200.0, 0.25, 120.0],
         fenv_amt: 0.15,
         wheel_amt: 0.0,
-        aenv: [2.0, 250.0, 0.75, 120.0],
+        aenv: [3.0, 250.0, 0.75, 120.0],
         trim_db: 12.0,
     });
     v.r.route(v.m, "velocity", v.lad, "cutoff_hz", 0.05);
     v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.4);
-    v.r.route(v.knob, "m2", v.lad, "resonance", 0.45);
+    v.r.route(v.knob, "m2", v.lad, "resonance", 0.38);
     let pwm = v.r.add("lfo", &[("rate_hz", 0.7)]);
     v.r.depth_route(pwm, "out", v.oscs[1], "pw", v.knob, "m4", 0.35);
     v.stage("compressor", &compressor(-24.0, 3.0, 5.0, 100.0, 4.0));

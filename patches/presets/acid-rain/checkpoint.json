@@ -82,8 +82,8 @@
         "y": 320.0
       },
       "params": {
-        "drive_db": 10.0,
-        "trim_db": -5.0
+        "drive_db": 7.0,
+        "trim_db": -3.5
       }
     },
     "7": {
@@ -94,8 +94,8 @@
       },
       "params": {
         "cutoff_hz": 220.0,
-        "drive_db": 6.0,
-        "resonance": 0.4
+        "drive_db": 2.0,
+        "resonance": 0.28
       }
     },
     "8": {
@@ -105,7 +105,7 @@
         "y": 320.0
       },
       "params": {
-        "attack_ms": 1.0,
+        "attack_ms": 6.0,
         "decay_ms": 220.0,
         "release_ms": 100.0,
         "sustain": 0.0
@@ -118,7 +118,7 @@
         "y": 320.0
       },
       "params": {
-        "attack_ms": 1.0,
+        "attack_ms": 3.0,
         "decay_ms": 250.0,
         "release_ms": 40.0,
         "sustain": 0.7
@@ -397,7 +397,7 @@
         }
       },
       "params": {
-        "amount": 0.22
+        "amount": 0.16
       },
       "steps": []
     },
@@ -433,7 +433,7 @@
         }
       },
       "params": {
-        "amount": 0.06
+        "amount": 0.03
       },
       "steps": []
     },
@@ -469,7 +469,7 @@
         }
       },
       "params": {
-        "amount": 0.45
+        "amount": 0.35
       },
       "steps": []
     },

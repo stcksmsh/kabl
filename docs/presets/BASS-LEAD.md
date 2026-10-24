@@ -48,6 +48,10 @@ Depth routes: Soft Shoe's Pluck scales the filter envelope's depth; the vibratos
 - clips: 320 kbps mp3 decoded against the float render, 40 to 82 dB under the signal below 16 kHz, peaks within 0.1 dB (peaks are compared below 16 kHz now; a bright saw's edges above it are not the encoder's doing).
 - REAPER 7.75 (`scripts/host.py`, evidence in `evidence/host-bass-lead/`): all eight saved, fully quit, reopened, identical state, identical render; the MIDI is what plays them (Steel Toe keeps its kick). Standalone (`scripts/standalone.py`, evidence in `evidence/standalone-bass-lead/`): all eight open and stay running with real-time priority. Both ran on the silent sink `kabl_agents`.
 
+## Round two (Kosta's first listen)
+
+Acid Rain was too resonant with high clicks; Hot Wire the same, less. Measured as energy above 3 kHz in 5 ms windows: Acid Rain peaked 16 dB under the total level at default, now 22 dB lower than before. Causes: 1 ms attacks on the filter envelope (the cutoff jumped and the resonance rang), ladder drive plus the drive stage feeding the resonance, and a resonance of 0.40. Now: filter attack 6 ms (Hot Wire 4), amp attack 3 ms, resonance 0.28 (Hot Wire 0.32), ladder drive 2 dB, drive stage 7 dB (Acid Rain), a smaller envelope and velocity sweep, and a smaller Squelch range (at Squelch 1 Acid Rain is still 10 dB quieter above 3 kHz than the old default). Slides are untouched.
+
 ## Gaps
 
 - Unison is capped at four voices on master (PR #42 lifts it); poly glide is not needed here (all voices are mono).
