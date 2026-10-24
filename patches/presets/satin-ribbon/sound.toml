@@ -1,0 +1,12 @@
+name = "Satin Ribbon"
+category = "Lead"
+tags = [
+    "mono",
+    "legato",
+    "smooth",
+    "chorus",
+    "pop",
+]
+description = "A smooth, vocal pop lead: a detuned saw stack over a triangle, a ladder filter that opens with velocity, light chorus and a dotted echo. Play legato; notes glide. Tone brightens, Edge adds drive, Space adds the echo and a room, Vibrato fades in a gentle vibrato."
+keys = true
+sequence = false

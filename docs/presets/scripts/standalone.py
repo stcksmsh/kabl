@@ -16,7 +16,7 @@ from pathlib import Path
 
 repo = Path(__file__).resolve().parents[3]
 os.chdir(repo)
-out = repo / 'docs/presets/evidence/standalone'
+out = Path(os.environ.get('PH_OUT', repo / 'docs/presets/evidence/standalone'))
 out.mkdir(parents=True, exist_ok=True)
 scratch = repo / 'scratch/presets-standalone'
 scratch.mkdir(parents=True, exist_ok=True)
@@ -27,6 +27,9 @@ presets = {
     'glass-elevator': [52, 59, 64, 67], 'undertow': [28], 'salt-flat': [50, 57, 62, 65],
     'boxwood': [60, 64, 67], 'neon-highway': [64],
 }
+# Other presets: slug=note,note ... on the command line.
+if sys.argv[1:]:
+    presets = {a.split('=')[0]: [int(n) for n in a.split('=')[1].split(',')] for a in sys.argv[1:]}
 env = dict(os.environ, PIPEWIRE_NODE='kabl_agents', PULSE_SINK='kabl_agents', DISPLAY=disp, WINIT_X11_SCALE_FACTOR='1', KABL_PLAYER='1', KABL_ARGS='--midi kabl-player',
            KABL_CAPTURE_WINDOW='1', KABL_USER_DIR=str(scratch / 'library'))
 x = sp.Popen(['Xvfb', disp, '-screen', '0', '1600x1000x24', '-nolisten', 'tcp'], stdout=sp.DEVNULL, stderr=sp.DEVNULL)

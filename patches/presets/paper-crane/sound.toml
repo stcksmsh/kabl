@@ -1,0 +1,13 @@
+name = "Paper Crane"
+category = "Lead"
+tags = [
+    "mono",
+    "legato",
+    "soft",
+    "slow",
+    "ambient",
+    "cinematic",
+]
+description = "A soft ambient lead that swells in: a triangle stack with a sine an octave up, chorus, a long echo and a big room. Play long, slow notes. Tone opens the filter, Swell lengthens the fade-in of each note, Space is the echo and room, Vibrato adds a slow vibrato."
+keys = true
+sequence = false
