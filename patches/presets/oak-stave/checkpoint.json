@@ -93,7 +93,7 @@
         "y": 320.0
       },
       "params": {
-        "cutoff_hz": 900.0,
+        "cutoff_hz": 380.0,
         "drive_db": 0.0,
         "resonance": 0.1
       }
@@ -106,7 +106,7 @@
       },
       "params": {
         "attack_ms": 2.0,
-        "decay_ms": 120.0,
+        "decay_ms": 240.0,
         "release_ms": 60.0,
         "sustain": 0.1
       }
@@ -397,7 +397,7 @@
         }
       },
       "params": {
-        "amount": 0.1
+        "amount": 0.25
       },
       "steps": []
     },
@@ -469,7 +469,7 @@
         }
       },
       "params": {
-        "amount": 0.5
+        "amount": 1.0
       },
       "steps": []
     },

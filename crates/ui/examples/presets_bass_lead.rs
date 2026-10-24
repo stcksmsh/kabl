@@ -1192,9 +1192,9 @@ fn slate_roof() -> Rack {
     v.r.depth_route(growl, "out", v.lad, "cutoff_hz", v.knob, "m2", 0.25);
     let crush = v.stage(
         "bitcrusher",
-        &[("bits", 9.0), ("downsample", 2.0), ("mix", 0.0)],
+        &[("bits", 6.0), ("downsample", 4.0), ("mix", 0.0)],
     );
-    v.r.route(v.knob, "m3", crush, "mix", 0.5);
+    v.r.route(v.knob, "m3", crush, "mix", 0.9);
     v.stage("compressor", &compressor(-24.0, 6.0, 3.0, 90.0, 6.0));
     v.finish("m4", &echo(100.0, 18.0, 3500.0), 0.12, (0.4, 0.12), None)
 }
@@ -1416,16 +1416,16 @@ fn oak_stave() -> Rack {
         midi: [1.0, 0.0, 120.0],
         oscs: vec![osc(1.0, 0.0, 0.5), osc(0.0, -1.0, 0.2)],
         drive: [2.0, -1.0],
-        lad: [900.0, 0.10, 0.0],
-        fenv: [2.0, 120.0, 0.1, 60.0],
-        fenv_amt: 0.10,
+        lad: [380.0, 0.10, 0.0],
+        fenv: [2.0, 240.0, 0.1, 60.0],
+        fenv_amt: 0.25,
         wheel_amt: 0.0,
         aenv: [2.0, 700.0, 0.15, 160.0],
         trim_db: 16.0,
     });
     v.r.route(v.fenv, "out", v.oscs[0], "fine", 0.15);
     v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.4);
-    v.r.depth_route(v.fenv, "out", v.lad, "cutoff_hz", v.knob, "m2", 0.5);
+    v.r.depth_route(v.fenv, "out", v.lad, "cutoff_hz", v.knob, "m2", 1.0);
     v.r.route(v.knob, "m3", v.mix, "level2", 0.6);
     v.stage("compressor", &compressor(-22.0, 3.0, 10.0, 120.0, 3.0));
     v.finish("m4", &echo(95.0, 18.0, 3500.0), 0.2, (0.8, 0.25), None)
