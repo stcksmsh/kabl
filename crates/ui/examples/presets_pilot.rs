@@ -288,7 +288,7 @@ fn parquet_loop() -> Rack {
     let knob = macros(
         &mut r,
         ["Cutoff", "Crunch", "Space", "Glide"],
-        [0.50, 0.45, 0.25, 0.80],
+        [0.50, 0.45, 0.25, 0.90],
     );
     let clock = r.add("clock", &[("bpm", 122.0), ("swing", 25.0)]);
     // Poly with glide on: each new note slides from the nearest tone of the chord before it, so

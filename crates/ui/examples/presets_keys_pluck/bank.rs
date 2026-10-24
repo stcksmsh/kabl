@@ -2,6 +2,8 @@
 
 use super::*;
 
+mod group2;
+
 const ECHO: &[(&str, f32)] = &[
     ("time_ms", 250.0),
     ("feedback", 30.0),
@@ -20,6 +22,7 @@ fn pst() -> Post<'static> {
         phaser: None,
         chorus: None,
         comp: None,
+        duck: None,
         echo: ECHO,
         echo_max: 0.2,
         clock: None,
@@ -32,6 +35,7 @@ fn pst() -> Post<'static> {
 /// envelope the caller routes into the ladder returned by `post`.
 struct Va {
     out: ModuleId,
+    osc_a: ModuleId,
     aenv: ModuleId,
     fenv: ModuleId,
 }
@@ -60,7 +64,7 @@ fn va(
     r.wire(m, "gate", aenv, "gate");
     r.wire(m, "gate", fenv, "gate");
     r.wire(aenv, "out", vca, "cv");
-    Va { out: vca, aenv, fenv }
+    Va { out: vca, osc_a: oa, aenv, fenv }
 }
 
 // ---- keys -------------------------------------------------------------------------------------
@@ -509,7 +513,7 @@ fn spark_phrase() -> Vec<Hit> {
 // ---- the list ---------------------------------------------------------------------------------
 
 pub fn presets() -> Vec<Preset> {
-    vec![
+    let mut all = vec![
         Preset {
             slug: "velvet-tine",
             name: "Velvet Tine",
@@ -606,5 +610,7 @@ pub fn presets() -> Vec<Preset> {
             phrase: spark_phrase,
             secs: 6.0,
         },
-    ]
+    ];
+    all.extend(group2::presets());
+    all
 }

@@ -1,0 +1,12 @@
+name = "Tin Roof"
+category = "Keys"
+tags = [
+    "poly",
+    "fm",
+    "reedy",
+    "funk",
+    "disco",
+]
+description = "A Wurlitzer-like electric piano: a reedy attack that barks harder when you play harder, and a quick fall to a soft sustain. Play funky stabs and short vamps. Tone opens the FM brightness and the filter, Bark pushes the drive, Room sets the echo and a short room, Chorus brings in a light chorus."
+keys = true
+sequence = false

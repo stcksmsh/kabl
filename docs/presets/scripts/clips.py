@@ -24,6 +24,10 @@ extras = [('salt-flat', 'salt-flat-textured', {'PP_SET': 'macro.m4=0.7'}), ('par
 # A legato line (each note overlaps the next by 0.1 s), Parquet Loop in POLY and in MONO.
 line = [48, 60, 52, 64, 55, 67, 60, 72]
 hits = ';'.join(f'{i * 0.8:.2f}:{n}:100;{i * 0.8 + 0.9:.2f}:{n}:0' for i, n in enumerate(line))
+# Glide demo: single-note leaps (E2, A3, G2, D4) a second apart, with and without glide.
+leaps = ';'.join(f'{i * 1.2:.2f}:{n}:100;{i * 1.2 + 1.0:.2f}:{n}:0' for i, n in enumerate([40, 57, 43, 62, 40]))
+extras += [('parquet-loop', 'parquet-loop-glide-demo', {'PP_HITS': leaps}),
+           ('parquet-loop', 'parquet-loop-glide-demo-off', {'PP_HITS': leaps, 'PP_SET': 'macro.m4=0'})]
 extras += [('parquet-loop', 'parquet-loop-legato-poly', {'PP_HITS': hits}),
            ('parquet-loop', 'parquet-loop-legato-mono', {'PP_HITS': hits, 'PP_SET': 'midi.in.mode=1'})]
 
