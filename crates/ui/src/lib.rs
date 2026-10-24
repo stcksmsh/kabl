@@ -2030,13 +2030,17 @@ fn draw_module(
         );
         let r = ui.interact(edit, Id::new(("native-edit-face", m.id)), Sense::click());
         ui_state.record(format!("edit-face:{}", m.id), edit);
-        if let Some(font) = kit::face::face_font(&st, style::Role::Caption, z) {
+        // Printed on hover only; the context menu always has it.
+        if let (true, Some(font)) = (
+            r.hovered(),
+            kit::face::face_font(&st, style::Role::Caption, z),
+        ) {
             painter.text(
                 edit.center(),
                 egui::Align2::CENTER_CENTER,
                 "Edit face",
                 font,
-                if r.hovered() { ink } else { ink2 },
+                ink,
             );
         }
         if r.clicked() {
@@ -2145,7 +2149,17 @@ fn draw_module(
                 ui_state.wants.display(m.id, m.info.kind);
                 ui_state.wants.feeds(editor.state(), m.id, m.info.kind);
             }
-            displays::draw(editor.state(), &st, &ui_state.live, now, painter, xf, m, r);
+            displays::draw(
+                editor.state(),
+                &st,
+                &ui_state.live,
+                now,
+                painter,
+                xf,
+                m,
+                r,
+                th.panel,
+            );
             if m.info.kind == "osc.wt" && z >= 0.45 {
                 // A chip in the display's corner opens the table editor.
                 let d = xf.r(r);
@@ -4576,15 +4590,17 @@ fn draw_authored_face(
     );
     let r = ui.interact(edit, Id::new(("face-design", id)), Sense::click());
     view.record(format!("composite:{id}:design"), edit);
-    text(
-        &painter,
-        edit.center(),
-        egui::Align2::CENTER_CENTER,
-        "Edit face",
-        11.0 * z,
-        th.ink2,
-        false,
-    );
+    if r.hovered() {
+        text(
+            &painter,
+            edit.center(),
+            egui::Align2::CENTER_CENTER,
+            "Edit face",
+            11.0 * z,
+            th.ink2,
+            false,
+        );
+    }
     if r.clicked() {
         panels::open(view, id, c);
     }

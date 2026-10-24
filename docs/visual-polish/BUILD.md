@@ -124,3 +124,16 @@ built-in themes ship with the new recipes only when the whole set lands.
   README.
 - **Theme files in the wild**: new recipe names must default sensibly for a theme file that does not name
   them (the loader already falls back per value).
+
+## Stage 1 as built
+
+Kosta chose Option 1 (Seated) for both themes, so there is one recipe set. Built on `claude/visual-polish-1`:
+
+- `kit/face.rs: surface`: the lacquer gloss band is now a full-height gradient (top light fading to nothing), so no edge crosses the content (audit problem 2).
+- `kit/face.rs: display_frame` takes the face colour and draws the seated frame for every non-paper display in both themes: glass tinted 12% toward the face hue, lit lower lip, 2 px bezel, inner shadow top and sides, faint sheen (audit problem 1). The neon halo is gone. The wavetable stack and wave views use the same function.
+- `kit/face.rs: title`: titles and captions are left aligned in both themes (the dot stays a theme B ornament); a title that would touch face content still falls back to centred.
+- `Edit face` is drawn on hover only (module and composite faces); the hit area and the context menu entry are unchanged.
+
+Deviations from the plan: no new theme slots or dials yet (`well()` as a separate kit function, `display.frame = seated` and the dials `bezel`, `inner_shadow`, `sheen`, `tint_depth` are stage 2, with the port tray); the seated recipe is hard-wired for non-paper frames, so a custom theme with `Glass` or `Neon` also gets it. Frame time did not need mesh caching: dense 1440x900 median 4.7 ms light, 3.5 ms dark, max 6.3 ms (budget 8 and 16).
+
+Stage 2 next: slots and dials for the well, `ports_tray`, `header`, knob size by count, segmented control as the one selector idiom.
