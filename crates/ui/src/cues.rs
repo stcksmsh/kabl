@@ -68,7 +68,8 @@ pub fn cues(state: &PatchState, id: ModuleId) -> Vec<Cue> {
                 .take_while(|(k, _)| k.starts_with(&prefix))
                 .filter_map(|(k, &v)| {
                     let seq: ModuleId = k[prefix.len()..].parse().ok()?;
-                    exists(seq, "seq").then_some((seq, v.round().clamp(0.0, 3.0) as usize))
+                    (exists(seq, "seq") || exists(seq, "drum.grid"))
+                        .then_some((seq, v.round().clamp(0.0, 3.0) as usize))
                 })
                 .collect();
             let mprefix = key(n, "macro.");

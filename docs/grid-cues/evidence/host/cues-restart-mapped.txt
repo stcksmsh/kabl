@@ -1,0 +1,4 @@
+7fbcb0000000-7fbcb042f000 r--p 00000000 103:01 13526790                  /secondary/Programming/Github/kabl/.worktrees/functional-cables/scratch/grid-cues-host/plugin/kabl.clap
+7fbcb042f000-7fbcb0c33000 r-xp 0042e000 103:01 13526790                  /secondary/Programming/Github/kabl/.worktrees/functional-cables/scratch/grid-cues-host/plugin/kabl.clap
+7fbcb0c33000-7fbcb0c83000 r--p 00c31000 103:01 13526790                  /secondary/Programming/Github/kabl/.worktrees/functional-cables/scratch/grid-cues-host/plugin/kabl.clap
+7fbcb0c83000-7fbcb0c85000 rw-p 00c80000 103:01 13526790                  /secondary/Programming/Github/kabl/.worktrees/functional-cables/scratch/grid-cues-host/plugin/kabl.clap
