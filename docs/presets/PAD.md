@@ -31,4 +31,31 @@ Slugs checked against `master`, `claude/presets-keys-pluck` and `claude/presets-
 
 ## Group 1
 
-(filled in below once built)
+Clips in `docs/presets/clips/pad/group1/` (`<slug>.flac` and `<slug>.mp3` at 320 kbps, `tour.flac`). Tour start times (one second of silence between clips): concrete-cloud 0, cotton-mill 15, deep-field 30, drive-in 57, dry-cleaner 84, fog-bank 94, picture-window 121, static-garden 136 seconds. Clip phrases are five-note chords at velocity 100 (the level test uses four notes at 90), so Fog Bank and Deep Field touch the limiter at -1.5 dB in the clip.
+
+| Preset | Macros (CC 20 up) | Listen for |
+|---|---|---|
+| Fog Bank | Bloom, Drift, Depth, Space | Chords that take about two seconds to arrive and several to fade; Drift up for a slow shimmer in pitch and filter, Depth for an octave of weight underneath. |
+| Deep Field | Swell, Sub, Shimmer, Space | The filter opening over several seconds on every held chord; Swell at 0 stays dark, Sub and Shimmer add an octave below and above. |
+| Cotton Mill | Cutoff, Motion, Chorus, Space | The pulse width breathing inside held chords; Chorus at 0 is dry and narrow. |
+| Picture Window | Cutoff, Spread, Sparkle, Space | A clean, bright stack that widens with Spread; Sparkle adds airy octave-up saws. |
+| Drive-In | Cutoff, Wobble, Chorus, Space | Wide chorused saws with a slow pitch sway; Chorus at 0 is a plain stack. |
+| Dry Cleaner | Sweep, Phase, Grit, Room | Phaser sweeping through short, compressed chord stabs; Phase at 0 is a plain saw chord, Sweep works like a DJ filter. |
+| Concrete Cloud | Weight, Cutoff, Crush, Room | A heavy, squashed chord that stays dense while held; Crush up for lo-fi grit, Weight up for more saturation. |
+| Static Garden | Texture, Motion, Metal, Space | Hiss and grain around the chord (Texture), bell-like inharmonic overtones (Metal), a filter that wanders by itself (Motion). |
+
+### Checks (group 1)
+
+- `every_preset_keeps_to_the_brief`, the library tests and `factory_levels_hold_the_target` pass.
+- Levels as `factory_bank::level_table` measures them (peak / loudness dBFS): Fog Bank -3.4 / -19.9, Deep Field -2.7 / -21.0, Cotton Mill -4.0 / -19.2, Picture Window -3.6 / -19.9, Drive-In -4.6 / -19.9, Dry Cleaner -3.9 / -20.7, Concrete Cloud -8.3 / -20.7, Static Garden -4.2 / -20.1. The generator's own `levels` command plays the same chord at the same times but reads a few dB differently for the slow pads; the test's number is the one that counts.
+- Macros (`presets_pad macros patches 1`): every macro moves the render. Weakest: Static Garden Texture (-13 dB under the render, after raising the noise level and the route; the first version was -29 dB), Concrete Cloud Crush (-17 dB). Several, such as Deep Field Swell or Fog Bank Space, move the render as much as the signal itself.
+- Clicks: energy above 3 kHz in 5 ms windows, flagged where it jumps 10 dB while the total level rises under 6 dB: no flagged window in any of the eight. Highest high-frequency share of any window: Dry Cleaner -3 dB (its short stabs), Concrete Cloud -9 dB; the rest under -6.5 dB.
+- clips: 320 kbps mp3 against the float render, all eight pass (SNR 36 to 73 dB below 16 kHz, peaks within 0.1 dB).
+- REAPER (`scripts/host.py`, evidence in `evidence/host-pad/`): all eight saved, quit, reopened with identical state and identical render; nothing plays without MIDI.
+- Standalone (`scripts/standalone.py`, evidence in `evidence/standalone-pad/`): all eight open, take a chord from a virtual MIDI controller and stay running, audio on the silent sink.
+
+### Notes
+
+- Stereo is only the engine's step 1: every pad is a mono voice into stereo chorus, phaser, delay and reverb stages. Unison detune and the fx make the width; a stereo voice path (each unison voice panned, `osc.va` `out_r`) waits for step 2.
+- Dry Cleaner has no clock and no pump: it plays chords, the phaser and compressor supply the movement. The kick-ducked pad is Pump House (group 2).
+- Fog Bank and Deep Field use long attacks, so the level test's three-second holds sit on the swell; their loudness once a chord has fully opened is a little higher than the number above.
