@@ -1,0 +1,59 @@
+{
+ "plugin_sha256": "f5422dc4a71a6b1aff57cf00c8a6fe7e7df1feef01fcc70555cf7f2721bd70f6",
+ "steel-toe": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1039,
+  "rms": 0.0212,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.00918
+ },
+ "tar-pit": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0532,
+  "rms": 0.026,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "acid-rain": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0618,
+  "rms": 0.0271,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "soft-shoe": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0656,
+  "rms": 0.0268,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "satin-ribbon": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0793,
+  "rms": 0.0224,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "rust-belt": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0786,
+  "rms": 0.0225,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "hot-wire": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1002,
+  "rms": 0.0249,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "paper-crane": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1384,
+  "rms": 0.0268,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ }
+}

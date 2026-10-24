@@ -231,6 +231,8 @@ enum Step {
     },
     /// Voice-rate output -> global-rate input: sum `sources` (one per voice) into `dest`.
     SumVoices { sources: Vec<BufIdx>, dest: BufIdx },
+    /// Stereo cable into a mono input: `dest` = `(a + b) / 2`. Exactly the input when `a == b`.
+    Average { a: BufIdx, b: BufIdx, dest: BufIdx },
     /// Cycle-breaking (brief section 7.1): copy `src`'s current-block content into `dest` (a
     /// pinned delay buffer) for a delayed cable's reader to pick up on the *next* `process_block`
     /// call. Placed at the end of the schedule so this block's own `Step::Process` reads (earlier
@@ -253,6 +255,7 @@ enum Step {
 /// parameter's slot (in its own unit) at each pulse. `scale` is the signed amount times the
 /// slot's range over the source's full scale, so an amount means the same thing as for a module
 /// param: a fraction of the destination's travel.
+#[derive(Clone, Copy)]
 struct CableMod {
     slot: usize,
     src: BufIdx,
@@ -444,6 +447,12 @@ fn coalesce_buffers(
                 first_def[*dest] = step_idx;
                 last_use[*dest] = last_use[*dest].max(step_idx);
             }
+            Step::Average { a, b, dest } => {
+                last_use[*a] = last_use[*a].max(step_idx);
+                last_use[*b] = last_use[*b].max(step_idx);
+                first_def[*dest] = step_idx;
+                last_use[*dest] = last_use[*dest].max(step_idx);
+            }
             Step::CopyToDelay { src, dest } => {
                 last_use[*src] = last_use[*src].max(step_idx);
                 first_def[*dest] = step_idx;
@@ -521,6 +530,8 @@ struct DelaySlotKey {
     from_id: ModuleId,
     from_port_idx: usize,
     lane: Option<usize>,
+    /// Channel of a doubled module's output (0 for everything else).
+    ch: u8,
 }
 
 pub struct CompiledPatch {
@@ -533,6 +544,8 @@ pub struct CompiledPatch {
     /// Parallel to `modules`: which `(ModuleId, voice index)` each instance came from — `None`
     /// voice index for global-rate modules. Used for state carry-over on recompile.
     module_origin: Vec<(ModuleId, Option<usize>)>,
+    /// Parallel to `modules`: 1 for the second instance of a module run once per channel, else 0.
+    module_channel: Vec<u8>,
     steps: Vec<Step>,
     buffers: Vec<[f32; BLOCK]>,
     /// Every delay buffer's physical index, keyed by what it holds rather than where it lives —
@@ -711,9 +724,95 @@ fn route_bypassed(c: &kabl_core::CableState) -> bool {
 
 #[derive(Default)]
 struct BufMaps {
-    voice: HashMap<(ModuleId, usize, usize), BufIdx>,
-    global: HashMap<(ModuleId, usize), BufIdx>,
-    summed: HashMap<(ModuleId, usize), BufIdx>,
+    /// `(module, output, lane, channel)`.
+    voice: HashMap<(ModuleId, usize, usize, u8), BufIdx>,
+    global: HashMap<(ModuleId, usize, u8), BufIdx>,
+    summed: HashMap<(ModuleId, usize, u8), BufIdx>,
+}
+
+/// Where a cable's signal comes from: one or two `(output port, channel)` pairs. Width is a
+/// property of the source port, fixed here at compile time.
+#[derive(Clone, Copy)]
+struct Src {
+    left: (usize, u8),
+    /// `None`: a mono source.
+    right: Option<(usize, u8)>,
+}
+
+/// The two ports named by a stereo pair alias (`in_st`, `out_st`): the first adjacent
+/// `(in_l, in_r)` or `(left, right)` among the module's ports of `dir`, as indices among them.
+/// Step 1's stand-in for width-2 ports, which the port change adds; the alias names never equal
+/// a real port name.
+fn stereo_pair(info: &ModuleInfo, dir: PortDirection) -> Option<(usize, usize)> {
+    let names: Vec<&str> = info
+        .ports
+        .iter()
+        .filter(|p| p.direction == dir)
+        .map(|p| p.name)
+        .collect();
+    names
+        .windows(2)
+        .position(|w| matches!((w[0], w[1]), ("in_l", "in_r") | ("left", "right")))
+        .map(|i| (i, i + 1))
+}
+
+const STEREO_IN: &str = "in_st";
+const STEREO_OUT: &str = "out_st";
+
+/// One incoming cable's source, resolved.
+#[derive(Clone, Copy)]
+struct SrcInfo {
+    src: Src,
+    is_voice: bool,
+    full_scale: f32,
+    port_type: PortType,
+}
+
+/// Which signal a reader takes from a cable: a channel of a stereo source (a mono source is the
+/// same buffer for both) or the average of both channels.
+#[derive(Clone, Copy)]
+enum Want {
+    Left,
+    Right,
+    Mix,
+}
+
+/// The buffer cable `c` delivers to a reader in `lane`: `want` applied to the source, each channel
+/// through its own copy of the cable's node when the cable is functional (same seed, so both
+/// channels gate alike).
+#[allow(clippy::too_many_arguments)]
+fn read_cable(
+    w: &mut Wiring,
+    c: &CableInfo,
+    s: &SrcInfo,
+    want: Want,
+    dest_is_voice: bool,
+    lane: usize,
+    carry: Carry,
+    clock: Option<usize>,
+    sample_rate: f32,
+    mods: Vec<(CableId, f32, CableMod)>,
+) -> BufIdx {
+    let one = |w: &mut Wiring, from: (usize, u8), mods| {
+        let b = w.source_buf(c.from_id, from, s.is_voice, dest_is_voice, lane, c.delayed);
+        w.through_cable(c, b, carry, clock, sample_rate, mods)
+    };
+    match (s.src.right, want) {
+        (None, _) | (Some(_), Want::Left) => one(w, s.src.left, mods),
+        (Some(r), Want::Right) => one(w, r, mods),
+        (Some(r), Want::Mix) => {
+            let a = one(w, s.src.left, mods.clone());
+            let b = one(w, r, mods);
+            w.average(a, b)
+        }
+    }
+}
+
+/// Modules with a stereo pair are stereo themselves; every other module with an audio input
+/// runs once per channel when a stereo signal reaches that input.
+fn follows_channels(info: &ModuleInfo) -> bool {
+    stereo_pair(info, PortDirection::Input).is_none()
+        && stereo_pair(info, PortDirection::Output).is_none()
 }
 
 /// Buffer and step bookkeeping while `compile` wires modules. `live` holds this block's output
@@ -728,6 +827,8 @@ struct Wiring {
     cable_steps: Vec<(CableId, u32)>,
     /// Route slots of the routes into functional cables' parameters.
     cable_route_slots: Vec<RouteSlot>,
+    /// `Step::Average` outputs by input pair.
+    averaged: HashMap<(BufIdx, BufIdx), BufIdx>,
 }
 
 impl Wiring {
@@ -779,7 +880,7 @@ impl Wiring {
     fn source_buf(
         &mut self,
         from_id: ModuleId,
-        out_idx: usize,
+        (out_idx, ch): (usize, u8),
         src_is_voice: bool,
         dest_is_voice: bool,
         lane: usize,
@@ -791,16 +892,16 @@ impl Wiring {
             &mut self.live
         };
         if !src_is_voice {
-            return maps.global[&(from_id, out_idx)];
+            return maps.global[&(from_id, out_idx, ch)];
         }
         if dest_is_voice {
-            return maps.voice[&(from_id, out_idx, lane)];
+            return maps.voice[&(from_id, out_idx, lane, ch)];
         }
-        if let Some(&b) = maps.summed.get(&(from_id, out_idx)) {
+        if let Some(&b) = maps.summed.get(&(from_id, out_idx, ch)) {
             return b;
         }
         let sources: Vec<BufIdx> = (0..self.voice_count)
-            .map(|v| maps.voice[&(from_id, out_idx, v)])
+            .map(|v| maps.voice[&(from_id, out_idx, v, ch)])
             .collect();
         self.buffers.push([0.0; BLOCK]);
         let dest = self.buffers.len() - 1;
@@ -810,7 +911,22 @@ impl Wiring {
         } else {
             &mut self.live
         };
-        maps.summed.insert((from_id, out_idx), dest);
+        maps.summed.insert((from_id, out_idx, ch), dest);
+        dest
+    }
+
+    /// `(a + b) / 2` of two channel buffers: the mono reading of a stereo cable. One step per
+    /// pair; the same buffer twice (a broadcast mono signal) needs none.
+    fn average(&mut self, a: BufIdx, b: BufIdx) -> BufIdx {
+        if a == b {
+            return a;
+        }
+        if let Some(&d) = self.averaged.get(&(a, b)) {
+            return d;
+        }
+        let dest = self.new_buf();
+        self.steps.push(Step::Average { a, b, dest });
+        self.averaged.insert((a, b), dest);
         dest
     }
 }
@@ -1053,6 +1169,72 @@ fn compile_inner(
         return Err(CompileError::Cycle(remaining));
     }
 
+    // Channels. A source port is width 2 when it is a stereo pair alias (`out_st`) or an audio
+    // output of a module that runs once per channel; a module runs once per channel when an audio
+    // input of it is fed by a width-2 source (it follows the signal's width). Widths only grow, so
+    // iterating until nothing changes settles them, feedback loops included.
+    let resolve = |doubled: &std::collections::BTreeSet<ModuleId>,
+                   from_id: ModuleId,
+                   from_port: &str|
+     -> Option<(Src, PortType)> {
+        let info = metas[&from_id].info;
+        let outs = || {
+            info.ports
+                .iter()
+                .filter(|p| p.direction == PortDirection::Output)
+        };
+        if from_port == STEREO_OUT {
+            let (l, r) = stereo_pair(info, PortDirection::Output)?;
+            let port_type = outs().nth(l)?.port_type;
+            return Some((
+                Src {
+                    left: (l, 0),
+                    right: Some((r, 0)),
+                },
+                port_type,
+            ));
+        }
+        let i = output_port_index(info, from_port)?;
+        let port_type = outs().nth(i)?.port_type;
+        let right = (port_type == PortType::Audio && doubled.contains(&from_id)).then_some((i, 1));
+        Some((
+            Src {
+                left: (i, 0),
+                right,
+            },
+            port_type,
+        ))
+    };
+    let mut doubled: std::collections::BTreeSet<ModuleId> = Default::default();
+    loop {
+        let before = doubled.len();
+        for (&to_id, cables) in &cables_by_dest {
+            let info = metas[&to_id].info;
+            if !follows_channels(info) {
+                continue;
+            }
+            for c in cables {
+                let CableTo::Port(name) = &c.to else {
+                    continue;
+                };
+                let audio_in = info.ports.iter().any(|p| {
+                    p.direction == PortDirection::Input
+                        && p.name == name
+                        && p.port_type == PortType::Audio
+                });
+                if audio_in
+                    && resolve(&doubled, c.from_id, &c.from_port)
+                        .is_some_and(|(s, _)| s.right.is_some())
+                {
+                    doubled.insert(to_id);
+                }
+            }
+        }
+        if doubled.len() == before {
+            break;
+        }
+    }
+
     // Voice-rate modules only need an instance per voice when a `midi.in` reaches them. A chain
     // driven only by global modules (a sequencer, a drone) would play the same samples in every
     // voice, so it runs once, as a global instance; the voice average of identical lanes is that
@@ -1130,6 +1312,7 @@ fn compile_inner(
         delay: BufMaps::default(),
         cable_steps: Vec::new(),
         cable_route_slots: Vec::new(),
+        averaged: HashMap::new(),
     };
     let silence_buf = w.new_buf();
 
@@ -1146,22 +1329,24 @@ fn compile_inner(
         }
     }
     for (from_id, from_port) in delayed_sources {
-        let src_meta = &metas[&from_id];
-        let src_out_idx = output_port_index(src_meta.info, &from_port).ok_or_else(|| {
-            CompileError::UnknownPort {
+        let (src, _) =
+            resolve(&doubled, from_id, &from_port).ok_or_else(|| CompileError::UnknownPort {
                 id: from_id,
                 kind: "source",
                 port: from_port.clone(),
-            }
-        })?;
-        if voiced.contains(&from_id) {
-            for lane in 0..voice_count {
+            })?;
+        for (out_idx, ch) in std::iter::once(src.left).chain(src.right) {
+            if voiced.contains(&from_id) {
+                for lane in 0..voice_count {
+                    if !w.delay.voice.contains_key(&(from_id, out_idx, lane, ch)) {
+                        let b = w.new_buf();
+                        w.delay.voice.insert((from_id, out_idx, lane, ch), b);
+                    }
+                }
+            } else if !w.delay.global.contains_key(&(from_id, out_idx, ch)) {
                 let b = w.new_buf();
-                w.delay.voice.insert((from_id, src_out_idx, lane), b);
+                w.delay.global.insert((from_id, out_idx, ch), b);
             }
-        } else {
-            let b = w.new_buf();
-            w.delay.global.insert((from_id, src_out_idx), b);
         }
     }
 
@@ -1173,6 +1358,7 @@ fn compile_inner(
     let mut route_slots: Vec<RouteSlot> = Vec::new();
     let mut modules: Vec<Box<dyn Module>> = Vec::new();
     let mut module_origin: Vec<(ModuleId, Option<usize>)> = Vec::new();
+    let mut module_channel: Vec<u8> = Vec::new();
     let mut midi_ins: Vec<(usize, usize)> = Vec::new();
     let mut audio_ins: Vec<usize> = Vec::new();
     let mut out_left = silence_buf;
@@ -1243,6 +1429,8 @@ fn compile_inner(
             });
         }
 
+        let n_ch: u8 = if doubled.contains(&id) { 2 } else { 1 };
+        let in_pair = stereo_pair(meta.info, PortDirection::Input);
         let empty = Vec::new();
         let incoming = cables_by_dest.get(&id).unwrap_or(&empty);
         // Clocks are scheduled first, so the reference clock (lowest id) exists by now.
@@ -1252,7 +1440,8 @@ fn compile_inner(
         let mut sources = Vec::with_capacity(incoming.len());
         for cable in incoming {
             if let CableTo::Port(port) = &cable.to {
-                if input_port_index(meta.info, port).is_none() {
+                let alias = port == STEREO_IN && in_pair.is_some();
+                if !alias && input_port_index(meta.info, port).is_none() {
                     return Err(CompileError::UnknownPort {
                         id,
                         kind: "destination",
@@ -1260,32 +1449,24 @@ fn compile_inner(
                     });
                 }
             }
-            let src_info = metas[&cable.from_id].info;
-            let src_out_idx = output_port_index(src_info, &cable.from_port).ok_or_else(|| {
-                CompileError::UnknownPort {
-                    id: cable.from_id,
-                    kind: "source",
-                    port: cable.from_port.clone(),
-                }
-            })?;
-            let port_type = src_info
-                .ports
-                .iter()
-                .filter(|p| p.direction == PortDirection::Output)
-                .nth(src_out_idx)
-                .expect("index from output_port_index")
-                .port_type;
+            let (src, port_type) =
+                resolve(&doubled, cable.from_id, &cable.from_port).ok_or_else(|| {
+                    CompileError::UnknownPort {
+                        id: cable.from_id,
+                        kind: "source",
+                        port: cable.from_port.clone(),
+                    }
+                })?;
             let (lo, hi) = port_type.nominal_range();
-            let full_scale = lo.abs().max(hi.abs());
-            sources.push((
-                src_out_idx,
-                voiced.contains(&cable.from_id),
-                full_scale,
+            sources.push(SrcInfo {
+                src,
+                is_voice: voiced.contains(&cable.from_id),
+                full_scale: lo.abs().max(hi.abs()),
                 port_type,
-            ));
+            });
         }
 
-        for lane in 0..n_lanes {
+        for (lane, ch) in (0..n_lanes).flat_map(|l| (0..n_ch).map(move |c| (l, c))) {
             // Routes into cable parameters first, deepest chain first, so a cable's own routes
             // are wired before the cable that reads them.
             let mut cable_mods: BTreeMap<CableId, Vec<(CableId, f32, CableMod)>> = BTreeMap::new();
@@ -1305,17 +1486,21 @@ fn compile_inner(
             for k in routed {
                 let c = &incoming[k];
                 if let CableTo::Depth { target, amount } = c.to {
-                    let (src_out_idx, src_is_voice, full_scale, _) = sources[k];
-                    let buf = w.source_buf(
-                        c.from_id,
-                        src_out_idx,
-                        src_is_voice,
+                    let s = sources[k];
+                    let full_scale = s.full_scale;
+                    let own = cable_mods.remove(&c.cable).unwrap_or_default();
+                    let buf = read_cable(
+                        &mut w,
+                        c,
+                        &s,
+                        Want::Mix,
                         is_voice,
                         lane,
-                        c.delayed,
+                        Carry::Scale,
+                        clock_index,
+                        sample_rate,
+                        own,
                     );
-                    let own = cable_mods.remove(&c.cable).unwrap_or_default();
-                    let buf = w.through_cable(c, buf, Carry::Scale, clock_index, sample_rate, own);
                     depth_mods.entry(target).or_default().push((
                         c.cable,
                         buf,
@@ -1332,22 +1517,26 @@ fn compile_inner(
                 else {
                     continue;
                 };
-                let (src_out_idx, src_is_voice, full_scale, port_type) = sources[k];
-                let buf = w.source_buf(
-                    c.from_id,
-                    src_out_idx,
-                    src_is_voice,
-                    is_voice,
-                    lane,
-                    c.delayed,
-                );
-                let carry = if port_type == PortType::Pitch {
+                let s = sources[k];
+                let full_scale = s.full_scale;
+                let carry = if s.port_type == PortType::Pitch {
                     Carry::Hold
                 } else {
                     Carry::Scale
                 };
                 let own = cable_mods.remove(&c.cable).unwrap_or_default();
-                let src = w.through_cable(c, buf, carry, clock_index, sample_rate, own);
+                let src = read_cable(
+                    &mut w,
+                    c,
+                    &s,
+                    Want::Mix,
+                    is_voice,
+                    lane,
+                    carry,
+                    clock_index,
+                    sample_rate,
+                    own,
+                );
                 let range = kabl_cables::mod_range(slot);
                 cable_mods.entry(target).or_default().push((
                     c.cable,
@@ -1360,32 +1549,52 @@ fn compile_inner(
                 ));
             }
             let mut lane_inputs = Vec::with_capacity(input_ports.len());
-            for port in &input_ports {
-                let found = incoming
+            for (pi, port) in input_ports.iter().enumerate() {
+                // A cable into the pair alias reaches both halves of the pair, one channel each.
+                let by_name = incoming
                     .iter()
                     .position(|c| matches!(&c.to, CableTo::Port(p) if p == port.name));
+                let by_pair = || {
+                    let (a, b) = in_pair?;
+                    let side = [Want::Left, Want::Right][usize::from(pi == b)];
+                    (pi == a || pi == b)
+                        .then(|| {
+                            incoming
+                                .iter()
+                                .position(|c| matches!(&c.to, CableTo::Port(p) if p == STEREO_IN))
+                        })
+                        .flatten()
+                        .map(|k| (k, side))
+                };
+                // Else a doubled module's audio port takes its own channel; every other port
+                // takes the cable's mono reading (a stereo cable averages).
+                let found = by_name
+                    .map(|k| {
+                        let want = match (n_ch, port.port_type) {
+                            (2, PortType::Audio) => [Want::Left, Want::Right][usize::from(ch)],
+                            _ => Want::Mix,
+                        };
+                        (k, want)
+                    })
+                    .or_else(by_pair);
                 lane_inputs.push(match found {
                     None => InputSource::Silence,
-                    Some(k) => {
-                        let (src_out_idx, src_is_voice, _, port_type) = sources[k];
+                    Some((k, want)) => {
+                        let s = sources[k];
                         let c = &incoming[k];
-                        let buf = w.source_buf(
-                            c.from_id,
-                            src_out_idx,
-                            src_is_voice,
-                            is_voice,
-                            lane,
-                            c.delayed,
-                        );
-                        let carry = match port_type {
+                        let carry = match s.port_type {
                             PortType::Audio => Carry::Audio,
                             PortType::Pitch => Carry::Hold,
                             _ => Carry::Scale,
                         };
-                        let own = cable_mods.remove(&c.cable).unwrap_or_default();
-                        InputSource::Buffer(w.through_cable(
+                        let own = cable_mods.get(&c.cable).cloned().unwrap_or_default();
+                        InputSource::Buffer(read_cable(
+                            &mut w,
                             c,
-                            buf,
+                            &s,
+                            want,
+                            is_voice,
+                            lane,
                             carry,
                             clock_index,
                             sample_rate,
@@ -1394,29 +1603,32 @@ fn compile_inner(
                     }
                 });
             }
-
             let mut mods: Vec<ParamMod> = Vec::new();
             let first_route = route_slots.len();
             for (k, c) in incoming.iter().enumerate() {
                 let CableTo::Param { index, amount } = c.to else {
                     continue;
                 };
-                let (src_out_idx, src_is_voice, full_scale, port_type) = sources[k];
-                let buf = w.source_buf(
-                    c.from_id,
-                    src_out_idx,
-                    src_is_voice,
-                    is_voice,
-                    lane,
-                    c.delayed,
-                );
-                let carry = if port_type == PortType::Pitch {
+                let s = sources[k];
+                let full_scale = s.full_scale;
+                let carry = if s.port_type == PortType::Pitch {
                     Carry::Hold
                 } else {
                     Carry::Scale
                 };
                 let own = cable_mods.remove(&c.cable).unwrap_or_default();
-                let buf = w.through_cable(c, buf, carry, clock_index, sample_rate, own);
+                let buf = read_cable(
+                    &mut w,
+                    c,
+                    &s,
+                    Want::Mix,
+                    is_voice,
+                    lane,
+                    carry,
+                    clock_index,
+                    sample_rate,
+                    own,
+                );
                 let mut route = Route {
                     buf,
                     scale: amount / full_scale,
@@ -1467,13 +1679,17 @@ fn compile_inner(
             }
 
             let mut lane_outputs = Vec::with_capacity(output_ports.len());
-            for (out_idx, _) in output_ports.iter().enumerate() {
+            for (out_idx, port) in output_ports.iter().enumerate() {
                 let buf = w.new_buf();
                 lane_outputs.push(buf);
+                // The second instance of a doubled module only publishes its audio outputs.
+                if ch > 0 && port.port_type != PortType::Audio {
+                    continue;
+                }
                 if is_voice {
-                    w.live.voice.insert((id, out_idx, lane), buf);
+                    w.live.voice.insert((id, out_idx, lane, ch), buf);
                 } else {
-                    w.live.global.insert((id, out_idx), buf);
+                    w.live.global.insert((id, out_idx, ch), buf);
                 }
             }
 
@@ -1518,6 +1734,7 @@ fn compile_inner(
             let module_index = modules.len();
             modules.push(instance);
             module_origin.push((id, if is_voice { Some(lane) } else { None }));
+            module_channel.push(ch);
             if meta.kind == "midi.in" {
                 midi_ins.push((module_index, lane));
             }
@@ -1571,8 +1788,8 @@ fn compile_inner(
     // deterministic (matters for reproducing `buffer_count()` across identical compiles).
     let mut voice_delay_keys: Vec<_> = voice_delay_buf.keys().copied().collect();
     voice_delay_keys.sort();
-    for key @ (from_id, out_idx, lane) in voice_delay_keys {
-        let live_buf = voice_output_buf[&(from_id, out_idx, lane)];
+    for key in voice_delay_keys {
+        let live_buf = voice_output_buf[&key];
         steps.push(Step::CopyToDelay {
             src: live_buf,
             dest: voice_delay_buf[&key],
@@ -1580,8 +1797,8 @@ fn compile_inner(
     }
     let mut global_delay_keys: Vec<_> = global_delay_buf.keys().copied().collect();
     global_delay_keys.sort();
-    for key @ (from_id, out_idx) in global_delay_keys {
-        let live_buf = global_output_buf[&(from_id, out_idx)];
+    for key in global_delay_keys {
+        let live_buf = global_output_buf[&key];
         steps.push(Step::CopyToDelay {
             src: live_buf,
             dest: global_delay_buf[&key],
@@ -1596,22 +1813,24 @@ fn compile_inner(
     }
 
     let mut delay_slots: HashMap<DelaySlotKey, BufIdx> = HashMap::new();
-    for (&(from_id, from_port_idx, lane), &buf) in &voice_delay_buf {
+    for (&(from_id, from_port_idx, lane, ch), &buf) in &voice_delay_buf {
         delay_slots.insert(
             DelaySlotKey {
                 from_id,
                 from_port_idx,
                 lane: Some(lane),
+                ch,
             },
             buf,
         );
     }
-    for (&(from_id, from_port_idx), &buf) in &global_delay_buf {
+    for (&(from_id, from_port_idx, ch), &buf) in &global_delay_buf {
         delay_slots.insert(
             DelaySlotKey {
                 from_id,
                 from_port_idx,
                 lane: None,
+                ch,
             },
             buf,
         );
@@ -1648,6 +1867,11 @@ fn compile_inner(
                 for src in sources.iter_mut() {
                     *src = remap[*src];
                 }
+                *dest = remap[*dest];
+            }
+            Step::Average { a, b, dest } => {
+                *a = remap[*a];
+                *b = remap[*b];
                 *dest = remap[*dest];
             }
             Step::CopyToDelay { src, dest } => {
@@ -1691,6 +1915,7 @@ fn compile_inner(
         midi_ins,
         audio_ins,
         module_origin,
+        module_channel,
         steps,
         buffers,
         delay_slots,
@@ -2225,6 +2450,13 @@ impl CompiledPatch {
                     }
                     self.buffers[*dest] = sum;
                 }
+                Step::Average { a, b, dest } => {
+                    let (a, b) = (self.buffers[*a], self.buffers[*b]);
+                    let out = &mut self.buffers[*dest];
+                    for i in 0..BLOCK {
+                        out[i] = (a[i] + b[i]) * 0.5;
+                    }
+                }
                 Step::CopyToDelay { src, dest } => {
                     self.buffers[*dest] = self.buffers[*src];
                 }
@@ -2364,7 +2596,7 @@ impl CompiledPatch {
             for (index, (&(id, voice), m)) in
                 self.module_origin.iter().zip(&self.modules).enumerate()
             {
-                if id != t.module || m.info().kind != t.kind {
+                if id != t.module || m.info().kind != t.kind || self.module_channel[index] > 0 {
                     continue;
                 }
                 let outputs = m
@@ -2419,14 +2651,16 @@ impl CompiledPatch {
             .module_origin
             .iter()
             .zip(&self.modules)
-            .map(|(&(id, _), m)| {
+            .zip(&self.module_channel)
+            .map(|((&(id, _), m), &ch)| {
                 let info = m.info();
                 let outputs = info
                     .ports
                     .iter()
                     .filter(|p| p.direction == PortDirection::Output)
                     .count();
-                (id, info.kind, outputs)
+                // The second channel of a module is not a face lane: no id names it.
+                (if ch > 0 { ModuleId::MAX } else { id }, info.kind, outputs)
             });
         self.faces.set(targets, it);
     }
@@ -2853,13 +3087,20 @@ pub fn carry_state(old: &mut CompiledPatch, new_patch: &mut CompiledPatch) {
     }
     for (new_index, &origin) in new_patch.module_origin.iter().enumerate() {
         // A module that changed between one instance and one per voice (a `midi.in` cable came
-        // or went) carries from voice 0, or into every voice.
+        // or went) carries from voice 0, or into every voice. A second channel that is new
+        // starts from the first channel's state, so a mono chain turned stereo does not click.
+        let ch = new_patch.module_channel[new_index];
         let fallback = (origin.0, if origin.1.is_some() { None } else { Some(0) });
-        let Some(old_index) = old
-            .module_origin
-            .iter()
-            .position(|&o| o == origin)
-            .or_else(|| old.module_origin.iter().position(|&o| o == fallback))
+        let find = |o: (ModuleId, Option<usize>), ch: u8| {
+            old.module_origin
+                .iter()
+                .zip(&old.module_channel)
+                .position(|(&x, &c)| x == o && c == ch)
+        };
+        let Some(old_index) = find(origin, ch)
+            .or_else(|| find(fallback, ch))
+            .or_else(|| find(origin, 0))
+            .or_else(|| find(fallback, 0))
         else {
             continue;
         };

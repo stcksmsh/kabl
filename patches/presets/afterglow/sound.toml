@@ -1,0 +1,13 @@
+name = "Afterglow"
+category = "Lead"
+tags = [
+    "mono",
+    "legato",
+    "unison",
+    "chorus",
+    "synthwave",
+    "80s",
+]
+description = "A big synthwave lead: a seven-voice saw stack with an octave stack and a pulse, chorus, a long echo and a big room. Play slow, soaring lines; notes glide. Cutoff brightens, Spread widens the detune of the main stack, Space adds the echo and the room, Vibrato adds vibrato."
+keys = true
+sequence = false

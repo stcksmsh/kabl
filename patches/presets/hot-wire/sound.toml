@@ -1,0 +1,13 @@
+name = "Hot Wire"
+category = "Lead"
+tags = [
+    "mono",
+    "legato",
+    "acid",
+    "glide",
+    "house",
+    "techno",
+]
+description = "A legato acid lead: a saw and a narrow pulse into a resonant ladder filter with velocity accents and a dotted echo. Play a sixteenth-note line and overlap notes to slide. Cutoff opens the filter, Squelch raises the resonance, Space adds the echo and a room, Pulse sets a slow pulse-width sweep on the second oscillator."
+keys = true
+sequence = false

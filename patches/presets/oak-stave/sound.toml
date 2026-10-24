@@ -1,0 +1,12 @@
+name = "Oak Stave"
+category = "Bass"
+tags = [
+    "mono",
+    "plucked",
+    "upright",
+    "acoustic",
+    "world",
+]
+description = "An upright-style plucked bass: a triangle with a sine body, a soft pitch snap and a filter that closes after each pluck. Play walking lines. Tone opens the filter, Pluck deepens the filter snap, Body adds the sine body under the note, Room adds a short room."
+keys = true
+sequence = false

@@ -1,0 +1,8 @@
+(EE) 
+Fatal server error:
+(EE) Server is already active for display 149
+	If this server is no longer running, remove /tmp/.X149-lock
+	and start again.
+(EE) 
+
+(metacity:1265067): metacity-WARNING **: 11:10:00.532: Screen 0 on display ":149" already has a window manager; try using the --replace option to replace the current window manager.

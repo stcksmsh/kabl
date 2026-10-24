@@ -1,0 +1,12 @@
+name = "Horn Section"
+category = "Lead"
+tags = [
+    "mono",
+    "brass",
+    "stabs",
+    "funk",
+    "disco",
+]
+description = "A synth brass lead for funk and disco: a three-voice saw stack with a second saw, a filter that swells open on every note and a light compressor. Play short stabs; harder notes are brighter. Tone opens the filter, Blat deepens the filter swell on each note, Space adds a short echo and a room, Vibrato adds a light vibrato."
+keys = true
+sequence = false

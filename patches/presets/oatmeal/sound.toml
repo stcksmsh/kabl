@@ -1,0 +1,11 @@
+name = "Oatmeal"
+category = "Bass"
+tags = [
+    "mono",
+    "clean",
+    "round",
+    "pop",
+]
+description = "A clean, round pop bass: a triangle over a sine an octave down, a soft pluck in the low-pass and a light compressor. It sits under anything. Tone opens the filter, Pluck deepens the filter snap on each note, Grit adds a little drive, Room adds a short room and slapback."
+keys = true
+sequence = false

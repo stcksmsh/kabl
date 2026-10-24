@@ -1,0 +1,13 @@
+name = "Glass Needle"
+category = "Lead"
+tags = [
+    "mono",
+    "legato",
+    "pure",
+    "sine",
+    "modular",
+    "experimental",
+]
+description = "A pure modular lead: a sine with an octave of overtone and a ping-pong echo. Play slow, high lines; notes glide. Tone opens the filter, Overtone brings in the octave above, Space adds the echo and the room, Vibrato fades in a gentle vibrato."
+keys = true
+sequence = false
