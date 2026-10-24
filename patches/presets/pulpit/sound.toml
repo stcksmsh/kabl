@@ -1,0 +1,12 @@
+name = "Pulpit"
+category = "Keys"
+tags = [
+    "poly",
+    "organ",
+    "additive",
+    "house",
+    "pop",
+]
+description = "A drawbar-style organ from six added sines, played through a rotary-speaker chorus. Hold chords, or play a house line. Brightness opens the filter, Overdrive adds the crunch of a pushed tube, Room sets a short room, Rotor brings in the speaker and speeds it up."
+keys = true
+sequence = false

@@ -1,0 +1,12 @@
+name = "Rosewood"
+category = "Pluck"
+tags = [
+    "poly",
+    "fm",
+    "marimba",
+    "world",
+    "pop",
+]
+description = "A deep marimba: a round body, a tuned overtone that rings for a moment, and a soft mallet. Play it with velocity. Mallet sets the hardness of the strike, Warmth adds a little drive, Room sets the echo and a medium room, Ring lengthens the body."
+keys = true
+sequence = false

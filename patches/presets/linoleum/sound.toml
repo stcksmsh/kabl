@@ -1,0 +1,14 @@
+name = "Linoleum"
+category = "Keys"
+tags = [
+    "poly",
+    "fm",
+    "phased",
+    "compressed",
+    "french touch",
+    "122bpm",
+    "signature",
+]
+description = "A phased disco electric piano, driven and compressed: bright, clipped, with a six-stage phaser always on. Play two-beat chord stabs. Bright opens the FM index and the filter, Crunch pushes the drive, Room sets a tight room and a slapback, Swirl speeds the phaser."
+keys = true
+sequence = false

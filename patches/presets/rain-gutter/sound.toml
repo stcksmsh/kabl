@@ -1,0 +1,12 @@
+name = "Rain Gutter"
+category = "Pluck"
+tags = [
+    "poly",
+    "fm",
+    "kalimba",
+    "ambient",
+    "pop",
+]
+description = "A kalimba: a short metallic click, a long clear ring, and a wet tail that blurs the notes into each other. Play slow, sparse notes. Tine sets the brightness of the click, Warmth adds a little drive, Space sets the echo and the long room, Shimmer brings in the slow chorus."
+keys = true
+sequence = false

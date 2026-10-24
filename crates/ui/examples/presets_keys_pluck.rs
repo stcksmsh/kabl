@@ -183,7 +183,8 @@ struct Post<'a> {
     /// How far m1 sweeps the cutoff.
     cut_m1: f32,
     trim_db: f32,
-    phaser: Option<&'a [(&'static str, f32)]>,
+    /// Phaser params, and an optional m4 route into one of its knobs (param, amount).
+    phaser: Option<(&'a [(&'static str, f32)], Option<(&'static str, f32)>)>,
     /// Chorus params, and the share of m4 that opens its mix (None: the mix is as stored).
     chorus: Option<(&'a [(&'static str, f32)], Option<f32>)>,
     comp: Option<&'a [(&'static str, f32)]>,
@@ -226,7 +227,7 @@ fn post(r: &mut Rack, knob: ModuleId, src: ModuleId, p: &Post) -> Stages {
     let mut last = trim;
     let mut first = true;
     let mut chorus_id = None;
-    let mut stage = |r: &mut Rack, last: &mut ModuleId, first: &mut bool, id: ModuleId| {
+    let stage = |r: &mut Rack, last: &mut ModuleId, first: &mut bool, id: ModuleId| {
         if *first {
             r.wire_both(*last, "out", id);
             *first = false;
@@ -235,9 +236,12 @@ fn post(r: &mut Rack, knob: ModuleId, src: ModuleId, p: &Post) -> Stages {
         }
         *last = id;
     };
-    if let Some(ph) = p.phaser {
+    if let Some((ph, m4)) = p.phaser {
         let id = r.add("phaser", ph);
         stage(r, &mut last, &mut first, id);
+        if let Some((param, amt)) = m4 {
+            r.route(knob, "m4", id, param, amt);
+        }
     }
     if let Some((ch, m4)) = p.chorus {
         let id = r.add("chorus", ch);
@@ -351,6 +355,7 @@ struct Preset {
     secs: f32,
 }
 
+#[path = "presets_keys_pluck/bank.rs"]
 mod bank;
 use bank::presets;
 
@@ -450,7 +455,7 @@ fn level(state: &kabl_core::PatchState) -> (f64, f64) {
         }
     }
     let db = |v: f64| 20.0 * v.max(1e-12).log10();
-    (db(peak), db(sum / n.max(1) as f64))
+    (db(peak), db((sum / n.max(1) as f64).sqrt()))
 }
 
 fn main() {
@@ -570,6 +575,11 @@ fn main() {
                 })
                 .collect();
             std::fs::write(&args[2], format!("{{{}}}\n", entries.join(","))).unwrap();
+        }
+        Some("names") => {
+            for p in presets() {
+                println!("{}\t{}", p.slug, p.name);
+            }
         }
         Some("info") => {
             let info = kabl_modules::registry::info_for(&args[2]).expect("kind");
