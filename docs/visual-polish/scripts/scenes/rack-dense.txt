@@ -1,0 +1,6 @@
+# Dense Composition: routing drawer open, then closed.
+sleep 3
+shot rack
+click routing
+sleep 1
+shot rack-closed
