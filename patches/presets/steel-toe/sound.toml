@@ -1,0 +1,14 @@
+name = "Steel Toe"
+category = "Bass"
+tags = [
+    "mono",
+    "distorted",
+    "compressed",
+    "sidechain",
+    "124bpm",
+    "french touch",
+    "signature",
+]
+description = "A blunt mono bass for French touch: two saws over a square sub, 18 dB of drive and a compressor squeezing it flat, then ducked hard by a four-on-the-floor kick through a sidechain. Press Run to start the kick, then play short off-beat notes; the mod wheel opens the filter. Bite opens the filter, Grit pushes the drive, Pump sets how hard the kick ducks the bass, Room adds a tempo-synced slapback and a tight room."
+keys = true
+sequence = true

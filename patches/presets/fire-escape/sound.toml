@@ -1,0 +1,12 @@
+name = "Fire Escape"
+category = "Lead"
+tags = [
+    "mono",
+    "unison",
+    "stabs",
+    "dive",
+    "house",
+]
+description = "A house stab lead: two unison saw stacks with a pitch dive on every note, chorus and a dotted echo. Play short, bright stabs. Cutoff opens the filter, Dive sets how far each note falls into its pitch, Space adds the echo and the room, Edge adds drive."
+keys = true
+sequence = false

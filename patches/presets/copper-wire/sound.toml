@@ -1,11 +1,12 @@
 name = "Copper Wire"
-category = "Keys"
+category = "Bass"
 tags = [
-    "poly",
-    "fm",
+    "mono",
+    "ring mod",
     "metallic",
     "experimental",
+    "modular",
 ]
-description = "A metallic FM tone that rings and wavers: inharmonic partials, a little feedback and a slow fade. Play sparse two-note intervals. Strike sets the brightness, Rust adds drive, Space sets the echo and room, Warp feeds the sound back into itself."
+description = "An experimental metal bass: a sine ring-modulated by a triangle a fifth up, which adds inharmonic bell tones above a clean sub. Play slow, low notes. Tone opens the filter, Metal brings in the ring modulator, Grit adds drive, Room adds an echo and a room."
 keys = true
 sequence = false

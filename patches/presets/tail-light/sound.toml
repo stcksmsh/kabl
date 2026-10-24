@@ -1,0 +1,12 @@
+name = "Tail Light"
+category = "Bass"
+tags = [
+    "mono",
+    "chorus",
+    "pulsing",
+    "synthwave",
+    "80s",
+]
+description = "A synthwave bass: two saws and a square sub with a medium pluck and a wide chorus. Play steady eighth notes. Cutoff opens the filter, Drive adds drive, Chorus brings in the chorus, Space adds a dotted echo and a room."
+keys = true
+sequence = false

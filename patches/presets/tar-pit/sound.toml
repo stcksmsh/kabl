@@ -1,0 +1,13 @@
+name = "Tar Pit"
+category = "Bass"
+tags = [
+    "mono",
+    "808",
+    "sub",
+    "glide",
+    "trap",
+    "hip-hop",
+]
+description = "A trap 808: a pure sine with a small pitch snap and a long, round body, sliding from note to note. Play long low notes and overlap them to slide. Tone opens the low-pass, Dirt drives it so it speaks on small speakers, Slide sets how long the slide takes, Room adds a short slapback and room."
+keys = true
+sequence = false

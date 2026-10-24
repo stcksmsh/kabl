@@ -1,0 +1,13 @@
+name = "Short Circuit"
+category = "Lead"
+tags = [
+    "mono",
+    "ring mod",
+    "bitcrushed",
+    "distorted",
+    "french touch",
+    "signature",
+]
+description = "A metallic lead for French touch: a saw ring-modulated by a square a fifth up, 14 dB of drive, a bitcrusher and a heavy compressor. Play short, jagged lines. Cutoff opens the filter, Metal brings in the ring modulator, Crush mixes in the bitcrusher, Room adds a slapback and a tight room."
+keys = true
+sequence = false

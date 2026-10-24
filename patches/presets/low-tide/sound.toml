@@ -1,0 +1,13 @@
+name = "Low Tide"
+category = "Bass"
+tags = [
+    "mono",
+    "legato",
+    "sub",
+    "slow",
+    "ambient",
+    "cinematic",
+]
+description = "An ambient sub bass that swells in: a sine over a triangle an octave down, a slow filter tide, chorus, a long echo and a big room. Play long, slow notes; they glide into each other. Tone opens the filter, Tide fades in a slow filter movement, Swell lengthens the fade-in of each note, Space is the echo and the room."
+keys = true
+sequence = false

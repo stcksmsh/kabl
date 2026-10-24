@@ -1,0 +1,12 @@
+name = "Slate Roof"
+category = "Bass"
+tags = [
+    "mono",
+    "neuro",
+    "unison",
+    "distorted",
+    "drum and bass",
+]
+description = "A neuro bass for drum and bass: a four-voice saw stack against a detuned saw over a square sub, 14 dB of drive and a compressor. Play long half-time notes; the mod wheel opens the filter. Cutoff opens the filter, Growl fades in a rolling filter movement, Crush mixes in a bitcrusher, Room adds a tight room and slapback."
+keys = true
+sequence = false
