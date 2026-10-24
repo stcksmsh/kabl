@@ -41,8 +41,16 @@ and its own voice assignment; every one still hears every key (as before).
   "sustained". Pedal up releases every sustained voice.
 - The same key again while it still sounds (held twice, or sustained): it stays on its voice
   and the envelope restarts.
-- Glide ALWAYS: each voice glides from the last pitch *it* played (a voice's first note does
-  not glide). Glide LEGATO has no meaning in POLY and does nothing.
+- **Glide** (any voice, whichever the allocator picks): a new note slides from the pitch of the
+  most recent note played, not from the voice's own last pitch. Note-ons within 40 ms of each
+  other are one chord; a chord tone slides from the *nearest* tone of the previous chord (a
+  tie goes to the lower tone), so a single note, being a chord of one, slides from the note
+  before it. The very first note after load has nothing to slide from.
+  - ALWAYS: every note glides, including after silence (from the last note played).
+  - LEGATO: only a note pressed while a key from before its chord is still down glides; the
+    first note after silence does not.
+  - A chord rolled slower than 40 ms between tones counts as a fast line; legato playing is
+    slower than that.
 
 ### MONO and LEGATO
 
@@ -66,10 +74,11 @@ One voice (voice 0). The keyboard keeps the list of held keys, each with its vel
   the last pitch played; the very first note does not glide). LEGATO glides only when another
   key was held (overlapping playing, including returns to a held note).
 
-### Glide
+### Glide time
 
 From the pitch the voice is at right now (mid-glide included) to the new note, in a straight
-line in semitones, taking exactly `glide_ms` whatever the interval (constant time). A glide
+line in semitones, taking exactly `glide_ms` whatever the interval (constant time; no
+constant-rate option). A glide
 time change applies to the glide in progress from the next block.
 
 ### Envelope restart ("gate dip")

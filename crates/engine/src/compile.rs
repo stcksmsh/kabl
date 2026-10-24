@@ -2327,6 +2327,7 @@ impl CompiledPatch {
                 pitch,
                 velocity,
                 glide,
+                glide_from,
                 retrigger,
             } => (
                 Some(voice),
@@ -2334,6 +2335,7 @@ impl CompiledPatch {
                     pitch,
                     velocity,
                     glide,
+                    from: glide_from,
                     retrigger,
                 },
             ),
