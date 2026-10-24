@@ -1,0 +1,59 @@
+{
+ "plugin_sha256": "2cd6267bb4749e8c28941d483cdd48918d3ebb1e4266ffe4843c127e20940285",
+ "fog-bank": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.2188,
+  "rms": 0.046,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "deep-field": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.2188,
+  "rms": 0.0567,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "cotton-mill": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1705,
+  "rms": 0.0377,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "picture-window": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.172,
+  "rms": 0.0349,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "drive-in": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1837,
+  "rms": 0.0354,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "dry-cleaner": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1655,
+  "rms": 0.0267,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "concrete-cloud": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1069,
+  "rms": 0.0291,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "static-garden": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.184,
+  "rms": 0.0381,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ }
+}

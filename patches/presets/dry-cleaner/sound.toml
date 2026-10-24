@@ -1,0 +1,13 @@
+name = "Dry Cleaner"
+category = "Pad"
+tags = [
+    "poly",
+    "phased",
+    "compressed",
+    "stabs",
+    "french touch",
+    "signature",
+]
+description = "Phased chord stabs for French touch: two detuned saws and a pulse through a phaser, a compressor and a little drive, in a close, dry room. Play short, syncopated chords. Sweep opens the filter like a DJ, Phase brings in the phaser, Grit adds drive, Room adds the echo and the room."
+keys = true
+sequence = false
