@@ -60,7 +60,11 @@ fn va(
     r.wire(m, "gate", aenv, "gate");
     r.wire(m, "gate", fenv, "gate");
     r.wire(aenv, "out", vca, "cv");
-    Va { out: vca, aenv, fenv }
+    Va {
+        out: vca,
+        aenv,
+        fenv,
+    }
 }
 
 // ---- keys -------------------------------------------------------------------------------------
@@ -68,7 +72,11 @@ fn va(
 /// Velvet Tine: a soft Rhodes-like electric piano with a phaser on the Phase macro.
 fn velvet_tine() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Tine", "Drive", "Space", "Phase"], &[0.50, 0.20, 0.45, 0.35]);
+    let knob = macros(
+        &mut r,
+        &["Tine", "Drive", "Space", "Phase"],
+        &[0.50, 0.20, 0.45, 0.35],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
         [1.0, 0.0, 1.0, 1.0, 2200.0, 0.12, 300.0, 0.3],
@@ -98,7 +106,12 @@ fn velvet_tine() -> Rack {
                 ],
                 Some(("mix", 0.5)),
             )),
-            echo: &[("time_ms", 300.0), ("feedback", 28.0), ("mix", 0.0), ("tone_hz", 4500.0)],
+            echo: &[
+                ("time_ms", 300.0),
+                ("feedback", 28.0),
+                ("mix", 0.0),
+                ("tone_hz", 4500.0),
+            ],
             echo_max: 0.2,
             room_decay: 2.4,
             room_max: 0.35,
@@ -114,7 +127,11 @@ fn velvet_tine() -> Rack {
 /// Checkerboard: a house piano stab, driven and compressed until it barks.
 fn checkerboard() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Cutoff", "Crunch", "Room", "Length"], &[0.50, 0.55, 0.25, 0.40]);
+    let knob = macros(
+        &mut r,
+        &["Cutoff", "Crunch", "Room", "Length"],
+        &[0.50, 0.55, 0.25, 0.40],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let v = va(
         &mut r,
@@ -142,7 +159,12 @@ fn checkerboard() -> Rack {
                 ("release_ms", 90.0),
                 ("makeup_db", 5.0),
             ]),
-            echo: &[("time_ms", 161.0), ("feedback", 25.0), ("mix", 0.0), ("tone_hz", 4000.0)],
+            echo: &[
+                ("time_ms", 161.0),
+                ("feedback", 25.0),
+                ("mix", 0.0),
+                ("tone_hz", 4000.0),
+            ],
             echo_max: 0.25,
             room_decay: 0.6,
             room_max: 0.15,
@@ -159,7 +181,11 @@ fn checkerboard() -> Rack {
 /// Linoleum: a phased disco electric piano, driven and compressed.
 fn linoleum() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Bright", "Crunch", "Room", "Swirl"], &[0.50, 0.45, 0.25, 0.40]);
+    let knob = macros(
+        &mut r,
+        &["Bright", "Crunch", "Room", "Swirl"],
+        &[0.50, 0.45, 0.25, 0.40],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
         [1.0, 0.0, 1.0, 0.5, 900.0, 0.2, 140.0, 0.3],
@@ -197,7 +223,12 @@ fn linoleum() -> Rack {
                 ("release_ms", 110.0),
                 ("makeup_db", 5.0),
             ]),
-            echo: &[("time_ms", 244.0), ("feedback", 30.0), ("mix", 0.0), ("tone_hz", 4500.0)],
+            echo: &[
+                ("time_ms", 244.0),
+                ("feedback", 30.0),
+                ("mix", 0.0),
+                ("tone_hz", 4500.0),
+            ],
             echo_max: 0.2,
             room_decay: 0.7,
             room_max: 0.15,
@@ -212,7 +243,11 @@ fn linoleum() -> Rack {
 /// Cellar Door: a dark, slow-wobbling electric piano for hip-hop.
 fn cellar_door() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Dark", "Dirt", "Room", "Wobble"], &[0.35, 0.30, 0.30, 0.40]);
+    let knob = macros(
+        &mut r,
+        &["Dark", "Dirt", "Room", "Wobble"],
+        &[0.35, 0.30, 0.30, 0.40],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
         [1.0, 0.0, 1.0, 2.0, 1800.0, 0.15, 280.0, 0.25],
@@ -233,8 +268,16 @@ fn cellar_door() -> Rack {
             resonance: 0.12,
             cut_m1: 0.6,
             trim_db: 8.5,
-            chorus: Some((&[("rate_hz", 0.35), ("depth", 70.0), ("mix", 0.0)], Some(0.6))),
-            echo: &[("time_ms", 340.0), ("feedback", 32.0), ("mix", 0.0), ("tone_hz", 3000.0)],
+            chorus: Some((
+                &[("rate_hz", 0.35), ("depth", 70.0), ("mix", 0.0)],
+                Some(0.6),
+            )),
+            echo: &[
+                ("time_ms", 340.0),
+                ("feedback", 32.0),
+                ("mix", 0.0),
+                ("tone_hz", 3000.0),
+            ],
             echo_max: 0.2,
             room_decay: 1.4,
             room_max: 0.3,
@@ -249,10 +292,21 @@ fn cellar_door() -> Rack {
 /// Pulpit: a drawbar-style organ (six added sines) through a rotor.
 fn pulpit() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Brightness", "Overdrive", "Room", "Rotor"], &[0.55, 0.20, 0.35, 0.50]);
+    let knob = macros(
+        &mut r,
+        &["Brightness", "Overdrive", "Room", "Rotor"],
+        &[0.55, 0.20, 0.35, 0.50],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     // Sub, fundamental, 2nd, 3rd, 4th and 6th harmonics: ratio, fine, level, then a flat envelope.
-    let bars = [(0.0, 0.6), (1.0, 1.0), (2.0, 0.8), (3.0, 0.5), (4.0, 0.4), (6.0, 0.25)];
+    let bars = [
+        (0.0, 0.6),
+        (1.0, 1.0),
+        (2.0, 0.8),
+        (3.0, 0.5),
+        (4.0, 0.4),
+        (6.0, 0.25),
+    ];
     let ops: [Op; 6] = bars.map(|(ratio, level)| [ratio, 0.0, level, 3.0, 50.0, 1.0, 40.0, 0.0]);
     let v = fm(&mut r, m, 7.0, 1.0, 0.0, &ops);
     post(
@@ -265,8 +319,16 @@ fn pulpit() -> Rack {
             resonance: 0.05,
             cut_m1: 0.6,
             trim_db: 1.0,
-            chorus: Some((&[("rate_hz", 5.5), ("depth", 22.0), ("mix", 0.0)], Some(0.55))),
-            echo: &[("time_ms", 300.0), ("feedback", 25.0), ("mix", 0.0), ("tone_hz", 4500.0)],
+            chorus: Some((
+                &[("rate_hz", 5.5), ("depth", 22.0), ("mix", 0.0)],
+                Some(0.55),
+            )),
+            echo: &[
+                ("time_ms", 300.0),
+                ("feedback", 25.0),
+                ("mix", 0.0),
+                ("tone_hz", 4500.0),
+            ],
             echo_max: 0.1,
             room_decay: 1.6,
             room_max: 0.3,
@@ -282,7 +344,11 @@ fn pulpit() -> Rack {
 /// Rosewood: a deep marimba; the 4th partial rings a moment, the Ring macro lengthens the body.
 fn rosewood() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Mallet", "Warmth", "Room", "Ring"], &[0.50, 0.20, 0.40, 0.45]);
+    let knob = macros(
+        &mut r,
+        &["Mallet", "Warmth", "Room", "Ring"],
+        &[0.50, 0.20, 0.40, 0.45],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
         [1.0, 0.0, 1.0, 0.5, 900.0, 0.0, 160.0, 0.3],
@@ -302,7 +368,12 @@ fn rosewood() -> Rack {
             cutoff: 4500.0,
             cut_m1: 0.4,
             trim_db: 9.0,
-            echo: &[("time_ms", 330.0), ("feedback", 28.0), ("mix", 0.0), ("tone_hz", 4500.0)],
+            echo: &[
+                ("time_ms", 330.0),
+                ("feedback", 28.0),
+                ("mix", 0.0),
+                ("tone_hz", 4500.0),
+            ],
             echo_max: 0.15,
             room_decay: 2.2,
             room_max: 0.4,
@@ -319,7 +390,11 @@ fn rosewood() -> Rack {
 /// Rain Gutter: a kalimba with a long, wet tail.
 fn rain_gutter() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Tine", "Warmth", "Space", "Shimmer"], &[0.50, 0.15, 0.60, 0.40]);
+    let knob = macros(
+        &mut r,
+        &["Tine", "Warmth", "Space", "Shimmer"],
+        &[0.50, 0.15, 0.60, 0.40],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
         [1.0, 0.0, 1.0, 0.5, 1700.0, 0.0, 250.0, 0.3],
@@ -339,8 +414,16 @@ fn rain_gutter() -> Rack {
             cutoff: 6000.0,
             cut_m1: 0.35,
             trim_db: 11.0,
-            chorus: Some((&[("rate_hz", 0.4), ("depth", 40.0), ("mix", 0.0)], Some(0.55))),
-            echo: &[("time_ms", 420.0), ("feedback", 42.0), ("mix", 0.0), ("tone_hz", 5000.0)],
+            chorus: Some((
+                &[("rate_hz", 0.4), ("depth", 40.0), ("mix", 0.0)],
+                Some(0.55),
+            )),
+            echo: &[
+                ("time_ms", 420.0),
+                ("feedback", 42.0),
+                ("mix", 0.0),
+                ("tone_hz", 5000.0),
+            ],
             echo_max: 0.3,
             room_decay: 4.0,
             room_max: 0.45,
@@ -355,7 +438,11 @@ fn rain_gutter() -> Rack {
 /// Spark Plug: a blunt, driven, compressed pluck.
 fn spark_plug() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, &["Cutoff", "Crunch", "Room", "Decay"], &[0.50, 0.60, 0.25, 0.40]);
+    let knob = macros(
+        &mut r,
+        &["Cutoff", "Crunch", "Room", "Decay"],
+        &[0.50, 0.60, 0.25, 0.40],
+    );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let v = va(
         &mut r,
@@ -383,7 +470,12 @@ fn spark_plug() -> Rack {
                 ("release_ms", 80.0),
                 ("makeup_db", 6.5),
             ]),
-            echo: &[("time_ms", 242.0), ("feedback", 28.0), ("mix", 0.0), ("tone_hz", 3800.0)],
+            echo: &[
+                ("time_ms", 242.0),
+                ("feedback", 28.0),
+                ("mix", 0.0),
+                ("tone_hz", 3800.0),
+            ],
             echo_max: 0.25,
             room_decay: 0.5,
             room_max: 0.12,
@@ -420,13 +512,17 @@ fn checker_phrase() -> Vec<Hit> {
     let mut v = Vec::new();
     for bar in 0..4 {
         let (c, b0) = if bar % 2 == 0 { (am, bar) } else { (dm, bar) };
-        v.extend(comp(124.0, 100, &[
-            (b0 as f32 * 4.0 + 0.0, 0.5, c),
-            (b0 as f32 * 4.0 + 0.75, 0.5, c),
-            (b0 as f32 * 4.0 + 1.5, 0.5, c),
-            (b0 as f32 * 4.0 + 2.5, 0.5, c),
-            (b0 as f32 * 4.0 + 3.5, 0.25, c),
-        ]));
+        v.extend(comp(
+            124.0,
+            100,
+            &[
+                (b0 as f32 * 4.0 + 0.0, 0.5, c),
+                (b0 as f32 * 4.0 + 0.75, 0.5, c),
+                (b0 as f32 * 4.0 + 1.5, 0.5, c),
+                (b0 as f32 * 4.0 + 2.5, 0.5, c),
+                (b0 as f32 * 4.0 + 3.5, 0.25, c),
+            ],
+        ));
     }
     v
 }
@@ -473,7 +569,9 @@ fn pulpit_phrase() -> Vec<Hit> {
 }
 
 fn rosewood_phrase() -> Vec<Hit> {
-    let notes = [57u8, 60, 64, 69, 67, 64, 60, 62, 65, 69, 72, 69, 67, 64, 62, 60];
+    let notes = [
+        57u8, 60, 64, 69, 67, 64, 60, 62, 65, 69, 72, 69, 67, 64, 62, 60,
+    ];
     let mut v = line(
         &notes
             .iter()
@@ -491,7 +589,14 @@ fn gutter_phrase() -> Vec<Hit> {
         &notes
             .iter()
             .enumerate()
-            .map(|(i, &n)| (i as f32 * 0.4 + if i % 3 == 2 { 0.1 } else { 0.0 }, 0.3, n, 70 + (i as u8 * 7) % 30))
+            .map(|(i, &n)| {
+                (
+                    i as f32 * 0.4 + if i % 3 == 2 { 0.1 } else { 0.0 },
+                    0.3,
+                    n,
+                    70 + (i as u8 * 7) % 30,
+                )
+            })
             .collect::<Vec<_>>(),
     )
 }
@@ -500,8 +605,18 @@ fn spark_phrase() -> Vec<Hit> {
     // 124 BPM sixteenths, off-beat accents.
     let s16 = 60.0 / 124.0 / 4.0;
     let pat: [(u32, u8, u8); 12] = [
-        (0, 45, 110), (3, 45, 90), (6, 52, 100), (8, 48, 110), (11, 48, 90), (14, 55, 100),
-        (16, 45, 110), (19, 57, 90), (22, 52, 100), (24, 43, 110), (27, 50, 90), (30, 55, 100),
+        (0, 45, 110),
+        (3, 45, 90),
+        (6, 52, 100),
+        (8, 48, 110),
+        (11, 48, 90),
+        (14, 55, 100),
+        (16, 45, 110),
+        (19, 57, 90),
+        (22, 52, 100),
+        (24, 43, 110),
+        (27, 50, 90),
+        (30, 55, 100),
     ];
     line(&pat.map(|(s, n, v)| (s as f32 * s16, s16 * 0.7, n, v)))
 }
