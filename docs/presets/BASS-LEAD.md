@@ -52,6 +52,19 @@ Depth routes: Oatmeal's Pluck scales the filter envelope's depth; the vibratos (
 
 Acid Rain was too resonant with high clicks; Hot Wire the same, less. Measured as energy above 3 kHz in 5 ms windows: Acid Rain peaked 16 dB under the total level at default, now 22 dB lower than before. Causes: 1 ms attacks on the filter envelope (the cutoff jumped and the resonance rang), ladder drive plus the drive stage feeding the resonance, and a resonance of 0.40. Now: filter attack 6 ms (Hot Wire 4), amp attack 3 ms, resonance 0.28 (Hot Wire 0.32), ladder drive 2 dB, drive stage 7 dB (Acid Rain), a smaller envelope and velocity sweep, and a smaller Squelch range (at Squelch 1 Acid Rain is still 10 dB quieter above 3 kHz than the old default). Slides are untouched.
 
+## Group 2
+
+Eight basses (Rubber Band, Slate Roof, Gutter, Low Tide, Copper Wire, Tail Light, Rail Yard, Oak Stave) and seven leads (Glass Needle, Loud Mouth, Dust Devil, Afterglow, Horn Section, Fire Escape, Short Circuit); clips and tour in `clips/bass-lead/group2/`, tour start times printed by `clips.py` (alphabetical order, one second of silence between).
+
+### Checks (group 2)
+
+- `every_preset_keeps_to_the_brief`, the library, presets and factory_bank tests pass.
+- Levels, peak / loudness dBFS: Rubber Band -9.3 / -21.8, Slate Roof -11.9 / -19.3, Gutter -7.3 / -16.5, Low Tide -12.2 / -21.7, Copper Wire -13.9 / -21.0, Tail Light -10.2 / -21.4, Rail Yard -8.9 / -21.4, Oak Stave -5.6 / -21.9, Glass Needle -9.9 / -20.9, Loud Mouth -13.9 / -22.1, Dust Devil -14.1 / -21.6, Afterglow -7.9 / -21.7, Horn Section -12.1 / -21.1, Fire Escape -9.9 / -21.6, Short Circuit -11.6 / -21.4. Loud Mouth sits at the edge of the -19 +- 3 band (its compressor makes trim insensitive).
+- Macros: every macro moves the render. Weakest after a fix: Oak Stave Pluck (-24 dB under the render; the first version was -31) and Slate Roof Crush (-20 dB; first version -37, bitcrusher now 6 bits, downsample 4). A Pluck that is only a 240 ms filter snap on a triangle stays subtle by nature.
+- Clicks: nobody on this side can listen. Energy above 3 kHz in 5 ms windows, flagged where it jumps 10 dB while total level rises under 6 dB: none in 10 of 15. Gutter (bitcrusher plus 24 dB drive), Rubber Band (the slap), Slate Roof (14 dB drive), Rail Yard (hats and clap) and Tail Light show flagged windows; the same measure flags Steel Toe and Acid Rain in group 1, so it separates grit from clicks poorly. These five need Kosta's ears.
+- clips: 320 kbps mp3 against the float render, all 15 pass (SNR 41 to 82 dB below 16 kHz, peaks within 0.1 dB).
+- REAPER (`scripts/host.py`, evidence in `evidence/host-bass-lead-2/`): all 15 saved, quit, reopened with identical state and identical render; nothing plays without MIDI except Rail Yard's own drum grid (exempted in `host.py` like Steel Toe). The standalone check (`scripts/standalone.py`) was not run for group 2.
+
 ## Gaps
 
 - Unison is capped at four voices on master (PR #42 lifts it); poly glide is not needed here (all voices are mono).

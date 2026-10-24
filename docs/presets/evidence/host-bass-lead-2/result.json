@@ -1,0 +1,66 @@
+{
+ "plugin_sha256": "46f20b989bd9c349d0d43eb0aae9b9097a1b79200dcd1c3a8a9114e8be9e0905",
+ "rail-yard": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0981,
+  "rms": 0.0203,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.01776
+ },
+ "oak-stave": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1127,
+  "rms": 0.0291,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "glass-needle": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1089,
+  "rms": 0.0308,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "loud-mouth": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0594,
+  "rms": 0.0153,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "dust-devil": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0551,
+  "rms": 0.024,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "afterglow": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1149,
+  "rms": 0.0258,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "horn-section": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0657,
+  "rms": 0.0223,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "fire-escape": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0906,
+  "rms": 0.0223,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "short-circuit": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0678,
+  "rms": 0.019,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ }
+}

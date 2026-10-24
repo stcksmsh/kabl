@@ -9,17 +9,13 @@ Build the first part of the factory preset bank: Bass to 14 and Lead to 12 (the 
 - Group 1 (8 presets) delivered on draft PR #48, branch `claude/presets-bass-lead`: Steel Toe, Tar Pit, Acid Rain, Oatmeal (bass), Spun Sugar, Pig Iron, Hot Wire, Lantern (lead). Commits `b1d21f2` (group 1), `74e1ec3` (Acid Rain and Hot Wire resonance and click fix), `14b93af` (merge of master with PR #42 and #43), then the rename commit and the group 2 code commit (see `git log`).
 - Kosta's verdict: Steel Toe and Tar Pit keep; Oatmeal, Spun Sugar, Pig Iron, Lantern OK (renamed from Soft Shoe, Satin Ribbon, Rust Belt, Paper Crane at his pick); Acid Rain and Hot Wire were too resonant with high clicks, fixed (see lessons).
 - Generator `crates/ui/examples/presets_bass_lead.rs`; report and checks in `docs/presets/BASS-LEAD.md`; clips in `docs/presets/clips/bass-lead/group1/`; evidence in `docs/presets/evidence/host-bass-lead/` and `standalone-bass-lead/` (these still carry the old slugs Paper Crane, Satin Ribbon, Soft Shoe, Rust Belt; rerun the scripts to refresh).
-- Group 2 code is written and compiles but is NOT verified: the 15 functions and `Preset` entries (`group: 2`) are in the generator; their patches are not written to `patches/presets/`, not in `FACTORY`, not leveled, not heard.
+- Group 2 (15 presets) done: patches, levels, FACTORY entries, clips + tour in `docs/presets/clips/bass-lead/group2/`, REAPER evidence in `evidence/host-bass-lead-2/`, report in `BASS-LEAD.md`. Commits `75f6aaf`, `18531f0` and the evidence commit (see `git log`). Slate Roof Crush and Oak Stave Pluck were strengthened after the macro check.
 
-## Remaining, in order
+## Remaining
 
-1. `cargo run --release -p kabl-ui --example presets_bass_lead -- write patches 2` (the last argument is the group; omit for all).
-2. `target/release/examples/presets_bass_lead levels patches 2`: each preset must land at -19 +- 3 dBFS loudness, peak under -1; adjust each `trim_db` (or the compressor makeup for heavily compressed ones). `... macros patches 2` shows each macro's effect in dB (nothing dead) and the all-0 / all-1 peaks.
-3. `... library patches 2` prints `FACTORY` entries: paste them in one block after the group 1 block in `crates/ui/tests/library.rs`. Run `cargo test -p kabl-ui --test library --test presets --test factory_bank` (library search tests fail if a description contains a word those tests expect only elsewhere, such as "singing" or "warm").
-4. Check the clips objectively (`>3 kHz` energy in 5 ms windows, see the lessons) since nobody on this side can listen.
-5. Clips and tour: `PP_TOOL=presets_bass_lead PP_OUT=docs/presets/clips/bass-lead/group2 PP_GROUP=2 python3 docs/presets/scripts/clips.py`.
-6. Hosts: `target/release/examples/presets_bass_lead phrases scratch/bass-lead-phrases.json`, `cargo build --release -p kabl-clap`, then `PH_PHRASES=scratch/bass-lead-phrases.json PH_OUT=docs/presets/evidence/host-bass-lead-2 python3 docs/presets/scripts/host.py <slugs>`; standalone: `PH_OUT=... python3 docs/presets/scripts/standalone.py slug=note,note ...` (`cargo build --release -p kabl-ui --bins --examples` first). Rail Yard (and Steel Toe) play their drums with the transport: host.py allows the kick without MIDI.
-7. Report to Kosta: one line per preset, tour start times; update `BASS-LEAD.md` and the PR body; `cargo clean`.
+1. Kosta listens to group 1 (Acid Rain, Hot Wire) and group 2. Click-suspect by measure: Gutter, Rubber Band, Slate Roof, Rail Yard, Tail Light. Loud Mouth is at the loudness band edge (-22.1).
+2. Optional: `PH_OUT=... python3 docs/presets/scripts/standalone.py slug=note,...` for group 2 (not run; build `cargo build --release -p kabl-ui --bins --examples` first).
+3. Update the PR #48 body for group 2; `cargo clean` when done.
 
 Group 2 in the generator: bass Rubber Band (funk), Slate Roof (neuro, drum and bass), Gutter (French touch, signature), Low Tide (ambient sub), Copper Wire (experimental ring mod), Tail Light (synthwave), Rail Yard (house, drum grid sidechain), Oak Stave (upright pluck); lead Glass Needle (modular sine), Loud Mouth (French touch, formant, signature), Dust Devil (trap whistle), Afterglow (synthwave, 7-voice unison), Horn Section (funk and disco brass), Fire Escape (house stabs, 8 + 4 voice unison, pitch dive), Short Circuit (French touch, ring mod and crush, signature).
 
