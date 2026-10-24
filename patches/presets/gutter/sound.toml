@@ -1,0 +1,13 @@
+name = "Gutter"
+category = "Bass"
+tags = [
+    "mono",
+    "distorted",
+    "bitcrushed",
+    "compressed",
+    "french touch",
+    "signature",
+]
+description = "A dirty mid-range bass for French touch: a saw and a square sub into 24 dB of drive, a light bitcrusher and an 8:1 compressor, with a pulse an octave up to bring in. Play short, chugging notes. Bite opens the filter, Grit pushes the drive, Octave brings in the pulse an octave up, Room adds a slapback and a tight room."
+keys = true
+sequence = false

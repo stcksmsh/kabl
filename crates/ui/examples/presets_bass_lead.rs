@@ -1221,7 +1221,7 @@ fn gutter() -> Rack {
         fenv_amt: 0.25,
         wheel_amt: 0.25,
         aenv: [2.0, 150.0, 0.8, 40.0],
-        trim_db: 10.0,
+        trim_db: 7.5,
     });
     v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.45);
     v.r.route(v.knob, "m2", v.drive, "drive_db", 0.3);
@@ -1252,7 +1252,7 @@ fn low_tide() -> Rack {
         fenv_amt: 0.10,
         wheel_amt: 0.0,
         aenv: [60.0, 500.0, 0.9, 1200.0],
-        trim_db: 9.0,
+        trim_db: 14.0,
     });
     v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.45);
     let tide = v.r.add("lfo", &[("rate_hz", 0.15)]);
@@ -1421,7 +1421,7 @@ fn oak_stave() -> Rack {
         fenv_amt: 0.10,
         wheel_amt: 0.0,
         aenv: [2.0, 700.0, 0.15, 160.0],
-        trim_db: 9.0,
+        trim_db: 16.0,
     });
     v.r.route(v.fenv, "out", v.oscs[0], "fine", 0.15);
     v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.4);
@@ -1449,7 +1449,7 @@ fn glass_needle() -> Rack {
         fenv_amt: 0.08,
         wheel_amt: 0.0,
         aenv: [4.0, 300.0, 0.8, 320.0],
-        trim_db: 10.0,
+        trim_db: 14.0,
     });
     v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.4);
     v.r.route(v.knob, "m2", v.mix, "level2", 0.5);
@@ -1491,7 +1491,7 @@ fn loud_mouth() -> Rack {
         fenv_amt: 0.0,
         wheel_amt: 0.0,
         aenv: [2.0, 200.0, 0.85, 60.0],
-        trim_db: 10.0,
+        trim_db: 17.0,
     });
     let formant = v.mono_after(
         "filter.formant",
@@ -1557,7 +1557,7 @@ fn afterglow() -> Rack {
         fenv_amt: 0.10,
         wheel_amt: 0.0,
         aenv: [10.0, 300.0, 0.8, 350.0],
-        trim_db: 10.0,
+        trim_db: 16.0,
     });
     v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.4);
     v.r.route(v.knob, "m2", v.oscs[0], "detune", 0.35);
@@ -1591,7 +1591,7 @@ fn horn_section() -> Rack {
         fenv_amt: 0.15,
         wheel_amt: 0.0,
         aenv: [18.0, 220.0, 0.85, 100.0],
-        trim_db: 10.0,
+        trim_db: 13.0,
     });
     v.r.route(v.m, "velocity", v.lad, "cutoff_hz", 0.12);
     v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.4);
@@ -1622,7 +1622,7 @@ fn fire_escape() -> Rack {
         fenv_amt: 0.12,
         wheel_amt: 0.0,
         aenv: [3.0, 260.0, 0.8, 110.0],
-        trim_db: 10.0,
+        trim_db: 13.0,
     });
     v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.4);
     for o in v.oscs.clone() {
@@ -2065,7 +2065,7 @@ fn presets() -> Vec<Preset> {
             name: "Afterglow",
             category: "Lead",
             tags: &["mono", "legato", "unison", "chorus", "synthwave", "80s"],
-            description: "A big synthwave lead: a seven-voice saw stack with an octave stack and a pulse, chorus, a long echo and a big room. Play slow, singing lines; notes glide. Cutoff brightens, Spread widens the detune of the main stack, Space adds the echo and the room, Vibrato adds vibrato.",
+            description: "A big synthwave lead: a seven-voice saw stack with an octave stack and a pulse, chorus, a long echo and a big room. Play slow, soaring lines; notes glide. Cutoff brightens, Spread widens the detune of the main stack, Space adds the echo and the room, Vibrato adds vibrato.",
             listen: "The wide stack and the long echo; Spread up for a bigger, looser sound.",
             build: afterglow,
             group: 2,
