@@ -71,8 +71,16 @@ pub fn surface(p: &Painter, st: &Style, rect: Rect, base: Color32, edge: Color32
     mesh.add_triangle(0, 2, 3);
     p.add(Shape::mesh(mesh));
     if f.material == FaceMaterial::Lacquer && f.gloss > 0.0 {
-        let band = Rect::from_min_size(rect.min, vec2(rect.width(), rect.height() * 0.36));
-        p.rect_filled(band, cr, Color32::from_white_alpha((f.gloss * 255.0) as u8));
+        // Continuous top light: fades out over the whole face, so no edge cuts the content.
+        let mut mesh = Mesh::default();
+        let lit = Color32::from_white_alpha((f.gloss * 255.0) as u8);
+        mesh.colored_vertex(rect.left_top(), lit);
+        mesh.colored_vertex(rect.right_top(), lit);
+        mesh.colored_vertex(rect.right_bottom(), Color32::TRANSPARENT);
+        mesh.colored_vertex(rect.left_bottom(), Color32::TRANSPARENT);
+        mesh.add_triangle(0, 1, 2);
+        mesh.add_triangle(0, 2, 3);
+        p.add(Shape::mesh(mesh));
     }
     if f.grain > 0.0 && z >= 0.5 {
         let a = (f.grain * 100.0) as u8;
@@ -143,8 +151,9 @@ pub fn title(
     let cx = face.center().x;
     let y = face.top() + 26.0 * z;
     let mut rect = Rect::NOTHING;
-    let left = st.slots.face.title == FaceTitle::LeftDot && {
-        let x0 = face.left() + 32.0 * z;
+    let dot = st.slots.face.title == FaceTitle::LeftDot;
+    let x0 = face.left() + if dot { 32.0 } else { 12.0 } * z;
+    let left = st.slots.face.title != FaceTitle::CapsRule && {
         let size = |text: &str, font: Option<FontId>| {
             font.map_or(egui::Vec2::ZERO, |f| {
                 p.layout_no_wrap(text.to_string(), f, ink).size()
@@ -162,8 +171,9 @@ pub fn title(
                 .any(|a| a.intersects(name_r) || a.intersects(tag_r))
     };
     let kind = match st.slots.face.title {
-        FaceTitle::LeftDot if !left => FaceTitle::Centered,
-        k => k,
+        FaceTitle::CapsRule => FaceTitle::CapsRule,
+        _ if left => FaceTitle::LeftDot,
+        _ => FaceTitle::Centered,
     };
     if let Some(mut font) = title_font(st, z) {
         // Keep clear of the "+N" chip on the right: a long name steps down a size.
@@ -179,9 +189,11 @@ pub fn title(
                 p.text(pos2(cx, y), egui::Align2::CENTER_CENTER, name, font, ink)
             }
             FaceTitle::LeftDot => {
-                p.circle_filled(pos2(face.left() + 22.0 * z, y), 4.0 * z, st.roles.accent);
+                if dot {
+                    p.circle_filled(pos2(face.left() + 22.0 * z, y), 4.0 * z, st.roles.accent);
+                }
                 p.text(
-                    pos2(face.left() + 32.0 * z, y),
+                    pos2(x0, y),
                     egui::Align2::LEFT_CENTER,
                     name,
                     font,
@@ -212,7 +224,7 @@ pub fn title(
         match kind {
             FaceTitle::LeftDot => {
                 p.text(
-                    pos2(face.left() + 32.0 * z, at.y),
+                    pos2(x0, at.y),
                     egui::Align2::LEFT_CENTER,
                     tag,
                     font,
@@ -463,44 +475,60 @@ pub fn readout(
     Some(p.layout_no_wrap(s.replace(' ', ""), font, col))
 }
 
-/// The frame of a live display: glass, neon or paper, with a faint grid.
-pub fn display_frame(p: &Painter, st: &Style, rect: Rect, z: f32) {
+/// A shadow strip along one edge of `rect` (0 top, 1 left, 2 right), `depth` deep, fading from
+/// alpha `a` at the edge to nothing.
+fn fade(p: &Painter, rect: Rect, side: usize, depth: f32, a: u8) {
+    let (c0, c1) = (alpha(Color32::BLACK, a), alpha(Color32::BLACK, 0));
+    let (l, r, t, b) = (rect.left(), rect.right(), rect.top(), rect.bottom());
+    let q = match side {
+        0 => [(pos2(l, t), c0), (pos2(r, t), c0), (pos2(r, t + depth), c1), (pos2(l, t + depth), c1)],
+        1 => [(pos2(l, t), c0), (pos2(l, b), c0), (pos2(l + depth, b), c1), (pos2(l + depth, t), c1)],
+        _ => [(pos2(r, t), c0), (pos2(r, b), c0), (pos2(r - depth, b), c1), (pos2(r - depth, t), c1)],
+    };
+    let mut mesh = Mesh::default();
+    for (v, c) in q {
+        mesh.colored_vertex(v, c);
+    }
+    mesh.add_triangle(0, 1, 2);
+    mesh.add_triangle(0, 2, 3);
+    p.add(Shape::mesh(mesh));
+}
+
+/// The frame of a live display, seated into the face colour `face`: a tinted glass with a
+/// bezel, a lit lower lip, an inner shadow at the top and sides and a faint sheen. Paper
+/// themes keep the flat sheet.
+pub fn display_frame(p: &Painter, st: &Style, rect: Rect, face: Color32, z: f32) {
     let r = &st.roles;
     let cr = CornerRadius::same((3.0 * z).clamp(2.0, 6.0) as u8);
-    match st.slots.display.frame {
-        DisplayFrame::Glass => {
-            p.rect_filled(rect, cr, r.disp_bg);
-            let sh = Rect::from_min_size(rect.min, vec2(rect.width(), (6.0 * z).max(2.0)));
-            p.rect_filled(sh, cr, alpha(Color32::BLACK, 70));
-            p.rect_stroke(
-                rect,
-                cr,
-                Stroke::new(1.0, alpha(Color32::BLACK, 120)),
-                StrokeKind::Inside,
-            );
-        }
-        DisplayFrame::Neon => {
-            p.rect_filled(rect, cr, r.disp_bg);
-            p.rect_stroke(
-                rect.expand(1.5),
-                cr,
-                Stroke::new(
-                    3.0,
-                    alpha(r.disp_trace, (70.0 * st.slots.display.glow) as u8),
-                ),
-                StrokeKind::Outside,
-            );
-            p.rect_stroke(
-                rect,
-                cr,
-                Stroke::new(1.0, alpha(r.disp_trace, 150)),
-                StrokeKind::Inside,
-            );
-        }
-        DisplayFrame::Paper => {
-            p.rect_filled(rect, cr, mix(r.disp_bg, Color32::WHITE, 0.82));
-            p.rect_stroke(rect, cr, Stroke::new(1.0, r.line2), StrokeKind::Inside);
-        }
+    if st.slots.display.frame == DisplayFrame::Paper {
+        p.rect_filled(rect, cr, mix(r.disp_bg, Color32::WHITE, 0.82));
+        p.rect_stroke(rect, cr, Stroke::new(1.0, r.line2), StrokeKind::Inside);
+    } else {
+        // Lower lip: the panel's edge catching the light under the cut.
+        p.rect_stroke(
+            rect.translate(vec2(0.0, 1.0)).expand(1.0),
+            cr,
+            Stroke::new(1.0, alpha(Color32::WHITE, 60)),
+            StrokeKind::Outside,
+        );
+        p.rect_filled(rect, cr, mix(r.disp_bg, face, 0.12));
+        fade(p, rect, 0, (7.0 * z).max(3.0), 120);
+        fade(p, rect, 1, (4.0 * z).max(2.0), 70);
+        fade(p, rect, 2, (4.0 * z).max(2.0), 70);
+        let (w, h) = (rect.width(), rect.height());
+        let mut sheen = Mesh::default();
+        sheen.colored_vertex(rect.left_top(), alpha(Color32::WHITE, 14));
+        sheen.colored_vertex(rect.left_top() + vec2(w * 0.5, 0.0), alpha(Color32::WHITE, 0));
+        sheen.colored_vertex(rect.left_top() + vec2(0.0, h * 0.6), alpha(Color32::WHITE, 0));
+        sheen.add_triangle(0, 1, 2);
+        p.add(Shape::mesh(sheen));
+        // Bezel.
+        p.rect_stroke(
+            rect,
+            cr,
+            Stroke::new(2.0, alpha(mix(face, Color32::BLACK, 0.7), 230)),
+            StrokeKind::Inside,
+        );
     }
     if rect.height() >= 28.0 {
         let grid = if st.slots.display.frame == DisplayFrame::Paper {
