@@ -1,0 +1,12 @@
+name = "Cellar Door"
+category = "Keys"
+tags = [
+    "poly",
+    "fm",
+    "dark",
+    "hip-hop",
+    "lofi",
+]
+description = "A dark electric piano that sits low in a beat: a closed filter, a little drive, a slow pitch wobble from the chorus. Play slow minor chords. Dark opens the filter and the FM index, Dirt adds drive, Room sets the echo and room, Wobble brings in the slow chorus."
+keys = true
+sequence = false

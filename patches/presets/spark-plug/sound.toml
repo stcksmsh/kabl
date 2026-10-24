@@ -1,0 +1,14 @@
+name = "Spark Plug"
+category = "Pluck"
+tags = [
+    "poly",
+    "pluck",
+    "distorted",
+    "compressed",
+    "french touch",
+    "124bpm",
+    "signature",
+]
+description = "A blunt, driven synth pluck: two saws and a square, 18 dB of drive, a fast compressor. Play short low notes. Cutoff opens the filter, Crunch pushes the drive, Room sets a slapback and a tight room, Decay lengthens the note."
+keys = true
+sequence = false

@@ -1,0 +1,12 @@
+name = "Velvet Tine"
+category = "Keys"
+tags = [
+    "poly",
+    "fm",
+    "phased",
+    "pop",
+    "soul",
+]
+description = "A soft Rhodes-like electric piano: a mellow body, a tine that fades in a tenth of a second, velocity-sensitive bark. Play chords. Tine opens the FM brightness and the filter, Drive adds warmth, Space sets the echo and room, Phase brings in a slow phaser."
+keys = true
+sequence = false
