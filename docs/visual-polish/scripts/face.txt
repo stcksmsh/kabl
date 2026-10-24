@@ -1,0 +1,14 @@
+# One module face at 100% and at 50%, routing panel closed. The theme comes from KABL_THEME.
+sleep 2
+click routing
+sleep 1
+click zoom:100
+sleep 1
+shot z100
+click zoom:out
+sleep 0.4
+click zoom:out
+sleep 0.4
+click zoom:out
+sleep 1
+shot z50

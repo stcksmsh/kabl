@@ -69,11 +69,16 @@ pub fn candidates(patch: &PatchState) -> Vec<Target> {
             }
         }
     }
-    // Pins and macros first; deterministic module/name ordering breaks ties.
+    // Pins and macros first, then face controls before advanced ones (a module's growing
+    // advanced list must not push the next module's controls out of the sixteen slots);
+    // deterministic module/name ordering breaks ties.
     targets.sort_by_key(|t| {
+        let advanced =
+            registry::info_for(&t.kind).is_some_and(|i| i.advanced.contains(&t.param.as_str()));
         (
             !kabl_ui::perform::is_pinned(patch, t.module, &t.param),
             t.kind != "macro",
+            advanced,
             t.module,
             t.param.clone(),
         )

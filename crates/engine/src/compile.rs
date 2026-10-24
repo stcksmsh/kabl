@@ -1889,6 +1889,8 @@ impl CompiledPatch {
         for (m, &(id, _)) in self.modules.iter().zip(&self.module_origin) {
             if let Some(seq) = m.as_any().downcast_ref::<Seq>() {
                 f(id, seq.step(), seq.bank(), seq.armed());
+            } else if let Some(grid) = m.as_any().downcast_ref::<DrumGrid>() {
+                f(id, grid.step(), grid.pattern(), grid.armed());
             }
         }
     }
@@ -1916,7 +1918,7 @@ impl CompiledPatch {
     pub fn inherit_armed_seqs(&mut self, previous: &Self) {
         previous.seqs(|id, _, _, armed| {
             if let Some(bank) = armed {
-                self.with_seq(id, |s| s.arm(bank, 0));
+                self.arm_bank(id, bank, 0);
             }
         });
     }
@@ -1928,6 +1930,40 @@ impl CompiledPatch {
             .and_then(|m| m.as_any_mut().downcast_mut::<Seq>())
         {
             f(s);
+        }
+    }
+
+    /// Audio thread: arms bank `bank` of the `seq`, or pattern `bank` of the `drum.grid`,
+    /// `id`, from sample `from` of the next block. No allocation.
+    pub fn arm_bank(&mut self, id: ModuleId, bank: usize, from: usize) {
+        if let Some(m) = self.module_mut(id, None) {
+            if let Some(s) = m.as_any_mut().downcast_mut::<Seq>() {
+                s.arm(bank, from);
+            } else if let Some(g) = m.as_any_mut().downcast_mut::<DrumGrid>() {
+                g.arm(bank, from);
+            }
+        }
+    }
+
+    /// Audio thread: drops the arm of the `seq` or `drum.grid` `id`. No allocation.
+    pub fn cancel_bank(&mut self, id: ModuleId) {
+        if let Some(m) = self.module_mut(id, None) {
+            if let Some(s) = m.as_any_mut().downcast_mut::<Seq>() {
+                s.cancel();
+            } else if let Some(g) = m.as_any_mut().downcast_mut::<DrumGrid>() {
+                g.cancel();
+            }
+        }
+    }
+
+    /// Audio thread: drops every arm. No allocation.
+    pub fn cancel_banks(&mut self) {
+        for m in &mut self.modules {
+            if let Some(s) = m.as_any_mut().downcast_mut::<Seq>() {
+                s.cancel();
+            } else if let Some(g) = m.as_any_mut().downcast_mut::<DrumGrid>() {
+                g.cancel();
+            }
         }
     }
 
@@ -2291,6 +2327,7 @@ impl CompiledPatch {
                 pitch,
                 velocity,
                 glide,
+                glide_from,
                 retrigger,
             } => (
                 Some(voice),
@@ -2298,6 +2335,7 @@ impl CompiledPatch {
                     pitch,
                     velocity,
                     glide,
+                    from: glide_from,
                     retrigger,
                 },
             ),
@@ -2764,6 +2802,8 @@ fn arm_launches(
         };
         if let Some(seq) = modules[si].as_any_mut().downcast_mut::<Seq>() {
             seq.arm(l.bank as usize, offset as usize);
+        } else if let Some(grid) = modules[si].as_any_mut().downcast_mut::<DrumGrid>() {
+            grid.arm(l.bank as usize, offset as usize);
         }
     }
 }

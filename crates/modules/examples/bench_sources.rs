@@ -148,6 +148,18 @@ fn main() {
             time(&["osc.va"], &[("unison", 4.0)], |_| {}),
         ),
         (
+            "osc.va saw, unison 8",
+            time(&["osc.va"], &[("unison", 8.0)], |_| {}),
+        ),
+        (
+            "osc.va saw, unison 16",
+            time(&["osc.va"], &[("unison", 16.0)], |_| {}),
+        ),
+        (
+            "osc.va saw, unison 16, width 100",
+            time(&["osc.va"], &[("unison", 16.0), ("width", 100.0)], |_| {}),
+        ),
+        (
             "osc.wt, one frame",
             time(&["osc.wt"], &[("table", 0.0)], |_| {}),
         ),

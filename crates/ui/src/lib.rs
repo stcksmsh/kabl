@@ -3003,18 +3003,28 @@ fn cues_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::U
     let seqs: Vec<ModuleId> = state
         .modules
         .iter()
-        .filter(|(_, m)| m.kind == "seq")
+        .filter(|(_, m)| matches!(m.kind.as_str(), "seq" | "drum.grid"))
         .map(|(&c, _)| c)
         .collect();
+    let is_grid = |s: ModuleId| state.modules.get(&s).is_some_and(|m| m.kind == "drum.grid");
     let playing_now: HashMap<ModuleId, usize> = seqs
         .iter()
         .map(|&s| {
             (
                 s,
-                ui_state
-                    .seq_banks
-                    .get(&s)
-                    .map_or_else(|| banks::startup(state, s), |b| b.0),
+                ui_state.seq_banks.get(&s).map_or_else(
+                    || {
+                        if is_grid(s) {
+                            state.modules[&s]
+                                .params
+                                .get("pattern")
+                                .map_or(0, |&v| v.round() as usize)
+                        } else {
+                            banks::startup(state, s)
+                        }
+                    },
+                    |b| b.0,
+                ),
             )
         })
         .collect();
@@ -3103,17 +3113,29 @@ fn cues_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::U
         });
         for &s in &seqs {
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new(format!("Sequencer #{s}")).small());
+                let grid = is_grid(s);
+                let label = if grid { "Drum grid" } else { "Sequencer" };
+                ui.label(egui::RichText::new(format!("{label} #{s}")).small());
                 let current = c.targets.iter().find(|t| t.0 == s).map(|t| t.1);
                 let r = ui.selectable_label(current.is_none(), "Keep");
                 ui_state.record(format!("cue-bank:{id}.{}.{s}.keep", c.n), r.rect);
                 if r.on_hover_text("This cue leaves it playing").clicked() {
                     edit = Some(Edit::Target(c.n, s, None));
                 }
-                for b in 0..seq::BANKS {
+                let names: &[&str] = if grid {
+                    &kabl_modules::builtins::PATTERN_NAMES
+                } else {
+                    &seq::BANK_NAMES
+                };
+                for (b, &name) in names.iter().enumerate() {
+                    let hover = if grid {
+                        format!("Pattern {name}")
+                    } else {
+                        banks::title(state, s, b)
+                    };
                     let r = ui
-                        .selectable_label(current == Some(b), seq::BANK_NAMES[b])
-                        .on_hover_text(banks::title(state, s, b));
+                        .selectable_label(current == Some(b), name)
+                        .on_hover_text(hover);
                     ui_state.record(format!("cue-bank:{id}.{}.{s}.{b}", c.n), r.rect);
                     if r.clicked() {
                         edit = Some(Edit::Target(c.n, s, Some(b)));

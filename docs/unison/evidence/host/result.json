@@ -1,0 +1,41 @@
+{
+ "new_plugin_sha256": "015d092964b455b86095455a059e95352ec2a249689087f328228d28331b9fe3",
+ "master_plugin_sha256": "28020d009f2f8bdc5fcf34e84f80cee032d8edb83422f3e5ead90463d11fe576",
+ "super_state_identical_across_save_quit_reopen": true,
+ "super_unison_in_saved_project": [
+  16.0,
+  16.0
+ ],
+ "super_initial": {
+  "frames": 1152000,
+  "finite": true,
+  "peak": 0.1013195812702179,
+  "rms": 0.020368104800581932,
+  "sha256": "61a7b31d54b9f4b824bef41ad77e83d711fd7d3ad2687b8399ecba7e572ff6da"
+ },
+ "super_restart": {
+  "frames": 1152000,
+  "finite": true,
+  "peak": 0.1013195812702179,
+  "rms": 0.020368104800581932,
+  "sha256": "61a7b31d54b9f4b824bef41ad77e83d711fd7d3ad2687b8399ecba7e572ff6da"
+ },
+ "super_renders_bit_identical": true,
+ "old_state_identical_new_and_master": true,
+ "old_new": {
+  "frames": 1152000,
+  "finite": true,
+  "peak": 0.11155856400728226,
+  "rms": 0.020619455724954605,
+  "sha256": "d2eaaffe72241a1af2baf435fa846ec3a81abaaee9d81fc61242961d25b3adb5"
+ },
+ "old_master": {
+  "frames": 1152000,
+  "finite": true,
+  "peak": 0.11155856400728226,
+  "rms": 0.020619455724954605,
+  "sha256": "d2eaaffe72241a1af2baf435fa846ec3a81abaaee9d81fc61242961d25b3adb5"
+ },
+ "old_renders_bit_identical_to_master": true,
+ "super_differs_from_old": true
+}

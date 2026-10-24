@@ -365,6 +365,7 @@ impl PatchEngine {
     /// (`Keyboard::midi`).
     fn send_key(&mut self, e: MidiEvent, offset: usize) {
         self.sync_once();
+        let ms = (self.rendered + offset as u64) * 1000 / self.active.sample_rate() as u64;
         let PatchEngine {
             keyboards,
             active,
@@ -373,6 +374,7 @@ impl PatchEngine {
         } = self;
         for kb in keyboards.iter_mut().flatten() {
             let id = kb.id;
+            kb.at(ms);
             kb.midi(e, &mut |a| act(active, incoming, id, a, offset));
         }
         active.for_each_arp(|a| arp_key(a, e));
@@ -647,7 +649,7 @@ impl PatchEngine {
                 for slot in self.deferred_launches.iter_mut() {
                     if let Some(l) = slot.filter(|l| l.clock == id) {
                         *slot = None;
-                        g.with_seq(l.seq, |s| s.arm(l.bank as usize, 0));
+                        g.arm_bank(l.seq, l.bank as usize, 0);
                     }
                 }
             }
@@ -726,7 +728,7 @@ impl PatchEngine {
                     self.pending
                         .as_mut()
                         .unwrap()
-                        .with_seq(seq, |s| s.arm(bank as usize, 0));
+                        .arm_bank(seq, bank as usize, 0);
                 }
                 None => arm_scoped(
                     &mut self.active,
@@ -800,8 +802,8 @@ impl PatchEngine {
             }
         }
         let disarm = |g: &mut CompiledPatch| match seq {
-            Some(id) => g.with_seq(id, |s| s.cancel()),
-            None => g.for_each_seq(|s| s.cancel()),
+            Some(id) => g.cancel_bank(id),
+            None => g.cancel_banks(),
         };
         if self.pending.as_ref().is_some_and(|g| g.fresh) {
             disarm(self.pending.as_mut().unwrap());
@@ -1106,26 +1108,22 @@ fn arm_scoped(
     bank: usize,
 ) {
     if let Some(g) = pending.as_mut().filter(|g| g.fresh) {
-        g.with_seq(seq, |s| s.arm(bank, 0));
+        g.arm_bank(seq, bank, 0);
         return;
     }
     if incoming.as_ref().is_some_and(|(g, _)| g.fresh) {
-        incoming
-            .as_mut()
-            .unwrap()
-            .0
-            .with_seq(seq, |s| s.arm(bank, 0));
+        incoming.as_mut().unwrap().0.arm_bank(seq, bank, 0);
         if let Some(g) = pending.as_mut() {
-            g.with_seq(seq, |s| s.arm(bank, 0));
+            g.arm_bank(seq, bank, 0);
         }
         return;
     }
-    active.with_seq(seq, |s| s.arm(bank, 0));
+    active.arm_bank(seq, bank, 0);
     if let Some((g, _)) = incoming.as_mut() {
-        g.with_seq(seq, |s| s.arm(bank, 0));
+        g.arm_bank(seq, bank, 0);
     }
     if let Some(g) = pending.as_mut() {
-        g.with_seq(seq, |s| s.arm(bank, 0));
+        g.arm_bank(seq, bank, 0);
     }
 }
 

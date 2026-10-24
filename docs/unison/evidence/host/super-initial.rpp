@@ -1,0 +1,422 @@
+<REAPER_PROJECT 0.1 "7.75/linux-x86_64" 1792797866 0
+  RIPPLE 0 0
+  GROUPOVERRIDE 0 0 0 0
+  AUTOXFADE 129
+  ENVATTACH 3
+  POOLEDENVATTACH 0
+  TCPUIFLAGS 0
+  MIXERUIFLAGS 11 48
+  PEAKGAIN 1
+  FEEDBACK 0
+  PANLAW 1
+  PROJOFFS 0 0 0
+  MAXPROJLEN 0 0
+  GRID 3199 8 1 8 1 0 0 0
+  TIMEMODE 1 5 -1 30 0 0 -1 0
+  CURSOR 0
+  ZOOM 100 0 0
+  VZOOMEX 6 0
+  USE_REC_CFG 0
+  RECMODE 1
+  SMPTESYNC 0 30 100 40 1000 300 0 0 1 0 0
+  LOOP 0
+  LOOPGRAN 0 4
+  RECORD_PATH "Media" ""
+  <RECORD_CFG
+    ZXZhdxgAAQ==
+  >
+  <APPLYFX_CFG
+  >
+  RENDER_FILE render
+  RENDER_PATTERN ""
+  RENDER_FMT 0 2 48000
+  RENDER_1X 0
+  RENDER_RANGE 0 0 36 0 1000
+  RENDER_RESAMPLE 3 0 1
+  RENDER_ADDTOPROJ 0
+  RENDER_STEMS 0
+  RENDER_DITHER 0
+  RENDER_TRIM 0.000001 0.000001 0 0
+  TIMELOCKMODE 1
+  TEMPOENVLOCKMODE 1
+  ITEMMIX 1
+  DEFPITCHMODE 589824 0
+  TAKELANE 1
+  SAMPLERATE 48000 1 0
+  <RENDER_CFG
+    ZXZhdyAAAA==
+  >
+  LOCK 1
+  <METRONOME 6 2
+    VOL 0.25 0.125
+    BEATLEN 4
+    FREQ 1760 880 1
+    SAMPLES "" "" "" ""
+    SPLIGNORE 0 0
+    SPLDEF 2 660 "" 0 ""
+    SPLDEF 3 440 "" 0 ""
+    PATTERN 0 169
+    PATTERNSTR ABBB
+    MULT 1
+  >
+  GLOBAL_AUTO -1
+  TEMPO 120 4 4 0
+  PLAYRATE 1 0 0.25 4
+  SELECTION 0 0
+  SELECTION2 0 0
+  MASTERAUTOMODE 0
+  MASTERTRACKHEIGHT 0 0
+  MASTERPEAKCOL 16576
+  MASTERMUTESOLO 0
+  MASTERTRACKVIEW 0 0.6667 0.5 0.5 0 0 0 0 0 0 0 0 0 0 0
+  MASTERHWOUT 0 0 1 0 0 0 0 -1
+  MASTER_NCH 2 2
+  MASTER_VOLUME 1 0 -1 -1 1
+  MASTER_FX 1
+  MASTER_SEL 0
+  <MASTERPLAYSPEEDENV
+    EGUID {704C0A30-4911-DB3E-4639-32854ACE0E72}
+    ACT 0 -1
+    VIS 0 1 1
+    LANEHEIGHT 0 0
+    ARM 0
+    DEFSHAPE 0 -1 -1
+  >
+  <TEMPOENVEX
+    EGUID {64239B5F-CA0F-EFB3-C08C-5A3C3ED39266}
+    ACT 1 -1
+    VIS 1 0 1
+    LANEHEIGHT 0 0
+    ARM 0
+    DEFSHAPE 1 -1 -1
+    PT 0.000000000000 120.0000000000 1 262148 0 1 0 "" 0 169 0 ABBB
+    PT 8.000000000000 140.0000000000 1 262148 0 1 0 "" 0 169 0 ABBB
+    PT 16.571428571429 100.0000000000 1 262148 0 1 0 "" 0 169 0 ABBB
+  >
+  RULERHEIGHT 86 86
+  RULERLANE 1 4 "" 0 -1 0
+  RULERLANE 2 8 "" 0 -1 0
+  <PROJBAY
+  >
+  <TRACK {4CA9B1BD-93CF-B569-F295-F01B903FCAEF}
+    NAME "Glass Keys - virtual/scripted MIDI"
+    PEAKCOL 16576
+    BEAT -1
+    AUTOMODE 1
+    VOLPAN 0.65 0 1 -1 1
+    MUTESOLO 0 0 0
+    IPHASE 0
+    PLAYOFFS 0 1
+    ISBUS 0 0
+    BUSCOMP 0 0 0 0 0
+    SHOWINMIX 1 0.6667 0.5 1 0.5 0 0 0 0
+    LANEREC -1 -1 -1 0
+    SEL 0
+    REC 0 0 1 0 0 0 0 0
+    TRACKHEIGHT 0 0 0 0 0 0 0
+    INQ 0 0 0 0.5 100 0 0 100
+    NCHAN 2
+    FX 1
+    TRACKID {4CA9B1BD-93CF-B569-F295-F01B903FCAEF}
+    PERF 3
+    MIDIOUT -1 -1
+    MAINSEND 1 0
+    <FXCHAIN
+      WNDRECT 0 46 1440 757
+      SHOW 0
+      LASTSEL 0
+      DOCKED 0
+      BYPASS 0 0 0
+      <CLAP "CLAPi: kabl (stcksmsh)" dev.stcksmsh.kabl ""
+        CFG 4 1180 680 ""
+        <STATE
+          YBoAAAAAAAB7InZlcnNpb24iOjIsInBhdGNoIjp7Im1vZHVsZXMiOnsiMSI6eyJraW5kIjoibWFjcm8iLCJwb3MiOnsieCI6MjQuMCwieSI6MTQ5MC4wfSwicGFyYW1z
+          Ijp7ImNjLm0xIjoyMC4wLCJjYy5tMiI6MjEuMCwiY2MubTMiOjIyLjAsImNjLm00IjoyMy4wLCJtMSI6MC40LCJtMiI6MC41LCJtMyI6MC4zLCJtNCI6MC40LCJwaW4u
+          bTEiOjAuMCwicGluLm0yIjoxLjAsInBpbi5tMyI6Mi4wLCJwaW4ubTQiOjMuMH19LCIyIjp7ImtpbmQiOiJtaWRpLmluIiwicG9zIjp7IngiOjI0LjAsInkiOjEwLjB9
+          LCJwYXJhbXMiOnsicGluLm1vZGUiOjcuMH19LCIzIjp7ImtpbmQiOiJvc2MudmEiLCJwb3MiOnsieCI6MjM0LjAsInkiOjEwLjB9LCJwYXJhbXMiOnsiY3VydmUiOjYw
+          LjAsImRldHVuZSI6MzAuMCwicHciOjM1LjAsInVuaXNvbiI6MTYuMCwid2F2ZWZvcm0iOjMuMH19LCI0Ijp7ImtpbmQiOiJvc2MudmEiLCJwb3MiOnsieCI6NDc0LjAs
+          InkiOjEwLjB9LCJwYXJhbXMiOnsiY3VydmUiOjYwLjAsImRldHVuZSI6MzAuMCwiZmluZSI6LTkuMCwidW5pc29uIjoxNi4wLCJ3YXZlZm9ybSI6Mi4wfX0sIjUiOnsi
+          a2luZCI6Im5vaXNlIiwicG9zIjp7IngiOjcxNC4wLCJ5IjoxMC4wfSwicGFyYW1zIjp7ImNvbG9yIjoxLjAsImxldmVsX2RiIjotMzAuMH19LCI2Ijp7ImtpbmQiOiJt
+          aXhlciIsInBvcyI6eyJ4Ijo4OTQuMCwieSI6MTAuMH0sInBhcmFtcyI6eyJsZXZlbDEiOjAuNDUsImxldmVsMiI6MC4zNSwibGV2ZWwzIjoxLjB9fSwiNyI6eyJraW5k
+          IjoiZmlsdGVyLmxhZGRlciIsInBvcyI6eyJ4IjoxMTY0LjAsInkiOjEwLjB9LCJwYXJhbXMiOnsiY3V0b2ZmX2h6Ijo2NTAuMCwiZHJpdmVfZGIiOjQuMCwicmVzb25h
+          bmNlIjowLjM1fX0sIjgiOnsia2luZCI6ImVudi5hZHNyIiwicG9zIjp7IngiOjI0LjAsInkiOjM4MC4wfSwicGFyYW1zIjp7ImF0dGFja19tcyI6MTQwMC4wLCJjYy5h
+          dHRhY2tfbXMiOjI0LjAsImNjLnJlbGVhc2VfbXMiOjI1LjAsImRlY2F5X21zIjoyMDAwLjAsInBpbi5hdHRhY2tfbXMiOjQuMCwicGluLnJlbGVhc2VfbXMiOjUuMCwi
+          cmVsZWFzZV9tcyI6MjgwMC4wLCJzdXN0YWluIjowLjl9fSwiOSI6eyJraW5kIjoidmNhIiwicG9zIjp7IngiOjI5NC4wLCJ5IjozODAuMH0sInBhcmFtcyI6eyJnYWlu
+          IjowLjB9fSwiMTAiOnsia2luZCI6ImdhaW4iLCJwb3MiOnsieCI6NTA0LjAsInkiOjM4MC4wfSwicGFyYW1zIjp7ImNjLmdhaW5fZGIiOjI2LjAsImdhaW5fZGIiOi0x
+          LjUsInBpbi5nYWluX2RiIjo2LjB9fSwiMTEiOnsia2luZCI6ImxmbyIsInBvcyI6eyJ4Ijo2ODQuMCwieSI6MzgwLjB9LCJwYXJhbXMiOnsicmF0ZV9oeiI6MC4xMX19
+          LCIxMiI6eyJraW5kIjoibGZvIiwicG9zIjp7IngiOjkyNC4wLCJ5IjozODAuMH0sInBhcmFtcyI6eyJyYXRlX2h6IjowLjEyNSwid2F2ZWZvcm0iOjEuMH19LCIxMyI6
+          eyJraW5kIjoicmluZ21vZCIsInBvcyI6eyJ4IjoxMTY0LjAsInkiOjM4MC4wfSwicGFyYW1zIjp7fX0sIjE0Ijp7ImtpbmQiOiJjaG9ydXMiLCJwb3MiOnsieCI6MjQu
+          MCwieSI6NzUwLjB9LCJwYXJhbXMiOnsiZGVwdGgiOjQwLjAsIm1peCI6MzUuMCwicmF0ZV9oeiI6MC4xOH19LCIxNSI6eyJraW5kIjoiZGVsYXkiLCJwb3MiOnsieCI6
+          Mjk0LjAsInkiOjc1MC4wfSwicGFyYW1zIjp7ImZlZWRiYWNrIjo0NS4wLCJtaXgiOjE4LjAsIm1vZGUiOjEuMCwic3luYyI6MC4wLCJ0aW1lX21zIjo0ODAuMCwidG9u
+          ZV9oeiI6MjUwMC4wfX0sIjE2Ijp7ImtpbmQiOiJtaXhlciIsInBvcyI6eyJ4Ijo1NjQuMCwieSI6NzUwLjB9LCJwYXJhbXMiOnsibGV2ZWwyIjowLjV9fSwiMTciOnsi
+          a2luZCI6Im1peGVyIiwicG9zIjp7IngiOjgzNC4wLCJ5Ijo3NTAuMH0sInBhcmFtcyI6eyJsZXZlbDIiOjAuNX19LCIxOCI6eyJraW5kIjoicmV2ZXJiIiwicG9zIjp7
+          IngiOjI0LjAsInkiOjExMjAuMH0sInBhcmFtcyI6eyJkYW1wX2h6Ijo0MjAwLjAsImRlY2F5X3MiOjUuNSwibWl4IjozMi4wLCJwcmVkZWxheV9tcyI6MzUuMH19LCIx
+          OSI6eyJraW5kIjoib3V0IiwicG9zIjp7IngiOjI5NC4wLCJ5IjoxMTIwLjB9LCJwYXJhbXMiOnt9fX0sImNhYmxlcyI6eyIxIjp7ImZyb20iOnsiTW9kdWxlIjp7Imlk
+          IjoyLCJwb3J0IjoicGl0Y2gifX0sInRvIjp7Ik1vZHVsZSI6eyJpZCI6MywicG9ydCI6InBpdGNoIn19LCJwYXJhbXMiOnt9LCJzdGVwcyI6W119LCIyIjp7ImZyb20i
+          OnsiTW9kdWxlIjp7ImlkIjoyLCJwb3J0IjoicGl0Y2gifX0sInRvIjp7Ik1vZHVsZSI6eyJpZCI6NCwicG9ydCI6InBpdGNoIn19LCJwYXJhbXMiOnt9LCJzdGVwcyI6
+          W119LCIzIjp7ImZyb20iOnsiTW9kdWxlIjp7ImlkIjoyLCJwb3J0IjoiZ2F0ZSJ9fSwidG8iOnsiTW9kdWxlIjp7ImlkIjo4LCJwb3J0IjoiZ2F0ZSJ9fSwicGFyYW1z
+          Ijp7fSwic3RlcHMiOltdfSwiNCI6eyJmcm9tIjp7Ik1vZHVsZSI6eyJpZCI6MywicG9ydCI6Im91dCJ9fSwidG8iOnsiTW9kdWxlIjp7ImlkIjo2LCJwb3J0IjoiaW4x
+          In19LCJwYXJhbXMiOnt9LCJzdGVwcyI6W119LCI1Ijp7ImZyb20iOnsiTW9kdWxlIjp7ImlkIjo0LCJwb3J0Ijoib3V0In19LCJ0byI6eyJNb2R1bGUiOnsiaWQiOjYs
+          InBvcnQiOiJpbjIifX0sInBhcmFtcyI6e30sInN0ZXBzIjpbXX0sIjYiOnsiZnJvbSI6eyJNb2R1bGUiOnsiaWQiOjUsInBvcnQiOiJvdXQifX0sInRvIjp7Ik1vZHVs
+          ZSI6eyJpZCI6NiwicG9ydCI6ImluMyJ9fSwicGFyYW1zIjp7fSwic3RlcHMiOltdfSwiNyI6eyJmcm9tIjp7Ik1vZHVsZSI6eyJpZCI6NiwicG9ydCI6Im91dCJ9fSwi
+          dG8iOnsiTW9kdWxlIjp7ImlkIjo3LCJwb3J0IjoiaW4ifX0sInBhcmFtcyI6e30sInN0ZXBzIjpbXX0sIjgiOnsiZnJvbSI6eyJNb2R1bGUiOnsiaWQiOjcsInBvcnQi
+          OiJvdXQifX0sInRvIjp7Ik1vZHVsZSI6eyJpZCI6OSwicG9ydCI6ImluIn19LCJwYXJhbXMiOnt9LCJzdGVwcyI6W119LCI5Ijp7ImZyb20iOnsiTW9kdWxlIjp7Imlk
+          Ijo4LCJwb3J0Ijoib3V0In19LCJ0byI6eyJNb2R1bGUiOnsiaWQiOjksInBvcnQiOiJjdiJ9fSwicGFyYW1zIjp7fSwic3RlcHMiOltdfSwiMTAiOnsiZnJvbSI6eyJN
+          b2R1bGUiOnsiaWQiOjksInBvcnQiOiJvdXQifX0sInRvIjp7Ik1vZHVsZSI6eyJpZCI6MTAsInBvcnQiOiJpbiJ9fSwicGFyYW1zIjp7fSwic3RlcHMiOltdfSwiMTEi
+          OnsiZnJvbSI6eyJNb2R1bGUiOnsiaWQiOjEyLCJwb3J0Ijoib3V0In19LCJ0byI6eyJNb2R1bGUiOnsiaWQiOjEzLCJwb3J0IjoiYSJ9fSwicGFyYW1zIjp7fSwic3Rl
+          cHMiOltdfSwiMTIiOnsiZnJvbSI6eyJNb2R1bGUiOnsiaWQiOjEsInBvcnQiOiJtMiJ9fSwidG8iOnsiTW9kdWxlIjp7ImlkIjoxMywicG9ydCI6ImIifX0sInBhcmFt
+          cyI6e30sInN0ZXBzIjpbXX0sIjEzIjp7ImZyb20iOnsiTW9kdWxlIjp7ImlkIjoxMSwicG9ydCI6Im91dCJ9fSwidG8iOnsiUGFyYW0iOnsiaWQiOjMsInBhcmFtIjoi
+          cHcifX0sInBhcmFtcyI6eyJhbW91bnQiOjAuMjV9LCJzdGVwcyI6W119LCIxNCI6eyJmcm9tIjp7Ik1vZHVsZSI6eyJpZCI6MTMsInBvcnQiOiJvdXQifX0sInRvIjp7
+          IlBhcmFtIjp7ImlkIjo3LCJwYXJhbSI6ImN1dG9mZl9oeiJ9fSwicGFyYW1zIjp7ImFtb3VudCI6MC4xMn0sInN0ZXBzIjpbXX0sIjE1Ijp7ImZyb20iOnsiTW9kdWxl
+          Ijp7ImlkIjoyLCJwb3J0IjoicGl0Y2gifX0sInRvIjp7IlBhcmFtIjp7ImlkIjo3LCJwYXJhbSI6ImN1dG9mZl9oeiJ9fSwicGFyYW1zIjp7ImFtb3VudCI6MC4yfSwi
+          c3RlcHMiOltdfSwiMTYiOnsiZnJvbSI6eyJNb2R1bGUiOnsiaWQiOjgsInBvcnQiOiJvdXQifX0sInRvIjp7IlBhcmFtIjp7ImlkIjo3LCJwYXJhbSI6ImN1dG9mZl9o
+          eiJ9fSwicGFyYW1zIjp7ImFtb3VudCI6MC4wNn0sInN0ZXBzIjpbXX0sIjE3Ijp7ImZyb20iOnsiTW9kdWxlIjp7ImlkIjoxMCwicG9ydCI6Im91dCJ9fSwidG8iOnsi
+          TW9kdWxlIjp7ImlkIjoxNCwicG9ydCI6ImluX2wifX0sInBhcmFtcyI6e30sInN0ZXBzIjpbXX0sIjE4Ijp7ImZyb20iOnsiTW9kdWxlIjp7ImlkIjoxMCwicG9ydCI6
+          Im91dCJ9fSwidG8iOnsiTW9kdWxlIjp7ImlkIjoxNCwicG9ydCI6ImluX3IifX0sInBhcmFtcyI6e30sInN0ZXBzIjpbXX0sIjE5Ijp7ImZyb20iOnsiTW9kdWxlIjp7
+          ImlkIjoxMCwicG9ydCI6Im91dCJ9fSwidG8iOnsiTW9kdWxlIjp7ImlkIjoxNSwicG9ydCI6ImluIn19LCJwYXJhbXMiOnt9LCJzdGVwcyI6W119LCIyMCI6eyJmcm9t
+          Ijp7Ik1vZHVsZSI6eyJpZCI6MTQsInBvcnQiOiJsZWZ0In19LCJ0byI6eyJNb2R1bGUiOnsiaWQiOjE2LCJwb3J0IjoiaW4xIn19LCJwYXJhbXMiOnt9LCJzdGVwcyI6
+          W119LCIyMSI6eyJmcm9tIjp7Ik1vZHVsZSI6eyJpZCI6MTQsInBvcnQiOiJyaWdodCJ9fSwidG8iOnsiTW9kdWxlIjp7ImlkIjoxNywicG9ydCI6ImluMSJ9fSwicGFy
+          YW1zIjp7fSwic3RlcHMiOltdfSwiMjIiOnsiZnJvbSI6eyJNb2R1bGUiOnsiaWQiOjE1LCJwb3J0IjoibGVmdCJ9fSwidG8iOnsiTW9kdWxlIjp7ImlkIjoxNiwicG9y
+          dCI6ImluMiJ9fSwicGFyYW1zIjp7fSwic3RlcHMiOltdfSwiMjMiOnsiZnJvbSI6eyJNb2R1bGUiOnsiaWQiOjE1LCJwb3J0IjoicmlnaHQifX0sInRvIjp7Ik1vZHVs
+          ZSI6eyJpZCI6MTcsInBvcnQiOiJpbjIifX0sInBhcmFtcyI6e30sInN0ZXBzIjpbXX0sIjI0Ijp7ImZyb20iOnsiTW9kdWxlIjp7ImlkIjoxNiwicG9ydCI6Im91dCJ9
+          fSwidG8iOnsiTW9kdWxlIjp7ImlkIjoxOCwicG9ydCI6ImluX2wifX0sInBhcmFtcyI6e30sInN0ZXBzIjpbXX0sIjI1Ijp7ImZyb20iOnsiTW9kdWxlIjp7ImlkIjox
+          NywicG9ydCI6Im91dCJ9fSwidG8iOnsiTW9kdWxlIjp7ImlkIjoxOCwicG9ydCI6ImluX3IifX0sInBhcmFtcyI6e30sInN0ZXBzIjpbXX0sIjI2Ijp7ImZyb20iOnsi
+          TW9kdWxlIjp7ImlkIjoxOCwicG9ydCI6ImxlZnQifX0sInRvIjp7Ik1vZHVsZSI6eyJpZCI6MTksInBvcnQiOiJsZWZ0In19LCJwYXJhbXMiOnt9LCJzdGVwcyI6W119
+          LCIyNyI6eyJmcm9tIjp7Ik1vZHVsZSI6eyJpZCI6MTgsInBvcnQiOiJyaWdodCJ9fSwidG8iOnsiTW9kdWxlIjp7ImlkIjoxOSwicG9ydCI6InJpZ2h0In19LCJwYXJh
+          bXMiOnt9LCJzdGVwcyI6W119LCIyOCI6eyJmcm9tIjp7Ik1vZHVsZSI6eyJpZCI6MSwicG9ydCI6Im0xIn19LCJ0byI6eyJQYXJhbSI6eyJpZCI6NywicGFyYW0iOiJj
+          dXRvZmZfaHoifX0sInBhcmFtcyI6eyJhbW91bnQiOjAuMn0sInN0ZXBzIjpbXX0sIjI5Ijp7ImZyb20iOnsiTW9kdWxlIjp7ImlkIjoxLCJwb3J0IjoibTEifX0sInRv
+          Ijp7IlBhcmFtIjp7ImlkIjo3LCJwYXJhbSI6ImRyaXZlX2RiIn19LCJwYXJhbXMiOnsiYW1vdW50IjowLjN9LCJzdGVwcyI6W119LCIzMCI6eyJmcm9tIjp7Ik1vZHVs
+          ZSI6eyJpZCI6MSwicG9ydCI6Im0zIn19LCJ0byI6eyJQYXJhbSI6eyJpZCI6NSwicGFyYW0iOiJsZXZlbF9kYiJ9fSwicGFyYW1zIjp7ImFtb3VudCI6MC4zNX0sInN0
+          ZXBzIjpbXX0sIjMxIjp7ImZyb20iOnsiTW9kdWxlIjp7ImlkIjoxLCJwb3J0IjoibTQifX0sInRvIjp7IlBhcmFtIjp7ImlkIjoxOCwicGFyYW0iOiJtaXgifX0sInBh
+          cmFtcyI6eyJhbW91bnQiOjAuM30sInN0ZXBzIjpbXX0sIjMyIjp7ImZyb20iOnsiTW9kdWxlIjp7ImlkIjoxLCJwb3J0IjoibTQifX0sInRvIjp7IlBhcmFtIjp7Imlk
+          IjoxNSwicGFyYW0iOiJtaXgifX0sInBhcmFtcyI6eyJhbW91bnQiOjAuMjV9LCJzdGVwcyI6W119fSwibGFiZWxzIjp7IjEiOnsiZ3VpZGUiOiJIb2xkIEUzLUIzLUU0
+          LUc0IGZvciBhdCBsZWFzdCBmb3VyIHNlY29uZHMuIFdhcm10aCBvcGVucyB0aGUgZmlsdGVyLCBFdm9sdmUgZGVlcGVucyBtb3Rpb24sIEFpciBhZGRzIGJyZWF0aCwg
+          U3BhY2UgYWRkcyBlY2hvIGFuZCByb29tLiBMZWF2ZSB0aW1lIGZvciB0aGUgcmVsZWFzZTsgQ0MyMC0yMyBjb250cm9sIG1hY3Jvcy4iLCJuYW1lLm0xIjoiV2FybXRo
+          IiwibmFtZS5tMiI6IkV2b2x2ZSIsIm5hbWUubTMiOiJBaXIiLCJuYW1lLm00IjoiU3BhY2UifSwiMiI6eyJwaW4ubW9kZSI6IktleXMifSwiOCI6eyJwaW4uYXR0YWNr
+          X21zIjoiQXR0YWNrIiwicGluLnJlbGVhc2VfbXMiOiJSZWxlYXNlIn0sIjEwIjp7InBpbi5nYWluX2RiIjoiTGV2ZWwifX19LCJvdXRwdXRfZ2FpbiI6MC40LCJsYW5l
+          cyI6W3sidGFyZ2V0IjpudWxsLCJyZXRpcmVkIjpmYWxzZX0seyJ0YXJnZXQiOm51bGwsInJldGlyZWQiOmZhbHNlfSx7InRhcmdldCI6bnVsbCwicmV0aXJlZCI6ZmFs
+          c2V9LHsidGFyZ2V0IjpudWxsLCJyZXRpcmVkIjpmYWxzZX0seyJ0YXJnZXQiOm51bGwsInJldGlyZWQiOmZhbHNlfSx7InRhcmdldCI6bnVsbCwicmV0aXJlZCI6ZmFs
+          c2V9LHsidGFyZ2V0IjpudWxsLCJyZXRpcmVkIjpmYWxzZX0seyJ0YXJnZXQiOm51bGwsInJldGlyZWQiOmZhbHNlfSx7InRhcmdldCI6bnVsbCwicmV0aXJlZCI6ZmFs
+          c2V9LHsidGFyZ2V0IjpudWxsLCJyZXRpcmVkIjpmYWxzZX0seyJ0YXJnZXQiOm51bGwsInJldGlyZWQiOmZhbHNlfSx7InRhcmdldCI6bnVsbCwicmV0aXJlZCI6ZmFs
+          c2V9LHsidGFyZ2V0IjpudWxsLCJyZXRpcmVkIjpmYWxzZX0seyJ0YXJnZXQiOm51bGwsInJldGlyZWQiOmZhbHNlfSx7InRhcmdldCI6bnVsbCwicmV0aXJlZCI6ZmFs
+          c2V9LHsidGFyZ2V0IjpudWxsLCJyZXRpcmVkIjpmYWxzZX1dLCJzbG90X3ZhbHVlcyI6WzAuMCwwLjAsMC4wLDAuMCwwLjAsMC4wLDAuMCwwLjAsMC4wLDAuMCwwLjAs
+          MC4wLDAuMCwwLjAsMC4wLDAuMF0sImhvc3RfY2xvY2siOmZhbHNlfQ==
+        >
+      >
+      FLOATPOS 0 0 0 0
+      FXID {C4E9B72F-ECE4-BF48-D25A-9002E6580F0E}
+      WAK 0 0
+    >
+    <ITEM
+      POSITION 0
+      SNAPOFFS 0
+      LENGTH 36
+      LOOP 1
+      ALLTAKES 0
+      FADEIN 1 0 0 1 0 0 0
+      FADEOUT 1 0 0 1 0 0 0
+      MUTE 0 0
+      SEL 0
+      IGUID {44D62F00-51D3-8DC4-635B-2236754643C0}
+      IID 1
+      NAME ""
+      VOLPAN 1 0 1 -1
+      SOFFS 0 0
+      PLAYRATE 1 1 0 -1 0 0.0025
+      CHANMODE 0
+      GUID {C2E5A5CF-1B64-5582-8B22-08AC7A2F68AC}
+      <SOURCE MIDI
+        HASDATA 1 960 QN
+        CCINTERP 32
+        POOLEDEVTS {99081A5E-E848-9032-AA9F-78C967FECB97}
+        E 960 90 3c 64
+        E 1440 80 3c 00
+        E 480 90 40 64
+        E 1440 80 40 00
+        E 480 90 43 64
+        E 1440 80 43 00
+        E 480 90 45 64
+        E 1440 80 45 00
+        E 480 90 43 64
+        E 1440 80 43 00
+        E 480 90 40 64
+        E 1440 80 40 00
+        E 480 90 3c 64
+        E 1440 80 3c 00
+        E 480 90 37 64
+        E 1440 80 37 00
+        E 480 90 3c 64
+        E 1440 80 3c 00
+        E 480 90 40 64
+        E 1440 80 40 00
+        E 480 90 43 64
+        E 1440 80 43 00
+        E 480 90 48 64
+        E 1440 80 48 00
+        CCINTERP 32
+        GUID {A7DF63B2-B1A6-A0AB-D935-3326E1F3D95E}
+        IGNTEMPO 0 120 4 4
+        SRCCOLOR 0
+        EVTFILTER 0 -1 -1 -1 -1 0 0 0 0 -1 -1 -1 -1 0 -1 0 -1 -1
+      >
+    >
+  >
+  <TRACK {7AAF0569-E14F-BFED-2780-2FE9C8B481BD}
+    NAME "Slow Horizons - editable real sequencer"
+    PEAKCOL 16576
+    BEAT -1
+    AUTOMODE 1
+    VOLPAN 0.65 0 1 -1 1
+    MUTESOLO 0 0 0
+    IPHASE 0
+    PLAYOFFS 0 1
+    ISBUS 0 0
+    BUSCOMP 0 0 0 0 0
+    SHOWINMIX 1 0.6667 0.5 1 0.5 0 0 0 0
+    LANEREC -1 -1 -1 0
+    SEL 0
+    REC 0 0 1 0 0 0 0 0
+    TRACKHEIGHT 0 0 0 0 0 0 0
+    INQ 0 0 0 0.5 100 0 0 100
+    NCHAN 2
+    FX 1
+    TRACKID {7AAF0569-E14F-BFED-2780-2FE9C8B481BD}
+    PERF 3
+    MIDIOUT -1 -1
+    MAINSEND 1 0
+    <FXCHAIN
+      WNDRECT 0 46 1440 757
+      SHOW 0
+      LASTSEL 0
+      DOCKED 0
+      BYPASS 0 0 0
+      <CLAP "CLAPi: kabl (stcksmsh)" dev.stcksmsh.kabl ""
+        CFG 4 1180 680 ""
+        <STATE
+          shgAAAAAAAB7InZlcnNpb24iOjIsInBhdGNoIjp7Im1vZHVsZXMiOnsiMSI6eyJraW5kIjoibWlkaS5pbiIsInBvcyI6eyJ4IjoyNC4wLCJ5IjoxMC4wfSwicGFyYW1z
+          Ijp7InBpbi5tb2RlIjo3LjB9fSwiMiI6eyJraW5kIjoib3NjLnZhIiwicG9zIjp7IngiOjIzNC4wLCJ5IjoxMC4wfSwicGFyYW1zIjp7ImRldHVuZSI6MzUuMCwidW5p
+          c29uIjo0LjAsIndhdmVmb3JtIjoyLjB9fSwiMyI6eyJraW5kIjoib3NjLnZhIiwicG9zIjp7IngiOjQ3NC4wLCJ5IjoxMC4wfSwicGFyYW1zIjp7ImJhc2VfaHoiOjEz
+          MC44MSwiZGV0dW5lIjoyMC4wLCJmaW5lIjotNi4wLCJ1bmlzb24iOjIuMCwid2F2ZWZvcm0iOjIuMH19LCI0Ijp7ImtpbmQiOiJtaXhlciIsInBvcyI6eyJ4Ijo3MTQu
+          MCwieSI6MTAuMH0sInBhcmFtcyI6eyJsZXZlbDEiOjAuNSwibGV2ZWwyIjowLjM1fX0sIjUiOnsia2luZCI6ImZpbHRlci5sYWRkZXIiLCJwb3MiOnsieCI6OTg0LjAs
+          InkiOjEwLjB9LCJwYXJhbXMiOnsiY3V0b2ZmX2h6IjoyNDAwLjAsImRyaXZlX2RiIjoyLjAsInJlc29uYW5jZSI6MC4xMn19LCI2Ijp7ImtpbmQiOiJlbnYuYWRzciIs
+          InBvcyI6eyJ4IjoyNC4wLCJ5IjozODAuMH0sInBhcmFtcyI6eyJhdHRhY2tfbXMiOjI4MC4wLCJjYy5yZWxlYXNlX21zIjoyNS4wLCJkZWNheV9tcyI6NjAwLjAsInBp
+          bi5yZWxlYXNlX21zIjo1LjAsInJlbGVhc2VfbXMiOjExMDAuMCwic3VzdGFpbiI6MC44NX19LCI3Ijp7ImtpbmQiOiJyaW5nbW9kIiwicG9zIjp7IngiOjI5NC4wLCJ5
+          IjozODAuMH0sInBhcmFtcyI6e319LCI4Ijp7ImtpbmQiOiJ2Y2EiLCJwb3MiOnsieCI6NDc0LjAsInkiOjM4MC4wfSwicGFyYW1zIjp7ImdhaW4iOjAuMH19LCI5Ijp7
+          ImtpbmQiOiJnYWluIiwicG9zIjp7IngiOjY4NC4wLCJ5IjozODAuMH0sInBhcmFtcyI6eyJjYy5nYWluX2RiIjoyNi4wLCJnYWluX2RiIjo3LjUsInBpbi5nYWluX2Ri
+          Ijo2LjB9fSwiMTAiOnsia2luZCI6ImxmbyIsInBvcyI6eyJ4Ijo4NjQuMCwieSI6MzgwLjB9LCJwYXJhbXMiOnsicmF0ZV9oeiI6MC4yMywid2F2ZWZvcm0iOjEuMH19
+          LCIxMSI6eyJraW5kIjoibGZvIiwicG9zIjp7IngiOjExMDQuMCwieSI6MzgwLjB9LCJwYXJhbXMiOnsicmF0ZV9oeiI6NS4zfX0sIjEyIjp7ImtpbmQiOiJjaG9ydXMi
+          LCJwb3MiOnsieCI6MjQuMCwieSI6NzUwLjB9LCJwYXJhbXMiOnsiY2MucmF0ZV9oeiI6MjQuMCwiZGVwdGgiOjY1LjAsIm1peCI6NTUuMCwicGluLnJhdGVfaHoiOjQu
+          MCwicmF0ZV9oeiI6MC4zNSwid2lkdGgiOjEwMC4wfX0sIjEzIjp7ImtpbmQiOiJyZXZlcmIiLCJwb3MiOnsieCI6Mjk0LjAsInkiOjc1MC4wfSwicGFyYW1zIjp7ImRh
+          bXBfaHoiOjYwMDAuMCwiZGVjYXlfcyI6Mi4yLCJtaXgiOjE4LjAsInByZWRlbGF5X21zIjoyMC4wfX0sIjE0Ijp7ImtpbmQiOiJvdXQiLCJwb3MiOnsieCI6NTY0LjAs
+          InkiOjc1MC4wfSwicGFyYW1zIjp7fX0sIjE1Ijp7ImtpbmQiOiJtYWNybyIsInBvcyI6eyJ4Ijo3NDQuMCwieSI6NzUwLjB9LCJwYXJhbXMiOnsiY2MubTEiOjIwLjAs
+          ImNjLm0yIjoyMS4wLCJjYy5tMyI6MjIuMCwiY2MubTQiOjIzLjAsIm0xIjowLjQsIm0yIjowLjUsIm0zIjowLjMsIm00IjowLjMsInBpbi5tMSI6MC4wLCJwaW4ubTIi
+          OjEuMCwicGluLm0zIjoyLjAsInBpbi5tNCI6My4wfX19LCJjYWJsZXMiOnsiMSI6eyJmcm9tIjp7Ik1vZHVsZSI6eyJpZCI6MSwicG9ydCI6InBpdGNoIn19LCJ0byI6
+          eyJNb2R1bGUiOnsiaWQiOjIsInBvcnQiOiJwaXRjaCJ9fSwicGFyYW1zIjp7fSwic3RlcHMiOltdfSwiMiI6eyJmcm9tIjp7Ik1vZHVsZSI6eyJpZCI6MSwicG9ydCI6
+          InBpdGNoIn19LCJ0byI6eyJNb2R1bGUiOnsiaWQiOjMsInBvcnQiOiJwaXRjaCJ9fSwicGFyYW1zIjp7fSwic3RlcHMiOltdfSwiMyI6eyJmcm9tIjp7Ik1vZHVsZSI6
+          eyJpZCI6MSwicG9ydCI6ImdhdGUifX0sInRvIjp7Ik1vZHVsZSI6eyJpZCI6NiwicG9ydCI6ImdhdGUifX0sInBhcmFtcyI6e30sInN0ZXBzIjpbXX0sIjQiOnsiZnJv
+          bSI6eyJNb2R1bGUiOnsiaWQiOjIsInBvcnQiOiJvdXQifX0sInRvIjp7Ik1vZHVsZSI6eyJpZCI6NCwicG9ydCI6ImluMSJ9fSwicGFyYW1zIjp7fSwic3RlcHMiOltd
+          fSwiNSI6eyJmcm9tIjp7Ik1vZHVsZSI6eyJpZCI6MywicG9ydCI6Im91dCJ9fSwidG8iOnsiTW9kdWxlIjp7ImlkIjo0LCJwb3J0IjoiaW4yIn19LCJwYXJhbXMiOnt9
+          LCJzdGVwcyI6W119LCI2Ijp7ImZyb20iOnsiTW9kdWxlIjp7ImlkIjo0LCJwb3J0Ijoib3V0In19LCJ0byI6eyJNb2R1bGUiOnsiaWQiOjUsInBvcnQiOiJpbiJ9fSwi
+          cGFyYW1zIjp7fSwic3RlcHMiOltdfSwiNyI6eyJmcm9tIjp7Ik1vZHVsZSI6eyJpZCI6NSwicG9ydCI6Im91dCJ9fSwidG8iOnsiTW9kdWxlIjp7ImlkIjo4LCJwb3J0
+          IjoiaW4ifX0sInBhcmFtcyI6e30sInN0ZXBzIjpbXX0sIjgiOnsiZnJvbSI6eyJNb2R1bGUiOnsiaWQiOjYsInBvcnQiOiJvdXQifX0sInRvIjp7Ik1vZHVsZSI6eyJp
+          ZCI6NywicG9ydCI6ImEifX0sInBhcmFtcyI6e30sInN0ZXBzIjpbXX0sIjkiOnsiZnJvbSI6eyJNb2R1bGUiOnsiaWQiOjEsInBvcnQiOiJ2ZWxvY2l0eSJ9fSwidG8i
+          OnsiTW9kdWxlIjp7ImlkIjo3LCJwb3J0IjoiYiJ9fSwicGFyYW1zIjp7fSwic3RlcHMiOltdfSwiMTAiOnsiZnJvbSI6eyJNb2R1bGUiOnsiaWQiOjcsInBvcnQiOiJv
+          dXQifX0sInRvIjp7Ik1vZHVsZSI6eyJpZCI6OCwicG9ydCI6ImN2In19LCJwYXJhbXMiOnt9LCJzdGVwcyI6W119LCIxMSI6eyJmcm9tIjp7Ik1vZHVsZSI6eyJpZCI6
+          OCwicG9ydCI6Im91dCJ9fSwidG8iOnsiTW9kdWxlIjp7ImlkIjo5LCJwb3J0IjoiaW4ifX0sInBhcmFtcyI6e30sInN0ZXBzIjpbXX0sIjEyIjp7ImZyb20iOnsiTW9k
+          dWxlIjp7ImlkIjoxLCJwb3J0IjoicGl0Y2gifX0sInRvIjp7IlBhcmFtIjp7ImlkIjo1LCJwYXJhbSI6ImN1dG9mZl9oeiJ9fSwicGFyYW1zIjp7ImFtb3VudCI6MC4z
+          NX0sInN0ZXBzIjpbXX0sIjEzIjp7ImZyb20iOnsiTW9kdWxlIjp7ImlkIjo2LCJwb3J0Ijoib3V0In19LCJ0byI6eyJQYXJhbSI6eyJpZCI6NSwicGFyYW0iOiJjdXRv
+          ZmZfaHoifX0sInBhcmFtcyI6eyJhbW91bnQiOjAuMDh9LCJzdGVwcyI6W119LCIxNCI6eyJmcm9tIjp7Ik1vZHVsZSI6eyJpZCI6MSwicG9ydCI6InZlbG9jaXR5In19
+          LCJ0byI6eyJQYXJhbSI6eyJpZCI6NSwicGFyYW0iOiJjdXRvZmZfaHoifX0sInBhcmFtcyI6eyJhbW91bnQiOjAuMDh9LCJzdGVwcyI6W119LCIxNSI6eyJmcm9tIjp7
+          Ik1vZHVsZSI6eyJpZCI6MTAsInBvcnQiOiJvdXQifX0sInRvIjp7IlBhcmFtIjp7ImlkIjo1LCJwYXJhbSI6ImN1dG9mZl9oeiJ9fSwicGFyYW1zIjp7ImFtb3VudCI6
+          MC4wNX0sInN0ZXBzIjpbXX0sIjE2Ijp7ImZyb20iOnsiTW9kdWxlIjp7ImlkIjoxMSwicG9ydCI6Im91dCJ9fSwidG8iOnsiUGFyYW0iOnsiaWQiOjIsInBhcmFtIjoi
+          ZmluZSJ9fSwicGFyYW1zIjp7ImFtb3VudCI6MC4wNX0sInN0ZXBzIjpbXX0sIjE3Ijp7ImZyb20iOnsiTW9kdWxlIjp7ImlkIjoxMSwicG9ydCI6Im91dCJ9fSwidG8i
+          OnsiUGFyYW0iOnsiaWQiOjMsInBhcmFtIjoiZmluZSJ9fSwicGFyYW1zIjp7ImFtb3VudCI6MC4wNX0sInN0ZXBzIjpbXX0sIjE4Ijp7ImZyb20iOnsiTW9kdWxlIjp7
+          ImlkIjo5LCJwb3J0Ijoib3V0In19LCJ0byI6eyJNb2R1bGUiOnsiaWQiOjEyLCJwb3J0IjoiaW5fbCJ9fSwicGFyYW1zIjp7fSwic3RlcHMiOltdfSwiMTkiOnsiZnJv
+          bSI6eyJNb2R1bGUiOnsiaWQiOjksInBvcnQiOiJvdXQifX0sInRvIjp7Ik1vZHVsZSI6eyJpZCI6MTIsInBvcnQiOiJpbl9yIn19LCJwYXJhbXMiOnt9LCJzdGVwcyI6
+          W119LCIyMCI6eyJmcm9tIjp7Ik1vZHVsZSI6eyJpZCI6MTIsInBvcnQiOiJsZWZ0In19LCJ0byI6eyJNb2R1bGUiOnsiaWQiOjEzLCJwb3J0IjoiaW5fbCJ9fSwicGFy
+          YW1zIjp7fSwic3RlcHMiOltdfSwiMjEiOnsiZnJvbSI6eyJNb2R1bGUiOnsiaWQiOjEyLCJwb3J0IjoicmlnaHQifX0sInRvIjp7Ik1vZHVsZSI6eyJpZCI6MTMsInBv
+          cnQiOiJpbl9yIn19LCJwYXJhbXMiOnt9LCJzdGVwcyI6W119LCIyMiI6eyJmcm9tIjp7Ik1vZHVsZSI6eyJpZCI6MTMsInBvcnQiOiJsZWZ0In19LCJ0byI6eyJNb2R1
+          bGUiOnsiaWQiOjE0LCJwb3J0IjoibGVmdCJ9fSwicGFyYW1zIjp7fSwic3RlcHMiOltdfSwiMjMiOnsiZnJvbSI6eyJNb2R1bGUiOnsiaWQiOjEzLCJwb3J0Ijoicmln
+          aHQifX0sInRvIjp7Ik1vZHVsZSI6eyJpZCI6MTQsInBvcnQiOiJyaWdodCJ9fSwicGFyYW1zIjp7fSwic3RlcHMiOltdfSwiMjQiOnsiZnJvbSI6eyJNb2R1bGUiOnsi
+          aWQiOjE1LCJwb3J0IjoibTEifX0sInRvIjp7IlBhcmFtIjp7ImlkIjo1LCJwYXJhbSI6ImN1dG9mZl9oeiJ9fSwicGFyYW1zIjp7ImFtb3VudCI6MC4yNX0sInN0ZXBz
+          IjpbXX0sIjI1Ijp7ImZyb20iOnsiTW9kdWxlIjp7ImlkIjoxNSwicG9ydCI6Im0yIn19LCJ0byI6eyJQYXJhbSI6eyJpZCI6MTIsInBhcmFtIjoiZGVwdGgifX0sInBh
+          cmFtcyI6eyJhbW91bnQiOjAuM30sInN0ZXBzIjpbXX0sIjI2Ijp7ImZyb20iOnsiTW9kdWxlIjp7ImlkIjoxNSwicG9ydCI6Im0yIn19LCJ0byI6eyJQYXJhbSI6eyJp
+          ZCI6MTIsInBhcmFtIjoibWl4In19LCJwYXJhbXMiOnsiYW1vdW50IjowLjJ9LCJzdGVwcyI6W119LCIyNyI6eyJmcm9tIjp7Ik1vZHVsZSI6eyJpZCI6MTUsInBvcnQi
+          OiJtMiJ9fSwidG8iOnsiUGFyYW0iOnsiaWQiOjIsInBhcmFtIjoiZGV0dW5lIn19LCJwYXJhbXMiOnsiYW1vdW50IjowLjN9LCJzdGVwcyI6W119LCIyOCI6eyJmcm9t
+          Ijp7Ik1vZHVsZSI6eyJpZCI6MTUsInBvcnQiOiJtMyJ9fSwidG8iOnsiUGFyYW0iOnsiaWQiOjYsInBhcmFtIjoiYXR0YWNrX21zIn19LCJwYXJhbXMiOnsiYW1vdW50
+          IjowLjE0fSwic3RlcHMiOltdfSwiMjkiOnsiZnJvbSI6eyJNb2R1bGUiOnsiaWQiOjE1LCJwb3J0IjoibTMifX0sInRvIjp7IlBhcmFtIjp7ImlkIjo2LCJwYXJhbSI6
+          InJlbGVhc2VfbXMifX0sInBhcmFtcyI6eyJhbW91bnQiOjAuMDh9LCJzdGVwcyI6W119LCIzMCI6eyJmcm9tIjp7Ik1vZHVsZSI6eyJpZCI6MTUsInBvcnQiOiJtNCJ9
+          fSwidG8iOnsiUGFyYW0iOnsiaWQiOjEzLCJwYXJhbSI6Im1peCJ9fSwicGFyYW1zIjp7ImFtb3VudCI6MC4zfSwic3RlcHMiOltdfSwiMzEiOnsiZnJvbSI6eyJNb2R1
+          bGUiOnsiaWQiOjE1LCJwb3J0IjoibTQifX0sInRvIjp7IlBhcmFtIjp7ImlkIjoxMywicGFyYW0iOiJkZWNheV9zIn19LCJwYXJhbXMiOnsiYW1vdW50IjowLjE1fSwi
+          c3RlcHMiOltdfX0sImxhYmVscyI6eyIxIjp7InBpbi5tb2RlIjoiS2V5cyJ9LCI2Ijp7InBpbi5yZWxlYXNlX21zIjoiUmVsZWFzZSJ9LCI5Ijp7InBpbi5nYWluX2Ri
+          IjoiTGV2ZWwifSwiMTIiOnsicGluLnJhdGVfaHoiOiJDaG9ydXMgcmF0ZSJ9LCIxNSI6eyJndWlkZSI6IkhvbGQgRTMtRzMtQjMtRTQ7IG92ZXJsYXAgdGhlIG5leHQg
+          Y2hvcmQuIEJyaWdodCBvcGVucyB0aGUgdG9uZSwgRW5zZW1ibGUgd2lkZW5zIGRldHVuaW5nLCBCb3cgc29mdGVucyBhdHRhY2ssIFNwYWNlIGFkZHMgcm9vbS4gVmVs
+          b2NpdHkgc2hhcGVzIHZvbHVtZTsgQ0MyMC0yMyBjb250cm9sIG1hY3Jvcy4iLCJuYW1lLm0xIjoiQnJpZ2h0IiwibmFtZS5tMiI6IkVuc2VtYmxlIiwibmFtZS5tMyI6
+          IkJvdyIsIm5hbWUubTQiOiJTcGFjZSJ9fX0sIm91dHB1dF9nYWluIjowLjQsImxhbmVzIjpbeyJ0YXJnZXQiOm51bGwsInJldGlyZWQiOmZhbHNlfSx7InRhcmdldCI6
+          bnVsbCwicmV0aXJlZCI6ZmFsc2V9LHsidGFyZ2V0IjpudWxsLCJyZXRpcmVkIjpmYWxzZX0seyJ0YXJnZXQiOm51bGwsInJldGlyZWQiOmZhbHNlfSx7InRhcmdldCI6
+          bnVsbCwicmV0aXJlZCI6ZmFsc2V9LHsidGFyZ2V0IjpudWxsLCJyZXRpcmVkIjpmYWxzZX0seyJ0YXJnZXQiOm51bGwsInJldGlyZWQiOmZhbHNlfSx7InRhcmdldCI6
+          bnVsbCwicmV0aXJlZCI6ZmFsc2V9LHsidGFyZ2V0IjpudWxsLCJyZXRpcmVkIjpmYWxzZX0seyJ0YXJnZXQiOm51bGwsInJldGlyZWQiOmZhbHNlfSx7InRhcmdldCI6
+          bnVsbCwicmV0aXJlZCI6ZmFsc2V9LHsidGFyZ2V0IjpudWxsLCJyZXRpcmVkIjpmYWxzZX0seyJ0YXJnZXQiOm51bGwsInJldGlyZWQiOmZhbHNlfSx7InRhcmdldCI6
+          bnVsbCwicmV0aXJlZCI6ZmFsc2V9LHsidGFyZ2V0IjpudWxsLCJyZXRpcmVkIjpmYWxzZX0seyJ0YXJnZXQiOm51bGwsInJldGlyZWQiOmZhbHNlfV0sInNsb3RfdmFs
+          dWVzIjpbMC4wLDAuMCwwLjAsMC4wLDAuMCwwLjAsMC4wLDAuMCwwLjAsMC4wLDAuMCwwLjAsMC4wLDAuMCwwLjAsMC4wXSwiaG9zdF9jbG9jayI6ZmFsc2V9
+        >
+      >
+      FLOATPOS 0 0 0 0
+      FXID {F4F528EA-CD00-1F26-7987-6CF281E0C770}
+      WAK 0 0
+    >
+    <ITEM
+      POSITION 0
+      SNAPOFFS 0
+      LENGTH 36
+      LOOP 1
+      ALLTAKES 0
+      FADEIN 1 0 0 1 0 0 0
+      FADEOUT 1 0 0 1 0 0 0
+      MUTE 0 0
+      SEL 0
+      IGUID {44C06B67-65A2-4CA8-9CA4-A6B0F8A69E19}
+      IID 1
+      NAME ""
+      VOLPAN 1 0 1 -1
+      SOFFS 0 0
+      PLAYRATE 1 1 0 -1 0 0.0025
+      CHANMODE 0
+      GUID {32029044-7F3D-44C9-BAE3-80B15B513426}
+      <SOURCE MIDI
+        HASDATA 1 960 QN
+        CCINTERP 32
+        POOLEDEVTS {2E6CEEC5-D963-4DA3-8F44-4526100192F4}
+        E 960 90 3c 64
+        E 1440 80 3c 00
+        E 480 90 40 64
+        E 1440 80 40 00
+        E 480 90 43 64
+        E 1440 80 43 00
+        E 480 90 45 64
+        E 1440 80 45 00
+        E 480 90 43 64
+        E 1440 80 43 00
+        E 480 90 40 64
+        E 1440 80 40 00
+        E 480 90 3c 64
+        E 1440 80 3c 00
+        E 480 90 37 64
+        E 1440 80 37 00
+        E 480 90 3c 64
+        E 1440 80 3c 00
+        E 480 90 40 64
+        E 1440 80 40 00
+        E 480 90 43 64
+        E 1440 80 43 00
+        E 480 90 48 64
+        E 1440 80 48 00
+        CCINTERP 32
+        GUID {26B0EA06-88F3-402B-AB97-D98103067154}
+        IGNTEMPO 0 120 4 4
+        SRCCOLOR 0
+        EVTFILTER 0 -1 -1 -1 -1 0 0 0 0 -1 -1 -1 -1 0 -1 0 -1 -1
+      >
+    >
+  >
+>
