@@ -408,7 +408,10 @@ fn place_local(
 ) -> Placed {
     // A step's ratchet count is a four-position knob: eight selectors would not fit the drawer.
     let knob = |p: &ParamInfo| {
-        p.taper != Taper::Stepped || (info.kind == "seq" && seq::slot_name(p.name).starts_with('k'))
+        p.taper != Taper::Stepped
+            || (info.kind == "seq" && seq::slot_name(p.name).starts_with('k'))
+            // Sixteen selectors would be wider than the module.
+            || (info.kind == "osc.va" && p.name == "unison")
     };
     let face_knobs: Vec<usize> = (0..info.params.len())
         .filter(|&i| shown[i] && primary[i] && knob(&info.params[i]))
@@ -490,9 +493,10 @@ fn place_local(
         let ports = ins.len() + outs.len();
         let fm6 = info.kind == "osc.fm6";
         // A wide panel (the sequencer) keeps one row, clear of its selector row.
+        // The oscillator's four jacks (pitch, sync, out, out_r) keep its one row too.
         let two_rows = !column
             && ports > 3
-            && !(ports == 4 && fw >= 240.0)
+            && !(ports == 4 && (fw >= 240.0 || info.kind == "osc.va"))
             && fw < 100.0 * ports as f32
             && info.kind != "drum.grid";
         if fm6 {
@@ -1241,8 +1245,10 @@ mod tests {
         let p = place_local(
             1,
             info,
-            &[true, true, false, false, false, false],
-            &[true; 6],
+            &[
+                true, true, false, false, false, false, false, false, false, false,
+            ],
+            &[true; 10],
             false,
             false,
             Some(&SKIN),
@@ -1267,8 +1273,10 @@ mod tests {
         let p = place_local(
             1,
             info,
-            &[true, false, false, false, false, false],
-            &[true; 6],
+            &[
+                true, false, false, false, false, false, false, false, false, false,
+            ],
+            &[true; 10],
             true,
             false,
             Some(&SKIN),

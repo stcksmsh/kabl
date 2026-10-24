@@ -2035,7 +2035,13 @@ fn draw_module(
             r.hovered(),
             kit::face::face_font(&st, style::Role::Caption, z),
         ) {
-            painter.text(edit.center(), egui::Align2::CENTER_CENTER, "Edit face", font, ink);
+            painter.text(
+                edit.center(),
+                egui::Align2::CENTER_CENTER,
+                "Edit face",
+                font,
+                ink,
+            );
         }
         if r.clicked() {
             ui_state.choose = Some((
@@ -2143,7 +2149,17 @@ fn draw_module(
                 ui_state.wants.display(m.id, m.info.kind);
                 ui_state.wants.feeds(editor.state(), m.id, m.info.kind);
             }
-            displays::draw(editor.state(), &st, &ui_state.live, now, painter, xf, m, r, th.panel);
+            displays::draw(
+                editor.state(),
+                &st,
+                &ui_state.live,
+                now,
+                painter,
+                xf,
+                m,
+                r,
+                th.panel,
+            );
             if m.info.kind == "osc.wt" && z >= 0.45 {
                 // A chip in the display's corner opens the table editor.
                 let d = xf.r(r);

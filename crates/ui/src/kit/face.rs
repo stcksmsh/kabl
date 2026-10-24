@@ -192,13 +192,7 @@ pub fn title(
                 if dot {
                     p.circle_filled(pos2(face.left() + 22.0 * z, y), 4.0 * z, st.roles.accent);
                 }
-                p.text(
-                    pos2(x0, y),
-                    egui::Align2::LEFT_CENTER,
-                    name,
-                    font,
-                    ink,
-                )
+                p.text(pos2(x0, y), egui::Align2::LEFT_CENTER, name, font, ink)
             }
             FaceTitle::CapsRule => {
                 let r = p.text(
@@ -223,13 +217,7 @@ pub fn title(
         let at = pos2(cx, face.top() + 43.0 * z);
         match kind {
             FaceTitle::LeftDot => {
-                p.text(
-                    pos2(x0, at.y),
-                    egui::Align2::LEFT_CENTER,
-                    tag,
-                    font,
-                    ink2,
-                );
+                p.text(pos2(x0, at.y), egui::Align2::LEFT_CENTER, tag, font, ink2);
             }
             _ => {
                 p.text(at, egui::Align2::CENTER_CENTER, tag, font, ink2);
@@ -481,9 +469,24 @@ fn fade(p: &Painter, rect: Rect, side: usize, depth: f32, a: u8) {
     let (c0, c1) = (alpha(Color32::BLACK, a), alpha(Color32::BLACK, 0));
     let (l, r, t, b) = (rect.left(), rect.right(), rect.top(), rect.bottom());
     let q = match side {
-        0 => [(pos2(l, t), c0), (pos2(r, t), c0), (pos2(r, t + depth), c1), (pos2(l, t + depth), c1)],
-        1 => [(pos2(l, t), c0), (pos2(l, b), c0), (pos2(l + depth, b), c1), (pos2(l + depth, t), c1)],
-        _ => [(pos2(r, t), c0), (pos2(r, b), c0), (pos2(r - depth, b), c1), (pos2(r - depth, t), c1)],
+        0 => [
+            (pos2(l, t), c0),
+            (pos2(r, t), c0),
+            (pos2(r, t + depth), c1),
+            (pos2(l, t + depth), c1),
+        ],
+        1 => [
+            (pos2(l, t), c0),
+            (pos2(l, b), c0),
+            (pos2(l + depth, b), c1),
+            (pos2(l + depth, t), c1),
+        ],
+        _ => [
+            (pos2(r, t), c0),
+            (pos2(r, b), c0),
+            (pos2(r - depth, b), c1),
+            (pos2(r - depth, t), c1),
+        ],
     };
     let mut mesh = Mesh::default();
     for (v, c) in q {
@@ -518,8 +521,14 @@ pub fn display_frame(p: &Painter, st: &Style, rect: Rect, face: Color32, z: f32)
         let (w, h) = (rect.width(), rect.height());
         let mut sheen = Mesh::default();
         sheen.colored_vertex(rect.left_top(), alpha(Color32::WHITE, 14));
-        sheen.colored_vertex(rect.left_top() + vec2(w * 0.5, 0.0), alpha(Color32::WHITE, 0));
-        sheen.colored_vertex(rect.left_top() + vec2(0.0, h * 0.6), alpha(Color32::WHITE, 0));
+        sheen.colored_vertex(
+            rect.left_top() + vec2(w * 0.5, 0.0),
+            alpha(Color32::WHITE, 0),
+        );
+        sheen.colored_vertex(
+            rect.left_top() + vec2(0.0, h * 0.6),
+            alpha(Color32::WHITE, 0),
+        );
         sheen.add_triangle(0, 1, 2);
         p.add(Shape::mesh(sheen));
         // Bezel.

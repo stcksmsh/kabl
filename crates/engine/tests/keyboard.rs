@@ -166,15 +166,113 @@ fn poly_repeated_note_restarts_on_its_own_voice() {
     assert_eq!(k.voices_sounding(), 1);
 }
 
+/// POLY glide: (note, glide, start pitch in notes) per note-on, each event at its own ms.
+fn glides(k: &mut Keyboard, evs: &[(u64, KeyEvent)]) -> Vec<(i32, bool, Option<i32>)> {
+    let mut v = Vec::new();
+    for &(ms, e) in evs {
+        k.at(ms);
+        k.event(e, &mut |a| {
+            if let Action::Play {
+                pitch,
+                glide,
+                glide_from,
+                retrigger: true,
+                ..
+            } = a
+            {
+                v.push((pitch as i32 + 60, glide, glide_from.map(|f| f as i32 + 60)));
+            }
+        });
+    }
+    v
+}
+
 #[test]
-fn poly_glide_always_follows_each_voice_from_its_last_note() {
+fn poly_glide_always_starts_from_the_last_note_even_on_a_fresh_voice_and_after_silence() {
     let mut k = kb(0, 0, 1);
-    let a = run(&mut k, &[on(60), on(64), off(60), off(64), on(67)]);
-    assert!(!a[0].3 && !a[1].3, "a voice's first note doesn't glide");
-    // 67 lands on voice 2 (never used): no glide either; voice 0 next would glide.
-    assert_eq!(a[4], (P, 2, 67, false, true));
-    let a = run(&mut k, &[on(69), on(71), on(72)]);
-    assert!(a.iter().filter(|x| x.1 < 2).all(|x| x.3), "{a:?}");
+    let g = glides(
+        &mut k,
+        &[
+            (0, on(60)),
+            (700, on(64)),
+            (1400, on(67)),
+            (1500, off(60)),
+            (1500, off(64)),
+            (1500, off(67)),
+            (5000, on(72)),
+        ],
+    );
+    assert_eq!(
+        g,
+        vec![
+            (60, false, None),
+            (64, true, Some(60)),
+            (67, true, Some(64)),
+            (72, true, Some(67)),
+        ]
+    );
+}
+
+#[test]
+fn poly_glide_legato_only_glides_over_a_held_key() {
+    let mut k = kb(0, 0, 2);
+    let g = glides(
+        &mut k,
+        &[
+            (0, on(60)),
+            (700, on(64)),
+            (800, off(60)),
+            (900, off(64)),
+            (3000, on(67)),
+            (3700, on(69)),
+        ],
+    );
+    assert_eq!(
+        g,
+        vec![
+            (60, false, None),
+            (64, true, Some(60)),  // 60 still down
+            (67, false, Some(64)), // silence: no glide
+            (69, true, Some(67)),
+        ]
+    );
+}
+
+#[test]
+fn poly_chord_tones_glide_from_the_nearest_tone_of_the_previous_chord() {
+    let mut k = kb(0, 0, 1);
+    let g = glides(
+        &mut k,
+        &[
+            (0, on(60)),
+            (5, on(64)),
+            (10, on(67)),
+            (500, off(60)),
+            (500, off(64)),
+            (500, off(67)),
+            (1000, on(62)),
+            (1005, on(65)),
+            (1010, on(69)),
+        ],
+    );
+    assert_eq!(
+        g,
+        vec![
+            (60, false, None), // the first chord has nothing before it
+            (64, false, None),
+            (67, false, None),
+            (62, true, Some(60)), // a tie goes to the lower tone
+            (65, true, Some(64)),
+            (69, true, Some(67)),
+        ]
+    );
+}
+
+#[test]
+fn poly_glide_off_never_glides() {
+    let mut k = kb(0, 0, 0);
+    let g = glides(&mut k, &[(0, on(60)), (700, on(64))]);
+    assert!(g.iter().all(|x| !x.1));
 }
 
 // ---- MONO / LEGATO ----
@@ -433,6 +531,63 @@ fn legato_glide_is_a_straight_line_of_the_set_time_and_mono_dips_the_gate() {
         2.0,
         "no glide: the pitch is there at once"
     );
+}
+
+/// One POLY voice, glide ALWAYS, 100 ms: the pitch after the first block of a note-on.
+fn poly_trace(glide: f32, hold_first: bool) -> Vec<f32> {
+    let collector = Collector::new();
+    let patch = probe(&[("mode", 0.0), ("glide", glide), ("glide_ms", 100.0)]);
+    let mut e = PatchEngine::new(&collector.handle(), &patch, SR, 1).unwrap();
+    e.key(on(60));
+    block(&mut e);
+    for _ in 0..40 {
+        block(&mut e); // over 40 ms apart: not one chord
+    }
+    if !hold_first {
+        e.key(off(60));
+    }
+    e.key(on(72));
+    let mut pitch = Vec::new();
+    for _ in 0..100 {
+        pitch.extend(block(&mut e).0);
+    }
+    pitch
+}
+
+#[test]
+fn poly_pitch_trace_always_after_silence_and_legato_overlap() {
+    // ALWAYS, after a release: a straight line 0 -> 12 st over 4800 samples.
+    let t = poly_trace(1.0, false);
+    for (i, &p) in t.iter().enumerate().take(4800) {
+        let want = 12.0 * (i + 1) as f32 / 4800.0;
+        assert!((p - want).abs() < 1e-3, "sample {i}: {p} vs {want}");
+    }
+    // LEGATO, after silence: there at once.
+    assert!((poly_trace(2.0, false)[0] - 12.0).abs() < 1e-4);
+    // LEGATO, overlapping: the same line.
+    let t = poly_trace(2.0, true);
+    assert!((t[2400] - 6.0).abs() < 0.01, "{}", t[2400]);
+    // OFF: there at once.
+    assert!((poly_trace(0.0, true)[0] - 12.0).abs() < 1e-4);
+}
+
+#[test]
+fn mono_pitch_trace_always_glides_after_silence_from_the_last_pitch() {
+    let collector = Collector::new();
+    let patch = probe(&[("mode", 1.0), ("glide", 1.0), ("glide_ms", 100.0)]);
+    let mut e = PatchEngine::new(&collector.handle(), &patch, SR, 1).unwrap();
+    e.key(on(60));
+    block(&mut e);
+    e.key(off(60));
+    for _ in 0..40 {
+        block(&mut e);
+    }
+    e.key(on(72));
+    let mut t = Vec::new();
+    for _ in 0..100 {
+        t.extend(block(&mut e).0);
+    }
+    assert!((t[2400] - 6.0).abs() < 0.01, "{}", t[2400]);
 }
 
 #[test]

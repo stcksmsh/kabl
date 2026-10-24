@@ -365,6 +365,7 @@ impl PatchEngine {
     /// (`Keyboard::midi`).
     fn send_key(&mut self, e: MidiEvent, offset: usize) {
         self.sync_once();
+        let ms = (self.rendered + offset as u64) * 1000 / self.active.sample_rate() as u64;
         let PatchEngine {
             keyboards,
             active,
@@ -373,6 +374,7 @@ impl PatchEngine {
         } = self;
         for kb in keyboards.iter_mut().flatten() {
             let id = kb.id;
+            kb.at(ms);
             kb.midi(e, &mut |a| act(active, incoming, id, a, offset));
         }
         active.for_each_arp(|a| arp_key(a, e));

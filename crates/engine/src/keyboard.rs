@@ -25,6 +25,8 @@ const LOW: u8 = 1;
 const ALWAYS: u8 = 1;
 const GLIDE_LEGATO: u8 = 2;
 const ALL_CHANNELS: u16 = 0xFFFF;
+/// POLY: note-ons this close together (ms) are one chord for glide.
+const CHORD_MS: u64 = 40;
 
 /// Where a key event comes from. Part of a note's identity: a source's release never
 /// releases another source's key.
@@ -146,6 +148,8 @@ pub enum Action {
         pitch: f32,
         velocity: f32,
         glide: bool,
+        /// Where the glide starts; `None`: the pitch the voice is at now (MONO).
+        glide_from: Option<f32>,
         retrigger: bool,
     },
     Release {
@@ -177,8 +181,6 @@ struct Voice {
     /// Event count when it last started a note, and when it last released.
     started: u64,
     released: u64,
-    /// It has played a pitch (the first note of a voice never glides).
-    played: bool,
 }
 
 pub struct Keyboard {
@@ -200,6 +202,16 @@ pub struct Keyboard {
     wheel: f32,
     bend_from: Option<(u8, u8)>,
     wheel_from: Option<(u8, u8)>,
+    /// POLY glide: engine time (ms) of the last note-on, set by `at`.
+    now_ms: u64,
+    last_on_ms: u64,
+    /// Pitches of the chord being played (note-ons within `CHORD_MS`) and of the one before.
+    chord: [f32; MAX_VOICES],
+    n_chord: usize,
+    prev: [f32; MAX_VOICES],
+    n_prev: usize,
+    /// Event count when the current chord began: keys older than that are held "under" it.
+    chord_clock: u64,
 }
 
 fn pitch(note: u8) -> f32 {
@@ -237,7 +249,19 @@ impl Keyboard {
             wheel: 0.0,
             bend_from: None,
             wheel_from: None,
+            now_ms: 0,
+            last_on_ms: 0,
+            chord: [0.0; MAX_VOICES],
+            n_chord: 0,
+            prev: [0.0; MAX_VOICES],
+            n_prev: 0,
+            chord_clock: 0,
         }
+    }
+
+    /// Engine time in ms for the events that follow; POLY groups note-ons into chords with it.
+    pub fn at(&mut self, ms: u64) {
+        self.now_ms = ms;
     }
 
     pub fn settings(&self) -> KeySettings {
@@ -477,10 +501,36 @@ impl Keyboard {
                 pitch: pitch(note),
                 velocity: vel(velocity),
                 glide: false,
+                glide_from: None,
                 retrigger: true,
             });
             return;
         }
+        // Glide from the nearest tone of the previous chord (a single note is its own chord, so
+        // a line glides from the note before). LEGATO: only while a key from before this chord
+        // is still down.
+        if self.n_chord == 0 || self.now_ms.saturating_sub(self.last_on_ms) > CHORD_MS {
+            (self.prev, self.n_prev) = (self.chord, self.n_chord);
+            (self.n_chord, self.chord_clock) = (0, self.clock);
+        }
+        self.last_on_ms = self.now_ms;
+        let p = pitch(note);
+        let glide_from = self.prev[..self.n_prev]
+            .iter()
+            .copied()
+            .min_by(|a, b| (a - p).abs().total_cmp(&(b - p).abs()));
+        if self.n_chord < MAX_VOICES {
+            self.chord[self.n_chord] = p;
+            self.n_chord += 1;
+        }
+        let glide = glide_from.is_some()
+            && match self.settings.glide {
+                ALWAYS => true,
+                GLIDE_LEGATO => self.held[..self.n_held]
+                    .iter()
+                    .any(|h| h.at < self.chord_clock),
+                _ => false,
+            };
         let oldest = |pred: &dyn Fn(&Voice) -> bool, key: &dyn Fn(&Voice) -> u64| {
             (0..n)
                 .filter(|&i| pred(&voices[i]))
@@ -491,20 +541,19 @@ impl Keyboard {
             .or_else(|| oldest(&|_| true, &|v| v.started))
             .unwrap_or(0);
         let v = &mut voices[i];
-        let glide = self.settings.glide == ALWAYS && v.played;
         // A stolen voice forgets its old holders: their later releases find nothing.
         *v = Voice {
             key: Some((ch, note)),
             holders: 1 << src,
             started: self.clock,
             released: v.released,
-            played: true,
         };
         out(Action::Play {
             voice: i,
             pitch: pitch(note),
             velocity: vel(velocity),
             glide,
+            glide_from,
             // A stolen voice, or one released earlier in this block, restarts its envelope
             // (`MidiIn::play` dips only a gate that is or was just high).
             retrigger: true,
@@ -604,6 +653,7 @@ impl Keyboard {
             pitch: pitch(key.2),
             velocity: vel(velocity),
             glide,
+            glide_from: None,
             retrigger,
         });
     }

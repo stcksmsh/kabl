@@ -171,6 +171,8 @@ pub enum Change {
         pitch: f32,
         velocity: f32,
         glide: bool,
+        /// Where a glide starts; `None`: the pitch this voice is at now.
+        from: Option<f32>,
         retrigger: bool,
     },
     Release,
@@ -216,13 +218,16 @@ impl Core {
                 pitch,
                 velocity,
                 glide,
+                from,
                 retrigger,
             } => {
                 self.dip |= retrigger && (self.gate > 0.5 || high);
                 self.gate = 1.0;
                 self.velocity = velocity.clamp(0.0, 1.0);
                 self.pitch = pitch;
-                if glide && self.played {
+                if let Some(f) = from.filter(|_| glide) {
+                    (self.at, self.from) = (f, f);
+                } else if glide && self.played {
                     self.from = self.at;
                 } else {
                     (self.at, self.from) = (pitch, pitch);

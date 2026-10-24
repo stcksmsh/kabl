@@ -291,8 +291,9 @@ fn parquet_loop() -> Rack {
         [0.50, 0.45, 0.25, 0.50],
     );
     let clock = r.add("clock", &[("bpm", 122.0), ("swing", 25.0)]);
-    // Poly with glide on: each voice slides from the last pitch it played, so a chord change
-    // moves the chord tones into each other. The Glide macro sets the time; at 0 it is 5 ms.
+    // Poly with glide on: each new note slides from the nearest tone of the chord before it, so
+    // a chord change moves the chord tones into each other. The Glide macro sets the time; at 0
+    // it is 5 ms.
     let m = r.add(
         "midi.in",
         &[("glide", 1.0), ("glide_ms", 5.0), ("bend", 2.0)],
@@ -1308,7 +1309,7 @@ fn render(
     let mut state = state.clone();
     for item in std::env::var("PP_SET").unwrap_or_default().split(',') {
         if let Some((target, v)) = item.split_once('=') {
-            let (kind, param) = target.split_once('.').expect("kind.param");
+            let (kind, param) = target.rsplit_once('.').expect("kind.param");
             for m in state.modules.values_mut().filter(|m| m.kind == kind) {
                 m.params.insert(param.into(), v.parse().expect("number"));
             }
