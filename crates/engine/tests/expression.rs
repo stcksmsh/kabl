@@ -404,6 +404,7 @@ fn a_voice_takes_at_most_its_bound_of_changes_and_a_release_always_lands() {
                 pitch: i as f32,
                 velocity: 1.0,
                 glide: false,
+                from: None,
                 retrigger: true,
             },
         );

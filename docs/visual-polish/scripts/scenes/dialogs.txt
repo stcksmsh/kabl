@@ -1,0 +1,17 @@
+sleep 2
+click save-as
+sleep 0.6
+shot save-as
+key Escape
+sleep 0.5
+click diagnostics
+sleep 1
+shot diagnostics
+key Escape
+sleep 0.5
+click view-menu
+sleep 0.6
+shot view-menu
+click menu:about
+sleep 1
+shot about

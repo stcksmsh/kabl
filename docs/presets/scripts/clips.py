@@ -22,8 +22,13 @@ tool = 'target/release/examples/' + os.environ.get('PP_TOOL', 'presets_pilot')
 out = Path(os.environ.get('PP_OUT', 'docs/presets/clips'))
 group = os.environ.get('PP_GROUP')
 out.mkdir(parents=True, exist_ok=True)
-# (slug, clip name, PP_SET override): the extra clips show a macro moved
-extras = [] if 'PP_TOOL' in os.environ else [('salt-flat', 'salt-flat-textured', 'macro.m4=0.7'), ('parquet-loop', 'parquet-loop-no-glide', 'macro.m4=0')]
+# (slug, clip name, env overrides: PP_SET, PP_HITS): the extra clips show a macro moved
+extras = [] if 'PP_TOOL' in os.environ else [('salt-flat', 'salt-flat-textured', {'PP_SET': 'macro.m4=0.7'}), ('parquet-loop', 'parquet-loop-no-glide', {'PP_SET': 'macro.m4=0'})]
+# A legato line (each note overlaps the next by 0.1 s), Parquet Loop in POLY and in MONO.
+line = [48, 60, 52, 64, 55, 67, 60, 72]
+hits = ';'.join(f'{i * 0.8:.2f}:{n}:100;{i * 0.8 + 0.9:.2f}:{n}:0' for i, n in enumerate(line))
+extras += [] if 'PP_TOOL' in os.environ else [('parquet-loop', 'parquet-loop-legato-poly', {'PP_HITS': hits}),
+           ('parquet-loop', 'parquet-loop-legato-mono', {'PP_HITS': hits, 'PP_SET': 'midi.in.mode=1'})]
 
 
 def pcm(path):
@@ -65,8 +70,7 @@ with tempfile.TemporaryDirectory() as tmp:
     for slug, name, override in [(None, None, None)] + extras:
         d = Path(tmp) / (name or 'main')
         env = dict(os.environ, PP_F32='1')
-        if override:
-            env['PP_SET'] = override
+        env.update(override or {})
         sp.run([tool, 'clips', 'patches', str(d)] + ([group] if group else []), env=env, check=True, capture_output=True)
         if name is None:
             wavs = sorted(d.glob('*.wav'))

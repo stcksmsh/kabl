@@ -1,0 +1,7 @@
+# The cable pattern editor on route 9 of Composition.
+sleep 3
+click route:9
+sleep 1
+click pattern:9
+sleep 1.5
+shot pattern

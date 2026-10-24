@@ -1,0 +1,11 @@
+# The wavetable editor (imported-morph, module 2).
+sleep 2
+click routing
+sleep 1
+click zoom:100
+sleep 1
+goto module:2 560 330
+sleep 1
+click edit-table:2
+sleep 2
+shot wt-editor

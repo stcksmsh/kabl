@@ -271,10 +271,11 @@ pub(crate) fn draw(
     xf: Xf,
     m: &Placed,
     r: Rect,
+    face: egui::Color32,
 ) {
     let z = xf.zoom;
     let r = xf.r(r);
-    face::display_frame(painter, st, r, z);
+    face::display_frame(painter, st, r, face, z);
     let d = detail(z);
     if d == Detail::Frame {
         return;

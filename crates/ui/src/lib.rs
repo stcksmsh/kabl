@@ -2030,13 +2030,17 @@ fn draw_module(
         );
         let r = ui.interact(edit, Id::new(("native-edit-face", m.id)), Sense::click());
         ui_state.record(format!("edit-face:{}", m.id), edit);
-        if let Some(font) = kit::face::face_font(&st, style::Role::Caption, z) {
+        // Printed on hover only; the context menu always has it.
+        if let (true, Some(font)) = (
+            r.hovered(),
+            kit::face::face_font(&st, style::Role::Caption, z),
+        ) {
             painter.text(
                 edit.center(),
                 egui::Align2::CENTER_CENTER,
                 "Edit face",
                 font,
-                if r.hovered() { ink } else { ink2 },
+                ink,
             );
         }
         if r.clicked() {
@@ -2145,7 +2149,17 @@ fn draw_module(
                 ui_state.wants.display(m.id, m.info.kind);
                 ui_state.wants.feeds(editor.state(), m.id, m.info.kind);
             }
-            displays::draw(editor.state(), &st, &ui_state.live, now, painter, xf, m, r);
+            displays::draw(
+                editor.state(),
+                &st,
+                &ui_state.live,
+                now,
+                painter,
+                xf,
+                m,
+                r,
+                th.panel,
+            );
             if m.info.kind == "osc.wt" && z >= 0.45 {
                 // A chip in the display's corner opens the table editor.
                 let d = xf.r(r);
@@ -3003,18 +3017,28 @@ fn cues_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::U
     let seqs: Vec<ModuleId> = state
         .modules
         .iter()
-        .filter(|(_, m)| m.kind == "seq")
+        .filter(|(_, m)| matches!(m.kind.as_str(), "seq" | "drum.grid"))
         .map(|(&c, _)| c)
         .collect();
+    let is_grid = |s: ModuleId| state.modules.get(&s).is_some_and(|m| m.kind == "drum.grid");
     let playing_now: HashMap<ModuleId, usize> = seqs
         .iter()
         .map(|&s| {
             (
                 s,
-                ui_state
-                    .seq_banks
-                    .get(&s)
-                    .map_or_else(|| banks::startup(state, s), |b| b.0),
+                ui_state.seq_banks.get(&s).map_or_else(
+                    || {
+                        if is_grid(s) {
+                            state.modules[&s]
+                                .params
+                                .get("pattern")
+                                .map_or(0, |&v| v.round() as usize)
+                        } else {
+                            banks::startup(state, s)
+                        }
+                    },
+                    |b| b.0,
+                ),
             )
         })
         .collect();
@@ -3103,17 +3127,29 @@ fn cues_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::U
         });
         for &s in &seqs {
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new(format!("Sequencer #{s}")).small());
+                let grid = is_grid(s);
+                let label = if grid { "Drum grid" } else { "Sequencer" };
+                ui.label(egui::RichText::new(format!("{label} #{s}")).small());
                 let current = c.targets.iter().find(|t| t.0 == s).map(|t| t.1);
                 let r = ui.selectable_label(current.is_none(), "Keep");
                 ui_state.record(format!("cue-bank:{id}.{}.{s}.keep", c.n), r.rect);
                 if r.on_hover_text("This cue leaves it playing").clicked() {
                     edit = Some(Edit::Target(c.n, s, None));
                 }
-                for b in 0..seq::BANKS {
+                let names: &[&str] = if grid {
+                    &kabl_modules::builtins::PATTERN_NAMES
+                } else {
+                    &seq::BANK_NAMES
+                };
+                for (b, &name) in names.iter().enumerate() {
+                    let hover = if grid {
+                        format!("Pattern {name}")
+                    } else {
+                        banks::title(state, s, b)
+                    };
                     let r = ui
-                        .selectable_label(current == Some(b), seq::BANK_NAMES[b])
-                        .on_hover_text(banks::title(state, s, b));
+                        .selectable_label(current == Some(b), name)
+                        .on_hover_text(hover);
                     ui_state.record(format!("cue-bank:{id}.{}.{s}.{b}", c.n), r.rect);
                     if r.clicked() {
                         edit = Some(Edit::Target(c.n, s, Some(b)));
@@ -4554,15 +4590,17 @@ fn draw_authored_face(
     );
     let r = ui.interact(edit, Id::new(("face-design", id)), Sense::click());
     view.record(format!("composite:{id}:design"), edit);
-    text(
-        &painter,
-        edit.center(),
-        egui::Align2::CENTER_CENTER,
-        "Edit face",
-        11.0 * z,
-        th.ink2,
-        false,
-    );
+    if r.hovered() {
+        text(
+            &painter,
+            edit.center(),
+            egui::Align2::CENTER_CENTER,
+            "Edit face",
+            11.0 * z,
+            th.ink2,
+            false,
+        );
+    }
     if r.clicked() {
         panels::open(view, id, c);
     }

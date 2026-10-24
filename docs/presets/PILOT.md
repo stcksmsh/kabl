@@ -55,16 +55,20 @@ Kosta heard a static or fuzz in Cinder Block and in the clean Salt Flat, no glid
 
 Round four (Kosta, at normal volume: Salt Flat is good, Cinder Block still has some grit): Crush is now stored at 0.05 (was 0.3), which takes the content above 8 kHz from -45 to -59 dB (-63 with no crush at all) and leaves the dirt to the 18 dB of drive and the compressor; the macro keeps its full range. Earlier text: Cinder Block's bitcrusher (Crush stored at 0.3, so 18 % of the mix) added 18 dB of inharmonic content above 8 kHz, 5 dB of it aliasing. That is the dirt Kosta liked and also "static" by definition. The Crush macro takes it out; if the default should be lower, 0.15 halves it.
 
-**Parquet Loop glide.** In poly mode a voice's first note never glides (`docs/sound-palette-batch/keyboard.md`: "each voice glides from the last pitch *it* played (a voice's first note does not glide)"), and the allocator gives a new note the free voice released longest ago. After load all eight voices are fresh, so the first eight notes (and the first chords) do not glide at all; after that each note slides in from whatever that voice played eight notes earlier. Measured on this patch with Glide at 1 (about 830 ms), an alternating C3 and C5 legato line: 200 ms after each note-on, notes 1 to 9 are already exactly on pitch (130.4 and 521.5 Hz); the first mid-slide reading is note 11 (265 Hz on its way from the C5 that voice played before). The preset's glide time is fine and the filter loop does not mask it. **This is a keyboard/allocator limitation, reported rather than worked around:** a poly glide that does what a player expects needs the allocator to take the voice whose last pitch is nearest the new note (or glide a fresh voice from the most recent pitch of any voice). A legato line is a mono preset today.
+**Parquet Loop glide.** Found to be a keyboard/allocator limitation; fixed afterwards, see "Poly glide" below.
 
 **Loading Dock first half second.** The pink-noise riser entered before the drive, so even Wash 0.15 became a loud, steady hiss (about -22 dBFS) that the drive's saturation held up; before Run there is nothing else to hear, which is why it stood out in the first half second. Now the riser joins after the drive, and Wash is 0 at the Intro (and stored at 0), so the preset is silent until Run and the riser grows with the Build from nothing.
 
-### Defect note: poly glide (for the module fix)
+### Poly glide (fixed on `claude/poly-glide`)
 
-- **What:** `midi.in` with `glide` ALWAYS in POLY mode does not give a player a legato slide. A voice's first note never glides, and the allocator hands a new note the free voice that was released longest ago, so the pitch a note slides from is the one that voice played several notes earlier, unrelated to the note just played.
-- **Measured** (Parquet Loop, `glide_ms` driven to about 830 ms, alternating C3 and C5 played legato every 0.7 s, `PP_HITS` and `PP_SET=macro.m4=1`): 200 ms after each note-on, notes 1 to 9 are exactly on pitch (130.4 and 521.5 Hz); note 11 is mid-slide (265 Hz). All eight voices are fresh after load, so nothing glides until the pool has cycled.
-- **Expected:** a new note slides from the pitch a player just heard: the most recent note (or the nearest held one), also on a fresh voice.
-- **Fix to assign:** in the POLY allocator (`kabl_engine::keyboard`, rules in `docs/sound-palette-batch/keyboard.md`), glide a voice's first note from the last pitch any voice played, and prefer for a new note the free voice whose last pitch is nearest. Not worked around in the preset (no per-voice slew on pitch).
+The defect (a voice's first note never glided, and the allocator handed a new note whichever voice had been free longest, so the slide started from an unrelated old pitch) is fixed in `kabl_engine::keyboard`. Rules in `docs/sound-palette-batch/keyboard.md`:
+
+- A new note slides from the pitch of the most recent note, whatever voice it lands on. Note-ons within 40 ms are one chord; each chord tone slides from the nearest tone of the previous chord (a tie goes to the lower tone). A single note is a chord of one.
+- ALWAYS glides every note, also after silence (from the last note played). LEGATO now works in POLY: only a note pressed while a key from before its chord is still down glides. The first note after load never glides.
+- Mono and legato modes are unchanged. Glide time is constant time as before; no constant-rate option.
+- **Presets whose sound changes:** only Parquet Loop (POLY, glide ALWAYS): chord changes now slide as described (its clip differs from the glide-off clip from the first chord change, about 3.9 s, by about -15 dBFS RMS; before, about -20). Undertow, Neon Highway and every factory and palette patch with glide use the MONO or LEGATO modes and are unchanged. No schema change.
+- Clips: `clips/parquet-loop.*`, `parquet-loop-no-glide.*`, and a legato line (C3, C4, E3, E4, G3, G4, C4, C5 overlapping) in POLY and in MONO: `clips/parquet-loop-legato-poly.*`, `clips/parquet-loop-legato-mono.*`.
+- REAPER (plugin rebuilt, silent sink): Parquet Loop saves, quits, reopens with an identical state; restart render difference 0.0; peak 0.208, RMS 0.029; without MIDI RMS 0.0.
 
 ## Where a fifth macro would help
 
@@ -103,8 +107,7 @@ Things kabl lacks that a preset wanted. Each is written down, not built.
 6. **No genre field.** Genre lives in the tags; the metadata would need a field (a schema change, so not done here).
 7. **Vocoder.** The voice presets gain it when the module lands.
 8. **Cue pieces are leveled at their first cue.** The level test renders a piece at its stored macro values (the Intro); the Drop is a few dB louder than that.
-9. **Poly glide is voice-by-voice and not on the first notes (see round three).** A poly keys sound that glides like a legato line (the new note slides from the last note played, not from the voice that happened to be free) needs the allocator to prefer the voice that played the nearest pitch. Not changed here.
-10. **Stepped parameters cannot be routed.** The glide mode (OFF, ALWAYS, LEGATO) is stepped, so a macro can set the glide time but not switch glide on; Glide at 0 is a 5 ms slide, not off.
+9. **Stepped parameters cannot be routed.** The glide mode (OFF, ALWAYS, LEGATO) is stepped, so a macro can set the glide time but not switch glide on; Glide at 0 is a 5 ms slide, not off.
 
 Changes outside the presets: `CATEGORIES` in `crates/ui/src/library.rs` gains **Groove**, **Voice** and **Pluck**. It is a list of names for the browser and Save As; the patch format is unchanged.
 

@@ -1,0 +1,4 @@
+sleep 2
+click browser
+sleep 1.5
+shot sounds

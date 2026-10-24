@@ -1,0 +1,458 @@
+{
+  "modules": {
+    "1": {
+      "kind": "clock",
+      "pos": {
+        "x": 20.0,
+        "y": 20.0
+      },
+      "params": {
+        "bpm": 124.0,
+        "pin.transport": 0.0
+      }
+    },
+    "2": {
+      "kind": "drum.grid",
+      "pos": {
+        "x": 20.0,
+        "y": 300.0
+      },
+      "params": {
+        "a11": 4.0,
+        "a12": 4.0,
+        "a13": 4.0,
+        "a14": 4.0,
+        "a21": 0.0,
+        "a22": 4.0,
+        "a23": 0.0,
+        "a24": 4.0,
+        "a31": 0.0,
+        "a32": 4.0,
+        "a33": 0.0,
+        "a34": 4.0,
+        "a41": 65571.0,
+        "a42": 65571.0,
+        "a43": 65571.0,
+        "a44": 65571.0,
+        "a51": 3072.0,
+        "a52": 3072.0,
+        "a53": 3072.0,
+        "a54": 3072.0,
+        "b11": 4.0,
+        "b12": 4.0,
+        "b13": 4.0,
+        "b14": 0.0,
+        "b21": 0.0,
+        "b22": 4.0,
+        "b23": 67617.0,
+        "b24": 135267.0,
+        "b41": 65571.0,
+        "b42": 65571.0,
+        "b43": 0.0,
+        "b44": 0.0,
+        "b51": 3072.0,
+        "b52": 3072.0,
+        "b53": 0.0,
+        "b54": 0.0,
+        "b61": 0.0,
+        "b62": 0.0,
+        "b63": 3072.0,
+        "b64": 135171.0,
+        "c11": 4.0,
+        "c12": 0.0,
+        "c13": 0.0,
+        "c14": 0.0,
+        "c31": 0.0,
+        "c32": 0.0,
+        "c33": 0.0,
+        "c34": 3072.0,
+        "c51": 0.0,
+        "c52": 0.0,
+        "c53": 3.0,
+        "c54": 0.0,
+        "c61": 0.0,
+        "c62": 3074.0,
+        "c63": 0.0,
+        "c64": 0.0,
+        "d41": 2051.0,
+        "d42": 2051.0,
+        "d43": 2051.0,
+        "d44": 2051.0
+      }
+    },
+    "3": {
+      "kind": "drum.kick",
+      "pos": {
+        "x": 400.0,
+        "y": 20.0
+      },
+      "params": {}
+    },
+    "4": {
+      "kind": "drum.snare",
+      "pos": {
+        "x": 400.0,
+        "y": 300.0
+      },
+      "params": {
+        "level_db": -6.0
+      }
+    },
+    "5": {
+      "kind": "drum.clap",
+      "pos": {
+        "x": 400.0,
+        "y": 560.0
+      },
+      "params": {
+        "level_db": -6.0
+      }
+    },
+    "6": {
+      "kind": "drum.hat",
+      "pos": {
+        "x": 700.0,
+        "y": 20.0
+      },
+      "params": {
+        "level_db": -6.0
+      }
+    },
+    "7": {
+      "kind": "drum.tom",
+      "pos": {
+        "x": 700.0,
+        "y": 300.0
+      },
+      "params": {
+        "level_db": -5.0,
+        "tune_hz": 110.0
+      }
+    },
+    "8": {
+      "kind": "mixer",
+      "pos": {
+        "x": 1000.0,
+        "y": 20.0
+      },
+      "params": {
+        "level1": 0.9,
+        "level2": 0.55,
+        "level3": 0.5,
+        "level4": 0.55
+      }
+    },
+    "9": {
+      "kind": "mixer",
+      "pos": {
+        "x": 1000.0,
+        "y": 300.0
+      },
+      "params": {
+        "level1": 0.42,
+        "level2": 0.3
+      }
+    },
+    "10": {
+      "kind": "out",
+      "pos": {
+        "x": 1000.0,
+        "y": 560.0
+      },
+      "params": {}
+    },
+    "11": {
+      "kind": "cues",
+      "pos": {
+        "x": 20.0,
+        "y": 560.0
+      },
+      "params": {
+        "btn.cue.1": 40.0,
+        "btn.cue.2": 41.0,
+        "btn.cue.3": 42.0,
+        "btn.cue.4": 43.0,
+        "cue1.clock": 1.0,
+        "cue1.on": 1.0,
+        "cue1.seq.2": 3.0,
+        "cue1.timing": 0.0,
+        "cue2.clock": 1.0,
+        "cue2.on": 1.0,
+        "cue2.seq.2": 0.0,
+        "cue3.clock": 1.0,
+        "cue3.on": 1.0,
+        "cue3.seq.2": 1.0,
+        "cue4.clock": 1.0,
+        "cue4.on": 1.0,
+        "cue4.seq.2": 2.0,
+        "pin.cues": 1.0
+      }
+    }
+  },
+  "cables": {
+    "1": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "gate"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 2,
+          "port": "clock"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "2": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "reset"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 2,
+          "port": "reset"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "3": {
+      "from": {
+        "Module": {
+          "id": 2,
+          "port": "kick"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 3,
+          "port": "gate"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "4": {
+      "from": {
+        "Module": {
+          "id": 2,
+          "port": "snare"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 4,
+          "port": "gate"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "5": {
+      "from": {
+        "Module": {
+          "id": 2,
+          "port": "clap"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 5,
+          "port": "gate"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "6": {
+      "from": {
+        "Module": {
+          "id": 2,
+          "port": "chat"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 6,
+          "port": "closed"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "7": {
+      "from": {
+        "Module": {
+          "id": 2,
+          "port": "ohat"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 6,
+          "port": "open"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "8": {
+      "from": {
+        "Module": {
+          "id": 2,
+          "port": "tom"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 7,
+          "port": "gate"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "9": {
+      "from": {
+        "Module": {
+          "id": 3,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 8,
+          "port": "in1"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "10": {
+      "from": {
+        "Module": {
+          "id": 4,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 8,
+          "port": "in2"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "11": {
+      "from": {
+        "Module": {
+          "id": 5,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 8,
+          "port": "in3"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "12": {
+      "from": {
+        "Module": {
+          "id": 6,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 8,
+          "port": "in4"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "13": {
+      "from": {
+        "Module": {
+          "id": 8,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 9,
+          "port": "in1"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "14": {
+      "from": {
+        "Module": {
+          "id": 7,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 9,
+          "port": "in2"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "15": {
+      "from": {
+        "Module": {
+          "id": 9,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 10,
+          "port": "left"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "16": {
+      "from": {
+        "Module": {
+          "id": 9,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 10,
+          "port": "right"
+        }
+      },
+      "params": {},
+      "steps": []
+    }
+  },
+  "labels": {
+    "11": {
+      "cue1": "Intro",
+      "cue2": "Groove",
+      "cue3": "Fill",
+      "cue4": "Break"
+    }
+  }
+}
