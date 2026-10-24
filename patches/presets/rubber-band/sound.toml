@@ -1,0 +1,12 @@
+name = "Rubber Band"
+category = "Bass"
+tags = [
+    "mono",
+    "plucked",
+    "slap",
+    "funk",
+    "disco",
+]
+description = "A funky plucked bass: a narrow pulse over a saw an octave down, a fast filter slap on every note and a light compressor. Play 16th-note grooves; harder notes open the filter more. Tone opens the filter, Slap deepens the filter snap on each note, Grit adds drive, Room adds a short slapback and room."
+keys = true
+sequence = false

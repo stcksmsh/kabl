@@ -1,0 +1,13 @@
+name = "Acid Rain"
+category = "Bass"
+tags = [
+    "mono",
+    "legato",
+    "acid",
+    "glide",
+    "house",
+    "techno",
+]
+description = "A legato acid bass: a saw over a square sub into a resonant ladder filter that snaps on every note, with a short slide between overlapped notes. Play a sixteenth-note line; velocity accents the filter. Cutoff opens the filter, Squelch raises the resonance, Space adds a dotted echo and a room, Drive pushes the drive stage."
+keys = true
+sequence = false

@@ -16,15 +16,18 @@ import numpy as np
 
 repo = Path(__file__).resolve().parents[3]
 os.chdir(repo)
-tool = 'target/release/examples/presets_pilot'
-out = Path('docs/presets/clips')
+# Another generator: PP_TOOL=presets_bass_lead PP_OUT=docs/presets/clips/bass-lead/group1 PP_GROUP=1.
+# Its clips also get a tour: all of them back to back with a second of silence between.
+tool = 'target/release/examples/' + os.environ.get('PP_TOOL', 'presets_pilot')
+out = Path(os.environ.get('PP_OUT', 'docs/presets/clips'))
+group = os.environ.get('PP_GROUP')
 out.mkdir(parents=True, exist_ok=True)
 # (slug, clip name, env overrides: PP_SET, PP_HITS): the extra clips show a macro moved
-extras = [('salt-flat', 'salt-flat-textured', {'PP_SET': 'macro.m4=0.7'}), ('parquet-loop', 'parquet-loop-no-glide', {'PP_SET': 'macro.m4=0'})]
+extras = [] if 'PP_TOOL' in os.environ else [('salt-flat', 'salt-flat-textured', {'PP_SET': 'macro.m4=0.7'}), ('parquet-loop', 'parquet-loop-no-glide', {'PP_SET': 'macro.m4=0'})]
 # A legato line (each note overlaps the next by 0.1 s), Parquet Loop in POLY and in MONO.
 line = [48, 60, 52, 64, 55, 67, 60, 72]
 hits = ';'.join(f'{i * 0.8:.2f}:{n}:100;{i * 0.8 + 0.9:.2f}:{n}:0' for i, n in enumerate(line))
-extras += [('parquet-loop', 'parquet-loop-legato-poly', {'PP_HITS': hits}),
+extras += [] if 'PP_TOOL' in os.environ else [('parquet-loop', 'parquet-loop-legato-poly', {'PP_HITS': hits}),
            ('parquet-loop', 'parquet-loop-legato-mono', {'PP_HITS': hits, 'PP_SET': 'midi.in.mode=1'})]
 
 
@@ -54,7 +57,8 @@ def encode_and_check(wav, mp3):
     a_full = a
     a, b = lp(a), lp(b)
     err = 20 * np.log10(np.sqrt(((a - b) ** 2).mean()) + 1e-12)
-    peak = 20 * np.log10(np.abs(a_full).max() + 1e-12), 20 * np.log10(np.abs(b).max() + 1e-12)
+    # Peaks too are compared below 16 kHz: a saw's edges above it are not the encoder's doing.
+    peak = 20 * np.log10(np.abs(a).max() + 1e-12), 20 * np.log10(np.abs(b).max() + 1e-12)
     snr = 20 * np.log10(np.sqrt((a ** 2).mean()) + 1e-12) - err
     ok = snr > 35 and abs(peak[0] - peak[1]) < 0.5
     print(f'{Path(mp3).name:26} error {err:6.1f} dBFS  snr {snr:5.1f} dB  peak {peak[0]:5.1f} -> {peak[1]:5.1f}  {"ok" if ok else "FAIL"}')
@@ -67,10 +71,20 @@ with tempfile.TemporaryDirectory() as tmp:
         d = Path(tmp) / (name or 'main')
         env = dict(os.environ, PP_F32='1')
         env.update(override or {})
-        sp.run([tool, 'clips', 'patches', str(d)], env=env, check=True, capture_output=True)
+        sp.run([tool, 'clips', 'patches', str(d)] + ([group] if group else []), env=env, check=True, capture_output=True)
         if name is None:
-            for wav in sorted(d.glob('*.wav')):
+            wavs = sorted(d.glob('*.wav'))
+            for wav in wavs:
                 good &= encode_and_check(wav, out / (wav.stem + '.mp3'))
+            if group:
+                gap = np.zeros((48000, 2), '<f4')
+                parts, at = [], 0.0
+                for wav in wavs:
+                    x = pcm(wav)
+                    print(f'tour {at:6.1f} s  {wav.stem}')
+                    parts += [x, gap]
+                    at += (len(x) + len(gap)) / 48000
+                sp.run(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'f32le', '-ar', '48000', '-ac', '2', '-i', '-', '-c:a', 'flac', '-sample_fmt', 's32', '-bits_per_raw_sample', '24', str(out / 'tour.flac')], input=np.concatenate(parts[:-1]).astype('<f4').tobytes(), check=True)
         else:
             good &= encode_and_check(d / (slug + '.wav'), out / (name + '.mp3'))
 sys.exit(0 if good else 1)

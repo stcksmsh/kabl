@@ -1,0 +1,12 @@
+name = "Copper Wire"
+category = "Bass"
+tags = [
+    "mono",
+    "ring mod",
+    "metallic",
+    "experimental",
+    "modular",
+]
+description = "An experimental metal bass: a sine ring-modulated by a triangle a fifth up, which adds inharmonic bell tones above a clean sub. Play slow, low notes. Tone opens the filter, Metal brings in the ring modulator, Grit adds drive, Room adds an echo and a room."
+keys = true
+sequence = false

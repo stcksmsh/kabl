@@ -1,0 +1,13 @@
+name = "Pig Iron"
+category = "Lead"
+tags = [
+    "mono",
+    "distorted",
+    "bitcrushed",
+    "compressed",
+    "french touch",
+    "signature",
+]
+description = "A hard, crushed lead for French touch: a narrow pulse and a saw into 16 dB of drive, a bitcrusher and a compressor, retriggered on every note. Play short syncopated lines. Cutoff opens the filter, Grit pushes the drive, Crush mixes in the bitcrusher, Room adds a slapback and a tight room."
+keys = true
+sequence = false

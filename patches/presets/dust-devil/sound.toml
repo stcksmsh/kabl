@@ -1,0 +1,12 @@
+name = "Dust Devil"
+category = "Lead"
+tags = [
+    "mono",
+    "glide",
+    "whistle",
+    "trap",
+    "hip-hop",
+]
+description = "A trap whistle lead: a sine with a touch of triangle that slides from note to note, with a dotted echo and a vibrato. Play simple melodies. Tone opens the filter, Slide sets how long the slide takes, Space adds the echo and the room, Vibrato fades in a vibrato."
+keys = true
+sequence = false
