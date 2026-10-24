@@ -32,12 +32,28 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
         }
         ("osc.va", "fine") => "Fine tuning in cents (100 cents = one semitone).",
         ("osc.va", "unison") => {
-            "How many oscillators play each note (1–4). More sounds thicker; the level is \
+            "How many oscillators play each note (1–16). More sounds thicker; the level is \
              kept the same."
         }
         ("osc.va", "detune") => {
             "Spread of the unison oscillators, lowest to highest, in cents. Needs Unison 2 or \
              more."
+        }
+        ("osc.va", "curve") => {
+            "How the detune is shared out: 0 in even steps, 100 with the outer oscillators far \
+             more detuned than the inner ones, as in a classic supersaw."
+        }
+        ("osc.va", "width") => {
+            "Spreads the unison oscillators across the stereo field. Wire Out and Out R to hear \
+             it; 0 is mono."
+        }
+        ("osc.va", "blend") => {
+            "Centre against side oscillators: 0 only the centre one, 50 all equal, 100 only the \
+             sides. Needs Unison 3 or more."
+        }
+        ("osc.va", "restart") => {
+            "What a Sync edge does to a unison stack: 0 restarts every oscillator in step (hard \
+             sync), 1 restarts each at its own phase so the stack never lines up."
         }
         ("osc.fm", "base_hz") => {
             "Tuning: the frequency played at pitch 0 (C4 = 261.63 Hz), before Ratio and Fine."
