@@ -288,7 +288,7 @@ fn parquet_loop() -> Rack {
     let knob = macros(
         &mut r,
         ["Cutoff", "Crunch", "Space", "Glide"],
-        [0.50, 0.45, 0.25, 0.50],
+        [0.50, 0.45, 0.25, 0.80],
     );
     let clock = r.add("clock", &[("bpm", 122.0), ("swing", 25.0)]);
     // Poly with glide on: each new note slides from the nearest tone of the chord before it, so
@@ -840,11 +840,13 @@ fn bass_phrase() -> Vec<Hit> {
 }
 
 fn loop_phrase() -> Vec<Hit> {
-    // Em9 for two bars, then A7, then Em9 again: the loop is the filter, the chord just sits.
+    // Em9, then A7 an octave up, then Gmaj7 low, then Em9 again: the loop is the filter, and the
+    // voicings leap far enough (up to an octave) that the glide shows on every change.
     let bar = 16.0 * S16;
-    let mut v = chord(0.0, 2.0 * bar - 0.1, &[52, 59, 62, 66, 71]);
-    v.extend(chord(2.0 * bar, 2.0 * bar - 0.1, &[57, 61, 64, 67, 71]));
-    v.extend(chord(4.0 * bar, 1.5 * bar, &[52, 59, 62, 66, 71]));
+    let mut v = chord(0.0, 2.0 * bar - 0.1, &[40, 47, 50, 54, 59]);
+    v.extend(chord(2.0 * bar, 2.0 * bar - 0.1, &[57, 61, 64, 67, 73]));
+    v.extend(chord(4.0 * bar, 2.0 * bar - 0.1, &[43, 50, 54, 59, 62]));
+    v.extend(chord(6.0 * bar, 1.5 * bar, &[52, 59, 62, 66, 71]));
     v
 }
 
@@ -1198,7 +1200,7 @@ fn presets() -> Vec<Preset> {
             listen: "The filter closing on the beat under a held chord, and the chord tones sliding into the next chord; Glide down removes the slide.",
             build: parquet_loop,
             phrase: loop_phrase,
-            secs: 10.0,
+            secs: 15.0,
         },
         Preset {
             slug: "loading-dock",
