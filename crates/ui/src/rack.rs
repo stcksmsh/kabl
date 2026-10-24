@@ -79,7 +79,12 @@ pub fn primary_set(m: &ModuleState, info: &ModuleInfo) -> Vec<bool> {
 /// Whether param `name` of a module is drawn at all: a sequencer shows its module-wide params
 /// and the edit bank's; every other module everything.
 pub fn visible(info: &ModuleInfo, name: &str, edit_bank: usize) -> bool {
-    info.kind != "seq" || seq::bank_of(name).is_none_or(|(b, _)| b == edit_bank)
+    match info.kind {
+        "seq" => seq::bank_of(name).is_none_or(|(b, _)| b == edit_bank),
+        // The grid face edits every param itself.
+        "drum.grid" => false,
+        _ => true,
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -150,6 +155,8 @@ pub enum Decor {
     Operators(Rect),
     /// The cue buttons (two rows of four) and Cancel.
     Cues(Rect),
+    /// The drum grid's step editor.
+    Grid(Rect),
 }
 
 #[derive(Debug, Clone)]
@@ -233,6 +240,7 @@ impl Placed {
             Decor::Status(c) => Decor::Status(c + d),
             Decor::Banks(r) => Decor::Banks(r.translate(d)),
             Decor::Cues(r) => Decor::Cues(r.translate(d)),
+            Decor::Grid(r) => Decor::Grid(r.translate(d)),
             Decor::Operators(r) => Decor::Operators(r.translate(d)),
         };
     }
@@ -489,7 +497,8 @@ fn place_local(
         let two_rows = !column
             && ports > 3
             && !(ports == 4 && (fw >= 240.0 || info.kind == "osc.va"))
-            && fw < 100.0 * ports as f32;
+            && fw < 100.0 * ports as f32
+            && info.kind != "drum.grid";
         if fm6 {
             // Top left, above the operators.
             for (k, &port) in ins.iter().chain(&outs).enumerate() {
@@ -548,6 +557,12 @@ fn place_local(
                 decor = Decor::Cues(Rect::from_min_size(
                     pos2(16.0, 64.0),
                     vec2(fw - 32.0, 250.0),
+                ))
+            }
+            "drum.grid" => {
+                decor = Decor::Grid(Rect::from_min_size(
+                    pos2(14.0, DISPLAY_TOP + 6.0),
+                    vec2(fw - 28.0, crate::drum_grid::HEIGHT),
                 ))
             }
             "clock" => {

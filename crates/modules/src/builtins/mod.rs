@@ -15,6 +15,7 @@ mod crossfade;
 mod cues;
 mod delay;
 mod drive;
+mod drum_grid;
 mod drums;
 mod env_adsr;
 mod eq;
@@ -61,6 +62,11 @@ pub use crossfade::{Crossfade, Pan, CROSSFADE_INFO, PAN_INFO};
 pub use cues::{Cues, CUES, CUES_INFO};
 pub use delay::{Delay, DelayLock, DELAY_INFO};
 pub use drive::{drive_g, Drive, DRIVE_INFO};
+pub use drum_grid::{
+    cell_index, code_in, len_index, levels, make_code, pattern_index, with_code, DrumGrid, CHANCE,
+    DRUM_GRID_INFO, PATTERN_NAMES, ROWS as GRID_ROWS, ROW_NAMES as GRID_ROW_NAMES,
+    STEPS as GRID_STEPS, VELOCITY,
+};
 pub use drums::{
     clap_curve, hat_corner_hz, snare_decays, thump_curve, Clap, Hat, Kick, Snare, Tom, CLAP_INFO,
     HAT_INFO, KICK_INFO, SNARE_INFO, TOM_INFO,

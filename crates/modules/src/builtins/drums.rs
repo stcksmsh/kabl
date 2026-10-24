@@ -8,8 +8,9 @@
 //! voice reads `velocity` and `accent` on that sample only, so a sequencer's, arpeggiator's,
 //! clock's or `midi.drums`' gate works unchanged. Falling edges are ignored: a drum is a
 //! one-shot. Hit gain is `1 - vel_sens * (1 - velocity)` times `accent_db * accent` of boost. An
-//! unpatched `velocity` (a held 0) counts as full velocity, so a voice patched to a bare gate
-//! plays at full level.
+//! unpatched `velocity` (a held 0) takes the velocity from the gate's own level above the 0.5
+//! threshold (`2 * gate - 1`, how `drum.grid` fits eight rows in eight outputs), so a voice
+//! patched to a bare gate of 1 plays at full level.
 //!
 //! **Retrigger without a click.** A hit that starts while the voice still sounds keeps the
 //! output where it was: the last output sample becomes an offset that fades out over 1 ms, added
@@ -170,11 +171,12 @@ fn db(x: f32) -> f32 {
 
 /// Hit gain from the velocity and accent inputs at the trigger sample.
 #[inline]
-fn hit_gain(vel: Signal, accent: Signal, i: usize, sens: f32, accent_db: f32) -> f32 {
+fn hit_gain(vel: Signal, accent: Signal, gate: f32, i: usize, sens: f32, accent_db: f32) -> f32 {
     let v = vel.at(i);
-    // An unpatched velocity is a held 0: full velocity.
+    // An unpatched velocity is a held 0: the gate's own level above the 0.5 threshold sets the
+    // velocity (`drum.grid` encodes it there), so a plain gate of 1 is full velocity.
     let v = if vel.is_scalar() && v == 0.0 {
-        1.0
+        bound(2.0 * gate - 1.0, 0.0, 1.0)
     } else {
         bound(v, 0.0, 1.0)
     };
@@ -354,7 +356,7 @@ impl Thump {
                 self.pitch = 1.0;
                 self.amp = 1.0;
                 self.click = 1.0;
-                self.gain = hit_gain(vel, accent, i, sens, acc_db);
+                self.gain = hit_gain(vel, accent, gate.at(i), i, sens, acc_db);
                 self.active = true;
                 self.age = 0;
             }
@@ -574,7 +576,7 @@ impl Module for Snare {
                 self.declick.hit();
                 (self.ph1, self.ph2) = (0.0, 0.0);
                 (self.pitch, self.body, self.noise) = (1.0, 1.0, 1.0);
-                self.gain = hit_gain(vel, accent, i, sens, acc_db);
+                self.gain = hit_gain(vel, accent, gate.at(i), i, sens, acc_db);
                 self.active = true;
                 self.age = 0;
             }
@@ -750,7 +752,7 @@ impl Module for Clap {
             if self.trig.rising(gate.at(i)) {
                 self.declick.hit();
                 (self.env, self.stage, self.count) = (1.0, 0, 0);
-                self.gain = hit_gain(vel, accent, i, sens, acc_db);
+                self.gain = hit_gain(vel, accent, gate.at(i), i, sens, acc_db);
                 self.active = true;
                 self.age = 0;
             }
@@ -955,7 +957,14 @@ impl Module for Hat {
                 self.env = 1.0;
                 self.k = if c { kc } else { ko };
                 self.was_open = !c;
-                self.gain = hit_gain(vel, accent, i, sens, acc_db);
+                self.gain = hit_gain(
+                    vel,
+                    accent,
+                    if c { closed.at(i) } else { open.at(i) },
+                    i,
+                    sens,
+                    acc_db,
+                );
                 self.active = true;
                 self.age = 0;
             }

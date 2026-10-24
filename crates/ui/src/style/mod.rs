@@ -433,7 +433,7 @@ impl Style {
             }
             "env.adsr" | "lfo" | "macro" => &self.sections.modulation,
             "vca" | "mixer" | "gain" | "out" => &self.sections.amp,
-            "midi.in" | "midi.note" | "clock" | "seq" | "cues" | "clock.div" => {
+            "midi.in" | "midi.note" | "clock" | "seq" | "drum.grid" | "cues" | "clock.div" => {
                 &self.sections.timing
             }
             _ => &self.sections.fx,

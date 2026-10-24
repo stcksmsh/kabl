@@ -1,0 +1,111 @@
+{
+ "plugin_sha256": "e92651d74e690ce72aa725cdf326df866656521ce04f6f375c02ccd0b236e4ab",
+ "cue_buttons": [
+  [
+   40,
+   0.1
+  ],
+  [
+   41,
+   3.2
+  ],
+  [
+   42,
+   10.5
+  ],
+  [
+   43,
+   12.5
+  ]
+ ],
+ "states_identical_across_save_quit_reopen": true,
+ "cue_grid_targets_in_saved_project": {
+  "cue1.seq.2": 3.0,
+  "cue2.seq.2": 0.0,
+  "cue3.seq.2": 1.0,
+  "cue4.seq.2": 2.0
+ },
+ "cues_initial": {
+  "frames": 768000,
+  "finite": true,
+  "peak": 0.12460966408252716,
+  "rms": 0.01666649803519249,
+  "per_second_rms": [
+   0.0146,
+   0.0008,
+   0.0008,
+   0.0143,
+   0.021,
+   0.0209,
+   0.0209,
+   0.0209,
+   0.0209,
+   0.0209,
+   0.0209,
+   0.0208,
+   0.0147,
+   0.0008,
+   0.0008,
+   0.0179
+  ]
+ },
+ "cues_restart": {
+  "frames": 768000,
+  "finite": true,
+  "peak": 0.12460966408252716,
+  "rms": 0.01666649803519249,
+  "per_second_rms": [
+   0.0146,
+   0.0008,
+   0.0008,
+   0.0143,
+   0.021,
+   0.0209,
+   0.0209,
+   0.0209,
+   0.0209,
+   0.0209,
+   0.0209,
+   0.0208,
+   0.0147,
+   0.0008,
+   0.0008,
+   0.0179
+  ]
+ },
+ "initial_vs_restart": {
+  "relative_difference_rms": 0.0,
+  "envelope_correlation": 1.0
+ },
+ "cues_vs_nocues": {
+  "relative_difference_rms": 0.8328,
+  "envelope_correlation": -0.17831
+ },
+ "nocues": {
+  "frames": 768000,
+  "finite": true,
+  "peak": 0.130154550075531,
+  "rms": 0.021326692774891853,
+  "per_second_rms": [
+   0.0232,
+   0.0222,
+   0.0216,
+   0.0212,
+   0.0209,
+   0.0209,
+   0.0209,
+   0.0208,
+   0.0209,
+   0.0209,
+   0.0208,
+   0.0209,
+   0.0209,
+   0.0208,
+   0.0209,
+   0.0233
+  ]
+ },
+ "groove_step_up_s": 3.871,
+ "break_step_down_s": 13.668,
+ "bars_between": 5.06
+}

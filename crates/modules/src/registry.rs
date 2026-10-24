@@ -32,8 +32,8 @@ use crate::builtins::{
     FILTER_LADDER_INFO, MACRO_INFO, NOISE_INFO,
 };
 use crate::builtins::{
-    Clap, Hat, Kick, MidiNote, Snare, Tom, CLAP_INFO, HAT_INFO, KICK_INFO, MIDI_NOTE_INFO,
-    SNARE_INFO, TOM_INFO,
+    Clap, DrumGrid, Hat, Kick, MidiNote, Snare, Tom, CLAP_INFO, DRUM_GRID_INFO, HAT_INFO,
+    KICK_INFO, MIDI_NOTE_INFO, SNARE_INFO, TOM_INFO,
 };
 use crate::builtins::{
     Clock, ClockDiv, Delay, Out, Reverb, Seq, CLOCK_DIV_INFO, CLOCK_INFO, DELAY_INFO, OUT_INFO,
@@ -100,6 +100,7 @@ pub const KNOWN_KINDS: &[&str] = &[
     "drum.hat",
     "drum.tom",
     "midi.note",
+    "drum.grid",
 ];
 
 /// Builds a fresh instance of `kind`, or `None` if `kind` isn't a known built-in.
@@ -155,13 +156,14 @@ pub fn create(kind: &str) -> Option<Box<dyn Module>> {
         "drum.hat" => Box::new(Hat::new()),
         "drum.tom" => Box::new(Tom::new()),
         "midi.note" => Box::new(MidiNote::new()),
+        "drum.grid" => Box::new(DrumGrid::new()),
         _ => return None,
     })
 }
 
 /// `ModuleInfo` for every known kind, in the same order as `KNOWN_KINDS` — what a catalog UI
 /// (not built) would enumerate.
-static ALL_INFOS: [&ModuleInfo; 50] = [
+static ALL_INFOS: [&ModuleInfo; 51] = [
     &OSC_VA_INFO,
     &FILTER_SVF_INFO,
     &ENV_ADSR_INFO,
@@ -212,6 +214,7 @@ static ALL_INFOS: [&ModuleInfo; 50] = [
     &HAT_INFO,
     &TOM_INFO,
     &MIDI_NOTE_INFO,
+    &DRUM_GRID_INFO,
 ];
 
 pub fn all_infos() -> &'static [&'static ModuleInfo] {

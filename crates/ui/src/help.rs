@@ -271,6 +271,13 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
              span octaves."
         }
         ("clock.div", "div") => "Passes every Nth tick: 2 halves the speed, 4 quarters it.",
+        ("drum.grid", "pattern") => "The pattern that plays, A to D (the face tabs set it).",
+        ("drum.grid", s) if s.starts_with("len") => {
+            "How many steps this row plays before it loops (1 to 16): rows of different lengths drift against each other."
+        }
+        ("drum.grid", _) => {
+            "Four steps of one row of a pattern, packed into one number: edit them on the face grid."
+        }
         ("seq", s) if s.len() == 2 && s.starts_with('p') => {
             "Pitch of this step in semitones from the reference note."
         }
@@ -529,6 +536,14 @@ pub fn port_help(kind: &str, port: &str) -> Option<&'static str> {
         ("arp", "velocity") => "How hard the key for this note was pressed, 0 to 1.",
         ("seq", "clock") => "Each rising edge plays the next step.",
         ("seq", "reset") => "Jumps back to the first step.",
+        ("drum.grid", "clock") => "Each rising edge plays the next step of every row.",
+        ("drum.grid", "reset") => "The next clock edge plays the first step again.",
+        ("drum.grid", "pattern") => {
+            "Adds to the pattern chosen on the face: 0 is A, 1/3 is B, 2/3 is C, 1 is D."
+        }
+        ("drum.grid", "kick" | "snare" | "clap" | "chat" | "ohat" | "tom" | "perc1" | "perc2") => {
+            "A gate for this row. Its level carries the step's velocity: patch it to a drum's gate."
+        }
         ("quantizer", "in") => "The pitch to snap to the scale.",
         ("quantizer", "out") => "The pitch, moved onto the nearest note of the scale.",
         ("quantizer", "trig") => {

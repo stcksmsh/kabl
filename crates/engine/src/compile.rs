@@ -63,8 +63,8 @@ use std::fmt;
 use kabl_cables::{Carry, Node as CableNode, Settings as CableSettings};
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
 use kabl_modules::builtins::{
-    Arp, AudioIn, Change, Clock, Delay, DelayLock, KeySettings, Lfo, LfoSync, MidiIn, MidiNote,
-    Noise, OscWt, Random, Seq, Transport,
+    Arp, AudioIn, Change, Clock, Delay, DelayLock, DrumGrid, KeySettings, Lfo, LfoSync, MidiIn,
+    MidiNote, Noise, OscWt, Random, Seq, Transport,
 };
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::ModuleView;
@@ -1494,6 +1494,9 @@ fn compile_inner(
             if let Some(seq) = instance.as_any_mut().downcast_mut::<Seq>() {
                 seq.seed(id);
             }
+            if let Some(g) = instance.as_any_mut().downcast_mut::<DrumGrid>() {
+                g.seed(id);
+            }
             if let Some(arp) = instance.as_any_mut().downcast_mut::<Arp>() {
                 arp.seed(id);
             }
@@ -1886,6 +1889,8 @@ impl CompiledPatch {
         for (m, &(id, _)) in self.modules.iter().zip(&self.module_origin) {
             if let Some(seq) = m.as_any().downcast_ref::<Seq>() {
                 f(id, seq.step(), seq.bank(), seq.armed());
+            } else if let Some(grid) = m.as_any().downcast_ref::<DrumGrid>() {
+                f(id, grid.step(), grid.pattern(), grid.armed());
             }
         }
     }
@@ -1913,7 +1918,7 @@ impl CompiledPatch {
     pub fn inherit_armed_seqs(&mut self, previous: &Self) {
         previous.seqs(|id, _, _, armed| {
             if let Some(bank) = armed {
-                self.with_seq(id, |s| s.arm(bank, 0));
+                self.arm_bank(id, bank, 0);
             }
         });
     }
@@ -1925,6 +1930,40 @@ impl CompiledPatch {
             .and_then(|m| m.as_any_mut().downcast_mut::<Seq>())
         {
             f(s);
+        }
+    }
+
+    /// Audio thread: arms bank `bank` of the `seq`, or pattern `bank` of the `drum.grid`,
+    /// `id`, from sample `from` of the next block. No allocation.
+    pub fn arm_bank(&mut self, id: ModuleId, bank: usize, from: usize) {
+        if let Some(m) = self.module_mut(id, None) {
+            if let Some(s) = m.as_any_mut().downcast_mut::<Seq>() {
+                s.arm(bank, from);
+            } else if let Some(g) = m.as_any_mut().downcast_mut::<DrumGrid>() {
+                g.arm(bank, from);
+            }
+        }
+    }
+
+    /// Audio thread: drops the arm of the `seq` or `drum.grid` `id`. No allocation.
+    pub fn cancel_bank(&mut self, id: ModuleId) {
+        if let Some(m) = self.module_mut(id, None) {
+            if let Some(s) = m.as_any_mut().downcast_mut::<Seq>() {
+                s.cancel();
+            } else if let Some(g) = m.as_any_mut().downcast_mut::<DrumGrid>() {
+                g.cancel();
+            }
+        }
+    }
+
+    /// Audio thread: drops every arm. No allocation.
+    pub fn cancel_banks(&mut self) {
+        for m in &mut self.modules {
+            if let Some(s) = m.as_any_mut().downcast_mut::<Seq>() {
+                s.cancel();
+            } else if let Some(g) = m.as_any_mut().downcast_mut::<DrumGrid>() {
+                g.cancel();
+            }
         }
     }
 
@@ -2761,6 +2800,8 @@ fn arm_launches(
         };
         if let Some(seq) = modules[si].as_any_mut().downcast_mut::<Seq>() {
             seq.arm(l.bank as usize, offset as usize);
+        } else if let Some(grid) = modules[si].as_any_mut().downcast_mut::<DrumGrid>() {
+            grid.arm(l.bank as usize, offset as usize);
         }
     }
 }
