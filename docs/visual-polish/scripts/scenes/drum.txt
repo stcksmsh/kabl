@@ -1,0 +1,11 @@
+# The drum grid face (four-floor, module 2), zoomed in.
+sleep 2
+click routing
+sleep 1
+wheel grid:2 2 ctrl
+sleep 1
+goto grid:2 560 320
+sleep 1
+at 1100 640
+sleep 1
+shot drum-grid
