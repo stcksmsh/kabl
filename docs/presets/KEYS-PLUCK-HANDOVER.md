@@ -1,4 +1,6 @@
-# Keys / Pluck presets: handover
+# Keys / Pluck presets: handover (PR #46: group 1 only)
+
+Group 2 work lives on `claude/presets-keys-pluck-2`.
 
 Branch `claude/presets-keys-pluck` (PR #46, draft; never merge). Report to the session "Kabl overseer". Stop when done.
 
@@ -8,9 +10,8 @@ Branch `claude/presets-keys-pluck` (PR #46, draft; never merge). Report to the s
 3. Fix an engine or renderer defect only if one exists. Do not continue to group 2 presets.
 
 ## Done
-- `a1a8d98` WIP commit: group 2 start (15 preset definitions in `crates/ui/examples/presets_keys_pluck/group2.rs`, 14 new patch dirs, library entries), Parquet Loop legato and glide-demo clips, `clips.py` additions.
+- Group 2 start moved to `claude/presets-keys-pluck-2`.
 - Glide diagnosis: no engine or renderer defect (below). Added `docs/presets/scripts/host_glide.py` and evidence in `docs/presets/evidence/host-glide/`.
-- `cargo test -p kabl-ui --test library`: 24 passed with the WIP.
 
 ## Glide finding
 - Cause: none found. The stored patch glides in the offline renderer and in real REAPER (CLAP plugin on `kabl_agents`).
@@ -21,8 +22,7 @@ Branch `claude/presets-keys-pluck` (PR #46, draft; never merge). Report to the s
 
 ## Remaining (not started, in order)
 1. Ask Kosta how he tested: which build, which preset copy, whether he moved the Glide knob down, and whether he played overlapping chords. If still silent for him, repeat with his exact MIDI.
-2. Group 2: render clips (`docs/presets/scripts/clips_keys_pluck.py`), listen, host check with `host.py`, tune. None done. Patches exist, sound unreviewed.
-3. Next command: `target/release/examples/presets_keys_pluck write <dir>` after `cargo build --release --examples -p kabl-ui`.
+2. Group 2: see branch `claude/presets-keys-pluck-2`.
 
 ## Facts that cost effort
 - `host_glide.py` needs `scratch/presets-phrases.json` with a `parquet-loop` entry (`secs`, `hits` as `[t, note, vel]`, `cues`). `GLIDE_M4=<0..1>` overrides macro m4. Needs a release `kabl-clap` build.

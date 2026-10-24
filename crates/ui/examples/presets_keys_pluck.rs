@@ -188,8 +188,6 @@ struct Post<'a> {
     /// Chorus params, and the share of m4 that opens its mix (None: the mix is as stored).
     chorus: Option<(&'a [(&'static str, f32)], Option<f32>)>,
     comp: Option<&'a [(&'static str, f32)]>,
-    /// A module whose `out` feeds the compressor's sidechain, and an m4 route into one of its knobs.
-    duck: Option<(ModuleId, Option<(&'static str, f32)>)>,
     echo: &'a [(&'static str, f32)],
     echo_max: f32,
     clock: Option<ModuleId>,
@@ -256,12 +254,6 @@ fn post(r: &mut Rack, knob: ModuleId, src: ModuleId, p: &Post) -> Stages {
     if let Some(cp) = p.comp {
         let id = r.add("compressor", cp);
         stage(r, &mut last, &mut first, id);
-        if let Some((src, m4)) = p.duck {
-            r.wire(src, "out", id, "sc");
-            if let Some((param, amt)) = m4 {
-                r.route(knob, "m4", id, param, amt);
-            }
-        }
     }
     if first {
         // No stereo stage: a plain width-less chorus-free path still needs left and right.
