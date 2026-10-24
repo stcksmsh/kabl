@@ -395,6 +395,17 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
             "Moves every formant up or down in semitones: a smaller or larger mouth."
         }
         ("filter.formant", "q") => "Sharpness of the vowel peaks: higher is more pronounced.",
+        ("vocoder", "bands") => "How many slices the voice is split into: more is clearer speech, fewer is more robotic.",
+        ("vocoder", "spacing") => "Left: more bands where speech lives. Right: bands spread evenly, more at the top.",
+        ("vocoder", "low_hz") => "The lowest band.",
+        ("vocoder", "high_hz") => "The highest band.",
+        ("vocoder", "shift_st") => "Moves the synth's side of the bands against the voice's: up is a smaller mouth, down a larger one.",
+        ("vocoder", "attack_ms") => "How fast a band opens when the voice gets louder there.",
+        ("vocoder", "release_ms") => "How slowly a band closes. Short is crisp, long is smeared.",
+        ("vocoder", "hf") => "Adds hiss on the s, t and f sounds of the voice so consonants survive. Zero is clean: no hiss at all. Higher is crisper, then hissy.",
+        ("vocoder", "drive_db") => "Gain of the voice into the bands. A quiet voice needs more; too much makes the result loud.",
+        ("vocoder", "mix") => "The synth alone (0) to the vocoded sound alone (1).",
+        ("audio.in", "gain_db") => "Gain of the incoming sound.",
         ("drum.kick" | "drum.tom", "tune_hz") => {
             "The pitch the drum settles on, in Hz. Lower is deeper and longer to hear."
         }
@@ -491,6 +502,13 @@ pub fn port_help(kind: &str, port: &str) -> Option<&'static str> {
         ("filter.comb", "in") => "The sound to ring: a click, a noise burst or a held tone.",
         ("filter.comb", "pitch") => "Pitch in semitones from the Frequency setting.",
         ("filter.formant", "in") => "A buzzy or noisy sound to give a vowel to.",
+        ("vocoder", "in_l" | "in_r") => {
+            "The synth to make speak (carrier): a saw or supersaw chord works best."
+        }
+        ("vocoder", "mod") => "The voice (modulator): an Audio in, or a patched robot phrase.",
+        ("audio.in", "left" | "right") => {
+            "Sound from outside: the input device, or the host's audio input."
+        }
         ("filter.svf", "notch") => "Notch: removes a band around the cutoff and keeps the rest.",
         ("env.adsr", "gate") => "Starts the envelope while high, releases it when low.",
         ("lfo" | "delay", "clock") => "A clock for Sync to follow.",

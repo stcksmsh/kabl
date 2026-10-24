@@ -426,8 +426,8 @@ impl Style {
 
     pub fn section_of(&self, kind: &str) -> &Section {
         match kind {
-            "osc.va" | "osc.wt" | "osc.fm" | "osc.fm6" | "noise" | "drum.kick" | "drum.snare"
-            | "drum.clap" | "drum.hat" | "drum.tom" => &self.sections.osc,
+            "osc.va" | "osc.wt" | "osc.fm" | "osc.fm6" | "noise" | "audio.in" | "drum.kick"
+            | "drum.snare" | "drum.clap" | "drum.hat" | "drum.tom" => &self.sections.osc,
             "filter.svf" | "filter.ladder" | "filter.comb" | "filter.formant" => {
                 &self.sections.filter
             }

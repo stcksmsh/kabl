@@ -21,6 +21,7 @@ use crate::builtins::{
     ARP_INFO, ATTENUVERTER_INFO, COMPARATOR_INFO, CROSSFADE_INFO, LOGIC_INFO, PAN_INFO,
     QUANTIZER_INFO, RANDOM_INFO, SAMPLE_HOLD_INFO, SLEW_INFO,
 };
+use crate::builtins::{AudioIn, Vocoder, AUDIO_IN_INFO, VOCODER_INFO};
 use crate::builtins::{
     Bitcrusher, Compressor, Eq, FilterComb, FilterFormant, Flanger, Limiter, Phaser,
     BITCRUSHER_INFO, COMPRESSOR_INFO, EQ_INFO, FILTER_COMB_INFO, FILTER_FORMANT_INFO, FLANGER_INFO,
@@ -91,6 +92,8 @@ pub const KNOWN_KINDS: &[&str] = &[
     "bitcrusher",
     "filter.comb",
     "filter.formant",
+    "vocoder",
+    "audio.in",
     "drum.kick",
     "drum.snare",
     "drum.clap",
@@ -145,6 +148,8 @@ pub fn create(kind: &str) -> Option<Box<dyn Module>> {
         "bitcrusher" => Box::new(Bitcrusher::new()),
         "filter.comb" => Box::new(FilterComb::new()),
         "filter.formant" => Box::new(FilterFormant::new()),
+        "vocoder" => Box::new(Vocoder::new()),
+        "audio.in" => Box::new(AudioIn::new()),
         "drum.kick" => Box::new(Kick::new()),
         "drum.snare" => Box::new(Snare::new()),
         "drum.clap" => Box::new(Clap::new()),
@@ -158,7 +163,7 @@ pub fn create(kind: &str) -> Option<Box<dyn Module>> {
 
 /// `ModuleInfo` for every known kind, in the same order as `KNOWN_KINDS` — what a catalog UI
 /// (not built) would enumerate.
-static ALL_INFOS: [&ModuleInfo; 49] = [
+static ALL_INFOS: [&ModuleInfo; 51] = [
     &OSC_VA_INFO,
     &FILTER_SVF_INFO,
     &ENV_ADSR_INFO,
@@ -201,6 +206,8 @@ static ALL_INFOS: [&ModuleInfo; 49] = [
     &BITCRUSHER_INFO,
     &FILTER_COMB_INFO,
     &FILTER_FORMANT_INFO,
+    &VOCODER_INFO,
+    &AUDIO_IN_INFO,
     &KICK_INFO,
     &SNARE_INFO,
     &CLAP_INFO,

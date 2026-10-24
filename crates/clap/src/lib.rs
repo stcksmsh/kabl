@@ -710,6 +710,9 @@ pub struct Instrument {
     pending: Option<Owned<Session>>,
     session: Option<Owned<Session>>,
     timeline: Timeline,
+    /// The host's audio input (the optional second input port), queued for `audio.in`.
+    input_tx: rtrb::Producer<[f32; 2]>,
+    input_rx: rtrb::Consumer<[f32; 2]>,
     rate: f32,
     worker: Option<JoinHandle<()>>,
     editor_state: Arc<EguiState>,
@@ -873,6 +876,7 @@ impl Default for Instrument {
                 }
             })
             .expect("plugin control worker");
+        let (input_tx, input_rx) = rtrb::RingBuffer::new(16384);
         Self {
             shared,
             loads,
@@ -883,6 +887,8 @@ impl Default for Instrument {
             pending: None,
             session: None,
             timeline: Timeline::new(),
+            input_tx,
+            input_rx,
             rate: 48000.0,
             worker: Some(worker),
             editor_state: EguiState::from_size(LogicalSize::new(1180.0, 680.0), 1.0),
@@ -990,8 +996,15 @@ impl Instrument {
         let schedule = &mut self.schedule;
         let bank = &s.bank;
         let rate = self.rate;
+        let input = &mut self.input_rx;
         self.timeline
             .render(&mut s.engine, left, right, |engine, start| {
+                let (mut il, mut ir) = (
+                    [0.0; kabl_engine::graph::BLOCK],
+                    [0.0; kabl_engine::graph::BLOCK],
+                );
+                kabl_standalone::input::take_block(input, &mut il, &mut ir);
+                engine.set_audio_in(&il, &ir);
                 schedule.block(engine, start, bank, rate);
             });
         self.shared
@@ -1034,6 +1047,7 @@ impl Plugin for Instrument {
     const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[AudioIOLayout {
         main_input_channels: None,
         main_output_channels: NonZeroU32::new(2),
+        aux_input_ports: &[new_nonzero_u32(2)],
         ..AudioIOLayout::const_default()
     }];
     const MIDI_INPUT: MidiConfig = MidiConfig::MidiCCs;
@@ -1136,11 +1150,12 @@ impl Plugin for Instrument {
             }
         }
         self.shared.midi_overflow.store(false, Ordering::Relaxed);
+        while self.input_rx.pop().is_ok() {}
     }
     fn process(
         &mut self,
         buffer: &mut Buffer,
-        _aux: &mut AuxiliaryBuffers,
+        aux: &mut AuxiliaryBuffers,
         context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
         self.accept_loads();
@@ -1240,10 +1255,38 @@ impl Plugin for Instrument {
         // Only bounded parameter events reach the wrapper. No native-note dialect advertised.
         while context.next_event().is_some() {}
         let dropped_before = self.schedule.dropped;
+        // The host's input (a sidechain pin) for `audio.in`: a host that connects nothing
+        // delivers silence, and one without the port delivers no buffer at all.
+        if let Some(input) = aux.inputs.first_mut() {
+            let input = input.as_slice();
+            if let Some(l) = input.first() {
+                let r = input.get(1).unwrap_or(l);
+                for (&a, &b) in l.iter().zip(r.iter()) {
+                    let _ = self.input_tx.push([a, b]);
+                }
+            }
+        }
         let channels = buffer.as_slice();
         if channels.len() >= 2 {
             let (left, right) = channels.split_at_mut(1);
             self.render(left[0], right[0]);
+        }
+        // Before the input port existed, anything a host mixed onto the track (audio items,
+        // sends) passed through an instrument that had no inputs. Keep that for every patch that
+        // does not take the input itself (`audio.in`), so existing projects sound the same.
+        if !self
+            .session
+            .as_ref()
+            .is_some_and(|s| s.engine.uses_audio_in())
+        {
+            if let Some(input) = aux.inputs.first_mut() {
+                let input = input.as_slice();
+                for (out, inp) in buffer.as_slice().iter_mut().zip(input.iter()) {
+                    for (o, i) in out.iter_mut().zip(inp.iter()) {
+                        *o += *i;
+                    }
+                }
+            }
         }
         self.shared
             .event_drops
