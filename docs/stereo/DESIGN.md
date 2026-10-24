@@ -234,8 +234,8 @@ Yes, target met by construction, and proven by the existing tests:
 - `crates/clap/src/lib.rs` already declares `main_output_channels: 2` and one stereo aux input (`aux_input_ports: [2]`),
   and passes `[f32; 2]` frames to `audio.in` through `input_rx`. No port change in the plugin.
 - `audio.in` has one width-2 `out` and keeps its "mono source plays on both" behaviour (module code unchanged).
-  Old patches are migrated on load. Nothing about untrusted-input clamping changes. The plugin loads state from the
-  host, so a DAW project saved with a v7 patch embedded loads through the same migration (test in step 5).
+  Old patches are migrated on load. Nothing about untrusted-input clamping changes. The plugin embeds `PatchState` in
+  the host project (`SoundState`), so it needs `migrate_state` at `decode` and state version 5 (step 2b, see "Step 1 results").
 - Needs a REAPER render check for one stereo patch (spec in the standing REAPER recipe), to run silent per CLAUDE.md.
 
 ## 7. Build plan
@@ -279,6 +279,68 @@ Splitting across agents and avoiding collisions:
 | C12 | Merge of two cables that carry gate/probability/steps | keep as `split`/`join` legs (always bit-identical); or merge when equal | legs; revisit after the seed check in step 1 |
 | C13 | Undo across the migration | barrier (history before it is read-only); or no history kept for migrated patches | barrier if `PatchLog` allows, else snapshot |
 
+## Step 1 results (engine channels, built)
+
+Branch `claude/stereo-engine`. Measured, not estimated.
+
+**What step 1 is.** `compile.rs` gains width per source port, one instance per channel for a module that follows
+a stereo signal, `Step::Average`, per-channel buffers, delay slots, voice sums and state carry. No `PortInfo`, patch
+format or module change. Step 1 spells a stereo cable with two aliases that the compiler derives from port names:
+`out_st` over an adjacent `(left, right)` output pair, `in_st` over `(in_l, in_r)` or `(left, right)` inputs. Step 2a deletes
+the aliases when `PortInfo.width` arrives. Differences from the design above, all small:
+
+- A module with a stereo pair in either direction is native and never doubled. A stereo cable into any plain port of it
+  (`sc`, `mod`, `in` of `delay` and `pan`) is averaged.
+- A doubled module publishes only its audio outputs for channel 1. A CV output of a doubled module (none exists in the
+  registry today with an audio input) would carry channel 0.
+- A mono cable into the pair alias is a broadcast of one buffer. Averaging `a == b` is the buffer itself, no step.
+- `module_origin` keeps its shape; a parallel `module_channel` carries the channel. State carry matches
+  `(origin, channel)`, and a new channel 1 takes channel 0's state. Probe and face taps see channel 0 only.
+
+**Tests.** `tests/stereo.rs`: stereo chain equals two mono chains sample for sample (with state), mono broadcast, stereo
+average, centre pan collapses to mono, state carry mono to stereo, feedback through a stereo cable, voices summed per
+channel. Whole workspace `cargo test`, strict clippy and `cargo fmt --check` pass; `legacy_patches`, `golden_renders` and
+`factory_levels_hold_the_target` pass with the hash files untouched.
+
+**CPU** (`bench_patches`, i7-13700H, 48 kHz, 64-sample blocks, `taskset -c 2`, all voices sounding, host load average 2.7;
+a first run at load 26 gave about 2.5 times these numbers and is discarded). `+st` puts a `pan` before every filter, so
+every voice module after the first filter runs twice, and each `in_l`/`in_r` pair fed by one source is one stereo cable.
+That is the design's upper-bound case (everything after the oscillator mixer doubles):
+
+| patch | voices | mono us (% of 1333 us) | +st us (%) | extra |
+|---|---|---|---|---|
+| palette/pad | 8 | 67.1 (5.0%) | 95.8 (7.2%) | +43% |
+| palette/pad | 16 | 122.5 (9.2%) | 181.3 (13.6%) | +48% |
+| palette/strings | 8 | 65.7 (4.9%) | 91.6 (6.9%) | +39% |
+| palette/strings | 16 | 120.1 (9.0%) | 173.0 (13.0%) | +44% |
+| crowded | 8 | 32.8 (2.5%) | 47.5 (3.6%) | +45% |
+| crowded | 16 | 64.4 (4.8%) | 93.5 (7.0%) | +45% |
+
+The +40% to +80% estimate held at its low end; worst case here is 13.6% of the audio budget at 16 voices on a desktop
+core. The Pi 4 is still unmeasured. A mono patch pays nothing (no stereo cable, no extra step). The reproduction is
+`cargo build --release -p kabl-engine --example bench_patches` and `taskset -c 2 target/release/examples/bench_patches PATCH...`;
+`stereo_demo` renders the same path with an auto-pan to WAV.
+
+**Items step 2b depends on.**
+
+- *Cable seed.* A functional cable's gate and probability seed is `kabl_cables::seed_of(cable id)`. Two legacy cables have
+  two seeds. One merged stereo cable gives both channels one seed, so merging two functional cables changes the sound.
+  Confirms C12: legs through `split`/`join`, never a merge. A stereo functional cable gets two nodes on one cable id, so both
+  channels gate alike and the runtime value writers reach both (`cable_steps` already holds several steps per cable).
+- *Undo barrier.* `PatchLog` (`crates/core/src/log.rs`) has `entries`, `cursor` and per-entry inverses, no barrier. Undoing
+  the migration ops would restore cables to ports that no longer exist. Needs a small `floor` index (about 15 lines):
+  `can_undo` is `cursor > floor`, `undo` stops there, and migration sets `floor` after appending. Not in step 1.
+- *checkpoint.json.* `format::save` writes it, `format::load` never reads it ("deferred", `format.rs:45`). A stale one is
+  dead data, not a load bug. The rewrite script regenerates it through `save`. `ui/library.rs` copies the folder files
+  unchanged.
+- *Plugin embedded state.* **Plan change.** `crates/clap` saves `SoundState { version 1..=4, patch: PatchState, ... }` as JSON in the
+  host project. A DAW project holds raw `PatchState` with half-port names and never goes through `format::load`. The
+  migration must therefore be a pure function over `PatchState` (`migrate_state`), with the log migration built on it
+  (diff of before and after becomes the appended ops), and `SoundState` needs `version` 5 (older builds refuse it, as for
+  composites and tables) plus `SoundState::decode` calling `migrate_state` for versions below 5. Step 2b grows by about 100 lines
+  and one test with a version-4 state blob. REAPER projects saved today stay loadable.
+- *Composites.* Not touched by step 1; the plan in section 4 stands.
+
 ## Risks and unknowns
 
 - The 20 ns/sample figure for filters and the +40% to +80% range are estimates; step 1 measures them. If the measured cost
@@ -286,9 +348,9 @@ Splitting across agents and avoiding collisions:
   skipping the second instance for a module whose two inputs are identical buffers (a broadcast mono feeding a Follow module stays one instance).
 - `compile.rs` is large and shared; a mid-air collision costs more than the feature code. Land step 1 fast.
 - Migration is the new main risk. Mitigations: pure function, one fixture per edge case, the 67 shipped files as free fixtures,
-  hashes unchanged. Unknowns to settle in step 1/2: cable seed derivation (decides whether merging two functional cables is
-  ever safe; the rule is conservative until checked), `PatchLog` undo barrier, `checkpoint.json` fate, composite exposed ports,
-  and whether the plugin embeds patch state in the host project (if it does, DAW projects need the same migration).
+  hashes unchanged. Settled by step 1 (see "Step 1 results"): cable seed (no merging of functional cables), `PatchLog` has no
+  undo barrier (add one), `checkpoint.json` is never read, the plugin embeds `PatchState` (migrate at `SoundState::decode`,
+  state version 5). Still open: composite exposed ports.
 - Users with their own v7 patches: loading works through the migration, but they get a v8 file on first save and a v7
   build cannot open it. Say so in the release notes.
 - `split`/`join` modules appear in migrated patches next to modules that did not have them (rules 2, 5, 8). They are
