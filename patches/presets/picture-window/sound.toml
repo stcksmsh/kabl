@@ -1,0 +1,12 @@
+name = "Picture Window"
+category = "Pad"
+tags = [
+    "poly",
+    "supersaw",
+    "bright",
+    "wide",
+    "pop",
+]
+description = "A clean, bright pad for pop: a seven-voice saw stack with a light chorus and a medium room. Play simple triads. Cutoff opens the filter, Spread widens the detune of the stack, Sparkle adds an octave of airy saw above, Space adds the echo and the room."
+keys = true
+sequence = false

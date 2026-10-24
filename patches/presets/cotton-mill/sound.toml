@@ -1,0 +1,12 @@
+name = "Cotton Mill"
+category = "Pad"
+tags = [
+    "poly",
+    "analog",
+    "pulse width",
+    "chorus",
+    "pop",
+]
+description = "An analog-style pad for pop: a pulse with moving width and two detuned saws, soft chorus and a mid-sized room. Play open chords. Cutoff opens the filter, Motion sets how far the pulse width moves, Chorus brings in the chorus, Space adds the echo and the room."
+keys = true
+sequence = false
