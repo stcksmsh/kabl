@@ -71,7 +71,7 @@ Effects are part of the sound. A preset ships with its echo and room already on,
 - **Default space is moderate and genre-appropriate, not low everywhere.** Ambient and cinematic, synthwave and pop pads and leads sit high (Space 0.5 to 0.7, long rooms, long echoes). Pop keys and plucks sit in the middle. Hip-hop, bass and signature presets sit low (0.2 to 0.35: slapbacks, tight rooms, tempo-synced echoes used as an effect, not a wash).
 - **Character effects** (chorus, phaser, bitcrusher) that define a sound sit at their working mix on the module, or, when they should be dialled out, are driven by a macro that names them (`Drive`, `Chorus`, `Crush`) and are 0 on the module.
 - Never bake an effect in so deep that no macro can take it out.
-- Every preset ends in a `limiter` (ceiling -1.5 dB, 150 ms release) so no macro setting can clip the output.
+- No preset has a `limiter`. Headroom comes from the patch gain: peak at or under -1 dBFS on the clip phrases, the chord level test, each macro alone at 1 and all macros at 1 (`factory_levels_hold_the_target`, `audio_defects.py` PEAK).
 
 ## The signature subset
 
@@ -132,7 +132,7 @@ Patch format and schema are unchanged. A preset only uses modules that exist on 
 3. One `macro` module, its macros named for what they do (four typical, more discouraged), on CC 20 and up, pinned in order, each audibly doing its job from 0 to 1 (`every_preset_keeps_to_the_brief` checks the names, CCs, pins, flags, category, tags and that the description names every macro).
 4. The space macro at 0 is dry; its stored value is the designed wet amount for its genre.
 5. A category from the vocabulary; a name that follows the rules; three to seven tags including a genre; a description with one clause per macro.
-6. Level: peak under -1 dBFS and -19 +-5.5 dBFS loudness (`factory_levels_hold_the_target`); no clipping with every macro up (the limiter).
+6. Level: peak under -1 dBFS and -19 +-5.5 dBFS loudness (`factory_levels_hold_the_target`); peak at or under -1 dBFS with every macro up (patch gain, no limiter).
 7. Loads, compiles and renders without a note in the Sounds browser (`every_factory_sound_is_discoverable_categorized_and_loads`).
 8. No module added or changed; no dead macro; no macro added to fill a slot.
 9. Checked in the standalone and in REAPER.

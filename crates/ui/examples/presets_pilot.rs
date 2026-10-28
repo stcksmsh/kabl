@@ -99,14 +99,11 @@ impl Rack {
         self.route(knob, "m4", depth, "gain", 1.0);
         depth
     }
-    /// The last stage: a limiter just under the level target's ceiling, so no macro setting
-    /// can clip the output, then the output.
+    /// The last stage: the output. No limiter; headroom comes from the patch gain.
     fn out_stereo(&mut self, from: ModuleId) {
-        let limiter = self.add("limiter", &[("ceiling_db", -1.5), ("release_ms", 150.0)]);
         let out = self.add("out", &[]);
-        self.stereo(from, limiter);
-        self.wire(limiter, "left", out, "left");
-        self.wire(limiter, "right", out, "right");
+        self.wire(from, "left", out, "left");
+        self.wire(from, "right", out, "right");
     }
 }
 
@@ -164,7 +161,7 @@ fn perform(r: &mut Rack, knob: ModuleId, clock: Option<ModuleId>, cue: Option<(M
 
 /// The tail every preset shares: a short mono-in echo (a slapback, or a tempo-synced echo when
 /// `clock` is given) and a tight room, both at mix 0 until the Space macro opens them. `src` is
-/// a stereo module (`left`/`right`); returns the room, whose outputs go on to the limiter.
+/// a stereo module (`left`/`right`); returns the room, whose outputs go on to the output.
 #[allow(clippy::too_many_arguments)]
 fn space_tail(
     r: &mut Rack,
@@ -578,17 +575,14 @@ fn loading_dock() -> Rack {
         1.2,
         0.3,
     );
-    // The drums join after the echo and the room, then the limiter.
+    // The drums join after the echo and the room, then the output.
     r.wire(tail, "left", mix_l, "in1");
     r.wire(tail, "right", mix_r, "in1");
     r.wire(drums, "out", mix_l, "in2");
     r.wire(drums, "out", mix_r, "in2");
-    let limiter = r.add("limiter", &[("ceiling_db", -1.5), ("release_ms", 150.0)]);
     let out = r.add("out", &[]);
-    r.wire(mix_l, "out", limiter, "in_l");
-    r.wire(mix_r, "out", limiter, "in_r");
-    r.wire(limiter, "left", out, "left");
-    r.wire(limiter, "right", out, "right");
+    r.wire(mix_l, "out", out, "left");
+    r.wire(mix_r, "out", out, "right");
 
     r.route(knob, "m4", duck, "ratio", 0.95);
     r.wire(noise, "out", riser, "in");
@@ -1271,6 +1265,25 @@ fn presets() -> Vec<Preset> {
     ]
 }
 
+impl Rack {
+    /// Adds `db` to every gain stage's `gain_db`.
+    fn trim(&mut self, db: f32) {
+        let gains: Vec<_> = self
+            .e
+            .state()
+            .modules
+            .iter()
+            .filter(|(_, m)| m.kind == "gain")
+            .map(|(&id, m)| (id, m.params.get("gain_db").copied().unwrap_or(0.0)))
+            .collect();
+        for (id, g) in gains {
+            self.e.set_param(id, "gain_db", g + db);
+        }
+    }
+}
+
+include!("preset_trims.inc");
+
 fn write_wav(path: &Path, left: &[f32], right: &[f32]) {
     // `PP_F32` writes 32-bit float, for measuring without the 16-bit step.
     let float = std::env::var("PP_F32").is_ok();
@@ -1404,7 +1417,8 @@ fn main() {
     match args.get(1).map(String::as_str) {
         Some("write") => {
             for p in presets() {
-                let rack = (p.build)();
+                let mut rack = (p.build)();
+                rack.trim(level_trim(p.slug));
                 let dir = Path::new(&args[2]).join("presets").join(p.slug);
                 let _ = std::fs::remove_dir_all(&dir);
                 kabl_core::save(&dir, rack.e.log()).expect("save");

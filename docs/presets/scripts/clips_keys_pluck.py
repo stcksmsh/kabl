@@ -77,4 +77,6 @@ with tempfile.TemporaryDirectory() as tmp:
     flac(str(raw), str(out / 'tour.flac'), ['-f', 'f32le', '-ar', str(SR), '-ac', '2'])
     (out / 'tour.txt').write_text('\n'.join(lines) + '\n')
     print('\n'.join(lines))
+# Defect scan of the rendered clips (impulsive clicks, limiter pinning, DC, NaN, HF bursts).
+good &= sp.run([sys.executable, 'docs/presets/scripts/audio_defects.py', '--allow', 'docs/presets/scripts/audio_defects.allow', str(out)]).returncode == 0
 sys.exit(0 if good else 1)

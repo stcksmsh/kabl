@@ -1,0 +1,33 @@
+// Per-preset level trims in dB, added to the preset's gain stage when it is written.
+// Patch gain only: no limiter, so these keep every peak at or under -1 dBFS.
+fn level_trim(slug: &str) -> f32 {
+    match slug {
+        "boxwood" => -1.0,
+        "brass-filament" => -2.0,
+        "cellar-door" => -3.0,
+        "checkerboard" => -0.5,
+        "cold-cut" => -3.0,
+        "corduroy" => -0.2,
+        "deep-field" => -7.2,
+        "dry-creek" => -3.0,
+        "fog-bank" => -3.2,
+        "glass-elevator" => -2.0,
+        "gumdrop" => -3.0,
+        "hand-bell" => -4.0,
+        "linoleum" => -1.6,
+        "matinee" => -3.0,
+        "picture-window" => -2.0,
+        "rain-gutter" => -3.3,
+        "rivet-gun" => -0.9,
+        "rosewood" => -2.2,
+        "salt-flat" => -6.3,
+        "snowmelt" => -0.6,
+        "spark-plug" => -0.6,
+        "spinet" => -3.0,
+        "tuning-fork" => -5.0,
+        "turnstile" => -1.6,
+        "velvet-tine" => -2.7,
+        "willow" => -5.0,
+        _ => 0.0,
+    }
+}

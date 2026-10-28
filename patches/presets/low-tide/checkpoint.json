@@ -209,20 +209,9 @@
       }
     },
     "17": {
-      "kind": "limiter",
-      "pos": {
-        "x": 1354.0,
-        "y": 620.0
-      },
-      "params": {
-        "ceiling_db": -1.5,
-        "release_ms": 150.0
-      }
-    },
-    "18": {
       "kind": "out",
       "pos": {
-        "x": 1544.0,
+        "x": 1354.0,
         "y": 620.0
       },
       "params": {}
@@ -653,7 +642,7 @@
       "to": {
         "Module": {
           "id": 17,
-          "port": "in_l"
+          "port": "left"
         }
       },
       "params": {},
@@ -669,38 +658,6 @@
       "to": {
         "Module": {
           "id": 17,
-          "port": "in_r"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "30": {
-      "from": {
-        "Module": {
-          "id": 17,
-          "port": "left"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 18,
-          "port": "left"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "31": {
-      "from": {
-        "Module": {
-          "id": 17,
-          "port": "right"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 18,
           "port": "right"
         }
       },

@@ -85,13 +85,11 @@ impl Rack {
         let cable = self.e.connect_route(jack(a, ap), b, param);
         self.e.set_route_amount(cable, amount, true);
     }
-    /// The last stage: a limiter just under the level target's ceiling, then the output.
+    /// The last stage: the output. No limiter; headroom comes from the patch gain.
     fn out_stereo(&mut self, from: ModuleId) {
-        let limiter = self.add("limiter", &[("ceiling_db", -1.5), ("release_ms", 150.0)]);
         let out = self.add("out", &[]);
-        self.stereo(from, limiter);
-        self.wire(limiter, "left", out, "left");
-        self.wire(limiter, "right", out, "right");
+        self.wire(from, "left", out, "left");
+        self.wire(from, "right", out, "right");
     }
 }
 
@@ -178,7 +176,7 @@ type PhaserSpec<'a> = (&'a [(&'static str, f32)], Option<(&'static str, f32)>);
 type ChorusSpec<'a> = (&'a [(&'static str, f32)], Option<f32>);
 
 /// Everything after the voice, the same for every preset: drive, ladder filter, trim, then the
-/// stereo stages (phaser, chorus, compressor), the echo and room, the limiter. m1 opens the
+/// stereo stages (phaser, chorus, compressor), the echo and room. m1 opens the
 /// filter, m2 pushes the drive, m3 is the space; the caller routes m4.
 struct Post<'a> {
     /// Drive stage: (drive dB stored, trim dB, m2 amount).
@@ -373,6 +371,25 @@ struct Preset {
 mod bank;
 use bank::presets;
 
+impl Rack {
+    /// Adds `db` to every gain stage's `gain_db`.
+    fn trim(&mut self, db: f32) {
+        let gains: Vec<_> = self
+            .e
+            .state()
+            .modules
+            .iter()
+            .filter(|(_, m)| m.kind == "gain")
+            .map(|(&id, m)| (id, m.params.get("gain_db").copied().unwrap_or(0.0)))
+            .collect();
+        for (id, g) in gains {
+            self.e.set_param(id, "gain_db", g + db);
+        }
+    }
+}
+
+include!("preset_trims.inc");
+
 fn write_wav(path: &Path, left: &[f32], right: &[f32]) {
     let spec = hound::WavSpec {
         channels: 2,
@@ -473,7 +490,8 @@ fn main() {
     match args.get(1).map(String::as_str) {
         Some("write") => {
             for p in presets() {
-                let rack = (p.build)();
+                let mut rack = (p.build)();
+                rack.trim(level_trim(p.slug));
                 let dir = Path::new(&args[2]).join("presets").join(p.slug);
                 let _ = std::fs::remove_dir_all(&dir);
                 kabl_core::save(&dir, rack.e.log()).expect("save");
