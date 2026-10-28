@@ -47,7 +47,6 @@ pub struct Theme {
 pub fn theme(st: &Style) -> Theme {
     let r = &st.roles;
     let dark = st.dark;
-    let accent_pill = st.slots.selector == crate::style::SelectorRecipe::AccentPill;
     Theme {
         dark,
         chrome: r.bg,
@@ -73,8 +72,10 @@ pub fn theme(st: &Style) -> Theme {
         display: r.disp_bg,
         display_ink: r.disp_trace,
         seg_bg: r.inset,
-        seg_on: if accent_pill { r.accent } else { r.text },
-        seg_on_text: if accent_pill { r.on_accent } else { r.surface },
+        // One selector idiom for every theme: a dark track with an accent segment. `selector` stays
+        // in the theme file for compatibility but no longer changes the face selectors.
+        seg_on: r.accent,
+        seg_on_text: r.on_accent,
         sel: r.focus,
         sel_ink: if contrast(r.on_accent, r.focus) >= contrast(r.text, r.focus) {
             r.on_accent

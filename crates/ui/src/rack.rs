@@ -23,6 +23,16 @@ pub const ROW_PITCH: f32 = 370.0;
 pub const RACK_X: f32 = 24.0;
 pub const R_LARGE: f32 = 22.0;
 pub const R_SMALL: f32 = 17.0;
+
+/// Knob radius by the number of knobs sharing the face: one or two get the large knob, three or
+/// more the small one.
+fn knob_radius(n: usize) -> f32 {
+    if n <= 2 {
+        R_LARGE
+    } else {
+        R_SMALL
+    }
+}
 pub const JACK_R: f32 = 13.0;
 /// Jack rows sit low on the face so the middle is free for a live display.
 pub const JACK_Y: f32 = 296.0;
@@ -451,11 +461,7 @@ fn place_local(
                 .find(|c| c.id == id && c.kind == kind)
                 .map(|c| pos2(c.pos.0 * fw, c.pos.1 * PANEL_H))
         };
-        let r = if face_knobs.len() == 1 {
-            R_LARGE
-        } else {
-            R_SMALL
-        };
+        let r = knob_radius(face_knobs.len());
         for &i in face_knobs.iter().chain(&face_sels) {
             let p = &info.params[i];
             match at(p.name, ControlKind::Knob) {
@@ -600,11 +606,7 @@ fn place_local(
         } else {
             let n = face_knobs.len();
             for (k, &i) in face_knobs.iter().enumerate() {
-                let r = if n == 1 || (n == 2 && k == 0 && i == 0) {
-                    R_LARGE
-                } else {
-                    R_SMALL
-                };
+                let r = knob_radius(n);
                 let x = match n {
                     1 => fw / 2.0,
                     2 => fw * (k as f32 + 0.5) / 2.0,
@@ -813,7 +815,7 @@ fn midi_in_face(
     let n = knobs.len();
     for (k, &i) in knobs.iter().enumerate() {
         let x = fw * (k as f32 + 0.5) / n as f32;
-        let r = if n == 1 { R_LARGE } else { R_SMALL };
+        let r = knob_radius(n);
         ctls.push(Ctl {
             param: &info.params[i],
             primary: true,
