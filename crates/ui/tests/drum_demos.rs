@@ -267,7 +267,9 @@ fn pump() -> PatchEditor {
     r.wire(kick, "out", mix, "in1");
     r.wire(clap, "out", mix, "in2");
     r.wire(hat, "out", mix, "in3");
-    r.wire(duck, "in", mix, "in4");
+    let sides = r.add("split", &[]);
+    r.wire(duck, "out", sides, "in");
+    r.wire(sides, "left", mix, "in4");
     r.wire(mix, "out", out, "in");
     r.e
 }

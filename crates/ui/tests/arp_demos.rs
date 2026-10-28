@@ -312,8 +312,10 @@ fn arp_cable() -> PatchEditor {
         ],
     );
     r.wire(clock, "gate", delay, "clock");
-    r.wire(delay, "in", mixer, "in2");
-    r.wire(delay, "in", mixer, "in3");
+    let sides = r.add("split", &[]);
+    r.wire(delay, "out", sides, "in");
+    r.wire(sides, "left", mixer, "in2");
+    r.wire(sides, "right", mixer, "in3");
     r.wire(mixer, "out", out, "in");
     r.route(env, "out", filter, "cutoff_hz", 0.3);
     r.e
