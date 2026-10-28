@@ -20,21 +20,14 @@ Lint (fmt --check, clippy --workspace --all-targets -D warnings) + tests before 
 - All of `kabl-engine`, `kabl-core`, `kabl-modules`, `kabl-clap` tests pass.
 
 ## Remaining, in order
-1. `kabl-ui` tests: 24 fail (log: run `cargo test -p kabl-ui --no-fail-fast`). Causes:
-   a. "committed_*_match_builders" (composition, echo, interlocking, performance, expressive, sound_engines, sound_palette, arp_demos,
-      drum_demos, library init-keyboard/recipes): the test builders (Rack/PatchEditor) must equal the committed files. My regex rename
-      of old port names in these files is WRONG for builders. Plan: `git checkout origin/master -- ` those ui/tests builder files (and
-      `ui/src/recipes.rs`), keep the old names in builders, and compare/compile `migrated(builder)` (add a small
-      `kabl_core::migrate_state` call on the built `PatchState`), so builder == script output by construction.
-      Needs a one-line public editor helper or `migrate_state(&mut state.clone())` at each comparison/compile site.
-   b. Source misfires of my rename (`delay`/`duck`/`chorus` `left`/`right` became `in`): arp_demos (fixed), drum_demos (fixed),
-      echo.rs:70-71, sound_palette.rs:858-861 (use a `split`), signal_inspection.rs (cable_to ... "in" returns None), composites.rs:276
-      (pan "out"?), runtime_controls.rs:251 (left 2 right 3).
-2. After overseer says #53 merged: rebase, update `crates/ui/examples` (same migrate approach or v8 names), `library.rs`, run
-   `cargo run -p kabl-core --example rewrite_v8 -- patches`, check `git diff --stat patches`, tests.
+1. DONE except `crates/ui/tests/library.rs` (out of scope until #53 merges): kabl-ui 343 pass, 7 fail, all in library.rs
+   (init_keyboard/recipes compare, folder-save tests using old `left` names). Builders keep old names and end `.migrated()`
+   (`PatchEditor::migrated`, editor.rs); `interlocking_base` stays unmigrated (echo extends it).
+2. Check `git log origin/master | grep "pull request #53"`. When merged: rebase, fix library.rs (same `.migrated()` approach),
+   update `crates/ui/examples`, run `cargo run -p kabl-core --example rewrite_v8 -- patches`, `git diff --stat patches`, tests.
 3. `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, push, draft PR, `cargo clean`.
 4. Report to overseer: audit list (modules: chorus reverb eq flanger phaser limiter bitcrusher vocoder compressor out audio.in delay pan),
-   what 2b left, known non-bit-identical case: none found (all shipped patches identical).
+   what 2b left, known non-bit-identical case: none found.
 
 ## Facts
 - Engine slots: a width-2 port = two consecutive io slots; tap/probe port numbers are slots (unchanged numbers).
