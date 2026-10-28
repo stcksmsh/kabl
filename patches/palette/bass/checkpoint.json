@@ -516,23 +516,7 @@
       "to": {
         "Module": {
           "id": 13,
-          "port": "left"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "18": {
-      "from": {
-        "Module": {
-          "id": 12,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 13,
-          "port": "right"
+          "port": "in"
         }
       },
       "params": {},

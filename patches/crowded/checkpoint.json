@@ -124,6 +124,14 @@
         "y": 750.0
       },
       "params": {}
+    },
+    "16": {
+      "kind": "join",
+      "pos": {
+        "x": 680.0,
+        "y": 420.0
+      },
+      "params": {}
     }
   },
   "cables": {
@@ -376,7 +384,7 @@
       },
       "to": {
         "Module": {
-          "id": 10,
+          "id": 16,
           "port": "left"
         }
       },
@@ -392,7 +400,7 @@
       },
       "to": {
         "Module": {
-          "id": 10,
+          "id": 16,
           "port": "right"
         }
       },
@@ -570,6 +578,22 @@
         "Param": {
           "id": 9,
           "param": "exponential"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "29": {
+      "from": {
+        "Module": {
+          "id": 16,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 10,
+          "port": "in"
         }
       },
       "params": {},

@@ -182,23 +182,7 @@
       "to": {
         "Module": {
           "id": 5,
-          "port": "left"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "10": {
-      "from": {
-        "Module": {
-          "id": 7,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 5,
-          "port": "right"
+          "port": "in"
         }
       },
       "params": {},

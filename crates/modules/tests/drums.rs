@@ -10,7 +10,7 @@ fn assert_no_alloc<T>(f: impl FnOnce() -> T) -> T {
 }
 use kabl_modules::builtins::MidiNote;
 use kabl_modules::module::{QualityConfig, QualityTier};
-use kabl_modules::{registry, Module, PortDirection, ProcessIo, Signal};
+use kabl_modules::{registry, Module, ProcessIo, Signal};
 
 #[cfg(debug_assertions)]
 #[global_allocator]

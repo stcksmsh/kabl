@@ -51,6 +51,11 @@ struct Rack {
 }
 
 impl Rack {
+    fn migrated(mut self) -> Self {
+        self.e = self.e.migrated();
+        self
+    }
+
     fn new() -> Self {
         Rack {
             e: PatchEditor::new(),
@@ -2167,7 +2172,7 @@ fn main() {
     match args.get(1).map(String::as_str) {
         Some("write") => {
             for p in presets().into_iter().filter(|p| only(p)) {
-                let mut rack = (p.build)();
+                let mut rack = (p.build)().migrated();
                 rack.trim(level_trim(p.slug));
                 let dir = Path::new(&args[2]).join("presets").join(p.slug);
                 let _ = std::fs::remove_dir_all(&dir);
@@ -2229,7 +2234,7 @@ fn main() {
             for p in presets().into_iter().filter(|p| only(p)) {
                 let mut line = format!("{:14}", p.slug);
                 for (label, value) in [("all 0", 0.0), ("all 1", 1.0)] {
-                    let mut rack = (p.build)();
+                    let mut rack = (p.build)().migrated();
                     let knob = *rack.e.state().modules.iter().find(|(_, m)| m.kind == "macro").unwrap().0;
                     for k in 1..=8 {
                         if rack.e.state().modules[&knob].params.contains_key(&format!("pin.m{k}")) {
@@ -2243,13 +2248,13 @@ fn main() {
                 }
                 // Each macro alone, 0 against 1: how far the render moves (dB under the render).
                 let probe = |k: usize, v: f32| {
-                    let mut rack = (p.build)();
+                    let mut rack = (p.build)().migrated();
                     let knob = *rack.e.state().modules.iter().find(|(_, m)| m.kind == "macro").unwrap().0;
                     rack.e.set_param(knob, &format!("m{k}"), v);
                     render(rack.e.state(), &(p.phrase)(), p.secs).0
                 };
                 let count = (1..=8)
-                    .filter(|k| (p.build)().e.state().modules.values().any(|m| m.params.contains_key(&format!("pin.m{k}"))))
+                    .filter(|k| (p.build)().migrated().e.state().modules.values().any(|m| m.params.contains_key(&format!("pin.m{k}"))))
                     .count();
                 for k in 1..=count {
                     let (a, b) = (probe(k, 0.0), probe(k, 1.0));

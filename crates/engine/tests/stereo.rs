@@ -53,8 +53,7 @@ fn cable(p: &mut PatchState, from: (u64, &str), to: (u64, &str)) {
 /// (always `out`'s) through a `join` into `in`.
 fn wire(p: &mut PatchState, from: u64, fp: &str, to: u64, tp: &str) {
     let (from, fp) = if matches!(fp, "left" | "right") {
-        if !p.modules.contains_key(&SPLIT) {
-            p.modules.insert(SPLIT, module("split", &[]));
+        if p.modules.insert(SPLIT, module("split", &[])).is_none() {
             cable(p, (from, "out"), (SPLIT, "in"));
         }
         (SPLIT, fp)
@@ -62,8 +61,7 @@ fn wire(p: &mut PatchState, from: u64, fp: &str, to: u64, tp: &str) {
         (from, fp)
     };
     let (to, tp) = if matches!(tp, "left" | "right") {
-        if !p.modules.contains_key(&JOIN) {
-            p.modules.insert(JOIN, module("join", &[]));
+        if p.modules.insert(JOIN, module("join", &[])).is_none() {
             cable(p, (JOIN, "out"), (to, "in"));
         }
         (JOIN, tp)

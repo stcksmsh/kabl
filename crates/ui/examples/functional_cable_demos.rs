@@ -472,7 +472,7 @@ fn main() {
         Some("write") => {
             for (name, build) in DEMOS {
                 let dir = Path::new(&args[2]).join(name);
-                kabl_core::save(&dir, build().log()).expect("save");
+                kabl_core::save(&dir, build().migrated().log()).expect("save");
                 println!("wrote {}", dir.display());
             }
         }

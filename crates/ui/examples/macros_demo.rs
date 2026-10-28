@@ -194,6 +194,7 @@ fn render(state: &kabl_core::PatchState, knob: ModuleId) -> (Vec<f32>, Vec<f32>)
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let (e, knob) = build();
+    let e = e.migrated();
     match args.get(1).map(String::as_str) {
         Some("write") => {
             let dir = Path::new(&args[2]);

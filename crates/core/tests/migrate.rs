@@ -7,7 +7,8 @@ use kabl_core::{
     migrate_state, CableState, ModuleState, PatchState, PortRef, Vec2, CURRENT_SCHEMA_VERSION,
 };
 
-fn state(modules: &[(u64, &str)], cables: &[((u64, &str), (u64, &str))]) -> PatchState {
+type Wire<'a> = ((u64, &'a str), (u64, &'a str));
+fn state(modules: &[(u64, &str)], cables: &[Wire]) -> PatchState {
     let mut s = PatchState::default();
     for &(id, kind) in modules {
         s.modules.insert(

@@ -747,7 +747,7 @@ fn init_keyboard() -> PatchEditor {
     for (id, key, label) in pins {
         e.set_label(id, &format!("{PIN_PREFIX}{key}"), Some(label.to_string()));
     }
-    e
+    e.migrated()
 }
 
 #[test]

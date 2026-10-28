@@ -239,6 +239,7 @@ sequence = true
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let (e, knob, routes) = build();
+    let e = e.migrated();
     match args.get(1).map(String::as_str) {
         Some("write") => {
             let dir = Path::new(&args[2]);

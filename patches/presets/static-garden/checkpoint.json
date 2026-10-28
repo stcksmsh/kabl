@@ -243,6 +243,14 @@
         "y": 620.0
       },
       "params": {}
+    },
+    "21": {
+      "kind": "split",
+      "pos": {
+        "x": 1524.0,
+        "y": 670.0
+      },
+      "params": {}
     }
   },
   "cables": {
@@ -656,23 +664,7 @@
       "to": {
         "Module": {
           "id": 17,
-          "port": "in_l"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "26": {
-      "from": {
-        "Module": {
-          "id": 11,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 17,
-          "port": "in_r"
+          "port": "in"
         }
       },
       "params": {},
@@ -681,7 +673,7 @@
     "27": {
       "from": {
         "Module": {
-          "id": 17,
+          "id": 21,
           "port": "left"
         }
       },
@@ -698,29 +690,13 @@
       "from": {
         "Module": {
           "id": 18,
-          "port": "left"
+          "port": "out"
         }
       },
       "to": {
         "Module": {
           "id": 19,
-          "port": "in_l"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "31": {
-      "from": {
-        "Module": {
-          "id": 18,
-          "port": "right"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 19,
-          "port": "in_r"
+          "port": "in"
         }
       },
       "params": {},
@@ -766,29 +742,29 @@
       "from": {
         "Module": {
           "id": 19,
-          "port": "left"
+          "port": "out"
         }
       },
       "to": {
         "Module": {
           "id": 20,
-          "port": "left"
+          "port": "in"
         }
       },
       "params": {},
       "steps": []
     },
-    "35": {
+    "36": {
       "from": {
         "Module": {
-          "id": 19,
-          "port": "right"
+          "id": 17,
+          "port": "out"
         }
       },
       "to": {
         "Module": {
-          "id": 20,
-          "port": "right"
+          "id": 21,
+          "port": "in"
         }
       },
       "params": {},

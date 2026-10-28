@@ -302,23 +302,7 @@
       "to": {
         "Module": {
           "id": 10,
-          "port": "left"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "12": {
-      "from": {
-        "Module": {
-          "id": 9,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 10,
-          "port": "right"
+          "port": "in"
         }
       },
       "params": {},

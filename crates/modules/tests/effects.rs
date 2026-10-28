@@ -14,7 +14,7 @@ fn assert_no_alloc<T>(f: impl FnOnce() -> T) -> T {
     f()
 }
 use kabl_modules::module::{QualityConfig, QualityTier};
-use kabl_modules::{registry, Module, PortDirection, ProcessIo, Signal};
+use kabl_modules::{registry, Module, ProcessIo, Signal};
 use std::f32::consts::PI;
 
 #[cfg(debug_assertions)]

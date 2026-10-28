@@ -519,6 +519,7 @@ fn timeline_json(ids: &HashMap<&'static str, CableId>) -> String {
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let (e, ids) = build();
+    let e = e.migrated();
     match args.get(1).map(String::as_str) {
         Some("write") => {
             kabl_core::save(Path::new(&args[2]), e.log()).expect("save");

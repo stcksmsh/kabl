@@ -611,7 +611,7 @@ fn voice(cutoff: f32, res: f32, env: [f32; 4]) -> PatchEditor {
     e.connect(port(adsr, "out"), port(vca, "cv"));
     e.connect(port(vca, "out"), port(out, "left"));
     e.connect(port(vca, "out"), port(out, "right"));
-    e.migrated()
+    e
 }
 
 /// `patches/recipes/pluck-to-pad`: a plucked saw, envelope controls pinned.

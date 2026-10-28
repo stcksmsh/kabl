@@ -46,8 +46,8 @@
       "params": {
         "attack_ms": 3.0,
         "decay_ms": 160.0,
-        "sustain": 0.25,
-        "release_ms": 120.0
+        "release_ms": 120.0,
+        "sustain": 0.25
       }
     },
     "6": {
@@ -202,23 +202,7 @@
       "to": {
         "Module": {
           "id": 7,
-          "port": "left"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "9": {
-      "from": {
-        "Module": {
-          "id": 8,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 7,
-          "port": "right"
+          "port": "in"
         }
       },
       "params": {},

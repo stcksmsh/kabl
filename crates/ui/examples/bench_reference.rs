@@ -60,8 +60,7 @@ pub fn routeless() -> PatchState {
         ((3, "lp"), (5, "in")),
         ((1, "gate"), (4, "gate")),
         ((4, "out"), (5, "cv")),
-        ((5, "out"), (6, "left")),
-        ((5, "out"), (6, "right")),
+        ((5, "out"), (6, "in")),
     ]
     .into_iter()
     .enumerate()

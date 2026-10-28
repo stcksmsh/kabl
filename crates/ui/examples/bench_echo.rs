@@ -44,7 +44,24 @@ fn two_delays() -> PatchState {
         .find(|(_, c)| c.to == port(6, "in1"))
         .unwrap()
         .0;
-    p.cables.get_mut(&to_in1).unwrap().from = port(100, "left");
+    p.cables.get_mut(&to_in1).unwrap().from = port(101, "left");
+    p.modules.insert(
+        101,
+        ModuleState {
+            kind: "split".into(),
+            pos: Vec2 { x: 0.0, y: 0.0 },
+            params: Default::default(),
+        },
+    );
+    p.cables.insert(
+        1001,
+        CableState {
+            from: port(100, "out"),
+            to: port(101, "in"),
+            params: Default::default(),
+            steps: vec![],
+        },
+    );
     p.cables.insert(
         1000,
         CableState {
