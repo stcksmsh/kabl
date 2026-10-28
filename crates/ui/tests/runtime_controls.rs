@@ -205,6 +205,7 @@ fn routine_controls_never_build_a_graph() {
 fn a_structural_edit_while_controls_move_keeps_every_value() {
     let mut h = H::new();
     h.settle();
+    let modules = h.editor.state().modules.len();
     let at = (h.base(MACRO, "m1") * 127.0).round() as u8;
     h.cc(&[(20, at)]);
     for k in 0..40u8 {
@@ -238,7 +239,7 @@ fn a_structural_edit_while_controls_move_keeps_every_value() {
     assert!(h.editor.undo()); // the last knob drag
     h.deliver();
     let g = h.graphs();
-    while h.editor.can_undo() && h.editor.state().modules.len() > 39 {
+    while h.editor.can_undo() && h.editor.state().modules.len() > modules {
         h.editor.undo();
     }
     h.deliver();

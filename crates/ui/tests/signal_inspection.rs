@@ -394,8 +394,6 @@ fn why_no_sound_a_removed_connection_is_a_graph_fact() {
     let mut s = init_state();
     let c = cable_to(&s, 5, "in");
     s.cables.remove(&c);
-    let c = cable_to(&s, 5, "in");
-    s.cables.remove(&c);
     let d = inspect::diagnose(&s, Some(2), &cx(&clocks, None));
     assert!(
         d.facts
@@ -1070,9 +1068,8 @@ fn why_no_sound_leaves_optional_inputs_alone() {
 
     // VCA out -> mixer in2 -> reverb in_l -> chorus in_r -> out.
     let mut s = init_state();
-    for c in [cable_to(&s, 5, "out"), cable_to(&s, 5, "in")] {
-        s.cables.remove(&c);
-    }
+    let c = cable_to(&s, 5, "in");
+    s.cables.remove(&c);
     for (id, kind) in [(10, "mixer"), (11, "reverb"), (12, "chorus")] {
         s.modules.insert(
             id,
@@ -1104,7 +1101,6 @@ fn why_no_sound_leaves_optional_inputs_alone() {
     wire(&mut s, 51, (10, "out"), (11, "in"));
     wire(&mut s, 52, (11, "out"), (12, "in"));
     wire(&mut s, 53, (12, "out"), (5, "in"));
-    wire(&mut s, 54, (12, "out"), (5, "in"));
     let d = inspect::diagnose(&s, Some(2), &cx(&clocks, None));
     assert!(
         d.facts.iter().all(|f| !f.contains("No cable into")),
