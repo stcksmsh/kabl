@@ -284,9 +284,9 @@ fn a_v7_file_loads_migrated_and_the_migration_is_not_undoable() {
         wiring(back.state()),
         [
             pair("gain.out", "reverb.in"),
+            pair("join.out", "out.in"),
             pair("reverb.out", "split.in"),
             pair("split.left", "join.left"),
-            pair("join.out", "out.in"),
         ]
     );
     let migrated = back.state().clone();

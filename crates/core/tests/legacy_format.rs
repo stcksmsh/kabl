@@ -33,7 +33,7 @@ fn v1_fixtures_load_to_their_saved_checkpoint() {
 #[test]
 fn v1_history_undoes_to_empty_exactly() {
     let mut log = load(&fixture("v1_edited")).unwrap();
-    // The schema-8 migration (the last entry) is the barrier: undo stops above it.
+    // The schema-8 migration (the last entry) is a barrier: undo never reaches it.
     let n = log.entries().len();
     for k in (0..n).rev() {
         if !log.can_undo() {
