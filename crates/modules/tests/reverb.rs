@@ -244,3 +244,39 @@ fn carry_from_copies_the_whole_history() {
     let from_c = run_with(&mut c, &silence, &silence, 64, |_| P::wet(3.0));
     assert!(from_c.0.iter().all(|&x| x == 0.0));
 }
+
+/// Guard: the float output has no kinks. (A 16-bit round of the same quiet tail does: 3, 7 and 19
+/// windows at 3, 10 and 30 s, so a scan of FLAC clips must skip windows near the LSB.)
+/// Peak over RMS of the second difference per 50 ms window; windows above 12 hold a single-sample kink.
+fn kink_windows(x: &[f32]) -> usize {
+    let w = (SR * 0.05) as usize;
+    x.chunks(w)
+        .filter(|c| c.len() == w)
+        .filter(|c| {
+            let d: Vec<f32> = c.windows(3).map(|v| v[2] - 2.0 * v[1] + v[0]).collect();
+            let rms = (d.iter().map(|v| v * v).sum::<f32>() / d.len() as f32).sqrt();
+            let peak = d.iter().fold(0.0f32, |a, v| a.max(v.abs()));
+            rms > 1e-9 && peak / rms > 12.0
+        })
+        .count()
+}
+
+#[test]
+fn dark_long_decay_has_no_single_sample_kinks() {
+    for decay in [3.0, 10.0, 30.0] {
+        let n = (SR * (decay * 1.6 + 4.0)) as usize;
+        let sine: Vec<f32> = (0..n)
+            .map(|i| {
+                if i < 96000 {
+                    0.8 * (2.0 * (55.0 * i as f32 / SR).fract() - 1.0)
+                } else {
+                    0.0
+                }
+            })
+            .collect();
+        let p = P::wet(decay).with(1, 1500.0);
+        let (l, _) = run(SR, p, &sine, &sine);
+        let k = kink_windows(&l);
+        assert_eq!(k, 0, "decay {decay}");
+    }
+}
