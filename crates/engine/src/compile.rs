@@ -2587,12 +2587,7 @@ impl CompiledPatch {
                 if id != t.module || m.info().kind != t.kind || self.module_channel[index] > 0 {
                     continue;
                 }
-                let outputs = m
-                    .info()
-                    .ports
-                    .iter()
-                    .filter(|p| p.direction == PortDirection::Output)
-                    .count();
+                let outputs = m.info().slots(PortDirection::Output);
                 if t.port as usize >= outputs {
                     continue;
                 }
@@ -2642,11 +2637,7 @@ impl CompiledPatch {
             .zip(&self.module_channel)
             .map(|((&(id, _), m), &ch)| {
                 let info = m.info();
-                let outputs = info
-                    .ports
-                    .iter()
-                    .filter(|p| p.direction == PortDirection::Output)
-                    .count();
+                let outputs = info.slots(PortDirection::Output);
                 // The second channel of a module is not a face lane: no id names it.
                 (if ch > 0 { ModuleId::MAX } else { id }, info.kind, outputs)
             });
