@@ -24,12 +24,16 @@ impl SoundState {
         if bytes.is_empty() || bytes.len() > MAX_STATE_BYTES {
             return Err("State size limit".into());
         }
-        let state: Self = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
+        let mut state: Self = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
+        // Before version 5 a project names the old stereo half ports.
+        if state.version < 5 {
+            kabl_core::migrate_state(&mut state.patch);
+        }
         state.validate()?;
         Ok(state)
     }
     pub fn validate(&self) -> Result<(), String> {
-        if !matches!(self.version, 1..=4) {
+        if !matches!(self.version, 1..=5) {
             return Err("Unsupported sound state version".into());
         }
         if !self.output_gain.is_finite() || !(0.0..=1.0).contains(&self.output_gain) {
@@ -176,7 +180,7 @@ mod table_tests {
             assert!(state(v).validate().is_err(), "version {v}");
         }
         assert!(state(4).validate().is_ok());
-        assert!(state(5).validate().is_err());
+        assert!(state(6).validate().is_err());
     }
 
     #[test]

@@ -143,7 +143,10 @@ impl Ctx<'_> {
         let at = self.s.modules[&m].pos;
         if let (Some(ca), Some(cb)) = (ca, cb) {
             if self.plain(ca) && self.plain(cb) {
-                let (fa, fb) = (self.s.cables[&ca].from.clone(), self.s.cables[&cb].from.clone());
+                let (fa, fb) = (
+                    self.s.cables[&ca].from.clone(),
+                    self.s.cables[&cb].from.clone(),
+                );
                 let pair = match (module_port(&fa), module_port(&fb)) {
                     (Some((x, "left")), Some((y, "right"))) => x == y && has_out_pair(self.kind(x)),
                     _ => false,
@@ -188,7 +191,9 @@ impl Ctx<'_> {
             .s
             .cables
             .iter()
-            .filter(|(_, c)| matches!(module_port(&c.from), Some((id, "left" | "right")) if id == x))
+            .filter(
+                |(_, c)| matches!(module_port(&c.from), Some((id, "left" | "right")) if id == x),
+            )
             .map(|(&k, _)| k)
             .collect();
         if users.is_empty() {
