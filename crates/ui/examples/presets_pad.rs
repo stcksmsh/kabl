@@ -208,7 +208,6 @@ fn space_tail(
     verb
 }
 
-
 // ---- the bank entries and their clips -------------------------------------------------------
 
 /// One thing that happens in a clip: a key goes down (velocity) or up.
@@ -413,6 +412,9 @@ struct Voice {
     mono: ModuleId,
     cur: Option<ModuleId>,
     n: usize,
+    /// A compressor between the room and the limiter, for a pad whose chords would otherwise
+    /// push the limiter (instant attack, no lookahead) into distortion.
+    guard: Option<[(&'static str, f32); 6]>,
 }
 
 impl Voice {
@@ -510,6 +512,7 @@ impl Voice {
             mono: trim,
             cur: None,
             n: c.macros.len(),
+            guard: None,
         }
     }
 
@@ -545,6 +548,14 @@ impl Voice {
             room.1,
             mac,
         );
+        let tail = match self.guard {
+            Some(g) => {
+                let comp = self.r.add("compressor", &g);
+                self.r.stereo(tail, comp);
+                comp
+            }
+            None => tail,
+        };
         self.r.out_stereo(tail);
         perform(&mut self.r, self.knob, self.n, clock);
         self.r
@@ -637,7 +648,11 @@ fn pop_phrase() -> Vec<Hit> {
 fn stab_phrase() -> Vec<Hit> {
     let grid = [(0, 3.0), (3, 1.0), (6, 2.0), (8, 3.0), (11, 1.0), (14, 1.0)];
     let mut v = stabs(&[57, 60, 64, 67], &grid);
-    for (bar, notes) in [(1u32, &[53u8, 57, 60, 65][..]), (2, &[55, 59, 62, 67]), (3, &[57, 60, 64, 67])] {
+    for (bar, notes) in [
+        (1u32, &[53u8, 57, 60, 65][..]),
+        (2, &[55, 59, 62, 67]),
+        (3, &[57, 60, 64, 67]),
+    ] {
         for h in stabs(notes, &grid) {
             v.push(Hit(h.0 + bar as f32 * 16.0 * S16, h.1, h.2));
         }
@@ -674,7 +689,12 @@ fn pad_recipe<'a>(
 /// Fog Bank: a very slow ambient cloud, saw stack and triangle, a long attack and a nine second room.
 fn fog_bank() -> Rack {
     let mut v = Voice::new(pad_recipe(
-        &[("Bloom", 0.50), ("Drift", 0.40), ("Depth", 0.35), ("Space", 0.65)],
+        &[
+            ("Bloom", 0.50),
+            ("Drift", 0.40),
+            ("Depth", 0.35),
+            ("Space", 0.65),
+        ],
         vec![
             osc(2.0, 0.0, 0.30).unison(4.0, 12.0),
             osc(1.0, 0.0, 0.30).fine(7.0),
@@ -684,21 +704,30 @@ fn fog_bank() -> Rack {
         [3500.0, 3000.0, 0.7, 3500.0],
         0.25,
         [2600.0, 1500.0, 0.9, 5000.0],
-        9.5,
+        11.0,
     ));
     v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.5);
     v.r.route(v.knob, "m3", v.mix, "level3", 0.5);
     let drift = v.r.add("lfo", &[("rate_hz", 0.07)]);
     v.r.depth_route(drift, "out", v.lad, "cutoff_hz", v.knob, "m2", 0.35);
     v.vibrato("m2", 0.13, 0.06);
-    v.stage("chorus", &[("rate_hz", 0.15), ("depth", 55.0), ("mix", 22.0)]);
+    v.stage(
+        "chorus",
+        &[("rate_hz", 0.15), ("depth", 55.0), ("mix", 22.0)],
+    );
+    v.guard = Some(compressor(-16.0, 3.0, 15.0, 250.0, 0.0));
     v.finish("m4", &echo(700.0, 45.0, 3000.0), 0.3, (9.0, 0.55), None)
 }
 
 /// Deep Field: a cinematic swell, saws over a deep sub, a filter that opens over seconds.
 fn deep_field() -> Rack {
     let mut v = Voice::new(pad_recipe(
-        &[("Swell", 0.50), ("Sub", 0.50), ("Shimmer", 0.35), ("Space", 0.60)],
+        &[
+            ("Swell", 0.50),
+            ("Sub", 0.50),
+            ("Shimmer", 0.35),
+            ("Space", 0.60),
+        ],
         vec![
             osc(2.0, 0.0, 0.28).unison(3.0, 10.0),
             osc(2.0, -1.0, 0.25).fine(5.0),
@@ -709,19 +738,28 @@ fn deep_field() -> Rack {
         [4500.0, 2500.0, 0.5, 4000.0],
         0.0,
         [3200.0, 1500.0, 0.9, 5500.0],
-        11.0,
+        14.0,
     ));
     v.r.depth_route(v.fenv, "out", v.lad, "cutoff_hz", v.knob, "m1", 0.6);
     v.r.route(v.knob, "m2", v.mix, "level4", 0.6);
     v.r.route(v.knob, "m3", v.mix, "level3", 0.5);
-    v.stage("chorus", &[("rate_hz", 0.10), ("depth", 45.0), ("mix", 15.0)]);
-    v.finish("m4", &echo(800.0, 50.0, 2500.0), 0.3, (10.0, 0.6), None)
+    v.stage(
+        "chorus",
+        &[("rate_hz", 0.10), ("depth", 45.0), ("mix", 15.0)],
+    );
+    v.guard = Some(compressor(-16.0, 3.0, 15.0, 250.0, 0.0));
+    v.finish("m4", &echo(800.0, 50.0, 2500.0), 0.3, (6.5, 0.6), None)
 }
 
 /// Cotton Mill: an analog pop pad, a pulse with moving width and two saws, chorus.
 fn cotton_mill() -> Rack {
     let mut v = Voice::new(pad_recipe(
-        &[("Cutoff", 0.50), ("Motion", 0.45), ("Chorus", 0.50), ("Space", 0.50)],
+        &[
+            ("Cutoff", 0.50),
+            ("Motion", 0.45),
+            ("Chorus", 0.50),
+            ("Space", 0.50),
+        ],
         vec![
             osc(3.0, 0.0, 0.30).pw(35.0),
             osc(2.0, 0.0, 0.30).fine(6.0),
@@ -744,7 +782,12 @@ fn cotton_mill() -> Rack {
 /// Picture Window: a clean, bright seven-voice saw stack for pop.
 fn picture_window() -> Rack {
     let mut v = Voice::new(pad_recipe(
-        &[("Cutoff", 0.55), ("Spread", 0.50), ("Sparkle", 0.40), ("Space", 0.50)],
+        &[
+            ("Cutoff", 0.55),
+            ("Spread", 0.50),
+            ("Sparkle", 0.40),
+            ("Space", 0.50),
+        ],
         vec![
             osc(2.0, 0.0, 0.28).unison(7.0, 8.0),
             osc(2.0, 1.0, 0.0).unison(3.0, 14.0),
@@ -758,14 +801,22 @@ fn picture_window() -> Rack {
     v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.5);
     v.r.route(v.knob, "m2", v.oscs[0], "detune", 0.5);
     v.r.route(v.knob, "m3", v.mix, "level2", 0.5);
-    v.stage("chorus", &[("rate_hz", 0.3), ("depth", 55.0), ("mix", 22.0)]);
+    v.stage(
+        "chorus",
+        &[("rate_hz", 0.3), ("depth", 55.0), ("mix", 22.0)],
+    );
     v.finish("m4", &echo(380.0, 30.0, 4000.0), 0.25, (4.0, 0.5), None)
 }
 
 /// Drive-In: a lush synthwave pad, detuned saws over a square, slow vibrato, wide chorus.
 fn drive_in() -> Rack {
     let mut v = Voice::new(pad_recipe(
-        &[("Cutoff", 0.50), ("Wobble", 0.40), ("Chorus", 0.60), ("Space", 0.60)],
+        &[
+            ("Cutoff", 0.50),
+            ("Wobble", 0.40),
+            ("Chorus", 0.60),
+            ("Space", 0.60),
+        ],
         vec![
             osc(2.0, 0.0, 0.28).unison(5.0, 16.0),
             osc(2.0, 0.0, 0.25).fine(-9.0),
@@ -787,7 +838,12 @@ fn drive_in() -> Rack {
 /// Dry Cleaner: phased chords through a compressor, close and dry, a filter sweep on macro 1.
 fn dry_cleaner() -> Rack {
     let mut c = pad_recipe(
-        &[("Sweep", 0.45), ("Phase", 0.50), ("Grit", 0.35), ("Room", 0.25)],
+        &[
+            ("Sweep", 0.45),
+            ("Phase", 0.50),
+            ("Grit", 0.35),
+            ("Room", 0.25),
+        ],
         vec![
             osc(2.0, 0.0, 0.30).unison(2.0, 8.0),
             osc(2.0, 0.0, 0.25).fine(10.0),
@@ -805,7 +861,13 @@ fn dry_cleaner() -> Rack {
     v.r.route(v.knob, "m3", v.drive, "drive_db", 0.5);
     let ph = v.stage(
         "phaser",
-        &[("stages", 6.0), ("rate_hz", 0.35), ("depth", 85.0), ("feedback", 55.0), ("mix", 0.0)],
+        &[
+            ("stages", 6.0),
+            ("rate_hz", 0.35),
+            ("depth", 85.0),
+            ("feedback", 55.0),
+            ("mix", 0.0),
+        ],
     );
     v.r.route(v.knob, "m2", ph, "mix", 0.9);
     v.stage("compressor", &compressor(-22.0, 4.0, 6.0, 120.0, 5.0));
@@ -815,7 +877,12 @@ fn dry_cleaner() -> Rack {
 /// Concrete Cloud: a thick saturated pad, drive into a hard compressor, a bitcrusher on request.
 fn concrete_cloud() -> Rack {
     let mut c = pad_recipe(
-        &[("Weight", 0.55), ("Cutoff", 0.45), ("Crush", 0.25), ("Room", 0.25)],
+        &[
+            ("Weight", 0.55),
+            ("Cutoff", 0.45),
+            ("Crush", 0.25),
+            ("Room", 0.25),
+        ],
         vec![
             osc(2.0, 0.0, 0.30).unison(4.0, 14.0),
             osc(2.0, -1.0, 0.30),
@@ -843,8 +910,16 @@ fn concrete_cloud() -> Rack {
 /// Static Garden: a triangle bed with a noise layer, a ring modulated layer and a wandering filter.
 fn static_garden() -> Rack {
     let mut v = Voice::new(pad_recipe(
-        &[("Texture", 0.40), ("Motion", 0.50), ("Metal", 0.30), ("Space", 0.55)],
-        vec![osc(1.0, 0.0, 0.35).unison(3.0, 9.0), osc(0.0, 0.0, 0.20).fine(4.0)],
+        &[
+            ("Texture", 0.40),
+            ("Motion", 0.50),
+            ("Metal", 0.30),
+            ("Space", 0.55),
+        ],
+        vec![
+            osc(1.0, 0.0, 0.35).unison(3.0, 9.0),
+            osc(0.0, 0.0, 0.20).fine(4.0),
+        ],
         [1100.0, 0.12, 0.0],
         [1200.0, 2000.0, 0.6, 2500.0],
         0.15,
@@ -870,7 +945,10 @@ fn static_garden() -> Rack {
     let walk2 = v.r.add("lfo", &[("rate_hz", 0.29)]);
     v.r.depth_route(walk1, "out", v.lad, "cutoff_hz", v.knob, "m2", 0.4);
     v.r.depth_route(walk2, "out", v.lad, "cutoff_hz", v.knob, "m2", 0.2);
-    v.stage("chorus", &[("rate_hz", 0.2), ("depth", 50.0), ("mix", 18.0)]);
+    v.stage(
+        "chorus",
+        &[("rate_hz", 0.2), ("depth", 50.0), ("mix", 18.0)],
+    );
     v.finish("m4", &echo(620.0, 45.0, 2800.0), 0.3, (7.0, 0.55), None)
 }
 
@@ -975,7 +1053,6 @@ fn presets() -> Vec<Preset> {
     ]
 }
 
-
 /// Peak and loudness (dBFS) the way `factory_levels_hold_the_target` measures a poly keys patch:
 /// the chord E3 B3 E4 G4 at velocity 90, down at 1, 5 and 13 s, up at 4, 9 and 17 s, 24 s render.
 fn level(p: &Preset, state: &kabl_core::PatchState) -> (f32, f32) {
@@ -993,15 +1070,22 @@ fn level(p: &Preset, state: &kabl_core::PatchState) -> (f32, f32) {
     let peak = l.iter().chain(&r).fold(0.0f32, |m, s| m.max(s.abs()));
     let (mut sum, mut n) = (0.0f64, 0usize);
     for (cl, cr) in l.chunks(4800).zip(r.chunks(4800)) {
-        let ms = cl.iter().chain(cr).map(|s| (*s as f64).powi(2)).sum::<f64>() / (cl.len() * 2) as f64;
+        let ms = cl
+            .iter()
+            .chain(cr)
+            .map(|s| (*s as f64).powi(2))
+            .sum::<f64>()
+            / (cl.len() * 2) as f64;
         if ms > 1e-5 {
             sum += ms;
             n += 1;
         }
     }
-    (db(peak), 20.0 * (sum / n.max(1) as f64).sqrt().log10() as f32)
+    (
+        db(peak),
+        20.0 * (sum / n.max(1) as f64).sqrt().log10() as f32,
+    )
 }
-
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -1026,8 +1110,11 @@ fn main() {
                     keys,
                     sequence,
                 };
-                std::fs::write(dir.join("sound.toml"), toml::to_string_pretty(&meta).unwrap())
-                    .expect("sound.toml");
+                std::fs::write(
+                    dir.join("sound.toml"),
+                    toml::to_string_pretty(&meta).unwrap(),
+                )
+                .expect("sound.toml");
                 println!("wrote {}", dir.display());
             }
         }
@@ -1043,7 +1130,10 @@ fn main() {
                 assert_eq!(l, l2, "{}: render is deterministic", p.slug);
                 write_wav(&out.join(format!("{}.wav", p.slug)), &l, &r);
                 let peak = l.iter().chain(&r).fold(0.0f32, |m, s| m.max(s.abs()));
-                println!("{:14} peak {peak:.3} | {} | {}", p.slug, p.category, p.listen);
+                println!(
+                    "{:14} peak {peak:.3} | {} | {}",
+                    p.slug, p.category, p.listen
+                );
             }
         }
         Some("phrases") => {
@@ -1055,7 +1145,12 @@ fn main() {
                         .iter()
                         .map(|h| format!("[{:.3},{},{}]", h.0, h.1, h.2.unwrap_or(0)))
                         .collect();
-                    format!("\"{}\":{{\"secs\":{},\"hits\":[{}],\"cues\":[]}}", p.slug, p.secs, hits.join(","))
+                    format!(
+                        "\"{}\":{{\"secs\":{},\"hits\":[{}],\"cues\":[]}}",
+                        p.slug,
+                        p.secs,
+                        hits.join(",")
+                    )
                 })
                 .collect();
             std::fs::write(&args[2], format!("{{{}}}\n", entries.join(","))).unwrap();
@@ -1063,7 +1158,8 @@ fn main() {
         Some("levels") => {
             // levels <patches dir>: peak and loudness (dBFS) as the level test measures them
             for p in presets().into_iter().filter(|p| only(p)) {
-                let log = kabl_core::load(&Path::new(&args[2]).join("presets").join(p.slug)).unwrap();
+                let log =
+                    kabl_core::load(&Path::new(&args[2]).join("presets").join(p.slug)).unwrap();
                 let (peak, loud) = level(&p, log.state());
                 println!("LEVEL {:14} peak {peak:6.2}  loud {loud:6.2}", p.slug);
             }
@@ -1075,9 +1171,19 @@ fn main() {
                 let mut line = format!("{:14}", p.slug);
                 for (label, value) in [("all 0", 0.0), ("all 1", 1.0)] {
                     let mut rack = (p.build)();
-                    let knob = *rack.e.state().modules.iter().find(|(_, m)| m.kind == "macro").unwrap().0;
+                    let knob = *rack
+                        .e
+                        .state()
+                        .modules
+                        .iter()
+                        .find(|(_, m)| m.kind == "macro")
+                        .unwrap()
+                        .0;
                     for k in 1..=8 {
-                        if rack.e.state().modules[&knob].params.contains_key(&format!("pin.m{k}")) {
+                        if rack.e.state().modules[&knob]
+                            .params
+                            .contains_key(&format!("pin.m{k}"))
+                        {
                             rack.e.set_param(knob, &format!("m{k}"), value);
                         }
                     }
@@ -1089,17 +1195,38 @@ fn main() {
                 // Each macro alone, 0 against 1: how far the render moves (dB under the render).
                 let probe = |k: usize, v: f32| {
                     let mut rack = (p.build)();
-                    let knob = *rack.e.state().modules.iter().find(|(_, m)| m.kind == "macro").unwrap().0;
+                    let knob = *rack
+                        .e
+                        .state()
+                        .modules
+                        .iter()
+                        .find(|(_, m)| m.kind == "macro")
+                        .unwrap()
+                        .0;
                     rack.e.set_param(knob, &format!("m{k}"), v);
                     render(rack.e.state(), &(p.phrase)(), p.secs).0
                 };
                 let count = (1..=8)
-                    .filter(|k| (p.build)().e.state().modules.values().any(|m| m.params.contains_key(&format!("pin.m{k}"))))
+                    .filter(|k| {
+                        (p.build)()
+                            .e
+                            .state()
+                            .modules
+                            .values()
+                            .any(|m| m.params.contains_key(&format!("pin.m{k}")))
+                    })
                     .count();
                 for k in 1..=count {
                     let (a, b) = (probe(k, 0.0), probe(k, 1.0));
-                    let rms = |f: &dyn Fn(usize) -> f32| (a.iter().enumerate().map(|(i, _)| f(i).powi(2)).sum::<f32>() / a.len() as f32).sqrt();
-                    line += &format!("  m{k} {:6.1} dB", db(rms(&|i| a[i] - b[i]) / rms(&|i| a[i]).max(1e-9)));
+                    let rms = |f: &dyn Fn(usize) -> f32| {
+                        (a.iter().enumerate().map(|(i, _)| f(i).powi(2)).sum::<f32>()
+                            / a.len() as f32)
+                            .sqrt()
+                    };
+                    line += &format!(
+                        "  m{k} {:6.1} dB",
+                        db(rms(&|i| a[i] - b[i]) / rms(&|i| a[i]).max(1e-9))
+                    );
                 }
                 println!("{line}");
             }
@@ -1110,6 +1237,8 @@ fn main() {
                 println!("    (\n        \"presets/{}\",\n        {:?},\n        {:?},\n        &{:?},\n        {:?},\n    ),", p.slug, p.name, p.category, p.tags, p.description);
             }
         }
-        _ => eprintln!("usage: presets_pad write|clips|levels|macros|library <patches dir> [out dir] [group]"),
+        _ => eprintln!(
+            "usage: presets_pad write|clips|levels|macros|library <patches dir> [out dir] [group]"
+        ),
     }
 }

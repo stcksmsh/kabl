@@ -20,6 +20,7 @@ Pad 14 total (the pilot's Salt Flat counts); group 1 is about eight. Write `docs
 
 - The level that counts is `cargo test --release -p kabl-ui --test factory_bank level_table -- --ignored --nocapture`; for a poly patch it plays E3 B3 E4 G4 at velocity 90, down at 1, 5, 13 s, up at 4, 9, 17 s. The generator's `levels` command copies that but can read 1 to 4 dB differently for slow pads: trust the test.
 - Stored macro values already move the knob (see `BASS-LEAD-HANDOVER.md`); a macro on a mixer level or noise level needs a high enough route amount, or it measures about -29 dB (Static Garden Texture was that at first).
+- The `limiter` module has instant attack and no lookahead (its own doc says so): a pad that pins it crackles. Keep a compressor before it (`Voice::guard`) and check clips with the second-difference test (per 50 ms, peak over RMS of the second difference above 12), not a high-frequency-energy scan; a long reverb on a bass-heavy pad adds single-sample kinks too (about 1 % of the signal at 10 s decay).
 - `ringmod` has no params: a "Metal" macro is a mixer level on a ring-modulated layer, not a mix control.
 - `osc.va` has `out_r`, but a stereo cable needs the `left`/`right` or `in_l`/`in_r` pairs of the fx modules (step 1), so unison stays mono until step 2.
 - Commands are refused in the worktree when compound (`&&` is fine in a plain `cd X && cmd`, heredocs and `sed 'Nr file'` are not): write scripts with the Write tool.

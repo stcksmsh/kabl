@@ -157,7 +157,7 @@
         "y": 620.0
       },
       "params": {
-        "gain_db": 9.5
+        "gain_db": 11.0
       }
     },
     "13": {
@@ -220,9 +220,24 @@
       }
     },
     "18": {
-      "kind": "limiter",
+      "kind": "compressor",
       "pos": {
         "x": 1354.0,
+        "y": 620.0
+      },
+      "params": {
+        "attack_ms": 15.0,
+        "knee_db": 4.0,
+        "makeup_db": 0.0,
+        "ratio": 3.0,
+        "release_ms": 250.0,
+        "threshold_db": -16.0
+      }
+    },
+    "19": {
+      "kind": "limiter",
+      "pos": {
+        "x": 1544.0,
         "y": 620.0
       },
       "params": {
@@ -230,10 +245,10 @@
         "release_ms": 150.0
       }
     },
-    "19": {
+    "20": {
       "kind": "out",
       "pos": {
-        "x": 1544.0,
+        "x": 1734.0,
         "y": 620.0
       },
       "params": {}
@@ -822,7 +837,7 @@
       "to": {
         "Module": {
           "id": 19,
-          "port": "left"
+          "port": "in_l"
         }
       },
       "params": {},
@@ -838,6 +853,38 @@
       "to": {
         "Module": {
           "id": 19,
+          "port": "in_r"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "39": {
+      "from": {
+        "Module": {
+          "id": 19,
+          "port": "left"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 20,
+          "port": "left"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "40": {
+      "from": {
+        "Module": {
+          "id": 19,
+          "port": "right"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 20,
           "port": "right"
         }
       },
