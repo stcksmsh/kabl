@@ -1,0 +1,11 @@
+name = "Matinee"
+category = "Keys"
+tags = [
+    "poly",
+    "supersaw",
+    "chorus",
+    "synthwave",
+]
+description = "A wide keyboard from seven detuned saws, a soft filter and a big room. Play slow chords. Cutoff opens the filter, Warmth adds a little drive, Space sets the echo and the long room, Width pulls the saws apart."
+keys = true
+sequence = false

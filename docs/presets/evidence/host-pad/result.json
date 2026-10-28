@@ -1,0 +1,17 @@
+{
+ "plugin_sha256": "e74f489efd6a8af658a628920a5f5544eaa54dc0dec0813992d346d5255d66a3",
+ "fog-bank": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1535,
+  "rms": 0.0291,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "deep-field": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1595,
+  "rms": 0.0329,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ }
+}

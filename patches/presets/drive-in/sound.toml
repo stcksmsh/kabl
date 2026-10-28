@@ -1,0 +1,13 @@
+name = "Drive-In"
+category = "Pad"
+tags = [
+    "poly",
+    "supersaw",
+    "chorus",
+    "vibrato",
+    "synthwave",
+    "80s",
+]
+description = "A lush synthwave pad: detuned saws over a square, a slow vibrato, wide chorus and a long echo. Play slow minor chords. Cutoff opens the filter, Wobble sets the depth of the vibrato, Chorus brings in the chorus, Space adds the echo and the room."
+keys = true
+sequence = false

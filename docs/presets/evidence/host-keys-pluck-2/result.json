@@ -1,0 +1,108 @@
+{
+ "plugin_sha256": "d984121f924071d02fa2a31aa06b89bc93bad0021590762979301b4d39599b47",
+ "tin-roof": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.188,
+  "rms": 0.0374,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "turnstile": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.2188,
+  "rms": 0.032,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "hand-bell": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1266,
+  "rms": 0.0181,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "corduroy": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1867,
+  "rms": 0.0348,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "matinee": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1824,
+  "rms": 0.0327,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "snowmelt": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.2188,
+  "rms": 0.0393,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "scaffold": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1605,
+  "rms": 0.0256,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "brass-filament": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1352,
+  "rms": 0.0216,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "spinet": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0943,
+  "rms": 0.0269,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "willow": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1765,
+  "rms": 0.0319,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "dry-creek": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0892,
+  "rms": 0.0255,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "gumdrop": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0936,
+  "rms": 0.0219,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "cold-cut": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0818,
+  "rms": 0.025,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "rivet-gun": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1574,
+  "rms": 0.0319,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "tuning-fork": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1172,
+  "rms": 0.0168,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ }
+}

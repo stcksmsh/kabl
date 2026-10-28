@@ -193,6 +193,8 @@ struct Post<'a> {
     /// Chorus params, and the share of m4 that opens its mix (None: the mix is as stored).
     chorus: Option<ChorusSpec<'a>>,
     comp: Option<&'a [(&'static str, f32)]>,
+    /// A module whose `out` feeds the compressor's sidechain, and an m4 route into one of its knobs.
+    duck: Option<(ModuleId, Option<(&'static str, f32)>)>,
     echo: &'a [(&'static str, f32)],
     echo_max: f32,
     clock: Option<ModuleId>,
@@ -255,6 +257,12 @@ fn post(r: &mut Rack, knob: ModuleId, src: ModuleId, p: &Post) -> Stages {
     if let Some(cp) = p.comp {
         let id = r.add("compressor", cp);
         stage(r, &mut last, &mut first, id);
+        if let Some((src, m4)) = p.duck {
+            r.wire(src, "out", id, "sc");
+            if let Some((param, amt)) = m4 {
+                r.route(knob, "m4", id, param, amt);
+            }
+        }
     }
     if first {
         // No stereo stage: a plain width-less chorus-free path still needs left and right.
@@ -555,6 +563,49 @@ fn main() {
                         db(peak),
                         db(ms.sqrt())
                     );
+                }
+                println!("{line}");
+            }
+        }
+        Some("moves") => {
+            // Each named macro alone at 0 and at 1 (the others as stored): the renders must differ.
+            // Prints the difference as dB below the louder render's RMS; under -40 dB is flagged.
+            let only = args.get(2);
+            for p in presets()
+                .into_iter()
+                .filter(|p| only.is_none_or(|s| s == p.slug))
+            {
+                let rack = (p.build)();
+                let knob = *rack
+                    .e
+                    .state()
+                    .modules
+                    .iter()
+                    .find(|(_, m)| m.kind == "macro")
+                    .unwrap()
+                    .0;
+                let mut line = format!("MOVES {:16}", p.slug);
+                for k in 1..=8 {
+                    let key = format!("m{k}");
+                    let Some(name) = rack.e.state().labels[&knob]
+                        .get(&format!("name.{key}"))
+                        .cloned()
+                    else {
+                        continue;
+                    };
+                    let at = |v: f32| {
+                        let mut r = (p.build)();
+                        r.e.set_param(knob, &key, v);
+                        render(r.e.state(), &(p.phrase)(), p.secs).0
+                    };
+                    let (a, b) = (at(0.0), at(1.0));
+                    let rms = |v: &[f32]| {
+                        (v.iter().map(|s| s * s).sum::<f32>() / v.len().max(1) as f32).sqrt()
+                    };
+                    let d: Vec<f32> = a.iter().zip(&b).map(|(x, y)| x - y).collect();
+                    let db = 20.0 * (rms(&d) / rms(&a).max(rms(&b)).max(1e-9)).max(1e-9).log10();
+                    let flag = if db < -40.0 { " FLAT" } else { "" };
+                    line += &format!(" | {key} {name} {db:.1}{flag}");
                 }
                 println!("{line}");
             }
