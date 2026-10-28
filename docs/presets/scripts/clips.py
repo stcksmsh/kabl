@@ -46,6 +46,14 @@ def pcm(path):
         at += 8 + size + (size & 1)
 
 
+def fade(x, ms=20):
+    """Raised-cosine fade in and out at the ends of a tour clip, so the splice to silence does not click."""
+    n = min(int(48000 * ms / 1000), len(x) // 2)
+    w = (0.5 - 0.5 * np.cos(np.pi * (np.arange(n) + 0.5) / n)).astype('<f4')[:, None]
+    x = x.copy(); x[:n] *= w; x[len(x) - n:] *= w[::-1]
+    return x
+
+
 def encode_and_check(wav, mp3):
     sp.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', wav, '-b:a', '320k', mp3], check=True)
     # For ears: the same float render as 24-bit FLAC, next to the mp3.
@@ -86,7 +94,7 @@ with tempfile.TemporaryDirectory() as tmp:
                 for wav in wavs:
                     x = pcm(wav)
                     print(f'tour {at:6.1f} s  {wav.stem}')
-                    parts += [x, gap]
+                    parts += [fade(x), gap]
                     at += (len(x) + len(gap)) / 48000
                 sp.run(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'f32le', '-ar', '48000', '-ac', '2', '-i', '-', '-c:a', 'flac', '-sample_fmt', 's32', '-bits_per_raw_sample', '24', str(out / 'tour.flac')], input=np.concatenate(parts[:-1]).astype('<f4').tobytes(), check=True)
         else:
