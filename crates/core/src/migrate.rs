@@ -18,6 +18,9 @@ use std::collections::BTreeMap;
 use crate::{CableId, CableState, Composite, ModuleId, ModuleState, Op, ParamTarget, PatchState};
 use crate::{PatchLog, PortRef, Source, Vec2};
 
+/// Last op of the migration group; a loaded file is an undo barrier after it.
+pub(crate) const MIGRATED_NOTE: &str = "migrated to schema 8";
+
 const STEREO_IN: &[&str] = &[
     "chorus",
     "reverb",
@@ -327,7 +330,7 @@ pub fn migrate_v7_to_v8(log: &mut PatchLog) {
         }
     }
     ops.push(Op::Annotate {
-        text: "migrated to schema 8".into(),
+        text: MIGRATED_NOTE.into(),
     });
     let t_ms = log.all_entries().last().map_or(0, |e| e.t_ms);
     log.append_new(Op::Group { ops }, t_ms, Source::Director);

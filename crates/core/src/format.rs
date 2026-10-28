@@ -95,6 +95,7 @@ pub fn load(dir: &Path) -> Result<PatchLog, FormatError> {
     if meta.schema_version < 5 && !log.state().tables.is_empty() {
         return Err(FormatError::UnknownSchemaVersion(5));
     }
+    log.floor_after_migration();
     if meta.schema_version < 8 {
         crate::migrate::migrate_v7_to_v8(&mut log);
     }

@@ -298,4 +298,5 @@ fn a_v7_file_loads_migrated_and_the_migration_is_not_undoable() {
     kabl_core::save(out.path(), &back).unwrap();
     let again = kabl_core::load(out.path()).unwrap();
     assert_eq!(again.state(), &migrated);
+    assert!(!again.can_undo(), "the barrier survives a save");
 }

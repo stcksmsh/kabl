@@ -56,6 +56,20 @@ impl PatchLog {
         self.cursor > self.floor
     }
 
+    /// Undo floor from a loaded file: past the last schema migration it holds, if any.
+    pub(crate) fn floor_after_migration(&mut self) {
+        let marker = |e: &Entry| match &e.op {
+            crate::Op::Group { ops } => matches!(
+                ops.last(),
+                Some(crate::Op::Annotate { text }) if text == crate::migrate::MIGRATED_NOTE
+            ),
+            _ => false,
+        };
+        if let Some(i) = self.entries.iter().rposition(marker) {
+            self.floor = self.floor.max(i + 1);
+        }
+    }
+
     /// Makes everything applied so far permanent: undo stops here.
     pub fn set_undo_floor(&mut self) {
         self.floor = self.cursor;
