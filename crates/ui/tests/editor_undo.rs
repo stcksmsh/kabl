@@ -23,7 +23,7 @@ fn editor() -> (PatchEditor, [u64; 5]) {
     let lfo = e.add_module("lfo", at);
     let env = e.add_module("env.adsr", at);
     e.connect(out(midi, "gate"), out(vca, "in"));
-    e.connect(out(vca, "out"), out(o, "left"));
+    e.connect(out(vca, "out"), out(o, "in"));
     e.connect(out(midi, "gate"), out(env, "gate"));
     e.take_dirty();
     (e, [midi, vca, o, lfo, env])

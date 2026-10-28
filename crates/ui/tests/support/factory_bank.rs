@@ -99,9 +99,7 @@ pub fn keyboard(bass: bool) -> PatchEditor {
         .state()
         .cables
         .iter()
-        .filter(|(_, c)| {
-            c.to == port(4, "cv") || c.to == port(5, "left") || c.to == port(5, "right")
-        })
+        .filter(|(_, c)| c.to == port(4, "cv") || c.to == port(5, "out") || c.to == port(5, "in"))
         .map(|(&id, _)| id)
         .collect();
     for id in remove {
@@ -112,10 +110,8 @@ pub fn keyboard(bass: bool) -> PatchEditor {
         (1, "velocity", vel, "b"),
         (vel, "out", 4, "cv"),
         (4, "out", gain, "in"),
-        (gain, "out", reverb, "in_l"),
-        (gain, "out", reverb, "in_r"),
-        (reverb, "left", 5, "left"),
-        (reverb, "right", 5, "right"),
+        (gain, "out", reverb, "in"),
+        (reverb, "out", 5, "in"),
     ] {
         e.connect(port(a, ap), port(b, bp));
     }
@@ -190,10 +186,8 @@ pub fn progression() -> PatchEditor {
         (mix, "out", filt, "in"),
         (filt, "out", vca, "in"),
         (env, "out", vca, "cv"),
-        (vca, "out", reverb, "in_l"),
-        (vca, "out", reverb, "in_r"),
-        (reverb, "left", out, "left"),
-        (reverb, "right", out, "right"),
+        (vca, "out", reverb, "in"),
+        (reverb, "out", out, "in"),
     ] {
         e.connect(port(a, ap), port(b, bp));
     }

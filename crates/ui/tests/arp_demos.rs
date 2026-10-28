@@ -126,8 +126,7 @@ fn arp_chord() -> PatchEditor {
     r.wire(clock, "gate", delay, "clock");
     r.wire(vca, "out", trim, "in");
     r.wire(trim, "out", delay, "in");
-    r.wire(delay, "left", out, "left");
-    r.wire(delay, "right", out, "right");
+    r.wire(delay, "out", out, "in");
     r.route(env, "out", filter, "cutoff_hz", 0.3);
     r.e
 }
@@ -191,8 +190,7 @@ fn swing_seq() -> PatchEditor {
     r.wire(clock, "gate", henv, "gate");
     r.wire(henv, "out", hvca, "cv");
     r.wire(hvca, "out", mixer, "in2");
-    r.wire(mixer, "out", out, "left");
-    r.wire(mixer, "out", out, "right");
+    r.wire(mixer, "out", out, "in");
     r.route(env, "out", ladder, "cutoff_hz", 0.35);
     r.e
 }
@@ -246,8 +244,7 @@ fn ratchet_roll() -> PatchEditor {
     r.wire(clock, "gate", delay, "clock");
     r.wire(vca, "out", trim, "in");
     r.wire(trim, "out", delay, "in");
-    r.wire(delay, "left", out, "left");
-    r.wire(delay, "right", out, "right");
+    r.wire(delay, "out", out, "in");
     r.route(env, "out", filter, "cutoff_hz", 0.3);
     r.e
 }
@@ -315,10 +312,9 @@ fn arp_cable() -> PatchEditor {
         ],
     );
     r.wire(clock, "gate", delay, "clock");
-    r.wire(delay, "left", mixer, "in2");
-    r.wire(delay, "right", mixer, "in3");
-    r.wire(mixer, "out", out, "left");
-    r.wire(mixer, "out", out, "right");
+    r.wire(delay, "in", mixer, "in2");
+    r.wire(delay, "in", mixer, "in3");
+    r.wire(mixer, "out", out, "in");
     r.route(env, "out", filter, "cutoff_hz", 0.3);
     r.e
 }

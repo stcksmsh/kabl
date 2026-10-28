@@ -32,11 +32,13 @@ const PORTS: &[PortInfo] = &[
         name: "gate",
         port_type: PortType::Gate,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "out",
         port_type: PortType::UnipolarCv,
         direction: PortDirection::Output,
+        width: 1,
     },
 ];
 

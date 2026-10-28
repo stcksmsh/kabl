@@ -986,7 +986,7 @@ fn focused_view_keeps_existing_native_jack_and_parameter_cables() {
         },
         kabl_core::PortRef::Module {
             id: OUTPUT,
-            port: "left".into(),
+            port: "in".into(),
         },
     );
     for _ in 0..3 {
@@ -1264,8 +1264,8 @@ fn write_crowded_patch() {
         ("f2", "bp", "vca2", "in"),
         ("env1", "out", "vca1", "cv"),
         ("env2", "out", "vca2", "cv"),
-        ("vca1", "out", "out", "left"),
-        ("vca2", "out", "out", "right"),
+        ("vca1", "out", "out", "in"),
+        ("vca2", "out", "out", "in"),
     ] {
         e.connect(port(a, ap), port(b, bp));
     }

@@ -58,8 +58,8 @@ fn patch(left: &str) -> PatchState {
         (m(CLOCK, "reset"), m(DIV, "reset")),
         (m(CLOCK, "reset"), m(SEQ_A, "reset")),
         (m(CLOCK, "reset"), m(SEQ_B, "reset")),
-        (m(SEQ_A, left), m(OUT, "left")),
-        (m(SEQ_B, "pitch"), m(OUT, "right")),
+        (m(SEQ_A, left), m(OUT, "in")),
+        (m(SEQ_B, "pitch"), m(OUT, "in")),
     ];
     for (i, (from, to)) in cables.into_iter().enumerate() {
         p.cables.insert(

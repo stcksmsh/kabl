@@ -56,26 +56,31 @@ const PORTS: &[PortInfo] = &[
         name: "clock",
         port_type: PortType::Gate,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "reset",
         port_type: PortType::Gate,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "gate",
         port_type: PortType::Gate,
         direction: PortDirection::Output,
+        width: 1,
     },
     PortInfo {
         name: "pitch",
         port_type: PortType::Pitch,
         direction: PortDirection::Output,
+        width: 1,
     },
     PortInfo {
         name: "velocity",
         port_type: PortType::UnipolarCv,
         direction: PortDirection::Output,
+        width: 1,
     },
 ];
 

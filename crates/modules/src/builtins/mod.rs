@@ -49,6 +49,7 @@ pub mod seq;
 mod slew;
 mod vca;
 mod vocoder;
+mod wiring;
 
 pub use arp::{Arp, ARP_INFO, MAX_NOTES};
 pub use attenuverter::{Attenuverter, ATTENUVERTER_INFO};
@@ -102,3 +103,4 @@ pub use seq::{Direction, Seq, SEQ_INFO};
 pub use slew::{Slew, MODE_LABELS as SLEW_MODE_LABELS, SLEW_INFO};
 pub use vca::{Vca, VCA_INFO};
 pub use vocoder::{band_centers, Vocoder, MAX_BANDS, VOCODER_INFO};
+pub use wiring::{Join, Split, JOIN_INFO, SPLIT_INFO};

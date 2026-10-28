@@ -53,8 +53,7 @@ fn patch(clock: &[(&str, f32)], arp: &[(&str, f32)]) -> PatchState {
     wire(&mut p, (2, "pitch"), (3, "pitch"));
     wire(&mut p, (3, "out"), (4, "in"));
     wire(&mut p, (2, "gate"), (4, "cv"));
-    wire(&mut p, (4, "out"), (5, "left"));
-    wire(&mut p, (4, "out"), (5, "right"));
+    wire(&mut p, (4, "out"), (5, "in"));
     p
 }
 

@@ -232,17 +232,17 @@ fn exact_pcm_voice_stereo_effect_feedback_and_no_callback_allocation() {
         src.clone(),
         PortRef::Module {
             id: chorus,
-            port: "in_l".into(),
+            port: "in".into(),
         },
     );
     e.connect(
         src,
         PortRef::Module {
             id: chorus,
-            port: "in_r".into(),
+            port: "in".into(),
         },
     );
-    for (a, b) in [("left", "in_l"), ("right", "in_r")] {
+    for (a, b) in [("out", "in"), ("out", "in")] {
         e.connect(
             PortRef::Module {
                 id: chorus,
@@ -254,7 +254,7 @@ fn exact_pcm_voice_stereo_effect_feedback_and_no_callback_allocation() {
             },
         );
     }
-    for port in ["left", "right"] {
+    for port in ["out", "in"] {
         e.connect(
             PortRef::Module {
                 id: reverb,

@@ -133,13 +133,11 @@ fn palette(mode: f32) -> PatchState {
         .c(port(LADDER, "out"), port(VCA, "in"))
         .c(port(ENV, "out"), port(VCA, "cv"))
         .c(port(VCA, "out"), port(DRIVE, "in"))
-        .c(port(DRIVE, "out"), port(CHORUS_A, "in_l"))
-        .c(port(DRIVE, "out"), port(CHORUS_A, "in_r"))
-        .c(port(DRIVE, "out"), port(CHORUS_B, "in_l"))
-        .c(port(DRIVE, "out"), port(CHORUS_B, "in_r"))
-        .c(port(CHORUS_A, "left"), port(OUT, "left"))
-        .c(port(CHORUS_B, "right"), port(DRIVE_B, "in"))
-        .c(port(DRIVE_B, "out"), port(OUT, "right"));
+        .c(port(DRIVE, "out"), port(CHORUS_A, "in"))
+        .c(port(DRIVE, "out"), port(CHORUS_B, "in"))
+        .c(port(CHORUS_A, "out"), port(OUT, "in"))
+        .c(port(CHORUS_B, "out"), port(DRIVE_B, "in")) // STEREO-FIX
+        .c(port(DRIVE_B, "out"), port(OUT, "in"));
     b.0
 }
 
@@ -302,8 +300,8 @@ fn noise_voices() -> PatchState {
     b.c(port(MIDI, "gate"), port(ENV, "gate"))
         .c(port(NOISE, "out"), port(VCA, "in"))
         .c(port(ENV, "out"), port(VCA, "cv"))
-        .c(port(VCA, "out"), port(OUT, "left"))
-        .c(port(VCA, "out"), port(OUT, "right"));
+        .c(port(VCA, "out"), port(OUT, "in"))
+        .c(port(VCA, "out"), port(OUT, "in"));
     b.0
 }
 
@@ -334,12 +332,12 @@ fn each_voice_plays_its_own_noise_stream() {
     // it stays one instance, so the right keeps its full level, and the voices share the
     // stream (a chord adds in amplitude).
     let mut q = p.clone();
-    q.cables.retain(|_, c| c.to != port(OUT, "right"));
+    q.cables.retain(|_, c| c.to != port(OUT, "in"));
     q.cables.insert(
         99,
         CableState {
             from: port(NOISE, "out"),
-            to: port(OUT, "right"),
+            to: port(OUT, "in"),
             params: Default::default(),
             steps: vec![],
         },
@@ -362,7 +360,7 @@ fn single_instance_noise_plays_the_lane_zero_stream() {
     // cable never changes what an unvoiced noise sounds like at its start.
     let mut b = B(PatchState::new(), 0);
     b.m(NOISE, "noise", &[("color", 1.0)]).m(OUT, "out", &[]);
-    b.c(port(NOISE, "out"), port(OUT, "left"));
+    b.c(port(NOISE, "out"), port(OUT, "in"));
     let alone = b.0;
     let mut single = compile(&alone, SR, VOICES).unwrap();
     // The voiced patch with the gate held from the first sample (attack 0.1 ms, full sustain)
@@ -509,7 +507,7 @@ fn old_patches_are_unchanged_by_the_new_params() {
         .c(port(MIDI, "gate"), port(ENV, "gate"))
         .c(port(OSC, "out"), port(VCA, "in"))
         .c(port(ENV, "out"), port(VCA, "cv"))
-        .c(port(VCA, "out"), port(OUT, "left"));
+        .c(port(VCA, "out"), port(OUT, "in"));
     let old = b.0;
     let mut new = old.clone();
     for (k, v) in [

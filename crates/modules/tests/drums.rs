@@ -44,12 +44,8 @@ impl Dut {
         );
         let info = m.info();
         let params = info.params.iter().map(|p| p.default).collect();
-        let n_in = info
-            .ports
-            .iter()
-            .filter(|p| p.direction == PortDirection::Input)
-            .count();
-        let n_out = info.ports.len() - n_in;
+        let n_in = info.slots(kabl_modules::PortDirection::Input);
+        let n_out = info.slots(kabl_modules::PortDirection::Output);
         let mut d = Dut {
             m,
             params,

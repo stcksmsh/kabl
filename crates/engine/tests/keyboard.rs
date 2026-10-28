@@ -480,8 +480,8 @@ fn probe(params: &[(&str, f32)]) -> PatchState {
     let mut p = PatchState::new();
     p.modules.insert(MIDI, module("midi.in", params));
     p.modules.insert(OUT, module("out", &[]));
-    cable(&mut p, port(MIDI, "pitch"), port(OUT, "left"));
-    cable(&mut p, port(MIDI, "gate"), port(OUT, "right"));
+    cable(&mut p, port(MIDI, "pitch"), port(OUT, "in"));
+    cable(&mut p, port(MIDI, "gate"), port(OUT, "in"));
     p
 }
 
@@ -723,8 +723,8 @@ fn keyboard_settings_never_touch_a_sequencer_chain() {
         p.modules.insert(OSC, module("osc.va", &[]));
         cable(&mut p, port(CLOCK, "gate"), port(SEQ, "clock"));
         cable(&mut p, port(SEQ, "pitch"), port(OSC, "pitch"));
-        cable(&mut p, port(OSC, "out"), port(OUT, "left"));
-        cable(&mut p, port(MIDI, "gate"), port(OUT, "right"));
+        cable(&mut p, port(OSC, "out"), port(OUT, "in"));
+        cable(&mut p, port(MIDI, "gate"), port(OUT, "in"));
         p
     };
     let collector = Collector::new();

@@ -53,8 +53,8 @@ fn kit() -> PatchState {
     wire(&mut p, (1, "velocity"), (2, "velocity"));
     wire(&mut p, (5, "gate"), (3, "gate"));
     wire(&mut p, (5, "velocity"), (3, "velocity"));
-    wire(&mut p, (2, "out"), (4, "left"));
-    wire(&mut p, (3, "out"), (4, "right"));
+    wire(&mut p, (2, "out"), (4, "in"));
+    wire(&mut p, (3, "out"), (4, "in"));
     p
 }
 
@@ -133,7 +133,7 @@ fn midi_drums_and_a_voiced_keyboard_patch_do_not_disturb_each_other() {
     wire(&mut p, (6, "pitch"), (7, "pitch"));
     wire(&mut p, (7, "out"), (8, "in"));
     wire(&mut p, (6, "gate"), (8, "cv"));
-    wire(&mut p, (8, "out"), (4, "left"));
+    wire(&mut p, (8, "out"), (4, "in"));
     let (_c, mut e) = engine(&p);
     blocks(&mut e, 2);
     note(&mut e, 36, 100, 0);
@@ -164,11 +164,9 @@ fn the_kick_ducks_a_pad_through_the_compressor_sidechain() {
     );
     p.modules.insert(5, module("out", &[]));
     wire(&mut p, (1, "gate"), (2, "gate"));
-    wire(&mut p, (3, "out"), (4, "in_l"));
-    wire(&mut p, (3, "out"), (4, "in_r"));
+    wire(&mut p, (3, "out"), (4, "in"));
     wire(&mut p, (2, "out"), (4, "sc"));
-    wire(&mut p, (4, "left"), (5, "left"));
-    wire(&mut p, (4, "right"), (5, "right"));
+    wire(&mut p, (4, "out"), (5, "in"));
     let (_c, mut e) = engine(&p);
     blocks(&mut e, 100);
     let level = |x: &[f32]| (x.iter().map(|v| v * v).sum::<f32>() / x.len() as f32).sqrt();

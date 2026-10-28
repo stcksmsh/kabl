@@ -385,7 +385,7 @@ fn signal_paths_come_from_cables_and_stay_bounded() {
         prev = n;
     }
     let out = ed.add_module("out", kabl_core::Vec2::default());
-    ed.connect(port(prev, "out"), port(out, "left"));
+    ed.connect(port(prev, "out"), port(out, "in"));
     assert_eq!(
         explain::path_to_output(ed.state(), first),
         Err(explain::PathLimit)

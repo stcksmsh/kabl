@@ -52,7 +52,7 @@ fn probe(gain: f32) -> PatchState {
     p.modules.insert(2, module("vca", &[("gain", gain)]));
     p.modules.insert(3, module("out", &[]));
     p.cables.insert(1, cable((7, "gate"), (2, "in")));
-    p.cables.insert(2, cable((2, "out"), (3, "left")));
+    p.cables.insert(2, cable((2, "out"), (3, "in")));
     p
 }
 
@@ -188,7 +188,7 @@ fn every_midi_in_receives_notes_whatever_its_id() {
     let mut p = probe(1.0);
     // A second midi.in at id 40 feeding the right channel.
     p.modules.insert(40, module("midi.in", &[]));
-    p.cables.insert(3, cable((40, "gate"), (3, "right")));
+    p.cables.insert(3, cable((40, "gate"), (3, "in")));
     let mut compiled = compile(&p, SR, 2).unwrap();
     compiled.note_on(1, 0.0, 1.0);
     compiled.process_block();

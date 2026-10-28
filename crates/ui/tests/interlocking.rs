@@ -119,8 +119,7 @@ pub fn interlocking_base() -> PatchEditor {
 
     set(&mut e, mixer, "level1", 0.22);
     set(&mut e, mixer, "level2", 0.12);
-    e.connect(port(mixer, "out"), port(out, "left"));
-    e.connect(port(mixer, "out"), port(out, "right"));
+    e.connect(port(mixer, "out"), port(out, "in"));
     e
 }
 

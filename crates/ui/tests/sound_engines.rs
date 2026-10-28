@@ -154,10 +154,8 @@ fn tine_keys() -> PatchEditor {
     }
     r.wire(ea, "out", vca, "cv");
     r.wire(vca, "out", gain, "in");
-    r.wire(gain, "out", chorus, "in_l");
-    r.wire(gain, "out", chorus, "in_r");
-    r.wire(chorus, "left", out, "left");
-    r.wire(chorus, "right", out, "right");
+    r.wire(gain, "out", chorus, "in");
+    r.wire(chorus, "out", out, "in");
     // The operators' own envelopes shape how far each bends the carrier, as on a DX.
     r.route(eb, "out", body, "level", 0.8);
     r.route(m, "velocity", body, "level", 0.25);
@@ -214,10 +212,8 @@ fn glass_bells() -> PatchEditor {
     r.wire(vca_a, "out", mix, "in1");
     r.wire(vca_b, "out", mix, "in2");
     r.wire(mix, "out", gain, "in");
-    r.wire(gain, "out", reverb, "in_l");
-    r.wire(gain, "out", reverb, "in_r");
-    r.wire(reverb, "left", out, "left");
-    r.wire(reverb, "right", out, "right");
+    r.wire(gain, "out", reverb, "in");
+    r.wire(reverb, "out", out, "in");
     r.route(env_ma, "out", mod_a, "level", 1.0);
     r.route(env_mb, "out", mod_b, "level", 1.0);
     r.route(m, "velocity", car_a, "index", 0.1);
@@ -293,12 +289,9 @@ fn vowel_drift() -> PatchEditor {
     r.wire(m, "gate", env, "gate");
     r.wire(env, "out", vca, "cv");
     r.wire(vca, "out", gain, "in");
-    r.wire(gain, "out", chorus, "in_l");
-    r.wire(gain, "out", chorus, "in_r");
-    r.wire(chorus, "left", reverb, "in_l");
-    r.wire(chorus, "right", reverb, "in_r");
-    r.wire(reverb, "left", out, "left");
-    r.wire(reverb, "right", out, "right");
+    r.wire(gain, "out", chorus, "in");
+    r.wire(chorus, "out", reverb, "in");
+    r.wire(reverb, "out", out, "in");
     r.route(env, "out", filter, "cutoff_hz", 0.12);
     r.e
 }
@@ -390,10 +383,8 @@ fn imported_morph() -> PatchEditor {
     r.wire(m, "gate", env, "gate");
     r.wire(env, "out", vca, "cv");
     r.wire(vca, "out", gain, "in");
-    r.wire(gain, "out", reverb, "in_l");
-    r.wire(gain, "out", reverb, "in_r");
-    r.wire(reverb, "left", out, "left");
-    r.wire(reverb, "right", out, "right");
+    r.wire(gain, "out", reverb, "in");
+    r.wire(reverb, "out", out, "in");
     // Every note sweeps the table from its first frame toward the resonant top.
     r.route(env, "out", wt, "position", 0.8);
     r.route(m, "velocity", wt, "position", 0.2);
@@ -410,10 +401,8 @@ fn fm6_chain(r: &mut Rack, m: ModuleId, voice: ModuleId, gain_db: f32, chorus: &
     let fx = r.add("chorus", chorus);
     let out = r.add("out", &[]);
     r.wire(voice, "out", gain, "in");
-    r.wire(gain, "out", fx, "in_l");
-    r.wire(gain, "out", fx, "in_r");
-    r.wire(fx, "left", out, "left");
-    r.wire(fx, "right", out, "right");
+    r.wire(gain, "out", fx, "in");
+    r.wire(fx, "out", out, "in");
 }
 
 fn dx_keys() -> PatchEditor {
@@ -484,10 +473,8 @@ fn iron_bell() -> PatchEditor {
     let gain = r.add("gain", &[("gain_db", 6.0)]);
     let out = r.add("out", &[]);
     r.wire(voice, "out", gain, "in");
-    r.wire(gain, "out", reverb, "in_l");
-    r.wire(gain, "out", reverb, "in_r");
-    r.wire(reverb, "left", out, "left");
-    r.wire(reverb, "right", out, "right");
+    r.wire(gain, "out", reverb, "in");
+    r.wire(reverb, "out", out, "in");
     r.e
 }
 
@@ -560,12 +547,9 @@ fn rising_pad() -> PatchEditor {
     r.wire(m, "gate", amp, "gate");
     r.wire(amp, "out", vca, "cv");
     r.wire(vca, "out", gain, "in");
-    r.wire(gain, "out", chorus, "in_l");
-    r.wire(gain, "out", chorus, "in_r");
-    r.wire(chorus, "left", reverb, "in_l");
-    r.wire(chorus, "right", reverb, "in_r");
-    r.wire(reverb, "left", out, "left");
-    r.wire(reverb, "right", out, "right");
+    r.wire(gain, "out", chorus, "in");
+    r.wire(chorus, "out", reverb, "in");
+    r.wire(reverb, "out", out, "in");
     r.route(sweep, "out", a, "position", 0.9);
     r.route(sweep, "out", b, "position", 0.6);
     r.route(m, "velocity", a, "position", 0.1);
@@ -662,10 +646,8 @@ fn scale_walk() -> PatchEditor {
     r.wire(env, "out", vca, "cv");
     r.wire(vca, "out", trim, "in");
     r.wire(trim, "out", delay, "in");
-    r.wire(delay, "left", reverb, "in_l");
-    r.wire(delay, "right", reverb, "in_r");
-    r.wire(reverb, "left", out, "left");
-    r.wire(reverb, "right", out, "right");
+    r.wire(delay, "out", reverb, "in");
+    r.wire(reverb, "out", out, "in");
     r.route(env, "out", filter, "cutoff_hz", 0.35);
     r.e
 }
@@ -743,10 +725,8 @@ fn clock_logic() -> PatchEditor {
     r.wire(gated, "and", bell, "gate");
     r.wire(vca_b, "out", mix, "in1");
     r.wire(bell, "out", mix, "in2");
-    r.wire(mix, "out", reverb, "in_l");
-    r.wire(mix, "out", reverb, "in_r");
-    r.wire(reverb, "left", out, "left");
-    r.wire(reverb, "right", out, "right");
+    r.wire(mix, "out", reverb, "in");
+    r.wire(reverb, "out", out, "in");
     r.e
 }
 
@@ -822,10 +802,8 @@ fn stepped_sweep() -> PatchEditor {
     r.wire(gain, "out", filter, "in");
     r.wire(filter, "out", pan, "in");
     r.wire(sl_p, "out", pan, "pan");
-    r.wire(pan, "left", reverb, "in_l");
-    r.wire(pan, "right", reverb, "in_r");
-    r.wire(reverb, "left", out, "left");
-    r.wire(reverb, "right", out, "right");
+    r.wire(pan, "out", reverb, "in");
+    r.wire(reverb, "out", out, "in");
     r.route(sl_f, "out", filter, "cutoff_hz", 0.6);
     r.e
 }

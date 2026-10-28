@@ -392,9 +392,9 @@ fn cable_to(s: &PatchState, id: u64, port: &str) -> u64 {
 fn why_no_sound_a_removed_connection_is_a_graph_fact() {
     let clocks = HashMap::new();
     let mut s = init_state();
-    let c = cable_to(&s, 5, "left");
+    let c = cable_to(&s, 5, "in");
     s.cables.remove(&c);
-    let c = cable_to(&s, 5, "right");
+    let c = cable_to(&s, 5, "in");
     s.cables.remove(&c);
     let d = inspect::diagnose(&s, Some(2), &cx(&clocks, None));
     assert!(
@@ -848,7 +848,7 @@ fn a_path_search_that_hits_its_limit_is_unknown_not_disconnected() {
     s.modules.insert(601, m("out"));
     for id in 1..=600u64 {
         let to = if id == 600 {
-            (601, "left")
+            (601, "in")
         } else {
             (id + 1, "in")
         };
@@ -1070,7 +1070,7 @@ fn why_no_sound_leaves_optional_inputs_alone() {
 
     // VCA out -> mixer in2 -> reverb in_l -> chorus in_r -> out.
     let mut s = init_state();
-    for c in [cable_to(&s, 5, "left"), cable_to(&s, 5, "right")] {
+    for c in [cable_to(&s, 5, "out"), cable_to(&s, 5, "in")] {
         s.cables.remove(&c);
     }
     for (id, kind) in [(10, "mixer"), (11, "reverb"), (12, "chorus")] {
@@ -1101,10 +1101,10 @@ fn why_no_sound_leaves_optional_inputs_alone() {
         );
     };
     wire(&mut s, 50, (4, "out"), (10, "in2"));
-    wire(&mut s, 51, (10, "out"), (11, "in_l"));
-    wire(&mut s, 52, (11, "left"), (12, "in_r"));
-    wire(&mut s, 53, (12, "left"), (5, "left"));
-    wire(&mut s, 54, (12, "right"), (5, "right"));
+    wire(&mut s, 51, (10, "out"), (11, "in"));
+    wire(&mut s, 52, (11, "out"), (12, "in"));
+    wire(&mut s, 53, (12, "out"), (5, "in"));
+    wire(&mut s, 54, (12, "out"), (5, "in"));
     let d = inspect::diagnose(&s, Some(2), &cx(&clocks, None));
     assert!(
         d.facts.iter().all(|f| !f.contains("No cable into")),

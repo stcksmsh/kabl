@@ -26,7 +26,7 @@ use crate::info::{Category, ModuleInfo, ParamInfo, PortInfo, QualitySupport, Rat
 use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig};
 
-const PORTS: &[PortInfo] = &[STEREO_IN[0], STEREO_IN[1], STEREO_OUT[0], STEREO_OUT[1]];
+const PORTS: &[PortInfo] = &[STEREO_IN, STEREO_OUT];
 
 const PARAMS: &[ParamInfo] = &[
     param("low_hz", 20.0, 1000.0, 100.0, "Hz", Taper::Exponential),

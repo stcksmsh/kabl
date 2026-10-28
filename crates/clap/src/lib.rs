@@ -1577,7 +1577,7 @@ mod tests {
                 },
                 to: kabl_core::PortRef::Module {
                     id: 6,
-                    port: "left".into(),
+                    port: "in".into(),
                 },
                 params: Default::default(),
                 steps: vec![],

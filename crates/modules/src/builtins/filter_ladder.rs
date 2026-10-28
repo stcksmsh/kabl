@@ -48,16 +48,19 @@ const PORTS: &[PortInfo] = &[
         name: "in",
         port_type: PortType::Audio,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "cutoff_cv",
         port_type: PortType::Cv,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "out",
         port_type: PortType::Audio,
         direction: PortDirection::Output,
+        width: 1,
     },
 ];
 

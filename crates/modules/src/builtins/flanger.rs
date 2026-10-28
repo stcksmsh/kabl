@@ -22,7 +22,7 @@ use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig};
 use crate::view::ModuleView;
 
-const PORTS: &[PortInfo] = &[STEREO_IN[0], STEREO_IN[1], STEREO_OUT[0], STEREO_OUT[1]];
+const PORTS: &[PortInfo] = &[STEREO_IN, STEREO_OUT];
 
 const PARAMS: &[ParamInfo] = &[
     param("rate_hz", 0.02, 5.0, 0.25, "Hz", Taper::Exponential),

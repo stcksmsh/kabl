@@ -67,8 +67,7 @@ fn gate_to_out(p: &mut PatchState, from: u64) {
     p.cables.insert(20, cable((from, "out"), (5, "in")));
     p.cables.insert(21, cable((1, "gate"), (6, "gate")));
     p.cables.insert(22, cable((6, "out"), (5, "cv")));
-    p.cables.insert(23, cable((5, "out"), (4, "left")));
-    p.cables.insert(24, cable((5, "out"), (4, "right")));
+    p.cables.insert(23, cable((5, "out"), (4, "in")));
 }
 
 /// midi.in -> osc.wt (an LFO on its pos jack) -> out.
@@ -179,7 +178,7 @@ fn eight_voices_of_both_sources_allocate_nothing() {
     p.tables.insert(1, user_table());
     p.modules.insert(7, module("osc.wt", &[("user", 1.0)]));
     p.cables.insert(6, cable((1, "pitch"), (7, "pitch")));
-    p.cables.insert(7, cable((7, "out"), (4, "left")));
+    p.cables.insert(7, cable((7, "out"), (4, "in")));
     let mut c = compile(&p, SR, 8).unwrap();
     let notes: Vec<(usize, f32)> = (0..8).map(|v| (v, v as f32 * 3.0 - 12.0)).collect();
     let out = render(&mut c, &notes, 400);

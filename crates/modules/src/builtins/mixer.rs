@@ -15,26 +15,31 @@ const PORTS: &[PortInfo] = &[
         name: "in1",
         port_type: PortType::Audio,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "in2",
         port_type: PortType::Audio,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "in3",
         port_type: PortType::Audio,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "in4",
         port_type: PortType::Audio,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "out",
         port_type: PortType::Audio,
         direction: PortDirection::Output,
+        width: 1,
     },
 ];
 

@@ -136,8 +136,7 @@ fn minimal_patch() -> PatchState {
         .insert(2, module("osc.va", &[("base_hz", 261.63)]));
     patch.modules.insert(3, module("out", &[]));
     patch.cables.insert(1, cable(1, "pitch", 2, "pitch"));
-    patch.cables.insert(2, cable(2, "out", 3, "left"));
-    patch.cables.insert(3, cable(2, "out", 3, "right"));
+    patch.cables.insert(2, cable(2, "out", 3, "in"));
     patch
 }
 

@@ -61,8 +61,7 @@ fn osc_vca_patch(gain: f32) -> PatchState {
         .insert(2, module("vca", &[("gain", gain), ("exponential", 0.0)]));
     patch.modules.insert(3, module("out", &[]));
     patch.cables.insert(1, cable(1, "out", 2, "in"));
-    patch.cables.insert(2, cable(2, "out", 3, "left"));
-    patch.cables.insert(3, cable(2, "out", 3, "right"));
+    patch.cables.insert(2, cable(2, "out", 3, "in"));
     patch
 }
 

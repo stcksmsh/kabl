@@ -66,7 +66,7 @@ fn finite_route(
         return false;
     }
     let routes: Vec<_> = p.cables.values().filter(|c| matches!(&c.to,
-        PortRef::Module { id: target, port } if *target == id && matches!(port.as_str(), "in" | "in_l" | "in_r" | "left" | "right" | "a" | "b" | "c" | "d" | "in1" | "in2" | "in3" | "in4"))) .collect();
+        PortRef::Module { id: target, port } if *target == id && matches!(port.as_str(), "in" | "a" | "b" | "c" | "d" | "in1" | "in2" | "in3" | "in4"))) .collect();
     let finite = !routes.is_empty()
         && routes.iter().all(|c| {
             c.from

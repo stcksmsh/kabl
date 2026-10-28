@@ -31,21 +31,25 @@ const CROSSFADE_PORTS: &[PortInfo] = &[
         name: "a",
         port_type: PortType::Audio,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "b",
         port_type: PortType::Audio,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "fade",
         port_type: PortType::Cv,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "out",
         port_type: PortType::Audio,
         direction: PortDirection::Output,
+        width: 1,
     },
 ];
 
@@ -140,21 +144,19 @@ const PAN_PORTS: &[PortInfo] = &[
         name: "in",
         port_type: PortType::Audio,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "pan",
         port_type: PortType::Cv,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
-        name: "left",
+        name: "out",
         port_type: PortType::Audio,
         direction: PortDirection::Output,
-    },
-    PortInfo {
-        name: "right",
-        port_type: PortType::Audio,
-        direction: PortDirection::Output,
+        width: 2,
     },
 ];
 

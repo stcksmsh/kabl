@@ -43,8 +43,7 @@ fn single_osc_patch(base_hz: f32) -> PatchState {
         .modules
         .insert(1, module("osc.va", &[("base_hz", base_hz)]));
     patch.modules.insert(2, module("out", &[]));
-    patch.cables.insert(1, cable(1, "out", 2, "left"));
-    patch.cables.insert(2, cable(1, "out", 2, "right"));
+    patch.cables.insert(1, cable(1, "out", 2, "in"));
     patch
 }
 
@@ -100,8 +99,7 @@ fn unconnected_input_defaults_to_silence() {
     let mut patch = PatchState::new();
     patch.modules.insert(1, module("filter.svf", &[]));
     patch.modules.insert(2, module("out", &[]));
-    patch.cables.insert(1, cable(1, "lp", 2, "left"));
-    patch.cables.insert(2, cable(1, "lp", 2, "right"));
+    patch.cables.insert(1, cable(1, "lp", 2, "in"));
 
     let mut compiled = compile(&patch, SAMPLE_RATE, 1).expect("should compile");
     for _ in 0..5 {
@@ -137,8 +135,7 @@ fn cycle_compiles_with_implicit_one_block_delay() {
     patch.cables.insert(1, cable(1, "out", 3, "in"));
     patch.cables.insert(2, cable(3, "out", 2, "in"));
     patch.cables.insert(3, cable(2, "out", 3, "cv")); // the back edge -> delayed
-    patch.cables.insert(4, cable(2, "out", 4, "left"));
-    patch.cables.insert(5, cable(2, "out", 4, "right"));
+    patch.cables.insert(4, cable(2, "out", 4, "in"));
 
     let mut compiled = compile(&patch, SAMPLE_RATE, 1)
         .expect("a cycle should compile via an implicit 1-block delay, not error");
@@ -188,8 +185,7 @@ fn recompile_carries_over_a_cycles_delay_buffer_memory() {
     patch.cables.insert(1, cable(1, "out", 3, "in"));
     patch.cables.insert(2, cable(3, "out", 2, "in"));
     patch.cables.insert(3, cable(2, "out", 3, "cv")); // the back edge -> delayed
-    patch.cables.insert(4, cable(2, "out", 4, "left"));
-    patch.cables.insert(5, cable(2, "out", 4, "right"));
+    patch.cables.insert(4, cable(2, "out", 4, "in"));
 
     let mut compiled = compile(&patch, SAMPLE_RATE, 1).expect("should compile");
     for _ in 0..10 {
@@ -262,8 +258,7 @@ fn chord_patch() -> PatchState {
     patch.cables.insert(3, cable(1, "gate", 4, "gate"));
     patch.cables.insert(4, cable(3, "lp", 5, "in"));
     patch.cables.insert(5, cable(4, "out", 5, "cv"));
-    patch.cables.insert(6, cable(5, "out", 6, "left"));
-    patch.cables.insert(7, cable(5, "out", 6, "right"));
+    patch.cables.insert(6, cable(5, "out", 6, "in"));
     patch
 }
 

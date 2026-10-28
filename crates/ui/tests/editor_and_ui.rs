@@ -34,7 +34,7 @@ fn remove_module_removes_it_and_its_cables() {
         },
         PortRef::Module {
             id: b,
-            port: "left".into(),
+            port: "in".into(),
         },
     );
     assert!(editor.state().cables.contains_key(&cable_id));
@@ -59,7 +59,7 @@ fn connect_and_disconnect_round_trip() {
         },
         PortRef::Module {
             id: b,
-            port: "left".into(),
+            port: "in".into(),
         },
     );
     assert!(editor.state().cables.contains_key(&cable_id));

@@ -46,7 +46,7 @@ fn probe(mode: f32) -> PatchState {
         1,
         CableState {
             from: port(1, "gate"),
-            to: port(2, "right"),
+            to: port(2, "in"),
             params: Default::default(),
             steps: vec![],
         },

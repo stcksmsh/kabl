@@ -69,7 +69,7 @@ fn probe(base_gain: f32) -> PatchState {
         module("lfo", &[("rate_hz", 0.01), ("waveform", 3.0)]),
     );
     p.cables.insert(1, jack((MIDI, "gate"), (VCA, "in")));
-    p.cables.insert(2, jack((VCA, "out"), (OUT, "left")));
+    p.cables.insert(2, jack((VCA, "out"), (OUT, "in")));
     p
 }
 
@@ -266,7 +266,7 @@ fn mixer_probe(params: &[(&str, f32)]) -> PatchState {
     p.modules.insert(OUT, module("out", &[]));
     p.cables.insert(1, jack((MIDI, "gate"), (VCA, "in1")));
     p.cables.insert(2, jack((MIDI, "gate"), (VCA, "in2")));
-    p.cables.insert(3, jack((VCA, "out"), (OUT, "left")));
+    p.cables.insert(3, jack((VCA, "out"), (OUT, "in")));
     p
 }
 

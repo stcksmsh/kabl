@@ -68,8 +68,8 @@ fn patch() -> PatchState {
     for (i, (from, to)) in [
         (m(CLOCK, "gate"), m(GRID, "clock")),
         (m(CLOCK, "gate"), m(OTHER, "clock")),
-        (m(GRID, "kick"), m(OUT, "left")),
-        (m(GRID, "snare"), m(OUT, "right")),
+        (m(GRID, "kick"), m(OUT, "in")),
+        (m(GRID, "snare"), m(OUT, "in")),
     ]
     .into_iter()
     .enumerate()

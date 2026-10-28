@@ -179,8 +179,7 @@ fn four_floor() -> PatchEditor {
     r.wire(hat, "out", kit, "in4");
     r.wire(kit, "out", fill, "in1");
     r.wire(tom, "out", fill, "in2");
-    r.wire(fill, "out", out, "left");
-    r.wire(fill, "out", out, "right");
+    r.wire(fill, "out", out, "in");
     r.e
 }
 
@@ -263,15 +262,13 @@ fn pump() -> PatchEditor {
     r.wire(osc_a, "out", pad, "in1");
     r.wire(osc_b, "out", pad, "in2");
     r.wire(pad, "out", tone, "in");
-    r.wire(tone, "out", duck, "in_l");
-    r.wire(tone, "out", duck, "in_r");
+    r.wire(tone, "out", duck, "in");
     r.wire(kick, "out", duck, "sc");
     r.wire(kick, "out", mix, "in1");
     r.wire(clap, "out", mix, "in2");
     r.wire(hat, "out", mix, "in3");
-    r.wire(duck, "left", mix, "in4");
-    r.wire(mix, "out", out, "left");
-    r.wire(mix, "out", out, "right");
+    r.wire(duck, "in", mix, "in4");
+    r.wire(mix, "out", out, "in");
     r.e
 }
 

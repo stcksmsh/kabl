@@ -84,8 +84,7 @@ fn melody() -> PatchState {
     wire(&mut p, (1, "gate"), (2, "clock"));
     wire(&mut p, (2, "out"), (3, "in"));
     wire(&mut p, (3, "out"), (4, "pitch"));
-    wire(&mut p, (4, "out"), (5, "left"));
-    wire(&mut p, (4, "out"), (5, "right"));
+    wire(&mut p, (4, "out"), (5, "in"));
     p
 }
 
@@ -134,7 +133,7 @@ fn a_global_clock_shares_one_value_and_a_key_clock_gives_each_voice_its_own() {
     p.modules.insert(4, module("out", &[]));
     wire(&mut p, (1, "gate"), (2, "clock"));
     wire(&mut p, (2, "out"), (3, "in"));
-    wire(&mut p, (3, "out"), (4, "left"));
+    wire(&mut p, (3, "out"), (4, "in"));
     let (_c, mut e) = engine(&p, 4);
     probe(&mut e, 2, "random", 0);
     for note in [60, 64, 67] {
@@ -199,8 +198,7 @@ fn everything() -> PatchState {
     wire(&mut p, (8, "and"), (11, "fade"));
     wire(&mut p, (11, "out"), (12, "in"));
     wire(&mut p, (5, "out"), (12, "pan"));
-    wire(&mut p, (12, "left"), (13, "left"));
-    wire(&mut p, (12, "right"), (13, "right"));
+    wire(&mut p, (12, "out"), (13, "in"));
     p
 }
 

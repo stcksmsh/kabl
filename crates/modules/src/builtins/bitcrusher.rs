@@ -22,7 +22,7 @@ use crate::info::{Category, ModuleInfo, ParamInfo, PortInfo, QualitySupport, Rat
 use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig};
 
-const PORTS: &[PortInfo] = &[STEREO_IN[0], STEREO_IN[1], STEREO_OUT[0], STEREO_OUT[1]];
+const PORTS: &[PortInfo] = &[STEREO_IN, STEREO_OUT];
 
 const PARAMS: &[ParamInfo] = &[
     param("bits", 1.0, 16.0, 8.0, "bit", Taper::Linear),

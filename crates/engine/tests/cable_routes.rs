@@ -85,14 +85,13 @@ fn probe(morph: f32) -> PatchState {
     p.modules
         .insert(LFO, module("lfo", &[("rate_hz", 0.01), ("waveform", 3.0)]));
     p.modules.insert(OUT, module("out", &[]));
-    let mut cable = jack((LFO, "out"), (OUT, "left"), A);
+    let mut cable = jack((LFO, "out"), (OUT, "in"), A);
     for (k, v) in B {
         cable.params.insert(format!("b.{k}"), *v);
     }
     cable.params.insert("morph".into(), morph);
     p.cables.insert(CABLE, cable);
-    p.cables
-        .insert(2, jack((CLOCK, "gate"), (OUT, "right"), &[]));
+    p.cables.insert(2, jack((CLOCK, "gate"), (OUT, "in"), &[]));
     p
 }
 
@@ -197,9 +196,7 @@ fn a_moving_source_is_read_at_each_pulse_sample() {
     let mut alone = PatchState::new();
     alone.modules.insert(SRC, module("lfo", &sine));
     alone.modules.insert(OUT, module("out", &[]));
-    alone
-        .cables
-        .insert(1, jack((SRC, "out"), (OUT, "left"), &[]));
+    alone.cables.insert(1, jack((SRC, "out"), (OUT, "in"), &[]));
     let blocks = 1200;
     let reference = left_of(&alone, blocks);
     let (l, r) = render(&mut compile(&p, SR, 1).unwrap(), blocks, |_, _| {});
@@ -243,9 +240,8 @@ fn three_cables(routed: bool) -> PatchState {
     p.modules.insert(OUT, module("out", &[]));
     p.modules.insert(MACRO, module("macro", &[("m1", 0.5)]));
     p.modules.insert(6, module("mixer", &[]));
-    p.cables.insert(1, jack((6, "out"), (OUT, "left"), &[]));
-    p.cables
-        .insert(2, jack((CLOCK, "gate"), (OUT, "right"), &[]));
+    p.cables.insert(1, jack((6, "out"), (OUT, "in"), &[]));
+    p.cables.insert(2, jack((CLOCK, "gate"), (OUT, "in"), &[]));
     let depths = [1.0, 0.5, -0.5];
     for (k, depth) in depths.iter().enumerate() {
         let (lfo, cable) = (20 + k as u64, 30 + k as u64);
@@ -490,8 +486,8 @@ fn ops() -> Vec<Op> {
         m(LFO, "lfo"),
         m(OUT, "out"),
         m(MACRO, "macro"),
-        jack(CABLE, (LFO, "out"), (OUT, "left")),
-        jack(2, (CLOCK, "gate"), (OUT, "right")),
+        jack(CABLE, (LFO, "out"), (OUT, "in")),
+        jack(2, (CLOCK, "gate"), (OUT, "in")),
         Op::Connect {
             id: ROUTE,
             from: PortRef::Module {
@@ -625,7 +621,7 @@ fn files_saved_before_cable_routes_load_and_render_unchanged() {
     let meta = std::fs::read_to_string(dir.path().join("meta.toml")).unwrap();
     std::fs::write(
         dir.path().join("meta.toml"),
-        meta.replace("schema_version = 7", "schema_version = 6"),
+        meta.replace("schema_version = 8", "schema_version = 6"),
     )
     .unwrap();
     let back = kabl_core::load(dir.path()).expect("a v6 file loads");

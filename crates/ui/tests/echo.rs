@@ -63,14 +63,14 @@ pub fn echo() -> PatchEditor {
     // Lead through the delay, left and right to a mixer each; the bass on both, dry.
     let c = into(&e, port(MIXER, "in2"));
     e.disconnect(c);
-    let c = into(&e, port(OUT, "right"));
+    let c = into(&e, port(OUT, "in"));
     e.disconnect(c);
     e.connect(port(VCA_B, "out"), port(delay, "in"));
     e.connect(port(CLOCK, "gate"), port(delay, "clock"));
-    e.connect(port(delay, "left"), port(MIXER, "in2"));
-    e.connect(port(delay, "right"), port(mixer_r, "in2"));
+    e.connect(port(delay, "in"), port(MIXER, "in2"));
+    e.connect(port(delay, "in"), port(mixer_r, "in2"));
     e.connect(port(VCA_A, "out"), port(mixer_r, "in1"));
-    e.connect(port(mixer_r, "out"), port(OUT, "right"));
+    e.connect(port(mixer_r, "out"), port(OUT, "in"));
 
     // Dotted eighths against the lead's straight eighths, bouncing left and right; repeats
     // darker than the lead, audible for two to three seconds after the notes stop.

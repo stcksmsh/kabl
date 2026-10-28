@@ -56,7 +56,7 @@ fn probe(base: f32) -> PatchState {
     p.cables
         .insert(1, cable(port(LFO, "out"), port(ATT, "in"), None));
     p.cables
-        .insert(2, cable(port(ATT, "out"), port(OUT, "left"), None));
+        .insert(2, cable(port(ATT, "out"), port(OUT, "in"), None));
     p.cables.insert(
         ROUTE,
         cable(

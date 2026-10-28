@@ -1,7 +1,7 @@
 //! Stereo cables, step 1 (docs/stereo/DESIGN.md): width comes from the source port, a module with
 //! an audio input fed by a stereo cable runs once per channel, a mono cable into a stereo input
-//! is broadcast and a stereo cable into a mono input is averaged. Stereo is spelled with the pair
-//! aliases `out_st` / `in_st` over the existing half ports until the port change replaces them.
+//! is broadcast and a stereo cable into a mono input is averaged. Stereo is spelled with the width-2
+//! ports (`out`, `in`), with `split` / `join` for the one-sided mono references.
 //!
 //! Every stereo patch here has an equivalent built from two mono chains and half cables; the two
 //! must render the same samples exactly.
@@ -31,18 +31,46 @@ fn module(kind: &str, params: &[(&str, f32)]) -> ModuleState {
     }
 }
 
-fn wire(p: &mut PatchState, from: u64, fp: &str, to: u64, tp: &str) {
-    let port = |id, p: &str| PortRef::Module { id, port: p.into() };
+/// Joins and splits the test patches use to wire a stereo port one side at a time.
+const SPLIT: u64 = 90;
+const JOIN: u64 = 91;
+
+fn cable(p: &mut PatchState, from: (u64, &str), to: (u64, &str)) {
+    let port = |(id, p): (u64, &str)| PortRef::Module { id, port: p.into() };
     let id = p.cables.len() as u64 + 1;
     p.cables.insert(
         id,
         CableState {
-            from: port(from, fp),
-            to: port(to, tp),
+            from: port(from),
+            to: port(to),
             params: BTreeMap::new(),
             steps: Vec::new(),
         },
     );
+}
+
+/// `left` / `right` as a source go through a `split` on the module's `out`; as a destination
+/// (always `out`'s) through a `join` into `in`.
+fn wire(p: &mut PatchState, from: u64, fp: &str, to: u64, tp: &str) {
+    let (from, fp) = if matches!(fp, "left" | "right") {
+        if !p.modules.contains_key(&SPLIT) {
+            p.modules.insert(SPLIT, module("split", &[]));
+            cable(p, (from, "out"), (SPLIT, "in"));
+        }
+        (SPLIT, fp)
+    } else {
+        (from, fp)
+    };
+    let (to, tp) = if matches!(tp, "left" | "right") {
+        if !p.modules.contains_key(&JOIN) {
+            p.modules.insert(JOIN, module("join", &[]));
+            cable(p, (JOIN, "out"), (to, "in"));
+        }
+        (JOIN, tp)
+    } else {
+        (to, tp)
+    };
+    cable(p, (from, fp), (to, tp));
 }
 
 fn base(pan: f32) -> PatchState {
@@ -79,8 +107,8 @@ fn a_stereo_chain_equals_two_mono_chains() {
     // Stereo: pan -> svf -> gain -> out as three single cables.
     let mut st = base(0.6);
     add_chain(&mut st, SVF, GAIN);
-    wire(&mut st, PAN, "out_st", SVF, "in");
-    wire(&mut st, GAIN, "out", OUT, "in_st");
+    wire(&mut st, PAN, "out", SVF, "in");
+    wire(&mut st, GAIN, "out", OUT, "in");
     // Reference: a chain per side, half cables.
     let mut mono = base(0.6);
     add_chain(&mut mono, SVF, GAIN);
@@ -103,7 +131,7 @@ fn a_mono_cable_into_a_stereo_input_plays_on_both_sides() {
     let mut st = base(0.0);
     st.modules.remove(&PAN);
     st.cables.clear();
-    wire(&mut st, NOISE, "out", OUT, "in_st");
+    wire(&mut st, NOISE, "out", OUT, "in");
     let mut mono = st.clone();
     mono.cables.clear();
     wire(&mut mono, NOISE, "out", OUT, "left");
@@ -121,7 +149,7 @@ fn a_stereo_cable_into_a_mono_input_is_averaged() {
     // Pan hard right: the sides differ, and the mono input gets (L + R) / 2.
     let mut st = base(1.0);
     st.modules.insert(GAIN, module("gain", &[("gain_db", 0.0)]));
-    wire(&mut st, PAN, "out_st", GAIN, "in");
+    wire(&mut st, PAN, "out", GAIN, "in");
     wire(&mut st, GAIN, "out", OUT, "left");
     let mut sides = base(1.0);
     wire(&mut sides, PAN, "left", OUT, "left");
@@ -143,7 +171,7 @@ fn a_stereo_chain_fed_equal_channels_collapses_to_the_mono_sound() {
     add_chain(&mut st, SVF, GAIN);
     st.modules
         .insert(GAIN_R, module("gain", &[("gain_db", 0.0)]));
-    wire(&mut st, PAN, "out_st", SVF, "in");
+    wire(&mut st, PAN, "out", SVF, "in");
     wire(&mut st, GAIN, "out", GAIN_R, "in");
     wire(&mut st, GAIN_R, "out", OUT, "left");
     let mut mono = base(0.0);
@@ -167,8 +195,8 @@ fn a_second_channel_starts_from_the_first_ones_state() {
     wire(&mut mono, GAIN, "out", OUT, "left");
     let mut st = base(0.0);
     add_chain(&mut st, SVF, GAIN);
-    wire(&mut st, PAN, "out_st", SVF, "in");
-    wire(&mut st, GAIN, "out", OUT, "in_st");
+    wire(&mut st, PAN, "out", SVF, "in");
+    wire(&mut st, GAIN, "out", OUT, "in");
 
     let mut old = compile(&mono, 48000.0, 1).unwrap();
     for _ in 0..30 {
@@ -191,10 +219,10 @@ fn a_feedback_loop_through_a_stereo_cable_compiles_and_runs() {
     p.modules
         .insert(SVF, module("filter.svf", &[("cutoff_hz", 700.0)]));
     p.modules.insert(GAIN, module("mixer", &[]));
-    wire(&mut p, PAN, "out_st", GAIN, "in1");
+    wire(&mut p, PAN, "out", GAIN, "in1");
     wire(&mut p, SVF, "lp", GAIN, "in2");
     wire(&mut p, GAIN, "out", SVF, "in");
-    wire(&mut p, GAIN, "out", OUT, "in_st");
+    wire(&mut p, GAIN, "out", OUT, "in");
     let (l, r) = render(&p, 20);
     assert!(l.iter().chain(&r).all(|x| x.is_finite()));
     assert!(l.iter().any(|&x| x != 0.0));
@@ -213,8 +241,8 @@ fn voices_sum_per_channel() {
         wire(&mut p, 10, "pitch", 11, "pitch");
         wire(&mut p, 11, "out", PAN, "in");
         if stereo {
-            wire(&mut p, PAN, "out_st", SVF, "in");
-            wire(&mut p, GAIN, "out", OUT, "in_st");
+            wire(&mut p, PAN, "out", SVF, "in");
+            wire(&mut p, GAIN, "out", OUT, "in");
         } else {
             add_chain(&mut p, SVF_R, GAIN_R);
             wire(&mut p, PAN, "left", SVF, "in");

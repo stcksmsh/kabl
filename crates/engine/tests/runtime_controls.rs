@@ -56,7 +56,7 @@ fn probe(gain: f32) -> PatchState {
     p.modules.insert(2, module("vca", &[("gain", gain)]));
     p.modules.insert(3, module("out", &[]));
     p.cables.insert(1, cable((7, "gate"), jack(2, "in")));
-    p.cables.insert(2, cable((2, "out"), jack(3, "left")));
+    p.cables.insert(2, cable((2, "out"), jack(3, "in")));
     p
 }
 

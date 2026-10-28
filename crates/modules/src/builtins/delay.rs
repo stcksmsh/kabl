@@ -26,21 +26,19 @@ const PORTS: &[PortInfo] = &[
         name: "in",
         port_type: PortType::Audio,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "clock",
         port_type: PortType::Gate,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
-        name: "left",
+        name: "out",
         port_type: PortType::Audio,
         direction: PortDirection::Output,
-    },
-    PortInfo {
-        name: "right",
-        port_type: PortType::Audio,
-        direction: PortDirection::Output,
+        width: 2,
     },
 ];
 

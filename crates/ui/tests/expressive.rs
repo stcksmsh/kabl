@@ -99,8 +99,8 @@ pub fn split() -> PatchEditor {
         e.set_param(m, "level1", keys_level);
         e.set_param(m, "level2", bass_level);
     }
-    e.connect(port(mix_l, "out"), port(out, "left"));
-    e.connect(port(mix_r, "out"), port(out, "right"));
+    e.connect(port(mix_l, "out"), port(out, "in"));
+    e.connect(port(mix_r, "out"), port(out, "in"));
     e
 }
 
@@ -111,8 +111,7 @@ pub fn gate_probe() -> PatchEditor {
     let mut e = PatchEditor::new();
     let midi = e.add_module("midi.in", at(24.0, 0));
     let out = e.add_module("out", at(174.0, 0));
-    e.connect(port(midi, "gate"), port(out, "left"));
-    e.connect(port(midi, "gate"), port(out, "right"));
+    e.connect(port(midi, "gate"), port(out, "in"));
     // Unconnected: a face knob for measurement scripts to keep turning (UI and runtime
     // values) without changing the recorded gate.
     e.add_module("lfo", at(324.0, 0));

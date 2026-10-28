@@ -21,6 +21,7 @@ const fn out(name: &'static str) -> PortInfo {
         name,
         port_type: PortType::UnipolarCv,
         direction: PortDirection::Output,
+        width: 1,
     }
 }
 

@@ -28,31 +28,37 @@ const LOGIC_PORTS: &[PortInfo] = &[
         name: "a",
         port_type: PortType::Gate,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "b",
         port_type: PortType::Gate,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "and",
         port_type: PortType::Gate,
         direction: PortDirection::Output,
+        width: 1,
     },
     PortInfo {
         name: "or",
         port_type: PortType::Gate,
         direction: PortDirection::Output,
+        width: 1,
     },
     PortInfo {
         name: "xor",
         port_type: PortType::Gate,
         direction: PortDirection::Output,
+        width: 1,
     },
     PortInfo {
         name: "not",
         port_type: PortType::Gate,
         direction: PortDirection::Output,
+        width: 1,
     },
 ];
 
@@ -116,11 +122,13 @@ const COMPARATOR_PORTS: &[PortInfo] = &[
         name: "in",
         port_type: PortType::Cv,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "out",
         port_type: PortType::Gate,
         direction: PortDirection::Output,
+        width: 1,
     },
 ];
 

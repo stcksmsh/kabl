@@ -50,7 +50,7 @@ fn chain() -> PatchState {
     p.modules.insert(4, module("out", &[]));
     p.cables.insert(1, cable(1, "m1", 2, "in"));
     p.cables.insert(2, cable(2, "out", 3, "in"));
-    p.cables.insert(3, cable(3, "out", 4, "left"));
+    p.cables.insert(3, cable(3, "out", 4, "in"));
     p
 }
 
@@ -67,8 +67,7 @@ fn keys() -> PatchState {
     p.cables.insert(2, cable(1, "gate", 3, "gate"));
     p.cables.insert(3, cable(2, "out", 4, "in"));
     p.cables.insert(4, cable(3, "out", 4, "cv"));
-    p.cables.insert(5, cable(4, "out", 5, "left"));
-    p.cables.insert(6, cable(4, "out", 5, "right"));
+    p.cables.insert(5, cable(4, "out", 5, "in"));
     p
 }
 

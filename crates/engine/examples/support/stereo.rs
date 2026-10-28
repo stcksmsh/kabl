@@ -55,27 +55,6 @@ pub fn stereo_variant(p: &PatchState, autopan: bool) -> Option<PatchState> {
             changed = true;
         }
     }
-    // A stereo source feeding both halves of a pair is one stereo cable.
-    let cables: Vec<(u64, CableState)> = s.cables.iter().map(|(&k, c)| (k, c.clone())).collect();
-    for (k, c) in &cables {
-        let PortRef::Module { id, port } = &c.to else {
-            continue;
-        };
-        if port != "in_l" {
-            continue;
-        }
-        let twin = cables.iter().find(|(_, o)| {
-            o.from == c.from
-                && matches!(&o.to, PortRef::Module { id: i, port: p } if i == id && p == "in_r")
-        });
-        if let Some((tk, _)) = twin {
-            s.cables.remove(tk);
-            s.cables.get_mut(k).expect("listed").to = PortRef::Module {
-                id: *id,
-                port: "in_st".into(),
-            };
-        }
-    }
     // Audible stereo: one slow LFO moves every pan.
     if autopan && !pans.is_empty() {
         let lfo = next_module;

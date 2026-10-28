@@ -61,8 +61,7 @@ fn keys(t: Table) -> PatchState {
         .insert(2, module("osc.wt", &[("user", 1.0), ("position", 0.5)]));
     p.modules.insert(3, module("out", &[]));
     p.cables.insert(1, cable(1, "pitch", 2, "pitch"));
-    p.cables.insert(2, cable(2, "out", 3, "left"));
-    p.cables.insert(3, cable(2, "out", 3, "right"));
+    p.cables.insert(2, cable(2, "out", 3, "in"));
     p.tables.insert(1, t);
     p
 }

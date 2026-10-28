@@ -43,8 +43,8 @@ fn patch() -> PatchState {
         port: port.into(),
     };
     for (i, (from, to)) in [
-        (m(MACRO, "m1"), m(OUT, "left")),
-        (m(MACRO, "m2"), m(OUT, "right")),
+        (m(MACRO, "m1"), m(OUT, "in")),
+        (m(MACRO, "m2"), m(OUT, "in")),
     ]
     .into_iter()
     .enumerate()

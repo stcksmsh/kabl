@@ -31,11 +31,9 @@ use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig};
 
 const PORTS: &[PortInfo] = &[
-    STEREO_IN[0],
-    STEREO_IN[1],
+    STEREO_IN,
     port("sc", PortType::Audio, true),
-    STEREO_OUT[0],
-    STEREO_OUT[1],
+    STEREO_OUT,
     port("gr", PortType::Cv, false),
 ];
 

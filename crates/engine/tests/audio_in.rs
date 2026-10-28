@@ -30,8 +30,7 @@ fn the_hosts_input_reaches_the_output() {
     let mut p = PatchState::new();
     p.modules.insert(1, module("audio.in"));
     p.modules.insert(2, module("out"));
-    p.cables.insert(1, cable(1, "left", 2, "left"));
-    p.cables.insert(2, cable(1, "right", 2, "right"));
+    p.cables.insert(1, cable(1, "out", 2, "in"));
     let c = Collector::new();
     let mut e = PatchEngine::new(&c.handle(), &p, 48000.0, 1).unwrap();
     let (mut l, mut r) = ([0.0; BLOCK], [0.0; BLOCK]);

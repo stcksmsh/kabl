@@ -45,21 +45,25 @@ const PORTS: &[PortInfo] = &[
         name: "pitch",
         port_type: PortType::Pitch,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "sync",
         port_type: PortType::Gate,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "out",
         port_type: PortType::Audio,
         direction: PortDirection::Output,
+        width: 1,
     },
     PortInfo {
         name: "out_r",
         port_type: PortType::Audio,
         direction: PortDirection::Output,
+        width: 1,
     },
 ];
 

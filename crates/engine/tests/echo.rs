@@ -204,7 +204,7 @@ fn a_delay_edit_keeps_the_tail_and_two_delays_stay_apart() {
         .find(|(_, c)| c.to == port(MIXER, "in1"))
         .unwrap()
         .0;
-    p.cables.get_mut(&to_in1).unwrap().from = port(d2, "left");
+    p.cables.get_mut(&to_in1).unwrap().from = port(d2, "in");
     let cable = |from, to| CableState {
         from,
         to,
