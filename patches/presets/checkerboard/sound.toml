@@ -1,0 +1,14 @@
+name = "Checkerboard"
+category = "Keys"
+tags = [
+    "poly",
+    "stab",
+    "distorted",
+    "compressed",
+    "french touch",
+    "124bpm",
+    "signature",
+]
+description = "A house piano stab: two saws and a square, driven hard and squashed until it barks. Play short syncopated chords. Cutoff opens the filter, Crunch pushes the drive, Room sets a slapback and a tight room, Length stretches the stab."
+keys = true
+sequence = false
