@@ -29,7 +29,7 @@ pub fn interlocking() -> PatchEditor {
     let mut e = interlocking_base();
     factory_controls::prepare(&mut e, false);
     factory_bank::attach_guide(&mut e, "interlocking");
-    e
+    e.migrated()
 }
 
 pub fn interlocking_base() -> PatchEditor {
@@ -119,8 +119,9 @@ pub fn interlocking_base() -> PatchEditor {
 
     set(&mut e, mixer, "level1", 0.22);
     set(&mut e, mixer, "level2", 0.12);
-    e.connect(port(mixer, "out"), port(out, "in"));
-    e
+    e.connect(port(mixer, "out"), port(out, "left"));
+    e.connect(port(mixer, "out"), port(out, "right"));
+    e.migrated()
 }
 
 /// Not a check: writes `patches/interlocking`.

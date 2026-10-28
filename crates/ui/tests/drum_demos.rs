@@ -179,8 +179,9 @@ fn four_floor() -> PatchEditor {
     r.wire(hat, "out", kit, "in4");
     r.wire(kit, "out", fill, "in1");
     r.wire(tom, "out", fill, "in2");
-    r.wire(fill, "out", out, "in");
-    r.e
+    r.wire(fill, "out", out, "left");
+    r.wire(fill, "out", out, "right");
+    r.e.migrated()
 }
 
 /// A saw pad ducked by the kick: the kick's output goes to the compressor's sidechain, the pad
@@ -262,16 +263,16 @@ fn pump() -> PatchEditor {
     r.wire(osc_a, "out", pad, "in1");
     r.wire(osc_b, "out", pad, "in2");
     r.wire(pad, "out", tone, "in");
-    r.wire(tone, "out", duck, "in");
+    r.wire(tone, "out", duck, "in_l");
+    r.wire(tone, "out", duck, "in_r");
     r.wire(kick, "out", duck, "sc");
     r.wire(kick, "out", mix, "in1");
     r.wire(clap, "out", mix, "in2");
     r.wire(hat, "out", mix, "in3");
-    let sides = r.add("split", &[]);
-    r.wire(duck, "out", sides, "in");
-    r.wire(sides, "left", mix, "in4");
-    r.wire(mix, "out", out, "in");
-    r.e
+    r.wire(duck, "left", mix, "in4");
+    r.wire(mix, "out", out, "left");
+    r.wire(mix, "out", out, "right");
+    r.e.migrated()
 }
 
 type Demo = (
@@ -402,7 +403,7 @@ fn showcase() -> PatchEditor {
         1,
         &[(4, 3, 0), (7, 0, 2), (10, 0, 2), (12, 3, 0), (15, 1, 1)],
     );
-    r.e
+    r.e.migrated()
 }
 
 /// Not a check: `target/drum-grid/beat.wav`, 16 seconds of `showcase`.

@@ -63,14 +63,14 @@ pub fn echo() -> PatchEditor {
     // Lead through the delay, left and right to a mixer each; the bass on both, dry.
     let c = into(&e, port(MIXER, "in2"));
     e.disconnect(c);
-    let c = into(&e, port(OUT, "in"));
+    let c = into(&e, port(OUT, "right"));
     e.disconnect(c);
     e.connect(port(VCA_B, "out"), port(delay, "in"));
     e.connect(port(CLOCK, "gate"), port(delay, "clock"));
-    e.connect(port(delay, "in"), port(MIXER, "in2"));
-    e.connect(port(delay, "in"), port(mixer_r, "in2"));
+    e.connect(port(delay, "left"), port(MIXER, "in2"));
+    e.connect(port(delay, "right"), port(mixer_r, "in2"));
     e.connect(port(VCA_A, "out"), port(mixer_r, "in1"));
-    e.connect(port(mixer_r, "out"), port(OUT, "in"));
+    e.connect(port(mixer_r, "out"), port(OUT, "right"));
 
     // Dotted eighths against the lead's straight eighths, bouncing left and right; repeats
     // darker than the lead, audible for two to three seconds after the notes stop.
@@ -89,7 +89,7 @@ pub fn echo() -> PatchEditor {
     }
     factory_controls::prepare(&mut e, true);
     factory_bank::attach_guide(&mut e, "echo");
-    e
+    e.migrated()
 }
 
 use interlocking::{factory_bank, factory_controls};

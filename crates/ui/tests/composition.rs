@@ -330,13 +330,13 @@ pub fn composition() -> PatchEditor {
     e.connect(port(vca_b, "out"), port(echo, "in2"));
     e.connect(port(echo, "out"), port(delay, "in"));
     e.connect(port(clock, "gate"), port(delay, "clock"));
-    for (bus, side) in [(bus_l, "out"), (bus_r, "in")] {
+    for (bus, side) in [(bus_l, "left"), (bus_r, "right")] {
         e.connect(port(atmos, "out"), port(bus, "in1"));
         e.connect(port(delay, side), port(bus, "in2"));
     }
-    e.connect(port(bus_l, "out"), port(reverb, "in"));
-    e.connect(port(bus_r, "out"), port(reverb, "in"));
-    for (main, side) in [(main_l, "out"), (main_r, "in")] {
+    e.connect(port(bus_l, "out"), port(reverb, "in_l"));
+    e.connect(port(bus_r, "out"), port(reverb, "in_r"));
+    for (main, side) in [(main_l, "left"), (main_r, "right")] {
         e.connect(port(dry, "out"), port(main, "in1"));
         e.connect(port(reverb, side), port(main, "in2"));
         e.connect(port(main, "out"), port(out, side));
@@ -464,7 +464,7 @@ pub fn composition() -> PatchEditor {
     e.connect(port(pad_filt, "lp"), port(pad_vca, "in"));
     e.connect(port(pad_vca, "out"), port(atmos, "in2"));
     factory_bank::attach_guide(&mut e, "composition");
-    e
+    e.migrated()
 }
 
 /// Not a check: writes `patches/composition`.

@@ -609,8 +609,9 @@ fn voice(cutoff: f32, res: f32, env: [f32; 4]) -> PatchEditor {
     e.connect(port(filter, "lp"), port(vca, "in"));
     e.connect(port(midi, "gate"), port(adsr, "gate"));
     e.connect(port(adsr, "out"), port(vca, "cv"));
-    e.connect(port(vca, "out"), port(out, "in"));
-    e
+    e.connect(port(vca, "out"), port(out, "left"));
+    e.connect(port(vca, "out"), port(out, "right"));
+    e.migrated()
 }
 
 /// `patches/recipes/pluck-to-pad`: a plucked saw, envelope controls pinned.
@@ -630,8 +631,9 @@ pub fn pluck_to_pad() -> PatchEditor {
     let gain = e.add_module("gain", at(0, 900.0));
     e.set_param(gain, "gain_db", 6.5);
     e.connect(port(4, "out"), port(gain, "in"));
-    e.connect(port(gain, "out"), port(5, "in"));
-    e
+    e.connect(port(gain, "out"), port(5, "left"));
+    e.connect(port(gain, "out"), port(5, "right"));
+    e.migrated()
 }
 
 /// `patches/recipes/filter-movement`: a held saw through a resonant low-pass, with LFO #7
@@ -651,5 +653,5 @@ pub fn filter_movement() -> PatchEditor {
             (lfo, "rate_hz", "LFO rate"),
         ],
     );
-    e
+    e.migrated()
 }
