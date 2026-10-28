@@ -115,14 +115,11 @@ impl Rack {
             .expect("a route has a depth");
         self.e.set_route_amount(d, depth, true);
     }
-    /// The last stage: a limiter just under the level target's ceiling, so no macro setting
-    /// can clip the output, then the output.
+    /// The last stage: the output. No limiter; headroom comes from the patch gain.
     fn out_stereo(&mut self, from: ModuleId) {
-        let limiter = self.add("limiter", &[("ceiling_db", -1.5), ("release_ms", 150.0)]);
         let out = self.add("out", &[]);
-        self.stereo(from, limiter);
-        self.wire(limiter, "left", out, "left");
-        self.wire(limiter, "right", out, "right");
+        self.wire(from, "left", out, "left");
+        self.wire(from, "right", out, "right");
     }
 }
 
@@ -172,7 +169,7 @@ fn perform(r: &mut Rack, knob: ModuleId, n: usize, clock: Option<ModuleId>) {
 
 /// The tail every preset shares: a short mono-in echo (a slapback, or a tempo-synced echo when
 /// `clock` is given) and a tight room, both at mix 0 until the space macro `mac` opens them. `src` is
-/// a stereo module (`left`/`right`); returns the room, whose outputs go on to the limiter.
+/// a stereo module (`left`/`right`); returns the room, whose outputs go on to the output.
 #[allow(clippy::too_many_arguments)]
 fn space_tail(
     r: &mut Rack,
@@ -238,6 +235,25 @@ struct Preset {
     /// Seconds of the clip.
     secs: f32,
 }
+
+impl Rack {
+    /// Adds `db` to every gain stage's `gain_db`.
+    fn trim(&mut self, db: f32) {
+        let gains: Vec<_> = self
+            .e
+            .state()
+            .modules
+            .iter()
+            .filter(|(_, m)| m.kind == "gain")
+            .map(|(&id, m)| (id, m.params.get("gain_db").copied().unwrap_or(0.0)))
+            .collect();
+        for (id, g) in gains {
+            self.e.set_param(id, "gain_db", g + db);
+        }
+    }
+}
+
+include!("preset_trims.inc");
 
 fn write_wav(path: &Path, left: &[f32], right: &[f32]) {
     // `PP_F32` writes 32-bit float, for measuring without the 16-bit step.
@@ -412,9 +428,6 @@ struct Voice {
     mono: ModuleId,
     cur: Option<ModuleId>,
     n: usize,
-    /// A compressor between the room and the limiter, for a pad whose chords would otherwise
-    /// push the limiter (instant attack, no lookahead) into distortion.
-    guard: Option<[(&'static str, f32); 6]>,
 }
 
 impl Voice {
@@ -512,7 +525,6 @@ impl Voice {
             mono: trim,
             cur: None,
             n: c.macros.len(),
-            guard: None,
         }
     }
 
@@ -527,7 +539,7 @@ impl Voice {
         s
     }
 
-    /// The echo and room on macro `mac`, then the limiter and the output.
+    /// The echo and room on macro `mac`, then the output.
     fn finish(
         mut self,
         mac: &str,
@@ -548,14 +560,6 @@ impl Voice {
             room.1,
             mac,
         );
-        let tail = match self.guard {
-            Some(g) => {
-                let comp = self.r.add("compressor", &g);
-                self.r.stereo(tail, comp);
-                comp
-            }
-            None => tail,
-        };
         self.r.out_stereo(tail);
         perform(&mut self.r, self.knob, self.n, clock);
         self.r
@@ -715,7 +719,6 @@ fn fog_bank() -> Rack {
         "chorus",
         &[("rate_hz", 0.15), ("depth", 55.0), ("mix", 22.0)],
     );
-    v.guard = Some(compressor(-16.0, 3.0, 15.0, 250.0, 0.0));
     v.finish("m4", &echo(700.0, 45.0, 3000.0), 0.3, (9.0, 0.55), None)
 }
 
@@ -747,7 +750,6 @@ fn deep_field() -> Rack {
         "chorus",
         &[("rate_hz", 0.10), ("depth", 45.0), ("mix", 15.0)],
     );
-    v.guard = Some(compressor(-16.0, 3.0, 15.0, 250.0, 0.0));
     v.finish("m4", &echo(800.0, 50.0, 2500.0), 0.3, (6.5, 0.6), None)
 }
 
@@ -1097,7 +1099,8 @@ fn main() {
     match args.get(1).map(String::as_str) {
         Some("write") => {
             for p in presets().into_iter().filter(|p| only(p)) {
-                let rack = (p.build)();
+                let mut rack = (p.build)();
+                rack.trim(level_trim(p.slug));
                 let dir = Path::new(&args[2]).join("presets").join(p.slug);
                 let _ = std::fs::remove_dir_all(&dir);
                 kabl_core::save(&dir, rack.e.log()).expect("save");

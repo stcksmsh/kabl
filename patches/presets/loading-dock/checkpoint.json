@@ -552,20 +552,9 @@
       }
     },
     "37": {
-      "kind": "limiter",
-      "pos": {
-        "x": 1354.0,
-        "y": 1220.0
-      },
-      "params": {
-        "ceiling_db": -1.5,
-        "release_ms": 150.0
-      }
-    },
-    "38": {
       "kind": "out",
       "pos": {
-        "x": 1544.0,
+        "x": 1354.0,
         "y": 1220.0
       },
       "params": {}
@@ -1466,7 +1455,7 @@
       "to": {
         "Module": {
           "id": 37,
-          "port": "in_l"
+          "port": "left"
         }
       },
       "params": {},
@@ -1482,45 +1471,13 @@
       "to": {
         "Module": {
           "id": 37,
-          "port": "in_r"
+          "port": "right"
         }
       },
       "params": {},
       "steps": []
     },
     "60": {
-      "from": {
-        "Module": {
-          "id": 37,
-          "port": "left"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 38,
-          "port": "left"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "61": {
-      "from": {
-        "Module": {
-          "id": 37,
-          "port": "right"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 38,
-          "port": "right"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "62": {
       "from": {
         "Module": {
           "id": 1,
@@ -1538,7 +1495,7 @@
       },
       "steps": []
     },
-    "63": {
+    "61": {
       "from": {
         "Module": {
           "id": 17,
@@ -1554,7 +1511,7 @@
       "params": {},
       "steps": []
     },
-    "64": {
+    "62": {
       "from": {
         "Module": {
           "id": 18,
@@ -1570,7 +1527,7 @@
       "params": {},
       "steps": []
     },
-    "65": {
+    "63": {
       "from": {
         "Module": {
           "id": 1,
@@ -1588,7 +1545,7 @@
       },
       "steps": []
     },
-    "66": {
+    "64": {
       "from": {
         "Module": {
           "id": 1,
@@ -1606,7 +1563,7 @@
       },
       "steps": []
     },
-    "67": {
+    "65": {
       "from": {
         "Module": {
           "id": 1,
@@ -1624,7 +1581,7 @@
       },
       "steps": []
     },
-    "68": {
+    "66": {
       "from": {
         "Module": {
           "id": 1,

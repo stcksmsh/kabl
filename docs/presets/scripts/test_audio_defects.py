@@ -46,6 +46,16 @@ class Detector(unittest.TestCase):
         x = np.clip(pad() * 6, -0.84, 0.84)
         self.assertIn('PINNED', scan(x))
 
+    def test_peak_over_minus_1_dbfs(self):
+        x = pad() * 0.8 / 0.28  # ~ -1.9 dBFS ok, then over
+        self.assertNotIn('PEAK', scan(x * 0.8))
+        self.assertIn('PEAK', scan(np.clip(x * 1.5, -1, 1)))
+
+    def test_click_in_lsb_loud_window_is_ignored(self):
+        x = np.zeros((SR, 2))
+        x[SR // 2, :] = 8 / 32768
+        self.assertNotIn('CLICK', scan(x))
+
     def test_dc_offset(self):
         self.assertIn('DC', scan(pad() + 0.05))
 

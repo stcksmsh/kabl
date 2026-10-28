@@ -5,7 +5,7 @@
     python3 docs/presets/scripts/audio_defects.py --json PATH ...
     python3 docs/presets/scripts/audio_defects.py --allow docs/presets/scripts/audio_defects.allow PATH ...
 
-Exit status 1 if an ERROR flag (NONFINITE, DENORMAL, CLICK, PINNED) is raised that is not listed in
+Exit status 1 if an ERROR flag (NONFINITE, DENORMAL, CLICK, PINNED, PEAK) is raised that is not listed in
 the allow file. DC and HF_BURST are advisory: printed, never fatal. Needs numpy, scipy and
 soundfile. Every flag prints the time stamps (seconds) it was seen at.
 
@@ -16,8 +16,12 @@ Flags
              |x[n] - 2x[n-1] + x[n-2]| is at least CLICK_ISOLATION times the largest second
              difference more than 3 samples away, and at least CLICK_MIN_DB. Smooth attacks,
              saw edges (many per window) and onsets from digital silence do not qualify.
+             Windows whose peak is only a few 16-bit LSB (below CLICK_QUIET_DB) are skipped:
+             the staircase of a rounded tail is not a click.
   PINNED     the output sits on its ceiling: at least PIN_PER_SEC samples per active second are
              within 0.04 dB of the file's peak (only checked when the peak is above PIN_FROM_DB).
+  PEAK       a sample above PEAK_LIMIT_DB (-1 dBFS): the presets have no limiter, so headroom
+             is patch gain; this also catches clipping (0 dBFS and over).
   DC         mean of the active signal above DC_LIMIT.
   HF_BURST   5 ms of energy above 6 kHz that is HF_RISE_DB over the local median while the
              full-band energy rises less than HF_BAND_DB (an attack raises both; a crackle only HF).
@@ -33,6 +37,8 @@ from scipy.ndimage import median_filter
 CLICK_ISOLATION = 5.0
 CLICK_MIN_DB = -45.0
 CLICK_NEIGHBOUR_MIN = 3e-5
+CLICK_QUIET_DB = -66.0  # 16 LSB of 16 bits
+PEAK_LIMIT_DB = -1.0
 PIN_FROM_DB = -3.0
 PIN_PER_SEC = 30.0
 DC_LIMIT = 0.01
@@ -40,7 +46,7 @@ HF_RISE_DB = 30.0
 HF_BAND_DB = 3.0
 HF_MIN_DB = -50.0
 ACTIVE_DB = -50.0
-ERRORS = {'NONFINITE', 'DENORMAL', 'CLICK', 'PINNED'}
+ERRORS = {'NONFINITE', 'DENORMAL', 'CLICK', 'PINNED', 'PEAK'}
 
 
 def db(v):
@@ -63,7 +69,7 @@ def clicks(x, sr):
             b = d2[i * w:(i + 1) * w]
             k = int(b.argmax())
             top = b[k]
-            if db(top) < CLICK_MIN_DB:
+            if db(top) < CLICK_MIN_DB or db(np.abs(x[i * w:(i + 1) * w + 2, c]).max()) < CLICK_QUIET_DB:
                 continue
             m = b.copy()
             m[max(0, k - 3):k + 4] = 0
@@ -71,6 +77,11 @@ def clicks(x, sr):
             if rest > CLICK_NEIGHBOUR_MIN and top / rest >= CLICK_ISOLATION:
                 found.append(i * .05 + k / sr)
     return merge(found)
+
+
+def peak(x, sr):
+    over = np.abs(x).max(1) > 10 ** (PEAK_LIMIT_DB / 20)
+    return merge(np.where(over)[0] / sr, gap=0.05)
 
 
 def pinned(x, sr):
@@ -117,7 +128,7 @@ def scan(path):
     tiny = (x != 0) & (np.abs(x) < 1.18e-38)
     if tiny.any():
         flags['DENORMAL'] = merge(np.where(tiny.any(1))[0] / sr, gap=0.01)
-    for name, f in (('CLICK', clicks), ('PINNED', pinned), ('DC', dc), ('HF_BURST', hf_bursts)):
+    for name, f in (('CLICK', clicks), ('PINNED', pinned), ('PEAK', peak), ('DC', dc), ('HF_BURST', hf_bursts)):
         t = f(x, sr)
         if t:
             flags[name] = [round(float(v), 3) for v in t]
