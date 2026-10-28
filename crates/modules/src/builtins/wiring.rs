@@ -4,6 +4,9 @@
 //!
 //! `split` takes a stereo jack and gives its `left` and `right` channels as separate mono ports.
 //! `join` takes two mono ports and gives one stereo jack; an unwired side is silence.
+//!
+//! Rates: `join` is global, like every stereo module it can feed, so a voice source is summed into
+//! it exactly as it was summed into the old half port. `split` follows its source.
 
 use crate::info::{Category, ModuleInfo, PortDirection, PortInfo, PortType, QualitySupport, Rate};
 use crate::io::ProcessIo;
@@ -59,7 +62,7 @@ pub static JOIN_INFO: ModuleInfo = ModuleInfo {
     kind: "join",
     name: "Join",
     category: Category::Utility,
-    rate: Rate::Voice,
+    rate: Rate::Global,
     explain: "Puts two signals on one stereo cable: left and right in, one stereo cable out. A side with no cable is silent.",
     lesson: None,
     requires: &[],
