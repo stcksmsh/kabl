@@ -28,6 +28,8 @@ const SRC: u64 = 4;
 const MACRO: u64 = 5;
 const CABLE: u64 = 1;
 const ROUTE: u64 = 10;
+/// Joins the two signals the tests read on the left and right output.
+const JOIN: u64 = 90;
 
 const A: &[(&str, f32)] = &[("length", 3.0), ("s2", 0.0), ("r3", 60.0)];
 const B: &[(&str, f32)] = &[
@@ -85,13 +87,16 @@ fn probe(morph: f32) -> PatchState {
     p.modules
         .insert(LFO, module("lfo", &[("rate_hz", 0.01), ("waveform", 3.0)]));
     p.modules.insert(OUT, module("out", &[]));
-    let mut cable = jack((LFO, "out"), (OUT, "in"), A);
+    p.modules.insert(JOIN, module("join", &[]));
+    p.cables.insert(JOIN, jack((JOIN, "out"), (OUT, "in"), &[]));
+    let mut cable = jack((LFO, "out"), (JOIN, "left"), A);
     for (k, v) in B {
         cable.params.insert(format!("b.{k}"), *v);
     }
     cable.params.insert("morph".into(), morph);
     p.cables.insert(CABLE, cable);
-    p.cables.insert(2, jack((CLOCK, "gate"), (OUT, "in"), &[]));
+    p.cables
+        .insert(2, jack((CLOCK, "gate"), (JOIN, "right"), &[]));
     p
 }
 
@@ -240,8 +245,11 @@ fn three_cables(routed: bool) -> PatchState {
     p.modules.insert(OUT, module("out", &[]));
     p.modules.insert(MACRO, module("macro", &[("m1", 0.5)]));
     p.modules.insert(6, module("mixer", &[]));
-    p.cables.insert(1, jack((6, "out"), (OUT, "in"), &[]));
-    p.cables.insert(2, jack((CLOCK, "gate"), (OUT, "in"), &[]));
+    p.modules.insert(JOIN, module("join", &[]));
+    p.cables.insert(JOIN, jack((JOIN, "out"), (OUT, "in"), &[]));
+    p.cables.insert(1, jack((6, "out"), (JOIN, "left"), &[]));
+    p.cables
+        .insert(2, jack((CLOCK, "gate"), (JOIN, "right"), &[]));
     let depths = [1.0, 0.5, -0.5];
     for (k, depth) in depths.iter().enumerate() {
         let (lfo, cable) = (20 + k as u64, 30 + k as u64);
@@ -485,9 +493,11 @@ fn ops() -> Vec<Op> {
         m(CLOCK, "clock"),
         m(LFO, "lfo"),
         m(OUT, "out"),
+        m(JOIN, "join"),
         m(MACRO, "macro"),
-        jack(CABLE, (LFO, "out"), (OUT, "in")),
-        jack(2, (CLOCK, "gate"), (OUT, "in")),
+        jack(JOIN, (JOIN, "out"), (OUT, "in")),
+        jack(CABLE, (LFO, "out"), (JOIN, "left")),
+        jack(2, (CLOCK, "gate"), (JOIN, "right")),
         Op::Connect {
             id: ROUTE,
             from: PortRef::Module {

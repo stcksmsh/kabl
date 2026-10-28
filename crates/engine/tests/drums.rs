@@ -53,8 +53,10 @@ fn kit() -> PatchState {
     wire(&mut p, (1, "velocity"), (2, "velocity"));
     wire(&mut p, (5, "gate"), (3, "gate"));
     wire(&mut p, (5, "velocity"), (3, "velocity"));
-    wire(&mut p, (2, "out"), (4, "in"));
-    wire(&mut p, (3, "out"), (4, "in"));
+    p.modules.insert(9, module("join", &[]));
+    wire(&mut p, (9, "out"), (4, "in"));
+    wire(&mut p, (2, "out"), (9, "left"));
+    wire(&mut p, (3, "out"), (9, "right"));
     p
 }
 

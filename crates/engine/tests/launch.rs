@@ -19,6 +19,8 @@ const SEQ_A: ModuleId = 2;
 const DIV: ModuleId = 3;
 const SEQ_B: ModuleId = 4;
 const OUT: ModuleId = 5;
+/// Joins the two signals the tests read on the left and right output.
+const JOIN: ModuleId = 90;
 /// 16ths at 125 bpm: 5760 samples, 90 blocks, so ticks land on block starts; 131 bpm puts them
 /// mid-block.
 const BPM: f32 = 131.0;
@@ -47,6 +49,7 @@ fn patch(left: &str) -> PatchState {
     p.modules.insert(DIV, module("clock.div", &[("div", 3.0)]));
     p.modules.insert(SEQ_B, seq);
     p.modules.insert(OUT, module("out", &[]));
+    p.modules.insert(JOIN, module("join", &[]));
     let m = |id, port: &str| PortRef::Module {
         id,
         port: port.into(),
@@ -58,8 +61,9 @@ fn patch(left: &str) -> PatchState {
         (m(CLOCK, "reset"), m(DIV, "reset")),
         (m(CLOCK, "reset"), m(SEQ_A, "reset")),
         (m(CLOCK, "reset"), m(SEQ_B, "reset")),
-        (m(SEQ_A, left), m(OUT, "in")),
-        (m(SEQ_B, "pitch"), m(OUT, "in")),
+        (m(SEQ_A, left), m(JOIN, "left")),
+        (m(SEQ_B, "pitch"), m(JOIN, "right")),
+        (m(JOIN, "out"), m(OUT, "in")),
     ];
     for (i, (from, to)) in cables.into_iter().enumerate() {
         p.cables.insert(

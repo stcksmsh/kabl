@@ -25,6 +25,8 @@ const SR: f32 = 48000.0;
 const CLOCK: u64 = 1;
 const LFO: u64 = 2;
 const OUT: u64 = 3;
+/// Joins the two signals the tests read on the left and right output.
+const JOIN: u64 = 90;
 const CABLE: u64 = 1;
 
 fn params(kv: &[(&str, f32)]) -> BTreeMap<String, f32> {
@@ -58,9 +60,12 @@ fn probe(cable: &[(&str, f32)]) -> PatchState {
     p.modules
         .insert(LFO, module("lfo", &[("rate_hz", 0.01), ("waveform", 3.0)]));
     p.modules.insert(OUT, module("out", &[]));
+    p.modules.insert(JOIN, module("join", &[]));
+    p.cables.insert(JOIN, jack((JOIN, "out"), (OUT, "in"), &[]));
     p.cables
-        .insert(CABLE, jack((LFO, "out"), (OUT, "in"), cable));
-    p.cables.insert(2, jack((CLOCK, "gate"), (OUT, "in"), &[]));
+        .insert(CABLE, jack((LFO, "out"), (JOIN, "left"), cable));
+    p.cables
+        .insert(2, jack((CLOCK, "gate"), (JOIN, "right"), &[]));
     p
 }
 
@@ -202,9 +207,12 @@ fn route_pattern_gates_the_modulation_amount() {
     p.modules.insert(4, module("midi.in", &[]));
     p.modules.insert(5, module("vca", &[("gain", 0.0)]));
     p.modules.insert(OUT, module("out", &[]));
+    p.modules.insert(JOIN, module("join", &[]));
+    p.cables.insert(JOIN, jack((JOIN, "out"), (OUT, "in"), &[]));
     p.cables.insert(10, jack((4, "gate"), (5, "in"), &[]));
-    p.cables.insert(11, jack((5, "out"), (OUT, "in"), &[]));
-    p.cables.insert(12, jack((CLOCK, "gate"), (OUT, "in"), &[]));
+    p.cables.insert(11, jack((5, "out"), (JOIN, "left"), &[]));
+    p.cables
+        .insert(12, jack((CLOCK, "gate"), (JOIN, "right"), &[]));
     p.cables.insert(
         CABLE,
         CableState {
@@ -682,7 +690,7 @@ fn voice_rate_cable_gates_every_lane_and_takes_runtime_edits() {
     p.modules.insert(OUT, module("out", &[]));
     p.cables.insert(
         CABLE,
-        jack((4, "gate"), (OUT, "out"), &[("length", 2.0), ("s2", 0.0)]), // STEREO-FIX
+        jack((4, "gate"), (OUT, "in"), &[("length", 2.0), ("s2", 0.0)]),
     );
     let mut c = compile(&p, SR, 4).unwrap();
     c.note_on(0, 0.0, 1.0);

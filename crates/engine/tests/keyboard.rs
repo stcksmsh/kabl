@@ -445,6 +445,8 @@ fn raw_midi_parses_to_key_events() {
 
 const MIDI: ModuleId = 1;
 const OUT: ModuleId = 2;
+/// Joins the two signals the tests read on the left and right output.
+const JOIN: ModuleId = 90;
 const CLOCK: ModuleId = 3;
 const SEQ: ModuleId = 4;
 const OSC: ModuleId = 5;
@@ -480,8 +482,10 @@ fn probe(params: &[(&str, f32)]) -> PatchState {
     let mut p = PatchState::new();
     p.modules.insert(MIDI, module("midi.in", params));
     p.modules.insert(OUT, module("out", &[]));
-    cable(&mut p, port(MIDI, "pitch"), port(OUT, "in"));
-    cable(&mut p, port(MIDI, "gate"), port(OUT, "in"));
+    p.modules.insert(JOIN, module("join", &[]));
+    cable(&mut p, port(JOIN, "out"), port(OUT, "in"));
+    cable(&mut p, port(MIDI, "pitch"), port(JOIN, "left"));
+    cable(&mut p, port(MIDI, "gate"), port(JOIN, "right"));
     p
 }
 
@@ -723,8 +727,10 @@ fn keyboard_settings_never_touch_a_sequencer_chain() {
         p.modules.insert(OSC, module("osc.va", &[]));
         cable(&mut p, port(CLOCK, "gate"), port(SEQ, "clock"));
         cable(&mut p, port(SEQ, "pitch"), port(OSC, "pitch"));
-        cable(&mut p, port(OSC, "out"), port(OUT, "in"));
-        cable(&mut p, port(MIDI, "gate"), port(OUT, "in"));
+        p.modules.insert(JOIN, module("join", &[]));
+        cable(&mut p, port(JOIN, "out"), port(OUT, "in"));
+        cable(&mut p, port(OSC, "out"), port(JOIN, "left"));
+        cable(&mut p, port(MIDI, "gate"), port(JOIN, "right"));
         p
     };
     let collector = Collector::new();
