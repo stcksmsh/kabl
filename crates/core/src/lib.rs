@@ -3,10 +3,12 @@
 pub mod composite;
 pub mod format;
 mod log;
+pub mod migrate;
 mod op;
 mod state;
 pub mod table;
 
+pub use migrate::{migrate_state, migrate_v7_to_v8};
 pub use format::{load, save, FormatError, CURRENT_SCHEMA_VERSION};
 pub use log::{PatchLog, CHECKPOINT_EVERY, COALESCE_WINDOW_MS};
 pub use op::{CableId, Entry, ModuleId, Op, ParamTarget, PortRef, Source, Vec2};

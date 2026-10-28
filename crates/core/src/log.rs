@@ -16,6 +16,9 @@ pub struct PatchLog {
     entries: Vec<Entry>,
     /// Number of entries currently applied. `entries[cursor..]` is the redo tail.
     cursor: usize,
+    /// Entries below this index are not undoable: a schema migration rewrote the ports they
+    /// name, so reverting past it would restore cables to ports that no longer exist.
+    floor: usize,
     state: PatchState,
     next_seq: u64,
 }
@@ -31,6 +34,7 @@ impl PatchLog {
         PatchLog {
             entries: Vec::new(),
             cursor: 0,
+            floor: 0,
             state: PatchState::new(),
             next_seq: 0,
         }
@@ -49,7 +53,12 @@ impl PatchLog {
     }
 
     pub fn can_undo(&self) -> bool {
-        self.cursor > 0
+        self.cursor > self.floor
+    }
+
+    /// Makes everything applied so far permanent: undo stops here.
+    pub fn set_undo_floor(&mut self) {
+        self.floor = self.cursor;
     }
 
     pub fn can_redo(&self) -> bool {
@@ -179,7 +188,10 @@ impl PatchLog {
 
     /// The entry the next `undo()` would revert, if any.
     pub fn undo_entry(&self) -> Option<&Entry> {
-        self.cursor.checked_sub(1).map(|i| &self.entries[i])
+        self.cursor
+            .checked_sub(1)
+            .filter(|&i| i >= self.floor)
+            .map(|i| &self.entries[i])
     }
 
     /// The entry the next `redo()` would re-apply, if any.
@@ -202,7 +214,7 @@ impl PatchLog {
     /// Reverts the last entry and forgets it, leaving nothing to redo: for a gesture the user
     /// cancelled (Escape mid-drag). Only acts when that entry is the newest one.
     pub fn discard_last(&mut self) -> bool {
-        if self.cursor == 0 || self.cursor != self.entries.len() {
+        if self.cursor <= self.floor || self.cursor != self.entries.len() {
             return false;
         }
         self.undo();
@@ -212,7 +224,7 @@ impl PatchLog {
 
     /// O(1): apply the inverse of the last-applied entry, no replay.
     pub fn undo(&mut self) -> bool {
-        if self.cursor == 0 {
+        if self.cursor <= self.floor {
             return false;
         }
         self.cursor -= 1;
