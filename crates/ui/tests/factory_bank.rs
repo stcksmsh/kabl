@@ -216,7 +216,7 @@ fn every_entry_opens_stopped_has_real_controls_and_recalls_complete_state() {
 
 /// `render_raw` plus the check that a stopped load is silent for the first second.
 fn render(state: &PatchState, keys: bool, secs: usize, hot: bool) -> (Vec<f32>, serde_json::Value) {
-    let (samples, metrics) = render_raw(state, keys, secs, hot);
+    let (samples, metrics) = render_raw(state, keys, secs, if hot { 0b1111 } else { 0 });
     assert!(
         rms(&samples[..96000]) < 0.000001,
         "Stopped load must remain silent"
@@ -277,7 +277,7 @@ fn render_raw(
     state: &PatchState,
     keys: bool,
     secs: usize,
-    hot: bool,
+    hot: u8,
 ) -> (Vec<f32>, serde_json::Value) {
     let collector = basedrop::Collector::new();
     let mut engine = PatchEngine::new(&collector.handle(), state, 48000.0, 8).unwrap();
@@ -407,7 +407,7 @@ fn render_raw(
                         let batch = kabl_engine::runtime::ParamSet {
                             rev: t as u64 + 1,
                             target,
-                            value: if hot {
+                            value: if hot & (1 << (n - 1)) != 0 {
                                 1.0
                             } else if t == 3 * 48000 {
                                 0.65
@@ -576,7 +576,7 @@ fn render_digest() {
             continue;
         }
         let (keys, _) = Meta::play_of(log.state());
-        let (samples, _) = render_raw(log.state(), keys, 24, false);
+        let (samples, _) = render_raw(log.state(), keys, 24, 0);
         out += &format!("{dir} {:016x}\n", digest(&samples));
     }
     std::fs::write(path, out).unwrap();
@@ -590,7 +590,7 @@ fn level(dir: &str) -> (f64, f64) {
         toml::from_str(&std::fs::read_to_string(root().join(dir).join("sound.toml")).unwrap())
             .unwrap();
     let keys = Meta::play_of(log.state()).0 || meta.keys;
-    let (samples, _) = render_raw(log.state(), keys, 24, false);
+    let (samples, _) = render_raw(log.state(), keys, 24, 0);
     let peak = samples.iter().fold(0.0_f32, |a, b| a.max(b.abs())) as f64;
     let (mut sum, mut n) = (0.0_f64, 0usize);
     for block in samples.chunks(9600) {
@@ -602,6 +602,27 @@ fn level(dir: &str) -> (f64, f64) {
     }
     let db = |v: f64| 20.0 * v.max(1e-12).log10();
     (db(peak), db((sum / n.max(1) as f64).sqrt()))
+}
+
+/// Peak (dBFS) of one patch with all macros at 1 and with each macro alone at 1 (the others
+/// as in the normal render): the worst of the five renders.
+fn macro_peak(dir: &str) -> f64 {
+    let log = kabl_core::load(&root().join(dir)).unwrap();
+    let keys = Meta::play_of(log.state()).0
+        || toml::from_str::<Meta>(
+            &std::fs::read_to_string(root().join(dir).join("sound.toml")).unwrap(),
+        )
+        .unwrap()
+        .keys;
+    [0b1111, 1, 2, 4, 8]
+        .into_iter()
+        .map(|hot| {
+            let (s, _) = render_raw(log.state(), keys, 24, hot);
+            20.0 * (s.iter().fold(0.0_f32, |a, b| a.max(b.abs())) as f64)
+                .max(1e-12)
+                .log10()
+        })
+        .fold(f64::MIN, f64::max)
 }
 
 /// Levels of every factory patch, rendered on a thread each.
@@ -628,15 +649,45 @@ fn level_table() {
     }
 }
 
+#[test]
+#[ignore = "prints the worst peak over the macro sweeps of every preset"]
+fn macro_peak_table() {
+    std::thread::scope(|s| {
+        let jobs: Vec<_> = all_factory_dirs()
+            .into_iter()
+            .map(|dir| s.spawn(move || (macro_peak(&dir), dir)))
+            .collect();
+        for j in jobs {
+            let (p, dir) = j.join().unwrap();
+            println!("MACROPEAK {dir:36} {p:7.2}");
+        }
+    });
+}
+
 /// The bank's level target (docs/factory-levels/README.md): no sample above `PEAK_CEILING`,
 /// loudness within `LOUD_WINDOW` of `LOUD_TARGET`.
 const PEAK_CEILING: f64 = -1.0;
 const LOUD_TARGET: f64 = -19.0;
 const LOUD_WINDOW: f64 = 5.5;
+/// Presets without a limiter whose macros at 1 add 6 dB or more over the stored settings: the
+/// peak rule (-1 dBFS with every macro up) puts their loudness about 1.7 dB under the window.
+/// Deep Field -26.1, Salt Flat -26.2. Raise them only by narrowing a macro, not by patch gain.
+const LOUD_EXCEPTIONS: [&str; 2] = ["presets/deep-field", "presets/salt-flat"];
 
 #[test]
 fn factory_levels_hold_the_target() {
     let mut bad = Vec::new();
+    let macro_peaks: std::collections::HashMap<_, _> = std::thread::scope(|s| {
+        let jobs: Vec<_> = all_factory_dirs()
+            .into_iter()
+            .filter(|d| d.starts_with("presets/"))
+            .map(|d| s.spawn(move || (macro_peak(&d), d)))
+            .collect();
+        jobs.into_iter()
+            .map(|j| j.join().unwrap())
+            .map(|(p, d)| (d, p))
+            .collect()
+    });
     for (dir, peak, loud) in levels() {
         // The arpeggiator demos are silent without a held chord: nothing to measure.
         if loud < -100.0 {
@@ -645,7 +696,13 @@ fn factory_levels_hold_the_target() {
             bad.push(format!(
                 "{dir}: peak {peak:.2} dBFS clips (ceiling {PEAK_CEILING})"
             ));
-        } else if (loud - LOUD_TARGET).abs() > LOUD_WINDOW {
+        } else if macro_peaks.get(&dir).is_some_and(|p| *p > PEAK_CEILING) {
+            bad.push(format!(
+                "{dir}: a macro sweep peaks above {PEAK_CEILING} dBFS"
+            ));
+        } else if (loud - LOUD_TARGET).abs() > LOUD_WINDOW
+            && !LOUD_EXCEPTIONS.contains(&dir.as_str())
+        {
             bad.push(format!(
                 "{dir}: loudness {loud:.2} dBFS is outside {LOUD_TARGET} +- {LOUD_WINDOW}"
             ));

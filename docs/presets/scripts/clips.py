@@ -91,4 +91,6 @@ with tempfile.TemporaryDirectory() as tmp:
                 sp.run(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'f32le', '-ar', '48000', '-ac', '2', '-i', '-', '-c:a', 'flac', '-sample_fmt', 's32', '-bits_per_raw_sample', '24', str(out / 'tour.flac')], input=np.concatenate(parts[:-1]).astype('<f4').tobytes(), check=True)
         else:
             good &= encode_and_check(d / (slug + '.wav'), out / (name + '.mp3'))
+# Defect scan of the rendered clips (impulsive clicks, limiter pinning, DC, NaN, HF bursts).
+good &= sp.run([sys.executable, 'docs/presets/scripts/audio_defects.py', '--allow', 'docs/presets/scripts/audio_defects.allow', str(out)]).returncode == 0
 sys.exit(0 if good else 1)

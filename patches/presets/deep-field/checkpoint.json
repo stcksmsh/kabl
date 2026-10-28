@@ -173,7 +173,7 @@
         "y": 620.0
       },
       "params": {
-        "gain_db": 14.0
+        "gain_db": 6.8
       }
     },
     "14": {
@@ -216,35 +216,9 @@
       }
     },
     "17": {
-      "kind": "compressor",
-      "pos": {
-        "x": 974.0,
-        "y": 620.0
-      },
-      "params": {
-        "attack_ms": 15.0,
-        "knee_db": 4.0,
-        "makeup_db": 0.0,
-        "ratio": 3.0,
-        "release_ms": 250.0,
-        "threshold_db": -16.0
-      }
-    },
-    "18": {
-      "kind": "limiter",
-      "pos": {
-        "x": 1164.0,
-        "y": 620.0
-      },
-      "params": {
-        "ceiling_db": -1.5,
-        "release_ms": 150.0
-      }
-    },
-    "19": {
       "kind": "out",
       "pos": {
-        "x": 1354.0,
+        "x": 974.0,
         "y": 620.0
       },
       "params": {}
@@ -725,7 +699,7 @@
       "to": {
         "Module": {
           "id": 17,
-          "port": "in_l"
+          "port": "left"
         }
       },
       "params": {},
@@ -741,70 +715,6 @@
       "to": {
         "Module": {
           "id": 17,
-          "port": "in_r"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "33": {
-      "from": {
-        "Module": {
-          "id": 17,
-          "port": "left"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 18,
-          "port": "in_l"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "34": {
-      "from": {
-        "Module": {
-          "id": 17,
-          "port": "right"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 18,
-          "port": "in_r"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "35": {
-      "from": {
-        "Module": {
-          "id": 18,
-          "port": "left"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 19,
-          "port": "left"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "36": {
-      "from": {
-        "Module": {
-          "id": 18,
-          "port": "right"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 19,
           "port": "right"
         }
       },

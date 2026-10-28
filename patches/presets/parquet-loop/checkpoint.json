@@ -216,20 +216,9 @@
       }
     },
     "18": {
-      "kind": "limiter",
-      "pos": {
-        "x": 1164.0,
-        "y": 620.0
-      },
-      "params": {
-        "ceiling_db": -1.5,
-        "release_ms": 150.0
-      }
-    },
-    "19": {
       "kind": "out",
       "pos": {
-        "x": 1354.0,
+        "x": 1164.0,
         "y": 620.0
       },
       "params": {}
@@ -618,7 +607,7 @@
       "to": {
         "Module": {
           "id": 18,
-          "port": "in_l"
+          "port": "left"
         }
       },
       "params": {},
@@ -634,45 +623,13 @@
       "to": {
         "Module": {
           "id": 18,
-          "port": "in_r"
+          "port": "right"
         }
       },
       "params": {},
       "steps": []
     },
     "28": {
-      "from": {
-        "Module": {
-          "id": 18,
-          "port": "left"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 19,
-          "port": "left"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "29": {
-      "from": {
-        "Module": {
-          "id": 18,
-          "port": "right"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 19,
-          "port": "right"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "30": {
       "from": {
         "Module": {
           "id": 9,
@@ -690,7 +647,7 @@
       },
       "steps": []
     },
-    "31": {
+    "29": {
       "from": {
         "Module": {
           "id": 12,
@@ -708,7 +665,7 @@
       },
       "steps": []
     },
-    "32": {
+    "30": {
       "from": {
         "Module": {
           "id": 3,
@@ -726,7 +683,7 @@
       },
       "steps": []
     },
-    "33": {
+    "31": {
       "from": {
         "Module": {
           "id": 1,
@@ -744,7 +701,7 @@
       },
       "steps": []
     },
-    "34": {
+    "32": {
       "from": {
         "Module": {
           "id": 1,
@@ -762,7 +719,7 @@
       },
       "steps": []
     },
-    "35": {
+    "33": {
       "from": {
         "Module": {
           "id": 1,
