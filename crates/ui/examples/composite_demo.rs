@@ -102,49 +102,6 @@ fn main() {
     e.connect(port(chorus, "out"), port(reverb, "in"));
     e.connect(port(reverb, "out"), port(out, "in"));
     let flat = e.state().clone();
-    let members = flat
-        .modules
-        .iter()
-        .filter(|(_, m)| m.kind != "out" && m.kind != "midi.in")
-        .map(|(&id, _)| id)
-        .collect();
-    let voice =
-        composites::encapsulate(&mut e, members, BTreeSet::new(), "Subtractive voice").unwrap();
-    let a = render(&flat, &root.join("voice-flat.wav"));
-    let b = render(e.state(), &root.join("voice-composite.wav"));
-    assert_eq!(a, b);
-    kabl_core::save(&root.join("voice"), e.log()).unwrap();
-    let pkg = composites::package(e.state(), voice).unwrap();
-    std::fs::write(
-        root.join("voice.json"),
-        serde_json::to_vec_pretty(&pkg).unwrap(),
-    )
-    .unwrap();
-    let chorus = e.add_module("chorus", Vec2 { x: 240., y: 780. });
-    let reverb = e.add_module("reverb", Vec2 { x: 480., y: 780. });
-    let out = *e
-        .state()
-        .modules
-        .iter()
-        .find(|(_, m)| m.kind == "out")
-        .unwrap()
-        .0;
-    let vca = *e
-        .state()
-        .modules
-        .iter()
-        .find(|(_, m)| m.kind == "vca")
-        .unwrap()
-        .0;
-    e.connect(port(vca, "out"), port(chorus, "in_l"));
-    e.connect(port(vca, "out"), port(chorus, "in_r"));
-    for (src, dst) in [("left", "in_l"), ("right", "in_r")] {
-        e.connect(port(chorus, src), port(reverb, dst));
-    }
-    for side in ["left", "right"] {
-        e.connect(port(reverb, side), port(out, side));
-    }
-    let flat = e.state().clone();
     let fx = composites::encapsulate(
         &mut e,
         BTreeSet::from([chorus, reverb]),
