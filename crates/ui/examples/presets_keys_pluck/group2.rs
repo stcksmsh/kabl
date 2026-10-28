@@ -318,7 +318,7 @@ fn snowmelt() -> Rack {
             drive: Some((0.0, 0.0, 0.25)),
             cutoff: 3200.0,
             cut_m1: 0.5,
-            trim_db: 11.0,
+            trim_db: 7.0,
             chorus: Some((
                 &[("rate_hz", 0.25), ("depth", 55.0), ("mix", 0.0)],
                 Some(0.6),

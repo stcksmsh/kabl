@@ -35,7 +35,7 @@ Tin Roof 0:00, Turnstile 0:14, Hand Bell 0:25, Corduroy 0:40, Matinee 0:50, Snow
 - Tuning Fork: tuned metal bars, six free-bar partials. Strike, Warmth, Space, Wobble.
 
 ## Measured flags
-- Level test loud/peak dBFS: Tin Roof -18.7/-4.6, Turnstile -19.1/-3.4, Hand Bell -19.0/-1.5, Corduroy -20.0/-2.8, Matinee -18.6/-5.3, Snowmelt -17.2/-1.5, Scaffold -20.5/-4.7, Brass Filament -19.1/-3.1, Spinet -20.9/-3.4, Willow -17.0/-2.2, Dry Creek -19.3/-1.8, Gumdrop -18.5/-4.3, Cold Cut -19.7/-1.5, Rivet Gun -19.8/-1.5, Tuning Fork -19.6/-1.5.
+- Level test loud/peak dBFS: Tin Roof -18.7/-4.6, Turnstile -19.1/-3.4, Hand Bell -19.0/-1.5, Corduroy -20.0/-2.8, Matinee -18.6/-5.3, Snowmelt -20.6/-3.3 (output gain 11 to 7 dB, see below), Scaffold -20.5/-4.7, Brass Filament -19.1/-3.1, Spinet -20.9/-3.4, Willow -17.0/-2.2, Dry Creek -19.3/-1.8, Gumdrop -18.5/-4.3, Cold Cut -19.7/-1.5, Rivet Gun -19.8/-1.5, Tuning Fork -19.6/-1.5.
 - Clip peaks are lower (-1.5 Turnstile and Snowmelt to -10.0 Cold Cut): the clip phrases are sparse and soft.
 - Click scan (5 ms windows, share above 3 kHz over 0.7 at audible level): Hand Bell 36 windows (bright by design, inharmonic partials), Cold Cut 5 windows (metallic click by design); all others 0. Not judged by ear.
 - Weakest macro moves: Corduroy Cutoff -24.1 dB, Spinet Tone -21.8, Matinee Cutoff -18.7; the rest are -17 dB or stronger.
@@ -50,3 +50,7 @@ Tin Roof 0:00, Turnstile 0:14, Hand Bell 0:25, Corduroy 0:40, Matinee 0:50, Snow
 ## Facts
 - `PH_OUT=... PH_PHRASES=... python3 docs/presets/scripts/host.py [slugs]`; phrases from `presets_keys_pluck phrases <file>`.
 - Compound shell commands can trip the worktree guard. A temp `git worktree add` with `CARGO_TARGET_DIR` set to this target dir avoids a second build.
+
+## Snowmelt crackle fix
+Cause: output gain stage 11 dB pushed the FM voice into the `limiter` (instant attack, no lookahead, by design), which kinks the waveform wherever it engages. Found by raising the limiter ceiling to 0 (9 clicks down to 3) and lowering the gain stage (8 dB clean at stored macros). Fixed to 7 dB, which also stays clean with Space at 1 and Tine at 1. Not an engine bug. With Warmth at 1 the limiter still engages at 7 dB (one click at 0.6 s, tested down to 6 dB; Warmth at 1 with Tine at 1 clicks at 10.6 s): the Warmth macro range is the remaining cause and was left alone.
+Other group 2 presets whose level test peaks at -1.5 dBFS (Hand Bell, Cold Cut, Rivet Gun, Tuning Fork, Turnstile) have the same limiter engagement under the chord level test; their stored clips scan clean. Not changed.
