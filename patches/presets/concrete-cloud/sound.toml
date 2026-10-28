@@ -1,0 +1,13 @@
+name = "Concrete Cloud"
+category = "Pad"
+tags = [
+    "poly",
+    "distorted",
+    "compressed",
+    "bitcrushed",
+    "french touch",
+    "signature",
+]
+description = "A thick, saturated pad for French touch: saws and an octave down driven hard into a compressor, with a bitcrusher on request. Play fat, held chords. Weight sets the amount of drive, Cutoff opens the filter, Crush brings in the bitcrusher, Room adds the echo and the room."
+keys = true
+sequence = false

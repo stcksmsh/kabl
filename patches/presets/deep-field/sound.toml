@@ -1,0 +1,12 @@
+name = "Deep Field"
+category = "Pad"
+tags = [
+    "poly",
+    "swell",
+    "sub",
+    "cinematic",
+    "ambient",
+]
+description = "A cinematic swell: saws over a deep sub with a filter that opens over several seconds. Play low, wide chords and hold them. Swell sets how far the filter opens, Sub adds an octave below, Shimmer adds an octave above, Space adds the echo and the room."
+keys = true
+sequence = false

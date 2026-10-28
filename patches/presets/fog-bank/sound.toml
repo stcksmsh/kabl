@@ -1,0 +1,12 @@
+name = "Fog Bank"
+category = "Pad"
+tags = [
+    "poly",
+    "slow",
+    "wide",
+    "ambient",
+    "cinematic",
+]
+description = "A very slow ambient cloud: a saw stack and a triangle with a long attack and a nine second room. Play long chords and let them overlap. Bloom opens the filter, Drift adds slow drift to the filter and the pitch, Depth brings in an octave of sub, Space adds the echo and the room."
+keys = true
+sequence = false

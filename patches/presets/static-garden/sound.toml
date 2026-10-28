@@ -1,0 +1,12 @@
+name = "Static Garden"
+category = "Pad"
+tags = [
+    "poly",
+    "evolving",
+    "noise",
+    "ring mod",
+    "ambient",
+]
+description = "An evolving, textured pad: a triangle bed with a noise layer, a ring modulated layer and a filter that wanders on its own. Play slow chords. Texture brings in the noise, Motion sets how far the filter wanders, Metal adds the ring modulated layer, Space adds the echo and the room."
+keys = true
+sequence = false
