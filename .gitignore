@@ -6,3 +6,4 @@ docs/design/build/
 
 /scratch/
 !crates/modules/assets/wavetables/*.wav
+__pycache__/
