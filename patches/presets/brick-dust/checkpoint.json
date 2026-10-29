@@ -306,7 +306,7 @@
       "params": {
         "attack_ms": 4.0,
         "knee_db": 4.0,
-        "makeup_db": 8.0,
+        "makeup_db": 4.0,
         "ratio": 6.0,
         "release_ms": 110.0,
         "threshold_db": -26.0

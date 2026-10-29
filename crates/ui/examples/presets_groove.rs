@@ -1111,7 +1111,7 @@ fn brick_dust() -> Rack {
         filter: [700.0, 0.30],
         fx: None,
         crush: false,
-        comp: [-26.0, 6.0, 8.0],
+        comp: [-26.0, 6.0, 4.0],
         echo: [90.0, 15.0, 3000.0],
         space: [0.15, 0.25, 0.1],
         trim_db: -4.5,
