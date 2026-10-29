@@ -671,6 +671,8 @@ struct Part {
     gate: f32,
     env: [f32; 4],
     level: f32,
+    /// Low-pass on the part in Hz (0 for none): it keeps the pulse's upper harmonics from ringing.
+    lp: f32,
 }
 
 /// Steps from a compact text: note numbers and `-` rests, space separated, 16 entries.
@@ -732,7 +734,7 @@ struct Spec {
     trim_db: f32,
 }
 
-fn seq_part(r: &mut Rack, clock: ModuleId, p: &Part) -> ModuleId {
+fn seq_part(r: &mut Rack, clock: ModuleId, p: &Part) -> (ModuleId, &'static str) {
     let seq = r.add("seq", &[("length", 16.0), ("gate_len", p.gate)]);
     r.wire(clock, "gate", seq, "clock");
     r.wire(clock, "reset", seq, "reset");
@@ -773,7 +775,12 @@ fn seq_part(r: &mut Rack, clock: ModuleId, p: &Part) -> ModuleId {
     r.wire(mix, "out", vca, "in");
     r.wire(env, "out", vca, "cv");
     r.wire(vca, "out", lvl, "in");
-    lvl
+    if p.lp > 0.0 {
+        let tone = r.add("filter.svf", &[("cutoff_hz", p.lp), ("resonance", 0.0)]);
+        r.wire(lvl, "out", tone, "in");
+        return (tone, "lp");
+    }
+    (lvl, "out")
 }
 
 fn groove(s: Spec) -> Rack {
@@ -799,9 +806,9 @@ fn groove(s: Spec) -> Rack {
         "mixer",
         &[("level1", 1.0), ("level2", 1.0), ("level3", 1.0)],
     );
-    v.r.wire(bass, "out", bus, "in1");
+    v.r.wire(bass.0, bass.1, bus, "in1");
     if let Some(c) = chords {
-        v.r.wire(c, "out", bus, "in2");
+        v.r.wire(c.0, c.1, bus, "in2");
     }
     v.r.wire(v.mono, "out", bus, "in3");
     if s.targets.iter().any(|t| matches!(t, T::Dust(_))) {
@@ -1004,6 +1011,14 @@ fn part(text: &str, osc: [f32; 5], sub: f32, gate: f32, env: [f32; 4], level: f3
         gate,
         env,
         level,
+        lp: 0.0,
+    }
+}
+
+impl Part {
+    fn lp(mut self, hz: f32) -> Self {
+        self.lp = hz;
+        self
     }
 }
 
@@ -1339,15 +1354,18 @@ fn corner_store() -> Rack {
             [1.0, 140.0, 0.4, 40.0],
             0.7,
         ),
-        chords: Some(part(
-            "- - 12 - - - 15 - - - 12 14 - - - -",
-            [3.0, 1.0, 8.0, 30.0, 0.0],
-            0.0,
-            30.0,
-            [1.0, 110.0, 0.0, 40.0],
-            0.4,
-        )),
-        play: [3.0, 0.0, 0.5],
+        chords: Some(
+            part(
+                "- - 12 - - - 15 - - - 12 14 - - - -",
+                [3.0, 1.0, 8.0, 30.0, -1.0],
+                0.0,
+                30.0,
+                [1.0, 110.0, 0.0, 40.0],
+                0.5,
+            )
+            .lp(1900.0),
+        ),
+        play: [3.0, -1.0, 0.5],
         drive: [4.0, -2.0],
         filter: [1600.0, 0.20],
         fx: None,
@@ -1370,51 +1388,57 @@ fn glass_coast() -> Rack {
         targets: [T::Cutoff(0.55), T::Hats(1.0), T::Fx(0.9)],
         bpm: 100.0,
         swing: 0.0,
-        kit: kit(
-            [
-                "X.......X.X.....",
-                "....X.......X...",
-                "....X.......X...",
-                "x.x.x.x.x.x.x.x.",
-                NONE,
-                NONE,
-            ],
-            [
-                "X.......X.X...X.",
-                "....X.......X.XX",
-                "....X.......XXXX",
-                "x.x.x.x.x.x.x.x.",
-                NONE,
-                "..........X.XXXX",
-            ],
-            [-3.0, 260.0, 4.0],
-            [-6.0, -10.0, -12.0, -5.0],
-            [0.3, 0.22, 0.14, 0.5],
-        ),
+        kit: Kit {
+            snare_decay: 130.0,
+            ..kit(
+                [
+                    "X.......X.X.....",
+                    "....X.......X...",
+                    "....X.......X...",
+                    "x.x.x.x.x.x.x.x.",
+                    NONE,
+                    NONE,
+                ],
+                [
+                    "X.......X.X...X.",
+                    "....X.......X.XX",
+                    "....X.......XXXX",
+                    "x.x.x.x.x.x.x.x.",
+                    NONE,
+                    "..........X.XXXX",
+                ],
+                [-3.0, 260.0, 4.0],
+                [-4.0, -8.0, -12.0, -5.0],
+                [0.3, 0.22, 0.14, 0.5],
+            )
+        },
         bass: part(
             "0 0 12 0 0 12 0 0 -2 -2 10 -2 -2 10 -2 -2",
             [2.0, 2.0, 12.0, 50.0, -2.0],
-            0.4,
+            0.5,
             50.0,
             [1.0, 150.0, 0.6, 40.0],
             0.6,
         ),
-        chords: Some(part(
-            "7 12 16 19 16 12 7 12 5 9 12 17 12 9 5 9",
-            [2.0, 3.0, 14.0, 50.0, 0.0],
-            0.0,
-            60.0,
-            [2.0, 200.0, 0.2, 100.0],
-            0.4,
-        )),
-        play: [2.0, 0.0, 0.5],
+        chords: Some(
+            part(
+                "7 12 16 19 16 12 7 12 5 9 12 17 12 9 5 9",
+                [2.0, 4.0, 18.0, 50.0, -1.0],
+                0.3,
+                78.0,
+                [3.0, 260.0, 0.35, 240.0],
+                0.45,
+            )
+            .lp(2400.0),
+        ),
+        play: [2.0, -1.0, 0.5],
         drive: [2.0, -1.0],
         filter: [2500.0, 0.10],
         fx: Some("chorus"),
         crush: false,
         comp: [-22.0, 3.0, 3.0],
-        echo: [0.0, 45.0, 3000.0],
-        space: [0.5, 2.5, 0.35],
+        echo: [0.0, 52.0, 2800.0],
+        space: [0.55, 3.2, 0.42],
         trim_db: -1.0,
     })
 }

@@ -55,6 +55,19 @@ Clips in `docs/presets/clips/groove/group1/` (`<slug>.flac`, `<slug>.mp3` at 320
 - REAPER (`host.py` with `PH_SELF=1`, evidence in `evidence/host-groove/`): all eight save, quit, reopen with identical state. The render after reopen is identical for six; Ore Cart and Stoop Sale differ in about half the runs, because the free-running clock starts at another phase in each host run (relative difference 0.8 to 1.4); for self-playing patches the check compares loudness (within 1.5 dB) instead of samples. `host.py` also writes plugin state version 5 now (it wrote 2, which the plugin migrates, so state compared unequal).
 - Standalone (`standalone.py`, evidence in `evidence/standalone-groove/`): all eight open, take a chord from a virtual MIDI controller and stay running, audio on the silent sink.
 
+### Harshness (group 1)
+
+Corner Store had a narrow tone at 3111 Hz, 23 dB above the spectrum around it: the 5th harmonic of the D#5 clav stab (a 30 % pulse an octave too high; layer muting pinned it to the stab part, the bus filter macro did not move it). The clav stab now sits an octave lower with a 1.9 kHz low-pass, and the MIDI voice an octave lower. Glass Coast's arp had the same build-up (2625 Hz, 5th harmonic of the arp): it is now an octave lower, four-voice, with a sub, a 2.4 kHz low-pass and longer notes, plus a shorter gated snare and a longer echo and room.
+
+| Preset | Strongest peak above 2 kHz before / after (level dB, prominence dB) | 2-5 kHz energy / total before / after (dB) |
+|---|---|---|
+| Corner Store | 3111 Hz -52.8, 23.2 / 2487 Hz -61.8, 13.6 | -16.8 / -20.4 |
+| Glass Coast | 2625 Hz -56.4, 16.5 / 2101 Hz -61.5, 9.2 | -14.1 / -19.6 |
+| Brick Dust, Copper Mile, Fault Line, Ore Cart, Stoop Sale | unchanged: no peak above 8.5 dB prominence, level under -65 dB | -22.9, -24.6, -19.5, -28.1, -26.8 |
+| Still Water | 2353 Hz -62.5, 29.0 (unchanged; a quiet bell partial) | -25.8 |
+
+With every macro at 1 Corner Store's strongest peak is 2180 Hz at -57 dB (it was 3111 Hz at -49.5 dB with Drive up).
+
 ### Notes
 
 - A groove's bass and stab parts come from `seq` modules and play only while the clock runs; the MIDI voice plays over them through the same filter, compressor and kick duck. The kit joins after the echo and room, so the drums are not ducked by their own kick.

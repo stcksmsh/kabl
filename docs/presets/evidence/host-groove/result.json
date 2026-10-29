@@ -1,51 +1,15 @@
 {
- "plugin_sha256": "33a412101e37cbabb975fdcc5e20e240657496f5ee5d0add000ef1f0dddcb315",
- "copper-mile": {
-  "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1216,
-  "rms": 0.0224,
-  "restart_relative_difference": 1.36285
- },
- "brick-dust": {
-  "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1666,
-  "rms": 0.025,
-  "restart_relative_difference": 1.40298
- },
- "ore-cart": {
-  "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1391,
-  "rms": 0.0239,
-  "restart_relative_difference": 0.0
- },
- "stoop-sale": {
-  "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1345,
-  "rms": 0.026,
-  "restart_relative_difference": 0.0
- },
- "fault-line": {
-  "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1912,
-  "rms": 0.0291,
-  "restart_relative_difference": 0.0
- },
+ "plugin_sha256": "d5cda48340531b1a7d2818546da7689564ae6dd9f6f0a82d6aba4b9cce06f525",
  "corner-store": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.181,
-  "rms": 0.0302,
+  "peak": 0.1821,
+  "rms": 0.0304,
   "restart_relative_difference": 0.0
  },
  "glass-coast": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1585,
-  "rms": 0.0273,
-  "restart_relative_difference": 0.45286
- },
- "still-water": {
-  "states_identical_across_save_quit_reopen": true,
-  "peak": 0.0904,
-  "rms": 0.0172,
-  "restart_relative_difference": 0.2728
+  "peak": 0.1674,
+  "rms": 0.0292,
+  "restart_relative_difference": 0.0
  }
 }
