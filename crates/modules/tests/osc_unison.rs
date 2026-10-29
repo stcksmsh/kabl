@@ -54,7 +54,7 @@ fn sixteen_voices_stay_band_limited_at_48_and_96_khz() {
 fn width_pans_the_stack_and_zero_is_mono() {
     let set = [("base_hz", 220.0), ("unison", 8.0), ("detune", 30.0)];
     let mono = osc(&set).render(9600, 0, |_, _| 0.0);
-    let right = osc(&set).render(9600, 1, |_, _| 0.0);
+    let right = osc(&set).render(9600, 2, |_, _| 0.0);
     assert_eq!(mono, right);
     let mut wide = osc(&[
         ("base_hz", 220.0),
@@ -65,8 +65,8 @@ fn width_pans_the_stack_and_zero_is_mono() {
     let (mut l, mut r) = (Vec::new(), Vec::new());
     for _ in 0..300 {
         let b = wide.block(&[]);
-        l.extend_from_slice(&b[0]);
-        r.extend_from_slice(&b[1]);
+        l.extend_from_slice(&b[1]);
+        r.extend_from_slice(&b[2]);
     }
     let diff: Vec<f32> = l.iter().zip(&r).map(|(a, b)| a - b).collect();
     assert!(rms(&diff) > 0.2 * rms(&l), "channels differ");
@@ -122,5 +122,40 @@ fn every_setting_and_rate_is_finite() {
             });
             assert!(x.iter().all(|v| v.is_finite()), "{sr} {count} {wave}");
         }
+    }
+}
+
+/// Width 0/0.5/1 on a unison saw: L/R correlation and the mono fold ((L+R)/2) against the
+/// width-0 level. Run with `--nocapture` for the numbers.
+#[test]
+fn width_keeps_the_mono_fold_alive() {
+    let mut ref_db = 0.0;
+    for (w, floor) in [(0.0, -0.1), (50.0, -3.0), (100.0, -6.0)] {
+        let mut o = osc(&[
+            ("base_hz", 220.0),
+            ("unison", 8.0),
+            ("detune", 30.0),
+            ("width", w),
+        ]);
+        let (mut l, mut r) = (Vec::new(), Vec::new());
+        for _ in 0..300 {
+            let b = o.block(&[]);
+            l.extend_from_slice(&b[1]);
+            r.extend_from_slice(&b[2]);
+        }
+        let (l, r) = (&l[4800..], &r[4800..]);
+        let dot: f32 = l.iter().zip(r).map(|(a, b)| a * b).sum();
+        let corr = dot
+            / (l.iter().map(|a| a * a).sum::<f32>() * r.iter().map(|b| b * b).sum::<f32>()).sqrt();
+        let fold: Vec<f32> = l.iter().zip(r).map(|(a, b)| 0.5 * (a + b)).collect();
+        let fold_db = db(rms(&fold) as f64);
+        if w == 0.0 {
+            ref_db = fold_db;
+        }
+        println!(
+            "width {w}: corr {corr:.3}, mono fold {:.2} dB vs width 0",
+            fold_db - ref_db
+        );
+        assert!(fold_db - ref_db > floor);
     }
 }
