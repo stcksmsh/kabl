@@ -1,0 +1,38 @@
+{
+ "plugin_sha256": "5a85af0838191ff475d0889c27b9ff7f3c7206ae6c15b84c552611e326202f30",
+ "glacier": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1316,
+  "rms": 0.0255,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "pump-house": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1126,
+  "rms": 0.0192,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.00911
+ },
+ "tin-voice": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0743,
+  "rms": 0.0209,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "rooftop": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1538,
+  "rms": 0.0267,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "tidepool": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1455,
+  "rms": 0.0281,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ }
+}

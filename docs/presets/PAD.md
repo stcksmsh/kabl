@@ -56,7 +56,7 @@ Clips in `docs/presets/clips/pad/group1/` (`<slug>.flac` and `<slug>.mp3` at 320
 
 ### Notes
 
-- Stereo is only the engine's step 1: every pad is a mono voice into stereo chorus, phaser, delay and reverb stages. Unison detune and the fx make the width; a stereo voice path (each unison voice panned, `osc.va` `out_r`) waits for step 2.
+- Stereo is only the engine's step 1: every pad is a mono voice into stereo chorus, phaser, delay and reverb stages. Unison detune and the fx make the width; a stereo voice path is available since stereo step 4 (see Group 2).
 - Dry Cleaner has no clock and no pump: it plays chords, the phaser and compressor supply the movement. The kick-ducked pad is Pump House (group 2).
 - Fog Bank and Deep Field use long attacks, so the level test's three-second holds sit on the swell; their loudness once a chord has fully opened is a little higher than the number above.
 
@@ -68,3 +68,28 @@ Deep Field crackled from about 5 s. The overseer's test: per 50 ms window, peak 
 - The room: a ten second reverb on a sub-heavy signal. Reverb only (delay and room off otherwise), ceiling raised: 24 windows at 10 s decay, 123 at 30 s, 1 at 3 s, 3 at 4 s, 22 at 8 s. The kinks scale with decay (the tank level), they are single samples about 1 % of the signal. Not changed here: the reverb module's modulated allpass is the likely source; it is an engine matter, flagged, not touched.
 
 Fix, in the patches only: Deep Field's room from 10 s to 6.5 s, and a gentle compressor (threshold -16 dB, 3:1, 15 ms attack, 250 ms release) between the room and the limiter, on Deep Field and Fog Bank (`Voice::guard`), so the limiter is only a safety. Trim raised to keep the level (Deep Field +3 dB, Fog Bank +1.5 dB). Character kept: the slow swell, the sub and the long tail; the tail is a little shorter. After: 0 flagged windows in both, 0 in the other six (apart from the onset window), levels -22.1 and -21.0 by the factory test, clip peaks -4.7 and -5.1 dBFS. REAPER and standalone checks rerun for both. Tour start times unchanged.
+
+## Group 2
+
+Clips in `docs/presets/clips/pad/group2/` (`<slug>.flac`, `<slug>.mp3` at 320 kbps, `tour.flac` with 20 ms fades at each join and a second of silence between clips). Tour start times: glacier 0, pump-house 27, rooftop 42, tidepool 57, tin-voice 84 seconds. Generator: the same `presets_pad.rs` (`write patches 2`, `levels`, `fold`, `macros`, `library`).
+
+Width: since stereo step 4 (`osc.va` `stereo` port and per-sample `width`), a pad can leave the oscillator stereo. `Osc::wide(percent)` wires `stereo` into the mixer and the mono part (mixer, drive, ladder, VCA, gain) then runs as a channel pair into the first stereo stage. Glacier (70 %), Rooftop (60 %) and Tidepool (80 %) use it; Pump House and Tin Voice stay mono voices (the duck and the formant filter are mono stages).
+
+| Preset | What | Macros (CC 20 up) | Width | Loud / peak (dBFS) | Mono fold |
+|---|---|---|---|---|---|
+| Glacier | glassy slow sine and triangle stack, high glass partial, slow swell, long echo | Frost, Swell, Drift, Space | yes, 70 % | -23.2 / -7.3 | -0.47 dB |
+| Pump House | chord pad ducked by its own 124 BPM kick through a sidechain (Run starts it) | Cutoff, Drive, Pump, Room | no | -24.2 / -7.3 | 0 dB |
+| Tin Voice | robot vowel chords through a formant filter, dry and driven | Vowel, Grit, Shift, Room | no | -22.7 / -10.2 | 0 dB |
+| Rooftop | brassy analog pad, detuned saws, slow filter envelope swell | Cutoff, Swell, Chorus, Space | yes, 60 % | -21.9 / -6.7 | -0.13 dB |
+| Tidepool | glassy pad with slow random steps in pitch and filter | Drift, Motion, Tone, Space | yes, 80 % | -22.3 / -6.3 | -0.54 dB |
+
+Level numbers are `factory_bank::level_table`'s (`factory_levels_hold_the_target` passes). Mono fold is the level of (L+R)/2 against the stereo power, level-test chord (limit 1.5 dB).
+
+### Checks (group 2)
+
+- No limiter. Peak with every macro at 1 (trim included, `presets_pad macros patches 2`): Glacier -2.4, Pump House -3.5, Tin Voice -12.5, Rooftop -4.9, Tidepool -2.8 dBFS. Trims in `preset_trims.inc`.
+- Every macro moves the render. Weakest: Glacier Swell -11.7 dB under the render (first version -30 dB: a route from the filter envelope to a cutoff the voice recipe already routes shares one cable, so the depth macro scaled the whole envelope; the recipe's amount is now 0 there).
+- `audio_defects.py`: all five FLAC, all five mp3 and the tour clean.
+- mp3 against the float render (`clips.py`): SNR 37 to 75 dB, peaks equal. Rooftop is the lowest (37 dB).
+- REAPER (`scripts/host.py`, evidence `evidence/host-pad2/`): all five saved, quit, reopened with identical state and render. Pump House plays its kick without MIDI (the clock runs in the host), so it joins Steel Toe and Rail Yard in the no-MIDI exemption. The script now compares states ignoring `version` (it writes version 2; the plugin saves 5), which had made every preset fail the check since #56.
+- Standalone (`scripts/standalone.py`, evidence `evidence/standalone-pad2/`): all five open, take a chord from a virtual MIDI controller and stay running, audio on `kabl_agents`.
