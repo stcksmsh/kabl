@@ -1,0 +1,10 @@
+{
+ "plugin_sha256": "0518313a5842668f5f0149a84590216f148354dfb4741d6f91d8d7be3ac77b82",
+ "pump-house": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1509,
+  "rms": 0.0285,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ }
+}

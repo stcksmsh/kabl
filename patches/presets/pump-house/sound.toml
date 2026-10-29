@@ -1,0 +1,12 @@
+name = "Pump House"
+category = "Pad"
+tags = [
+    "poly",
+    "sidechain",
+    "124bpm",
+    "french touch",
+    "signature",
+]
+description = "A chord pad that pumps with the beat for French touch: saws and an octave down, ducked on every beat of the host tempo by a silent envelope, no drum. Press Run to start the clock, then hold chords. Cutoff opens the filter, Drive pushes the saturation, Pump sets how deep the duck goes, Room adds a tempo-synced echo and a tight room."
+keys = true
+sequence = true

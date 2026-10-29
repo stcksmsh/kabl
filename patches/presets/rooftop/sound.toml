@@ -1,0 +1,12 @@
+name = "Rooftop"
+category = "Pad"
+tags = [
+    "poly",
+    "analog",
+    "wide",
+    "brass",
+    "pop",
+]
+description = "A brassy analog pad: detuned saws with a slow filter envelope that swells every chord. Play open triads and hold them. Cutoff sets the filter, Swell sets how far each chord opens, Chorus widens the sound, Space adds the echo and the room."
+keys = true
+sequence = false
