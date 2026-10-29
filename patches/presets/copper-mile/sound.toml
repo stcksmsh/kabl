@@ -1,13 +1,12 @@
 name = "Copper Mile"
 category = "Groove"
 tags = [
-    "sequenced",
     "phased",
     "pumping",
     "french touch",
     "123bpm",
     "signature",
 ]
-description = "A filtered disco loop for French touch: a round octave bass, syncopated saw stabs and a hard kick and clap, phased and compressed, with the kick ducking the music. Press Run, then play stabs on top. Filter opens the loop like a DJ knob, Phase brings in the phaser, Pump sets how hard the kick ducks the music, Room adds a tempo-synced echo and a tight room."
+description = "A filtered disco loop for French touch: a soft octave bass, syncopated saw stabs and a hard kick and clap, phased and compressed, with the kick ducking the music. Press Run, then play stabs on top. Filter opens the loop like a DJ knob, Phase brings in the phaser, Pump sets how hard the kick ducks the music, Room adds a tempo-synced echo and a tight room."
 keys = true
 sequence = true
