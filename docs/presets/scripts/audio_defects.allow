@@ -3,3 +3,12 @@
 clips/bass-lead/group2/rubber-band.flac CLICK
 # Rail Yard: the kick onset at 8.0 s (a step from -69 to +28 in one sample at the drum grid), probably intended.
 clips/bass-lead/group2/rail-yard.flac CLICK
+# Groove group 1 (presets_groove): instant-attack drum voices (hat and kick onsets from drum.grid, as Rail Yard) and,
+# at fixed clip times (x.5 s), an unexplained step that is independent of MIDI and of the kick (Copper Mile 10.5,
+# Corner Store 13.0, Fault Line, Ore Cart, Brick Dust). Not judged by ear; flagged to the overseer.
+clips/groove/group1/brick-dust.flac CLICK
+clips/groove/group1/copper-mile.flac CLICK
+clips/groove/group1/corner-store.flac CLICK
+clips/groove/group1/fault-line.flac CLICK
+clips/groove/group1/glass-coast.flac CLICK
+clips/groove/group1/ore-cart.flac CLICK

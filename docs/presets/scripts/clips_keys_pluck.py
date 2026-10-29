@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Renders the keys and plucks clips of one delivery group: FLAC plus 320 kbps mp3 per preset
 (mp3 checked against the float WAV as in clips.py), and one tour FLAC with the presets back to
-back, a second of silence between, plus tour.txt with the start times.
+back, a second of silence between (each clip faded 20 ms at both ends), plus tour.txt with the start times.
 
     cargo build --release -p kabl-ui --example presets_keys_pluck
     python3 docs/presets/scripts/clips_keys_pluck.py 1        # group 1 -> docs/presets/clips/keys-pluck/group1/
@@ -37,6 +37,14 @@ def flac(src, dst, extra=()):
             '-bits_per_raw_sample', '24', dst], check=True)
 
 
+def fade(x, ms=20):
+    """Raised-cosine fade in and out at the ends of a tour clip, so the splice to silence does not click."""
+    n = min(int(48000 * ms / 1000), len(x) // 2)
+    w = (0.5 - 0.5 * np.cos(np.pi * (np.arange(n) + 0.5) / n)).astype('<f4')[:, None]
+    x = x.copy(); x[:n] *= w; x[len(x) - n:] *= w[::-1]
+    return x
+
+
 def encode_and_check(wav, stem):
     mp3 = str(stem) + '.mp3'
     sp.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', wav, '-b:a', '320k', mp3], check=True)
@@ -70,7 +78,7 @@ with tempfile.TemporaryDirectory() as tmp:
         good &= encode_and_check(wav, out / slug)
         x = pcm(wav)
         lines.append(f'{int(t // 60)}:{t % 60:05.2f}  {names.get(slug, slug)}')
-        tour += [x, np.zeros((SR, 2), '<f4')]
+        tour += [fade(x), np.zeros((SR, 2), '<f4')]
         t += len(x) / SR + 1.0
     raw = Path(tmp) / 'tour.f32'
     raw.write_bytes(np.concatenate(tour[:-1]).astype('<f4').tobytes())
