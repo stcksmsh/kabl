@@ -1,0 +1,13 @@
+name = "Pump House"
+category = "Pad"
+tags = [
+    "poly",
+    "sidechain",
+    "drums",
+    "124bpm",
+    "french touch",
+    "signature",
+]
+description = "A chord pad ducked by its own four-on-the-floor kick for French touch: saws and an octave down through a sidechain compressor. Press Run to start the kick, then hold chords. Cutoff opens the filter, Drive pushes the saturation, Pump sets how hard the kick ducks the pad, Room adds a tempo-synced echo and a tight room."
+keys = true
+sequence = true

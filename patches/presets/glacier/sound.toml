@@ -1,0 +1,12 @@
+name = "Glacier"
+category = "Pad"
+tags = [
+    "poly",
+    "slow",
+    "wide",
+    "ambient",
+    "cinematic",
+]
+description = "A glassy, slow pad: a wide sine and triangle stack with a high glass partial, a slow swell and a long echo. Play long, open chords. Frost opens the filter and brings in the glass partial, Swell opens the filter over each held chord, Drift adds a slow pitch sway, Space adds the echo and the room."
+keys = true
+sequence = false
