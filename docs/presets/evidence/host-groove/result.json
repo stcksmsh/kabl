@@ -1,51 +1,51 @@
 {
- "plugin_sha256": "f187f4d26e277ff9ee13396ef4098d99deac21faec4e5d7f900e8b5f88ae5394",
+ "plugin_sha256": "33a412101e37cbabb975fdcc5e20e240657496f5ee5d0add000ef1f0dddcb315",
  "copper-mile": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1217,
-  "rms": 0.0216,
-  "restart_relative_difference": 0.0
+  "peak": 0.1216,
+  "rms": 0.0224,
+  "restart_relative_difference": 1.36285
  },
  "brick-dust": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1668,
-  "rms": 0.0254,
-  "restart_relative_difference": 0.0
+  "peak": 0.1666,
+  "rms": 0.025,
+  "restart_relative_difference": 1.40298
  },
  "ore-cart": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1374,
+  "peak": 0.1391,
   "rms": 0.0239,
-  "restart_relative_difference": 1.40205
+  "restart_relative_difference": 0.0
  },
  "stoop-sale": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1623,
-  "rms": 0.0261,
-  "restart_relative_difference": 0.80705
+  "peak": 0.1345,
+  "rms": 0.026,
+  "restart_relative_difference": 0.0
  },
  "fault-line": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1604,
+  "peak": 0.1912,
   "rms": 0.0291,
   "restart_relative_difference": 0.0
  },
  "corner-store": {
   "states_identical_across_save_quit_reopen": true,
   "peak": 0.181,
-  "rms": 0.0303,
+  "rms": 0.0302,
   "restart_relative_difference": 0.0
  },
  "glass-coast": {
   "states_identical_across_save_quit_reopen": true,
   "peak": 0.1585,
   "rms": 0.0273,
-  "restart_relative_difference": 0.0
+  "restart_relative_difference": 0.45286
  },
  "still-water": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1016,
+  "peak": 0.0904,
   "rms": 0.0172,
-  "restart_relative_difference": 0.0
+  "restart_relative_difference": 0.2728
  }
 }
