@@ -164,5 +164,9 @@ fn paused_consumer_keeps_ownership_bounded_and_recovers() {
     // Shutdown with errors still queued: dropping both ends frees them and the queue.
     drop(tx);
     drop(rx);
-    assert_eq!(live_settled(base, -ring), -ring, "nothing outstanding after shutdown");
+    assert_eq!(
+        live_settled(base, -ring),
+        -ring,
+        "nothing outstanding after shutdown"
+    );
 }
