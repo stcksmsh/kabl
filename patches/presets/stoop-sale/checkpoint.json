@@ -406,7 +406,7 @@
         "y": 920.0
       },
       "params": {
-        "gain_db": -1.0
+        "gain_db": -4.0
       }
     },
     "30": {
@@ -416,8 +416,8 @@
         "y": 920.0
       },
       "params": {
-        "bits": 6.0,
-        "downsample": 4.0,
+        "bits": 5.0,
+        "downsample": 6.0,
         "mix": 0.0
       }
     },
@@ -567,8 +567,8 @@
         "y": 920.0
       },
       "params": {
-        "level1": 0.6,
-        "level2": 0.45,
+        "level1": 0.45,
+        "level2": 0.34,
         "level3": 0.0,
         "level4": 0.2
       }
@@ -1560,7 +1560,7 @@
         }
       },
       "params": {
-        "amount": 0.8
+        "amount": 1.0
       },
       "steps": []
     },
