@@ -54,7 +54,7 @@ fn sixteen_voices_stay_band_limited_at_48_and_96_khz() {
 fn width_pans_the_stack_and_zero_is_mono() {
     let set = [("base_hz", 220.0), ("unison", 8.0), ("detune", 30.0)];
     let mono = osc(&set).render(9600, 0, |_, _| 0.0);
-    let right = osc(&set).render(9600, 1, |_, _| 0.0);
+    let right = osc(&set).render(9600, 2, |_, _| 0.0);
     assert_eq!(mono, right);
     let mut wide = osc(&[
         ("base_hz", 220.0),
@@ -65,8 +65,8 @@ fn width_pans_the_stack_and_zero_is_mono() {
     let (mut l, mut r) = (Vec::new(), Vec::new());
     for _ in 0..300 {
         let b = wide.block(&[]);
-        l.extend_from_slice(&b[0]);
-        r.extend_from_slice(&b[1]);
+        l.extend_from_slice(&b[1]);
+        r.extend_from_slice(&b[2]);
     }
     let diff: Vec<f32> = l.iter().zip(&r).map(|(a, b)| a - b).collect();
     assert!(rms(&diff) > 0.2 * rms(&l), "channels differ");
@@ -123,4 +123,73 @@ fn every_setting_and_rate_is_finite() {
             assert!(x.iter().all(|v| v.is_finite()), "{sr} {count} {wave}");
         }
     }
+}
+
+/// Width 0/0.5/1 on a unison saw: L/R correlation and the mono fold ((L+R)/2) against the
+/// width-0 level. Run with `--nocapture` for the numbers.
+#[test]
+fn width_keeps_the_mono_fold_alive() {
+    let mut ref_db = 0.0;
+    for (w, floor) in [(0.0, -0.1), (50.0, -3.0), (100.0, -6.0)] {
+        let mut o = osc(&[
+            ("base_hz", 220.0),
+            ("unison", 8.0),
+            ("detune", 30.0),
+            ("width", w),
+        ]);
+        let (mut l, mut r) = (Vec::new(), Vec::new());
+        for _ in 0..300 {
+            let b = o.block(&[]);
+            l.extend_from_slice(&b[1]);
+            r.extend_from_slice(&b[2]);
+        }
+        let (l, r) = (&l[4800..], &r[4800..]);
+        let dot: f32 = l.iter().zip(r).map(|(a, b)| a * b).sum();
+        let corr = dot
+            / (l.iter().map(|a| a * a).sum::<f32>() * r.iter().map(|b| b * b).sum::<f32>()).sqrt();
+        let fold: Vec<f32> = l.iter().zip(r).map(|(a, b)| 0.5 * (a + b)).collect();
+        let fold_db = db(rms(&fold) as f64);
+        if w == 0.0 {
+            ref_db = fold_db;
+        }
+        println!(
+            "width {w}: corr {corr:.3}, mono fold {:.2} dB vs width 0",
+            fold_db - ref_db
+        );
+        assert!(fold_db - ref_db > floor);
+    }
+}
+
+/// Width moved 0 -> 100 % inside one block must ramp: sample 0 is within one ramp step of the
+/// width-0 sound, and the block ends on the width-100 sound. A stepped gain jumps at sample 0.
+#[test]
+fn a_fast_width_move_does_not_step() {
+    let set = [("base_hz", 220.0), ("unison", 8.0), ("detune", 30.0)];
+    let run = |w0: f32, w1: f32| {
+        let mut o = osc(&[set[0], set[1], set[2], ("width", w0)]);
+        for _ in 0..20 {
+            o.block(&[]);
+        }
+        o.set("width", w1);
+        let b = o.block(&[]);
+        (b[1], b[2])
+    };
+    let (l0, _) = run(0.0, 0.0);
+    let (l1, r1) = run(100.0, 100.0);
+    let (l, r) = run(0.0, 100.0);
+    let scale = peak(&l1).max(peak(&l0));
+    assert!((l[0] - l0[0]).abs() < 0.1 * scale, "step at sample 0");
+    assert!(
+        (r[0] - l0[0]).abs() < 0.1 * scale,
+        "step at sample 0 (right)"
+    );
+    let n = BLOCK - 1;
+    assert!((l[n] - l1[n]).abs() < 1e-3 * scale && (r[n] - r1[n]).abs() < 1e-3 * scale);
+    // And it is a ramp, not a wobble: a worse jump than the saw's own edges never appears.
+    let jump = |x: &[f32]| {
+        x.windows(2)
+            .map(|w| (w[1] - w[0]).abs())
+            .fold(0.0, f32::max)
+    };
+    assert!(jump(&l) <= 1.05 * jump(&l0).max(jump(&l1)));
 }
