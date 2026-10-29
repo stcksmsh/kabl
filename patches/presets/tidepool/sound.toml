@@ -1,0 +1,12 @@
+name = "Tidepool"
+category = "Pad"
+tags = [
+    "poly",
+    "evolving",
+    "wide",
+    "ambient",
+    "glass",
+]
+description = "An evolving glassy pad that never repeats: slow random steps in pitch and filter over a wide triangle stack. Play slow chords and let it move. Drift sets the pitch sway, Motion sets how far the filter wanders, Tone sets the brightness, Space adds the echo and the room."
+keys = true
+sequence = false

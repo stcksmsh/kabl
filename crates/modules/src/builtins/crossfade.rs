@@ -144,7 +144,7 @@ const PAN_PORTS: &[PortInfo] = &[
         name: "in",
         port_type: PortType::Audio,
         direction: PortDirection::Input,
-        width: 1,
+        width: 2,
     },
     PortInfo {
         name: "pan",
@@ -175,7 +175,7 @@ pub static PAN_INFO: ModuleInfo = ModuleInfo {
     name: "Pan",
     category: Category::Utility,
     rate: Rate::Voice,
-    explain: "Places a mono sound between the left and right speakers.",
+    explain: "Places a sound between the left and right speakers; a stereo input is balanced.",
     lesson: None,
     requires: &[],
     ports: PAN_PORTS,
@@ -211,15 +211,16 @@ impl Module for Pan {
 
     fn process(&mut self, io: &mut ProcessIo) {
         let n = io.block_len();
-        let (input, cv, knob) = (io.input(0), io.input(1), io.param(0));
+        // A stereo `in` is a balance (each side keeps its own channel); a mono one is
+        // broadcast to both sides, the old pan sample for sample.
+        let (left, right, cv, knob) = (io.input(0), io.input(1), io.input(2), io.param(0));
         for i in 0..n {
             let p = (knob.at(i) + cv.at(i)).clamp(-1.0, 1.0);
             let p = if p.is_finite() { p } else { 0.0 };
             let angle = (p + 1.0) * 0.5 * FRAC_PI_2;
-            let x = input.at(i);
             let fin = |v: f32| if v.is_finite() { v } else { 0.0 };
-            io.output(0)[i] = fin(x * angle.cos());
-            io.output(1)[i] = fin(x * angle.sin());
+            io.output(0)[i] = fin(left.at(i) * angle.cos());
+            io.output(1)[i] = fin(right.at(i) * angle.sin());
         }
     }
 

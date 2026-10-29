@@ -60,7 +60,7 @@ def chunk_of(state):
 
 def project(slug, with_midi):
     patch = json.loads((repo / 'patches/presets' / slug / 'checkpoint.json').read_text())
-    state = {'version': 5, 'patch': patch, 'output_gain': .4, 'host_clock': False,
+    state = {'version': 2, 'patch': patch, 'output_gain': .4, 'host_clock': False,
              'lanes': [{'retired': False, 'target': None} for _ in range(16)], 'slot_values': [0.0] * 16}
     proj = re.sub(r'\n      <PARMENV[\s\S]*?\n      >', '', TEMPLATE.read_text())
     t2 = proj.index('\n  <TRACK', proj.index('<TRACK') + 1)
@@ -138,7 +138,9 @@ try:
         run(f'{slug}-init', S / f'{slug}.rpp', secs)
         run(f'{slug}-restart', S / f'saved-{slug}-init.rpp', secs)
         s0, s1, s2 = (states_of(p.read_text()) for p in (S / f'{slug}.rpp', S / f'saved-{slug}-init.rpp', S / f'saved-{slug}-restart.rpp'))
-        assert f32(s0) == f32(s1) == f32(s2), f'{slug}: state changed across save, quit and reopen'
+        # The script writes state version 2; the plugin saves its current version (5) on first save.
+        nov = lambda ss: [{k: x for k, x in s.items() if k != 'version'} for s in ss]
+        assert f32(nov(s0)) == f32(nov(s1)) == f32(nov(s2)) and f32(s1) == f32(s2), f'{slug}: state changed across save, quit and reopen'
         r['states_identical_across_save_quit_reopen'] = True
         a, b = feats(S / f'render-{slug}-init.wav'), feats(S / f'render-{slug}-restart.wav')
         assert a['finite'] and b['finite'] and a['peak'] < 1.0 and a['rms'] > 0.003, (slug, a)

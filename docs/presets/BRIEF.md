@@ -125,6 +125,10 @@ sequence = false                       # derived: the patch has a clock
 
 Patch format and schema are unchanged. A preset only uses modules that exist on master.
 
+## No built-in drums outside Groove and Piece
+
+Only Groove and Piece presets may contain a drum module (`drum.kick`, `drum.snare`, `drums`, `drum.grid` and the like). Every other category stays silent without a played note. A rhythmic feel such as a pump is built from the host clock instead: a `clock` (or the transport) into `clock.div` and an envelope that moves a gain or filter stage, so nothing audible but the preset's own sound. The depth is a macro (for a pump, "Pump"), the preset is inert until Run starts the clock, and the REAPER no-MIDI check must render near silence for it (no `audio_defects.allow` entry, no exemption in `host.py`).
+
 ## Checklist: a preset passes only if
 
 1. Plays from MIDI on load (`midi.in`, or an `arp` fed by held keys with a `midi.in` beside it), with a 2-semitone bend range; mono or legato for bass and lead.

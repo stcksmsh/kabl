@@ -16,7 +16,8 @@
 //! centre oscillator(s) against the side ones (50 = equal); `width` pans the stack across the
 //! field. Level law: equal power, each oscillator at `weight / √(Σ weight²)`, so loudness
 //! stays put as the count or the blend changes. `out` is the whole stack when `width` is 0 and
-//! the left channel otherwise; `out_r` is the right channel (a copy of `out` at width 0).
+//! the left channel otherwise; `stereo` (width 2) is the whole stack as a left/right pair (both a
+//! copy of `out` at width 0). Wire `stereo` to carry the spread past the oscillator.
 //! `restart` chooses what a `sync` edge does to a stack: 0 restarts every oscillator at phase 0
 //! (hard sync), 1 restarts each at its own start phase, so a retriggered stack never aligns.
 //!
@@ -60,10 +61,10 @@ const PORTS: &[PortInfo] = &[
         width: 1,
     },
     PortInfo {
-        name: "out_r",
+        name: "stereo",
         port_type: PortType::Audio,
         direction: PortDirection::Output,
-        width: 1,
+        width: 2,
     },
 ];
 
@@ -202,7 +203,8 @@ const CURVE_PARAM: usize = 6;
 const WIDTH_PARAM: usize = 7;
 const BLEND_PARAM: usize = 8;
 const RESTART_PARAM: usize = 9;
-const OUT_R: usize = 1;
+/// First slot of the width-2 `stereo` port (left; right follows).
+const STEREO: usize = 1;
 
 pub const MAX_UNISON: usize = 16;
 /// The stacks the first unison laid out by table; larger ones use even steps.
@@ -312,6 +314,9 @@ struct Core {
     gain: [f32; MAX_UNISON],
     /// Pulse width (0..1) at the end of the last block: the next block ramps from it.
     pw: f32,
+    /// Left/right gain of each oscillator at the end of the last block: the next block ramps
+    /// from it, so a moved `width` never steps.
+    pan: [(f32, f32); MAX_UNISON],
     /// The last `sync` input sample, for edge detection and the edge's fractional position.
     last_sync: f32,
 }
@@ -328,6 +333,7 @@ impl OscVa {
                 phase: START_PHASE,
                 gain: [-1.0; MAX_UNISON],
                 pw: -1.0,
+                pan: [(1.0, 1.0); MAX_UNISON],
                 last_sync: 0.0,
             },
             sample_rate: 48000.0,
@@ -394,7 +400,7 @@ impl Module for OscVa {
         let width = extra(WIDTH_PARAM, 0.0).clamp(0.0, 100.0) / 100.0;
         let blend = extra(BLEND_PARAM, 50.0).clamp(0.0, 100.0) / 100.0;
         let restart = extra(RESTART_PARAM, 0.0) >= 0.5;
-        let stereo = io.output_count() > OUT_R;
+        let stereo = io.output_count() > STEREO + 1;
         let n = io.block_len();
         let sr = self.sample_rate;
         let c = &mut self.c;
@@ -452,6 +458,20 @@ impl Module for OscVa {
         }
         if c.gain[0] < 0.0 {
             c.gain = target;
+            c.pan = pan;
+        }
+        // Pan gains ramp across the block from where the last one ended.
+        let ramping = c.pan != pan;
+        let wide = ramping || width > 0.0;
+        let mut cur = c.pan;
+        let mut pan_step = [(0.0f32, 0.0f32); MAX_UNISON];
+        if ramping {
+            for k in 0..MAX_UNISON {
+                pan_step[k] = (
+                    (pan[k].0 - cur[k].0) / n as f32,
+                    (pan[k].1 - cur[k].1) / n as f32,
+                );
+            }
         }
         if c.pw < 0.0 {
             c.pw = pw_target;
@@ -476,6 +496,12 @@ impl Module for OscVa {
             let freq = base_hz.at(i) * 2f32.powf(pitch.at(i) / 12.0);
 
             let (mut v, mut v_r) = (0.0, 0.0);
+            if ramping {
+                for k in 0..MAX_UNISON {
+                    cur[k].0 += pan_step[k].0;
+                    cur[k].1 += pan_step[k].1;
+                }
+            }
             for k in 0..MAX_UNISON {
                 let g = &mut c.gain[k];
                 if *g != target[k] {
@@ -510,19 +536,21 @@ impl Module for OscVa {
                     *p -= 1.0;
                 }
                 let y = if *g == 1.0 { y } else { *g * y };
-                if width > 0.0 {
-                    v += y * pan[k].0;
-                    v_r += y * pan[k].1;
+                if wide {
+                    v += y * cur[k].0;
+                    v_r += y * cur[k].1;
                 } else {
                     v += y;
                 }
             }
             io.output(OUT)[i] = v;
             if stereo {
-                io.output(OUT_R)[i] = if width > 0.0 { v_r } else { v };
+                io.output(STEREO)[i] = v;
+                io.output(STEREO + 1)[i] = if wide { v_r } else { v };
             }
         }
         c.pw = pw_target;
+        c.pan = pan;
         c.last_sync = prev_sync;
     }
 

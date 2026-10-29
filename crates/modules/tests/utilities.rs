@@ -366,7 +366,7 @@ fn equal_power_crossfade_dips_less_in_the_middle() {
 fn pan_is_equal_power_and_hard_ends_are_one_sided() {
     for p in [-1.0f32, -0.5, 0.0, 0.3, 1.0] {
         let mut r = Rig::new("pan", &[("pan", p)], SR);
-        let o = r.block(&[&[1.0; BLOCK]]);
+        let o = r.block(&[&[1.0; BLOCK], &[1.0; BLOCK]]);
         let (l, rt) = (o[0][0], o[1][0]);
         assert!(
             (l * l + rt * rt - 1.0).abs() < 1e-5,
@@ -385,8 +385,12 @@ fn pan_is_equal_power_and_hard_ends_are_one_sided() {
     }
     // The pan input adds to the knob.
     let mut r = Rig::new("pan", &[("pan", -0.5)], SR);
-    let o = r.block(&[&[1.0; BLOCK], &[0.5; BLOCK]]);
+    let o = r.block(&[&[1.0; BLOCK], &[1.0; BLOCK], &[0.5; BLOCK]]);
     assert!((o[0][0] - o[1][0]).abs() < 1e-6);
+    // A stereo input is balanced: each side keeps its own channel.
+    let mut r = Rig::new("pan", &[("pan", 0.0)], SR);
+    let o = r.block(&[&[1.0; BLOCK], &[0.0; BLOCK], &[0.0; BLOCK]]);
+    assert!(o[0][0] > 0.7 && o[1][0] == 0.0);
 }
 
 // ---- random ---------------------------------------------------------------------------------
