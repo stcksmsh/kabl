@@ -1,0 +1,12 @@
+name = "Glass Coast"
+category = "Groove"
+tags = [
+    "sequenced",
+    "arp",
+    "chorus",
+    "synthwave",
+    "100bpm",
+]
+description = "A synthwave groove: a pulsing octave bass, a rolling arpeggio, a gated snare and clap and a long echo. Press Run, then play leads over it. Filter opens the music, Hats raises the hats, Chorus widens the whole mix, Space adds the long echo and the room."
+keys = true
+sequence = true

@@ -1,0 +1,11 @@
+name = "Ore Cart"
+category = "Groove"
+tags = [
+    "sequenced",
+    "rumble",
+    "techno",
+    "132bpm",
+]
+description = "A rolling techno groove: a four-on-the-floor kick, off-beat hats, a rumbling bass between the kicks and a sparse stab. Press Run, then play stabs over it. Filter opens the music, Rumble raises the bass, Pump sets how hard the kick ducks it, Space adds the echo and the room."
+keys = true
+sequence = true

@@ -1,0 +1,14 @@
+name = "Brick Dust"
+category = "Groove"
+tags = [
+    "sequenced",
+    "mono",
+    "distorted",
+    "compressed",
+    "french touch",
+    "126bpm",
+    "signature",
+]
+description = "A blunt, overdriven stomp: a hard-driven saw and square bass line under a short kick, snare and hats, squashed by a heavy compressor. Press Run, then play low notes over it. Filter opens the bass, Dirt adds drive, Pump sets how hard the kick ducks the music, Room adds a slapback and a tight room."
+keys = true
+sequence = true

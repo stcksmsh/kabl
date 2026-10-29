@@ -1,0 +1,12 @@
+name = "Fault Line"
+category = "Groove"
+tags = [
+    "sequenced",
+    "reese",
+    "breaks",
+    "drum and bass",
+    "174bpm",
+]
+description = "A two-step drum and bass loop: a sharp kick and snare, ghost snares, fast hats and a detuned reese bass. Press Run, then play low notes over it. Reese adds drive to the bass, Filter opens it, Hats raises the hats, Space adds the echo and the room."
+keys = true
+sequence = true

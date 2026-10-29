@@ -1,0 +1,12 @@
+name = "Still Water"
+category = "Groove"
+tags = [
+    "sequenced",
+    "slow",
+    "sparse",
+    "ambient",
+    "68bpm",
+]
+description = "A sparse ambient groove: a soft kick, a few random hats and toms, a slow bass and bell-like chords with long tails. Press Run, then play slow chords over it. Bloom opens the music, Pulse raises the hats and drops, Weight raises the bass, Space adds the long echo and room."
+keys = true
+sequence = true
