@@ -631,16 +631,6 @@ fn echo(time_ms: f32, feedback: f32, tone_hz: f32) -> [(&'static str, f32); 4] {
     ]
 }
 
-/// A kick lane on the 16th grid: gates on `on` of the eight steps over two beats.
-fn drum_lane(r: &mut Rack, on: &[usize]) -> ModuleId {
-    let seq = r.add("seq", &[]);
-    for k in 1..=8 {
-        r.e.set_param(seq, &format!("g{k}"), f32::from(u8::from(on.contains(&k))));
-        r.e.set_param(seq, &format!("v{k}"), 0.9);
-    }
-    seq
-}
-
 // ---- clip phrases ---------------------------------------------------------------------------
 
 /// A chord held from `t` for `len` seconds.
@@ -1086,7 +1076,8 @@ fn tidepool() -> Rack {
     v.finish("m4", &echo(540.0, 42.0, 3000.0), 0.35, (6.5, 0.55), None)
 }
 
-/// Pump House: a chord pad ducked by its own four-on-the-floor kick through a sidechain.
+/// Pump House: a chord pad that ducks on every beat of the host clock: a silent envelope, no drum,
+/// dips the pad's gain like a sidechain would. Depth on macro 3; inert until Run starts the clock.
 fn pump_house() -> Rack {
     let mut v = Voice::new(pad_recipe(
         &[
@@ -1105,33 +1096,20 @@ fn pump_house() -> Rack {
     v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.5);
     v.r.route(v.knob, "m2", v.drive, "drive_db", 0.2);
     let clock = v.r.add("clock", &[("bpm", 124.0), ("swing", 0.0)]);
-    let duck = v.stage(
-        "compressor",
-        &[
-            ("threshold_db", -34.0),
-            ("ratio", 1.0),
-            ("attack_ms", 1.0),
-            ("release_ms", 220.0),
-            ("knee_db", 3.0),
-        ],
+    let beat = v.r.add("clock.div", &[("div", 4.0)]);
+    v.r.wire(clock, "gate", beat, "clock");
+    v.r.wire(clock, "reset", beat, "reset");
+    let duck = v.r.add("env.adsr", &adsr(1.0, 280.0, 0.0, 50.0));
+    v.r.wire(beat, "gate", duck, "gate");
+    // The envelope pulls the voice's gain stage down (84 dB travel: 0.30 is about 25 dB).
+    let gain = v.mono;
+    v.r.depth_route(duck, "out", gain, "gain_db", v.knob, "m3", -0.30);
+    v.stage(
+        "chorus",
+        &[("rate_hz", 0.3), ("depth", 40.0), ("mix", 14.0)],
     );
-    v.r.route(v.knob, "m3", duck, "ratio", 0.95);
-    let lane = drum_lane(&mut v.r, &[1, 5]);
-    let kick = v.r.add(
-        "drum.kick",
-        &[("level_db", -3.0), ("decay_ms", 280.0), ("drive_db", 10.0)],
-    );
-    v.r.wire(clock, "gate", lane, "clock");
-    v.r.wire(clock, "reset", lane, "reset");
-    v.r.wire(lane, "gate", kick, "gate");
-    v.r.wire(lane, "velocity", kick, "velocity");
-    v.r.wire(kick, "out", duck, "sc");
-    let beat = v.r.add("mixer", &[("level1", 0.45)]);
-    v.r.wire(kick, "out", beat, "in1");
-    let tail = space_tail(
-        &mut v.r,
-        v.knob,
-        duck,
+    v.finish(
+        "m4",
         &[
             ("sync", 3.0),
             ("time_ms", 360.0),
@@ -1139,22 +1117,10 @@ fn pump_house() -> Rack {
             ("mix", 0.0),
             ("tone_hz", 3500.0),
         ],
-        Some(clock),
         0.2,
-        3.0,
-        0.35,
-        "m4",
-    );
-    let (mix_l, mix_r) = (v.r.add("mixer", &[]), v.r.add("mixer", &[]));
-    for (mix, side) in [(mix_l, "left"), (mix_r, "right")] {
-        v.r.wire(tail, side, mix, "in1");
-        v.r.wire(beat, "out", mix, "in2");
-    }
-    let out = v.r.add("out", &[]);
-    v.r.wire(mix_l, "out", out, "left");
-    v.r.wire(mix_r, "out", out, "right");
-    perform(&mut v.r, v.knob, v.n, Some(clock));
-    v.r
+        (3.0, 0.35),
+        Some(clock),
+    )
 }
 
 /// Tin Voice: robot vowel chords, saws and a pulse driven through a formant filter, dry.
@@ -1308,9 +1274,9 @@ fn presets() -> Vec<Preset> {
             slug: "pump-house",
             name: "Pump House",
             category: "Pad",
-            tags: &["poly", "sidechain", "drums", "124bpm", "french touch", "signature"],
-            description: "A chord pad ducked by its own four-on-the-floor kick for French touch: saws and an octave down through a sidechain compressor. Press Run to start the kick, then hold chords. Cutoff opens the filter, Drive pushes the saturation, Pump sets how hard the kick ducks the pad, Room adds a tempo-synced echo and a tight room.",
-            listen: "The chord breathing in time with the kick; Pump at 0 is a steady pad under the beat, at 1 it ducks to almost nothing on every kick.",
+            tags: &["poly", "sidechain", "124bpm", "french touch", "signature"],
+            description: "A chord pad that pumps with the beat for French touch: saws and an octave down, ducked on every beat of the host tempo by a silent envelope, no drum. Press Run to start the clock, then hold chords. Cutoff opens the filter, Drive pushes the saturation, Pump sets how deep the duck goes, Room adds a tempo-synced echo and a tight room.",
+            listen: "The chord breathing on every beat (silent, no drum); Pump at 0 is a steady pad, at 1 it ducks deep on every beat.",
             build: pump_house,
             group: 2,
             phrase: pop_phrase,

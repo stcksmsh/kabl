@@ -19,7 +19,7 @@ fn level_trim(slug: &str) -> f32 {
         "linoleum" => -1.6,
         "matinee" => -3.0,
         "picture-window" => -2.0,
-        "pump-house" => 1.5,
+        "pump-house" => -0.5,
         "tin-voice" => 2.0,
         "rain-gutter" => -3.3,
         "rivet-gun" => -0.9,

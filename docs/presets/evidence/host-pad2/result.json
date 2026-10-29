@@ -1,37 +1,9 @@
 {
- "plugin_sha256": "5a85af0838191ff475d0889c27b9ff7f3c7206ae6c15b84c552611e326202f30",
- "glacier": {
-  "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1316,
-  "rms": 0.0255,
-  "restart_relative_difference": 0.0,
-  "rms_without_midi": 0.0
- },
+ "plugin_sha256": "0518313a5842668f5f0149a84590216f148354dfb4741d6f91d8d7be3ac77b82",
  "pump-house": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1126,
-  "rms": 0.0192,
-  "restart_relative_difference": 0.0,
-  "rms_without_midi": 0.00911
- },
- "tin-voice": {
-  "states_identical_across_save_quit_reopen": true,
-  "peak": 0.0743,
-  "rms": 0.0209,
-  "restart_relative_difference": 0.0,
-  "rms_without_midi": 0.0
- },
- "rooftop": {
-  "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1538,
-  "rms": 0.0267,
-  "restart_relative_difference": 0.0,
-  "rms_without_midi": 0.0
- },
- "tidepool": {
-  "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1455,
-  "rms": 0.0281,
+  "peak": 0.1509,
+  "rms": 0.0285,
   "restart_relative_difference": 0.0,
   "rms_without_midi": 0.0
  }

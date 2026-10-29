@@ -539,8 +539,8 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "presets/pump-house",
         "Pump House",
         "Pad",
-        &["poly", "sidechain", "drums", "124bpm", "french touch", "signature"],
-        "A chord pad ducked by its own four-on-the-floor kick for French touch: saws and an octave down through a sidechain compressor. Press Run to start the kick, then hold chords. Cutoff opens the filter, Drive pushes the saturation, Pump sets how hard the kick ducks the pad, Room adds a tempo-synced echo and a tight room.",
+        &["poly", "sidechain", "124bpm", "french touch", "signature"],
+        "A chord pad that pumps with the beat for French touch: saws and an octave down, ducked on every beat of the host tempo by a silent envelope, no drum. Press Run to start the clock, then hold chords. Cutoff opens the filter, Drive pushes the saturation, Pump sets how deep the duck goes, Room adds a tempo-synced echo and a tight room.",
     ),
     (
         "presets/tin-voice",

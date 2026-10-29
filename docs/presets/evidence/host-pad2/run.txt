@@ -5,4 +5,4 @@ Fatal server error:
 	and start again.
 (EE) 
 
-(metacity:1360125): metacity-WARNING **: 14:33:46.625: Screen 0 on display ":149" already has a window manager; try using the --replace option to replace the current window manager.
+(metacity:1566229): metacity-WARNING **: 17:17:10.675: Screen 0 on display ":149" already has a window manager; try using the --replace option to replace the current window manager.
