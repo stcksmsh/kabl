@@ -44,6 +44,17 @@ fn live() -> isize {
     LIVE.load(Ordering::Relaxed)
 }
 
+/// `live() - base` once it reaches `want`, waiting up to a second for it. A scoped-thread
+/// join returns before the exiting thread drops its own `Thread` and result `Arc`s, so those
+/// spawn blocks are briefly still live; a real leak never settles and the caller's assert fails.
+fn live_settled(base: isize, want: isize) -> isize {
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(1);
+    while live() - base != want && std::time::Instant::now() < end {
+        std::thread::yield_now();
+    }
+    live() - base
+}
+
 /// (allocations, frees) made on this thread by `f`.
 fn counted(f: impl FnOnce()) -> (u64, u64) {
     let (a, d) = (ALLOCS.with(Cell::get), FREES.with(Cell::get));
@@ -106,7 +117,7 @@ fn paused_consumer_keeps_ownership_bounded_and_recovers() {
         });
     });
     assert_eq!(
-        live() - base,
+        live_settled(base, STREAM_ERROR_QUEUE as isize),
         STREAM_ERROR_QUEUE as isize,
         "only the queued messages"
     );
@@ -137,7 +148,7 @@ fn paused_consumer_keeps_ownership_bounded_and_recovers() {
         n += 1;
     }
     assert_eq!(n, STREAM_ERROR_QUEUE as u64);
-    assert_eq!(live(), base, "drained");
+    assert_eq!(live_settled(base, 0), 0, "drained");
 
     // Recovery: new errors are delivered again.
     std::thread::scope(|s| {
@@ -148,10 +159,10 @@ fn paused_consumer_keeps_ownership_bounded_and_recovers() {
         });
     });
     assert_eq!(counts.since(&mut seen), ("BackendError=5".to_string(), 0));
-    assert_eq!(live() - base, 5);
+    assert_eq!(live_settled(base, 5), 5);
 
     // Shutdown with errors still queued: dropping both ends frees them and the queue.
     drop(tx);
     drop(rx);
-    assert_eq!(live(), base - ring, "nothing outstanding after shutdown");
+    assert_eq!(live_settled(base, -ring), -ring, "nothing outstanding after shutdown");
 }
