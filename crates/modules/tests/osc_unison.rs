@@ -159,3 +159,37 @@ fn width_keeps_the_mono_fold_alive() {
         assert!(fold_db - ref_db > floor);
     }
 }
+
+/// Width moved 0 -> 100 % inside one block must ramp: sample 0 is within one ramp step of the
+/// width-0 sound, and the block ends on the width-100 sound. A stepped gain jumps at sample 0.
+#[test]
+fn a_fast_width_move_does_not_step() {
+    let set = [("base_hz", 220.0), ("unison", 8.0), ("detune", 30.0)];
+    let run = |w0: f32, w1: f32| {
+        let mut o = osc(&[set[0], set[1], set[2], ("width", w0)]);
+        for _ in 0..20 {
+            o.block(&[]);
+        }
+        o.set("width", w1);
+        let b = o.block(&[]);
+        (b[1], b[2])
+    };
+    let (l0, _) = run(0.0, 0.0);
+    let (l1, r1) = run(100.0, 100.0);
+    let (l, r) = run(0.0, 100.0);
+    let scale = peak(&l1).max(peak(&l0));
+    assert!((l[0] - l0[0]).abs() < 0.1 * scale, "step at sample 0");
+    assert!(
+        (r[0] - l0[0]).abs() < 0.1 * scale,
+        "step at sample 0 (right)"
+    );
+    let n = BLOCK - 1;
+    assert!((l[n] - l1[n]).abs() < 1e-3 * scale && (r[n] - r1[n]).abs() < 1e-3 * scale);
+    // And it is a ramp, not a wobble: a worse jump than the saw's own edges never appears.
+    let jump = |x: &[f32]| {
+        x.windows(2)
+            .map(|w| (w[1] - w[0]).abs())
+            .fold(0.0, f32::max)
+    };
+    assert!(jump(&l) <= 1.05 * jump(&l0).max(jump(&l1)));
+}
