@@ -373,13 +373,24 @@
       "params": {
         "level1": 1.0,
         "level2": 1.0,
-        "level3": 1.0
+        "level3": 1.0,
+        "level4": 0.0
       }
     },
     "27": {
-      "kind": "drive",
+      "kind": "noise",
       "pos": {
         "x": 214.0,
+        "y": 920.0
+      },
+      "params": {
+        "color": 1.0
+      }
+    },
+    "28": {
+      "kind": "drive",
+      "pos": {
+        "x": 404.0,
         "y": 920.0
       },
       "params": {
@@ -387,10 +398,10 @@
         "trim_db": -1.5
       }
     },
-    "28": {
+    "29": {
       "kind": "filter.ladder",
       "pos": {
-        "x": 404.0,
+        "x": 594.0,
         "y": 920.0
       },
       "params": {
@@ -399,26 +410,14 @@
         "resonance": 0.1
       }
     },
-    "29": {
-      "kind": "gain",
-      "pos": {
-        "x": 594.0,
-        "y": 920.0
-      },
-      "params": {
-        "gain_db": -4.0
-      }
-    },
     "30": {
-      "kind": "bitcrusher",
+      "kind": "gain",
       "pos": {
         "x": 784.0,
         "y": 920.0
       },
       "params": {
-        "bits": 5.0,
-        "downsample": 6.0,
-        "mix": 0.0
+        "gain_db": -4.0
       }
     },
     "31": {
@@ -1195,14 +1194,14 @@
     "34": {
       "from": {
         "Module": {
-          "id": 26,
+          "id": 27,
           "port": "out"
         }
       },
       "to": {
         "Module": {
-          "id": 27,
-          "port": "in"
+          "id": 26,
+          "port": "in4"
         }
       },
       "params": {},
@@ -1211,7 +1210,7 @@
     "35": {
       "from": {
         "Module": {
-          "id": 27,
+          "id": 26,
           "port": "out"
         }
       },
@@ -1555,12 +1554,12 @@
       },
       "to": {
         "Param": {
-          "id": 30,
-          "param": "mix"
+          "id": 26,
+          "param": "level4"
         }
       },
       "params": {
-        "amount": 1.0
+        "amount": 0.3
       },
       "steps": []
     },
@@ -1573,7 +1572,7 @@
       },
       "to": {
         "Param": {
-          "id": 28,
+          "id": 29,
           "param": "cutoff_hz"
         }
       },

@@ -60,7 +60,7 @@ def chunk_of(state):
 
 def project(slug, with_midi):
     patch = json.loads((repo / 'patches/presets' / slug / 'checkpoint.json').read_text())
-    state = {'version': 2, 'patch': patch, 'output_gain': .4, 'host_clock': False,
+    state = {'version': 5, 'patch': patch, 'output_gain': .4, 'host_clock': False,
              'lanes': [{'retired': False, 'target': None} for _ in range(16)], 'slot_values': [0.0] * 16}
     proj = re.sub(r'\n      <PARMENV[\s\S]*?\n      >', '', TEMPLATE.read_text())
     t2 = proj.index('\n  <TRACK', proj.index('<TRACK') + 1)
@@ -146,7 +146,7 @@ try:
         diff = float(np.sqrt(((a['_m'][:n] - b['_m'][:n]) ** 2).mean()) / a['rms'])
         r.update(peak=round(a['peak'], 4), rms=round(a['rms'], 4), restart_relative_difference=round(diff, 5))
         assert diff < 1e-3, f'{slug}: render changed after reopen ({diff})'
-        if slug != 'loading-dock':  # plays by itself with the transport running
+        if slug != 'loading-dock' and not os.environ.get('PH_SELF'):  # plays by itself with the transport running
             (S / f'{slug}-nomidi.rpp').write_text(project(slug, False))
             run(f'{slug}-nomidi', S / f'{slug}-nomidi.rpp', secs)
             q = feats(S / f'render-{slug}-nomidi.wav')

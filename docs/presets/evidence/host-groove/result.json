@@ -1,0 +1,27 @@
+{
+ "plugin_sha256": "f187f4d26e277ff9ee13396ef4098d99deac21faec4e5d7f900e8b5f88ae5394",
+ "copper-mile": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1217,
+  "rms": 0.0216,
+  "restart_relative_difference": 0.0
+ },
+ "brick-dust": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1668,
+  "rms": 0.0254,
+  "restart_relative_difference": 0.0
+ },
+ "ore-cart": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1374,
+  "rms": 0.0239,
+  "restart_relative_difference": 0.0
+ },
+ "stoop-sale": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1325,
+  "rms": 0.0259,
+  "restart_relative_difference": 0.81461
+ }
+}

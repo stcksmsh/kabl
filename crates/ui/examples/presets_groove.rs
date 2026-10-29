@@ -697,6 +697,8 @@ enum T {
     Fx(f32),
     /// The bitcrusher mix.
     Crush(f32),
+    /// A hiss layer in the music bus (the bitcrusher's output differs between host runs).
+    Dust(f32),
     /// The level of the hats in the beat.
     Hats(f32),
     /// The level of the bass part in the bus.
@@ -802,6 +804,11 @@ fn groove(s: Spec) -> Rack {
         v.r.wire(c, "out", bus, "in2");
     }
     v.r.wire(v.mono, "out", bus, "in3");
+    if s.targets.iter().any(|t| matches!(t, T::Dust(_))) {
+        let hiss = v.r.add("noise", &[("color", 1.0)]);
+        v.r.wire(hiss, "out", bus, "in4");
+        v.r.e.set_param(bus, "level4", 0.0);
+    }
     let drive = v.r.add(
         "drive",
         &[("drive_db", s.drive[0]), ("trim_db", s.drive[1])],
@@ -908,6 +915,7 @@ fn groove(s: Spec) -> Rack {
             T::Pump => v.r.route(v.knob, &m, duck, "ratio", 0.95),
             T::Swing(a) => v.r.route(v.knob, &m, clock, "swing", a),
             T::Fx(a) => v.r.route(v.knob, &m, fx.expect("an fx stage"), "mix", a),
+            T::Dust(a) => v.r.route(v.knob, &m, bus, "level4", a),
             T::Crush(a) => v.r.route(v.knob, &m, crush.expect("a crusher"), "mix", a),
             // The macro is the level: stored at 0.5 it gives the kit's own hat level.
             T::Hats(a) => {
@@ -1186,7 +1194,7 @@ fn stoop_sale() -> Rack {
             ("Filter", 0.50),
             ("Space", 0.30),
         ],
-        targets: [T::Swing(0.5), T::Crush(1.0), T::Cutoff(0.5)],
+        targets: [T::Swing(0.5), T::Dust(0.3), T::Cutoff(0.5)],
         bpm: 86.0,
         swing: 38.0,
         kit: kit(
@@ -1230,7 +1238,7 @@ fn stoop_sale() -> Rack {
         drive: [3.0, -1.5],
         filter: [1800.0, 0.10],
         fx: None,
-        crush: true,
+        crush: false,
         comp: [-22.0, 3.0, 3.0],
         echo: [0.0, 25.0, 2800.0],
         space: [0.3, 0.8, 0.2],
@@ -1609,8 +1617,8 @@ fn presets() -> Vec<Preset> {
             "A rolling techno groove: a four-on-the-floor kick, off-beat hats, a rumbling bass between the kicks and a sparse stab. Press Run, then play stabs over it. Filter opens the music, Rumble raises the bass, Pump sets how hard the kick ducks it, Space adds the echo and the room.",
             "The bass rolling between the kicks; Rumble up for more low end, Pump for a deeper duck.", ore_cart, ore_phrase, 16.0),
         p("stoop-sale", "Stoop Sale", &["sequenced", "swung", "dusty", "hip hop", "86bpm"],
-            "A boom-bap loop: a loose kick and snare, swung hats, a sine sub bass and a soft seventh chord. Press Run, then play chords over it. Swing pushes the off-beats late, Dust adds bitcrushed grit, Filter opens the music, Space adds the echo and the room.",
-            "The late, loose off-beats; Swing up to drag them further, Dust up for a lo-fi crunch.", stoop_sale, stoop_phrase, 16.0),
+            "A boom-bap loop: a loose kick and snare, swung hats, a sine sub bass and a soft seventh chord. Press Run, then play chords over it. Swing pushes the off-beats late, Dust brings in a layer of vinyl hiss, Filter opens the music, Space adds the echo and the room.",
+            "The late, loose off-beats; Swing up to drag them further, Dust up for a dusty hiss.", stoop_sale, stoop_phrase, 16.0),
         p("fault-line", "Fault Line", &["sequenced", "reese", "breaks", "drum and bass", "174bpm"],
             "A two-step drum and bass loop: a sharp kick and snare, ghost snares, fast hats and a detuned reese bass. Press Run, then play low notes over it. Reese adds drive to the bass, Filter opens it, Hats raises the hats, Space adds the echo and the room.",
             "The detuned bass growling under the break; Reese up for more teeth, Hats up for a busier top.", fault_line, fault_phrase, 16.0),
