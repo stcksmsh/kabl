@@ -69,8 +69,8 @@ use kabl_modules::builtins::{
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::ModuleView;
 use kabl_modules::{
-    registry, Module, ModuleInfo, ParamInfo, PortDirection, PortType, ProcessIo, Rate, Signal,
-    StateBuf,
+    registry, Module, ModuleInfo, ParamInfo, PortDirection, PortInfo, PortType, ProcessIo, Rate,
+    Signal, StateBuf,
 };
 
 use crate::facetap::{FaceReport, FaceTaps, FaceTargets, NO_SLOT};
@@ -504,18 +504,24 @@ fn coalesce_buffers(
     (remap, next_physical)
 }
 
+/// First io slot of the input port `name`.
 fn input_port_index(info: &ModuleInfo, name: &str) -> Option<usize> {
-    info.ports
-        .iter()
-        .filter(|p| p.direction == PortDirection::Input)
-        .position(|p| p.name == name)
+    info.port_slot(PortDirection::Input, name)
 }
 
+/// First io slot of the output port `name`.
 fn output_port_index(info: &ModuleInfo, name: &str) -> Option<usize> {
+    info.port_slot(PortDirection::Output, name)
+}
+
+/// The io slots of `dir` in order, each with its port and the channel of that port it carries
+/// (a width-2 port yields two entries).
+fn port_slots(info: &ModuleInfo, dir: PortDirection) -> Vec<(&'static PortInfo, u8)> {
     info.ports
         .iter()
-        .filter(|p| p.direction == PortDirection::Output)
-        .position(|p| p.name == name)
+        .filter(|p| p.direction == dir)
+        .flat_map(|p| (0..p.width).map(move |c| (p, c)))
+        .collect()
 }
 
 /// Identifies one delay buffer (brief section 7.1's cycle-breaking) by what it holds, independent
@@ -739,25 +745,21 @@ struct Src {
     right: Option<(usize, u8)>,
 }
 
-/// The two ports named by a stereo pair alias (`in_st`, `out_st`): the first adjacent
-/// `(in_l, in_r)` or `(left, right)` among the module's ports of `dir`, as indices among them.
-/// Step 1's stand-in for width-2 ports, which the port change adds; the alias names never equal
-/// a real port name.
+/// The io slots of the first width-2 port of `dir`, if any.
 fn stereo_pair(info: &ModuleInfo, dir: PortDirection) -> Option<(usize, usize)> {
-    let names: Vec<&str> = info
+    let at = info
         .ports
         .iter()
         .filter(|p| p.direction == dir)
-        .map(|p| p.name)
-        .collect();
-    names
-        .windows(2)
-        .position(|w| matches!((w[0], w[1]), ("in_l", "in_r") | ("left", "right")))
-        .map(|i| (i, i + 1))
+        .scan(0, |at, p| {
+            let first = *at;
+            *at += usize::from(p.width);
+            Some((first, p.width))
+        })
+        .find(|&(_, w)| w == 2)?
+        .0;
+    Some((at, at + 1))
 }
-
-const STEREO_IN: &str = "in_st";
-const STEREO_OUT: &str = "out_st";
 
 /// One incoming cable's source, resolved.
 #[derive(Clone, Copy)]
@@ -1178,24 +1180,18 @@ fn compile_inner(
                    from_port: &str|
      -> Option<(Src, PortType)> {
         let info = metas[&from_id].info;
-        let outs = || {
-            info.ports
-                .iter()
-                .filter(|p| p.direction == PortDirection::Output)
-        };
-        if from_port == STEREO_OUT {
-            let (l, r) = stereo_pair(info, PortDirection::Output)?;
-            let port_type = outs().nth(l)?.port_type;
+        let i = output_port_index(info, from_port)?;
+        let (port, _) = info.slot_port(PortDirection::Output, i)?;
+        let port_type = port.port_type;
+        if port.width == 2 {
             return Some((
                 Src {
-                    left: (l, 0),
-                    right: Some((r, 0)),
+                    left: (i, 0),
+                    right: Some((i + 1, 0)),
                 },
                 port_type,
             ));
         }
-        let i = output_port_index(info, from_port)?;
-        let port_type = outs().nth(i)?.port_type;
         let right = (port_type == PortType::Audio && doubled.contains(&from_id)).then_some((i, 1));
         Some((
             Src {
@@ -1388,18 +1384,8 @@ fn compile_inner(
             })
             .collect();
 
-        let input_ports: Vec<_> = meta
-            .info
-            .ports
-            .iter()
-            .filter(|p| p.direction == PortDirection::Input)
-            .collect();
-        let output_ports: Vec<_> = meta
-            .info
-            .ports
-            .iter()
-            .filter(|p| p.direction == PortDirection::Output)
-            .collect();
+        let input_ports = port_slots(meta.info, PortDirection::Input);
+        let output_ports = port_slots(meta.info, PortDirection::Output);
 
         if input_ports.len() > MAX_INPUTS {
             return Err(CompileError::TooManyPorts {
@@ -1430,7 +1416,6 @@ fn compile_inner(
         }
 
         let n_ch: u8 = if doubled.contains(&id) { 2 } else { 1 };
-        let in_pair = stereo_pair(meta.info, PortDirection::Input);
         let empty = Vec::new();
         let incoming = cables_by_dest.get(&id).unwrap_or(&empty);
         // Clocks are scheduled first, so the reference clock (lowest id) exists by now.
@@ -1440,8 +1425,7 @@ fn compile_inner(
         let mut sources = Vec::with_capacity(incoming.len());
         for cable in incoming {
             if let CableTo::Port(port) = &cable.to {
-                let alias = port == STEREO_IN && in_pair.is_some();
-                if !alias && input_port_index(meta.info, port).is_none() {
+                if input_port_index(meta.info, port).is_none() {
                     return Err(CompileError::UnknownPort {
                         id,
                         kind: "destination",
@@ -1549,34 +1533,21 @@ fn compile_inner(
                 ));
             }
             let mut lane_inputs = Vec::with_capacity(input_ports.len());
-            for (pi, port) in input_ports.iter().enumerate() {
-                // A cable into the pair alias reaches both halves of the pair, one channel each.
-                let by_name = incoming
+            for &(port, side) in input_ports.iter() {
+                // A stereo port takes its own channel of the cable; a doubled module's audio port
+                // takes its own channel; every other port takes the cable's mono reading (a
+                // stereo cable averages).
+                let found = incoming
                     .iter()
-                    .position(|c| matches!(&c.to, CableTo::Port(p) if p == port.name));
-                let by_pair = || {
-                    let (a, b) = in_pair?;
-                    let side = [Want::Left, Want::Right][usize::from(pi == b)];
-                    (pi == a || pi == b)
-                        .then(|| {
-                            incoming
-                                .iter()
-                                .position(|c| matches!(&c.to, CableTo::Port(p) if p == STEREO_IN))
-                        })
-                        .flatten()
-                        .map(|k| (k, side))
-                };
-                // Else a doubled module's audio port takes its own channel; every other port
-                // takes the cable's mono reading (a stereo cable averages).
-                let found = by_name
+                    .position(|c| matches!(&c.to, CableTo::Port(p) if p == port.name))
                     .map(|k| {
-                        let want = match (n_ch, port.port_type) {
-                            (2, PortType::Audio) => [Want::Left, Want::Right][usize::from(ch)],
+                        let want = match (port.width, n_ch, port.port_type) {
+                            (2, _, _) => [Want::Left, Want::Right][usize::from(side)],
+                            (_, 2, PortType::Audio) => [Want::Left, Want::Right][usize::from(ch)],
                             _ => Want::Mix,
                         };
                         (k, want)
-                    })
-                    .or_else(by_pair);
+                    });
                 lane_inputs.push(match found {
                     None => InputSource::Silence,
                     Some((k, want)) => {
@@ -1678,8 +1649,25 @@ fn compile_inner(
                 mods[m].routes.push(route);
             }
 
+            // `split` and `join` are wiring: each output slot is the input slot's buffer. No
+            // instance, no step.
+            if matches!(meta.kind.as_str(), "split" | "join") {
+                for (slot, src) in lane_inputs.iter().enumerate() {
+                    let buf = match src {
+                        InputSource::Buffer(b) => *b,
+                        InputSource::Silence => silence_buf,
+                    };
+                    if is_voice {
+                        w.live.voice.insert((id, slot, lane, ch), buf);
+                    } else {
+                        w.live.global.insert((id, slot, ch), buf);
+                    }
+                }
+                continue;
+            }
+
             let mut lane_outputs = Vec::with_capacity(output_ports.len());
-            for (out_idx, port) in output_ports.iter().enumerate() {
+            for (out_idx, &(port, _)) in output_ports.iter().enumerate() {
                 let buf = w.new_buf();
                 lane_outputs.push(buf);
                 // The second instance of a doubled module only publishes its audio outputs.
@@ -2599,12 +2587,7 @@ impl CompiledPatch {
                 if id != t.module || m.info().kind != t.kind || self.module_channel[index] > 0 {
                     continue;
                 }
-                let outputs = m
-                    .info()
-                    .ports
-                    .iter()
-                    .filter(|p| p.direction == PortDirection::Output)
-                    .count();
+                let outputs = m.info().slots(PortDirection::Output);
                 if t.port as usize >= outputs {
                     continue;
                 }
@@ -2654,11 +2637,7 @@ impl CompiledPatch {
             .zip(&self.module_channel)
             .map(|((&(id, _), m), &ch)| {
                 let info = m.info();
-                let outputs = info
-                    .ports
-                    .iter()
-                    .filter(|p| p.direction == PortDirection::Output)
-                    .count();
+                let outputs = info.slots(PortDirection::Output);
                 // The second channel of a module is not a face lane: no id names it.
                 (if ch > 0 { ModuleId::MAX } else { id }, info.kind, outputs)
             });

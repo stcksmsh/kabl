@@ -29,7 +29,7 @@ pub fn interlocking() -> PatchEditor {
     let mut e = interlocking_base();
     factory_controls::prepare(&mut e, false);
     factory_bank::attach_guide(&mut e, "interlocking");
-    e
+    e.migrated()
 }
 
 pub fn interlocking_base() -> PatchEditor {

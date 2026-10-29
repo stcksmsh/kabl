@@ -258,6 +258,22 @@
         "cutoff_hz": 4500.0,
         "resonance": 0.4
       }
+    },
+    "25": {
+      "kind": "join",
+      "pos": {
+        "x": 1094.0,
+        "y": 790.0
+      },
+      "params": {}
+    },
+    "26": {
+      "kind": "split",
+      "pos": {
+        "x": 594.0,
+        "y": 800.0
+      },
+      "params": {}
     }
   },
   "cables": {
@@ -545,23 +561,7 @@
       "to": {
         "Module": {
           "id": 18,
-          "port": "in_l"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "19": {
-      "from": {
-        "Module": {
-          "id": 5,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 18,
-          "port": "in_r"
+          "port": "in"
         }
       },
       "params": {},
@@ -586,7 +586,7 @@
     "21": {
       "from": {
         "Module": {
-          "id": 18,
+          "id": 26,
           "port": "left"
         }
       },
@@ -602,7 +602,7 @@
     "22": {
       "from": {
         "Module": {
-          "id": 18,
+          "id": 26,
           "port": "right"
         }
       },
@@ -624,7 +624,7 @@
       },
       "to": {
         "Module": {
-          "id": 21,
+          "id": 25,
           "port": "left"
         }
       },
@@ -640,7 +640,7 @@
       },
       "to": {
         "Module": {
-          "id": 21,
+          "id": 25,
           "port": "right"
         }
       },
@@ -721,6 +721,38 @@
       "to": {
         "Module": {
           "id": 16,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "30": {
+      "from": {
+        "Module": {
+          "id": 25,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 21,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "31": {
+      "from": {
+        "Module": {
+          "id": 18,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 26,
           "port": "in"
         }
       },

@@ -42,7 +42,7 @@ pub fn lead() -> PatchEditor {
     e.set_param(midi, "bend", 2.0);
     let wheel = e.connect_route(port(midi, "wheel"), macros, "m2");
     e.set_route_amount(wheel, 0.8, true);
-    e
+    e.migrated()
 }
 
 pub fn split() -> PatchEditor {
@@ -101,7 +101,7 @@ pub fn split() -> PatchEditor {
     }
     e.connect(port(mix_l, "out"), port(out, "left"));
     e.connect(port(mix_r, "out"), port(out, "right"));
-    e
+    e.migrated()
 }
 
 /// Measurement fixture `docs/midi-timing/fixtures/gate-probe`: every voice's gate straight to
@@ -116,7 +116,7 @@ pub fn gate_probe() -> PatchEditor {
     // Unconnected: a face knob for measurement scripts to keep turning (UI and runtime
     // values) without changing the recorded gate.
     e.add_module("lfo", at(324.0, 0));
-    e
+    e.migrated()
 }
 
 #[test]

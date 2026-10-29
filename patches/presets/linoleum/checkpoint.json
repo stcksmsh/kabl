@@ -185,6 +185,14 @@
         "y": 320.0
       },
       "params": {}
+    },
+    "12": {
+      "kind": "split",
+      "pos": {
+        "x": 954.0,
+        "y": 370.0
+      },
+      "params": {}
     }
   },
   "cables": {
@@ -330,23 +338,7 @@
       "to": {
         "Module": {
           "id": 7,
-          "port": "in_l"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "10": {
-      "from": {
-        "Module": {
-          "id": 6,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 7,
-          "port": "in_r"
+          "port": "in"
         }
       },
       "params": {},
@@ -374,29 +366,13 @@
       "from": {
         "Module": {
           "id": 7,
-          "port": "left"
+          "port": "out"
         }
       },
       "to": {
         "Module": {
           "id": 8,
-          "port": "in_l"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "13": {
-      "from": {
-        "Module": {
-          "id": 7,
-          "port": "right"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 8,
-          "port": "in_r"
+          "port": "in"
         }
       },
       "params": {},
@@ -405,7 +381,7 @@
     "14": {
       "from": {
         "Module": {
-          "id": 8,
+          "id": 12,
           "port": "left"
         }
       },
@@ -422,29 +398,13 @@
       "from": {
         "Module": {
           "id": 9,
-          "port": "left"
+          "port": "out"
         }
       },
       "to": {
         "Module": {
           "id": 10,
-          "port": "in_l"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "18": {
-      "from": {
-        "Module": {
-          "id": 9,
-          "port": "right"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 10,
-          "port": "in_r"
+          "port": "in"
         }
       },
       "params": {},
@@ -490,29 +450,13 @@
       "from": {
         "Module": {
           "id": 10,
-          "port": "left"
+          "port": "out"
         }
       },
       "to": {
         "Module": {
           "id": 11,
-          "port": "left"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "22": {
-      "from": {
-        "Module": {
-          "id": 10,
-          "port": "right"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 11,
-          "port": "right"
+          "port": "in"
         }
       },
       "params": {},
@@ -534,6 +478,22 @@
       "params": {
         "amount": 0.4
       },
+      "steps": []
+    },
+    "24": {
+      "from": {
+        "Module": {
+          "id": 8,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 12,
+          "port": "in"
+        }
+      },
+      "params": {},
       "steps": []
     }
   },

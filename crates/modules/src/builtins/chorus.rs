@@ -33,24 +33,16 @@ use crate::module::{Module, QualityConfig};
 
 const PORTS: &[PortInfo] = &[
     PortInfo {
-        name: "in_l",
+        name: "in",
         port_type: PortType::Audio,
         direction: PortDirection::Input,
+        width: 2,
     },
     PortInfo {
-        name: "in_r",
-        port_type: PortType::Audio,
-        direction: PortDirection::Input,
-    },
-    PortInfo {
-        name: "left",
+        name: "out",
         port_type: PortType::Audio,
         direction: PortDirection::Output,
-    },
-    PortInfo {
-        name: "right",
-        port_type: PortType::Audio,
-        direction: PortDirection::Output,
+        width: 2,
     },
 ];
 

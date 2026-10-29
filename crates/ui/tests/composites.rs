@@ -229,40 +229,21 @@ fn exact_pcm_voice_stereo_effect_feedback_and_no_callback_allocation() {
         .from
         .clone();
     e.connect(
-        src.clone(),
-        PortRef::Module {
-            id: chorus,
-            port: "in_l".into(),
-        },
-    );
-    e.connect(
         src,
         PortRef::Module {
             id: chorus,
-            port: "in_r".into(),
+            port: "in".into(),
         },
     );
-    for (a, b) in [("left", "in_l"), ("right", "in_r")] {
+    for (from, to) in [(chorus, reverb), (reverb, out)] {
         e.connect(
             PortRef::Module {
-                id: chorus,
-                port: a.into(),
+                id: from,
+                port: "out".into(),
             },
             PortRef::Module {
-                id: reverb,
-                port: b.into(),
-            },
-        );
-    }
-    for port in ["left", "right"] {
-        e.connect(
-            PortRef::Module {
-                id: reverb,
-                port: port.into(),
-            },
-            PortRef::Module {
-                id: out,
-                port: port.into(),
+                id: to,
+                port: "in".into(),
             },
         );
     }

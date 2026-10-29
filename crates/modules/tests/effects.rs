@@ -14,7 +14,7 @@ fn assert_no_alloc<T>(f: impl FnOnce() -> T) -> T {
     f()
 }
 use kabl_modules::module::{QualityConfig, QualityTier};
-use kabl_modules::{registry, Module, PortDirection, ProcessIo, Signal};
+use kabl_modules::{registry, Module, ProcessIo, Signal};
 use std::f32::consts::PI;
 
 #[cfg(debug_assertions)]
@@ -53,12 +53,8 @@ impl Dut {
         );
         let info = m.info();
         let params = info.params.iter().map(|p| p.default).collect();
-        let n_in = info
-            .ports
-            .iter()
-            .filter(|p| p.direction == PortDirection::Input)
-            .count();
-        let n_out = info.ports.len() - n_in;
+        let n_in = info.slots(kabl_modules::PortDirection::Input);
+        let n_out = info.slots(kabl_modules::PortDirection::Output);
         let mut d = Dut {
             m,
             params,
@@ -113,7 +109,7 @@ impl Dut {
 
     /// Mono-ish: the same signal on the first two (stereo) or one input.
     fn run_mono(&mut self, x: &[f32], block: usize) -> Vec<Vec<f32>> {
-        if self.m.info().ports[1].name == "in_r" {
+        if self.m.info().ports[1].name == "in" {
             self.run(&[x, x], block)
         } else {
             self.run(&[x], block)
@@ -717,12 +713,8 @@ fn audio_rate_modulation_stays_finite() {
                 tier: QualityTier::Live,
             },
         );
-        let n_in = info
-            .ports
-            .iter()
-            .filter(|p| p.direction == PortDirection::Input)
-            .count();
-        let n_out = info.ports.len() - n_in;
+        let n_in = info.slots(kabl_modules::PortDirection::Input);
+        let n_out = info.slots(kabl_modules::PortDirection::Output);
         let mods: Vec<Vec<f32>> = info
             .params
             .iter()

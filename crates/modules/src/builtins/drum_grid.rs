@@ -61,6 +61,7 @@ const fn out(name: &'static str) -> PortInfo {
         name,
         port_type: PortType::Gate,
         direction: PortDirection::Output,
+        width: 1,
     }
 }
 
@@ -69,16 +70,19 @@ const PORTS: &[PortInfo] = &[
         name: "clock",
         port_type: PortType::Gate,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "reset",
         port_type: PortType::Gate,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "pattern",
         port_type: PortType::UnipolarCv,
         direction: PortDirection::Input,
+        width: 1,
     },
     out(ROW_NAMES[0]),
     out(ROW_NAMES[1]),

@@ -169,7 +169,7 @@ fn main() {
         params: Default::default(),
         steps: vec![],
     };
-    min.cables.insert(1, jack((2, "out"), (3, "left")));
+    min.cables.insert(1, jack((2, "out"), (3, "in")));
     let a = report("minimal: plain cable", &min, 1, blocks);
     min.cables
         .get_mut(&1)
@@ -202,10 +202,10 @@ fn main() {
             2,
             lfo_cable(PortRef::Module {
                 id: 3,
-                port: "right".into(),
+                port: "in".into(),
             }),
         );
-        let lfo = report("minimal: plus an lfo to out.right", &min, 1, blocks);
+        let lfo = report("minimal: plus an lfo to out.in", &min, 1, blocks);
         min.cables.insert(
             2,
             lfo_cable(PortRef::CableParam {

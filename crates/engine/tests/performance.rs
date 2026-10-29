@@ -321,14 +321,23 @@ fn two_reverbs_keep_separate_histories() {
         params: Default::default(),
         steps: vec![],
     };
+    let split: ModuleId = 101;
+    p.modules.insert(
+        split,
+        ModuleState {
+            kind: "split".into(),
+            pos: Vec2 { x: 0.0, y: 0.0 },
+            params: Default::default(),
+        },
+    );
     p.cables
-        .insert(1000, cable(port(DRY, "out"), port(r2, "in_l")));
+        .insert(1000, cable(port(DRY, "out"), port(r2, "in")));
     p.cables
-        .insert(1001, cable(port(DRY, "out"), port(r2, "in_r")));
+        .insert(1001, cable(port(r2, "out"), port(split, "in")));
     p.cables
-        .insert(1002, cable(port(r2, "left"), port(MAIN_L, "in3")));
+        .insert(1002, cable(port(split, "left"), port(MAIN_L, "in3")));
     p.cables
-        .insert(1003, cable(port(r2, "right"), port(MAIN_R, "in3")));
+        .insert(1003, cable(port(split, "right"), port(MAIN_R, "in3")));
     let stop = 2 * SEC;
     let blocks = stop + 2 * SEC;
     let cmds = [(stop, Transport::Stop)];

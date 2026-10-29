@@ -21,22 +21,26 @@ const PORTS: &[PortInfo] = &[
         name: "gate",
         port_type: PortType::Gate,
         direction: PortDirection::Output,
+        width: 1,
     },
     PortInfo {
         name: "pitch",
         port_type: PortType::Pitch,
         direction: PortDirection::Output,
+        width: 1,
     },
     PortInfo {
         name: "velocity",
         port_type: PortType::UnipolarCv,
         direction: PortDirection::Output,
+        width: 1,
     },
     // The modulation wheel (CC 1), 0..1, the same on every voice of this keyboard.
     PortInfo {
         name: "wheel",
         port_type: PortType::UnipolarCv,
         direction: PortDirection::Output,
+        width: 1,
     },
 ];
 

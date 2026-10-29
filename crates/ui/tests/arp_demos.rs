@@ -129,7 +129,7 @@ fn arp_chord() -> PatchEditor {
     r.wire(delay, "left", out, "left");
     r.wire(delay, "right", out, "right");
     r.route(env, "out", filter, "cutoff_hz", 0.3);
-    r.e
+    r.e.migrated()
 }
 
 /// A player moving from one chord to the next: the new keys go down before the old ones come up,
@@ -194,7 +194,7 @@ fn swing_seq() -> PatchEditor {
     r.wire(mixer, "out", out, "left");
     r.wire(mixer, "out", out, "right");
     r.route(env, "out", ladder, "cutoff_hz", 0.35);
-    r.e
+    r.e.migrated()
 }
 
 /// A lead whose steps 3, 6 and 8 are repeated two, three and four times, with some steps left to
@@ -249,7 +249,7 @@ fn ratchet_roll() -> PatchEditor {
     r.wire(delay, "left", out, "left");
     r.wire(delay, "right", out, "right");
     r.route(env, "out", filter, "cutoff_hz", 0.3);
-    r.e
+    r.e.migrated()
 }
 
 /// A random arpeggio of a held chord whose output is gated by a six-step cable against the
@@ -320,7 +320,7 @@ fn arp_cable() -> PatchEditor {
     r.wire(mixer, "out", out, "left");
     r.wire(mixer, "out", out, "right");
     r.route(env, "out", filter, "cutoff_hz", 0.3);
-    r.e
+    r.e.migrated()
 }
 
 type Events = Vec<(f32, u8, bool)>;

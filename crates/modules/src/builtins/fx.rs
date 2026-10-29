@@ -34,18 +34,19 @@ pub(super) const fn port(name: &'static str, port_type: PortType, input: bool) -
         } else {
             PortDirection::Output
         },
+        width: 1,
     }
 }
 
-/// The stereo pair every effect here shares: `in_l`, `in_r` in; `left`, `right` out.
-pub(super) const STEREO_IN: [PortInfo; 2] = [
-    port("in_l", PortType::Audio, true),
-    port("in_r", PortType::Audio, true),
-];
-pub(super) const STEREO_OUT: [PortInfo; 2] = [
-    port("left", PortType::Audio, false),
-    port("right", PortType::Audio, false),
-];
+/// The stereo jacks every effect here shares: `in` and `out`, width 2 (io slots 0 and 1).
+pub(super) const STEREO_IN: PortInfo = PortInfo {
+    width: 2,
+    ..port("in", PortType::Audio, true)
+};
+pub(super) const STEREO_OUT: PortInfo = PortInfo {
+    width: 2,
+    ..port("out", PortType::Audio, false)
+};
 
 /// 20/ln 10 and ln 10/20: dB per neper and back.
 pub(super) const DB_PER_NEPER: f32 = 20.0 * std::f32::consts::LOG10_E;

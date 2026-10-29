@@ -449,23 +449,7 @@
       "to": {
         "Module": {
           "id": 13,
-          "port": "in_l"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "18": {
-      "from": {
-        "Module": {
-          "id": 10,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 13,
-          "port": "in_r"
+          "port": "in"
         }
       },
       "params": {},
@@ -475,29 +459,13 @@
       "from": {
         "Module": {
           "id": 13,
-          "port": "left"
+          "port": "out"
         }
       },
       "to": {
         "Module": {
           "id": 14,
-          "port": "in_l"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "20": {
-      "from": {
-        "Module": {
-          "id": 13,
-          "port": "right"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 14,
-          "port": "in_r"
+          "port": "in"
         }
       },
       "params": {},
@@ -507,29 +475,13 @@
       "from": {
         "Module": {
           "id": 14,
-          "port": "left"
+          "port": "out"
         }
       },
       "to": {
         "Module": {
           "id": 15,
-          "port": "left"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "22": {
-      "from": {
-        "Module": {
-          "id": 14,
-          "port": "right"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 15,
-          "port": "right"
+          "port": "in"
         }
       },
       "params": {},

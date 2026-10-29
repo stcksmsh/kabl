@@ -19,6 +19,8 @@ const SR: f32 = 48000.0;
 const CLOCK: ModuleId = 1;
 const GRID: ModuleId = 2;
 const OUT: ModuleId = 3;
+/// Joins the two signals the tests read on the left and right output.
+const JOIN: ModuleId = 90;
 const OTHER: ModuleId = 4;
 /// 120 bpm: a 16th is 6000 samples, a bar 96000.
 const STEP: usize = 6000;
@@ -61,6 +63,7 @@ fn patch() -> PatchState {
     other.extend(full_row("b", 2));
     p.modules.insert(OTHER, module("drum.grid", &other));
     p.modules.insert(OUT, module("out", &[]));
+    p.modules.insert(JOIN, module("join", &[]));
     let m = |id, port: &str| PortRef::Module {
         id,
         port: port.into(),
@@ -68,8 +71,9 @@ fn patch() -> PatchState {
     for (i, (from, to)) in [
         (m(CLOCK, "gate"), m(GRID, "clock")),
         (m(CLOCK, "gate"), m(OTHER, "clock")),
-        (m(GRID, "kick"), m(OUT, "left")),
-        (m(GRID, "snare"), m(OUT, "right")),
+        (m(GRID, "kick"), m(JOIN, "left")),
+        (m(GRID, "snare"), m(JOIN, "right")),
+        (m(JOIN, "out"), m(OUT, "in")),
     ]
     .into_iter()
     .enumerate()

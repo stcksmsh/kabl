@@ -16,10 +16,12 @@ fn fixture(name: &str) -> std::path::PathBuf {
 fn v1_fixtures_load_to_their_saved_checkpoint() {
     for name in ["v1_default", "v1_edited"] {
         let log = load(&fixture(name)).expect("v1 loads");
-        let checkpoint: PatchState = serde_json::from_str(
+        let mut checkpoint: PatchState = serde_json::from_str(
             &std::fs::read_to_string(fixture(name).join("checkpoint.json")).unwrap(),
         )
         .unwrap();
+        // The baseline names the old `out` pair; loading migrates it to schema 8.
+        kabl_core::migrate_state(&mut checkpoint);
         assert_eq!(
             log.state(),
             &checkpoint,
@@ -31,8 +33,12 @@ fn v1_fixtures_load_to_their_saved_checkpoint() {
 #[test]
 fn v1_history_undoes_to_empty_exactly() {
     let mut log = load(&fixture("v1_edited")).unwrap();
+    // The schema-8 migration (the last entry) is a barrier: undo never reaches it.
     let n = log.entries().len();
     for k in (0..n).rev() {
+        if !log.can_undo() {
+            break;
+        }
         assert!(log.undo());
         let mut replay = PatchState::new();
         for e in &log.all_entries()[..k] {
@@ -40,7 +46,7 @@ fn v1_history_undoes_to_empty_exactly() {
         }
         assert_eq!(log.state(), &replay, "undo step to prefix {k}");
     }
-    assert_eq!(log.state(), &PatchState::new());
+    assert!(!log.can_undo());
 }
 
 #[test]

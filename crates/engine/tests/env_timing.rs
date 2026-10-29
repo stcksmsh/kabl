@@ -63,8 +63,7 @@ fn env_patch(timing: f32, attack: f32, release: f32) -> PatchState {
     p.modules.insert(3, module("out", &[]));
     p.cables
         .insert(1, cable((1, "gate"), jack(ENV, "gate"), &[]));
-    p.cables
-        .insert(2, cable((ENV, "out"), jack(3, "left"), &[]));
+    p.cables.insert(2, cable((ENV, "out"), jack(3, "in"), &[]));
     p
 }
 

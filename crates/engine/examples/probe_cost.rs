@@ -180,7 +180,11 @@ fn main() {
         .filter(|(_, m)| m.kind != "out" && m.kind != "macro")
         .max_by_key(|(_, m)| {
             let i = kabl_modules::registry::info_for(&m.kind).unwrap();
-            (i.rate == kabl_modules::Rate::Voice, i.ports.len())
+            (
+                i.rate == kabl_modules::Rate::Voice,
+                i.slots(kabl_modules::PortDirection::Input)
+                    + i.slots(kabl_modules::PortDirection::Output),
+            )
         })
         .unwrap();
     let kind = kabl_modules::registry::info_for(&m.kind).unwrap().kind;

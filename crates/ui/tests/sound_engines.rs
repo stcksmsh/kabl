@@ -163,7 +163,7 @@ fn tine_keys() -> PatchEditor {
     r.route(m, "velocity", body, "level", 0.25);
     r.route(et, "out", tine, "level", 0.35);
     r.route(m, "velocity", tine, "level", 0.2);
-    r.e
+    r.e.migrated()
 }
 
 fn glass_bells() -> PatchEditor {
@@ -221,7 +221,7 @@ fn glass_bells() -> PatchEditor {
     r.route(env_ma, "out", mod_a, "level", 1.0);
     r.route(env_mb, "out", mod_b, "level", 1.0);
     r.route(m, "velocity", car_a, "index", 0.1);
-    r.e
+    r.e.migrated()
 }
 
 fn vowel_drift() -> PatchEditor {
@@ -300,7 +300,7 @@ fn vowel_drift() -> PatchEditor {
     r.wire(reverb, "left", out, "left");
     r.wire(reverb, "right", out, "right");
     r.route(env, "out", filter, "cutoff_hz", 0.12);
-    r.e
+    r.e.migrated()
 }
 
 /// The table `imported-morph` embeds: 24 frames of a saw-like spectrum with a resonant peak
@@ -397,7 +397,7 @@ fn imported_morph() -> PatchEditor {
     // Every note sweeps the table from its first frame toward the resonant top.
     r.route(env, "out", wt, "position", 0.8);
     r.route(m, "velocity", wt, "position", 0.2);
-    r.e
+    r.e.migrated()
 }
 
 /// midi.in -> `voice` (pitch, gate, velocity) -> gain -> chorus -> out. The voice's own
@@ -448,7 +448,7 @@ fn dx_keys() -> PatchEditor {
             ("width", 100.0),
         ],
     );
-    r.e
+    r.e.migrated()
 }
 
 fn iron_bell() -> PatchEditor {
@@ -488,7 +488,7 @@ fn iron_bell() -> PatchEditor {
     r.wire(gain, "out", reverb, "in_r");
     r.wire(reverb, "left", out, "left");
     r.wire(reverb, "right", out, "right");
-    r.e
+    r.e.migrated()
 }
 
 fn rising_pad() -> PatchEditor {
@@ -570,7 +570,7 @@ fn rising_pad() -> PatchEditor {
     r.route(sweep, "out", b, "position", 0.6);
     r.route(m, "velocity", a, "position", 0.1);
     r.route(sweep, "out", filter, "cutoff_hz", 0.1);
-    r.e
+    r.e.migrated()
 }
 
 fn rust_bass() -> PatchEditor {
@@ -603,7 +603,7 @@ fn rust_bass() -> PatchEditor {
             ("width", 100.0),
         ],
     );
-    r.e
+    r.e.migrated()
 }
 
 fn scale_walk() -> PatchEditor {
@@ -667,7 +667,7 @@ fn scale_walk() -> PatchEditor {
     r.wire(reverb, "left", out, "left");
     r.wire(reverb, "right", out, "right");
     r.route(env, "out", filter, "cutoff_hz", 0.35);
-    r.e
+    r.e.migrated()
 }
 
 fn clock_logic() -> PatchEditor {
@@ -747,7 +747,7 @@ fn clock_logic() -> PatchEditor {
     r.wire(mix, "out", reverb, "in_r");
     r.wire(reverb, "left", out, "left");
     r.wire(reverb, "right", out, "right");
-    r.e
+    r.e.migrated()
 }
 
 fn stepped_sweep() -> PatchEditor {
@@ -827,7 +827,7 @@ fn stepped_sweep() -> PatchEditor {
     r.wire(reverb, "left", out, "left");
     r.wire(reverb, "right", out, "right");
     r.route(sl_f, "out", filter, "cutoff_hz", 0.6);
-    r.e
+    r.e.migrated()
 }
 
 /// (time s, note, on)

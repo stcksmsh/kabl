@@ -643,7 +643,7 @@ fn wavetable_state_survives_a_host_project_reopen() {
         .load(SoundState::decode(&saved).unwrap())
         .unwrap();
     let again = reopened.shared.snapshot();
-    assert_eq!(again.version, 4);
+    assert_eq!(again.version, 5);
     assert_eq!(again.patch.tables[&2].name, "mine.wav");
     assert_eq!(serde_json::to_vec(&again).unwrap(), saved);
 }
@@ -709,4 +709,63 @@ fn all_eight_macros_are_automation_candidates() {
         param: "m5".into(),
     };
     assert!(automation::resolve(&patch, &fifth).is_some());
+}
+
+#[test]
+fn a_version_4_project_with_half_ports_loads_with_stereo_ports() {
+    use kabl_core::{CableState, ModuleState, PatchState, PortRef};
+    let module = |kind: &str| ModuleState {
+        kind: kind.into(),
+        pos: Vec2 { x: 0., y: 0. },
+        params: Default::default(),
+    };
+    let cable = |from: (u64, &str), to: (u64, &str)| CableState {
+        from: PortRef::Module {
+            id: from.0,
+            port: from.1.into(),
+        },
+        to: PortRef::Module {
+            id: to.0,
+            port: to.1.into(),
+        },
+        params: Default::default(),
+        steps: vec![],
+    };
+    let mut patch = PatchState::default();
+    patch.modules.insert(1, module("gain"));
+    patch.modules.insert(2, module("reverb"));
+    patch.modules.insert(3, module("out"));
+    for (id, c) in [
+        cable((1, "out"), (2, "in_l")),
+        cable((1, "out"), (2, "in_r")),
+        cable((2, "left"), (3, "left")),
+        cable((2, "right"), (3, "right")),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        patch.cables.insert(id as u64 + 1, c);
+    }
+    let p = tests::instrument();
+    let mut json: serde_json::Value = serde_json::to_value(p.shared.snapshot()).unwrap();
+    json["version"] = 4.into();
+    json["patch"] = serde_json::to_value(&patch).unwrap();
+    for key in ["lanes", "slot_values"] {
+        json.as_object_mut().unwrap().remove(key);
+    }
+    let state = SoundState::decode(&serde_json::to_vec(&json).unwrap()).unwrap();
+    let ports: Vec<_> = state
+        .patch
+        .cables
+        .values()
+        .map(|c| match (&c.from, &c.to) {
+            (PortRef::Module { port: f, .. }, PortRef::Module { port: t, .. }) => {
+                (f.clone(), t.clone())
+            }
+            _ => unreachable!(),
+        })
+        .collect();
+    assert_eq!(ports.len(), 2);
+    assert!(ports.contains(&("out".into(), "in".into())));
+    assert!(state.patch.modules.len() == 3);
 }

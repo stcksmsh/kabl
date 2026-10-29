@@ -45,8 +45,7 @@ fn voice_patch(kind: &str, gate: &str, note: f32, params: &[(&str, f32)]) -> Pat
     p.modules.insert(3, module("out", &[]));
     wire(&mut p, (1, "gate"), (2, gate));
     wire(&mut p, (1, "velocity"), (2, "velocity"));
-    wire(&mut p, (2, "out"), (3, "left"));
-    wire(&mut p, (2, "out"), (3, "right"));
+    wire(&mut p, (2, "out"), (3, "in"));
     p
 }
 

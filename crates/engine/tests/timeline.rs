@@ -93,7 +93,7 @@ fn synth(channel_a: f32, split: bool) -> PatchState {
     cable(&mut p, port(1, "gate"), port(5, "gate"), None);
     cable(&mut p, port(4, "lp"), port(6, "in"), None);
     cable(&mut p, port(5, "out"), port(6, "cv"), None);
-    cable(&mut p, port(6, "out"), port(9, "left"), None);
+    cable(&mut p, port(6, "out"), port(9, "in"), None);
     cable(&mut p, port(1, "wheel"), param(4, "cutoff_hz"), Some(0.6));
     cable(
         &mut p,
@@ -115,9 +115,9 @@ fn synth(channel_a: f32, split: bool) -> PatchState {
         cable(&mut p, port(10, "pitch"), port(11, "pitch"), None);
         cable(&mut p, port(11, "out"), port(12, "in"), None);
         cable(&mut p, port(10, "gate"), port(12, "cv"), None);
-        cable(&mut p, port(12, "out"), port(9, "right"), None);
+        cable(&mut p, port(12, "out"), port(9, "in"), None);
     } else {
-        cable(&mut p, port(6, "out"), port(9, "right"), None);
+        cable(&mut p, port(6, "out"), port(9, "in"), None);
     }
     p
 }
@@ -407,7 +407,7 @@ fn a_note_sounds_from_its_own_sample() {
     let mut p = PatchState::new();
     p.modules.insert(1, module("midi.in", &[]));
     p.modules.insert(2, module("out", &[]));
-    cable(&mut p, port(1, "gate"), port(2, "right"), None);
+    cable(&mut p, port(1, "gate"), port(2, "in"), None);
     for (t, n) in [
         (1000u64, 1),
         (1000, 7),

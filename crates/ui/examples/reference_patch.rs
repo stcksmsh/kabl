@@ -127,7 +127,7 @@ fn main() {
     match args.get(1).map(String::as_str) {
         Some("write") => {
             let dir = Path::new(&args[2]);
-            kabl_core::save(dir, build().log()).expect("save");
+            kabl_core::save(dir, build().migrated().log()).expect("save");
             println!("wrote {}", dir.display());
         }
         Some("render") => {

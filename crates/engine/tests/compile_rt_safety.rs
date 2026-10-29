@@ -75,8 +75,7 @@ fn chord_patch() -> PatchState {
     patch.cables.insert(3, cable(1, "gate", 4, "gate"));
     patch.cables.insert(4, cable(3, "lp", 5, "in"));
     patch.cables.insert(5, cable(4, "out", 5, "cv"));
-    patch.cables.insert(6, cable(5, "out", 6, "left"));
-    patch.cables.insert(7, cable(5, "out", 6, "right"));
+    patch.cables.insert(6, cable(5, "out", 6, "in"));
     patch
 }
 

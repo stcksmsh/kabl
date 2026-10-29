@@ -807,7 +807,7 @@ pub fn strings_patch() -> PatchEditor {
         (v.gain, "gain_db", Some(26), Some("Level")),
         (v.midi, "mode", None, Some("Keys")),
     ]);
-    r.e
+    r.e.migrated()
 }
 
 pub fn pad_patch() -> PatchEditor {
@@ -877,7 +877,7 @@ pub fn pad_patch() -> PatchEditor {
         (v.gain, "gain_db", Some(26), Some("Level")),
         (v.midi, "mode", None, Some("Keys")),
     ]);
-    r.e
+    r.e.migrated()
 }
 
 pub fn lead_patch() -> PatchEditor {
@@ -926,7 +926,7 @@ pub fn lead_patch() -> PatchEditor {
         (v.midi, "mode", None, Some("Keys")),
         (v.midi, "glide", None, Some("Glide")),
     ]);
-    r.e
+    r.e.migrated()
 }
 
 pub fn bass_patch() -> PatchEditor {
@@ -960,7 +960,7 @@ pub fn bass_patch() -> PatchEditor {
         (clock, "bpm", Some(25), Some("Tempo")),
         (level, "gain_db", Some(26), Some("Level")),
     ]);
-    r.e
+    r.e.migrated()
 }
 
 pub fn breath_patch() -> PatchEditor {
@@ -1009,7 +1009,7 @@ pub fn breath_patch() -> PatchEditor {
         (v.gain, "gain_db", Some(26), Some("Level")),
         (v.midi, "mode", None, Some("Keys")),
     ]);
-    r.e
+    r.e.migrated()
 }
 
 pub fn perc_patch() -> PatchEditor {
@@ -1047,7 +1047,7 @@ pub fn perc_patch() -> PatchEditor {
         (v.hat_seq, BANKS, None, Some("Hat")),
         (v.bus, "level3", Some(24), Some("Hat level")),
     ]);
-    r.e
+    r.e.migrated()
 }
 
 fn macro_perc(r: &mut Rack, m: ModuleId, v: &Perc, reverb: ModuleId) {
@@ -1231,7 +1231,7 @@ pub fn piece_patch() -> PatchEditor {
     changes.push((clock, format!("{BTN_PREFIX}run"), Some(46.0)));
     changes.push((clock, format!("{BTN_PREFIX}restart"), Some(47.0)));
     r.e.set_presentation(&changes);
-    r.e
+    r.e.migrated()
 }
 
 type Builder = fn() -> PatchEditor;

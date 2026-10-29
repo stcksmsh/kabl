@@ -15,16 +15,19 @@ const PORTS: &[PortInfo] = &[
         name: "clock",
         port_type: PortType::Gate,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "reset",
         port_type: PortType::Gate,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "gate",
         port_type: PortType::Gate,
         direction: PortDirection::Output,
+        width: 1,
     },
 ];
 

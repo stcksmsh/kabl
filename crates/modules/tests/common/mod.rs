@@ -32,12 +32,8 @@ impl Rig {
             let i = info.params.iter().position(|p| p.name == name).unwrap();
             params[i] = v;
         }
-        let n_in = info
-            .ports
-            .iter()
-            .filter(|p| p.direction == kabl_modules::PortDirection::Input)
-            .count();
-        let n_out = info.ports.len() - n_in;
+        let n_in = info.slots(kabl_modules::PortDirection::Input);
+        let n_out = info.slots(kabl_modules::PortDirection::Output);
         Rig {
             m,
             params,

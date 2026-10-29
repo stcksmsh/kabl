@@ -89,7 +89,7 @@ pub fn echo() -> PatchEditor {
     }
     factory_controls::prepare(&mut e, true);
     factory_bank::attach_guide(&mut e, "echo");
-    e
+    e.migrated()
 }
 
 use interlocking::{factory_bank, factory_controls};

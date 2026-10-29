@@ -283,7 +283,7 @@ pub fn performance() -> PatchEditor {
     for (id, key, _, label) in controls {
         e.set_label(id, &format!("{PIN_PREFIX}{key}"), Some(label.to_string()));
     }
-    e
+    e.migrated()
 }
 
 /// Not a check: writes `patches/performance`.

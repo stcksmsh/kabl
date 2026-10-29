@@ -7,7 +7,7 @@
         "name": "Stereo chorus room",
         "help": "Open internals to inspect the real modules and routes. Editing affects this instance only.",
         "definition": {
-          "id": "kabl-31-1791227534474581132-2",
+          "id": "kabl-613829-1793226825687587888-2",
           "version": 0
         },
         "parent": null,
@@ -21,44 +21,26 @@
         },
         "ports": {
           "1": {
-            "label": "in_l · #7",
+            "label": "in · #7",
             "target": {
               "Module": {
                 "id": 7,
-                "port": "in_l"
+                "port": "in"
               }
             }
           },
           "2": {
-            "label": "in_r · #7",
-            "target": {
-              "Module": {
-                "id": 7,
-                "port": "in_r"
-              }
-            }
-          },
-          "3": {
-            "label": "left · #8",
+            "label": "out · #8",
             "target": {
               "Module": {
                 "id": 8,
-                "port": "left"
-              }
-            }
-          },
-          "4": {
-            "label": "right · #8",
-            "target": {
-              "Module": {
-                "id": 8,
-                "port": "right"
+                "port": "out"
               }
             }
           }
         },
         "controls": {
-          "5": {
+          "3": {
             "label": "Motion",
             "target": {
               "Param": {
@@ -67,7 +49,7 @@
               }
             }
           },
-          "6": {
+          "4": {
             "label": "Room mix",
             "target": {
               "Param": {
@@ -76,7 +58,7 @@
               }
             }
           },
-          "7": {
+          "5": {
             "label": "Room time",
             "target": {
               "Param": {
@@ -85,7 +67,7 @@
               }
             }
           },
-          "8": {
+          "6": {
             "label": "mix · #8",
             "target": {
               "Param": {
@@ -95,7 +77,7 @@
             }
           }
         },
-        "next_interface": 9
+        "next_interface": 7
       }
     },
     "modules": {
@@ -117,33 +99,17 @@
       }
     },
     "cables": {
-      "10": {
+      "8": {
         "from": {
           "Module": {
             "id": 7,
-            "port": "left"
+            "port": "out"
           }
         },
         "to": {
           "Module": {
             "id": 8,
-            "port": "in_l"
-          }
-        },
-        "params": {},
-        "steps": []
-      },
-      "11": {
-        "from": {
-          "Module": {
-            "id": 7,
-            "port": "right"
-          }
-        },
-        "to": {
-          "Module": {
-            "id": 8,
-            "port": "in_r"
+            "port": "in"
           }
         },
         "params": {},

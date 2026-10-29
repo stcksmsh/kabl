@@ -518,13 +518,11 @@ pub fn port_help(kind: &str, port: &str) -> Option<&'static str> {
         ("filter.comb", "in") => "The sound to ring: a click, a noise burst or a held tone.",
         ("filter.comb", "pitch") => "Pitch in semitones from the Frequency setting.",
         ("filter.formant", "in") => "A buzzy or noisy sound to give a vowel to.",
-        ("vocoder", "in_l" | "in_r") => {
+        ("vocoder", "in") => {
             "The synth to make speak (carrier): a saw or supersaw chord works best."
         }
         ("vocoder", "mod") => "The voice (modulator): an Audio in, or a patched robot phrase.",
-        ("audio.in", "left" | "right") => {
-            "Sound from outside: the input device, or the host's audio input."
-        }
+        ("audio.in", "out") => "Sound from outside: the input device, or the host's audio input.",
         ("filter.svf", "notch") => "Notch: removes a band around the cutoff and keeps the rest.",
         ("env.adsr", "gate") => "Starts the envelope while high, releases it when low.",
         ("lfo" | "delay", "clock") => "A clock for Sync to follow.",

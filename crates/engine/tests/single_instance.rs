@@ -122,8 +122,7 @@ fn mixed() -> PatchState {
         .c(port(VCA_B, "out"), port(MIX, "in2"))
         .c(port(VCA_A, "out"), port(FILT_A, "cutoff_cv"))
         .c(port(MIX, "out"), port(DELAY, "in"))
-        .c(port(DELAY, "left"), port(OUT, "left"))
-        .c(port(DELAY, "right"), port(OUT, "right"))
+        .c(port(DELAY, "out"), port(OUT, "in"))
         .cp(
             port(LFO, "out"),
             param(FILT_A, "cutoff_hz"),

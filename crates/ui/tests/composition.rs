@@ -464,7 +464,7 @@ pub fn composition() -> PatchEditor {
     e.connect(port(pad_filt, "lp"), port(pad_vca, "in"));
     e.connect(port(pad_vca, "out"), port(atmos, "in2"));
     factory_bank::attach_guide(&mut e, "composition");
-    e
+    e.migrated()
 }
 
 /// Not a check: writes `patches/composition`.

@@ -60,13 +60,7 @@ use crate::view::ModuleView;
 /// Most bands.
 pub const MAX_BANDS: usize = 32;
 
-const PORTS: &[PortInfo] = &[
-    STEREO_IN[0],
-    STEREO_IN[1],
-    port("mod", PortType::Audio, true),
-    STEREO_OUT[0],
-    STEREO_OUT[1],
-];
+const PORTS: &[PortInfo] = &[STEREO_IN, port("mod", PortType::Audio, true), STEREO_OUT];
 
 const PARAMS: &[ParamInfo] = &[
     param("bands", 8.0, MAX_BANDS as f32, 16.0, "bands", Taper::Linear),

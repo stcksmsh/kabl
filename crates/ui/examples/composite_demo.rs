@@ -98,14 +98,9 @@ fn main() {
         .find(|(_, m)| m.kind == "vca")
         .unwrap()
         .0;
-    e.connect(port(vca, "out"), port(chorus, "in_l"));
-    e.connect(port(vca, "out"), port(chorus, "in_r"));
-    for (src, dst) in [("left", "in_l"), ("right", "in_r")] {
-        e.connect(port(chorus, src), port(reverb, dst));
-    }
-    for side in ["left", "right"] {
-        e.connect(port(reverb, side), port(out, side));
-    }
+    e.connect(port(vca, "out"), port(chorus, "in"));
+    e.connect(port(chorus, "out"), port(reverb, "in"));
+    e.connect(port(reverb, "out"), port(out, "in"));
     let flat = e.state().clone();
     let fx = composites::encapsulate(
         &mut e,

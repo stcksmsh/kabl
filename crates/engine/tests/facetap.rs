@@ -49,7 +49,7 @@ fn chain() -> PatchState {
     p.modules.insert(5, module("lfo", &[("rate_hz", 2.0)]));
     p.cables.insert(1, cable(1, "m1", 2, "in"));
     p.cables.insert(2, cable(2, "out", 3, "in"));
-    p.cables.insert(3, cable(3, "out", 4, "left"));
+    p.cables.insert(3, cable(3, "out", 4, "in"));
     p
 }
 
@@ -68,8 +68,7 @@ fn keys() -> PatchState {
     p.cables.insert(2, cable(1, "gate", 3, "gate"));
     p.cables.insert(3, cable(2, "out", 4, "in"));
     p.cables.insert(4, cable(3, "out", 4, "cv"));
-    p.cables.insert(5, cable(4, "out", 5, "left"));
-    p.cables.insert(6, cable(4, "out", 5, "right"));
+    p.cables.insert(5, cable(4, "out", 5, "in"));
     p
 }
 
@@ -224,12 +223,12 @@ fn effects() -> PatchState {
     p.modules.insert(5, module("out", &[]));
     for (i, (a, b)) in [(1, 2), (2, 3), (3, 4)].into_iter().enumerate() {
         let (fa, fb) = match a {
-            1 => ("m1", "in_l"),
-            _ => ("left", "in_l"),
+            1 => ("m1", "in"),
+            _ => ("out", "in"),
         };
         p.cables.insert(i as u64 * 2, cable(a, fa, b, fb));
     }
-    p.cables.insert(10, cable(4, "left", 5, "left"));
+    p.cables.insert(10, cable(4, "out", 5, "in"));
     p
 }
 

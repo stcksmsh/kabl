@@ -30,6 +30,7 @@ const PORTS: &[PortInfo] = &[PortInfo {
     name: "out",
     port_type: PortType::Audio,
     direction: PortDirection::Output,
+    width: 1,
 }];
 
 const PARAMS: &[ParamInfo] = &[

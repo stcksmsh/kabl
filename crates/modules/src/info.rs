@@ -64,6 +64,45 @@ pub struct PortInfo {
     pub name: &'static str,
     pub port_type: PortType,
     pub direction: PortDirection,
+    /// Channels the port carries: 1, or 2 for a stereo jack. A width-2 port takes two
+    /// consecutive io slots, so the module reads `io.input(n)`, `io.input(n + 1)`.
+    pub width: u8,
+}
+
+impl ModuleInfo {
+    /// Number of io slots of `dir`: the sum of the port widths.
+    pub fn slots(&self, dir: PortDirection) -> usize {
+        self.ports
+            .iter()
+            .filter(|p| p.direction == dir)
+            .map(|p| usize::from(p.width))
+            .sum()
+    }
+
+    /// The port of direction `dir` that owns io slot `slot`, and which channel of it the slot is.
+    pub fn slot_port(&self, dir: PortDirection, slot: usize) -> Option<(&PortInfo, u8)> {
+        let mut at = 0;
+        for p in self.ports.iter().filter(|p| p.direction == dir) {
+            let w = usize::from(p.width);
+            if slot < at + w {
+                return Some((p, (slot - at) as u8));
+            }
+            at += w;
+        }
+        None
+    }
+
+    /// First io slot of the port `name` of direction `dir`.
+    pub fn port_slot(&self, dir: PortDirection, name: &str) -> Option<usize> {
+        let mut at = 0;
+        for p in self.ports.iter().filter(|p| p.direction == dir) {
+            if p.name == name {
+                return Some(at);
+            }
+            at += usize::from(p.width);
+        }
+        None
+    }
 }
 
 /// How a param's displayed/edited value maps to its underlying linear range — matters for knob

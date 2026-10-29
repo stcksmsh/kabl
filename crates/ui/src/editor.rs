@@ -168,6 +168,14 @@ impl PatchEditor {
         }
     }
 
+    /// This editor after the schema 8 migration, as the loader would apply it to a file. Lets a
+    /// hardcoded builder keep the pre-stereo port names and still equal its migrated file.
+    pub fn migrated(self) -> Self {
+        let mut log = self.log;
+        kabl_core::migrate_v7_to_v8(&mut log);
+        Self::from_log(log)
+    }
+
     /// High-water marks include removed objects retained by Undo/Redo, not only live state.
     pub fn reserved_ids(&self) -> (ModuleId, CableId) {
         fn visit(op: &Op, module: &mut u64, cable: &mut u64) {

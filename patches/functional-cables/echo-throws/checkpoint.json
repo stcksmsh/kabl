@@ -105,6 +105,14 @@
         "y": 160.0
       },
       "params": {}
+    },
+    "10": {
+      "kind": "split",
+      "pos": {
+        "x": 830.0,
+        "y": 70.0
+      },
+      "params": {}
     }
   },
   "cables": {
@@ -282,7 +290,7 @@
     "11": {
       "from": {
         "Module": {
-          "id": 7,
+          "id": 10,
           "port": "left"
         }
       },
@@ -298,7 +306,7 @@
     "12": {
       "from": {
         "Module": {
-          "id": 7,
+          "id": 10,
           "port": "right"
         }
       },
@@ -321,23 +329,23 @@
       "to": {
         "Module": {
           "id": 9,
-          "port": "left"
+          "port": "in"
         }
       },
       "params": {},
       "steps": []
     },
-    "14": {
+    "15": {
       "from": {
         "Module": {
-          "id": 8,
+          "id": 7,
           "port": "out"
         }
       },
       "to": {
         "Module": {
-          "id": 9,
-          "port": "right"
+          "id": 10,
+          "port": "in"
         }
       },
       "params": {},

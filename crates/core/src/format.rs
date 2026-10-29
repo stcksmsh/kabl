@@ -12,9 +12,14 @@ use crate::op::Entry;
 /// gives cable params a meaning for functional cables (`length`, `s1..`, `prob`, `r1..`; see the
 /// `kabl-cables` crate); v7 adds `PortRef::CableParam` (a cable's morph, probability or glide as
 /// a modulation destination). Each is a strict superset of the one before, so older files load
-/// unchanged; there is nothing to migrate. An older build refuses a newer file instead of
-/// playing its functional cables, or the routes into them, as plain ones.
-pub const CURRENT_SCHEMA_VERSION: u32 = 7;
+/// unchanged. An older build refuses a newer file instead of playing its functional cables, or
+/// the routes into them, as plain ones.
+///
+/// v8 is not a superset: stereo effects, `out`, `audio.in`, `pan` and `delay` have one width-2
+/// port (`in`, `out`) where v7 files name the pair `in_l`/`in_r`, `left`/`right`. A v7 build
+/// refuses a v8 file. Files below v8 name the old ports; the migration that rewrites them lands
+/// with step 2b of `docs/stereo/DESIGN.md`.
+pub const CURRENT_SCHEMA_VERSION: u32 = 8;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Meta {
@@ -89,6 +94,10 @@ pub fn load(dir: &Path) -> Result<PatchLog, FormatError> {
     }
     if meta.schema_version < 5 && !log.state().tables.is_empty() {
         return Err(FormatError::UnknownSchemaVersion(5));
+    }
+    log.floor_after_migration();
+    if meta.schema_version < 8 {
+        crate::migrate::migrate_v7_to_v8(&mut log);
     }
     crate::composite::validate(log.state()).map_err(FormatError::Composite)?;
     Ok(log)

@@ -126,7 +126,7 @@ pub fn keyboard(bass: bool) -> PatchEditor {
     route(&mut e, m, "m4", reverb, "mix", 0.2);
     pin(&mut e, 6, "release_ms", 5.0, "Release");
     pin(&mut e, gain, "gain_db", 6.0, "Level");
-    e
+    e.migrated()
 }
 
 pub fn progression() -> PatchEditor {
@@ -224,7 +224,7 @@ pub fn progression() -> PatchEditor {
     pin(&mut e, clock, "transport", 0.0, "Transport");
     pin(&mut e, seq, "banks", 5.0, "Harmony");
     pin(&mut e, clock, "bpm", 6.0, "Tempo");
-    e
+    e.migrated()
 }
 
 pub fn write_metadata(root: &Path) {

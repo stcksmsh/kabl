@@ -642,17 +642,9 @@ pub fn diagnose(state: &PatchState, focus: Option<ModuleId>, cx: &Context) -> Di
             .values()
             .any(|c| matches!(&c.to, PortRef::Module { id, port: p } if *id == out && p == port))
     };
-    match (plugged("left"), plugged("right")) {
-        (false, false) => d.facts.push(format!(
-            "Nothing is plugged into Output #{out} (left or right)."
-        )),
-        (true, false) => d.facts.push(format!(
-            "Output #{out}: left is connected, right is not (right is silent)."
-        )),
-        (false, true) => d.facts.push(format!(
-            "Output #{out}: right is connected, left is not (left is silent)."
-        )),
-        (true, true) => {}
+    if !plugged("in") {
+        d.facts
+            .push(format!("Nothing is plugged into Output #{out}."));
     }
 
     let focus = cx.tap.as_ref().map(|(s, _, _)| s.id).or(focus);
@@ -951,9 +943,9 @@ pub fn needed_inputs(kind: &str) -> &'static [&'static [&'static str]] {
         | "drive" | "gain" => &[&["in"]],
         "mixer" => &[&["in1", "in2", "in3", "in4"]],
         "reverb" | "chorus" | "phaser" | "flanger" | "compressor" | "eq" | "limiter"
-        | "bitcrusher" => &[&["in_l", "in_r"]],
+        | "bitcrusher" => &[&["in"]],
         "ringmod" => &[&["a"], &["b"]],
-        "vocoder" => &[&["in_l", "in_r"], &["mod"]],
+        "vocoder" => &[&["in"], &["mod"]],
         _ => &[],
     }
 }

@@ -18,10 +18,10 @@ use crate::info::{
 use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig};
 
-const PORTS: &[PortInfo] = &[
-    port("left", PortType::Audio, false),
-    port("right", PortType::Audio, false),
-];
+const PORTS: &[PortInfo] = &[PortInfo {
+    width: 2,
+    ..port("out", PortType::Audio, false)
+}];
 
 const PARAMS: &[ParamInfo] = &[param("gain_db", -24.0, 36.0, 0.0, "dB", Taper::Linear)];
 

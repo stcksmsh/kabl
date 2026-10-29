@@ -19,6 +19,8 @@ const SR: f32 = 48000.0;
 const CLOCK: ModuleId = 1;
 const MACRO: ModuleId = 2;
 const OUT: ModuleId = 3;
+/// Joins the two signals the tests read on the left and right output.
+const JOIN: ModuleId = 90;
 /// 120 bpm: a 16th is 6000 samples, a bar 96000 samples = 1500 blocks.
 const BAR_BLOCKS: usize = 1500;
 const PULSE_BLOCKS: usize = 93; // 6000 / 64 rounded down, for stepping near a pulse
@@ -38,13 +40,15 @@ fn patch() -> PatchState {
     p.modules
         .insert(MACRO, module("macro", &[("m1", 0.2), ("m2", 0.7)]));
     p.modules.insert(OUT, module("out", &[]));
+    p.modules.insert(JOIN, module("join", &[]));
     let m = |id, port: &str| PortRef::Module {
         id,
         port: port.into(),
     };
     for (i, (from, to)) in [
-        (m(MACRO, "m1"), m(OUT, "left")),
-        (m(MACRO, "m2"), m(OUT, "right")),
+        (m(MACRO, "m1"), m(JOIN, "left")),
+        (m(MACRO, "m2"), m(JOIN, "right")),
+        (m(JOIN, "out"), m(OUT, "in")),
     ]
     .into_iter()
     .enumerate()

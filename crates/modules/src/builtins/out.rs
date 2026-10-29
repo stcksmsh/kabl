@@ -9,18 +9,12 @@ use crate::info::{Category, ModuleInfo, PortDirection, PortInfo, PortType, Quali
 use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig};
 
-const PORTS: &[PortInfo] = &[
-    PortInfo {
-        name: "left",
-        port_type: PortType::Audio,
-        direction: PortDirection::Input,
-    },
-    PortInfo {
-        name: "right",
-        port_type: PortType::Audio,
-        direction: PortDirection::Input,
-    },
-];
+const PORTS: &[PortInfo] = &[PortInfo {
+    name: "in",
+    port_type: PortType::Audio,
+    direction: PortDirection::Input,
+    width: 2,
+}];
 
 pub static OUT_INFO: ModuleInfo = ModuleInfo {
     kind: "out",

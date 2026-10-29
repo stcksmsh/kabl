@@ -64,12 +64,14 @@ fn patch(patterned: bool) -> PatchState {
         .insert(2, module("osc.wt", &[("table", 5.0), ("user", 1.0)]));
     p.modules.insert(4, module("out", &[]));
     p.cables.insert(1, cable((1, "pitch"), (2, "pitch"), &[]));
-    p.cables.insert(2, cable((2, "out"), (4, "left"), &[]));
+    p.modules.insert(90, module("join", &[]));
+    p.cables.insert(90, cable((90, "out"), (4, "in"), &[]));
+    p.cables.insert(2, cable((2, "out"), (90, "left"), &[]));
     if patterned {
         p.modules.insert(7, module("clock", &[("bpm", 300.0)]));
         let pattern = [("length", 3.0), ("s2", 0.0), ("r3", 60.0)];
         p.cables
-            .insert(3, cable((7, "gate"), (4, "right"), &pattern));
+            .insert(3, cable((7, "gate"), (90, "right"), &pattern));
     }
     p
 }

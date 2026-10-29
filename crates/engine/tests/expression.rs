@@ -48,10 +48,12 @@ fn two(a: &[(&str, f32)], out1: &str, b: Option<&[(&str, f32)]>, out2: &str) -> 
     let mut p = PatchState::new();
     p.modules.insert(1, module("midi.in", a));
     p.modules.insert(9, module("out", &[]));
-    cable(&mut p, port(1, out1), port(9, "left"));
+    p.modules.insert(90, module("join", &[]));
+    cable(&mut p, port(90, "out"), port(9, "in"));
+    cable(&mut p, port(1, out1), port(90, "left"));
     if let Some(b) = b {
         p.modules.insert(2, module("midi.in", b));
-        cable(&mut p, port(2, out2), port(9, "right"));
+        cable(&mut p, port(2, out2), port(90, "right"));
     }
     p
 }
@@ -166,7 +168,7 @@ fn the_wheel_routed_to_a_cutoff_changes_the_sound() {
     p.modules.insert(4, module("out", &[]));
     cable(&mut p, port(1, "pitch"), port(2, "pitch"));
     cable(&mut p, port(2, "out"), port(3, "in"));
-    cable(&mut p, port(3, "lp"), port(4, "left"));
+    cable(&mut p, port(3, "lp"), port(4, "in"));
     let id = p.cables.len() as u64 + 1;
     p.cables.insert(
         id,

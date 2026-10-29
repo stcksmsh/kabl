@@ -32,36 +32,43 @@ const PORTS: &[PortInfo] = &[
         name: "in",
         port_type: PortType::Audio,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "cutoff_cv",
         port_type: PortType::Cv,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "resonance_cv",
         port_type: PortType::Cv,
         direction: PortDirection::Input,
+        width: 1,
     },
     PortInfo {
         name: "lp",
         port_type: PortType::Audio,
         direction: PortDirection::Output,
+        width: 1,
     },
     PortInfo {
         name: "bp",
         port_type: PortType::Audio,
         direction: PortDirection::Output,
+        width: 1,
     },
     PortInfo {
         name: "hp",
         port_type: PortType::Audio,
         direction: PortDirection::Output,
+        width: 1,
     },
     PortInfo {
         name: "notch",
         port_type: PortType::Audio,
         direction: PortDirection::Output,
+        width: 1,
     },
 ];
 

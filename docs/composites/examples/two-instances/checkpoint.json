@@ -4,7 +4,7 @@
       "name": "Subtractive voice",
       "help": "Open internals to inspect the real modules and routes. Editing affects this instance only.",
       "definition": {
-        "id": "kabl-31-1791227534026753521-1",
+        "id": "kabl-613829-1793226824837324153-1",
         "version": 0
       },
       "parent": null,
@@ -91,7 +91,7 @@
       "name": "Stereo chorus room",
       "help": "Open internals to inspect the real modules and routes. Editing affects this instance only.",
       "definition": {
-        "id": "kabl-31-1791227534474581132-2",
+        "id": "kabl-613829-1793226825687587888-2",
         "version": 0
       },
       "parent": null,
@@ -105,44 +105,26 @@
       },
       "ports": {
         "1": {
-          "label": "in_l · #7",
+          "label": "in · #7",
           "target": {
             "Module": {
               "id": 7,
-              "port": "in_l"
+              "port": "in"
             }
           }
         },
         "2": {
-          "label": "in_r · #7",
-          "target": {
-            "Module": {
-              "id": 7,
-              "port": "in_r"
-            }
-          }
-        },
-        "3": {
-          "label": "left · #8",
+          "label": "out · #8",
           "target": {
             "Module": {
               "id": 8,
-              "port": "left"
-            }
-          }
-        },
-        "4": {
-          "label": "right · #8",
-          "target": {
-            "Module": {
-              "id": 8,
-              "port": "right"
+              "port": "out"
             }
           }
         }
       },
       "controls": {
-        "5": {
+        "3": {
           "label": "Motion",
           "target": {
             "Param": {
@@ -151,7 +133,7 @@
             }
           }
         },
-        "6": {
+        "4": {
           "label": "Room mix",
           "target": {
             "Param": {
@@ -160,7 +142,7 @@
             }
           }
         },
-        "7": {
+        "5": {
           "label": "Room time",
           "target": {
             "Param": {
@@ -169,7 +151,7 @@
             }
           }
         },
-        "8": {
+        "6": {
           "label": "mix · #8",
           "target": {
             "Param": {
@@ -179,13 +161,13 @@
           }
         }
       },
-      "next_interface": 9
+      "next_interface": 7
     },
     "3": {
       "name": "Subtractive voice",
       "help": "Open internals to inspect the real modules and routes. Editing affects this instance only.",
       "definition": {
-        "id": "kabl-31-1791227534026753521-1",
+        "id": "kabl-613829-1793226824837324153-1",
         "version": 0
       },
       "parent": null,
@@ -484,7 +466,7 @@
       "params": {},
       "steps": []
     },
-    "8": {
+    "7": {
       "from": {
         "Module": {
           "id": 5,
@@ -494,7 +476,23 @@
       "to": {
         "Module": {
           "id": 7,
-          "port": "in_l"
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "8": {
+      "from": {
+        "Module": {
+          "id": 7,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 8,
+          "port": "in"
         }
       },
       "params": {},
@@ -503,84 +501,20 @@
     "9": {
       "from": {
         "Module": {
-          "id": 5,
+          "id": 8,
           "port": "out"
         }
       },
       "to": {
         "Module": {
-          "id": 7,
-          "port": "in_r"
+          "id": 6,
+          "port": "in"
         }
       },
       "params": {},
       "steps": []
     },
     "10": {
-      "from": {
-        "Module": {
-          "id": 7,
-          "port": "left"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 8,
-          "port": "in_l"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "11": {
-      "from": {
-        "Module": {
-          "id": 7,
-          "port": "right"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 8,
-          "port": "in_r"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "12": {
-      "from": {
-        "Module": {
-          "id": 8,
-          "port": "left"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 6,
-          "port": "left"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "13": {
-      "from": {
-        "Module": {
-          "id": 8,
-          "port": "right"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 6,
-          "port": "right"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "14": {
       "from": {
         "Module": {
           "id": 9,
@@ -596,7 +530,7 @@
       "params": {},
       "steps": []
     },
-    "15": {
+    "11": {
       "from": {
         "Module": {
           "id": 10,
@@ -612,7 +546,7 @@
       "params": {},
       "steps": []
     },
-    "16": {
+    "12": {
       "from": {
         "Module": {
           "id": 11,

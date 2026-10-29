@@ -39,8 +39,8 @@ fn last_sample(sidechain: bool) -> f32 {
         ),
     );
     p.modules.insert(3, module("out", &[]));
-    p.cables.insert(1, cable(1, "m1", 2, "in_l"));
-    p.cables.insert(2, cable(2, "left", 3, "left"));
+    p.cables.insert(1, cable(1, "m1", 2, "in"));
+    p.cables.insert(2, cable(2, "out", 3, "in"));
     if sidechain {
         p.cables.insert(3, cable(1, "m1", 2, "sc"));
     }

@@ -10,7 +10,7 @@ fn assert_no_alloc<T>(f: impl FnOnce() -> T) -> T {
 }
 use kabl_modules::builtins::MidiNote;
 use kabl_modules::module::{QualityConfig, QualityTier};
-use kabl_modules::{registry, Module, PortDirection, ProcessIo, Signal};
+use kabl_modules::{registry, Module, ProcessIo, Signal};
 
 #[cfg(debug_assertions)]
 #[global_allocator]
@@ -44,12 +44,8 @@ impl Dut {
         );
         let info = m.info();
         let params = info.params.iter().map(|p| p.default).collect();
-        let n_in = info
-            .ports
-            .iter()
-            .filter(|p| p.direction == PortDirection::Input)
-            .count();
-        let n_out = info.ports.len() - n_in;
+        let n_in = info.slots(kabl_modules::PortDirection::Input);
+        let n_out = info.slots(kabl_modules::PortDirection::Output);
         let mut d = Dut {
             m,
             params,
