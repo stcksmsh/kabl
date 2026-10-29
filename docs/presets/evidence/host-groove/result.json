@@ -16,12 +16,36 @@
   "states_identical_across_save_quit_reopen": true,
   "peak": 0.1374,
   "rms": 0.0239,
-  "restart_relative_difference": 0.0
+  "restart_relative_difference": 1.40205
  },
  "stoop-sale": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1325,
-  "rms": 0.0259,
-  "restart_relative_difference": 0.81461
+  "peak": 0.1623,
+  "rms": 0.0261,
+  "restart_relative_difference": 0.80705
+ },
+ "fault-line": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1604,
+  "rms": 0.0291,
+  "restart_relative_difference": 0.0
+ },
+ "corner-store": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.181,
+  "rms": 0.0303,
+  "restart_relative_difference": 0.0
+ },
+ "glass-coast": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1585,
+  "rms": 0.0273,
+  "restart_relative_difference": 0.0
+ },
+ "still-water": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1016,
+  "rms": 0.0172,
+  "restart_relative_difference": 0.0
  }
 }

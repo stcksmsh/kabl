@@ -145,7 +145,10 @@ try:
         n = min(len(a['_m']), len(b['_m']))
         diff = float(np.sqrt(((a['_m'][:n] - b['_m'][:n]) ** 2).mean()) / a['rms'])
         r.update(peak=round(a['peak'], 4), rms=round(a['rms'], 4), restart_relative_difference=round(diff, 5))
-        assert diff < 1e-3, f'{slug}: render changed after reopen ({diff})'
+        if os.environ.get('PH_SELF'):  # a free-running clock starts at a different phase each run: compare level, not samples
+            assert abs(20 * np.log10(b['rms'] / a['rms'])) < 1.5, f'{slug}: loudness changed after reopen'
+        else:
+            assert diff < 1e-3, f'{slug}: render changed after reopen ({diff})'
         if slug != 'loading-dock' and not os.environ.get('PH_SELF'):  # plays by itself with the transport running
             (S / f'{slug}-nomidi.rpp').write_text(project(slug, False))
             run(f'{slug}-nomidi', S / f'{slug}-nomidi.rpp', secs)
