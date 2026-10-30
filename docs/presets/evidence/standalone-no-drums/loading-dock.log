@@ -1,4 +1,4 @@
-kabl-ui: start kabl-ui 0.1.0 (commit 809c0ac95338) level=INFO log=/secondary/Programming/Github/kabl/.claude/worktrees/fix-flaky-alloc/scratch/presets-standalone/library/logs/kabl.log
+kabl-ui: start kabl-ui 0.1.0 (commit b9695e6dd396+modified) level=INFO log=/secondary/Programming/Github/kabl/.claude/worktrees/fix-flaky-alloc/scratch/presets-standalone/library/logs/kabl.log
 kabl-ui: factory sounds: /secondary/Programming/Github/kabl/.claude/worktrees/fix-flaky-alloc/patches; your sounds: /secondary/Programming/Github/kabl/.claude/worktrees/fix-flaky-alloc/scratch/presets-standalone/library/sounds
 kabl-ui: listening for MIDI on "kabl-player:kabl-player 128:0"
 kabl-ui: backend=Alsa requested rate=None frames=None rt=true

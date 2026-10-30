@@ -1,6 +1,6 @@
 # Factory presets: grooves
 
-Fourth part of the bank (`BRIEF.md`): Groove to 14. Generator: `crates/ui/examples/presets_groove.rs` (same recipe as `presets_pad.rs`: a `Rack`, one function per preset, a `Preset` entry with metadata and a clip phrase). Each preset is a folder under `patches/presets/` and an entry in the `FACTORY` list of `crates/ui/tests/library.rs`. Patches are schema 8 (`Rack::migrated`).
+Fourth part of the bank (`BRIEF.md`): Groove to 15 (14 new grooves plus Loading Dock, moved from the pilot set). Generator: `crates/ui/examples/presets_groove.rs` (same recipe as `presets_pad.rs`: a `Rack`, one function per preset, a `Preset` entry with metadata and a clip phrase). Each preset is a folder under `patches/presets/` and an entry in the `FACTORY` list of `crates/ui/tests/library.rs`. Patches are schema 8 (`Rack::migrated`).
 
 A Groove is a playable, self-running patch: a clock, a `drum.grid` kit (pattern A is the groove, pattern B a fill the grid cues can switch to), a sequenced bass line and, where it suits, a sequenced chord part. **Run starts it.** MIDI plays a third voice over the top (a chord or lead voice that follows the same filter and pump). Space defaults follow the brief; no limiter, level by patch gain.
 
@@ -28,6 +28,8 @@ Signature share: 4 of 14. Each macro is named for what it does for that groove.
 | Dune Buggy | UK garage | 130 / 58 | shuffled two-step with a sub and chopped chords | kick, snare, hats; sub; chords | Swing, Filter, Chop, Space | no | 2 |
 
 Slugs checked against `origin/master`: none of the fourteen exists there.
+
+Loading Dock (filter house, 124 / 28 swing, Sweep, Drive, Wash, Pump) moved here from the pilot set after #62: it keeps its drums (kick, clap, open hats on sequencer lanes, the kick sidechaining the music) and five cues, so it is a Groove that plays itself on Run. Its generator stays in `presets_pilot.rs`; category Groove, clip `clips/loading-dock.*`. That makes 15 grooves.
 
 ## Group 1
 

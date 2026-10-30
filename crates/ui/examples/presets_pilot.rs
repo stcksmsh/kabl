@@ -96,27 +96,6 @@ impl Rack {
         let cable = self.e.connect_route(jack(a, ap), b, param);
         self.e.set_route_amount(cable, amount, true);
     }
-    /// A route whose amount is scaled by macro `mac`: `depth` is the fraction of the knob's travel
-    /// the source sweeps at the macro's maximum.
-    #[allow(clippy::too_many_arguments)]
-    fn depth_route(
-        &mut self,
-        a: ModuleId,
-        ap: &str,
-        b: ModuleId,
-        param: &str,
-        knob: ModuleId,
-        mac: &str,
-        depth: f32,
-    ) {
-        let cable = self.e.connect_route(jack(a, ap), b, param);
-        self.e.set_route_amount(cable, 0.0, true);
-        let d = self
-            .e
-            .connect_cable_route(jack(knob, mac), cable, "amount")
-            .expect("a route has a depth");
-        self.e.set_route_amount(d, depth, true);
-    }
     /// An LFO whose depth is macro 4: the LFO runs through a VCA the macro opens.
     fn motion(&mut self, knob: ModuleId, rate_hz: f32) -> ModuleId {
         let lfo = self.add("lfo", &[("rate_hz", rate_hz)]);
@@ -404,6 +383,16 @@ fn parquet_loop() -> Rack {
     r
 }
 
+/// A sequencer lane for the drums: gates on the given 1-based steps of its 8 (two beats).
+fn drum_lane(r: &mut Rack, on: &[usize]) -> ModuleId {
+    let seq = r.add("seq", &[]);
+    for k in 1..=8 {
+        r.e.set_param(seq, &format!("g{k}"), f32::from(u8::from(on.contains(&k))));
+        r.e.set_param(seq, &format!("v{k}"), 0.9);
+    }
+    seq
+}
+
 // ---- 7. Loading Dock: filter-house piece with cues ------------------------------------------
 
 /// (name, [Sweep, Drive, Wash, Pump] targets, morph in beats, launch time in the clip, s)
@@ -484,10 +473,34 @@ fn loading_dock() -> Rack {
     let riser = r.add("vca", &[("gain", 0.0)]);
     let post = r.add("mixer", &[("level1", 1.0), ("level2", 0.5)]);
     r.next_row();
-    // The pump: no drum is built in. The host clock, divided to the beat, fires a short envelope
-    // that dips the music's gain stage; the Pump macro is the depth.
-    let beat = r.add("clock.div", &[("div", 4.0)]);
-    let duck = r.add("env.adsr", &adsr(1.0, 220.0, 0.0, 50.0));
+    // Real drums (drum.kick and friends): a four-on-the-floor kick, a clap on the 2 and 4 and
+    // open hats on the off-beats, each on a 2-beat sequencer lane. The kick also feeds the
+    // sidechain of the compressor that ducks the music: the Pump macro is that ratio.
+    let kick_seq = drum_lane(&mut r, &[1, 5]);
+    let clap_seq = drum_lane(&mut r, &[5]);
+    let hat_seq = drum_lane(&mut r, &[3, 7]);
+    let kick = r.add(
+        "drum.kick",
+        &[("level_db", -3.0), ("decay_ms", 300.0), ("drive_db", 10.0)],
+    );
+    let clap = r.add("drum.clap", &[("level_db", -9.0)]);
+    let hat = r.add("drum.hat", &[("level_db", -10.0)]);
+    let drums = r.add(
+        "mixer",
+        &[("level1", 0.45), ("level2", 0.2), ("level3", 0.15)],
+    );
+    let duck = r.add(
+        "compressor",
+        &[
+            ("threshold_db", -34.0),
+            ("ratio", 1.0),
+            ("attack_ms", 1.0),
+            ("release_ms", 220.0),
+            ("knee_db", 3.0),
+        ],
+    );
+    let mix_l = r.add("mixer", &[("level1", 1.0), ("level2", 1.0)]);
+    let mix_r = r.add("mixer", &[("level1", 1.0), ("level2", 1.0)]);
     r.next_row();
     let drive = r.add("drive", &[("drive_db", 20.0), ("trim_db", -9.0)]);
     let lad = r.add(
@@ -535,14 +548,26 @@ fn loading_dock() -> Rack {
     r.wire(lad, "out", trim, "in");
     r.wire_both(trim, "out", crush);
     r.stereo(crush, comp);
-    r.wire(clock, "gate", beat, "clock");
-    r.wire(clock, "reset", beat, "reset");
-    r.wire(beat, "gate", duck, "gate");
-    r.depth_route(duck, "out", trim, "gain_db", knob, "m4", -0.25);
+    r.wire(comp, "left", duck, "in_l");
+    r.wire(comp, "right", duck, "in_r");
+    r.wire(kick, "out", duck, "sc");
+    for (seq, voice, gate) in [
+        (kick_seq, kick, "gate"),
+        (clap_seq, clap, "gate"),
+        (hat_seq, hat, "open"),
+    ] {
+        r.wire(clock, "gate", seq, "clock");
+        r.wire(clock, "reset", seq, "reset");
+        r.wire(seq, "gate", voice, gate);
+        r.wire(seq, "velocity", voice, "velocity");
+    }
+    r.wire(kick, "out", drums, "in1");
+    r.wire(clap, "out", drums, "in2");
+    r.wire(hat, "out", drums, "in3");
     let tail = space_tail(
         &mut r,
         knob,
-        comp,
+        duck,
         &[
             ("sync", 3.0),
             ("time_ms", 360.0),
@@ -555,8 +580,16 @@ fn loading_dock() -> Rack {
         1.2,
         0.3,
     );
-    r.out_stereo(tail);
+    // The drums join after the echo and the room, then the output.
+    r.wire(tail, "left", mix_l, "in1");
+    r.wire(tail, "right", mix_r, "in1");
+    r.wire(drums, "out", mix_l, "in2");
+    r.wire(drums, "out", mix_r, "in2");
+    let out = r.add("out", &[]);
+    r.wire(mix_l, "out", out, "left");
+    r.wire(mix_r, "out", out, "right");
 
+    r.route(knob, "m4", duck, "ratio", 0.95);
     r.wire(noise, "out", riser, "in");
     r.wire(riser, "out", post, "in2");
     r.route(knob, "m3", riser, "gain", 0.9);
@@ -1171,9 +1204,9 @@ fn presets() -> Vec<Preset> {
         Preset {
             slug: "loading-dock",
             name: "Loading Dock",
-            category: "Piece",
-            tags: &["sequenced", "cues", "drop", "124bpm", "filter house", "signature"],
-            description: "A self-playing filter-house piece at 124 BPM with swing: a bass and a stab line that duck on every beat through a silent envelope on the host clock (no drum is built in), a resonant filter, a noise riser and a hand-played voice on top. Five cues: Intro (filter shut, dry, silent until Run), Build (the filter opens over three bars as the riser and the wash rise), Gap (everything shut but the wash), Drop (drive and pump at full), Break (back down, wet). Press Run, then launch the cues with the pads or CC 40-44; turn a macro to take over. Sweep opens the filter, Drive pushes the drive and the bitcrusher, Wash brings in the riser, the echo and the room, Pump sets how hard the beat ducks the music.",
+            category: "Groove",
+            tags: &["sequenced", "cues", "drums", "drop", "124bpm", "filter house", "signature"],
+            description: "A self-playing filter-house piece at 124 BPM with swing: a four-on-the-floor kick with a clap and open hats, a bass and a stab line that duck hard to the kick through the compressor sidechain, a resonant filter, a noise riser and a hand-played voice on top. Five cues: Intro (filter shut, dry, silent until Run), Build (the filter opens over three bars as the riser and the wash rise), Gap (everything shut but the wash), Drop (drive and pump at full), Break (back down, wet). Press Run, then launch the cues with the pads or CC 40-44; turn a macro to take over. Sweep opens the filter, Drive pushes the drive and the bitcrusher, Wash brings in the riser, the echo and the room, Pump sets how hard the kick ducks the bass and stabs.",
             listen: "The filter and riser rising through the Build, the gap, the Drop landing with the pump at full, and the Break pulling back to a dark loop.",
             build: loading_dock,
             phrase: drop_phrase,
