@@ -1718,7 +1718,7 @@ fn slab_city() -> Rack {
             ("Room", 0.25),
         ],
         targets: [T::Cutoff(0.5), T::Glide(0.6), T::Hats(1.0)],
-        bpm: 140.4,
+        bpm: 140.0,
         swing: 0.0,
         kit: kit(
             [
@@ -1915,7 +1915,7 @@ fn pinball() -> Rack {
             ("Space", 0.45),
         ],
         targets: [T::Pitch(1.0), T::Tempo(0.4), T::Chords(1.0)],
-        bpm: 120.3,
+        bpm: 120.0,
         swing: 0.0,
         kit: Kit {
             lens: [16.0, 16.0, 13.0, 7.0, 16.0, 9.0],
@@ -2052,7 +2052,7 @@ fn dune_buggy() -> Rack {
             ("Space", 0.30),
         ],
         targets: [T::Swing(0.5), T::Cutoff(0.55), T::Chop(0.8)],
-        bpm: 130.3,
+        bpm: 130.0,
         swing: 33.0,
         kit: kit(
             [

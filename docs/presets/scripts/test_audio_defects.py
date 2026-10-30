@@ -42,6 +42,17 @@ class Detector(unittest.TestCase):
         x[SR:SR + 48] *= np.linspace(0, 1, 48)[:, None]  # 1 ms fade-in
         self.assertNotIn('CLICK', scan(x))
 
+    def test_attack_at_the_start_of_a_window_is_not_a_click(self):
+        # A kick whose short attack begins exactly on a 50 ms window boundary, after a noise
+        # burst: the aligned window holds nothing but the attack and the tail.
+        x = np.zeros((SR * 4, 2))
+        x[SR:2 * SR] = np.random.default_rng(1).uniform(-0.2, 0.2, (SR, 1))
+        n = 3
+        k = 0.5 * np.cos(2 * np.pi * 120 * t[:SR]) * np.exp(-t[:SR] * 20)
+        k[:n] *= 0.5 - 0.5 * np.cos(np.pi * np.arange(n) / n)
+        x[2 * SR:3 * SR] = k[:, None]
+        self.assertNotIn('CLICK', scan(x))
+
     def test_hard_clipped_signal_is_pinned(self):
         x = np.clip(pad() * 6, -0.84, 0.84)
         self.assertIn('PINNED', scan(x))
