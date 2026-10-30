@@ -1,0 +1,30 @@
+{
+ "plugin_sha256": "302562f34e62ba8f694541878ff6f1fa780837ffc4434afe7666ad504bfe37ea",
+ "steel-toe": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1577,
+  "rms": 0.0409,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "rail-yard": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1076,
+  "rms": 0.0226,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "turnstile": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.2227,
+  "rms": 0.0404,
+  "restart_relative_difference": 0.0,
+  "rms_without_midi": 0.0
+ },
+ "loading-dock": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1944,
+  "rms": 0.0235,
+  "restart_relative_difference": 0.0
+ }
+}
