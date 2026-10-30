@@ -103,7 +103,7 @@ Kosta's notes: Pinball "claps too frequent and the tone too high"; Slab City "to
 
 ### Revision 2 after listening (Pinball, Slab City)
 
-Kosta: Pinball "better but still somewhat goofy", Slab City "a bit too goofy again". Three variants of each (a, b, c; 8 s each) are in `docs/presets/clips/groove/group2/variants/` (`<slug>-a/b/c.flac|mp3`, and `<slug>-abc.flac` with a at 0 s, b at 9 s, c at 18 s). Kosta picked Slab City c and Pinball a, which are the committed sounds; `PP_VAR=a|b|c presets_groove write ...` writes another.
+Kosta: Pinball "better but still somewhat goofy", Slab City "a bit too goofy again". Three variants of each (a, b, c; 8 s each) were rendered for Kosta to pick from; the variant clips are not kept. Kosta picked Slab City c and Pinball a, which are the committed sounds; `PP_VAR=a|b|c presets_groove write ...` writes another.
 
 - Slab City: a = root and a fifth late in the bar, straight eighth hats, pad filter 650 Hz, no glide; b = root, root again and a late fifth, pad 500 Hz and quieter, glide 0.12; c = root, root and a minor third, pad 650 Hz with a slow attack, glide 0.25. All: straight eighth-note hats (no triplet stutters, no rolls except two hits at the end of the fill), dark minor notes held long, no 808 slide unless the Glide macro adds it.
 - Pinball: a = few pitches (root and a minor third, fifth and a minor third on the second line), b = one pitch per line (hypnotic; the Pitch macro bends it), c = sine waves, narrow intervals. All: filtered at 650 to 1000 Hz, short decays (80 and 100 ms), the played voice darker (900 Hz) and the clip riff on narrow minor steps.
