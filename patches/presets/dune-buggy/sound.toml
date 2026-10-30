@@ -1,0 +1,11 @@
+name = "Dune Buggy"
+category = "Groove"
+tags = [
+    "swung",
+    "chopped",
+    "garage",
+    "130bpm",
+]
+description = "A UK garage groove: a shuffled two-step kick and snare, ticking hats, a round sub and minor chords chopped into short stabs. Press Run, then play chords over it. Swing sets the shuffle of the 16ths, Filter opens the music, Chop sets how short the chord stabs are, Space adds the echo and the room."
+keys = true
+sequence = true

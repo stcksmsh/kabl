@@ -295,7 +295,7 @@ fn render(state: &kabl_core::PatchState, hits: &[Hit], secs: f32) -> (Vec<f32>, 
     let mut state = state.clone();
     for item in std::env::var("PP_SET").unwrap_or_default().split(',') {
         if let Some((target, v)) = item.split_once('=') {
-            let (kind, param) = target.split_once('.').expect("kind.param");
+            let (kind, param) = target.rsplit_once('.').expect("kind.param");
             for m in state.modules.values_mut().filter(|m| m.kind == kind) {
                 m.params.insert(param.into(), v.parse().expect("number"));
             }
@@ -657,6 +657,8 @@ struct Kit {
     /// Mixer levels: kick, snare, clap, hats.
     mix: [f32; 4],
     snare_decay: f32,
+    /// Steps per row (kick, snare, clap, closed hat, open hat, tom): 16 unless a row is polymetric.
+    lens: [f32; 6],
 }
 
 /// One synth part that plays itself: a sequencer into an oscillator (and a sub) and an amp
@@ -673,6 +675,13 @@ struct Part {
     level: f32,
     /// Low-pass on the part in Hz (0 for none): it keeps the pulse's upper harmonics from ringing.
     lp: f32,
+    /// A slew on the pitch (a glide between notes) and a formant filter on the part.
+    glide: bool,
+    formant: bool,
+    /// Steps the sequencer plays before it wraps (a polymeter against the clock's bar).
+    len: f32,
+    /// Pitch of the second oscillator against the first, semitones (-12: the usual sub).
+    sub_st: f32,
 }
 
 /// Steps from a compact text: note numbers and `-` rests, space separated, 16 entries.
@@ -707,6 +716,18 @@ enum T {
     Bass(f32),
     /// The level of the chord part in the bus.
     Chords(f32),
+    /// The glide time of the bass part (needs `Part::glide`).
+    Glide(f32),
+    /// The vowel of the formant filter on the chord part (needs `Part::formant`).
+    Vowel(f32),
+    /// The tempo of the clock, by this fraction of its travel.
+    Tempo(f32),
+    /// The pitch of both synth parts, fine tune by this fraction of its travel.
+    Pitch(f32),
+    /// The gate length of the chord part.
+    Chop(f32),
+    /// The mix of the chord part's own tempo echo (needs `Spec::dub`).
+    Dub(f32),
 }
 
 struct Spec {
@@ -732,10 +753,21 @@ struct Spec {
     echo: [f32; 3],
     space: [f32; 3],
     trim_db: f32,
+    /// A tempo-synced dotted echo on the chord part alone, at mix 0 until the `Dub` macro.
+    dub: bool,
 }
 
-fn seq_part(r: &mut Rack, clock: ModuleId, p: &Part) -> (ModuleId, &'static str) {
-    let seq = r.add("seq", &[("length", 16.0), ("gate_len", p.gate)]);
+/// What `seq_part` built: where the audio comes out, and the stages a macro can reach.
+struct Built {
+    out: (ModuleId, &'static str),
+    slew: Option<ModuleId>,
+    formant: Option<ModuleId>,
+    seq: ModuleId,
+    osc: ModuleId,
+}
+
+fn seq_part(r: &mut Rack, clock: ModuleId, p: &Part) -> Built {
+    let seq = r.add("seq", &[("length", p.len), ("gate_len", p.gate)]);
     r.wire(clock, "gate", seq, "clock");
     r.wire(clock, "reset", seq, "reset");
     for (k, s) in p.steps.iter().enumerate() {
@@ -759,7 +791,7 @@ fn seq_part(r: &mut Rack, clock: ModuleId, p: &Part) -> (ModuleId, &'static str)
     let sub = r.add(
         "osc.va",
         &[
-            ("base_hz", 261.63 * 2f32.powf(p.osc[4] - 1.0)),
+            ("base_hz", 261.63 * 2f32.powf(p.osc[4] + p.sub_st / 12.0)),
             ("waveform", 3.0),
         ],
     );
@@ -767,20 +799,46 @@ fn seq_part(r: &mut Rack, clock: ModuleId, p: &Part) -> (ModuleId, &'static str)
     let mix = r.add("mixer", &[("level1", 1.0), ("level2", p.sub)]);
     let vca = r.add("vca", &[("gain", 0.0)]);
     let lvl = r.add("gain", &[("gain_db", 20.0 * p.level.max(1e-3).log10())]);
-    r.wire(seq, "pitch", main, "pitch");
-    r.wire(seq, "pitch", sub, "pitch");
+    let slew = p
+        .glide
+        .then(|| r.add("slew", &[("rise_ms", 0.1), ("fall_ms", 0.1)]));
+    match slew {
+        Some(sl) => {
+            r.wire(seq, "pitch", sl, "in");
+            r.wire(sl, "out", main, "pitch");
+            r.wire(sl, "out", sub, "pitch");
+        }
+        None => {
+            r.wire(seq, "pitch", main, "pitch");
+            r.wire(seq, "pitch", sub, "pitch");
+        }
+    }
     r.wire(seq, "gate", env, "gate");
     r.wire(main, "out", mix, "in1");
     r.wire(sub, "out", mix, "in2");
     r.wire(mix, "out", vca, "in");
     r.wire(env, "out", vca, "cv");
     r.wire(vca, "out", lvl, "in");
+    let mut out = (lvl, "out");
+    let mut formant = None;
+    if p.formant {
+        let f = r.add("filter.formant", &[("vowel", 0.0), ("q", 2.0)]);
+        r.wire(out.0, out.1, f, "in");
+        out = (f, "out");
+        formant = Some(f);
+    }
     if p.lp > 0.0 {
         let tone = r.add("filter.svf", &[("cutoff_hz", p.lp), ("resonance", 0.0)]);
-        r.wire(lvl, "out", tone, "in");
-        return (tone, "lp");
+        r.wire(out.0, out.1, tone, "in");
+        out = (tone, "lp");
     }
-    (lvl, "out")
+    Built {
+        out,
+        slew,
+        formant,
+        seq,
+        osc: main,
+    }
 }
 
 fn groove(s: Spec) -> Rack {
@@ -806,10 +864,30 @@ fn groove(s: Spec) -> Rack {
         "mixer",
         &[("level1", 1.0), ("level2", 1.0), ("level3", 1.0)],
     );
-    v.r.wire(bass.0, bass.1, bus, "in1");
-    if let Some(c) = chords {
-        v.r.wire(c.0, c.1, bus, "in2");
-    }
+    v.r.wire(bass.out.0, bass.out.1, bus, "in1");
+    let dub = match (&chords, s.dub) {
+        (Some(c), true) => {
+            let d = v.r.add(
+                "delay",
+                &[
+                    ("sync", 3.0),
+                    ("time_ms", 400.0),
+                    ("feedback", 62.0),
+                    ("mix", 0.0),
+                    ("tone_hz", 1800.0),
+                ],
+            );
+            v.r.wire(c.out.0, c.out.1, d, "in");
+            v.r.wire(clock, "gate", d, "clock");
+            v.r.wire(d, "left", bus, "in2");
+            Some(d)
+        }
+        (Some(c), false) => {
+            v.r.wire(c.out.0, c.out.1, bus, "in2");
+            None
+        }
+        _ => None,
+    };
     v.r.wire(v.mono, "out", bus, "in3");
     if s.targets.iter().any(|t| matches!(t, T::Dust(_))) {
         let hiss = v.r.add("noise", &[("color", 1.0)]);
@@ -836,7 +914,7 @@ fn groove(s: Spec) -> Rack {
     let crush = s.crush.then(|| {
         v.mono_after(
             "bitcrusher",
-            &[("bits", 5.0), ("downsample", 6.0), ("mix", 0.0)],
+            &[("bits", 4.0), ("downsample", 10.0), ("mix", 0.0)],
         )
     });
     let fx = s.fx.map(|kind| match kind {
@@ -872,6 +950,8 @@ fn groove(s: Spec) -> Rack {
     v.r.wire(clock, "gate", grid, "clock");
     v.r.wire(clock, "reset", grid, "reset");
     for (row, (a, b)) in k.a.iter().zip(&k.b).enumerate() {
+        v.r.e
+            .set_param(grid, &format!("len{}", row + 1), k.lens[row]);
         grid_row(&mut v.r, grid, 0, row, a);
         grid_row(&mut v.r, grid, 1, row, b);
     }
@@ -916,6 +996,7 @@ fn groove(s: Spec) -> Rack {
     // The macros.
     for (i, t) in s.targets.iter().enumerate() {
         let m = format!("m{}", i + 1);
+        let stored = s.macros[i].1;
         match *t {
             T::Cutoff(a) => v.r.route(v.knob, &m, lad, "cutoff_hz", a),
             T::Dirt(a) => v.r.route(v.knob, &m, drive, "drive_db", a),
@@ -934,7 +1015,42 @@ fn groove(s: Spec) -> Rack {
                 v.r.e.set_param(bus, "level1", 0.4);
                 v.r.route(v.knob, &m, bus, "level1", 0.6 * a)
             }
-            T::Chords(a) => v.r.route(v.knob, &m, bus, "level2", a),
+            T::Chords(a) => {
+                v.r.e.set_param(bus, "level2", 0.3);
+                v.r.route(v.knob, &m, bus, "level2", 0.7 * a)
+            }
+            T::Glide(a) => {
+                let sl = bass.slew.expect("a glide part");
+                v.r.route(v.knob, &m, sl, "rise_ms", a);
+                v.r.route(v.knob, &m, sl, "fall_ms", a)
+            }
+            T::Vowel(a) => {
+                let f = chords
+                    .as_ref()
+                    .and_then(|c| c.formant)
+                    .expect("a formant part");
+                v.r.route(v.knob, &m, f, "vowel", a)
+            }
+            // The route adds `a * macro * travel` to the base, so the base is set that far below the
+            // designed value and the stored macro lands on it (280 bpm, 200 ct and 99 % of travel).
+            T::Tempo(a) => {
+                v.r.e.set_param(clock, "bpm", s.bpm - a * stored * 280.0);
+                v.r.route(v.knob, &m, clock, "bpm", a)
+            }
+            T::Pitch(a) => {
+                for o in std::iter::once(bass.osc).chain(chords.as_ref().map(|c| c.osc)) {
+                    v.r.e.set_param(o, "fine", -a * stored * 200.0);
+                    v.r.route(v.knob, &m, o, "fine", a)
+                }
+            }
+            T::Chop(a) => {
+                let c = chords.as_ref().expect("a chord part");
+                let gate = s.chords.as_ref().expect("a chord part").gate;
+                v.r.e.set_param(c.seq, "gate_mode", 1.0);
+                v.r.e.set_param(c.seq, "gate_len", gate - a * stored * 99.0);
+                v.r.route(v.knob, &m, c.seq, "gate_len", a)
+            }
+            T::Dub(a) => v.r.route(v.knob, &m, dub.expect("a dub echo"), "mix", a),
         }
     }
     let echo = [
@@ -1000,6 +1116,7 @@ fn kit(
         levels,
         mix,
         snare_decay: 220.0,
+        lens: [16.0; 6],
     }
 }
 
@@ -1012,12 +1129,32 @@ fn part(text: &str, osc: [f32; 5], sub: f32, gate: f32, env: [f32; 4], level: f3
         env,
         level,
         lp: 0.0,
+        glide: false,
+        formant: false,
+        len: 16.0,
+        sub_st: -12.0,
     }
 }
 
 impl Part {
     fn lp(mut self, hz: f32) -> Self {
         self.lp = hz;
+        self
+    }
+    fn len(mut self, steps: f32) -> Self {
+        self.len = steps;
+        self
+    }
+    fn sub_at(mut self, semitones: f32) -> Self {
+        self.sub_st = semitones;
+        self
+    }
+    fn glide(mut self) -> Self {
+        self.glide = true;
+        self
+    }
+    fn formant(mut self) -> Self {
+        self.formant = true;
         self
     }
 }
@@ -1085,6 +1222,7 @@ fn copper_mile() -> Rack {
         echo: [0.0, 25.0, 3000.0],
         space: [0.2, 0.4, 0.15],
         trim_db: 0.0,
+        dub: false,
     })
 }
 
@@ -1138,6 +1276,7 @@ fn brick_dust() -> Rack {
         echo: [90.0, 15.0, 3000.0],
         space: [0.15, 0.25, 0.1],
         trim_db: -4.5,
+        dub: false,
     })
 }
 
@@ -1198,6 +1337,7 @@ fn ore_cart() -> Rack {
         echo: [0.0, 40.0, 2500.0],
         space: [0.3, 1.2, 0.2],
         trim_db: 0.0,
+        dub: false,
     })
 }
 
@@ -1258,6 +1398,7 @@ fn stoop_sale() -> Rack {
         echo: [0.0, 25.0, 2800.0],
         space: [0.3, 0.8, 0.2],
         trim_db: -4.0,
+        dub: false,
     })
 }
 
@@ -1311,6 +1452,7 @@ fn fault_line() -> Rack {
         echo: [0.0, 30.0, 3000.0],
         space: [0.25, 0.8, 0.2],
         trim_db: -2.0,
+        dub: false,
     })
 }
 
@@ -1374,6 +1516,7 @@ fn corner_store() -> Rack {
         echo: [0.0, 20.0, 3000.0],
         space: [0.15, 0.3, 0.12],
         trim_db: 0.0,
+        dub: false,
     })
 }
 
@@ -1440,6 +1583,7 @@ fn glass_coast() -> Rack {
         echo: [0.0, 52.0, 2800.0],
         space: [0.55, 3.2, 0.42],
         trim_db: -1.0,
+        dub: false,
     })
 }
 
@@ -1500,6 +1644,395 @@ fn still_water() -> Rack {
         echo: [0.0, 55.0, 2500.0],
         space: [0.5, 5.0, 0.45],
         trim_db: -11.0,
+        dub: false,
+    })
+}
+
+// ---- group 2 --------------------------------------------------------------------------------
+
+fn slab_city() -> Rack {
+    groove(Spec {
+        macros: [
+            ("Tone", 0.55),
+            ("Glide", 0.30),
+            ("Hats", 0.60),
+            ("Room", 0.25),
+        ],
+        targets: [T::Cutoff(0.5), T::Glide(0.6), T::Hats(1.0)],
+        bpm: 140.3,
+        swing: 0.0,
+        kit: kit(
+            [
+                "X.....x...X.....",
+                NONE,
+                "........X.......",
+                "X.x.X.xxXxX?x.X?",
+                "..............o.",
+                NONE,
+            ],
+            [
+                "X.....x...X..X.X",
+                "........X.......",
+                "........X...XXXX",
+                "XxxxXxxxX.XxxxXx",
+                NONE,
+                "..........X.X.XX",
+            ],
+            [-4.0, 160.0, 4.0],
+            [-8.0, -7.0, -11.0, 0.0],
+            [0.32, 0.0, 0.4, 0.5],
+        ),
+        bass: part(
+            "0 - - - - - 5 - - - 3 - - - - -",
+            [0.0, 1.0, 8.0, 50.0, -2.0],
+            0.0,
+            100.0,
+            [2.0, 700.0, 0.35, 140.0],
+            0.6,
+        )
+        .glide(),
+        chords: None,
+        play: [1.0, 0.0, 0.5],
+        drive: [9.0, -4.0],
+        filter: [1000.0, 0.15],
+        fx: None,
+        crush: false,
+        comp: [-24.0, 3.0, 3.0],
+        echo: [0.0, 25.0, 2800.0],
+        space: [0.15, 0.5, 0.15],
+        trim_db: 0.0,
+        dub: false,
+    })
+}
+
+fn rope_walk() -> Rack {
+    groove(Spec {
+        macros: [
+            ("Filter", 0.55),
+            ("Phase", 0.55),
+            ("Pump", 0.60),
+            ("Room", 0.25),
+        ],
+        targets: [T::Cutoff(0.6), T::Fx(0.9), T::Pump],
+        bpm: 118.0,
+        swing: 30.0,
+        kit: kit(
+            [
+                FLOOR,
+                NONE,
+                BACKBEAT,
+                "x.o.x.o.x.o.x.o.",
+                "..X...X...X...X.",
+                NONE,
+            ],
+            [
+                "X...X...X...X.X.",
+                NONE,
+                "....X.......XXXX",
+                "x.o.x.o.x.o.x.o.",
+                "..X...X...X.....",
+                "..........X.X.XX",
+            ],
+            [-3.0, 230.0, 6.0],
+            [-8.0, -9.0, -11.0, -6.0],
+            [0.5, 0.3, 0.3, 0.18],
+        ),
+        bass: part(
+            "0 - 12 12 0 - 12 - 3 - 15 15 3 - 15 -",
+            [2.0, 1.0, 8.0, 50.0, -2.0],
+            0.5,
+            65.0,
+            [2.0, 170.0, 0.7, 40.0],
+            0.7,
+        ),
+        chords: Some(
+            part(
+                "- - 7 - - - 7 7 - - 10 - - - 12 -",
+                [2.0, 3.0, 14.0, 50.0, -1.0],
+                0.0,
+                40.0,
+                [1.0, 160.0, 0.0, 60.0],
+                0.5,
+            )
+            .lp(2000.0),
+        ),
+        play: [2.0, 0.0, 0.5],
+        drive: [5.0, -2.5],
+        filter: [1500.0, 0.25],
+        fx: Some("phaser"),
+        crush: false,
+        comp: [-24.0, 4.0, 5.5],
+        echo: [0.0, 25.0, 3000.0],
+        space: [0.2, 0.4, 0.15],
+        trim_db: 1.0,
+        dub: false,
+    })
+}
+
+fn lamp_oil() -> Rack {
+    groove(Spec {
+        macros: [
+            ("Chord", 0.70),
+            ("Dub", 0.50),
+            ("Filter", 0.50),
+            ("Space", 0.50),
+        ],
+        targets: [T::Chords(1.0), T::Dub(0.7), T::Cutoff(0.6)],
+        bpm: 124.0,
+        swing: 0.0,
+        kit: Kit {
+            snare_decay: 70.0,
+            ..kit(
+                [
+                    "X...X...X...X...",
+                    "..x.......x.....",
+                    NONE,
+                    "..o...o...o...o.",
+                    NONE,
+                    NONE,
+                ],
+                [
+                    "X...X...X...X.X.",
+                    "..x.......x...x.",
+                    NONE,
+                    "..o...o...o.o.o.",
+                    NONE,
+                    "..........X.....",
+                ],
+                [-4.0, 280.0, 3.0],
+                [-10.0, -9.0, -13.0, -6.0],
+                [0.45, 0.28, 0.0, 0.18],
+            )
+        },
+        bass: part(
+            "0 - - - - - - - - - - - 0 - 3 -",
+            [0.0, 1.0, 6.0, 50.0, -2.0],
+            0.0,
+            95.0,
+            [6.0, 500.0, 0.8, 200.0],
+            0.9,
+        ),
+        chords: Some(
+            part(
+                "- - 0 - - - - - - - - - 3 - - -",
+                [2.0, 3.0, 12.0, 50.0, -1.0],
+                0.55,
+                25.0,
+                [3.0, 220.0, 0.0, 110.0],
+                0.55,
+            )
+            .sub_at(7.0)
+            .lp(1000.0),
+        ),
+        play: [1.0, 0.0, 0.5],
+        drive: [2.0, -1.0],
+        filter: [1400.0, 0.15],
+        fx: None,
+        crush: false,
+        comp: [-24.0, 3.0, 3.0],
+        echo: [0.0, 55.0, 2200.0],
+        space: [0.45, 4.0, 0.32],
+        trim_db: -2.0,
+        dub: true,
+    })
+}
+
+fn pinball() -> Rack {
+    groove(Spec {
+        macros: [
+            ("Pitch", 0.50),
+            ("Tempo", 0.50),
+            ("Bleep", 0.60),
+            ("Space", 0.45),
+        ],
+        targets: [T::Pitch(1.0), T::Tempo(0.4), T::Chords(1.0)],
+        bpm: 120.3,
+        swing: 0.0,
+        kit: Kit {
+            lens: [16.0, 16.0, 5.0, 7.0, 16.0, 9.0],
+            ..kit(
+                [
+                    NONE,
+                    NONE,
+                    "x.o.x...........",
+                    "x.x.o.x.........",
+                    NONE,
+                    "x..o..x.o.......",
+                ],
+                [
+                    NONE,
+                    NONE,
+                    "xxo.x...........",
+                    "x.xxo.x.........",
+                    NONE,
+                    "x.xo.xx.o.......",
+                ],
+                [-6.0, 200.0, 0.0],
+                [-8.0, -9.0, -12.0, -5.0],
+                [0.0, 0.0, 0.4, 0.3],
+            )
+        },
+        bass: part(
+            "0 7 3 - 10 - - - - - - - - - - -",
+            [3.0, 1.0, 8.0, 25.0, 0.0],
+            0.0,
+            35.0,
+            [1.0, 90.0, 0.0, 30.0],
+            0.7,
+        )
+        .len(5.0)
+        .lp(2400.0),
+        chords: Some(
+            part(
+                "12 5 - 8 15 - 3 - - - - - - - - -",
+                [1.0, 1.0, 8.0, 50.0, 1.0],
+                0.0,
+                40.0,
+                [1.0, 120.0, 0.0, 40.0],
+                0.6,
+            )
+            .len(7.0)
+            .lp(2000.0),
+        ),
+        play: [1.0, 1.0, 0.5],
+        drive: [2.0, -1.0],
+        filter: [3000.0, 0.15],
+        fx: None,
+        crush: false,
+        comp: [-22.0, 2.0, 2.0],
+        echo: [0.0, 50.0, 2800.0],
+        space: [0.5, 2.2, 0.35],
+        trim_db: -1.5,
+        dub: false,
+    })
+}
+
+fn scrap_metal() -> Rack {
+    groove(Spec {
+        macros: [
+            ("Vowel", 0.50),
+            ("Crush", 0.30),
+            ("Pump", 0.60),
+            ("Room", 0.30),
+        ],
+        targets: [T::Vowel(1.0), T::Crush(0.8), T::Pump],
+        bpm: 128.0,
+        swing: 20.0,
+        kit: kit(
+            [
+                "X.....X..X..X...",
+                "....X.......X...",
+                "....X.......X..!",
+                "x.x.x.x.x.x.x.x.",
+                "..X...X...X...X.",
+                NONE,
+            ],
+            [
+                "X.....X..X..X.XX",
+                "....X.......XXXX",
+                "....X.......X.X.",
+                "x.x.x.x.xxx.xxxx",
+                "..X...X...X.....",
+                "..........X.X.XX",
+            ],
+            [-3.0, 190.0, 8.0],
+            [-8.0, -9.0, -11.0, -6.0],
+            [0.5, 0.3, 0.3, 0.2],
+        ),
+        bass: part(
+            "0 - 0 - - 0 - - 5 - 5 - - 3 - -",
+            [2.0, 2.0, 8.0, 50.0, -2.0],
+            0.5,
+            60.0,
+            [1.0, 150.0, 0.7, 40.0],
+            0.8,
+        ),
+        chords: Some(
+            part(
+                "- - 0 - - 0 - 0 - - 7 - - 3 - -",
+                [2.0, 2.0, 12.0, 50.0, -1.0],
+                0.0,
+                50.0,
+                [1.0, 130.0, 0.4, 40.0],
+                0.7,
+            )
+            .formant()
+            .lp(2400.0),
+        ),
+        play: [2.0, 0.0, 0.5],
+        drive: [10.0, -6.0],
+        filter: [1200.0, 0.30],
+        fx: None,
+        crush: true,
+        comp: [-24.0, 6.0, 5.5],
+        echo: [90.0, 20.0, 2800.0],
+        space: [0.3, 0.5, 0.2],
+        trim_db: -1.0,
+        dub: false,
+    })
+}
+
+fn dune_buggy() -> Rack {
+    groove(Spec {
+        macros: [
+            ("Swing", 0.50),
+            ("Filter", 0.55),
+            ("Chop", 0.50),
+            ("Space", 0.30),
+        ],
+        targets: [T::Swing(0.5), T::Cutoff(0.55), T::Chop(0.8)],
+        bpm: 130.3,
+        swing: 33.0,
+        kit: kit(
+            [
+                "X.......X.X.....",
+                "....X.......X...",
+                NONE,
+                "x.x.x.x.x.x.x.x.",
+                "......X.......X.",
+                NONE,
+            ],
+            [
+                "X.......X.X...XX",
+                "....X.......X.XX",
+                NONE,
+                "x.x.x.xxx.x.x.x.",
+                "......X.......X.",
+                "..........X.X.XX",
+            ],
+            [-3.0, 200.0, 4.0],
+            [-7.0, -9.0, -11.0, -6.0],
+            [0.5, 0.4, 0.0, 0.2],
+        ),
+        bass: part(
+            "0 - - - - - 0 - - - 5 - - - - 3",
+            [0.0, 1.0, 8.0, 50.0, -2.0],
+            0.0,
+            90.0,
+            [2.0, 300.0, 0.7, 60.0],
+            0.9,
+        ),
+        chords: Some(
+            part(
+                "- - 0 - 3 - - 0 - - - 7 - - 10 -",
+                [2.0, 2.0, 10.0, 50.0, -1.0],
+                0.0,
+                50.0,
+                [1.0, 130.0, 0.4, 30.0],
+                0.55,
+            )
+            .lp(2000.0),
+        ),
+        play: [2.0, 0.0, 0.5],
+        drive: [3.0, -1.5],
+        filter: [1700.0, 0.15],
+        fx: None,
+        crush: false,
+        comp: [-22.0, 3.0, 3.0],
+        echo: [0.0, 25.0, 2800.0],
+        space: [0.3, 1.0, 0.2],
+        trim_db: -1.0,
+        dub: false,
     })
 }
 
@@ -1610,6 +2143,80 @@ phrase!(
     ]
 );
 
+phrase!(
+    slab_phrase,
+    140.0,
+    [
+        (0.0, 1.5, 63),
+        (0.0, 1.5, 66),
+        (2.0, 1.5, 61),
+        (2.0, 1.5, 65),
+        (4.0, 3.0, 58),
+        (4.0, 3.0, 63)
+    ]
+);
+phrase!(
+    rope_phrase,
+    118.0,
+    [
+        (1.0, 0.5, 65),
+        (1.5, 0.5, 68),
+        (3.0, 0.5, 72),
+        (5.0, 1.0, 65),
+        (7.0, 0.5, 63)
+    ]
+);
+phrase!(
+    lamp_phrase,
+    124.0,
+    [
+        (0.0, 3.0, 60),
+        (0.0, 3.0, 63),
+        (0.0, 3.0, 67),
+        (4.0, 3.0, 58),
+        (4.0, 3.0, 62),
+        (4.0, 3.0, 65)
+    ]
+);
+phrase!(
+    pinball_phrase,
+    120.0,
+    [
+        (0.0, 0.5, 72),
+        (0.5, 0.5, 79),
+        (1.5, 0.5, 75),
+        (3.0, 0.5, 82),
+        (4.0, 0.5, 70),
+        (5.5, 0.5, 77)
+    ]
+);
+phrase!(
+    scrap_phrase,
+    128.0,
+    [
+        (1.0, 0.5, 55),
+        (2.0, 0.5, 58),
+        (3.5, 0.5, 55),
+        (5.0, 1.0, 62),
+        (7.0, 0.5, 58)
+    ]
+);
+phrase!(
+    dune_phrase,
+    130.0,
+    [
+        (0.0, 1.0, 60),
+        (0.0, 1.0, 64),
+        (0.0, 1.0, 67),
+        (2.5, 0.5, 62),
+        (2.5, 0.5, 65),
+        (2.5, 0.5, 69),
+        (4.0, 2.0, 59),
+        (4.0, 2.0, 62),
+        (4.0, 2.0, 67)
+    ]
+);
+
 fn presets() -> Vec<Preset> {
     let p = |slug,
              name,
@@ -1629,6 +2236,17 @@ fn presets() -> Vec<Preset> {
         group: 1,
         phrase,
         secs,
+    };
+    let q = |slug,
+             name,
+             tags,
+             description,
+             listen,
+             build: fn() -> Rack,
+             phrase: fn() -> Vec<Hit>,
+             secs| Preset {
+        group: 2,
+        ..p(slug, name, tags, description, listen, build, phrase, secs)
     };
     vec![
         p("copper-mile", "Copper Mile", &["phased", "pumping", "french touch", "123bpm", "signature"],
@@ -1655,7 +2273,27 @@ fn presets() -> Vec<Preset> {
         p("still-water", "Still Water", &["slow", "sparse", "ambient", "68bpm"],
             "A sparse ambient groove: a soft kick, a few random hats and toms, a slow bass and bell-like chords with long tails. Press Run, then play slow chords over it. Bloom opens the music, Pulse raises the hats and drops, Weight raises the bass, Space adds the long echo and room.",
             "Rare, soft hits that never repeat exactly; Pulse up for more of them, Space up for a long tail.", still_water, still_phrase, 24.0),
-    ]
+    ].into_iter().chain([
+        q("slab-city", "Slab City", &["glide", "808", "trap", "140bpm"],
+            "A half-time trap loop: a short kick and a clap on the third beat, rolling hats with some left to chance, and a sliding sine 808 under them. Press Run, then play minor chords over it. Tone opens the music, Glide sets how long the 808 slides between notes, Hats raises the hats, Room adds a short echo and a tight room.",
+            "The 808 sliding between its notes; Glide up for longer slides, Hats up for busier rolls.", slab_city, slab_phrase, 16.0),
+        q("rope-walk", "Rope Walk", &["phased", "pumping", "french touch", "118bpm", "signature"],
+            "A disco loop for French touch: an octave-jumping bass walking up in steps, syncopated saw stabs through a phaser, a four-on-the-floor kick and a clap, all ducked by the kick. Press Run, then play stabs on top. Filter opens the loop like a DJ knob, Phase brings in the phaser, Pump sets how hard the kick ducks the music, Room adds a tempo-synced echo and a tight room.",
+            "The octave bass walking under the stabs; Phase up for swirl, Pump up for a harder duck.", rope_walk, rope_phrase, 18.0),
+        q("lamp-oil", "Lamp Oil", &["dub", "echo", "dub techno", "124bpm"],
+            "A dub techno loop: a soft kick, a rim click, a deep sine sub and a muted chord stab thrown into a long dotted echo. Press Run, then play chords over it. Chord sets the level of the stab, Dub feeds more of it to its own tempo echo, Filter opens the music, Space adds the long echo and the room.",
+            "The chord stab repeating into the dark; Dub up for a longer tail, Chord up for a louder stab.", lamp_oil, lamp_phrase, 16.0),
+        q("pinball", "Pinball", &["polymeter", "bleeps", "modular", "120bpm"],
+            "A polymetric bleep machine: two sequencers of five and seven steps drift against a clap, a hat and a tom of five, seven and nine steps, so the pattern only repeats after many bars. Press Run, then play notes over it. Pitch tunes the bleeps, Tempo speeds the whole machine up and down, Bleep raises the second bleep line, Space adds the echo and the room.",
+            "The five-, seven- and nine-step lines drifting apart; Tempo up to speed them, Pitch to bend the bleeps.", pinball, pinball_phrase, 16.0),
+        q("scrap-metal", "Scrap Metal", &["formant", "crushed", "electro", "french touch", "128bpm", "signature"],
+            "A robot stomp: a hard-driven bass, a stab that talks through a vowel filter, a tight kick, snare and clap, crushed and compressed until it pumps. Press Run, then play lines on top. Vowel morphs the stab from a to u, Crush brings in the bitcrusher, Pump sets how hard the kick ducks the music, Room adds a slapback and a tight room.",
+            "The stab changing vowel; Crush up for grit, Vowel to open and close the mouth.", scrap_metal, scrap_phrase, 16.0),
+        q("dune-buggy", "Dune Buggy", &["swung", "chopped", "garage", "130bpm"],
+            "A UK garage groove: a shuffled two-step kick and snare, ticking hats, a round sub and minor chords chopped into short stabs. Press Run, then play chords over it. Swing sets the shuffle of the 16ths, Filter opens the music, Chop sets how short the chord stabs are, Space adds the echo and the room.",
+            "The shuffled hats and chopped chords; Swing up for more skip, Chop down for shorter stabs.", dune_buggy, dune_phrase, 16.0),
+    ])
+    .collect()
 }
 
 /// Peak and loudness (dBFS) of the clip phrase.
