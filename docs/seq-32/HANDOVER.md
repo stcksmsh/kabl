@@ -12,7 +12,7 @@ Lint + full tests (debug), draft PR (overseer opens if denied), `cargo clean`, c
 
 ## Done
 
-Nothing coded yet: only investigation (below). Branch exists locally, clean.
+Lane rule done (Kosta decided: no per-step seq param is ever a lane target; `seq::is_step_param` + guard in `automation::resolve` + test). No shipped patch/fixture/golden targets a seq lane (checked docs evidence JSON, host_tests, composite fixture). Stored `length` is 16 in 14 groove logs, 8 in 2: raising max to 32 makes 9-16 silent until step 6 restores them. Engine/UI/generators still todo.
 
 ## Facts found
 
@@ -30,7 +30,7 @@ Nothing coded yet: only investigation (below). Branch exists locally, clean.
 
 ## Working assumptions / open
 
-- Steps 9-32 hidden from automation, no ask needed (overseer add-on). Report host param count before/after (18 / 18).
+- Decided: ALL per-step params hidden from lanes. Host count stays 18.
 - Exposing 32 steps per pattern to the host: NOT doing it.
 
 ## Standing rules

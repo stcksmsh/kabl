@@ -279,6 +279,16 @@ pub fn bank_of(name: &str) -> Option<(usize, usize)> {
         .map(|slot| (bank, slot))
 }
 
+/// True for a per-step value (`p3`, `c.v12`, `k32`): patch data, never a host automation target.
+/// Module-wide and per-bank controls (`length`, `transpose`, `gate_len`, `gate_mode`) are not steps.
+pub fn is_step_param(name: &str) -> bool {
+    let bare = name.split_once('.').map_or(name, |(_, rest)| rest);
+    let mut chars = bare.chars();
+    matches!(chars.next(), Some('p' | 'g' | 'v' | 'r' | 'k'))
+        && !chars.as_str().is_empty()
+        && chars.all(|c| c.is_ascii_digit())
+}
+
 /// The same slot's param name in `bank`.
 pub fn bank_param(bank: usize, slot: usize) -> &'static str {
     PARAMS[param_index(bank, slot)].name
