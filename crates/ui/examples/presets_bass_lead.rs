@@ -298,7 +298,7 @@ fn tail_phrase() -> Vec<Hit> {
 }
 
 fn rail_phrase() -> Vec<Hit> {
-    // Off-beat notes over the grid's kick, which Run starts at 0.5 s.
+    // Off-beat notes over the duck, which Run starts at 0.5 s.
     let bar = [(2, 40, 1.5), (6, 40, 1.5), (10, 40, 1.5), (14, 43, 1.5)];
     later(0.5, steps(&bars(&bar, &[&[], &[(3, 45)], &[], &[(3, 47)]])))
 }
@@ -833,17 +833,18 @@ fn echo(time_ms: f32, feedback: f32, tone_hz: f32) -> [(&'static str, f32); 4] {
 
 // ---- group 1 --------------------------------------------------------------------------------
 
-/// A kick lane on the 16th grid: gates on `on` of the eight steps over two beats.
-fn drum_lane(r: &mut Rack, on: &[usize]) -> ModuleId {
-    let seq = r.add("seq", &[]);
-    for k in 1..=8 {
-        r.e.set_param(seq, &format!("g{k}"), f32::from(u8::from(on.contains(&k))));
-        r.e.set_param(seq, &format!("v{k}"), 0.9);
-    }
-    seq
+/// A silent beat duck from the host clock: `clock.div` into a fast-decay `env.adsr` that pulls the
+/// voice's gain stage down, depth on macro 3. No drum is built in; it stays still until Run.
+fn clock_duck(v: &mut Voice, clock: ModuleId, decay_ms: f32, depth: f32) {
+    let beat = v.r.add("clock.div", &[("div", 4.0)]);
+    v.r.wire(clock, "gate", beat, "clock");
+    v.r.wire(clock, "reset", beat, "reset");
+    let env = v.r.add("env.adsr", &adsr(3.0, decay_ms, 0.0, 50.0));
+    v.r.wire(beat, "gate", env, "gate");
+    v.r.depth_route(env, "out", v.mono, "gain_db", v.knob, "m3", depth);
 }
 
-/// Steel Toe: a blunt compressed bass that a four-on-the-floor kick ducks through a sidechain.
+/// Steel Toe: a blunt compressed bass that ducks on every beat of the host clock.
 fn steel_toe() -> Rack {
     let mut v = Voice::new(Recipe {
         bass: true,
@@ -860,42 +861,16 @@ fn steel_toe() -> Rack {
         fenv: [1.0, 140.0, 0.12, 70.0],
         fenv_amt: 0.22,
         wheel_amt: 0.25,
-        aenv: [1.0, 180.0, 0.8, 45.0],
+        aenv: [2.0, 180.0, 0.8, 45.0],
         trim_db: 11.0,
     });
     v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.5);
     v.r.route(v.knob, "m2", v.drive, "drive_db", 0.35);
     v.stage("compressor", &compressor(-26.0, 6.0, 2.0, 90.0, 13.0));
     let clock = v.r.add("clock", &[("bpm", 124.0), ("swing", 25.0)]);
-    let duck = v.stage(
-        "compressor",
-        &[
-            ("threshold_db", -34.0),
-            ("ratio", 1.0),
-            ("attack_ms", 1.0),
-            ("release_ms", 200.0),
-            ("knee_db", 3.0),
-        ],
-    );
-    v.r.route(v.knob, "m3", duck, "ratio", 0.95);
-    // The kick on every beat; it feeds the duck and joins after the tail, so it is not ducked.
-    let lane = drum_lane(&mut v.r, &[1, 5]);
-    let kick = v.r.add(
-        "drum.kick",
-        &[("level_db", -3.0), ("decay_ms", 280.0), ("drive_db", 10.0)],
-    );
-    v.r.wire(clock, "gate", lane, "clock");
-    v.r.wire(clock, "reset", lane, "reset");
-    v.r.wire(lane, "gate", kick, "gate");
-    v.r.wire(lane, "velocity", kick, "velocity");
-    v.r.wire(kick, "out", duck, "sc");
-    let beat = v.r.add("mixer", &[("level1", 0.45)]);
-    v.r.wire(kick, "out", beat, "in1");
-    finish_drums(
-        v,
-        duck,
-        clock,
-        beat,
+    clock_duck(&mut v, clock, 200.0, -0.30);
+    v.finish(
+        "m4",
         &[
             ("sync", 3.0),
             ("time_ms", 360.0),
@@ -903,41 +878,10 @@ fn steel_toe() -> Rack {
             ("mix", 0.0),
             ("tone_hz", 3500.0),
         ],
-        (0.22, 0.45, 0.16),
-    )
-}
-
-/// The tail of a bass that plays with a drum bus: echo and room on macro 4, the drum bus joined
-/// after them (so the drums are not ducked by their own kick), the output.
-fn finish_drums(
-    mut v: Voice,
-    duck: ModuleId,
-    clock: ModuleId,
-    beat: ModuleId,
-    echo: &[(&str, f32)],
-    (echo_max, decay, room_max): (f32, f32, f32),
-) -> Rack {
-    let tail = space_tail(
-        &mut v.r,
-        v.knob,
-        duck,
-        echo,
+        0.22,
+        (0.45, 0.16),
         Some(clock),
-        echo_max,
-        decay,
-        room_max,
-        "m4",
-    );
-    let (mix_l, mix_r) = (v.r.add("mixer", &[]), v.r.add("mixer", &[]));
-    for (mix, side) in [(mix_l, "left"), (mix_r, "right")] {
-        v.r.wire(tail, side, mix, "in1");
-        v.r.wire(beat, "out", mix, "in2");
-    }
-    let out = v.r.add("out", &[]);
-    v.r.wire(mix_l, "out", out, "left");
-    v.r.wire(mix_r, "out", out, "right");
-    perform(&mut v.r, v.knob, v.n, Some(clock));
-    v.r
+    )
 }
 
 /// Tar Pit: a trap 808, a sine with a pitch snap and a long body, sliding between notes.
@@ -1348,7 +1292,7 @@ fn tail_light() -> Rack {
     v.finish("m4", &echo(352.0, 38.0, 4000.0), 0.3, (1.8, 0.3), None)
 }
 
-/// Rail Yard: a house bass ducked by its own drum grid (kick, clap, hats); press Run.
+/// Rail Yard: a house bass that ducks on every beat of the host clock; press Run.
 fn rail_yard() -> Rack {
     let mut v = Voice::new(Recipe {
         bass: true,
@@ -1372,43 +1316,9 @@ fn rail_yard() -> Rack {
     v.r.route(v.knob, "m2", v.drive, "drive_db", 0.4);
     v.stage("compressor", &compressor(-24.0, 4.0, 3.0, 90.0, 6.0));
     let clock = v.r.add("clock", &[("bpm", 124.0), ("swing", 20.0)]);
-    let duck = v.stage(
-        "compressor",
-        &[
-            ("threshold_db", -34.0),
-            ("ratio", 1.0),
-            ("attack_ms", 1.0),
-            ("release_ms", 200.0),
-            ("knee_db", 3.0),
-        ],
-    );
-    v.r.route(v.knob, "m3", duck, "ratio", 0.95);
-    // The drum grid plays its default beat: kick, clap and closed hat.
-    let grid = v.r.add("drum.grid", &[]);
-    v.r.wire(clock, "gate", grid, "clock");
-    v.r.wire(clock, "reset", grid, "reset");
-    let kick = v.r.add(
-        "drum.kick",
-        &[("level_db", -3.0), ("decay_ms", 260.0), ("drive_db", 6.0)],
-    );
-    let clap = v.r.add("drum.clap", &[("level_db", -9.0)]);
-    let hat = v.r.add("drum.hat", &[("level_db", -11.0)]);
-    v.r.wire(grid, "kick", kick, "gate");
-    v.r.wire(grid, "clap", clap, "gate");
-    v.r.wire(grid, "chat", hat, "closed");
-    v.r.wire(kick, "out", duck, "sc");
-    let beat = v.r.add(
-        "mixer",
-        &[("level1", 0.45), ("level2", 0.2), ("level3", 0.15)],
-    );
-    v.r.wire(kick, "out", beat, "in1");
-    v.r.wire(clap, "out", beat, "in2");
-    v.r.wire(hat, "out", beat, "in3");
-    finish_drums(
-        v,
-        duck,
-        clock,
-        beat,
+    clock_duck(&mut v, clock, 200.0, -0.30);
+    v.finish(
+        "m4",
         &[
             ("sync", 3.0),
             ("time_ms", 360.0),
@@ -1416,7 +1326,9 @@ fn rail_yard() -> Rack {
             ("mix", 0.0),
             ("tone_hz", 3500.0),
         ],
-        (0.2, 0.5, 0.16),
+        0.2,
+        (0.5, 0.16),
+        Some(clock),
     )
 }
 
@@ -1716,7 +1628,7 @@ fn later(t: f32, v: Vec<Hit>) -> Vec<Hit> {
 }
 
 fn steel_phrase() -> Vec<Hit> {
-    // Off-beat stabs over the kick, which Run starts at 0.5 s.
+    // Off-beat stabs over the duck, which Run starts at 0.5 s.
     let bar = [
         (2, 40, 1.5),
         (5, 40, 1.0),
@@ -1854,8 +1766,8 @@ fn presets() -> Vec<Preset> {
             name: "Steel Toe",
             category: "Bass",
             tags: &["mono", "distorted", "compressed", "sidechain", "124bpm", "french touch", "signature"],
-            description: "A blunt mono bass for French touch: two saws over a square sub, 18 dB of drive and a compressor squeezing it flat, then ducked hard by a four-on-the-floor kick through a sidechain. Press Run to start the kick, then play short off-beat notes; the mod wheel opens the filter. Bite opens the filter, Grit pushes the drive, Pump sets how hard the kick ducks the bass, Room adds a tempo-synced slapback and a tight room.",
-            listen: "The bass snapping shut on every kick and swelling back between beats; Pump at 0 plays the bass flat, at 1 it pumps hard.",
+            description: "A blunt mono bass for French touch: two saws over a square sub, 18 dB of drive and a compressor squeezing it flat, then ducked on every beat by a silent envelope on the host clock (no drum is built in). Press Run to start the clock, then play short off-beat notes; the mod wheel opens the filter. Bite opens the filter, Grit pushes the drive, Pump sets how hard the beat ducks the bass, Room adds a tempo-synced slapback and a tight room.",
+            listen: "The bass snapping shut on every beat and swelling back between beats; Pump at 0 plays the bass flat, at 1 it pumps hard. Silent until Run.",
             build: steel_toe,
             group: 1,
             phrase: steel_phrase,
@@ -2021,9 +1933,9 @@ fn presets() -> Vec<Preset> {
             slug: "rail-yard",
             name: "Rail Yard",
             category: "Bass",
-            tags: &["mono", "sidechain", "drums", "124bpm", "house"],
-            description: "A house bass ducked by its own drum grid: a saw and a square sub through a compressor, with a kick, clap and hats playing from the grid. Press Run for the beat, then play off-beat notes; the mod wheel opens the filter. Cutoff opens the filter, Drive adds drive, Pump sets how hard the kick ducks the bass, Room adds a synced echo and a room.",
-            listen: "The bass breathing around the kick; Pump at 0 plays flat, at 1 it pumps hard.",
+            tags: &["mono", "sidechain", "124bpm", "house"],
+            description: "A house bass that ducks on every beat: a saw and a square sub through a compressor, pulled down by a silent envelope on the host clock (no drum is built in). Press Run for the pump, then play off-beat notes; the mod wheel opens the filter. Cutoff opens the filter, Drive adds drive, Pump sets how hard the beat ducks the bass, Room adds a synced echo and a room.",
+            listen: "The bass breathing on every beat; Pump at 0 plays flat, at 1 it pumps hard. Silent until Run.",
             build: rail_yard,
             group: 2,
             phrase: rail_phrase,

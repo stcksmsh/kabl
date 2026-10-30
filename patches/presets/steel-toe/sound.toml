@@ -9,6 +9,6 @@ tags = [
     "french touch",
     "signature",
 ]
-description = "A blunt mono bass for French touch: two saws over a square sub, 18 dB of drive and a compressor squeezing it flat, then ducked hard by a four-on-the-floor kick through a sidechain. Press Run to start the kick, then play short off-beat notes; the mod wheel opens the filter. Bite opens the filter, Grit pushes the drive, Pump sets how hard the kick ducks the bass, Room adds a tempo-synced slapback and a tight room."
+description = "A blunt mono bass for French touch: two saws over a square sub, 18 dB of drive and a compressor squeezing it flat, then ducked on every beat by a silent envelope on the host clock (no drum is built in). Press Run to start the clock, then play short off-beat notes; the mod wheel opens the filter. Bite opens the filter, Grit pushes the drive, Pump sets how hard the beat ducks the bass, Room adds a tempo-synced slapback and a tight room."
 keys = true
 sequence = true

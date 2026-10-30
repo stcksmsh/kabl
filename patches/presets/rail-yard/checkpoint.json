@@ -172,75 +172,32 @@
       }
     },
     "14": {
-      "kind": "compressor",
+      "kind": "clock.div",
       "pos": {
         "x": 784.0,
         "y": 620.0
       },
       "params": {
-        "attack_ms": 1.0,
-        "knee_db": 3.0,
-        "ratio": 1.0,
-        "release_ms": 200.0,
-        "threshold_db": -34.0
+        "div": 4.0
       }
     },
     "15": {
-      "kind": "drum.grid",
+      "kind": "env.adsr",
       "pos": {
         "x": 974.0,
         "y": 620.0
       },
-      "params": {}
+      "params": {
+        "attack_ms": 3.0,
+        "decay_ms": 200.0,
+        "release_ms": 50.0,
+        "sustain": 0.0
+      }
     },
     "16": {
-      "kind": "drum.kick",
-      "pos": {
-        "x": 1164.0,
-        "y": 620.0
-      },
-      "params": {
-        "decay_ms": 260.0,
-        "drive_db": 6.0,
-        "level_db": -3.0
-      }
-    },
-    "17": {
-      "kind": "drum.clap",
-      "pos": {
-        "x": 1354.0,
-        "y": 620.0
-      },
-      "params": {
-        "level_db": -9.0
-      }
-    },
-    "18": {
-      "kind": "drum.hat",
-      "pos": {
-        "x": 1544.0,
-        "y": 620.0
-      },
-      "params": {
-        "level_db": -11.0
-      }
-    },
-    "19": {
-      "kind": "mixer",
-      "pos": {
-        "x": 1734.0,
-        "y": 620.0
-      },
-      "params": {
-        "level1": 0.45,
-        "level2": 0.2,
-        "level3": 0.15
-      }
-    },
-    "20": {
       "kind": "delay",
       "pos": {
-        "x": 1924.0,
+        "x": 1164.0,
         "y": 620.0
       },
       "params": {
@@ -251,10 +208,10 @@
         "tone_hz": 3500.0
       }
     },
-    "21": {
+    "17": {
       "kind": "reverb",
       "pos": {
-        "x": 2114.0,
+        "x": 1354.0,
         "y": 620.0
       },
       "params": {
@@ -265,50 +222,18 @@
         "width": 60.0
       }
     },
-    "22": {
-      "kind": "mixer",
-      "pos": {
-        "x": 2304.0,
-        "y": 620.0
-      },
-      "params": {}
-    },
-    "23": {
-      "kind": "mixer",
-      "pos": {
-        "x": 2494.0,
-        "y": 620.0
-      },
-      "params": {}
-    },
-    "24": {
+    "18": {
       "kind": "out",
       "pos": {
-        "x": 2684.0,
+        "x": 1544.0,
         "y": 620.0
       },
       "params": {}
     },
-    "25": {
-      "kind": "join",
-      "pos": {
-        "x": 2554.0,
-        "y": 660.0
-      },
-      "params": {}
-    },
-    "26": {
+    "19": {
       "kind": "split",
       "pos": {
-        "x": 954.0,
-        "y": 670.0
-      },
-      "params": {}
-    },
-    "27": {
-      "kind": "split",
-      "pos": {
-        "x": 2284.0,
+        "x": 574.0,
         "y": 670.0
       },
       "params": {}
@@ -582,14 +507,30 @@
     "18": {
       "from": {
         "Module": {
-          "id": 12,
-          "port": "out"
+          "id": 13,
+          "port": "gate"
         }
       },
       "to": {
         "Module": {
           "id": 14,
-          "port": "in"
+          "port": "clock"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "19": {
+      "from": {
+        "Module": {
+          "id": 13,
+          "port": "reset"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 14,
+          "port": "reset"
         }
       },
       "params": {},
@@ -598,64 +539,66 @@
     "20": {
       "from": {
         "Module": {
-          "id": 2,
-          "port": "m3"
+          "id": 14,
+          "port": "gate"
         }
       },
       "to": {
-        "Param": {
-          "id": 14,
-          "param": "ratio"
+        "Module": {
+          "id": 15,
+          "port": "gate"
         }
       },
-      "params": {
-        "amount": 0.95
-      },
+      "params": {},
       "steps": []
     },
     "21": {
       "from": {
         "Module": {
-          "id": 13,
-          "port": "gate"
+          "id": 15,
+          "port": "out"
         }
       },
       "to": {
-        "Module": {
-          "id": 15,
-          "port": "clock"
+        "Param": {
+          "id": 11,
+          "param": "gain_db"
         }
       },
-      "params": {},
+      "params": {
+        "amount": 0.0
+      },
       "steps": []
     },
     "22": {
       "from": {
         "Module": {
-          "id": 13,
-          "port": "reset"
+          "id": 2,
+          "port": "m3"
         }
       },
       "to": {
-        "Module": {
-          "id": 15,
-          "port": "reset"
+        "CableParam": {
+          "cable": 21,
+          "param": "amount"
         }
       },
-      "params": {},
+      "params": {
+        "amount": -0.3
+      },
       "steps": []
     },
     "23": {
       "from": {
         "Module": {
-          "id": 15,
-          "port": "kick"
+          "id": 19,
+          "port": "left"
         }
       },
       "to": {
         "Module": {
           "id": 16,
-          "port": "gate"
+          "port": "in"
         }
       },
       "params": {},
@@ -664,46 +607,14 @@
     "24": {
       "from": {
         "Module": {
-          "id": 15,
-          "port": "clap"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 17,
+          "id": 13,
           "port": "gate"
         }
       },
-      "params": {},
-      "steps": []
-    },
-    "25": {
-      "from": {
-        "Module": {
-          "id": 15,
-          "port": "chat"
-        }
-      },
       "to": {
-        "Module": {
-          "id": 18,
-          "port": "closed"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "26": {
-      "from": {
         "Module": {
           "id": 16,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 14,
-          "port": "sc"
+          "port": "clock"
         }
       },
       "params": {},
@@ -718,24 +629,8 @@
       },
       "to": {
         "Module": {
-          "id": 19,
-          "port": "in1"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "28": {
-      "from": {
-        "Module": {
           "id": 17,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 19,
-          "port": "in2"
+          "port": "in"
         }
       },
       "params": {},
@@ -744,77 +639,13 @@
     "29": {
       "from": {
         "Module": {
-          "id": 18,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 19,
-          "port": "in3"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "30": {
-      "from": {
-        "Module": {
-          "id": 26,
-          "port": "left"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 20,
-          "port": "in"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "31": {
-      "from": {
-        "Module": {
-          "id": 13,
-          "port": "gate"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 20,
-          "port": "clock"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "34": {
-      "from": {
-        "Module": {
-          "id": 20,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 21,
-          "port": "in"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "36": {
-      "from": {
-        "Module": {
           "id": 2,
           "port": "m4"
         }
       },
       "to": {
         "Param": {
-          "id": 20,
+          "id": 16,
           "param": "mix"
         }
       },
@@ -823,7 +654,7 @@
       },
       "steps": []
     },
-    "37": {
+    "30": {
       "from": {
         "Module": {
           "id": 2,
@@ -832,7 +663,7 @@
       },
       "to": {
         "Param": {
-          "id": 21,
+          "id": 17,
           "param": "mix"
         }
       },
@@ -841,144 +672,32 @@
       },
       "steps": []
     },
-    "38": {
+    "31": {
       "from": {
         "Module": {
-          "id": 27,
-          "port": "left"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 22,
-          "port": "in1"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "39": {
-      "from": {
-        "Module": {
-          "id": 19,
+          "id": 17,
           "port": "out"
         }
       },
       "to": {
         "Module": {
-          "id": 22,
-          "port": "in2"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "40": {
-      "from": {
-        "Module": {
-          "id": 27,
-          "port": "right"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 23,
-          "port": "in1"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "41": {
-      "from": {
-        "Module": {
-          "id": 19,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 23,
-          "port": "in2"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "42": {
-      "from": {
-        "Module": {
-          "id": 22,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 25,
-          "port": "left"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "43": {
-      "from": {
-        "Module": {
-          "id": 23,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 25,
-          "port": "right"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "44": {
-      "from": {
-        "Module": {
-          "id": 25,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 24,
+          "id": 18,
           "port": "in"
         }
       },
       "params": {},
       "steps": []
     },
-    "45": {
+    "33": {
       "from": {
         "Module": {
-          "id": 14,
+          "id": 12,
           "port": "out"
         }
       },
       "to": {
         "Module": {
-          "id": 26,
-          "port": "in"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "46": {
-      "from": {
-        "Module": {
-          "id": 21,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 27,
+          "id": 19,
           "port": "in"
         }
       },

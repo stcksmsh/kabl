@@ -54,24 +54,19 @@ fn tin_roof() -> Rack {
     r
 }
 
-/// A clock, a kick sequencer lane (steps 1 and 5 of 8: four on the floor) and the kick, used only
-/// to duck the music. Returns (clock, kick).
-fn kick_duck(r: &mut Rack, bpm: f32) -> (ModuleId, ModuleId) {
+/// A clock and a beat envelope (`clock.div` into a fast-decay `env.adsr`) that ducks the music
+/// silently; no drum is built in. Returns (clock, envelope).
+fn beat_duck(r: &mut Rack, bpm: f32) -> (ModuleId, ModuleId) {
     let clock = r.add("clock", &[("bpm", bpm), ("swing", 25.0)]);
-    let seq = r.add("seq", &[]);
-    for k in 1..=8 {
-        r.e.set_param(seq, &format!("g{k}"), f32::from(u8::from(k == 1 || k == 5)));
-        r.e.set_param(seq, &format!("v{k}"), 0.9);
-    }
-    let kick = r.add("drum.kick", &[("level_db", -3.0), ("decay_ms", 300.0)]);
-    r.wire(clock, "gate", seq, "clock");
-    r.wire(clock, "reset", seq, "reset");
-    r.wire(seq, "gate", kick, "gate");
-    r.wire(seq, "velocity", kick, "velocity");
-    (clock, kick)
+    let beat = r.add("clock.div", &[("div", 4.0)]);
+    r.wire(clock, "gate", beat, "clock");
+    r.wire(clock, "reset", beat, "reset");
+    let env = r.add("env.adsr", &adsr(1.0, 230.0, 0.0, 50.0));
+    r.wire(beat, "gate", env, "gate");
+    (clock, env)
 }
 
-/// Turnstile: a held chord that pumps against a kick you never hear.
+/// Turnstile: a held chord that ducks on every beat of the host clock: a silent envelope, no drum.
 fn turnstile() -> Rack {
     let mut r = Rack::new();
     let knob = macros(
@@ -79,7 +74,7 @@ fn turnstile() -> Rack {
         &["Cutoff", "Crunch", "Room", "Pump"],
         &[0.50, 0.50, 0.25, 0.65],
     );
-    let (clock, kick) = kick_duck(&mut r, 123.0);
+    let (clock, duck) = beat_duck(&mut r, 123.0);
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let v = va(
         &mut r,
@@ -118,7 +113,6 @@ fn turnstile() -> Rack {
                 ("knee_db", 3.0),
                 ("makeup_db", 4.0),
             ]),
-            duck: Some((kick, Some(("ratio", 0.9)))),
             echo: &[
                 ("sync", 3.0),
                 ("time_ms", 370.0),
@@ -135,6 +129,7 @@ fn turnstile() -> Rack {
     );
     r.route(v.fenv, "out", s.lad, "cutoff_hz", 0.3);
     r.route(m, "velocity", s.lad, "cutoff_hz", 0.1);
+    r.depth_route(duck, "out", s.trim, "gain_db", knob, "m4", -0.25);
     perform(&mut r, knob, Some(clock), 4);
     r
 }
@@ -1093,8 +1088,8 @@ pub fn presets() -> Vec<Preset> {
             name: "Turnstile",
             category: "Keys",
             tags: &["poly", "sequenced", "pumping", "phased", "french touch", "123bpm", "signature"],
-            description: "Hold a chord and press Run: a driven, phased saw chord that pumps against a kick you never hear (a sidechain from an internal kick, four on the floor, at 123 BPM with swing). Cutoff opens the filter, Crunch pushes the drive, Room sets a synced echo and a tight room, Pump sets how hard the kick ducks the chord.",
-            listen: "The chord ducking on every beat and swelling back between kicks; Pump at 0 holds it steady",
+            description: "Hold a chord and press Run: a driven, phased saw chord that ducks on every beat (a silent envelope on the host clock at 123 BPM with swing; no drum is built in). Cutoff opens the filter, Crunch pushes the drive, Room sets a synced echo and a tight room, Pump sets how hard the beat ducks the chord.",
+            listen: "The chord ducking on every beat and swelling back between beats; Pump at 0 holds it steady",
             group: 2,
             build: turnstile,
             phrase: turnstile_phrase,
