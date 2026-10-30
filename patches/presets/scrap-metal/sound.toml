@@ -1,0 +1,13 @@
+name = "Scrap Metal"
+category = "Groove"
+tags = [
+    "formant",
+    "crushed",
+    "electro",
+    "french touch",
+    "128bpm",
+    "signature",
+]
+description = "A robot stomp: a hard-driven bass, a stab that talks through a vowel filter, a tight kick, snare and clap, crushed and compressed until it pumps. Press Run, then play lines on top. Vowel morphs the stab from a to u, Crush brings in the bitcrusher, Pump sets how hard the kick ducks the music, Room adds a slapback and a tight room."
+keys = true
+sequence = true
