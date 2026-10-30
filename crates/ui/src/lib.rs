@@ -2261,7 +2261,7 @@ fn draw_module(
     if let Some(&s) = ui_state.seq_steps.get(&m.id) {
         let edit = ui_state.edit_bank_of(editor.state(), m.id);
         let playing = ui_state.seq_banks.get(&m.id).map_or(edit, |b| b.0);
-        if let Some(c) = m.ctl(seq::bank_param(edit, s.min(seq::STEPS - 1))) {
+        if let Some(c) = m.ctl(seq::bank_param(edit, seq::pitch_slot(s.min(seq::STEPS - 1)))) {
             let at = xf.p(c.geo.label_pos() - vec2(16.0, 0.0));
             if playing == edit {
                 painter.circle_filled(at, 4.0 * z, th.gate);
