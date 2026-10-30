@@ -682,6 +682,8 @@ struct Part {
     len: f32,
     /// Pitch of the second oscillator against the first, semitones (-12: the usual sub).
     sub_st: f32,
+    /// Clock division in front of the sequencer (2: eighth-note steps, a bar in its 8 steps).
+    div: f32,
 }
 
 /// Steps from a compact text: note numbers and `-` rests, space separated, 16 entries.
@@ -771,7 +773,14 @@ struct Built {
 
 fn seq_part(r: &mut Rack, clock: ModuleId, p: &Part) -> Built {
     let seq = r.add("seq", &[("length", p.len), ("gate_len", p.gate)]);
-    r.wire(clock, "gate", seq, "clock");
+    if p.div > 1.0 {
+        let d = r.add("clock.div", &[("div", p.div)]);
+        r.wire(clock, "gate", d, "clock");
+        r.wire(clock, "reset", d, "reset");
+        r.wire(d, "gate", seq, "clock");
+    } else {
+        r.wire(clock, "gate", seq, "clock");
+    }
     r.wire(clock, "reset", seq, "reset");
     for (k, s) in p.steps.iter().enumerate() {
         r.e.set_param(seq, &format!("p{}", k + 1), s.unwrap_or(0.0));
@@ -1137,6 +1146,7 @@ fn part(text: &str, osc: [f32; 5], sub: f32, gate: f32, env: [f32; 4], level: f3
         formant: false,
         len: 16.0,
         sub_st: -12.0,
+        div: 1.0,
     }
 }
 
@@ -1151,6 +1161,10 @@ impl Part {
     }
     fn sub_at(mut self, semitones: f32) -> Self {
         self.sub_st = semitones;
+        self
+    }
+    fn div(mut self, by: f32) -> Self {
+        self.div = by;
         self
     }
     fn glide(mut self) -> Self {
@@ -1662,11 +1676,44 @@ fn still_water() -> Rack {
 
 // ---- group 2 --------------------------------------------------------------------------------
 
+/// The variant under audition (`PP_VAR=a|b|c`); the committed sound is the default, `b`.
+fn variant() -> char {
+    std::env::var("PP_VAR")
+        .ok()
+        .and_then(|v| v.chars().next())
+        .unwrap_or('b')
+}
+
 fn slab_city() -> Rack {
+    let v = variant();
+    // 808 line (dark: root, fifth, minor third; long notes), hats (straight, sparse), pad, glide.
+    let (line, hats, hats_b, pad, glide) = match v {
+        'a' => (
+            "0 - - - - - 7 -",
+            "x.x.x.x.x.x.x.x.",
+            "x.x.x.x.x.x.xxx.",
+            (650.0, 12.0, [120.0, 1200.0, 0.5, 900.0], 0.35),
+            0.0,
+        ),
+        'c' => (
+            "0 - 0 - - - 3 -",
+            "X.x.X.x.X.x.X.x.",
+            "X.x.X.x.X.x.X.xx",
+            (650.0, 14.0, [80.0, 900.0, 0.55, 800.0], 0.30),
+            0.25,
+        ),
+        _ => (
+            "0 - - - 0 - - 7",
+            "X.x.X.x.X.x.X.x.",
+            "X.x.X.x.X.x.X.xx",
+            (500.0, 10.0, [150.0, 1400.0, 0.5, 1000.0], 0.25),
+            0.12,
+        ),
+    };
     groove(Spec {
         macros: [
             ("Tone", 0.55),
-            ("Glide", 0.30),
+            ("Glide", glide),
             ("Hats", 0.60),
             ("Room", 0.25),
         ],
@@ -1678,7 +1725,7 @@ fn slab_city() -> Rack {
                 "X.....x...X.....",
                 NONE,
                 "........X.......",
-                "X.x.X.xxXxX?x.X?",
+                hats,
                 "..............o.",
                 NONE,
             ],
@@ -1686,7 +1733,7 @@ fn slab_city() -> Rack {
                 "X.....x...X..X.X",
                 "........X.......",
                 "........X...XXXX",
-                "XxxxXxxxX.XxxxXx",
+                hats_b,
                 NONE,
                 "..........X.X.XX",
             ],
@@ -1695,16 +1742,17 @@ fn slab_city() -> Rack {
             [0.32, 0.0, 0.4, 0.5],
         ),
         bass: part(
-            "0 - - - - - 5 - - - 3 - - - - -",
+            line,
             [0.0, 1.0, 8.0, 50.0, -2.0],
             0.0,
             100.0,
             [2.0, 700.0, 0.35, 140.0],
             0.6,
         )
+        .div(2.0)
         .glide(),
         chords: None,
-        play: [2.0, 0.0, 0.5],
+        play: [2.0, 0.0, pad.3],
         drive: [6.0, -3.0],
         filter: [1000.0, 0.15],
         fx: None,
@@ -1714,7 +1762,7 @@ fn slab_city() -> Rack {
         space: [0.15, 0.5, 0.15],
         trim_db: 0.0,
         dub: false,
-        voice: Some((750.0, 14.0, [60.0, 900.0, 0.55, 800.0])),
+        voice: Some((pad.0, pad.1, pad.2)),
     })
 }
 
@@ -1853,6 +1901,12 @@ fn lamp_oil() -> Rack {
 }
 
 fn pinball() -> Rack {
+    // Hypnotic and serious: few pitches, narrow intervals, dark short notes.
+    let (bass, chords, wave, lp) = match variant() {
+        'a' => ("0 0 - 3 0", "7 - 7 - - 5 -", 1.0, (900.0, 800.0)),
+        'c' => ("0 3 - 0 -", "5 - - 7 - 3 -", 0.0, (1000.0, 900.0)),
+        _ => ("0 - 0 0 -", "7 - - 7 - - -", 1.0, (700.0, 650.0)),
+    };
     groove(Spec {
         macros: [
             ("Pitch", 0.50),
@@ -1888,26 +1942,26 @@ fn pinball() -> Rack {
             )
         },
         bass: part(
-            "0 7 - 3 -",
-            [1.0, 1.0, 8.0, 50.0, -1.0],
+            bass,
+            [wave, 1.0, 8.0, 50.0, -1.0],
             0.0,
             45.0,
-            [4.0, 160.0, 0.0, 60.0],
+            [4.0, 80.0, 0.0, 40.0],
             0.8,
         )
         .len(5.0)
-        .lp(1500.0),
+        .lp(lp.0),
         chords: Some(
             part(
-                "7 - 0 - - 3 -",
-                [1.0, 1.0, 8.0, 50.0, 0.0],
+                chords,
+                [wave, 1.0, 8.0, 50.0, 0.0],
                 0.0,
                 45.0,
-                [4.0, 200.0, 0.0, 80.0],
+                [4.0, 100.0, 0.0, 50.0],
                 0.7,
             )
             .len(7.0)
-            .lp(1200.0),
+            .lp(lp.1),
         ),
         play: [1.0, 0.0, 0.5],
         drive: [2.0, -1.0],
@@ -1919,7 +1973,7 @@ fn pinball() -> Rack {
         space: [0.5, 2.2, 0.35],
         trim_db: -1.5,
         dub: false,
-        voice: Some((1800.0, 8.0, [3.0, 300.0, 0.6, 90.0])),
+        voice: Some((900.0, 8.0, [4.0, 200.0, 0.5, 80.0])),
     })
 }
 
@@ -2200,11 +2254,10 @@ phrase!(
     pinball_phrase,
     120.0,
     [
-        (0.0, 1.0, 60),
-        (1.0, 1.0, 67),
-        (3.0, 1.0, 63),
-        (4.0, 2.0, 70),
-        (6.0, 1.0, 58)
+        (0.0, 2.0, 60),
+        (2.0, 2.0, 63),
+        (4.0, 3.0, 60),
+        (7.0, 1.0, 58)
     ]
 );
 phrase!(
@@ -2301,8 +2354,8 @@ fn presets() -> Vec<Preset> {
             "A dub techno loop: a soft kick, a rim click, a deep sine sub and a muted chord stab thrown into a long dotted echo. Press Run, then play chords over it. Chord sets the level of the stab, Dub feeds more of it to its own tempo echo, Filter opens the music, Space adds the long echo and the room.",
             "The chord stab repeating into the dark; Dub up for a longer tail, Chord up for a louder stab.", lamp_oil, lamp_phrase, 16.0),
         q("pinball", "Pinball", &["polymeter", "bleeps", "modular", "120bpm"],
-            "A polymetric bleep machine: two low sequencer lines of five and seven steps drift against a sparse clap, hat and tom of thirteen, seven and nine steps, so the pattern only repeats after many bars. Press Run, then play notes over it. Pitch tunes the bleeps, Tempo speeds the whole machine up and down, Bleep raises the second bleep line, Space adds the echo and the room.",
-            "The low five- and seven-step lines drifting against sparse hits; Tempo up to speed them, Pitch to bend the bleeps.", pinball, pinball_phrase, 16.0),
+            "A hypnotic modular groove: two dark, low sequencer lines of five and seven steps drift against a sparse clap, hat and tom of thirteen, seven and nine steps, so the pattern only repeats after many bars. Press Run, then play notes over it. Pitch tunes the bleeps, Tempo speeds the whole machine up and down, Bleep raises the second bleep line, Space adds the echo and the room.",
+            "The dark five- and seven-step lines drifting against sparse hits; Tempo up to speed them, Pitch to bend the bleeps.", pinball, pinball_phrase, 16.0),
         q("scrap-metal", "Scrap Metal", &["formant", "crushed", "electro", "french touch", "128bpm", "signature"],
             "A robot stomp: a hard-driven bass, a stab that talks through a vowel filter, a tight kick, snare and clap, crushed and compressed until it pumps. Press Run, then play lines on top. Vowel morphs the stab from a to u, Crush brings in the bitcrusher, Pump sets how hard the kick ducks the music, Room adds a slapback and a tight room.",
             "The stab changing vowel; Crush up for grit, Vowel to open and close the mouth.", scrap_metal, scrap_phrase, 16.0),

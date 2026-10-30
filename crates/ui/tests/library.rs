@@ -610,7 +610,7 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "Pinball",
         "Groove",
         &["polymeter", "bleeps", "modular", "120bpm"],
-        "A polymetric bleep machine: two low sequencer lines of five and seven steps drift against a sparse clap, hat and tom of thirteen, seven and nine steps, so the pattern only repeats after many bars. Press Run, then play notes over it. Pitch tunes the bleeps, Tempo speeds the whole machine up and down, Bleep raises the second bleep line, Space adds the echo and the room.",
+        "A hypnotic modular groove: two dark, low sequencer lines of five and seven steps drift against a sparse clap, hat and tom of thirteen, seven and nine steps, so the pattern only repeats after many bars. Press Run, then play notes over it. Pitch tunes the bleeps, Tempo speeds the whole machine up and down, Bleep raises the second bleep line, Space adds the echo and the room.",
     ),
     (
         "presets/scrap-metal",
