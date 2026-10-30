@@ -1,15 +1,15 @@
 {
- "plugin_sha256": "72b90ed8153da5fa47df004c39383c1a50668b32eea240db6251a2b701c90d12",
+ "plugin_sha256": "0d2fa4547db891efafdfbb38a19c237fd86bfcd4fcf5a57fe346071abdaca73a",
  "slab-city": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.119,
-  "rms": 0.0217,
+  "peak": 0.1169,
+  "rms": 0.0223,
   "restart_relative_difference": 0.0
  },
  "pinball": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1713,
-  "rms": 0.0339,
-  "restart_relative_difference": 0.36865
+  "peak": 0.1793,
+  "rms": 0.037,
+  "restart_relative_difference": 0.33818
  }
 }

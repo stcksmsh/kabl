@@ -1676,16 +1676,16 @@ fn still_water() -> Rack {
 
 // ---- group 2 --------------------------------------------------------------------------------
 
-/// The variant under audition (`PP_VAR=a|b|c`); the committed sound is the default, `b`.
-fn variant() -> char {
+/// The variant under audition (`PP_VAR=a|b|c`); without it the committed sound, `default`.
+fn variant(default: char) -> char {
     std::env::var("PP_VAR")
         .ok()
         .and_then(|v| v.chars().next())
-        .unwrap_or('b')
+        .unwrap_or(default)
 }
 
 fn slab_city() -> Rack {
-    let v = variant();
+    let v = variant('c');
     // 808 line (dark: root, fifth, minor third; long notes), hats (straight, sparse), pad, glide.
     let (line, hats, hats_b, pad, glide) = match v {
         'a' => (
@@ -1902,7 +1902,7 @@ fn lamp_oil() -> Rack {
 
 fn pinball() -> Rack {
     // Hypnotic and serious: few pitches, narrow intervals, dark short notes.
-    let (bass, chords, wave, lp) = match variant() {
+    let (bass, chords, wave, lp) = match variant('a') {
         'a' => ("0 0 - 3 0", "7 - 7 - - 5 -", 1.0, (900.0, 800.0)),
         'c' => ("0 3 - 0 -", "5 - - 7 - 3 -", 0.0, (1000.0, 900.0)),
         _ => ("0 - 0 0 -", "7 - - 7 - - -", 1.0, (700.0, 650.0)),
