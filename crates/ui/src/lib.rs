@@ -221,6 +221,8 @@ pub struct UiState {
     pub edit_bank: HashMap<ModuleId, usize>,
     /// Every sequencer's effective edit bank, rebuilt each frame for the layout.
     edit_view: HashMap<ModuleId, usize>,
+    /// Step page (8 steps each) the user picked per sequencer. View only, like `edit_bank`.
+    pub edit_page: HashMap<ModuleId, usize>,
     /// Bank launches and cancels for `main.rs` to send to the audio thread (runtime only).
     pub launches: Vec<Command>,
     /// Last state of each MIDI button (channel, CC): high = pressed.
@@ -399,6 +401,7 @@ impl Default for UiState {
             seq_banks: HashMap::new(),
             edit_bank: HashMap::new(),
             edit_view: HashMap::new(),
+            edit_page: HashMap::new(),
             launches: Vec::new(),
             bank_rename: None,
             cue_rename: None,
@@ -614,6 +617,7 @@ impl UiState {
             choose: None,
             moving: None,
             edit_banks: Some(&self.edit_view),
+            edit_pages: Some(&self.edit_page),
         }
     }
 
@@ -2261,7 +2265,13 @@ fn draw_module(
     if let Some(&s) = ui_state.seq_steps.get(&m.id) {
         let edit = ui_state.edit_bank_of(editor.state(), m.id);
         let playing = ui_state.seq_banks.get(&m.id).map_or(edit, |b| b.0);
-        if let Some(c) = m.ctl(seq::bank_param(edit, seq::pitch_slot(s.min(seq::STEPS - 1)))) {
+        let page = ui_state.edit_page.get(&m.id).copied().unwrap_or(0);
+        let s = s.min(seq::STEPS - 1);
+        let on_page = s / 8 == page;
+        if let Some(c) = m
+            .ctl(seq::bank_param(edit, seq::pitch_slot(s)))
+            .filter(|_| on_page)
+        {
             let at = xf.p(c.geo.label_pos() - vec2(16.0, 0.0));
             if playing == edit {
                 painter.circle_filled(at, 4.0 * z, th.gate);
@@ -2633,6 +2643,42 @@ fn draw_banks(
         );
     };
     label(r.left(), "EDIT");
+    // Step pages, under the strip: steps 1-8, 9-16, 17-24, 25-32 (view only).
+    let page = ui_state.edit_page.get(&id).copied().unwrap_or(0);
+    let pw = 44.0;
+    for pg in 0..seq::STEPS / 8 {
+        let t = xf.r(Rect::from_min_size(
+            pos2(r.left() + 36.0 + pg as f32 * (pw + 4.0), r.bottom() + 3.0),
+            vec2(pw, 15.0),
+        ));
+        ui_state.record(format!("seq-page:{id}.{pg}"), t);
+        let resp = ui.interact(t, Id::new(("kabl-seq-page", id, pg)), Sense::click());
+        let on = pg == page;
+        painter.rect_filled(
+            t,
+            CornerRadius::same(4),
+            if on {
+                th.sel
+            } else if th.dark {
+                th.btn
+            } else {
+                th.plate
+            },
+        );
+        text(
+            painter,
+            t.center(),
+            egui::Align2::CENTER_CENTER,
+            &format!("{}-{}", pg * 8 + 1, pg * 8 + 8),
+            10.5 * z,
+            if on { th.sel_ink } else { th.plate_ink },
+            false,
+        );
+        if resp.on_hover_text("Steps shown on the face (view only)").clicked() {
+            ui_state.edit_page.insert(id, pg);
+        }
+    }
+
     let play_x = r.right() - 4.0 * (bw + 4.0);
     label(play_x - 38.0, "PLAY");
     for b in 0..seq::BANKS {

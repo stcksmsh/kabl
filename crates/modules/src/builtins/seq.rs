@@ -323,11 +323,16 @@ pub fn bank_of(name: &str) -> Option<(usize, usize)> {
 /// True for a per-step value (`p3`, `c.v12`, `k32`): patch data, never a host automation target.
 /// Module-wide and per-bank controls (`length`, `transpose`, `gate_len`, `gate_mode`) are not steps.
 pub fn is_step_param(name: &str) -> bool {
+    step_of(name).is_some()
+}
+
+/// `(kind, step)` of a per-step param name: `"c.v12"` is `('v', 12)`, steps counted from 1.
+pub fn step_of(name: &str) -> Option<(char, usize)> {
     let bare = name.split_once('.').map_or(name, |(_, rest)| rest);
     let mut chars = bare.chars();
-    matches!(chars.next(), Some('p' | 'g' | 'v' | 'r' | 'k'))
-        && !chars.as_str().is_empty()
-        && chars.all(|c| c.is_ascii_digit())
+    let kind = chars.next().filter(|c| "pgvrk".contains(*c))?;
+    let n: usize = chars.as_str().parse().ok()?;
+    (1..=STEPS).contains(&n).then_some((kind, n))
 }
 
 /// Slot of step `k` (0-based, 0..32)'s pitch.

@@ -79,8 +79,16 @@ pub fn primary_set(m: &ModuleState, info: &ModuleInfo) -> Vec<bool> {
 /// Whether param `name` of a module is drawn at all: a sequencer shows its module-wide params
 /// and the edit bank's; every other module everything.
 pub fn visible(info: &ModuleInfo, name: &str, edit_bank: usize) -> bool {
+    visible_page(info, name, edit_bank, 0)
+}
+
+/// `visible`, with a sequencer showing only the steps of its face's `page` (8 steps each).
+pub fn visible_page(info: &ModuleInfo, name: &str, edit_bank: usize, page: usize) -> bool {
     match info.kind {
-        "seq" => seq::bank_of(name).is_none_or(|(b, _)| b == edit_bank),
+        "seq" => {
+            seq::bank_of(name).is_none_or(|(b, _)| b == edit_bank)
+                && seq::step_of(name).is_none_or(|(_, n)| (n - 1) / 8 == page)
+        }
         // The grid face edits every param itself.
         "drum.grid" => false,
         _ => true,
@@ -258,6 +266,8 @@ pub struct View<'a> {
     pub moving: Option<(ModuleId, kabl_core::Vec2)>,
     /// Each sequencer's edit bank; absent = A.
     pub edit_banks: Option<&'a std::collections::HashMap<ModuleId, usize>>,
+    /// Each sequencer's step page (0..4); absent = first.
+    pub edit_pages: Option<&'a std::collections::HashMap<ModuleId, usize>>,
 }
 
 pub struct Layout {
@@ -290,14 +300,37 @@ pub fn snap(p: Pos2) -> kabl_core::Vec2 {
     }
 }
 
+/// The sequencer's face on step page `page`: each face step control of steps 1..8 moves to the
+/// same position of the page's steps, so a page reuses the first page's slots and choices.
+fn paged_primary(info: &ModuleInfo, mut primary: Vec<bool>, page: usize) -> Vec<bool> {
+    let base = primary.clone();
+    for (i, p) in info.params.iter().enumerate() {
+        let Some((kind, n)) = seq::step_of(p.name) else {
+            continue;
+        };
+        primary[i] = (n - 1) / 8 == page && {
+            let prefix = p.name.split_once('.').map_or("", |(b, _)| b);
+            let dot = if prefix.is_empty() { "" } else { "." };
+            let old = format!("{prefix}{dot}{kind}{}", n - 8 * page);
+            info.params
+                .iter()
+                .position(|q| q.name == old)
+                .is_some_and(|j| base[j])
+        };
+    }
+    primary
+}
+
 pub fn layout(state: &PatchState, v: &View) -> Layout {
     let mut placed: Vec<(usize, f32, Placed)> = Vec::new();
     for (&id, m) in &state.modules {
         let Some(info) = registry::info_for(&m.kind) else {
             continue;
         };
+        let page = v.edit_pages.and_then(|b| b.get(&id)).copied().unwrap_or(0);
         let primary = match v.choose {
             Some((cid, set)) if cid == id => set.to_vec(),
+            _ if info.kind == "seq" && page > 0 => paged_primary(info, primary_set(m, info), page),
             _ => primary_set(m, info),
         };
         let choosing = v.choose.is_some_and(|(cid, _)| cid == id);
@@ -307,7 +340,7 @@ pub fn layout(state: &PatchState, v: &View) -> Layout {
         let shown: Vec<bool> = info
             .params
             .iter()
-            .map(|p| visible(info, p.name, bank))
+            .map(|p| visible_page(info, p.name, bank, page))
             .collect();
         let mut pl = place_local(id, info, &primary, &shown, expanded, choosing, skin);
         let order = control_order(m, info);
@@ -961,6 +994,33 @@ mod tests {
             x = if i == 4 { RACK_X } else { x + 150.0 };
         }
         p
+    }
+
+    #[test]
+    fn seq_pages_put_each_eight_steps_on_the_face_in_the_same_slots() {
+        let mut p = PatchState::new();
+        p.modules.insert(1, module("seq", RACK_X, row_y(0)));
+        let face = |page: usize| {
+            let pages = std::collections::HashMap::from([(1, page)]);
+            let l = layout(
+                &p,
+                &View {
+                    edit_pages: Some(&pages),
+                    ..Default::default()
+                },
+            );
+            let m = &l.mods[0];
+            let pos = |name: &str| m.ctl(name).filter(|c| c.primary).map(|c| c.geo.label_pos());
+            (pos("p1"), pos("p9"), pos("p17"), pos("p32"), pos("g25"))
+        };
+        let first = face(0);
+        assert!(first.0.is_some() && first.1.is_none() && first.2.is_none());
+        let second = face(1);
+        assert!(second.0.is_none() && second.1.is_some() && second.2.is_none());
+        // Page 2's first pitch sits where page 1's first pitch does.
+        assert_eq!(face(2).2, first.0);
+        let last = face(3);
+        assert!(last.3.is_some() && last.4.is_some());
     }
 
     fn rects(l: &Layout) -> Vec<(ModuleId, Rect)> {
