@@ -1,0 +1,12 @@
+name = "Rope Walk"
+category = "Groove"
+tags = [
+    "phased",
+    "pumping",
+    "french touch",
+    "118bpm",
+    "signature",
+]
+description = "A disco loop for French touch: an octave-jumping bass walking up in steps, syncopated saw stabs through a phaser, a four-on-the-floor kick and a clap, all ducked by the kick. Press Run, then play stabs on top. Filter opens the loop like a DJ knob, Phase brings in the phaser, Pump sets how hard the kick ducks the music, Room adds a tempo-synced echo and a tight room."
+keys = true
+sequence = true

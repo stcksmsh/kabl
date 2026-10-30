@@ -1,0 +1,11 @@
+name = "Lamp Oil"
+category = "Groove"
+tags = [
+    "dub",
+    "echo",
+    "dub techno",
+    "124bpm",
+]
+description = "A dub techno loop: a soft kick, a rim click, a deep sine sub and a muted chord stab thrown into a long dotted echo. Press Run, then play chords over it. Chord sets the level of the stab, Dub feeds more of it to its own tempo echo, Filter opens the music, Space adds the long echo and the room."
+keys = true
+sequence = true

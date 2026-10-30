@@ -1,0 +1,11 @@
+name = "Slab City"
+category = "Groove"
+tags = [
+    "glide",
+    "808",
+    "trap",
+    "140bpm",
+]
+description = "A half-time trap loop: a short kick and a clap on the third beat, rolling hats with some left to chance, and a sliding sine 808 under them. Press Run, then play slow minor chords over it; the played voice is a dark, soft saw pad. Tone opens the music, Glide sets how long the 808 slides between notes, Hats raises the hats, Room adds a short echo and a tight room."
+keys = true
+sequence = true
