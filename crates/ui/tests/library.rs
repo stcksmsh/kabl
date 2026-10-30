@@ -589,7 +589,7 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "Slab City",
         "Groove",
         &["glide", "808", "trap", "140bpm"],
-        "A half-time trap loop: a short kick and a clap on the third beat, rolling hats with some left to chance, and a sliding sine 808 under them. Press Run, then play minor chords over it. Tone opens the music, Glide sets how long the 808 slides between notes, Hats raises the hats, Room adds a short echo and a tight room.",
+        "A half-time trap loop: a short kick and a clap on the third beat, rolling hats with some left to chance, and a sliding sine 808 under them. Press Run, then play slow minor chords over it; the played voice is a dark, soft saw pad. Tone opens the music, Glide sets how long the 808 slides between notes, Hats raises the hats, Room adds a short echo and a tight room.",
     ),
     (
         "presets/rope-walk",
@@ -610,7 +610,7 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "Pinball",
         "Groove",
         &["polymeter", "bleeps", "modular", "120bpm"],
-        "A polymetric bleep machine: two sequencers of five and seven steps drift against a clap, a hat and a tom of five, seven and nine steps, so the pattern only repeats after many bars. Press Run, then play notes over it. Pitch tunes the bleeps, Tempo speeds the whole machine up and down, Bleep raises the second bleep line, Space adds the echo and the room.",
+        "A polymetric bleep machine: two low sequencer lines of five and seven steps drift against a sparse clap, hat and tom of thirteen, seven and nine steps, so the pattern only repeats after many bars. Press Run, then play notes over it. Pitch tunes the bleeps, Tempo speeds the whole machine up and down, Bleep raises the second bleep line, Space adds the echo and the room.",
     ),
     (
         "presets/scrap-metal",

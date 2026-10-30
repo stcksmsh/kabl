@@ -74,10 +74,10 @@ Clips in `docs/presets/clips/groove/group2/` (`<slug>.flac`, `<slug>.mp3` at 320
 
 | Preset | Macros (CC 20 up) | Listen for |
 |---|---|---|
-| Slab City | Tone, Glide, Hats, Room | The sine 808 sliding between its notes; Glide up for longer slides, Hats up for busier rolls. |
+| Slab City | Tone, Glide, Hats, Room | The sine 808 sliding between its notes under a dark, soft pad; Glide up for longer slides, Hats up for busier rolls. |
 | Rope Walk | Filter, Phase, Pump, Room | The octave bass walking under phased stabs; Phase up for swirl, Pump up for a harder duck. |
 | Lamp Oil | Chord, Dub, Filter, Space | The muted chord stab repeating into a dotted echo; Dub up for a longer tail. |
-| Pinball | Pitch, Tempo, Bleep, Space | Five- and seven-step bleep lines drifting against five-, seven- and nine-step drum rows; Tempo speeds the whole machine. |
+| Pinball | Pitch, Tempo, Bleep, Space | Low five- and seven-step bleep lines drifting against sparse thirteen-, seven- and nine-step drum rows; Tempo speeds the whole machine. |
 | Scrap Metal | Vowel, Crush, Pump, Room | The stab changing vowel; Crush up for grit. |
 | Dune Buggy | Swing, Filter, Chop, Space | Shuffled hats and chopped chords; Chop down for shorter stabs. |
 
@@ -86,12 +86,20 @@ New generator pieces (no engine or module change): a `slew` on the 808's pitch f
 ### Checks (group 2)
 
 - `every_preset_keeps_to_the_brief`, the library tests and `factory_levels_hold_the_target` pass (debug).
-- Levels as `level_table` measures them (peak / loudness dBFS): Slab City -4.4 / -20.0, Rope Walk -6.2 / -21.9, Lamp Oil -4.5 / -19.9, Pinball -1.6 / -17.6, Scrap Metal -5.2 / -21.8, Dune Buggy -2.9 / -18.0.
-- Macros (`presets_groove macros patches 2`: peak with every macro at 0 and at 1, and dB of the difference render under the render for each macro alone). All peaks are under -1 dBFS: all at 0 / all at 1 are -5.4 / -3.6 (Slab City), -1.5 / -5.9 (Rope Walk), -4.4 / -3.5 (Lamp Oil), -3.2 / -3.2 (Pinball), -1.5 / -5.2 (Scrap Metal), -2.6 / -2.6 (Dune Buggy). Weakest macros: Slab City Hats -19.6, Scrap Metal Vowel -18.2 and Crush -19.0, Rope Walk Room -17.4; every other macro is -16 dB or louder. Slab City Hats is limited by the hat voice itself (more hat level did not move it), so the hats got louder velocities and the 808 got quieter.
-- `audio_defects.py` on the clips: clean for all six (HF_BURST advisories only), no new allow entry. The first scan flagged single-sample CLICKs in Dune Buggy (two), Pinball (eleven) and Slab City (one). Muting drum voices pinned them to the kick, snare, hat, clap and tom, at the times where a step falls exactly on a 64-sample block edge (26 sixteenths at 130 bpm is exactly 144000 samples); the 0.4 ms attack of group 1 does not cover a hit that starts on a block edge while a tail still rings. That is an engine matter (`drums.rs`, not touched here), so the three tempos sit 0.3 bpm off the round number (140.3, 120.3, 130.3) to keep the clip clean. A drum hit on a block edge in another tempo can still show this; flagged for the engine owner.
+- Levels as `level_table` measures them (peak / loudness dBFS): Slab City -4.7 / -20.7, Rope Walk -6.2 / -21.9, Lamp Oil -4.5 / -19.9, Pinball -4.3 / -17.6, Scrap Metal -5.2 / -21.8, Dune Buggy -2.9 / -18.0.
+- Macros (`presets_groove macros patches 2`: peak with every macro at 0 and at 1, and dB of the difference render under the render for each macro alone). All peaks are under -1 dBFS: all at 0 / all at 1 are -5.6 / -3.6 (Slab City), -1.5 / -5.9 (Rope Walk), -4.4 / -3.5 (Lamp Oil), -5.2 / -4.6 (Pinball), -1.5 / -5.2 (Scrap Metal), -2.6 / -2.6 (Dune Buggy). Weakest macros: Slab City Hats -18.9, Scrap Metal Vowel -18.2 and Crush -19.0, Rope Walk Room -17.4; every other macro is -16 dB or louder. Slab City Hats is limited by the hat voice itself (more hat level did not move it), so the hats got louder velocities and the 808 got quieter.
+- `audio_defects.py` on the clips: clean for all six (HF_BURST advisories only), no new allow entry. The first scan flagged single-sample CLICKs in Dune Buggy (two), Pinball (eleven) and Slab City (one). Muting drum voices pinned them to the kick, snare, hat, clap and tom, at the times where a step falls exactly on a 64-sample block edge (26 sixteenths at 130 bpm is exactly 144000 samples); the 0.4 ms attack of group 1 does not cover a hit that starts on a block edge while a tail still rings. That is an engine matter (`drums.rs`, not touched here), so the three tempos sit a fraction of a bpm off the round number (140.4, 120.3, 130.3) to keep the clip clean. A drum hit on a block edge in another tempo can still show this; flagged for the engine owner.
 - Clips: 320 kbps mp3 against the float render, all six pass (snr 39.7 to 54.4 dB).
 - REAPER (`host.py` with `PH_SELF=1`, evidence in `evidence/host-groove2/`): all six save, quit, reopen with identical state. The render after reopen is identical for four; Slab City and Dune Buggy differ because the free-running clock starts at another phase each run (the script compares loudness instead).
 - Standalone (`standalone.py`, evidence in `evidence/standalone-groove2/`): all six open, take a chord from a virtual MIDI controller and stay running, audio on the silent sink.
+
+### Revision after listening (Pinball, Slab City)
+
+Kosta's notes: Pinball "claps too frequent and the tone too high"; Slab City "too goofy and hard at the same time", bassline fine, the other sound bad.
+
+- Pinball: the clap row is one soft hit in 13 steps (was a hit in four of five), the hat row two in seven, the tom row two in nine (fill pattern B a little denser); the bleep lines are an octave and more lower (triangle waves from C3 and C4, low-passed at 1.5 and 1.2 kHz, was square and triangle from C4 and C5), have fewer notes (three of five, three of seven) and a slower attack; the played voice and the clip riff sit an octave lower, behind a softer 1.8 kHz filter.
+- Slab City: the played voice, which carried the cartoonish top line, is now a slow-attack saw pad (60 ms attack, 800 ms release) through a 750 Hz ladder with wider detune, so chords read as a dark choir bed; the clip plays slow minor triads. The 808 line is unchanged. Less hard: clap 3 dB quieter, bus drive 9 to 6 dB. Slab City's tempo moved to 140.4 for the clip-click workaround below.
+- New generator field `Spec::voice` (ladder cutoff, detune, amp envelope of the played voice); `None` keeps the group 1 and other group 2 sounds as they were.
 
 ### Harshness (group 2)
 
@@ -101,12 +109,12 @@ New generator pieces (no engine or module change): a `slew` on the 808's pitch f
 |---|---|---|
 | Dune Buggy | 2016, -60.5, 10.3 | -25.2 |
 | Lamp Oil | 2156, -66.8, 14.3 (before: 1500 Hz low-pass, -61.6, 18.5) | -35.7 |
-| Pinball | 2353, -47.8, 13.7 | -20.6 |
+| Pinball | 23200, -89.1, 11.2 | -33.2 |
 | Rope Walk | 7849, -67.4, 14.6 | -23.1 |
 | Scrap Metal | 21454, -73.8, 3.1 | -23.6 |
-| Slab City | 16802, -71.2, 14.4 | -26.0 |
+| Slab City | 8804, -64.5, 14.8 | -27.3 |
 
-Lamp Oil's first build had a tone at 2156 Hz, the 11th harmonic of the square fifth (G3) in the chord stab; the stab's low-pass went from 1.5 kHz to 1.0 kHz. Rope Walk's, Slab City's and Scrap Metal's strongest peaks are far above 5 kHz at -67 dBFS or lower. Pinball is the closest to the energy limit (-20.6 against -18): the bleeps are low-passed at 2.4 and 2.0 kHz.
+Lamp Oil's first build had a tone at 2156 Hz, the 11th harmonic of the square fifth (G3) in the chord stab; the stab's low-pass went from 1.5 kHz to 1.0 kHz. Rope Walk's, Slab City's and Scrap Metal's strongest peaks are far above 5 kHz at -67 dBFS or lower. 
 
 Loading Dock (pilot, 124 bpm filter house) moves into Groove on another branch. Lamp Oil is also 124 bpm but is a sparse dub techno groove (rim click, sine sub, chord stab in a dotted echo, no four-on-the-floor bass duck), Rope Walk is 118 bpm disco.
 

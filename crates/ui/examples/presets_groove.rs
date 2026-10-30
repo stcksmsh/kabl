@@ -755,6 +755,9 @@ struct Spec {
     trim_db: f32,
     /// A tempo-synced dotted echo on the chord part alone, at mix 0 until the `Dub` macro.
     dub: bool,
+    /// The played voice's ladder cutoff Hz, unison detune and amp envelope, when not the default
+    /// (3500 Hz, 8 ct, 2/300/0.6/90): a darker, softer voice.
+    voice: Option<(f32, f32, [f32; 4])>,
 }
 
 /// What `seq_part` built: where the audio comes out, and the stages a macro can reach.
@@ -843,17 +846,18 @@ fn seq_part(r: &mut Rack, clock: ModuleId, p: &Part) -> Built {
 
 fn groove(s: Spec) -> Rack {
     // The voice MIDI plays over the groove, with its own amp and a fixed open filter.
+    let (cutoff, detune, aenv) = s.voice.unwrap_or((3500.0, 8.0, [2.0, 300.0, 0.6, 90.0]));
     let mut v = Voice::new(Recipe {
         bass: false,
         macros: &s.macros,
         midi: [1.0, 0.0, 120.0],
-        oscs: vec![osc(s.play[0], s.play[1], 0.5).unison(2.0, 8.0)],
+        oscs: vec![osc(s.play[0], s.play[1], 0.5).unison(2.0, detune)],
         drive: [0.0, 0.0],
-        lad: [3500.0, 0.1, 0.0],
+        lad: [cutoff, 0.1, 0.0],
         fenv: [2.0, 200.0, 0.3, 100.0],
         fenv_amt: 0.0,
         wheel_amt: 0.0,
-        aenv: [2.0, 300.0, 0.6, 90.0],
+        aenv,
         trim_db: 20.0 * s.play[2].max(1e-3).log10(),
     });
     let clock = v.r.add("clock", &[("bpm", s.bpm), ("swing", s.swing)]);
@@ -1223,6 +1227,7 @@ fn copper_mile() -> Rack {
         space: [0.2, 0.4, 0.15],
         trim_db: 0.0,
         dub: false,
+        voice: None,
     })
 }
 
@@ -1277,6 +1282,7 @@ fn brick_dust() -> Rack {
         space: [0.15, 0.25, 0.1],
         trim_db: -4.5,
         dub: false,
+        voice: None,
     })
 }
 
@@ -1338,6 +1344,7 @@ fn ore_cart() -> Rack {
         space: [0.3, 1.2, 0.2],
         trim_db: 0.0,
         dub: false,
+        voice: None,
     })
 }
 
@@ -1399,6 +1406,7 @@ fn stoop_sale() -> Rack {
         space: [0.3, 0.8, 0.2],
         trim_db: -4.0,
         dub: false,
+        voice: None,
     })
 }
 
@@ -1453,6 +1461,7 @@ fn fault_line() -> Rack {
         space: [0.25, 0.8, 0.2],
         trim_db: -2.0,
         dub: false,
+        voice: None,
     })
 }
 
@@ -1517,6 +1526,7 @@ fn corner_store() -> Rack {
         space: [0.15, 0.3, 0.12],
         trim_db: 0.0,
         dub: false,
+        voice: None,
     })
 }
 
@@ -1584,6 +1594,7 @@ fn glass_coast() -> Rack {
         space: [0.55, 3.2, 0.42],
         trim_db: -1.0,
         dub: false,
+        voice: None,
     })
 }
 
@@ -1645,6 +1656,7 @@ fn still_water() -> Rack {
         space: [0.5, 5.0, 0.45],
         trim_db: -11.0,
         dub: false,
+        voice: None,
     })
 }
 
@@ -1659,7 +1671,7 @@ fn slab_city() -> Rack {
             ("Room", 0.25),
         ],
         targets: [T::Cutoff(0.5), T::Glide(0.6), T::Hats(1.0)],
-        bpm: 140.3,
+        bpm: 140.4,
         swing: 0.0,
         kit: kit(
             [
@@ -1679,7 +1691,7 @@ fn slab_city() -> Rack {
                 "..........X.X.XX",
             ],
             [-4.0, 160.0, 4.0],
-            [-8.0, -7.0, -11.0, 0.0],
+            [-8.0, -10.0, -11.0, 0.0],
             [0.32, 0.0, 0.4, 0.5],
         ),
         bass: part(
@@ -1692,8 +1704,8 @@ fn slab_city() -> Rack {
         )
         .glide(),
         chords: None,
-        play: [1.0, 0.0, 0.5],
-        drive: [9.0, -4.0],
+        play: [2.0, 0.0, 0.5],
+        drive: [6.0, -3.0],
         filter: [1000.0, 0.15],
         fx: None,
         crush: false,
@@ -1702,6 +1714,7 @@ fn slab_city() -> Rack {
         space: [0.15, 0.5, 0.15],
         trim_db: 0.0,
         dub: false,
+        voice: Some((750.0, 14.0, [60.0, 900.0, 0.55, 800.0])),
     })
 }
 
@@ -1766,6 +1779,7 @@ fn rope_walk() -> Rack {
         space: [0.2, 0.4, 0.15],
         trim_db: 1.0,
         dub: false,
+        voice: None,
     })
 }
 
@@ -1834,6 +1848,7 @@ fn lamp_oil() -> Rack {
         space: [0.45, 4.0, 0.32],
         trim_db: -2.0,
         dub: true,
+        voice: None,
     })
 }
 
@@ -1849,23 +1864,23 @@ fn pinball() -> Rack {
         bpm: 120.3,
         swing: 0.0,
         kit: Kit {
-            lens: [16.0, 16.0, 5.0, 7.0, 16.0, 9.0],
+            lens: [16.0, 16.0, 13.0, 7.0, 16.0, 9.0],
             ..kit(
                 [
                     NONE,
                     NONE,
-                    "x.o.x...........",
-                    "x.x.o.x.........",
+                    "o...............",
+                    "x..o............",
                     NONE,
-                    "x..o..x.o.......",
+                    "x....o..........",
                 ],
                 [
                     NONE,
                     NONE,
-                    "xxo.x...........",
-                    "x.xxo.x.........",
+                    "o.....o.........",
+                    "x.xo..x.........",
                     NONE,
-                    "x.xo.xx.o.......",
+                    "x..o..o.x.......",
                 ],
                 [-6.0, 200.0, 0.0],
                 [-8.0, -9.0, -12.0, -5.0],
@@ -1873,28 +1888,28 @@ fn pinball() -> Rack {
             )
         },
         bass: part(
-            "0 7 3 - 10 - - - - - - - - - - -",
-            [3.0, 1.0, 8.0, 25.0, 0.0],
+            "0 7 - 3 -",
+            [1.0, 1.0, 8.0, 50.0, -1.0],
             0.0,
-            35.0,
-            [1.0, 90.0, 0.0, 30.0],
-            0.7,
+            45.0,
+            [4.0, 160.0, 0.0, 60.0],
+            0.8,
         )
         .len(5.0)
-        .lp(2400.0),
+        .lp(1500.0),
         chords: Some(
             part(
-                "12 5 - 8 15 - 3 - - - - - - - - -",
-                [1.0, 1.0, 8.0, 50.0, 1.0],
+                "7 - 0 - - 3 -",
+                [1.0, 1.0, 8.0, 50.0, 0.0],
                 0.0,
-                40.0,
-                [1.0, 120.0, 0.0, 40.0],
-                0.6,
+                45.0,
+                [4.0, 200.0, 0.0, 80.0],
+                0.7,
             )
             .len(7.0)
-            .lp(2000.0),
+            .lp(1200.0),
         ),
-        play: [1.0, 1.0, 0.5],
+        play: [1.0, 0.0, 0.5],
         drive: [2.0, -1.0],
         filter: [3000.0, 0.15],
         fx: None,
@@ -1904,6 +1919,7 @@ fn pinball() -> Rack {
         space: [0.5, 2.2, 0.35],
         trim_db: -1.5,
         dub: false,
+        voice: Some((1800.0, 8.0, [3.0, 300.0, 0.6, 90.0])),
     })
 }
 
@@ -1969,6 +1985,7 @@ fn scrap_metal() -> Rack {
         space: [0.3, 0.5, 0.2],
         trim_db: -1.0,
         dub: false,
+        voice: None,
     })
 }
 
@@ -2033,6 +2050,7 @@ fn dune_buggy() -> Rack {
         space: [0.3, 1.0, 0.2],
         trim_db: -1.0,
         dub: false,
+        voice: None,
     })
 }
 
@@ -2147,12 +2165,12 @@ phrase!(
     slab_phrase,
     140.0,
     [
-        (0.0, 1.5, 63),
-        (0.0, 1.5, 66),
-        (2.0, 1.5, 61),
-        (2.0, 1.5, 65),
-        (4.0, 3.0, 58),
-        (4.0, 3.0, 63)
+        (0.0, 3.5, 58),
+        (0.0, 3.5, 63),
+        (0.0, 3.5, 66),
+        (4.0, 3.5, 56),
+        (4.0, 3.5, 61),
+        (4.0, 3.5, 65)
     ]
 );
 phrase!(
@@ -2182,12 +2200,11 @@ phrase!(
     pinball_phrase,
     120.0,
     [
-        (0.0, 0.5, 72),
-        (0.5, 0.5, 79),
-        (1.5, 0.5, 75),
-        (3.0, 0.5, 82),
-        (4.0, 0.5, 70),
-        (5.5, 0.5, 77)
+        (0.0, 1.0, 60),
+        (1.0, 1.0, 67),
+        (3.0, 1.0, 63),
+        (4.0, 2.0, 70),
+        (6.0, 1.0, 58)
     ]
 );
 phrase!(
@@ -2275,7 +2292,7 @@ fn presets() -> Vec<Preset> {
             "Rare, soft hits that never repeat exactly; Pulse up for more of them, Space up for a long tail.", still_water, still_phrase, 24.0),
     ].into_iter().chain([
         q("slab-city", "Slab City", &["glide", "808", "trap", "140bpm"],
-            "A half-time trap loop: a short kick and a clap on the third beat, rolling hats with some left to chance, and a sliding sine 808 under them. Press Run, then play minor chords over it. Tone opens the music, Glide sets how long the 808 slides between notes, Hats raises the hats, Room adds a short echo and a tight room.",
+            "A half-time trap loop: a short kick and a clap on the third beat, rolling hats with some left to chance, and a sliding sine 808 under them. Press Run, then play slow minor chords over it; the played voice is a dark, soft saw pad. Tone opens the music, Glide sets how long the 808 slides between notes, Hats raises the hats, Room adds a short echo and a tight room.",
             "The 808 sliding between its notes; Glide up for longer slides, Hats up for busier rolls.", slab_city, slab_phrase, 16.0),
         q("rope-walk", "Rope Walk", &["phased", "pumping", "french touch", "118bpm", "signature"],
             "A disco loop for French touch: an octave-jumping bass walking up in steps, syncopated saw stabs through a phaser, a four-on-the-floor kick and a clap, all ducked by the kick. Press Run, then play stabs on top. Filter opens the loop like a DJ knob, Phase brings in the phaser, Pump sets how hard the kick ducks the music, Room adds a tempo-synced echo and a tight room.",
@@ -2284,8 +2301,8 @@ fn presets() -> Vec<Preset> {
             "A dub techno loop: a soft kick, a rim click, a deep sine sub and a muted chord stab thrown into a long dotted echo. Press Run, then play chords over it. Chord sets the level of the stab, Dub feeds more of it to its own tempo echo, Filter opens the music, Space adds the long echo and the room.",
             "The chord stab repeating into the dark; Dub up for a longer tail, Chord up for a louder stab.", lamp_oil, lamp_phrase, 16.0),
         q("pinball", "Pinball", &["polymeter", "bleeps", "modular", "120bpm"],
-            "A polymetric bleep machine: two sequencers of five and seven steps drift against a clap, a hat and a tom of five, seven and nine steps, so the pattern only repeats after many bars. Press Run, then play notes over it. Pitch tunes the bleeps, Tempo speeds the whole machine up and down, Bleep raises the second bleep line, Space adds the echo and the room.",
-            "The five-, seven- and nine-step lines drifting apart; Tempo up to speed them, Pitch to bend the bleeps.", pinball, pinball_phrase, 16.0),
+            "A polymetric bleep machine: two low sequencer lines of five and seven steps drift against a sparse clap, hat and tom of thirteen, seven and nine steps, so the pattern only repeats after many bars. Press Run, then play notes over it. Pitch tunes the bleeps, Tempo speeds the whole machine up and down, Bleep raises the second bleep line, Space adds the echo and the room.",
+            "The low five- and seven-step lines drifting against sparse hits; Tempo up to speed them, Pitch to bend the bleeps.", pinball, pinball_phrase, 16.0),
         q("scrap-metal", "Scrap Metal", &["formant", "crushed", "electro", "french touch", "128bpm", "signature"],
             "A robot stomp: a hard-driven bass, a stab that talks through a vowel filter, a tight kick, snare and clap, crushed and compressed until it pumps. Press Run, then play lines on top. Vowel morphs the stab from a to u, Crush brings in the bitcrusher, Pump sets how hard the kick ducks the music, Room adds a slapback and a tight room.",
             "The stab changing vowel; Crush up for grit, Vowel to open and close the mouth.", scrap_metal, scrap_phrase, 16.0),
