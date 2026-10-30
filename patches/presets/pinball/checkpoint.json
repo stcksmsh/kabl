@@ -135,7 +135,7 @@
         "y": 620.0
       },
       "params": {
-        "bpm": 64.3,
+        "bpm": 64.0,
         "pin.transport": 0.0,
         "swing": 0.0
       }
