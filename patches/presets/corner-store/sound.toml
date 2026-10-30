@@ -1,0 +1,10 @@
+name = "Corner Store"
+category = "Groove"
+tags = [
+    "swung",
+    "funk",
+    "108bpm",
+]
+description = "A funk groove: a soft plucked bass with octave jumps, a tight kick and snare, swung hats and clav-like stabs. Press Run, then play lines over it. Swing sets the shuffle of the 16ths, Filter opens the stabs and the bass, Drive adds bite, Room adds a short echo and a small room."
+keys = true
+sequence = true

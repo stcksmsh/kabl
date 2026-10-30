@@ -1,0 +1,15 @@
+{
+ "plugin_sha256": "d5cda48340531b1a7d2818546da7689564ae6dd9f6f0a82d6aba4b9cce06f525",
+ "corner-store": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1821,
+  "rms": 0.0304,
+  "restart_relative_difference": 0.0
+ },
+ "glass-coast": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1674,
+  "rms": 0.0292,
+  "restart_relative_difference": 0.0
+ }
+}

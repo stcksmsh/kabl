@@ -45,6 +45,14 @@ const LN_1000: f32 = 6.907_755;
 const FLOOR: f32 = 1e-4;
 /// Fade of the retrigger offset (`Declick`) in ms.
 const DECLICK_MS: f32 = 1.0;
+/// Raised-cosine attack of a hit that starts from silence, in ms (`Declick`).
+const ATTACK_MS: f32 = 0.4;
+
+/// The attack ramp length in samples.
+#[inline]
+fn attack_len(sr: f32) -> u32 {
+    ((ATTACK_MS * 0.001 * sr).round() as u32).max(2)
+}
 
 const fn input(name: &'static str, t: PortType) -> PortInfo {
     port(name, t, true)
@@ -114,12 +122,16 @@ impl Edge {
 
 /// The offset that keeps a retriggered output continuous: the first sample of the new hit is
 /// moved onto the last sample of the old output, and the difference fades out over 1 ms. A hit
-/// from silence (last output near 0) is left alone, so its attack stays sharp.
+/// from silence (last output near 0) gets a short raised-cosine attack instead (`ATTACK_MS`), so
+/// the first sample is not a step.
 #[derive(Debug, Clone, Copy, Default)]
 struct Declick {
     off: f32,
     last: f32,
     pending: bool,
+    /// Samples of the attack ramp played so far, and whether it is running.
+    pos: u32,
+    ramping: bool,
 }
 
 impl Declick {
@@ -129,14 +141,26 @@ impl Declick {
     }
     /// `x` plus the fading offset; call once per sample, silent samples included.
     #[inline]
-    fn apply(&mut self, x: f32, k: f32) -> f32 {
+    fn apply(&mut self, x: f32, k: f32, ramp: u32) -> f32 {
         if self.pending {
             self.pending = false;
             if self.last.abs() > 1e-4 {
                 self.off = self.last - x;
+                self.ramping = false;
+            } else {
+                self.pos = 0;
+                self.ramping = true;
             }
         }
-        let y = x + self.off;
+        let mut y = x + self.off;
+        if self.ramping {
+            self.pos += 1;
+            if self.pos >= ramp {
+                self.ramping = false;
+            } else {
+                y *= 0.5 - 0.5 * (std::f32::consts::PI * self.pos as f32 / ramp as f32).cos();
+            }
+        }
         self.off *= k;
         if self.off.abs() < 1e-9 {
             self.off = 0.0;
@@ -316,6 +340,8 @@ impl Thump {
                 off: 0.0,
                 last: 0.0,
                 pending: false,
+                pos: 0,
+                ramping: false,
             },
             rng: Rng(seed),
             phase: 0.0,
@@ -346,6 +372,7 @@ impl Thump {
         let level = db(p(io, T_LEVEL, -60.0, 12.0));
         let (sens, acc_db) = (p(io, T_VEL, 0.0, 1.0), p(io, T_ACCENT, 0.0, 24.0));
         let kd = t60(DECLICK_MS, sr);
+        let rn = attack_len(sr);
         let floor = FLOOR / g;
         let base = tune.min(max_hz(sr));
         let out = &mut io.output(0)[..n];
@@ -361,7 +388,7 @@ impl Thump {
                 self.age = 0;
             }
             if !self.active {
-                *o = self.declick.apply(0.0, kd);
+                *o = self.declick.apply(0.0, kd, rn);
                 continue;
             }
             let f = base + (start - base) * self.pitch;
@@ -371,7 +398,7 @@ impl Thump {
             self.lp += a_lp * (x - self.lp);
             *o = self
                 .declick
-                .apply(drive(self.lp, g, norm) * self.gain * level, kd);
+                .apply(drive(self.lp, g, norm) * self.gain * level, kd, rn);
             self.pitch *= kp;
             self.amp *= ka;
             self.click *= kc;
@@ -569,6 +596,7 @@ impl Module for Snare {
         let level = db(p(io, S_LEVEL, -60.0, 12.0));
         let (sens, acc_db) = (p(io, S_VEL, 0.0, 1.0), p(io, S_ACCENT, 0.0, 24.0));
         let kd = t60(DECLICK_MS, sr);
+        let rn = attack_len(sr);
         let floor = FLOOR / g;
         let out = &mut io.output(0)[..n];
         for (i, o) in out.iter_mut().enumerate() {
@@ -581,7 +609,7 @@ impl Module for Snare {
                 self.age = 0;
             }
             if !self.active {
-                *o = self.declick.apply(0.0, kd);
+                *o = self.declick.apply(0.0, kd, rn);
                 continue;
             }
             let f = tune * (1.0 + 0.4 * self.pitch);
@@ -599,7 +627,7 @@ impl Module for Snare {
             let x = drum * wb + hiss * wn;
             *o = self
                 .declick
-                .apply(drive(x, g, norm) * self.gain * level, kd);
+                .apply(drive(x, g, norm) * self.gain * level, kd, rn);
             self.pitch *= kp;
             self.body *= kb;
             self.noise *= kn;
@@ -747,6 +775,7 @@ impl Module for Clap {
         let level = db(p(io, C_LEVEL, -60.0, 12.0)) * 2.4;
         let (sens, acc_db) = (p(io, C_VEL, 0.0, 1.0), p(io, C_ACCENT, 0.0, 24.0));
         let kd = t60(DECLICK_MS, sr);
+        let rn = attack_len(sr);
         let out = &mut io.output(0)[..n];
         for (i, o) in out.iter_mut().enumerate() {
             if self.trig.rising(gate.at(i)) {
@@ -757,7 +786,7 @@ impl Module for Clap {
                 self.age = 0;
             }
             if !self.active {
-                *o = self.declick.apply(0.0, kd);
+                *o = self.declick.apply(0.0, kd, rn);
                 continue;
             }
             let x = self
@@ -765,7 +794,7 @@ impl Module for Clap {
                 .process_with_coeffs_multi(self.rng.white(), &bp)
                 .bandpass
                 * self.env;
-            *o = self.declick.apply((x * self.gain * level).tanh(), kd);
+            *o = self.declick.apply((x * self.gain * level).tanh(), kd, rn);
             self.age = self.age.saturating_add(1);
             if self.stage + 1 < bursts {
                 self.env *= kb;
@@ -947,6 +976,7 @@ impl Module for Hat {
         let level = db(p(io, H_LEVEL, -60.0, 12.0)) * 6.0;
         let (sens, acc_db) = (p(io, H_VEL, 0.0, 1.0), p(io, H_ACCENT, 0.0, 24.0));
         let kd = t60(DECLICK_MS, sr);
+        let rn = attack_len(sr);
         let out = &mut io.output(0)[..n];
         for (i, o) in out.iter_mut().enumerate() {
             // The closed gate wins when both rise on one sample.
@@ -969,7 +999,7 @@ impl Module for Hat {
                 self.age = 0;
             }
             if !self.active {
-                *o = self.declick.apply(0.0, kd);
+                *o = self.declick.apply(0.0, kd, rn);
                 continue;
             }
             let mut s = 0.0;
@@ -984,7 +1014,7 @@ impl Module for Hat {
                 .highpass;
             *o = self
                 .declick
-                .apply((x * self.env * self.gain * level).tanh(), kd);
+                .apply((x * self.env * self.gain * level).tanh(), kd, rn);
             self.env *= self.k;
             self.age = self.age.saturating_add(1);
             if self.env < FLOOR {

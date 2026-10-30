@@ -155,6 +155,37 @@ fn a_hit_starts_on_the_sample_of_the_rising_edge() {
 }
 
 #[test]
+fn a_hit_from_silence_rises_over_a_short_ramp_instead_of_stepping() {
+    for kind in VOICES {
+        for edge in [1usize, 37, 64, 100] {
+            let len = 4096;
+            let g = gate(len, &[edge], 200);
+            let x = Dut::new(kind, &[], SR).run(&[&g], len, 64).remove(0);
+            let top = peak(&x[edge..edge + 2000]);
+            let first = x.iter().position(|v| v.abs() > 1e-9).unwrap();
+            assert!(
+                x[first].abs() < 0.02 * top,
+                "{kind}: edge {edge} starts with {} of a peak of {top}",
+                x[first]
+            );
+            // The ramp is 0.4 ms (19 samples): its raised cosine climbs at most
+            // pi / (2 * 19) of the hit's level per sample, so the output stays within
+            // that slope plus the voice's own movement over the ramp.
+            let ramp = 19;
+            let own = max_step(
+                &Dut::new(kind, &[], SR).run(&[&gate(len, &[edge], 200)], len, 64)[0]
+                    [edge + ramp..edge + 3 * ramp],
+            );
+            let step = max_step(&x[first - 1..first + ramp]);
+            assert!(
+                step <= top * 0.15 + own,
+                "{kind}: edge {edge} steps by {step} in the ramp (peak {top}, later steps {own})"
+            );
+        }
+    }
+}
+
+#[test]
 fn block_size_does_not_change_the_sound() {
     for kind in VOICES {
         let len = 9600;
@@ -177,7 +208,8 @@ fn a_retrigger_steps_no_more_than_a_fresh_hit() {
         let len = 24000;
         let fresh = gate(len, &[100], 100);
         let a = Dut::new(kind, &[], SR).run(&[&fresh], len, 64).remove(0);
-        let own = max_step(&a[..2000]);
+        // The voice's own movement once its 0.4 ms attack ramp is over.
+        let own = max_step(&a[100 + 24..2000]);
         // Second hit while the first is loud: 1 ms, 3 ms and 20 ms after it.
         for gap in [48usize, 144, 960] {
             let g = gate(len, &[100, 100 + gap], 100);
@@ -189,7 +221,9 @@ fn a_retrigger_steps_no_more_than_a_fresh_hit() {
                 "{kind}: gap {gap}: step {around:.3}, fresh hit {own:.3}, hard restart {jump:.3}"
             );
             assert!(
-                around <= (own * 1.25 + 0.02).max(0.5 * jump),
+                // A retrigger has no attack ramp (the offset keeps it continuous), so the new hit's own
+                // click may step as hard as a fraction of the voice's level.
+                around <= (own * 1.25 + 0.02).max(0.5 * jump).max(0.35 * peak(&a)),
                 "{kind}: retrigger after {gap} steps {around}, a fresh hit {own}, a hard restart {jump}"
             );
         }
@@ -455,4 +489,36 @@ fn a_note_in_the_first_block_of_a_new_module_is_not_lost() {
     // The other note was kept in the queue and dropped when the params were known.
     assert_eq!(o[1][4], 100.0 / 127.0);
     assert_eq!(o[1][63], 100.0 / 127.0);
+}
+
+/// `cargo test --release -p kabl-modules --test drums -- --ignored --nocapture`: peak of the hit and
+/// the share of the energy above 5 kHz in its first 20 ms, to compare the onset ramp with a build without it.
+#[test]
+#[ignore = "prints the transient peak and the energy above 5 kHz of every voice"]
+fn print_transient_metrics() {
+    for kind in VOICES {
+        let x = one_hit(kind, SR);
+        let seg = &x[100..100 + 960];
+        let n = 960usize;
+        let (mut hi, mut all) = (0.0f64, 0.0f64);
+        for k in 1..n / 2 {
+            let (mut re, mut im) = (0.0f64, 0.0f64);
+            for (i, v) in seg.iter().enumerate() {
+                let a = std::f64::consts::TAU * (k * i) as f64 / n as f64;
+                re += *v as f64 * a.cos();
+                im -= *v as f64 * a.sin();
+            }
+            let e = re * re + im * im;
+            all += e;
+            if k as f64 * SR as f64 / n as f64 > 5000.0 {
+                hi += e;
+            }
+        }
+        println!(
+            "METRIC {kind}: peak {:.4} dB, energy above 5 kHz {:.4} dB",
+            20.0 * peak(&x).log10(),
+            10.0 * hi.log10()
+        );
+        let _ = all;
+    }
 }

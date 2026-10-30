@@ -1,5 +1,3 @@
 # Accepted findings: "<path suffix> <FLAG>". Add a line only with a reason; a fixed preset removes its line.
 # Rubber Band: two real clicks (bass retrigger edge, 0.2 FS in 3 samples). Fix pending, not part of the scanner task.
 clips/bass-lead/group2/rubber-band.flac CLICK
-# Rail Yard: the kick onset at 8.0 s (a step from -69 to +28 in one sample at the drum grid), probably intended.
-clips/bass-lead/group2/rail-yard.flac CLICK
