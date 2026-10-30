@@ -9,6 +9,6 @@ tags = [
     "123bpm",
     "signature",
 ]
-description = "Hold a chord and press Run: a driven, phased saw chord that pumps against a kick you never hear (a sidechain from an internal kick, four on the floor, at 123 BPM with swing). Cutoff opens the filter, Crunch pushes the drive, Room sets a synced echo and a tight room, Pump sets how hard the kick ducks the chord."
+description = "Hold a chord and press Run: a driven, phased saw chord that ducks on every beat (a silent envelope on the host clock at 123 BPM with swing; no drum is built in). Cutoff opens the filter, Crunch pushes the drive, Room sets a synced echo and a tight room, Pump sets how hard the beat ducks the chord."
 keys = true
 sequence = true

@@ -109,7 +109,7 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
     (
         "presets/loading-dock",
         "Loading Dock",
-        "Piece",
+        "Groove",
         &["sequenced", "cues", "drums", "drop", "124bpm", "filter house", "signature"],
         "A self-playing filter-house piece at 124 BPM with swing: a four-on-the-floor kick with a clap and open hats, a bass and a stab line that duck hard to the kick through the compressor sidechain, a resonant filter, a noise riser and a hand-played voice on top. Five cues: Intro (filter shut, dry, silent until Run), Build (the filter opens over three bars as the riser and the wash rise), Gap (everything shut but the wash), Drop (drive and pump at full), Break (back down, wet). Press Run, then launch the cues with the pads or CC 40-44; turn a macro to take over. Sweep opens the filter, Drive pushes the drive and the bitcrusher, Wash brings in the riser, the echo and the room, Pump sets how hard the kick ducks the bass and stabs.",
     ),
@@ -217,7 +217,7 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "Turnstile",
         "Keys",
         &["poly", "sequenced", "pumping", "phased", "french touch", "123bpm", "signature"],
-        "Hold a chord and press Run: a driven, phased saw chord that pumps against a kick you never hear (a sidechain from an internal kick, four on the floor, at 123 BPM with swing). Cutoff opens the filter, Crunch pushes the drive, Room sets a synced echo and a tight room, Pump sets how hard the kick ducks the chord.",
+        "Hold a chord and press Run: a driven, phased saw chord that ducks on every beat (a silent envelope on the host clock at 123 BPM with swing; no drum is built in). Cutoff opens the filter, Crunch pushes the drive, Room sets a synced echo and a tight room, Pump sets how hard the beat ducks the chord.",
     ),
     (
         "presets/hand-bell",
@@ -316,7 +316,7 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "Steel Toe",
         "Bass",
         &["mono", "distorted", "compressed", "sidechain", "124bpm", "french touch", "signature"],
-        "A blunt mono bass for French touch: two saws over a square sub, 18 dB of drive and a compressor squeezing it flat, then ducked hard by a four-on-the-floor kick through a sidechain. Press Run to start the kick, then play short off-beat notes; the mod wheel opens the filter. Bite opens the filter, Grit pushes the drive, Pump sets how hard the kick ducks the bass, Room adds a tempo-synced slapback and a tight room.",
+        "A blunt mono bass for French touch: two saws over a square sub, 18 dB of drive and a compressor squeezing it flat, then ducked on every beat by a silent envelope on the host clock (no drum is built in). Press Run to start the clock, then play short off-beat notes; the mod wheel opens the filter. Bite opens the filter, Grit pushes the drive, Pump sets how hard the beat ducks the bass, Room adds a tempo-synced slapback and a tight room.",
     ),
     (
         "presets/tar-pit",
@@ -413,8 +413,8 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "presets/rail-yard",
         "Rail Yard",
         "Bass",
-        &["mono", "sidechain", "drums", "124bpm", "house"],
-        "A house bass ducked by its own drum grid: a saw and a square sub through a compressor, with a kick, clap and hats playing from the grid. Press Run for the beat, then play off-beat notes; the mod wheel opens the filter. Cutoff opens the filter, Drive adds drive, Pump sets how hard the kick ducks the bass, Room adds a synced echo and a room.",
+        &["mono", "sidechain", "124bpm", "house"],
+        "A house bass that ducks on every beat: a saw and a square sub through a compressor, pulled down by a silent envelope on the host clock (no drum is built in). Press Run for the pump, then play off-beat notes; the mod wheel opens the filter. Cutoff opens the filter, Drive adds drive, Pump sets how hard the beat ducks the bass, Room adds a synced echo and a room.",
     ),
     (
         "presets/oak-stave",

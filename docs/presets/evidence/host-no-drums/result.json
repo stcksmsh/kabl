@@ -1,0 +1,9 @@
+{
+ "plugin_sha256": "afef60d6cc7db91ef6d9a108e5239893ddeea402b656be5096f7761c0c8b49df",
+ "loading-dock": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0779,
+  "rms": 0.0137,
+  "restart_relative_difference": 0.0
+ }
+}

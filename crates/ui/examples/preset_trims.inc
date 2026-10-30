@@ -29,7 +29,7 @@ fn level_trim(slug: &str) -> f32 {
         "spark-plug" => -0.6,
         "spinet" => -3.0,
         "tuning-fork" => -5.0,
-        "turnstile" => -1.6,
+        "turnstile" => -4.8,
         "velvet-tine" => -2.7,
         "willow" => -5.0,
         _ => 0.0,

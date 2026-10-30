@@ -90,6 +90,27 @@ impl Rack {
         let cable = self.e.connect_route(jack(a, ap), b, param);
         self.e.set_route_amount(cable, amount, true);
     }
+    /// A route whose amount is scaled by macro `mac`: `depth` is the fraction of the knob's travel
+    /// the source sweeps at the macro's maximum.
+    #[allow(clippy::too_many_arguments)]
+    fn depth_route(
+        &mut self,
+        a: ModuleId,
+        ap: &str,
+        b: ModuleId,
+        param: &str,
+        knob: ModuleId,
+        mac: &str,
+        depth: f32,
+    ) {
+        let cable = self.e.connect_route(jack(a, ap), b, param);
+        self.e.set_route_amount(cable, 0.0, true);
+        let d = self
+            .e
+            .connect_cable_route(jack(knob, mac), cable, "amount")
+            .expect("a route has a depth");
+        self.e.set_route_amount(d, depth, true);
+    }
     /// The last stage: the output. No limiter; headroom comes from the patch gain.
     fn out_stereo(&mut self, from: ModuleId) {
         let out = self.add("out", &[]);
@@ -207,6 +228,7 @@ struct Post<'a> {
 
 struct Stages {
     lad: ModuleId,
+    trim: ModuleId,
 }
 
 fn post(r: &mut Rack, knob: ModuleId, src: ModuleId, p: &Post) -> Stages {
@@ -283,7 +305,7 @@ fn post(r: &mut Rack, knob: ModuleId, src: ModuleId, p: &Post) -> Stages {
         p.room_max,
     );
     r.out_stereo(tail);
-    Stages { lad }
+    Stages { lad, trim }
 }
 
 /// A short echo (a slapback, or tempo-synced when `clock` is given) and a room, both at mix 0

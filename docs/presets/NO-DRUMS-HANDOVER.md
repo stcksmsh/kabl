@@ -29,3 +29,12 @@ Step 2 above. The four presets live in `presets_bass_lead.rs` (steel_toe, rail_y
 ## Decisions for Kosta
 
 None open.
+
+## Step 2 done (claude/presets-no-drums)
+
+Update (Kosta approved): Loading Dock is not reworked. It is back to its master version with its drums, category Groove (it plays itself on Run; `GROOVE.md` counts 15, `BRIEF.md` updated). Everything below about Loading Dock (duck depth, -4.0 dB trim, its levels, evidence) is superseded: no trim, patch and clip equal master apart from the category. The before/after tour has the other three only.
+
+Steel Toe, Rail Yard, Turnstile, Loading Dock: `drum.*`, `seq` lanes, `drum.grid`, the sidechain compressor and the drum bus are gone. Each has `clock.div` (div 4) into `env.adsr` (3 ms attack, 200-230 ms decay) routed to the voice's trim `gain_db`, depth -0.30 (bass) or -0.25 (Turnstile, Loading Dock) scaled by the Pump macro (m3; m4 in Loading Dock). Without MIDI the three keyboard/bass presets render silence (rms 0.0); Loading Dock plays itself. Steel Toe's amp attack went 1 to 2 ms: the kick had hidden a CLICK at 6.548 s. Trims: Turnstile -4.8 dB, Loading Dock -4.0 dB.
+Levels (clip peak / loudness): Steel Toe -4.3 dBFS / -14.8, Rail Yard -8.4 / -18.6, Turnstile -3.5 / -15.1, Loading Dock -2.4. `factory_levels_hold_the_target` passes (all macros up, peak <= -1 dBFS).
+Evidence: `evidence/host-no-drums`, `evidence/standalone-no-drums`. Before/after tour `clips/no-drums/before-after-tour.flac` (start seconds, before / after): steel-toe 0 / 10, rail-yard 20 / 30, turnstile 40 / 51, loading-dock 62 / 93. Group tour starts: steel-toe 65 s (bass-lead group1), rail-yard 110 s (bass-lead group2), turnstile 153 s (keys-pluck group2).
+`audio_defects.allow` had no entries for these four; the `host.py` no-MIDI exemption for steel-toe and rail-yard is removed.

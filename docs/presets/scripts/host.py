@@ -156,8 +156,7 @@ try:
             run(f'{slug}-nomidi', S / f'{slug}-nomidi.rpp', secs)
             q = feats(S / f'render-{slug}-nomidi.wav')
             r['rms_without_midi'] = round(q['rms'], 5)
-            # steel-toe keeps its kick without MIDI; the bass is what MIDI adds
-            assert q['rms'] < a['rms'] * (0.9 if slug in ('steel-toe', 'rail-yard') else 0.1), f'{slug}: plays without MIDI?'
+            assert q['rms'] < a['rms'] * 0.1, f'{slug}: plays without MIDI?'
         print(slug, json.dumps(r))
 finally:
     for pr in (wm, x):

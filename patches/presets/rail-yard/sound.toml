@@ -3,10 +3,9 @@ category = "Bass"
 tags = [
     "mono",
     "sidechain",
-    "drums",
     "124bpm",
     "house",
 ]
-description = "A house bass ducked by its own drum grid: a saw and a square sub through a compressor, with a kick, clap and hats playing from the grid. Press Run for the beat, then play off-beat notes; the mod wheel opens the filter. Cutoff opens the filter, Drive adds drive, Pump sets how hard the kick ducks the bass, Room adds a synced echo and a room."
+description = "A house bass that ducks on every beat: a saw and a square sub through a compressor, pulled down by a silent envelope on the host clock (no drum is built in). Press Run for the pump, then play off-beat notes; the mod wheel opens the filter. Cutoff opens the filter, Drive adds drive, Pump sets how hard the beat ducks the bass, Room adds a synced echo and a room."
 keys = true
 sequence = true
