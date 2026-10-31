@@ -1,28 +1,28 @@
 {
- "plugin_sha256": "bdd65857751b3c08022a69a3d6b2c7827d1004d0b3855ec1129b02295d34385b",
+ "plugin_sha256": "41bb400766c855fa7f696c1a356d88e9d327a0d45d2c3cf9062f12e6ffefb0ab",
  "slab-city": {
   "states_identical_across_save_quit_reopen": true,
   "peak": 0.1169,
   "rms": 0.0223,
-  "restart_relative_difference": 0.0
+  "restart_relative_difference": 0.46842
  },
  "rope-walk": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1272,
-  "rms": 0.021,
-  "restart_relative_difference": 1.33399
+  "peak": 0.12,
+  "rms": 0.0216,
+  "restart_relative_difference": 0.0
  },
  "lamp-oil": {
   "states_identical_across_save_quit_reopen": true,
   "peak": 0.1609,
   "rms": 0.0267,
-  "restart_relative_difference": 0.0
+  "restart_relative_difference": 0.74735
  },
- "pinball": {
+ "acid-line": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1624,
-  "rms": 0.0334,
-  "restart_relative_difference": 0.0
+  "peak": 0.1824,
+  "rms": 0.026,
+  "restart_relative_difference": 1.35214
  },
  "scrap-metal": {
   "states_identical_across_save_quit_reopen": true,

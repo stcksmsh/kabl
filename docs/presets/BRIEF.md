@@ -23,7 +23,7 @@ Categories are by role. The role is the preset's `category` in the Sounds browse
 | Keys (keys and chords) | 16 | Poly. Clean electric pianos and organs (pop, house), disco stabs and phased chord loops (signature), FM keys, rhodes-like keys, house piano stabs. |
 | Pad | 14 | Poly. Ambient and cinematic (slow, wide, long tails), supersaw and analog pads (synthwave, pop), thick and saturated pads (signature), evolving and textured pads. |
 | Pluck (plucks and mallets) | 10 | Poly. FM and sampled-feel mallets, marimbas, kalimbas, harp and guitar-like plucks, short synth plucks for pop and trap. |
-| Groove (grooves and arps) | 15 | Arpeggiators and sequences that play with a held chord or on their own, at a stated tempo: house and techno loops, pumping arps (signature), trap and breaks patterns, modular bleeps. Start on Run. |
+| Groove (grooves and arps) | 15 | Arpeggiators and sequences that play with a held chord or on their own, at a stated tempo: house and techno loops, pumping arps (signature), trap and breaks patterns, acid bass lines. Start on Run. |
 | Piece | 9 | Self-playing pieces with cues: build-ups and drops (filter house, techno), ambient evolutions, cinematic swells, a pop loop with sections. Cues move the preset's macros; the sequencers keep playing. |
 | Voice (voices and FX) | 10 | Vowel, formant, talkbox and robot voices, metal, glass and noise, risers and impacts. Vocoder presets when the module lands. `FX` becomes a category with the first FX preset. |
 

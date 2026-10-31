@@ -23,7 +23,7 @@ Signature share: 4 of 14. Each macro is named for what it does for that groove.
 | Slab City | trap | 140 / 0 | half-time kick and snare, 808 and rolling hats | kick, clap, hats with chance; 808 | Tone, Glide, Hats, Room | no | 2 |
 | Rope Walk | French touch | 118 / 30 | disco bass and phased chord loop | kick, clap, hats; bass; chords | Filter, Phase, Pump, Room | yes | 2 |
 | Lamp Oil | dub techno | 124 / 0 | deep chords through a long tempo echo | kick, rim, hat; sub; chord | Chord, Dub, Filter, Space | no | 2 |
-| Pinball | modular | 120 / 0 | polymeter bleeps (rows of 5, 7, 9) | grid rows of different lengths; two seqs | Pitch, Tempo, Bleep, Space | no | 2 |
+| Acid Line | acid house | 124 / 16 | squelchy 303-style bass over a 909-style kick, clap and offbeat open hats | kick, clap, hats, open hat; resonant saw bass with accents and slides | Cutoff, Resonance, Accent, Slide | no | 2 |
 | Scrap Metal | electro, French touch | 128 / 20 | robot stomp: crushed drums and a talking filter | kick, snare, clap, hats; bass; formant stab | Vowel, Crush, Pump, Room | yes | 2 |
 | Dune Buggy | UK garage | 130 / 58 | shuffled two-step with a sub and chopped chords | kick, snare, hats; sub; chords | Swing, Filter, Chop, Space | no | 2 |
 
@@ -72,14 +72,14 @@ With every macro at 1 Corner Store's strongest peak is 2180 Hz at -57 dB (it was
 
 ## Group 2
 
-Clips in `docs/presets/clips/groove/group2/` (`<slug>.flac`, `<slug>.mp3` at 320 kbps, `tour.flac` with a 20 ms fade at both ends of each clip). Tour start times (one second of silence between clips): dune-buggy 0, lamp-oil 17, pinball 34, rope-walk 51, scrap-metal 70, slab-city 87 seconds. Each clip is the groove running with a short MIDI riff on top.
+Clips in `docs/presets/clips/groove/group2/` (`<slug>.flac`, `<slug>.mp3` at 320 kbps, `tour.flac` with a 20 ms fade at both ends of each clip). Tour start times (one second of silence between clips): acid-line 0, dune-buggy 17, lamp-oil 34, rope-walk 51, scrap-metal 70, slab-city 87 seconds. Each clip is the groove running with a short MIDI riff on top.
 
 | Preset | Macros (CC 20 up) | Listen for |
 |---|---|---|
 | Slab City | Tone, Glide, Hats, Room | The sine 808 sliding between its notes under a dark, soft pad; Glide up for longer slides, Hats up for busier rolls. |
 | Rope Walk | Filter, Phase, Pump, Room | The octave bass walking under phased stabs; Phase up for swirl, Pump up for a harder duck. |
 | Lamp Oil | Chord, Dub, Filter, Space | The muted chord stab repeating into a dotted echo; Dub up for a longer tail. |
-| Pinball | Pitch, Tempo, Bleep, Space | Low five- and seven-step bleep lines drifting against sparse thirteen-, seven- and nine-step drum rows; Tempo speeds the whole machine. |
+| Acid Line | Cutoff, Resonance, Accent, Slide | The bass squelching on the accented notes and sliding into the marked ones; Resonance up for the squeal, Accent up for wider opening on the accents, Slide up for longer glides. |
 | Scrap Metal | Vowel, Crush, Pump, Room | The stab changing vowel; Crush up for grit. |
 | Dune Buggy | Swing, Filter, Chop, Space | Shuffled hats and chopped chords; Chop down for shorter stabs. |
 
@@ -88,8 +88,8 @@ New generator pieces (no engine or module change): a `slew` on the 808's pitch f
 ### Checks (group 2)
 
 - `every_preset_keeps_to_the_brief`, the library tests and `factory_levels_hold_the_target` pass (debug).
-- Levels as `level_table` measures them (peak / loudness dBFS): Slab City -4.0 / -21.3, Rope Walk -6.2 / -21.9, Lamp Oil -4.5 / -19.9, Pinball -4.1 / -16.8, Scrap Metal -5.2 / -21.8, Dune Buggy -2.9 / -18.0.
-- Macros (`presets_groove macros patches 2`: peak with every macro at 0 and at 1, and dB of the difference render under the render for each macro alone). All peaks are under -1 dBFS: all at 0 / all at 1 are -5.8 / -4.3 (Slab City), -1.5 / -5.9 (Rope Walk), -4.4 / -3.5 (Lamp Oil), -5.4 / -4.8 (Pinball), -1.5 / -5.2 (Scrap Metal), -2.6 / -2.6 (Dune Buggy). Weakest macros: Slab City Hats -19.4, Scrap Metal Vowel -18.2 and Crush -19.0, Rope Walk Room -17.4; every other macro is -16 dB or louder. Slab City Hats is limited by the hat voice itself (more hat level did not move it), so the hats got louder velocities and the 808 got quieter.
+- Levels as `level_table` measures them (peak / loudness dBFS): Slab City -4.0 / -21.3, Rope Walk -6.2 / -21.9, Lamp Oil -4.5 / -19.9, Acid Line -3.1 / -19.8, Scrap Metal -5.2 / -21.8, Dune Buggy -2.9 / -18.0.
+- Macros (`presets_groove macros patches 2`: peak with every macro at 0 and at 1, and dB of the difference render under the render for each macro alone). All peaks are under -1 dBFS: all at 0 / all at 1 are -5.8 / -4.3 (Slab City), -1.5 / -5.9 (Rope Walk), -4.4 / -3.5 (Lamp Oil), -3.1 / -3.1 (Acid Line), -1.5 / -5.2 (Scrap Metal), -2.6 / -2.6 (Dune Buggy). Weakest macros: Slab City Hats -19.4, Scrap Metal Vowel -18.2 and Crush -19.0, Rope Walk Room -17.4; every other macro is -16 dB or louder. Slab City Hats is limited by the hat voice itself (more hat level did not move it), so the hats got louder velocities and the 808 got quieter.
 - `audio_defects.py` on the clips: clean for all six (HF_BURST advisories only), no new allow entry. The three tempos were first set a fraction of a bpm off the round number (140.4, 120.3, 130.3) because the scan flagged CLICKs in Dune Buggy (two), Pinball (one) and Slab City (one) at round tempos. Re-checked after the drum crossfade (#64): the engine is clean. The scan was the cause. It reads fixed 50 ms windows, and at round tempos a hit lands right at a window boundary (3.5 s and 6.5 s in Dune Buggy, 2.152 s in Pinball), so the window holds the attack and its tail and nothing before it, and a 0.4 ms attack looks like an isolated spike. Shifting the window by 600, 1200 or 1800 samples flags nothing. `audio_defects.py` now reads a spike in the first 2 ms or last 1 ms of a window with the neighbouring half window too (test: `test_attack_at_the_start_of_a_window_is_not_a_click`); the committed clips give the same flags as before except those three, the Rubber Band allow entries still match. Tempos are 140, 120 and 130 again.
 - Clips: 320 kbps mp3 against the float render, all six pass (snr 39.7 to 54.4 dB).
 - REAPER (`host.py` with `PH_SELF=1`, evidence in `evidence/host-groove2/`): all six save, quit, reopen with identical state. The render after reopen is identical for four; Slab City and Dune Buggy differ because the free-running clock starts at another phase each run (the script compares loudness instead).
@@ -119,12 +119,29 @@ Kosta: Pinball "better but still somewhat goofy", Slab City "a bit too goofy aga
 |---|---|---|
 | Dune Buggy | 2016, -60.5, 10.3 | -25.2 |
 | Lamp Oil | 2156, -66.8, 14.3 (before: 1500 Hz low-pass, -61.6, 18.5) | -35.7 |
-| Pinball | 23200, -89.1, 11.2 | -33.2 |
+| Acid Line | 23200, -83.5, 10.7 | -18.8 |
 | Rope Walk | 7849, -67.4, 14.6 | -23.1 |
 | Scrap Metal | 21454, -73.8, 3.1 | -23.6 |
 | Slab City | 16799, -73.2, 13.5 | -26.8 |
 
 Lamp Oil's first build had a tone at 2156 Hz, the 11th harmonic of the square fifth (G3) in the chord stab; the stab's low-pass went from 1.5 kHz to 1.0 kHz. Rope Walk's, Slab City's and Scrap Metal's strongest peaks are far above 5 kHz at -67 dBFS or lower. 
+
+### Pinball replaced by Acid Line
+
+Pinball ("concept is bad") is gone: patch, clips, generator entry and evidence deleted. Acid Line takes its slot in group 2; Groove stays at 15. `docs/presets/clips/groove/pinball-vs-acid-line.mp3`: the old Pinball clip, one second of silence, the Acid Line clip (Acid Line starts at 17.0 s). The four macro sweeps of Acid Line (0 to 1 to 0 over 8 s, groove running) are in `docs/presets/clips/groove/acid-line-macros/` (`acid-line-tour.mp3`: Cutoff 0, Resonance 11, Accent 22, Slide 33 seconds).
+
+- Voice: a saw through its own resonant ladder (`filter.ladder`, drive 6 dB), a filter envelope (220 ms decay) scaled by each step's velocity and routed into the cutoff, a gate-length amp envelope also scaled by the velocity (accent steps are louder and open the filter further). Slides: a `slew` on the pitch and a `crossfade` between the raw and the slewed pitch, moved by a second `seq` whose pitch lane is the slide flag of each step, so only the flagged steps glide (steps 4 and 7). The kit is `drum.grid` and the 909-style voices as in the other grooves; the kick ducks the music (ratio 4, not a macro).
+- Pattern length: `seq` has 8 steps on this branch, so the line is 8 sixteenths (A minor pentatonic, one rest, accents on steps 1 and 6) that repeats twice per bar. `clock.div` was not needed. When the longer `seq` lands the line can become 16 steps (change `length` and fill `p9..p16`, `v9..v16` in `acid_line`).
+- Macros: Cutoff (bass cutoff 180 Hz to 5.7 kHz, 0.5 of travel), Resonance (0.25 to 0.87), Accent (envelope depth 0 to 0.6 of travel, a depth route like the Wash and Sweep of Loading Dock), Slide (glide 8 to 100 ms). Built with the findings of the macro audit (#66) in mind: the routes end where the sound stops changing, no ratio-style first step, a glide scale that starts audible.
+- Macro audit of Acid Line (`macro_audit.py`, same method as #66; no dead steps, no jump, no end problem, no click while moving):
+
+
+| macro | routes: value at macro 0 / 0.5 / 1 | effect (change vs macro 0: at 0.5 / at 1; waveform 0 vs 1) | measured flags | verdict |
+|---|---|---|---|---|
+| m1 Cutoff | filter.ladder#17.cutoff_hz 180 / 1012 / 5692 Hz (range 20-2e+04, exponential; base 180, macro x 0.50 of travel) | +2.7 dB near 8980 Hz. 1.32 / 1.17 dB; waveform -7.7 dB | duplicate; overlaps Accent (m3): same change, cosine 0.98 | **ok**: bass cutoff 180 Hz to 5.7 kHz in even steps (0.5 to 0.8 dB per step), no dead step, last step 0.3 dB as the saw's harmonics run out; overlaps Accent only by the measure (Cutoff brightens every note, Accent only the accented ones) |
+| m2 Resonance | filter.ladder#17.resonance 0.25 / 0.56 / 0.87  (range 0-1, linear; base 0.25, macro x 0.62 of travel) | brighter (top +4.0 dB, low -0.4 dB); +6.8 dB near 2245 Hz. 0.62 / 1.40 dB; waveform -13.8 dB | - | **ok**: resonance 0.25 to 0.87: +7 dB near 2.2 kHz, steps 0.1 to 0.5 dB, no peak above -3 dBFS at 1, no click while moving |
+| m3 Accent | depth of vca#19.out to filter.ladder#17.cutoff_hz.amount: 0.00 / 0.30 / 0.60 (macro adds up to 0.60) | brighter (top +3.7 dB, low +0.0 dB); +6.0 dB near 5657 Hz. 1.01 / 1.68 dB; waveform -9.0 dB | duplicate; overlaps Cutoff (m1): same change, cosine 0.98 | **ok**: filter-envelope depth 0 to 0.6 of travel: even steps (0.45 to 0.6 dB), accented notes open further than plain ones; overlaps Cutoff only by the measure |
+| m4 Slide | slew#14.rise_ms 8 / 28.39 / 100.7 ms (range 0.1-1e+04, exponential; base 8, macro x 0.22 of travel)<br>slew#14.fall_ms 8 / 28.39 / 100.7 ms (range 0.1-1e+04, exponential; base 8, macro x 0.22 of travel) | no change in level, spectrum or density; the waveform differs by -4.8 dB (pitch path, timing or phase). 0.44 / 0.44 dB; waveform -4.8 dB | - | **ok**: glide 8 ms to 100 ms on the two marked steps: the spectrum stays and the pitch path moves (waveform -4.8 dB), even steps; no click while moving |
 
 Loading Dock (pilot, 124 bpm filter house) moves into Groove on another branch. Lamp Oil is also 124 bpm but is a sparse dub techno groove (rim click, sine sub, chord stab in a dotted echo, no four-on-the-floor bass duck), Rope Walk is 118 bpm disco.
 

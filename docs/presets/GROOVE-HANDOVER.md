@@ -17,7 +17,7 @@ From "Kabl overseer": Groove 14 total. Write `docs/presets/GROOVE.md` (plan of 1
 3. Clips: `PP_TOOL=presets_groove PP_OUT=docs/presets/clips/groove/group1 PP_GROUP=1` with `docs/presets/scripts/clips.py` (FLAC + 320k mp3 + tour with 20 ms fades); then `audio_defects.py`; `phrases` -> `host.py`; `standalone.py` on `kabl_agents`.
 4. Fill the "Group 1" section of `GROOVE.md` (start times, levels, macro evidence, checks).
 5. `cargo fmt`, `cargo clippy -D warnings`, tests, push, draft PR, `cargo clean`.
-6. Group 2 (6 presets in the plan): Slab City, Rope Walk, Lamp Oil, Pinball, Scrap Metal, Dune Buggy. Needs a formant stage for Scrap Metal (see Loud Mouth) and uneven row lengths (`len1..len8` of the grid) for Pinball.
+6. Group 2 (6 presets in the plan): Slab City, Rope Walk, Lamp Oil, Pinball (later replaced by Acid Line), Scrap Metal, Dune Buggy. Needs a formant stage for Scrap Metal (see Loud Mouth) and uneven row lengths (`len1..len8` of the grid) for Pinball.
 
 ## Facts that cost effort
 
