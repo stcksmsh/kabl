@@ -2,6 +2,10 @@
 
 Branch `claude/groove-macro-defects-2` (from origin/master 6e92737, #68 merged). No code changed yet; this file is the state. Rules: no stash, no merge, `cargo clean` at the end, draft PRs only, fmt + clippy (`bash .github/scripts/clippy.sh`), audio_defects with no allow entries, REAPER/standalone on `kabl_agents`. Shell tip: the worktree guard refuses compound git commands and heredocs; use the Write tool for scripts and plain single commands.
 
+## Click: parked (overseer decision)
+
+Do not chase it as a module bug now. `vca.gain=1` and `release_ms=300` clearing it suggest the VCA closing on resonant ringing (a short-release gate click, so probably real). Corner Store and Fault Line macros are redesigned later; their redesigned macros must render CLICK-free. Handle it there.
+
 ## Status (third session)
 
 - Loading Dock 6/5 dB vs 0.3 dB: both true at different points. #68 lowers the trim gain by 6.4 dB (Build) and 4.8 dB (Drop) (-9 dB per Sweep, +2.2 per Pump). With the music `compressor` bypassed (`PP_SET=compressor.ratio=1`) the cue rms drops Build -2.7 dB, Drop -4.7 dB (Intro 0.0). With it in the chain (as shipped) the compressor evens the level out: Build -0.2 dB, Drop -0.3 dB.
