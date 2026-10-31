@@ -119,7 +119,7 @@ fn paper() -> Th {
         cv: hex("#12958A"),
         gate: hex("#7651D6"),
         pitch: hex("#2F7FD6"),
-        accent: hex("#F2A33A"),
+        accent: hex("#A97229"),
         on_accent: hex("#1C1206"),
         skirt: hex("#D6D2C9"),
         cap0: hex("#FFFFFF"),
@@ -670,6 +670,62 @@ impl<'a> Face<'a> {
     }
 }
 
+// ---------------------------------------------------------------- Plex Sans Condensed (locked: titles + section labels)
+
+fn cond_family() -> egui::FontFamily {
+    egui::FontFamily::Name("kabl-cond-semibold".into())
+}
+
+/// Uppercase, +0.07 em tracking. Returns the screen width of `s` at `px`.
+fn cond_width(p: &Painter, s: &str, px: f32) -> f32 {
+    let u = s.to_uppercase();
+    p.layout_no_wrap(u.clone(), FontId::new(px, cond_family()), Color32::WHITE)
+        .size()
+        .x
+        + 0.07 * px * u.chars().count().saturating_sub(1) as f32
+}
+
+/// Draws `s` left-aligned, vertically centred on `at`, glyph by glyph so the tracking is kept.
+fn cond_draw(p: &Painter, at: Pos2, s: &str, px: f32, col: Color32) {
+    let u = s.to_uppercase();
+    let font = FontId::new(px, cond_family());
+    let mut prefix = String::new();
+    for ch in u.chars() {
+        let x = if prefix.is_empty() {
+            0.0
+        } else {
+            p.layout_no_wrap(prefix.clone(), font.clone(), col).size().x
+                + 0.07 * px * prefix.chars().count() as f32
+        };
+        p.text(
+            at + vec2(x, 0.0),
+            Align2::LEFT_CENTER,
+            ch.to_string(),
+            font.clone(),
+            col,
+        );
+        prefix.push(ch);
+    }
+}
+
+fn cond_text(p: &Painter, at: Pos2, s: &str, px: f32, col: Color32) {
+    cond_draw(p, at, s, px, col);
+}
+
+impl Face<'_> {
+    fn cond_w(&self, s: &str, size: f32) -> f32 {
+        cond_width(self.p, s, size * self.z) / self.z
+    }
+    fn cond_title(&mut self, s: &str, x: f32, top: f32, size: f32, col: Color32) {
+        let cy = top + size * 0.55;
+        cond_draw(self.p, self.pt(x, cy), s, size * self.z, col);
+        let w = self.cond_w(s, size);
+        let r = Rect::from_min_size(self.pt(x, cy - size * 0.425), vec2(w, size * 0.85) * self.z);
+        let bg = self.th.surf;
+        self.leaf(LK::Text, r, 0, 0, Some(col), bg, s);
+    }
+}
+
 // ---------------------------------------------------------------- specs
 
 struct Ctl {
@@ -958,7 +1014,12 @@ fn paint_face(f: &mut Face, sp: &Spec) {
         rx -= 8.0;
     }
     if let Some((opts, sel)) = sp.header {
-        let sw = 34.0;
+        let sw = opts
+            .iter()
+            .map(|o| f.tw(o, f.fsz(11.0), Font::MonoMedium))
+            .fold(0.0, f32::max)
+            + 8.0;
+        let sw = sw.max(34.0);
         rx -= sw * opts.len() as f32;
         f.seg(rx, 14.0, opts, sel, 18.0, Some(sw), None, None, None);
         rx -= 8.0;
@@ -1000,25 +1061,11 @@ fn paint_face(f: &mut Face, sp: &Spec) {
             6.0
         };
     let tcol = th.title_col(sp.fam);
-    match f.fit(
-        sp.title,
-        Some(sp.short),
-        tsize,
-        max_title,
-        Font::SansSemibold,
-    ) {
-        Some(t) => f.text(
-            &t,
-            M,
-            12.0,
-            tsize,
-            Font::SansSemibold,
-            tcol,
-            0,
-            0,
-            0,
-            th.surf,
-        ),
+    match [sp.title, sp.short]
+        .into_iter()
+        .find(|t| f.cond_w(t, tsize) <= max_title)
+    {
+        Some(t) => f.cond_title(t, M, 12.0, tsize, tcol),
         None => f.drop_text("title", sp.title, true),
     }
     if !compact {
@@ -1806,11 +1853,11 @@ fn paint_parts(p: &Painter, th: Th, o: Pos2) {
     f.fill(panel, 3.0, th.surf);
     f.stroke_r(panel, 3.0, Stroke::new(1.0, th.edge));
     // knobs
-    f.p.text(
+    cond_text(
+        f.p,
         f.pt(16.0, 20.0),
-        Align2::LEFT_CENTER,
         "KNOB  S 16 · M 20 · L 24 · states",
-        fnt(Font::SansSemibold, 14.0),
+        14.0,
         th.title_col("fx"),
     );
     let mut x = 50.0;
@@ -1833,11 +1880,11 @@ fn paint_parts(p: &Painter, th: Th, o: Pos2) {
         x += 90.0;
     }
     // selector + toggle + chip
-    f.p.text(
+    cond_text(
+        f.p,
         f.pt(16.0, 160.0),
-        Align2::LEFT_CENTER,
         "SELECTOR · TOGGLE · CHIP",
-        fnt(Font::SansSemibold, 14.0),
+        14.0,
         th.title_col("fx"),
     );
     f.seg(
@@ -1880,11 +1927,11 @@ fn paint_parts(p: &Painter, th: Th, o: Pos2) {
         th.text2,
     );
     // jacks
-    f.p.text(
+    cond_text(
+        f.p,
         f.pt(16.0, 230.0),
-        Align2::LEFT_CENTER,
         "JACK  audio · cv · gate · pitch · stereo · patched · hover",
-        fnt(Font::SansSemibold, 14.0),
+        14.0,
         th.title_col("fx"),
     );
     let mut x = 40.0;
@@ -1902,11 +1949,11 @@ fn paint_parts(p: &Painter, th: Th, o: Pos2) {
         x += 80.0;
     }
     // cables
-    f.p.text(
+    cond_text(
+        f.p,
         f.pt(16.0, 340.0),
-        Align2::LEFT_CENTER,
         "CABLE  rest · lit · stereo · functional (step beads)",
-        fnt(Font::SansSemibold, 14.0),
+        14.0,
         th.title_col("fx"),
     );
     let cable =
@@ -1964,11 +2011,11 @@ fn paint_parts(p: &Painter, th: Th, o: Pos2) {
     cable(&f, 500.0, 360.0, th.audio, 4.0, true, false, false);
     cable(&f, 740.0, 360.0, th.gate, 4.0, false, false, true);
     // family marker / stripe
-    f.p.text(
+    cond_text(
+        f.p,
         f.pt(16.0, 470.0),
-        Align2::LEFT_CENTER,
         "FAMILY MARKER  title colour (line styles) · 3 px stripe (solid styles)",
-        fnt(Font::SansSemibold, 14.0),
+        14.0,
         th.title_col("fx"),
     );
     for (i, fam) in ["osc", "filter", "env", "timing", "amp", "fx"]
@@ -1979,13 +2026,7 @@ fn paint_parts(p: &Painter, th: Th, o: Pos2) {
         let r = f.rc(x, 490.0, 140.0, 60.0);
         f.fill(r, 3.0, th.surf);
         f.stroke_r(r, 3.0, Stroke::new(1.0, th.edge));
-        f.p.text(
-            f.pt(x + 10.0, 506.0),
-            Align2::LEFT_CENTER,
-            *fam,
-            fnt(Font::SansSemibold, 14.0),
-            th.title_col(fam),
-        );
+        cond_text(f.p, f.pt(x + 10.0, 506.0), fam, 14.0, th.title_col(fam));
         let stripe = f.rc(x + 1.0, 491.0, 138.0, 3.0);
         let hue = th.title_col(fam);
         f.fill(stripe, 1.0, hue);
@@ -1998,11 +2039,11 @@ fn paint_parts(p: &Painter, th: Th, o: Pos2) {
         );
     }
     // trays
-    f.p.text(
+    cond_text(
+        f.p,
         f.pt(16.0, 575.0),
-        Align2::LEFT_CENTER,
         "TRAY  two_row (< 480 px) · single_row_wide (>= 480 px)",
-        fnt(Font::SansSemibold, 14.0),
+        14.0,
         th.title_col("fx"),
     );
     let t2 = f.rc(20.0, 590.0, 200.0, 86.0);
@@ -2054,11 +2095,11 @@ fn paint_parts(p: &Painter, th: Th, o: Pos2) {
         );
     }
     // drum cell
-    f.p.text(
+    cond_text(
+        f.p,
         f.pt(700.0, 575.0),
-        Align2::LEFT_CENTER,
         "DRUM CELL  off · 4 velocities · 3 chances",
-        fnt(Font::SansSemibold, 14.0),
+        14.0,
         th.title_col("fx"),
     );
     let well = f.rc(700.0, 590.0, 280.0, 60.0);
@@ -2108,15 +2149,7 @@ fn paint_sheet(p: &Painter, th: Th, top_left: Pos2, report: bool) -> Tally {
     let sp = specs();
     let mut tally = Tally::default();
     let mut y = 16.0;
-    let label = |y: f32, s: &str| {
-        p.text(
-            top_left + vec2(24.0, y + 10.0),
-            Align2::LEFT_CENTER,
-            s,
-            fnt(Font::SansSemibold, 14.0),
-            th.text,
-        )
-    };
+    let label = |y: f32, s: &str| cond_text(p, top_left + vec2(24.0, y + 10.0), s, 14.0, th.text);
     for z in ZOOMS {
         label(
             y,
@@ -2249,6 +2282,16 @@ fn main() {
         opts,
         Box::new(move |cc| {
             kabl_ui::theme::install_fonts(&cc.egui_ctx);
+            cc.egui_ctx.add_font(egui::epaint::text::FontInsert::new(
+                "plex-cond-semibold",
+                egui::FontData::from_static(include_bytes!(
+                    "../assets/IBMPlexSansCondensed-SemiBold.ttf"
+                )),
+                vec![egui::epaint::text::InsertFontFamily {
+                    family: cond_family(),
+                    priority: egui::epaint::text::FontPriority::Highest,
+                }],
+            ));
             cc.egui_ctx.set_pixels_per_point(1.0);
             Ok(Box::new(App {
                 th,
