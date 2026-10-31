@@ -2674,7 +2674,10 @@ fn draw_banks(
             if on { th.sel_ink } else { th.plate_ink },
             false,
         );
-        if resp.on_hover_text("Steps shown on the face (view only)").clicked() {
+        if resp
+            .on_hover_text("Steps shown on the face (view only)")
+            .clicked()
+        {
             ui_state.edit_page.insert(id, pg);
         }
     }

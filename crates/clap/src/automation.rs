@@ -156,7 +156,14 @@ mod tests {
         for name in ["p1", "g8", "v12", "r32", "k5", "b.p1", "c.v32", "d.k9"] {
             assert!(is_step_param(name), "{name}");
         }
-        for name in ["length", "transpose", "gate_len", "gate_mode", "b.length", "b.gate_len"] {
+        for name in [
+            "length",
+            "transpose",
+            "gate_len",
+            "gate_mode",
+            "b.length",
+            "b.gate_len",
+        ] {
             assert!(!is_step_param(name), "{name}");
         }
         let info = registry::info_for("seq").unwrap();

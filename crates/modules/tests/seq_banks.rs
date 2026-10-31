@@ -316,6 +316,12 @@ fn steps_past_eight_start_off_and_belong_to_their_bank() {
     assert_eq!(gates[..8], [true; 8]);
     assert_eq!(gates[8..], [false; 8]);
     // Bank D's step 20 is a different param from bank A's.
-    assert_ne!(param_index(0, pitch_slot(19)), param_index(3, pitch_slot(19)));
-    assert_eq!(SEQ_INFO.params[param_index(3, pitch_slot(19))].name, "d.p20");
+    assert_ne!(
+        param_index(0, pitch_slot(19)),
+        param_index(3, pitch_slot(19))
+    );
+    assert_eq!(
+        SEQ_INFO.params[param_index(3, pitch_slot(19))].name,
+        "d.p20"
+    );
 }

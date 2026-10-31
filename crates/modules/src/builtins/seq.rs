@@ -236,7 +236,11 @@ const fn join(a: [ParamInfo; BASE_SLOTS], e: [ParamInfo; 5 * EXTRA]) -> [ParamIn
     let mut out = [a[0]; SLOTS];
     let mut i = 0;
     while i < SLOTS {
-        out[i] = if i < BASE_SLOTS { a[i] } else { e[i - BASE_SLOTS] };
+        out[i] = if i < BASE_SLOTS {
+            a[i]
+        } else {
+            e[i - BASE_SLOTS]
+        };
         i += 1;
     }
     out
