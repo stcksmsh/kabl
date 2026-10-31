@@ -853,6 +853,59 @@ fn seq_part(r: &mut Rack, clock: ModuleId, p: &Part) -> Built {
     }
 }
 
+/// The drums of a groove: the grid, the five voices, the beat mixer and the kit mixer. The kick
+/// feeds the sidechain of `duck`. Returns the beat (kick to hats) and the kit (beat and toms).
+fn wire_kit(v: &mut Voice, clock: ModuleId, k: &Kit, duck: ModuleId) -> (ModuleId, ModuleId) {
+    let grid = v.r.add("drum.grid", &[]);
+    v.r.wire(clock, "gate", grid, "clock");
+    v.r.wire(clock, "reset", grid, "reset");
+    for (row, (a, b)) in k.a.iter().zip(&k.b).enumerate() {
+        v.r.e
+            .set_param(grid, &format!("len{}", row + 1), k.lens[row]);
+        grid_row(&mut v.r, grid, 0, row, a);
+        grid_row(&mut v.r, grid, 1, row, b);
+    }
+    let kick = v.r.add(
+        "drum.kick",
+        &[
+            ("level_db", k.kick[0]),
+            ("decay_ms", k.kick[1]),
+            ("drive_db", k.kick[2]),
+        ],
+    );
+    let snare = v.r.add(
+        "drum.snare",
+        &[("level_db", k.levels[0]), ("decay_ms", k.snare_decay)],
+    );
+    let clap = v.r.add("drum.clap", &[("level_db", k.levels[1])]);
+    let hat = v.r.add("drum.hat", &[("level_db", k.levels[2])]);
+    let tom = v.r.add("drum.tom", &[("level_db", k.levels[3])]);
+    v.r.wire(grid, "kick", kick, "gate");
+    v.r.wire(grid, "snare", snare, "gate");
+    v.r.wire(grid, "clap", clap, "gate");
+    v.r.wire(grid, "chat", hat, "closed");
+    v.r.wire(grid, "ohat", hat, "open");
+    v.r.wire(grid, "tom", tom, "gate");
+    v.r.wire(kick, "out", duck, "sc");
+    let beat = v.r.add(
+        "mixer",
+        &[
+            ("level1", k.mix[0]),
+            ("level2", k.mix[1]),
+            ("level3", k.mix[2]),
+            ("level4", k.mix[3]),
+        ],
+    );
+    v.r.wire(kick, "out", beat, "in1");
+    v.r.wire(snare, "out", beat, "in2");
+    v.r.wire(clap, "out", beat, "in3");
+    v.r.wire(hat, "out", beat, "in4");
+    let kit_out = v.r.add("mixer", &[("level1", 1.0), ("level2", 0.35)]);
+    v.r.wire(beat, "out", kit_out, "in1");
+    v.r.wire(tom, "out", kit_out, "in2");
+    (beat, kit_out)
+}
+
 fn groove(s: Spec) -> Rack {
     // The voice MIDI plays over the groove, with its own amp and a fixed open filter.
     let (cutoff, detune, aenv) = s.voice.unwrap_or((3500.0, 8.0, [2.0, 300.0, 0.6, 90.0]));
@@ -957,55 +1010,8 @@ fn groove(s: Spec) -> Rack {
             ("knee_db", 3.0),
         ],
     );
-    // The kit.
+    let (beat, kit) = wire_kit(&mut v, clock, &s.kit, duck);
     let k = &s.kit;
-    let grid = v.r.add("drum.grid", &[]);
-    v.r.wire(clock, "gate", grid, "clock");
-    v.r.wire(clock, "reset", grid, "reset");
-    for (row, (a, b)) in k.a.iter().zip(&k.b).enumerate() {
-        v.r.e
-            .set_param(grid, &format!("len{}", row + 1), k.lens[row]);
-        grid_row(&mut v.r, grid, 0, row, a);
-        grid_row(&mut v.r, grid, 1, row, b);
-    }
-    let kick = v.r.add(
-        "drum.kick",
-        &[
-            ("level_db", k.kick[0]),
-            ("decay_ms", k.kick[1]),
-            ("drive_db", k.kick[2]),
-        ],
-    );
-    let snare = v.r.add(
-        "drum.snare",
-        &[("level_db", k.levels[0]), ("decay_ms", k.snare_decay)],
-    );
-    let clap = v.r.add("drum.clap", &[("level_db", k.levels[1])]);
-    let hat = v.r.add("drum.hat", &[("level_db", k.levels[2])]);
-    let tom = v.r.add("drum.tom", &[("level_db", k.levels[3])]);
-    v.r.wire(grid, "kick", kick, "gate");
-    v.r.wire(grid, "snare", snare, "gate");
-    v.r.wire(grid, "clap", clap, "gate");
-    v.r.wire(grid, "chat", hat, "closed");
-    v.r.wire(grid, "ohat", hat, "open");
-    v.r.wire(grid, "tom", tom, "gate");
-    v.r.wire(kick, "out", duck, "sc");
-    let beat = v.r.add(
-        "mixer",
-        &[
-            ("level1", k.mix[0]),
-            ("level2", k.mix[1]),
-            ("level3", k.mix[2]),
-            ("level4", k.mix[3]),
-        ],
-    );
-    v.r.wire(kick, "out", beat, "in1");
-    v.r.wire(snare, "out", beat, "in2");
-    v.r.wire(clap, "out", beat, "in3");
-    v.r.wire(hat, "out", beat, "in4");
-    let kit = v.r.add("mixer", &[("level1", 1.0), ("level2", 0.35)]);
-    v.r.wire(beat, "out", kit, "in1");
-    v.r.wire(tom, "out", kit, "in2");
     // The macros.
     for (i, t) in s.targets.iter().enumerate() {
         let m = format!("m{}", i + 1);
@@ -1900,81 +1906,203 @@ fn lamp_oil() -> Rack {
     })
 }
 
-fn pinball() -> Rack {
-    // Hypnotic and serious: few pitches, narrow intervals, dark short notes.
-    let (bass, chords, wave, lp) = match variant('a') {
-        'a' => ("0 0 - 3 0", "7 - 7 - - 5 -", 1.0, (900.0, 800.0)),
-        'c' => ("0 3 - 0 -", "5 - - 7 - 3 -", 0.0, (1000.0, 900.0)),
-        _ => ("0 - 0 0 -", "7 - - 7 - - -", 1.0, (700.0, 650.0)),
-    };
-    groove(Spec {
-        macros: [
-            ("Pitch", 0.50),
-            ("Tempo", 0.50),
-            ("Bleep", 0.60),
-            ("Space", 0.45),
+/// Acid house: a 303-style bass (a saw through its own resonant ladder, a filter envelope whose
+/// depth the accent steps raise, glide on the flagged steps) over a 909-style kick, clap and
+/// hats. The `seq` has 8 steps on this branch, so the line is 8 sixteenths (half a bar) that
+/// repeats twice per bar; a 16-step line waits for the longer `seq`.
+fn acid_line() -> Rack {
+    let macros = [
+        ("Cutoff", 0.40),
+        ("Resonance", 0.55),
+        ("Accent", 0.60),
+        ("Slide", 0.50),
+    ];
+    let mut v = Voice::new(Recipe {
+        bass: false,
+        macros: &macros,
+        midi: [1.0, 0.0, 120.0],
+        oscs: vec![osc(2.0, 0.0, 0.5).unison(2.0, 8.0)],
+        drive: [0.0, 0.0],
+        lad: [2600.0, 0.1, 0.0],
+        fenv: [2.0, 200.0, 0.3, 100.0],
+        fenv_amt: 0.0,
+        wheel_amt: 0.0,
+        aenv: [2.0, 300.0, 0.6, 90.0],
+        trim_db: -10.0,
+    });
+    let clock = v.r.add("clock", &[("bpm", 124.0), ("swing", 16.0)]);
+    // The line: pitches (semitones from C), accents (velocity) and which steps glide into the note.
+    let notes = [
+        Some(9.0),
+        Some(9.0),
+        Some(21.0),
+        Some(9.0),
+        None,
+        Some(12.0),
+        Some(14.0),
+        Some(7.0),
+    ];
+    let accent = [100.0, 60.0, 60.0, 60.0, 0.0, 100.0, 60.0, 60.0];
+    let slide = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0];
+    let seq = v.r.add(
+        "seq",
+        &[("length", 8.0), ("gate_mode", 1.0), ("gate_len", 62.0)],
+    );
+    let flags = v.r.add("seq", &[("length", 8.0)]);
+    for s in [seq, flags] {
+        v.r.wire(clock, "gate", s, "clock");
+        v.r.wire(clock, "reset", s, "reset");
+    }
+    for k in 0..8 {
+        let n = k + 1;
+        v.r.e
+            .set_param(seq, &format!("p{n}"), notes[k].unwrap_or(0.0));
+        v.r.e.set_param(
+            seq,
+            &format!("g{n}"),
+            f32::from(u8::from(notes[k].is_some())),
+        );
+        v.r.e.set_param(seq, &format!("v{n}"), accent[k]);
+        v.r.e.set_param(flags, &format!("p{n}"), slide[k]);
+        v.r.e.set_param(flags, &format!("g{n}"), 1.0);
+    }
+    // A slid step follows the slewed pitch, any other step the raw one.
+    let slew = v.r.add("slew", &[("rise_ms", 8.0), ("fall_ms", 8.0)]);
+    let xf = v.r.add("crossfade", &[("mix", 0.0)]);
+    v.r.wire(seq, "pitch", slew, "in");
+    v.r.wire(seq, "pitch", xf, "a");
+    v.r.wire(slew, "out", xf, "b");
+    v.r.wire(flags, "pitch", xf, "fade");
+    v.r.next_row();
+    let osc = v.r.add(
+        "osc.va",
+        &[
+            ("base_hz", 261.63 / 4.0),
+            ("waveform", 2.0),
+            ("unison", 1.0),
         ],
-        targets: [T::Pitch(1.0), T::Tempo(0.4), T::Chords(1.0)],
-        bpm: 120.0,
-        swing: 0.0,
-        kit: Kit {
-            lens: [16.0, 16.0, 13.0, 7.0, 16.0, 9.0],
-            ..kit(
-                [
-                    NONE,
-                    NONE,
-                    "o...............",
-                    "x..o............",
-                    NONE,
-                    "x....o..........",
-                ],
-                [
-                    NONE,
-                    NONE,
-                    "o.....o.........",
-                    "x.xo..x.........",
-                    NONE,
-                    "x..o..o.x.......",
-                ],
-                [-6.0, 200.0, 0.0],
-                [-8.0, -9.0, -12.0, -5.0],
-                [0.0, 0.0, 0.4, 0.3],
-            )
-        },
-        bass: part(
-            bass,
-            [wave, 1.0, 8.0, 50.0, -1.0],
-            0.0,
-            45.0,
-            [4.0, 80.0, 0.0, 40.0],
-            0.8,
-        )
-        .len(5.0)
-        .lp(lp.0),
-        chords: Some(
-            part(
-                chords,
-                [wave, 1.0, 8.0, 50.0, 0.0],
-                0.0,
-                45.0,
-                [4.0, 100.0, 0.0, 50.0],
-                0.7,
-            )
-            .len(7.0)
-            .lp(lp.1),
+    );
+    v.r.wire(xf, "out", osc, "pitch");
+    let lad = v.r.add(
+        "filter.ladder",
+        &[("cutoff_hz", 180.0), ("resonance", 0.25), ("drive_db", 6.0)],
+    );
+    v.r.wire(osc, "out", lad, "in");
+    // The filter envelope, scaled by the step's accent; its depth is the Accent macro.
+    let fenv = v.r.add("env.adsr", &adsr(0.5, 220.0, 0.0, 40.0));
+    let fvca = v.r.add("vca", &[("gain", 0.0)]);
+    v.r.wire(seq, "gate", fenv, "gate");
+    v.r.wire(fenv, "out", fvca, "in");
+    v.r.wire(seq, "velocity", fvca, "cv");
+    v.r.depth_route(fvca, "out", lad, "cutoff_hz", v.knob, "m3", 0.6);
+    // The amp: a gate envelope, louder on the accent steps.
+    let aenv = v.r.add("env.adsr", &adsr(1.0, 160.0, 0.8, 30.0));
+    let avca = v.r.add("vca", &[("gain", 0.0)]);
+    let accent_vca = v.r.add("vca", &[("gain", 0.0)]);
+    v.r.wire(seq, "gate", aenv, "gate");
+    v.r.wire(lad, "out", avca, "in");
+    v.r.wire(aenv, "out", avca, "cv");
+    v.r.wire(avca, "out", accent_vca, "in");
+    v.r.wire(seq, "velocity", accent_vca, "cv");
+    let bass = v.r.add("gain", &[("gain_db", 6.0)]);
+    v.r.wire(accent_vca, "out", bass, "in");
+    // The macros.
+    v.r.route(v.knob, "m1", lad, "cutoff_hz", 0.5);
+    v.r.e.set_param(lad, "resonance", 0.25);
+    v.r.route(v.knob, "m2", lad, "resonance", 0.62);
+    v.r.route(v.knob, "m4", slew, "rise_ms", 0.22);
+    v.r.route(v.knob, "m4", slew, "fall_ms", 0.22);
+    v.r.next_row();
+    let bus = v.r.add("mixer", &[("level1", 1.0), ("level3", 1.0)]);
+    v.r.wire(bass, "out", bus, "in1");
+    v.r.wire(v.mono, "out", bus, "in3");
+    let drive = v.r.add("drive", &[("drive_db", 4.0), ("trim_db", -2.0)]);
+    let master_lad = v.r.add(
+        "filter.ladder",
+        &[
+            ("cutoff_hz", 14000.0),
+            ("resonance", 0.0),
+            ("drive_db", 0.0),
+        ],
+    );
+    v.r.wire(bus, "out", drive, "in");
+    v.r.wire(drive, "out", master_lad, "in");
+    let master = v.r.add("gain", &[("gain_db", -5.0)]);
+    v.r.wire(master_lad, "out", master, "in");
+    v.mono = master;
+    v.stage("compressor", &compressor(-22.0, 3.0, 4.0, 110.0, -2.0));
+    let duck = v.stage(
+        "compressor",
+        &[
+            ("threshold_db", -34.0),
+            ("ratio", 4.0),
+            ("attack_ms", 1.0),
+            ("release_ms", 140.0),
+            ("knee_db", 3.0),
+        ],
+    );
+    let (_, kit_mix) = wire_kit(
+        &mut v,
+        clock,
+        &kit(
+            [
+                "X...X...X...X...",
+                NONE,
+                "....X.......X...",
+                "x.x.x.x.x.x.x.x.",
+                "..X...X...X...X.",
+                NONE,
+            ],
+            [
+                "X...X...X...X.XX",
+                NONE,
+                "....X.......X.X.",
+                "x.x.xxx.x.x.xxxx",
+                "..X...X...X...X.",
+                "..........X.X.XX",
+            ],
+            [-3.0, 260.0, 3.0],
+            [-8.0, -8.0, -12.0, -6.0],
+            [0.7, 0.0, 0.5, 0.4],
         ),
-        play: [1.0, 0.0, 0.5],
-        drive: [2.0, -1.0],
-        filter: [3000.0, 0.15],
-        fx: None,
-        crush: false,
-        comp: [-22.0, 2.0, 2.0],
-        echo: [0.0, 50.0, 2800.0],
-        space: [0.5, 2.2, 0.35],
-        trim_db: -1.5,
-        dub: false,
-        voice: Some((900.0, 8.0, [4.0, 200.0, 0.5, 80.0])),
-    })
+        duck,
+    );
+    // A fixed echo (tempo-synced) and a short room on the music, the kit joined after them.
+    let delay = v.r.add(
+        "delay",
+        &[
+            ("sync", 3.0),
+            ("time_ms", 240.0),
+            ("feedback", 35.0),
+            ("mix", 0.16),
+            ("tone_hz", 3000.0),
+        ],
+    );
+    let verb = v.r.add(
+        "reverb",
+        &[
+            ("decay_s", 0.8),
+            ("damp_hz", 3500.0),
+            ("mix", 0.08),
+            ("predelay_ms", 0.0),
+            ("width", 60.0),
+        ],
+    );
+    v.r.wire(duck, "left", delay, "in");
+    v.r.wire(clock, "gate", delay, "clock");
+    v.r.stereo(duck, verb);
+    v.r.wire(delay, "left", verb, "in_l");
+    v.r.wire(delay, "right", verb, "in_r");
+    let (mix_l, mix_r) = (v.r.add("mixer", &[]), v.r.add("mixer", &[]));
+    for (mix, side) in [(mix_l, "left"), (mix_r, "right")] {
+        v.r.wire(verb, side, mix, "in1");
+        v.r.wire(kit_mix, "out", mix, "in2");
+    }
+    let out = v.r.add("out", &[]);
+    v.r.wire(mix_l, "out", out, "left");
+    v.r.wire(mix_r, "out", out, "right");
+    perform(&mut v.r, v.knob, v.n, Some(clock));
+    v.r
 }
 
 fn scrap_metal() -> Rack {
@@ -2251,13 +2379,14 @@ phrase!(
     ]
 );
 phrase!(
-    pinball_phrase,
-    120.0,
+    acid_phrase,
+    124.0,
     [
-        (0.0, 2.0, 60),
-        (2.0, 2.0, 63),
-        (4.0, 3.0, 60),
-        (7.0, 1.0, 58)
+        (1.0, 0.5, 69),
+        (1.5, 0.5, 72),
+        (3.0, 0.5, 76),
+        (5.0, 1.0, 69),
+        (7.0, 0.5, 67)
     ]
 );
 phrase!(
@@ -2353,9 +2482,9 @@ fn presets() -> Vec<Preset> {
         q("lamp-oil", "Lamp Oil", &["dub", "echo", "dub techno", "124bpm"],
             "A dub techno loop: a soft kick, a rim click, a deep sine sub and a muted chord stab thrown into a long dotted echo. Press Run, then play chords over it. Chord sets the level of the stab, Dub feeds more of it to its own tempo echo, Filter opens the music, Space adds the long echo and the room.",
             "The chord stab repeating into the dark; Dub up for a longer tail, Chord up for a louder stab.", lamp_oil, lamp_phrase, 16.0),
-        q("pinball", "Pinball", &["polymeter", "bleeps", "modular", "120bpm"],
-            "A hypnotic modular groove: two dark, low sequencer lines of five and seven steps drift against a sparse clap, hat and tom of thirteen, seven and nine steps, so the pattern only repeats after many bars. Press Run, then play notes over it. Pitch tunes the bleeps, Tempo speeds the whole machine up and down, Bleep raises the second bleep line, Space adds the echo and the room.",
-            "The dark five- and seven-step lines drifting against sparse hits; Tempo up to speed them, Pitch to bend the bleeps.", pinball, pinball_phrase, 16.0),
+        q("acid-line", "Acid Line", &["acid", "303", "squelch", "slide", "124bpm"],
+            "An acid house loop: a 303-style saw bass with a squelchy resonant filter, accents that open it wider and slides between notes, over a 909-style kick, clap and offbeat open hats. Press Run, then play stabs on top. Cutoff opens the bass filter, Resonance makes it squeal, Accent sets how far each accented note opens the filter, Slide sets how long the marked notes glide.",
+            "The bass squelching on the accented notes and sliding into the marked ones; Resonance up for the squeal, Slide up for longer glides.", acid_line, acid_phrase, 16.0),
         q("scrap-metal", "Scrap Metal", &["formant", "crushed", "electro", "french touch", "128bpm", "signature"],
             "A robot stomp: a hard-driven bass, a stab that talks through a vowel filter, a tight kick, snare and clap, crushed and compressed until it pumps. Press Run, then play lines on top. Vowel morphs the stab from a to u, Crush brings in the bitcrusher, Pump sets how hard the kick ducks the music, Room adds a slapback and a tight room.",
             "The stab changing vowel; Crush up for grit, Vowel to open and close the mouth.", scrap_metal, scrap_phrase, 16.0),

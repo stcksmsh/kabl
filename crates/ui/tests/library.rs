@@ -606,11 +606,11 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "A dub techno loop: a soft kick, a rim click, a deep sine sub and a muted chord stab thrown into a long dotted echo. Press Run, then play chords over it. Chord sets the level of the stab, Dub feeds more of it to its own tempo echo, Filter opens the music, Space adds the long echo and the room.",
     ),
     (
-        "presets/pinball",
-        "Pinball",
+        "presets/acid-line",
+        "Acid Line",
         "Groove",
-        &["polymeter", "bleeps", "modular", "120bpm"],
-        "A hypnotic modular groove: two dark, low sequencer lines of five and seven steps drift against a sparse clap, hat and tom of thirteen, seven and nine steps, so the pattern only repeats after many bars. Press Run, then play notes over it. Pitch tunes the bleeps, Tempo speeds the whole machine up and down, Bleep raises the second bleep line, Space adds the echo and the room.",
+        &["acid", "303", "squelch", "slide", "124bpm"],
+        "An acid house loop: a 303-style saw bass with a squelchy resonant filter, accents that open it wider and slides between notes, over a 909-style kick, clap and offbeat open hats. Press Run, then play stabs on top. Cutoff opens the bass filter, Resonance makes it squeal, Accent sets how far each accented note opens the filter, Slide sets how long the marked notes glide.",
     ),
     (
         "presets/scrap-metal",
