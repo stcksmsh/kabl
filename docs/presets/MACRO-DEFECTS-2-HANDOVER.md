@@ -2,6 +2,13 @@
 
 Branch `claude/groove-macro-defects-2` (from origin/master 6e92737, #68 merged). No code changed yet; this file is the state. Rules: no stash, no merge, `cargo clean` at the end, draft PRs only, fmt + clippy (`bash .github/scripts/clippy.sh`), audio_defects with no allow entries, REAPER/standalone on `kabl_agents`. Shell tip: the worktree guard refuses compound git commands and heredocs; use the Write tool for scripts and plain single commands.
 
+## Status (second session)
+
+- Loading Dock re-level: NOT NEEDED. The trim sits before `crush` and the music `comp`, which absorbs it. Per cue (peak / rms dBFS, float, 30 s clip): before #68 Intro -11.8/-26.2, Build -13.4/-25.6, Gap -15.2/-25.9, Drop -13.2/-25.4, Break -13.5/-25.7; after #68 (= now, no change made) -11.8/-26.2, -13.6/-25.8, -15.1/-25.9, -13.5/-25.7, -13.7/-25.8. Macro audit steps: rms within 0.6 dB before vs after, peak worst now -1.5 (Pump 0) and -2.0 (Sweep). The "lost 5-6 dB" of the trim is not heard.
+- Click cause: NOT found. Corner Store clip at Filter 0.72 (`PP_SET=macro.m2=0.72`, group 1) gives HF_BURST at 3.965, 8.385, 12.82 and no CLICK in the stored phrase. `vca.gain=1` clears all flags; `env.adsr.attack_ms=20` and `filter.ladder.cutoff_hz=18000` add CLICK 5.695; `unison=1`, `comp.ratio=1` change nothing. `seq` is sample-accurate (reviewed `seq.rs` process), `env.adsr` attacks from the current level (no reset). Next: reproduce the audit CLICK itself (macro_audit render, not the clip) and bisect there; build the module chain test only after.
+- Redesign pilot: not started.
+- Tools: `scratch/ld/` (untracked) has `cues.py`, `steps.py`, `probe_cs.py`; `presets_groove clips` takes a numeric group (1 = first eight), not a slug; the filter macro of Corner Store is `macro.m2`.
+
 ## 1. Osc phase check (Fault Line and Corner Store Filter "clicks")
 
 Findings so far:
