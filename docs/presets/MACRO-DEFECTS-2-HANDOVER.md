@@ -2,6 +2,12 @@
 
 Branch `claude/groove-macro-defects-2` (from origin/master 6e92737, #68 merged). No code changed yet; this file is the state. Rules: no stash, no merge, `cargo clean` at the end, draft PRs only, fmt + clippy (`bash .github/scripts/clippy.sh`), audio_defects with no allow entries, REAPER/standalone on `kabl_agents`. Shell tip: the worktree guard refuses compound git commands and heredocs; use the Write tool for scripts and plain single commands.
 
+## Status (third session)
+
+- Loading Dock 6/5 dB vs 0.3 dB: both true at different points. #68 lowers the trim gain by 6.4 dB (Build) and 4.8 dB (Drop) (-9 dB per Sweep, +2.2 per Pump). With the music `compressor` bypassed (`PP_SET=compressor.ratio=1`) the cue rms drops Build -2.7 dB, Drop -4.7 dB (Intro 0.0). With it in the chain (as shipped) the compressor evens the level out: Build -0.2 dB, Drop -0.3 dB.
+- Click reproduced: Corner Store, `PP_SET=macro.m2=0.5714` with `presets_groove clips patches OUT 1` gives CLICK at 3.748 s (the audit's m2-s4/s5; s6/s7 at 7.637 s). Not the cause: env attack (5 and 20 ms keep it), unison, drive and ladder drive_db. Cleared by: `vca.gain=1`, `env.adsr.release_ms=300`, `filter.ladder.resonance` 0 or 0.3 (not 0.1), main/all waveform sine or square. Changing the ladder cutoff moves it to other times, so the scanner window context decides. No engine fault shown: `seq`, `env.adsr` and `osc.va` read clean. Open: take a tap of the bus before the ladder (a probe in `render`) to see if the step is upstream of the ladder; if it is only a band-limited saw edge in a quiet window, it is a scanner/design question for Kosta, not a module bug.
+- Redesign pilot: not started.
+
 ## Status (second session)
 
 - Loading Dock re-level: NOT NEEDED. The trim sits before `crush` and the music `comp`, which absorbs it. Per cue (peak / rms dBFS, float, 30 s clip): before #68 Intro -11.8/-26.2, Build -13.4/-25.6, Gap -15.2/-25.9, Drop -13.2/-25.4, Break -13.5/-25.7; after #68 (= now, no change made) -11.8/-26.2, -13.6/-25.8, -15.1/-25.9, -13.5/-25.7, -13.7/-25.8. Macro audit steps: rms within 0.6 dB before vs after, peak worst now -1.5 (Pump 0) and -2.0 (Sweep). The "lost 5-6 dB" of the trim is not heard.
