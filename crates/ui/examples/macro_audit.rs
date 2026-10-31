@@ -160,10 +160,7 @@ fn routes(state: &PatchState, knob: ModuleId, k: usize) -> Vec<serde_json::Value
                 let (src, dst) = t.map_or((String::new(), String::new()), |t| {
                     (describe(state, &t.from), describe(state, &t.to))
                 });
-                let a0 = t
-                    .and_then(|t| t.params.get(param))
-                    .copied()
-                    .unwrap_or(0.0);
+                let a0 = t.and_then(|t| t.params.get(param)).copied().unwrap_or(0.0);
                 out.push(serde_json::json!({
                     "macro": k, "type": "depth", "cable": cable, "param": param,
                     "from": src, "to": dst, "route_amount": a0, "depth": amount,
@@ -226,8 +223,11 @@ fn main() {
             .expect("a macro module")
             .0;
         let mut listing = Vec::new();
-        for k in (1..=8).filter(|k| state.modules[&knob].params.contains_key(&format!("pin.m{k}")))
-        {
+        for k in (1..=8).filter(|k| {
+            state.modules[&knob]
+                .params
+                .contains_key(&format!("pin.m{k}"))
+        }) {
             let name = format!("m{k}");
             let index = macro_params.iter().position(|p| p.name == name).unwrap() as u16;
             listing.push(serde_json::json!({
@@ -245,11 +245,7 @@ fn main() {
                 write_wav(&out.join(format!("steps/{slug}-m{k}-s{s}.wav")), &l, &r);
             }
             let mut st = state.clone();
-            st.modules
-                .get_mut(&knob)
-                .unwrap()
-                .params
-                .insert(name, 0.0);
+            st.modules.get_mut(&knob).unwrap().params.insert(name, 0.0);
             let (l, r) = render(&st, &hits, Some((knob, index)));
             write_wav(&out.join(format!("sweep/{slug}-m{k}.wav")), &l, &r);
             println!("{slug} m{k}");

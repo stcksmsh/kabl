@@ -199,6 +199,7 @@ def audit_macro(slug, entry, renders):
     tobs = [tob(x) for x in steps]
     pair = [rel(steps[i], steps[i + 1], tobs[i], tobs[i + 1]) for i in range(STEPS - 1)]
     ends = rel(steps[0], steps[-1], tobs[0], tobs[-1])
+    half = (rel(steps[0], steps[3], tobs[0], tobs[3]) + rel(steps[0], steps[4], tobs[0], tobs[4])) / 2  # about 0.5
     wave = db(np.sqrt(np.mean((steps[0] - steps[-1]) ** 2)) / max(np.sqrt(np.mean(steps[0] ** 2)), 1e-9))
     psize = list(pair)
     med = float(np.median(psize))
@@ -236,7 +237,7 @@ def audit_macro(slug, entry, renders):
         flags.append('zipper')
     return {
         'macro': k, 'steps': ms, 'mid': mid, 'vec': vec.tolist(), 'pair_db': pair, 'pair_size': psize,
-        'ends_db': ends, 'wave_db': wave, 'zone': zone, 'jumps': jumps, 'flags': flags, 'problems': problems,
+        'ends_db': ends, 'half_db': half, 'wave_db': wave, 'zone': zone, 'jumps': jumps, 'flags': flags, 'problems': problems,
         'sweep_clicks': sweep_clicks, 'words': words(ms[0], mid, ms[-1], vec, shifts(tobs[0], tobs[-1])) or (
             f"no change in level, spectrum or density; the waveform differs by {wave:.1f} dB (pitch path, timing or phase)"
             if wave > -15 else 'no change you can name from the measures'),
@@ -278,6 +279,9 @@ def main():
     ap.add_argument('--patches', default='patches')
     ap.add_argument('--clips')
     ap.add_argument('--out', required=True)
+    ap.add_argument('--verdicts', help='JSON {"slug/mK": [verdict, one line why]}, written by hand after reading the numbers')
+    ap.add_argument('--intro', help='markdown for the top of the report (method, findings)')
+    ap.add_argument('--doc', help='write the full report here')
     ap.add_argument('slugs', nargs='+')
     a = ap.parse_args()
     renders, out = Path(a.renders), Path(a.out)
@@ -329,13 +333,39 @@ def main():
         result['_tour'] = [(l, round(t, 1)) for l, t in starts]
         result['_preset_tours'] = {s: [(l, round(t, 1)) for l, t in v] for s, v in starts_all.items()}
     (out / 'audit.json').write_text(json.dumps(result, indent=1, default=float))
+    verdicts = json.loads(Path(a.verdicts).read_text()) if a.verdicts else {}
     for slug in a.slugs:
         md.append(f'### {slug}\n')
-        md.append('| macro | routes (value at macro 0 / 0.5 / 1) | effect 0 to 1 | flags |\n|---|---|---|---|')
+        md.append('| macro | routes: value at macro 0 / 0.5 / 1 | effect (change vs macro 0: at 0.5 / at 1; waveform 0 vs 1) | measured flags | verdict |\n|---|---|---|---|---|')
         for r in result[slug]:
-            md.append(f"| m{r['macro']} {r['name']} | {'<br>'.join(r['routes'])} | {r['words']} (change {r['ends_db']:.2f} dB, waveform {r['wave_db']:.1f} dB) | {', '.join(dict.fromkeys(r['flags'])) or 'ok'} |")
+            v = verdicts.get(f"{slug}/m{r['macro']}", ['', ''])
+            flags = ', '.join(dict.fromkeys(r['flags'])) or '-'
+            more = ''.join(f"; {x}" for x in r['problems'])
+            more += ''.join(f"; click while moving at {t:.1f} s" for t in r['sweep_clicks'])
+            more += ''.join(f"; overlaps {x}" for x in r.get('overlap', []))
+            md.append(f"| m{r['macro']} {r['name']} | {'<br>'.join(r['routes'])} | {r['words']}. {r['half_db']:.2f} / {r['ends_db']:.2f} dB; waveform {r['wave_db']:.1f} dB | {flags}{more} | **{v[0]}**: {v[1]} |")
         md.append('')
     (out / 'tables.md').write_text('\n'.join(md))
+    if a.doc:
+        flagged = [(s, r) for s in a.slugs for r in result[s] if verdicts.get(f"{s}/m{r['macro']}", ['ok'])[0] != 'ok']
+        total = sum(len(result[s]) for s in a.slugs)
+        text = [f'# Macro audit: {a.category}\n']
+        text.append(Path(a.intro).read_text() if a.intro else '')
+        text.append(f'\n## Flagged macros ({len(flagged)} of {total})\n')
+        for s, r in flagged:
+            v = verdicts[f"{s}/m{r['macro']}"]
+            text.append(f"- {s} m{r['macro']} {r['name']}: **{v[0]}**, {v[1]}")
+        text.append('\n## Tables\n')
+        text += md
+        if a.clips:
+            text.append('## Clips\n')
+            text.append(f'Every clip: the groove runs, the macro moves 0 to 1 to 0 over 8 s (1 s to 9 s of a 10 s render), the other macros at their stored values. Start times are in seconds from the start of the file.\n')
+            text.append(f"- `{a.clips}/tour.mp3`: all {total} sweeps, 1 s apart, 20 ms fades:")
+            text.append('  ' + '; '.join(f"{t} {l}" for l, t in result['_tour']))
+            for s in a.slugs:
+                text.append(f"- `{a.clips}/{s}-tour.mp3` (this preset's macros): " + '; '.join(f"{t} {l.split(' ', 1)[1]}" for l, t in result['_preset_tours'][s]))
+            text.append(f"- one file per macro: `{a.clips}/<slug>-m<k>-<name>.mp3`")
+        Path(a.doc).write_text('\n'.join(text) + '\n')
     print('wrote', out)
 
 
