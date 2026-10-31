@@ -121,10 +121,10 @@ fn paper() -> Th {
         pitch: hex("#2F7FD6"),
         accent: hex("#A97229"),
         on_accent: hex("#1C1206"),
-        skirt: hex("#D6D2C9"),
-        cap0: hex("#FFFFFF"),
-        cap1: hex("#E2DED6"),
-        pointer: hex("#1A1917"),
+        skirt: hex("#141518"),
+        cap0: hex("#3C3F45"),
+        cap1: hex("#1D1F23"),
+        pointer: hex("#F2F0EB"),
         nut: hex("#FFFFFF"),
         nut_edge: hex("#C8C4BB"),
         hole: hex("#24232A"),
@@ -445,7 +445,7 @@ impl<'a> Face<'a> {
                 (cx + a.cos() * (r - 1.2), cy + a.sin() * (r - 1.2)),
                 (cx + a.cos() * (r - 3.6), cy + a.sin() * (r - 3.6)),
                 1.0,
-                al(th.text, 70),
+                al(th.pointer, 90),
             );
         }
         for i in 0..4 {
@@ -2195,6 +2195,8 @@ fn paint_sheet(p: &Painter, th: Th, top_left: Pos2, report: bool) -> Tally {
         ("cv on surface", th.cv, th.surf),
         ("gate on surface", th.gate, th.surf),
         ("pitch on surface", th.pitch, th.surf),
+        ("pointer on cap (light end)", th.pointer, th.cap0),
+        ("pointer on cap (dark end)", th.pointer, th.cap1),
     ] {
         let c = contrast(fg, bg);
         if c < 3.0 {
