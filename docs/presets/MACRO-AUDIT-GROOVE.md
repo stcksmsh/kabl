@@ -1,6 +1,6 @@
 # Macro audit: Groove
 
-Pilot for the macro audit. Kosta judges by ear whether this format works before other categories are done. Audit only: no preset was changed. 13 of the 14 Groove presets are covered; Pinball is left out (it is being replaced).
+Pilot for the macro audit. Kosta judges by ear whether this format works before other categories are done. Audit only: no preset was changed. 14 of the 15 Groove presets are covered; Pinball is left out (it is being replaced). Loading Dock is a self-playing piece with cues: it is audited with no cue launched, so it plays its stored loop (the macros sit at their stored values) and the cues do not move the macros.
 
 ## Method
 
@@ -15,16 +15,17 @@ Pilot for the macro audit. Kosta judges by ear whether this format works before 
 
 ## Findings
 
-1. **Every Filter macro has a dead top.** Cutoff macros (Copper Mile, Brick Dust, Ore Cart, Stoop Sale, Fault Line, Corner Store, Glass Coast, Rope Walk, Lamp Oil, Dune Buggy) run from a base of 0.9 to 2.5 kHz to 20 kHz. The sound stops changing between macro 0.55 and 0.75 because the filter is already past the content. Effect: about the top third of the knob does nothing. Fix idea: shorter route amount (about 0.3 to 0.4 of travel) or a higher base.
-2. **Pump (five presets) is a switch, not a knob.** Copper Mile, Brick Dust, Ore Cart, Rope Walk and Scrap Metal route macro 3 to the kick-duck compressor ratio, 1 to 19. The first step (1/7) already does 80% of the change (5.7 to 6.8 dB) and nothing moves above 0.3. Fix idea: route it to threshold or to a ratio range of about 1 to 6, or to the duck's release.
+1. **Every Filter macro has a dead top.** Cutoff macros (Copper Mile, Brick Dust, Ore Cart, Stoop Sale, Fault Line, Corner Store, Glass Coast, Rope Walk, Lamp Oil, Dune Buggy; Loading Dock's Sweep is even but too hot, see 8) run from a base of 0.9 to 2.5 kHz to 20 kHz. The sound stops changing between macro 0.55 and 0.75 because the filter is already past the content. Effect: about the top third of the knob does nothing. Fix idea: shorter route amount (about 0.3 to 0.4 of travel) or a higher base.
+2. **Pump (six presets) is a switch, not a knob.** Copper Mile, Brick Dust, Ore Cart, Rope Walk, Scrap Metal and Loading Dock route macro 3 to the kick-duck compressor ratio, 1 to 19. The first step (1/7) already does 80% of the change (5.7 to 6.8 dB; Loading Dock 6.5 dB) and nothing moves above 0.3. Fix idea: route it to threshold or to a ratio range of about 1 to 6, or to the duck's release.
 3. **Clicks while moving or at an end:** Fault Line Filter (5.8 s), Corner Store Filter (3.7 s while moving, 7.6 s at the end render), Rope Walk Pump (8.9 s at the end render; also +0.1 dBFS peak at macro 0).
 4. **Slab City Tone does nothing audible** (it opens the filter of a sine 808). **Slab City Glide** is silent below 0.8 (log scale).
 5. **Fault Line Hats** has no effect (0.04 dB), **Glass Coast Hats** barely (0.4 dB).
 6. **Room/Space macros are all alike** (mono to stereo, a few dB). They work, even steps. Brick Dust Room is weak (0.5 dB, 15%/10% mix at most).
 7. **Overlap:** Lamp Oil Chord and Dub, and Ore Cart Rumble and Space, share a measured signature, but they drive different layers; not a duplicate.
+8. **Loading Dock:** Sweep clips: the peak is above 0 dBFS from macro 0.57 up (+1.4 dBFS). Pump peaks at -0.6 dBFS at macro 0. Drive is weak (0.75 dB). Wash jumps 5 dB in its first step.
 
 
-## Flagged macros (24 of 52)
+## Flagged macros (28 of 56)
 
 - copper-mile m1 Filter: **weak**, cutoff 1.4k to 20k moves only +2.4 dB near 4.5 kHz, and nothing above macro 0.6 (the filter is already open)
 - copper-mile m3 Pump: **dead zone**, kick-duck ratio 1 to 19: the first step (1/7) does 80% of the change, 0.3 to 1 is flat; also a jump of 5.7 dB at the bottom
@@ -50,6 +51,10 @@ Pilot for the macro audit. Kosta judges by ear whether this format works before 
 - scrap-metal m1 Vowel: **weak**, vowel 0 to 4 changes the long-term spectrum by only 0.7 dB (the formant sits on a quiet stab); the steps are uneven (0.1 to 0.7 dB)
 - scrap-metal m3 Pump: **dead zone**, kick-duck ratio: 5.7 dB jump in the first step, flat from 0.3 up
 - dune-buggy m2 Filter: **dead zone**, cutoff: +4.4 dB near 2.2 kHz in the first third, zero change from 0.71 up
+- loading-dock m1 Sweep: **bad end**, cutoff 170 Hz to 15 kHz: even steps (1.4 to 3.6 dB), but the peak passes 0 dBFS from macro 0.57 (+1.4 dBFS) and is -0.1 dBFS at 1; top +20 dB, centroid 127 Hz to 2.2 kHz
+- loading-dock m2 Drive: **weak**, drive 20 to 36 dB plus crusher 0 to 60% changes the render by 0.75 dB, nothing above 0.7; the waveform moves (-9 dB)
+- loading-dock m3 Wash: **jump**, riser, delay and reverb: the first step is a 5 dB jump (mono to stereo, the riser opens), then 0.4 dB per step
+- loading-dock m4 Pump: **bad end**, kick-duck ratio: peak -0.6 dBFS at macro 0 (ratio 1, no duck), 6.5 dB jump in the first step, flat from 0.3 up
 
 ## Tables
 
@@ -170,12 +175,21 @@ Pilot for the macro audit. Kosta judges by ear whether this format works before 
 | m3 Chop | seq#19.gate_len 10.4 / 50 / 89.6 % (range 1-100, linear; base 10.4, macro x 0.80 of travel) | +4.0 dB near 1414 Hz. 2.90 / 5.49 dB; waveform -8.6 dB | - | **ok**: chop: +4 dB near 1.4 kHz, even steps |
 | m4 Space | delay#41.mix 0 / 15 / 30 % (range 0-100, linear; base 0, macro x 0.30 of travel)<br>reverb#42.mix 0 / 10 / 20 % (range 0-100, linear; base 0, macro x 0.20 of travel) | goes from mono to stereo. 1.90 / 3.52 dB; waveform -9.2 dB | - | **ok**: space, mono to stereo |
 
+### loading-dock
+
+| macro | routes: value at macro 0 / 0.5 / 1 | effect (change vs macro 0: at 0.5 / at 1; waveform 0 vs 1) | measured flags | verdict |
+|---|---|---|---|---|
+| m1 Sweep | filter.ladder#31.cutoff_hz 170 / 1605 / 1.515e+04 Hz (range 20-2e+04, exponential; base 170, macro x 0.65 of travel) | brighter (top +20.4 dB, low -1.6 dB); +20.7 dB near 11314 Hz; -2.6 dB near 140 Hz; centroid 127 to 2235 Hz. 5.67 / 10.32 dB; waveform 0.4 dB | bad end; peak -0.1 dBFS at 1 | **bad end**: cutoff 170 Hz to 15 kHz: even steps (1.4 to 3.6 dB), but the peak passes 0 dBFS from macro 0.57 (+1.4 dBFS) and is -0.1 dBFS at 1; top +20 dB, centroid 127 Hz to 2.2 kHz |
+| m2 Drive | drive#30.drive_db 20 / 30.8 / 36 dB (range 0-36, linear; base 20, macro x 0.60 of travel)<br>bitcrusher#33.mix 0 / 30 / 60 % (range 0-100, linear; base 0, macro x 0.60 of travel) | no change in level, spectrum or density; the waveform differs by -9.4 dB (pitch path, timing or phase). 0.66 / 0.75 dB; waveform -9.4 dB | dead | **weak**: drive 20 to 36 dB plus crusher 0 to 60% changes the render by 0.75 dB, nothing above 0.7; the waveform moves (-9 dB) |
+| m3 Wash | delay#35.mix 0 / 15 / 30 % (range 0-100, linear; base 0, macro x 0.30 of travel)<br>reverb#36.mix 0 / 15 / 30 % (range 0-100, linear; base 0, macro x 0.30 of travel)<br>vca#18.gain 0 / 0.45 / 0.9  (range 0-1, linear; base 0, macro x 0.90 of travel) | goes from mono to stereo. 5.68 / 6.58 dB; waveform -5.6 dB | jump | **jump**: riser, delay and reverb: the first step is a 5 dB jump (mono to stereo, the riser opens), then 0.4 dB per step |
+| m4 Pump | compressor#27.ratio 1 / 10.02 / 19.05 :1 (range 1-20, linear; base 1, macro x 0.95 of travel) | quieter by 6.5 dB; brighter (top -0.1 dB, low -6.2 dB); mid -7.8 dB; -8.1 dB near 223 Hz. 7.77 / 8.09 dB; waveform -3.3 dB | dead, jump, bad end; peak -0.6 dBFS at 0 | **bad end**: kick-duck ratio: peak -0.6 dBFS at macro 0 (ratio 1, no duck), 6.5 dB jump in the first step, flat from 0.3 up |
+
 ## Clips
 
 Every clip: the groove runs, the macro moves 0 to 1 to 0 over 8 s (1 s to 9 s of a 10 s render), the other macros at their stored values. Start times are in seconds from the start of the file.
 
-- `docs/presets/clips/macro-audit/groove/tour.mp3`: all 52 sweeps, 1 s apart, 20 ms fades:
-  0.0 copper-mile Filter; 11.0 copper-mile Phase; 22.0 copper-mile Pump; 33.0 copper-mile Room; 44.0 brick-dust Filter; 55.0 brick-dust Dirt; 66.0 brick-dust Pump; 77.0 brick-dust Room; 88.0 ore-cart Filter; 99.0 ore-cart Rumble; 110.0 ore-cart Pump; 121.0 ore-cart Space; 132.0 stoop-sale Swing; 143.0 stoop-sale Dust; 154.0 stoop-sale Filter; 165.0 stoop-sale Space; 176.0 fault-line Reese; 187.0 fault-line Filter; 198.0 fault-line Hats; 209.0 fault-line Space; 220.0 corner-store Swing; 231.0 corner-store Filter; 242.0 corner-store Drive; 253.0 corner-store Room; 264.0 glass-coast Filter; 275.0 glass-coast Hats; 286.0 glass-coast Chorus; 297.0 glass-coast Space; 308.0 still-water Bloom; 319.0 still-water Pulse; 330.0 still-water Weight; 341.0 still-water Space; 352.0 slab-city Tone; 363.0 slab-city Glide; 374.0 slab-city Hats; 385.0 slab-city Room; 396.0 rope-walk Filter; 407.0 rope-walk Phase; 418.0 rope-walk Pump; 429.0 rope-walk Room; 440.0 lamp-oil Chord; 451.0 lamp-oil Dub; 462.0 lamp-oil Filter; 473.0 lamp-oil Space; 484.0 scrap-metal Vowel; 495.0 scrap-metal Crush; 506.0 scrap-metal Pump; 517.0 scrap-metal Room; 528.0 dune-buggy Swing; 539.0 dune-buggy Filter; 550.0 dune-buggy Chop; 561.0 dune-buggy Space
+- `docs/presets/clips/macro-audit/groove/tour.mp3`: all 56 sweeps, 1 s apart, 20 ms fades:
+  0.0 copper-mile Filter; 11.0 copper-mile Phase; 22.0 copper-mile Pump; 33.0 copper-mile Room; 44.0 brick-dust Filter; 55.0 brick-dust Dirt; 66.0 brick-dust Pump; 77.0 brick-dust Room; 88.0 ore-cart Filter; 99.0 ore-cart Rumble; 110.0 ore-cart Pump; 121.0 ore-cart Space; 132.0 stoop-sale Swing; 143.0 stoop-sale Dust; 154.0 stoop-sale Filter; 165.0 stoop-sale Space; 176.0 fault-line Reese; 187.0 fault-line Filter; 198.0 fault-line Hats; 209.0 fault-line Space; 220.0 corner-store Swing; 231.0 corner-store Filter; 242.0 corner-store Drive; 253.0 corner-store Room; 264.0 glass-coast Filter; 275.0 glass-coast Hats; 286.0 glass-coast Chorus; 297.0 glass-coast Space; 308.0 still-water Bloom; 319.0 still-water Pulse; 330.0 still-water Weight; 341.0 still-water Space; 352.0 slab-city Tone; 363.0 slab-city Glide; 374.0 slab-city Hats; 385.0 slab-city Room; 396.0 rope-walk Filter; 407.0 rope-walk Phase; 418.0 rope-walk Pump; 429.0 rope-walk Room; 440.0 lamp-oil Chord; 451.0 lamp-oil Dub; 462.0 lamp-oil Filter; 473.0 lamp-oil Space; 484.0 scrap-metal Vowel; 495.0 scrap-metal Crush; 506.0 scrap-metal Pump; 517.0 scrap-metal Room; 528.0 dune-buggy Swing; 539.0 dune-buggy Filter; 550.0 dune-buggy Chop; 561.0 dune-buggy Space; 572.0 loading-dock Sweep; 583.0 loading-dock Drive; 594.0 loading-dock Wash; 605.0 loading-dock Pump
 - `docs/presets/clips/macro-audit/groove/copper-mile-tour.mp3` (this preset's macros): 0.0 Filter; 11.0 Phase; 22.0 Pump; 33.0 Room
 - `docs/presets/clips/macro-audit/groove/brick-dust-tour.mp3` (this preset's macros): 0.0 Filter; 11.0 Dirt; 22.0 Pump; 33.0 Room
 - `docs/presets/clips/macro-audit/groove/ore-cart-tour.mp3` (this preset's macros): 0.0 Filter; 11.0 Rumble; 22.0 Pump; 33.0 Space
@@ -189,4 +203,5 @@ Every clip: the groove runs, the macro moves 0 to 1 to 0 over 8 s (1 s to 9 s of
 - `docs/presets/clips/macro-audit/groove/lamp-oil-tour.mp3` (this preset's macros): 0.0 Chord; 11.0 Dub; 22.0 Filter; 33.0 Space
 - `docs/presets/clips/macro-audit/groove/scrap-metal-tour.mp3` (this preset's macros): 0.0 Vowel; 11.0 Crush; 22.0 Pump; 33.0 Room
 - `docs/presets/clips/macro-audit/groove/dune-buggy-tour.mp3` (this preset's macros): 0.0 Swing; 11.0 Filter; 22.0 Chop; 33.0 Space
+- `docs/presets/clips/macro-audit/groove/loading-dock-tour.mp3` (this preset's macros): 0.0 Sweep; 11.0 Drive; 22.0 Wash; 33.0 Pump
 - one file per macro: `docs/presets/clips/macro-audit/groove/<slug>-m<k>-<name>.mp3`
