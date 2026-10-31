@@ -96,10 +96,14 @@ pub fn builtin_a(dark: bool) -> Style {
             },
             plug: PlugRecipe::Cap,
             display: DisplaySlots {
-                frame: DisplayFrame::Glass,
+                frame: DisplayFrame::Seated,
                 trace: DisplayTrace::SoftGlow,
                 glow: 0.45,
                 fill: 0.3,
+                bezel: 2.0,
+                inner_shadow: 0.6,
+                sheen: 0.5,
+                tint_depth: 0.12,
             },
             controls: ControlSlots {
                 button: Shape::Rounded,
@@ -323,10 +327,14 @@ pub fn builtin_b(dark: bool) -> Style {
             },
             plug: PlugRecipe::Ring,
             display: DisplaySlots {
-                frame: DisplayFrame::Neon,
+                frame: DisplayFrame::Seated,
                 trace: DisplayTrace::StrongGlow,
                 glow: 0.8,
                 fill: 0.35,
+                bezel: 2.0,
+                inner_shadow: 0.6,
+                sheen: 0.5,
+                tint_depth: 0.12,
             },
             controls: ControlSlots {
                 button: Shape::Pill,

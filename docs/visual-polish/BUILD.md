@@ -137,3 +137,10 @@ Kosta chose Option 1 (Seated) for both themes, so there is one recipe set. Built
 Deviations from the plan: no new theme slots or dials yet (`well()` as a separate kit function, `display.frame = seated` and the dials `bezel`, `inner_shadow`, `sheen`, `tint_depth` are stage 2, with the port tray); the seated recipe is hard-wired for non-paper frames, so a custom theme with `Glass` or `Neon` also gets it. Frame time did not need mesh caching: dense 1440x900 median 4.7 ms light, 3.5 ms dark, max 6.3 ms (budget 8 and 16).
 
 Stage 2 next: slots and dials for the well, `ports_tray`, `header`, knob size by count, segmented control as the one selector idiom.
+
+## Stage 2 split
+
+- **2a (built on `claude/visual-polish-2`)**: `DisplayFrame::Seated` and the dials `bezel`, `inner_shadow`, `sheen`, `tint_depth` (loader clamps, serde defaults for old theme files); `display_frame` renamed `kit::face::well` and driven by the dials; knob size by count (`rack.rs: knob_radius`: one or two knobs large, three or more small); one selector idiom (accent segment on a dark track in both themes).
+- **2b (next)**: `ports_tray()` and `header()` kit functions, jacks onto tray rows (touches the pixel tests), empty-face fill, label wrap on 210 px faces, `face.ports` slot.
+
+Stage 2a verification: captures in `docs/visual-polish/captures-2a` (rack-dense and drum, both themes, light and dark, 1440x900 and 1280x800; the theme B dark drum grid now captures). Dense frame time (`bench_chrome 300 live`): 1440x900 median 4.6 ms light, 5.3 ms dark, max 7.1 ms; 1280x800 median 3.1 ms, max 3.3 ms (budget 8 and 16). Only `kabl-ui` changed, so renders are unchanged.

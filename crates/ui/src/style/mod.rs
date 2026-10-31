@@ -215,7 +215,7 @@ recipes! {
     JackRecipe { Nut, GlowRing, Donut }
     CableRecipe { Rope, Glow, Outlined }
     PlugRecipe { Cap, Ring, Dot }
-    DisplayFrame { Glass, Neon, Paper }
+    DisplayFrame { Glass, Neon, Paper, Seated }
     DisplayTrace { SoftGlow, StrongGlow, Crisp }
     /// Corner treatment of buttons, chips, fields and rows.
     Shape { Rounded, Pill, Square }
@@ -280,6 +280,34 @@ pub struct DisplaySlots {
     pub trace: DisplayTrace,
     pub glow: f32,
     pub fill: f32,
+    /// Bezel width of a seated well in px at zoom 1, 0..=4.
+    #[serde(default = "default_bezel")]
+    pub bezel: f32,
+    /// Strength of the inner shadow of a seated well, 0..=1.
+    #[serde(default = "default_inner_shadow")]
+    pub inner_shadow: f32,
+    /// Strength of the sheen across a seated well, 0..=1.
+    #[serde(default = "default_sheen")]
+    pub sheen: f32,
+    /// How far the glass takes the face hue, 0..=1.
+    #[serde(default = "default_tint_depth")]
+    pub tint_depth: f32,
+}
+
+fn default_bezel() -> f32 {
+    2.0
+}
+
+fn default_inner_shadow() -> f32 {
+    0.6
+}
+
+fn default_sheen() -> f32 {
+    0.5
+}
+
+fn default_tint_depth() -> f32 {
+    0.12
 }
 
 /// How the chrome's widgets are shaped and finished.

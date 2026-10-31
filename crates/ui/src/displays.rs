@@ -275,7 +275,7 @@ pub(crate) fn draw(
 ) {
     let z = xf.zoom;
     let r = xf.r(r);
-    face::display_frame(painter, st, r, face, z);
+    face::well(painter, st, r, face, z);
     let d = detail(z);
     if d == Detail::Frame {
         return;

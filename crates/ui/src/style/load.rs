@@ -394,6 +394,17 @@ fn clamp(s: &mut Style, base: &Style, mode: &str, notes: &mut Vec<String>) {
         (&mut sl.display.glow, bl.display.glow, "display.glow"),
         (&mut sl.display.fill, bl.display.fill, "display.fill"),
         (
+            &mut sl.display.inner_shadow,
+            bl.display.inner_shadow,
+            "display.inner_shadow",
+        ),
+        (&mut sl.display.sheen, bl.display.sheen, "display.sheen"),
+        (
+            &mut sl.display.tint_depth,
+            bl.display.tint_depth,
+            "display.tint_depth",
+        ),
+        (
             &mut sl.controls.gradient,
             bl.controls.gradient,
             "controls.gradient",
@@ -401,6 +412,15 @@ fn clamp(s: &mut Style, base: &Style, mode: &str, notes: &mut Vec<String>) {
     ] {
         num(v, 0.0, 1.0, d, what, mode, notes);
     }
+    num(
+        &mut sl.display.bezel,
+        0.0,
+        4.0,
+        bl.display.bezel,
+        "display.bezel",
+        mode,
+        notes,
+    );
     num(
         &mut sl.cable.width,
         1.0,

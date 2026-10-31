@@ -337,7 +337,7 @@ fn stack(
     let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
     ui_state.record("wt:stack".into(), rect);
     let p = ui.painter_at(rect);
-    kit::face::display_frame(&p, st, rect, ui.visuals().panel_fill, 1.0);
+    kit::face::well(&p, st, rect, ui.visuals().panel_fill, 1.0);
     let n = frames.len();
     let inner = rect.shrink(8.0);
     let amp = inner.height() * 0.22;
@@ -398,7 +398,7 @@ fn wave(
     let (rect, resp) = ui.allocate_exact_size(size, Sense::click_and_drag());
     ui_state.record("wt:wave".into(), rect);
     let p = ui.painter_at(rect);
-    kit::face::display_frame(&p, st, rect, ui.visuals().panel_fill, 1.0);
+    kit::face::well(&p, st, rect, ui.visuals().panel_fill, 1.0);
     let down = resp.is_pointer_button_down_on();
     if let (true, Some(at)) = (down, ui.input(|i| i.pointer.latest_pos())) {
         let x = ((at.x - rect.left()) / rect.width()).clamp(0.0, 0.9999);
@@ -443,7 +443,7 @@ fn bars(
     let (rect, resp) = ui.allocate_exact_size(size, Sense::click_and_drag());
     ui_state.record("wt:bars".into(), rect);
     let p = ui.painter_at(rect);
-    kit::face::display_frame(&p, st, rect, ui.visuals().panel_fill, 1.0);
+    kit::face::well(&p, st, rect, ui.visuals().panel_fill, 1.0);
     let w = rect.width() / ed::BARS as f32;
     let down = resp.is_pointer_button_down_on();
     if let (true, Some(at)) = (down, ui.input(|i| i.pointer.latest_pos())) {

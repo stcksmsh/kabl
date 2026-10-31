@@ -500,7 +500,7 @@ fn fade(p: &Painter, rect: Rect, side: usize, depth: f32, a: u8) {
 /// The frame of a live display, seated into the face colour `face`: a tinted glass with a
 /// bezel, a lit lower lip, an inner shadow at the top and sides and a faint sheen. Paper
 /// themes keep the flat sheet.
-pub fn display_frame(p: &Painter, st: &Style, rect: Rect, face: Color32, z: f32) {
+pub fn well(p: &Painter, st: &Style, rect: Rect, face: Color32, z: f32) {
     let r = &st.roles;
     let cr = CornerRadius::same((3.0 * z).clamp(2.0, 6.0) as u8);
     if st.slots.display.frame == DisplayFrame::Paper {
@@ -514,13 +514,18 @@ pub fn display_frame(p: &Painter, st: &Style, rect: Rect, face: Color32, z: f32)
             Stroke::new(1.0, alpha(Color32::WHITE, 60)),
             StrokeKind::Outside,
         );
-        p.rect_filled(rect, cr, mix(r.disp_bg, face, 0.12));
-        fade(p, rect, 0, (7.0 * z).max(3.0), 120);
-        fade(p, rect, 1, (4.0 * z).max(2.0), 70);
-        fade(p, rect, 2, (4.0 * z).max(2.0), 70);
+        let d = &st.slots.display;
+        let shade = |a: f32| (a * d.inner_shadow / 0.6).clamp(0.0, 255.0) as u8;
+        p.rect_filled(rect, cr, mix(r.disp_bg, face, d.tint_depth));
+        fade(p, rect, 0, (7.0 * z).max(3.0), shade(120.0));
+        fade(p, rect, 1, (4.0 * z).max(2.0), shade(70.0));
+        fade(p, rect, 2, (4.0 * z).max(2.0), shade(70.0));
         let (w, h) = (rect.width(), rect.height());
         let mut sheen = Mesh::default();
-        sheen.colored_vertex(rect.left_top(), alpha(Color32::WHITE, 14));
+        sheen.colored_vertex(
+            rect.left_top(),
+            alpha(Color32::WHITE, (28.0 * d.sheen) as u8),
+        );
         sheen.colored_vertex(
             rect.left_top() + vec2(w * 0.5, 0.0),
             alpha(Color32::WHITE, 0),
@@ -535,7 +540,10 @@ pub fn display_frame(p: &Painter, st: &Style, rect: Rect, face: Color32, z: f32)
         p.rect_stroke(
             rect,
             cr,
-            Stroke::new(2.0, alpha(mix(face, Color32::BLACK, 0.7), 230)),
+            Stroke::new(
+                (d.bezel * z).max(0.0),
+                alpha(mix(face, Color32::BLACK, 0.7), 230),
+            ),
             StrokeKind::Inside,
         );
     }
