@@ -1,15 +1,39 @@
 {
- "plugin_sha256": "0d2fa4547db891efafdfbb38a19c237fd86bfcd4fcf5a57fe346071abdaca73a",
+ "plugin_sha256": "bdd65857751b3c08022a69a3d6b2c7827d1004d0b3855ec1129b02295d34385b",
  "slab-city": {
   "states_identical_across_save_quit_reopen": true,
   "peak": 0.1169,
   "rms": 0.0223,
   "restart_relative_difference": 0.0
  },
+ "rope-walk": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1272,
+  "rms": 0.021,
+  "restart_relative_difference": 1.33399
+ },
+ "lamp-oil": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1609,
+  "rms": 0.0267,
+  "restart_relative_difference": 0.0
+ },
  "pinball": {
   "states_identical_across_save_quit_reopen": true,
-  "peak": 0.1793,
-  "rms": 0.037,
-  "restart_relative_difference": 0.33818
+  "peak": 0.1624,
+  "rms": 0.0334,
+  "restart_relative_difference": 0.0
+ },
+ "scrap-metal": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1494,
+  "rms": 0.0211,
+  "restart_relative_difference": 1.32714
+ },
+ "dune-buggy": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1984,
+  "rms": 0.0328,
+  "restart_relative_difference": 0.0
  }
 }
