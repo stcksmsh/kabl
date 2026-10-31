@@ -677,6 +677,9 @@ struct Part {
     lp: f32,
     /// A slew on the pitch (a glide between notes) and a formant filter on the part.
     glide: bool,
+    /// A slew of this many ms on the pitch without a macro, so a note change on a ringing tail
+    /// does not click (0 for none).
+    pitch_ms: f32,
     formant: bool,
     /// Steps the sequencer plays before it wraps (a polymeter against the clock's bar).
     len: f32,
@@ -704,6 +707,9 @@ enum T {
     Dirt(f32),
     /// How hard the kick ducks the music.
     Pump,
+    /// As `Pump`, and the music is this many dB quieter at macro 0 than at the stored value (the
+    /// level rises to the stored value linearly): without the duck the music alone would peak.
+    PumpTrim(f32),
     /// The clock's swing.
     Swing(f32),
     /// The mix of the phaser or chorus on the music.
@@ -811,9 +817,10 @@ fn seq_part(r: &mut Rack, clock: ModuleId, p: &Part) -> Built {
     let mix = r.add("mixer", &[("level1", 1.0), ("level2", p.sub)]);
     let vca = r.add("vca", &[("gain", 0.0)]);
     let lvl = r.add("gain", &[("gain_db", 20.0 * p.level.max(1e-3).log10())]);
-    let slew = p
-        .glide
-        .then(|| r.add("slew", &[("rise_ms", 0.1), ("fall_ms", 0.1)]));
+    let slew = (p.glide || p.pitch_ms > 0.0).then(|| {
+        let ms = if p.glide { 0.1 } else { p.pitch_ms };
+        r.add("slew", &[("rise_ms", ms), ("fall_ms", ms)])
+    });
     match slew {
         Some(sl) => {
             r.wire(seq, "pitch", sl, "in");
@@ -1019,7 +1026,7 @@ fn groove(s: Spec) -> Rack {
         match *t {
             T::Cutoff(a) => v.r.route(v.knob, &m, lad, "cutoff_hz", a),
             T::Dirt(a) => v.r.route(v.knob, &m, drive, "drive_db", a),
-            T::Pump => v.r.route(v.knob, &m, duck, "ratio", 0.95),
+            T::Pump | T::PumpTrim(_) => v.r.route(v.knob, &m, duck, "ratio", 0.95),
             T::Swing(a) => v.r.route(v.knob, &m, clock, "swing", a),
             T::Fx(a) => v.r.route(v.knob, &m, fx.expect("an fx stage"), "mix", a),
             T::Dust(a) => v.r.route(v.knob, &m, bus, "level4", a),
@@ -1079,6 +1086,10 @@ fn groove(s: Spec) -> Rack {
         ("mix", 0.0),
         ("tone_hz", s.echo[2]),
     ];
+    let trim = s.targets.iter().enumerate().find_map(|(i, t)| match *t {
+        T::PumpTrim(db) => Some((format!("m{}", i + 1), 10f32.powf(-db / 20.0), s.macros[i].1)),
+        _ => None,
+    });
     finish_drums(
         v,
         duck,
@@ -1086,6 +1097,7 @@ fn groove(s: Spec) -> Rack {
         kit,
         &echo,
         (s.space[0], s.space[1], s.space[2]),
+        trim,
     )
 }
 
@@ -1097,6 +1109,7 @@ fn finish_drums(
     beat: ModuleId,
     echo: &[(&str, f32)],
     (echo_max, decay, room_max): (f32, f32, f32),
+    trim: Option<(String, f32, f32)>,
 ) -> Rack {
     let tail = space_tail(
         &mut v.r,
@@ -1113,6 +1126,13 @@ fn finish_drums(
     for (mix, side) in [(mix_l, "left"), (mix_r, "right")] {
         v.r.wire(tail, side, mix, "in1");
         v.r.wire(beat, "out", mix, "in2");
+    }
+    // The music joins at level 1 (its stored value); a trim macro lowers it toward macro 0.
+    if let Some((mac, g0, stored)) = trim {
+        for mix in [mix_l, mix_r] {
+            v.r.e.set_param(mix, "level1", g0);
+            v.r.route(v.knob, &mac, mix, "level1", (1.0 - g0) / stored);
+        }
     }
     let out = v.r.add("out", &[]);
     v.r.wire(mix_l, "out", out, "left");
@@ -1149,6 +1169,7 @@ fn part(text: &str, osc: [f32; 5], sub: f32, gate: f32, env: [f32; 4], level: f3
         level,
         lp: 0.0,
         glide: false,
+        pitch_ms: 0.0,
         formant: false,
         len: 16.0,
         sub_st: -12.0,
@@ -1175,6 +1196,10 @@ impl Part {
     }
     fn glide(mut self) -> Self {
         self.glide = true;
+        self
+    }
+    fn smooth(mut self, ms: f32) -> Self {
+        self.pitch_ms = ms;
         self
     }
     fn formant(mut self) -> Self {
@@ -1780,7 +1805,7 @@ fn rope_walk() -> Rack {
             ("Pump", 0.60),
             ("Room", 0.25),
         ],
-        targets: [T::Cutoff(0.6), T::Fx(0.9), T::Pump],
+        targets: [T::Cutoff(0.6), T::Fx(0.9), T::PumpTrim(2.2)],
         bpm: 118.0,
         swing: 30.0,
         kit: kit(
@@ -1811,7 +1836,8 @@ fn rope_walk() -> Rack {
             65.0,
             [2.0, 170.0, 0.7, 40.0],
             0.7,
-        ),
+        )
+        .smooth(1.5),
         chords: Some(
             part(
                 "- - 7 - - - 7 7 - - 10 - - - 12 -",
@@ -2636,7 +2662,7 @@ fn main() {
                         .unwrap()
                         .0;
                     rack.e.set_param(knob, &format!("m{k}"), v);
-                    render(rack.e.state(), &(p.phrase)(), p.secs).0
+                    render(rack.e.state(), &(p.phrase)(), p.secs)
                 };
                 let count = (1..=8)
                     .filter(|k| {
@@ -2650,7 +2676,7 @@ fn main() {
                     })
                     .count();
                 for k in 1..=count {
-                    let (a, b) = (probe(k, 0.0), probe(k, 1.0));
+                    let (a, b) = (probe(k, 0.0).0, probe(k, 1.0).0);
                     let rms = |f: &dyn Fn(usize) -> f32| {
                         (a.iter().enumerate().map(|(i, _)| f(i).powi(2)).sum::<f32>()
                             / a.len() as f32)
@@ -2661,7 +2687,29 @@ fn main() {
                         db(rms(&|i| a[i] - b[i]) / rms(&|i| a[i]).max(1e-9))
                     );
                 }
+                // The peak along each macro's travel (8 steps, the others at their stored values):
+                // every position stays under -1 dBFS, not only all 0 and all 1.
+                let mut worst = (f32::MIN, 0, 0.0);
+                for k in 1..=count {
+                    for step in 0..8 {
+                        let v = step as f32 / 7.0;
+                        let (l, r) = probe(k, v);
+                        let peak = db(l.iter().chain(&r).fold(0.0f32, |m, s| m.max(s.abs())));
+                        if peak > worst.0 {
+                            worst = (peak, k, v);
+                        }
+                    }
+                }
+                line += &format!("  travel peak {:5.1} (m{} at {:.2})", worst.0, worst.1, worst.2);
                 println!("{line}");
+                assert!(
+                    worst.0 <= -1.0,
+                    "{}: macro {} at {:.2} peaks at {:.1} dBFS",
+                    p.slug,
+                    worst.1,
+                    worst.2,
+                    worst.0
+                );
             }
         }
         Some("library") => {

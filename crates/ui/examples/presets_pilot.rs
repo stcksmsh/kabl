@@ -590,6 +590,13 @@ fn loading_dock() -> Rack {
     r.wire(mix_r, "out", out, "right");
 
     r.route(knob, "m4", duck, "ratio", 0.95);
+    // Headroom: the first beat of a run peaks above 0 dBFS with the filter open (Sweep from 0.43
+    // up) or with no duck (Pump 0). The trim after the filter follows: -9.0 dB per unit of Sweep
+    // from its stored value, +2.2 dB per unit of Pump, so the stored (Intro) macros are unchanged.
+    let (sweep0, pump0) = (DROP_CUES[0].1[0], DROP_CUES[0].1[3]);
+    r.e.set_param(trim, "gain_db", 9.0 + 9.0 * sweep0 - 2.2 * pump0);
+    r.route(knob, "m1", trim, "gain_db", -9.0 / 84.0);
+    r.route(knob, "m4", trim, "gain_db", 2.2 / 84.0);
     r.wire(noise, "out", riser, "in");
     r.wire(riser, "out", post, "in2");
     r.route(knob, "m3", riser, "gain", 0.9);
