@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 
-use egui::{pos2, vec2, Pos2, Rect, Stroke};
+use egui::{pos2, Pos2, Rect, Stroke};
 use kabl_core::{ModuleId, PatchState, PortRef};
 use kabl_engine::facetap::{FaceTarget, FaceTargets, MAX_FACE_TAPS};
 use kabl_engine::patch_engine::Command;
@@ -647,9 +647,4 @@ fn lfo(
             z,
         );
     }
-}
-
-/// The scope in the FM voice's header, between its jacks and the feedback knob.
-pub fn fm6_scope(face: Rect) -> Rect {
-    Rect::from_min_size(face.min + vec2(246.0, 38.0), vec2(150.0, 52.0))
 }

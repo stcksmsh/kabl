@@ -25,6 +25,7 @@ mod drum_grid;
 pub mod editor;
 pub mod explain;
 pub mod filebrowser;
+mod fm6;
 mod fx_displays;
 pub mod help;
 pub mod inspect;
@@ -2140,9 +2141,11 @@ fn draw_module(
     }
     if skin.is_none() {
         draw_decor(painter, th, xf, m);
+        if let Decor::Operators(r) = m.decor {
+            fm6::draw(editor, ui_state, ui, painter, xf, m, r);
+        }
         let scope = match m.decor {
             Decor::Display(r) => Some(r),
-            Decor::Operators(_) => Some(displays::fm6_scope(m.face)),
             _ => None,
         };
         if let Some(r) = scope {
@@ -3434,24 +3437,8 @@ fn draw_decor(p: &egui::Painter, th: &Theme, xf: Xf, m: &Placed) {
                 p.circle_stroke(c, r * z, Stroke::new(1.2, th.ink2));
             }
         }
-        Decor::Operators(r) => {
-            for (i, b) in rack::fm6_blocks(r).into_iter().enumerate() {
-                p.rect_stroke(
-                    xf.r(b),
-                    CornerRadius::same(5),
-                    Stroke::new(1.0, th.tick),
-                    egui::StrokeKind::Inside,
-                );
-                p.text(
-                    xf.p(b.left_top() + vec2(8.0, 9.0)),
-                    egui::Align2::LEFT_CENTER,
-                    format!("Op {}", i + 1),
-                    egui::FontId::proportional(11.5 * z),
-                    th.ink2,
-                );
-            }
-        }
         Decor::None
+        | Decor::Operators(_)
         | Decor::Display(_)
         | Decor::Transport(_)
         | Decor::Status(_)
