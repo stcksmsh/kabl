@@ -931,7 +931,7 @@ pub(crate) fn param_knob(
     // Label above, value below (a pill with a coloured edge when modulated).
     if let Some(font) = crate::kit::face::face_font(&ui_state.style, crate::style::Role::Label, z) {
         painter.text(
-            center - EguiVec2::new(0.0, (r + 21.0) * z),
+            center - EguiVec2::new(0.0, crate::rack::knob_text_dy(r, z, font.size * 1.075)),
             egui::Align2::CENTER_CENTER,
             crate::macro_name(editor.state(), id, param.name).unwrap_or_else(|| param_label(param)),
             font,
@@ -939,7 +939,9 @@ pub(crate) fn param_knob(
         );
     }
     let value = fmt_value(param, base);
-    let vpos = center + EguiVec2::new(0.0, (r + 14.0) * z);
+    let vh = crate::kit::face::face_font(&ui_state.style, crate::style::Role::Value, z)
+        .map_or(0.0, |f| f.size * 1.075);
+    let vpos = center + EguiVec2::new(0.0, crate::rack::knob_text_dy(r, z, vh));
     if routes.is_empty() {
         if let Some(g) = crate::kit::face::readout(
             painter,
@@ -1231,15 +1233,7 @@ pub(crate) fn stepped_selector(
     let key = format!("{id}.{}", param.name);
     ui_state.record(format!("knob:{key}"), rect);
     let routes = routes_into(editor.state(), id, param.name);
-    if let Some(font) = crate::kit::face::face_font(&ui_state.style, crate::style::Role::Label, z) {
-        painter.text(
-            egui::pos2(rect.center().x, rect.top() - 13.0 * z),
-            egui::Align2::CENTER_CENTER,
-            param_label(param),
-            font,
-            look.ink,
-        );
-    }
+    // A selector names itself by its options (G1b target): no label above it.
     let text_of = |k: usize| {
         labels
             .and_then(|l| l.get(k).copied())

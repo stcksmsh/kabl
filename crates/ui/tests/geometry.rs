@@ -16,7 +16,9 @@ use kabl_core::{ModuleState, PatchState, Vec2 as WorldVec};
 use kabl_modules::{registry, PortDirection};
 use kabl_ui::rack::{self, Decor, Geo, Placed};
 use kabl_ui::routing::{fmt_value, param_label};
-use kabl_ui::style::{builtin_a, builtin_b, contrast, KnobScale, Role, Style};
+use kabl_ui::style::{
+    builtin_a, builtin_b, contrast, line_solid_default, CompactText, KnobScale, Role, Style,
+};
 use std::fmt::Write as _;
 
 const ZOOMS: [f32; 6] = [0.5, 0.58, 0.75, 1.0, 1.5, 2.0];
@@ -160,7 +162,7 @@ fn sc(m: &Placed, z: f32, r: Rect) -> Rect {
 
 /// Containers: wells and plates. Leaves may sit inside or apart, never straddle.
 fn containers(m: &Placed) -> Vec<Rect> {
-    let mut v: Vec<Rect> = m.plate.into_iter().collect();
+    let mut v: Vec<Rect> = m.plate.into_iter().chain(m.tray).collect();
     match m.decor {
         Decor::Keys(r)
         | Decor::Display(r)
@@ -212,7 +214,9 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
         (15.0 * z).max(10.5)
     };
     // Today's renderer: labels need 12 * z >= 9.5.
-    let renders_today = 12.0 * z >= HIDE_BELOW;
+    // Compact-text styles (`Hold`) draw held 9.5 px text from the compact tier up.
+    let renders_today =
+        12.0 * z >= HIDE_BELOW || (st.slots.face.compact == CompactText::Hold && !overview);
 
     let mut leaves: Vec<Leaf> = Vec::new();
     let mut required: Vec<(String, Rect)> = Vec::new();
@@ -220,7 +224,7 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
     let mut group = 0usize;
     let knob_ring = match st.slots.knob.scale {
         KnobScale::Ticks => 7.5,
-        KnobScale::TrackArc => 6.7,
+        KnobScale::TrackArc => 4.8,
         KnobScale::None => 1.5,
     };
 
@@ -228,12 +232,16 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
         group += 1;
         let label = param_label(c.param);
         let lw = ruler.size(&label, font(st, Role::Label, label_px));
-        let lp = sc(
+        let mut lp = sc(
             &m,
             z,
             Rect::from_center_size(c.geo.label_pos(), egui::Vec2::ZERO),
         )
         .center();
+        if let Geo::Knob { c: at, r } = c.geo {
+            let at = sc(&m, z, Rect::from_center_size(at, egui::Vec2::ZERO)).center();
+            lp = at - vec2(0.0, rack::knob_text_dy(r, z, lw.y));
+        }
         let lr = Rect::from_center_size(lp, lw);
         let (slot, ax) = match c.geo {
             Geo::Knob { c: at, .. } => (m.slot_width(c), at.x - m.face.min.x),
@@ -262,6 +270,10 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
                     name: c.param.name.into(),
                 });
             }
+        }
+        // A selector names itself by its options (G1b): no label.
+        if matches!(c.geo, Geo::Select { .. }) {
+            continue;
         }
         // The label is required text. Text wider than its slot is dropped by rule (info) in the
         // compact tier and an error in the full tier.
@@ -317,6 +329,13 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
                     Rect::from_center_size(c.geo.value_pos(), egui::Vec2::ZERO),
                 )
                 .center();
+                let vp = match c.geo {
+                    Geo::Knob { c: at, r } => {
+                        let at = sc(&m, z, Rect::from_center_size(at, egui::Vec2::ZERO)).center();
+                        at + vec2(0.0, rack::knob_text_dy(r, z, vs.y))
+                    }
+                    Geo::Select { .. } => vp,
+                };
                 let vr = Rect::from_center_size(vp, vs);
                 if vs.x > max_w {
                     push(
@@ -343,7 +362,7 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
         let ax = j.c.x - m.face.min.x;
         leaves.push(Leaf {
             k: K::Jack,
-            r: Rect::from_center_size(c, egui::Vec2::splat(2.0 * rack::JACK_R * z)),
+            r: Rect::from_center_size(c, egui::Vec2::splat(2.0 * rack::JACK_NUT * z)),
             group,
             ax,
             name: format!("jack {}", j.port.name),
@@ -353,7 +372,7 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
         let lc = if j.label_right {
             c + vec2(20.0 * z + lw.x / 2.0, 0.0)
         } else {
-            c - vec2(0.0, 24.0 * z)
+            c - vec2(0.0, rack::jack_text_dy(z, lw.y))
         };
         let lr = Rect::from_center_size(lc, lw);
         if !renders_today || overview {
@@ -408,11 +427,18 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
     // Header: title (as `kit::face::title`), `+N` chip, caption.
     group += 1;
     let tf = font(st, Role::H3, title_px);
-    let mut tsz = ruler.size(m.info.name, tf.clone());
+    let shown = if ruler.size(m.info.name, tf.clone()).x
+        > kabl_ui::kit::face::title_room(face.width(), z)
+    {
+        kabl_ui::kit::face::short_title(m.info.name)
+    } else {
+        m.info.name
+    };
+    let mut tsz = ruler.size(shown, tf.clone());
     let mut tfont = tf;
     if tsz.x > face.width() - 100.0 * z {
         tfont = FontId::new((title_px * 0.8).max(11.0), tfont.family.clone());
-        tsz = ruler.size(m.info.name, tfont.clone());
+        tsz = ruler.size(shown, tfont.clone());
     }
     let tag = format!("{} · #{}", m.info.kind, 1);
     let capsz = ruler.size(&tag, font(st, Role::Caption, caption_px));
@@ -691,7 +717,7 @@ fn run_all() -> Out {
         ctx.begin_pass(input());
         let _ = ctx.end_pass();
     }
-    let mut st = builtin_a(true);
+    let mut st = line_solid_default(true);
     st.fonts_ready = true;
     let mut out = Out {
         recs: vec![],

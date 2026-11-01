@@ -169,6 +169,36 @@ pub fn hardware(p: &Painter, st: &Style, rect: Rect, z: f32) {
 /// face content (jacks and their labels, knobs, displays): a left-aligned title that would
 /// touch any of them is set centred instead, as the centred recipes are.
 #[allow(clippy::too_many_arguments)]
+/// The name a face shows when the full one does not fit beside the `+N` chip (PLAN section 4:
+/// short name, never an ellipsis). Unlisted names are already short.
+pub fn short_title(name: &str) -> &str {
+    match name {
+        "VA Oscillator" => "VA Osc",
+        "SVF Filter" => "SVF",
+        "ADSR Envelope" => "ADSR",
+        "Ladder Filter" => "Ladder",
+        "Comb Filter" => "Comb",
+        "Wavetable Oscillator" => "Wavetable",
+        "FM Operator" => "FM Op",
+        "FM Voice (6 operators)" => "FM Voice",
+        "Ring Modulator" => "Ring Mod",
+        "Sample & Hold" => "S&H",
+        "Comparator" => "Comp",
+        "Crossfade" => "X-Fade",
+        "Quantizer" => "Quant",
+        "Attenuverter" => "Atten",
+        "Compressor" => "Comp",
+        "Arpeggiator" => "Arp",
+        "Bitcrusher" => "Crush",
+        _ => name,
+    }
+}
+
+/// Room for a title: the face less the `+N` chip, its gap and the side margin.
+pub fn title_room(face_w: f32, z: f32) -> f32 {
+    face_w - 66.0 * z
+}
+
 pub fn title(
     p: &Painter,
     st: &Style,
@@ -185,6 +215,15 @@ pub fn title(
     let y = face.top() + if cond { 19.7 } else { 26.0 } * z;
     let y_tag = face.top() + if cond { 38.0 } else { 43.0 } * z;
     let mut rect = Rect::NOTHING;
+    let name = match title_font(st, z) {
+        Some(f)
+            if p.layout_no_wrap(name.to_string(), f.clone(), ink).size().x
+                > title_room(face.width(), z) =>
+        {
+            short_title(name)
+        }
+        _ => name,
+    };
     let dot = st.slots.face.title == FaceTitle::LeftDot;
     let x0 = face.left() + if dot { 32.0 } else { 12.0 } * z;
     let left = st.slots.face.title != FaceTitle::CapsRule && {
