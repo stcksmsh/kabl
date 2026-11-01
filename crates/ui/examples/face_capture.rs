@@ -113,11 +113,21 @@ impl eframe::App for App {
         let j = &self.jobs[self.i];
         if self.id.is_none() {
             self.editor = PatchEditor::seed_from(&Default::default());
-            self.id = Some(
-                self.editor
-                    .add_module(j.kind, kabl_core::Vec2 { x: 24.0, y: 20.0 }),
-            );
+            let id = self
+                .editor
+                .add_module(j.kind, kabl_core::Vec2 { x: 24.0, y: 20.0 });
+            self.id = Some(id);
             self.ui.theme = self.theme.clone();
+            // KABL_CAPTURE_SET="algorithm=3,feedback=0.4": params set on every captured module.
+            for kv in std::env::var("KABL_CAPTURE_SET")
+                .unwrap_or_default()
+                .split(',')
+                .filter(|kv| !kv.is_empty())
+            {
+                if let Some((k, v)) = kv.split_once('=') {
+                    self.editor.set_param(id, k, v.parse().unwrap());
+                }
+            }
         }
         self.ui.dark = j.dark;
         self.ui.zoom = j.zoom;

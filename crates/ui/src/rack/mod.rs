@@ -567,7 +567,6 @@ fn place_local(
     } else {
         // Jacks first: they anchor the bottom of the face and never move.
         let column = info.kind == "out";
-        let fm6 = info.kind == "osc.fm6";
         let wide = fw >= WIDE_FROM;
         // Jack pitch (PLAN section 4): 56 on a wide face, else up to 72, left aligned so the
         // inputs sit above the outputs.
@@ -577,16 +576,7 @@ fn place_local(
             72.0f32.min((fw - 2.0 * SIDE) / ins.len().max(outs.len()).max(3) as f32)
         };
         let col_x = |k: usize| SIDE + pitch / 2.0 + k as f32 * pitch;
-        if fm6 {
-            // Top left, above the operators.
-            for (k, &port) in ins.iter().chain(&outs).enumerate() {
-                jacks.push(Jack {
-                    port,
-                    c: pos2(36.0 + 56.0 * k as f32, 60.0),
-                    label_right: false,
-                });
-            }
-        } else if column {
+        if column {
             for (i, &port) in ins.iter().enumerate() {
                 jacks.push(Jack {
                     port,
@@ -742,7 +732,12 @@ fn place_local(
         // transpose), one knob per step.
         // Two rows of 13: velocities, gate length and ratchets 1-4 above probabilities,
         // transpose and ratchets 5-8.
-        let per_row = if info.kind == "seq" { 13 } else { 5 };
+        // The FM voice's drawer: one column per operator, Fine above Vel.
+        let per_row = match info.kind {
+            "seq" => 13,
+            "osc.fm6" => 6,
+            _ => 5,
+        };
         // Knob spacing: the sequencer's 13 columns are packed closer.
         let pitch = if info.kind == "seq" { 57.0 } else { 76.0 };
         if info.kind == "seq" {
@@ -758,6 +753,12 @@ fn place_local(
                     _ => (1, 9),
                 };
                 (row, col, i)
+            });
+        }
+        if info.kind == "osc.fm6" {
+            hk.sort_by_key(|&i| {
+                let n = info.params[i].name;
+                (n.starts_with("vel"), n.as_bytes()[n.len() - 1], i)
             });
         }
         let hs: Vec<usize> = off_face
@@ -822,7 +823,7 @@ fn place_local(
         .filter(|j| j.port.direction == PortDirection::Output)
         .map(|j| j.c.x);
     let (lo, hi) = outs_x.fold((f32::MAX, f32::MIN), |(lo, hi), x| (lo.min(x), hi.max(x)));
-    let has_row = skin.is_none() && info.kind != "out" && info.kind != "osc.fm6";
+    let has_row = skin.is_none() && info.kind != "out";
     // Output plate: under the output jacks, a half pitch beyond the outer ones.
     // Two-row trays: the plate spans the tray (G1b target); one-row trays: just the outputs.
     let has_in = jacks
@@ -1078,7 +1079,9 @@ mod tests {
                         }
                     }
                     if !expanded {
-                        let shown = m.ctls.len() + m.hidden.len();
+                        // The FM voice's envelope curves edit the A/D/S/R params of six operators.
+                        let curves = if m.info.kind == "osc.fm6" { 24 } else { 0 };
+                        let shown = m.ctls.len() + m.hidden.len() + curves;
                         let visible = m
                             .info
                             .params

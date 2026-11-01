@@ -1258,6 +1258,15 @@ pub(crate) fn stepped_selector(
             .and_then(|l| l.get(k).copied())
             .map_or(format!("{}", param.min + k as f32), str::to_string)
     };
+    // The FM voice's algorithm: the header says `ALG n`; the list and the tooltip add the routing.
+    let alg = kind == "osc.fm6" && param.name == "algorithm";
+    let short_of = |k: usize| {
+        if alg {
+            format!("ALG {}", k + 1)
+        } else {
+            text_of(k)
+        }
+    };
     let w = rect.width() / n as f32;
     // Segments too narrow for the longest option would draw their labels over each other: a
     // dropdown of the same options instead, whatever the module.
@@ -1270,10 +1279,15 @@ pub(crate) fn stepped_selector(
         let opened = ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
             egui::ComboBox::from_id_salt(("kabl-sel", id, param.name))
                 .width(rect.width() - 24.0)
-                .selected_text(egui::RichText::new(text_of(cur)).monospace())
+                .selected_text(egui::RichText::new(short_of(cur)).monospace())
                 .show_ui(ui, |ui| {
                     for k in 0..n {
-                        if ui.selectable_label(k == cur, text_of(k)).clicked() {
+                        let item = if alg {
+                            format!("{}  {}", short_of(k), text_of(k))
+                        } else {
+                            text_of(k)
+                        };
+                        if ui.selectable_label(k == cur, item).clicked() {
                             inspect(ui_state, &routes, id, param.name);
                             editor.set_param(id, param.name, param.min + k as f32);
                         }
@@ -1284,6 +1298,9 @@ pub(crate) fn stepped_selector(
         // Opening the list inspects the control, as picking a segment does.
         if opened.inner.clicked() {
             inspect(ui_state, &routes, id, param.name);
+        }
+        if alg {
+            opened.inner.on_hover_text(text_of(cur));
         }
         return selector_plug(ui_state, painter, look, &routes, rect);
     }

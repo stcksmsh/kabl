@@ -187,3 +187,29 @@ fn save_load_preserves_routes_timing_and_undo() {
     let c = loaded.connect_route(out(lfo, "out"), env, "decay_ms");
     assert!(c > b);
 }
+
+/// An FM voice envelope handle edits two params per frame; the whole drag undoes in one step.
+#[test]
+fn fm6_envelope_drag_undoes_as_one_step() {
+    let mut e = PatchEditor::new();
+    let id = e.add_module("osc.fm6", Vec2 { x: 0.0, y: 0.0 });
+    let t = |p: &str| ParamTarget::Module {
+        id,
+        param: p.into(),
+    };
+    let get = |e: &PatchEditor, p: &str| e.state().modules[&id].params.get(p).copied();
+    for (frame, (d, s)) in [(50.0, 0.5), (60.0, 0.4), (80.0, 0.3)]
+        .into_iter()
+        .enumerate()
+    {
+        e.set_param_group(t("decay1"), d, frame > 0);
+        e.set_param_group(t("sustain1"), s, true);
+    }
+    assert_eq!(get(&e, "decay1"), Some(80.0));
+    assert_eq!(get(&e, "sustain1"), Some(0.3));
+    e.undo();
+    assert_eq!(get(&e, "decay1"), None, "one undo restores both params");
+    assert_eq!(get(&e, "sustain1"), None);
+    e.redo();
+    assert_eq!(get(&e, "decay1"), Some(80.0));
+}
