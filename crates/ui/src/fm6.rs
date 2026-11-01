@@ -132,6 +132,7 @@ pub(crate) fn draw(
 ///   use one bus line under the row: short drops, ONE arrowhead per target.
 /// - Any other edge is a curve over (even source) or under (odd source) the row.
 /// - Carriers are filled with the accent; operator 6's feedback is a small arc over its box.
+///
 /// Nothing is drawn across a box.
 pub(crate) fn graph(p: &egui::Painter, st: &crate::style::Style, xf: Xf, well: Rect, alg: usize) {
     let ro = &st.roles;
