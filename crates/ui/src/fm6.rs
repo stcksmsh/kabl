@@ -126,10 +126,13 @@ pub(crate) fn draw(
     }
 }
 
-/// Operator graph: solid boxes 6..1 left to right. A modulation edge between neighbours is a
-/// short arrow from box edge to box edge; any other edge is a curve under the row that leaves a
-/// box's bottom and arrives at the target's bottom. Carriers are filled with the accent;
-/// operator 6's feedback is a small arc over it. Strokes are 1.5 px in the display ink.
+/// Operator graph: solid boxes 6..1 left to right, strokes 1.5 px in the display ink.
+/// - A modulation edge between neighbours is a short arrow, box edge to box edge.
+/// - A target with several modulators (fan-in) and a modulator with several targets (fan-out)
+///   use one bus line under the row: short drops, ONE arrowhead per target.
+/// - Any other edge is a curve over (even source) or under (odd source) the row.
+/// - Carriers are filled with the accent; operator 6's feedback is a small arc over its box.
+/// Nothing is drawn across a box.
 pub(crate) fn graph(p: &egui::Painter, st: &crate::style::Style, xf: Xf, well: Rect, alg: usize) {
     let ro = &st.roles;
     let z = xf.zoom;
@@ -137,8 +140,13 @@ pub(crate) fn graph(p: &egui::Painter, st: &crate::style::Style, xf: Xf, well: R
     let (bw, pitch) = (14.0, 30.0);
     let x0 = well.center().x - 2.5 * pitch;
     let cy = well.top() + 44.0;
-    let at = |op: usize| pos2(x0 + (6 - op) as f32 * pitch, cy);
+    let (top, bottom) = (cy - bw / 2.0, cy + bw / 2.0);
+    let bus_y = bottom + 9.0;
+    let x_of = |op: usize| x0 + (6 - op) as f32 * pitch;
     let line = Stroke::new(1.5 * z.max(0.7), ro.disp_text);
+    let seg = |a: Pos2, b: Pos2| {
+        p.line_segment([xf.p(a), xf.p(b)], line);
+    };
     // Filled arrowhead with its tip at `tip` (world), pointing along `dir`.
     let head = |tip: Pos2, dir: egui::Vec2| {
         let n = vec2(-dir.y, dir.x);
@@ -166,39 +174,61 @@ pub(crate) fn graph(p: &egui::Painter, st: &crate::style::Style, xf: Xf, well: R
             .collect();
         p.add(egui::Shape::line(pts, line));
     };
-    // Edges as (source op, target op), numbers 1..6.
-    let edges: Vec<(usize, usize)> = (0..6usize)
+    // Edges (source op, target op), numbers 1..6; each is drawn once.
+    let mut edges: Vec<(usize, usize)> = (0..6usize)
         .flat_map(|k| (k + 1..6).map(move |j| (j, k)))
         .filter(|&(j, k)| a.mods[k] >> j & 1 == 1)
         .map(|(j, k)| (j + 1, k + 1))
         .collect();
-    let far: Vec<(usize, usize)> = edges.iter().copied().filter(|&(j, k)| j != k + 1).collect();
-    // Arcs sharing a box end are spread along its bottom so they do not land on one point.
-    let spread = |n: usize, i: usize| (i as f32 - (n as f32 - 1.0) / 2.0) * 3.5;
-    let rank = |same: &dyn Fn(&(usize, usize)) -> bool, e: &(usize, usize)| {
-        let all: Vec<&(usize, usize)> = far.iter().filter(|x| same(x)).collect();
-        (all.len(), all.iter().position(|x| *x == e).unwrap_or(0))
-    };
-    for e @ &(j, k) in &edges {
-        let (from, to) = (at(j), at(k));
-        if j == k + 1 {
-            let (s, t) = (from.x + bw / 2.0, to.x - bw / 2.0);
-            p.line_segment([xf.p(pos2(s, cy)), xf.p(pos2(t - 3.0, cy))], line);
-            head(pos2(t, cy), vec2(1.0, 0.0));
-        } else {
-            let (ns, is) = rank(&|x| x.0 == j, e);
-            let (nt, it) = rank(&|x| x.1 == k, e);
-            let bottom = cy + bw / 2.0;
-            let s = pos2(from.x + spread(ns, is), bottom);
-            let t = pos2(to.x + spread(nt, it), bottom + 3.0);
-            // Controls straight below the ends: the curve leaves and arrives vertically.
-            let d = 2.9 * (j - k) as f32;
-            curve(s, s + vec2(0.0, d), t + vec2(0.0, d), t);
-            head(pos2(t.x, bottom), vec2(0.0, -1.0));
+    // Fan-in: a target with two or more modulators. One bus, one arrowhead.
+    for t in 1..=6usize {
+        let src: Vec<usize> = edges.iter().filter(|e| e.1 == t).map(|e| e.0).collect();
+        if src.len() < 2 {
+            continue;
         }
+        let left = src.iter().map(|&s| x_of(s)).fold(f32::MAX, f32::min);
+        for &s in &src {
+            seg(pos2(x_of(s), bottom), pos2(x_of(s), bus_y));
+        }
+        seg(pos2(left, bus_y), pos2(x_of(t), bus_y));
+        seg(pos2(x_of(t), bus_y), pos2(x_of(t), bottom + 4.0));
+        head(pos2(x_of(t), bottom), vec2(0.0, -1.0));
+        edges.retain(|e| e.1 != t);
+    }
+    // Fan-out: a modulator with two or more targets. One line into the bus, a drop per target.
+    for s in 1..=6usize {
+        let dst: Vec<usize> = edges.iter().filter(|e| e.0 == s).map(|e| e.1).collect();
+        if dst.len() < 2 {
+            continue;
+        }
+        let right = dst.iter().map(|&t| x_of(t)).fold(f32::MIN, f32::max);
+        seg(pos2(x_of(s), bottom), pos2(x_of(s), bus_y));
+        seg(pos2(x_of(s), bus_y), pos2(right, bus_y));
+        for &t in &dst {
+            seg(pos2(x_of(t), bus_y), pos2(x_of(t), bottom + 4.0));
+            head(pos2(x_of(t), bottom), vec2(0.0, -1.0));
+        }
+        edges.retain(|e| e.0 != s);
+    }
+    // Single edges: neighbours get an arrow, others a curve over or under the row.
+    for &(j, k) in &edges {
+        let (xs, xt) = (x_of(j), x_of(k));
+        if j == k + 1 {
+            seg(pos2(xs + bw / 2.0, cy), pos2(xt - bw / 2.0 - 3.0, cy));
+            head(pos2(xt - bw / 2.0, cy), vec2(1.0, 0.0));
+            continue;
+        }
+        // Even sources go over the row, odd ones under it; ends sit 4 px off the box centre.
+        let up = if j % 2 == 0 { -1.0 } else { 1.0 };
+        let edge_y = if up < 0.0 { top } else { bottom };
+        let d = 2.9 * (j - k) as f32 * up;
+        let s = pos2(xs + 4.0, edge_y);
+        let t = pos2(xt - 4.0, edge_y + 3.0 * up);
+        curve(s, s + vec2(0.0, d), t + vec2(0.0, d), t);
+        head(pos2(t.x, edge_y), vec2(0.0, -up));
     }
     for op in 1..=6usize {
-        let r = Rect::from_center_size(xf.p(at(op)), vec2(bw, bw) * z);
+        let r = Rect::from_center_size(xf.p(pos2(x_of(op), cy)), vec2(bw, bw) * z);
         let carrier = a.carriers >> (op - 1) & 1 == 1;
         let fill = if carrier {
             ro.accent
@@ -225,15 +255,15 @@ pub(crate) fn graph(p: &egui::Painter, st: &crate::style::Style, xf: Xf, well: R
             );
         }
     }
-    // Feedback of operator 6: a small arc over its box, arrowhead back into the box.
-    let f = at(6) + vec2(0.0, -bw / 2.0);
+    // Feedback of operator 6: a small arc over the left half of its box, arrowhead into the box.
+    let f = pos2(x_of(6), top);
     curve(
-        f + vec2(-3.5, 0.0),
-        f + vec2(-6.5, -9.0),
-        f + vec2(6.5, -9.0),
-        f + vec2(3.5, -3.0),
+        f + vec2(-5.0, 0.0),
+        f + vec2(-7.0, -9.0),
+        f + vec2(1.0, -9.0),
+        f + vec2(-1.0, -3.0),
     );
-    head(f + vec2(3.5, 0.0), vec2(0.0, 1.0));
+    head(f + vec2(-1.0, 0.0), vec2(0.0, 1.0));
 }
 
 /// One operator's envelope curve with four draggable handles.
