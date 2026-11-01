@@ -3681,26 +3681,7 @@ fn draw_jacks(
         }
         let label = macro_name(editor.state(), m.id, port.name)
             .unwrap_or_else(|| face_port_label(m.info.kind, port.name));
-        // Neighbouring jack of the same row and direction: the room one label has.
-        let pitch = m
-            .jacks
-            .iter()
-            .filter(|o| {
-                !std::ptr::eq(*o, j)
-                    && (o.c.y - j.c.y).abs() < 4.0
-                    && o.port.direction == j.port.direction
-            })
-            .map(|o| (o.c.x - j.c.x).abs())
-            .fold(f32::MAX, f32::min);
-        if let Some(font) = kit::face::face_font(&st, style::Role::Label, z).filter(|f| {
-            !kit::face::compact_tier(&st, z)
-                || j.label_right
-                || painter
-                    .layout_no_wrap(label.clone(), f.clone(), ink)
-                    .size()
-                    .x
-                    <= pitch * z - 2.0
-        }) {
+        if let Some(font) = kit::face::face_font(&st, style::Role::Label, z) {
             if j.label_right {
                 painter.text(
                     c + vec2(20.0 * z, 0.0),

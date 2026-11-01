@@ -123,6 +123,7 @@ pub(crate) fn draw(
     d: Detail,
 ) {
     match m.info.kind {
+        "mixer" => mixer(state, st, live, now, p, m, r, z, d),
         "eq" => eq(state, st, live, now, p, m, r, z, d),
         "compressor" => compressor(state, st, live, now, p, m, r, z, d),
         "limiter" => limiter(state, st, live, now, p, m, r, z, d),
@@ -599,4 +600,59 @@ fn bitcrusher(
         ));
     }
     paint(p, st, pts, z, d, None);
+}
+
+/// Four channel meters in the well, centred over the four level knobs: segments lit by the
+/// live input times its level (the sample the face tap reports last), the fader setting as a
+/// tick beside the column so the picture is right with audio off.
+#[allow(clippy::too_many_arguments)]
+fn mixer(
+    state: &PatchState,
+    st: &Style,
+    live: &Live,
+    now: f64,
+    p: &egui::Painter,
+    m: &Placed,
+    r: Rect,
+    z: f32,
+    d: Detail,
+) {
+    const CHANNELS: usize = 4;
+    const SEGMENTS: usize = 12;
+    // Segments from this one up read as the hot end: accent, then the last two bad.
+    const ACCENT_FROM: usize = 8;
+    const HOT_FROM: usize = 10;
+    let pad = (5.0 * z).max(3.0);
+    let (left, width) = (r.left() - pad, r.width() + 2.0 * pad);
+    let seg_h = r.height() / SEGMENTS as f32;
+    for k in 0..CHANNELS {
+        let level = param(state, m, &format!("level{}", k + 1)).clamp(0.0, 1.0);
+        let signal = input_value(state, live, now, m.id, &format!("in{}", k + 1))
+            .map(|v| (v.abs() * level).clamp(0.0, 1.0));
+        let cx = left + width * (k as f32 + 0.5) / CHANNELS as f32;
+        let seg_w = (10.0 * z).max(4.0);
+        for s in 0..SEGMENTS {
+            let top = r.bottom() - (s + 1) as f32 * seg_h;
+            let col = if s >= HOT_FROM {
+                st.roles.bad
+            } else if s >= ACCENT_FROM {
+                st.roles.accent
+            } else {
+                st.roles.cv
+            };
+            let on = signal.is_some_and(|v| (s as f32 / SEGMENTS as f32) < v);
+            let cell = Rect::from_min_size(
+                pos2(cx - seg_w / 2.0, top + seg_h * 0.12),
+                vec2(seg_w, seg_h * 0.76),
+            );
+            p.rect_filled(cell, 1.0, alpha(col, if on { 240 } else { 36 }));
+        }
+        if d == Detail::Full {
+            let y = r.bottom() - level * r.height();
+            p.line_segment(
+                [pos2(cx + seg_w, y), pos2(cx + seg_w + 6.0 * z, y)],
+                Stroke::new(1.5 * z, st.roles.text2),
+            );
+        }
+    }
 }

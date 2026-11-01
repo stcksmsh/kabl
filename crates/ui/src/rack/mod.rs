@@ -657,7 +657,7 @@ fn place_local(
                 // The picture goes above the knobs when the knobs, the selectors and the jacks
                 // still fit under it; else the module keeps its plain layout.
                 "osc.va" | "osc.wt" | "osc.fm" | "filter.svf" | "filter.ladder" | "lfo"
-                | "env.adsr" | "phaser" | "flanger" | "compressor" | "eq" | "limiter"
+                | "env.adsr" | "mixer" | "phaser" | "flanger" | "compressor" | "eq" | "limiter"
                 | "bitcrusher" | "filter.comb" | "filter.formant" | "vocoder" | "drum.kick"
                 | "drum.snare" | "drum.clap" | "drum.hat" | "drum.tom"
                     if ZONE_TOP_WELL + rows_h <= zone_bottom =>
