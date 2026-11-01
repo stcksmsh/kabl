@@ -12,6 +12,8 @@
     {"date": "2026-11-01", "item": "G1b knobs: dark filled caps", "verdict": "approve"},
     {"date": "2026-11-01", "item": "G1b paper accent #A97229 + title hue mix amp 45 / fx 40 / others 35 %", "verdict": "approve", "note": "tentative, confirm at sign-off"},
     {"date": "2026-11-01", "item": "Cables: port cable_look.rs, theme only (planner spec)", "verdict": "approve"},
-    {"date": "2026-11-01", "item": "G1b sheets", "verdict": "approve", "note": "graphite cap light end stays as is"}
+    {"date": "2026-11-01", "item": "G1b sheets", "verdict": "approve", "note": "graphite cap light end stays as is"},
+    {"date": "2026-11-01", "item": "G2 paper signal colours", "verdict": "approve", "note": "audio #B66518, cv #11897F, pitch #2E7CD2, gate unchanged"},
+    {"date": "2026-11-01", "item": "G2 kit (#76)", "verdict": "approve"}
   ]
 }
