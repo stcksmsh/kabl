@@ -351,6 +351,17 @@ pub fn snap(p: Pos2) -> kabl_core::Vec2 {
     }
 }
 
+/// The short label a face draws for `param` of `kind` when its family has one, else `None`
+/// (callers fall back to the full label). Full names stay in the inspector and tooltips.
+pub fn short_name(kind: &str, param: &str) -> Option<&'static str> {
+    osc::short_name(kind, param)
+        .or_else(|| filter::short_name(kind, param))
+        .or_else(|| env::short_name(kind, param))
+        .or_else(|| fx::short_name(kind, param))
+        .or_else(|| amp::short_name(kind, param))
+        .or_else(|| util::short_name(kind, param))
+}
+
 pub fn layout(state: &PatchState, v: &View) -> Layout {
     let mut placed: Vec<(usize, f32, Placed)> = Vec::new();
     for (&id, m) in &state.modules {

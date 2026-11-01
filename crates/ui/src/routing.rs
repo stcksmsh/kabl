@@ -296,6 +296,12 @@ pub fn target_label(p: &ParamInfo) -> String {
     }
 }
 
+/// The label a face draws: the family's short name where it has one (`rack::short_name`), else
+/// `param_label`. The inspector and tooltips keep the full `param_label`.
+pub fn face_label(kind: &str, p: &ParamInfo) -> String {
+    crate::rack::short_name(kind, p.name).map_or_else(|| param_label(p), str::to_string)
+}
+
 /// Human label for a param name: `attack_ms` → `Attack`. A sequencer bank param is labelled
 /// by its slot (`c.v2` → `V2`), as on the face.
 pub fn param_label(p: &ParamInfo) -> String {
@@ -933,7 +939,14 @@ pub(crate) fn param_knob(
         painter.text(
             center - EguiVec2::new(0.0, crate::rack::knob_text_dy(r, z, font.size * 1.075)),
             egui::Align2::CENTER_CENTER,
-            crate::macro_name(editor.state(), id, param.name).unwrap_or_else(|| param_label(param)),
+            crate::macro_name(editor.state(), id, param.name).unwrap_or_else(|| {
+                let kind = editor
+                    .state()
+                    .modules
+                    .get(&id)
+                    .map_or("", |m| m.kind.as_str());
+                face_label(kind, param)
+            }),
             font,
             look.ink,
         );

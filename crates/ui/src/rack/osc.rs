@@ -96,3 +96,8 @@ pub fn fm6_blocks(r: Rect) -> [Rect; 6] {
         Rect::from_min_size(pos2(x, r.top()), vec2(w, r.height()))
     })
 }
+
+/// Short face label of `param` for the family's kinds (none yet).
+pub(super) fn short_name(_kind: &str, _param: &str) -> Option<&'static str> {
+    None
+}

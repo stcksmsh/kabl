@@ -3535,7 +3535,7 @@ fn draw_control(
         return;
     };
     let on = set[i];
-    let pr = xf.r(c.geo.pin_rect(&routing::param_label(c.param)));
+    let pr = xf.r(c.geo.pin_rect(&routing::face_label(m.info.kind, c.param)));
     ui_state.record(format!("pin:{}.{}", m.id, c.param.name), pr);
     let resp = ui.interact(
         pr,
