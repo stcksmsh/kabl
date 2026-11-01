@@ -126,84 +126,114 @@ pub(crate) fn draw(
     }
 }
 
-/// Operator graph: operators 6..1 left to right; a modulation edge is an arrow between
-/// neighbours or an arc under the row; carriers are filled; operator 6's feedback is a loop.
-fn graph(p: &egui::Painter, st: &crate::style::Style, xf: Xf, well: Rect, alg: usize) {
+/// Operator graph: solid boxes 6..1 left to right. A modulation edge between neighbours is a
+/// short arrow from box edge to box edge; any other edge is a curve under the row that leaves a
+/// box's bottom and arrives at the target's bottom. Carriers are filled with the accent;
+/// operator 6's feedback is a small arc over it. Strokes are 1.5 px in the display ink.
+pub(crate) fn graph(p: &egui::Painter, st: &crate::style::Style, xf: Xf, well: Rect, alg: usize) {
     let ro = &st.roles;
     let z = xf.zoom;
     let a = &ALGORITHMS[alg];
-    let pitch = 30.0;
-    let x0 = well.left() + 16.0 + (well.width() - 32.0 - 5.0 * pitch) / 2.0;
+    let (bw, pitch) = (14.0, 30.0);
+    let x0 = well.center().x - 2.5 * pitch;
     let cy = well.top() + 44.0;
     let at = |op: usize| pos2(x0 + (6 - op) as f32 * pitch, cy);
-    let line = Stroke::new(1.3 * z.max(0.6), alpha(ro.disp_text, 160));
-    for k in 0..6usize {
-        for j in k + 1..6 {
-            if a.mods[k] >> j & 1 == 0 {
-                continue;
-            }
-            let (from, to) = (at(j + 1), at(k + 1));
-            if j == k + 1 {
-                let (s, e) = (xf.p(from + vec2(-8.0, 0.0)), xf.p(to + vec2(8.0, 0.0)));
-                p.line_segment([s, e], line);
-                for d in [-2.5, 2.5] {
-                    p.line_segment([e, e + vec2(-3.5, d) * z], line);
-                }
-            } else {
-                let h = (2.2 * (j - k) as f32).min(12.0);
-                let (s, e) = (from + vec2(0.0, 7.0), to + vec2(0.0, 7.0));
-                let pts: Vec<Pos2> = (0..=12)
-                    .map(|t| {
-                        let u = t as f32 / 12.0;
-                        let x = s.x + (e.x - s.x) * u;
-                        xf.p(pos2(x, s.y + 4.0 * h * u * (1.0 - u)))
-                    })
-                    .collect();
-                p.add(egui::Shape::line(pts, line));
-            }
+    let line = Stroke::new(1.5 * z.max(0.7), ro.disp_text);
+    // Filled arrowhead with its tip at `tip` (world), pointing along `dir`.
+    let head = |tip: Pos2, dir: egui::Vec2| {
+        let n = vec2(-dir.y, dir.x);
+        p.add(egui::Shape::convex_polygon(
+            vec![
+                xf.p(tip),
+                xf.p(tip - dir * 4.5 + n * 2.6),
+                xf.p(tip - dir * 4.5 - n * 2.6),
+            ],
+            ro.disp_text,
+            Stroke::NONE,
+        ));
+    };
+    let curve = |p0: Pos2, p1: Pos2, p2: Pos2, p3: Pos2| {
+        let pts: Vec<Pos2> = (0..=16)
+            .map(|i| {
+                let t = i as f32 / 16.0;
+                let u = 1.0 - t;
+                let q = p0.to_vec2() * (u * u * u)
+                    + p1.to_vec2() * (3.0 * u * u * t)
+                    + p2.to_vec2() * (3.0 * u * t * t)
+                    + p3.to_vec2() * (t * t * t);
+                xf.p(q.to_pos2())
+            })
+            .collect();
+        p.add(egui::Shape::line(pts, line));
+    };
+    // Edges as (source op, target op), numbers 1..6.
+    let edges: Vec<(usize, usize)> = (0..6usize)
+        .flat_map(|k| (k + 1..6).map(move |j| (j, k)))
+        .filter(|&(j, k)| a.mods[k] >> j & 1 == 1)
+        .map(|(j, k)| (j + 1, k + 1))
+        .collect();
+    let far: Vec<(usize, usize)> = edges.iter().copied().filter(|&(j, k)| j != k + 1).collect();
+    // Arcs sharing a box end are spread along its bottom so they do not land on one point.
+    let spread = |n: usize, i: usize| (i as f32 - (n as f32 - 1.0) / 2.0) * 3.5;
+    let rank = |same: &dyn Fn(&(usize, usize)) -> bool, e: &(usize, usize)| {
+        let all: Vec<&(usize, usize)> = far.iter().filter(|x| same(x)).collect();
+        (all.len(), all.iter().position(|x| *x == e).unwrap_or(0))
+    };
+    for e @ &(j, k) in &edges {
+        let (from, to) = (at(j), at(k));
+        if j == k + 1 {
+            let (s, t) = (from.x + bw / 2.0, to.x - bw / 2.0);
+            p.line_segment([xf.p(pos2(s, cy)), xf.p(pos2(t - 3.0, cy))], line);
+            head(pos2(t, cy), vec2(1.0, 0.0));
+        } else {
+            let (ns, is) = rank(&|x| x.0 == j, e);
+            let (nt, it) = rank(&|x| x.1 == k, e);
+            let bottom = cy + bw / 2.0;
+            let s = pos2(from.x + spread(ns, is), bottom);
+            let t = pos2(to.x + spread(nt, it), bottom + 3.0);
+            // Controls straight below the ends: the curve leaves and arrives vertically.
+            let d = 2.9 * (j - k) as f32;
+            curve(s, s + vec2(0.0, d), t + vec2(0.0, d), t);
+            head(pos2(t.x, bottom), vec2(0.0, -1.0));
         }
     }
     for op in 1..=6usize {
-        let c = at(op);
-        let r = Rect::from_center_size(xf.p(c), vec2(15.0, 15.0) * z);
-        if a.carriers >> (op - 1) & 1 == 1 {
-            p.rect_filled(r, 3.0 * z, ro.accent);
+        let r = Rect::from_center_size(xf.p(at(op)), vec2(bw, bw) * z);
+        let carrier = a.carriers >> (op - 1) & 1 == 1;
+        let fill = if carrier {
+            ro.accent
         } else {
-            p.rect_stroke(
-                r,
-                3.0 * z,
-                Stroke::new(1.3 * z.max(0.6), alpha(ro.disp_text, 180)),
-                egui::StrokeKind::Inside,
-            );
-        }
-    }
-    // Feedback loop above operator 6.
-    let f = at(6) + vec2(0.0, -8.0);
-    let loop_pts = [
-        pos2(f.x - 3.5, f.y),
-        pos2(f.x - 3.5, f.y - 6.0),
-        pos2(f.x + 3.5, f.y - 6.0),
-        pos2(f.x + 3.5, f.y),
-    ]
-    .map(|q| xf.p(q))
-    .to_vec();
-    p.add(egui::Shape::line(
-        loop_pts,
-        Stroke::new(1.3 * z.max(0.6), ro.accent),
-    ));
-    // Operator numbers (full tier).
-    if let Some(font) = face::face_font(st, Role::Value, z) {
-        for op in 1..=6usize {
-            let carrier = a.carriers >> (op - 1) & 1 == 1;
+            crate::style::mix(ro.disp_bg, ro.disp_text, 0.16)
+        };
+        p.rect_filled(r, 3.0 * z, fill);
+        p.rect_stroke(
+            r,
+            3.0 * z,
+            Stroke::new(
+                1.5 * z.max(0.7),
+                if carrier { ro.accent } else { ro.disp_text },
+            ),
+            egui::StrokeKind::Inside,
+        );
+        if let Some(font) = face::face_font(st, Role::Value, z) {
             p.text(
-                xf.p(at(op)),
+                r.center(),
                 egui::Align2::CENTER_CENTER,
                 op.to_string(),
-                font.clone(),
+                font,
                 if carrier { ro.on_accent } else { ro.disp_text },
             );
         }
     }
+    // Feedback of operator 6: a small arc over its box, arrowhead back into the box.
+    let f = at(6) + vec2(0.0, -bw / 2.0);
+    curve(
+        f + vec2(-3.5, 0.0),
+        f + vec2(-6.5, -9.0),
+        f + vec2(6.5, -9.0),
+        f + vec2(3.5, -3.0),
+    );
+    head(f + vec2(3.5, 0.0), vec2(0.0, 1.0));
 }
 
 /// One operator's envelope curve with four draggable handles.
