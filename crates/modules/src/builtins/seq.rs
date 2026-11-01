@@ -246,9 +246,13 @@ const fn join(a: [ParamInfo; BASE_SLOTS], e: [ParamInfo; 5 * EXTRA]) -> [ParamIn
     out
 }
 
+#[allow(clippy::large_const_arrays)] // const-evaluated layout tables, never indexed at run time by value
 const A: [ParamInfo; SLOTS] = join(bank!(""), extra!(""));
+#[allow(clippy::large_const_arrays)] // const-evaluated layout tables, never indexed at run time by value
 const B: [ParamInfo; SLOTS] = join(bank!("b."), extra!("b."));
+#[allow(clippy::large_const_arrays)] // const-evaluated layout tables, never indexed at run time by value
 const C: [ParamInfo; SLOTS] = join(bank!("c."), extra!("c."));
+#[allow(clippy::large_const_arrays)] // const-evaluated layout tables, never indexed at run time by value
 const D: [ParamInfo; SLOTS] = join(bank!("d."), extra!("d."));
 
 const TRANSPOSE_PARAM: usize = S_LENGTH + 1;
@@ -263,6 +267,7 @@ const EXTRA_BASE: usize = RATCH_BASE + BANKS * OLD_STEPS;
 /// Bank A's first 28 params keep their historic order and indices (`p1..p8`, `g1..g8`,
 /// `length`, `transpose`, `v1..v8`, `gate_len`, `gate_mode`); then `r1..r8`, `direction`,
 /// `bank`, and banks B, C, D in slot order. `param_index` relies on this layout.
+#[allow(clippy::large_const_arrays)] // const-evaluated layout tables, never indexed at run time by value
 const PARAMS: [ParamInfo; EXTRA_BASE + BANKS * 5 * EXTRA] = {
     let mut out = [A[0]; EXTRA_BASE + BANKS * 5 * EXTRA];
     let mut i = 0;

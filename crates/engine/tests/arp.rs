@@ -199,7 +199,7 @@ fn an_old_sequencer_patch_has_no_ratchets() {
     for p in info.params.iter().filter(|p| p.unit == "x") {
         assert_eq!(p.default, 1.0, "{}", p.name);
     }
-    assert_eq!(info.params.iter().filter(|p| p.unit == "x").count(), 32);
+    assert_eq!(info.params.iter().filter(|p| p.unit == "x").count(), 128);
     // And it still plays: one note per 16th, as before.
     let (_c, mut e) = engine(&state);
     let x = render(&mut e, 48000);
