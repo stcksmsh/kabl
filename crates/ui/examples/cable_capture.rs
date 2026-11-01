@@ -95,8 +95,10 @@ impl eframe::App for App {
             }
             self.ui.theme = j.theme.into();
             self.ui.dark = j.dark;
-            self.ui.zoom = j.zoom;
         }
+        // The same view in every look: pinned each frame, so a fit or a re-layout cannot move it.
+        self.ui.zoom = j.zoom;
+        self.ui.pan = egui::vec2(12.0, 12.0);
         let mut raw_ui = egui::Ui::new(
             ctx.clone(),
             egui::Id::new("root"),
