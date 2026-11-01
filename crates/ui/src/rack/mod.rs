@@ -452,6 +452,8 @@ fn place_local(
     let knob = |p: &ParamInfo| {
         p.taper != Taper::Stepped
             || (info.kind == "seq" && seq::slot_name(p.name).starts_with('k'))
+            // Thirty-two selectors would be wider than the module.
+            || (info.kind == "seq" && seq::slot_name(p.name) == "length")
             // Sixteen selectors would be wider than the module.
             || (info.kind == "osc.va" && p.name == "unison")
     };
@@ -679,21 +681,23 @@ fn place_local(
             .collect();
         // The sequencer: a velocity row (then gate length) and a probability row (then
         // transpose), one knob per step.
-        // Two rows of 13: velocities, gate length and ratchets 1-4 above probabilities,
+        // Rows of 14: velocities, gate length, ratchets 1-4 and length above probabilities,
         // transpose and ratchets 5-8.
-        let per_row = if info.kind == "seq" { 13 } else { 5 };
-        // Knob spacing: the sequencer's 13 columns are packed closer.
+        let per_row = if info.kind == "seq" { 14 } else { 5 };
+        // Knob spacing: the sequencer's 14 columns are packed closer.
         let pitch = if info.kind == "seq" { 57.0 } else { 76.0 };
         if info.kind == "seq" {
             hk.sort_by_key(|&i| {
                 let slot = seq::slot_name(info.params[i].name);
-                let d = slot.as_bytes().get(1).map_or(0, |c| (c - b'0') as usize);
+                // Position within the page of 8, so every page lays out like the first.
+                let d = seq::step_of(slot).map_or(0, |(_, n)| (n - 1) % 8 + 1);
                 let (row, col) = match slot.as_bytes()[0] {
                     b'v' => (0, d),
                     b'g' => (0, 9),
                     b'k' if d <= 4 => (0, 9 + d),
                     b'r' => (1, d),
                     b'k' => (1, 9 + d),
+                    b'l' => (0, 14),
                     _ => (1, 9),
                 };
                 (row, col, i)
