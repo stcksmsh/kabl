@@ -32,6 +32,10 @@ kabl-engine = { path = "../engine" }
 kabl-modules = { path = "../modules" }
 kabl-standalone = { path = "../standalone" }
 
+[features]
+# Geometry checker (tests/geometry.rs) fails on errors instead of only reporting them.
+strict = []
+
 [dev-dependencies]
 tempfile = "3.27.0"
 skrifa = "=0.42.1"

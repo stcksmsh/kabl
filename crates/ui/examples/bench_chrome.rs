@@ -179,7 +179,7 @@ fn main() {
     };
     let simple = kabl_standalone::default_patch();
     let dense = dense();
-    for (w, h) in [(1440.0, 900.0), (1280.0, 800.0)] {
+    for (w, h) in [(1440.0, 900.0), (1280.0, 800.0), (1180.0, 680.0)] {
         for dark in [false, true] {
             run("simple", &simple, w, h, dark, frames, 0, live, edit);
             run("dense", &dense, w, h, dark, frames, 0, live, edit);
