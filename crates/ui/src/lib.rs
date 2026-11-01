@@ -3739,7 +3739,7 @@ fn draw_jacks(
         let patched = cabled
             .iter()
             .any(|(d, p)| *d == port.direction && p == port.name);
-        kit::face::jack(
+        kit::face::jack_ch(
             painter,
             &st,
             c,
@@ -3748,6 +3748,7 @@ fn draw_jacks(
             th.signal(port.port_type),
             patched,
             hot,
+            port.width == 2 || port.name == "stereo",
         );
         let badge = (ui_state.cable_view == CableView::Hidden)
             .then(|| jack_badge(editor, m.id, port.name, port.direction))

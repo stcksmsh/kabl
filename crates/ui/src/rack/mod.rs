@@ -824,11 +824,19 @@ fn place_local(
     let (lo, hi) = outs_x.fold((f32::MAX, f32::MIN), |(lo, hi), x| (lo.min(x), hi.max(x)));
     let has_row = skin.is_none() && info.kind != "out" && info.kind != "osc.fm6";
     // Output plate: under the output jacks, a half pitch beyond the outer ones.
+    // Two-row trays: the plate spans the tray (G1b target); one-row trays: just the outputs.
+    let has_in = jacks
+        .iter()
+        .any(|j| j.port.direction == PortDirection::Input);
     let plate = (has_row && hi >= lo).then(|| {
-        Rect::from_min_max(
-            pos2((lo - 28.0).max(8.0), PLATE_TOP),
-            pos2((hi + 28.0).min(fw - 8.0), TRAY_BOTTOM),
-        )
+        if fw < WIDE_FROM && has_in {
+            Rect::from_min_max(pos2(8.0, PLATE_TOP), pos2(fw - 8.0, TRAY_BOTTOM))
+        } else {
+            Rect::from_min_max(
+                pos2((lo - 28.0).max(8.0), PLATE_TOP),
+                pos2((hi + 28.0).min(fw - 8.0), TRAY_BOTTOM),
+            )
+        }
     });
     // Port tray: two rows on narrow faces (when inputs exist), one on wide ones.
     let tray = (has_row && !jacks.is_empty()).then(|| {
