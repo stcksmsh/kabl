@@ -278,23 +278,23 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
         ("drum.grid", _) => {
             "Four steps of one row of a pattern, packed into one number: edit them on the face grid."
         }
-        ("seq", s) if s.len() == 2 && s.starts_with('p') => {
+        ("seq", s) if seq::step_of(s).is_some_and(|(k, _)| k == 'p') => {
             "Pitch of this step in semitones from the reference note."
         }
-        ("seq", s) if s.len() == 2 && s.starts_with('g') => {
+        ("seq", s) if seq::step_of(s).is_some_and(|(k, _)| k == 'g') => {
             "Step on or off. An off step is a rest."
         }
-        ("seq", s) if s.len() == 2 && s.starts_with('v') => {
+        ("seq", s) if seq::step_of(s).is_some_and(|(k, _)| k == 'v') => {
             "Velocity (strength) of this step; patch the velocity jack to use it."
         }
-        ("seq", s) if s.len() == 2 && s.starts_with('r') => {
+        ("seq", s) if seq::step_of(s).is_some_and(|(k, _)| k == 'r') => {
             "Chance that this step plays each time round; the rest of the time it is a rest."
         }
-        ("seq", s) if s.len() == 2 && s.starts_with('k') => {
+        ("seq", s) if seq::step_of(s).is_some_and(|(k, _)| k == 'k') => {
             "Ratchet: plays this step 1 to 4 times, evenly spaced inside the step. A rest stays \
              a rest; Prob decides all the repeats together."
         }
-        ("seq", "length") => "How many steps the pattern plays before it loops (1–8).",
+        ("seq", "length") => "How many steps the pattern plays before it loops (1–32).",
         ("seq", "transpose") => "Shifts every step by whole semitones.",
         ("seq", "gate_len") => "In LENGTH gate mode, how long each note is held, as % of a step.",
         ("seq", "gate_mode") => {

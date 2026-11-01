@@ -7,7 +7,7 @@ use basedrop::{Collector, Handle};
 use kabl_core::{ModuleId, ModuleState, PatchState, PortRef, Vec2};
 use kabl_engine::graph::BLOCK;
 use kabl_engine::patch_engine::{Launch, PatchEngine, Timing};
-use kabl_modules::builtins::seq::{param_index, BANKS, STEPS};
+use kabl_modules::builtins::seq::{param_index, BANKS};
 use kabl_modules::builtins::Transport;
 
 #[global_allocator]
@@ -39,7 +39,7 @@ fn patch(left: &str) -> PatchState {
     let mut p = PatchState::new();
     let mut seq = module("seq", &[]);
     for b in 0..BANKS {
-        for k in 0..STEPS {
+        for k in 0..8 {
             let name = kabl_modules::builtins::SEQ_INFO.params[param_index(b, k)].name;
             seq.params.insert(name.into(), (10 * b + k) as f32);
         }

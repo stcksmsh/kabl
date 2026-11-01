@@ -37,6 +37,9 @@ pub fn resolve(patch: &PatchState, target: &Target) -> Option<Resolved> {
         .iter()
         .enumerate()
         .find(|(_, p)| p.name == target.param)?;
+    if info.kind == "seq" && kabl_modules::builtins::seq::is_step_param(param.name) {
+        return None;
+    }
     if param_class(info.kind, param.name) != ParamClass::Runtime || param.taper == Taper::Stepped {
         return None;
     }
@@ -141,4 +144,42 @@ pub fn release_bases(patch: &PatchState, previous: Bank) -> Bank {
             Some(resolved)
         })
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn seq_step_params_are_never_lane_candidates() {
+        use kabl_modules::builtins::seq::is_step_param;
+        for name in ["p1", "g8", "v12", "r32", "k5", "b.p1", "c.v32", "d.k9"] {
+            assert!(is_step_param(name), "{name}");
+        }
+        for name in [
+            "length",
+            "transpose",
+            "gate_len",
+            "gate_mode",
+            "b.length",
+            "b.gate_len",
+        ] {
+            assert!(!is_step_param(name), "{name}");
+        }
+        let info = registry::info_for("seq").unwrap();
+        assert!(info.params.iter().any(|p| is_step_param(p.name)));
+        let mut patch = PatchState::default();
+        patch.modules.insert(
+            1,
+            kabl_core::ModuleState {
+                kind: "seq".into(),
+                pos: kabl_core::Vec2::default(),
+                params: Default::default(),
+            },
+        );
+        assert!(!candidates(&patch).is_empty());
+        for t in candidates(&patch) {
+            assert!(!is_step_param(&t.param), "{}", t.param);
+        }
+    }
 }
