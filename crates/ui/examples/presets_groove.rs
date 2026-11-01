@@ -766,6 +766,103 @@ struct Spec {
     /// The played voice's ladder cutoff Hz, unison detune and amp envelope, when not the default
     /// (3500 Hz, 8 ct, 2/300/0.6/90): a darker, softer voice.
     voice: Option<(f32, f32, [f32; 4])>,
+    /// Routes macros 1 to 3 itself instead of `targets` (a redesigned preset); the fourth stays
+    /// the space macro.
+    custom: Option<fn(&mut Voice, &Handles, &Spec)>,
+}
+
+/// The stages a custom macro plan can reach.
+struct Handles {
+    lad: ModuleId,
+    drive: ModuleId,
+    fx: Option<ModuleId>,
+    crush: Option<ModuleId>,
+    /// The compressor on the music, and the one the kick ducks through.
+    music: ModuleId,
+    duck: ModuleId,
+    clock: ModuleId,
+    chord_osc: Option<ModuleId>,
+}
+
+fn param_of(kind: &str, param: &str) -> kabl_modules::ParamInfo {
+    *kabl_modules::registry::info_for(kind)
+        .and_then(|i| i.params.iter().find(|p| p.name == param))
+        .unwrap_or_else(|| panic!("{kind}.{param}"))
+}
+
+/// What an old route of `amount` from a macro at `stored` leaves on a param with base `base`.
+fn routed(kind: &str, param: &str, base: f32, amount: f32, stored: f32) -> f32 {
+    let i = param_of(kind, param);
+    i.from_norm(i.to_norm(base) + stored * amount)
+}
+
+/// Macro `m` (1-based) takes `param` from `lo` at 0 to `d` at its stored position, and on in the
+/// same line to 1. The stored sound is exactly `d`; panics when the line leaves the param's range.
+#[allow(clippy::too_many_arguments)]
+fn span(
+    v: &mut Voice,
+    m: usize,
+    stored: f32,
+    id: ModuleId,
+    kind: &str,
+    param: &str,
+    lo: f32,
+    d: f32,
+) {
+    let i = param_of(kind, param);
+    let (n0, nd) = (i.to_norm(lo), i.to_norm(d));
+    let amount = (nd - n0) / stored;
+    assert!(
+        n0 + amount <= 1.0 + 1e-3 && n0 + amount >= -1e-3,
+        "{kind}.{param}: macro {m} runs out of range ({})",
+        n0 + amount
+    );
+    v.r.e.set_param(id, param, lo);
+    v.r.route(v.knob, &format!("m{m}"), id, param, amount);
+}
+
+/// As `span`, with the value `hi` at macro 1 given and the value at 0 derived.
+#[allow(clippy::too_many_arguments)]
+fn span_hi(
+    v: &mut Voice,
+    m: usize,
+    stored: f32,
+    id: ModuleId,
+    kind: &str,
+    param: &str,
+    d: f32,
+    hi: f32,
+) {
+    let i = param_of(kind, param);
+    let (nd, n1) = (i.to_norm(d), i.to_norm(hi));
+    let n0 = (nd - stored * n1) / (1.0 - stored);
+    assert!(
+        (-1e-3..=1.0 + 1e-3).contains(&n0),
+        "{kind}.{param}: macro {m} starts out of range ({n0})"
+    );
+    span(
+        v,
+        m,
+        stored,
+        id,
+        kind,
+        param,
+        i.from_norm(n0.clamp(0.0, 1.0)),
+        d,
+    );
+}
+
+/// Macro `m` at stored position 0 leaves `param` at `d`; at 1 it is `hi`.
+fn rise(v: &mut Voice, m: usize, id: ModuleId, kind: &str, param: &str, d: f32, hi: f32) {
+    let i = param_of(kind, param);
+    v.r.e.set_param(id, param, d);
+    v.r.route(
+        v.knob,
+        &format!("m{m}"),
+        id,
+        param,
+        i.to_norm(hi) - i.to_norm(d),
+    );
 }
 
 /// What `seq_part` built: where the audio comes out, and the stages a macro can reach.
@@ -1003,7 +1100,7 @@ fn groove(s: Spec) -> Rack {
         ),
         _ => v.stage("chorus", &[("rate_hz", 0.3), ("depth", 55.0), ("mix", 0.0)]),
     });
-    v.stage(
+    let music = v.stage(
         "compressor",
         &compressor(s.comp[0], s.comp[1], 4.0, 110.0, s.comp[2]),
     );
@@ -1020,7 +1117,20 @@ fn groove(s: Spec) -> Rack {
     let (beat, kit) = wire_kit(&mut v, clock, &s.kit, duck);
     let k = &s.kit;
     // The macros.
-    for (i, t) in s.targets.iter().enumerate() {
+    if let Some(plan) = s.custom {
+        let h = Handles {
+            lad,
+            drive,
+            fx,
+            crush,
+            music,
+            duck,
+            clock,
+            chord_osc: chords.as_ref().map(|c| c.osc),
+        };
+        plan(&mut v, &h, &s);
+    }
+    for (i, t) in s.targets.iter().enumerate().filter(|_| s.custom.is_none()) {
         let m = format!("m{}", i + 1);
         let stored = s.macros[i].1;
         match *t {
@@ -1214,11 +1324,89 @@ const FLOOR: &str = "X...X...X...X...";
 const BACKBEAT: &str = "....X.......X...";
 const NONE: &str = "................";
 
+/// Copper Mile: Sweep (a closed, resonant filter opening), Swirl (the phaser, its speed and depth,
+/// and the chords' detune), Pump (the kick's duck, from none to the stored depth and beyond).
+fn copper_plan(v: &mut Voice, h: &Handles, s: &Spec) {
+    let [(_, st1), (_, st2), (_, st3), _] = s.macros;
+    let cut = routed("filter.ladder", "cutoff_hz", s.filter[0], 0.6, 0.55);
+    span_hi(v, 1, st1, h.lad, "filter.ladder", "cutoff_hz", cut, 20000.0);
+    span(
+        v,
+        1,
+        st1,
+        h.lad,
+        "filter.ladder",
+        "resonance",
+        0.6,
+        s.filter[1],
+    );
+    let fx = h.fx.expect("a phaser");
+    let mix = routed("phaser", "mix", 0.0, 0.9, 0.5);
+    span(v, 2, st2, fx, "phaser", "mix", 0.0, mix);
+    span(v, 2, st2, fx, "phaser", "rate_hz", 0.15, 0.4);
+    span(v, 2, st2, fx, "phaser", "depth", 62.0, 80.0);
+    span(v, 2, st2, fx, "phaser", "feedback", 10.0, 50.0);
+    span(
+        v,
+        2,
+        st2,
+        h.chord_osc.expect("chords"),
+        "osc.va",
+        "detune",
+        2.0,
+        14.0,
+    );
+    // The duck depth was the ratio (the first step did most of it); the threshold is graded.
+    let ratio = routed("compressor", "ratio", 1.0, 0.95, 0.6);
+    v.r.e.set_param(h.duck, "ratio", ratio);
+    span(v, 3, st3, h.duck, "compressor", "threshold_db", 0.0, -34.0);
+}
+
+/// Brick Dust: Grind (the bitcrusher in, the drive up), Squash (the music compressor), Push (the
+/// tempo).
+fn brick_plan(v: &mut Voice, h: &Handles, s: &Spec) {
+    let [_, (_, st2), (_, st3), _] = s.macros;
+    // The crusher sits on the bass bus: it needs a coarse hold to alias the bass harmonics.
+    let crush = h.crush.expect("a crusher");
+    rise(v, 1, crush, "bitcrusher", "mix", 0.0, 100.0);
+    rise(v, 1, crush, "bitcrusher", "bits", 8.0, 4.0);
+    rise(v, 1, crush, "bitcrusher", "downsample", 3.0, 14.0);
+    // The stored cutoff, drive and duck are what the old Filter, Dirt and Pump macros left.
+    let cut = routed("filter.ladder", "cutoff_hz", s.filter[0], 0.6, 0.5);
+    v.r.e.set_param(h.lad, "cutoff_hz", cut);
+    let ratio = routed("compressor", "ratio", 1.0, 0.95, 0.65);
+    v.r.e.set_param(h.duck, "ratio", ratio);
+    let dirt = routed("drive", "drive_db", s.drive[0], 0.45, 0.6);
+    rise(v, 1, h.drive, "drive", "drive_db", dirt, 36.0);
+    rise(v, 1, h.drive, "drive", "trim_db", s.drive[1], -16.0);
+    span(
+        v,
+        2,
+        st2,
+        h.music,
+        "compressor",
+        "threshold_db",
+        -6.0,
+        s.comp[0],
+    );
+    span(
+        v,
+        2,
+        st2,
+        h.music,
+        "compressor",
+        "makeup_db",
+        0.0,
+        s.comp[2],
+    );
+    span(v, 3, st3, h.clock, "clock", "bpm", 112.0, s.bpm);
+}
+
 fn copper_mile() -> Rack {
     groove(Spec {
         macros: [
-            ("Filter", 0.55),
-            ("Phase", 0.50),
+            ("Sweep", 0.90),
+            ("Swirl", 0.50),
             ("Pump", 0.60),
             ("Room", 0.25),
         ],
@@ -1273,16 +1461,17 @@ fn copper_mile() -> Rack {
         trim_db: 0.0,
         dub: false,
         voice: None,
+        custom: Some(copper_plan),
     })
 }
 
 fn brick_dust() -> Rack {
     groove(Spec {
         macros: [
-            ("Filter", 0.50),
-            ("Dirt", 0.60),
-            ("Pump", 0.65),
-            ("Room", 0.20),
+            ("Grind", 0.00),
+            ("Squash", 0.60),
+            ("Push", 0.50),
+            ("Slap", 0.0667),
         ],
         targets: [T::Cutoff(0.6), T::Dirt(0.45), T::Pump],
         bpm: 126.0,
@@ -1321,13 +1510,14 @@ fn brick_dust() -> Rack {
         drive: [20.0, -10.0],
         filter: [700.0, 0.30],
         fx: None,
-        crush: false,
+        crush: true,
         comp: [-26.0, 6.0, 4.0],
         echo: [90.0, 15.0, 3000.0],
-        space: [0.15, 0.25, 0.1],
+        space: [0.45, 0.25, 0.3],
         trim_db: -4.5,
         dub: false,
         voice: None,
+        custom: Some(brick_plan),
     })
 }
 
@@ -1390,6 +1580,7 @@ fn ore_cart() -> Rack {
         trim_db: 0.0,
         dub: false,
         voice: None,
+        custom: None,
     })
 }
 
@@ -1452,6 +1643,7 @@ fn stoop_sale() -> Rack {
         trim_db: -4.0,
         dub: false,
         voice: None,
+        custom: None,
     })
 }
 
@@ -1507,6 +1699,7 @@ fn fault_line() -> Rack {
         trim_db: -2.0,
         dub: false,
         voice: None,
+        custom: None,
     })
 }
 
@@ -1572,6 +1765,7 @@ fn corner_store() -> Rack {
         trim_db: 0.0,
         dub: false,
         voice: None,
+        custom: None,
     })
 }
 
@@ -1640,6 +1834,7 @@ fn glass_coast() -> Rack {
         trim_db: -1.0,
         dub: false,
         voice: None,
+        custom: None,
     })
 }
 
@@ -1702,6 +1897,7 @@ fn still_water() -> Rack {
         trim_db: -11.0,
         dub: false,
         voice: None,
+        custom: None,
     })
 }
 
@@ -1794,6 +1990,7 @@ fn slab_city() -> Rack {
         trim_db: 0.0,
         dub: false,
         voice: Some((pad.0, pad.1, pad.2)),
+        custom: None,
     })
 }
 
@@ -1860,6 +2057,7 @@ fn rope_walk() -> Rack {
         trim_db: 1.0,
         dub: false,
         voice: None,
+        custom: None,
     })
 }
 
@@ -1929,6 +2127,7 @@ fn lamp_oil() -> Rack {
         trim_db: -2.0,
         dub: true,
         voice: None,
+        custom: None,
     })
 }
 
@@ -2194,6 +2393,7 @@ fn scrap_metal() -> Rack {
         trim_db: -1.0,
         dub: false,
         voice: None,
+        custom: None,
     })
 }
 
@@ -2259,6 +2459,7 @@ fn dune_buggy() -> Rack {
         trim_db: -1.0,
         dub: false,
         voice: None,
+        custom: None,
     })
 }
 
@@ -2475,11 +2676,11 @@ fn presets() -> Vec<Preset> {
     };
     vec![
         p("copper-mile", "Copper Mile", &["phased", "pumping", "french touch", "123bpm", "signature"],
-            "A filtered disco loop for French touch: a soft octave bass, syncopated saw stabs and a hard kick and clap, phased and compressed, with the kick ducking the music. Press Run, then play stabs on top. Filter opens the loop like a DJ knob, Phase brings in the phaser, Pump sets how hard the kick ducks the music, Room adds a tempo-synced echo and a tight room.",
-            "The whole loop pumping on the kick; Phase up for swirl on the stabs, Filter for the sweep.", copper_mile, copper_phrase, 16.0),
+            "A filtered disco loop for French touch: a soft octave bass, syncopated saw stabs and a hard kick and clap, phased and compressed, with the kick ducking the music. Press Run, then play stabs on top. Sweep opens a closed, resonant filter over the bass and stabs, Swirl brings in a faster, deeper phaser and widens the stabs, Pump sets how hard the kick ducks the music, Room adds a tempo-synced echo and a tight room.",
+            "The whole loop pumping on the kick; Swirl up for a deeper phaser on the stabs, Sweep for the filter.", copper_mile, copper_phrase, 16.0),
         p("brick-dust", "Brick Dust", &["mono", "distorted", "compressed", "french touch", "126bpm", "signature"],
-            "A blunt, overdriven stomp: a hard-driven saw and square bass line under a short kick, snare and hats, squashed by a heavy compressor. Press Run, then play low notes over it. Filter opens the bass, Dirt adds drive, Pump sets how hard the kick ducks the music, Room adds a slapback and a tight room.",
-            "Distorted bass stabs locked to the kick; Dirt up for more bite, Pump up for deeper ducking.", brick_dust, brick_phrase, 16.0),
+            "A blunt, overdriven stomp: a hard-driven saw and square bass line under a short kick, snare and hats, squashed by a heavy compressor. Press Run, then play low notes over it. Grind crushes and drives the bass, Squash clamps the whole mix down harder, Push speeds the stomp up or slows it down, Slap adds a bigger slapback and a tight room.",
+            "Distorted bass stabs locked to the kick; Grind up for a crushed bite, Squash for a flatter, heavier mix.", brick_dust, brick_phrase, 16.0),
         p("ore-cart", "Ore Cart", &["rumble", "techno", "132bpm"],
             "A rolling techno groove: a four-on-the-floor kick, off-beat hats, a rumbling bass between the kicks and a sparse stab. Press Run, then play stabs over it. Filter opens the music, Rumble raises the bass, Pump sets how hard the kick ducks it, Space adds the echo and the room.",
             "The bass rolling between the kicks; Rumble up for more low end, Pump for a deeper duck.", ore_cart, ore_phrase, 16.0),
