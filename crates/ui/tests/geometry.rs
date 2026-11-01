@@ -545,6 +545,20 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
                 }
             }
         }
+        // corner screws stay clear of jacks
+        if a.k == K::Jack {
+            for at in kabl_ui::kit::face::screw_points(m.face.width(), m.face.height()) {
+                let s = Rect::from_center_size(at * z, vec2(7.0, 7.0) * z).expand(2.0);
+                if overlaps(a.r, s) {
+                    push(
+                        "overlap",
+                        Sev::Error,
+                        format!("{} touches a corner screw", a.name),
+                        vec![a.r, s],
+                    );
+                }
+            }
+        }
         // containers: inside or apart, never straddling
         for c in &boxes {
             if overlaps(a.r, *c) && !c.expand(0.5).contains_rect(a.r) {

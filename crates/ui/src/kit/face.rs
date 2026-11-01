@@ -153,17 +153,23 @@ pub fn surface(p: &Painter, st: &Style, rect: Rect, base: Color32, edge: Color32
     }
 }
 
+/// Corner nut centres of a `w` x `h` face, in face units from its top left. A face under 100
+/// wide (Split, Join) has its three jacks across the bottom, so it keeps only the top pair.
+pub fn screw_points(w: f32, h: f32) -> Vec<Pos2> {
+    let ys: &[f32] = if w < 100.0 { &[9.0] } else { &[9.0, h - 9.0] };
+    ys.iter()
+        .flat_map(|&y| [pos2(9.0, y), pos2(w - 9.0, y)])
+        .collect()
+}
+
 /// The corner nuts or screws.
 pub fn hardware(p: &Painter, st: &Style, rect: Rect, z: f32) {
     let f = &st.slots.face;
     let nut = mix(st.roles.knob, st.roles.knob_hi, 0.35);
     let nut_edge = mix(st.roles.knob, st.roles.knob_hi, 0.8);
     if f.hardware != FaceHardware::None {
-        for (sx, sy) in [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)] {
-            let c = pos2(
-                rect.left() + 9.0 * z + sx * (rect.width() - 18.0 * z),
-                rect.top() + 9.0 * z + sy * (rect.height() - 18.0 * z),
-            );
+        for at in screw_points(rect.width() / z, rect.height() / z) {
+            let c = rect.min + at.to_vec2() * z;
             p.circle_filled(c, 3.5 * z, nut);
             p.circle_stroke(c, 3.5 * z, Stroke::new(1.0, nut_edge));
             if f.hardware == FaceHardware::Screws {
