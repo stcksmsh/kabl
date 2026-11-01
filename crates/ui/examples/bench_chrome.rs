@@ -183,7 +183,14 @@ fn main() {
     };
     let simple = kabl_standalone::default_patch();
     let dense = dense();
-    for (w, h) in [(1440.0, 900.0), (1280.0, 800.0), (1180.0, 680.0)] {
+    // KABL_BENCH_SIZES=1 measures 1440x900 only (interleaved A/B runs).
+    let sizes = [(1440.0, 900.0), (1280.0, 800.0), (1180.0, 680.0)];
+    let n = if std::env::var("KABL_BENCH_SIZES").as_deref() == Ok("1") {
+        1
+    } else {
+        3
+    };
+    for &(w, h) in &sizes[..n] {
         for dark in [false, true] {
             run("simple", &simple, w, h, dark, frames, 0, live, edit);
             run("dense", &dense, w, h, dark, frames, 0, live, edit);

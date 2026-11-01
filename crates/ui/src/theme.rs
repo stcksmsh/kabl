@@ -209,6 +209,17 @@ pub fn panel_theme(st: &Style, kind: &str) -> Theme {
     t.panel_edge = t.panel.lerp_to_gamma(Color32::BLACK, 0.3);
     t.ink = sec.ink;
     t.ink2 = sec.ink2;
+    let ink = st.slots.face.ink;
+    if ink.a() > 0 {
+        // Solid panel: its own ink, wells and buttons derived from the panel fill.
+        t.ink = ink;
+        t.seg_bg = mix(
+            sec.base,
+            Color32::BLACK,
+            if sec.base.r() < 128 { 0.35 } else { 0.10 },
+        );
+        t.btn = mix(sec.base, ink, 0.10);
+    }
     t.tick = t.ink2;
     t
 }

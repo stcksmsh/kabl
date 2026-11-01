@@ -109,6 +109,15 @@ impl eframe::App for App {
         );
         show(&mut self.editor, &mut self.ui, &mut raw_ui);
         // `show` builds the style from the theme once; force the classic cable on top of it.
+        if matches!(j.look, "graphite" | "aluminium") {
+            // Face styles that no built-in theme carries: composed here, kept under the
+            // line_solid id so `show` does not rebuild the style.
+            let mut st = kabl_ui::style::compose(j.look, j.dark, kabl_ui::style::Accent::Amber)
+                .expect("face style");
+            st.id = self.ui.style.id.clone();
+            st.fonts_ready = self.ui.style.fonts_ready;
+            self.ui.style = Arc::new(st);
+        }
         if j.look == "solid-classic"
             && self.ui.style.slots.cable.style != kabl_ui::style::CableStyle::Classic
         {
@@ -150,11 +159,27 @@ fn main() {
             ed.state().cables.len()
         );
     }
+    let extra: Vec<&'static str> = std::env::var("KABL_CAP_LOOKS")
+        .map(|v| {
+            v.split(',')
+                .filter_map(|n| match n {
+                    "graphite" => Some("graphite"),
+                    "aluminium" => Some("aluminium"),
+                    _ => None,
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let looks: Vec<(&'static str, &'static str)> = if extra.is_empty() {
+        LOOKS.to_vec()
+    } else {
+        extra.iter().map(|&n| (n, "kabl.line_solid")).collect()
+    };
     let mut jobs = Vec::new();
     for p in &patches {
         for dark in [false, true] {
             for z in ZOOMS {
-                for (look, theme) in LOOKS {
+                for &(look, theme) in &looks {
                     jobs.push(Job {
                         patch: p.clone(),
                         look,

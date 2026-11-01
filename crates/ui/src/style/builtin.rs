@@ -77,6 +77,7 @@ pub fn builtin_a(dark: bool) -> Style {
                 family: FamilyMarker::Title,
                 compact: CompactText::Hide,
                 tray: TrayRecipe::None,
+                ink: Color32::TRANSPARENT,
             },
             rack: RackSurface::Plain,
             knob: KnobSlots {
@@ -316,6 +317,7 @@ pub fn builtin_b(dark: bool) -> Style {
                 family: FamilyMarker::Title,
                 compact: CompactText::Hide,
                 tray: TrayRecipe::None,
+                ink: Color32::TRANSPARENT,
             },
             rack: RackSurface::Plain,
             knob: KnobSlots {
