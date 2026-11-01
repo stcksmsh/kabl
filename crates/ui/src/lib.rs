@@ -2129,7 +2129,7 @@ fn draw_module(
     }
     let avoid: Vec<Rect> = avoid.into_iter().map(|r| xf.r(r)).collect();
     let ti = kit::face::family_ink(&st, m.info.kind, ink);
-    kit::face::title(painter, &st, face, z, m.info.name, &tag, ti, ink2, &avoid);
+    let title_r = kit::face::title(painter, &st, face, z, m.info.name, &tag, ti, ink2, &avoid);
     if ui_state.selected_module == Some(m.id) {
         painter.rect_stroke(
             rect.expand(1.0),
@@ -2271,7 +2271,11 @@ fn draw_module(
             }
         }
     }
-    if let Some(p) = m.plate {
+    if skin.is_none() && st.slots.face.tray == style::TrayRecipe::Outline {
+        if let Some(t) = m.tray {
+            kit::parts::tray(painter, &st, xf.r(t), m.plate.map(|p| xf.r(p)), z);
+        }
+    } else if let Some(p) = m.plate {
         if skin.is_some() {
             painter.rect_filled(xf.r(p), CornerRadius::same(6), th.plate);
         } else {
@@ -2307,12 +2311,17 @@ fn draw_module(
         };
         ui_state.record(format!("toggle:{}", m.id), r);
         let resp = ui.interact(r, Id::new(("kabl-toggle", m.id)), Sense::click());
-        painter.rect_filled(
-            r,
-            CornerRadius::same(4),
-            if th.dark { th.btn } else { th.plate },
-        );
-        if resp.hovered() {
+        // The overview tier of a compact-text style draws no face text, so no chip either.
+        let chip = !kit::face::overview(&ui_state.style, z)
+            && (!kit::face::compact_tier(&ui_state.style, z) || title_r.max.x + 1.5 <= r.min.x);
+        if chip {
+            painter.rect_filled(
+                r,
+                CornerRadius::same(4),
+                if th.dark { th.btn } else { th.plate },
+            );
+        }
+        if chip && resp.hovered() {
             painter.rect_stroke(
                 r,
                 CornerRadius::same(4),
@@ -2320,15 +2329,17 @@ fn draw_module(
                 egui::StrokeKind::Inside,
             );
         }
-        text(
-            painter,
-            r.center(),
-            egui::Align2::CENTER_CENTER,
-            &label,
-            12.0 * z,
-            th.plate_ink,
-            false,
-        );
+        if chip {
+            text(
+                painter,
+                r.center(),
+                egui::Align2::CENTER_CENTER,
+                &label,
+                12.0 * z,
+                th.plate_ink,
+                false,
+            );
+        }
         let routed = hidden_routes(editor, m);
         for (cable, _) in &routed {
             drawn.plugs.push((*cable, r.center()));
@@ -3709,7 +3720,7 @@ fn draw_jacks(
         let patched = cabled
             .iter()
             .any(|(d, p)| *d == port.direction && p == port.name);
-        kit::face::jack(
+        kit::face::jack_ch(
             painter,
             &st,
             c,
@@ -3718,6 +3729,7 @@ fn draw_jacks(
             th.signal(port.port_type),
             patched,
             hot,
+            port.width == 2 || port.name == "stereo",
         );
         let badge = (ui_state.cable_view == CableView::Hidden)
             .then(|| jack_badge(editor, m.id, port.name, port.direction))

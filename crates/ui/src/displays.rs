@@ -356,7 +356,8 @@ fn osc_va(
         None => {
             let kind = param(state, m, "waveform").round() as i32;
             let pw = param(state, m, "pw") / 100.0;
-            plot(r, 96, |x| wave(kind, pw, x))
+            // Two cycles read as a waveform (G1b target), one ramp does not.
+            plot(r, 192, |x| wave(kind, pw, (x * 2.0).fract()))
         }
     };
     paint(p, st, pts, z, d, None);
@@ -491,7 +492,8 @@ fn filter(
         let strong = ladder
             || patched(port)
             || (o == 0 && !["lp", "bp", "hp", "notch"].iter().any(|q| patched(q)));
-        if d != Detail::Full && !strong {
+        // One response, filled, for the selected output (G1b target).
+        if !strong {
             continue;
         }
         let pts = plot(r, 80, |x| {
@@ -504,7 +506,7 @@ fn filter(
             })
         });
         if strong {
-            paint(p, st, pts, z, d, (o == 0).then_some(r.bottom()));
+            paint(p, st, pts, z, d, Some(r.bottom()));
         } else {
             p.add(egui::Shape::line(
                 pts,
@@ -565,7 +567,14 @@ fn envelope(
     if d != Detail::Full {
         return;
     }
+    // At rest the marker sits at the start of the sustain (G1b target).
     let Some(t) = live.tap(m.id, 0, now).filter(|t| t.view.valid) else {
+        let c = pos2(sx(x2 + 1.0), sy(s));
+        p.line_segment(
+            [pos2(c.x, r.top()), pos2(c.x, r.bottom())],
+            Stroke::new(1.0, alpha(st.roles.disp_text, 70)),
+        );
+        face::playhead(p, st, c, z);
         return;
     };
     let level = t.last.clamp(0.0, 1.0);

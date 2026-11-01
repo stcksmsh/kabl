@@ -11,3 +11,18 @@ pub(super) fn decor(_kind: &str) -> Option<Decor> {
 pub(super) fn short_name(_kind: &str, _param: &str) -> Option<&'static str> {
     None
 }
+
+/// Params the family's face shows although the module lists them as advanced.
+pub(super) fn on_face(_kind: &str, _param: &str) -> bool {
+    false
+}
+
+/// A family knob radius override for `param`.
+pub(super) fn knob_size(_kind: &str, _param: &str) -> Option<f32> {
+    None
+}
+
+/// ADSR (R1): the CONT / KEY choice sits in the header.
+pub(super) fn in_header(kind: &str, param: &str) -> bool {
+    kind == "env.adsr" && param == "timing"
+}

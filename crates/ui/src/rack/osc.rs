@@ -98,6 +98,34 @@ pub fn fm6_blocks(r: Rect) -> [Rect; 6] {
 }
 
 /// Short face label of `param` for the family's kinds (none yet).
-pub(super) fn short_name(_kind: &str, _param: &str) -> Option<&'static str> {
-    None
+pub(super) fn short_name(kind: &str, param: &str) -> Option<&'static str> {
+    match (kind, param) {
+        ("osc.va", "pw") => Some("PW"),
+        _ => None,
+    }
+}
+
+/// VA Oscillator (R1): Fine and Pulse width sit beside Frequency; the other advanced params
+/// stay behind `+N`.
+pub(super) fn on_face(kind: &str, param: &str) -> bool {
+    kind == "osc.va" && matches!(param, "fine" | "pw")
+}
+
+/// VA Oscillator: Frequency large, Fine and Pulse width small.
+pub(super) fn knob_size(kind: &str, param: &str) -> Option<f32> {
+    match (kind, param) {
+        ("osc.va", "base_hz") => Some(KNOB_L),
+        ("osc.va", "fine" | "pw") => Some(KNOB_S),
+        _ => None,
+    }
+}
+
+/// Default face order of the VA Oscillator's extra knobs: Fine, then Pulse width, right after
+/// Waveform (R1 reads Frequency, Fine, Pulse width).
+pub(super) fn order(kind: &str, param: &str) -> Option<f32> {
+    match (kind, param) {
+        ("osc.va", "fine") => Some(1.5),
+        ("osc.va", "pw") => Some(1.6),
+        _ => None,
+    }
 }
