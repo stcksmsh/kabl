@@ -95,12 +95,12 @@ fn roles(dark: bool, accent: Accent) -> Roles {
     let (audio, cv, gate, pitch) = if dark {
         ("#F59E3B", "#38C6B2", "#A68BFA", "#5BA8F7")
     } else {
-        ("#D9781C", "#12958A", "#7651D6", "#2F7FD6")
+        ("#B66518", "#11897F", "#7651D6", "#2E7CD2")
     };
     let base = builtin_a(dark).roles;
     let rack = if dark { "#0C0D0E" } else { "#DCD9D2" };
     // Cables are drawn on the rack: on paper the signal colours are darkened until they reach
-    // 3:1 there (PLAN §6 hues #D9781C #12958A #7651D6 #2F7FD6 start below it).
+    // 3:1 there (PLAN §6 hues #B66518 #11897F #7651D6 #2E7CD2 approved 2026-11-01).
     let sig = |c: &str| {
         let c = h(c);
         let mut t = 0.0;
