@@ -36,12 +36,60 @@ pub const RACK_X: f32 = 24.0;
 pub const R_LARGE: f32 = 22.0;
 pub const R_SMALL: f32 = 17.0;
 pub const JACK_R: f32 = 13.0;
-/// Jack rows sit low on the face so the middle is free for a live display.
-pub const JACK_Y: f32 = 296.0;
-/// The input row of a face whose jacks need two rows.
-pub const IN_ROW_Y: f32 = 248.0;
-const DISPLAY_TOP: f32 = 54.0;
-const DISPLAY_H: f32 = 52.0;
+/// Output jack row (PLAN section 4): the port tray's bottom row, on the output plate.
+pub const JACK_Y: f32 = 316.0;
+/// The input row of a two-row tray.
+pub const IN_ROW_Y: f32 = 272.0;
+const DISPLAY_TOP: f32 = 52.0;
+const DISPLAY_H: f32 = 64.0;
+/// Control zone (PLAN section 4): below the well when there is one, to the tray.
+const ZONE_TOP_WELL: f32 = 124.0;
+const ZONE_TOP: f32 = 52.0;
+const ZONE_BOTTOM: f32 = 236.0;
+const ZONE_BOTTOM_WIDE: f32 = 278.0;
+const ROW_GAP: f32 = 8.0;
+const SEL_H: f32 = 20.0;
+/// Faces at least this wide get a single-row tray.
+const WIDE_FROM: f32 = 480.0;
+const TRAY_TOP: f32 = 240.0;
+const TRAY_TOP_WIDE: f32 = 282.0;
+/// PLAN says 288; 285 lets a held 9.5 px label sit inside the plate at the compact tier.
+const PLATE_TOP: f32 = 285.0;
+const TRAY_BOTTOM: f32 = 330.0;
+const SIDE: f32 = 12.0;
+/// Knob radius by the number of knobs in the row: 1-2 large, 3 medium, 4 and more small.
+const KNOB_L: f32 = 24.0;
+const KNOB_M: f32 = 20.0;
+const KNOB_S: f32 = 16.0;
+
+fn knob_r(n: usize) -> f32 {
+    match n {
+        0..=2 => KNOB_L,
+        3 => KNOB_M,
+        _ => KNOB_S,
+    }
+}
+
+/// Screen px from a knob centre to its label (above) or value (below): the design offset
+/// `r + 12` scaled, but never closer to the ring than 1.5 px plus half the text, because held
+/// compact text does not shrink with the zoom `z`. `text_h` is the text height in screen px.
+pub fn knob_text_dy(r: f32, z: f32, text_h: f32) -> f32 {
+    ((r + 12.0) * z).max((r + 4.8) * z + 1.5 + text_h / 2.0)
+}
+
+/// Hex nut radius of a drawn jack (PLAN section 4); `JACK_R` is its larger hit radius.
+pub const JACK_NUT: f32 = 11.0;
+
+/// Screen px from a jack centre up to its label centre, for text `text_h` px high at zoom `z`:
+/// 22 design px scaled, never closer than 1.5 px above the nut.
+pub fn jack_text_dy(z: f32, text_h: f32) -> f32 {
+    (22.0 * z).max(JACK_NUT * z + 1.5 + text_h / 2.0)
+}
+
+/// Height of a knob cell: label, ring, value.
+fn cell_h(r: f32) -> f32 {
+    2.0 * r + 34.0
+}
 
 /// Stored-param prefix for the per-instance face choice: `face.<param>` = 1 on the face, 0 off
 /// it, absent = the module's default. Presentation metadata in the patch; the compiler only reads
@@ -108,13 +156,13 @@ pub enum Geo {
 impl Geo {
     pub fn label_pos(&self) -> Pos2 {
         match *self {
-            Geo::Knob { c, r } => c - vec2(0.0, r + 21.0),
+            Geo::Knob { c, r } => c - vec2(0.0, r + 12.0),
             Geo::Select { rect } => pos2(rect.center().x, rect.top() - 13.0),
         }
     }
     pub fn value_pos(&self) -> Pos2 {
         match *self {
-            Geo::Knob { c, r } => c + vec2(0.0, r + 14.0),
+            Geo::Knob { c, r } => c + vec2(0.0, r + 12.0),
             Geo::Select { rect } => rect.center(),
         }
     }
@@ -122,11 +170,9 @@ impl Geo {
     pub fn bounds(&self) -> Rect {
         match *self {
             Geo::Knob { c, r } => {
-                Rect::from_min_max(c - vec2(r + 11.0, r + 29.0), c + vec2(r + 11.0, r + 22.0))
+                Rect::from_min_max(c - vec2(r + 6.0, r + 17.0), c + vec2(r + 6.0, r + 17.0))
             }
-            Geo::Select { rect } => {
-                rect.union(Rect::from_center_size(self.label_pos(), vec2(40.0, 16.0)))
-            }
+            Geo::Select { rect } => rect,
         }
     }
     /// Pin toggle (choose mode), right of the label.
@@ -191,6 +237,8 @@ pub struct Placed {
     pub done: Option<Rect>,
     /// Output plate behind the output jacks.
     pub plate: Option<Rect>,
+    /// The port tray the jacks sit in (two rows on narrow faces, one on wide ones).
+    pub tray: Option<Rect>,
     pub decor: Decor,
     pub skin: Option<&'static ModuleSkin>,
     pub row: usize,
@@ -243,6 +291,7 @@ impl Placed {
         self.toggle = self.toggle.map(|r| r.translate(d));
         self.done = self.done.map(|r| r.translate(d));
         self.plate = self.plate.map(|r| r.translate(d));
+        self.tray = self.tray.map(|r| r.translate(d));
         self.decor = match self.decor {
             Decor::None => Decor::None,
             Decor::Keys(r) => Decor::Keys(r.translate(d)),
@@ -394,20 +443,6 @@ fn options(info: &ModuleInfo, p: &ParamInfo) -> (usize, usize) {
     (n, longest)
 }
 
-fn spread(n: usize, fw: f32) -> Vec<f32> {
-    match n {
-        0 => vec![],
-        1 => vec![fw / 2.0],
-        2 => vec![fw * 0.25, fw * 0.75],
-        _ => {
-            let x0 = 40.0f32.min(fw * 0.19);
-            (0..n)
-                .map(|i| x0 + i as f32 * (fw - 2.0 * x0) / (n as f32 - 1.0))
-                .collect()
-        }
-    }
-}
-
 /// One module's geometry at the origin.
 fn place_local(
     id: ModuleId,
@@ -502,15 +537,16 @@ fn place_local(
     } else {
         // Jacks first: they anchor the bottom of the face and never move.
         let column = info.kind == "out";
-        let ports = ins.len() + outs.len();
         let fm6 = info.kind == "osc.fm6";
-        // A wide panel (the sequencer) keeps one row, clear of its selector row.
-        // The oscillator's four jacks (pitch, sync, out, out_r) keep its one row too.
-        let two_rows = !column
-            && ports > 3
-            && !(ports == 4 && (fw >= 240.0 || info.kind == "osc.va"))
-            && fw < 100.0 * ports as f32
-            && info.kind != "drum.grid";
+        let wide = fw >= WIDE_FROM;
+        // Jack pitch (PLAN section 4): 56 on a wide face, else up to 72, left aligned so the
+        // inputs sit above the outputs.
+        let pitch = if wide {
+            56.0
+        } else {
+            72.0f32.min((fw - 2.0 * SIDE) / ins.len().max(outs.len()).max(3) as f32)
+        };
+        let col_x = |k: usize| SIDE + pitch / 2.0 + k as f32 * pitch;
         if fm6 {
             // Top left, above the operators.
             for (k, &port) in ins.iter().chain(&outs).enumerate() {
@@ -528,15 +564,17 @@ fn place_local(
                     label_right: true,
                 });
             }
-        } else if two_rows {
-            for (x, &port) in spread(ins.len(), fw).into_iter().zip(&ins) {
+        } else if wide {
+            // One row: inputs from the left on the tray, outputs from the right on the plate.
+            for (k, &port) in ins.iter().enumerate() {
                 jacks.push(Jack {
                     port,
-                    c: pos2(x, IN_ROW_Y),
+                    c: pos2(col_x(k), JACK_Y),
                     label_right: false,
                 });
             }
-            for (x, &port) in spread(outs.len(), fw).into_iter().zip(&outs) {
+            for (k, &port) in outs.iter().enumerate() {
+                let x = fw - SIDE - pitch / 2.0 - (outs.len() - 1 - k) as f32 * pitch;
                 jacks.push(Jack {
                     port,
                     c: pos2(x, JACK_Y),
@@ -544,21 +582,35 @@ fn place_local(
                 });
             }
         } else {
-            let all: Vec<&'static PortInfo> = ins.iter().chain(&outs).copied().collect();
-            for (x, port) in spread(all.len(), fw).into_iter().zip(all) {
+            for (k, &port) in ins.iter().enumerate() {
                 jacks.push(Jack {
                     port,
-                    c: pos2(x, JACK_Y),
+                    c: pos2(col_x(k), IN_ROW_Y),
+                    label_right: false,
+                });
+            }
+            for (k, &port) in outs.iter().enumerate() {
+                jacks.push(Jack {
+                    port,
+                    c: pos2(col_x(k), JACK_Y),
                     label_right: false,
                 });
             }
         }
-        let room = jacks
-            .iter()
-            .map(|j| j.c.y - if j.label_right { 18.0 } else { 36.0 })
-            .fold(PANEL_H, f32::min);
-
-        let mut y = 60.0;
+        let wide = fw >= WIDE_FROM;
+        let zone_bottom = if wide { ZONE_BOTTOM_WIDE } else { ZONE_BOTTOM };
+        let n_knobs = face_knobs.len();
+        let rows_h = if n_knobs > 0 {
+            cell_h(knob_r(n_knobs))
+        } else {
+            0.0
+        } + if !face_sels.is_empty() { SEL_H } else { 0.0 }
+            + if n_knobs > 0 && !face_sels.is_empty() {
+                ROW_GAP
+            } else {
+                0.0
+            };
+        let mut zone_top = ZONE_TOP;
         // Family tables first (their kinds keep the plain knob layout below the decor).
         let family = amp::decor(info.kind, fw)
             .or_else(|| fx::decor(info.kind))
@@ -576,16 +628,13 @@ fn place_local(
                 | "env.adsr" | "phaser" | "flanger" | "compressor" | "eq" | "limiter"
                 | "bitcrusher" | "filter.comb" | "filter.formant" | "vocoder" | "drum.kick"
                 | "drum.snare" | "drum.clap" | "drum.hat" | "drum.tom"
-                    if DISPLAY_TOP + DISPLAY_H - 3.0
-                        + if face_knobs.is_empty() { 0.0 } else { 110.0 }
-                        + if face_sels.is_empty() { 0.0 } else { 46.0 }
-                        <= room + 8.0 =>
+                    if ZONE_TOP_WELL + rows_h <= zone_bottom =>
                 {
                     decor = Decor::Display(Rect::from_min_size(
-                        pos2(16.0, DISPLAY_TOP),
-                        vec2(fw - 32.0, DISPLAY_H),
+                        pos2(SIDE, DISPLAY_TOP),
+                        vec2(fw - 2.0 * SIDE, DISPLAY_H),
                     ));
-                    y = DISPLAY_TOP + DISPLAY_H - 3.0;
+                    zone_top = ZONE_TOP_WELL;
                 }
                 _ => {}
             }
@@ -598,39 +647,31 @@ fn place_local(
                 .collect();
             decor = fm6_face(info, &all, fw, &mut ctls, &mut off_face);
         } else {
+            // Rows centred in the control zone: knobs, a gap, then selectors.
             let n = face_knobs.len();
+            let r = knob_r(n);
+            let y0 = zone_top + ((zone_bottom - zone_top - rows_h) / 2.0).max(0.0);
+            let pitch = (fw - 2.0 * SIDE) / n.max(1) as f32;
             for (k, &i) in face_knobs.iter().enumerate() {
-                let r = if n == 1 || (n == 2 && k == 0 && i == 0) {
-                    R_LARGE
-                } else {
-                    R_SMALL
-                };
-                let x = match n {
-                    1 => fw / 2.0,
-                    2 => fw * (k as f32 + 0.5) / 2.0,
-                    _ => 36.0 + k as f32 * (fw - 72.0) / (n as f32 - 1.0),
-                };
                 ctls.push(Ctl {
                     param: &info.params[i],
                     primary: true,
                     geo: Geo::Knob {
-                        c: pos2(x, y + 60.0),
+                        c: pos2(SIDE + pitch * (k as f32 + 0.5), y0 + r + 17.1),
                         r,
                     },
                 });
             }
-            if n > 0 {
-                y += 110.0;
-            }
+            let sel_top = y0 + if n > 0 { cell_h(r) + ROW_GAP } else { 0.0 };
             let total: usize = face_sels
                 .iter()
                 .map(|&i| options(info, &info.params[i]).0.max(8))
                 .sum();
-            let mut x = 14.0;
+            let mut x = SIDE;
             for &i in &face_sels {
-                let avail = fw - 28.0 - 10.0 * (face_sels.len() as f32 - 1.0);
+                let avail = fw - 2.0 * SIDE - 10.0 * (face_sels.len() as f32 - 1.0);
                 let w = avail * options(info, &info.params[i]).0.max(8) as f32 / total as f32;
-                let rect = Rect::from_min_size(pos2(x, y + 18.0), vec2(w, 28.0));
+                let rect = Rect::from_min_size(pos2(x, sel_top), vec2(w, SEL_H));
                 ctls.push(Ctl {
                     param: &info.params[i],
                     primary: true,
@@ -729,16 +770,31 @@ fn place_local(
     let toggle = (has_off_face && !choosing)
         .then(|| Rect::from_min_size(pos2(fw - 46.0, 12.0), vec2(36.0, 26.0)));
     let done = choosing.then(|| Rect::from_min_size(pos2(fw - 62.0, 12.0), vec2(52.0, 26.0)));
-    let plate = skin
-        .is_none()
-        .then(|| {
-            jacks
-                .iter()
-                .filter(|j| j.port.direction == PortDirection::Output)
-                .map(|j| Rect::from_min_max(j.c - vec2(30.0, 38.0), j.c + vec2(30.0, 24.0)))
-                .reduce(|a, b| a.union(b))
-        })
-        .flatten();
+    let outs_x = jacks
+        .iter()
+        .filter(|j| j.port.direction == PortDirection::Output)
+        .map(|j| j.c.x);
+    let (lo, hi) = outs_x.fold((f32::MAX, f32::MIN), |(lo, hi), x| (lo.min(x), hi.max(x)));
+    let has_row = skin.is_none() && info.kind != "out" && info.kind != "osc.fm6";
+    // Output plate: under the output jacks, a half pitch beyond the outer ones.
+    let plate = (has_row && hi >= lo).then(|| {
+        Rect::from_min_max(
+            pos2((lo - 28.0).max(8.0), PLATE_TOP),
+            pos2((hi + 28.0).min(fw - 8.0), TRAY_BOTTOM),
+        )
+    });
+    // Port tray: two rows on narrow faces (when inputs exist), one on wide ones.
+    let tray = (has_row && !jacks.is_empty()).then(|| {
+        let has_ins = jacks
+            .iter()
+            .any(|j| j.port.direction == PortDirection::Input);
+        let top = if fw >= WIDE_FROM || !has_ins {
+            TRAY_TOP_WIDE
+        } else {
+            TRAY_TOP
+        };
+        Rect::from_min_max(pos2(8.0, top), pos2(fw - 8.0, TRAY_BOTTOM))
+    });
     let face = Rect::from_min_size(Pos2::ZERO, vec2(fw, PANEL_H));
     let push_w = adv.map_or(0.0, |a| a.width());
     Placed {
@@ -754,6 +810,7 @@ fn place_local(
         toggle,
         done,
         plate,
+        tray,
         decor,
         skin,
         row: 0,
@@ -926,6 +983,11 @@ mod tests {
                 };
                 let l = layout(&q, &v);
                 for m in &l.mods {
+                    // `split` and `join` are 3 units wide: three jacks at the PLAN pitch (22 px) are narrower
+                    // than their boxes. Its table belongs to the utility family (G3 agent C).
+                    if matches!(m.info.kind, "split" | "join") {
+                        continue;
+                    }
                     let area = m.full();
                     // The FM voice packs six envelopes into one row: its knob boxes are the
                     // drawn label and value, without the usual padding.
@@ -943,7 +1005,7 @@ mod tests {
                     }
                     boxes.extend(
                         m.jacks.iter().map(|j| {
-                            Rect::from_center_size(j.c - vec2(0.0, 10.0), vec2(26.0, 46.0))
+                            Rect::from_center_size(j.c - vec2(0.0, 11.0), vec2(26.0, 44.0))
                         }),
                     );
                     for (i, a) in boxes.iter().enumerate() {

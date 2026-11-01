@@ -3681,7 +3681,7 @@ fn draw_jacks(
                 );
             } else {
                 painter.text(
-                    c - vec2(0.0, 24.0 * z),
+                    c - vec2(0.0, rack::jack_text_dy(z, font.size * 1.075)),
                     egui::Align2::CENTER_CENTER,
                     &label,
                     font,

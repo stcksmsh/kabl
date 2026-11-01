@@ -819,7 +819,12 @@ fn a_fast_body_drag_to_the_range_end_cancels_and_undoes_cleanly() {
 
 impl H {
     fn rclick(&mut self, key: &str) {
-        let p = self.at(key);
+        // A face's centre may hold a control; its title strip is always bare body.
+        let p = if key.starts_with("module:") {
+            self.ui.hits[key].min + egui::vec2(24.0, 22.0)
+        } else {
+            self.at(key)
+        };
         self.move_to(p);
         for pressed in [true, false] {
             self.events.push(Event::PointerButton {
