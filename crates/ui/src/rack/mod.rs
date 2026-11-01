@@ -11,9 +11,12 @@
 use std::collections::BTreeSet;
 
 mod amp;
+mod env;
+mod filter;
 mod fx;
 mod osc;
 mod timing;
+mod util;
 
 pub use osc::fm6_blocks;
 use osc::fm6_face;
@@ -559,7 +562,10 @@ fn place_local(
         // Family tables first (their kinds keep the plain knob layout below the decor).
         let family = amp::decor(info.kind, fw)
             .or_else(|| fx::decor(info.kind))
-            .or_else(|| timing::decor(info.kind, fw));
+            .or_else(|| timing::decor(info.kind, fw))
+            .or_else(|| filter::decor(info.kind))
+            .or_else(|| env::decor(info.kind))
+            .or_else(|| util::decor(info.kind));
         if let Some(d) = family {
             decor = d;
         } else {
