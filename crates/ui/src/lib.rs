@@ -4019,6 +4019,8 @@ fn cable_path(
         0.35,
         false,
         1.0,
+        zoom,
+        false,
     );
     p.extend(caps);
     pts
@@ -4164,7 +4166,18 @@ fn draw_cables(
     // Resting cables first, lit ones on top.
     let mut order: Vec<usize> = (0..runs.len()).collect();
     order.sort_by_key(|&i| lit[i]);
-    for i in order {
+    let bases: Vec<Color32> = runs
+        .iter()
+        .map(|r| {
+            if r.route {
+                cable_color(r.id)
+            } else {
+                port_color(th, editor, &r.c.from)
+            }
+        })
+        .collect();
+    // Per-cable look this frame: lit fraction, opacity, width, colour, casing.
+    let look = |i: usize| {
         let r = &runs[i];
         let on = lit[i];
         let kind = if r.route { 0.75 } else { 1.0 };
@@ -4179,19 +4192,36 @@ fn draw_cables(
         let alpha =
             ctx.animate_value_with_time(Id::new(("kabl-cable-alpha", r.id)), alpha_to, secs);
         let w = ((slots.rest_width + (slots.width - slots.rest_width) * t) * kind * z).max(2.0);
-        let base = if r.route {
-            cable_color(r.id)
-        } else {
-            port_color(th, editor, &r.c.from)
-        };
-        let (col, rest_casing) = cable_look::resting(&ctx, &st, base, slots.rest_alpha);
+        let (col, rest_casing) = cable_look::resting(&ctx, &st, bases[i], slots.rest_alpha);
         let casing = (rest_casing * (alpha / slots.rest_alpha).min(1.0) * (1.0 + 0.8 * t)).min(1.0);
+        (t, alpha, w, col, casing)
+    };
+    // Themed: all glows first, then all cores.
+    if slots.style == style::CableStyle::Themed {
+        for &i in &order {
+            let (t, alpha, _, col, _) = look(i);
+            cable_look::glow(painter, &st, &runs[i].pts, col, alpha, t, z);
+        }
+    }
+    let themed = slots.style == style::CableStyle::Themed;
+    for i in order {
+        let r = &runs[i];
+        let (t, alpha, w, col, casing) = look(i);
+        let stereo = !r.route && port_width(editor, &r.c.from) == 2;
         let bypass = r.route && r.c.params.get("bypass").is_some_and(|&b| b >= 0.5);
         cable_look::paint(
-            painter, &mut top, &st, &r.pts, col, w, alpha, casing, bypass, t,
+            painter, &mut top, &st, &r.pts, col, w, alpha, casing, bypass, t, z, stereo,
         );
         let mid = r.pts[r.pts.len() / 2];
-        if routing::is_functional(r.c) {
+        let steps = kabl_cables::Settings::from_params(&r.c.params);
+        let len = kabl_cables::slot_value(&r.c.params, 0) as usize;
+        if themed && routing::is_functional(r.c) && len > 0 {
+            let seed = kabl_cables::seed_of(r.id);
+            let on: Vec<bool> = (0..len)
+                .map(|k| steps.level_at(seed, k as u64) > 0.0)
+                .collect();
+            cable_look::beads(&mut top, &st, &r.pts, col, th.sel, &on, None, z);
+        } else if routing::is_functional(r.c) {
             top.extend(routing::functional_mark(
                 r.pts[r.pts.len() / 3],
                 z,
@@ -4240,6 +4270,24 @@ fn draw_cables(
         });
     }
     top
+}
+
+/// Channels of an output jack: 2 for a stereo jack.
+fn port_width(editor: &PatchEditor, from: &PortRef) -> u8 {
+    let PortRef::Module { id, port } = from else {
+        return 1;
+    };
+    editor
+        .state()
+        .modules
+        .get(id)
+        .and_then(|m| registry::info_for(&m.kind))
+        .and_then(|i| {
+            i.ports
+                .iter()
+                .find(|p| p.name == port && p.direction == PortDirection::Output)
+        })
+        .map_or(1, |p| p.width)
 }
 
 pub(crate) fn port_color(th: &Theme, editor: &PatchEditor, from: &PortRef) -> Color32 {
