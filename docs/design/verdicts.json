@@ -1,0 +1,16 @@
+{
+  "about": "Owner (Kosta) approve/change decisions for the UI redesign. Agents read this before each PR. Newest last.",
+  "verdicts": [
+    {"date": "2026-10-31", "item": "PLAN §11.1 jack rows to y 273/316, single-row tray on wide faces", "verdict": "approve"},
+    {"date": "2026-10-31", "item": "PLAN §11.2 compact tier: text held at 9.5 px, short names, values on hover", "verdict": "approve"},
+    {"date": "2026-10-31", "item": "PLAN §11.3 FM Voice operator cards; fine + vel behind +12", "verdict": "approve"},
+    {"date": "2026-10-31", "item": "PLAN §11.4 mixer meter strip (new content)", "verdict": "approve"},
+    {"date": "2026-10-31", "item": "PLAN §11.5 R2 sign-off target rendered by egui", "verdict": "approve"},
+    {"date": "2026-10-31", "item": "PLAN §11.6 overview tier below 0.55", "verdict": "approve", "note": "build in G6"},
+    {"date": "2026-10-31", "item": "PLAN §11.7 hosts beyond REAPER", "verdict": "approve", "note": "REAPER only verified for 1.0; others unverified"},
+    {"date": "2026-10-31", "item": "PLAN §11.8 built-ins besides the defaults in 1.0", "verdict": "approve", "note": "ship behind an experimental flag"},
+    {"date": "2026-11-01", "item": "G1b knobs: dark filled caps", "verdict": "approve"},
+    {"date": "2026-11-01", "item": "G1b paper accent #A97229 + title hue mix amp 45 / fx 40 / others 35 %", "verdict": "approve", "note": "tentative, confirm at sign-off"},
+    {"date": "2026-11-01", "item": "Cables: port cable_look.rs, theme only (planner spec)", "verdict": "approve"}
+  ]
+}

@@ -1,0 +1,98 @@
+The XKEYBOARD keymap compiler (xkbcomp) reports:
+> Warning:          Could not resolve keysym XF86CameraAccessEnable
+> Warning:          Could not resolve keysym XF86CameraAccessDisable
+> Warning:          Could not resolve keysym XF86CameraAccessToggle
+> Warning:          Could not resolve keysym XF86NextElement
+> Warning:          Could not resolve keysym XF86PreviousElement
+> Warning:          Could not resolve keysym XF86AutopilotEngageToggle
+> Warning:          Could not resolve keysym XF86MarkWaypoint
+> Warning:          Could not resolve keysym XF86Sos
+> Warning:          Could not resolve keysym XF86NavChart
+> Warning:          Could not resolve keysym XF86FishingChart
+> Warning:          Could not resolve keysym XF86SingleRangeRadar
+> Warning:          Could not resolve keysym XF86DualRangeRadar
+> Warning:          Could not resolve keysym XF86RadarOverlay
+> Warning:          Could not resolve keysym XF86TraditionalSonar
+> Warning:          Could not resolve keysym XF86ClearvuSonar
+> Warning:          Could not resolve keysym XF86SidevuSonar
+> Warning:          Could not resolve keysym XF86NavInfo
+Errors from xkbcomp are not fatal to the X server
+
+(metacity:3546913): metacity-WARNING **: 16:54:21.825: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+
+(metacity:3546913): metacity-WARNING **: 16:54:25.529: Window 0xa00004 (Default - Wine desktop) sets an MWM hint indicating it isn't resizable, but sets min size 1 x 1 and max size 2147483647 x 2147483647; this doesn't make much sense.
+
+(metacity:3546913): metacity-WARNING **: 16:54:25.529: Window 0xa00004 (Default - Wine desktop) sets an MWM hint indicating it isn't resizable, but sets min size 1 x 1 and max size 2147483647 x 2147483647; this doesn't make much sense.
+
+(metacity:3546913): metacity-WARNING **: 16:54:36.906: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400050 (REAPER v7.75 - EVALUATION LICE)
+
+(metacity:3546913): metacity-WARNING **: 16:54:36.949: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40005e (REAPER (loading))
+
+(metacity:3546913): metacity-WARNING **: 16:54:37.131: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400085 (About REAPER v7.75/linux-x86_6)
+
+(metacity:3546913): metacity-WARNING **: 16:54:37.861: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400138 (REAPER New Version Notificatio)
+
+(metacity:3546913): metacity-WARNING **: 16:54:39.164: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40026c (Rendering to file...)
+
+(metacity:3546913): metacity-WARNING **: 16:54:44.744: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400050 (rope-walk - REAPER v7.75 - EVA)
+
+(metacity:3546913): metacity-WARNING **: 16:54:45.186: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+
+(metacity:3546913): metacity-WARNING **: 16:54:45.319: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (REAPER v7.75 - EVALUATION LICE)
+
+(metacity:3546913): metacity-WARNING **: 16:54:45.370: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400024 (REAPER (loading))
+
+(metacity:3546913): metacity-WARNING **: 16:54:45.524: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40004f (About REAPER v7.75/linux-x86_6)
+
+(metacity:3546913): metacity-WARNING **: 16:54:46.220: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400102 (REAPER New Version Notificatio)
+
+(metacity:3546913): metacity-WARNING **: 16:54:47.525: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400236 (Rendering to file...)
+
+(metacity:3546913): metacity-WARNING **: 16:54:54.263: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (saved-rope-walk-init - REAPER )
+
+(metacity:3546913): metacity-WARNING **: 16:54:55.049: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+
+(metacity:3546913): metacity-WARNING **: 16:54:55.183: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (REAPER v7.75 - EVALUATION LICE)
+
+(metacity:3546913): metacity-WARNING **: 16:54:55.225: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400024 (REAPER (loading))
+
+(metacity:3546913): metacity-WARNING **: 16:54:55.382: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40004c (About REAPER v7.75/linux-x86_6)
+
+(metacity:3546913): metacity-WARNING **: 16:54:56.078: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000ff (REAPER New Version Notificatio)
+
+(metacity:3546913): metacity-WARNING **: 16:54:57.397: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40023c (Rendering to file...)
+
+(metacity:3546913): metacity-WARNING **: 16:55:04.285: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (loading-dock - REAPER v7.75 - )
+
+(metacity:3546913): metacity-WARNING **: 16:55:04.900: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400003 (Scanning VST plugins...)
+
+(metacity:3546913): metacity-WARNING **: 16:55:05.033: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (REAPER v7.75 - EVALUATION LICE)
+
+(metacity:3546913): metacity-WARNING **: 16:55:05.048: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400024 (REAPER (loading))
+
+(metacity:3546913): metacity-WARNING **: 16:55:05.206: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40004c (About REAPER v7.75/linux-x86_6)
+
+(metacity:3546913): metacity-WARNING **: 16:55:05.920: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x4000ff (REAPER New Version Notificatio)
+
+(metacity:3546913): metacity-WARNING **: 16:55:07.239: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x40023c (Rendering to file...)
+
+(metacity:3546913): metacity-WARNING **: 16:55:13.973: Buggy client sent a _NET_ACTIVE_WINDOW message with a timestamp of 0 for 0x400016 (saved-loading-dock-init - REAP)
+The XKEYBOARD keymap compiler (xkbcomp) reports:
+> Warning:          Could not resolve keysym XF86CameraAccessEnable
+> Warning:          Could not resolve keysym XF86CameraAccessDisable
+> Warning:          Could not resolve keysym XF86CameraAccessToggle
+> Warning:          Could not resolve keysym XF86NextElement
+> Warning:          Could not resolve keysym XF86PreviousElement
+> Warning:          Could not resolve keysym XF86AutopilotEngageToggle
+> Warning:          Could not resolve keysym XF86MarkWaypoint
+> Warning:          Could not resolve keysym XF86Sos
+> Warning:          Could not resolve keysym XF86NavChart
+> Warning:          Could not resolve keysym XF86FishingChart
+> Warning:          Could not resolve keysym XF86SingleRangeRadar
+> Warning:          Could not resolve keysym XF86DualRangeRadar
+> Warning:          Could not resolve keysym XF86RadarOverlay
+> Warning:          Could not resolve keysym XF86TraditionalSonar
+> Warning:          Could not resolve keysym XF86ClearvuSonar
+> Warning:          Could not resolve keysym XF86SidevuSonar
+> Warning:          Could not resolve keysym XF86NavInfo
+Errors from xkbcomp are not fatal to the X server

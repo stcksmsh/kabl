@@ -1,0 +1,479 @@
+<title>kabl Directions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: control strip, then one full app screen scaled to width (or a grid of all six combos). Page chrome stays neutral. */
+:root{--bg:#EDEBE6;--panel:#F8F7F3;--ink:#1C1B19;--ink2:#625F59;--line:#D8D4CC;--accent:#1C1B19;--on:#F8F7F3;
+  --sans:"IBM Plex Sans",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111213;--panel:#1A1B1D;--ink:#ECEAE6;--ink2:#A19E98;--line:#2E3034;--accent:#ECEAE6;--on:#111213;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#111213;--panel:#1A1B1D;--ink:#ECEAE6;--ink2:#A19E98;--line:#2E3034;--accent:#ECEAE6;--on:#111213;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:1480px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{font-size:22px;font-weight:600;margin:0;letter-spacing:-.01em}
+header p{margin:4px 0 0;color:var(--ink2);max-width:75ch}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:8px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;border-bottom:1px solid var(--line)}
+.grp{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.grp>span{font:500 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--ink2)}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--panel)}
+.seg button{font:500 12px/1 var(--mono);border:0;background:transparent;color:var(--ink);padding:7px 10px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on)}
+.seg button:focus-visible{outline:2px solid var(--ink2);outline-offset:-2px}
+.screen svg{display:block;width:100%;height:auto;border-radius:8px;box-shadow:0 0 0 1px var(--line)}
+.info{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:baseline}
+.info b{font-size:16px;font-weight:600}
+.info span{color:var(--ink2)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,440px),1fr));gap:16px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;text-align:left;color:inherit;font:inherit}
+.tile:focus-visible{outline:2px solid var(--ink2)}
+.tile svg{display:block;width:100%;height:auto;border-radius:4px}
+.tile div{display:flex;justify-content:space-between;gap:8px;padding:8px 4px 2px}
+.tile b{font-weight:600}.tile span{color:var(--ink2);font:500 11px/1.6 var(--mono)}
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;min-width:0}
+.card h3{margin:0 0 6px;font-size:14px;font-weight:600}
+.card p{margin:0;color:var(--ink2);font-size:13px}
+</style>
+
+<div class="wrap">
+<header>
+  <h1>kabl directions</h1>
+  <p>Eight combinations of app material and face style (recommended defaults: Signal solid for dark, Drafting solid for light), drawn as the whole app: rack with routing drawer, Perform, Sounds browser. Same patch everywhere. 1440×900 is standalone; 1180×680 is the plugin window, where the rack drops to the compact zoom tier from R1. Every shape is egui-drawable.</p>
+</header>
+<div class="bar" role="toolbar" aria-label="Direction controls">
+  <div class="grp"><span>View</span><div class="seg" id="mode"><button data-v="one">Single</button><button data-v="grid">Compare 6</button></div></div>
+  <div class="grp"><span>Screen</span><div class="seg" id="screen"><button data-v="rack">Rack</button><button data-v="perform">Perform</button><button data-v="sounds">Sounds</button><button data-v="sheet">Face sheet</button></div></div>
+  <div class="grp"><span>Size</span><div class="seg" id="size"><button data-v="1440">1440×900</button><button data-v="1180">1180×680</button></div></div>
+  <div class="grp"><span>App</span><div class="seg" id="app"><button data-v="graphite">Graphite</button><button data-v="paper">Paper</button></div></div>
+  <div class="grp"><span>Faces</span><div class="seg" id="faces"><button data-v="graphite">Graphite</button><button data-v="alu">Aluminium</button><button data-v="outline">Outline</button><button data-v="hybrid">Line + solid</button></div></div>
+  <div class="grp"><span>Accent</span><div class="seg" id="accent"><button data-v="amber">Amber</button><button data-v="coral">Coral</button><button data-v="cyan">Cyan</button></div></div>
+</div>
+<div class="info" id="info"></div>
+<div id="out"></div>
+<div class="notes">
+  <div class="card"><h3>What stays the same in all six</h3><p>One toolbar, one drawer, one status bar, one icon set. Colour only for signals (audio, CV, gate, pitch), live state, and one accent. Module family is a 3 px stripe or the title colour, never the whole face. Depth only on knobs, jacks and displays.</p></div>
+  <div class="card"><h3>How to judge</h3><p>Look at the plugin size first: it is the harder case. Then flip Rack ↔ Perform: a direction works only if both feel like the same product.</p></div>
+  <div class="card"><h3>Placeholders</h3><p>Acid Line, Slab City and Rope Walk are real factory sounds. Other sound names, macro names and scene names are invented for layout.</p></div>
+</div>
+</div>
+
+<script>
+(()=>{"use strict";
+const SANS='IBM Plex Sans',MONO='IBM Plex Mono',COND='IBM Plex Sans Condensed';
+const ff=f=>`'${f}', ${f===MONO?'ui-monospace, monospace':'system-ui, sans-serif'}`;
+const ctx=document.createElement('canvas').getContext('2d');
+const tw=(s,size,w=500,f=SANS,ls=0)=>{ctx.font=`${w} ${size}px "${f}"`;return ctx.measureText(s).width+ls*size*s.length};
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const hx=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const mix=(a,b,t)=>'#'+hx(a).map((v,i)=>Math.round(v+(hx(b)[i]-v)*t).toString(16).padStart(2,'0')).join('');
+
+/* ---------- tokens ---------- */
+const APPS={
+ graphite:{name:'Graphite',dark:true,bg:'#111214',bar:'#17181B',surf:'#1A1B1E',raised:'#232529',inset:'#0F1012',line:'#2A2C31',line2:'#393C42',tx:'#ECEAE6',tx2:'#A29F99',tx3:'#6F6D68',rack:'#0C0D0E',rail:'#1B1C1F',hole:'#060607',
+   sig:{audio:'#F59E3B',cv:'#38C6B2',gate:'#A68BFA',pitch:'#5BA8F7'}},
+ paper:{name:'Paper',dark:false,bg:'#ECEAE5',bar:'#F7F6F2',surf:'#FBFAF7',raised:'#FFFFFF',inset:'#E4E1DA',line:'#DCD8D0',line2:'#C8C4BB',tx:'#1A1917',tx2:'#5F5C56',tx3:'#8E8A83',rack:'#DCD9D2',rail:'#C9C5BC',hole:'#A39E94',
+   sig:{audio:'#D9781C',cv:'#12958A',gate:'#7651D6',pitch:'#2F7FD6'}}
+};
+const ACC={amber:{c:'#F2A33A',ink:'#1C1206'},coral:{c:'#FF6B3D',ink:'#1F0B04'},cyan:{c:'#33C1D8',ink:'#04181C'}};
+const FAM={osc:'#E07A5F',filter:'#7FB59A',env:'#9D8DF1',timing:'#5FA8D3',amp:'#E3BE5C',fx:'#B9B2A6'};
+function faceStyle(kind,A,acc){
+  if(kind==='graphite')return{kind,capId:'cap-graphite',base:A.dark?'#1D1E21':'#242528',edge:A.dark?'#2C2E33':'#141517',hi:'rgba(255,255,255,.06)',ink:'#ECEAE6',ink2:'#9C9A94',
+    well:'#0C0D0F',wellEdge:'#2C2E33',track:'rgba(255,255,255,.12)',arc:'#ECEAE6',skirt:'#0E0F11',cap:['#3B3D42','#18191C'],pointer:'#F4F2ED',
+    nut:'#33353A',nutEdge:'#4A4D53',hole:'#050506',tray:'#18191C',plate:'#131416',segT:'#0F1012',segOn:'#E8E6E1',segInk:'#141414',segTx:'#A09E98',trace:acc.c,stripe:true,screws:false,shadow:.4};
+  if(kind==='alu')return{kind,capId:'cap-alu',base:'url(#alu)',edge:'#8E8E89',hi:'rgba(255,255,255,.55)',ink:'#121212',ink2:'#4B4B48',
+    well:'#101113',wellEdge:'#7E7E79',track:'rgba(0,0,0,.16)',arc:'#121212',skirt:'#141414',cap:['#4A4B4F','#0F1011'],pointer:'#FFFFFF',
+    nut:'#EDEDE9',nutEdge:'#8A8A85',hole:'#0A0A0A',tray:'#C2C2BD',plate:'#B3B3AD',segT:'#2B2C2F',segOn:'#F3F3EF',segInk:'#121212',segTx:'#C9C9C4',trace:acc.c,stripe:true,screws:true,shadow:.35};
+  const ink=A.tx, edge=A.dark?'rgba(236,234,230,.26)':'rgba(26,25,23,.3)';
+  if(kind==='hybrid')return{kind,line:true,capId:A.dark?'cap-hyb-d':'cap-hyb-l',base:A.dark?'rgba(255,255,255,.022)':'rgba(255,255,255,.4)',edge,hi:'rgba(0,0,0,0)',ink,ink2:A.tx2,
+    well:'none',wellEdge:edge,track:edge,arc:acc.c,skirt:A.dark?'#141518':'#D6D2C9',pointer:A.dark?'#F2F0EB':'#1A1917',
+    nut:A.dark?'#2B2D32':'#FFFFFF',nutEdge:A.dark?'#45484E':A.line2,hole:A.dark?'#050506':'#24232A',tray:'none',plate:'none',
+    segT:A.dark?A.inset:'#D6D2C8',segOn:acc.c,segInk:acc.ink,segTx:A.tx2,trace:acc.c,stripe:false,screws:false,shadow:A.dark?.45:.14};
+  return{kind,line:true,base:A.dark?'rgba(255,255,255,.018)':'rgba(255,255,255,.35)',edge,hi:'rgba(0,0,0,0)',ink,ink2:A.tx2,well:'none',wellEdge:edge,track:edge,arc:acc.c,skirt:'none',cap:null,pointer:ink,
+    nut:'none',nutEdge:'none',hole:A.rack,tray:'none',plate:'none',segT:'none',segOn:acc.c,segInk:acc.ink,segTx:A.tx2,trace:acc.c,stripe:false,screws:false,shadow:0};
+}
+const COMBOS=[['graphite','graphite','Studio graphite'],['graphite','alu','Instrument aluminium'],['graphite','outline','Signal'],['paper','graphite','Console'],['paper','alu','Daylight aluminium'],['paper','outline','Drafting'],['graphite','hybrid','Signal solid'],['paper','hybrid','Drafting solid']];
+const comboName=(a,f)=>COMBOS.find(c=>c[0]===a&&c[1]===f)[2];
+
+/* ---------- icons (16 px box, stroke) ---------- */
+const IC={
+ undo:'M5 6H10.5A3.5 3.5 0 0 1 10.5 13H7M5 6L7.5 3.5M5 6L7.5 8.5',
+ redo:'M11 6H5.5A3.5 3.5 0 0 0 5.5 13H9M11 6L8.5 3.5M11 6L8.5 8.5',
+ search:'M7 2.5A4.5 4.5 0 1 1 7 11.5A4.5 4.5 0 1 1 7 2.5M10.3 10.3L14 14',
+ plus:'M8 3V13M3 8H13', minus:'M3 8H13',
+ play:'M5 3.5L12.5 8L5 12.5Z', stop:'M4 4H12V12H4Z', restart:'M4 3.5V12.5M12 3.5L6 8L12 12.5Z',
+ cable:'M3 4.5A1.5 1.5 0 1 1 3 4.49M13 11.5A1.5 1.5 0 1 1 13 11.49M4.3 5.2C8 6 8 10 11.7 10.8',
+ route:'M2.5 4H8M2.5 8H11M2.5 12H6M10.5 4A1.3 1.3 0 1 1 10.5 3.99M13.5 8A1.3 1.3 0 1 1 13.5 7.99M8.5 12A1.3 1.3 0 1 1 8.5 11.99',
+ info:'M8 2A6 6 0 1 1 8 14A6 6 0 1 1 8 2M8 7.2V11.2M8 4.8V5',
+ target:'M8 2V5M8 11V14M2 8H5M11 8H14M8 5.5A2.5 2.5 0 1 1 8 10.5A2.5 2.5 0 1 1 8 5.5',
+ chev:'M4.5 6.5L8 10L11.5 6.5', fit:'M2.5 6V2.5H6M10 2.5H13.5V6M13.5 10V13.5H10M6 13.5H2.5V10',
+ midi:'M8 2A6 6 0 1 1 8 14A6 6 0 1 1 8 2M5.5 7.5V7.4M10.5 7.5V7.4M8 5.5V5.4M6.2 10.2V10.1M9.8 10.2V10.1',
+ save:'M8 2.5V10M5 7L8 10L11 7M3 12.5H13', grid:'M3 3H7V7H3ZM9 3H13V7H9ZM3 9H7V13H3ZM9 9H13V13H9Z', heart:'M8 13L3 8A2.8 2.8 0 0 1 8 4.5A2.8 2.8 0 0 1 13 8Z'
+};
+const icon=(n,x,y,col,s=1,w=1.5)=>`<path d="${IC[n]}" transform="translate(${x},${y}) scale(${s})" fill="${n==='play'||n==='stop'||n==='restart'?col:'none'}" stroke="${col}" stroke-width="${w/s}" stroke-linecap="round" stroke-linejoin="round"/>`;
+const T=(s,x,y,o={})=>`<text x="${x}" y="${y}" font-family="${ff(o.f||SANS)}" font-size="${o.size||12}" font-weight="${o.w||400}" fill="${o.fill}" text-anchor="${o.a||'start'}"${o.ls?` letter-spacing="${o.ls}em"`:''}${o.op!=null?` fill-opacity="${o.op}"`:''}>${esc(s)}</text>`;
+
+/* ---------- faces ---------- */
+const FACE_H=340, M=12;
+const FACES={
+ seq:{title:'Sequencer',short:'Seq',fam:'timing',w:660,more:9,body:'seq',ins:[['Clock','gate'],['Reset','gate']],outs:[['Gate','gate'],['Pitch','pitch'],['Vel','cv']]},
+ va:{title:'VA Oscillator',short:'VA Osc',fam:'osc',w:240,more:7,well:'saw',rows:[[{l:'Frequency',s:'Freq',val:'262 Hz',v:.56,size:24},{l:'Fine',val:'+0 ct',v:.5,size:16},{l:'Pulse width',s:'PW',val:'50 %',v:.5,size:16}],{seg:['SIN','TRI','SAW','SQR'],sel:2}],
+   ins:[['Pitch','pitch'],['Sync','gate']],outs:[['Out','audio'],['Stereo','audio',2]]},
+ svf:{title:'SVF Filter',short:'SVF',fam:'filter',w:210,well:'svf',rows:[[{l:'Cutoff',val:'1.00 kHz',v:.58,size:24,mod:[.8,.7]},{l:'Resonance',s:'Res',val:'0.30',v:.32,size:24}]],
+   ins:[['In','audio'],['Cutoff CV','cv','','Cut CV'],['Res CV','cv']],outs:[['LP','audio'],['BP','audio'],['HP','audio'],['Notch','audio','','N']]},
+ adsr:{title:'ADSR Envelope',short:'ADSR',fam:'env',w:210,well:'adsr',hseg:['CONT','KEY'],rows:[[{l:'Attack',s:'Atk',val:'10 ms',v:.2},{l:'Decay',s:'Dec',val:'180 ms',v:.42},{l:'Sustain',s:'Sus',val:'0.62',v:.62},{l:'Release',s:'Rel',val:'420 ms',v:.5}]],
+   ins:[['Gate','gate']],outs:[['Out','cv']]},
+ mix:{title:'Mixer',short:'Mixer',fam:'amp',w:240,well:'meters',rows:[[1,2,3,4].map((n,i)=>({l:'Level '+n,s:'Lv '+n,val:['0.80','0.62','1.00','0.35'][i],v:[.8,.62,1,.35][i]}))],
+   ins:[['In 1','audio'],['In 2','audio'],['In 3','audio'],['In 4','audio']],outs:[['Out','audio']]},
+ dly:{title:'Delay',short:'Delay',fam:'fx',w:240,more:2,well:'taps',rows:[[{l:'Time',val:'375 ms',v:.45},{l:'Feedback',s:'Fdbk',val:'42 %',v:.42},{l:'Mix',val:'30 %',v:.3}],{seg:['FREE','1/16','1/8','1/8D','1/4'],sel:3}],
+   ins:[['In','audio'],['Clock','gate']],outs:[['Out','audio',2]]},
+ rev:{title:'Reverb',short:'Reverb',fam:'fx',w:210,more:2,well:'tail',rows:[[{l:'Decay',val:'3.2 s',v:.55,mod:[.85,.74]},{l:'Damping',s:'Damp',val:'6 kHz',v:.6},{l:'Mix',val:'28 %',v:.28}]],
+   ins:[['In','audio',2]],outs:[['Out','audio',2]]},
+ out:{title:'Output',short:'Out',fam:'amp',w:210,well:'stereo',rows:[[{l:'Level',val:'−6.0 dB',v:.72,size:24}]],ins:[['In','audio',2]],outs:[]}
+};
+const PATCH=[['seq','Pitch','va','Pitch','pitch'],['seq','Gate','adsr','Gate','gate'],['va','Out','svf','In','audio'],['adsr','Out','svf','Cutoff CV','cv'],
+  ['svf','LP','mix','In 1','audio'],['mix','Out','dly','In','audio'],['dly','Out','rev','In','audio',2],['rev','Out','out','In','audio',2]];
+const ROWS=[['seq','va','svf'],['adsr','mix','dly','rev','out']];
+
+function drawFace(id,X,Y,z,A,F,acc,J){
+  const sp=FACES[id], w=sp.w, compact=z<0.864, wide=w>=480, BOT=wide?278:236;
+  const fs=b=>compact?Math.max(b,9.5/z):b;
+  let o='';const P=s=>o+=s;
+  const ink=F.ink, famCol=F.line?(A.dark?mix(FAM[sp.fam],'#FFFFFF',.15):mix(FAM[sp.fam],'#000000',.35)):FAM[sp.fam];
+  // surface
+  if(F.shadow)P(`<rect x="1" y="3" width="${w-2}" height="${FACE_H}" rx="4" fill="rgba(0,0,0,${F.shadow*.5})"/>`);
+  P(`<rect x=".5" y=".5" width="${w-1}" height="${FACE_H-1}" rx="4" fill="${F.base}" stroke="${F.edge}"/>`);
+  if(!F.line)P(`<rect x="1.5" y="1.5" width="${w-3}" height="1" fill="${F.hi}"/>`);
+  if(F.stripe)P(`<path d="M4.5,.5H${w-4.5}A4,4 0 0 1 ${w-.5},4.5V4H.5V4.5A4,4 0 0 1 4.5,.5Z" fill="${famCol}"/><rect x=".5" y="3" width="${w-1}" height="1" fill="${famCol}"/>`);
+  if(F.screws)for(const [sx,sy] of [[8,10],[w-8,10],[8,FACE_H-8],[w-8,FACE_H-8]])P(`<circle cx="${sx}" cy="${sy}" r="2.6" fill="#B9B9B4" stroke="#8A8A85" stroke-width=".8"/><path d="M${sx-1.5},${sy}H${sx+1.5}" stroke="#77776F" stroke-width=".8"/>`);
+  // header
+  let rx=w-M;
+  if(sp.more){const t='+'+sp.more,cw=Math.max(24,tw(t,fs(11),500,MONO)+10);rx-=cw;
+    P(`<rect x="${rx}" y="13" width="${cw}" height="18" rx="9" fill="none" stroke="${F.line?F.edge:(F.kind==='alu'?'rgba(0,0,0,.25)':'rgba(255,255,255,.18)')}"/>`+T(t,rx+cw/2,13+9+fs(11)*.36,{f:MONO,size:fs(11),w:500,fill:F.ink2,a:'middle'}));rx-=8}
+  function seg(x,y,ww,h,opts,sel,cap){
+    const n=opts.length,sw=ww/n,tsz=fs(11),fit=opts.every(t=>tw(t,tsz,500,MONO)<=sw-4);
+    if(F.segT==='none')P(`<rect x="${x}" y="${y}" width="${ww}" height="${h}" rx="${h/2}" fill="none" stroke="${F.edge}"/>`);
+    else P(`<rect x="${x}" y="${y}" width="${ww}" height="${h}" rx="${h/2}" fill="${F.segT}"/>`);
+    opts.forEach((t,i)=>{const sx=x+i*sw;if(i===sel)P(`<rect x="${sx+2}" y="${y+2}" width="${sw-4}" height="${h-4}" rx="${(h-4)/2}" fill="${F.segOn}"/>`);
+      if(fit)P(T(t,sx+sw/2,y+h/2+tsz*.36,{f:MONO,size:tsz,w:500,fill:i===sel?F.segInk:F.segTx,a:'middle'}))});
+  }
+  if(sp.hseg){const ww=72;rx-=ww;seg(rx,13,ww,18,sp.hseg,0);rx-=8}
+  if(sp.body==='seq'){const groups=[['EDIT',['A','B','C','D'],0],['PLAY',['A','B','C','D'],1],['PAGE',['1','2','3','4'],0]];
+    for(const [cap,op,sel] of groups.reverse()){const ww=84;rx-=ww;seg(rx,13,ww,18,op,sel);const cw=tw(cap,fs(10),500,MONO);rx-=cw+6;
+      if(!compact||cw<40)P(T(cap,rx,13+9+fs(10)*.36,{f:MONO,size:fs(10),w:500,fill:F.ink2}));rx-=14}}
+  const tsize=compact?Math.max(13,10.5/z):13, lsp=.07;
+  let title=sp.title.toUpperCase(); if(tw(title,tsize,600,COND,lsp)>rx-M-6)title=sp.short.toUpperCase();
+  if(tw(title,tsize,600,COND,lsp)<=rx-M-4)P(T(title,M,14+tsize*.85,{f:COND,size:tsize,w:600,fill:F.stripe?ink:famCol,ls:lsp}));
+  // well
+  function well(x,y,ww,hh){
+    if(F.line){P(`<rect x="${x}" y="${y}" width="${ww}" height="${hh}" rx="4" fill="none" stroke="${F.edge}"/>`);return}
+    P(`<rect x="${x}" y="${y}" width="${ww}" height="${hh}" rx="4" fill="${F.well}" stroke="${F.wellEdge}"/>`);
+    P(`<rect x="${x+1}" y="${y+1}" width="${ww-2}" height="${hh*.42}" rx="3" fill="url(#glass)"/>`);
+  }
+  const glow=d=>F.line?`<path d="${d}" stroke="${F.trace}" stroke-opacity=".18" stroke-width="7" fill="none" stroke-linejoin="round" stroke-linecap="round"/>`:'';
+  const trace=(d,fill)=>{if(fill)P(`<path d="${fill}" fill="${F.trace}" fill-opacity="${F.line?.08:.14}"/>`);P(glow(d)+`<path d="${d}" stroke="${F.trace}" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/>`)};
+  if(sp.well){const x=M,y=52,ww=w-2*M,hh=64;well(x,y,ww,hh);
+    const gl=F.line?F.edge:'rgba(255,255,255,.06)';let g='';for(let i=1;i<6;i++)g+=`M${x+ww*i/6},${y+4}V${y+hh-4}`;for(let j=1;j<3;j++)g+=`M${x+4},${y+hh*j/3}H${x+ww-4}`;
+    if(sp.well!=='meters'&&sp.well!=='stereo')P(`<path d="${g}" stroke="${gl}" stroke-opacity="${F.line?.4:1}" fill="none"/>`);
+    const b=y+hh-10,t=y+10;
+    if(sp.well==='saw'){let d='';for(let i=0;i<3;i++){const x0=x+10+i*(ww-20)/3;d+=`${i?'L':'M'}${x0},${b}L${x0+(ww-20)/3},${t}`}trace(d+`L${x+ww-10},${b}`)}
+    if(sp.well==='svf'){let d='';for(let i=0;i<=48;i++){const f=i/48,fc=.58,q=2.2,gg=1/Math.sqrt((1-(f/fc)**2)**2+((f/fc)/q)**2);let yy=b-Math.min(1.2,gg*.5)*(b-t);if(f>fc)yy=Math.min(b+4,yy+(f-fc)*80);d+=(i?'L':'M')+(x+8+f*(ww-16)).toFixed(1)+','+yy.toFixed(1)}
+      trace(d,d+`L${x+ww-8},${b+4}L${x+8},${b+4}Z`)}
+    if(sp.well==='adsr'){const X=[x+10,x+28,x+60,x+ww-50,x+ww-10],sy=t+(b-t)*.38,d=`M${X[0]},${b}L${X[1]},${t}Q${X[1]+10},${sy} ${X[2]},${sy}L${X[3]},${sy}Q${X[3]+14},${b-4} ${X[4]},${b}`;trace(d,d+`L${X[0]},${b}Z`);
+      P(`<line x1="${X[2]+28}" y1="${y+6}" x2="${X[2]+28}" y2="${y+hh-6}" stroke="${F.line?F.ink2:'#FFFFFF'}" stroke-opacity=".4"/><circle cx="${X[2]+28}" cy="${sy}" r="3.4" fill="${F.trace}"/>`)}
+    if(sp.well==='taps'){for(let i=0;i<7;i++){const xx=x+16+i*(ww-32)/6,hh2=(b-t)*Math.pow(.68,i);P(`<rect x="${xx-2}" y="${b-hh2}" width="4" height="${hh2}" rx="2" fill="${F.trace}" fill-opacity="${1-i*.1}"/>`)}}
+    if(sp.well==='tail'){let d='';for(let i=0;i<=60;i++){const f=i/60,a=Math.exp(-f*3.2)*(b-t)*.5*(1+.5*Math.sin(i*2.7)*(.6+.4*Math.cos(i*.9)));d+=(i?'L':'M')+(x+8+f*(ww-16)).toFixed(1)+','+((t+b)/2-a*(i%2?1:-1)).toFixed(1)}trace(d)}
+    if(sp.well==='meters'||sp.well==='stereo'){const n=sp.well==='meters'?4:2,pitch=sp.well==='meters'?(w-2*M)/4:44,lv=sp.well==='meters'?[.72,.55,.9,.3]:[.78,.74],x0=sp.well==='meters'?M:w/2-44;
+      for(let i=0;i<n;i++){const cx=x0+pitch*(i+.5),bw=sp.well==='meters'?8:14,segs=14,sh=(hh-14)/segs;for(let s=0;s<segs;s++){const on=s/segs<lv[i],c=s>=12?'#E5533C':s>=10?F.trace:(A.dark||!F.line?'#5CCB8A':'#2E9E5E');
+        P(`<rect x="${cx-bw/2}" y="${b+3-(s+1)*sh}" width="${bw}" height="${sh-1.6}" rx="1" fill="${c}" fill-opacity="${on?.95:(F.line?.12:.16)}"/>`)}}
+      if(sp.well==='stereo'&&!compact){P(T('L',w/2-22,y+hh-1,{f:MONO,size:9.5,fill:F.line?F.ink2:'#9C9A94',a:'middle'})+T('R',w/2+22,y+hh-1,{f:MONO,size:9.5,fill:F.line?F.ink2:'#9C9A94',a:'middle'}))}}
+  }
+  // knob
+  function knob(cx,cy,r,v,mod){
+    const a0=-225*Math.PI/180,sw=270*Math.PI/180,ar=r+3.5,pt=(a,rr)=>[cx+Math.cos(a)*rr,cy+Math.sin(a)*rr];
+    const arc=(t0,t1,rr)=>{const A0=a0+sw*t0,B=a0+sw*t1,[x0,y0]=pt(A0,rr),[x1,y1]=pt(B,rr);return `M${x0.toFixed(2)},${y0.toFixed(2)}A${rr},${rr} 0 ${(B-A0)>Math.PI?1:0} 1 ${x1.toFixed(2)},${y1.toFixed(2)}`};
+    if(F.kind==='hybrid'&&A.dark)P(`<path d="${arc(0,v,ar)}" stroke="${F.arc}" stroke-opacity=".22" stroke-width="7" fill="none" stroke-linecap="round"/>`);
+    P(`<path d="${arc(0,1,ar)}" stroke="${F.track}" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="${arc(0,v,ar)}" stroke="${F.arc}" stroke-width="2.5" fill="none" stroke-linecap="round"/>`);
+    if(mod){P(`<path d="${arc(v,mod[0],ar)}" stroke="${A.sig.cv}" stroke-width="2.5" fill="none" stroke-linecap="round"/>`);const [lx,ly]=pt(a0+sw*mod[1],ar);P(`<circle cx="${lx}" cy="${ly}" r="3" fill="${A.sig.cv}"/>`)}
+    if(F.kind==='outline'){P(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${A.rack}" fill-opacity=".6" stroke="${F.ink}" stroke-opacity=".55" stroke-width="1.3"/>`)}
+    else{P(`<circle cx="${cx}" cy="${cy+2}" r="${r+.5}" fill="rgba(0,0,0,${F.shadow})"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${F.skirt}"/><circle cx="${cx}" cy="${cy}" r="${r*.78}" fill="url(#${F.capId})"/>`);
+      if(F.kind==='alu')P(`<circle cx="${cx}" cy="${cy}" r="${r-.6}" fill="none" stroke="rgba(255,255,255,.12)"/>`);
+      if(F.kind==='hybrid')P(`<circle cx="${cx}" cy="${cy}" r="${r-.5}" fill="none" stroke="${A.dark?'rgba(255,255,255,.10)':A.line2}"/>`)}
+    const [p0x,p0y]=pt(a0+sw*v,r*.2),[p1x,p1y]=pt(a0+sw*v,r*.72);
+    P(`<line x1="${p0x}" y1="${p0y}" x2="${p1x}" y2="${p1y}" stroke="${F.pointer}" stroke-width="${r>18?2.4:2}" stroke-linecap="round"/>`);
+  }
+  function cell(c,cx,cy,r,pitch){
+    knob(cx,cy,r,c.v,c.mod);
+    const ls=fs(11),mw=pitch-4;let lab=compact?(c.s||c.l):c.l;if(tw(lab,ls)>mw)lab=c.s&&tw(c.s,ls)<=mw?c.s:null;
+    if(lab)P(T(lab,cx,cy-r-3.5-4-ls*.22,{size:ls,w:500,fill:ink,a:'middle'}));
+    if(!compact&&c.val&&tw(c.val,11,400,MONO)<=mw)P(T(c.val,cx,cy+r+3.5+4+9,{f:MONO,size:11,fill:F.ink2,a:'middle'}));
+  }
+  if(sp.rows){const top=sp.well?124:52;const hgt=row=>row.seg?20:Math.max(...row.map(c=>2*(c.size||(row.length<=2?24:row.length===3?20:16))+34));
+    const hs=sp.rows.map(hgt),tot=hs.reduce((a,b)=>a+b,0)+8*(hs.length-1);let y=top+Math.max(0,(BOT-top-tot)/2);
+    sp.rows.forEach((row,i)=>{if(row.seg)seg(M,y,w-2*M,20,row.seg,row.sel);else{const n=row.length,pitch=(w-2*M)/n,rs=row.map(c=>c.size||(n<=2?24:n===3?20:16)),rm=Math.max(...rs),cy=y+17.5+rm+(compact?Math.max(0,9.5/z*1.1-12):0);
+      row.forEach((c,k)=>cell(c,M+pitch*(k+.5),cy,rs[k],pitch))}y+=hs[i]+8});}
+  if(sp.body==='seq'){
+    const steps=[['+0',1,1],['+7',.55,1],['+12',.78,0],['+3',.78,1],['−5',1,1],['+7',.3,1],['+10',.55,0],['+12',.78,1]],play=4,dy=compact?6:0;
+    cell({l:'Length',s:'Len',val:'32 steps',v:1},M+56,110+dy,16,112);cell({l:'Gate length',s:'Gate',val:'50 %',v:.5},M+56,200+dy,16,112);
+    P(`<line x1="${M+124}" y1="58" x2="${M+124}" y2="${BOT-6}" stroke="${F.edge}"/>`);
+    const x0=M+136,cw=(w-M-x0)/8;
+    steps.forEach(([p,v,g],i)=>{const cx=x0+cw*(i+.5),on=i===play;
+      if(on)P(`<rect x="${cx-cw/2+3}" y="54" width="${cw-6}" height="${BOT-60}" rx="6" fill="${F.trace}" fill-opacity="${F.kind==='alu'?.14:.07}"/>`);
+      P(`<circle cx="${cx}" cy="64" r="3" fill="${on?F.trace:F.track}"/>`);
+      if(!compact||cw*z>16)P(T(String(i+1),cx,86+(compact?4:0),{f:MONO,size:fs(11),w:500,fill:on?ink:F.ink2,a:'middle'}));
+      knob(cx,124+dy,16,(parseInt(p.replace('−','-'))+24)/48);
+      if(!compact)P(T(p+' st',cx,159,{f:MONO,size:11,fill:F.ink2,a:'middle'}));
+      const gy=176+dy;P(`<rect x="${cx-14}" y="${gy}" width="28" height="16" rx="8" fill="${g?A.sig.gate:(F.kind==='outline'?'none':F.segT)}" ${F.kind==='outline'&&!g?`stroke="${F.edge}"`:''}/>`);
+      const vy=204+dy,vh=40;P(`<rect x="${cx-3}" y="${vy}" width="6" height="${vh}" rx="3" fill="${F.track}"/><rect x="${cx-3}" y="${vy+vh*(1-v)}" width="6" height="${vh*v}" rx="3" fill="${A.sig.gate}"/>`);
+    });
+  }
+  // tray
+  const lsz=fs(11), lab=(p,pitch,room)=>{const [n,,,s]=p;let t=compact?(s||n):n;if(tw(t,lsz)>pitch-4)t=s&&tw(s,lsz)<=pitch-4?s:null;return lsz*1.1<=room?t:null};
+  function jack(cx,cy,type,ch){const c=A.sig[type];J[id+':'+arguments[4]]={x:X+cx*z,y:Y+cy*z,c,ch};
+    if(F.kind==='outline'){P(`<circle cx="${cx}" cy="${cy}" r="9" fill="${A.rack}" stroke="${c}" stroke-width="1.6"/>`);if(ch===2)P(`<circle cx="${cx}" cy="${cy}" r="5.6" fill="none" stroke="${c}" stroke-width="1.4"/>`);else P(`<circle cx="${cx}" cy="${cy}" r="4.6" fill="${c}" fill-opacity=".25"/>`);return}
+    P(`<circle cx="${cx}" cy="${cy+1.5}" r="11" fill="rgba(0,0,0,${F.shadow*.8})"/><circle cx="${cx}" cy="${cy}" r="10.5" fill="${F.nut}" stroke="${F.nutEdge}"/>`);
+    if(ch===2)P(`<circle cx="${cx}" cy="${cy}" r="7.6" fill="${F.hole}" stroke="${c}" stroke-width="1.7"/><circle cx="${cx}" cy="${cy}" r="4.6" fill="none" stroke="${c}" stroke-width="1.7"/>`);
+    else P(`<circle cx="${cx}" cy="${cy}" r="7.2" fill="${c}"/><circle cx="${cx}" cy="${cy}" r="5" fill="${F.hole}"/>`)}
+  const portLabel=(t,cx,cy)=>{if(t)P(T(t,cx,cy-11-4-lsz*.22,{size:lsz,w:500,fill:ink,a:'middle'}))};
+  if(wide){const y=286,h=44,px=w-8-(sp.outs.length*56+8);
+    if(F.line)P(`<path d="M${M},${y-4}H${w-M}" stroke="${F.edge}"/><path d="M${px},${y+4}V${y+h-4}" stroke="${F.edge}"/>`);
+    else P(`<rect x="8" y="${y}" width="${w-16}" height="${h}" rx="6" fill="${F.tray}"/><path d="M${px},${y}H${w-14}A6,6 0 0 1 ${w-8},${y+6}V${y+h-6}A6,6 0 0 1 ${w-14},${y+h}H${px}Z" fill="${F.plate}"/>`);
+    sp.ins.forEach((p,i)=>{const cx=M+56*(i+.5);jack(cx,316,p[1],p[2]===2?2:1,p[0]);portLabel(lab(p,56,316-14-(y+2)),cx,316)});
+    sp.outs.forEach((p,i)=>{const cx=px+4+56*(i+.5);jack(cx,316,p[1],p[2]===2?2:1,p[0]);portLabel(lab(p,56,316-14-(y+2)),cx,316)});
+  }else{const y=244,h=86;
+    if(F.line)P(`<path d="M${M},${y-2}H${w-M}" stroke="${F.edge}"/><path d="M${M},288H${w-M}" stroke="${F.edge}" stroke-dasharray="2 3"/>`);
+    else P(`<rect x="8" y="${y}" width="${w-16}" height="${h}" rx="6" fill="${F.tray}"/><path d="M8,288H${w-8}V${y+h-6}A6,6 0 0 1 ${w-14},${y+h}H14A6,6 0 0 1 8,${y+h-6}Z" fill="${F.plate}"/>`);
+    const pitch=Math.min(72,(w-2*M)/Math.max(sp.ins.length,sp.outs.length,3));
+    sp.ins.forEach((p,i)=>{const cx=M+pitch*(i+.5);jack(cx,273,p[1],p[2]===2?2:1,p[0]);portLabel(lab(p,pitch,273-14-(y+2)),cx,273)});
+    sp.outs.forEach((p,i)=>{const cx=M+pitch*(i+.5);jack(cx,316,p[1],p[2]===2?2:1,p[0]);portLabel(lab(p,pitch,316-14-(273+11+(compact?2/z:3))),cx,316)});
+  }
+  return `<g transform="translate(${X},${Y}) scale(${z})">${o}</g>`;
+}
+function cables(J,A,F){let o='';
+  for(const [fa,pa,fb,pb,type,ch] of PATCH){const a=J[fa+':'+pa],b=J[fb+':'+pb];if(!a||!b)continue;
+    const dx=b.x-a.x,dy=b.y-a.y,dist=Math.hypot(dx,dy),sag=Math.min(160,30+dist*.28);
+    const d=`M${a.x},${a.y}C${a.x+dx*.15},${a.y+sag} ${b.x-dx*.15},${b.y+sag} ${b.x},${b.y}`, c=A.sig[type];
+    if(F.kind==='outline'){o+=`<path d="${d}" stroke="${c}" stroke-opacity=".16" stroke-width="9" fill="none" stroke-linecap="round"/><path d="${d}" stroke="${c}" stroke-width="${ch===2?3.4:2.2}" fill="none" stroke-linecap="round"/>`;
+      if(ch===2)o+=`<path d="${d}" stroke="${A.rack}" stroke-width="1" fill="none"/>`;
+      for(const p of [a,b])o+=`<circle cx="${p.x}" cy="${p.y}" r="4.2" fill="${c}"/>`}
+    else{if(F.kind==='hybrid'&&A.dark)o+=`<path d="${d}" stroke="${c}" stroke-opacity=".14" stroke-width="12" fill="none" stroke-linecap="round"/>`;
+      o+=`<path d="${d}" stroke="rgba(0,0,0,.35)" stroke-width="${ch===2?8:6.5}" fill="none" transform="translate(0,3)" stroke-linecap="round"/><path d="${d}" stroke="${mix(c,'#000000',.35)}" stroke-width="${ch===2?8:6}" fill="none" stroke-linecap="round"/><path d="${d}" stroke="${c}" stroke-width="${ch===2?6.4:4.6}" fill="none" stroke-linecap="round"/>`;
+      if(ch===2)o+=`<path d="${d}" stroke="${mix(c,'#000000',.45)}" stroke-width="1.4" fill="none"/>`;else o+=`<path d="${d}" stroke="rgba(255,255,255,.28)" stroke-width="1.1" fill="none" transform="translate(-.6,-.8)"/>`;
+      for(const p of [a,b])o+=`<circle cx="${p.x}" cy="${p.y+1.2}" r="7.6" fill="rgba(0,0,0,.35)"/><circle cx="${p.x}" cy="${p.y}" r="7.2" fill="${c}"/><circle cx="${p.x}" cy="${p.y}" r="3.2" fill="${mix(c,'#000000',.3)}"/>`}}
+  return o}
+
+/* ---------- chrome ---------- */
+function chrome(W,H,A,acc,screen,compactWin,zoom){
+  let o='';const P=s=>o+=s;
+  P(`<rect width="${W}" height="${H}" fill="${A.bg}"/>`);
+  // toolbar
+  const th=48;P(`<rect width="${W}" height="${th}" fill="${A.bar}"/><rect y="${th-1}" width="${W}" height="1" fill="${A.line}"/>`);
+  // mark
+  P(`<rect x="16" y="12" width="24" height="24" rx="6" fill="${acc.c}"/><path d="M22,18.5C28,18.5 28,29.5 34,29.5" stroke="${acc.ink}" stroke-width="2.2" fill="none" stroke-linecap="round"/><circle cx="21.5" cy="18.5" r="2.4" fill="${acc.ink}"/><circle cx="34.5" cy="29.5" r="2.4" fill="${acc.ink}"/>`);
+  P(T('kabl',48,30,{size:17,w:600,fill:A.tx,ls:-.01}));
+  // sound selector
+  const sx=100;P(`<rect x="${sx}" y="10" width="${compactWin?170:210}" height="28" rx="6" fill="${A.surf}" stroke="${A.line}"/>`+T('BASS',sx+10,28,{f:MONO,size:10,w:500,fill:A.tx3,ls:.06})+T('Acid Line',sx+46,28.5,{size:13,w:500,fill:A.tx})+`<circle cx="${sx+(compactWin?128:116)}" cy="24" r="3" fill="${acc.c}"/>`+icon('chev',sx+(compactWin?146:186),16,A.tx2));
+  // view switch (centre)
+  const vs=['Rack','Perform','Sounds'],vw=86,vx=W/2-vw*1.5;P(`<rect x="${vx}" y="10" width="${vw*3}" height="28" rx="7" fill="${A.inset}"/>`);
+  vs.forEach((v,i)=>{const on=v.toLowerCase()===screen;if(on)P(`<rect x="${vx+i*vw+2}" y="12" width="${vw-4}" height="24" rx="5" fill="${A.raised}" stroke="${A.line}"/>`);P(T(v,vx+i*vw+vw/2,28.5,{size:13,w:on?600:500,fill:on?A.tx:A.tx2,a:'middle'}))});
+  // right tools
+  let rx=W-16;
+  const btn=(label,primary)=>{const bw=tw(label,13,600)+28;rx-=bw;P(`<rect x="${rx}" y="10" width="${bw}" height="28" rx="6" fill="${primary?acc.c:A.surf}" ${primary?'':`stroke="${A.line}"`}/>`+T(label,rx+bw/2,28.5,{size:13,w:600,fill:primary?acc.ink:A.tx,a:'middle'}));rx-=8};
+  const ib=(n)=>{rx-=28;P(icon(n,rx+6,16,A.tx2));rx-=4};
+  btn('Save',true);
+  if(screen==='rack'){P(`<rect x="${rx-1}" y="14" width="1" height="20" fill="${A.line}"/>`);rx-=10;
+    const z=Math.round((zoom||1)*100)+' %';ib('plus');rx-=tw(z,12,500,MONO)+4;P(T(z,rx+2,28.5,{f:MONO,size:12,w:500,fill:A.tx}));ib('minus');
+    if(!compactWin){ib('fit');P(`<rect x="${rx-1}" y="14" width="1" height="20" fill="${A.line}"/>`);rx-=10;
+      const cw=3*30;rx-=cw;P(`<rect x="${rx}" y="10" width="${cw}" height="28" rx="6" fill="${A.inset}"/><rect x="${rx+2}" y="12" width="26" height="24" rx="4" fill="${A.raised}" stroke="${A.line}"/>`+icon('cable',rx+7,16,A.tx)+icon('target',rx+37,16,A.tx2)+`<path d="M${rx+67},16L${rx+81},32" stroke="${A.tx2}" stroke-width="1.5"/>`+icon('cable',rx+67,16,A.tx2));rx-=10}
+    ib('redo');ib('undo');
+    if(!compactWin){const fw=180;rx-=fw;P(`<rect x="${rx}" y="10" width="${fw}" height="28" rx="6" fill="${A.surf}" stroke="${A.line}"/>`+icon('search',rx+9,16,A.tx3)+T('Add module',rx+32,28.5,{size:13,fill:A.tx3})+`<rect x="${rx+fw-30}" y="16" width="20" height="16" rx="4" fill="${A.inset}"/>`+T('A',rx+fw-20,28,{f:MONO,size:10,w:500,fill:A.tx2,a:'middle'}))}
+  } else if(screen==='perform'){ib('midi')} else {ib('heart')}
+  // status bar
+  const sb=26,sy=H-sb;P(`<rect y="${sy}" width="${W}" height="${sb}" fill="${A.bar}"/><rect y="${sy}" width="${W}" height="1" fill="${A.line}"/>`);
+  // stereo meter
+  for(let ch=0;ch<2;ch++){P(`<rect x="16" y="${sy+8+ch*6}" width="80" height="4" rx="2" fill="${A.inset}"/><rect x="16" y="${sy+8+ch*6}" width="${[56,52][ch]}" height="4" rx="2" fill="${A.dark?'#5CCB8A':'#2E9E5E'}"/>`)}
+  const st=[['−9.4 dB',''],['48 kHz · 128',''],['CPU 6 %',''],['Voices 4 / 8','']];let x=110;
+  st.forEach(([t])=>{P(T(t,x,sy+17,{f:MONO,size:11,fill:A.tx2}));x+=tw(t,11,400,MONO)+22});
+  P(`<circle cx="${x+4}" cy="${sy+13}" r="3.5" fill="${A.dark?'#5CCB8A':'#2E9E5E'}"/>`+T(compactWin?'MIDI':'MIDI · KeyStep',x+13,sy+17,{f:MONO,size:11,fill:A.tx2}));
+  P(T('124.0 BPM',W-120,sy+17,{f:MONO,size:11,w:500,fill:A.tx,a:'end'})+T('17 . 3 . 2',W-16,sy+17,{f:MONO,size:11,w:500,fill:A.tx,a:'end'}));
+  return {svg:o,top:th,bottom:sy};
+}
+function card(x,y,w,h,A,title,right){let o=`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="${A.surf}" stroke="${A.line}"/>`;
+  if(title)o+=T(title.toUpperCase(),x+16,y+24,{f:COND,size:12,w:600,fill:A.tx2,ls:.08});if(right)o+=T(right,x+w-16,y+24,{f:MONO,size:11,fill:A.tx3,a:'end'});return o}
+
+/* ---------- screens ---------- */
+function rackScreen(W,H,A,F,acc){
+  const compactWin=W<1300, drawerW=compactWin?44:320, cw=W-drawerW, top=48, bot=H-26;
+  const rowW=Math.max(...ROWS.map(r=>r.reduce((a,id)=>a+FACES[id].w+4,0)));
+  const z=Math.floor(Math.min((cw-40)/rowW,(bot-top-32)/(2*(FACE_H+24)))*100)/100;
+  const ch=chrome(W,H,A,acc,'rack',compactWin,z);let o=ch.svg;
+  o+=`<rect x="0" y="${top}" width="${cw}" height="${bot-top}" fill="${A.rack}"/>`;
+  const J={};let faces='';
+  const railH=12,rowH=(FACE_H+2*railH)*z;
+  ROWS.forEach((row,ri)=>{const y=top+12+ri*(rowH+8);
+    for(const ry of [y,y+railH*z+FACE_H*z]){o+=`<rect x="0" y="${ry}" width="${cw}" height="${railH*z}" fill="${A.rail}"/>`;for(let hx2=18;hx2<cw;hx2+=26)o+=`<rect x="${hx2-2.5}" y="${ry+railH*z/2-1.5}" width="5" height="3" rx="1.5" fill="${A.hole}"/>`}
+    let x=20;row.forEach(id=>{faces+=drawFace(id,x,y+railH*z,z,A,F,acc,J);x+=(FACES[id].w+4)*z})});
+  o+=`<clipPath id="rk"><rect x="0" y="${top}" width="${cw}" height="${bot-top}"/></clipPath><g clip-path="url(#rk)">`+faces+cables(J,A,F)+'</g>';
+  // drawer
+  const dx=cw;o+=`<rect x="${dx}" y="${top}" width="${drawerW}" height="${bot-top}" fill="${A.bar}"/><rect x="${dx}" y="${top}" width="1" height="${bot-top}" fill="${A.line}"/>`;
+  if(compactWin){['route','info','target','grid'].forEach((n,i)=>{const yy=top+16+i*40;if(i===0)o+=`<rect x="${dx+6}" y="${yy-6}" width="32" height="32" rx="7" fill="${A.raised}" stroke="${A.line}"/>`;o+=icon(n,dx+14,yy+2,i===0?A.tx:A.tx2)});}
+  else{
+    const tabs=['Routing','Explain','Inspect'];let tx=dx+16;tabs.forEach((t,i)=>{o+=T(t,tx,top+30,{size:13,w:i?500:600,fill:i?A.tx2:A.tx});if(!i)o+=`<rect x="${tx}" y="${top+40}" width="${tw(t,13,600)}" height="2" rx="1" fill="${acc.c}"/>`;tx+=tw(t,13,600)+20});
+    o+=`<rect x="${dx}" y="${top+42}" width="${drawerW}" height="1" fill="${A.line}"/>`;
+    let y=top+70;o+=T('CABLES',dx+16,y,{f:COND,size:12,w:600,fill:A.tx2,ls:.08})+T('8',dx+drawerW-16,y,{f:MONO,size:11,fill:A.tx3,a:'end'});y+=14;
+    const nm={seq:'Seq',va:'VA Osc',svf:'SVF',adsr:'ADSR',mix:'Mixer',dly:'Delay',rev:'Reverb',out:'Output'};
+    PATCH.forEach(([fa,pa,fb,pb,type,chh],i)=>{const yy=y+i*34,sel=i===2;
+      if(sel)o+=`<rect x="${dx+8}" y="${yy}" width="${drawerW-16}" height="30" rx="6" fill="${A.raised}" stroke="${A.line}"/>`;
+      o+=T(String(i+1).padStart(2,'0'),dx+18,yy+19,{f:MONO,size:11,fill:A.tx3})+`<rect x="${dx+42}" y="${yy+12}" width="16" height="${chh===2?6:4}" rx="2" fill="${A.sig[type]}"/>`;
+      o+=T(`${nm[fa]} ${pa}`,dx+68,yy+19.5,{size:12.5,w:500,fill:A.tx})+T('→',dx+170,yy+19.5,{size:12.5,fill:A.tx3,a:'middle'})+T(`${nm[fb]} ${pb==='Cutoff CV'?'Cut CV':pb}`,dx+184,yy+19.5,{size:12.5,w:500,fill:A.tx})});
+    y+=PATCH.length*34+22;
+    o+=T('MODULATION',dx+16,y,{f:COND,size:12,w:600,fill:A.tx2,ls:.08});y+=16;
+    [['Bite','SVF Cutoff','+38 %',.38],['Bite','ADSR Decay','−20 %',.2],['Wash','Reverb Decay','+60 %',.6],['Wash','Delay Mix','+25 %',.25]].forEach(([m,dst,amt,v],i)=>{const yy=y+i*30;
+      o+=`<rect x="${dx+16}" y="${yy}" width="44" height="20" rx="10" fill="${A.inset}"/>`+T(m,dx+38,yy+14,{size:11.5,w:600,fill:A.tx,a:'middle'})+T(dst,dx+70,yy+14,{size:12.5,fill:A.tx});
+      o+=`<rect x="${dx+drawerW-96}" y="${yy+8}" width="40" height="4" rx="2" fill="${A.inset}"/><rect x="${dx+drawerW-96}" y="${yy+8}" width="${40*v}" height="4" rx="2" fill="${A.sig.cv}"/>`+T(amt,dx+drawerW-16,yy+14,{f:MONO,size:11,fill:A.tx2,a:'end'})});
+    y+=4*30+18;
+    o+=`<rect x="${dx+16}" y="${y}" width="${drawerW-32}" height="${Math.min(118,bot-y-16)}" rx="8" fill="${A.surf}" stroke="${A.line}"/>`+icon('info',dx+28,y+14,acc.c);
+    o+=T('Why it sounds like this',dx+52,y+27,{size:13,w:600,fill:A.tx});
+    ['Saw through a resonant low-pass. The','envelope opens the filter on every step;','Bite pushes cutoff and shortens decay.'].forEach((l,i)=>o+=T(l,dx+28,y+50+i*19,{size:12.5,fill:A.tx2}));
+  }
+  return o;
+}
+function performScreen(W,H,A,F,acc){
+  const cw=W<1300, ch=chrome(W,H,A,acc,'perform',cw);let o=ch.svg;
+  const top=ch.top+16,bot=ch.bottom-16,g=16,L=16,R=W-16, lw=cw?300:380, rx=L+lw+g, rw=R-rx;
+  // transport
+  const th=cw?200:220;o+=card(L,top,lw,th,A,'Transport','Host sync');
+  o+=T('124.0',L+16,top+(cw?96:112),{size:cw?54:68,w:500,fill:A.tx,ls:-.02})+T('BPM',L+16+tw('124.0',cw?54:68,500)-tw('124.0',cw?54:68,500)*0.02*0+8,top+(cw?96:112),{f:MONO,size:12,w:500,fill:A.tx3});
+  o+=T('17 . 3',L+16,top+(cw?128:156),{f:MONO,size:cw?20:24,w:500,fill:A.tx});
+  for(let i=0;i<4;i++)o+=`<rect x="${L+110+i*18}" y="${top+(cw?116:142)}" width="12" height="12" rx="3" fill="${i===2?acc.c:A.inset}"/>`;
+  const by=top+th-50;o+=`<circle cx="${L+38}" cy="${by+18}" r="20" fill="${acc.c}"/>`+icon('play',L+30,by+10,acc.ink,1,1.2);
+  o+=`<rect x="${L+68}" y="${by}" width="36" height="36" rx="18" fill="${A.raised}" stroke="${A.line}"/>`+icon('stop',L+78,by+10,A.tx,1,1.2)+`<rect x="${L+112}" y="${by}" width="36" height="36" rx="18" fill="${A.raised}" stroke="${A.line}"/>`+icon('restart',L+122,by+10,A.tx,1,1.2);
+  // scenes
+  const sy=top+th+g, sh=bot-sy;o+=card(L,sy,lw,sh,A,'Scenes','Next bar');
+  const names=['Intro','Build','Drop','Break','Verse','Lift','Outro','Fill'],st=['idle','idle','playing','queued','idle','idle','idle','idle'];
+  const pw=(lw-32-10)/2, ph=(sh-50-30)/4;
+  names.forEach((n,i)=>{const px=L+16+(i%2)*(pw+10),py=sy+40+Math.floor(i/2)*(ph+10),s=st[i];
+    const fill=s==='playing'?acc.c:A.raised;o+=`<rect x="${px}" y="${py}" width="${pw}" height="${ph}" rx="8" fill="${fill}" stroke="${s==='queued'?acc.c:A.line}" stroke-width="${s==='queued'?2:1}"/>`;
+    o+=T(n,px+12,py+24,{size:cw?13:15,w:600,fill:s==='playing'?acc.ink:A.tx})+T(String(i+1),px+pw-12,py+22,{f:MONO,size:11,fill:s==='playing'?acc.ink:A.tx3,a:'end'});
+    o+=T(s==='idle'?'Ready':s==='playing'?'Playing':'Queued',px+12,py+ph-12,{f:MONO,size:11,fill:s==='playing'?acc.ink:A.tx2,op:s==='playing'?.75:1});
+    if(s==='queued')o+=`<rect x="${px+pw-62}" y="${py+ph-17}" width="50" height="4" rx="2" fill="${A.inset}"/><rect x="${px+pw-62}" y="${py+ph-17}" width="30" height="4" rx="2" fill="${acc.c}"/>`});
+  // macros
+  const mh=cw?262:390;o+=card(rx,top,rw,mh,A,'Macros','MIDI CC 20–23');
+  const macros=[['Bite',.62,'CC 20',['SVF Cutoff','ADSR Decay']],['Wash',.35,'CC 21',['Reverb Decay','Delay Mix']],['Drive',.48,'CC 22',['VA Unison','Mixer Gain']],['Space',.7,'CC 23',['Delay Feedback','Reverb Mix']]];
+  const mw=rw/4, r=cw?40:58;
+  macros.forEach(([n,v,cc,dst],i)=>{const cx=rx+mw*(i+.5), cy=top+(cw?110:160);
+    const a0=-225*Math.PI/180,sw=270*Math.PI/180,ar=r+8,pt=(a,rr)=>[cx+Math.cos(a)*rr,cy+Math.sin(a)*rr];
+    const arc=(t0,t1,rr)=>{const A0=a0+sw*t0,B=a0+sw*t1,[x0,y0]=pt(A0,rr),[x1,y1]=pt(B,rr);return `M${x0},${y0}A${rr},${rr} 0 ${(B-A0)>Math.PI?1:0} 1 ${x1},${y1}`};
+    o+=`<path d="${arc(0,1,ar)}" stroke="${A.inset}" stroke-width="6" fill="none" stroke-linecap="round"/><path d="${arc(0,v,ar)}" stroke="${acc.c}" stroke-width="6" fill="none" stroke-linecap="round"/>`;
+    o+=`<circle cx="${cx}" cy="${cy+3}" r="${r}" fill="rgba(0,0,0,${A.dark?.4:.12})"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${A.raised}" stroke="${A.line2}"/>`;
+    const [p0x,p0y]=pt(a0+sw*v,r*.35),[p1x,p1y]=pt(a0+sw*v,r*.8);o+=`<line x1="${p0x}" y1="${p0y}" x2="${p1x}" y2="${p1y}" stroke="${A.tx}" stroke-width="3" stroke-linecap="round"/>`;
+    o+=T(Math.round(v*100)+'',cx,cy+(cw?6:8),{f:MONO,size:cw?16:20,w:500,fill:A.tx,a:'middle'});
+    const ny=cy+r+(cw?30:40);o+=T(n,cx,ny,{size:cw?17:22,w:600,fill:A.tx,a:'middle'});
+    const ccw=tw(cc,10.5,500,MONO)+12;o+=`<rect x="${cx-ccw/2}" y="${ny+8}" width="${ccw}" height="18" rx="9" fill="${A.inset}"/>`+T(cc,cx,ny+21,{f:MONO,size:10.5,w:500,fill:A.tx2,a:'middle'});
+    if(!cw)dst.forEach((d,k)=>o+=T(d,cx,ny+48+k*18,{size:12,fill:A.tx2,a:'middle'}));
+    else o+=T(dst[0]+' +1',cx,ny+44,{size:11.5,fill:A.tx2,a:'middle'});
+  });
+  // sequences
+  const qy=top+mh+g,qh=bot-qy;o+=card(rx,qy,rw,qh,A,'Sequences');
+  const lanes=[['Bass',1,[.9,.5,.0,.7,1,.3,0,.8,.9,.5,.6,.0,1,.4,.7,.5],A.sig.gate],['Drums',0,[1,0,.6,0,1,0,.6,.3,1,0,.6,0,1,.4,.6,.8],A.sig.audio],['Lead',2,[.0,.7,0,.7,0,.9,0,.5,0,.7,0,.7,0,.9,.3,.5],A.sig.pitch]];
+  const lh=(qh-46)/3;
+  lanes.forEach(([n,sel,vals,col],i)=>{const ly=qy+40+i*lh;o+=T(n,rx+16,ly+lh/2+5,{size:14,w:600,fill:A.tx});
+    ['A','B','C','D'].forEach((b,k)=>{const bx=rx+90+k*32;o+=`<rect x="${bx}" y="${ly+lh/2-12}" width="28" height="24" rx="6" fill="${k===sel?acc.c:A.raised}" stroke="${k===sel?acc.c:A.line}"/>`+T(b,bx+14,ly+lh/2+4,{f:MONO,size:12,w:500,fill:k===sel?acc.ink:A.tx2,a:'middle'})});
+    const sx=rx+232,sw=(rw-232-16)/16;vals.forEach((v,s)=>{const bh=(lh-20)*v,bx=sx+s*sw;o+=`<rect x="${bx+2}" y="${ly+10}" width="${sw-4}" height="${lh-20}" rx="3" fill="${A.inset}"/>`;
+      if(v)o+=`<rect x="${bx+2}" y="${ly+lh-10-bh}" width="${sw-4}" height="${bh}" rx="3" fill="${col}" fill-opacity="${.45+.55*v}"/>`;if(s===6)o+=`<rect x="${bx+.5}" y="${ly+6}" width="${sw-1}" height="${lh-12}" rx="4" fill="none" stroke="${A.tx}" stroke-opacity=".5"/>`})});
+  return o;
+}
+function soundsScreen(W,H,A,F,acc){
+  const cw=W<1300, ch=chrome(W,H,A,acc,'sounds',cw);let o=ch.svg;
+  const top=ch.top,bot=ch.bottom, sw=cw?190:230, aw=cw?320:380;
+  o+=`<rect x="0" y="${top}" width="${sw}" height="${bot-top}" fill="${A.bar}"/><rect x="${sw}" y="${top}" width="1" height="${bot-top}" fill="${A.line}"/>`;
+  const cats=[['All',64],['Bass',12],['Lead',9],['Keys',7],['Pad',8],['Pluck',6],['Groove',10],['Piece',7],['Voice',5]];
+  let y=top+24;o+=T('LIBRARY',16,y,{f:COND,size:12,w:600,fill:A.tx2,ls:.08});y+=12;
+  [['Factory',64],['My sounds',11],['Favourites',6]].forEach(([n,c],i)=>{const yy=y+i*32;if(i===0)o+=`<rect x="8" y="${yy}" width="${sw-16}" height="28" rx="6" fill="${A.raised}" stroke="${A.line}"/>`;o+=T(n,18,yy+18.5,{size:13,w:i?400:600,fill:i?A.tx2:A.tx})+T(String(c),sw-18,yy+18.5,{f:MONO,size:11,fill:A.tx3,a:'end'})});
+  y+=3*32+26;o+=T('CATEGORY',16,y,{f:COND,size:12,w:600,fill:A.tx2,ls:.08});y+=12;
+  cats.forEach(([n,c],i)=>{const yy=y+i*30;o+=`<circle cx="22" cy="${yy+14}" r="4" fill="${i===1?acc.c:'none'}" stroke="${i===1?acc.c:A.line2}" stroke-width="1.3"/>`+T(n,36,yy+18.5,{size:13,fill:i===1?A.tx:A.tx2,w:i===1?600:400})+T(String(c),sw-18,yy+18.5,{f:MONO,size:11,fill:A.tx3,a:'end'})});
+  // list
+  const lx=sw+1,lw=W-sw-1-aw;o+=`<rect x="${lx}" y="${top}" width="${lw}" height="${bot-top}" fill="${A.bg}"/>`;
+  o+=`<rect x="${lx+16}" y="${top+16}" width="${lw-32}" height="36" rx="8" fill="${A.surf}" stroke="${A.line}"/>`+icon('search',lx+28,top+26,A.tx3)+T('Search 64 sounds',lx+52,top+39,{size:13.5,fill:A.tx3});
+  const chips=['Bass','sequenced','dark'];let cx=lx+16;chips.forEach((c,i)=>{const w2=tw(c,12,500)+24+(i===0?0:0);o+=`<rect x="${cx}" y="${top+64}" width="${w2}" height="26" rx="13" fill="${i===0?acc.c:A.surf}" stroke="${i===0?acc.c:A.line}"/>`+T(c,cx+w2/2,top+81,{size:12,w:500,fill:i===0?acc.ink:A.tx,a:'middle'});cx+=w2+8});
+  const hy=top+112;o+=T('NAME',lx+28,hy,{f:COND,size:11.5,w:600,fill:A.tx3,ls:.08})+T('MACROS',lx+(cw?210:260),hy,{f:COND,size:11.5,w:600,fill:A.tx3,ls:.08});if(!cw)o+=T('TAGS',lx+lw-170,hy,{f:COND,size:11.5,w:600,fill:A.tx3,ls:.08});
+  const rows=[['Acid Line','Bite · Wash · Drive · Space','303 · seq'],['Low Orbit','Sub · Grit · Glide','sub · mono'],['Slab City','Crunch · Room · Swing','groove'],['Rope Walk','Tension · Air · Fold','piece'],['Iron Lung','Bite · Pump','fm · seq'],['Wet Concrete','Wash · Drive','dark'],['Tar Pit','Sub · Squash · Space','slow'],['Night Bus','Bite · Wash · Gate','seq'],['Copper Wire','Ring · Drive','metallic'],['Mud Flap','Grit · Glide','mono'],['Basement','Pump · Room','groove'],['Signal Fire','Bite · Space','lead-ish']];
+  const rh=40,maxR=Math.floor((bot-hy-14)/rh);
+  rows.slice(0,maxR).forEach(([n,m,t],i)=>{const yy=hy+10+i*rh,sel=i===0;o+=`<rect x="${lx+16}" y="${yy}" width="${lw-32}" height="${rh-4}" rx="7" fill="${sel?A.raised:'none'}" ${sel?`stroke="${acc.c}" stroke-width="1.5"`:''}/>`;
+    if(i>0)o+=`<rect x="${lx+28}" y="${yy-2}" width="${lw-56}" height="1" fill="${A.line}"/>`;
+    o+=icon(sel?'stop':'play',lx+28,yy+10,sel?acc.c:A.tx3,.85,1.4)+T(n,lx+52,yy+23,{size:13.5,w:sel?600:500,fill:A.tx})+T(m,lx+(cw?210:260),yy+23,{size:12.5,fill:A.tx2});if(!cw)o+=T(t,lx+lw-170,yy+23,{f:MONO,size:11.5,fill:A.tx3})});
+  // audition
+  const ax=W-aw;o+=`<rect x="${ax}" y="${top}" width="${aw}" height="${bot-top}" fill="${A.bar}"/><rect x="${ax}" y="${top}" width="1" height="${bot-top}" fill="${A.line}"/>`;
+  let ay=top+24;o+=T('BASS · FACTORY',ax+20,ay,{f:COND,size:12,w:600,fill:A.tx2,ls:.08});ay+=34;
+  o+=T('Acid Line',ax+20,ay,{size:26,w:600,fill:A.tx,ls:-.01});ay+=26;
+  ['Squelchy saw bass driven by an 8-step','sequence. Bite opens the filter.'].forEach((l,i)=>o+=T(l,ax+20,ay+i*19,{size:13,fill:A.tx2}));ay+=52;
+  // scope
+  const sh=cw?84:110;o+=`<rect x="${ax+20}" y="${ay}" width="${aw-40}" height="${sh}" rx="8" fill="${F.kind==='alu'||F.kind==='graphite'?'#0C0D0F':A.inset}"/>`;
+  let d='';for(let i=0;i<=80;i++){const f=i/80,yy=ay+sh/2-Math.sin(f*Math.PI*6)*(sh*.32)*(1-.6*((f*3)%1));d+=(i?'L':'M')+(ax+28+f*(aw-56)).toFixed(1)+','+yy.toFixed(1)}
+  o+=`<path d="${d}" stroke="${acc.c}" stroke-width="2" fill="none"/>`;ay+=sh+24;
+  o+=T('MACROS',ax+20,ay,{f:COND,size:12,w:600,fill:A.tx2,ls:.08});ay+=16;
+  const mw=(aw-40)/4;[['Bite',.62],['Wash',.35],['Drive',.48],['Space',.7]].forEach(([n,v],i)=>{const cx2=ax+20+mw*(i+.5),cy=ay+34,r=cw?18:22,a0=-225*Math.PI/180,sw2=270*Math.PI/180,ar=r+5,pt=(a,rr)=>[cx2+Math.cos(a)*rr,cy+Math.sin(a)*rr];
+    const arc=(t1)=>{const [x0,y0]=pt(a0,ar),[x1,y1]=pt(a0+sw2*t1,ar);return `M${x0},${y0}A${ar},${ar} 0 ${sw2*t1>Math.PI?1:0} 1 ${x1},${y1}`};
+    o+=`<path d="${arc(1)}" stroke="${A.inset}" stroke-width="4" fill="none" stroke-linecap="round"/><path d="${arc(v)}" stroke="${acc.c}" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="${cx2}" cy="${cy}" r="${r}" fill="${A.raised}" stroke="${A.line2}"/>`;
+    const [p0x,p0y]=pt(a0+sw2*v,r*.3),[p1x,p1y]=pt(a0+sw2*v,r*.8);o+=`<line x1="${p0x}" y1="${p0y}" x2="${p1x}" y2="${p1y}" stroke="${A.tx}" stroke-width="2.2" stroke-linecap="round"/>`+T(n,cx2,cy+r+22,{size:12.5,w:500,fill:A.tx,a:'middle'})});
+  ay+=(cw?100:110);
+  o+=`<rect x="${ax+20}" y="${ay}" width="${aw-40}" height="40" rx="8" fill="${acc.c}"/>`+T('Load sound',ax+aw/2,ay+25,{size:14,w:600,fill:acc.ink,a:'middle'});ay+=50;
+  o+=`<rect x="${ax+20}" y="${ay}" width="${(aw-48)/2}" height="36" rx="8" fill="${A.surf}" stroke="${A.line}"/>`+T('Audition',ax+20+(aw-48)/4,ay+23,{size:13,w:500,fill:A.tx,a:'middle'});
+  o+=`<rect x="${ax+28+(aw-48)/2}" y="${ay}" width="${(aw-48)/2}" height="36" rx="8" fill="${A.surf}" stroke="${A.line}"/>`+T('Open in rack',ax+28+(aw-48)*.75,ay+23,{size:13,w:500,fill:A.tx,a:'middle'});
+  return o;
+}
+function sheetScreen(W,H,A,F,acc){
+  let o=`<rect width="${W}" height="${H}" fill="${A.rack}"/>`;const J={};
+  const rows=[['seq','va'],['svf','adsr','mix','dly'],['rev','out']];
+  const block=(z,y0,label)=>{o+=T(label,24,y0+16,{f:COND,size:13,w:600,fill:A.tx2,ls:.08});let y=y0+30;
+    rows.forEach(r=>{let x=24;r.forEach(id=>{o+=drawFace(id,x,y,z,A,F,acc,J);x+=(FACES[id].w+8)*z});y+=(FACE_H+16)*z});return y};
+  const y1=block(1,8,'100 %  ·  FULL TIER');block(.75,y1+16,'75 %  ·  COMPACT TIER (PLUGIN WINDOW)');return o}
+function defs(){return `<defs>
+<linearGradient id="alu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E1E1DD"/><stop offset=".55" stop-color="#D2D2CD"/><stop offset="1" stop-color="#C4C4BF"/></linearGradient>
+<linearGradient id="glass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".07"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<radialGradient id="cap-graphite" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="#3D3F44"/><stop offset="1" stop-color="#17181B"/></radialGradient>
+<radialGradient id="cap-alu" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="#4C4D51"/><stop offset="1" stop-color="#0E0F10"/></radialGradient>
+<radialGradient id="cap-hyb-d" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="#3C3F45"/><stop offset="1" stop-color="#1D1F23"/></radialGradient>
+<radialGradient id="cap-hyb-l" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#E2DED6"/></radialGradient>
+</defs>`}
+function render(screen,size,app,faces,accent){
+  let W=size==='1180'?1180:1440,H=size==='1180'?680:900;const A=APPS[app],acc=ACC[accent],F=faceStyle(faces,A,acc);
+  if(screen==='sheet'){W=970;H=8+30+3*356+16+16+30+3*356*.75+16}
+  const body=screen==='rack'?rackScreen(W,H,A,F,acc):screen==='perform'?performScreen(W,H,A,F,acc):screen==='sheet'?sheetScreen(W,H,A,F,acc):soundsScreen(W,H,A,F,acc);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="kabl ${screen} screen, ${comboName(app,faces)}, ${W} by ${H}">${defs()}${body}</svg>`;
+}
+
+/* ---------- page state ---------- */
+const S={mode:'one',screen:'rack',size:'1440',app:'graphite',faces:'hybrid',accent:'amber'};
+try{Object.assign(S,JSON.parse(localStorage.getItem('kabl-dir2')||'{}'))}catch(e){}
+const save=()=>{try{localStorage.setItem('kabl-dir2',JSON.stringify(S))}catch(e){}};
+const DESC={
+ 'graphite/graphite':'Dark neutral throughout; colour only from signals, stripe and accent. Safest pro read, closest to studio software.',
+ 'graphite/alu':'Light machined faces with black print inside a dark app. Reads as premium hardware; highest contrast between rack and chrome.',
+ 'graphite/outline':'Faces as line art on a dark field; cables and displays glow. Most distinctive; needs the most care to stay legible.',
+ 'paper/graphite':'Dark faces sitting in a light app, like a console in a bright room. Rack pops; chrome stays calm.',
+ 'paper/alu':'All light. Calm, daytime, document-like. Cables carry nearly all the colour.',
+ 'paper/outline':'Ink line drawing on paper: the old Silkscreen idea, done as a system. Very clean; weakest depth cues for grabbing.',
+ 'graphite/hybrid':'Recommended dark default. Signal panels (line art, glowing displays and cables) with solid knobs and jacks so controls read as grabbable.',
+ 'paper/hybrid':'Recommended light default. Drafting panels with solid white hardware. Same face style as Signal solid; only the app theme changes.'
+};
+function draw(){
+  for(const k of ['mode','screen','size','app','faces','accent'])document.querySelectorAll(`#${k} button`).forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===S[k])));
+  const one=S.mode==='one';document.querySelectorAll('#app button,#faces button').forEach(b=>b.disabled=!one);
+  document.getElementById('app').style.opacity=document.getElementById('faces').style.opacity=one?1:.45;
+  const info=document.getElementById('info'),out=document.getElementById('out');
+  if(one){info.innerHTML=`<b>${comboName(S.app,S.faces)}</b><span>${DESC[S.app+'/'+S.faces]}</span>`;
+    out.className='screen';out.innerHTML=render(S.screen,S.size,S.app,S.faces,S.accent)}
+  else{info.innerHTML=`<b>All six</b><span>Tap a tile to open it.</span>`;out.className='grid';
+    out.innerHTML=COMBOS.map(([a,f,n])=>`<button class="tile" data-a="${a}" data-f="${f}">${render(S.screen,S.size,a,f,S.accent)}<div><b>${n}</b><span>${APPS[a].name} app · ${{alu:'Aluminium',hybrid:'Line + solid',graphite:'Graphite',outline:'Outline'}[f]} faces</span></div></button>`).join('');
+    out.querySelectorAll('.tile').forEach(t=>t.addEventListener('click',()=>{S.app=t.dataset.a;S.faces=t.dataset.f;S.mode='one';save();draw();window.scrollTo({top:0})}))}
+}
+document.querySelectorAll('.seg').forEach(g=>g.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;S[g.id]=b.dataset.v;save();draw()}));
+draw();
+Promise.all(['500 12px "IBM Plex Sans"','600 13px "IBM Plex Sans Condensed"','500 11px "IBM Plex Mono"'].map(f=>document.fonts?document.fonts.load(f):0)).then(()=>document.fonts.ready).then(()=>{draw();window.__ready=true},()=>{draw();window.__ready=true});
+window.__set=o=>{Object.assign(S,o);draw()};
+})();
+</script>

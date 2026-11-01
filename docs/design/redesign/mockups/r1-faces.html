@@ -1,0 +1,691 @@
+<title>kabl Faces R1</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky control strip, then a dark-or-light "rack" canvas per tab; chrome stays quiet so the faces carry the page. */
+:root{
+  --bg:#ECE8E1; --panel:#F7F4EF; --ink:#1E1C19; --ink2:#5B564E; --line:#D3CDC3; --accent:#B4561F; --on-accent:#FFF8F2;
+  --bad:#C0322B; --warn:#A86A00; --good:#2F7D4F;
+  --sans:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141311; --panel:#1D1B18; --ink:#EEE9E1; --ink2:#A9A297; --line:#35322D; --accent:#E8894A; --on-accent:#1A0F07;
+  --bad:#F06A5F; --warn:#E3A93C; --good:#5DBB84; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141311; --panel:#1D1B18; --ink:#EEE9E1; --ink2:#A9A297; --line:#35322D; --accent:#E8894A; --on-accent:#1A0F07;
+  --bad:#F06A5F; --warn:#E3A93C; --good:#5DBB84; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1500px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header h1{font-size:22px;font-weight:600;margin:0;letter-spacing:-.01em;text-wrap:balance}
+header p{margin:4px 0 0;color:var(--ink2);max-width:72ch}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:8px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;border-bottom:1px solid var(--line)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.grp{display:flex;align-items:center;gap:6px}
+.grp>span{font:500 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--ink2)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--panel)}
+.seg button{font:500 12px/1 var(--mono);border:0;background:transparent;color:var(--ink);padding:7px 10px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.canvas{overflow-x:auto;border-radius:8px;border:1px solid var(--line)}
+.canvas svg{display:block}
+.sum{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:baseline;font:500 12px/1.4 var(--mono)}
+.sum b{font-weight:500}
+.pill{display:inline-block;padding:2px 8px;border-radius:99px;font:500 11px/1.5 var(--mono)}
+.pill.err{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+.pill.inf{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.pill.ok{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+details{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+details summary{cursor:pointer;font-weight:500}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;font-size:12.5px;width:100%;min-width:520px}
+th,td{text-align:left;padding:5px 10px 5px 0;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:500 11px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--ink2)}
+td.m,code{font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;min-width:0}
+.card h3{margin:0 0 8px;font-size:15px;font-weight:600}
+.card p,.card li{color:var(--ink2);margin:4px 0}
+.card ul{padding-left:18px;margin:4px 0}
+.note{font-size:12.5px;color:var(--ink2)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header>
+  <h1>kabl faces, round 1</h1>
+  <p>Evolved "Seated": same rack idiom, layout driven by numeric zones. Every face below is laid out by one rule set, and the checker under the rack runs those rules on the mockup itself. Real pixel sizes, faces 340 px tall. Only egui-drawable primitives: rounded rects, strokes, linear/radial gradients, alpha, paths, IBM Plex.</p>
+</header>
+
+<div class="bar" role="toolbar" aria-label="View controls">
+  <div class="grp"><span>Tab</span><div class="seg" id="tab"><button data-v="faces" aria-pressed="true">Faces</button><button data-v="parts">Parts</button><button data-v="rules">Rules</button></div></div>
+  <div class="grp"><span>Look</span><div class="seg" id="look"><button data-v="light">Satin light</button><button data-v="dark">Satin dark</button></div></div>
+  <div class="grp"><span>Zoom</span><div class="seg" id="zoom"><button data-v="1" aria-pressed="true">100</button><button data-v="0.75">75</button><button data-v="0.58">58</button></div></div>
+  <div class="grp"><span>Checker</span><div class="seg" id="chk"><button data-v="on" aria-pressed="true">Overlay</button><button data-v="off">Off</button></div></div>
+</div>
+
+<section id="v-faces">
+  <div class="canvas" id="rack"></div>
+  <div style="height:12px"></div>
+  <div class="sum" id="sum"></div>
+  <div style="height:10px"></div>
+  <details id="find"><summary>Checker findings</summary><div class="tbl"><table><thead><tr><th>Face</th><th>Rule</th><th>Detail</th></tr></thead><tbody id="findBody"></tbody></table></div></details>
+</section>
+
+<section id="v-parts" hidden>
+  <div class="canvas" id="parts"></div>
+  <p class="note">Bottom strip repeats jacks and cables at 58 % so mono vs stereo can be judged at the zoom the owner calls "50 %".</p>
+</section>
+
+<section id="v-rules" hidden>
+<div class="cols">
+  <div class="card"><h3>Face zones (px at 100 %)</h3><div class="tbl"><table>
+    <tr><th>Zone</th><th>y</th><th>Rule</th></tr>
+    <tr><td>Header</td><td class="m">0–46</td><td>Title 14 SemiBold at x 12, caption 11 mono below. Right cluster: mode selector, then <code>+N</code>. Title falls back to short name, never ellipsis.</td></tr>
+    <tr><td>Display well</td><td class="m">52–116</td><td>Optional, 64 tall, full width minus 12. Tinted from face hue, never neutral black.</td></tr>
+    <tr><td>Control zone</td><td class="m">124–236</td><td>Grows to 52–236 when no well. Rows centred vertically, 8 gap.</td></tr>
+    <tr><td>Port tray</td><td class="m">244–330</td><td>Fixed on every face so trays align across a rack row. Inputs row, outputs on darker plate. Jack centres 273 / 316.</td></tr>
+    <tr><td>Wide tray</td><td class="m">286–330</td><td>Faces ≥ 480 px: one row at the output height (316), inputs left, outputs right on the plate. Control zone grows to 278.</td></tr>
+  </table></div></div>
+  <div class="card"><h3>Hardware sizes</h3><div class="tbl"><table>
+    <tr><th>Part</th><th>Size</th><th>Rule</th></tr>
+    <tr><td>Knob L / M / S</td><td class="m">r 24 / 20 / 16</td><td>By count in row: 1–2 → L, 3 → M, 4+ → S. Arc ring at r+3.5. Cell height 2r+34.</td></tr>
+    <tr><td>Jack</td><td class="m">hex 11</td><td>Signal ring r 7.5. Stereo: two rings (8 / 5.2), smaller hole.</td></tr>
+    <tr><td>Selector</td><td class="m">h 20 (18 header)</td><td>One idiom: inset track, raised cap for selected.</td></tr>
+    <tr><td>Slot pitch</td><td class="m">(w−24)/n</td><td>Jacks: min(72, usable / max(ins, outs, 3)).</td></tr>
+  </table></div></div>
+  <div class="card"><h3>Zoom tiers</h3><ul>
+    <li><b>Full</b>, zoom ≥ 0.864 (11 px × z ≥ 9.5): everything drawn.</li>
+    <li><b>Compact</b>, zoom &lt; 0.864: text is held at 9.5 screen px instead of hidden. Labels switch to short form; a label is dropped only when the short form is wider than its slot. Values and captions hide (shown on hover and drag).</li>
+    <li><b>Overview</b>, zoom &lt; 0.55 (proposed, not drawn in R1): title, display, connected jacks only.</li>
+  </ul><p>Today labels vanish below 86 %, so a plugin window at 65–75 % shows no labels at all. Compact fixes that without breaking the 9.5 px legibility rule.</p></div>
+  <div class="card"><h3>Checker rules (run on this page)</h3><ul>
+    <li><code>overlap</code>: any two leaf boxes (text, knob, jack, selector, chip, pad) intersect.</li>
+    <li><code>gap</code>: leaves closer than 3 px (2 px for a label to its own control), screen px.</li>
+    <li><code>edge</code>: leaf closer than 4 px to the face edge; child outside its container.</li>
+    <li><code>fit</code>: text wider than its slot after short-name fallback (would need ellipsis).</li>
+    <li><code>missing</code>: a required label not drawn at Full tier.</li>
+    <li><code>contrast</code>: text pair under 4.5:1.</li>
+    <li>Info: text dropped by Compact rules (expected, listed for review).</li>
+  </ul><p>All geometry-only, so the same checks port to <code>rack.rs</code> unit tests with no GPU.</p></div>
+  <div class="card"><h3>Decisions taken in R1</h3><ul>
+    <li>Direction: evolve Seated. Depth stays (seated wells, proud hardware); wells now take the face hue.</li>
+    <li>Themes: one material (Satin), light and dark, done properly. Lacquer returns later as a token set once Satin is signed off.</li>
+    <li>FM Voice: operator cards show ratio, level and an envelope curve. Fine and velocity per operator go behind <code>+12</code>.</li>
+    <li>Sequencer: 32 steps as 4 pages of 8; page selector in the header beside edit and play banks.</li>
+    <li>Drum grid: velocity = fill height, chance = pips. Readable without colour.</li>
+    <li>Stereo: double-ring jack, twin-strand cable.</li>
+  </ul></div>
+  <div class="card"><h3>Open for your review</h3><ul>
+    <li>Jack rows move from y 248 / 296 to 273 / 316. Cables follow port identity, so saved racks load; positions shift.</li>
+    <li>ADSR title becomes "ADSR" when the mode selector sits in the header (no room for the full name at 210 px).</li>
+    <li>Mixer gets an input meter strip (new content).</li>
+    <li>Short labels: Atk Dec Sus Rel, Cut CV, Fdbk. Full names in tooltips.</li>
+  </ul></div>
+</div>
+</section>
+</div>
+
+<script>
+(()=>{
+"use strict";
+const SANS='"IBM Plex Sans", system-ui, sans-serif', MONO='"IBM Plex Mono", ui-monospace, monospace';
+const FACE_H=340, M=12, HIDE=9.5;
+const Z={titleTop:12,title:14,capTop:32,cap:11,wellY:52,wellH:64,ctrlTop:124,ctrlBot:236,ctrlTopNoWell:52,trayY:244,trayH:86,inRowJack:273,outRowJack:316,plateY:288};
+
+/* ---------- colour ---------- */
+const hx=h=>{h=h.replace('#','');return[0,2,4].map(i=>parseInt(h.slice(i,i+2),16))};
+const toHex=a=>'#'+a.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
+const mix=(a,b,t)=>{const A=hx(a),B=hx(b);return toHex(A.map((v,i)=>v+(B[i]-v)*t))};
+const lum=c=>{const v=hx(c).map(x=>{x/=255;return x<=.03928?x/12.92:((x+.055)/1.055)**2.4});return .2126*v[0]+.7152*v[1]+.0722*v[2]};
+const contrast=(a,b)=>{const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05)};
+
+const LOOKS={
+ light:{rack:'#CBC4B7',rail:'#A39B8F',railHole:'#6F685D',capA:'#4A4640',capB:'#1D1B18',skirt:'#2B2825',pointer:'#F5EFE5',
+   nut:'#D6D0C5',nutEdge:'#8A8378',hole:'#141311',segOn:'#F7F2E9',segOnInk:'#1F1C18',trace:'#F3B23E',traceSoft:'rgba(243,178,62,.18)',
+   audio:'#E5832A',cv:'#1E9E92',gate:'#7550D2',pitch:'#3B8BE3',ucv:'#1E9E92',focus:'#2E6FD8',sheet:'#BDB6A9',
+   fam:{osc:{base:'#E3A28C',ink:'#2B140D',ink2:'#5A2B1D'},filter:{base:'#B7CBA4',ink:'#1A2513',ink2:'#3A4C30'},
+        env:{base:'#C5B9E2',ink:'#211936',ink2:'#463B66'},timing:{base:'#B5CAD5',ink:'#11222B',ink2:'#344B58'},
+        amp:{base:'#D8CA97',ink:'#28220C',ink2:'#544A28'},fx:{base:'#E2DACA',ink:'#26221C',ink2:'#585045'}}},
+ dark:{rack:'#141311',rail:'#2B2926',railHole:'#090908',capA:'#5A5650',capB:'#24221F',skirt:'#141311',pointer:'#F5EFE5',
+   nut:'#8C867C',nutEdge:'#4A463F',hole:'#0A0909',segOn:'#EEE7DA',segOnInk:'#1F1C18',trace:'#F3B23E',traceSoft:'rgba(243,178,62,.16)',
+   audio:'#F0913A',cv:'#2DB7A9',gate:'#9E7EF0',pitch:'#58A2F2',ucv:'#2DB7A9',focus:'#6FA3FF',sheet:'#0E0D0C',
+   fam:{osc:{base:'#4C2C23',ink:'#F7E4DB',ink2:'#D6B0A1'},filter:{base:'#2E3A27',ink:'#E6F0DD',ink2:'#B5C7A7'},
+        env:{base:'#352E4B',ink:'#EDE7FB',ink2:'#C0B4E0'},timing:{base:'#23353F',ink:'#E0EEF5',ink2:'#ABC4D1'},
+        amp:{base:'#3F3920',ink:'#F3EDD3',ink2:'#D0C59C'},fx:{base:'#36332D',ink:'#F0EBE1',ink2:'#C6BEAF'}}}
+};
+function famCol(L,f,dark){const F=L.fam[f];return{...F,
+  well:mix(F.base,'#0B0A09',dark?.62:.8), wellInk:mix(F.base,'#FFFFFF',dark?.78:.82),
+  tray:mix(F.base,'#000000',dark?.18:.09), plate:mix(F.base,'#000000',dark?.32:.2),
+  track:mix(F.base,'#000000',dark?.42:.55), trackInk:mix(F.base,'#FFFFFF',.8),
+  chip:mix(F.base,'#000000',dark?.28:.14), card:mix(F.base,dark?'#000000':'#000000',dark?.1:.05), rule:mix(F.base,'#000000',dark?.35:.22),
+  hi:dark?'rgba(255,255,255,.07)':'rgba(255,255,255,.35)'}}
+
+/* ---------- text measure ---------- */
+const cv=document.createElement('canvas').getContext('2d');
+function tw(s,size,w=500,mono=false){cv.font=`${w} ${size}px ${mono?MONO:SANS}`;return cv.measureText(s).width}
+
+/* ---------- specs (engine parameter names, real port lists) ---------- */
+const FACES=[
+ {id:'osc.va',title:'VA Oscillator',short:'VA Osc',fam:'osc',w:240,num:10,more:7,well:'saw',
+  rows:[[{k:'knob',l:'Frequency',s:'Freq',val:'262 Hz',v:.56,size:'L'},{k:'knob',l:'Fine',val:'+0 ct',v:.5,size:'S'},{k:'knob',l:'Pulse width',s:'PW',val:'50 %',v:.5,size:'S'}],
+        [{k:'seg',opts:['SIN','TRI','SAW','SQR'],sel:2}]],
+  ins:[['Pitch','pitch'],['Sync','gate']],outs:[['Out','audio'],['Stereo','audio',2]]},
+ {id:'filter.svf',title:'SVF Filter',short:'SVF',fam:'filter',w:210,num:11,more:0,well:'svf',
+  rows:[[{k:'knob',l:'Cutoff',val:'1.00 kHz',v:.58},{k:'knob',l:'Resonance',s:'Res',val:'0.30',v:.32}]],
+  ins:[['In','audio'],['Cutoff CV','cv','','Cut CV'],['Res CV','cv']],outs:[['LP','audio'],['BP','audio'],['HP','audio'],['Notch','audio','','N']]},
+ {id:'env.adsr',title:'ADSR Envelope',short:'ADSR',fam:'env',w:210,num:12,more:0,well:'adsr',header:{opts:['CONT','KEY'],sel:0},
+  rows:[[{k:'knob',l:'Attack',s:'Atk',val:'10 ms',v:.2},{k:'knob',l:'Decay',s:'Dec',val:'180 ms',v:.42},{k:'knob',l:'Sustain',s:'Sus',val:'0.62',v:.62},{k:'knob',l:'Release',s:'Rel',val:'420 ms',v:.5}]],
+  ins:[['Gate','gate']],outs:[['Out','ucv']]},
+ {id:'mixer',title:'Mixer',short:'Mixer',fam:'amp',w:240,num:14,more:0,well:'meters',
+  rows:[[1,2,3,4].map((n,i)=>({k:'knob',l:'Level '+n,s:'Lv '+n,val:['0.80','0.62','1.00','0.35'][i],v:[.8,.62,1,.35][i]}))],
+  ins:[['In 1','audio'],['In 2','audio'],['In 3','audio'],['In 4','audio']],outs:[['Out','audio']]},
+ {id:'seq',title:'Sequencer',short:'Seq',fam:'timing',w:660,num:8,more:9,body:'seq',
+  headerSegs:[{cap:'EDIT',opts:['A','B','C','D'],sel:0},{cap:'PLAY',opts:['A','B','C','D'],sel:0,accent:'gate'},{cap:'PAGE',opts:['1','2','3','4'],sel:0,playing:1}],
+  ins:[['Clock','gate'],['Reset','gate']],outs:[['Gate','gate'],['Pitch','pitch'],['Vel','ucv']]},
+ {id:'drum.grid',title:'Drum Grid',short:'Drums',fam:'timing',w:660,num:21,more:0,body:'drum',
+  headerSegs:[{cap:'PAT',opts:['A','B','C','D'],sel:0},{cap:'VEL',opts:['30','55','78','100'],sel:3},{cap:'CHANCE',opts:['100','75','50','25'],sel:0}],
+  ins:[['Clock','gate'],['Reset','gate'],['Pattern','ucv','','Pat']],
+  outs:['Kick','Snare','Clap','Chat','Ohat','Tom','Perc 1','Perc 2'].map((n,i)=>[n,'gate','',['BD','SD','CP','CH','OH','TM','P1','P2'][i]])},
+ {id:'osc.fm6',title:'FM Voice (6 operators)',short:'FM Voice',fam:'osc',w:660,num:17,more:12,body:'fm6',
+  ins:[['Pitch','pitch'],['Gate','gate'],['Velocity','ucv','','Vel']],outs:[['Out','audio']]}
+];
+const LAYOUT=[['osc.va','filter.svf','env.adsr','mixer'],['seq'],['drum.grid'],['osc.fm6']];
+
+/* ---------- state ---------- */
+const prefersDark=()=>{const t=document.documentElement.dataset.theme;if(t)return t==='dark';return matchMedia('(prefers-color-scheme: dark)').matches};
+const S={look:prefersDark()?'dark':'light',zoom:1,chk:true,tab:'faces'};
+try{const s=JSON.parse(localStorage.getItem('kabl-r1')||'{}');Object.assign(S,s)}catch(e){}
+const save=()=>{try{localStorage.setItem('kabl-r1',JSON.stringify(S))}catch(e){}};
+
+/* ---------- face builder ---------- */
+function buildFace(spec,L,dark,z){
+  const C=famCol(L,spec.fam,dark), w=spec.w, compact=z<0.864, wide=w>=480, BOT=wide?Z.plateY-10:Z.ctrlBot;
+  const out=[], boxes=[], notes=[];
+  const P=s=>out.push(s);
+  const box=(b)=>{b.face=spec.id;boxes.push(b);return b};
+  const fsz=(base)=>compact?Math.max(base,HIDE/z):base;   // compact: hold text at 9.5 screen px
+  const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  function text(str,x,top,size,{w:wt=500,mono=false,fill=C.ink,bg=C.base,anchor='start',kind='text',owner=null,parent=null,role='label'}={}){
+    const width=tw(str,size,wt,mono), h=size*1.1;
+    const bx=anchor==='middle'?x-width/2:anchor==='end'?x-width:x;
+    P(`<text x="${x.toFixed(2)}" y="${(top+size*.82).toFixed(2)}" font-family='${mono?MONO:SANS}' font-size="${size.toFixed(2)}" font-weight="${wt}" fill="${fill}" text-anchor="${anchor}">${esc(str)}</text>`);
+    return box({kind,x:bx,y:top,w:width,h,owner,parent,fg:fill,bg,role,str,size});
+  }
+  // fit full → short → drop. Returns chosen string or null.
+  function fit(full,short,size,maxW,opts={}){
+    if(tw(full,size,opts.w||500,opts.mono)<=maxW)return full;
+    if(short&&tw(short,size,opts.w||500,opts.mono)<=maxW)return short;
+    return null;
+  }
+  const drop=(what,str,required)=>{notes.push({face:spec.id,rule:compact&&!required?'dropped':'missing',detail:`${what} "${str}" not drawn`,sev:compact&&!required?'info':(compact?'info':'err')})};
+
+  /* surface */
+  P(`<rect x="0.5" y="0.5" width="${w-1}" height="${FACE_H-1}" rx="3" fill="${C.base}" stroke="${C.rule}" stroke-width="1"/>`);
+  P(`<rect x="1.5" y="1.5" width="${w-3}" height="22" rx="2" fill="url(#topl-${dark?'d':'l'})"/>`); // continuous top light
+  for(const [sx,sy] of [[7,7],[w-7,7],[7,FACE_H-7],[w-7,FACE_H-7]]){
+    P(`<circle cx="${sx}" cy="${sy+0.8}" r="2.6" fill="rgba(0,0,0,.25)"/><circle cx="${sx}" cy="${sy}" r="2.4" fill="${C.tray}" stroke="${C.rule}" stroke-width=".8"/><line x1="${sx-1.4}" y1="${sy}" x2="${sx+1.4}" y2="${sy}" stroke="${C.rule}" stroke-width=".8"/>`);
+  }
+
+  /* header right cluster */
+  let rx=w-M;
+  if(spec.more){
+    const t='+'+spec.more, cw=Math.max(26,tw(t,fsz(11),500,true)+12), ch=18;
+    rx-=cw;
+    P(`<rect x="${rx}" y="14" width="${cw}" height="${ch}" rx="4" fill="${C.chip}"/>`);
+    const tt=text(t,rx+cw/2,14+(ch-fsz(11)*1.1)/2,fsz(11),{mono:true,anchor:'middle',fill:C.ink,bg:C.chip,kind:'chiptext',parent:'chip'});
+    box({kind:'chip',x:rx,y:14,w:cw,h:ch});
+    rx-=8;
+  }
+  const segH=18;
+  function seg(x,y,opts,sel,{h=20,segW=null,cap=null,accent=null,playing=null,inHeader=false}={}){
+    const n=opts.length, sw=segW||Math.max(...opts.map(o=>tw(o,11,500,true)))+14;
+    let capW=0;
+    if(cap){capW=tw(cap,11,500,true)+8}
+    const W=capW+sw*n;
+    const s0=x;
+    if(cap){
+      const capSize=fsz(11);
+      if(!compact||tw(cap,capSize,500,true)<=capW-4) text(cap,x,y+(h-capSize*1.1)/2,capSize,{mono:true,fill:C.ink2,kind:'segcap',parent:'seg'});
+    }
+    const tx=x+capW;
+    P(`<rect x="${tx}" y="${y}" width="${sw*n}" height="${h}" rx="4" fill="${C.track}"/>`);
+    P(`<rect x="${tx}" y="${y}" width="${sw*n}" height="3" rx="1.5" fill="rgba(0,0,0,.25)"/>`);
+    const tsz=fsz(11);
+    const allFit=opts.every(o=>tw(o,tsz,500,true)<=sw-4);
+    opts.forEach((o,i)=>{
+      const sx=tx+i*sw;
+      if(i===sel){
+        const capCol=accent?L[accent]:L.segOn, ink=accent?(contrast('#FFFFFF',capCol)>=contrast('#1F1C18',capCol)?'#FFFFFF':'#1F1C18'):L.segOnInk;
+        P(`<rect x="${sx+1.5}" y="${y+2.5}" width="${sw-3}" height="${h-3}" rx="3" fill="rgba(0,0,0,.35)"/><rect x="${sx+1.5}" y="${y+1.5}" width="${sw-3}" height="${h-3}" rx="3" fill="${capCol}"/>`);
+        if(allFit) text(o,sx+sw/2,y+(h-tsz*1.1)/2,tsz,{mono:true,anchor:'middle',fill:ink,bg:capCol,kind:'segtext',parent:'seg'});
+      }else{
+        if(i>0&&i!==sel+1) P(`<line x1="${sx}" y1="${y+5}" x2="${sx}" y2="${y+h-5}" stroke="rgba(255,255,255,.12)"/>`);
+        if(allFit) text(o,sx+sw/2,y+(h-tsz*1.1)/2,tsz,{mono:true,anchor:'middle',fill:C.trackInk,bg:C.track,kind:'segtext',parent:'seg'});
+      }
+      if(playing===i) P(`<circle cx="${sx+sw-4}" cy="${y+4}" r="2" fill="${L.gate}"/>`);
+    });
+    if(!allFit) notes.push({face:spec.id,rule:'dropped',detail:`selector text (${opts.join(' ')}) hidden, selection still shown`,sev:'info'});
+    box({kind:'seg',x:s0+(cap?capW:0),y,w:sw*n,h});
+    return W;
+  }
+  if(spec.header){
+    const sw=34, W=sw*spec.header.opts.length; rx-=W;
+    seg(rx,14,spec.header.opts,spec.header.sel,{h:segH,segW:sw,inHeader:true}); rx-=8;
+  }
+  if(spec.headerSegs){
+    for(const hs of [...spec.headerSegs].reverse()){
+      const sw=Math.max(...hs.opts.map(o=>tw(o,11,500,true)))+12, capW=tw(hs.cap,11,500,true)+8, W=capW+sw*hs.opts.length;
+      rx-=W; seg(rx,14,hs.opts,hs.sel,{h:segH,segW:sw,cap:hs.cap,accent:hs.accent,playing:hs.playing,inHeader:true}); rx-=14;
+    }
+  }
+  /* title */
+  const tsize=compact?Math.max(14,10.5/z):14, maxTitle=rx-M+ (rx===w-M?0:6);
+  const title=fit(spec.title,spec.short,tsize,maxTitle,{w:600});
+  if(title) text(title,M,Z.titleTop,tsize,{w:600,role:'title'}); else drop('title',spec.title,true);
+  if(!compact) text(`${spec.id} · #${spec.num}`,M,Z.capTop,11,{mono:true,fill:C.ink2,w:400,role:'caption'});
+  else notes.push({face:spec.id,rule:'dropped',detail:'caption hidden (compact tier)',sev:'info'});
+
+  /* well helper */
+  function well(x,y,ww,hh,{rr=4}={}){
+    P(`<rect x="${x}" y="${y+1}" width="${ww}" height="${hh}" rx="${rr}" fill="${C.hi}"/>`); // lower lip highlight
+    P(`<rect x="${x}" y="${y}" width="${ww}" height="${hh}" rx="${rr}" fill="${C.well}" stroke="${C.rule}" stroke-width="1"/>`);
+    P(`<rect x="${x+1}" y="${y+1}" width="${ww-2}" height="7" rx="${rr-1}" fill="url(#ish)"/>`);
+    box({kind:'well',x,y,w:ww,h:hh});
+  }
+  function grid(x,y,ww,hh,nx,ny){
+    let g='';for(let i=1;i<nx;i++)g+=`M${x+ww*i/nx},${y+3}V${y+hh-3}`;for(let j=1;j<ny;j++)g+=`M${x+3},${y+hh*j/ny}H${x+ww-3}`;
+    P(`<path d="${g}" stroke="rgba(255,255,255,.07)" stroke-width="1" fill="none"/>`);
+  }
+
+  /* knob */
+  const R={L:24,M:20,S:16};
+  function knob(cx,cy,r,v,{mod=null,state=null}={}){
+    const a0=-225*Math.PI/180, sweep=270*Math.PI/180, ar=r+3.5;
+    const pt=(ang,rad)=>[cx+Math.cos(ang)*rad,cy+Math.sin(ang)*rad];
+    const arc=(t0,t1,rad)=>{const A=a0+sweep*t0,B=a0+sweep*t1,[x0,y0]=pt(A,rad),[x1,y1]=pt(B,rad);return `M${x0.toFixed(2)},${y0.toFixed(2)}A${rad},${rad} 0 ${(B-A)>Math.PI?1:0} 1 ${x1.toFixed(2)},${y1.toFixed(2)}`};
+    const op=state==='disabled'?' opacity=".4"':'';
+    P(`<g${op}>`);
+    P(`<path d="${arc(0,1,ar)}" stroke="${C.ink}" stroke-opacity="${state==='hover'?.32:.16}" stroke-width="2.5" fill="none" stroke-linecap="round"/>`);
+    if(v>0.001)P(`<path d="${arc(0,v,ar)}" stroke="${C.ink}" stroke-opacity=".85" stroke-width="2.5" fill="none" stroke-linecap="round"/>`);
+    if(mod){P(`<path d="${arc(Math.min(v,mod[0]),Math.max(v,mod[0]),ar)}" stroke="${L.cv}" stroke-width="2.5" fill="none" stroke-linecap="round"/>`);
+      const [lx,ly]=pt(a0+sweep*mod[1],ar);P(`<circle cx="${lx}" cy="${ly}" r="3.2" fill="${L.cv}" stroke="${C.base}" stroke-width="1.2"/>`)}
+    P(`<circle cx="${cx}" cy="${cy+3}" r="${r+1}" fill="rgba(0,0,0,.12)"/><circle cx="${cx}" cy="${cy+1.5}" r="${r+.5}" fill="rgba(0,0,0,.28)"/>`);
+    P(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${L.skirt}"/>`);
+    // skirt ticks
+    let t='';for(let i=0;i<=10;i++){const A=a0+sweep*i/10,[x0,y0]=pt(A,r-1.2),[x1,y1]=pt(A,r-3.6);t+=`M${x0.toFixed(2)},${y0.toFixed(2)}L${x1.toFixed(2)},${y1.toFixed(2)}`}
+    P(`<path d="${t}" stroke="rgba(255,255,255,.28)" stroke-width="1" />`);
+    P(`<circle cx="${cx}" cy="${cy}" r="${r*.74}" fill="url(#cap-${dark?'d':'l'})"/>`);
+    const [p0x,p0y]=pt(a0+sweep*v,r*.18),[p1x,p1y]=pt(a0+sweep*v,r*.68);
+    P(`<line x1="${p0x}" y1="${p0y}" x2="${p1x}" y2="${p1y}" stroke="${L.pointer}" stroke-width="${r>18?2.4:2}" stroke-linecap="round"/>`);
+    if(state==='focus')P(`<circle cx="${cx}" cy="${cy}" r="${r+7.5}" stroke="${L.focus}" stroke-width="2" fill="none"/>`);
+    P(`</g>`);
+    return box({kind:'knob',x:cx-ar-1.25,y:cy-ar-1.25,w:2*ar+2.5,h:2*ar+2.5});
+  }
+  function knobCell(c,cx,cy,r,pitch,opts={}){
+    const kb=knob(cx,cy,r,c.v,opts); const id=spec.id+':'+c.l;
+    kb.owner=id;
+    const ls=fsz(11), lmax=pitch-4;
+    const lab=compact?fit(c.s||c.l,null,ls,lmax):fit(c.l,c.s,ls,lmax);
+    const lTop=cy-r-3.5-1.25-3-ls*1.1;
+    if(lab)text(lab,cx,lTop,ls,{anchor:'middle',owner:id,fill:C.ink}); else drop('label',c.l,true);
+    if(!compact&&c.val){const vv=fit(c.val,null,11,lmax,{mono:true});
+      if(vv)text(vv,cx,cy+r+3.5+1.25+3,11,{mono:true,anchor:'middle',owner:id,fill:C.ink2,w:400,role:'value'}); else drop('value',c.val,false)}
+  }
+
+  /* jack */
+  function jack(cx,cy,type,ch=1,{state=null,plug=false}={}){
+    const col=L[type]||L.cv, op=state==='disabled'?' opacity=".4"':'';
+    P(`<g${op}>`);
+    const hex=(r)=>{let d='';for(let i=0;i<6;i++){const A=Math.PI/6+i*Math.PI/3;d+=(i?'L':'M')+(cx+Math.cos(A)*r).toFixed(2)+','+(cy+Math.sin(A)*r).toFixed(2)}return d+'Z'};
+    P(`<path d="${hex(11.5)}" transform="translate(0,1.2)" fill="rgba(0,0,0,.28)"/>`);
+    P(`<path d="${hex(11)}" fill="${L.nut}" stroke="${L.nutEdge}" stroke-width=".8"/>`);
+    if(state==='hover')P(`<circle cx="${cx}" cy="${cy}" r="14" stroke="${col}" stroke-opacity=".5" stroke-width="2" fill="none"/>`);
+    if(ch===2){P(`<circle cx="${cx}" cy="${cy}" r="8.1" fill="${L.hole}"/><circle cx="${cx}" cy="${cy}" r="8.1" stroke="${col}" stroke-width="1.7" fill="none"/><circle cx="${cx}" cy="${cy}" r="5" stroke="${col}" stroke-width="1.7" fill="none"/><circle cx="${cx}" cy="${cy}" r="2.4" fill="${L.hole}"/>`)}
+    else{P(`<circle cx="${cx}" cy="${cy}" r="7.6" fill="${col}"/><circle cx="${cx}" cy="${cy}" r="5.2" fill="${L.hole}"/>`)}
+    if(plug){P(`<circle cx="${cx}" cy="${cy+1.5}" r="8" fill="rgba(0,0,0,.35)"/><circle cx="${cx}" cy="${cy}" r="7.5" fill="${col}"/><circle cx="${cx-2}" cy="${cy-2}" r="3" fill="rgba(255,255,255,.35)"/>`)}
+    P(`</g>`);
+    return box({kind:'jack',x:cx-11,y:cy-11,w:22,h:22});
+  }
+
+  /* tray */
+  function tray(){
+    if(wide)return trayWide();
+    const x=8,ww=w-16,y=Z.trayY,h=Z.trayH;
+    P(`<rect x="${x}" y="${y+1}" width="${ww}" height="${h}" rx="5" fill="${C.hi}"/>`);
+    P(`<rect x="${x}" y="${y}" width="${ww}" height="${h}" rx="5" fill="${C.tray}"/>`);
+    P(`<path d="M${x},${Z.plateY}H${x+ww}V${y+h-5}a5,5 0 0 1 -5,5H${x+5}a5,5 0 0 1 -5,-5Z" fill="${C.plate}"/>`);
+    P(`<rect x="${x+1}" y="${y+1}" width="${ww-2}" height="6" rx="4" fill="url(#ish)" opacity=".6"/>`);
+    box({kind:'tray',x,y,w:ww,h});
+    const usable=w-2*M, n=Math.max(spec.ins.length,spec.outs.length,3), pitch=Math.min(72,usable/n);
+    const row=(ports,cy,bg)=>ports.forEach((p,i)=>{
+      const [name,type,ch,short]=p, cx=M+pitch*(i+.5);
+      const jb=jack(cx,cy,type,ch===2?2:1); const id=spec.id+':port:'+name; jb.owner=id; jb.parent='tray';
+      const ls=fsz(11), lab0=compact?fit(short||name,null,ls,pitch-4):fit(name,short,ls,pitch-4);
+      const above=cy===Z.inRowJack?Z.trayY+2:Z.inRowJack+11+(compact?2/z:3), room=(cy-11-3)-above;
+      const lab=ls*1.1<=room?lab0:null;
+      if(lab)text(lab,cx,cy-11-3-ls*1.1,ls,{anchor:'middle',owner:id,parent:'tray',bg,fill:C.ink});else drop('port label',name,!compact);
+    });
+    row(spec.ins,Z.inRowJack,C.tray); row(spec.outs,Z.outRowJack,C.plate);
+  }
+
+  function trayWide(){
+    // faces >= 480 px: one row at the out-row height; inputs left on tray, outputs right on plate
+    const x=8,ww=w-16,y=Z.plateY-2,h=FACE_H-10-y, cy=Z.outRowJack, pitch=56;
+    const outW=spec.outs.length*pitch+8, px=x+ww-outW;
+    P(`<rect x="${x}" y="${y+1}" width="${ww}" height="${h}" rx="5" fill="${C.hi}"/><rect x="${x}" y="${y}" width="${ww}" height="${h}" rx="5" fill="${C.tray}"/>`);
+    P(`<path d="M${px},${y}H${x+ww-5}a5,5 0 0 1 5,5V${y+h-5}a5,5 0 0 1 -5,5H${px}Z" fill="${C.plate}"/>`);
+    P(`<rect x="${x+1}" y="${y+1}" width="${ww-2}" height="6" rx="4" fill="url(#ish)" opacity=".6"/>`);
+    box({kind:'tray',x,y,w:ww,h});
+    const put=(p,cx,bg)=>{const [name,type,ch,short]=p;const jb=jack(cx,cy,type,ch===2?2:1);const id=spec.id+':port:'+name;jb.owner=id;
+      const ls=fsz(11),lab0=compact?fit(short||name,null,ls,pitch-4):fit(name,short,ls,pitch-4),room=(cy-11-3)-(y+2),lab=ls*1.1<=room?lab0:null;
+      if(lab)text(lab,cx,cy-11-3-ls*1.1,ls,{anchor:'middle',owner:id,parent:'tray',bg,fill:C.ink});else drop('port label',name,!compact)};
+    spec.ins.forEach((p,i)=>put(p,M+pitch*(i+.5),C.tray));
+    spec.outs.forEach((p,i)=>put(p,px+4+pitch*(i+.5),C.plate));
+  }
+  /* bodies */
+  const hasWell=!!spec.well;
+  if(spec.well){
+    const x=M,y=Z.wellY,ww=w-2*M,hh=Z.wellH; well(x,y,ww,hh);
+    if(spec.well!=='meters')grid(x,y,ww,hh,8,4);
+    const tr=L.trace;
+    if(spec.well==='saw'){let d='';const n=3;for(let i=0;i<n;i++){const x0=x+10+i*(ww-20)/n,x1=x0+(ww-20)/n;d+=`${i?'L':'M'}${x0},${y+hh-12}L${x1},${y+12}`}d+=`L${x+ww-10},${y+hh-12}`;
+      P(`<path d="${d}" stroke="${tr}" stroke-width="2" fill="none" stroke-linejoin="round"/>`)}
+    if(spec.well==='svf'){let d='';for(let i=0;i<=60;i++){const f=i/60,xx=x+8+f*(ww-16),fc=.58,q=1+.3*6;const g=1/Math.sqrt((1-(f/fc)**2)**2+((f/fc)/q)**2);const yy=y+hh-10-Math.min(1.25,Math.max(0,g*.55))*(hh-22);d+=(i?'L':'M')+xx.toFixed(1)+','+(f>fc?Math.min(y+hh-6,yy+ (f-fc)*90):yy).toFixed(1)}
+      P(`<path d="${d}L${x+ww-8},${y+hh-6}L${x+8},${y+hh-6}Z" fill="${L.traceSoft}"/><path d="${d}" stroke="${tr}" stroke-width="2" fill="none"/>`);
+      const cx=x+8+.58*(ww-16);P(`<line x1="${cx}" y1="${y+6}" x2="${cx}" y2="${y+hh-6}" stroke="${C.wellInk}" stroke-opacity=".35" stroke-dasharray="2 3"/>`)}
+    if(spec.well==='adsr'){const b=y+hh-10,t=y+10,X=[x+10,x+30,x+62,x+ww-54,x+ww-10],sy=t+(b-t)*(1-.62);
+      const d=`M${X[0]},${b}L${X[1]},${t}Q${X[1]+10},${sy} ${X[2]},${sy}L${X[3]},${sy}Q${X[3]+14},${b-4} ${X[4]},${b}`;
+      P(`<path d="${d}L${X[0]},${b}Z" fill="${L.traceSoft}"/><path d="${d}" stroke="${tr}" stroke-width="2" fill="none" stroke-linejoin="round"/>`);
+      P(`<line x1="${X[2]+30}" y1="${y+5}" x2="${X[2]+30}" y2="${y+hh-5}" stroke="${C.wellInk}" stroke-opacity=".45"/><circle cx="${X[2]+30}" cy="${sy}" r="3.6" fill="${tr}" stroke="${C.well}" stroke-width="1.5"/>`)}
+    if(spec.well==='meters'){const n=4,pitch=(w-2*M)/n,lv=[.72,.55,.9,.3];for(let i=0;i<n;i++){const cx=M+pitch*(i+.5),bw=10,segs=12;
+      for(let s=0;s<segs;s++){const sy=y+hh-8-(s+1)*((hh-14)/segs),on=s/segs<lv[i],c=s>=10?'#E0533B':s>=8?tr:L.cv;P(`<rect x="${cx-bw/2}" y="${sy+1}" width="${bw}" height="${(hh-14)/segs-1.5}" rx="1" fill="${c}" fill-opacity="${on?.95:.14}"/>`)}}}
+  }
+  if(spec.rows){
+    const top=hasWell?Z.ctrlTop:Z.ctrlTopNoWell, bot=Z.ctrlBot;
+    const rowH=row=>row[0].k==='seg'?20:Math.max(...row.map(c=>2*R[c.size||autoSize(row)]+34));
+    function autoSize(row){const n=row.length;return n<=2?'L':n===3?'M':'S'}
+    const hs=spec.rows.map(rowH), total=hs.reduce((a,b)=>a+b,0)+8*(hs.length-1);
+    let y=top+Math.max(0,(bot-top-total)/2);
+    spec.rows.forEach((row,ri)=>{
+      if(row[0].k==='seg'){const s=row[0],sw=(w-2*M)/s.opts.length;seg(M,y,s.opts,s.sel,{h:20,segW:sw})}
+      else{const n=row.length,pitch=(w-2*M)/n,rmax=Math.max(...row.map(c=>R[c.size||autoSize(row)]));const cy=y+14+3.5+rmax+(compact?Math.max(0,HIDE/z*1.1-12):0);
+        row.forEach((c,i)=>knobCell(c,M+pitch*(i+.5),cy,R[c.size||autoSize(row)],pitch))}
+      y+=hs[ri]+8;
+    });
+  }
+  if(spec.body==='seq'){
+    const steps=[{p:'+0',v:1,g:1,pr:100},{p:'+7',v:.55,g:1,pr:100},{p:'+12',v:.78,g:0,pr:100},{p:'+3',v:.78,g:1,pr:75},{p:'−5',v:1,g:1,pr:100},{p:'+7',v:.3,g:1,pr:50},{p:'+10',v:.55,g:0,pr:100},{p:'+12',v:.78,g:1,pr:100}];
+    const playing=4;
+    // left: pattern knobs
+    const lx=M, lw=112; const cyA=52+14+3.5+16+(compact?Math.max(0,HIDE/z*1.1-12):0)+10+(wide?18:0);
+    knobCell({l:'Length',s:'Len',val:'32',v:1},lx+lw/2,cyA,16,lw);
+    knobCell({l:'Gate length',s:'Gate',val:'50 %',v:.5},lx+lw/2,cyA+82,16,lw);
+    P(`<line x1="${lx+lw+8}" y1="56" x2="${lx+lw+8}" y2="${BOT-4}" stroke="${C.rule}" stroke-width="1"/>`);
+    // row labels
+    const rl=lx+lw+16, colX0=rl+44, cw=(w-M-colX0)/8;
+    const dy=wide?18:0, knobCy=104+dy, gateY=145+dy, velY=170+dy, velH=24, prY=201+dy;
+    const lsz=fsz(11);
+    const rows=[['Pitch',knobCy-lsz*.55],['Gate',gateY+9-lsz*.55],['Vel',velY+velH/2-lsz*.55],['Prob',prY]];
+    rows.forEach(([n,yy])=>{if(!compact||tw(n,lsz,500,true)<=40)text(n,rl,yy,lsz,{mono:true,fill:C.ink2,w:500});else drop('row label',n,false)});
+    steps.forEach((s,i)=>{
+      const cx=colX0+cw*(i+.5), on=i===playing;
+      // step number + led
+      const num=String(i+1);
+      P(`<circle cx="${cx-10}" cy="${62+dy}" r="3.2" fill="${on?L.gate:C.track}" ${on?'':'fill-opacity=".55"'}/>`);
+      box({kind:'pad',x:cx-13.2,y:58.8+dy,w:6.4,h:6.4});
+      text(num,cx-3,56+dy,fsz(11),{mono:true,fill:C.ink,w:500});
+      const kb=knob(cx,knobCy,16,(parseInt(s.p.replace('−','-'))+24)/48); kb.owner='step'+i;
+      if(!compact)text(s.p+' st',cx,knobCy+16+3.5+1.25+3,11,{mono:true,anchor:'middle',fill:C.ink2,w:400,role:'value',owner:'step'+i});
+      else notes.push({face:spec.id,rule:'dropped',detail:'step value "'+s.p+' st" hidden (compact)',sev:'info'});
+      // gate pad
+      const gw=28,gh=18,gx=cx-gw/2;
+      P(`<rect x="${gx}" y="${gateY+1}" width="${gw}" height="${gh}" rx="3" fill="rgba(0,0,0,.3)"/><rect x="${gx}" y="${gateY}" width="${gw}" height="${gh}" rx="3" fill="${s.g?L.gate:C.track}"/>`);
+      if(s.g)P(`<rect x="${gx+3}" y="${gateY+2}" width="${gw-6}" height="4" rx="2" fill="rgba(255,255,255,.35)"/>`);
+      box({kind:'pad',x:gx,y:gateY,w:gw,h:gh});
+      // vel lane
+      P(`<rect x="${cx-13}" y="${velY}" width="26" height="${velH}" rx="3" fill="${C.well}"/><rect x="${cx-10}" y="${velY+velH-3-(velH-6)*s.v}" width="20" height="${(velH-6)*s.v}" rx="1.5" fill="${L.gate}" fill-opacity="${.45+.55*s.v}"/>`);
+      box({kind:'pad',x:cx-13,y:velY,w:26,h:velH});
+      text(String(s.pr),cx,prY,fsz(11),{mono:true,anchor:'middle',fill:s.pr<100?C.ink:C.ink2,w:500});
+      if(on)P(`<rect x="${cx-cw/2+3}" y="${50+dy}" width="${cw-6}" height="${170+8}" rx="4" fill="${L.gate}" fill-opacity=".08"/>`);
+    });
+  }
+  if(spec.body==='drum'){
+    const x=M,y=52,ww=w-2*M,hh=BOT-52; well(x,y,ww,hh);
+    const names=['kick','snare','clap','chat','ohat','tom','perc1','perc2'], sh=['BD','SD','CP','CH','OH','TM','P1','P2'];
+    const lens=[16,16,16,16,16,16,16,12];
+    const pat=[
+      '4000400040004030','0000400000004000','0000000200000002','2121212121212121','0020002000200020','0000000000003020','1000010000100001','0300030003000'];
+    const ch=['0000000000000000','0000000000000001','0000000300000000','0002000200020002','0000000000000000','0000000000000000','0100000100000100','000000000000'];
+    const nameW=40, gx=x+nameW+6, gw=ww-nameW-12, gap=4, grpGap=6, cwid=(gw-15*gap-3*(grpGap-gap))/16, rh=(hh-10)/8, play=4;
+    const lsz=fsz(11);
+    names.forEach((n,r)=>{const ry=y+5+r*rh; const lab=compact?(tw(sh[r],lsz,500,true)<=nameW?sh[r]:null):(tw(n,lsz,500,true)<=nameW?n:sh[r]);
+      if(lab)text(lab,x+6,ry+(rh-lsz*1.1)/2,lsz,{mono:true,fill:C.wellInk,bg:C.well,parent:'well'});
+      for(let s=0;s<16;s++){const cx=gx+s*(cwid+gap)+Math.floor(s/4)*(grpGap-gap), cy=ry+2, chh=rh-4, active=s<lens[r];
+        const lvl=+(pat[r][s]||0), c=+(ch[r][s]||0);
+        if(!active){P(`<rect x="${cx}" y="${cy}" width="${cwid}" height="${chh}" rx="2" fill="none" stroke="${C.wellInk}" stroke-opacity=".08"/>`);continue}
+        P(`<rect x="${cx}" y="${cy}" width="${cwid}" height="${chh}" rx="2" fill="${mix(C.well,'#FFFFFF',dark?.07:.09)}"/>`);
+        if(lvl){const f=[0,.3,.55,.78,1][lvl], fh=(chh-2)*f;P(`<rect x="${cx+1}" y="${cy+chh-1-fh}" width="${cwid-2}" height="${fh}" rx="1.5" fill="${L.trace}" fill-opacity="${.55+.45*f}"/>`);
+          for(let k=0;k<c;k++)P(`<circle cx="${cx+cwid-4-k*4}" cy="${cy+4}" r="1.4" fill="${C.well}"/>`)}
+      }});
+    const px=gx+play*(cwid+gap)+Math.floor(play/4)*(grpGap-gap);
+    P(`<rect x="${px-1.5}" y="${y+3}" width="${cwid+3}" height="${hh-6}" rx="3" fill="none" stroke="${C.wellInk}" stroke-opacity=".55" stroke-width="1.2"/>`);
+  }
+  if(spec.body==='fm6'){
+    const lw=180, x=M;
+    well(x,Z.wellY,lw,Z.wellH);
+    const ay=Z.wellY+Z.wellH/2+6;
+    text('ALG 1',x+8,Z.wellY+6,fsz(11),{mono:true,fill:C.wellInk,bg:C.well,parent:'well'});
+    // algorithm picture: chain 6>5>4>3>2>1, feedback on 6
+    for(let i=0;i<6;i++){const nx=x+18+i*29, op=6-i, carrier=op===1;
+      P(`<rect x="${nx-9}" y="${ay-9}" width="18" height="18" rx="3" fill="${carrier?L.trace:'none'}" stroke="${carrier?L.trace:C.wellInk}" stroke-opacity="${carrier?1:.7}" stroke-width="1.3"/>`);
+      if(i<5)P(`<path d="M${nx+10},${ay}H${nx+19}" stroke="${C.wellInk}" stroke-opacity=".6" stroke-width="1.3"/><path d="M${nx+16},${ay-2.5}L${nx+19.5},${ay}L${nx+16},${ay+2.5}" fill="none" stroke="${C.wellInk}" stroke-opacity=".6" stroke-width="1.3"/>`);
+      if(!compact)P(`<text x="${nx}" y="${ay+3.8}" text-anchor="middle" font-family='${MONO}' font-size="11" font-weight="500" fill="${carrier?'#1B1208':C.wellInk}">${op}</text>`)}
+    P(`<path d="M${x+18-4},${ay-9}V${ay-16}H${x+18+4}V${ay-9}" fill="none" stroke="${L.trace}" stroke-width="1.3"/>`);
+    const gk=[{l:'Frequency',s:'Freq',val:'262 Hz',v:.56},{l:'Fine',val:'+0 ct',v:.5},{l:'Feedback',s:'Fdbk',val:'0.20',v:.2},{l:'Index',val:'1.10',v:.55}];
+    const pitch=lw/4, cy=Z.ctrlTop+14+3.5+16+20+(compact?Math.max(0,HIDE/z*1.1-12):0);
+    gk.forEach((c,i)=>knobCell(c,x+pitch*(i+.5),cy,16,pitch));
+    seg(x,240,['2×','4×'],0,{h:20,segW:44,cap:'OVERSAMPLE'});
+    P(`<line x1="${x+lw+8}" y1="56" x2="${x+lw+8}" y2="${BOT-4}" stroke="${C.rule}" stroke-width="1"/>`);
+    const ox=x+lw+16, ow=w-M-ox, gap=5, cw=(ow-5*gap)/6;
+    const ratios=['×1.00','×1.00','×2.00','×3.00','×0.50','×7.00'], lv=[.9,.6,.45,.7,.3,.5];
+    for(let i=0;i<6;i++){const cx0=ox+i*(cw+gap), cy0=52, chh=BOT-52, op=i+1;
+      P(`<rect x="${cx0}" y="${cy0}" width="${cw}" height="${chh}" rx="5" fill="${C.card}" stroke="${C.rule}" stroke-opacity=".7"/>`);
+      box({kind:'card',x:cx0,y:cy0,w:cw,h:chh});
+      text('OP '+op,cx0+7,cy0+6,fsz(11),{mono:true,fill:C.ink,w:500,parent:'card',bg:C.card});
+      if(op===1)P(`<circle cx="${cx0+cw-10}" cy="${cy0+12}" r="3.4" fill="${L.trace}"/>`);
+      // ratio field
+      const fy=cy0+Math.max(26,6+fsz(11)*1.1+4), fw=cw-12;
+      P(`<rect x="${cx0+6}" y="${fy}" width="${fw}" height="20" rx="4" fill="${C.track}"/>`);
+      text(ratios[i],cx0+11,fy+(20-fsz(11)*1.1)/2,fsz(11),{mono:true,fill:C.trackInk,bg:C.track,parent:'card',kind:'segtext'});
+      P(`<path d="M${cx0+6+fw-12},${fy+8}l3.5,4 3.5,-4" fill="none" stroke="${C.trackInk}" stroke-width="1.4"/>`);
+      box({kind:'seg',x:cx0+6,y:fy,w:fw,h:20});
+      const kcy=cy0+60+14+3.5+16+(compact?Math.max(0,HIDE/z*1.1-12):0);
+      knobCell({l:'Level',s:'Lvl',val:Math.round(lv[i]*99)+'',v:lv[i]},cx0+cw/2,kcy,16,cw);
+      // env mini well
+      const ey=cy0+chh-62, ex=cx0+6, ew=cw-12, eh=56;
+      P(`<rect x="${ex}" y="${ey}" width="${ew}" height="${eh}" rx="3" fill="${C.well}"/>`);
+      const b=ey+eh-6,t=ey+6,s=t+(b-t)*(.3+.1*i%3);
+      P(`<path d="M${ex+4},${b}L${ex+10+i},${t}L${ex+22},${s}L${ex+ew-16},${s}L${ex+ew-4},${b}" stroke="${L.trace}" stroke-width="1.6" fill="none" stroke-linejoin="round"/>`);
+      [ex+10+i,ex+22,ex+ew-16].forEach((px,k)=>P(`<circle cx="${px}" cy="${k?s:t}" r="2.2" fill="${L.trace}"/>`));
+      box({kind:'pad',x:ex,y:ey,w:ew,h:eh,parent:'card'});
+    }
+  }
+  tray();
+  return {svg:out.join(''),boxes,notes};
+}
+
+/* ---------- checker ---------- */
+const LEAF=new Set(['text','knob','jack','seg','chip','pad','segcap']);
+function check(spec,res,z,L,dark){
+  const f=[...res.notes];
+  const bx=res.boxes, leaves=bx.filter(b=>LEAF.has(b.kind));
+  const compact=z<0.864, minGap=compact?2:3;
+  const sep=(a,b)=>{const dx=Math.max(a.x-(b.x+b.w),b.x-(a.x+a.w)),dy=Math.max(a.y-(b.y+b.h),b.y-(a.y+a.h));return Math.max(dx,dy)};
+  const hits=[];
+  for(let i=0;i<leaves.length;i++)for(let j=i+1;j<leaves.length;j++){
+    const a=leaves[i],b=leaves[j]; const s=sep(a,b)*z;
+    const own=a.owner&&a.owner===b.owner, need=own?(compact?1.5:2):minGap;
+    if(s< -0.01){f.push({face:spec.id,rule:'overlap',detail:`${desc(a)} × ${desc(b)}`,sev:'err'});hits.push(a,b)}
+    else if(s<need-0.01){f.push({face:spec.id,rule:'gap',detail:`${desc(a)} ↔ ${desc(b)}: ${s.toFixed(1)} px < ${need}`,sev:'err'});hits.push(a,b)}
+  }
+  for(const b of bx){
+    const m=Math.min(b.x,b.y,spec.w-(b.x+b.w),FACE_H-(b.y+b.h))*z;
+    if(m<(b.kind==='tray'?3.9:4)-0.01&&b.kind!=='tray'){f.push({face:spec.id,rule:'edge',detail:`${desc(b)} ${m.toFixed(1)} px from face edge`,sev:'err'});hits.push(b)}
+    if(b.kind==='text'||b.kind==='segtext'||b.kind==='chiptext'){
+      const c=contrast(b.fg,b.bg); if(c<4.5){f.push({face:spec.id,rule:'contrast',detail:`"${b.str}" ${c.toFixed(2)}:1`,sev:'err'});hits.push(b)}
+    }
+  }
+  return {findings:f,hits};
+}
+const desc=b=>b.kind==='text'?`"${b.str}"`:b.kind;
+
+/* ---------- render ---------- */
+function defs(L){return `<defs>
+ <radialGradient id="cap-l" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="${LOOKS.light.capA}"/><stop offset="1" stop-color="${LOOKS.light.capB}"/></radialGradient>
+ <radialGradient id="cap-d" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="${LOOKS.dark.capA}"/><stop offset="1" stop-color="${LOOKS.dark.capB}"/></radialGradient>
+ <linearGradient id="ish" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity=".45"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient>
+ <linearGradient id="topl-l" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".32"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+ <linearGradient id="topl-d" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".07"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+</defs>`}
+
+function renderRack(){
+  const L=LOOKS[S.look], dark=S.look==='dark', z=S.zoom, seam=3, railH=12;
+  const byId=Object.fromEntries(FACES.map(f=>[f.id,f]));
+  const rowW=LAYOUT.map(r=>r.reduce((a,id)=>a+byId[id].w,0)+seam*(r.length-1));
+  const W=Math.max(...rowW)+32, H=LAYOUT.length*(FACE_H+2*railH+10)+16;
+  let svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${W*z}" height="${H*z}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Seven kabl module faces in a rack">${defs(L)}<rect width="${W}" height="${H}" fill="${L.rack}"/>`;
+  let all=[];
+  LAYOUT.forEach((row,ri)=>{
+    const y0=8+ri*(FACE_H+2*railH+10);
+    for(const ry of [y0,y0+railH+FACE_H]){svg+=`<rect x="0" y="${ry}" width="${W}" height="${railH}" fill="${L.rail}"/><rect x="0" y="${ry}" width="${W}" height="1.5" fill="rgba(255,255,255,.12)"/>`;
+      for(let hx2=24;hx2<W;hx2+=30)svg+=`<rect x="${hx2-3}" y="${ry+railH/2-2}" width="6" height="4" rx="2" fill="${L.railHole}"/>`}
+    let x=16;
+    row.forEach(id=>{const spec=byId[id];const res=buildFace(spec,L,dark,z);const ck=check(spec,res,z,L,dark);all.push(...ck.findings);
+      svg+=`<g transform="translate(${x},${y0+railH})">${res.svg}`;
+      if(S.chk)for(const h of ck.hits)svg+=`<rect x="${h.x-1}" y="${h.y-1}" width="${h.w+2}" height="${h.h+2}" fill="rgba(230,40,30,.12)" stroke="#E6281E" stroke-width="${1.4/z}"/>`;
+      svg+=`</g>`; x+=spec.w+seam});
+  });
+  svg+='</svg>';
+  document.getElementById('rack').innerHTML=svg;
+  const err=all.filter(f=>f.sev==='err'), inf=all.filter(f=>f.sev!=='err');
+  const tier=z>=0.864?'Full':'Compact';
+  document.getElementById('sum').innerHTML=`<span>Tier <b>${tier}</b> · zoom ${Math.round(z*100)} % · ${S.look==='dark'?'Satin dark':'Satin light'}</span>
+   <span class="pill ${err.length?'err':'ok'}">${err.length} error${err.length===1?'':'s'}</span><span class="pill inf">${inf.length} dropped by rule</span>`;
+  document.getElementById('findBody').innerHTML=all.length?all.map(f=>`<tr><td class="m">${f.face}</td><td class="m" style="color:${f.sev==='err'?'var(--bad)':'var(--warn)'}">${f.rule}</td><td>${f.detail.replace(/</g,'&lt;')}</td></tr>`).join(''):'<tr><td colspan="3">No findings.</td></tr>';
+  window.__kablFindings=all;
+}
+
+function renderParts(){
+  const L=LOOKS[S.look], dark=S.look==='dark';
+  const W=1180,H=760;
+  const spec={id:'parts',title:'',fam:'fx',w:W,num:0,ins:[],outs:[]};
+  // reuse builder primitives by building a pseudo face and extracting helpers is heavy; draw directly with mini helpers
+  const C=famCol(L,'fx',dark);
+  let s=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Component states">${defs(L)}<rect width="${W}" height="${H}" fill="${L.rack}"/>`;
+  s+=`<rect x="16" y="16" width="${W-32}" height="${H-32}" rx="4" fill="${C.base}" stroke="${C.rule}"/>`;
+  const T=(str,x,y,o={})=>`<text x="${x}" y="${y}" font-family='${o.mono?MONO:SANS}' font-size="${o.size||11}" font-weight="${o.w||500}" fill="${o.fill||C.ink}" text-anchor="${o.anchor||'middle'}">${str}</text>`;
+  const H2=(str,y)=>T(str.toUpperCase(),36,y,{mono:true,fill:C.ink2,anchor:'start'});
+  // build a tiny face to borrow knob/jack drawing
+  const draw=(fn)=>{const f={id:'p',title:'',fam:'fx',w:W,num:0,ins:[],outs:[],rows:null};return fn};
+  const mk=(cx,cy,r,v,o)=>{const res=buildPartsKnob(cx,cy,r,v,o,L,dark);return res};
+  s+=H2('Knobs',48);
+  const kn=[['S',16,.35,{}],['M',20,.5,{}],['L',24,.62,{}],['hover',20,.5,{state:'hover'}],['focus',20,.5,{state:'focus'}],['modulated',20,.4,{mod:[.75,.62]}],['disabled',20,.5,{state:'disabled'}]];
+  kn.forEach(([n,r,v,o],i)=>{const cx=90+i*120;s+=mk(cx,105,r,v,o)+T(n,cx,160)});
+  s+=H2('Jacks',200);
+  const jk=[['audio','audio',1,{}],['cv','cv',1,{}],['gate','gate',1,{}],['pitch','pitch',1,{}],['stereo','audio',2,{}],['connected','audio',1,{plug:true}],['hover','cv',1,{state:'hover'}],['disabled','gate',1,{state:'disabled'}]];
+  jk.forEach(([n,t,ch,o],i)=>{const cx=90+i*110;s+=buildPartsJack(cx,240,t,ch,o,L,dark)+T(n,cx,276)});
+  s+=H2('Cables',316);
+  const cab=(x0,y0,x1,y1,col,kind)=>{const sag=46,d=`M${x0},${y0}C${x0},${y0+sag} ${x1},${y1+sag} ${x1},${y1}`;
+    let o=`<path d="${d}" stroke="rgba(0,0,0,.28)" stroke-width="7" fill="none" transform="translate(0,3)"/>`;
+    if(kind==='stereo')o+=`<path d="${d}" stroke="${mix(col,'#000000',.35)}" stroke-width="8" fill="none"/><path d="${d}" stroke="${col}" stroke-width="6.4" fill="none"/><path d="${d}" stroke="${mix(col,'#000000',.45)}" stroke-width="1.6" fill="none"/>`;
+    else if(kind==='lit')o+=`<path d="${d}" stroke="${mix(col,'#000000',.3)}" stroke-width="6.5" fill="none"/><path d="${d}" stroke="${mix(col,'#FFFFFF',.15)}" stroke-width="5" fill="none"/><path d="${d}" stroke="rgba(255,255,255,.55)" stroke-width="1.3" fill="none" transform="translate(-.8,-.8)"/>`;
+    else if(kind==='dim')o+=`<path d="${d}" stroke="${col}" stroke-opacity=".28" stroke-width="5" fill="none"/>`;
+    else o+=`<path d="${d}" stroke="${mix(col,'#000000',.3)}" stroke-width="6.5" fill="none"/><path d="${d}" stroke="${col}" stroke-width="5" fill="none"/>`;
+    if(kind==='pattern'){const pts=[];for(let i=1;i<8;i++){const t=i/8,mt=1-t;pts.push([mt**3*x0+3*mt*mt*t*x0+3*mt*t*t*x1+t**3*x1,mt**3*y0+3*mt*mt*t*(y0+sag)+3*mt*t*t*(y1+sag)+t**3*y1])}
+      pts.forEach(([px,py],i)=>{const on=[1,0,1,1,0,1,0][i];o+=`<circle cx="${px}" cy="${py}" r="4" fill="${on?'#FFF5E6':C.base}" stroke="${mix(col,'#000000',.3)}" stroke-width="1.5"/>`})}
+    return o+buildPartsJack(x0,y0,'audio',kind==='stereo'?2:1,{plug:true,col},L,dark)+buildPartsJack(x1,y1,'audio',kind==='stereo'?2:1,{plug:true,col},L,dark)};
+  const cbs=[['rest',L.audio,'rest'],['lit (signal)',L.audio,'lit'],['stereo',L.audio,'stereo'],['functional',L.cv,'pattern'],['dimmed (focus)',L.gate,'dim']];
+  cbs.forEach(([n,c,k],i)=>{const x=60+i*220;s+=cab(x,346,x+150,346,c,k)+T(n,x+75,420)});
+  s+=H2('Selectors, pads, chips',462);
+  // segmented
+  const segs=(x,y,opts,sel)=>{const sw=40;let o=`<rect x="${x}" y="${y}" width="${sw*opts.length}" height="20" rx="4" fill="${C.track}"/><rect x="${x}" y="${y}" width="${sw*opts.length}" height="3" rx="1.5" fill="rgba(0,0,0,.25)"/>`;
+    opts.forEach((t,i)=>{if(i===sel)o+=`<rect x="${x+i*sw+1.5}" y="${y+2.5}" width="${sw-3}" height="17" rx="3" fill="rgba(0,0,0,.35)"/><rect x="${x+i*sw+1.5}" y="${y+1.5}" width="${sw-3}" height="17" rx="3" fill="${L.segOn}"/>`;
+      o+=T(t,x+i*sw+sw/2,y+14,{mono:true,fill:i===sel?L.segOnInk:C.trackInk})});return o};
+  s+=segs(36,490,['SIN','TRI','SAW','SQR'],2)+T('selector',116,530);
+  s+=`<rect x="232" y="491" width="28" height="18" rx="3" fill="${C.track}"/><rect x="272" y="491" width="28" height="18" rx="3" fill="${L.gate}"/><rect x="275" y="493" width="22" height="4" rx="2" fill="rgba(255,255,255,.35)"/>`+T('toggle off / on',266,530);
+  s+=`<rect x="352" y="491" width="30" height="18" rx="4" fill="${C.chip}"/>`+T('+7',367,504,{mono:true})+T('chip',367,530);
+  // cue pads
+  const pad=(x,state,name)=>{const w2=96,h2=56,y=482;let o=`<rect x="${x}" y="${y+2}" width="${w2}" height="${h2}" rx="6" fill="rgba(0,0,0,.3)"/>`;
+    const fill=state==='playing'?L.trace:state==='queued'?mix(C.base,'#000000',.12):C.track;
+    o+=`<rect x="${x}" y="${y}" width="${w2}" height="${h2}" rx="6" fill="${fill}" ${state==='queued'?`stroke="${L.trace}" stroke-width="2"`:''}/>`;
+    if(state==='queued')o+=`<rect x="${x+8}" y="${y+h2-12}" width="${(w2-16)}" height="4" rx="2" fill="rgba(0,0,0,.2)"/><rect x="${x+8}" y="${y+h2-12}" width="${(w2-16)*.6}" height="4" rx="2" fill="${L.trace}"/>`;
+    o+=T(name,x+12,y+24,{anchor:'start',size:14,w:600,fill:state==='playing'?'#1B1208':state==='queued'?C.ink:C.trackInk});
+    o+=T(state.toUpperCase(),x+12,y+40,{anchor:'start',mono:true,fill:state==='playing'?'#3A2608':state==='queued'?C.ink2:C.trackInk});return o};
+  s+=pad(440,'idle','Intro')+pad(548,'queued','Drop')+pad(656,'playing','Verse');
+  // drum cells
+  const cell=(x,f,c)=>{let o=`<rect x="${x}" y="488" width="30" height="22" rx="2" fill="${C.well}"/>`;if(f){const fh=20*f;o+=`<rect x="${x+1}" y="${509-fh}" width="28" height="${fh}" rx="1.5" fill="${L.trace}" fill-opacity="${.55+.45*f}"/>`}
+    for(let k=0;k<c;k++)o+=`<circle cx="${x+26-k*4}" cy="${492}" r="1.4" fill="${C.well}"/>`;return o};
+  [[0,0],[.3,0],[.55,0],[.78,0],[1,0],[1,1],[1,2],[1,3]].forEach(([f,c],i)=>s+=cell(790+i*36,f,c));
+  s+=T('drum cell: off · vel 30 55 78 100 · chance 75 50 25',934,530);
+  // 58% strip
+  s+=H2('Same parts at 58 %',586);
+  s+=`<g transform="translate(36,600) scale(.58)">`;
+  [['audio',1],['audio',2],['cv',1],['cv',2]].forEach(([t,ch],i)=>{s+=buildPartsJack(40+i*70,60,t,ch,{},L,dark)});
+  s+=cab(360,60,560,60,L.audio,'rest')+cab(640,60,840,60,L.audio,'stereo')+cab(920,60,1120,60,L.cv,'pattern');
+  s+=`</g>`;
+  s+=T('mono · stereo · mono · stereo',150,700,{fill:C.ink2})+T('mono · stereo · functional',520,700,{fill:C.ink2});
+  s+='</svg>';
+  document.getElementById('parts').innerHTML=s;
+}
+// thin wrappers: build a face with one control, return its svg
+function buildPartsKnob(cx,cy,r,v,o,L,dark){
+  const spec={id:'k',title:'',fam:'fx',w:2000,num:0,ins:[],outs:[]};
+  const res=partsCtx(L,dark);return res.knob(cx,cy,r,v,o)}
+function buildPartsJack(cx,cy,t,ch,o,L,dark){const res=partsCtx(L,dark);return res.jack(cx,cy,t,ch,o)}
+function partsCtx(L,dark){
+  const C=famCol(L,'fx',dark);
+  return{
+    knob(cx,cy,r,v,{mod=null,state=null}={}){let o='';const P=s=>o+=s;
+      const a0=-225*Math.PI/180,sweep=270*Math.PI/180,ar=r+3.5,pt=(a,rad)=>[cx+Math.cos(a)*rad,cy+Math.sin(a)*rad];
+      const arc=(t0,t1,rad)=>{const A=a0+sweep*t0,B=a0+sweep*t1,[x0,y0]=pt(A,rad),[x1,y1]=pt(B,rad);return `M${x0},${y0}A${rad},${rad} 0 ${(B-A)>Math.PI?1:0} 1 ${x1},${y1}`};
+      P(`<g ${state==='disabled'?'opacity=".4"':''}>`);
+      P(`<path d="${arc(0,1,ar)}" stroke="${C.ink}" stroke-opacity="${state==='hover'?.34:.16}" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="${arc(0,v,ar)}" stroke="${C.ink}" stroke-opacity=".85" stroke-width="2.5" fill="none" stroke-linecap="round"/>`);
+      if(mod){P(`<path d="${arc(v,mod[0],ar)}" stroke="${L.cv}" stroke-width="2.5" fill="none" stroke-linecap="round"/>`);const [lx,ly]=pt(a0+sweep*mod[1],ar);P(`<circle cx="${lx}" cy="${ly}" r="3.2" fill="${L.cv}" stroke="${C.base}" stroke-width="1.2"/>`)}
+      P(`<circle cx="${cx}" cy="${cy+3}" r="${r+1}" fill="rgba(0,0,0,.12)"/><circle cx="${cx}" cy="${cy+1.5}" r="${r+.5}" fill="rgba(0,0,0,.28)"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${L.skirt}"/>`);
+      let t='';for(let i=0;i<=10;i++){const A=a0+sweep*i/10,[x0,y0]=pt(A,r-1.2),[x1,y1]=pt(A,r-3.6);t+=`M${x0},${y0}L${x1},${y1}`}P(`<path d="${t}" stroke="rgba(255,255,255,.28)" stroke-width="1"/>`);
+      P(`<circle cx="${cx}" cy="${cy}" r="${r*.74}" fill="url(#cap-${dark?'d':'l'})"/>`);
+      const [p0x,p0y]=pt(a0+sweep*v,r*.18),[p1x,p1y]=pt(a0+sweep*v,r*.68);P(`<line x1="${p0x}" y1="${p0y}" x2="${p1x}" y2="${p1y}" stroke="${L.pointer}" stroke-width="${r>18?2.4:2}" stroke-linecap="round"/>`);
+      if(state==='focus')P(`<circle cx="${cx}" cy="${cy}" r="${r+7.5}" stroke="${L.focus}" stroke-width="2" fill="none"/>`);
+      return o+'</g>'},
+    jack(cx,cy,type,ch=1,{state=null,plug=false,col=null}={}){let o='';const P=s=>o+=s;const c=col||L[type];
+      const hex=r=>{let d='';for(let i=0;i<6;i++){const A=Math.PI/6+i*Math.PI/3;d+=(i?'L':'M')+(cx+Math.cos(A)*r)+','+(cy+Math.sin(A)*r)}return d+'Z'};
+      P(`<g ${state==='disabled'?'opacity=".4"':''}><path d="${hex(11.5)}" transform="translate(0,1.2)" fill="rgba(0,0,0,.28)"/><path d="${hex(11)}" fill="${L.nut}" stroke="${L.nutEdge}" stroke-width=".8"/>`);
+      if(state==='hover')P(`<circle cx="${cx}" cy="${cy}" r="14" stroke="${c}" stroke-opacity=".5" stroke-width="2" fill="none"/>`);
+      if(ch===2)P(`<circle cx="${cx}" cy="${cy}" r="8.1" fill="${L.hole}"/><circle cx="${cx}" cy="${cy}" r="8.1" stroke="${c}" stroke-width="1.7" fill="none"/><circle cx="${cx}" cy="${cy}" r="5" stroke="${c}" stroke-width="1.7" fill="none"/><circle cx="${cx}" cy="${cy}" r="2.4" fill="${L.hole}"/>`);
+      else P(`<circle cx="${cx}" cy="${cy}" r="7.6" fill="${c}"/><circle cx="${cx}" cy="${cy}" r="5.2" fill="${L.hole}"/>`);
+      if(plug){if(ch===2)P(`<circle cx="${cx}" cy="${cy+1.5}" r="8.6" fill="rgba(0,0,0,.35)"/><circle cx="${cx}" cy="${cy}" r="8.2" fill="${c}"/><circle cx="${cx}" cy="${cy}" r="4.6" fill="none" stroke="${mix(c,'#000000',.45)}" stroke-width="1.6"/>`);
+        else P(`<circle cx="${cx}" cy="${cy+1.5}" r="8" fill="rgba(0,0,0,.35)"/><circle cx="${cx}" cy="${cy}" r="7.5" fill="${c}"/><circle cx="${cx-2}" cy="${cy-2}" r="2.6" fill="rgba(255,255,255,.35)"/>`)}
+      return o+'</g>'}
+  }}
+
+/* ---------- controls ---------- */
+function syncButtons(){
+  for(const [id,key] of [['tab','tab'],['look','look'],['zoom','zoom'],['chk','chk']]){
+    document.querySelectorAll(`#${id} button`).forEach(b=>{const v=b.dataset.v;const cur=key==='zoom'?String(S.zoom):key==='chk'?(S.chk?'on':'off'):S[key];b.setAttribute('aria-pressed',String(v===cur))})}
+  for(const t of ['faces','parts','rules'])document.getElementById('v-'+t).hidden=S.tab!==t;
+}
+function renderAll(){syncButtons();if(S.tab==='faces')renderRack();if(S.tab==='parts')renderParts()}
+document.querySelectorAll('.seg').forEach(g=>g.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const v=b.dataset.v;
+  if(g.id==='tab')S.tab=v; if(g.id==='look')S.look=v; if(g.id==='zoom')S.zoom=parseFloat(v); if(g.id==='chk')S.chk=v==='on';
+  save();renderAll()}));
+const go=()=>{renderAll();window.__kablReady=true};
+const loads=['500 11px "IBM Plex Sans"','600 14px "IBM Plex Sans"','400 11px "IBM Plex Mono"','500 11px "IBM Plex Mono"'].map(f=>document.fonts?document.fonts.load(f):Promise.resolve());
+renderAll();
+Promise.all(loads).then(()=>document.fonts.ready).then(go,go);
+window.__kablRun=(o)=>{Object.assign(S,o);renderAll();return window.__kablFindings};
+})();
+</script>

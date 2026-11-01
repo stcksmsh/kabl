@@ -1,0 +1,15 @@
+{
+ "plugin_sha256": "d69b5d651a79e38c550979e9195f2e27935015910189b11b12653de22ec0abb3",
+ "rope-walk": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.1203,
+  "rms": 0.0216,
+  "restart_relative_difference": 0.0
+ },
+ "loading-dock": {
+  "states_identical_across_save_quit_reopen": true,
+  "peak": 0.0779,
+  "rms": 0.0135,
+  "restart_relative_difference": 0.0
+ }
+}

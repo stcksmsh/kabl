@@ -71,8 +71,14 @@ def clicks(x, sr):
             top = b[k]
             if db(top) < CLICK_MIN_DB or db(np.abs(x[i * w:(i + 1) * w + 2, c]).max()) < CLICK_QUIET_DB:
                 continue
-            m = b.copy()
-            m[max(0, k - 3):k + 4] = 0
+            # A spike in the first 2 ms or last 1 ms is read with the neighbouring half window too: a hit
+            # that starts right at a window boundary has no earlier (or later) audio in its own
+            # window, so its attack looks isolated there and only there.
+            lo = max(0, i * w - w // 2) if k < w // 24 else i * w
+            hi = (i + 1) * w + w // 2 if k >= w - w // 50 else (i + 1) * w
+            m = d2[lo:hi].copy()
+            j = i * w + k - lo
+            m[max(0, j - 3):j + 4] = 0
             rest = m.max()
             if rest > CLICK_NEIGHBOUR_MIN and top / rest >= CLICK_ISOLATION:
                 found.append(i * .05 + k / sr)
