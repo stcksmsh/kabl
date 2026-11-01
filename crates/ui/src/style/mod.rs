@@ -10,12 +10,18 @@ mod load;
 
 pub use builtin::{builtin_a, builtin_b, BUILTIN_A_ID, BUILTIN_B_ID};
 pub use load::{config_dir, themes_dir, Prefs, Theme, Themes};
+pub use solid::{
+    compose, line_solid_default, outline_default, with_accent, Accent, FACE_STYLES, LINE_SOLID_ID,
+    OUTLINE_ID,
+};
 
 use egui::{Color32, FontFamily, FontId};
 use serde::{Deserialize, Serialize};
 
 /// Smallest text size anywhere in the chrome. Not themable.
 pub const TEXT_FLOOR: f32 = 11.0;
+
+mod solid;
 
 mod hex {
     use egui::Color32;
@@ -66,6 +72,7 @@ roles!(
     audio,
     cv,
     gate,
+    pitch,
     good,
     warn,
     bad,
@@ -109,6 +116,8 @@ pub enum Font {
     Sans,
     SansMedium,
     SansSemibold,
+    /// IBM Plex Sans Condensed SemiBold: face titles and section labels.
+    SansCondSemibold,
     Mono,
     MonoMedium,
 }
@@ -120,10 +129,13 @@ impl Font {
         match self {
             Font::Sans => FontFamily::Proportional,
             Font::Mono => FontFamily::Monospace,
-            Font::SansMedium | Font::SansSemibold if !ready => FontFamily::Proportional,
+            Font::SansMedium | Font::SansSemibold | Font::SansCondSemibold if !ready => {
+                FontFamily::Proportional
+            }
             Font::MonoMedium if !ready => FontFamily::Monospace,
             Font::SansMedium => FontFamily::Name("kabl-sans-medium".into()),
             Font::SansSemibold => FontFamily::Name("kabl-sans-semibold".into()),
+            Font::SansCondSemibold => FontFamily::Name("kabl-cond-semibold".into()),
             Font::MonoMedium => FontFamily::Name("kabl-mono-medium".into()),
         }
     }
@@ -202,17 +214,17 @@ macro_rules! recipes {
 }
 
 recipes! {
-    FaceMaterial { Satin, Lacquer, Flat }
+    FaceMaterial { Satin, Lacquer, Flat, Line }
     FaceHardware { Nuts, None, Screws }
-    FaceTitle { Centered, LeftDot, CapsRule }
+    FaceTitle { Centered, LeftDot, CapsRule, CondCaps }
     OutPlate { Tint, Dark, Outline }
     RackSurface { Plain, Grid }
-    KnobBody { Cap, Glass, Disc }
+    KnobBody { Cap, Glass, Disc, Solid }
     KnobScale { Ticks, TrackArc, None }
     KnobValue { Line, Dot, Notch, Arc }
     KnobMod { ArcDot, ArcGlow, Segment }
     SelectorRecipe { InsetPill, AccentPill, Outlined }
-    JackRecipe { Nut, GlowRing, Donut }
+    JackRecipe { Nut, GlowRing, Donut, Hex }
     CableRecipe { Rope, Glow, Outlined }
     PlugRecipe { Cap, Ring, Dot }
     DisplayFrame { Glass, Neon, Paper }
@@ -223,6 +235,16 @@ recipes! {
     Navigator { Left, PresetBar }
     BrowserRows { Cards, Table }
     Icons { Stroke }
+    /// `Classic` is the cable look as it was before the redesign; `Themed` reads the paint
+    /// tokens of [`CableSlots`].
+    CableStyle { Classic, Themed }
+    /// How a module's family shows: coloured title (line styles) or a 3 px stripe (solid styles).
+    FamilyMarker { Title, Stripe }
+    /// Face text below the full zoom tier: `Hide` drops it under 9.5 screen px (classic), `Hold`
+    /// keeps it at 9.5 px down to the overview tier, dropping values and captions.
+    CompactText { Hide, Hold }
+    /// The port tray behind the jacks: none, or an outlined tray with a raised output plate.
+    TrayRecipe { None, Outline }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -236,6 +258,9 @@ pub struct FaceSlots {
     pub title: FaceTitle,
     pub out_plate: OutPlate,
     pub shadow: usize,
+    pub family: FamilyMarker,
+    pub compact: CompactText,
+    pub tray: TrayRecipe,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -264,6 +289,18 @@ pub struct CableSlots {
     pub glow: f32,
     /// Opacity of the other cables while Focus pins one module's cables.
     pub dimmed: f32,
+    /// Paint tokens (PLAN §7 Cables), read when `style` is `Themed`.
+    pub style: CableStyle,
+    /// Darkening of the edge around the core, 0..=1.
+    pub edge: f32,
+    /// Alpha of the highlight line on a lit cable, 0..=1.
+    pub highlight: f32,
+    /// Alpha of the shadow under the cable, 0..=1, and its offset in rack units.
+    pub shadow_alpha: f32,
+    pub shadow_dy: f32,
+    /// Alpha and total width (rack units) of the glow under a lit cable; 0 for none.
+    pub glow_alpha: f32,
+    pub glow_width: f32,
 }
 
 fn default_rest_width() -> f32 {
@@ -584,6 +621,6 @@ mod tests {
 
     #[test]
     fn every_role_has_a_name() {
-        assert_eq!(Roles::NAMES.len(), 29);
+        assert_eq!(Roles::NAMES.len(), 30);
     }
 }

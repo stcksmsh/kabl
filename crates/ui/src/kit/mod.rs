@@ -9,6 +9,7 @@ mod containers;
 mod controls;
 pub mod face;
 mod icons;
+pub mod parts;
 mod recipes;
 
 pub use containers::*;
