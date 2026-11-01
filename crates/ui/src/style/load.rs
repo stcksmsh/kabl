@@ -6,7 +6,10 @@
 //! would be unreadable is dropped whole. Nothing here can fail the app: the worst result is
 //! the base theme plus notes.
 
-use super::{builtin_a, builtin_b, contrast, Style, TEXT_FLOOR};
+use super::{
+    builtin_a, builtin_b, compose, contrast, line_solid_default, outline_default, with_accent,
+    Accent, Style, FACE_STYLES, TEXT_FLOOR,
+};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -15,7 +18,7 @@ pub const MAX_THEME_BYTES: u64 = 64 * 1024;
 /// Largest number of user theme files read.
 pub const MAX_THEMES: usize = 64;
 /// Vocabulary version a theme file may declare with `ui_api`.
-pub const UI_API: i64 = 1;
+pub const UI_API: i64 = 2;
 /// Below this ratio a text pair is rejected; below 4.5 it is only reported.
 const REJECT_BELOW: f32 = 3.0;
 
@@ -52,6 +55,8 @@ impl Default for Themes {
             list: vec![
                 builtin(builtin_a, "Satin Studio"),
                 builtin(builtin_b, "Lacquer and Light"),
+                builtin(line_solid_default, "Signal and Drafting solid"),
+                builtin(outline_default, "Outline"),
             ],
         }
     }
@@ -156,7 +161,17 @@ pub fn parse(text: &str, known: &Themes) -> Result<Theme, String> {
     let mut notes = Vec::new();
     for k in doc.keys() {
         if ![
-            "id", "name", "extends", "author", "version", "license", "ui_api", "light", "dark",
+            "id",
+            "name",
+            "extends",
+            "author",
+            "version",
+            "license",
+            "ui_api",
+            "light",
+            "dark",
+            "accent",
+            "face_style",
         ]
         .contains(&k.as_str())
         {
@@ -170,9 +185,37 @@ pub fn parse(text: &str, known: &Themes) -> Result<Theme, String> {
     {
         notes.push("written for a newer kabl; unknown parts are ignored".into());
     }
+    // ui_api 2: `accent` ("amber", "coral", "cyan" or "#rrggbb") and `face_style` choose two of
+    // the three theme layers; a ui_api 1 file never reads them.
+    let api = doc
+        .get("ui_api")
+        .and_then(toml::Value::as_integer)
+        .unwrap_or(1);
+    let (mut accent, mut face_style) = (None, None);
+    if api >= 2 {
+        if let Some(a) = doc.get("accent").and_then(toml::Value::as_str) {
+            accent = Accent::parse(a);
+            if accent.is_none() {
+                notes.push(format!("accent `{a}` unknown, base accent kept"));
+            }
+        }
+        if let Some(f) = doc.get("face_style").and_then(toml::Value::as_str) {
+            face_style = FACE_STYLES.iter().copied().find(|s| *s == f);
+            if face_style.is_none() {
+                notes.push(format!("face_style `{f}` unknown, base face style kept"));
+            }
+        }
+    } else if doc.contains_key("accent") || doc.contains_key("face_style") {
+        notes.push("accent and face_style need ui_api = 2, ignored".into());
+    }
     let mut mode = |dark: bool| {
         let key = if dark { "dark" } else { "light" };
-        let b = base.style(dark);
+        let layered = match (face_style, accent) {
+            (Some(f), a) => compose(f, dark, a.unwrap_or(Accent::Amber)),
+            (None, Some(a)) => Some(with_accent(base.style(dark).clone(), a)),
+            (None, None) => None,
+        };
+        let b = layered.as_ref().unwrap_or_else(|| base.style(dark));
         match doc.get(key) {
             None => b.clone(),
             Some(toml::Value::Table(over)) => overlay(b, over, key, &mut notes),
@@ -632,7 +675,16 @@ mod tests {
         std::fs::write(d.path().join("big.toml"), vec![b'#'; 70_000]).unwrap();
         let (t, msgs) = Themes::with_user_dir(d.path());
         let ids: Vec<_> = t.list.iter().map(|t| t.id.as_str()).collect();
-        assert_eq!(ids, ["kabl.satin", "kabl.lacquer", "u.a"]);
+        assert_eq!(
+            ids,
+            [
+                "kabl.satin",
+                "kabl.lacquer",
+                "kabl.line_solid",
+                "kabl.outline",
+                "u.a"
+            ]
+        );
         assert_eq!(msgs.len(), 3, "{msgs:?}");
         assert_eq!(t.resolve("gone").id, "kabl.satin");
     }

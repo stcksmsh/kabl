@@ -10,12 +10,18 @@ mod load;
 
 pub use builtin::{builtin_a, builtin_b, BUILTIN_A_ID, BUILTIN_B_ID};
 pub use load::{config_dir, themes_dir, Prefs, Theme, Themes};
+pub use solid::{
+    compose, line_solid_default, outline_default, with_accent, Accent, FACE_STYLES, LINE_SOLID_ID,
+    OUTLINE_ID,
+};
 
 use egui::{Color32, FontFamily, FontId};
 use serde::{Deserialize, Serialize};
 
 /// Smallest text size anywhere in the chrome. Not themable.
 pub const TEXT_FLOOR: f32 = 11.0;
+
+mod solid;
 
 mod hex {
     use egui::Color32;

@@ -39,6 +39,7 @@ pub struct Theme {
     pub audio: Color32,
     pub cv: Color32,
     pub gate: Color32,
+    pub pitch: Color32,
     pub btn: Color32,
 }
 
@@ -57,7 +58,12 @@ pub fn theme(st: &Style) -> Theme {
         rail_hi: r.text3,
         hole: r.hole,
         panel: r.surface,
-        panel_edge: r.line2,
+        // Line art: a hairline in the text colour at 26 % over the face.
+        panel_edge: if st.slots.face.material == crate::style::FaceMaterial::Line {
+            mix(r.surface, r.text, 0.26)
+        } else {
+            r.line2
+        },
         ink: r.text,
         ink2: r.text2,
         plate: mix(r.knob, r.hole, 0.5),
@@ -85,6 +91,7 @@ pub fn theme(st: &Style) -> Theme {
         audio: r.audio,
         cv: r.cv,
         gate: r.gate,
+        pitch: r.pitch,
         btn: mix(r.inset, r.raised, 0.4),
     }
 }
@@ -98,7 +105,8 @@ impl Theme {
     pub fn signal(&self, t: PortType) -> Color32 {
         match t {
             PortType::Audio => self.audio,
-            PortType::Cv | PortType::UnipolarCv | PortType::Pitch => self.cv,
+            PortType::Cv | PortType::UnipolarCv => self.cv,
+            PortType::Pitch => self.pitch,
             PortType::Gate => self.gate,
         }
     }
@@ -127,7 +135,7 @@ impl Theme {
 /// Portable IBM Plex typography; OFL-1.1 and reserved name notice in assets/FONT-LICENSE.txt.
 pub fn install_fonts(ctx: &egui::Context) {
     let mut fonts = egui::FontDefinitions::default();
-    let faces: [(&str, &[u8], egui::FontFamily); 5] = [
+    let faces: [(&str, &[u8], egui::FontFamily); 6] = [
         (
             "plex-sans",
             include_bytes!("../assets/IBMPlexSans-Regular.ttf"),
@@ -147,6 +155,11 @@ pub fn install_fonts(ctx: &egui::Context) {
             "plex-sans-semibold",
             include_bytes!("../assets/IBMPlexSans-SemiBold.ttf"),
             egui::FontFamily::Name("kabl-sans-semibold".into()),
+        ),
+        (
+            "plex-cond-semibold",
+            include_bytes!("../assets/IBMPlexSansCondensed-SemiBold.ttf"),
+            egui::FontFamily::Name("kabl-cond-semibold".into()),
         ),
         (
             "plex-mono-medium",
