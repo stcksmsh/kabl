@@ -17,7 +17,7 @@ fn h(s: &str) -> Color32 {
 }
 
 /// Face styles a theme file may name with `face_style` (ui_api 2).
-pub const FACE_STYLES: &[&str] = &["line_solid", "outline"];
+pub const FACE_STYLES: &[&str] = &["line_solid", "outline", "graphite", "aluminium"];
 
 /// An accent: a named preset or a custom colour.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -231,11 +231,65 @@ fn outline(dark: bool, accent: Accent) -> Style {
     s
 }
 
+/// `graphite` and `aluminium`: solid panels with their own fill and ink in both app themes, a
+/// 3 px family stripe instead of a coloured title, flat material. Experimental (automatic
+/// checks only, PLAN §3 review policy). `fill`, `ink`, `ink2` are the panel colours.
+fn solid_panel(dark: bool, accent: Accent, fill: &str, ink: &str, ink2: &str) -> Style {
+    let mut s = line_solid(dark, accent);
+    let face_dark = h(fill).r() < 128;
+    s.slots.face.material = FaceMaterial::Flat;
+    s.slots.face.family = FamilyMarker::Stripe;
+    s.slots.face.hardware = FaceHardware::Screws;
+    s.slots.face.ink = h(ink);
+    let sec = |hue: &str| Section {
+        base: h(fill),
+        // Stripe colour: the family hue, pushed away from the fill until it reads (4.5:1, like a title ink).
+        ink: {
+            let to = if face_dark {
+                Color32::WHITE
+            } else {
+                Color32::BLACK
+            };
+            let mut t = 0.0;
+            while contrast(mix(h(hue), to, t), h(fill)) < 4.5 && t < 0.95 {
+                t += 0.05;
+            }
+            mix(h(hue), to, t)
+        },
+        ink2: h(ink2),
+    };
+    s.sections = Sections {
+        osc: sec("#E07A5F"),
+        filter: sec("#7FB59A"),
+        modulation: sec("#9D8DF1"),
+        timing: sec("#5FA8D3"),
+        amp: sec("#E3BE5C"),
+        fx: sec("#B9B2A6"),
+    };
+    s
+}
+
+fn graphite(dark: bool, accent: Accent) -> Style {
+    let mut s = solid_panel(dark, accent, "#2B2D32", "#ECEAE6", "#A9A6A0");
+    s.id = "kabl.graphite".into();
+    s.name = "Graphite panels (experimental)".into();
+    s
+}
+
+fn aluminium(dark: bool, accent: Accent) -> Style {
+    let mut s = solid_panel(dark, accent, "#C7CACF", "#17181B", "#4A4D54");
+    s.id = "kabl.aluminium".into();
+    s.name = "Aluminium panels (experimental)".into();
+    s
+}
+
 /// The face style `name` (see [`FACE_STYLES`]) in app theme `dark` with `accent`.
 pub fn compose(face_style: &str, dark: bool, accent: Accent) -> Option<Style> {
     match face_style {
         "line_solid" => Some(line_solid(dark, accent)),
         "outline" => Some(outline(dark, accent)),
+        "graphite" => Some(graphite(dark, accent)),
+        "aluminium" => Some(aluminium(dark, accent)),
         _ => None,
     }
 }
@@ -290,6 +344,21 @@ mod tests {
             );
         }
         assert!(contrast(paper.sections.amp.ink, face) >= 4.5);
+    }
+
+    #[test]
+    fn solid_panels_keep_ink_and_stripe_readable() {
+        for fs in ["graphite", "aluminium"] {
+            for dark in [true, false] {
+                let s = compose(fs, dark, Accent::Amber).unwrap();
+                let sec = s.sections.osc;
+                assert!(contrast(s.slots.face.ink, sec.base) >= 4.5, "{fs} ink");
+                assert!(contrast(sec.ink2, sec.base) >= 4.5, "{fs} ink2");
+                for c in [s.sections.filter, s.sections.fx, s.sections.amp] {
+                    assert!(contrast(c.ink, c.base) >= 3.0, "{fs} stripe");
+                }
+            }
+        }
     }
 
     #[test]

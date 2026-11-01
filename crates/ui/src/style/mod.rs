@@ -261,6 +261,14 @@ pub struct FaceSlots {
     pub family: FamilyMarker,
     pub compact: CompactText,
     pub tray: TrayRecipe,
+    /// Text ink of a solid panel (`graphite`, `aluminium` face styles), which does not follow
+    /// the app theme (PLAN §3 rule 3). Transparent = the section ink, as for line panels.
+    #[serde(with = "hex", default = "no_ink")]
+    pub ink: Color32,
+}
+
+fn no_ink() -> Color32 {
+    Color32::TRANSPARENT
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
