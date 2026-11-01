@@ -15,7 +15,7 @@ use egui::{pos2, vec2, Color32, FontId, Painter, Pos2, Rect};
 use kabl_core::{ModuleState, PatchState, Vec2 as WorldVec};
 use kabl_modules::{registry, PortDirection};
 use kabl_ui::rack::{self, Decor, Geo, Placed};
-use kabl_ui::routing::{fmt_value, param_label};
+use kabl_ui::routing::{face_label, fmt_value};
 use kabl_ui::style::{
     builtin_a, builtin_b, contrast, line_solid_default, CompactText, KnobScale, Role, Style,
 };
@@ -230,7 +230,7 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
 
     for c in &m.ctls {
         group += 1;
-        let label = param_label(c.param);
+        let label = face_label(m.info.kind, c.param);
         let lw = ruler.size(&label, font(st, Role::Label, label_px));
         let mut lp = sc(
             &m,
@@ -367,7 +367,8 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
             ax,
             name: format!("jack {}", j.port.name),
         });
-        let label = port_label(j.port.name);
+        let label = rack::short_name(m.info.kind, j.port.name)
+            .map_or_else(|| port_label(j.port.name), str::to_string);
         let lw = ruler.size(&label, font(st, Role::Label, label_px));
         let lc = if j.label_right {
             c + vec2(20.0 * z + lw.x / 2.0, 0.0)

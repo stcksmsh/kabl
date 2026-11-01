@@ -3535,7 +3535,7 @@ fn draw_control(
         return;
     };
     let on = set[i];
-    let pr = xf.r(c.geo.pin_rect(&routing::param_label(c.param)));
+    let pr = xf.r(c.geo.pin_rect(&routing::face_label(m.info.kind, c.param)));
     ui_state.record(format!("pin:{}.{}", m.id, c.param.name), pr);
     let resp = ui.interact(
         pr,
@@ -3668,8 +3668,8 @@ fn draw_jacks(
                 th.panel.gamma_multiply(0.96),
             );
         }
-        let label =
-            macro_name(editor.state(), m.id, port.name).unwrap_or_else(|| port_label(port.name));
+        let label = macro_name(editor.state(), m.id, port.name)
+            .unwrap_or_else(|| face_port_label(m.info.kind, port.name));
         if let Some(font) = kit::face::face_font(&st, style::Role::Label, z) {
             if j.label_right {
                 painter.text(
@@ -3769,6 +3769,11 @@ fn draw_jacks(
 }
 
 /// `cutoff_cv` -> `Cutoff CV`, `lp` -> `LP`, `in2` -> `In 2`.
+/// The label a face draws on a jack: the family's short name where it has one, else `port_label`.
+pub fn face_port_label(kind: &str, name: &str) -> String {
+    rack::short_name(kind, name).map_or_else(|| port_label(name), str::to_string)
+}
+
 fn port_label(name: &str) -> String {
     name.split('_')
         .map(|w| {
