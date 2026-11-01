@@ -577,7 +577,16 @@ fn place_local(
             72.0f32.min((fw - 2.0 * SIDE) / ins.len().max(outs.len()).max(3) as f32)
         };
         let col_x = |k: usize| SIDE + pitch / 2.0 + k as f32 * pitch;
-        if fm6 {
+        if matches!(info.kind, "split" | "join") {
+            // Three jacks in one row, centred, pitch 28 (owner pick, option A): In L R / L R Out.
+            for (k, &port) in ins.iter().chain(&outs).enumerate() {
+                jacks.push(Jack {
+                    port,
+                    c: pos2(fw / 2.0 + (k as f32 - 1.0) * 28.0, JACK_Y),
+                    label_right: false,
+                });
+            }
+        } else if fm6 {
             // Top left, above the operators.
             for (k, &port) in ins.iter().chain(&outs).enumerate() {
                 jacks.push(Jack {
@@ -822,7 +831,7 @@ fn place_local(
         .filter(|j| j.port.direction == PortDirection::Output)
         .map(|j| j.c.x);
     let (lo, hi) = outs_x.fold((f32::MAX, f32::MIN), |(lo, hi), x| (lo.min(x), hi.max(x)));
-    let has_row = skin.is_none() && info.kind != "out" && info.kind != "osc.fm6";
+    let has_row = skin.is_none() && !matches!(info.kind, "out" | "split" | "join");
     // Output plate: under the output jacks, a half pitch beyond the outer ones.
     // Two-row trays: the plate spans the tray (G1b target); one-row trays: just the outputs.
     let has_in = jacks
@@ -1038,11 +1047,6 @@ mod tests {
                 };
                 let l = layout(&q, &v);
                 for m in &l.mods {
-                    // `split` and `join` are 3 units wide: three jacks at the PLAN pitch (22 px) are narrower
-                    // than their boxes. Its table belongs to the utility family (G3 agent C).
-                    if matches!(m.info.kind, "split" | "join") {
-                        continue;
-                    }
                     let area = m.full();
                     // The FM voice packs six envelopes into one row: its knob boxes are the
                     // drawn label and value, without the usual padding.
