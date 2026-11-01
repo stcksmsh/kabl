@@ -10,6 +10,7 @@
     {"date": "2026-10-31", "item": "PLAN §11.7 hosts beyond REAPER", "verdict": "approve", "note": "REAPER only verified for 1.0; others unverified"},
     {"date": "2026-10-31", "item": "PLAN §11.8 built-ins besides the defaults in 1.0", "verdict": "approve", "note": "ship behind an experimental flag"},
     {"date": "2026-11-01", "item": "G1b knobs: dark filled caps", "verdict": "approve"},
-    {"date": "2026-11-01", "item": "G1b paper accent #A97229 + title hue mix amp 45 / fx 40 / others 35 %", "verdict": "approve", "note": "tentative, confirm at sign-off"}
+    {"date": "2026-11-01", "item": "G1b paper accent #A97229 + title hue mix amp 45 / fx 40 / others 35 %", "verdict": "approve", "note": "tentative, confirm at sign-off"},
+    {"date": "2026-11-01", "item": "Cables: port cable_look.rs, theme only (planner spec)", "verdict": "approve"}
   ]
 }
