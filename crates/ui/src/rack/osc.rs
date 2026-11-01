@@ -2,11 +2,16 @@
 
 use super::*;
 
-const FM6_H: f32 = 214.0;
+/// Height of the operator cards, from y 52 to the bottom of the control zone.
+const FM6_H: f32 = 226.0;
+const FM6_TOP: f32 = 52.0;
+/// Left column: algorithm well, four knobs, oversample.
+const FM6_LEFT: f32 = 196.0;
 
-/// The six-operator FM voice. A header band holds the jacks, feedback, index and the algorithm
-/// choice; under it one framed block per operator: ratio across the top, then fine, level and
-/// velocity, then the four envelope knobs. Other chosen controls go to the advanced area.
+/// The six-operator FM voice (PLAN section 4): a left column with the algorithm well, Freq,
+/// Fine, Fdbk and Index, and the oversample choice; six operator cards, each with its ratio,
+/// Level knob and an envelope curve (drawn and edited by `fm6.rs`). Fine and velocity per
+/// operator stay behind `+N`.
 pub(super) fn fm6_face(
     info: &'static ModuleInfo,
     controls: &[usize],
@@ -14,8 +19,12 @@ pub(super) fn fm6_face(
     ctls: &mut Vec<Ctl>,
     off_face: &mut Vec<usize>,
 ) -> Decor {
-    const TOP: f32 = 100.0;
-    let blocks = fm6_blocks(Rect::from_min_size(pos2(10.0, TOP), vec2(fw - 20.0, FM6_H)));
+    let cards = Rect::from_min_max(
+        pos2(SIDE + FM6_LEFT + 16.0, FM6_TOP),
+        pos2(fw - SIDE, FM6_TOP + FM6_H),
+    );
+    let blocks = fm6_blocks(cards);
+    let pitch = FM6_LEFT / 4.0;
     for &i in controls {
         let name = info.params[i].name;
         let op = name
@@ -25,53 +34,46 @@ pub(super) fn fm6_face(
             .filter(|d| (1..=6).contains(d))
             .map(|d| d as usize - 1);
         let base = op.map_or(name, |_| &name[..name.len() - 1]);
-        let b = blocks[op.unwrap_or(0)];
-        let (bx, bw) = (b.left(), b.width());
-        let row1 = |k: usize| pos2(bx + bw * (k as f32 + 0.5) / 3.0, TOP + 87.0);
-        let row2 = |k: usize| pos2(bx + bw * (k as f32 + 0.5) / 4.0, TOP + 171.0);
+        let col = |k: f32| SIDE + pitch * (k + 0.5);
+        let knob_y = FM6_TOP + 76.0 + 17.1 + KNOB_S;
         let geo = match (op, base) {
-            (Some(_), "ratio") => Geo::Select {
-                rect: Rect::from_min_size(pos2(bx + 10.0, TOP + 20.0), vec2(bw - 20.0, 20.0)),
+            (Some(o), "ratio") => Geo::Select {
+                rect: Rect::from_min_size(
+                    pos2(blocks[o].left() + 6.0, FM6_TOP + 24.0),
+                    vec2(blocks[o].width() - 12.0, 20.0),
+                ),
             },
-            (Some(_), "fine") => Geo::Knob {
-                c: row1(0),
-                r: R_SMALL,
-            },
-            (Some(_), "level") => Geo::Knob {
-                c: row1(1),
-                r: R_SMALL,
-            },
-            (Some(_), "vel") => Geo::Knob {
-                c: row1(2),
-                r: R_SMALL,
-            },
-            (Some(_), "attack") => Geo::Knob {
-                c: row2(0),
-                r: R_SMALL,
-            },
-            (Some(_), "decay") => Geo::Knob {
-                c: row2(1),
-                r: R_SMALL,
-            },
-            (Some(_), "sustain") => Geo::Knob {
-                c: row2(2),
-                r: R_SMALL,
-            },
-            (Some(_), "release") => Geo::Knob {
-                c: row2(3),
-                r: R_SMALL,
-            },
-            (None, "feedback") => Geo::Knob {
-                c: pos2(430.0, 60.0),
-                r: R_SMALL,
-            },
-            (None, "index") => Geo::Knob {
-                c: pos2(490.0, 60.0),
-                r: R_SMALL,
+            (Some(o), "level") => Geo::Knob {
+                c: pos2(blocks[o].center().x, FM6_TOP + 54.0 + 17.1 + KNOB_S),
+                r: KNOB_S,
             },
             (None, "algorithm") => Geo::Select {
-                rect: Rect::from_min_size(pos2(fw - 400.0, 40.0), vec2(220.0, 28.0)),
+                rect: Rect::from_min_size(pos2(SIDE + 6.0, FM6_TOP + 4.0), vec2(184.0, 20.0)),
             },
+            (None, "base_hz") => Geo::Knob {
+                c: pos2(col(0.0), knob_y),
+                r: KNOB_S,
+            },
+            (None, "fine") => Geo::Knob {
+                c: pos2(col(1.0), knob_y),
+                r: KNOB_S,
+            },
+            (None, "feedback") => Geo::Knob {
+                c: pos2(col(2.0), knob_y),
+                r: KNOB_S,
+            },
+            (None, "index") => Geo::Knob {
+                c: pos2(col(3.0), knob_y),
+                r: KNOB_S,
+            },
+            (None, "oversample") => Geo::Select {
+                rect: Rect::from_min_size(
+                    pos2(SIDE + FM6_LEFT - 80.0, cards.bottom() - 28.0),
+                    vec2(80.0, 20.0),
+                ),
+            },
+            // The envelope curve edits these four; they need no place of their own.
+            (Some(_), "attack" | "decay" | "sustain" | "release") => continue,
             _ => {
                 off_face.push(i);
                 continue;
@@ -84,16 +86,17 @@ pub(super) fn fm6_face(
         });
     }
     off_face.sort_unstable();
-    Decor::Operators(Rect::from_min_size(pos2(10.0, TOP), vec2(fw - 20.0, FM6_H)))
+    Decor::Operators(cards)
 }
 
-/// The six operator blocks inside `r`. A wider gap down the middle keeps the face caption
-/// clear of the controls.
+/// The six operator cards inside `r`.
 pub fn fm6_blocks(r: Rect) -> [Rect; 6] {
-    let w = (r.width() - 55.0) / 6.0;
+    let w = (r.width() - 25.0) / 6.0;
     std::array::from_fn(|i| {
-        let x = r.left() + i as f32 * (w + 3.0) + if i >= 3 { 40.0 } else { 0.0 };
-        Rect::from_min_size(pos2(x, r.top()), vec2(w, r.height()))
+        Rect::from_min_size(
+            pos2(r.left() + i as f32 * (w + 5.0), r.top()),
+            vec2(w, r.height()),
+        )
     })
 }
 
@@ -101,6 +104,8 @@ pub fn fm6_blocks(r: Rect) -> [Rect; 6] {
 pub(super) fn short_name(kind: &str, param: &str) -> Option<&'static str> {
     match (kind, param) {
         ("osc.va", "pw") => Some("PW"),
+        ("osc.fm6", "base_hz") => Some("Freq"),
+        ("osc.fm6", "feedback") => Some("Fdbk"),
         _ => None,
     }
 }
@@ -108,7 +113,8 @@ pub(super) fn short_name(kind: &str, param: &str) -> Option<&'static str> {
 /// VA Oscillator (R1): Fine and Pulse width sit beside Frequency; the other advanced params
 /// stay behind `+N`.
 pub(super) fn on_face(kind: &str, param: &str) -> bool {
-    kind == "osc.va" && matches!(param, "fine" | "pw")
+    (kind == "osc.va" && matches!(param, "fine" | "pw"))
+        || (kind == "osc.fm6" && matches!(param, "base_hz" | "fine" | "oversample"))
 }
 
 /// VA Oscillator: Frequency large, Fine and Pulse width small.
