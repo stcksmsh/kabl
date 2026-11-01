@@ -427,11 +427,18 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
     // Header: title (as `kit::face::title`), `+N` chip, caption.
     group += 1;
     let tf = font(st, Role::H3, title_px);
-    let mut tsz = ruler.size(m.info.name, tf.clone());
+    let shown = if ruler.size(m.info.name, tf.clone()).x
+        > kabl_ui::kit::face::title_room(face.width(), z)
+    {
+        kabl_ui::kit::face::short_title(m.info.name)
+    } else {
+        m.info.name
+    };
+    let mut tsz = ruler.size(shown, tf.clone());
     let mut tfont = tf;
     if tsz.x > face.width() - 100.0 * z {
         tfont = FontId::new((title_px * 0.8).max(11.0), tfont.family.clone());
-        tsz = ruler.size(m.info.name, tfont.clone());
+        tsz = ruler.size(shown, tfont.clone());
     }
     let tag = format!("{} · #{}", m.info.kind, 1);
     let capsz = ruler.size(&tag, font(st, Role::Caption, caption_px));

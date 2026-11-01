@@ -74,7 +74,7 @@ fn knob_r(n: usize) -> f32 {
 /// `r + 12` scaled, but never closer to the ring than 1.5 px plus half the text, because held
 /// compact text does not shrink with the zoom `z`. `text_h` is the text height in screen px.
 pub fn knob_text_dy(r: f32, z: f32, text_h: f32) -> f32 {
-    ((r + 12.0) * z).max((r + 4.8) * z + 1.5 + text_h / 2.0)
+    ((r + 12.0) * z).max((r + 4.8) * z + 1.6 + text_h / 2.0)
 }
 
 /// Hex nut radius of a drawn jack (PLAN section 4); `JACK_R` is its larger hit radius.
@@ -83,7 +83,7 @@ pub const JACK_NUT: f32 = 11.0;
 /// Screen px from a jack centre up to its label centre, for text `text_h` px high at zoom `z`:
 /// 22 design px scaled, never closer than 1.5 px above the nut.
 pub fn jack_text_dy(z: f32, text_h: f32) -> f32 {
-    (22.0 * z).max(JACK_NUT * z + 1.5 + text_h / 2.0)
+    (22.0 * z).max(JACK_NUT * z + 1.6 + text_h / 2.0)
 }
 
 /// Height of a knob cell: label, ring, value.
