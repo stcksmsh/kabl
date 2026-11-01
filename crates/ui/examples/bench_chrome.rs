@@ -50,6 +50,10 @@ fn run(
     {
         ui.zoom = z;
     }
+    // KABL_BENCH_CABLES=hidden measures the frame without cables, to size their share.
+    if std::env::var("KABL_BENCH_CABLES").as_deref() == Ok("hidden") {
+        ui.cable_view = kabl_ui::CableView::Hidden;
+    }
     ui.perform_open = perform > 0;
     ui.perform_tall = perform == 1;
     ui.dark = dark;
