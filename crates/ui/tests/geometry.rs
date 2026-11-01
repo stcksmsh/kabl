@@ -545,6 +545,20 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
                 }
             }
         }
+        // corner screws stay clear of jacks
+        if a.k == K::Jack {
+            for at in kabl_ui::kit::face::screw_points(m.face.width(), m.face.height()) {
+                let s = Rect::from_center_size(at * z, vec2(7.0, 7.0) * z).expand(2.0);
+                if overlaps(a.r, s) {
+                    push(
+                        "overlap",
+                        Sev::Error,
+                        format!("{} touches a corner screw", a.name),
+                        vec![a.r, s],
+                    );
+                }
+            }
+        }
         // containers: inside or apart, never straddling
         for c in &boxes {
             if overlaps(a.r, *c) && !c.expand(0.5).contains_rect(a.r) {
@@ -569,7 +583,10 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
                 .min(face.max.x - a.r.max.x)
                 .min(a.r.min.y - face.min.y)
                 .min(face.max.y - a.r.max.y);
-            if m_ < 4.0 {
+            // Split / Join (owner pick, option A): three 26 px jacks at pitch 28 in 90 px leave
+            // 4 world px, which is under 4 screen px below zoom 1.
+            let narrow = matches!(kind, "split" | "join") && z < 1.0;
+            if m_ < 4.0 && !narrow {
                 push(
                     "edge",
                     Sev::Error,
