@@ -428,6 +428,22 @@ fn clamp(s: &mut Style, base: &Style, mode: &str, notes: &mut Vec<String>) {
         (&mut sl.face.grain, bl.face.grain, "face.grain"),
         (&mut sl.knob.glow, bl.knob.glow, "knob.glow"),
         (&mut sl.cable.glow, bl.cable.glow, "cable.glow"),
+        (&mut sl.cable.edge, bl.cable.edge, "cable.edge"),
+        (
+            &mut sl.cable.highlight,
+            bl.cable.highlight,
+            "cable.highlight",
+        ),
+        (
+            &mut sl.cable.shadow_alpha,
+            bl.cable.shadow_alpha,
+            "cable.shadow_alpha",
+        ),
+        (
+            &mut sl.cable.glow_alpha,
+            bl.cable.glow_alpha,
+            "cable.glow_alpha",
+        ),
         (&mut sl.cable.dimmed, bl.cable.dimmed, "cable.dimmed"),
         (
             &mut sl.cable.rest_alpha,
@@ -459,6 +475,24 @@ fn clamp(s: &mut Style, base: &Style, mode: &str, notes: &mut Vec<String>) {
         12.0,
         bl.cable.rest_width,
         "cable.rest_width",
+        mode,
+        notes,
+    );
+    num(
+        &mut sl.cable.glow_width,
+        0.0,
+        24.0,
+        bl.cable.glow_width,
+        "cable.glow_width",
+        mode,
+        notes,
+    );
+    num(
+        &mut sl.cable.shadow_dy,
+        -8.0,
+        8.0,
+        bl.cable.shadow_dy,
+        "cable.shadow_dy",
         mode,
         notes,
     );

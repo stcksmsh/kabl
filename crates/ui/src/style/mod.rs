@@ -235,6 +235,9 @@ recipes! {
     Navigator { Left, PresetBar }
     BrowserRows { Cards, Table }
     Icons { Stroke }
+    /// `Classic` is the cable look as it was before the redesign; `Themed` reads the paint
+    /// tokens of [`CableSlots`].
+    CableStyle { Classic, Themed }
     /// How a module's family shows: coloured title (line styles) or a 3 px stripe (solid styles).
     FamilyMarker { Title, Stripe }
     /// Face text below the full zoom tier: `Hide` drops it under 9.5 screen px (classic), `Hold`
@@ -286,6 +289,18 @@ pub struct CableSlots {
     pub glow: f32,
     /// Opacity of the other cables while Focus pins one module's cables.
     pub dimmed: f32,
+    /// Paint tokens (PLAN §7 Cables), read when `style` is `Themed`.
+    pub style: CableStyle,
+    /// Darkening of the edge around the core, 0..=1.
+    pub edge: f32,
+    /// Alpha of the highlight line on a lit cable, 0..=1.
+    pub highlight: f32,
+    /// Alpha of the shadow under the cable, 0..=1, and its offset in rack units.
+    pub shadow_alpha: f32,
+    pub shadow_dy: f32,
+    /// Alpha and total width (rack units) of the glow under a lit cable; 0 for none.
+    pub glow_alpha: f32,
+    pub glow_width: f32,
 }
 
 fn default_rest_width() -> f32 {

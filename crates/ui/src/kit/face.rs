@@ -778,3 +778,22 @@ pub fn playhead(p: &Painter, st: &Style, at: Pos2, z: f32) {
     p.circle_filled(at, 5.0 * z.max(0.7), alpha(col, 70));
     p.circle_filled(at, 3.0 * z.max(0.7), st.roles.disp_text);
 }
+
+/// The ink of a face title: the module family's colour for line styles with a coloured-title
+/// family marker, else the plain face `ink`.
+pub fn family_ink(st: &Style, kind: &str, ink: Color32) -> Color32 {
+    let f = &st.slots.face;
+    if f.material == FaceMaterial::Line && f.family == crate::style::FamilyMarker::Title {
+        st.section_of(kind).ink
+    } else {
+        ink
+    }
+}
+
+/// The 3 px family stripe along the top edge of a face (`FamilyMarker::Stripe`).
+pub fn family_stripe(p: &Painter, st: &Style, face: Rect, kind: &str, z: f32) {
+    if st.slots.face.family == crate::style::FamilyMarker::Stripe {
+        let r = Rect::from_min_size(face.min + vec2(z, z), vec2(face.width() - 2.0 * z, 3.0 * z));
+        p.rect_filled(r, CornerRadius::same(1), st.section_of(kind).ink);
+    }
+}

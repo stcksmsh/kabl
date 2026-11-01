@@ -3,9 +3,9 @@
 //! reads any of it. Satin and Lacquer stay whole styles (`builtin_a`, `builtin_b`).
 
 use super::{
-    alpha, builtin_a, contrast, mix, CompactText, DisplayFrame, DisplayTrace, FaceHardware,
-    FaceMaterial, FaceTitle, FamilyMarker, Font, JackRecipe, KnobBody, KnobScale, KnobValue,
-    OutPlate, Roles, Section, Sections, SelectorRecipe, Style, TrayRecipe,
+    alpha, builtin_a, contrast, mix, CableStyle, CompactText, DisplayFrame, DisplayTrace,
+    FaceHardware, FaceMaterial, FaceTitle, FamilyMarker, Font, JackRecipe, KnobBody, KnobScale,
+    KnobValue, OutPlate, Roles, Section, Sections, SelectorRecipe, Style, TrayRecipe,
 };
 use egui::Color32;
 
@@ -197,6 +197,14 @@ fn line_solid(dark: bool, accent: Accent) -> Style {
     k.scale = KnobScale::TrackArc;
     k.value = KnobValue::Arc;
     k.glow = if dark { 0.4 } else { 0.0 };
+    let c = &mut s.slots.cable;
+    c.style = CableStyle::Themed;
+    c.edge = if dark { 0.35 } else { 0.5 };
+    c.highlight = 0.45;
+    c.shadow_alpha = if dark { 0.0 } else { 0.28 };
+    c.shadow_dy = 1.5;
+    c.glow_alpha = if dark { 0.16 } else { 0.0 };
+    c.glow_width = 12.0;
     s.slots.selector = SelectorRecipe::AccentPill;
     s.slots.jack = JackRecipe::Hex;
     s.slots.display.frame = DisplayFrame::Paper;

@@ -2128,7 +2128,8 @@ fn draw_module(
         avoid.push(r);
     }
     let avoid: Vec<Rect> = avoid.into_iter().map(|r| xf.r(r)).collect();
-    kit::face::title(painter, &st, face, z, m.info.name, &tag, ink, ink2, &avoid);
+    let ti = kit::face::family_ink(&st, m.info.kind, ink);
+    kit::face::title(painter, &st, face, z, m.info.name, &tag, ti, ink2, &avoid);
     if ui_state.selected_module == Some(m.id) {
         painter.rect_stroke(
             rect.expand(1.0),
