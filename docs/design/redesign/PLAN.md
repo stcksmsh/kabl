@@ -178,6 +178,20 @@ Still to draw (R2): dropdown, button primary/ghost/icon, field, slider, step lan
 
 Stereo at 58 % is weak in R1 (double ring reads, twin strand is thin). R2: hold stereo centre line ≥ 1.5 screen px at any zoom.
 
+### Cables (planner decision, relayed by Kosta 2026-11-01)
+
+Do not redesign cables. Port `cable_look.rs` as-is and theme it. Applies in G2 (cable paint tokens) and G6 (stereo, functional).
+
+- Geometry, sag, drag, beads and plug logic are unchanged. The theme supplies paint only: core (signal colour from the app theme), edge darken, highlight alpha, shadow alpha and offset, glow alpha and width, plug style.
+- The current look stays selectable as `cable.style = "classic"`.
+- Dark default: a lit cable gets a glow underlay of about 12 px. Light default: no glow, stronger edge and shadow.
+- Two passes: all glows first, then all cores. Core at least 2.5 screen px at any zoom; stereo centre line at least 1.5 px.
+- Stereo = twin strand + double-ring plug. Functional = beads (filled on, hollow off, current step in the accent).
+- Focus view: other cables at 25 %; the selected cable glows (dark) or thickens (light).
+- Cache meshes per (cable, zoom, theme). Composition patch: median < 8 ms, max < 16 ms.
+- Before/after capture set: simple, Composition, stereo, functional x classic vs both defaults x 100 / 58 % x 1440x900 and 1180x680.
+- Gate: Kosta compares side by side. If the new look loses anywhere, ship the classic renderer with the new tokens only.
+
 ---
 
 ## 8. Scaling: standalone and DAW equally
