@@ -36,3 +36,6 @@ Lane rule done (Kosta decided: no per-step seq param is ever a lane target; `seq
 ## Standing rules
 
 Report to "Kabl overseer"; do not merge; no git stash; Caveman + Ponytail ultra in chat, normal English in code/commits/docs; `cargo clean` when done.
+
+## Update (final)
+Engine 32 steps, paging, lane exclusion, compile cap 655, clippy/tests green. Groove restore needed no generator edit: logs already hold p9..p16/g9..g16 + length 16 (the old engine clamped to 8). 13 grooves change (brick-dust, copper-mile, corner-store, dune-buggy, fault-line, glass-coast, lamp-oil, ore-cart, rope-walk, scrap-metal, slab-city, still-water, stoop-sale); Acid Line (length 8) renders byte-identical. Tour: docs/seq-32/groove-before-after-tour.{mp3,txt} (FLAC: /secondary/Programming/Github/kabl-tours/). Not done: REAPER save/reopen, level/peak check of the 13 changed grooves (factory_bank tests pass).
