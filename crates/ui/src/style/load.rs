@@ -724,6 +724,30 @@ mod tests {
     }
 
     #[test]
+    fn ui_api_2_layers_load_and_ui_api_1_files_ignore_them() {
+        let known = Themes::default();
+        let t = parse(
+            "id = \"u.c\"\nname = \"C\"\nui_api = 2\nface_style = \"outline\"\naccent = \"coral\"\n",
+            &known,
+        )
+        .unwrap();
+        assert_eq!(t.dark.slots.knob.body, super::super::KnobBody::Disc);
+        assert_eq!(t.dark.roles.accent, Color::from_rgb(0xff, 0x6b, 0x3d));
+        assert!(t.notes.is_empty(), "{:?}", t.notes);
+        let t1 = parse(
+            "id = \"u.d\"\nname = \"D\"\nui_api = 1\naccent = \"coral\"\n",
+            &known,
+        )
+        .unwrap();
+        assert_eq!(t1.dark.roles.accent, builtin_a(true).roles.accent);
+        assert!(
+            t1.notes.iter().any(|n| n.contains("ui_api = 2")),
+            "{:?}",
+            t1.notes
+        );
+    }
+
+    #[test]
     fn the_documented_example_theme_loads_clean() {
         let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../docs/themes/example/midnight-rose.toml");
