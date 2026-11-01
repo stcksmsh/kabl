@@ -367,7 +367,8 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
             ax,
             name: format!("jack {}", j.port.name),
         });
-        let label = port_label(j.port.name);
+        let label = rack::short_name(m.info.kind, j.port.name)
+            .map_or_else(|| port_label(j.port.name), str::to_string);
         let lw = ruler.size(&label, font(st, Role::Label, label_px));
         let lc = if j.label_right {
             c + vec2(20.0 * z + lw.x / 2.0, 0.0)
