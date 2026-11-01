@@ -66,6 +66,7 @@ roles!(
     audio,
     cv,
     gate,
+    pitch,
     good,
     warn,
     bad,
@@ -109,6 +110,8 @@ pub enum Font {
     Sans,
     SansMedium,
     SansSemibold,
+    /// IBM Plex Sans Condensed SemiBold: face titles and section labels.
+    SansCondSemibold,
     Mono,
     MonoMedium,
 }
@@ -120,10 +123,13 @@ impl Font {
         match self {
             Font::Sans => FontFamily::Proportional,
             Font::Mono => FontFamily::Monospace,
-            Font::SansMedium | Font::SansSemibold if !ready => FontFamily::Proportional,
+            Font::SansMedium | Font::SansSemibold | Font::SansCondSemibold if !ready => {
+                FontFamily::Proportional
+            }
             Font::MonoMedium if !ready => FontFamily::Monospace,
             Font::SansMedium => FontFamily::Name("kabl-sans-medium".into()),
             Font::SansSemibold => FontFamily::Name("kabl-sans-semibold".into()),
+            Font::SansCondSemibold => FontFamily::Name("kabl-cond-semibold".into()),
             Font::MonoMedium => FontFamily::Name("kabl-mono-medium".into()),
         }
     }
@@ -202,17 +208,17 @@ macro_rules! recipes {
 }
 
 recipes! {
-    FaceMaterial { Satin, Lacquer, Flat }
+    FaceMaterial { Satin, Lacquer, Flat, Line }
     FaceHardware { Nuts, None, Screws }
-    FaceTitle { Centered, LeftDot, CapsRule }
+    FaceTitle { Centered, LeftDot, CapsRule, CondCaps }
     OutPlate { Tint, Dark, Outline }
     RackSurface { Plain, Grid }
-    KnobBody { Cap, Glass, Disc }
+    KnobBody { Cap, Glass, Disc, Solid }
     KnobScale { Ticks, TrackArc, None }
     KnobValue { Line, Dot, Notch, Arc }
     KnobMod { ArcDot, ArcGlow, Segment }
     SelectorRecipe { InsetPill, AccentPill, Outlined }
-    JackRecipe { Nut, GlowRing, Donut }
+    JackRecipe { Nut, GlowRing, Donut, Hex }
     CableRecipe { Rope, Glow, Outlined }
     PlugRecipe { Cap, Ring, Dot }
     DisplayFrame { Glass, Neon, Paper }
@@ -223,6 +229,13 @@ recipes! {
     Navigator { Left, PresetBar }
     BrowserRows { Cards, Table }
     Icons { Stroke }
+    /// How a module's family shows: coloured title (line styles) or a 3 px stripe (solid styles).
+    FamilyMarker { Title, Stripe }
+    /// Face text below the full zoom tier: `Hide` drops it under 9.5 screen px (classic), `Hold`
+    /// keeps it at 9.5 px down to the overview tier, dropping values and captions.
+    CompactText { Hide, Hold }
+    /// The port tray behind the jacks: none, or an outlined tray with a raised output plate.
+    TrayRecipe { None, Outline }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -236,6 +249,9 @@ pub struct FaceSlots {
     pub title: FaceTitle,
     pub out_plate: OutPlate,
     pub shadow: usize,
+    pub family: FamilyMarker,
+    pub compact: CompactText,
+    pub tray: TrayRecipe,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -584,6 +600,6 @@ mod tests {
 
     #[test]
     fn every_role_has_a_name() {
-        assert_eq!(Roles::NAMES.len(), 29);
+        assert_eq!(Roles::NAMES.len(), 30);
     }
 }
