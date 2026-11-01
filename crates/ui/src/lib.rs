@@ -2129,7 +2129,7 @@ fn draw_module(
     }
     let avoid: Vec<Rect> = avoid.into_iter().map(|r| xf.r(r)).collect();
     let ti = kit::face::family_ink(&st, m.info.kind, ink);
-    kit::face::title(painter, &st, face, z, m.info.name, &tag, ti, ink2, &avoid);
+    let title_r = kit::face::title(painter, &st, face, z, m.info.name, &tag, ti, ink2, &avoid);
     if ui_state.selected_module == Some(m.id) {
         painter.rect_stroke(
             rect.expand(1.0),
@@ -2271,7 +2271,11 @@ fn draw_module(
             }
         }
     }
-    if let Some(p) = m.plate {
+    if skin.is_none() && st.slots.face.tray == style::TrayRecipe::Outline {
+        if let Some(t) = m.tray {
+            kit::parts::tray(painter, &st, xf.r(t), m.plate.map(|p| xf.r(p)), z);
+        }
+    } else if let Some(p) = m.plate {
         if skin.is_some() {
             painter.rect_filled(xf.r(p), CornerRadius::same(6), th.plate);
         } else {
@@ -2307,12 +2311,17 @@ fn draw_module(
         };
         ui_state.record(format!("toggle:{}", m.id), r);
         let resp = ui.interact(r, Id::new(("kabl-toggle", m.id)), Sense::click());
-        painter.rect_filled(
-            r,
-            CornerRadius::same(4),
-            if th.dark { th.btn } else { th.plate },
-        );
-        if resp.hovered() {
+        // The overview tier of a compact-text style draws no face text, so no chip either.
+        let chip = !kit::face::overview(&ui_state.style, z)
+            && (!kit::face::compact_tier(&ui_state.style, z) || title_r.max.x + 1.5 <= r.min.x);
+        if chip {
+            painter.rect_filled(
+                r,
+                CornerRadius::same(4),
+                if th.dark { th.btn } else { th.plate },
+            );
+        }
+        if chip && resp.hovered() {
             painter.rect_stroke(
                 r,
                 CornerRadius::same(4),
@@ -2320,15 +2329,17 @@ fn draw_module(
                 egui::StrokeKind::Inside,
             );
         }
-        text(
-            painter,
-            r.center(),
-            egui::Align2::CENTER_CENTER,
-            &label,
-            12.0 * z,
-            th.plate_ink,
-            false,
-        );
+        if chip {
+            text(
+                painter,
+                r.center(),
+                egui::Align2::CENTER_CENTER,
+                &label,
+                12.0 * z,
+                th.plate_ink,
+                false,
+            );
+        }
         let routed = hidden_routes(editor, m);
         for (cable, _) in &routed {
             drawn.plugs.push((*cable, r.center()));
@@ -3670,7 +3681,26 @@ fn draw_jacks(
         }
         let label = macro_name(editor.state(), m.id, port.name)
             .unwrap_or_else(|| face_port_label(m.info.kind, port.name));
-        if let Some(font) = kit::face::face_font(&st, style::Role::Label, z) {
+        // Neighbouring jack of the same row and direction: the room one label has.
+        let pitch = m
+            .jacks
+            .iter()
+            .filter(|o| {
+                !std::ptr::eq(*o, j)
+                    && (o.c.y - j.c.y).abs() < 4.0
+                    && o.port.direction == j.port.direction
+            })
+            .map(|o| (o.c.x - j.c.x).abs())
+            .fold(f32::MAX, f32::min);
+        if let Some(font) = kit::face::face_font(&st, style::Role::Label, z).filter(|f| {
+            !kit::face::compact_tier(&st, z)
+                || j.label_right
+                || painter
+                    .layout_no_wrap(label.clone(), f.clone(), ink)
+                    .size()
+                    .x
+                    <= pitch * z - 2.0
+        }) {
             if j.label_right {
                 painter.text(
                     c + vec2(20.0 * z, 0.0),

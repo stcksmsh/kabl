@@ -427,9 +427,24 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
 
     // Header: title (as `kit::face::title`), `+N` chip, caption.
     group += 1;
+    let avoid: Vec<Rect> = m
+        .ctls
+        .iter()
+        .map(|c| sc(&m, z, c.geo.bounds().expand2(vec2(4.0, 0.0))))
+        .chain(m.jacks.iter().map(|j| {
+            sc(
+                &m,
+                z,
+                Rect::from_center_size(j.c, vec2(48.0, 20.0)).translate(vec2(0.0, -14.0)),
+            )
+        }))
+        .collect();
     let tf = font(st, Role::H3, title_px);
-    let shown = if ruler.size(m.info.name, tf.clone()).x
-        > kabl_ui::kit::face::title_room(face.width(), z)
+    let shown = if ruler
+        .size(&kabl_ui::kit::face::title_text(st, m.info.name), tf.clone())
+        .x
+        * 1.06
+        > kabl_ui::kit::face::title_room_beside(face, z, 26.0 * z, &avoid)
     {
         kabl_ui::kit::face::short_title(m.info.name)
     } else {
@@ -446,18 +461,6 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
     let y = 26.0 * z;
     let name_r = Rect::from_min_size(pos2(12.0 * z, y - tsz.y / 2.0), tsz);
     let tag_r = Rect::from_min_size(pos2(12.0 * z, 43.0 * z - capsz.y / 2.0), capsz);
-    let avoid: Vec<Rect> = m
-        .ctls
-        .iter()
-        .map(|c| sc(&m, z, c.geo.bounds().expand2(vec2(4.0, 0.0))))
-        .chain(m.jacks.iter().map(|j| {
-            sc(
-                &m,
-                z,
-                Rect::from_center_size(j.c, vec2(48.0, 20.0)).translate(vec2(0.0, -14.0)),
-            )
-        }))
-        .collect();
     let decor = match m.decor {
         Decor::Keys(r)
         | Decor::Display(r)
@@ -500,7 +503,9 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
             name: "caption".into(),
         });
     }
-    if let Some(t) = m.toggle {
+    // Compact tier: a `+N` chip that would sit on its title is not drawn (as in `draw_module`).
+    let chip_fits = |t: Rect| tier_full || name_r.max.x + 1.5 <= sc(&m, z, t).min.x;
+    if let Some(t) = m.toggle.filter(|&t| !overview && chip_fits(t)) {
         group += 1;
         leaves.push(Leaf {
             k: K::Chip,

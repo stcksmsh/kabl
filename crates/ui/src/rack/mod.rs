@@ -122,6 +122,25 @@ pub fn face_name<'a>(info: &ModuleInfo, name: &'a str) -> &'a str {
     }
 }
 
+/// Controls a family's face (PLAN section 4, R1) shows although the module lists them as
+/// advanced. Presentation only: the module and saved racks are untouched, and a stored face
+/// choice still wins.
+fn on_face_by_default(kind: &str, param: &str) -> bool {
+    osc::on_face(kind, param) || filter::on_face(kind, param) || env::on_face(kind, param)
+}
+
+/// Selectors a family draws in the header cluster instead of the control zone.
+fn in_header(kind: &str, param: &str) -> bool {
+    env::in_header(kind, param)
+}
+
+/// A family's own knob radius for `param`, else the one the row count gives.
+fn knob_override(kind: &str, param: &str) -> Option<f32> {
+    osc::knob_size(kind, param)
+        .or_else(|| filter::knob_size(kind, param))
+        .or_else(|| env::knob_size(kind, param))
+}
+
 /// Which of `info.params` are on the face: the user's choice where stored, else the default.
 pub fn primary_set(m: &ModuleState, info: &ModuleInfo) -> Vec<bool> {
     info.params
@@ -130,7 +149,7 @@ pub fn primary_set(m: &ModuleState, info: &ModuleInfo) -> Vec<bool> {
             let name = face_name(info, p.name);
             match m.params.get(&face_key(name)) {
                 Some(&v) => v >= 0.5,
-                None => !info.advanced.contains(&name),
+                None => !info.advanced.contains(&name) || on_face_by_default(info.kind, name),
             }
         })
         .collect()
@@ -474,9 +493,9 @@ fn place_local(
     let face_knobs: Vec<usize> = (0..info.params.len())
         .filter(|&i| shown[i] && primary[i] && knob(&info.params[i]))
         .collect();
-    let face_sels: Vec<usize> = (0..info.params.len())
+    let (header_sels, face_sels): (Vec<usize>, Vec<usize>) = (0..info.params.len())
         .filter(|&i| shown[i] && primary[i] && !knob(&info.params[i]))
-        .collect();
+        .partition(|&i| in_header(info.kind, info.params[i].name));
     let base_w = info.width_units as f32 * UNIT;
     let fw = match skin {
         Some(s) => ((s.panel_size.0 / UNIT).round() * UNIT).max(base_w),
@@ -611,11 +630,13 @@ fn place_local(
         let wide = fw >= WIDE_FROM;
         let zone_bottom = if wide { ZONE_BOTTOM_WIDE } else { ZONE_BOTTOM };
         let n_knobs = face_knobs.len();
-        let rows_h = if n_knobs > 0 {
-            cell_h(knob_r(n_knobs))
-        } else {
-            0.0
-        } + if !face_sels.is_empty() { SEL_H } else { 0.0 }
+        let knob_rs: Vec<f32> = face_knobs
+            .iter()
+            .map(|&i| knob_override(info.kind, info.params[i].name).unwrap_or(knob_r(n_knobs)))
+            .collect();
+        let r_max = knob_rs.iter().copied().fold(0.0, f32::max);
+        let rows_h = if n_knobs > 0 { cell_h(r_max) } else { 0.0 }
+            + if !face_sels.is_empty() { SEL_H } else { 0.0 }
             + if n_knobs > 0 && !face_sels.is_empty() {
                 ROW_GAP
             } else {
@@ -660,7 +681,7 @@ fn place_local(
         } else {
             // Rows centred in the control zone: knobs, a gap, then selectors.
             let n = face_knobs.len();
-            let r = knob_r(n);
+            let r = r_max;
             let y0 = zone_top + ((zone_bottom - zone_top - rows_h) / 2.0).max(0.0);
             let pitch = (fw - 2.0 * SIDE) / n.max(1) as f32;
             for (k, &i) in face_knobs.iter().enumerate() {
@@ -669,7 +690,7 @@ fn place_local(
                     primary: true,
                     geo: Geo::Knob {
                         c: pos2(SIDE + pitch * (k as f32 + 0.5), y0 + r + 17.1),
-                        r,
+                        r: knob_rs[k],
                     },
                 });
             }
@@ -689,6 +710,21 @@ fn place_local(
                     geo: Geo::Select { rect },
                 });
                 x += w + 10.0;
+            }
+            // Header selectors (a mode choice) sit in the right-hand cluster, right aligned.
+            let mut right = fw - SIDE;
+            for &i in header_sels.iter().rev() {
+                let (n, longest) = options(info, &info.params[i]);
+                let w = (7.0 * longest as f32 + 12.0) * n as f32;
+                right -= w;
+                ctls.push(Ctl {
+                    param: &info.params[i],
+                    primary: true,
+                    geo: Geo::Select {
+                        rect: Rect::from_min_size(pos2(right, 14.0), vec2(w, 18.0)),
+                    },
+                });
+                right -= 8.0;
             }
         }
     }
@@ -779,7 +815,7 @@ fn place_local(
 
     let has_off_face = !off_face.is_empty();
     let toggle = (has_off_face && !choosing)
-        .then(|| Rect::from_min_size(pos2(fw - 46.0, 12.0), vec2(36.0, 26.0)));
+        .then(|| Rect::from_min_size(pos2(fw - 46.0, 14.0), vec2(36.0, 18.0)));
     let done = choosing.then(|| Rect::from_min_size(pos2(fw - 62.0, 12.0), vec2(52.0, 26.0)));
     let outs_x = jacks
         .iter()
@@ -839,7 +875,7 @@ pub fn control_order(m: &ModuleState, info: &ModuleInfo) -> Vec<usize> {
                     face_name(info, info.params[i].name)
                 ))
                 .copied()
-                .unwrap_or(i as f32)
+                .unwrap_or_else(|| osc::order(info.kind, info.params[i].name).unwrap_or(i as f32))
         };
         rank(a).total_cmp(&rank(b)).then(a.cmp(&b))
     });

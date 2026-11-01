@@ -1075,7 +1075,8 @@ mod tests {
             .geo;
         v.choose = Some((a, visible));
         let mut order = rack::control_order(&before.modules[&a], info);
-        order.swap(0, pulse);
+        let at = order.iter().position(|&k| k == pulse).unwrap();
+        order.swap(0, at);
         v.face_order = Some(order.clone());
         for _ in 0..3 {
             frame(&ctx, &mut e, &mut v, vec![]);

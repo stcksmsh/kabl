@@ -936,20 +936,30 @@ pub(crate) fn param_knob(
 
     // Label above, value below (a pill with a coloured edge when modulated).
     if let Some(font) = crate::kit::face::face_font(&ui_state.style, crate::style::Role::Label, z) {
-        painter.text(
-            center - EguiVec2::new(0.0, crate::rack::knob_text_dy(r, z, font.size * 1.075)),
-            egui::Align2::CENTER_CENTER,
-            crate::macro_name(editor.state(), id, param.name).unwrap_or_else(|| {
-                let kind = editor
-                    .state()
-                    .modules
-                    .get(&id)
-                    .map_or("", |m| m.kind.as_str());
-                face_label(kind, param)
-            }),
-            font,
-            look.ink,
-        );
+        let text = crate::macro_name(editor.state(), id, param.name).unwrap_or_else(|| {
+            let kind = editor
+                .state()
+                .modules
+                .get(&id)
+                .map_or("", |m| m.kind.as_str());
+            face_label(kind, param)
+        });
+        let width = painter
+            .layout_no_wrap(text.clone(), font.clone(), look.ink)
+            .size()
+            .x;
+        // Held compact text that does not fit its slot is dropped, not drawn over the next label.
+        let fits =
+            !crate::kit::face::compact_tier(&ui_state.style, z) || width <= look.slot * z - 4.0;
+        if fits {
+            painter.text(
+                center - EguiVec2::new(0.0, crate::rack::knob_text_dy(r, z, font.size * 1.075)),
+                egui::Align2::CENTER_CENTER,
+                text,
+                font,
+                look.ink,
+            );
+        }
     }
     let value = fmt_value(param, base);
     let vh = crate::kit::face::face_font(&ui_state.style, crate::style::Role::Value, z)

@@ -44,6 +44,17 @@ const HOLD_TITLE: f32 = 10.5;
 const OVERVIEW_BELOW: f32 = 0.55;
 const FULL_FROM: f32 = 0.864;
 
+/// Whether `z` is in the overview tier of a `Hold` style: no face text, not even the `+N` chip.
+pub fn overview(st: &Style, z: f32) -> bool {
+    st.slots.face.compact == CompactText::Hold && z < OVERVIEW_BELOW
+}
+
+/// Whether `z` is in the compact tier of a `Hold` style: held text, which is dropped where it
+/// does not fit its slot (PLAN section 5), instead of overlapping its neighbours.
+pub fn compact_tier(st: &Style, z: f32) -> bool {
+    st.slots.face.compact == CompactText::Hold && (OVERVIEW_BELOW..FULL_FROM).contains(&z)
+}
+
 fn sized(st: &Style, role: Role, z: f32, hide_below: f32) -> Option<FontId> {
     let t = st.type_role(role);
     if st.slots.face.compact == CompactText::Hold {
@@ -194,11 +205,32 @@ pub fn short_title(name: &str) -> &str {
     }
 }
 
+/// The text a title measures as: condensed-caps titles are drawn in capitals.
+pub fn title_text(st: &Style, name: &str) -> String {
+    if st.slots.face.title == FaceTitle::CondCaps {
+        name.to_uppercase()
+    } else {
+        name.to_string()
+    }
+}
+
+/// Room for a title on the row at screen `y`: from the left margin to the nearest thing in the
+/// header band (`avoid`), or the `+N` chip's place, less a gap.
+pub fn title_room_beside(face: Rect, z: f32, y: f32, avoid: &[Rect]) -> f32 {
+    let right = avoid
+        .iter()
+        .filter(|a| a.top() < y + 8.0 * z && a.bottom() > y - 8.0 * z && a.left() > face.center().x)
+        .map(|a| a.left())
+        .fold(face.right() - 46.0 * z, f32::min);
+    right - 10.0 * z - (face.left() + 12.0 * z)
+}
+
 /// Room for a title: the face less the `+N` chip, its gap and the side margin.
 pub fn title_room(face_w: f32, z: f32) -> f32 {
     face_w - 66.0 * z
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn title(
     p: &Painter,
     st: &Style,
@@ -217,8 +249,11 @@ pub fn title(
     let mut rect = Rect::NOTHING;
     let name = match title_font(st, z) {
         Some(f)
-            if p.layout_no_wrap(name.to_string(), f.clone(), ink).size().x
-                > title_room(face.width(), z) =>
+            if p.layout_no_wrap(title_text(st, name), f.clone(), ink)
+                .size()
+                .x
+                * 1.06
+                > title_room_beside(face, z, y, avoid) =>
         {
             short_title(name)
         }
@@ -710,7 +745,13 @@ pub fn display_frame(p: &Painter, st: &Style, rect: Rect, face: Color32, z: f32)
     let r = &st.roles;
     let cr = CornerRadius::same((3.0 * z).clamp(2.0, 6.0) as u8);
     if st.slots.display.frame == DisplayFrame::Paper {
-        p.rect_filled(rect, cr, mix(r.disp_bg, Color32::WHITE, 0.82));
+        // Paper wells are near white on light themes; on dark themes they stay the dark inset.
+        let fill = if st.dark {
+            r.disp_bg
+        } else {
+            mix(r.disp_bg, Color32::WHITE, 0.82)
+        };
+        p.rect_filled(rect, cr, fill);
         p.rect_stroke(rect, cr, Stroke::new(1.0, r.line2), StrokeKind::Inside);
     } else {
         // Lower lip: the panel's edge catching the light under the cut.
@@ -763,7 +804,7 @@ pub fn display_frame(p: &Painter, st: &Style, rect: Rect, face: Color32, z: f32)
 
 /// The trace colour of a display.
 pub fn trace_color(st: &Style) -> Color32 {
-    if st.slots.display.frame == DisplayFrame::Paper {
+    if st.slots.display.frame == DisplayFrame::Paper && !st.dark {
         mix(st.roles.disp_bg, st.roles.accent, 0.7)
     } else {
         st.roles.disp_trace
