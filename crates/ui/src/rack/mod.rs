@@ -10,6 +10,15 @@
 
 use std::collections::BTreeSet;
 
+mod amp;
+mod fx;
+mod osc;
+mod timing;
+
+pub use osc::fm6_blocks;
+use osc::fm6_face;
+use timing::midi_in_face;
+
 use egui::{pos2, vec2, Pos2, Rect};
 use kabl_core::{ModuleId, ModuleState, PatchState};
 use kabl_modules::builtins::seq;
@@ -547,48 +556,33 @@ fn place_local(
             .fold(PANEL_H, f32::min);
 
         let mut y = 60.0;
-        match info.kind {
-            "out" => decor = Decor::Speaker(pos2(fw / 2.0, 112.0)),
-            "delay" => decor = Decor::Status(pos2(14.0, 228.0)),
-            "seq" => {
-                decor = Decor::Banks(Rect::from_min_size(pos2(14.0, 12.0), vec2(fw - 74.0, 26.0)))
+        // Family tables first (their kinds keep the plain knob layout below the decor).
+        let family = amp::decor(info.kind, fw)
+            .or_else(|| fx::decor(info.kind))
+            .or_else(|| timing::decor(info.kind, fw));
+        if let Some(d) = family {
+            decor = d;
+        } else {
+            match info.kind {
+                // The picture goes above the knobs when the knobs, the selectors and the jacks
+                // still fit under it; else the module keeps its plain layout.
+                "osc.va" | "osc.wt" | "osc.fm" | "filter.svf" | "filter.ladder" | "lfo"
+                | "env.adsr" | "phaser" | "flanger" | "compressor" | "eq" | "limiter"
+                | "bitcrusher" | "filter.comb" | "filter.formant" | "vocoder" | "drum.kick"
+                | "drum.snare" | "drum.clap" | "drum.hat" | "drum.tom"
+                    if DISPLAY_TOP + DISPLAY_H - 3.0
+                        + if face_knobs.is_empty() { 0.0 } else { 110.0 }
+                        + if face_sels.is_empty() { 0.0 } else { 46.0 }
+                        <= room + 8.0 =>
+                {
+                    decor = Decor::Display(Rect::from_min_size(
+                        pos2(16.0, DISPLAY_TOP),
+                        vec2(fw - 32.0, DISPLAY_H),
+                    ));
+                    y = DISPLAY_TOP + DISPLAY_H - 3.0;
+                }
+                _ => {}
             }
-            "cues" => {
-                decor = Decor::Cues(Rect::from_min_size(
-                    pos2(16.0, 64.0),
-                    vec2(fw - 32.0, 250.0),
-                ))
-            }
-            "drum.grid" => {
-                decor = Decor::Grid(Rect::from_min_size(
-                    pos2(14.0, DISPLAY_TOP + 6.0),
-                    vec2(fw - 28.0, crate::drum_grid::HEIGHT),
-                ))
-            }
-            "clock" => {
-                decor = Decor::Transport(Rect::from_min_size(
-                    pos2(12.0, 174.0),
-                    vec2(fw - 24.0, 32.0),
-                ))
-            }
-            // The picture goes above the knobs when the knobs, the selectors and the jacks
-            // still fit under it; else the module keeps its plain layout.
-            "osc.va" | "osc.wt" | "osc.fm" | "filter.svf" | "filter.ladder" | "lfo"
-            | "env.adsr" | "phaser" | "flanger" | "compressor" | "eq" | "limiter"
-            | "bitcrusher" | "filter.comb" | "filter.formant" | "vocoder" | "drum.kick"
-            | "drum.snare" | "drum.clap" | "drum.hat" | "drum.tom"
-                if DISPLAY_TOP + DISPLAY_H - 3.0
-                    + if face_knobs.is_empty() { 0.0 } else { 110.0 }
-                    + if face_sels.is_empty() { 0.0 } else { 46.0 }
-                    <= room + 8.0 =>
-            {
-                decor = Decor::Display(Rect::from_min_size(
-                    pos2(16.0, DISPLAY_TOP),
-                    vec2(fw - 32.0, DISPLAY_H),
-                ));
-                y = DISPLAY_TOP + DISPLAY_H - 3.0;
-            }
-            _ => {}
         }
         if info.kind == "midi.in" {
             decor = midi_in_face(info, &face_knobs, &face_sels, fw, &mut ctls, &mut off_face);
@@ -758,167 +752,6 @@ fn place_local(
         skin,
         row: 0,
     }
-}
-
-/// The MIDI In face, top to bottom: the keys picture with a line naming this module's voice
-/// settings, then one full-width row per selector (three options with long names need the
-/// width), then a knob row. They must end above the output plate; the picture goes first when
-/// room is short, then chosen controls from the last, which move to the advanced area.
-fn midi_in_face(
-    info: &'static ModuleInfo,
-    knobs: &[usize],
-    sels: &[usize],
-    fw: f32,
-    ctls: &mut Vec<Ctl>,
-    off_face: &mut Vec<usize>,
-) -> Decor {
-    const TOP: f32 = 54.0;
-    const BOTTOM: f32 = 212.0;
-    const SEL_ROW: f32 = 52.0;
-    const KNOB_ROW: f32 = 110.0;
-    const PICTURE: f32 = 46.0;
-    let mut sels = sels.to_vec();
-    let mut knobs = knobs.to_vec();
-    let height = |s: &[usize], k: &[usize]| {
-        s.len() as f32 * SEL_ROW + if k.is_empty() { 0.0 } else { KNOB_ROW }
-    };
-    while height(&sels, &knobs) > BOTTOM - TOP {
-        let last_knob = knobs.last().copied();
-        let last_sel = sels.last().copied();
-        let drop = match (last_knob, last_sel) {
-            (Some(k), Some(s)) if k > s => knobs.pop(),
-            (Some(_), None) => knobs.pop(),
-            _ => sels.pop(),
-        };
-        off_face.extend(drop);
-    }
-    off_face.sort_unstable();
-    let picture = height(&sels, &knobs) + PICTURE <= BOTTOM - TOP;
-    let decor = if picture {
-        // Shorter keys leave two text lines under them: voice settings, then bend and channel.
-        Decor::Keys(Rect::from_min_size(pos2(12.0, TOP), vec2(fw - 24.0, 18.0)))
-    } else {
-        Decor::None
-    };
-    let mut y = if picture { TOP + PICTURE } else { TOP };
-    for &i in &sels {
-        let rect = Rect::from_min_size(pos2(14.0, y + 26.0), vec2(fw - 28.0, 28.0));
-        ctls.push(Ctl {
-            param: &info.params[i],
-            primary: true,
-            geo: Geo::Select { rect },
-        });
-        y += SEL_ROW;
-    }
-    let n = knobs.len();
-    for (k, &i) in knobs.iter().enumerate() {
-        let x = fw * (k as f32 + 0.5) / n as f32;
-        let r = if n == 1 { R_LARGE } else { R_SMALL };
-        ctls.push(Ctl {
-            param: &info.params[i],
-            primary: true,
-            geo: Geo::Knob {
-                c: pos2(x, y + 60.0),
-                r,
-            },
-        });
-    }
-    decor
-}
-
-const FM6_H: f32 = 214.0;
-
-/// The six-operator FM voice. A header band holds the jacks, feedback, index and the algorithm
-/// choice; under it one framed block per operator: ratio across the top, then fine, level and
-/// velocity, then the four envelope knobs. Other chosen controls go to the advanced area.
-fn fm6_face(
-    info: &'static ModuleInfo,
-    controls: &[usize],
-    fw: f32,
-    ctls: &mut Vec<Ctl>,
-    off_face: &mut Vec<usize>,
-) -> Decor {
-    const TOP: f32 = 100.0;
-    let blocks = fm6_blocks(Rect::from_min_size(pos2(10.0, TOP), vec2(fw - 20.0, FM6_H)));
-    for &i in controls {
-        let name = info.params[i].name;
-        let op = name
-            .chars()
-            .last()
-            .and_then(|c| c.to_digit(10))
-            .filter(|d| (1..=6).contains(d))
-            .map(|d| d as usize - 1);
-        let base = op.map_or(name, |_| &name[..name.len() - 1]);
-        let b = blocks[op.unwrap_or(0)];
-        let (bx, bw) = (b.left(), b.width());
-        let row1 = |k: usize| pos2(bx + bw * (k as f32 + 0.5) / 3.0, TOP + 87.0);
-        let row2 = |k: usize| pos2(bx + bw * (k as f32 + 0.5) / 4.0, TOP + 171.0);
-        let geo = match (op, base) {
-            (Some(_), "ratio") => Geo::Select {
-                rect: Rect::from_min_size(pos2(bx + 10.0, TOP + 20.0), vec2(bw - 20.0, 20.0)),
-            },
-            (Some(_), "fine") => Geo::Knob {
-                c: row1(0),
-                r: R_SMALL,
-            },
-            (Some(_), "level") => Geo::Knob {
-                c: row1(1),
-                r: R_SMALL,
-            },
-            (Some(_), "vel") => Geo::Knob {
-                c: row1(2),
-                r: R_SMALL,
-            },
-            (Some(_), "attack") => Geo::Knob {
-                c: row2(0),
-                r: R_SMALL,
-            },
-            (Some(_), "decay") => Geo::Knob {
-                c: row2(1),
-                r: R_SMALL,
-            },
-            (Some(_), "sustain") => Geo::Knob {
-                c: row2(2),
-                r: R_SMALL,
-            },
-            (Some(_), "release") => Geo::Knob {
-                c: row2(3),
-                r: R_SMALL,
-            },
-            (None, "feedback") => Geo::Knob {
-                c: pos2(430.0, 60.0),
-                r: R_SMALL,
-            },
-            (None, "index") => Geo::Knob {
-                c: pos2(490.0, 60.0),
-                r: R_SMALL,
-            },
-            (None, "algorithm") => Geo::Select {
-                rect: Rect::from_min_size(pos2(fw - 400.0, 40.0), vec2(220.0, 28.0)),
-            },
-            _ => {
-                off_face.push(i);
-                continue;
-            }
-        };
-        ctls.push(Ctl {
-            param: &info.params[i],
-            primary: true,
-            geo,
-        });
-    }
-    off_face.sort_unstable();
-    Decor::Operators(Rect::from_min_size(pos2(10.0, TOP), vec2(fw - 20.0, FM6_H)))
-}
-
-/// The six operator blocks inside `r`. A wider gap down the middle keeps the face caption
-/// clear of the controls.
-pub fn fm6_blocks(r: Rect) -> [Rect; 6] {
-    let w = (r.width() - 55.0) / 6.0;
-    std::array::from_fn(|i| {
-        let x = r.left() + i as f32 * (w + 3.0) + if i >= 3 { 40.0 } else { 0.0 };
-        Rect::from_min_size(pos2(x, r.top()), vec2(w, r.height()))
-    })
 }
 
 /// Stable per-instance presentation order, shared by all sequencer banks.
