@@ -7,12 +7,14 @@ Task as received from "Kabl overseer": redesign G5 chrome (lib.rs toolbar / draw
 - #88 `claude/ui-g5-sounds` (Sounds scene: library, list, detail with macros), #89 `claude/ui-g5-perform` (two-column Perform composition), #90 `claude/ui-g5-perform2` (card styling, `Button::large`). All on master.
 - Tools: `crates/ui/examples/chrome_capture.rs` (scenes x 3 sizes x 2 modes; `KABL_CAPTURE_PATCH=DIR`), sheet scripts in the job tmp dir (not in repo).
 
-## Remaining, in order
-1. #88: use `Button::large()` for Load sound / Open in rack once #90 (kit) has merged; note: do not edit #88's branch from #90.
-2. #86 gaps: centred tabs, search field, sound dropdown with category, cable-tool icons, zoom in the toolbar, glyph wordmark (all mockup items still missing).
-3. #87 gaps: cable list excludes param routes (ADSR to Cut CV shows under Modulation), selected-row highlight, card text is the module description.
-4. #90 gaps: one "Sequences" card with a row per sequencer, centred macro names.
-5. Perf gate: line_solid was 1-10 % above satin on the dense patch in 3 interleaved rounds (docs/design/redesign/g5/pr2/perf-ab-raw.txt); sent to Kosta by the overseer, not mine to resolve.
+## Review round 2026-11-02 (Kosta: match the mockup closer; cables #87 accepted)
+Done and pushed: #86 toolbar (17b96f8, 2a6f70b, 56e4ccc; metrics in FACTS.md), #88 library column (f8550cf, d0617a9), #90 Perform (card kicker rows with hover tools, big macro knobs, 2x4 scene pads, one Sequences card with a row per sequencer, light-theme knob contrast; #89 merged into #90, close #89). Sheets: docs/design/redesign/g5/{toolbar-fix,sounds-fix,perform-fix}.
+
+## Remaining
+1. #87: add the verdicts.json entry (Kosta chose option A, drawer stays an overlay below 1280, no refit); gaps listed before still open (cable list excludes param routes, selected-row highlight, card text).
+2. #90 gaps: Perform view header row (title, MIDI in, All notes off, Keep Routing open, Show rack) is not in the mockup, home for these actions undecided; sequencers have 8 steps (mockup 16); macro value inside the knob shows the param value, the mockup a percent; separate Stop button (the run button toggles).
+3. #88: All and Recent library filters left the UI (Recent code kept); unmapped categories Basic, Sounds, Sequences, Performances show under All only.
+4. Perf gate deferred by the overseer until the other machine jobs finish.
 
 ## Facts that cost effort
 - Worktree guard rejects compound shell commands and heredocs: write scripts with the Write tool, run `python3 -I script.py`, plain single commands; `gh pr edit` fails (Projects classic), use `gh api -X PATCH repos/stcksmsh/kabl/pulls/N -F body=@file`.

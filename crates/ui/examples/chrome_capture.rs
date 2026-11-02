@@ -108,6 +108,19 @@ impl App {
                         e.set_param(id, &format!("v{}", k + 1), v);
                         e.set_param(id, &format!("r{}", k + 1), r);
                     }
+                    // Scenes 1 to 4 launch banks A to D of this sequencer.
+                    let cues: Vec<_> = e
+                        .state()
+                        .modules
+                        .iter()
+                        .filter(|(_, m)| m.kind == "cues")
+                        .map(|(&c, _)| c)
+                        .collect();
+                    for c in cues {
+                        for k in 1..=4u32 {
+                            e.set_param(c, &format!("cue{k}.seq.{id}"), (k - 1) as f32);
+                        }
+                    }
                 }
                 e
             }
@@ -127,6 +140,47 @@ impl App {
         ui.drawer_open = j.scene == "rack";
         ui.perform_open = j.scene == "perform";
         ui.perform_tall = j.scene == "perform";
+        if j.scene == "perform" {
+            // A moving show: bar 17 beat 3 on the clock, the first scene playing, the second
+            // queued for the next bar, and a playhead on every sequencer.
+            let state = self.editor.state();
+            let ids = |kind: &str| -> Vec<kabl_core::ModuleId> {
+                state
+                    .modules
+                    .iter()
+                    .filter(|(_, m)| m.kind == kind)
+                    .map(|(&id, _)| id)
+                    .collect()
+            };
+            for c in ids("clock") {
+                ui.clock_pos.insert(c, 16.0 * 16.0 + 2.0 * 4.0 + 1.0);
+            }
+            for s in ids("seq") {
+                ui.seq_steps.insert(s, 5);
+            }
+            for cues in ids("cues") {
+                let all = kabl_ui::cues::cues(state, cues);
+                if let Some(first) = all.first() {
+                    for &(s, bank) in &first.targets {
+                        ui.seq_banks.insert(s, (bank, None));
+                    }
+                    // The next scene that plays a different bank is the queued one.
+                    let next = all.iter().skip(1).find(|c| {
+                        c.targets
+                            .iter()
+                            .any(|&(s, b)| ui.seq_banks.get(&s).is_some_and(|e| e.0 != b))
+                    });
+                    for &(s, bank) in next.iter().flat_map(|c| c.targets.iter()) {
+                        if let Some(e) = ui.seq_banks.get_mut(&s) {
+                            if e.0 != bank {
+                                e.1 = Some(bank);
+                            }
+                        }
+                    }
+                }
+                ui.last_cue.insert(cues, 1);
+            }
+        }
         // Like the mockup: the oscillator-to-filter cable and the filter are selected.
         ui.selected_route = self
             .editor

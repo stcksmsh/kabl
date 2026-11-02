@@ -321,9 +321,11 @@ pub fn standing(cue: &Cue, bank_of: &dyn Fn(ModuleId) -> (usize, Option<usize>))
         let (playing, queued) = bank_of(s);
         queued.unwrap_or(playing) == b
     };
+    // The cue whose banks play now stays active while another one waits for its bar.
+    let active = cue.targets.iter().all(|&(s, b)| bank_of(s).0 == b);
     let waiting = cue.targets.iter().any(|&(s, b)| bank_of(s).1 == Some(b));
     let all = cue.targets.iter().all(lands);
-    (all && !waiting, all && waiting)
+    (active, all && waiting && !active)
 }
 
 /// `standing` for the drawn cues: a cue with no sequencer has no banks to show it playing, so

@@ -33,21 +33,16 @@ const FIXED_H: f32 = 64.0 + 168.0 + 132.0 + 32.0;
 /// height; the docked strip below the rack uses the flowing rows instead.
 const COLUMNS_MIN_H: f32 = 520.0;
 /// Width of the left column (transport, scenes) as a share of the view, and its limits.
-const LEFT_SHARE: f32 = 0.27;
-const LEFT_MIN_W: f32 = 290.0;
-const LEFT_MAX_W: f32 = 400.0;
 /// Height of the transport card; the scenes take the rest of the left column.
 const TRANSPORT_H: f32 = 220.0;
 /// Most other controls the two-column scene carries (one row below it).
 const COLUMNS_MAX_CONTROLS: usize = 4;
 /// Share of the right column the macros take when sequences are beside them.
-const MACROS_SHARE: f32 = 0.56;
 /// Knob diameter limits in the macro card, and what the card spends on everything but the knob.
 const KNOB_MIN: f32 = 64.0;
-const KNOB_MAX: f32 = 140.0;
-const MACRO_CHROME_H: f32 = 130.0 + 64.0;
+const KNOB_MAX: f32 = 138.0;
+const MACRO_CHROME_H: f32 = 160.0;
 /// A scenes card narrower than this lays its pads out two across, with the buttons below.
-const CUES_NARROW_W: f32 = 480.0;
 
 /// Widths for `items` (min, weight) in a row of `avail`: the minimums, plus the spare room by
 /// weight. When the minimums do not fit they stay as they are and the row wraps.
@@ -181,7 +176,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             if spread { n } else { 0.0 },
         )
     }));
-    items.extend(banks.iter().map(|_| (BANK_MIN, BANK_WEIGHT)));
+    items.extend(banks.first().map(|_| (BANK_MIN, BANK_WEIGHT)));
     let widths = split(avail, g, &items);
     // Controls: whole columns of at least CTRL_W, all the same width.
     let cols = (((avail + g) / (CTRL_W + g)) as usize).clamp(1, controls.len().max(1));
@@ -198,8 +193,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         && (!tiles.is_empty() || !banks.is_empty())
         // More sequencers or other controls than the columns carry keep the flowing rows, which
         // fit them in view.
-        && controls.len() <= COLUMNS_MAX_CONTROLS
-        && banks.len() <= 1;
+        && controls.len() <= COLUMNS_MAX_CONTROLS;
     // With other controls below, the columns keep the height the flowing rows had, so those
     // controls stay above the fold; alone they take the whole view.
     let body_h = if controls.is_empty() {
@@ -212,7 +206,10 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         .auto_shrink([false, false])
         .show_owned(ui, |ui| {
             if columns {
-                let left_w = (avail * LEFT_SHARE).clamp(LEFT_MIN_W, LEFT_MAX_W);
+                // Mockup sizes: 380 px left column at full width, 300 compact.
+                let compact = avail < 1180.0;
+                let left_w = if compact { 300.0 } else { 380.0 };
+                let transport_h = if compact { 200.0 } else { TRANSPORT_H };
                 let right_w = avail - left_w - g;
                 ui.horizontal_top(|ui| {
                     ui.spacing_mut().item_spacing = vec2(g, g);
@@ -221,10 +218,10 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                         let cues_h = if cues.is_empty() {
                             0.0
                         } else {
-                            body_h - TRANSPORT_H - g
+                            body_h - transport_h - g
                         };
                         for &(i, pin) in &transports {
-                            let h = if cues.is_empty() { body_h } else { TRANSPORT_H };
+                            let h = if cues.is_empty() { body_h } else { transport_h };
                             transport_card(editor, ui_state, ui, &st, pin, i, n, vec2(left_w, h));
                         }
                         let pad_h = ((cues_h - 64.0) / 4.0 - st.sp(1)).clamp(64.0, 140.0);
@@ -244,12 +241,13 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                     });
                     ui.vertical(|ui| {
                         ui.spacing_mut().item_spacing = vec2(g, g);
+                        // Mockup: macros 390 px tall (262 compact), sequences take the rest.
                         let macros_h = if banks.is_empty() {
                             body_h
                         } else if tiles.is_empty() {
                             0.0
                         } else {
-                            (body_h - g) * MACROS_SHARE
+                            (if compact { 262.0_f32 } else { 390.0_f32 }).min((body_h - g) * 0.7)
                         };
                         let knob = (macros_h - MACRO_CHROME_H).clamp(KNOB_MIN, KNOB_MAX);
                         let tw = split(right_w, g, &vec![(TILE_MIN, 1.0); tiles.len()]);
@@ -273,21 +271,16 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                         } else {
                             body_h - macros_h - g
                         };
-                        let each = ((rest - g * banks.len().saturating_sub(1) as f32)
-                            / banks.len().max(1) as f32)
-                            .max(120.0);
-                        for (k, &(i, pin)) in banks.iter().enumerate() {
-                            let hue = [st.roles.audio, st.roles.cv, st.roles.gate][k % 3];
-                            banks_card(
+                        if !banks.is_empty() {
+                            let rows: Vec<(usize, &Pin)> = banks.clone();
+                            sequences_card(
                                 editor,
                                 ui_state,
                                 ui,
                                 &st,
-                                pin,
-                                i,
+                                &rows,
                                 n,
-                                vec2(right_w, each),
-                                hue,
+                                vec2(right_w, rest.max(120.0)),
                             );
                         }
                     });
@@ -333,12 +326,9 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                     for (mine, &w) in tiles.iter().zip(&widths[lead..]) {
                         macros_card(editor, ui_state, ui, &st, mine, n, vec2(w, row2_h), knob);
                     }
-                    for (k, (&(i, pin), &w)) in
-                        banks.iter().zip(&widths[lead + tiles.len()..]).enumerate()
-                    {
-                        // One hue per sequencer, from the theme's signal colours.
-                        let hue = [st.roles.audio, st.roles.cv, st.roles.gate][k % 3];
-                        banks_card(editor, ui_state, ui, &st, pin, i, n, vec2(w, row2_h), hue);
+                    if let Some(&w) = widths.get(lead + tiles.len()) {
+                        let rows: Vec<(usize, &Pin)> = banks.clone();
+                        sequences_card(editor, ui_state, ui, &st, &rows, n, vec2(w, row2_h));
                     }
                     for &(i, pin) in &controls {
                         control_card(editor, ui_state, ui, &st, pin, i, n, ctrl_w);
@@ -477,11 +467,204 @@ fn shell(
             add(ui, ui_state);
         });
     });
+    note_hover(ui, key, r.response.rect);
     ui_state.record(format!("pcard:{key}"), r.response.rect);
     r.response.rect
 }
 
-/// Title row of a pin: its name (double-click renames), the explain button and the menu.
+/// How visible a card's tools (explain, menu) are: 0 until the pointer is over the card, then 1.
+/// The tools stay in the layout either way, so they keep their hit targets.
+fn tool_fade(ui: &egui::Ui, key: &str) -> f32 {
+    let id = egui::Id::new(("pcard-hover", key));
+    let on = ui.ctx().data(|d| d.get_temp::<bool>(id)).unwrap_or(false);
+    ui.ctx().animate_bool_with_time(id.with("fade"), on, 0.12)
+}
+
+/// Records whether the pointer is over the card `rect`, for next frame.
+fn note_hover(ui: &egui::Ui, key: &str, rect: egui::Rect) {
+    let over = ui
+        .input(|i| i.pointer.hover_pos())
+        .is_some_and(|p| rect.contains(p));
+    ui.ctx()
+        .data_mut(|d| d.insert_temp(egui::Id::new(("pcard-hover", key)), over));
+}
+
+/// Extra menu items a card adds to its "…" menu.
+type Extra<'a> = Option<&'a mut dyn FnMut(&mut egui::Ui, &mut PatchEditor, &mut UiState)>;
+
+/// The items of a pin's menu: rename, move, unpin.
+#[allow(clippy::too_many_arguments)]
+fn pin_menu(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    st: &Style,
+    pin: &Pin,
+    index: usize,
+    count: usize,
+    title: &str,
+) {
+    let key = format!("{}.{}", pin.id, pin.key);
+    let r = kit::menu_item(ui, st, "Rename…", false);
+    ui_state.record(format!("prename:{key}"), r.rect);
+    if r.clicked() {
+        ui_state.renaming = Some((pin.id, pin.key.clone(), title.to_string()));
+        ui.close();
+    }
+    let r = kit::menu_item_tone(ui, st, "Move left", false, Tone::Text, index > 0);
+    ui_state.record(format!("pleft:{key}"), r.rect);
+    if r.clicked() {
+        move_pin(editor, index, -1);
+        ui_state.pin_reveal = Some((pin.id, pin.key.clone()));
+        ui.close();
+    }
+    let r = kit::menu_item_tone(ui, st, "Move right", false, Tone::Text, index + 1 < count);
+    ui_state.record(format!("pright:{key}"), r.rect);
+    if r.clicked() {
+        move_pin(editor, index, 1);
+        ui_state.pin_reveal = Some((pin.id, pin.key.clone()));
+        ui.close();
+    }
+    let r = kit::menu_item(ui, st, "Unpin", false);
+    ui_state.record(format!("punpin:{key}"), r.rect);
+    if r.clicked() {
+        toggle_pin(editor, pin.id, &pin.key);
+        ui.close();
+    }
+}
+
+/// The explain button and the "…" menu of a pin, right to left. Called inside a right-to-left
+/// layout; faded by `fade`.
+#[allow(clippy::too_many_arguments)]
+fn pin_tools(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    st: &Style,
+    pin: &Pin,
+    index: usize,
+    count: usize,
+    title: &str,
+    fade: f32,
+    extra: Extra,
+) {
+    let key = format!("{}.{}", pin.id, pin.key);
+    ui.scope(|ui| {
+        ui.set_opacity(fade.max(0.001));
+        ui.spacing_mut().item_spacing.x = st.sp(1);
+        let menu = kit::icon_menu(ui, st, Ic::More, |ui| {
+            pin_menu(editor, ui_state, ui, st, pin, index, count, title);
+            if let Some(extra) = extra {
+                kit::rule(ui, st);
+                extra(ui, editor, ui_state);
+            }
+        })
+        .tip(st, "Rename, move, unpin");
+        ui_state.record(format!("pmenu:{key}"), menu.rect);
+        let explaining = ui_state.explain.card.as_ref() == Some(&(pin.id, pin.key.clone()))
+            && ui_state.explain.is_open();
+        let r = ui
+            .add(
+                kit::Button::new(st, "?")
+                    .small()
+                    .ghost()
+                    .selected(explaining),
+            )
+            .tip(st, "Explain: what this control really changes, and where");
+        ui_state.record(format!("pexplain:{key}"), r.rect);
+        if r.clicked() {
+            if explaining {
+                ui_state.explain.close();
+            } else {
+                crate::explain::open(
+                    ui_state,
+                    crate::explain::Subject::Control {
+                        id: pin.id,
+                        key: pin.key.clone(),
+                    },
+                    Some((pin.id, pin.key.clone())),
+                );
+            }
+        }
+    });
+}
+
+/// A pin's name: a label (double-click renames) or, while renaming, a text field. `font`
+/// overrides the role's font.
+#[allow(clippy::too_many_arguments)]
+fn pin_title(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    st: &Style,
+    pin: &Pin,
+    title: &str,
+    role: Role,
+    section: bool,
+    font: Option<egui::FontId>,
+) {
+    let key = format!("{}.{}", pin.id, pin.key);
+    let source = pin_source(editor.state(), pin);
+    let renaming = ui_state
+        .renaming
+        .as_ref()
+        .is_some_and(|(id, k, _)| *id == pin.id && *k == pin.key);
+    if renaming {
+        let (_, _, text) = ui_state.renaming.as_mut().unwrap();
+        let r = kit::field(ui, st, text, "Name", None, Some(ui.available_width()));
+        ui_state.record(format!("plabel-edit:{key}"), r.rect);
+        let enter = ui.input(|i| i.key_pressed(egui::Key::Enter));
+        let esc = ui.input(|i| i.key_pressed(egui::Key::Escape));
+        if esc {
+            ui_state.renaming = None;
+        } else if enter || r.lost_focus() {
+            if let Some((id, k, text)) = ui_state.renaming.take() {
+                if text.trim() != title {
+                    rename_pin(editor, id, &k, &text);
+                }
+            }
+        }
+        // Focus only while renaming: a field that is gone must not keep the keyboard (undo,
+        // Escape) after Enter or Escape.
+        if ui_state.renaming.is_some() {
+            r.request_focus();
+        } else {
+            r.surrender_focus();
+        }
+        return;
+    }
+    let text = if section {
+        let tr = &st.types.section;
+        RichText::new(if tr.caps {
+            title.to_uppercase()
+        } else {
+            title.to_string()
+        })
+        .font(st.section_font())
+        .color(st.roles.text2)
+    } else {
+        let t = kit::rich(st, role, Tone::Text, title);
+        match font {
+            Some(f) => t.font(f),
+            None => t,
+        }
+    };
+    let r = ui
+        .add(
+            egui::Label::new(text)
+                .truncate()
+                .selectable(false)
+                .sense(Sense::click()),
+        )
+        .tip(st, &format!("{title}\n{source}\nDouble-click to rename"));
+    ui_state.record(format!("plabel:{key}"), r.rect);
+    if r.double_clicked() {
+        ui_state.renaming = Some((pin.id, pin.key.clone(), title.to_string()));
+    }
+}
+
+/// Title row of a card: the kicker (its name in caps) at the left, a muted note at the right
+/// that gives way to the explain button and the menu while the pointer is over the card.
 #[allow(clippy::too_many_arguments)]
 fn pin_head(
     editor: &mut PatchEditor,
@@ -494,6 +677,8 @@ fn pin_head(
     role: Role,
     section: bool,
     fallback: Option<String>,
+    note: &str,
+    extra: Extra,
 ) {
     let key = format!("{}.{}", pin.id, pin.key);
     let named = editor
@@ -504,119 +689,25 @@ fn pin_head(
         Some(f) if !named => f,
         _ => pin_label(editor.state(), pin),
     };
-    let source = pin_source(editor.state(), pin);
-    let renaming = ui_state
-        .renaming
-        .as_ref()
-        .is_some_and(|(id, k, _)| *id == pin.id && *k == pin.key);
+    let fade = tool_fade(ui, &key);
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = st.sp(1);
+        let row = ui.max_rect();
+        if !note.is_empty() && fade < 0.99 {
+            ui.painter().text(
+                egui::pos2(row.right(), row.center().y),
+                egui::Align2::RIGHT_CENTER,
+                note,
+                st.font(Role::Caption),
+                crate::style::alpha(st.roles.text3, (255.0 * (1.0 - fade)) as u8),
+            );
+        }
         ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
-            let menu = kit::icon_menu(ui, st, Ic::More, |ui| {
-                let r = kit::menu_item(ui, st, "Rename…", false);
-                ui_state.record(format!("prename:{key}"), r.rect);
-                if r.clicked() {
-                    ui_state.renaming = Some((pin.id, pin.key.clone(), title.clone()));
-                    ui.close();
-                }
-                let r = kit::menu_item_tone(ui, st, "Move left", false, Tone::Text, index > 0);
-                ui_state.record(format!("pleft:{key}"), r.rect);
-                if r.clicked() {
-                    move_pin(editor, index, -1);
-                    ui_state.pin_reveal = Some((pin.id, pin.key.clone()));
-                    ui.close();
-                }
-                let r =
-                    kit::menu_item_tone(ui, st, "Move right", false, Tone::Text, index + 1 < count);
-                ui_state.record(format!("pright:{key}"), r.rect);
-                if r.clicked() {
-                    move_pin(editor, index, 1);
-                    ui_state.pin_reveal = Some((pin.id, pin.key.clone()));
-                    ui.close();
-                }
-                let r = kit::menu_item(ui, st, "Unpin", false);
-                ui_state.record(format!("punpin:{key}"), r.rect);
-                if r.clicked() {
-                    toggle_pin(editor, pin.id, &pin.key);
-                    ui.close();
-                }
-            })
-            .tip(st, "Rename, move, unpin");
-            ui_state.record(format!("pmenu:{key}"), menu.rect);
-            let explaining = ui_state.explain.card.as_ref() == Some(&(pin.id, pin.key.clone()))
-                && ui_state.explain.is_open();
-            let r = ui
-                .add(
-                    kit::Button::new(st, "?")
-                        .small()
-                        .ghost()
-                        .selected(explaining),
-                )
-                .tip(st, "Explain: what this control really changes, and where");
-            ui_state.record(format!("pexplain:{key}"), r.rect);
-            if r.clicked() {
-                if explaining {
-                    ui_state.explain.close();
-                } else {
-                    crate::explain::open(
-                        ui_state,
-                        crate::explain::Subject::Control {
-                            id: pin.id,
-                            key: pin.key.clone(),
-                        },
-                        Some((pin.id, pin.key.clone())),
-                    );
-                }
-            }
+            pin_tools(
+                editor, ui_state, ui, st, pin, index, count, &title, fade, extra,
+            );
             ui.with_layout(Layout::left_to_right(egui::Align::Center), |ui| {
-                if renaming {
-                    let (_, _, text) = ui_state.renaming.as_mut().unwrap();
-                    let r = kit::field(ui, st, text, "Name", None, Some(ui.available_width()));
-                    ui_state.record(format!("plabel-edit:{key}"), r.rect);
-                    let enter = ui.input(|i| i.key_pressed(egui::Key::Enter));
-                    let esc = ui.input(|i| i.key_pressed(egui::Key::Escape));
-                    if esc {
-                        ui_state.renaming = None;
-                    } else if enter || r.lost_focus() {
-                        if let Some((id, k, text)) = ui_state.renaming.take() {
-                            if text.trim() != title {
-                                rename_pin(editor, id, &k, &text);
-                            }
-                        }
-                    }
-                    // Focus only while renaming: a field that is gone must not keep the
-                    // keyboard (undo, Escape) after Enter or Escape.
-                    if ui_state.renaming.is_some() {
-                        r.request_focus();
-                    } else {
-                        r.surrender_focus();
-                    }
-                } else {
-                    let text = if section {
-                        let tr = &st.types.section;
-                        RichText::new(if tr.caps {
-                            title.to_uppercase()
-                        } else {
-                            title.clone()
-                        })
-                        .font(st.section_font())
-                        .color(st.roles.text2)
-                    } else {
-                        kit::rich(st, role, Tone::Text, &title)
-                    };
-                    let r = ui
-                        .add(
-                            egui::Label::new(text)
-                                .truncate()
-                                .selectable(false)
-                                .sense(Sense::click()),
-                        )
-                        .tip(st, &format!("{title}\n{source}\nDouble-click to rename"));
-                    ui_state.record(format!("plabel:{key}"), r.rect);
-                    if r.double_clicked() {
-                        ui_state.renaming = Some((pin.id, pin.key.clone(), title.clone()));
-                    }
-                }
+                pin_title(editor, ui_state, ui, st, pin, &title, role, section, None);
             });
         });
     });
@@ -696,7 +787,13 @@ fn transport_card(
     let bpm = registry::info_for("clock")
         .and_then(|i| i.params.iter().find(|p| p.name == "bpm"))
         .map(|p| routing::base_value(editor.state(), id, p));
+    let compact = size.x < 340.0;
     let rect = shell(ui, ui_state, st, &key, size, |ui, ui_state| {
+        let note = if ui_state.host_clock {
+            "Host sync"
+        } else {
+            "Internal clock"
+        };
         pin_head(
             editor,
             ui_state,
@@ -708,24 +805,20 @@ fn transport_card(
             Role::H3,
             true,
             None,
+            note,
+            None,
         );
         let run = running(ui_state, id);
         let pos = ui_state.clock_pos.get(&id).copied();
+        // The tempo is read from across the room: 68 px (54 compact), as in the mockup.
+        let big = if compact { 54.0 } else { 68.0 };
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = st.sp(1);
             let text = bpm.map_or("--".to_string(), |b| format!("{b:.1}"));
-            // The tempo is read from across the room: a big step above the display role.
-            let big = st.type_role(Role::Display).size * 1.7;
             ui.label(kit::rich(st, Role::Display, Tone::Text, text).size(big));
             ui.vertical(|ui| {
-                kit::label(ui, st, Role::Label, Tone::Text2, "BPM");
-                kit::label(
-                    ui,
-                    st,
-                    Role::Caption,
-                    if run { Tone::Good } else { Tone::Text3 },
-                    if run { "running" } else { "stopped" },
-                );
+                ui.add_space(big * 0.55);
+                kit::label(ui, st, Role::Caption, Tone::Text3, "BPM");
             });
         });
         // Bar . beat, and the four beats of the bar.
@@ -737,16 +830,14 @@ fn transport_card(
             } else {
                 "-- . --".to_string()
             };
-            ui.label(kit::rich(st, Role::Title, Tone::Text, text));
-            let d = st.sp(1) * 2.0;
+            let size = if compact { 20.0 } else { 24.0 };
+            ui.label(kit::rich(st, Role::Value, Tone::Text, text).size(size));
+            ui.add_space(st.sp(1));
             for i in 0..4u64 {
-                let (r, _) = ui.allocate_exact_size(vec2(d, d), Sense::hover());
+                let (r, _) = ui.allocate_exact_size(vec2(12.0, 12.0), Sense::hover());
                 let on = pos.is_some() && beat == i + 1;
-                ui.painter().rect_filled(
-                    r,
-                    st.sp(0),
-                    if on { st.roles.accent } else { st.roles.line2 },
-                );
+                ui.painter()
+                    .rect_filled(r, 3.0, if on { st.roles.accent } else { st.roles.inset });
             }
         });
         if run {
@@ -754,10 +845,12 @@ fn transport_card(
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(33));
         }
+        // The buttons sit at the foot of the card.
+        let d = st.metrics.large_h;
+        ui.add_space((ui.available_height() - d - st.sp(1)).max(st.sp(2)));
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = st.sp(2);
             let enabled = !ui_state.host_clock;
-            let d = st.metrics.large_h;
             let r = kit::round_button(
                 ui,
                 st,
@@ -780,11 +873,8 @@ fn transport_card(
                     .transport
                     .push((id, if run { Transport::Stop } else { Transport::Run }));
             }
-            let r = ui.add(
-                kit::Button::new(st, "Restart")
-                    .min_width(92.0)
-                    .enabled(enabled),
-            );
+            let r = kit::round_button(ui, st, Ic::Restart, false, d - 4.0, enabled)
+                .tip(st, "Restart from the first bar");
             ui_state.record(format!("prestart:{id}"), r.rect);
             if r.clicked() {
                 ui_state.transport.push((id, Transport::Restart));
@@ -813,36 +903,66 @@ fn cues_card(
     index: usize,
     count: usize,
     size: egui::Vec2,
-    pad_h: f32,
+    _pad_h: f32,
 ) {
     let key = format!("{}.{}", pin.id, pin.key);
     let id = pin.id;
     let all = crate::cues::cues(editor.state(), id);
-    // One row up to five cues (the usual set), else rows of four.
-    let narrow = size.x < CUES_NARROW_W;
-    let per_row = if narrow {
-        2
-    } else if all.len() <= 5 {
-        all.len().max(4)
-    } else {
-        4
-    };
-    // The pads share the width left beside the Cancel button (all of it when narrow: the
-    // buttons go below).
-    let fixed = if narrow {
-        st.sp(3) * 2.0 + 4.0
-    } else {
-        84.0 + 110.0 + st.sp(1) + st.sp(2) + st.sp(3) * 2.0 + 4.0
-    };
-    let pad_w =
-        ((size.x - fixed) / per_row as f32 - st.sp(1)).max(if narrow { 60.0 } else { 80.0 });
+    // Pads two across, as many rows as the scenes need; they share the card's height.
+    let per_row = 2;
+    let gap = 10.0;
+    let pad_w = ((size.x - st.sp(3) * 2.0 - 4.0 - gap) / per_row as f32).max(60.0);
     let rows = all.len().div_ceil(per_row).max(1);
-    // Rows share the height the row was given.
-    let pad_h = pad_h
-        .min((size.y - 64.0) / rows as f32 - st.sp(1))
-        .max(64.0);
+    let pad_h = ((size.y - 64.0 - gap * (rows as f32 - 1.0)) / rows as f32).clamp(44.0, 150.0);
+    let state = editor.state().clone();
+    let standing: Vec<(bool, bool)> = {
+        let bank_of = |s: ModuleId| {
+            ui_state
+                .seq_banks
+                .get(&s)
+                .copied()
+                .unwrap_or((crate::banks::startup(&state, s), None))
+        };
+        all.iter()
+            .map(|c| crate::cues::standing_now(c, &bank_of, ui_state.last_cue.get(&id).copied()))
+            .collect()
+    };
+    let current = all.iter().zip(&standing).find(|(_, s)| s.0).map(|(c, _)| c);
+    let any_queued = standing.iter().any(|s| s.1);
     let rect = shell(ui, ui_state, st, &key, size, |ui, ui_state| {
-        let who = "Scenes".to_string();
+        // Cancel and Store macros live in the card's menu.
+        let mut extra = |ui: &mut egui::Ui, editor: &mut PatchEditor, ui_state: &mut UiState| {
+            let r = kit::menu_item_tone(
+                ui,
+                st,
+                "Cancel the queued scene",
+                false,
+                Tone::Text,
+                any_queued,
+            );
+            if any_queued {
+                ui_state.record(format!("pcue-cancel:{id}"), r.rect);
+            }
+            if r.clicked() && any_queued {
+                for c in all.iter().zip(&standing).filter(|(_, s)| s.1) {
+                    for &(s, _) in &c.0.targets {
+                        ui_state.launches.push(Command::Cancel(Some(s)));
+                    }
+                }
+                ui.close();
+            }
+            let label = current.map_or_else(
+                || "Store macros (launch a scene first)".to_string(),
+                |c| format!("Store macros into {}", c.name),
+            );
+            let store = kit::menu_item_tone(ui, st, &label, false, Tone::Text, current.is_some());
+            ui_state.record(format!("pcue-store:{id}"), store.rect);
+            if let (true, Some(c)) = (store.clicked(), current) {
+                let now = |m, k| ui_state.macro_now(&state, m, k);
+                crate::cues::store_macros(editor, id, c.n, &now);
+                ui.close();
+            }
+        };
         pin_head(
             editor,
             ui_state,
@@ -853,22 +973,10 @@ fn cues_card(
             count,
             Role::H3,
             true,
-            Some(who),
+            Some("Scenes".to_string()),
+            "Next bar",
+            Some(&mut extra),
         );
-        let state = editor.state().clone();
-        let bank_of = |s: ModuleId| {
-            ui_state
-                .seq_banks
-                .get(&s)
-                .copied()
-                .unwrap_or((crate::banks::startup(&state, s), None))
-        };
-        let standing: Vec<(bool, bool)> = all
-            .iter()
-            .map(|c| crate::cues::standing_now(c, &bank_of, ui_state.last_cue.get(&id).copied()))
-            .collect();
-        let current = all.iter().zip(&standing).find(|(_, s)| s.0).map(|(c, _)| c);
-        let any_queued = standing.iter().any(|s| s.1);
         if all.is_empty() {
             kit::label(
                 ui,
@@ -878,120 +986,65 @@ fn cues_card(
                 "No cues yet: add them in the drawer",
             );
         }
-        let flow = if narrow {
-            Layout::top_down(egui::Align::Min)
-        } else {
-            Layout::left_to_right(egui::Align::Min)
-        };
-        ui.with_layout(flow, |ui| {
-            ui.spacing_mut().item_spacing = vec2(st.sp(1), st.sp(1));
-            ui.vertical(|ui| {
-                ui.spacing_mut().item_spacing = vec2(st.sp(1), st.sp(1));
-                for (row, flags) in all.chunks(per_row).zip(standing.chunks(per_row)) {
-                    ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing.x = st.sp(1);
-                        for (c, &(active, queued)) in row.iter().zip(flags) {
-                            let tag =
-                                button_mapping(&state, id, &format!("cue.{}", c.n)).map(cc_text);
-                            let hover = format!(
-                                "Launch {}{}",
-                                c.name,
-                                button_text(&state, id, &format!("cue.{}", c.n))
-                                    .map_or(String::new(), |t| format!("\n{t}"))
-                            );
-                            let (ps, sub) = if active {
-                                (PadState::Playing, "Playing")
-                            } else if queued {
-                                (PadState::Queued, "Queued")
-                            } else {
-                                (PadState::Idle, "Ready")
-                            };
-                            // A queued pad fills toward the bar line it launches on; a playing
-                            // one fills as its macros arrive.
-                            let progress = (queued && !active)
-                                .then(|| c.clock.and_then(|k| ui_state.clock_pos.get(&k)))
-                                .flatten()
-                                .map(|&p| p.rem_euclid(16.0) as f32 / 16.0)
-                                .or_else(|| {
-                                    active
-                                        .then(|| {
-                                            c.macros
-                                                .iter()
-                                                .filter_map(|&(m, k, to)| {
-                                                    ui_state
-                                                        .live_macro(m, k)
-                                                        .filter(|l| l.progress < 1.0 && l.to == to)
-                                                })
-                                                .map(|l| l.progress)
-                                                .reduce(f32::min)
+        ui.spacing_mut().item_spacing = vec2(gap, gap);
+        for (row, flags) in all.chunks(per_row).zip(standing.chunks(per_row)) {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = gap;
+                for (c, &(active, queued)) in row.iter().zip(flags) {
+                    let tag = button_mapping(&state, id, &format!("cue.{}", c.n)).map(cc_text);
+                    let hover = format!(
+                        "Launch {}{}",
+                        c.name,
+                        button_text(&state, id, &format!("cue.{}", c.n))
+                            .map_or(String::new(), |t| format!("\n{t}"))
+                    );
+                    let (ps, sub) = if active {
+                        (PadState::Playing, "Playing")
+                    } else if queued {
+                        (PadState::Queued, "Queued")
+                    } else {
+                        (PadState::Idle, "Ready")
+                    };
+                    // A queued pad fills toward the bar line it launches on; a playing one
+                    // fills as its macros arrive.
+                    let progress = (queued && !active)
+                        .then(|| c.clock.and_then(|k| ui_state.clock_pos.get(&k)))
+                        .flatten()
+                        .map(|&p| p.rem_euclid(16.0) as f32 / 16.0)
+                        .or_else(|| {
+                            active
+                                .then(|| {
+                                    c.macros
+                                        .iter()
+                                        .filter_map(|&(m, k, to)| {
+                                            ui_state
+                                                .live_macro(m, k)
+                                                .filter(|l| l.progress < 1.0 && l.to == to)
                                         })
-                                        .flatten()
-                                });
-                            let hover = match &tag {
-                                Some(t) => format!("{hover}\n{t}"),
-                                None => hover,
-                            };
-                            let r = kit::scene_pad(
-                                ui,
-                                st,
-                                vec2(pad_w, pad_h),
-                                &c.name,
-                                c.n,
-                                sub,
-                                ps,
-                                progress,
-                            )
+                                        .map(|l| l.progress)
+                                        .reduce(f32::min)
+                                })
+                                .flatten()
+                        });
+                    let hover = match &tag {
+                        Some(t) => format!("{hover}\n{t}"),
+                        None => hover,
+                    };
+                    let r =
+                        kit::scene_pad(ui, st, vec2(pad_w, pad_h), &c.name, c.n, sub, ps, progress)
                             .tip(st, &hover);
-                            ui_state.record(format!("pcue:{id}.{}", c.n), r.rect);
-                            if r.clicked() {
-                                match crate::cues::launch(&mut ui_state.launches, &state, id, c.n) {
-                                    Ok(()) => {
-                                        ui_state.last_cue.insert(id, c.n);
-                                    }
-                                    Err(e) => ui_state.last_message = Some(e),
-                                }
+                    ui_state.record(format!("pcue:{id}.{}", c.n), r.rect);
+                    if r.clicked() {
+                        match crate::cues::launch(&mut ui_state.launches, &state, id, c.n) {
+                            Ok(()) => {
+                                ui_state.last_cue.insert(id, c.n);
                             }
+                            Err(e) => ui_state.last_message = Some(e),
                         }
-                    });
-                }
-            });
-            let r = ui
-                .add(
-                    kit::Button::new(st, "Cancel")
-                        .min_width(84.0)
-                        .enabled(any_queued),
-                )
-                .tip(st, "Drop the queued cue");
-            if any_queued {
-                ui_state.record(format!("pcue-cancel:{id}"), r.rect);
-            }
-            // "Store current": the playing cue takes the macros where they are now.
-            let store = ui
-                .add(
-                    kit::Button::new(st, "Store macros")
-                        .min_width(110.0)
-                        .enabled(current.is_some()),
-                )
-                .tip(
-                    st,
-                    &current.map_or_else(
-                        || "Launch a cue first: it takes the macro positions".to_string(),
-                        |c| format!("Save the macro positions into {}", c.name),
-                    ),
-                );
-            ui_state.record(format!("pcue-store:{id}"), store.rect);
-            if let (true, Some(c)) = (store.clicked(), current) {
-                let now = |m, k| ui_state.macro_now(&state, m, k);
-                crate::cues::store_macros(editor, id, c.n, &now);
-            }
-            if r.clicked() {
-                for c in all.iter().zip(&standing).filter(|(_, s)| s.1) {
-                    for &(s, _) in &c.0.targets {
-                        ui_state.launches.push(Command::Cancel(Some(s)));
                     }
                 }
-            }
-        });
+            });
+        }
     });
     after_card(ui, ui_state, st, pin, rect);
 }
@@ -1071,20 +1124,36 @@ fn macros_card(
         (size.x - st.sp(3) * 2.0 - st.sp(1) * (pins.len() as f32 - 1.0)) / pins.len() as f32;
     // A knob never wider than its tile (eight macros share a narrow card).
     let knob = knob.min(tile_w - st.sp(2) * 2.0).max(KNOB_MIN / 2.0);
+    // The card says which MIDI CCs the macros answer, when they are all mapped in a run.
+    let ccs: Vec<u8> = pins
+        .iter()
+        .filter_map(|(_, p)| mapping(editor.state(), p.id, &p.key).map(|m| m.1))
+        .collect();
+    let note = match (ccs.iter().min(), ccs.iter().max()) {
+        (Some(a), Some(b)) if ccs.len() == pins.len() && a != b => format!("MIDI CC {a}–{b}"),
+        (Some(a), _) if ccs.len() == pins.len() => format!("MIDI CC {a}"),
+        _ => String::new(),
+    };
     ui.allocate_ui_with_layout(size, Layout::top_down(egui::Align::Min), |ui| {
         let f = kit::card_frame(st);
         let m = f.inner_margin.sum();
         f.show(ui, |ui| {
             ui.set_width(size.x - m.x);
             ui.set_min_height(size.y - m.y);
-            kit::section(ui, st, "Macros");
-            kit::label(
-                ui,
-                st,
-                Role::Caption,
-                Tone::Text3,
-                "turn to hear · hover a name to see what moves",
-            );
+            let row = ui.horizontal(|ui| {
+                kit::section(ui, st, "Macros");
+            });
+            if !note.is_empty() {
+                let r = row.response.rect;
+                ui.painter().text(
+                    egui::pos2(r.left() + size.x - m.x, r.center().y),
+                    egui::Align2::RIGHT_CENTER,
+                    &note,
+                    st.font(Role::Caption),
+                    st.roles.text3,
+                );
+            }
+            ui.add_space(st.sp(1));
             ui.horizontal_top(|ui| {
                 ui.spacing_mut().item_spacing.x = st.sp(1);
                 for &(i, pin) in pins {
@@ -1093,6 +1162,92 @@ fn macros_card(
             });
         });
     });
+}
+
+/// The CC chip of a macro: the mapping (or "Learn") on a pill; click to learn another control.
+/// The pickup state is in its tooltip, Clear in its menu.
+fn cc_chip(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    st: &Style,
+    id: ModuleId,
+    p: &'static ParamInfo,
+) {
+    if !learnable(p) {
+        return;
+    }
+    let key = format!("{id}.{}", p.name);
+    let map = mapping(editor.state(), id, p.name);
+    let learning = ui_state.learn.as_ref() == Some(&(id, p.name.to_string()));
+    let text = match (learning, map) {
+        (true, _) => "Learning…".to_string(),
+        (false, Some((_, cc))) => format!("CC {cc}"),
+        (false, None) => "Learn".to_string(),
+    };
+    let font = egui::FontId::new(10.5, egui::FontFamily::Monospace);
+    let g = ui.painter().layout_no_wrap(
+        text,
+        font,
+        if learning {
+            st.roles.on_accent
+        } else {
+            st.roles.text2
+        },
+    );
+    let (rect, r) = ui.allocate_exact_size(vec2(g.size().x + 12.0, 18.0), Sense::click());
+    let fill = if learning {
+        st.roles.accent
+    } else {
+        st.roles.inset
+    };
+    ui.painter().rect_filled(rect, 9.0, fill);
+    let ink = if learning {
+        st.roles.on_accent
+    } else {
+        st.roles.text2
+    };
+    ui.painter().galley(rect.center() - g.size() / 2.0, g, ink);
+    let tip = match map {
+        Some(m) => {
+            let t = ui_state
+                .takeover
+                .get(&(id, p.name.to_string()))
+                .copied()
+                .unwrap_or_default();
+            let at = p.to_norm(ui_state.param_now(editor.state(), id, p));
+            let pickup = if t.picked {
+                "The hardware controls it".to_string()
+            } else {
+                format!(
+                    "Pickup: move the hardware to {:.0} % to take over (it won't jump)",
+                    at * 100.0
+                )
+            };
+            format!(
+                "{}: click to learn another control; right-click to clear\n{pickup}",
+                cc_text(m)
+            )
+        }
+        None => "Click, then move a hardware control".into(),
+    };
+    let r = r.tip(st, &tip);
+    ui_state.record(format!("plearn:{key}"), r.rect);
+    if r.clicked() {
+        ui_state.learn = (!learning).then(|| (id, p.name.to_string()));
+    }
+    if map.is_some() {
+        egui::Popup::context_menu(&r)
+            .frame(kit::popover_frame(st))
+            .show(|ui| {
+                let c = kit::menu_item(ui, st, "Clear the MIDI mapping", false);
+                ui_state.record(format!("pclear:{key}"), c.rect);
+                if c.clicked() {
+                    unlearn(editor, id, p.name);
+                    ui.close();
+                }
+            });
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1111,13 +1266,17 @@ fn macro_tile(
     let Some(p) = pin_param(editor.state(), pin) else {
         return;
     };
+    let compact = knob < 110.0;
+    let title = pin_label(editor.state(), pin);
+    let fade = tool_fade(ui, &key);
     let rect = ui
         .allocate_ui_with_layout(
-            vec2(tile_w, knob + 130.0),
+            vec2(tile_w, knob + if compact { 104.0 } else { 150.0 }),
             Layout::top_down(egui::Align::Center),
             |ui| {
                 ui.set_width(tile_w);
                 ui.spacing_mut().item_spacing.y = st.sp(1);
+                let tile = ui.max_rect();
                 // A cue may be moving this macro: show it where it is, with where it is heading
                 // as the knob's range. A hand on the knob ends the morph (the engine does the
                 // same when the value arrives).
@@ -1129,7 +1288,7 @@ fn macro_tile(
                     |m| m.value,
                 );
                 let span = heading.map(|m| (p.to_norm(m.value), p.to_norm(m.to)));
-                let (resp, new) = kit::arc_knob(ui, st, p.to_norm(cur), knob, span);
+                let (resp, new) = kit::macro_knob(ui, st, p.to_norm(cur), knob, span);
                 ui_state.record(format!("pslider:{key}"), resp.rect);
                 let continuing = continuing(ui, &resp);
                 if let Some(v) = new {
@@ -1140,13 +1299,14 @@ fn macro_tile(
                     };
                     editor.set_param_gesture(target, p.from_norm(v), !continuing);
                 }
-                // The value sits inside the knob.
+                // The value sits inside the knob, in the text colour of the raised body.
+                let vs = if compact { 16.0 } else { 20.0 };
                 ui.painter().text(
-                    resp.rect.center(),
+                    resp.rect.center() + vec2(0.0, if compact { 6.0 } else { 8.0 }),
                     egui::Align2::CENTER_CENTER,
                     routing::fmt_value(p, cur),
-                    st.font(Role::Value),
-                    kit::tone(st, Tone::Text),
+                    egui::FontId::new(vs, egui::FontFamily::Monospace),
+                    st.roles.text,
                 );
                 if let Some(m) = heading {
                     kit::label(
@@ -1164,48 +1324,82 @@ fn macro_tile(
                     ui.ctx()
                         .request_repaint_after(std::time::Duration::from_millis(30));
                 }
-                pin_head(
+                // The name, centred: 22 px semibold (17 compact).
+                let font = egui::FontId::new(
+                    if compact { 17.0 } else { 22.0 },
+                    crate::style::Font::SansSemibold.family(st.fonts_ready),
+                );
+                ui.add_space(st.sp(1));
+                pin_title(
                     editor,
                     ui_state,
                     ui,
                     st,
                     pin,
-                    index,
-                    count,
+                    &title,
                     Role::Title,
                     false,
-                    None,
+                    Some(font),
                 );
-                midi_row(editor, ui_state, ui, st, pin.id, p);
+                cc_chip(editor, ui_state, ui, st, pin.id, p);
                 let moves = macro_moves(editor.state(), pin.id, p.name);
-                let text = match moves.len() {
-                    0 => "moves nothing yet".to_string(),
-                    1..=3 => moves.join(" · "),
-                    n => format!("{} · +{}", moves[..2].join(" · "), n - 2),
+                let tone = if moves.is_empty() {
+                    Tone::Text3
+                } else {
+                    Tone::Text2
                 };
-                kit::label_truncated(
-                    ui,
-                    st,
-                    Role::Caption,
-                    if moves.is_empty() {
-                        Tone::Text3
+                let tip = if moves.is_empty() {
+                    "Route this macro's output to controls in the drawer".to_string()
+                } else {
+                    moves.join("\n")
+                };
+                ui.add_space(st.sp(1));
+                if moves.is_empty() {
+                    kit::label(ui, st, Role::Caption, tone, "moves nothing yet").tip(st, &tip);
+                } else if compact {
+                    let t = if moves.len() == 1 {
+                        moves[0].clone()
                     } else {
-                        Tone::Text2
-                    },
-                    text,
-                )
-                .tip(
-                    st,
-                    &if moves.is_empty() {
-                        "Route this macro's output to controls in the drawer".to_string()
-                    } else {
-                        moves.join("\n")
+                        format!("{} +{}", moves[0], moves.len() - 1)
+                    };
+                    kit::label_truncated(ui, st, Role::Caption, tone, t).tip(st, &tip);
+                } else {
+                    // One destination per line, two at most; the rest as "+n more".
+                    let shown = if moves.len() > 2 { 1 } else { moves.len() };
+                    for m in &moves[..shown] {
+                        kit::label_truncated(ui, st, Role::Caption, tone, m.clone()).tip(st, &tip);
+                    }
+                    if moves.len() > shown {
+                        kit::label(
+                            ui,
+                            st,
+                            Role::Caption,
+                            tone,
+                            format!("+{} more", moves.len() - shown),
+                        )
+                        .tip(st, &tip);
+                    }
+                }
+                // Explain and the menu, at the tile's top right while the pointer is over it.
+                let tools = egui::Rect::from_min_size(
+                    egui::pos2(tile.right() - 60.0, tile.top()),
+                    vec2(60.0, 26.0),
+                );
+                ui.scope_builder(
+                    egui::UiBuilder::new()
+                        .max_rect(tools)
+                        .layout(Layout::right_to_left(egui::Align::Min)),
+                    |ui| {
+                        pin_tools(
+                            editor, ui_state, ui, st, pin, index, count, &title, fade, None,
+                        );
                     },
                 );
             },
         )
         .response
         .rect;
+    note_hover(ui, &key, rect);
     ui_state.record(format!("pcard:{key}"), rect);
     after_card(ui, ui_state, st, pin, rect);
 }
@@ -1368,6 +1562,8 @@ fn control_card(
             Role::H3,
             true,
             None,
+            "",
+            None,
         );
         kit::label_truncated(
             ui,
@@ -1411,104 +1607,194 @@ fn lane(state: &kabl_core::PatchState, id: ModuleId, bank: usize) -> Vec<Step> {
         .collect()
 }
 
+/// One "Sequences" card with a row per sequencer: its name, the A-D bank chips and the step
+/// lane (level bars, probability as brightness, the playing step outlined).
 #[allow(clippy::too_many_arguments)]
-fn banks_card(
+fn sequences_card(
     editor: &mut PatchEditor,
     ui_state: &mut UiState,
     ui: &mut egui::Ui,
     st: &Style,
-    pin: &Pin,
-    index: usize,
+    banks: &[(usize, &Pin)],
     count: usize,
     size: egui::Vec2,
-    hue: egui::Color32,
 ) {
-    let key = format!("{}.{}", pin.id, pin.key);
-    let id = pin.id;
-    let rect = shell(ui, ui_state, st, &key, size, |ui, ui_state| {
-        let who = format!(
-            "Sequences · {} #{id}",
-            perform::module_name(editor.state(), id)
-        );
-        pin_head(
-            editor,
-            ui_state,
-            ui,
-            st,
-            pin,
-            index,
-            count,
-            Role::H3,
-            true,
-            Some(who),
-        );
+    let n = banks.len().max(1) as f32;
+    let row_h = ((size.y - 64.0) / n).clamp(44.0, 96.0);
+    let hues = [st.roles.gate, st.roles.audio, st.roles.pitch];
+    let rect = shell(ui, ui_state, st, "sequences", size, |ui, ui_state| {
+        kit::section(ui, st, "Sequences");
+        ui.add_space(st.sp(1));
         let state = editor.state().clone();
-        let (playing, queued) = ui_state
-            .seq_banks
-            .get(&id)
-            .copied()
-            .unwrap_or((crate::banks::startup(&state, id), None));
-        let steps = lane(&state, id, playing);
-        let lane_h = (size.y - 96.0).max(st.sp(6) * 2.0);
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = st.sp(1);
-            for b in 0..seq::BANKS {
-                let name = crate::banks::title(&state, id, b);
-                let hover = format!(
-                    "Launch bank {name}{}",
-                    button_text(&state, id, &format!("bank.{b}"))
-                        .map_or(String::new(), |t| format!("\n{t}"))
-                );
-                let ps = if b == playing {
-                    PadState::Playing
-                } else if queued == Some(b) {
-                    PadState::Queued
-                } else {
-                    PadState::Idle
-                };
-                let r = kit::pad(
-                    ui,
-                    st,
-                    vec2(st.sp(5) + st.sp(2), st.sp(5) + st.sp(2)),
-                    seq::BANK_NAMES[b],
-                    None,
-                    None,
-                    ps,
-                    None,
+        for (k, &(index, pin)) in banks.iter().enumerate() {
+            let id = pin.id;
+            let key = format!("{}.{}", pin.id, pin.key);
+            let named = state
+                .label(id, &format!("{}{}", perform::PIN_PREFIX, pin.key))
+                .is_some();
+            let title = if named {
+                pin_label(&state, pin)
+            } else if banks.len() > 1 {
+                format!("{} #{id}", perform::module_name(&state, id))
+            } else {
+                perform::module_name(&state, id).to_string()
+            };
+            let (playing, queued) = ui_state
+                .seq_banks
+                .get(&id)
+                .copied()
+                .unwrap_or((crate::banks::startup(&state, id), None));
+            let steps = lane(&state, id, playing);
+            let fade = tool_fade(ui, &key);
+            let row = ui
+                .allocate_ui_with_layout(
+                    vec2(ui.available_width(), row_h),
+                    Layout::left_to_right(egui::Align::Center),
+                    |ui| {
+                        ui.spacing_mut().item_spacing.x = st.sp(1);
+                        let tile = ui.max_rect();
+                        ui.allocate_ui_with_layout(
+                            vec2(74.0, row_h),
+                            Layout::left_to_right(egui::Align::Center),
+                            |ui| {
+                                let font = egui::FontId::new(
+                                    14.0,
+                                    crate::style::Font::SansSemibold.family(st.fonts_ready),
+                                );
+                                pin_title(
+                                    editor,
+                                    ui_state,
+                                    ui,
+                                    st,
+                                    pin,
+                                    &title,
+                                    Role::Body,
+                                    false,
+                                    Some(font),
+                                );
+                            },
+                        );
+                        for b in 0..seq::BANKS {
+                            let name = crate::banks::title(&state, id, b);
+                            let hover = format!(
+                                "Launch bank {name}{}",
+                                button_text(&state, id, &format!("bank.{b}"))
+                                    .map_or(String::new(), |t| format!("\n{t}"))
+                            );
+                            let ps = if b == playing {
+                                PadState::Playing
+                            } else if queued == Some(b) {
+                                PadState::Queued
+                            } else {
+                                PadState::Idle
+                            };
+                            let r = bank_chip(ui, st, seq::BANK_NAMES[b], ps).tip(st, &hover);
+                            ui_state.record(format!("pbank:{id}.{b}"), r.rect);
+                            if r.clicked() {
+                                if let Err(e) =
+                                    crate::banks::launch(&mut ui_state.launches, &state, id, b)
+                                {
+                                    ui_state.last_message = Some(e);
+                                }
+                            }
+                        }
+                        ui.add_space(st.sp(2));
+                        let w = ui.available_width();
+                        kit::step_lane(
+                            ui,
+                            st,
+                            vec2(w, (row_h - 20.0).max(24.0)),
+                            &steps,
+                            ui_state.seq_steps.get(&id).copied(),
+                            hues[k % 3],
+                        );
+                        // Explain and the menu, with Cancel while a bank is queued, at the row's
+                        // top right while the pointer is over it.
+                        let tools = egui::Rect::from_min_size(
+                            egui::pos2(tile.right() - 60.0, tile.top()),
+                            vec2(60.0, 26.0),
+                        );
+                        let queued_now = queued.is_some();
+                        let mut extra =
+                            |ui: &mut egui::Ui, _: &mut PatchEditor, ui_state: &mut UiState| {
+                                let r = kit::menu_item_tone(
+                                    ui,
+                                    st,
+                                    "Cancel the queued bank",
+                                    false,
+                                    Tone::Text,
+                                    queued_now,
+                                );
+                                if queued_now {
+                                    ui_state.record(format!("pbank-cancel:{id}"), r.rect);
+                                }
+                                if r.clicked() && queued_now {
+                                    ui_state.launches.push(Command::Cancel(Some(id)));
+                                    ui.close();
+                                }
+                            };
+                        ui.scope_builder(
+                            egui::UiBuilder::new()
+                                .max_rect(tools)
+                                .layout(Layout::right_to_left(egui::Align::Min)),
+                            |ui| {
+                                pin_tools(
+                                    editor,
+                                    ui_state,
+                                    ui,
+                                    st,
+                                    pin,
+                                    index,
+                                    count,
+                                    &title,
+                                    fade,
+                                    Some(&mut extra),
+                                );
+                            },
+                        );
+                    },
                 )
-                .tip(st, &hover);
-                ui_state.record(format!("pbank:{id}.{b}"), r.rect);
-                if r.clicked() {
-                    if let Err(e) = crate::banks::launch(&mut ui_state.launches, &state, id, b) {
-                        ui_state.last_message = Some(e);
-                    }
-                }
-            }
-            if queued.is_some() {
-                let r = ui.add(kit::Button::new(st, "Cancel").small());
-                ui_state.record(format!("pbank-cancel:{id}"), r.rect);
-                if r.clicked() {
-                    ui_state.launches.push(Command::Cancel(Some(id)));
-                }
-            }
-            ui.add_space(st.sp(2));
-            let w = ui.available_width();
-            kit::step_lane(
-                ui,
-                st,
-                vec2(w, lane_h),
-                &steps,
-                ui_state.seq_steps.get(&id).copied(),
-                hue,
-            );
-        });
-        let text = match queued {
-            Some(q) => format!("next: {}", crate::banks::title(&state, id, q)),
-            None => format!("playing: {}", crate::banks::title(&state, id, playing)),
-        };
-        kit::label_truncated(ui, st, Role::Caption, Tone::Text2, text);
+                .response
+                .rect;
+            note_hover(ui, &key, row);
+            ui_state.record(format!("pcard:{key}"), row);
+            after_card(ui, ui_state, st, pin, row);
+        }
     });
-    after_card(ui, ui_state, st, pin, rect);
+    let _ = rect;
+}
+
+/// A bank chip, 28 x 24: the playing bank is filled with the accent, the queued one outlined.
+fn bank_chip(ui: &mut egui::Ui, st: &Style, text: &str, state: PadState) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(vec2(28.0, 24.0), Sense::click());
+    let r = &st.roles;
+    let hover = ui
+        .ctx()
+        .animate_bool_with_time(resp.id.with("hover"), resp.hovered(), 0.1);
+    let (fill, line, ink) = match state {
+        PadState::Playing => (r.accent, r.accent, r.on_accent),
+        PadState::Queued => (r.raised, r.accent, r.text),
+        PadState::Idle => (
+            crate::style::mix(r.raised, r.text, 0.05 * hover),
+            r.line,
+            r.text2,
+        ),
+    };
+    ui.painter().rect_filled(rect, 6.0, fill);
+    ui.painter().rect_stroke(
+        rect,
+        6.0,
+        egui::Stroke::new(if state == PadState::Queued { 2.0 } else { 1.0 }, line),
+        egui::StrokeKind::Inside,
+    );
+    ui.painter().text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        text,
+        egui::FontId::new(12.0, egui::FontFamily::Monospace),
+        ink,
+    );
+    resp
 }
 
 #[cfg(test)]

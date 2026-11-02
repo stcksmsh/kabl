@@ -8,6 +8,7 @@ use std::f32::consts::PI;
 pub enum Ic {
     Play,
     Stop,
+    Restart,
     Undo,
     Redo,
     Search,
@@ -58,6 +59,13 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
                 vec![q(-4.0, -6.0), q(6.0, 0.0), q(-4.0, 6.0)],
                 col,
                 PathStroke::NONE,
+            ));
+        }
+        Ic::Restart => {
+            p.add(Shape::line(arc(c, 6.0 * u, -PI * 0.35, PI * 1.25), st));
+            p.add(Shape::line(
+                vec![q(-1.8, -9.0), q(-5.2, -6.0), q(-1.4, -3.2)],
+                st,
             ));
         }
         Ic::Stop => {

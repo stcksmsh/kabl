@@ -142,6 +142,89 @@ pub fn arc_knob(
     (resp, out)
 }
 
+/// The Perform macro knob, drawn as in the mockup: a raised body with a soft shadow, a pointer
+/// line, and a 6 px value arc around it. `size` is the whole square; the body is 11 px smaller
+/// than the arc ring on each side. The caller paints the value inside it. Same drag as
+/// [`arc_knob`].
+pub fn macro_knob(
+    ui: &mut Ui,
+    st: &Style,
+    value: f32,
+    size: f32,
+    mod_span: Option<(f32, f32)>,
+) -> (Response, Option<f32>) {
+    let enabled = ui.is_enabled();
+    let (rect, resp) = ui.allocate_exact_size(
+        vec2(size, size),
+        if enabled {
+            Sense::click_and_drag()
+        } else {
+            Sense::hover()
+        },
+    );
+    let mut out = None;
+    if enabled && resp.dragged() {
+        let d = resp.drag_delta();
+        let fine = ui.input(|i| i.modifiers.shift);
+        let per_px = if fine { 1.0 / 800.0 } else { 1.0 / 200.0 };
+        let v = (value + (d.x - d.y) * per_px).clamp(0.0, 1.0);
+        if v != value {
+            out = Some(v);
+        }
+    }
+    let value = out.unwrap_or(value);
+    let r = &st.roles;
+    let c = rect.center();
+    let ring = size / 2.0 - 3.0;
+    let body = ring - 8.0;
+    let p = ui.painter();
+    let cap = |p: &Painter, v: f32, col: Color32| {
+        let pt = A0 + SWEEP * v;
+        p.circle_filled(c + vec2(pt.cos(), pt.sin()) * ring, 3.0, col);
+    };
+    p.add(Shape::line(
+        arc_points(c, ring, 0.0, 1.0),
+        Stroke::new(6.0, r.inset),
+    ));
+    cap(p, 0.0, r.inset);
+    cap(p, 1.0, r.inset);
+    if let Some((a, b)) = mod_span {
+        p.add(Shape::line(
+            arc_points(c, ring + 5.0, a.min(b), a.max(b)),
+            Stroke::new(2.0, alpha(r.cv, 220)),
+        ));
+    }
+    if value > 0.004 {
+        p.add(Shape::line(
+            arc_points(c, ring, 0.0, value),
+            Stroke::new(6.0, r.accent),
+        ));
+        cap(p, 0.0, r.accent);
+        cap(p, value, r.accent);
+    }
+    p.circle_filled(
+        c + vec2(0.0, 3.0),
+        body,
+        alpha(Color32::BLACK, if st.dark { 100 } else { 30 }),
+    );
+    p.circle_filled(c, body, r.raised);
+    p.circle_stroke(c, body, Stroke::new(1.0, r.line2));
+    let a = A0 + SWEEP * value;
+    let dir = vec2(a.cos(), a.sin());
+    p.line_segment(
+        [c + dir * body * 0.62, c + dir * body * 0.9],
+        Stroke::new(3.0, r.text),
+    );
+    if resp.has_focus() {
+        p.circle_stroke(
+            c,
+            size / 2.0,
+            Stroke::new(st.slots.controls.focus_ring, r.focus),
+        );
+    }
+    (resp, out)
+}
+
 /// What a launch pad shows.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PadState {

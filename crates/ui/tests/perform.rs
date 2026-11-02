@@ -698,16 +698,17 @@ fn scenes_and_macros_use_the_width_at_every_size() {
                 .find(|(k, _)| k.ends_with(".cues"))
                 .map(|(_, r)| *r)
                 .expect("scenes card");
+        // The scenes are the left column of the two-column view (300 to 380 px).
         assert!(
-            right - scenes.right() < 30.0,
-            "{w}: scenes end at {}",
-            scenes.right()
+            (290.0..=400.0).contains(&scenes.width()),
+            "{w}: scenes are {} wide",
+            scenes.width()
         );
         // The bank cards of the second row also reach the right edge.
         let last =
             h.ui.hits
                 .iter()
-                .filter(|(k, _)| k.starts_with("pcard:") && k.ends_with(".banks"))
+                .filter(|(k, _)| k.as_str() == "pcard:sequences")
                 .map(|(_, r)| r.right())
                 .fold(0.0, f32::max);
         assert!(right - last < 30.0, "{w}: banks end at {last}");
@@ -717,13 +718,17 @@ fn scenes_and_macros_use_the_width_at_every_size() {
             "{w}: scene row {}",
             scenes.height()
         );
-        let ctrl_bottom = h
-            .ui
-            .hits
-            .iter()
-            .filter(|(k, _)| k.starts_with("pcard:") && !k.ends_with(".banks") && !k.contains(".m"))
-            .map(|(_, r)| r.bottom())
-            .fold(0.0, f32::max);
+        let ctrl_bottom =
+            h.ui.hits
+                .iter()
+                .filter(|(k, _)| {
+                    k.starts_with("pcard:")
+                        && !k.ends_with(".banks")
+                        && !k.contains(".m")
+                        && *k != "pcard:sequences"
+                })
+                .map(|(_, r)| r.bottom())
+                .fold(0.0, f32::max);
         assert!(
             ctrl_bottom <= hgt - 20.0,
             "{w}: controls end at {ctrl_bottom}"
