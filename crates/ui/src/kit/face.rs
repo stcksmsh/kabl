@@ -751,13 +751,8 @@ pub fn display_frame(p: &Painter, st: &Style, rect: Rect, face: Color32, z: f32)
     let r = &st.roles;
     let cr = CornerRadius::same((3.0 * z).clamp(2.0, 6.0) as u8);
     if st.slots.display.frame == DisplayFrame::Paper {
-        // Paper wells are near white on light themes; on dark themes they stay the dark inset.
-        let fill = if st.dark {
-            r.disp_bg
-        } else {
-            mix(r.disp_bg, Color32::WHITE, 0.82)
-        };
-        p.rect_filled(rect, cr, fill);
+        // Paper wells are the inset colour in both themes (light grey on paper, as in the mockup).
+        p.rect_filled(rect, cr, r.disp_bg);
         p.rect_stroke(rect, cr, Stroke::new(1.0, r.line2), StrokeKind::Inside);
     } else {
         // Lower lip: the panel's edge catching the light under the cut.
@@ -811,7 +806,8 @@ pub fn display_frame(p: &Painter, st: &Style, rect: Rect, face: Color32, z: f32)
 /// The trace colour of a display.
 pub fn trace_color(st: &Style) -> Color32 {
     if st.slots.display.frame == DisplayFrame::Paper && !st.dark {
-        mix(st.roles.disp_bg, st.roles.accent, 0.7)
+        // The mockup's trace is the accent itself.
+        st.roles.accent
     } else {
         st.roles.disp_trace
     }
