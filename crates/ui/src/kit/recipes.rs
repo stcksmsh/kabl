@@ -212,7 +212,7 @@ pub fn macro_knob(
     let a = A0 + SWEEP * value;
     let dir = vec2(a.cos(), a.sin());
     p.line_segment(
-        [c + dir * body * 0.62, c + dir * body * 0.9],
+        [c + dir * body * 0.74, c + dir * body * 0.93],
         Stroke::new(3.0, r.text),
     );
     if resp.has_focus() {

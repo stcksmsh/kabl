@@ -415,7 +415,7 @@ fn the_panel_reads_at_both_sizes_whatever_the_rack_zoom() {
             .map(|k| h.rect(&format!("pcard:{k}")))
             .collect();
         assert_eq!(cards, again);
-        for key in ["midi-input", "perform", "routing"] {
+        for key in ["perform", "routing"] {
             assert!(screen.contains_rect(h.rect(key)), "{key}");
         }
     }
@@ -580,16 +580,37 @@ fn the_demo_controls_fit_together_at_1280() {
             }
             rects.push(r);
         }
-        for k in [
-            "rec-start",
-            "midi-input",
-            "notes-off",
-            "prun:1",
-            "prestart:1",
-        ] {
+        for k in ["rec-start", "prun:1", "prestart:1"] {
             assert!(screen.contains_rect(h.rect(k)), "{w}: {k}");
         }
     }
+}
+
+/// The header row is gone: the transport card's menu carries MIDI in, All notes off, Keep
+/// Routing open and the view size.
+#[test]
+fn the_transport_menu_carries_the_view_controls() {
+    let mut h = H::new(1440.0, 900.0);
+    h.pin(CLOCK, TRANSPORT);
+    h.ui.perform_open = true;
+    h.ui.perform_tall = true;
+    h.ui.midi_inputs = vec!["KeyStep".into()];
+    h.frame();
+    assert!(
+        !h.ui.hits.contains_key("notes-off"),
+        "not drawn until the menu opens"
+    );
+    h.click("pmenu:1.transport");
+    for k in [
+        "notes-off",
+        "drawer-pin",
+        "perform-size",
+        "midi-input:KeyStep",
+    ] {
+        assert!(h.ui.hits.contains_key(k), "{k}");
+    }
+    h.click("notes-off");
+    assert!(h.ui.all_notes_off);
 }
 
 #[test]
@@ -605,6 +626,7 @@ fn the_toolbar_switch_opens_perform_as_a_view_and_show_rack_docks_it() {
         !h.ui.hits.keys().any(|k| k.starts_with("knob:")),
         "the rack is hidden in the view"
     );
+    h.click("pmenu:1.transport");
     h.click("perform-size");
     assert!(
         h.ui.perform_open && !h.ui.perform_tall,
@@ -659,6 +681,7 @@ fn the_full_view_takes_the_drawer_unless_pinned_and_gives_it_back() {
     // Pinned from inside Perform: the drawer comes back and stays through the trip.
     h.click("perform");
     assert!(!h.ui.drawer_open);
+    h.click("pmenu:1.transport");
     h.click("drawer-pin");
     assert!(h.ui.drawer_pinned && h.ui.drawer_open);
     h.click("rack");
