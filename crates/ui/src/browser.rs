@@ -1005,22 +1005,42 @@ pub fn doc_field(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui
         });
 }
 
-/// The primary Save button, at the right end of the toolbar.
+/// The primary Save button, at the right end of the toolbar: 14 px semibold, 32 px tall.
 pub fn save_button(
     editor: &mut PatchEditor,
     ui_state: &mut UiState,
     ui: &mut egui::Ui,
     st: &Style,
 ) {
-    let r = ui
-        .add(
-            kit::Button::new(st, "Save")
-                .primary()
-                .enabled(!io_busy(ui_state)),
-        )
-        .tip(st, "Ctrl+S");
+    let enabled = !io_busy(ui_state);
+    let font = egui::FontId::new(
+        14.0,
+        crate::style::Font::SansSemibold.family(st.fonts_ready),
+    );
+    let g = ui
+        .painter()
+        .layout_no_wrap("Save".into(), font, st.roles.on_accent);
+    let (rect, r) = ui.allocate_exact_size(
+        vec2(g.size().x + st.sp(4) * 2.0, 32.0),
+        if enabled {
+            Sense::click()
+        } else {
+            Sense::hover()
+        },
+    );
+    let hover = ui.ctx().animate_bool_with_time(
+        r.id.with("hover"),
+        enabled && r.hovered(),
+        Style::secs(st.motion.hover),
+    );
+    let fill = crate::style::mix(st.roles.accent, egui::Color32::BLACK, 0.10 * hover);
+    let radius = st.shape_radius(st.slots.controls.button, rect.height());
+    ui.painter().rect_filled(rect, radius, fill);
+    ui.painter()
+        .galley(rect.center() - g.size() / 2.0, g, st.roles.on_accent);
+    let r = r.tip(st, "Ctrl+S");
     hit(ui_state, "save", &r);
-    if r.clicked() {
+    if r.clicked() && enabled {
         save(editor, ui_state, None);
     }
 }

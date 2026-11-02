@@ -1171,18 +1171,18 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
     let wide = full.width() >= 1300.0;
     let lay = |l| egui::UiBuilder::new().layout(l);
     // Centre: the view switch, centred in the window.
-    let sw = egui::Rect::from_center_size(full.center(), egui::vec2(270.0, full.height()));
+    let sw = egui::Rect::from_center_size(full.center(), egui::vec2(280.0, 38.0));
     ui.scope_builder(
-        lay(egui::Layout::left_to_right(egui::Align::Center)).max_rect(sw),
+        lay(egui::Layout::left_to_right(egui::Align::Min)).max_rect(sw),
         |ui| {
             kit::view_switch(ui, st, |ui| {
-                let r = kit::seg(ui, st, "Rack", scene == Scene::Rack);
+                let r = kit::seg_large(ui, st, "Rack", scene == Scene::Rack);
                 ui_state.record("rack".into(), r.rect);
                 if r.clicked() {
                     ui_state.perform_open = false;
                     ui_state.browser_open = false;
                 }
-                let r = kit::seg(ui, st, "Perform", scene == Scene::Perform);
+                let r = kit::seg_large(ui, st, "Perform", scene == Scene::Perform);
                 ui_state.record("perform".into(), r.rect);
                 if r.clicked() {
                     // The switch opens Perform as a view; "Show rack" in its header docks it.
@@ -1190,7 +1190,7 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
                     ui_state.perform_tall = true;
                     ui_state.browser_open = false;
                 }
-                let r = kit::seg(ui, st, "Sounds", scene == Scene::Sounds);
+                let r = kit::seg_large(ui, st, "Sounds", scene == Scene::Sounds);
                 ui_state.record("browser".into(), r.rect);
                 if r.clicked() {
                     ui_state.browser_open = !ui_state.browser_open;
@@ -1213,7 +1213,9 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
     ui.scope_builder(
         lay(egui::Layout::right_to_left(egui::Align::Center)).max_rect(right),
         |ui| {
+            ui.spacing_mut().item_spacing.x = st.sp(1);
             browser::save_button(editor, ui_state, ui, st);
+            ui.add_space(st.sp(1));
             match scene {
                 Scene::Rack => {
                     let c = ui_state.canvas.center();
