@@ -913,12 +913,16 @@ pub fn doc_field(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui
     } else {
         name.clone()
     };
-    let kick = ui
-        .painter()
-        .layout_no_wrap(cat, st.font(Role::Caption), st.roles.text3);
+    // Mockup: kicker mono 10 px, name 13 px medium.
+    let kick = ui.painter().layout_no_wrap(
+        cat,
+        egui::FontId::new(10.0, egui::FontFamily::Monospace),
+        st.roles.text3,
+    );
+    let nm_font = egui::FontId::new(13.0, crate::style::Font::SansMedium.family(st.fonts_ready));
     let nm = ui
         .painter()
-        .layout_no_wrap(name, st.font(Role::Body), st.roles.text);
+        .layout_no_wrap(name, nm_font.clone(), st.roles.text);
     let pad = st.sp(2);
     let gap = st.sp(2);
     let dot = if modified { 3.0 * 2.0 + gap } else { 0.0 };
@@ -927,7 +931,11 @@ pub fn doc_field(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui
     } else {
         0.0
     };
-    let w = (pad * 2.0 + kick_w + nm.size().x + dot + gap + 12.0).clamp(150.0, 260.0);
+    let w = if ui.max_rect().width() >= 330.0 {
+        210.0
+    } else {
+        170.0
+    };
     let (rect, r) = ui.allocate_exact_size(vec2(w, st.metrics.control_h), Sense::click());
     let radius = st.shape_radius(st.slots.controls.field, rect.height());
     let hover = ui.ctx().animate_bool_with_time(
@@ -960,9 +968,7 @@ pub fn doc_field(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui
     } else {
         nm.job.text.clone()
     };
-    let nm = ui
-        .painter()
-        .layout_no_wrap(shown, st.font(Role::Body), st.roles.text);
+    let nm = ui.painter().layout_no_wrap(shown, nm_font, st.roles.text);
     let nx = nm.size().x;
     ui.painter()
         .galley(egui::pos2(x, cy - nm.size().y / 2.0), nm, st.roles.text);
@@ -1005,7 +1011,8 @@ pub fn doc_field(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui
         });
 }
 
-/// The primary Save button, at the right end of the toolbar: 14 px semibold, 32 px tall.
+/// The primary Save button, at the right end of the toolbar: 13 px semibold, 28 px tall,
+/// text width + 28 px (mockup metrics).
 pub fn save_button(
     editor: &mut PatchEditor,
     ui_state: &mut UiState,
@@ -1014,14 +1021,14 @@ pub fn save_button(
 ) {
     let enabled = !io_busy(ui_state);
     let font = egui::FontId::new(
-        14.0,
+        13.0,
         crate::style::Font::SansSemibold.family(st.fonts_ready),
     );
     let g = ui
         .painter()
         .layout_no_wrap("Save".into(), font, st.roles.on_accent);
     let (rect, r) = ui.allocate_exact_size(
-        vec2(g.size().x + st.sp(4) * 2.0, 32.0),
+        vec2(g.size().x + 28.0, st.metrics.control_h),
         if enabled {
             Sense::click()
         } else {

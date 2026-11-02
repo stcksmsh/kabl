@@ -326,7 +326,8 @@ pub fn seg(ui: &mut Ui, st: &Style, text: &str, selected: bool) -> Response {
     seg_enabled(ui, st, text, selected, true)
 }
 
-/// A scene switch item: 14 px semibold, 32 px tall, at least 86 px wide.
+/// A scene switch item, mockup metrics: 13 px (semibold selected, medium otherwise), 24 px
+/// tall in a 28 px track, 84 px wide at least.
 pub fn seg_large(ui: &mut Ui, st: &Style, text: &str, selected: bool) -> Response {
     seg_sized(ui, st, text, selected, true, true)
 }
@@ -356,13 +357,13 @@ fn seg_sized(
         .painter()
         .layout_no_wrap(text.to_string(), font.clone(), Color32::WHITE);
     let h = if large {
-        32.0
+        st.metrics.control_h - 4.0
     } else {
         st.metrics.control_h - 6.0
     };
     let (rect, resp) = ui.allocate_exact_size(
         vec2(
-            (g.size().x + st.sp(3) * 2.0).max(if large { 86.0 } else { 0.0 }),
+            (g.size().x + st.sp(3) * 2.0).max(if large { 84.0 } else { 0.0 }),
             h,
         ),
         if enabled {

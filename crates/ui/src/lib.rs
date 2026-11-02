@@ -1017,9 +1017,11 @@ enum Scene {
 
 /// The brand mark and wordmark: an accent tile with a cable curve, then "kabl".
 fn brand(ui: &mut egui::Ui, st: &Style) {
-    let word =
-        ui.painter()
-            .layout_no_wrap("kabl".into(), st.font(style::Role::Title), st.roles.text);
+    let word = ui.painter().layout_no_wrap(
+        "kabl".into(),
+        egui::FontId::new(17.0, style::Font::SansSemibold.family(st.fonts_ready)),
+        st.roles.text,
+    );
     let s = 24.0;
     let (r, _) = ui.allocate_exact_size(
         egui::vec2(s + st.sp(2) + word.size().x, s),
@@ -1171,7 +1173,8 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
     let wide = full.width() >= 1300.0;
     let lay = |l| egui::UiBuilder::new().layout(l);
     // Centre: the view switch, centred in the window.
-    let sw = egui::Rect::from_center_size(full.center(), egui::vec2(280.0, 38.0));
+    let sw =
+        egui::Rect::from_center_size(full.center(), egui::vec2(270.0, st.metrics.control_h + 4.0));
     ui.scope_builder(
         lay(egui::Layout::left_to_right(egui::Align::Min)).max_rect(sw),
         |ui| {
