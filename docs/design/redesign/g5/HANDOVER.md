@@ -10,11 +10,15 @@ Task as received from "Kabl overseer": redesign G5 chrome (lib.rs toolbar / draw
 ## Review round 2026-11-02 (Kosta: match the mockup closer; cables #87 accepted)
 Done and pushed: #86 toolbar (17b96f8, 2a6f70b, 56e4ccc; metrics in FACTS.md), #88 library column (f8550cf, d0617a9), #90 Perform (card kicker rows with hover tools, big macro knobs, 2x4 scene pads, one Sequences card with a row per sequencer, light-theme knob contrast; #89 merged into #90, close #89). Sheets: docs/design/redesign/g5/{toolbar-fix,sounds-fix,perform-fix}.
 
-## Remaining
-1. #87: add the verdicts.json entry (Kosta chose option A, drawer stays an overlay below 1280, no refit); gaps listed before still open (cable list excludes param routes, selected-row highlight, card text).
-2. #90 gaps: Perform view header row (title, MIDI in, All notes off, Keep Routing open, Show rack) is not in the mockup, home for these actions undecided; sequencers have 8 steps (mockup 16); macro value inside the knob shows the param value, the mockup a percent; separate Stop button (the run button toggles).
-3. #88: All and Recent library filters left the UI (Recent code kept); unmapped categories Basic, Sounds, Sequences, Performances show under All only.
-4. Perf gate deferred by the overseer until the other machine jobs finish.
+## Checkpoint 2026-11-02 (budget stop)
+Pushed since the review round: #86 f99cf1c, 131b767 (dirty dot capture, status bar tooltip); #90 98064ba, 77909f2 (lane, needle, Plex Sans semibold knob value, fixed name column, mockup-like capture patch, `KABL_CAPTURE_FEW=1` for the small sound); #88 d0617a9; new #91 `claude/ui-g5-tokens` (theme tokens to mockup, draft, base master): mockup orange in both themes, `bar` and `accent_text` roles (paper text #A94F00), mockup paper signals, warm-grey face, light caps and light wells on paper, verdict entries in docs/design/verdicts.json (based on master after #92). Sheets: g5/tokens, g5/perform-fix (and few/).
+
+## Remaining, in order
+1. Wait for #91 to merge, then rebase #87, #88, #90 on master (no stacking). #90 and #86 captures then show the new colours.
+2. #87 (`claude/ui-g5-drawer`): G4 spec: drawer docks at 320 px at 1280 and above (check the code, the brief saw 360); below 1280 a 44 px rail plus a 320 px overlay with a left shadow, rack zoom unchanged. Cable list still excludes param routes, no selected-row highlight, card text is the module description.
+3. #90 gaps: lanes have 8 steps (mockup 16); no separate Stop button; the Perform header only shows when no transport card is pinned.
+4. #88: All and Recent filters left the UI; unmapped categories Basic, Sounds, Sequences, Performances show under All only.
+5. Perf gate deferred by the overseer. Next role after G5: F (G4 chrome surfaces) once agent 2's kit lands; do not add kit parts.
 
 ## Facts that cost effort
 - Worktree guard rejects compound shell commands and heredocs: write scripts with the Write tool, run `python3 -I script.py`, plain single commands; `gh pr edit` fails (Projects classic), use `gh api -X PATCH repos/stcksmsh/kabl/pulls/N -F body=@file`.
