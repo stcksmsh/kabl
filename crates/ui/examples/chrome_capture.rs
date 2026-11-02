@@ -51,6 +51,13 @@ impl App {
             Some(patches()),
             self._user.path().to_path_buf(),
         ));
+        let mut doc = kabl_ui::browser::Doc::new(
+            "Acid Line",
+            kabl_ui::browser::DocOrigin::Library("factory:acid-line".into()),
+            &state,
+        );
+        doc.meta.category = "Bass".into();
+        ui.doc = Some(doc);
         ui.browser_open = j.scene == "sounds";
         ui.drawer_open = j.scene == "rack";
         ui.perform_open = j.scene == "perform";

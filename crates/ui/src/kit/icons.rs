@@ -23,6 +23,9 @@ pub enum Ic {
     Close,
     Folder,
     Cable,
+    CableOff,
+    Midi,
+    Heart,
     Bolt,
     Save,
     Note,
@@ -169,6 +172,39 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
                 arc(q(0.0, -1.0), 7.0 * u, PI * 0.8, PI * 0.2),
                 st,
             ));
+        }
+        Ic::CableOff => {
+            p.circle_stroke(q(-5.0, -4.0), 2.2 * u, st);
+            p.circle_stroke(q(5.0, 4.0), 2.2 * u, st);
+            p.add(Shape::line(
+                arc(q(0.0, -1.0), 7.0 * u, PI * 0.8, PI * 0.2),
+                st,
+            ));
+            line(&[(-7.0, -7.0), (7.0, 7.0)]);
+        }
+        Ic::Midi => {
+            p.circle_stroke(c, 7.0 * u, st);
+            for (x, y) in [
+                (-4.5, 0.5),
+                (-2.3, -3.2),
+                (0.0, -4.2),
+                (2.3, -3.2),
+                (4.5, 0.5),
+            ] {
+                p.circle_filled(q(x, y), 0.9 * u, col);
+            }
+        }
+        Ic::Heart => {
+            let pts: Vec<Pos2> = (0..=24)
+                .map(|i| {
+                    let t = i as f32 / 24.0 * 2.0 * PI;
+                    q(
+                        7.0 * t.sin().powi(3) * 0.9,
+                        -(5.6 * t.cos() - 2.2 * (2.0 * t).cos() - 0.9 * (3.0 * t).cos()) + 0.5,
+                    )
+                })
+                .collect();
+            p.add(Shape::closed_line(pts, st));
         }
         Ic::Bolt => {
             p.add(Shape::convex_polygon(

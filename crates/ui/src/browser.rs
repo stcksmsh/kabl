@@ -888,20 +888,24 @@ pub fn frame_input(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &egui::
     }
 }
 
-/// The document name, unsaved mark, Save and Save As, for the toolbar.
-/// The open sound's name field (a dot marks unsaved changes).
-pub fn doc_field(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
+/// The open sound as a dropdown: category kicker, name, unsaved dot, chevron. Its menu holds
+/// Save and Save As.
+pub fn doc_field(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
     let modified = is_modified(editor, ui_state);
     let name = ui_state
         .doc
         .as_ref()
-        .map_or("", |d| d.name.as_str())
+        .map_or("Untitled", |d| d.name.as_str())
         .to_string();
+    let cat = ui_state
+        .doc
+        .as_ref()
+        .map_or("", |d| d.meta.category.as_str())
+        .to_uppercase();
     let factory = matches!(
         ui_state.doc.as_ref().map(|d| &d.origin),
         Some(DocOrigin::Library(id)) if id.starts_with("factory:")
     );
-    let text = format!("{}{name}", if modified { "• " } else { "" });
     let tip = if modified {
         format!("{name}: unsaved changes")
     } else if factory {
@@ -909,25 +913,100 @@ pub fn doc_field(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     } else {
         name.clone()
     };
-    let r = egui::Frame::new()
-        .fill(st.roles.inset)
-        .stroke(egui::Stroke::new(1.0, st.roles.line))
-        .corner_radius(egui::CornerRadius::same(
-            st.shape_radius(st.slots.controls.field, st.metrics.small_h) as u8,
-        ))
-        .inner_margin(egui::Margin::symmetric(st.sp(2) as i8, 2))
-        .show(ui, |ui| {
-            ui.set_width(160.0);
-            kit::label_truncated(ui, st, Role::Body, Tone::Text, text);
-        })
-        .response
-        .interact(Sense::hover())
-        .tip(st, &tip);
+    let kick = ui
+        .painter()
+        .layout_no_wrap(cat, st.font(Role::Caption), st.roles.text3);
+    let nm = ui
+        .painter()
+        .layout_no_wrap(name, st.font(Role::Body), st.roles.text);
+    let pad = st.sp(2);
+    let gap = st.sp(2);
+    let dot = if modified { 3.0 * 2.0 + gap } else { 0.0 };
+    let kick_w = if kick.size().x > 0.0 {
+        kick.size().x + gap
+    } else {
+        0.0
+    };
+    let w = (pad * 2.0 + kick_w + nm.size().x + dot + gap + 12.0).clamp(150.0, 260.0);
+    let (rect, r) = ui.allocate_exact_size(vec2(w, st.metrics.control_h), Sense::click());
+    let radius = st.shape_radius(st.slots.controls.field, rect.height());
+    let hover = ui.ctx().animate_bool_with_time(
+        r.id.with("hover"),
+        r.hovered(),
+        Style::secs(st.motion.hover),
+    );
+    let p = ui.painter();
+    p.rect_filled(rect, radius, st.roles.surface);
+    p.rect_stroke(
+        rect,
+        radius,
+        egui::Stroke::new(1.0, crate::style::mix(st.roles.line, st.roles.text3, hover)),
+        egui::StrokeKind::Inside,
+    );
+    let cy = rect.center().y;
+    let mut x = rect.left() + pad;
+    if kick_w > 0.0 {
+        p.galley(
+            egui::pos2(x, cy - kick.size().y / 2.0),
+            kick.clone(),
+            st.roles.text3,
+        );
+        x += kick_w;
+    }
+    let max_name = rect.right() - 12.0 - gap - dot - st.sp(2) - x;
+    let shown = if nm.size().x > max_name {
+        let full = nm.job.text.clone();
+        kit::fit_text(ui, st, &full, max_name)
+    } else {
+        nm.job.text.clone()
+    };
+    let nm = ui
+        .painter()
+        .layout_no_wrap(shown, st.font(Role::Body), st.roles.text);
+    let nx = nm.size().x;
+    ui.painter()
+        .galley(egui::pos2(x, cy - nm.size().y / 2.0), nm, st.roles.text);
+    x += nx + gap;
+    if modified {
+        ui.painter()
+            .circle_filled(egui::pos2(x + 3.0, cy), 3.0, st.roles.accent);
+    }
+    kit::icon(
+        ui.painter(),
+        Ic::Down,
+        egui::pos2(rect.right() - st.sp(2) - 5.0, cy),
+        st.metrics.icon,
+        st.roles.text2,
+    );
+    let r = r.tip(st, &tip);
     hit(ui_state, "doc-name", &r);
+    ui_state.record("sound-menu".into(), r.rect);
+    egui::Popup::menu(&r)
+        .frame(kit::popover_frame(st))
+        .close_behavior(egui::PopupCloseBehavior::CloseOnClick)
+        .width(180.0)
+        .show(|ui| {
+            let busy = io_busy(ui_state);
+            let s = kit::menu_item(ui, st, "Save", false);
+            hit(ui_state, "save-menu", &s);
+            if s.clicked() && !busy {
+                save(editor, ui_state, None);
+            }
+            let a = kit::menu_item(ui, st, "Save As...", false);
+            hit(ui_state, "save-as", &a);
+            if a.clicked() {
+                open_save_as(ui_state, None);
+            }
+            let o = kit::menu_item(ui, st, "Browse sounds", ui_state.browser_open);
+            hit(ui_state, "browse-sounds", &o);
+            if o.clicked() {
+                ui_state.browser_open = true;
+            }
+        });
 }
 
-/// Save (primary) and Save As. Laid out right to left, so Save ends up rightmost.
-pub fn save_buttons(
+/// The primary Save button, at the right end of the toolbar.
+pub fn save_button(
     editor: &mut PatchEditor,
     ui_state: &mut UiState,
     ui: &mut egui::Ui,
@@ -943,11 +1022,6 @@ pub fn save_buttons(
     hit(ui_state, "save", &r);
     if r.clicked() {
         save(editor, ui_state, None);
-    }
-    let r = ui.add(kit::Button::new(st, "Save As").ghost());
-    hit(ui_state, "save-as", &r);
-    if r.clicked() {
-        open_save_as(ui_state, None);
     }
 }
 
