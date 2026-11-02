@@ -559,7 +559,7 @@ impl Style {
         let r = &self.roles;
         // The accent fills (buttons, dots, arcs, playing pads) are the mockup's orange in both
         // themes and carry their own ink (`on_accent`); small accent text uses `accent_text`.
-        // The mockup's paper signal hues reach only about 2:1 to 4:1 on the paper rack.
+        // The mockup's paper signal hues reach 2.2 to 3.9:1 on the paper rack.
         let sig = if self.dark { 3.0 } else { 2.0 };
         vec![
             ("focus on surface", r.focus, r.surface, 3.0),

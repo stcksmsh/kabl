@@ -51,6 +51,10 @@ impl Accent {
     /// The accent as small text on `well`: the preset, mixed toward black until it reaches
     /// 4.5:1 there. Fills, dots and arcs use the preset as it is.
     fn text_on(self, well: Color32) -> Color32 {
+        // The G4 spec's paper amber text (4.6:1 on bg, 5.3:1 on surf).
+        if self == Accent::Amber {
+            return h("#A94F00");
+        }
         let c = self.colour();
         let mut t = 0.0;
         while contrast(mix(c, Color32::BLACK, t), well) < 4.5 && t < 0.9 {
@@ -96,7 +100,7 @@ fn roles(dark: bool, accent: Accent) -> Roles {
     };
     let base = builtin_a(dark).roles;
     let rack = if dark { "#0C0D0E" } else { "#DCD9D2" };
-    // Signal colours are the mockup's, on the rack as they are.
+    // Signal colours are the mockup's (they supersede the 2026-11-01 darkened paper hues).
     let sig = h;
     let acc = accent.colour();
     let acc_text = if dark {
@@ -131,15 +135,15 @@ fn roles(dark: bool, accent: Accent) -> Roles {
         pitch: sig(pitch),
         rack: h(rack),
         rail: h(if dark { "#1B1C1F" } else { "#C9C5BC" }),
-        hole: h(if dark { "#060607" } else { "#A39E94" }),
+        hole: h(if dark { "#050506" } else { "#24232A" }),
         disp_bg: h(inset),
         disp_grid: alpha(h(text), 20),
         disp_trace: acc_text,
         disp_text: h(text2),
-        // Dark filled caps in both app themes.
-        knob: h("#1D1F23"),
-        knob_hi: h("#3C3F45"),
-        knob_ink: h("#F2F0EB"),
+        // Caps as in the mockup's cap-hyb-d / cap-hyb-l gradients; dark pointer on paper.
+        knob: h(if dark { "#1D1F23" } else { "#E2DED6" }),
+        knob_hi: h(if dark { "#3C3F45" } else { "#FFFFFF" }),
+        knob_ink: h(if dark { "#F2F0EB" } else { "#1A1917" }),
         ..base
     }
 }
@@ -165,7 +169,8 @@ fn sections(dark: bool, face: Color32, text2: Color32) -> Sections {
 fn line_solid(dark: bool, accent: Accent) -> Style {
     let mut s = builtin_a(dark);
     s.roles = roles(dark, accent);
-    s.sections = sections(dark, s.roles.surface, s.roles.text2);
+    let face = mix(s.roles.rack, Color32::WHITE, if dark { 0.022 } else { 0.4 });
+    s.sections = sections(dark, face, s.roles.text2);
     s.id = LINE_SOLID_ID.into();
     s.name = "Signal and Drafting solid".into();
     s.types.h3.font = Font::SansCondSemibold;
@@ -336,18 +341,19 @@ mod tests {
         let dark = line_solid_default(true);
         assert_eq!(dark.roles.accent, h("#F2A33A"));
         assert_eq!(dark.roles.accent_text, h("#F2A33A"));
-        // Approved mixes on paper: amp 45 %, fx 40 %, the rest 35 %.
-        let face = paper.roles.surface;
+        // Title inks on the paper face (the mockup's warm grey): the family hue mixed toward
+        // black at least as far as the approved mixes (amp 45 %, fx 40 %, the rest 35 %), until
+        // 4.5:1.
+        let face = paper.sections.amp.base;
+        assert_ne!(face, paper.roles.surface, "the face is not the surf colour");
         for (sec, hue, t) in [
             (paper.sections.amp.ink, "#E3BE5C", 0.45),
             (paper.sections.fx.ink, "#B9B2A6", 0.40),
             (paper.sections.osc.ink, "#E07A5F", 0.35),
         ] {
-            let want = mix(h(hue), Color32::BLACK, t);
-            assert!(
-                (i32::from(sec.r()) - i32::from(want.r())).abs() <= 1,
-                "{hue} {sec:?} {want:?}"
-            );
+            let approved = mix(h(hue), Color32::BLACK, t);
+            assert!(sec.r() <= approved.r() + 1, "{hue} {sec:?} {approved:?}");
+            assert!(contrast(sec, face) >= 4.5, "{hue}");
         }
         assert!(contrast(paper.sections.amp.ink, face) >= 4.5);
     }

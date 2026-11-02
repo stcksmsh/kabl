@@ -24,11 +24,11 @@ Mockup source: `APPS`, `ACC` in `mockups/directions.html`. App: `crates/ui/src/s
 | tx / tx2 / tx3 | #ECEAE6 / #A29F99 / #6F6D68 | same | same | #1A1917 / #5F5C56 / #8E8A83 | same | same |
 | rack | #0C0D0E | same | same | #DCD9D2 | same | same |
 | rail | #1B1C1F | same | same | #C9C5BC | same | same |
-| hole | #060607 | #050506 | #060607 | #A39E94 | #24232A | #A39E94 |
+| jack hole (face) | #050506 | same | same | #24232A | same | same (the mockup's #A39E94 is the rack punch colour) |
 | accent (amber) | #F2A33A | same | same | #F2A33A | #A97229 (darkened for 3:1) | #F2A33A |
 | accent ink | #1C1206 | same | same | #1C1206 | white or #1C1206 by contrast | #1C1206 |
-| sig audio / cv / gate / pitch | #F59E3B #38C6B2 #A68BFA #5BA8F7 | same | same | #D9781C #12958A #7651D6 #2F7FD6 | #B66518 #11897F #7651D6 #2E7CD2 (darkened for 3:1 on the rack) | mockup values |
+| sig audio / cv / gate / pitch | #F59E3B #38C6B2 #A68BFA #5BA8F7 | same | same | #D9781C #12958A #7651D6 #2F7FD6 | #B66518 #11897F #7651D6 #2E7CD2 (darkened for 3:1 on the rack) | mockup values (supersede the 2026-11-01 darkened hues) |
 
-Not a mockup token, added so paper keeps legible small text: `accent_text`, equal to the accent on graphite, the amber mixed toward black until 4.5:1 on surf on paper (#9B6825: 4.6:1 on surf, 4.0:1 on bg, 3.7:1 on inset). Uses: `Tone::Accent` text, the "Queued" word on a scene pad, the focus ring, the display trace on paper. Everything else keeps the orange: buttons, dots, value arcs, active chips, playing pads, selected-row marks.
+Not a mockup token, added so paper keeps legible small text: `accent_text`, equal to the accent on graphite, the amber mixed toward black until 4.5:1 on surf on paper (#A94F00 as in the G4 spec: 5.3:1 on surf, 4.6:1 on bg). Uses: `Tone::Accent` text, the "Queued" word on a scene pad, the focus ring, the display trace on paper. Everything else keeps the orange: buttons, dots, value arcs, active chips, playing pads, selected-row marks.
 
-Contrast checker changes: new text pair "accent_text on surface" (4.0, the satin theme's own accent text is 4.35). The marks "accent on surface" (3:1) is gone, because the mockup's orange is about 2:1 on paper by design and carries its own ink; the paper signal hues on the paper rack are checked at 2:1 (they reach 2.2 to 3.9), dark themes keep 3:1.
+Contrast checker changes: new text pair "accent_text on surface" (4.0, the satin theme's own accent text is 4.35). The marks "accent on surface" (3:1) is gone, because the mockup's orange is about 2:1 on paper by design and carries its own ink; the paper signal marks on the rack are checked at 2:1 (they reach 2.2 to 3.9), dark keeps 3:1.
