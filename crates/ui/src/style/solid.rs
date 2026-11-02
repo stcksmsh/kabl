@@ -48,15 +48,12 @@ impl Accent {
         }
     }
 
-    /// The accent on `well`: mixed toward black until non-text marks (value arcs, traces)
-    /// reach 3:1 there. Dark app themes keep the preset as is.
-    fn on(self, dark: bool, well: Color32) -> Color32 {
+    /// The accent as small text on `well`: the preset, mixed toward black until it reaches
+    /// 4.5:1 there. Fills, dots and arcs use the preset as it is.
+    fn text_on(self, well: Color32) -> Color32 {
         let c = self.colour();
-        if dark {
-            return c;
-        }
         let mut t = 0.0;
-        while contrast(mix(c, Color32::BLACK, t), well) < 3.0 && t < 0.9 {
+        while contrast(mix(c, Color32::BLACK, t), well) < 4.5 && t < 0.9 {
             t += 0.02;
         }
         mix(c, Color32::BLACK, t)
@@ -95,21 +92,18 @@ fn roles(dark: bool, accent: Accent) -> Roles {
     let (audio, cv, gate, pitch) = if dark {
         ("#F59E3B", "#38C6B2", "#A68BFA", "#5BA8F7")
     } else {
-        ("#B66518", "#11897F", "#7651D6", "#2E7CD2")
+        ("#D9781C", "#12958A", "#7651D6", "#2F7FD6")
     };
     let base = builtin_a(dark).roles;
     let rack = if dark { "#0C0D0E" } else { "#DCD9D2" };
-    // Cables are drawn on the rack: on paper the signal colours are darkened until they reach
-    // 3:1 there (PLAN §6 hues #B66518 #11897F #7651D6 #2E7CD2 approved 2026-11-01).
-    let sig = |c: &str| {
-        let c = h(c);
-        let mut t = 0.0;
-        while !dark && contrast(mix(c, Color32::BLACK, t), h(rack)) < 3.0 && t < 0.9 {
-            t += 0.02;
-        }
-        mix(c, Color32::BLACK, t)
+    // Signal colours are the mockup's, on the rack as they are.
+    let sig = h;
+    let acc = accent.colour();
+    let acc_text = if dark {
+        acc
+    } else {
+        accent.text_on(h(surface))
     };
-    let acc = accent.on(dark, h(inset));
     let on_accent = if contrast(h("#1C1206"), acc) >= contrast(Color32::WHITE, acc) {
         h("#1C1206")
     } else {
@@ -118,6 +112,7 @@ fn roles(dark: bool, accent: Accent) -> Roles {
     Roles {
         bg: h(bg),
         surface: h(surface),
+        bar: h(if dark { "#17181B" } else { "#F7F6F2" }),
         raised: h(raised),
         inset: h(inset),
         line: h(line),
@@ -126,19 +121,20 @@ fn roles(dark: bool, accent: Accent) -> Roles {
         text2: h(text2),
         text3: h(text3),
         accent: acc,
+        accent_text: acc_text,
         on_accent,
         accent_soft: mix(acc, h(bg), 0.8),
-        focus: acc,
+        focus: acc_text,
         audio: sig(audio),
         cv: sig(cv),
         gate: sig(gate),
         pitch: sig(pitch),
         rack: h(rack),
         rail: h(if dark { "#1B1C1F" } else { "#C9C5BC" }),
-        hole: h(if dark { "#050506" } else { "#24232A" }),
+        hole: h(if dark { "#060607" } else { "#A39E94" }),
         disp_bg: h(inset),
         disp_grid: alpha(h(text), 20),
-        disp_trace: acc,
+        disp_trace: acc_text,
         disp_text: h(text2),
         // Dark filled caps in both app themes.
         knob: h("#1D1F23"),
@@ -297,16 +293,22 @@ pub fn compose(face_style: &str, dark: bool, accent: Accent) -> Option<Style> {
 /// `style` with its accent replaced (an accent preset or custom colour on any built-in).
 pub fn with_accent(mut style: Style, accent: Accent) -> Style {
     let r = &mut style.roles;
-    let acc = accent.on(style.dark, r.inset);
+    let acc = accent.colour();
+    let acc_text = if style.dark {
+        acc
+    } else {
+        accent.text_on(r.surface)
+    };
     r.accent = acc;
+    r.accent_text = acc_text;
     r.on_accent = if contrast(h("#1C1206"), acc) >= contrast(Color32::WHITE, acc) {
         h("#1C1206")
     } else {
         Color32::WHITE
     };
     r.accent_soft = mix(acc, r.bg, 0.8);
-    r.focus = acc;
-    r.disp_trace = acc;
+    r.focus = acc_text;
+    r.disp_trace = acc_text;
     style
 }
 
@@ -327,9 +329,13 @@ mod tests {
     #[test]
     fn paper_amber_and_hue_mixes_are_the_approved_tokens() {
         let paper = line_solid_default(false);
-        assert_eq!(paper.roles.accent, h("#A97229"));
+        // The mockup's amber fills in both themes; only small text on paper is darker.
+        assert_eq!(paper.roles.accent, h("#F2A33A"));
+        assert!(contrast(paper.roles.accent_text, paper.roles.surface) >= 4.5);
+        assert_ne!(paper.roles.accent_text, paper.roles.accent);
         let dark = line_solid_default(true);
         assert_eq!(dark.roles.accent, h("#F2A33A"));
+        assert_eq!(dark.roles.accent_text, h("#F2A33A"));
         // Approved mixes on paper: amp 45 %, fx 40 %, the rest 35 %.
         let face = paper.roles.surface;
         for (sec, hue, t) in [
