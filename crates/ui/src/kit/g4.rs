@@ -231,13 +231,13 @@ pub fn modal_framed<T>(
 }
 
 /// Non-blocking tool window with a 44 px title bar: grip, title 14/600, optional tag chip
-/// (for example ADVANCED), close. Anchored at x = 40 so it never clips at 1180 px.
+/// (for example ADVANCED), close. Callers pass `at` with x = 40 so it never clips at 1180 px.
 pub fn tool_window(
     ctx: &egui::Context,
     st: &Style,
     id: &str,
-    title: &str,
-    tag: Option<&str>,
+    (title, tag): (&str, Option<&str>),
+    at: egui::Pos2,
     open: &mut bool,
     content: impl FnOnce(&mut Ui),
 ) {
@@ -246,14 +246,17 @@ pub fn tool_window(
     }
     let wid = egui::Id::new(id);
     if let Some(r) = ctx.memory(|m| m.area_rect(wid)) {
-        let p = ctx.layer_painter(egui::LayerId::new(egui::Order::Middle, wid.with("shadow")));
+        let p = ctx.layer_painter(egui::LayerId::new(
+            egui::Order::Background,
+            wid.with("shadow"),
+        ));
         stacked_shadow(&p, st, r, 12.0);
     }
     egui::Window::new(title)
         .id(wid)
         .title_bar(false)
         .resizable(false)
-        .default_pos(pos2(40.0, 72.0))
+        .default_pos(at)
         .frame(surface_frame(st, 12.0).inner_margin(Margin::ZERO))
         .show(ctx, |ui| {
             ui.set_min_width(380.0);
@@ -601,18 +604,26 @@ pub fn range_bar(
     );
     let font = st.font(Role::Value);
     let y = rect.bottom() - 7.0;
-    for (v, al) in [
-        (min, egui::Align2::LEFT_CENTER),
-        (now, egui::Align2::CENTER_CENTER),
-        (max, egui::Align2::RIGHT_CENTER),
-    ] {
-        let px = match al {
-            egui::Align2::LEFT_CENTER => rect.left(),
-            egui::Align2::RIGHT_CENTER => rect.right(),
-            _ => x(now).clamp(rect.left() + 30.0, rect.right() - 30.0),
-        };
+    let w = |s: &str| {
         ui.painter()
-            .text(pos2(px, y), al, fmt(v), font.clone(), r.text2);
+            .layout_no_wrap(s.to_string(), font.clone(), r.text2)
+            .size()
+            .x
+    };
+    let (smin, smax, snow) = (fmt(min), fmt(max), fmt(now));
+    let lo_edge = rect.left() + w(&smin) + 8.0 + w(&snow) / 2.0;
+    let hi_edge = rect.right() - w(&smax) - 8.0 - w(&snow) / 2.0;
+    let nx = if lo_edge <= hi_edge {
+        x(now).clamp(lo_edge, hi_edge)
+    } else {
+        rect.center().x
+    };
+    for (t, al, px) in [
+        (smin, egui::Align2::LEFT_CENTER, rect.left()),
+        (snow, egui::Align2::CENTER_CENTER, nx),
+        (smax, egui::Align2::RIGHT_CENTER, rect.right()),
+    ] {
+        ui.painter().text(pos2(px, y), al, t, font.clone(), r.text2);
     }
     resp
 }
