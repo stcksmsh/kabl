@@ -129,6 +129,17 @@ fn the_fit_keeps_every_cable_inside_the_viewport() {
                     view.contains_rect(ropes),
                     "{w}x{h} drawer {drawer} dark {dark}: ropes {ropes:?} outside {view:?}"
                 );
+                // The rope layer is cut by nothing but the viewport and paints after all module
+                // content (trays, plates, titles), so nothing hides a rope.
+                let (clip, modules_end, cables_start, cables_end) = s.ui.cable_audit;
+                assert!(
+                    clip.contains_rect(view),
+                    "{w}x{h}: the cable layer is clipped to {clip:?}, smaller than {view:?}"
+                );
+                assert!(
+                    cables_start >= modules_end && cables_end > cables_start,
+                    "{w}x{h}: cables must paint after the modules ({modules_end}, {cables_start}..{cables_end})"
+                );
             }
         }
     }

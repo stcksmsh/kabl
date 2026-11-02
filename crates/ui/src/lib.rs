@@ -315,6 +315,9 @@ pub struct UiState {
     /// World ends of every drawn cable (output, input), from the last frame: what the fit
     /// needs to keep the sagging ropes inside the viewport.
     cable_ends: Vec<(Pos2, Pos2)>,
+    /// Paint audit of the last rack frame: the clip rect the cables were painted with, the
+    /// shape index where module content ended, where the cables started and where they ended.
+    pub cable_audit: (Rect, usize, usize, usize),
     /// A fit of the whole patch that still has to account for the cables: (world, max zoom).
     pending_fit: Option<(Rect, f32)>,
     /// Compact window (below `COMPACT_W`), set each frame.
@@ -465,6 +468,7 @@ impl Default for UiState {
             canvas: Rect::NOTHING,
             fitted: false,
             cable_ends: Vec::new(),
+            cable_audit: (Rect::NOTHING, 0, 0, 0),
             pending_fit: None,
             compact: false,
             auto_fit: true,
@@ -1790,9 +1794,6 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     let mut drawn = Drawn::default();
     ui_state.deferred.clear();
     draw_composites(editor, ui_state, ui, xf, &mut drawn);
-    let faces_from = ui
-        .ctx()
-        .graphics(|g| g.get(painter.layer_id()).map_or(0, |l| l.next_idx().0));
     for m in &lay.mods {
         if ui_state
             .moving
@@ -1835,24 +1836,24 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         .collect();
 
     let deferred = std::mem::take(&mut ui_state.deferred);
-    // Cables lie on the face material but under everything drawn on it: titles, readouts,
-    // knobs, displays, jacks. Lift those above the cables, then put the plugs on top.
-    let faces: Vec<Rect> = lay.mods.iter().map(|m| xf.r(m.face)).collect();
-    let lifted = lift_foreground(ui, &painter, &faces, faces_from);
+    let modules_end = ui
+        .ctx()
+        .graphics(|g| g.get(painter.layer_id()).map_or(0, |l| l.next_idx().0));
+    // Ropes paint above all module content (trays, plates, titles, knobs), cut by nothing but
+    // the rack viewport; only the drawer, toolbar and status bar sit over them. Plugs go on top.
+    let next_idx = |ui: &egui::Ui| {
+        ui.ctx()
+            .graphics(|g| g.get(painter.layer_id()).map_or(0, |l| l.next_idx().0))
+    };
+    let cables_start = next_idx(ui);
     let plugs = draw_cables(editor, ui_state, ui, &painter, th, xf, &lay, &drawn, None);
     if let Some((world, max_zoom)) = ui_state.pending_fit.take() {
         // The cables are known now: fit them too; the next frame draws the result.
         ui_state.refit_with_cables(world, max_zoom);
         ui.ctx().request_repaint();
     }
-    let layer = painter.layer_id();
-    ui.ctx().graphics_mut(|g| {
-        let list = g.entry(layer);
-        for (clip, shape) in lifted {
-            list.add(clip, shape);
-        }
-    });
     painter.extend(plugs);
+    ui_state.cable_audit = (painter.clip_rect(), modules_end, cables_start, next_idx(ui));
     painter.extend(deferred);
     // Hidden modulated controls: the lead docks on the `+N` button, which says so.
     for m in &lay.mods {
@@ -4123,35 +4124,6 @@ fn port_ref_pos<'a>(
         return None;
     };
     ports.get(&(*id, direction, port.clone()))
-}
-
-/// Moves every shape drawn since shape index `from` that is not a face's own background out of
-/// the paint list and returns it in order, so the caller can paint it again above the cables.
-fn lift_foreground(
-    ui: &egui::Ui,
-    painter: &egui::Painter,
-    faces: &[Rect],
-    from: usize,
-) -> Vec<(Rect, egui::Shape)> {
-    let mut out = Vec::new();
-    ui.ctx().graphics_mut(|g| {
-        let list = g.entry(painter.layer_id());
-        for i in from..list.next_idx().0 {
-            list.mutate_shape(egui::layers::ShapeIdx(i), |cs| {
-                let r = cs.shape.visual_bounding_rect();
-                let background = faces
-                    .iter()
-                    .any(|f| r.width() >= 0.9 * f.width() && r.height() >= 0.9 * f.height());
-                if !background && !matches!(cs.shape, egui::Shape::Noop) {
-                    out.push((
-                        cs.clip_rect,
-                        std::mem::replace(&mut cs.shape, egui::Shape::Noop),
-                    ));
-                }
-            });
-        }
-    });
-    out
 }
 
 /// A cable drawn straight into `p`, in the theme's lit width: the one in the hand while a plug
