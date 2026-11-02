@@ -250,6 +250,7 @@ pub fn pad(
 /// A scene pad: the title top-left, the scene number top-right, the state (Ready / Playing /
 /// Queued) bottom-left and, while a cue arrives or waits for its bar, a short progress bar
 /// bottom-right. A playing pad is filled with the accent, a queued one pulses its outline.
+#[allow(clippy::too_many_arguments)]
 pub fn scene_pad(
     ui: &mut Ui,
     st: &Style,
