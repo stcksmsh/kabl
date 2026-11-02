@@ -1397,7 +1397,7 @@ fn macro_tile(
                     resp.rect.center() + vec2(0.0, if compact { 4.0 } else { 6.0 }),
                     egui::Align2::CENTER_CENTER,
                     format!("{:.0}", (p.to_norm(cur) * 100.0).clamp(0.0, 100.0)),
-                    egui::FontId::new(vs, egui::FontFamily::Monospace),
+                    egui::FontId::new(vs, crate::style::Font::SansSemibold.family(st.fonts_ready)),
                     st.roles.text,
                 );
                 if let Some(m) = heading {
@@ -1793,26 +1793,29 @@ fn sequences_card(
                     Layout::left_to_right(egui::Align::Center),
                     |ui| {
                         ui.spacing_mut().item_spacing.x = st.sp(1);
-                        ui.allocate_ui_with_layout(
-                            vec2(74.0, row_h),
-                            Layout::left_to_right(egui::Align::Center),
-                            |ui| {
-                                let font = egui::FontId::new(
-                                    14.0,
-                                    crate::style::Font::SansSemibold.family(st.fonts_ready),
-                                );
-                                pin_title(
-                                    editor,
-                                    ui_state,
-                                    ui,
-                                    st,
-                                    pin,
-                                    &title,
-                                    Role::Body,
-                                    false,
-                                    Some(font),
-                                );
-                            },
+                        // A fixed name column, so every lane starts at the same x.
+                        let (name_rect, _) =
+                            ui.allocate_exact_size(vec2(74.0, row_h), Sense::hover());
+                        // A child that does not claim space in the row again.
+                        let mut name_ui = ui.new_child(
+                            egui::UiBuilder::new()
+                                .max_rect(name_rect)
+                                .layout(Layout::left_to_right(egui::Align::Center)),
+                        );
+                        let font = egui::FontId::new(
+                            14.0,
+                            crate::style::Font::SansSemibold.family(st.fonts_ready),
+                        );
+                        pin_title(
+                            editor,
+                            ui_state,
+                            &mut name_ui,
+                            st,
+                            pin,
+                            &title,
+                            Role::Body,
+                            false,
+                            Some(font),
                         );
                         for b in 0..seq::BANKS {
                             let name = crate::banks::title(&state, id, b);

@@ -66,6 +66,96 @@ fn mockup_patch() -> PatchEditor {
     e
 }
 
+/// The Perform mockup as a patch: a clock, four macros (Bite, Wash, Drive, Space on CC 20 to 23,
+/// each moving two controls), three sequencers (Bass, Drums, Lead) and eight scenes, so the
+/// capture compares like for like. `KABL_CAPTURE_FEW=1` captures the small cue-macros sound
+/// instead.
+fn perform_mockup_patch() -> PatchEditor {
+    use kabl_core::PortRef;
+    use kabl_ui::perform::{rename_pin, toggle_pin, BANKS, CUE_PADS, TRANSPORT};
+    let mut e = PatchEditor::seed_from(&Default::default());
+    let at = |x: f32, y: f32| kabl_core::Vec2 { x, y };
+    let clock = e.add_module("clock", at(24.0, 20.0));
+    e.set_param(clock, "bpm", 124.0);
+    let seqs = [
+        e.add_module("seq", at(244.0, 20.0)),
+        e.add_module("seq", at(484.0, 20.0)),
+        e.add_module("seq", at(724.0, 20.0)),
+    ];
+    let osc = e.add_module("osc.va", at(24.0, 320.0));
+    let svf = e.add_module("filter.svf", at(244.0, 320.0));
+    let adsr = e.add_module("env.adsr", at(464.0, 320.0));
+    let mix = e.add_module("mixer", at(684.0, 320.0));
+    let delay = e.add_module("delay", at(904.0, 320.0));
+    let verb = e.add_module("reverb", at(1124.0, 320.0));
+    let mac = e.add_module("macro", at(964.0, 20.0));
+    let cues = e.add_module("cues", at(1184.0, 20.0));
+    let m = |id, port: &str| PortRef::Module {
+        id,
+        port: port.to_string(),
+    };
+    let macros = [
+        ("Bite", 0.62, [(svf, "cutoff_hz"), (adsr, "decay_ms")]),
+        ("Wash", 0.35, [(verb, "decay_s"), (delay, "mix")]),
+        ("Drive", 0.48, [(osc, "unison"), (mix, "level1")]),
+        ("Space", 0.70, [(delay, "feedback"), (verb, "mix")]),
+    ];
+    for (k, (name, v, dst)) in macros.iter().enumerate() {
+        let out = format!("m{}", k + 1);
+        e.set_label(mac, &format!("name.{out}"), Some((*name).into()));
+        e.set_param(mac, &out, *v);
+        e.set_param(mac, &format!("cc.{out}"), (20 + k) as f32);
+        for &(to, param) in dst {
+            e.connect_route(m(mac, &out), to, param);
+        }
+        toggle_pin(&mut e, mac, &out);
+    }
+    // Step levels (percent) of the first eight steps of each lane in the mockup.
+    let lanes: [(&str, [f32; 8]); 3] = [
+        ("Bass", [90.0, 50.0, 0.0, 70.0, 100.0, 30.0, 0.0, 80.0]),
+        ("Drums", [100.0, 0.0, 60.0, 0.0, 100.0, 0.0, 60.0, 30.0]),
+        ("Lead", [0.0, 70.0, 0.0, 70.0, 0.0, 90.0, 0.0, 50.0]),
+    ];
+    for (&s, (name, levels)) in seqs.iter().zip(lanes) {
+        // Every bank plays the lane (the playing bank is the one the lane shows).
+        for prefix in ["", "b.", "c.", "d."] {
+            for (k, &v) in levels.iter().enumerate() {
+                e.set_param(s, &format!("{prefix}v{}", k + 1), v);
+                e.set_param(
+                    s,
+                    &format!("{prefix}g{}", k + 1),
+                    if v > 0.0 { 1.0 } else { 0.0 },
+                );
+            }
+        }
+        toggle_pin(&mut e, s, BANKS);
+        rename_pin(&mut e, s, BANKS, name);
+    }
+    toggle_pin(&mut e, clock, TRANSPORT);
+    // Scene -> banks of (Bass, Drums, Lead). Scene 3 plays, scene 4 is queued.
+    let scenes = [
+        ("Intro", [0, 0, 0]),
+        ("Build", [0, 0, 1]),
+        ("Drop", [1, 0, 2]),
+        ("Break", [2, 1, 0]),
+        ("Verse", [0, 1, 1]),
+        ("Lift", [1, 1, 2]),
+        ("Outro", [2, 2, 0]),
+        ("Fill", [3, 3, 3]),
+    ];
+    for (i, (name, banks)) in scenes.iter().enumerate() {
+        let n = i + 1;
+        e.set_label(cues, &format!("cue{n}"), Some((*name).into()));
+        e.set_param(cues, &format!("cue{n}.on"), 1.0);
+        e.set_param(cues, &format!("cue{n}.clock"), clock as f32);
+        for (&s, &b) in seqs.iter().zip(banks) {
+            e.set_param(cues, &format!("cue{n}.seq.{s}"), b as f32);
+        }
+    }
+    toggle_pin(&mut e, cues, CUE_PADS);
+    e
+}
+
 impl App {
     fn prepare(&mut self) {
         let j = &self.jobs[self.i];
@@ -76,6 +166,9 @@ impl App {
             ),
             // Perform needs pins, cues and macros: the cue-macros sound, with its sequencers'
             // banks pinned too.
+            Err(_) if j.scene == "perform" && std::env::var("KABL_CAPTURE_FEW").is_err() => {
+                perform_mockup_patch()
+            }
             Err(_) if j.scene == "perform" => {
                 let dir = patches().join("cue-macros");
                 let mut e = PatchEditor::from_log(kabl_core::load(&dir).expect("cue-macros"));
@@ -160,16 +253,20 @@ impl App {
             }
             for cues in ids("cues") {
                 let all = kabl_ui::cues::cues(state, cues);
-                if let Some(first) = all.first() {
+                if let Some(first) = all.get(2).or(all.first()) {
                     for &(s, bank) in &first.targets {
                         ui.seq_banks.insert(s, (bank, None));
                     }
                     // The next scene that plays a different bank is the queued one.
-                    let next = all.iter().skip(1).find(|c| {
-                        c.targets
-                            .iter()
-                            .any(|&(s, b)| ui.seq_banks.get(&s).is_some_and(|e| e.0 != b))
-                    });
+                    let next = all
+                        .iter()
+                        .skip(all.len().min(3))
+                        .chain(all.iter())
+                        .find(|c| {
+                            c.targets
+                                .iter()
+                                .any(|&(s, b)| ui.seq_banks.get(&s).is_some_and(|e| e.0 != b))
+                        });
                     for &(s, bank) in next.iter().flat_map(|c| c.targets.iter()) {
                         if let Some(e) = ui.seq_banks.get_mut(&s) {
                             if e.0 != bank {
