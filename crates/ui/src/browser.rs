@@ -1256,7 +1256,14 @@ fn nav_text(
         egui::pos2(x, rect.center().y),
         egui::Align2::LEFT_CENTER,
         label,
-        st.font(Role::Body),
+        if on {
+            egui::FontId::new(
+                st.font(Role::Body).size,
+                crate::style::Font::SansSemibold.family(st.fonts_ready),
+            )
+        } else {
+            st.font(Role::Body)
+        },
         kit::tone(st, ink),
     );
     p.text(
