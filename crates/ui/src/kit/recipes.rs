@@ -212,7 +212,7 @@ pub fn macro_knob(
     let a = A0 + SWEEP * value;
     let dir = vec2(a.cos(), a.sin());
     p.line_segment(
-        [c + dir * body * 0.74, c + dir * body * 0.93],
+        [c + dir * body * 0.56, c + dir * body * 0.96],
         Stroke::new(3.0, r.text),
     );
     if resp.has_focus() {
@@ -517,6 +517,58 @@ pub fn step_lane(
                 cell,
                 3.0,
                 Stroke::new(1.5, tone(st, Tone::Text)),
+                egui::StrokeKind::Inside,
+            );
+        }
+    }
+}
+
+/// The Perform step lane, as in the mockup: each step a dim well with a bar rising from the
+/// bottom to its level (brighter with its probability, a stub when its gate is off), a 4 px gap
+/// between steps, cells at most 48 px wide, and the playing step outlined by a column a little
+/// taller than the wells. `size` is the lane's full height; the wells are 10 px in from the
+/// top and bottom.
+pub fn seq_lane(
+    ui: &mut Ui,
+    st: &Style,
+    size: egui::Vec2,
+    steps: &[Step],
+    playing: Option<usize>,
+    hue: Color32,
+) {
+    let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
+    let r = &st.roles;
+    let n = steps.len().max(1);
+    let pitch = (rect.width() / n as f32).min(48.0);
+    let well_h = (rect.height() - 20.0).max(8.0);
+    for (i, s) in steps.iter().enumerate() {
+        let x = rect.left() + i as f32 * pitch;
+        let well = Rect::from_min_size(pos2(x + 2.0, rect.top() + 10.0), vec2(pitch - 4.0, well_h));
+        ui.painter().rect_filled(well, 3.0, r.inset);
+        let h = if s.gate {
+            (well_h * s.level.clamp(0.0, 1.0)).max(3.0)
+        } else {
+            3.0
+        };
+        let col = if s.gate {
+            mix(alpha(hue, 115), hue, s.prob.clamp(0.0, 1.0))
+        } else {
+            r.line2
+        };
+        ui.painter().rect_filled(
+            Rect::from_min_max(pos2(well.left(), well.bottom() - h), well.max),
+            3.0,
+            col,
+        );
+        if playing == Some(i) {
+            let col_rect = Rect::from_min_size(
+                pos2(x + 0.5, rect.top() + 6.0),
+                vec2(pitch - 1.0, rect.height() - 12.0),
+            );
+            ui.painter().rect_stroke(
+                col_rect,
+                4.0,
+                Stroke::new(1.0, alpha(r.text, 130)),
                 egui::StrokeKind::Inside,
             );
         }

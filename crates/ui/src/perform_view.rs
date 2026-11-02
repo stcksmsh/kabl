@@ -1712,7 +1712,7 @@ fn sequences_card(
     size: egui::Vec2,
 ) {
     let n = banks.len().max(1) as f32;
-    let row_h = ((size.y - 64.0) / n).clamp(44.0, 96.0);
+    let row_h = ((size.y - 64.0) / n).clamp(44.0, 110.0);
     let hues = [st.roles.gate, st.roles.audio, st.roles.pitch];
     let rect = shell(ui, ui_state, st, "sequences", size, |ui, ui_state| {
         let state = editor.state().clone();
@@ -1840,10 +1840,10 @@ fn sequences_card(
                         }
                         ui.add_space(st.sp(2));
                         let w = ui.available_width();
-                        kit::step_lane(
+                        kit::seq_lane(
                             ui,
                             st,
-                            vec2(w, (row_h - 20.0).max(24.0)),
+                            vec2(w, row_h),
                             &steps,
                             ui_state.seq_steps.get(&id).copied(),
                             hues[k % 3],
