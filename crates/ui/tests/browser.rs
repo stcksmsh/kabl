@@ -206,7 +206,7 @@ fn browsing_never_makes_sound_or_loads() {
         assert_eq!(t.ui.browser.selected.as_deref(), Some(id));
     }
     t.click("filter:favorites");
-    t.click("filter:all");
+    t.click("filter:factory");
     t.click("fav:factory:palette/lead");
     t.click("search");
     t.key(Key::ArrowDown, Modifiers::NONE);
@@ -632,7 +632,8 @@ fn missing_recents_and_bad_patches_are_explained() {
     assert_eq!(t.editor.state(), &work, "the working sound survives");
     assert!(t.modified(), "and is still unsaved");
 
-    t.click("filter:recent");
+    t.ui.browser.filter = kabl_ui::browser::Filter::Recent;
+    t.frame();
     assert!(t.has("forget:user:gone"));
     assert!(t.has("sound:factory:palette/pad"));
     t.click("forget:user:gone");
@@ -987,17 +988,14 @@ fn the_sounds_scene_replaces_the_rack_and_fits_the_plugin_window() {
     );
     assert!(!t.has("help"), "the drawer waits behind the scene");
     for key in [
-        "filter:all",
         "filter:favorites",
-        "filter:recent",
         "filter:factory",
         "filter:user",
         "search",
         "new",
-        "browser-close",
     ] {
         assert!(screen.contains_rect(t.ui.hits[key]), "{key} on screen");
     }
-    t.click("browser-close");
+    t.click("browser");
     assert!(!t.ui.browser_open);
 }

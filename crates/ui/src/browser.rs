@@ -20,11 +20,11 @@ use kabl_engine::patch_engine::{Command, MAX_PREVIEW_NOTES, MAX_PREVIEW_SECS};
 use kabl_modules::builtins::Transport;
 use std::collections::HashMap;
 
-use crate::library::{Entry, LibError, Library, Meta, Origin, CATEGORIES};
+use crate::library::{Entry, LibError, Library, Meta, Origin, CATEGORIES, SHELVES};
 use crate::{PatchEditor, UiState};
 
 /// The Sounds scene: library column, selected-sound column.
-const NAV_W: f32 = 200.0;
+const NAV_W: f32 = 230.0;
 const DETAIL_W: f32 = 320.0;
 /// The list column stops growing here; the detail column takes the rest.
 const LIST_MAX_W: f32 = 760.0;
@@ -256,7 +256,7 @@ impl Default for Browser {
     fn default() -> Self {
         Browser {
             query: String::new(),
-            filter: Filter::All,
+            filter: Filter::Factory,
             category: None,
             selected: None,
             audition: Audition::default(),
@@ -1123,24 +1123,6 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         );
         return;
     }
-    ui.horizontal(|ui| {
-        kit::label(ui, st, Role::Title, Tone::Text, "Sounds");
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let r = ui.add(kit::Button::new(st, "Close").ghost());
-            hit(ui_state, "browser-close", &r);
-            if r.clicked() {
-                ui_state.browser_open = false;
-            }
-            let r = ui
-                .add(kit::Button::new(st, "New").icon(Ic::Plus))
-                .tip(st, "Start a new sound from Init Keyboard");
-            hit(ui_state, "new", &r);
-            if r.clicked() {
-                request(editor, ui_state, Pending::New);
-            }
-        });
-    });
-    kit::gap(ui, st, 1);
     if ui_state.library.is_none() {
         kit::label(
             ui,
@@ -1154,7 +1136,11 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     // Three columns: the library (filters, categories), the list, the selected sound.
     let area = ui.available_rect_before_wrap();
     let gap = st.sp(3);
-    let nav = Rect::from_min_size(area.min, vec2(NAV_W, area.height()));
+    // The library column runs to the panel edge, as in the mockup (230 px wide).
+    let nav = Rect::from_min_size(
+        pos2(area.left() - st.sp(3), area.top() + 7.0),
+        vec2(NAV_W, area.height() - 7.0),
+    );
     let mid_w = (area.width() - NAV_W - DETAIL_W - 2.0 * gap).clamp(300.0, LIST_MAX_W);
     let side_w = (area.width() - NAV_W - mid_w - 2.0 * gap).max(0.0);
     // A little in from the edge: the right-aligned buttons stay inside the scroll body.
@@ -1163,12 +1149,12 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         area.max - vec2(st.sp(1), 0.0),
     );
     let mid = Rect::from_min_size(
-        pos2(nav.right() + gap, area.top()),
+        pos2(nav.right() + gap - st.sp(3), area.top()),
         vec2(mid_w, area.height()),
     );
     let col = |r: Rect| egui::UiBuilder::new().max_rect(r);
     let mut open = None;
-    ui.scope_builder(col(nav), |ui| nav_column(ui_state, ui, st));
+    ui.scope_builder(col(nav), |ui| nav_column(editor, ui_state, ui, st));
     ui.scope_builder(col(mid), |ui| list_column(ui_state, ui, st, &mut open));
     ui.scope_builder(col(side), |ui| {
         detail_column(editor, ui_state, ui, st, &mut open)
@@ -1178,43 +1164,119 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     }
 }
 
-/// One row of the library or category list: label, count at the right.
+/// Row geometry of the Sounds scene's left column, from the mockup: library rows are 28 px
+/// tall on a 32 px pitch, category rows 30 px.
+const LIB_ROW: f32 = 28.0;
+const LIB_PITCH: f32 = 32.0;
+const CAT_PITCH: f32 = 30.0;
+
+/// A section kicker, 16 px in from the column edge.
+fn kicker(ui: &mut egui::Ui, st: &Style, text: &str) -> egui::Response {
+    ui.horizontal(|ui| {
+        ui.add_space(16.0);
+        kit::section(ui, st, text)
+    })
+    .inner
+}
+
+/// A library row: a filled card when selected, the count right-aligned and muted.
 fn nav_row(ui: &mut egui::Ui, st: &Style, label: &str, count: usize, on: bool) -> egui::Response {
-    let (rect, r) = ui.allocate_exact_size(
-        vec2(ui.available_width(), st.metrics.control_h),
-        Sense::click(),
+    let (cell, r) = ui.allocate_exact_size(vec2(ui.available_width(), LIB_PITCH), Sense::click());
+    let rect = egui::Rect::from_min_size(
+        cell.min + vec2(8.0, 0.0),
+        vec2(cell.width() - 16.0, LIB_ROW),
     );
     let hover = ui.ctx().animate_bool_with_time(
         r.id.with("hover"),
         r.hovered(),
         Style::secs(st.motion.hover),
     );
-    kit::row_bg(ui, st, rect, on, hover);
+    if on {
+        let radius = st.shape_radius(st.slots.controls.button, rect.height());
+        ui.painter().rect_filled(rect, radius, st.roles.raised);
+        ui.painter().rect_stroke(
+            rect,
+            radius,
+            egui::Stroke::new(1.0, st.roles.line),
+            egui::StrokeKind::Inside,
+        );
+    } else {
+        kit::row_bg(ui, st, rect, false, hover);
+    }
+    nav_text(
+        ui,
+        st,
+        rect,
+        cell.left() + 18.0,
+        cell.right() - 18.0,
+        label,
+        count,
+        on,
+    );
+    r
+}
+
+/// A category row: a radio dot (accent when selected), the name, a muted count.
+fn cat_row(ui: &mut egui::Ui, st: &Style, label: &str, count: usize, on: bool) -> egui::Response {
+    let (rect, r) = ui.allocate_exact_size(vec2(ui.available_width(), CAT_PITCH), Sense::click());
+    let c = egui::pos2(rect.left() + 22.0, rect.center().y);
+    let (fill, line) = if on {
+        (st.roles.accent, st.roles.accent)
+    } else {
+        (egui::Color32::TRANSPARENT, st.roles.line2)
+    };
+    ui.painter()
+        .circle(c, 4.0, fill, egui::Stroke::new(1.3, line));
+    nav_text(
+        ui,
+        st,
+        rect,
+        rect.left() + 36.0,
+        rect.right() - 18.0,
+        label,
+        count,
+        on,
+    );
+    r
+}
+
+fn nav_text(
+    ui: &egui::Ui,
+    st: &Style,
+    rect: egui::Rect,
+    x: f32,
+    right: f32,
+    label: &str,
+    count: usize,
+    on: bool,
+) {
     let p = ui.painter();
     let ink = if on { Tone::Text } else { Tone::Text2 };
     p.text(
-        rect.left_center() + vec2(st.sp(2), 0.0),
+        egui::pos2(x, rect.center().y),
         egui::Align2::LEFT_CENTER,
         label,
         st.font(Role::Body),
         kit::tone(st, ink),
     );
     p.text(
-        rect.right_center() - vec2(st.sp(2), 0.0),
+        egui::pos2(right, rect.center().y),
         egui::Align2::RIGHT_CENTER,
         count.to_string(),
         st.font(Role::Caption),
         kit::tone(st, Tone::Text3),
     );
-    r
 }
 
 /// The library column scrolls when the window is short.
-fn nav_column(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
+fn nav_column(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
     egui::ScrollArea::vertical()
         .id_salt("kabl-browser-nav")
         .auto_shrink([false, false])
-        .show_owned(ui, |ui| nav_rows(ui_state, ui, st));
+        .show_owned(ui, |ui| {
+            nav_rows(ui_state, ui, st);
+            nav_foot(editor, ui_state, ui, st);
+        });
 }
 
 /// The library filters and the category list, each with the number of sounds it holds.
@@ -1238,26 +1300,27 @@ fn nav_rows(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
             .count(),
     };
     let filters = [
-        (Filter::All, "all", "All"),
-        (Filter::Favorites, "favorites", "Favorites"),
-        (Filter::Recent, "recent", "Recent"),
         (Filter::Factory, "factory", "Factory"),
-        (Filter::User, "user", "Your Sounds"),
+        (Filter::User, "user", "My sounds"),
+        (Filter::Favorites, "favorites", "Favourites"),
     ]
     .map(|(f, k, l)| (f, k, l, count(f)));
-    let cats: Vec<(&str, usize)> = CATEGORIES
+    let cats: Vec<(&str, usize)> = SHELVES
         .iter()
         .map(|c| {
             (
                 *c,
-                lib.entries.iter().filter(|e| e.meta.in_category(c)).count(),
+                lib.entries
+                    .iter()
+                    .filter(|e| e.meta.shelf() == Some(*c))
+                    .count(),
             )
         })
-        .filter(|(_, n)| *n > 0)
         .collect();
     let all = lib.entries.len();
     ui.spacing_mut().item_spacing.y = 0.0;
-    kit::section(ui, st, "Library");
+    kicker(ui, st, "Library");
+    ui.add_space(7.0);
     for (f, key, label, n) in filters {
         let r = nav_row(ui, st, label, n, ui_state.browser.filter == f);
         hit(ui_state, &format!("filter:{key}"), &r);
@@ -1265,16 +1328,17 @@ fn nav_rows(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
             ui_state.browser.filter = f;
         }
     }
-    kit::gap(ui, st, 1);
-    let head = kit::section(ui, st, "Category");
+    ui.add_space(13.0);
+    let head = kicker(ui, st, "Category");
     hit(ui_state, "category", &head);
-    let r = nav_row(ui, st, "Any", all, ui_state.browser.category.is_none());
+    ui.add_space(6.0);
+    let r = cat_row(ui, st, "All", all, ui_state.browser.category.is_none());
     hit(ui_state, "category:Any", &r);
     if r.clicked() {
         ui_state.browser.category = None;
     }
     for (c, n) in cats {
-        let r = nav_row(
+        let r = cat_row(
             ui,
             st,
             c,
@@ -1286,6 +1350,21 @@ fn nav_rows(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
             ui_state.browser.category = Some(c.to_string());
         }
     }
+}
+
+/// "New" and the way back to the rack, under the library column.
+fn nav_foot(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
+    ui.add_space(st.sp(3));
+    ui.horizontal(|ui| {
+        ui.add_space(16.0);
+        let r = ui
+            .add(kit::Button::new(st, "New sound").icon(Ic::Plus))
+            .tip(st, "Start a new sound from Init Keyboard");
+        hit(ui_state, "new", &r);
+        if r.clicked() {
+            request(editor, ui_state, Pending::New);
+        }
+    });
 }
 
 /// Search and the list of sounds; a double-click on a row sets `open`.
@@ -1318,7 +1397,9 @@ fn list_column(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, open: &mut
     let b = &ui_state.browser;
     let visible = |e: &&Entry| {
         e.matches(&b.query)
-            && b.category.as_ref().is_none_or(|c| e.meta.in_category(c))
+            && b.category
+                .as_deref()
+                .is_none_or(|c| e.meta.shelf() == Some(c))
             && match b.filter {
                 Filter::All | Filter::Recent => true,
                 Filter::Favorites => lib.prefs.favorites.contains(&e.id),
