@@ -20,6 +20,7 @@ pub mod composites;
 pub mod control;
 pub mod cues;
 pub mod displays;
+mod drawer;
 mod drum_displays;
 mod drum_grid;
 pub mod editor;
@@ -942,52 +943,7 @@ fn drawer(
     st: &Style,
     now: f64,
 ) {
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = st.sp(1);
-        kit::label(ui, st, style::Role::Title, kit::Tone::Text, "Routing");
-        let on = ui_state.explain.help;
-        let r = ui
-            .add(kit::Button::new(st, "Help").small().selected(on))
-            .tip(st, "Show what each module and control does");
-        ui_state.record("help".into(), r.rect);
-        if r.clicked() {
-            ui_state.explain.help = !on;
-        }
-        let on = ui_state.inspect.open;
-        let r = ui
-            .add(kit::Button::new(st, "Inspect").small().selected(on))
-            .tip(st, "Measure one output and ask why there is no sound");
-        ui_state.record("inspect-open".into(), r.rect);
-        if r.clicked() {
-            ui_state.inspect.open = !on;
-            ui_state.inspect.reveal = !on;
-        }
-        let on = ui_state.compare.open;
-        let r = ui
-            .add(kit::Button::new(st, "Compare").small().selected(on))
-            .tip(st, "Keep a reference copy of the patch and restore it");
-        ui_state.record("compare-open".into(), r.rect);
-        if r.clicked() {
-            ui_state.compare.open = !on;
-            ui_state.compare.reveal = !on;
-        }
-        let on = ui_state.recipes.open;
-        let r = ui
-            .add(kit::Button::new(st, "Learn").small().selected(on))
-            .tip(st, "Three short listening recipes (optional)");
-        ui_state.record("learn-open".into(), r.rect);
-        if r.clicked() {
-            ui_state.recipes.open = !on;
-        }
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if kit::icon_button(ui, st, kit::Ic::Close, false, true)
-                .tip(st, "Close the drawer")
-                .clicked()
-            {
-                ui_state.drawer_open = false;
-            }
-        });
-    });
+    drawer::tabs(ui_state, ui, st);
     if ui_state.recipes.open {
         // Above the drawer's scrolling content, so Show (which scrolls the drawer
         // to the routes) never scrolls the recipe away.
@@ -1027,10 +983,22 @@ fn drawer(
                 compare::panel(editor, ui_state, ui);
             });
         }
+        // The patch-wide lists lead when no control is being edited, and follow its editor
+        // otherwise, so the control's routes stay in view.
+        let lists = !ui_state.explain.is_open() && !ui_state.inspect.open;
+        let editing = ui_state.inspected.is_some() || ui_state.cable_fn.is_some();
+        if lists && !editing {
+            drawer::lists(editor, ui_state, ui, st);
+            drawer::why_card(editor, ui_state, ui, st);
+        }
         show_param_panel(editor, ui_state, ui);
         pattern::panel(editor, ui_state, ui);
         routing::drawer(editor, ui_state, ui);
         routing::cable_routes(editor, ui_state, ui);
+        if lists && editing {
+            drawer::lists(editor, ui_state, ui, st);
+            drawer::why_card(editor, ui_state, ui, st);
+        }
     });
 }
 

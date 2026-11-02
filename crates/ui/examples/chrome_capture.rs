@@ -82,6 +82,21 @@ impl App {
         ui.drawer_open = j.scene == "rack";
         ui.perform_open = j.scene == "perform";
         ui.perform_tall = j.scene == "perform";
+        // Like the mockup: the oscillator-to-filter cable and the filter are selected.
+        ui.selected_route = self
+            .editor
+            .state()
+            .cables
+            .iter()
+            .find(|(_, c)| matches!(&c.to, kabl_core::PortRef::Module { port, .. } if port == "in"))
+            .map(|(&id, _)| id);
+        ui.selected_module = self
+            .editor
+            .state()
+            .modules
+            .iter()
+            .find(|(_, m)| m.kind == "filter.svf")
+            .map(|(&id, _)| id);
         self.ui = ui;
         self.f = 0;
     }

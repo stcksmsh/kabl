@@ -151,8 +151,8 @@ impl H {
 }
 
 fn sizes() -> [(f32, f32); 2] {
-    // 30 px taller than the nominal windows: the status bar takes them, so the rack and drawer keep their room.
-    [(1280.0, 830.0), (1440.0, 930.0)]
+    // 60 px taller than the nominal windows: the status bar (30) and the drawer's second header row (30) take them, so the explain list keeps its room.
+    [(1280.0, 860.0), (1440.0, 960.0)]
 }
 
 // patches/palette/pad: Macros #1 (m1 "Warmth" → c28 ladder #7 cutoff, c29 ladder #7 drive,
