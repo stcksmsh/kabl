@@ -179,6 +179,11 @@
       "item": "Logo frame + plugs: rebuilt geometric version vs original artwork",
       "verdict": "open",
       "note": "owner to choose; letters identical in both"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "logo: rebuilt frame and plugs, original letters; toolbar logo in text colour, orange only for app icon and splash",
+      "verdict": "approve"
     }
   ]
 }
