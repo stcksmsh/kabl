@@ -18,6 +18,7 @@ use egui::{pos2, vec2, Rect, Sense};
 use kabl_core::{PatchLog, PatchState};
 use kabl_engine::patch_engine::{Command, MAX_PREVIEW_NOTES, MAX_PREVIEW_SECS};
 use kabl_modules::builtins::Transport;
+use std::collections::HashMap;
 
 use crate::library::{Entry, LibError, Library, Meta, Origin, CATEGORIES};
 use crate::{PatchEditor, UiState};
@@ -25,6 +26,10 @@ use crate::{PatchEditor, UiState};
 /// The Sounds scene: library column, selected-sound column.
 const NAV_W: f32 = 200.0;
 const DETAIL_W: f32 = 320.0;
+/// The list column stops growing here; the detail column takes the rest.
+const LIST_MAX_W: f32 = 760.0;
+/// Sounds whose macros are read from disk per frame while the list fills in.
+const MACROS_PER_FRAME: usize = 8;
 pub const INIT_ID: &str = "factory:init-keyboard";
 
 /// Where the open patch lives.
@@ -203,6 +208,8 @@ pub struct Browser {
     /// Deterministic worker delay for recovery tests.
     pub io_delay_ms: u64,
     io: Option<IoTask>,
+    /// Macro names and positions per sound id, read from the sound's files on first sight.
+    macros: HashMap<String, Vec<(String, f32)>>,
 }
 
 #[derive(Clone)]
@@ -261,6 +268,7 @@ impl Default for Browser {
             async_io: false,
             io_delay_ms: 0,
             io: None,
+            macros: HashMap::new(),
         }
     }
 }
@@ -953,16 +961,90 @@ fn badge(ui: &mut egui::Ui, st: &Style, e: &Meta) {
     kit::tag(ui, st, text, c);
 }
 
-/// One sound as a card row: star, name, category, play-kind tag. Returns (row, star) responses.
+/// The named macros of the sound in `dir`: (name, position 0..1). Empty when it has none.
+fn macros_of(dir: &std::path::Path) -> Vec<(String, f32)> {
+    let Ok(log) = kabl_core::load(dir) else {
+        return Vec::new();
+    };
+    let state = log.state();
+    let Some((&id, m)) = state.modules.iter().find(|(_, m)| m.kind == "macro") else {
+        return Vec::new();
+    };
+    (1..=8)
+        .filter_map(|k| {
+            let key = format!("m{k}");
+            let name = state.label(id, &format!("name.{key}"))?;
+            Some((name.to_string(), m.params.get(&key).copied().unwrap_or(0.0)))
+        })
+        .collect()
+}
+
+/// The macros of `e`, loaded now when `budget` allows (a few sounds per frame, so a long list
+/// never stalls one), else what is known so far.
+fn macros_cached<'a>(b: &'a mut Browser, e: &Entry, budget: &mut usize) -> &'a [(String, f32)] {
+    if !b.macros.contains_key(&e.id) && *budget > 0 {
+        *budget -= 1;
+        b.macros.insert(e.id.clone(), macros_of(&e.dir));
+    }
+    b.macros.get(&e.id).map_or(&[], |v| v.as_slice())
+}
+
+/// Column x positions of a list row: (name, macros, tags).
+fn sound_cols(rect: Rect, st: &Style) -> [f32; 3] {
+    let name = rect.left() + st.sp(3) + 4.0 + st.metrics.control_h / 2.0 + st.sp(1);
+    let w = rect.right() - name;
+    [name, name + w * 0.34, name + w * 0.72]
+}
+
+/// A read-only macro knob: skirt, accent value arc, pointer, name below.
+fn macro_knob(ui: &mut egui::Ui, st: &Style, name: &str, v: f32, w: f32) {
+    let r = st.sp(5) - st.sp(1);
+    let h = 2.0 * r + st.sp(4);
+    let (rect, _) = ui.allocate_exact_size(vec2(w, h), Sense::hover());
+    let c = pos2(rect.center().x, rect.top() + r + st.sp(1));
+    let at = |t: f32, rad: f32| {
+        let a = (135.0 + 270.0 * t).to_radians();
+        c + vec2(a.cos(), a.sin()) * rad
+    };
+    let p = ui.painter();
+    p.circle_filled(c, r, st.roles.inset);
+    p.circle_stroke(c, r, egui::Stroke::new(1.0, st.roles.line2));
+    let ring = r + st.sp(0) * 1.5;
+    let pts: Vec<_> = (0..=24)
+        .map(|i| at(v.clamp(0.0, 1.0) * i as f32 / 24.0, ring))
+        .collect();
+    p.add(egui::Shape::line(
+        pts,
+        egui::Stroke::new(st.sp(0), st.roles.accent),
+    ));
+    p.line_segment(
+        [
+            at(v.clamp(0.0, 1.0), r * 0.35),
+            at(v.clamp(0.0, 1.0), r * 0.9),
+        ],
+        egui::Stroke::new(st.sp(0), st.roles.text),
+    );
+    p.text(
+        pos2(rect.center().x, rect.bottom() - st.sp(1)),
+        egui::Align2::CENTER_BOTTOM,
+        name,
+        st.font(Role::Label),
+        st.roles.text,
+    );
+}
+
+/// One sound as a row: star, name, macro names, tags.
 fn sound_row(
     ui: &mut egui::Ui,
     st: &Style,
     e: &Entry,
+    macros: &str,
     fav: bool,
     sel: bool,
 ) -> (egui::Response, egui::Response) {
     let w = ui.available_width();
-    let (rect, row) = ui.allocate_exact_size(vec2(w, st.metrics.row_h), Sense::click());
+    let (rect, row) =
+        ui.allocate_exact_size(vec2(w, st.metrics.control_h + st.sp(2)), Sense::click());
     let hover = ui.ctx().animate_bool_with_time(
         row.id.with("hover"),
         row.hovered(),
@@ -988,33 +1070,42 @@ fn sound_row(
         st.metrics.icon + 2.0,
         ink,
     );
-    let x = star_rect.right() + st.sp(1);
-    let right_pad = 78.0;
-    let name = kit::fit_text(ui, st, &e.meta.name, rect.right() - right_pad - x);
-    let g = ui
-        .painter()
-        .layout_no_wrap(name, st.font(Role::Body), st.roles.text);
-    ui.painter()
-        .galley(egui::pos2(x, rect.top() + st.sp(2)), g, st.roles.text);
-    let cat = if e.meta.category.is_empty() {
-        "Uncategorized"
-    } else {
-        &e.meta.category
-    };
-    let g = ui
-        .painter()
-        .layout_no_wrap(cat.to_string(), st.font(Role::Caption), st.roles.text2);
-    ui.painter().galley(
-        egui::pos2(x, rect.bottom() - st.sp(2) - g.size().y),
-        g,
+    let [x, x_macros, x_tags] = sound_cols(rect, st);
+    let mid = rect.center().y;
+    let name = kit::fit_text(ui, st, &e.meta.name, x_macros - x - st.sp(2));
+    let p = ui.painter();
+    p.text(
+        pos2(x, mid),
+        egui::Align2::LEFT_CENTER,
+        name,
+        st.font(Role::Body),
+        st.roles.text,
+    );
+    let macros = kit::fit_text(ui, st, macros, x_tags - x_macros - st.sp(2));
+    let tags = e
+        .meta
+        .tags
+        .iter()
+        .take(2)
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(" · ");
+    let tags = kit::fit_text(ui, st, &tags, rect.right() - x_tags - st.sp(2));
+    let p = ui.painter();
+    p.text(
+        pos2(x_macros, mid),
+        egui::Align2::LEFT_CENTER,
+        macros,
+        st.font(Role::Body),
         st.roles.text2,
     );
-    let mut tag_ui = ui.new_child(
-        egui::UiBuilder::new()
-            .max_rect(rect.shrink2(vec2(st.sp(2), 0.0)))
-            .layout(egui::Layout::right_to_left(egui::Align::Center)),
+    p.text(
+        pos2(x_tags, mid),
+        egui::Align2::LEFT_CENTER,
+        tags,
+        st.font(Role::Caption),
+        st.roles.text3,
     );
-    badge(&mut tag_ui, st, &e.meta);
     (row, star)
 }
 
@@ -1064,15 +1155,16 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     let area = ui.available_rect_before_wrap();
     let gap = st.sp(3);
     let nav = Rect::from_min_size(area.min, vec2(NAV_W, area.height()));
-    let side_w = DETAIL_W.min((area.width() - NAV_W - 2.0 * gap) * 0.5);
+    let mid_w = (area.width() - NAV_W - DETAIL_W - 2.0 * gap).clamp(300.0, LIST_MAX_W);
+    let side_w = (area.width() - NAV_W - mid_w - 2.0 * gap).max(0.0);
     // A little in from the edge: the right-aligned buttons stay inside the scroll body.
     let side = Rect::from_min_max(
         pos2(area.right() - side_w, area.top()),
         area.max - vec2(st.sp(1), 0.0),
     );
-    let mid = Rect::from_min_max(
+    let mid = Rect::from_min_size(
         pos2(nav.right() + gap, area.top()),
-        pos2(side.left() - gap, area.bottom()),
+        vec2(mid_w, area.height()),
     );
     let col = |r: Rect| egui::UiBuilder::new().max_rect(r);
     let mut open = None;
@@ -1161,6 +1253,7 @@ fn nav_rows(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
                 lib.entries.iter().filter(|e| e.meta.in_category(c)).count(),
             )
         })
+        .filter(|(_, n)| *n > 0)
         .collect();
     let all = lib.entries.len();
     ui.spacing_mut().item_spacing.y = 0.0;
@@ -1207,6 +1300,20 @@ fn list_column(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, open: &mut
     );
     hit(ui_state, "search", &r);
     kit::gap(ui, st, 1);
+    {
+        let (rect, _) =
+            ui.allocate_exact_size(vec2(ui.available_width(), st.sp(4)), Sense::hover());
+        let [x, x_macros, x_tags] = sound_cols(rect, st);
+        for (x, label) in [(x, "NAME"), (x_macros, "MACROS"), (x_tags, "TAGS")] {
+            ui.painter().text(
+                pos2(x, rect.center().y),
+                egui::Align2::LEFT_CENTER,
+                label,
+                st.font(Role::Caption),
+                st.roles.text3,
+            );
+        }
+    }
     let lib = ui_state.library.as_ref().unwrap();
     let b = &ui_state.browser;
     let visible = |e: &&Entry| {
@@ -1262,6 +1369,7 @@ fn list_column(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, open: &mut
     // The panel body scrolls, so the list takes the room and the audition block sits
     // below it, reached by scrolling when the window is short.
     let list_h = ui.available_height();
+    let mut budget = MACROS_PER_FRAME;
     let mut toggle = None;
     let mut forget = None;
     egui::ScrollArea::vertical()
@@ -1310,7 +1418,12 @@ fn list_column(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, open: &mut
                         }
                         let fav = favorites.contains(&e.id);
                         let sel = ui_state.browser.selected.as_deref() == Some(&e.id);
-                        let (row, star) = sound_row(ui, st, e, fav, sel);
+                        let macros = macros_cached(&mut ui_state.browser, e, &mut budget)
+                            .iter()
+                            .map(|(n, _)| n.as_str())
+                            .collect::<Vec<_>>()
+                            .join(" · ");
+                        let (row, star) = sound_row(ui, st, e, &macros, fav, sel);
                         let star = star.tip(
                             st,
                             if fav {
@@ -1393,59 +1506,72 @@ fn detail_column(
                 .and_then(|id| ui_state.library.as_ref().unwrap().get(&id).cloned());
             match &selected {
                 Some(e) => {
-                    ui.horizontal(|ui| {
-                        kit::label_truncated(ui, st, Role::H3, Tone::Text, &e.meta.name);
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            let r = ui
-                                .add(kit::Button::new(st, "Open").primary())
-                                .tip(st, "Load into the rack");
-                            hit(ui_state, "open", &r);
-                            if r.clicked() {
-                                *open = Some(e.id.clone());
-                            }
-                            if e.origin == Origin::User {
-                                let r = ui.add(kit::Button::new(st, "Rename"));
-                                hit(ui_state, "rename", &r);
-                                if r.clicked() {
-                                    ui_state.browser.dialog = Some(Dialog::Rename {
-                                        id: e.id.clone(),
-                                        name: e.meta.name.clone(),
-                                        error: None,
-                                    });
-                                }
-                            }
-                        });
-                    });
-                    ui.horizontal(|ui| {
-                        kit::label(
-                            ui,
-                            st,
-                            Role::Caption,
-                            Tone::Text2,
-                            format!(
-                                "{} · {}",
-                                if e.meta.category.is_empty() {
-                                    "Uncategorized"
-                                } else {
-                                    &e.meta.category
-                                },
-                                match e.origin {
-                                    Origin::Factory => "Factory",
-                                    Origin::User => "Your Sounds",
-                                }
-                            ),
-                        );
-                        badge(ui, st, &e.meta);
-                    });
+                    let kicker = format!(
+                        "{} · {}",
+                        if e.meta.category.is_empty() {
+                            "Uncategorized"
+                        } else {
+                            &e.meta.category
+                        },
+                        match e.origin {
+                            Origin::Factory => "Factory",
+                            Origin::User => "Your Sounds",
+                        }
+                    );
+                    kit::section(ui, st, kicker);
+                    kit::label_truncated(ui, st, Role::Display, Tone::Text, &e.meta.name);
                     if !e.meta.description.is_empty() {
-                        kit::label_truncated(
-                            ui,
-                            st,
-                            Role::Caption,
-                            Tone::Text2,
-                            &e.meta.description,
+                        kit::paragraph(ui, st, Role::Body, Tone::Text2, &e.meta.description);
+                    }
+                    ui.horizontal(|ui| {
+                        badge(ui, st, &e.meta);
+                        if e.origin == Origin::User {
+                            let r = ui.add(kit::Button::new(st, "Rename").small().ghost());
+                            hit(ui_state, "rename", &r);
+                            if r.clicked() {
+                                ui_state.browser.dialog = Some(Dialog::Rename {
+                                    id: e.id.clone(),
+                                    name: e.meta.name.clone(),
+                                    error: None,
+                                });
+                            }
+                        }
+                    });
+                    let mut one = 1;
+                    let macros = macros_cached(&mut ui_state.browser, e, &mut one).to_vec();
+                    if !macros.is_empty() {
+                        kit::gap(ui, st, 1);
+                        kit::section(ui, st, "Macros");
+                        let per_row = 4;
+                        for chunk in macros.chunks(per_row) {
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().item_spacing.x = 0.0;
+                                let w = ui.available_width() / per_row as f32;
+                                for (name, v) in chunk {
+                                    macro_knob(ui, st, name, *v, w);
+                                }
+                            });
+                        }
+                    }
+                    kit::gap(ui, st, 1);
+                    let r = ui
+                        .add(
+                            kit::Button::new(st, "Load sound")
+                                .primary()
+                                .min_width(ui.available_width()),
                         )
-                        .tip(st, &e.meta.description);
+                        .tip(st, "Load into the rack");
+                    hit(ui_state, "open", &r);
+                    if r.clicked() {
+                        *open = Some(e.id.clone());
+                    }
+                    let r = ui
+                        .add(kit::Button::new(st, "Open in rack").min_width(ui.available_width()))
+                        .tip(st, "Load into the rack and show the rack");
+                    hit(ui_state, "open-rack", &r);
+                    if r.clicked() {
+                        *open = Some(e.id.clone());
+                        ui_state.browser_open = false;
                     }
                     if !e.meta.tags.is_empty() {
                         let tags = format!("tags: {}", e.meta.tags.join(", "));
@@ -1459,7 +1585,7 @@ fn detail_column(
                         st,
                         Role::Body,
                         Tone::Text3,
-                        "Click a sound to see it; Open (or double-click) loads it.",
+                        "Click a sound to see it; Load sound (or double-click) loads it.",
                     );
                 }
             }
@@ -1667,7 +1793,7 @@ fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui:
         }
         ui.horizontal(|ui| {
             let r = ui
-                .add(kit::Button::new(st, label).icon(Ic::Play).primary())
+                .add(kit::Button::new(st, label).icon(Ic::Play))
                 .tip(st, &help);
             hit(ui_state, "play", &r);
             if r.clicked() {
