@@ -698,14 +698,14 @@ fn every_control_is_reachable_at_both_sizes() {
                 "{w}×{h}: {key} at {r:?} off screen"
             );
         }
-        // Toolbar items don't overlap.
+        // Toolbar items don't overlap (the segments of the view switch abut by design).
         let row = [
             "browser", "doc-name", "save", "save-as", "routing", "perform",
         ];
         for (i, a) in row.iter().enumerate() {
             for b in &row[i + 1..] {
                 assert!(
-                    !t.ui.hits[*a].intersects(t.ui.hits[*b]),
+                    !t.ui.hits[*a].shrink(1.0).intersects(t.ui.hits[*b]),
                     "{w}: {a} overlaps {b}"
                 );
             }

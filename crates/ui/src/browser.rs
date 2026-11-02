@@ -889,7 +889,8 @@ pub fn frame_input(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &egui::
 }
 
 /// The document name, unsaved mark, Save and Save As, for the toolbar.
-pub fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
+/// The open sound's name field (a dot marks unsaved changes).
+pub fn doc_field(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
     let modified = is_modified(editor, ui_state);
     let name = ui_state
         .doc
@@ -923,10 +924,19 @@ pub fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
         .interact(Sense::hover())
         .tip(st, &tip);
     hit(ui_state, "doc-name", &r);
+}
+
+/// Save (primary) and Save As. Laid out right to left, so Save ends up rightmost.
+pub fn save_buttons(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    st: &Style,
+) {
     let r = ui
         .add(
             kit::Button::new(st, "Save")
-                .icon(Ic::Save)
+                .primary()
                 .enabled(!io_busy(ui_state)),
         )
         .tip(st, "Ctrl+S");
@@ -934,7 +944,7 @@ pub fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
     if r.clicked() {
         save(editor, ui_state, None);
     }
-    let r = ui.add(kit::Button::new(st, "Save As"));
+    let r = ui.add(kit::Button::new(st, "Save As").ghost());
     hit(ui_state, "save-as", &r);
     if r.clicked() {
         open_save_as(ui_state, None);

@@ -337,6 +337,10 @@ pub struct UiState {
     pub midi_select: Option<Option<String>>,
     /// Final output meter (fed by `main.rs` from the audio callback).
     pub meter: record::Meter,
+    /// The host feeds `meter` and `sample_rate` (standalone): the status bar shows them.
+    pub status_meter: bool,
+    /// The host's audio status line (device, rate, buffer), shown in the status bar.
+    pub status_audio: String,
     /// Stereo output recorder; `None` without an audio device.
     pub recorder: Option<record::Recorder>,
     /// The open "what does this control change" explanation and inline help (view only).
@@ -463,6 +467,8 @@ impl Default for UiState {
             midi_select: None,
             recorder: None,
             meter: Default::default(),
+            status_meter: false,
+            status_audio: String::new(),
             explain: Default::default(),
             inspect: Default::default(),
             compare: Default::default(),
@@ -692,6 +698,17 @@ impl UiState {
 /// Draws the rack editor for one frame and applies user edits to `editor` directly. Call once
 /// per frame from `eframe::App::ui`.
 pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
+    show_with(editor, ui_state, ui, |_, _| {});
+}
+
+/// `show`, with the host's own controls at the right end of the status bar (audio device,
+/// diagnostics). The host's closure draws right to left.
+pub fn show_with(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    status_right: impl FnOnce(&mut egui::Ui, &mut UiState),
+) {
     wheel::begin(ui.ctx());
     theme::ensure_fonts(ui.ctx());
     let ready = theme::fonts_ready(ui.ctx());
@@ -819,6 +836,10 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
         .exact_size(st.metrics.toolbar_h)
         .frame(kit::bar_frame(&st))
         .show(ui, |ui| toolbar(editor, ui_state, ui, &st));
+    egui::Panel::bottom("kabl-status")
+        .exact_size(st.metrics.status_h)
+        .frame(kit::bar_frame(&st))
+        .show(ui, |ui| status_bar(ui_state, ui, &st, status_right));
     egui::Panel::right("kabl-rail")
         .exact_size(st.metrics.rail_w)
         .resizable(false)
@@ -1016,8 +1037,14 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
                 ui_state.perform_open = true;
                 ui_state.perform_tall = true;
             }
+            let open = ui_state.browser_open;
+            let r = kit::seg(ui, st, "Sounds", open);
+            ui_state.record("browser".into(), r.rect);
+            if r.clicked() {
+                ui_state.browser_open = !open;
+            }
         });
-        browser::toolbar(editor, ui_state, ui, st);
+        browser::doc_field(editor, ui_state, ui, st);
         vsep(ui, st);
         let r = kit::icon_button(ui, st, kit::Ic::Undo, false, editor.can_undo())
             .tip(st, "Undo (Ctrl+Z)");
@@ -1045,29 +1072,11 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
             }
         });
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            browser::save_buttons(editor, ui_state, ui, st);
             let open = ui_state.drawer_open;
             if tool(ui, st, ui_state, "routing", "Routing", open) {
                 ui_state.drawer_open = !open;
                 ui_state.drawer_auto_closed = false;
-            }
-            let open = ui_state.browser_open;
-            if tool(ui, st, ui_state, "browser", "Sounds", open) {
-                ui_state.browser_open = !open;
-            }
-            if let Some(rec) = ui_state.recorder.as_ref().filter(|r| r.recording()) {
-                let t = rec.elapsed() as u64;
-                kit::label(
-                    ui,
-                    st,
-                    style::Role::Label,
-                    kit::Tone::Bad,
-                    format!("• REC {:02}:{:02}", t / 60, t % 60),
-                );
-            }
-            if let Some(msg) = &ui_state.last_message {
-                // Truncated to the room left, never over the tools.
-                kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, msg)
-                    .on_hover_text(msg);
             }
         });
     });
@@ -1248,6 +1257,65 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
             })
             .tip(st, "Theme and view settings");
             ui_state.record("view-menu".into(), menu.rect);
+        });
+    });
+}
+
+/// The status bar: output meter and peak, sample rate, MIDI input, the last message and the
+/// recording clock; the host's controls at the right end.
+fn status_bar(
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    st: &Style,
+    right: impl FnOnce(&mut egui::Ui, &mut UiState),
+) {
+    ui.horizontal_centered(|ui| {
+        ui.spacing_mut().item_spacing.x = st.sp(3);
+        if ui_state.status_meter {
+            kit::label(ui, st, style::Role::Label, kit::Tone::Text2, "Out");
+            record::meter_ui(ui, st, &mut ui_state.meter);
+            let peak = ui_state
+                .meter
+                .max_db
+                .map_or("no signal".to_string(), |m| format!("{m:+.1} dB"));
+            kit::label(ui, st, style::Role::Value, kit::Tone::Text2, peak);
+            let khz = ui_state.sample_rate / 1000.0;
+            kit::label(
+                ui,
+                st,
+                style::Role::Value,
+                kit::Tone::Text2,
+                format!("{khz:.1} kHz"),
+            );
+        }
+        if let Some(port) = ui_state.midi_input.clone() {
+            let (dot, _) =
+                ui.allocate_exact_size(egui::Vec2::splat(st.sp(2)), egui::Sense::hover());
+            ui.painter()
+                .circle_filled(dot.center(), st.sp(1), st.roles.good);
+            kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, &port);
+        }
+        if !ui_state.status_audio.is_empty() {
+            let text = ui_state.status_audio.clone();
+            kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, &text)
+                .on_hover_text(&text);
+        }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            right(ui, ui_state);
+            if let Some(rec) = ui_state.recorder.as_ref().filter(|r| r.recording()) {
+                let t = rec.elapsed() as u64;
+                kit::label(
+                    ui,
+                    st,
+                    style::Role::Label,
+                    kit::Tone::Bad,
+                    format!("• REC {:02}:{:02}", t / 60, t % 60),
+                );
+            }
+            if let Some(msg) = &ui_state.last_message {
+                kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, msg)
+                    .on_hover_text(msg);
+            }
         });
     });
 }
