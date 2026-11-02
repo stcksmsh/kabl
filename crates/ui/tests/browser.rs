@@ -644,6 +644,12 @@ fn missing_recents_and_bad_patches_are_explained() {
 
 /// Brings `key` into the visible part of the Sounds panel body by scrolling it.
 fn scroll_into_view(t: &mut H, key: &str) {
+    // The library and list columns do not scroll with the detail column's body: they are
+    // reachable when they are on screen (the caller asserts that).
+    let (body, r) = (t.ui.hits["browser-body"], t.ui.hits[key]);
+    if r.right() <= body.left() {
+        return;
+    }
     if !scroll_body_to(t, key) {
         panic!("{key} cannot be scrolled into view: {:?}", t.ui.hits[key]);
     }
@@ -964,4 +970,34 @@ fn cancel_after_a_collision_keeps_the_other_sound() {
     assert_eq!(user_ids(&t), ["user:alpha"]);
     assert_eq!(t.editor.state(), &work);
     assert!(t.modified());
+}
+
+/// Sounds is a scene: the library, list and detail columns replace the rack (and the drawer
+/// waits behind it), and every filter is on screen in the plugin's window.
+#[test]
+fn the_sounds_scene_replaces_the_rack_and_fits_the_plugin_window() {
+    let mut t = H::new(1180.0, 680.0);
+    t.ui.drawer_open = true;
+    t.frame();
+    t.frame();
+    let screen = Rect::from_min_size(Pos2::ZERO, egui::vec2(1180.0, 680.0));
+    assert!(
+        !t.ui.hits.keys().any(|k| k.starts_with("module:")),
+        "no rack"
+    );
+    assert!(!t.has("help"), "the drawer waits behind the scene");
+    for key in [
+        "filter:all",
+        "filter:favorites",
+        "filter:recent",
+        "filter:factory",
+        "filter:user",
+        "search",
+        "new",
+        "browser-close",
+    ] {
+        assert!(screen.contains_rect(t.ui.hits[key]), "{key} on screen");
+    }
+    t.click("browser-close");
+    assert!(!t.ui.browser_open);
 }

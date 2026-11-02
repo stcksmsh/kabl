@@ -824,13 +824,6 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
         .resizable(false)
         .frame(kit::panel_frame(&st).inner_margin(egui::Margin::symmetric(0, st.sp(2) as i8)))
         .show(ui, |ui| rail(editor, ui_state, ui, &st));
-    if ui_state.browser_open {
-        egui::Panel::left("kabl-browser")
-            .exact_size(browser::PANEL_W)
-            .resizable(false)
-            .frame(kit::panel_frame(&st))
-            .show(ui, |ui| browser::panel(editor, ui_state, ui));
-    }
 
     let perform_full = ui_state.perform_open && ui_state.perform_tall;
     // The drawer gives its 360 px to the Perform view unless pinned, and comes back with the rack.
@@ -850,7 +843,8 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
             .frame(kit::panel_frame(&st))
             .show(ui, |ui| perform_view::panel(editor, ui_state, ui));
     }
-    if ui_state.drawer_open {
+    // The Sounds scene has its own detail column: the drawer waits behind it.
+    if ui_state.drawer_open && !ui_state.browser_open {
         egui::Panel::right("kabl-params")
             .exact_size(DRAWER_W)
             .resizable(false)
@@ -949,7 +943,11 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
             });
     }
 
-    if perform_full {
+    if ui_state.browser_open {
+        egui::CentralPanel::default()
+            .frame(kit::panel_frame(&st))
+            .show(ui, |ui| browser::panel(editor, ui_state, ui));
+    } else if perform_full {
         egui::CentralPanel::default()
             .frame(kit::panel_frame(&st))
             .show(ui, |ui| perform_view::panel(editor, ui_state, ui));
