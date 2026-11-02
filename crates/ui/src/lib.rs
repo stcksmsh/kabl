@@ -1456,7 +1456,10 @@ fn status_bar(
     ui.horizontal_centered(|ui| {
         ui.spacing_mut().item_spacing.x = st.sp(3);
         if ui_state.status_meter {
-            kit::label(ui, st, style::Role::Label, kit::Tone::Text2, "Out");
+            let out = kit::label(ui, st, style::Role::Label, kit::Tone::Text2, "Out");
+            if ui_state.recorder.is_none() {
+                out.on_hover_text("Recording needs an audio device.");
+            }
             record::meter_ui(ui, st, &mut ui_state.meter);
             let peak = ui_state
                 .meter
