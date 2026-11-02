@@ -59,6 +59,7 @@ pub struct Button<'a> {
     selected: bool,
     enabled: bool,
     small: bool,
+    large: bool,
     min_w: f32,
     tone: Option<Tone>,
 }
@@ -73,6 +74,7 @@ impl<'a> Button<'a> {
             selected: false,
             enabled: true,
             small: false,
+            large: false,
             min_w: 0.0,
             tone: None,
         }
@@ -101,6 +103,11 @@ impl<'a> Button<'a> {
         self.small = true;
         self
     }
+    /// The scene's primary action: `metrics.large_h` tall, wider padding.
+    pub fn large(mut self) -> Self {
+        self.large = true;
+        self
+    }
     pub fn min_width(mut self, w: f32) -> Self {
         self.min_w = w;
         self
@@ -118,10 +125,18 @@ impl Widget for Button<'_> {
         let font = st.font(Role::Label);
         let h = if self.small {
             st.metrics.small_h
+        } else if self.large {
+            st.metrics.large_h
         } else {
             st.metrics.control_h
         };
-        let pad = if self.small { st.sp(2) } else { st.sp(3) };
+        let pad = if self.small {
+            st.sp(2)
+        } else if self.large {
+            st.sp(4)
+        } else {
+            st.sp(3)
+        };
         let icon_w = if self.icon.is_some() {
             st.metrics.icon + st.sp(1) + 2.0
         } else {

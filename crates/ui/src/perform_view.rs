@@ -586,12 +586,12 @@ fn transport_card(
         let pos = ui_state.clock_pos.get(&id).copied();
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = st.sp(1);
-            let text = bpm.map_or("--".to_string(), |b| format!("{b:.0}"));
+            let text = bpm.map_or("--".to_string(), |b| format!("{b:.1}"));
             // The tempo is read from across the room: a big step above the display role.
             let big = st.type_role(Role::Display).size * 1.7;
             ui.label(kit::rich(st, Role::Display, Tone::Text, text).size(big));
             ui.vertical(|ui| {
-                kit::label(ui, st, Role::Label, Tone::Text2, "bpm");
+                kit::label(ui, st, Role::Label, Tone::Text2, "BPM");
                 kit::label(
                     ui,
                     st,
@@ -600,18 +600,28 @@ fn transport_card(
                     if run { "running" } else { "stopped" },
                 );
             });
-            let room = vec2(ui.available_width(), 40.0);
-            ui.allocate_ui_with_layout(room, Layout::top_down(egui::Align::Max), |ui| {
-                let (bar, beat) = pos.map_or(("--".into(), "--".into()), |p| {
-                    let (b, beat, _) = bar_beat(p);
-                    (b.to_string(), beat.to_string())
-                });
-                kit::label(ui, st, Role::Value, Tone::Text, format!("BAR {bar}"));
-                kit::label(ui, st, Role::Value, Tone::Text2, format!("BEAT {beat}"));
-            });
         });
-        let w = ui.available_width();
-        kit::bar_meter(ui, st, vec2(w, 6.0), pos.map_or(0.0, |p| bar_beat(p).2));
+        // Bar . beat, and the four beats of the bar.
+        let (bar, beat, _) = pos.map_or((0, 0, 0.0), bar_beat);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = st.sp(2);
+            let text = if pos.is_some() {
+                format!("{bar} . {beat}")
+            } else {
+                "-- . --".to_string()
+            };
+            ui.label(kit::rich(st, Role::Title, Tone::Text, text));
+            let d = st.sp(1) * 2.0;
+            for i in 0..4u64 {
+                let (r, _) = ui.allocate_exact_size(vec2(d, d), Sense::hover());
+                let on = pos.is_some() && beat == i + 1;
+                ui.painter().rect_filled(
+                    r,
+                    st.sp(0),
+                    if on { st.roles.accent } else { st.roles.line2 },
+                );
+            }
+        });
         if run {
             // The readout moves with the clock; the report arrives every audio callback.
             ui.ctx()
@@ -620,12 +630,22 @@ fn transport_card(
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = st.sp(2);
             let enabled = !ui_state.host_clock;
-            let r = ui.add(
-                kit::Button::new(st, if run { "Stop" } else { "Run" })
-                    .icon(if run { Ic::Stop } else { Ic::Play })
-                    .primary()
-                    .min_width(92.0)
-                    .enabled(enabled),
+            let d = st.metrics.large_h;
+            let r = kit::round_button(
+                ui,
+                st,
+                if run { Ic::Stop } else { Ic::Play },
+                true,
+                d,
+                enabled,
+            )
+            .tip(
+                st,
+                if run {
+                    "Stop the clock"
+                } else {
+                    "Run the clock"
+                },
             );
             ui_state.record(format!("prun:{id}"), r.rect);
             if r.clicked() {
@@ -735,13 +755,11 @@ fn cues_card(
                                     .map_or(String::new(), |t| format!("\n{t}"))
                             );
                             let (ps, sub) = if active {
-                                (PadState::Playing, Some("playing"))
+                                (PadState::Playing, "Playing")
                             } else if queued {
-                                (PadState::Queued, Some("next bar"))
-                            } else if !c.macros.is_empty() {
-                                (PadState::Idle, Some("sets macros"))
+                                (PadState::Queued, "Queued")
                             } else {
-                                (PadState::Idle, None)
+                                (PadState::Idle, "Ready")
                             };
                             // A queued pad fills toward the bar line it launches on; a playing
                             // one fills as its macros arrive.
@@ -764,12 +782,16 @@ fn cues_card(
                                         })
                                         .flatten()
                                 });
-                            let r = kit::pad(
+                            let hover = match &tag {
+                                Some(t) => format!("{hover}\n{t}"),
+                                None => hover,
+                            };
+                            let r = kit::scene_pad(
                                 ui,
                                 st,
                                 vec2(pad_w, pad_h),
                                 &c.name,
-                                tag.as_deref(),
+                                c.n,
                                 sub,
                                 ps,
                                 progress,
@@ -949,18 +971,6 @@ fn macro_tile(
             |ui| {
                 ui.set_width(tile_w);
                 ui.spacing_mut().item_spacing.y = st.sp(1);
-                pin_head(
-                    editor,
-                    ui_state,
-                    ui,
-                    st,
-                    pin,
-                    index,
-                    count,
-                    Role::H3,
-                    false,
-                    None,
-                );
                 // A cue may be moving this macro: show it where it is, with where it is heading
                 // as the knob's range. A hand on the knob ends the morph (the engine does the
                 // same when the value arrives).
@@ -983,7 +993,14 @@ fn macro_tile(
                     };
                     editor.set_param_gesture(target, p.from_norm(v), !continuing);
                 }
-                kit::label(ui, st, Role::Value, Tone::Text, routing::fmt_value(p, cur));
+                // The value sits inside the knob.
+                ui.painter().text(
+                    resp.rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    routing::fmt_value(p, cur),
+                    st.font(Role::Value),
+                    kit::tone(st, Tone::Text),
+                );
                 if let Some(m) = heading {
                     kit::label(
                         ui,
@@ -1000,6 +1017,19 @@ fn macro_tile(
                     ui.ctx()
                         .request_repaint_after(std::time::Duration::from_millis(30));
                 }
+                pin_head(
+                    editor,
+                    ui_state,
+                    ui,
+                    st,
+                    pin,
+                    index,
+                    count,
+                    Role::Title,
+                    false,
+                    None,
+                );
+                midi_row(editor, ui_state, ui, st, pin.id, p);
                 let moves = macro_moves(editor.state(), pin.id, p.name);
                 let text = match moves.len() {
                     0 => "moves nothing yet".to_string(),
@@ -1025,7 +1055,6 @@ fn macro_tile(
                         moves.join("\n")
                     },
                 );
-                midi_row(editor, ui_state, ui, st, pin.id, p);
             },
         )
         .response
@@ -1250,7 +1279,10 @@ fn banks_card(
     let key = format!("{}.{}", pin.id, pin.key);
     let id = pin.id;
     let rect = shell(ui, ui_state, st, &key, size, |ui, ui_state| {
-        let who = format!("Banks · {} #{id}", perform::module_name(editor.state(), id));
+        let who = format!(
+            "Sequences · {} #{id}",
+            perform::module_name(editor.state(), id)
+        );
         pin_head(
             editor,
             ui_state,
@@ -1269,6 +1301,8 @@ fn banks_card(
             .get(&id)
             .copied()
             .unwrap_or((crate::banks::startup(&state, id), None));
+        let steps = lane(&state, id, playing);
+        let lane_h = (size.y - 96.0).max(st.sp(6) * 2.0);
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = st.sp(1);
             for b in 0..seq::BANKS {
@@ -1288,7 +1322,7 @@ fn banks_card(
                 let r = kit::pad(
                     ui,
                     st,
-                    vec2(44.0, 38.0),
+                    vec2(st.sp(5) + st.sp(2), st.sp(5) + st.sp(2)),
                     seq::BANK_NAMES[b],
                     None,
                     None,
@@ -1310,29 +1344,22 @@ fn banks_card(
                     ui_state.launches.push(Command::Cancel(Some(id)));
                 }
             }
+            ui.add_space(st.sp(2));
+            let w = ui.available_width();
+            kit::step_lane(
+                ui,
+                st,
+                vec2(w, lane_h),
+                &steps,
+                ui_state.seq_steps.get(&id).copied(),
+                hue,
+            );
         });
         let text = match queued {
             Some(q) => format!("next: {}", crate::banks::title(&state, id, q)),
             None => format!("playing: {}", crate::banks::title(&state, id, playing)),
         };
         kit::label_truncated(ui, st, Role::Caption, Tone::Text2, text);
-        let steps = lane(&state, id, playing);
-        let w = ui.available_width();
-        kit::step_lane(
-            ui,
-            st,
-            vec2(w, (size.y - 150.0).max(64.0)),
-            &steps,
-            ui_state.seq_steps.get(&id).copied(),
-            hue,
-        );
-        kit::label(
-            ui,
-            st,
-            Role::Caption,
-            Tone::Text3,
-            "bar height = level · brightness = probability",
-        );
     });
     after_card(ui, ui_state, st, pin, rect);
 }
