@@ -29,6 +29,25 @@ const BANK_WEIGHT: f32 = 2.4;
 /// Heights of what is not pad, knob or lane: card chrome of the scene row, the macro row, one
 /// control row and the gaps between rows. The rest of the window height goes to pads and knobs.
 const FIXED_H: f32 = 64.0 + 168.0 + 132.0 + 32.0;
+/// The two-column Perform scene (transport over scenes, macros over sequences) needs this much
+/// height; the docked strip below the rack uses the flowing rows instead.
+const COLUMNS_MIN_H: f32 = 520.0;
+/// Width of the left column (transport, scenes) as a share of the view, and its limits.
+const LEFT_SHARE: f32 = 0.27;
+const LEFT_MIN_W: f32 = 290.0;
+const LEFT_MAX_W: f32 = 400.0;
+/// Height of the transport card; the scenes take the rest of the left column.
+const TRANSPORT_H: f32 = 220.0;
+/// Most other controls the two-column scene carries (one row below it).
+const COLUMNS_MAX_CONTROLS: usize = 4;
+/// Share of the right column the macros take when sequences are beside them.
+const MACROS_SHARE: f32 = 0.56;
+/// Knob diameter limits in the macro card, and what the card spends on everything but the knob.
+const KNOB_MIN: f32 = 64.0;
+const KNOB_MAX: f32 = 140.0;
+const MACRO_CHROME_H: f32 = 130.0 + 64.0;
+/// A scenes card narrower than this lays its pads out two across, with the buttons below.
+const CUES_NARROW_W: f32 = 480.0;
 
 /// Widths for `items` (min, weight) in a row of `avail`: the minimums, plus the spare room by
 /// weight. When the minimums do not fit they stay as they are and the row wraps.
@@ -174,10 +193,118 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         ((avail - g * (cols - 1) as f32) / cols as f32).min(CTRL_W * 1.6)
     };
 
+    let columns = ui.available_height() >= COLUMNS_MIN_H
+        && (!transports.is_empty() || !cues.is_empty())
+        && (!tiles.is_empty() || !banks.is_empty())
+        // More sequencers or other controls than the columns carry keep the flowing rows, which
+        // fit them in view.
+        && controls.len() <= COLUMNS_MAX_CONTROLS
+        && banks.len() <= 1;
+    // With other controls below, the columns keep the height the flowing rows had, so those
+    // controls stay above the fold; alone they take the whole view.
+    let body_h = if controls.is_empty() {
+        (ui.available_height() - 16.0).max(COLUMNS_MIN_H - 16.0)
+    } else {
+        (row1_h + g + row2_h).max(COLUMNS_MIN_H * 0.8)
+    };
     egui::ScrollArea::vertical()
         .id_salt("perform-cards")
         .auto_shrink([false, false])
         .show_owned(ui, |ui| {
+            if columns {
+                let left_w = (avail * LEFT_SHARE).clamp(LEFT_MIN_W, LEFT_MAX_W);
+                let right_w = avail - left_w - g;
+                ui.horizontal_top(|ui| {
+                    ui.spacing_mut().item_spacing = vec2(g, g);
+                    ui.vertical(|ui| {
+                        ui.spacing_mut().item_spacing = vec2(g, g);
+                        let cues_h = if cues.is_empty() {
+                            0.0
+                        } else {
+                            body_h - TRANSPORT_H - g
+                        };
+                        for &(i, pin) in &transports {
+                            let h = if cues.is_empty() { body_h } else { TRANSPORT_H };
+                            transport_card(editor, ui_state, ui, &st, pin, i, n, vec2(left_w, h));
+                        }
+                        let pad_h = ((cues_h - 64.0) / 4.0 - st.sp(1)).clamp(64.0, 140.0);
+                        for &(i, pin) in &cues {
+                            cues_card(
+                                editor,
+                                ui_state,
+                                ui,
+                                &st,
+                                pin,
+                                i,
+                                n,
+                                vec2(left_w, cues_h),
+                                pad_h,
+                            );
+                        }
+                    });
+                    ui.vertical(|ui| {
+                        ui.spacing_mut().item_spacing = vec2(g, g);
+                        let macros_h = if banks.is_empty() {
+                            body_h
+                        } else if tiles.is_empty() {
+                            0.0
+                        } else {
+                            (body_h - g) * MACROS_SHARE
+                        };
+                        let knob = (macros_h - MACRO_CHROME_H).clamp(KNOB_MIN, KNOB_MAX);
+                        let tw = split(right_w, g, &vec![(TILE_MIN, 1.0); tiles.len()]);
+                        ui.horizontal_top(|ui| {
+                            ui.spacing_mut().item_spacing.x = g;
+                            for (mine, &w) in tiles.iter().zip(&tw) {
+                                macros_card(
+                                    editor,
+                                    ui_state,
+                                    ui,
+                                    &st,
+                                    mine,
+                                    n,
+                                    vec2(w, macros_h),
+                                    knob,
+                                );
+                            }
+                        });
+                        let rest = if tiles.is_empty() {
+                            body_h
+                        } else {
+                            body_h - macros_h - g
+                        };
+                        let each = ((rest - g * banks.len().saturating_sub(1) as f32)
+                            / banks.len().max(1) as f32)
+                            .max(120.0);
+                        for (k, &(i, pin)) in banks.iter().enumerate() {
+                            let hue = [st.roles.audio, st.roles.cv, st.roles.gate][k % 3];
+                            banks_card(
+                                editor,
+                                ui_state,
+                                ui,
+                                &st,
+                                pin,
+                                i,
+                                n,
+                                vec2(right_w, each),
+                                hue,
+                            );
+                        }
+                    });
+                });
+                if !controls.is_empty() {
+                    ui.with_layout(
+                        Layout::left_to_right(egui::Align::Min).with_main_wrap(true),
+                        |ui| {
+                            ui.spacing_mut().item_spacing = vec2(g, g);
+                            for &(i, pin) in &controls {
+                                control_card(editor, ui_state, ui, &st, pin, i, n, ctrl_w);
+                            }
+                        },
+                    );
+                }
+                return;
+            }
             ui.with_layout(
                 Layout::left_to_right(egui::Align::Min).with_main_wrap(true),
                 |ui| {
@@ -672,10 +799,23 @@ fn cues_card(
     let id = pin.id;
     let all = crate::cues::cues(editor.state(), id);
     // One row up to five cues (the usual set), else rows of four.
-    let per_row = if all.len() <= 5 { all.len().max(4) } else { 4 };
-    // The pads share the width left beside the Cancel button.
-    let fixed = 84.0 + 110.0 + st.sp(1) + st.sp(2) + st.sp(3) * 2.0 + 4.0;
-    let pad_w = ((size.x - fixed) / per_row as f32 - st.sp(1)).max(80.0);
+    let narrow = size.x < CUES_NARROW_W;
+    let per_row = if narrow {
+        2
+    } else if all.len() <= 5 {
+        all.len().max(4)
+    } else {
+        4
+    };
+    // The pads share the width left beside the Cancel button (all of it when narrow: the
+    // buttons go below).
+    let fixed = if narrow {
+        st.sp(3) * 2.0 + 4.0
+    } else {
+        84.0 + 110.0 + st.sp(1) + st.sp(2) + st.sp(3) * 2.0 + 4.0
+    };
+    let pad_w =
+        ((size.x - fixed) / per_row as f32 - st.sp(1)).max(if narrow { 60.0 } else { 80.0 });
     let rows = all.len().div_ceil(per_row).max(1);
     // Rows share the height the row was given.
     let pad_h = pad_h
@@ -718,7 +858,12 @@ fn cues_card(
                 "No cues yet: add them in the drawer",
             );
         }
-        ui.horizontal_top(|ui| {
+        let flow = if narrow {
+            Layout::top_down(egui::Align::Min)
+        } else {
+            Layout::left_to_right(egui::Align::Min)
+        };
+        ui.with_layout(flow, |ui| {
             ui.spacing_mut().item_spacing = vec2(st.sp(1), st.sp(1));
             ui.vertical(|ui| {
                 ui.spacing_mut().item_spacing = vec2(st.sp(1), st.sp(1));
@@ -902,6 +1047,8 @@ fn macros_card(
 ) {
     let tile_w =
         (size.x - st.sp(3) * 2.0 - st.sp(1) * (pins.len() as f32 - 1.0)) / pins.len() as f32;
+    // A knob never wider than its tile (eight macros share a narrow card).
+    let knob = knob.min(tile_w - st.sp(2) * 2.0).max(KNOB_MIN / 2.0);
     ui.allocate_ui_with_layout(size, Layout::top_down(egui::Align::Min), |ui| {
         let f = kit::card_frame(st);
         let m = f.inner_margin.sum();
