@@ -144,6 +144,10 @@ fn roles(dark: bool, accent: Accent) -> Roles {
         knob: h("#1D1F23"),
         knob_hi: h("#3C3F45"),
         knob_ink: h("#F2F0EB"),
+        // G4 state colours (G4-SPEC §2).
+        bad: h(if dark { "#F06A5F" } else { "#C2362B" }),
+        good: h(if dark { "#5CCB8A" } else { "#2C774B" }),
+        warn: h(if dark { "#E3A93C" } else { "#945E00" }),
         ..base
     }
 }

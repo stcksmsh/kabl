@@ -276,10 +276,11 @@ fn main() {
             ("accent", r.accent),
         ] {
             println!(
-                "{} {n:6} on surface {:.2}  on raised {:.2}",
+                "{} {n:6} on surface {:.2}  on raised {:.2}  on bg {:.2}",
                 if dark { "graphite" } else { "paper   " },
                 contrast(c, r.surface),
-                contrast(c, r.raised)
+                contrast(c, r.raised),
+                contrast(c, r.bg)
             );
         }
     }

@@ -8,3 +8,11 @@ The brief and plan mark four items as unverified. Findings:
 4. **seq-32** (`claude/seq-32`, dd33766, pushed, no PR yet): 32 steps per pattern, length 1 to 32, face shows pages of 8; seq param cap 655; per-step params are never automation-lane targets. Agent 2 is finishing it. G3 timing/drums (agent D) must build on it after it merges.
 
 Also present on master: an older design set in `docs/design/` (BRIEF.md, app-target/, directions/, revision-2/, REVIEW.md, QA.md). `docs/design/redesign/` is the current one.
+
+## G4 paper state colours (2026-11-02, #93)
+
+Spec hexes bad #C2362B, good #2E7D4F, warn #9A6200 measured on paper surface 5.22 / 4.83 / 4.88 but on bg (#ECEAE5) 4.53 / 4.20 / 4.24. Good and warn darkened minimally to reach 4.5 on bg. Final paper values, contrast on surface / raised / bg:
+- bad `#C2362B`: 5.22 / 5.45 / 4.53
+- good `#2C774B`: 5.23 / 5.46 / 4.54
+- warn `#945E00`: 5.21 / 5.44 / 4.52
+Graphite uses the spec values unchanged (bad #F06A5F, good #5CCB8A, warn #E3A93C; all above 5.0 on surface, raised and bg). Paper accent text (#A94F00) is #91's and not touched.
