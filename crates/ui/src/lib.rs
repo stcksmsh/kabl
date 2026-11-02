@@ -68,6 +68,9 @@ use theme::{theme, Theme};
 
 /// Width of the routing drawer (right).
 pub const DRAWER_W: f32 = 360.0;
+/// Window width below which (the plugin's 1180 px) the drawer floats over the rack and the
+/// rack fits itself to the window.
+pub const COMPACT_W: f32 = 1280.0;
 pub const MIN_ZOOM: f32 = 0.5;
 pub const MAX_ZOOM: f32 = 2.0;
 
@@ -308,6 +311,11 @@ pub struct UiState {
     reveal: Option<ModuleId>,
     canvas: Rect,
     fitted: bool,
+    /// Compact window (below `COMPACT_W`), set each frame.
+    compact: bool,
+    /// Compact windows refit the rack on resize until the user zooms.
+    pub auto_fit: bool,
+    compact_seen: bool,
     last_inspected: Option<(ModuleId, String)>,
     /// Inspected knob and route count whose source lanes were last panned into view.
     lanes_shown: Option<(ModuleId, String, usize)>,
@@ -450,6 +458,9 @@ impl Default for UiState {
             reveal: None,
             canvas: Rect::NOTHING,
             fitted: false,
+            compact: false,
+            auto_fit: true,
+            compact_seen: false,
             last_inspected: None,
             lanes_shown: None,
             deferred: Vec::new(),
@@ -563,6 +574,7 @@ impl UiState {
 
     fn zoom_about(&mut self, zoom: f32, at: Pos2) {
         let world = self.xf().inv(at);
+        self.auto_fit = false;
         self.zoom = zoom.clamp(MIN_ZOOM, MAX_ZOOM);
         self.pan = at - self.canvas.min - world.to_vec2() * self.zoom;
     }
@@ -853,6 +865,12 @@ pub fn show_with(
             .show(ui, |ui| browser::panel(editor, ui_state, ui));
     }
 
+    let compact = ui.max_rect().width() < COMPACT_W;
+    ui_state.compact = compact;
+    if compact && !std::mem::replace(&mut ui_state.compact_seen, true) {
+        // The plugin window starts with the drawer shut: the rack gets the room.
+        ui_state.drawer_open = false;
+    }
     let perform_full = ui_state.perform_open && ui_state.perform_tall;
     // The drawer gives its 360 px to the Perform view unless pinned, and comes back with the rack.
     if perform_full != ui_state.perform_full_seen {
@@ -872,102 +890,32 @@ pub fn show_with(
             .show(ui, |ui| perform_view::panel(editor, ui_state, ui));
     }
     if ui_state.drawer_open {
-        egui::Panel::right("kabl-params")
-            .exact_size(DRAWER_W)
-            .resizable(false)
-            .frame(kit::panel_frame(&st))
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = st.sp(1);
-                    kit::label(ui, &st, style::Role::Title, kit::Tone::Text, "Routing");
-                    let on = ui_state.explain.help;
-                    let r = ui
-                        .add(kit::Button::new(&st, "Help").small().selected(on))
-                        .tip(&st, "Show what each module and control does");
-                    ui_state.record("help".into(), r.rect);
-                    if r.clicked() {
-                        ui_state.explain.help = !on;
-                    }
-                    let on = ui_state.inspect.open;
-                    let r = ui
-                        .add(kit::Button::new(&st, "Inspect").small().selected(on))
-                        .tip(&st, "Measure one output and ask why there is no sound");
-                    ui_state.record("inspect-open".into(), r.rect);
-                    if r.clicked() {
-                        ui_state.inspect.open = !on;
-                        ui_state.inspect.reveal = !on;
-                    }
-                    let on = ui_state.compare.open;
-                    let r = ui
-                        .add(kit::Button::new(&st, "Compare").small().selected(on))
-                        .tip(&st, "Keep a reference copy of the patch and restore it");
-                    ui_state.record("compare-open".into(), r.rect);
-                    if r.clicked() {
-                        ui_state.compare.open = !on;
-                        ui_state.compare.reveal = !on;
-                    }
-                    let on = ui_state.recipes.open;
-                    let r = ui
-                        .add(kit::Button::new(&st, "Learn").small().selected(on))
-                        .tip(&st, "Three short listening recipes (optional)");
-                    ui_state.record("learn-open".into(), r.rect);
-                    if r.clicked() {
-                        ui_state.recipes.open = !on;
-                    }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if kit::icon_button(ui, &st, kit::Ic::Close, false, true)
-                            .tip(&st, "Close the drawer")
-                            .clicked()
-                        {
-                            ui_state.drawer_open = false;
-                        }
+        if compact {
+            // Below 1280 px the drawer floats over the rack instead of splitting the window.
+            let avail = ui.available_rect_before_wrap();
+            let frame = kit::panel_frame(&st);
+            let rect = egui::Rect::from_min_max(
+                egui::pos2(avail.right() - DRAWER_W, avail.top()),
+                avail.max,
+            );
+            egui::Area::new(egui::Id::new("kabl-params-overlay"))
+                .order(egui::Order::Foreground)
+                .fade_in(false)
+                .fixed_pos(rect.min)
+                .show(ui.ctx(), |ui| {
+                    frame.show(ui, |ui| {
+                        ui.set_min_size(rect.size() - frame.total_margin().sum());
+                        ui.set_max_size(rect.size() - frame.total_margin().sum());
+                        drawer(editor, ui_state, ui, &st, now);
                     });
                 });
-                if ui_state.recipes.open {
-                    // Above the drawer's scrolling content, so Show (which scrolls the drawer
-                    // to the routes) never scrolls the recipe away.
-                    let h = ui.available_height() * 0.4;
-                    egui::ScrollArea::vertical()
-                        .id_salt("kabl-recipes")
-                        .max_height(h)
-                        .show_owned(ui, |ui| {
-                            ui.set_max_width(DRAWER_W - 24.0);
-                            egui::Frame::group(ui.style()).show(ui, |ui| {
-                                recipes::panel(editor, ui_state, ui, now);
-                            });
-                        });
-                }
-                if ui_state.explain.is_open() {
-                    // Its own scroll area, at most about half the drawer: the module and
-                    // routing sections below stay in reach while it is open.
-                    let h = ui.available_height() * 0.55;
-                    egui::ScrollArea::vertical()
-                        .id_salt("kabl-explain")
-                        .max_height(h)
-                        .show_owned(ui, |ui| {
-                            ui.set_max_width(DRAWER_W - 24.0);
-                            explain::panel(editor, ui_state, ui);
-                        });
-                }
-                egui::ScrollArea::vertical().show_owned(ui, |ui| {
-                    // Rows wrap instead of widening the drawer over the rack.
-                    ui.set_max_width(DRAWER_W - 24.0);
-                    if ui_state.inspect.open {
-                        egui::Frame::group(ui.style()).show(ui, |ui| {
-                            inspect::panel(editor, ui_state, ui, now);
-                        });
-                    }
-                    if ui_state.compare.open {
-                        egui::Frame::group(ui.style()).show(ui, |ui| {
-                            compare::panel(editor, ui_state, ui);
-                        });
-                    }
-                    show_param_panel(editor, ui_state, ui);
-                    pattern::panel(editor, ui_state, ui);
-                    routing::drawer(editor, ui_state, ui);
-                    routing::cable_routes(editor, ui_state, ui);
-                });
-            });
+        } else {
+            egui::Panel::right("kabl-params")
+                .exact_size(DRAWER_W)
+                .resizable(false)
+                .frame(kit::panel_frame(&st))
+                .show(ui, |ui| drawer(editor, ui_state, ui, &st, now));
+        }
     }
 
     if perform_full {
@@ -983,6 +931,107 @@ pub fn show_with(
     ui_state.explain.typing =
         ui.ctx().egui_wants_keyboard_input() || egui::Popup::is_any_open(ui.ctx());
     ui_state.hits = std::mem::take(&mut ui_state.frame_hits);
+}
+
+/// The routing drawer: its header (help, inspect, compare, learn, close) and the scrolling
+/// sections below it.
+fn drawer(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    st: &Style,
+    now: f64,
+) {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = st.sp(1);
+        kit::label(ui, st, style::Role::Title, kit::Tone::Text, "Routing");
+        let on = ui_state.explain.help;
+        let r = ui
+            .add(kit::Button::new(st, "Help").small().selected(on))
+            .tip(st, "Show what each module and control does");
+        ui_state.record("help".into(), r.rect);
+        if r.clicked() {
+            ui_state.explain.help = !on;
+        }
+        let on = ui_state.inspect.open;
+        let r = ui
+            .add(kit::Button::new(st, "Inspect").small().selected(on))
+            .tip(st, "Measure one output and ask why there is no sound");
+        ui_state.record("inspect-open".into(), r.rect);
+        if r.clicked() {
+            ui_state.inspect.open = !on;
+            ui_state.inspect.reveal = !on;
+        }
+        let on = ui_state.compare.open;
+        let r = ui
+            .add(kit::Button::new(st, "Compare").small().selected(on))
+            .tip(st, "Keep a reference copy of the patch and restore it");
+        ui_state.record("compare-open".into(), r.rect);
+        if r.clicked() {
+            ui_state.compare.open = !on;
+            ui_state.compare.reveal = !on;
+        }
+        let on = ui_state.recipes.open;
+        let r = ui
+            .add(kit::Button::new(st, "Learn").small().selected(on))
+            .tip(st, "Three short listening recipes (optional)");
+        ui_state.record("learn-open".into(), r.rect);
+        if r.clicked() {
+            ui_state.recipes.open = !on;
+        }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if kit::icon_button(ui, st, kit::Ic::Close, false, true)
+                .tip(st, "Close the drawer")
+                .clicked()
+            {
+                ui_state.drawer_open = false;
+            }
+        });
+    });
+    if ui_state.recipes.open {
+        // Above the drawer's scrolling content, so Show (which scrolls the drawer
+        // to the routes) never scrolls the recipe away.
+        let h = ui.available_height() * 0.4;
+        egui::ScrollArea::vertical()
+            .id_salt("kabl-recipes")
+            .max_height(h)
+            .show_owned(ui, |ui| {
+                ui.set_max_width(DRAWER_W - 24.0);
+                egui::Frame::group(ui.style()).show(ui, |ui| {
+                    recipes::panel(editor, ui_state, ui, now);
+                });
+            });
+    }
+    if ui_state.explain.is_open() {
+        // Its own scroll area, at most about half the drawer: the module and
+        // routing sections below stay in reach while it is open.
+        let h = ui.available_height() * 0.55;
+        egui::ScrollArea::vertical()
+            .id_salt("kabl-explain")
+            .max_height(h)
+            .show_owned(ui, |ui| {
+                ui.set_max_width(DRAWER_W - 24.0);
+                explain::panel(editor, ui_state, ui);
+            });
+    }
+    egui::ScrollArea::vertical().show_owned(ui, |ui| {
+        // Rows wrap instead of widening the drawer over the rack.
+        ui.set_max_width(DRAWER_W - 24.0);
+        if ui_state.inspect.open {
+            egui::Frame::group(ui.style()).show(ui, |ui| {
+                inspect::panel(editor, ui_state, ui, now);
+            });
+        }
+        if ui_state.compare.open {
+            egui::Frame::group(ui.style()).show(ui, |ui| {
+                compare::panel(editor, ui_state, ui);
+            });
+        }
+        show_param_panel(editor, ui_state, ui);
+        pattern::panel(editor, ui_state, ui);
+        routing::drawer(editor, ui_state, ui);
+        routing::cable_routes(editor, ui_state, ui);
+    });
 }
 
 fn tool(
@@ -1166,6 +1215,7 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
         ) {
             let lay = composite_layout(editor.state(), ui_state);
             ui_state.frame_world(lay.bounds.expand(4.0), 1.5);
+            ui_state.auto_fit = true;
         }
         let focus_target = ui_state
             .inspected
@@ -1601,6 +1651,9 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     } else if canvas != ui_state.canvas {
         // Drawer opened or window resized: keep what the user is working on reachable.
         ui_state.canvas = canvas;
+        if ui_state.compact && ui_state.auto_fit {
+            ui_state.frame_world(lay.bounds.expand(4.0), 1.0);
+        }
         let target = inspected_extent(editor, ui_state, &lay)
             .map(|(r, _)| r)
             .or_else(|| {
@@ -1837,6 +1890,7 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         if !cancelled {
             egui::Area::new(Id::new("lifted-rack-item"))
                 .order(egui::Order::Foreground)
+                .fade_in(false)
                 .fixed_pos(xf.p(live))
                 .constrain(false)
                 .sense(Sense::hover())

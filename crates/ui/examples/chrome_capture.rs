@@ -14,7 +14,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 3] = ["rack", "perform", "sounds"];
+const SCENES: [&str; 4] = ["rack", "perform", "sounds", "drawer"];
 
 struct Job {
     scene: &'static str,
@@ -110,6 +110,10 @@ impl eframe::App for App {
                 egui::vec2(size.0 as f32, size.1 as f32),
             )),
         );
+        if self.f == 6 && self.jobs[self.i].scene == "drawer" {
+            // After the first frame: a compact window closes the drawer there, the user opens it.
+            self.ui.drawer_open = true;
+        }
         show(&mut self.editor, &mut self.ui, &mut root);
         self.f += 1;
         if self.f == 12 {
