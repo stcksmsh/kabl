@@ -312,6 +312,11 @@ pub struct UiState {
     reveal: Option<ModuleId>,
     canvas: Rect,
     fitted: bool,
+    /// World ends of every drawn cable (output, input), from the last frame: what the fit
+    /// needs to keep the sagging ropes inside the viewport.
+    cable_ends: Vec<(Pos2, Pos2)>,
+    /// A fit of the whole patch that still has to account for the cables: (world, max zoom).
+    pending_fit: Option<(Rect, f32)>,
     /// Compact window (below `COMPACT_W`), set each frame.
     compact: bool,
     /// Compact windows refit the rack on resize until the user zooms.
@@ -459,6 +464,8 @@ impl Default for UiState {
             reveal: None,
             canvas: Rect::NOTHING,
             fitted: false,
+            cable_ends: Vec::new(),
+            pending_fit: None,
             compact: false,
             auto_fit: true,
             compact_seen: false,
@@ -580,8 +587,7 @@ impl UiState {
         self.pan = at - self.canvas.min - world.to_vec2() * self.zoom;
     }
 
-    /// Zooms so `world` fits the canvas (at most `max_zoom`), left-aligned, centred vertically
-    /// when there is room.
+    /// Zooms so `world` fits the canvas (at most `max_zoom`), anchored top-left under the toolbar.
     fn frame_world(&mut self, world: Rect, max_zoom: f32) {
         if !world.min.x.is_finite()
             || !world.min.y.is_finite()
@@ -600,10 +606,63 @@ impl UiState {
             .clamp(MIN_ZOOM, max_zoom);
         self.zoom = z;
         self.pan = c.min - self.canvas.min - world.min.to_vec2() * z;
-        let spare = c.height() - world.height() * z;
-        if spare > 0.0 {
-            self.pan.y += spare / 2.0;
+    }
+
+    /// `frame_world` for the whole patch: the module fit now, refined with the cable ropes
+    /// once they are drawn (`refit_with_cables`).
+    fn frame_patch(&mut self, world: Rect, max_zoom: f32) {
+        self.frame_world(world, max_zoom);
+        self.pending_fit = Some((world, max_zoom));
+    }
+
+    /// Screen bounds of `world` and every cable rope at the current zoom and pan.
+    fn rack_bounds(&self, world: Rect) -> Rect {
+        let xf = self.xf();
+        let sag = self.style.slots.cable.sag;
+        let mut r = xf.r(world);
+        for (a, b) in &self.cable_ends {
+            for p in cable_look::points(xf.p(*a), xf.p(*b), xf.zoom, sag) {
+                r.extend_with(p);
+            }
         }
+        r
+    }
+
+    /// Shrinks the fit until the modules and the sagging cables are inside the canvas (never
+    /// below `MIN_ZOOM`), anchored top-left under the toolbar.
+    fn refit_with_cables(&mut self, world: Rect, max_zoom: f32) {
+        let c = self.canvas.shrink(12.0);
+        for _ in 0..8 {
+            let r = self.rack_bounds(world);
+            if r.width() <= c.width() + 0.5 && r.height() <= c.height() + 0.5 {
+                break;
+            }
+            let k = (c.width() / r.width()).min(c.height() / r.height()) * 0.99;
+            self.zoom = (self.zoom * k).clamp(MIN_ZOOM, max_zoom);
+        }
+        let r = self.rack_bounds(world);
+        self.pan += c.min - r.min;
+    }
+
+    /// Screen bounds of every drawn cable rope (none when no cable is drawn).
+    pub fn cable_bounds(&self) -> Option<Rect> {
+        let xf = self.xf();
+        let sag = self.style.slots.cable.sag;
+        let mut r: Option<Rect> = None;
+        for (a, b) in &self.cable_ends {
+            for p in cable_look::points(xf.p(*a), xf.p(*b), xf.zoom, sag) {
+                match r.as_mut() {
+                    Some(r) => r.extend_with(p),
+                    None => r = Some(Rect::from_min_max(p, p)),
+                }
+            }
+        }
+        r
+    }
+
+    /// The rack viewport of the last frame, screen px.
+    pub fn rack_canvas(&self) -> Rect {
+        self.canvas
     }
 
     /// Pans the least needed to bring the screen rect `target` inside the canvas (its
@@ -1182,7 +1241,7 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
             true,
         ) {
             let lay = composite_layout(editor.state(), ui_state);
-            ui_state.frame_world(lay.bounds.expand(4.0), 1.5);
+            ui_state.frame_patch(lay.bounds.expand(4.0), 1.5);
             ui_state.auto_fit = true;
         }
         let focus_target = ui_state
@@ -1614,13 +1673,13 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     if !ui_state.fitted {
         // First frame: the whole patch, never above 100 %.
         ui_state.canvas = canvas;
-        ui_state.frame_world(lay.bounds.expand(4.0), 1.0);
+        ui_state.frame_patch(lay.bounds.expand(4.0), 1.0);
         ui_state.fitted = true;
     } else if canvas != ui_state.canvas {
         // Drawer opened or window resized: keep what the user is working on reachable.
         ui_state.canvas = canvas;
-        if ui_state.compact && ui_state.auto_fit {
-            ui_state.frame_world(lay.bounds.expand(4.0), 1.0);
+        if ui_state.auto_fit {
+            ui_state.frame_patch(lay.bounds.expand(4.0), 1.0);
         }
         let target = inspected_extent(editor, ui_state, &lay)
             .map(|(r, _)| r)
@@ -1781,6 +1840,11 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     let faces: Vec<Rect> = lay.mods.iter().map(|m| xf.r(m.face)).collect();
     let lifted = lift_foreground(ui, &painter, &faces, faces_from);
     let plugs = draw_cables(editor, ui_state, ui, &painter, th, xf, &lay, &drawn, None);
+    if let Some((world, max_zoom)) = ui_state.pending_fit.take() {
+        // The cables are known now: fit them too; the next frame draws the result.
+        ui_state.refit_with_cables(world, max_zoom);
+        ui.ctx().request_repaint();
+    }
     let layer = painter.layer_id();
     ui.ctx().graphics_mut(|g| {
         let list = g.entry(layer);
@@ -4149,6 +4213,9 @@ fn draw_cables(
     only: Option<ModuleId>,
 ) -> Vec<egui::Shape> {
     let mut top = Vec::new();
+    if only.is_none() {
+        ui_state.cable_ends.clear();
+    }
     if ui_state.cable_view == CableView::Hidden {
         return top;
     }
@@ -4197,6 +4264,9 @@ fn draw_cables(
             continue;
         };
         if let Some(&b) = port_ref_pos(&drawn.ports, &c.to, PortDirection::Input) {
+            if only.is_none() {
+                ui_state.cable_ends.push((xf.inv(a), xf.inv(b)));
+            }
             let pts = cable_look::points(a, b, z, slots.sag);
             runs.push(Run {
                 id: *cable_id,
@@ -4216,6 +4286,9 @@ fn draw_cables(
         let Some(&a) = port_ref_pos(&drawn.ports, &c.from, PortDirection::Output) else {
             continue;
         };
+        if only.is_none() {
+            ui_state.cable_ends.push((xf.inv(a), xf.inv(*pos)));
+        }
         let pts = cable_look::points(a, *pos, z, slots.sag);
         runs.push(Run {
             id: *cable_id,
