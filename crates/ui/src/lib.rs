@@ -20,6 +20,7 @@ pub mod composites;
 pub mod control;
 pub mod cues;
 pub mod displays;
+mod drawer;
 mod drum_displays;
 mod drum_grid;
 pub mod editor;
@@ -67,7 +68,10 @@ use style::Style;
 use theme::{theme, Theme};
 
 /// Width of the routing drawer (right).
-pub const DRAWER_W: f32 = 360.0;
+pub const DRAWER_W: f32 = 320.0;
+/// Window width below which (the plugin's 1180 px) the drawer floats over the rack and the
+/// rack fits itself to the window.
+pub const COMPACT_W: f32 = 1280.0;
 pub const MIN_ZOOM: f32 = 0.5;
 pub const MAX_ZOOM: f32 = 2.0;
 
@@ -308,6 +312,19 @@ pub struct UiState {
     reveal: Option<ModuleId>,
     canvas: Rect,
     fitted: bool,
+    /// World ends of every drawn cable (output, input), from the last frame: what the fit
+    /// needs to keep the sagging ropes inside the viewport.
+    cable_ends: Vec<(Pos2, Pos2)>,
+    /// Paint audit of the last rack frame: the clip rect the cables were painted with, the
+    /// shape index where module content ended, where the cables started and where they ended.
+    pub cable_audit: (Rect, usize, usize, usize),
+    /// A fit of the whole patch that still has to account for the cables: (world, max zoom).
+    pending_fit: Option<(Rect, f32)>,
+    /// Compact window (below `COMPACT_W`), set each frame.
+    compact: bool,
+    /// Compact windows refit the rack on resize until the user zooms.
+    pub auto_fit: bool,
+    compact_seen: bool,
     last_inspected: Option<(ModuleId, String)>,
     /// Inspected knob and route count whose source lanes were last panned into view.
     lanes_shown: Option<(ModuleId, String, usize)>,
@@ -450,6 +467,12 @@ impl Default for UiState {
             reveal: None,
             canvas: Rect::NOTHING,
             fitted: false,
+            cable_ends: Vec::new(),
+            cable_audit: (Rect::NOTHING, 0, 0, 0),
+            pending_fit: None,
+            compact: false,
+            auto_fit: true,
+            compact_seen: false,
             last_inspected: None,
             lanes_shown: None,
             deferred: Vec::new(),
@@ -563,12 +586,12 @@ impl UiState {
 
     fn zoom_about(&mut self, zoom: f32, at: Pos2) {
         let world = self.xf().inv(at);
+        self.auto_fit = false;
         self.zoom = zoom.clamp(MIN_ZOOM, MAX_ZOOM);
         self.pan = at - self.canvas.min - world.to_vec2() * self.zoom;
     }
 
-    /// Zooms so `world` fits the canvas (at most `max_zoom`), left-aligned, centred vertically
-    /// when there is room.
+    /// Zooms so `world` fits the canvas (at most `max_zoom`), anchored top-left under the toolbar.
     fn frame_world(&mut self, world: Rect, max_zoom: f32) {
         if !world.min.x.is_finite()
             || !world.min.y.is_finite()
@@ -587,10 +610,63 @@ impl UiState {
             .clamp(MIN_ZOOM, max_zoom);
         self.zoom = z;
         self.pan = c.min - self.canvas.min - world.min.to_vec2() * z;
-        let spare = c.height() - world.height() * z;
-        if spare > 0.0 {
-            self.pan.y += spare / 2.0;
+    }
+
+    /// `frame_world` for the whole patch: the module fit now, refined with the cable ropes
+    /// once they are drawn (`refit_with_cables`).
+    fn frame_patch(&mut self, world: Rect, max_zoom: f32) {
+        self.frame_world(world, max_zoom);
+        self.pending_fit = Some((world, max_zoom));
+    }
+
+    /// Screen bounds of `world` and every cable rope at the current zoom and pan.
+    fn rack_bounds(&self, world: Rect) -> Rect {
+        let xf = self.xf();
+        let sag = self.style.slots.cable.sag;
+        let mut r = xf.r(world);
+        for (a, b) in &self.cable_ends {
+            for p in cable_look::points(xf.p(*a), xf.p(*b), xf.zoom, sag) {
+                r.extend_with(p);
+            }
         }
+        r
+    }
+
+    /// Shrinks the fit until the modules and the sagging cables are inside the canvas (never
+    /// below `MIN_ZOOM`), anchored top-left under the toolbar.
+    fn refit_with_cables(&mut self, world: Rect, max_zoom: f32) {
+        let c = self.canvas.shrink(12.0);
+        for _ in 0..8 {
+            let r = self.rack_bounds(world);
+            if r.width() <= c.width() + 0.5 && r.height() <= c.height() + 0.5 {
+                break;
+            }
+            let k = (c.width() / r.width()).min(c.height() / r.height()) * 0.99;
+            self.zoom = (self.zoom * k).clamp(MIN_ZOOM, max_zoom);
+        }
+        let r = self.rack_bounds(world);
+        self.pan += c.min - r.min;
+    }
+
+    /// Screen bounds of every drawn cable rope (none when no cable is drawn).
+    pub fn cable_bounds(&self) -> Option<Rect> {
+        let xf = self.xf();
+        let sag = self.style.slots.cable.sag;
+        let mut r: Option<Rect> = None;
+        for (a, b) in &self.cable_ends {
+            for p in cable_look::points(xf.p(*a), xf.p(*b), xf.zoom, sag) {
+                match r.as_mut() {
+                    Some(r) => r.extend_with(p),
+                    None => r = Some(Rect::from_min_max(p, p)),
+                }
+            }
+        }
+        r
+    }
+
+    /// The rack viewport of the last frame, screen px.
+    pub fn rack_canvas(&self) -> Rect {
+        self.canvas
     }
 
     /// Pans the least needed to bring the screen rect `target` inside the canvas (its
@@ -853,8 +929,14 @@ pub fn show_with(
             .show(ui, |ui| browser::panel(editor, ui_state, ui));
     }
 
+    let compact = ui.max_rect().width() < COMPACT_W;
+    ui_state.compact = compact;
+    if compact && !std::mem::replace(&mut ui_state.compact_seen, true) {
+        // The plugin window starts with the drawer shut: the rack gets the room.
+        ui_state.drawer_open = false;
+    }
     let perform_full = ui_state.perform_open && ui_state.perform_tall;
-    // The drawer gives its 360 px to the Perform view unless pinned, and comes back with the rack.
+    // The drawer gives its 320 px to the Perform view unless pinned, and comes back with the rack.
     if perform_full != ui_state.perform_full_seen {
         ui_state.perform_full_seen = perform_full;
         if perform_full && ui_state.drawer_open && !ui_state.drawer_pinned {
@@ -872,102 +954,37 @@ pub fn show_with(
             .show(ui, |ui| perform_view::panel(editor, ui_state, ui));
     }
     if ui_state.drawer_open {
-        egui::Panel::right("kabl-params")
-            .exact_size(DRAWER_W)
-            .resizable(false)
-            .frame(kit::panel_frame(&st))
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = st.sp(1);
-                    kit::label(ui, &st, style::Role::Title, kit::Tone::Text, "Routing");
-                    let on = ui_state.explain.help;
-                    let r = ui
-                        .add(kit::Button::new(&st, "Help").small().selected(on))
-                        .tip(&st, "Show what each module and control does");
-                    ui_state.record("help".into(), r.rect);
-                    if r.clicked() {
-                        ui_state.explain.help = !on;
-                    }
-                    let on = ui_state.inspect.open;
-                    let r = ui
-                        .add(kit::Button::new(&st, "Inspect").small().selected(on))
-                        .tip(&st, "Measure one output and ask why there is no sound");
-                    ui_state.record("inspect-open".into(), r.rect);
-                    if r.clicked() {
-                        ui_state.inspect.open = !on;
-                        ui_state.inspect.reveal = !on;
-                    }
-                    let on = ui_state.compare.open;
-                    let r = ui
-                        .add(kit::Button::new(&st, "Compare").small().selected(on))
-                        .tip(&st, "Keep a reference copy of the patch and restore it");
-                    ui_state.record("compare-open".into(), r.rect);
-                    if r.clicked() {
-                        ui_state.compare.open = !on;
-                        ui_state.compare.reveal = !on;
-                    }
-                    let on = ui_state.recipes.open;
-                    let r = ui
-                        .add(kit::Button::new(&st, "Learn").small().selected(on))
-                        .tip(&st, "Three short listening recipes (optional)");
-                    ui_state.record("learn-open".into(), r.rect);
-                    if r.clicked() {
-                        ui_state.recipes.open = !on;
-                    }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if kit::icon_button(ui, &st, kit::Ic::Close, false, true)
-                            .tip(&st, "Close the drawer")
-                            .clicked()
-                        {
-                            ui_state.drawer_open = false;
-                        }
+        if compact {
+            // Below 1280 px the drawer floats over the rack instead of splitting the window.
+            let avail = ui.available_rect_before_wrap();
+            let frame = kit::panel_frame(&st).shadow(egui::Shadow {
+                offset: [-6, 0],
+                blur: 16,
+                spread: 0,
+                color: egui::Color32::from_black_alpha(70),
+            });
+            let rect = egui::Rect::from_min_max(
+                egui::pos2(avail.right() - DRAWER_W, avail.top()),
+                avail.max,
+            );
+            egui::Area::new(egui::Id::new("kabl-params-overlay"))
+                .order(egui::Order::Foreground)
+                .fade_in(false)
+                .fixed_pos(rect.min)
+                .show(ui.ctx(), |ui| {
+                    frame.show(ui, |ui| {
+                        ui.set_min_size(rect.size() - frame.total_margin().sum());
+                        ui.set_max_size(rect.size() - frame.total_margin().sum());
+                        drawer(editor, ui_state, ui, &st, now);
                     });
                 });
-                if ui_state.recipes.open {
-                    // Above the drawer's scrolling content, so Show (which scrolls the drawer
-                    // to the routes) never scrolls the recipe away.
-                    let h = ui.available_height() * 0.4;
-                    egui::ScrollArea::vertical()
-                        .id_salt("kabl-recipes")
-                        .max_height(h)
-                        .show_owned(ui, |ui| {
-                            ui.set_max_width(DRAWER_W - 24.0);
-                            egui::Frame::group(ui.style()).show(ui, |ui| {
-                                recipes::panel(editor, ui_state, ui, now);
-                            });
-                        });
-                }
-                if ui_state.explain.is_open() {
-                    // Its own scroll area, at most about half the drawer: the module and
-                    // routing sections below stay in reach while it is open.
-                    let h = ui.available_height() * 0.55;
-                    egui::ScrollArea::vertical()
-                        .id_salt("kabl-explain")
-                        .max_height(h)
-                        .show_owned(ui, |ui| {
-                            ui.set_max_width(DRAWER_W - 24.0);
-                            explain::panel(editor, ui_state, ui);
-                        });
-                }
-                egui::ScrollArea::vertical().show_owned(ui, |ui| {
-                    // Rows wrap instead of widening the drawer over the rack.
-                    ui.set_max_width(DRAWER_W - 24.0);
-                    if ui_state.inspect.open {
-                        egui::Frame::group(ui.style()).show(ui, |ui| {
-                            inspect::panel(editor, ui_state, ui, now);
-                        });
-                    }
-                    if ui_state.compare.open {
-                        egui::Frame::group(ui.style()).show(ui, |ui| {
-                            compare::panel(editor, ui_state, ui);
-                        });
-                    }
-                    show_param_panel(editor, ui_state, ui);
-                    pattern::panel(editor, ui_state, ui);
-                    routing::drawer(editor, ui_state, ui);
-                    routing::cable_routes(editor, ui_state, ui);
-                });
-            });
+        } else {
+            egui::Panel::right("kabl-params")
+                .exact_size(DRAWER_W)
+                .resizable(false)
+                .frame(kit::panel_frame(&st))
+                .show(ui, |ui| drawer(editor, ui_state, ui, &st, now));
+        }
     }
 
     if perform_full {
@@ -983,6 +1000,74 @@ pub fn show_with(
     ui_state.explain.typing =
         ui.ctx().egui_wants_keyboard_input() || egui::Popup::is_any_open(ui.ctx());
     ui_state.hits = std::mem::take(&mut ui_state.frame_hits);
+}
+
+/// The routing drawer: its header (help, inspect, compare, learn, close) and the scrolling
+/// sections below it.
+fn drawer(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    st: &Style,
+    now: f64,
+) {
+    drawer::tabs(ui_state, ui, st);
+    if ui_state.recipes.open {
+        // Above the drawer's scrolling content, so Show (which scrolls the drawer
+        // to the routes) never scrolls the recipe away.
+        let h = ui.available_height() * 0.4;
+        egui::ScrollArea::vertical()
+            .id_salt("kabl-recipes")
+            .max_height(h)
+            .show_owned(ui, |ui| {
+                ui.set_max_width(DRAWER_W - 24.0);
+                egui::Frame::group(ui.style()).show(ui, |ui| {
+                    recipes::panel(editor, ui_state, ui, now);
+                });
+            });
+    }
+    if ui_state.explain.is_open() {
+        // Its own scroll area, at most about half the drawer: the module and
+        // routing sections below stay in reach while it is open.
+        let h = ui.available_height() * 0.55;
+        egui::ScrollArea::vertical()
+            .id_salt("kabl-explain")
+            .max_height(h)
+            .show_owned(ui, |ui| {
+                ui.set_max_width(DRAWER_W - 24.0);
+                explain::panel(editor, ui_state, ui);
+            });
+    }
+    egui::ScrollArea::vertical().show_owned(ui, |ui| {
+        // Rows wrap instead of widening the drawer over the rack.
+        ui.set_max_width(DRAWER_W - 24.0);
+        if ui_state.inspect.open {
+            egui::Frame::group(ui.style()).show(ui, |ui| {
+                inspect::panel(editor, ui_state, ui, now);
+            });
+        }
+        if ui_state.compare.open {
+            egui::Frame::group(ui.style()).show(ui, |ui| {
+                compare::panel(editor, ui_state, ui);
+            });
+        }
+        // The patch-wide lists lead when no control is being edited, and follow its editor
+        // otherwise, so the control's routes stay in view.
+        let lists = !ui_state.explain.is_open() && !ui_state.inspect.open;
+        let editing = ui_state.inspected.is_some() || ui_state.cable_fn.is_some();
+        if lists && !editing {
+            drawer::lists(editor, ui_state, ui, st);
+            drawer::why_card(editor, ui_state, ui, st);
+        }
+        show_param_panel(editor, ui_state, ui);
+        pattern::panel(editor, ui_state, ui);
+        routing::drawer(editor, ui_state, ui);
+        routing::cable_routes(editor, ui_state, ui);
+        if lists && editing {
+            drawer::lists(editor, ui_state, ui, st);
+            drawer::why_card(editor, ui_state, ui, st);
+        }
+    });
 }
 
 fn vsep(ui: &mut egui::Ui, st: &Style) {
@@ -1755,11 +1840,14 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     if !ui_state.fitted {
         // First frame: the whole patch, never above 100 %.
         ui_state.canvas = canvas;
-        ui_state.frame_world(lay.bounds.expand(4.0), 1.0);
+        ui_state.frame_patch(lay.bounds.expand(4.0), 1.0);
         ui_state.fitted = true;
     } else if canvas != ui_state.canvas {
         // Drawer opened or window resized: keep what the user is working on reachable.
         ui_state.canvas = canvas;
+        if ui_state.auto_fit {
+            ui_state.frame_patch(lay.bounds.expand(4.0), 1.0);
+        }
         let target = inspected_extent(editor, ui_state, &lay)
             .map(|(r, _)| r)
             .or_else(|| {
@@ -1869,9 +1957,6 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     let mut drawn = Drawn::default();
     ui_state.deferred.clear();
     draw_composites(editor, ui_state, ui, xf, &mut drawn);
-    let faces_from = ui
-        .ctx()
-        .graphics(|g| g.get(painter.layer_id()).map_or(0, |l| l.next_idx().0));
     for m in &lay.mods {
         if ui_state
             .moving
@@ -1914,19 +1999,24 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         .collect();
 
     let deferred = std::mem::take(&mut ui_state.deferred);
-    // Cables lie on the face material but under everything drawn on it: titles, readouts,
-    // knobs, displays, jacks. Lift those above the cables, then put the plugs on top.
-    let faces: Vec<Rect> = lay.mods.iter().map(|m| xf.r(m.face)).collect();
-    let lifted = lift_foreground(ui, &painter, &faces, faces_from);
+    let modules_end = ui
+        .ctx()
+        .graphics(|g| g.get(painter.layer_id()).map_or(0, |l| l.next_idx().0));
+    // Ropes paint above all module content (trays, plates, titles, knobs), cut by nothing but
+    // the rack viewport; only the drawer, toolbar and status bar sit over them. Plugs go on top.
+    let next_idx = |ui: &egui::Ui| {
+        ui.ctx()
+            .graphics(|g| g.get(painter.layer_id()).map_or(0, |l| l.next_idx().0))
+    };
+    let cables_start = next_idx(ui);
     let plugs = draw_cables(editor, ui_state, ui, &painter, th, xf, &lay, &drawn, None);
-    let layer = painter.layer_id();
-    ui.ctx().graphics_mut(|g| {
-        let list = g.entry(layer);
-        for (clip, shape) in lifted {
-            list.add(clip, shape);
-        }
-    });
+    if let Some((world, max_zoom)) = ui_state.pending_fit.take() {
+        // The cables are known now: fit them too; the next frame draws the result.
+        ui_state.refit_with_cables(world, max_zoom);
+        ui.ctx().request_repaint();
+    }
     painter.extend(plugs);
+    ui_state.cable_audit = (painter.clip_rect(), modules_end, cables_start, next_idx(ui));
     painter.extend(deferred);
     // Hidden modulated controls: the lead docks on the `+N` button, which says so.
     for m in &lay.mods {
@@ -1996,6 +2086,7 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         if !cancelled {
             egui::Area::new(Id::new("lifted-rack-item"))
                 .order(egui::Order::Foreground)
+                .fade_in(false)
                 .fixed_pos(xf.p(live))
                 .constrain(false)
                 .sense(Sense::hover())
@@ -4199,35 +4290,6 @@ fn port_ref_pos<'a>(
     ports.get(&(*id, direction, port.clone()))
 }
 
-/// Moves every shape drawn since shape index `from` that is not a face's own background out of
-/// the paint list and returns it in order, so the caller can paint it again above the cables.
-fn lift_foreground(
-    ui: &egui::Ui,
-    painter: &egui::Painter,
-    faces: &[Rect],
-    from: usize,
-) -> Vec<(Rect, egui::Shape)> {
-    let mut out = Vec::new();
-    ui.ctx().graphics_mut(|g| {
-        let list = g.entry(painter.layer_id());
-        for i in from..list.next_idx().0 {
-            list.mutate_shape(egui::layers::ShapeIdx(i), |cs| {
-                let r = cs.shape.visual_bounding_rect();
-                let background = faces
-                    .iter()
-                    .any(|f| r.width() >= 0.9 * f.width() && r.height() >= 0.9 * f.height());
-                if !background && !matches!(cs.shape, egui::Shape::Noop) {
-                    out.push((
-                        cs.clip_rect,
-                        std::mem::replace(&mut cs.shape, egui::Shape::Noop),
-                    ));
-                }
-            });
-        }
-    });
-    out
-}
-
 /// A cable drawn straight into `p`, in the theme's lit width: the one in the hand while a plug
 /// is dragged, which is always fully visible.
 fn cable_path(
@@ -4287,6 +4349,9 @@ fn draw_cables(
     only: Option<ModuleId>,
 ) -> Vec<egui::Shape> {
     let mut top = Vec::new();
+    if only.is_none() {
+        ui_state.cable_ends.clear();
+    }
     if ui_state.cable_view == CableView::Hidden {
         return top;
     }
@@ -4335,6 +4400,9 @@ fn draw_cables(
             continue;
         };
         if let Some(&b) = port_ref_pos(&drawn.ports, &c.to, PortDirection::Input) {
+            if only.is_none() {
+                ui_state.cable_ends.push((xf.inv(a), xf.inv(b)));
+            }
             let pts = cable_look::points(a, b, z, slots.sag);
             runs.push(Run {
                 id: *cable_id,
@@ -4354,6 +4422,9 @@ fn draw_cables(
         let Some(&a) = port_ref_pos(&drawn.ports, &c.from, PortDirection::Output) else {
             continue;
         };
+        if only.is_none() {
+            ui_state.cable_ends.push((xf.inv(a), xf.inv(*pos)));
+        }
         let pts = cable_look::points(a, *pos, z, slots.sag);
         runs.push(Run {
             id: *cable_id,
