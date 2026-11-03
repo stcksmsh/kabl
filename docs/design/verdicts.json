@@ -1,23 +1,213 @@
 {
   "about": "Owner (Kosta) approve/change decisions for the UI redesign. Agents read this before each PR. Newest last.",
   "verdicts": [
-    {"date": "2026-10-31", "item": "PLAN §11.1 jack rows to y 273/316, single-row tray on wide faces", "verdict": "approve"},
-    {"date": "2026-10-31", "item": "PLAN §11.2 compact tier: text held at 9.5 px, short names, values on hover", "verdict": "approve"},
-    {"date": "2026-10-31", "item": "PLAN §11.3 FM Voice operator cards; fine + vel behind +12", "verdict": "approve"},
-    {"date": "2026-10-31", "item": "PLAN §11.4 mixer meter strip (new content)", "verdict": "approve"},
-    {"date": "2026-10-31", "item": "PLAN §11.5 R2 sign-off target rendered by egui", "verdict": "approve"},
-    {"date": "2026-10-31", "item": "PLAN §11.6 overview tier below 0.55", "verdict": "approve", "note": "build in G6"},
-    {"date": "2026-10-31", "item": "PLAN §11.7 hosts beyond REAPER", "verdict": "approve", "note": "REAPER only verified for 1.0; others unverified"},
-    {"date": "2026-10-31", "item": "PLAN §11.8 built-ins besides the defaults in 1.0", "verdict": "approve", "note": "ship behind an experimental flag"},
-    {"date": "2026-11-01", "item": "G1b knobs: dark filled caps", "verdict": "approve"},
-    {"date": "2026-11-01", "item": "G1b paper accent #A97229 + title hue mix amp 45 / fx 40 / others 35 %", "verdict": "approve", "note": "tentative, confirm at sign-off"},
-    {"date": "2026-11-01", "item": "Cables: port cable_look.rs, theme only (planner spec)", "verdict": "approve"},
-    {"date": "2026-11-01", "item": "G1b sheets", "verdict": "approve", "note": "graphite cap light end stays as is"},
-    {"date": "2026-11-01", "item": "G2 paper signal colours", "verdict": "approve", "note": "audio #B66518, cv #11897F, pitch #2E7CD2, gate unchanged"},
-    {"date": "2026-11-01", "item": "G2 kit (#76)", "verdict": "approve"},
-    {"date": "2026-11-01", "item": "G2 cables: themed, both themes (#78)", "verdict": "approve", "note": "classic stays selectable as cable.style = classic"},
-    {"date": "2026-11-01", "item": "FM Voice header: ALG n, routing in dropdown + tooltip", "verdict": "approve"},
-    {"date": "2026-11-01", "item": "split/join labels: option A", "verdict": "approve", "note": "short labels In/L/R and L/R/Out, pitch 28, width 90"},
-    {"date": "2026-11-01", "item": "perf gate: no quiet box", "verdict": "approve", "note": "gate = line_solid not slower than satin in interleaved A/B; absolute < 8 ms deferred"}
+    {
+      "date": "2026-10-31",
+      "item": "PLAN §11.1 jack rows to y 273/316, single-row tray on wide faces",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-10-31",
+      "item": "PLAN §11.2 compact tier: text held at 9.5 px, short names, values on hover",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-10-31",
+      "item": "PLAN §11.3 FM Voice operator cards; fine + vel behind +12",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-10-31",
+      "item": "PLAN §11.4 mixer meter strip (new content)",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-10-31",
+      "item": "PLAN §11.5 R2 sign-off target rendered by egui",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-10-31",
+      "item": "PLAN §11.6 overview tier below 0.55",
+      "verdict": "approve",
+      "note": "build in G6"
+    },
+    {
+      "date": "2026-10-31",
+      "item": "PLAN §11.7 hosts beyond REAPER",
+      "verdict": "approve",
+      "note": "REAPER only verified for 1.0; others unverified"
+    },
+    {
+      "date": "2026-10-31",
+      "item": "PLAN §11.8 built-ins besides the defaults in 1.0",
+      "verdict": "approve",
+      "note": "ship behind an experimental flag"
+    },
+    {
+      "date": "2026-11-01",
+      "item": "G1b knobs: dark filled caps",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-11-01",
+      "item": "G1b paper accent #A97229 + title hue mix amp 45 / fx 40 / others 35 %",
+      "verdict": "approve",
+      "note": "tentative, confirm at sign-off"
+    },
+    {
+      "date": "2026-11-01",
+      "item": "Cables: port cable_look.rs, theme only (planner spec)",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-11-01",
+      "item": "G1b sheets",
+      "verdict": "approve",
+      "note": "graphite cap light end stays as is"
+    },
+    {
+      "date": "2026-11-01",
+      "item": "G2 paper signal colours",
+      "verdict": "approve",
+      "note": "audio #B66518, cv #11897F, pitch #2E7CD2, gate unchanged"
+    },
+    {
+      "date": "2026-11-01",
+      "item": "G2 kit (#76)",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-11-01",
+      "item": "G2 cables: themed, both themes (#78)",
+      "verdict": "approve",
+      "note": "classic stays selectable as cable.style = classic"
+    },
+    {
+      "date": "2026-11-01",
+      "item": "FM Voice header: ALG n, routing in dropdown + tooltip",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-11-01",
+      "item": "split/join labels: option A",
+      "verdict": "approve",
+      "note": "short labels In/L/R and L/R/Out, pitch 28, width 90"
+    },
+    {
+      "date": "2026-11-01",
+      "item": "perf gate: no quiet box",
+      "verdict": "approve",
+      "note": "gate = line_solid not slower than satin in interleaved A/B; absolute < 8 ms deferred"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "Paper accent #A97229 (brown)",
+      "verdict": "change",
+      "note": "rejected; accent fills use #F2A33A in both themes"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "Accent text on paper #A94F00 (small text and links only)",
+      "verdict": "approve",
+      "note": "4.6:1 on bg, 5.3:1 on surf"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "App theme tokens reset to directions.html values",
+      "verdict": "approve",
+      "note": "dark panels read too grey, light too white in captures"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "G4 Q1 frames: modal / tool window / popover, one family",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "G4 Q2 one drawer editor kit + shared step-grid widget",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "G4 Q3 wavetable editor as bottom dock (330 px, 280 at 1180)",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "G4 Q4 developer tools: same kit + ADVANCED tag; Edit face merged into More controls as tab 2",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "G4 Q5 empty-state and toast patterns; errors persist, warnings 8 s, success 3 s; status-bar error pill",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "G4 Q6 style the built-in file browser; no native OS dialogs in 1.0",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "G4 Q7 scrims: graphite black 55 %, paper #1A1917 28 %; stacked-rect shadows",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "Drawer below 1280 px: 44 px rail + 320 px overlay, rack zoom unchanged",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "G4 state colours bad/good/warn (G4-SPEC §2)",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "Logo: keep Kosta's logo concept; drop the mockup tile placeholder",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "Logo letters and k: Kosta's original paths, never redrawn",
+      "verdict": "approve",
+      "note": "a full letter redraw was rejected (k not good enough)"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "Logo frame + plugs: rebuilt geometric version vs original artwork",
+      "verdict": "open",
+      "note": "owner to choose; letters identical in both"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "logo: rebuilt frame and plugs, original letters; toolbar logo in text colour, orange only for app icon and splash",
+      "verdict": "approve"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "paper accent #A97229 (G1b, 'confirm at sign-off')",
+      "verdict": "change",
+      "note": "rejected: fills (buttons, dots, arcs, active chips, playing pads) are #F2A33A on paper too; small accent text on paper is #A94F00 (4.6:1 on bg, 5.3:1 on surf). PR #91"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "paper signal hues darkened for 3:1 on the rack (audio #B66518, cv #11897F, pitch #2E7CD2; verdict 2026-11-01)",
+      "verdict": "change",
+      "note": "superseded: paper signal colours are the mockup's (audio #D9781C, cv #12958A, gate #7651D6, pitch #2F7FD6); the cable shape is unchanged. PR #91"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "dark knob caps in both app themes (G1b)",
+      "verdict": "change",
+      "note": "superseded for paper: light caps as in the mockup (cap gradient #FFFFFF to #E2DED6, dark pointer); dark caps stay on graphite. PR #91"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "drawer below 1280 px: overlay over the rack, no refit (option A)",
+      "verdict": "approve",
+      "note": "G4 spec: docks at 320 px at 1280 and above; below that a 44 px rail plus a 320 px overlay with a left shadow, rack zoom unchanged. PR #87"
+    }
   ]
 }
