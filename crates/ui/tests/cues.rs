@@ -278,6 +278,12 @@ fn a_cue_shows_queued_only_when_all_its_banks_are_coming() {
         cues::standing(&cue(vec![(BASS, 1), (ARP, 1)]), &now),
         (false, true)
     );
+    // While (B, B) waits, the cue playing (A, A) is still what you hear: active.
+    let now = |_: ModuleId| (0, Some(1));
+    assert_eq!(
+        cues::standing(&cue(vec![(BASS, 0), (ARP, 0)]), &now),
+        (true, false)
+    );
 }
 
 /// A macro module with a cue on the performance patch.

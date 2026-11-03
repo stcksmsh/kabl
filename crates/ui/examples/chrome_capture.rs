@@ -14,13 +14,14 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 7] = [
+const SCENES: [&str; 8] = [
     "rack",
     "perform",
     "sounds",
     "drawer",
     "wavetable-editor",
     "seq-pattern-editor",
+    "cues-editor",
     "cable-pattern-editor",
 ];
 
@@ -116,7 +117,7 @@ impl App {
         ui.browser_open = j.scene == "sounds";
         ui.drawer_open = matches!(
             j.scene,
-            "rack" | "seq-pattern-editor" | "cable-pattern-editor"
+            "rack" | "seq-pattern-editor" | "cues-editor" | "cable-pattern-editor"
         );
         ui.perform_open = j.scene == "perform";
         ui.perform_tall = j.scene == "perform";
@@ -226,6 +227,46 @@ impl App {
             ui.selected_route = Some(cable);
             ui.selected_module = None;
         }
+        if j.scene == "cues-editor" {
+            // The mockup's state: Bass, Drums and Lead sequencers (two more in a third row,
+            // below the view), four cues, Drop playing and Break queued.
+            let at = |x: f32, y: f32| kabl_core::Vec2 { x, y };
+            let bass = self
+                .editor
+                .state()
+                .modules
+                .iter()
+                .find(|(_, m)| m.kind == "seq")
+                .map(|(&id, _)| id)
+                .unwrap();
+            let drums = self.editor.add_module("seq", at(24.0, 640.0));
+            let lead = self.editor.add_module("seq", at(724.0, 640.0));
+            let cues = self.editor.add_module("cues", at(1424.0, 640.0));
+            for (s, name) in [(bass, "Bass"), (drums, "Drums"), (lead, "Lead")] {
+                kabl_ui::perform::rename_pin(&mut self.editor, s, kabl_ui::perform::BANKS, name);
+            }
+            // Banks of (Bass, Drums, Lead) per cue; None leaves it ("off" in the mockup).
+            let scenes: [(&str, [Option<usize>; 3]); 4] = [
+                ("Intro", [Some(0), Some(0), None]),
+                ("Build", [Some(0), Some(1), Some(0)]),
+                ("Drop", [Some(1), Some(0), Some(2)]),
+                ("Break", [None, Some(3), Some(1)]),
+            ];
+            for (k, (name, banks)) in scenes.into_iter().enumerate() {
+                kabl_ui::cues::add(&mut self.editor, cues, &|_| 0);
+                kabl_ui::cues::rename(&mut self.editor, cues, k + 1, name);
+                for (s, b) in [bass, drums, lead].into_iter().zip(banks) {
+                    kabl_ui::cues::set_target(&mut self.editor, cues, k + 1, s, b);
+                }
+            }
+            ui.selected_module = Some(cues);
+            ui.selected_route = None;
+            // Drop plays; Break is queued (Drums waits for D, Lead for B; Bass keeps B).
+            ui.seq_banks.insert(bass, (1, None));
+            ui.seq_banks.insert(drums, (0, Some(3)));
+            ui.seq_banks.insert(lead, (2, Some(1)));
+            ui.last_cue.insert(cues, 3);
+        }
         self.ui = ui;
         self.f = 0;
     }
@@ -284,15 +325,20 @@ impl eframe::App for App {
         if self.f == 6
             && matches!(
                 self.jobs[self.i].scene,
-                "drawer" | "seq-pattern-editor" | "cable-pattern-editor"
+                "drawer" | "seq-pattern-editor" | "cues-editor" | "cable-pattern-editor"
             )
         {
             // After the first frame: a compact window closes the drawer there, the user opens it.
             self.ui.drawer_open = true;
         }
         show(&mut self.editor, &mut self.ui, &mut root);
-        // The mockup's rack zoom (95 %, 78 % at 1180); the macro sits below the view.
-        if self.f == 6 && self.jobs[self.i].scene == "cable-pattern-editor" {
+        // The mockup's rack zoom (95 %, 78 % at 1180); the extra modules sit below the view.
+        if self.f == 6
+            && matches!(
+                self.jobs[self.i].scene,
+                "cues-editor" | "cable-pattern-editor"
+            )
+        {
             self.ui.zoom = if self.jobs[self.i].size.0 < 1280 {
                 0.78
             } else {
