@@ -316,6 +316,10 @@ pub(crate) fn cues_panel(
             let mut parts: Vec<String> = seqs
                 .iter()
                 .map(|&s| {
+                    // The name Perform shows for its banks ("Bass"), else "Seq #3".
+                    let named = state
+                        .label(s, &format!("{}{}", perform::PIN_PREFIX, perform::BANKS))
+                        .map(str::to_string);
                     let kind = if is_grid(s) { "Grid" } else { "Seq" };
                     let names: &[&str] = if is_grid(s) {
                         &kabl_modules::builtins::PATTERN_NAMES
@@ -323,7 +327,8 @@ pub(crate) fn cues_panel(
                         &seq::BANK_NAMES
                     };
                     let b = c.targets.iter().find(|t| t.0 == s).map(|t| t.1);
-                    format!("{kind} #{s} {}", b.map_or("keep", |b| names[b]))
+                    let who = named.unwrap_or_else(|| format!("{kind} #{s}"));
+                    format!("{who} {}", b.map_or("keep", |b| names[b]))
                 })
                 .collect();
             if !c.macros.is_empty() {

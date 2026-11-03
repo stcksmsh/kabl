@@ -146,8 +146,10 @@ impl App {
             self.editor.set_param(wt, "position", 0.4);
         }
         if j.scene == "cues-editor" {
-            // The mockup's state: four cues, Drop playing, Break queued.
-            let seq = self
+            // The mockup's state: Bass, Drums and Lead sequencers (two more in a third row,
+            // below the view), four cues, Drop playing.
+            let at = |x: f32, y: f32| kabl_core::Vec2 { x, y };
+            let bass = self
                 .editor
                 .state()
                 .modules
@@ -155,19 +157,33 @@ impl App {
                 .find(|(_, m)| m.kind == "seq")
                 .map(|(&id, _)| id)
                 .unwrap();
-            let cues = self
-                .editor
-                .add_module("cues", kabl_core::Vec2 { x: 24.0, y: 620.0 });
-            for (b, name) in ["Intro", "Build", "Drop", "Break"].into_iter().enumerate() {
-                kabl_ui::cues::add(&mut self.editor, cues, &|_| b);
-                kabl_ui::cues::rename(&mut self.editor, cues, b + 1, name);
+            let drums = self.editor.add_module("seq", at(24.0, 640.0));
+            let lead = self.editor.add_module("seq", at(724.0, 640.0));
+            let cues = self.editor.add_module("cues", at(1424.0, 640.0));
+            for (s, name) in [(bass, "Bass"), (drums, "Drums"), (lead, "Lead")] {
+                kabl_ui::perform::rename_pin(&mut self.editor, s, kabl_ui::perform::BANKS, name);
             }
-            // One sequencer here, three in the mockup: Drop keeps it and was launched last (it
-            // plays), Break waits for bank D (queued).
-            kabl_ui::cues::set_target(&mut self.editor, cues, 3, seq, None);
+            // Banks of (Bass, Drums, Lead) per cue; None leaves it ("off" in the mockup).
+            let scenes: [(&str, [Option<usize>; 3]); 4] = [
+                ("Intro", [Some(0), Some(0), None]),
+                ("Build", [Some(0), Some(1), Some(0)]),
+                ("Drop", [Some(1), Some(0), Some(2)]),
+                ("Break", [None, Some(3), Some(1)]),
+            ];
+            for (k, (name, banks)) in scenes.into_iter().enumerate() {
+                kabl_ui::cues::add(&mut self.editor, cues, &|_| 0);
+                kabl_ui::cues::rename(&mut self.editor, cues, k + 1, name);
+                for (s, b) in [bass, drums, lead].into_iter().zip(banks) {
+                    kabl_ui::cues::set_target(&mut self.editor, cues, k + 1, s, b);
+                }
+            }
             ui.selected_module = Some(cues);
             ui.selected_route = None;
-            ui.seq_banks.insert(seq, (2, Some(3)));
+            // Drop plays. (The mockup also shows Break queued; a cue reads as playing only
+            // while nothing else is queued, so the two cannot show together.)
+            ui.seq_banks.insert(bass, (1, None));
+            ui.seq_banks.insert(drums, (0, None));
+            ui.seq_banks.insert(lead, (2, None));
             ui.last_cue.insert(cues, 3);
         }
         self.ui = ui;
@@ -230,6 +246,15 @@ impl eframe::App for App {
             self.ui.drawer_open = true;
         }
         show(&mut self.editor, &mut self.ui, &mut root);
+        // The mockup's rack zoom (95 %, 78 % at 1180); the extra sequencers and the cues sit
+        // below the view.
+        if self.f == 6 && self.jobs[self.i].scene == "cues-editor" {
+            self.ui.zoom = if self.jobs[self.i].size.0 < 1280 {
+                0.78
+            } else {
+                0.95
+            };
+        }
         self.f += 1;
         if self.f == 12 {
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
