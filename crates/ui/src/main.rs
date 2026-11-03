@@ -725,6 +725,9 @@ impl AudioHost {
                     let _ = morphs_tx.push((id, k, v, to, p));
                 });
                 let (held, sounding) = engine.keys();
+                // Voices sounding: the keyboards' own, or the envelopes not idle when a
+                // sequencer or an arpeggiator plays the patch.
+                let sounding = sounding.max(engine.active_envelopes());
                 keys.store(pack_keys(held, sounding), Ordering::Relaxed);
                 // Full (UI not drawing): this window is dropped; the UI counts the gap.
                 if let Some(r) = engine.take_probe_report() {

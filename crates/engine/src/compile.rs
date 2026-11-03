@@ -63,8 +63,8 @@ use std::fmt;
 use kabl_cables::{Carry, Node as CableNode, Settings as CableSettings};
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
 use kabl_modules::builtins::{
-    Arp, AudioIn, Change, Clock, Delay, DelayLock, DrumGrid, KeySettings, Lfo, LfoSync, MidiIn,
-    MidiNote, Noise, OscWt, Random, Seq, Transport,
+    Arp, AudioIn, Change, Clock, Delay, DelayLock, DrumGrid, EnvAdsr, KeySettings, Lfo, LfoSync,
+    MidiIn, MidiNote, Noise, OscWt, Random, Seq, Transport,
 };
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::ModuleView;
@@ -2095,6 +2095,19 @@ impl CompiledPatch {
                 f(id, c.running(), c.position());
             }
         }
+    }
+
+    /// Envelopes (`env.adsr`, one per voice lane where the patch is polyphonic) that are not
+    /// idle: the voices sounding, whether keys or a sequencer drive them. No allocation.
+    pub fn active_envelopes(&self) -> usize {
+        self.modules
+            .iter()
+            .filter(|m| {
+                m.as_any()
+                    .downcast_ref::<EnvAdsr>()
+                    .is_some_and(EnvAdsr::active)
+            })
+            .count()
     }
 
     /// Calls `f(id, step, playing bank, armed bank)` for every `seq` module. No allocation.

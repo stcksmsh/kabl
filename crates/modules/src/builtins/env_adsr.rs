@@ -137,6 +137,13 @@ impl EnvAdsr {
     }
 }
 
+impl EnvAdsr {
+    /// Whether the envelope is anywhere but idle: a voice still sounding or about to.
+    pub fn active(&self) -> bool {
+        self.env.stage != crate::dsp::AdsrStage::Idle
+    }
+}
+
 impl Default for EnvAdsr {
     fn default() -> Self {
         Self::new()
