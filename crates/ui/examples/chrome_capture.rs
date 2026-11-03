@@ -59,12 +59,12 @@ impl App {
         doc.meta.category = "Bass".into();
         ui.doc = Some(doc);
         // An unsaved edit, so the sound dropdown shows its dot.
-        let edit = self.editor.state().modules.iter().find_map(|(&id, m)| {
-            m.params
-                .iter()
-                .next()
-                .map(|(k, &v)| (id, k.clone(), v))
-        });
+        let edit = self
+            .editor
+            .state()
+            .modules
+            .iter()
+            .find_map(|(&id, m)| m.params.iter().next().map(|(k, &v)| (id, k.clone(), v)));
         if let Some((id, k, v)) = edit {
             self.editor.set_param(id, &k, v + 1.0);
         }
