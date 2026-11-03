@@ -52,6 +52,7 @@ pub enum Ic {
     Wave,
     Clock,
     External,
+    Info,
 }
 
 pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
@@ -288,6 +289,11 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
             ));
             line(&[(0.0, -2.0), (0.0, 2.0)]);
             p.circle_filled(q(0.0, 4.2), 0.9 * u, col);
+        }
+        Ic::Info => {
+            p.circle_stroke(c, 6.0 * u, st);
+            line(&[(0.0, -0.4), (0.0, 3.4)]);
+            p.circle_filled(q(0.0, -3.1), 0.9 * u, col);
         }
         Ic::Pin => {
             p.circle_stroke(q(0.0, -3.5), 3.5 * u, st);

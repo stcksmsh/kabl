@@ -63,8 +63,8 @@ use std::fmt;
 use kabl_cables::{Carry, Node as CableNode, Settings as CableSettings};
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
 use kabl_modules::builtins::{
-    Arp, AudioIn, Change, Clock, Delay, DelayLock, DrumGrid, KeySettings, Lfo, LfoSync, MidiIn,
-    MidiNote, Noise, OscWt, Random, Seq, Transport,
+    Arp, AudioIn, Change, Clock, Delay, DelayLock, DrumGrid, EnvAdsr, KeySettings, Lfo, LfoSync,
+    MidiIn, MidiNote, Noise, OscWt, Random, Seq, Transport,
 };
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::ModuleView;
@@ -2095,6 +2095,23 @@ impl CompiledPatch {
                 f(id, c.running(), c.position());
             }
         }
+    }
+
+    /// Voices with an envelope (`env.adsr`) that is not idle: the voices sounding, whether keys
+    /// or a sequencer drive them. A voice's amp and filter envelopes, and the second channel's
+    /// copies, count once (they share a voice lane); a global-rate envelope counts as voice 0.
+    /// No allocation.
+    pub fn active_envelopes(&self) -> usize {
+        let mut lanes = 0u64;
+        for (m, &(_, lane)) in self.modules.iter().zip(&self.module_origin) {
+            if m.as_any()
+                .downcast_ref::<EnvAdsr>()
+                .is_some_and(EnvAdsr::active)
+            {
+                lanes |= 1 << lane.unwrap_or(0).min(63);
+            }
+        }
+        lanes.count_ones() as usize
     }
 
     /// Calls `f(id, step, playing bank, armed bank)` for every `seq` module. No allocation.
