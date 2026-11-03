@@ -225,6 +225,16 @@ fn browsing_never_makes_sound_or_loads() {
 }
 
 #[test]
+fn all_and_recent_filters_are_reachable() {
+    use kabl_ui::browser::Filter;
+    let mut t = H::new(1440.0, 900.0);
+    t.click("filter:recent");
+    assert_eq!(t.ui.browser.filter, Filter::Recent);
+    t.click("filter:all");
+    assert_eq!(t.ui.browser.filter, Filter::All);
+}
+
+#[test]
 fn open_a_voice_and_audition_it() {
     let mut t = H::new(1440.0, 900.0);
     t.open("factory:palette/pad");
@@ -352,7 +362,7 @@ fn edit_save_as_reopen_and_the_factory_file_stays() {
 
 #[test]
 fn unsaved_edits_ask_and_cancel_keeps_them_exactly() {
-    let mut t = H::new(1440.0, 900.0);
+    let mut t = H::new(1440.0, 1000.0);
     t.open("factory:palette/strings");
     t.edit("chorus", "mix", 0.9);
     let work = t.editor.state().clone();

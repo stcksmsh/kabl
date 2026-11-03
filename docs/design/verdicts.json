@@ -208,6 +208,12 @@
       "item": "drawer below 1280 px: overlay over the rack, no refit (option A)",
       "verdict": "approve",
       "note": "G4 spec: docks at 320 px at 1280 and above; below that a 44 px rail plus a 320 px overlay with a left shadow, rack zoom unchanged. PR #87"
+    },
+    {
+      "date": "2026-11-03",
+      "item": "Sounds category mapping: the mockup's categories",
+      "verdict": "approve",
+      "note": "Kosta accepted the mockup's category list for the Sounds library column. PR #88"
     }
   ]
 }

@@ -2322,3 +2322,5 @@ pub fn open_library() -> Library {
         crate::library::default_user_root(),
     )
 }
+        (Filter::All, "all", "All sounds"),
+        (Filter::Recent, "recent", "Recent"),
