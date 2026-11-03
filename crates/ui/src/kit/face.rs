@@ -385,18 +385,9 @@ pub fn knob(p: &Painter, st: &Style, k: &Knob, tick: Color32) {
     let r = &st.roles;
     let ks = &st.slots.knob;
     let solid = ks.body == KnobBody::Solid;
-    let track = rs + if solid { 3.5 } else { 5.5 } * z;
+    let track = rs + 3.5 * z;
     match ks.scale {
-        KnobScale::Ticks => {
-            for i in 0..=10 {
-                let a = travel_angle(i as f32 / 10.0);
-                p.line_segment(
-                    [on_circle(c, rs + 4.0 * z, a), on_circle(c, rs + 7.5 * z, a)],
-                    Stroke::new((1.2 * z).max(1.0), tick),
-                );
-            }
-        }
-        KnobScale::TrackArc => {
+        KnobScale::TrackArc | KnobScale::Ticks => {
             p.add(Shape::line(
                 arc_pts(c, track, 0.0, 1.0),
                 Stroke::new(2.4 * z, alpha(tick, 90)),
@@ -424,7 +415,7 @@ pub fn knob(p: &Painter, st: &Style, k: &Knob, tick: Color32) {
     let rim = alpha(mix(r.knob_hi, r.knob, 0.5), 255);
     match ks.body {
         KnobBody::Solid => {
-            // Dark filled cap: drop shadow, skirt with ticks, four-step cap gradient, pointer.
+            // Dark filled cap: drop shadow, plain skirt, four-step cap gradient, pointer.
             let sh = if st.dark { 115 } else { 36 };
             p.circle_filled(
                 c + vec2(0.0, 3.0 * z),
@@ -437,13 +428,6 @@ pub fn knob(p: &Painter, st: &Style, k: &Knob, tick: Color32) {
                 alpha(Color32::BLACK, sh / 2),
             );
             p.circle_filled(c, rs, mix(r.knob, Color32::BLACK, 0.3));
-            for i in 0..=10 {
-                let a = travel_angle(i as f32 / 10.0);
-                p.line_segment(
-                    [on_circle(c, rs - 1.2 * z, a), on_circle(c, rs - 3.6 * z, a)],
-                    Stroke::new((1.0 * z).max(0.75), alpha(r.knob_ink, 90)),
-                );
-            }
             for i in 0..4 {
                 let t = i as f32 / 3.0;
                 p.circle_filled(
@@ -467,14 +451,6 @@ pub fn knob(p: &Painter, st: &Style, k: &Knob, tick: Color32) {
             p.circle_filled(c, rs + 1.5 * z, skirt);
             p.circle_filled(c, rs * 0.84, r.knob);
             p.circle_stroke(c, rs * 0.84, Stroke::new((0.8 * z).max(0.8), rim));
-            for i in 0..24 {
-                let a = i as f32 / 24.0 * std::f32::consts::TAU;
-                let d = vec2(a.cos(), a.sin());
-                p.line_segment(
-                    [c + d * rs * 0.73, c + d * rs * 0.82],
-                    Stroke::new((0.6 * z).max(0.6), mix(r.knob_hi, r.knob, 0.65)),
-                );
-            }
         }
         KnobBody::Glass => {
             p.circle_filled(
