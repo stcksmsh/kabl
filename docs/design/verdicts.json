@@ -184,6 +184,30 @@
       "date": "2026-11-02",
       "item": "logo: rebuilt frame and plugs, original letters; toolbar logo in text colour, orange only for app icon and splash",
       "verdict": "approve"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "paper accent #A97229 (G1b, 'confirm at sign-off')",
+      "verdict": "change",
+      "note": "rejected: fills (buttons, dots, arcs, active chips, playing pads) are #F2A33A on paper too; small accent text on paper is #A94F00 (4.6:1 on bg, 5.3:1 on surf). PR #91"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "paper signal hues darkened for 3:1 on the rack (audio #B66518, cv #11897F, pitch #2E7CD2; verdict 2026-11-01)",
+      "verdict": "change",
+      "note": "superseded: paper signal colours are the mockup's (audio #D9781C, cv #12958A, gate #7651D6, pitch #2F7FD6); the cable shape is unchanged. PR #91"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "dark knob caps in both app themes (G1b)",
+      "verdict": "change",
+      "note": "superseded for paper: light caps as in the mockup (cap gradient #FFFFFF to #E2DED6, dark pointer); dark caps stay on graphite. PR #91"
+    },
+    {
+      "date": "2026-11-02",
+      "item": "drawer below 1280 px: overlay over the rack, no refit (option A)",
+      "verdict": "approve",
+      "note": "G4 spec: docks at 320 px at 1280 and above; below that a 44 px rail plus a 320 px overlay with a left shadow, rack zoom unchanged. PR #87"
     }
   ]
 }
