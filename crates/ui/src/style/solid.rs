@@ -135,9 +135,6 @@ fn roles(dark: bool, accent: Accent) -> Roles {
         rack: h(rack),
         rail: h(if dark { "#1B1C1F" } else { "#C9C5BC" }),
         hole: h(if dark { "#060607" } else { "#A39E94" }),
-        good: h(if dark { "#5CCB8A" } else { "#2E9E5E" }),
-        warn: if dark { acc } else { acc_text },
-        bad: h("#E5533C"),
         disp_bg: h(inset),
         disp_grid: alpha(h(text), 20),
         disp_trace: acc,
@@ -146,6 +143,10 @@ fn roles(dark: bool, accent: Accent) -> Roles {
         knob: h(if dark { "#1D1F23" } else { "#E2DED6" }),
         knob_hi: h(if dark { "#3C3F45" } else { "#FFFFFF" }),
         knob_ink: h(if dark { "#F2F0EB" } else { "#1A1917" }),
+        // G4 state colours (G4-SPEC §2).
+        bad: h(if dark { "#F06A5F" } else { "#C2362B" }),
+        good: h(if dark { "#5CCB8A" } else { "#2C774B" }),
+        warn: h(if dark { "#E3A93C" } else { "#945E00" }),
     }
 }
 

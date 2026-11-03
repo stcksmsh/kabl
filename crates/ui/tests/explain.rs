@@ -151,7 +151,8 @@ impl H {
 }
 
 fn sizes() -> [(f32, f32); 2] {
-    [(1280.0, 800.0), (1440.0, 900.0)]
+    // Taller than the nominal windows: the status bar, the drawer's second header row and the 320 px drawer's extra wrapping take the room, so the explain list keeps its reach.
+    [(1280.0, 960.0), (1440.0, 1060.0)]
 }
 
 // patches/palette/pad: Macros #1 (m1 "Warmth" → c28 ladder #7 cutoff, c29 ladder #7 drive,
@@ -804,6 +805,7 @@ fn a_save_dialog_over_an_explanation_keeps_escape_and_the_document() {
     h.click("explain-dest:29");
     // Focused controls own pointer input. Close before using underlying toolbar.
     h.click("more:close");
+    h.click("sound-menu");
     h.click("save-as");
     assert!(h.ui.browser.dialog.is_some(), "Save As opened");
     h.key(Key::Escape);

@@ -322,6 +322,9 @@ fn one_step_undoes_by_itself() {
 fn the_step_grids_fit_the_drawer_at_the_maximum_step_count() {
     for size in [egui::vec2(1440.0, 900.0), egui::vec2(1180.0, 680.0)] {
         let mut t = H::sized(size);
+        // The compact window starts with the drawer shut: open it, as the user would.
+        t.ui.drawer_open = true;
+        t.frame();
         t.click(&format!("knob:{ENV}.attack_ms"));
         let route = *t
             .ui

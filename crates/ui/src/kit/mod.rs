@@ -8,6 +8,7 @@
 mod containers;
 mod controls;
 pub mod face;
+pub mod g4;
 mod icons;
 pub mod parts;
 mod recipes;

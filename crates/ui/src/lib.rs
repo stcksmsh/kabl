@@ -20,6 +20,7 @@ pub mod composites;
 pub mod control;
 pub mod cues;
 pub mod displays;
+mod drawer;
 mod drum_displays;
 mod drum_grid;
 pub mod editor;
@@ -67,7 +68,10 @@ use style::Style;
 use theme::{theme, Theme};
 
 /// Width of the routing drawer (right).
-pub const DRAWER_W: f32 = 360.0;
+pub const DRAWER_W: f32 = 320.0;
+/// Window width below which (the plugin's 1180 px) the drawer floats over the rack and the
+/// rack fits itself to the window.
+pub const COMPACT_W: f32 = 1280.0;
 pub const MIN_ZOOM: f32 = 0.5;
 pub const MAX_ZOOM: f32 = 2.0;
 
@@ -308,6 +312,19 @@ pub struct UiState {
     reveal: Option<ModuleId>,
     canvas: Rect,
     fitted: bool,
+    /// World ends of every drawn cable (output, input), from the last frame: what the fit
+    /// needs to keep the sagging ropes inside the viewport.
+    cable_ends: Vec<(Pos2, Pos2)>,
+    /// Paint audit of the last rack frame: the clip rect the cables were painted with, the
+    /// shape index where module content ended, where the cables started and where they ended.
+    pub cable_audit: (Rect, usize, usize, usize),
+    /// A fit of the whole patch that still has to account for the cables: (world, max zoom).
+    pending_fit: Option<(Rect, f32)>,
+    /// Compact window (below `COMPACT_W`), set each frame.
+    compact: bool,
+    /// Compact windows refit the rack on resize until the user zooms.
+    pub auto_fit: bool,
+    compact_seen: bool,
     last_inspected: Option<(ModuleId, String)>,
     /// Inspected knob and route count whose source lanes were last panned into view.
     lanes_shown: Option<(ModuleId, String, usize)>,
@@ -337,6 +354,10 @@ pub struct UiState {
     pub midi_select: Option<Option<String>>,
     /// Final output meter (fed by `main.rs` from the audio callback).
     pub meter: record::Meter,
+    /// The host feeds `meter` and `sample_rate` (standalone): the status bar shows them.
+    pub status_meter: bool,
+    /// The host's audio status line (device, rate, buffer), shown in the status bar.
+    pub status_audio: String,
     /// Stereo output recorder; `None` without an audio device.
     pub recorder: Option<record::Recorder>,
     /// The open "what does this control change" explanation and inline help (view only).
@@ -446,6 +467,12 @@ impl Default for UiState {
             reveal: None,
             canvas: Rect::NOTHING,
             fitted: false,
+            cable_ends: Vec::new(),
+            cable_audit: (Rect::NOTHING, 0, 0, 0),
+            pending_fit: None,
+            compact: false,
+            auto_fit: true,
+            compact_seen: false,
             last_inspected: None,
             lanes_shown: None,
             deferred: Vec::new(),
@@ -463,6 +490,8 @@ impl Default for UiState {
             midi_select: None,
             recorder: None,
             meter: Default::default(),
+            status_meter: false,
+            status_audio: String::new(),
             explain: Default::default(),
             inspect: Default::default(),
             compare: Default::default(),
@@ -557,12 +586,12 @@ impl UiState {
 
     fn zoom_about(&mut self, zoom: f32, at: Pos2) {
         let world = self.xf().inv(at);
+        self.auto_fit = false;
         self.zoom = zoom.clamp(MIN_ZOOM, MAX_ZOOM);
         self.pan = at - self.canvas.min - world.to_vec2() * self.zoom;
     }
 
-    /// Zooms so `world` fits the canvas (at most `max_zoom`), left-aligned, centred vertically
-    /// when there is room.
+    /// Zooms so `world` fits the canvas (at most `max_zoom`), anchored top-left under the toolbar.
     fn frame_world(&mut self, world: Rect, max_zoom: f32) {
         if !world.min.x.is_finite()
             || !world.min.y.is_finite()
@@ -581,10 +610,63 @@ impl UiState {
             .clamp(MIN_ZOOM, max_zoom);
         self.zoom = z;
         self.pan = c.min - self.canvas.min - world.min.to_vec2() * z;
-        let spare = c.height() - world.height() * z;
-        if spare > 0.0 {
-            self.pan.y += spare / 2.0;
+    }
+
+    /// `frame_world` for the whole patch: the module fit now, refined with the cable ropes
+    /// once they are drawn (`refit_with_cables`).
+    fn frame_patch(&mut self, world: Rect, max_zoom: f32) {
+        self.frame_world(world, max_zoom);
+        self.pending_fit = Some((world, max_zoom));
+    }
+
+    /// Screen bounds of `world` and every cable rope at the current zoom and pan.
+    fn rack_bounds(&self, world: Rect) -> Rect {
+        let xf = self.xf();
+        let sag = self.style.slots.cable.sag;
+        let mut r = xf.r(world);
+        for (a, b) in &self.cable_ends {
+            for p in cable_look::points(xf.p(*a), xf.p(*b), xf.zoom, sag) {
+                r.extend_with(p);
+            }
         }
+        r
+    }
+
+    /// Shrinks the fit until the modules and the sagging cables are inside the canvas (never
+    /// below `MIN_ZOOM`), anchored top-left under the toolbar.
+    fn refit_with_cables(&mut self, world: Rect, max_zoom: f32) {
+        let c = self.canvas.shrink(12.0);
+        for _ in 0..8 {
+            let r = self.rack_bounds(world);
+            if r.width() <= c.width() + 0.5 && r.height() <= c.height() + 0.5 {
+                break;
+            }
+            let k = (c.width() / r.width()).min(c.height() / r.height()) * 0.99;
+            self.zoom = (self.zoom * k).clamp(MIN_ZOOM, max_zoom);
+        }
+        let r = self.rack_bounds(world);
+        self.pan += c.min - r.min;
+    }
+
+    /// Screen bounds of every drawn cable rope (none when no cable is drawn).
+    pub fn cable_bounds(&self) -> Option<Rect> {
+        let xf = self.xf();
+        let sag = self.style.slots.cable.sag;
+        let mut r: Option<Rect> = None;
+        for (a, b) in &self.cable_ends {
+            for p in cable_look::points(xf.p(*a), xf.p(*b), xf.zoom, sag) {
+                match r.as_mut() {
+                    Some(r) => r.extend_with(p),
+                    None => r = Some(Rect::from_min_max(p, p)),
+                }
+            }
+        }
+        r
+    }
+
+    /// The rack viewport of the last frame, screen px.
+    pub fn rack_canvas(&self) -> Rect {
+        self.canvas
     }
 
     /// Pans the least needed to bring the screen rect `target` inside the canvas (its
@@ -692,6 +774,17 @@ impl UiState {
 /// Draws the rack editor for one frame and applies user edits to `editor` directly. Call once
 /// per frame from `eframe::App::ui`.
 pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
+    show_with(editor, ui_state, ui, |_, _| {});
+}
+
+/// `show`, with the host's own controls at the right end of the status bar (audio device,
+/// diagnostics). The host's closure draws right to left.
+pub fn show_with(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    status_right: impl FnOnce(&mut egui::Ui, &mut UiState),
+) {
     wheel::begin(ui.ctx());
     theme::ensure_fonts(ui.ctx());
     let ready = theme::fonts_ready(ui.ctx());
@@ -819,6 +912,10 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
         .exact_size(st.metrics.toolbar_h)
         .frame(kit::bar_frame(&st))
         .show(ui, |ui| toolbar(editor, ui_state, ui, &st));
+    egui::Panel::bottom("kabl-status")
+        .exact_size(st.metrics.status_h)
+        .frame(kit::bar_frame(&st))
+        .show(ui, |ui| status_bar(ui_state, ui, &st, status_right));
     egui::Panel::right("kabl-rail")
         .exact_size(st.metrics.rail_w)
         .resizable(false)
@@ -832,8 +929,14 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
             .show(ui, |ui| browser::panel(editor, ui_state, ui));
     }
 
+    let compact = ui.max_rect().width() < COMPACT_W;
+    ui_state.compact = compact;
+    if compact && !std::mem::replace(&mut ui_state.compact_seen, true) {
+        // The plugin window starts with the drawer shut: the rack gets the room.
+        ui_state.drawer_open = false;
+    }
     let perform_full = ui_state.perform_open && ui_state.perform_tall;
-    // The drawer gives its 360 px to the Perform view unless pinned, and comes back with the rack.
+    // The drawer gives its 320 px to the Perform view unless pinned, and comes back with the rack.
     if perform_full != ui_state.perform_full_seen {
         ui_state.perform_full_seen = perform_full;
         if perform_full && ui_state.drawer_open && !ui_state.drawer_pinned {
@@ -851,102 +954,37 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
             .show(ui, |ui| perform_view::panel(editor, ui_state, ui));
     }
     if ui_state.drawer_open {
-        egui::Panel::right("kabl-params")
-            .exact_size(DRAWER_W)
-            .resizable(false)
-            .frame(kit::panel_frame(&st))
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = st.sp(1);
-                    kit::label(ui, &st, style::Role::Title, kit::Tone::Text, "Routing");
-                    let on = ui_state.explain.help;
-                    let r = ui
-                        .add(kit::Button::new(&st, "Help").small().selected(on))
-                        .tip(&st, "Show what each module and control does");
-                    ui_state.record("help".into(), r.rect);
-                    if r.clicked() {
-                        ui_state.explain.help = !on;
-                    }
-                    let on = ui_state.inspect.open;
-                    let r = ui
-                        .add(kit::Button::new(&st, "Inspect").small().selected(on))
-                        .tip(&st, "Measure one output and ask why there is no sound");
-                    ui_state.record("inspect-open".into(), r.rect);
-                    if r.clicked() {
-                        ui_state.inspect.open = !on;
-                        ui_state.inspect.reveal = !on;
-                    }
-                    let on = ui_state.compare.open;
-                    let r = ui
-                        .add(kit::Button::new(&st, "Compare").small().selected(on))
-                        .tip(&st, "Keep a reference copy of the patch and restore it");
-                    ui_state.record("compare-open".into(), r.rect);
-                    if r.clicked() {
-                        ui_state.compare.open = !on;
-                        ui_state.compare.reveal = !on;
-                    }
-                    let on = ui_state.recipes.open;
-                    let r = ui
-                        .add(kit::Button::new(&st, "Learn").small().selected(on))
-                        .tip(&st, "Three short listening recipes (optional)");
-                    ui_state.record("learn-open".into(), r.rect);
-                    if r.clicked() {
-                        ui_state.recipes.open = !on;
-                    }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if kit::icon_button(ui, &st, kit::Ic::Close, false, true)
-                            .tip(&st, "Close the drawer")
-                            .clicked()
-                        {
-                            ui_state.drawer_open = false;
-                        }
+        if compact {
+            // Below 1280 px the drawer floats over the rack instead of splitting the window.
+            let avail = ui.available_rect_before_wrap();
+            let frame = kit::panel_frame(&st).shadow(egui::Shadow {
+                offset: [-6, 0],
+                blur: 16,
+                spread: 0,
+                color: egui::Color32::from_black_alpha(70),
+            });
+            let rect = egui::Rect::from_min_max(
+                egui::pos2(avail.right() - DRAWER_W, avail.top()),
+                avail.max,
+            );
+            egui::Area::new(egui::Id::new("kabl-params-overlay"))
+                .order(egui::Order::Foreground)
+                .fade_in(false)
+                .fixed_pos(rect.min)
+                .show(ui.ctx(), |ui| {
+                    frame.show(ui, |ui| {
+                        ui.set_min_size(rect.size() - frame.total_margin().sum());
+                        ui.set_max_size(rect.size() - frame.total_margin().sum());
+                        drawer(editor, ui_state, ui, &st, now);
                     });
                 });
-                if ui_state.recipes.open {
-                    // Above the drawer's scrolling content, so Show (which scrolls the drawer
-                    // to the routes) never scrolls the recipe away.
-                    let h = ui.available_height() * 0.4;
-                    egui::ScrollArea::vertical()
-                        .id_salt("kabl-recipes")
-                        .max_height(h)
-                        .show_owned(ui, |ui| {
-                            ui.set_max_width(DRAWER_W - 24.0);
-                            egui::Frame::group(ui.style()).show(ui, |ui| {
-                                recipes::panel(editor, ui_state, ui, now);
-                            });
-                        });
-                }
-                if ui_state.explain.is_open() {
-                    // Its own scroll area, at most about half the drawer: the module and
-                    // routing sections below stay in reach while it is open.
-                    let h = ui.available_height() * 0.55;
-                    egui::ScrollArea::vertical()
-                        .id_salt("kabl-explain")
-                        .max_height(h)
-                        .show_owned(ui, |ui| {
-                            ui.set_max_width(DRAWER_W - 24.0);
-                            explain::panel(editor, ui_state, ui);
-                        });
-                }
-                egui::ScrollArea::vertical().show_owned(ui, |ui| {
-                    // Rows wrap instead of widening the drawer over the rack.
-                    ui.set_max_width(DRAWER_W - 24.0);
-                    if ui_state.inspect.open {
-                        egui::Frame::group(ui.style()).show(ui, |ui| {
-                            inspect::panel(editor, ui_state, ui, now);
-                        });
-                    }
-                    if ui_state.compare.open {
-                        egui::Frame::group(ui.style()).show(ui, |ui| {
-                            compare::panel(editor, ui_state, ui);
-                        });
-                    }
-                    show_param_panel(editor, ui_state, ui);
-                    pattern::panel(editor, ui_state, ui);
-                    routing::drawer(editor, ui_state, ui);
-                    routing::cable_routes(editor, ui_state, ui);
-                });
-            });
+        } else {
+            egui::Panel::right("kabl-params")
+                .exact_size(DRAWER_W)
+                .resizable(false)
+                .frame(kit::panel_frame(&st))
+                .show(ui, |ui| drawer(editor, ui_state, ui, &st, now));
+        }
     }
 
     if perform_full {
@@ -964,17 +1002,72 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
     ui_state.hits = std::mem::take(&mut ui_state.frame_hits);
 }
 
-fn tool(
+/// The routing drawer: its header (help, inspect, compare, learn, close) and the scrolling
+/// sections below it.
+fn drawer(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
     ui: &mut egui::Ui,
     st: &Style,
-    ui_state: &mut UiState,
-    key: &str,
-    label: &str,
-    on: bool,
-) -> bool {
-    let r = ui.add(kit::Button::new(st, label).selected(on));
-    ui_state.record(key.to_string(), r.rect);
-    r.clicked()
+    now: f64,
+) {
+    drawer::tabs(ui_state, ui, st);
+    if ui_state.recipes.open {
+        // Above the drawer's scrolling content, so Show (which scrolls the drawer
+        // to the routes) never scrolls the recipe away.
+        let h = ui.available_height() * 0.4;
+        egui::ScrollArea::vertical()
+            .id_salt("kabl-recipes")
+            .max_height(h)
+            .show_owned(ui, |ui| {
+                ui.set_max_width(DRAWER_W - 24.0);
+                egui::Frame::group(ui.style()).show(ui, |ui| {
+                    recipes::panel(editor, ui_state, ui, now);
+                });
+            });
+    }
+    if ui_state.explain.is_open() {
+        // Its own scroll area, at most about half the drawer: the module and
+        // routing sections below stay in reach while it is open.
+        let h = ui.available_height() * 0.55;
+        egui::ScrollArea::vertical()
+            .id_salt("kabl-explain")
+            .max_height(h)
+            .show_owned(ui, |ui| {
+                ui.set_max_width(DRAWER_W - 24.0);
+                explain::panel(editor, ui_state, ui);
+            });
+    }
+    egui::ScrollArea::vertical().show_owned(ui, |ui| {
+        // Rows wrap instead of widening the drawer over the rack.
+        ui.set_max_width(DRAWER_W - 24.0);
+        if ui_state.inspect.open {
+            egui::Frame::group(ui.style()).show(ui, |ui| {
+                inspect::panel(editor, ui_state, ui, now);
+            });
+        }
+        if ui_state.compare.open {
+            egui::Frame::group(ui.style()).show(ui, |ui| {
+                compare::panel(editor, ui_state, ui);
+            });
+        }
+        // The patch-wide lists lead when no control is being edited, and follow its editor
+        // otherwise, so the control's routes stay in view.
+        let lists = !ui_state.explain.is_open() && !ui_state.inspect.open;
+        let editing = ui_state.inspected.is_some() || ui_state.cable_fn.is_some();
+        if lists && !editing {
+            drawer::lists(editor, ui_state, ui, st);
+            drawer::why_card(editor, ui_state, ui, st);
+        }
+        show_param_panel(editor, ui_state, ui);
+        pattern::panel(editor, ui_state, ui);
+        routing::drawer(editor, ui_state, ui);
+        routing::cable_routes(editor, ui_state, ui);
+        if lists && editing {
+            drawer::lists(editor, ui_state, ui, st);
+            drawer::why_card(editor, ui_state, ui, st);
+        }
+    });
 }
 
 fn vsep(ui: &mut egui::Ui, st: &Style) {
@@ -999,78 +1092,329 @@ fn tool_icon(
     r.clicked()
 }
 
-fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
-    ui.horizontal_centered(|ui| {
-        kit::logo(ui, st, 30.0);
-        kit::view_switch(ui, st, |ui| {
-            let open = ui_state.perform_open;
-            let r = kit::seg(ui, st, "Rack", !open);
-            ui_state.record("rack".into(), r.rect);
-            if r.clicked() {
-                ui_state.perform_open = false;
-            }
-            let r = kit::seg(ui, st, "Perform", open);
-            ui_state.record("perform".into(), r.rect);
-            if r.clicked() {
-                // The switch opens Perform as a view; "Show rack" in its header docks it.
-                ui_state.perform_open = true;
-                ui_state.perform_tall = true;
-            }
+/// Which scene the toolbar shows controls for.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Scene {
+    Rack,
+    Perform,
+    Sounds,
+}
+
+/// The brand mark and wordmark: an accent tile with a cable curve, then "kabl".
+fn brand(ui: &mut egui::Ui, st: &Style) {
+    let word = ui.painter().layout_no_wrap(
+        "kabl".into(),
+        egui::FontId::new(17.0, style::Font::SansSemibold.family(st.fonts_ready)),
+        st.roles.text,
+    );
+    let s = 24.0;
+    let (r, _) = ui.allocate_exact_size(
+        egui::vec2(s + st.sp(2) + word.size().x, s),
+        egui::Sense::hover(),
+    );
+    let p = ui.painter();
+    let tile = egui::Rect::from_min_size(r.min, egui::vec2(s, s));
+    p.rect_filled(tile, 6.0, st.roles.accent);
+    let c = tile.center();
+    let pts: Vec<egui::Pos2> = (0..=16)
+        .map(|i| {
+            let t = i as f32 / 16.0;
+            let e = t * t * (3.0 - 2.0 * t);
+            c + egui::vec2(-6.0 + 12.0 * t, -5.5 + 11.0 * e)
+        })
+        .collect();
+    p.add(egui::Shape::line(
+        pts,
+        egui::Stroke::new(2.2, st.roles.on_accent),
+    ));
+    p.circle_filled(c + egui::vec2(-6.5, -5.5), 2.4, st.roles.on_accent);
+    p.circle_filled(c + egui::vec2(6.5, 5.5), 2.4, st.roles.on_accent);
+    let pos = egui::pos2(tile.right() + st.sp(2), r.center().y - word.size().y / 2.0);
+    p.galley(pos, word, st.roles.text);
+}
+
+/// Adds a module of `kind` at the end of the first row and selects it.
+fn add_module_end(editor: &mut PatchEditor, ui_state: &mut UiState, kind: &str) {
+    let lay = composite_layout(editor.state(), ui_state);
+    let x = rack_editor::items(&lay)
+        .into_iter()
+        .filter(|(_, r)| rack::row_of(r.top()) == 0)
+        .map(|(_, r)| r.right())
+        .fold(rack::RACK_X, f32::max);
+    let id = editor.add_module_in_scope(kind, Vec2 { x, y: rack::ROW_Y0 }, ui_state.scope);
+    ui_state.selected_module = Some(id);
+    ui_state.reveal = Some(id);
+}
+
+/// "Add module" search field with its key hint; the popup lists the module kinds that match.
+fn add_search(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    st: &Style,
+    wide: bool,
+) {
+    let w = if wide { 180.0 } else { st.metrics.control_h };
+    let (rect, r) =
+        ui.allocate_exact_size(egui::vec2(w, st.metrics.control_h), egui::Sense::click());
+    let radius = st.shape_radius(st.slots.controls.field, rect.height());
+    let hover = ui.ctx().animate_bool_with_time(
+        r.id.with("hover"),
+        r.hovered(),
+        Style::secs(st.motion.hover),
+    );
+    let p = ui.painter();
+    p.rect_filled(rect, radius, st.roles.surface);
+    p.rect_stroke(
+        rect,
+        radius,
+        egui::Stroke::new(1.0, style::mix(st.roles.line, st.roles.text3, hover)),
+        egui::StrokeKind::Inside,
+    );
+    let ic_c = egui::pos2(rect.left() + st.sp(2) + 6.0, rect.center().y);
+    if !wide {
+        kit::icon(
+            p,
+            kit::Ic::Search,
+            rect.center(),
+            st.metrics.icon,
+            st.roles.text2,
+        );
+    } else {
+        kit::icon(p, kit::Ic::Search, ic_c, st.metrics.icon, st.roles.text3);
+        let g = p.layout_no_wrap(
+            "Add module".into(),
+            st.font(style::Role::Body),
+            st.roles.text3,
+        );
+        p.galley(
+            egui::pos2(ic_c.x + 14.0, rect.center().y - g.size().y / 2.0),
+            g,
+            st.roles.text3,
+        );
+        let key = egui::Rect::from_center_size(
+            egui::pos2(rect.right() - st.sp(2) - 10.0, rect.center().y),
+            egui::vec2(20.0, 16.0),
+        );
+        p.rect_filled(key, 4.0, st.roles.inset);
+        let g = p.layout_no_wrap("A".into(), st.font(style::Role::Caption), st.roles.text2);
+        p.galley(key.center() - g.size() / 2.0, g, st.roles.text2);
+    }
+    let r = r.tip(st, "Add a module (A)");
+    ui_state.record("add-menu".into(), r.rect);
+    let pop = egui::Popup::default_response_id(&r);
+    if !ui.ctx().egui_wants_keyboard_input()
+        && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::A))
+    {
+        egui::Popup::open_id(ui.ctx(), pop);
+    }
+    let fid = r.id.with("filter");
+    egui::Popup::menu(&r)
+        .id(pop)
+        .frame(kit::popover_frame(st))
+        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+        .width(228.0)
+        .show(|ui| {
+            let mut q: String = ui.data(|d| d.get_temp(fid)).unwrap_or_default();
+            let te = ui.add(
+                egui::TextEdit::singleline(&mut q)
+                    .hint_text("Add module")
+                    .desired_width(f32::INFINITY),
+            );
+            te.request_focus();
+            let needle = q.to_lowercase();
+            let kinds: Vec<&str> = PatchEditor::known_kinds()
+                .iter()
+                .copied()
+                .filter(|k| k.to_lowercase().contains(&needle))
+                .collect();
+            let enter = ui.input(|i| i.key_pressed(egui::Key::Enter));
+            egui::ScrollArea::vertical()
+                .max_height(260.0)
+                .show(ui, |ui| {
+                    for (i, kind) in kinds.iter().enumerate() {
+                        let it = kit::menu_item(ui, st, kind, false);
+                        ui_state.record(format!("add:{kind}"), it.rect);
+                        if it.clicked() || (enter && i == 0) {
+                            add_module_end(editor, ui_state, kind);
+                            q.clear();
+                            ui.close();
+                        }
+                    }
+                });
+            ui.data_mut(|d| d.insert_temp(fid, q));
         });
-        browser::toolbar(editor, ui_state, ui, st);
-        vsep(ui, st);
-        let r = kit::icon_button(ui, st, kit::Ic::Undo, false, editor.can_undo())
-            .tip(st, "Undo (Ctrl+Z)");
-        if r.clicked() {
-            editor.undo();
-        }
-        let r = kit::icon_button(ui, st, kit::Ic::Redo, false, editor.can_redo())
-            .tip(st, "Redo (Ctrl+Shift+Z)");
-        if r.clicked() {
-            editor.redo();
-        }
-        vsep(ui, st);
-        kit::label(ui, st, style::Role::Label, kit::Tone::Text2, "Cables");
-        kit::segmented(ui, st, |ui| {
-            for (mode, label) in [
-                (CableView::All, "All"),
-                (CableView::Focus, "Focus"),
-                (CableView::Hidden, "Hidden"),
+}
+
+fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
+    let full = ui.max_rect();
+    let scene = if ui_state.browser_open {
+        Scene::Sounds
+    } else if ui_state.perform_open {
+        Scene::Perform
+    } else {
+        Scene::Rack
+    };
+    let wide = full.width() >= 1300.0;
+    let lay = |l| egui::UiBuilder::new().layout(l);
+    // Centre: the view switch, centred in the window.
+    let sw = egui::Rect::from_center_size(full.center(), egui::vec2(270.0, st.metrics.control_h));
+    ui.scope_builder(
+        lay(egui::Layout::left_to_right(egui::Align::Min)).max_rect(sw),
+        |ui| {
+            kit::view_switch(ui, st, |ui| {
+                let r = kit::seg_large(ui, st, "Rack", scene == Scene::Rack);
+                ui_state.record("rack".into(), r.rect);
+                if r.clicked() {
+                    ui_state.perform_open = false;
+                    ui_state.browser_open = false;
+                }
+                let r = kit::seg_large(ui, st, "Perform", scene == Scene::Perform);
+                ui_state.record("perform".into(), r.rect);
+                if r.clicked() {
+                    // The switch opens Perform as a view; "Show rack" in its header docks it.
+                    ui_state.perform_open = true;
+                    ui_state.perform_tall = true;
+                    ui_state.browser_open = false;
+                }
+                let r = kit::seg_large(ui, st, "Sounds", scene == Scene::Sounds);
+                ui_state.record("browser".into(), r.rect);
+                if r.clicked() {
+                    ui_state.browser_open = !ui_state.browser_open;
+                }
+            });
+        },
+    );
+    // Left: brand and the sound dropdown.
+    let left = egui::Rect::from_min_max(full.min, egui::pos2(sw.left() - 8.0, full.max.y));
+    ui.scope_builder(
+        lay(egui::Layout::left_to_right(egui::Align::Center)).max_rect(left),
+        |ui| {
+            ui.spacing_mut().item_spacing.x = st.sp(3);
+            brand(ui, st);
+            browser::doc_field(editor, ui_state, ui, st);
+        },
+    );
+    // Right, read left to right: search, undo/redo, cable tools, fit, zoom, Save.
+    let right = egui::Rect::from_min_max(egui::pos2(sw.right() + 8.0, full.min.y), full.max);
+    ui.scope_builder(
+        lay(egui::Layout::right_to_left(egui::Align::Center)).max_rect(right),
+        |ui| {
+            ui.spacing_mut().item_spacing.x = st.sp(1);
+            browser::save_button(editor, ui_state, ui, st);
+            ui.add_space(st.sp(1));
+            match scene {
+                Scene::Rack => {
+                    let c = ui_state.canvas.center();
+                    if tool_icon(ui, st, ui_state, "zoom:in", kit::Ic::Plus, "Zoom in", true) {
+                        ui_state.zoom_about(ui_state.zoom * 1.2, c);
+                    }
+                    let pct = format!("{:.0} %", ui_state.zoom * 100.0);
+                    let r = ui
+                        .add(kit::Button::new(st, pct).ghost().small())
+                        .tip(st, "Zoom to 100%");
+                    ui_state.record("zoom:100".into(), r.rect);
+                    if r.clicked() {
+                        ui_state.zoom_about(1.0, c);
+                    }
+                    if tool_icon(
+                        ui,
+                        st,
+                        ui_state,
+                        "zoom:out",
+                        kit::Ic::Minus,
+                        "Zoom out",
+                        true,
+                    ) {
+                        ui_state.zoom_about(ui_state.zoom / 1.2, c);
+                    }
+                    {
+                        if tool_icon(
+                            ui,
+                            st,
+                            ui_state,
+                            "zoom:fit",
+                            kit::Ic::Fit,
+                            "Fit the whole patch",
+                            true,
+                        ) {
+                            let lay = composite_layout(editor.state(), ui_state);
+                            ui_state.frame_world(lay.bounds.expand(4.0), 1.5);
+                        }
+                        vsep(ui, st);
+                    }
+                    cable_tools(ui, st, ui_state);
+                    vsep(ui, st);
+                    undo_redo(editor, ui, st);
+                    add_search(editor, ui_state, ui, st, wide);
+                }
+                Scene::Perform => {
+                    let r = kit::icon_menu(ui, st, kit::Ic::Midi, |ui| {
+                        let none = ui_state.midi_input.is_none();
+                        if kit::menu_item(ui, st, "No MIDI input", none).clicked() {
+                            ui_state.midi_select = Some(None);
+                        }
+                        for port in ui_state.midi_inputs.clone() {
+                            let on = ui_state.midi_input.as_deref() == Some(port.as_str());
+                            if kit::menu_item(ui, st, &port, on).clicked() {
+                                ui_state.midi_select = Some(Some(port));
+                            }
+                        }
+                    })
+                    .tip(st, "MIDI input");
+                    ui_state.record("midi-menu".into(), r.rect);
+                }
+                Scene::Sounds => {
+                    let on = ui_state.browser.filter == browser::Filter::Favorites;
+                    let r =
+                        kit::icon_button(ui, st, kit::Ic::Heart, on, true).tip(st, "Favourites");
+                    ui_state.record("favorites".into(), r.rect);
+                    if r.clicked() {
+                        ui_state.browser.filter = if on {
+                            browser::Filter::All
+                        } else {
+                            browser::Filter::Favorites
+                        };
+                    }
+                }
+            }
+        },
+    );
+}
+
+/// Cable view as a segmented control of three icons: All, Focus, Hidden.
+fn cable_tools(ui: &mut egui::Ui, st: &Style, ui_state: &mut UiState) {
+    kit::segmented(ui, st, |ui| {
+        // Added left to right inside a right-to-left parent, so reverse the order.
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            for (mode, label, ic) in [
+                (CableView::Hidden, "Hidden", kit::Ic::CableOff),
+                (CableView::Focus, "Focus", kit::Ic::Focus),
+                (CableView::All, "All", kit::Ic::Cable),
             ] {
-                let r = kit::seg(ui, st, label, ui_state.cable_view == mode);
+                let on = ui_state.cable_view == mode;
+                let r = kit::icon_button(ui, st, ic, on, true).tip(st, &format!("Cables: {label}"));
                 ui_state.record(format!("view:{label}"), r.rect);
                 if r.clicked() {
                     ui_state.cable_view = mode;
                 }
             }
         });
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let open = ui_state.drawer_open;
-            if tool(ui, st, ui_state, "routing", "Routing", open) {
-                ui_state.drawer_open = !open;
-                ui_state.drawer_auto_closed = false;
-            }
-            let open = ui_state.browser_open;
-            if tool(ui, st, ui_state, "browser", "Sounds", open) {
-                ui_state.browser_open = !open;
-            }
-            if let Some(rec) = ui_state.recorder.as_ref().filter(|r| r.recording()) {
-                let t = rec.elapsed() as u64;
-                kit::label(
-                    ui,
-                    st,
-                    style::Role::Label,
-                    kit::Tone::Bad,
-                    format!("• REC {:02}:{:02}", t / 60, t % 60),
-                );
-            }
-            if let Some(msg) = &ui_state.last_message {
-                // Truncated to the room left, never over the tools.
-                kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, msg)
-                    .on_hover_text(msg);
-            }
-        });
     });
+}
+
+/// Called in a right-to-left layout: redo goes first so undo ends up on its left.
+fn undo_redo(editor: &mut PatchEditor, ui: &mut egui::Ui, st: &Style) {
+    let r = kit::icon_button(ui, st, kit::Ic::Redo, false, editor.can_redo())
+        .tip(st, "Redo (Ctrl+Shift+Z)");
+    if r.clicked() {
+        editor.redo();
+    }
+    let r =
+        kit::icon_button(ui, st, kit::Ic::Undo, false, editor.can_undo()).tip(st, "Undo (Ctrl+Z)");
+    if r.clicked() {
+        editor.undo();
+    }
 }
 
 /// The side rail: composites, add module, zoom, and the view and theme settings.
@@ -1083,81 +1427,14 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
         if r.clicked() {
             ui_state.composites.panel = !on;
         }
-        let r = kit::icon_menu(ui, st, kit::Ic::Plus, |ui| {
-            let kinds = PatchEditor::known_kinds();
-            kit::dropdown(
-                ui,
-                st,
-                "kind",
-                &ui_state.selected_kind.clone(),
-                228.0,
-                |ui| {
-                    for kind in kinds {
-                        if kit::menu_item(ui, st, kind, ui_state.selected_kind == *kind).clicked() {
-                            ui_state.selected_kind = kind.to_string();
-                        }
-                    }
-                },
-            );
-            kit::gap(ui, st, 1);
-            let r = ui.add(kit::Button::new(st, "Add module").primary());
-            ui_state.record("add".into(), r.rect);
-            if r.clicked() {
-                // At the end of the first row.
-                let lay = composite_layout(editor.state(), ui_state);
-                let x = rack_editor::items(&lay)
-                    .into_iter()
-                    .filter(|(_, r)| rack::row_of(r.top()) == 0)
-                    .map(|(_, r)| r.right())
-                    .fold(rack::RACK_X, f32::max);
-                let id = editor.add_module_in_scope(
-                    &ui_state.selected_kind,
-                    Vec2 { x, y: rack::ROW_Y0 },
-                    ui_state.scope,
-                );
-                ui_state.selected_module = Some(id);
-                ui_state.reveal = Some(id);
-                ui.close();
-            }
-        })
-        .tip(st, "Add a module");
-        ui_state.record("add-menu".into(), r.rect);
-        kit::rule(ui, st);
-        let c = ui_state.canvas.center();
-        if tool_icon(ui, st, ui_state, "zoom:in", kit::Ic::Plus, "Zoom in", true) {
-            ui_state.zoom_about(ui_state.zoom * 1.2, c);
-        }
-        let pct = format!("{:.0}%", ui_state.zoom * 100.0);
-        let r = ui
-            .add(kit::Button::new(st, pct).ghost().small())
-            .tip(st, "Zoom to 100%");
-        ui_state.record("zoom:100".into(), r.rect);
+        let on = ui_state.drawer_open;
+        let r = kit::icon_button(ui, st, kit::Ic::Cable, on, true).tip(st, "Routing");
+        ui_state.record("routing".into(), r.rect);
         if r.clicked() {
-            ui_state.zoom_about(1.0, c);
+            ui_state.drawer_open = !on;
+            ui_state.drawer_auto_closed = false;
         }
-        if tool_icon(
-            ui,
-            st,
-            ui_state,
-            "zoom:out",
-            kit::Ic::Minus,
-            "Zoom out",
-            true,
-        ) {
-            ui_state.zoom_about(ui_state.zoom / 1.2, c);
-        }
-        if tool_icon(
-            ui,
-            st,
-            ui_state,
-            "zoom:fit",
-            kit::Ic::Fit,
-            "Fit the whole patch",
-            true,
-        ) {
-            let lay = composite_layout(editor.state(), ui_state);
-            ui_state.frame_world(lay.bounds.expand(4.0), 1.5);
-        }
+        kit::rule(ui, st);
         let focus_target = ui_state
             .inspected
             .as_ref()
@@ -1248,6 +1525,68 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
             })
             .tip(st, "Theme and view settings");
             ui_state.record("view-menu".into(), menu.rect);
+        });
+    });
+}
+
+/// The status bar: output meter and peak, sample rate, MIDI input, the last message and the
+/// recording clock; the host's controls at the right end.
+fn status_bar(
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    st: &Style,
+    right: impl FnOnce(&mut egui::Ui, &mut UiState),
+) {
+    ui.horizontal_centered(|ui| {
+        ui.spacing_mut().item_spacing.x = st.sp(3);
+        if ui_state.status_meter {
+            let out = kit::label(ui, st, style::Role::Label, kit::Tone::Text2, "Out");
+            if ui_state.recorder.is_none() {
+                out.on_hover_text("Recording needs an audio device.");
+            }
+            record::meter_ui(ui, st, &mut ui_state.meter);
+            let peak = ui_state
+                .meter
+                .max_db
+                .map_or("no signal".to_string(), |m| format!("{m:+.1} dB"));
+            kit::label(ui, st, style::Role::Value, kit::Tone::Text2, peak);
+            let khz = ui_state.sample_rate / 1000.0;
+            kit::label(
+                ui,
+                st,
+                style::Role::Value,
+                kit::Tone::Text2,
+                format!("{khz:.1} kHz"),
+            );
+        }
+        if let Some(port) = ui_state.midi_input.clone() {
+            let (dot, _) =
+                ui.allocate_exact_size(egui::Vec2::splat(st.sp(2)), egui::Sense::hover());
+            ui.painter()
+                .circle_filled(dot.center(), st.sp(1), st.roles.good);
+            kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, &port);
+        }
+        if !ui_state.status_audio.is_empty() {
+            let text = ui_state.status_audio.clone();
+            kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, &text)
+                .on_hover_text(&text);
+        }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            right(ui, ui_state);
+            if let Some(rec) = ui_state.recorder.as_ref().filter(|r| r.recording()) {
+                let t = rec.elapsed() as u64;
+                kit::label(
+                    ui,
+                    st,
+                    style::Role::Label,
+                    kit::Tone::Bad,
+                    format!("• REC {:02}:{:02}", t / 60, t % 60),
+                );
+            }
+            if let Some(msg) = &ui_state.last_message {
+                kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, msg)
+                    .on_hover_text(msg);
+            }
         });
     });
 }
@@ -1528,11 +1867,14 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     if !ui_state.fitted {
         // First frame: the whole patch, never above 100 %.
         ui_state.canvas = canvas;
-        ui_state.frame_world(lay.bounds.expand(4.0), 1.0);
+        ui_state.frame_patch(lay.bounds.expand(4.0), 1.0);
         ui_state.fitted = true;
     } else if canvas != ui_state.canvas {
         // Drawer opened or window resized: keep what the user is working on reachable.
         ui_state.canvas = canvas;
+        if ui_state.auto_fit {
+            ui_state.frame_patch(lay.bounds.expand(4.0), 1.0);
+        }
         let target = inspected_extent(editor, ui_state, &lay)
             .map(|(r, _)| r)
             .or_else(|| {
@@ -1642,9 +1984,6 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     let mut drawn = Drawn::default();
     ui_state.deferred.clear();
     draw_composites(editor, ui_state, ui, xf, &mut drawn);
-    let faces_from = ui
-        .ctx()
-        .graphics(|g| g.get(painter.layer_id()).map_or(0, |l| l.next_idx().0));
     for m in &lay.mods {
         if ui_state
             .moving
@@ -1687,19 +2026,24 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         .collect();
 
     let deferred = std::mem::take(&mut ui_state.deferred);
-    // Cables lie on the face material but under everything drawn on it: titles, readouts,
-    // knobs, displays, jacks. Lift those above the cables, then put the plugs on top.
-    let faces: Vec<Rect> = lay.mods.iter().map(|m| xf.r(m.face)).collect();
-    let lifted = lift_foreground(ui, &painter, &faces, faces_from);
+    let modules_end = ui
+        .ctx()
+        .graphics(|g| g.get(painter.layer_id()).map_or(0, |l| l.next_idx().0));
+    // Ropes paint above all module content (trays, plates, titles, knobs), cut by nothing but
+    // the rack viewport; only the drawer, toolbar and status bar sit over them. Plugs go on top.
+    let next_idx = |ui: &egui::Ui| {
+        ui.ctx()
+            .graphics(|g| g.get(painter.layer_id()).map_or(0, |l| l.next_idx().0))
+    };
+    let cables_start = next_idx(ui);
     let plugs = draw_cables(editor, ui_state, ui, &painter, th, xf, &lay, &drawn, None);
-    let layer = painter.layer_id();
-    ui.ctx().graphics_mut(|g| {
-        let list = g.entry(layer);
-        for (clip, shape) in lifted {
-            list.add(clip, shape);
-        }
-    });
+    if let Some((world, max_zoom)) = ui_state.pending_fit.take() {
+        // The cables are known now: fit them too; the next frame draws the result.
+        ui_state.refit_with_cables(world, max_zoom);
+        ui.ctx().request_repaint();
+    }
     painter.extend(plugs);
+    ui_state.cable_audit = (painter.clip_rect(), modules_end, cables_start, next_idx(ui));
     painter.extend(deferred);
     // Hidden modulated controls: the lead docks on the `+N` button, which says so.
     for m in &lay.mods {
@@ -1769,6 +2113,7 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         if !cancelled {
             egui::Area::new(Id::new("lifted-rack-item"))
                 .order(egui::Order::Foreground)
+                .fade_in(false)
                 .fixed_pos(xf.p(live))
                 .constrain(false)
                 .sense(Sense::hover())
@@ -4126,35 +4471,6 @@ fn port_ref_pos<'a>(
     ports.get(&(*id, direction, port.clone()))
 }
 
-/// Moves every shape drawn since shape index `from` that is not a face's own background out of
-/// the paint list and returns it in order, so the caller can paint it again above the cables.
-fn lift_foreground(
-    ui: &egui::Ui,
-    painter: &egui::Painter,
-    faces: &[Rect],
-    from: usize,
-) -> Vec<(Rect, egui::Shape)> {
-    let mut out = Vec::new();
-    ui.ctx().graphics_mut(|g| {
-        let list = g.entry(painter.layer_id());
-        for i in from..list.next_idx().0 {
-            list.mutate_shape(egui::layers::ShapeIdx(i), |cs| {
-                let r = cs.shape.visual_bounding_rect();
-                let background = faces
-                    .iter()
-                    .any(|f| r.width() >= 0.9 * f.width() && r.height() >= 0.9 * f.height());
-                if !background && !matches!(cs.shape, egui::Shape::Noop) {
-                    out.push((
-                        cs.clip_rect,
-                        std::mem::replace(&mut cs.shape, egui::Shape::Noop),
-                    ));
-                }
-            });
-        }
-    });
-    out
-}
-
 /// A cable drawn straight into `p`, in the theme's lit width: the one in the hand while a plug
 /// is dragged, which is always fully visible.
 fn cable_path(
@@ -4214,6 +4530,9 @@ fn draw_cables(
     only: Option<ModuleId>,
 ) -> Vec<egui::Shape> {
     let mut top = Vec::new();
+    if only.is_none() {
+        ui_state.cable_ends.clear();
+    }
     if ui_state.cable_view == CableView::Hidden {
         return top;
     }
@@ -4262,6 +4581,9 @@ fn draw_cables(
             continue;
         };
         if let Some(&b) = port_ref_pos(&drawn.ports, &c.to, PortDirection::Input) {
+            if only.is_none() {
+                ui_state.cable_ends.push((xf.inv(a), xf.inv(b)));
+            }
             let pts = cable_look::points(a, b, z, slots.sag);
             runs.push(Run {
                 id: *cable_id,
@@ -4281,6 +4603,9 @@ fn draw_cables(
         let Some(&a) = port_ref_pos(&drawn.ports, &c.from, PortDirection::Output) else {
             continue;
         };
+        if only.is_none() {
+            ui_state.cable_ends.push((xf.inv(a), xf.inv(*pos)));
+        }
         let pts = cable_look::points(a, *pos, z, slots.sag);
         runs.push(Run {
             id: *cable_id,
