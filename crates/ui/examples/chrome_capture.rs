@@ -81,7 +81,7 @@ impl App {
         let mut doc = kabl_ui::browser::Doc::new(
             "Acid Line",
             kabl_ui::browser::DocOrigin::Library("factory:acid-line".into()),
-            &state,
+            self.editor.state(),
         );
         doc.meta.category = "Bass".into();
         ui.doc = Some(doc);
