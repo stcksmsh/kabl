@@ -1742,22 +1742,17 @@ pub(crate) fn cable_param_routes(
         .collect();
     let mut remove = None;
     let st = ui_state.style.clone();
-    ui.horizontal(|ui| {
-        kit::label(
-            ui,
-            &st,
-            Role::Label,
-            kit::Tone::Text2,
-            format!("{} moved by", cable_param_label(param)),
-        );
-        if routes.is_empty() {
-            kit::label(ui, &st, Role::Label, kit::Tone::Text3, "nothing");
-        }
-    });
-    for route in routes {
-        cable_route_row(ui, editor, ui_state, route, false, &mut remove);
-    }
     let mut add = None;
+    let chips: Vec<(CableId, String)> = routes
+        .iter()
+        .filter_map(|&r| {
+            let c = editor.state().cables.get(&r)?;
+            let PortRef::Module { id, port } = &c.from else {
+                return None;
+            };
+            Some((r, source_label(editor.state(), *id, port)))
+        })
+        .collect();
     let state = editor.state();
     let outputs: Vec<(String, PortRef)> = state
         .modules
@@ -1784,27 +1779,101 @@ pub(crate) fn cable_param_routes(
             (source_label(state, id, port), r)
         })
         .collect();
-    let resp = kit::dropdown(
-        ui,
-        &st,
-        ("add-croute", cable, param.to_string()),
-        "Add source",
-        160.0,
-        |ui| {
-            for (label, from) in &outputs {
-                let r = kit::menu_item(ui, &st, label, false);
-                if let PortRef::Module { id, port } = from {
-                    ui_state.record(format!("croute-source:{cable}:{param}:{id}.{port}"), r.rect);
-                }
-                if r.clicked() {
-                    add = Some(from.clone());
+    // G4: "Moved by nothing" (or the routes below) and a ghost "+ Source" menu at the right.
+    let resp = ui
+        .horizontal(|ui| {
+            kit::label(ui, &st, Role::Label, kit::Tone::Text2, "Moved by");
+            if routes.is_empty() {
+                kit::label(ui, &st, Role::Label, kit::Tone::Text2, "nothing");
+            }
+            // One chip per source (cv dot, name); a tap shows its depth, invert and bypass.
+            for &(route, ref name) in &chips {
+                let font = st.font(Role::Label);
+                let g = ui
+                    .painter()
+                    .layout_no_wrap(name.clone(), font, st.roles.text);
+                let (r, resp) = ui
+                    .allocate_exact_size(egui::vec2(g.size().x + 30.0, 24.0), egui::Sense::click());
+                let open = ui.data(|d| d.get_temp::<bool>(egui::Id::new(("croute-open", route))));
+                let fill = if open.unwrap_or(false) || resp.hovered() {
+                    st.roles.raised
+                } else if st.dark {
+                    st.roles.inset
+                } else {
+                    st.roles.surface
+                };
+                ui.painter().rect(
+                    r,
+                    12.0,
+                    fill,
+                    egui::Stroke::new(1.0, st.roles.line),
+                    egui::StrokeKind::Inside,
+                );
+                ui.painter().circle_filled(
+                    egui::pos2(r.left() + 12.0, r.center().y),
+                    3.5,
+                    st.roles.cv,
+                );
+                ui.painter().galley(
+                    egui::pos2(r.left() + 21.0, r.center().y - g.size().y / 2.0),
+                    g,
+                    st.roles.text,
+                );
+                ui_state.record(format!("croute-chip:{route}"), r);
+                if resp.clicked() {
+                    let id = egui::Id::new(("croute-open", route));
+                    ui.data_mut(|d| d.insert_temp(id, !open.unwrap_or(false)));
                 }
             }
-        },
-    );
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let resp = ui
+                    .add(
+                        kit::Button::new(&st, "Source")
+                            .icon(kit::Ic::Plus)
+                            .ghost()
+                            .small(),
+                    )
+                    .on_hover_text(format!("Route a signal into {}", cable_param_label(param)));
+                egui::Popup::menu(&resp)
+                    .frame(kit::popover_frame(&st))
+                    .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+                    .width(240.0)
+                    .show(|ui| {
+                        egui::ScrollArea::vertical()
+                            .max_height(320.0)
+                            .show(ui, |ui| {
+                                for (label, from) in &outputs {
+                                    let r = kit::menu_item(ui, &st, label, false);
+                                    if let PortRef::Module { id, port } = from {
+                                        ui_state.record(
+                                            format!("croute-source:{cable}:{param}:{id}.{port}"),
+                                            r.rect,
+                                        );
+                                    }
+                                    if r.clicked() {
+                                        add = Some(from.clone());
+                                        ui.close();
+                                    }
+                                }
+                            });
+                    });
+                resp
+            })
+            .inner
+        })
+        .inner;
     ui_state.record(format!("croute-add:{cable}:{param}"), resp.rect);
+    for route in routes {
+        let open = ui.data(|d| d.get_temp::<bool>(egui::Id::new(("croute-open", route))));
+        if open.unwrap_or(false) {
+            cable_route_row(ui, editor, ui_state, route, false, &mut remove);
+        }
+    }
     if let Some(from) = add {
-        editor.connect_cable_route(from, cable, param);
+        // A new source opens its depth row, to set how far it moves the parameter.
+        if let Some(route) = editor.connect_cable_route(from, cable, param) {
+            ui.data_mut(|d| d.insert_temp(egui::Id::new(("croute-open", route)), true));
+        }
     }
     if let Some(route) = remove {
         editor.disconnect(route);
