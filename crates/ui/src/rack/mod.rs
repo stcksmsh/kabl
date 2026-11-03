@@ -77,7 +77,7 @@ pub fn knob_text_dy(r: f32, z: f32, text_h: f32) -> f32 {
     ((r + 12.0) * z).max((r + 4.8) * z + 1.6 + text_h / 2.0)
 }
 
-/// Hex nut radius of a drawn jack (PLAN section 4); `JACK_R` is its larger hit radius.
+/// Nut radius of a drawn jack (PLAN section 4); `JACK_R` is its larger hit radius.
 pub const JACK_NUT: f32 = 11.0;
 
 /// Screen px from a jack centre up to its label centre, for text `text_h` px high at zoom `z`:
