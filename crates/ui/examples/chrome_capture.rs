@@ -128,6 +128,9 @@ impl App {
                 .map(|(&id, _)| id)
                 .unwrap();
             kabl_ui::tables::open(&self.editor, &mut ui, wt);
+            // Like the mockup: frame 7 of 16 selected, the oscillator's position at 0.40.
+            ui.tables.select(6);
+            self.editor.set_param(wt, "position", 0.4);
         }
         self.ui = ui;
         self.f = 0;

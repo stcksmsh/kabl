@@ -283,7 +283,8 @@ pub fn tool_window(
         });
 }
 
-/// Bottom dock: full width, drag handle on the top edge, resizable between `min` and `max`.
+/// Bottom dock: full width of `ui`'s free area, drawn over its lower part (the rack keeps its
+/// size and zoom), with a drag handle on the top edge resizing it between `min` and `max`.
 pub fn dock(
     ui: &mut Ui,
     st: &Style,
@@ -293,38 +294,52 @@ pub fn dock(
     max: f32,
     content: impl FnOnce(&mut Ui),
 ) {
-    egui::Panel::bottom(egui::Id::new(id))
-        .resizable(true)
-        .default_size(height)
-        .size_range(min..=max)
-        .frame(
-            Frame::new()
-                .fill(st.roles.bar)
-                .inner_margin(Margin::symmetric(16, 10)),
-        )
-        .show(ui, |ui| {
-            let top = ui.max_rect().top();
-            // A 1 px rule on the top edge and a 6 px shadow strip over the rack above it.
-            let edge = top - 10.0;
-            let full = ui.max_rect().x_range().expand(16.0);
-            let shade = egui::Color32::from_black_alpha(if st.dark { 89 } else { 20 });
-            let p = ui
-                .ctx()
-                .layer_painter(egui::LayerId::new(egui::Order::Middle, egui::Id::new(id)));
+    let avail = ui.available_rect_before_wrap();
+    let hid = egui::Id::new(id).with("height");
+    let h = ui
+        .data(|d| d.get_temp::<f32>(hid))
+        .unwrap_or(height)
+        .clamp(min, max.max(min));
+    let rect = Rect::from_min_max(pos2(avail.left(), avail.bottom() - h), avail.max);
+    let ctx = ui.ctx().clone();
+    egui::Area::new(egui::Id::new(id))
+        .order(egui::Order::Middle)
+        .fade_in(false)
+        .fixed_pos(rect.min)
+        .show(&ctx, |ui| {
+            ui.set_min_size(rect.size());
+            ui.set_max_size(rect.size());
+            // A 6 px shadow strip over the rack above, the fill, and a 1 px rule on the top edge.
+            let p = ui.painter().with_clip_rect(ctx.content_rect());
+            let shade = Color32::from_black_alpha(if st.dark { 89 } else { 20 });
             p.rect_filled(
-                Rect::from_x_y_ranges(full, edge - 6.0..=edge),
+                Rect::from_x_y_ranges(rect.x_range(), rect.top() - 6.0..=rect.top()),
                 CornerRadius::ZERO,
                 shade,
             );
-            ui.painter()
-                .hline(full, edge + 0.5, Stroke::new(1.0, st.roles.line2));
-            let c = pos2(ui.max_rect().center().x, top - 5.0);
-            ui.painter().rect_filled(
-                Rect::from_center_size(c, vec2(36.0, 4.0)),
+            p.rect_filled(rect, CornerRadius::ZERO, st.roles.bar);
+            p.hline(
+                rect.x_range(),
+                rect.top() + 0.5,
+                Stroke::new(1.0, st.roles.line2),
+            );
+            let grip = Rect::from_min_size(rect.min, vec2(rect.width(), 8.0));
+            let resp = ui.interact(grip, egui::Id::new(id).with("grip"), Sense::drag());
+            if resp.hovered() || resp.dragged() {
+                ctx.set_cursor_icon(egui::CursorIcon::ResizeVertical);
+            }
+            if resp.dragged() {
+                let nh = (h - resp.drag_delta().y).clamp(min, max.max(min));
+                ui.data_mut(|d| d.insert_temp(hid, nh));
+            }
+            p.rect_filled(
+                Rect::from_center_size(pos2(rect.center().x, rect.top() + 7.0), vec2(36.0, 4.0)),
                 CornerRadius::same(2),
                 st.roles.line2,
             );
-            content(ui);
+            let inner = rect - Margin::symmetric(16, 10);
+            let mut c = ui.new_child(egui::UiBuilder::new().max_rect(inner));
+            content(&mut c);
         });
 }
 

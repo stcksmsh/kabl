@@ -118,6 +118,12 @@ impl View {
     }
 
     /// The selected frame.
+    /// Selects frame `k` (clamped), as a click in the stack does.
+    pub fn select(&mut self, k: usize) {
+        self.sel = k.min(self.frames.len().saturating_sub(1));
+        self.mark = None;
+    }
+
     pub fn selected(&self) -> usize {
         self.sel
     }
@@ -675,7 +681,7 @@ fn header(
     } else {
         ("Audition", Ic::Play)
     };
-    let a = r.add(Button::new(st, label).icon(ic));
+    let a = r.add(Button::new(st, label).icon(ic).g4(30.0));
     ui_state.record("wt:audition".into(), a.rect);
     if a.clicked() {
         if v.audition {
@@ -696,6 +702,7 @@ fn header(
     let imp = r.add(
         Button::new(st, "Import…")
             .icon(Ic::Folder)
+            .g4(30.0)
             .selected(v.importing),
     );
     ui_state.record("wt:open-import".into(), imp.rect);
@@ -946,6 +953,7 @@ fn body(
             let r = c.add(
                 Button::new(st, text)
                     .icon(ic)
+                    .g4(32.0)
                     .min_width(200.0)
                     .enabled(v.can(o)),
             );
