@@ -1242,6 +1242,7 @@ fn cat_row(ui: &mut egui::Ui, st: &Style, label: &str, count: usize, on: bool) -
     r
 }
 
+#[allow(clippy::too_many_arguments)]
 fn nav_text(
     ui: &egui::Ui,
     st: &Style,
@@ -1309,6 +1310,8 @@ fn nav_rows(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
             .count(),
     };
     let filters = [
+        (Filter::All, "all", "All sounds"),
+        (Filter::Recent, "recent", "Recent"),
         (Filter::Factory, "factory", "Factory"),
         (Filter::User, "user", "My sounds"),
         (Filter::Favorites, "favorites", "Favourites"),
@@ -2322,5 +2325,3 @@ pub fn open_library() -> Library {
         crate::library::default_user_root(),
     )
 }
-        (Filter::All, "all", "All sounds"),
-        (Filter::Recent, "recent", "Recent"),
