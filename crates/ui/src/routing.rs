@@ -1489,20 +1489,26 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
         .iter()
         .find(|r| Some(r.cable) == ui_state.selected_route)
     {
+        // One line each (truncated, full text on hover): a wrapped line would make the two
+        // states differ in height.
         Some(sel) => {
             let (a, b) = route_span(sel, base_n);
-            ui.label(format!(
+            let text = format!(
                 "Selected ({}): {} – {}",
                 source_label(editor.state(), sel.from_id, &sel.from_port),
                 fmt_value(param, param.from_norm(a)),
                 fmt_value(param, param.from_norm(b))
-            ));
+            );
+            ui.add(egui::Label::new(&text).truncate())
+                .on_hover_text(text);
         }
         None => {
-            ui.colored_label(
-                ui_state.style.roles.warn,
-                "No source selected: click one below to edit its depth.",
-            );
+            let text = "No source selected: click one below to edit its depth.";
+            ui.add(
+                egui::Label::new(egui::RichText::new(text).color(ui_state.style.roles.warn))
+                    .truncate(),
+            )
+            .on_hover_text(text);
         }
     }
     ui.small("Ranges are computed from each source's nominal range, not measured. Block rate (64 samples).");

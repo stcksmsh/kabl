@@ -311,6 +311,11 @@ pub fn view_switch<R>(ui: &mut Ui, st: &Style, add: impl FnOnce(&mut Ui) -> R) -
     if st.slots.chrome.view_switch != crate::style::ViewSwitch::Tabs {
         return segmented(ui, st, add);
     }
+    tabs(ui, st, add)
+}
+
+/// A row of plain tabs: [`seg`] items without a pill, the selected one underlined.
+pub fn tabs<R>(ui: &mut Ui, st: &Style, add: impl FnOnce(&mut Ui) -> R) -> R {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = st.sp(2);
         ui.data_mut(|d| d.insert_temp(tabs_flag(), true));
