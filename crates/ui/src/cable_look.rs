@@ -3,7 +3,7 @@
 //! face colour, so it can be found and its colour read without hovering: on a light theme
 //! through a dark casing around the true colour, on a dark theme through a lightened colour.
 
-use crate::style::{CableRecipe, PlugRecipe, Style};
+use crate::style::{CableRecipe, CableStyle, PlugRecipe, Style};
 use egui::{vec2, Color32, Id, Painter, Pos2, Shape, Stroke};
 
 /// WCAG contrast a cable keeps against the surfaces it crosses.
@@ -142,6 +142,53 @@ pub fn distance_to(pts: &[Pos2], p: Pos2) -> f32 {
         .fold(f32::MAX, f32::min)
 }
 
+/// Themed styles only: the glow under a lit cable, drawn for all cables before any core so one
+/// cable's halo never covers another's core. `z` is the zoom; `lit` is 0..=1.
+pub fn glow(p: &Painter, st: &Style, pts: &[Pos2], col: Color32, alpha: f32, lit: f32, z: f32) {
+    let t = &st.slots.cable;
+    if t.style == CableStyle::Themed && t.glow_alpha > 0.0 && lit > 0.0 {
+        p.add(Shape::line(
+            pts.to_vec(),
+            Stroke::new(
+                t.glow_width * z,
+                col.gamma_multiply(t.glow_alpha * lit * alpha),
+            ),
+        ));
+    }
+}
+
+/// Themed functional cable: one bead per pattern step along the curve, filled = on, hollow =
+/// off, in the signal colour; `current` (the step playing) is drawn in `accent`.
+#[allow(clippy::too_many_arguments)]
+pub fn beads(
+    caps: &mut Vec<Shape>,
+    st: &Style,
+    pts: &[Pos2],
+    col: Color32,
+    accent: Color32,
+    steps: &[bool],
+    current: Option<usize>,
+    z: f32,
+) {
+    let n = steps.len();
+    if n == 0 || pts.len() < 2 {
+        return;
+    }
+    let r = 4.0 * z.clamp(0.6, 1.5);
+    for (i, &on) in steps.iter().enumerate() {
+        let f = (i as f32 + 0.5) / n as f32 * (pts.len() - 1) as f32;
+        let k = (f as usize).min(pts.len() - 2);
+        let c = pts[k] + (pts[k + 1] - pts[k]) * (f - k as f32);
+        let ink = if current == Some(i) { accent } else { col };
+        caps.push(Shape::circle_filled(
+            c,
+            r,
+            if on { ink } else { st.roles.surface },
+        ));
+        caps.push(Shape::circle_stroke(c, r, Stroke::new(1.5, ink)));
+    }
+}
+
 /// Paints the rope into `p`; its two plugs go to `caps`, which the caller paints above the
 /// faces. `casing` (0..=1) is the opacity of the dark edge, `lit` (0..=1) how emphasised the
 /// cable is: it drives the halo.
@@ -157,8 +204,11 @@ pub fn paint(
     casing: f32,
     bypass: bool,
     lit: f32,
+    z: f32,
+    stereo: bool,
 ) {
     let slots = &st.slots.cable;
+    let themed = slots.style == CableStyle::Themed;
     if bypass {
         p.extend(Shape::dashed_line(
             pts,
@@ -166,6 +216,47 @@ pub fn paint(
             7.0,
             5.0,
         ));
+    } else if themed {
+        // Paint tokens (PLAN §7 Cables): shadow, darkened edge, core, highlight. The glow is
+        // drawn earlier by `glow`. A stereo cable is a twin strand with a dark centre line.
+        let w = w.max(2.5);
+        let ww = if stereo { w * 1.6 } else { w };
+        let a8 = |x: f32| (x.clamp(0.0, 1.0) * 255.0) as u8;
+        if slots.shadow_alpha > 0.0 {
+            let dy = vec2(0.0, slots.shadow_dy * z);
+            p.add(Shape::line(
+                pts.iter().map(|&q| q + dy).collect(),
+                Stroke::new(
+                    ww + 2.0,
+                    Color32::from_black_alpha(a8(slots.shadow_alpha * alpha)),
+                ),
+            ));
+        }
+        let edge = col.lerp_to_gamma(Color32::BLACK, slots.edge);
+        p.add(Shape::line(
+            pts.to_vec(),
+            Stroke::new(ww + 2.0, edge.gamma_multiply(alpha)),
+        ));
+        let core = col.lerp_to_gamma(Color32::WHITE, 0.25 * lit);
+        p.add(Shape::line(
+            pts.to_vec(),
+            Stroke::new(ww, core.gamma_multiply(alpha)),
+        ));
+        if stereo {
+            p.add(Shape::line(
+                pts.to_vec(),
+                Stroke::new(1.5, edge.gamma_multiply(alpha)),
+            ));
+        }
+        if lit > 0.0 && slots.highlight > 0.0 {
+            p.add(Shape::line(
+                pts.to_vec(),
+                Stroke::new(
+                    1.0,
+                    Color32::from_white_alpha(a8(slots.highlight * lit * alpha)),
+                ),
+            ));
+        }
     } else {
         let glow = slots.glow * lit;
         if glow > 0.0 {
@@ -198,6 +289,13 @@ pub fn paint(
             PlugRecipe::Cap => {
                 caps.push(Shape::circle_filled(e, w * 1.35, dark));
                 caps.push(Shape::circle_filled(e, w * 0.9, col.gamma_multiply(alpha)));
+                if themed && stereo {
+                    caps.push(Shape::circle_stroke(
+                        e,
+                        w * 2.1,
+                        Stroke::new(w * 0.35, col.gamma_multiply(alpha)),
+                    ));
+                }
             }
             PlugRecipe::Ring => {
                 caps.push(Shape::circle_stroke(
@@ -205,6 +303,13 @@ pub fn paint(
                     w * 1.1,
                     Stroke::new(w * 0.6, col.gamma_multiply(alpha)),
                 ));
+                if themed && stereo {
+                    caps.push(Shape::circle_stroke(
+                        e,
+                        w * 2.1,
+                        Stroke::new(w * 0.35, col.gamma_multiply(alpha)),
+                    ));
+                }
             }
             PlugRecipe::Dot => {
                 caps.push(Shape::circle_filled(e, w * 1.0, col.gamma_multiply(alpha)));

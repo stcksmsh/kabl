@@ -4,8 +4,8 @@
 
 use super::containers::eshadow;
 use crate::style::{
-    alpha, mix, DisplayFrame, DisplayTrace, FaceHardware, FaceMaterial, FaceTitle, JackRecipe,
-    KnobBody, KnobMod, KnobScale, KnobValue, Role, Style, TEXT_FLOOR,
+    alpha, mix, CompactText, DisplayFrame, DisplayTrace, FaceHardware, FaceMaterial, FaceTitle,
+    JackRecipe, KnobBody, KnobMod, KnobScale, KnobValue, Role, Style, TEXT_FLOOR,
 };
 use egui::{
     epaint::Mesh, pos2, vec2, Color32, CornerRadius, FontId, Painter, Pos2, Rect, Shape, Stroke,
@@ -26,11 +26,47 @@ pub fn face_font(st: &Style, role: Role, z: f32) -> Option<FontId> {
 /// A module's name stays readable lower than the rest, so a zoomed-out rack still says what is
 /// what.
 fn title_font(st: &Style, z: f32) -> Option<FontId> {
+    if st.slots.face.compact == CompactText::Hold {
+        let t = st.type_role(Role::H3);
+        return Some(FontId::new(
+            (t.size * z).max(HOLD_TITLE),
+            t.font.family(st.fonts_ready),
+        ));
+    }
     sized(st, Role::H3, z, 6.0)
+}
+
+/// Compact tier (`CompactText::Hold`): the smallest face text and title, in screen px.
+pub const HOLD_FLOOR: f32 = 9.5;
+const HOLD_TITLE: f32 = 10.5;
+/// Zoom below which no face text is drawn under `Hold` (the overview tier) and above which
+/// values and captions are drawn again (the full tier).
+const OVERVIEW_BELOW: f32 = 0.55;
+const FULL_FROM: f32 = 0.864;
+
+/// Whether `z` is in the overview tier of a `Hold` style: no face text, not even the `+N` chip.
+pub fn overview(st: &Style, z: f32) -> bool {
+    st.slots.face.compact == CompactText::Hold && z < OVERVIEW_BELOW
+}
+
+/// Whether `z` is in the compact tier of a `Hold` style: held text, which is dropped where it
+/// does not fit its slot (PLAN section 5), instead of overlapping its neighbours.
+pub fn compact_tier(st: &Style, z: f32) -> bool {
+    st.slots.face.compact == CompactText::Hold && (OVERVIEW_BELOW..FULL_FROM).contains(&z)
 }
 
 fn sized(st: &Style, role: Role, z: f32, hide_below: f32) -> Option<FontId> {
     let t = st.type_role(role);
+    if st.slots.face.compact == CompactText::Hold {
+        let value_like = matches!(role, Role::Value | Role::Caption);
+        if z < OVERVIEW_BELOW || (value_like && z < FULL_FROM) {
+            return None;
+        }
+        return Some(FontId::new(
+            (t.size * z).max(HOLD_FLOOR),
+            t.font.family(st.fonts_ready),
+        ));
+    }
     (t.size * z >= hide_below)
         .then(|| FontId::new((t.size * z).max(TEXT_FLOOR), t.font.family(st.fonts_ready)))
 }
@@ -59,6 +95,13 @@ pub fn surface(p: &Painter, st: &Style, rect: Rect, base: Color32, edge: Color32
     let cr = CornerRadius::same(3);
     if f.material != FaceMaterial::Flat && st.shadows[f.shadow.min(2)].alpha > 0 {
         p.add(eshadow(st, f.shadow).as_shape(rect, cr));
+    }
+    if f.material == FaceMaterial::Line {
+        // Line art: the surface colour, one hairline edge, screws; no gradient, gloss or grain.
+        p.rect_filled(rect, cr, base);
+        p.rect_stroke(rect, cr, Stroke::new(1.0, edge), StrokeKind::Inside);
+        hardware(p, st, rect, z);
+        return;
     }
     let top = mix(base, Color32::WHITE, f.gradient * 0.8);
     let bottom = mix(base, Color32::BLACK, f.gradient * 0.65);
@@ -110,17 +153,23 @@ pub fn surface(p: &Painter, st: &Style, rect: Rect, base: Color32, edge: Color32
     }
 }
 
+/// Corner nut centres of a `w` x `h` face, in face units from its top left. A face under 100
+/// wide (Split, Join) has its three jacks across the bottom, so it keeps only the top pair.
+pub fn screw_points(w: f32, h: f32) -> Vec<Pos2> {
+    let ys: &[f32] = if w < 100.0 { &[9.0] } else { &[9.0, h - 9.0] };
+    ys.iter()
+        .flat_map(|&y| [pos2(9.0, y), pos2(w - 9.0, y)])
+        .collect()
+}
+
 /// The corner nuts or screws.
 pub fn hardware(p: &Painter, st: &Style, rect: Rect, z: f32) {
     let f = &st.slots.face;
     let nut = mix(st.roles.knob, st.roles.knob_hi, 0.35);
     let nut_edge = mix(st.roles.knob, st.roles.knob_hi, 0.8);
     if f.hardware != FaceHardware::None {
-        for (sx, sy) in [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)] {
-            let c = pos2(
-                rect.left() + 9.0 * z + sx * (rect.width() - 18.0 * z),
-                rect.top() + 9.0 * z + sy * (rect.height() - 18.0 * z),
-            );
+        for at in screw_points(rect.width() / z, rect.height() / z) {
+            let c = rect.min + at.to_vec2() * z;
             p.circle_filled(c, 3.5 * z, nut);
             p.circle_stroke(c, 3.5 * z, Stroke::new(1.0, nut_edge));
             if f.hardware == FaceHardware::Screws {
@@ -137,6 +186,57 @@ pub fn hardware(p: &Painter, st: &Style, rect: Rect, z: f32) {
 /// face content (jacks and their labels, knobs, displays): a left-aligned title that would
 /// touch any of them is set centred instead, as the centred recipes are.
 #[allow(clippy::too_many_arguments)]
+/// The name a face shows when the full one does not fit beside the `+N` chip (PLAN section 4:
+/// short name, never an ellipsis). Unlisted names are already short.
+pub fn short_title(name: &str) -> &str {
+    match name {
+        "VA Oscillator" => "VA Osc",
+        "SVF Filter" => "SVF",
+        "ADSR Envelope" => "ADSR",
+        "Ladder Filter" => "Ladder",
+        "Comb Filter" => "Comb",
+        "Wavetable Oscillator" => "Wavetable",
+        "FM Operator" => "FM Op",
+        "FM Voice (6 operators)" => "FM Voice",
+        "Ring Modulator" => "Ring Mod",
+        "Sample & Hold" => "S&H",
+        "Comparator" => "Comp",
+        "Crossfade" => "X-Fade",
+        "Quantizer" => "Quant",
+        "Attenuverter" => "Atten",
+        "Compressor" => "Comp",
+        "Arpeggiator" => "Arp",
+        "Bitcrusher" => "Crush",
+        _ => name,
+    }
+}
+
+/// The text a title measures as: condensed-caps titles are drawn in capitals.
+pub fn title_text(st: &Style, name: &str) -> String {
+    if st.slots.face.title == FaceTitle::CondCaps {
+        name.to_uppercase()
+    } else {
+        name.to_string()
+    }
+}
+
+/// Room for a title on the row at screen `y`: from the left margin to the nearest thing in the
+/// header band (`avoid`), or the `+N` chip's place, less a gap.
+pub fn title_room_beside(face: Rect, z: f32, y: f32, avoid: &[Rect]) -> f32 {
+    let right = avoid
+        .iter()
+        .filter(|a| a.top() < y + 8.0 * z && a.bottom() > y - 8.0 * z && a.left() > face.center().x)
+        .map(|a| a.left())
+        .fold(face.right() - 46.0 * z, f32::min);
+    right - 10.0 * z - (face.left() + 12.0 * z)
+}
+
+/// Room for a title: the face less the `+N` chip, its gap and the side margin.
+pub fn title_room(face_w: f32, z: f32) -> f32 {
+    face_w - 66.0 * z
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn title(
     p: &Painter,
     st: &Style,
@@ -149,8 +249,22 @@ pub fn title(
     avoid: &[Rect],
 ) -> Rect {
     let cx = face.center().x;
-    let y = face.top() + 26.0 * z;
+    let cond = st.slots.face.title == FaceTitle::CondCaps;
+    let y = face.top() + if cond { 19.7 } else { 26.0 } * z;
+    let y_tag = face.top() + if cond { 38.0 } else { 43.0 } * z;
     let mut rect = Rect::NOTHING;
+    let name = match title_font(st, z) {
+        Some(f)
+            if p.layout_no_wrap(title_text(st, name), f.clone(), ink)
+                .size()
+                .x
+                * 1.06
+                > title_room_beside(face, z, y, avoid) =>
+        {
+            short_title(name)
+        }
+        _ => name,
+    };
     let dot = st.slots.face.title == FaceTitle::LeftDot;
     let x0 = face.left() + if dot { 32.0 } else { 12.0 } * z;
     let left = st.slots.face.title != FaceTitle::CapsRule && {
@@ -162,7 +276,7 @@ pub fn title(
         let n = size(name, title_font(st, z));
         let t = size(tag, face_font(st, Role::Caption, z));
         let name_r = Rect::from_min_size(pos2(x0, y - n.y / 2.0), n);
-        let tag_r = Rect::from_min_size(pos2(x0, face.top() + 43.0 * z - t.y / 2.0), t);
+        let tag_r = Rect::from_min_size(pos2(x0, y_tag - t.y / 2.0), t);
         // Too wide for the room right of the dot: centre it, as the centred recipes do.
         name_r.max.x <= face.right() - 6.0 * z
             && tag_r.max.x <= face.right() - 6.0 * z
@@ -172,6 +286,7 @@ pub fn title(
     };
     let kind = match st.slots.face.title {
         FaceTitle::CapsRule => FaceTitle::CapsRule,
+        FaceTitle::CondCaps => FaceTitle::CondCaps,
         _ if left => FaceTitle::LeftDot,
         _ => FaceTitle::Centered,
     };
@@ -185,6 +300,7 @@ pub fn title(
             font.size = (font.size * 0.8).max(TEXT_FLOOR);
         }
         rect = match kind {
+            FaceTitle::CondCaps => cond_draw(p, pos2(x0, y), name, &font, ink),
             FaceTitle::Centered => {
                 p.text(pos2(cx, y), egui::Align2::CENTER_CENTER, name, font, ink)
             }
@@ -214,9 +330,9 @@ pub fn title(
         };
     }
     if let Some(font) = face_font(st, Role::Caption, z) {
-        let at = pos2(cx, face.top() + 43.0 * z);
+        let at = pos2(cx, y_tag);
         match kind {
-            FaceTitle::LeftDot => {
+            FaceTitle::LeftDot | FaceTitle::CondCaps => {
                 p.text(pos2(x0, at.y), egui::Align2::LEFT_CENTER, tag, font, ink2);
             }
             _ => {
@@ -225,6 +341,33 @@ pub fn title(
         }
     }
     rect
+}
+
+/// Condensed caps title: uppercase with +0.07 em tracking, drawn glyph by glyph because egui
+/// has no letter spacing. `at` is the left end, vertically centred. Returns the text rect.
+pub fn cond_draw(p: &Painter, at: Pos2, text: &str, font: &FontId, col: Color32) -> Rect {
+    let up = text.to_uppercase();
+    let track = 0.07 * font.size;
+    let mut prefix = String::new();
+    for ch in up.chars() {
+        let x = if prefix.is_empty() {
+            0.0
+        } else {
+            p.layout_no_wrap(prefix.clone(), font.clone(), col).size().x
+                + track * prefix.chars().count() as f32
+        };
+        p.text(
+            at + vec2(x, 0.0),
+            egui::Align2::LEFT_CENTER,
+            ch,
+            font.clone(),
+            col,
+        );
+        prefix.push(ch);
+    }
+    let w = p.layout_no_wrap(up.clone(), font.clone(), col).size().x
+        + track * up.chars().count().saturating_sub(1) as f32;
+    Rect::from_min_size(at - vec2(0.0, font.size * 0.5), vec2(w, font.size))
 }
 
 /// A knob in the theme's body, scale and value-marker recipes. `rs` is the screen radius.
@@ -241,7 +384,8 @@ pub fn knob(p: &Painter, st: &Style, k: &Knob, tick: Color32) {
     let (c, rs, z) = (k.c, k.rs, k.z);
     let r = &st.roles;
     let ks = &st.slots.knob;
-    let track = rs + 5.5 * z;
+    let solid = ks.body == KnobBody::Solid;
+    let track = rs + if solid { 3.5 } else { 5.5 } * z;
     match ks.scale {
         KnobScale::Ticks => {
             for i in 0..=10 {
@@ -261,14 +405,59 @@ pub fn knob(p: &Painter, st: &Style, k: &Knob, tick: Color32) {
         KnobScale::None => {}
     }
     if ks.value == KnobValue::Arc && k.value > 0.004 {
+        if solid && st.dark && ks.glow > 0.0 {
+            // Glow underlay: the same arc, wide and faint.
+            p.add(Shape::line(
+                arc_pts(c, track, 0.0, k.value),
+                Stroke::new(
+                    6.0 * z,
+                    alpha(r.accent, (40.0 * ks.glow.min(1.0) / 0.4) as u8),
+                ),
+            ));
+        }
         p.add(Shape::line(
             arc_pts(c, track, 0.0, k.value),
-            Stroke::new(2.4 * z, r.accent),
+            Stroke::new(2.5 * z, r.accent),
         ));
     }
     let skirt = mix(r.knob, r.knob_hi, 0.25);
     let rim = alpha(mix(r.knob_hi, r.knob, 0.5), 255);
     match ks.body {
+        KnobBody::Solid => {
+            // Dark filled cap: drop shadow, skirt with ticks, four-step cap gradient, pointer.
+            let sh = if st.dark { 115 } else { 36 };
+            p.circle_filled(
+                c + vec2(0.0, 3.0 * z),
+                rs + z,
+                alpha(Color32::BLACK, sh / 4),
+            );
+            p.circle_filled(
+                c + vec2(0.0, 1.5 * z),
+                rs + 0.5 * z,
+                alpha(Color32::BLACK, sh / 2),
+            );
+            p.circle_filled(c, rs, mix(r.knob, Color32::BLACK, 0.3));
+            for i in 0..=10 {
+                let a = travel_angle(i as f32 / 10.0);
+                p.line_segment(
+                    [on_circle(c, rs - 1.2 * z, a), on_circle(c, rs - 3.6 * z, a)],
+                    Stroke::new((1.0 * z).max(0.75), alpha(r.knob_ink, 90)),
+                );
+            }
+            for i in 0..4 {
+                let t = i as f32 / 3.0;
+                p.circle_filled(
+                    c - vec2(rs * 0.06, rs * 0.08) * (1.0 - t),
+                    rs * (0.74 - 0.14 * t),
+                    mix(r.knob_hi, r.knob, t),
+                );
+            }
+            let a = travel_angle(k.value);
+            p.line_segment(
+                [on_circle(c, rs * 0.18, a), on_circle(c, rs * 0.68, a)],
+                Stroke::new((if rs > 18.0 * z { 2.4 } else { 2.0 }) * z, r.knob_ink),
+            );
+        }
         KnobBody::Cap => {
             p.circle_filled(
                 c + vec2(0.0, 1.6 * z),
@@ -308,6 +497,9 @@ pub fn knob(p: &Painter, st: &Style, k: &Knob, tick: Color32) {
     }
     if k.hot {
         p.circle_stroke(c, rs + 1.5 * z, Stroke::new((1.2 * z).max(1.2), r.focus));
+    }
+    if solid {
+        return;
     }
     let a = travel_angle(k.value);
     let w = (2.6 * z).max(1.6);
@@ -402,20 +594,75 @@ pub fn jack(
     patched: bool,
     hot: bool,
 ) {
+    jack_ch(p, st, c, r, z, signal, patched, hot, false);
+}
+
+/// [`jack`] with the channel count: a stereo jack of the `Hex` recipe shows a double ring.
+#[allow(clippy::too_many_arguments)]
+pub fn jack_ch(
+    p: &Painter,
+    st: &Style,
+    c: Pos2,
+    r: f32,
+    z: f32,
+    signal: Color32,
+    patched: bool,
+    hot: bool,
+    stereo: bool,
+) {
     let ro = &st.roles;
     let nut = mix(ro.knob, ro.knob_hi, 0.35);
     let edge = mix(ro.knob, ro.knob_hi, 0.8);
     match st.slots.jack {
+        JackRecipe::Hex => {
+            // Hex nut (r 11 in rack units, scaled with the jack), signal ring, hole.
+            let k = r / 13.0;
+            let hex = |rad: f32, dy: f32| -> Vec<Pos2> {
+                (0..6)
+                    .map(|i| {
+                        let a =
+                            std::f32::consts::FRAC_PI_6 + i as f32 * std::f32::consts::FRAC_PI_3;
+                        c + vec2(a.cos() * rad, a.sin() * rad + dy) * k
+                    })
+                    .collect()
+            };
+            let sh = if st.dark { 115 } else { 36 };
+            p.add(Shape::convex_polygon(
+                hex(11.5, 1.2),
+                alpha(Color32::BLACK, sh / 2),
+                Stroke::NONE,
+            ));
+            p.add(Shape::convex_polygon(
+                hex(11.0, 0.0),
+                st.roles.raised,
+                Stroke::new((0.8 * z).max(0.75), st.roles.line2),
+            ));
+            let ring = (1.7 * z).max(1.0);
+            if stereo {
+                p.circle_filled(c, 8.1 * k, st.jack_hole());
+                p.circle_stroke(c, 8.1 * k, Stroke::new(ring, signal));
+                p.circle_stroke(c, 5.0 * k, Stroke::new(ring, signal));
+                p.circle_filled(c, 2.4 * k, st.jack_hole());
+            } else {
+                p.circle_filled(c, 7.6 * k, signal);
+                p.circle_filled(c, 5.2 * k, st.jack_hole());
+            }
+            if patched {
+                p.circle_filled(c + vec2(0.0, 1.5 * k), 8.0 * k, alpha(Color32::BLACK, 90));
+                p.circle_filled(c, 7.5 * k, signal);
+                p.circle_filled(c - vec2(2.0, 2.0) * k, 3.0 * k, alpha(Color32::WHITE, 90));
+            }
+        }
         JackRecipe::Nut => {
             p.circle_filled(c, r, nut);
             p.circle_stroke(c, r, Stroke::new(1.0, edge));
             if patched {
                 p.circle_stroke(c, r * 0.72, Stroke::new((2.2 * z).max(1.5), signal));
             }
-            p.circle_filled(c, r * 0.54, ro.hole);
+            p.circle_filled(c, r * 0.54, st.jack_hole());
         }
         JackRecipe::GlowRing => {
-            p.circle_filled(c, r, mix(ro.knob, ro.hole, 0.4));
+            p.circle_filled(c, r, mix(ro.knob, st.jack_hole(), 0.4));
             if patched {
                 let g = st.slots.knob.glow.max(0.4);
                 p.circle_stroke(
@@ -429,7 +676,7 @@ pub fn jack(
                 r * 0.86,
                 Stroke::new((2.0 * z).max(1.5), if patched { signal } else { edge }),
             );
-            p.circle_filled(c, r * 0.5, ro.hole);
+            p.circle_filled(c, r * 0.5, st.jack_hole());
         }
         JackRecipe::Donut => {
             p.circle_stroke(
@@ -438,7 +685,7 @@ pub fn jack(
                 Stroke::new(r * 0.44, if patched { signal } else { nut }),
             );
             p.circle_stroke(c, r, Stroke::new(1.0, edge));
-            p.circle_filled(c, r * 0.5, ro.hole);
+            p.circle_filled(c, r * 0.5, st.jack_hole());
         }
     }
     if hot {
@@ -504,7 +751,8 @@ pub fn display_frame(p: &Painter, st: &Style, rect: Rect, face: Color32, z: f32)
     let r = &st.roles;
     let cr = CornerRadius::same((3.0 * z).clamp(2.0, 6.0) as u8);
     if st.slots.display.frame == DisplayFrame::Paper {
-        p.rect_filled(rect, cr, mix(r.disp_bg, Color32::WHITE, 0.82));
+        // Paper wells are the inset colour in both themes (light grey on paper, as in the mockup).
+        p.rect_filled(rect, cr, r.disp_bg);
         p.rect_stroke(rect, cr, Stroke::new(1.0, r.line2), StrokeKind::Inside);
     } else {
         // Lower lip: the panel's edge catching the light under the cut.
@@ -557,8 +805,9 @@ pub fn display_frame(p: &Painter, st: &Style, rect: Rect, face: Color32, z: f32)
 
 /// The trace colour of a display.
 pub fn trace_color(st: &Style) -> Color32 {
-    if st.slots.display.frame == DisplayFrame::Paper {
-        mix(st.roles.disp_bg, st.roles.accent, 0.7)
+    if st.slots.display.frame == DisplayFrame::Paper && !st.dark {
+        // The mockup's trace is the accent itself.
+        st.roles.accent
     } else {
         st.roles.disp_trace
     }
@@ -610,4 +859,23 @@ pub fn playhead(p: &Painter, st: &Style, at: Pos2, z: f32) {
     let col = trace_color(st);
     p.circle_filled(at, 5.0 * z.max(0.7), alpha(col, 70));
     p.circle_filled(at, 3.0 * z.max(0.7), st.roles.disp_text);
+}
+
+/// The ink of a face title: the module family's colour for line styles with a coloured-title
+/// family marker, else the plain face `ink`.
+pub fn family_ink(st: &Style, kind: &str, ink: Color32) -> Color32 {
+    let f = &st.slots.face;
+    if f.material == FaceMaterial::Line && f.family == crate::style::FamilyMarker::Title {
+        st.section_of(kind).ink
+    } else {
+        ink
+    }
+}
+
+/// The 3 px family stripe along the top edge of a face (`FamilyMarker::Stripe`).
+pub fn family_stripe(p: &Painter, st: &Style, face: Rect, kind: &str, z: f32) {
+    if st.slots.face.family == crate::style::FamilyMarker::Stripe {
+        let r = Rect::from_min_size(face.min + vec2(z, z), vec2(face.width() - 2.0 * z, 3.0 * z));
+        p.rect_filled(r, CornerRadius::same(1), st.section_of(kind).ink);
+    }
 }

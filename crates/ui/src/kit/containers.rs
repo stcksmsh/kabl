@@ -54,14 +54,19 @@ pub fn shadow(ui: &Ui, st: &Style, rect: Rect, radius: f32, level: usize) {
 /// Side panels (Sounds, Routing, Perform).
 pub fn panel_frame(st: &Style) -> Frame {
     Frame::new()
-        .fill(st.roles.surface)
+        .fill(st.roles.bar)
         .inner_margin(Margin::symmetric(st.sp(3) as i8, st.sp(1) as i8))
+}
+
+/// The page behind cards (the Perform view): the app background, as in the mockup.
+pub fn page_frame(st: &Style) -> Frame {
+    panel_frame(st).fill(st.roles.bg)
 }
 
 /// Toolbar and status bar.
 pub fn bar_frame(st: &Style) -> Frame {
     Frame::new()
-        .fill(st.roles.surface)
+        .fill(st.roles.bar)
         .inner_margin(Margin::symmetric(st.sp(3) as i8, st.sp(2) as i8))
 }
 
@@ -76,7 +81,7 @@ pub fn popover_frame(st: &Style) -> Frame {
 
 pub fn card_frame(st: &Style) -> Frame {
     Frame::new()
-        .fill(st.roles.raised)
+        .fill(st.roles.surface)
         .stroke(Stroke::new(st.slots.controls.outline, st.roles.line))
         .corner_radius(CornerRadius::same(st.radius(Rad::Md) as u8))
         .shadow(eshadow(st, st.slots.controls.card_shadow))
@@ -418,7 +423,7 @@ pub fn apply(ctx: &Context, st: &Style) {
     v.selection.bg_fill = r.accent_soft;
     v.selection.stroke = Stroke::new(1.0, r.accent);
     v.text_cursor.stroke = Stroke::new(2.0, r.text);
-    v.hyperlink_color = r.focus;
+    v.hyperlink_color = r.accent_text;
     v.warn_fg_color = r.warn;
     v.error_fg_color = r.bad;
     let cr = CornerRadius::same((st.radii.sm + 1.0) as u8);

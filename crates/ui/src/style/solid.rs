@@ -1,0 +1,396 @@
+//! The three-layer theme model (PLAN §3, §6): an app theme (`graphite` dark, `paper` light), a
+//! face style (`line_solid`, `outline`) and an accent, composed into one [`Style`]. Layout never
+//! reads any of it. Satin and Lacquer stay whole styles (`builtin_a`, `builtin_b`).
+
+use super::{
+    alpha, builtin_a, contrast, mix, CableStyle, CompactText, DisplayFrame, DisplayTrace,
+    FaceHardware, FaceMaterial, FaceTitle, FamilyMarker, Font, JackRecipe, KnobBody, KnobScale,
+    KnobValue, OutPlate, Roles, Section, Sections, SelectorRecipe, Style, TrayRecipe,
+};
+use egui::Color32;
+
+pub const LINE_SOLID_ID: &str = "kabl.line_solid";
+pub const OUTLINE_ID: &str = "kabl.outline";
+
+fn h(s: &str) -> Color32 {
+    Color32::from_hex(s).expect("valid colour")
+}
+
+/// Face styles a theme file may name with `face_style` (ui_api 2).
+pub const FACE_STYLES: &[&str] = &["line_solid", "outline", "graphite", "aluminium"];
+
+/// An accent: a named preset or a custom colour.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Accent {
+    Amber,
+    Coral,
+    Cyan,
+    Custom(Color32),
+}
+
+impl Accent {
+    /// `amber`, `coral`, `cyan` or `#rrggbb`.
+    pub fn parse(s: &str) -> Option<Accent> {
+        match s {
+            "amber" => Some(Accent::Amber),
+            "coral" => Some(Accent::Coral),
+            "cyan" => Some(Accent::Cyan),
+            _ => Color32::from_hex(s).ok().map(Accent::Custom),
+        }
+    }
+
+    fn colour(self) -> Color32 {
+        match self {
+            Accent::Amber => h("#F2A33A"),
+            Accent::Coral => h("#FF6B3D"),
+            Accent::Cyan => h("#33C1D8"),
+            Accent::Custom(c) => c,
+        }
+    }
+
+    /// The accent as small text on `well`: the preset, mixed toward black until it reaches
+    /// 4.5:1 there. Fills, dots and arcs use the preset as it is.
+    fn text_on(self, well: Color32) -> Color32 {
+        // The G4 spec's paper amber text (4.6:1 on bg, 5.3:1 on surf).
+        if self == Accent::Amber {
+            return h("#A94F00");
+        }
+        let c = self.colour();
+        let mut t = 0.0;
+        while contrast(mix(c, Color32::BLACK, t), well) < 4.5 && t < 0.9 {
+            t += 0.02;
+        }
+        mix(c, Color32::BLACK, t)
+    }
+}
+
+/// Family title colour: the hue mixed toward white (dark) or black (light) until it reaches
+/// 4.5:1 on the face. PLAN §6 starts at 15 % / 35 %; paper amp and fx end at 45 % and 40 %.
+fn title_ink(hue: &str, dark: bool, face: Color32) -> Color32 {
+    let to = if dark { Color32::WHITE } else { Color32::BLACK };
+    let mut t = if dark { 0.15 } else { 0.35 };
+    loop {
+        let c = mix(h(hue), to, t);
+        if contrast(c, face) >= 4.5 || t >= 0.95 {
+            return c;
+        }
+        t += 0.05;
+    }
+}
+
+fn roles(dark: bool, accent: Accent) -> Roles {
+    let (bg, surface, raised, inset, line, line2) = if dark {
+        (
+            "#111214", "#1A1B1E", "#232529", "#0F1012", "#2A2C31", "#393C42",
+        )
+    } else {
+        (
+            "#ECEAE5", "#FBFAF7", "#FFFFFF", "#E4E1DA", "#DCD8D0", "#C8C4BB",
+        )
+    };
+    let (text, text2, text3) = if dark {
+        ("#ECEAE6", "#A29F99", "#6F6D68")
+    } else {
+        ("#1A1917", "#5F5C56", "#8E8A83")
+    };
+    let (audio, cv, gate, pitch) = if dark {
+        ("#F59E3B", "#38C6B2", "#A68BFA", "#5BA8F7")
+    } else {
+        ("#D9781C", "#12958A", "#7651D6", "#2F7FD6")
+    };
+    let rack = if dark { "#0C0D0E" } else { "#DCD9D2" };
+    // Signal colours are the mockup's (they supersede the 2026-11-01 darkened paper hues).
+    let sig = h;
+    let acc = accent.colour();
+    let acc_text = if dark {
+        acc
+    } else {
+        accent.text_on(h(surface))
+    };
+    let on_accent = if contrast(h("#1C1206"), acc) >= contrast(Color32::WHITE, acc) {
+        h("#1C1206")
+    } else {
+        Color32::WHITE
+    };
+    Roles {
+        bg: h(bg),
+        surface: h(surface),
+        bar: h(if dark { "#17181B" } else { "#F7F6F2" }),
+        raised: h(raised),
+        inset: h(inset),
+        line: h(line),
+        line2: h(line2),
+        text: h(text),
+        text2: h(text2),
+        text3: h(text3),
+        accent: acc,
+        accent_text: acc_text,
+        on_accent,
+        accent_soft: mix(acc, h(bg), 0.8),
+        focus: acc,
+        audio: sig(audio),
+        cv: sig(cv),
+        gate: sig(gate),
+        pitch: sig(pitch),
+        rack: h(rack),
+        rail: h(if dark { "#1B1C1F" } else { "#C9C5BC" }),
+        hole: h(if dark { "#060607" } else { "#A39E94" }),
+        disp_bg: h(inset),
+        disp_grid: alpha(h(text), 20),
+        disp_trace: acc,
+        disp_text: h(text2),
+        // Caps as in the mockup's cap-hyb-d / cap-hyb-l gradients; dark pointer on paper.
+        knob: h(if dark { "#1D1F23" } else { "#E2DED6" }),
+        knob_hi: h(if dark { "#3C3F45" } else { "#FFFFFF" }),
+        knob_ink: h(if dark { "#F2F0EB" } else { "#1A1917" }),
+        // G4 state colours (G4-SPEC §2).
+        bad: h(if dark { "#F06A5F" } else { "#C2362B" }),
+        good: h(if dark { "#5CCB8A" } else { "#2C774B" }),
+        warn: h(if dark { "#E3A93C" } else { "#945E00" }),
+    }
+}
+
+fn sections(dark: bool, face: Color32, text2: Color32) -> Sections {
+    let s = |hue: &str| Section {
+        base: face,
+        ink: title_ink(hue, dark, face),
+        ink2: text2,
+    };
+    Sections {
+        osc: s("#E07A5F"),
+        filter: s("#7FB59A"),
+        modulation: s("#9D8DF1"),
+        timing: s("#5FA8D3"),
+        amp: s("#E3BE5C"),
+        fx: s("#B9B2A6"),
+    }
+}
+
+/// `line_solid`: line-art panels and wells, solid hardware (filled caps, hex jacks, accent
+/// selectors), glow on dark.
+fn line_solid(dark: bool, accent: Accent) -> Style {
+    let mut s = builtin_a(dark);
+    s.roles = roles(dark, accent);
+    let face = mix(s.roles.rack, Color32::WHITE, if dark { 0.022 } else { 0.4 });
+    s.sections = sections(dark, face, s.roles.text2);
+    s.id = LINE_SOLID_ID.into();
+    s.name = "Signal and Drafting solid".into();
+    s.types.h3.font = Font::SansCondSemibold;
+    s.types.h3.size = 14.0;
+    s.types.label.size = 11.0;
+    s.types.value.font = Font::Mono;
+    s.types.value.size = 11.0;
+    s.types.caption.font = Font::Mono;
+    s.types.section.font = Font::SansCondSemibold;
+    s.types.section.tracking = 0.8;
+    let f = &mut s.slots.face;
+    f.material = FaceMaterial::Line;
+    f.gradient = 0.0;
+    f.gloss = 0.0;
+    f.grain = 0.0;
+    f.hardware = FaceHardware::Screws;
+    f.title = FaceTitle::CondCaps;
+    f.out_plate = OutPlate::Outline;
+    f.shadow = 0;
+    f.family = FamilyMarker::Title;
+    f.compact = CompactText::Hold;
+    f.tray = TrayRecipe::Outline;
+    let k = &mut s.slots.knob;
+    k.body = KnobBody::Solid;
+    k.scale = KnobScale::TrackArc;
+    k.value = KnobValue::Arc;
+    k.glow = if dark { 0.4 } else { 0.0 };
+    let c = &mut s.slots.cable;
+    c.style = CableStyle::Themed;
+    c.edge = if dark { 0.35 } else { 0.5 };
+    c.highlight = 0.45;
+    c.shadow_alpha = if dark { 0.0 } else { 0.28 };
+    c.shadow_dy = 1.5;
+    c.glow_alpha = if dark { 0.16 } else { 0.0 };
+    c.glow_width = 12.0;
+    s.slots.selector = SelectorRecipe::AccentPill;
+    s.slots.jack = JackRecipe::Hex;
+    s.slots.display.frame = DisplayFrame::Paper;
+    s.slots.display.trace = if dark {
+        DisplayTrace::SoftGlow
+    } else {
+        DisplayTrace::Crisp
+    };
+    s
+}
+
+/// `outline`: the same line art with outlined hardware (flat discs, ring jacks, outlined
+/// selectors) and no glow.
+fn outline(dark: bool, accent: Accent) -> Style {
+    let mut s = line_solid(dark, accent);
+    s.id = OUTLINE_ID.into();
+    s.name = "Outline".into();
+    s.slots.knob.body = KnobBody::Disc;
+    s.slots.knob.value = KnobValue::Line;
+    s.slots.knob.glow = 0.0;
+    s.slots.jack = JackRecipe::Donut;
+    s.slots.selector = SelectorRecipe::Outlined;
+    s.slots.display.trace = DisplayTrace::Crisp;
+    s
+}
+
+/// `graphite` and `aluminium`: solid panels with their own fill and ink in both app themes, a
+/// 3 px family stripe instead of a coloured title, flat material. Experimental (automatic
+/// checks only, PLAN §3 review policy). `fill`, `ink`, `ink2` are the panel colours.
+fn solid_panel(dark: bool, accent: Accent, fill: &str, ink: &str, ink2: &str) -> Style {
+    let mut s = line_solid(dark, accent);
+    let face_dark = h(fill).r() < 128;
+    s.slots.face.material = FaceMaterial::Flat;
+    s.slots.face.family = FamilyMarker::Stripe;
+    s.slots.face.hardware = FaceHardware::Screws;
+    s.slots.face.ink = h(ink);
+    let sec = |hue: &str| Section {
+        base: h(fill),
+        // Stripe colour: the family hue, pushed away from the fill until it reads (4.5:1, like a title ink).
+        ink: {
+            let to = if face_dark {
+                Color32::WHITE
+            } else {
+                Color32::BLACK
+            };
+            let mut t = 0.0;
+            while contrast(mix(h(hue), to, t), h(fill)) < 4.5 && t < 0.95 {
+                t += 0.05;
+            }
+            mix(h(hue), to, t)
+        },
+        ink2: h(ink2),
+    };
+    s.sections = Sections {
+        osc: sec("#E07A5F"),
+        filter: sec("#7FB59A"),
+        modulation: sec("#9D8DF1"),
+        timing: sec("#5FA8D3"),
+        amp: sec("#E3BE5C"),
+        fx: sec("#B9B2A6"),
+    };
+    s
+}
+
+fn graphite(dark: bool, accent: Accent) -> Style {
+    let mut s = solid_panel(dark, accent, "#2B2D32", "#ECEAE6", "#A9A6A0");
+    s.id = "kabl.graphite".into();
+    s.name = "Graphite panels (experimental)".into();
+    s
+}
+
+fn aluminium(dark: bool, accent: Accent) -> Style {
+    let mut s = solid_panel(dark, accent, "#C7CACF", "#17181B", "#4A4D54");
+    s.id = "kabl.aluminium".into();
+    s.name = "Aluminium panels (experimental)".into();
+    s
+}
+
+/// The face style `name` (see [`FACE_STYLES`]) in app theme `dark` with `accent`.
+pub fn compose(face_style: &str, dark: bool, accent: Accent) -> Option<Style> {
+    match face_style {
+        "line_solid" => Some(line_solid(dark, accent)),
+        "outline" => Some(outline(dark, accent)),
+        "graphite" => Some(graphite(dark, accent)),
+        "aluminium" => Some(aluminium(dark, accent)),
+        _ => None,
+    }
+}
+
+/// `style` with its accent replaced (an accent preset or custom colour on any built-in).
+pub fn with_accent(mut style: Style, accent: Accent) -> Style {
+    let r = &mut style.roles;
+    let acc = accent.colour();
+    let acc_text = if style.dark {
+        acc
+    } else {
+        accent.text_on(r.surface)
+    };
+    r.accent = acc;
+    r.accent_text = acc_text;
+    r.on_accent = if contrast(h("#1C1206"), acc) >= contrast(Color32::WHITE, acc) {
+        h("#1C1206")
+    } else {
+        Color32::WHITE
+    };
+    r.accent_soft = mix(acc, r.bg, 0.8);
+    r.focus = acc;
+    r.disp_trace = acc;
+    style
+}
+
+/// `line_solid` with the default amber accent: the redesign's two default looks.
+pub fn line_solid_default(dark: bool) -> Style {
+    line_solid(dark, Accent::Amber)
+}
+
+/// `outline` with the default amber accent.
+pub fn outline_default(dark: bool) -> Style {
+    outline(dark, Accent::Amber)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn paper_amber_and_hue_mixes_are_the_approved_tokens() {
+        let paper = line_solid_default(false);
+        // The mockup's amber fills in both themes; only small text on paper is darker.
+        assert_eq!(paper.roles.accent, h("#F2A33A"));
+        assert!(contrast(paper.roles.accent_text, paper.roles.surface) >= 4.5);
+        assert_ne!(paper.roles.accent_text, paper.roles.accent);
+        let dark = line_solid_default(true);
+        assert_eq!(dark.roles.accent, h("#F2A33A"));
+        assert_eq!(dark.roles.accent_text, h("#F2A33A"));
+        // Title inks on the paper face (the mockup's warm grey): the family hue mixed toward
+        // black at least as far as the approved mixes (amp 45 %, fx 40 %, the rest 35 %), until
+        // 4.5:1.
+        let face = paper.sections.amp.base;
+        assert_ne!(face, paper.roles.surface, "the face is not the surf colour");
+        for (sec, hue, t) in [
+            (paper.sections.amp.ink, "#E3BE5C", 0.45),
+            (paper.sections.fx.ink, "#B9B2A6", 0.40),
+            (paper.sections.osc.ink, "#E07A5F", 0.35),
+        ] {
+            let approved = mix(h(hue), Color32::BLACK, t);
+            assert!(sec.r() <= approved.r() + 1, "{hue} {sec:?} {approved:?}");
+            assert!(contrast(sec, face) >= 4.5, "{hue}");
+        }
+        assert!(contrast(paper.sections.amp.ink, face) >= 4.5);
+    }
+
+    #[test]
+    fn solid_panels_keep_ink_and_stripe_readable() {
+        for fs in ["graphite", "aluminium"] {
+            for dark in [true, false] {
+                let s = compose(fs, dark, Accent::Amber).unwrap();
+                let sec = s.sections.osc;
+                assert!(contrast(s.slots.face.ink, sec.base) >= 4.5, "{fs} ink");
+                assert!(contrast(sec.ink2, sec.base) >= 4.5, "{fs} ink2");
+                for c in [s.sections.filter, s.sections.fx, s.sections.amp] {
+                    assert!(contrast(c.ink, c.base) >= 3.0, "{fs} stripe");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn every_combo_passes_the_text_pairs() {
+        for dark in [true, false] {
+            for accent in [Accent::Amber, Accent::Coral, Accent::Cyan] {
+                for fs in FACE_STYLES {
+                    let s = compose(fs, dark, accent).unwrap();
+                    for (what, a, b, min) in s.contrast_pairs() {
+                        let c = contrast(a, b);
+                        assert!(c >= min, "{fs} dark={dark} {accent:?} {what}: {c:.2}");
+                    }
+                    for (what, a, b, min) in s.mark_pairs() {
+                        let c = contrast(a, b);
+                        assert!(c >= min, "{fs} dark={dark} {accent:?} {what}: {c:.2}");
+                    }
+                }
+            }
+        }
+    }
+}

@@ -39,6 +39,7 @@ pub struct Theme {
     pub audio: Color32,
     pub cv: Color32,
     pub gate: Color32,
+    pub pitch: Color32,
     pub btn: Color32,
 }
 
@@ -48,6 +49,7 @@ pub fn theme(st: &Style) -> Theme {
     let r = &st.roles;
     let dark = st.dark;
     let accent_pill = st.slots.selector == crate::style::SelectorRecipe::AccentPill;
+    let line = st.slots.face.material == crate::style::FaceMaterial::Line;
     Theme {
         dark,
         chrome: r.bg,
@@ -57,7 +59,12 @@ pub fn theme(st: &Style) -> Theme {
         rail_hi: r.text3,
         hole: r.hole,
         panel: r.surface,
-        panel_edge: r.line2,
+        // Line art: a hairline in the text colour at 26 % over the face.
+        panel_edge: if st.slots.face.material == crate::style::FaceMaterial::Line {
+            mix(r.surface, r.text, 0.26)
+        } else {
+            r.line2
+        },
         ink: r.text,
         ink2: r.text2,
         plate: mix(r.knob, r.hole, 0.5),
@@ -65,11 +72,30 @@ pub fn theme(st: &Style) -> Theme {
         knob: r.knob,
         knob_hi: r.knob_hi,
         pointer: r.knob_ink,
-        skirt: mix(r.knob, r.knob_hi, 0.25),
+        skirt: if line && !dark {
+            hex("#D6D2C9")
+        } else if line {
+            hex("#141518")
+        } else {
+            mix(r.knob, r.knob_hi, 0.25)
+        },
         tick: r.text2,
-        nut: mix(r.knob, r.knob_hi, 0.35),
-        nut_edge: mix(r.knob, r.knob_hi, 0.8),
-        hole_c: r.hole,
+        // Line art hardware, as in the mockup: white nuts on paper, dark nuts on graphite.
+        nut: if line && !dark {
+            r.raised
+        } else if line {
+            hex("#2B2D32")
+        } else {
+            mix(r.knob, r.knob_hi, 0.35)
+        },
+        nut_edge: if line && !dark {
+            r.line2
+        } else if line {
+            hex("#45484E")
+        } else {
+            mix(r.knob, r.knob_hi, 0.8)
+        },
+        hole_c: st.jack_hole(),
         display: r.disp_bg,
         display_ink: r.disp_trace,
         seg_bg: r.inset,
@@ -85,6 +111,7 @@ pub fn theme(st: &Style) -> Theme {
         audio: r.audio,
         cv: r.cv,
         gate: r.gate,
+        pitch: r.pitch,
         btn: mix(r.inset, r.raised, 0.4),
     }
 }
@@ -98,7 +125,8 @@ impl Theme {
     pub fn signal(&self, t: PortType) -> Color32 {
         match t {
             PortType::Audio => self.audio,
-            PortType::Cv | PortType::UnipolarCv | PortType::Pitch => self.cv,
+            PortType::Cv | PortType::UnipolarCv => self.cv,
+            PortType::Pitch => self.pitch,
             PortType::Gate => self.gate,
         }
     }
@@ -127,7 +155,7 @@ impl Theme {
 /// Portable IBM Plex typography; OFL-1.1 and reserved name notice in assets/FONT-LICENSE.txt.
 pub fn install_fonts(ctx: &egui::Context) {
     let mut fonts = egui::FontDefinitions::default();
-    let faces: [(&str, &[u8], egui::FontFamily); 5] = [
+    let faces: [(&str, &[u8], egui::FontFamily); 6] = [
         (
             "plex-sans",
             include_bytes!("../assets/IBMPlexSans-Regular.ttf"),
@@ -147,6 +175,11 @@ pub fn install_fonts(ctx: &egui::Context) {
             "plex-sans-semibold",
             include_bytes!("../assets/IBMPlexSans-SemiBold.ttf"),
             egui::FontFamily::Name("kabl-sans-semibold".into()),
+        ),
+        (
+            "plex-cond-semibold",
+            include_bytes!("../assets/IBMPlexSansCondensed-SemiBold.ttf"),
+            egui::FontFamily::Name("kabl-cond-semibold".into()),
         ),
         (
             "plex-mono-medium",
@@ -193,9 +226,33 @@ pub fn panel_theme(st: &Style, kind: &str) -> Theme {
     let mut t = theme(st);
     let sec = st.section_of(kind);
     t.panel = sec.base;
-    t.panel_edge = t.panel.lerp_to_gamma(Color32::BLACK, 0.3);
+    t.panel_edge = if st.slots.face.material == crate::style::FaceMaterial::Line {
+        // Line art: the text colour at 26 % (graphite) or 30 % (paper) over the face.
+        mix(t.panel, st.roles.text, if st.dark { 0.26 } else { 0.30 })
+    } else {
+        t.panel.lerp_to_gamma(Color32::BLACK, 0.3)
+    };
     t.ink = sec.ink;
     t.ink2 = sec.ink2;
+    if st.slots.face.material == crate::style::FaceMaterial::Line
+        && st.slots.face.family == crate::style::FamilyMarker::Title
+    {
+        // Line panels: only the title wears the family hue (`kit::face::family_ink`); labels,
+        // values and ticks use the app text colours.
+        t.ink = st.roles.text;
+        t.ink2 = st.roles.text2;
+    }
+    let ink = st.slots.face.ink;
+    if ink.a() > 0 {
+        // Solid panel: its own ink, wells and buttons derived from the panel fill.
+        t.ink = ink;
+        t.seg_bg = mix(
+            sec.base,
+            Color32::BLACK,
+            if sec.base.r() < 128 { 0.35 } else { 0.10 },
+        );
+        t.btn = mix(sec.base, ink, 0.10);
+    }
     t.tick = t.ink2;
     t
 }

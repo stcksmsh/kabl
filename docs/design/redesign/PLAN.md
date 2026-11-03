@@ -155,10 +155,10 @@ App themes:
 | line / line2 | `#2A2C31 / #393C42` | `#DCD8D0 / #C8C4BB` |
 | text / text2 / text3 | `#ECEAE6 / #A29F99 / #6F6D68` | `#1A1917 / #5F5C56 / #8E8A83` |
 | rack / rail / rail hole | `#0C0D0E / #1B1C1F / #060607` | `#DCD9D2 / #C9C5BC / #A39E94` |
-| audio / cv / gate / pitch | `#F59E3B / #38C6B2 / #A68BFA / #5BA8F7` | `#D9781C / #12958A / #7651D6 / #2F7FD6` |
+| audio / cv / gate / pitch | `#F59E3B / #38C6B2 / #A68BFA / #5BA8F7` | `#B66518 / #11897F / #7651D6 / #2E7CD2` |
 
-Accent: amber `#F2A33A` (ink on accent `#1C1206`), coral `#FF6B3D`, cyan `#33C1D8`.
-Family hues: osc `#E07A5F`, filter `#7FB59A`, env `#9D8DF1`, timing `#5FA8D3`, amp `#E3BE5C`, fx `#B9B2A6`. Line styles draw titles with hue mixed 15 % to white (dark) / 35 % to black (light) **[contrast unverified]**.
+Accent: amber `#F2A33A` graphite, `#A97229` paper (ink on accent `#1C1206`), coral `#FF6B3D`, cyan `#33C1D8`.
+Family hues: osc `#E07A5F`, filter `#7FB59A`, env `#9D8DF1`, timing `#5FA8D3`, amp `#E3BE5C`, fx `#B9B2A6`. Line styles draw titles with hue mixed 15 % to white (dark) / to black (light): amp 45 %, fx 40 %, others 35 % **[contrast unverified]**.
 
 `line_solid` values (dark / light): panel edge `rgba(236,234,230,.26)` / `rgba(26,25,23,.30)`; knob skirt `#141518` / `#D6D2C9`; cap gradient `#3C3F45→#1D1F23` / `#FFFFFF→#E2DED6`; pointer `#F2F0EB` / `#1A1917`; jack nut `#2B2D32` / `#FFFFFF`, nut edge `#45484E` / line2; hole `#050506` / `#24232A`; selector track inset / `#D6D2C8`; shadow alpha .45 / .14; glow alpha .14–.22 (dark only).
 

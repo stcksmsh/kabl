@@ -15,8 +15,10 @@ use egui::{pos2, vec2, Color32, FontId, Painter, Pos2, Rect};
 use kabl_core::{ModuleState, PatchState, Vec2 as WorldVec};
 use kabl_modules::{registry, PortDirection};
 use kabl_ui::rack::{self, Decor, Geo, Placed};
-use kabl_ui::routing::{fmt_value, param_label};
-use kabl_ui::style::{builtin_a, builtin_b, contrast, KnobScale, Role, Style};
+use kabl_ui::routing::{face_label, fmt_value};
+use kabl_ui::style::{
+    builtin_a, builtin_b, contrast, line_solid_default, CompactText, KnobScale, Role, Style,
+};
 use std::fmt::Write as _;
 
 const ZOOMS: [f32; 6] = [0.5, 0.58, 0.75, 1.0, 1.5, 2.0];
@@ -160,7 +162,7 @@ fn sc(m: &Placed, z: f32, r: Rect) -> Rect {
 
 /// Containers: wells and plates. Leaves may sit inside or apart, never straddle.
 fn containers(m: &Placed) -> Vec<Rect> {
-    let mut v: Vec<Rect> = m.plate.into_iter().collect();
+    let mut v: Vec<Rect> = m.plate.into_iter().chain(m.tray).collect();
     match m.decor {
         Decor::Keys(r)
         | Decor::Display(r)
@@ -212,7 +214,9 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
         (15.0 * z).max(10.5)
     };
     // Today's renderer: labels need 12 * z >= 9.5.
-    let renders_today = 12.0 * z >= HIDE_BELOW;
+    // Compact-text styles (`Hold`) draw held 9.5 px text from the compact tier up.
+    let renders_today =
+        12.0 * z >= HIDE_BELOW || (st.slots.face.compact == CompactText::Hold && !overview);
 
     let mut leaves: Vec<Leaf> = Vec::new();
     let mut required: Vec<(String, Rect)> = Vec::new();
@@ -220,20 +224,24 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
     let mut group = 0usize;
     let knob_ring = match st.slots.knob.scale {
         KnobScale::Ticks => 7.5,
-        KnobScale::TrackArc => 6.7,
+        KnobScale::TrackArc => 4.8,
         KnobScale::None => 1.5,
     };
 
     for c in &m.ctls {
         group += 1;
-        let label = param_label(c.param);
+        let label = face_label(m.info.kind, c.param);
         let lw = ruler.size(&label, font(st, Role::Label, label_px));
-        let lp = sc(
+        let mut lp = sc(
             &m,
             z,
             Rect::from_center_size(c.geo.label_pos(), egui::Vec2::ZERO),
         )
         .center();
+        if let Geo::Knob { c: at, r } = c.geo {
+            let at = sc(&m, z, Rect::from_center_size(at, egui::Vec2::ZERO)).center();
+            lp = at - vec2(0.0, rack::knob_text_dy(r, z, lw.y));
+        }
         let lr = Rect::from_center_size(lp, lw);
         let (slot, ax) = match c.geo {
             Geo::Knob { c: at, .. } => (m.slot_width(c), at.x - m.face.min.x),
@@ -262,6 +270,10 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
                     name: c.param.name.into(),
                 });
             }
+        }
+        // A selector names itself by its options (G1b): no label.
+        if matches!(c.geo, Geo::Select { .. }) {
+            continue;
         }
         // The label is required text. Text wider than its slot is dropped by rule (info) in the
         // compact tier and an error in the full tier.
@@ -317,6 +329,13 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
                     Rect::from_center_size(c.geo.value_pos(), egui::Vec2::ZERO),
                 )
                 .center();
+                let vp = match c.geo {
+                    Geo::Knob { c: at, r } => {
+                        let at = sc(&m, z, Rect::from_center_size(at, egui::Vec2::ZERO)).center();
+                        at + vec2(0.0, rack::knob_text_dy(r, z, vs.y))
+                    }
+                    Geo::Select { .. } => vp,
+                };
                 let vr = Rect::from_center_size(vp, vs);
                 if vs.x > max_w {
                     push(
@@ -343,17 +362,18 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
         let ax = j.c.x - m.face.min.x;
         leaves.push(Leaf {
             k: K::Jack,
-            r: Rect::from_center_size(c, egui::Vec2::splat(2.0 * rack::JACK_R * z)),
+            r: Rect::from_center_size(c, egui::Vec2::splat(2.0 * rack::JACK_NUT * z)),
             group,
             ax,
             name: format!("jack {}", j.port.name),
         });
-        let label = port_label(j.port.name);
+        let label = rack::short_name(m.info.kind, j.port.name)
+            .map_or_else(|| port_label(j.port.name), str::to_string);
         let lw = ruler.size(&label, font(st, Role::Label, label_px));
         let lc = if j.label_right {
             c + vec2(20.0 * z + lw.x / 2.0, 0.0)
         } else {
-            c - vec2(0.0, 24.0 * z)
+            c - vec2(0.0, rack::jack_text_dy(z, lw.y))
         };
         let lr = Rect::from_center_size(lc, lw);
         if !renders_today || overview {
@@ -407,18 +427,6 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
 
     // Header: title (as `kit::face::title`), `+N` chip, caption.
     group += 1;
-    let tf = font(st, Role::H3, title_px);
-    let mut tsz = ruler.size(m.info.name, tf.clone());
-    let mut tfont = tf;
-    if tsz.x > face.width() - 100.0 * z {
-        tfont = FontId::new((title_px * 0.8).max(11.0), tfont.family.clone());
-        tsz = ruler.size(m.info.name, tfont.clone());
-    }
-    let tag = format!("{} · #{}", m.info.kind, 1);
-    let capsz = ruler.size(&tag, font(st, Role::Caption, caption_px));
-    let y = 26.0 * z;
-    let name_r = Rect::from_min_size(pos2(12.0 * z, y - tsz.y / 2.0), tsz);
-    let tag_r = Rect::from_min_size(pos2(12.0 * z, 43.0 * z - capsz.y / 2.0), capsz);
     let avoid: Vec<Rect> = m
         .ctls
         .iter()
@@ -431,6 +439,28 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
             )
         }))
         .collect();
+    let tf = font(st, Role::H3, title_px);
+    let shown = if ruler
+        .size(&kabl_ui::kit::face::title_text(st, m.info.name), tf.clone())
+        .x
+        * 1.06
+        > kabl_ui::kit::face::title_room_beside(face, z, 26.0 * z, &avoid)
+    {
+        kabl_ui::kit::face::short_title(m.info.name)
+    } else {
+        m.info.name
+    };
+    let mut tsz = ruler.size(shown, tf.clone());
+    let mut tfont = tf;
+    if tsz.x > face.width() - 100.0 * z {
+        tfont = FontId::new((title_px * 0.8).max(11.0), tfont.family.clone());
+        tsz = ruler.size(shown, tfont.clone());
+    }
+    let tag = format!("{} · #{}", m.info.kind, 1);
+    let capsz = ruler.size(&tag, font(st, Role::Caption, caption_px));
+    let y = 26.0 * z;
+    let name_r = Rect::from_min_size(pos2(12.0 * z, y - tsz.y / 2.0), tsz);
+    let tag_r = Rect::from_min_size(pos2(12.0 * z, 43.0 * z - capsz.y / 2.0), capsz);
     let decor = match m.decor {
         Decor::Keys(r)
         | Decor::Display(r)
@@ -473,7 +503,9 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
             name: "caption".into(),
         });
     }
-    if let Some(t) = m.toggle {
+    // Compact tier: a `+N` chip that would sit on its title is not drawn (as in `draw_module`).
+    let chip_fits = |t: Rect| tier_full || name_r.max.x + 1.5 <= sc(&m, z, t).min.x;
+    if let Some(t) = m.toggle.filter(|&t| !overview && chip_fits(t)) {
         group += 1;
         leaves.push(Leaf {
             k: K::Chip,
@@ -513,6 +545,20 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
                 }
             }
         }
+        // corner screws stay clear of jacks
+        if a.k == K::Jack {
+            for at in kabl_ui::kit::face::screw_points(m.face.width(), m.face.height()) {
+                let s = Rect::from_center_size(at * z, vec2(7.0, 7.0) * z).expand(2.0);
+                if overlaps(a.r, s) {
+                    push(
+                        "overlap",
+                        Sev::Error,
+                        format!("{} touches a corner screw", a.name),
+                        vec![a.r, s],
+                    );
+                }
+            }
+        }
         // containers: inside or apart, never straddling
         for c in &boxes {
             if overlaps(a.r, *c) && !c.expand(0.5).contains_rect(a.r) {
@@ -537,7 +583,10 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
                 .min(face.max.x - a.r.max.x)
                 .min(a.r.min.y - face.min.y)
                 .min(face.max.y - a.r.max.y);
-            if m_ < 4.0 {
+            // Split / Join (owner pick, option A): three 26 px jacks at pitch 28 in 90 px leave
+            // 4 world px, which is under 4 screen px below zoom 1.
+            let narrow = matches!(kind, "split" | "join") && z < 1.0;
+            if m_ < 4.0 && !narrow {
                 push(
                     "edge",
                     Sev::Error,
@@ -691,7 +740,7 @@ fn run_all() -> Out {
         ctx.begin_pass(input());
         let _ = ctx.end_pass();
     }
-    let mut st = builtin_a(true);
+    let mut st = line_solid_default(true);
     st.fonts_ready = true;
     let mut out = Out {
         recs: vec![],

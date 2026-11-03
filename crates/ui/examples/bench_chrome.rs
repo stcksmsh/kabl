@@ -50,6 +50,10 @@ fn run(
     {
         ui.zoom = z;
     }
+    // KABL_BENCH_CABLES=hidden measures the frame without cables, to size their share.
+    if std::env::var("KABL_BENCH_CABLES").as_deref() == Ok("hidden") {
+        ui.cable_view = kabl_ui::CableView::Hidden;
+    }
     ui.perform_open = perform > 0;
     ui.perform_tall = perform == 1;
     ui.dark = dark;
@@ -179,7 +183,16 @@ fn main() {
     };
     let simple = kabl_standalone::default_patch();
     let dense = dense();
-    for (w, h) in [(1440.0, 900.0), (1280.0, 800.0), (1180.0, 680.0)] {
+    // KABL_BENCH_SIZES=1 measures 1440x900 only (interleaved A/B runs).
+    let sizes = [(1440.0, 900.0), (1280.0, 800.0), (1180.0, 680.0)];
+    // KABL_BENCH_SIZES=1 measures 1440x900 only, =1180 measures 1180x680 only.
+    let only = std::env::var("KABL_BENCH_SIZES").unwrap_or_default();
+    let picked: Vec<(f32, f32)> = match only.as_str() {
+        "1" => vec![sizes[0]],
+        "1180" => vec![sizes[2]],
+        _ => sizes.to_vec(),
+    };
+    for &(w, h) in &picked {
         for dark in [false, true] {
             run("simple", &simple, w, h, dark, frames, 0, live, edit);
             run("dense", &dense, w, h, dark, frames, 0, live, edit);

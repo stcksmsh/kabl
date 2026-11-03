@@ -58,7 +58,7 @@ pub fn paint_arc_knob(
     p.circle_filled(c, body_r, r.knob);
     match st.slots.knob.body {
         KnobBody::Disc => {}
-        KnobBody::Cap | KnobBody::Glass => {
+        KnobBody::Cap | KnobBody::Glass | KnobBody::Solid => {
             let k = if st.slots.knob.body == KnobBody::Glass {
                 0.5
             } else {
@@ -226,7 +226,7 @@ pub fn pad(
             s.to_uppercase(),
             st.font(Role::Caption),
             if state == PadState::Queued {
-                r.accent
+                r.accent_text
             } else {
                 ink2
             },

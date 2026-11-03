@@ -23,6 +23,9 @@ pub enum Ic {
     Close,
     Folder,
     Cable,
+    CableOff,
+    Midi,
+    Heart,
     Bolt,
     Save,
     Note,
@@ -34,15 +37,20 @@ pub enum Ic {
     Rec,
     More,
     Pin,
-}
-
-fn arc(c: Pos2, r: f32, a0: f32, a1: f32) -> Vec<Pos2> {
-    (0..=12)
-        .map(|i| {
-            let a = a0 + (a1 - a0) * i as f32 / 12.0;
-            c + vec2(a.cos(), a.sin()) * r
-        })
-        .collect()
+    File,
+    Err,
+    Back,
+    Up,
+    Home,
+    Copy,
+    Grip,
+    Invert,
+    Bypass,
+    Trash,
+    Plug,
+    Wave,
+    Clock,
+    External,
 }
 
 pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
@@ -118,10 +126,10 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
             }
         }
         Ic::Focus => {
-            p.circle_stroke(c, 5.0 * u, st);
-            p.circle_filled(c, 1.6 * u, col);
+            // The mockup's `target`: a ring and four short ticks.
+            p.circle_stroke(c, 2.5 * u, st);
             for (dx, dy) in [(0.0, -1.0), (0.0, 1.0), (-1.0, 0.0), (1.0, 0.0)] {
-                line(&[(dx * 5.0, dy * 5.0), (dx * 8.0, dy * 8.0)]);
+                line(&[(dx * 3.0, dy * 3.0), (dx * 6.0, dy * 6.0)]);
             }
         }
         Ic::Gear => {
@@ -162,13 +170,49 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
                 st,
             ));
         }
-        Ic::Cable => {
-            p.circle_stroke(q(-5.0, -4.0), 2.2 * u, st);
-            p.circle_stroke(q(5.0, 4.0), 2.2 * u, st);
-            p.add(Shape::line(
-                arc(q(0.0, -1.0), 7.0 * u, PI * 0.8, PI * 0.2),
-                st,
-            ));
+        Ic::Cable | Ic::CableOff => {
+            // The mockup's `cable`: two small plugs joined by one curve.
+            p.circle_stroke(q(-5.0, -3.5), 1.5 * u, st);
+            p.circle_stroke(q(5.0, 3.5), 1.5 * u, st);
+            let (p0, p1, p2, p3) = ((-3.7, -2.8), (0.0, -2.0), (0.0, 2.0), (3.7, 2.8));
+            let pts: Vec<Pos2> = (0..=16)
+                .map(|i| {
+                    let t = i as f32 / 16.0;
+                    let m = 1.0 - t;
+                    let k = |a: f32, b: f32, c2: f32, d: f32| {
+                        m * m * m * a + 3.0 * m * m * t * b + 3.0 * m * t * t * c2 + t * t * t * d
+                    };
+                    q(k(p0.0, p1.0, p2.0, p3.0), k(p0.1, p1.1, p2.1, p3.1))
+                })
+                .collect();
+            p.add(Shape::line(pts, st));
+            if ic == Ic::CableOff {
+                line(&[(-8.0, -8.0), (6.0, 8.0)]);
+            }
+        }
+        Ic::Midi => {
+            p.circle_stroke(c, 7.0 * u, st);
+            for (x, y) in [
+                (-4.5, 0.5),
+                (-2.3, -3.2),
+                (0.0, -4.2),
+                (2.3, -3.2),
+                (4.5, 0.5),
+            ] {
+                p.circle_filled(q(x, y), 0.9 * u, col);
+            }
+        }
+        Ic::Heart => {
+            let pts: Vec<Pos2> = (0..=24)
+                .map(|i| {
+                    let t = i as f32 / 24.0 * 2.0 * PI;
+                    q(
+                        7.0 * t.sin().powi(3) * 0.9,
+                        -(5.6 * t.cos() - 2.2 * (2.0 * t).cos() - 0.9 * (3.0 * t).cos()) + 0.5,
+                    )
+                })
+                .collect();
+            p.add(Shape::closed_line(pts, st));
         }
         Ic::Bolt => {
             p.add(Shape::convex_polygon(
@@ -241,5 +285,108 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
             line(&[(0.0, 1.0), (0.0, 7.0)]);
         }
         Ic::Check => line(&[(-5.0, 0.0), (-1.5, 4.0), (5.5, -4.0)]),
+        Ic::File => {
+            line(&[
+                (-4.5, -7.0),
+                (2.0, -7.0),
+                (5.5, -3.5),
+                (5.5, 7.0),
+                (-4.5, 7.0),
+                (-4.5, -7.0),
+            ]);
+            line(&[(2.0, -7.0), (2.0, -3.5), (5.5, -3.5)]);
+        }
+        Ic::Err => {
+            p.circle_stroke(q(0.0, 0.0), 6.5 * u, st);
+            line(&[(-2.5, -2.5), (2.5, 2.5)]);
+            line(&[(2.5, -2.5), (-2.5, 2.5)]);
+        }
+        Ic::Back => line(&[(2.0, -4.0), (-2.0, 0.0), (2.0, 4.0)]),
+        Ic::Up => {
+            line(&[(0.0, 5.0), (0.0, -5.0)]);
+            line(&[(-4.0, -1.0), (0.0, -5.0), (4.0, -1.0)]);
+        }
+        Ic::Home => {
+            line(&[(-6.5, 0.0), (0.0, -6.0), (6.5, 0.0)]);
+            line(&[(-4.5, -1.5), (-4.5, 6.0), (4.5, 6.0), (4.5, -1.5)]);
+        }
+        Ic::Copy => {
+            p.rect_stroke(
+                Rect::from_min_max(q(-2.0, -2.0), q(6.0, 6.5)),
+                1.5,
+                st,
+                StrokeKind::Middle,
+            );
+            line(&[
+                (-4.0, 3.0),
+                (-6.0, 3.0),
+                (-6.0, -6.0),
+                (1.5, -6.0),
+                (1.5, -4.0),
+            ]);
+        }
+        Ic::Grip => {
+            for x in [-2.5_f32, 2.5] {
+                for y in [-4.5_f32, 0.0, 4.5] {
+                    p.circle_filled(q(x, y), 1.1 * u, col);
+                }
+            }
+        }
+        Ic::Invert => {
+            line(&[(-6.0, -3.0), (5.0, -3.0)]);
+            line(&[(2.0, -6.0), (5.0, -3.0), (2.0, 0.0)]);
+            line(&[(6.0, 3.0), (-5.0, 3.0)]);
+            line(&[(-2.0, 0.0), (-5.0, 3.0), (-2.0, 6.0)]);
+        }
+        Ic::Bypass => {
+            line(&[(-7.0, 0.0), (-3.0, 0.0)]);
+            line(&[(3.0, 0.0), (7.0, 0.0)]);
+            p.circle_stroke(q(-3.0, 0.0), 1.2 * u, st);
+            p.circle_stroke(q(3.0, 0.0), 1.2 * u, st);
+            line(&[(-3.0, -1.0), (3.0, -5.0)]);
+        }
+        Ic::Trash => {
+            line(&[(-6.0, -4.0), (6.0, -4.0)]);
+            line(&[(-2.0, -4.0), (-2.0, -6.5), (2.0, -6.5), (2.0, -4.0)]);
+            line(&[(-4.5, -4.0), (-3.8, 6.5), (3.8, 6.5), (4.5, -4.0)]);
+            line(&[(0.0, -1.5), (0.0, 4.0)]);
+        }
+        Ic::Plug => {
+            line(&[(-2.5, -7.0), (-2.5, -3.0)]);
+            line(&[(2.5, -7.0), (2.5, -3.0)]);
+            line(&[
+                (-5.0, -3.0),
+                (5.0, -3.0),
+                (5.0, 0.5),
+                (0.0, 4.0),
+                (-5.0, 0.5),
+                (-5.0, -3.0),
+            ]);
+            line(&[(0.0, 4.0), (0.0, 7.0)]);
+        }
+        Ic::Wave => {
+            let pts: Vec<(f32, f32)> = (0..=16)
+                .map(|i| {
+                    let x = -7.0 + i as f32 * 14.0 / 16.0;
+                    (x, (x * 0.9).sin() * 4.5)
+                })
+                .collect();
+            line(&pts);
+        }
+        Ic::Clock => {
+            p.circle_stroke(q(0.0, 0.0), 6.5 * u, st);
+            line(&[(0.0, -3.5), (0.0, 0.0), (3.0, 1.5)]);
+        }
+        Ic::External => {
+            line(&[(-1.0, -5.5), (5.5, -5.5), (5.5, 1.0)]);
+            line(&[(5.5, -5.5), (-1.0, 1.0)]);
+            line(&[
+                (-3.0, -3.5),
+                (-6.0, -3.5),
+                (-6.0, 6.0),
+                (3.0, 6.0),
+                (3.0, 3.0),
+            ]);
+        }
     }
 }

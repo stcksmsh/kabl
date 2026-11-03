@@ -8,3 +8,47 @@ The brief and plan mark four items as unverified. Findings:
 4. **seq-32** (`claude/seq-32`, dd33766, pushed, no PR yet): 32 steps per pattern, length 1 to 32, face shows pages of 8; seq param cap 655; per-step params are never automation-lane targets. Agent 2 is finishing it. G3 timing/drums (agent D) must build on it after it merges.
 
 Also present on master: an older design set in `docs/design/` (BRIEF.md, app-target/, directions/, revision-2/, REVIEW.md, QA.md). `docs/design/redesign/` is the current one.
+
+## Toolbar metrics in `mockups/directions.html` (read from `chrome()`, 2026-11-02)
+
+The mockup draws SVG, so these are the drawn values (1 unit = 1 px at the 1440 frame; the sheet frame is 1392 wide, so measured screenshots read about 3 % smaller):
+
+- Toolbar 48 px; 1 px bottom line. Logo tile 24x24, radius 6, at x 16; wordmark "kabl" 17 px, weight 600.
+- Sound selector 28 px tall, 210 wide (170 below 1300 px), radius 6: kicker mono 10 px weight 500, name 13 px weight 500, dirty dot r 3, chevron.
+- View switch: track 28 px tall, 3 x 86 = 258 wide, radius 7; selected segment 24 px tall inside it (2 px inset), radius 5; label 13 px, weight 600 selected, 500 otherwise.
+- Add module: 180x28, radius 6, search icon, 13 px placeholder, key hint 20x16 radius 4 with a mono 10 px letter. Hidden below 1300 px.
+- Icon buttons 28 wide (16 px icon), 4 px apart. Cable tools: 3 x 30 = 90 wide, 28 tall track, 26x24 segments. Zoom text mono 12 px weight 500.
+- Save: 28 tall, label width + 28, 13 px weight 600, radius 6.
+- Perform shows one icon (MIDI), Sounds one icon (heart), both left of Save.
+
+## Colour tokens: mockup vs app (2026-11-02)
+
+Mockup source: `APPS`, `ACC` in `mockups/directions.html`. App: `crates/ui/src/style/solid.rs` `roles()`, default "Signal solid" (dark) and "Drafting solid" (light). Before = origin/master, After = this PR.
+
+| Token | Graphite mockup | App before | App after | Paper mockup | App before | App after |
+|---|---|---|---|---|---|---|
+| bg | #111214 | same | same | #ECEAE5 | same | same |
+| bar (toolbar, status, side panels) | #17181B | no token (used surface #1A1B1E) | `bar` #17181B | #F7F6F2 | no token (surface #FBFAF7) | `bar` #F7F6F2 |
+| surf (cards) | #1A1B1E | same, but cards drew `raised` | same, cards draw surf | #FBFAF7 | same, cards drew white | same, cards draw surf |
+| raised | #232529 | same | same | #FFFFFF | same | same |
+| inset | #0F1012 | same | same | #E4E1DA | same | same |
+| line / line2 | #2A2C31 / #393C42 | same | same | #DCD8D0 / #C8C4BB | same | same |
+| tx / tx2 / tx3 | #ECEAE6 / #A29F99 / #6F6D68 | same | same | #1A1917 / #5F5C56 / #8E8A83 | same | same |
+| rack | #0C0D0E | same | same | #DCD9D2 | same | same |
+| rail | #1B1C1F | same | same | #C9C5BC | same | same |
+| jack hole (face) | #050506 | same | same | #24232A | same | same (the mockup's #A39E94 is the rack punch colour) |
+| accent (amber) | #F2A33A | same | same | #F2A33A | #A97229 (darkened for 3:1) | #F2A33A |
+| accent ink | #1C1206 | same | same | #1C1206 | white or #1C1206 by contrast | #1C1206 |
+| sig audio / cv / gate / pitch | #F59E3B #38C6B2 #A68BFA #5BA8F7 | same | same | #D9781C #12958A #7651D6 #2F7FD6 | #B66518 #11897F #7651D6 #2E7CD2 (darkened for 3:1 on the rack) | mockup values (supersede the 2026-11-01 darkened hues) |
+
+Not a mockup token, added so paper keeps legible small text: `accent_text`, equal to the accent on graphite, the amber mixed toward black until 4.5:1 on surf on paper (#A94F00 as in the G4 spec: 5.3:1 on surf, 4.6:1 on bg). Uses: `Tone::Accent` text, the "Queued" word on a scene pad, the focus ring, the display trace on paper. Everything else keeps the orange: buttons, dots, value arcs, active chips, playing pads, selected-row marks.
+
+Contrast checker changes: new text pair "accent_text on surface" (4.0, the satin theme's own accent text is 4.35). The marks "accent on surface" (3:1) is gone, because the mockup's orange is about 2:1 on paper by design and carries its own ink; the paper signal marks on the rack are checked at 2:1 (they reach 2.2 to 3.9), dark keeps 3:1.
+
+## G4 paper state colours (2026-11-02, #93)
+
+Spec hexes bad #C2362B, good #2E7D4F, warn #9A6200 measured on paper surface 5.22 / 4.83 / 4.88 but on bg (#ECEAE5) 4.53 / 4.20 / 4.24. Good and warn darkened minimally to reach 4.5 on bg. Final paper values, contrast on surface / raised / bg:
+- bad `#C2362B`: 5.22 / 5.45 / 4.53
+- good `#2C774B`: 5.23 / 5.46 / 4.54
+- warn `#945E00`: 5.21 / 5.44 / 4.52
+Graphite uses the spec values unchanged (bad #F06A5F, good #5CCB8A, warn #E3A93C; all above 5.0 on surface, raised and bg). Paper accent text (#A94F00) is #91's and not touched.

@@ -424,6 +424,18 @@ impl PatchEditor {
         );
     }
 
+    /// A drag that edits several params at once (an envelope handle): all frames join one undo
+    /// step. `continuing` is false only for the gesture's very first edit.
+    pub fn set_param_group(&mut self, target: ParamTarget, value: f32, continuing: bool) {
+        self.dirty = true;
+        self.log.append_to_group(
+            Op::SetParam { target, value },
+            now_ms(),
+            Source::User,
+            continuing,
+        );
+    }
+
     pub fn cancel_gesture(&mut self) {
         if self.log.discard_last() {
             self.dirty = true;

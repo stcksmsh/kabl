@@ -93,7 +93,7 @@ pub static OSC_FM6_INFO: ModuleInfo = ModuleInfo {
         interpolation: true,
     },
     skin: None,
-    width_units: 41,
+    width_units: 22,
     advanced: &["base_hz", "fine", "oversample"],
 };
 

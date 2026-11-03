@@ -296,6 +296,12 @@ pub fn target_label(p: &ParamInfo) -> String {
     }
 }
 
+/// The label a face draws: the family's short name where it has one (`rack::short_name`), else
+/// `param_label`. The inspector and tooltips keep the full `param_label`.
+pub fn face_label(kind: &str, p: &ParamInfo) -> String {
+    crate::rack::short_name(kind, p.name).map_or_else(|| param_label(p), str::to_string)
+}
+
 /// Human label for a param name: `attack_ms` → `Attack`. A sequencer bank param is labelled
 /// by its slot (`c.v2` → `V2`), as on the face.
 pub fn param_label(p: &ParamInfo) -> String {
@@ -931,15 +937,30 @@ pub(crate) fn param_knob(
     // Label above, value below (a pill with a coloured edge when modulated).
     if let Some(font) = crate::kit::face::face_font(&ui_state.style, crate::style::Role::Label, z) {
         painter.text(
-            center - EguiVec2::new(0.0, (r + 21.0) * z),
+            center - EguiVec2::new(0.0, crate::rack::knob_text_dy(r, z, font.size * 1.075)),
             egui::Align2::CENTER_CENTER,
-            crate::macro_name(editor.state(), id, param.name).unwrap_or_else(|| param_label(param)),
+            crate::macro_name(editor.state(), id, param.name).unwrap_or_else(|| {
+                let kind = editor
+                    .state()
+                    .modules
+                    .get(&id)
+                    .map_or("", |m| m.kind.as_str());
+                face_label(kind, param)
+            }),
             font,
             look.ink,
         );
     }
     let value = fmt_value(param, base);
-    let vpos = center + EguiVec2::new(0.0, (r + 14.0) * z);
+    let vh = crate::kit::face::face_font(&ui_state.style, crate::style::Role::Value, z)
+        .map_or(0.0, |f| f.size * 1.075);
+    let vpos = center + EguiVec2::new(0.0, crate::rack::knob_text_dy(r, z, vh));
+    // Line panels: values read in the dimmer text colour (G1b target).
+    let value_ink = if ui_state.style.slots.face.material == crate::style::FaceMaterial::Line {
+        look.ink2
+    } else {
+        look.ink
+    };
     if routes.is_empty() {
         if let Some(g) = crate::kit::face::readout(
             painter,
@@ -947,12 +968,12 @@ pub(crate) fn param_knob(
             &value,
             z,
             look.slot * z - 4.0,
-            look.ink,
+            value_ink,
         ) {
             let rect = egui::Align2::CENTER_CENTER.anchor_size(vpos, g.size());
             ui_state
                 .deferred
-                .push(egui::Shape::galley(rect.min, g, look.ink));
+                .push(egui::Shape::galley(rect.min, g, value_ink));
         }
     } else {
         let edge = if routes.iter().any(|rt| !rt.bypass) {
@@ -1033,6 +1054,7 @@ pub(crate) fn param_knob(
         ));
         pill(
             &top,
+            &ui_state.style,
             center - EguiVec2::new(0.0, (r + RING_OUTER) * z + 4.0),
             &text,
         );
@@ -1089,7 +1111,7 @@ fn source_lanes(
     top.circle_filled(
         center,
         outer,
-        Color32::from_rgba_unmultiplied(14, 14, 18, 215),
+        crate::style::alpha(ui_state.style.roles.surface, 215),
     );
     for (k, rt) in routes.iter().enumerate() {
         let radius = lane_radius(k);
@@ -1175,6 +1197,7 @@ fn source_lanes(
                     egui::Order::Tooltip,
                     Id::new("kabl-lane-pill"),
                 )),
+                &ui_state.style,
                 center - EguiVec2::new(0.0, outer + 4.0),
                 &match grab {
                     Some(g) if g.cancelled => "Cancelled".to_string(),
@@ -1189,22 +1212,27 @@ fn source_lanes(
     }
 }
 
-pub(crate) fn pill(painter: &egui::Painter, bottom_center: Pos2, text: &str) {
+pub(crate) fn pill(
+    painter: &egui::Painter,
+    st: &crate::style::Style,
+    bottom_center: Pos2,
+    text: &str,
+) {
     let galley = painter.layout_no_wrap(
         text.to_string(),
         egui::FontId::proportional(11.0),
-        Color32::WHITE,
+        st.roles.text,
     );
     let size = galley.size() + EguiVec2::new(10.0, 4.0);
     let rect = Rect::from_center_size(bottom_center - EguiVec2::new(0.0, size.y / 2.0), size);
-    painter.rect_filled(rect, 4.0, Color32::from_rgba_unmultiplied(20, 20, 22, 235));
+    painter.rect_filled(rect, 4.0, crate::style::alpha(st.roles.raised, 235));
     painter.rect_stroke(
         rect,
         4.0,
-        Stroke::new(1.0, Color32::from_rgb(90, 155, 255)),
+        Stroke::new(1.0, st.roles.accent),
         egui::StrokeKind::Outside,
     );
-    painter.galley(rect.min + EguiVec2::new(5.0, 2.0), galley, Color32::WHITE);
+    painter.galley(rect.min + EguiVec2::new(5.0, 2.0), galley, st.roles.text);
 }
 
 /// Segmented selector for a `Taper::Stepped` param (envelope timing, waveforms) at screen
@@ -1231,19 +1259,20 @@ pub(crate) fn stepped_selector(
     let key = format!("{id}.{}", param.name);
     ui_state.record(format!("knob:{key}"), rect);
     let routes = routes_into(editor.state(), id, param.name);
-    if let Some(font) = crate::kit::face::face_font(&ui_state.style, crate::style::Role::Label, z) {
-        painter.text(
-            egui::pos2(rect.center().x, rect.top() - 13.0 * z),
-            egui::Align2::CENTER_CENTER,
-            param_label(param),
-            font,
-            look.ink,
-        );
-    }
+    // A selector names itself by its options (G1b target): no label above it.
     let text_of = |k: usize| {
         labels
             .and_then(|l| l.get(k).copied())
             .map_or(format!("{}", param.min + k as f32), str::to_string)
+    };
+    // The FM voice's algorithm: the header says `ALG n`; the list and the tooltip add the routing.
+    let alg = kind == "osc.fm6" && param.name == "algorithm";
+    let short_of = |k: usize| {
+        if alg {
+            format!("ALG {}", k + 1)
+        } else {
+            text_of(k)
+        }
     };
     let w = rect.width() / n as f32;
     // Segments too narrow for the longest option would draw their labels over each other: a
@@ -1257,10 +1286,15 @@ pub(crate) fn stepped_selector(
         let opened = ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
             egui::ComboBox::from_id_salt(("kabl-sel", id, param.name))
                 .width(rect.width() - 24.0)
-                .selected_text(egui::RichText::new(text_of(cur)).monospace())
+                .selected_text(egui::RichText::new(short_of(cur)).monospace())
                 .show_ui(ui, |ui| {
                     for k in 0..n {
-                        if ui.selectable_label(k == cur, text_of(k)).clicked() {
+                        let item = if alg {
+                            format!("{}  {}", short_of(k), text_of(k))
+                        } else {
+                            text_of(k)
+                        };
+                        if ui.selectable_label(k == cur, item).clicked() {
                             inspect(ui_state, &routes, id, param.name);
                             editor.set_param(id, param.name, param.min + k as f32);
                         }
@@ -1271,6 +1305,9 @@ pub(crate) fn stepped_selector(
         // Opening the list inspects the control, as picking a segment does.
         if opened.inner.clicked() {
             inspect(ui_state, &routes, id, param.name);
+        }
+        if alg {
+            opened.inner.on_hover_text(text_of(cur));
         }
         return selector_plug(ui_state, painter, look, &routes, rect);
     }
@@ -1464,7 +1501,7 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
         }
         None => {
             ui.colored_label(
-                Color32::from_rgb(255, 200, 90),
+                ui_state.style.roles.warn,
                 "No source selected: click one below to edit its depth.",
             );
         }
