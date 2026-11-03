@@ -152,7 +152,8 @@ pub fn tray(p: &Painter, st: &Style, rect: Rect, plate: Option<Rect>, z: f32) {
         StrokeKind::Inside,
     );
     if let Some(pl) = plate {
-        p.rect_filled(pl, cr(5.0, z), r.raised);
+        // The mockup's line faces barely tint the plate: a quarter of the way from face to raised.
+        p.rect_filled(pl, cr(5.0, z), mix(st.sections.amp.base, r.raised, 0.25));
         p.rect_stroke(
             pl,
             cr(5.0, z),
