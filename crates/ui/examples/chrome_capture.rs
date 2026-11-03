@@ -14,7 +14,14 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 5] = ["rack", "perform", "sounds", "drawer", "wavetable-editor"];
+const SCENES: [&str; 6] = [
+    "rack",
+    "perform",
+    "sounds",
+    "drawer",
+    "wavetable-editor",
+    "cues-editor",
+];
 
 struct Job {
     scene: &'static str,
@@ -106,7 +113,7 @@ impl App {
             self.editor.set_param(id, &k, v + 1.0);
         }
         ui.browser_open = j.scene == "sounds";
-        ui.drawer_open = j.scene == "rack";
+        ui.drawer_open = j.scene == "rack" || j.scene == "cues-editor";
         ui.perform_open = j.scene == "perform";
         ui.perform_tall = j.scene == "perform";
         // Like the mockup: the oscillator-to-filter cable and the filter are selected.
@@ -137,6 +144,31 @@ impl App {
             // Like the mockup: frame 7 of 16 selected, the oscillator's position at 0.40.
             ui.tables.select(6);
             self.editor.set_param(wt, "position", 0.4);
+        }
+        if j.scene == "cues-editor" {
+            // The mockup's state: four cues, Drop playing, Break queued.
+            let seq = self
+                .editor
+                .state()
+                .modules
+                .iter()
+                .find(|(_, m)| m.kind == "seq")
+                .map(|(&id, _)| id)
+                .unwrap();
+            let cues = self
+                .editor
+                .add_module("cues", kabl_core::Vec2 { x: 24.0, y: 620.0 });
+            for (b, name) in ["Intro", "Build", "Drop", "Break"].into_iter().enumerate() {
+                kabl_ui::cues::add(&mut self.editor, cues, &|_| b);
+                kabl_ui::cues::rename(&mut self.editor, cues, b + 1, name);
+            }
+            // One sequencer here, three in the mockup: Drop keeps it and was launched last (it
+            // plays), Break waits for bank D (queued).
+            kabl_ui::cues::set_target(&mut self.editor, cues, 3, seq, None);
+            ui.selected_module = Some(cues);
+            ui.selected_route = None;
+            ui.seq_banks.insert(seq, (2, Some(3)));
+            ui.last_cue.insert(cues, 3);
         }
         self.ui = ui;
         self.f = 0;
@@ -193,7 +225,7 @@ impl eframe::App for App {
                 egui::vec2(size.0 as f32, size.1 as f32),
             )),
         );
-        if self.f == 6 && self.jobs[self.i].scene == "drawer" {
+        if self.f == 6 && matches!(self.jobs[self.i].scene, "drawer" | "cues-editor") {
             // After the first frame: a compact window closes the drawer there, the user opens it.
             self.ui.drawer_open = true;
         }
