@@ -124,11 +124,20 @@ pub(super) fn seq_face(
                 .map(|k| x0 + cw * (k as f32 - 0.5))
         };
         let geo = match slot {
-            "length" => Geo::Knob { c: pos2(SIDE + 56.0, 110.0), r: 16.0 },
-            "gate_len" => Geo::Knob { c: pos2(SIDE + 56.0, 200.0), r: 16.0 },
+            "length" => Geo::Knob {
+                c: pos2(SIDE + 56.0, 110.0),
+                r: 16.0,
+            },
+            "gate_len" => Geo::Knob {
+                c: pos2(SIDE + 56.0, 200.0),
+                r: 16.0,
+            },
             _ => {
                 if let Some(cx) = step('p') {
-                    Geo::Knob { c: pos2(cx, 124.0), r: 16.0 }
+                    Geo::Knob {
+                        c: pos2(cx, 124.0),
+                        r: 16.0,
+                    }
                 } else if let Some(cx) = step('g') {
                     Geo::Select {
                         rect: Rect::from_min_size(pos2(cx - 14.0, 176.0), vec2(28.0, 16.0)),

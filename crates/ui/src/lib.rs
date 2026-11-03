@@ -2644,7 +2644,10 @@ fn draw_banks(
         );
         let tx = gx + BANK_CAP_W + 6.0;
         painter.rect_filled(
-            xf.r(Rect::from_min_size(pos2(tx, r.top()), vec2(BANK_SEG_W, r.height()))),
+            xf.r(Rect::from_min_size(
+                pos2(tx, r.top()),
+                vec2(BANK_SEG_W, r.height()),
+            )),
             CornerRadius::same((r.height() / 2.0 * z) as u8),
             track,
         );
@@ -2859,7 +2862,11 @@ fn draw_seq_steps(
                 st.roles.accent.gamma_multiply(0.07),
             );
         }
-        painter.circle_filled(at(cx, 64.0), 3.0 * z, if on { st.roles.accent } else { edge });
+        painter.circle_filled(
+            at(cx, 64.0),
+            3.0 * z,
+            if on { st.roles.accent } else { edge },
+        );
         text(
             painter,
             at(cx, 82.0),
@@ -2903,7 +2910,11 @@ fn seq_step_cell(
             if on { st.roles.gate } else { seg_track(&st) },
         );
         let resp = ui
-            .interact(r.expand(2.0 * z), Id::new(("kabl-seq-gate", id, param.name)), Sense::click())
+            .interact(
+                r.expand(2.0 * z),
+                Id::new(("kabl-seq-gate", id, param.name)),
+                Sense::click(),
+            )
             .on_hover_text(format!(
                 "Step {step} gate: {}. Click to switch it {}",
                 if on { "on" } else { "off (a rest)" },
@@ -3621,7 +3632,9 @@ fn draw_control(
     if let (true, Geo::Select { rect }) = (m.info.kind == "seq", c.geo) {
         let slot = seq::slot_name(c.param.name);
         if slot.len() == 2 && matches!(slot.as_bytes()[0], b'g' | b'v') {
-            seq_step_cell(editor, ui_state, ui, painter, xf, m.id, c.param, rect, drawn);
+            seq_step_cell(
+                editor, ui_state, ui, painter, xf, m.id, c.param, rect, drawn,
+            );
             return;
         }
     }
