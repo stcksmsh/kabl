@@ -1659,6 +1659,12 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
         ui.label("Unknown module kind.");
         return;
     };
+    if kind == "seq" {
+        // The G4 seq editor draws its own header and controls.
+        let edit = ui_state.edit_bank_of(editor.state(), id);
+        seq_editor::seq_panel(editor, ui_state, ui, id, edit);
+        return;
+    }
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new(format!("{} #{id}", info.name)).strong());
         let r = ui
@@ -1673,12 +1679,6 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
         ui.add(egui::Label::new(egui::RichText::new(info.explain).small()).wrap());
     }
     let edit = ui_state.edit_bank_of(editor.state(), id);
-    if kind == "seq" {
-        seq_editor::seq_panel(editor, ui_state, ui, id, edit);
-    }
-    if kind == "cues" {
-        seq_editor::cues_panel(editor, ui_state, ui, id);
-    }
     if kind == "macro" {
         for (k, p) in info.params.iter().enumerate() {
             ui.horizontal(|ui| {

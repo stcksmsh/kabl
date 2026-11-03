@@ -14,12 +14,13 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 6] = [
+const SCENES: [&str; 7] = [
     "rack",
     "perform",
     "sounds",
     "drawer",
     "wavetable-editor",
+    "seq-pattern-editor",
     "cues-editor",
 ];
 
@@ -113,7 +114,7 @@ impl App {
             self.editor.set_param(id, &k, v + 1.0);
         }
         ui.browser_open = j.scene == "sounds";
-        ui.drawer_open = j.scene == "rack" || j.scene == "cues-editor";
+        ui.drawer_open = matches!(j.scene, "rack" | "seq-pattern-editor" | "cues-editor");
         ui.perform_open = j.scene == "perform";
         ui.perform_tall = j.scene == "perform";
         // Like the mockup: the oscillator-to-filter cable and the filter are selected.
@@ -131,6 +132,32 @@ impl App {
             .iter()
             .find(|(_, m)| m.kind == "filter.svf")
             .map(|(&id, _)| id);
+        if j.scene == "seq-pattern-editor" {
+            // The mockup's state: editing A, B playing, step 5 under the playhead.
+            let seq = self
+                .editor
+                .state()
+                .modules
+                .iter()
+                .find(|(_, m)| m.kind == "seq")
+                .map(|(&id, _)| id)
+                .unwrap();
+            let gate = [1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0];
+            let vel = [100.0, 80.0, 80.0, 60.0, 100.0, 50.0, 70.0, 90.0];
+            let prob = [100.0, 100.0, 100.0, 75.0, 100.0, 50.0, 100.0, 100.0];
+            let ratch = [1.0, 1.0, 1.0, 2.0, 1.0, 1.0, 1.0, 3.0];
+            for i in 0..8 {
+                self.editor.set_param(seq, &format!("g{}", i + 1), gate[i]);
+                self.editor.set_param(seq, &format!("v{}", i + 1), vel[i]);
+                self.editor.set_param(seq, &format!("r{}", i + 1), prob[i]);
+                self.editor.set_param(seq, &format!("k{}", i + 1), ratch[i]);
+            }
+            ui.selected_module = Some(seq);
+            ui.selected_route = None;
+            ui.edit_bank.insert(seq, 0);
+            ui.seq_banks.insert(seq, (1, None));
+            ui.seq_steps.insert(seq, 4);
+        }
         if j.scene == "wavetable-editor" {
             let wt = self
                 .editor
@@ -147,7 +174,7 @@ impl App {
         }
         if j.scene == "cues-editor" {
             // The mockup's state: Bass, Drums and Lead sequencers (two more in a third row,
-            // below the view), four cues, Drop playing.
+            // below the view), four cues, Drop playing and Break queued.
             let at = |x: f32, y: f32| kabl_core::Vec2 { x, y };
             let bass = self
                 .editor
@@ -179,11 +206,10 @@ impl App {
             }
             ui.selected_module = Some(cues);
             ui.selected_route = None;
-            // Drop plays. (The mockup also shows Break queued; a cue reads as playing only
-            // while nothing else is queued, so the two cannot show together.)
+            // Drop plays; Break is queued (Drums waits for D, Lead for B; Bass keeps B).
             ui.seq_banks.insert(bass, (1, None));
-            ui.seq_banks.insert(drums, (0, None));
-            ui.seq_banks.insert(lead, (2, None));
+            ui.seq_banks.insert(drums, (0, Some(3)));
+            ui.seq_banks.insert(lead, (2, Some(1)));
             ui.last_cue.insert(cues, 3);
         }
         self.ui = ui;
@@ -241,7 +267,12 @@ impl eframe::App for App {
                 egui::vec2(size.0 as f32, size.1 as f32),
             )),
         );
-        if self.f == 6 && matches!(self.jobs[self.i].scene, "drawer" | "cues-editor") {
+        if self.f == 6
+            && matches!(
+                self.jobs[self.i].scene,
+                "drawer" | "seq-pattern-editor" | "cues-editor"
+            )
+        {
             // After the first frame: a compact window closes the drawer there, the user opens it.
             self.ui.drawer_open = true;
         }
