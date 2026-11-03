@@ -61,6 +61,9 @@ pub struct Button<'a> {
     small: bool,
     min_w: f32,
     tone: Option<Tone>,
+    /// G4-SPEC §3 look at this height: label 13/600 (12.5 below 32 px), padding 14, secondary
+    /// on `raised` with a `line2` border and `text` ink, icon at the left edge.
+    g4: Option<f32>,
 }
 
 impl<'a> Button<'a> {
@@ -75,6 +78,7 @@ impl<'a> Button<'a> {
             small: false,
             min_w: 0.0,
             tone: None,
+            g4: None,
         }
     }
     pub fn icon(mut self, ic: Ic) -> Self {
@@ -109,19 +113,35 @@ impl<'a> Button<'a> {
         self.tone = Some(t);
         self
     }
+    pub fn g4(mut self, height: f32) -> Self {
+        self.g4 = Some(height);
+        self
+    }
 }
 
 impl Widget for Button<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
         let st = self.st;
         let enabled = self.enabled && ui.is_enabled();
-        let font = st.font(Role::Label);
-        let h = if self.small {
-            st.metrics.small_h
-        } else {
-            st.metrics.control_h
+        let font = match self.g4 {
+            Some(h) => egui::FontId::new(
+                if h < 32.0 { 12.5 } else { 13.0 },
+                crate::style::Font::SansSemibold.family(st.fonts_ready),
+            ),
+            None => st.font(Role::Label),
         };
-        let pad = if self.small { st.sp(2) } else { st.sp(3) };
+        let h = match self.g4 {
+            Some(h) => h,
+            None if self.small => st.metrics.small_h,
+            None => st.metrics.control_h,
+        };
+        let pad = if self.g4.is_some() {
+            14.0
+        } else if self.small {
+            st.sp(2)
+        } else {
+            st.sp(3)
+        };
         let icon_w = if self.icon.is_some() {
             st.metrics.icon + st.sp(1) + 2.0
         } else {
@@ -129,7 +149,7 @@ impl Widget for Button<'_> {
         };
         let galley = (!self.text.is_empty()).then(|| {
             ui.painter()
-                .layout_no_wrap(self.text.clone(), font, Color32::WHITE)
+                .layout_no_wrap(self.text.clone(), font.clone(), Color32::WHITE)
         });
         let tw = galley.as_ref().map_or(0.0, |g| g.size().x);
         let w = (pad * 2.0 + icon_w + tw)
@@ -174,6 +194,8 @@ impl Widget for Button<'_> {
                     )
                 } else if down {
                     (r.inset, Some(r.line2), r.text)
+                } else if self.g4.is_some() {
+                    (mix(r.raised, r.inset, 0.3 * hover), Some(r.line2), r.text)
                 } else {
                     (
                         mix(alpha(r.raised, 0), r.raised, hover),
@@ -208,6 +230,10 @@ impl Widget for Button<'_> {
             );
         }
         let mut x = rect.center().x - (tw + icon_w) / 2.0;
+        if self.g4.is_some() && self.icon.is_some() && self.min_w > 0.0 {
+            // A fixed-width G4 button: icon at the left edge, label centred in the rest.
+            x = rect.left() + 12.0;
+        }
         if let Some(ic) = self.icon {
             icon(
                 ui.painter(),
@@ -219,11 +245,12 @@ impl Widget for Button<'_> {
             x += icon_w;
         }
         if galley.is_some() {
-            let g = ui.painter().layout_no_wrap(
-                self.text.clone(),
-                st.font(Role::Label),
-                dim(ink, enabled),
-            );
+            let g = ui
+                .painter()
+                .layout_no_wrap(self.text.clone(), font.clone(), dim(ink, enabled));
+            if self.g4.is_some() && self.icon.is_some() && self.min_w > 0.0 {
+                x = rect.left() + (rect.width() + icon_w - tw) / 2.0;
+            }
             ui.painter().galley(
                 pos2(x, rect.center().y - g.size().y / 2.0),
                 g,

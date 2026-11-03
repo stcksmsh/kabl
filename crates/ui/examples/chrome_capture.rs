@@ -14,7 +14,14 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 5] = ["rack", "perform", "sounds", "drawer", "seq-pattern-editor"];
+const SCENES: [&str; 6] = [
+    "rack",
+    "perform",
+    "sounds",
+    "drawer",
+    "wavetable-editor",
+    "seq-pattern-editor",
+];
 
 struct Job {
     scene: &'static str,
@@ -37,13 +44,14 @@ fn patches() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../patches")
 }
 
-/// The mockup's patch: sequencer, VA oscillator, SVF, ADSR, mixer, delay, reverb, output.
-fn mockup_patch() -> PatchEditor {
+/// The mockup's patch: sequencer, VA (or, with `wt`, wavetable) oscillator, SVF, ADSR, mixer,
+/// delay, reverb, output.
+fn mockup_patch(wt: bool) -> PatchEditor {
     use kabl_core::PortRef;
     let mut e = PatchEditor::seed_from(&Default::default());
     let at = |x: f32, y: f32| kabl_core::Vec2 { x, y };
     let seq = e.add_module("seq", at(24.0, 20.0));
-    let osc = e.add_module("osc.va", at(714.0, 20.0));
+    let osc = e.add_module(if wt { "osc.wt" } else { "osc.va" }, at(714.0, 20.0));
     let svf = e.add_module("filter.svf", at(964.0, 20.0));
     let adsr = e.add_module("env.adsr", at(24.0, 320.0));
     let mix = e.add_module("mixer", at(244.0, 320.0));
@@ -69,7 +77,7 @@ fn mockup_patch() -> PatchEditor {
 impl App {
     fn prepare(&mut self) {
         let j = &self.jobs[self.i];
-        self.editor = mockup_patch();
+        self.editor = mockup_patch(j.scene == "wavetable-editor");
         let mut ui = UiState::default();
         ui.theme = self.theme.clone();
         ui.dark = j.dark;
@@ -148,6 +156,20 @@ impl App {
             ui.edit_bank.insert(seq, 0);
             ui.seq_banks.insert(seq, (1, None));
             ui.seq_steps.insert(seq, 4);
+        }
+        if j.scene == "wavetable-editor" {
+            let wt = self
+                .editor
+                .state()
+                .modules
+                .iter()
+                .find(|(_, m)| m.kind == "osc.wt")
+                .map(|(&id, _)| id)
+                .unwrap();
+            kabl_ui::tables::open(&self.editor, &mut ui, wt);
+            // Like the mockup: frame 7 of 16 selected, the oscillator's position at 0.40.
+            ui.tables.select(6);
+            self.editor.set_param(wt, "position", 0.4);
         }
         self.ui = ui;
         self.f = 0;
