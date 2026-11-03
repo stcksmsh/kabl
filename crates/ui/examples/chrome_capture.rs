@@ -74,6 +74,12 @@ impl App {
         ui.theme = self.theme.clone();
         ui.dark = j.dark;
         ui.status_meter = true;
+        // The mockup's status bar readouts, as a host would feed them.
+        ui.status_cpu = Some(6.0);
+        ui.status_buffer = Some(128);
+        ui.status_voices = Some((4, 8));
+        ui.status_bpm = Some(124.0);
+        ui.status_pos = Some("17 . 3 . 2".into());
         ui.library = Some(Library::open(
             Some(patches()),
             self._user.path().to_path_buf(),
@@ -203,10 +209,6 @@ impl eframe::App for App {
             self.ui.drawer_open = true;
         }
         show(&mut self.editor, &mut self.ui, &mut root);
-        // The mockup's rack is drawn at 95 %: set it once the first fit has run.
-        if self.f == 6 && self.jobs[self.i].scene == "rack" {
-            self.ui.zoom = 0.95;
-        }
         self.f += 1;
         if self.f == 12 {
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));

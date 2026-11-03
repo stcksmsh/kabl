@@ -77,7 +77,7 @@ pub fn knob_text_dy(r: f32, z: f32, text_h: f32) -> f32 {
     ((r + 12.0) * z).max((r + 4.8) * z + 1.6 + text_h / 2.0)
 }
 
-/// Hex nut radius of a drawn jack (PLAN section 4); `JACK_R` is its larger hit radius.
+/// Nut radius of a drawn jack (PLAN section 4); `JACK_R` is its larger hit radius.
 pub const JACK_NUT: f32 = 11.0;
 
 /// Screen px from a jack centre up to its label centre, for text `text_h` px high at zoom `z`:
@@ -126,7 +126,10 @@ pub fn face_name<'a>(info: &ModuleInfo, name: &'a str) -> &'a str {
 /// advanced. Presentation only: the module and saved racks are untouched, and a stored face
 /// choice still wins.
 fn on_face_by_default(kind: &str, param: &str) -> bool {
-    osc::on_face(kind, param) || filter::on_face(kind, param) || env::on_face(kind, param)
+    osc::on_face(kind, param)
+        || filter::on_face(kind, param)
+        || env::on_face(kind, param)
+        || timing::on_face(kind, param)
 }
 
 /// Selectors a family draws in the header cluster instead of the control zone.
@@ -499,7 +502,7 @@ fn place_local(
     let base_w = info.width_units as f32 * UNIT;
     let fw = match skin {
         Some(s) => ((s.panel_size.0 / UNIT).round() * UNIT).max(base_w),
-        None if face_knobs.len() >= 3 && info.kind != "osc.fm6" => {
+        None if face_knobs.len() >= 3 && !matches!(info.kind, "osc.fm6" | "seq") => {
             base_w.max(((72.0 + 56.0 * (face_knobs.len() as f32 - 1.0)) / UNIT).ceil() * UNIT)
         }
         None => base_w,
@@ -677,6 +680,11 @@ fn place_local(
                 .filter(|i| face_knobs.contains(i) || face_sels.contains(i))
                 .collect();
             decor = fm6_face(info, &all, fw, &mut ctls, &mut off_face);
+        } else if info.kind == "seq" {
+            let all: Vec<usize> = (0..info.params.len())
+                .filter(|i| face_knobs.contains(i) || face_sels.contains(i))
+                .collect();
+            timing::seq_face(info, &all, fw, &mut ctls, &mut off_face);
         } else {
             // Rows centred in the control zone: knobs, a gap, then selectors.
             let n = face_knobs.len();

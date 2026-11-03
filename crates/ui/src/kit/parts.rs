@@ -142,24 +142,27 @@ pub fn drum_cell(p: &Painter, st: &Style, rect: Rect, level: usize, chance: usiz
     }
 }
 
-/// The port tray: an outlined rounded rect; `plate` is the raised output plate inside it.
+/// The port tray, a single hairline as in the mockup's line faces: a rule above the ports and,
+/// where an output `plate` is given, a divider between inputs and outputs (vertical when the
+/// outputs sit beside the inputs, dashed and horizontal when they sit below).
 pub fn tray(p: &Painter, st: &Style, rect: Rect, plate: Option<Rect>, z: f32) {
-    let r = &st.roles;
-    p.rect_stroke(
-        rect,
-        cr(5.0, z),
-        Stroke::new(1.0, r.line2),
-        StrokeKind::Inside,
-    );
-    if let Some(pl) = plate {
-        // The mockup's line faces barely tint the plate: a quarter of the way from face to raised.
-        p.rect_filled(pl, cr(5.0, z), mix(st.sections.amp.base, r.raised, 0.25));
-        p.rect_stroke(
-            pl,
-            cr(5.0, z),
-            Stroke::new(1.0, r.line2),
-            StrokeKind::Inside,
+    let stroke = Stroke::new(1.0, st.roles.line2);
+    p.line_segment([rect.left_top(), rect.right_top()], stroke);
+    let Some(pl) = plate else { return };
+    if pl.width() < rect.width() * 0.9 {
+        let x = pl.left();
+        let inset = 4.0 * z;
+        p.line_segment(
+            [pos2(x, rect.top() + inset), pos2(x, rect.bottom() - inset)],
+            stroke,
         );
+    } else {
+        p.extend(Shape::dashed_line(
+            &[pl.left_top(), pl.right_top()],
+            stroke,
+            2.0 * z,
+            3.0 * z,
+        ));
     }
 }
 

@@ -533,9 +533,13 @@ fn inline_help_is_opt_in_and_changes_nothing() {
     let mut h = H::new("init-keyboard", 1440.0, 900.0);
     let before = h.snapshot();
     assert!(!h.ui.explain.help);
+    h.ui.drawer_more = true;
+    h.frame();
     h.click("help");
     assert!(h.ui.explain.help);
     h.ui.selected_module = Some(3);
+    h.frame();
+    h.ui.inspect.open = true;
     h.frame();
     h.click("explain-module:3");
     assert_eq!(h.ui.explain.subject, Some(Subject::Module(3)));
@@ -543,6 +547,8 @@ fn inline_help_is_opt_in_and_changes_nothing() {
     assert_eq!(h.ui.selected_module, Some(3));
     h.unchanged_since(&before);
     // Common controls stay reachable with help closed.
+    h.ui.drawer_more = true;
+    h.frame();
     h.click("help");
     h.ui.explain.close();
     h.frame();
@@ -750,6 +756,8 @@ fn edits_through_the_card_and_the_rack_agree_while_explained() {
         .contains(&routing::fmt_value(p, b1)));
     // The same value from the rack's drawer control.
     h.click("explain-show:3.cutoff_hz");
+    h.ui.inspect.open = true;
+    h.frame();
     h.drag("dparam:3.cutoff_hz", -60.0);
     let b2 = base(&h);
     assert!(b2 < b1);

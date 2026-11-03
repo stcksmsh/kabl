@@ -223,6 +223,9 @@ struct CallbackTiming {
     /// Adapter queue: events dropped or forced to a release, and events moved in time.
     timeline_dropped: AtomicU64,
     timeline_moved: AtomicU64,
+    /// Smoothed share of the callback's audio period spent executing, in permille (the
+    /// status bar's CPU readout).
+    load_permille: AtomicU64,
 }
 
 struct Hist([AtomicU64; HIST_BINS]);
@@ -314,6 +317,11 @@ impl CallbackTiming {
         }
         self.frames_min.fetch_min(frames as u64, Ordering::Relaxed);
         self.frames_max.fetch_max(frames as u64, Ordering::Relaxed);
+        // One writer (the audio thread): a plain read-modify-write is enough for the average.
+        let share = ns as f64 / (frames as f64 / sample_rate as f64 * 1e9) * 1000.0;
+        let old = self.load_permille.load(Ordering::Relaxed) as f64;
+        self.load_permille
+            .store((old * 0.95 + share * 0.05) as u64, Ordering::Relaxed);
         if (n * frames as u64) < sample_rate as u64 {
             self.startup_worst_ns.fetch_max(ns, Ordering::Relaxed);
             return;
@@ -717,6 +725,9 @@ impl AudioHost {
                     let _ = morphs_tx.push((id, k, v, to, p));
                 });
                 let (held, sounding) = engine.keys();
+                // Voices sounding: the keyboards' own, or the envelopes not idle when a
+                // sequencer or an arpeggiator plays the patch.
+                let sounding = sounding.max(engine.active_envelopes());
                 keys.store(pack_keys(held, sounding), Ordering::Relaxed);
                 // Full (UI not drawing): this window is dropped; the UI counts the gap.
                 if let Some(r) = engine.take_probe_report() {
@@ -1966,6 +1977,13 @@ impl eframe::App for App {
         }
         ui_state.status_meter = true;
         ui_state.status_audio.clone_from(&self.audio.status);
+        if let Some(t) = self.audio.timing.as_ref() {
+            ui_state.status_cpu = Some(t.load_permille.load(Ordering::Relaxed) as f32 / 10.0);
+            let frames = t.frames_max.load(Ordering::Relaxed);
+            ui_state.status_buffer = (frames > 0).then_some(frames as u32);
+        }
+        let (_, sounding) = unpack_keys(self.midi.keys.load(Ordering::Relaxed));
+        ui_state.status_voices = Some((sounding as u32, DEFAULT_VOICE_COUNT as u32));
         kabl_ui::show_with(editor, ui_state, ui, |ui, ui_state| {
             // Requested but not yet with the audio thread (it is not taking messages).
             let waiting = delivery.pending();
