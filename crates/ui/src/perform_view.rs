@@ -1271,7 +1271,10 @@ fn dest_line(ui: &mut egui::Ui, st: &Style, tone: Tone, text: String) -> egui::R
     ui.add(
         egui::Label::new(
             RichText::new(text)
-                .font(egui::FontId::new(12.0, crate::style::Font::Sans.family(st.fonts_ready)))
+                .font(egui::FontId::new(
+                    12.0,
+                    crate::style::Font::Sans.family(st.fonts_ready),
+                ))
                 .color(col),
         )
         .truncate()
