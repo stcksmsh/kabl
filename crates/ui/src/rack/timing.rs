@@ -5,7 +5,11 @@ use super::*;
 /// The family's decor for `kind`, if it has one.
 pub(super) fn decor(kind: &str, fw: f32) -> Option<Decor> {
     Some(match kind {
-        "seq" => Decor::Banks(Rect::from_min_size(pos2(14.0, 12.0), vec2(fw - 74.0, 26.0))),
+        // Header row right of the title, ending 8 left of the `+N` chip (G4 mockup).
+        "seq" => Decor::Banks(Rect::from_min_size(
+            pos2(fw - 54.0 - crate::BANKS_W, 13.0),
+            vec2(crate::BANKS_W, 18.0),
+        )),
         "cues" => Decor::Cues(Rect::from_min_size(
             pos2(16.0, 64.0),
             vec2(fw - 32.0, 250.0),

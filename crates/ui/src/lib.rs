@@ -2227,7 +2227,7 @@ fn draw_module(
         drum_grid::draw(editor, ui_state, ui, painter, th, xf, m.id, r);
     }
     if let Decor::Banks(r) = m.decor {
-        draw_banks(editor, ui_state, ui, painter, th, xf, m.id, r, now, drawn);
+        draw_banks(editor, ui_state, ui, painter, xf, m.id, r, now, drawn);
     }
     if let Decor::Status(p) = m.decor {
         let (lock, ms) = ui_state
@@ -2318,29 +2318,23 @@ fn draw_module(
         let chip = !kit::face::overview(&ui_state.style, z)
             && (!kit::face::compact_tier(&ui_state.style, z) || title_r.max.x + 1.5 <= r.min.x);
         if chip {
-            painter.rect_filled(
-                r,
-                CornerRadius::same(4),
-                if th.dark { th.btn } else { th.plate },
-            );
-        }
-        if chip && resp.hovered() {
+            // G4 mockup: outlined pill (face edge, accent on hover), mono 11 `text2`.
+            let roles = &ui_state.style.roles;
+            let edge = style::alpha(roles.text, if th.dark { 66 } else { 77 });
             painter.rect_stroke(
                 r,
-                CornerRadius::same(4),
-                Stroke::new(1.0, th.sel),
+                CornerRadius::same((r.height() / 2.0) as u8),
+                Stroke::new(1.0, if resp.hovered() { roles.accent } else { edge }),
                 egui::StrokeKind::Inside,
             );
-        }
-        if chip {
             text(
                 painter,
                 r.center(),
                 egui::Align2::CENTER_CENTER,
                 &label,
-                12.0 * z,
-                th.plate_ink,
-                false,
+                11.0 * z,
+                roles.text2,
+                true,
             );
         }
         let routed = hidden_routes(editor, m);
@@ -2612,16 +2606,26 @@ fn draw_transport(
     }
 }
 
-/// The sequencer's bank strip. EDIT tabs pick the bank the face shows (view only); PLAY buttons
-/// launch a bank with the sequencer's own timing and clock (runtime); the playing bank is lit,
-/// a queued one blinks, and Cancel drops the queued launch. Right-click a tab for bank edits.
+/// Sequencer header groups, measured from the G4 mockup (`g4-surfaces.html`, seq face): each
+/// group is a mono 10 caption, 6 px, then an 84 x 18 pill track of four 21 px options; 14 px
+/// between groups. Three groups: EDIT, PLAY and PAGE.
+const BANK_CAP_W: f32 = 24.0;
+const BANK_SEG_W: f32 = 84.0;
+const BANK_GROUP_W: f32 = BANK_CAP_W + 6.0 + BANK_SEG_W;
+const BANK_GROUP_GAP: f32 = 14.0;
+/// Width of the sequencer header row (`rack::timing` places it).
+pub(crate) const BANKS_W: f32 = 3.0 * BANK_GROUP_W + 2.0 * BANK_GROUP_GAP;
+
+/// The sequencer's header row. EDIT picks the bank the face shows (view only); PLAY launches a
+/// bank with the sequencer's own timing and clock (runtime); the playing bank is lit, a queued
+/// one blinks, and Cancel drops the queued launch. Right-click an EDIT option for bank edits.
+/// The third group's place is kept for PAGE: the engine has no step pages yet.
 #[allow(clippy::too_many_arguments)]
 fn draw_banks(
     editor: &mut PatchEditor,
     ui_state: &mut UiState,
     ui: &mut egui::Ui,
     painter: &egui::Painter,
-    th: &Theme,
     xf: Xf,
     id: ModuleId,
     r: Rect,
@@ -2629,57 +2633,72 @@ fn draw_banks(
     drawn: &mut Drawn,
 ) {
     let z = xf.zoom;
+    let roles = ui_state.style.roles.clone();
+    // Track: the mockup's `segT` (graphite inset; paper #D6D2C8, nearest token `line`).
+    let track = if ui_state.style.dark { roles.inset } else { roles.line };
     let edit = ui_state.edit_bank_of(editor.state(), id);
     let (playing, queued) = ui_state
         .seq_banks
         .get(&id)
         .copied()
         .unwrap_or((banks::startup(editor.state(), id), None));
-    let bw = 26.0;
-    let label = |x: f32, s: &str| {
+    let sw = BANK_SEG_W / seq::BANKS as f32;
+    // One group: caption, track, and the option rects in screen space.
+    let group = |gx: f32, cap: &str| -> Vec<Rect> {
         text(
             painter,
-            xf.p(pos2(x, r.center().y)),
+            xf.p(pos2(gx, r.center().y)),
             egui::Align2::LEFT_CENTER,
-            s,
-            10.5 * z,
-            th.ink2,
+            cap,
+            10.0 * z,
+            roles.text2,
             true,
         );
-    };
-    label(r.left(), "EDIT");
-    let play_x = r.right() - 4.0 * (bw + 4.0);
-    label(play_x - 38.0, "PLAY");
-    for b in 0..seq::BANKS {
-        let name = banks::title(editor.state(), id, b);
-        // EDIT tab.
-        let t = xf.r(Rect::from_min_size(
-            pos2(r.left() + 36.0 + b as f32 * (bw + 4.0), r.top()),
-            vec2(bw, r.height()),
-        ));
-        ui_state.record(format!("bank-edit:{id}.{b}"), t);
-        let resp = ui.interact(t, Id::new(("kabl-bank-edit", id, b)), Sense::click());
-        let on = b == edit;
+        let tx = gx + BANK_CAP_W + 6.0;
         painter.rect_filled(
-            t,
-            CornerRadius::same(4),
-            if on {
-                th.sel
-            } else if th.dark {
-                th.btn
-            } else {
-                th.plate
-            },
+            xf.r(Rect::from_min_size(pos2(tx, r.top()), vec2(BANK_SEG_W, r.height()))),
+            CornerRadius::same((r.height() / 2.0 * z) as u8),
+            track,
         );
+        (0..seq::BANKS)
+            .map(|b| {
+                xf.r(Rect::from_min_size(
+                    pos2(tx + b as f32 * sw, r.top()),
+                    vec2(sw, r.height()),
+                ))
+            })
+            .collect()
+    };
+    // The selected option: accent pill inset 2 px; the others are plain `text2` letters.
+    let option = |t: Rect, s: &str, on: bool| {
+        if on {
+            let pill = t.shrink(2.0 * z);
+            painter.rect_filled(
+                pill,
+                CornerRadius::same((pill.height() / 2.0) as u8),
+                roles.accent,
+            );
+        }
         text(
             painter,
             t.center(),
             egui::Align2::CENTER_CENTER,
-            seq::BANK_NAMES[b],
-            12.0 * z,
-            if on { th.sel_ink } else { th.plate_ink },
-            false,
+            s,
+            11.0 * z,
+            if on { roles.on_accent } else { roles.text2 },
+            true,
         );
+    };
+    let edit_tabs = group(r.left(), "EDIT");
+    let play_btns = group(r.left() + BANK_GROUP_W + BANK_GROUP_GAP, "PLAY");
+    for b in 0..seq::BANKS {
+        let name = banks::title(editor.state(), id, b);
+        // EDIT option.
+        let t = edit_tabs[b];
+        ui_state.record(format!("bank-edit:{id}.{b}"), t);
+        let resp = ui.interact(t, Id::new(("kabl-bank-edit", id, b)), Sense::click());
+        let on = b == edit;
+        option(t, seq::BANK_NAMES[b], on);
         // Routes into this bank's controls while another bank is on the face plug in here.
         let routed: Vec<CableId> = if on {
             Vec::new()
@@ -2702,7 +2721,7 @@ fn draw_banks(
             drawn.plugs.push((c, t.center_bottom()));
         }
         if !routed.is_empty() {
-            painter.circle_filled(t.right_top(), 3.5 * z, th.sel);
+            painter.circle_filled(t.right_top(), 2.0 * z, roles.accent);
         }
         let resp = resp.on_hover_text(format!(
             "Edit bank {name}{}{} (does not launch it). Right-click: copy, clear, rename",
@@ -2721,25 +2740,12 @@ fn draw_banks(
             kit::context_menu(&resp, &st, |ui| bank_menu(editor, ui_state, ui, id, b));
         }
 
-        // PLAY button.
-        let pbtn = xf.r(Rect::from_min_size(
-            pos2(play_x + b as f32 * (bw + 4.0), r.top()),
-            vec2(bw, r.height()),
-        ));
+        // PLAY option.
+        let pbtn = play_btns[b];
         ui_state.record(format!("bank-play:{id}.{b}"), pbtn);
         let resp = ui.interact(pbtn, Id::new(("kabl-bank-play", id, b)), Sense::click());
         let lit = b == playing;
-        painter.rect_filled(
-            pbtn,
-            CornerRadius::same(4),
-            if lit {
-                th.gate
-            } else if th.dark {
-                th.btn
-            } else {
-                th.plate
-            },
-        );
+        option(pbtn, seq::BANK_NAMES[b], lit);
         if queued == Some(b) {
             // Blinks twice a second until it lands.
             let a = if (now * 4.0) as i64 % 2 == 0 {
@@ -2747,24 +2753,16 @@ fn draw_banks(
             } else {
                 0.35
             };
+            let pill = pbtn.shrink(2.0 * z);
             painter.rect_stroke(
-                pbtn.expand(1.5 * z),
-                CornerRadius::same(5),
-                Stroke::new(2.5 * z, th.gate.gamma_multiply(a)),
-                egui::StrokeKind::Outside,
+                pill,
+                CornerRadius::same((pill.height() / 2.0) as u8),
+                Stroke::new(1.5 * z, roles.accent.gamma_multiply(a)),
+                egui::StrokeKind::Inside,
             );
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(120));
         }
-        text(
-            painter,
-            pbtn.center(),
-            egui::Align2::CENTER_CENTER,
-            seq::BANK_NAMES[b],
-            12.0 * z,
-            if lit { th.sel_ink } else { th.plate_ink },
-            false,
-        );
         let timing = banks::timing(editor.state(), id);
         let when = banks::TIMINGS
             .iter()
@@ -2784,21 +2782,22 @@ fn draw_banks(
         }
     }
     if queued.is_some() {
+        // Left of EDIT, same height and pill shape as the header chips.
         let c = xf.r(Rect::from_min_size(
-            pos2(play_x - 96.0, r.top()),
+            pos2(r.left() - BANK_GROUP_GAP - 54.0, r.top()),
             vec2(54.0, r.height()),
         ));
         ui_state.record(format!("bank-cancel:{id}"), c);
         let resp = ui.interact(c, Id::new(("kabl-bank-cancel", id)), Sense::click());
         painter.rect_stroke(
             c,
-            CornerRadius::same(4),
+            CornerRadius::same((c.height() / 2.0) as u8),
             Stroke::new(
                 1.0,
                 if resp.hovered() {
-                    th.sel
+                    roles.accent
                 } else {
-                    th.panel_edge
+                    roles.line2
                 },
             ),
             egui::StrokeKind::Inside,
@@ -2809,7 +2808,7 @@ fn draw_banks(
             egui::Align2::CENTER_CENTER,
             "Cancel",
             11.0 * z,
-            th.ink,
+            roles.text,
             false,
         );
         if resp.on_hover_text("Drop the queued launch").clicked() {
