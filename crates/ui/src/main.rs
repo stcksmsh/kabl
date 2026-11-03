@@ -2374,6 +2374,12 @@ fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("kabl")
+            .with_icon(
+                eframe::icon_data::from_png_bytes(include_bytes!(
+                    "../../../packaging/linux/logo/hicolor/256x256/apps/kabl.png"
+                ))
+                .expect("bundled app icon"),
+            )
             .with_inner_size(size)
             .with_min_inner_size([1280.0, 800.0]),
         ..Default::default()

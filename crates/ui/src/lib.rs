@@ -1001,7 +1001,7 @@ fn tool_icon(
 
 fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
     ui.horizontal_centered(|ui| {
-        kit::logo(ui, st, 30.0);
+        kit::logo(ui, st, 32.0);
         kit::view_switch(ui, st, |ui| {
             let open = ui_state.perform_open;
             let r = kit::seg(ui, st, "Rack", !open);
