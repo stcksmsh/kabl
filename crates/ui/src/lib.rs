@@ -2468,20 +2468,18 @@ fn draw_module(
     if m.info.kind == "seq" {
         draw_seq_steps(editor, ui_state, painter, xf, m, ink, ink2);
     }
-    if skin.is_none() && st.slots.face.tray == style::TrayRecipe::Outline {
-        if let Some(t) = m.tray {
-            kit::parts::tray(painter, &st, xf.r(t), m.plate.map(|p| xf.r(p)), z);
-        }
-    } else if let Some(p) = m.plate {
-        if skin.is_some() {
+    if skin.is_some() {
+        if let Some(p) = m.plate {
             painter.rect_filled(xf.r(p), CornerRadius::same(6), th.plate);
-        } else {
-            let r = xf.r(p);
-            painter.line_segment(
-                [r.left_top(), r.right_top()],
-                Stroke::new(0.8, th.panel_edge),
-            );
         }
+    } else if let Some(t) = m.tray {
+        kit::parts::tray(painter, &st, xf.r(t), m.plate.map(|p| xf.r(p)), z);
+    } else if let Some(p) = m.plate {
+        let r = xf.r(p);
+        painter.line_segment(
+            [r.left_top(), r.right_top()],
+            Stroke::new(0.8, th.panel_edge),
+        );
     }
 
     let look = Look {

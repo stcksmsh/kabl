@@ -77,7 +77,6 @@ impl App {
                     value: v,
                     hot: label == "focus",
                 },
-                r.text2,
             );
             self.caption(p, o, x, 125.0, label);
             x += 90.0;

@@ -791,7 +791,6 @@ pub(crate) fn param_knob(
             value: base_n,
             hot,
         },
-        th.tick,
     );
 
     // Collapsed knob with several sources: one thin ring per source (display only; pressing
