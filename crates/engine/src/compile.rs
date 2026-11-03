@@ -2097,17 +2097,21 @@ impl CompiledPatch {
         }
     }
 
-    /// Envelopes (`env.adsr`, one per voice lane where the patch is polyphonic) that are not
-    /// idle: the voices sounding, whether keys or a sequencer drive them. No allocation.
+    /// Voices with an envelope (`env.adsr`) that is not idle: the voices sounding, whether keys
+    /// or a sequencer drive them. A voice's amp and filter envelopes, and the second channel's
+    /// copies, count once (they share a voice lane); a global-rate envelope counts as voice 0.
+    /// No allocation.
     pub fn active_envelopes(&self) -> usize {
-        self.modules
-            .iter()
-            .filter(|m| {
-                m.as_any()
-                    .downcast_ref::<EnvAdsr>()
-                    .is_some_and(EnvAdsr::active)
-            })
-            .count()
+        let mut lanes = 0u64;
+        for (m, &(_, lane)) in self.modules.iter().zip(&self.module_origin) {
+            if m.as_any()
+                .downcast_ref::<EnvAdsr>()
+                .is_some_and(EnvAdsr::active)
+            {
+                lanes |= 1 << lane.unwrap_or(0).min(63);
+            }
+        }
+        lanes.count_ones() as usize
     }
 
     /// Calls `f(id, step, playing bank, armed bank)` for every `seq` module. No allocation.
