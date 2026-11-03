@@ -546,10 +546,13 @@ pub fn slider(
             Sense::hover()
         },
     );
-    let track_r = Rect::from_min_max(
-        rect.min,
-        pos2(rect.right() - readout_w - st.sp(2), rect.max.y),
-    );
+    // An empty readout (the value shown elsewhere) gives the track the full width.
+    let reserve = if readout.is_empty() {
+        0.0
+    } else {
+        readout_w + st.sp(2)
+    };
+    let track_r = Rect::from_min_max(rect.min, pos2(rect.right() - reserve, rect.max.y));
     let (lo, hi) = (*range.start(), *range.end());
     let span = (hi - lo).max(f64::EPSILON);
     let before = *value;
