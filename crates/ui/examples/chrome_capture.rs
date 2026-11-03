@@ -99,7 +99,7 @@ impl App {
             self.editor.set_param(id, &k, v + 1.0);
         }
         ui.browser_open = j.scene == "sounds";
-        ui.drawer_open = matches!(j.scene, "rack" | "error");
+        ui.drawer_open = matches!(j.scene, "rack");
         if j.scene == "empty" {
             self.editor = PatchEditor::new();
         }
