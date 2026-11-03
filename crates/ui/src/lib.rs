@@ -2260,19 +2260,8 @@ fn draw_module(
             true,
         );
     }
-    // Step light: beside the playing step's pitch label; hollow while the face edits a bank
-    // that is not playing.
-    if let Some(&s) = ui_state.seq_steps.get(&m.id) {
-        let edit = ui_state.edit_bank_of(editor.state(), m.id);
-        let playing = ui_state.seq_banks.get(&m.id).map_or(edit, |b| b.0);
-        if let Some(c) = m.ctl(seq::bank_param(edit, s.min(seq::STEPS - 1))) {
-            let at = xf.p(c.geo.label_pos() - vec2(16.0, 0.0));
-            if playing == edit {
-                painter.circle_filled(at, 4.0 * z, th.gate);
-            } else {
-                painter.circle_stroke(at, 3.5 * z, Stroke::new(1.5 * z, th.gate));
-            }
-        }
+    if m.info.kind == "seq" {
+        draw_seq_steps(editor, ui_state, painter, xf, m, ink, ink2);
     }
     if skin.is_none() && st.slots.face.tray == style::TrayRecipe::Outline {
         if let Some(t) = m.tray {
@@ -2320,7 +2309,7 @@ fn draw_module(
         if chip {
             // G4 mockup: outlined pill (face edge, accent on hover), mono 11 `text2`.
             let roles = &ui_state.style.roles;
-            let edge = style::alpha(roles.text, if th.dark { 66 } else { 77 });
+            let edge = face_edge(&ui_state.style);
             painter.rect_stroke(
                 r,
                 CornerRadius::same((r.height() / 2.0) as u8),
@@ -2634,8 +2623,7 @@ fn draw_banks(
 ) {
     let z = xf.zoom;
     let roles = ui_state.style.roles.clone();
-    // Track: the mockup's `segT` (graphite inset; paper #D6D2C8, nearest token `line`).
-    let track = if ui_state.style.dark { roles.inset } else { roles.line };
+    let track = seg_track(&ui_state.style);
     let edit = ui_state.edit_bank_of(editor.state(), id);
     let (playing, queued) = ui_state
         .seq_banks
@@ -2814,6 +2802,153 @@ fn draw_banks(
         if resp.on_hover_text("Drop the queued launch").clicked() {
             ui_state.launches.push(Command::Cancel(Some(id)));
         }
+    }
+}
+
+/// Line colour of the G4 mockup's line faces (`edge`): text at 26 % (graphite) / 30 % (paper).
+fn face_edge(st: &Style) -> Color32 {
+    style::alpha(st.roles.text, if st.dark { 66 } else { 77 })
+}
+
+/// The G4 mockup's selector track (`segT`): graphite `inset`; paper #D6D2C8, which has no
+/// token, so `line`, the nearest.
+fn seg_track(st: &Style) -> Color32 {
+    if st.dark {
+        st.roles.inset
+    } else {
+        st.roles.line
+    }
+}
+
+/// The sequencer body behind its controls (G4 mockup, seq body): the left column's divider,
+/// then per step a dot (accent on the playing step), the step number, and the playing step's
+/// column tint. Shown only while the face edits the playing bank.
+fn draw_seq_steps(
+    editor: &PatchEditor,
+    ui_state: &UiState,
+    painter: &egui::Painter,
+    xf: Xf,
+    m: &Placed,
+    ink: Color32,
+    ink2: Color32,
+) {
+    let st = &ui_state.style;
+    let z = xf.zoom;
+    let edge = face_edge(st);
+    let f = m.face;
+    let edit = ui_state.edit_bank_of(editor.state(), m.id);
+    let playing_bank = ui_state.seq_banks.get(&m.id).map_or(edit, |b| b.0);
+    let now = ui_state
+        .seq_steps
+        .get(&m.id)
+        .copied()
+        .filter(|_| playing_bank == edit);
+    let at = |x: f32, y: f32| xf.p(f.min + vec2(x, y));
+    painter.line_segment([at(136.0, 58.0), at(136.0, 272.0)], Stroke::new(1.0, edge));
+    let cw = (f.width() - 12.0 - 148.0) / seq::STEPS as f32;
+    for k in 0..seq::STEPS {
+        let cx = 148.0 + cw * (k as f32 + 0.5);
+        let on = now == Some(k);
+        if on {
+            painter.rect_filled(
+                xf.r(Rect::from_min_size(
+                    f.min + vec2(cx - cw / 2.0 + 3.0, 54.0),
+                    vec2(cw - 6.0, 218.0),
+                )),
+                CornerRadius::same((6.0 * z) as u8),
+                st.roles.accent.gamma_multiply(0.07),
+            );
+        }
+        painter.circle_filled(at(cx, 64.0), 3.0 * z, if on { st.roles.accent } else { edge });
+        text(
+            painter,
+            at(cx, 82.0),
+            egui::Align2::CENTER_CENTER,
+            &(k + 1).to_string(),
+            11.0 * z,
+            if on { ink } else { ink2 },
+            true,
+        );
+    }
+}
+
+/// A sequencer step's gate pill (click: on/off; on = gate signal colour, off = the selector
+/// track) or velocity bar (click or drag; filled from the bottom in the gate colour), from the
+/// G4 mockup. Routed cables plug in at its centre.
+#[allow(clippy::too_many_arguments)]
+fn seq_step_cell(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    painter: &egui::Painter,
+    xf: Xf,
+    id: ModuleId,
+    param: &'static kabl_modules::ParamInfo,
+    rect: Rect,
+    drawn: &mut Drawn,
+) {
+    let st = ui_state.style.clone();
+    let z = xf.zoom;
+    let r = xf.r(rect);
+    let slot = seq::slot_name(param.name);
+    let step = &slot[1..];
+    let v = routing::base_value(editor.state(), id, param);
+    let key = format!("{id}.{}", param.name);
+    ui_state.record(format!("step:{key}"), r);
+    if slot.starts_with('g') {
+        let on = v >= 0.5;
+        painter.rect_filled(
+            r,
+            CornerRadius::same((r.height() / 2.0) as u8),
+            if on { st.roles.gate } else { seg_track(&st) },
+        );
+        let resp = ui
+            .interact(r.expand(2.0 * z), Id::new(("kabl-seq-gate", id, param.name)), Sense::click())
+            .on_hover_text(format!(
+                "Step {step} gate: {}. Click to switch it {}",
+                if on { "on" } else { "off (a rest)" },
+                if on { "off" } else { "on" }
+            ));
+        if resp.clicked() {
+            editor.set_param(id, param.name, if on { 0.0 } else { 1.0 });
+        }
+    } else {
+        let n = param.to_norm(v).clamp(0.0, 1.0);
+        let round = CornerRadius::same((r.width() / 2.0) as u8);
+        painter.rect_filled(r, round, face_edge(&st));
+        if n > 0.0 {
+            painter.rect_filled(
+                Rect::from_min_max(pos2(r.left(), r.bottom() - r.height() * n), r.max),
+                round,
+                st.roles.gate,
+            );
+        }
+        let resp = ui
+            .interact(
+                r.expand2(vec2(10.0, 4.0) * z),
+                Id::new(("kabl-seq-vel", id, param.name)),
+                Sense::click_and_drag(),
+            )
+            .on_hover_text(format!(
+                "Step {step} velocity: {}. Click or drag to set",
+                routing::fmt_value(param, v)
+            ));
+        if resp.clicked() || resp.dragged() {
+            if let Some(p) = resp.interact_pointer_pos() {
+                let n = ((r.bottom() - p.y) / r.height()).clamp(0.0, 1.0);
+                editor.set_param_gesture(
+                    kabl_core::ParamTarget::Module {
+                        id,
+                        param: param.name.to_string(),
+                    },
+                    param.min + n * (param.max - param.min),
+                    resp.clicked() || resp.drag_started(),
+                );
+            }
+        }
+    }
+    for rt in routing::routes_into(editor.state(), id, param.name) {
+        drawn.plugs.push((rt.cable, r.center()));
     }
 }
 
@@ -3482,6 +3617,13 @@ fn draw_control(
             CornerRadius::same(5),
             th.panel.gamma_multiply(0.96),
         );
+    }
+    if let (true, Geo::Select { rect }) = (m.info.kind == "seq", c.geo) {
+        let slot = seq::slot_name(c.param.name);
+        if slot.len() == 2 && matches!(slot.as_bytes()[0], b'g' | b'v') {
+            seq_step_cell(editor, ui_state, ui, painter, xf, m.id, c.param, rect, drawn);
+            return;
+        }
     }
     match c.geo {
         Geo::Knob { c: cen, r } => {

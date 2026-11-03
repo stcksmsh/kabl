@@ -91,3 +91,63 @@ pub(super) fn midi_in_face(
     }
     decor
 }
+
+/// Sequencer slots the face shows besides the step pitches and gates (G4 mockup).
+pub(super) fn on_face(kind: &str, slot: &str) -> bool {
+    kind == "seq"
+        && (matches!(slot, "length" | "gate_len")
+            || slot.strip_prefix('v').is_some_and(|k| k.len() == 1))
+}
+
+/// The sequencer's face, measured from the G4 mockup (`g4-surfaces.html`, seq body): a left
+/// column with Length and Gate length (r 16, at y 110 and 200, centred 56 from the margin), a
+/// divider at x 136, then eight step columns from x 148 to the margin. Per step: pitch knob
+/// (r 16, y 124), gate pill (28 x 16, top 176) and velocity bar (6 x 40, top 204); gates and
+/// velocities are drawn by the face (`Geo::Select` rects). Anything else the user pins goes
+/// to the advanced area.
+pub(super) fn seq_face(
+    info: &'static ModuleInfo,
+    on: &[usize],
+    fw: f32,
+    ctls: &mut Vec<Ctl>,
+    off_face: &mut Vec<usize>,
+) {
+    let x0 = SIDE + 136.0;
+    let cw = (fw - SIDE - x0) / seq::STEPS as f32;
+    for &i in on {
+        let param = &info.params[i];
+        let slot = seq::slot_name(param.name);
+        let step = |pre: char| {
+            slot.strip_prefix(pre)
+                .and_then(|k| k.parse::<usize>().ok())
+                .filter(|k| (1..=seq::STEPS).contains(k))
+                .map(|k| x0 + cw * (k as f32 - 0.5))
+        };
+        let geo = match slot {
+            "length" => Geo::Knob { c: pos2(SIDE + 56.0, 110.0), r: 16.0 },
+            "gate_len" => Geo::Knob { c: pos2(SIDE + 56.0, 200.0), r: 16.0 },
+            _ => {
+                if let Some(cx) = step('p') {
+                    Geo::Knob { c: pos2(cx, 124.0), r: 16.0 }
+                } else if let Some(cx) = step('g') {
+                    Geo::Select {
+                        rect: Rect::from_min_size(pos2(cx - 14.0, 176.0), vec2(28.0, 16.0)),
+                    }
+                } else if let Some(cx) = step('v') {
+                    Geo::Select {
+                        rect: Rect::from_min_size(pos2(cx - 3.0, 204.0), vec2(6.0, 40.0)),
+                    }
+                } else {
+                    off_face.push(i);
+                    continue;
+                }
+            }
+        };
+        ctls.push(Ctl {
+            param,
+            primary: true,
+            geo,
+        });
+    }
+    off_face.sort_unstable();
+}

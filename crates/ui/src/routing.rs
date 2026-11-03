@@ -316,7 +316,7 @@ pub fn param_label(p: &ParamInfo) -> String {
         match slot {
             "bank" => return "Startup".into(),
             "direction" => return "Direction".into(),
-            "gate_len" => return "Gate len".into(),
+            "gate_len" => return "Gate length".into(),
             _ => slot,
         }
     } else {
@@ -934,8 +934,13 @@ pub(crate) fn param_knob(
         }
     }
 
-    // Label above, value below (a pill with a coloured edge when modulated).
-    if let Some(font) = crate::kit::face::face_font(&ui_state.style, crate::style::Role::Label, z) {
+    // Label above, value below (a pill with a coloured edge when modulated). A sequencer step's
+    // pitch has no label: the face draws the step number higher up (G4 mockup).
+    let seq_step = SEQ_INFO.params.iter().any(|q| std::ptr::eq(q, param))
+        && seq::slot_name(param.name).starts_with('p');
+    if let Some(font) = crate::kit::face::face_font(&ui_state.style, crate::style::Role::Label, z)
+        .filter(|_| !seq_step)
+    {
         painter.text(
             center - EguiVec2::new(0.0, crate::rack::knob_text_dy(r, z, font.size * 1.075)),
             egui::Align2::CENTER_CENTER,
