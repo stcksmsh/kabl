@@ -1009,14 +1009,16 @@ fn macro_knob(ui: &mut egui::Ui, st: &Style, name: &str, v: f32, w: f32, compact
         let a = (135.0 + 270.0 * t).to_radians();
         c + vec2(a.cos(), a.sin()) * rad
     };
-    let arc = |t: f32| -> Vec<egui::Pos2> {
-        (0..=32).map(|i| at(t * i as f32 / 32.0, ring)).collect()
-    };
+    let arc =
+        |t: f32| -> Vec<egui::Pos2> { (0..=32).map(|i| at(t * i as f32 / 32.0, ring)).collect() };
     let p = ui.painter();
     let track = egui::Stroke::new(4.0, st.roles.inset);
     p.add(egui::Shape::line(arc(1.0), track));
     if v > 0.0 {
-        p.add(egui::Shape::line(arc(v), egui::Stroke::new(4.0, st.roles.accent)));
+        p.add(egui::Shape::line(
+            arc(v),
+            egui::Stroke::new(4.0, st.roles.accent),
+        ));
     }
     p.circle_filled(c, r, st.roles.raised);
     p.circle_stroke(c, r, egui::Stroke::new(1.0, st.roles.line2));
@@ -1031,32 +1033,6 @@ fn macro_knob(ui: &mut egui::Ui, st: &Style, name: &str, v: f32, w: f32, compact
         st.font(Role::Label),
         st.roles.text,
     );
-}
-
-/// A waveform well under the title. ponytail: decorative (the mockup's damped sine); a real
-/// preview needs an offline render of the sound, add when the engine can render a snippet.
-fn preview_well(ui: &mut egui::Ui, st: &Style, h: f32) {
-    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), h), Sense::hover());
-    let p = ui.painter();
-    p.rect_filled(rect, st.radius(crate::style::Rad::Md), st.roles.disp_bg);
-    let pts: Vec<egui::Pos2> = (0..=80)
-        .map(|i| {
-            let f = i as f32 / 80.0;
-            let y = (f * std::f32::consts::PI * 6.0).sin() * h * 0.32 * (1.0 - 0.6 * ((f * 3.0) % 1.0));
-            pos2(rect.left() + 8.0 + f * (rect.width() - 16.0), rect.center().y - y)
-        })
-        .collect();
-    p.add(egui::Shape::line(pts, egui::Stroke::new(2.0, st.roles.disp_trace)));
-}
-
-/// `s` cut at a word boundary within `max` characters, with an ellipsis when it was longer.
-fn clamp_words(s: &str, max: usize) -> String {
-    if s.chars().count() <= max {
-        return s.to_string();
-    }
-    let cut: String = s.chars().take(max).collect();
-    let cut = cut.rsplit_once(' ').map_or(cut.as_str(), |(a, _)| a);
-    format!("{}…", cut.trim_end_matches(|c: char| !c.is_alphanumeric()))
 }
 
 /// One sound as a row: star, name, macro names, tags.
@@ -1635,14 +1611,9 @@ fn detail_column(
                     kit::section(ui, st, kicker);
                     kit::label_truncated(ui, st, Role::Display, Tone::Text, &e.meta.name);
                     if !e.meta.description.is_empty() {
-                        // Two lines at most; the full text is the tooltip.
-                        let short = clamp_words(&e.meta.description, 90);
-                        kit::paragraph(ui, st, Role::Body, Tone::Text2, &short)
-                            .tip(st, &e.meta.description);
+                        kit::paragraph(ui, st, Role::Body, Tone::Text2, &e.meta.description);
                     }
                     let compact = ui.available_width() < 330.0;
-                    kit::gap(ui, st, 1);
-                    preview_well(ui, st, if compact { 84.0 } else { 110.0 });
                     let mut one = 1;
                     let macros = macros_cached(&mut ui_state.browser, e, &mut one).to_vec();
                     if !macros.is_empty() {
