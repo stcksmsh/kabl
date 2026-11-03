@@ -805,6 +805,7 @@ fn a_save_dialog_over_an_explanation_keeps_escape_and_the_document() {
     h.click("explain-dest:29");
     // Focused controls own pointer input. Close before using underlying toolbar.
     h.click("more:close");
+    h.click("sound-menu");
     h.click("save-as");
     assert!(h.ui.browser.dialog.is_some(), "Save As opened");
     h.key(Key::Escape);

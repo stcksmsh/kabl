@@ -463,6 +463,7 @@ fn delayed_open_preserves_an_edit_accepted_while_reading() {
 fn delayed_save_commits_a_snapshot_without_hiding_a_later_edit() {
     let mut t = H::new(1440.0, 900.0);
     t.open("factory:palette/pad");
+    t.click("sound-menu");
     t.click("save-as");
     t.save_as_named("Async Pad");
     t.edit("filter.ladder", "cutoff_hz", 4300.0);
@@ -511,6 +512,7 @@ fn a_failed_save_keeps_the_work_and_the_question() {
     let user = tempfile::tempdir_in(dir.path()).unwrap();
     let mut t = H::with_user(1440.0, 900.0, user);
     t.open("factory:palette/pad");
+    t.click("sound-menu");
     t.click("save-as");
     t.save_as_named("Mine");
     assert_eq!(t.doc_origin(), DocOrigin::Library("user:mine".into()));
@@ -538,10 +540,12 @@ fn a_failed_save_keeps_the_work_and_the_question() {
 fn save_as_onto_a_taken_name_offers_replace() {
     let mut t = H::new(1440.0, 900.0);
     t.open("factory:palette/pad");
+    t.click("sound-menu");
     t.click("save-as");
     t.save_as_named("Twin");
     t.edit("filter.ladder", "cutoff_hz", 555.0);
     let second = t.editor.state().clone();
+    t.click("sound-menu");
     t.click("save-as");
     t.save_as_named("twin");
     match &t.ui.browser.dialog {
@@ -574,8 +578,10 @@ fn save_as_onto_a_taken_name_offers_replace() {
 fn rename_through_the_browser() {
     let mut t = H::new(1440.0, 900.0);
     t.open("factory:palette/pad");
+    t.click("sound-menu");
     t.click("save-as");
     t.save_as_named("First");
+    t.click("sound-menu");
     t.click("save-as");
     t.save_as_named("Second");
     t.click("filter:user");
@@ -690,7 +696,12 @@ fn every_control_is_reachable_at_both_sizes() {
         let screen = Rect::from_min_size(Pos2::ZERO, egui::vec2(w, h));
         // The toolbar and the panel header never scroll.
         for key in [
-            "browser", "save", "save-as", "doc-name", "routing", "perform", "new",
+            "browser",
+            "save",
+            "sound-menu",
+            "doc-name",
+            "perform",
+            "new",
         ] {
             let r = t.ui.hits.get(key).unwrap_or_else(|| panic!("{w}: {key}"));
             assert!(
@@ -699,9 +710,7 @@ fn every_control_is_reachable_at_both_sizes() {
             );
         }
         // Toolbar items don't overlap (the segments of the view switch abut by design).
-        let row = [
-            "browser", "doc-name", "save", "save-as", "routing", "perform",
-        ];
+        let row = ["browser", "doc-name", "save", "perform"];
         for (i, a) in row.iter().enumerate() {
             for b in &row[i + 1..] {
                 assert!(
@@ -780,11 +789,13 @@ fn user_ids(t: &H) -> Vec<String> {
 fn replace_never_targets_a_sound_after_the_name_changed() {
     let mut t = H::new(1440.0, 900.0);
     t.open("factory:palette/pad");
+    t.click("sound-menu");
     t.click("save-as");
     t.save_as_named("Alpha");
     let alpha = saved_state(&t, "user:alpha");
     t.edit("filter.ladder", "cutoff_hz", 1234.0);
     let work = t.editor.state().clone();
+    t.click("sound-menu");
     t.click("save-as");
     t.save_as_named("alpha");
     assert!(t.has("dlg:replace"), "a collision offers Replace it");
@@ -933,6 +944,7 @@ fn save_to_folder_is_staged_too() {
 fn cancel_after_a_collision_keeps_the_other_sound() {
     let mut t = H::new(1440.0, 900.0);
     t.open("factory:palette/pad");
+    t.click("sound-menu");
     t.click("save-as");
     t.save_as_named("Alpha");
     let dir =
@@ -955,6 +967,7 @@ fn cancel_after_a_collision_keeps_the_other_sound() {
     let before = bytes(&dir);
     t.edit("filter.ladder", "cutoff_hz", 999.0);
     let work = t.editor.state().clone();
+    t.click("sound-menu");
     t.click("save-as");
     t.save_as_named("ALPHA");
     assert!(t.has("dlg:replace"));

@@ -78,6 +78,23 @@ impl App {
             Some(patches()),
             self._user.path().to_path_buf(),
         ));
+        let mut doc = kabl_ui::browser::Doc::new(
+            "Acid Line",
+            kabl_ui::browser::DocOrigin::Library("factory:acid-line".into()),
+            &state,
+        );
+        doc.meta.category = "Bass".into();
+        ui.doc = Some(doc);
+        // An unsaved edit, so the sound dropdown shows its dot.
+        let edit = self
+            .editor
+            .state()
+            .modules
+            .iter()
+            .find_map(|(&id, m)| m.params.iter().next().map(|(k, &v)| (id, k.clone(), v)));
+        if let Some((id, k, v)) = edit {
+            self.editor.set_param(id, &k, v + 1.0);
+        }
         ui.browser_open = j.scene == "sounds";
         ui.drawer_open = j.scene == "rack";
         ui.perform_open = j.scene == "perform";
@@ -157,6 +174,10 @@ impl eframe::App for App {
             self.ui.drawer_open = true;
         }
         show(&mut self.editor, &mut self.ui, &mut root);
+        // The mockup's rack is drawn at 95 %: set it once the first fit has run.
+        if self.f == 6 && self.jobs[self.i].scene == "rack" {
+            self.ui.zoom = 0.95;
+        }
         self.f += 1;
         if self.f == 12 {
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
