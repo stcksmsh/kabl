@@ -1651,6 +1651,11 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
         ui.label("No module selected.");
         return;
     };
+    if kind == "cues" {
+        // The G4 cues editor draws its own header and controls.
+        seq_editor::cues_panel(editor, ui_state, ui, id);
+        return;
+    }
     let Some(info) = registry::info_for(&kind) else {
         ui.label("Unknown module kind.");
         return;
@@ -1675,9 +1680,6 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
         ui.add(egui::Label::new(egui::RichText::new(info.explain).small()).wrap());
     }
     let edit = ui_state.edit_bank_of(editor.state(), id);
-    if kind == "cues" {
-        seq_editor::cues_panel(editor, ui_state, ui, id);
-    }
     if kind == "macro" {
         for (k, p) in info.params.iter().enumerate() {
             ui.horizontal(|ui| {
