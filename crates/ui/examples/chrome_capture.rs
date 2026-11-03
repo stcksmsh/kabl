@@ -78,6 +78,9 @@ impl App {
             Some(patches()),
             self._user.path().to_path_buf(),
         ));
+        if j.scene == "sounds" {
+            ui.browser.selected = Some("factory:presets/acid-line".into());
+        }
         let mut doc = kabl_ui::browser::Doc::new(
             "Acid Line",
             kabl_ui::browser::DocOrigin::Library("factory:acid-line".into()),

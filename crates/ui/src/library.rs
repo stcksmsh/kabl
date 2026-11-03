@@ -26,6 +26,11 @@ pub const MAX_RECENTS: usize = 12;
 pub const MAX_NAME: usize = 60;
 
 /// The category vocabulary, in browser order.
+/// The shelves of the Sounds scene's category list, in the mockup's order.
+pub const SHELVES: [&str; 8] = [
+    "Bass", "Lead", "Keys", "Pad", "Pluck", "Groove", "Piece", "Voice",
+];
+
 pub const CATEGORIES: &[&str] = &[
     "Sounds",
     "Sequences",
@@ -73,6 +78,22 @@ impl Meta {
             (_, true) => "Sequences",
             _ => "Sounds",
         }
+    }
+
+    /// The category list of the Sounds scene: the mockup's eight shelves. Data categories
+    /// outside it map to the nearest one; `None` (Basic and the purpose words) shows under All.
+    pub fn shelf(&self) -> Option<&'static str> {
+        Some(match self.category.as_str() {
+            "Bass" => "Bass",
+            "Lead" | "Wind" => "Lead",
+            "Keys" => "Keys",
+            "Pad" | "Strings" => "Pad",
+            "Pluck" => "Pluck",
+            "Groove" | "Percussion" => "Groove",
+            "Piece" | "Study" => "Piece",
+            "Voice" => "Voice",
+            _ => return None,
+        })
     }
 
     pub fn in_category(&self, category: &str) -> bool {

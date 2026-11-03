@@ -921,13 +921,6 @@ pub fn show_with(
         .resizable(false)
         .frame(kit::panel_frame(&st).inner_margin(egui::Margin::symmetric(0, st.sp(2) as i8)))
         .show(ui, |ui| rail(editor, ui_state, ui, &st));
-    if ui_state.browser_open {
-        egui::Panel::left("kabl-browser")
-            .exact_size(browser::PANEL_W)
-            .resizable(false)
-            .frame(kit::panel_frame(&st))
-            .show(ui, |ui| browser::panel(editor, ui_state, ui));
-    }
 
     let compact = ui.max_rect().width() < COMPACT_W;
     ui_state.compact = compact;
@@ -953,7 +946,8 @@ pub fn show_with(
             .frame(kit::panel_frame(&st))
             .show(ui, |ui| perform_view::panel(editor, ui_state, ui));
     }
-    if ui_state.drawer_open {
+    // The Sounds scene has its own detail column: the drawer waits behind it.
+    if ui_state.drawer_open && !ui_state.browser_open {
         if compact {
             // Below 1280 px the drawer floats over the rack instead of splitting the window.
             let avail = ui.available_rect_before_wrap();
@@ -987,7 +981,11 @@ pub fn show_with(
         }
     }
 
-    if perform_full {
+    if ui_state.browser_open {
+        egui::CentralPanel::default()
+            .frame(kit::panel_frame(&st))
+            .show(ui, |ui| browser::panel(editor, ui_state, ui));
+    } else if perform_full {
         egui::CentralPanel::default()
             .frame(kit::page_frame(&st))
             .show(ui, |ui| perform_view::panel(editor, ui_state, ui));

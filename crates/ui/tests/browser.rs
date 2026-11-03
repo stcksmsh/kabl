@@ -206,7 +206,7 @@ fn browsing_never_makes_sound_or_loads() {
         assert_eq!(t.ui.browser.selected.as_deref(), Some(id));
     }
     t.click("filter:favorites");
-    t.click("filter:all");
+    t.click("filter:factory");
     t.click("fav:factory:palette/lead");
     t.click("search");
     t.key(Key::ArrowDown, Modifiers::NONE);
@@ -222,6 +222,16 @@ fn browsing_never_makes_sound_or_loads() {
         .prefs
         .favorites
         .contains("factory:palette/lead"));
+}
+
+#[test]
+fn all_and_recent_filters_are_reachable() {
+    use kabl_ui::browser::Filter;
+    let mut t = H::new(1440.0, 900.0);
+    t.click("filter:recent");
+    assert_eq!(t.ui.browser.filter, Filter::Recent);
+    t.click("filter:all");
+    assert_eq!(t.ui.browser.filter, Filter::All);
 }
 
 #[test]
@@ -352,7 +362,7 @@ fn edit_save_as_reopen_and_the_factory_file_stays() {
 
 #[test]
 fn unsaved_edits_ask_and_cancel_keeps_them_exactly() {
-    let mut t = H::new(1440.0, 900.0);
+    let mut t = H::new(1440.0, 1000.0);
     t.open("factory:palette/strings");
     t.edit("chorus", "mix", 0.9);
     let work = t.editor.state().clone();
@@ -638,7 +648,8 @@ fn missing_recents_and_bad_patches_are_explained() {
     assert_eq!(t.editor.state(), &work, "the working sound survives");
     assert!(t.modified(), "and is still unsaved");
 
-    t.click("filter:recent");
+    t.ui.browser.filter = kabl_ui::browser::Filter::Recent;
+    t.frame();
     assert!(t.has("forget:user:gone"));
     assert!(t.has("sound:factory:palette/pad"));
     t.click("forget:user:gone");
@@ -650,6 +661,12 @@ fn missing_recents_and_bad_patches_are_explained() {
 
 /// Brings `key` into the visible part of the Sounds panel body by scrolling it.
 fn scroll_into_view(t: &mut H, key: &str) {
+    // The library and list columns do not scroll with the detail column's body: they are
+    // reachable when they are on screen (the caller asserts that).
+    let (body, r) = (t.ui.hits["browser-body"], t.ui.hits[key]);
+    if r.right() <= body.left() {
+        return;
+    }
     if !scroll_body_to(t, key) {
         panic!("{key} cannot be scrolled into view: {:?}", t.ui.hits[key]);
     }
@@ -977,4 +994,31 @@ fn cancel_after_a_collision_keeps_the_other_sound() {
     assert_eq!(user_ids(&t), ["user:alpha"]);
     assert_eq!(t.editor.state(), &work);
     assert!(t.modified());
+}
+
+/// Sounds is a scene: the library, list and detail columns replace the rack (and the drawer
+/// waits behind it), and every filter is on screen in the plugin's window.
+#[test]
+fn the_sounds_scene_replaces_the_rack_and_fits_the_plugin_window() {
+    let mut t = H::new(1180.0, 680.0);
+    t.ui.drawer_open = true;
+    t.frame();
+    t.frame();
+    let screen = Rect::from_min_size(Pos2::ZERO, egui::vec2(1180.0, 680.0));
+    assert!(
+        !t.ui.hits.keys().any(|k| k.starts_with("module:")),
+        "no rack"
+    );
+    assert!(!t.has("help"), "the drawer waits behind the scene");
+    for key in [
+        "filter:favorites",
+        "filter:factory",
+        "filter:user",
+        "search",
+        "new",
+    ] {
+        assert!(screen.contains_rect(t.ui.hits[key]), "{key} on screen");
+    }
+    t.click("browser");
+    assert!(!t.ui.browser_open);
 }

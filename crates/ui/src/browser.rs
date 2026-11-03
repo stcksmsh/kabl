@@ -14,15 +14,22 @@ use crate::filebrowser::{self, Mode, Purpose};
 use crate::kit::{self, Ic, Tip, Tone};
 use crate::style::{Role, Style};
 use crate::wheel::OwnedScroll;
-use egui::{vec2, Sense};
+use egui::{pos2, vec2, Rect, Sense};
 use kabl_core::{PatchLog, PatchState};
 use kabl_engine::patch_engine::{Command, MAX_PREVIEW_NOTES, MAX_PREVIEW_SECS};
 use kabl_modules::builtins::Transport;
+use std::collections::HashMap;
 
-use crate::library::{Entry, LibError, Library, Meta, Origin, CATEGORIES};
+use crate::library::{Entry, LibError, Library, Meta, Origin, CATEGORIES, SHELVES};
 use crate::{PatchEditor, UiState};
 
-pub const PANEL_W: f32 = 300.0;
+/// The Sounds scene: library column, selected-sound column.
+const NAV_W: f32 = 230.0;
+const DETAIL_W: f32 = 320.0;
+/// The list column stops growing here; the detail column takes the rest.
+const LIST_MAX_W: f32 = 760.0;
+/// Sounds whose macros are read from disk per frame while the list fills in.
+const MACROS_PER_FRAME: usize = 8;
 pub const INIT_ID: &str = "factory:init-keyboard";
 
 /// Where the open patch lives.
@@ -201,6 +208,8 @@ pub struct Browser {
     /// Deterministic worker delay for recovery tests.
     pub io_delay_ms: u64,
     io: Option<IoTask>,
+    /// Macro names and positions per sound id, read from the sound's files on first sight.
+    macros: HashMap<String, Vec<(String, f32)>>,
 }
 
 #[derive(Clone)]
@@ -247,7 +256,7 @@ impl Default for Browser {
     fn default() -> Self {
         Browser {
             query: String::new(),
-            filter: Filter::All,
+            filter: Filter::Factory,
             category: None,
             selected: None,
             audition: Audition::default(),
@@ -259,6 +268,7 @@ impl Default for Browser {
             async_io: false,
             io_delay_ms: 0,
             io: None,
+            macros: HashMap::new(),
         }
     }
 }
@@ -1062,16 +1072,92 @@ fn badge(ui: &mut egui::Ui, st: &Style, e: &Meta) {
     kit::tag(ui, st, text, c);
 }
 
-/// One sound as a card row: star, name, category, play-kind tag. Returns (row, star) responses.
+/// The named macros of the sound in `dir`: (name, position 0..1). Empty when it has none.
+fn macros_of(dir: &std::path::Path) -> Vec<(String, f32)> {
+    let Ok(log) = kabl_core::load(dir) else {
+        return Vec::new();
+    };
+    let state = log.state();
+    let Some((&id, m)) = state.modules.iter().find(|(_, m)| m.kind == "macro") else {
+        return Vec::new();
+    };
+    (1..=8)
+        .filter_map(|k| {
+            let key = format!("m{k}");
+            let name = state.label(id, &format!("name.{key}"))?;
+            Some((name.to_string(), m.params.get(&key).copied().unwrap_or(0.0)))
+        })
+        .collect()
+}
+
+/// The macros of `e`, loaded now when `budget` allows (a few sounds per frame, so a long list
+/// never stalls one), else what is known so far.
+fn macros_cached<'a>(b: &'a mut Browser, e: &Entry, budget: &mut usize) -> &'a [(String, f32)] {
+    if !b.macros.contains_key(&e.id) && *budget > 0 {
+        *budget -= 1;
+        b.macros.insert(e.id.clone(), macros_of(&e.dir));
+    }
+    b.macros.get(&e.id).map_or(&[], |v| v.as_slice())
+}
+
+/// Column x positions of a list row: (name, macros, tags).
+fn sound_cols(rect: Rect, st: &Style) -> [f32; 3] {
+    let name = rect.left() + st.sp(3) + 4.0 + st.metrics.control_h / 2.0 + st.sp(1);
+    let w = rect.right() - name;
+    [name, name + w * 0.34, name + w * 0.72]
+}
+
+/// A read-only macro knob: skirt, accent value arc, pointer, name below.
+fn macro_knob(ui: &mut egui::Ui, st: &Style, name: &str, v: f32, w: f32, compact: bool) {
+    // The mockup's detail knobs: a disc of r 22 (18 compact) inside a 4 px accent arc.
+    let r = if compact { 18.0 } else { 22.0 };
+    let ring = r + 5.0;
+    let h = 2.0 * ring + st.sp(4) + st.sp(1);
+    let (rect, _) = ui.allocate_exact_size(vec2(w, h), Sense::hover());
+    let c = pos2(rect.center().x, rect.top() + ring + 2.0);
+    let v = v.clamp(0.0, 1.0);
+    let at = |t: f32, rad: f32| {
+        let a = (135.0 + 270.0 * t).to_radians();
+        c + vec2(a.cos(), a.sin()) * rad
+    };
+    let arc =
+        |t: f32| -> Vec<egui::Pos2> { (0..=32).map(|i| at(t * i as f32 / 32.0, ring)).collect() };
+    let p = ui.painter();
+    let track = egui::Stroke::new(4.0, st.roles.inset);
+    p.add(egui::Shape::line(arc(1.0), track));
+    if v > 0.0 {
+        p.add(egui::Shape::line(
+            arc(v),
+            egui::Stroke::new(4.0, st.roles.accent),
+        ));
+    }
+    p.circle_filled(c, r, st.roles.raised);
+    p.circle_stroke(c, r, egui::Stroke::new(1.0, st.roles.line2));
+    p.line_segment(
+        [at(v, r * 0.3), at(v, r * 0.8)],
+        egui::Stroke::new(2.2, st.roles.text),
+    );
+    p.text(
+        pos2(rect.center().x, rect.bottom() - 1.0),
+        egui::Align2::CENTER_BOTTOM,
+        name,
+        st.font(Role::Label),
+        st.roles.text,
+    );
+}
+
+/// One sound as a row: star, name, macro names, tags.
 fn sound_row(
     ui: &mut egui::Ui,
     st: &Style,
     e: &Entry,
+    macros: &str,
     fav: bool,
     sel: bool,
 ) -> (egui::Response, egui::Response) {
     let w = ui.available_width();
-    let (rect, row) = ui.allocate_exact_size(vec2(w, st.metrics.row_h), Sense::click());
+    let (rect, row) =
+        ui.allocate_exact_size(vec2(w, st.metrics.control_h + st.sp(2)), Sense::click());
     let hover = ui.ctx().animate_bool_with_time(
         row.id.with("hover"),
         row.hovered(),
@@ -1097,33 +1183,42 @@ fn sound_row(
         st.metrics.icon + 2.0,
         ink,
     );
-    let x = star_rect.right() + st.sp(1);
-    let right_pad = 78.0;
-    let name = kit::fit_text(ui, st, &e.meta.name, rect.right() - right_pad - x);
-    let g = ui
-        .painter()
-        .layout_no_wrap(name, st.font(Role::Body), st.roles.text);
-    ui.painter()
-        .galley(egui::pos2(x, rect.top() + st.sp(2)), g, st.roles.text);
-    let cat = if e.meta.category.is_empty() {
-        "Uncategorized"
-    } else {
-        &e.meta.category
-    };
-    let g = ui
-        .painter()
-        .layout_no_wrap(cat.to_string(), st.font(Role::Caption), st.roles.text2);
-    ui.painter().galley(
-        egui::pos2(x, rect.bottom() - st.sp(2) - g.size().y),
-        g,
+    let [x, x_macros, x_tags] = sound_cols(rect, st);
+    let mid = rect.center().y;
+    let name = kit::fit_text(ui, st, &e.meta.name, x_macros - x - st.sp(2));
+    let p = ui.painter();
+    p.text(
+        pos2(x, mid),
+        egui::Align2::LEFT_CENTER,
+        name,
+        st.font(Role::Body),
+        st.roles.text,
+    );
+    let macros = kit::fit_text(ui, st, macros, x_tags - x_macros - st.sp(2));
+    let tags = e
+        .meta
+        .tags
+        .iter()
+        .take(2)
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(" · ");
+    let tags = kit::fit_text(ui, st, &tags, rect.right() - x_tags - st.sp(2));
+    let p = ui.painter();
+    p.text(
+        pos2(x_macros, mid),
+        egui::Align2::LEFT_CENTER,
+        macros,
+        st.font(Role::Body),
         st.roles.text2,
     );
-    let mut tag_ui = ui.new_child(
-        egui::UiBuilder::new()
-            .max_rect(rect.shrink2(vec2(st.sp(2), 0.0)))
-            .layout(egui::Layout::right_to_left(egui::Align::Center)),
+    p.text(
+        pos2(x_tags, mid),
+        egui::Align2::LEFT_CENTER,
+        tags,
+        st.font(Role::Caption),
+        st.roles.text3,
     );
-    badge(&mut tag_ui, st, &e.meta);
     (row, star)
 }
 
@@ -1141,24 +1236,6 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         );
         return;
     }
-    ui.horizontal(|ui| {
-        kit::label(ui, st, Role::Title, Tone::Text, "Sounds");
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let r = ui.add(kit::Button::new(st, "Close").ghost());
-            hit(ui_state, "browser-close", &r);
-            if r.clicked() {
-                ui_state.browser_open = false;
-            }
-            let r = ui
-                .add(kit::Button::new(st, "New").icon(Ic::Plus))
-                .tip(st, "Start a new sound from Init Keyboard");
-            hit(ui_state, "new", &r);
-            if r.clicked() {
-                request(editor, ui_state, Pending::New);
-            }
-        });
-    });
-    kit::gap(ui, st, 1);
     if ui_state.library.is_none() {
         kit::label(
             ui,
@@ -1169,257 +1246,462 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         );
         return;
     }
-    let body_h = ui.available_height();
+    // Three columns: the library (filters, categories), the list, the selected sound.
+    let area = ui.available_rect_before_wrap();
+    let gap = st.sp(3);
+    // The library column runs to the panel edge, as in the mockup (230 px wide).
+    let nav = Rect::from_min_size(
+        pos2(area.left() - st.sp(3), area.top() + 7.0),
+        vec2(NAV_W, area.height() - 7.0),
+    );
+    let mid_w = (area.width() - NAV_W - DETAIL_W - 2.0 * gap).clamp(300.0, LIST_MAX_W);
+    let side_w = (area.width() - NAV_W - mid_w - 2.0 * gap).max(0.0);
+    // A little in from the edge: the right-aligned buttons stay inside the scroll body.
+    let side = Rect::from_min_max(
+        pos2(area.right() - side_w, area.top()),
+        area.max - vec2(st.sp(1), 0.0),
+    );
+    let mid = Rect::from_min_size(
+        pos2(nav.right() + gap - st.sp(3), area.top()),
+        vec2(mid_w, area.height()),
+    );
+    let col = |r: Rect| egui::UiBuilder::new().max_rect(r);
+    let mut open = None;
+    ui.scope_builder(col(nav), |ui| nav_column(editor, ui_state, ui, st));
+    ui.scope_builder(col(mid), |ui| list_column(ui_state, ui, st, &mut open));
+    ui.scope_builder(col(side), |ui| {
+        detail_column(editor, ui_state, ui, st, &mut open)
+    });
+    if let Some(id) = open {
+        request(editor, ui_state, Pending::Open(id));
+    }
+}
+
+/// Row geometry of the Sounds scene's left column, from the mockup: library rows are 28 px
+/// tall on a 32 px pitch, category rows 30 px.
+const LIB_ROW: f32 = 28.0;
+const LIB_PITCH: f32 = 32.0;
+const CAT_PITCH: f32 = 30.0;
+
+/// A section kicker, 16 px in from the column edge.
+fn kicker(ui: &mut egui::Ui, st: &Style, text: &str) -> egui::Response {
+    ui.horizontal(|ui| {
+        ui.add_space(16.0);
+        kit::section(ui, st, text)
+    })
+    .inner
+}
+
+/// A library row: a filled card when selected, the count right-aligned and muted.
+fn nav_row(ui: &mut egui::Ui, st: &Style, label: &str, count: usize, on: bool) -> egui::Response {
+    let (cell, r) = ui.allocate_exact_size(vec2(ui.available_width(), LIB_PITCH), Sense::click());
+    let rect = egui::Rect::from_min_size(
+        cell.min + vec2(8.0, 0.0),
+        vec2(cell.width() - 16.0, LIB_ROW),
+    );
+    let hover = ui.ctx().animate_bool_with_time(
+        r.id.with("hover"),
+        r.hovered(),
+        Style::secs(st.motion.hover),
+    );
+    if on {
+        let radius = st.shape_radius(st.slots.controls.button, rect.height());
+        ui.painter().rect_filled(rect, radius, st.roles.raised);
+        ui.painter().rect_stroke(
+            rect,
+            radius,
+            egui::Stroke::new(1.0, st.roles.line),
+            egui::StrokeKind::Inside,
+        );
+    } else {
+        kit::row_bg(ui, st, rect, false, hover);
+    }
+    nav_text(
+        ui,
+        st,
+        rect,
+        cell.left() + 18.0,
+        cell.right() - 18.0,
+        label,
+        count,
+        on,
+    );
+    r
+}
+
+/// A category row: a radio dot (accent when selected), the name, a muted count.
+fn cat_row(ui: &mut egui::Ui, st: &Style, label: &str, count: usize, on: bool) -> egui::Response {
+    let (rect, r) = ui.allocate_exact_size(vec2(ui.available_width(), CAT_PITCH), Sense::click());
+    let c = egui::pos2(rect.left() + 22.0, rect.center().y);
+    let (fill, line) = if on {
+        (st.roles.accent, st.roles.accent)
+    } else {
+        (egui::Color32::TRANSPARENT, st.roles.line2)
+    };
+    ui.painter()
+        .circle(c, 4.0, fill, egui::Stroke::new(1.3, line));
+    nav_text(
+        ui,
+        st,
+        rect,
+        rect.left() + 36.0,
+        rect.right() - 18.0,
+        label,
+        count,
+        on,
+    );
+    r
+}
+
+#[allow(clippy::too_many_arguments)]
+fn nav_text(
+    ui: &egui::Ui,
+    st: &Style,
+    rect: egui::Rect,
+    x: f32,
+    right: f32,
+    label: &str,
+    count: usize,
+    on: bool,
+) {
+    let p = ui.painter();
+    let ink = if on { Tone::Text } else { Tone::Text2 };
+    p.text(
+        egui::pos2(x, rect.center().y),
+        egui::Align2::LEFT_CENTER,
+        label,
+        if on {
+            egui::FontId::new(
+                st.font(Role::Body).size,
+                crate::style::Font::SansSemibold.family(st.fonts_ready),
+            )
+        } else {
+            st.font(Role::Body)
+        },
+        kit::tone(st, ink),
+    );
+    p.text(
+        egui::pos2(right, rect.center().y),
+        egui::Align2::RIGHT_CENTER,
+        count.to_string(),
+        st.font(Role::Caption),
+        kit::tone(st, Tone::Text3),
+    );
+}
+
+/// The library column scrolls when the window is short.
+fn nav_column(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
+    egui::ScrollArea::vertical()
+        .id_salt("kabl-browser-nav")
+        .auto_shrink([false, false])
+        .show_owned(ui, |ui| {
+            nav_rows(ui_state, ui, st);
+            nav_foot(editor, ui_state, ui, st);
+        });
+}
+
+/// The library filters and the category list, each with the number of sounds it holds.
+fn nav_rows(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
+    let Some(lib) = ui_state.library.as_ref() else {
+        return;
+    };
+    let count = |f: Filter| match f {
+        Filter::All => lib.entries.len(),
+        Filter::Favorites => lib.prefs.favorites.len(),
+        Filter::Recent => lib.prefs.recents.len(),
+        Filter::Factory => lib
+            .entries
+            .iter()
+            .filter(|e| e.origin == Origin::Factory)
+            .count(),
+        Filter::User => lib
+            .entries
+            .iter()
+            .filter(|e| e.origin == Origin::User)
+            .count(),
+    };
+    let filters = [
+        (Filter::All, "all", "All sounds"),
+        (Filter::Recent, "recent", "Recent"),
+        (Filter::Factory, "factory", "Factory"),
+        (Filter::User, "user", "My sounds"),
+        (Filter::Favorites, "favorites", "Favourites"),
+    ]
+    .map(|(f, k, l)| (f, k, l, count(f)));
+    let cats: Vec<(&str, usize)> = SHELVES
+        .iter()
+        .map(|c| {
+            (
+                *c,
+                lib.entries
+                    .iter()
+                    .filter(|e| e.meta.shelf() == Some(*c))
+                    .count(),
+            )
+        })
+        .collect();
+    let all = lib.entries.len();
+    ui.spacing_mut().item_spacing.y = 0.0;
+    kicker(ui, st, "Library");
+    ui.add_space(7.0);
+    for (f, key, label, n) in filters {
+        let r = nav_row(ui, st, label, n, ui_state.browser.filter == f);
+        hit(ui_state, &format!("filter:{key}"), &r);
+        if r.clicked() {
+            ui_state.browser.filter = f;
+        }
+    }
+    ui.add_space(13.0);
+    let head = kicker(ui, st, "Category");
+    hit(ui_state, "category", &head);
+    ui.add_space(6.0);
+    let r = cat_row(ui, st, "All", all, ui_state.browser.category.is_none());
+    hit(ui_state, "category:Any", &r);
+    if r.clicked() {
+        ui_state.browser.category = None;
+    }
+    for (c, n) in cats {
+        let r = cat_row(
+            ui,
+            st,
+            c,
+            n,
+            ui_state.browser.category.as_deref() == Some(c),
+        );
+        hit(ui_state, &format!("category:{c}"), &r);
+        if r.clicked() {
+            ui_state.browser.category = Some(c.to_string());
+        }
+    }
+}
+
+/// "New" and the way back to the rack, under the library column.
+fn nav_foot(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
+    ui.add_space(st.sp(3));
+    ui.horizontal(|ui| {
+        ui.add_space(16.0);
+        let r = ui
+            .add(kit::Button::new(st, "New sound").icon(Ic::Plus))
+            .tip(st, "Start a new sound from Init Keyboard");
+        hit(ui_state, "new", &r);
+        if r.clicked() {
+            request(editor, ui_state, Pending::New);
+        }
+    });
+}
+
+/// Search and the list of sounds; a double-click on a row sets `open`.
+fn list_column(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, open: &mut Option<String>) {
+    let r = kit::field(
+        ui,
+        st,
+        &mut ui_state.browser.query,
+        "Search name, purpose, mood, tempo",
+        Some(Ic::Search),
+        None,
+    );
+    hit(ui_state, "search", &r);
+    kit::gap(ui, st, 1);
+    {
+        let (rect, _) =
+            ui.allocate_exact_size(vec2(ui.available_width(), st.sp(4)), Sense::hover());
+        let [x, x_macros, x_tags] = sound_cols(rect, st);
+        for (x, label) in [(x, "NAME"), (x_macros, "MACROS"), (x_tags, "TAGS")] {
+            ui.painter().text(
+                pos2(x, rect.center().y),
+                egui::Align2::LEFT_CENTER,
+                label,
+                st.font(Role::Caption),
+                st.roles.text3,
+            );
+        }
+    }
+    let lib = ui_state.library.as_ref().unwrap();
+    let b = &ui_state.browser;
+    let visible = |e: &&Entry| {
+        e.matches(&b.query)
+            && b.category
+                .as_deref()
+                .is_none_or(|c| e.meta.shelf() == Some(c))
+            && match b.filter {
+                Filter::All | Filter::Recent => true,
+                Filter::Favorites => lib.prefs.favorites.contains(&e.id),
+                Filter::Factory => e.origin == Origin::Factory,
+                Filter::User => e.origin == Origin::User,
+            }
+    };
+    // Recent lists in recency order, including sounds that have gone missing.
+    let rows: Vec<Result<Entry, String>> = match b.filter {
+        Filter::Recent => lib
+            .prefs
+            .recents
+            .iter()
+            .filter_map(|id| match lib.get(id) {
+                Some(e) => visible(&e).then(|| Ok(e.clone())),
+                None => Some(Err(id.clone())),
+            })
+            .collect(),
+        Filter::Favorites => {
+            let mut v: Vec<_> = lib
+                .entries
+                .iter()
+                .filter(visible)
+                .cloned()
+                .map(Ok)
+                .collect();
+            v.extend(
+                lib.prefs
+                    .favorites
+                    .iter()
+                    .filter(|id| lib.get(id).is_none())
+                    .map(|id| Err(id.clone())),
+            );
+            v
+        }
+        _ => lib
+            .entries
+            .iter()
+            .filter(visible)
+            .cloned()
+            .map(Ok)
+            .collect(),
+    };
+    let favorites = lib.prefs.favorites.clone();
+    let has_user = lib.entries.iter().any(|e| e.origin == Origin::User);
+    let filter = b.filter;
+
+    // The panel body scrolls, so the list takes the room and the audition block sits
+    // below it, reached by scrolling when the window is short.
+    let list_h = ui.available_height();
+    let mut budget = MACROS_PER_FRAME;
+    let mut toggle = None;
+    let mut forget = None;
+    egui::ScrollArea::vertical()
+        .max_height(list_h)
+        .auto_shrink([false, false])
+        .show_owned(ui, |ui| {
+            let mut last_origin = None;
+            let narrowed =
+                !ui_state.browser.query.trim().is_empty() || ui_state.browser.category.is_some();
+            if rows.is_empty() && narrowed {
+                kit::label(
+                    ui,
+                    st,
+                    Role::Body,
+                    Tone::Text3,
+                    "No sound matches the search or category.",
+                );
+            } else if rows.is_empty() {
+                kit::paragraph(
+                    ui,
+                    st,
+                    Role::Body,
+                    Tone::Text3,
+                    match filter {
+                        Filter::Favorites => "No favorites yet: click the star next to a sound.",
+                        Filter::Recent => "Nothing opened yet.",
+                        Filter::User => "No sounds of yours yet: Save As puts them here.",
+                        _ => "No sound matches.",
+                    },
+                );
+            }
+            for row in &rows {
+                match row {
+                    Ok(e) => {
+                        if filter != Filter::Recent && last_origin != Some(e.origin) {
+                            last_origin = Some(e.origin);
+                            kit::gap(ui, st, 1);
+                            kit::section(
+                                ui,
+                                st,
+                                match e.origin {
+                                    Origin::Factory => "Factory",
+                                    Origin::User => "Your Sounds",
+                                },
+                            );
+                        }
+                        let fav = favorites.contains(&e.id);
+                        let sel = ui_state.browser.selected.as_deref() == Some(&e.id);
+                        let macros = macros_cached(&mut ui_state.browser, e, &mut budget)
+                            .iter()
+                            .map(|(n, _)| n.as_str())
+                            .collect::<Vec<_>>()
+                            .join(" · ");
+                        let (row, star) = sound_row(ui, st, e, &macros, fav, sel);
+                        let star = star.tip(
+                            st,
+                            if fav {
+                                "Remove from favorites"
+                            } else {
+                                "Add to favorites"
+                            },
+                        );
+                        ui_state.record(format!("fav:{}", e.id), star.rect);
+                        ui_state.record(format!("sound:{}", e.id), row.rect);
+                        if star.clicked() {
+                            toggle = Some(e.id.clone());
+                        } else if row.clicked() {
+                            ui_state.browser.selected = Some(e.id.clone());
+                        }
+                        if row.double_clicked() {
+                            *open = Some(e.id.clone());
+                        }
+                    }
+                    Err(id) => {
+                        ui.horizontal(|ui| {
+                            kit::label(ui, st, Role::Body, Tone::Text3, format!("{id}: not found"))
+                                .tip(
+                                    st,
+                                    "Removed or renamed outside kabl. Forget drops it from \
+                         favorites and recents.",
+                                );
+                            let r = ui.add(kit::Button::new(st, "Forget").small());
+                            ui_state.record(format!("forget:{id}"), r.rect);
+                            if r.clicked() {
+                                forget = Some(id.clone());
+                            }
+                        });
+                    }
+                }
+            }
+            if filter == Filter::All && !has_user && ui_state.browser.query.is_empty() {
+                kit::section(ui, st, "Your Sounds");
+                kit::label(
+                    ui,
+                    st,
+                    Role::Body,
+                    Tone::Text3,
+                    "None yet: Save As puts your sounds here.",
+                );
+            }
+        });
+    if let Some(id) = toggle {
+        let note = ui_state.library.as_mut().unwrap().toggle_favorite(&id);
+        if let Some(n) = note {
+            message(ui_state, n);
+        }
+    }
+    if let Some(id) = forget {
+        let note = ui_state.library.as_mut().unwrap().forget(&id);
+        if let Some(n) = note {
+            message(ui_state, n);
+        }
+    }
+}
+
+/// The selected sound: name, description, Open, the audition block and the folder tools.
+fn detail_column(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    st: &Style,
+    open: &mut Option<String>,
+) {
     let body = egui::ScrollArea::vertical()
         .id_salt("kabl-browser-body")
         .auto_shrink([false, false])
         .show_owned(ui, |ui| {
-            let r = kit::field(
-                ui,
-                st,
-                &mut ui_state.browser.query,
-                "Search name, purpose, mood, tempo",
-                Some(Ic::Search),
-                None,
-            );
-            hit(ui_state, "search", &r);
-            kit::gap(ui, st, 1);
-            ui.horizontal_wrapped(|ui| {
-                for (f, key, label) in [
-                    (Filter::All, "all", "All"),
-                    (Filter::Favorites, "favorites", "Favorites"),
-                    (Filter::Recent, "recent", "Recent"),
-                    (Filter::Factory, "factory", "Factory"),
-                    (Filter::User, "user", "Your Sounds"),
-                ] {
-                    let mut btn = kit::Button::new(st, label)
-                        .small()
-                        .selected(ui_state.browser.filter == f);
-                    if f == Filter::Favorites {
-                        btn = btn.icon(Ic::Star);
-                    }
-                    let r = ui.add(btn);
-                    hit(ui_state, &format!("filter:{key}"), &r);
-                    if r.clicked() {
-                        ui_state.browser.filter = f;
-                    }
-                }
-            });
-            ui.horizontal(|ui| {
-                kit::label(ui, st, Role::Label, Tone::Text2, "Category");
-                let current = ui_state
-                    .browser
-                    .category
-                    .clone()
-                    .unwrap_or_else(|| "Any".into());
-                let r = kit::dropdown(
-                    ui,
-                    st,
-                    "browser-category",
-                    &current,
-                    ui.available_width(),
-                    |ui| {
-                        let r = kit::menu_item(ui, st, "Any", ui_state.browser.category.is_none());
-                        hit(ui_state, "category:Any", &r);
-                        if r.clicked() {
-                            ui_state.browser.category = None;
-                        }
-                        for c in CATEGORIES {
-                            let r = kit::menu_item(
-                                ui,
-                                st,
-                                c,
-                                ui_state.browser.category.as_deref() == Some(*c),
-                            );
-                            hit(ui_state, &format!("category:{c}"), &r);
-                            if r.clicked() {
-                                ui_state.browser.category = Some(c.to_string());
-                            }
-                        }
-                    },
-                );
-                hit(ui_state, "category", &r);
-            });
-            kit::gap(ui, st, 1);
-            kit::rule(ui, st);
-            kit::gap(ui, st, 1);
-
-            let lib = ui_state.library.as_ref().unwrap();
-            let b = &ui_state.browser;
-            let visible = |e: &&Entry| {
-                e.matches(&b.query)
-                    && b.category.as_ref().is_none_or(|c| e.meta.in_category(c))
-                    && match b.filter {
-                        Filter::All | Filter::Recent => true,
-                        Filter::Favorites => lib.prefs.favorites.contains(&e.id),
-                        Filter::Factory => e.origin == Origin::Factory,
-                        Filter::User => e.origin == Origin::User,
-                    }
-            };
-            // Recent lists in recency order, including sounds that have gone missing.
-            let rows: Vec<Result<Entry, String>> = match b.filter {
-                Filter::Recent => lib
-                    .prefs
-                    .recents
-                    .iter()
-                    .filter_map(|id| match lib.get(id) {
-                        Some(e) => visible(&e).then(|| Ok(e.clone())),
-                        None => Some(Err(id.clone())),
-                    })
-                    .collect(),
-                Filter::Favorites => {
-                    let mut v: Vec<_> = lib
-                        .entries
-                        .iter()
-                        .filter(visible)
-                        .cloned()
-                        .map(Ok)
-                        .collect();
-                    v.extend(
-                        lib.prefs
-                            .favorites
-                            .iter()
-                            .filter(|id| lib.get(id).is_none())
-                            .map(|id| Err(id.clone())),
-                    );
-                    v
-                }
-                _ => lib
-                    .entries
-                    .iter()
-                    .filter(visible)
-                    .cloned()
-                    .map(Ok)
-                    .collect(),
-            };
-            let favorites = lib.prefs.favorites.clone();
-            let has_user = lib.entries.iter().any(|e| e.origin == Origin::User);
-            let filter = b.filter;
-
-            // The panel body scrolls, so the list takes the room and the audition block sits
-            // below it, reached by scrolling when the window is short.
-            let list_h = (body_h - 330.0).max(300.0);
-            let mut open = None;
-            let mut toggle = None;
-            let mut forget = None;
-            egui::ScrollArea::vertical()
-                .max_height(list_h)
-                .auto_shrink([false, false])
-                .show_owned(ui, |ui| {
-                    let mut last_origin = None;
-                    let narrowed = !ui_state.browser.query.trim().is_empty()
-                        || ui_state.browser.category.is_some();
-                    if rows.is_empty() && narrowed {
-                        kit::label(
-                            ui,
-                            st,
-                            Role::Body,
-                            Tone::Text3,
-                            "No sound matches the search or category.",
-                        );
-                    } else if rows.is_empty() {
-                        kit::paragraph(
-                            ui,
-                            st,
-                            Role::Body,
-                            Tone::Text3,
-                            match filter {
-                                Filter::Favorites => {
-                                    "No favorites yet: click the star next to a sound."
-                                }
-                                Filter::Recent => "Nothing opened yet.",
-                                Filter::User => "No sounds of yours yet: Save As puts them here.",
-                                _ => "No sound matches.",
-                            },
-                        );
-                    }
-                    for row in &rows {
-                        match row {
-                            Ok(e) => {
-                                if filter != Filter::Recent && last_origin != Some(e.origin) {
-                                    last_origin = Some(e.origin);
-                                    kit::gap(ui, st, 1);
-                                    kit::section(
-                                        ui,
-                                        st,
-                                        match e.origin {
-                                            Origin::Factory => "Factory",
-                                            Origin::User => "Your Sounds",
-                                        },
-                                    );
-                                }
-                                let fav = favorites.contains(&e.id);
-                                let sel = ui_state.browser.selected.as_deref() == Some(&e.id);
-                                let (row, star) = sound_row(ui, st, e, fav, sel);
-                                let star = star.tip(
-                                    st,
-                                    if fav {
-                                        "Remove from favorites"
-                                    } else {
-                                        "Add to favorites"
-                                    },
-                                );
-                                ui_state.record(format!("fav:{}", e.id), star.rect);
-                                ui_state.record(format!("sound:{}", e.id), row.rect);
-                                if star.clicked() {
-                                    toggle = Some(e.id.clone());
-                                } else if row.clicked() {
-                                    ui_state.browser.selected = Some(e.id.clone());
-                                }
-                                if row.double_clicked() {
-                                    open = Some(e.id.clone());
-                                }
-                            }
-                            Err(id) => {
-                                ui.horizontal(|ui| {
-                                    kit::label(
-                                        ui,
-                                        st,
-                                        Role::Body,
-                                        Tone::Text3,
-                                        format!("{id}: not found"),
-                                    )
-                                    .tip(
-                                        st,
-                                        "Removed or renamed outside kabl. Forget drops it from \
-                                 favorites and recents.",
-                                    );
-                                    let r = ui.add(kit::Button::new(st, "Forget").small());
-                                    ui_state.record(format!("forget:{id}"), r.rect);
-                                    if r.clicked() {
-                                        forget = Some(id.clone());
-                                    }
-                                });
-                            }
-                        }
-                    }
-                    if filter == Filter::All && !has_user && ui_state.browser.query.is_empty() {
-                        kit::section(ui, st, "Your Sounds");
-                        kit::label(
-                            ui,
-                            st,
-                            Role::Body,
-                            Tone::Text3,
-                            "None yet: Save As puts your sounds here.",
-                        );
-                    }
-                });
-            if let Some(id) = toggle {
-                let note = ui_state.library.as_mut().unwrap().toggle_favorite(&id);
-                if let Some(n) = note {
-                    message(ui_state, n);
-                }
-            }
-            if let Some(id) = forget {
-                let note = ui_state.library.as_mut().unwrap().forget(&id);
-                if let Some(n) = note {
-                    message(ui_state, n);
-                }
-            }
-            kit::gap(ui, st, 1);
-            kit::rule(ui, st);
-            kit::gap(ui, st, 1);
-
+            ui.set_max_width(ui.available_width() - st.sp(1));
             // The selected sound.
             let selected = ui_state
                 .browser
@@ -1428,60 +1710,106 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                 .and_then(|id| ui_state.library.as_ref().unwrap().get(&id).cloned());
             match &selected {
                 Some(e) => {
-                    ui.horizontal(|ui| {
-                        kit::label_truncated(ui, st, Role::H3, Tone::Text, &e.meta.name);
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            let r = ui
-                                .add(kit::Button::new(st, "Open").primary())
-                                .tip(st, "Load into the rack");
-                            hit(ui_state, "open", &r);
-                            if r.clicked() {
-                                open = Some(e.id.clone());
-                            }
-                            if e.origin == Origin::User {
-                                let r = ui.add(kit::Button::new(st, "Rename"));
-                                hit(ui_state, "rename", &r);
-                                if r.clicked() {
-                                    ui_state.browser.dialog = Some(Dialog::Rename {
-                                        id: e.id.clone(),
-                                        name: e.meta.name.clone(),
-                                        error: None,
-                                    });
-                                }
-                            }
-                        });
-                    });
-                    ui.horizontal(|ui| {
-                        kit::label(
-                            ui,
-                            st,
-                            Role::Caption,
-                            Tone::Text2,
-                            format!(
-                                "{} · {}",
-                                if e.meta.category.is_empty() {
-                                    "Uncategorized"
-                                } else {
-                                    &e.meta.category
-                                },
-                                match e.origin {
-                                    Origin::Factory => "Factory",
-                                    Origin::User => "Your Sounds",
-                                }
-                            ),
-                        );
-                        badge(ui, st, &e.meta);
-                    });
+                    let kicker = format!(
+                        "{} · {}",
+                        if e.meta.category.is_empty() {
+                            "Uncategorized"
+                        } else {
+                            &e.meta.category
+                        },
+                        match e.origin {
+                            Origin::Factory => "Factory",
+                            Origin::User => "Your Sounds",
+                        }
+                    );
+                    kit::section(ui, st, kicker);
+                    kit::label_truncated(ui, st, Role::Display, Tone::Text, &e.meta.name);
                     if !e.meta.description.is_empty() {
-                        kit::label_truncated(
-                            ui,
-                            st,
-                            Role::Caption,
-                            Tone::Text2,
-                            &e.meta.description,
-                        )
-                        .tip(st, &e.meta.description);
+                        kit::paragraph(ui, st, Role::Body, Tone::Text2, &e.meta.description);
                     }
+                    let compact = ui.available_width() < 330.0;
+                    let mut one = 1;
+                    let macros = macros_cached(&mut ui_state.browser, e, &mut one).to_vec();
+                    if !macros.is_empty() {
+                        kit::gap(ui, st, 1);
+                        kit::section(ui, st, "Macros");
+                        for chunk in macros.chunks(4) {
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().item_spacing.x = 0.0;
+                                let w = ui.available_width() / 4.0;
+                                for (name, v) in chunk {
+                                    macro_knob(ui, st, name, *v, w, compact);
+                                }
+                            });
+                        }
+                    }
+                    kit::gap(ui, st, 1);
+                    let r = ui
+                        .add(
+                            kit::Button::new(st, "Load sound")
+                                .primary()
+                                .min_width(ui.available_width()),
+                        )
+                        .tip(st, "Load into the rack");
+                    hit(ui_state, "open", &r);
+                    if r.clicked() {
+                        *open = Some(e.id.clone());
+                    }
+                    ui.horizontal(|ui| {
+                        let gap = st.sp(1);
+                        ui.spacing_mut().item_spacing.x = gap;
+                        let w = (ui.available_width() - gap) / 2.0;
+                        let (keys, sequence) = Meta::play_of(editor.state());
+                        let r = ui
+                            .add(
+                                kit::Button::new(st, "Audition")
+                                    .min_width(w)
+                                    .enabled(keys || sequence),
+                            )
+                            .tip(st, "Play the sound in the rack; options below");
+                        hit(ui_state, "audition", &r);
+                        if r.clicked() {
+                            if keys {
+                                let a = &ui_state.browser.audition;
+                                let (cmd, secs) = (a.command(ui_state.sample_rate), a.secs as f64);
+                                ui_state.launches.push(cmd);
+                                let now = ui.input(|i| i.time);
+                                ui_state.browser.preview_until = Some(now + secs);
+                            } else {
+                                let clocks = editor
+                                    .state()
+                                    .modules
+                                    .iter()
+                                    .filter(|(_, m)| m.kind == "clock")
+                                    .map(|(&id, _)| (id, Transport::Run));
+                                ui_state.transport.extend(clocks);
+                            }
+                        }
+                        let r = ui
+                            .add(kit::Button::new(st, "Open in rack").min_width(w))
+                            .tip(st, "Load into the rack and show the rack");
+                        hit(ui_state, "open-rack", &r);
+                        if r.clicked() {
+                            *open = Some(e.id.clone());
+                            ui_state.browser_open = false;
+                        }
+                    });
+                    // Quiet facts below the buttons.
+                    kit::gap(ui, st, 1);
+                    ui.horizontal(|ui| {
+                        badge(ui, st, &e.meta);
+                        if e.origin == Origin::User {
+                            let r = ui.add(kit::Button::new(st, "Rename").small().ghost());
+                            hit(ui_state, "rename", &r);
+                            if r.clicked() {
+                                ui_state.browser.dialog = Some(Dialog::Rename {
+                                    id: e.id.clone(),
+                                    name: e.meta.name.clone(),
+                                    error: None,
+                                });
+                            }
+                        }
+                    });
                     if !e.meta.tags.is_empty() {
                         let tags = format!("tags: {}", e.meta.tags.join(", "));
                         kit::label_truncated(ui, st, Role::Caption, Tone::Text3, &tags)
@@ -1494,12 +1822,9 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                         st,
                         Role::Body,
                         Tone::Text3,
-                        "Click a sound to see it; Open (or double-click) loads it.",
+                        "Click a sound to see it; Load sound (or double-click) loads it.",
                     );
                 }
-            }
-            if let Some(id) = open {
-                request(editor, ui_state, Pending::Open(id));
             }
             kit::gap(ui, st, 1);
             kit::rule(ui, st);
@@ -1705,7 +2030,7 @@ fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui:
         }
         ui.horizontal(|ui| {
             let r = ui
-                .add(kit::Button::new(st, label).icon(Ic::Play).primary())
+                .add(kit::Button::new(st, label).icon(Ic::Play))
                 .tip(st, &help);
             hit(ui_state, "play", &r);
             if r.clicked() {
