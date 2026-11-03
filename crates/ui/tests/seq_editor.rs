@@ -134,7 +134,7 @@ fn the_step_grid_writes_the_edited_bank_one_undo_step_per_edit() {
     let p = h.cell(0, PITCH, 86.0) - egui::vec2(0.0, 30.0);
     h.click_at(p);
     let pitch = h.param("p1").unwrap();
-    assert!(pitch > 12.0 && pitch.fract() == 0.0, "p1 = {pitch}");
+    assert!(pitch > 6.0 && pitch.fract() == 0.0, "p1 = {pitch}");
     // Three edits, three undo steps.
     assert!(h.editor.undo());
     assert!(h.editor.undo());

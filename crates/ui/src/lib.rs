@@ -1084,14 +1084,16 @@ fn drawer(
             drawer::lists(editor, ui_state, ui, st);
             drawer::why_card(editor, ui_state, ui, st);
         }
-        // The module's own editor lives under Inspect; the faces edit values in place.
-        if ui_state.inspect.open {
+        // The module's own editor lives under Inspect; the faces edit values in place. The
+        // seq and cues editors (G4) also open under Routing when their module is selected.
+        if ui_state.inspect.open || module_editor {
             show_param_panel(editor, ui_state, ui);
         }
         pattern::panel(editor, ui_state, ui);
         routing::drawer(editor, ui_state, ui);
         routing::cable_routes(editor, ui_state, ui);
-        if lists && editing {
+        // The seq and cues editors take the whole drawer (G4): no lists under them.
+        if lists && editing && !module_editor {
             drawer::lists(editor, ui_state, ui, st);
             drawer::why_card(editor, ui_state, ui, st);
         }

@@ -236,7 +236,8 @@ pub(crate) fn seq_panel(
             .collect()
     };
     let (mut pitch, mut gate, mut vel, mut prob, mut ratch) = (
-        lane("p", 24.0),
+        // ±12 st spans the lane, as in the mockup; larger steps show a full bar.
+        lane("p", 12.0),
         lane("g", 1.0),
         lane("v", 100.0),
         lane("r", 100.0),
@@ -255,7 +256,7 @@ pub(crate) fn seq_panel(
             unit: "st",
             color: Some(r.pitch),
             height: Some(86.0),
-            readout: Some(|v| format!("{:+}", (v * 24.0).round() as i32).replace("+0", "0")),
+            readout: Some(|v| format!("{:+}", (v * 12.0).round() as i32).replace("+0", "0")),
             ..kit::g4::Lane::new(
                 "Pitch",
                 kit::g4::LaneKind::Bars { bipolar: true },
@@ -284,7 +285,7 @@ pub(crate) fn seq_panel(
     if resp.changed() {
         let after = [pitch, gate, vel, prob, ratch];
         for ((k, scale), (a, b)) in [
-            ("p", 24.0),
+            ("p", 12.0),
             ("g", 1.0),
             ("v", 100.0),
             ("r", 100.0),
@@ -344,17 +345,31 @@ pub(crate) fn seq_panel(
         true,
         format!("{tr:+.0} st"),
     );
-    ui.add_space(st.sp(1));
-    seq_choice(editor, ui_state, ui, st, id, "Direction", "direction");
-    seq_choice(
-        editor,
-        ui_state,
-        ui,
-        st,
-        id,
-        "Gate mode",
-        &format!("{pre}gate_mode"),
-    );
+    // Settings the G4 editor does not show, behind a disclosure.
+    let more_id = Id::new(("seq-more", id));
+    let mut more = ui.data(|d| d.get_temp::<bool>(more_id)).unwrap_or(false);
+    let r = ui.add(kit::Button::new(st, "More").ghost().small().icon(if more {
+        kit::Ic::Down
+    } else {
+        kit::Ic::Right
+    }));
+    ui_state.record(format!("seq-more:{id}"), r.rect);
+    if r.clicked() {
+        more = !more;
+        ui.data_mut(|d| d.insert_temp(more_id, more));
+    }
+    if more {
+        seq_choice(editor, ui_state, ui, st, id, "Direction", "direction");
+        seq_choice(
+            editor,
+            ui_state,
+            ui,
+            st,
+            id,
+            "Gate mode",
+            &format!("{pre}gate_mode"),
+        );
+    }
     ui.add_space(st.sp(3));
     kit::rule(ui, st);
     ui.add_space(st.sp(2));
