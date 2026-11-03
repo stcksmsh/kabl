@@ -311,6 +311,11 @@ pub fn view_switch<R>(ui: &mut Ui, st: &Style, add: impl FnOnce(&mut Ui) -> R) -
     if st.slots.chrome.view_switch != crate::style::ViewSwitch::Tabs {
         return segmented(ui, st, add);
     }
+    tabs(ui, st, add)
+}
+
+/// A row of plain tabs: [`seg`] items without a pill, the selected one underlined.
+pub fn tabs<R>(ui: &mut Ui, st: &Style, add: impl FnOnce(&mut Ui) -> R) -> R {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = st.sp(2);
         ui.data_mut(|d| d.insert_temp(tabs_flag(), true));
@@ -326,15 +331,46 @@ pub fn seg(ui: &mut Ui, st: &Style, text: &str, selected: bool) -> Response {
     seg_enabled(ui, st, text, selected, true)
 }
 
+/// A scene switch item, mockup metrics: 13 px (semibold selected, medium otherwise), 24 px
+/// tall in a 28 px track, 84 px wide at least.
+pub fn seg_large(ui: &mut Ui, st: &Style, text: &str, selected: bool) -> Response {
+    seg_sized(ui, st, text, selected, true, true)
+}
+
 pub fn seg_enabled(ui: &mut Ui, st: &Style, text: &str, selected: bool, enabled: bool) -> Response {
+    seg_sized(ui, st, text, selected, enabled, false)
+}
+
+fn seg_sized(
+    ui: &mut Ui,
+    st: &Style,
+    text: &str,
+    selected: bool,
+    enabled: bool,
+    large: bool,
+) -> Response {
     let enabled = enabled && ui.is_enabled();
-    let font = st.font(Role::Label);
+    let font = if large {
+        egui::FontId::new(
+            14.0,
+            crate::style::Font::SansSemibold.family(st.fonts_ready),
+        )
+    } else {
+        st.font(Role::Label)
+    };
     let g = ui
         .painter()
-        .layout_no_wrap(text.to_string(), font, Color32::WHITE);
-    let h = st.metrics.control_h - 6.0;
+        .layout_no_wrap(text.to_string(), font.clone(), Color32::WHITE);
+    let h = if large {
+        st.metrics.control_h - 4.0
+    } else {
+        st.metrics.control_h - 6.0
+    };
     let (rect, resp) = ui.allocate_exact_size(
-        vec2(g.size().x + st.sp(3) * 2.0, h),
+        vec2(
+            (g.size().x + st.sp(3) * 2.0).max(if large { 84.0 } else { 0.0 }),
+            h,
+        ),
         if enabled {
             Sense::click()
         } else {
@@ -377,9 +413,7 @@ pub fn seg_enabled(ui: &mut Ui, st: &Style, text: &str, selected: bool, enabled:
         mix(r.text2, r.text, hover)
     };
     let ink = dim(ink, enabled);
-    let g = ui
-        .painter()
-        .layout_no_wrap(text.to_string(), st.font(Role::Label), ink);
+    let g = ui.painter().layout_no_wrap(text.to_string(), font, ink);
     ui.painter().galley(rect.center() - g.size() / 2.0, g, ink);
     if enabled && resp.has_focus() {
         focus_ring(ui, st, rect, radius);
