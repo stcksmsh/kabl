@@ -160,6 +160,9 @@ impl H {
     }
 
     fn type_path(&mut self, path: &str) {
+        if !self.ui.hits.contains_key("wt:path") {
+            self.click("wt:open-import");
+        }
         self.click("wt:path");
         self.events.push(Event::Key {
             key: egui::Key::A,
@@ -239,7 +242,10 @@ fn frame_operations_each_undo_in_one_step() {
     assert_eq!(h.table_frames(1).len(), n + 2);
     h.click("wt:delete");
     assert_eq!(h.table_frames(1).len(), n + 1);
+    // Moves live in the More menu.
+    h.click("wt:more");
     h.click("wt:left");
+    h.click("wt:more");
     h.click("wt:right");
     h.click("wt:normalise");
     h.click("wt:dc");
@@ -441,6 +447,7 @@ fn browsing_lists_folders_and_wavs_only_and_picks_a_file() {
     assert!(h.editor.state().tables.is_empty());
     // The folder is remembered: reopening the editor and browsing starts there.
     h.open_direct();
+    h.click("wt:open-import");
     h.click("wt:browse");
     wait_for(&mut h, "wt:file:one.WAV");
 }
@@ -512,6 +519,56 @@ fn the_editor_opens_below_the_toolbar_and_inside_a_1180_by_680_window() {
         top > toolbar,
         "editor starts at {top}, over the toolbar ({toolbar})"
     );
+}
+
+/// G4 dock acceptance at 1440x900 and 1180x680: every control inside the window and below the
+/// rack's top, the dock's controls never overlap each other, and its text pairs read at 4.5:1.
+#[test]
+fn the_dock_fits_without_overlap_at_both_sizes() {
+    for size in [egui::vec2(1440.0, 900.0), egui::vec2(1180.0, 680.0)] {
+        let mut h = H::new();
+        h.size = size;
+        h.settle();
+        h.open_editor();
+        let screen = Rect::from_min_size(Pos2::ZERO, size);
+        let rack_top = h.rect("rack").top();
+        // Leaf controls only: the wells' contents (stack, pen) sit beside them, not over them.
+        let leaves: Vec<(&String, &Rect)> = h
+            .ui
+            .hits
+            .iter()
+            .filter(|(k, _)| k.starts_with("wt:") && !matches!(k.as_str(), "wt:stack" | "wt:wave"))
+            .collect();
+        assert!(leaves.len() > 10, "{size:?}: dock not drawn");
+        for (i, (ka, a)) in leaves.iter().enumerate() {
+            assert!(
+                screen.contains_rect(**a),
+                "{size:?}: {ka} {a:?} leaves the window"
+            );
+            assert!(a.top() > rack_top, "{size:?}: {ka} over the toolbar");
+            for (kb, b) in &leaves[i + 1..] {
+                let inter = a.intersect(**b);
+                assert!(
+                    inter.width() <= 0.5 || inter.height() <= 0.5,
+                    "{size:?}: {ka} {a:?} overlaps {kb} {b:?}"
+                );
+            }
+        }
+    }
+    for dark in [true, false] {
+        let st = kabl_ui::style::line_solid_default(dark);
+        let r = &st.roles;
+        let well = if dark { r.inset } else { r.raised };
+        for (name, fg, bg) in [
+            ("text on bar", r.text, r.bar),
+            ("text2 on bar", r.text2, r.bar),
+            ("text on well", r.text, well),
+            ("text2 on well", r.text2, well),
+        ] {
+            let c = kabl_ui::style::contrast(fg, bg);
+            assert!(c >= 4.5, "dark={dark}: {name} {c:.2}:1");
+        }
+    }
 }
 
 // ---- Clips for listening (not checks): `cargo test -p kabl-ui --test wavetable_editor
