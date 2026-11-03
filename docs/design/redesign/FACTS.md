@@ -9,6 +9,18 @@ The brief and plan mark four items as unverified. Findings:
 
 Also present on master: an older design set in `docs/design/` (BRIEF.md, app-target/, directions/, revision-2/, REVIEW.md, QA.md). `docs/design/redesign/` is the current one.
 
+## Toolbar metrics in `mockups/directions.html` (read from `chrome()`, 2026-11-02)
+
+The mockup draws SVG, so these are the drawn values (1 unit = 1 px at the 1440 frame; the sheet frame is 1392 wide, so measured screenshots read about 3 % smaller):
+
+- Toolbar 48 px; 1 px bottom line. Logo tile 24x24, radius 6, at x 16; wordmark "kabl" 17 px, weight 600.
+- Sound selector 28 px tall, 210 wide (170 below 1300 px), radius 6: kicker mono 10 px weight 500, name 13 px weight 500, dirty dot r 3, chevron.
+- View switch: track 28 px tall, 3 x 86 = 258 wide, radius 7; selected segment 24 px tall inside it (2 px inset), radius 5; label 13 px, weight 600 selected, 500 otherwise.
+- Add module: 180x28, radius 6, search icon, 13 px placeholder, key hint 20x16 radius 4 with a mono 10 px letter. Hidden below 1300 px.
+- Icon buttons 28 wide (16 px icon), 4 px apart. Cable tools: 3 x 30 = 90 wide, 28 tall track, 26x24 segments. Zoom text mono 12 px weight 500.
+- Save: 28 tall, label width + 28, 13 px weight 600, radius 6.
+- Perform shows one icon (MIDI), Sounds one icon (heart), both left of Save.
+
 ## Colour tokens: mockup vs app (2026-11-02)
 
 Mockup source: `APPS`, `ACC` in `mockups/directions.html`. App: `crates/ui/src/style/solid.rs` `roles()`, default "Signal solid" (dark) and "Drafting solid" (light). Before = origin/master, After = this PR.
