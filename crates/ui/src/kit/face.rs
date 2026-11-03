@@ -622,7 +622,10 @@ pub fn jack_ch(
             // plug on top. The recipe keeps its old name, `hex`, so saved themes still load.
             let k = r / 13.0;
             let (nut, edge) = if st.dark {
-                (mix(ro.raised, ro.line2, 0.36), mix(ro.line2, ro.text, 0.067))
+                (
+                    mix(ro.raised, ro.line2, 0.36),
+                    mix(ro.line2, ro.text, 0.067),
+                )
             } else {
                 (ro.raised, ro.line2)
             };
