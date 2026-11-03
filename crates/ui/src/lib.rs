@@ -1011,8 +1011,9 @@ pub fn show_with(
             .frame(kit::panel_frame(&st))
             .show(ui, |ui| browser::panel(editor, ui_state, ui));
     } else if perform_full {
+        // The Perform view's cards sit 16 from the window edges (mockup `performScreen`).
         egui::CentralPanel::default()
-            .frame(kit::page_frame(&st))
+            .frame(kit::page_frame(&st).inner_margin(egui::Margin::same(16)))
             .show(ui, |ui| perform_view::panel(editor, ui_state, ui));
     } else {
         egui::CentralPanel::default()

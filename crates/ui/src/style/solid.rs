@@ -182,7 +182,9 @@ fn line_solid(dark: bool, accent: Accent) -> Style {
     s.types.value.size = 11.0;
     s.types.caption.font = Font::Mono;
     s.types.section.font = Font::SansCondSemibold;
-    s.types.section.tracking = 0.8;
+    // The mockup's card titles: condensed semibold 12, tracking 0.08 em.
+    s.types.section.size = 12.0;
+    s.types.section.tracking = 0.96;
     let f = &mut s.slots.face;
     f.material = FaceMaterial::Line;
     f.gradient = 0.0;

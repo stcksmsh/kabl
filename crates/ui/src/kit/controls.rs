@@ -59,6 +59,7 @@ pub struct Button<'a> {
     selected: bool,
     enabled: bool,
     small: bool,
+    large: bool,
     min_w: f32,
     tone: Option<Tone>,
     /// G4-SPEC §3 look at this height: label 13/600 (12.5 below 32 px), padding 14, secondary
@@ -76,6 +77,7 @@ impl<'a> Button<'a> {
             selected: false,
             enabled: true,
             small: false,
+            large: false,
             min_w: 0.0,
             tone: None,
             g4: None,
@@ -103,6 +105,11 @@ impl<'a> Button<'a> {
     }
     pub fn small(mut self) -> Self {
         self.small = true;
+        self
+    }
+    /// The scene's primary action: `metrics.large_h` tall, wider padding.
+    pub fn large(mut self) -> Self {
+        self.large = true;
         self
     }
     pub fn min_width(mut self, w: f32) -> Self {
@@ -133,12 +140,15 @@ impl Widget for Button<'_> {
         let h = match self.g4 {
             Some(h) => h,
             None if self.small => st.metrics.small_h,
+            None if self.large => st.metrics.large_h,
             None => st.metrics.control_h,
         };
         let pad = if self.g4.is_some() {
             14.0
         } else if self.small {
             st.sp(2)
+        } else if self.large {
+            st.sp(4)
         } else {
             st.sp(3)
         };

@@ -371,6 +371,8 @@ pub struct Slots {
 pub struct Metrics {
     pub control_h: f32,
     pub small_h: f32,
+    /// The large button: the primary action of a scene (Load sound, Open in rack).
+    pub large_h: f32,
     pub field_h: f32,
     pub row_h: f32,
     pub icon: f32,
@@ -387,6 +389,7 @@ impl Default for Metrics {
         Metrics {
             control_h: 28.0,
             small_h: 24.0,
+            large_h: 40.0,
             field_h: 30.0,
             row_h: 44.0,
             icon: 14.0,

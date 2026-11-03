@@ -142,6 +142,89 @@ pub fn arc_knob(
     (resp, out)
 }
 
+/// The Perform macro knob, drawn as in the mockup: a raised body with a soft shadow, a pointer
+/// line, and a 6 px value arc around it. `size` is the whole square; the body is 11 px smaller
+/// than the arc ring on each side. The caller paints the value inside it. Same drag as
+/// [`arc_knob`].
+pub fn macro_knob(
+    ui: &mut Ui,
+    st: &Style,
+    value: f32,
+    size: f32,
+    mod_span: Option<(f32, f32)>,
+) -> (Response, Option<f32>) {
+    let enabled = ui.is_enabled();
+    let (rect, resp) = ui.allocate_exact_size(
+        vec2(size, size),
+        if enabled {
+            Sense::click_and_drag()
+        } else {
+            Sense::hover()
+        },
+    );
+    let mut out = None;
+    if enabled && resp.dragged() {
+        let d = resp.drag_delta();
+        let fine = ui.input(|i| i.modifiers.shift);
+        let per_px = if fine { 1.0 / 800.0 } else { 1.0 / 200.0 };
+        let v = (value + (d.x - d.y) * per_px).clamp(0.0, 1.0);
+        if v != value {
+            out = Some(v);
+        }
+    }
+    let value = out.unwrap_or(value);
+    let r = &st.roles;
+    let c = rect.center();
+    let ring = size / 2.0 - 3.0;
+    let body = ring - 8.0;
+    let p = ui.painter();
+    let cap = |p: &Painter, v: f32, col: Color32| {
+        let pt = A0 + SWEEP * v;
+        p.circle_filled(c + vec2(pt.cos(), pt.sin()) * ring, 3.0, col);
+    };
+    p.add(Shape::line(
+        arc_points(c, ring, 0.0, 1.0),
+        Stroke::new(6.0, r.inset),
+    ));
+    cap(p, 0.0, r.inset);
+    cap(p, 1.0, r.inset);
+    if let Some((a, b)) = mod_span {
+        p.add(Shape::line(
+            arc_points(c, ring + 5.0, a.min(b), a.max(b)),
+            Stroke::new(2.0, alpha(r.cv, 220)),
+        ));
+    }
+    if value > 0.004 {
+        p.add(Shape::line(
+            arc_points(c, ring, 0.0, value),
+            Stroke::new(6.0, r.accent),
+        ));
+        cap(p, 0.0, r.accent);
+        cap(p, value, r.accent);
+    }
+    p.circle_filled(
+        c + vec2(0.0, 3.0),
+        body,
+        alpha(Color32::BLACK, if st.dark { 100 } else { 30 }),
+    );
+    p.circle_filled(c, body, r.raised);
+    p.circle_stroke(c, body, Stroke::new(1.0, r.line2));
+    let a = A0 + SWEEP * value;
+    let dir = vec2(a.cos(), a.sin());
+    p.line_segment(
+        [c + dir * body * 0.56, c + dir * body * 0.96],
+        Stroke::new(3.0, r.text),
+    );
+    if resp.has_focus() {
+        p.circle_stroke(
+            c,
+            size / 2.0,
+            Stroke::new(st.slots.controls.focus_ring, r.focus),
+        );
+    }
+    (resp, out)
+}
+
 /// What a launch pad shows.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PadState {
@@ -247,6 +330,146 @@ pub fn pad(
     resp
 }
 
+/// A scene pad: the title top-left, the scene number top-right, the state (Ready / Playing /
+/// Queued) bottom-left and, while a cue arrives or waits for its bar, a short progress bar
+/// bottom-right. A playing pad is filled with the accent, a queued one pulses its outline.
+#[allow(clippy::too_many_arguments)]
+pub fn scene_pad(
+    ui: &mut Ui,
+    st: &Style,
+    size: egui::Vec2,
+    title: &str,
+    number: usize,
+    state_text: &str,
+    state: PadState,
+    progress: Option<f32>,
+) -> Response {
+    let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
+    let r = &st.roles;
+    let hover = ease_to(ui, resp.id.with("hover"), resp.hovered(), st.motion.hover);
+    let radius = st.radius(crate::style::Rad::Md);
+    let down = resp.is_pointer_button_down_on();
+    let (fill, ink, ink2) = match state {
+        PadState::Playing => (r.accent, r.on_accent, alpha(r.on_accent, 200)),
+        _ => (
+            mix(
+                r.raised,
+                r.text,
+                0.03 + hover * 0.05 + if down { 0.05 } else { 0.0 },
+            ),
+            r.text,
+            r.text2,
+        ),
+    };
+    let stroke = match state {
+        PadState::Queued => {
+            let t = ui.input(|i| i.time);
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(100));
+            let pulse = 0.55 + 0.45 * ((t * 5.0).sin() as f32 * 0.5 + 0.5);
+            Stroke::new(2.5, alpha(r.accent, (255.0 * pulse) as u8))
+        }
+        PadState::Playing => Stroke::new(1.0, r.accent),
+        PadState::Idle => Stroke::new(st.slots.controls.outline, r.line),
+    };
+    let p = ui.painter();
+    p.rect_filled(rect, radius, fill);
+    p.rect_stroke(rect, radius, stroke, egui::StrokeKind::Inside);
+    let pad = st.sp(2);
+    let avail = rect.width() - pad * 2.0 - st.sp(3);
+    let mut tr = p.layout(title.to_string(), st.font(Role::H3), ink, f32::INFINITY);
+    if tr.size().x > avail {
+        tr = p.layout(title.to_string(), st.font(Role::Label), ink, avail);
+    }
+    p.galley(rect.left_top() + vec2(pad, pad), tr, ink);
+    p.text(
+        rect.right_top() + vec2(-pad, pad),
+        egui::Align2::RIGHT_TOP,
+        number.to_string(),
+        st.font(Role::Caption),
+        ink2,
+    );
+    p.text(
+        rect.left_bottom() + vec2(pad, -pad),
+        egui::Align2::LEFT_BOTTOM,
+        state_text,
+        st.font(Role::Caption),
+        if state == PadState::Queued {
+            r.accent
+        } else {
+            ink2
+        },
+    );
+    if let Some(f) = progress {
+        let h = st.sp(0) * 1.5;
+        let bar = Rect::from_min_size(
+            pos2(
+                rect.right() - pad - rect.width() * 0.3,
+                rect.bottom() - pad - h,
+            ),
+            vec2(rect.width() * 0.3, h),
+        );
+        p.rect_filled(bar, h / 2.0, alpha(ink, 50));
+        p.rect_filled(
+            Rect::from_min_size(bar.min, vec2(bar.width() * f.clamp(0.0, 1.0), h)),
+            h / 2.0,
+            if state == PadState::Playing {
+                ink
+            } else {
+                r.accent
+            },
+        );
+    }
+    resp
+}
+
+/// A round icon button of diameter `d`: the accent fill when `primary`, else a raised disc.
+pub fn round_button(
+    ui: &mut Ui,
+    st: &Style,
+    ic: crate::kit::Ic,
+    primary: bool,
+    d: f32,
+    enabled: bool,
+) -> Response {
+    let (rect, resp) = ui.allocate_exact_size(
+        egui::Vec2::splat(d),
+        if enabled {
+            Sense::click()
+        } else {
+            Sense::hover()
+        },
+    );
+    let r = &st.roles;
+    let hover = ease_to(
+        ui,
+        resp.id.with("hover"),
+        enabled && resp.hovered(),
+        st.motion.hover,
+    );
+    let (fill, ink) = if primary {
+        (mix(r.accent, r.text, hover * 0.15), r.on_accent)
+    } else {
+        (mix(r.raised, r.text, hover * 0.1), r.text)
+    };
+    let (fill, ink) = if enabled {
+        (fill, ink)
+    } else {
+        (alpha(fill, 110), alpha(ink, 110))
+    };
+    let p = ui.painter();
+    p.circle_filled(rect.center(), d / 2.0, fill);
+    if !primary {
+        p.circle_stroke(
+            rect.center(),
+            d / 2.0,
+            Stroke::new(st.slots.controls.outline, r.line),
+        );
+    }
+    crate::kit::icon(p, ic, rect.center(), d * 0.42, ink);
+    resp
+}
+
 /// One step of a lane: level and probability, 0..=1, and whether the gate is on.
 #[derive(Clone, Copy, Debug)]
 pub struct Step {
@@ -294,6 +517,58 @@ pub fn step_lane(
                 cell,
                 3.0,
                 Stroke::new(1.5, tone(st, Tone::Text)),
+                egui::StrokeKind::Inside,
+            );
+        }
+    }
+}
+
+/// The Perform step lane, as in the mockup: each step a dim well with a bar rising from the
+/// bottom to its level (brighter with its probability, a stub when its gate is off), a 4 px gap
+/// between steps, cells at most 48 px wide, and the playing step outlined by a column a little
+/// taller than the wells. `size` is the lane's full height; the wells are 10 px in from the
+/// top and bottom.
+pub fn seq_lane(
+    ui: &mut Ui,
+    st: &Style,
+    size: egui::Vec2,
+    steps: &[Step],
+    playing: Option<usize>,
+    hue: Color32,
+) {
+    let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
+    let r = &st.roles;
+    let n = steps.len().max(1);
+    let pitch = (rect.width() / n as f32).min(48.0);
+    let well_h = (rect.height() - 20.0).max(8.0);
+    for (i, s) in steps.iter().enumerate() {
+        let x = rect.left() + i as f32 * pitch;
+        let well = Rect::from_min_size(pos2(x + 2.0, rect.top() + 10.0), vec2(pitch - 4.0, well_h));
+        ui.painter().rect_filled(well, 3.0, r.inset);
+        let h = if s.gate {
+            (well_h * s.level.clamp(0.0, 1.0)).max(3.0)
+        } else {
+            3.0
+        };
+        let col = if s.gate {
+            mix(alpha(hue, 115), hue, s.prob.clamp(0.0, 1.0))
+        } else {
+            r.line2
+        };
+        ui.painter().rect_filled(
+            Rect::from_min_max(pos2(well.left(), well.bottom() - h), well.max),
+            3.0,
+            col,
+        );
+        if playing == Some(i) {
+            let col_rect = Rect::from_min_size(
+                pos2(x + 0.5, rect.top() + 6.0),
+                vec2(pitch - 1.0, rect.height() - 12.0),
+            );
+            ui.painter().rect_stroke(
+                col_rect,
+                4.0,
+                Stroke::new(1.0, alpha(r.text, 130)),
                 egui::StrokeKind::Inside,
             );
         }
