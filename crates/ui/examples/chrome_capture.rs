@@ -224,6 +224,13 @@ impl App {
         ui.dark = j.dark;
         ui.status_meter = true;
         // The toolbar's sound dropdown shows the mockup's sound, with an unsaved edit dot.
+        ui.library = Some(Library::open(
+            Some(patches()),
+            self._user.path().to_path_buf(),
+        ));
+        if j.scene == "sounds" {
+            ui.browser.selected = Some("factory:presets/acid-line".into());
+        }
         let mut doc = kabl_ui::browser::Doc::new(
             "Acid Line",
             kabl_ui::browser::DocOrigin::Library("factory:acid-line".into()),

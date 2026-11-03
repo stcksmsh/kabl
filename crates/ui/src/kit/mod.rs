@@ -18,7 +18,7 @@ pub use controls::*;
 pub use icons::{icon, Ic};
 pub use recipes::*;
 
-/// The kabl logo (Kosta's artwork, `assets/logo`), tinted from the theme's text colour.
+/// The kabl lockup (`assets/logo`), tinted from the theme's text colour.
 pub fn logo(ui: &mut egui::Ui, st: &crate::style::Style, height: f32) -> egui::Response {
     let id = egui::Id::new("kabl-logo");
     let tex = ui.ctx().data(|d| d.get_temp::<egui::TextureHandle>(id));
@@ -30,7 +30,8 @@ pub fn logo(ui: &mut egui::Ui, st: &crate::style::Style, height: f32) -> egui::R
         let tex = ui.ctx().load_texture(
             "kabl-logo",
             egui::ColorImage::from_rgba_unmultiplied(size, img.as_raw()),
-            egui::TextureOptions::LINEAR,
+            // Mipmaps: the 948 px mask is drawn at ~87 px, which aliases without them.
+            egui::TextureOptions::LINEAR.with_mipmap_mode(Some(egui::TextureFilter::Linear)),
         );
         ui.ctx().data_mut(|d| d.insert_temp(id, tex.clone()));
         tex
