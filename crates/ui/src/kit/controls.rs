@@ -61,6 +61,7 @@ pub struct Button<'a> {
     small: bool,
     min_w: f32,
     tone: Option<Tone>,
+    outlined: bool,
 }
 
 impl<'a> Button<'a> {
@@ -75,6 +76,7 @@ impl<'a> Button<'a> {
             small: false,
             min_w: 0.0,
             tone: None,
+            outlined: false,
         }
     }
     pub fn icon(mut self, ic: Ic) -> Self {
@@ -83,6 +85,11 @@ impl<'a> Button<'a> {
     }
     pub fn primary(mut self) -> Self {
         self.kind = Kind::Primary;
+        self
+    }
+    /// Secondary button drawn at rest with a raised fill and a firm border (mockup `btn secondary`).
+    pub fn outlined(mut self) -> Self {
+        self.outlined = true;
         self
     }
     pub fn ghost(mut self) -> Self {
@@ -174,6 +181,8 @@ impl Widget for Button<'_> {
                     )
                 } else if down {
                     (r.inset, Some(r.line2), r.text)
+                } else if self.outlined {
+                    (r.raised, Some(r.line2), r.text)
                 } else {
                     (
                         mix(alpha(r.raised, 0), r.raised, hover),

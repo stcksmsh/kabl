@@ -220,12 +220,16 @@ impl eframe::App for App {
                 sev: g4::Sev::Bad,
                 title: "Could not load patch".into(),
                 detail: Some("unknown module kind \"osc.xyz\"".into()),
+                actions: vec!["Show details".into(), "Open another…".into()],
+                expanded: false,
                 born: t,
             },
             g4::Toast {
                 sev: g4::Sev::Good,
                 title: "Saved to Your Sounds".into(),
                 detail: None,
+                actions: vec![],
+                expanded: false,
                 born: t,
             },
         ];

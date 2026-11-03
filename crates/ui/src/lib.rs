@@ -74,6 +74,8 @@ pub const DRAWER_W: f32 = 320.0;
 pub const COMPACT_W: f32 = 1280.0;
 pub const MIN_ZOOM: f32 = 0.5;
 pub const MAX_ZOOM: f32 = 2.0;
+/// Largest zoom the automatic fit may pick: small patches fill the window, as in the mockup.
+const FIT_MAX_ZOOM: f32 = 1.5;
 
 /// How patch cables are drawn. Positions never change between modes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1112,7 +1114,11 @@ fn empty_rack(ui_state: &mut UiState, ui: &mut egui::Ui, canvas: Rect) {
                 if add.clicked() {
                     ui_state.add_menu_req = true;
                 }
-                let browse = ui.add(kit::Button::new(&st, "Browse sounds").icon(kit::Ic::Search));
+                let browse = ui.add(
+                    kit::Button::new(&st, "Browse sounds")
+                        .icon(kit::Ic::Search)
+                        .outlined(),
+                );
                 ui_state.record("empty-browse".into(), browse.rect);
                 if browse.clicked() {
                     ui_state.browser_open = true;
@@ -1167,6 +1173,18 @@ fn toast_for(msg: &str) -> (kit::g4::Sev, String, Option<String>) {
     }
 }
 
+/// Action links of a toast: a failed load can show its detail or open another sound.
+fn toast_actions(sev: kit::g4::Sev, title: &str, has_detail: bool) -> Vec<String> {
+    let mut a = vec![];
+    if sev == kit::g4::Sev::Bad && has_detail {
+        a.push("Show details".to_string());
+        if title.to_lowercase().contains("load") {
+            a.push("Open another…".to_string());
+        }
+    }
+    a
+}
+
 /// Turns a new `last_message` into a toast and draws the stack at the rack's top right.
 fn show_toasts(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, area: Rect) {
     let now = ui.input(|i| i.time);
@@ -1174,10 +1192,13 @@ fn show_toasts(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, area: Rect
         ui_state.toast_seen.clone_from(&ui_state.last_message);
         if let Some(msg) = &ui_state.last_message {
             let (sev, title, detail) = toast_for(msg);
+            let actions = toast_actions(sev, &title, detail.is_some());
             ui_state.toasts.push(kit::g4::Toast {
                 sev,
                 title,
                 detail,
+                actions,
+                expanded: false,
                 born: now,
             });
         }
@@ -1185,7 +1206,16 @@ fn show_toasts(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, area: Rect
     if ui_state.toasts.is_empty() {
         return;
     }
-    kit::g4::toasts(ui.ctx(), st, area, &mut ui_state.toasts, now);
+    if let Some((i, a)) = kit::g4::toasts(ui.ctx(), st, area, &mut ui_state.toasts, now) {
+        let t = &mut ui_state.toasts[i];
+        match t.actions.remove(a).as_str() {
+            "Show details" => t.expanded = true,
+            _ => {
+                ui_state.toasts.remove(i);
+                ui_state.browser_open = true;
+            }
+        }
+    }
     if ui_state.toasts.iter().any(|t| t.sev.ttl().is_some()) {
         ui.ctx()
             .request_repaint_after(std::time::Duration::from_millis(500));
@@ -1968,15 +1998,15 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     rack_editor::update_drag(editor, ui_state, ui, &lay);
     let lay = composite_layout(editor.state(), ui_state);
     if !ui_state.fitted {
-        // First frame: the whole patch, never above 100 %.
+        // First frame: the whole patch, as large as the window allows.
         ui_state.canvas = canvas;
-        ui_state.frame_patch(fit_world(lay.bounds), 1.0);
+        ui_state.frame_patch(fit_world(lay.bounds), FIT_MAX_ZOOM);
         ui_state.fitted = true;
     } else if canvas != ui_state.canvas {
         // Drawer opened or window resized: keep what the user is working on reachable.
         ui_state.canvas = canvas;
         if ui_state.auto_fit {
-            ui_state.frame_patch(fit_world(lay.bounds), 1.0);
+            ui_state.frame_patch(fit_world(lay.bounds), FIT_MAX_ZOOM);
         }
         let target = inspected_extent(editor, ui_state, &lay)
             .map(|(r, _)| r)

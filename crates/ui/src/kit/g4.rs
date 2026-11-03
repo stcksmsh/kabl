@@ -371,7 +371,18 @@ pub struct Toast {
     pub sev: Sev,
     pub title: String,
     pub detail: Option<String>,
+    /// Text links under the detail (accent, 12.5 px); a click reports its index.
+    pub actions: Vec<String>,
+    /// Detail shows in full; otherwise one line, cut with an ellipsis.
+    pub expanded: bool,
     pub born: f64,
+}
+
+/// What a click on a toast did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ToastClick {
+    Dismiss,
+    Action(usize),
 }
 
 /// Number of persistent errors: the status bar's red pill shows this.
@@ -379,10 +390,10 @@ pub fn error_count(toasts: &[Toast]) -> usize {
     toasts.iter().filter(|t| t.sev == Sev::Bad).count()
 }
 
-/// One 380 px toast: 4 px severity bar, icon, title, mono detail, dismiss. True when dismissed.
-pub fn toast(ui: &mut Ui, st: &Style, t: &Toast) -> bool {
+/// One 380 px toast: 4 px severity bar, icon, title, mono detail, action links, dismiss.
+pub fn toast(ui: &mut Ui, st: &Style, t: &Toast) -> Option<ToastClick> {
     let c = t.sev.color(st);
-    let mut dismissed = false;
+    let mut click = None;
     let out = surface_frame(st, 10.0)
         .inner_margin(Margin {
             left: 16,
@@ -402,11 +413,35 @@ pub fn toast(ui: &mut Ui, st: &Style, t: &Toast) -> bool {
                         ui.add(
                             egui::Label::new(rich(st, Role::Value, Tone::Text2, d))
                                 .selectable(false)
-                                .wrap(),
+                                .wrap_mode(if t.expanded {
+                                    egui::TextWrapMode::Wrap
+                                } else {
+                                    egui::TextWrapMode::Truncate
+                                }),
                         );
                     }
+                    if !t.actions.is_empty() {
+                        ui.add_space(4.0);
+                        ui.horizontal(|ui| {
+                            ui.spacing_mut().item_spacing.x = 18.0;
+                            for (i, a) in t.actions.iter().enumerate() {
+                                let r = ui
+                                    .add(
+                                        egui::Label::new(rich(st, Role::Label, Tone::Accent, a))
+                                            .selectable(false)
+                                            .sense(Sense::click()),
+                                    )
+                                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+                                if r.clicked() {
+                                    click = Some(ToastClick::Action(i));
+                                }
+                            }
+                        });
+                    }
                 });
-                dismissed = icon_button(ui, st, Ic::Close, false, true).clicked();
+                if icon_button(ui, st, Ic::Close, false, true).clicked() {
+                    click = Some(ToastClick::Dismiss);
+                }
             });
         });
     let r = out.response.rect;
@@ -415,27 +450,45 @@ pub fn toast(ui: &mut Ui, st: &Style, t: &Toast) -> bool {
         CornerRadius::same(2),
         c,
     );
-    dismissed
+    click
 }
 
-/// Top-right toast stack inside `area`: newest first, at most 3, expiry per severity.
-pub fn toasts(ctx: &egui::Context, st: &Style, area: Rect, list: &mut Vec<Toast>, now: f64) {
+/// Top-right toast stack inside `area`: newest first, at most 3, expiry per severity. Esc
+/// dismisses the newest. Returns (toast index, action index) of a clicked action link; the
+/// caller decides what it does.
+pub fn toasts(
+    ctx: &egui::Context,
+    st: &Style,
+    area: Rect,
+    list: &mut Vec<Toast>,
+    now: f64,
+) -> Option<(usize, usize)> {
     list.retain(|t| t.sev.ttl().is_none_or(|ttl| now - t.born < ttl));
     let mut gone = None;
+    let mut acted = None;
+    if !list.is_empty()
+        && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
+    {
+        gone = Some(list.len() - 1);
+    }
     egui::Area::new(egui::Id::new("g4-toasts"))
         .order(egui::Order::Foreground)
         .fixed_pos(pos2(area.right() - 16.0 - 380.0, area.top() + 16.0))
         .show(ctx, |ui| {
             ui.spacing_mut().item_spacing.y = 8.0;
             for (i, t) in list.iter().enumerate().rev().take(3) {
-                if toast(ui, st, t) {
-                    gone = Some(i);
+                match toast(ui, st, t) {
+                    Some(ToastClick::Dismiss) => gone = Some(i),
+                    Some(ToastClick::Action(a)) => acted = Some((i, a)),
+                    None => {}
                 }
             }
         });
     if let Some(i) = gone {
         list.remove(i);
+        return None;
     }
+    acted
 }
 
 // ------------------------------------------------------------------ editors
@@ -666,6 +719,8 @@ mod tests {
             sev,
             title: "t".into(),
             detail: None,
+            actions: vec![],
+            expanded: false,
             born: 0.0,
         };
         let ctx = egui::Context::default();

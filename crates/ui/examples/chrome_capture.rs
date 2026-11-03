@@ -126,6 +126,12 @@ impl App {
                     sev,
                     title: title.into(),
                     detail: detail.map(Into::into),
+                    actions: if sev == Sev::Bad {
+                        vec!["Show details".into(), "Open another…".into()]
+                    } else {
+                        vec![]
+                    },
+                    expanded: true,
                     born: 0.0,
                 });
             }
