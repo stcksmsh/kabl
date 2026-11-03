@@ -76,6 +76,7 @@ impl App {
         ui.status_meter = true;
         // The mockup's status bar readouts, as a host would feed them.
         ui.status_cpu = Some(6.0);
+        ui.status_buffer = Some(128);
         ui.status_voices = Some((4, 8));
         ui.status_bpm = Some(124.0);
         ui.status_pos = Some("17 . 3 . 2".into());

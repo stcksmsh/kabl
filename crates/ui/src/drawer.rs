@@ -294,8 +294,24 @@ pub(crate) fn why_card(editor: &PatchEditor, ui_state: &UiState, ui: &mut egui::
     };
     kit::gap(ui, st, 1);
     kit::card(ui, st, |ui| {
-        kit::label(ui, st, Role::Label, Tone::Text, "Why it sounds like this");
-        kit::label(ui, st, Role::Caption, Tone::Text3, info.name);
-        kit::paragraph(ui, st, Role::Caption, Tone::Text2, info.explain);
+        ui.horizontal(|ui| {
+            let (r, _) = ui.allocate_exact_size(vec2(16.0, 16.0), Sense::hover());
+            kit::icon(
+                ui.painter(),
+                kit::Ic::Info,
+                r.center(),
+                16.0,
+                st.roles.accent,
+            );
+            ui.label(
+                egui::RichText::new("Why it sounds like this")
+                    .font(egui::FontId::new(
+                        st.font(Role::Body).size,
+                        crate::style::Font::SansSemibold.family(st.fonts_ready),
+                    ))
+                    .color(kit::tone(st, Tone::Text)),
+            );
+        });
+        kit::paragraph(ui, st, Role::Body, Tone::Text2, info.explain);
     });
 }
