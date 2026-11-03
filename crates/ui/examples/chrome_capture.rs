@@ -63,7 +63,7 @@ impl App {
             m.params
                 .iter()
                 .next()
-                .map(|(k, &v)| (id, k.clone(), v as f32))
+                .map(|(k, &v)| (id, k.clone(), v))
         });
         if let Some((id, k, v)) = edit {
             self.editor.set_param(id, &k, v + 1.0);
