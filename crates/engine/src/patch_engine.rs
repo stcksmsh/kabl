@@ -825,6 +825,16 @@ impl PatchEngine {
         }
     }
 
+    /// Audio-thread call: envelopes not idle in the graph fading in, else the active one (the
+    /// status bar's voices). No allocation.
+    pub fn active_envelopes(&self) -> usize {
+        match &self.incoming {
+            Some((g, _)) => g,
+            None => &self.active,
+        }
+        .active_envelopes()
+    }
+
     /// Audio-thread call: `f(id, step, playing bank, queued bank)` for every sequencer of the
     /// graph fading in, else the active one; queued = a pending launch or an arm. No allocation.
     pub fn seqs(&self, mut f: impl FnMut(kabl_core::ModuleId, usize, usize, Option<usize>)) {

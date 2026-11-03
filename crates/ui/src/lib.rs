@@ -359,6 +359,16 @@ pub struct UiState {
     pub status_meter: bool,
     /// The host's audio status line (device, rate, buffer), shown in the status bar.
     pub status_audio: String,
+    /// The drawer's Help, Compare and Learn switches are folded away until "More" is pressed.
+    pub drawer_more: bool,
+    /// Status bar readouts, each shown only when set. The host feeds the DSP load in percent,
+    /// the voices in use and available, and the callback size in frames; `show` derives the
+    /// tempo and the song position (bar . beat . tick) from the patch's first clock.
+    pub status_cpu: Option<f32>,
+    pub status_voices: Option<(u32, u32)>,
+    pub status_buffer: Option<u32>,
+    pub status_bpm: Option<f32>,
+    pub status_pos: Option<String>,
     /// Stereo output recorder; `None` without an audio device.
     pub recorder: Option<record::Recorder>,
     /// The open "what does this control change" explanation and inline help (view only).
@@ -493,6 +503,12 @@ impl Default for UiState {
             meter: Default::default(),
             status_meter: false,
             status_audio: String::new(),
+            drawer_more: false,
+            status_cpu: None,
+            status_buffer: None,
+            status_voices: None,
+            status_bpm: None,
+            status_pos: None,
             explain: Default::default(),
             inspect: Default::default(),
             compare: Default::default(),
@@ -913,6 +929,11 @@ pub fn show_with(
         .exact_size(st.metrics.toolbar_h)
         .frame(kit::bar_frame(&st))
         .show(ui, |ui| toolbar(editor, ui_state, ui, &st));
+    if let Some((bpm, pos)) = transport_readout(editor.state(), ui_state) {
+        // Under a host clock the module's own tempo is not the one playing.
+        ui_state.status_bpm = (!ui_state.host_clock).then_some(bpm);
+        ui_state.status_pos = Some(pos);
+    }
     egui::Panel::bottom("kabl-status")
         .exact_size(st.metrics.status_h)
         .frame(kit::bar_frame(&st))
@@ -1058,7 +1079,10 @@ fn drawer(
             drawer::lists(editor, ui_state, ui, st);
             drawer::why_card(editor, ui_state, ui, st);
         }
-        show_param_panel(editor, ui_state, ui);
+        // The module's own editor lives under Inspect; the faces edit values in place.
+        if ui_state.inspect.open {
+            show_param_panel(editor, ui_state, ui);
+        }
         pattern::panel(editor, ui_state, ui);
         routing::drawer(editor, ui_state, ui);
         routing::cable_routes(editor, ui_state, ui);
@@ -1501,6 +1525,21 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
     });
 }
 
+/// Tempo and song position of the patch's first clock (the one the engine follows), from the
+/// clock's own `bpm` and the position the audio thread reports in pulses (four to a beat, four
+/// beats to a bar). `None` without a clock or before it has reported.
+fn transport_readout(state: &PatchState, ui_state: &UiState) -> Option<(f32, String)> {
+    let (&id, m) = state.modules.iter().find(|(_, m)| m.kind == "clock")?;
+    let pos = *ui_state.clock_pos.get(&id)?;
+    let bpm = m.params.get("bpm").copied().unwrap_or(120.0);
+    let pulse = pos.max(0.0) as u64;
+    let (beat, tick) = (pulse / 4, pulse % 4);
+    Some((
+        bpm,
+        format!("{} . {} . {}", beat / 4 + 1, beat % 4 + 1, tick + 1),
+    ))
+}
+
 /// The status bar: output meter and peak, sample rate, MIDI input, the last message and the
 /// recording clock; the host's controls at the right end.
 fn status_bar(
@@ -1523,13 +1562,11 @@ fn status_bar(
                 .map_or("no signal".to_string(), |m| format!("{m:+.1} dB"));
             kit::label(ui, st, style::Role::Value, kit::Tone::Text2, peak);
             let khz = ui_state.sample_rate / 1000.0;
-            kit::label(
-                ui,
-                st,
-                style::Role::Value,
-                kit::Tone::Text2,
-                format!("{khz:.1} kHz"),
-            );
+            let rate = match ui_state.status_buffer {
+                Some(frames) => format!("{khz:.1} kHz · {frames}"),
+                None => format!("{khz:.1} kHz"),
+            };
+            kit::label(ui, st, style::Role::Value, kit::Tone::Text2, rate);
         }
         if let Some(port) = ui_state.midi_input.clone() {
             let (dot, _) =
@@ -1543,7 +1580,38 @@ fn status_bar(
             kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, &text)
                 .on_hover_text(&text);
         }
+        if let Some(cpu) = ui_state.status_cpu {
+            kit::label(
+                ui,
+                st,
+                style::Role::Caption,
+                kit::Tone::Text2,
+                format!("CPU {cpu:.0} %"),
+            );
+        }
+        if let Some((used, all)) = ui_state.status_voices {
+            kit::label(
+                ui,
+                st,
+                style::Role::Caption,
+                kit::Tone::Text2,
+                format!("Voices {used} / {all}"),
+            );
+        }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            // Tempo and position are the rightmost, as in the mockup; the host's controls follow.
+            if let Some(pos) = ui_state.status_pos.clone() {
+                kit::label(ui, st, style::Role::Value, kit::Tone::Text2, pos);
+            }
+            if let Some(bpm) = ui_state.status_bpm {
+                kit::label(
+                    ui,
+                    st,
+                    style::Role::Value,
+                    kit::Tone::Text2,
+                    format!("{bpm:.1} BPM"),
+                );
+            }
             right(ui, ui_state);
             if let Some(rec) = ui_state.recorder.as_ref().filter(|r| r.recording()) {
                 let t = rec.elapsed() as u64;
@@ -4959,6 +5027,30 @@ fn register_face_port(
 #[cfg(test)]
 mod tests {
     use super::port_label;
+
+    #[test]
+    fn transport_readout_counts_bars_beats_and_ticks() {
+        let mut editor = crate::PatchEditor::new();
+        let mut view = super::UiState::default();
+        assert!(super::transport_readout(editor.state(), &view).is_none());
+        let id = editor.add_module("clock", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+        assert!(
+            super::transport_readout(editor.state(), &view).is_none(),
+            "no report yet"
+        );
+        editor.set_param(id, "bpm", 100.0);
+        // Pulse 0 is 1 . 1 . 1; 4 pulses to a beat, 16 to a bar: pulse 37 is bar 3, beat 2, tick 2.
+        view.clock_pos.insert(id, 0.0);
+        assert_eq!(
+            super::transport_readout(editor.state(), &view),
+            Some((100.0, "1 . 1 . 1".into()))
+        );
+        view.clock_pos.insert(id, 37.9);
+        assert_eq!(
+            super::transport_readout(editor.state(), &view).unwrap().1,
+            "3 . 2 . 2"
+        );
+    }
 
     #[test]
     fn empty_rack_fit_keeps_import_coordinates_finite() {
