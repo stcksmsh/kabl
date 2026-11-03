@@ -957,7 +957,12 @@ pub fn show_with(
         if compact {
             // Below 1280 px the drawer floats over the rack instead of splitting the window.
             let avail = ui.available_rect_before_wrap();
-            let frame = kit::panel_frame(&st);
+            let frame = kit::panel_frame(&st).shadow(egui::Shadow {
+                offset: [-6, 0],
+                blur: 16,
+                spread: 0,
+                color: egui::Color32::from_black_alpha(70),
+            });
             let rect = egui::Rect::from_min_max(
                 egui::pos2(avail.right() - DRAWER_W, avail.top()),
                 avail.max,
