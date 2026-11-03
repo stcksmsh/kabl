@@ -14,13 +14,14 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 6] = [
+const SCENES: [&str; 7] = [
     "rack",
     "perform",
     "sounds",
     "drawer",
     "wavetable-editor",
     "seq-pattern-editor",
+    "cable-pattern-editor",
 ];
 
 struct Job {
@@ -113,7 +114,10 @@ impl App {
             self.editor.set_param(id, &k, v + 1.0);
         }
         ui.browser_open = j.scene == "sounds";
-        ui.drawer_open = j.scene == "rack" || j.scene == "seq-pattern-editor";
+        ui.drawer_open = matches!(
+            j.scene,
+            "rack" | "seq-pattern-editor" | "cable-pattern-editor"
+        );
         ui.perform_open = j.scene == "perform";
         ui.perform_tall = j.scene == "perform";
         // Like the mockup: the oscillator-to-filter cable and the filter are selected.
@@ -171,6 +175,57 @@ impl App {
             ui.tables.select(6);
             self.editor.set_param(wt, "position", 0.4);
         }
+        if j.scene == "cable-pattern-editor" {
+            // The mockup's state: Seq Pitch to VA Osc Pitch with a 16-step pattern, chance
+            // 100 %, morph 35 % moved by the Bite macro, glide 40 ms, and no clock.
+            let cable = self
+                .editor
+                .state()
+                .cables
+                .iter()
+                .find(|(_, c)| {
+                    matches!(&c.to, kabl_core::PortRef::Module { port, .. } if port == "pitch")
+                })
+                .map(|(&id, _)| id)
+                .unwrap();
+            let on = [1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1];
+            let chance = [
+                1.0, 1.0, 1.0, 0.75, 1.0, 1.0, 0.5, 1.0, 1.0, 1.0, 1.0, 0.75, 1.0, 1.0, 0.5, 1.0,
+            ];
+            let mut set = |slot: usize, v: f32| {
+                self.editor.set_param_gesture(
+                    kabl_core::ParamTarget::Cable {
+                        id: cable,
+                        param: kabl_cables::slot_name(slot),
+                    },
+                    v,
+                    true,
+                );
+            };
+            set(0, 16.0);
+            set(1, 100.0);
+            for k in 0..16 {
+                set(kabl_cables::LEVEL0 + k, on[k] as f32);
+                set(kabl_cables::CHANCE0 + k, chance[k] * 100.0);
+            }
+            set(kabl_cables::MORPH, 0.35);
+            set(kabl_cables::GLIDE, 40.0);
+            let mac = self
+                .editor
+                .add_module("macro", kabl_core::Vec2 { x: 24.0, y: 640.0 });
+            self.editor.set_label(mac, "name.m1", Some("Bite".into()));
+            self.editor.connect_cable_route(
+                kabl_core::PortRef::Module {
+                    id: mac,
+                    port: "m1".into(),
+                },
+                cable,
+                "morph",
+            );
+            ui.cable_fn = Some(cable);
+            ui.selected_route = Some(cable);
+            ui.selected_module = None;
+        }
         self.ui = ui;
         self.f = 0;
     }
@@ -226,11 +281,24 @@ impl eframe::App for App {
                 egui::vec2(size.0 as f32, size.1 as f32),
             )),
         );
-        if self.f == 6 && matches!(self.jobs[self.i].scene, "drawer" | "seq-pattern-editor") {
+        if self.f == 6
+            && matches!(
+                self.jobs[self.i].scene,
+                "drawer" | "seq-pattern-editor" | "cable-pattern-editor"
+            )
+        {
             // After the first frame: a compact window closes the drawer there, the user opens it.
             self.ui.drawer_open = true;
         }
         show(&mut self.editor, &mut self.ui, &mut root);
+        // The mockup's rack zoom (95 %, 78 % at 1180); the macro sits below the view.
+        if self.f == 6 && self.jobs[self.i].scene == "cable-pattern-editor" {
+            self.ui.zoom = if self.jobs[self.i].size.0 < 1280 {
+                0.78
+            } else {
+                0.95
+            };
+        }
         self.f += 1;
         if self.f == 12 {
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
