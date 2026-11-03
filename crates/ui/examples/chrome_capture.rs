@@ -14,7 +14,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 4] = ["rack", "perform", "sounds", "drawer"];
+const SCENES: [&str; 5] = ["rack", "perform", "sounds", "drawer", "seq-pattern-editor"];
 
 struct Job {
     scene: &'static str,
@@ -99,7 +99,7 @@ impl App {
             self.editor.set_param(id, &k, v + 1.0);
         }
         ui.browser_open = j.scene == "sounds";
-        ui.drawer_open = j.scene == "rack";
+        ui.drawer_open = j.scene == "rack" || j.scene == "seq-pattern-editor";
         ui.perform_open = j.scene == "perform";
         ui.perform_tall = j.scene == "perform";
         // Like the mockup: the oscillator-to-filter cable and the filter are selected.
@@ -117,6 +117,32 @@ impl App {
             .iter()
             .find(|(_, m)| m.kind == "filter.svf")
             .map(|(&id, _)| id);
+        if j.scene == "seq-pattern-editor" {
+            // The mockup's state: editing A, B playing, step 5 under the playhead.
+            let seq = self
+                .editor
+                .state()
+                .modules
+                .iter()
+                .find(|(_, m)| m.kind == "seq")
+                .map(|(&id, _)| id)
+                .unwrap();
+            let gate = [1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0];
+            let vel = [100.0, 80.0, 80.0, 60.0, 100.0, 50.0, 70.0, 90.0];
+            let prob = [100.0, 100.0, 100.0, 75.0, 100.0, 50.0, 100.0, 100.0];
+            let ratch = [1.0, 1.0, 1.0, 2.0, 1.0, 1.0, 1.0, 3.0];
+            for i in 0..8 {
+                self.editor.set_param(seq, &format!("g{}", i + 1), gate[i]);
+                self.editor.set_param(seq, &format!("v{}", i + 1), vel[i]);
+                self.editor.set_param(seq, &format!("r{}", i + 1), prob[i]);
+                self.editor.set_param(seq, &format!("k{}", i + 1), ratch[i]);
+            }
+            ui.selected_module = Some(seq);
+            ui.selected_route = None;
+            ui.edit_bank.insert(seq, 0);
+            ui.seq_banks.insert(seq, (1, None));
+            ui.seq_steps.insert(seq, 4);
+        }
         self.ui = ui;
         self.f = 0;
     }
@@ -172,7 +198,7 @@ impl eframe::App for App {
                 egui::vec2(size.0 as f32, size.1 as f32),
             )),
         );
-        if self.f == 6 && self.jobs[self.i].scene == "drawer" {
+        if self.f == 6 && matches!(self.jobs[self.i].scene, "drawer" | "seq-pattern-editor") {
             // After the first frame: a compact window closes the drawer there, the user opens it.
             self.ui.drawer_open = true;
         }

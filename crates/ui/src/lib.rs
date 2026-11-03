@@ -1053,7 +1053,12 @@ fn drawer(
         // The patch-wide lists lead when no control is being edited, and follow its editor
         // otherwise, so the control's routes stay in view.
         let lists = !ui_state.explain.is_open() && !ui_state.inspect.open;
-        let editing = ui_state.inspected.is_some() || ui_state.cable_fn.is_some();
+        // The seq and cues editors count as editing: they lead the drawer, as in G4.
+        let module_editor = ui_state
+            .selected_module
+            .and_then(|id| editor.state().modules.get(&id))
+            .is_some_and(|m| matches!(m.kind.as_str(), "seq" | "cues"));
+        let editing = ui_state.inspected.is_some() || ui_state.cable_fn.is_some() || module_editor;
         if lists && !editing {
             drawer::lists(editor, ui_state, ui, st);
             drawer::why_card(editor, ui_state, ui, st);
@@ -1576,6 +1581,12 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
         ui.label("Unknown module kind.");
         return;
     };
+    if kind == "seq" {
+        // The G4 seq editor draws its own header and controls.
+        let edit = ui_state.edit_bank_of(editor.state(), id);
+        seq_editor::seq_panel(editor, ui_state, ui, id, edit);
+        return;
+    }
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new(format!("{} #{id}", info.name)).strong());
         let r = ui
@@ -1590,9 +1601,6 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
         ui.add(egui::Label::new(egui::RichText::new(info.explain).small()).wrap());
     }
     let edit = ui_state.edit_bank_of(editor.state(), id);
-    if kind == "seq" {
-        seq_editor::seq_panel(editor, ui_state, ui, id, edit);
-    }
     if kind == "cues" {
         seq_editor::cues_panel(editor, ui_state, ui, id);
     }
