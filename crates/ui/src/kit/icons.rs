@@ -39,15 +39,6 @@ pub enum Ic {
     Pin,
 }
 
-fn arc(c: Pos2, r: f32, a0: f32, a1: f32) -> Vec<Pos2> {
-    (0..=12)
-        .map(|i| {
-            let a = a0 + (a1 - a0) * i as f32 / 12.0;
-            c + vec2(a.cos(), a.sin()) * r
-        })
-        .collect()
-}
-
 pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
     let u = size / 16.0;
     let st = Stroke::new((1.4 * u).max(1.2), col);
@@ -121,10 +112,10 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
             }
         }
         Ic::Focus => {
-            p.circle_stroke(c, 5.0 * u, st);
-            p.circle_filled(c, 1.6 * u, col);
+            // The mockup's `target`: a ring and four short ticks.
+            p.circle_stroke(c, 2.5 * u, st);
             for (dx, dy) in [(0.0, -1.0), (0.0, 1.0), (-1.0, 0.0), (1.0, 0.0)] {
-                line(&[(dx * 5.0, dy * 5.0), (dx * 8.0, dy * 8.0)]);
+                line(&[(dx * 3.0, dy * 3.0), (dx * 6.0, dy * 6.0)]);
             }
         }
         Ic::Gear => {
@@ -165,22 +156,25 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
                 st,
             ));
         }
-        Ic::Cable => {
-            p.circle_stroke(q(-5.0, -4.0), 2.2 * u, st);
-            p.circle_stroke(q(5.0, 4.0), 2.2 * u, st);
-            p.add(Shape::line(
-                arc(q(0.0, -1.0), 7.0 * u, PI * 0.8, PI * 0.2),
-                st,
-            ));
-        }
-        Ic::CableOff => {
-            p.circle_stroke(q(-5.0, -4.0), 2.2 * u, st);
-            p.circle_stroke(q(5.0, 4.0), 2.2 * u, st);
-            p.add(Shape::line(
-                arc(q(0.0, -1.0), 7.0 * u, PI * 0.8, PI * 0.2),
-                st,
-            ));
-            line(&[(-7.0, -7.0), (7.0, 7.0)]);
+        Ic::Cable | Ic::CableOff => {
+            // The mockup's `cable`: two small plugs joined by one curve.
+            p.circle_stroke(q(-5.0, -3.5), 1.5 * u, st);
+            p.circle_stroke(q(5.0, 3.5), 1.5 * u, st);
+            let (p0, p1, p2, p3) = ((-3.7, -2.8), (0.0, -2.0), (0.0, 2.0), (3.7, 2.8));
+            let pts: Vec<Pos2> = (0..=16)
+                .map(|i| {
+                    let t = i as f32 / 16.0;
+                    let m = 1.0 - t;
+                    let k = |a: f32, b: f32, c2: f32, d: f32| {
+                        m * m * m * a + 3.0 * m * m * t * b + 3.0 * m * t * t * c2 + t * t * t * d
+                    };
+                    q(k(p0.0, p1.0, p2.0, p3.0), k(p0.1, p1.1, p2.1, p3.1))
+                })
+                .collect();
+            p.add(Shape::line(pts, st));
+            if ic == Ic::CableOff {
+                line(&[(-8.0, -8.0), (6.0, 8.0)]);
+            }
         }
         Ic::Midi => {
             p.circle_stroke(c, 7.0 * u, st);

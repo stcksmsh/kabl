@@ -1173,8 +1173,7 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
     let wide = full.width() >= 1300.0;
     let lay = |l| egui::UiBuilder::new().layout(l);
     // Centre: the view switch, centred in the window.
-    let sw =
-        egui::Rect::from_center_size(full.center(), egui::vec2(270.0, st.metrics.control_h + 4.0));
+    let sw = egui::Rect::from_center_size(full.center(), egui::vec2(270.0, st.metrics.control_h));
     ui.scope_builder(
         lay(egui::Layout::left_to_right(egui::Align::Min)).max_rect(sw),
         |ui| {

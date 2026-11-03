@@ -128,6 +128,10 @@ impl eframe::App for App {
             )),
         );
         show(&mut self.editor, &mut self.ui, &mut root);
+        // The mockup's rack is drawn at 95 %: set it once the first fit has run.
+        if self.f == 6 && self.jobs[self.i].scene == "rack" {
+            self.ui.zoom = 0.95;
+        }
         self.f += 1;
         if self.f == 12 {
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
