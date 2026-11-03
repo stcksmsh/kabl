@@ -1054,6 +1054,7 @@ pub(crate) fn param_knob(
         ));
         pill(
             &top,
+            &ui_state.style,
             center - EguiVec2::new(0.0, (r + RING_OUTER) * z + 4.0),
             &text,
         );
@@ -1110,7 +1111,7 @@ fn source_lanes(
     top.circle_filled(
         center,
         outer,
-        Color32::from_rgba_unmultiplied(14, 14, 18, 215),
+        crate::style::alpha(ui_state.style.roles.surface, 215),
     );
     for (k, rt) in routes.iter().enumerate() {
         let radius = lane_radius(k);
@@ -1196,6 +1197,7 @@ fn source_lanes(
                     egui::Order::Tooltip,
                     Id::new("kabl-lane-pill"),
                 )),
+                &ui_state.style,
                 center - EguiVec2::new(0.0, outer + 4.0),
                 &match grab {
                     Some(g) if g.cancelled => "Cancelled".to_string(),
@@ -1210,22 +1212,27 @@ fn source_lanes(
     }
 }
 
-pub(crate) fn pill(painter: &egui::Painter, bottom_center: Pos2, text: &str) {
+pub(crate) fn pill(
+    painter: &egui::Painter,
+    st: &crate::style::Style,
+    bottom_center: Pos2,
+    text: &str,
+) {
     let galley = painter.layout_no_wrap(
         text.to_string(),
         egui::FontId::proportional(11.0),
-        Color32::WHITE,
+        st.roles.text,
     );
     let size = galley.size() + EguiVec2::new(10.0, 4.0);
     let rect = Rect::from_center_size(bottom_center - EguiVec2::new(0.0, size.y / 2.0), size);
-    painter.rect_filled(rect, 4.0, Color32::from_rgba_unmultiplied(20, 20, 22, 235));
+    painter.rect_filled(rect, 4.0, crate::style::alpha(st.roles.raised, 235));
     painter.rect_stroke(
         rect,
         4.0,
-        Stroke::new(1.0, Color32::from_rgb(90, 155, 255)),
+        Stroke::new(1.0, st.roles.accent),
         egui::StrokeKind::Outside,
     );
-    painter.galley(rect.min + EguiVec2::new(5.0, 2.0), galley, Color32::WHITE);
+    painter.galley(rect.min + EguiVec2::new(5.0, 2.0), galley, st.roles.text);
 }
 
 /// Segmented selector for a `Taper::Stepped` param (envelope timing, waveforms) at screen
@@ -1494,7 +1501,7 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
         }
         None => {
             ui.colored_label(
-                Color32::from_rgb(255, 200, 90),
+                ui_state.style.roles.warn,
                 "No source selected: click one below to edit its depth.",
             );
         }
