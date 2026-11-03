@@ -105,6 +105,8 @@ pub(super) fn short_name(kind: &str, param: &str) -> Option<&'static str> {
     match (kind, param) {
         ("osc.fm6", "base_hz") => Some("Freq"),
         ("osc.fm6", "feedback") => Some("Fdbk"),
+        // "Pulse width" is wider than the knob slot beside Frequency.
+        ("osc.va", "pw") => Some("Width"),
         _ => None,
     }
 }
