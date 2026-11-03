@@ -188,6 +188,12 @@ pub struct UiState {
     /// Output sample rate, for preview lengths (set by `main.rs`).
     pub sample_rate: f32,
     pub last_message: Option<String>,
+    /// Messages as toasts (errors stay, warnings 8 s, success 3 s); fed from `last_message`.
+    pub toasts: Vec<kit::g4::Toast>,
+    /// The `last_message` text already turned into a toast.
+    toast_seen: Option<String>,
+    /// The empty rack's Add module button asks the toolbar to open its menu.
+    add_menu_req: bool,
     pub cable_view: CableView,
     /// The knob (module, param) whose routes the drawer lists and whose ring edits
     /// `selected_route`.
@@ -404,6 +410,9 @@ impl Default for UiState {
             load_stopped: false,
             sample_rate: 48000.0,
             last_message: None,
+            toasts: Vec::new(),
+            toast_seen: None,
+            add_menu_req: false,
             cable_view: CableView::All,
             inspected: None,
             selected_route: None,
@@ -981,6 +990,7 @@ pub fn show_with(
         }
     }
 
+    let page = ui.available_rect_before_wrap();
     if ui_state.browser_open {
         egui::CentralPanel::default()
             .frame(kit::panel_frame(&st))
@@ -995,6 +1005,7 @@ pub fn show_with(
             .show(ui, |ui| show_rack(editor, ui_state, ui, &th));
     }
     browser::dialogs(editor, ui_state, ui.ctx());
+    show_toasts(ui_state, ui, &st, page);
     ui_state.explain.typing =
         ui.ctx().egui_wants_keyboard_input() || egui::Popup::is_any_open(ui.ctx());
     ui_state.hits = std::mem::take(&mut ui_state.frame_hits);
@@ -1066,6 +1077,119 @@ fn drawer(
             drawer::why_card(editor, ui_state, ui, st);
         }
     });
+}
+
+/// The world rectangle to fit: the patch's modules, or two empty rows when there are none.
+fn fit_world(bounds: Rect) -> Rect {
+    if bounds.is_positive() {
+        bounds.expand(4.0)
+    } else {
+        Rect::from_min_max(
+            pos2(0.0, rack::row_y(0) - 8.0),
+            pos2(1200.0, rack::row_y(1) + PANEL_H + 8.0),
+        )
+    }
+}
+
+/// The empty rack: the rails stay, a centred note offers the two ways to start.
+fn empty_rack(ui_state: &mut UiState, ui: &mut egui::Ui, canvas: Rect) {
+    let st = ui_state.style.clone();
+    let area = Rect::from_center_size(canvas.center() - vec2(0.0, 20.0), vec2(420.0, 240.0));
+    ui.scope_builder(egui::UiBuilder::new().max_rect(area), |ui| {
+        kit::g4::empty_state(
+            ui,
+            &st,
+            kit::Ic::Plug,
+            "Empty rack",
+            "Add a module, or start from a sound.",
+            |ui| {
+                let add = ui.add(
+                    kit::Button::new(&st, "Add module")
+                        .icon(kit::Ic::Plus)
+                        .primary(),
+                );
+                ui_state.record("empty-add".into(), add.rect);
+                if add.clicked() {
+                    ui_state.add_menu_req = true;
+                }
+                let browse = ui.add(kit::Button::new(&st, "Browse sounds").icon(kit::Ic::Search));
+                ui_state.record("empty-browse".into(), browse.rect);
+                if browse.clicked() {
+                    ui_state.browser_open = true;
+                }
+            },
+        );
+        ui.add_space(14.0);
+        ui.vertical_centered(|ui| {
+            kit::label(
+                ui,
+                &st,
+                style::Role::Caption,
+                kit::Tone::Text3,
+                "Tip: right-click the rack to add a module where you click.",
+            );
+        });
+    });
+}
+
+/// Severity, title and mono detail of a status message: what failed is an error, a hazard a
+/// warning, anything else a quiet success. "Could not load: why" splits at the colon.
+fn toast_for(msg: &str) -> (kit::g4::Sev, String, Option<String>) {
+    use kit::g4::Sev;
+    let m = msg.to_lowercase();
+    let has = |words: &[&str]| words.iter().any(|w| m.contains(w));
+    let sev = if has(&[
+        "error",
+        "failed",
+        "could not",
+        "couldn't",
+        "cannot",
+        "can't",
+        "not found",
+        "unsupported",
+        "refused",
+        "denied",
+        "invalid",
+        "unavailable",
+        "lost",
+    ]) {
+        Sev::Bad
+    } else if has(&[
+        "warning", "no sound", "stopped", "busy", "muted", "skipped", "ignored",
+    ]) {
+        Sev::Warn
+    } else {
+        Sev::Good
+    };
+    match msg.split_once(": ") {
+        Some((t, d)) => (sev, t.to_string(), Some(d.to_string())),
+        None => (sev, msg.to_string(), None),
+    }
+}
+
+/// Turns a new `last_message` into a toast and draws the stack at the rack's top right.
+fn show_toasts(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, area: Rect) {
+    let now = ui.input(|i| i.time);
+    if ui_state.last_message != ui_state.toast_seen {
+        ui_state.toast_seen.clone_from(&ui_state.last_message);
+        if let Some(msg) = &ui_state.last_message {
+            let (sev, title, detail) = toast_for(msg);
+            ui_state.toasts.push(kit::g4::Toast {
+                sev,
+                title,
+                detail,
+                born: now,
+            });
+        }
+    }
+    if ui_state.toasts.is_empty() {
+        return;
+    }
+    kit::g4::toasts(ui.ctx(), st, area, &mut ui_state.toasts, now);
+    if ui_state.toasts.iter().any(|t| t.sev.ttl().is_some()) {
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_millis(500));
+    }
 }
 
 fn vsep(ui: &mut egui::Ui, st: &Style) {
@@ -1174,8 +1298,9 @@ fn add_search(
     let r = r.tip(st, "Add a module (A)");
     ui_state.record("add-menu".into(), r.rect);
     let pop = egui::Popup::default_response_id(&r);
-    if !ui.ctx().egui_wants_keyboard_input()
-        && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::A))
+    if std::mem::take(&mut ui_state.add_menu_req)
+        || (!ui.ctx().egui_wants_keyboard_input()
+            && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::A)))
     {
         egui::Popup::open_id(ui.ctx(), pop);
     }
@@ -1554,9 +1679,16 @@ fn status_bar(
                     format!("• REC {:02}:{:02}", t / 60, t % 60),
                 );
             }
-            if let Some(msg) = &ui_state.last_message {
-                kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, msg)
-                    .on_hover_text(msg);
+            let errors = kit::g4::error_count(&ui_state.toasts);
+            if errors > 0 {
+                let word = if errors == 1 { "error" } else { "errors" };
+                kit::label(
+                    ui,
+                    st,
+                    style::Role::Caption,
+                    kit::Tone::Bad,
+                    format!("• {errors} {word}"),
+                );
             }
         });
     });
@@ -1838,13 +1970,13 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     if !ui_state.fitted {
         // First frame: the whole patch, never above 100 %.
         ui_state.canvas = canvas;
-        ui_state.frame_patch(lay.bounds.expand(4.0), 1.0);
+        ui_state.frame_patch(fit_world(lay.bounds), 1.0);
         ui_state.fitted = true;
     } else if canvas != ui_state.canvas {
         // Drawer opened or window resized: keep what the user is working on reachable.
         ui_state.canvas = canvas;
         if ui_state.auto_fit {
-            ui_state.frame_patch(lay.bounds.expand(4.0), 1.0);
+            ui_state.frame_patch(fit_world(lay.bounds), 1.0);
         }
         let target = inspected_extent(editor, ui_state, &lay)
             .map(|(r, _)| r)
@@ -1948,7 +2080,15 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     }
     let xf = ui_state.xf();
     let painter = ui.painter_at(canvas);
-    draw_rails(&painter, th, xf, canvas, lay.rows.max(1));
+    // Empty rows continue below the patch to the bottom of the window, like a rack with free slots.
+    let mut rows = lay.rows.max(1);
+    while rows < 24 && xf.p(pos2(0.0, rack::row_y(rows - 1) + PANEL_H + 8.0)).y < canvas.bottom() {
+        rows += 1;
+    }
+    draw_rails(&painter, th, xf, canvas, rows);
+    if editor.state().modules.is_empty() {
+        empty_rack(ui_state, ui, canvas);
+    }
 
     let focused_at_frame_start = !ui_state.expanded.is_empty();
     let lifted_at_frame_start = ui_state.moving.is_some();
@@ -5173,6 +5313,16 @@ fn register_face_port(
 #[cfg(test)]
 mod tests {
     use super::port_label;
+
+    #[test]
+    fn messages_become_toasts_of_the_right_severity() {
+        use crate::kit::g4::Sev;
+        let (sev, title, detail) = super::toast_for("Could not load patch: unknown module kind");
+        assert_eq!((sev, title.as_str()), (Sev::Bad, "Could not load patch"));
+        assert_eq!(detail.as_deref(), Some("unknown module kind"));
+        assert_eq!(super::toast_for("Audio device busy").0, Sev::Warn);
+        assert_eq!(super::toast_for("opened \"Evolving Pad\"").0, Sev::Good);
+    }
 
     #[test]
     fn empty_rack_fit_keeps_import_coordinates_finite() {

@@ -14,7 +14,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 4] = ["rack", "perform", "sounds", "drawer"];
+const SCENES: [&str; 6] = ["rack", "perform", "sounds", "drawer", "empty", "error"];
 
 struct Job {
     scene: &'static str,
@@ -99,7 +99,37 @@ impl App {
             self.editor.set_param(id, &k, v + 1.0);
         }
         ui.browser_open = j.scene == "sounds";
-        ui.drawer_open = j.scene == "rack";
+        ui.drawer_open = matches!(j.scene, "rack" | "error");
+        if j.scene == "empty" {
+            self.editor = PatchEditor::new();
+        }
+        if j.scene == "error" {
+            use kabl_ui::kit::g4::{Sev, Toast};
+            // Oldest first: the stack shows the newest on top.
+            for (sev, title, detail) in [
+                (
+                    Sev::Bad,
+                    "Could not load patch",
+                    Some("unknown module kind \"osc.xyz\""),
+                ),
+                (
+                    Sev::Warn,
+                    "Audio device busy",
+                    Some("Playing silent until it is free."),
+                ),
+                (Sev::Good, "Saved \"Warm pad\"", None),
+            ]
+            .into_iter()
+            .rev()
+            {
+                ui.toasts.push(Toast {
+                    sev,
+                    title: title.into(),
+                    detail: detail.map(Into::into),
+                    born: 0.0,
+                });
+            }
+        }
         ui.perform_open = j.scene == "perform";
         ui.perform_tall = j.scene == "perform";
         // Like the mockup: the oscillator-to-filter cable and the filter are selected.
@@ -178,7 +208,7 @@ impl eframe::App for App {
         }
         show(&mut self.editor, &mut self.ui, &mut root);
         // The mockup's rack is drawn at 95 %: set it once the first fit has run.
-        if self.f == 6 && self.jobs[self.i].scene == "rack" {
+        if self.f == 6 && matches!(self.jobs[self.i].scene, "rack" | "error") {
             self.ui.zoom = 0.95;
         }
         self.f += 1;
