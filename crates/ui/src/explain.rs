@@ -652,7 +652,7 @@ pub(crate) fn panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui:
         }
         if ui_state.explain.target_lost {
             ui.colored_label(
-                Color32::from_rgb(230, 160, 60),
+                ui_state.style.roles.warn,
                 "The target you were looking at was removed. Undo brings it back.",
             );
         }
@@ -1131,12 +1131,22 @@ pub(crate) fn mark_target(
             };
             let r = to_screen(c.geo.bounds()).expand(4.0 * zoom);
             painter.rect_stroke(r, 6.0 * zoom, stroke, egui::StrokeKind::Outside);
-            routing::pill(painter, r.center_top() - EguiVec2::new(0.0, 2.0), "Shown");
+            routing::pill(
+                painter,
+                &ui_state.style,
+                r.center_top() - EguiVec2::new(0.0, 2.0),
+                "Shown",
+            );
         }
         Target::Jack { id, port, .. } => {
             if let Some(p) = port_at(*id, port) {
                 painter.circle_stroke(p, 12.0 * zoom, stroke);
-                routing::pill(painter, p - EguiVec2::new(0.0, 14.0 * zoom), "Shown");
+                routing::pill(
+                    painter,
+                    &ui_state.style,
+                    p - EguiVec2::new(0.0, 14.0 * zoom),
+                    "Shown",
+                );
             }
         }
         Target::Module(id) => {

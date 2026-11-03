@@ -3951,6 +3951,7 @@ fn draw_port_drag(
         ));
         routing::pill(
             &tip,
+            &ui_state.style,
             b - EguiVec2::new(0.0, 14.0),
             &format!(
                 "Release to modulate {label} ({:+.0} %)",
