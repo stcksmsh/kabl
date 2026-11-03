@@ -14,7 +14,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 7] = [
+const SCENES: [&str; 8] = [
     "rack",
     "perform",
     "sounds",
@@ -22,6 +22,7 @@ const SCENES: [&str; 7] = [
     "wavetable-editor",
     "seq-pattern-editor",
     "cues-editor",
+    "cable-routes-drawer",
 ];
 
 struct Job {
@@ -253,7 +254,10 @@ impl App {
         doc.meta.category = "Bass".into();
         ui.doc = Some(doc);
         ui.browser_open = j.scene == "sounds";
-        ui.drawer_open = matches!(j.scene, "rack" | "seq-pattern-editor" | "cues-editor");
+        ui.drawer_open = matches!(
+            j.scene,
+            "rack" | "seq-pattern-editor" | "cues-editor" | "cable-routes-drawer"
+        );
         ui.perform_open = j.scene == "perform";
         ui.perform_tall = j.scene == "perform";
         if j.scene == "perform" {
@@ -396,6 +400,39 @@ impl App {
             ui.seq_banks.insert(lead, (2, Some(1)));
             ui.last_cue.insert(cues, 3);
         }
+        if j.scene == "cable-routes-drawer" {
+            // The mockup's state: the filter's cutoff at 1 kHz, moved by the envelope (+30 %,
+            // selected) and the Bite macro (+38 %, its module below the view).
+            let find = |kind: &str| {
+                self.editor
+                    .state()
+                    .modules
+                    .iter()
+                    .find(|(_, m)| m.kind == kind)
+                    .map(|(&id, _)| id)
+                    .unwrap()
+            };
+            let (svf, adsr) = (find("filter.svf"), find("env.adsr"));
+            let mac = self
+                .editor
+                .add_module("macro", kabl_core::Vec2 { x: 24.0, y: 640.0 });
+            self.editor.set_label(mac, "name.m1", Some("Bite".into()));
+            self.editor.set_param(svf, "cutoff_hz", 1000.0);
+            let m = |id, port: &str| kabl_core::PortRef::Module {
+                id,
+                port: port.into(),
+            };
+            let env = kabl_ui::routing::routes_into(self.editor.state(), svf, "cutoff_hz")
+                .into_iter()
+                .find(|r| r.from_id == adsr)
+                .unwrap()
+                .cable;
+            self.editor.set_route_amount(env, 0.30, true);
+            let bite = self.editor.connect_route(m(mac, "m1"), svf, "cutoff_hz");
+            self.editor.set_route_amount(bite, 0.38, true);
+            ui.inspected = Some((svf, "cutoff_hz".into()));
+            ui.selected_route = Some(env);
+        }
         self.ui = ui;
         self.f = 0;
     }
@@ -454,7 +491,7 @@ impl eframe::App for App {
         if self.f == 6
             && matches!(
                 self.jobs[self.i].scene,
-                "drawer" | "seq-pattern-editor" | "cues-editor"
+                "drawer" | "seq-pattern-editor" | "cues-editor" | "cable-routes-drawer"
             )
         {
             // After the first frame: a compact window closes the drawer there, the user opens it.
@@ -463,7 +500,12 @@ impl eframe::App for App {
         show(&mut self.editor, &mut self.ui, &mut root);
         // The mockup's rack zoom (95 %, 78 % at 1180); the extra sequencers and the cues sit
         // below the view.
-        if self.f == 6 && self.jobs[self.i].scene == "cues-editor" {
+        if self.f == 6
+            && matches!(
+                self.jobs[self.i].scene,
+                "cues-editor" | "cable-routes-drawer"
+            )
+        {
             self.ui.zoom = if self.jobs[self.i].size.0 < 1280 {
                 0.78
             } else {

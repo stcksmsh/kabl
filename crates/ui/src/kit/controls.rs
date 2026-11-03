@@ -531,6 +531,34 @@ pub fn slider(
     step: Option<f64>,
     readout: &str,
 ) -> Response {
+    let col = st.roles.accent;
+    slider_with(ui, st, value, range, step, readout, col, false)
+}
+
+/// [`slider`] for a signed value: the fill runs from the centre tick to the handle, in `col`.
+pub fn slider_bipolar(
+    ui: &mut Ui,
+    st: &Style,
+    value: &mut f64,
+    range: std::ops::RangeInclusive<f64>,
+    step: Option<f64>,
+    readout: &str,
+    col: Color32,
+) -> Response {
+    slider_with(ui, st, value, range, step, readout, col, true)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn slider_with(
+    ui: &mut Ui,
+    st: &Style,
+    value: &mut f64,
+    range: std::ops::RangeInclusive<f64>,
+    step: Option<f64>,
+    readout: &str,
+    col: Color32,
+    bipolar: bool,
+) -> Response {
     let enabled = ui.is_enabled();
     let readout_w = ui
         .painter()
@@ -602,13 +630,21 @@ pub fn slider(
         StrokeKind::Inside,
     );
     let x = tr.left() + tr.width() * t;
+    let x0 = if bipolar { tr.center().x } else { tr.left() };
     fill_rr(
         ui,
-        Rect::from_min_max(tr.min, pos2(x, tr.max.y)),
+        Rect::from_min_max(pos2(x0.min(x), tr.min.y), pos2(x0.max(x), tr.max.y)),
         th / 2.0,
-        dim(r.accent, enabled),
+        dim(col, enabled),
         0.0,
     );
+    if bipolar {
+        ui.painter().rect_filled(
+            Rect::from_center_size(tr.center(), vec2(1.0, 12.0)),
+            CornerRadius::ZERO,
+            r.text2,
+        );
+    }
     let h = pos2(x, cy);
     let hover = ease_to(
         ui,
@@ -624,7 +660,7 @@ pub fn slider(
     );
     ui.painter().circle_filled(h, hr, dim(r.raised, enabled));
     ui.painter()
-        .circle_stroke(h, hr, Stroke::new(1.5, dim(r.accent, enabled)));
+        .circle_stroke(h, hr, Stroke::new(1.5, dim(col, enabled)));
     if resp.has_focus() && enabled {
         ui.painter().circle_stroke(
             h,
