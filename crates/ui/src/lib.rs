@@ -358,6 +358,14 @@ pub struct UiState {
     pub status_meter: bool,
     /// The host's audio status line (device, rate, buffer), shown in the status bar.
     pub status_audio: String,
+    /// The drawer's Help, Compare and Learn switches are folded away until "More" is pressed.
+    pub drawer_more: bool,
+    /// Host-fed status bar readouts, each shown only when set: DSP load in percent, voices in
+    /// use and available, tempo in BPM, and the song position as bar . beat . tick.
+    pub status_cpu: Option<f32>,
+    pub status_voices: Option<(u32, u32)>,
+    pub status_bpm: Option<f32>,
+    pub status_pos: Option<String>,
     /// Stereo output recorder; `None` without an audio device.
     pub recorder: Option<record::Recorder>,
     /// The open "what does this control change" explanation and inline help (view only).
@@ -492,6 +500,11 @@ impl Default for UiState {
             meter: Default::default(),
             status_meter: false,
             status_audio: String::new(),
+            drawer_more: false,
+            status_cpu: None,
+            status_voices: None,
+            status_bpm: None,
+            status_pos: None,
             explain: Default::default(),
             inspect: Default::default(),
             compare: Default::default(),
@@ -1059,7 +1072,10 @@ fn drawer(
             drawer::lists(editor, ui_state, ui, st);
             drawer::why_card(editor, ui_state, ui, st);
         }
-        show_param_panel(editor, ui_state, ui);
+        // The module's own editor lives under Inspect; the faces edit values in place.
+        if ui_state.inspect.open {
+            show_param_panel(editor, ui_state, ui);
+        }
         pattern::panel(editor, ui_state, ui);
         routing::drawer(editor, ui_state, ui);
         routing::cable_routes(editor, ui_state, ui);
@@ -1571,7 +1587,38 @@ fn status_bar(
             kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, &text)
                 .on_hover_text(&text);
         }
+        if let Some(cpu) = ui_state.status_cpu {
+            kit::label(
+                ui,
+                st,
+                style::Role::Caption,
+                kit::Tone::Text2,
+                format!("CPU {cpu:.0} %"),
+            );
+        }
+        if let Some((used, all)) = ui_state.status_voices {
+            kit::label(
+                ui,
+                st,
+                style::Role::Caption,
+                kit::Tone::Text2,
+                format!("Voices {used} / {all}"),
+            );
+        }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            // Tempo and position are the rightmost, as in the mockup; the host's controls follow.
+            if let Some(pos) = ui_state.status_pos.clone() {
+                kit::label(ui, st, style::Role::Value, kit::Tone::Text2, pos);
+            }
+            if let Some(bpm) = ui_state.status_bpm {
+                kit::label(
+                    ui,
+                    st,
+                    style::Role::Value,
+                    kit::Tone::Text2,
+                    format!("{bpm:.1} BPM"),
+                );
+            }
             right(ui, ui_state);
             if let Some(rec) = ui_state.recorder.as_ref().filter(|r| r.recording()) {
                 let t = rec.elapsed() as u64;

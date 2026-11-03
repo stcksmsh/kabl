@@ -48,8 +48,19 @@ pub(crate) fn tabs(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
             {
                 ui_state.drawer_open = false;
             }
+            let on = ui_state.drawer_more;
+            let r = ui
+                .add(kit::Button::new(st, "More").small().ghost().selected(on))
+                .tip(st, "Help, Compare and Learn");
+            ui_state.record("drawer-more".into(), r.rect);
+            if r.clicked() {
+                ui_state.drawer_more = !on;
+            }
         });
     });
+    if !ui_state.drawer_more {
+        return;
+    }
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = st.sp(1);
         let on = ui_state.explain.help;
