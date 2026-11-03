@@ -1870,7 +1870,10 @@ pub(crate) fn cable_param_routes(
         }
     }
     if let Some(from) = add {
-        editor.connect_cable_route(from, cable, param);
+        // A new source opens its depth row, to set how far it moves the parameter.
+        if let Some(route) = editor.connect_cable_route(from, cable, param) {
+            ui.data_mut(|d| d.insert_temp(egui::Id::new(("croute-open", route)), true));
+        }
     }
     if let Some(route) = remove {
         editor.disconnect(route);

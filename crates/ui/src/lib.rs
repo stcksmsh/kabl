@@ -1094,9 +1094,16 @@ fn drawer(
         }
         pattern::panel(editor, ui_state, ui);
         routing::drawer(editor, ui_state, ui);
-        routing::cable_routes(editor, ui_state, ui);
+        // An open cable editor (G4) shows its own routes; the patch-wide ones and the lists
+        // wait behind its More disclosure.
+        let cable_open = ui_state
+            .cable_fn
+            .is_some_and(|c| !pattern::more_open(ui.ctx(), c));
+        if !cable_open {
+            routing::cable_routes(editor, ui_state, ui);
+        }
         // The seq and cues editors take the whole drawer (G4): no lists under them.
-        if lists && editing && !module_editor {
+        if lists && editing && !module_editor && !cable_open {
             drawer::lists(editor, ui_state, ui, st);
             drawer::why_card(editor, ui_state, ui, st);
         }
