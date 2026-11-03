@@ -299,12 +299,25 @@ pub fn dock(
         .size_range(min..=max)
         .frame(
             Frame::new()
-                .fill(st.roles.surface)
-                .stroke(Stroke::new(1.0, st.roles.line))
+                .fill(st.roles.bar)
                 .inner_margin(Margin::symmetric(16, 10)),
         )
         .show(ui, |ui| {
             let top = ui.max_rect().top();
+            // A 1 px rule on the top edge and a 6 px shadow strip over the rack above it.
+            let edge = top - 10.0;
+            let full = ui.max_rect().x_range().expand(16.0);
+            let shade = egui::Color32::from_black_alpha(if st.dark { 89 } else { 20 });
+            let p = ui
+                .ctx()
+                .layer_painter(egui::LayerId::new(egui::Order::Middle, egui::Id::new(id)));
+            p.rect_filled(
+                Rect::from_x_y_ranges(full, edge - 6.0..=edge),
+                CornerRadius::ZERO,
+                shade,
+            );
+            ui.painter()
+                .hline(full, edge + 0.5, Stroke::new(1.0, st.roles.line2));
             let c = pos2(ui.max_rect().center().x, top - 5.0);
             ui.painter().rect_filled(
                 Rect::from_center_size(c, vec2(36.0, 4.0)),

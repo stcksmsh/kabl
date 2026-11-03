@@ -808,7 +808,6 @@ pub fn show_with(
     composites::panel(editor, ui_state, ui.ctx());
     about::show(ui.ctx(), ui_state);
     panels::editor(editor, ui_state, ui.ctx());
-    tables::show(editor, ui_state, ui.ctx());
     filebrowser::window(ui_state, ui.ctx());
     rack_editor::edit_face(editor, ui_state, ui.ctx());
     browser::frame_input(editor, ui_state, ui);
@@ -981,6 +980,10 @@ pub fn show_with(
         }
     }
 
+    // The wavetable dock spans the rack's width, under the rack.
+    if !ui_state.browser_open && !perform_full {
+        tables::show(editor, ui_state, ui);
+    }
     if ui_state.browser_open {
         egui::CentralPanel::default()
             .frame(kit::panel_frame(&st))

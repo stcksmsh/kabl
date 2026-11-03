@@ -6,10 +6,10 @@
 //! Control thread only.
 
 use crate::filebrowser::{self, Event, FileBrowser, Mode, Place, WAV};
-use crate::kit::{self, Button, Tone};
+use crate::kit::{self, Button, Ic, Tone};
 use crate::style::{alpha, Role, Style};
 use crate::{PatchEditor, UiState};
-use egui::{pos2, vec2, Pos2, Rect, Sense, Shape, Stroke};
+use egui::{pos2, vec2, Pos2, Rect, Sense, Shape, Stroke, StrokeKind};
 use kabl_core::{table::MAX_TABLES, ModuleId};
 use kabl_engine::patch_engine::{Command, MAX_PREVIEW_NOTES, MAX_PREVIEW_SECS};
 use kabl_modules::tableedit as ed;
@@ -54,6 +54,12 @@ pub struct View {
     mark: Option<usize>,
     bars: bool,
     steps: usize,
+    /// The "new" field's text while it is being typed.
+    steps_text: String,
+    /// The last fill was Morph (spectral), not Interp.
+    fill_morph: bool,
+    /// The import form (path, Browse) is open in the editor well.
+    importing: bool,
     path: String,
     error: Option<String>,
     pending: Option<Pending>,
@@ -337,13 +343,12 @@ fn stack(
     let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
     ui_state.record("wt:stack".into(), rect);
     let p = ui.painter_at(rect);
-    kit::face::display_frame(&p, st, rect, ui.visuals().panel_fill, 1.0);
     let n = frames.len();
     let inner = rect.shrink(8.0);
-    let amp = inner.height() * 0.22;
+    let amp = (inner.height() * 0.07).max(6.0);
     let step = (inner.height() - amp * 2.0).max(1.0) / n.max(2) as f32;
-    let skew = inner.width() * 0.22 / n.max(2) as f32;
-    let wave_w = inner.width() * 0.76;
+    let skew = inner.width() * 0.4 / n.max(2) as f32;
+    let wave_w = inner.width() * 0.6;
     let base = |k: usize| {
         pos2(
             inner.left() + skew * k as f32,
@@ -354,7 +359,6 @@ fn stack(
         let b = base(k);
         Rect::from_min_size(pos2(b.x, b.y - amp), vec2(wave_w, amp * 2.0))
     };
-    let trace = kit::face::trace_color(st);
     for k in (0..n).rev() {
         let (sel, mark) = (!preview && k == v.sel, !preview && v.mark == Some(k));
         let pts = cycle_pts(lane(k), &frames[k], 96);
@@ -363,7 +367,7 @@ fn stack(
         } else if mark {
             (st.roles.warn, 1.8)
         } else {
-            (alpha(trace, 150), 1.0)
+            (alpha(st.roles.text2, 90), 1.0)
         };
         p.add(Shape::line(pts, Stroke::new(w, col)));
     }
@@ -398,7 +402,6 @@ fn wave(
     let (rect, resp) = ui.allocate_exact_size(size, Sense::click_and_drag());
     ui_state.record("wt:wave".into(), rect);
     let p = ui.painter_at(rect);
-    kit::face::display_frame(&p, st, rect, ui.visuals().panel_fill, 1.0);
     let down = resp.is_pointer_button_down_on();
     if let (true, Some(at)) = (down, ui.input(|i| i.pointer.latest_pos())) {
         let x = ((at.x - rect.left()) / rect.width()).clamp(0.0, 0.9999);
@@ -421,6 +424,11 @@ fn wave(
         v.dirty = true;
     }
     v.pen(editor, down, now);
+    p.hline(
+        rect.x_range(),
+        rect.center().y,
+        Stroke::new(1.0, st.roles.line2),
+    );
     let f = &v.frames[v.sel];
     kit::face::trace(
         &p,
@@ -443,7 +451,6 @@ fn bars(
     let (rect, resp) = ui.allocate_exact_size(size, Sense::click_and_drag());
     ui_state.record("wt:bars".into(), rect);
     let p = ui.painter_at(rect);
-    kit::face::display_frame(&p, st, rect, ui.visuals().panel_fill, 1.0);
     let w = rect.width() / ed::BARS as f32;
     let down = resp.is_pointer_button_down_on();
     if let (true, Some(at)) = (down, ui.input(|i| i.pointer.latest_pos())) {
@@ -478,139 +485,283 @@ fn button(
     r.clicked()
 }
 
-/// The stack of frames beside the pen or bars (the import preview while one is pending).
-fn main_area(
-    ui: &mut egui::Ui,
-    st: &Style,
-    ui_state: &mut UiState,
-    editor: &mut PatchEditor,
-    v: &mut View,
-    preview: &Option<Frames>,
-    now: f64,
-) {
-    ui.horizontal_top(|ui| {
-        let size = vec2(300.0, 280.0);
-        match &preview {
-            Some(frames) => stack(ui, st, ui_state, v, frames, size, true),
-            None => {
-                // The stack reads only the selection from `v`: lend it the frames by value.
-                let frames = std::mem::take(&mut v.frames);
-                stack(ui, st, ui_state, v, &frames, size, false);
-                v.frames = frames;
-            }
-        }
-        ui.vertical(|ui| {
-            kit::segmented(ui, st, |ui| {
-                let r = kit::seg(ui, st, "Draw", !v.bars);
-                ui_state.record("wt:tab-draw".into(), r.rect);
-                if r.clicked() {
-                    v.bars = false;
-                }
-                let r = kit::seg(ui, st, "Harmonics", v.bars);
-                ui_state.record("wt:tab-bars".into(), r.rect);
-                if r.clicked() {
-                    v.bars = true;
-                }
-            });
-            let size = vec2(440.0, 248.0);
-            if preview.is_some() {
-                kit::label(ui, st, Role::Body, Tone::Text2, "Previewing the import.");
-            } else if v.bars {
-                bars(ui, st, ui_state, editor, v, size, now);
-            } else {
-                wave(ui, st, ui_state, editor, v, size, now);
-            }
-        });
-    });
+fn icon_button(ui: &mut egui::Ui, st: &Style, ui_state: &mut UiState, key: &str, ic: Ic) -> bool {
+    let r = kit::icon_button(ui, st, ic, false, true);
+    ui_state.record(format!("wt:{key}"), r.rect);
+    r.clicked()
 }
 
-fn body(
+/// The rounded well the frame stack and the pen sit in.
+fn well(ui: &egui::Ui, st: &Style, rect: Rect) {
+    let r = &st.roles;
+    let fill = if st.dark { r.inset } else { r.raised };
+    ui.painter().rect(
+        rect,
+        8.0,
+        fill,
+        Stroke::new(1.0, r.line),
+        StrokeKind::Inside,
+    );
+}
+
+/// A child `Ui` in `rect` that takes no room in `ui`'s layout.
+fn child(ui: &mut egui::Ui, rect: Rect, layout: egui::Layout) -> egui::Ui {
+    ui.new_child(egui::UiBuilder::new().max_rect(rect).layout(layout))
+}
+
+/// A frame or process operation, from the right column or (compact) the More menu.
+#[derive(Clone, Copy, PartialEq)]
+enum Op {
+    Insert,
+    Dup,
+    Delete,
+    Left,
+    Right,
+    Normalise,
+    Dc,
+    Fade,
+}
+
+const FRAME_OPS: [(Op, &str, &str, Ic); 3] = [
+    (Op::Insert, "insert", "Insert", Ic::Plus),
+    (Op::Dup, "dup", "Duplicate", Ic::Copy),
+    (Op::Delete, "delete", "Delete", Ic::Trash),
+];
+const MOVE_OPS: [(Op, &str, &str); 2] = [
+    (Op::Left, "left", "Move earlier"),
+    (Op::Right, "right", "Move later"),
+];
+const PROCESS_OPS: [(Op, &str, &str); 3] = [
+    (Op::Normalise, "normalise", "Normalise"),
+    (Op::Dc, "dc", "DC"),
+    (Op::Fade, "fade", "Fade"),
+];
+
+impl View {
+    fn can(&self, op: Op) -> bool {
+        let (n, sel) = (self.frames.len(), self.sel);
+        self.pending.is_none()
+            && match op {
+                Op::Insert | Op::Dup => n < MAX_FRAMES,
+                Op::Delete => n > 1,
+                Op::Left => sel > 0,
+                Op::Right => sel + 1 < n,
+                Op::Normalise | Op::Dc | Op::Fade => true,
+            }
+    }
+
+    fn run(&mut self, editor: &mut PatchEditor, op: Op) {
+        let (sel, r) = (self.sel, self.range());
+        match op {
+            Op::Insert => {
+                self.apply(editor, |v| v.frames.insert(sel + 1, ed::sine()));
+                self.sel += 1;
+            }
+            Op::Dup => {
+                self.apply(editor, |v| {
+                    let f = v.frames[sel].clone();
+                    v.frames.insert(sel + 1, f);
+                });
+                self.sel += 1;
+            }
+            Op::Delete => self.apply(editor, |v| {
+                v.frames.remove(sel);
+            }),
+            Op::Left => {
+                self.apply(editor, |v| v.frames.swap(sel, sel - 1));
+                self.sel -= 1;
+            }
+            Op::Right => {
+                self.apply(editor, |v| v.frames.swap(sel, sel + 1));
+                self.sel += 1;
+            }
+            Op::Normalise => {
+                self.apply(editor, |v| r.for_each(|k| ed::normalise(&mut v.frames[k])))
+            }
+            Op::Dc => self.apply(editor, |v| r.for_each(|k| ed::remove_dc(&mut v.frames[k]))),
+            Op::Fade => self.apply(editor, |v| {
+                r.for_each(|k| ed::fade_edges(&mut v.frames[k], FADE))
+            }),
+        }
+    }
+
+    /// Fills `steps` frames between the selected and the shift-clicked frame.
+    fn fill(&mut self, editor: &mut PatchEditor, spectral: bool) {
+        let m = self.mark.unwrap_or(0);
+        let (a, b) = (self.sel.min(m), self.sel.max(m));
+        let steps = self.steps;
+        self.apply(editor, |v| {
+            // Adjacent frames: make room for `steps` new ones between them.
+            let b = if b == a + 1 {
+                let add = steps.min(MAX_FRAMES - v.frames.len());
+                for _ in 0..add {
+                    v.frames.insert(a + 1, ed::sine());
+                }
+                b + add
+            } else {
+                b
+            };
+            ed::fill_between(&mut v.frames, a, b, spectral);
+        });
+    }
+}
+
+/// Header: title, kind chip, file; right: undo, redo, More, Audition, Import…, close.
+/// True when closed.
+fn header(
     ui: &mut egui::Ui,
     st: &Style,
     ui_state: &mut UiState,
     editor: &mut PatchEditor,
     v: &mut View,
-    now: f64,
-) {
+    compact: bool,
+    op: &mut Option<Op>,
+) -> bool {
     let n = v.frames.len();
-    ui.horizontal(|ui| {
-        kit::label(
-            ui,
-            st,
-            Role::H3,
-            Tone::Text,
-            format!(
-                "{} · {n} frame{} · slot {}",
-                v.name,
-                if n == 1 { "" } else { "s" },
-                v.slot
-            ),
-        );
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if button(ui, st, ui_state, "redo", "Redo", true) {
-                editor.redo();
+    kit::label(ui, st, Role::H3, Tone::Text, "Wavetable");
+    if let Some(id) = v.module {
+        kit::tag(ui, st, &format!("osc.wt #{id}"), st.roles.text2);
+    }
+    kit::label(
+        ui,
+        st,
+        Role::Value,
+        Tone::Text2,
+        format!("{} · {n} frame{}", v.name, if n == 1 { "" } else { "s" }),
+    );
+    // The right group is laid out left to right (so Tab follows reading order) at the width it
+    // took last frame.
+    let wid = ui.id().with("wt-head-right");
+    let w = ui.data(|d| d.get_temp::<f32>(wid)).unwrap_or(360.0);
+    let full = ui.max_rect();
+    let rect = Rect::from_min_max(pos2(full.right() - w, full.top()), full.max);
+    let mut r = child(ui, rect, egui::Layout::left_to_right(egui::Align::Center));
+    let mut closed = false;
+    if icon_button(&mut r, st, ui_state, "undo", Ic::Undo) {
+        editor.undo();
+    }
+    if icon_button(&mut r, st, ui_state, "redo", Ic::Redo) {
+        editor.redo();
+    }
+    let more = kit::icon_menu(&mut r, st, Ic::More, |ui| {
+        let mut item = |ui: &mut egui::Ui, o: Op, key: &str, text: &str| {
+            let ok = v.can(o);
+            let resp = ui
+                .add_enabled_ui(ok, |ui| kit::menu_item(ui, st, text, false))
+                .inner;
+            ui_state.record(format!("wt:{key}"), resp.rect);
+            if resp.clicked() {
+                *op = Some(o);
+                ui.close();
             }
-            if button(ui, st, ui_state, "undo", "Undo", true) {
-                editor.undo();
+        };
+        for (o, key, text) in MOVE_OPS {
+            item(ui, o, key, text);
+        }
+        if compact {
+            kit::menu_rule(ui, st);
+            for (o, key, text, _) in FRAME_OPS {
+                item(ui, o, key, text);
             }
-            let label = if v.audition { "Stop" } else { "Audition" };
-            if button(ui, st, ui_state, "audition", label, true) {
-                if v.audition {
-                    ui_state.launches.push(Command::PreviewStop);
+            kit::menu_rule(ui, st);
+            for (o, key, text) in PROCESS_OPS {
+                item(ui, o, key, text);
+            }
+        }
+    });
+    ui_state.record("wt:more".into(), more.rect);
+    let (label, ic) = if v.audition {
+        ("Stop", Ic::Stop)
+    } else {
+        ("Audition", Ic::Play)
+    };
+    let a = r.add(Button::new(st, label).icon(ic));
+    ui_state.record("wt:audition".into(), a.rect);
+    if a.clicked() {
+        if v.audition {
+            ui_state.launches.push(Command::PreviewStop);
+        } else {
+            let mut notes = [0u8; MAX_PREVIEW_NOTES];
+            notes[0] = 48;
+            ui_state.launches.push(Command::Preview {
+                notes,
+                count: 1,
+                velocity: 100,
+                blocks: (MAX_PREVIEW_SECS * ui_state.sample_rate / kabl_engine::graph::BLOCK as f32)
+                    as u32,
+            });
+        }
+        v.audition = !v.audition;
+    }
+    let imp = r.add(
+        Button::new(st, "Import…")
+            .icon(Ic::Folder)
+            .selected(v.importing),
+    );
+    ui_state.record("wt:open-import".into(), imp.rect);
+    if imp.clicked() {
+        v.importing = !v.importing;
+        v.browse = None;
+    }
+    if icon_button(&mut r, st, ui_state, "close", Ic::Close) {
+        closed = true;
+    }
+    let used = r.min_rect().width();
+    ui.data_mut(|d| d.insert_temp(wid, used));
+    closed
+}
+
+/// The import form inside the editor well: path (Enter imports), Browse, Import; then the file
+/// browser, or what the pending import found with its frame size and "Use as table".
+fn import_form(
+    ui: &mut egui::Ui,
+    st: &Style,
+    ui_state: &mut UiState,
+    editor: &mut PatchEditor,
+    v: &mut View,
+) {
+    if v.importing {
+        ui.horizontal(|ui| {
+            let w = (ui.available_width() - 200.0).max(160.0);
+            let r = kit::field(ui, st, &mut v.path, "Path to a .wav file", None, Some(w));
+            ui_state.record("wt:path".into(), r.rect);
+            let enter = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+            if button(ui, st, ui_state, "browse", "Browse", true) {
+                if v.browse.is_some() {
+                    v.browse = None;
                 } else {
-                    let mut notes = [0u8; MAX_PREVIEW_NOTES];
-                    notes[0] = 48;
-                    ui_state.launches.push(Command::Preview {
-                        notes,
-                        count: 1,
-                        velocity: 100,
-                        blocks: (MAX_PREVIEW_SECS * ui_state.sample_rate
-                            / kabl_engine::graph::BLOCK as f32)
-                            as u32,
-                    });
+                    v.start_browse(ui_state);
                 }
-                v.audition = !v.audition;
+            }
+            let ok = !v.path.trim().is_empty();
+            if button(ui, st, ui_state, "import", "Import", ok) || (enter && ok) {
+                v.read_file();
             }
         });
-    });
-    ui.horizontal(|ui| {
-        let r = kit::field(
-            ui,
-            st,
-            &mut v.path,
-            "Path to a .wav file",
-            None,
-            Some(420.0),
-        );
-        ui_state.record("wt:path".into(), r.rect);
         ui.add_space(st.sp(1));
-        if button(ui, st, ui_state, "browse", "Browse", true) {
-            if v.browse.is_some() {
-                v.browse = None;
-            } else {
-                v.start_browse(ui_state);
-            }
-        }
-        if button(
-            ui,
-            st,
-            ui_state,
-            "import",
-            "Import",
-            !v.path.trim().is_empty(),
-        ) {
-            v.read_file();
-        }
-    });
-    if let Some(e) = &v.error {
-        kit::label(ui, st, Role::Caption, Tone::Bad, e);
     }
-    let mut use_pending = false;
-    let mut cancel = false;
-    let mut preview: Option<Arc<Vec<Vec<f32>>>> = None;
+    if let Some(b) = &mut v.browse {
+        let event = b.show(ui, st, ui_state);
+        let dir = b.dir.clone();
+        ui_state.folders_remember(Place::Wavetables, &dir);
+        match event {
+            Event::Pick(path) => {
+                v.path = path.to_string_lossy().into_owned();
+                v.browse = None;
+                v.read_file();
+            }
+            Event::Close => {
+                v.browse = None;
+                v.importing = false;
+            }
+            Event::None => {}
+        }
+        return;
+    }
+    let (mut use_pending, mut cancel) = (false, false);
     if let Some(pd) = &mut v.pending {
         match &pd.result {
-            Ok((frames, info)) => {
+            Ok((_, info)) => {
                 kit::label(ui, st, Role::Caption, Tone::Text2, Pending::text(info));
                 if info.ambiguous() {
                     kit::label(
@@ -621,7 +772,6 @@ fn body(
                         "Could be one long cycle instead: pick the frame size below.",
                     );
                 }
-                preview = Some(Arc::clone(frames));
             }
             Err(e) => {
                 kit::label(ui, st, Role::Caption, Tone::Bad, e);
@@ -630,7 +780,7 @@ fn body(
         let whole = pd.whole;
         let mut choice = pd.choice;
         ui.horizontal(|ui| {
-            kit::label(ui, st, Role::Caption, Tone::Text3, "Frame size");
+            kit::label(ui, st, Role::Caption, Tone::Text2, "Frame size");
             kit::segmented(ui, st, |ui| {
                 let r = kit::seg(ui, st, "Auto", choice.is_none());
                 ui_state.record("wt:size-auto".into(), r.rect);
@@ -658,12 +808,11 @@ fn body(
             pd.refresh();
         }
         ui.horizontal(|ui| {
-            let ok = pd.result.is_ok();
             let r = ui.add(
                 Button::new(st, "Use as table")
                     .primary()
                     .small()
-                    .enabled(ok),
+                    .enabled(pd.result.is_ok()),
             );
             ui_state.record("wt:use".into(), r.rect);
             use_pending = r.clicked();
@@ -683,84 +832,149 @@ fn body(
                 v.sel = 0;
                 v.mark = None;
             });
+            v.importing = false;
         }
     } else if cancel {
         v.pending = None;
     }
+}
 
-    ui.add_space(st.sp(1));
-    if let Some(b) = &mut v.browse {
-        let event = b.show(ui, st, ui_state);
-        let dir = b.dir.clone();
-        ui_state.folders_remember(Place::Wavetables, &dir);
-        match event {
-            Event::Pick(path) => {
-                v.path = path.to_string_lossy().into_owned();
-                v.browse = None;
-                v.read_file();
-            }
-            Event::Close => v.browse = None,
-            Event::None => {}
+/// The dock's content: header, frame stack, editor well, (1440) frame and process column,
+/// and the footer with the position slider and the fill between frames. True when closed.
+fn body(
+    ui: &mut egui::Ui,
+    st: &Style,
+    ui_state: &mut UiState,
+    editor: &mut PatchEditor,
+    v: &mut View,
+    now: f64,
+    compact: bool,
+) -> bool {
+    let a = ui.available_rect_before_wrap();
+    ui.allocate_space(a.size());
+    let mut op = None;
+    let head = Rect::from_min_max(
+        pos2(a.left(), a.top() + 6.0),
+        pos2(a.right(), a.top() + 36.0),
+    );
+    let mut h = child(ui, head, egui::Layout::left_to_right(egui::Align::Center));
+    let closed = header(&mut h, st, ui_state, editor, v, compact, &mut op);
+
+    let (top, bottom) = (a.top() + 50.0, a.bottom() - 46.0);
+    let fw = if compact { 250.0 } else { 300.0 };
+    let stack_r = Rect::from_min_max(pos2(a.left(), top), pos2(a.left() + fw, bottom));
+    let col_r = (!compact)
+        .then(|| Rect::from_min_max(pos2(a.right() - 200.0, top), pos2(a.right(), bottom)));
+    let ed_right = col_r.map_or(a.right(), |c| c.left() - 12.0);
+    let ed_r = Rect::from_min_max(pos2(stack_r.right() + 12.0, top), pos2(ed_right, bottom));
+
+    // The stack shows the import's frames while one is pending.
+    let preview = match &v.pending {
+        Some(Pending {
+            result: Ok((frames, _)),
+            ..
+        }) => Some(Arc::clone(frames)),
+        _ => None,
+    };
+    well(ui, st, stack_r);
+    let mut s = child(
+        ui,
+        stack_r.shrink2(vec2(12.0, 10.0)),
+        egui::Layout::top_down(egui::Align::Min),
+    );
+    kit::section(&mut s, st, "Frames");
+    let size = s.available_size();
+    match &preview {
+        Some(frames) => stack(&mut s, st, ui_state, v, frames, size, true),
+        None => {
+            // The stack reads only the selection from `v`: lend it the frames by value.
+            let frames = std::mem::take(&mut v.frames);
+            stack(&mut s, st, ui_state, v, &frames, size, false);
+            v.frames = frames;
         }
-    } else {
-        main_area(ui, st, ui_state, editor, v, &preview, now);
     }
 
-    ui.add_space(st.sp(1));
-    let (sel, room, can_morph) = (
-        v.sel,
-        n < MAX_FRAMES,
-        v.mark.is_some() && v.mark != Some(v.sel),
+    well(ui, st, ed_r);
+    let mut e = child(
+        ui,
+        ed_r.shrink(10.0),
+        egui::Layout::top_down(egui::Align::Min),
     );
-    let editing = preview.is_none();
-    ui.horizontal_wrapped(|ui| {
-        if button(ui, st, ui_state, "insert", "Insert", editing && room) {
-            v.apply(editor, |v| v.frames.insert(sel + 1, ed::sine()));
-            v.sel += 1;
-        }
-        if button(ui, st, ui_state, "dup", "Duplicate", editing && room) {
-            v.apply(editor, |v| {
-                let f = v.frames[sel].clone();
-                v.frames.insert(sel + 1, f);
-            });
-            v.sel += 1;
-        }
-        if button(ui, st, ui_state, "delete", "Delete", editing && n > 1) {
-            v.apply(editor, |v| {
-                v.frames.remove(sel);
-            });
-        }
-        if button(ui, st, ui_state, "left", "Move earlier", editing && sel > 0) {
-            v.apply(editor, |v| v.frames.swap(sel, sel - 1));
-            v.sel -= 1;
-        }
-        if button(
-            ui,
-            st,
-            ui_state,
-            "right",
-            "Move later",
-            editing && sel + 1 < n,
-        ) {
-            v.apply(editor, |v| v.frames.swap(sel, sel + 1));
-            v.sel += 1;
-        }
-        ui.separator();
-        let r = v.range();
-        if button(ui, st, ui_state, "normalise", "Normalise", editing) {
-            v.apply(editor, |v| r.for_each(|k| ed::normalise(&mut v.frames[k])));
-        }
-        if button(ui, st, ui_state, "dc", "Remove DC", editing) {
-            let r = v.range();
-            v.apply(editor, |v| r.for_each(|k| ed::remove_dc(&mut v.frames[k])));
-        }
-        if button(ui, st, ui_state, "fade", "Fade edges", editing) {
-            let r = v.range();
-            v.apply(editor, |v| {
-                r.for_each(|k| ed::fade_edges(&mut v.frames[k], FADE))
-            });
-        }
+    e.horizontal(|ui| {
+        kit::segmented(ui, st, |ui| {
+            let r = kit::seg(ui, st, "Draw", !v.bars);
+            ui_state.record("wt:tab-draw".into(), r.rect);
+            if r.clicked() {
+                v.bars = false;
+            }
+            let r = kit::seg(ui, st, "Harmonics", v.bars);
+            ui_state.record("wt:tab-bars".into(), r.rect);
+            if r.clicked() {
+                v.bars = true;
+            }
+        });
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let n = v.frames.len();
+            kit::label(
+                ui,
+                st,
+                Role::Value,
+                Tone::Text2,
+                format!("Frame {} / {n}", v.sel + 1),
+            );
+        });
     });
+    if let Some(err) = &v.error {
+        kit::label(&mut e, st, Role::Caption, Tone::Bad, err);
+    }
+    e.add_space(st.sp(1));
+    if v.importing || v.pending.is_some() || v.browse.is_some() {
+        import_form(&mut e, st, ui_state, editor, v);
+    } else {
+        let size = e.available_size();
+        if v.bars {
+            bars(&mut e, st, ui_state, editor, v, size, now);
+        } else {
+            wave(&mut e, st, ui_state, editor, v, size, now);
+        }
+    }
+
+    if let Some(c) = col_r {
+        let mut c = child(ui, c, egui::Layout::top_down(egui::Align::Min));
+        kit::section(&mut c, st, "Frame");
+        for (o, key, text, ic) in FRAME_OPS {
+            let r = c.add(
+                Button::new(st, text)
+                    .icon(ic)
+                    .min_width(200.0)
+                    .enabled(v.can(o)),
+            );
+            ui_state.record(format!("wt:{key}"), r.rect);
+            if r.clicked() {
+                op = Some(o);
+            }
+        }
+        c.add_space(st.sp(2));
+        kit::section(&mut c, st, "Process");
+        kit::segmented(&mut c, st, |ui| {
+            for (o, key, text) in PROCESS_OPS {
+                let r = kit::seg_enabled(ui, st, text, false, v.can(o));
+                ui_state.record(format!("wt:{key}"), r.rect);
+                if r.clicked() {
+                    op = Some(o);
+                }
+            }
+        });
+    }
+    if let Some(o) = op.filter(|&o| v.can(o)) {
+        v.run(editor, o);
+    }
+
+    let foot = Rect::from_min_max(
+        pos2(a.left(), a.bottom() - 34.0),
+        pos2(a.right(), a.bottom() - 4.0),
+    );
+    let mut f = child(ui, foot, egui::Layout::left_to_right(egui::Align::Center));
     // The module's own position, to sweep the frames while auditioning.
     if let Some(id) = v.module {
         let target = kabl_core::ParamTarget::Module {
@@ -768,8 +982,9 @@ fn body(
             param: "position".into(),
         };
         let mut pos = f64::from(editor.state().param(&target).unwrap_or(0.0));
-        ui.horizontal(|ui| {
-            kit::label(ui, st, Role::Caption, Tone::Text3, "Position");
+        kit::label(&mut f, st, Role::Body, Tone::Text, "Position");
+        let sw = (foot.width() * 0.36).min(420.0) + 56.0;
+        f.allocate_ui(vec2(sw, foot.height()), |ui| {
             let readout = format!("{pos:.2}");
             let r = kit::slider(ui, st, &mut pos, 0.0..=1.0, None, &readout);
             ui_state.record("wt:position".into(), r.rect);
@@ -782,45 +997,41 @@ fn body(
             }
         });
     }
-    ui.horizontal_wrapped(|ui| {
-        kit::label(
-            ui,
-            st,
-            Role::Caption,
-            Tone::Text3,
-            "Shift-click a second frame, then fill between:",
-        );
-        ui.add(
-            egui::DragValue::new(&mut v.steps)
-                .range(1..=16)
-                .suffix(" new"),
-        );
-        for (key, text, spectral) in [("interp", "Interpolate", false), ("morph", "Morph", true)] {
-            if button(ui, st, ui_state, key, text, editing && can_morph) {
-                let (a, b) = (
-                    v.sel.min(v.mark.unwrap_or(0)),
-                    v.sel.max(v.mark.unwrap_or(0)),
-                );
-                let steps = v.steps;
-                v.apply(editor, |v| {
-                    // Adjacent frames: make room for `steps` new ones between them.
-                    let b = if b == a + 1 {
-                        let add = steps.min(MAX_FRAMES - v.frames.len());
-                        for _ in 0..add {
-                            v.frames.insert(a + 1, ed::sine());
-                        }
-                        b + add
-                    } else {
-                        b
-                    };
-                    ed::fill_between(&mut v.frames, a, b, spectral);
-                });
+    let can_fill = v.pending.is_none() && v.mark.is_some() && v.mark != Some(v.sel);
+    f.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        let mut spectral = None;
+        kit::segmented(ui, st, |ui| {
+            // Right to left: Morph is added first.
+            for (key, text, sp) in [("morph", "Morph", true), ("interp", "Interp", false)] {
+                let r = kit::seg_enabled(ui, st, text, v.fill_morph == sp, can_fill)
+                    .on_hover_text("Shift-click a second frame in the stack, then fill between");
+                ui_state.record(format!("wt:{key}"), r.rect);
+                if r.clicked() {
+                    spectral = Some(sp);
+                }
+            }
+        });
+        kit::label(ui, st, Role::Caption, Tone::Text2, "new");
+        let r = kit::field(ui, st, &mut v.steps_text, "", None, Some(48.0));
+        ui_state.record("wt:steps".into(), r.rect);
+        if r.changed() {
+            if let Ok(k) = v.steps_text.trim().parse::<usize>() {
+                v.steps = k.clamp(1, 16);
             }
         }
+        if !r.has_focus() {
+            v.steps_text = v.steps.to_string();
+        }
+        ui.add_space(st.sp(1));
+        kit::label(ui, st, Role::Body, Tone::Text2, "Fill between frames");
+        if let Some(sp) = spectral {
+            v.fill_morph = sp;
+            v.fill(editor, sp);
+        }
     });
+    closed
 }
 
-/// The editor window, if one is open. Call once per frame.
 /// A .wav dropped on the editor window, or on an `osc.wt` display (which opens the editor for
 /// that module), is previewed as an import. Other files are ignored. Needs a host that passes
 /// file drops to the application: the standalone window does.
@@ -862,8 +1073,11 @@ fn dropped(editor: &PatchEditor, ui_state: &mut UiState, ctx: &egui::Context) {
     }
 }
 
-pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Context) {
-    dropped(editor, ui_state, ctx);
+/// The editor dock, if one is open: full rack width at the bottom, above the status bar and the
+/// Perform panel. Call once per frame, before the rack's central panel.
+pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
+    let ctx = ui.ctx().clone();
+    dropped(editor, ui_state, &ctx);
     let Some(id) = ui_state.tables.module else {
         return;
     };
@@ -882,30 +1096,52 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Contex
     }
     let st = ui_state.style.clone();
     let now = ctx.input(|i| i.time);
-    let mut open = true;
-    let below_toolbar = ui_state
-        .hits
-        .get("rack")
-        .map_or(56.0, |r| r.bottom() + 10.0);
-    egui::Window::new("Wavetable editor")
-        .id(egui::Id::new("wt-editor"))
-        // Below the toolbar (Save, the view switch), wherever the host puts it.
-        .default_pos(pos2(24.0, below_toolbar))
-        .open(&mut open)
-        .frame(kit::popover_frame(&st))
-        .collapsible(false)
-        .resizable(false)
-        .show(ctx, |ui| body(ui, &st, ui_state, editor, &mut v, now));
+    let compact = ui_state.compact;
+    let height = if compact { 280.0 } else { 330.0 };
+    let max = (ui.available_height() * 0.6).max(220.0);
+    let mut closed = false;
+    kit::g4::dock(
+        ui,
+        &st,
+        if compact {
+            "wt-dock-compact"
+        } else {
+            "wt-dock"
+        },
+        height,
+        220.0,
+        max,
+        |ui| {
+            closed = body(ui, &st, ui_state, editor, &mut v, now, compact);
+        },
+    );
+    // Escape closes the innermost layer: the browser, the pending import, the import form,
+    // then the dock. A text field or menu takes its own Escape first.
+    let esc = ctx.input(|i| i.key_pressed(egui::Key::Escape))
+        && !ctx.egui_wants_keyboard_input()
+        && !egui::Popup::is_any_open(&ctx)
+        && !ui_state.explain.typing;
+    if esc {
+        if v.browse.is_some() {
+            v.browse = None;
+        } else if v.pending.is_some() {
+            v.pending = None;
+        } else if v.importing {
+            v.importing = false;
+        } else {
+            closed = true;
+        }
+    }
     if let Some(d) = v.last_dir.take() {
         ui_state.folders_remember(Place::Wavetables, &d);
     }
-    if v.audition && !open {
+    if v.audition && closed {
         ui_state.launches.push(Command::PreviewStop);
     }
-    if open {
-        ui_state.tables = v;
-    } else {
+    if closed {
         // Closed: forget the table.
         ui_state.tables = View::default();
+    } else {
+        ui_state.tables = v;
     }
 }
