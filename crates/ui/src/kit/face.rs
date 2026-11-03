@@ -380,17 +380,23 @@ pub struct Knob {
     pub hot: bool,
 }
 
-pub fn knob(p: &Painter, st: &Style, k: &Knob, tick: Color32) {
+pub fn knob(p: &Painter, st: &Style, k: &Knob) {
     let (c, rs, z) = (k.c, k.rs, k.z);
     let r = &st.roles;
     let ks = &st.slots.knob;
     let solid = ks.body == KnobBody::Solid;
     let track = rs + 3.5 * z;
+    // The mockup's thin track: the ink at about a quarter strength.
+    let track_col = if st.dark {
+        Color32::from_rgba_unmultiplied(236, 234, 230, 66)
+    } else {
+        Color32::from_rgba_unmultiplied(26, 25, 23, 77)
+    };
     match ks.scale {
         KnobScale::TrackArc | KnobScale::Ticks => {
             p.add(Shape::line(
                 arc_pts(c, track, 0.0, 1.0),
-                Stroke::new(2.4 * z, alpha(tick, 90)),
+                Stroke::new(2.5 * z, track_col),
             ));
         }
         KnobScale::None => {}
@@ -415,27 +421,35 @@ pub fn knob(p: &Painter, st: &Style, k: &Knob, tick: Color32) {
     let rim = alpha(mix(r.knob_hi, r.knob, 0.5), 255);
     match ks.body {
         KnobBody::Solid => {
-            // Dark filled cap: drop shadow, plain skirt, four-step cap gradient, pointer.
+            // The mockup's solid cap: one drop shadow, a flat skirt, a cap at 0.78 of the radius
+            // shaded from the upper left (radial gradient in fourteen steps), a hairline rim.
             let sh = if st.dark { 115 } else { 36 };
             p.circle_filled(
-                c + vec2(0.0, 3.0 * z),
-                rs + z,
-                alpha(Color32::BLACK, sh / 4),
-            );
-            p.circle_filled(
-                c + vec2(0.0, 1.5 * z),
+                c + vec2(0.0, 2.0 * z),
                 rs + 0.5 * z,
-                alpha(Color32::BLACK, sh / 2),
+                alpha(Color32::BLACK, sh),
             );
-            p.circle_filled(c, rs, mix(r.knob, Color32::BLACK, 0.3));
-            for i in 0..4 {
-                let t = i as f32 / 3.0;
+            let skirt = if st.dark {
+                Color32::from_rgb(0x14, 0x15, 0x18)
+            } else {
+                Color32::from_rgb(0xD6, 0xD2, 0xC9)
+            };
+            p.circle_filled(c, rs, skirt);
+            let cap = rs * 0.78;
+            for i in 0..14 {
+                let t = i as f32 / 13.0;
                 p.circle_filled(
-                    c - vec2(rs * 0.06, rs * 0.08) * (1.0 - t),
-                    rs * (0.74 - 0.14 * t),
-                    mix(r.knob_hi, r.knob, t),
+                    c - vec2(cap * 0.24, cap * 0.4) * t * 0.5,
+                    cap * (1.0 - 0.8 * t),
+                    mix(r.knob, r.knob_hi, t),
                 );
             }
+            let rim = if st.dark {
+                Color32::from_white_alpha(26)
+            } else {
+                r.line2
+            };
+            p.circle_stroke(c, rs - 0.5 * z, Stroke::new(1.0, rim));
             let a = travel_angle(k.value);
             p.line_segment(
                 [on_circle(c, rs * 0.18, a), on_circle(c, rs * 0.68, a)],
