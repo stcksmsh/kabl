@@ -108,11 +108,13 @@ pub fn legible_cached(ctx: &egui::Context, st: &Style, col: Color32, alpha: f32)
     c
 }
 
-/// A hanging patch cable: a cubic with both handles pulled down by the theme's sag, more when
-/// longer. `zoom` scales the base sag.
+/// A hanging patch cable, drawn as the G4 mockup does (`cables()` in `g4-surfaces.html`): a
+/// cubic whose handles sit 15 % of the span inwards and hang by the theme's sag plus 0.28 of
+/// the length, at most 160. `zoom` scales the base sag and the limit.
 pub fn points(a: Pos2, b: Pos2, zoom: f32, sag: f32) -> Vec<Pos2> {
-    let sag = sag * zoom + 0.25 * (b - a).length();
-    let (c1, c2) = (a + vec2(0.0, sag), b + vec2(0.0, sag));
+    let d = b - a;
+    let sag = (sag * zoom + 0.28 * d.length()).min(160.0 * zoom);
+    let (c1, c2) = (a + vec2(d.x * 0.15, sag), b + vec2(-d.x * 0.15, sag));
     (0..=40)
         .map(|i| {
             let t = i as f32 / 40.0;
@@ -286,6 +288,21 @@ pub fn paint(
         .gamma_multiply(alpha);
     for e in [a, b] {
         match st.slots.plug {
+            PlugRecipe::Cap if themed && !stereo => {
+                // The G4 mockup's plug: a shadow 1.2 down (r 7.6, black 35 %), the plug in the
+                // signal colour (r 7.2) and its darker centre (r 3.2, 30 % toward black).
+                caps.push(Shape::circle_filled(
+                    e + vec2(0.0, 1.2 * z),
+                    7.6 * z,
+                    Color32::from_black_alpha((0.35 * alpha * 255.0) as u8),
+                ));
+                caps.push(Shape::circle_filled(e, 7.2 * z, col.gamma_multiply(alpha)));
+                caps.push(Shape::circle_filled(
+                    e,
+                    3.2 * z,
+                    col.lerp_to_gamma(Color32::BLACK, 0.3).gamma_multiply(alpha),
+                ));
+            }
             PlugRecipe::Cap => {
                 caps.push(Shape::circle_filled(e, w * 1.35, dark));
                 caps.push(Shape::circle_filled(e, w * 0.9, col.gamma_multiply(alpha)));

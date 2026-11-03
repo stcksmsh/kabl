@@ -615,42 +615,32 @@ pub fn jack_ch(
     let edge = mix(ro.knob, ro.knob_hi, 0.8);
     match st.slots.jack {
         JackRecipe::Hex => {
-            // Hex nut (r 11 in rack units, scaled with the jack), signal ring, hole.
+            // The G4 mockup's jack (`jack()` in `g4-surfaces.html`, solid faces), in rack units
+            // scaled with the jack: a shadow 1.5 down (r 11), a round nut (r 10.5, 1 px edge),
+            // then a signal disc (r 7.2) with the hole (r 5); stereo: the hole (r 7.6) ringed in
+            // the signal colour plus a ring at r 4.6, both 1.7 wide. A plugged cable draws its
+            // plug on top. The recipe keeps its old name, `hex`, so saved themes still load.
             let k = r / 13.0;
-            let hex = |rad: f32, dy: f32| -> Vec<Pos2> {
-                (0..6)
-                    .map(|i| {
-                        let a =
-                            std::f32::consts::FRAC_PI_6 + i as f32 * std::f32::consts::FRAC_PI_3;
-                        c + vec2(a.cos() * rad, a.sin() * rad + dy) * k
-                    })
-                    .collect()
-            };
-            let sh = if st.dark { 115 } else { 36 };
-            p.add(Shape::convex_polygon(
-                hex(11.5, 1.2),
-                alpha(Color32::BLACK, sh / 2),
-                Stroke::NONE,
-            ));
-            p.add(Shape::convex_polygon(
-                hex(11.0, 0.0),
-                st.roles.raised,
-                Stroke::new((0.8 * z).max(0.75), st.roles.line2),
-            ));
-            let ring = (1.7 * z).max(1.0);
-            if stereo {
-                p.circle_filled(c, 8.1 * k, st.jack_hole());
-                p.circle_stroke(c, 8.1 * k, Stroke::new(ring, signal));
-                p.circle_stroke(c, 5.0 * k, Stroke::new(ring, signal));
-                p.circle_filled(c, 2.4 * k, st.jack_hole());
+            let (nut, edge) = if st.dark {
+                (
+                    mix(ro.raised, ro.line2, 0.36),
+                    mix(ro.line2, ro.text, 0.067),
+                )
             } else {
-                p.circle_filled(c, 7.6 * k, signal);
-                p.circle_filled(c, 5.2 * k, st.jack_hole());
-            }
-            if patched {
-                p.circle_filled(c + vec2(0.0, 1.5 * k), 8.0 * k, alpha(Color32::BLACK, 90));
-                p.circle_filled(c, 7.5 * k, signal);
-                p.circle_filled(c - vec2(2.0, 2.0) * k, 3.0 * k, alpha(Color32::WHITE, 90));
+                (ro.raised, ro.line2)
+            };
+            let sh = if st.dark { 92 } else { 29 };
+            p.circle_filled(c + vec2(0.0, 1.5 * k), 11.0 * k, alpha(Color32::BLACK, sh));
+            p.circle_filled(c, 10.5 * k, nut);
+            p.circle_stroke(c, 10.5 * k, Stroke::new((1.0 * z).max(0.75), edge));
+            if stereo {
+                let ring = Stroke::new((1.7 * z).max(1.0), signal);
+                p.circle_filled(c, 7.6 * k, st.jack_hole());
+                p.circle_stroke(c, 7.6 * k, ring);
+                p.circle_stroke(c, 4.6 * k, ring);
+            } else {
+                p.circle_filled(c, 7.2 * k, signal);
+                p.circle_filled(c, 5.0 * k, st.jack_hole());
             }
         }
         JackRecipe::Nut => {
