@@ -408,8 +408,8 @@ fn the_panel_reads_at_both_sizes_whatever_the_rack_zoom() {
             }
         }
         // Rack zoom leaves the panel alone.
-        h.click("zoom:out");
-        h.click("zoom:out");
+        h.ui.zoom *= 0.7;
+        h.frame();
         let again: Vec<Rect> = ["1.transport", "9.cutoff_hz", "16.mix", "16.feedback"]
             .iter()
             .map(|k| h.rect(&format!("pcard:{k}")))
