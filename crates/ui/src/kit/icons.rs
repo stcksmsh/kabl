@@ -54,15 +54,6 @@ pub enum Ic {
     External,
 }
 
-fn arc(c: Pos2, r: f32, a0: f32, a1: f32) -> Vec<Pos2> {
-    (0..=12)
-        .map(|i| {
-            let a = a0 + (a1 - a0) * i as f32 / 12.0;
-            c + vec2(a.cos(), a.sin()) * r
-        })
-        .collect()
-}
-
 pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
     let u = size / 16.0;
     let st = Stroke::new((1.4 * u).max(1.2), col);
@@ -79,10 +70,12 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
             ));
         }
         Ic::Restart => {
-            p.add(Shape::line(arc(c, 6.0 * u, -PI * 0.35, PI * 1.25), st));
-            p.add(Shape::line(
-                vec![q(-1.8, -9.0), q(-5.2, -6.0), q(-1.4, -3.2)],
-                st,
+            // Back to the start, as the mockup's `restart` (M4 3.5V12.5M12 3.5L6 8L12 12.5Z).
+            line(&[(-4.0, -4.5), (-4.0, 4.5)]);
+            p.add(Shape::convex_polygon(
+                vec![q(4.0, -4.5), q(-2.0, 0.0), q(4.0, 4.5)],
+                col,
+                PathStroke::NONE,
             ));
         }
         Ic::Stop => {

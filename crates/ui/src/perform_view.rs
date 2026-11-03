@@ -110,7 +110,8 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         }
         v
     };
-    let g = st.sp(2);
+    // Card gap, as the mockup's `performScreen` (g = 16).
+    let g = st.sp(4);
     // Half a pixel short, so a row that sums to the full width does not wrap on rounding.
     let avail = ui.available_width() - 14.0 - 0.5;
     // A little under, so the last row clears the status bar and a scrollbar gutter.
@@ -1246,7 +1247,10 @@ fn macros_card(
                     st.roles.text3,
                 );
             }
-            ui.add_space(st.sp(1));
+            // The mockup puts the knob centres 160 below the top of its 390 px card.
+            let top = ui.max_rect().top() - f.inner_margin.top as f32;
+            let want = top + size.y * 160.0 / 390.0 - knob / 2.0;
+            ui.add_space((want - ui.cursor().top()).max(st.sp(1)));
             ui.horizontal_top(|ui| {
                 ui.spacing_mut().item_spacing.x = st.sp(1);
                 for &(i, pin) in pins {
@@ -1255,6 +1259,24 @@ fn macros_card(
             });
         });
     });
+}
+
+/// One line of a macro's destinations: sans 12, as in the mockup's macro card.
+fn dest_line(ui: &mut egui::Ui, st: &Style, tone: Tone, text: String) -> egui::Response {
+    let col = if tone == Tone::Text3 {
+        st.roles.text3
+    } else {
+        st.roles.text2
+    };
+    ui.add(
+        egui::Label::new(
+            RichText::new(text)
+                .font(egui::FontId::new(12.0, crate::style::Font::Sans.family(st.fonts_ready)))
+                .color(col),
+        )
+        .truncate()
+        .selectable(false),
+    )
 }
 
 /// The CC chip of a macro: the mapping (or "Learn") on a pill; click to learn another control.
@@ -1455,12 +1477,12 @@ fn macro_tile(
                     } else {
                         format!("{} +{}", moves[0], moves.len() - 1)
                     };
-                    kit::label_truncated(ui, st, Role::Caption, tone, t).tip(st, &tip);
+                    dest_line(ui, st, tone, t).tip(st, &tip);
                 } else {
                     // One destination per line, two at most; the rest as "+n more".
                     let shown = if moves.len() > 2 { 1 } else { moves.len() };
                     for m in &moves[..shown] {
-                        kit::label_truncated(ui, st, Role::Caption, tone, m.clone()).tip(st, &tip);
+                        dest_line(ui, st, tone, m.clone()).tip(st, &tip);
                     }
                     if moves.len() > shown {
                         kit::label(
