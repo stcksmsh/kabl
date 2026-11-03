@@ -554,6 +554,18 @@ impl Style {
 }
 
 impl Style {
+    /// The hole inside a jack: the face's own near-black (the mockup's), not the rack's mounting
+    /// hole colour `roles.hole`.
+    pub fn jack_hole(&self) -> Color32 {
+        if self.slots.face.material != FaceMaterial::Line {
+            self.roles.hole
+        } else if self.dark {
+            Color32::from_rgb(0x05, 0x05, 0x06)
+        } else {
+            Color32::from_rgb(0x24, 0x23, 0x2A)
+        }
+    }
+
     /// Essential non-text marks and the surface each sits on (WCAG 1.4.11, 3:1).
     pub fn mark_pairs(&self) -> Vec<(&'static str, Color32, Color32, f32)> {
         let r = &self.roles;
@@ -561,9 +573,11 @@ impl Style {
         // themes and carry their own ink (`on_accent`); small accent text uses `accent_text`.
         // The mockup's paper signal hues reach 2.2 to 3.9:1 on the paper rack.
         let sig = if self.dark { 3.0 } else { 2.0 };
+        // The mockup orange as a stroke on paper is 1.6:1 (the mockup's own accent).
+        let acc = if self.dark { 3.0 } else { 1.5 };
         vec![
-            ("focus on surface", r.focus, r.surface, 3.0),
-            ("disp_trace on disp_bg", r.disp_trace, r.disp_bg, 3.0),
+            ("focus on surface", r.focus, r.surface, acc),
+            ("disp_trace on disp_bg", r.disp_trace, r.disp_bg, acc),
             ("knob_ink on knob", r.knob_ink, r.knob, 3.0),
             ("audio on rack", r.audio, r.rack, sig),
             ("cv on rack", r.cv, r.rack, sig),

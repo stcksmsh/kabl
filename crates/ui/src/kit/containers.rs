@@ -423,7 +423,7 @@ pub fn apply(ctx: &Context, st: &Style) {
     v.selection.bg_fill = r.accent_soft;
     v.selection.stroke = Stroke::new(1.0, r.accent);
     v.text_cursor.stroke = Stroke::new(2.0, r.text);
-    v.hyperlink_color = r.focus;
+    v.hyperlink_color = r.accent_text;
     v.warn_fg_color = r.warn;
     v.error_fg_color = r.bad;
     let cr = CornerRadius::same((st.radii.sm + 1.0) as u8);

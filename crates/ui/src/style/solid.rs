@@ -98,7 +98,6 @@ fn roles(dark: bool, accent: Accent) -> Roles {
     } else {
         ("#D9781C", "#12958A", "#7651D6", "#2F7FD6")
     };
-    let base = builtin_a(dark).roles;
     let rack = if dark { "#0C0D0E" } else { "#DCD9D2" };
     // Signal colours are the mockup's (they supersede the 2026-11-01 darkened paper hues).
     let sig = h;
@@ -128,23 +127,25 @@ fn roles(dark: bool, accent: Accent) -> Roles {
         accent_text: acc_text,
         on_accent,
         accent_soft: mix(acc, h(bg), 0.8),
-        focus: acc_text,
+        focus: acc,
         audio: sig(audio),
         cv: sig(cv),
         gate: sig(gate),
         pitch: sig(pitch),
         rack: h(rack),
         rail: h(if dark { "#1B1C1F" } else { "#C9C5BC" }),
-        hole: h(if dark { "#050506" } else { "#24232A" }),
+        hole: h(if dark { "#060607" } else { "#A39E94" }),
+        good: h(if dark { "#5CCB8A" } else { "#2E9E5E" }),
+        warn: if dark { acc } else { acc_text },
+        bad: h("#E5533C"),
         disp_bg: h(inset),
         disp_grid: alpha(h(text), 20),
-        disp_trace: acc_text,
+        disp_trace: acc,
         disp_text: h(text2),
         // Caps as in the mockup's cap-hyb-d / cap-hyb-l gradients; dark pointer on paper.
         knob: h(if dark { "#1D1F23" } else { "#E2DED6" }),
         knob_hi: h(if dark { "#3C3F45" } else { "#FFFFFF" }),
         knob_ink: h(if dark { "#F2F0EB" } else { "#1A1917" }),
-        ..base
     }
 }
 
@@ -312,8 +313,8 @@ pub fn with_accent(mut style: Style, accent: Accent) -> Style {
         Color32::WHITE
     };
     r.accent_soft = mix(acc, r.bg, 0.8);
-    r.focus = acc_text;
-    r.disp_trace = acc_text;
+    r.focus = acc;
+    r.disp_trace = acc;
     style
 }
 

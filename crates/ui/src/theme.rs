@@ -95,7 +95,7 @@ pub fn theme(st: &Style) -> Theme {
         } else {
             mix(r.knob, r.knob_hi, 0.8)
         },
-        hole_c: r.hole,
+        hole_c: st.jack_hole(),
         display: r.disp_bg,
         display_ink: r.disp_trace,
         seg_bg: r.inset,

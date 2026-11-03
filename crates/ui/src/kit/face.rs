@@ -639,13 +639,13 @@ pub fn jack_ch(
             ));
             let ring = (1.7 * z).max(1.0);
             if stereo {
-                p.circle_filled(c, 8.1 * k, st.roles.hole);
+                p.circle_filled(c, 8.1 * k, st.jack_hole());
                 p.circle_stroke(c, 8.1 * k, Stroke::new(ring, signal));
                 p.circle_stroke(c, 5.0 * k, Stroke::new(ring, signal));
-                p.circle_filled(c, 2.4 * k, st.roles.hole);
+                p.circle_filled(c, 2.4 * k, st.jack_hole());
             } else {
                 p.circle_filled(c, 7.6 * k, signal);
-                p.circle_filled(c, 5.2 * k, st.roles.hole);
+                p.circle_filled(c, 5.2 * k, st.jack_hole());
             }
             if patched {
                 p.circle_filled(c + vec2(0.0, 1.5 * k), 8.0 * k, alpha(Color32::BLACK, 90));
@@ -659,10 +659,10 @@ pub fn jack_ch(
             if patched {
                 p.circle_stroke(c, r * 0.72, Stroke::new((2.2 * z).max(1.5), signal));
             }
-            p.circle_filled(c, r * 0.54, ro.hole);
+            p.circle_filled(c, r * 0.54, st.jack_hole());
         }
         JackRecipe::GlowRing => {
-            p.circle_filled(c, r, mix(ro.knob, ro.hole, 0.4));
+            p.circle_filled(c, r, mix(ro.knob, st.jack_hole(), 0.4));
             if patched {
                 let g = st.slots.knob.glow.max(0.4);
                 p.circle_stroke(
@@ -676,7 +676,7 @@ pub fn jack_ch(
                 r * 0.86,
                 Stroke::new((2.0 * z).max(1.5), if patched { signal } else { edge }),
             );
-            p.circle_filled(c, r * 0.5, ro.hole);
+            p.circle_filled(c, r * 0.5, st.jack_hole());
         }
         JackRecipe::Donut => {
             p.circle_stroke(
@@ -685,7 +685,7 @@ pub fn jack_ch(
                 Stroke::new(r * 0.44, if patched { signal } else { nut }),
             );
             p.circle_stroke(c, r, Stroke::new(1.0, edge));
-            p.circle_filled(c, r * 0.5, ro.hole);
+            p.circle_filled(c, r * 0.5, st.jack_hole());
         }
     }
     if hot {
