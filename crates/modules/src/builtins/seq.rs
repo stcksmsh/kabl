@@ -142,7 +142,7 @@ const fn length(name: &'static str) -> ParamInfo {
         min: 1.0,
         max: STEPS as f32,
         default: STEPS as f32,
-        unit: "",
+        unit: "steps",
         taper: Taper::Stepped,
         smoothing_ms: 0.0,
     }

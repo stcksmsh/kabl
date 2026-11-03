@@ -399,6 +399,7 @@ pub fn fmt_value(p: &ParamInfo, v: f32) -> String {
         "ct" => format!("{:+.0} ct", v.round() + 0.0),
         "x" => format!("{}X", v.round()),
         "bands" => format!("{}", v.round()),
+        "steps" => format!("{} steps", v.round()),
         "note" => {
             const NAMES: [&str; 12] = [
                 "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
