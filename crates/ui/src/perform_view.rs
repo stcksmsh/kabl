@@ -32,17 +32,14 @@ const FIXED_H: f32 = 64.0 + 168.0 + 132.0 + 32.0;
 /// The two-column Perform scene (transport over scenes, macros over sequences) needs this much
 /// height; the docked strip below the rack uses the flowing rows instead.
 const COLUMNS_MIN_H: f32 = 520.0;
-/// Width of the left column (transport, scenes) as a share of the view, and its limits.
 /// Height of the transport card; the scenes take the rest of the left column.
 const TRANSPORT_H: f32 = 220.0;
 /// Most other controls the two-column scene carries (one row below it).
 const COLUMNS_MAX_CONTROLS: usize = 4;
-/// Share of the right column the macros take when sequences are beside them.
 /// Knob diameter limits in the macro card, and what the card spends on everything but the knob.
 const KNOB_MIN: f32 = 64.0;
 const KNOB_MAX: f32 = 138.0;
 const MACRO_CHROME_H: f32 = 160.0;
-/// A scenes card narrower than this lays its pads out two across, with the buttons below.
 
 /// Widths for `items` (min, weight) in a row of `avail`: the minimums, plus the spare room by
 /// weight. When the minimums do not fit they stay as they are and the row wraps.

@@ -222,6 +222,15 @@ impl App {
         let mut ui = UiState::default();
         ui.theme = self.theme.clone();
         ui.dark = j.dark;
+        ui.status_meter = true;
+        // The toolbar's sound dropdown shows the mockup's sound, with an unsaved edit dot.
+        let mut doc = kabl_ui::browser::Doc::new(
+            "Acid Line",
+            kabl_ui::browser::DocOrigin::Library("factory:acid-line".into()),
+            self.editor.state(),
+        );
+        doc.meta.category = "Bass".into();
+        ui.doc = Some(doc);
         ui.library = Some(Library::open(
             Some(patches()),
             self._user.path().to_path_buf(),

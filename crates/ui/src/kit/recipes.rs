@@ -309,7 +309,7 @@ pub fn pad(
             s.to_uppercase(),
             st.font(Role::Caption),
             if state == PadState::Queued {
-                r.accent
+                r.accent_text
             } else {
                 ink2
             },

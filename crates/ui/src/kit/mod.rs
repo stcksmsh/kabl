@@ -8,6 +8,7 @@
 mod containers;
 mod controls;
 pub mod face;
+pub mod g4;
 mod icons;
 pub mod parts;
 mod recipes;
@@ -64,7 +65,7 @@ pub fn tone(st: &Style, t: Tone) -> Color32 {
         Tone::Text => r.text,
         Tone::Text2 => r.text2,
         Tone::Text3 => r.text3,
-        Tone::Accent => r.accent,
+        Tone::Accent => r.accent_text,
         Tone::OnAccent => r.on_accent,
         Tone::Good => r.good,
         Tone::Warn => r.warn,
