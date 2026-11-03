@@ -1100,37 +1100,10 @@ enum Scene {
     Sounds,
 }
 
-/// The brand mark and wordmark: an accent tile with a cable curve, then "kabl".
+/// The brand: the rebuilt kabl lockup in the text colour, 32 px high (G4 logo mockup,
+/// "Redraw lockup, text colour"); orange is for the app icon only.
 fn brand(ui: &mut egui::Ui, st: &Style) {
-    let word = ui.painter().layout_no_wrap(
-        "kabl".into(),
-        egui::FontId::new(17.0, style::Font::SansSemibold.family(st.fonts_ready)),
-        st.roles.text,
-    );
-    let s = 24.0;
-    let (r, _) = ui.allocate_exact_size(
-        egui::vec2(s + st.sp(2) + word.size().x, s),
-        egui::Sense::hover(),
-    );
-    let p = ui.painter();
-    let tile = egui::Rect::from_min_size(r.min, egui::vec2(s, s));
-    p.rect_filled(tile, 6.0, st.roles.accent);
-    let c = tile.center();
-    let pts: Vec<egui::Pos2> = (0..=16)
-        .map(|i| {
-            let t = i as f32 / 16.0;
-            let e = t * t * (3.0 - 2.0 * t);
-            c + egui::vec2(-6.0 + 12.0 * t, -5.5 + 11.0 * e)
-        })
-        .collect();
-    p.add(egui::Shape::line(
-        pts,
-        egui::Stroke::new(2.2, st.roles.on_accent),
-    ));
-    p.circle_filled(c + egui::vec2(-6.5, -5.5), 2.4, st.roles.on_accent);
-    p.circle_filled(c + egui::vec2(6.5, 5.5), 2.4, st.roles.on_accent);
-    let pos = egui::pos2(tile.right() + st.sp(2), r.center().y - word.size().y / 2.0);
-    p.galley(pos, word, st.roles.text);
+    kit::logo(ui, st, 32.0);
 }
 
 /// Adds a module of `kind` at the end of the first row and selects it.
