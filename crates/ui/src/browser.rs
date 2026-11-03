@@ -483,6 +483,7 @@ pub fn replace_patch(editor: &mut PatchEditor, ui: &mut UiState, log: PatchLog) 
     ui.clock_pos.clear();
     ui.lfo_status.clear();
     ui.edit_bank.clear();
+    ui.edit_page.clear();
     ui.selected_module = None;
     ui.inspected = None;
     ui.selected_route = None;

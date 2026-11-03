@@ -426,6 +426,7 @@ pub(crate) fn more(
             expanded: Some(&view.expanded),
             float: true,
             edit_banks: Some(&view.edit_view),
+            edit_pages: Some(&view.edit_page),
             skins: view.skins,
             ..Default::default()
         },

@@ -3,6 +3,7 @@
 fn level_trim(slug: &str) -> f32 {
     match slug {
         "boxwood" => -1.0,
+        "slab-city" => 2.3,
         "brass-filament" => -2.0,
         "cellar-door" => -3.0,
         "checkerboard" => -0.5,

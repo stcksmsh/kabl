@@ -51,7 +51,14 @@ use crate::info::{
 use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig, StateReader, StateWriter};
 
-pub const STEPS: usize = 8;
+pub const STEPS: usize = 32;
+/// The steps every older patch has; steps past it append after all older params.
+const OLD_STEPS: usize = 8;
+const EXTRA: usize = STEPS - OLD_STEPS;
+#[macro_use]
+mod steps {
+    include!("seq_steps.rs");
+}
 pub const BANKS: usize = 4;
 pub const BANK_NAMES: [&str; BANKS] = ["A", "B", "C", "D"];
 
@@ -141,7 +148,7 @@ const fn length(name: &'static str) -> ParamInfo {
         name,
         min: 1.0,
         max: STEPS as f32,
-        default: STEPS as f32,
+        default: OLD_STEPS as f32,
         unit: "",
         taper: Taper::Stepped,
         smoothing_ms: 0.0,
@@ -203,33 +210,66 @@ macro_rules! bank {
 
 /// Params per bank, in slot order. The first `OLD_SLOTS` are laid out as they always were; the
 /// ratchets (slots `S_RATCH..`) come after every other param so no older index moves.
-pub const SLOTS: usize = 43;
+const BASE_SLOTS: usize = 43;
+/// Bank slots 0..43 are the original ones; then p9..p32, g9..g32, v9..v32, r9..r32, k9..k32.
+pub const SLOTS: usize = BASE_SLOTS + 5 * EXTRA;
 const OLD_SLOTS: usize = 35;
 const S_RATCH: usize = OLD_SLOTS;
-const S_GATE: usize = STEPS;
-const S_LENGTH: usize = 2 * STEPS;
-const S_VEL: usize = 2 * STEPS + 1;
-const S_GATE_LEN: usize = 3 * STEPS + 1;
-const S_GATE_MODE: usize = 3 * STEPS + 2;
-const S_PROB: usize = 3 * STEPS + 3;
+const S_GATE: usize = OLD_STEPS;
+const S_LENGTH: usize = 2 * OLD_STEPS;
+const S_VEL: usize = 2 * OLD_STEPS + 1;
+const S_GATE_LEN: usize = 3 * OLD_STEPS + 1;
+const S_GATE_MODE: usize = 3 * OLD_STEPS + 2;
+const S_PROB: usize = 3 * OLD_STEPS + 3;
 
-const A: [ParamInfo; SLOTS] = bank!("");
-const B: [ParamInfo; SLOTS] = bank!("b.");
-const C: [ParamInfo; SLOTS] = bank!("c.");
-const D: [ParamInfo; SLOTS] = bank!("d.");
+/// Slot of step `k` of a per-step kind: `base` is its first old slot, `kind` its index among
+/// p, g, v, r, k.
+const fn step_slot(base: usize, kind: usize, k: usize) -> usize {
+    if k < OLD_STEPS {
+        base + k
+    } else {
+        BASE_SLOTS + kind * EXTRA + k - OLD_STEPS
+    }
+}
+
+const fn join(a: [ParamInfo; BASE_SLOTS], e: [ParamInfo; 5 * EXTRA]) -> [ParamInfo; SLOTS] {
+    let mut out = [a[0]; SLOTS];
+    let mut i = 0;
+    while i < SLOTS {
+        out[i] = if i < BASE_SLOTS {
+            a[i]
+        } else {
+            e[i - BASE_SLOTS]
+        };
+        i += 1;
+    }
+    out
+}
+
+#[allow(clippy::large_const_arrays)] // const-evaluated layout tables, never indexed at run time by value
+const A: [ParamInfo; SLOTS] = join(bank!(""), extra!(""));
+#[allow(clippy::large_const_arrays)] // const-evaluated layout tables, never indexed at run time by value
+const B: [ParamInfo; SLOTS] = join(bank!("b."), extra!("b."));
+#[allow(clippy::large_const_arrays)] // const-evaluated layout tables, never indexed at run time by value
+const C: [ParamInfo; SLOTS] = join(bank!("c."), extra!("c."));
+#[allow(clippy::large_const_arrays)] // const-evaluated layout tables, never indexed at run time by value
+const D: [ParamInfo; SLOTS] = join(bank!("d."), extra!("d."));
 
 const TRANSPOSE_PARAM: usize = S_LENGTH + 1;
 const DIRECTION_PARAM: usize = OLD_SLOTS + 1;
 const BANK_PARAM: usize = OLD_SLOTS + 2;
 const BANK_B: usize = OLD_SLOTS + 3;
-/// Bank `b`'s ratchets start at `RATCH_BASE + b * STEPS`.
+/// Bank `b`'s ratchets start at `RATCH_BASE + b * OLD_STEPS`.
 const RATCH_BASE: usize = BANK_B + 3 * OLD_SLOTS;
+/// Bank `b`'s steps 9..32 start at `EXTRA_BASE + b * 5 * EXTRA`.
+const EXTRA_BASE: usize = RATCH_BASE + BANKS * OLD_STEPS;
 
 /// Bank A's first 28 params keep their historic order and indices (`p1..p8`, `g1..g8`,
 /// `length`, `transpose`, `v1..v8`, `gate_len`, `gate_mode`); then `r1..r8`, `direction`,
 /// `bank`, and banks B, C, D in slot order. `param_index` relies on this layout.
-const PARAMS: [ParamInfo; RATCH_BASE + BANKS * STEPS] = {
-    let mut out = [A[0]; RATCH_BASE + BANKS * STEPS];
+#[allow(clippy::large_const_arrays)] // const-evaluated layout tables, never indexed at run time by value
+const PARAMS: [ParamInfo; EXTRA_BASE + BANKS * 5 * EXTRA] = {
+    let mut out = [A[0]; EXTRA_BASE + BANKS * 5 * EXTRA];
     let mut i = 0;
     while i < OLD_SLOTS {
         out[if i <= S_LENGTH { i } else { i + 1 }] = A[i];
@@ -239,11 +279,19 @@ const PARAMS: [ParamInfo; RATCH_BASE + BANKS * STEPS] = {
         i += 1;
     }
     i = 0;
-    while i < STEPS {
+    while i < OLD_STEPS {
         out[RATCH_BASE + i] = A[S_RATCH + i];
-        out[RATCH_BASE + STEPS + i] = B[S_RATCH + i];
-        out[RATCH_BASE + 2 * STEPS + i] = C[S_RATCH + i];
-        out[RATCH_BASE + 3 * STEPS + i] = D[S_RATCH + i];
+        out[RATCH_BASE + OLD_STEPS + i] = B[S_RATCH + i];
+        out[RATCH_BASE + 2 * OLD_STEPS + i] = C[S_RATCH + i];
+        out[RATCH_BASE + 3 * OLD_STEPS + i] = D[S_RATCH + i];
+        i += 1;
+    }
+    i = 0;
+    while i < 5 * EXTRA {
+        out[EXTRA_BASE + i] = A[BASE_SLOTS + i];
+        out[EXTRA_BASE + 5 * EXTRA + i] = B[BASE_SLOTS + i];
+        out[EXTRA_BASE + 10 * EXTRA + i] = C[BASE_SLOTS + i];
+        out[EXTRA_BASE + 15 * EXTRA + i] = D[BASE_SLOTS + i];
         i += 1;
     }
     out[TRANSPOSE_PARAM] = pitch("transpose", 0.0);
@@ -255,8 +303,10 @@ const PARAMS: [ParamInfo; RATCH_BASE + BANKS * STEPS] = {
 
 /// Index in `SEQ_INFO.params` of `slot` in `bank`.
 pub const fn param_index(bank: usize, slot: usize) -> usize {
-    if slot >= S_RATCH {
-        RATCH_BASE + bank * STEPS + (slot - S_RATCH)
+    if slot >= BASE_SLOTS {
+        EXTRA_BASE + bank * 5 * EXTRA + (slot - BASE_SLOTS)
+    } else if slot >= S_RATCH {
+        RATCH_BASE + bank * OLD_STEPS + (slot - S_RATCH)
     } else if bank == 0 {
         if slot <= S_LENGTH {
             slot
@@ -279,6 +329,26 @@ pub fn bank_of(name: &str) -> Option<(usize, usize)> {
         .map(|slot| (bank, slot))
 }
 
+/// True for a per-step value (`p3`, `c.v12`, `k32`): patch data, never a host automation target.
+/// Module-wide and per-bank controls (`length`, `transpose`, `gate_len`, `gate_mode`) are not steps.
+pub fn is_step_param(name: &str) -> bool {
+    step_of(name).is_some()
+}
+
+/// `(kind, step)` of a per-step param name: `"c.v12"` is `('v', 12)`, steps counted from 1.
+pub fn step_of(name: &str) -> Option<(char, usize)> {
+    let bare = name.split_once('.').map_or(name, |(_, rest)| rest);
+    let mut chars = bare.chars();
+    let kind = chars.next().filter(|c| "pgvrk".contains(*c))?;
+    let n: usize = chars.as_str().parse().ok()?;
+    (1..=STEPS).contains(&n).then_some((kind, n))
+}
+
+/// Slot of step `k` (0-based, 0..32)'s pitch.
+pub const fn pitch_slot(k: usize) -> usize {
+    step_slot(0, 0, k)
+}
+
 /// The same slot's param name in `bank`.
 pub fn bank_param(bank: usize, slot: usize) -> &'static str {
     PARAMS[param_index(bank, slot)].name
@@ -296,7 +366,7 @@ pub fn slot_name(name: &str) -> &str {
 /// probability, the default length and gate settings.
 pub fn cleared(slot: usize) -> f32 {
     match slot {
-        s if s < STEPS => 0.0,
+        s if s < OLD_STEPS => 0.0,
         s if s < S_LENGTH => 0.0,
         s => A[s].default,
     }
@@ -457,7 +527,7 @@ impl Seq {
         Seq {
             s: St {
                 // Parked on the last step (the next edge plays the start step).
-                step: STEPS - 1,
+                step: OLD_STEPS - 1,
                 up: true,
                 bank: 0,
                 started: false,
@@ -581,11 +651,15 @@ impl Module for Seq {
         let dir = Direction::from_param(io.param(DIRECTION_PARAM).at(0));
         let p = |io: &ProcessIo, b: usize, slot: usize| io.param(param_index(b, slot)).at(0);
         let banks: [Bank; BANKS] = std::array::from_fn(|b| Bank {
-            pitches: std::array::from_fn(|k| p(io, b, k).round() + transpose),
-            gates: std::array::from_fn(|k| p(io, b, S_GATE + k) >= 0.5),
-            velocities: std::array::from_fn(|k| (p(io, b, S_VEL + k) / 100.0).clamp(0.0, 1.0)),
-            probs: std::array::from_fn(|k| p(io, b, S_PROB + k)),
-            ratchets: std::array::from_fn(|k| (p(io, b, S_RATCH + k).round() as u8).clamp(1, 4)),
+            pitches: std::array::from_fn(|k| p(io, b, step_slot(0, 0, k)).round() + transpose),
+            gates: std::array::from_fn(|k| p(io, b, step_slot(S_GATE, 1, k)) >= 0.5),
+            velocities: std::array::from_fn(|k| {
+                (p(io, b, step_slot(S_VEL, 2, k)) / 100.0).clamp(0.0, 1.0)
+            }),
+            probs: std::array::from_fn(|k| p(io, b, step_slot(S_PROB, 3, k))),
+            ratchets: std::array::from_fn(|k| {
+                (p(io, b, step_slot(S_RATCH, 4, k)).round() as u8).clamp(1, 4)
+            }),
             length: (p(io, b, S_LENGTH).round() as usize).clamp(1, STEPS),
             timed: p(io, b, S_GATE_MODE) >= 0.5,
             gate_len: (p(io, b, S_GATE_LEN) / 100.0).clamp(0.01, 1.0),
