@@ -8,6 +8,7 @@ use std::f32::consts::PI;
 pub enum Ic {
     Play,
     Stop,
+    Restart,
     Undo,
     Redo,
     Search,
@@ -65,6 +66,15 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
         Ic::Play => {
             p.add(Shape::convex_polygon(
                 vec![q(-4.0, -6.0), q(6.0, 0.0), q(-4.0, 6.0)],
+                col,
+                PathStroke::NONE,
+            ));
+        }
+        Ic::Restart => {
+            // Back to the start, as the mockup's `restart` (M4 3.5V12.5M12 3.5L6 8L12 12.5Z).
+            line(&[(-4.0, -4.5), (-4.0, 4.5)]);
+            p.add(Shape::convex_polygon(
+                vec![q(4.0, -4.5), q(-2.0, 0.0), q(4.0, 4.5)],
                 col,
                 PathStroke::NONE,
             ));

@@ -310,9 +310,10 @@ pub fn launch(
 }
 
 /// How cue `n` stands against what the sequencers report (`bank_of`: playing, queued):
-/// `(active, queued)`. Active: every target plays its bank with nothing else queued. Queued:
-/// once what is queued lands, every target will play its bank, and one of them is still
-/// waiting (a cue sharing only some banks with the queued one is not shown as queued).
+/// `(active, queued)`. Active: every target plays its bank now, so it stays what you hear
+/// while another cue waits for the bar. Queued: once what is queued lands, every target will
+/// play its bank, and one of them is still waiting (a cue sharing only some banks with the
+/// queued one is not shown as queued). A cue is never both: queued wins.
 pub fn standing(cue: &Cue, bank_of: &dyn Fn(ModuleId) -> (usize, Option<usize>)) -> (bool, bool) {
     if cue.targets.is_empty() {
         return (false, false);
@@ -322,8 +323,9 @@ pub fn standing(cue: &Cue, bank_of: &dyn Fn(ModuleId) -> (usize, Option<usize>))
         queued.unwrap_or(playing) == b
     };
     let waiting = cue.targets.iter().any(|&(s, b)| bank_of(s).1 == Some(b));
-    let all = cue.targets.iter().all(lands);
-    (all && !waiting, all && waiting)
+    let queued = waiting && cue.targets.iter().all(lands);
+    let playing = cue.targets.iter().all(|&(s, b)| bank_of(s).0 == b);
+    (playing && !queued, queued)
 }
 
 /// `standing` for the drawn cues: a cue with no sequencer has no banks to show it playing, so
