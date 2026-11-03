@@ -661,6 +661,7 @@ fn save_targets_the_current_patch_while_comparing() {
     h.ui.compare.open = true;
     h.ui.inspect.open = true;
     h.frame();
+    h.click("sound-menu");
     h.click("save-as");
     match h.ui.browser.dialog.as_mut() {
         Some(Dialog::SaveAs { name, .. }) => *name = "Compared".into(),
@@ -699,6 +700,7 @@ fn escape_in_a_dialog_over_inspection_and_comparison_closes_only_the_dialog() {
     assert!(h.ui.browser.dialog.is_none());
     assert!(h.ui.inspect.open && h.ui.compare.open && h.ui.inspect.sel.is_some());
     // Rename over the same.
+    h.click("sound-menu");
     h.click("save-as");
     match h.ui.browser.dialog.as_mut() {
         Some(Dialog::SaveAs { name, .. }) => *name = "Mine".into(),
