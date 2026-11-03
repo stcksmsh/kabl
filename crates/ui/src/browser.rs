@@ -997,40 +997,66 @@ fn sound_cols(rect: Rect, st: &Style) -> [f32; 3] {
 }
 
 /// A read-only macro knob: skirt, accent value arc, pointer, name below.
-fn macro_knob(ui: &mut egui::Ui, st: &Style, name: &str, v: f32, w: f32) {
-    let r = st.sp(5) - st.sp(1);
-    let h = 2.0 * r + st.sp(4);
+fn macro_knob(ui: &mut egui::Ui, st: &Style, name: &str, v: f32, w: f32, compact: bool) {
+    // The mockup's detail knobs: a disc of r 22 (18 compact) inside a 4 px accent arc.
+    let r = if compact { 18.0 } else { 22.0 };
+    let ring = r + 5.0;
+    let h = 2.0 * ring + st.sp(4) + st.sp(1);
     let (rect, _) = ui.allocate_exact_size(vec2(w, h), Sense::hover());
-    let c = pos2(rect.center().x, rect.top() + r + st.sp(1));
+    let c = pos2(rect.center().x, rect.top() + ring + 2.0);
+    let v = v.clamp(0.0, 1.0);
     let at = |t: f32, rad: f32| {
         let a = (135.0 + 270.0 * t).to_radians();
         c + vec2(a.cos(), a.sin()) * rad
     };
+    let arc = |t: f32| -> Vec<egui::Pos2> {
+        (0..=32).map(|i| at(t * i as f32 / 32.0, ring)).collect()
+    };
     let p = ui.painter();
-    p.circle_filled(c, r, st.roles.inset);
+    let track = egui::Stroke::new(4.0, st.roles.inset);
+    p.add(egui::Shape::line(arc(1.0), track));
+    if v > 0.0 {
+        p.add(egui::Shape::line(arc(v), egui::Stroke::new(4.0, st.roles.accent)));
+    }
+    p.circle_filled(c, r, st.roles.raised);
     p.circle_stroke(c, r, egui::Stroke::new(1.0, st.roles.line2));
-    let ring = r + st.sp(0) * 1.5;
-    let pts: Vec<_> = (0..=24)
-        .map(|i| at(v.clamp(0.0, 1.0) * i as f32 / 24.0, ring))
-        .collect();
-    p.add(egui::Shape::line(
-        pts,
-        egui::Stroke::new(st.sp(0), st.roles.accent),
-    ));
     p.line_segment(
-        [
-            at(v.clamp(0.0, 1.0), r * 0.35),
-            at(v.clamp(0.0, 1.0), r * 0.9),
-        ],
-        egui::Stroke::new(st.sp(0), st.roles.text),
+        [at(v, r * 0.3), at(v, r * 0.8)],
+        egui::Stroke::new(2.2, st.roles.text),
     );
     p.text(
-        pos2(rect.center().x, rect.bottom() - st.sp(1)),
+        pos2(rect.center().x, rect.bottom() - 1.0),
         egui::Align2::CENTER_BOTTOM,
         name,
         st.font(Role::Label),
         st.roles.text,
     );
+}
+
+/// A waveform well under the title. ponytail: decorative (the mockup's damped sine); a real
+/// preview needs an offline render of the sound, add when the engine can render a snippet.
+fn preview_well(ui: &mut egui::Ui, st: &Style, h: f32) {
+    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), h), Sense::hover());
+    let p = ui.painter();
+    p.rect_filled(rect, st.radius(crate::style::Rad::Md), st.roles.disp_bg);
+    let pts: Vec<egui::Pos2> = (0..=80)
+        .map(|i| {
+            let f = i as f32 / 80.0;
+            let y = (f * std::f32::consts::PI * 6.0).sin() * h * 0.32 * (1.0 - 0.6 * ((f * 3.0) % 1.0));
+            pos2(rect.left() + 8.0 + f * (rect.width() - 16.0), rect.center().y - y)
+        })
+        .collect();
+    p.add(egui::Shape::line(pts, egui::Stroke::new(2.0, st.roles.disp_trace)));
+}
+
+/// `s` cut at a word boundary within `max` characters, with an ellipsis when it was longer.
+fn clamp_words(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        return s.to_string();
+    }
+    let cut: String = s.chars().take(max).collect();
+    let cut = cut.rsplit_once(' ').map_or(cut.as_str(), |(a, _)| a);
+    format!("{}…", cut.trim_end_matches(|c: char| !c.is_alphanumeric()))
 }
 
 /// One sound as a row: star, name, macro names, tags.
@@ -1609,34 +1635,25 @@ fn detail_column(
                     kit::section(ui, st, kicker);
                     kit::label_truncated(ui, st, Role::Display, Tone::Text, &e.meta.name);
                     if !e.meta.description.is_empty() {
-                        kit::paragraph(ui, st, Role::Body, Tone::Text2, &e.meta.description);
+                        // Two lines at most; the full text is the tooltip.
+                        let short = clamp_words(&e.meta.description, 90);
+                        kit::paragraph(ui, st, Role::Body, Tone::Text2, &short)
+                            .tip(st, &e.meta.description);
                     }
-                    ui.horizontal(|ui| {
-                        badge(ui, st, &e.meta);
-                        if e.origin == Origin::User {
-                            let r = ui.add(kit::Button::new(st, "Rename").small().ghost());
-                            hit(ui_state, "rename", &r);
-                            if r.clicked() {
-                                ui_state.browser.dialog = Some(Dialog::Rename {
-                                    id: e.id.clone(),
-                                    name: e.meta.name.clone(),
-                                    error: None,
-                                });
-                            }
-                        }
-                    });
+                    let compact = ui.available_width() < 330.0;
+                    kit::gap(ui, st, 1);
+                    preview_well(ui, st, if compact { 84.0 } else { 110.0 });
                     let mut one = 1;
                     let macros = macros_cached(&mut ui_state.browser, e, &mut one).to_vec();
                     if !macros.is_empty() {
                         kit::gap(ui, st, 1);
                         kit::section(ui, st, "Macros");
-                        let per_row = 4;
-                        for chunk in macros.chunks(per_row) {
+                        for chunk in macros.chunks(4) {
                             ui.horizontal(|ui| {
                                 ui.spacing_mut().item_spacing.x = 0.0;
-                                let w = ui.available_width() / per_row as f32;
+                                let w = ui.available_width() / 4.0;
                                 for (name, v) in chunk {
-                                    macro_knob(ui, st, name, *v, w);
+                                    macro_knob(ui, st, name, *v, w, compact);
                                 }
                             });
                         }
@@ -1653,14 +1670,61 @@ fn detail_column(
                     if r.clicked() {
                         *open = Some(e.id.clone());
                     }
-                    let r = ui
-                        .add(kit::Button::new(st, "Open in rack").min_width(ui.available_width()))
-                        .tip(st, "Load into the rack and show the rack");
-                    hit(ui_state, "open-rack", &r);
-                    if r.clicked() {
-                        *open = Some(e.id.clone());
-                        ui_state.browser_open = false;
-                    }
+                    ui.horizontal(|ui| {
+                        let gap = st.sp(1);
+                        ui.spacing_mut().item_spacing.x = gap;
+                        let w = (ui.available_width() - gap) / 2.0;
+                        let (keys, sequence) = Meta::play_of(editor.state());
+                        let r = ui
+                            .add(
+                                kit::Button::new(st, "Audition")
+                                    .min_width(w)
+                                    .enabled(keys || sequence),
+                            )
+                            .tip(st, "Play the sound in the rack; options below");
+                        hit(ui_state, "audition", &r);
+                        if r.clicked() {
+                            if keys {
+                                let a = &ui_state.browser.audition;
+                                let (cmd, secs) = (a.command(ui_state.sample_rate), a.secs as f64);
+                                ui_state.launches.push(cmd);
+                                let now = ui.input(|i| i.time);
+                                ui_state.browser.preview_until = Some(now + secs);
+                            } else {
+                                let clocks = editor
+                                    .state()
+                                    .modules
+                                    .iter()
+                                    .filter(|(_, m)| m.kind == "clock")
+                                    .map(|(&id, _)| (id, Transport::Run));
+                                ui_state.transport.extend(clocks);
+                            }
+                        }
+                        let r = ui
+                            .add(kit::Button::new(st, "Open in rack").min_width(w))
+                            .tip(st, "Load into the rack and show the rack");
+                        hit(ui_state, "open-rack", &r);
+                        if r.clicked() {
+                            *open = Some(e.id.clone());
+                            ui_state.browser_open = false;
+                        }
+                    });
+                    // Quiet facts below the buttons.
+                    kit::gap(ui, st, 1);
+                    ui.horizontal(|ui| {
+                        badge(ui, st, &e.meta);
+                        if e.origin == Origin::User {
+                            let r = ui.add(kit::Button::new(st, "Rename").small().ghost());
+                            hit(ui_state, "rename", &r);
+                            if r.clicked() {
+                                ui_state.browser.dialog = Some(Dialog::Rename {
+                                    id: e.id.clone(),
+                                    name: e.meta.name.clone(),
+                                    error: None,
+                                });
+                            }
+                        }
+                    });
                     if !e.meta.tags.is_empty() {
                         let tags = format!("tags: {}", e.meta.tags.join(", "));
                         kit::label_truncated(ui, st, Role::Caption, Tone::Text3, &tags)
