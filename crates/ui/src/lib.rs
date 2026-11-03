@@ -951,7 +951,7 @@ pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui)
 
     if perform_full {
         egui::CentralPanel::default()
-            .frame(kit::panel_frame(&st))
+            .frame(kit::page_frame(&st))
             .show(ui, |ui| perform_view::panel(editor, ui_state, ui));
     } else {
         egui::CentralPanel::default()
@@ -4092,6 +4092,7 @@ fn draw_port_drag(
         ));
         routing::pill(
             &tip,
+            &ui_state.style,
             b - EguiVec2::new(0.0, 14.0),
             &format!(
                 "Release to modulate {label} ({:+.0} %)",

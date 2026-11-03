@@ -138,6 +138,7 @@ fn light_parts() -> (Roles, Sections, [Shadow; 3]) {
         Roles {
             bg: h("#e7e2d6"),
             surface: h("#f3efe5"),
+            bar: h("#f3efe5"),
             raised: h("#fbf9f3"),
             inset: h("#dcd5c5"),
             line: h("#cbc3b0"),
@@ -146,6 +147,7 @@ fn light_parts() -> (Roles, Sections, [Shadow; 3]) {
             text2: h("#5a5347"),
             text3: h("#8a8272"),
             accent: h("#b8501f"),
+            accent_text: h("#b8501f"),
             on_accent: h("#fff8ef"),
             accent_soft: h("#f0d9c9"),
             focus: h("#2a6ae0"),
@@ -200,6 +202,7 @@ fn dark_parts() -> (Roles, Sections, [Shadow; 3]) {
         Roles {
             bg: h("#161412"),
             surface: h("#1f1c19"),
+            bar: h("#1f1c19"),
             raised: h("#292520"),
             inset: h("#110f0d"),
             line: h("#3a352e"),
@@ -208,6 +211,7 @@ fn dark_parts() -> (Roles, Sections, [Shadow; 3]) {
             text2: h("#b9af9c"),
             text3: h("#7f7769"),
             accent: h("#f0a04b"),
+            accent_text: h("#f0a04b"),
             on_accent: h("#26180a"),
             accent_soft: h("#4a3620"),
             focus: h("#6aa4ff"),
@@ -387,6 +391,7 @@ fn b_light_parts() -> (Roles, Sections, [Shadow; 3]) {
         Roles {
             bg: h("#e6e9f0"),
             surface: h("#f4f6fa"),
+            bar: h("#f4f6fa"),
             raised: h("#ffffff"),
             inset: h("#dce1ea"),
             line: h("#c8cfdb"),
@@ -395,6 +400,7 @@ fn b_light_parts() -> (Roles, Sections, [Shadow; 3]) {
             text2: h("#464e60"),
             text3: h("#7b8396"),
             accent: h("#3b4fe0"),
+            accent_text: h("#3b4fe0"),
             on_accent: h("#ffffff"),
             accent_soft: h("#dbe0fb"),
             focus: h("#3b4fe0"),
@@ -433,6 +439,7 @@ fn b_dark_parts() -> (Roles, Sections, [Shadow; 3]) {
         Roles {
             bg: h("#0d0e12"),
             surface: h("#15171d"),
+            bar: h("#15171d"),
             raised: h("#1e2129"),
             inset: h("#090a0d"),
             line: h("#292d38"),
@@ -441,6 +448,7 @@ fn b_dark_parts() -> (Roles, Sections, [Shadow; 3]) {
             text2: h("#a5abbb"),
             text3: h("#6c7388"),
             accent: h("#7f8bff"),
+            accent_text: h("#7f8bff"),
             on_accent: h("#0b0d1f"),
             accent_soft: h("#24285a"),
             focus: h("#9aa4ff"),
