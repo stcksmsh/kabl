@@ -49,6 +49,7 @@ pub fn theme(st: &Style) -> Theme {
     let r = &st.roles;
     let dark = st.dark;
     let accent_pill = st.slots.selector == crate::style::SelectorRecipe::AccentPill;
+    let line = st.slots.face.material == crate::style::FaceMaterial::Line;
     Theme {
         dark,
         chrome: r.bg,
@@ -71,11 +72,30 @@ pub fn theme(st: &Style) -> Theme {
         knob: r.knob,
         knob_hi: r.knob_hi,
         pointer: r.knob_ink,
-        skirt: mix(r.knob, r.knob_hi, 0.25),
+        skirt: if line && !dark {
+            hex("#D6D2C9")
+        } else if line {
+            hex("#141518")
+        } else {
+            mix(r.knob, r.knob_hi, 0.25)
+        },
         tick: r.text2,
-        nut: mix(r.knob, r.knob_hi, 0.35),
-        nut_edge: mix(r.knob, r.knob_hi, 0.8),
-        hole_c: r.hole,
+        // Line art hardware, as in the mockup: white nuts on paper, dark nuts on graphite.
+        nut: if line && !dark {
+            r.raised
+        } else if line {
+            hex("#2B2D32")
+        } else {
+            mix(r.knob, r.knob_hi, 0.35)
+        },
+        nut_edge: if line && !dark {
+            r.line2
+        } else if line {
+            hex("#45484E")
+        } else {
+            mix(r.knob, r.knob_hi, 0.8)
+        },
+        hole_c: st.jack_hole(),
         display: r.disp_bg,
         display_ink: r.disp_trace,
         seg_bg: r.inset,
@@ -206,7 +226,12 @@ pub fn panel_theme(st: &Style, kind: &str) -> Theme {
     let mut t = theme(st);
     let sec = st.section_of(kind);
     t.panel = sec.base;
-    t.panel_edge = t.panel.lerp_to_gamma(Color32::BLACK, 0.3);
+    t.panel_edge = if st.slots.face.material == crate::style::FaceMaterial::Line {
+        // Line art: the text colour at 26 % (graphite) or 30 % (paper) over the face.
+        mix(t.panel, st.roles.text, if st.dark { 0.26 } else { 0.30 })
+    } else {
+        t.panel.lerp_to_gamma(Color32::BLACK, 0.3)
+    };
     t.ink = sec.ink;
     t.ink2 = sec.ink2;
     if st.slots.face.material == crate::style::FaceMaterial::Line
