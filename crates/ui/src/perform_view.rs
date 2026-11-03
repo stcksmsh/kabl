@@ -175,7 +175,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         let tile = if spread { TILE_MIN } else { TILE_W };
         (
             // Five or more macros share one row: the tiles narrow before the row wraps.
-            (n * tile + (n - 1.0) * st.sp(1) + st.sp(3) * 2.0).min(avail),
+            (n * tile + (n - 1.0) * st.sp(1) + st.sp(4) * 2.0).min(avail),
             if spread { n } else { 0.0 },
         )
     }));
@@ -544,7 +544,10 @@ fn shell(
     add: impl FnOnce(&mut egui::Ui, &mut UiState),
 ) -> egui::Rect {
     let r = ui.allocate_ui_with_layout(size, Layout::top_down(egui::Align::Min), |ui| {
-        let f = kit::card_frame(st);
+        // The mockup's Perform cards (`card()` in directions.html) pad 16 at the sides; the
+        // card's own 12 above and below keeps the title on the mockup's line.
+        let f = kit::card_frame(st)
+            .inner_margin(egui::Margin::symmetric(st.sp(4) as i8, st.sp(3) as i8));
         let m = f.inner_margin.sum();
         f.show(ui, |ui| {
             ui.set_width(size.x - m.x);
@@ -728,6 +731,7 @@ fn pin_title(
         })
         .font(st.section_font())
         .color(st.roles.text2)
+        .extra_letter_spacing(tr.tracking)
     } else {
         let t = kit::rich(st, role, Tone::Text, title);
         match font {
@@ -940,27 +944,24 @@ fn transport_card(
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = st.sp(2);
             let enabled = !ui_state.host_clock;
-            let r = kit::round_button(
-                ui,
-                st,
-                if run { Ic::Stop } else { Ic::Play },
-                true,
-                d,
-                enabled,
-            )
-            .tip(
+            // Play (accent), Stop and Restart, as in the mockup's transport card.
+            let r = kit::round_button(ui, st, Ic::Play, true, d, enabled).tip(
                 st,
                 if run {
-                    "Stop the clock"
+                    "The clock is running"
                 } else {
                     "Run the clock"
                 },
             );
             ui_state.record(format!("prun:{id}"), r.rect);
-            if r.clicked() {
-                ui_state
-                    .transport
-                    .push((id, if run { Transport::Stop } else { Transport::Run }));
+            if r.clicked() && !run {
+                ui_state.transport.push((id, Transport::Run));
+            }
+            let r = kit::round_button(ui, st, Ic::Stop, false, d - 4.0, enabled)
+                .tip(st, "Stop the clock");
+            ui_state.record(format!("pstop:{id}"), r.rect);
+            if r.clicked() && run {
+                ui_state.transport.push((id, Transport::Stop));
             }
             let r = kit::round_button(ui, st, Ic::Restart, false, d - 4.0, enabled)
                 .tip(st, "Restart from the first bar");
@@ -1000,7 +1001,7 @@ fn cues_card(
     // Pads two across, as many rows as the scenes need; they share the card's height.
     let per_row = 2;
     let gap = 10.0;
-    let pad_w = ((size.x - st.sp(3) * 2.0 - 4.0 - gap) / per_row as f32).max(60.0);
+    let pad_w = ((size.x - st.sp(4) * 2.0 - 4.0 - gap) / per_row as f32).max(60.0);
     let rows = all.len().div_ceil(per_row).max(1);
     let pad_h = ((size.y - 64.0 - gap * (rows as f32 - 1.0)) / rows as f32).clamp(44.0, 150.0);
     let state = editor.state().clone();
@@ -1210,7 +1211,7 @@ fn macros_card(
     knob: f32,
 ) {
     let tile_w =
-        (size.x - st.sp(3) * 2.0 - st.sp(1) * (pins.len() as f32 - 1.0)) / pins.len() as f32;
+        (size.x - st.sp(4) * 2.0 - st.sp(1) * (pins.len() as f32 - 1.0)) / pins.len() as f32;
     // A knob never wider than its tile (eight macros share a narrow card).
     let knob = knob.min(tile_w - st.sp(2) * 2.0).max(KNOB_MIN / 2.0);
     // The card says which MIDI CCs the macros answer, when they are all mapped in a run.
@@ -1224,7 +1225,10 @@ fn macros_card(
         _ => String::new(),
     };
     ui.allocate_ui_with_layout(size, Layout::top_down(egui::Align::Min), |ui| {
-        let f = kit::card_frame(st);
+        // The mockup's Perform cards (`card()` in directions.html) pad 16 at the sides; the
+        // card's own 12 above and below keeps the title on the mockup's line.
+        let f = kit::card_frame(st)
+            .inner_margin(egui::Margin::symmetric(st.sp(4) as i8, st.sp(3) as i8));
         let m = f.inner_margin.sum();
         f.show(ui, |ui| {
             ui.set_width(size.x - m.x);

@@ -209,7 +209,7 @@ fn transport_card_sends_runtime_commands_only() {
     let mut h = H::new(1440.0, 900.0);
     h.pin(CLOCK, TRANSPORT);
     let entries = h.editor.log().entries().len();
-    h.click("prun:1");
+    h.click("pstop:1");
     h.click("prestart:1");
     assert_eq!(
         h.ui.transport,
@@ -580,7 +580,7 @@ fn the_demo_controls_fit_together_at_1280() {
             }
             rects.push(r);
         }
-        for k in ["rec-start", "prun:1", "prestart:1"] {
+        for k in ["rec-start", "prun:1", "pstop:1", "prestart:1"] {
             assert!(screen.contains_rect(h.rect(k)), "{w}: {k}");
         }
     }
