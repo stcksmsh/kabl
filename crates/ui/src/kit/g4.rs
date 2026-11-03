@@ -283,7 +283,8 @@ pub fn tool_window(
         });
 }
 
-/// Bottom dock: full width, drag handle on the top edge, resizable between `min` and `max`.
+/// Bottom dock: full width of `ui`'s free area, drawn over its lower part (the rack keeps its
+/// size and zoom), with a drag handle on the top edge resizing it between `min` and `max`.
 pub fn dock(
     ui: &mut Ui,
     st: &Style,
@@ -293,25 +294,52 @@ pub fn dock(
     max: f32,
     content: impl FnOnce(&mut Ui),
 ) {
-    egui::Panel::bottom(egui::Id::new(id))
-        .resizable(true)
-        .default_size(height)
-        .size_range(min..=max)
-        .frame(
-            Frame::new()
-                .fill(st.roles.surface)
-                .stroke(Stroke::new(1.0, st.roles.line))
-                .inner_margin(Margin::symmetric(16, 10)),
-        )
-        .show(ui, |ui| {
-            let top = ui.max_rect().top();
-            let c = pos2(ui.max_rect().center().x, top - 5.0);
-            ui.painter().rect_filled(
-                Rect::from_center_size(c, vec2(36.0, 4.0)),
+    let avail = ui.available_rect_before_wrap();
+    let hid = egui::Id::new(id).with("height");
+    let h = ui
+        .data(|d| d.get_temp::<f32>(hid))
+        .unwrap_or(height)
+        .clamp(min, max.max(min));
+    let rect = Rect::from_min_max(pos2(avail.left(), avail.bottom() - h), avail.max);
+    let ctx = ui.ctx().clone();
+    egui::Area::new(egui::Id::new(id))
+        .order(egui::Order::Middle)
+        .fade_in(false)
+        .fixed_pos(rect.min)
+        .show(&ctx, |ui| {
+            ui.set_min_size(rect.size());
+            ui.set_max_size(rect.size());
+            // A 6 px shadow strip over the rack above, the fill, and a 1 px rule on the top edge.
+            let p = ui.painter().with_clip_rect(ctx.content_rect());
+            let shade = Color32::from_black_alpha(if st.dark { 89 } else { 20 });
+            p.rect_filled(
+                Rect::from_x_y_ranges(rect.x_range(), rect.top() - 6.0..=rect.top()),
+                CornerRadius::ZERO,
+                shade,
+            );
+            p.rect_filled(rect, CornerRadius::ZERO, st.roles.bar);
+            p.hline(
+                rect.x_range(),
+                rect.top() + 0.5,
+                Stroke::new(1.0, st.roles.line2),
+            );
+            let grip = Rect::from_min_size(rect.min, vec2(rect.width(), 8.0));
+            let resp = ui.interact(grip, egui::Id::new(id).with("grip"), Sense::drag());
+            if resp.hovered() || resp.dragged() {
+                ctx.set_cursor_icon(egui::CursorIcon::ResizeVertical);
+            }
+            if resp.dragged() {
+                let nh = (h - resp.drag_delta().y).clamp(min, max.max(min));
+                ui.data_mut(|d| d.insert_temp(hid, nh));
+            }
+            p.rect_filled(
+                Rect::from_center_size(pos2(rect.center().x, rect.top() + 7.0), vec2(36.0, 4.0)),
                 CornerRadius::same(2),
                 st.roles.line2,
             );
-            content(ui);
+            let inner = rect - Margin::symmetric(16, 10);
+            let mut c = ui.new_child(egui::UiBuilder::new().max_rect(inner));
+            content(&mut c);
         });
 }
 
@@ -500,68 +528,152 @@ pub enum LaneKind {
     Bars { bipolar: bool },
     /// On/off pills (value > 0.5 is on).
     Gate,
+    /// A count 1..=`max` shown as "×n"; a tap steps it, wrapping to 1.
+    Count { max: u8 },
 }
 
 pub struct Lane<'a> {
     pub label: &'a str,
     pub kind: LaneKind,
     pub values: &'a mut [f32],
+    /// Small mono line under the label ("st").
+    pub unit: &'a str,
+    /// Bar and on-pill colour; `None` is the accent.
+    pub color: Option<Color32>,
+    /// Lane height; `None` is the kind's default.
+    pub height: Option<f32>,
+    /// Mono readout at the foot of each bar ("+7").
+    pub readout: Option<fn(f32) -> String>,
+}
+
+impl<'a> Lane<'a> {
+    pub fn new(label: &'a str, kind: LaneKind, values: &'a mut [f32]) -> Self {
+        Lane {
+            label,
+            kind,
+            values,
+            unit: "",
+            color: None,
+            height: None,
+            readout: None,
+        }
+    }
 }
 
 const LABEL_W: f32 = 56.0;
-const BARS_H: f32 = 44.0;
-const GATE_H: f32 = 22.0;
-const LANE_GAP: f32 = 6.0;
+const BARS_H: f32 = 36.0;
+const GATE_H: f32 = 20.0;
+const LANE_GAP: f32 = 8.0;
+/// The step-number row above the lanes.
+const NUMBERS_H: f32 = 22.0;
 
-/// Shared step editor (seq, cable pattern, Perform lanes): one column per step. Tap toggles a
-/// gate, drag sets a bar's value. The playhead is an accent outline across all lanes.
-/// True when a value changed.
+/// Shared step editor (seq, cable pattern, Perform lanes): one column per step, lane labels in
+/// a 56 px column, optional step-number row. Tap toggles a gate or steps a count, drag sets a
+/// bar's value. The playhead is an accent outline across all lanes. The response is marked
+/// changed when a value changed.
 pub fn step_grid(
     ui: &mut Ui,
     st: &Style,
     lanes: &mut [Lane],
     playhead: Option<usize>,
     width: f32,
-) -> bool {
+    numbers: bool,
+) -> Response {
     let steps = lanes.iter().map(|l| l.values.len()).max().unwrap_or(0);
-    if steps == 0 {
-        return false;
-    }
     let heights: Vec<f32> = lanes
         .iter()
-        .map(|l| match l.kind {
-            LaneKind::Bars { .. } => BARS_H,
-            LaneKind::Gate => GATE_H,
+        .map(|l| {
+            l.height.unwrap_or(match l.kind {
+                LaneKind::Bars { .. } => BARS_H,
+                LaneKind::Gate | LaneKind::Count { .. } => GATE_H,
+            })
         })
         .collect();
-    let total = heights.iter().sum::<f32>() + LANE_GAP * (lanes.len() as f32 - 1.0);
-    let (rect, resp) = ui.allocate_exact_size(vec2(width, total), Sense::click_and_drag());
+    let head = if numbers { NUMBERS_H } else { 0.0 };
+    let total = head + heights.iter().sum::<f32>() + LANE_GAP * (lanes.len() as f32 - 1.0).max(0.0);
+    let (rect, mut resp) = ui.allocate_exact_size(vec2(width, total), Sense::click_and_drag());
+    if steps == 0 {
+        return resp;
+    }
     let cell_w = (width - LABEL_W) / steps as f32;
     let r = &st.roles;
+    let well = if st.dark { r.inset } else { r.raised };
+    let mono = st.font(Role::Value);
+    let p = ui.painter();
     let mut changed = false;
     let ptr = resp.interact_pointer_pos();
+    let col_x = |i: usize| rect.left() + LABEL_W + i as f32 * cell_w;
     let mut y = rect.top();
+    if numbers {
+        p.text(
+            pos2(rect.left(), y + head / 2.0),
+            egui::Align2::LEFT_CENTER,
+            "STEP",
+            st.section_font(),
+            r.text2,
+        );
+        for i in 0..steps {
+            p.text(
+                pos2(col_x(i) + cell_w / 2.0, y + head / 2.0),
+                egui::Align2::CENTER_CENTER,
+                (i + 1).to_string(),
+                mono.clone(),
+                if playhead == Some(i) { r.text } else { r.text2 },
+            );
+        }
+        y += head;
+    }
     for (li, lane) in lanes.iter_mut().enumerate() {
         let h = heights[li];
-        ui.painter().text(
-            pos2(rect.left(), y + h / 2.0),
+        let col = lane.color.unwrap_or(r.accent);
+        let label_y = if h > 30.0 { y + 12.0 } else { y + h / 2.0 };
+        p.text(
+            pos2(rect.left(), label_y),
             egui::Align2::LEFT_CENTER,
             lane.label.to_uppercase(),
             st.section_font(),
             r.text2,
         );
-        for (i, v) in lane.values.iter_mut().enumerate() {
-            let cell = Rect::from_min_size(
-                pos2(rect.left() + LABEL_W + i as f32 * cell_w + 1.5, y),
-                vec2(cell_w - 3.0, h),
+        if !lane.unit.is_empty() {
+            p.text(
+                pos2(rect.left(), label_y + 16.0),
+                egui::Align2::LEFT_CENTER,
+                lane.unit,
+                mono.clone(),
+                r.text2,
             );
-            let hit = ptr.is_some_and(|p| cell.expand2(vec2(1.5, LANE_GAP / 2.0)).contains(p));
+        }
+        let lane_r = Rect::from_min_max(pos2(col_x(0), y), pos2(rect.right(), y + h));
+        if lane.kind == (LaneKind::Bars { bipolar: true }) {
+            // One well for the whole lane, with the zero line across it.
+            p.rect(
+                lane_r,
+                6.0,
+                well,
+                Stroke::new(1.0, r.line),
+                StrokeKind::Inside,
+            );
+        }
+        for (i, v) in lane.values.iter_mut().enumerate() {
+            let cell = Rect::from_min_size(pos2(col_x(i), y), vec2(cell_w, h));
+            let hit = ptr.is_some_and(|q| cell.expand2(vec2(0.0, LANE_GAP / 2.0)).contains(q));
             match lane.kind {
                 LaneKind::Bars { bipolar } => {
-                    fill_rr(ui, cell, 4.0, r.inset, 0.0);
+                    let foot = if lane.readout.is_some() { 16.0 } else { 0.0 };
+                    let inner = if bipolar {
+                        Rect::from_min_max(
+                            cell.min + vec2(5.0, 8.0),
+                            cell.max - vec2(5.0, 8.0 + foot),
+                        )
+                    } else {
+                        let c = cell.shrink2(vec2(4.0, 0.0));
+                        p.rect(c, 4.0, well, Stroke::new(1.0, r.line), StrokeKind::Inside);
+                        c.shrink(3.0)
+                    };
                     let (lo, hi) = if bipolar { (-1.0, 1.0) } else { (0.0, 1.0) };
                     if hit && (resp.dragged() || resp.is_pointer_button_down_on()) {
-                        let t = 1.0 - ((ptr.unwrap().y - cell.top()) / h).clamp(0.0, 1.0);
+                        let t =
+                            1.0 - ((ptr.unwrap().y - inner.top()) / inner.height()).clamp(0.0, 1.0);
                         let nv = lo + t * (hi - lo);
                         if (nv - *v).abs() > f32::EPSILON {
                             *v = nv;
@@ -571,16 +683,21 @@ pub fn step_grid(
                     let t = ((*v - lo) / (hi - lo)).clamp(0.0, 1.0);
                     let base: f32 = if bipolar { 0.5 } else { 0.0 };
                     let (a, b) = (base.min(t), base.max(t));
-                    let bar = Rect::from_min_max(
-                        pos2(cell.left(), cell.bottom() - b * h),
-                        pos2(cell.right(), cell.bottom() - a * h),
+                    let mut bar = Rect::from_min_max(
+                        pos2(inner.left(), inner.bottom() - b * inner.height()),
+                        pos2(inner.right(), inner.bottom() - a * inner.height()),
                     );
-                    fill_rr(ui, bar, 3.0, r.accent, 0.0);
-                    if bipolar {
-                        let cy = cell.center().y;
-                        ui.painter().line_segment(
-                            [pos2(cell.left(), cy), pos2(cell.right(), cy)],
-                            Stroke::new(1.0, r.line2),
+                    if bar.height() < 2.0 {
+                        bar = Rect::from_center_size(bar.center(), vec2(bar.width(), 2.0));
+                    }
+                    fill_rr(ui, bar, if bipolar { 3.0 } else { 2.0 }, col, 0.0);
+                    if let Some(f) = lane.readout {
+                        p.text(
+                            pos2(cell.center().x, cell.bottom() - 9.0),
+                            egui::Align2::CENTER_CENTER,
+                            f(*v),
+                            mono.clone(),
+                            r.text2,
                         );
                     }
                 }
@@ -589,29 +706,65 @@ pub fn step_grid(
                         *v = if *v > 0.5 { 0.0 } else { 1.0 };
                         changed = true;
                     }
-                    let on = *v > 0.5;
-                    fill_rr(ui, cell, h / 2.0, if on { r.accent } else { r.inset }, 0.0);
+                    let pill = cell.shrink2(vec2(4.0, 0.0));
+                    if *v > 0.5 {
+                        fill_rr(ui, pill, h / 2.0, col, 0.0);
+                    } else {
+                        p.rect(
+                            pill,
+                            h / 2.0,
+                            well,
+                            Stroke::new(1.0, r.line2),
+                            StrokeKind::Inside,
+                        );
+                    }
+                }
+                LaneKind::Count { max } => {
+                    if hit && resp.clicked() {
+                        let n = v.round() as u8;
+                        *v = f32::from(if n >= max { 1 } else { n + 1 });
+                        changed = true;
+                    }
+                    let n = v.round() as u8;
+                    p.text(
+                        cell.center(),
+                        egui::Align2::CENTER_CENTER,
+                        format!("×{n}"),
+                        mono.clone(),
+                        if n > 1 { r.text } else { r.text2 },
+                    );
                 }
             }
         }
+        if lane.kind == (LaneKind::Bars { bipolar: true }) {
+            let mid = lane_r.top()
+                + 8.0
+                + (h - 16.0 - if lane.readout.is_some() { 16.0 } else { 0.0 }) / 2.0;
+            p.hline(
+                lane_r.shrink2(vec2(4.0, 0.0)).x_range(),
+                mid,
+                Stroke::new(1.0, r.line2),
+            );
+        }
         y += h + LANE_GAP;
     }
-    if let Some(p) = playhead.filter(|&p| p < steps) {
-        let col = Rect::from_min_size(
-            pos2(rect.left() + LABEL_W + p as f32 * cell_w, rect.top() - 2.0),
-            vec2(cell_w, total + 4.0),
+    if let Some(i) = playhead.filter(|&i| i < steps) {
+        let col = Rect::from_min_max(
+            pos2(col_x(i) + 1.0, rect.top() - 4.0),
+            pos2(col_x(i + 1) - 1.0, rect.bottom() + 4.0),
         );
-        ui.painter().rect_stroke(
+        p.rect_stroke(
             col,
-            CornerRadius::same(4),
-            Stroke::new(1.5, r.accent),
-            StrokeKind::Outside,
+            CornerRadius::same(6),
+            Stroke::new(1.0, alpha(r.accent, 153)),
+            StrokeKind::Inside,
         );
     }
     if changed {
+        resp.mark_changed();
         ui.ctx().request_repaint();
     }
-    changed
+    resp
 }
 
 /// Values of a [`range_bar`]: the parameter's limits, its base, the span modulation sweeps, and now.

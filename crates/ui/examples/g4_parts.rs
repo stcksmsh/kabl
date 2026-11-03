@@ -135,24 +135,21 @@ impl eframe::App for App {
                             ui,
                             &st,
                             &mut [
-                                g4::Lane {
-                                    label: "pitch",
-                                    kind: g4::LaneKind::Bars { bipolar: true },
-                                    values: &mut self.pitch,
-                                },
-                                g4::Lane {
-                                    label: "vel",
-                                    kind: g4::LaneKind::Bars { bipolar: false },
-                                    values: &mut self.bars,
-                                },
-                                g4::Lane {
-                                    label: "gate",
-                                    kind: g4::LaneKind::Gate,
-                                    values: &mut self.gate,
-                                },
+                                g4::Lane::new(
+                                    "pitch",
+                                    g4::LaneKind::Bars { bipolar: true },
+                                    &mut self.pitch,
+                                ),
+                                g4::Lane::new(
+                                    "vel",
+                                    g4::LaneKind::Bars { bipolar: false },
+                                    &mut self.bars,
+                                ),
+                                g4::Lane::new("gate", g4::LaneKind::Gate, &mut self.gate),
                             ],
                             Some(2),
                             w,
+                            true,
                         );
                     });
                     card(b, &st, "Range bar", |ui| {

@@ -14,7 +14,16 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 6] = ["rack", "perform", "sounds", "drawer", "empty", "error"];
+const SCENES: [&str; 8] = [
+    "rack",
+    "perform",
+    "sounds",
+    "drawer",
+    "wavetable-editor",
+    "seq-pattern-editor",
+    "empty",
+    "error",
+];
 
 struct Job {
     scene: &'static str,
@@ -37,13 +46,14 @@ fn patches() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../patches")
 }
 
-/// The mockup's patch: sequencer, VA oscillator, SVF, ADSR, mixer, delay, reverb, output.
-fn mockup_patch() -> PatchEditor {
+/// The mockup's patch: sequencer, VA (or, with `wt`, wavetable) oscillator, SVF, ADSR, mixer,
+/// delay, reverb, output.
+fn mockup_patch(wt: bool) -> PatchEditor {
     use kabl_core::PortRef;
     let mut e = PatchEditor::seed_from(&Default::default());
     let at = |x: f32, y: f32| kabl_core::Vec2 { x, y };
     let seq = e.add_module("seq", at(24.0, 20.0));
-    let osc = e.add_module("osc.va", at(714.0, 20.0));
+    let osc = e.add_module(if wt { "osc.wt" } else { "osc.va" }, at(714.0, 20.0));
     let svf = e.add_module("filter.svf", at(964.0, 20.0));
     let adsr = e.add_module("env.adsr", at(24.0, 320.0));
     let mix = e.add_module("mixer", at(244.0, 320.0));
@@ -69,11 +79,17 @@ fn mockup_patch() -> PatchEditor {
 impl App {
     fn prepare(&mut self) {
         let j = &self.jobs[self.i];
-        self.editor = mockup_patch();
+        self.editor = mockup_patch(j.scene == "wavetable-editor");
         let mut ui = UiState::default();
         ui.theme = self.theme.clone();
         ui.dark = j.dark;
         ui.status_meter = true;
+        // The mockup's status bar readouts, as a host would feed them.
+        ui.status_cpu = Some(6.0);
+        ui.status_buffer = Some(128);
+        ui.status_voices = Some((4, 8));
+        ui.status_bpm = Some(124.0);
+        ui.status_pos = Some("17 . 3 . 2".into());
         ui.library = Some(Library::open(
             Some(patches()),
             self._user.path().to_path_buf(),
@@ -99,7 +115,7 @@ impl App {
             self.editor.set_param(id, &k, v + 1.0);
         }
         ui.browser_open = j.scene == "sounds";
-        ui.drawer_open = matches!(j.scene, "rack");
+        ui.drawer_open = j.scene == "rack" || j.scene == "seq-pattern-editor";
         if j.scene == "empty" {
             self.editor = PatchEditor::new();
         }
@@ -153,6 +169,46 @@ impl App {
             .iter()
             .find(|(_, m)| m.kind == "filter.svf")
             .map(|(&id, _)| id);
+        if j.scene == "seq-pattern-editor" {
+            // The mockup's state: editing A, B playing, step 5 under the playhead.
+            let seq = self
+                .editor
+                .state()
+                .modules
+                .iter()
+                .find(|(_, m)| m.kind == "seq")
+                .map(|(&id, _)| id)
+                .unwrap();
+            let gate = [1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0];
+            let vel = [100.0, 80.0, 80.0, 60.0, 100.0, 50.0, 70.0, 90.0];
+            let prob = [100.0, 100.0, 100.0, 75.0, 100.0, 50.0, 100.0, 100.0];
+            let ratch = [1.0, 1.0, 1.0, 2.0, 1.0, 1.0, 1.0, 3.0];
+            for i in 0..8 {
+                self.editor.set_param(seq, &format!("g{}", i + 1), gate[i]);
+                self.editor.set_param(seq, &format!("v{}", i + 1), vel[i]);
+                self.editor.set_param(seq, &format!("r{}", i + 1), prob[i]);
+                self.editor.set_param(seq, &format!("k{}", i + 1), ratch[i]);
+            }
+            ui.selected_module = Some(seq);
+            ui.selected_route = None;
+            ui.edit_bank.insert(seq, 0);
+            ui.seq_banks.insert(seq, (1, None));
+            ui.seq_steps.insert(seq, 4);
+        }
+        if j.scene == "wavetable-editor" {
+            let wt = self
+                .editor
+                .state()
+                .modules
+                .iter()
+                .find(|(_, m)| m.kind == "osc.wt")
+                .map(|(&id, _)| id)
+                .unwrap();
+            kabl_ui::tables::open(&self.editor, &mut ui, wt);
+            // Like the mockup: frame 7 of 16 selected, the oscillator's position at 0.40.
+            ui.tables.select(6);
+            self.editor.set_param(wt, "position", 0.4);
+        }
         self.ui = ui;
         self.f = 0;
     }
@@ -208,15 +264,11 @@ impl eframe::App for App {
                 egui::vec2(size.0 as f32, size.1 as f32),
             )),
         );
-        if self.f == 6 && self.jobs[self.i].scene == "drawer" {
+        if self.f == 6 && matches!(self.jobs[self.i].scene, "drawer" | "seq-pattern-editor") {
             // After the first frame: a compact window closes the drawer there, the user opens it.
             self.ui.drawer_open = true;
         }
         show(&mut self.editor, &mut self.ui, &mut root);
-        // The mockup's rack is drawn at 95 %: set it once the first fit has run.
-        if self.f == 6 && matches!(self.jobs[self.i].scene, "rack" | "error") {
-            self.ui.zoom = 0.95;
-        }
         self.f += 1;
         if self.f == 12 {
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));

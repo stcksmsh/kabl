@@ -128,6 +128,10 @@ impl eframe::App for App {
                     self.editor.set_param(id, k, v.parse().unwrap());
                 }
             }
+            // KABL_CAPTURE_STEP=4: a sequencer shows step 5 playing (0-based, no clock needed).
+            if let Ok(s) = std::env::var("KABL_CAPTURE_STEP") {
+                self.ui.seq_steps.insert(id, s.parse().unwrap());
+            }
         }
         self.ui.dark = j.dark;
         self.ui.zoom = j.zoom;
