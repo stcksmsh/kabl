@@ -1500,7 +1500,8 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
                 fmt_value(param, param.from_norm(a)),
                 fmt_value(param, param.from_norm(b))
             );
-            ui.add(egui::Label::new(&text).truncate()).on_hover_text(text);
+            ui.add(egui::Label::new(&text).truncate())
+                .on_hover_text(text);
         }
         None => {
             let text = "No source selected: click one below to edit its depth.";
