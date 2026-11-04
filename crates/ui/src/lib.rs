@@ -2309,7 +2309,7 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         }
     }
     if focused_at_frame_start {
-        rack_editor::more(editor, ui_state, ui, th, xf, &lay, &mut drawn);
+        rack_editor::more(editor, ui_state, ui, &lay, &mut drawn);
     }
 
     explain::mark_target(
@@ -2886,6 +2886,30 @@ fn menu_row(
     r
 }
 
+/// A menu's Remove row (danger tone, "Del" hint): true on a click, or on Delete while the
+/// menu is open.
+fn remove_row(ui: &mut egui::Ui, ui_state: &mut UiState, key: &str, label: &str) -> bool {
+    let st = ui_state.style.clone();
+    let r = menu_row(
+        ui,
+        ui_state,
+        key,
+        Some(kit::Ic::Trash),
+        label,
+        kit::Tone::Bad,
+    );
+    ui.painter().text(
+        pos2(r.rect.right() - st.sp(3), r.rect.center().y),
+        egui::Align2::RIGHT_CENTER,
+        "Del",
+        st.font(style::Role::Value),
+        st.roles.text2,
+    );
+    // Not while a field has focus: there Delete edits text.
+    r.clicked()
+        || (ui.input(|i| i.key_pressed(egui::Key::Delete)) && ui.memory(|m| m.focused().is_none()))
+}
+
 /// The module's context menu (G4 `menu-module`): header, Explain, Inspect output ▸, More
 /// controls…, Edit face…, Reset face, the Perform and MIDI submenus, Remove module.
 fn module_menu(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, m: &Placed) {
@@ -3009,16 +3033,7 @@ fn module_menu(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
     kit::menu_rule(ui, st);
     perform::module_menu(editor, ui_state, ui, m.id, m.info);
     kit::menu_rule(ui, st);
-    if menu_row(
-        ui,
-        ui_state,
-        "remove",
-        Some(kit::Ic::Trash),
-        "Remove module",
-        kit::Tone::Bad,
-    )
-    .clicked()
-    {
+    if remove_row(ui, ui_state, "remove", "Remove module") {
         editor.remove_module(m.id);
         ui.close();
     }
@@ -4690,10 +4705,7 @@ fn cable_menu(
         ui_state.cable_fn = Some(cable);
         ui.close();
     }
-    let dest = match to {
-        PortRef::Module { id, .. } => Some(*id),
-        _ => None,
-    };
+    let dest = to.module_id();
     if menu_row(
         ui,
         ui_state,
@@ -4720,23 +4732,22 @@ fn cable_menu(
         )
         .clicked()
         {
-            // Explain has no cable subject: the module the cable feeds, which lists its inputs.
-            explain::open(ui_state, explain::Subject::Module(d), None);
+            // Explain has no cable subject: what the cable feeds, the control a route moves
+            // or the module whose input it patches.
+            let subject = match to {
+                PortRef::Param { id, param } => explain::Subject::Control {
+                    id: *id,
+                    key: param.clone(),
+                },
+                _ => explain::Subject::Module(d),
+            };
+            explain::open(ui_state, subject, None);
             ui_state.selected_module = Some(d);
             ui.close();
         }
     }
     kit::menu_rule(ui, st);
-    if menu_row(
-        ui,
-        ui_state,
-        "remove-cable",
-        Some(kit::Ic::Trash),
-        "Remove cable",
-        kit::Tone::Bad,
-    )
-    .clicked()
-    {
+    if remove_row(ui, ui_state, "remove-cable", "Remove cable") {
         editor.disconnect(cable);
         ui.close();
     }

@@ -404,8 +404,6 @@ pub(crate) fn more(
     editor: &mut PatchEditor,
     view: &mut UiState,
     ui: &mut egui::Ui,
-    th: &Theme,
-    xf: Xf,
     scene: &Layout,
     drawn: &mut Drawn,
 ) {
@@ -429,18 +427,10 @@ pub(crate) fn more(
             ..Default::default()
         },
     );
-    let Some(mut m) = full.get(id).cloned() else {
+    let Some(m) = full.get(id).cloned() else {
         return;
     };
-    if let Some(adv) = m.adv.as_mut() {
-        let bottom = m
-            .ctls
-            .iter()
-            .filter(|c| !c.primary)
-            .map(|c| c.geo.label_pos().y + 64.)
-            .fold(adv.bottom(), f32::max);
-        adv.max.y = bottom;
-    }
+    let face = rack::primary_set(state, info);
     let ctx = ui.ctx().clone();
     let st = view.style.clone();
     let st = &*st;
@@ -452,9 +442,8 @@ pub(crate) fn more(
     }
     let mut close = false;
     let mut done = false;
-    let z = xf.zoom.clamp(0.85, 1.0);
-    let width = (m.full().width() * z + 48.)
-        .max(kit::g4::Size::L.width())
+    let width = kit::g4::Size::L
+        .width()
         .min(ctx.content_rect().width() - 80.);
     let keys_id = Id::new(("more-keys", id));
     let mut keys = ctx.data(|d| d.get_temp::<bool>(keys_id)).unwrap_or(false);
@@ -508,11 +497,25 @@ pub(crate) fn more(
                         }
                         return;
                     }
-                    // On the face: the controls the module shows, as pinned chips.
+                    // The draft decides what is on the face: a pin moves a control between the
+                    // face chips and the More grid; Done applies it.
+                    let draft = view
+                        .choose
+                        .as_ref()
+                        .filter(|c| c.0 == id)
+                        .map(|c| c.1.clone());
+                    let index = |p: &kabl_modules::ParamInfo| {
+                        info.params.iter().position(|q| q.name == p.name)
+                    };
+                    let pinned = |c: &rack::Ctl| match (&draft, index(c.param)) {
+                        (Some(v), Some(i)) => v[i],
+                        _ => c.primary,
+                    };
+                    let mut toggle = None;
                     let on_face: Vec<&'static kabl_modules::ParamInfo> = m
                         .ctls
                         .iter()
-                        .filter(|c| c.primary)
+                        .filter(|c| pinned(c))
                         .map(|c| c.param)
                         .collect();
                     ui.horizontal(|ui| {
@@ -533,14 +536,16 @@ pub(crate) fn more(
                                         .icon(kit::Ic::Pin)
                                         .small(),
                                 )
-                                .on_hover_text("On the face: change it in Face layout");
+                                .on_hover_text("Unpin: move it to More");
                             view.record(format!("more:pin:{id}:{}", p.name), r.rect);
                             if r.clicked() {
-                                view.more_tab = 1;
+                                toggle = Some(*p);
                             }
                         }
                     });
                     kit::gap(ui, st, 2);
+                    let hidden: Vec<rack::Ctl> =
+                        m.ctls.iter().filter(|c| !pinned(c)).cloned().collect();
                     ui.horizontal(|ui| {
                         kit::section(ui, st, "More");
                         kit::label(
@@ -548,58 +553,110 @@ pub(crate) fn more(
                             st,
                             style::Role::Value,
                             kit::Tone::Text2,
-                            m.ctls.iter().filter(|c| !c.primary).count().to_string(),
+                            hidden.len().to_string(),
                         );
                     });
-                    // The module itself with its hidden controls: its jacks still patch and
-                    // its routes still show.
-                    let (_, space) = ui.allocate_space(m.full().size() * z);
+                    // The hidden controls as a five-column grid of their own knobs and selectors.
+                    const COLS: usize = 5;
+                    const ROW: f32 = 96.0;
+                    let cell = ui.available_width() / COLS as f32;
+                    let rows = hidden.len().div_ceil(COLS);
+                    let (space, _) = ui.allocate_exact_size(
+                        egui::vec2(ui.available_width(), rows as f32 * ROW),
+                        Sense::hover(),
+                    );
                     view.record(format!("more:{id}:body"), space.intersect(ui.clip_rect()));
+                    let mut grid = m.clone();
+                    grid.ctls = hidden
+                        .iter()
+                        .enumerate()
+                        .map(|(k, c)| {
+                            let at = pos2(
+                                (k % COLS) as f32 * cell + cell * 0.5,
+                                (k / COLS) as f32 * ROW + 46.0,
+                            );
+                            let geo = match c.geo {
+                                rack::Geo::Knob { .. } => rack::Geo::Knob { c: at, r: 17.0 },
+                                rack::Geo::Select { rect } => rack::Geo::Select {
+                                    rect: Rect::from_center_size(
+                                        at,
+                                        egui::vec2(rect.width().min(cell - 12.0), rect.height()),
+                                    ),
+                                },
+                            };
+                            rack::Ctl { geo, ..c.clone() }
+                        })
+                        .collect();
                     let focus = Xf {
-                        origin: space.min - m.full().min.to_vec2() * z,
-                        zoom: z,
+                        origin: space.min,
+                        zoom: 1.0,
                     };
                     let painter = ui.painter_at(space.intersect(ui.clip_rect()));
                     let material = theme::panel_theme(&view.style, info.kind);
-                    let mut own = Drawn::default();
-                    let now = ui.input(|i| i.time);
-                    draw_module(editor, view, ui, &painter, th, focus, &m, now, &mut own);
-                    if let Some(adv) = m.adv {
-                        crate::kit::face::surface(
-                            &painter,
-                            &view.style,
-                            focus.r(adv),
-                            material.panel,
-                            material.panel_edge,
-                            focus.zoom,
-                        );
-                    }
                     let look = Look {
-                        z,
-                        ink: material.ink,
-                        ink2: material.ink2,
-                        slot: 76.0,
+                        z: 1.0,
+                        ink: st.roles.text,
+                        ink2: st.roles.text2,
+                        slot: cell,
                     };
-                    for c in m.ctls.iter().filter(|c| !c.primary) {
+                    let now = ui.input(|i| i.time);
+                    let mut own = Drawn::default();
+                    let label_font = st.font(style::Role::Label);
+                    // The grid draws its own pins: no choose-mode pins from `draw_control`.
+                    let held = view.choose.take();
+                    for c in &grid.ctls {
                         draw_control(
-                            editor, view, ui, &painter, &material, focus, &m, c, look, false, now,
-                            &mut own,
+                            editor, view, ui, &painter, &material, focus, &grid, c, look, false,
+                            now, &mut own,
                         );
+                        if let rack::Geo::Select { .. } = c.geo {
+                            painter.text(
+                                focus.p(c.geo.label_pos()),
+                                egui::Align2::CENTER_CENTER,
+                                routing::param_label(c.param),
+                                label_font.clone(),
+                                st.roles.text,
+                            );
+                        }
+                        // The pin beside the label puts it back on the face.
+                        let w = ui.fonts_mut(|f| {
+                            f.layout_no_wrap(
+                                routing::param_label(c.param).to_string(),
+                                label_font.clone(),
+                                st.roles.text,
+                            )
+                            .size()
+                            .x
+                        });
+                        let at = focus.p(c.geo.label_pos()) + egui::vec2(w * 0.5 + 12.0, 0.0);
+                        let r = Rect::from_center_size(at, egui::vec2(20.0, 20.0));
+                        let resp = ui
+                            .interact(r, Id::new(("more-pin", id, c.param.name)), Sense::click())
+                            .on_hover_text("Pin to the face");
+                        view.record(format!("more:pin:{id}:{}", c.param.name), r);
+                        let ink = if resp.hovered() {
+                            st.roles.text
+                        } else {
+                            st.roles.text2
+                        };
+                        kit::icon(&painter, kit::Ic::Pin, at, 13.0, ink);
+                        if resp.clicked() {
+                            toggle = Some(c.param);
+                        }
                     }
-                    let mut both = Drawn {
-                        ports: drawn.ports.clone(),
-                        plugs: own.plugs.clone(),
-                        drop_at: None,
-                    };
-                    both.ports.extend(own.ports.clone());
-                    let plugs =
-                        draw_cables(editor, view, ui, &painter, th, xf, scene, &both, Some(id));
-                    painter.extend(plugs);
+                    view.choose = held;
                     painter.extend(std::mem::take(&mut view.deferred));
                     drawn.ports.extend(own.ports);
-                    drawn.plugs.extend(own.plugs);
-                    if own.drop_at.is_some() {
-                        drawn.drop_at = own.drop_at;
+                    if let Some(p) = toggle {
+                        let on = m.ctls.iter().any(|c| c.param.name == p.name && pinned(c));
+                        let set = &mut view.choose.get_or_insert_with(|| (id, face.clone())).1;
+                        // Every bank of a sequencer shares the slot's choice.
+                        let slot = rack::face_name(info, p.name);
+                        for (k, q) in info.params.iter().enumerate() {
+                            if rack::face_name(info, q.name) == slot {
+                                set[k] = !on;
+                            }
+                        }
                     }
                     // Keyboard entry: an exact value for every control.
                     if keys {
@@ -663,7 +720,7 @@ pub(crate) fn more(
         });
     ctx.data_mut(|d| d.insert_temp(keys_id, keys));
     view.record("more:dialog".into(), modal.response.rect);
-    if done && view.more_tab == 1 {
+    if done && view.choose.as_ref().is_some_and(|c| c.0 == id) {
         if let Some((cid, visible)) = view.choose.take() {
             let order = view.face_order.take();
             if let Err(e) = apply_face(editor, cid, &visible, order.as_deref()) {
@@ -710,26 +767,69 @@ fn face_layout(
          selectors). The rest stay under More controls.",
     );
     kit::gap(ui, st, 1);
-    for n in 0..order.len() {
-        let index = order[n];
+    // The row being dragged by its grip (a position in `order`), and every row's rect.
+    let drag_id = Id::new(("face-drag", id));
+    let dragging: Option<usize> = ui.data(|d| d.get_temp(drag_id));
+    let mut rows: Vec<(usize, Rect)> = Vec::new();
+    for (n, &index) in order.iter().enumerate() {
         let p = &info.params[index];
         if rack::face_name(info, p.name) != p.name {
             continue;
         }
-        ui.horizontal(|ui| {
-            let r = chevron_button(ui, st, true, n > 0).on_hover_text("Move up");
-            view.record(format!("face:up:{id}:{}", p.name), r.rect);
-            if r.clicked() {
-                order.swap(n, n - 1);
+        let row = ui.horizontal(|ui| {
+            let (g, gr) = ui.allocate_exact_size(vec2(14.0, st.metrics.control_h), Sense::drag());
+            let hot = gr.hovered() || gr.dragged();
+            kit::icon(
+                ui.painter(),
+                kit::Ic::Grip,
+                g.center(),
+                st.metrics.icon,
+                if hot { st.roles.text } else { st.roles.text2 },
+            );
+            view.record(format!("face:grip:{id}:{}", p.name), g);
+            if gr.drag_started() {
+                ui.data_mut(|d| d.insert_temp(drag_id, n));
             }
-            let r = chevron_button(ui, st, false, n + 1 < order.len()).on_hover_text("Move down");
-            view.record(format!("face:down:{id}:{}", p.name), r.rect);
-            if r.clicked() {
-                order.swap(n, n + 1);
-            }
+            gr.on_hover_cursor(egui::CursorIcon::Grab)
+                .on_hover_text("Drag to reorder");
             let r = kit::g4::checkbox(ui, st, &mut visible[index], &routing::param_label(p));
             view.record(format!("face:{id}:{}", p.name), r.rect);
         });
+        rows.push((n, row.response.rect));
+    }
+    // While a grip is dragged: an accent line where the row lands; the release moves it.
+    if let Some(from) = dragging {
+        let (pos, released, held, esc) = ui.input(|i| {
+            (
+                i.pointer.latest_pos(),
+                i.pointer.any_released(),
+                i.pointer.any_down(),
+                i.key_pressed(egui::Key::Escape),
+            )
+        });
+        let target = pos.and_then(|p| {
+            rows.iter()
+                .find(|(_, rc)| p.y < rc.bottom())
+                .or(rows.last())
+                .copied()
+        });
+        if let Some((to, rc)) = target.filter(|t| t.0 != from) {
+            let y = if to > from {
+                rc.bottom() + 2.0
+            } else {
+                rc.top() - 2.0
+            };
+            ui.painter()
+                .hline(rc.x_range(), y, Stroke::new(2.0, st.roles.accent));
+            if released {
+                let moved = order.remove(from);
+                order.insert(to, moved);
+            }
+        }
+        if released || !held || esc {
+            ui.data_mut(|d| d.remove::<usize>(drag_id));
+        }
+        ui.ctx().request_repaint();
     }
     kit::gap(ui, st, 1);
     let r = ui.add(kit::Button::new(st, "Restore defaults").ghost());
@@ -744,44 +844,6 @@ fn face_layout(
     }
     view.choose = Some((id, visible));
     view.face_order = Some(order);
-}
-
-/// A small square button with an up or down chevron (the kit has a down chevron only).
-fn chevron_button(
-    ui: &mut egui::Ui,
-    st: &crate::style::Style,
-    up: bool,
-    enabled: bool,
-) -> egui::Response {
-    let s = st.metrics.control_h;
-    let (rect, resp) = ui.allocate_exact_size(
-        vec2(s, s),
-        if enabled {
-            Sense::click()
-        } else {
-            Sense::hover()
-        },
-    );
-    let r = &st.roles;
-    if enabled && resp.hovered() {
-        ui.painter().rect_filled(rect, st.radii.sm, r.inset);
-    }
-    let ink = if enabled {
-        r.text2
-    } else {
-        crate::style::alpha(r.text2, 90)
-    };
-    let (c, d) = (rect.center(), 4.0);
-    let dy = if up { -d / 2.0 } else { d / 2.0 };
-    ui.painter().line(
-        vec![
-            pos2(c.x - d, c.y - dy),
-            pos2(c.x, c.y + dy),
-            pos2(c.x + d, c.y - dy),
-        ],
-        Stroke::new(1.5, ink),
-    );
-    resp
 }
 
 /// Writes a face draft (which controls show, their order) to module `id` as one undoable

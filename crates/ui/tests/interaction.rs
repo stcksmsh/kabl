@@ -937,11 +937,13 @@ fn focused_controls_own_pointer_and_closing_click_does_not_touch_rack() {
     assert!(t.ui.hits.contains_key(&format!("more:{VCA}:body")));
     t.click(&format!("sel:{VCA}.exponential.1"));
     assert_eq!(t.param(VCA, "exponential"), Some(1.));
-    // Native jacks/knobs inside the focus retain the real cable gesture.
-    let from = t.at(&format!("out:{VCA}.out"));
-    let to = t.at(&format!("knob:{VCA}.exponential"));
-    t.drag(from, to);
-    assert_eq!(t.routes(VCA, "exponential").len(), 1);
+    // A pin moves a hidden control to the face draft; the backdrop below discards it.
+    t.click(&format!("more:pin:{VCA}:exponential"));
+    assert!(t
+        .ui
+        .hits
+        .contains_key(&format!("more:pin:{VCA}:exponential")));
+    assert!(t.ui.choose.as_ref().is_some_and(|c| c.0 == VCA));
     let selected = t.ui.selected_module;
     let pos = t.editor.state().modules[&OUTPUT].pos;
     let dialog = t.ui.hits["more:dialog"];
@@ -1531,4 +1533,35 @@ fn edit_face_is_the_more_controls_face_layout_tab_and_enter_applies() {
         assert_eq!(t.face(VCA, "exponential"), Some(1.0));
         assert!(t.ui.expanded.is_empty() && t.ui.choose.is_none());
     }
+}
+
+#[test]
+fn more_grid_pins_reorder_grips_and_delete_in_menu() {
+    let mut t = H::new(1440., 900.);
+    // A pin in the More grid puts the control on the face; Done applies it.
+    t.click(&format!("toggle:{VCA}"));
+    let pin = t.ui.hits[&format!("more:pin:{VCA}:exponential")];
+    assert!(t.ui.hits["more:dialog"].contains_rect(pin));
+    t.click(&format!("more:pin:{VCA}:exponential"));
+    t.click("more:done");
+    assert_eq!(t.face(VCA, "exponential"), Some(1.0));
+    // Face layout: dragging the first row's grip below the second swaps them.
+    t.rclick(&format!("module:{VCA}"));
+    t.click("menu:choose");
+    let mut grips: Vec<(String, Rect)> =
+        t.ui.hits
+            .iter()
+            .filter(|(k, _)| k.starts_with(&format!("face:grip:{VCA}:")))
+            .map(|(k, r)| (k.clone(), *r))
+            .collect();
+    grips.sort_by(|a, b| a.1.top().total_cmp(&b.1.top()));
+    let (first, second) = (grips[0].clone(), grips[1].clone());
+    t.drag(first.1.center(), second.1.center() + egui::vec2(0., 4.));
+    let after = t.ui.hits[&first.0];
+    assert!(after.top() > t.ui.hits[&second.0].top(), "row moved down");
+    t.key(Key::Escape, Modifiers::NONE);
+    // Delete in the module menu removes the module.
+    t.rclick(&format!("module:{VCA}"));
+    t.key(Key::Delete, Modifiers::NONE);
+    assert!(!t.editor.state().modules.contains_key(&VCA));
 }
