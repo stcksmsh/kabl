@@ -8,12 +8,13 @@ Acceptance per PR (G4-SPEC §6): graphite and paper captures at 1440x900 and 118
 - Group 1: PR #102 `claude/g4-f-rack-fill` (3f9ed8e5 plus this handover). Toasts with actions (Show details, Open another...) and Esc, error pill, empty rack with `.g4(32.0)` Browse sounds, rails to window bottom, `FIT_MAX_ZOOM` 1.5, scenes `empty` and `error`. Merged with master twice; fmt/clippy/tests green.
 - PR #90 `claude/ui-g5-perform2` merged with master, f6a54596.
 
+## Done since (checkpoint 3, 2026-11-04)
+- #102 merged with master again (516d55da). Overseer may have merged it since: check `git log origin/master`.
+- PR #106 `claude/ui-face-widths` (ac25be43, draft): widths NOT narrowed (Acid Line faces are no wider than the mockup; the 91 vs 95 % gap is the 44 px rail; Kosta's overseer chose option B). Fixed label overflow: VA Osc uneven knob x [39,102,172], sample.hold 5 units, ADSR header selector padding 8. Geometry checker zooms 0.77/0.91 added, zero errors.
+
 ## Remaining, in order
-1. PR `claude/ui-face-widths` from origin/master (Kosta OK'd option a): narrow every module face to the mockup's widths (measure each family from the `FACES` table in `docs/design/redesign/g4/mockups/g4-surfaces.html`), so auto-fit reaches about 109 % at 1440x900 with Acid Line and the two rows fill the height (mockup: `z=min((cw-40)/rowW,(bot-top-32)/(2*(FACE_H+24)))`). Fix the label crowding: tray labels "Cut CV"/"In" at 1440, Output "out" caption over the title. Extend the geometry checker: no overlapping or clipped face text at 1440 and 1180. Update the `face_width` test. Capture rack at 1440 and 1180, light and dark, beside the mockup; look at them. Draft PR, report one line. Start: `grep -n "fn face_width" crates/ui/src/*.rs`.
-2. Group 2: Explain / Inspect / Compare / Learn (`explain.rs`, `inspect.rs`, `compare.rs`, `recipes.rs`), targets in G4-SPEC §4 (surf ids `explain`, `inspect`, `compare`, `learn`).
-3. Module and cable context menus, More controls with Edit face as tab 2 (`menu-module`, `menu-cable`, `more-controls`).
-4. File browser: open, save, empty (`file-open`, `file-save`, `file-empty`), no native dialogs.
-5. The five dialogs (`dlg-unsaved`, `dlg-save-as`, `dlg-save-error`, `dlg-rename`, `dlg-restore`) and About (`about`).
+1. Group 2 from origin/master (after #102 merges, else from claude/g4-f-rack-fill): Explain / Inspect / Compare / Learn (`explain.rs` 1159 lines, `inspect.rs` 1307, `compare.rs` 373, `recipes.rs` 657), targets in G4-SPEC §4 rows explain-panel, signal-inspector, compare-panel, recipes-panel. Mockup: `python3 docs/design/redesign/g4/tools/shot_mockup.py OUT explain-panel,...`. Start: read G4-SPEC §4 rows, then `grep -n "fn show\|fn draw" crates/ui/src/compare.rs`.
+2. Context menus + More controls, 3. file browser, 4. dialogs + About (as before).
 
 ## Facts
 - Kit parts in `kit/g4.rs`; use them, no stock egui widgets. `Button::g4(h)` is the mockup button look (master's); `outlined` was dropped.
