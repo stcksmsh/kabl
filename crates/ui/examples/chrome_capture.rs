@@ -14,13 +14,15 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 9] = [
+const SCENES: [&str; 11] = [
     "rack",
     "perform",
     "sounds",
     "drawer",
     "wavetable-editor",
     "seq-pattern-editor",
+    "empty",
+    "error",
     "cues-editor",
     "cable-pattern-editor",
     "cable-routes-drawer",
@@ -263,6 +265,42 @@ impl App {
                 | "cable-pattern-editor"
                 | "cable-routes-drawer"
         );
+        if j.scene == "empty" {
+            self.editor = PatchEditor::new();
+        }
+        if j.scene == "error" {
+            use kabl_ui::kit::g4::{Sev, Toast};
+            // Oldest first: the stack shows the newest on top.
+            for (sev, title, detail) in [
+                (
+                    Sev::Bad,
+                    "Could not load patch",
+                    Some("unknown module kind \"osc.xyz\""),
+                ),
+                (
+                    Sev::Warn,
+                    "Audio device busy",
+                    Some("Playing silent until it is free."),
+                ),
+                (Sev::Good, "Saved \"Warm pad\"", None),
+            ]
+            .into_iter()
+            .rev()
+            {
+                ui.toasts.push(Toast {
+                    sev,
+                    title: title.into(),
+                    detail: detail.map(Into::into),
+                    actions: if sev == Sev::Bad {
+                        vec!["Show details".into(), "Open another…".into()]
+                    } else {
+                        vec![]
+                    },
+                    expanded: true,
+                    born: 0.0,
+                });
+            }
+        }
         ui.perform_open = j.scene == "perform";
         ui.perform_tall = j.scene == "perform";
         if j.scene == "perform" {
