@@ -2685,7 +2685,7 @@ fn draw_module(
         draw_transport(ui_state, ui, painter, th, xf, m.id, r);
     }
     if let Decor::Cues(r) = m.decor {
-        draw_cues(editor, ui_state, ui, painter, th, xf, m.id, r, now);
+        draw_cues(editor, ui_state, ui, painter, xf, m.id, r, now);
     }
     if let Decor::Grid(r) = m.decor {
         drum_grid::draw(editor, ui_state, ui, painter, th, xf, m.id, r);
@@ -3224,48 +3224,17 @@ fn draw_banks(
         let resp = resp.on_hover_text(if lit {
             format!("Bank {name} is playing")
         } else if queued == Some(b) {
-            format!("Bank {name} is queued ({when})")
+            format!("Bank {name} is queued ({when}). Click to cancel")
         } else {
             format!("Launch bank {name} ({when})")
         });
-        if resp.clicked() {
+        // The queued bank cancels itself: the header has no room for a Cancel chip.
+        if resp.clicked() && queued == Some(b) {
+            ui_state.launches.push(Command::Cancel(Some(id)));
+        } else if resp.clicked() {
             if let Err(e) = banks::launch(&mut ui_state.launches, editor.state(), id, b) {
                 ui_state.last_message = Some(e);
             }
-        }
-    }
-    if queued.is_some() {
-        // Left of EDIT, same height and pill shape as the header chips.
-        let c = xf.r(Rect::from_min_size(
-            pos2(r.left() - BANK_GROUP_GAP - 54.0, r.top()),
-            vec2(54.0, r.height()),
-        ));
-        ui_state.record(format!("bank-cancel:{id}"), c);
-        let resp = ui.interact(c, Id::new(("kabl-bank-cancel", id)), Sense::click());
-        painter.rect_stroke(
-            c,
-            CornerRadius::same((c.height() / 2.0) as u8),
-            Stroke::new(
-                1.0,
-                if resp.hovered() {
-                    roles.accent
-                } else {
-                    roles.line2
-                },
-            ),
-            egui::StrokeKind::Inside,
-        );
-        text(
-            painter,
-            c.center(),
-            egui::Align2::CENTER_CENTER,
-            "Cancel",
-            11.0 * z,
-            roles.text,
-            false,
-        );
-        if resp.on_hover_text("Drop the queued launch").clicked() {
-            ui_state.launches.push(Command::Cancel(Some(id)));
         }
     }
 }
@@ -3425,13 +3394,13 @@ fn seq_step_cell(
     }
 }
 
-/// A playing (lit) / queued (blinking) launch button on the rack.
+/// A launch button on the rack, as a G3 kit chip: neutral (inset, hairline), playing (accent
+/// fill) or queued (blinking accent outline).
 #[allow(clippy::too_many_arguments)]
 fn pad(
     ui_state: &mut UiState,
     ui: &egui::Ui,
     painter: &egui::Painter,
-    th: &Theme,
     z: f32,
     key: String,
     r: Rect,
@@ -3442,30 +3411,24 @@ fn pad(
 ) -> egui::Response {
     ui_state.record(key.clone(), r);
     let resp = ui.interact(r, Id::new(("kabl-pad", key)), Sense::click());
-    painter.rect_filled(
-        r,
-        CornerRadius::same(5),
-        if lit {
-            th.gate
-        } else if th.dark {
-            th.btn
-        } else {
-            th.plate
-        },
-    );
-    painter.rect_stroke(
-        r,
-        CornerRadius::same(5),
-        Stroke::new(
-            1.0,
-            if resp.hovered() {
-                th.sel
-            } else {
-                th.panel_edge
-            },
-        ),
-        egui::StrokeKind::Inside,
-    );
+    let roles = &ui_state.style.roles;
+    let radius = CornerRadius::same((6.0 * z) as u8);
+    painter.rect_filled(r, radius, if lit { roles.accent } else { roles.inset });
+    if !lit {
+        painter.rect_stroke(
+            r,
+            radius,
+            Stroke::new(
+                1.0,
+                if resp.hovered() {
+                    roles.accent
+                } else {
+                    roles.line2
+                },
+            ),
+            egui::StrokeKind::Inside,
+        );
+    }
     if queued {
         let a = if (now * 4.0) as i64 % 2 == 0 {
             1.0
@@ -3473,10 +3436,10 @@ fn pad(
             0.35
         };
         painter.rect_stroke(
-            r.expand(1.5 * z),
-            CornerRadius::same(6),
-            Stroke::new(2.5 * z, th.gate.gamma_multiply(a)),
-            egui::StrokeKind::Outside,
+            r,
+            radius,
+            Stroke::new(1.5 * z, roles.accent.gamma_multiply(a)),
+            egui::StrokeKind::Inside,
         );
         ui.ctx()
             .request_repaint_after(std::time::Duration::from_millis(120));
@@ -3486,8 +3449,8 @@ fn pad(
         r.center(),
         egui::Align2::CENTER_CENTER,
         label,
-        12.5 * z,
-        if lit { th.sel_ink } else { th.plate_ink },
+        12.0 * z,
+        if lit { roles.on_accent } else { roles.text },
         false,
     );
     resp
@@ -3500,7 +3463,6 @@ fn draw_cues(
     ui_state: &mut UiState,
     ui: &mut egui::Ui,
     painter: &egui::Painter,
-    th: &Theme,
     xf: Xf,
     id: ModuleId,
     r: Rect,
@@ -3538,7 +3500,6 @@ fn draw_cues(
                     ui_state,
                     ui,
                     painter,
-                    th,
                     z,
                     format!("cue:{id}.{n}"),
                     b,
@@ -3565,8 +3526,8 @@ fn draw_cues(
             None => {
                 painter.rect_stroke(
                     b,
-                    CornerRadius::same(5),
-                    Stroke::new(1.0, th.panel_edge),
+                    CornerRadius::same((6.0 * z) as u8),
+                    Stroke::new(1.0, ui_state.style.roles.line),
                     egui::StrokeKind::Inside,
                 );
             }
@@ -3588,7 +3549,7 @@ fn draw_cues(
         egui::Align2::LEFT_CENTER,
         &line,
         11.5 * z,
-        th.ink2,
+        ui_state.style.roles.text2,
         true,
     );
     if let Some(q) = queued {
@@ -3600,7 +3561,6 @@ fn draw_cues(
             ui_state,
             ui,
             painter,
-            th,
             z,
             format!("cue-cancel:{id}"),
             c,

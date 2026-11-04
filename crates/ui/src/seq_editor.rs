@@ -173,6 +173,15 @@ pub(crate) fn seq_panel(
     let (mut pick, mut tpick) = (None, None);
     ui.horizontal(|ui| {
         kit::label(ui, st, style::Role::Value, kit::Tone::Text2, &line);
+        if queued.is_some() {
+            let r = ui
+                .add(kit::Button::new(st, "Cancel").ghost().small())
+                .on_hover_text("Drop the queued launch");
+            ui_state.record(format!("bank-cancel:{id}"), r.rect);
+            if r.clicked() {
+                ui_state.launches.push(Command::Cancel(Some(id)));
+            }
+        }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let r = ui.add(kit::Button::new(st, timing_name).ghost().small());
             ui_state.record(format!("seq-launch:{id}"), r.rect);
@@ -474,6 +483,7 @@ pub(crate) fn cues_panel(
         Macro(usize, ModuleId, u8, Option<f32>),
         Morph(usize, f32),
         StoreMacros(usize),
+        Move(usize, usize),
     }
     let macro_mods: Vec<ModuleId> = state
         .modules
@@ -482,7 +492,6 @@ pub(crate) fn cues_panel(
         .map(|(&c, _)| c)
         .collect();
     let mut edit = None;
-    const SHORT: [&str; 3] = ["Now", "Step", "Bar"];
 
     // Header: title, kind chip, Explain.
     ui.horizontal(|ui| {
@@ -510,8 +519,8 @@ pub(crate) fn cues_panel(
     ui.horizontal(|ui| {
         kit::section(ui, st, "Launch");
         kit::segmented(ui, st, |ui| {
-            for (i, (t, _)) in banks::TIMINGS.iter().enumerate() {
-                let r = kit::seg(ui, st, SHORT[i], common == Some(*t));
+            for (i, (t, name)) in banks::TIMINGS.iter().enumerate() {
+                let r = kit::seg(ui, st, name, common == Some(*t));
                 ui_state.record(format!("cue-launch:{id}.{i}"), r.rect);
                 if r.clicked() {
                     edit = Some(Edit::TimingAll(*t));
@@ -536,6 +545,10 @@ pub(crate) fn cues_panel(
     let open_id = Id::new(("cue-open", id));
     let mut open: Option<usize> = ui.data(|d| d.get_temp(open_id)).flatten();
     let r = &st.roles;
+    // The cue being dragged by its grip, and every card's rect for the drop.
+    let drag_id = Id::new(("cue-drag", id));
+    let dragging: Option<usize> = ui.data(|d| d.get_temp(drag_id));
+    let mut cards: Vec<(usize, Rect)> = Vec::new();
     for (c, &(playing, queued)) in all.iter().zip(&standing) {
         let lit = playing || queued;
         let frame = egui::Frame::new()
@@ -557,6 +570,22 @@ pub(crate) fn cues_panel(
         let card = frame.show(ui, |ui| {
             ui.set_width(ui.available_width());
             let head = ui.horizontal(|ui| {
+                // Drag grip: drag the card to another place in the list.
+                let (g, gr) = ui.allocate_exact_size(vec2(14.0, 20.0), Sense::drag());
+                let hot = gr.hovered() || gr.dragged();
+                kit::icon(
+                    ui.painter(),
+                    kit::Ic::Grip,
+                    g.center(),
+                    st.metrics.icon,
+                    if hot { r.text } else { r.text2 },
+                );
+                ui_state.record(format!("cue-grip:{id}.{}", c.n), g);
+                if gr.drag_started() {
+                    ui.data_mut(|d| d.insert_temp(drag_id, c.n));
+                }
+                gr.on_hover_cursor(egui::CursorIcon::Grab)
+                    .on_hover_text("Drag to reorder");
                 kit::label(
                     ui,
                     st,
@@ -610,6 +639,7 @@ pub(crate) fn cues_panel(
             head.response.rect
         });
         let head = card.response.rect;
+        cards.push((c.n, head));
         let resp = ui.interact(head, Id::new(("cue-card", id, c.n)), Sense::click());
         ui_state.record(format!("cue-card:{id}.{}", c.n), head);
         if resp.clicked() {
@@ -672,8 +702,8 @@ pub(crate) fn cues_panel(
             });
             cue_row(ui, st, "Launch", |ui| {
                 kit::segmented(ui, st, |ui| {
-                    for (i, (t, _)) in banks::TIMINGS.iter().enumerate() {
-                        let r = kit::seg(ui, st, SHORT[i], c.timing == *t);
+                    for (i, (t, name)) in banks::TIMINGS.iter().enumerate() {
+                        let r = kit::seg(ui, st, name, c.timing == *t);
                         ui_state.record(format!("cue-timing:{id}.{}.{i}", c.n), r.rect);
                         if r.clicked() {
                             edit = Some(Edit::Timing(c.n, *t));
@@ -778,6 +808,44 @@ pub(crate) fn cues_panel(
         ui.add_space(st.sp(2));
     }
     ui.data_mut(|d| d.insert_temp(open_id, open));
+    // While a grip is dragged: an accent line where the cue lands; the release moves it.
+    if let Some(from) = dragging {
+        let (pos, released, held, esc) = ui.input(|i| {
+            (
+                i.pointer.latest_pos(),
+                i.pointer.any_released(),
+                i.pointer.any_down(),
+                i.key_pressed(egui::Key::Escape),
+            )
+        });
+        let target = pos.and_then(|p| {
+            cards
+                .iter()
+                .find(|(_, rc)| p.y < rc.bottom())
+                .or(cards.last())
+                .copied()
+        });
+        let from_i = cards.iter().position(|c| c.0 == from);
+        if let (Some((to, rc)), Some(fi)) = (target, from_i) {
+            let down = cards.iter().position(|c| c.0 == to).unwrap_or(fi) > fi;
+            let y = if down {
+                rc.bottom() + 3.0
+            } else {
+                rc.top() - 3.0
+            };
+            if to != from {
+                ui.painter()
+                    .hline(rc.x_range(), y, Stroke::new(2.0, r.accent));
+            }
+            if released {
+                edit = Some(Edit::Move(from, to));
+            }
+        }
+        if released || !held || esc {
+            ui.data_mut(|d| d.remove::<usize>(drag_id));
+        }
+        ui.ctx().request_repaint();
+    }
     ui.add_space(st.sp(1));
     let w = ui.available_width();
     let r = ui.add(
@@ -806,6 +874,16 @@ pub(crate) fn cues_panel(
             cues::add(editor, id, &|s| playing_now.get(&s).copied().unwrap_or(0));
         }
         Some(Edit::Delete(n)) => cues::delete(editor, id, n),
+        Some(Edit::Move(from, to)) => {
+            // The open card and the last launched cue follow their cue.
+            let moves = cues::reorder(editor, id, from, to);
+            let follow = |n: usize| moves.iter().find(|m| m.0 == n).map_or(n, |m| m.1);
+            if let Some(l) = ui_state.last_cue.get_mut(&id) {
+                *l = follow(*l);
+            }
+            let open: Option<usize> = ui.data(|d| d.get_temp(open_id)).flatten();
+            ui.data_mut(|d| d.insert_temp(open_id, open.map(follow)));
+        }
         Some(Edit::Capture(n)) => {
             let ops = seqs
                 .iter()

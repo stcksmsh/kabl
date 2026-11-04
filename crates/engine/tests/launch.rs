@@ -181,6 +181,25 @@ fn launch(timing: Timing, bank: u8) -> Ev {
 }
 
 #[test]
+fn next_two_bars_starts_on_the_next_line_of_two_bars() {
+    // Launched on tick 5: the bar line is tick 16, the two-bar line tick 32.
+    let r = run(
+        &patch("pitch"),
+        block_of(tick(40)),
+        vec![(block_of(tick(5)), launch(Timing::NextTwoBars, 1))],
+    );
+    let a = changes(&r, |s| s.0);
+    let first_b = a.iter().find(|c| c.1 >= 10.0).unwrap();
+    assert_eq!(first_b.1, 10.0);
+    assert!(
+        first_b.0.abs_diff(tick(32)) <= 1,
+        "{} vs {}",
+        first_b.0,
+        tick(32)
+    );
+}
+
+#[test]
 fn next_bar_starts_each_sequencer_on_its_first_edge_at_or_after_the_bar() {
     let r = run(
         &patch("pitch"),

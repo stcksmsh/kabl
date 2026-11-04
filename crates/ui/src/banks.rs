@@ -16,10 +16,11 @@ pub fn name_key(b: usize) -> String {
 /// Presentation params of a sequencer's own launches: the reference clock's id and the timing.
 pub const LAUNCH_CLOCK: &str = "launch.clock";
 pub const LAUNCH_TIMING: &str = "launch.timing";
-pub const TIMINGS: [(Timing, &str); 3] = [
+pub const TIMINGS: [(Timing, &str); 4] = [
     (Timing::Now, "Now"),
-    (Timing::NextStep, "Next step"),
-    (Timing::NextBar, "Next bar"),
+    (Timing::NextStep, "Step"),
+    (Timing::NextBar, "Bar"),
+    (Timing::NextTwoBars, "2 bars"),
 ];
 
 /// "B", or "B Verse" when bank B is named.
