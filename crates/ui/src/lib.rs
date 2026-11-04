@@ -1139,45 +1139,38 @@ fn fit_world(bounds: Rect) -> Rect {
 /// The empty rack: the rails stay, a centred note offers the two ways to start.
 fn empty_rack(ui_state: &mut UiState, ui: &mut egui::Ui, canvas: Rect) {
     let st = ui_state.style.clone();
-    let area = Rect::from_center_size(canvas.center() - vec2(0.0, 20.0), vec2(420.0, 240.0));
+    // The mockup centres the well 80 px above the middle of the canvas.
+    let top = canvas.center().y - 80.0 - 28.0;
+    let area = Rect::from_min_size(pos2(canvas.min.x, top), vec2(canvas.width(), 204.0));
     ui.scope_builder(egui::UiBuilder::new().max_rect(area), |ui| {
-        kit::g4::empty_state(
+        let r = kit::g4::empty_state(
             ui,
             &st,
             kit::Ic::Plug,
             "Empty rack",
             "Add a module, or start from a sound.",
-            |ui| {
-                let add = ui.add(
-                    kit::Button::new(&st, "Add module")
-                        .icon(kit::Ic::Plus)
-                        .primary(),
-                );
-                ui_state.record("empty-add".into(), add.rect);
-                if add.clicked() {
-                    ui_state.add_menu_req = true;
-                }
-                let browse = ui.add(
-                    kit::Button::new(&st, "Browse sounds")
-                        .icon(kit::Ic::Search)
-                        .g4(32.0),
-                );
-                ui_state.record("empty-browse".into(), browse.rect);
-                if browse.clicked() {
-                    ui_state.browser_open = true;
-                }
-            },
+            &[
+                kit::g4::EmptyAction {
+                    label: "Add module",
+                    primary: true,
+                    icon: kit::Ic::Plus,
+                },
+                kit::g4::EmptyAction {
+                    label: "Browse sounds",
+                    primary: false,
+                    icon: kit::Ic::Search,
+                },
+            ],
+            Some("Tip: right-click the rack to add a module where you click."),
         );
-        ui.add_space(14.0);
-        ui.vertical_centered(|ui| {
-            kit::label(
-                ui,
-                &st,
-                style::Role::Caption,
-                kit::Tone::Text3,
-                "Tip: right-click the rack to add a module where you click.",
-            );
-        });
+        ui_state.record("empty-add".into(), r[0].rect);
+        if r[0].clicked() {
+            ui_state.add_menu_req = true;
+        }
+        ui_state.record("empty-browse".into(), r[1].rect);
+        if r[1].clicked() {
+            ui_state.browser_open = true;
+        }
     });
 }
 
