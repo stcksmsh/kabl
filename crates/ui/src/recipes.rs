@@ -427,19 +427,71 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         para(ui, n);
     }
     let Some(a) = ui_state.recipes.active.clone() else {
-        weak(
+        crate::kit::label(
             ui,
-            "Optional. Each opens its own patch (you are asked first if your sound has unsaved \
-             changes). Leave any time: your patch stays as it is.",
+            &st,
+            crate::style::Role::Body,
+            crate::kit::Tone::Text2,
+            "Each opens in its own patch. Yours stays as it is.",
+        )
+        .on_hover_text(
+            "Optional. You are asked first if your sound has unsaved changes. Leave any time: \
+             your patch stays as it is.",
         );
+        ui.add_space(8.0);
         for (i, r) in RECIPES.iter().enumerate() {
-            ui.add_space(4.0);
-            let b = ui.add(kb(r.title.into())).on_hover_text(r.intent);
-            ui_state.record(format!("recipe:{}", r.key), b.rect);
-            if b.clicked() {
+            // g4-surfaces.html Learn card: 72 px, radius 8, title 14/600 at +26, line 12 at +48,
+            // step count in mono at the right.
+            let (rect, resp) = ui
+                .allocate_exact_size(egui::vec2(ui.available_width(), 72.0), egui::Sense::click());
+            let hover = resp.hovered();
+            let p = ui.painter();
+            p.rect(
+                rect,
+                egui::CornerRadius::same(8),
+                if hover {
+                    st.roles.line
+                } else {
+                    st.roles.raised
+                },
+                egui::Stroke::new(1.0, st.roles.line),
+                egui::StrokeKind::Inside,
+            );
+            let semi = crate::style::Font::SansSemibold.family(st.fonts_ready);
+            p.text(
+                rect.min + egui::vec2(12.0, 26.0 - 14.0 * 0.36),
+                egui::Align2::LEFT_CENTER,
+                r.title,
+                egui::FontId::new(14.0, semi),
+                st.roles.text,
+            );
+            let mut job = egui::text::LayoutJob::simple(
+                r.intent.to_string(),
+                egui::FontId::new(12.0, st.font(crate::style::Role::Body).family),
+                st.roles.text2,
+                rect.width() - 24.0,
+            );
+            job.wrap.max_rows = 1;
+            job.wrap.break_anywhere = true;
+            let galley = p.layout_job(job);
+            p.galley(
+                rect.min + egui::vec2(12.0, 48.0 - galley.size().y / 2.0 - 12.0 * 0.36 + 2.0),
+                galley,
+                st.roles.text2,
+            );
+            p.text(
+                egui::pos2(rect.max.x - 12.0, rect.min.y + 26.0 - 11.0 * 0.36),
+                egui::Align2::RIGHT_CENTER,
+                format!("{} steps", r.steps.len()),
+                st.font(crate::style::Role::Value),
+                st.roles.text3,
+            );
+            let resp = resp.on_hover_text(r.intent);
+            ui_state.record(format!("recipe:{}", r.key), rect);
+            if resp.clicked() {
                 start(editor, ui_state, i);
             }
-            weak(ui, r.intent);
+            ui.add_space(8.0);
         }
         return;
     };

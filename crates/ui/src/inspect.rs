@@ -1164,10 +1164,52 @@ pub fn panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, no
             }
         }
     } else {
-        weak(
+        // The mockup's empty state: well, title, line, then the Why button at +110, a rule at
+        // +168 and the tip at +194 (offsets from the well's centre).
+        let top = ui.cursor().top();
+        crate::kit::g4::empty_state(
             ui,
-            "Select a module in the rack to choose one of its outputs.",
+            &st,
+            crate::kit::Ic::Focus,
+            "Inspect a signal",
+            "Select a module, then pick one of its outputs.",
+            &[],
+            None,
         );
+        let c = egui::pos2(ui.min_rect().center().x, top + 28.0);
+        let open = ui_state.inspect.why;
+        let b = crate::kit::Button::new(&st, "Why no sound?")
+            .icon(crate::kit::Ic::Wave)
+            .g4(32.0)
+            .selected(open);
+        let w = b.width(ui).max(140.0);
+        let r = ui.put(
+            egui::Rect::from_min_size(egui::pos2(c.x - w / 2.0, c.y + 110.0), egui::vec2(w, 32.0)),
+            b.min_width(140.0),
+        );
+        ui_state.record("why".into(), r.rect);
+        if r.clicked() {
+            ui_state.inspect.why = !open;
+            log::debug!(target: "inspect", "why-no-sound open={}", !open);
+        }
+        let rule_y = c.y + 168.0;
+        ui.painter().hline(
+            ui.max_rect().x_range().shrink(16.0),
+            rule_y,
+            egui::Stroke::new(1.0, st.roles.line),
+        );
+        ui.painter().text(
+            egui::pos2(c.x, c.y + 194.0 - 12.0 * 0.36),
+            egui::Align2::CENTER_CENTER,
+            "Tip: right-click a module → Inspect output.",
+            egui::FontId::new(12.0, st.font(crate::style::Role::Body).family),
+            st.roles.text3,
+        );
+        ui.allocate_space(egui::vec2(ui.available_width(), 130.0));
+        if ui_state.inspect.why {
+            why_panel(editor, ui_state, ui, now);
+        }
+        return;
     }
 
     let status = ui_state.inspect.status(state, now);

@@ -318,6 +318,7 @@ impl App {
             }
         }
         if j.scene == "inspect" {
+            ui.selected_module = None;
             ui.inspect.open = true;
         }
         if j.scene == "learn" {
@@ -390,6 +391,9 @@ impl App {
             .iter()
             .find(|(_, m)| m.kind == "filter.svf")
             .map(|(&id, _)| id);
+        if j.scene == "inspect" {
+            ui.selected_module = None;
+        }
         if j.scene == "seq-pattern-editor" {
             // The mockup's state: editing A, B playing, step 5 under the playhead.
             let seq = self

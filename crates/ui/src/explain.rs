@@ -818,11 +818,6 @@ fn control(
         if let Some(h) = help::param_help(&kind, p.name) {
             para(ui, h);
         }
-        // Above the facts, not below: the drawer scrolls and Show must stay in reach.
-        ui.add_space(6.0);
-        crate::kit::g4::card(ui, &st, |ui| {
-            show_self(ui_state, ui);
-        });
         let range = help::range_text(&kind, p);
         let mut rows: Vec<(&str, String)> = Vec::new();
         let mut parts = range.split(" · ");
@@ -930,6 +925,60 @@ fn control(
                     }
                 });
             }
+        }
+        ui.add_space(8.0);
+        // g4-surfaces.html "Show in rack" card: 62 px, info icon, title 13/600, line 12.
+        let (rect, resp) =
+            ui.allocate_exact_size(egui::vec2(ui.available_width(), 62.0), egui::Sense::click());
+        let painter = ui.painter();
+        painter.rect(
+            rect,
+            egui::CornerRadius::same(8),
+            if resp.hovered() {
+                st.roles.line
+            } else {
+                st.roles.raised
+            },
+            egui::Stroke::new(1.0, st.roles.line),
+            egui::StrokeKind::Inside,
+        );
+        crate::kit::icon(
+            painter,
+            crate::kit::Ic::Info,
+            rect.min + egui::vec2(20.0, 20.0),
+            16.0,
+            st.roles.accent,
+        );
+        let semi = crate::style::Font::SansSemibold.family(st.fonts_ready);
+        painter.text(
+            rect.min + egui::vec2(36.0, 25.0 - 13.0 * 0.36),
+            egui::Align2::LEFT_CENTER,
+            "Show in rack",
+            egui::FontId::new(13.0, semi),
+            st.roles.text,
+        );
+        painter.text(
+            rect.min + egui::vec2(36.0, 44.0 - 12.0 * 0.36),
+            egui::Align2::LEFT_CENTER,
+            "Highlights the control and its cables.",
+            egui::FontId::new(12.0, st.font(crate::style::Role::Body).family),
+            st.roles.text3,
+        );
+        ui_state.record(format!("explain-show:{id}.{}", p.name), rect);
+        if resp
+            .on_hover_text("Bring it into view in the rack (no change to the sound)")
+            .clicked()
+        {
+            go(
+                editor,
+                ui_state,
+                Target::Control {
+                    id,
+                    param: p.name.to_string(),
+                    cable: None,
+                },
+                now,
+            );
         }
         selected_detail(editor.state(), ui_state, ui);
         return;

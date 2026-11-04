@@ -1052,7 +1052,7 @@ fn drawer(
     if ui_state.recipes.open {
         // Above the drawer's scrolling content, so Show (which scrolls the drawer
         // to the routes) never scrolls the recipe away.
-        let h = ui.available_height() * 0.65;
+        let h = ui.available_height() * 0.8;
         egui::ScrollArea::vertical()
             .id_salt("kabl-recipes")
             .max_height(h)
@@ -1064,7 +1064,7 @@ fn drawer(
     if ui_state.explain.is_open() {
         // Its own scroll area, at most about half the drawer: the module and
         // routing sections below stay in reach while it is open.
-        let h = ui.available_height() * 0.65;
+        let h = ui.available_height() * 0.8;
         egui::ScrollArea::vertical()
             .id_salt("kabl-explain")
             .max_height(h)
