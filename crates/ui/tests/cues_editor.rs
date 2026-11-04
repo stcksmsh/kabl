@@ -92,6 +92,33 @@ impl H {
         self.settle();
     }
 
+    /// Presses on `from`, moves in steps to `to`'s centre, releases.
+    fn drag(&mut self, from: &str, to: &str) {
+        let (a, b) = (self.ui.hits[from].center(), self.ui.hits[to].center());
+        self.events.push(Event::PointerMoved(a));
+        self.frame();
+        self.events.push(Event::PointerButton {
+            pos: a,
+            button: PointerButton::Primary,
+            pressed: true,
+            modifiers: Modifiers::NONE,
+        });
+        self.frame();
+        for k in 1..=8 {
+            self.events
+                .push(Event::PointerMoved(a + (b - a) * (k as f32 / 8.0)));
+            self.frame();
+        }
+        self.events.push(Event::PointerButton {
+            pos: b,
+            button: PointerButton::Primary,
+            pressed: false,
+            modifiers: Modifiers::NONE,
+        });
+        self.frame();
+        self.settle();
+    }
+
     fn all(&self) -> Vec<cues::Cue> {
         cues::cues(self.editor.state(), self.cues)
     }
@@ -189,4 +216,20 @@ fn the_cues_editor_text_reads_at_4_5_to_1() {
             assert!(c >= 4.5, "dark={dark}: {name} {c:.2}:1");
         }
     }
+}
+
+#[test]
+fn a_cards_grip_drags_it_to_another_place() {
+    let mut h = H::new(egui::vec2(1440.0, 900.0));
+    let id = h.cues;
+    h.click(&format!("cue-add:{id}"));
+    for (n, name) in [(1, "Intro"), (2, "Drop"), (3, "Break")] {
+        cues::rename(&mut h.editor, id, n, name);
+    }
+    h.settle();
+    let before = h.editor.log().entries().len();
+    h.drag(&format!("cue-grip:{id}.3"), &format!("cue-card:{id}.1"));
+    let names: Vec<String> = h.all().into_iter().map(|c| c.name).collect();
+    assert_eq!(names, ["Break", "Intro", "Drop"]);
+    assert_eq!(h.editor.log().entries().len(), before + 1, "one undo step");
 }

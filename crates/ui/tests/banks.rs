@@ -214,6 +214,10 @@ fn queued_state_shows_cancel_which_sends_a_cancel() {
     h.frame();
     h.click(&format!("bank-cancel:{BASS}"));
     assert_eq!(h.ui.launches, vec![Command::Cancel(Some(BASS))]);
+    // On the face, the queued bank itself cancels.
+    h.ui.launches.clear();
+    h.click(&format!("bank-play:{BASS}.2"));
+    assert_eq!(h.ui.launches, vec![Command::Cancel(Some(BASS))]);
 }
 
 #[test]
