@@ -896,6 +896,43 @@ pub fn card<R>(ui: &mut Ui, st: &Style, add: impl FnOnce(&mut Ui) -> R) -> R {
         .inner
 }
 
+/// A 22 px pill (G4-SPEC `chip`): optional signal dot, optional mono text.
+pub fn chip_label(
+    ui: &mut Ui,
+    st: &Style,
+    text: &str,
+    mono: bool,
+    dot: Option<Color32>,
+) -> Response {
+    let role = if mono { Role::Value } else { Role::Label };
+    let galley = ui
+        .painter()
+        .layout_no_wrap(text.into(), st.font(role), st.roles.text);
+    let pad = 9.0;
+    let dot_w = if dot.is_some() { 12.0 } else { 0.0 };
+    let (r, resp) = ui.allocate_exact_size(
+        vec2(galley.size().x + 2.0 * pad + dot_w, 22.0),
+        Sense::hover(),
+    );
+    ui.painter().rect(
+        r,
+        CornerRadius::same(11),
+        st.roles.inset,
+        Stroke::new(1.0, st.roles.line),
+        StrokeKind::Inside,
+    );
+    if let Some(c) = dot {
+        ui.painter()
+            .circle_filled(pos2(r.min.x + pad + 3.0, r.center().y), 3.0, c);
+    }
+    ui.painter().galley(
+        pos2(r.min.x + pad + dot_w, r.center().y - galley.size().y / 2.0),
+        galley,
+        st.roles.text,
+    );
+    resp
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
