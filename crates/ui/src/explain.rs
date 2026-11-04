@@ -818,6 +818,11 @@ fn control(
         if let Some(h) = help::param_help(&kind, p.name) {
             para(ui, h);
         }
+        // Above the facts, not below: the drawer scrolls and Show must stay in reach.
+        ui.add_space(6.0);
+        crate::kit::g4::card(ui, &st, |ui| {
+            show_self(ui_state, ui);
+        });
         let range = help::range_text(&kind, p);
         let mut rows: Vec<(&str, String)> = Vec::new();
         let mut parts = range.split(" · ");
@@ -926,10 +931,6 @@ fn control(
                 });
             }
         }
-        ui.add_space(8.0);
-        crate::kit::g4::card(ui, &st, |ui| {
-            show_self(ui_state, ui);
-        });
         selected_detail(editor.state(), ui_state, ui);
         return;
     }
