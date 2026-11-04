@@ -14,7 +14,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 11] = [
+const SCENES: [&str; 15] = [
     "rack",
     "perform",
     "sounds",
@@ -26,6 +26,10 @@ const SCENES: [&str; 11] = [
     "cues-editor",
     "cues-face",
     "cable-pattern-editor",
+    "menu-module",
+    "menu-cable",
+    "more-controls",
+    "more-controls-face",
 ];
 
 struct Job {
@@ -43,6 +47,8 @@ struct App {
     editor: PatchEditor,
     ui: UiState,
     _user: tempfile::TempDir,
+    /// Input events for the next frame (a right-click that opens a context menu).
+    inject: Vec<egui::Event>,
 }
 
 fn patches() -> PathBuf {
@@ -230,7 +236,9 @@ impl App {
                 }
                 e
             }
-            Err(_) => mockup_patch(j.scene == "wavetable-editor"),
+            Err(_) => {
+                mockup_patch(j.scene == "wavetable-editor" || j.scene.starts_with("more-controls"))
+            }
         };
         let mut ui = UiState::default();
         ui.theme = self.theme.clone();
@@ -496,6 +504,10 @@ impl App {
 }
 
 impl eframe::App for App {
+    fn raw_input_hook(&mut self, _ctx: &egui::Context, raw: &mut egui::RawInput) {
+        raw.events.append(&mut self.inject);
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         if self.i >= self.jobs.len() {
@@ -573,8 +585,69 @@ impl eframe::App for App {
             self.ui.zoom = 1.0;
             self.ui.pan = egui::vec2(-700.0, -560.0);
         }
+        // The mockup's More controls: the wavetable oscillator's, Controls tab (once the first
+        // frames, which reset the view, are past).
+        if self.f == 6 && self.jobs[self.i].scene.starts_with("more-controls") {
+            let wt = self
+                .editor
+                .state()
+                .modules
+                .iter()
+                .find(|(_, m)| m.kind == "osc.wt")
+                .map(|(&id, _)| id)
+                .unwrap();
+            self.ui.expanded.insert(wt);
+            self.ui.more_tab = usize::from(self.jobs[self.i].scene == "more-controls-face");
+        }
+        // The menus: a right-click on the sequencer's title bar, or on a cable's middle.
+        if matches!(self.f, 8 | 9)
+            && matches!(self.jobs[self.i].scene, "menu-module" | "menu-cable")
+        {
+            let state = self.editor.state();
+            let find = |kind: &str| {
+                state
+                    .modules
+                    .iter()
+                    .find(|(_, m)| m.kind == kind)
+                    .map(|(&id, _)| id)
+                    .unwrap()
+            };
+            let at = if self.jobs[self.i].scene == "menu-module" {
+                let r = self.ui.hits[&format!("module:{}", find("seq"))];
+                r.left_top() + egui::vec2(r.width() * 0.25, 22.0)
+            } else {
+                let (osc, svf) = (find("osc.va"), find("filter.svf"));
+                let c = state
+                    .cables
+                    .iter()
+                    .find(|(_, c)| {
+                        matches!((&c.from, &c.to), (
+                            kabl_core::PortRef::Module { id: a, .. },
+                            kabl_core::PortRef::Module { id: b, .. },
+                        ) if *a == osc && *b == svf)
+                    })
+                    .map(|(&id, _)| id)
+                    .unwrap();
+                self.ui.hits[&format!("cable:{c}")].center()
+            };
+            self.inject.push(egui::Event::PointerMoved(at));
+            self.inject.push(egui::Event::PointerButton {
+                pos: at,
+                button: egui::PointerButton::Secondary,
+                pressed: self.f == 8,
+                modifiers: egui::Modifiers::NONE,
+            });
+        }
         self.f += 1;
-        if self.f == 12 {
+        // Menus fade in after the click: give them time to settle.
+        let shot = if self.jobs[self.i].scene.starts_with("menu-")
+            || self.jobs[self.i].scene.starts_with("more-controls")
+        {
+            30
+        } else {
+            12
+        };
+        if self.f == shot {
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
         }
         ctx.request_repaint();
@@ -621,6 +694,7 @@ fn main() {
                 editor: PatchEditor::seed_from(&Default::default()),
                 ui: UiState::default(),
                 _user: tempfile::tempdir().unwrap(),
+                inject: Vec::new(),
             };
             app.prepare();
             Ok(Box::new(app))
