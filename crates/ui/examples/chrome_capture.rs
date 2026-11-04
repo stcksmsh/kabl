@@ -14,7 +14,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 10] = [
+const SCENES: [&str; 11] = [
     "rack",
     "perform",
     "sounds",
@@ -25,6 +25,7 @@ const SCENES: [&str; 10] = [
     "error",
     "cues-editor",
     "cable-pattern-editor",
+    "compare",
 ];
 
 struct Job {
@@ -295,6 +296,11 @@ impl App {
                     born: 0.0,
                 });
             }
+        }
+        if j.scene == "compare" {
+            ui.drawer_open = true;
+            ui.compare.open = true;
+            ui.compare.capture(&self.editor, "you");
         }
         ui.perform_open = j.scene == "perform";
         ui.perform_tall = j.scene == "perform";

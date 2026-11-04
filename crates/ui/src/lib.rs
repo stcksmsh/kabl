@@ -1084,9 +1084,7 @@ fn drawer(
             });
         }
         if ui_state.compare.open {
-            egui::Frame::group(ui.style()).show(ui, |ui| {
-                compare::panel(editor, ui_state, ui);
-            });
+            compare::panel(editor, ui_state, ui, st);
         }
         // The patch-wide lists lead when no control is being edited, and follow its editor
         // otherwise, so the control's routes stay in view.

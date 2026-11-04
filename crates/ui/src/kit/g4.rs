@@ -834,6 +834,68 @@ pub fn range_bar(
     resp
 }
 
+/// Large segmented control (G4-SPEC §4 Compare A/B): 40 px tall, `inset` track, the selected
+/// item `raised` with a `line` border. `pick` gets the index of an item clicked this frame.
+pub fn segmented_large(
+    ui: &mut Ui,
+    st: &Style,
+    item_w: f32,
+    items: &[(&str, bool)],
+    mut pick: impl FnMut(usize),
+) {
+    let (track, _) = ui.allocate_exact_size(
+        vec2(item_w * items.len() as f32 + 4.0, 40.0),
+        Sense::hover(),
+    );
+    ui.painter().rect(
+        track,
+        CornerRadius::same(8),
+        st.roles.inset,
+        Stroke::new(1.0, st.roles.line),
+        StrokeKind::Inside,
+    );
+    for (i, (text, on)) in items.iter().enumerate() {
+        let r = Rect::from_min_size(
+            track.min + vec2(2.0 + item_w * i as f32, 2.0),
+            vec2(item_w, 36.0),
+        );
+        let resp = ui.interact(r, ui.id().with(("seg-large", i)), Sense::click());
+        if *on {
+            ui.painter().rect(
+                r,
+                CornerRadius::same(6),
+                st.roles.raised,
+                Stroke::new(1.0, st.roles.line),
+                StrokeKind::Inside,
+            );
+        }
+        ui.painter().text(
+            r.center(),
+            egui::Align2::CENTER_CENTER,
+            text,
+            st.font(Role::Body),
+            if *on { st.roles.text } else { st.roles.text2 },
+        );
+        if resp.clicked() {
+            pick(i);
+        }
+    }
+}
+
+/// A bordered `raised` card for grouped facts (G4-SPEC §4 reference card).
+pub fn card<R>(ui: &mut Ui, st: &Style, add: impl FnOnce(&mut Ui) -> R) -> R {
+    Frame::new()
+        .fill(st.roles.raised)
+        .stroke(Stroke::new(1.0, st.roles.line))
+        .corner_radius(CornerRadius::same(8))
+        .inner_margin(Margin::same(12))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            add(ui)
+        })
+        .inner
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
