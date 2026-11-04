@@ -14,7 +14,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 14] = [
+const SCENES: [&str; 17] = [
     "rack",
     "perform",
     "sounds",
@@ -29,6 +29,9 @@ const SCENES: [&str; 14] = [
     "cable-routes-drawer",
     "cable-routes-rest",
     "cable-routes-opening",
+    "file-open",
+    "file-save",
+    "file-empty",
 ];
 
 struct Job {
@@ -287,6 +290,20 @@ impl App {
         );
         if j.scene == "empty" {
             self.editor = PatchEditor::new();
+        }
+        if j.scene.starts_with("file-") {
+            use kabl_ui::filebrowser::{self as fb, Mode, Purpose, FOLDERS};
+            let patches = std::env::temp_dir().join(PATCHES);
+            ui.folders.insert("patches".into(), patches.clone());
+            let (purpose, title, mode, name) = match j.scene {
+                "file-save" => (Purpose::PatchSave, "Save patch", Mode::Save, "my-patch"),
+                _ => (Purpose::PatchLoad, "Open patch", Mode::Folder, ""),
+            };
+            if j.scene == "file-empty" {
+                ui.folders
+                    .insert("patches".into(), patches.with_file_name("empty-set"));
+            }
+            fb::open(&mut ui, purpose, title, mode, FOLDERS, name, "");
         }
         if j.scene == "error" {
             use kabl_ui::kit::g4::{Sev, Toast};
@@ -723,8 +740,44 @@ impl eframe::App for App {
     }
 }
 
+/// The file browser scenes' folders, as in the mockup: `HOME/Music/kabl/patches` with patch
+/// folders of fixed dates, and an empty `empty-set` beside it. HOME is pointed at the tree's
+/// root so the breadcrumb starts at Home. Called before any thread starts (it sets HOME).
+fn file_tree() {
+    let home = std::env::temp_dir().join("kabl-capture-home");
+    let patches = std::env::temp_dir().join(PATCHES);
+    std::fs::create_dir_all(patches.with_file_name("empty-set")).unwrap();
+    // 2026-11-02 18:40 UTC, then a day or more earlier for each later row.
+    let base = 1_793_577_600u64 + 18 * 3600 + 40 * 60;
+    for (i, name) in [
+        "composition-batch",
+        "cue-macros",
+        "effects",
+        "acid-line",
+        "dense-composition",
+        "rope-walk",
+        "slab-city",
+        "warm-pad",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let d = patches.join(name);
+        std::fs::create_dir_all(&d).unwrap();
+        let t = std::time::UNIX_EPOCH + std::time::Duration::from_secs(base - i as u64 * 97_000);
+        let _ = std::fs::File::open(&d).and_then(|f| f.set_modified(t));
+    }
+    std::env::set_var("HOME", &home);
+}
+
+/// The patches folder of [`file_tree`], under the temporary folder.
+const PATCHES: &str = "kabl-capture-home/Music/kabl/patches";
+
 fn main() {
     let a: Vec<String> = std::env::args().skip(1).collect();
+    if a.get(1).is_none_or(|w| w == "all" || w.contains("file-")) {
+        file_tree();
+    }
     let dir = PathBuf::from(a.first().cloned().unwrap_or_else(|| "target/chrome".into()));
     std::fs::create_dir_all(&dir).unwrap();
     let want = a.get(1).cloned().unwrap_or_else(|| "all".into());
