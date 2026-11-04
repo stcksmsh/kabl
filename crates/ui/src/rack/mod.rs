@@ -696,7 +696,15 @@ fn place_local(
                     param: &info.params[i],
                     primary: true,
                     geo: Geo::Knob {
-                        c: pos2(SIDE + pitch * (k as f32 + 0.5), y0 + r + 17.1),
+                        c: pos2(
+                            // VA Oscillator: uneven pitch so "Pulse width" has room (mockup).
+                            if info.kind == "osc.va" && n == 3 && fw == 210.0 {
+                                [39.0, 102.0, 172.0][k]
+                            } else {
+                                SIDE + pitch * (k as f32 + 0.5)
+                            },
+                            y0 + r + 17.1,
+                        ),
                         r: knob_rs[k],
                     },
                 });
@@ -722,7 +730,7 @@ fn place_local(
             let mut right = fw - SIDE;
             for &i in header_sels.iter().rev() {
                 let (n, longest) = options(info, &info.params[i]);
-                let w = (7.0 * longest as f32 + 12.0) * n as f32;
+                let w = (7.0 * longest as f32 + 8.0) * n as f32;
                 right -= w;
                 ctls.push(Ctl {
                     param: &info.params[i],
