@@ -403,10 +403,18 @@ fn test_note(ui_state: &mut UiState, secs: f32) {
 
 /// The drawer section.
 pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, now: f64) {
+    let st = ui_state.style.clone();
+    let kb = |t: String| crate::kit::Button::new(&st, t).g4(28.0);
     ui.horizontal(|ui| {
-        ui.strong("Listening recipes");
+        crate::kit::label(
+            ui,
+            &st,
+            crate::style::Role::H3,
+            crate::kit::Tone::Text,
+            "Listening recipes",
+        );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let r = ui.small_button("Close");
+            let r = ui.add(crate::kit::Button::new(&st, "Close").ghost().small());
             ui_state.record("learn-close".into(), r.rect);
             if r.clicked() {
                 // Keeps the current patch and its edits.
@@ -425,14 +433,13 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
              changes). Leave any time: your patch stays as it is.",
         );
         for (i, r) in RECIPES.iter().enumerate() {
-            ui.horizontal_wrapped(|ui| {
-                let b = ui.button(r.title).on_hover_text(r.intent);
-                ui_state.record(format!("recipe:{}", r.key), b.rect);
-                if b.clicked() {
-                    start(editor, ui_state, i);
-                }
-                weak(ui, r.intent);
-            });
+            ui.add_space(4.0);
+            let b = ui.add(kb(r.title.into())).on_hover_text(r.intent);
+            ui_state.record(format!("recipe:{}", r.key), b.rect);
+            if b.clicked() {
+                start(editor, ui_state, i);
+            }
+            weak(ui, r.intent);
         }
         return;
     };
@@ -445,7 +452,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
              you. Your current sound is untouched.",
         );
         ui.horizontal(|ui| {
-            let b = ui.button("Open the recipe patch again");
+            let b = ui.add(kb("Open the recipe patch again".into()));
             ui_state.record("recipe-reopen".into(), b.rect);
             if b.clicked() {
                 start(editor, ui_state, a.recipe);
@@ -482,14 +489,14 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         ui.horizontal_wrapped(|ui| {
             if let Some((Some(t), _)) = resolved.clone() {
                 let b = ui
-                    .button("Show")
+                    .add(kb("Show".into()))
                     .on_hover_text("Bring it into view (no change to the sound)");
                 ui_state.record("recipe-show".into(), b.rect);
                 if b.clicked() {
                     explain::go(editor, ui_state, t, now);
                 }
                 if explain::can_go_back(&ui_state.explain) {
-                    let b = ui.button("Back");
+                    let b = ui.add(kb("Back".into()));
                     ui_state.record("recipe-back".into(), b.rect);
                     if b.clicked() {
                         explain::back(ui_state, now);
@@ -502,7 +509,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                     .modules
                     .get(&id)
                     .is_some_and(|m| m.kind == kind);
-                let b = ui.add_enabled(ok, egui::Button::new(format!("Inspect #{id} {port}")));
+                let b = ui.add_enabled(ok, kb(format!("Inspect #{id} {port}")));
                 ui_state.record("recipe-inspect".into(), b.rect);
                 if b.clicked() {
                     ui_state.selected_module = Some(id);
@@ -517,7 +524,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             }
             if let Some(secs) = s.note_secs {
                 let b = ui
-                    .button(format!("Play test note ({secs:.0} s)"))
+                    .add(kb(format!("Play test note ({secs:.0} s)")))
                     .on_hover_text("Middle C, same length and velocity every time");
                 ui_state.record("recipe-note".into(), b.rect);
                 if b.clicked() {
@@ -525,7 +532,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                 }
             }
             if s.compare {
-                let b = ui.button("Open Compare");
+                let b = ui.add(kb("Open Compare".into()));
                 ui_state.record("recipe-compare".into(), b.rect);
                 if b.clicked() {
                     ui_state.compare.open = true;
@@ -535,18 +542,20 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         });
     }
     ui.horizontal(|ui| {
-        let b = ui.add_enabled(a.step > 0, egui::Button::new("← Previous"));
+        let b = ui.add_enabled(a.step > 0, kb("Previous".into()).ghost());
         ui_state.record("recipe-prev".into(), b.rect);
         if b.clicked() {
             step_to(ui_state, a.step - 1);
         }
         let b = ui.add_enabled(
             a.step < n,
-            egui::Button::new(if a.step + 1 == n {
-                "Try on your own →"
+            kb(if a.step + 1 == n {
+                "Try on your own"
             } else {
-                "Next →"
-            }),
+                "Next"
+            }
+            .into())
+            .primary(),
         );
         ui_state.record("recipe-next".into(), b.rect);
         if b.clicked() {

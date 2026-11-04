@@ -14,7 +14,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 12] = [
+const SCENES: [&str; 15] = [
     "rack",
     "perform",
     "sounds",
@@ -27,6 +27,9 @@ const SCENES: [&str; 12] = [
     "cues-face",
     "cable-pattern-editor",
     "compare",
+    "explain",
+    "inspect",
+    "learn",
 ];
 
 struct Job {
@@ -297,6 +300,28 @@ impl App {
                     born: 0.0,
                 });
             }
+        }
+        if matches!(j.scene, "explain" | "inspect" | "learn") {
+            ui.drawer_open = true;
+        }
+        if j.scene == "explain" {
+            let state = self.editor.state();
+            if let Some((&id, _)) = state.modules.iter().find(|(_, m)| m.kind == "filter.svf") {
+                kabl_ui::explain::open(
+                    &mut ui,
+                    kabl_ui::explain::Subject::Control {
+                        id,
+                        key: "cutoff_hz".into(),
+                    },
+                    None,
+                );
+            }
+        }
+        if j.scene == "inspect" {
+            ui.inspect.open = true;
+        }
+        if j.scene == "learn" {
+            ui.recipes.open = true;
         }
         if j.scene == "compare" {
             ui.drawer_open = true;

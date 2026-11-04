@@ -1104,10 +1104,17 @@ pub fn panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, no
         ui.scroll_to_cursor(Some(egui::Align::TOP));
     }
     let state = editor.state();
+    let st = ui_state.style.clone();
     ui.horizontal(|ui| {
-        ui.strong("Inspect a signal");
+        crate::kit::label(
+            ui,
+            &st,
+            crate::style::Role::H3,
+            crate::kit::Tone::Text,
+            "Inspect a signal",
+        );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let r = ui.small_button("Close");
+            let r = ui.add(crate::kit::Button::new(&st, "Close").ghost().small());
             ui_state.record("inspect-close".into(), r.rect);
             if r.clicked() {
                 ui_state.inspect.open = false;
@@ -1141,7 +1148,7 @@ pub fn panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, no
                             .sel
                             .as_ref()
                             .is_some_and(|s| s.id == id && s.port == p);
-                        let r = ui.add(egui::Button::selectable(on, p));
+                        let r = ui.add(crate::kit::Button::new(&st, p).g4(28.0).selected(on));
                         ui_state.record(format!("inspect-port:{id}.{p}"), r.rect);
                         if r.clicked() {
                             ui_state.inspect.select(
@@ -1227,7 +1234,11 @@ pub fn panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, no
     }
     ui.add_space(4.0);
     let open = ui_state.inspect.why;
-    let r = ui.add(egui::Button::selectable(open, "Why no sound?"));
+    let r = ui.add(
+        crate::kit::Button::new(&st, "Why no sound?")
+            .g4(32.0)
+            .selected(open),
+    );
     ui_state.record("why".into(), r.rect);
     if r.clicked() {
         ui_state.inspect.why = !open;
@@ -1249,6 +1260,7 @@ fn type_name(t: PortType) -> &'static str {
 }
 
 fn why_panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, now: f64) {
+    let st = ui_state.style.clone();
     let state = editor.state();
     let sel = ui_state.inspect.sel.clone();
     let tap = sel.as_ref().and_then(|s| {
@@ -1296,7 +1308,10 @@ fn why_panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, no
             }
         }
         if let Some((id, port)) = d.next.clone() {
-            let r = ui.button(format!("Inspect {} {port}", title(state, id)));
+            let r = ui.add(
+                crate::kit::Button::new(&st, format!("Inspect {} {port}", title(state, id)))
+                    .g4(28.0),
+            );
             ui_state.record("why-next".into(), r.rect);
             if r.clicked() {
                 ui_state.selected_module = Some(id);

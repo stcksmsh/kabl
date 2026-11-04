@@ -1058,9 +1058,7 @@ fn drawer(
             .max_height(h)
             .show_owned(ui, |ui| {
                 ui.set_max_width(DRAWER_W - 24.0);
-                egui::Frame::group(ui.style()).show(ui, |ui| {
-                    recipes::panel(editor, ui_state, ui, now);
-                });
+                recipes::panel(editor, ui_state, ui, now);
             });
     }
     if ui_state.explain.is_open() {
@@ -1079,9 +1077,7 @@ fn drawer(
         // Rows wrap instead of widening the drawer over the rack.
         ui.set_max_width(DRAWER_W - 24.0);
         if ui_state.inspect.open {
-            egui::Frame::group(ui.style()).show(ui, |ui| {
-                inspect::panel(editor, ui_state, ui, now);
-            });
+            inspect::panel(editor, ui_state, ui, now);
         }
         if ui_state.compare.open {
             compare::panel(editor, ui_state, ui, st);

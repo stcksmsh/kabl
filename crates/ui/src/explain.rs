@@ -613,37 +613,44 @@ pub(crate) fn panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui:
     let Some(subject) = ui_state.explain.subject.clone() else {
         return;
     };
-    let th = crate::theme::theme(&ui_state.style);
     let now = ui.input(|i| i.time);
     let state = editor.state();
-    let frame = egui::Frame::group(ui.style())
-        .fill(ui.visuals().faint_bg_color)
-        .stroke(egui::Stroke::new(1.5, th.cv))
-        .inner_margin(egui::Margin::same(8));
-    frame.show(ui, |ui| {
+    let st = ui_state.style.clone();
+    {
+        let ui = &mut *ui;
         ui.set_width(ui.available_width());
-        ui.spacing_mut().item_spacing.y = 4.0;
+        ui.spacing_mut().item_spacing.y = 6.0;
         ui.horizontal(|ui| {
-            ui.label(RichText::new("Explain").strong().color(th.cv));
+            let can_back = ui_state.explain.saved.is_some() || ui_state.explain.card.is_some();
+            let back_text = match &ui_state.explain.card {
+                Some(c) => format!("Back to “{}”", card_label(state, c)),
+                None => "Back".into(),
+            };
+            let r = ui
+                .add(
+                    crate::kit::Button::new(&st, back_text)
+                        .icon(crate::kit::Ic::Back)
+                        .ghost()
+                        .g4(28.0)
+                        .enabled(can_back),
+                )
+                .on_hover_text("Return to the control you started from");
+            ui_state.record("explain-back".into(), r.rect);
+            if r.clicked() {
+                back(ui_state, now);
+            }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let r = ui
-                    .small_button("×")
+                    .add(
+                        crate::kit::Button::new(&st, "Close")
+                            .icon(crate::kit::Ic::Close)
+                            .ghost()
+                            .g4(28.0),
+                    )
                     .on_hover_text("Close the explanation (Esc)");
                 ui_state.record("explain-close".into(), r.rect);
                 if r.clicked() {
                     ui_state.explain.close();
-                }
-                let can_back = ui_state.explain.saved.is_some() || ui_state.explain.card.is_some();
-                let back_text = match &ui_state.explain.card {
-                    Some(c) => format!("← Back to “{}”", card_label(state, c)),
-                    None => "← Back".into(),
-                };
-                let r = ui
-                    .add_enabled(can_back, egui::Button::new(back_text).small())
-                    .on_hover_text("Return to the control you started from");
-                ui_state.record("explain-back".into(), r.rect);
-                if r.clicked() {
-                    back(ui_state, now);
                 }
             });
         });
@@ -660,7 +667,7 @@ pub(crate) fn panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui:
             Subject::Control { id, key } => control(editor, ui_state, ui, *id, key, now),
             Subject::Module(id) => module(editor, ui_state, ui, *id, now),
         }
-    });
+    }
     ui.add_space(6.0);
 }
 
@@ -730,7 +737,11 @@ fn control(
     };
     let card = perform::is_pinned(state, id, key).then(|| perform::pin_label(state, &pin));
     if let Some(help) = help::special_pin_help(key) {
-        ui.label(RichText::new(card.unwrap_or_else(|| key.to_string())).heading());
+        ui.label(
+            RichText::new(card.unwrap_or_else(|| key.to_string()))
+                .size(22.0)
+                .strong(),
+        );
         weak(ui, format!("Perform card for {title}"));
         para(ui, help);
         special(editor, ui_state, ui, id, key, now);
@@ -747,7 +758,7 @@ fn control(
     } else {
         card.clone().unwrap_or(label.clone())
     };
-    ui.label(RichText::new(&display).heading());
+    ui.label(RichText::new(&display).size(22.0).strong());
     // The identity, always: a duplicated label stays distinguishable.
     weak(
         ui,
@@ -1011,7 +1022,7 @@ fn module(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, id: M
         );
         return;
     };
-    ui.label(RichText::new(module_title(state, id)).heading());
+    ui.label(RichText::new(module_title(state, id)).size(22.0).strong());
     weak(ui, format!("kind “{}”", info.kind));
     para(ui, info.explain);
     if let Some(n) = help::module_note(info.kind) {
