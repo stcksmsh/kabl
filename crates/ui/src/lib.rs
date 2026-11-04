@@ -1108,11 +1108,12 @@ fn drawer(
         }
         pattern::panel(editor, ui_state, ui);
         routing::drawer(editor, ui_state, ui);
-        // An open cable editor (G4) shows its own routes; the patch-wide ones and the lists
-        // wait behind its More disclosure.
+        // An open cable editor or inspected control (G4) shows its own routes; the patch-wide
+        // ones and the lists wait behind its More disclosure.
         let cable_open = ui_state
             .cable_fn
-            .is_some_and(|c| !pattern::more_open(ui.ctx(), c));
+            .is_some_and(|c| !pattern::more_open(ui.ctx(), c))
+            || !routing::more_open(ui.ctx(), ui_state);
         if !cable_open {
             routing::cable_routes(editor, ui_state, ui);
         }

@@ -14,7 +14,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 11] = [
+const SCENES: [&str; 14] = [
     "rack",
     "perform",
     "sounds",
@@ -26,6 +26,9 @@ const SCENES: [&str; 11] = [
     "cues-editor",
     "cues-face",
     "cable-pattern-editor",
+    "cable-routes-drawer",
+    "cable-routes-rest",
+    "cable-routes-opening",
 ];
 
 struct Job {
@@ -43,7 +46,22 @@ struct App {
     editor: PatchEditor,
     ui: UiState,
     _user: tempfile::TempDir,
+    /// A control to inspect a few frames before the screenshot (the lanes mid-opening).
+    inspect_later: Option<(kabl_core::ModuleId, String)>,
+    /// `KABL_ANIM=1`: the lanes animation as frames on a fixed 60 fps clock (see `anim_step`).
+    anim: bool,
+    /// Frames since start, never reset: the fixed clock.
+    tick: u64,
+    /// Animation frames saved for this job.
+    saved: u32,
 }
+
+/// Lanes animation timeline, in 60 fps frames after the scene settles: rest 0.5 s, inspect,
+/// open (180 ms) and hold 0.7 s, deselect, close and hold 0.5 s.
+const ANIM_START: u32 = 12;
+const ANIM_OPEN_AT: u32 = 30;
+const ANIM_CLOSE_AT: u32 = 30 + 11 + 42;
+const ANIM_FRAMES: u32 = ANIM_CLOSE_AT + 11 + 30;
 
 fn patches() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../patches")
@@ -259,7 +277,13 @@ impl App {
         ui.browser_open = j.scene == "sounds";
         ui.drawer_open = matches!(
             j.scene,
-            "rack" | "seq-pattern-editor" | "cues-editor" | "cable-pattern-editor"
+            "rack"
+                | "seq-pattern-editor"
+                | "cues-editor"
+                | "cable-pattern-editor"
+                | "cable-routes-drawer"
+                | "cable-routes-rest"
+                | "cable-routes-opening"
         );
         if j.scene == "empty" {
             self.editor = PatchEditor::new();
@@ -490,12 +514,58 @@ impl App {
             ui.seq_banks.insert(lead, (2, Some(1)));
             ui.last_cue.insert(cues, 3);
         }
+        if j.scene.starts_with("cable-routes") {
+            // The mockup's state: the filter's cutoff at 1 kHz, moved by the envelope (+30 %,
+            // selected) and the Bite macro (+38 %, its module below the view).
+            let find = |kind: &str| {
+                self.editor
+                    .state()
+                    .modules
+                    .iter()
+                    .find(|(_, m)| m.kind == kind)
+                    .map(|(&id, _)| id)
+                    .unwrap()
+            };
+            let (svf, adsr) = (find("filter.svf"), find("env.adsr"));
+            let mac = self
+                .editor
+                .add_module("macro", kabl_core::Vec2 { x: 24.0, y: 640.0 });
+            self.editor.set_label(mac, "name.m1", Some("Bite".into()));
+            self.editor.set_param(svf, "cutoff_hz", 1000.0);
+            let m = |id, port: &str| kabl_core::PortRef::Module {
+                id,
+                port: port.into(),
+            };
+            let env = kabl_ui::routing::routes_into(self.editor.state(), svf, "cutoff_hz")
+                .into_iter()
+                .find(|r| r.from_id == adsr)
+                .unwrap()
+                .cable;
+            self.editor.set_route_amount(env, 0.30, true);
+            let bite = self.editor.connect_route(m(mac, "m1"), svf, "cutoff_hz");
+            self.editor.set_route_amount(bite, 0.38, true);
+            ui.inspected = Some((svf, "cutoff_hz".into()));
+            ui.selected_route = Some(env);
+            // At rest the lanes are collapsed; "opening" inspects 3 frames before the shot.
+            if j.scene != "cable-routes-drawer" {
+                self.inspect_later = ui.inspected.take();
+            }
+        }
         self.ui = ui;
         self.f = 0;
     }
 }
 
 impl eframe::App for App {
+    fn raw_input_hook(&mut self, _ctx: &egui::Context, raw: &mut egui::RawInput) {
+        // The animation runs on a fixed 60 fps clock, whatever the real frame rate.
+        if self.anim {
+            raw.time = Some(self.tick as f64 / 60.0);
+            raw.predicted_dt = 1.0 / 60.0;
+            self.tick += 1;
+        }
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         if self.i >= self.jobs.len() {
@@ -507,7 +577,43 @@ impl eframe::App for App {
                 shot = Some(image);
             }
         }
-        if let Some(img) = shot {
+        if let (Some(img), true) = (shot.as_ref(), self.anim) {
+            // A 2x crop of the filter's face, one PNG per frame.
+            let svf = self
+                .editor
+                .state()
+                .modules
+                .iter()
+                .find(|(_, m)| m.kind == "filter.svf")
+                .map(|(&id, _)| id)
+                .unwrap();
+            let r = self.ui.hits[&format!("module:{svf}")].expand(8.0);
+            let [w, h] = img.size;
+            let raw: Vec<u8> = img.pixels.iter().flat_map(|c| c.to_array()).collect();
+            let full = RgbaImage::from_raw(w as u32, h as u32, raw).unwrap();
+            let (x, y) = ((r.left() * 2.0) as u32, (r.top().max(0.0) * 2.0) as u32);
+            let cw = ((r.width() * 2.0) as u32).min(w as u32 - x) & !1;
+            let ch = ((r.height() * 2.0) as u32).min(h as u32 - y) & !1;
+            let crop = image::imageops::crop_imm(&full, x, y, cw, ch).to_image();
+            let j = &self.jobs[self.i];
+            let name = format!(
+                "anim__{}__{:03}.png",
+                if j.dark { "dark" } else { "light" },
+                self.saved
+            );
+            crop.save(self.dir.join(&name)).unwrap();
+            self.saved += 1;
+            if self.saved == ANIM_FRAMES {
+                println!("wrote {} frames", self.saved);
+                self.saved = 0;
+                self.i += 1;
+                if self.i >= self.jobs.len() {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    return;
+                }
+                self.prepare();
+            }
+        } else if let Some(img) = shot {
             let j = &self.jobs[self.i];
             let [w, h] = img.size;
             let raw: Vec<u8> = img.pixels.iter().flat_map(|c| c.to_array()).collect();
@@ -548,7 +654,13 @@ impl eframe::App for App {
         if self.f == 6
             && matches!(
                 self.jobs[self.i].scene,
-                "drawer" | "seq-pattern-editor" | "cues-editor" | "cable-pattern-editor"
+                "drawer"
+                    | "seq-pattern-editor"
+                    | "cues-editor"
+                    | "cable-pattern-editor"
+                    | "cable-routes-drawer"
+                    | "cable-routes-rest"
+                    | "cable-routes-opening"
             )
         {
             // After the first frame: a compact window closes the drawer there, the user opens it.
@@ -559,7 +671,11 @@ impl eframe::App for App {
         if self.f == 6
             && matches!(
                 self.jobs[self.i].scene,
-                "cues-editor" | "cable-pattern-editor"
+                "cues-editor"
+                    | "cable-pattern-editor"
+                    | "cable-routes-drawer"
+                    | "cable-routes-rest"
+                    | "cable-routes-opening"
             )
         {
             self.ui.zoom = if self.jobs[self.i].size.0 < 1280 {
@@ -573,8 +689,34 @@ impl eframe::App for App {
             self.ui.zoom = 1.0;
             self.ui.pan = egui::vec2(-700.0, -560.0);
         }
+        // The lanes' animation runs on the clock: give the routes scenes time to settle.
+        let shot = if self.jobs[self.i].scene.starts_with("cable-routes") {
+            30
+        } else {
+            12
+        };
+        if self.f == shot - 3 && self.jobs[self.i].scene == "cable-routes-opening" {
+            self.ui.inspected = self.inspect_later.take();
+        }
+        if self.anim {
+            // The face alone: no drawer over the filter.
+            self.ui.drawer_open = false;
+            let t = self.f.wrapping_sub(ANIM_START);
+            if t == ANIM_OPEN_AT {
+                self.ui.inspected = self.inspect_later.take();
+            }
+            if t == ANIM_CLOSE_AT {
+                self.inspect_later = self.ui.inspected.take();
+            }
+            if self.f >= ANIM_START && t < ANIM_FRAMES {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
+            }
+            self.f += 1;
+            ctx.request_repaint();
+            return;
+        }
         self.f += 1;
-        if self.f == 12 {
+        if self.f == shot {
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
         }
         ctx.request_repaint();
@@ -590,8 +732,18 @@ fn main() {
         .get(2)
         .cloned()
         .unwrap_or_else(|| "kabl.line_solid".into());
+    let anim = std::env::var("KABL_ANIM").is_ok();
     let mut jobs = Vec::new();
-    for scene in SCENES {
+    if anim {
+        for dark in [true, false] {
+            jobs.push(Job {
+                scene: "cable-routes-rest",
+                dark,
+                size: (1440, 900),
+            });
+        }
+    }
+    for scene in SCENES.iter().copied().filter(|_| !anim) {
         if want != "all" && !want.split(',').any(|w| w == scene) {
             continue;
         }
@@ -603,7 +755,11 @@ fn main() {
     }
     let opts = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1440.0, 900.0])
+            .with_inner_size(if anim {
+                [2880.0, 1800.0]
+            } else {
+                [1440.0, 900.0]
+            })
             .with_resizable(false),
         ..Default::default()
     };
@@ -612,6 +768,9 @@ fn main() {
         opts,
         Box::new(move |cc| {
             cc.egui_ctx.set_pixels_per_point(1.0);
+            if anim {
+                cc.egui_ctx.set_zoom_factor(2.0);
+            }
             let mut app = App {
                 jobs,
                 i: 0,
@@ -621,6 +780,10 @@ fn main() {
                 editor: PatchEditor::seed_from(&Default::default()),
                 ui: UiState::default(),
                 _user: tempfile::tempdir().unwrap(),
+                inspect_later: None,
+                anim,
+                tick: 0,
+                saved: 0,
             };
             app.prepare();
             Ok(Box::new(app))
