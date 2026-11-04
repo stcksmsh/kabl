@@ -383,12 +383,11 @@ fn external_dependencies(p: &PatchState, id: CompositeId) -> Vec<String> {
     deps.into_iter().collect()
 }
 
-/// Keep a stable top-left origin; Area's previous content size must not cap new content.
+/// Centred near the top, from the width alone: a stable origin that follows a resized window
+/// (Area's previous content size must not cap new content).
 pub(crate) fn focused_area(ctx: &egui::Context, id: Id, width: f32) -> egui::Area {
     let bounds = ctx.content_rect().shrink(12.);
-    let pos = egui::AreaState::load(ctx, id)
-        .map(|s| s.left_top_pos())
-        .unwrap_or(pos2(bounds.center().x - width * 0.5, bounds.top() + 36.));
+    let pos = pos2(bounds.center().x - width * 0.5, bounds.top() + 36.);
     egui::Area::new(id)
         .kind(egui::UiKind::Modal)
         .order(egui::Order::Foreground)
@@ -443,25 +442,117 @@ pub(crate) fn more(
         adv.max.y = bottom;
     }
     let ctx = ui.ctx().clone();
+    let st = view.style.clone();
+    let st = &*st;
+    let kind = state.kind.clone();
+    // Face layout works on a draft (pins and order), applied by Done as one undo step.
+    if view.more_tab == 1 && view.choose.as_ref().is_none_or(|c| c.0 != id) {
+        view.choose = Some((id, rack::primary_set(state, info)));
+        view.face_order = None;
+    }
     let mut close = false;
-    let width =
-        (m.full().width() * xf.zoom.clamp(0.85, 1.0) + 24.).min(ctx.content_rect().width() - 80.);
+    let mut done = false;
+    let z = xf.zoom.clamp(0.85, 1.0);
+    let width = (m.full().width() * z + 48.)
+        .max(kit::g4::Size::L.width())
+        .min(ctx.content_rect().width() - 80.);
+    let keys_id = Id::new(("more-keys", id));
+    let mut keys = ctx.data(|d| d.get_temp::<bool>(keys_id)).unwrap_or(false);
     let modal = egui::Modal::new(Id::new("more-controls"))
+        .frame(
+            kit::g4::surface_frame(st, 12.0)
+                .shadow(kit::eshadow(st, 2))
+                .inner_margin(egui::Margin::symmetric(24, 18)),
+        )
+        .backdrop_color(kit::g4::tokens(st).scrim)
         .area(focused_area(&ctx, Id::new("more-controls"), width))
         .show(&ctx, |ui| {
             focused_height(ui);
-            let z = xf.zoom.clamp(0.85, 1.0);
-            ui.set_width(width);
+            ui.set_width(width - 48.);
+            // Header: name, kind and id, close.
             ui.horizontal(|ui| {
-                ui.heading(format!("More controls · {}", info.name));
-                let r = ui.button("Close");
-                view.record("more:close".into(), r.rect);
-                close = r.clicked();
+                kit::label(ui, st, style::Role::Title, kit::Tone::Text, info.name);
+                kit::label(
+                    ui,
+                    st,
+                    style::Role::Value,
+                    kit::Tone::Text2,
+                    format!("{kind} · #{id}"),
+                );
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let r = kit::icon_button(ui, st, kit::Ic::Close, false, true)
+                        .on_hover_text("Close (Esc)");
+                    view.record("more:close".into(), r.rect);
+                    close = r.clicked();
+                });
             });
-            ui.label("Original knobs, selectors, jacks and routing. Rack layout stays unchanged.");
+            kit::gap(ui, st, 2);
+            kit::segmented(ui, st, |ui| {
+                for (k, t) in ["Controls", "Face layout"].into_iter().enumerate() {
+                    let r = kit::seg(ui, st, t, view.more_tab == k);
+                    view.record(format!("more:tab:{k}"), r.rect);
+                    if r.clicked() {
+                        view.more_tab = k;
+                    }
+                }
+            });
+            kit::gap(ui, st, 2);
+            let body_h = (ui.available_height() - 72.).max(80.);
             egui::ScrollArea::both()
-                .max_height(ui.available_height())
-                .show_owned(ui, |ui| {
+                .max_height(body_h)
+                .auto_shrink([false, true])
+                .show(ui, |ui| {
+                    if view.more_tab == 1 {
+                        if let Some(s) = editor.state().modules.get(&id).cloned() {
+                            face_layout(view, ui, st, id, info, &s);
+                        }
+                        return;
+                    }
+                    // On the face: the controls the module shows, as pinned chips.
+                    let on_face: Vec<&'static kabl_modules::ParamInfo> = m
+                        .ctls
+                        .iter()
+                        .filter(|c| c.primary)
+                        .map(|c| c.param)
+                        .collect();
+                    ui.horizontal(|ui| {
+                        kit::section(ui, st, "On the face");
+                        kit::label(
+                            ui,
+                            st,
+                            style::Role::Value,
+                            kit::Tone::Text2,
+                            on_face.len().to_string(),
+                        );
+                    });
+                    ui.horizontal_wrapped(|ui| {
+                        for p in &on_face {
+                            let r = ui
+                                .add(
+                                    kit::Button::new(st, routing::param_label(p))
+                                        .icon(kit::Ic::Pin)
+                                        .small(),
+                                )
+                                .on_hover_text("On the face: change it in Face layout");
+                            view.record(format!("more:pin:{id}:{}", p.name), r.rect);
+                            if r.clicked() {
+                                view.more_tab = 1;
+                            }
+                        }
+                    });
+                    kit::gap(ui, st, 2);
+                    ui.horizontal(|ui| {
+                        kit::section(ui, st, "More");
+                        kit::label(
+                            ui,
+                            st,
+                            style::Role::Value,
+                            kit::Tone::Text2,
+                            m.ctls.iter().filter(|c| !c.primary).count().to_string(),
+                        );
+                    });
+                    // The module itself with its hidden controls: its jacks still patch and
+                    // its routes still show.
                     let (_, space) = ui.allocate_space(m.full().size() * z);
                     view.record(format!("more:{id}:body"), space.intersect(ui.clip_rect()));
                     let focus = Xf {
@@ -510,30 +601,82 @@ pub(crate) fn more(
                     if own.drop_at.is_some() {
                         drawn.drop_at = own.drop_at;
                     }
-                    let entry = egui::CollapsingHeader::new("Keyboard / exact value entry").show(
-                        ui,
-                        |ui| {
-                            for c in &m.ctls {
-                                ui.horizontal(|ui| {
-                                    ui.label(routing::param_label(c.param));
-                                    perform::param_editor(
-                                        editor,
-                                        view,
-                                        ui,
-                                        id,
-                                        c.param,
-                                        false,
-                                        Some(format!("more:value:{id}:{}", c.param.name)),
-                                    );
-                                });
-                            }
-                        },
-                    );
-                    view.record("more:exact".into(), entry.header_response.rect);
+                    // Keyboard entry: an exact value for every control.
+                    if keys {
+                        kit::gap(ui, st, 2);
+                        kit::section(ui, st, "Keyboard entry");
+                        for c in &m.ctls {
+                            ui.horizontal(|ui| {
+                                let (r, _) = ui.allocate_exact_size(
+                                    egui::vec2(140., st.metrics.control_h),
+                                    Sense::hover(),
+                                );
+                                ui.painter().text(
+                                    r.left_center(),
+                                    egui::Align2::LEFT_CENTER,
+                                    routing::param_label(c.param),
+                                    st.font(style::Role::Body),
+                                    st.roles.text2,
+                                );
+                                perform::param_editor(
+                                    editor,
+                                    view,
+                                    ui,
+                                    id,
+                                    c.param,
+                                    false,
+                                    Some(format!("more:value:{id}:{}", c.param.name)),
+                                );
+                            });
+                        }
+                    }
                 });
+            kit::gap(ui, st, 1);
+            kit::rule(ui, st);
+            ui.horizontal(|ui| {
+                ui.set_height(52.);
+                let r = ui.add(
+                    kit::Button::new(st, "Keyboard entry…")
+                        .ghost()
+                        .selected(keys),
+                );
+                view.record("more:exact".into(), r.rect);
+                if r.clicked() {
+                    keys = !keys;
+                    view.more_tab = 0;
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let r = ui.add(kit::Button::new(st, "Done").primary());
+                    view.record(
+                        if view.more_tab == 1 {
+                            "face:apply".into()
+                        } else {
+                            "more:done".into()
+                        },
+                        r.rect,
+                    );
+                    let enter = ui.input(|i| i.key_pressed(egui::Key::Enter))
+                        && ui.ctx().memory(|mem| mem.focused().is_none());
+                    done = r.clicked() || enter;
+                });
+            });
         });
+    ctx.data_mut(|d| d.insert_temp(keys_id, keys));
     view.record("more:dialog".into(), modal.response.rect);
-    if close || (modal.should_close() && view.drag.is_none()) {
+    if done && view.more_tab == 1 {
+        if let Some((cid, visible)) = view.choose.take() {
+            let order = view.face_order.take();
+            if let Err(e) = apply_face(editor, cid, &visible, order.as_deref()) {
+                view.last_message = Some(e);
+                view.choose = Some((cid, visible));
+                view.face_order = order;
+                return;
+            }
+        }
+    }
+    if done || close || (modal.should_close() && view.drag.is_none()) {
+        view.choose = None;
+        view.face_order = None;
         view.expanded.clear();
         view.last_inspected = view.inspected.clone();
         view.lanes_shown = inspected_extent(editor, view, scene).map(|(_, key)| key);
@@ -541,80 +684,156 @@ pub(crate) fn more(
     }
 }
 
-pub(crate) fn edit_face(editor: &mut PatchEditor, view: &mut UiState, ctx: &egui::Context) {
-    let Some((id, mut visible)) = view.choose.take() else {
-        return;
-    };
-    let Some(m) = editor.state().modules.get(&id) else {
-        return;
-    };
-    let Some(info) = registry::info_for(&m.kind) else {
+/// The Face layout tab: which controls the module's face shows, and their order. Edits the
+/// pending draft in `view.choose` / `view.face_order`; Done applies it.
+fn face_layout(
+    view: &mut UiState,
+    ui: &mut egui::Ui,
+    st: &crate::style::Style,
+    id: ModuleId,
+    info: &'static kabl_modules::ModuleInfo,
+    m: &kabl_core::ModuleState,
+) {
+    let Some(mut visible) = view.choose.as_ref().map(|c| c.1.clone()) else {
         return;
     };
     let mut order = view
         .face_order
         .take()
         .unwrap_or_else(|| rack::control_order(m, info));
-    let mut done = false;
-    let mut cancel = false;
-    egui::Window::new(format!("Edit face · {}",info.name)).id(Id::new("native-edit-face")).default_width(420.).default_height(380.).max_height(ctx.content_rect().height()-100.).default_pos(ctx.content_rect().center()-vec2(210.,180.)).collapsible(false).vscroll(true).show(ctx,|ui|{
-        ui.label("Normally visible controls. Hidden controls remain in More controls. Order applies within knob/selector rows.");
-        for n in 0..order.len() {
-            let index=order[n];let p=&info.params[index];if rack::face_name(info,p.name)!=p.name {continue;}
-            ui.horizontal(|ui|{
-                let r=ui.checkbox(&mut visible[index],routing::param_label(p));view.record(format!("face:{id}:{}",p.name),r.rect);
-                let r=ui.add_enabled(n>0,egui::Button::new("↑"));view.record(format!("face:up:{id}:{}",p.name),r.rect);if r.clicked(){order.swap(n,n-1);}
-                let r=ui.add_enabled(n+1<order.len(),egui::Button::new("↓"));view.record(format!("face:down:{id}:{}",p.name),r.rect);if r.clicked(){order.swap(n,n+1);}
-            });
+    kit::paragraph(
+        ui,
+        st,
+        style::Role::Label,
+        kit::Tone::Text2,
+        "Ticked controls show on the face, in this order (within each row of knobs or \
+         selectors). The rest stay under More controls.",
+    );
+    kit::gap(ui, st, 1);
+    for n in 0..order.len() {
+        let index = order[n];
+        let p = &info.params[index];
+        if rack::face_name(info, p.name) != p.name {
+            continue;
         }
-        ui.horizontal(|ui|{
-            let r=ui.button("Apply / Undoable");view.record("face:apply".into(),r.rect);done=r.clicked();
-            if ui.button("Restore defaults").clicked(){visible=info.params.iter().map(|p|!info.advanced.contains(&rack::face_name(info,p.name))).collect();order=(0..info.params.len()).collect();}
-            cancel=ui.button("Cancel").clicked()||ui.input(|i|i.key_pressed(egui::Key::Escape));
-        });
-    });
-    if done {
-        let before = editor.state().clone();
-        let mut candidate = before.clone();
-        let module = candidate.modules.get_mut(&id).unwrap();
-        module
-            .params
-            .retain(|k, _| !k.starts_with(rack::FACE_PREFIX));
-        for (i, p) in info.params.iter().enumerate() {
-            let name = rack::face_name(info, p.name);
-            if name != p.name {
-                continue;
+        ui.horizontal(|ui| {
+            let r = chevron_button(ui, st, true, n > 0).on_hover_text("Move up");
+            view.record(format!("face:up:{id}:{}", p.name), r.rect);
+            if r.clicked() {
+                order.swap(n, n - 1);
             }
-            let default = !info.advanced.contains(&name);
-            if visible[i] != default {
+            let r = chevron_button(ui, st, false, n + 1 < order.len()).on_hover_text("Move down");
+            view.record(format!("face:down:{id}:{}", p.name), r.rect);
+            if r.clicked() {
+                order.swap(n, n + 1);
+            }
+            let r = kit::g4::checkbox(ui, st, &mut visible[index], &routing::param_label(p));
+            view.record(format!("face:{id}:{}", p.name), r.rect);
+        });
+    }
+    kit::gap(ui, st, 1);
+    let r = ui.add(kit::Button::new(st, "Restore defaults").ghost());
+    view.record("face:restore".into(), r.rect);
+    if r.clicked() {
+        visible = info
+            .params
+            .iter()
+            .map(|p| !info.advanced.contains(&rack::face_name(info, p.name)))
+            .collect();
+        order = (0..info.params.len()).collect();
+    }
+    view.choose = Some((id, visible));
+    view.face_order = Some(order);
+}
+
+/// A small square button with an up or down chevron (the kit has a down chevron only).
+fn chevron_button(
+    ui: &mut egui::Ui,
+    st: &crate::style::Style,
+    up: bool,
+    enabled: bool,
+) -> egui::Response {
+    let s = st.metrics.control_h;
+    let (rect, resp) = ui.allocate_exact_size(
+        vec2(s, s),
+        if enabled {
+            Sense::click()
+        } else {
+            Sense::hover()
+        },
+    );
+    let r = &st.roles;
+    if enabled && resp.hovered() {
+        ui.painter().rect_filled(rect, st.radii.sm, r.inset);
+    }
+    let ink = if enabled {
+        r.text2
+    } else {
+        crate::style::alpha(r.text2, 90)
+    };
+    let (c, d) = (rect.center(), 4.0);
+    let dy = if up { -d / 2.0 } else { d / 2.0 };
+    ui.painter().line(
+        vec![
+            pos2(c.x - d, c.y - dy),
+            pos2(c.x, c.y + dy),
+            pos2(c.x + d, c.y - dy),
+        ],
+        Stroke::new(1.5, ink),
+    );
+    resp
+}
+
+/// Writes a face draft (which controls show, their order) to module `id` as one undoable
+/// presentation edit. Errors when the module's saved settings would pass the 256 limit.
+fn apply_face(
+    editor: &mut PatchEditor,
+    id: ModuleId,
+    visible: &[bool],
+    order: Option<&[usize]>,
+) -> Result<(), String> {
+    let before = editor.state().clone();
+    let Some(info) = before
+        .modules
+        .get(&id)
+        .and_then(|m| registry::info_for(&m.kind))
+    else {
+        return Ok(());
+    };
+    let mut candidate = before.clone();
+    let module = candidate.modules.get_mut(&id).unwrap();
+    module
+        .params
+        .retain(|k, _| !k.starts_with(rack::FACE_PREFIX));
+    for (i, p) in info.params.iter().enumerate() {
+        let name = rack::face_name(info, p.name);
+        if name != p.name {
+            continue;
+        }
+        let default = !info.advanced.contains(&name);
+        if visible[i] != default {
+            module
+                .params
+                .insert(rack::face_key(name), if visible[i] { 1. } else { 0. });
+        }
+    }
+    if let Some(order) = order.filter(|o| o.iter().copied().ne(0..info.params.len())) {
+        for (rank, &index) in order.iter().enumerate() {
+            let name = rack::face_name(info, info.params[index].name);
+            if name == info.params[index].name && rank != index {
                 module
                     .params
-                    .insert(rack::face_key(name), if visible[i] { 1. } else { 0. });
+                    .insert(format!("face.order.{name}"), rank as f32);
             }
         }
-        if order.iter().copied().ne(0..info.params.len()) {
-            for (rank, &index) in order.iter().enumerate() {
-                let name = rack::face_name(info, info.params[index].name);
-                if name == info.params[index].name && rank != index {
-                    module
-                        .params
-                        .insert(format!("face.order.{name}"), rank as f32);
-                }
-            }
-        }
-        if module.params.len() > 256 {
-            view.last_message=Some("Face settings exceed per-module saved parameter limit (256). Restore defaults or remove custom settings.".into());
-            view.choose = Some((id, visible));
-            view.face_order = Some(order);
-            return;
-        }
-        if let Some(ops) = compare::diff(&before, &candidate) {
-            editor.restore_to(ops);
-        }
-    } else if !cancel {
-        view.choose = Some((id, visible));
-        view.face_order = Some(order);
     }
+    if module.params.len() > 256 {
+        return Err("Face settings exceed per-module saved parameter limit (256). Restore defaults or remove custom settings.".into());
+    }
+    if let Some(ops) = compare::diff(&before, &candidate) {
+        editor.restore_to(ops);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -835,7 +1054,8 @@ mod tests {
             "tall content genuinely needs scrolling"
         );
         let camera = (v.pan, v.zoom);
-        let p = pos2(dialog.left() + 30., dialog.bottom() - 40.);
+        // Over the scrolling body, above the dialog's footer.
+        let p = pos2(dialog.left() + 30., dialog.bottom() - 110.);
         frame_size(
             &ctx,
             &mut e,

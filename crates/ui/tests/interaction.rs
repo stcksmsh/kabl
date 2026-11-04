@@ -1508,3 +1508,27 @@ fn delay_controls_and_a_fresh_load() {
     assert!(t.ui.loaded && t.editor.take_dirty(), "Load rebuilds fresh");
     assert_eq!(t.param(DELAY, "sync"), Some(3.0), "the file's settings");
 }
+
+#[test]
+fn edit_face_is_the_more_controls_face_layout_tab_and_enter_applies() {
+    for (w, h) in [(1440.0, 900.0), (1180.0, 680.0)] {
+        let mut t = H::new(w, h);
+        t.rclick(&format!("module:{VCA}"));
+        t.click("menu:choose");
+        assert_eq!(t.ui.more_tab, 1, "{w}x{h}");
+        let dialog = t.ui.hits["more:dialog"];
+        assert!(
+            Rect::from_min_size(Pos2::ZERO, t.size).contains_rect(dialog),
+            "{w}x{h}: {dialog:?}"
+        );
+        for k in ["more:close", "more:tab:0", "more:tab:1", "face:apply"] {
+            assert!(dialog.contains_rect(t.ui.hits[k]), "{w}x{h}: {k}");
+        }
+        let entries = t.undo_depth();
+        t.click(&format!("face:{VCA}:exponential"));
+        t.key(Key::Enter, Modifiers::NONE);
+        assert_eq!(t.undo_depth(), entries + 1, "{w}x{h}: Enter is Done");
+        assert_eq!(t.face(VCA, "exponential"), Some(1.0));
+        assert!(t.ui.expanded.is_empty() && t.ui.choose.is_none());
+    }
+}

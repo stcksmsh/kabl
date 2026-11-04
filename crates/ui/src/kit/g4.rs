@@ -87,7 +87,7 @@ pub fn stacked_shadow(p: &Painter, st: &Style, rect: Rect, radius: f32) {
     }
 }
 
-fn surface_frame(st: &Style, radius: f32) -> Frame {
+pub(crate) fn surface_frame(st: &Style, radius: f32) -> Frame {
     Frame::new()
         .fill(st.roles.raised)
         .stroke(Stroke::new(1.0, st.roles.line))
