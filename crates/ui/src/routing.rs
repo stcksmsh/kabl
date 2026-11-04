@@ -1599,14 +1599,39 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
             ui_state.selected_route = None;
         }
     }
-    // The selected route's depth can itself be moved, by a macro, LFO or envelope.
+    // Behind More, as in the cable editor: what moves the selected route's depth (a macro,
+    // LFO or envelope), and the patch-wide lists.
+    let more_id = more_key(id, &pname);
+    let mut more = ui.data(|d| d.get_temp::<bool>(more_id)).unwrap_or(false);
+    let r = ui.add(kit::Button::new(st, "More").ghost().small().icon(if more {
+        kit::Ic::Down
+    } else {
+        kit::Ic::Right
+    }));
+    ui_state.record(format!("route-more:{id}.{pname}"), r.rect);
+    if r.clicked() {
+        more = !more;
+        ui.data_mut(|d| d.insert_temp(more_id, more));
+    }
     if let Some(sel) = ui_state
         .selected_route
-        .filter(|c| routes.iter().any(|r| r.cable == *c))
+        .filter(|c| more && routes.iter().any(|r| r.cable == *c))
     {
-        kit::rule(ui, st);
         cable_param_routes(ui, editor, ui_state, sel, kabl_engine::compile::DEPTH);
     }
+}
+
+fn more_key(id: ModuleId, param: &str) -> Id {
+    Id::new(("route-more", id, param))
+}
+
+/// The inspected control's More disclosure is open, or no control is inspected: the drawer
+/// then also shows the patch-wide lists and routes.
+pub(crate) fn more_open(ctx: &egui::Context, ui_state: &UiState) -> bool {
+    ui_state.inspected.as_ref().is_none_or(|(id, p)| {
+        ctx.data(|d| d.get_temp::<bool>(more_key(*id, p)))
+            .unwrap_or(false)
+    })
 }
 
 /// Every module output, labelled as a route source.

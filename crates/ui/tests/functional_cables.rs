@@ -384,9 +384,10 @@ fn a_routes_depth_gets_a_source_from_the_drawer_and_the_patch_still_compiles() {
             _ => None,
         })
         .expect("a route into a knob");
-    t.ui.inspected = Some((id, param));
+    t.ui.inspected = Some((id, param.clone()));
     t.ui.selected_route = Some(route);
     t.frame();
+    t.click(&format!("route-more:{id}.{param}"));
     t.click(&format!("croute-add:{route}:amount"));
     let source =
         t.ui.hits
