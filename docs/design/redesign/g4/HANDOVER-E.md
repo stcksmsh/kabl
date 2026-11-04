@@ -14,9 +14,7 @@ Agent 2, G4 owner E. Scope: wavetable bottom dock (`tables.rs`), seq pattern edi
 - #108 `claude/ui-cues-face` e31198f6, draft: G3 cues face, seq Cancel off the header (the queued bank cancels; Cancel in the drawer), cue drag reorder (`cues::reorder`), `Timing::NextTwoBars` ("2 bars"). render_hash over 129 patches identical.
 
 ## Remaining, in order
-1. Answer review on #107 / #108. Merge `origin/master` in when they conflict (usually `SCENES` in `chrome_capture.rs`: keep every scene).
-2. Source lanes on the inspected knob (#107): Kosta decides, A = remove (8 interaction tests use `lane:`), B = keep.
-3. `cargo clean` in the worktree when stopping.
+1. Stopped by Kosta: answer review on draft PRs #107 (routes, lanes kept and animated, clips added) and #111 (G4-F group 3: menus, More controls with Face layout tab), merging `origin/master` in when they conflict (usually `SCENES` in `chrome_capture.rs`: keep every scene).
 
 ## Facts that cost effort
 - Sheets: `/tmp/sheetjs/sheet.py MOCK APP OUT` (mockup scaled to the app size, side by side). Not in the repo.
