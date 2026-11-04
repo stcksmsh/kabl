@@ -437,3 +437,33 @@ fn a_cue_offers_macros_five_to_eight_only_once_they_are_in_use() {
     assert_eq!(c.macros.len(), 6);
     assert!(c.macros.contains(&(m, 7, 0.5)));
 }
+
+#[test]
+fn reordering_moves_each_cue_whole_and_undoes_in_one_step() {
+    let mut h = H::new();
+    h.add_cue("Intro", Some(0), None);
+    h.add_cue("Drop", Some(1), Some(2));
+    h.add_cue("Break", None, Some(3));
+    cues::set_timing(&mut h.editor, h.cues, 3, Timing::NextTwoBars);
+    let before = h.editor.state().clone();
+    let entries = h.editor.log().entries().len();
+    // Everything but the number.
+    let summary = |h: &H| {
+        cues::cues(h.editor.state(), h.cues)
+            .into_iter()
+            .map(|c| cues::Cue { n: 0, ..c })
+            .collect::<Vec<_>>()
+    };
+    let old = summary(&h);
+    // Break to the front: Break, Intro, Drop.
+    let moves = cues::reorder(&mut h.editor, h.cues, 3, 1);
+    assert_eq!(moves, vec![(3, 1), (1, 2), (2, 3)]);
+    assert_eq!(
+        summary(&h),
+        vec![old[2].clone(), old[0].clone(), old[1].clone()]
+    );
+    assert_eq!(h.editor.log().entries().len(), entries + 1, "one undo step");
+    h.editor.undo();
+    assert_eq!(*h.editor.state(), before);
+    assert!(cues::reorder(&mut h.editor, h.cues, 2, 2).is_empty());
+}

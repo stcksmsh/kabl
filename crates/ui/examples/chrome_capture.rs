@@ -14,7 +14,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 13] = [
+const SCENES: [&str; 14] = [
     "rack",
     "perform",
     "sounds",
@@ -24,6 +24,7 @@ const SCENES: [&str; 13] = [
     "empty",
     "error",
     "cues-editor",
+    "cues-face",
     "cable-pattern-editor",
     "cable-routes-drawer",
     "cable-routes-rest",
@@ -460,7 +461,7 @@ impl App {
             ui.selected_route = Some(cable);
             ui.selected_module = None;
         }
-        if j.scene == "cues-editor" {
+        if matches!(j.scene, "cues-editor" | "cues-face") {
             // The mockup's state: Bass, Drums and Lead sequencers (two more in a third row,
             // below the view), four cues, Drop playing and Break queued.
             let at = |x: f32, y: f32| kabl_core::Vec2 { x, y };
@@ -492,7 +493,7 @@ impl App {
                     kabl_ui::cues::set_target(&mut self.editor, cues, k + 1, s, b);
                 }
             }
-            ui.selected_module = Some(cues);
+            ui.selected_module = (j.scene == "cues-editor").then_some(cues);
             ui.selected_route = None;
             // Drop plays; Break is queued (Drums waits for D, Lead for B; Bass keeps B).
             ui.seq_banks.insert(bass, (1, None));
@@ -624,6 +625,11 @@ impl eframe::App for App {
             } else {
                 0.95
             };
+        }
+        // The cues face at full size: the third row, where the extra sequencers and the cues sit.
+        if self.f == 6 && self.jobs[self.i].scene == "cues-face" {
+            self.ui.zoom = 1.0;
+            self.ui.pan = egui::vec2(-700.0, -560.0);
         }
         // The lanes' animation runs on the clock: give the routes scenes time to settle.
         let shot = if self.jobs[self.i].scene.starts_with("cable-routes") {

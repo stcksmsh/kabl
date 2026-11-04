@@ -61,7 +61,7 @@ pub static SAMPLE_HOLD_INFO: ModuleInfo = ModuleInfo {
         interpolation: false,
     },
     skin: None,
-    width_units: 4,
+    width_units: 5,
     advanced: &[],
 };
 
