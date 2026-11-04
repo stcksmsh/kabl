@@ -14,7 +14,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 11] = [
+const SCENES: [&str; 13] = [
     "rack",
     "perform",
     "sounds",
@@ -26,6 +26,8 @@ const SCENES: [&str; 11] = [
     "cues-editor",
     "cable-pattern-editor",
     "cable-routes-drawer",
+    "cable-routes-rest",
+    "cable-routes-opening",
 ];
 
 struct Job {
@@ -43,6 +45,8 @@ struct App {
     editor: PatchEditor,
     ui: UiState,
     _user: tempfile::TempDir,
+    /// A control to inspect a few frames before the screenshot (the lanes mid-opening).
+    inspect_later: Option<(kabl_core::ModuleId, String)>,
 }
 
 fn patches() -> PathBuf {
@@ -264,6 +268,8 @@ impl App {
                 | "cues-editor"
                 | "cable-pattern-editor"
                 | "cable-routes-drawer"
+                | "cable-routes-rest"
+                | "cable-routes-opening"
         );
         if j.scene == "empty" {
             self.editor = PatchEditor::new();
@@ -494,7 +500,7 @@ impl App {
             ui.seq_banks.insert(lead, (2, Some(1)));
             ui.last_cue.insert(cues, 3);
         }
-        if j.scene == "cable-routes-drawer" {
+        if j.scene.starts_with("cable-routes") {
             // The mockup's state: the filter's cutoff at 1 kHz, moved by the envelope (+30 %,
             // selected) and the Bite macro (+38 %, its module below the view).
             let find = |kind: &str| {
@@ -526,6 +532,10 @@ impl App {
             self.editor.set_route_amount(bite, 0.38, true);
             ui.inspected = Some((svf, "cutoff_hz".into()));
             ui.selected_route = Some(env);
+            // At rest the lanes are collapsed; "opening" inspects 3 frames before the shot.
+            if j.scene != "cable-routes-drawer" {
+                self.inspect_later = ui.inspected.take();
+            }
         }
         self.ui = ui;
         self.f = 0;
@@ -590,6 +600,8 @@ impl eframe::App for App {
                     | "cues-editor"
                     | "cable-pattern-editor"
                     | "cable-routes-drawer"
+                    | "cable-routes-rest"
+                    | "cable-routes-opening"
             )
         {
             // After the first frame: a compact window closes the drawer there, the user opens it.
@@ -600,7 +612,11 @@ impl eframe::App for App {
         if self.f == 6
             && matches!(
                 self.jobs[self.i].scene,
-                "cues-editor" | "cable-pattern-editor" | "cable-routes-drawer"
+                "cues-editor"
+                    | "cable-pattern-editor"
+                    | "cable-routes-drawer"
+                    | "cable-routes-rest"
+                    | "cable-routes-opening"
             )
         {
             self.ui.zoom = if self.jobs[self.i].size.0 < 1280 {
@@ -609,8 +625,17 @@ impl eframe::App for App {
                 0.95
             };
         }
+        // The lanes' animation runs on the clock: give the routes scenes time to settle.
+        let shot = if self.jobs[self.i].scene.starts_with("cable-routes") {
+            30
+        } else {
+            12
+        };
+        if self.f == shot - 3 && self.jobs[self.i].scene == "cable-routes-opening" {
+            self.ui.inspected = self.inspect_later.take();
+        }
         self.f += 1;
-        if self.f == 12 {
+        if self.f == shot {
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
         }
         ctx.request_repaint();
@@ -657,6 +682,7 @@ fn main() {
                 editor: PatchEditor::seed_from(&Default::default()),
                 ui: UiState::default(),
                 _user: tempfile::tempdir().unwrap(),
+                inspect_later: None,
             };
             app.prepare();
             Ok(Box::new(app))

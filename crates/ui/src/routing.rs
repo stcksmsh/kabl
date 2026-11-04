@@ -33,6 +33,8 @@ const LANE_GAP: f32 = 7.0;
 /// Collapsed per-source rings: at most this many, this far apart, inside the ring band.
 const MINI_LANES: usize = 4;
 const MINI_GAP: f32 = 2.5;
+/// Longest time the lanes take to open or close, in ms.
+const LANES_MS: f32 = 180.0;
 
 const BYPASS_GREY: Color32 = Color32::from_gray(120);
 
@@ -700,6 +702,15 @@ pub(crate) fn param_knob(
     }
     let key = format!("{id}.{}", param.name);
     let inspected = ui_state.inspected.as_ref() == Some(&(id, param.name.to_string()));
+    // How far the source lanes are open: 0 = collapsed arcs hugging the ring, 1 = the full,
+    // draggable lanes of an inspected knob. A short ease-out; a theme with no drawer motion
+    // opens them at once.
+    let open = ui.ctx().animate_bool_with_time_and_easing(
+        Id::new(("kabl-lanes-open", id, param.name)),
+        inspected,
+        crate::style::Style::secs(ui_state.style.motion.drawer.min(LANES_MS)),
+        egui::emath::easing::cubic_out,
+    );
 
     let rs = r * z;
     let rect = Rect::from_center_size(center, EguiVec2::splat((r + RING_OUTER) * z * 2.0));
@@ -797,7 +808,7 @@ pub(crate) fn param_knob(
     // opens the editable lanes). Otherwise: combined reachable range, the selected route's own
     // span on top + its peak dot.
     let rr = (r + RING_DRAW) * z;
-    if routes.len() >= 2 && !inspected {
+    if routes.len() >= 2 && open == 0.0 {
         for (k, rt) in routes.iter().take(MINI_LANES).enumerate() {
             let radius = (r + RING_INNER + 1.0 + MINI_GAP * k as f32) * z;
             let (lo, hi) = route_span(rt, base_n);
@@ -1065,9 +1076,9 @@ pub(crate) fn param_knob(
         );
     }
 
-    if inspected && !routes.is_empty() {
+    if open > 0.0 && !routes.is_empty() {
         source_lanes(
-            editor, ui_state, ui, id, param, center, r, z, base_n, &routes,
+            editor, ui_state, ui, id, param, center, r, z, base_n, &routes, open, inspected,
         );
     }
     plugs
@@ -1079,6 +1090,14 @@ fn arc_points(center: Pos2, radius: f32, n0: f32, n1: f32) -> Vec<Pos2> {
     (0..=steps)
         .map(|i| on_circle(center, radius, a0 + (a1 - a0) * i as f32 / steps as f32))
         .collect()
+}
+
+/// Unzoomed radius of lane `k` around a knob of radius `r`, `open` of the way (0..=1) from its
+/// collapsed arc inside the knob's ring band to its full lane outside it.
+fn lane_radius(r: f32, k: usize, open: f32) -> f32 {
+    let mini = r + RING_INNER + 1.0 + MINI_GAP * k.min(MINI_LANES - 1) as f32;
+    let full = r + RING_OUTER + LANE_GAP * (k as f32 + 1.0);
+    mini + (full - mini) * open
 }
 
 /// Unzoomed radius of the backdrop behind `n` source lanes around a knob of radius `r`.
@@ -1102,8 +1121,10 @@ fn source_lanes(
     z: f32,
     base_n: f32,
     routes: &[RouteView],
+    open: f32,
+    inspected: bool,
 ) {
-    let lane_radius = |k: usize| (r + RING_OUTER + LANE_GAP * (k as f32 + 1.0)) * z;
+    let lane_radius = |k: usize| lane_radius(r, k, open) * z;
     let canvas = ui.clip_rect();
     let top = ui
         .ctx()
@@ -1112,11 +1133,11 @@ fn source_lanes(
             Id::new(("kabl-lanes", id, param.name)),
         ))
         .with_clip_rect(canvas);
-    let outer = lanes_outer(r, routes.len()) * z;
+    let outer = (r + RING_OUTER + (lanes_outer(r, routes.len()) - r - RING_OUTER) * open) * z;
     top.circle_filled(
         center,
         outer,
-        crate::style::alpha(ui_state.style.roles.surface, 215),
+        crate::style::alpha(ui_state.style.roles.surface, (215.0 * open) as u8),
     );
     for (k, rt) in routes.iter().enumerate() {
         let radius = lane_radius(k);
@@ -1141,8 +1162,16 @@ fn source_lanes(
             radius,
             lo.clamp(0.0, 1.0),
             hi.clamp(0.0, 1.0),
-            Stroke::new(if selected { 4.0 } else { 2.5 } * z.max(0.7), color),
+            Stroke::new(
+                (1.8 + (if selected { 2.2 } else { 0.7 }) * open) * z.max(0.7),
+                color,
+            ),
         );
+        // Dots only while inspected (from the first frame, wherever the lane is): a closing
+        // lane is display only.
+        if !inspected {
+            continue;
+        }
         let peak = (base_n + rt.amount * rt.src.1).clamp(0.0, 1.0);
         let at = on_circle(center, radius, travel_angle(peak));
         // At least 9 px to grab, whatever the zoom.
@@ -2113,6 +2142,19 @@ mod tests {
     }
 
     /// The label shows the semitone the sequencer plays (it rounds), never "-0 st".
+    #[test]
+    fn collapsed_lanes_stay_inside_the_knobs_ring_band() {
+        for r in [10.0, 18.0, 30.0] {
+            for k in 0..8 {
+                // Collapsed: inside the ring band, so a neighbouring knob is never covered.
+                assert!(lane_radius(r, k, 0.0) <= r + RING_OUTER, "r {r} lane {k}");
+                // Open: outside it, a lane gap apart.
+                assert!(lane_radius(r, k, 1.0) > r + RING_OUTER);
+                assert!(lane_radius(r, k, 0.5) < lane_radius(r, k, 1.0));
+            }
+        }
+    }
+
     #[test]
     fn pitch_labels_match_the_played_semitone() {
         let p = kabl_modules::registry::info_for("seq").unwrap().params[0];
