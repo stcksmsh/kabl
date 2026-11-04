@@ -189,10 +189,19 @@ impl eframe::App for App {
                             Ic::Plug,
                             "Nothing patched",
                             "Drag a module from the library, or load a sound.",
-                            |ui| {
-                                ui.add(kit::Button::new(&st, "Open library").primary());
-                                ui.add(kit::Button::new(&st, "New patch"));
-                            },
+                            &[
+                                g4::EmptyAction {
+                                    label: "Open library",
+                                    primary: true,
+                                    icon: Ic::Plus,
+                                },
+                                g4::EmptyAction {
+                                    label: "New patch",
+                                    primary: false,
+                                    icon: Ic::Plus,
+                                },
+                            ],
+                            None,
                         );
                     });
                     card(d, &st, "Menu", |ui| {

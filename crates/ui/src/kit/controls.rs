@@ -126,6 +126,51 @@ impl<'a> Button<'a> {
     }
 }
 
+impl Button<'_> {
+    /// The width the button takes: label, icon and padding.
+    pub fn width(&self, ui: &Ui) -> f32 {
+        let st = self.st;
+        let font = match self.g4 {
+            Some(h) => egui::FontId::new(
+                if h < 32.0 { 12.5 } else { 13.0 },
+                crate::style::Font::SansSemibold.family(st.fonts_ready),
+            ),
+            None => st.font(Role::Label),
+        };
+        let h = match self.g4 {
+            Some(h) => h,
+            None if self.small => st.metrics.small_h,
+            None if self.large => st.metrics.large_h,
+            None => st.metrics.control_h,
+        };
+        let pad = if self.g4.is_some() {
+            14.0
+        } else if self.small {
+            st.sp(2)
+        } else if self.large {
+            st.sp(4)
+        } else {
+            st.sp(3)
+        };
+        let icon_w = if self.icon.is_some() {
+            st.metrics.icon + st.sp(1) + 2.0
+        } else {
+            0.0
+        };
+        let tw = if self.text.is_empty() {
+            0.0
+        } else {
+            ui.painter()
+                .layout_no_wrap(self.text.clone(), font, Color32::WHITE)
+                .size()
+                .x
+        };
+        (pad * 2.0 + icon_w + tw)
+            .max(self.min_w)
+            .max(if self.text.is_empty() { h } else { 0.0 })
+    }
+}
+
 impl Widget for Button<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
         let st = self.st;

@@ -4,7 +4,7 @@
 //! Tokens are derived from the existing roles, so theme files keep loading unchanged.
 
 use super::controls::{fill_rr, focus_ring};
-use super::{dim, ease_to, icon, icon_button, label, paragraph, rich, rule, Ic, Tone};
+use super::{dim, ease_to, icon, icon_button, rich, rule, Ic, Tone};
 use crate::style::{alpha, mix, Role, Style};
 use egui::{
     pos2, vec2, Color32, CornerRadius, Frame, Margin, Painter, Rect, Response, Sense, Stroke,
@@ -345,29 +345,78 @@ pub fn dock(
 
 // ------------------------------------------------------------------ feedback
 
-/// A calm placeholder: 56 px circle with an icon, title, one line, up to two actions.
+/// An action of [`empty_state`]: label, primary or secondary, icon.
+pub struct EmptyAction<'a> {
+    pub label: &'a str,
+    pub primary: bool,
+    pub icon: Ic,
+}
+
+/// A calm placeholder (g4-surfaces.html `K.empty`): 56 px well with an icon, title 16/600 at
+/// +60, line 13 at +84 (offsets from the well's centre), the actions centred as a row at +104
+/// with an 8 px gap, then the optional tip 12 px at +170. Returns each action's response.
 pub fn empty_state(
     ui: &mut Ui,
     st: &Style,
     ic: Ic,
     title: &str,
     line: &str,
-    actions: impl FnOnce(&mut Ui),
-) {
-    ui.vertical_centered(|ui| {
-        ui.add_space(24.0);
-        let (r, _) = ui.allocate_exact_size(vec2(56.0, 56.0), Sense::hover());
-        ui.painter().circle_filled(r.center(), 28.0, st.roles.inset);
-        ui.painter()
-            .circle_stroke(r.center(), 28.0, Stroke::new(1.0, st.roles.line));
-        icon(ui.painter(), ic, r.center(), 24.0, st.roles.text2);
-        ui.add_space(12.0);
-        label(ui, st, Role::H3, Tone::Text, title);
-        ui.add_space(4.0);
-        paragraph(ui, st, Role::Body, Tone::Text2, line);
-        ui.add_space(14.0);
-        ui.horizontal(actions);
-    });
+    actions: &[EmptyAction],
+    tip: Option<&str>,
+) -> Vec<Response> {
+    use super::Button;
+    let (area, _) = ui.allocate_exact_size(vec2(ui.available_width(), 204.0), Sense::hover());
+    let c = pos2(area.center().x, area.min.y + 28.0);
+    let p = ui.painter();
+    p.circle_filled(c, 28.0, st.roles.raised);
+    p.circle_stroke(c, 28.0, Stroke::new(1.0, st.roles.line2));
+    icon(p, ic, c, 24.0, st.roles.text2);
+    let sans = |size: f32, semi: bool| {
+        egui::FontId::new(
+            size,
+            if semi {
+                crate::style::Font::SansSemibold.family(st.fonts_ready)
+            } else {
+                st.font(Role::Body).family
+            },
+        )
+    };
+    // Baselines from the mockup; CENTER_CENTER sits 0.36 em above a baseline.
+    let line_at = |dy: f32, size: f32, semi: bool, text: &str, col: Color32| {
+        p.text(
+            pos2(c.x, c.y + dy - size * 0.36),
+            egui::Align2::CENTER_CENTER,
+            text,
+            sans(size, semi),
+            col,
+        );
+    };
+    line_at(60.0, 16.0, true, title, st.roles.text);
+    line_at(84.0, 13.0, false, line, st.roles.text2);
+    if let Some(t) = tip {
+        line_at(170.0, 12.0, false, t, st.roles.text3);
+    }
+    let buttons: Vec<Button> = actions
+        .iter()
+        .map(|a| {
+            let b = Button::new(st, a.label).icon(a.icon).g4(32.0);
+            if a.primary {
+                b.primary()
+            } else {
+                b
+            }
+        })
+        .collect();
+    let widths: Vec<f32> = buttons.iter().map(|b| b.width(ui)).collect();
+    let total = widths.iter().sum::<f32>() + 8.0 * widths.len().saturating_sub(1) as f32;
+    let mut x = c.x - total / 2.0;
+    let mut out = Vec::new();
+    for (b, w) in buttons.into_iter().zip(widths) {
+        let r = Rect::from_min_size(pos2(x, c.y + 104.0), vec2(w, 32.0));
+        out.push(ui.put(r, b));
+        x += w + 8.0;
+    }
+    out
 }
 
 /// Inline banner (form errors, warnings): tinted, icon, title, optional mono detail.
