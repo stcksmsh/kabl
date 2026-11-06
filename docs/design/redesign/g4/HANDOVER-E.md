@@ -21,12 +21,15 @@ Overseer task: finish #111 first (rebase on origin/master, close or justify each
   - "Del" hint on Remove module / Remove cable (`remove_row` in `lib.rs`); Delete while the menu is open removes (not while a field has focus).
   - Explain this cable: a route opens Explain on the control it moves (`Subject::Control`); a jack cable on the module it feeds. Still no cable subject: justify in the PR.
 
+## 2026-11-06: #111 finished (overseer scope: #111 only)
+- The 3 interaction tests follow the More grid (More is modal: close it before clicking face controls). `cargo test -p kabl-ui` all green, fmt and clippy clean.
+- origin/master merged into the WIP work; `claude/ui-menus` fast-forwarded to f0b6383d (WIP tree merged with `-s ours` over the old tip, no force-push). `chrome_capture` SCENES is now 22.
+- Recaptured menu-module, menu-cable, more-controls-face (graphite + paper, 1440x900 + 1180x680) into their folders. `more-controls` and the sheets were not redone.
+
 ## Remaining, in order
-1. Fix 3 failing tests in `crates/ui/tests/interaction.rs` (they test the removed jack/cable copy in More): `focused_view_keeps_existing_native_jack_and_parameter_cables` (line ~1001), `a_route_to_an_off_face_control_docks_on_the_toggle_and_selecting_it_reveals`, `delay_controls_and_a_fresh_load` (both panic at line 74, a missing hit key). Rewrite them for the grid or drop the assertions on jacks in More. New test `more_grid_pins_reorder_grips_and_delete_in_menu` passes.
-2. Get Kosta/overseer OK to force-push `claude/ui-menus-wip` onto `claude/ui-menus` (rebase), or open a new draft PR from it and close #111.
-3. Recapture `menu-module menu-cable more-controls more-controls-face` (script: `$CLAUDE_JOB_DIR/tmp/cap.sh OUT scenes…`, it sets the env the Captures fact lists), copy into `docs/design/redesign/g4/<scene>/`, redo sheets, update the PR body (deviations section).
-4. Answer review on #107 (routes), merging `origin/master` in on conflict.
-5. Then the next UI items in order (none listed beyond these).
+1. #111 PR body: add the deviations section (Explain this cable has no cable subject).
+2. Answer review on #107 (routes), merging `origin/master` in on conflict.
+3. Redo `more-controls` capture and sheets if wanted.
 
 ## Facts that cost effort
 - Sheets: `/tmp/sheetjs/sheet.py MOCK APP OUT` (mockup scaled to the app size, side by side). Not in the repo.
