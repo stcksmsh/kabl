@@ -182,7 +182,10 @@ impl Size {
 }
 
 /// Modal: scrim, title 17/600 with a 28 px close, body, footer (64 px, top rule, actions
-/// right-aligned, primary last). Returns true when the user closed it (close, Esc, backdrop).
+/// right-aligned, primary last; `lead` sits at the left edge, for a danger action). An empty
+/// `title` leaves the header out (About draws its own). Returns true when the user closed it
+/// (close, Esc, backdrop).
+#[allow(clippy::too_many_arguments)]
 pub fn modal_framed<T>(
     ctx: &egui::Context,
     st: &Style,
@@ -190,6 +193,7 @@ pub fn modal_framed<T>(
     size: Size,
     title: &str,
     body: impl FnOnce(&mut Ui) -> T,
+    lead: impl FnOnce(&mut Ui),
     footer: impl FnOnce(&mut Ui),
 ) -> bool {
     let width = size.width().min(ctx.content_rect().width() - 80.0);
@@ -203,15 +207,17 @@ pub fn modal_framed<T>(
             ui.set_width(width);
             let mut closed = false;
             ui.add_space(20.0);
-            ui.horizontal(|ui| {
-                ui.add_space(24.0);
-                ui.label(rich(st, Role::Title, Tone::Text, title));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.add_space(14.0);
-                    closed = icon_button(ui, st, Ic::Close, false, true).clicked();
+            if !title.is_empty() {
+                ui.horizontal(|ui| {
+                    ui.add_space(24.0);
+                    ui.label(rich(st, Role::Title, Tone::Text, title));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.add_space(14.0);
+                        closed = icon_button(ui, st, Ic::Close, false, true).clicked();
+                    });
                 });
-            });
-            ui.add_space(8.0);
+                ui.add_space(8.0);
+            }
             Frame::new()
                 .inner_margin(Margin::symmetric(24, 4))
                 .show(ui, |ui| body(ui));
@@ -220,6 +226,7 @@ pub fn modal_framed<T>(
             ui.horizontal(|ui| {
                 ui.set_height(63.0);
                 ui.add_space(24.0);
+                lead(ui);
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.add_space(24.0);
                     footer(ui);

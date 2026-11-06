@@ -14,7 +14,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 22] = [
+const SCENES: [&str; 28] = [
     "rack",
     "perform",
     "sounds",
@@ -37,6 +37,12 @@ const SCENES: [&str; 22] = [
     "menu-cable",
     "more-controls",
     "more-controls-face",
+    "dlg-unsaved",
+    "dlg-save-as",
+    "dlg-save-error",
+    "dlg-rename",
+    "dlg-restore",
+    "about",
 ];
 
 struct Job {
@@ -353,6 +359,47 @@ impl App {
         }
         if j.scene == "learn" {
             ui.recipes.open = true;
+        }
+        {
+            use kabl_ui::browser::{Dialog, Pending};
+            let save_as = |error: Option<&str>| Dialog::SaveAs {
+                name: "Warm pad".into(),
+                category: "Pad".into(),
+                tags: "slow, wide".into(),
+                taken: None,
+                then: None,
+                error: error.map(Into::into),
+            };
+            match j.scene {
+                "dlg-unsaved" => {
+                    if let Some(d) = ui.doc.as_mut() {
+                        d.name = "Untitled".into();
+                    }
+                    ui.browser.dialog = Some(Dialog::Unsaved {
+                        then: Pending::New,
+                        error: None,
+                    });
+                }
+                "dlg-save-as" => ui.browser.dialog = Some(save_as(None)),
+                "dlg-save-error" => {
+                    ui.browser.dialog = Some(save_as(Some(
+                        "Permission denied \u{b7} ~/kabl/sounds/warm-pad.kabl",
+                    )))
+                }
+                "dlg-rename" => {
+                    ui.browser.dialog = Some(Dialog::Rename {
+                        id: "user:warm-pad".into(),
+                        name: "Warm pad".into(),
+                        error: None,
+                    })
+                }
+                "dlg-restore" => {
+                    ui.compare.capture(&self.editor, "you");
+                    ui.browser.dialog = Some(Dialog::Restore);
+                }
+                "about" => ui.about.open = true,
+                _ => {}
+            }
         }
         if j.scene == "compare" {
             ui.drawer_open = true;

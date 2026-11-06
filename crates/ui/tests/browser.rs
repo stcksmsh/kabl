@@ -176,6 +176,9 @@ impl H {
         }
         self.frame();
         self.click("dlg:save");
+        // The modal re-centres over the next frames when its content grows (a banner).
+        self.frame();
+        self.frame();
     }
 
     /// An edit on the first knob-like param of module kind `kind`.
