@@ -1762,7 +1762,13 @@ fn status_bar(
                 ui.allocate_exact_size(egui::Vec2::splat(st.sp(2)), egui::Sense::hover());
             ui.painter()
                 .circle_filled(dot.center(), st.sp(1), st.roles.good);
-            kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, &port);
+            kit::label_truncated(
+                ui,
+                st,
+                style::Role::Caption,
+                kit::Tone::Text2,
+                format!("MIDI · {port}"),
+            );
         }
         if !ui_state.status_audio.is_empty() {
             let text = ui_state.status_audio.clone();

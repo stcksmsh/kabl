@@ -42,7 +42,7 @@ const HOLD_TITLE: f32 = 10.5;
 /// Zoom below which no face text is drawn under `Hold` (the overview tier) and above which
 /// values and captions are drawn again (the full tier).
 const OVERVIEW_BELOW: f32 = 0.55;
-const FULL_FROM: f32 = 0.864;
+pub(crate) const FULL_FROM: f32 = 0.864;
 
 /// Whether `z` is in the overview tier of a `Hold` style: no face text, not even the `+N` chip.
 pub fn overview(st: &Style, z: f32) -> bool {
