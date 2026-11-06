@@ -1164,7 +1164,17 @@ fn sound_row(
         row.hovered(),
         Style::secs(st.motion.hover),
     );
-    kit::row_bg(ui, st, rect, sel, hover);
+    // A selected row is the accent outline below; the others get the hover fill.
+    kit::row_bg(ui, st, rect, false, if sel { 0.0 } else { hover });
+    if sel {
+        // The mockup's selected row: an accent outline.
+        ui.painter().rect_stroke(
+            rect,
+            6.0,
+            egui::Stroke::new(1.5, st.roles.accent),
+            egui::StrokeKind::Inside,
+        );
+    }
     let star_rect = egui::Rect::from_center_size(
         rect.left_center() + vec2(st.sp(3) + 4.0, 0.0),
         vec2(st.metrics.control_h, st.metrics.control_h),
@@ -1221,6 +1231,24 @@ fn sound_row(
         st.roles.text3,
     );
     (row, star)
+}
+
+/// An accent pill with the active category's name; clicking it clears the category.
+fn category_chip(ui: &mut egui::Ui, st: &Style, label: &str) -> egui::Response {
+    let font = st.font(Role::Caption);
+    let galley = ui
+        .painter()
+        .layout_no_wrap(label.to_string(), font, st.roles.on_accent);
+    let size = vec2(galley.size().x + 24.0, 24.0);
+    let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
+    let p = ui.painter();
+    p.rect_filled(rect, 12.0, st.roles.accent);
+    p.galley(
+        pos2(rect.left() + 12.0, rect.center().y - galley.size().y / 2.0),
+        galley,
+        st.roles.on_accent,
+    );
+    resp.on_hover_text("Click to show every category")
 }
 
 /// The left panel.
@@ -1493,16 +1521,36 @@ fn nav_foot(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui,
 
 /// Search and the list of sounds; a double-click on a row sets `open`.
 fn list_column(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, open: &mut Option<String>) {
+    // "Search 64 sounds": the sounds of the library filter being shown.
+    let in_filter = ui_state.library.as_ref().map_or(0, |lib| {
+        let of = |o: Origin| lib.entries.iter().filter(|e| e.origin == o).count();
+        match ui_state.browser.filter {
+            Filter::All => lib.entries.len(),
+            Filter::Recent => lib.prefs.recents.len(),
+            Filter::Favorites => lib.prefs.favorites.len(),
+            Filter::Factory => of(Origin::Factory),
+            Filter::User => of(Origin::User),
+        }
+    });
     let r = kit::field(
         ui,
         st,
         &mut ui_state.browser.query,
-        "Search name, purpose, mood, tempo",
+        &format!("Search {in_filter} sounds"),
         Some(Ic::Search),
         None,
     );
     hit(ui_state, "search", &r);
     kit::gap(ui, st, 1);
+    // The active category as a chip; a click drops it.
+    if let Some(cat) = ui_state.browser.category.clone() {
+        let r = category_chip(ui, st, &cat);
+        hit(ui_state, "category-chip", &r);
+        if r.clicked() {
+            ui_state.browser.category = None;
+        }
+        kit::gap(ui, st, 1);
+    }
     {
         let (rect, _) =
             ui.allocate_exact_size(vec2(ui.available_width(), st.sp(4)), Sense::hover());
@@ -2151,7 +2199,8 @@ fn dialog_button(
     let b = match look {
         Look::Plain => b,
         Look::Primary => b.primary(),
-        Look::Danger => b.tone(Tone::Bad),
+        // The mockup: a red label with no outline.
+        Look::Danger => b.ghost().tone(Tone::Bad),
     };
     let r = ui.add(b);
     hits.push((key, r.rect));

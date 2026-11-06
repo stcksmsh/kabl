@@ -304,6 +304,30 @@ pub fn face_label(kind: &str, p: &ParamInfo) -> String {
     crate::rack::short_name(kind, p.name).map_or_else(|| param_label(p), str::to_string)
 }
 
+/// The mockup's short face labels for the compact tier (zoom below the full-text tier), where
+/// a knob's column is too narrow for the full word. Decay is shortened on the ADSR only, where
+/// four knobs share the row.
+pub fn compact_label(kind: &str, label: &str) -> Option<&'static str> {
+    Some(match label {
+        "Attack" => "Atk",
+        "Damping" => "Damp",
+        "Decay" if kind == "env.adsr" => "Dec",
+        "Feedback" => "Fdbk",
+        "Frequency" => "Freq",
+        "Gate length" => "Gate",
+        "Length" => "Len",
+        "Pulse width" => "PW",
+        "Release" => "Rel",
+        "Resonance" => "Res",
+        "Sustain" => "Sus",
+        "Level 1" => "Lv 1",
+        "Level 2" => "Lv 2",
+        "Level 3" => "Lv 3",
+        "Level 4" => "Lv 4",
+        _ => return None,
+    })
+}
+
 /// Human label for a param name: `attack_ms` → `Attack`. A sequencer bank param is labelled
 /// by its slot (`c.v2` → `V2`), as on the face.
 pub fn param_label(p: &ParamInfo) -> String {
@@ -961,7 +985,12 @@ pub(crate) fn param_knob(
                     .modules
                     .get(&id)
                     .map_or("", |m| m.kind.as_str());
-                face_label(kind, param)
+                let full = face_label(kind, param);
+                if z < crate::kit::face::FULL_FROM {
+                    compact_label(kind, &full).map_or(full, str::to_string)
+                } else {
+                    full
+                }
             }),
             font,
             look.ink,

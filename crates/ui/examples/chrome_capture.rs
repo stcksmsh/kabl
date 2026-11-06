@@ -280,6 +280,10 @@ impl App {
         ui.status_voices = Some((4, 8));
         ui.status_bpm = Some(124.0);
         ui.status_pos = Some("17 . 3 . 2".into());
+        // The mockup: -9.4 dB peak on both channels, KeyStep on the MIDI input.
+        ui.meter.level = [0.34, 0.34];
+        ui.meter.max_db = Some(-9.4);
+        ui.midi_input = Some("KeyStep".into());
         ui.library = Some(Library::open(
             Some(patches()),
             self._user.path().to_path_buf(),
@@ -288,6 +292,9 @@ impl App {
         std::fs::create_dir_all(self._user.path().join("sounds")).unwrap();
         if j.scene == "sounds" {
             ui.browser.selected = Some("factory:presets/acid-line".into());
+            // The mockup narrows the Factory shelf to Bass; Acid Line is a Groove sound here.
+            ui.browser.filter = kabl_ui::browser::Filter::Factory;
+            ui.browser.category = Some("Groove".into());
         }
         let mut doc = kabl_ui::browser::Doc::new(
             "Acid Line",
@@ -309,6 +316,18 @@ impl App {
         );
         if j.scene == "empty" {
             self.editor = PatchEditor::new();
+        }
+        // The mockup's playhead sits on step 5 (index 4) of every sequencer.
+        let seqs: Vec<_> = self
+            .editor
+            .state()
+            .modules
+            .iter()
+            .filter(|(_, m)| m.kind == "seq")
+            .map(|(&id, _)| id)
+            .collect();
+        for s in seqs {
+            ui.seq_steps.insert(s, 4);
         }
         if j.scene.starts_with("file-") {
             use kabl_ui::filebrowser::{self as fb, Mode, Purpose};
@@ -360,7 +379,8 @@ impl App {
                         vec![]
                     },
                     expanded: true,
-                    born: 0.0,
+                    // Never expires: the warning and success toasts must still be there.
+                    born: 1.0e9,
                 });
             }
         }
