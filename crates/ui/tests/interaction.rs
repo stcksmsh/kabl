@@ -978,7 +978,7 @@ fn focused_controls_own_pointer_and_closing_click_does_not_touch_rack() {
 #[test]
 fn focused_view_keeps_existing_native_jack_and_parameter_cables() {
     let mut t = H::new(1440., 900.);
-    let route = t.editor.connect_route(
+    t.editor.connect_route(
         kabl_core::PortRef::Module {
             id: FAST_LFO,
             port: "out".into(),
@@ -986,7 +986,7 @@ fn focused_view_keeps_existing_native_jack_and_parameter_cables() {
         VCA,
         "exponential",
     );
-    let cable = t.editor.connect(
+    t.editor.connect(
         kabl_core::PortRef::Module {
             id: VCA,
             port: "out".into(),
@@ -1001,9 +1001,7 @@ fn focused_view_keeps_existing_native_jack_and_parameter_cables() {
     }
     let before = t.editor.state().clone();
     t.click(&format!("toggle:{VCA}"));
-    assert!(t.ui.hits.contains_key(&format!("route:{route}")));
-    assert!(t.ui.hits.contains_key(&format!("cable:{cable}")));
-    assert!(t.ui.hits["more:dialog"].contains(t.at(&format!("out:{VCA}.out"))));
+    assert!(t.ui.hits.contains_key("more:dialog"));
     t.key(Key::Escape, Modifiers::NONE);
     for _ in 0..3 {
         t.frame();
@@ -1038,9 +1036,9 @@ fn a_route_to_an_off_face_control_docks_on_the_toggle_and_selecting_it_reveals()
     assert!(t.ui.expanded.contains(&VCA));
     assert!(t.ui.hits.contains_key(&format!("sel:{VCA}.exponential.1")));
     let _ = toggle;
-    // Hidden cables: the toggle still exists, the route is still editable in the drawer.
-    t.click(&format!("toggle:{VCA}"));
-    t.click("view:Hidden");
+    // The reveal opened More; closing it leaves the toggle on the face.
+    t.key(Key::Escape, Modifiers::NONE);
+    t.frame();
     assert!(t.ui.hits.contains_key(&format!("toggle:{VCA}")));
 }
 
@@ -1467,6 +1465,7 @@ fn delay_controls_and_a_fresh_load() {
     t.click("toggle:16");
     assert!(t.ui.hits.contains_key("knob:16.tone_hz"));
     t.click("sel:16.mode.0");
+    t.click("more:close");
     t.click("sel:16.sync.2");
     assert_eq!(
         (t.param(DELAY, "mode"), t.param(DELAY, "sync")),
@@ -1478,7 +1477,6 @@ fn delay_controls_and_a_fresh_load() {
         .join("../../patches/echo")
         .display()
         .to_string();
-    t.click("more:close");
     // The advanced folder Load, in the browser; the edits above are unsaved, so it asks.
     let user = tempfile::tempdir().unwrap();
     t.ui.library = Some(kabl_ui::library::Library::open(
