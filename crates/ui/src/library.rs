@@ -23,6 +23,8 @@ use serde::{Deserialize, Serialize};
 pub const META_FILE: &str = "sound.toml";
 pub const PREFS_FILE: &str = "library.json";
 pub const MAX_RECENTS: usize = 12;
+/// Patch folders the Recent place of the file browser remembers.
+pub const MAX_PATCH_RECENTS: usize = 10;
 pub const MAX_NAME: usize = 60;
 
 /// The category vocabulary, in browser order.
@@ -141,6 +143,8 @@ pub struct Prefs {
     pub favorites: BTreeSet<String>,
     /// Newest first.
     pub recents: Vec<String>,
+    /// Paths of the patch folders last opened or saved through the file browser, newest first.
+    pub patch_recents: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -807,6 +811,21 @@ impl Library {
         self.prefs.recents.insert(0, id.to_string());
         self.prefs.recents.truncate(MAX_RECENTS);
         self.save_prefs()
+    }
+
+    /// Records the patch folder `path` as the newest recent patch and saves the preferences.
+    pub fn touch_patch(&mut self, path: &Path) -> Option<String> {
+        let s = path.to_string_lossy().into_owned();
+        self.prefs.patch_recents.retain(|r| *r != s);
+        self.prefs.patch_recents.insert(0, s);
+        self.prefs.patch_recents.truncate(MAX_PATCH_RECENTS);
+        self.save_prefs()
+    }
+
+    /// The recent patch folders that still exist, newest first.
+    pub fn recent_patches(&self) -> Vec<PathBuf> {
+        let dirs = self.prefs.patch_recents.iter().map(PathBuf::from);
+        dirs.filter(|p| p.is_dir()).collect()
     }
 
     pub fn toggle_favorite(&mut self, id: &str) -> Option<String> {
