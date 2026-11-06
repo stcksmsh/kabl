@@ -1052,21 +1052,19 @@ fn drawer(
     if ui_state.recipes.open {
         // Above the drawer's scrolling content, so Show (which scrolls the drawer
         // to the routes) never scrolls the recipe away.
-        let h = ui.available_height() * 0.4;
+        let h = ui.available_height() * 0.8;
         egui::ScrollArea::vertical()
             .id_salt("kabl-recipes")
             .max_height(h)
             .show_owned(ui, |ui| {
                 ui.set_max_width(DRAWER_W - 24.0);
-                egui::Frame::group(ui.style()).show(ui, |ui| {
-                    recipes::panel(editor, ui_state, ui, now);
-                });
+                recipes::panel(editor, ui_state, ui, now);
             });
     }
     if ui_state.explain.is_open() {
         // Its own scroll area, at most about half the drawer: the module and
         // routing sections below stay in reach while it is open.
-        let h = ui.available_height() * 0.55;
+        let h = ui.available_height() * 0.8;
         egui::ScrollArea::vertical()
             .id_salt("kabl-explain")
             .max_height(h)
@@ -1079,14 +1077,10 @@ fn drawer(
         // Rows wrap instead of widening the drawer over the rack.
         ui.set_max_width(DRAWER_W - 24.0);
         if ui_state.inspect.open {
-            egui::Frame::group(ui.style()).show(ui, |ui| {
-                inspect::panel(editor, ui_state, ui, now);
-            });
+            inspect::panel(editor, ui_state, ui, now);
         }
         if ui_state.compare.open {
-            egui::Frame::group(ui.style()).show(ui, |ui| {
-                compare::panel(editor, ui_state, ui);
-            });
+            compare::panel(editor, ui_state, ui, st);
         }
         // The patch-wide lists lead when no control is being edited, and follow its editor
         // otherwise, so the control's routes stay in view.
