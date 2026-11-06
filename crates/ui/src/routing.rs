@@ -968,8 +968,7 @@ pub(crate) fn param_knob(
         );
     }
     let value = fmt_value(param, base);
-    let vh = crate::kit::face::face_font(&ui_state.style, crate::style::Role::Value, z)
-        .map_or(0.0, |f| f.size * 1.075);
+    let vh = crate::kit::face::selector_font(&ui_state.style, z).map_or(0.0, |f| f.size * 1.075);
     let vpos = center + EguiVec2::new(0.0, crate::rack::knob_text_dy(r, z, vh));
     // Line panels: values read in the dimmer text colour (G1b target).
     let value_ink = if ui_state.style.slots.face.material == crate::style::FaceMaterial::Line {
@@ -1365,9 +1364,7 @@ pub(crate) fn stepped_selector(
                 egui::StrokeKind::Inside,
             );
         }
-        if let Some(font) =
-            crate::kit::face::face_font(&ui_state.style, crate::style::Role::Value, z)
-        {
+        if let Some(font) = crate::kit::face::selector_font(&ui_state.style, z) {
             painter.text(
                 r.center(),
                 egui::Align2::CENTER_CENTER,

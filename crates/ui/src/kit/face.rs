@@ -71,6 +71,17 @@ fn sized(st: &Style, role: Role, z: f32, hide_below: f32) -> Option<FontId> {
         .then(|| FontId::new((t.size * z).max(TEXT_FLOOR), t.font.family(st.fonts_ready)))
 }
 
+/// The font of a selector's option names. A selector's text is the control itself, not a value
+/// readout, so the compact tier keeps it (held at the floor size) instead of dropping it.
+pub fn selector_font(st: &Style, z: f32) -> Option<FontId> {
+    face_font(st, Role::Value, z).or_else(|| {
+        compact_tier(st, z).then(|| {
+            let t = st.type_role(Role::Value);
+            FontId::new((t.size * z).max(HOLD_FLOOR), t.font.family(st.fonts_ready))
+        })
+    })
+}
+
 /// Angle (radians from 12 o'clock, clockwise) of knob travel `n` on the 270° scale.
 pub fn travel_angle(n: f32) -> f32 {
     (-135.0 + n.clamp(0.0, 1.0) * 270.0).to_radians()
