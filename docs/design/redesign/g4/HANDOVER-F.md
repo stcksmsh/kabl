@@ -13,7 +13,7 @@ Task from "Kabl overseer": G4-F group 4 (file browser) only. UI only: no sound o
 Group 5 on a new branch from origin/master. Start: `grep -n "Modal\|egui::Window" crates/ui/src/browser.rs crates/ui/src/about.rs`.
 
 ## Facts
-- Patches are folders: "Open patch" is `Mode::Folder`, so the list shows folders only, not the mockup's `.kabl` files. Open mode keeps click-to-pick: footer has Cancel + Choose this folder only.
+- Patches are folders with meta.toml: listed as `name.kabl` items (file icon, display only; on disk no suffix); real folders first with chevron. Open mode: click selects, Open button or double-click picks. Sounds place = user_root/sounds. Recent place left out: no recent-patches list exists (library recents are sound ids).
 - Modified dates are UTC dates without time (`ponytail:` in `row()`).
 - Capture ctx is shared across jobs; modals centre on the screen rect.
 - `git push --force-with-lease` is denied: merge master, do not rebase.

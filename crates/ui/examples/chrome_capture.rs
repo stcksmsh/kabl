@@ -271,6 +271,8 @@ impl App {
             Some(patches()),
             self._user.path().to_path_buf(),
         ));
+        // The file browser's Sounds place needs the user's sounds folder.
+        std::fs::create_dir_all(self._user.path().join("sounds")).unwrap();
         if j.scene == "sounds" {
             ui.browser.selected = Some("factory:presets/acid-line".into());
         }
@@ -296,18 +298,21 @@ impl App {
             self.editor = PatchEditor::new();
         }
         if j.scene.starts_with("file-") {
-            use kabl_ui::filebrowser::{self as fb, Mode, Purpose, FOLDERS};
+            use kabl_ui::filebrowser::{self as fb, Mode, Purpose};
             let patches = std::env::temp_dir().join(PATCHES);
             ui.folders.insert("patches".into(), patches.clone());
             let (purpose, title, mode, name) = match j.scene {
                 "file-save" => (Purpose::PatchSave, "Save patch", Mode::Save, "my-patch"),
-                _ => (Purpose::PatchLoad, "Open patch", Mode::Folder, ""),
+                _ => (Purpose::PatchLoad, "Open patch", Mode::Open, ""),
             };
             if j.scene == "file-empty" {
                 ui.folders
                     .insert("patches".into(), patches.with_file_name("empty-set"));
             }
-            fb::open(&mut ui, purpose, title, mode, FOLDERS, name, "");
+            fb::open(&mut ui, purpose, title, mode, fb::PATCHES, name, "");
+            if j.scene != "file-empty" {
+                fb::preselect(&mut ui, "acid-line");
+            }
         }
         if j.scene == "error" {
             use kabl_ui::kit::g4::{Sev, Toast};
@@ -610,6 +615,8 @@ impl App {
 
 impl eframe::App for App {
     fn raw_input_hook(&mut self, _ctx: &egui::Context, raw: &mut egui::RawInput) {
+        // A headless window has no focus: text fields would show no caret.
+        raw.focused = true;
         // Modals centre on the screen rect: make it the capture size, not the real window.
         if let Some(j) = self.jobs.get(self.i) {
             raw.screen_rect = Some(Rect::from_min_size(
@@ -791,24 +798,21 @@ fn file_tree() {
     let home = std::env::temp_dir().join("kabl-capture-home");
     let patches = std::env::temp_dir().join(PATCHES);
     std::fs::create_dir_all(patches.with_file_name("empty-set")).unwrap();
-    // 2026-11-02 18:40 UTC, then a day or more earlier for each later row.
-    let base = 1_793_577_600u64 + 18 * 3600 + 40 * 60;
-    for (i, name) in [
-        "composition-batch",
-        "cue-macros",
-        "effects",
-        "acid-line",
-        "dense-composition",
-        "rope-walk",
-        "slab-city",
-        "warm-pad",
-    ]
-    .into_iter()
-    .enumerate()
-    {
+    // Real folders, then patches (a folder with meta.toml) with the mockup's dates (UTC).
+    for name in ["composition-batch", "cue-macros", "effects"] {
+        std::fs::create_dir_all(patches.join(name)).unwrap();
+    }
+    for (name, at) in [
+        ("acid-line", 1_793_644_800u64),
+        ("dense-composition", 1_793_571_300),
+        ("rope-walk", 1_793_476_920),
+        ("slab-city", 1_793_360_820),
+        ("warm-pad", 1_793_179_800),
+    ] {
         let d = patches.join(name);
         std::fs::create_dir_all(&d).unwrap();
-        let t = std::time::UNIX_EPOCH + std::time::Duration::from_secs(base - i as u64 * 97_000);
+        std::fs::write(d.join("meta.toml"), "schema_version = 8\n").unwrap();
+        let t = std::time::UNIX_EPOCH + std::time::Duration::from_secs(at);
         let _ = std::fs::File::open(&d).and_then(|f| f.set_modified(t));
     }
     std::env::set_var("HOME", &home);

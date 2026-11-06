@@ -34,23 +34,35 @@ pub struct Spec {
     pub exts: &'static [&'static str],
     /// What the files are called in the empty-folder message.
     pub what: &'static str,
+    /// A folder with a `meta.toml` is a patch: listed as a `name.kabl` file, picked whole.
+    pub patches: bool,
 }
 
 pub const WAV: Spec = Spec {
     exts: &["wav"],
     what: ".wav files",
+    patches: false,
 };
 pub const IMAGE: Spec = Spec {
     exts: &["png"],
     what: ".png images",
+    patches: false,
 };
 pub const PACKAGE: Spec = Spec {
     exts: &["json"],
     what: ".json packages",
+    patches: false,
 };
 pub const FOLDERS: Spec = Spec {
     exts: &[],
     what: "files",
+    patches: false,
+};
+
+pub const PATCHES: Spec = Spec {
+    exts: &[],
+    what: "kabl patches (.kabl)",
+    patches: true,
 };
 
 /// What a pick returns and how the browser behaves.
@@ -110,6 +122,8 @@ impl Purpose {
 struct Entry {
     name: String,
     dir: bool,
+    /// A patch folder: shown as a `.kabl` file, not entered.
+    patch: bool,
     /// Seconds since 1970 of the last change, when the system says.
     modified: Option<u64>,
 }
@@ -142,6 +156,10 @@ pub struct FileBrowser {
     /// A Save target that exists, waiting for the answer to "Replace it?".
     confirm: Option<PathBuf>,
     error: Option<String>,
+    /// The patch picked in Open mode, waiting for the Open button.
+    selected: Option<String>,
+    /// Save mode: the Name field takes focus on its first frame.
+    focus_name: bool,
     /// Height of the places column and the list.
     list_h: f32,
     /// How far the places column and the rule above it reach past `ui` to the frame's edges
@@ -163,6 +181,8 @@ impl FileBrowser {
             name,
             confirm: None,
             error: None,
+            selected: None,
+            focus_name: mode == Mode::Save,
             list_h: 300.0,
             bleed: 0.0,
         };
@@ -190,6 +210,7 @@ impl FileBrowser {
         self.listing = None;
         self.confirm = None;
         self.error = None;
+        self.selected = None;
         self.filter.clear();
     }
 
@@ -337,7 +358,12 @@ impl FileBrowser {
             }
             Some(Ok((rows, _))) if rows.is_empty() => {
                 ui.add_space(((list.height() - 204.0) / 2.0).max(0.0));
-                let (title, line) = if self.spec.exts.is_empty() {
+                let (title, line) = if self.spec.patches {
+                    (
+                        "No patches here".to_string(),
+                        "This folder has no folders or patches.".to_string(),
+                    )
+                } else if self.spec.exts.is_empty() {
                     (
                         "No folders here".to_string(),
                         "This folder has no folders in it.".to_string(),
@@ -395,17 +421,33 @@ impl FileBrowser {
                             filter.is_empty() || e.name.to_lowercase().contains(&filter)
                         }) {
                             shown += 1;
-                            let selected =
-                                !e.dir && self.mode == Mode::Save && e.name == self.name.trim();
+                            let item = !e.dir || e.patch;
+                            let selected = match self.mode {
+                                Mode::Save => {
+                                    item && (e.name == self.name.trim()
+                                        || self.selected.as_deref() == Some(&e.name))
+                                }
+                                _ => e.patch && self.selected.as_deref() == Some(&e.name),
+                            };
                             let resp = row(ui, st, e, selected, date_x);
-                            let k = if e.dir { "dir" } else { "file" };
+                            let k = if e.patch {
+                                "patch"
+                            } else if e.dir {
+                                "dir"
+                            } else {
+                                "file"
+                            };
                             ui_state.record(key(&format!("{k}:{}", e.name)), resp.rect);
-                            if resp.clicked() {
-                                if e.dir {
+                            if resp.double_clicked() && e.patch && self.mode == Mode::Open {
+                                pick = Some(self.dir.join(&e.name));
+                            } else if resp.clicked() {
+                                if e.dir && !e.patch {
                                     go = Some(self.dir.join(&e.name));
                                 } else if self.mode == Mode::Save {
                                     self.name.clone_from(&e.name);
                                     self.confirm = None;
+                                } else if e.patch {
+                                    self.selected = Some(e.name.clone());
                                 } else {
                                     pick = Some(self.dir.join(&e.name));
                                 }
@@ -459,17 +501,18 @@ impl FileBrowser {
     pub fn footer(&mut self, ui: &mut egui::Ui, st: &Style, ui_state: &mut UiState) -> Event {
         let prefix = self.prefix;
         let key = |k: &str| format!("{prefix}:{k}");
-        let mut button = |ui: &mut egui::Ui, k: &str, text: &str, primary: bool, w: f32| {
-            let b = Button::new(st, text).g4(32.0).min_width(w);
-            let r = ui.add(if primary { b.primary() } else { b });
-            ui_state.record(key(k), r.rect);
-            r.clicked()
-        };
+        let mut button =
+            |ui: &mut egui::Ui, k: &str, text: &str, primary: bool, w: f32, on: bool| {
+                let b = Button::new(st, text).g4(32.0).min_width(w).enabled(on);
+                let r = ui.add(if primary { b.primary() } else { b });
+                ui_state.record(key(k), r.rect);
+                r.clicked()
+            };
         if let Some(path) = self.confirm.clone() {
-            if button(ui, "replace", "Replace", true, 116.0) {
+            if button(ui, "replace", "Replace", true, 116.0, true) {
                 return Event::Pick(path);
             }
-            if button(ui, "replace-cancel", "Cancel", false, 100.0) {
+            if button(ui, "replace-cancel", "Cancel", false, 100.0, true) {
                 self.confirm = None;
             }
             return Event::None;
@@ -479,25 +522,39 @@ impl FileBrowser {
             Mode::Folder => {
                 let enter = ui.input(|i| i.key_pressed(egui::Key::Enter))
                     && ui.memory(|m| m.focused().is_none());
-                if button(ui, "choose", "Choose this folder", true, 116.0) || enter {
+                if button(ui, "choose", "Choose this folder", true, 116.0, true) || enter {
                     event = Event::Pick(self.dir.clone());
                 }
             }
             Mode::Save => {
-                let mut submit = button(ui, "save", "Save", true, 116.0);
-                if button(ui, "browse-close", "Cancel", false, 100.0) {
+                let mut submit = button(ui, "save", "Save", true, 116.0, true);
+                if button(ui, "browse-close", "Cancel", false, 100.0, true) {
                     return Event::Close;
                 }
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                     kit::label(ui, st, Role::Body, Tone::Text2, "Name");
                     ui.add_space(8.0);
-                    let suffix = self.spec.exts.first().map(|e| format!(".{e}"));
-                    let w = ui.available_width() - 16.0 - if suffix.is_some() { 48.0 } else { 0.0 };
+                    let suffix = if self.spec.patches {
+                        Some(".kabl".to_string())
+                    } else {
+                        self.spec.exts.first().map(|e| format!(".{e}"))
+                    };
+                    let w = ui.available_width() - 16.0;
                     let r = kit::field(ui, st, &mut self.name, "Name", None, Some(w.max(80.0)));
                     ui_state.record(key("name"), r.rect);
+                    if std::mem::take(&mut self.focus_name) {
+                        r.request_focus();
+                    }
                     submit |= r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
                     if let Some(s) = suffix {
-                        kit::label(ui, st, Role::Value, Tone::Text3, s);
+                        // Dim, inside the field's right edge.
+                        ui.painter().text(
+                            pos2(r.rect.right() - 12.0, r.rect.center().y),
+                            Align2::RIGHT_CENTER,
+                            s,
+                            st.font(Role::Value),
+                            st.roles.text3,
+                        );
                     }
                 });
                 if submit {
@@ -512,9 +569,18 @@ impl FileBrowser {
                 }
                 return event;
             }
+            Mode::Open if self.spec.patches => {
+                let chosen = self.selected.as_ref().map(|n| self.dir.join(n));
+                let r = button(ui, "open", "Open", true, 100.0, chosen.is_some());
+                if r {
+                    if let Some(p) = chosen {
+                        event = Event::Pick(p);
+                    }
+                }
+            }
             Mode::Open => {}
         }
-        if button(ui, "browse-close", "Cancel", false, 100.0) {
+        if button(ui, "browse-close", "Cancel", false, 100.0, true) {
             return Event::Close;
         }
         ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
@@ -544,6 +610,12 @@ fn places(
     if let Some(h) = home {
         list.push(("home", "Home", Ic::Home, h));
     }
+    // Sounds: the user's own sound library. Recent has no data source for patches yet.
+    let sounds = ui_state
+        .library
+        .as_ref()
+        .map(|l| l.user_root.join("sounds"))
+        .filter(|d| d.is_dir());
     for (place, label, ic) in [
         (Place::Patches, "Patches", Ic::Folder),
         (Place::Wavetables, "Wavetables", Ic::Wave),
@@ -553,6 +625,9 @@ fn places(
         if let Some(d) = ui_state.folders.get(place.key()).filter(|d| d.is_dir()) {
             list.push((place.key(), label, ic, d.clone()));
         }
+    }
+    if let Some(d) = sounds {
+        list.push(("sounds", "Sounds", Ic::Star, d));
     }
     let r = &st.roles;
     let mut go = None;
@@ -709,13 +784,14 @@ fn row(ui: &mut egui::Ui, st: &Style, e: &Entry, selected: bool, date_x: f32) ->
         );
     }
     let cy = rect.center().y;
-    let (ic, col) = if e.dir {
+    let folder = e.dir && !e.patch;
+    let (ic, col) = if folder {
         (Ic::Folder, r.accent_text)
     } else {
         (Ic::File, r.text2)
     };
     kit::icon(p, ic, pos2(rect.left() + 21.0, cy), st.metrics.icon, col);
-    let font = if e.dir {
+    let font = if folder {
         FontId::new(13.0, Font::SansMedium.family(st.fonts_ready))
     } else {
         regular(st, 13.0)
@@ -724,16 +800,27 @@ fn row(ui: &mut egui::Ui, st: &Style, e: &Entry, selected: bool, date_x: f32) ->
         pos2(rect.left() + 36.0, rect.top()),
         pos2((date_x - 16.0).max(rect.left() + 56.0), rect.bottom()),
     );
-    let g = p.layout_no_wrap(e.name.clone(), font, r.text);
+    let shown = if e.patch {
+        format!("{}.kabl", e.name)
+    } else {
+        e.name.clone()
+    };
+    let g = p.layout_no_wrap(shown, font, r.text);
     p.with_clip_rect(clip)
         .galley(pos2(clip.left(), cy - g.size().y / 2.0), g, r.text);
-    if let Some(secs) = e.modified {
-        // ponytail: a UTC date, no time of day; local time needs time-zone data (a dependency).
+    if let Some(secs) = e.modified.filter(|_| !folder) {
+        // ponytail: UTC; local time needs time-zone data (a dependency).
         const MONTHS: [&str; 12] = [
             "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
         ];
-        let (y, m, d) = crate::record::civil_date(secs);
-        let text = format!("{d} {} {y}", MONTHS[(m - 1) as usize]);
+        let (_, m, d) = crate::record::civil_date(secs);
+        let day = secs % 86_400;
+        let text = format!(
+            "{d} {} {:02}:{:02}",
+            MONTHS[(m - 1) as usize],
+            day / 3600,
+            day % 3600 / 60
+        );
         p.text(
             pos2(date_x, cy),
             Align2::LEFT_CENTER,
@@ -742,7 +829,7 @@ fn row(ui: &mut egui::Ui, st: &Style, e: &Entry, selected: bool, date_x: f32) ->
             r.text3,
         );
     }
-    if e.dir {
+    if folder {
         kit::icon(
             p,
             Ic::Right,
@@ -779,6 +866,7 @@ fn list(dir: &Path, spec: Spec, folders_only: bool) -> Listing {
         let Ok(meta) = std::fs::metadata(entry.path()) else {
             continue;
         };
+        let patch = spec.patches && meta.is_dir() && entry.path().join("meta.toml").is_file();
         let wanted = !folders_only
             && meta.is_file()
             && Path::new(&name).extension().is_some_and(|e| {
@@ -794,6 +882,7 @@ fn list(dir: &Path, spec: Spec, folders_only: bool) -> Listing {
             rows.push(Entry {
                 name,
                 dir: meta.is_dir(),
+                patch,
                 modified: meta
                     .modified()
                     .ok()
@@ -802,7 +891,8 @@ fn list(dir: &Path, spec: Spec, folders_only: bool) -> Listing {
             });
         }
     }
-    rows.sort_by_key(|e| (!e.dir, e.name.to_lowercase()));
+    // Real folders first, then files and patches.
+    rows.sort_by_key(|e| (!e.dir || e.patch, e.name.to_lowercase()));
     Ok((rows, cut))
 }
 
@@ -858,6 +948,13 @@ pub fn open(
 }
 
 /// Whether the browser window is open for `purpose`.
+/// Marks `name` as the selected row of the open browser (captures use it).
+pub fn preselect(ui_state: &mut UiState, name: &str) {
+    if let Some(r) = &mut ui_state.files {
+        r.browser.selected = Some(name.to_string());
+    }
+}
+
 pub fn is_open(ui_state: &UiState, purpose: Purpose) -> bool {
     ui_state
         .files
