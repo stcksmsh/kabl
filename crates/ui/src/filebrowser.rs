@@ -329,7 +329,13 @@ impl FileBrowser {
             // Inside another panel there is no footer: a close button ends the row.
             let inline = self.bleed == 0.0;
             let crumbs_w = (ui.available_width() - if inline { 252.0 } else { 212.0 }).max(60.0);
-            if let Some(d) = breadcrumb(ui, st, &self.dir, home.as_deref(), crumbs_w) {
+            if self.recent {
+                // Recent is a list, not a folder: one crumb, nothing to click.
+                let text = egui::RichText::new("Recent")
+                    .font(semibold(st, 13.0))
+                    .color(st.roles.text);
+                ui.add(egui::Label::new(text));
+            } else if let Some(d) = breadcrumb(ui, st, &self.dir, home.as_deref(), crumbs_w) {
                 go = Some(d);
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -674,10 +680,6 @@ fn places(
     if let Some(h) = home {
         list.push(("home", "Home", Ic::Home, h));
     }
-    // Recent patches: an empty path stands for the list.
-    if patches {
-        list.push(("recent", "Recent", Ic::Clock, PathBuf::new()));
-    }
     // Sounds: the user's own sound library.
     let sounds = ui_state
         .library
@@ -696,6 +698,10 @@ fn places(
     }
     if let Some(d) = sounds {
         list.push(("sounds", "Sounds", Ic::Star, d));
+    }
+    // Recent patches, last: an empty path stands for the list.
+    if patches {
+        list.push(("recent", "Recent", Ic::Clock, PathBuf::new()));
     }
     let r = &st.roles;
     let mut go = None;
