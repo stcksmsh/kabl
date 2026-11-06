@@ -1882,8 +1882,8 @@ fn detail_column(
                                 ui_state,
                                 Purpose::PatchLoad,
                                 "Open a patch folder",
-                                Mode::Folder,
-                                filebrowser::FOLDERS,
+                                Mode::Open,
+                                filebrowser::PATCHES,
                                 "",
                                 &hint,
                             );
@@ -1901,7 +1901,7 @@ fn detail_column(
                                 Purpose::PatchSave,
                                 "Save the patch to a folder",
                                 Mode::Save,
-                                filebrowser::FOLDERS,
+                                filebrowser::PATCHES,
                                 &name,
                                 &hint,
                             );

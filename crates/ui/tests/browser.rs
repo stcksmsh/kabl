@@ -588,6 +588,28 @@ fn save_as_onto_a_taken_name_offers_replace() {
 }
 
 #[test]
+fn choose_folder_after_a_save_error_opens_the_file_browser() {
+    let mut t = H::new(1440.0, 900.0);
+    t.open("factory:palette/pad");
+    t.ui.browser.dialog = Some(Dialog::SaveAs {
+        name: "Warm pad".into(),
+        category: "Pad".into(),
+        tags: String::new(),
+        taken: None,
+        then: None,
+        error: Some("Permission denied".into()),
+    });
+    t.frame();
+    t.frame();
+    t.click("dlg:choose-folder");
+    assert!(t.ui.browser.dialog.is_none());
+    assert!(kabl_ui::filebrowser::is_open(
+        &t.ui,
+        kabl_ui::filebrowser::Purpose::PatchSave
+    ));
+}
+
+#[test]
 fn rename_through_the_browser() {
     let mut t = H::new(1440.0, 900.0);
     t.open("factory:palette/pad");

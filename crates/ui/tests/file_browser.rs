@@ -409,23 +409,28 @@ fn a_picked_image_reaches_the_panel_authoring_path_field() {
 }
 
 #[test]
-fn opening_a_patch_folder_remembers_the_folder_it_was_in() {
+fn opening_a_patch_picks_it_with_the_open_button_and_remembers_its_folder() {
     let dir = tree();
+    std::fs::create_dir(dir.path().join("warm")).unwrap();
+    std::fs::write(dir.path().join("warm/meta.toml"), b"x").unwrap();
     let mut h = H::new();
     h.open(
         Purpose::PatchLoad,
-        Mode::Folder,
-        filebrowser::FOLDERS,
+        Mode::Open,
+        filebrowser::PATCHES,
         "",
         dir.path(),
     );
-    h.wait_for("fb:dir:sub");
-    h.click("fb:dir:sub");
-    h.wait_for("fb:choose");
-    h.click("fb:choose");
+    // A folder without meta.toml is a folder; one with it is a patch.
+    h.wait_for("fb:patch:warm");
+    assert!(h.has("fb:dir:sub") && !h.has("fb:dir:warm"));
+    // A click selects; only Open picks.
+    h.click("fb:patch:warm");
+    assert_eq!(filebrowser::take(&mut h.ui, Purpose::PatchLoad), None);
+    h.click("fb:open");
     assert_eq!(
         filebrowser::take(&mut h.ui, Purpose::PatchLoad),
-        Some(dir.path().join("sub"))
+        Some(dir.path().join("warm"))
     );
     assert_eq!(h.ui.folders.get("patches"), Some(&dir.path().to_path_buf()));
 }

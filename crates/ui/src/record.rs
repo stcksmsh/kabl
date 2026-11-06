@@ -435,9 +435,19 @@ fn utc_stamp() -> String {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs());
-    let (days, rem) = (secs / 86400, secs % 86400);
-    // Civil date from days since 1970-01-01 (Howard Hinnant's algorithm).
-    let z = days as i64 + 719468;
+    let (y, m, d) = civil_date(secs);
+    let rem = secs % 86400;
+    format!(
+        "{y:04}{m:02}{d:02}-{:02}{:02}{:02}Z",
+        rem / 3600,
+        rem / 60 % 60,
+        rem % 60
+    )
+}
+
+/// (year, month 1..=12, day) of `secs` since 1970-01-01, UTC (Howard Hinnant's algorithm).
+pub(crate) fn civil_date(secs: u64) -> (i64, i64, i64) {
+    let z = (secs / 86400) as i64 + 719468;
     let era = z.div_euclid(146097);
     let doe = z - era * 146097;
     let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
@@ -445,13 +455,7 @@ fn utc_stamp() -> String {
     let mp = (5 * doy + 2) / 153;
     let d = doy - (153 * mp + 2) / 5 + 1;
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = yoe + era * 400 + i64::from(m <= 2);
-    format!(
-        "{y:04}{m:02}{d:02}-{:02}{:02}{:02}Z",
-        rem / 3600,
-        rem / 60 % 60,
-        rem % 60
-    )
+    (yoe + era * 400 + i64::from(m <= 2), m, d)
 }
 
 fn clock(s: f32) -> String {
