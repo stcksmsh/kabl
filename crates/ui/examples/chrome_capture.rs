@@ -258,9 +258,7 @@ impl App {
                 }
                 e
             }
-            Err(_) => {
-                mockup_patch(j.scene == "wavetable-editor" || j.scene.starts_with("more-controls"))
-            }
+            Err(_) => mockup_patch(j.scene == "wavetable-editor"),
         };
         let mut ui = UiState::default();
         ui.theme = self.theme.clone();
@@ -741,13 +739,24 @@ impl eframe::App for App {
                 .state()
                 .modules
                 .iter()
-                .find(|(_, m)| m.kind == "osc.wt")
+                .find(|(_, m)| m.kind == "osc.va")
                 .map(|(&id, _)| id)
                 .unwrap();
             self.ui.expanded.insert(wt);
             self.ui.more_tab = usize::from(self.jobs[self.i].scene == "more-controls-face");
         }
-        // The menus: a right-click on the sequencer's title bar, or on a cable's middle.
+        // The menus: a right-click on the sequencer's title bar, or on a cable's middle. The
+        // previous job's menu is still open in egui's memory (the press would only close it):
+        // Escape it first.
+        if self.f == 6 && matches!(self.jobs[self.i].scene, "menu-module" | "menu-cable") {
+            self.inject.push(egui::Event::Key {
+                key: egui::Key::Escape,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: egui::Modifiers::NONE,
+            });
+        }
         if matches!(self.f, 8 | 9)
             && matches!(self.jobs[self.i].scene, "menu-module" | "menu-cable")
         {
