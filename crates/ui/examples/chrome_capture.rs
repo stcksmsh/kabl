@@ -610,6 +610,13 @@ impl App {
 
 impl eframe::App for App {
     fn raw_input_hook(&mut self, _ctx: &egui::Context, raw: &mut egui::RawInput) {
+        // Modals centre on the screen rect: make it the capture size, not the real window.
+        if let Some(j) = self.jobs.get(self.i) {
+            raw.screen_rect = Some(Rect::from_min_size(
+                Pos2::ZERO,
+                egui::vec2(j.size.0 as f32, j.size.1 as f32),
+            ));
+        }
         // The animation runs on a fixed 60 fps clock, whatever the real frame rate.
         if self.anim {
             raw.time = Some(self.tick as f64 / 60.0);
@@ -692,6 +699,8 @@ impl eframe::App for App {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 return;
             }
+            // Modals keep their position in memory: a smaller size must re-centre them.
+            ctx.memory_mut(|m| m.reset_areas());
             self.prepare();
         }
         let size = self.jobs[self.i].size;
