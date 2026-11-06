@@ -308,6 +308,8 @@ pub struct UiState {
     perform_full_seen: bool,
     /// Modules showing their advanced controls. View only: never saved, never undone.
     pub expanded: BTreeSet<ModuleId>,
+    /// The More controls dialog's tab: 0 Controls, 1 Face layout.
+    pub more_tab: usize,
     /// Advanced controls float over the neighbours instead of pushing them (setting).
     pub float_expansion: bool,
     /// Show illustrated skins where a module has one (core modules stay A / A-dark otherwise).
@@ -481,6 +483,7 @@ impl Default for UiState {
             drawer_auto_closed: false,
             perform_full_seen: false,
             expanded: BTreeSet::new(),
+            more_tab: 0,
             float_expansion: false,
             skins: true,
             skin_labels_on_art: None,
@@ -837,7 +840,16 @@ pub fn show_with(
     about::show(ui.ctx(), ui_state);
     panels::editor(editor, ui_state, ui.ctx());
     filebrowser::window(ui_state, ui.ctx());
-    rack_editor::edit_face(editor, ui_state, ui.ctx());
+    // Edit face is the More controls dialog's second tab.
+    if let Some(id) = ui_state
+        .choose
+        .as_ref()
+        .map(|c| c.0)
+        .filter(|_| ui_state.expanded.is_empty())
+    {
+        ui_state.expanded.insert(id);
+        ui_state.more_tab = 1;
+    }
     browser::frame_input(editor, ui_state, ui);
     ui_state.validate(editor);
     ui_state.explain.validate(editor);
@@ -2291,7 +2303,7 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         }
     }
     if focused_at_frame_start {
-        rack_editor::more(editor, ui_state, ui, th, xf, &lay, &mut drawn);
+        rack_editor::more(editor, ui_state, ui, &lay, &mut drawn);
     }
 
     explain::mark_target(
@@ -2843,100 +2855,179 @@ fn draw_module(
     }
 }
 
+/// A G4 menu row: optional leading icon and the label in `tone`. Recorded as `menu:<key>`.
+fn menu_row(
+    ui: &mut egui::Ui,
+    ui_state: &mut UiState,
+    key: &str,
+    ic: Option<kit::Ic>,
+    label: &str,
+    tone: kit::Tone,
+) -> egui::Response {
+    let st = ui_state.style.clone();
+    let r = kit::menu_item_tone(ui, &st, label, false, tone, true);
+    let ink = kit::tone(&st, tone);
+    if let Some(ic) = ic {
+        kit::icon(
+            ui.painter(),
+            ic,
+            pos2(r.rect.left() + st.sp(3), r.rect.center().y),
+            st.metrics.icon,
+            ink,
+        );
+    }
+    ui_state.record(format!("menu:{key}"), r.rect);
+    r
+}
+
+/// A menu's Remove row (danger tone, "Del" hint): true on a click, or on Delete while the
+/// menu is open.
+fn remove_row(ui: &mut egui::Ui, ui_state: &mut UiState, key: &str, label: &str) -> bool {
+    let st = ui_state.style.clone();
+    let r = menu_row(
+        ui,
+        ui_state,
+        key,
+        Some(kit::Ic::Trash),
+        label,
+        kit::Tone::Bad,
+    );
+    ui.painter().text(
+        pos2(r.rect.right() - st.sp(3), r.rect.center().y),
+        egui::Align2::RIGHT_CENTER,
+        "Del",
+        st.font(style::Role::Value),
+        st.roles.text2,
+    );
+    // Not while a field has focus: there Delete edits text.
+    r.clicked()
+        || (ui.input(|i| i.key_pressed(egui::Key::Delete)) && ui.memory(|m| m.focused().is_none()))
+}
+
+/// The module's context menu (G4 `menu-module`): header, Explain, Inspect output ▸, More
+/// controls…, Edit face…, Reset face, the Perform and MIDI submenus, Remove module.
 fn module_menu(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, m: &Placed) {
     let st = ui_state.style.clone();
     let st = &*st;
     kit::label(
         ui,
         st,
-        style::Role::H3,
-        kit::Tone::Text,
+        style::Role::Label,
+        kit::Tone::Text2,
         format!("{} #{}", m.info.name, m.id),
     );
-    kit::menu_rule(ui, st);
-    fn item(ui: &mut egui::Ui, ui_state: &mut UiState, key: &str, label: &str) -> bool {
-        let st = ui_state.style.clone();
-        let r = kit::menu_item(ui, &st, label, false);
-        ui_state.record(format!("menu:{key}"), r.rect);
-        r.clicked()
-    }
-    if item(ui, ui_state, "explain", "Explain this module") {
+    if menu_row(
+        ui,
+        ui_state,
+        "explain",
+        Some(kit::Ic::Info),
+        "Explain this module",
+        kit::Tone::Text,
+    )
+    .clicked()
+    {
         explain::open(ui_state, explain::Subject::Module(m.id), None);
         ui_state.selected_module = Some(m.id);
         ui.close();
     }
-    for p in m
+    let outputs: Vec<&str> = m
         .info
         .ports
         .iter()
         .filter(|p| p.direction == PortDirection::Output)
-    {
-        if item(
-            ui,
-            ui_state,
-            &format!("inspect:{}", p.name),
-            &format!("Inspect output \"{}\"", p.name),
-        ) {
-            ui_state.selected_module = Some(m.id);
-            ui_state.drawer_open = true;
-            let now = ui.input(|i| i.time);
-            ui_state.inspect.select(
-                inspect::Sel {
-                    id: m.id,
-                    port: p.name.to_string(),
-                },
-                now,
-            );
-            ui.close();
-        }
+        .map(|p| p.name)
+        .collect();
+    if !outputs.is_empty() {
+        let r = kit::submenu(ui, st, "Inspect output", |ui| {
+            for port in &outputs {
+                if menu_row(
+                    ui,
+                    ui_state,
+                    &format!("inspect:{port}"),
+                    Some(kit::Ic::Plug),
+                    port,
+                    kit::Tone::Text,
+                )
+                .clicked()
+                {
+                    ui_state.selected_module = Some(m.id);
+                    ui_state.drawer_open = true;
+                    let now = ui.input(|i| i.time);
+                    ui_state.inspect.select(
+                        inspect::Sel {
+                            id: m.id,
+                            port: port.to_string(),
+                        },
+                        now,
+                    );
+                    ui.close();
+                }
+            }
+        });
+        kit::icon(
+            ui.painter(),
+            kit::Ic::Focus,
+            pos2(r.rect.left() + st.sp(3), r.rect.center().y),
+            st.metrics.icon,
+            st.roles.text,
+        );
+        ui_state.record("menu:inspect".into(), r.rect);
     }
-    if !m.info.params.is_empty() && item(ui, ui_state, "choose", "Edit face…") {
-        let set = editor
-            .state()
-            .modules
-            .get(&m.id)
-            .map(|s| rack::primary_set(s, m.info))
-            .unwrap_or_default();
-        ui_state.choose = Some((m.id, set));
-        ui_state.reveal = Some(m.id);
-        ui.close();
-    }
-    if !m.info.params.is_empty() && item(ui, ui_state, "reset-face", "Reset face to module default")
-    {
-        let changes: Vec<_> = editor.state().modules[&m.id]
-            .params
-            .keys()
-            .filter(|k| k.starts_with(rack::FACE_PREFIX))
-            .map(|k| (m.id, k.clone(), None))
-            .collect();
-        editor.set_presentation(&changes);
-        ui.close();
-    }
-    if m.toggle.is_some() {
-        let expanded = ui_state.expanded.contains(&m.id);
-        if item(
+    kit::menu_rule(ui, st);
+    if m.toggle.is_some()
+        && menu_row(
             ui,
             ui_state,
             "expand",
-            if expanded {
-                "Close More controls"
-            } else {
-                "More controls"
-            },
-        ) {
-            if expanded {
-                ui_state.expanded.remove(&m.id);
-            } else {
-                ui_state.expanded.clear();
-                ui_state.expanded.insert(m.id);
-            }
+            Some(kit::Ic::Panel),
+            "More controls…",
+            kit::Tone::Text,
+        )
+        .clicked()
+    {
+        ui_state.expanded.clear();
+        ui_state.expanded.insert(m.id);
+        ui_state.more_tab = 0;
+        ui.close();
+    }
+    if !m.info.params.is_empty() {
+        if menu_row(ui, ui_state, "choose", None, "Edit face…", kit::Tone::Text).clicked() {
+            let set = editor
+                .state()
+                .modules
+                .get(&m.id)
+                .map(|s| rack::primary_set(s, m.info))
+                .unwrap_or_default();
+            ui_state.choose = Some((m.id, set));
+            ui_state.expanded.clear();
+            ui_state.expanded.insert(m.id);
+            ui_state.more_tab = 1;
+            ui.close();
+        }
+        if menu_row(
+            ui,
+            ui_state,
+            "reset-face",
+            None,
+            "Reset face to default",
+            kit::Tone::Text,
+        )
+        .clicked()
+        {
+            let changes: Vec<_> = editor.state().modules[&m.id]
+                .params
+                .keys()
+                .filter(|k| k.starts_with(rack::FACE_PREFIX))
+                .map(|k| (m.id, k.clone(), None))
+                .collect();
+            editor.set_presentation(&changes);
             ui.close();
         }
     }
     kit::menu_rule(ui, st);
     perform::module_menu(editor, ui_state, ui, m.id, m.info);
     kit::menu_rule(ui, st);
-    if item(ui, ui_state, "remove", "Remove module") {
+    if remove_row(ui, ui_state, "remove", "Remove module") {
         editor.remove_module(m.id);
         ui.close();
     }
@@ -4550,22 +4641,110 @@ fn draw_cables(
         }
         let resp = resp.on_hover_text("Drag its plug out of the input to move or remove it");
         let cable_id = r.id;
+        let (from, to) = (r.c.from.clone(), r.c.to.clone());
         kit::context_menu(&resp, &st, |ui| {
-            let m = kit::menu_item(ui, &st, "Pattern & probability...", false);
-            ui_state.record("menu:cable-pattern".into(), m.rect);
-            if m.clicked() {
-                ui_state.cable_fn = Some(cable_id);
-                ui.close();
-            }
-            let m = kit::menu_item(ui, &st, "Remove cable", false);
-            ui_state.record("menu:remove-cable".into(), m.rect);
-            if m.clicked() {
-                editor.disconnect(cable_id);
-                ui.close();
-            }
+            cable_menu(editor, ui_state, ui, cable_id, col, &from, &to)
         });
     }
     top
+}
+
+/// The cable's context menu (G4 `menu-cable`): a header with the cable's swatch and route,
+/// Pattern & probability…, Focus this cable, Explain this cable, Remove cable.
+fn cable_menu(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    cable: CableId,
+    col: Color32,
+    from: &PortRef,
+    to: &PortRef,
+) {
+    let st = ui_state.style.clone();
+    let st = &*st;
+    let end = |p: &PortRef| match p {
+        PortRef::Module { id, port } => {
+            let name = editor
+                .state()
+                .modules
+                .get(id)
+                .and_then(|m| registry::info_for(&m.kind))
+                .map_or("?", |i| i.name);
+            format!("{name} {port}")
+        }
+        _ => "?".into(),
+    };
+    ui.horizontal(|ui| {
+        let (sw, _) = ui.allocate_exact_size(vec2(16.0, 4.0), Sense::hover());
+        ui.painter().rect_filled(sw, 2.0, col);
+        kit::label(
+            ui,
+            st,
+            style::Role::Label,
+            kit::Tone::Text,
+            format!("{} → {}", end(from), end(to)),
+        );
+    });
+    kit::menu_rule(ui, st);
+    if menu_row(
+        ui,
+        ui_state,
+        "cable-pattern",
+        Some(kit::Ic::Wave),
+        "Pattern & probability…",
+        kit::Tone::Text,
+    )
+    .clicked()
+    {
+        ui_state.cable_fn = Some(cable);
+        ui.close();
+    }
+    let dest = to.module_id();
+    if menu_row(
+        ui,
+        ui_state,
+        "cable-focus",
+        Some(kit::Ic::Focus),
+        "Focus this cable",
+        kit::Tone::Text,
+    )
+    .clicked()
+    {
+        // Focus shows the selected module's cables: this one's destination.
+        ui_state.cable_view = CableView::Focus;
+        ui_state.selected_module = dest;
+        ui.close();
+    }
+    if let Some(d) = dest {
+        if menu_row(
+            ui,
+            ui_state,
+            "cable-explain",
+            Some(kit::Ic::Info),
+            "Explain this cable",
+            kit::Tone::Text,
+        )
+        .clicked()
+        {
+            // Explain has no cable subject: what the cable feeds, the control a route moves
+            // or the module whose input it patches.
+            let subject = match to {
+                PortRef::Param { id, param } => explain::Subject::Control {
+                    id: *id,
+                    key: param.clone(),
+                },
+                _ => explain::Subject::Module(d),
+            };
+            explain::open(ui_state, subject, None);
+            ui_state.selected_module = Some(d);
+            ui.close();
+        }
+    }
+    kit::menu_rule(ui, st);
+    if remove_row(ui, ui_state, "remove-cable", "Remove cable") {
+        editor.disconnect(cable);
+        ui.close();
+    }
 }
 
 /// Channels of an output jack: 2 for a stereo jack.
