@@ -14,12 +14,12 @@ Group 5 on a new branch from origin/master. Start: `grep -n "Modal\|egui::Window
 
 ## Facts
 - Patches are folders with meta.toml: listed as `name.kabl` items (file icon, display only; on disk no suffix); real folders first with chevron. Open mode: click selects, Open button or double-click picks. Sounds place = user_root/sounds. Recent place left out: no recent-patches list exists (library recents are sound ids).
-- Modified dates are UTC dates without time (`ponytail:` in `row()`).
+- Modified is UTC "2 Nov 18:40" (no time-zone data); real folders show no date.
 - Capture ctx is shared across jobs; modals centre on the screen rect.
 - `git push --force-with-lease` is denied: merge master, do not rebase.
 
 ## Open for Kosta
-Open mode has no Open button (click picks). Mockup shows files and a Sounds/Recent place; the app has Home + remembered folders only.
+Recent place missing: needs a recent-patches list (none exists). Patch save writes the folder without ".kabl"; the suffix is display-only.
 
 ## Standing rules
 Report to "Kabl overseer", do not merge, stop when done. Apply Style (caveman and ponytail ultra) on restart, read only this file.
