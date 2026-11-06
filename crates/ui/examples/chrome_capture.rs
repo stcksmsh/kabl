@@ -14,7 +14,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 17] = [
+const SCENES: [&str; 21] = [
     "rack",
     "perform",
     "sounds",
@@ -26,6 +26,10 @@ const SCENES: [&str; 17] = [
     "cues-editor",
     "cues-face",
     "cable-pattern-editor",
+    "compare",
+    "explain",
+    "inspect",
+    "learn",
     "cable-routes-drawer",
     "cable-routes-rest",
     "cable-routes-opening",
@@ -338,6 +342,34 @@ impl App {
                 });
             }
         }
+        if matches!(j.scene, "explain" | "inspect" | "learn") {
+            ui.drawer_open = true;
+        }
+        if j.scene == "explain" {
+            let state = self.editor.state();
+            if let Some((&id, _)) = state.modules.iter().find(|(_, m)| m.kind == "filter.svf") {
+                kabl_ui::explain::open(
+                    &mut ui,
+                    kabl_ui::explain::Subject::Control {
+                        id,
+                        key: "cutoff_hz".into(),
+                    },
+                    None,
+                );
+            }
+        }
+        if j.scene == "inspect" {
+            ui.selected_module = None;
+            ui.inspect.open = true;
+        }
+        if j.scene == "learn" {
+            ui.recipes.open = true;
+        }
+        if j.scene == "compare" {
+            ui.drawer_open = true;
+            ui.compare.open = true;
+            ui.compare.capture(&self.editor, "you");
+        }
         ui.perform_open = j.scene == "perform";
         ui.perform_tall = j.scene == "perform";
         if j.scene == "perform" {
@@ -400,6 +432,9 @@ impl App {
             .iter()
             .find(|(_, m)| m.kind == "filter.svf")
             .map(|(&id, _)| id);
+        if j.scene == "inspect" {
+            ui.selected_module = None;
+        }
         if j.scene == "seq-pattern-editor" {
             // The mockup's state: editing A, B playing, step 5 under the playhead.
             let seq = self
