@@ -2125,6 +2125,19 @@ enum Look {
     Danger,
 }
 
+/// Focuses a dialog's first field once, when the dialog opens (`dialogs` clears the flag).
+fn first_focus(ui: &egui::Ui, r: &egui::Response) {
+    let id = egui::Id::new("dlg-focused");
+    if !ui.data(|d| d.get_temp::<bool>(id)).unwrap_or(false) {
+        // Asked for until the field reports it has it (the first frame of a modal is a sizing pass).
+        if ui.memory(|m| m.has_focus(r.id)) {
+            ui.data_mut(|d| d.insert_temp(id, true));
+        } else {
+            r.request_focus();
+        }
+    }
+}
+
 /// A 32 px dialog footer button (G4-SPEC §3); records its rect under `key` for the tests.
 fn dialog_button(
     ui: &mut egui::Ui,
@@ -2147,6 +2160,18 @@ fn dialog_button(
 
 /// The open dialog, if any (modal). Escape cancels it.
 pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Context) {
+    // The pick of "Choose folder…" in the Save as dialog (the dialog closed to make room).
+    let choose_id = egui::Id::new("dlg-choose-folder");
+    if ctx.data(|d| d.get_temp::<bool>(choose_id)).unwrap_or(false) {
+        if let Some(p) = filebrowser::take(ui_state, Purpose::PatchSave) {
+            ctx.data_mut(|d| d.remove::<bool>(choose_id));
+            let p = p.to_string_lossy().into_owned();
+            ui_state.browser.folder.clone_from(&p);
+            save_to_folder(editor, ui_state, p);
+        } else if !filebrowser::is_open(ui_state, Purpose::PatchSave) {
+            ctx.data_mut(|d| d.remove::<bool>(choose_id));
+        }
+    }
     if io_busy(ui_state) {
         return;
     }
@@ -2248,7 +2273,7 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
             let is_taken = taken.is_some();
             let mut enter = false;
             let (mut bh, mut fh) = (Vec::new(), Vec::new());
-            let (mut ok, mut replace, mut cancel) = (false, false, false);
+            let (mut ok, mut replace, mut cancel, mut choose) = (false, false, false, false);
             let add_id = egui::Id::new("dlg-add-tag");
             let closed = g4::modal_framed(
                 ctx,
@@ -2292,9 +2317,7 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
                         let w = ui.available_width();
                         let r = kit::field(ui, st, &mut name, "", None, Some(w));
                         bh.push(("dlg:name", r.rect));
-                        if ui.memory(|m| m.focused().is_none()) {
-                            r.request_focus();
-                        }
+                        first_focus(ui, &r);
                         if r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                             enter = true;
                         }
@@ -2351,6 +2374,16 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
                 |ui| {
                     let label = if retry { "Try again" } else { "Save" };
                     ok = dialog_button(ui, st, &mut fh, "dlg:save", label, Look::Primary);
+                    if retry {
+                        choose = dialog_button(
+                            ui,
+                            st,
+                            &mut fh,
+                            "dlg:choose-folder",
+                            "Choose folder\u{2026}",
+                            Look::Plain,
+                        );
+                    }
                     if replace_id.is_some() {
                         replace = dialog_button(
                             ui,
@@ -2369,7 +2402,21 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
             }
             // The name may have been edited this frame: a Replace for the old name is void.
             let replace_ok = replace && !stale(&taken, &name);
-            if cancel || closed {
+            if choose {
+                // The save goes to a folder picked in the file browser; the dialog closes.
+                let hint = ui_state.browser.folder.clone();
+                filebrowser::open(
+                    ui_state,
+                    Purpose::PatchSave,
+                    "Save the patch to a folder",
+                    Mode::Save,
+                    filebrowser::FOLDERS,
+                    name.trim(),
+                    &hint,
+                );
+                ctx.data_mut(|d| d.insert_temp(egui::Id::new("dlg-choose-folder"), true));
+                None
+            } else if cancel || closed {
                 None
             } else if ok || enter || replace_ok {
                 let target = if replace_ok { replace_id } else { None };
@@ -2423,9 +2470,7 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
                     }
                     let r = kit::field(ui, st, &mut name, "", None, None);
                     bh.push(("dlg:name", r.rect));
-                    if ui.memory(|m| m.focused().is_none()) {
-                        r.request_focus();
-                    }
+                    first_focus(ui, &r);
                     if r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                         enter = true;
                     }
@@ -2519,6 +2564,9 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
             next
         }
     };
+    if next.is_none() {
+        ctx.data_mut(|d| d.remove::<bool>(egui::Id::new("dlg-focused")));
+    }
     let escape = ctx.input(|i| i.key_pressed(egui::Key::Escape));
     if ui_state.browser.dialog.is_none() && !escape {
         ui_state.browser.dialog = next;

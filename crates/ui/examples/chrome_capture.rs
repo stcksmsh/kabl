@@ -657,6 +657,12 @@ impl eframe::App for App {
 
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        // No window manager under xvfb: say the window has focus so a focused field shows it.
+        ctx.input_mut(|i| i.focused = true);
+        if self.f == 0 {
+            // Each scene opens its dialog anew: it asks for focus again.
+            ctx.data_mut(|d| d.remove::<bool>(egui::Id::new("dlg-focused")));
+        }
         if self.i >= self.jobs.len() {
             return;
         }

@@ -13,8 +13,8 @@ Branch `claude/g4-group5` from origin/master. Draft PR. UI only; `lib.rs` untouc
 `g4/g5-dialogs/ours/<scene>__<graphite|paper>__<1440x900|1180x680>.png`, mockup shots in `g4/g5-dialogs/mockup/` (same names). Every PNG viewed.
 
 ## Gaps
-- "Choose folder…" in the save-error dialog is not there: the library has no folder picker.
-- Rename/Save as name field: focus ring missing in captures (`request_focus` when nothing is focused; the capture harness has the rack focused). Works live.
+- "Choose folder…" (save-error dialog, after an error): closes the dialog and opens the file browser (`Purpose::PatchSave`, Save mode) on the patch folder; the pick saves with `save_to_folder`. The typed name is the browser's name field; tags and category are dropped.
+- Name fields take focus once on open (`first_focus`, flag `dlg-focused` cleared when the dialog closes). `chrome_capture` now sets `input.focused = true` (xvfb has no window focus) and clears the flag per scene; capture dialog scenes one at a time (a previous scene's focus flag otherwise lingers when jobs run in one process).
 - "Add tag" is a kit field, not bare placeholder text as in the mockup.
 - Rack-editor modals: More controls already uses `g4::surface_frame` (agent 2's work); nothing changed there. `panels.rs` panel-fallback modal is stock `egui::Modal` and out of scope (not in the group 5 list).
 - Backdrops differ from the mockup (ours: live rack at 107 %/77 %, mockup 109 %/78 %): same as earlier groups.
