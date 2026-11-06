@@ -11,6 +11,7 @@
 //! - A failed open or save changes nothing in the editor.
 
 use crate::filebrowser::{self, Mode, Purpose};
+use crate::kit::g4::{self, Sev, Size};
 use crate::kit::{self, Ic, Tip, Tone};
 use crate::style::{Role, Style};
 use crate::wheel::OwnedScroll;
@@ -2117,8 +2118,60 @@ fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui:
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Look {
+    Plain,
+    Primary,
+    Danger,
+}
+
+/// Focuses a dialog's first field once, when the dialog opens (`dialogs` clears the flag).
+fn first_focus(ui: &egui::Ui, r: &egui::Response) {
+    let id = egui::Id::new("dlg-focused");
+    if !ui.data(|d| d.get_temp::<bool>(id)).unwrap_or(false) {
+        // Asked for until the field reports it has it (the first frame of a modal is a sizing pass).
+        if ui.memory(|m| m.has_focus(r.id)) {
+            ui.data_mut(|d| d.insert_temp(id, true));
+        } else {
+            r.request_focus();
+        }
+    }
+}
+
+/// A 32 px dialog footer button (G4-SPEC §3); records its rect under `key` for the tests.
+fn dialog_button(
+    ui: &mut egui::Ui,
+    st: &Style,
+    hits: &mut Vec<(&'static str, Rect)>,
+    key: &'static str,
+    label: &str,
+    look: Look,
+) -> bool {
+    let b = kit::Button::new(st, label).g4(32.0);
+    let b = match look {
+        Look::Plain => b,
+        Look::Primary => b.primary(),
+        Look::Danger => b.tone(Tone::Bad),
+    };
+    let r = ui.add(b);
+    hits.push((key, r.rect));
+    r.clicked()
+}
+
 /// The open dialog, if any (modal). Escape cancels it.
 pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Context) {
+    // The pick of "Choose folder…" in the Save as dialog (the dialog closed to make room).
+    let choose_id = egui::Id::new("dlg-choose-folder");
+    if ctx.data(|d| d.get_temp::<bool>(choose_id)).unwrap_or(false) {
+        if let Some(p) = filebrowser::take(ui_state, Purpose::PatchSave) {
+            ctx.data_mut(|d| d.remove::<bool>(choose_id));
+            let p = p.to_string_lossy().into_owned();
+            ui_state.browser.folder.clone_from(&p);
+            save_to_folder(editor, ui_state, p);
+        } else if !filebrowser::is_open(ui_state, Purpose::PatchSave) {
+            ctx.data_mut(|d| d.remove::<bool>(choose_id));
+        }
+    }
     if io_busy(ui_state) {
         return;
     }
@@ -2143,42 +2196,57 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
                 then: then.clone(),
                 error: error.clone(),
             });
-            kit::modal(ctx, st, "dlg-unsaved", 380.0, |ui| {
-                kit::dialog_title(ui, st, "Unsaved changes");
-                kit::paragraph(
-                    ui,
-                    st,
-                    Role::Body,
-                    Tone::Text,
-                    format!("\"{name}\" has changes you haven't saved. Save them before {what}?"),
-                );
-                if let Some(e) = &error {
-                    kit::paragraph(ui, st, Role::Body, Tone::Bad, e);
-                }
-                kit::gap(ui, st, 2);
-                ui.horizontal(|ui| {
-                    let r = ui.add(kit::Button::new(st, "Save").primary());
-                    hit(ui_state, "dlg:save", &r);
-                    if r.clicked() {
-                        next =
-                            save(editor, ui_state, Some(then.clone())).map(|e| Dialog::Unsaved {
-                                then: then.clone(),
-                                error: Some(e),
-                            });
+            let (mut fh, mut lh) = (Vec::new(), Vec::new());
+            let (mut save_it, mut discard, mut cancel) = (false, false, false);
+            let closed = g4::modal_framed(
+                ctx,
+                st,
+                "dlg-unsaved",
+                Size::S,
+                "Unsaved changes",
+                |ui| {
+                    kit::paragraph(
+                        ui,
+                        st,
+                        Role::Body,
+                        Tone::Text,
+                        format!("\u{201c}{name}\u{201d} has changes you haven\u{2019}t saved."),
+                    );
+                    kit::paragraph(
+                        ui,
+                        st,
+                        Role::Body,
+                        Tone::Text2,
+                        format!("Save them before {what}?"),
+                    );
+                    if let Some(e) = &error {
+                        kit::gap(ui, st, 1);
+                        g4::banner(ui, st, Sev::Bad, "Could not save", Some(e));
                     }
-                    let r = ui.add(kit::Button::new(st, "Don't save"));
-                    hit(ui_state, "dlg:discard", &r);
-                    if r.clicked() {
-                        next = None;
-                        perform(editor, ui_state, then.clone());
-                    }
-                    let r = ui.add(kit::Button::new(st, "Cancel").ghost());
-                    hit(ui_state, "dlg:cancel", &r);
-                    if r.clicked() {
-                        next = None;
-                    }
+                },
+                |ui| {
+                    discard =
+                        dialog_button(ui, st, &mut lh, "dlg:discard", "Don't save", Look::Danger)
+                },
+                |ui| {
+                    save_it = dialog_button(ui, st, &mut fh, "dlg:save", "Save", Look::Primary);
+                    cancel = dialog_button(ui, st, &mut fh, "dlg:cancel", "Cancel", Look::Plain);
+                },
+            );
+            for (k, r) in lh.into_iter().chain(fh) {
+                ui_state.record(k.into(), r);
+            }
+            if save_it {
+                next = save(editor, ui_state, Some(then.clone())).map(|e| Dialog::Unsaved {
+                    then: then.clone(),
+                    error: Some(e),
                 });
-            });
+            } else if discard {
+                next = None;
+                perform(editor, ui_state, then.clone());
+            } else if cancel || closed {
+                next = None;
+            }
             next
         }
         Dialog::SaveAs {
@@ -2189,94 +2257,176 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
             then,
             mut error,
         } => {
-            let mut submit: Option<Option<String>> = None;
-            let mut cancel = false;
-            kit::modal(ctx, st, "dlg-save-as", 380.0, |ui| {
-                kit::dialog_title(ui, st, "Save As");
-                kit::paragraph(
-                    ui,
-                    st,
-                    Role::Body,
-                    Tone::Text2,
-                    "Saves a copy in Your Sounds. Factory sounds stay as they are.",
-                );
-                kit::gap(ui, st, 2);
-                ui.horizontal(|ui| {
-                    ui.add_sized(
-                        [72.0, st.metrics.field_h],
-                        egui::Label::new(kit::rich(st, Role::Label, Tone::Text2, "Name"))
-                            .selectable(false),
-                    );
-                    let r = kit::field(ui, st, &mut name, "", None, Some(280.0));
-                    hit(ui_state, "dlg:name", &r);
-                    if r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                        submit = Some(None);
-                    }
-                });
-                // A confirmation belongs to the name it was offered for: editing the name drops
-                // it (and its message) before the buttons are drawn, so Replace it can never
-                // send an old target with a new name.
-                if taken
+            // A confirmation belongs to the name it was offered for: editing the name drops it
+            // (and its message), so Replace it can never send an old target with a new name.
+            let stale = |taken: &Option<(String, String)>, name: &str| {
+                taken
                     .as_ref()
                     .is_some_and(|(_, n)| n.to_lowercase() != name.trim().to_lowercase())
-                {
-                    taken = None;
-                    error = None;
-                }
-                ui.horizontal(|ui| {
-                    ui.add_sized(
-                        [72.0, st.metrics.field_h],
-                        egui::Label::new(kit::rich(st, Role::Label, Tone::Text2, "Category"))
-                            .selectable(false),
-                    );
-                    let cur = category.clone();
-                    kit::dropdown(ui, st, "dlg-category", &cur, 200.0, |ui| {
-                        for c in CATEGORIES {
-                            if kit::menu_item(ui, st, c, category == *c).clicked() {
-                                category = c.to_string();
-                            }
+            };
+            if stale(&taken, &name) {
+                taken = None;
+                error = None;
+            }
+            let replace_id = taken.as_ref().map(|(id, _)| id.clone());
+            let retry = error.is_some() && taken.is_none();
+            let is_taken = taken.is_some();
+            let mut enter = false;
+            let (mut bh, mut fh) = (Vec::new(), Vec::new());
+            let (mut ok, mut replace, mut cancel, mut choose) = (false, false, false, false);
+            let add_id = egui::Id::new("dlg-add-tag");
+            let closed = g4::modal_framed(
+                ctx,
+                st,
+                "dlg-save-as",
+                Size::M,
+                "Save as",
+                |ui| {
+                    if let Some(e) = &error {
+                        let (sev, title) = if is_taken {
+                            (Sev::Warn, "Name already in use")
+                        } else {
+                            (Sev::Bad, "Could not write the sound")
+                        };
+                        g4::banner(ui, st, sev, title, Some(e));
+                        kit::gap(ui, st, 2);
+                    } else {
+                        kit::paragraph(
+                            ui,
+                            st,
+                            Role::Body,
+                            Tone::Text2,
+                            "Saves a copy in Your Sounds. Factory sounds stay as they are.",
+                        );
+                        kit::gap(ui, st, 2);
+                    }
+                    let label = |ui: &mut egui::Ui, t: &str| {
+                        ui.allocate_ui_with_layout(
+                            vec2(96.0, st.metrics.field_h),
+                            egui::Layout::left_to_right(egui::Align::Center),
+                            |ui| {
+                                ui.add(
+                                    egui::Label::new(kit::rich(st, Role::Body, Tone::Text2, t))
+                                        .selectable(false),
+                                )
+                            },
+                        );
+                    };
+                    ui.horizontal(|ui| {
+                        label(ui, "Name");
+                        let w = ui.available_width();
+                        let r = kit::field(ui, st, &mut name, "", None, Some(w));
+                        bh.push(("dlg:name", r.rect));
+                        first_focus(ui, &r);
+                        if r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                            enter = true;
                         }
                     });
-                });
-                ui.horizontal(|ui| {
-                    ui.add_sized(
-                        [72.0, st.metrics.field_h],
-                        egui::Label::new(kit::rich(st, Role::Label, Tone::Text2, "Tags"))
-                            .selectable(false),
-                    );
-                    kit::field(ui, st, &mut tags, "comma separated", None, Some(280.0));
-                });
-                if let Some(e) = &error {
-                    kit::paragraph(ui, st, Role::Body, Tone::Bad, e);
-                }
-                kit::gap(ui, st, 2);
-                ui.horizontal(|ui| {
-                    let r = ui.add(kit::Button::new(st, "Save").primary());
-                    hit(ui_state, "dlg:save", &r);
-                    if r.clicked() {
-                        submit = Some(None);
-                    }
-                    if let Some((id, _)) = &taken {
-                        let r = ui.add(kit::Button::new(st, "Replace it"));
-                        hit(ui_state, "dlg:replace", &r);
-                        if r.clicked() {
-                            submit = Some(Some(id.clone()));
+                    ui.horizontal(|ui| {
+                        label(ui, "Category");
+                        let cur = category.clone();
+                        kit::dropdown(ui, st, "dlg-category", &cur, 200.0, |ui| {
+                            for c in CATEGORIES {
+                                if kit::menu_item(ui, st, c, category == *c).clicked() {
+                                    category = c.to_string();
+                                }
+                            }
+                        });
+                    });
+                    ui.horizontal(|ui| {
+                        label(ui, "Tags");
+                        let mut list: Vec<String> = tags
+                            .split(',')
+                            .map(|t| t.trim().to_string())
+                            .filter(|t| !t.is_empty())
+                            .collect();
+                        let mut gone = None;
+                        for (i, t) in list.iter().enumerate() {
+                            let r = g4::chip_label(ui, st, &format!("{t}  \u{d7}"), false, None);
+                            let r = ui.interact(r.rect, add_id.with(i), Sense::click());
+                            if r.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
+                                gone = Some(i);
+                            }
                         }
+                        let mut add = ui
+                            .data(|d| d.get_temp::<String>(add_id))
+                            .unwrap_or_default();
+                        let r = kit::field(ui, st, &mut add, "Add tag", None, Some(120.0));
+                        let commit = (r.lost_focus()
+                            && ui.input(|i| i.key_pressed(egui::Key::Enter)))
+                            || add.ends_with(',');
+                        if commit {
+                            let t = add.trim().trim_end_matches(',').trim().to_string();
+                            if !t.is_empty() && !list.contains(&t) {
+                                list.push(t);
+                            }
+                            add.clear();
+                            r.request_focus();
+                        }
+                        if let Some(i) = gone {
+                            list.remove(i);
+                        }
+                        ui.data_mut(|d| d.insert_temp(add_id, add));
+                        tags = list.join(", ");
+                    });
+                },
+                |_| {},
+                |ui| {
+                    let label = if retry { "Try again" } else { "Save" };
+                    ok = dialog_button(ui, st, &mut fh, "dlg:save", label, Look::Primary);
+                    if retry {
+                        choose = dialog_button(
+                            ui,
+                            st,
+                            &mut fh,
+                            "dlg:choose-folder",
+                            "Choose folder\u{2026}",
+                            Look::Plain,
+                        );
                     }
-                    let r = ui.add(kit::Button::new(st, "Cancel").ghost());
-                    hit(ui_state, "dlg:cancel", &r);
-                    cancel = r.clicked();
-                });
-            });
-            match submit {
-                _ if cancel => None,
-                Some(replace) => save_as(
+                    if replace_id.is_some() {
+                        replace = dialog_button(
+                            ui,
+                            st,
+                            &mut fh,
+                            "dlg:replace",
+                            "Replace it",
+                            Look::Plain,
+                        );
+                    }
+                    cancel = dialog_button(ui, st, &mut fh, "dlg:cancel", "Cancel", Look::Plain);
+                },
+            );
+            for (k, r) in bh.into_iter().chain(fh) {
+                ui_state.record(k.into(), r);
+            }
+            // The name may have been edited this frame: a Replace for the old name is void.
+            let replace_ok = replace && !stale(&taken, &name);
+            if choose {
+                // The save goes to a folder picked in the file browser; the dialog closes.
+                let hint = ui_state.browser.folder.clone();
+                filebrowser::open(
+                    ui_state,
+                    Purpose::PatchSave,
+                    "Save the patch to a folder",
+                    Mode::Save,
+                    filebrowser::FOLDERS,
+                    name.trim(),
+                    &hint,
+                );
+                ctx.data_mut(|d| d.insert_temp(egui::Id::new("dlg-choose-folder"), true));
+                None
+            } else if cancel || closed {
+                None
+            } else if ok || enter || replace_ok {
+                let target = if replace_ok { replace_id } else { None };
+                save_as(
                     editor,
                     ui_state,
                     &name,
                     &category,
                     &tags,
-                    replace,
+                    target,
                     then.clone(),
                 )
                 .err()
@@ -2287,15 +2437,16 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
                     taken,
                     then: then.clone(),
                     error: Some(e),
-                }),
-                None => Some(Dialog::SaveAs {
+                })
+            } else {
+                Some(Dialog::SaveAs {
                     name,
                     category,
                     tags,
                     taken,
                     then,
                     error,
-                }),
+                })
             }
         }
         Dialog::Rename {
@@ -2303,31 +2454,39 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
             mut name,
             error,
         } => {
-            let mut submit = false;
-            let mut cancel = false;
-            kit::modal(ctx, st, "dlg-rename", 340.0, |ui| {
-                kit::dialog_title(ui, st, "Rename");
-                let r = kit::field(ui, st, &mut name, "", None, None);
-                hit(ui_state, "dlg:name", &r);
-                if r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                    submit = true;
-                }
-                if let Some(e) = &error {
-                    kit::paragraph(ui, st, Role::Body, Tone::Bad, e);
-                }
-                kit::gap(ui, st, 2);
-                ui.horizontal(|ui| {
-                    let r = ui.add(kit::Button::new(st, "Rename").primary());
-                    hit(ui_state, "dlg:save", &r);
-                    submit |= r.clicked();
-                    let r = ui.add(kit::Button::new(st, "Cancel").ghost());
-                    hit(ui_state, "dlg:cancel", &r);
-                    cancel = r.clicked();
-                });
-            });
-            if cancel {
+            let mut enter = false;
+            let (mut bh, mut fh) = (Vec::new(), Vec::new());
+            let (mut ok, mut cancel) = (false, false);
+            let closed = g4::modal_framed(
+                ctx,
+                st,
+                "dlg-rename",
+                Size::S,
+                "Rename sound",
+                |ui| {
+                    if let Some(e) = &error {
+                        g4::banner(ui, st, Sev::Bad, "Not renamed", Some(e));
+                        kit::gap(ui, st, 2);
+                    }
+                    let r = kit::field(ui, st, &mut name, "", None, None);
+                    bh.push(("dlg:name", r.rect));
+                    first_focus(ui, &r);
+                    if r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        enter = true;
+                    }
+                },
+                |_| {},
+                |ui| {
+                    ok = dialog_button(ui, st, &mut fh, "dlg:save", "Rename", Look::Primary);
+                    cancel = dialog_button(ui, st, &mut fh, "dlg:cancel", "Cancel", Look::Plain);
+                },
+            );
+            for (k, r) in bh.into_iter().chain(fh) {
+                ui_state.record(k.into(), r);
+            }
+            if cancel || closed {
                 None
-            } else if submit {
+            } else if ok || enter {
                 rename(ui_state, &id, &name).err().map(|e| Dialog::Rename {
                     id,
                     name,
@@ -2345,54 +2504,69 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
                 .reference
                 .as_ref()
                 .map_or(String::new(), |r| r.at.clone());
-            kit::modal(ctx, st, "dlg-restore", 380.0, |ui| {
-                kit::dialog_title(ui, st, "Restore reference");
-                kit::paragraph(
-                    ui,
-                    st,
-                    Role::Body,
-                    Tone::Text,
-                    format!(
-                        "Replace the whole current patch (values, cables, routes, labels, Perform \
-                         pins, MIDI mappings) with the reference captured {at}?"
-                    ),
-                );
-                kit::paragraph(
-                    ui,
-                    st,
-                    Role::Body,
-                    Tone::Text2,
-                    "It is one undo step: Undo brings your current version back with all \
-                     its edits.",
-                );
-                if redo {
+            let mut fh = Vec::new();
+            let (mut ok, mut cancel) = (false, false);
+            let closed = g4::modal_framed(
+                ctx,
+                st,
+                "dlg-restore",
+                Size::M,
+                "Restore the reference?",
+                |ui| {
                     kit::paragraph(
                         ui,
                         st,
                         Role::Body,
-                        Tone::Bad,
-                        "Like any edit, it replaces the steps you could Redo right now.",
+                        Tone::Text,
+                        format!(
+                            "Replaces the whole patch: values, cables, routes, labels, Perform \
+                             pins and MIDI mappings, with the reference captured {at}."
+                        ),
                     );
-                }
-                kit::gap(ui, st, 2);
-                ui.horizontal(|ui| {
-                    let r = ui.add(kit::Button::new(st, "Restore").primary());
-                    hit(ui_state, "dlg:restore", &r);
-                    if r.clicked() {
-                        let m = crate::compare::restore(editor, ui_state);
-                        message(ui_state, m);
-                        next = None;
+                    kit::gap(ui, st, 1);
+                    ui.horizontal(|ui| {
+                        let (r, _) = ui.allocate_exact_size(vec2(18.0, 18.0), Sense::hover());
+                        kit::icon(ui.painter(), Ic::Undo, r.center(), 16.0, st.roles.text3);
+                        kit::paragraph(
+                            ui,
+                            st,
+                            Role::Body,
+                            Tone::Text2,
+                            "One undo step brings your version back.",
+                        );
+                    });
+                    if redo {
+                        kit::paragraph(
+                            ui,
+                            st,
+                            Role::Caption,
+                            Tone::Bad,
+                            "Like any edit, it replaces the steps you could Redo right now.",
+                        );
                     }
-                    let r = ui.add(kit::Button::new(st, "Cancel").ghost());
-                    hit(ui_state, "dlg:cancel", &r);
-                    if r.clicked() {
-                        next = None;
-                    }
-                });
-            });
+                },
+                |_| {},
+                |ui| {
+                    ok = dialog_button(ui, st, &mut fh, "dlg:restore", "Restore", Look::Primary);
+                    cancel = dialog_button(ui, st, &mut fh, "dlg:cancel", "Cancel", Look::Plain);
+                },
+            );
+            for (k, r) in fh {
+                ui_state.record(k.into(), r);
+            }
+            if ok {
+                let m = crate::compare::restore(editor, ui_state);
+                message(ui_state, m);
+                next = None;
+            } else if cancel || closed {
+                next = None;
+            }
             next
         }
     };
+    if next.is_none() {
+        ctx.data_mut(|d| d.remove::<bool>(egui::Id::new("dlg-focused")));
+    }
     let escape = ctx.input(|i| i.key_pressed(egui::Key::Escape));
     if ui_state.browser.dialog.is_none() && !escape {
         ui_state.browser.dialog = next;

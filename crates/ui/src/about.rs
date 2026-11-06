@@ -2,8 +2,10 @@
 //! Wording comes from COPYRIGHT and TRADEMARKS.md. Opened from the settings menu; the same
 //! code serves the standalone app and the plugin editor.
 
-use crate::kit::{self, Tone};
+use crate::kit::g4::{self, Size};
+use crate::kit::{self, Ic, Tone};
 use crate::style::Role;
+use egui::Sense;
 use std::sync::OnceLock;
 
 /// A modified version sets this to its attribution line, e.g. "Based on kabl by Kosta
@@ -26,9 +28,9 @@ pub struct About {
 /// "0.1.0 (commit 1a2b3c4d5e6f)"; the commit is unavailable outside a git checkout.
 pub fn version_line() -> String {
     format!(
-        "Version {} (commit {})",
+        "Version {} \u{b7} commit {}",
         env!("CARGO_PKG_VERSION"),
-        option_env!("KABL_COMMIT").unwrap_or("unavailable")
+        option_env!("KABL_COMMIT").map_or("unavailable", |c| c.get(..7).unwrap_or(c))
     )
 }
 
@@ -44,96 +46,161 @@ pub fn show(ctx: &egui::Context, ui_state: &mut crate::UiState) {
     let st = ui_state.style.clone();
     let st = &*st;
     let mut about = std::mem::take(&mut ui_state.about);
-    let mut hits = Vec::new();
-    let resp = kit::modal(ctx, st, "dlg-about", 460.0, |ui| {
-        ui.horizontal(|ui| {
-            kit::logo(ui, st, 36.0);
-            ui.vertical(|ui| {
-                kit::dialog_title(ui, st, "About kabl");
-                kit::label(ui, st, Role::Caption, Tone::Text2, version_line());
-            });
-        });
-        kit::gap(ui, st, 2);
-        if !FORK_LINE.is_empty() {
-            kit::paragraph(ui, st, Role::Body, Tone::Text, FORK_LINE);
-            kit::gap(ui, st, 1);
-        }
-        kit::label(ui, st, Role::Body, Tone::Text, COPYRIGHT_LINE);
-        kit::gap(ui, st, 1);
-        kit::paragraph(
-            ui,
-            st,
-            Role::Body,
-            Tone::Text2,
-            "kabl is free software, licensed under the GNU General Public License, version 3 or \
-             any later version (GPL-3.0-or-later). It comes with ABSOLUTELY NO WARRANTY, without \
-             even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. \
-             You are welcome to redistribute it under the conditions of that licence.",
-        );
-        kit::gap(ui, st, 1);
-        kit::paragraph(
-            ui,
-            st,
-            Role::Caption,
-            Tone::Text2,
-            format!(
-                "The full licence text is the file LICENSE in the source and in every package, \
-                 and at {LICENCE_URL}. The factory patches, logo and documentation have their \
-                 own terms (ASSET-LICENSES.md)."
-            ),
-        );
-        kit::gap(ui, st, 2);
-        ui.horizontal(|ui| {
-            kit::label(ui, st, Role::Label, Tone::Text2, "Source");
-            kit::label(ui, st, Role::Body, Tone::Text, SOURCE_URL);
-            if ui
-                .add(kit::Button::new(st, "Copy").ghost().small())
-                .clicked()
-            {
-                ui.ctx().copy_text(SOURCE_URL.into());
-            }
-        });
-        if about.notices {
-            kit::gap(ui, st, 2);
-            kit::section(ui, st, "Third-party notices");
-            kit::gap(ui, st, 1);
-            let lines = notice_lines();
-            let font = st.font(Role::Caption);
-            let row_h = ui.fonts_mut(|f| f.row_height(&font));
-            egui::ScrollArea::vertical()
-                .max_height(260.0)
-                .auto_shrink([false, false])
-                .show_rows(ui, row_h, lines.len(), |ui, range| {
-                    for l in &lines[range] {
-                        kit::label_truncated(ui, st, Role::Caption, Tone::Text2, l);
-                    }
+    let mut hits: Vec<(&str, egui::Rect)> = Vec::new();
+    let mut hits2: Vec<(&str, egui::Rect)> = Vec::new();
+    let mut close = false;
+    let mut notices = about.notices;
+    let closed = g4::modal_framed(
+        ctx,
+        st,
+        "dlg-about",
+        Size::M,
+        "",
+        |ui| {
+            ui.horizontal(|ui| {
+                let (r, _) = ui.allocate_exact_size(egui::vec2(56.0, 56.0), Sense::hover());
+                let (p, ink) = (ui.painter(), st.roles.on_accent);
+                p.rect_filled(r, egui::CornerRadius::same(14), st.roles.accent);
+                let at = |x: f32, y: f32| r.min + egui::vec2(x, y);
+                let curve = egui::epaint::CubicBezierShape::from_points_stroke(
+                    [
+                        at(14.0, 15.0),
+                        at(28.0, 15.0),
+                        at(28.0, 41.0),
+                        at(42.0, 41.0),
+                    ],
+                    false,
+                    egui::Color32::TRANSPARENT,
+                    egui::Stroke::new(4.0, ink),
+                );
+                p.add(curve);
+                p.circle_filled(at(13.0, 15.0), 5.0, ink);
+                p.circle_filled(at(43.0, 41.0), 5.0, ink);
+                ui.vertical(|ui| {
+                    ui.add_space(2.0);
+                    ui.label(kit::rich(st, Role::Display, Tone::Text, "kabl"));
+                    kit::label(ui, st, Role::Value, Tone::Text2, version_line());
                 });
-        }
-        kit::gap(ui, st, 2);
-        ui.horizontal(|ui| {
-            let label = if about.notices {
+            });
+            kit::gap(ui, st, 2);
+            kit::label(
+                ui,
+                st,
+                Role::Body,
+                Tone::Text,
+                "A legible modular synthesizer.",
+            );
+            kit::gap(ui, st, 1);
+            if !FORK_LINE.is_empty() {
+                kit::paragraph(ui, st, Role::Caption, Tone::Text, FORK_LINE);
+            }
+            kit::label(ui, st, Role::Body, Tone::Text2, COPYRIGHT_LINE);
+            kit::paragraph(
+                ui,
+                st,
+                Role::Body,
+                Tone::Text2,
+                "kabl is free software, licensed under the GNU General Public License, version 3 \
+                 or any later version (GPL-3.0-or-later). It comes with ABSOLUTELY NO WARRANTY, \
+                 without even the implied warranty of MERCHANTABILITY or FITNESS FOR A \
+                 PARTICULAR PURPOSE. You are welcome to redistribute it under the conditions of \
+                 that licence.",
+            );
+            kit::paragraph(
+                ui,
+                st,
+                Role::Body,
+                Tone::Text3,
+                format!(
+                    "The full licence text is the file LICENSE in the source and in every \
+                     package, and at {LICENCE_URL}. The factory patches, logo and documentation \
+                     have their own terms (ASSET-LICENSES.md)."
+                ),
+            );
+            kit::gap(ui, st, 2);
+            // Source row: an inset strip with the mono URL and a copy button.
+            egui::Frame::new()
+                .fill(st.roles.inset)
+                .stroke(egui::Stroke::new(1.0, st.roles.line))
+                .corner_radius(egui::CornerRadius::same(8))
+                .inner_margin(egui::Margin::symmetric(12, 4))
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal(|ui| {
+                        let (r, _) = ui.allocate_exact_size(egui::vec2(18.0, 18.0), Sense::hover());
+                        kit::icon(ui.painter(), Ic::External, r.center(), 16.0, st.roles.text2);
+                        kit::label(
+                            ui,
+                            st,
+                            Role::Value,
+                            Tone::Text,
+                            SOURCE_URL.trim_start_matches("https://"),
+                        );
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            let r = kit::icon_button(ui, st, Ic::Copy, false, true);
+                            hits.push(("about:copy", r.rect));
+                            if r.clicked() {
+                                ui.ctx().copy_text(SOURCE_URL.into());
+                            }
+                        });
+                    });
+                });
+            kit::gap(ui, st, 2);
+            let label = if notices {
                 "Hide third-party notices"
             } else {
                 "Third-party notices"
             };
-            let r = ui.add(kit::Button::new(st, label).ghost());
-            hits.push(("about:notices", r.rect));
-            if r.clicked() {
-                about.notices = !about.notices;
+            let g = ui.painter().layout_no_wrap(
+                label.into(),
+                st.font(Role::Label),
+                st.roles.accent_text,
+            );
+            let (r, resp) = ui.allocate_exact_size(g.size(), Sense::click());
+            ui.painter().galley(r.min, g, st.roles.accent_text);
+            hits.push(("about:notices", r));
+            if resp
+                .on_hover_cursor(egui::CursorIcon::PointingHand)
+                .clicked()
+            {
+                notices = !notices;
             }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let r = ui.add(kit::Button::new(st, "Close").primary());
-                hits.push(("about:close", r.rect));
-                r.clicked()
-            })
-            .inner
-        })
-        .inner
-    });
-    if resp.inner || resp.should_close() {
+            if notices {
+                kit::gap(ui, st, 1);
+                let lines = notice_lines();
+                let font = st.font(Role::Caption);
+                let row_h = ui.fonts_mut(|f| f.row_height(&font));
+                egui::ScrollArea::vertical()
+                    .max_height(220.0)
+                    .auto_shrink([false, false])
+                    .show_rows(ui, row_h, lines.len(), |ui, range| {
+                        for l in &lines[range] {
+                            kit::label_truncated(ui, st, Role::Caption, Tone::Text2, l);
+                        }
+                    });
+            } else {
+                kit::label(
+                    ui,
+                    st,
+                    Role::Body,
+                    Tone::Text3,
+                    "Fonts: IBM Plex, SIL OFL 1.1",
+                );
+            }
+        },
+        |_| {},
+        |ui| {
+            let r = ui.add(kit::Button::new(st, "Close").g4(32.0));
+            hits2.push(("about:close", r.rect));
+            close = r.clicked();
+        },
+    );
+    about.notices = notices;
+    if close || closed {
         about.open = false;
         about.notices = false;
     }
+    hits.extend(hits2);
     ui_state.about = about;
     for (k, r) in hits {
         ui_state.record(k.into(), r);

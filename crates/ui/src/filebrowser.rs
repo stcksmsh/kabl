@@ -1113,6 +1113,7 @@ pub fn window(ui_state: &mut UiState, ctx: &egui::Context) {
                 *e = ev;
             }
         },
+        |_| {},
         |ui| {
             let (b, u, e) = &mut *cell.borrow_mut();
             let ev = b.footer(ui, &st, u);
