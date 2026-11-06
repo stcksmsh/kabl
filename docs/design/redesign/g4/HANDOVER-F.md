@@ -13,13 +13,13 @@ Task from "Kabl overseer": G4-F group 4 (file browser) only. UI only: no sound o
 Group 5 on a new branch from origin/master. Start: `grep -n "Modal\|egui::Window" crates/ui/src/browser.rs crates/ui/src/about.rs`.
 
 ## Facts
-- Patches are folders with meta.toml: listed as `name.kabl` items (file icon, display only; on disk no suffix); real folders first with chevron. Open mode: click selects, Open button or double-click picks. Sounds place = user_root/sounds. Recent place left out: no recent-patches list exists (library recents are sound ids).
+- Patches are folders with meta.toml: listed as `name.kabl` items (file icon, display only; on disk no suffix); real folders first with chevron. Open mode: click selects, Open button or double-click picks. Sounds place = user_root/sounds. Recent place = last 10 opened or saved patch folders (`patch_recents` in library.json, missing ones dropped); scene `file-recent`.
 - Modified is UTC "2 Nov 18:40" (no time-zone data); real folders show no date.
 - Capture ctx is shared across jobs; modals centre on the screen rect.
 - `git push --force-with-lease` is denied: merge master, do not rebase.
 
 ## Open for Kosta
-Recent place missing: needs a recent-patches list (none exists). Patch save writes the folder without ".kabl"; the suffix is display-only.
+Patch save writes the folder without ".kabl"; the suffix is display-only.
 
 ## Standing rules
 Report to "Kabl overseer", do not merge, stop when done. Apply Style (caveman and ponytail ultra) on restart, read only this file.

@@ -126,6 +126,8 @@ struct Entry {
     patch: bool,
     /// Seconds since 1970 of the last change, when the system says.
     modified: Option<u64>,
+    /// Recent list only: where the patch is (it is not in the folder shown).
+    full: Option<PathBuf>,
 }
 
 /// A folder's rows (and whether the list was cut), or why it could not be read.
@@ -158,6 +160,8 @@ pub struct FileBrowser {
     error: Option<String>,
     /// The patch picked in Open mode, waiting for the Open button.
     selected: Option<String>,
+    /// The Recent place is shown instead of the folder.
+    recent: bool,
     /// Save mode: the Name field takes focus on its first frame.
     focus_name: bool,
     /// Height of the places column and the list.
@@ -182,6 +186,7 @@ impl FileBrowser {
             confirm: None,
             error: None,
             selected: None,
+            recent: false,
             focus_name: mode == Mode::Save,
             list_h: 300.0,
             bleed: 0.0,
@@ -206,12 +211,58 @@ impl FileBrowser {
             let _ = tx.send(list(&there, spec, folders_only));
         });
         self.dir = dir;
+        self.recent = false;
         self.rx = Some(rx);
         self.listing = None;
         self.confirm = None;
         self.error = None;
         self.selected = None;
         self.filter.clear();
+    }
+
+    /// Shows the recent patches of the library (in place of a folder listing).
+    fn show_recent(&mut self, ui_state: &UiState) {
+        let rows = ui_state
+            .library
+            .as_ref()
+            .map_or_else(Vec::new, |l| l.recent_patches());
+        let rows = rows
+            .into_iter()
+            .map(|p| Entry {
+                name: p
+                    .file_name()
+                    .map_or(String::new(), |n| n.to_string_lossy().into_owned()),
+                dir: true,
+                patch: true,
+                modified: std::fs::metadata(&p)
+                    .and_then(|m| m.modified())
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs()),
+                full: Some(p),
+            })
+            .collect();
+        self.rx = None;
+        self.listing = Some(Ok((rows, false)));
+        self.recent = true;
+        self.confirm = None;
+        self.error = None;
+        self.selected = None;
+        self.filter.clear();
+    }
+
+    /// The path of the row called `name`.
+    fn path_of(&self, name: &str) -> PathBuf {
+        if let Some(Ok((rows, _))) = &self.listing {
+            if let Some(p) = rows
+                .iter()
+                .find(|e| e.name == name)
+                .and_then(|e| e.full.clone())
+            {
+                return p;
+            }
+        }
+        self.dir.join(name)
     }
 
     fn poll(&mut self) {
@@ -338,8 +389,20 @@ impl FileBrowser {
                 Stroke::new(1.0, r.line),
             );
         }
-        if let Some(d) = places(ui, st, ui_state, prefix, side, &self.dir, home) {
-            go = Some(d);
+        if let Some(d) = places(
+            ui,
+            st,
+            ui_state,
+            prefix,
+            side,
+            (&self.dir, self.recent, self.spec.patches),
+            home,
+        ) {
+            if d.as_os_str().is_empty() {
+                self.show_recent(ui_state);
+            } else {
+                go = Some(d);
+            }
         }
         // The list: Name / Modified header, then the rows.
         let list = Rect::from_min_max(pos2(side.right() + 1.0, area.top() + 1.0), area.max);
@@ -439,7 +502,8 @@ impl FileBrowser {
                             };
                             ui_state.record(key(&format!("{k}:{}", e.name)), resp.rect);
                             if resp.double_clicked() && e.patch && self.mode == Mode::Open {
-                                pick = Some(self.dir.join(&e.name));
+                                pick =
+                                    Some(e.full.clone().unwrap_or_else(|| self.dir.join(&e.name)));
                             } else if resp.clicked() {
                                 if e.dir && !e.patch {
                                     go = Some(self.dir.join(&e.name));
@@ -570,7 +634,7 @@ impl FileBrowser {
                 return event;
             }
             Mode::Open if self.spec.patches => {
-                let chosen = self.selected.as_ref().map(|n| self.dir.join(n));
+                let chosen = self.selected.as_ref().map(|n| self.path_of(n));
                 let r = button(ui, "open", "Open", true, 100.0, chosen.is_some());
                 if r {
                     if let Some(p) = chosen {
@@ -603,14 +667,18 @@ fn places(
     ui_state: &mut UiState,
     prefix: &str,
     side: Rect,
-    dir: &Path,
+    (dir, recent, patches): (&Path, bool, bool),
     home: Option<PathBuf>,
 ) -> Option<PathBuf> {
     let mut list: Vec<(&str, &str, Ic, PathBuf)> = Vec::new();
     if let Some(h) = home {
         list.push(("home", "Home", Ic::Home, h));
     }
-    // Sounds: the user's own sound library. Recent has no data source for patches yet.
+    // Recent patches: an empty path stands for the list.
+    if patches {
+        list.push(("recent", "Recent", Ic::Clock, PathBuf::new()));
+    }
+    // Sounds: the user's own sound library.
     let sounds = ui_state
         .library
         .as_ref()
@@ -639,7 +707,11 @@ fn places(
         if row.bottom() > side.bottom() {
             break;
         }
-        let on = d == dir;
+        let on = if d.as_os_str().is_empty() {
+            recent
+        } else {
+            !recent && d == dir
+        };
         let resp = ui.interact(row, ui.id().with((prefix, "place", i)), Sense::click());
         ui_state.record(format!("{prefix}:place:{k}"), row);
         let p = ui.painter();
@@ -883,6 +955,7 @@ fn list(dir: &Path, spec: Spec, folders_only: bool) -> Listing {
                 name,
                 dir: meta.is_dir(),
                 patch,
+                full: None,
                 modified: meta
                     .modified()
                     .ok()
@@ -953,6 +1026,30 @@ pub fn preselect(ui_state: &mut UiState, name: &str) {
     if let Some(r) = &mut ui_state.files {
         r.browser.selected = Some(name.to_string());
     }
+}
+
+/// Shows the Recent place with `paths` as its patches (captures use it).
+pub fn show_recent_for_capture(ui_state: &mut UiState, paths: &[PathBuf]) {
+    let Some(r) = &mut ui_state.files else { return };
+    let rows = paths
+        .iter()
+        .map(|p| Entry {
+            name: p
+                .file_name()
+                .map_or(String::new(), |n| n.to_string_lossy().into_owned()),
+            dir: true,
+            patch: true,
+            modified: std::fs::metadata(p)
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs()),
+            full: Some(p.clone()),
+        })
+        .collect();
+    r.browser.rx = None;
+    r.browser.listing = Some(Ok((rows, false)));
+    r.browser.recent = true;
 }
 
 pub fn is_open(ui_state: &UiState, purpose: Purpose) -> bool {
@@ -1026,6 +1123,12 @@ pub fn window(ui_state: &mut UiState, ctx: &egui::Context) {
             if req.purpose == Purpose::PatchLoad {
                 if let Some(parent) = path.parent() {
                     ui_state.folders_remember(Place::Patches, parent);
+                }
+            }
+            if matches!(req.purpose, Purpose::PatchLoad | Purpose::PatchSave) {
+                if let Some(l) = &mut ui_state.library {
+                    // A failed save of the preferences only loses the list; nothing to tell.
+                    let _ = l.touch_patch(&path);
                 }
             }
             ui_state.picked = Some(Picked {

@@ -14,7 +14,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 25] = [
+const SCENES: [&str; 26] = [
     "rack",
     "perform",
     "sounds",
@@ -36,6 +36,7 @@ const SCENES: [&str; 25] = [
     "file-open",
     "file-save",
     "file-empty",
+    "file-recent",
     "menu-module",
     "menu-cable",
     "more-controls",
@@ -316,6 +317,10 @@ impl App {
                     .insert("patches".into(), patches.with_file_name("empty-set"));
             }
             fb::open(&mut ui, purpose, title, mode, fb::PATCHES, name, "");
+            if j.scene == "file-recent" {
+                let paths = [patches.join("acid-line"), patches.join("warm-pad")];
+                fb::show_recent_for_capture(&mut ui, &paths);
+            }
             if j.scene != "file-empty" {
                 fb::preselect(&mut ui, "acid-line");
             }
