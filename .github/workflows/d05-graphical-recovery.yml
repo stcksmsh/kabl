@@ -47,7 +47,7 @@ jobs:
             fi
             xvfb-run -a -s '-screen 0 1600x1000x24' bash -c '
               openbox >/dev/null 2>&1 &
-              exec timeout 45s python3 docs/rack-migration/drive.py "$1" "$2" "$3" patches/composition
+              exec timeout 45s python3 docs/rack-migration/drive.py "$1" "$2" "$3" "${KABL_BIN%/bin/kabl-ui}/share/kabl/patches/composition.kabl"
             ' _ "$script" "$size" "$case_dir/shots"
           done
           python3 - <<'PY'
