@@ -573,11 +573,19 @@ impl UiState {
             }
         }
         if let Some(cable) = self.selected_route {
-            let belongs = state.cables.get(&cable).is_some_and(|c| {
-                matches!((&c.to, &self.inspected),
-                    (PortRef::Param { id, param }, Some((iid, ip)))
-                        if id == iid && routing::reaches(state, *id, param, ip))
-            });
+            // A cable picked in the drawer's list stays selected; a depth route only while its
+            // control is inspected.
+            let belongs =
+                state
+                    .cables
+                    .get(&cable)
+                    .is_some_and(|c| match (&c.to, &self.inspected) {
+                        (PortRef::Param { id, param }, Some((iid, ip))) => {
+                            id == iid && routing::reaches(state, *id, param, ip)
+                        }
+                        (PortRef::Param { .. }, None) => false,
+                        _ => true,
+                    });
             if !belongs {
                 self.selected_route = None;
             }
