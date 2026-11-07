@@ -533,7 +533,6 @@ fn inline_help_is_opt_in_and_changes_nothing() {
     let mut h = H::new("init-keyboard", 1440.0, 1800.0);
     let before = h.snapshot();
     assert!(!h.ui.explain.help);
-    h.ui.drawer_more = true;
     h.frame();
     h.click("help");
     assert!(h.ui.explain.help);
@@ -547,7 +546,6 @@ fn inline_help_is_opt_in_and_changes_nothing() {
     assert_eq!(h.ui.selected_module, Some(3));
     h.unchanged_since(&before);
     // Common controls stay reachable with help closed.
-    h.ui.drawer_more = true;
     h.frame();
     h.click("help");
     h.ui.explain.close();

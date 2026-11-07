@@ -369,8 +369,6 @@ pub struct UiState {
     pub status_meter: bool,
     /// The host's audio status line (device, rate, buffer), shown in the status bar.
     pub status_audio: String,
-    /// The drawer's Help, Compare and Learn switches are folded away until "More" is pressed.
-    pub drawer_more: bool,
     /// Status bar readouts, each shown only when set. The host feeds the DSP load in percent,
     /// the voices in use and available, and the callback size in frames; `show` derives the
     /// tempo and the song position (bar . beat . tick) from the patch's first clock.
@@ -517,7 +515,6 @@ impl Default for UiState {
             meter: Default::default(),
             status_meter: false,
             status_audio: String::new(),
-            drawer_more: false,
             status_cpu: None,
             status_buffer: None,
             status_voices: None,
@@ -1069,17 +1066,24 @@ fn drawer(
     now: f64,
 ) {
     drawer::tabs(ui_state, ui, st);
+    // Learn and Compare are tabs of their own: each replaces the drawer's body.
     if ui_state.recipes.open {
-        // Above the drawer's scrolling content, so Show (which scrolls the drawer
-        // to the routes) never scrolls the recipe away.
-        let h = ui.available_height() * 0.8;
         egui::ScrollArea::vertical()
             .id_salt("kabl-recipes")
-            .max_height(h)
             .show_owned(ui, |ui| {
                 ui.set_max_width(DRAWER_W - 24.0);
                 recipes::panel(editor, ui_state, ui, now);
             });
+        return;
+    }
+    if ui_state.compare.open {
+        egui::ScrollArea::vertical()
+            .id_salt("kabl-compare")
+            .show_owned(ui, |ui| {
+                ui.set_max_width(DRAWER_W - 24.0);
+                compare::panel(editor, ui_state, ui, st);
+            });
+        return;
     }
     if ui_state.explain.is_open() {
         // Its own scroll area, at most about half the drawer: the module and
@@ -1098,9 +1102,6 @@ fn drawer(
         ui.set_max_width(DRAWER_W - 24.0);
         if ui_state.inspect.open {
             inspect::panel(editor, ui_state, ui, now);
-        }
-        if ui_state.compare.open {
-            compare::panel(editor, ui_state, ui, st);
         }
         // The patch-wide lists lead when no control is being edited, and follow its editor
         // otherwise, so the control's routes stay in view.
@@ -1604,12 +1605,27 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
         if r.clicked() {
             ui_state.composites.panel = !on;
         }
-        let on = ui_state.drawer_open;
-        let r = kit::icon_button(ui, st, kit::Ic::Cable, on, true).tip(st, "Routing");
-        ui_state.record("routing".into(), r.rect);
-        if r.clicked() {
-            ui_state.drawer_open = !on;
-            ui_state.drawer_auto_closed = false;
+        // One icon per drawer tab: a click opens the drawer on it, or closes the drawer when
+        // that tab is the one showing.
+        let now = drawer::current(ui_state);
+        for tab in drawer::Tab::ALL {
+            let on = ui_state.drawer_open && now == tab;
+            let r = kit::icon_button(ui, st, tab.icon(), on, true).tip(st, tab.label());
+            let key = if tab == drawer::Tab::Routing {
+                "routing".to_string()
+            } else {
+                format!("rail:{}", tab.key())
+            };
+            ui_state.record(key, r.rect);
+            if r.clicked() {
+                if on {
+                    ui_state.drawer_open = false;
+                } else {
+                    ui_state.drawer_open = true;
+                    ui_state.drawer_auto_closed = false;
+                    drawer::open(ui_state, tab);
+                }
+            }
         }
         kit::rule(ui, st);
         let focus_target = ui_state
