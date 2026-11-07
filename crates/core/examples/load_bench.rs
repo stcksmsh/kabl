@@ -25,7 +25,9 @@ fn main() {
     let mut worst = (0.0f64, PathBuf::new(), 0usize);
     for d in &dirs {
         let t = Instant::now();
-        let Ok(log) = kabl_core::format::load(d) else { continue };
+        let Ok(log) = kabl_core::format::load(d) else {
+            continue;
+        };
         let r = t.elapsed().as_secs_f64();
         let n = log.entries().len();
         replay += r;
@@ -43,5 +45,10 @@ fn main() {
         "patches {ok}  replay total {:.1} ms (mean {:.2} ms)  checkpoint parse (Value, lower bound) total {:.1} ms (mean {:.2} ms)",
         replay * 1e3, replay * 1e3 / ok as f64, snap * 1e3, snap * 1e3 / ok as f64
     );
-    println!("slowest replay {:.2} ms: {} ({} entries)", worst.0 * 1e3, worst.1.display(), worst.2);
+    println!(
+        "slowest replay {:.2} ms: {} ({} entries)",
+        worst.0 * 1e3,
+        worst.1.display(),
+        worst.2
+    );
 }
