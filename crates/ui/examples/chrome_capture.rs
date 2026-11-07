@@ -1007,6 +1007,12 @@ fn file_tree() {
         let t = std::time::UNIX_EPOCH + std::time::Duration::from_secs(at);
         let _ = std::fs::File::open(&d).and_then(|f| f.set_modified(t));
     }
+    // A real .kabl file beside the legacy folders.
+    let lead = patches.join("pluck-lead.kabl");
+    let log = kabl_core::PatchLog::new();
+    kabl_core::format::save_kabl(&lead, &log).unwrap();
+    let t = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_793_700_000);
+    let _ = std::fs::File::open(&lead).and_then(|f| f.set_modified(t));
     std::env::set_var("HOME", &home);
 }
 

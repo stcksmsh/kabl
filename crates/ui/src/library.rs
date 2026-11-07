@@ -335,11 +335,49 @@ fn check_name(name: &str) -> Result<String, LibError> {
 /// Reads a patch directory and checks that it compiles, without touching anything else:
 /// the caller replaces its working sound only on `Ok`.
 pub fn read_patch(dir: &Path) -> Result<PatchLog, LibError> {
-    repair_folder(dir);
-    let log = kabl_core::load(dir).map_err(|e| LibError::Unreadable(format!("{e:?}")))?;
+    // A real `.kabl` file, or a legacy patch folder.
+    let log = if dir.is_file() {
+        kabl_core::format::load_kabl(dir)
+    } else {
+        repair_folder(dir);
+        kabl_core::load(dir)
+    }
+    .map_err(|e| LibError::Unreadable(format!("{e:?}")))?;
     kabl_engine::compile::compile(log.state(), 48000.0, kabl_standalone::DEFAULT_VOICE_COUNT)
         .map_err(|e| LibError::Uncompilable(e.to_string()))?;
     Ok(log)
+}
+
+/// Whether `p` names a `.kabl` file (by its extension, not by what is on disk).
+pub fn is_kabl_path(p: &Path) -> bool {
+    p.extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("kabl"))
+}
+
+/// Where `save_patch` writes for `path`: a `.kabl` path as it is; a legacy patch folder, or any
+/// other name, as `name.kabl` next to it. The folder is never touched.
+pub fn patch_target(path: &Path) -> PathBuf {
+    if is_kabl_path(path) && !path.is_dir() {
+        return path.to_path_buf();
+    }
+    let mut s = path.as_os_str().to_owned();
+    s.push(".kabl");
+    PathBuf::from(s)
+}
+
+/// Saves `log` as a `.kabl` file (see `patch_target`), reads it back to check it, and returns
+/// the file written. A failed save leaves the old file in place (`save_kabl` renames last).
+pub fn save_patch(path: &Path, log: &PatchLog) -> Result<PathBuf, LibError> {
+    let target = patch_target(path);
+    fail_point("kabl")?;
+    kabl_core::format::save_kabl(&target, log)
+        .map_err(|e| LibError::Io(format!("can't save to {}: {e:?}", target.display())))?;
+    let back = kabl_core::format::load_kabl(&target)
+        .map_err(|e| LibError::Io(format!("saved copy doesn't read back: {e:?}")))?;
+    if back.state() != log.state() {
+        return Err(LibError::Io("saved copy doesn't match the sound".into()));
+    }
+    Ok(target)
 }
 
 /// Replaces `target` by the complete directory `staged` with renames: `target` → `.old`,
@@ -388,7 +426,7 @@ thread_local! {
 /// `KABL_RECORD_FAIL_AFTER`; never set in normal use). Stages: `staged` (the new copy is written and
 /// read back, nothing replaced yet), `replace:dir` (a sound of yours moved aside),
 /// `replace:<file>` (a folder save after that file was replaced: `meta.toml`,
-/// `checkpoint.json`, `log.jsonl`).
+/// `checkpoint.json`, `log.jsonl`), `kabl` (a `.kabl` patch file, before anything is written).
 pub fn fail_saves_at(stage: Option<&str>) {
     FAIL_AT.with(|f| *f.borrow_mut() = stage.map(str::to_string));
 }
@@ -825,7 +863,7 @@ impl Library {
     /// The recent patch folders that still exist, newest first.
     pub fn recent_patches(&self) -> Vec<PathBuf> {
         let dirs = self.prefs.patch_recents.iter().map(PathBuf::from);
-        dirs.filter(|p| p.is_dir()).collect()
+        dirs.filter(|p| p.exists()).collect()
     }
 
     pub fn toggle_favorite(&mut self, id: &str) -> Option<String> {
