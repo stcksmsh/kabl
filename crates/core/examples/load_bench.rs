@@ -31,7 +31,10 @@ fn main() {
                 times.push((t.elapsed().as_secs_f64(), d.clone()));
             }
         }
-        println!("pass {pass}: {:.1} ms total", t0.elapsed().as_secs_f64() * 1e3);
+        println!(
+            "pass {pass}: {:.1} ms total",
+            t0.elapsed().as_secs_f64() * 1e3
+        );
     }
     times.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
     for (t, d) in times.iter().take(5) {
