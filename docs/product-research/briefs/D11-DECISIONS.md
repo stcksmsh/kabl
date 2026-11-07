@@ -75,3 +75,21 @@ Record each numbered decision in `docs/design/redesign/verdicts.json`. Items mar
 - Audio-thread allocation check passes with 16 voices × 4 custom modules.
 - Patch round-trip: save, reopen, identical audio (bit-exact for the same input).
 - No regression in the existing perf gate.
+
+---
+
+# D11 follow-up (owner, 2026-11-07)
+
+Gate: passed. wasmi only is confirmed (5.7× native, fuel +5 %, 16 voices = 1.24 % of block).
+
+Flush-to-zero: option (a), engine-wide.
+- RAII guard at audio-callback entry/exit, standalone and CLAP: set FTZ+DAZ (x86 MXCSR) / FZ (aarch64 FPCR) via inline asm, restore the previous state on exit. Never leave the host thread modified. Do NOT use _mm_setcsr (deprecated since Rust 1.75; Rust documents FP-env changes as UB because LLVM assumes the default state).
+- Add a code comment explaining that UB caveat and that the golden renders (release build, FTZ on) are the guard against miscompiles.
+- Before re-recording golden hashes: render every golden patch with FTZ off vs on and report the max |diff| per patch in dBFS. Accept if ≤ −140 dBFS. Any patch above that, stop and report.
+- Explicitly test self-oscillating patches (resonant filter at max resonance, no input; feedback delays): confirm they still start and sound the same with FTZ on. If one relies on denormal noise to start, add a deterministic tiny excitation in that module instead.
+- Remove any per-module denormal workarounds only after this passes.
+
+Fuel calibration:
+- Calibrate with the slowest fuel-per-µs code mix (worst case), so the fuel budget never exceeds the time cap.
+- Add a wall-clock backstop: time each process() call; exceeding the per-module cap counts as an overrun even if fuel remains (same 8-in-a-row → crash rule).
+- Report calibration values on the dev machine and inside REAPER.

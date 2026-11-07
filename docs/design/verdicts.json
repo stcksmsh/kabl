@@ -274,6 +274,18 @@
       "item": "D11 decision 10: denormals",
       "verdict": "approve",
       "note": "[verify] decaying feedback loop into silence, flush-to-zero on vs off; if slow, DC offset or module-side fix documented for D12."
+    },
+    {
+      "date": "2026-11-07",
+      "item": "D11 follow-up: flush-to-zero engine-wide (option a)",
+      "verdict": "approve",
+      "note": "RAII guard at audio-callback entry/exit, standalone and CLAP: FTZ+DAZ (x86 MXCSR) / FZ (aarch64 FPCR) via inline asm, restore previous state on exit; not _mm_setcsr (deprecated, FP-env changes are UB in Rust). Before re-recording golden hashes render every golden patch FTZ off vs on and report max |diff| per patch, accept at -140 dBFS or lower, else stop. Test self-oscillating patches still start; remove per-module denormal workarounds only after that. Separate PR (agent 2)."
+    },
+    {
+      "date": "2026-11-07",
+      "item": "D11 follow-up: fuel calibration rules",
+      "verdict": "approve",
+      "note": "Calibrate with the slowest fuel-per-us code mix so the fuel budget never exceeds the time cap; wall-clock backstop times each process() call and over the per-module cap counts as an overrun even with fuel left (8 in a row = crash); report calibration values on the dev machine and inside REAPER."
     }
   ]
 }
