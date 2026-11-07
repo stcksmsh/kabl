@@ -595,8 +595,6 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
             }
         }
         Pending::OpenFolder(path) => {
-            // Settle an interrupted save first, and say so.
-            let repaired = crate::library::repair_folder(std::path::Path::new(&path));
             match crate::library::read_patch(std::path::Path::new(&path)) {
                 Ok(log) => {
                     replace_patch(editor, ui, log);
@@ -607,20 +605,11 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
                         DocOrigin::Folder(path.clone()),
                         editor.state(),
                     ));
-                    message(
-                        ui,
-                        repaired.map_or_else(
-                            || format!("loaded {path}"),
-                            |n| format!("loaded {path} ({n})"),
-                        ),
-                    );
+                    message(ui, format!("loaded {path}"));
                 }
                 Err(err) => message(ui, {
                     log::warn!(target: "doc", "open failed origin=folder error={}; working patch kept", err.log_text());
-                    format!(
-                        "load failed: {err}. Your sound is unchanged.{}",
-                        repaired.map_or(String::new(), |n| format!(" ({n})"))
-                    )
+                    format!("load failed: {err}. Your sound is unchanged.")
                 }),
             }
         }
@@ -1099,9 +1088,9 @@ fn badge(ui: &mut egui::Ui, st: &Style, e: &Meta) {
     kit::tag(ui, st, text, c);
 }
 
-/// The named macros of the sound in `dir`: (name, position 0..1). Empty when it has none.
+/// The named macros of the sound file `dir`: (name, position 0..1). Empty when it has none.
 fn macros_of(dir: &std::path::Path) -> Vec<(String, f32)> {
-    let Ok(log) = kabl_core::load(dir) else {
+    let Ok(log) = kabl_core::format::load_kabl(dir) else {
         return Vec::new();
     };
     let state = log.state();

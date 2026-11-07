@@ -205,7 +205,7 @@ fn main() {
             let user = tempfile::tempdir().unwrap().keep();
             let mut ui = UiState::default();
             ui.library = Some(kabl_ui::library::Library::open(
-                Some(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches")),
+                Some(kabl_ui::library::built_factory_dir()),
                 user,
             ));
             ui.drawer_open = false;

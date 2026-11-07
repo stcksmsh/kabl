@@ -1473,14 +1473,14 @@ fn delay_controls_and_a_fresh_load() {
     );
     assert!(!t.ui.loaded, "an edit is a live edit");
 
-    t.ui.browser.folder = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../patches/echo")
+    t.ui.browser.folder = kabl_ui::library::built_factory_dir()
+        .join("echo.kabl")
         .display()
         .to_string();
     // The advanced folder Load, in the browser; the edits above are unsaved, so it asks.
     let user = tempfile::tempdir().unwrap();
     t.ui.library = Some(kabl_ui::library::Library::open(
-        Some(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches")),
+        Some(kabl_ui::library::built_factory_dir()),
         user.path().to_path_buf(),
     ));
     t.ui.browser_open = true;

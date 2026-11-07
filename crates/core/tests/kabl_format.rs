@@ -68,6 +68,51 @@ fn save_and_load_use_a_path_and_leave_no_tmp() {
     assert!(!dir.path().join("a.kabl.tmp").exists());
 }
 
+/// What ships: `kabl pack-tree` over `patches/` gives one .kabl per folder, and each loads to the
+/// folder's state, entries and `sound.toml` text. The app reads only these files.
+#[test]
+fn the_packed_factory_equals_its_folders() {
+    let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches");
+    let out = tempfile::tempdir().unwrap();
+    let n = format::pack_tree(&src, out.path()).unwrap();
+    assert_eq!(n, factory().len());
+    for dir in factory() {
+        let rel = dir.strip_prefix(&src).unwrap();
+        let file = out.path().join(rel).with_extension("kabl");
+        let (log, meta) = format::load_kabl_meta(&file).unwrap();
+        let folder = format::load(&dir).unwrap();
+        assert_eq!(log.state(), folder.state(), "{}", dir.display());
+        assert_eq!(log.entries(), folder.entries(), "{}", dir.display());
+        assert_eq!(
+            meta,
+            std::fs::read_to_string(dir.join("sound.toml")).ok(),
+            "{}",
+            dir.display()
+        );
+    }
+}
+
+#[test]
+fn metadata_round_trips_and_a_plain_reader_skips_it() {
+    let (log, _) = one();
+    let meta = "name = \"Warm Pad\"\ntags = [\"a\"]\n";
+    let mut b = Vec::new();
+    format::write_kabl_meta(&mut b, &log, Some(meta)).unwrap();
+    let (back, got) = format::read_kabl_meta(&b[..]).unwrap();
+    assert_eq!((back.state(), got.as_deref()), (log.state(), Some(meta)));
+    // read_kabl ignores the frame; a file without one reads as no metadata.
+    assert_eq!(format::read_kabl(&b[..]).unwrap().state(), log.state());
+    let plain = bytes(&log);
+    assert_eq!(format::read_kabl_meta(&plain[..]).unwrap().1, None);
+    // The metadata frame is a skippable zstd frame: zstd -d style readers pass over it.
+    assert!(b.len() > plain.len());
+    // A cut metadata frame is refused.
+    assert!(matches!(
+        format::read_kabl_meta(&b[..24]),
+        Err(FormatError::Corrupt(_))
+    ));
+}
+
 /// Accepts every write, fails on flush: what a full disk does to a buffered writer.
 struct FailsOnFlush;
 impl std::io::Write for FailsOnFlush {
