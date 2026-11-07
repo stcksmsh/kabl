@@ -1,5 +1,6 @@
 //! Patch model: op log, state, replay, undo, file format. No audio deps — see brief section 5.
 
+pub mod cli;
 pub mod composite;
 pub mod format;
 mod log;
