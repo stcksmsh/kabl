@@ -11,15 +11,19 @@
 //! next pre-built instance; per-node grouping in the compiler is a follow-up.
 
 pub mod abi;
+pub mod budget;
 pub mod engine;
 pub mod fake;
 pub mod meta;
 pub mod module;
+pub mod wasmi_engine;
 
 pub use abi::{Layout, LayoutError, ABI_VERSION, DEFAULT_MEMORY_CAP, MAX_BLOB_BYTES};
+pub use budget::{scaled_shares, Budget, Calibration, PER_MODULE_SHARE, TOTAL_SHARE};
 pub use engine::{CompiledModule, Fault, InstanceConfig, LoadError, WasmEngine, WasmInstance};
 pub use meta::{CodeMeta, CodeParam, CodePort};
 pub use module::{in_code_call, CodeModule, Health, FADE_MS, OVERRUN_LIMIT};
+pub use wasmi_engine::{WasmiEngine, ALLOWED_IMPORTS, META_SECTION};
 
 use crate::info::{ModuleInfo, PortDirection};
 use std::collections::BTreeMap;

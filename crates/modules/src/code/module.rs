@@ -88,6 +88,14 @@ impl Health {
 
     /// Per-block fuel and per-call wall-clock cap, rescaled by the controller (calibration and
     /// the 50 % total cap come in a later PR).
+    pub fn fuel_budget(&self) -> u64 {
+        self.fuel_budget.load(Relaxed)
+    }
+
+    pub fn wall_cap(&self) -> Duration {
+        Duration::from_nanos(self.wall_cap_ns.load(Relaxed))
+    }
+
     pub fn set_budget(&self, fuel: u64, wall_cap: Duration) {
         self.fuel_budget.store(fuel, Relaxed);
         self.wall_cap_ns.store(wall_cap.as_nanos() as u64, Relaxed);
