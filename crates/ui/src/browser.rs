@@ -327,20 +327,18 @@ fn start_io(editor: &PatchEditor, ui: &mut UiState, request: IoRequest) {
                     .err();
                 }
                 IoRequest::SaveFolder(path) => {
-                    match crate::library::save_folder(
+                    match crate::library::save_patch(
                         std::path::Path::new(&path),
                         scratch_editor.log(),
                     ) {
-                        Ok(()) => {
-                            let name = std::path::Path::new(&path)
-                                .file_name()
-                                .map_or(path.clone(), |n| n.to_string_lossy().to_string());
+                        Ok(target) => {
+                            let t = target.to_string_lossy().into_owned();
                             scratch.doc = Some(Doc::new(
-                                &name,
-                                DocOrigin::Folder(path.clone()),
+                                &patch_name(&target),
+                                DocOrigin::Folder(t.clone()),
                                 scratch_editor.state(),
                             ));
-                            message(&mut scratch, format!("saved to {path}"));
+                            message(&mut scratch, format!("saved to {t}"));
                         }
                         Err(e) => {
                             let text = save_failed(&e);
@@ -459,6 +457,11 @@ pub fn poll_io(editor: &mut PatchEditor, ui: &mut UiState) {
         }
         IoRequest::SaveFolder(_) => {
             if done.error.is_none() && same_doc {
+                if let (Some(DocOrigin::Folder(p)), Some(l)) =
+                    (done.doc.as_ref().map(|d| &d.origin), ui.library.as_mut())
+                {
+                    let _ = l.touch_patch(std::path::Path::new(p));
+                }
                 ui.doc = done.doc;
             }
             ui.last_message = done.message;
@@ -598,9 +601,7 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
                 Ok(log) => {
                     replace_patch(editor, ui, log);
                     log::info!(target: "doc", "open ok origin=folder editor={}", editor.instance());
-                    let name = std::path::Path::new(&path)
-                        .file_name()
-                        .map_or(path.clone(), |n| n.to_string_lossy().to_string());
+                    let name = patch_name(std::path::Path::new(&path));
                     ui.doc = Some(Doc::new(
                         &name,
                         DocOrigin::Folder(path.clone()),
@@ -667,6 +668,8 @@ pub fn save(editor: &mut PatchEditor, ui: &mut UiState, then: Option<Pending>) -
         }
         return None;
     }
+    // Where a patch file went when the save wrote a `.kabl` (a legacy folder saves beside it).
+    let mut moved: Option<String> = None;
     let result = match &doc.origin {
         DocOrigin::Library(id)
             if ui
@@ -686,7 +689,9 @@ pub fn save(editor: &mut PatchEditor, ui: &mut UiState, then: Option<Pending>) -
                 .as_ref()
                 .is_some_and(|l| l.is_factory_path(std::path::Path::new(path))) =>
         {
-            crate::library::save_folder(std::path::Path::new(path), editor.log())
+            crate::library::save_patch(std::path::Path::new(path), editor.log()).map(|t| {
+                moved = Some(t.to_string_lossy().into_owned());
+            })
         }
         _ => {
             open_save_as(ui, then);
@@ -707,6 +712,13 @@ pub fn save(editor: &mut PatchEditor, ui: &mut UiState, then: Option<Pending>) -
             if let Some(d) = ui.doc.as_mut() {
                 d.saved = editor.state().clone();
                 d.name = name.clone();
+                if let Some(p) = &moved {
+                    d.origin = DocOrigin::Folder(p.clone());
+                    d.name = patch_name(std::path::Path::new(p));
+                }
+            }
+            if let (Some(p), Some(l)) = (&moved, ui.library.as_mut()) {
+                let _ = l.touch_patch(std::path::Path::new(p));
             }
             log::info!(target: "doc", "save ok origin={}", doc_kind(&doc.origin));
             message(ui, format!("saved \"{name}\""));
@@ -739,22 +751,36 @@ fn save_to_folder(editor: &mut PatchEditor, ui_state: &mut UiState, p: String) {
         start_io(editor, ui_state, IoRequest::SaveFolder(p.clone()));
         "saving folder in background".into()
     } else {
-        match crate::library::save_folder(path, editor.log()) {
-            Ok(()) => {
-                let name = path
-                    .file_name()
-                    .map_or(p.clone(), |n| n.to_string_lossy().to_string());
+        match crate::library::save_patch(path, editor.log()) {
+            Ok(target) => {
+                let t = target.to_string_lossy().into_owned();
                 ui_state.doc = Some(Doc::new(
-                    &name,
-                    DocOrigin::Folder(p.clone()),
+                    &patch_name(&target),
+                    DocOrigin::Folder(t.clone()),
                     editor.state(),
                 ));
-                format!("saved to {p}")
+                if let Some(l) = ui_state.library.as_mut() {
+                    let _ = l.touch_patch(&target);
+                }
+                format!("saved to {t}")
             }
             Err(err) => save_failed(&err),
         }
     };
     message(ui_state, text);
+}
+
+/// The name a patch file or folder goes by: a `.kabl` file without the extension.
+fn patch_name(p: &std::path::Path) -> String {
+    let n = if crate::library::is_kabl_path(p) && p.is_file() {
+        p.file_stem()
+    } else {
+        p.file_name()
+    };
+    n.map_or_else(
+        || p.to_string_lossy().into_owned(),
+        |n| n.to_string_lossy().into_owned(),
+    )
 }
 
 fn save_failed(e: &LibError) -> String {
