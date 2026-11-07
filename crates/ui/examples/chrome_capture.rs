@@ -14,7 +14,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 32] = [
+const SCENES: [&str; 33] = [
     "rack",
     "perform",
     "sounds",
@@ -47,6 +47,7 @@ const SCENES: [&str; 32] = [
     "dlg-rename",
     "dlg-restore",
     "about",
+    "dev-tools",
 ];
 
 struct Job {
@@ -406,6 +407,39 @@ impl App {
         }
         if j.scene == "learn" {
             ui.recipes.open = true;
+        }
+        // Panel authoring (advanced): a "Voice" composite made from the filter, once, with one
+        // control and two jacks exposed. Last in SCENES, so no other scene sees the composite.
+        if j.scene == "dev-tools" {
+            use kabl_core::PortRef;
+            let svf = self
+                .editor
+                .state()
+                .modules
+                .iter()
+                .find(|(_, m)| m.kind == "filter.svf")
+                .map(|(&id, _)| id)
+                .unwrap();
+            if self.editor.state().composites.is_empty() {
+                let id = kabl_ui::composites::encapsulate(
+                    &mut self.editor,
+                    [svf].into(),
+                    Default::default(),
+                    "Voice",
+                )
+                .unwrap();
+                let port = |port: &str| PortRef::Module {
+                    id: svf,
+                    port: port.into(),
+                };
+                let cutoff = PortRef::Param {
+                    id: svf,
+                    param: "cutoff_hz".into(),
+                };
+                kabl_ui::composites::add_exposure(&mut self.editor, id, cutoff, true).unwrap();
+                kabl_ui::composites::add_exposure(&mut self.editor, id, port("in"), false).unwrap();
+                kabl_ui::composites::add_exposure(&mut self.editor, id, port("lp"), false).unwrap();
+            }
         }
         {
             use kabl_ui::browser::{Dialog, Pending};
@@ -842,6 +876,11 @@ impl eframe::App for App {
             self.ui.zoom = 1.0;
             self.ui.pan = egui::vec2(-700.0, -560.0);
         }
+        // Panel authoring opens once the first frames, which reset its state, are past.
+        if self.f == 6 && self.jobs[self.i].scene == "dev-tools" {
+            let (&id, c) = self.editor.state().composites.iter().next().unwrap();
+            kabl_ui::panels::open(&mut self.ui, id, c);
+        }
         // The mockup's More controls: the wavetable oscillator's, Controls tab (once the first
         // frames, which reset the view, are past).
         if self.f == 6 && self.jobs[self.i].scene.starts_with("more-controls") {
@@ -910,6 +949,7 @@ impl eframe::App for App {
         let shot = if self.jobs[self.i].scene.starts_with("cable-routes")
             || self.jobs[self.i].scene.starts_with("menu-")
             || self.jobs[self.i].scene.starts_with("more-controls")
+            || self.jobs[self.i].scene == "dev-tools"
         {
             30
         } else {

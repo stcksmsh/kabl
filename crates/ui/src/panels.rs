@@ -1,4 +1,6 @@
 //! Composite face authoring and asset preparation. Called only on UI/control threads.
+use crate::kit::{self, g4, g4::Sev, Tone};
+use crate::style::Role;
 use crate::wheel::OwnedScroll;
 use crate::{composites, PatchEditor, UiState};
 use kabl_core::{
@@ -104,10 +106,29 @@ pub struct View {
     pub textures: BTreeMap<(CompositeId, bool), (Artwork, egui::TextureHandle, egui::Color32)>,
     editor: u64,
 }
-fn button(ui: &mut egui::Ui, view: &mut UiState, key: &str, label: &str) -> bool {
-    let r = ui.button(label);
-    view.record(key.into(), r.rect);
-    r.clicked()
+/// A numeric field: edits a text copy while focused, then shows the clamped value again.
+fn num_field(
+    ui: &mut egui::Ui,
+    st: &crate::style::Style,
+    key: &str,
+    v: &mut f32,
+    lo: f32,
+    hi: f32,
+) -> egui::Response {
+    let id = egui::Id::new(("panel-num", key));
+    let mut s = ui
+        .data_mut(|d| d.get_temp::<String>(id))
+        .unwrap_or_else(|| format!("{}", *v));
+    let r = kit::field(ui, st, &mut s, "", None, Some(72.0));
+    if r.has_focus() {
+        if let Ok(x) = s.trim().parse::<f32>() {
+            *v = x.clamp(lo, hi);
+        }
+        ui.data_mut(|d| d.insert_temp(id, s));
+    } else {
+        ui.data_mut(|d| d.remove::<String>(id));
+    }
+    r
 }
 pub fn open(view: &mut UiState, id: CompositeId, c: &kabl_core::Composite) {
     view.panels.selected = Some(id);
@@ -151,89 +172,325 @@ pub fn editor(editor: &mut PatchEditor, view: &mut UiState, ctx: &egui::Context)
             return;
         };
         let mut shown = true;
-        egui::Window::new(format!("Panel authoring · {} #{id}",c.name)).id(egui::Id::new("panel-authoring"))
-            .open(&mut shown).default_width(560.0).default_height(640.0).vscroll(true).show(ctx,|ui| {
-            ui.label("340-point face. Coordinates include label/value footprints. Apply = one project Undo step.");
-            if let Some(e)=&view.panels.error { ui.colored_label(egui::Color32::LIGHT_RED,e); }
-            ui.horizontal(|ui| {
-                ui.label("Width");
-                let r=ui.add(egui::DragValue::new(&mut view.panels.draft.width).speed(30.0).range(180.0..=840.0));view.record("panel:width".into(),r.rect);
-                if button(ui,view,"panel:light","Preview light") { view.dark=false; }
-                if button(ui,view,"panel:dark","Preview dark") { view.dark=true; }
-            });
-            ui.label("PNG import or complete package export path (local file)");
-            ui.horizontal(|ui| {
-                let r=ui.text_edit_singleline(&mut view.panels.path);view.record("panel:path".into(),r.rect);
-                let r=ui.button("Browse");view.record("panel:browse".into(),r.rect);
-                if r.clicked() {
-                    let hint=view.panels.path.clone();
-                    crate::filebrowser::open(view,crate::filebrowser::Purpose::PanelArt,"Choose artwork",crate::filebrowser::Mode::Open,crate::filebrowser::IMAGE,"",&hint);
+        let st = view.style.clone();
+        let st = &*st;
+        let title = format!("Panel authoring · {} #{id}", c.name);
+        let width = 528.0_f32.min(ctx.content_rect().width() - 112.0);
+        g4::tool_window(
+            ctx,
+            st,
+            "panel-authoring",
+            (&title, Some("ADVANCED")),
+            egui::pos2(40.0, 80.0),
+            &mut shown,
+            |ui| {
+                ui.set_width(width);
+                ui.spacing_mut().item_spacing = egui::vec2(8.0, 8.0);
+                if let Some(e) = view.panels.error.clone() {
+                    g4::banner(ui, st, Sev::Bad, "Could not apply", Some(&e));
                 }
-            });
-            ui.horizontal(|ui| {
-                for (dark,label) in [(false,"Import light PNG"),(true,"Import dark PNG")] {
-                    if button(ui,view,if dark {"panel:import-dark"} else {"panel:import-light"},label) {
-                        match import_art(Path::new(&view.panels.path)) { Ok(a)=>{if dark {view.panels.draft.dark=Some(a)}else{view.panels.draft.light=Some(a)};view.panels.error=None},Err(e)=>view.panels.error=Some(e) }
-                    }
-                }
-                if button(ui,view,"panel:clear-art","Clear artwork") {view.panels.draft.light=None;view.panels.draft.dark=None;}
-            });
-            ui.label(format!("Light: {} · Dark: {}",view.panels.draft.light.as_ref().map_or("missing",|a|a.name.as_str()),view.panels.draft.dark.as_ref().map_or("missing",|a|a.name.as_str())));
-            ui.separator();
-            for (&key,e) in c.controls.iter().chain(&c.ports) {
-                ui.push_id(key,|ui| {
+                let row = |ui: &mut egui::Ui, label: &str, add: &mut dyn FnMut(&mut egui::Ui)| {
                     ui.horizontal(|ui| {
-                        ui.label(format!("ID {key}"));
-                        let label=view.panels.labels.entry(key).or_insert_with(||e.label.clone());
-                        let r=ui.add(egui::TextEdit::singleline(label).desired_width(210.0));view.record(format!("panel:{key}:label"),r.rect);
-                        if !view.panels.draft.placements.contains_key(&key) && button(ui,view,&format!("panel:place:{key}"),"Place") {
-                            let kind=if c.ports.contains_key(&key) {Kind::Jack} else {
-                                let PortRef::Param{id:leaf,param}=&e.target else{return};
-                                let stepped=registry::info_for(&editor.state().modules[leaf].kind).is_some_and(|i|i.params.iter().any(|p|p.name==param&&p.taper==Taper::Stepped));
-                                if stepped {Kind::Selector}else{Kind::Knob}
-                            };
-                            let (w,h)=match kind {Kind::Knob=>(84.0,110.0),Kind::Selector=>(180.0,55.0),Kind::Jack=>(64.0,58.0)};
-                            let x=12.0;let y=72.0;
-                            view.panels.draft.placements.insert(key,Placement{kind,x,y,width:w,height:h});
+                        ui.set_min_height(32.0);
+                        let (r, _) =
+                            ui.allocate_exact_size(egui::vec2(112.0, 32.0), egui::Sense::hover());
+                        ui.painter().text(
+                            r.left_center(),
+                            egui::Align2::LEFT_CENTER,
+                            label,
+                            st.font(Role::Body),
+                            kit::tone(st, Tone::Text2),
+                        );
+                        add(ui);
+                    });
+                };
+                row(ui, "Width", &mut |ui| {
+                    let r = num_field(
+                        ui,
+                        st,
+                        "panel-width",
+                        &mut view.panels.draft.width,
+                        180.0,
+                        840.0,
+                    );
+                    view.record("panel:width".into(), r.rect);
+                    kit::label(ui, st, Role::Value, Tone::Text3, "px");
+                });
+                row(ui, "Preview", &mut |ui| {
+                    kit::segmented(ui, st, |ui| {
+                        let r = kit::seg(ui, st, "Light", !view.dark);
+                        view.record("panel:light".into(), r.rect);
+                        if r.clicked() {
+                            view.dark = false;
+                        }
+                        let r = kit::seg(ui, st, "Dark", view.dark);
+                        view.record("panel:dark".into(), r.rect);
+                        if r.clicked() {
+                            view.dark = true;
                         }
                     });
-                    if let Some(p)=view.panels.draft.placements.get_mut(&key) {
-                        let mut remove=false;
-                        let mut recorded=Vec::new();
-                        ui.horizontal(|ui| {
-                            ui.label(format!("{:?}",p.kind));
-                            for (name,value) in [("x",&mut p.x),("y",&mut p.y),("w",&mut p.width),("h",&mut p.height)] {
-                                ui.label(name);let r=ui.add(egui::DragValue::new(value).speed(1.0));recorded.push((format!("panel:{key}:{name}"),r.rect));
-                            }
-                            remove=ui.small_button("Unplace").clicked();
-                        });
-                        for (key,rect) in recorded {view.record(key,rect);}
-                        if remove {view.panels.draft.placements.remove(&key);}
+                });
+                kit::rule(ui, st);
+                kit::section(ui, st, "Artwork");
+                row(ui, "PNG or package", &mut |ui| {
+                    let w = ui.available_width() - 100.0 - 8.0;
+                    let r = kit::field(
+                        ui,
+                        st,
+                        &mut view.panels.path,
+                        "Local file path",
+                        None,
+                        Some(w),
+                    );
+                    view.record("panel:path".into(), r.rect);
+                    let r = ui.add(kit::Button::new(st, "Browse…").g4(32.0).min_width(100.0));
+                    view.record("panel:browse".into(), r.rect);
+                    if r.clicked() {
+                        let hint = view.panels.path.clone();
+                        crate::filebrowser::open(
+                            view,
+                            crate::filebrowser::Purpose::PanelArt,
+                            "Choose artwork",
+                            crate::filebrowser::Mode::Open,
+                            crate::filebrowser::IMAGE,
+                            "",
+                            &hint,
+                        );
                     }
                 });
-            }
-            ui.separator();
-            ui.horizontal(|ui| {
-                if button(ui,view,"panel:apply","Apply panel / Undoable") {
-                    let mut latest=editor.state().composites[&id].clone();latest.panel=Some(Box::new(view.panels.draft.clone()));
-                    for (key,label) in &view.panels.labels {
-                        if let Some(e)=latest.controls.get_mut(key).or_else(||latest.ports.get_mut(key)) {e.label=label.clone();}
+                for dark in [false, true] {
+                    let have = if dark {
+                        view.panels.draft.dark.as_ref()
+                    } else {
+                        view.panels.draft.light.as_ref()
                     }
-                    view.panels.error=composites::set(editor,id,latest).err();
+                    .map(|a| a.name.clone());
+                    let key = if dark {
+                        "panel:import-dark"
+                    } else {
+                        "panel:import-light"
+                    };
+                    row(ui, if dark { "Dark PNG" } else { "Light PNG" }, &mut |ui| {
+                        let dot = if have.is_some() {
+                            st.roles.good
+                        } else {
+                            st.roles.warn
+                        };
+                        g4::chip_label(
+                            ui,
+                            st,
+                            have.as_deref().unwrap_or("missing"),
+                            true,
+                            Some(dot),
+                        );
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            let r =
+                                ui.add(kit::Button::new(st, "Import…").g4(32.0).min_width(100.0));
+                            view.record(key.into(), r.rect);
+                            if r.clicked() {
+                                match import_art(Path::new(&view.panels.path)) {
+                                    Ok(a) => {
+                                        if dark {
+                                            view.panels.draft.dark = Some(a);
+                                        } else {
+                                            view.panels.draft.light = Some(a);
+                                        }
+                                        view.panels.error = None;
+                                    }
+                                    Err(e) => view.panels.error = Some(e),
+                                }
+                            }
+                        });
+                    });
                 }
-                if button(ui,view,"panel:reload","Reload saved face") {let latest=editor.state().composites[&id].clone();open(view,id,&latest);}
-                if button(ui,view,"panel:done","Done") { view.panels.selected=None; }
-                if button(ui,view,"panel:remove","Use default face") {
-                    let mut latest=editor.state().composites[&id].clone();latest.panel=None;view.panels.error=composites::set(editor,id,latest).err();
+                if view.panels.draft.light.is_some() || view.panels.draft.dark.is_some() {
+                    let r = ui.add(kit::Button::new(st, "Clear artwork").g4(32.0).ghost());
+                    view.record("panel:clear-art".into(), r.rect);
+                    if r.clicked() {
+                        view.panels.draft.light = None;
+                        view.panels.draft.dark = None;
+                    }
                 }
-            });
-            ui.label("Preview uses applied face. Unplaced controls remain reachable in Public controls. Edit labels/help in instance tools.");
-            if button(ui,view,"panel:export","Export complete package (new file)") {view.panels.error=export(editor,id,Path::new(&view.panels.path)).err();}
-            if button(ui,view,"panel:import-package","Import complete package as new instance") {
-                let result=read_package(Path::new(&view.panels.path)).and_then(|pkg|composites::insert(editor,&pkg));
-                match result {Ok(id)=>view.last_message=Some(format!("Imported independent instance #{id}")),Err(e)=>view.panels.error=Some(e)}
-            }
-        });
+                kit::rule(ui, st);
+                kit::section(ui, st, "Controls and jacks");
+                egui::ScrollArea::vertical()
+                    .max_height((ctx.content_rect().height() - 520.0).clamp(120.0, 260.0))
+                    .show_owned(ui, |ui| {
+                        for (&key, e) in c.controls.iter().chain(&c.ports) {
+                            ui.push_id(key, |ui| {
+                                let placed = view.panels.draft.placements.contains_key(&key);
+                                ui.horizontal(|ui| {
+                                    ui.set_min_height(32.0);
+                                    kit::label(ui, st, Role::Value, Tone::Text3, format!("{key}"));
+                                    let label = view
+                                        .panels
+                                        .labels
+                                        .entry(key)
+                                        .or_insert_with(|| e.label.clone());
+                                    let r = kit::field(ui, st, label, "Label", None, Some(200.0));
+                                    view.record(format!("panel:{key}:label"), r.rect);
+                                    if placed {
+                                        g4::chip_label(ui, st, "placed", true, Some(st.roles.good));
+                                    }
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center),
+                                        |ui| {
+                                            let (k, text) = if placed {
+                                                (format!("panel:unplace:{key}"), "Unplace")
+                                            } else {
+                                                (format!("panel:place:{key}"), "Place")
+                                            };
+                                            let r = ui.add(
+                                                kit::Button::new(st, text)
+                                                    .g4(32.0)
+                                                    .min_width(100.0),
+                                            );
+                                            view.record(k, r.rect);
+                                            if !r.clicked() {
+                                                return;
+                                            }
+                                            if placed {
+                                                view.panels.draft.placements.remove(&key);
+                                                return;
+                                            }
+                                            let kind = if c.ports.contains_key(&key) {
+                                                Kind::Jack
+                                            } else {
+                                                let PortRef::Param { id: leaf, param } = &e.target
+                                                else {
+                                                    return;
+                                                };
+                                                let stepped = registry::info_for(
+                                                    &editor.state().modules[leaf].kind,
+                                                )
+                                                .is_some_and(|i| {
+                                                    i.params.iter().any(|p| {
+                                                        p.name == param && p.taper == Taper::Stepped
+                                                    })
+                                                });
+                                                if stepped {
+                                                    Kind::Selector
+                                                } else {
+                                                    Kind::Knob
+                                                }
+                                            };
+                                            let (w, h) = match kind {
+                                                Kind::Knob => (84.0, 110.0),
+                                                Kind::Selector => (180.0, 55.0),
+                                                Kind::Jack => (64.0, 58.0),
+                                            };
+                                            view.panels.draft.placements.insert(
+                                                key,
+                                                Placement {
+                                                    kind,
+                                                    x: 12.0,
+                                                    y: 72.0,
+                                                    width: w,
+                                                    height: h,
+                                                },
+                                            );
+                                        },
+                                    );
+                                });
+                                if let Some(mut p) = view.panels.draft.placements.get(&key).cloned()
+                                {
+                                    let mut recorded = Vec::new();
+                                    ui.horizontal(|ui| {
+                                        kit::label(
+                                            ui,
+                                            st,
+                                            Role::Caption,
+                                            Tone::Text3,
+                                            format!("{:?}", p.kind),
+                                        );
+                                        for (name, value) in [
+                                            ("x", &mut p.x),
+                                            ("y", &mut p.y),
+                                            ("w", &mut p.width),
+                                            ("h", &mut p.height),
+                                        ] {
+                                            kit::label(ui, st, Role::Caption, Tone::Text3, name);
+                                            let r = num_field(
+                                                ui,
+                                                st,
+                                                &format!("panel-{key}-{name}"),
+                                                value,
+                                                0.0,
+                                                2000.0,
+                                            );
+                                            recorded.push((format!("panel:{key}:{name}"), r.rect));
+                                        }
+                                    });
+                                    for (k, rect) in recorded {
+                                        view.record(k, rect);
+                                    }
+                                    view.panels.draft.placements.insert(key, p);
+                                }
+                            });
+                        }
+                    });
+                kit::paragraph(
+                    ui,
+                    st,
+                    Role::Caption,
+                    Tone::Text3,
+                    "Apply is one project Undo step. Unplaced controls stay reachable in Public controls.",
+                );
+                kit::rule(ui, st);
+                ui.horizontal(|ui| {
+                    ui.set_min_height(32.0);
+                    let r = ui.add(kit::Button::new(st, "Export package…").g4(32.0).ghost());
+                    view.record("panel:export".into(), r.rect);
+                    if r.clicked() {
+                        view.panels.error = export(editor, id, Path::new(&view.panels.path)).err();
+                    }
+                    let r = ui.add(kit::Button::new(st, "Import package…").g4(32.0).ghost());
+                    view.record("panel:import-package".into(), r.rect);
+                    if r.clicked() {
+                        let result = read_package(Path::new(&view.panels.path))
+                            .and_then(|pkg| composites::insert(editor, &pkg));
+                        match result {
+                            Ok(id) => {
+                                view.last_message =
+                                    Some(format!("Imported independent instance #{id}"))
+                            }
+                            Err(e) => view.panels.error = Some(e),
+                        }
+                    }
+                    let r = ui.add(kit::Button::new(st, "Default face").g4(32.0).ghost());
+                    view.record("panel:remove".into(), r.rect);
+                    if r.clicked() {
+                        let mut latest = editor.state().composites[&id].clone();
+                        latest.panel = None;
+                        view.panels.error = composites::set(editor, id, latest).err();
+                    }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let r = ui.add(kit::Button::new(st, "Apply").g4(32.0).primary());
+                        view.record("panel:apply".into(), r.rect);
+                        if r.clicked() {
+                            let mut latest = editor.state().composites[&id].clone();
+                            latest.panel = Some(Box::new(view.panels.draft.clone()));
+                            for (key, label) in &view.panels.labels {
+                                if let Some(e) = latest
+                                    .controls
+                                    .get_mut(key)
+                                    .or_else(|| latest.ports.get_mut(key))
+                                {
+                                    e.label = label.clone();
+                                }
+                            }
+                            view.panels.error = composites::set(editor, id, latest).err();
+                        }
+                        let r = ui.add(kit::Button::new(st, "Reload").g4(32.0));
+                        view.record("panel:reload".into(), r.rect);
+                        if r.clicked() {
+                            let latest = editor.state().composites[&id].clone();
+                            open(view, id, &latest);
+                        }
+                    });
+                });
+            },
+        );
         if !shown {
             view.panels.selected = None;
         }

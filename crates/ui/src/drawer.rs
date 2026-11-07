@@ -91,21 +91,63 @@ pub(crate) fn tabs(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
     });
 }
 
-/// "Seq Pitch": the module's short name and the port, capitalised.
-fn end_label(state: &PatchState, id: ModuleId, port: &str) -> String {
-    let kind = state.modules.get(&id).map_or("?", |m| m.kind.as_str());
-    let name = match routing::short_name(kind) {
-        "?" => registry::info_for(kind).map_or("?", |i| i.name),
-        n => n,
-    };
-    let mut p = port.to_string();
-    if let Some(c) = p.get_mut(0..1) {
-        c.make_ascii_uppercase();
+/// The mockup's list name for a module kind ("Seq", "VA Osc", "SVF"); the registry name for the
+/// rest. Kept apart from `routing::short_name`, which the faces use for their badges.
+fn list_name(kind: &str) -> String {
+    match kind {
+        "seq" => "Seq",
+        "osc.va" => "VA Osc",
+        "filter.svf" => "SVF",
+        "env.adsr" => "ADSR",
+        "mixer" => "Mixer",
+        "delay" => "Delay",
+        "reverb" => "Reverb",
+        "out" => "Output",
+        _ => return registry::info_for(kind).map_or_else(|| "?".into(), |i| i.name.to_string()),
     }
-    format!("{name} {p}")
+    .to_string()
 }
 
-/// One row of the cable list: index, signal colour, source, arrow, destination.
+/// A port name as the list shows it: words capitalised, short filter and CV words upper-case,
+/// a trailing digit split off ("in1" is "In 1").
+fn port_words(port: &str) -> String {
+    let split = port.trim_end_matches(|c: char| c.is_ascii_digit());
+    let digits = &port[split.len()..];
+    let mut words: Vec<String> = split
+        .split(['_', ' '])
+        .filter(|w| !w.is_empty())
+        .map(|w| match w {
+            "cv" | "lp" | "bp" | "hp" | "fm" | "wt" | "cc" => w.to_uppercase(),
+            _ => {
+                let mut c = w.chars();
+                c.next()
+                    .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
+                    .unwrap_or_default()
+            }
+        })
+        .collect();
+    if !digits.is_empty() {
+        words.push(digits.to_string());
+    }
+    words.join(" ")
+}
+
+/// "Seq Pitch": the module's list name and the port.
+fn end_label(state: &PatchState, id: ModuleId, port: &str) -> String {
+    let kind = state.modules.get(&id).map_or("?", |m| m.kind.as_str());
+    format!("{} {}", list_name(kind), port_words(port))
+}
+
+/// The list's medium-weight sans, for names the eye scans (cables and targets).
+fn medium(st: &Style) -> egui::FontId {
+    egui::FontId::new(
+        st.font(Role::Body).size,
+        crate::style::Font::SansMedium.family(st.fonts_ready),
+    )
+}
+
+/// One row of the cable list: index, signal swatch, source, arrow, destination. The selected
+/// row is filled and outlined like a raised card.
 fn cable_row(
     ui: &mut egui::Ui,
     st: &Style,
@@ -123,40 +165,57 @@ fn cable_row(
         resp.hovered(),
         crate::style::Style::secs(st.motion.hover),
     );
-    kit::row_bg(ui, st, rect, selected, hover);
+    let card = rect.shrink2(vec2(st.sp(1), 0.0));
+    if selected {
+        let p = ui.painter();
+        p.rect_filled(card, st.radius(crate::style::Rad::Md), st.roles.raised);
+        p.rect_stroke(
+            card,
+            st.radius(crate::style::Rad::Md),
+            egui::Stroke::new(1.0, st.roles.line),
+            egui::StrokeKind::Inside,
+        );
+    } else {
+        kit::row_bg(ui, st, card, false, hover);
+    }
     let p = ui.painter();
     let ink = |t: Tone| kit::tone(st, t);
-    let font = st.font(Role::Caption);
     let mid = rect.center().y;
-    let x0 = rect.left() + st.sp(2);
+    let x0 = card.left() + st.sp(1) + st.sp(1) / 2.0;
     p.text(
         pos2(x0, mid),
         egui::Align2::LEFT_CENTER,
         format!("{id:02}"),
-        font.clone(),
+        st.font(Role::Value),
         ink(Tone::Text3),
     );
-    let sw = Rect::from_center_size(
-        pos2(x0 + st.sp(5) + st.sp(4) / 2.0, mid),
-        vec2(st.sp(4), st.sp(1) / 2.0),
+    let sw = Rect::from_min_size(
+        pos2(x0 + st.sp(5) - st.sp(1), mid - 2.0),
+        vec2(st.sp(4), 4.0),
     );
-    p.rect_filled(sw, 1.0, port_color(th, editor, &c.from));
-    let src_x = x0 + st.sp(5) + st.sp(4) + st.sp(2);
-    let half = (rect.right() - src_x - st.sp(2)) / 2.0;
+    p.rect_filled(sw, 2.0, port_color(th, editor, &c.from));
     let (PortRef::Module { id: fi, port: fp }, PortRef::Module { id: ti, port: tp }) =
         (&c.from, &c.to)
     else {
         return resp;
     };
-    let src = kit::fit_text(ui, st, &end_label(state, *fi, fp), half - st.sp(3));
+    let src_x = sw.right() + st.sp(2);
+    let dst_x = card.left() + card.width() * 0.62;
+    let arrow_x = dst_x - st.sp(2) - st.sp(1) / 2.0;
+    let src = kit::fit_text(
+        ui,
+        st,
+        &end_label(state, *fi, fp),
+        arrow_x - st.sp(2) - src_x,
+    );
     let dst = kit::fit_text(
         ui,
         st,
         &end_label(state, *ti, tp),
-        half - st.sp(3) - st.sp(1),
+        card.right() - st.sp(1) - dst_x,
     );
     let p = ui.painter();
-    let font = st.font(Role::Body);
+    let font = medium(st);
     p.text(
         pos2(src_x, mid),
         egui::Align2::LEFT_CENTER,
@@ -165,14 +224,14 @@ fn cable_row(
         ink(Tone::Text),
     );
     p.text(
-        pos2(src_x + half, mid),
-        egui::Align2::LEFT_CENTER,
+        pos2(arrow_x, mid),
+        egui::Align2::CENTER_CENTER,
         "→",
-        font.clone(),
+        st.font(Role::Body),
         ink(Tone::Text3),
     );
     p.text(
-        pos2(src_x + half + st.sp(3), mid),
+        pos2(dst_x, mid),
         egui::Align2::LEFT_CENTER,
         dst,
         font,
@@ -239,47 +298,76 @@ pub(crate) fn lists(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui:
             || param.clone(),
             |p| {
                 let kind = state.modules.get(ti).map_or("?", |m| m.kind.as_str());
-                format!("{} {}", routing::short_name(kind), routing::target_label(p))
+                format!("{} {}", list_name(kind), routing::target_label(p))
             },
         );
-        let source = routing::source_label(state, *fi, fp);
-        ui.horizontal(|ui| {
-            kit::tag(ui, st, &source, port_color(&th, editor, &c.from));
-            let (rect, _) = ui.allocate_exact_size(
-                vec2(ui.available_width(), st.metrics.control_h),
-                Sense::hover(),
-            );
-            let bar_w = st.sp(6);
-            let pct = format!("{:+.0} %", amount * 100.0);
-            let p = ui.painter();
-            let mid = rect.center().y;
-            let track = Rect::from_center_size(
-                pos2(rect.right() - st.sp(7) - st.sp(1) - bar_w / 2.0, mid),
-                vec2(bar_w, st.sp(1)),
-            );
-            p.rect_filled(track, 1.0, st.roles.inset);
-            let fill = Rect::from_min_size(
-                track.min,
-                vec2(bar_w * amount.abs().min(1.0), track.height()),
-            );
-            p.rect_filled(fill, 1.0, st.roles.accent);
-            p.text(
-                pos2(rect.right(), mid),
-                egui::Align2::RIGHT_CENTER,
-                pct,
-                st.font(Role::Value),
-                kit::tone(st, Tone::Text2),
-            );
-            let w = track.left() - rect.left() - st.sp(2);
-            let text = kit::fit_text(ui, st, &target, w);
-            ui.painter().text(
-                pos2(rect.left() + st.sp(1), mid),
-                egui::Align2::LEFT_CENTER,
-                text,
-                st.font(Role::Body),
-                kit::tone(st, Tone::Text),
-            );
+        let source = crate::macro_name(state, *fi, fp).unwrap_or_else(|| {
+            if fp == "out" {
+                list_name(state.modules.get(fi).map_or("?", |m| m.kind.as_str()))
+            } else {
+                end_label(state, *fi, fp)
+            }
         });
+        let (rect, _) = ui.allocate_exact_size(
+            vec2(ui.available_width(), st.metrics.row_h - st.sp(1)),
+            Sense::hover(),
+        );
+        let mid = rect.center().y;
+        let chip_font = egui::FontId::new(
+            st.font(Role::Caption).size,
+            crate::style::Font::SansSemibold.family(st.fonts_ready),
+        );
+        let chip_text = kit::fit_text(ui, st, &source, st.sp(12));
+        let tw = ui
+            .painter()
+            .layout_no_wrap(
+                chip_text.clone(),
+                chip_font.clone(),
+                kit::tone(st, Tone::Text),
+            )
+            .size()
+            .x;
+        let chip = Rect::from_min_size(
+            pos2(rect.left() + st.sp(2), mid - 10.0),
+            vec2((tw + st.sp(3)).max(44.0), 20.0),
+        );
+        let pct = format!("{:+.0} %", amount * 100.0).replace('-', "\u{2212}");
+        let p = ui.painter();
+        p.rect_filled(chip, 10.0, st.roles.inset);
+        p.text(
+            chip.center(),
+            egui::Align2::CENTER_CENTER,
+            chip_text,
+            chip_font,
+            kit::tone(st, Tone::Text),
+        );
+        let amount_right = rect.right() - st.sp(2);
+        let track = Rect::from_min_size(
+            pos2(amount_right - 40.0 - st.sp(8), mid - 2.0),
+            vec2(40.0, 4.0),
+        );
+        p.rect_filled(track, 2.0, st.roles.inset);
+        p.rect_filled(
+            Rect::from_min_size(track.min, vec2(40.0 * amount.abs().min(1.0), 4.0)),
+            2.0,
+            th.cv,
+        );
+        p.text(
+            pos2(amount_right, mid),
+            egui::Align2::RIGHT_CENTER,
+            pct,
+            st.font(Role::Value),
+            kit::tone(st, Tone::Text2),
+        );
+        let tx = chip.right() + st.sp(2);
+        let text = kit::fit_text(ui, st, &target, track.left() - tx - st.sp(2));
+        ui.painter().text(
+            pos2(tx, mid),
+            egui::Align2::LEFT_CENTER,
+            text,
+            st.font(Role::Body),
+            kit::tone(st, Tone::Text),
+        );
     }
 }
 
