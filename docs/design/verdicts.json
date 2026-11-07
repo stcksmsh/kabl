@@ -214,6 +214,78 @@
       "item": "Sounds category mapping: the mockup's categories",
       "verdict": "approve",
       "note": "Kosta accepted the mockup's category list for the Sounds library column. PR #88"
+    },
+    {
+      "date": "2026-11-07",
+      "item": "D11 decision 1: engine wasmi only, behind a WasmEngine trait",
+      "verdict": "approve",
+      "note": "Gate first: real kernel (biquad + 1-sample feedback), 64-sample blocks, 16 voices, release; report us/block/voice and % of block at 48 kHz. Over the item-5 budget: stop and report, do not add wasmtime. CompilationMode::Eager, compile off the audio thread. No JIT because a plug-in cannot grant itself JIT permission on macOS."
+    },
+    {
+      "date": "2026-11-07",
+      "item": "D11 decision 2: .wasm embedded in the .kabl",
+      "verdict": "approve",
+      "note": "SHA-256 hash + module id + version per blob, instances reference the hash; 2 MiB cap per blob; no host imports except kabl's ABI, no WASI; one-time Open/Cancel notice per content hash."
+    },
+    {
+      "date": "2026-11-07",
+      "item": "D11 decision 3: one instance per voice",
+      "verdict": "approve",
+      "note": "Own linear memory; StoreLimits 4 MiB, over cap = crash; pre-built pool sized to max voices, rebuilt off-thread; never instantiate on the audio thread."
+    },
+    {
+      "date": "2026-11-07",
+      "item": "D11 decision 4: crash handling",
+      "verdict": "approve",
+      "note": "Trap, OOM or NaN/Inf output: fade to zero over ~5 ms then silence, warning badge plus toast; crash in any voice disables the module in all voices; stays off until reset or reload, no auto retry."
+    },
+    {
+      "date": "2026-11-07",
+      "item": "D11 decision 5: time limit via fuel",
+      "verdict": "approve",
+      "note": "Calibrate fuel per us at startup and on device change; 25 % of block per module, 50 % for all custom modules together (scaled proportionally); out of fuel = silent block; 8 consecutive overruns = crash. [verify] fuel overhead on vs off."
+    },
+    {
+      "date": "2026-11-07",
+      "item": "D11 decision 6: Faust optional, cut first",
+      "verdict": "approve",
+      "note": "One optional PR: a Faust effect compiled to WASM through a thin adapter, as a test of ABI generality."
+    },
+    {
+      "date": "2026-11-07",
+      "item": "D11 decision 7: module version changes",
+      "verdict": "approve",
+      "note": "v3 patch opened with v4: defaults plus a notice; keep the old state blob in the patch so reopening with v3 restores it; D12 may add migrate(old_version, state)."
+    },
+    {
+      "date": "2026-11-07",
+      "item": "D11 decision 8: ABI v0 is per block",
+      "verdict": "approve",
+      "note": "One call per block; buffers in module linear memory, kabl copies in/out; params in a shared array written by kabl, modulation and smoothing host-side; exports init, process, reset, optional state_save/state_load; D12 freezes it."
+    },
+    {
+      "date": "2026-11-07",
+      "item": "D11 decision 9: nothing allocates on the audio thread",
+      "verdict": "approve",
+      "note": "Compile, instantiate, grow memory, load state all off-thread; memory.grow in process traps; debug assertion on allocation inside the audio callback."
+    },
+    {
+      "date": "2026-11-07",
+      "item": "D11 decision 10: denormals",
+      "verdict": "approve",
+      "note": "[verify] decaying feedback loop into silence, flush-to-zero on vs off; if slow, DC offset or module-side fix documented for D12."
+    },
+    {
+      "date": "2026-11-07",
+      "item": "D11 follow-up: flush-to-zero engine-wide (option a)",
+      "verdict": "approve",
+      "note": "RAII guard at audio-callback entry/exit, standalone and CLAP: FTZ+DAZ (x86 MXCSR) / FZ (aarch64 FPCR) via inline asm, restore previous state on exit; not _mm_setcsr (deprecated, FP-env changes are UB in Rust). Before re-recording golden hashes render every golden patch FTZ off vs on and report max |diff| per patch, accept at -140 dBFS or lower, else stop. Test self-oscillating patches still start; remove per-module denormal workarounds only after that. Separate PR (agent 2)."
+    },
+    {
+      "date": "2026-11-07",
+      "item": "D11 follow-up: fuel calibration rules",
+      "verdict": "approve",
+      "note": "Calibrate with the slowest fuel-per-us code mix so the fuel budget never exceeds the time cap; wall-clock backstop times each process() call and over the per-module cap counts as an overrun even with fuel left (8 in a row = crash); report calibration values on the dev machine and inside REAPER."
     }
   ]
 }
