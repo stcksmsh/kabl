@@ -4,6 +4,7 @@
 //! relocated from engine to modules".
 
 pub mod builtins;
+pub mod code;
 pub mod dsp;
 mod fmdsp;
 pub mod info;
