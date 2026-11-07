@@ -162,7 +162,7 @@ pub fn create(kind: &str) -> Option<Box<dyn Module>> {
         "drum.tom" => Box::new(Tom::new()),
         "midi.note" => Box::new(MidiNote::new()),
         "drum.grid" => Box::new(DrumGrid::new()),
-        _ => return None,
+        _ => return crate::code::create(kind),
     })
 }
 
@@ -231,7 +231,11 @@ pub fn all_infos() -> &'static [&'static ModuleInfo] {
 /// Metadata for one kind, or `None` if unknown — for looking up ports/params without building an
 /// instance (e.g. to validate a patch op before applying it).
 pub fn info_for(kind: &str) -> Option<&'static ModuleInfo> {
-    all_infos().iter().copied().find(|info| info.kind == kind)
+    all_infos()
+        .iter()
+        .copied()
+        .find(|info| info.kind == kind)
+        .or_else(|| crate::code::info_for(kind))
 }
 
 /// The stored name an older patch used for `param` of `kind`, if it differs. Only the mixer's
