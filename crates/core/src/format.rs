@@ -147,7 +147,8 @@ pub fn write_kabl<W: Write>(mut w: W, log: &PatchLog) -> Result<(), FormatError>
     let mut enc = zstd::stream::write::Encoder::new(w, KABL_ZSTD_LEVEL)?;
     enc.include_checksum(true)?;
     enc.write_all(lines.as_bytes())?;
-    enc.finish()?;
+    // The writer comes back so a buffered writer's flush error is not lost in its drop.
+    enc.finish()?.flush()?;
     Ok(())
 }
 
@@ -206,6 +207,16 @@ pub fn save_kabl(path: &Path, log: &PatchLog) -> Result<(), FormatError> {
         write_kabl(io::BufWriter::new(&mut f), log)?;
         f.sync_all()?;
         fs::rename(&tmp, path)?;
+        // So the rename survives a power loss.
+        #[cfg(unix)]
+        if let Some(dir) = path.parent() {
+            fs::File::open(if dir.as_os_str().is_empty() {
+                Path::new(".")
+            } else {
+                dir
+            })?
+            .sync_all()?;
+        }
         Ok(())
     })();
     if result.is_err() {

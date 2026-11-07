@@ -68,6 +68,26 @@ fn save_and_load_use_a_path_and_leave_no_tmp() {
     assert!(!dir.path().join("a.kabl.tmp").exists());
 }
 
+/// Accepts every write, fails on flush: what a full disk does to a buffered writer.
+struct FailsOnFlush;
+impl std::io::Write for FailsOnFlush {
+    fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
+        Ok(b.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Err(std::io::Error::other("disk full"))
+    }
+}
+
+#[test]
+fn a_failed_flush_fails_the_write() {
+    let (log, _) = one();
+    assert!(matches!(
+        format::write_kabl(FailsOnFlush, &log),
+        Err(FormatError::Io(_))
+    ));
+}
+
 fn err(b: &[u8]) -> FormatError {
     format::read_kabl(b).expect_err("must be refused")
 }
