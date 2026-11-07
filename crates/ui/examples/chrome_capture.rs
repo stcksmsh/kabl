@@ -286,7 +286,7 @@ impl App {
         ui.meter.max_db = Some(-9.4);
         ui.midi_input = Some("KeyStep".into());
         ui.library = Some(Library::open(
-            Some(patches()),
+            Some(kabl_ui::library::built_factory_dir()),
             self._user.path().to_path_buf(),
         ));
         // The file browser's Sounds place needs the user's sounds folder.
@@ -1029,7 +1029,7 @@ fn file_tree() {
     let home = std::env::temp_dir().join("kabl-capture-home");
     let patches = std::env::temp_dir().join(PATCHES);
     std::fs::create_dir_all(patches.with_file_name("empty-set")).unwrap();
-    // Real folders, then patches (a folder with meta.toml) with the mockup's dates (UTC).
+    // Real folders, then `.kabl` patch files with the mockup's dates (UTC).
     for name in ["composition-batch", "cue-macros", "effects"] {
         std::fs::create_dir_all(patches.join(name)).unwrap();
     }
@@ -1040,18 +1040,11 @@ fn file_tree() {
         ("slab-city", 1_793_360_820),
         ("warm-pad", 1_793_179_800),
     ] {
-        let d = patches.join(name);
-        std::fs::create_dir_all(&d).unwrap();
-        std::fs::write(d.join("meta.toml"), "schema_version = 8\n").unwrap();
+        let f = patches.join(format!("{name}.kabl"));
+        kabl_core::format::save_kabl(&f, &kabl_core::PatchLog::new()).unwrap();
         let t = std::time::UNIX_EPOCH + std::time::Duration::from_secs(at);
-        let _ = std::fs::File::open(&d).and_then(|f| f.set_modified(t));
+        let _ = std::fs::File::open(&f).and_then(|f| f.set_modified(t));
     }
-    // A real .kabl file beside the legacy folders.
-    let lead = patches.join("pluck-lead.kabl");
-    let log = kabl_core::PatchLog::new();
-    kabl_core::format::save_kabl(&lead, &log).unwrap();
-    let t = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_793_700_000);
-    let _ = std::fs::File::open(&lead).and_then(|f| f.set_modified(t));
     std::env::set_var("HOME", &home);
 }
 

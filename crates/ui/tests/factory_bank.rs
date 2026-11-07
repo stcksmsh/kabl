@@ -72,7 +72,10 @@ fn purpose_filters_preserve_legacy_metadata_and_user_saves() {
     assert!(legacy.in_category("Bass"));
     assert!(!legacy.in_category("Sounds"));
     let tmp = tempfile::tempdir().unwrap();
-    let mut lib = Library::open(Some(root()), tmp.path().into());
+    let mut lib = Library::open(
+        Some(kabl_ui::library::built_factory_dir()),
+        tmp.path().into(),
+    );
     let keys = lib.get("factory:palette/keys").unwrap().clone();
     assert!(keys.matches("sounds pluck bright"));
     assert!(!keys.matches("sequences"));
@@ -123,10 +126,11 @@ fn purpose_filters_preserve_legacy_metadata_and_user_saves() {
             .count(),
         1
     );
-    let user_dir = lib.get(&user).unwrap().dir.clone();
-    std::fs::write(
-        user_dir.join("sound.toml"),
-        "name='Legacy keys'\ncategory='Keys'",
+    let user_file = lib.get(&user).unwrap().dir.clone();
+    kabl_core::format::save_kabl_meta(
+        &user_file,
+        &kabl_core::format::load_kabl(&user_file).unwrap(),
+        Some("name='Legacy keys'\ncategory='Keys'"),
     )
     .unwrap();
     lib.rescan();
@@ -138,7 +142,10 @@ fn purpose_filters_preserve_legacy_metadata_and_user_saves() {
 fn every_entry_opens_stopped_has_real_controls_and_recalls_complete_state() {
     let tmp = tempfile::tempdir().unwrap();
     let mut ui = UiState::default();
-    ui.library = Some(Library::open(Some(root()), tmp.path().into()));
+    ui.library = Some(Library::open(
+        Some(kabl_ui::library::built_factory_dir()),
+        tmp.path().into(),
+    ));
     let mut editor = PatchEditor::new();
     for (dir, _, _, _) in bank::INVENTORY {
         browser::perform(

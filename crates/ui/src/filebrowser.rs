@@ -34,7 +34,7 @@ pub struct Spec {
     pub exts: &'static [&'static str],
     /// What the files are called in the empty-folder message.
     pub what: &'static str,
-    /// A folder with a `meta.toml` is a patch: listed as a `name.kabl` file, picked whole.
+    /// Lists `.kabl` files as patches (picked whole); folders are only folders.
     pub patches: bool,
 }
 
@@ -122,7 +122,7 @@ impl Purpose {
 struct Entry {
     name: String,
     dir: bool,
-    /// A patch folder: shown as a `.kabl` file, not entered.
+    /// A `.kabl` patch file.
     patch: bool,
     /// Seconds since 1970 of the last change, when the system says.
     modified: Option<u64>,
@@ -881,12 +881,7 @@ fn row(ui: &mut egui::Ui, st: &Style, e: &Entry, selected: bool, date_x: f32) ->
         pos2(rect.left() + 36.0, rect.top()),
         pos2((date_x - 16.0).max(rect.left() + 56.0), rect.bottom()),
     );
-    let shown = if e.patch && !e.name.to_lowercase().ends_with(".kabl") {
-        format!("{}.kabl", e.name)
-    } else {
-        e.name.clone()
-    };
-    let g = p.layout_no_wrap(shown, font, r.text);
+    let g = p.layout_no_wrap(e.name.clone(), font, r.text);
     p.with_clip_rect(clip)
         .galley(pos2(clip.left(), cy - g.size().y / 2.0), g, r.text);
     if let Some(secs) = e.modified.filter(|_| !folder) {
@@ -947,14 +942,12 @@ fn list(dir: &Path, spec: Spec, folders_only: bool) -> Listing {
         let Ok(meta) = std::fs::metadata(entry.path()) else {
             continue;
         };
-        let patch_dir = spec.patches && meta.is_dir() && entry.path().join("meta.toml").is_file();
-        // A real `.kabl` file is a patch too, listed as it is.
-        let patch_file = spec.patches
+        // A patch is a `.kabl` file; a folder is only a folder, whatever is inside it.
+        let patch = spec.patches
             && !folders_only
             && meta.is_file()
             && crate::library::is_kabl_path(Path::new(&name));
-        let patch = patch_dir || patch_file;
-        let wanted = patch_file
+        let wanted = patch
             || (!folders_only
                 && meta.is_file()
                 && Path::new(&name).extension().is_some_and(|e| {
@@ -980,15 +973,6 @@ fn list(dir: &Path, spec: Spec, folders_only: bool) -> Listing {
             });
         }
     }
-    // A legacy patch folder `x` is listed as `x.kabl`; a real `x.kabl` beside it replaces it.
-    let files: std::collections::HashSet<String> = rows
-        .iter()
-        .filter(|e| e.patch && !e.dir)
-        .map(|e| e.name.to_lowercase())
-        .collect();
-    rows.retain(|e| {
-        !(e.patch && e.dir && files.contains(&format!("{}.kabl", e.name.to_lowercase())))
-    });
     // Real folders first, then files and patches.
     rows.sort_by_key(|e| (!e.dir || e.patch, e.name.to_lowercase()));
     Ok((rows, cut))
@@ -1062,7 +1046,7 @@ pub fn show_recent_for_capture(ui_state: &mut UiState, paths: &[PathBuf]) {
             name: p
                 .file_name()
                 .map_or(String::new(), |n| n.to_string_lossy().into_owned()),
-            dir: true,
+            dir: p.is_dir(),
             patch: true,
             modified: std::fs::metadata(p)
                 .and_then(|m| m.modified())

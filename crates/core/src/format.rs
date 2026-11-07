@@ -135,10 +135,29 @@ pub const KABL_DICT_1: &[u8] = include_bytes!("../assets/kabl-dict-1.zstdict");
 /// The dictionary id `write_kabl` writes.
 pub const KABL_DICT_ID: u32 = 1;
 
+/// Skippable frame (after the header) that carries a sound's `sound.toml` text. Optional: a file
+/// without it (every file before it existed) reads as no metadata, and an older reader skips it
+/// as it skips any skippable frame, so the container version stays 1.
+const SKIPPABLE_META: u32 = 0x184D_2A51;
+/// Cap on the metadata text.
+const MAX_META_BYTES: usize = 1024 * 1024;
+
 /// Write `log` as a `.kabl` file: a skippable header frame (`KABL`, container version, schema
 /// version, dictionary id 1) and one zstd level-19 frame using dictionary 1, with a content checksum, holding the
 /// log as JSON lines (`inverse` kept). The checkpoint is not stored; load replays the log.
-pub fn write_kabl<W: Write>(mut w: W, log: &PatchLog) -> Result<(), FormatError> {
+pub fn write_kabl<W: Write>(w: W, log: &PatchLog) -> Result<(), FormatError> {
+    write_kabl_meta(w, log, None)
+}
+
+/// [`write_kabl`] with a sound's metadata (`sound.toml` text) in its own skippable frame.
+pub fn write_kabl_meta<W: Write>(
+    mut w: W,
+    log: &PatchLog,
+    meta: Option<&str>,
+) -> Result<(), FormatError> {
+    if meta.is_some_and(|m| m.len() > MAX_META_BYTES) {
+        return Err(FormatError::TooLarge(MAX_META_BYTES));
+    }
     let mut lines = String::new();
     for entry in log.entries() {
         lines.push_str(&serde_json::to_string(entry)?);
@@ -150,6 +169,11 @@ pub fn write_kabl<W: Write>(mut w: W, log: &PatchLog) -> Result<(), FormatError>
     w.write_all(&KABL_CONTAINER_VERSION.to_le_bytes())?;
     w.write_all(&(CURRENT_SCHEMA_VERSION as u16).to_le_bytes())?;
     w.write_all(&KABL_DICT_ID.to_le_bytes())?;
+    if let Some(m) = meta {
+        w.write_all(&SKIPPABLE_META.to_le_bytes())?;
+        w.write_all(&(m.len() as u32).to_le_bytes())?;
+        w.write_all(m.as_bytes())?;
+    }
     let mut enc = zstd::stream::write::Encoder::with_dictionary(w, KABL_ZSTD_LEVEL, KABL_DICT_1)?;
     enc.include_checksum(true)?;
     enc.write_all(lines.as_bytes())?;
@@ -167,6 +191,18 @@ pub fn read_kabl<R: Read>(r: R) -> Result<PatchLog, FormatError> {
 
 /// [`read_kabl`] with an explicit cap on the encoded and the decoded size.
 pub fn read_kabl_limited<R: Read>(r: R, max: usize) -> Result<PatchLog, FormatError> {
+    read_kabl_meta_limited(r, max).map(|(log, _)| log)
+}
+
+/// [`read_kabl`] that also returns the metadata frame's text, when the file has one.
+pub fn read_kabl_meta<R: Read>(r: R) -> Result<(PatchLog, Option<String>), FormatError> {
+    read_kabl_meta_limited(r, MAX_KABL_BYTES)
+}
+
+fn read_kabl_meta_limited<R: Read>(
+    r: R,
+    max: usize,
+) -> Result<(PatchLog, Option<String>), FormatError> {
     let mut bytes = Vec::new();
     r.take(max as u64 + 1).read_to_end(&mut bytes)?;
     if bytes.len() > max {
@@ -193,8 +229,20 @@ pub fn read_kabl_limited<R: Read>(r: R, max: usize) -> Result<PatchLog, FormatEr
         other => return Err(FormatError::UnknownDictionary(other)),
     };
     let corrupt = |e: io::Error| FormatError::Corrupt(e.to_string());
-    let mut dec =
-        zstd::stream::read::Decoder::with_dictionary(&bytes[20..], dict).map_err(corrupt)?;
+    let mut body = &bytes[20..];
+    let mut meta = None;
+    if body.len() >= 8 && body[..4] == SKIPPABLE_META.to_le_bytes() {
+        let n = u32::from_le_bytes(body[4..8].try_into().unwrap()) as usize;
+        let text = body
+            .get(8..8usize.saturating_add(n))
+            .filter(|_| n <= MAX_META_BYTES)
+            .ok_or_else(|| FormatError::Corrupt("metadata frame is cut or too large".into()))?;
+        meta = Some(
+            String::from_utf8(text.to_vec()).map_err(|e| FormatError::Corrupt(e.to_string()))?,
+        );
+        body = &body[8 + n..];
+    }
+    let mut dec = zstd::stream::read::Decoder::with_dictionary(body, dict).map_err(corrupt)?;
     let mut text = Vec::new();
     // One byte past the cap tells a bomb from a log that fits exactly.
     (&mut dec)
@@ -205,17 +253,22 @@ pub fn read_kabl_limited<R: Read>(r: R, max: usize) -> Result<PatchLog, FormatEr
         return Err(FormatError::TooLarge(max));
     }
     let text = String::from_utf8(text).map_err(|e| FormatError::Corrupt(e.to_string()))?;
-    replay(schema, &text)
+    Ok((replay(schema, &text)?, meta))
 }
 
 /// Save `log` to `path` (`name.kabl`): write `name.kabl.tmp`, fsync, then rename over `path`.
 pub fn save_kabl(path: &Path, log: &PatchLog) -> Result<(), FormatError> {
+    save_kabl_meta(path, log, None)
+}
+
+/// [`save_kabl`] with a sound's metadata (`sound.toml` text).
+pub fn save_kabl_meta(path: &Path, log: &PatchLog, meta: Option<&str>) -> Result<(), FormatError> {
     let mut tmp = path.as_os_str().to_owned();
     tmp.push(".tmp");
     let tmp = PathBuf::from(tmp);
     let result = (|| {
         let mut f = fs::File::create(&tmp)?;
-        write_kabl(io::BufWriter::new(&mut f), log)?;
+        write_kabl_meta(io::BufWriter::new(&mut f), log, meta)?;
         f.sync_all()?;
         fs::rename(&tmp, path)?;
         // So the rename survives a power loss.
@@ -239,4 +292,41 @@ pub fn save_kabl(path: &Path, log: &PatchLog) -> Result<(), FormatError> {
 /// Load a `.kabl` file by replaying its log.
 pub fn load_kabl(path: &Path) -> Result<PatchLog, FormatError> {
     read_kabl(fs::File::open(path)?)
+}
+
+/// [`load_kabl`] that also returns the metadata text, when the file has it.
+pub fn load_kabl_meta(path: &Path) -> Result<(PatchLog, Option<String>), FormatError> {
+    read_kabl_meta(fs::File::open(path)?)
+}
+
+/// Pack a patch folder (`meta.toml`, `log.jsonl`, and `sound.toml` when present) into one
+/// `.kabl` file at `out`. The one packer behind `kabl pack`, the build's factory packing and
+/// the packaging script.
+pub fn pack_dir(dir: &Path, out: &Path) -> Result<(), FormatError> {
+    let log = load(dir)?;
+    let meta = fs::read_to_string(dir.join("sound.toml")).ok();
+    save_kabl_meta(out, &log, meta.as_deref())
+}
+
+/// Pack every patch folder under `src` (a folder holding `meta.toml`) into `dst`, keeping the
+/// relative layout: `src/a/b` becomes `dst/a/b.kabl`. Returns how many it packed.
+pub fn pack_tree(src: &Path, dst: &Path) -> Result<usize, FormatError> {
+    let mut n = 0;
+    for e in fs::read_dir(src)?.flatten() {
+        let p = e.path();
+        if !p.is_dir() {
+            continue;
+        }
+        let name = e.file_name();
+        if p.join("meta.toml").is_file() {
+            fs::create_dir_all(dst)?;
+            let mut out = dst.join(&name).into_os_string();
+            out.push(".kabl");
+            pack_dir(&p, Path::new(&out))?;
+            n += 1;
+        } else {
+            n += pack_tree(&p, &dst.join(&name))?;
+        }
+    }
+    Ok(n)
 }

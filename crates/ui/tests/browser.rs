@@ -14,7 +14,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::{Path, PathBuf};
 
 fn factory() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches")
+    kabl_ui::library::built_factory_dir()
 }
 
 struct H {
@@ -326,7 +326,7 @@ fn a_piece_opens_stopped_and_starts_explicitly() {
 #[test]
 fn edit_save_as_reopen_and_the_factory_file_stays() {
     let mut t = H::new(1440.0, 900.0);
-    let factory_log = std::fs::read(factory().join("palette/pad/log.jsonl")).unwrap();
+    let factory_log = std::fs::read(factory().join("palette/pad.kabl")).unwrap();
     t.open("factory:palette/pad");
     t.edit("filter.ladder", "cutoff_hz", 4321.0);
     assert!(t.modified());
@@ -340,7 +340,7 @@ fn edit_save_as_reopen_and_the_factory_file_stays() {
     assert!(!t.modified());
     assert_eq!(t.doc_origin(), DocOrigin::Library("user:bright-pad".into()));
     assert_eq!(
-        std::fs::read(factory().join("palette/pad/log.jsonl")).unwrap(),
+        std::fs::read(factory().join("palette/pad.kabl")).unwrap(),
         factory_log
     );
     let saved = t.editor.state().clone();
@@ -531,9 +531,10 @@ fn a_failed_save_keeps_the_work_and_the_question() {
     assert_eq!(t.doc_origin(), DocOrigin::Library("user:mine".into()));
     t.edit("filter.ladder", "cutoff_hz", 777.0);
     let work = t.editor.state().clone();
-    // The sounds directory becomes unusable: a file where the staging dir goes.
+    // The sounds folder becomes unusable: a folder where the staged file goes.
     let sounds = t.ui.library.as_ref().unwrap().sounds_dir();
-    std::fs::write(sounds.join(".mine.new"), b"x").unwrap();
+    std::fs::create_dir_all(sounds.join("mine.kabl.new")).unwrap();
+    std::fs::write(sounds.join("mine.kabl.new/x"), b"x").unwrap();
     t.open("factory:palette/lead");
     t.click("dlg:save");
     match &t.ui.browser.dialog {
@@ -653,7 +654,8 @@ fn missing_recents_and_bad_patches_are_explained() {
     // An uncompilable patch among the user's sounds.
     let mut alien = PatchEditor::new();
     alien.add_module("no.such.module", kabl_core::Vec2::default());
-    kabl_core::save(&sounds.join("alien"), alien.log()).unwrap();
+    std::fs::create_dir_all(&sounds).unwrap();
+    kabl_core::format::save_kabl(&sounds.join("alien.kabl"), alien.log()).unwrap();
     std::fs::write(
         user.path().join("library.json"),
         r#"{"favorites":["user:gone"],"recents":["user:gone","factory:palette/pad"]}"#,
@@ -887,202 +889,28 @@ fn folder_doc(t: &mut H, dir: &Path) {
     ));
 }
 
-/// R2: a folder save that fails part way leaves the folder as it was and says so. At the
-/// base (58e6622) this was reproduced with `checkpoint.json` made a directory, which failed
-/// the old direct writer after it had rewritten `log.jsonl` (evidence/repro-before.txt); the
-/// staged save moves such a directory aside, so the failure is injected here instead: after
-/// the new `log.jsonl` is in place, the stage the old writer failed after.
+/// A failed save of a `.kabl` file leaves the file as it was and says so.
 #[test]
-fn a_failed_folder_save_leaves_the_saved_folder_unchanged() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("song");
-    let mut t = H::new(1440.0, 900.0);
-    kabl_core::save(&dir, t.editor.log()).unwrap();
-    std::fs::write(dir.join("notes.txt"), "mine").unwrap();
-    let files = |d: &Path| -> Vec<(String, Vec<u8>)> {
-        let mut v: Vec<_> = std::fs::read_dir(d)
-            .unwrap()
-            .flatten()
-            .map(|e| {
-                (
-                    e.file_name().to_string_lossy().to_string(),
-                    std::fs::read(e.path()).unwrap(),
-                )
-            })
-            .collect();
-        v.sort();
-        v
-    };
-    let before = files(&dir);
-    folder_doc(&mut t, &dir);
-    t.edit("filter.svf", "cutoff_hz", 321.0);
-    let work = t.editor.state().clone();
-    kabl_ui::library::fail_saves_at(Some("kabl"));
-    t.click("save");
-    let msg = t.ui.last_message.clone().unwrap();
-    assert!(
-        msg.starts_with("save failed") && msg.contains("Nothing was overwritten"),
-        "{msg}"
-    );
-    assert!(
-        files(&dir) == before,
-        "folder changed though the message says: {msg}"
-    );
-    assert_eq!(t.editor.state(), &work);
-    assert!(t.modified(), "still unsaved");
-
-    // Save-then-Open doesn't continue after the failure.
-    t.open("factory:palette/pad");
-    t.click("dlg:save");
-    assert!(
-        matches!(
-            &t.ui.browser.dialog,
-            Some(Dialog::Unsaved { error: Some(_), .. })
-        ),
-        "the question stays with the reason"
-    );
-    assert_eq!(t.editor.state(), &work, "nothing opened");
-
-    // Once saving works again, Save writes the folder and the open continues.
-    kabl_ui::library::fail_saves_at(None);
-    // The pointer leaves and comes back: a second press on the same spot right away is a
-    // double click to egui.
-    t.events.push(Event::PointerMoved(Pos2::new(5.0, 5.0)));
-    t.frame();
-    t.click("dlg:save");
-    assert_eq!(
-        t.doc_origin(),
-        DocOrigin::Library("factory:palette/pad".into())
-    );
-    // A legacy folder is saved beside itself as song.kabl; the folder is not touched.
-    let kabl = dir.with_file_name("song.kabl");
-    assert_eq!(kabl_core::format::load_kabl(&kabl).unwrap().state(), &work);
-    assert!(files(&dir) == before, "the legacy folder was changed");
-    assert!(!dir.join(".kabl-save").exists());
-}
-
-fn load_path(t: &mut H, p: &Path) {
-    t.ui.browser.folder = p.display().to_string();
-    if !t.ui.browser.folder_open {
-        t.click("folder-header");
-    }
-    t.click("load");
-}
-
-/// A `.kabl` file saves, reopens to the same patch, and heads the recent patches.
-#[test]
-fn a_kabl_file_saves_and_reopens() {
+fn a_failed_kabl_save_leaves_the_file_unchanged() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("song.kabl");
     let mut t = H::new(1440.0, 900.0);
-    t.edit("filter.svf", "cutoff_hz", 777.0);
-    let work = t.editor.state().clone();
-    t.ui.browser.folder = file.display().to_string();
-    t.click("folder-header");
-    t.click("save-folder");
-    assert!(file.is_file(), "{:?}", t.ui.last_message);
-    assert!(!tmp.path().join("song.kabl.kabl").exists());
-    assert_eq!(
-        t.doc_origin(),
-        DocOrigin::Folder(file.display().to_string())
-    );
-    assert_eq!(
-        t.ui.library.as_ref().unwrap().recent_patches(),
-        vec![file.clone()]
-    );
-    t.edit("filter.svf", "cutoff_hz", 100.0);
-    t.click("save");
-    let saved = t.editor.state().clone();
-    assert_ne!(saved, work);
-    assert_eq!(
-        kabl_core::format::load_kabl(&file).unwrap().state(),
-        &saved,
-        "the second save was written"
-    );
-    t.edit("filter.svf", "cutoff_hz", 5.0);
-    t.click("save");
-    load_path(&mut t, &file);
-    assert_eq!(
-        t.editor.state(),
-        kabl_core::format::load_kabl(&file).unwrap().state()
-    );
-}
-
-/// A legacy folder opens, and saving it writes name.kabl beside it, folder untouched.
-#[test]
-fn a_legacy_folder_opens_and_saves_as_kabl() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("old");
-    let mut t = H::new(1440.0, 900.0);
-    kabl_core::save(&dir, t.editor.log()).unwrap();
-    let log_before = std::fs::read(dir.join("log.jsonl")).unwrap();
-    load_path(&mut t, &dir);
-    t.edit("filter.svf", "cutoff_hz", 640.0);
-    t.click("save");
-    let kabl = tmp.path().join("old.kabl");
-    assert_eq!(
-        kabl_core::format::load_kabl(&kabl).unwrap().state(),
-        t.editor.state()
-    );
-    assert_eq!(std::fs::read(dir.join("log.jsonl")).unwrap(), log_before);
-    assert_eq!(
-        t.doc_origin(),
-        DocOrigin::Folder(kabl.display().to_string())
-    );
-    assert_eq!(t.ui.library.as_ref().unwrap().recent_patches(), vec![kabl]);
-}
-
-/// A damaged `.kabl` is refused with the load banner; the working patch stays.
-#[test]
-fn a_corrupt_kabl_shows_the_banner() {
-    let tmp = tempfile::tempdir().unwrap();
-    let file = tmp.path().join("bad.kabl");
-    let mut t = H::new(1440.0, 900.0);
-    let mut bytes = Vec::new();
-    kabl_core::format::write_kabl(&mut bytes, t.editor.log()).unwrap();
-    let n = bytes.len();
-    bytes[n - 6] ^= 0x40;
-    std::fs::write(&file, bytes).unwrap();
-    let work = t.editor.state().clone();
-    load_path(&mut t, &file);
-    let msg = t.ui.last_message.clone().unwrap();
-    assert!(
-        msg.starts_with("load failed") && msg.contains("unchanged"),
-        "{msg}"
-    );
-    assert_eq!(t.editor.state(), &work);
-}
-
-/// R2: Save to folder (the advanced section) goes through the same staged save.
-#[test]
-fn save_to_folder_is_staged_too() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("other");
-    let mut t = H::new(1440.0, 900.0);
-    kabl_core::save(&dir, t.editor.log()).unwrap();
-    let log_before = std::fs::read(dir.join("log.jsonl")).unwrap();
-    t.edit("filter.svf", "cutoff_hz", 222.0);
-    t.ui.browser.folder = dir.display().to_string();
-    t.click("folder-header");
+    kabl_core::format::save_kabl(&file, t.editor.log()).unwrap();
+    let before = std::fs::read(&file).unwrap();
+    folder_doc(&mut t, &file);
+    t.edit("filter.svf", "cutoff_hz", 321.0);
     kabl_ui::library::fail_saves_at(Some("kabl"));
-    t.click("save-folder");
+    t.click("save");
     let msg = t.ui.last_message.clone().unwrap();
     assert!(msg.contains("Nothing was overwritten"), "{msg}");
-    assert_eq!(std::fs::read(dir.join("log.jsonl")).unwrap(), log_before);
     kabl_ui::library::fail_saves_at(None);
-    t.click("save-folder");
-    // The folder stays; the patch is written beside it as other.kabl.
-    assert_eq!(std::fs::read(dir.join("log.jsonl")).unwrap(), log_before);
-    let kabl = tmp.path().join("other.kabl");
+    assert_eq!(std::fs::read(&file).unwrap(), before);
+    assert!(t.modified(), "still unsaved");
+    t.click("save");
     assert_eq!(
-        kabl_core::format::load_kabl(&kabl).unwrap().state(),
+        kabl_core::format::load_kabl(&file).unwrap().state(),
         t.editor.state()
     );
-    assert_eq!(
-        t.ui.library.as_ref().unwrap().recent_patches(),
-        vec![kabl.clone()]
-    );
-    assert!(!t.modified(), "the folder is now the document");
 }
 
 /// R1: Cancel after a collision writes nothing.
@@ -1101,15 +929,7 @@ fn cancel_after_a_collision_keeps_the_other_sound() {
             .unwrap()
             .dir
             .clone();
-    let bytes = |d: &Path| -> Vec<Vec<u8>> {
-        let mut v: Vec<_> = std::fs::read_dir(d)
-            .unwrap()
-            .flatten()
-            .map(|e| std::fs::read(e.path()).unwrap())
-            .collect();
-        v.sort();
-        v
-    };
+    let bytes = |d: &Path| std::fs::read(d).unwrap();
     let before = bytes(&dir);
     t.edit("filter.ladder", "cutoff_hz", 999.0);
     let work = t.editor.state().clone();

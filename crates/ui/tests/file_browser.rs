@@ -411,8 +411,7 @@ fn a_picked_image_reaches_the_panel_authoring_path_field() {
 #[test]
 fn opening_a_patch_picks_it_with_the_open_button_and_remembers_its_folder() {
     let dir = tree();
-    std::fs::create_dir(dir.path().join("warm")).unwrap();
-    std::fs::write(dir.path().join("warm/meta.toml"), b"x").unwrap();
+    std::fs::write(dir.path().join("warm.kabl"), b"x").unwrap();
     let mut h = H::new();
     h.open(
         Purpose::PatchLoad,
@@ -421,28 +420,26 @@ fn opening_a_patch_picks_it_with_the_open_button_and_remembers_its_folder() {
         "",
         dir.path(),
     );
-    // A folder without meta.toml is a folder; one with it is a patch.
-    h.wait_for("fb:patch:warm");
-    assert!(h.has("fb:dir:sub") && !h.has("fb:dir:warm"));
+    // A `.kabl` file is a patch; a folder is a folder.
+    h.wait_for("fb:patch:warm.kabl");
+    assert!(h.has("fb:dir:sub"));
     // A click selects; only Open picks.
-    h.click("fb:patch:warm");
+    h.click("fb:patch:warm.kabl");
     assert_eq!(filebrowser::take(&mut h.ui, Purpose::PatchLoad), None);
     h.click("fb:open");
     assert_eq!(
         filebrowser::take(&mut h.ui, Purpose::PatchLoad),
-        Some(dir.path().join("warm"))
+        Some(dir.path().join("warm.kabl"))
     );
     assert_eq!(h.ui.folders.get("patches"), Some(&dir.path().to_path_buf()));
 }
 
 #[test]
-fn a_real_kabl_file_is_listed_as_it_is_and_hides_the_folder_it_replaces() {
+fn only_kabl_files_are_patches_and_patch_folders_are_plain_folders() {
     let dir = tree();
     std::fs::create_dir(dir.path().join("warm")).unwrap();
     std::fs::write(dir.path().join("warm/meta.toml"), b"x").unwrap();
-    std::fs::create_dir(dir.path().join("old")).unwrap();
-    std::fs::write(dir.path().join("old/meta.toml"), b"x").unwrap();
-    std::fs::write(dir.path().join("warm.kabl"), b"x").unwrap();
+    std::fs::write(dir.path().join("warm/log.jsonl"), b"").unwrap();
     std::fs::write(dir.path().join("lead.kabl"), b"x").unwrap();
     let mut h = H::new();
     h.open(
@@ -453,8 +450,8 @@ fn a_real_kabl_file_is_listed_as_it_is_and_hides_the_folder_it_replaces() {
         dir.path(),
     );
     h.wait_for("fb:patch:lead.kabl");
-    assert!(h.has("fb:patch:warm.kabl") && h.has("fb:patch:old"));
-    assert!(!h.has("fb:patch:warm"), "the real file replaces the folder");
+    assert!(h.has("fb:dir:warm"), "a patch folder is only a folder");
+    assert!(!h.has("fb:patch:warm") && !h.has("fb:patch:warm.kabl"));
     h.click("fb:patch:lead.kabl");
     h.click("fb:open");
     assert_eq!(
