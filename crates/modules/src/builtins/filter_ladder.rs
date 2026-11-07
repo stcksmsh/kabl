@@ -114,8 +114,6 @@ pub static FILTER_LADDER_INFO: ModuleInfo = ModuleInfo {
     advanced: &["drive_db"],
 };
 
-/// States this small are flushed to 0 (a decaying filter must not go subnormal).
-const TINY: f32 = 1e-20;
 /// Feedback at full resonance: a little past the self-oscillation threshold (k = 4), so the
 /// top of the knob sings steadily at a level the input stage sets.
 const K_MAX: f32 = 4.4;
@@ -158,15 +156,6 @@ impl Default for FilterLadder {
 #[inline]
 fn prewarp(fc: f32, sr: f32) -> f32 {
     (std::f32::consts::PI * fc.clamp(10.0, 0.45 * sr) / sr).tan()
-}
-
-#[inline]
-fn flush(x: f32) -> f32 {
-    if x.abs() < TINY {
-        0.0
-    } else {
-        x
-    }
 }
 
 impl Module for FilterLadder {
@@ -226,7 +215,7 @@ impl Module for FilterLadder {
             for s in c.s.iter_mut() {
                 let v = (u - *s) * big_g;
                 let y = v + *s;
-                *s = flush(y + v);
+                *s = y + v;
                 u = y;
             }
             *o = u;

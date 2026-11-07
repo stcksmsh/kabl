@@ -29,6 +29,8 @@ fn patch_dirs(root: &Path, out: &mut Vec<PathBuf>, depth: usize) {
 
 /// FNV-1a over the bit patterns of the left and right output.
 fn render_hash(dir: &Path) -> String {
+    // Recorded with flush-to-zero on, like the audio callbacks.
+    let _ftz = kabl_engine::ftz::FtzGuard::new();
     let log = kabl_core::load(dir).expect("loads");
     let Ok(mut c) = compile(log.state(), 48000.0, 8) else {
         return "compile-error".into();

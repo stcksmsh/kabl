@@ -20,7 +20,7 @@
 //! **Modulation.** All three controls are read every sample; a knob glides (20 ms), a cable is
 //! followed at audio rate. Coefficients are recomputed only while a control moves.
 
-use super::fx::{coef, flush, param, port, Glide, NEPER_PER_DB};
+use super::fx::{coef, param, port, Glide, NEPER_PER_DB};
 use crate::info::{
     Category, ModuleInfo, ParamInfo, PortInfo, PortType, QualitySupport, Rate, Taper,
 };
@@ -215,8 +215,8 @@ impl Module for FilterFormant {
                 let v3 = x - b.ic[1];
                 let v1 = a1 * b.ic[0] + a2 * v3;
                 let v2 = b.ic[1] + a2 * b.ic[0] + a3 * v3;
-                b.ic[0] = flush(2.0 * v1 - b.ic[0]);
-                b.ic[1] = flush(2.0 * v2 - b.ic[1]);
+                b.ic[0] = 2.0 * v1 - b.ic[0];
+                b.ic[1] = 2.0 * v2 - b.ic[1];
                 sum += level * kk * v1;
             }
             io.output(0)[i] = sum;

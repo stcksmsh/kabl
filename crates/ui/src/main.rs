@@ -625,6 +625,8 @@ impl AudioHost {
                     callback_warmups += 1;
                     CallbackAllocationScope::new(callback_warmups > 2)
                 };
+                // Flush subnormals to zero for the whole callback; restored when it returns.
+                let _ftz = kabl_engine::ftz::FtzGuard::new();
                 // Once, on the first callback: ask for real-time priority for this thread (rtkit
                 // over D-Bus, else the rlimit). It may allocate and block briefly; the stream
                 // is starting and silent. Refusal leaves the thread as it was.

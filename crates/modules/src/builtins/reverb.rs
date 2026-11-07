@@ -134,16 +134,6 @@ const TAPS: [[(usize, usize, f32, f32); 7]; 2] = [
 const OUT_GAIN: f32 = 0.6;
 const CTRL_TAU_S: f32 = 0.02;
 const PREDELAY_TAU_S: f32 = 0.1;
-const TINY: f32 = 1e-20;
-
-#[inline]
-fn flush(x: f32) -> f32 {
-    if x.abs() < TINY {
-        0.0
-    } else {
-        x
-    }
-}
 
 /// A circular line. `read(k)` is the sample written `k` writes ago (k ≥ 1).
 struct Line {
@@ -194,7 +184,7 @@ fn allpass(line: &mut Line, d: f32, g: f32, x: f32) -> f32 {
     } else {
         line.read_frac(d)
     };
-    let w = flush(x - g * delayed);
+    let w = x - g * delayed;
     line.write(w);
     g * w + delayed
 }
@@ -344,7 +334,7 @@ impl Module for Reverb {
                 let p = &mut self.pre[side];
                 p.write(x[side]);
                 let delayed = p.read_frac(c.predelay);
-                c.band[side] = flush(c.band[side] + BANDWIDTH * (delayed - c.band[side]));
+                c.band[side] = c.band[side] + BANDWIDTH * (delayed - c.band[side]);
                 let mut v = c.band[side];
                 for (k, line) in self.diff[side].iter_mut().enumerate() {
                     v = allpass(line, ap_len[k], INPUT_AP[k].1, v);
@@ -362,7 +352,7 @@ impl Module for Reverb {
                 let v = allpass(&mut t[0], lens[0] + md, -DECAY_DIFFUSION_1, v);
                 t[1].write(v);
                 let v = t[1].read(lens[1] as usize);
-                c.lp[h] = flush(v + c.damp * (c.lp[h] - v));
+                c.lp[h] = v + c.damp * (c.lp[h] - v);
                 let v = allpass(&mut t[2], lens[2], diffusion_2, c.lp[h] * c.decay);
                 t[3].write(v);
                 c.fb[h] = t[3].read(lens[3] as usize) * c.decay;

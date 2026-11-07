@@ -37,6 +37,9 @@ fn time(patch: &PatchState, voices: usize) -> Option<(f64, f64)> {
 }
 
 fn main() {
+    // The audio callbacks run with flush-to-zero on; so does the bench (KABL_FTZ=0 turns it off).
+    let _ftz =
+        (std::env::var("KABL_FTZ").as_deref() != Ok("0")).then(kabl_engine::ftz::FtzGuard::new);
     println!(
         "{:<38} {:>6} {:>10} {:>10} {:>9}",
         "patch", "voices", "median us", "p99.9 us", "% budget"

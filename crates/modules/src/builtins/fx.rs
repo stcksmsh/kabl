@@ -89,16 +89,6 @@ impl Glide {
     }
 }
 
-/// States this small are flushed to 0 (a decaying loop must not go subnormal).
-#[inline]
-pub(super) fn flush(x: f32) -> f32 {
-    if x.abs() < 1e-20 {
-        0.0
-    } else {
-        x
-    }
-}
-
 /// Dry/wet: exactly `dry` at 0, exactly `wet` at 1.
 #[inline]
 pub(super) fn blend(dry: f32, wet: f32, mix: f32) -> f32 {

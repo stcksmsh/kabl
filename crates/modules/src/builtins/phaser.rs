@@ -18,7 +18,7 @@
 //! glide (20 ms) when set by a knob; a patched cable is followed as it is. The LFO phase is
 //! continuous whatever the rate does, and state rides across live edits in `carry_from`.
 
-use super::fx::{blend, coef, flush, param, sin1, Glide, STEREO_IN, STEREO_OUT};
+use super::fx::{blend, coef, param, sin1, Glide, STEREO_IN, STEREO_OUT};
 use crate::info::{Category, ModuleInfo, ParamInfo, PortInfo, QualitySupport, Rate, Taper};
 use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig};
@@ -136,10 +136,10 @@ impl Module for Phaser {
                 let mut v = xc + fb * c.prev[ch].tanh();
                 for z in &mut c.z[ch][..stages] {
                     let y = a * v + *z;
-                    *z = flush(v - a * y);
+                    *z = v - a * y;
                     v = y;
                 }
-                c.prev[ch] = flush(v);
+                c.prev[ch] = v;
                 io.output(ch)[i] = blend(xc, v, m);
             }
             c.phase = (c.phase + rate.at(i).clamp(0.05, 10.0) / sr).fract();

@@ -18,6 +18,9 @@ const SR: f32 = 48000.0;
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let secs: f32 = args[0].parse().expect("seconds");
+    // Goldens are recorded with flush-to-zero on, like the audio callbacks; KABL_FTZ=0 turns it off.
+    let _ftz =
+        (std::env::var("KABL_FTZ").as_deref() != Ok("0")).then(kabl_engine::ftz::FtzGuard::new);
     for dir in &args[1..] {
         let log = kabl_core::load(std::path::Path::new(dir)).expect("patch");
         let collector = Collector::new();

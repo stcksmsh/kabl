@@ -23,7 +23,7 @@
 //! sqrt((1 + |fb|)/(1 − |fb|)), about 18 dB at the top of the range.
 
 use super::delay::{line, read};
-use super::fx::{coef, flush, param, port, Glide};
+use super::fx::{coef, param, port, Glide};
 use crate::info::{
     Category, ModuleInfo, ParamInfo, PortInfo, PortType, QualitySupport, Rate, Taper,
 };
@@ -147,9 +147,9 @@ impl Module for FilterComb {
             // The damping pole lags a/(1−a) samples at low frequency: take it off the delay.
             let d = (sr / f - a / (1.0 - a)).clamp(min_d, max_d);
             let wet = read(&self.line, c.write, d as f64);
-            c.lp = flush((1.0 - a) * wet + a * c.lp);
+            c.lp = (1.0 - a) * wet + a * c.lp;
             let y = input.at(i) + fb * c.lp;
-            self.line[c.write] = flush(y.clamp(-LIMIT, LIMIT));
+            self.line[c.write] = y.clamp(-LIMIT, LIMIT);
             c.write = (c.write + 1) % len;
             io.output(0)[i] = y * (1.0 - fb * fb).sqrt();
         }

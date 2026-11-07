@@ -16,7 +16,7 @@
 //! is. Delay lines and the LFO phase ride across live edits in `carry_from`.
 
 use super::delay::{line, read};
-use super::fx::{blend, coef, flush, param, sin1, Glide, STEREO_IN, STEREO_OUT};
+use super::fx::{blend, coef, param, sin1, Glide, STEREO_IN, STEREO_OUT};
 use crate::info::{Category, ModuleInfo, ParamInfo, PortInfo, QualitySupport, Rate, Taper};
 use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig};
@@ -135,7 +135,7 @@ impl Module for Flanger {
                 let lfo = sin1(c.phase - 0.25 * ch as f32);
                 let delay = (MIN_MS + SPAN_MS * (1.0 + d * lfo)) * ms;
                 let wet = read(&self.lines[ch], c.write, delay as f64);
-                self.lines[ch][c.write] = flush(xc + fb * wet.tanh());
+                self.lines[ch][c.write] = xc + fb * wet.tanh();
                 io.output(ch)[i] = blend(xc, wet, m);
             }
             c.write = (c.write + 1) % len;

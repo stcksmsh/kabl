@@ -5,6 +5,7 @@
 pub mod compile;
 pub mod dyn_dispatch_spike;
 pub mod facetap;
+pub mod ftz;
 pub mod graph;
 pub mod keyboard;
 pub mod morph;

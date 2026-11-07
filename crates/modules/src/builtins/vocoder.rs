@@ -39,17 +39,15 @@
 //! **Mix.** 0 is the carrier only, 1 the vocoded sound only. An unpatched `mod` is silence:
 //! the vocoded part is silent too.
 //!
-//! **Safety.** Non-finite input is read as 0 and inputs are clamped to ±16. Filter states are
-//! flushed against denormals. Nothing allocates after `new`. Band count, spacing, range and
+//! **Safety.** Non-finite input is read as 0 and inputs are clamped to ±16. Subnormals are
+//! flushed to zero by the audio callback's `FtzGuard`. Nothing allocates after `new`. Band count, spacing, range and
 //! shift glide (20 ms); the filters are redesigned every 16 samples while one moves, and not
 //! at all while still. Parameters are read once per 16 samples.
 //!
 //! **View.** `Module::view` reports each band's envelope (square-rooted, 0 … 1) in
 //! `cycle[..bands]` for the face's level display.
 
-use super::fx::{
-    blend, coef, flush, param, port, Glide, TimeCoef, NEPER_PER_DB, STEREO_IN, STEREO_OUT,
-};
+use super::fx::{blend, coef, param, port, Glide, TimeCoef, NEPER_PER_DB, STEREO_IN, STEREO_OUT};
 use crate::info::{
     Category, ModuleInfo, ParamInfo, PortInfo, PortType, QualitySupport, Rate, Taper,
 };
@@ -271,8 +269,8 @@ fn stage(ic: &mut [f32; 2], co: &[f32; 4], x: f32) -> f32 {
     let v3 = x - ic[1];
     let v1 = co[0] * ic[0] + co[1] * v3;
     let v2 = ic[1] + co[1] * ic[0] + co[2] * v3;
-    ic[0] = flush(2.0 * v1 - ic[0]);
-    ic[1] = flush(2.0 * v2 - ic[1]);
+    ic[0] = 2.0 * v1 - ic[0];
+    ic[1] = 2.0 * v2 - ic[1];
     co[3] * v1
 }
 
@@ -294,8 +292,8 @@ fn hp_stage(ic: &mut [f32; 2], co: &[f32; 4], x: f32) -> f32 {
     let v3 = x - ic[1];
     let v1 = co[0] * ic[0] + co[1] * v3;
     let v2 = ic[1] + co[1] * ic[0] + co[2] * v3;
-    ic[0] = flush(2.0 * v1 - ic[0]);
-    ic[1] = flush(2.0 * v2 - ic[1]);
+    ic[0] = 2.0 * v1 - ic[0];
+    ic[1] = 2.0 * v2 - ic[1];
     x - co[3] * v1 - v2
 }
 
@@ -396,7 +394,7 @@ impl Module for Vocoder {
                     let m = cascade(&mut b.m, &b.an, x[2][j], stage);
                     let a = m.abs() * det;
                     let k = if a > b.env { att } else { rel };
-                    b.env = flush((a + (b.env - a) * k).min(ENV_MAX));
+                    b.env = (a + (b.env - a) * k).min(ENV_MAX);
                     for (ch, w) in wet.iter_mut().enumerate() {
                         w[j] += cascade(&mut b.c[ch], &b.sy, x[ch][j], stage) * b.env;
                     }
@@ -409,10 +407,10 @@ impl Module for Vocoder {
                     let h = cascade(&mut c.hf_mod, &hp, x[2][j], hp_stage);
                     let a = h.abs() * det;
                     let k = if a > c.hf_env { ka } else { kr };
-                    c.hf_env = flush((a + (c.hf_env - a) * k).min(ENV_MAX));
+                    c.hf_env = (a + (c.hf_env - a) * k).min(ENV_MAX);
                     let a = (x[2][j] - h).abs() * det;
                     let k = if a > c.lf_env { ka } else { kr };
-                    c.lf_env = flush((a + (c.lf_env - a) * k).min(ENV_MAX));
+                    c.lf_env = (a + (c.lf_env - a) * k).min(ENV_MAX);
                     // Voiced speech has its energy below HF_HZ and a little above it; s, t, f
                     // have it above. Only the second kind opens the noise.
                     let share = c.hf_env / (c.hf_env + c.lf_env + 1e-6);
@@ -420,7 +418,7 @@ impl Module for Vocoder {
                         ((share - UNVOICED_FROM) / (UNVOICED_FULL - UNVOICED_FROM)).clamp(0.0, 1.0);
                     let level = x[0][j].abs().max(x[1][j].abs());
                     let k = if level > c.car_env { ca } else { cr };
-                    c.car_env = flush(level + (c.car_env - level) * k);
+                    c.car_env = level + (c.car_env - level) * k;
                     // Full from -34 dBFS up: the noise follows the synth, not the voice alone.
                     let gate = (c.car_env * CAR_GATE).min(1.0);
                     for (ch, w) in wet.iter_mut().enumerate() {

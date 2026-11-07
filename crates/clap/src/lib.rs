@@ -1153,6 +1153,8 @@ impl Plugin for Instrument {
         aux: &mut AuxiliaryBuffers,
         context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
+        // Flush subnormals to zero for this call; the host thread's state is restored on return.
+        let _ftz = kabl_engine::ftz::FtzGuard::new();
         self.accept_loads();
         // Raw CLAP MIDI bypasses the framework's unbounded VecDeque. The outer callback
         // gives full host-buffer offsets; Timeline retains them across automation subblocks.
