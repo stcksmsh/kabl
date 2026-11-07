@@ -66,7 +66,7 @@ Tiny frames compress badly, because each starts with no history. Appending a fra
 
 ## 4. Load speed: replay vs checkpoint
 
-`load_bench` (release build, includes toml, migration check and `composite::validate`): mean **7.5 ms** per patch for full replay (139 patches, 1.04 s total). Parsing the whole `checkpoint.json` as `serde_json::Value` is a **0.07 ms** lower bound. Slowest was `robot-voice` at 122 ms with only 100 entries, so that cost is not log length (probably validation or state building; worth a profile before anyone adds a snapshot). Verdict: a snapshot would be 100x faster to read but costs +36 % file size (log 400 KB + checkpoint 261 KB compressed separately, 545 KB together) and creates a second source of truth. At 7.5 ms mean and 923 ops maximum, **not worth it now**. Revisit only if a profile of the slow case shows replay itself dominates. Compacting on save is cheap and recommended (see layout).
+`load_bench` (release build, includes toml, migration check and `composite::validate`), corrected after profiling: warm, the whole 139-patch corpus loads in **32 ms**, a mean of **0.24 ms** per patch for full replay; the slowest is `performance-project` at 2.4 ms for 923 entries (cost scales with entry count, about 2.5 us per op). Parsing the whole `checkpoint.json` as `serde_json::Value` is a 0.05 ms lower bound. The first version of this section reported 7.5 ms mean and a 122 ms outlier (`robot-voice`, 100 entries): that was a cold file cache and a busy machine, not a hot spot (`robot-voice` loads in 0.15 ms cold, 0.08 ms warm, run alone). Verdict: replay is already fast enough that a snapshot would save well under 1 ms per patch while costing +36 % file size (log 400 KB + checkpoint 261 KB compressed separately, 545 KB together) and creating a second source of truth: **not worth it**. Compacting on save is cheap and recommended (see layout).
 
 ## 5. Container options
 
@@ -133,5 +133,4 @@ Total: 4 PRs required (~1.2-1.5k LOC), a 5th optional. Order matters: 1 before 2
 ## 9. Open items for Kosta
 - Drop `inverse` from the file (15 % smaller, loses persisted undo)? Default here: keep.
 - Keep factory patches as folders in git, or switch to `.kabl` in the repo? Default here: folders in git, `.kabl` in packaging.
-- Profile `robot-voice` (122 ms load for 100 entries) before deciding on a snapshot.
 - Dictionary + multi-frame overhead was not measured together; verify in PR 3 before relying on append.

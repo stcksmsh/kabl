@@ -21,6 +21,25 @@ fn main() {
     let root = std::env::args().nth(1).expect("root");
     let mut dirs = Vec::new();
     walk(Path::new(&root), &mut dirs);
+    let mut times: Vec<(f64, PathBuf)> = Vec::new();
+    for pass in 0..2 {
+        let t0 = Instant::now();
+        for d in &dirs {
+            let t = Instant::now();
+            let _ = kabl_core::format::load(d);
+            if pass == 1 {
+                times.push((t.elapsed().as_secs_f64(), d.clone()));
+            }
+        }
+        println!(
+            "pass {pass}: {:.1} ms total",
+            t0.elapsed().as_secs_f64() * 1e3
+        );
+    }
+    times.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+    for (t, d) in times.iter().take(5) {
+        println!("warm {:.2} ms {}", t * 1e3, d.display());
+    }
     let (mut replay, mut snap, mut ok) = (0.0f64, 0.0f64, 0);
     let mut worst = (0.0f64, PathBuf::new(), 0usize);
     for d in &dirs {
