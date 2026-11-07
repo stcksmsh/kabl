@@ -814,7 +814,7 @@ fn a_recipe_starts_through_the_unsaved_question_and_exit_keeps_the_patch() {
         }
         assert_eq!(h.ui.recipes.active.as_ref().unwrap().step, 5);
         let kept = h.editor.state().clone();
-        h.click("learn-close");
+        h.click("routing-tab");
         assert!(h.ui.recipes.active.is_none());
         assert_eq!(h.editor.state(), &kept);
         assert_eq!(kept.modules[&6].params["sustain"], 0.7);
