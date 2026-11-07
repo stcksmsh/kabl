@@ -15,6 +15,7 @@ pub mod about;
 pub mod banks;
 pub mod browser;
 mod cable_look;
+pub mod code_notice;
 pub mod compare;
 pub mod composites;
 pub mod control;

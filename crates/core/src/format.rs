@@ -1,3 +1,4 @@
+use crate::embedded::{EmbedError, Embedded, MAX_CODE_BLOB_BYTES};
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
@@ -43,6 +44,8 @@ pub enum FormatError {
     Corrupt(String),
     /// The `.kabl` file or its decoded log passes the cap (a decompression-bomb guard).
     TooLarge(usize),
+    /// A custom-code blob over the 2 MiB cap, or otherwise unusable embedded code.
+    Code(crate::embedded::EmbedError),
 }
 
 impl From<io::Error> for FormatError {
@@ -139,6 +142,12 @@ pub const KABL_DICT_ID: u32 = 1;
 /// without it (every file before it existed) reads as no metadata, and an older reader skips it
 /// as it skips any skippable frame, so the container version stays 1.
 const SKIPPABLE_META: u32 = 0x184D_2A51;
+/// Skippable frames (after the header) that carry embedded code (D11): `2A52` one wasm blob
+/// (hash, version, module id, bytes), `2A53` one instance-to-hash reference, `2A54` one state
+/// kept from an older module version. All optional and skippable, like the metadata frame.
+const SKIPPABLE_CODE: u32 = 0x184D_2A52;
+const SKIPPABLE_CODE_REF: u32 = 0x184D_2A53;
+const SKIPPABLE_CODE_STATE: u32 = 0x184D_2A54;
 /// Cap on the metadata text.
 const MAX_META_BYTES: usize = 1024 * 1024;
 
@@ -151,10 +160,39 @@ pub fn write_kabl<W: Write>(w: W, log: &PatchLog) -> Result<(), FormatError> {
 
 /// [`write_kabl`] with a sound's metadata (`sound.toml` text) in its own skippable frame.
 pub fn write_kabl_meta<W: Write>(
-    mut w: W,
+    w: W,
     log: &PatchLog,
     meta: Option<&str>,
 ) -> Result<(), FormatError> {
+    write_kabl_full(w, log, meta, None)
+}
+
+fn write_frame<W: Write>(w: &mut W, magic: u32, payload: &[u8]) -> Result<(), FormatError> {
+    w.write_all(&magic.to_le_bytes())?;
+    w.write_all(&(payload.len() as u32).to_le_bytes())?;
+    w.write_all(payload)?;
+    Ok(())
+}
+
+/// [`write_kabl_meta`] with embedded code: one frame per blob, per reference and per kept
+/// state. A blob over the 2 MiB cap is refused; blobs nothing references are still written
+/// (call [`Embedded::prune_unreferenced`] first to drop them).
+pub fn write_kabl_full<W: Write>(
+    mut w: W,
+    log: &PatchLog,
+    meta: Option<&str>,
+    code: Option<&Embedded>,
+) -> Result<(), FormatError> {
+    if let Some(c) = code {
+        for (_, b) in c.blobs() {
+            if b.bytes.len() > MAX_CODE_BLOB_BYTES {
+                return Err(FormatError::Code(EmbedError::TooLarge {
+                    size: b.bytes.len(),
+                    cap: MAX_CODE_BLOB_BYTES,
+                }));
+            }
+        }
+    }
     if meta.is_some_and(|m| m.len() > MAX_META_BYTES) {
         return Err(FormatError::TooLarge(MAX_META_BYTES));
     }
@@ -170,9 +208,18 @@ pub fn write_kabl_meta<W: Write>(
     w.write_all(&(CURRENT_SCHEMA_VERSION as u16).to_le_bytes())?;
     w.write_all(&KABL_DICT_ID.to_le_bytes())?;
     if let Some(m) = meta {
-        w.write_all(&SKIPPABLE_META.to_le_bytes())?;
-        w.write_all(&(m.len() as u32).to_le_bytes())?;
-        w.write_all(m.as_bytes())?;
+        write_frame(&mut w, SKIPPABLE_META, m.as_bytes())?;
+    }
+    if let Some(c) = code {
+        for (h, b) in c.blobs() {
+            write_frame(&mut w, SKIPPABLE_CODE, &Embedded::blob_payload(h, b))?;
+        }
+        for (i, h) in c.refs() {
+            write_frame(&mut w, SKIPPABLE_CODE_REF, &Embedded::ref_payload(i, h))?;
+        }
+        for k in c.kept_states() {
+            write_frame(&mut w, SKIPPABLE_CODE_STATE, &Embedded::kept_payload(k))?;
+        }
     }
     let mut enc = zstd::stream::write::Encoder::with_dictionary(w, KABL_ZSTD_LEVEL, KABL_DICT_1)?;
     enc.include_checksum(true)?;
@@ -203,6 +250,18 @@ fn read_kabl_meta_limited<R: Read>(
     r: R,
     max: usize,
 ) -> Result<(PatchLog, Option<String>), FormatError> {
+    read_kabl_full_limited(r, max).map(|(log, meta, _)| (log, meta))
+}
+
+/// [`read_kabl_meta`] that also returns the embedded code (empty for a file without any).
+pub fn read_kabl_full<R: Read>(r: R) -> Result<(PatchLog, Option<String>, Embedded), FormatError> {
+    read_kabl_full_limited(r, MAX_KABL_BYTES)
+}
+
+fn read_kabl_full_limited<R: Read>(
+    r: R,
+    max: usize,
+) -> Result<(PatchLog, Option<String>, Embedded), FormatError> {
     let mut bytes = Vec::new();
     r.take(max as u64 + 1).read_to_end(&mut bytes)?;
     if bytes.len() > max {
@@ -231,15 +290,48 @@ fn read_kabl_meta_limited<R: Read>(
     let corrupt = |e: io::Error| FormatError::Corrupt(e.to_string());
     let mut body = &bytes[20..];
     let mut meta = None;
-    if body.len() >= 8 && body[..4] == SKIPPABLE_META.to_le_bytes() {
+    let mut code = Embedded::new();
+    // Skippable frames in any order; ones this build does not know are passed over.
+    while body.len() >= 8 {
+        let magic = u32::from_le_bytes(body[..4].try_into().unwrap());
+        if !(0x184D_2A50..=0x184D_2A5F).contains(&magic) {
+            break;
+        }
         let n = u32::from_le_bytes(body[4..8].try_into().unwrap()) as usize;
-        let text = body
-            .get(8..8usize.saturating_add(n))
-            .filter(|_| n <= MAX_META_BYTES)
-            .ok_or_else(|| FormatError::Corrupt("metadata frame is cut or too large".into()))?;
-        meta = Some(
-            String::from_utf8(text.to_vec()).map_err(|e| FormatError::Corrupt(e.to_string()))?,
-        );
+        if matches!(
+            magic,
+            SKIPPABLE_CODE | SKIPPABLE_CODE_REF | SKIPPABLE_CODE_STATE
+        ) && n > MAX_CODE_BLOB_BYTES + (1 << 17)
+        {
+            return Err(FormatError::Code(EmbedError::TooLarge {
+                size: n,
+                cap: MAX_CODE_BLOB_BYTES,
+            }));
+        }
+        let cut = || FormatError::Corrupt("skippable frame is cut".into());
+        let payload = body.get(8..8usize.saturating_add(n)).ok_or_else(cut)?;
+        match magic {
+            SKIPPABLE_META => {
+                if n > MAX_META_BYTES || meta.is_some() {
+                    return Err(FormatError::Corrupt(
+                        "metadata frame is cut or too large".into(),
+                    ));
+                }
+                meta = Some(
+                    String::from_utf8(payload.to_vec())
+                        .map_err(|e| FormatError::Corrupt(e.to_string()))?,
+                );
+            }
+            SKIPPABLE_CODE | SKIPPABLE_CODE_REF | SKIPPABLE_CODE_STATE => {
+                let r = match magic {
+                    SKIPPABLE_CODE => code.read_blob(payload),
+                    SKIPPABLE_CODE_REF => code.read_ref(payload),
+                    _ => code.read_kept(payload),
+                };
+                r.map_err(FormatError::Corrupt)?;
+            }
+            _ => {}
+        }
         body = &body[8 + n..];
     }
     let mut dec = zstd::stream::read::Decoder::with_dictionary(body, dict).map_err(corrupt)?;
@@ -253,7 +345,7 @@ fn read_kabl_meta_limited<R: Read>(
         return Err(FormatError::TooLarge(max));
     }
     let text = String::from_utf8(text).map_err(|e| FormatError::Corrupt(e.to_string()))?;
-    Ok((replay(schema, &text)?, meta))
+    Ok((replay(schema, &text)?, meta, code))
 }
 
 /// Save `log` to `path` (`name.kabl`): write `name.kabl.tmp`, fsync, then rename over `path`.
@@ -263,12 +355,22 @@ pub fn save_kabl(path: &Path, log: &PatchLog) -> Result<(), FormatError> {
 
 /// [`save_kabl`] with a sound's metadata (`sound.toml` text).
 pub fn save_kabl_meta(path: &Path, log: &PatchLog, meta: Option<&str>) -> Result<(), FormatError> {
+    save_kabl_full(path, log, meta, None)
+}
+
+/// [`save_kabl_meta`] with embedded code.
+pub fn save_kabl_full(
+    path: &Path,
+    log: &PatchLog,
+    meta: Option<&str>,
+    code: Option<&Embedded>,
+) -> Result<(), FormatError> {
     let mut tmp = path.as_os_str().to_owned();
     tmp.push(".tmp");
     let tmp = PathBuf::from(tmp);
     let result = (|| {
         let mut f = fs::File::create(&tmp)?;
-        write_kabl_meta(io::BufWriter::new(&mut f), log, meta)?;
+        write_kabl_full(io::BufWriter::new(&mut f), log, meta, code)?;
         f.sync_all()?;
         fs::rename(&tmp, path)?;
         // So the rename survives a power loss.
@@ -297,6 +399,11 @@ pub fn load_kabl(path: &Path) -> Result<PatchLog, FormatError> {
 /// [`load_kabl`] that also returns the metadata text, when the file has it.
 pub fn load_kabl_meta(path: &Path) -> Result<(PatchLog, Option<String>), FormatError> {
     read_kabl_meta(fs::File::open(path)?)
+}
+
+/// [`load_kabl_meta`] that also returns the embedded code.
+pub fn load_kabl_full(path: &Path) -> Result<(PatchLog, Option<String>, Embedded), FormatError> {
+    read_kabl_full(fs::File::open(path)?)
 }
 
 /// Pack a patch folder (`meta.toml`, `log.jsonl`, and `sound.toml` when present) into one
