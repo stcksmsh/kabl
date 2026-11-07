@@ -126,8 +126,43 @@ fn a_future_version_is_refused() {
     s[14] = 200;
     assert!(matches!(err(&s), FormatError::UnknownSchemaVersion(200)));
     let mut d = b;
-    d[16] = 1;
-    assert!(matches!(err(&d), FormatError::UnknownDictionary(1)));
+    d[16] = 9;
+    assert!(matches!(err(&d), FormatError::UnknownDictionary(9)));
+}
+
+#[test]
+fn the_embedded_dictionary_has_the_id_the_writer_writes() {
+    // A zstd dictionary starts with magic 0xEC30A437 and its id, both little-endian.
+    let d = format::KABL_DICT_1;
+    assert_eq!(&d[..4], &0xEC30_A437u32.to_le_bytes());
+    assert_eq!(
+        u32::from_le_bytes(d[4..8].try_into().unwrap()),
+        format::KABL_DICT_ID
+    );
+    let (log, b) = one();
+    assert_eq!(u32::from_le_bytes(b[16..20].try_into().unwrap()), 1);
+    assert_eq!(format::read_kabl(&b[..]).unwrap().entries(), log.entries());
+    // The frame really uses the dictionary: the same bytes under id 0 do not decode.
+    let mut none = b;
+    none[16] = 0;
+    assert!(matches!(err(&none), FormatError::Corrupt(_)));
+}
+
+#[test]
+fn an_id_0_file_without_a_dictionary_still_loads() {
+    let log = format::load(&factory()[0]).unwrap();
+    let mut lines = String::new();
+    for e in log.entries() {
+        lines.push_str(&serde_json::to_string(e).unwrap());
+        lines.push('\n');
+    }
+    let (_, current) = one();
+    let mut old = current[..16].to_vec();
+    old.extend_from_slice(&0u32.to_le_bytes());
+    old.extend(zstd::stream::encode_all(lines.as_bytes(), 19).unwrap());
+    let back = format::read_kabl(&old[..]).unwrap();
+    assert_eq!(back.state(), log.state());
+    assert_eq!(back.entries(), log.entries());
 }
 
 #[test]

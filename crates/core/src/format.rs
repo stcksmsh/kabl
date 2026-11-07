@@ -37,7 +37,7 @@ pub enum FormatError {
     BadMagic,
     /// A `.kabl` container version this build does not know.
     UnknownContainerVersion(u16),
-    /// The header names a dictionary this build does not have (none exist yet: any id but 0).
+    /// The header names a dictionary this build does not have (it knows 0, none, and 1).
     UnknownDictionary(u32),
     /// Truncated, damaged or failed-checksum `.kabl` data.
     Corrupt(String),
@@ -128,9 +128,15 @@ pub const MAX_KABL_BYTES: usize = 64 * 1024 * 1024;
 const SKIPPABLE_HEADER: u32 = 0x184D_2A50;
 const HEADER_PAYLOAD: u32 = 12;
 const KABL_ZSTD_LEVEL: i32 = 19;
+/// Dictionary 1, trained offline by `docs/format/train_dict.sh` from the factory logs. Permanent:
+/// files written with id 1 need these exact bytes, so a better dictionary gets a new id and this
+/// one stays in the binary.
+pub const KABL_DICT_1: &[u8] = include_bytes!("../assets/kabl-dict-1.zstdict");
+/// The dictionary id `write_kabl` writes.
+pub const KABL_DICT_ID: u32 = 1;
 
 /// Write `log` as a `.kabl` file: a skippable header frame (`KABL`, container version, schema
-/// version, dictionary id 0) and one zstd level-19 frame, with a content checksum, holding the
+/// version, dictionary id 1) and one zstd level-19 frame using dictionary 1, with a content checksum, holding the
 /// log as JSON lines (`inverse` kept). The checkpoint is not stored; load replays the log.
 pub fn write_kabl<W: Write>(mut w: W, log: &PatchLog) -> Result<(), FormatError> {
     let mut lines = String::new();
@@ -143,8 +149,8 @@ pub fn write_kabl<W: Write>(mut w: W, log: &PatchLog) -> Result<(), FormatError>
     w.write_all(b"KABL")?;
     w.write_all(&KABL_CONTAINER_VERSION.to_le_bytes())?;
     w.write_all(&(CURRENT_SCHEMA_VERSION as u16).to_le_bytes())?;
-    w.write_all(&0u32.to_le_bytes())?;
-    let mut enc = zstd::stream::write::Encoder::new(w, KABL_ZSTD_LEVEL)?;
+    w.write_all(&KABL_DICT_ID.to_le_bytes())?;
+    let mut enc = zstd::stream::write::Encoder::with_dictionary(w, KABL_ZSTD_LEVEL, KABL_DICT_1)?;
     enc.include_checksum(true)?;
     enc.write_all(lines.as_bytes())?;
     // The writer comes back so a buffered writer's flush error is not lost in its drop.
@@ -179,11 +185,16 @@ pub fn read_kabl_limited<R: Read>(r: R, max: usize) -> Result<PatchLog, FormatEr
     if !(1..=CURRENT_SCHEMA_VERSION).contains(&schema) {
         return Err(FormatError::UnknownSchemaVersion(schema));
     }
-    if u32_at(16) != 0 {
-        return Err(FormatError::UnknownDictionary(u32_at(16)));
-    }
+    let dict: &[u8] = match u32_at(16) {
+        0 => &[],
+        // Literal ids: a later dictionary adds an arm and bumps KABL_DICT_ID (the writer's id);
+        // it must never change what id 1 means.
+        1 => KABL_DICT_1,
+        other => return Err(FormatError::UnknownDictionary(other)),
+    };
     let corrupt = |e: io::Error| FormatError::Corrupt(e.to_string());
-    let mut dec = zstd::stream::read::Decoder::new(&bytes[20..]).map_err(corrupt)?;
+    let mut dec =
+        zstd::stream::read::Decoder::with_dictionary(&bytes[20..], dict).map_err(corrupt)?;
     let mut text = Vec::new();
     // One byte past the cap tells a bomb from a log that fits exactly.
     (&mut dec)
