@@ -42,6 +42,17 @@ const RING_CAPACITY: usize = BLOCK * 256;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    // `kabl cat|pack|unpack`: the .kabl file tools, before audio and the logger start.
+    if args
+        .get(1)
+        .is_some_and(|c| kabl_core::cli::COMMANDS.contains(&c.as_str()))
+    {
+        if let Err(msg) = kabl_core::cli::run(&args[1..], &mut std::io::stdout().lock()) {
+            eprintln!("kabl: {msg}");
+            std::process::exit(1);
+        }
+        return;
+    }
     let (level, bad_level) = kabl_standalone::applog::level_from(&args);
     let log = kabl_standalone::applog::init("kabl", level, kabl_standalone::applog::log_dir());
     log::info!(
