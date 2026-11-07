@@ -90,12 +90,13 @@ fn the_cable_list_draws_rows_for_jack_cables() {
 }
 
 #[test]
-fn the_explain_tab_opens_the_selected_module_and_routing_closes_it() {
+fn the_explain_view_belongs_to_routing_and_the_routing_tab_closes_it() {
     let mut h = H::new();
     let id = *h.editor.state().modules.keys().next().unwrap();
     h.ui.selected_module = Some(id);
     h.frames(2);
-    h.click("explain-tab");
+    kabl_ui::explain::open(&mut h.ui, kabl_ui::explain::Subject::Module(id), None);
+    h.frames(1);
     assert!(h.ui.explain.is_open());
     h.click("routing-tab");
     assert!(!h.ui.explain.is_open());

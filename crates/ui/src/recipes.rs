@@ -405,24 +405,13 @@ fn test_note(ui_state: &mut UiState, secs: f32) {
 pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, now: f64) {
     let st = ui_state.style.clone();
     let kb = |t: String| crate::kit::Button::new(&st, t).g4(28.0);
-    ui.horizontal(|ui| {
-        crate::kit::label(
-            ui,
-            &st,
-            crate::style::Role::H3,
-            crate::kit::Tone::Text,
-            "Listening recipes",
-        );
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let r = ui.add(crate::kit::Button::new(&st, "Close").ghost().small());
-            ui_state.record("learn-close".into(), r.rect);
-            if r.clicked() {
-                // Keeps the current patch and its edits.
-                ui_state.recipes.open = false;
-                ui_state.recipes.active = None;
-            }
-        });
-    });
+    crate::kit::label(
+        ui,
+        &st,
+        crate::style::Role::H3,
+        crate::kit::Tone::Text,
+        "Listening recipes",
+    );
     if let Some(n) = ui_state.recipes.note.clone() {
         para(ui, n);
     }

@@ -624,35 +624,25 @@ pub(crate) fn panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui:
             let can_back = ui_state.explain.saved.is_some() || ui_state.explain.card.is_some();
             let back_text = match &ui_state.explain.card {
                 Some(c) => format!("Back to “{}”", card_label(state, c)),
-                None => "Back".into(),
+                None => "Back to routing".into(),
             };
             let r = ui
                 .add(
                     crate::kit::Button::new(&st, back_text)
                         .icon(crate::kit::Ic::Back)
                         .ghost()
-                        .g4(28.0)
-                        .enabled(can_back),
+                        .g4(28.0),
                 )
-                .on_hover_text("Return to the control you started from");
+                .on_hover_text("Return to where you started (Esc closes the explanation)");
             ui_state.record("explain-back".into(), r.rect);
             if r.clicked() {
-                back(ui_state, now);
-            }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let r = ui
-                    .add(
-                        crate::kit::Button::new(&st, "Close")
-                            .icon(crate::kit::Ic::Close)
-                            .ghost()
-                            .g4(28.0),
-                    )
-                    .on_hover_text("Close the explanation (Esc)");
-                ui_state.record("explain-close".into(), r.rect);
-                if r.clicked() {
+                // With nowhere to go back to, Back returns to the routing view.
+                if can_back {
+                    back(ui_state, now);
+                } else {
                     ui_state.explain.close();
                 }
-            });
+            }
         });
         if !ui_state.explain.is_open() {
             return;

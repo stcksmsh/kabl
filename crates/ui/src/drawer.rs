@@ -5,88 +5,152 @@ use crate::kit::{self, Tip, Tone};
 use crate::style::{Role, Style};
 use crate::theme::Theme;
 use crate::{explain, port_color, routing, PatchEditor, UiState};
-use egui::{pos2, vec2, Align, Layout, Rect, Sense};
+use egui::{pos2, vec2, Rect, Sense};
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
 use kabl_modules::registry;
 
-/// Tabs, then the drawer-wide switches. Tab keys: `routing-tab`, `explain-tab`, `inspect-open`.
-pub(crate) fn tabs(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
-    ui.horizontal(|ui| {
-        kit::tabs(ui, st, |ui| {
-            let explain_on = ui_state.explain.is_open();
-            let inspect_on = ui_state.inspect.open;
-            let r = kit::seg(ui, st, "Routing", !explain_on && !inspect_on);
-            ui_state.record("routing-tab".into(), r.rect);
-            if r.clicked() {
-                ui_state.explain.close();
-                ui_state.inspect.open = false;
-            }
-            let r = kit::seg(ui, st, "Explain", explain_on)
-                .tip(st, "What the selected module does and what moves it");
-            ui_state.record("explain-tab".into(), r.rect);
-            if r.clicked() {
-                if explain_on {
-                    ui_state.explain.close();
-                } else if let Some(id) = ui_state.selected_module {
-                    explain::open(ui_state, explain::Subject::Module(id), None);
-                } else {
-                    ui_state.last_message = Some("Select a module to explain it".into());
-                }
-            }
-            let r = kit::seg(ui, st, "Inspect", inspect_on)
-                .tip(st, "Measure one output and ask why there is no sound");
-            ui_state.record("inspect-open".into(), r.rect);
-            if r.clicked() {
-                ui_state.inspect.open = !inspect_on;
-                ui_state.inspect.reveal = !inspect_on;
-            }
-        });
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            if kit::icon_button(ui, st, kit::Ic::Close, false, true)
-                .tip(st, "Close the drawer")
-                .clicked()
-            {
-                ui_state.drawer_open = false;
-            }
-            let on = ui_state.drawer_more;
-            let r = ui
-                .add(kit::Button::new(st, "More").small().ghost().selected(on))
-                .tip(st, "Help, Compare and Learn");
-            ui_state.record("drawer-more".into(), r.rect);
-            if r.clicked() {
-                ui_state.drawer_more = !on;
-            }
-        });
-    });
-    if !ui_state.drawer_more {
-        return;
+/// The drawer's tabs (G4): each is one panel that replaces the drawer's body.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Tab {
+    Routing,
+    Inspect,
+    Compare,
+    Learn,
+    Help,
+}
+
+impl Tab {
+    pub const ALL: [Tab; 5] = [
+        Tab::Routing,
+        Tab::Inspect,
+        Tab::Compare,
+        Tab::Learn,
+        Tab::Help,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Tab::Routing => "Routing",
+            Tab::Inspect => "Inspect",
+            Tab::Compare => "Compare",
+            Tab::Learn => "Learn",
+            Tab::Help => "Help",
+        }
     }
+
+    /// The hit key of the tab (and of its rail icon with `rail:` in front).
+    pub fn key(self) -> &'static str {
+        match self {
+            Tab::Routing => "routing-tab",
+            Tab::Inspect => "inspect-open",
+            Tab::Compare => "compare-open",
+            Tab::Learn => "learn-open",
+            Tab::Help => "help",
+        }
+    }
+
+    pub fn icon(self) -> kit::Ic {
+        match self {
+            Tab::Routing => kit::Ic::Cable,
+            Tab::Inspect => kit::Ic::Target,
+            Tab::Compare => kit::Ic::Compare,
+            Tab::Learn => kit::Ic::Learn,
+            Tab::Help => kit::Ic::Info,
+        }
+    }
+
+    fn tip(self) -> &'static str {
+        match self {
+            Tab::Routing => "Cables and modulation; Explain opens from here",
+            Tab::Inspect => "Measure one output and ask why there is no sound",
+            Tab::Compare => "Keep a reference copy of the patch and restore it",
+            Tab::Learn => "Three short listening recipes (optional)",
+            Tab::Help => "Show what each module and control does",
+        }
+    }
+}
+
+/// The tab showing now. The Explain view belongs to Routing (Back returns to it).
+pub fn current(ui_state: &UiState) -> Tab {
+    if ui_state.recipes.open {
+        Tab::Learn
+    } else if ui_state.compare.open {
+        Tab::Compare
+    } else if ui_state.inspect.open {
+        Tab::Inspect
+    } else if ui_state.explain.help && !ui_state.explain.is_open() {
+        Tab::Help
+    } else {
+        Tab::Routing
+    }
+}
+
+/// Shows `tab` and closes the others.
+pub fn open(ui_state: &mut UiState, tab: Tab) {
+    if tab != Tab::Learn {
+        // Leaving Learn keeps the patch and its edits, and ends the running recipe.
+        ui_state.recipes.active = None;
+    }
+    ui_state.explain.close();
+    ui_state.inspect.open = false;
+    ui_state.compare.open = false;
+    ui_state.recipes.open = false;
+    ui_state.explain.help = false;
+    match tab {
+        Tab::Routing => {}
+        Tab::Inspect => {
+            ui_state.inspect.open = true;
+            ui_state.inspect.reveal = true;
+        }
+        Tab::Compare => {
+            ui_state.compare.open = true;
+            ui_state.compare.reveal = true;
+        }
+        Tab::Learn => ui_state.recipes.open = true,
+        Tab::Help => ui_state.explain.help = true,
+    }
+}
+
+/// One drawer tab, as the mockup draws it: 12.5 px text (semibold when showing), a 2 px accent
+/// underline under the showing one. No padding: five tabs and their 14 px gaps fit the drawer.
+fn tab_button(ui: &mut egui::Ui, st: &Style, text: &str, on: bool) -> egui::Response {
+    let family = if on {
+        crate::style::Font::SansSemibold
+    } else {
+        crate::style::Font::SansMedium
+    };
+    let font = egui::FontId::new(12.5, family.family(st.fonts_ready));
+    let r = &st.roles;
+    let ink = if on { r.text } else { r.text2 };
+    let g = ui.painter().layout_no_wrap(text.to_string(), font, ink);
+    let (rect, resp) = ui.allocate_exact_size(vec2(g.size().x, 28.0), Sense::click());
+    let ink = if !on && resp.hovered() { r.text } else { ink };
+    let (pos, bar) = (
+        pos2(rect.left(), rect.center().y - g.size().y / 2.0),
+        Rect::from_min_size(
+            pos2(rect.left(), rect.bottom() - 2.0),
+            vec2(rect.width(), 2.0),
+        ),
+    );
+    ui.painter().galley(pos, g, ink);
+    if on {
+        ui.painter().rect_filled(bar, 1.0, r.accent);
+    }
+    resp
+}
+
+/// The tab strip: Routing, Inspect, Compare, Learn, Help. Hit keys are `Tab::key`.
+pub(crate) fn tabs(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
+    let now = current(ui_state);
     ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = st.sp(1);
-        let on = ui_state.explain.help;
-        let r = ui
-            .add(kit::Button::new(st, "Help").small().ghost().selected(on))
-            .tip(st, "Show what each module and control does");
-        ui_state.record("help".into(), r.rect);
-        if r.clicked() {
-            ui_state.explain.help = !on;
-        }
-        let on = ui_state.compare.open;
-        let r = ui
-            .add(kit::Button::new(st, "Compare").small().ghost().selected(on))
-            .tip(st, "Keep a reference copy of the patch and restore it");
-        ui_state.record("compare-open".into(), r.rect);
-        if r.clicked() {
-            ui_state.compare.open = !on;
-            ui_state.compare.reveal = !on;
-        }
-        let on = ui_state.recipes.open;
-        let r = ui
-            .add(kit::Button::new(st, "Learn").small().ghost().selected(on))
-            .tip(st, "Three short listening recipes (optional)");
-        ui_state.record("learn-open".into(), r.rect);
-        if r.clicked() {
-            ui_state.recipes.open = !on;
+        ui.spacing_mut().item_spacing.x = 14.0;
+        for tab in Tab::ALL {
+            let r = tab_button(ui, st, tab.label(), now == tab).tip(st, tab.tip());
+            ui_state.record(tab.key().into(), r.rect);
+            // The Routing tab also leaves the Explain view, which belongs to it.
+            if r.clicked() && (now != tab || tab == Tab::Routing) {
+                open(ui_state, tab);
+            }
         }
     });
 }

@@ -284,16 +284,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     if std::mem::take(&mut ui_state.compare.reveal) {
         ui.scroll_to_cursor(Some(egui::Align::TOP));
     }
-    ui.horizontal(|ui| {
-        label(ui, st, Role::H3, Tone::Text, "Compare with a reference");
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let r = ui.add(Button::new(st, "Close").ghost().small());
-            ui_state.record("compare-close".into(), r.rect);
-            if r.clicked() {
-                ui_state.compare.open = false;
-            }
-        });
-    });
+    label(ui, st, Role::H3, Tone::Text, "Compare with a reference");
     paragraph(
         ui,
         st,

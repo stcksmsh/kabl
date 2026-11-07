@@ -53,6 +53,10 @@ pub enum Ic {
     Clock,
     External,
     Info,
+    /// Two overlapping squares: A against B.
+    Compare,
+    /// A ring with four ticks: measure one signal.
+    Target,
 }
 
 pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
@@ -392,6 +396,27 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
         Ic::Clock => {
             p.circle_stroke(q(0.0, 0.0), 6.5 * u, st);
             line(&[(0.0, -3.5), (0.0, 0.0), (3.0, 1.5)]);
+        }
+        Ic::Compare => {
+            p.rect_stroke(
+                Rect::from_center_size(q(-2.0, -2.0), vec2(9.0, 9.0) * u),
+                1.5,
+                st,
+                egui::StrokeKind::Middle,
+            );
+            p.rect_stroke(
+                Rect::from_center_size(q(2.5, 2.5), vec2(9.0, 9.0) * u),
+                1.5,
+                st,
+                egui::StrokeKind::Middle,
+            );
+        }
+        Ic::Target => {
+            p.circle_stroke(q(0.0, 0.0), 4.5 * u, st);
+            line(&[(0.0, -7.0), (0.0, -3.5)]);
+            line(&[(0.0, 3.5), (0.0, 7.0)]);
+            line(&[(-7.0, 0.0), (-3.5, 0.0)]);
+            line(&[(3.5, 0.0), (7.0, 0.0)]);
         }
         Ic::External => {
             line(&[(-1.0, -5.5), (5.5, -5.5), (5.5, 1.0)]);

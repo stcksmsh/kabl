@@ -554,7 +554,6 @@ fn why_no_sound_names_the_output_the_engine_plays() {
 fn a_restore_is_one_undo_step_and_keeps_the_working_version() {
     let mut h = H::new(1440.0, 900.0);
     h.open("factory:palette/pad");
-    h.ui.drawer_more = true;
     h.frame();
     h.click("compare-open");
     let log_before = h.editor.log().all_entries().len();
@@ -757,9 +756,7 @@ fn a_recipe_starts_through_the_unsaved_question_and_exit_keeps_the_patch() {
         h.editor.set_param(3, "cutoff_hz", 444.0);
         h.frame();
         let song = h.editor.state().clone();
-        h.ui.drawer_more = true;
         h.frame();
-        h.ui.drawer_more = true;
         h.frame();
         h.click("learn-open");
         h.click("recipe:pluck-to-pad");
@@ -817,7 +814,7 @@ fn a_recipe_starts_through_the_unsaved_question_and_exit_keeps_the_patch() {
         }
         assert_eq!(h.ui.recipes.active.as_ref().unwrap().step, 5);
         let kept = h.editor.state().clone();
-        h.click("learn-close");
+        h.click("routing-tab");
         assert!(h.ui.recipes.active.is_none());
         assert_eq!(h.editor.state(), &kept);
         assert_eq!(kept.modules[&6].params["sustain"], 0.7);
@@ -828,7 +825,6 @@ fn a_recipe_starts_through_the_unsaved_question_and_exit_keeps_the_patch() {
 fn opening_another_sound_detaches_a_recipe() {
     let mut h = H::new(1440.0, 900.0);
     h.open(INIT);
-    h.ui.drawer_more = true;
     h.frame();
     h.click("learn-open");
     h.click("recipe:filter-movement");
