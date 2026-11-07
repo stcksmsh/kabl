@@ -6,12 +6,40 @@ use kabl_modules::code::{
     MAX_BLOB_BYTES, OVERRUN_LIMIT,
 };
 use kabl_modules::{registry, Module, ProcessIo, QualityConfig, QualityTier, Signal};
+use std::alloc::{GlobalAlloc, Layout as Layout2, System};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-#[cfg(debug_assertions)]
+/// Counts allocations made on a thread that is inside a code-module call (the module's own
+/// marker, `in_code_call`) or inside a block the test marks with `NO_ALLOC`.
+struct CountingAlloc;
+static VIOLATIONS: AtomicUsize = AtomicUsize::new(0);
+thread_local! {
+    static NO_ALLOC: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+fn watched() -> bool {
+    NO_ALLOC.with(|c| c.get()) || kabl_modules::code::in_code_call()
+}
+unsafe impl GlobalAlloc for CountingAlloc {
+    unsafe fn alloc(&self, l: Layout2) -> *mut u8 {
+        if watched() {
+            VIOLATIONS.fetch_add(1, Ordering::Relaxed);
+        }
+        System.alloc(l)
+    }
+    unsafe fn dealloc(&self, p: *mut u8, l: Layout2) {
+        System.dealloc(p, l)
+    }
+    unsafe fn realloc(&self, p: *mut u8, l: Layout2, n: usize) -> *mut u8 {
+        if watched() {
+            VIOLATIONS.fetch_add(1, Ordering::Relaxed);
+        }
+        System.realloc(p, l, n)
+    }
+}
 #[global_allocator]
-static ALLOCATOR: assert_no_alloc::AllocDisabler = assert_no_alloc::AllocDisabler;
+static ALLOCATOR: CountingAlloc = CountingAlloc;
 
 const SR: f32 = 48_000.0;
 const N: usize = 64;
@@ -76,13 +104,23 @@ fn healthy_module_processes_without_allocating() {
             let mut outs: [&mut [f32]; 1] = [&mut out];
             let mut io = ProcessIo::new(&sig, &mut outs, &ps, N);
             // The whole process call, not just the module's inner call, must not allocate.
-            #[cfg(debug_assertions)]
-            assert_no_alloc::assert_no_alloc(|| m.process(&mut io));
-            #[cfg(not(debug_assertions))]
+            NO_ALLOC.with(|c| c.set(true));
             m.process(&mut io);
+            NO_ALLOC.with(|c| c.set(false));
         }
         assert!(out.iter().all(|&v| v == 0.5));
     }
+    assert_eq!(
+        VIOLATIONS.load(Ordering::Relaxed),
+        0,
+        "allocated while processing"
+    );
+    // The detector itself works: an allocation inside a marked region is counted.
+    NO_ALLOC.with(|c| c.set(true));
+    let v = std::hint::black_box(vec![1u8; 16]);
+    NO_ALLOC.with(|c| c.set(false));
+    assert!(VIOLATIONS.swap(0, Ordering::Relaxed) >= 1);
+    drop(v);
     assert!(!g.health().is_crashed());
 }
 

@@ -8,8 +8,8 @@
 //! - running out of fuel, or a block taking longer than the wall-clock cap (the backstop), is an
 //!   **overrun**: that block is silent (same short fade), and eight in a row make a crash. A
 //!   one-off overrun is only counted.
-//! - nothing allocates while a block runs; a debug build asserts it (`assert_no_alloc` is active
-//!   when the binary installs its `AllocDisabler`).
+//! - nothing allocates while a block runs; debug builds mark the call
+//!   ([`in_code_call`]) so a checking allocator can assert it.
 
 use super::abi::Layout;
 use super::engine::{Fault, InstanceConfig, WasmInstance};
@@ -179,6 +179,29 @@ impl CodeModule {
     }
 }
 
+thread_local! {
+    static IN_CODE_CALL: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+/// True while this thread is inside a code module's audio-thread call (debug builds only; always
+/// false in release). A debug binary's allocator checks it to catch allocation on the audio
+/// thread while custom modules run; `tests/code_module.rs` installs such an allocator. No
+/// dependency: the usual checker crate's licence is not on the allow list for the shipped tree.
+pub fn in_code_call() -> bool {
+    cfg!(debug_assertions) && IN_CODE_CALL.with(|c| c.get() > 0)
+}
+
+fn no_alloc<T>(f: impl FnOnce() -> T) -> T {
+    if cfg!(debug_assertions) {
+        IN_CODE_CALL.with(|c| c.set(c.get() + 1));
+        let r = f();
+        IN_CODE_CALL.with(|c| c.set(c.get() - 1));
+        r
+    } else {
+        f()
+    }
+}
+
 fn fade_len(sample_rate: f32) -> usize {
     ((sample_rate * FADE_MS / 1000.0) as usize).max(1)
 }
@@ -236,7 +259,7 @@ impl Module for CodeModule {
         self.inst.set_fuel(budget);
         let started = Instant::now();
         let inst = &mut self.inst;
-        let result = assert_no_alloc::assert_no_alloc(|| inst.call_block(n as u32));
+        let result = no_alloc(|| inst.call_block(n as u32));
         let took = started.elapsed();
 
         match result {

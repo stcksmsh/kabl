@@ -19,7 +19,7 @@ pub mod module;
 pub use abi::{Layout, LayoutError, ABI_VERSION, DEFAULT_MEMORY_CAP, MAX_BLOB_BYTES};
 pub use engine::{CompiledModule, Fault, InstanceConfig, LoadError, WasmEngine, WasmInstance};
 pub use meta::{CodeMeta, CodeParam, CodePort};
-pub use module::{CodeModule, Health, FADE_MS, OVERRUN_LIMIT};
+pub use module::{in_code_call, CodeModule, Health, FADE_MS, OVERRUN_LIMIT};
 
 use crate::info::{ModuleInfo, PortDirection};
 use std::collections::BTreeMap;
