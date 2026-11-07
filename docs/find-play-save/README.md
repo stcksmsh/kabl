@@ -17,8 +17,11 @@ change its controls, save your own version and find it again.
     tar -xzf target/dist/kabl-0.1.0-linux-x86_64.tar.gz -C ~/opt
     ~/opt/kabl-0.1.0-linux-x86_64/bin/kabl-ui      # add --size 1280x800 for the smaller window
 
-From the source tree `cargo run --release -p kabl-ui` does the same (factory sounds are then
-read from `patches/`). `--patch DIR` still opens a folder directly.
+From the source tree `cargo run --release -p kabl-ui` does the same (the build packs `patches/`
+to `.kabl` files and the app reads those). `--patch FILE.kabl` opens a file directly. The app
+reads and writes only `.kabl`: sounds are one file each, with `sound.toml` in the file's
+metadata frame; the factory sounds stay folders in git and are packed by the build and by
+`packaging/linux/package.sh` (`kabl pack-tree`).
 
 ## What it does
 
@@ -76,7 +79,7 @@ read from `patches/`). `--patch DIR` still opens a folder directly.
 
 | What | Where |
 |---|---|
-| Factory sounds | `KABL_FACTORY_DIR`, else `<bin>/../share/kabl/patches` (package), else `$XDG_DATA_DIRS/kabl/patches` (`/usr/local/share`, `/usr/share`), else the source checkout's `patches/` |
+| Factory sounds | `KABL_FACTORY_DIR`, else `<bin>/../share/kabl/patches` (package), else `$XDG_DATA_DIRS/kabl/patches` (`/usr/local/share`, `/usr/share`), else the `.kabl` files the build packed from the checkout's `patches/` |
 | Your sounds | `KABL_USER_DIR/sounds`, else `$XDG_DATA_HOME/kabl/sounds`, else `~/.local/share/kabl/sounds` — one directory per sound |
 | Favorites, recents | `library.json` beside `sounds/` (preferences: not in any patch, never undone) |
 | A sound | the existing patch directory (`log.jsonl` = source of truth, `checkpoint.json`, `meta.toml`) plus optional `sound.toml` (name, category, tags, description, keys, sequence) |

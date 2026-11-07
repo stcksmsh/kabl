@@ -1,15 +1,16 @@
 //! The sound library behind the browser: factory sounds shipped with kabl (read-only) and the
-//! user's own sounds, both plain patch directories (`kabl_core::save` format). No `egui`
-//! here, so it is tested headlessly (`tests/library.rs`).
+//! user's own sounds, both `.kabl` files. No `egui` here, so it is tested headlessly
+//! (`tests/library.rs`). Folders are ignored: the app reads and writes only `.kabl`.
 //!
-//! - A sound is a patch directory. Its optional `sound.toml` holds browser metadata (name,
+//! - A sound is one `.kabl` file. Its metadata frame holds the `sound.toml` text (name,
 //!   category, tags, description, how it plays); the op log stays the only musical state.
-//! - Identity is `factory:<relative dir>` or `user:<dir name>`, never the display name, so a
+//! - Identity is `factory:<relative path>` or `user:<file name>` (no extension), never the
+//!   display name, so a
 //!   rename keeps favorites and recents, and two sounds may look alike without colliding.
 //! - Favorites and recents (`library.json`) are library preferences: never in a patch, never
 //!   undone.
-//! - A user save writes a complete new directory beside the old one, reads it back, then
-//!   swaps it in with renames (`commit_dir`). An interrupted swap is repaired on the next scan.
+//! - A user save writes a complete new file beside the old one, reads it back, then renames it
+//!   over the old one.
 //!
 //! Locations: docs/find-play-save/README.md, "Where things live".
 
@@ -23,7 +24,7 @@ use serde::{Deserialize, Serialize};
 pub const META_FILE: &str = "sound.toml";
 pub const PREFS_FILE: &str = "library.json";
 pub const MAX_RECENTS: usize = 12;
-/// Patch folders the Recent place of the file browser remembers.
+/// Patch files the Recent place of the file browser remembers.
 pub const MAX_PATCH_RECENTS: usize = 10;
 pub const MAX_NAME: usize = 60;
 
@@ -143,7 +144,7 @@ pub struct Prefs {
     pub favorites: BTreeSet<String>,
     /// Newest first.
     pub recents: Vec<String>,
-    /// Paths of the patch folders last opened or saved through the file browser, newest first.
+    /// Paths of the patch files last opened or saved through the file browser, newest first.
     pub patch_recents: Vec<String>,
 }
 
@@ -246,11 +247,18 @@ pub fn find_factory_dir() -> Option<PathBuf> {
             .split(':')
             .map(|d| Path::new(d).join("kabl/patches")),
     );
-    candidates.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches"));
+    // A development build: the checkout's `patches/` packed by this crate's build script.
+    candidates.push(built_factory_dir());
     candidates
         .into_iter()
         .find(|d| d.is_dir())
         .map(|d| d.canonicalize().unwrap_or(d))
+}
+
+/// The factory sounds as `.kabl` files, packed from the checkout's `patches/` folders when this
+/// crate was built (`build.rs`). What a development build and the tests use.
+pub fn built_factory_dir() -> PathBuf {
+    PathBuf::from(env!("KABL_FACTORY_BUILD"))
 }
 
 /// `KABL_USER_DIR`, else `$XDG_DATA_HOME/kabl`, else `~/.local/share/kabl`.
@@ -265,39 +273,35 @@ pub fn default_user_root() -> PathBuf {
     home.join(".local/share/kabl")
 }
 
-fn is_patch_dir(d: &Path) -> bool {
-    d.join("meta.toml").is_file() && d.join("log.jsonl").is_file()
+fn is_patch_file(p: &Path) -> bool {
+    p.is_file() && is_kabl_path(p)
 }
 
-fn read_meta(dir: &Path, fallback_name: &str, notes: &mut Vec<String>) -> Meta {
-    let mut meta = match fs::read_to_string(dir.join(META_FILE)) {
-        Ok(text) => match toml::from_str::<Meta>(&text) {
-            Ok(m) => m,
-            Err(e) => {
-                notes.push(format!("{}: unreadable {META_FILE} ({e})", dir.display()));
-                Meta::default()
-            }
-        },
-        // A patch saved before the library (or copied in by hand): look inside it.
-        Err(_) => match kabl_core::load(dir) {
-            Ok(log) => {
-                let (keys, sequence) = Meta::play_of(log.state());
-                Meta {
-                    keys,
-                    sequence,
-                    ..Meta::default()
-                }
-            }
-            Err(_) => Meta::default(),
-        },
+/// Reads a sound file: the metadata frame (`sound.toml` text) or the defaults, with the play
+/// flags taken from the patch itself.
+fn read_meta(file: &Path, fallback_name: &str, notes: &mut Vec<String>) -> Meta {
+    let by_default = Meta {
+        name: fallback_name.to_string(),
+        ..Meta::default()
+    };
+    let (log, text) = match kabl_core::format::load_kabl_meta(file) {
+        Ok(v) => v,
+        Err(e) => {
+            notes.push(format!("{}: unreadable ({e:?})", file.display()));
+            return by_default;
+        }
+    };
+    let mut meta = match text {
+        Some(t) => toml::from_str::<Meta>(&t).unwrap_or_else(|e| {
+            notes.push(format!("{}: unreadable metadata ({e})", file.display()));
+            Meta::default()
+        }),
+        None => Meta::default(),
     };
     if meta.name.trim().is_empty() {
-        meta.name = fallback_name.to_string();
+        meta.name = by_default.name;
     }
-    // Older metadata may omit play flags; the complete graph remains authoritative.
-    if let Ok(log) = kabl_core::load(dir) {
-        (meta.keys, meta.sequence) = Meta::play_of(log.state());
-    }
+    (meta.keys, meta.sequence) = Meta::play_of(log.state());
     meta
 }
 
@@ -332,17 +336,11 @@ fn check_name(name: &str) -> Result<String, LibError> {
     Ok(name.to_string())
 }
 
-/// Reads a patch directory and checks that it compiles, without touching anything else:
+/// Reads a `.kabl` file and checks that it compiles, without touching anything else:
 /// the caller replaces its working sound only on `Ok`.
-pub fn read_patch(dir: &Path) -> Result<PatchLog, LibError> {
-    // A real `.kabl` file, or a legacy patch folder.
-    let log = if dir.is_file() {
-        kabl_core::format::load_kabl(dir)
-    } else {
-        repair_folder(dir);
-        kabl_core::load(dir)
-    }
-    .map_err(|e| LibError::Unreadable(format!("{e:?}")))?;
+pub fn read_patch(file: &Path) -> Result<PatchLog, LibError> {
+    let log =
+        kabl_core::format::load_kabl(file).map_err(|e| LibError::Unreadable(format!("{e:?}")))?;
     kabl_engine::compile::compile(log.state(), 48000.0, kabl_standalone::DEFAULT_VOICE_COUNT)
         .map_err(|e| LibError::Uncompilable(e.to_string()))?;
     Ok(log)
@@ -354,10 +352,9 @@ pub fn is_kabl_path(p: &Path) -> bool {
         .is_some_and(|e| e.eq_ignore_ascii_case("kabl"))
 }
 
-/// Where `save_patch` writes for `path`: a `.kabl` path as it is; a legacy patch folder, or any
-/// other name, as `name.kabl` next to it. The folder is never touched.
+/// Where `save_patch` writes for `path`: a `.kabl` path as it is, any other name as `name.kabl`.
 pub fn patch_target(path: &Path) -> PathBuf {
-    if is_kabl_path(path) && !path.is_dir() {
+    if is_kabl_path(path) {
         return path.to_path_buf();
     }
     let mut s = path.as_os_str().to_owned();
@@ -378,43 +375,6 @@ pub fn save_patch(path: &Path, log: &PatchLog) -> Result<PathBuf, LibError> {
         return Err(LibError::Io("saved copy doesn't match the sound".into()));
     }
     Ok(target)
-}
-
-/// Replaces `target` by the complete directory `staged` with renames: `target` → `.old`,
-/// `staged` → `target`, then `.old` is removed. A failure puts the old one back. Not
-/// crash-proof (no fsync); `repair` finishes or undoes an interrupted swap on the next scan.
-fn commit_dir(staged: &Path, target: &Path) -> Result<(), LibError> {
-    let old = sibling(target, "old");
-    if old.exists() {
-        if !target.exists() {
-            // The only saved copy: put it back rather than clear it.
-            fs::rename(&old, target).map_err(|e| io("can't restore", &old, e))?;
-        } else {
-            fs::remove_dir_all(&old).map_err(|e| io("can't clear", &old, e))?;
-        }
-    }
-    let had = target.exists();
-    if had {
-        fs::rename(target, &old).map_err(|e| io("can't replace", target, e))?;
-    }
-    let moved = fail_point("replace:dir")
-        .and_then(|()| fs::rename(staged, target).map_err(|e| io("can't write", target, e)));
-    if let Err(e) = moved {
-        if had {
-            if let Err(back) = fs::rename(&old, target) {
-                return Err(LibError::Interrupted(format!(
-                    "{e}; the previous version is kept at {} ({back}) and is restored the next \
-                     time kabl starts",
-                    old.display()
-                )));
-            }
-        }
-        return Err(e);
-    }
-    if had {
-        let _ = fs::remove_dir_all(&old);
-    }
-    Ok(())
 }
 
 thread_local! {
@@ -438,192 +398,6 @@ fn fail_point(stage: &str) -> Result<(), LibError> {
         Err(LibError::Io(format!("injected failure at {stage}")))
     } else {
         Ok(())
-    }
-}
-
-/// The patch files a folder save replaces, in the order it replaces them: the log, the only
-/// authoritative one, last.
-const FOLDER_FILES: [&str; 3] = ["meta.toml", "checkpoint.json", "log.jsonl"];
-/// Staging directory a folder save keeps inside the patch folder while it works.
-const FOLDER_STAGING: &str = ".kabl-save";
-
-/// Marker file inside a staging directory kabl made: `writing` while the new copy is written,
-/// `replacing` once it has been read back and files start moving, `done` (the save stands)
-/// or `undone` (rolled back) before the staging is cleaned up. A `.kabl-save` without it is
-/// not kabl's and is never touched.
-const FOLDER_MARKER: &str = "kabl-staging";
-
-/// Saves `log` into a patch folder the user chose, touching only its three patch files
-/// (other files in the folder stay). The new files are written and read back in
-/// `<dir>/.kabl-save/`, then each old file is moved into the staging directory and the new
-/// one moved in, `log.jsonl` last. Any failure moves the old files back and removes files
-/// the save added, so the folder is as it was. A crash half way is finished or undone by
-/// `repair_folder` on the next open or save of that folder. Not crash-proof on power loss
-/// (no fsync). A `.kabl-save` that kabl didn't make blocks the save instead of being used.
-pub fn save_folder(dir: &Path, log: &PatchLog) -> Result<(), LibError> {
-    repair_folder(dir);
-    let staging = dir.join(FOLDER_STAGING);
-    let marker = staging.join(FOLDER_MARKER);
-    // An empty one (kabl stopped right after making it) just goes.
-    let _ = fs::remove_dir(&staging);
-    if marker.exists() {
-        return Err(LibError::Interrupted(format!(
-            "an earlier save here could not be undone: the previous files are kept in {}",
-            staging.display()
-        )));
-    }
-    if staging.exists() {
-        return Err(LibError::Io(format!(
-            "{} is in the way (kabl didn't make it): rename it to save here",
-            staging.display()
-        )));
-    }
-    let written = (|| {
-        fs::create_dir_all(&staging).map_err(|e| io("can't create", &staging, e))?;
-        fs::write(&marker, "writing").map_err(|e| io("can't write", &marker, e))?;
-        kabl_core::save(&staging, log)
-            .map_err(|e| LibError::Io(format!("can't save to {}: {e:?}", dir.display())))?;
-        let back = kabl_core::load(&staging)
-            .map_err(|e| LibError::Io(format!("saved copy doesn't read back: {e:?}")))?;
-        if back.state() != log.state() {
-            return Err(LibError::Io("saved copy doesn't match the sound".into()));
-        }
-        fail_point("staged")?;
-        fs::write(&marker, "replacing").map_err(|e| io("can't write", &marker, e))
-    })();
-    if let Err(e) = written {
-        remove_staging(&staging);
-        return Err(e);
-    }
-    let mut result = Ok(());
-    for f in FOLDER_FILES {
-        let (live, new, old) = (
-            dir.join(f),
-            staging.join(f),
-            staging.join(format!("{f}.old")),
-        );
-        let step = (|| {
-            if live.exists() {
-                fs::rename(&live, &old).map_err(|e| io("can't replace", &live, e))?;
-            }
-            fs::rename(&new, &live).map_err(|e| io("can't write", &live, e))?;
-            fail_point(&format!("replace:{f}"))
-        })();
-        if let Err(e) = step {
-            result = Err(e);
-            break;
-        }
-    }
-    if let Err(e) = result {
-        if roll_back(dir, &staging) {
-            let _ = fs::write(&marker, "undone");
-            remove_staging(&staging);
-            return Err(e);
-        }
-        return Err(LibError::Interrupted(format!(
-            "{e}; putting the previous files back failed: they are kept in {} and the next \
-             open or save of this folder settles it",
-            staging.display()
-        )));
-    }
-    // The save stands from here on, whatever happens to the cleanup.
-    let _ = fs::write(&marker, "done");
-    remove_staging(&staging);
-    Ok(())
-}
-
-/// Undoes a folder save in the `replacing` phase: every `.old` goes back over its file, and a
-/// patch file the save moved in where there was none (its staged copy gone, no `.old`) is
-/// removed. True when everything was undone.
-fn roll_back(dir: &Path, staging: &Path) -> bool {
-    let mut ok = true;
-    for f in FOLDER_FILES {
-        let (live, new, old) = (
-            dir.join(f),
-            staging.join(f),
-            staging.join(format!("{f}.old")),
-        );
-        let r = if old.exists() {
-            fs::rename(&old, &live)
-        } else if !new.exists() && live.exists() {
-            fs::remove_file(&live)
-        } else {
-            Ok(())
-        };
-        ok &= r.is_ok();
-    }
-    ok
-}
-
-/// Removes a staging directory kabl made: only the files it writes, then the directory
-/// itself (not recursively, so anything else in it stays and keeps the directory).
-fn remove_staging(staging: &Path) {
-    for f in FOLDER_FILES {
-        let _ = fs::remove_file(staging.join(f));
-        let _ = fs::remove_file(staging.join(format!("{f}.old")));
-    }
-    let _ = fs::remove_file(staging.join(FOLDER_MARKER));
-    let _ = fs::remove_dir(staging);
-}
-
-/// Finishes or undoes a folder save that stopped half way (see `save_folder`). Acts only on
-/// a staging directory with kabl's marker. `writing`: nothing in the folder changed.
-/// `done` / `undone`: only the cleanup was left. `replacing`: the log moves last, so if the
-/// new log is in place (its staged copy gone and `log.jsonl` present) the save completed and
-/// stands; otherwise it is rolled back. Returns a note for the user when something was
-/// restored.
-pub fn repair_folder(dir: &Path) -> Option<String> {
-    let staging = dir.join(FOLDER_STAGING);
-    let phase = fs::read_to_string(staging.join(FOLDER_MARKER)).ok()?;
-    let committed = !staging.join("log.jsonl").exists() && dir.join("log.jsonl").exists();
-    let mut note = None;
-    if phase.trim() == "replacing" && !committed {
-        if roll_back(dir, &staging) {
-            note = Some(format!(
-                "{}: an interrupted save was undone; the folder is as it was before it",
-                dir.display()
-            ));
-        } else {
-            return Some(format!(
-                "{}: an interrupted save could not be undone; the previous files are in {}",
-                dir.display(),
-                staging.display()
-            ));
-        }
-    }
-    remove_staging(&staging);
-    note
-}
-
-/// `.name.old` / `.name.new` beside `dir`.
-fn sibling(dir: &Path, what: &str) -> PathBuf {
-    let name = dir
-        .file_name()
-        .map_or_else(Default::default, |n| n.to_string_lossy().to_string());
-    dir.with_file_name(format!(".{name}.{what}"))
-}
-
-/// Finishes or undoes interrupted saves in `sounds`: a `.x.old` whose `x` is gone is put
-/// back (the swap stopped half way), otherwise removed; leftover `.x.new` staging is removed.
-fn repair(sounds: &Path, notes: &mut Vec<String>) {
-    let Ok(rd) = fs::read_dir(sounds) else {
-        return;
-    };
-    for e in rd.flatten() {
-        let name = e.file_name().to_string_lossy().to_string();
-        let Some(rest) = name.strip_prefix('.') else {
-            continue;
-        };
-        if let Some(base) = rest.strip_suffix(".old") {
-            let target = sounds.join(base);
-            if target.exists() {
-                let _ = fs::remove_dir_all(e.path());
-            } else if fs::rename(e.path(), &target).is_ok() {
-                notes.push(format!("restored \"{base}\" after an interrupted save"));
-            }
-        } else if rest.ends_with(".new") {
-            let _ = fs::remove_dir_all(e.path());
-        }
     }
 }
 
@@ -664,33 +438,34 @@ impl Library {
         let mut entries = Vec::new();
         match &self.factory_dir {
             Some(root) => {
-                let mut dirs = Vec::new();
+                let mut files = Vec::new();
                 for e in fs::read_dir(root).into_iter().flatten().flatten() {
                     let p = e.path();
-                    if is_patch_dir(&p) {
-                        dirs.push(p);
+                    if is_patch_file(&p) {
+                        files.push(p);
                     } else if p.is_dir() {
                         for e in fs::read_dir(&p).into_iter().flatten().flatten() {
-                            if is_patch_dir(&e.path()) {
-                                dirs.push(e.path());
+                            if is_patch_file(&e.path()) {
+                                files.push(e.path());
                             }
                         }
                     }
                 }
-                for dir in dirs {
-                    let rel = dir
+                for file in files {
+                    let rel = file
                         .strip_prefix(root)
-                        .unwrap_or(&dir)
+                        .unwrap_or(&file)
+                        .with_extension("")
                         .to_string_lossy()
                         .replace('\\', "/");
-                    let fallback = dir
-                        .file_name()
+                    let fallback = file
+                        .file_stem()
                         .map_or(rel.clone(), |n| n.to_string_lossy().to_string());
-                    let meta = read_meta(&dir, &fallback, &mut notes);
+                    let meta = read_meta(&file, &fallback, &mut notes);
                     entries.push(Entry {
                         id: format!("factory:{rel}"),
                         origin: Origin::Factory,
-                        dir,
+                        dir: file,
                         meta,
                     });
                 }
@@ -702,10 +477,12 @@ impl Library {
             ),
         }
         let sounds = self.sounds_dir();
-        repair(&sounds, &mut notes);
         for e in fs::read_dir(&sounds).into_iter().flatten().flatten() {
-            let name = e.file_name().to_string_lossy().to_string();
-            if name.starts_with('.') || !is_patch_dir(&e.path()) {
+            let name = e
+                .path()
+                .file_stem()
+                .map_or(String::new(), |n| n.to_string_lossy().to_string());
+            if e.file_name().to_string_lossy().starts_with('.') || !is_patch_file(&e.path()) {
                 continue;
             }
             let meta = read_meta(&e.path(), &name, &mut notes);
@@ -759,9 +536,6 @@ impl Library {
         if let Some(taken) = self.user_named(&meta.name, replace) {
             return Err(LibError::NameTaken(taken.id.clone()));
         }
-        // A swap that stopped half way earlier this session is settled first, so its `.old`
-        // (possibly the only saved copy) is put back rather than cleared by this save.
-        repair(&self.sounds_dir(), &mut self.notes);
         let target = match replace {
             Some(id) => {
                 let e = self
@@ -782,49 +556,49 @@ impl Library {
             None => {
                 let base = slug(&meta.name);
                 let sounds = self.sounds_dir();
-                let mut dir = sounds.join(&base);
+                let mut file = sounds.join(format!("{base}.kabl"));
                 let mut n = 2;
-                while dir.exists() || sibling(&dir, "old").exists() {
-                    dir = sounds.join(format!("{base}-{n}"));
+                while file.exists() {
+                    file = sounds.join(format!("{base}-{n}.kabl"));
                     n += 1;
                 }
-                dir
+                file
             }
         };
         (meta.keys, meta.sequence) = Meta::play_of(log.state());
         let sounds = self.sounds_dir();
         fs::create_dir_all(&sounds).map_err(|e| io("can't create", &sounds, e))?;
-        let staged = sibling(&target, "new");
-        let _ = fs::remove_dir_all(&staged);
+        let text = toml::to_string_pretty(&meta).map_err(|e| LibError::Io(e.to_string()))?;
+        let mut staged = target.clone().into_os_string();
+        staged.push(".new");
+        let staged = PathBuf::from(staged);
         let written = (|| {
-            kabl_core::save(&staged, log)
+            kabl_core::format::save_kabl_meta(&staged, log, Some(&text))
                 .map_err(|e| LibError::Io(format!("can't save {}: {e:?}", staged.display())))?;
-            let text = toml::to_string_pretty(&meta).map_err(|e| LibError::Io(e.to_string()))?;
-            fs::write(staged.join(META_FILE), text).map_err(|e| io("can't write", &staged, e))?;
             // Read it back: only a copy that loads to the same sound replaces anything.
-            let back = kabl_core::load(&staged)
+            let (back, back_meta) = kabl_core::format::load_kabl_meta(&staged)
                 .map_err(|e| LibError::Io(format!("saved copy doesn't read back: {e:?}")))?;
-            if back.state() != log.state() {
+            if back.state() != log.state() || back_meta.as_deref() != Some(text.as_str()) {
                 return Err(LibError::Io("saved copy doesn't match the sound".into()));
             }
             fail_point("staged")?;
-            commit_dir(&staged, &target)
+            fs::rename(&staged, &target).map_err(|e| io("can't write", &target, e))
         })();
         if written.is_err() {
-            let _ = fs::remove_dir_all(&staged);
+            let _ = fs::remove_file(&staged);
         }
         written?;
         let id = format!(
             "user:{}",
-            target.file_name().unwrap_or_default().to_string_lossy()
+            target.file_stem().unwrap_or_default().to_string_lossy()
         );
         self.rescan();
         self.touch(&id);
         Ok(id)
     }
 
-    /// Changes a user sound's metadata (rename, category, tags). Only `sound.toml` changes,
-    /// through a temporary file: a failure leaves the sound as it was.
+    /// Changes a user sound's metadata (rename, category, tags): the file is rewritten with the
+    /// same log, through a temporary file, so a failure leaves the sound as it was.
     pub fn set_meta(&mut self, id: &str, mut meta: Meta) -> Result<(), LibError> {
         meta.name = check_name(&meta.name)?;
         let e = self
@@ -838,7 +612,10 @@ impl Library {
         }
         (meta.keys, meta.sequence) = (e.meta.keys, e.meta.sequence);
         let text = toml::to_string_pretty(&meta).map_err(|e| LibError::Io(e.to_string()))?;
-        write_atomic(&e.dir.join(META_FILE), &text)?;
+        let (log, _) = kabl_core::format::load_kabl_meta(&e.dir)
+            .map_err(|e| LibError::Unreadable(format!("{e:?}")))?;
+        kabl_core::format::save_kabl_meta(&e.dir, &log, Some(&text))
+            .map_err(|e| LibError::Io(format!("can't save: {e:?}")))?;
         self.rescan();
         Ok(())
     }
@@ -851,7 +628,7 @@ impl Library {
         self.save_prefs()
     }
 
-    /// Records the patch folder `path` as the newest recent patch and saves the preferences.
+    /// Records the patch file `path` as the newest recent patch and saves the preferences.
     pub fn touch_patch(&mut self, path: &Path) -> Option<String> {
         let s = path.to_string_lossy().into_owned();
         self.prefs.patch_recents.retain(|r| *r != s);
@@ -860,7 +637,7 @@ impl Library {
         self.save_prefs()
     }
 
-    /// The recent patch folders that still exist, newest first.
+    /// The recent patch files that still exist, newest first.
     pub fn recent_patches(&self) -> Vec<PathBuf> {
         let dirs = self.prefs.patch_recents.iter().map(PathBuf::from);
         dirs.filter(|p| p.exists()).collect()

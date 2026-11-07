@@ -60,7 +60,10 @@ fn run(
     if let Ok(id) = std::env::var("KABL_BENCH_THEME") {
         ui.theme = id;
     }
-    ui.library = Some(Library::open(Some(patches()), user.path().to_path_buf()));
+    ui.library = Some(Library::open(
+        Some(kabl_ui::library::built_factory_dir()),
+        user.path().to_path_buf(),
+    ));
     let size = egui::vec2(w, h);
     let mut times = Vec::with_capacity(frames);
     for i in 0..frames + 20 {

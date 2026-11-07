@@ -12,10 +12,10 @@ use kabl_ui::inspect::{self, Context, Sel, Status};
 use kabl_ui::library::Library;
 use kabl_ui::{compare, recipes, show, PatchEditor, UiState};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 fn factory() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches")
+    kabl_ui::library::built_factory_dir()
 }
 
 struct H {
@@ -374,7 +374,7 @@ fn summary(t_stats: LaneStats, lanes: usize) -> inspect::Summary {
 }
 
 fn init_state() -> PatchState {
-    kabl_core::load(&factory().join("init-keyboard"))
+    kabl_core::format::load_kabl(&factory().join("init-keyboard.kabl"))
         .unwrap()
         .state()
         .clone()
@@ -491,7 +491,7 @@ fn why_no_sound_does_not_diagnose_a_valid_quiet_or_stopped_patch() {
         "a held key is not a missing trigger: {d:?}"
     );
 
-    let piece = kabl_core::load(&factory().join("interlocking"))
+    let piece = kabl_core::format::load_kabl(&factory().join("interlocking.kabl"))
         .unwrap()
         .state()
         .clone();

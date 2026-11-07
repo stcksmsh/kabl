@@ -10,8 +10,8 @@
 //! synthesis path is intact even on a machine (or container) with no audio hardware, rather than
 //! just failing with no evidence either way.
 //!
-//! `--patch <dir>` loads a patch saved by `kabl_core::save` (the same format `kabl-ui`'s "Save"
-//! button writes) instead of playing `default_patch()`. `--save-default <dir>` writes
+//! `--patch <file.kabl>` loads a patch saved by `kabl_core::format::save_kabl` (the same format `kabl-ui`'s "Save"
+//! button writes) instead of playing `default_patch()`. `--save-default <file.kabl>` writes
 //! `default_patch()` out in that format and exits, as a starting point to then edit with
 //! `kabl-ui` — neither binary shipped any way to get a save file onto disk before this existed.
 //! `--midi <substring>` connects to the first port whose name contains it (case-insensitive);
@@ -86,7 +86,7 @@ fn run(args: &[String]) -> i32 {
     }
 
     let patch = match flag_value(&args, "--patch") {
-        Some(dir) => match kabl_core::load(Path::new(&dir)) {
+        Some(dir) => match kabl_core::format::load_kabl(Path::new(&dir)) {
             Ok(log) => log.state().clone(),
             Err(err) => {
                 log::error!(target: "app", "failed to load patch from {dir}: {err:?}");
@@ -379,5 +379,5 @@ fn save_default_patch(dir: &Path) -> Result<(), kabl_core::FormatError> {
             Source::User,
         );
     }
-    kabl_core::save(dir, &log)
+    kabl_core::format::save_kabl(dir, &log)
 }

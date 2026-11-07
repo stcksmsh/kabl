@@ -4,7 +4,8 @@
 #   kabl-<version>-linux-<arch>/
 #     bin/kabl-ui                          standalone
 #     lib/clap/kabl.clap                   CLAP plugin
-#     share/kabl/patches/...               factory sounds (found relative to bin/)
+#     share/kabl/patches/...               factory sounds as .kabl files, packed from patches/
+#                                          (found relative to bin/)
 #     share/applications/kabl.desktop, share/icons/hicolor/...
 #     install.sh                           installs (and --uninstall removes) under ~/.local and ~/.clap
 #     LICENSE, COPYRIGHT, TRADEMARKS.md, THIRD-PARTY-NOTICES.md, ASSET-LICENSES.md, README.txt
@@ -20,6 +21,9 @@ OUT=${OUT:-target/dist}
 # Two invocations: with one, --bin applies to every -p and silently drops the plugin's cdylib.
 cargo build --release -p kabl-ui --bin kabl-ui
 cargo build --release -p kabl-clap
+# The app reads only .kabl files; the factory sounds are folders in git. Pack them with the
+# same code as `kabl pack`.
+cargo build --release -p kabl-standalone --bin kabl
 rm -rf "$OUT/$NAME" "$OUT/$NAME.tar.gz"
 mkdir -p "$OUT/$NAME/bin" "$OUT/$NAME/lib/clap" "$OUT/$NAME/share/kabl" "$OUT/$NAME/share/applications"
 cp target/release/kabl-ui "$OUT/$NAME/bin/"
@@ -29,7 +33,7 @@ mkdir "$OUT/$NAME/share/icons"
 cp -r packaging/linux/logo/hicolor "$OUT/$NAME/share/icons/hicolor"
 cp packaging/linux/install.sh "$OUT/$NAME/"
 cp LICENSE COPYRIGHT TRADEMARKS.md THIRD-PARTY-NOTICES.md ASSET-LICENSES.md "$OUT/$NAME/"
-cp -r patches "$OUT/$NAME/share/kabl/patches"
+target/release/kabl pack-tree patches "$OUT/$NAME/share/kabl/patches"
 cat > "$OUT/$NAME/README.txt" <<TXT
 kabl $VERSION (Linux, $(uname -m)), built from $(git rev-parse --short HEAD 2>/dev/null || echo unknown).
 License: GPL-3.0-or-later (LICENSE; owner and notice: COPYRIGHT; name and logo: TRADEMARKS.md;

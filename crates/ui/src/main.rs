@@ -2270,7 +2270,7 @@ fn delivery_line(d: &Delivery) -> String {
     )
 }
 
-/// `kabl-ui [--patch <dir>] [--size <W>x<H>]`. Without `--patch`, starts from
+/// `kabl-ui [--patch <file.kabl>] [--size <W>x<H>]`. Without `--patch`, starts from
 /// `default_patch()`. Default window 1440×900; 1280×800 is the supported minimum.
 fn main() -> eframe::Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -2307,7 +2307,7 @@ fn main() -> eframe::Result<()> {
         log::warn!(target: "library", "{note}");
     }
     let editor = match flag("--patch") {
-        Some(dir) => match kabl_core::load(std::path::Path::new(&dir)) {
+        Some(dir) => match kabl_core::format::load_kabl(std::path::Path::new(&dir)) {
             Ok(log) => {
                 let editor = PatchEditor::from_log(log);
                 // A library sound opened by path keeps its library identity (factory
