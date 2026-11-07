@@ -3381,7 +3381,7 @@ fn draw_banks(
     let page_btns = group(r.left() + 2.0 * (BANK_GROUP_W + BANK_GROUP_GAP), "PAGE");
     let page = ui_state.edit_page.get(&id).copied().unwrap_or(0);
     for (pg, &t) in page_btns.iter().enumerate() {
-        ui_state.record(format!("seq-page:{id}.{pg}"), t);
+        ui_state.record(format!("bank-page:{id}.{pg}"), t);
         let resp = ui.interact(t, Id::new(("kabl-seq-page", id, pg)), Sense::click());
         option(t, &(pg + 1).to_string(), pg == page);
         if resp
