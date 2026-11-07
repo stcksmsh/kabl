@@ -187,7 +187,9 @@ pub fn read_kabl_limited<R: Read>(r: R, max: usize) -> Result<PatchLog, FormatEr
     }
     let dict: &[u8] = match u32_at(16) {
         0 => &[],
-        KABL_DICT_ID => KABL_DICT_1,
+        // Literal ids: a later dictionary adds an arm and bumps KABL_DICT_ID (the writer's id);
+        // it must never change what id 1 means.
+        1 => KABL_DICT_1,
         other => return Err(FormatError::UnknownDictionary(other)),
     };
     let corrupt = |e: io::Error| FormatError::Corrupt(e.to_string());
