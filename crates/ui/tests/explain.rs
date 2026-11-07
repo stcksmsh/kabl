@@ -151,8 +151,8 @@ impl H {
 }
 
 fn sizes() -> [(f32, f32); 2] {
-    // 30 px taller than the nominal windows: the status bar takes them, so the rack and drawer keep their room.
-    [(1280.0, 830.0), (1440.0, 930.0)]
+    // Taller than the nominal windows: the status bar, the drawer's second header row and the 320 px drawer's extra wrapping take the room, so the explain list keeps its reach.
+    [(1280.0, 960.0), (1440.0, 1060.0)]
 }
 
 // patches/palette/pad: Macros #1 (m1 "Warmth" → c28 ladder #7 cutoff, c29 ladder #7 drive,
@@ -228,7 +228,7 @@ fn a_macro_card_lists_its_real_destinations_and_reveals_an_off_face_one() {
 
 #[test]
 fn a_direct_pin_reaches_its_exact_parameter() {
-    let mut h = H::new("palette/pad", 1440.0, 900.0);
+    let mut h = H::new("palette/pad", 1440.0, 1800.0);
     let before = h.snapshot();
     h.click("pexplain:8.attack_ms");
     h.click("explain-show:8.attack_ms");
@@ -245,7 +245,7 @@ fn a_direct_pin_reaches_its_exact_parameter() {
 
 #[test]
 fn the_explanation_follows_route_edits_and_undo() {
-    let mut h = H::new("palette/pad", 1440.0, 900.0);
+    let mut h = H::new("palette/pad", 1440.0, 1800.0);
     h.click("pexplain:1.m1");
     let dests = |h: &H| explain::destinations(h.editor.state(), MACROS, "m1").0;
     assert_eq!(
@@ -302,7 +302,7 @@ fn param(h: &H, id: ModuleId, name: &str) -> &'static kabl_modules::ParamInfo {
 
 #[test]
 fn a_macro_without_routes_says_so_and_duplicate_labels_stay_distinct() {
-    let mut h = H::new("palette/pad", 1440.0, 900.0);
+    let mut h = H::new("palette/pad", 1440.0, 1800.0);
     let m = h
         .editor
         .add_module("macro", kabl_core::Vec2 { x: 0.0, y: 900.0 });
@@ -438,7 +438,7 @@ fn base_and_modulation_are_told_apart_with_units() {
 
 #[test]
 fn edits_from_perform_and_rack_are_one_state_while_explained() {
-    let mut h = H::new("init-keyboard", 1440.0, 900.0);
+    let mut h = H::new("init-keyboard", 1440.0, 1800.0);
     h.click("pexplain:3.cutoff_hz");
     h.click("explain-show:3.cutoff_hz");
     // The rack's Base field and the card write the same stored value.
@@ -461,7 +461,7 @@ fn edits_from_perform_and_rack_are_one_state_while_explained() {
 
 #[test]
 fn module_removal_and_patch_replacement_invalidate_safely() {
-    let mut h = H::new("palette/pad", 1440.0, 900.0);
+    let mut h = H::new("palette/pad", 1440.0, 1800.0);
     h.click("pexplain:1.m1");
     h.click("explain-dest:28");
     // Delete the ladder: its routes and the target go; the panel keeps drawing.
@@ -502,7 +502,7 @@ fn module_removal_and_patch_replacement_invalidate_safely() {
 
 #[test]
 fn escape_and_text_fields_keep_their_priority() {
-    let mut h = H::new("palette/pad", 1440.0, 900.0);
+    let mut h = H::new("palette/pad", 1440.0, 1800.0);
     h.click("pexplain:1.m1");
     // Escape first cancels a pending MIDI learn, then closes the explanation.
     h.ui.learn = Some((MACROS, "m2".into()));
@@ -530,12 +530,15 @@ fn escape_and_text_fields_keep_their_priority() {
 
 #[test]
 fn inline_help_is_opt_in_and_changes_nothing() {
-    let mut h = H::new("init-keyboard", 1440.0, 900.0);
+    let mut h = H::new("init-keyboard", 1440.0, 1800.0);
     let before = h.snapshot();
     assert!(!h.ui.explain.help);
+    h.frame();
     h.click("help");
     assert!(h.ui.explain.help);
     h.ui.selected_module = Some(3);
+    h.frame();
+    h.ui.inspect.open = true;
     h.frame();
     h.click("explain-module:3");
     assert_eq!(h.ui.explain.subject, Some(Subject::Module(3)));
@@ -543,6 +546,7 @@ fn inline_help_is_opt_in_and_changes_nothing() {
     assert_eq!(h.ui.selected_module, Some(3));
     h.unchanged_since(&before);
     // Common controls stay reachable with help closed.
+    h.frame();
     h.click("help");
     h.ui.explain.close();
     h.frame();
@@ -682,7 +686,7 @@ fn write_help_coverage() {
 #[test]
 fn a_direct_pin_to_an_off_face_control_reveals_it() {
     // palette/lead "Glide time" is MIDI In #2 glide_ms, an advanced (off-face) control.
-    let mut h = H::new("palette/lead", 1280.0, 800.0);
+    let mut h = H::new("palette/lead", 1280.0, 1600.0);
     let before = h.snapshot();
     assert!(
         !h.ui.hits.contains_key("knob:2.glide_ms"),
@@ -738,7 +742,7 @@ fn transport_acts_on_sequencers_behind_a_divider() {
 
 #[test]
 fn edits_through_the_card_and_the_rack_agree_while_explained() {
-    let mut h = H::new("init-keyboard", 1440.0, 900.0);
+    let mut h = H::new("init-keyboard", 1440.0, 1800.0);
     h.click("pexplain:3.cutoff_hz");
     let p = param(&h, 3, "cutoff_hz");
     let base = |h: &H| routing::base_value(h.editor.state(), 3, p);
@@ -750,6 +754,8 @@ fn edits_through_the_card_and_the_rack_agree_while_explained() {
         .contains(&routing::fmt_value(p, b1)));
     // The same value from the rack's drawer control.
     h.click("explain-show:3.cutoff_hz");
+    h.ui.inspect.open = true;
+    h.frame();
     h.drag("dparam:3.cutoff_hz", -60.0);
     let b2 = base(&h);
     assert!(b2 < b1);
@@ -766,7 +772,7 @@ fn edits_through_the_card_and_the_rack_agree_while_explained() {
 
 #[test]
 fn escape_with_a_menu_open_closes_only_the_menu() {
-    let mut h = H::new("palette/pad", 1440.0, 900.0);
+    let mut h = H::new("palette/pad", 1440.0, 1800.0);
     h.click("pexplain:1.m1");
     h.click("pmenu:1.m1");
     assert!(egui::Popup::is_any_open(&h.ctx), "the card menu is open");
@@ -780,7 +786,7 @@ fn escape_with_a_menu_open_closes_only_the_menu() {
 
 #[test]
 fn a_card_rename_commits_when_you_click_elsewhere() {
-    let mut h = H::new("palette/pad", 1440.0, 900.0);
+    let mut h = H::new("palette/pad", 1440.0, 1800.0);
     h.ui.renaming = Some((MACROS, "m1".into(), "Heat".into()));
     h.frame();
     h.frame();
@@ -799,7 +805,7 @@ fn a_card_rename_commits_when_you_click_elsewhere() {
 fn a_save_dialog_over_an_explanation_keeps_escape_and_the_document() {
     // D01's Save As dialog (D01-R1 repaired) takes Escape first; the explanation stays, and
     // explaining never makes the sound count as unsaved.
-    let mut h = H::new("palette/pad", 1440.0, 900.0);
+    let mut h = H::new("palette/pad", 1440.0, 1800.0);
     let before = h.snapshot();
     h.click("pexplain:1.m1");
     h.click("explain-dest:29");

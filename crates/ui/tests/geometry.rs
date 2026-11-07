@@ -21,7 +21,7 @@ use kabl_ui::style::{
 };
 use std::fmt::Write as _;
 
-const ZOOMS: [f32; 6] = [0.5, 0.58, 0.75, 1.0, 1.5, 2.0];
+const ZOOMS: [f32; 8] = [0.5, 0.58, 0.75, 0.77, 0.91, 1.0, 1.5, 2.0];
 const FULL_FROM: f32 = 0.864;
 const COMPACT_FROM: f32 = 0.55;
 /// Text smaller than this on screen is dropped by today's renderer (`kit::face::HIDE_BELOW`).
@@ -535,7 +535,8 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
             } else {
                 let min = if own { g_own } else { g_any };
                 let d = dist(a.r, b.r);
-                if d < min {
+                // Sub-pixel slack: a 1.9 px gap at a fractional zoom is rounding, not crowding.
+                if d < min - 0.25 {
                     push(
                         "gap",
                         Sev::Error,

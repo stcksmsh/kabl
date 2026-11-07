@@ -1642,3 +1642,34 @@ fn leftover_staging_is_cleared_or_explained() {
     assert!(matches!(err, LibError::Interrupted(_)), "{err:?}");
     assert!(err.to_string().contains("kept in"), "{err}");
 }
+
+#[test]
+fn recent_patches_dedupe_cap_and_drop_missing_folders() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dirs: Vec<PathBuf> = (0..12)
+        .map(|i| {
+            let d = tmp.path().join(format!("p{i}"));
+            fs::create_dir(&d).unwrap();
+            d
+        })
+        .collect();
+    let mut lib = open(tmp.path());
+    for d in &dirs {
+        lib.touch_patch(d);
+    }
+    lib.touch_patch(&dirs[5]);
+    let lib = open(tmp.path());
+    let got = lib.recent_patches();
+    assert_eq!(got.len(), library::MAX_PATCH_RECENTS, "capped");
+    assert_eq!(got[0], dirs[5], "newest first");
+    assert_eq!(
+        got.iter().filter(|p| **p == dirs[5]).count(),
+        1,
+        "no duplicates"
+    );
+    fs::remove_dir(&dirs[5]).unwrap();
+    assert!(
+        !lib.recent_patches().contains(&dirs[5]),
+        "missing folder dropped"
+    );
+}

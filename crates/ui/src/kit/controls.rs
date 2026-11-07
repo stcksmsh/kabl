@@ -59,8 +59,12 @@ pub struct Button<'a> {
     selected: bool,
     enabled: bool,
     small: bool,
+    large: bool,
     min_w: f32,
     tone: Option<Tone>,
+    /// G4-SPEC §3 look at this height: label 13/600 (12.5 below 32 px), padding 14, secondary
+    /// on `raised` with a `line2` border and `text` ink, icon at the left edge.
+    g4: Option<f32>,
 }
 
 impl<'a> Button<'a> {
@@ -73,8 +77,10 @@ impl<'a> Button<'a> {
             selected: false,
             enabled: true,
             small: false,
+            large: false,
             min_w: 0.0,
             tone: None,
+            g4: None,
         }
     }
     pub fn icon(mut self, ic: Ic) -> Self {
@@ -101,6 +107,11 @@ impl<'a> Button<'a> {
         self.small = true;
         self
     }
+    /// The scene's primary action: `metrics.large_h` tall, wider padding.
+    pub fn large(mut self) -> Self {
+        self.large = true;
+        self
+    }
     pub fn min_width(mut self, w: f32) -> Self {
         self.min_w = w;
         self
@@ -109,19 +120,83 @@ impl<'a> Button<'a> {
         self.tone = Some(t);
         self
     }
+    pub fn g4(mut self, height: f32) -> Self {
+        self.g4 = Some(height);
+        self
+    }
+}
+
+impl Button<'_> {
+    /// The width the button takes: label, icon and padding.
+    pub fn width(&self, ui: &Ui) -> f32 {
+        let st = self.st;
+        let font = match self.g4 {
+            Some(h) => egui::FontId::new(
+                if h < 32.0 { 12.5 } else { 13.0 },
+                crate::style::Font::SansSemibold.family(st.fonts_ready),
+            ),
+            None => st.font(Role::Label),
+        };
+        let h = match self.g4 {
+            Some(h) => h,
+            None if self.small => st.metrics.small_h,
+            None if self.large => st.metrics.large_h,
+            None => st.metrics.control_h,
+        };
+        let pad = if self.g4.is_some() {
+            14.0
+        } else if self.small {
+            st.sp(2)
+        } else if self.large {
+            st.sp(4)
+        } else {
+            st.sp(3)
+        };
+        let icon_w = if self.icon.is_some() {
+            st.metrics.icon + st.sp(1) + 2.0
+        } else {
+            0.0
+        };
+        let tw = if self.text.is_empty() {
+            0.0
+        } else {
+            ui.painter()
+                .layout_no_wrap(self.text.clone(), font, Color32::WHITE)
+                .size()
+                .x
+        };
+        (pad * 2.0 + icon_w + tw)
+            .max(self.min_w)
+            .max(if self.text.is_empty() { h } else { 0.0 })
+    }
 }
 
 impl Widget for Button<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
         let st = self.st;
         let enabled = self.enabled && ui.is_enabled();
-        let font = st.font(Role::Label);
-        let h = if self.small {
-            st.metrics.small_h
-        } else {
-            st.metrics.control_h
+        let font = match self.g4 {
+            Some(h) => egui::FontId::new(
+                if h < 32.0 { 12.5 } else { 13.0 },
+                crate::style::Font::SansSemibold.family(st.fonts_ready),
+            ),
+            None => st.font(Role::Label),
         };
-        let pad = if self.small { st.sp(2) } else { st.sp(3) };
+        let h = match self.g4 {
+            Some(h) => h,
+            None if self.small => st.metrics.small_h,
+            None if self.large => st.metrics.large_h,
+            None => st.metrics.control_h,
+        };
+        let pad = if self.g4.is_some() {
+            14.0
+        } else if self.small {
+            st.sp(2)
+        } else if self.large {
+            st.sp(4)
+        } else {
+            st.sp(3)
+        };
         let icon_w = if self.icon.is_some() {
             st.metrics.icon + st.sp(1) + 2.0
         } else {
@@ -129,7 +204,7 @@ impl Widget for Button<'_> {
         };
         let galley = (!self.text.is_empty()).then(|| {
             ui.painter()
-                .layout_no_wrap(self.text.clone(), font, Color32::WHITE)
+                .layout_no_wrap(self.text.clone(), font.clone(), Color32::WHITE)
         });
         let tw = galley.as_ref().map_or(0.0, |g| g.size().x);
         let w = (pad * 2.0 + icon_w + tw)
@@ -174,6 +249,8 @@ impl Widget for Button<'_> {
                     )
                 } else if down {
                     (r.inset, Some(r.line2), r.text)
+                } else if self.g4.is_some() {
+                    (mix(r.raised, r.inset, 0.3 * hover), Some(r.line2), r.text)
                 } else {
                     (
                         mix(alpha(r.raised, 0), r.raised, hover),
@@ -208,6 +285,10 @@ impl Widget for Button<'_> {
             );
         }
         let mut x = rect.center().x - (tw + icon_w) / 2.0;
+        if self.g4.is_some() && self.icon.is_some() && self.min_w > 0.0 {
+            // A fixed-width G4 button: icon at the left edge, label centred in the rest.
+            x = rect.left() + 12.0;
+        }
         if let Some(ic) = self.icon {
             icon(
                 ui.painter(),
@@ -219,11 +300,12 @@ impl Widget for Button<'_> {
             x += icon_w;
         }
         if galley.is_some() {
-            let g = ui.painter().layout_no_wrap(
-                self.text.clone(),
-                st.font(Role::Label),
-                dim(ink, enabled),
-            );
+            let g = ui
+                .painter()
+                .layout_no_wrap(self.text.clone(), font.clone(), dim(ink, enabled));
+            if self.g4.is_some() && self.icon.is_some() && self.min_w > 0.0 {
+                x = rect.left() + (rect.width() + icon_w - tw) / 2.0;
+            }
             ui.painter().galley(
                 pos2(x, rect.center().y - g.size().y / 2.0),
                 g,
@@ -311,6 +393,11 @@ pub fn view_switch<R>(ui: &mut Ui, st: &Style, add: impl FnOnce(&mut Ui) -> R) -
     if st.slots.chrome.view_switch != crate::style::ViewSwitch::Tabs {
         return segmented(ui, st, add);
     }
+    tabs(ui, st, add)
+}
+
+/// A row of plain tabs: [`seg`] items without a pill, the selected one underlined.
+pub fn tabs<R>(ui: &mut Ui, st: &Style, add: impl FnOnce(&mut Ui) -> R) -> R {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = st.sp(2);
         ui.data_mut(|d| d.insert_temp(tabs_flag(), true));
@@ -489,6 +576,34 @@ pub fn slider(
     step: Option<f64>,
     readout: &str,
 ) -> Response {
+    let col = st.roles.accent;
+    slider_with(ui, st, value, range, step, readout, col, false)
+}
+
+/// [`slider`] for a signed value: the fill runs from the centre tick to the handle, in `col`.
+pub fn slider_bipolar(
+    ui: &mut Ui,
+    st: &Style,
+    value: &mut f64,
+    range: std::ops::RangeInclusive<f64>,
+    step: Option<f64>,
+    readout: &str,
+    col: Color32,
+) -> Response {
+    slider_with(ui, st, value, range, step, readout, col, true)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn slider_with(
+    ui: &mut Ui,
+    st: &Style,
+    value: &mut f64,
+    range: std::ops::RangeInclusive<f64>,
+    step: Option<f64>,
+    readout: &str,
+    col: Color32,
+    bipolar: bool,
+) -> Response {
     let enabled = ui.is_enabled();
     let readout_w = ui
         .painter()
@@ -504,10 +619,13 @@ pub fn slider(
             Sense::hover()
         },
     );
-    let track_r = Rect::from_min_max(
-        rect.min,
-        pos2(rect.right() - readout_w - st.sp(2), rect.max.y),
-    );
+    // An empty readout (the value shown elsewhere) gives the track the full width.
+    let reserve = if readout.is_empty() {
+        0.0
+    } else {
+        readout_w + st.sp(2)
+    };
+    let track_r = Rect::from_min_max(rect.min, pos2(rect.right() - reserve, rect.max.y));
     let (lo, hi) = (*range.start(), *range.end());
     let span = (hi - lo).max(f64::EPSILON);
     let before = *value;
@@ -560,13 +678,21 @@ pub fn slider(
         StrokeKind::Inside,
     );
     let x = tr.left() + tr.width() * t;
+    let x0 = if bipolar { tr.center().x } else { tr.left() };
     fill_rr(
         ui,
-        Rect::from_min_max(tr.min, pos2(x, tr.max.y)),
+        Rect::from_min_max(pos2(x0.min(x), tr.min.y), pos2(x0.max(x), tr.max.y)),
         th / 2.0,
-        dim(r.accent, enabled),
+        dim(col, enabled),
         0.0,
     );
+    if bipolar {
+        ui.painter().rect_filled(
+            Rect::from_center_size(tr.center(), vec2(1.0, 12.0)),
+            CornerRadius::ZERO,
+            r.text2,
+        );
+    }
     let h = pos2(x, cy);
     let hover = ease_to(
         ui,
@@ -582,7 +708,7 @@ pub fn slider(
     );
     ui.painter().circle_filled(h, hr, dim(r.raised, enabled));
     ui.painter()
-        .circle_stroke(h, hr, Stroke::new(1.5, dim(r.accent, enabled)));
+        .circle_stroke(h, hr, Stroke::new(1.5, dim(col, enabled)));
     if resp.has_focus() && enabled {
         ui.painter().circle_stroke(
             h,

@@ -15,6 +15,7 @@ struct H {
     t: f64,
     pointer: Pos2,
     size: egui::Vec2,
+    modifiers: Modifiers,
 }
 
 impl H {
@@ -32,6 +33,7 @@ impl H {
             t: 0.0,
             pointer: Pos2::ZERO,
             size,
+            modifiers: Modifiers::NONE,
         };
         h.frame();
         h.frame();
@@ -44,6 +46,7 @@ impl H {
             screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
             events: std::mem::take(&mut self.events),
             time: Some(self.t),
+            modifiers: self.modifiers,
             ..Default::default()
         };
         self.t += 1.0 / 60.0;
@@ -76,7 +79,7 @@ impl H {
             pos: self.pointer,
             button,
             pressed,
-            modifiers: Modifiers::NONE,
+            modifiers: self.modifiers,
         });
         self.frame();
     }
@@ -292,11 +295,14 @@ fn dragging_across_steps_paints_their_levels_and_chances() {
         assert!((v - 0.75).abs() < 0.06, "{s} painted to 75 %: {v}");
     }
     assert_eq!(t.cable_param(route, "s4"), None, "step 4 untouched");
-    let odds = t.ui.hits[&format!("fn-chance:{route}:3")];
+    // A Shift-drag sets the chance on the same bar.
+    let odds = t.ui.hits[&format!("fn-level:{route}:3")];
+    t.modifiers = Modifiers::SHIFT;
     t.drag_between(
         odds.lerp_inside(egui::vec2(0.5, 0.9)),
         odds.lerp_inside(egui::vec2(0.5, 0.5)),
     );
+    t.modifiers = Modifiers::NONE;
     let chance = t.cable_param(route, "r4").expect("chance stored");
     assert!(
         (chance - 50.0).abs() < 12.0,
@@ -322,6 +328,9 @@ fn one_step_undoes_by_itself() {
 fn the_step_grids_fit_the_drawer_at_the_maximum_step_count() {
     for size in [egui::vec2(1440.0, 900.0), egui::vec2(1180.0, 680.0)] {
         let mut t = H::sized(size);
+        // The compact window starts with the drawer shut: open it, as the user would.
+        t.ui.drawer_open = true;
+        t.frame();
         t.click(&format!("knob:{ENV}.attack_ms"));
         let route = *t
             .ui
@@ -345,17 +354,18 @@ fn the_step_grids_fit_the_drawer_at_the_maximum_step_count() {
         }
         t.frame();
         t.frame();
+        // Pattern B sits behind the editor's More disclosure.
+        t.click(&format!("fn-more:{route}"));
         let edge = t.ui.hits[&format!("fn-prob:{route}")].right();
         for tag in ["", "-b"] {
             for k in [0, kabl_cables::MAX_STEPS - 1] {
-                for lane in ["level", "chance"] {
-                    let r = t.ui.hits[&format!("fn-{lane}{tag}:{route}:{k}")];
-                    assert!(
-                        r.right() <= edge + 0.5,
-                        "{size:?} {lane}{tag} step {k} ends at {} past the drawer edge {edge}",
-                        r.right()
-                    );
-                }
+                // One bar per step: the level bar (its strength is the chance).
+                let r = t.ui.hits[&format!("fn-level{tag}:{route}:{k}")];
+                assert!(
+                    r.right() <= edge + 0.5,
+                    "{size:?} level{tag} step {k} ends at {} past the drawer edge {edge}",
+                    r.right()
+                );
             }
         }
     }
@@ -374,9 +384,10 @@ fn a_routes_depth_gets_a_source_from_the_drawer_and_the_patch_still_compiles() {
             _ => None,
         })
         .expect("a route into a knob");
-    t.ui.inspected = Some((id, param));
+    t.ui.inspected = Some((id, param.clone()));
     t.ui.selected_route = Some(route);
     t.frame();
+    t.click(&format!("route-more:{id}.{param}"));
     t.click(&format!("croute-add:{route}:amount"));
     let source =
         t.ui.hits

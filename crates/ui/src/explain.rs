@@ -613,39 +613,36 @@ pub(crate) fn panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui:
     let Some(subject) = ui_state.explain.subject.clone() else {
         return;
     };
-    let th = crate::theme::theme(&ui_state.style);
     let now = ui.input(|i| i.time);
     let state = editor.state();
-    let frame = egui::Frame::group(ui.style())
-        .fill(ui.visuals().faint_bg_color)
-        .stroke(egui::Stroke::new(1.5, th.cv))
-        .inner_margin(egui::Margin::same(8));
-    frame.show(ui, |ui| {
+    let st = ui_state.style.clone();
+    {
+        let ui = &mut *ui;
         ui.set_width(ui.available_width());
-        ui.spacing_mut().item_spacing.y = 4.0;
+        ui.spacing_mut().item_spacing.y = 6.0;
         ui.horizontal(|ui| {
-            ui.label(RichText::new("Explain").strong().color(th.cv));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let r = ui
-                    .small_button("×")
-                    .on_hover_text("Close the explanation (Esc)");
-                ui_state.record("explain-close".into(), r.rect);
-                if r.clicked() {
+            let can_back = ui_state.explain.saved.is_some() || ui_state.explain.card.is_some();
+            let back_text = match &ui_state.explain.card {
+                Some(c) => format!("Back to “{}”", card_label(state, c)),
+                None => "Back to routing".into(),
+            };
+            let r = ui
+                .add(
+                    crate::kit::Button::new(&st, back_text)
+                        .icon(crate::kit::Ic::Back)
+                        .ghost()
+                        .g4(28.0),
+                )
+                .on_hover_text("Return to where you started (Esc closes the explanation)");
+            ui_state.record("explain-back".into(), r.rect);
+            if r.clicked() {
+                // With nowhere to go back to, Back returns to the routing view.
+                if can_back {
+                    back(ui_state, now);
+                } else {
                     ui_state.explain.close();
                 }
-                let can_back = ui_state.explain.saved.is_some() || ui_state.explain.card.is_some();
-                let back_text = match &ui_state.explain.card {
-                    Some(c) => format!("← Back to “{}”", card_label(state, c)),
-                    None => "← Back".into(),
-                };
-                let r = ui
-                    .add_enabled(can_back, egui::Button::new(back_text).small())
-                    .on_hover_text("Return to the control you started from");
-                ui_state.record("explain-back".into(), r.rect);
-                if r.clicked() {
-                    back(ui_state, now);
-                }
-            });
+            }
         });
         if !ui_state.explain.is_open() {
             return;
@@ -660,7 +657,7 @@ pub(crate) fn panel(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui:
             Subject::Control { id, key } => control(editor, ui_state, ui, *id, key, now),
             Subject::Module(id) => module(editor, ui_state, ui, *id, now),
         }
-    });
+    }
     ui.add_space(6.0);
 }
 
@@ -693,11 +690,13 @@ fn show_button(
     now: f64,
 ) {
     let selected = ui_state.explain.target.as_ref() == Some(&target);
+    let st = ui_state.style.clone();
     let r = ui
-        .add(egui::Button::selectable(
-            selected,
-            if selected { "• Shown" } else { "Show" },
-        ))
+        .add(
+            crate::kit::Button::new(&st, if selected { "Shown" } else { "Show" })
+                .g4(28.0)
+                .selected(selected),
+        )
         .on_hover_text("Bring it into view in the rack (no change to the sound)");
     ui_state.record(hit, r.rect);
     if r.clicked() {
@@ -730,7 +729,11 @@ fn control(
     };
     let card = perform::is_pinned(state, id, key).then(|| perform::pin_label(state, &pin));
     if let Some(help) = help::special_pin_help(key) {
-        ui.label(RichText::new(card.unwrap_or_else(|| key.to_string())).heading());
+        ui.label(
+            RichText::new(card.unwrap_or_else(|| key.to_string()))
+                .size(22.0)
+                .strong(),
+        );
         weak(ui, format!("Perform card for {title}"));
         para(ui, help);
         special(editor, ui_state, ui, id, key, now);
@@ -747,7 +750,15 @@ fn control(
     } else {
         card.clone().unwrap_or(label.clone())
     };
-    ui.label(RichText::new(&display).heading());
+    let st = ui_state.style.clone();
+    crate::kit::label(
+        ui,
+        &st,
+        crate::style::Role::Caption,
+        crate::kit::Tone::Text3,
+        format!("EXPLAIN · {title}"),
+    );
+    ui.label(RichText::new(&display).size(22.0).strong());
     // The identity, always: a duplicated label stays distinguishable.
     weak(
         ui,
@@ -794,17 +805,173 @@ fn control(
         ui.label(RichText::new("The macro knob itself").strong());
         show_self(ui_state, ui);
     } else {
-        show_self(ui_state, ui);
         if let Some(h) = help::param_help(&kind, p.name) {
             para(ui, h);
         }
-    }
-    weak(ui, help::range_text(&kind, p));
-    for l in base_and_modulation(editor.state(), id, p) {
-        weak(ui, l);
-    }
-    if !is_macro {
-        path_line(editor.state(), ui, id);
+        let range = help::range_text(&kind, p);
+        let mut rows: Vec<(&str, String)> = Vec::new();
+        let mut parts = range.split(" · ");
+        if let Some(r) = parts.next() {
+            rows.push(("Range", r.to_string()));
+        }
+        let rest: Vec<&str> = parts.collect();
+        for part in &rest {
+            if let Some(d) = part.strip_prefix("default ") {
+                rows.push(("Default", d.to_string()));
+            }
+        }
+        let lines = base_and_modulation(editor.state(), id, p);
+        let mut movers: Vec<String> = Vec::new();
+        for l in &lines {
+            if let Some(v) = l.strip_prefix("Base (stored): ") {
+                let v = v.split(" — ").next().unwrap_or(v);
+                rows.push(("Base now", v.to_string()));
+            } else if let Some(v) = l.strip_prefix("All active routes together can reach ") {
+                let v = v.split(". ").next().unwrap_or(v);
+                rows.push(("Moves within", v.trim_end_matches('.').to_string()));
+            } else if let Some(v) = l.strip_prefix("• ") {
+                movers.push(v.split(" of ").next().unwrap_or(v).replace(": ", " · "));
+            }
+        }
+        ui.add_space(4.0);
+        for (k, v) in rows {
+            ui.horizontal_wrapped(|ui| {
+                ui.allocate_ui_with_layout(
+                    egui::vec2(96.0, 18.0),
+                    egui::Layout::left_to_right(egui::Align::Center),
+                    |ui| {
+                        crate::kit::label(
+                            ui,
+                            &st,
+                            crate::style::Role::Label,
+                            crate::kit::Tone::Text2,
+                            k,
+                        )
+                    },
+                );
+                crate::kit::label(
+                    ui,
+                    &st,
+                    crate::style::Role::Value,
+                    crate::kit::Tone::Text,
+                    v,
+                );
+            });
+        }
+        if !movers.is_empty() {
+            ui.add_space(8.0);
+            crate::kit::label(
+                ui,
+                &st,
+                crate::style::Role::Caption,
+                crate::kit::Tone::Text3,
+                "MOVED BY",
+            );
+            ui.horizontal_wrapped(|ui| {
+                for m in &movers {
+                    crate::kit::g4::chip_label(
+                        ui,
+                        &st,
+                        m,
+                        false,
+                        Some(crate::theme::theme(&st).cv),
+                    );
+                }
+            });
+        }
+        if let Ok(Some(path)) = path_to_output(editor.state(), id) {
+            if !matches!(kind.as_str(), "macro" | "clock" | "cues" | "out") {
+                ui.add_space(8.0);
+                crate::kit::label(
+                    ui,
+                    &st,
+                    crate::style::Role::Caption,
+                    crate::kit::Tone::Text3,
+                    "SIGNAL PATH",
+                );
+                ui.horizontal_wrapped(|ui| {
+                    for (i, m) in path.iter().enumerate() {
+                        if i > 0 {
+                            crate::kit::label(
+                                ui,
+                                &st,
+                                crate::style::Role::Label,
+                                crate::kit::Tone::Text3,
+                                "›",
+                            );
+                        }
+                        let k = editor
+                            .state()
+                            .modules
+                            .get(m)
+                            .map_or("", |s| s.kind.as_str());
+                        crate::kit::g4::chip_label(
+                            ui,
+                            &st,
+                            &format!("{} #{m}", short(k)),
+                            true,
+                            None,
+                        );
+                    }
+                });
+            }
+        }
+        ui.add_space(8.0);
+        // g4-surfaces.html "Show in rack" card: 62 px, info icon, title 13/600, line 12.
+        let (rect, resp) =
+            ui.allocate_exact_size(egui::vec2(ui.available_width(), 62.0), egui::Sense::click());
+        let painter = ui.painter();
+        painter.rect(
+            rect,
+            egui::CornerRadius::same(8),
+            if resp.hovered() {
+                st.roles.line
+            } else {
+                st.roles.raised
+            },
+            egui::Stroke::new(1.0, st.roles.line),
+            egui::StrokeKind::Inside,
+        );
+        crate::kit::icon(
+            painter,
+            crate::kit::Ic::Info,
+            rect.min + egui::vec2(20.0, 20.0),
+            16.0,
+            st.roles.accent,
+        );
+        let semi = crate::style::Font::SansSemibold.family(st.fonts_ready);
+        painter.text(
+            rect.min + egui::vec2(36.0, 25.0 - 13.0 * 0.36),
+            egui::Align2::LEFT_CENTER,
+            "Show in rack",
+            egui::FontId::new(13.0, semi),
+            st.roles.text,
+        );
+        painter.text(
+            rect.min + egui::vec2(36.0, 44.0 - 12.0 * 0.36),
+            egui::Align2::LEFT_CENTER,
+            "Highlights the control and its cables.",
+            egui::FontId::new(12.0, st.font(crate::style::Role::Body).family),
+            st.roles.text3,
+        );
+        ui_state.record(format!("explain-show:{id}.{}", p.name), rect);
+        if resp
+            .on_hover_text("Bring it into view in the rack (no change to the sound)")
+            .clicked()
+        {
+            go(
+                editor,
+                ui_state,
+                Target::Control {
+                    id,
+                    param: p.name.to_string(),
+                    cable: None,
+                },
+                now,
+            );
+        }
+        selected_detail(editor.state(), ui_state, ui);
+        return;
     }
     selected_detail(editor.state(), ui_state, ui);
 }
@@ -1011,7 +1178,7 @@ fn module(editor: &PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, id: M
         );
         return;
     };
-    ui.label(RichText::new(module_title(state, id)).heading());
+    ui.label(RichText::new(module_title(state, id)).size(22.0).strong());
     weak(ui, format!("kind “{}”", info.kind));
     para(ui, info.explain);
     if let Some(n) = help::module_note(info.kind) {

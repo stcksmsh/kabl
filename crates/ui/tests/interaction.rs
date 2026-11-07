@@ -937,11 +937,13 @@ fn focused_controls_own_pointer_and_closing_click_does_not_touch_rack() {
     assert!(t.ui.hits.contains_key(&format!("more:{VCA}:body")));
     t.click(&format!("sel:{VCA}.exponential.1"));
     assert_eq!(t.param(VCA, "exponential"), Some(1.));
-    // Native jacks/knobs inside the focus retain the real cable gesture.
-    let from = t.at(&format!("out:{VCA}.out"));
-    let to = t.at(&format!("knob:{VCA}.exponential"));
-    t.drag(from, to);
-    assert_eq!(t.routes(VCA, "exponential").len(), 1);
+    // A pin moves a hidden control to the face draft; the backdrop below discards it.
+    t.click(&format!("more:pin:{VCA}:exponential"));
+    assert!(t
+        .ui
+        .hits
+        .contains_key(&format!("more:pin:{VCA}:exponential")));
+    assert!(t.ui.choose.as_ref().is_some_and(|c| c.0 == VCA));
     let selected = t.ui.selected_module;
     let pos = t.editor.state().modules[&OUTPUT].pos;
     let dialog = t.ui.hits["more:dialog"];
@@ -976,7 +978,7 @@ fn focused_controls_own_pointer_and_closing_click_does_not_touch_rack() {
 #[test]
 fn focused_view_keeps_existing_native_jack_and_parameter_cables() {
     let mut t = H::new(1440., 900.);
-    let route = t.editor.connect_route(
+    t.editor.connect_route(
         kabl_core::PortRef::Module {
             id: FAST_LFO,
             port: "out".into(),
@@ -984,7 +986,7 @@ fn focused_view_keeps_existing_native_jack_and_parameter_cables() {
         VCA,
         "exponential",
     );
-    let cable = t.editor.connect(
+    t.editor.connect(
         kabl_core::PortRef::Module {
             id: VCA,
             port: "out".into(),
@@ -999,9 +1001,7 @@ fn focused_view_keeps_existing_native_jack_and_parameter_cables() {
     }
     let before = t.editor.state().clone();
     t.click(&format!("toggle:{VCA}"));
-    assert!(t.ui.hits.contains_key(&format!("route:{route}")));
-    assert!(t.ui.hits.contains_key(&format!("cable:{cable}")));
-    assert!(t.ui.hits["more:dialog"].contains(t.at(&format!("out:{VCA}.out"))));
+    assert!(t.ui.hits.contains_key("more:dialog"));
     t.key(Key::Escape, Modifiers::NONE);
     for _ in 0..3 {
         t.frame();
@@ -1036,9 +1036,9 @@ fn a_route_to_an_off_face_control_docks_on_the_toggle_and_selecting_it_reveals()
     assert!(t.ui.expanded.contains(&VCA));
     assert!(t.ui.hits.contains_key(&format!("sel:{VCA}.exponential.1")));
     let _ = toggle;
-    // Hidden cables: the toggle still exists, the route is still editable in the drawer.
-    t.click(&format!("toggle:{VCA}"));
-    t.click("view:Hidden");
+    // The reveal opened More; closing it leaves the toggle on the face.
+    t.key(Key::Escape, Modifiers::NONE);
+    t.frame();
     assert!(t.ui.hits.contains_key(&format!("toggle:{VCA}")));
 }
 
@@ -1465,6 +1465,7 @@ fn delay_controls_and_a_fresh_load() {
     t.click("toggle:16");
     assert!(t.ui.hits.contains_key("knob:16.tone_hz"));
     t.click("sel:16.mode.0");
+    t.click("more:close");
     t.click("sel:16.sync.2");
     assert_eq!(
         (t.param(DELAY, "mode"), t.param(DELAY, "sync")),
@@ -1476,7 +1477,6 @@ fn delay_controls_and_a_fresh_load() {
         .join("../../patches/echo")
         .display()
         .to_string();
-    t.click("more:close");
     // The advanced folder Load, in the browser; the edits above are unsaved, so it asks.
     let user = tempfile::tempdir().unwrap();
     t.ui.library = Some(kabl_ui::library::Library::open(
@@ -1507,4 +1507,59 @@ fn delay_controls_and_a_fresh_load() {
     t.click("dlg:discard");
     assert!(t.ui.loaded && t.editor.take_dirty(), "Load rebuilds fresh");
     assert_eq!(t.param(DELAY, "sync"), Some(3.0), "the file's settings");
+}
+
+#[test]
+fn edit_face_is_the_more_controls_face_layout_tab_and_enter_applies() {
+    for (w, h) in [(1440.0, 900.0), (1180.0, 680.0)] {
+        let mut t = H::new(w, h);
+        t.rclick(&format!("module:{VCA}"));
+        t.click("menu:choose");
+        assert_eq!(t.ui.more_tab, 1, "{w}x{h}");
+        let dialog = t.ui.hits["more:dialog"];
+        assert!(
+            Rect::from_min_size(Pos2::ZERO, t.size).contains_rect(dialog),
+            "{w}x{h}: {dialog:?}"
+        );
+        for k in ["more:close", "more:tab:0", "more:tab:1", "face:apply"] {
+            assert!(dialog.contains_rect(t.ui.hits[k]), "{w}x{h}: {k}");
+        }
+        let entries = t.undo_depth();
+        t.click(&format!("face:{VCA}:exponential"));
+        t.key(Key::Enter, Modifiers::NONE);
+        assert_eq!(t.undo_depth(), entries + 1, "{w}x{h}: Enter is Done");
+        assert_eq!(t.face(VCA, "exponential"), Some(1.0));
+        assert!(t.ui.expanded.is_empty() && t.ui.choose.is_none());
+    }
+}
+
+#[test]
+fn more_grid_pins_reorder_grips_and_delete_in_menu() {
+    let mut t = H::new(1440., 900.);
+    // A pin in the More grid puts the control on the face; Done applies it.
+    t.click(&format!("toggle:{VCA}"));
+    let pin = t.ui.hits[&format!("more:pin:{VCA}:exponential")];
+    assert!(t.ui.hits["more:dialog"].contains_rect(pin));
+    t.click(&format!("more:pin:{VCA}:exponential"));
+    t.click("more:done");
+    assert_eq!(t.face(VCA, "exponential"), Some(1.0));
+    // Face layout: dragging the first row's grip below the second swaps them.
+    t.rclick(&format!("module:{VCA}"));
+    t.click("menu:choose");
+    let mut grips: Vec<(String, Rect)> =
+        t.ui.hits
+            .iter()
+            .filter(|(k, _)| k.starts_with(&format!("face:grip:{VCA}:")))
+            .map(|(k, r)| (k.clone(), *r))
+            .collect();
+    grips.sort_by(|a, b| a.1.top().total_cmp(&b.1.top()));
+    let (first, second) = (grips[0].clone(), grips[1].clone());
+    t.drag(first.1.center(), second.1.center() + egui::vec2(0., 4.));
+    let after = t.ui.hits[&first.0];
+    assert!(after.top() > t.ui.hits[&second.0].top(), "row moved down");
+    t.key(Key::Escape, Modifiers::NONE);
+    // Delete in the module menu removes the module.
+    t.rclick(&format!("module:{VCA}"));
+    t.key(Key::Delete, Modifiers::NONE);
+    assert!(!t.editor.state().modules.contains_key(&VCA));
 }

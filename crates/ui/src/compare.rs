@@ -8,6 +8,7 @@
 
 use kabl_core::{Op, ParamTarget, PatchState};
 
+use crate::style::{Role, Style};
 use crate::{browser, PatchEditor, UiState};
 
 #[derive(Debug, Clone)]
@@ -277,62 +278,103 @@ pub fn restore(editor: &mut PatchEditor, ui: &mut UiState) -> String {
     }
 }
 
-fn para(ui: &mut egui::Ui, text: impl Into<String>) {
-    ui.add(egui::Label::new(text.into()).wrap());
-}
-
-fn weak(ui: &mut egui::Ui, text: impl Into<String>) {
-    ui.add(egui::Label::new(egui::RichText::new(text.into()).small().weak()).wrap());
-}
-
-/// The drawer section.
-pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
+/// The drawer section (G4-SPEC §4 Compare): explainer, A/B segmented, reference card, actions.
+pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
+    use crate::kit::{g4, label, paragraph, Button, Tone};
     if std::mem::take(&mut ui_state.compare.reveal) {
         ui.scroll_to_cursor(Some(egui::Align::TOP));
     }
-    ui.horizontal(|ui| {
-        ui.strong("Compare with a reference");
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let r = ui.small_button("Close");
-            ui_state.record("compare-close".into(), r.rect);
-            if r.clicked() {
-                ui_state.compare.open = false;
-            }
-        });
-    });
-    weak(
+    label(ui, st, Role::H3, Tone::Text, "Compare with a reference");
+    paragraph(
         ui,
-        "The reference is a copy of the whole patch (values, cables, routes, labels, Perform \
-         pins and MIDI mappings), kept only in this session and not saved with the sound.",
+        st,
+        Role::Body,
+        Tone::Text2,
+        "Capture the whole patch, keep editing, then flip between A (now) and B (reference). \
+         The reference holds values, cables, routes, labels, Perform pins and MIDI mappings.",
     );
     if let Some(n) = ui_state.compare.note.clone() {
-        para(ui, n);
+        paragraph(ui, st, Role::Body, Tone::Text, n);
     }
     let has = ui_state.compare.reference.is_some();
     let same = ui_state.compare.same(editor);
-    match &ui_state.compare.reference {
-        Some(r) => para(
-            ui,
-            format!(
-                "Reference: captured {} by {}. You hear and edit the current patch{}.",
-                r.at,
-                r.by,
-                if same {
-                    ", which is the same as the reference now"
-                } else {
-                    ", which differs from it"
-                }
-            ),
-        ),
-        None => para(ui, "No reference yet. You hear and edit the current patch."),
+    let can_undo = ui_state.compare.can_undo_restore(editor);
+    let can_redo = ui_state.compare.can_redo_restore(editor);
+    ui.add_space(10.0);
+    // A is what you edit; B is the reference. B is selected only while it is restored.
+    let on_b = has && same && can_undo;
+    let seg_w = (ui.available_width() - 4.0) / 2.0;
+    let (mut to_a, mut to_b) = (false, false);
+    g4::segmented_large(
+        ui,
+        st,
+        seg_w,
+        &[("A · now", !on_b), ("B · reference", on_b)],
+        |i| {
+            if i == 0 {
+                to_a = true
+            } else {
+                to_b = true
+            }
+        },
+    );
+    if to_a && can_undo {
+        editor.undo();
+    } else if to_b && can_redo {
+        editor.redo();
+    } else if to_b && has && !same {
+        ui_state.browser.dialog = Some(browser::Dialog::Restore);
     }
+    ui.add_space(10.0);
+    g4::card(ui, st, |ui| {
+        label(ui, st, Role::Caption, Tone::Text3, "REFERENCE");
+        match &ui_state.compare.reference {
+            Some(r) => {
+                label(
+                    ui,
+                    st,
+                    Role::Value,
+                    Tone::Text,
+                    format!("Captured {} by {}", r.at, r.by),
+                );
+                label(
+                    ui,
+                    st,
+                    Role::Caption,
+                    Tone::Text3,
+                    if same {
+                        "Same as the current patch. Kept for this session only."
+                    } else {
+                        "Differs from the current patch. Kept for this session only."
+                    },
+                );
+            }
+            None => {
+                label(ui, st, Role::Body, Tone::Text2, "No reference yet.");
+                label(
+                    ui,
+                    st,
+                    Role::Caption,
+                    Tone::Text3,
+                    "Kept for this session only.",
+                );
+            }
+        }
+    });
+    ui.add_space(10.0);
     ui.horizontal_wrapped(|ui| {
         let r = ui
-            .button(if has {
-                "Replace reference"
-            } else {
-                "Capture reference"
-            })
+            .add(
+                Button::new(
+                    st,
+                    if has {
+                        "Capture again"
+                    } else {
+                        "Capture reference"
+                    },
+                )
+                .g4(32.0),
+            )
             .on_hover_text("Copy the current patch as the reference (changes nothing)");
         ui_state.record("compare-capture".into(), r.rect);
         if r.clicked() {
@@ -340,34 +382,53 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             ui_state.last_message = Some("reference captured (not saved with the sound)".into());
         }
         let r = ui
-            .add_enabled(has && !same, egui::Button::new("Restore reference…"))
+            .add(Button::new(st, "Restore B…").g4(32.0).enabled(has && !same))
             .on_hover_text("Replace the whole current patch with the reference, as one undo step");
         ui_state.record("compare-restore".into(), r.rect);
         if r.clicked() {
             ui_state.browser.dialog = Some(browser::Dialog::Restore);
         }
-        if ui_state.compare.can_undo_restore(editor) {
-            let r = ui
-                .button("Back to my version (Undo)")
-                .on_hover_text("Undo the restore: your version with all its edits");
-            ui_state.record("compare-undo".into(), r.rect);
-            if r.clicked() {
-                editor.undo();
-            }
-        } else if ui_state.compare.can_redo_restore(editor) {
-            let r = ui
-                .button("Hear the reference again (Redo)")
-                .on_hover_text("Redo the restore");
-            ui_state.record("compare-redo".into(), r.rect);
-            if r.clicked() {
-                editor.redo();
-            }
-        }
     });
-    weak(
+    if can_undo || can_redo {
+        ui.horizontal_wrapped(|ui| {
+            let (text, tip) = if can_undo {
+                (
+                    "Back to my version (Undo)",
+                    "Undo the restore: your version with all its edits",
+                )
+            } else {
+                ("Hear the reference again (Redo)", "Redo the restore")
+            };
+            let r = ui
+                .add(Button::new(st, text).ghost().g4(28.0))
+                .on_hover_text(tip);
+            ui_state.record(
+                if can_undo {
+                    "compare-undo"
+                } else {
+                    "compare-redo"
+                }
+                .into(),
+                r.rect,
+            );
+            if r.clicked() {
+                if can_undo {
+                    editor.undo();
+                } else {
+                    editor.redo();
+                }
+            }
+        });
+    }
+    ui.add_space(6.0);
+    paragraph(
         ui,
+        st,
+        Role::Caption,
+        Tone::Text3,
         "Switching rebuilds the sound like any edit (a short crossfade): held notes, tails and \
-         running phases continue, so it is not a sample-exact A/B. Levels are not adjusted: use \
-         the output meter to compare loudness.",
+         running phases continue, so it is not a sample-exact A/B. Levels are not matched: use \
+         the output meter.",
     );
+    ui.add_space(12.0);
 }

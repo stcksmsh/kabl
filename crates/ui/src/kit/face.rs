@@ -42,7 +42,7 @@ const HOLD_TITLE: f32 = 10.5;
 /// Zoom below which no face text is drawn under `Hold` (the overview tier) and above which
 /// values and captions are drawn again (the full tier).
 const OVERVIEW_BELOW: f32 = 0.55;
-const FULL_FROM: f32 = 0.864;
+pub(crate) const FULL_FROM: f32 = 0.864;
 
 /// Whether `z` is in the overview tier of a `Hold` style: no face text, not even the `+N` chip.
 pub fn overview(st: &Style, z: f32) -> bool {
@@ -69,6 +69,17 @@ fn sized(st: &Style, role: Role, z: f32, hide_below: f32) -> Option<FontId> {
     }
     (t.size * z >= hide_below)
         .then(|| FontId::new((t.size * z).max(TEXT_FLOOR), t.font.family(st.fonts_ready)))
+}
+
+/// The font of a selector's option names. A selector's text is the control itself, not a value
+/// readout, so the compact tier keeps it (held at the floor size) instead of dropping it.
+pub fn selector_font(st: &Style, z: f32) -> Option<FontId> {
+    face_font(st, Role::Value, z).or_else(|| {
+        compact_tier(st, z).then(|| {
+            let t = st.type_role(Role::Value);
+            FontId::new((t.size * z).max(HOLD_FLOOR), t.font.family(st.fonts_ready))
+        })
+    })
 }
 
 /// Angle (radians from 12 o'clock, clockwise) of knob travel `n` on the 270° scale.
@@ -380,26 +391,23 @@ pub struct Knob {
     pub hot: bool,
 }
 
-pub fn knob(p: &Painter, st: &Style, k: &Knob, tick: Color32) {
+pub fn knob(p: &Painter, st: &Style, k: &Knob) {
     let (c, rs, z) = (k.c, k.rs, k.z);
     let r = &st.roles;
     let ks = &st.slots.knob;
     let solid = ks.body == KnobBody::Solid;
-    let track = rs + if solid { 3.5 } else { 5.5 } * z;
+    let track = rs + 3.5 * z;
+    // The mockup's thin track: the ink at about a quarter strength.
+    let track_col = if st.dark {
+        Color32::from_rgba_unmultiplied(236, 234, 230, 66)
+    } else {
+        Color32::from_rgba_unmultiplied(26, 25, 23, 77)
+    };
     match ks.scale {
-        KnobScale::Ticks => {
-            for i in 0..=10 {
-                let a = travel_angle(i as f32 / 10.0);
-                p.line_segment(
-                    [on_circle(c, rs + 4.0 * z, a), on_circle(c, rs + 7.5 * z, a)],
-                    Stroke::new((1.2 * z).max(1.0), tick),
-                );
-            }
-        }
-        KnobScale::TrackArc => {
+        KnobScale::TrackArc | KnobScale::Ticks => {
             p.add(Shape::line(
                 arc_pts(c, track, 0.0, 1.0),
-                Stroke::new(2.4 * z, alpha(tick, 90)),
+                Stroke::new(2.5 * z, track_col),
             ));
         }
         KnobScale::None => {}
@@ -424,34 +432,35 @@ pub fn knob(p: &Painter, st: &Style, k: &Knob, tick: Color32) {
     let rim = alpha(mix(r.knob_hi, r.knob, 0.5), 255);
     match ks.body {
         KnobBody::Solid => {
-            // Dark filled cap: drop shadow, skirt with ticks, four-step cap gradient, pointer.
+            // The mockup's solid cap: one drop shadow, a flat skirt, a cap at 0.78 of the radius
+            // shaded from the upper left (radial gradient in fourteen steps), a hairline rim.
             let sh = if st.dark { 115 } else { 36 };
             p.circle_filled(
-                c + vec2(0.0, 3.0 * z),
-                rs + z,
-                alpha(Color32::BLACK, sh / 4),
-            );
-            p.circle_filled(
-                c + vec2(0.0, 1.5 * z),
+                c + vec2(0.0, 2.0 * z),
                 rs + 0.5 * z,
-                alpha(Color32::BLACK, sh / 2),
+                alpha(Color32::BLACK, sh),
             );
-            p.circle_filled(c, rs, mix(r.knob, Color32::BLACK, 0.3));
-            for i in 0..=10 {
-                let a = travel_angle(i as f32 / 10.0);
-                p.line_segment(
-                    [on_circle(c, rs - 1.2 * z, a), on_circle(c, rs - 3.6 * z, a)],
-                    Stroke::new((1.0 * z).max(0.75), alpha(r.knob_ink, 90)),
-                );
-            }
-            for i in 0..4 {
-                let t = i as f32 / 3.0;
+            let skirt = if st.dark {
+                Color32::from_rgb(0x14, 0x15, 0x18)
+            } else {
+                Color32::from_rgb(0xD6, 0xD2, 0xC9)
+            };
+            p.circle_filled(c, rs, skirt);
+            let cap = rs * 0.78;
+            for i in 0..14 {
+                let t = i as f32 / 13.0;
                 p.circle_filled(
-                    c - vec2(rs * 0.06, rs * 0.08) * (1.0 - t),
-                    rs * (0.74 - 0.14 * t),
-                    mix(r.knob_hi, r.knob, t),
+                    c - vec2(cap * 0.24, cap * 0.4) * t * 0.5,
+                    cap * (1.0 - 0.8 * t),
+                    mix(r.knob, r.knob_hi, t),
                 );
             }
+            let rim = if st.dark {
+                Color32::from_white_alpha(26)
+            } else {
+                r.line2
+            };
+            p.circle_stroke(c, rs - 0.5 * z, Stroke::new(1.0, rim));
             let a = travel_angle(k.value);
             p.line_segment(
                 [on_circle(c, rs * 0.18, a), on_circle(c, rs * 0.68, a)],
@@ -467,14 +476,6 @@ pub fn knob(p: &Painter, st: &Style, k: &Knob, tick: Color32) {
             p.circle_filled(c, rs + 1.5 * z, skirt);
             p.circle_filled(c, rs * 0.84, r.knob);
             p.circle_stroke(c, rs * 0.84, Stroke::new((0.8 * z).max(0.8), rim));
-            for i in 0..24 {
-                let a = i as f32 / 24.0 * std::f32::consts::TAU;
-                let d = vec2(a.cos(), a.sin());
-                p.line_segment(
-                    [c + d * rs * 0.73, c + d * rs * 0.82],
-                    Stroke::new((0.6 * z).max(0.6), mix(r.knob_hi, r.knob, 0.65)),
-                );
-            }
         }
         KnobBody::Glass => {
             p.circle_filled(
@@ -615,42 +616,32 @@ pub fn jack_ch(
     let edge = mix(ro.knob, ro.knob_hi, 0.8);
     match st.slots.jack {
         JackRecipe::Hex => {
-            // Hex nut (r 11 in rack units, scaled with the jack), signal ring, hole.
+            // The G4 mockup's jack (`jack()` in `g4-surfaces.html`, solid faces), in rack units
+            // scaled with the jack: a shadow 1.5 down (r 11), a round nut (r 10.5, 1 px edge),
+            // then a signal disc (r 7.2) with the hole (r 5); stereo: the hole (r 7.6) ringed in
+            // the signal colour plus a ring at r 4.6, both 1.7 wide. A plugged cable draws its
+            // plug on top. The recipe keeps its old name, `hex`, so saved themes still load.
             let k = r / 13.0;
-            let hex = |rad: f32, dy: f32| -> Vec<Pos2> {
-                (0..6)
-                    .map(|i| {
-                        let a =
-                            std::f32::consts::FRAC_PI_6 + i as f32 * std::f32::consts::FRAC_PI_3;
-                        c + vec2(a.cos() * rad, a.sin() * rad + dy) * k
-                    })
-                    .collect()
-            };
-            let sh = if st.dark { 115 } else { 36 };
-            p.add(Shape::convex_polygon(
-                hex(11.5, 1.2),
-                alpha(Color32::BLACK, sh / 2),
-                Stroke::NONE,
-            ));
-            p.add(Shape::convex_polygon(
-                hex(11.0, 0.0),
-                st.roles.raised,
-                Stroke::new((0.8 * z).max(0.75), st.roles.line2),
-            ));
-            let ring = (1.7 * z).max(1.0);
-            if stereo {
-                p.circle_filled(c, 8.1 * k, st.jack_hole());
-                p.circle_stroke(c, 8.1 * k, Stroke::new(ring, signal));
-                p.circle_stroke(c, 5.0 * k, Stroke::new(ring, signal));
-                p.circle_filled(c, 2.4 * k, st.jack_hole());
+            let (nut, edge) = if st.dark {
+                (
+                    mix(ro.raised, ro.line2, 0.36),
+                    mix(ro.line2, ro.text, 0.067),
+                )
             } else {
-                p.circle_filled(c, 7.6 * k, signal);
-                p.circle_filled(c, 5.2 * k, st.jack_hole());
-            }
-            if patched {
-                p.circle_filled(c + vec2(0.0, 1.5 * k), 8.0 * k, alpha(Color32::BLACK, 90));
-                p.circle_filled(c, 7.5 * k, signal);
-                p.circle_filled(c - vec2(2.0, 2.0) * k, 3.0 * k, alpha(Color32::WHITE, 90));
+                (ro.raised, ro.line2)
+            };
+            let sh = if st.dark { 92 } else { 29 };
+            p.circle_filled(c + vec2(0.0, 1.5 * k), 11.0 * k, alpha(Color32::BLACK, sh));
+            p.circle_filled(c, 10.5 * k, nut);
+            p.circle_stroke(c, 10.5 * k, Stroke::new((1.0 * z).max(0.75), edge));
+            if stereo {
+                let ring = Stroke::new((1.7 * z).max(1.0), signal);
+                p.circle_filled(c, 7.6 * k, st.jack_hole());
+                p.circle_stroke(c, 7.6 * k, ring);
+                p.circle_stroke(c, 4.6 * k, ring);
+            } else {
+                p.circle_filled(c, 7.2 * k, signal);
+                p.circle_filled(c, 5.0 * k, st.jack_hole());
             }
         }
         JackRecipe::Nut => {

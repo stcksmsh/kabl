@@ -20,6 +20,7 @@ pub mod composites;
 pub mod control;
 pub mod cues;
 pub mod displays;
+mod drawer;
 mod drum_displays;
 mod drum_grid;
 pub mod editor;
@@ -44,6 +45,7 @@ use wheel::OwnedScroll;
 pub mod recipes;
 pub mod record;
 pub mod routing;
+mod seq_editor;
 pub mod style;
 pub mod tables;
 pub mod theme;
@@ -67,9 +69,14 @@ use style::Style;
 use theme::{theme, Theme};
 
 /// Width of the routing drawer (right).
-pub const DRAWER_W: f32 = 360.0;
+pub const DRAWER_W: f32 = 320.0;
+/// Window width below which (the plugin's 1180 px) the drawer floats over the rack and the
+/// rack fits itself to the window.
+pub const COMPACT_W: f32 = 1280.0;
 pub const MIN_ZOOM: f32 = 0.5;
 pub const MAX_ZOOM: f32 = 2.0;
+/// Largest zoom the automatic fit may pick: small patches fill the window, as in the mockup.
+const FIT_MAX_ZOOM: f32 = 1.5;
 
 /// How patch cables are drawn. Positions never change between modes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -184,6 +191,12 @@ pub struct UiState {
     /// Output sample rate, for preview lengths (set by `main.rs`).
     pub sample_rate: f32,
     pub last_message: Option<String>,
+    /// Messages as toasts (errors stay, warnings 8 s, success 3 s); fed from `last_message`.
+    pub toasts: Vec<kit::g4::Toast>,
+    /// The `last_message` text already turned into a toast.
+    toast_seen: Option<String>,
+    /// The empty rack's Add module button asks the toolbar to open its menu.
+    add_menu_req: bool,
     pub cable_view: CableView,
     /// The knob (module, param) whose routes the drawer lists and whose ring edits
     /// `selected_route`.
@@ -297,6 +310,8 @@ pub struct UiState {
     perform_full_seen: bool,
     /// Modules showing their advanced controls. View only: never saved, never undone.
     pub expanded: BTreeSet<ModuleId>,
+    /// The More controls dialog's tab: 0 Controls, 1 Face layout.
+    pub more_tab: usize,
     /// Advanced controls float over the neighbours instead of pushing them (setting).
     pub float_expansion: bool,
     /// Show illustrated skins where a module has one (core modules stay A / A-dark otherwise).
@@ -310,6 +325,19 @@ pub struct UiState {
     reveal: Option<ModuleId>,
     canvas: Rect,
     fitted: bool,
+    /// World ends of every drawn cable (output, input), from the last frame: what the fit
+    /// needs to keep the sagging ropes inside the viewport.
+    cable_ends: Vec<(Pos2, Pos2)>,
+    /// Paint audit of the last rack frame: the clip rect the cables were painted with, the
+    /// shape index where module content ended, where the cables started and where they ended.
+    pub cable_audit: (Rect, usize, usize, usize),
+    /// A fit of the whole patch that still has to account for the cables: (world, max zoom).
+    pending_fit: Option<(Rect, f32)>,
+    /// Compact window (below `COMPACT_W`), set each frame.
+    compact: bool,
+    /// Compact windows refit the rack on resize until the user zooms.
+    pub auto_fit: bool,
+    compact_seen: bool,
     last_inspected: Option<(ModuleId, String)>,
     /// Inspected knob and route count whose source lanes were last panned into view.
     lanes_shown: Option<(ModuleId, String, usize)>,
@@ -343,6 +371,14 @@ pub struct UiState {
     pub status_meter: bool,
     /// The host's audio status line (device, rate, buffer), shown in the status bar.
     pub status_audio: String,
+    /// Status bar readouts, each shown only when set. The host feeds the DSP load in percent,
+    /// the voices in use and available, and the callback size in frames; `show` derives the
+    /// tempo and the song position (bar . beat . tick) from the patch's first clock.
+    pub status_cpu: Option<f32>,
+    pub status_voices: Option<(u32, u32)>,
+    pub status_buffer: Option<u32>,
+    pub status_bpm: Option<f32>,
+    pub status_pos: Option<String>,
     /// Stereo output recorder; `None` without an audio device.
     pub recorder: Option<record::Recorder>,
     /// The open "what does this control change" explanation and inline help (view only).
@@ -389,6 +425,9 @@ impl Default for UiState {
             load_stopped: false,
             sample_rate: 48000.0,
             last_message: None,
+            toasts: Vec::new(),
+            toast_seen: None,
+            add_menu_req: false,
             cable_view: CableView::All,
             inspected: None,
             selected_route: None,
@@ -445,6 +484,7 @@ impl Default for UiState {
             drawer_auto_closed: false,
             perform_full_seen: false,
             expanded: BTreeSet::new(),
+            more_tab: 0,
             float_expansion: false,
             skins: true,
             skin_labels_on_art: None,
@@ -453,6 +493,12 @@ impl Default for UiState {
             reveal: None,
             canvas: Rect::NOTHING,
             fitted: false,
+            cable_ends: Vec::new(),
+            cable_audit: (Rect::NOTHING, 0, 0, 0),
+            pending_fit: None,
+            compact: false,
+            auto_fit: true,
+            compact_seen: false,
             last_inspected: None,
             lanes_shown: None,
             deferred: Vec::new(),
@@ -472,6 +518,11 @@ impl Default for UiState {
             meter: Default::default(),
             status_meter: false,
             status_audio: String::new(),
+            status_cpu: None,
+            status_buffer: None,
+            status_voices: None,
+            status_bpm: None,
+            status_pos: None,
             explain: Default::default(),
             inspect: Default::default(),
             compare: Default::default(),
@@ -525,11 +576,19 @@ impl UiState {
             }
         }
         if let Some(cable) = self.selected_route {
-            let belongs = state.cables.get(&cable).is_some_and(|c| {
-                matches!((&c.to, &self.inspected),
-                    (PortRef::Param { id, param }, Some((iid, ip)))
-                        if id == iid && routing::reaches(state, *id, param, ip))
-            });
+            // A cable picked in the drawer's list stays selected; a depth route only while its
+            // control is inspected.
+            let belongs =
+                state
+                    .cables
+                    .get(&cable)
+                    .is_some_and(|c| match (&c.to, &self.inspected) {
+                        (PortRef::Param { id, param }, Some((iid, ip))) => {
+                            id == iid && routing::reaches(state, *id, param, ip)
+                        }
+                        (PortRef::Param { .. }, None) => false,
+                        _ => true,
+                    });
             if !belongs {
                 self.selected_route = None;
             }
@@ -566,12 +625,12 @@ impl UiState {
 
     fn zoom_about(&mut self, zoom: f32, at: Pos2) {
         let world = self.xf().inv(at);
+        self.auto_fit = false;
         self.zoom = zoom.clamp(MIN_ZOOM, MAX_ZOOM);
         self.pan = at - self.canvas.min - world.to_vec2() * self.zoom;
     }
 
-    /// Zooms so `world` fits the canvas (at most `max_zoom`), left-aligned, centred vertically
-    /// when there is room.
+    /// Zooms so `world` fits the canvas (at most `max_zoom`), anchored top-left under the toolbar.
     fn frame_world(&mut self, world: Rect, max_zoom: f32) {
         if !world.min.x.is_finite()
             || !world.min.y.is_finite()
@@ -590,10 +649,63 @@ impl UiState {
             .clamp(MIN_ZOOM, max_zoom);
         self.zoom = z;
         self.pan = c.min - self.canvas.min - world.min.to_vec2() * z;
-        let spare = c.height() - world.height() * z;
-        if spare > 0.0 {
-            self.pan.y += spare / 2.0;
+    }
+
+    /// `frame_world` for the whole patch: the module fit now, refined with the cable ropes
+    /// once they are drawn (`refit_with_cables`).
+    fn frame_patch(&mut self, world: Rect, max_zoom: f32) {
+        self.frame_world(world, max_zoom);
+        self.pending_fit = Some((world, max_zoom));
+    }
+
+    /// Screen bounds of `world` and every cable rope at the current zoom and pan.
+    fn rack_bounds(&self, world: Rect) -> Rect {
+        let xf = self.xf();
+        let sag = self.style.slots.cable.sag;
+        let mut r = xf.r(world);
+        for (a, b) in &self.cable_ends {
+            for p in cable_look::points(xf.p(*a), xf.p(*b), xf.zoom, sag) {
+                r.extend_with(p);
+            }
         }
+        r
+    }
+
+    /// Shrinks the fit until the modules and the sagging cables are inside the canvas (never
+    /// below `MIN_ZOOM`), anchored top-left under the toolbar.
+    fn refit_with_cables(&mut self, world: Rect, max_zoom: f32) {
+        let c = self.canvas.shrink(12.0);
+        for _ in 0..8 {
+            let r = self.rack_bounds(world);
+            if r.width() <= c.width() + 0.5 && r.height() <= c.height() + 0.5 {
+                break;
+            }
+            let k = (c.width() / r.width()).min(c.height() / r.height()) * 0.99;
+            self.zoom = (self.zoom * k).clamp(MIN_ZOOM, max_zoom);
+        }
+        let r = self.rack_bounds(world);
+        self.pan += c.min - r.min;
+    }
+
+    /// Screen bounds of every drawn cable rope (none when no cable is drawn).
+    pub fn cable_bounds(&self) -> Option<Rect> {
+        let xf = self.xf();
+        let sag = self.style.slots.cable.sag;
+        let mut r: Option<Rect> = None;
+        for (a, b) in &self.cable_ends {
+            for p in cable_look::points(xf.p(*a), xf.p(*b), xf.zoom, sag) {
+                match r.as_mut() {
+                    Some(r) => r.extend_with(p),
+                    None => r = Some(Rect::from_min_max(p, p)),
+                }
+            }
+        }
+        r
+    }
+
+    /// The rack viewport of the last frame, screen px.
+    pub fn rack_canvas(&self) -> Rect {
+        self.canvas
     }
 
     /// Pans the least needed to bring the screen rect `target` inside the canvas (its
@@ -736,9 +848,17 @@ pub fn show_with(
     composites::panel(editor, ui_state, ui.ctx());
     about::show(ui.ctx(), ui_state);
     panels::editor(editor, ui_state, ui.ctx());
-    tables::show(editor, ui_state, ui.ctx());
     filebrowser::window(ui_state, ui.ctx());
-    rack_editor::edit_face(editor, ui_state, ui.ctx());
+    // Edit face is the More controls dialog's second tab.
+    if let Some(id) = ui_state
+        .choose
+        .as_ref()
+        .map(|c| c.0)
+        .filter(|_| ui_state.expanded.is_empty())
+    {
+        ui_state.expanded.insert(id);
+        ui_state.more_tab = 1;
+    }
     browser::frame_input(editor, ui_state, ui);
     ui_state.validate(editor);
     ui_state.explain.validate(editor);
@@ -840,6 +960,11 @@ pub fn show_with(
         .exact_size(st.metrics.toolbar_h)
         .frame(kit::bar_frame(&st))
         .show(ui, |ui| toolbar(editor, ui_state, ui, &st));
+    if let Some((bpm, pos)) = transport_readout(editor.state(), ui_state) {
+        // Under a host clock the module's own tempo is not the one playing.
+        ui_state.status_bpm = (!ui_state.host_clock).then_some(bpm);
+        ui_state.status_pos = Some(pos);
+    }
     egui::Panel::bottom("kabl-status")
         .exact_size(st.metrics.status_h)
         .frame(kit::bar_frame(&st))
@@ -849,16 +974,15 @@ pub fn show_with(
         .resizable(false)
         .frame(kit::panel_frame(&st).inner_margin(egui::Margin::symmetric(0, st.sp(2) as i8)))
         .show(ui, |ui| rail(editor, ui_state, ui, &st));
-    if ui_state.browser_open {
-        egui::Panel::left("kabl-browser")
-            .exact_size(browser::PANEL_W)
-            .resizable(false)
-            .frame(kit::panel_frame(&st))
-            .show(ui, |ui| browser::panel(editor, ui_state, ui));
-    }
 
+    let compact = ui.max_rect().width() < COMPACT_W;
+    ui_state.compact = compact;
+    if compact && !std::mem::replace(&mut ui_state.compact_seen, true) {
+        // The plugin window starts with the drawer shut: the rack gets the room.
+        ui_state.drawer_open = false;
+    }
     let perform_full = ui_state.perform_open && ui_state.perform_tall;
-    // The drawer gives its 360 px to the Perform view unless pinned, and comes back with the rack.
+    // The drawer gives its 320 px to the Perform view unless pinned, and comes back with the rack.
     if perform_full != ui_state.perform_full_seen {
         ui_state.perform_full_seen = perform_full;
         if perform_full && ui_state.drawer_open && !ui_state.drawer_pinned {
@@ -875,108 +999,54 @@ pub fn show_with(
             .frame(kit::panel_frame(&st))
             .show(ui, |ui| perform_view::panel(editor, ui_state, ui));
     }
-    if ui_state.drawer_open {
-        egui::Panel::right("kabl-params")
-            .exact_size(DRAWER_W)
-            .resizable(false)
-            .frame(kit::panel_frame(&st))
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = st.sp(1);
-                    kit::label(ui, &st, style::Role::Title, kit::Tone::Text, "Routing");
-                    let on = ui_state.explain.help;
-                    let r = ui
-                        .add(kit::Button::new(&st, "Help").small().selected(on))
-                        .tip(&st, "Show what each module and control does");
-                    ui_state.record("help".into(), r.rect);
-                    if r.clicked() {
-                        ui_state.explain.help = !on;
-                    }
-                    let on = ui_state.inspect.open;
-                    let r = ui
-                        .add(kit::Button::new(&st, "Inspect").small().selected(on))
-                        .tip(&st, "Measure one output and ask why there is no sound");
-                    ui_state.record("inspect-open".into(), r.rect);
-                    if r.clicked() {
-                        ui_state.inspect.open = !on;
-                        ui_state.inspect.reveal = !on;
-                    }
-                    let on = ui_state.compare.open;
-                    let r = ui
-                        .add(kit::Button::new(&st, "Compare").small().selected(on))
-                        .tip(&st, "Keep a reference copy of the patch and restore it");
-                    ui_state.record("compare-open".into(), r.rect);
-                    if r.clicked() {
-                        ui_state.compare.open = !on;
-                        ui_state.compare.reveal = !on;
-                    }
-                    let on = ui_state.recipes.open;
-                    let r = ui
-                        .add(kit::Button::new(&st, "Learn").small().selected(on))
-                        .tip(&st, "Three short listening recipes (optional)");
-                    ui_state.record("learn-open".into(), r.rect);
-                    if r.clicked() {
-                        ui_state.recipes.open = !on;
-                    }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if kit::icon_button(ui, &st, kit::Ic::Close, false, true)
-                            .tip(&st, "Close the drawer")
-                            .clicked()
-                        {
-                            ui_state.drawer_open = false;
-                        }
+    // The Sounds scene has its own detail column: the drawer waits behind it.
+    if ui_state.drawer_open && !ui_state.browser_open {
+        if compact {
+            // Below 1280 px the drawer floats over the rack instead of splitting the window.
+            let avail = ui.available_rect_before_wrap();
+            let frame = kit::panel_frame(&st).shadow(egui::Shadow {
+                offset: [-6, 0],
+                blur: 16,
+                spread: 0,
+                color: egui::Color32::from_black_alpha(70),
+            });
+            let rect = egui::Rect::from_min_max(
+                egui::pos2(avail.right() - DRAWER_W, avail.top()),
+                avail.max,
+            );
+            egui::Area::new(egui::Id::new("kabl-params-overlay"))
+                .order(egui::Order::Foreground)
+                .fade_in(false)
+                .fixed_pos(rect.min)
+                .show(ui.ctx(), |ui| {
+                    frame.show(ui, |ui| {
+                        ui.set_min_size(rect.size() - frame.total_margin().sum());
+                        ui.set_max_size(rect.size() - frame.total_margin().sum());
+                        drawer(editor, ui_state, ui, &st, now);
                     });
                 });
-                if ui_state.recipes.open {
-                    // Above the drawer's scrolling content, so Show (which scrolls the drawer
-                    // to the routes) never scrolls the recipe away.
-                    let h = ui.available_height() * 0.4;
-                    egui::ScrollArea::vertical()
-                        .id_salt("kabl-recipes")
-                        .max_height(h)
-                        .show_owned(ui, |ui| {
-                            ui.set_max_width(DRAWER_W - 24.0);
-                            egui::Frame::group(ui.style()).show(ui, |ui| {
-                                recipes::panel(editor, ui_state, ui, now);
-                            });
-                        });
-                }
-                if ui_state.explain.is_open() {
-                    // Its own scroll area, at most about half the drawer: the module and
-                    // routing sections below stay in reach while it is open.
-                    let h = ui.available_height() * 0.55;
-                    egui::ScrollArea::vertical()
-                        .id_salt("kabl-explain")
-                        .max_height(h)
-                        .show_owned(ui, |ui| {
-                            ui.set_max_width(DRAWER_W - 24.0);
-                            explain::panel(editor, ui_state, ui);
-                        });
-                }
-                egui::ScrollArea::vertical().show_owned(ui, |ui| {
-                    // Rows wrap instead of widening the drawer over the rack.
-                    ui.set_max_width(DRAWER_W - 24.0);
-                    if ui_state.inspect.open {
-                        egui::Frame::group(ui.style()).show(ui, |ui| {
-                            inspect::panel(editor, ui_state, ui, now);
-                        });
-                    }
-                    if ui_state.compare.open {
-                        egui::Frame::group(ui.style()).show(ui, |ui| {
-                            compare::panel(editor, ui_state, ui);
-                        });
-                    }
-                    show_param_panel(editor, ui_state, ui);
-                    pattern::panel(editor, ui_state, ui);
-                    routing::drawer(editor, ui_state, ui);
-                    routing::cable_routes(editor, ui_state, ui);
-                });
-            });
+        } else {
+            egui::Panel::right("kabl-params")
+                .exact_size(DRAWER_W)
+                .resizable(false)
+                .frame(kit::panel_frame(&st))
+                .show(ui, |ui| drawer(editor, ui_state, ui, &st, now));
+        }
     }
 
-    if perform_full {
+    let page = ui.available_rect_before_wrap();
+    // The wavetable dock spans the rack's width, under the rack.
+    if !ui_state.browser_open && !perform_full {
+        tables::show(editor, ui_state, ui);
+    }
+    if ui_state.browser_open {
         egui::CentralPanel::default()
-            .frame(kit::page_frame(&st))
+            .frame(kit::panel_frame(&st))
+            .show(ui, |ui| browser::panel(editor, ui_state, ui));
+    } else if perform_full {
+        // The Perform view's cards sit 16 from the window edges (mockup `performScreen`).
+        egui::CentralPanel::default()
+            .frame(kit::page_frame(&st).inner_margin(egui::Margin::same(16)))
             .show(ui, |ui| perform_view::panel(editor, ui_state, ui));
     } else {
         egui::CentralPanel::default()
@@ -984,9 +1054,228 @@ pub fn show_with(
             .show(ui, |ui| show_rack(editor, ui_state, ui, &th));
     }
     browser::dialogs(editor, ui_state, ui.ctx());
+    show_toasts(ui_state, ui, &st, page);
     ui_state.explain.typing =
         ui.ctx().egui_wants_keyboard_input() || egui::Popup::is_any_open(ui.ctx());
     ui_state.hits = std::mem::take(&mut ui_state.frame_hits);
+}
+
+/// The routing drawer: its header (help, inspect, compare, learn, close) and the scrolling
+/// sections below it.
+fn drawer(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    st: &Style,
+    now: f64,
+) {
+    drawer::tabs(ui_state, ui, st);
+    // Learn and Compare are tabs of their own: each replaces the drawer's body.
+    if ui_state.recipes.open {
+        egui::ScrollArea::vertical()
+            .id_salt("kabl-recipes")
+            .show_owned(ui, |ui| {
+                ui.set_max_width(DRAWER_W - 24.0);
+                recipes::panel(editor, ui_state, ui, now);
+            });
+        return;
+    }
+    if ui_state.compare.open {
+        egui::ScrollArea::vertical()
+            .id_salt("kabl-compare")
+            .show_owned(ui, |ui| {
+                ui.set_max_width(DRAWER_W - 24.0);
+                compare::panel(editor, ui_state, ui, st);
+            });
+        return;
+    }
+    if ui_state.explain.is_open() {
+        // Its own scroll area, at most about half the drawer: the module and
+        // routing sections below stay in reach while it is open.
+        let h = ui.available_height() * 0.8;
+        egui::ScrollArea::vertical()
+            .id_salt("kabl-explain")
+            .max_height(h)
+            .show_owned(ui, |ui| {
+                ui.set_max_width(DRAWER_W - 24.0);
+                explain::panel(editor, ui_state, ui);
+            });
+    }
+    egui::ScrollArea::vertical().show_owned(ui, |ui| {
+        // Rows wrap instead of widening the drawer over the rack.
+        ui.set_max_width(DRAWER_W - 24.0);
+        if ui_state.inspect.open {
+            inspect::panel(editor, ui_state, ui, now);
+        }
+        // The patch-wide lists lead when no control is being edited, and follow its editor
+        // otherwise, so the control's routes stay in view.
+        let lists = !ui_state.explain.is_open() && !ui_state.inspect.open;
+        // The seq and cues editors count as editing: they lead the drawer, as in G4.
+        let module_editor = ui_state
+            .selected_module
+            .and_then(|id| editor.state().modules.get(&id))
+            .is_some_and(|m| matches!(m.kind.as_str(), "seq" | "cues"));
+        let editing = ui_state.inspected.is_some() || ui_state.cable_fn.is_some() || module_editor;
+        if lists && !editing {
+            drawer::lists(editor, ui_state, ui, st);
+            drawer::why_card(editor, ui_state, ui, st);
+        }
+        // The module's own editor lives under Inspect; the faces edit values in place. The
+        // seq and cues editors (G4) also open under Routing when their module is selected.
+        if ui_state.inspect.open || module_editor {
+            show_param_panel(editor, ui_state, ui);
+        }
+        pattern::panel(editor, ui_state, ui);
+        routing::drawer(editor, ui_state, ui);
+        // An open cable editor or inspected control (G4) shows its own routes; the patch-wide
+        // ones and the lists wait behind its More disclosure.
+        let cable_open = ui_state
+            .cable_fn
+            .is_some_and(|c| !pattern::more_open(ui.ctx(), c))
+            || !routing::more_open(ui.ctx(), ui_state);
+        if !cable_open {
+            routing::cable_routes(editor, ui_state, ui);
+        }
+        // The seq and cues editors take the whole drawer (G4): no lists under them.
+        if lists && editing && !module_editor && !cable_open {
+            drawer::lists(editor, ui_state, ui, st);
+            drawer::why_card(editor, ui_state, ui, st);
+        }
+    });
+}
+
+/// The world rectangle to fit: the patch's modules, or two empty rows when there are none.
+fn fit_world(bounds: Rect) -> Rect {
+    if bounds.is_positive() {
+        bounds.expand(4.0)
+    } else {
+        Rect::from_min_max(
+            pos2(0.0, rack::row_y(0) - 8.0),
+            pos2(1200.0, rack::row_y(1) + PANEL_H + 8.0),
+        )
+    }
+}
+
+/// The empty rack: the rails stay, a centred note offers the two ways to start.
+fn empty_rack(ui_state: &mut UiState, ui: &mut egui::Ui, canvas: Rect) {
+    let st = ui_state.style.clone();
+    // The mockup centres the well 80 px above the middle of the canvas.
+    let top = canvas.center().y - 80.0 - 28.0;
+    let area = Rect::from_min_size(pos2(canvas.min.x, top), vec2(canvas.width(), 204.0));
+    ui.scope_builder(egui::UiBuilder::new().max_rect(area), |ui| {
+        let r = kit::g4::empty_state(
+            ui,
+            &st,
+            kit::Ic::Plug,
+            "Empty rack",
+            "Add a module, or start from a sound.",
+            &[
+                kit::g4::EmptyAction {
+                    label: "Add module",
+                    primary: true,
+                    icon: kit::Ic::Plus,
+                },
+                kit::g4::EmptyAction {
+                    label: "Browse sounds",
+                    primary: false,
+                    icon: kit::Ic::Search,
+                },
+            ],
+            Some("Tip: right-click the rack to add a module where you click."),
+        );
+        ui_state.record("empty-add".into(), r[0].rect);
+        if r[0].clicked() {
+            ui_state.add_menu_req = true;
+        }
+        ui_state.record("empty-browse".into(), r[1].rect);
+        if r[1].clicked() {
+            ui_state.browser_open = true;
+        }
+    });
+}
+
+/// Severity, title and mono detail of a status message: what failed is an error, a hazard a
+/// warning, anything else a quiet success. "Could not load: why" splits at the colon.
+fn toast_for(msg: &str) -> (kit::g4::Sev, String, Option<String>) {
+    use kit::g4::Sev;
+    let m = msg.to_lowercase();
+    let has = |words: &[&str]| words.iter().any(|w| m.contains(w));
+    let sev = if has(&[
+        "error",
+        "failed",
+        "could not",
+        "couldn't",
+        "cannot",
+        "can't",
+        "not found",
+        "unsupported",
+        "refused",
+        "denied",
+        "invalid",
+        "unavailable",
+        "lost",
+    ]) {
+        Sev::Bad
+    } else if has(&[
+        "warning", "no sound", "stopped", "busy", "muted", "skipped", "ignored",
+    ]) {
+        Sev::Warn
+    } else {
+        Sev::Good
+    };
+    match msg.split_once(": ") {
+        Some((t, d)) => (sev, t.to_string(), Some(d.to_string())),
+        None => (sev, msg.to_string(), None),
+    }
+}
+
+/// Action links of a toast: a failed load can show its detail or open another sound.
+fn toast_actions(sev: kit::g4::Sev, title: &str, has_detail: bool) -> Vec<String> {
+    let mut a = vec![];
+    if sev == kit::g4::Sev::Bad && has_detail {
+        a.push("Show details".to_string());
+        if title.to_lowercase().contains("load") {
+            a.push("Open another…".to_string());
+        }
+    }
+    a
+}
+
+/// Turns a new `last_message` into a toast and draws the stack at the rack's top right.
+fn show_toasts(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, area: Rect) {
+    let now = ui.input(|i| i.time);
+    if ui_state.last_message != ui_state.toast_seen {
+        ui_state.toast_seen.clone_from(&ui_state.last_message);
+        if let Some(msg) = &ui_state.last_message {
+            let (sev, title, detail) = toast_for(msg);
+            let actions = toast_actions(sev, &title, detail.is_some());
+            ui_state.toasts.push(kit::g4::Toast {
+                sev,
+                title,
+                detail,
+                actions,
+                expanded: false,
+                born: now,
+            });
+        }
+    }
+    if ui_state.toasts.is_empty() {
+        return;
+    }
+    if let Some((i, a)) = kit::g4::toasts(ui.ctx(), st, area, &mut ui_state.toasts, now) {
+        let t = &mut ui_state.toasts[i];
+        match t.actions.remove(a).as_str() {
+            "Show details" => t.expanded = true,
+            _ => {
+                ui_state.toasts.remove(i);
+                ui_state.browser_open = true;
+            }
+        }
+    }
+    if ui_state.toasts.iter().any(|t| t.sev.ttl().is_some()) {
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_millis(500));
+    }
 }
 
 fn vsep(ui: &mut egui::Ui, st: &Style) {
@@ -1019,37 +1308,10 @@ enum Scene {
     Sounds,
 }
 
-/// The brand mark and wordmark: an accent tile with a cable curve, then "kabl".
+/// The brand: the rebuilt kabl lockup in the text colour, 32 px high (G4 logo mockup,
+/// "Redraw lockup, text colour"); orange is for the app icon only.
 fn brand(ui: &mut egui::Ui, st: &Style) {
-    let word = ui.painter().layout_no_wrap(
-        "kabl".into(),
-        egui::FontId::new(17.0, style::Font::SansSemibold.family(st.fonts_ready)),
-        st.roles.text,
-    );
-    let s = 24.0;
-    let (r, _) = ui.allocate_exact_size(
-        egui::vec2(s + st.sp(2) + word.size().x, s),
-        egui::Sense::hover(),
-    );
-    let p = ui.painter();
-    let tile = egui::Rect::from_min_size(r.min, egui::vec2(s, s));
-    p.rect_filled(tile, 6.0, st.roles.accent);
-    let c = tile.center();
-    let pts: Vec<egui::Pos2> = (0..=16)
-        .map(|i| {
-            let t = i as f32 / 16.0;
-            let e = t * t * (3.0 - 2.0 * t);
-            c + egui::vec2(-6.0 + 12.0 * t, -5.5 + 11.0 * e)
-        })
-        .collect();
-    p.add(egui::Shape::line(
-        pts,
-        egui::Stroke::new(2.2, st.roles.on_accent),
-    ));
-    p.circle_filled(c + egui::vec2(-6.5, -5.5), 2.4, st.roles.on_accent);
-    p.circle_filled(c + egui::vec2(6.5, 5.5), 2.4, st.roles.on_accent);
-    let pos = egui::pos2(tile.right() + st.sp(2), r.center().y - word.size().y / 2.0);
-    p.galley(pos, word, st.roles.text);
+    kit::logo(ui, st, 32.0);
 }
 
 /// Adds a module of `kind` at the end of the first row and selects it.
@@ -1122,8 +1384,9 @@ fn add_search(
     let r = r.tip(st, "Add a module (A)");
     ui_state.record("add-menu".into(), r.rect);
     let pop = egui::Popup::default_response_id(&r);
-    if !ui.ctx().egui_wants_keyboard_input()
-        && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::A))
+    if std::mem::take(&mut ui_state.add_menu_req)
+        || (!ui.ctx().egui_wants_keyboard_input()
+            && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::A)))
     {
         egui::Popup::open_id(ui.ctx(), pop);
     }
@@ -1346,12 +1609,27 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
         if r.clicked() {
             ui_state.composites.panel = !on;
         }
-        let on = ui_state.drawer_open;
-        let r = kit::icon_button(ui, st, kit::Ic::Cable, on, true).tip(st, "Routing");
-        ui_state.record("routing".into(), r.rect);
-        if r.clicked() {
-            ui_state.drawer_open = !on;
-            ui_state.drawer_auto_closed = false;
+        // One icon per drawer tab: a click opens the drawer on it, or closes the drawer when
+        // that tab is the one showing.
+        let now = drawer::current(ui_state);
+        for tab in drawer::Tab::ALL {
+            let on = ui_state.drawer_open && now == tab;
+            let r = kit::icon_button(ui, st, tab.icon(), on, true).tip(st, tab.label());
+            let key = if tab == drawer::Tab::Routing {
+                "routing".to_string()
+            } else {
+                format!("rail:{}", tab.key())
+            };
+            ui_state.record(key, r.rect);
+            if r.clicked() {
+                if on {
+                    ui_state.drawer_open = false;
+                } else {
+                    ui_state.drawer_open = true;
+                    ui_state.drawer_auto_closed = false;
+                    drawer::open(ui_state, tab);
+                }
+            }
         }
         kit::rule(ui, st);
         let focus_target = ui_state
@@ -1448,6 +1726,21 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
     });
 }
 
+/// Tempo and song position of the patch's first clock (the one the engine follows), from the
+/// clock's own `bpm` and the position the audio thread reports in pulses (four to a beat, four
+/// beats to a bar). `None` without a clock or before it has reported.
+fn transport_readout(state: &PatchState, ui_state: &UiState) -> Option<(f32, String)> {
+    let (&id, m) = state.modules.iter().find(|(_, m)| m.kind == "clock")?;
+    let pos = *ui_state.clock_pos.get(&id)?;
+    let bpm = m.params.get("bpm").copied().unwrap_or(120.0);
+    let pulse = pos.max(0.0) as u64;
+    let (beat, tick) = (pulse / 4, pulse % 4);
+    Some((
+        bpm,
+        format!("{} . {} . {}", beat / 4 + 1, beat % 4 + 1, tick + 1),
+    ))
+}
+
 /// The status bar: output meter and peak, sample rate, MIDI input, the last message and the
 /// recording clock; the host's controls at the right end.
 fn status_bar(
@@ -1470,27 +1763,62 @@ fn status_bar(
                 .map_or("no signal".to_string(), |m| format!("{m:+.1} dB"));
             kit::label(ui, st, style::Role::Value, kit::Tone::Text2, peak);
             let khz = ui_state.sample_rate / 1000.0;
-            kit::label(
-                ui,
-                st,
-                style::Role::Value,
-                kit::Tone::Text2,
-                format!("{khz:.1} kHz"),
-            );
+            let rate = match ui_state.status_buffer {
+                Some(frames) => format!("{khz:.1} kHz · {frames}"),
+                None => format!("{khz:.1} kHz"),
+            };
+            kit::label(ui, st, style::Role::Value, kit::Tone::Text2, rate);
         }
         if let Some(port) = ui_state.midi_input.clone() {
             let (dot, _) =
                 ui.allocate_exact_size(egui::Vec2::splat(st.sp(2)), egui::Sense::hover());
             ui.painter()
                 .circle_filled(dot.center(), st.sp(1), st.roles.good);
-            kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, &port);
+            kit::label_truncated(
+                ui,
+                st,
+                style::Role::Caption,
+                kit::Tone::Text2,
+                format!("MIDI · {port}"),
+            );
         }
         if !ui_state.status_audio.is_empty() {
             let text = ui_state.status_audio.clone();
             kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, &text)
                 .on_hover_text(&text);
         }
+        if let Some(cpu) = ui_state.status_cpu {
+            kit::label(
+                ui,
+                st,
+                style::Role::Caption,
+                kit::Tone::Text2,
+                format!("CPU {cpu:.0} %"),
+            );
+        }
+        if let Some((used, all)) = ui_state.status_voices {
+            kit::label(
+                ui,
+                st,
+                style::Role::Caption,
+                kit::Tone::Text2,
+                format!("Voices {used} / {all}"),
+            );
+        }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            // Tempo and position are the rightmost, as in the mockup; the host's controls follow.
+            if let Some(pos) = ui_state.status_pos.clone() {
+                kit::label(ui, st, style::Role::Value, kit::Tone::Text2, pos);
+            }
+            if let Some(bpm) = ui_state.status_bpm {
+                kit::label(
+                    ui,
+                    st,
+                    style::Role::Value,
+                    kit::Tone::Text2,
+                    format!("{bpm:.1} BPM"),
+                );
+            }
             right(ui, ui_state);
             if let Some(rec) = ui_state.recorder.as_ref().filter(|r| r.recording()) {
                 let t = rec.elapsed() as u64;
@@ -1502,9 +1830,16 @@ fn status_bar(
                     format!("• REC {:02}:{:02}", t / 60, t % 60),
                 );
             }
-            if let Some(msg) = &ui_state.last_message {
-                kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, msg)
-                    .on_hover_text(msg);
+            let errors = kit::g4::error_count(&ui_state.toasts);
+            if errors > 0 {
+                let word = if errors == 1 { "error" } else { "errors" };
+                kit::label(
+                    ui,
+                    st,
+                    style::Role::Caption,
+                    kit::Tone::Bad,
+                    format!("• {errors} {word}"),
+                );
             }
         });
     });
@@ -1519,10 +1854,21 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
         ui.label("No module selected.");
         return;
     };
+    if kind == "cues" {
+        // The G4 cues editor draws its own header and controls.
+        seq_editor::cues_panel(editor, ui_state, ui, id);
+        return;
+    }
     let Some(info) = registry::info_for(&kind) else {
         ui.label("Unknown module kind.");
         return;
     };
+    if kind == "seq" {
+        // The G4 seq editor draws its own header and controls.
+        let edit = ui_state.edit_bank_of(editor.state(), id);
+        seq_editor::seq_panel(editor, ui_state, ui, id, edit);
+        return;
+    }
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new(format!("{} #{id}", info.name)).strong());
         let r = ui
@@ -1537,12 +1883,6 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
         ui.add(egui::Label::new(egui::RichText::new(info.explain).small()).wrap());
     }
     let edit = ui_state.edit_bank_of(editor.state(), id);
-    if kind == "seq" {
-        seq_panel(editor, ui_state, ui, id, edit);
-    }
-    if kind == "cues" {
-        cues_panel(editor, ui_state, ui, id);
-    }
     if kind == "macro" {
         for (k, p) in info.params.iter().enumerate() {
             ui.horizontal(|ui| {
@@ -1593,118 +1933,6 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
     if ui.button("Remove module").clicked() {
         editor.remove_module(id);
     }
-}
-
-/// The drawer's sequencer header: which bank the controls below edit, bank edits, and the
-/// sequencer's own launch settings.
-fn seq_panel(
-    editor: &mut PatchEditor,
-    ui_state: &mut UiState,
-    ui: &mut egui::Ui,
-    id: ModuleId,
-    edit: usize,
-) {
-    let state = editor.state();
-    let (playing, queued) = ui_state
-        .seq_banks
-        .get(&id)
-        .copied()
-        .unwrap_or((banks::startup(state, id), None));
-    ui.horizontal_wrapped(|ui| {
-        ui.label("Editing");
-        for b in 0..seq::BANKS {
-            let r = ui.selectable_label(b == edit, banks::title(state, id, b));
-            ui_state.record(format!("drawer-bank:{id}.{b}"), r.rect);
-            if r.clicked() {
-                ui_state.edit_bank.insert(id, b);
-            }
-        }
-    });
-    ui.label(
-        egui::RichText::new(format!(
-            "Playing {}{}{}",
-            banks::title(state, id, playing),
-            queued.map_or(String::new(), |q| format!(
-                " · queued {}",
-                banks::title(state, id, q)
-            )),
-            if banks::startup(state, id) == playing {
-                " · startup".to_string()
-            } else {
-                format!(
-                    " · startup {}",
-                    banks::title(state, id, banks::startup(state, id))
-                )
-            }
-        ))
-        .small(),
-    );
-    ui.menu_button(format!("Bank {} ↓", seq::BANK_NAMES[edit]), |ui| {
-        bank_menu(editor, ui_state, ui, id, edit)
-    });
-    let (mut pick, mut tpick) = (None, None);
-    ui.horizontal_wrapped(|ui| {
-        let state = editor.state();
-        ui.label("Launch on");
-        let clocks: Vec<ModuleId> = state
-            .modules
-            .iter()
-            .filter(|(_, m)| m.kind == "clock")
-            .map(|(&c, _)| c)
-            .collect();
-        let chosen = state
-            .modules
-            .get(&id)
-            .and_then(|m| m.params.get(banks::LAUNCH_CLOCK))
-            .map(|&v| v as ModuleId);
-        let current = banks::reference_clock(state, id);
-        let text = match (current, chosen) {
-            (Some(c), Some(_)) => format!("Clock #{c}"),
-            (Some(c), None) => format!("Clock #{c} (patched)"),
-            (None, _) => "no clock".into(),
-        };
-        egui::ComboBox::from_id_salt(("seq-clock", id))
-            .selected_text(text)
-            .show_ui(ui, |ui| {
-                if ui
-                    .selectable_label(chosen.is_none(), "The patched clock")
-                    .clicked()
-                {
-                    pick = Some(None);
-                }
-                for c in clocks {
-                    if ui
-                        .selectable_label(chosen == Some(c), format!("Clock #{c}"))
-                        .clicked()
-                    {
-                        pick = Some(Some(c as f32));
-                    }
-                }
-            });
-        let timing = banks::timing(state, id);
-        egui::ComboBox::from_id_salt(("seq-timing", id))
-            .selected_text(
-                banks::TIMINGS
-                    .iter()
-                    .find(|t| t.0 == timing)
-                    .map_or("", |t| t.1),
-            )
-            .show_ui(ui, |ui| {
-                for (i, (t, name)) in banks::TIMINGS.iter().enumerate() {
-                    if ui.selectable_label(*t == timing, *name).clicked() {
-                        tpick = Some(i);
-                    }
-                }
-            });
-    });
-    if let Some(v) = pick {
-        editor.set_presentation(&[(id, banks::LAUNCH_CLOCK.into(), v)]);
-    }
-    if let Some(i) = tpick {
-        let v = (i != 2).then_some(i as f32);
-        editor.set_presentation(&[(id, banks::LAUNCH_TIMING.into(), v)]);
-    }
-    ui.separator();
 }
 
 /// A macro knob's name (label `name.m1`), for its knob, jack, pins and route sources.
@@ -1784,13 +2012,16 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     rack_editor::update_drag(editor, ui_state, ui, &lay);
     let lay = composite_layout(editor.state(), ui_state);
     if !ui_state.fitted {
-        // First frame: the whole patch, never above 100 %.
+        // First frame: the whole patch, as large as the window allows.
         ui_state.canvas = canvas;
-        ui_state.frame_world(lay.bounds.expand(4.0), 1.0);
+        ui_state.frame_patch(fit_world(lay.bounds), FIT_MAX_ZOOM);
         ui_state.fitted = true;
     } else if canvas != ui_state.canvas {
         // Drawer opened or window resized: keep what the user is working on reachable.
         ui_state.canvas = canvas;
+        if ui_state.auto_fit {
+            ui_state.frame_patch(fit_world(lay.bounds), FIT_MAX_ZOOM);
+        }
         let target = inspected_extent(editor, ui_state, &lay)
             .map(|(r, _)| r)
             .or_else(|| {
@@ -1893,16 +2124,21 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     }
     let xf = ui_state.xf();
     let painter = ui.painter_at(canvas);
-    draw_rails(&painter, th, xf, canvas, lay.rows.max(1));
+    // Empty rows continue below the patch to the bottom of the window, like a rack with free slots.
+    let mut rows = lay.rows.max(1);
+    while rows < 24 && xf.p(pos2(0.0, rack::row_y(rows - 1) + PANEL_H + 8.0)).y < canvas.bottom() {
+        rows += 1;
+    }
+    draw_rails(&painter, th, xf, canvas, rows);
+    if editor.state().modules.is_empty() {
+        empty_rack(ui_state, ui, canvas);
+    }
 
     let focused_at_frame_start = !ui_state.expanded.is_empty();
     let lifted_at_frame_start = ui_state.moving.is_some();
     let mut drawn = Drawn::default();
     ui_state.deferred.clear();
     draw_composites(editor, ui_state, ui, xf, &mut drawn);
-    let faces_from = ui
-        .ctx()
-        .graphics(|g| g.get(painter.layer_id()).map_or(0, |l| l.next_idx().0));
     for m in &lay.mods {
         if ui_state
             .moving
@@ -1945,19 +2181,24 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         .collect();
 
     let deferred = std::mem::take(&mut ui_state.deferred);
-    // Cables lie on the face material but under everything drawn on it: titles, readouts,
-    // knobs, displays, jacks. Lift those above the cables, then put the plugs on top.
-    let faces: Vec<Rect> = lay.mods.iter().map(|m| xf.r(m.face)).collect();
-    let lifted = lift_foreground(ui, &painter, &faces, faces_from);
+    let modules_end = ui
+        .ctx()
+        .graphics(|g| g.get(painter.layer_id()).map_or(0, |l| l.next_idx().0));
+    // Ropes paint above all module content (trays, plates, titles, knobs), cut by nothing but
+    // the rack viewport; only the drawer, toolbar and status bar sit over them. Plugs go on top.
+    let next_idx = |ui: &egui::Ui| {
+        ui.ctx()
+            .graphics(|g| g.get(painter.layer_id()).map_or(0, |l| l.next_idx().0))
+    };
+    let cables_start = next_idx(ui);
     let plugs = draw_cables(editor, ui_state, ui, &painter, th, xf, &lay, &drawn, None);
-    let layer = painter.layer_id();
-    ui.ctx().graphics_mut(|g| {
-        let list = g.entry(layer);
-        for (clip, shape) in lifted {
-            list.add(clip, shape);
-        }
-    });
+    if let Some((world, max_zoom)) = ui_state.pending_fit.take() {
+        // The cables are known now: fit them too; the next frame draws the result.
+        ui_state.refit_with_cables(world, max_zoom);
+        ui.ctx().request_repaint();
+    }
     painter.extend(plugs);
+    ui_state.cable_audit = (painter.clip_rect(), modules_end, cables_start, next_idx(ui));
     painter.extend(deferred);
     // Hidden modulated controls: the lead docks on the `+N` button, which says so.
     for m in &lay.mods {
@@ -2027,6 +2268,7 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         if !cancelled {
             egui::Area::new(Id::new("lifted-rack-item"))
                 .order(egui::Order::Foreground)
+                .fade_in(false)
                 .fixed_pos(xf.p(live))
                 .constrain(false)
                 .sense(Sense::hover())
@@ -2095,7 +2337,7 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         }
     }
     if focused_at_frame_start {
-        rack_editor::more(editor, ui_state, ui, th, xf, &lay, &mut drawn);
+        rack_editor::more(editor, ui_state, ui, &lay, &mut drawn);
     }
 
     explain::mark_target(
@@ -2479,13 +2721,13 @@ fn draw_module(
         draw_transport(ui_state, ui, painter, th, xf, m.id, r);
     }
     if let Decor::Cues(r) = m.decor {
-        draw_cues(editor, ui_state, ui, painter, th, xf, m.id, r, now);
+        draw_cues(editor, ui_state, ui, painter, xf, m.id, r, now);
     }
     if let Decor::Grid(r) = m.decor {
         drum_grid::draw(editor, ui_state, ui, painter, th, xf, m.id, r);
     }
     if let Decor::Banks(r) = m.decor {
-        draw_banks(editor, ui_state, ui, painter, th, xf, m.id, r, now, drawn);
+        draw_banks(editor, ui_state, ui, painter, xf, m.id, r, now, drawn);
     }
     if let Decor::Status(p) = m.decor {
         let (lock, ms) = ui_state
@@ -2518,40 +2760,21 @@ fn draw_module(
             true,
         );
     }
-    // Step light: beside the playing step's pitch label; hollow while the face edits a bank
-    // that is not playing.
-    if let Some(&s) = ui_state.seq_steps.get(&m.id) {
-        let edit = ui_state.edit_bank_of(editor.state(), m.id);
-        let playing = ui_state.seq_banks.get(&m.id).map_or(edit, |b| b.0);
-        let page = ui_state.edit_page.get(&m.id).copied().unwrap_or(0);
-        let s = s.min(seq::STEPS - 1);
-        let on_page = s / 8 == page;
-        if let Some(c) = m
-            .ctl(seq::bank_param(edit, seq::pitch_slot(s)))
-            .filter(|_| on_page)
-        {
-            let at = xf.p(c.geo.label_pos() - vec2(16.0, 0.0));
-            if playing == edit {
-                painter.circle_filled(at, 4.0 * z, th.gate);
-            } else {
-                painter.circle_stroke(at, 3.5 * z, Stroke::new(1.5 * z, th.gate));
-            }
-        }
+    if m.info.kind == "seq" {
+        draw_seq_steps(editor, ui_state, painter, xf, m, ink, ink2);
     }
-    if skin.is_none() && st.slots.face.tray == style::TrayRecipe::Outline {
-        if let Some(t) = m.tray {
-            kit::parts::tray(painter, &st, xf.r(t), m.plate.map(|p| xf.r(p)), z);
-        }
-    } else if let Some(p) = m.plate {
-        if skin.is_some() {
+    if skin.is_some() {
+        if let Some(p) = m.plate {
             painter.rect_filled(xf.r(p), CornerRadius::same(6), th.plate);
-        } else {
-            let r = xf.r(p);
-            painter.line_segment(
-                [r.left_top(), r.right_top()],
-                Stroke::new(0.8, th.panel_edge),
-            );
         }
+    } else if let Some(t) = m.tray {
+        kit::parts::tray(painter, &st, xf.r(t), m.plate.map(|p| xf.r(p)), z);
+    } else if let Some(p) = m.plate {
+        let r = xf.r(p);
+        painter.line_segment(
+            [r.left_top(), r.right_top()],
+            Stroke::new(0.8, th.panel_edge),
+        );
     }
 
     let look = Look {
@@ -2582,29 +2805,23 @@ fn draw_module(
         let chip = !kit::face::overview(&ui_state.style, z)
             && (!kit::face::compact_tier(&ui_state.style, z) || title_r.max.x + 1.5 <= r.min.x);
         if chip {
-            painter.rect_filled(
-                r,
-                CornerRadius::same(4),
-                if th.dark { th.btn } else { th.plate },
-            );
-        }
-        if chip && resp.hovered() {
+            // G4 mockup: outlined pill (face edge, accent on hover), mono 11 `text2`.
+            let roles = &ui_state.style.roles;
+            let edge = face_edge(&ui_state.style);
             painter.rect_stroke(
                 r,
-                CornerRadius::same(4),
-                Stroke::new(1.0, th.sel),
+                CornerRadius::same((r.height() / 2.0) as u8),
+                Stroke::new(1.0, if resp.hovered() { roles.accent } else { edge }),
                 egui::StrokeKind::Inside,
             );
-        }
-        if chip {
             text(
                 painter,
                 r.center(),
                 egui::Align2::CENTER_CENTER,
                 &label,
-                12.0 * z,
-                th.plate_ink,
-                false,
+                11.0 * z,
+                roles.text2,
+                true,
             );
         }
         let routed = hidden_routes(editor, m);
@@ -2672,100 +2889,179 @@ fn draw_module(
     }
 }
 
+/// A G4 menu row: optional leading icon and the label in `tone`. Recorded as `menu:<key>`.
+fn menu_row(
+    ui: &mut egui::Ui,
+    ui_state: &mut UiState,
+    key: &str,
+    ic: Option<kit::Ic>,
+    label: &str,
+    tone: kit::Tone,
+) -> egui::Response {
+    let st = ui_state.style.clone();
+    let r = kit::menu_item_tone(ui, &st, label, false, tone, true);
+    let ink = kit::tone(&st, tone);
+    if let Some(ic) = ic {
+        kit::icon(
+            ui.painter(),
+            ic,
+            pos2(r.rect.left() + st.sp(3), r.rect.center().y),
+            st.metrics.icon,
+            ink,
+        );
+    }
+    ui_state.record(format!("menu:{key}"), r.rect);
+    r
+}
+
+/// A menu's Remove row (danger tone, "Del" hint): true on a click, or on Delete while the
+/// menu is open.
+fn remove_row(ui: &mut egui::Ui, ui_state: &mut UiState, key: &str, label: &str) -> bool {
+    let st = ui_state.style.clone();
+    let r = menu_row(
+        ui,
+        ui_state,
+        key,
+        Some(kit::Ic::Trash),
+        label,
+        kit::Tone::Bad,
+    );
+    ui.painter().text(
+        pos2(r.rect.right() - st.sp(3), r.rect.center().y),
+        egui::Align2::RIGHT_CENTER,
+        "Del",
+        st.font(style::Role::Value),
+        st.roles.text2,
+    );
+    // Not while a field has focus: there Delete edits text.
+    r.clicked()
+        || (ui.input(|i| i.key_pressed(egui::Key::Delete)) && ui.memory(|m| m.focused().is_none()))
+}
+
+/// The module's context menu (G4 `menu-module`): header, Explain, Inspect output ▸, More
+/// controls…, Edit face…, Reset face, the Perform and MIDI submenus, Remove module.
 fn module_menu(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, m: &Placed) {
     let st = ui_state.style.clone();
     let st = &*st;
     kit::label(
         ui,
         st,
-        style::Role::H3,
-        kit::Tone::Text,
+        style::Role::Label,
+        kit::Tone::Text2,
         format!("{} #{}", m.info.name, m.id),
     );
-    kit::menu_rule(ui, st);
-    fn item(ui: &mut egui::Ui, ui_state: &mut UiState, key: &str, label: &str) -> bool {
-        let st = ui_state.style.clone();
-        let r = kit::menu_item(ui, &st, label, false);
-        ui_state.record(format!("menu:{key}"), r.rect);
-        r.clicked()
-    }
-    if item(ui, ui_state, "explain", "Explain this module") {
+    if menu_row(
+        ui,
+        ui_state,
+        "explain",
+        Some(kit::Ic::Info),
+        "Explain this module",
+        kit::Tone::Text,
+    )
+    .clicked()
+    {
         explain::open(ui_state, explain::Subject::Module(m.id), None);
         ui_state.selected_module = Some(m.id);
         ui.close();
     }
-    for p in m
+    let outputs: Vec<&str> = m
         .info
         .ports
         .iter()
         .filter(|p| p.direction == PortDirection::Output)
-    {
-        if item(
-            ui,
-            ui_state,
-            &format!("inspect:{}", p.name),
-            &format!("Inspect output \"{}\"", p.name),
-        ) {
-            ui_state.selected_module = Some(m.id);
-            ui_state.drawer_open = true;
-            let now = ui.input(|i| i.time);
-            ui_state.inspect.select(
-                inspect::Sel {
-                    id: m.id,
-                    port: p.name.to_string(),
-                },
-                now,
-            );
-            ui.close();
-        }
+        .map(|p| p.name)
+        .collect();
+    if !outputs.is_empty() {
+        let r = kit::submenu(ui, st, "Inspect output", |ui| {
+            for port in &outputs {
+                if menu_row(
+                    ui,
+                    ui_state,
+                    &format!("inspect:{port}"),
+                    Some(kit::Ic::Plug),
+                    port,
+                    kit::Tone::Text,
+                )
+                .clicked()
+                {
+                    ui_state.selected_module = Some(m.id);
+                    ui_state.drawer_open = true;
+                    let now = ui.input(|i| i.time);
+                    ui_state.inspect.select(
+                        inspect::Sel {
+                            id: m.id,
+                            port: port.to_string(),
+                        },
+                        now,
+                    );
+                    ui.close();
+                }
+            }
+        });
+        kit::icon(
+            ui.painter(),
+            kit::Ic::Focus,
+            pos2(r.rect.left() + st.sp(3), r.rect.center().y),
+            st.metrics.icon,
+            st.roles.text,
+        );
+        ui_state.record("menu:inspect".into(), r.rect);
     }
-    if !m.info.params.is_empty() && item(ui, ui_state, "choose", "Edit face…") {
-        let set = editor
-            .state()
-            .modules
-            .get(&m.id)
-            .map(|s| rack::primary_set(s, m.info))
-            .unwrap_or_default();
-        ui_state.choose = Some((m.id, set));
-        ui_state.reveal = Some(m.id);
-        ui.close();
-    }
-    if !m.info.params.is_empty() && item(ui, ui_state, "reset-face", "Reset face to module default")
-    {
-        let changes: Vec<_> = editor.state().modules[&m.id]
-            .params
-            .keys()
-            .filter(|k| k.starts_with(rack::FACE_PREFIX))
-            .map(|k| (m.id, k.clone(), None))
-            .collect();
-        editor.set_presentation(&changes);
-        ui.close();
-    }
-    if m.toggle.is_some() {
-        let expanded = ui_state.expanded.contains(&m.id);
-        if item(
+    kit::menu_rule(ui, st);
+    if m.toggle.is_some()
+        && menu_row(
             ui,
             ui_state,
             "expand",
-            if expanded {
-                "Close More controls"
-            } else {
-                "More controls"
-            },
-        ) {
-            if expanded {
-                ui_state.expanded.remove(&m.id);
-            } else {
-                ui_state.expanded.clear();
-                ui_state.expanded.insert(m.id);
-            }
+            Some(kit::Ic::Panel),
+            "More controls…",
+            kit::Tone::Text,
+        )
+        .clicked()
+    {
+        ui_state.expanded.clear();
+        ui_state.expanded.insert(m.id);
+        ui_state.more_tab = 0;
+        ui.close();
+    }
+    if !m.info.params.is_empty() {
+        if menu_row(ui, ui_state, "choose", None, "Edit face…", kit::Tone::Text).clicked() {
+            let set = editor
+                .state()
+                .modules
+                .get(&m.id)
+                .map(|s| rack::primary_set(s, m.info))
+                .unwrap_or_default();
+            ui_state.choose = Some((m.id, set));
+            ui_state.expanded.clear();
+            ui_state.expanded.insert(m.id);
+            ui_state.more_tab = 1;
+            ui.close();
+        }
+        if menu_row(
+            ui,
+            ui_state,
+            "reset-face",
+            None,
+            "Reset face to default",
+            kit::Tone::Text,
+        )
+        .clicked()
+        {
+            let changes: Vec<_> = editor.state().modules[&m.id]
+                .params
+                .keys()
+                .filter(|k| k.starts_with(rack::FACE_PREFIX))
+                .map(|k| (m.id, k.clone(), None))
+                .collect();
+            editor.set_presentation(&changes);
             ui.close();
         }
     }
     kit::menu_rule(ui, st);
     perform::module_menu(editor, ui_state, ui, m.id, m.info);
     kit::menu_rule(ui, st);
-    if item(ui, ui_state, "remove", "Remove module") {
+    if remove_row(ui, ui_state, "remove", "Remove module") {
         editor.remove_module(m.id);
         ui.close();
     }
@@ -2876,16 +3172,26 @@ fn draw_transport(
     }
 }
 
-/// The sequencer's bank strip. EDIT tabs pick the bank the face shows (view only); PLAY buttons
-/// launch a bank with the sequencer's own timing and clock (runtime); the playing bank is lit,
-/// a queued one blinks, and Cancel drops the queued launch. Right-click a tab for bank edits.
+/// Sequencer header groups, measured from the G4 mockup (`g4-surfaces.html`, seq face): each
+/// group is a mono 10 caption, 6 px, then an 84 x 18 pill track of four 21 px options; 14 px
+/// between groups. Three groups: EDIT, PLAY and PAGE.
+const BANK_CAP_W: f32 = 24.0;
+const BANK_SEG_W: f32 = 84.0;
+const BANK_GROUP_W: f32 = BANK_CAP_W + 6.0 + BANK_SEG_W;
+const BANK_GROUP_GAP: f32 = 14.0;
+/// Width of the sequencer header row (`rack::timing` places it).
+pub(crate) const BANKS_W: f32 = 3.0 * BANK_GROUP_W + 2.0 * BANK_GROUP_GAP;
+
+/// The sequencer's header row. EDIT picks the bank the face shows (view only); PLAY launches a
+/// bank with the sequencer's own timing and clock (runtime); the playing bank is lit, a queued
+/// one blinks, and Cancel drops the queued launch. Right-click an EDIT option for bank edits.
+/// PAGE shows steps 1-8, 9-16, 17-24 or 25-32 (view only).
 #[allow(clippy::too_many_arguments)]
 fn draw_banks(
     editor: &mut PatchEditor,
     ui_state: &mut UiState,
     ui: &mut egui::Ui,
     painter: &egui::Painter,
-    th: &Theme,
     xf: Xf,
     id: ModuleId,
     r: Rect,
@@ -2893,96 +3199,74 @@ fn draw_banks(
     drawn: &mut Drawn,
 ) {
     let z = xf.zoom;
+    let roles = ui_state.style.roles.clone();
+    let track = seg_track(&ui_state.style);
     let edit = ui_state.edit_bank_of(editor.state(), id);
     let (playing, queued) = ui_state
         .seq_banks
         .get(&id)
         .copied()
         .unwrap_or((banks::startup(editor.state(), id), None));
-    let bw = 26.0;
-    let label = |x: f32, s: &str| {
+    let sw = BANK_SEG_W / seq::BANKS as f32;
+    // One group: caption, track, and the option rects in screen space.
+    let group = |gx: f32, cap: &str| -> Vec<Rect> {
         text(
             painter,
-            xf.p(pos2(x, r.center().y)),
+            xf.p(pos2(gx, r.center().y)),
             egui::Align2::LEFT_CENTER,
+            cap,
+            10.0 * z,
+            roles.text2,
+            true,
+        );
+        let tx = gx + BANK_CAP_W + 6.0;
+        painter.rect_filled(
+            xf.r(Rect::from_min_size(
+                pos2(tx, r.top()),
+                vec2(BANK_SEG_W, r.height()),
+            )),
+            CornerRadius::same((r.height() / 2.0 * z) as u8),
+            track,
+        );
+        (0..seq::BANKS)
+            .map(|b| {
+                xf.r(Rect::from_min_size(
+                    pos2(tx + b as f32 * sw, r.top()),
+                    vec2(sw, r.height()),
+                ))
+            })
+            .collect()
+    };
+    // The selected option: accent pill inset 2 px; the others are plain `text2` letters.
+    let option = |t: Rect, s: &str, on: bool| {
+        if on {
+            let pill = t.shrink(2.0 * z);
+            painter.rect_filled(
+                pill,
+                CornerRadius::same((pill.height() / 2.0) as u8),
+                roles.accent,
+            );
+        }
+        text(
+            painter,
+            t.center(),
+            egui::Align2::CENTER_CENTER,
             s,
-            10.5 * z,
-            th.ink2,
+            11.0 * z,
+            if on { roles.on_accent } else { roles.text2 },
             true,
         );
     };
-    label(r.left(), "EDIT");
-    // Step pages, under the strip: steps 1-8, 9-16, 17-24, 25-32 (view only).
-    let page = ui_state.edit_page.get(&id).copied().unwrap_or(0);
-    let pw = 44.0;
-    for pg in 0..seq::STEPS / 8 {
-        let t = xf.r(Rect::from_min_size(
-            pos2(r.left() + 36.0 + pg as f32 * (pw + 4.0), r.bottom() + 3.0),
-            vec2(pw, 15.0),
-        ));
-        ui_state.record(format!("seq-page:{id}.{pg}"), t);
-        let resp = ui.interact(t, Id::new(("kabl-seq-page", id, pg)), Sense::click());
-        let on = pg == page;
-        painter.rect_filled(
-            t,
-            CornerRadius::same(4),
-            if on {
-                th.sel
-            } else if th.dark {
-                th.btn
-            } else {
-                th.plate
-            },
-        );
-        text(
-            painter,
-            t.center(),
-            egui::Align2::CENTER_CENTER,
-            &format!("{}-{}", pg * 8 + 1, pg * 8 + 8),
-            10.5 * z,
-            if on { th.sel_ink } else { th.plate_ink },
-            false,
-        );
-        if resp
-            .on_hover_text("Steps shown on the face (view only)")
-            .clicked()
-        {
-            ui_state.edit_page.insert(id, pg);
-        }
-    }
-
-    let play_x = r.right() - 4.0 * (bw + 4.0);
-    label(play_x - 38.0, "PLAY");
+    let edit_tabs = group(r.left(), "EDIT");
+    let play_btns = group(r.left() + BANK_GROUP_W + BANK_GROUP_GAP, "PLAY");
     for b in 0..seq::BANKS {
         let name = banks::title(editor.state(), id, b);
-        // EDIT tab.
-        let t = xf.r(Rect::from_min_size(
-            pos2(r.left() + 36.0 + b as f32 * (bw + 4.0), r.top()),
-            vec2(bw, r.height()),
-        ));
+        // EDIT option.
+        let t = edit_tabs[b];
         ui_state.record(format!("bank-edit:{id}.{b}"), t);
         let resp = ui.interact(t, Id::new(("kabl-bank-edit", id, b)), Sense::click());
         let on = b == edit;
-        painter.rect_filled(
-            t,
-            CornerRadius::same(4),
-            if on {
-                th.sel
-            } else if th.dark {
-                th.btn
-            } else {
-                th.plate
-            },
-        );
-        text(
-            painter,
-            t.center(),
-            egui::Align2::CENTER_CENTER,
-            seq::BANK_NAMES[b],
-            12.0 * z,
-            if on { th.sel_ink } else { th.plate_ink },
-            false,
-        );
+        option(t, seq::BANK_NAMES[b], on);
         // Routes into this bank's controls while another bank is on the face plug in here.
         let routed: Vec<CableId> = if on {
             Vec::new()
@@ -3005,7 +3289,7 @@ fn draw_banks(
             drawn.plugs.push((c, t.center_bottom()));
         }
         if !routed.is_empty() {
-            painter.circle_filled(t.right_top(), 3.5 * z, th.sel);
+            painter.circle_filled(t.right_top(), 2.0 * z, roles.accent);
         }
         let resp = resp.on_hover_text(format!(
             "Edit bank {name}{}{} (does not launch it). Right-click: copy, clear, rename",
@@ -3024,25 +3308,12 @@ fn draw_banks(
             kit::context_menu(&resp, &st, |ui| bank_menu(editor, ui_state, ui, id, b));
         }
 
-        // PLAY button.
-        let pbtn = xf.r(Rect::from_min_size(
-            pos2(play_x + b as f32 * (bw + 4.0), r.top()),
-            vec2(bw, r.height()),
-        ));
+        // PLAY option.
+        let pbtn = play_btns[b];
         ui_state.record(format!("bank-play:{id}.{b}"), pbtn);
         let resp = ui.interact(pbtn, Id::new(("kabl-bank-play", id, b)), Sense::click());
         let lit = b == playing;
-        painter.rect_filled(
-            pbtn,
-            CornerRadius::same(4),
-            if lit {
-                th.gate
-            } else if th.dark {
-                th.btn
-            } else {
-                th.plate
-            },
-        );
+        option(pbtn, seq::BANK_NAMES[b], lit);
         if queued == Some(b) {
             // Blinks twice a second until it lands.
             let a = if (now * 4.0) as i64 % 2 == 0 {
@@ -3050,24 +3321,16 @@ fn draw_banks(
             } else {
                 0.35
             };
+            let pill = pbtn.shrink(2.0 * z);
             painter.rect_stroke(
-                pbtn.expand(1.5 * z),
-                CornerRadius::same(5),
-                Stroke::new(2.5 * z, th.gate.gamma_multiply(a)),
-                egui::StrokeKind::Outside,
+                pill,
+                CornerRadius::same((pill.height() / 2.0) as u8),
+                Stroke::new(1.5 * z, roles.accent.gamma_multiply(a)),
+                egui::StrokeKind::Inside,
             );
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(120));
         }
-        text(
-            painter,
-            pbtn.center(),
-            egui::Align2::CENTER_CENTER,
-            seq::BANK_NAMES[b],
-            12.0 * z,
-            if lit { th.sel_ink } else { th.plate_ink },
-            false,
-        );
         let timing = banks::timing(editor.state(), id);
         let when = banks::TIMINGS
             .iter()
@@ -3076,58 +3339,204 @@ fn draw_banks(
         let resp = resp.on_hover_text(if lit {
             format!("Bank {name} is playing")
         } else if queued == Some(b) {
-            format!("Bank {name} is queued ({when})")
+            format!("Bank {name} is queued ({when}). Click to cancel")
         } else {
             format!("Launch bank {name} ({when})")
         });
-        if resp.clicked() {
+        // The queued bank cancels itself: the header has no room for a Cancel chip.
+        if resp.clicked() && queued == Some(b) {
+            ui_state.launches.push(Command::Cancel(Some(id)));
+        } else if resp.clicked() {
             if let Err(e) = banks::launch(&mut ui_state.launches, editor.state(), id, b) {
                 ui_state.last_message = Some(e);
             }
         }
     }
-    if queued.is_some() {
-        let c = xf.r(Rect::from_min_size(
-            pos2(play_x - 96.0, r.top()),
-            vec2(54.0, r.height()),
-        ));
-        ui_state.record(format!("bank-cancel:{id}"), c);
-        let resp = ui.interact(c, Id::new(("kabl-bank-cancel", id)), Sense::click());
-        painter.rect_stroke(
-            c,
-            CornerRadius::same(4),
-            Stroke::new(
-                1.0,
-                if resp.hovered() {
-                    th.sel
-                } else {
-                    th.panel_edge
-                },
-            ),
-            egui::StrokeKind::Inside,
-        );
-        text(
-            painter,
-            c.center(),
-            egui::Align2::CENTER_CENTER,
-            "Cancel",
-            11.0 * z,
-            th.ink,
-            false,
-        );
-        if resp.on_hover_text("Drop the queued launch").clicked() {
-            ui_state.launches.push(Command::Cancel(Some(id)));
+    // PAGE 1-4: which eight steps the face shows (view only).
+    let page_btns = group(r.left() + 2.0 * (BANK_GROUP_W + BANK_GROUP_GAP), "PAGE");
+    let page = ui_state.edit_page.get(&id).copied().unwrap_or(0);
+    for (pg, &t) in page_btns.iter().enumerate() {
+        ui_state.record(format!("seq-page:{id}.{pg}"), t);
+        let resp = ui.interact(t, Id::new(("kabl-seq-page", id, pg)), Sense::click());
+        option(t, &(pg + 1).to_string(), pg == page);
+        if resp
+            .on_hover_text(format!(
+                "Steps {}-{} (view only)",
+                pg * seq::PAGE_STEPS + 1,
+                (pg + 1) * seq::PAGE_STEPS
+            ))
+            .clicked()
+        {
+            ui_state.edit_page.insert(id, pg);
         }
     }
 }
 
-/// A playing (lit) / queued (blinking) launch button on the rack.
+/// Line colour of the G4 mockup's line faces (`edge`): text at 26 % (graphite) / 30 % (paper).
+fn face_edge(st: &Style) -> Color32 {
+    style::alpha(st.roles.text, if st.dark { 66 } else { 77 })
+}
+
+/// The G4 mockup's selector track (`segT`): graphite `inset`; paper #D6D2C8, which has no
+/// token, so `line`, the nearest.
+fn seg_track(st: &Style) -> Color32 {
+    if st.dark {
+        st.roles.inset
+    } else {
+        st.roles.line
+    }
+}
+
+/// The sequencer body behind its controls (G4 mockup, seq body): the left column's divider,
+/// then per step a dot (accent on the playing step), the step number, and the playing step's
+/// column tint. Shown only while the face edits the playing bank.
+fn draw_seq_steps(
+    editor: &PatchEditor,
+    ui_state: &UiState,
+    painter: &egui::Painter,
+    xf: Xf,
+    m: &Placed,
+    ink: Color32,
+    ink2: Color32,
+) {
+    let st = &ui_state.style;
+    let z = xf.zoom;
+    let edge = face_edge(st);
+    let f = m.face;
+    let edit = ui_state.edit_bank_of(editor.state(), m.id);
+    let playing_bank = ui_state.seq_banks.get(&m.id).map_or(edit, |b| b.0);
+    let page = ui_state.edit_page.get(&m.id).copied().unwrap_or(0);
+    let now = ui_state
+        .seq_steps
+        .get(&m.id)
+        .copied()
+        .filter(|_| playing_bank == edit)
+        .and_then(|s| s.checked_sub(page * seq::PAGE_STEPS))
+        .filter(|&s| s < seq::PAGE_STEPS);
+    let at = |x: f32, y: f32| xf.p(f.min + vec2(x, y));
+    painter.line_segment([at(136.0, 58.0), at(136.0, 272.0)], Stroke::new(1.0, edge));
+    let cw = (f.width() - 12.0 - 148.0) / seq::PAGE_STEPS as f32;
+    for k in 0..seq::PAGE_STEPS {
+        let cx = 148.0 + cw * (k as f32 + 0.5);
+        let on = now == Some(k);
+        if on {
+            painter.rect_filled(
+                xf.r(Rect::from_min_size(
+                    f.min + vec2(cx - cw / 2.0 + 3.0, 54.0),
+                    vec2(cw - 6.0, 218.0),
+                )),
+                CornerRadius::same((6.0 * z) as u8),
+                st.roles.accent.gamma_multiply(0.07),
+            );
+        }
+        painter.circle_filled(
+            at(cx, 64.0),
+            3.0 * z,
+            if on { st.roles.accent } else { edge },
+        );
+        text(
+            painter,
+            at(cx, 82.0),
+            egui::Align2::CENTER_CENTER,
+            &(page * seq::PAGE_STEPS + k + 1).to_string(),
+            11.0 * z,
+            if on { ink } else { ink2 },
+            true,
+        );
+    }
+}
+
+/// A sequencer step's gate pill (click: on/off; on = gate signal colour, off = the selector
+/// track) or velocity bar (click or drag; filled from the bottom in the gate colour), from the
+/// G4 mockup. Routed cables plug in at its centre.
+#[allow(clippy::too_many_arguments)]
+fn seq_step_cell(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    painter: &egui::Painter,
+    xf: Xf,
+    id: ModuleId,
+    param: &'static kabl_modules::ParamInfo,
+    rect: Rect,
+    drawn: &mut Drawn,
+) {
+    let st = ui_state.style.clone();
+    let z = xf.zoom;
+    let r = xf.r(rect);
+    let slot = seq::slot_name(param.name);
+    let step = &slot[1..];
+    let v = routing::base_value(editor.state(), id, param);
+    let key = format!("{id}.{}", param.name);
+    ui_state.record(format!("step:{key}"), r);
+    if slot.starts_with('g') {
+        let on = v >= 0.5;
+        painter.rect_filled(
+            r,
+            CornerRadius::same((r.height() / 2.0) as u8),
+            if on { st.roles.gate } else { seg_track(&st) },
+        );
+        let resp = ui
+            .interact(
+                r.expand(2.0 * z),
+                Id::new(("kabl-seq-gate", id, param.name)),
+                Sense::click(),
+            )
+            .on_hover_text(format!(
+                "Step {step} gate: {}. Click to switch it {}",
+                if on { "on" } else { "off (a rest)" },
+                if on { "off" } else { "on" }
+            ));
+        if resp.clicked() {
+            editor.set_param(id, param.name, if on { 0.0 } else { 1.0 });
+        }
+    } else {
+        let n = param.to_norm(v).clamp(0.0, 1.0);
+        let round = CornerRadius::same((r.width() / 2.0) as u8);
+        painter.rect_filled(r, round, face_edge(&st));
+        if n > 0.0 {
+            painter.rect_filled(
+                Rect::from_min_max(pos2(r.left(), r.bottom() - r.height() * n), r.max),
+                round,
+                st.roles.gate,
+            );
+        }
+        let resp = ui
+            .interact(
+                r.expand2(vec2(10.0, 4.0) * z),
+                Id::new(("kabl-seq-vel", id, param.name)),
+                Sense::click_and_drag(),
+            )
+            .on_hover_text(format!(
+                "Step {step} velocity: {}. Click or drag to set",
+                routing::fmt_value(param, v)
+            ));
+        if resp.clicked() || resp.dragged() {
+            if let Some(p) = resp.interact_pointer_pos() {
+                let n = ((r.bottom() - p.y) / r.height()).clamp(0.0, 1.0);
+                editor.set_param_gesture(
+                    kabl_core::ParamTarget::Module {
+                        id,
+                        param: param.name.to_string(),
+                    },
+                    param.min + n * (param.max - param.min),
+                    resp.clicked() || resp.drag_started(),
+                );
+            }
+        }
+    }
+    for rt in routing::routes_into(editor.state(), id, param.name) {
+        drawn.plugs.push((rt.cable, r.center()));
+    }
+}
+
+/// A launch button on the rack, as a G3 kit chip: neutral (inset, hairline), playing (accent
+/// fill) or queued (blinking accent outline).
 #[allow(clippy::too_many_arguments)]
 fn pad(
     ui_state: &mut UiState,
     ui: &egui::Ui,
     painter: &egui::Painter,
-    th: &Theme,
     z: f32,
     key: String,
     r: Rect,
@@ -3138,30 +3547,24 @@ fn pad(
 ) -> egui::Response {
     ui_state.record(key.clone(), r);
     let resp = ui.interact(r, Id::new(("kabl-pad", key)), Sense::click());
-    painter.rect_filled(
-        r,
-        CornerRadius::same(5),
-        if lit {
-            th.gate
-        } else if th.dark {
-            th.btn
-        } else {
-            th.plate
-        },
-    );
-    painter.rect_stroke(
-        r,
-        CornerRadius::same(5),
-        Stroke::new(
-            1.0,
-            if resp.hovered() {
-                th.sel
-            } else {
-                th.panel_edge
-            },
-        ),
-        egui::StrokeKind::Inside,
-    );
+    let roles = &ui_state.style.roles;
+    let radius = CornerRadius::same((6.0 * z) as u8);
+    painter.rect_filled(r, radius, if lit { roles.accent } else { roles.inset });
+    if !lit {
+        painter.rect_stroke(
+            r,
+            radius,
+            Stroke::new(
+                1.0,
+                if resp.hovered() {
+                    roles.accent
+                } else {
+                    roles.line2
+                },
+            ),
+            egui::StrokeKind::Inside,
+        );
+    }
     if queued {
         let a = if (now * 4.0) as i64 % 2 == 0 {
             1.0
@@ -3169,10 +3572,10 @@ fn pad(
             0.35
         };
         painter.rect_stroke(
-            r.expand(1.5 * z),
-            CornerRadius::same(6),
-            Stroke::new(2.5 * z, th.gate.gamma_multiply(a)),
-            egui::StrokeKind::Outside,
+            r,
+            radius,
+            Stroke::new(1.5 * z, roles.accent.gamma_multiply(a)),
+            egui::StrokeKind::Inside,
         );
         ui.ctx()
             .request_repaint_after(std::time::Duration::from_millis(120));
@@ -3182,8 +3585,8 @@ fn pad(
         r.center(),
         egui::Align2::CENTER_CENTER,
         label,
-        12.5 * z,
-        if lit { th.sel_ink } else { th.plate_ink },
+        12.0 * z,
+        if lit { roles.on_accent } else { roles.text },
         false,
     );
     resp
@@ -3196,7 +3599,6 @@ fn draw_cues(
     ui_state: &mut UiState,
     ui: &mut egui::Ui,
     painter: &egui::Painter,
-    th: &Theme,
     xf: Xf,
     id: ModuleId,
     r: Rect,
@@ -3234,7 +3636,6 @@ fn draw_cues(
                     ui_state,
                     ui,
                     painter,
-                    th,
                     z,
                     format!("cue:{id}.{n}"),
                     b,
@@ -3261,8 +3662,8 @@ fn draw_cues(
             None => {
                 painter.rect_stroke(
                     b,
-                    CornerRadius::same(5),
-                    Stroke::new(1.0, th.panel_edge),
+                    CornerRadius::same((6.0 * z) as u8),
+                    Stroke::new(1.0, ui_state.style.roles.line),
                     egui::StrokeKind::Inside,
                 );
             }
@@ -3284,7 +3685,7 @@ fn draw_cues(
         egui::Align2::LEFT_CENTER,
         &line,
         11.5 * z,
-        th.ink2,
+        ui_state.style.roles.text2,
         true,
     );
     if let Some(q) = queued {
@@ -3296,7 +3697,6 @@ fn draw_cues(
             ui_state,
             ui,
             painter,
-            th,
             z,
             format!("cue-cancel:{id}"),
             c,
@@ -3318,261 +3718,6 @@ fn draw_cues(
             }
             Err(e) => ui_state.last_message = Some(e),
         }
-    }
-}
-
-/// The drawer's cue editor: per cue, its name, reference clock, timing and a bank (or Keep)
-/// per sequencer; add, capture what plays, delete.
-fn cues_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, id: ModuleId) {
-    let state = editor.state();
-    let all = cues::cues(state, id);
-    let clocks: Vec<ModuleId> = state
-        .modules
-        .iter()
-        .filter(|(_, m)| m.kind == "clock")
-        .map(|(&c, _)| c)
-        .collect();
-    let seqs: Vec<ModuleId> = state
-        .modules
-        .iter()
-        .filter(|(_, m)| matches!(m.kind.as_str(), "seq" | "drum.grid"))
-        .map(|(&c, _)| c)
-        .collect();
-    let is_grid = |s: ModuleId| state.modules.get(&s).is_some_and(|m| m.kind == "drum.grid");
-    let playing_now: HashMap<ModuleId, usize> = seqs
-        .iter()
-        .map(|&s| {
-            (
-                s,
-                ui_state.seq_banks.get(&s).map_or_else(
-                    || {
-                        if is_grid(s) {
-                            state.modules[&s]
-                                .params
-                                .get("pattern")
-                                .map_or(0, |&v| v.round() as usize)
-                        } else {
-                            banks::startup(state, s)
-                        }
-                    },
-                    |b| b.0,
-                ),
-            )
-        })
-        .collect();
-    enum Edit {
-        Add,
-        Delete(usize),
-        Capture(usize),
-        Clock(usize, ModuleId),
-        Timing(usize, kabl_engine::patch_engine::Timing),
-        Target(usize, ModuleId, Option<usize>),
-        Rename(usize, String),
-        Macro(usize, ModuleId, u8, Option<f32>),
-        Morph(usize, f32),
-        StoreMacros(usize),
-    }
-    let macro_mods: Vec<ModuleId> = state
-        .modules
-        .iter()
-        .filter(|(_, m)| m.kind == "macro")
-        .map(|(&c, _)| c)
-        .collect();
-    let mut edit = None;
-    for c in &all {
-        ui.separator();
-        ui.horizontal(|ui| {
-            ui.label(egui::RichText::new(format!("{}", c.n)).strong());
-            let mut name = ui_state
-                .cue_rename
-                .as_ref()
-                .filter(|(i, n, _)| (*i, *n) == (id, c.n))
-                .map_or_else(|| c.name.clone(), |(_, _, t)| t.clone());
-            let r = ui.add(egui::TextEdit::singleline(&mut name).desired_width(120.0));
-            ui_state.record(format!("cue-name:{id}.{}", c.n), r.rect);
-            if r.changed() {
-                ui_state.cue_rename = Some((id, c.n, name.clone()));
-            }
-            if r.lost_focus() {
-                ui_state.cue_rename = None;
-                if name != c.name {
-                    edit = Some(Edit::Rename(c.n, name));
-                }
-            }
-            let r = ui.small_button("Capture");
-            ui_state.record(format!("cue-capture:{id}.{}", c.n), r.rect);
-            if r.on_hover_text("Set every sequencer to the bank it plays now")
-                .clicked()
-            {
-                edit = Some(Edit::Capture(c.n));
-            }
-            let r = ui.small_button("Delete");
-            ui_state.record(format!("cue-delete:{id}.{}", c.n), r.rect);
-            if r.clicked() {
-                edit = Some(Edit::Delete(c.n));
-            }
-        });
-        ui.horizontal_wrapped(|ui| {
-            egui::ComboBox::from_id_salt(("cue-clock", id, c.n))
-                .selected_text(
-                    c.clock
-                        .map_or("choose clock".into(), |k| format!("Clock #{k}")),
-                )
-                .show_ui(ui, |ui| {
-                    for &k in &clocks {
-                        if ui
-                            .selectable_label(c.clock == Some(k), format!("Clock #{k}"))
-                            .clicked()
-                        {
-                            edit = Some(Edit::Clock(c.n, k));
-                        }
-                    }
-                });
-            egui::ComboBox::from_id_salt(("cue-timing", id, c.n))
-                .selected_text(
-                    banks::TIMINGS
-                        .iter()
-                        .find(|t| t.0 == c.timing)
-                        .map_or("", |t| t.1),
-                )
-                .show_ui(ui, |ui| {
-                    for (t, name) in banks::TIMINGS {
-                        if ui.selectable_label(c.timing == t, name).clicked() {
-                            edit = Some(Edit::Timing(c.n, t));
-                        }
-                    }
-                });
-        });
-        for &s in &seqs {
-            ui.horizontal(|ui| {
-                let grid = is_grid(s);
-                let label = if grid { "Drum grid" } else { "Sequencer" };
-                ui.label(egui::RichText::new(format!("{label} #{s}")).small());
-                let current = c.targets.iter().find(|t| t.0 == s).map(|t| t.1);
-                let r = ui.selectable_label(current.is_none(), "Keep");
-                ui_state.record(format!("cue-bank:{id}.{}.{s}.keep", c.n), r.rect);
-                if r.on_hover_text("This cue leaves it playing").clicked() {
-                    edit = Some(Edit::Target(c.n, s, None));
-                }
-                let names: &[&str] = if grid {
-                    &kabl_modules::builtins::PATTERN_NAMES
-                } else {
-                    &seq::BANK_NAMES
-                };
-                for (b, &name) in names.iter().enumerate() {
-                    let hover = if grid {
-                        format!("Pattern {name}")
-                    } else {
-                        banks::title(state, s, b)
-                    };
-                    let r = ui
-                        .selectable_label(current == Some(b), name)
-                        .on_hover_text(hover);
-                    ui_state.record(format!("cue-bank:{id}.{}.{s}.{b}", c.n), r.rect);
-                    if r.clicked() {
-                        edit = Some(Edit::Target(c.n, s, Some(b)));
-                    }
-                }
-            });
-        }
-        if !macro_mods.is_empty() {
-            ui.horizontal_wrapped(|ui| {
-                ui.label(egui::RichText::new("Macros").small());
-                for &mm in &macro_mods {
-                    for k in cues::active_macros(state, mm) {
-                        let set = c.macros.iter().find(|t| (t.0, t.1) == (mm, k)).map(|t| t.2);
-                        let name = state
-                            .label(mm, &format!("name.m{}", k + 1))
-                            .map_or_else(|| format!("m{}", k + 1), str::to_string);
-                        let r = ui.selectable_label(set.is_some(), name).on_hover_text(
-                            "Tick to set a target for this macro; unticked leaves it",
-                        );
-                        ui_state.record(format!("cue-macro:{id}.{}.{mm}.{k}", c.n), r.rect);
-                        if r.clicked() {
-                            let v = set.is_none().then(|| ui_state.macro_now(state, mm, k));
-                            edit = Some(Edit::Macro(c.n, mm, k, v));
-                        }
-                        if let Some(mut v) = set {
-                            let d = ui.add(
-                                egui::DragValue::new(&mut v)
-                                    .range(0.0..=1.0)
-                                    .speed(0.005)
-                                    .fixed_decimals(2),
-                            );
-                            ui_state
-                                .record(format!("cue-macro-value:{id}.{}.{mm}.{k}", c.n), d.rect);
-                            if d.changed() {
-                                edit = Some(Edit::Macro(c.n, mm, k, Some(v)));
-                            }
-                        }
-                    }
-                }
-            });
-            ui.horizontal(|ui| {
-                let mut beats = c.morph_beats;
-                ui.label(egui::RichText::new("Morph").small());
-                let d = ui.add(
-                    egui::DragValue::new(&mut beats)
-                        .range(0.0..=cues::MAX_MORPH_BEATS)
-                        .speed(0.1)
-                        .fixed_decimals(1)
-                        .suffix(" beats"),
-                );
-                ui_state.record(format!("cue-morph:{id}.{}", c.n), d.rect);
-                d.on_hover_text(
-                    "Time the macros take to reach this cue's values, on the clock; 0 jumps",
-                );
-                if beats != c.morph_beats {
-                    edit = Some(Edit::Morph(c.n, beats));
-                }
-                let r = ui.small_button("Store macros");
-                ui_state.record(format!("cue-store-macros:{id}.{}", c.n), r.rect);
-                if r.on_hover_text("Set every macro to where it is now")
-                    .clicked()
-                {
-                    edit = Some(Edit::StoreMacros(c.n));
-                }
-            });
-        }
-    }
-    ui.separator();
-    let r = ui.add_enabled(
-        all.len() < kabl_modules::builtins::CUES,
-        egui::Button::new("Add cue (from what plays)"),
-    );
-    ui_state.record(format!("cue-add:{id}"), r.rect);
-    if r.clicked() {
-        edit = Some(Edit::Add);
-    }
-    match edit {
-        Some(Edit::Add) => {
-            cues::add(editor, id, &|s| playing_now.get(&s).copied().unwrap_or(0));
-        }
-        Some(Edit::Delete(n)) => cues::delete(editor, id, n),
-        Some(Edit::Capture(n)) => {
-            let ops = seqs
-                .iter()
-                .map(|&s| kabl_core::Op::SetParam {
-                    target: kabl_core::ParamTarget::Module {
-                        id,
-                        param: format!("cue{n}.seq.{s}"),
-                    },
-                    value: playing_now[&s] as f32,
-                })
-                .collect();
-            editor.edit(ops);
-        }
-        Some(Edit::Clock(n, k)) => cues::set_clock(editor, id, n, k),
-        Some(Edit::Timing(n, t)) => cues::set_timing(editor, id, n, t),
-        Some(Edit::Target(n, s, b)) => cues::set_target(editor, id, n, s, b),
-        Some(Edit::Rename(n, t)) => cues::rename(editor, id, n, &t),
-        Some(Edit::Macro(n, m, k, v)) => cues::set_macro(editor, id, n, m, k, v),
-        Some(Edit::Morph(n, b)) => cues::set_morph(editor, id, n, b),
-        Some(Edit::StoreMacros(n)) => {
-            let state = editor.state().clone();
-            cues::store_macros(editor, id, n, &|m, k| ui_state.macro_now(&state, m, k));
-        }
-        None => {}
     }
 }
 
@@ -3786,6 +3931,15 @@ fn draw_control(
             CornerRadius::same(5),
             th.panel.gamma_multiply(0.96),
         );
+    }
+    if let (true, Geo::Select { rect }) = (m.info.kind == "seq", c.geo) {
+        let slot = seq::slot_name(c.param.name);
+        if slot.len() == 2 && matches!(slot.as_bytes()[0], b'g' | b'v') {
+            seq_step_cell(
+                editor, ui_state, ui, painter, xf, m.id, c.param, rect, drawn,
+            );
+            return;
+        }
     }
     match c.geo {
         Geo::Knob { c: cen, r } => {
@@ -4275,35 +4429,6 @@ fn port_ref_pos<'a>(
     ports.get(&(*id, direction, port.clone()))
 }
 
-/// Moves every shape drawn since shape index `from` that is not a face's own background out of
-/// the paint list and returns it in order, so the caller can paint it again above the cables.
-fn lift_foreground(
-    ui: &egui::Ui,
-    painter: &egui::Painter,
-    faces: &[Rect],
-    from: usize,
-) -> Vec<(Rect, egui::Shape)> {
-    let mut out = Vec::new();
-    ui.ctx().graphics_mut(|g| {
-        let list = g.entry(painter.layer_id());
-        for i in from..list.next_idx().0 {
-            list.mutate_shape(egui::layers::ShapeIdx(i), |cs| {
-                let r = cs.shape.visual_bounding_rect();
-                let background = faces
-                    .iter()
-                    .any(|f| r.width() >= 0.9 * f.width() && r.height() >= 0.9 * f.height());
-                if !background && !matches!(cs.shape, egui::Shape::Noop) {
-                    out.push((
-                        cs.clip_rect,
-                        std::mem::replace(&mut cs.shape, egui::Shape::Noop),
-                    ));
-                }
-            });
-        }
-    });
-    out
-}
-
 /// A cable drawn straight into `p`, in the theme's lit width: the one in the hand while a plug
 /// is dragged, which is always fully visible.
 fn cable_path(
@@ -4363,6 +4488,9 @@ fn draw_cables(
     only: Option<ModuleId>,
 ) -> Vec<egui::Shape> {
     let mut top = Vec::new();
+    if only.is_none() {
+        ui_state.cable_ends.clear();
+    }
     if ui_state.cable_view == CableView::Hidden {
         return top;
     }
@@ -4411,6 +4539,9 @@ fn draw_cables(
             continue;
         };
         if let Some(&b) = port_ref_pos(&drawn.ports, &c.to, PortDirection::Input) {
+            if only.is_none() {
+                ui_state.cable_ends.push((xf.inv(a), xf.inv(b)));
+            }
             let pts = cable_look::points(a, b, z, slots.sag);
             runs.push(Run {
                 id: *cable_id,
@@ -4430,6 +4561,9 @@ fn draw_cables(
         let Some(&a) = port_ref_pos(&drawn.ports, &c.from, PortDirection::Output) else {
             continue;
         };
+        if only.is_none() {
+            ui_state.cable_ends.push((xf.inv(a), xf.inv(*pos)));
+        }
         let pts = cable_look::points(a, *pos, z, slots.sag);
         runs.push(Run {
             id: *cable_id,
@@ -4562,22 +4696,110 @@ fn draw_cables(
         }
         let resp = resp.on_hover_text("Drag its plug out of the input to move or remove it");
         let cable_id = r.id;
+        let (from, to) = (r.c.from.clone(), r.c.to.clone());
         kit::context_menu(&resp, &st, |ui| {
-            let m = kit::menu_item(ui, &st, "Pattern & probability...", false);
-            ui_state.record("menu:cable-pattern".into(), m.rect);
-            if m.clicked() {
-                ui_state.cable_fn = Some(cable_id);
-                ui.close();
-            }
-            let m = kit::menu_item(ui, &st, "Remove cable", false);
-            ui_state.record("menu:remove-cable".into(), m.rect);
-            if m.clicked() {
-                editor.disconnect(cable_id);
-                ui.close();
-            }
+            cable_menu(editor, ui_state, ui, cable_id, col, &from, &to)
         });
     }
     top
+}
+
+/// The cable's context menu (G4 `menu-cable`): a header with the cable's swatch and route,
+/// Pattern & probability…, Focus this cable, Explain this cable, Remove cable.
+fn cable_menu(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    cable: CableId,
+    col: Color32,
+    from: &PortRef,
+    to: &PortRef,
+) {
+    let st = ui_state.style.clone();
+    let st = &*st;
+    let end = |p: &PortRef| match p {
+        PortRef::Module { id, port } => {
+            let name = editor
+                .state()
+                .modules
+                .get(id)
+                .and_then(|m| registry::info_for(&m.kind))
+                .map_or("?", |i| i.name);
+            format!("{name} {port}")
+        }
+        _ => "?".into(),
+    };
+    ui.horizontal(|ui| {
+        let (sw, _) = ui.allocate_exact_size(vec2(16.0, 4.0), Sense::hover());
+        ui.painter().rect_filled(sw, 2.0, col);
+        kit::label(
+            ui,
+            st,
+            style::Role::Label,
+            kit::Tone::Text,
+            format!("{} → {}", end(from), end(to)),
+        );
+    });
+    kit::menu_rule(ui, st);
+    if menu_row(
+        ui,
+        ui_state,
+        "cable-pattern",
+        Some(kit::Ic::Wave),
+        "Pattern & probability…",
+        kit::Tone::Text,
+    )
+    .clicked()
+    {
+        ui_state.cable_fn = Some(cable);
+        ui.close();
+    }
+    let dest = to.module_id();
+    if menu_row(
+        ui,
+        ui_state,
+        "cable-focus",
+        Some(kit::Ic::Focus),
+        "Focus this cable",
+        kit::Tone::Text,
+    )
+    .clicked()
+    {
+        // Focus shows the selected module's cables: this one's destination.
+        ui_state.cable_view = CableView::Focus;
+        ui_state.selected_module = dest;
+        ui.close();
+    }
+    if let Some(d) = dest {
+        if menu_row(
+            ui,
+            ui_state,
+            "cable-explain",
+            Some(kit::Ic::Info),
+            "Explain this cable",
+            kit::Tone::Text,
+        )
+        .clicked()
+        {
+            // Explain has no cable subject: what the cable feeds, the control a route moves
+            // or the module whose input it patches.
+            let subject = match to {
+                PortRef::Param { id, param } => explain::Subject::Control {
+                    id: *id,
+                    key: param.clone(),
+                },
+                _ => explain::Subject::Module(d),
+            };
+            explain::open(ui_state, subject, None);
+            ui_state.selected_module = Some(d);
+            ui.close();
+        }
+    }
+    kit::menu_rule(ui, st);
+    if remove_row(ui, ui_state, "remove-cable", "Remove cable") {
+        editor.disconnect(cable);
+        ui.close();
+    }
 }
 
 /// Channels of an output jack: 2 for a stereo jack.
@@ -5180,6 +5402,40 @@ fn register_face_port(
 #[cfg(test)]
 mod tests {
     use super::port_label;
+
+    #[test]
+    fn messages_become_toasts_of_the_right_severity() {
+        use crate::kit::g4::Sev;
+        let (sev, title, detail) = super::toast_for("Could not load patch: unknown module kind");
+        assert_eq!((sev, title.as_str()), (Sev::Bad, "Could not load patch"));
+        assert_eq!(detail.as_deref(), Some("unknown module kind"));
+        assert_eq!(super::toast_for("Audio device busy").0, Sev::Warn);
+        assert_eq!(super::toast_for("opened \"Evolving Pad\"").0, Sev::Good);
+    }
+
+    #[test]
+    fn transport_readout_counts_bars_beats_and_ticks() {
+        let mut editor = crate::PatchEditor::new();
+        let mut view = super::UiState::default();
+        assert!(super::transport_readout(editor.state(), &view).is_none());
+        let id = editor.add_module("clock", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+        assert!(
+            super::transport_readout(editor.state(), &view).is_none(),
+            "no report yet"
+        );
+        editor.set_param(id, "bpm", 100.0);
+        // Pulse 0 is 1 . 1 . 1; 4 pulses to a beat, 16 to a bar: pulse 37 is bar 3, beat 2, tick 2.
+        view.clock_pos.insert(id, 0.0);
+        assert_eq!(
+            super::transport_readout(editor.state(), &view),
+            Some((100.0, "1 . 1 . 1".into()))
+        );
+        view.clock_pos.insert(id, 37.9);
+        assert_eq!(
+            super::transport_readout(editor.state(), &view).unwrap().1,
+            "3 . 2 . 2"
+        );
+    }
 
     #[test]
     fn empty_rack_fit_keeps_import_coordinates_finite() {

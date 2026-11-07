@@ -8,6 +8,7 @@ use std::f32::consts::PI;
 pub enum Ic {
     Play,
     Stop,
+    Restart,
     Undo,
     Redo,
     Search,
@@ -51,6 +52,11 @@ pub enum Ic {
     Wave,
     Clock,
     External,
+    Info,
+    /// Two overlapping squares: A against B.
+    Compare,
+    /// A ring with four ticks: measure one signal.
+    Target,
 }
 
 pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
@@ -64,6 +70,15 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
         Ic::Play => {
             p.add(Shape::convex_polygon(
                 vec![q(-4.0, -6.0), q(6.0, 0.0), q(-4.0, 6.0)],
+                col,
+                PathStroke::NONE,
+            ));
+        }
+        Ic::Restart => {
+            // Back to the start, as the mockup's `restart` (M4 3.5V12.5M12 3.5L6 8L12 12.5Z).
+            line(&[(-4.0, -4.5), (-4.0, 4.5)]);
+            p.add(Shape::convex_polygon(
+                vec![q(4.0, -4.5), q(-2.0, 0.0), q(4.0, 4.5)],
                 col,
                 PathStroke::NONE,
             ));
@@ -279,6 +294,11 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
             line(&[(0.0, -2.0), (0.0, 2.0)]);
             p.circle_filled(q(0.0, 4.2), 0.9 * u, col);
         }
+        Ic::Info => {
+            p.circle_stroke(c, 6.0 * u, st);
+            line(&[(0.0, -0.4), (0.0, 3.4)]);
+            p.circle_filled(q(0.0, -3.1), 0.9 * u, col);
+        }
         Ic::Pin => {
             p.circle_stroke(q(0.0, -3.5), 3.5 * u, st);
             line(&[(-4.5, 1.0), (4.5, 1.0)]);
@@ -376,6 +396,27 @@ pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
         Ic::Clock => {
             p.circle_stroke(q(0.0, 0.0), 6.5 * u, st);
             line(&[(0.0, -3.5), (0.0, 0.0), (3.0, 1.5)]);
+        }
+        Ic::Compare => {
+            p.rect_stroke(
+                Rect::from_center_size(q(-2.0, -2.0), vec2(9.0, 9.0) * u),
+                1.5,
+                st,
+                egui::StrokeKind::Middle,
+            );
+            p.rect_stroke(
+                Rect::from_center_size(q(2.5, 2.5), vec2(9.0, 9.0) * u),
+                1.5,
+                st,
+                egui::StrokeKind::Middle,
+            );
+        }
+        Ic::Target => {
+            p.circle_stroke(q(0.0, 0.0), 4.5 * u, st);
+            line(&[(0.0, -7.0), (0.0, -3.5)]);
+            line(&[(0.0, 3.5), (0.0, 7.0)]);
+            line(&[(-7.0, 0.0), (-3.5, 0.0)]);
+            line(&[(3.5, 0.0), (7.0, 0.0)]);
         }
         Ic::External => {
             line(&[(-1.0, -5.5), (5.5, -5.5), (5.5, 1.0)]);

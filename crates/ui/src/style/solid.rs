@@ -166,7 +166,7 @@ fn sections(dark: bool, face: Color32, text2: Color32) -> Sections {
     }
 }
 
-/// `line_solid`: line-art panels and wells, solid hardware (filled caps, hex jacks, accent
+/// `line_solid`: line-art panels and wells, solid hardware (filled caps, round jacks, accent
 /// selectors), glow on dark.
 fn line_solid(dark: bool, accent: Accent) -> Style {
     let mut s = builtin_a(dark);
@@ -182,7 +182,9 @@ fn line_solid(dark: bool, accent: Accent) -> Style {
     s.types.value.size = 11.0;
     s.types.caption.font = Font::Mono;
     s.types.section.font = Font::SansCondSemibold;
-    s.types.section.tracking = 0.8;
+    // The mockup's card titles: condensed semibold 12, tracking 0.08 em.
+    s.types.section.size = 12.0;
+    s.types.section.tracking = 0.96;
     let f = &mut s.slots.face;
     f.material = FaceMaterial::Line;
     f.gradient = 0.0;
@@ -208,6 +210,8 @@ fn line_solid(dark: bool, accent: Accent) -> Style {
     c.shadow_dy = 1.5;
     c.glow_alpha = if dark { 0.16 } else { 0.0 };
     c.glow_width = 12.0;
+    // The G4 mockup's base sag (`cables()`: 30 + 0.28 of the length).
+    c.sag = 30.0;
     s.slots.selector = SelectorRecipe::AccentPill;
     s.slots.jack = JackRecipe::Hex;
     s.slots.display.frame = DisplayFrame::Paper;

@@ -270,6 +270,81 @@ pub fn rename(editor: &mut PatchEditor, id: ModuleId, n: usize, text: &str) {
     editor.set_label(id, &label_key(n), Some(text));
 }
 
+/// Moves cue `from` to cue `to`'s place in the list, shifting the cues between: each cue keeps
+/// its name, settings and MIDI button, under its new number. One undo step. Returns the moves
+/// (old number, new number); empty when nothing moves.
+pub fn reorder(
+    editor: &mut PatchEditor,
+    id: ModuleId,
+    from: usize,
+    to: usize,
+) -> Vec<(usize, usize)> {
+    let state = editor.state();
+    let Some(m) = state.modules.get(&id) else {
+        return Vec::new();
+    };
+    let slots: Vec<usize> = cues(state, id).iter().map(|c| c.n).collect();
+    let (Some(i), Some(j)) = (
+        slots.iter().position(|&n| n == from),
+        slots.iter().position(|&n| n == to),
+    ) else {
+        return Vec::new();
+    };
+    if i == j {
+        return Vec::new();
+    }
+    let mut order = slots.clone();
+    let moved = order.remove(i);
+    order.insert(j, moved);
+    let btn = |n: usize| format!("{}cue.{n}", crate::perform::BTN_PREFIX);
+    // A cue's own keys, without its number: `cue<N>.rest` → "rest", its button → "".
+    let owned = |n: usize| -> Vec<(String, f32)> {
+        let prefix = format!("cue{n}.");
+        m.params
+            .iter()
+            .filter_map(|(k, &v)| {
+                let rest = if *k == btn(n) {
+                    String::new()
+                } else {
+                    k.strip_prefix(&prefix)?.to_string()
+                };
+                Some((rest, v))
+            })
+            .collect()
+    };
+    let full = |n: usize, rest: &str| {
+        if rest.is_empty() {
+            btn(n)
+        } else {
+            key(n, rest)
+        }
+    };
+    let (mut unsets, mut sets, mut moves) = (Vec::new(), Vec::new(), Vec::new());
+    for (&dst, &src) in slots.iter().zip(&order) {
+        if src == dst {
+            continue;
+        }
+        moves.push((src, dst));
+        let incoming = owned(src);
+        for (rest, _) in owned(dst) {
+            if !incoming.iter().any(|(r, _)| *r == rest) {
+                unsets.push(set(id, full(dst, &rest), None));
+            }
+        }
+        for (rest, v) in incoming {
+            sets.push(set(id, full(dst, &rest), Some(v)));
+        }
+        sets.push(Op::SetLabel {
+            id,
+            key: label_key(dst),
+            text: state.label(id, &label_key(src)).map(str::to_string),
+        });
+    }
+    unsets.extend(sets);
+    editor.edit(unsets);
+    moves
+}
+
 /// Queues the launch of cue `n`. Errors on a cue with no clock or no sequencer.
 pub fn launch(
     out: &mut Vec<Command>,
@@ -310,9 +385,10 @@ pub fn launch(
 }
 
 /// How cue `n` stands against what the sequencers report (`bank_of`: playing, queued):
-/// `(active, queued)`. Active: every target plays its bank with nothing else queued. Queued:
-/// once what is queued lands, every target will play its bank, and one of them is still
-/// waiting (a cue sharing only some banks with the queued one is not shown as queued).
+/// `(active, queued)`. Active: every target plays its bank now, so it stays what you hear
+/// while another cue waits for the bar. Queued: once what is queued lands, every target will
+/// play its bank, and one of them is still waiting (a cue sharing only some banks with the
+/// queued one is not shown as queued). A cue is never both: queued wins.
 pub fn standing(cue: &Cue, bank_of: &dyn Fn(ModuleId) -> (usize, Option<usize>)) -> (bool, bool) {
     if cue.targets.is_empty() {
         return (false, false);
@@ -322,8 +398,9 @@ pub fn standing(cue: &Cue, bank_of: &dyn Fn(ModuleId) -> (usize, Option<usize>))
         queued.unwrap_or(playing) == b
     };
     let waiting = cue.targets.iter().any(|&(s, b)| bank_of(s).1 == Some(b));
-    let all = cue.targets.iter().all(lands);
-    (all && !waiting, all && waiting)
+    let queued = waiting && cue.targets.iter().all(lands);
+    let playing = cue.targets.iter().all(|&(s, b)| bank_of(s).0 == b);
+    (playing && !queued, queued)
 }
 
 /// `standing` for the drawn cues: a cue with no sequencer has no banks to show it playing, so

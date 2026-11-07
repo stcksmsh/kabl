@@ -209,7 +209,7 @@ fn transport_card_sends_runtime_commands_only() {
     let mut h = H::new(1440.0, 900.0);
     h.pin(CLOCK, TRANSPORT);
     let entries = h.editor.log().entries().len();
-    h.click("prun:1");
+    h.click("pstop:1");
     h.click("prestart:1");
     assert_eq!(
         h.ui.transport,
@@ -415,7 +415,7 @@ fn the_panel_reads_at_both_sizes_whatever_the_rack_zoom() {
             .map(|k| h.rect(&format!("pcard:{k}")))
             .collect();
         assert_eq!(cards, again);
-        for key in ["midi-input", "perform", "routing"] {
+        for key in ["perform", "routing"] {
             assert!(screen.contains_rect(h.rect(key)), "{key}");
         }
     }
@@ -580,16 +580,37 @@ fn the_demo_controls_fit_together_at_1280() {
             }
             rects.push(r);
         }
-        for k in [
-            "rec-start",
-            "midi-input",
-            "notes-off",
-            "prun:1",
-            "prestart:1",
-        ] {
+        for k in ["rec-start", "prun:1", "pstop:1", "prestart:1"] {
             assert!(screen.contains_rect(h.rect(k)), "{w}: {k}");
         }
     }
+}
+
+/// The header row is gone: the transport card's menu carries MIDI in, All notes off, Keep
+/// Routing open and the view size.
+#[test]
+fn the_transport_menu_carries_the_view_controls() {
+    let mut h = H::new(1440.0, 900.0);
+    h.pin(CLOCK, TRANSPORT);
+    h.ui.perform_open = true;
+    h.ui.perform_tall = true;
+    h.ui.midi_inputs = vec!["KeyStep".into()];
+    h.frame();
+    assert!(
+        !h.ui.hits.contains_key("notes-off"),
+        "not drawn until the menu opens"
+    );
+    h.click("pmenu:1.transport");
+    for k in [
+        "notes-off",
+        "drawer-pin",
+        "perform-size",
+        "midi-input:KeyStep",
+    ] {
+        assert!(h.ui.hits.contains_key(k), "{k}");
+    }
+    h.click("notes-off");
+    assert!(h.ui.all_notes_off);
 }
 
 #[test]
@@ -605,6 +626,7 @@ fn the_toolbar_switch_opens_perform_as_a_view_and_show_rack_docks_it() {
         !h.ui.hits.keys().any(|k| k.starts_with("knob:")),
         "the rack is hidden in the view"
     );
+    h.click("pmenu:1.transport");
     h.click("perform-size");
     assert!(
         h.ui.perform_open && !h.ui.perform_tall,
@@ -659,6 +681,7 @@ fn the_full_view_takes_the_drawer_unless_pinned_and_gives_it_back() {
     // Pinned from inside Perform: the drawer comes back and stays through the trip.
     h.click("perform");
     assert!(!h.ui.drawer_open);
+    h.click("pmenu:1.transport");
     h.click("drawer-pin");
     assert!(h.ui.drawer_pinned && h.ui.drawer_open);
     h.click("rack");
@@ -698,16 +721,17 @@ fn scenes_and_macros_use_the_width_at_every_size() {
                 .find(|(k, _)| k.ends_with(".cues"))
                 .map(|(_, r)| *r)
                 .expect("scenes card");
+        // The scenes are the left column of the two-column view (300 to 380 px).
         assert!(
-            right - scenes.right() < 30.0,
-            "{w}: scenes end at {}",
-            scenes.right()
+            (290.0..=400.0).contains(&scenes.width()),
+            "{w}: scenes are {} wide",
+            scenes.width()
         );
         // The bank cards of the second row also reach the right edge.
         let last =
             h.ui.hits
                 .iter()
-                .filter(|(k, _)| k.starts_with("pcard:") && k.ends_with(".banks"))
+                .filter(|(k, _)| k.as_str() == "pcard:sequences")
                 .map(|(_, r)| r.right())
                 .fold(0.0, f32::max);
         assert!(right - last < 30.0, "{w}: banks end at {last}");
@@ -717,13 +741,17 @@ fn scenes_and_macros_use_the_width_at_every_size() {
             "{w}: scene row {}",
             scenes.height()
         );
-        let ctrl_bottom = h
-            .ui
-            .hits
-            .iter()
-            .filter(|(k, _)| k.starts_with("pcard:") && !k.ends_with(".banks") && !k.contains(".m"))
-            .map(|(_, r)| r.bottom())
-            .fold(0.0, f32::max);
+        let ctrl_bottom =
+            h.ui.hits
+                .iter()
+                .filter(|(k, _)| {
+                    k.starts_with("pcard:")
+                        && !k.ends_with(".banks")
+                        && !k.contains(".m")
+                        && *k != "pcard:sequences"
+                })
+                .map(|(_, r)| r.bottom())
+                .fold(0.0, f32::max);
         assert!(
             ctrl_bottom <= hgt - 20.0,
             "{w}: controls end at {ctrl_bottom}"

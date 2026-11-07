@@ -383,12 +383,11 @@ fn external_dependencies(p: &PatchState, id: CompositeId) -> Vec<String> {
     deps.into_iter().collect()
 }
 
-/// Keep a stable top-left origin; Area's previous content size must not cap new content.
+/// Centred near the top, from the width alone: a stable origin that follows a resized window
+/// (Area's previous content size must not cap new content).
 pub(crate) fn focused_area(ctx: &egui::Context, id: Id, width: f32) -> egui::Area {
     let bounds = ctx.content_rect().shrink(12.);
-    let pos = egui::AreaState::load(ctx, id)
-        .map(|s| s.left_top_pos())
-        .unwrap_or(pos2(bounds.center().x - width * 0.5, bounds.top() + 36.));
+    let pos = pos2(bounds.center().x - width * 0.5, bounds.top() + 36.);
     egui::Area::new(id)
         .kind(egui::UiKind::Modal)
         .order(egui::Order::Foreground)
@@ -405,8 +404,6 @@ pub(crate) fn more(
     editor: &mut PatchEditor,
     view: &mut UiState,
     ui: &mut egui::Ui,
-    th: &Theme,
-    xf: Xf,
     scene: &Layout,
     drawn: &mut Drawn,
 ) {
@@ -431,110 +428,313 @@ pub(crate) fn more(
             ..Default::default()
         },
     );
-    let Some(mut m) = full.get(id).cloned() else {
+    let Some(m) = full.get(id).cloned() else {
         return;
     };
-    if let Some(adv) = m.adv.as_mut() {
-        let bottom = m
-            .ctls
-            .iter()
-            .filter(|c| !c.primary)
-            .map(|c| c.geo.label_pos().y + 64.)
-            .fold(adv.bottom(), f32::max);
-        adv.max.y = bottom;
-    }
+    let face = rack::primary_set(state, info);
     let ctx = ui.ctx().clone();
+    let st = view.style.clone();
+    let st = &*st;
+    let kind = state.kind.clone();
+    // Face layout works on a draft (pins and order), applied by Done as one undo step.
+    if view.more_tab == 1 && view.choose.as_ref().is_none_or(|c| c.0 != id) {
+        view.choose = Some((id, rack::primary_set(state, info)));
+        view.face_order = None;
+    }
     let mut close = false;
-    let width =
-        (m.full().width() * xf.zoom.clamp(0.85, 1.0) + 24.).min(ctx.content_rect().width() - 80.);
+    let mut done = false;
+    let width = kit::g4::Size::L
+        .width()
+        .min(ctx.content_rect().width() - 80.);
+    let keys_id = Id::new(("more-keys", id));
+    let mut keys = ctx.data(|d| d.get_temp::<bool>(keys_id)).unwrap_or(false);
     let modal = egui::Modal::new(Id::new("more-controls"))
+        .frame(
+            kit::g4::surface_frame(st, 12.0)
+                .shadow(kit::eshadow(st, 2))
+                .inner_margin(egui::Margin::symmetric(24, 18)),
+        )
+        .backdrop_color(kit::g4::tokens(st).scrim)
         .area(focused_area(&ctx, Id::new("more-controls"), width))
         .show(&ctx, |ui| {
             focused_height(ui);
-            let z = xf.zoom.clamp(0.85, 1.0);
-            ui.set_width(width);
+            ui.set_width(width - 48.);
+            // Header: name, kind and id, close.
             ui.horizontal(|ui| {
-                ui.heading(format!("More controls · {}", info.name));
-                let r = ui.button("Close");
-                view.record("more:close".into(), r.rect);
-                close = r.clicked();
+                kit::label(ui, st, style::Role::Title, kit::Tone::Text, info.name);
+                kit::label(
+                    ui,
+                    st,
+                    style::Role::Value,
+                    kit::Tone::Text2,
+                    format!("{kind} · #{id}"),
+                );
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let r = kit::icon_button(ui, st, kit::Ic::Close, false, true)
+                        .on_hover_text("Close (Esc)");
+                    view.record("more:close".into(), r.rect);
+                    close = r.clicked();
+                });
             });
-            ui.label("Original knobs, selectors, jacks and routing. Rack layout stays unchanged.");
+            kit::gap(ui, st, 2);
+            kit::segmented(ui, st, |ui| {
+                for (k, t) in ["Controls", "Face layout"].into_iter().enumerate() {
+                    let r = kit::seg(ui, st, t, view.more_tab == k);
+                    view.record(format!("more:tab:{k}"), r.rect);
+                    if r.clicked() {
+                        view.more_tab = k;
+                    }
+                }
+            });
+            kit::gap(ui, st, 2);
+            let body_h = (ui.available_height() - 72.).max(80.);
             egui::ScrollArea::both()
-                .max_height(ui.available_height())
-                .show_owned(ui, |ui| {
-                    let (_, space) = ui.allocate_space(m.full().size() * z);
+                .max_height(body_h)
+                .auto_shrink([false, true])
+                .show(ui, |ui| {
+                    if view.more_tab == 1 {
+                        if let Some(s) = editor.state().modules.get(&id).cloned() {
+                            face_layout(view, ui, st, id, info, &s);
+                        }
+                        return;
+                    }
+                    // The draft decides what is on the face: a pin moves a control between the
+                    // face chips and the More grid; Done applies it.
+                    let draft = view
+                        .choose
+                        .as_ref()
+                        .filter(|c| c.0 == id)
+                        .map(|c| c.1.clone());
+                    let index = |p: &kabl_modules::ParamInfo| {
+                        info.params.iter().position(|q| q.name == p.name)
+                    };
+                    let pinned = |c: &rack::Ctl| match (&draft, index(c.param)) {
+                        (Some(v), Some(i)) => v[i],
+                        _ => c.primary,
+                    };
+                    let mut toggle = None;
+                    let on_face: Vec<&'static kabl_modules::ParamInfo> = m
+                        .ctls
+                        .iter()
+                        .filter(|c| pinned(c))
+                        .map(|c| c.param)
+                        .collect();
+                    ui.horizontal(|ui| {
+                        kit::section(ui, st, "On the face");
+                        kit::label(
+                            ui,
+                            st,
+                            style::Role::Value,
+                            kit::Tone::Text2,
+                            on_face.len().to_string(),
+                        );
+                    });
+                    ui.horizontal_wrapped(|ui| {
+                        for p in &on_face {
+                            let r = ui
+                                .add(
+                                    kit::Button::new(st, routing::param_label(p))
+                                        .icon(kit::Ic::Pin)
+                                        .small(),
+                                )
+                                .on_hover_text("Unpin: move it to More");
+                            view.record(format!("more:pin:{id}:{}", p.name), r.rect);
+                            if r.clicked() {
+                                toggle = Some(*p);
+                            }
+                        }
+                    });
+                    kit::gap(ui, st, 2);
+                    let hidden: Vec<rack::Ctl> =
+                        m.ctls.iter().filter(|c| !pinned(c)).cloned().collect();
+                    ui.horizontal(|ui| {
+                        kit::section(ui, st, "More");
+                        kit::label(
+                            ui,
+                            st,
+                            style::Role::Value,
+                            kit::Tone::Text2,
+                            hidden.len().to_string(),
+                        );
+                    });
+                    // The hidden controls as a five-column grid of their own knobs and selectors.
+                    const COLS: usize = 5;
+                    const ROW: f32 = 96.0;
+                    let cell = ui.available_width() / COLS as f32;
+                    let rows = hidden.len().div_ceil(COLS);
+                    let (space, _) = ui.allocate_exact_size(
+                        egui::vec2(ui.available_width(), rows as f32 * ROW),
+                        Sense::hover(),
+                    );
                     view.record(format!("more:{id}:body"), space.intersect(ui.clip_rect()));
+                    let mut grid = m.clone();
+                    grid.ctls = hidden
+                        .iter()
+                        .enumerate()
+                        .map(|(k, c)| {
+                            let at = pos2(
+                                (k % COLS) as f32 * cell + cell * 0.5,
+                                (k / COLS) as f32 * ROW + 46.0,
+                            );
+                            let geo = match c.geo {
+                                rack::Geo::Knob { .. } => rack::Geo::Knob { c: at, r: 17.0 },
+                                rack::Geo::Select { rect } => rack::Geo::Select {
+                                    rect: Rect::from_center_size(
+                                        at,
+                                        egui::vec2(rect.width().min(cell - 12.0), rect.height()),
+                                    ),
+                                },
+                            };
+                            rack::Ctl { geo, ..c.clone() }
+                        })
+                        .collect();
                     let focus = Xf {
-                        origin: space.min - m.full().min.to_vec2() * z,
-                        zoom: z,
+                        origin: space.min,
+                        zoom: 1.0,
                     };
                     let painter = ui.painter_at(space.intersect(ui.clip_rect()));
                     let material = theme::panel_theme(&view.style, info.kind);
-                    let mut own = Drawn::default();
-                    let now = ui.input(|i| i.time);
-                    draw_module(editor, view, ui, &painter, th, focus, &m, now, &mut own);
-                    if let Some(adv) = m.adv {
-                        crate::kit::face::surface(
-                            &painter,
-                            &view.style,
-                            focus.r(adv),
-                            material.panel,
-                            material.panel_edge,
-                            focus.zoom,
-                        );
-                    }
                     let look = Look {
-                        z,
-                        ink: material.ink,
-                        ink2: material.ink2,
-                        slot: 76.0,
+                        z: 1.0,
+                        ink: st.roles.text,
+                        ink2: st.roles.text2,
+                        slot: cell,
                     };
-                    for c in m.ctls.iter().filter(|c| !c.primary) {
+                    let now = ui.input(|i| i.time);
+                    let mut own = Drawn::default();
+                    let label_font = st.font(style::Role::Label);
+                    // The grid draws its own pins: no choose-mode pins from `draw_control`.
+                    let held = view.choose.take();
+                    for c in &grid.ctls {
                         draw_control(
-                            editor, view, ui, &painter, &material, focus, &m, c, look, false, now,
-                            &mut own,
+                            editor, view, ui, &painter, &material, focus, &grid, c, look, false,
+                            now, &mut own,
                         );
+                        if let rack::Geo::Select { .. } = c.geo {
+                            painter.text(
+                                focus.p(c.geo.label_pos()),
+                                egui::Align2::CENTER_CENTER,
+                                routing::param_label(c.param),
+                                label_font.clone(),
+                                st.roles.text,
+                            );
+                        }
+                        // The pin beside the label puts it back on the face.
+                        let w = ui.fonts_mut(|f| {
+                            f.layout_no_wrap(
+                                routing::param_label(c.param).to_string(),
+                                label_font.clone(),
+                                st.roles.text,
+                            )
+                            .size()
+                            .x
+                        });
+                        let at = focus.p(c.geo.label_pos()) + egui::vec2(w * 0.5 + 12.0, 0.0);
+                        let r = Rect::from_center_size(at, egui::vec2(20.0, 20.0));
+                        let resp = ui
+                            .interact(r, Id::new(("more-pin", id, c.param.name)), Sense::click())
+                            .on_hover_text("Pin to the face");
+                        view.record(format!("more:pin:{id}:{}", c.param.name), r);
+                        let ink = if resp.hovered() {
+                            st.roles.text
+                        } else {
+                            st.roles.text2
+                        };
+                        kit::icon(&painter, kit::Ic::Pin, at, 13.0, ink);
+                        if resp.clicked() {
+                            toggle = Some(c.param);
+                        }
                     }
-                    let mut both = Drawn {
-                        ports: drawn.ports.clone(),
-                        plugs: own.plugs.clone(),
-                        drop_at: None,
-                    };
-                    both.ports.extend(own.ports.clone());
-                    let plugs =
-                        draw_cables(editor, view, ui, &painter, th, xf, scene, &both, Some(id));
-                    painter.extend(plugs);
+                    view.choose = held;
                     painter.extend(std::mem::take(&mut view.deferred));
                     drawn.ports.extend(own.ports);
-                    drawn.plugs.extend(own.plugs);
-                    if own.drop_at.is_some() {
-                        drawn.drop_at = own.drop_at;
-                    }
-                    let entry = egui::CollapsingHeader::new("Keyboard / exact value entry").show(
-                        ui,
-                        |ui| {
-                            for c in &m.ctls {
-                                ui.horizontal(|ui| {
-                                    ui.label(routing::param_label(c.param));
-                                    perform::param_editor(
-                                        editor,
-                                        view,
-                                        ui,
-                                        id,
-                                        c.param,
-                                        false,
-                                        Some(format!("more:value:{id}:{}", c.param.name)),
-                                    );
-                                });
+                    if let Some(p) = toggle {
+                        let on = m.ctls.iter().any(|c| c.param.name == p.name && pinned(c));
+                        let set = &mut view.choose.get_or_insert_with(|| (id, face.clone())).1;
+                        // Every bank of a sequencer shares the slot's choice.
+                        let slot = rack::face_name(info, p.name);
+                        for (k, q) in info.params.iter().enumerate() {
+                            if rack::face_name(info, q.name) == slot {
+                                set[k] = !on;
                             }
-                        },
-                    );
-                    view.record("more:exact".into(), entry.header_response.rect);
+                        }
+                    }
+                    // Keyboard entry: an exact value for every control.
+                    if keys {
+                        kit::gap(ui, st, 2);
+                        kit::section(ui, st, "Keyboard entry");
+                        for c in &m.ctls {
+                            ui.horizontal(|ui| {
+                                let (r, _) = ui.allocate_exact_size(
+                                    egui::vec2(140., st.metrics.control_h),
+                                    Sense::hover(),
+                                );
+                                ui.painter().text(
+                                    r.left_center(),
+                                    egui::Align2::LEFT_CENTER,
+                                    routing::param_label(c.param),
+                                    st.font(style::Role::Body),
+                                    st.roles.text2,
+                                );
+                                perform::param_editor(
+                                    editor,
+                                    view,
+                                    ui,
+                                    id,
+                                    c.param,
+                                    false,
+                                    Some(format!("more:value:{id}:{}", c.param.name)),
+                                );
+                            });
+                        }
+                    }
                 });
+            kit::gap(ui, st, 1);
+            kit::rule(ui, st);
+            ui.horizontal(|ui| {
+                ui.set_height(52.);
+                let r = ui.add(
+                    kit::Button::new(st, "Keyboard entry…")
+                        .ghost()
+                        .selected(keys),
+                );
+                view.record("more:exact".into(), r.rect);
+                if r.clicked() {
+                    keys = !keys;
+                    view.more_tab = 0;
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let r = ui.add(kit::Button::new(st, "Done").primary());
+                    view.record(
+                        if view.more_tab == 1 {
+                            "face:apply".into()
+                        } else {
+                            "more:done".into()
+                        },
+                        r.rect,
+                    );
+                    let enter = ui.input(|i| i.key_pressed(egui::Key::Enter))
+                        && ui.ctx().memory(|mem| mem.focused().is_none());
+                    done = r.clicked() || enter;
+                });
+            });
         });
+    ctx.data_mut(|d| d.insert_temp(keys_id, keys));
     view.record("more:dialog".into(), modal.response.rect);
-    if close || (modal.should_close() && view.drag.is_none()) {
+    if done && view.choose.as_ref().is_some_and(|c| c.0 == id) {
+        if let Some((cid, visible)) = view.choose.take() {
+            let order = view.face_order.take();
+            if let Err(e) = apply_face(editor, cid, &visible, order.as_deref()) {
+                view.last_message = Some(e);
+                view.choose = Some((cid, visible));
+                view.face_order = order;
+                return;
+            }
+        }
+    }
+    if done || close || (modal.should_close() && view.drag.is_none()) {
+        view.choose = None;
+        view.face_order = None;
         view.expanded.clear();
         view.last_inspected = view.inspected.clone();
         view.lanes_shown = inspected_extent(editor, view, scene).map(|(_, key)| key);
@@ -542,80 +742,161 @@ pub(crate) fn more(
     }
 }
 
-pub(crate) fn edit_face(editor: &mut PatchEditor, view: &mut UiState, ctx: &egui::Context) {
-    let Some((id, mut visible)) = view.choose.take() else {
-        return;
-    };
-    let Some(m) = editor.state().modules.get(&id) else {
-        return;
-    };
-    let Some(info) = registry::info_for(&m.kind) else {
+/// The Face layout tab: which controls the module's face shows, and their order. Edits the
+/// pending draft in `view.choose` / `view.face_order`; Done applies it.
+fn face_layout(
+    view: &mut UiState,
+    ui: &mut egui::Ui,
+    st: &crate::style::Style,
+    id: ModuleId,
+    info: &'static kabl_modules::ModuleInfo,
+    m: &kabl_core::ModuleState,
+) {
+    let Some(mut visible) = view.choose.as_ref().map(|c| c.1.clone()) else {
         return;
     };
     let mut order = view
         .face_order
         .take()
         .unwrap_or_else(|| rack::control_order(m, info));
-    let mut done = false;
-    let mut cancel = false;
-    egui::Window::new(format!("Edit face · {}",info.name)).id(Id::new("native-edit-face")).default_width(420.).default_height(380.).max_height(ctx.content_rect().height()-100.).default_pos(ctx.content_rect().center()-vec2(210.,180.)).collapsible(false).vscroll(true).show(ctx,|ui|{
-        ui.label("Normally visible controls. Hidden controls remain in More controls. Order applies within knob/selector rows.");
-        for n in 0..order.len() {
-            let index=order[n];let p=&info.params[index];if rack::face_name(info,p.name)!=p.name {continue;}
-            ui.horizontal(|ui|{
-                let r=ui.checkbox(&mut visible[index],routing::param_label(p));view.record(format!("face:{id}:{}",p.name),r.rect);
-                let r=ui.add_enabled(n>0,egui::Button::new("↑"));view.record(format!("face:up:{id}:{}",p.name),r.rect);if r.clicked(){order.swap(n,n-1);}
-                let r=ui.add_enabled(n+1<order.len(),egui::Button::new("↓"));view.record(format!("face:down:{id}:{}",p.name),r.rect);if r.clicked(){order.swap(n,n+1);}
-            });
+    kit::paragraph(
+        ui,
+        st,
+        style::Role::Label,
+        kit::Tone::Text2,
+        "Ticked controls show on the face, in this order (within each row of knobs or \
+         selectors). The rest stay under More controls.",
+    );
+    kit::gap(ui, st, 1);
+    // The row being dragged by its grip (a position in `order`), and every row's rect.
+    let drag_id = Id::new(("face-drag", id));
+    let dragging: Option<usize> = ui.data(|d| d.get_temp(drag_id));
+    let mut rows: Vec<(usize, Rect)> = Vec::new();
+    for (n, &index) in order.iter().enumerate() {
+        let p = &info.params[index];
+        if rack::face_name(info, p.name) != p.name {
+            continue;
         }
-        ui.horizontal(|ui|{
-            let r=ui.button("Apply / Undoable");view.record("face:apply".into(),r.rect);done=r.clicked();
-            if ui.button("Restore defaults").clicked(){visible=info.params.iter().map(|p|!info.advanced.contains(&rack::face_name(info,p.name))).collect();order=(0..info.params.len()).collect();}
-            cancel=ui.button("Cancel").clicked()||ui.input(|i|i.key_pressed(egui::Key::Escape));
-        });
-    });
-    if done {
-        let before = editor.state().clone();
-        let mut candidate = before.clone();
-        let module = candidate.modules.get_mut(&id).unwrap();
-        module
-            .params
-            .retain(|k, _| !k.starts_with(rack::FACE_PREFIX));
-        for (i, p) in info.params.iter().enumerate() {
-            let name = rack::face_name(info, p.name);
-            if name != p.name {
-                continue;
+        let row = ui.horizontal(|ui| {
+            let (g, gr) = ui.allocate_exact_size(vec2(14.0, st.metrics.control_h), Sense::drag());
+            let hot = gr.hovered() || gr.dragged();
+            kit::icon(
+                ui.painter(),
+                kit::Ic::Grip,
+                g.center(),
+                st.metrics.icon,
+                if hot { st.roles.text } else { st.roles.text2 },
+            );
+            view.record(format!("face:grip:{id}:{}", p.name), g);
+            if gr.drag_started() {
+                ui.data_mut(|d| d.insert_temp(drag_id, n));
             }
-            let default = !info.advanced.contains(&name);
-            if visible[i] != default {
+            gr.on_hover_cursor(egui::CursorIcon::Grab)
+                .on_hover_text("Drag to reorder");
+            let r = kit::g4::checkbox(ui, st, &mut visible[index], &routing::param_label(p));
+            view.record(format!("face:{id}:{}", p.name), r.rect);
+        });
+        rows.push((n, row.response.rect));
+    }
+    // While a grip is dragged: an accent line where the row lands; the release moves it.
+    if let Some(from) = dragging {
+        let (pos, released, held, esc) = ui.input(|i| {
+            (
+                i.pointer.latest_pos(),
+                i.pointer.any_released(),
+                i.pointer.any_down(),
+                i.key_pressed(egui::Key::Escape),
+            )
+        });
+        let target = pos.and_then(|p| {
+            rows.iter()
+                .find(|(_, rc)| p.y < rc.bottom())
+                .or(rows.last())
+                .copied()
+        });
+        if let Some((to, rc)) = target.filter(|t| t.0 != from) {
+            let y = if to > from {
+                rc.bottom() + 2.0
+            } else {
+                rc.top() - 2.0
+            };
+            ui.painter()
+                .hline(rc.x_range(), y, Stroke::new(2.0, st.roles.accent));
+            if released {
+                let moved = order.remove(from);
+                order.insert(to, moved);
+            }
+        }
+        if released || !held || esc {
+            ui.data_mut(|d| d.remove::<usize>(drag_id));
+        }
+        ui.ctx().request_repaint();
+    }
+    kit::gap(ui, st, 1);
+    let r = ui.add(kit::Button::new(st, "Restore defaults").ghost());
+    view.record("face:restore".into(), r.rect);
+    if r.clicked() {
+        visible = info
+            .params
+            .iter()
+            .map(|p| !info.advanced.contains(&rack::face_name(info, p.name)))
+            .collect();
+        order = (0..info.params.len()).collect();
+    }
+    view.choose = Some((id, visible));
+    view.face_order = Some(order);
+}
+
+/// Writes a face draft (which controls show, their order) to module `id` as one undoable
+/// presentation edit. Errors when the module's saved settings would pass the 256 limit.
+fn apply_face(
+    editor: &mut PatchEditor,
+    id: ModuleId,
+    visible: &[bool],
+    order: Option<&[usize]>,
+) -> Result<(), String> {
+    let before = editor.state().clone();
+    let Some(info) = before
+        .modules
+        .get(&id)
+        .and_then(|m| registry::info_for(&m.kind))
+    else {
+        return Ok(());
+    };
+    let mut candidate = before.clone();
+    let module = candidate.modules.get_mut(&id).unwrap();
+    module
+        .params
+        .retain(|k, _| !k.starts_with(rack::FACE_PREFIX));
+    for (i, p) in info.params.iter().enumerate() {
+        let name = rack::face_name(info, p.name);
+        if name != p.name {
+            continue;
+        }
+        let default = !info.advanced.contains(&name);
+        if visible[i] != default {
+            module
+                .params
+                .insert(rack::face_key(name), if visible[i] { 1. } else { 0. });
+        }
+    }
+    if let Some(order) = order.filter(|o| o.iter().copied().ne(0..info.params.len())) {
+        for (rank, &index) in order.iter().enumerate() {
+            let name = rack::face_name(info, info.params[index].name);
+            if name == info.params[index].name && rank != index {
                 module
                     .params
-                    .insert(rack::face_key(name), if visible[i] { 1. } else { 0. });
+                    .insert(format!("face.order.{name}"), rank as f32);
             }
         }
-        if order.iter().copied().ne(0..info.params.len()) {
-            for (rank, &index) in order.iter().enumerate() {
-                let name = rack::face_name(info, info.params[index].name);
-                if name == info.params[index].name && rank != index {
-                    module
-                        .params
-                        .insert(format!("face.order.{name}"), rank as f32);
-                }
-            }
-        }
-        if module.params.len() > 256 {
-            view.last_message=Some("Face settings exceed per-module saved parameter limit (256). Restore defaults or remove custom settings.".into());
-            view.choose = Some((id, visible));
-            view.face_order = Some(order);
-            return;
-        }
-        if let Some(ops) = compare::diff(&before, &candidate) {
-            editor.restore_to(ops);
-        }
-    } else if !cancel {
-        view.choose = Some((id, visible));
-        view.face_order = Some(order);
     }
+    if module.params.len() > 256 {
+        return Err("Face settings exceed per-module saved parameter limit (256). Restore defaults or remove custom settings.".into());
+    }
+    if let Some(ops) = compare::diff(&before, &candidate) {
+        editor.restore_to(ops);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -836,7 +1117,8 @@ mod tests {
             "tall content genuinely needs scrolling"
         );
         let camera = (v.pan, v.zoom);
-        let p = pos2(dialog.left() + 30., dialog.bottom() - 40.);
+        // Over the scrolling body, above the dialog's footer.
+        let p = pos2(dialog.left() + 30., dialog.bottom() - 110.);
         frame_size(
             &ctx,
             &mut e,

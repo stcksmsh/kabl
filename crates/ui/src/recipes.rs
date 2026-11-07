@@ -403,36 +403,84 @@ fn test_note(ui_state: &mut UiState, secs: f32) {
 
 /// The drawer section.
 pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, now: f64) {
-    ui.horizontal(|ui| {
-        ui.strong("Listening recipes");
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let r = ui.small_button("Close");
-            ui_state.record("learn-close".into(), r.rect);
-            if r.clicked() {
-                // Keeps the current patch and its edits.
-                ui_state.recipes.open = false;
-                ui_state.recipes.active = None;
-            }
-        });
-    });
+    let st = ui_state.style.clone();
+    let kb = |t: String| crate::kit::Button::new(&st, t).g4(28.0);
+    crate::kit::label(
+        ui,
+        &st,
+        crate::style::Role::H3,
+        crate::kit::Tone::Text,
+        "Listening recipes",
+    );
     if let Some(n) = ui_state.recipes.note.clone() {
         para(ui, n);
     }
     let Some(a) = ui_state.recipes.active.clone() else {
-        weak(
+        crate::kit::label(
             ui,
-            "Optional. Each opens its own patch (you are asked first if your sound has unsaved \
-             changes). Leave any time: your patch stays as it is.",
+            &st,
+            crate::style::Role::Body,
+            crate::kit::Tone::Text2,
+            "Each opens in its own patch. Yours stays as it is.",
+        )
+        .on_hover_text(
+            "Optional. You are asked first if your sound has unsaved changes. Leave any time: \
+             your patch stays as it is.",
         );
+        ui.add_space(8.0);
         for (i, r) in RECIPES.iter().enumerate() {
-            ui.horizontal_wrapped(|ui| {
-                let b = ui.button(r.title).on_hover_text(r.intent);
-                ui_state.record(format!("recipe:{}", r.key), b.rect);
-                if b.clicked() {
-                    start(editor, ui_state, i);
-                }
-                weak(ui, r.intent);
-            });
+            // g4-surfaces.html Learn card: 72 px, radius 8, title 14/600 at +26, line 12 at +48,
+            // step count in mono at the right.
+            let (rect, resp) = ui
+                .allocate_exact_size(egui::vec2(ui.available_width(), 72.0), egui::Sense::click());
+            let hover = resp.hovered();
+            let p = ui.painter();
+            p.rect(
+                rect,
+                egui::CornerRadius::same(8),
+                if hover {
+                    st.roles.line
+                } else {
+                    st.roles.raised
+                },
+                egui::Stroke::new(1.0, st.roles.line),
+                egui::StrokeKind::Inside,
+            );
+            let semi = crate::style::Font::SansSemibold.family(st.fonts_ready);
+            p.text(
+                rect.min + egui::vec2(12.0, 26.0 - 14.0 * 0.36),
+                egui::Align2::LEFT_CENTER,
+                r.title,
+                egui::FontId::new(14.0, semi),
+                st.roles.text,
+            );
+            let mut job = egui::text::LayoutJob::simple(
+                r.intent.to_string(),
+                egui::FontId::new(12.0, st.font(crate::style::Role::Body).family),
+                st.roles.text2,
+                rect.width() - 24.0,
+            );
+            job.wrap.max_rows = 1;
+            job.wrap.break_anywhere = true;
+            let galley = p.layout_job(job);
+            p.galley(
+                rect.min + egui::vec2(12.0, 48.0 - galley.size().y / 2.0 - 12.0 * 0.36 + 2.0),
+                galley,
+                st.roles.text2,
+            );
+            p.text(
+                egui::pos2(rect.max.x - 12.0, rect.min.y + 26.0 - 11.0 * 0.36),
+                egui::Align2::RIGHT_CENTER,
+                format!("{} steps", r.steps.len()),
+                st.font(crate::style::Role::Value),
+                st.roles.text3,
+            );
+            let resp = resp.on_hover_text(r.intent);
+            ui_state.record(format!("recipe:{}", r.key), rect);
+            if resp.clicked() {
+                start(editor, ui_state, i);
+            }
+            ui.add_space(8.0);
         }
         return;
     };
@@ -445,7 +493,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
              you. Your current sound is untouched.",
         );
         ui.horizontal(|ui| {
-            let b = ui.button("Open the recipe patch again");
+            let b = ui.add(kb("Open the recipe patch again".into()));
             ui_state.record("recipe-reopen".into(), b.rect);
             if b.clicked() {
                 start(editor, ui_state, a.recipe);
@@ -482,14 +530,14 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         ui.horizontal_wrapped(|ui| {
             if let Some((Some(t), _)) = resolved.clone() {
                 let b = ui
-                    .button("Show")
+                    .add(kb("Show".into()))
                     .on_hover_text("Bring it into view (no change to the sound)");
                 ui_state.record("recipe-show".into(), b.rect);
                 if b.clicked() {
                     explain::go(editor, ui_state, t, now);
                 }
                 if explain::can_go_back(&ui_state.explain) {
-                    let b = ui.button("Back");
+                    let b = ui.add(kb("Back".into()));
                     ui_state.record("recipe-back".into(), b.rect);
                     if b.clicked() {
                         explain::back(ui_state, now);
@@ -502,7 +550,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                     .modules
                     .get(&id)
                     .is_some_and(|m| m.kind == kind);
-                let b = ui.add_enabled(ok, egui::Button::new(format!("Inspect #{id} {port}")));
+                let b = ui.add_enabled(ok, kb(format!("Inspect #{id} {port}")));
                 ui_state.record("recipe-inspect".into(), b.rect);
                 if b.clicked() {
                     ui_state.selected_module = Some(id);
@@ -517,7 +565,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             }
             if let Some(secs) = s.note_secs {
                 let b = ui
-                    .button(format!("Play test note ({secs:.0} s)"))
+                    .add(kb(format!("Play test note ({secs:.0} s)")))
                     .on_hover_text("Middle C, same length and velocity every time");
                 ui_state.record("recipe-note".into(), b.rect);
                 if b.clicked() {
@@ -525,7 +573,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                 }
             }
             if s.compare {
-                let b = ui.button("Open Compare");
+                let b = ui.add(kb("Open Compare".into()));
                 ui_state.record("recipe-compare".into(), b.rect);
                 if b.clicked() {
                     ui_state.compare.open = true;
@@ -535,18 +583,20 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         });
     }
     ui.horizontal(|ui| {
-        let b = ui.add_enabled(a.step > 0, egui::Button::new("← Previous"));
+        let b = ui.add_enabled(a.step > 0, kb("Previous".into()).ghost());
         ui_state.record("recipe-prev".into(), b.rect);
         if b.clicked() {
             step_to(ui_state, a.step - 1);
         }
         let b = ui.add_enabled(
             a.step < n,
-            egui::Button::new(if a.step + 1 == n {
-                "Try on your own →"
+            kb(if a.step + 1 == n {
+                "Try on your own"
             } else {
-                "Next →"
-            }),
+                "Next"
+            }
+            .into())
+            .primary(),
         );
         ui_state.record("recipe-next".into(), b.rect);
         if b.clicked() {

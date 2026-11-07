@@ -54,6 +54,8 @@ use crate::module::{Module, QualityConfig, StateReader, StateWriter};
 pub const STEPS: usize = 32;
 /// The steps every older patch has; steps past it append after all older params.
 const OLD_STEPS: usize = 8;
+/// Steps per page: a face and a drawer grid show this many at a time (PAGE 1-4).
+pub const PAGE_STEPS: usize = OLD_STEPS;
 const EXTRA: usize = STEPS - OLD_STEPS;
 #[macro_use]
 mod steps {
@@ -149,7 +151,7 @@ const fn length(name: &'static str) -> ParamInfo {
         min: 1.0,
         max: STEPS as f32,
         default: OLD_STEPS as f32,
-        unit: "",
+        unit: "steps",
         taper: Taper::Stepped,
         smoothing_ms: 0.0,
     }

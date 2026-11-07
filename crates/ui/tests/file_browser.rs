@@ -409,23 +409,74 @@ fn a_picked_image_reaches_the_panel_authoring_path_field() {
 }
 
 #[test]
-fn opening_a_patch_folder_remembers_the_folder_it_was_in() {
+fn opening_a_patch_picks_it_with_the_open_button_and_remembers_its_folder() {
     let dir = tree();
+    std::fs::create_dir(dir.path().join("warm")).unwrap();
+    std::fs::write(dir.path().join("warm/meta.toml"), b"x").unwrap();
     let mut h = H::new();
     h.open(
         Purpose::PatchLoad,
-        Mode::Folder,
-        filebrowser::FOLDERS,
+        Mode::Open,
+        filebrowser::PATCHES,
         "",
         dir.path(),
     );
-    h.wait_for("fb:dir:sub");
-    h.click("fb:dir:sub");
-    h.wait_for("fb:choose");
-    h.click("fb:choose");
+    // A folder without meta.toml is a folder; one with it is a patch.
+    h.wait_for("fb:patch:warm");
+    assert!(h.has("fb:dir:sub") && !h.has("fb:dir:warm"));
+    // A click selects; only Open picks.
+    h.click("fb:patch:warm");
+    assert_eq!(filebrowser::take(&mut h.ui, Purpose::PatchLoad), None);
+    h.click("fb:open");
     assert_eq!(
         filebrowser::take(&mut h.ui, Purpose::PatchLoad),
-        Some(dir.path().join("sub"))
+        Some(dir.path().join("warm"))
     );
     assert_eq!(h.ui.folders.get("patches"), Some(&dir.path().to_path_buf()));
+}
+
+#[test]
+fn a_real_kabl_file_is_listed_as_it_is_and_hides_the_folder_it_replaces() {
+    let dir = tree();
+    std::fs::create_dir(dir.path().join("warm")).unwrap();
+    std::fs::write(dir.path().join("warm/meta.toml"), b"x").unwrap();
+    std::fs::create_dir(dir.path().join("old")).unwrap();
+    std::fs::write(dir.path().join("old/meta.toml"), b"x").unwrap();
+    std::fs::write(dir.path().join("warm.kabl"), b"x").unwrap();
+    std::fs::write(dir.path().join("lead.kabl"), b"x").unwrap();
+    let mut h = H::new();
+    h.open(
+        Purpose::PatchLoad,
+        Mode::Open,
+        filebrowser::PATCHES,
+        "",
+        dir.path(),
+    );
+    h.wait_for("fb:patch:lead.kabl");
+    assert!(h.has("fb:patch:warm.kabl") && h.has("fb:patch:old"));
+    assert!(!h.has("fb:patch:warm"), "the real file replaces the folder");
+    h.click("fb:patch:lead.kabl");
+    h.click("fb:open");
+    assert_eq!(
+        filebrowser::take(&mut h.ui, Purpose::PatchLoad),
+        Some(dir.path().join("lead.kabl"))
+    );
+}
+
+#[test]
+fn saving_a_patch_names_a_kabl_file() {
+    let dir = tree();
+    let mut h = H::new();
+    h.open(
+        Purpose::PatchSave,
+        Mode::Save,
+        filebrowser::PATCHES,
+        "mine",
+        dir.path(),
+    );
+    h.click("fb:save");
+    assert_eq!(
+        filebrowser::take(&mut h.ui, Purpose::PatchSave),
+        Some(dir.path().join("mine.kabl"))
+    );
 }

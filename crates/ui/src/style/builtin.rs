@@ -82,7 +82,7 @@ pub fn builtin_a(dark: bool) -> Style {
             rack: RackSurface::Plain,
             knob: KnobSlots {
                 body: KnobBody::Cap,
-                scale: KnobScale::Ticks,
+                scale: KnobScale::TrackArc,
                 value: KnobValue::Line,
                 modulation: KnobMod::ArcDot,
                 glow: 0.0,

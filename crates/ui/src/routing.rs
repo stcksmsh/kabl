@@ -33,6 +33,8 @@ const LANE_GAP: f32 = 7.0;
 /// Collapsed per-source rings: at most this many, this far apart, inside the ring band.
 const MINI_LANES: usize = 4;
 const MINI_GAP: f32 = 2.5;
+/// Longest time the lanes take to open or close, in ms.
+const LANES_MS: f32 = 180.0;
 
 const BYPASS_GREY: Color32 = Color32::from_gray(120);
 
@@ -302,6 +304,30 @@ pub fn face_label(kind: &str, p: &ParamInfo) -> String {
     crate::rack::short_name(kind, p.name).map_or_else(|| param_label(p), str::to_string)
 }
 
+/// The mockup's short face labels for the compact tier (zoom below the full-text tier), where
+/// a knob's column is too narrow for the full word. Decay is shortened on the ADSR only, where
+/// four knobs share the row.
+pub fn compact_label(kind: &str, label: &str) -> Option<&'static str> {
+    Some(match label {
+        "Attack" => "Atk",
+        "Damping" => "Damp",
+        "Decay" if kind == "env.adsr" => "Dec",
+        "Feedback" => "Fdbk",
+        "Frequency" => "Freq",
+        "Gate length" => "Gate",
+        "Length" => "Len",
+        "Pulse width" => "PW",
+        "Release" => "Rel",
+        "Resonance" => "Res",
+        "Sustain" => "Sus",
+        "Level 1" => "Lv 1",
+        "Level 2" => "Lv 2",
+        "Level 3" => "Lv 3",
+        "Level 4" => "Lv 4",
+        _ => return None,
+    })
+}
+
 /// Human label for a param name: `attack_ms` → `Attack`. A sequencer bank param is labelled
 /// by its slot (`c.v2` → `V2`), as on the face.
 pub fn param_label(p: &ParamInfo) -> String {
@@ -316,7 +342,7 @@ pub fn param_label(p: &ParamInfo) -> String {
         match slot {
             "bank" => return "Startup".into(),
             "direction" => return "Direction".into(),
-            "gate_len" => return "Gate len".into(),
+            "gate_len" => return "Gate length".into(),
             _ => slot,
         }
     } else {
@@ -399,6 +425,7 @@ pub fn fmt_value(p: &ParamInfo, v: f32) -> String {
         "ct" => format!("{:+.0} ct", v.round() + 0.0),
         "x" => format!("{}X", v.round()),
         "bands" => format!("{}", v.round()),
+        "steps" => format!("{} steps", v.round()),
         "note" => {
             const NAMES: [&str; 12] = [
                 "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
@@ -699,6 +726,15 @@ pub(crate) fn param_knob(
     }
     let key = format!("{id}.{}", param.name);
     let inspected = ui_state.inspected.as_ref() == Some(&(id, param.name.to_string()));
+    // How far the source lanes are open: 0 = collapsed arcs hugging the ring, 1 = the full,
+    // draggable lanes of an inspected knob. A short ease-out; a theme with no drawer motion
+    // opens them at once.
+    let open = ui.ctx().animate_bool_with_time_and_easing(
+        Id::new(("kabl-lanes-open", id, param.name)),
+        inspected,
+        crate::style::Style::secs(ui_state.style.motion.drawer.min(LANES_MS)),
+        egui::emath::easing::cubic_out,
+    );
 
     let rs = r * z;
     let rect = Rect::from_center_size(center, EguiVec2::splat((r + RING_OUTER) * z * 2.0));
@@ -790,14 +826,13 @@ pub(crate) fn param_knob(
             value: base_n,
             hot,
         },
-        th.tick,
     );
 
     // Collapsed knob with several sources: one thin ring per source (display only; pressing
     // opens the editable lanes). Otherwise: combined reachable range, the selected route's own
     // span on top + its peak dot.
     let rr = (r + RING_DRAW) * z;
-    if routes.len() >= 2 && !inspected {
+    if routes.len() >= 2 && open == 0.0 {
         for (k, rt) in routes.iter().take(MINI_LANES).enumerate() {
             let radius = (r + RING_INNER + 1.0 + MINI_GAP * k as f32) * z;
             let (lo, hi) = route_span(rt, base_n);
@@ -934,8 +969,13 @@ pub(crate) fn param_knob(
         }
     }
 
-    // Label above, value below (a pill with a coloured edge when modulated).
-    if let Some(font) = crate::kit::face::face_font(&ui_state.style, crate::style::Role::Label, z) {
+    // Label above, value below (a pill with a coloured edge when modulated). A sequencer step's
+    // pitch has no label: the face draws the step number higher up (G4 mockup).
+    let seq_step = SEQ_INFO.params.iter().any(|q| std::ptr::eq(q, param))
+        && seq::slot_name(param.name).starts_with('p');
+    if let Some(font) = crate::kit::face::face_font(&ui_state.style, crate::style::Role::Label, z)
+        .filter(|_| !seq_step)
+    {
         painter.text(
             center - EguiVec2::new(0.0, crate::rack::knob_text_dy(r, z, font.size * 1.075)),
             egui::Align2::CENTER_CENTER,
@@ -945,15 +985,19 @@ pub(crate) fn param_knob(
                     .modules
                     .get(&id)
                     .map_or("", |m| m.kind.as_str());
-                face_label(kind, param)
+                let full = face_label(kind, param);
+                if z < crate::kit::face::FULL_FROM {
+                    compact_label(kind, &full).map_or(full, str::to_string)
+                } else {
+                    full
+                }
             }),
             font,
             look.ink,
         );
     }
     let value = fmt_value(param, base);
-    let vh = crate::kit::face::face_font(&ui_state.style, crate::style::Role::Value, z)
-        .map_or(0.0, |f| f.size * 1.075);
+    let vh = crate::kit::face::selector_font(&ui_state.style, z).map_or(0.0, |f| f.size * 1.075);
     let vpos = center + EguiVec2::new(0.0, crate::rack::knob_text_dy(r, z, vh));
     // Line panels: values read in the dimmer text colour (G1b target).
     let value_ink = if ui_state.style.slots.face.material == crate::style::FaceMaterial::Line {
@@ -1060,9 +1104,9 @@ pub(crate) fn param_knob(
         );
     }
 
-    if inspected && !routes.is_empty() {
+    if open > 0.0 && !routes.is_empty() {
         source_lanes(
-            editor, ui_state, ui, id, param, center, r, z, base_n, &routes,
+            editor, ui_state, ui, id, param, center, r, z, base_n, &routes, open, inspected,
         );
     }
     plugs
@@ -1074,6 +1118,14 @@ fn arc_points(center: Pos2, radius: f32, n0: f32, n1: f32) -> Vec<Pos2> {
     (0..=steps)
         .map(|i| on_circle(center, radius, a0 + (a1 - a0) * i as f32 / steps as f32))
         .collect()
+}
+
+/// Unzoomed radius of lane `k` around a knob of radius `r`, `open` of the way (0..=1) from its
+/// collapsed arc inside the knob's ring band to its full lane outside it.
+fn lane_radius(r: f32, k: usize, open: f32) -> f32 {
+    let mini = r + RING_INNER + 1.0 + MINI_GAP * k.min(MINI_LANES - 1) as f32;
+    let full = r + RING_OUTER + LANE_GAP * (k as f32 + 1.0);
+    mini + (full - mini) * open
 }
 
 /// Unzoomed radius of the backdrop behind `n` source lanes around a knob of radius `r`.
@@ -1097,21 +1149,23 @@ fn source_lanes(
     z: f32,
     base_n: f32,
     routes: &[RouteView],
+    open: f32,
+    inspected: bool,
 ) {
-    let lane_radius = |k: usize| (r + RING_OUTER + LANE_GAP * (k as f32 + 1.0)) * z;
+    let lane_radius = |k: usize| lane_radius(r, k, open) * z;
     let canvas = ui.clip_rect();
     let top = ui
         .ctx()
         .layer_painter(egui::LayerId::new(
-            egui::Order::Foreground,
+            egui::Order::Middle,
             Id::new(("kabl-lanes", id, param.name)),
         ))
         .with_clip_rect(canvas);
-    let outer = lanes_outer(r, routes.len()) * z;
+    let outer = (r + RING_OUTER + (lanes_outer(r, routes.len()) - r - RING_OUTER) * open) * z;
     top.circle_filled(
         center,
         outer,
-        crate::style::alpha(ui_state.style.roles.surface, 215),
+        crate::style::alpha(ui_state.style.roles.surface, (215.0 * open) as u8),
     );
     for (k, rt) in routes.iter().enumerate() {
         let radius = lane_radius(k);
@@ -1136,8 +1190,16 @@ fn source_lanes(
             radius,
             lo.clamp(0.0, 1.0),
             hi.clamp(0.0, 1.0),
-            Stroke::new(if selected { 4.0 } else { 2.5 } * z.max(0.7), color),
+            Stroke::new(
+                (1.8 + (if selected { 2.2 } else { 0.7 }) * open) * z.max(0.7),
+                color,
+            ),
         );
+        // Dots only while inspected (from the first frame, wherever the lane is): a closing
+        // lane is display only.
+        if !inspected {
+            continue;
+        }
         let peak = (base_n + rt.amount * rt.src.1).clamp(0.0, 1.0);
         let at = on_circle(center, radius, travel_angle(peak));
         // At least 9 px to grab, whatever the zoom.
@@ -1152,7 +1214,7 @@ fn source_lanes(
         }
         ui_state.record(format!("lane:{}", rt.cable), hit);
         let resp = egui::Area::new(Id::new(("kabl-lane", rt.cable)))
-            .order(egui::Order::Foreground)
+            .order(egui::Order::Middle)
             .fixed_pos(hit.min)
             .constrain(false)
             .show(ui.ctx(), |ui| {
@@ -1331,9 +1393,7 @@ pub(crate) fn stepped_selector(
                 egui::StrokeKind::Inside,
             );
         }
-        if let Some(font) =
-            crate::kit::face::face_font(&ui_state.style, crate::style::Role::Value, z)
-        {
+        if let Some(font) = crate::kit::face::selector_font(&ui_state.style, z) {
             painter.text(
                 r.center(),
                 egui::Align2::CENTER_CENTER,
@@ -1406,24 +1466,35 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
     };
     let base = base_value(editor.state(), id, param);
     let routes = routes_into(editor.state(), id, param.name);
+    let st = ui_state.style.clone();
+    let st = &*st;
 
-    ui.separator();
-    let head = ui.horizontal_wrapped(|ui| {
-        ui.heading(format!("{} · {kind} #{id}", target_label(param)));
-        let r = ui
-            .small_button("Explain")
-            .on_hover_text("What this control does, its base value and what moves it");
-        ui_state.record(format!("explain-control:{id}.{pname}"), r.rect);
-        if r.clicked() {
-            crate::explain::open(
-                ui_state,
-                crate::explain::Subject::Control {
-                    id,
-                    key: pname.clone(),
-                },
-                None,
-            );
-        }
+    // Header: the control, its module chip, Explain.
+    kit::gap(ui, st, 1);
+    let head = ui.horizontal(|ui| {
+        kit::label(ui, st, Role::H3, kit::Tone::Text, target_label(param));
+        kit::tag(ui, st, &format!("{kind} #{id}"), st.roles.text2);
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let r = ui
+                .add(
+                    kit::Button::new(st, "Explain")
+                        .ghost()
+                        .small()
+                        .tone(kit::Tone::Accent),
+                )
+                .on_hover_text("What this control does, its base value and what moves it");
+            ui_state.record(format!("explain-control:{id}.{pname}"), r.rect);
+            if r.clicked() {
+                crate::explain::open(
+                    ui_state,
+                    crate::explain::Subject::Control {
+                        id,
+                        key: pname.clone(),
+                    },
+                    None,
+                );
+            }
+        });
     });
     // Just shown from an explanation: this control's routes, not the module list, in view.
     if std::mem::take(&mut ui_state.explain.scroll_to_routes) {
@@ -1431,31 +1502,27 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
     }
     if ui_state.explain.help {
         if let Some(h) = crate::help::param_help(&kind, param.name) {
-            ui.add(egui::Label::new(h).wrap());
+            kit::paragraph(ui, st, Role::Body, kit::Tone::Text, h);
         }
-        ui.add(
-            egui::Label::new(
-                egui::RichText::new(crate::help::range_text(&kind, param))
-                    .small()
-                    .weak(),
-            )
-            .wrap(),
+        kit::paragraph(
+            ui,
+            st,
+            Role::Caption,
+            kit::Tone::Text2,
+            crate::help::range_text(&kind, param),
         );
     }
+    kit::gap(ui, st, 1);
 
-    // Base value entry.
+    // Base value entry and Default.
     ui.horizontal(|ui| {
-        ui.label("Base");
+        kit::label(ui, st, Role::Body, kit::Tone::Text, "Base");
         let key = (id, pname.clone());
         if ui_state.base_text_for.as_ref() != Some(&key) {
             ui_state.base_text = fmt_value(param, base);
             ui_state.base_text_for = Some(key);
         }
-        let resp = ui.add(
-            egui::TextEdit::singleline(&mut ui_state.base_text)
-                .desired_width(80.0)
-                .id(Id::new("kabl-base-entry")),
-        );
+        let resp = kit::field(ui, st, &mut ui_state.base_text, "", None, Some(96.0));
         ui_state.record(format!("base-entry:{id}.{pname}"), resp.rect);
         if resp.lost_focus() {
             if let Some(v) = parse_value(param, &ui_state.base_text) {
@@ -1467,119 +1534,339 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
         } else if !resp.has_focus() && ui_state.base_text != fmt_value(param, base) {
             ui_state.base_text = fmt_value(param, base);
         }
-        if ui.small_button("Default").clicked() {
+        let r = ui.add(
+            kit::Button::new(st, "Default")
+                .ghost()
+                .small()
+                .tone(kit::Tone::Accent),
+        );
+        if r.clicked() {
             editor.set_param(id, param.name, param.default);
         }
     });
+    kit::gap(ui, st, 1);
 
-    if routes.is_empty() {
-        ui.label("No modulation. Drag an output jack onto the knob to add a source.");
-        return;
-    }
-
+    // The range every source together can sweep, the base and where it is now.
     let base_n = param.to_norm(base);
     let (lo, hi) = combined_span(&routes, base_n);
-    ui.label(format!(
-        "All sources: {} – {}",
-        fmt_value(param, param.from_norm(lo)),
-        fmt_value(param, param.from_norm(hi))
-    ));
-    // Exactly one status line whether or not a source is selected, so selecting one never
-    // shifts the rows below under the pointer.
-    match routes
-        .iter()
-        .find(|r| Some(r.cable) == ui_state.selected_route)
-    {
-        Some(sel) => {
-            let (a, b) = route_span(sel, base_n);
-            ui.label(format!(
-                "Selected ({}): {} – {}",
-                source_label(editor.state(), sel.from_id, &sel.from_port),
-                fmt_value(param, param.from_norm(a)),
-                fmt_value(param, param.from_norm(b))
-            ));
-        }
-        None => {
-            ui.colored_label(
-                ui_state.style.roles.warn,
-                "No source selected: click one below to edit its depth.",
+    let now = ui.input(|i| i.time);
+    let now_n =
+        crate::displays::modulated_norm(&ui_state.live, editor.state(), &routes, base_n, now)
+            .unwrap_or(base_n);
+    let w = ui.available_width();
+    kit::g4::range_bar(
+        ui,
+        st,
+        w,
+        kit::g4::Range {
+            min: 0.0,
+            max: 1.0,
+            base: base_n,
+            lo,
+            hi,
+            now: now_n,
+        },
+        |n| fmt_value(param, param.from_norm(n)),
+    );
+    kit::gap(ui, st, 1);
+
+    ui.horizontal(|ui| {
+        kit::section(ui, st, "Routes");
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            kit::label(
+                ui,
+                st,
+                Role::Value,
+                kit::Tone::Text2,
+                routes.len().to_string(),
             );
-        }
+        });
+    });
+    if routes.is_empty() {
+        kit::paragraph(
+            ui,
+            st,
+            Role::Caption,
+            kit::Tone::Text2,
+            "No modulation. Drag an output jack onto the knob, or add a source.",
+        );
     }
-    ui.small("Ranges are computed from each source's nominal range, not measured. Block rate (64 samples).");
 
     let mut remove = None;
     for rt in &routes {
+        let label = source_label(editor.state(), rt.from_id, &rt.from_port);
+        let dot = if rt.bypass {
+            BYPASS_GREY
+        } else {
+            cable_color(rt.cable)
+        };
         let selected = Some(rt.cable) == ui_state.selected_route;
-        ui.horizontal_wrapped(|ui| {
-            let label = source_label(editor.state(), rt.from_id, &rt.from_port);
-            let resp = ui.selectable_label(
-                selected,
-                // Route colours are unreadable on the selection fill.
-                egui::RichText::new(label.clone()).color(if selected {
-                    ui_state.style.roles.text
-                } else if rt.bypass {
-                    BYPASS_GREY
-                } else {
-                    cable_color(rt.cable)
-                }),
-            );
-            ui_state.record(format!("row:{}", rt.cable), resp.rect);
-            if resp.clicked() {
-                ui_state.selected_route = Some(rt.cable);
-            }
-            let mut pct = rt.amount * 100.0;
-            let resp = ui.add(
-                egui::DragValue::new(&mut pct)
-                    .range(-100.0..=100.0)
-                    .speed(0.5)
-                    .suffix(" %")
-                    .max_decimals(1),
-            );
-            ui_state.record(format!("amount:{}", rt.cable), resp.rect);
-            if resp.changed() {
-                let continuing = resp.dragged() && !resp.drag_started();
-                editor.set_route_amount(rt.cable, pct / 100.0, !continuing);
-            }
-            let resp = ui.small_button("Invert");
-            ui_state.record(format!("invert:{}", rt.cable), resp.rect);
-            if resp.clicked() {
-                editor.set_route_amount(rt.cable, -rt.amount, true);
-            }
-            let mut bypass = rt.bypass;
-            let resp = ui.checkbox(&mut bypass, "Bypass");
-            ui_state.record(format!("bypass:{}", rt.cable), resp.rect);
-            if resp.changed() {
-                editor.set_route_bypass(rt.cable, bypass);
-            }
-            let resp = ui
-                .small_button("Pattern")
-                .on_hover_text("Step pattern and pass probability for this route");
-            ui_state.record(format!("pattern:{}", rt.cable), resp.rect);
-            if resp.clicked() {
-                ui_state.cable_fn = Some(rt.cable);
-            }
-            let resp = ui.small_button("Remove");
-            ui_state.record(format!("remove:{}", rt.cable), resp.rect);
-            if resp.clicked() {
-                remove = Some(rt.cable);
-            }
-        });
+        let e = route_card(
+            ui, ui_state, "", rt.cable, &label, dot, rt.amount, rt.bypass, selected, None,
+        );
+        if e.select {
+            ui_state.selected_route = Some(rt.cable);
+        }
+        e.apply(editor, ui_state, rt.cable, rt.amount, &mut remove);
     }
+
+    // Any module output as another source.
+    let outputs = module_outputs(editor.state());
+    let w = ui.available_width();
+    let resp = ui.add(
+        kit::Button::new(st, "Add source")
+            .icon(kit::Ic::Plus)
+            .min_width(w),
+    );
+    ui_state.record(format!("route-add:{id}.{pname}"), resp.rect);
+    let mut add = None;
+    egui::Popup::menu(&resp)
+        .frame(kit::popover_frame(st))
+        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+        .width(w.min(280.0))
+        .show(|ui| {
+            egui::ScrollArea::vertical()
+                .max_height(320.0)
+                .show(ui, |ui| {
+                    for (label, from) in &outputs {
+                        if kit::menu_item(ui, st, label, false).clicked() {
+                            add = Some(from.clone());
+                            ui.close();
+                        }
+                    }
+                });
+        });
+    if let Some(from) = add {
+        let route = editor.connect_route(from, id, param.name);
+        ui_state.selected_route = Some(route);
+    }
+    kit::paragraph(
+        ui,
+        st,
+        Role::Caption,
+        kit::Tone::Text2,
+        "Ranges come from each source's nominal range, not measured audio. Block rate (64 samples).",
+    );
+
     if let Some(cable) = remove {
         editor.disconnect(cable);
         if ui_state.selected_route == Some(cable) {
             ui_state.selected_route = None;
         }
     }
-    // The selected route's depth can itself be moved, by a macro, LFO or envelope.
+    // Behind More, as in the cable editor: what moves the selected route's depth (a macro,
+    // LFO or envelope), and the patch-wide lists.
+    let more_id = more_key(id, &pname);
+    let mut more = ui.data(|d| d.get_temp::<bool>(more_id)).unwrap_or(false);
+    let r = ui.add(kit::Button::new(st, "More").ghost().small().icon(if more {
+        kit::Ic::Down
+    } else {
+        kit::Ic::Right
+    }));
+    ui_state.record(format!("route-more:{id}.{pname}"), r.rect);
+    if r.clicked() {
+        more = !more;
+        ui.data_mut(|d| d.insert_temp(more_id, more));
+    }
     if let Some(sel) = ui_state
         .selected_route
-        .filter(|c| routes.iter().any(|r| r.cable == *c))
+        .filter(|c| more && routes.iter().any(|r| r.cable == *c))
     {
-        ui.separator();
         cable_param_routes(ui, editor, ui_state, sel, kabl_engine::compile::DEPTH);
     }
+}
+
+fn more_key(id: ModuleId, param: &str) -> Id {
+    Id::new(("route-more", id, param))
+}
+
+/// The inspected control's More disclosure is open, or no control is inspected: the drawer
+/// then also shows the patch-wide lists and routes.
+pub(crate) fn more_open(ctx: &egui::Context, ui_state: &UiState) -> bool {
+    ui_state.inspected.as_ref().is_none_or(|(id, p)| {
+        ctx.data(|d| d.get_temp::<bool>(more_key(*id, p)))
+            .unwrap_or(false)
+    })
+}
+
+/// Every module output, labelled as a route source.
+fn module_outputs(state: &PatchState) -> Vec<(String, PortRef)> {
+    state
+        .modules
+        .iter()
+        .filter_map(|(&id, m)| Some((id, registry::info_for(&m.kind)?)))
+        .flat_map(|(id, info)| {
+            info.ports
+                .iter()
+                .filter(|p| p.direction == PortDirection::Output)
+                .map(move |p| {
+                    (
+                        source_label(state, id, p.name),
+                        PortRef::Module {
+                            id,
+                            port: p.name.to_string(),
+                        },
+                    )
+                })
+        })
+        .collect()
+}
+
+/// What the user did on a route card this frame.
+#[derive(Default)]
+struct CardEdit {
+    select: bool,
+    amount: Option<(f32, bool)>,
+    invert: bool,
+    bypass: Option<bool>,
+    pattern: bool,
+    remove: bool,
+}
+
+impl CardEdit {
+    /// Applies the edits to route `route`, whose amount is `amount`; a removal goes to `remove`.
+    fn apply(
+        &self,
+        editor: &mut PatchEditor,
+        ui_state: &mut UiState,
+        route: CableId,
+        amount: f32,
+        remove: &mut Option<CableId>,
+    ) {
+        if let Some((a, first)) = self.amount {
+            editor.set_route_amount(route, a, first);
+        }
+        if self.invert {
+            editor.set_route_amount(route, -amount, true);
+        }
+        if let Some(b) = self.bypass {
+            editor.set_route_bypass(route, b);
+        }
+        if self.pattern {
+            ui_state.cable_fn = Some(route);
+        }
+        if self.remove {
+            *remove = Some(route);
+        }
+    }
+}
+
+/// The source of a route: a pill with the route's colour dot. A tap selects the route.
+fn source_chip(
+    ui: &mut egui::Ui,
+    st: &crate::style::Style,
+    label: &str,
+    dot: Color32,
+) -> egui::Response {
+    let text = kit::fit_text(ui, st, label, (ui.available_width() - 34.0).max(24.0));
+    let g = ui
+        .painter()
+        .layout_no_wrap(text, st.font(Role::Label), st.roles.text);
+    let (rect, resp) =
+        ui.allocate_exact_size(EguiVec2::new(g.size().x + 30.0, 24.0), Sense::click());
+    let r = &st.roles;
+    let edge = if resp.hovered() { r.line2 } else { r.line };
+    ui.painter().rect(
+        rect,
+        12.0,
+        r.inset,
+        Stroke::new(1.0, edge),
+        egui::StrokeKind::Inside,
+    );
+    ui.painter()
+        .circle_filled(Pos2::new(rect.left() + 12.0, rect.center().y), 4.0, dot);
+    ui.painter().galley(
+        Pos2::new(rect.left() + 21.0, rect.center().y - g.size().y / 2.0),
+        g,
+        r.text,
+    );
+    resp
+}
+
+/// One route as a G4 card: the source chip, invert / bypass / pattern / remove icon buttons,
+/// an optional `note`, then the bipolar depth slider and its value. A selected card wears an
+/// accent border. `keys` prefixes the hit-test names: "" for routes into knobs, "croute-" for
+/// routes into cable parameters.
+#[allow(clippy::too_many_arguments)]
+fn route_card(
+    ui: &mut egui::Ui,
+    ui_state: &mut UiState,
+    keys: &str,
+    route: CableId,
+    label: &str,
+    dot: Color32,
+    amount: f32,
+    bypass: bool,
+    selected: bool,
+    note: Option<String>,
+) -> CardEdit {
+    let st = ui_state.style.clone();
+    let r = &st.roles;
+    let mut out = CardEdit::default();
+    egui::Frame::new()
+        .inner_margin(egui::Margin::symmetric(10, 8))
+        .corner_radius(8)
+        .fill(if selected {
+            r.raised
+        } else {
+            Color32::TRANSPARENT
+        })
+        // One stroke width either way: the frame's size includes it, and selecting a card
+        // must not move the rows under the pointer.
+        .stroke(Stroke::new(1.5, if selected { r.accent } else { r.line }))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = st.sp(1);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let b = kit::icon_button(ui, &st, kit::Ic::Trash, false, true)
+                        .on_hover_text("Remove this route");
+                    ui_state.record(format!("{keys}remove:{route}"), b.rect);
+                    out.remove = b.clicked();
+                    let b = kit::icon_button(ui, &st, kit::Ic::Wave, false, true)
+                        .on_hover_text("Step pattern and pass probability for this route");
+                    ui_state.record(format!("{keys}pattern:{route}"), b.rect);
+                    out.pattern = b.clicked();
+                    let b = kit::icon_button(ui, &st, kit::Ic::Bypass, bypass, true)
+                        .on_hover_text("Bypass: the route stays but moves nothing");
+                    ui_state.record(format!("{keys}bypass:{route}"), b.rect);
+                    if b.clicked() {
+                        out.bypass = Some(!bypass);
+                    }
+                    let b = kit::icon_button(ui, &st, kit::Ic::Invert, amount < 0.0, true)
+                        .on_hover_text("Invert the depth");
+                    ui_state.record(format!("{keys}invert:{route}"), b.rect);
+                    out.invert = b.clicked();
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        let c = source_chip(ui, &st, label, dot);
+                        ui_state.record(format!("{keys}row:{route}"), c.rect);
+                        out.select = c.clicked();
+                    });
+                });
+            });
+            if let Some(n) = note {
+                kit::label(ui, &st, Role::Caption, kit::Tone::Text2, n);
+            }
+            let mut pct = (amount * 100.0) as f64;
+            let readout = format!("{pct:+.1} %");
+            let col = if bypass { r.text3 } else { r.cv };
+            let resp =
+                kit::slider_bipolar(ui, &st, &mut pct, -100.0..=100.0, Some(0.5), &readout, col);
+            ui_state.record(format!("{keys}amount:{route}"), resp.rect);
+            // The 0.5 % snap also moves an amount set elsewhere (the knob's ring): only a
+            // press or an arrow key on the slider is an edit.
+            let touched = resp.is_pointer_button_down_on()
+                || resp.clicked()
+                || (resp.has_focus()
+                    && ui.input(|i| {
+                        i.key_pressed(egui::Key::ArrowLeft) || i.key_pressed(egui::Key::ArrowRight)
+                    }));
+            if resp.changed() && touched {
+                let continuing = resp.dragged() && !resp.drag_started();
+                out.amount = Some((pct as f32 / 100.0, !continuing));
+            }
+        });
+    out
 }
 
 /// A functional cable's mark: three small bars at `at` on a small backing plate, so a patterned
@@ -1655,61 +1942,17 @@ fn cable_route_row(
         .copied()
         .unwrap_or(kabl_engine::compile::DEFAULT_ROUTE_AMOUNT);
     let bypass = c.params.get("bypass").is_some_and(|&b| b >= 0.5);
-    let st = ui_state.style.clone();
     let label = source_label(editor.state(), *id, port);
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = st.sp(1);
-        let tone = if bypass {
-            kit::Tone::Text3
-        } else {
-            kit::Tone::Text
-        };
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let resp = ui.add(kit::Button::new(&st, "Remove").ghost().small());
-            ui_state.record(format!("croute-remove:{route}"), resp.rect);
-            if resp.clicked() {
-                *remove = Some(route);
-            }
-            let resp = ui
-                .add(kit::Button::new(&st, "Pattern").ghost().small())
-                .on_hover_text("Step pattern and pass probability for this route");
-            ui_state.record(format!("croute-pattern:{route}"), resp.rect);
-            if resp.clicked() {
-                ui_state.cable_fn = Some(route);
-            }
-            let resp = ui.add(kit::Button::new(&st, "Invert").ghost().small());
-            ui_state.record(format!("croute-invert:{route}"), resp.rect);
-            if resp.clicked() {
-                editor.set_route_amount(route, -amount, true);
-            }
-            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                kit::label_truncated(ui, &st, Role::Label, tone, label);
-            });
-        });
-    });
-    if target {
-        kit::label(
-            ui,
-            &st,
-            Role::Caption,
-            kit::Tone::Text2,
-            format!("moves {} of cable #{cable}", cable_param_label(param)),
-        );
-    }
-    let mut pct = (amount * 100.0) as f64;
-    let readout = format!("{pct:.1} %");
-    let resp = kit::slider(ui, &st, &mut pct, -100.0..=100.0, Some(0.5), &readout);
-    ui_state.record(format!("croute-amount:{route}"), resp.rect);
-    if resp.changed() {
-        let continuing = resp.dragged() && !resp.drag_started();
-        editor.set_route_amount(route, pct as f32 / 100.0, !continuing);
-    }
-    let mut off = bypass;
-    let resp = kit::toggle(ui, &st, &mut off, "Bypass");
-    ui_state.record(format!("croute-bypass:{route}"), resp.rect);
-    if resp.changed() {
-        editor.set_route_bypass(route, off);
-    }
+    let dot = if bypass {
+        BYPASS_GREY
+    } else {
+        cable_color(route)
+    };
+    let note = target.then(|| format!("moves {} of cable #{cable}", cable_param_label(param)));
+    let e = route_card(
+        ui, ui_state, "croute-", route, &label, dot, amount, bypass, false, note,
+    );
+    e.apply(editor, ui_state, route, amount, remove);
 }
 
 /// The sources that move parameter `param` of cable `cable`: one row each, and a chooser that
@@ -1731,22 +1974,17 @@ pub(crate) fn cable_param_routes(
         .collect();
     let mut remove = None;
     let st = ui_state.style.clone();
-    ui.horizontal(|ui| {
-        kit::label(
-            ui,
-            &st,
-            Role::Label,
-            kit::Tone::Text2,
-            format!("{} moved by", cable_param_label(param)),
-        );
-        if routes.is_empty() {
-            kit::label(ui, &st, Role::Label, kit::Tone::Text3, "nothing");
-        }
-    });
-    for route in routes {
-        cable_route_row(ui, editor, ui_state, route, false, &mut remove);
-    }
     let mut add = None;
+    let chips: Vec<(CableId, String)> = routes
+        .iter()
+        .filter_map(|&r| {
+            let c = editor.state().cables.get(&r)?;
+            let PortRef::Module { id, port } = &c.from else {
+                return None;
+            };
+            Some((r, source_label(editor.state(), *id, port)))
+        })
+        .collect();
     let state = editor.state();
     let outputs: Vec<(String, PortRef)> = state
         .modules
@@ -1773,27 +2011,101 @@ pub(crate) fn cable_param_routes(
             (source_label(state, id, port), r)
         })
         .collect();
-    let resp = kit::dropdown(
-        ui,
-        &st,
-        ("add-croute", cable, param.to_string()),
-        "Add source",
-        160.0,
-        |ui| {
-            for (label, from) in &outputs {
-                let r = kit::menu_item(ui, &st, label, false);
-                if let PortRef::Module { id, port } = from {
-                    ui_state.record(format!("croute-source:{cable}:{param}:{id}.{port}"), r.rect);
-                }
-                if r.clicked() {
-                    add = Some(from.clone());
+    // G4: "Moved by nothing" (or the routes below) and a ghost "+ Source" menu at the right.
+    let resp = ui
+        .horizontal(|ui| {
+            kit::label(ui, &st, Role::Label, kit::Tone::Text2, "Moved by");
+            if routes.is_empty() {
+                kit::label(ui, &st, Role::Label, kit::Tone::Text2, "nothing");
+            }
+            // One chip per source (cv dot, name); a tap shows its depth, invert and bypass.
+            for &(route, ref name) in &chips {
+                let font = st.font(Role::Label);
+                let g = ui
+                    .painter()
+                    .layout_no_wrap(name.clone(), font, st.roles.text);
+                let (r, resp) = ui
+                    .allocate_exact_size(egui::vec2(g.size().x + 30.0, 24.0), egui::Sense::click());
+                let open = ui.data(|d| d.get_temp::<bool>(egui::Id::new(("croute-open", route))));
+                let fill = if open.unwrap_or(false) || resp.hovered() {
+                    st.roles.raised
+                } else if st.dark {
+                    st.roles.inset
+                } else {
+                    st.roles.surface
+                };
+                ui.painter().rect(
+                    r,
+                    12.0,
+                    fill,
+                    egui::Stroke::new(1.0, st.roles.line),
+                    egui::StrokeKind::Inside,
+                );
+                ui.painter().circle_filled(
+                    egui::pos2(r.left() + 12.0, r.center().y),
+                    3.5,
+                    st.roles.cv,
+                );
+                ui.painter().galley(
+                    egui::pos2(r.left() + 21.0, r.center().y - g.size().y / 2.0),
+                    g,
+                    st.roles.text,
+                );
+                ui_state.record(format!("croute-chip:{route}"), r);
+                if resp.clicked() {
+                    let id = egui::Id::new(("croute-open", route));
+                    ui.data_mut(|d| d.insert_temp(id, !open.unwrap_or(false)));
                 }
             }
-        },
-    );
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let resp = ui
+                    .add(
+                        kit::Button::new(&st, "Source")
+                            .icon(kit::Ic::Plus)
+                            .ghost()
+                            .small(),
+                    )
+                    .on_hover_text(format!("Route a signal into {}", cable_param_label(param)));
+                egui::Popup::menu(&resp)
+                    .frame(kit::popover_frame(&st))
+                    .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+                    .width(240.0)
+                    .show(|ui| {
+                        egui::ScrollArea::vertical()
+                            .max_height(320.0)
+                            .show(ui, |ui| {
+                                for (label, from) in &outputs {
+                                    let r = kit::menu_item(ui, &st, label, false);
+                                    if let PortRef::Module { id, port } = from {
+                                        ui_state.record(
+                                            format!("croute-source:{cable}:{param}:{id}.{port}"),
+                                            r.rect,
+                                        );
+                                    }
+                                    if r.clicked() {
+                                        add = Some(from.clone());
+                                        ui.close();
+                                    }
+                                }
+                            });
+                    });
+                resp
+            })
+            .inner
+        })
+        .inner;
     ui_state.record(format!("croute-add:{cable}:{param}"), resp.rect);
+    for route in routes {
+        let open = ui.data(|d| d.get_temp::<bool>(egui::Id::new(("croute-open", route))));
+        if open.unwrap_or(false) {
+            cable_route_row(ui, editor, ui_state, route, false, &mut remove);
+        }
+    }
     if let Some(from) = add {
-        editor.connect_cable_route(from, cable, param);
+        // A new source opens its depth row, to set how far it moves the parameter.
+        if let Some(route) = editor.connect_cable_route(from, cable, param) {
+            ui.data_mut(|d| d.insert_temp(egui::Id::new(("croute-open", route)), true));
+        }
     }
     if let Some(route) = remove {
         editor.disconnect(route);
@@ -1813,8 +2125,9 @@ pub(crate) fn cable_routes(editor: &mut PatchEditor, ui_state: &mut UiState, ui:
     if routes.is_empty() {
         return;
     }
-    ui.separator();
-    ui.heading("Routes into cable parameters");
+    let st = ui_state.style.clone();
+    kit::rule(ui, &st);
+    kit::section(ui, &st, "Routes into cables");
     let mut remove = None;
     for route in routes {
         cable_route_row(ui, editor, ui_state, route, true, &mut remove);
@@ -1855,6 +2168,19 @@ mod tests {
     }
 
     /// The label shows the semitone the sequencer plays (it rounds), never "-0 st".
+    #[test]
+    fn collapsed_lanes_stay_inside_the_knobs_ring_band() {
+        for r in [10.0, 18.0, 30.0] {
+            for k in 0..8 {
+                // Collapsed: inside the ring band, so a neighbouring knob is never covered.
+                assert!(lane_radius(r, k, 0.0) <= r + RING_OUTER, "r {r} lane {k}");
+                // Open: outside it, a lane gap apart.
+                assert!(lane_radius(r, k, 1.0) > r + RING_OUTER);
+                assert!(lane_radius(r, k, 0.5) < lane_radius(r, k, 1.0));
+            }
+        }
+    }
+
     #[test]
     fn pitch_labels_match_the_played_semitone() {
         let p = kabl_modules::registry::info_for("seq").unwrap().params[0];

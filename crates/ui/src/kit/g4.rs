@@ -4,7 +4,7 @@
 //! Tokens are derived from the existing roles, so theme files keep loading unchanged.
 
 use super::controls::{fill_rr, focus_ring};
-use super::{dim, ease_to, icon, icon_button, label, paragraph, rich, rule, Ic, Tone};
+use super::{dim, ease_to, icon, icon_button, rich, rule, Ic, Tone};
 use crate::style::{alpha, mix, Role, Style};
 use egui::{
     pos2, vec2, Color32, CornerRadius, Frame, Margin, Painter, Rect, Response, Sense, Stroke,
@@ -87,7 +87,7 @@ pub fn stacked_shadow(p: &Painter, st: &Style, rect: Rect, radius: f32) {
     }
 }
 
-fn surface_frame(st: &Style, radius: f32) -> Frame {
+pub(crate) fn surface_frame(st: &Style, radius: f32) -> Frame {
     Frame::new()
         .fill(st.roles.raised)
         .stroke(Stroke::new(1.0, st.roles.line))
@@ -182,7 +182,10 @@ impl Size {
 }
 
 /// Modal: scrim, title 17/600 with a 28 px close, body, footer (64 px, top rule, actions
-/// right-aligned, primary last). Returns true when the user closed it (close, Esc, backdrop).
+/// right-aligned, primary last; `lead` sits at the left edge, for a danger action). An empty
+/// `title` leaves the header out (About draws its own). Returns true when the user closed it
+/// (close, Esc, backdrop).
+#[allow(clippy::too_many_arguments)]
 pub fn modal_framed<T>(
     ctx: &egui::Context,
     st: &Style,
@@ -190,6 +193,7 @@ pub fn modal_framed<T>(
     size: Size,
     title: &str,
     body: impl FnOnce(&mut Ui) -> T,
+    lead: impl FnOnce(&mut Ui),
     footer: impl FnOnce(&mut Ui),
 ) -> bool {
     let width = size.width().min(ctx.content_rect().width() - 80.0);
@@ -203,15 +207,17 @@ pub fn modal_framed<T>(
             ui.set_width(width);
             let mut closed = false;
             ui.add_space(20.0);
-            ui.horizontal(|ui| {
-                ui.add_space(24.0);
-                ui.label(rich(st, Role::Title, Tone::Text, title));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.add_space(14.0);
-                    closed = icon_button(ui, st, Ic::Close, false, true).clicked();
+            if !title.is_empty() {
+                ui.horizontal(|ui| {
+                    ui.add_space(24.0);
+                    ui.label(rich(st, Role::Title, Tone::Text, title));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.add_space(14.0);
+                        closed = icon_button(ui, st, Ic::Close, false, true).clicked();
+                    });
                 });
-            });
-            ui.add_space(8.0);
+                ui.add_space(8.0);
+            }
             Frame::new()
                 .inner_margin(Margin::symmetric(24, 4))
                 .show(ui, |ui| body(ui));
@@ -220,6 +226,7 @@ pub fn modal_framed<T>(
             ui.horizontal(|ui| {
                 ui.set_height(63.0);
                 ui.add_space(24.0);
+                lead(ui);
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.add_space(24.0);
                     footer(ui);
@@ -283,7 +290,8 @@ pub fn tool_window(
         });
 }
 
-/// Bottom dock: full width, drag handle on the top edge, resizable between `min` and `max`.
+/// Bottom dock: full width of `ui`'s free area, drawn over its lower part (the rack keeps its
+/// size and zoom), with a drag handle on the top edge resizing it between `min` and `max`.
 pub fn dock(
     ui: &mut Ui,
     st: &Style,
@@ -293,53 +301,129 @@ pub fn dock(
     max: f32,
     content: impl FnOnce(&mut Ui),
 ) {
-    egui::Panel::bottom(egui::Id::new(id))
-        .resizable(true)
-        .default_size(height)
-        .size_range(min..=max)
-        .frame(
-            Frame::new()
-                .fill(st.roles.surface)
-                .stroke(Stroke::new(1.0, st.roles.line))
-                .inner_margin(Margin::symmetric(16, 10)),
-        )
-        .show(ui, |ui| {
-            let top = ui.max_rect().top();
-            let c = pos2(ui.max_rect().center().x, top - 5.0);
-            ui.painter().rect_filled(
-                Rect::from_center_size(c, vec2(36.0, 4.0)),
+    let avail = ui.available_rect_before_wrap();
+    let hid = egui::Id::new(id).with("height");
+    let h = ui
+        .data(|d| d.get_temp::<f32>(hid))
+        .unwrap_or(height)
+        .clamp(min, max.max(min));
+    let rect = Rect::from_min_max(pos2(avail.left(), avail.bottom() - h), avail.max);
+    let ctx = ui.ctx().clone();
+    egui::Area::new(egui::Id::new(id))
+        .order(egui::Order::Middle)
+        .fade_in(false)
+        .fixed_pos(rect.min)
+        .show(&ctx, |ui| {
+            ui.set_min_size(rect.size());
+            ui.set_max_size(rect.size());
+            // A 6 px shadow strip over the rack above, the fill, and a 1 px rule on the top edge.
+            let p = ui.painter().with_clip_rect(ctx.content_rect());
+            let shade = Color32::from_black_alpha(if st.dark { 89 } else { 20 });
+            p.rect_filled(
+                Rect::from_x_y_ranges(rect.x_range(), rect.top() - 6.0..=rect.top()),
+                CornerRadius::ZERO,
+                shade,
+            );
+            p.rect_filled(rect, CornerRadius::ZERO, st.roles.bar);
+            p.hline(
+                rect.x_range(),
+                rect.top() + 0.5,
+                Stroke::new(1.0, st.roles.line2),
+            );
+            let grip = Rect::from_min_size(rect.min, vec2(rect.width(), 8.0));
+            let resp = ui.interact(grip, egui::Id::new(id).with("grip"), Sense::drag());
+            if resp.hovered() || resp.dragged() {
+                ctx.set_cursor_icon(egui::CursorIcon::ResizeVertical);
+            }
+            if resp.dragged() {
+                let nh = (h - resp.drag_delta().y).clamp(min, max.max(min));
+                ui.data_mut(|d| d.insert_temp(hid, nh));
+            }
+            p.rect_filled(
+                Rect::from_center_size(pos2(rect.center().x, rect.top() + 7.0), vec2(36.0, 4.0)),
                 CornerRadius::same(2),
                 st.roles.line2,
             );
-            content(ui);
+            let inner = rect - Margin::symmetric(16, 10);
+            let mut c = ui.new_child(egui::UiBuilder::new().max_rect(inner));
+            content(&mut c);
         });
 }
 
 // ------------------------------------------------------------------ feedback
 
-/// A calm placeholder: 56 px circle with an icon, title, one line, up to two actions.
+/// An action of [`empty_state`]: label, primary or secondary, icon.
+pub struct EmptyAction<'a> {
+    pub label: &'a str,
+    pub primary: bool,
+    pub icon: Ic,
+}
+
+/// A calm placeholder (g4-surfaces.html `K.empty`): 56 px well with an icon, title 16/600 at
+/// +60, line 13 at +84 (offsets from the well's centre), the actions centred as a row at +104
+/// with an 8 px gap, then the optional tip 12 px at +170. Returns each action's response.
 pub fn empty_state(
     ui: &mut Ui,
     st: &Style,
     ic: Ic,
     title: &str,
     line: &str,
-    actions: impl FnOnce(&mut Ui),
-) {
-    ui.vertical_centered(|ui| {
-        ui.add_space(24.0);
-        let (r, _) = ui.allocate_exact_size(vec2(56.0, 56.0), Sense::hover());
-        ui.painter().circle_filled(r.center(), 28.0, st.roles.inset);
-        ui.painter()
-            .circle_stroke(r.center(), 28.0, Stroke::new(1.0, st.roles.line));
-        icon(ui.painter(), ic, r.center(), 24.0, st.roles.text2);
-        ui.add_space(12.0);
-        label(ui, st, Role::H3, Tone::Text, title);
-        ui.add_space(4.0);
-        paragraph(ui, st, Role::Body, Tone::Text2, line);
-        ui.add_space(14.0);
-        ui.horizontal(actions);
-    });
+    actions: &[EmptyAction],
+    tip: Option<&str>,
+) -> Vec<Response> {
+    use super::Button;
+    let (area, _) = ui.allocate_exact_size(vec2(ui.available_width(), 204.0), Sense::hover());
+    let c = pos2(area.center().x, area.min.y + 28.0);
+    let p = ui.painter();
+    p.circle_filled(c, 28.0, st.roles.raised);
+    p.circle_stroke(c, 28.0, Stroke::new(1.0, st.roles.line2));
+    icon(p, ic, c, 24.0, st.roles.text2);
+    let sans = |size: f32, semi: bool| {
+        egui::FontId::new(
+            size,
+            if semi {
+                crate::style::Font::SansSemibold.family(st.fonts_ready)
+            } else {
+                st.font(Role::Body).family
+            },
+        )
+    };
+    // Baselines from the mockup; CENTER_CENTER sits 0.36 em above a baseline.
+    let line_at = |dy: f32, size: f32, semi: bool, text: &str, col: Color32| {
+        p.text(
+            pos2(c.x, c.y + dy - size * 0.36),
+            egui::Align2::CENTER_CENTER,
+            text,
+            sans(size, semi),
+            col,
+        );
+    };
+    line_at(60.0, 16.0, true, title, st.roles.text);
+    line_at(84.0, 13.0, false, line, st.roles.text2);
+    if let Some(t) = tip {
+        line_at(170.0, 12.0, false, t, st.roles.text3);
+    }
+    let buttons: Vec<Button> = actions
+        .iter()
+        .map(|a| {
+            let b = Button::new(st, a.label).icon(a.icon).g4(32.0);
+            if a.primary {
+                b.primary()
+            } else {
+                b
+            }
+        })
+        .collect();
+    let widths: Vec<f32> = buttons.iter().map(|b| b.width(ui)).collect();
+    let total = widths.iter().sum::<f32>() + 8.0 * widths.len().saturating_sub(1) as f32;
+    let mut x = c.x - total / 2.0;
+    let mut out = Vec::new();
+    for (b, w) in buttons.into_iter().zip(widths) {
+        let r = Rect::from_min_size(pos2(x, c.y + 104.0), vec2(w, 32.0));
+        out.push(ui.put(r, b));
+        x += w + 8.0;
+    }
+    out
 }
 
 /// Inline banner (form errors, warnings): tinted, icon, title, optional mono detail.
@@ -371,7 +455,18 @@ pub struct Toast {
     pub sev: Sev,
     pub title: String,
     pub detail: Option<String>,
+    /// Text links under the detail (accent, 12.5 px); a click reports its index.
+    pub actions: Vec<String>,
+    /// Detail shows in full; otherwise one line, cut with an ellipsis.
+    pub expanded: bool,
     pub born: f64,
+}
+
+/// What a click on a toast did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ToastClick {
+    Dismiss,
+    Action(usize),
 }
 
 /// Number of persistent errors: the status bar's red pill shows this.
@@ -379,10 +474,10 @@ pub fn error_count(toasts: &[Toast]) -> usize {
     toasts.iter().filter(|t| t.sev == Sev::Bad).count()
 }
 
-/// One 380 px toast: 4 px severity bar, icon, title, mono detail, dismiss. True when dismissed.
-pub fn toast(ui: &mut Ui, st: &Style, t: &Toast) -> bool {
+/// One 380 px toast: 4 px severity bar, icon, title, mono detail, action links, dismiss.
+pub fn toast(ui: &mut Ui, st: &Style, t: &Toast) -> Option<ToastClick> {
     let c = t.sev.color(st);
-    let mut dismissed = false;
+    let mut click = None;
     let out = surface_frame(st, 10.0)
         .inner_margin(Margin {
             left: 16,
@@ -402,11 +497,35 @@ pub fn toast(ui: &mut Ui, st: &Style, t: &Toast) -> bool {
                         ui.add(
                             egui::Label::new(rich(st, Role::Value, Tone::Text2, d))
                                 .selectable(false)
-                                .wrap(),
+                                .wrap_mode(if t.expanded {
+                                    egui::TextWrapMode::Wrap
+                                } else {
+                                    egui::TextWrapMode::Truncate
+                                }),
                         );
                     }
+                    if !t.actions.is_empty() {
+                        ui.add_space(4.0);
+                        ui.horizontal(|ui| {
+                            ui.spacing_mut().item_spacing.x = 18.0;
+                            for (i, a) in t.actions.iter().enumerate() {
+                                let r = ui
+                                    .add(
+                                        egui::Label::new(rich(st, Role::Label, Tone::Accent, a))
+                                            .selectable(false)
+                                            .sense(Sense::click()),
+                                    )
+                                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+                                if r.clicked() {
+                                    click = Some(ToastClick::Action(i));
+                                }
+                            }
+                        });
+                    }
                 });
-                dismissed = icon_button(ui, st, Ic::Close, false, true).clicked();
+                if icon_button(ui, st, Ic::Close, false, true).clicked() {
+                    click = Some(ToastClick::Dismiss);
+                }
             });
         });
     let r = out.response.rect;
@@ -415,27 +534,45 @@ pub fn toast(ui: &mut Ui, st: &Style, t: &Toast) -> bool {
         CornerRadius::same(2),
         c,
     );
-    dismissed
+    click
 }
 
-/// Top-right toast stack inside `area`: newest first, at most 3, expiry per severity.
-pub fn toasts(ctx: &egui::Context, st: &Style, area: Rect, list: &mut Vec<Toast>, now: f64) {
+/// Top-right toast stack inside `area`: newest first, at most 3, expiry per severity. Esc
+/// dismisses the newest. Returns (toast index, action index) of a clicked action link; the
+/// caller decides what it does.
+pub fn toasts(
+    ctx: &egui::Context,
+    st: &Style,
+    area: Rect,
+    list: &mut Vec<Toast>,
+    now: f64,
+) -> Option<(usize, usize)> {
     list.retain(|t| t.sev.ttl().is_none_or(|ttl| now - t.born < ttl));
     let mut gone = None;
+    let mut acted = None;
+    if !list.is_empty()
+        && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
+    {
+        gone = Some(list.len() - 1);
+    }
     egui::Area::new(egui::Id::new("g4-toasts"))
         .order(egui::Order::Foreground)
         .fixed_pos(pos2(area.right() - 16.0 - 380.0, area.top() + 16.0))
         .show(ctx, |ui| {
             ui.spacing_mut().item_spacing.y = 8.0;
             for (i, t) in list.iter().enumerate().rev().take(3) {
-                if toast(ui, st, t) {
-                    gone = Some(i);
+                match toast(ui, st, t) {
+                    Some(ToastClick::Dismiss) => gone = Some(i),
+                    Some(ToastClick::Action(a)) => acted = Some((i, a)),
+                    None => {}
                 }
             }
         });
     if let Some(i) = gone {
         list.remove(i);
+        return None;
     }
+    acted
 }
 
 // ------------------------------------------------------------------ editors
@@ -447,68 +584,152 @@ pub enum LaneKind {
     Bars { bipolar: bool },
     /// On/off pills (value > 0.5 is on).
     Gate,
+    /// A count 1..=`max` shown as "×n"; a tap steps it, wrapping to 1.
+    Count { max: u8 },
 }
 
 pub struct Lane<'a> {
     pub label: &'a str,
     pub kind: LaneKind,
     pub values: &'a mut [f32],
+    /// Small mono line under the label ("st").
+    pub unit: &'a str,
+    /// Bar and on-pill colour; `None` is the accent.
+    pub color: Option<Color32>,
+    /// Lane height; `None` is the kind's default.
+    pub height: Option<f32>,
+    /// Mono readout at the foot of each bar ("+7").
+    pub readout: Option<fn(f32) -> String>,
+}
+
+impl<'a> Lane<'a> {
+    pub fn new(label: &'a str, kind: LaneKind, values: &'a mut [f32]) -> Self {
+        Lane {
+            label,
+            kind,
+            values,
+            unit: "",
+            color: None,
+            height: None,
+            readout: None,
+        }
+    }
 }
 
 const LABEL_W: f32 = 56.0;
-const BARS_H: f32 = 44.0;
-const GATE_H: f32 = 22.0;
-const LANE_GAP: f32 = 6.0;
+const BARS_H: f32 = 36.0;
+const GATE_H: f32 = 20.0;
+const LANE_GAP: f32 = 8.0;
+/// The step-number row above the lanes.
+const NUMBERS_H: f32 = 22.0;
 
-/// Shared step editor (seq, cable pattern, Perform lanes): one column per step. Tap toggles a
-/// gate, drag sets a bar's value. The playhead is an accent outline across all lanes.
-/// True when a value changed.
+/// Shared step editor (seq, cable pattern, Perform lanes): one column per step, lane labels in
+/// a 56 px column, optional step-number row. Tap toggles a gate or steps a count, drag sets a
+/// bar's value. The playhead is an accent outline across all lanes. The response is marked
+/// changed when a value changed.
 pub fn step_grid(
     ui: &mut Ui,
     st: &Style,
     lanes: &mut [Lane],
     playhead: Option<usize>,
     width: f32,
-) -> bool {
+    numbers: bool,
+) -> Response {
     let steps = lanes.iter().map(|l| l.values.len()).max().unwrap_or(0);
-    if steps == 0 {
-        return false;
-    }
     let heights: Vec<f32> = lanes
         .iter()
-        .map(|l| match l.kind {
-            LaneKind::Bars { .. } => BARS_H,
-            LaneKind::Gate => GATE_H,
+        .map(|l| {
+            l.height.unwrap_or(match l.kind {
+                LaneKind::Bars { .. } => BARS_H,
+                LaneKind::Gate | LaneKind::Count { .. } => GATE_H,
+            })
         })
         .collect();
-    let total = heights.iter().sum::<f32>() + LANE_GAP * (lanes.len() as f32 - 1.0);
-    let (rect, resp) = ui.allocate_exact_size(vec2(width, total), Sense::click_and_drag());
+    let head = if numbers { NUMBERS_H } else { 0.0 };
+    let total = head + heights.iter().sum::<f32>() + LANE_GAP * (lanes.len() as f32 - 1.0).max(0.0);
+    let (rect, mut resp) = ui.allocate_exact_size(vec2(width, total), Sense::click_and_drag());
+    if steps == 0 {
+        return resp;
+    }
     let cell_w = (width - LABEL_W) / steps as f32;
     let r = &st.roles;
+    let well = if st.dark { r.inset } else { r.raised };
+    let mono = st.font(Role::Value);
+    let p = ui.painter();
     let mut changed = false;
     let ptr = resp.interact_pointer_pos();
+    let col_x = |i: usize| rect.left() + LABEL_W + i as f32 * cell_w;
     let mut y = rect.top();
+    if numbers {
+        p.text(
+            pos2(rect.left(), y + head / 2.0),
+            egui::Align2::LEFT_CENTER,
+            "STEP",
+            st.section_font(),
+            r.text2,
+        );
+        for i in 0..steps {
+            p.text(
+                pos2(col_x(i) + cell_w / 2.0, y + head / 2.0),
+                egui::Align2::CENTER_CENTER,
+                (i + 1).to_string(),
+                mono.clone(),
+                if playhead == Some(i) { r.text } else { r.text2 },
+            );
+        }
+        y += head;
+    }
     for (li, lane) in lanes.iter_mut().enumerate() {
         let h = heights[li];
-        ui.painter().text(
-            pos2(rect.left(), y + h / 2.0),
+        let col = lane.color.unwrap_or(r.accent);
+        let label_y = if h > 30.0 { y + 12.0 } else { y + h / 2.0 };
+        p.text(
+            pos2(rect.left(), label_y),
             egui::Align2::LEFT_CENTER,
             lane.label.to_uppercase(),
             st.section_font(),
             r.text2,
         );
-        for (i, v) in lane.values.iter_mut().enumerate() {
-            let cell = Rect::from_min_size(
-                pos2(rect.left() + LABEL_W + i as f32 * cell_w + 1.5, y),
-                vec2(cell_w - 3.0, h),
+        if !lane.unit.is_empty() {
+            p.text(
+                pos2(rect.left(), label_y + 16.0),
+                egui::Align2::LEFT_CENTER,
+                lane.unit,
+                mono.clone(),
+                r.text2,
             );
-            let hit = ptr.is_some_and(|p| cell.expand2(vec2(1.5, LANE_GAP / 2.0)).contains(p));
+        }
+        let lane_r = Rect::from_min_max(pos2(col_x(0), y), pos2(rect.right(), y + h));
+        if lane.kind == (LaneKind::Bars { bipolar: true }) {
+            // One well for the whole lane, with the zero line across it.
+            p.rect(
+                lane_r,
+                6.0,
+                well,
+                Stroke::new(1.0, r.line),
+                StrokeKind::Inside,
+            );
+        }
+        for (i, v) in lane.values.iter_mut().enumerate() {
+            let cell = Rect::from_min_size(pos2(col_x(i), y), vec2(cell_w, h));
+            let hit = ptr.is_some_and(|q| cell.expand2(vec2(0.0, LANE_GAP / 2.0)).contains(q));
             match lane.kind {
                 LaneKind::Bars { bipolar } => {
-                    fill_rr(ui, cell, 4.0, r.inset, 0.0);
+                    let foot = if lane.readout.is_some() { 16.0 } else { 0.0 };
+                    let inner = if bipolar {
+                        Rect::from_min_max(
+                            cell.min + vec2(5.0, 8.0),
+                            cell.max - vec2(5.0, 8.0 + foot),
+                        )
+                    } else {
+                        let c = cell.shrink2(vec2(4.0, 0.0));
+                        p.rect(c, 4.0, well, Stroke::new(1.0, r.line), StrokeKind::Inside);
+                        c.shrink(3.0)
+                    };
                     let (lo, hi) = if bipolar { (-1.0, 1.0) } else { (0.0, 1.0) };
                     if hit && (resp.dragged() || resp.is_pointer_button_down_on()) {
-                        let t = 1.0 - ((ptr.unwrap().y - cell.top()) / h).clamp(0.0, 1.0);
+                        let t =
+                            1.0 - ((ptr.unwrap().y - inner.top()) / inner.height()).clamp(0.0, 1.0);
                         let nv = lo + t * (hi - lo);
                         if (nv - *v).abs() > f32::EPSILON {
                             *v = nv;
@@ -518,16 +739,21 @@ pub fn step_grid(
                     let t = ((*v - lo) / (hi - lo)).clamp(0.0, 1.0);
                     let base: f32 = if bipolar { 0.5 } else { 0.0 };
                     let (a, b) = (base.min(t), base.max(t));
-                    let bar = Rect::from_min_max(
-                        pos2(cell.left(), cell.bottom() - b * h),
-                        pos2(cell.right(), cell.bottom() - a * h),
+                    let mut bar = Rect::from_min_max(
+                        pos2(inner.left(), inner.bottom() - b * inner.height()),
+                        pos2(inner.right(), inner.bottom() - a * inner.height()),
                     );
-                    fill_rr(ui, bar, 3.0, r.accent, 0.0);
-                    if bipolar {
-                        let cy = cell.center().y;
-                        ui.painter().line_segment(
-                            [pos2(cell.left(), cy), pos2(cell.right(), cy)],
-                            Stroke::new(1.0, r.line2),
+                    if bar.height() < 2.0 {
+                        bar = Rect::from_center_size(bar.center(), vec2(bar.width(), 2.0));
+                    }
+                    fill_rr(ui, bar, if bipolar { 3.0 } else { 2.0 }, col, 0.0);
+                    if let Some(f) = lane.readout {
+                        p.text(
+                            pos2(cell.center().x, cell.bottom() - 9.0),
+                            egui::Align2::CENTER_CENTER,
+                            f(*v),
+                            mono.clone(),
+                            r.text2,
                         );
                     }
                 }
@@ -536,29 +762,65 @@ pub fn step_grid(
                         *v = if *v > 0.5 { 0.0 } else { 1.0 };
                         changed = true;
                     }
-                    let on = *v > 0.5;
-                    fill_rr(ui, cell, h / 2.0, if on { r.accent } else { r.inset }, 0.0);
+                    let pill = cell.shrink2(vec2(4.0, 0.0));
+                    if *v > 0.5 {
+                        fill_rr(ui, pill, h / 2.0, col, 0.0);
+                    } else {
+                        p.rect(
+                            pill,
+                            h / 2.0,
+                            well,
+                            Stroke::new(1.0, r.line2),
+                            StrokeKind::Inside,
+                        );
+                    }
+                }
+                LaneKind::Count { max } => {
+                    if hit && resp.clicked() {
+                        let n = v.round() as u8;
+                        *v = f32::from(if n >= max { 1 } else { n + 1 });
+                        changed = true;
+                    }
+                    let n = v.round() as u8;
+                    p.text(
+                        cell.center(),
+                        egui::Align2::CENTER_CENTER,
+                        format!("×{n}"),
+                        mono.clone(),
+                        if n > 1 { r.text } else { r.text2 },
+                    );
                 }
             }
         }
+        if lane.kind == (LaneKind::Bars { bipolar: true }) {
+            let mid = lane_r.top()
+                + 8.0
+                + (h - 16.0 - if lane.readout.is_some() { 16.0 } else { 0.0 }) / 2.0;
+            p.hline(
+                lane_r.shrink2(vec2(4.0, 0.0)).x_range(),
+                mid,
+                Stroke::new(1.0, r.line2),
+            );
+        }
         y += h + LANE_GAP;
     }
-    if let Some(p) = playhead.filter(|&p| p < steps) {
-        let col = Rect::from_min_size(
-            pos2(rect.left() + LABEL_W + p as f32 * cell_w, rect.top() - 2.0),
-            vec2(cell_w, total + 4.0),
+    if let Some(i) = playhead.filter(|&i| i < steps) {
+        let col = Rect::from_min_max(
+            pos2(col_x(i) + 1.0, rect.top() - 4.0),
+            pos2(col_x(i + 1) - 1.0, rect.bottom() + 4.0),
         );
-        ui.painter().rect_stroke(
+        p.rect_stroke(
             col,
-            CornerRadius::same(4),
-            Stroke::new(1.5, r.accent),
-            StrokeKind::Outside,
+            CornerRadius::same(6),
+            Stroke::new(1.0, alpha(r.accent, 153)),
+            StrokeKind::Inside,
         );
     }
     if changed {
+        resp.mark_changed();
         ui.ctx().request_repaint();
     }
-    changed
+    resp
 }
 
 /// Values of a [`range_bar`]: the parameter's limits, its base, the span modulation sweeps, and now.
@@ -628,6 +890,105 @@ pub fn range_bar(
     resp
 }
 
+/// Large segmented control (G4-SPEC §4 Compare A/B): 40 px tall, `inset` track, the selected
+/// item `raised` with a `line` border. `pick` gets the index of an item clicked this frame.
+pub fn segmented_large(
+    ui: &mut Ui,
+    st: &Style,
+    item_w: f32,
+    items: &[(&str, bool)],
+    mut pick: impl FnMut(usize),
+) {
+    let (track, _) = ui.allocate_exact_size(
+        vec2(item_w * items.len() as f32 + 4.0, 40.0),
+        Sense::hover(),
+    );
+    ui.painter().rect(
+        track,
+        CornerRadius::same(8),
+        st.roles.inset,
+        Stroke::new(1.0, st.roles.line),
+        StrokeKind::Inside,
+    );
+    for (i, (text, on)) in items.iter().enumerate() {
+        let r = Rect::from_min_size(
+            track.min + vec2(2.0 + item_w * i as f32, 2.0),
+            vec2(item_w, 36.0),
+        );
+        let resp = ui.interact(r, ui.id().with(("seg-large", i)), Sense::click());
+        if *on {
+            ui.painter().rect(
+                r,
+                CornerRadius::same(6),
+                st.roles.raised,
+                Stroke::new(1.0, st.roles.line),
+                StrokeKind::Inside,
+            );
+        }
+        ui.painter().text(
+            r.center(),
+            egui::Align2::CENTER_CENTER,
+            text,
+            st.font(Role::Body),
+            if *on { st.roles.text } else { st.roles.text2 },
+        );
+        if resp.clicked() {
+            pick(i);
+        }
+    }
+}
+
+/// A bordered `raised` card for grouped facts (G4-SPEC §4 reference card).
+pub fn card<R>(ui: &mut Ui, st: &Style, add: impl FnOnce(&mut Ui) -> R) -> R {
+    Frame::new()
+        .fill(st.roles.raised)
+        .stroke(Stroke::new(1.0, st.roles.line))
+        .corner_radius(CornerRadius::same(8))
+        .inner_margin(Margin::same(12))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            add(ui)
+        })
+        .inner
+}
+
+/// A 22 px pill (G4-SPEC `chip`): optional signal dot, optional mono text.
+pub fn chip_label(
+    ui: &mut Ui,
+    st: &Style,
+    text: &str,
+    mono: bool,
+    dot: Option<Color32>,
+) -> Response {
+    let role = if mono { Role::Value } else { Role::Label };
+    let galley = ui
+        .painter()
+        .layout_no_wrap(text.into(), st.font(role), st.roles.text);
+    let pad = 9.0;
+    let dot_w = if dot.is_some() { 12.0 } else { 0.0 };
+    let (r, resp) = ui.allocate_exact_size(
+        vec2(galley.size().x + 2.0 * pad + dot_w, 22.0),
+        Sense::hover(),
+    );
+    ui.painter().rect(
+        r,
+        CornerRadius::same(11),
+        st.roles.inset,
+        Stroke::new(1.0, st.roles.line),
+        StrokeKind::Inside,
+    );
+    if let Some(c) = dot {
+        ui.painter()
+            .circle_filled(pos2(r.min.x + pad + 3.0, r.center().y), 3.0, c);
+    }
+    ui.painter().galley(
+        pos2(r.min.x + pad + dot_w, r.center().y - galley.size().y / 2.0),
+        galley,
+        st.roles.text,
+    );
+    resp
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -666,6 +1027,8 @@ mod tests {
             sev,
             title: "t".into(),
             detail: None,
+            actions: vec![],
+            expanded: false,
             born: 0.0,
         };
         let ctx = egui::Context::default();

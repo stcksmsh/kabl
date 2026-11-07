@@ -116,6 +116,8 @@ pub enum Timing {
     Now,
     NextStep,
     NextBar,
+    /// The next line of two bars (32 sixteenths from the clock's start).
+    NextTwoBars,
 }
 
 /// Pulses per bar: 16 sixteenths, 4/4.
@@ -709,6 +711,7 @@ impl PatchEngine {
             Timing::Now => None,
             Timing::NextStep => Some((epoch, next)),
             Timing::NextBar => Some((epoch, next.div_ceil(BAR_TICKS) * BAR_TICKS)),
+            Timing::NextTwoBars => Some((epoch, next.div_ceil(2 * BAR_TICKS) * 2 * BAR_TICKS)),
         };
         // A cue waiting behind a fresh Load is not playing yet: its macros are not scheduled.
         if !self.pending.as_ref().is_some_and(|g| g.fresh) {
@@ -823,6 +826,16 @@ impl PatchEngine {
         if let Some(g) = self.pending.as_mut() {
             disarm(g);
         }
+    }
+
+    /// Audio-thread call: envelopes not idle in the graph fading in, else the active one (the
+    /// status bar's voices). No allocation.
+    pub fn active_envelopes(&self) -> usize {
+        match &self.incoming {
+            Some((g, _)) => g,
+            None => &self.active,
+        }
+        .active_envelopes()
     }
 
     /// Audio-thread call: `f(id, step, playing bank, queued bank)` for every sequencer of the

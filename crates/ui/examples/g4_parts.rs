@@ -135,24 +135,21 @@ impl eframe::App for App {
                             ui,
                             &st,
                             &mut [
-                                g4::Lane {
-                                    label: "pitch",
-                                    kind: g4::LaneKind::Bars { bipolar: true },
-                                    values: &mut self.pitch,
-                                },
-                                g4::Lane {
-                                    label: "vel",
-                                    kind: g4::LaneKind::Bars { bipolar: false },
-                                    values: &mut self.bars,
-                                },
-                                g4::Lane {
-                                    label: "gate",
-                                    kind: g4::LaneKind::Gate,
-                                    values: &mut self.gate,
-                                },
+                                g4::Lane::new(
+                                    "pitch",
+                                    g4::LaneKind::Bars { bipolar: true },
+                                    &mut self.pitch,
+                                ),
+                                g4::Lane::new(
+                                    "vel",
+                                    g4::LaneKind::Bars { bipolar: false },
+                                    &mut self.bars,
+                                ),
+                                g4::Lane::new("gate", g4::LaneKind::Gate, &mut self.gate),
                             ],
                             Some(2),
                             w,
+                            true,
                         );
                     });
                     card(b, &st, "Range bar", |ui| {
@@ -192,10 +189,19 @@ impl eframe::App for App {
                             Ic::Plug,
                             "Nothing patched",
                             "Drag a module from the library, or load a sound.",
-                            |ui| {
-                                ui.add(kit::Button::new(&st, "Open library").primary());
-                                ui.add(kit::Button::new(&st, "New patch"));
-                            },
+                            &[
+                                g4::EmptyAction {
+                                    label: "Open library",
+                                    primary: true,
+                                    icon: Ic::Plus,
+                                },
+                                g4::EmptyAction {
+                                    label: "New patch",
+                                    primary: false,
+                                    icon: Ic::Plus,
+                                },
+                            ],
+                            None,
                         );
                     });
                     card(d, &st, "Menu", |ui| {
@@ -220,12 +226,16 @@ impl eframe::App for App {
                 sev: g4::Sev::Bad,
                 title: "Could not load patch".into(),
                 detail: Some("unknown module kind \"osc.xyz\"".into()),
+                actions: vec!["Show details".into(), "Open another…".into()],
+                expanded: false,
                 born: t,
             },
             g4::Toast {
                 sev: g4::Sev::Good,
                 title: "Saved to Your Sounds".into(),
                 detail: None,
+                actions: vec![],
+                expanded: false,
                 born: t,
             },
         ];

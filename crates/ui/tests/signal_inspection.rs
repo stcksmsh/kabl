@@ -554,6 +554,7 @@ fn why_no_sound_names_the_output_the_engine_plays() {
 fn a_restore_is_one_undo_step_and_keeps_the_working_version() {
     let mut h = H::new(1440.0, 900.0);
     h.open("factory:palette/pad");
+    h.frame();
     h.click("compare-open");
     let log_before = h.editor.log().all_entries().len();
     h.click("compare-capture");
@@ -661,6 +662,7 @@ fn save_targets_the_current_patch_while_comparing() {
     h.ui.compare.open = true;
     h.ui.inspect.open = true;
     h.frame();
+    h.frame();
     h.click("sound-menu");
     h.click("save-as");
     match h.ui.browser.dialog.as_mut() {
@@ -754,6 +756,8 @@ fn a_recipe_starts_through_the_unsaved_question_and_exit_keeps_the_patch() {
         h.editor.set_param(3, "cutoff_hz", 444.0);
         h.frame();
         let song = h.editor.state().clone();
+        h.frame();
+        h.frame();
         h.click("learn-open");
         h.click("recipe:pluck-to-pad");
         assert!(matches!(h.ui.browser.dialog, Some(Dialog::Unsaved { .. })));
@@ -810,7 +814,7 @@ fn a_recipe_starts_through_the_unsaved_question_and_exit_keeps_the_patch() {
         }
         assert_eq!(h.ui.recipes.active.as_ref().unwrap().step, 5);
         let kept = h.editor.state().clone();
-        h.click("learn-close");
+        h.click("routing-tab");
         assert!(h.ui.recipes.active.is_none());
         assert_eq!(h.editor.state(), &kept);
         assert_eq!(kept.modules[&6].params["sustain"], 0.7);
@@ -821,6 +825,7 @@ fn a_recipe_starts_through_the_unsaved_question_and_exit_keeps_the_patch() {
 fn opening_another_sound_detaches_a_recipe() {
     let mut h = H::new(1440.0, 900.0);
     h.open(INIT);
+    h.frame();
     h.click("learn-open");
     h.click("recipe:filter-movement");
     assert!(h.ui.recipes.active.is_some());
