@@ -1704,7 +1704,7 @@ fn control_card(
     after_card(ui, ui_state, st, pin, rect);
 }
 
-/// The bank step lane data: level, probability and gate of the playing bank's eight steps.
+/// The bank step lane data: level, probability and gate of each of the playing bank's steps.
 fn lane(state: &kabl_core::PatchState, id: ModuleId, bank: usize) -> Vec<Step> {
     let Some(info) = registry::info_for("seq") else {
         return Vec::new();
@@ -1716,7 +1716,13 @@ fn lane(state: &kabl_core::PatchState, id: ModuleId, bank: usize) -> Vec<Step> {
             .map(|p| (p.to_norm(routing::base_value(state, id, p)), p.max))
     };
     let prefix = ["", "b.", "c.", "d."][bank.min(3)];
-    (1..=seq::STEPS)
+    // The bank's real length (1-32), not a fixed count.
+    let len = info
+        .params
+        .iter()
+        .find(|p| p.name == format!("{prefix}length"))
+        .map_or(seq::STEPS as f32, |p| routing::base_value(state, id, p));
+    (1..=(len.round() as usize).clamp(1, seq::STEPS))
         .map(|k| Step {
             level: val(format!("{prefix}v{k}")).map_or(1.0, |v| v.0),
             prob: val(format!("{prefix}r{k}")).map_or(1.0, |v| v.0),

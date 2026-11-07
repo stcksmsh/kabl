@@ -1,6 +1,6 @@
 //! Pattern banks, direction, probability and arming on `seq`, sample by sample.
 
-use kabl_modules::builtins::seq::{bank_of, bank_param, param_index, BANKS, SLOTS, STEPS};
+use kabl_modules::builtins::seq::{bank_of, bank_param, param_index, BANKS, SLOTS};
 use kabl_modules::builtins::{Clock, Seq, SEQ_INFO};
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::{Module, ProcessIo, Signal};
@@ -30,7 +30,7 @@ impl Rig {
         let mut params: Vec<f32> = SEQ_INFO.params.iter().map(|p| p.default).collect();
         // Every bank's step k plays pitch 10 * bank + k, so the output names bank and step.
         for b in 0..BANKS {
-            for k in 0..STEPS {
+            for k in 0..8 {
                 params[param_index(b, k)] = (10 * b + k) as f32;
             }
         }
@@ -288,4 +288,40 @@ fn carried_state_keeps_bank_arm_heading_and_stream() {
     r.run(12);
     twin.run(12);
     assert_eq!(r.steps[5..], twin.steps[..]);
+}
+
+#[test]
+fn every_length_to_32_cycles_through_its_own_steps() {
+    use kabl_modules::builtins::seq::pitch_slot;
+    for len in [1usize, 2, 5, 7, 8, 9, 13, 16, 21, 31, 32] {
+        let mut r = Rig::new();
+        for k in 0..32 {
+            r.params[param_index(0, pitch_slot(k))] = k as f32;
+        }
+        r.set("length", len as f32).run(2 * len);
+        let want: Vec<f32> = (0..2 * len).map(|i| (i % len) as f32).collect();
+        assert_eq!(r.pitches(), want, "length {len}");
+    }
+}
+
+#[test]
+fn steps_past_eight_start_off_and_belong_to_their_bank() {
+    use kabl_modules::builtins::seq::pitch_slot;
+    let mut r = Rig::new();
+    for k in 0..8 {
+        r.set(&format!("g{}", k + 1), 1.0);
+    }
+    r.set("length", 16.0).run(16);
+    let gates: Vec<bool> = r.steps.iter().map(|s| s.1).collect();
+    assert_eq!(gates[..8], [true; 8]);
+    assert_eq!(gates[8..], [false; 8]);
+    // Bank D's step 20 is a different param from bank A's.
+    assert_ne!(
+        param_index(0, pitch_slot(19)),
+        param_index(3, pitch_slot(19))
+    );
+    assert_eq!(
+        SEQ_INFO.params[param_index(3, pitch_slot(19))].name,
+        "d.p20"
+    );
 }

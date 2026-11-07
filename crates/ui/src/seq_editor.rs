@@ -134,10 +134,15 @@ pub(crate) fn seq_panel(
             if r.clicked() {
                 explain::open(ui_state, explain::Subject::Module(id), None);
             }
+            let r = kit::icon_menu(ui, st, kit::Ic::More, |ui| {
+                bank_menu(editor, ui_state, ui, id, edit)
+            });
+            ui_state.record(format!("seq-bank-menu:{id}"), r.rect);
         });
     });
     ui.add_space(st.sp(2));
-    // Edit A-D and the bank's menu.
+    // Edit A-D, Page 1-4 (which eight steps the grid shows) and the bank's menu.
+    let page = ui_state.edit_page.get(&id).copied().unwrap_or(0);
     ui.horizontal(|ui| {
         kit::section(ui, st, "Edit");
         kit::segmented(ui, st, |ui| {
@@ -149,10 +154,18 @@ pub(crate) fn seq_panel(
                 }
             }
         });
-        let r = kit::icon_menu(ui, st, kit::Ic::More, |ui| {
-            bank_menu(editor, ui_state, ui, id, edit)
+    });
+    ui.horizontal(|ui| {
+        kit::section(ui, st, "Page");
+        kit::segmented(ui, st, |ui| {
+            for pg in 0..seq::STEPS / seq::PAGE_STEPS {
+                let r = kit::seg(ui, st, &(pg + 1).to_string(), pg == page);
+                ui_state.record(format!("drawer-page:{id}.{pg}"), r.rect);
+                if r.clicked() {
+                    ui_state.pick_page(id, pg);
+                }
+            }
         });
-        ui_state.record(format!("seq-bank-menu:{id}"), r.rect);
     });
     // What plays, and the launch settings behind the quantise label.
     let state = editor.state();
@@ -170,6 +183,12 @@ pub(crate) fn seq_panel(
         .iter()
         .find(|t| t.0 == timing)
         .map_or("", |t| t.1);
+    // The launch button reads "Next bar" (the menu keeps "Bar").
+    let timing_label = if timing == kabl_engine::patch_engine::Timing::Now {
+        timing_name.to_string()
+    } else {
+        format!("Next {}", timing_name.to_lowercase())
+    };
     let (mut pick, mut tpick) = (None, None);
     ui.horizontal(|ui| {
         kit::label(ui, st, style::Role::Value, kit::Tone::Text2, &line);
@@ -183,7 +202,7 @@ pub(crate) fn seq_panel(
             }
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let r = ui.add(kit::Button::new(st, timing_name).ghost().small());
+            let r = ui.add(kit::Button::new(st, &timing_label).ghost().small());
             ui_state.record(format!("seq-launch:{id}"), r.rect);
             let dot = pos2(r.rect.left() - 4.0, r.rect.center().y);
             ui.painter().circle_filled(dot, 3.5, st.roles.accent);
@@ -240,8 +259,8 @@ pub(crate) fn seq_panel(
     let name = |k: &str, i: usize| format!("{pre}{k}{}", i + 1);
     let state = editor.state();
     let lane = |k: &str, scale: f32| -> Vec<f32> {
-        (0..seq::STEPS)
-            .map(|i| seq_value(state, id, &name(k, i)) / scale)
+        (0..seq::PAGE_STEPS)
+            .map(|i| seq_value(state, id, &name(k, page * seq::PAGE_STEPS + i)) / scale)
             .collect()
     };
     let (mut pitch, mut gate, mut vel, mut prob, mut ratch) = (
@@ -287,7 +306,11 @@ pub(crate) fn seq_panel(
         ),
         kit::g4::Lane::new("Ratchet", kit::g4::LaneKind::Count { max: 4 }, &mut ratch),
     ];
-    let playhead = ui_state.seq_steps.get(&id).copied();
+    let playhead = ui_state
+        .seq_steps
+        .get(&id)
+        .and_then(|s| s.checked_sub(page * seq::PAGE_STEPS))
+        .filter(|&s| s < seq::PAGE_STEPS);
     let w = ui.available_width();
     let resp = kit::g4::step_grid(ui, st, &mut lanes, playhead, w, true);
     ui_state.record(format!("seq-grid:{id}"), resp.rect);
@@ -303,11 +326,11 @@ pub(crate) fn seq_panel(
         .into_iter()
         .zip(before.iter().zip(after.iter()))
         {
-            for i in 0..seq::STEPS {
+            for i in 0..seq::PAGE_STEPS {
                 if a[i] != b[i] {
                     let v = b[i] * scale;
                     let v = if k == "p" { v.round() } else { v };
-                    seq_write(editor, ui, id, &name(k, i), v);
+                    seq_write(editor, ui, id, &name(k, page * seq::PAGE_STEPS + i), v);
                 }
             }
         }

@@ -54,7 +54,7 @@ mod theme_tests;
 
 pub use editor::PatchEditor;
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use egui::{pos2, vec2, Color32, CornerRadius, Id, Pos2, Rect, Sense, Stroke, Vec2 as EguiVec2};
 use kabl_core::{CableId, ModuleId, PatchState, PortRef, Vec2};
@@ -235,6 +235,10 @@ pub struct UiState {
     pub edit_bank: HashMap<ModuleId, usize>,
     /// Every sequencer's effective edit bank, rebuilt each frame for the layout.
     edit_view: HashMap<ModuleId, usize>,
+    /// Step page (8 steps each) the user picked per sequencer. View only, like `edit_bank`.
+    pub edit_page: HashMap<ModuleId, usize>,
+    /// Sequencers whose page the user picked: the others follow the playing step's page.
+    pub page_pinned: HashSet<ModuleId>,
     /// Bank launches and cancels for `main.rs` to send to the audio thread (runtime only).
     pub launches: Vec<Command>,
     /// Last state of each MIDI button (channel, CC): high = pressed.
@@ -443,6 +447,8 @@ impl Default for UiState {
             seq_banks: HashMap::new(),
             edit_bank: HashMap::new(),
             edit_view: HashMap::new(),
+            edit_page: HashMap::new(),
+            page_pinned: HashSet::new(),
             launches: Vec::new(),
             bank_rename: None,
             cue_rename: None,
@@ -533,8 +539,30 @@ impl UiState {
         self.frame_hits.insert(key, rect);
     }
 
+    /// A page chip click: pins the page, or, on the pinned page, lets it follow playback again.
+    pub fn pick_page(&mut self, id: ModuleId, page: usize) {
+        if self.page_pinned.contains(&id) && self.edit_page.get(&id) == Some(&page) {
+            self.page_pinned.remove(&id);
+        } else {
+            self.page_pinned.insert(id);
+            self.edit_page.insert(id, page);
+        }
+    }
+
+    /// Sequencers that are not pinned show the page of their playing step.
+    fn follow_pages(&mut self) {
+        for (&id, &step) in &self.seq_steps {
+            if !self.page_pinned.contains(&id) {
+                let pages = seq::STEPS / seq::PAGE_STEPS;
+                self.edit_page
+                    .insert(id, (step / seq::PAGE_STEPS).min(pages - 1));
+            }
+        }
+    }
+
     /// Drops selections that point at things undo, delete or load removed.
     fn validate(&mut self, editor: &PatchEditor) {
+        self.follow_pages();
         let state = editor.state();
         if self.navigation_editor != editor.instance() {
             self.navigation_editor = editor.instance();
@@ -733,6 +761,7 @@ impl UiState {
             choose: None,
             moving: None,
             edit_banks: Some(&self.edit_view),
+            edit_pages: Some(&self.edit_page),
         }
     }
 
@@ -3181,7 +3210,7 @@ pub(crate) const BANKS_W: f32 = 3.0 * BANK_GROUP_W + 2.0 * BANK_GROUP_GAP;
 /// The sequencer's header row. EDIT picks the bank the face shows (view only); PLAY launches a
 /// bank with the sequencer's own timing and clock (runtime); the playing bank is lit, a queued
 /// one blinks, and Cancel drops the queued launch. Right-click an EDIT option for bank edits.
-/// The third group's place is kept for PAGE: the engine has no step pages yet.
+/// PAGE shows steps 1-8, 9-16, 17-24 or 25-32 (view only).
 #[allow(clippy::too_many_arguments)]
 fn draw_banks(
     editor: &mut PatchEditor,
@@ -3348,6 +3377,24 @@ fn draw_banks(
             }
         }
     }
+    // PAGE 1-4: which eight steps the face shows (view only).
+    let page_btns = group(r.left() + 2.0 * (BANK_GROUP_W + BANK_GROUP_GAP), "PAGE");
+    let page = ui_state.edit_page.get(&id).copied().unwrap_or(0);
+    for (pg, &t) in page_btns.iter().enumerate() {
+        ui_state.record(format!("bank-page:{id}.{pg}"), t);
+        let resp = ui.interact(t, Id::new(("kabl-seq-page", id, pg)), Sense::click());
+        option(t, &(pg + 1).to_string(), pg == page);
+        if resp
+            .on_hover_text(format!(
+                "Steps {}-{} (view only). Click again to follow playback",
+                pg * seq::PAGE_STEPS + 1,
+                (pg + 1) * seq::PAGE_STEPS
+            ))
+            .clicked()
+        {
+            ui_state.pick_page(id, pg);
+        }
+    }
 }
 
 /// Line colour of the G4 mockup's line faces (`edge`): text at 26 % (graphite) / 30 % (paper).
@@ -3383,15 +3430,18 @@ fn draw_seq_steps(
     let f = m.face;
     let edit = ui_state.edit_bank_of(editor.state(), m.id);
     let playing_bank = ui_state.seq_banks.get(&m.id).map_or(edit, |b| b.0);
+    let page = ui_state.edit_page.get(&m.id).copied().unwrap_or(0);
     let now = ui_state
         .seq_steps
         .get(&m.id)
         .copied()
-        .filter(|_| playing_bank == edit);
+        .filter(|_| playing_bank == edit)
+        .and_then(|s| s.checked_sub(page * seq::PAGE_STEPS))
+        .filter(|&s| s < seq::PAGE_STEPS);
     let at = |x: f32, y: f32| xf.p(f.min + vec2(x, y));
     painter.line_segment([at(136.0, 58.0), at(136.0, 272.0)], Stroke::new(1.0, edge));
-    let cw = (f.width() - 12.0 - 148.0) / seq::STEPS as f32;
-    for k in 0..seq::STEPS {
+    let cw = (f.width() - 12.0 - 148.0) / seq::PAGE_STEPS as f32;
+    for k in 0..seq::PAGE_STEPS {
         let cx = 148.0 + cw * (k as f32 + 0.5);
         let on = now == Some(k);
         if on {
@@ -3413,7 +3463,7 @@ fn draw_seq_steps(
             painter,
             at(cx, 82.0),
             egui::Align2::CENTER_CENTER,
-            &(k + 1).to_string(),
+            &(page * seq::PAGE_STEPS + k + 1).to_string(),
             11.0 * z,
             if on { ink } else { ink2 },
             true,
@@ -5377,6 +5427,29 @@ fn register_face_port(
 #[cfg(test)]
 mod tests {
     use super::port_label;
+
+    #[test]
+    fn page_chips_follow_playback_until_one_is_picked() {
+        let mut ui = super::UiState::default();
+        ui.seq_steps.insert(7, 3);
+        ui.follow_pages();
+        assert_eq!(ui.edit_page[&7], 0);
+        // The playhead crosses into steps 17-24 (index 16): page 3 follows.
+        ui.seq_steps.insert(7, 16);
+        ui.follow_pages();
+        assert_eq!(ui.edit_page[&7], 2);
+        ui.seq_steps.insert(7, 31);
+        ui.follow_pages();
+        assert_eq!(ui.edit_page[&7], 3);
+        // A picked page stays while playback moves on; picking it again releases it.
+        ui.pick_page(7, 1);
+        ui.seq_steps.insert(7, 0);
+        ui.follow_pages();
+        assert_eq!(ui.edit_page[&7], 1);
+        ui.pick_page(7, 1);
+        ui.follow_pages();
+        assert_eq!(ui.edit_page[&7], 0);
+    }
 
     #[test]
     fn messages_become_toasts_of_the_right_severity() {

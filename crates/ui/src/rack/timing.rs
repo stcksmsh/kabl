@@ -113,7 +113,7 @@ pub(super) fn seq_face(
     off_face: &mut Vec<usize>,
 ) {
     let x0 = SIDE + 136.0;
-    let cw = (fw - SIDE - x0) / seq::STEPS as f32;
+    let cw = (fw - SIDE - x0) / seq::PAGE_STEPS as f32;
     for &i in on {
         let param = &info.params[i];
         let slot = seq::slot_name(param.name);
@@ -121,7 +121,7 @@ pub(super) fn seq_face(
             slot.strip_prefix(pre)
                 .and_then(|k| k.parse::<usize>().ok())
                 .filter(|k| (1..=seq::STEPS).contains(k))
-                .map(|k| x0 + cw * (k as f32 - 0.5))
+                .map(|k| x0 + cw * (((k - 1) % seq::PAGE_STEPS) as f32 + 0.5))
         };
         let geo = match slot {
             "length" => Geo::Knob {

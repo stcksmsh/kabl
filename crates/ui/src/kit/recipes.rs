@@ -544,7 +544,13 @@ pub fn seq_lane(
     for (i, s) in steps.iter().enumerate() {
         let x = rect.left() + i as f32 * pitch;
         let well = Rect::from_min_size(pos2(x + 2.0, rect.top() + 10.0), vec2(pitch - 4.0, well_h));
-        ui.painter().rect_filled(well, 3.0, r.inset);
+        // Every other bar of 16 steps gets a lighter well, so a long pattern reads in bars.
+        let tint = if (i / 16) % 2 == 1 {
+            mix(r.inset, r.line2, 0.6)
+        } else {
+            r.inset
+        };
+        ui.painter().rect_filled(well, 3.0, tint);
         let h = if s.gate {
             (well_h * s.level.clamp(0.0, 1.0)).max(3.0)
         } else {
