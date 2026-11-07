@@ -487,6 +487,45 @@ impl App {
             ui.compare.open = true;
             ui.compare.capture(&self.editor, "you");
         }
+        // KABL_CAPTURE_SEQ_LEN=16|32 lengthens every sequencer bank (steps past 8 get a pattern);
+        // KABL_CAPTURE_PAGE=0..3 puts every sequencer's face and drawer on that page.
+        let seqs: Vec<_> = self
+            .editor
+            .state()
+            .modules
+            .iter()
+            .filter(|(_, m)| m.kind == "seq")
+            .map(|(&id, _)| id)
+            .collect();
+        if let Some(n) = std::env::var("KABL_CAPTURE_SEQ_LEN")
+            .ok()
+            .and_then(|v| v.parse::<f32>().ok())
+        {
+            for &id in &seqs {
+                for pre in ["", "b.", "c.", "d."] {
+                    self.editor.set_param(id, &format!("{pre}length"), n);
+                    for i in 9..=n as usize {
+                        let v = ((i * 7) % 60) as f32 + 40.0;
+                        let gate = if i % 3 != 0 { 1.0 } else { 0.0 };
+                        self.editor.set_param(id, &format!("{pre}g{i}"), gate);
+                        self.editor.set_param(id, &format!("{pre}v{i}"), v);
+                        self.editor.set_param(
+                            id,
+                            &format!("{pre}p{i}"),
+                            ((i * 5) % 13) as f32 - 4.0,
+                        );
+                    }
+                }
+            }
+        }
+        if let Some(pg) = std::env::var("KABL_CAPTURE_PAGE")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+        {
+            for &id in &seqs {
+                ui.edit_page.insert(id, pg);
+            }
+        }
         ui.perform_open = j.scene == "perform";
         ui.perform_tall = j.scene == "perform";
         if j.scene == "perform" {
