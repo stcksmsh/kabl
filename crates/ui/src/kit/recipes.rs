@@ -546,7 +546,7 @@ pub fn seq_lane(
         let well = Rect::from_min_size(pos2(x + 2.0, rect.top() + 10.0), vec2(pitch - 4.0, well_h));
         // Every other bar of 16 steps gets a lighter well, so a long pattern reads in bars.
         let tint = if (i / 16) % 2 == 1 {
-            mix(r.inset, r.line, 0.55)
+            mix(r.inset, r.line2, 0.6)
         } else {
             r.inset
         };

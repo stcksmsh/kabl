@@ -134,6 +134,10 @@ pub(crate) fn seq_panel(
             if r.clicked() {
                 explain::open(ui_state, explain::Subject::Module(id), None);
             }
+            let r = kit::icon_menu(ui, st, kit::Ic::More, |ui| {
+                bank_menu(editor, ui_state, ui, id, edit)
+            });
+            ui_state.record(format!("seq-bank-menu:{id}"), r.rect);
         });
     });
     ui.add_space(st.sp(2));
@@ -150,20 +154,18 @@ pub(crate) fn seq_panel(
                 }
             }
         });
+    });
+    ui.horizontal(|ui| {
         kit::section(ui, st, "Page");
         kit::segmented(ui, st, |ui| {
             for pg in 0..seq::STEPS / seq::PAGE_STEPS {
                 let r = kit::seg(ui, st, &(pg + 1).to_string(), pg == page);
                 ui_state.record(format!("drawer-page:{id}.{pg}"), r.rect);
                 if r.clicked() {
-                    ui_state.edit_page.insert(id, pg);
+                    ui_state.pick_page(id, pg);
                 }
             }
         });
-        let r = kit::icon_menu(ui, st, kit::Ic::More, |ui| {
-            bank_menu(editor, ui_state, ui, id, edit)
-        });
-        ui_state.record(format!("seq-bank-menu:{id}"), r.rect);
     });
     // What plays, and the launch settings behind the quantise label.
     let state = editor.state();

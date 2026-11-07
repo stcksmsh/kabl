@@ -523,7 +523,7 @@ impl App {
             .and_then(|v| v.parse::<usize>().ok())
         {
             for &id in &seqs {
-                ui.edit_page.insert(id, pg);
+                ui.pick_page(id, pg);
             }
         }
         ui.perform_open = j.scene == "perform";

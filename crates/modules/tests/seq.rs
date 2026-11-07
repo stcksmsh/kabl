@@ -11,6 +11,14 @@ const LENGTH: usize = 16;
 /// defaults and a reset pulse at each sample index in `resets`. Returns the pitch of every note
 /// played, read on its last gated sample (so a pitch change mid-note shows).
 fn notes(changes: &[(usize, f32)], resets: &[usize], steps: usize) -> Vec<f32> {
+    note_events(changes, resets, steps)
+        .into_iter()
+        .map(|(_, p)| p)
+        .collect()
+}
+
+/// Like [`notes`], with the sample at which each note's gate rises.
+fn note_events(changes: &[(usize, f32)], resets: &[usize], steps: usize) -> Vec<(usize, f32)> {
     let q = QualityConfig {
         tier: QualityTier::Live,
     };
@@ -50,10 +58,10 @@ fn notes(changes: &[(usize, f32)], resets: &[usize], steps: usize) -> Vec<f32> {
         seq.process(&mut ProcessIo::new(&ins, &mut outs, &params, BLOCK));
         for i in 0..BLOCK {
             if gate[i] > 0.5 && !high {
-                out.push(pitch[i]);
+                out.push((b * BLOCK + i, pitch[i]));
             }
             if gate[i] > 0.5 {
-                *out.last_mut().unwrap() = pitch[i];
+                out.last_mut().unwrap().1 = pitch[i];
             }
             high = gate[i] > 0.5;
         }
@@ -92,4 +100,35 @@ fn reset_restarts_the_pattern_on_the_next_tick() {
 #[test]
 fn reset_just_after_a_tick_plays_step_one() {
     assert_eq!(notes(&[], &[3 * STEP + 50], 5), [0.0, 3.0, 7.0, 0.0, 3.0]);
+}
+
+/// A 32-step pattern fires steps 17-32 on the clock, one per 16th note: every note's gate rises
+/// exactly one step (6000 samples) after the previous one, steps 17-32 included, with each
+/// step's own pitch, and the pattern wraps to step 1.
+#[test]
+fn a_32_step_pattern_fires_steps_17_to_32_at_the_right_sample_offsets() {
+    let idx = |name: &str| {
+        Seq::new()
+            .info()
+            .params
+            .iter()
+            .position(|p| p.name == name)
+            .unwrap()
+    };
+    let mut changes = vec![(idx("length"), 32.0)];
+    for k in 1..=32 {
+        changes.push((idx(&format!("p{k}")), k as f32));
+        changes.push((idx(&format!("g{k}")), 1.0));
+    }
+    let events = note_events(&changes, &[], 64);
+    assert_eq!(events.len(), 64);
+    let first = events[0].0;
+    for (n, &(at, pitch)) in events.iter().enumerate() {
+        assert_eq!(at, first + n * STEP, "note {n}");
+        assert_eq!(pitch, (n % 32 + 1) as f32, "note {n}");
+    }
+    // Steps 17-32 are the second half of the first pass.
+    assert_eq!(events[16].1, 17.0);
+    assert_eq!(events[31].1, 32.0);
+    assert_eq!(events[32].1, 1.0);
 }
