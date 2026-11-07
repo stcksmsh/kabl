@@ -321,7 +321,24 @@ pub fn editor(editor: &mut PatchEditor, view: &mut UiState, ctx: &egui::Context)
                                 let placed = view.panels.draft.placements.contains_key(&key);
                                 ui.horizontal(|ui| {
                                     ui.set_min_height(32.0);
-                                    kit::label(ui, st, Role::Value, Tone::Text3, format!("{key}"));
+                                    let kind_name = if c.ports.contains_key(&key) {
+                                        "Jack"
+                                    } else if matches!(&e.target, PortRef::Param { id: leaf, param }
+                                        if registry::info_for(&editor.state().modules[leaf].kind)
+                                            .is_some_and(|i| i.params.iter().any(|p| p.name == param && p.taper == Taper::Stepped)))
+                                    {
+                                        "Selector"
+                                    } else {
+                                        "Knob"
+                                    };
+                                    let (r, _) = ui.allocate_exact_size(egui::vec2(60.0, 22.0), egui::Sense::hover());
+                                    ui.painter().text(
+                                        r.left_center(),
+                                        egui::Align2::LEFT_CENTER,
+                                        kind_name,
+                                        st.font(Role::Value),
+                                        kit::tone(st, Tone::Text3),
+                                    );
                                     let label = view
                                         .panels
                                         .labels
