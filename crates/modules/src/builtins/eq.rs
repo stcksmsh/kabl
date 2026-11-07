@@ -21,7 +21,7 @@
 //! costs four multiplies and no trigonometry. Gains and frequencies set by a knob glide, so
 //! there is no zipper noise; a cable into a frequency or gain is followed at audio rate.
 
-use super::fx::{coef, flush, param, Glide, STEREO_IN, STEREO_OUT};
+use super::fx::{coef, param, Glide, STEREO_IN, STEREO_OUT};
 use crate::info::{Category, ModuleInfo, ParamInfo, PortInfo, QualitySupport, Rate, Taper};
 use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig};
@@ -150,7 +150,7 @@ impl Band {
         let v2 = z[1] + a2 * z[0] + a3 * v3;
         z[0] = 2.0 * v1 - z[0];
         z[1] = 2.0 * v2 - z[1];
-        flush((m0 * x + m1 * v1 + m2 * v2) as f32)
+        (m0 * x + m1 * v1 + m2 * v2) as f32
     }
 }
 

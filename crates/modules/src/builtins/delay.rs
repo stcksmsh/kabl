@@ -120,8 +120,6 @@ const CTRL_TAU_S: f32 = 0.02;
 const MAX_GLIDE: f64 = 0.5;
 /// Interval agreement needed to accept a clock interval.
 const AGREE: f32 = 0.1;
-/// Values this small are written as 0, so a decaying tail never goes subnormal (slow on x86).
-const TINY: f32 = 1e-20;
 
 /// Everything but the audio history. `Copy`, so a swap carries it whole.
 #[derive(Debug, Clone, Copy)]
@@ -228,15 +226,6 @@ pub(crate) fn read(buf: &[f32], write: usize, d: f64) -> f32 {
     ((c3 * t + c2) * t + c1) * t + x0
 }
 
-#[inline]
-fn flush(x: f32) -> f32 {
-    if x.abs() < TINY {
-        0.0
-    } else {
-        x
-    }
-}
-
 impl Module for Delay {
     fn as_any(&self) -> &dyn std::any::Any {
         self
@@ -325,11 +314,11 @@ impl Module for Delay {
 
             let yl = read(left, c.write, c.delay);
             let yr = read(right, c.write, c.delay);
-            c.tone_l = flush(c.tone_l + a_tone * (yl - c.tone_l));
-            c.tone_r = flush(c.tone_r + a_tone * (yr - c.tone_r));
+            c.tone_l = c.tone_l + a_tone * (yl - c.tone_l);
+            c.tone_r = c.tone_r + a_tone * (yr - c.tone_r);
             let x = input.at(i);
-            left[c.write] = flush(x + c.feedback * c.tone_r);
-            right[c.write] = flush(c.feedback * c.tone_l);
+            left[c.write] = x + c.feedback * c.tone_r;
+            right[c.write] = c.feedback * c.tone_l;
             c.write = (c.write + 1) % len;
 
             let centre = std::f32::consts::FRAC_1_SQRT_2 * (yl + yr);

@@ -139,6 +139,8 @@ fn run(args: &[String]) -> i32 {
     let stream = device.build_output_stream(
         config.config(),
         move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+            // Flush subnormals to zero for the whole callback; restored when it returns.
+            let _ftz = kabl_engine::ftz::FtzGuard::new();
             // Audio thread: apply any MIDI events queued since the last callback, then produce
             // and interleave samples. No allocation anywhere in this closure body.
             while let Ok(event) = midi_consumer.pop() {
