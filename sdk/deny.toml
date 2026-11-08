@@ -1,0 +1,13 @@
+# Licence policy for the SDK workspace. Run: cargo deny --manifest-path sdk/Cargo.toml check
+# The SDK is 0BSD and has no dependencies at all; this keeps it that way.
+[graph]
+targets = ["wasm32-unknown-unknown", "x86_64-unknown-linux-gnu"]
+
+[licenses]
+confidence-threshold = 0.9
+allow = ["0BSD"]
+
+[bans]
+multiple-versions = "deny"
+wildcards = "deny"
+allow-wildcard-paths = true # the examples depend on the SDK by path
