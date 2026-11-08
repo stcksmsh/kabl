@@ -2315,11 +2315,8 @@ fn main() -> eframe::Result<()> {
             Ok((log, _, code)) => {
                 // Named on the command line, so its embedded code is registered without the
                 // trust notice the browser shows.
-                let blobs = code
-                    .blobs()
-                    .map(|(_, b)| (b.module_id.as_str(), b.version, &b.bytes[..]));
-                for r in kabl_modules::code::host::register_all(blobs) {
-                    log::warn!(target: "app", "{r}");
+                for w in kabl_standalone::code_load::register_for_cli(&code, log.state()) {
+                    log::warn!(target: "app", "{w}");
                 }
                 let editor = PatchEditor::from_log(log);
                 // A library sound opened by path keeps its library identity (factory

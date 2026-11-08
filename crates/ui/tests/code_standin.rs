@@ -230,3 +230,25 @@ fn saving_through_a_stand_in_keeps_the_blob_and_settings() {
     assert_eq!(back_code.instance_hash(10), Some(&hash_of(&bytes)));
     assert_eq!(back_code.instance_blob(10).unwrap().bytes, bytes);
 }
+
+#[test]
+fn the_command_line_paths_open_with_stand_ins_too() {
+    // An unreadable blob and a kind with no blob at all: both from the patch's own usage.
+    let junk = b"\0asm\x01\0\0\0junk".to_vec();
+    let path = file(
+        "cli",
+        &patch(Some("test.si.cli")),
+        &with_blob("test.si.cli", &junk),
+    );
+    let (log, _, code) = format::load_kabl_full(&path).unwrap();
+    let w = kabl_standalone::code_load::register_for_cli(&code, log.state());
+    assert_eq!(w.len(), 1, "{w:?}");
+    assert!(w[0].contains("test.si.cli v1"), "{}", w[0]);
+    kabl_engine::compile::compile(log.state(), 48000.0, 4).expect("compiles with the stand-in");
+
+    let path = file("cli2", &patch(Some("test.si.cli2")), &Embedded::new());
+    let (log, _, code) = format::load_kabl_full(&path).unwrap();
+    let w = kabl_standalone::code_load::register_for_cli(&code, log.state());
+    assert_eq!(w.len(), 1, "{w:?}");
+    kabl_engine::compile::compile(log.state(), 48000.0, 4).expect("compiles with the stand-in");
+}

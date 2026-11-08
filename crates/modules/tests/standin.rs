@@ -99,3 +99,28 @@ fn audio_passes_through_in_order_and_everything_else_is_silent() {
         1
     );
 }
+
+#[test]
+fn a_stand_in_replaces_a_running_module_of_the_same_kind() {
+    use kabl_modules::code::standin::StandIn;
+    host::register_examples().unwrap();
+    let running = registry::create("demo.logic").unwrap();
+    assert!(!running.as_any().is::<StandIn>());
+    host::register_stand_in("demo.logic", 1, None, "declined", None);
+    let m = registry::create("demo.logic").unwrap();
+    assert!(
+        m.as_any().is::<StandIn>(),
+        "the failed module must not keep running"
+    );
+    // Loading it for real again brings the module back.
+    let bytes = host::EXAMPLES
+        .iter()
+        .find(|e| e.kind == "demo.logic")
+        .unwrap()
+        .wasm;
+    host::register_blob(bytes).unwrap();
+    assert!(!registry::create("demo.logic")
+        .unwrap()
+        .as_any()
+        .is::<StandIn>());
+}
