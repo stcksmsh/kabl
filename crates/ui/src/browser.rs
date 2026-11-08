@@ -102,6 +102,12 @@ pub enum Dialog {
     },
     /// Restore the comparison reference over the whole current patch (`compare.rs`).
     Restore,
+    /// "This patch contains custom code modules": Open runs `then`, which reads the patch again
+    /// now that the answer is remembered; Cancel drops it.
+    CodeNotice {
+        entries: Vec<crate::code_notice::CodeEntry>,
+        then: Pending,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -242,6 +248,8 @@ struct IoDone {
     selected: Option<String>,
     message: Option<String>,
     error: Option<(Option<(String, String)>, String)>,
+    /// A dialog the worker wants shown (the custom-code notice).
+    dialog: Option<Dialog>,
 }
 
 impl Drop for Browser {
@@ -356,6 +364,7 @@ fn start_io(editor: &PatchEditor, ui: &mut UiState, request: IoRequest) {
                 selected: scratch.browser.selected.take(),
                 message: scratch.last_message,
                 error,
+                dialog: scratch.browser.dialog.take(),
             }
         })
         .expect("spawn one document I/O worker");
@@ -406,6 +415,11 @@ pub fn poll_io(editor: &mut PatchEditor, ui: &mut UiState) {
                 }
             } else {
                 ui.last_message = done.message;
+                // A failed open can still change the library (a declined code answer cleared).
+                ui.library = done.library;
+                if let Some(d @ Dialog::CodeNotice { .. }) = done.dialog {
+                    ui.browser.dialog = Some(d);
+                }
             }
         }
         IoRequest::Save(then) => {
@@ -587,6 +601,19 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
                         }),
                     );
                 }
+                Err(LibError::CodeNotice(entries)) => {
+                    ui.browser.dialog = Some(Dialog::CodeNotice {
+                        entries,
+                        then: Pending::Open(id),
+                    });
+                }
+                Err(LibError::CodeDeclined(entries)) => {
+                    let note = lib.forget_code_trust(&entries);
+                    message(
+                        ui,
+                        note.unwrap_or_else(|| LibError::CodeDeclined(entries).to_string()),
+                    );
+                }
                 Err(err) => {
                     log::warn!(target: "doc", "open failed origin={} error={}; working patch kept", origin_kind(&id), err.log_text());
                     message(
@@ -597,7 +624,12 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
             }
         }
         Pending::OpenFolder(path) => {
-            match crate::library::read_patch(std::path::Path::new(&path)) {
+            let trust = ui
+                .library
+                .as_ref()
+                .map(|l| l.prefs.code_trust.clone())
+                .unwrap_or_default();
+            match crate::library::read_patch(std::path::Path::new(&path), &trust) {
                 Ok(log) => {
                     replace_patch(editor, ui, log);
                     log::info!(target: "doc", "open ok origin=folder editor={}", editor.instance());
@@ -608,6 +640,22 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
                         editor.state(),
                     ));
                     message(ui, format!("loaded {path}"));
+                }
+                Err(LibError::CodeNotice(entries)) => {
+                    ui.browser.dialog = Some(Dialog::CodeNotice {
+                        entries,
+                        then: Pending::OpenFolder(path),
+                    });
+                }
+                Err(LibError::CodeDeclined(entries)) => {
+                    let note = ui
+                        .library
+                        .as_mut()
+                        .and_then(|l| l.forget_code_trust(&entries));
+                    message(
+                        ui,
+                        note.unwrap_or_else(|| LibError::CodeDeclined(entries).to_string()),
+                    );
                 }
                 Err(err) => message(ui, {
                     log::warn!(target: "doc", "open failed origin=folder error={}; working patch kept", err.log_text());
@@ -2315,6 +2363,27 @@ pub fn dialogs(editor: &mut PatchEditor, ui_state: &mut UiState, ctx: &egui::Con
             }
             next
         }
+        Dialog::CodeNotice { entries, then } => match crate::code_notice::show(ctx, st, &entries) {
+            None => Some(Dialog::CodeNotice { entries, then }),
+            Some(open) => {
+                let note = ui_state
+                    .library
+                    .as_mut()
+                    .and_then(|l| l.remember_code_trust(&entries, open));
+                if open {
+                    perform(editor, ui_state, then);
+                    if let Some(n) = note {
+                        message(ui_state, n);
+                    }
+                } else {
+                    message(
+                        ui_state,
+                        note.unwrap_or_else(|| "not opened: its code was not run".into()),
+                    );
+                }
+                None
+            }
+        },
         Dialog::SaveAs {
             mut name,
             mut category,

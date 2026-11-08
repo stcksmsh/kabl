@@ -15,6 +15,7 @@ pub mod about;
 pub mod banks;
 pub mod browser;
 mod cable_look;
+pub mod code_examples;
 pub mod code_notice;
 pub mod compare;
 pub mod composites;
@@ -1348,7 +1349,19 @@ fn add_module_end(editor: &mut PatchEditor, ui_state: &mut UiState, kind: &str) 
         .filter(|(_, r)| rack::row_of(r.top()) == 0)
         .map(|(_, r)| r.right())
         .fold(rack::RACK_X, f32::max);
-    let id = editor.add_module_in_scope(kind, Vec2 { x, y: rack::ROW_Y0 }, ui_state.scope);
+    let pos = Vec2 { x, y: rack::ROW_Y0 };
+    // A code module with a ready-made panel goes in as its labelled composite (top level only).
+    if ui_state.scope.is_none() && code_examples::has_panel(kind) {
+        match code_examples::add(editor, kind, pos) {
+            Ok((leaf, _)) => {
+                ui_state.selected_module = Some(leaf);
+                ui_state.reveal = Some(leaf);
+            }
+            Err(e) => ui_state.last_message = Some(format!("couldn't add {kind}: {e}")),
+        }
+        return;
+    }
+    let id = editor.add_module_in_scope(kind, pos, ui_state.scope);
     ui_state.selected_module = Some(id);
     ui_state.reveal = Some(id);
 }
@@ -1431,9 +1444,12 @@ fn add_search(
             );
             te.request_focus();
             let needle = q.to_lowercase();
+            // The example code modules (D11) are listed after the built-ins once registered.
+            let _ = kabl_modules::code::host::register_examples();
             let kinds: Vec<&str> = PatchEditor::known_kinds()
                 .iter()
                 .copied()
+                .chain(kabl_modules::code::all_infos().into_iter().map(|i| i.kind))
                 .filter(|k| k.to_lowercase().contains(&needle))
                 .collect();
             let enter = ui.input(|i| i.key_pressed(egui::Key::Enter));

@@ -14,6 +14,7 @@ pub mod abi;
 pub mod budget;
 pub mod engine;
 pub mod fake;
+pub mod host;
 pub mod meta;
 pub mod module;
 pub mod wasmi_engine;
