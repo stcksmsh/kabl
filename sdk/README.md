@@ -5,12 +5,16 @@ API may change, breaking (D12 decisions, principle 0). Licence: 0BSD (see `LICEN
 host and `cargo kabl` are GPL-3.0-or-later and are not in this directory.
 
 - `kabl-module-sdk/`: the `no_std`, dependency-free crate. `Module` trait, `kabl_module!`, the
-  const `Meta` builder (emits `abi_minor` and the `kabl.meta` section), the `kabl.notices`
-  section, state save/load through a module-sized transfer buffer, and an opt-in bump arena
+  const `Meta` builder (emits `abi_minor` and the `kabl.meta` section), state save/load through a module-sized transfer buffer, and an opt-in bump arena
   (cargo feature `arena`).
 - `examples/logic`, `examples/bitfilter`: `demo.logic` and `demo.bitfilter` ported to the SDK.
   They carry no `unsafe` (`#![forbid(unsafe_code)]`) and no layout code.
-- `template/`: LICENSE stub for the `cargo kabl new` template (the template is D12 PR 2).
+- `template/`: the project `cargo kabl new` copies (a working module, one test, README, 0BSD
+  LICENSE, pinned toolchain).
+
+`kabl.notices` (the Rust toolchain's licence notices, from `kabl-module-sdk/NOTICE.txt`) is
+written by `cargo kabl build` after linking, so a blob built with plain `cargo build` has no
+notice and `cargo kabl validate` warns. Always ship the output of `cargo kabl build`.
 
 ```
 rustup target add wasm32-unknown-unknown            # once

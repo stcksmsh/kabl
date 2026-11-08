@@ -86,6 +86,43 @@ jobs:
         with:
           manifest-path: sdk/Cargo.toml
 
+  cargo-kabl:
+    # D12 PR 2: the CLI builds the creator template. Two clean builds on the pinned toolchain
+    # (sdk/template/rust-toolchain.toml, installed by rustup on first use) must be byte-identical
+    # (decision G, Linux only), and `cargo kabl new` must give a crate that tests and builds.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --locked -p cargo-kabl
+      - name: Template formatting and tests
+        run: |
+          rustfmt --check --edition 2021 sdk/template/src/lib.rs sdk/template/control.rs
+          cargo test --locked --manifest-path sdk/template/Cargo.toml
+      - name: Two clean builds of the template are byte-identical
+        run: |
+          set -euo pipefail
+          build() {
+            rm -rf sdk/template/target
+            target/debug/cargo-kabl kabl build --locked --manifest-path sdk/template/Cargo.toml >&2
+            sha256sum sdk/template/target/wasm32-unknown-unknown/release/kabl/*.wasm
+          }
+          a=$(build)
+          b=$(build)
+          echo "$a"; echo "$b"
+          test "$a" = "$b"
+      - name: cargo kabl new, both variants, tests and builds
+        run: |
+          set -euo pipefail
+          for kind in audio control; do
+            target/debug/cargo-kabl kabl new "ci.$kind" "--$kind" --into "$RUNNER_TEMP" --sdk-path "$PWD/sdk/kabl-module-sdk"
+            (cd "$RUNNER_TEMP/ci-$kind" && cargo test && "$OLDPWD/target/debug/cargo-kabl" kabl build)
+          done
+
   test:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
