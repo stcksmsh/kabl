@@ -143,7 +143,11 @@ fn migrate_converts_old_settings_in_the_transfer_buffer() {
     // the host puts layout-6 settings (a lone counter) in the buffer and calls migrate
     unsafe { (*p).xfer = [41, 0, 0, 0, 0, 0, 0, 0] };
     assert_eq!(MT::migrate(s, 4, 6), 8);
-    assert_eq!(MT::state_load(s, 8, 7), 1, "the result loads as the current layout");
+    assert_eq!(
+        MT::state_load(s, 8, 7),
+        1,
+        "the result loads as the current layout"
+    );
     assert_eq!(peek(s), 41);
     // unknown old versions, bad lengths and short data are refused
     assert_eq!(MT::migrate(s, 4, 5), -1);
