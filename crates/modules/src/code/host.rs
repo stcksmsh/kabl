@@ -10,6 +10,7 @@ use super::{
     PER_MODULE_SHARE,
 };
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
 /// An example module: its kind and the committed wasm.
@@ -118,4 +119,72 @@ pub fn blob_for(kind: &str) -> Option<(u32, Arc<[u8]>)> {
         .unwrap_or_else(|e| e.into_inner())
         .get(kind)
         .map(|e| (e.version, Arc::clone(&e.wasm)))
+}
+
+/// Registers every `(module id, version, wasm)` of a patch's embedded code, so the patch can
+/// build. A blob whose metadata names another module or version than the file says is refused.
+/// Used by the command-line `--patch` paths, which have no trust notice: the user named the file.
+pub fn register_all<'a>(
+    blobs: impl IntoIterator<Item = (&'a str, u32, &'a [u8])>,
+) -> Result<(), String> {
+    for (id, version, bytes) in blobs {
+        let r = register_blob(bytes).map_err(|e| format!("{id}: {e}"))?;
+        if r.kind != id || r.version != version {
+            return Err(format!(
+                "{id} v{version}: the code says it is {} v{}",
+                r.kind, r.version
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn latest() -> &'static Mutex<(f32, u32)> {
+    static L: Mutex<(f32, u32)> = Mutex::new((DEFAULT_SAMPLE_RATE, DEFAULT_BLOCK));
+    &L
+}
+
+static CALIBRATING: AtomicBool = AtomicBool::new(false);
+static CALIBRATED: AtomicBool = AtomicBool::new(false);
+
+/// True once a measured calibration (not the fallback) is in use.
+pub fn is_calibrated() -> bool {
+    CALIBRATED.load(Ordering::Acquire)
+}
+
+/// Call at app startup and whenever the audio device changes (sample rate or block size). The
+/// block period is applied at once; the fuel-per-microsecond calibration runs on a background
+/// thread (never the audio thread) and rebalances every module's budget when it finishes.
+/// Until then budgets use the conservative fallback. A call while a measurement is running only
+/// updates the period.
+pub fn device_changed(sample_rate: f32, block_frames: u32) {
+    let block = block_frames.max(1);
+    *latest().lock().unwrap_or_else(|e| e.into_inner()) = (sample_rate, block);
+    budget().update(None, sample_rate, block);
+    if CALIBRATING.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let spawned = std::thread::Builder::new()
+        .name("kabl-calibrate".into())
+        .spawn(|| {
+            if let Ok(cal) = Calibration::measure(engine()) {
+                // The device may have changed again while measuring: use the latest period.
+                let (sr, blk) = *latest().lock().unwrap_or_else(|e| e.into_inner());
+                // For benchmark runs inside a host (REAPER): set the variable to a file path.
+                if let Some(path) = std::env::var_os("KABL_CODE_CALIBRATION_REPORT") {
+                    let mut text = format!("worst_fuel_per_us {:.1}\n", cal.fuel_per_us);
+                    for (name, rate) in &cal.probes {
+                        text.push_str(&format!("{name} {rate:.1}\n"));
+                    }
+                    text.push_str(&format!("period_us {:.1}\n", blk as f64 / sr as f64 * 1e6));
+                    let _ = std::fs::write(path, text);
+                }
+                budget().update(Some(cal), sr, blk);
+                CALIBRATED.store(true, Ordering::Release);
+            }
+            CALIBRATING.store(false, Ordering::Release);
+        });
+    if spawned.is_err() {
+        CALIBRATING.store(false, Ordering::Release);
+    }
 }

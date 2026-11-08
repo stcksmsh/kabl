@@ -86,8 +86,19 @@ fn run(args: &[String]) -> i32 {
     }
 
     let patch = match flag_value(&args, "--patch") {
-        Some(dir) => match kabl_core::format::load_kabl(Path::new(&dir)) {
-            Ok(log) => log.state().clone(),
+        Some(dir) => match kabl_core::format::load_kabl_full(Path::new(&dir)) {
+            Ok((log, _, code)) => {
+                // The user named this file on the command line, so its embedded code is
+                // registered without the trust notice the UI shows.
+                let blobs = code
+                    .blobs()
+                    .map(|(_, b)| (b.module_id.as_str(), b.version, &b.bytes[..]));
+                if let Err(err) = kabl_modules::code::host::register_all(blobs) {
+                    log::error!(target: "app", "custom code in {dir}: {err}");
+                    return 1;
+                }
+                log.state().clone()
+            }
             Err(err) => {
                 log::error!(target: "app", "failed to load patch from {dir}: {err:?}");
                 return 1;
@@ -113,6 +124,9 @@ fn run(args: &[String]) -> i32 {
     let channels = config.channels() as usize;
     log::info!(target: "app", "output device ready, {sample_rate} Hz, {channels} channel(s), {DEFAULT_VOICE_COUNT} voices"
     );
+
+    // Code-module time budgets: the engine calls modules once per BLOCK frames.
+    kabl_modules::code::host::device_changed(sample_rate, kabl_engine::graph::BLOCK as u32);
 
     let collector = Collector::new();
     let handle = collector.handle();

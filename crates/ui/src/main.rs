@@ -533,6 +533,8 @@ impl AudioHost {
         }
 
         let sample_rate = config.sample_rate() as f32;
+        // Startup and every device change: code-module budgets follow the new period and machine.
+        kabl_modules::code::host::device_changed(sample_rate, kabl_engine::graph::BLOCK as u32);
         let channels = config.channels() as usize;
         let timing = Arc::new(CallbackTiming::default());
         let t = timing.clone();
@@ -2309,8 +2311,17 @@ fn main() -> eframe::Result<()> {
         log::warn!(target: "library", "{note}");
     }
     let editor = match flag("--patch") {
-        Some(dir) => match kabl_core::format::load_kabl(std::path::Path::new(&dir)) {
-            Ok(log) => {
+        Some(dir) => match kabl_core::format::load_kabl_full(std::path::Path::new(&dir)) {
+            Ok((log, _, code)) => {
+                // Named on the command line, so its embedded code is registered without the
+                // trust notice the browser shows.
+                let blobs = code
+                    .blobs()
+                    .map(|(_, b)| (b.module_id.as_str(), b.version, &b.bytes[..]));
+                if let Err(err) = kabl_modules::code::host::register_all(blobs) {
+                    log::error!(target: "app", "custom code in {dir}: {err}");
+                    std::process::exit(1);
+                }
                 let editor = PatchEditor::from_log(log);
                 // A library sound opened by path keeps its library identity (factory
                 // protection, name); anything else is a plain folder.

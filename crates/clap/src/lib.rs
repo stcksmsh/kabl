@@ -1073,6 +1073,11 @@ impl Plugin for Instrument {
         if !config.sample_rate.is_finite() || !(1000.0..=768000.0).contains(&config.sample_rate) {
             return false;
         }
+        // Code-module budgets follow the host's rate; calibration runs off this thread.
+        kabl_modules::code::host::device_changed(
+            config.sample_rate,
+            kabl_engine::graph::BLOCK as u32,
+        );
         let mut c = self.shared.control.lock().unwrap();
         let epoch = c.epoch;
         let gain = self.shared.native_value(0, false);
