@@ -201,6 +201,22 @@ pub fn write_kabl_full<W: Write>(
         lines.push_str(&serde_json::to_string(entry)?);
         lines.push('\n');
     }
+    if let Some(c) = code {
+        // Every reader refuses a file over MAX_KABL_BYTES, so refuse to write one. The log
+        // frame is bounded by its uncompressed size (plus zstd's small framing).
+        let frames: usize = c
+            .blobs()
+            .map(|(h, b)| 8 + Embedded::blob_payload(h, b).len())
+            .sum::<usize>()
+            + c.refs().count() * 48
+            + c.kept_states()
+                .map(|(_, _, b)| 8 + 12 + b.len())
+                .sum::<usize>();
+        let total = 20 + meta.map_or(0, |m| 8 + m.len()) + frames + lines.len() + 64;
+        if total > MAX_KABL_BYTES {
+            return Err(FormatError::TooLarge(MAX_KABL_BYTES));
+        }
+    }
     w.write_all(&SKIPPABLE_HEADER.to_le_bytes())?;
     w.write_all(&HEADER_PAYLOAD.to_le_bytes())?;
     w.write_all(b"KABL")?;
@@ -217,8 +233,12 @@ pub fn write_kabl_full<W: Write>(
         for (i, h) in c.refs() {
             write_frame(&mut w, SKIPPABLE_CODE_REF, &Embedded::ref_payload(i, h))?;
         }
-        for k in c.kept_states() {
-            write_frame(&mut w, SKIPPABLE_CODE_STATE, &Embedded::kept_payload(k))?;
+        for (i, v, bytes) in c.kept_states() {
+            write_frame(
+                &mut w,
+                SKIPPABLE_CODE_STATE,
+                &Embedded::kept_payload(i, v, bytes),
+            )?;
         }
     }
     let mut enc = zstd::stream::write::Encoder::with_dictionary(w, KABL_ZSTD_LEVEL, KABL_DICT_1)?;
@@ -291,6 +311,8 @@ fn read_kabl_full_limited<R: Read>(
     let mut body = &bytes[20..];
     let mut meta = None;
     let mut code = Embedded::new();
+    // References are bound after the loop: frames may come in any order.
+    let mut refs = Vec::new();
     // Skippable frames in any order; ones this build does not know are passed over.
     while body.len() >= 8 {
         let magic = u32::from_le_bytes(body[..4].try_into().unwrap());
@@ -325,7 +347,7 @@ fn read_kabl_full_limited<R: Read>(
             SKIPPABLE_CODE | SKIPPABLE_CODE_REF | SKIPPABLE_CODE_STATE => {
                 let r = match magic {
                     SKIPPABLE_CODE => code.read_blob(payload),
-                    SKIPPABLE_CODE_REF => code.read_ref(payload),
+                    SKIPPABLE_CODE_REF => Embedded::read_ref(payload).map(|r| refs.push(r)),
                     _ => code.read_kept(payload),
                 };
                 r.map_err(FormatError::Corrupt)?;
@@ -333,6 +355,10 @@ fn read_kabl_full_limited<R: Read>(
             _ => {}
         }
         body = &body[8 + n..];
+    }
+    for (instance, hash) in refs {
+        code.bind(instance, hash)
+            .map_err(|e| FormatError::Corrupt(e.to_string()))?;
     }
     let mut dec = zstd::stream::read::Decoder::with_dictionary(body, dict).map_err(corrupt)?;
     let mut text = Vec::new();

@@ -16,6 +16,8 @@ use crate::ModuleId;
 pub const MAX_CODE_BLOB_BYTES: usize = 2 << 20;
 /// Cap on distinct blobs in one file, so a hostile file cannot make the loader build a huge map.
 pub const MAX_CODE_BLOBS: usize = 256;
+/// Cap on kept old-version states in one file (same reason).
+pub const MAX_KEPT_STATES: usize = 4096;
 
 /// SHA-256 of a blob's bytes.
 pub type CodeHash = [u8; 32];
@@ -35,6 +37,8 @@ pub enum EmbedError {
     TooLarge { size: usize, cap: usize },
     /// More than [`MAX_CODE_BLOBS`] distinct blobs.
     TooMany,
+    /// More than [`MAX_KEPT_STATES`] kept states.
+    TooManyStates,
     /// An empty blob or an empty module id.
     Empty,
     /// The hash names no blob in this file.
@@ -51,6 +55,9 @@ impl std::fmt::Display for EmbedError {
                 "custom code module is {size} bytes; the limit is {cap} bytes (2 MiB)"
             ),
             EmbedError::TooMany => write!(f, "more than {MAX_CODE_BLOBS} custom code modules"),
+            EmbedError::TooManyStates => {
+                write!(f, "more than {MAX_KEPT_STATES} kept module states")
+            }
             EmbedError::Empty => write!(f, "custom code module has no id or no code"),
             EmbedError::UnknownHash(h) => write!(f, "no embedded code with hash {h}"),
             EmbedError::Conflict(h) => {
@@ -69,15 +76,6 @@ impl std::error::Error for EmbedError {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodeBlob {
     pub module_id: String,
-    pub version: u32,
-    pub bytes: Vec<u8>,
-}
-
-/// The state an instance had under an older module version, kept so reopening with that version
-/// restores it (and a later `migrate` export loses nothing).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct KeptState {
-    pub instance: ModuleId,
     pub version: u32,
     pub bytes: Vec<u8>,
 }
@@ -105,7 +103,9 @@ impl VersionChange {
 pub struct Embedded {
     blobs: BTreeMap<CodeHash, CodeBlob>,
     refs: BTreeMap<ModuleId, CodeHash>,
-    kept: Vec<KeptState>,
+    /// The state an instance had under an older module version, kept so reopening with that
+    /// version restores it (and a later `migrate` export loses nothing).
+    kept: BTreeMap<(ModuleId, u32), Vec<u8>>,
 }
 
 impl Embedded {
@@ -195,30 +195,26 @@ impl Embedded {
     }
 
     /// Records `instance`'s state under `version`; replaces an earlier one for the same pair.
-    pub fn keep_state(&mut self, instance: ModuleId, version: u32, bytes: Vec<u8>) {
-        match self
-            .kept
-            .iter_mut()
-            .find(|k| k.instance == instance && k.version == version)
-        {
-            Some(k) => k.bytes = bytes,
-            None => self.kept.push(KeptState {
-                instance,
-                version,
-                bytes,
-            }),
+    pub fn keep_state(
+        &mut self,
+        instance: ModuleId,
+        version: u32,
+        bytes: Vec<u8>,
+    ) -> Result<(), EmbedError> {
+        if self.kept.len() >= MAX_KEPT_STATES && !self.kept.contains_key(&(instance, version)) {
+            return Err(EmbedError::TooManyStates);
         }
+        self.kept.insert((instance, version), bytes);
+        Ok(())
     }
 
     pub fn kept_state(&self, instance: ModuleId, version: u32) -> Option<&[u8]> {
-        self.kept
-            .iter()
-            .find(|k| k.instance == instance && k.version == version)
-            .map(|k| &k.bytes[..])
+        self.kept.get(&(instance, version)).map(|b| &b[..])
     }
 
-    pub fn kept_states(&self) -> &[KeptState] {
-        &self.kept
+    /// `(instance, version, state)` for every kept state.
+    pub fn kept_states(&self) -> impl Iterator<Item = (ModuleId, u32, &[u8])> {
+        self.kept.iter().map(|(&(i, v), b)| (i, v, &b[..]))
     }
 
     /// Instances whose embedded version differs from the installed one (`installed` returns the
@@ -289,19 +285,21 @@ impl Embedded {
         p
     }
 
-    pub(crate) fn read_ref(&mut self, p: &[u8]) -> Result<(), String> {
+    /// Parses a reference frame; the caller binds it once every blob frame has been read.
+    pub(crate) fn read_ref(p: &[u8]) -> Result<(ModuleId, CodeHash), String> {
         if p.len() != 40 {
             return Err("code reference frame has the wrong size".into());
         }
-        let instance = u64::from_le_bytes(p[..8].try_into().unwrap());
-        self.bind(instance, p[8..].try_into().unwrap())
-            .map_err(|e| e.to_string())
+        Ok((
+            u64::from_le_bytes(p[..8].try_into().unwrap()),
+            p[8..].try_into().unwrap(),
+        ))
     }
 
-    pub(crate) fn kept_payload(k: &KeptState) -> Vec<u8> {
-        let mut p = k.instance.to_le_bytes().to_vec();
-        p.extend_from_slice(&k.version.to_le_bytes());
-        p.extend_from_slice(&k.bytes);
+    pub(crate) fn kept_payload(instance: ModuleId, version: u32, bytes: &[u8]) -> Vec<u8> {
+        let mut p = instance.to_le_bytes().to_vec();
+        p.extend_from_slice(&version.to_le_bytes());
+        p.extend_from_slice(bytes);
         p
     }
 
@@ -311,7 +309,7 @@ impl Embedded {
         }
         let instance = u64::from_le_bytes(p[..8].try_into().unwrap());
         let version = u32::from_le_bytes(p[8..12].try_into().unwrap());
-        self.keep_state(instance, version, p[12..].to_vec());
-        Ok(())
+        self.keep_state(instance, version, p[12..].to_vec())
+            .map_err(|e| e.to_string())
     }
 }
