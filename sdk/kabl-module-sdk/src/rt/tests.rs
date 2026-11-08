@@ -40,6 +40,15 @@ impl Module for T {
             w.u32(0); // 12 bytes into an 8-byte buffer
         }
     }
+    /// Layout 6 was the counter alone; 7 adds its complement.
+    fn migrate(old_version: u32, bytes: &[u8], out: &mut StateWriter) -> bool {
+        let Some(a) = StateReader::new(bytes).u32().filter(|_| old_version == 6) else {
+            return false;
+        };
+        out.u32(a);
+        out.u32(!a);
+        true
+    }
     fn load(&mut self, version: u32, bytes: &[u8]) -> bool {
         let mut r = StateReader::new(bytes);
         match (version, r.u32(), r.u32()) {
@@ -124,6 +133,23 @@ fn state_round_trip_through_the_transfer_buffer() {
         saved,
         "save after load is byte-identical"
     );
+}
+
+#[test]
+fn migrate_converts_old_settings_in_the_transfer_buffer() {
+    let s = store!();
+    MT::init(s, 48_000.0, 64);
+    let p = s.ptr();
+    // the host puts layout-6 settings (a lone counter) in the buffer and calls migrate
+    unsafe { (*p).xfer = [41, 0, 0, 0, 0, 0, 0, 0] };
+    assert_eq!(MT::migrate(s, 4, 6), 8);
+    assert_eq!(MT::state_load(s, 8, 7), 1, "the result loads as the current layout");
+    assert_eq!(peek(s), 41);
+    // unknown old versions, bad lengths and short data are refused
+    assert_eq!(MT::migrate(s, 4, 5), -1);
+    assert_eq!(MT::migrate(s, 2, 6), -1);
+    assert_eq!(MT::migrate(s, 9, 6), -1);
+    assert_eq!(MT::migrate(s, -1, 6), -1);
 }
 
 #[test]

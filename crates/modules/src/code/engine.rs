@@ -63,6 +63,8 @@ pub enum LoadError {
     ForbiddenImport(String),
     TooLarge { bytes: usize, cap: usize },
     AbiMismatch { module: u32, host: u32 },
+    /// The module needs a newer revision of the ABI than this host has.
+    AbiMinor { module: u32, host: u32 },
     MemoryOverCap { bytes: usize, cap: usize },
     Layout(String),
 }
@@ -80,6 +82,11 @@ impl std::fmt::Display for LoadError {
             LoadError::AbiMismatch { module, host } => write!(
                 f,
                 "code module targets ABI v{module}; this kabl runs v{host}"
+            ),
+            LoadError::AbiMinor { module, host } => write!(
+                f,
+                "code module needs ABI revision {module}; this kabl supports up to {host}. \
+                 Update kabl, or ask the module's author for a build for this version"
             ),
             LoadError::MemoryOverCap { bytes, cap } => write!(
                 f,
@@ -109,6 +116,15 @@ impl InstanceConfig {
     }
 }
 
+/// Where a module exchanges its saved settings with the host: a buffer in its own memory,
+/// declared in the `layout_ext` table, plus the version of the layout its `state_save` writes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StateXfer {
+    pub addr: usize,
+    pub cap: usize,
+    pub state_version: u32,
+}
+
 pub trait WasmEngine: Send + Sync {
     /// Validates and fully compiles `wasm` (no lazy translation: nothing may compile on first
     /// call). Rejects any import and any ABI mismatch. Blob size is checked by the caller side
@@ -134,4 +150,28 @@ pub trait WasmInstance: Send {
     /// Runs the module's `reset()` under the fuel the caller set with `set_fuel`, exactly like
     /// `call_block` (audio thread, no allocation on out-of-fuel).
     fn reset(&mut self) -> Result<(), Fault>;
+
+    /// The settings transfer buffer, when the module exports the state calls.
+    fn state_xfer(&self) -> Option<StateXfer> {
+        None
+    }
+    /// Whether the module exports `migrate`.
+    fn has_migrate(&self) -> bool {
+        false
+    }
+    /// `state_save() -> len`: the module writes its settings at the transfer buffer and returns
+    /// their length, or -1 when they do not fit. Control thread; a trap leaves the instance
+    /// unusable (drop it).
+    fn call_state_save(&mut self) -> Result<i32, Fault> {
+        Err(Fault::BadLayout)
+    }
+    /// `state_load(len, version) -> 1|0`: the host has put `len` bytes at the transfer buffer.
+    fn call_state_load(&mut self, _len: u32, _version: u32) -> Result<i32, Fault> {
+        Err(Fault::BadLayout)
+    }
+    /// `migrate(len, old_version) -> new_len|-1`: old settings in, new ones out, both at the
+    /// transfer buffer.
+    fn call_migrate(&mut self, _len: u32, _old_version: u32) -> Result<i32, Fault> {
+        Err(Fault::BadLayout)
+    }
 }

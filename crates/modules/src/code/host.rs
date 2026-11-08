@@ -2,7 +2,7 @@
 //! table of registered code blobs (so a save can embed exactly the code a patch uses).
 //!
 //! The example modules (`demo.logic`, `demo.bitfilter`) are committed as wasm blobs built from
-//! `crates/modules/code-examples` (see its `build.sh`). They are registered like any other
+//! `sdk/examples` with `kabl-module-sdk` (see `examples/README.md`). They are registered like any other
 //! blob, through [`register_blob`]; nothing about them is special after that.
 
 use super::standin::Report;

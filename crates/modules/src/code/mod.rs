@@ -18,6 +18,7 @@ pub mod host;
 pub mod meta;
 pub mod module;
 pub mod standin;
+pub mod state;
 pub mod wasmi_engine;
 
 pub use abi::{Layout, LayoutError, ABI_VERSION, DEFAULT_MEMORY_CAP, MAX_BLOB_BYTES};
@@ -123,12 +124,11 @@ impl CodeGroup {
             Some(i) => i,
             None => self.build_one()?,
         };
-        Ok(CodeModule::new(
-            self.info,
-            inst,
-            Arc::clone(&self.health),
-            &self.cfg,
-        ))
+        Ok(self.voice_from(inst))
+    }
+
+    fn voice_from(&self, inst: Box<dyn WasmInstance>) -> CodeModule {
+        CodeModule::new(self.info, inst, Arc::clone(&self.health), &self.cfg)
     }
 }
 
