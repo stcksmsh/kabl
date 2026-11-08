@@ -31,7 +31,9 @@ kabl module exception. As an additional permission under section 7 of the GNU GP
 module that interacts with kabl only through the documented kabl module ABI (exports, linear
 memory layout and metadata described in `docs/sdk/ABI.md`) is not considered a work based on
 kabl, and may be distributed under terms of your choice. This permission does not apply to any
-portion of kabl itself, including code copied from it into a module.
+portion of kabl itself, including code copied from it into a module. If you modify kabl, you may
+extend this exception to your version of kabl, but you are not obliged to do so. If you do not
+wish to do so, delete this exception statement from your version.
 
 The factory patches, the logo and the documentation are not covered by the licence of the code.
 See ASSET-LICENSES.md.
