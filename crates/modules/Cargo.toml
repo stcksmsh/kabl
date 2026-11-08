@@ -5,8 +5,14 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+# The code-module runtime (D11 decision 1). Pinned: ABI and fuel behaviour are tested against this
+# exact version. Interpreter only (no JIT); `validate` checks untrusted modules; `auto-dispatch` falls back to the
+# portable dispatch loop at opt-level 0/1 (the dev profile), where tail dispatch overflows the stack.
+wasmi = { version = "=2.0.0", default-features = false, features = ["stable", "std", "validate", "auto-dispatch"] }
 
 [dev-dependencies]
+# Test kernels are written as WAT text.
+wat = "1"
 # Only to verify a skin's embedded PNG actually decodes (crates/modules/tests/skin.rs) -- the
 # crate itself stays UI-framework/image-library-agnostic, see skin.rs's module doc.
 image = { version = "0.25", default-features = false, features = ["png"] }

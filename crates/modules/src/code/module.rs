@@ -8,8 +8,11 @@
 //! - running out of fuel, or a block taking longer than the wall-clock cap (the backstop), is an
 //!   **overrun**: that block is silent (same short fade), and eight in a row make a crash. A
 //!   one-off overrun is only counted.
-//! - nothing allocates while a block runs; debug builds mark the call
-//!   ([`in_code_call`]) so a checking allocator can assert it.
+//! - a normal block and an out-of-fuel block allocate nothing (the wasmi backend reads running
+//!   out of fuel from a resumable call instead of building an error). A real trap makes wasmi
+//!   build its error value: **one allocation, once**, because the module is disabled right
+//!   after and runs nothing further. Debug builds mark the call ([`in_code_call`]) so a checking
+//!   allocator can assert all of this.
 
 use super::abi::Layout;
 use super::engine::{Fault, InstanceConfig, WasmInstance};
@@ -88,6 +91,14 @@ impl Health {
 
     /// Per-block fuel and per-call wall-clock cap, rescaled by the controller (calibration and
     /// the 50 % total cap come in a later PR).
+    pub fn fuel_budget(&self) -> u64 {
+        self.fuel_budget.load(Relaxed)
+    }
+
+    pub fn wall_cap(&self) -> Duration {
+        Duration::from_nanos(self.wall_cap_ns.load(Relaxed))
+    }
+
     pub fn set_budget(&self, fuel: u64, wall_cap: Duration) {
         self.fuel_budget.store(fuel, Relaxed);
         self.wall_cap_ns.store(wall_cap.as_nanos() as u64, Relaxed);
