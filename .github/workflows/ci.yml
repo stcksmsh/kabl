@@ -57,6 +57,35 @@ jobs:
           python3 -I packaging/gen-notices.py > "$RUNNER_TEMP/notices.md"
           diff THIRD-PARTY-NOTICES.md "$RUNNER_TEMP/notices.md" || { echo "Regenerate: python3 -I packaging/gen-notices.py > THIRD-PARTY-NOTICES.md"; exit 1; }
 
+  sdk:
+    # The creator SDK is its own workspace (sdk/), outside the root one.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: sdk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: sdk
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy -p kabl-module-sdk --all-targets -- -D warnings
+      - run: cargo clippy -p kabl-module-sdk --all-targets --features arena -- -D warnings
+      - run: cargo clippy --release --locked --target wasm32-unknown-unknown -p sdk-demo-logic -p sdk-demo-bitfilter -- -D warnings
+      - name: Tests (native units, arena, and the wasm build of both examples)
+        run: |
+          cargo test --locked -p kabl-module-sdk
+          cargo test --locked -p kabl-module-sdk --features arena
+      - name: Allow-list check (sdk/deny.toml)
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: sdk/Cargo.toml
+
   test:
     runs-on: ubuntu-24.04
     timeout-minutes: 45

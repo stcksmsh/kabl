@@ -1,0 +1,13 @@
+[package]
+name = "kabl-module-sdk"
+description = "Write a kabl code module in safe Rust: the Module trait, kabl_module!, a const meta builder."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[features]
+# Opt-in bump arena: a module that declares `ARENA_BYTES` gets that much zeroed memory in `new`.
+arena = []
+
+[dependencies]

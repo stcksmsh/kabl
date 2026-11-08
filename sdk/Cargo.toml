@@ -1,0 +1,20 @@
+# kabl creator SDK (D12 PR 1). Its own cargo workspace, outside the kabl one (like
+# crates/modules/code-examples), and 0BSD licensed: see LICENSE.
+[workspace]
+resolver = "2"
+members = ["kabl-module-sdk", "examples/logic", "examples/bitfilter"]
+# The examples are `no_std` wasm cdylibs: they only build with --target wasm32-unknown-unknown.
+default-members = ["kabl-module-sdk"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "0BSD"
+
+[profile.release]
+opt-level = 3
+lto = true
+panic = "abort"
+codegen-units = 1
+strip = "debuginfo"
