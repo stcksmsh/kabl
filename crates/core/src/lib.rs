@@ -2,6 +2,7 @@
 
 pub mod cli;
 pub mod composite;
+pub mod embedded;
 pub mod format;
 mod log;
 pub mod migrate;
