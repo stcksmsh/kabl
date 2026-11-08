@@ -179,89 +179,153 @@ pub fn validate(wasm_bytes: &[u8], opts: Options) -> Report {
 
 /// Input patterns, one value per frame.
 type Stimulus = (&'static str, fn(usize) -> f32);
-// `f32::MAX` is left out on purpose: any module that scales its input overflows on it.
-const STIMULI: [Stimulus; 6] = [
+/// Tier 1: what a module can really receive (audio, CV, Hz-valued inputs are at most ~1e4).
+/// Non-finite output here is an error: the host disables the module.
+const REALISTIC: [Stimulus; 6] = [
     ("silence", |_| 0.0),
     ("impulse", |i| if i == 0 { 1.0 } else { 0.0 }),
-    ("full-scale square", |i| if i % 2 == 0 { 1.0 } else { -1.0 }),
-    ("+-1e30", |i| if i % 2 == 0 { 1.0e30 } else { -1.0e30 }),
+    ("full-scale square", |i| {
+        if i.is_multiple_of(2) {
+            1.0
+        } else {
+            -1.0
+        }
+    }),
+    (
+        "+-1e4",
+        |i| if i.is_multiple_of(2) { 1.0e4 } else { -1.0e4 },
+    ),
     ("f32::MIN_POSITIVE", |_| f32::MIN_POSITIVE),
-    ("denormals", |i| if i % 2 == 0 { 1.0e-40 } else { -1.0e-40 }),
+    ("denormals", |i| {
+        if i.is_multiple_of(2) {
+            1.0e-40
+        } else {
+            -1.0e-40
+        }
+    }),
 ];
+/// Tier 2: absurd inputs, smallest first. Non-finite output is only a warning, naming the
+/// smallest magnitude that did it (`x * x` is infinite from about 2e19).
+const EXTREME: [f32; 6] = [1.0e6, 1.0e9, 1.0e12, 1.0e15, 1.0e20, 1.0e30];
 
-/// Output beyond this is allowed but probably a blow-up.
+/// Output beyond this on an input of +-1 or less is allowed but probably a blow-up.
 const BIG: f32 = 1.0e6;
 
-fn smoke(meta: &CodeMeta, inst: &mut dyn WasmInstance, r: &mut Report) {
+struct Pass {
+    fuel: u64,
+    peak: f32,
+    non_finite: bool,
+}
+
+/// Renders `BLOCKS` blocks of `f` with `params` after a reset; `Err` is a fault or a bad reset.
+fn render(
+    inst: &mut dyn WasmInstance,
+    f: &dyn Fn(usize) -> f32,
+    params: &[f32],
+    frames: usize,
+) -> Result<Pass, String> {
     let layout = inst.layout();
-    let frames = FRAMES.min(layout.max_block as usize);
+    inst.reset().map_err(|f| format!("reset {}", f.label()))?;
+    let mut pass = Pass {
+        fuel: 0,
+        peak: 0.0,
+        non_finite: false,
+    };
+    for block in 0..BLOCKS {
+        let mem = inst.memory();
+        for slot in 0..layout.in_slots as usize {
+            for (i, c) in mem[layout.input_range(slot)]
+                .chunks_exact_mut(4)
+                .take(frames)
+                .enumerate()
+            {
+                c.copy_from_slice(&f(block * frames + i).to_le_bytes());
+            }
+        }
+        for (i, v) in params.iter().enumerate() {
+            mem[layout.param_range(i)].copy_from_slice(&v.to_le_bytes());
+        }
+        inst.set_fuel(FUEL);
+        pass.fuel = pass.fuel.max(
+            inst.call_block(frames as u32)
+                .map_err(|f| f.label().to_owned())?,
+        );
+        let mem = inst.memory();
+        for slot in 0..layout.out_slots as usize {
+            for c in mem[layout.output_range(slot)].chunks_exact(4).take(frames) {
+                let v = f32::from_le_bytes([c[0], c[1], c[2], c[3]]);
+                pass.non_finite |= !v.is_finite();
+                if v.is_finite() {
+                    pass.peak = pass.peak.max(v.abs());
+                }
+            }
+        }
+    }
+    Ok(pass)
+}
+
+fn smoke(meta: &CodeMeta, inst: &mut dyn WasmInstance, r: &mut Report) {
+    let frames = FRAMES.min(inst.layout().max_block as usize);
     let sets: [(&str, Vec<f32>); 3] = [
         ("default", meta.params.iter().map(|p| p.default).collect()),
         ("minimum", meta.params.iter().map(|p| p.min).collect()),
         ("maximum", meta.params.iter().map(|p| p.max).collect()),
     ];
     let mut max_fuel = 0u64;
-    for (sname, f) in STIMULI {
+    let mut blew_up = false;
+    for (sname, f) in REALISTIC {
         for (pname, params) in &sets {
-            if let Err(f) = inst.reset() {
-                r.errors.push(format!("reset {}", f.label()));
-                return;
-            }
-            for block in 0..BLOCKS {
-                let mem = inst.memory();
-                for slot in 0..layout.in_slots as usize {
-                    let range = layout.input_range(slot);
-                    for (i, c) in mem[range].chunks_exact_mut(4).take(frames).enumerate() {
-                        c.copy_from_slice(&f(block * frames + i).to_le_bytes());
-                    }
+            match render(inst, &f, params, frames) {
+                Err(e) => {
+                    r.errors.push(format!(
+                        "smoke render: module {e} (input: {sname}, params: {pname})"
+                    ));
+                    return;
                 }
-                for (i, v) in params.iter().enumerate() {
-                    mem[layout.param_range(i)].copy_from_slice(&v.to_le_bytes());
+                Ok(p) if p.non_finite => {
+                    r.errors.push(format!(
+                        "smoke render: output is not finite (input: {sname}, params: {pname}); \
+                         the host disables a module that does this"
+                    ));
+                    return;
                 }
-                inst.set_fuel(FUEL);
-                match inst.call_block(frames as u32) {
-                    Ok(fuel) => max_fuel = max_fuel.max(fuel),
-                    Err(fault) => {
-                        r.errors.push(format!(
-                            "smoke render: module {} (input: {sname}, params: {pname})",
-                            fault.label()
-                        ));
-                        return;
-                    }
-                }
-                let mem = inst.memory();
-                for slot in 0..layout.out_slots as usize {
-                    let out = || {
-                        mem[layout.output_range(slot)]
-                            .chunks_exact(4)
-                            .take(frames)
-                            .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-                    };
-                    let bad = out().any(|v| !v.is_finite());
-                    // A huge output from a huge input is no blow-up; only judge the sane inputs.
-                    let sane = sname != "+-1e30";
-                    if sane
-                        && out().any(|v| v.abs() > BIG)
-                        && !r.warnings.iter().any(|w| w.contains("exceeds"))
-                    {
+                Ok(p) => {
+                    max_fuel = max_fuel.max(p.fuel);
+                    if !blew_up && p.peak > BIG && sname != "+-1e4" {
+                        blew_up = true;
                         r.warnings.push(format!(
-                            "output slot {slot} exceeds +-{BIG} (input: {sname}, params: {pname}); a blow-up?"
+                            "output reaches {} on an input of +-1 or less (input: {sname}, \
+                             params: {pname}); the output exceeds +-{BIG}, a blow-up?",
+                            p.peak
                         ));
-                    }
-                    if bad {
-                        r.errors.push(format!(
-                            "smoke render: output slot {slot} is not finite (input: {sname}, \
-                             params: {pname}); the host disables a module that does this"
-                        ));
-                        return;
                     }
                 }
             }
         }
     }
+    // Tier 2: the smallest absurd input that makes the output non-finite.
+    let mut failed = None;
+    'ladder: for mag in EXTREME {
+        let f = move |i: usize| if i.is_multiple_of(2) { mag } else { -mag };
+        for (_, params) in &sets {
+            match render(inst, &f, params, frames) {
+                Ok(p) if !p.non_finite => max_fuel = max_fuel.max(p.fuel),
+                Ok(_) | Err(_) => {
+                    failed = Some(mag);
+                    break 'ladder;
+                }
+            }
+        }
+    }
+    if let Some(mag) = failed {
+        r.warnings.push(format!(
+            "kabl stops this module if an input reaches about +-{mag:e} (its output goes \
+             non-finite or it faults there); guard huge inputs if that matters"
+        ));
+    }
     r.notes.push(format!(
-        "smoke render ok: {} stimuli x {} param sets, {frames}-frame blocks, at most {max_fuel} fuel per block",
-        STIMULI.len(),
+        "smoke render ok: {} realistic stimuli x {} param sets, {frames}-frame blocks, at most {max_fuel} fuel per block",
+        REALISTIC.len(),
         sets.len()
     ));
 }
@@ -379,6 +443,15 @@ port in audio in 1\\nport out audio out 1\\nparam g 0 4 1 linear 5 x\\n{extra}";
         let boom = "(f32.store (i32.const 8256) (f32.const 1e9))";
         let r = validate(&blob("alice.t", "", "", 16448, boom), Options::default());
         assert!(text(&r.warnings).contains("exceeds"));
+    }
+
+    #[test]
+    fn a_square_overflows_only_on_absurd_inputs_so_it_warns() {
+        let sq = "(f32.store (i32.const 8256) (f32.mul (f32.load (i32.const 64)) (f32.load (i32.const 64))))";
+        let r = validate(&blob("alice.t", "", "", 16448, sq), Options::default());
+        assert!(r.ok(), "{}", text(&r.errors));
+        let w = text(&r.warnings);
+        assert!(w.contains("input reaches about +-1e20"), "{w}");
     }
 
     #[test]
