@@ -415,8 +415,9 @@ pub fn poll_io(editor: &mut PatchEditor, ui: &mut UiState) {
                 }
             } else {
                 ui.last_message = done.message;
+                // A failed open can still change the library (a declined code answer cleared).
+                ui.library = done.library;
                 if let Some(d @ Dialog::CodeNotice { .. }) = done.dialog {
-                    ui.library = done.library;
                     ui.browser.dialog = Some(d);
                 }
             }
