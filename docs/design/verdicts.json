@@ -400,6 +400,36 @@
       "item": "D12 decision G: reproducible builds",
       "verdict": "approve",
       "note": "Two clean Linux CI builds on the pinned toolchain byte-identical; no cross-OS promise."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 contradiction 1: unknown meta keys",
+      "verdict": "approve",
+      "note": "Host ignores unknown keys; module declares abi_minor N and the host rejects N above its own minor; cargo kabl validator warns on unknown keys. PR 0 host, PR 2 validator."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 contradiction 2: layout growth",
+      "verdict": "approve",
+      "note": "Optional export layout_ext() returns the address of a length-prefixed table (count, then extension words); unaware hosts ignore it. PR 0."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 contradiction 3: 0BSD notices",
+      "verdict": "approve",
+      "note": "Keep 0BSD; cargo kabl build writes the Rust toolchain MIT notice (core/compiler_builtins) into a kabl.notices custom section shown in module info; docs say notices handled automatically. PR 2 plus a host display item in PR 4."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 contradiction 4: authorship",
+      "verdict": "approve",
+      "note": "Finalise CONTRIBUTING.md; add to COPYRIGHT that commits authored as Claude are output of the owner's AI-assisted sessions with rights held by the owner (Anthropic terms assign Outputs rights 'if any' to the user; no third party holds rights, so the module exception needs no one else's consent). Edits go in PR 0."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 governing principle: nothing is set in stone until we ship",
+      "verdict": "approve",
+      "note": "Until kabl 1.0 ships the ABI, layout, meta format, package format and every other contract may change, including breaking changes (rebuild examples and saved test files, add a changelog line). Additive-only and escalate-to-Kosta apply from the 1.0 ship. Overrides D12 decisions 1 and D wording: v0 blobs may be rejected with a rebuild message before ship; the compatibility corpus is a regenerable regression check until the 1.0 freeze."
     }
   ]
 }
