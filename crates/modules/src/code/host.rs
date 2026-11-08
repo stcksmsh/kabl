@@ -48,6 +48,8 @@ pub struct Registered {
 struct Entry {
     version: u32,
     wasm: Arc<[u8]>,
+    /// The sample rate the group's instances were built for.
+    rate: f32,
 }
 
 fn engine() -> &'static Arc<WasmiEngine> {
@@ -79,13 +81,19 @@ pub fn register_blob(wasm: &[u8]) -> Result<Registered, LoadError> {
     let compiled = engine().compile(wasm)?;
     let meta = compiled.meta();
     let (kind, version) = (meta.kind.clone(), meta.version);
+    let rate = latest().lock().unwrap_or_else(|e| e.into_inner()).0;
     {
         let table = blobs().lock().unwrap_or_else(|e| e.into_inner());
-        if table.get(&kind).is_some_and(|e| *e.wasm == *wasm) && super::group(&kind).is_some() {
+        if table
+            .get(&kind)
+            .is_some_and(|e| *e.wasm == *wasm && e.rate == rate)
+            && super::group(&kind).is_some()
+        {
             return Ok(Registered { kind, version });
         }
     }
-    let cfg = InstanceConfig::new(DEFAULT_SAMPLE_RATE, MAX_BLOCK);
+    // `init` receives this rate, so a module's coefficients match the running device.
+    let cfg = InstanceConfig::new(rate, MAX_BLOCK);
     let group = CodeGroup::new(compiled, cfg, 1, std::time::Duration::from_secs(1))?;
     budget().register_with(group.health(), PER_MODULE_SHARE);
     super::unregister(&kind);
@@ -95,6 +103,7 @@ pub fn register_blob(wasm: &[u8]) -> Result<Registered, LoadError> {
         Entry {
             version,
             wasm: Arc::from(wasm),
+            rate,
         },
     );
     Ok(Registered { kind, version })
@@ -144,6 +153,20 @@ fn latest() -> &'static Mutex<(f32, u32)> {
     &L
 }
 
+/// A new sample rate: every registered module gets a fresh group built for it (graphs built
+/// from now on use it; a running graph is rebuilt by the app when the device restarts).
+fn rebuild_for_rate() {
+    let all: Vec<Arc<[u8]>> = blobs()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .values()
+        .map(|e| Arc::clone(&e.wasm))
+        .collect();
+    for wasm in all {
+        let _ = register_blob(&wasm);
+    }
+}
+
 static CALIBRATING: AtomicBool = AtomicBool::new(false);
 static CALIBRATED: AtomicBool = AtomicBool::new(false);
 
@@ -159,7 +182,14 @@ pub fn is_calibrated() -> bool {
 /// updates the period.
 pub fn device_changed(sample_rate: f32, block_frames: u32) {
     let block = block_frames.max(1);
-    *latest().lock().unwrap_or_else(|e| e.into_inner()) = (sample_rate, block);
+    let old_rate = std::mem::replace(
+        &mut *latest().lock().unwrap_or_else(|e| e.into_inner()),
+        (sample_rate, block),
+    )
+    .0;
+    if old_rate != sample_rate {
+        rebuild_for_rate();
+    }
     budget().update(None, sample_rate, block);
     if CALIBRATING.swap(true, Ordering::AcqRel) {
         return;
