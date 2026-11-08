@@ -179,17 +179,18 @@ pub fn validate(wasm_bytes: &[u8], opts: Options) -> Report {
 
 /// Input patterns, one value per frame.
 type Stimulus = (&'static str, fn(usize) -> f32);
-const STIMULI: [Stimulus; 4] = [
+// `f32::MAX` is left out on purpose: any module that scales its input overflows on it.
+const STIMULI: [Stimulus; 6] = [
     ("silence", |_| 0.0),
     ("impulse", |i| if i == 0 { 1.0 } else { 0.0 }),
-    ("extremes", |i| if i % 2 == 0 { 1.0e6 } else { -1.0e6 }),
-    ("NaN and infinity", |i| match i {
-        0 => f32::NAN,
-        1 => f32::INFINITY,
-        2 => f32::NEG_INFINITY,
-        _ => 0.0,
-    }),
+    ("full-scale square", |i| if i % 2 == 0 { 1.0 } else { -1.0 }),
+    ("+-1e30", |i| if i % 2 == 0 { 1.0e30 } else { -1.0e30 }),
+    ("f32::MIN_POSITIVE", |_| f32::MIN_POSITIVE),
+    ("denormals", |i| if i % 2 == 0 { 1.0e-40 } else { -1.0e-40 }),
 ];
+
+/// Output beyond this is allowed but probably a blow-up.
+const BIG: f32 = 1.0e6;
 
 fn smoke(meta: &CodeMeta, inst: &mut dyn WasmInstance, r: &mut Report) {
     let layout = inst.layout();
@@ -230,10 +231,23 @@ fn smoke(meta: &CodeMeta, inst: &mut dyn WasmInstance, r: &mut Report) {
                 }
                 let mem = inst.memory();
                 for slot in 0..layout.out_slots as usize {
-                    let bad = mem[layout.output_range(slot)]
-                        .chunks_exact(4)
-                        .take(frames)
-                        .any(|c| !f32::from_le_bytes([c[0], c[1], c[2], c[3]]).is_finite());
+                    let out = || {
+                        mem[layout.output_range(slot)]
+                            .chunks_exact(4)
+                            .take(frames)
+                            .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+                    };
+                    let bad = out().any(|v| !v.is_finite());
+                    // A huge output from a huge input is no blow-up; only judge the sane inputs.
+                    let sane = sname != "+-1e30";
+                    if sane
+                        && out().any(|v| v.abs() > BIG)
+                        && !r.warnings.iter().any(|w| w.contains("exceeds"))
+                    {
+                        r.warnings.push(format!(
+                            "output slot {slot} exceeds +-{BIG} (input: {sname}, params: {pname}); a blow-up?"
+                        ));
+                    }
                     if bad {
                         r.errors.push(format!(
                             "smoke render: output slot {slot} is not finite (input: {sname}, \
@@ -350,9 +364,21 @@ port in audio in 1\\nport out audio out 1\\nparam g 0 4 1 linear 5 x\\n{extra}";
     }
 
     #[test]
-    fn nan_passthrough_fails_the_smoke_render() {
-        let e = text(&validate(&blob("alice.t", "", "", 16448, PASS), Options::default()).errors);
-        assert!(e.contains("not finite") && e.contains("NaN"), "{e}");
+    fn non_finite_output_fails_the_smoke_render() {
+        let inf = "(f32.store (i32.const 8256) (f32.const inf))";
+        let e = text(&validate(&blob("alice.t", "", "", 16448, inf), Options::default()).errors);
+        assert!(e.contains("not finite"), "{e}");
+    }
+
+    #[test]
+    fn a_huge_output_warns() {
+        let r = validate(&blob("alice.t", "", "", 16448, PASS), Options::default());
+        assert!(r.ok(), "{}", text(&r.errors));
+        // PASS copies its input, so only the huge inputs give huge output: no warning.
+        assert!(!text(&r.warnings).contains("exceeds"));
+        let boom = "(f32.store (i32.const 8256) (f32.const 1e9))";
+        let r = validate(&blob("alice.t", "", "", 16448, boom), Options::default());
+        assert!(text(&r.warnings).contains("exceeds"));
     }
 
     #[test]

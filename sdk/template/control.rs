@@ -34,10 +34,8 @@ impl Module for Scale {
     fn process(&mut self, io: &mut Io) {
         let (amount, offset) = (io.param(AMOUNT), io.param(OFFSET));
         for i in 0..io.n {
-            // The host disables a module that outputs NaN or infinity, and `cargo kabl validate`
-            // feeds you both, so guard the input.
-            let x = io.input[IN][i];
-            io.output[OUT][i] = if x.is_finite() { x * amount } else { 0.0 } + offset;
+            // Inputs are always finite; the host disables a module whose output is not.
+            io.output[OUT][i] = io.input[IN][i] * amount + offset;
         }
     }
 }

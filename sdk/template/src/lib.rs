@@ -39,10 +39,8 @@ impl Module for Gain {
     fn process(&mut self, io: &mut Io) {
         let g = io.param(GAIN);
         for i in 0..io.n {
-            // The host disables a module that outputs NaN or infinity, and `cargo kabl validate`
-            // feeds you both, so guard the input.
-            let x = io.input[IN][i];
-            io.output[OUT][i] = if x.is_finite() { x * g } else { 0.0 };
+            // Inputs are always finite; the host disables a module whose output is not.
+            io.output[OUT][i] = io.input[IN][i] * g;
         }
         self.last = g;
     }
