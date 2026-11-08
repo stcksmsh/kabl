@@ -286,6 +286,120 @@
       "item": "D11 follow-up: fuel calibration rules",
       "verdict": "approve",
       "note": "Calibrate with the slowest fuel-per-us code mix so the fuel budget never exceeds the time cap; wall-clock backstop times each process() call and over the per-module cap counts as an overrun even with fuel left (8 in a row = crash); report calibration values on the dev machine and inside REAPER."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision 1: no ABI freeze before 1.0",
+      "verdict": "approve",
+      "note": "ABI stays preview until 1.0; each revision only adds optional exports/meta keys, never changes or removes; v0 blobs stay loadable; breaking change escalated to Kosta; freeze is 1.0 release work."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision 2: metadata format",
+      "verdict": "approve",
+      "note": "kabl.meta text stays in the wasm; JSON only in the package manifest; creators edit neither by hand."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision 3: licensing",
+      "verdict": "approve",
+      "note": "Host GPL-3.0-or-later plus a section 7 module exception in COPYRIGHT; SDK crate, macro, meta builder, template, package/manifest spec 0BSD; cargo kabl CLI with the test harness GPL-3.0-or-later; no kabl-module-test crate; manifest licence required, source required for copyleft; publishing a package permits redistribution inside songs."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision 4: package format",
+      "verdict": "approve",
+      "note": ".kablmod zip; same id and version with different hash refused with both hashes shown; same id from another author: first install wins; songs use their embedded copy."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision 5: trust",
+      "verdict": "approve",
+      "note": "Keep hash plus one-time Open/Cancel; reserve optional signature field in the manifest."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision 6: languages",
+      "verdict": "approve",
+      "note": "Rust supported; one-page C example (~60 lines) proves the ABI doc stands alone."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision 7: migrate",
+      "verdict": "approve",
+      "note": "Module-exported migrate(old_version, state); trap falls back to defaults plus kept settings; downgrade starts at defaults and the song keeps the newer settings."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision 8: capabilities",
+      "verdict": "approve",
+      "note": "None in D12; reserve the manifest field."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision 9: denormals",
+      "verdict": "approve",
+      "note": "FtzGuard (#128) covers wasm in the callback; docs only; the CLI offline harness must run under FtzGuard."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision 10: polyphony",
+      "verdict": "approve",
+      "note": "Validator renders 16 voices for voice-rate modules and states the run time."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision 11: SDK location",
+      "verdict": "approve",
+      "note": "sdk/ in this repo until after the first fresh-agent run passes."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision 12: cost figure",
+      "verdict": "approve",
+      "note": "Percent of block at 48 kHz/64, labelled estimate."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision A: publishing",
+      "verdict": "approve",
+      "note": "Publish 0.x at the beta under Kosta's own account; binary named cargo-kabl."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision B: module ids",
+      "verdict": "approve",
+      "note": "githubhandle.module; reserve kabl., demo., test.; the validator rejects them for third-party modules."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision C: module memory",
+      "verdict": "approve",
+      "note": "Opt-in bump arena in the SDK; SDK-only, no ABI change."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision D: v0 blobs",
+      "verdict": "approve",
+      "note": "Not rejected; nothing is removed, so existing blobs and saved .kabl files stay loadable."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision E: beta scope",
+      "verdict": "approve",
+      "note": "PRs 0-4 and 6 (about 2,800 lines); panels wait for 1.0; compatibility corpus starts in PR 0."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision F: fresh-agent test",
+      "verdict": "approve",
+      "note": "Different model, fresh context, docs and crate only, fixed task list, two runs with two modules; pass = both succeed, at most 3 doc defects each, all fixed."
+    },
+    {
+      "date": "2026-11-08",
+      "item": "D12 decision G: reproducible builds",
+      "verdict": "approve",
+      "note": "Two clean Linux CI builds on the pinned toolchain byte-identical; no cross-OS promise."
     }
   ]
 }
