@@ -497,3 +497,69 @@ fn two_blobs_of_one_kind_coexist_and_a_stand_in_never_replaces_anothers_group() 
     assert_eq!(render_in(&CodeScope::new(), kind), [1.5; N]);
     assert_eq!(render_in(&song_b, kind), [2.5; N]);
 }
+
+#[test]
+fn only_modules_in_use_divide_the_shared_budget() {
+    use kabl_modules::code::{PER_MODULE_SHARE, TOTAL_SHARE};
+    let _g = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+    // Twelve revisions of one module stay registered (twelve songs were opened)...
+    let regs: Vec<_> = (1..=12)
+        .map(|v| host::register_blob(&versioned("test.budget", v, v as i32)).unwrap())
+        .collect();
+    // ...and one of them plays.
+    let group = kabl_modules::code::group_by_key(&regs[3].key).unwrap();
+    let voice = group.voice().unwrap();
+    // The block period the host budget was built for.
+    let cal = host::budget().calibration();
+    let period_us = f64::from(512u32) / 48_000.0 * 1e6;
+    let full = cal.fuel_for_us(period_us * PER_MODULE_SHARE);
+    assert_eq!(
+        group.health().fuel_budget(),
+        full,
+        "the module in use gets its whole share, not a twelfth of the total"
+    );
+    // An idle revision does not take any of the total away...
+    let idle = kabl_modules::code::group_by_key(&regs[0].key).unwrap();
+    assert!(idle.health().fuel_budget() > 0);
+    // ...and a third and fourth module playing at once share the 50 % total as before.
+    let others: Vec<_> = [5usize, 7, 9]
+        .iter()
+        .map(|&i| kabl_modules::code::group_by_key(&regs[i].key).unwrap())
+        .collect();
+    let _voices: Vec<_> = others.iter().map(|g| g.voice().unwrap()).collect();
+    let quarter_of_total = cal.fuel_for_us(period_us * TOTAL_SHARE / 4.0);
+    assert_eq!(group.health().fuel_budget(), quarter_of_total);
+    drop(voice);
+}
+
+#[test]
+fn a_failed_save_through_the_running_module_keeps_the_previous_settings_and_notes_it() {
+    let mut f = Fixture::new(meta("test.cellover", 1, ""));
+    f.save = "(i32.const -1)";
+    let g = group(&f.wasm());
+    g.fill(1).unwrap();
+    let mut m = prepared(g.voice().unwrap());
+    let scope = CodeScope::new();
+    let previous = SavedState {
+        state_version: 2,
+        bytes: vec![9, 9, 9, 9],
+    };
+    scope.set_kept_state(7, "test.cellover", previous.clone());
+    scope.attach(7, "test.cellover", &mut m);
+    scope.request_capture();
+    run(&mut m, &[0.0; N]); // the module serves the request at the top of the block
+    assert_eq!(scope.collect(), 0);
+    assert_eq!(
+        scope.settings(),
+        vec![(7, previous)],
+        "previous settings kept"
+    );
+    let notes = scope.take_notes();
+    assert!(
+        notes
+            .iter()
+            .any(|n| n.contains("module 7") && n.contains("buffer")),
+        "{notes:?}"
+    );
+    assert!(!g.health().is_crashed());
+}

@@ -387,13 +387,16 @@ pub fn read_patch_declined(
         }
     }
     let scope = kabl_standalone::code_load::stand_in_missing_in(log.state(), &scope);
+    // Only checks that the song builds: it must not take the live graph's settings cells.
     kabl_engine::compile::compile_scoped(
         log.state(),
         48000.0,
         kabl_standalone::DEFAULT_VOICE_COUNT,
-        &scope,
+        &scope.detached(),
     )
     .map_err(|e| LibError::Uncompilable(e.to_string()))?;
+    // It opens: this is now the open song's code and settings.
+    kabl_modules::code::host::set_active_scope(scope);
     Ok((log, declined))
 }
 

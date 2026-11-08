@@ -3,6 +3,7 @@
 //! invalid, other ABI, forbidden import, missing) becomes a stand-in (see
 //! `kabl_modules::code::standin`) so the patch still opens.
 
+use kabl_modules::code::state::SavedState;
 use kabl_modules::code::{CodeHash, CodeScope};
 
 /// Compiles and registers every blob of `code` so the patch can build, and returns the
@@ -25,7 +26,56 @@ pub fn register(code: &kabl_core::embedded::Embedded, state: &kabl_core::PatchSt
         let key = stand_in(&b.module_id, b.version, Some(&b.bytes), &cause, state);
         scope = scope.with(&b.module_id, key);
     }
+    read_settings(code, &scope);
     scope
+}
+
+/// Puts the module settings the file kept into `scope`: each running instance loads its own
+/// when the graph is built, and a stand-in's are written back unchanged on save.
+fn read_settings(code: &kabl_core::embedded::Embedded, scope: &CodeScope) {
+    for (instance, _) in code.refs() {
+        let Some(blob) = code.instance_blob(instance) else {
+            continue;
+        };
+        if let Some(saved) = code
+            .kept_state(instance, blob.version)
+            .and_then(SavedState::from_kept)
+        {
+            scope.set_kept_state(instance, &blob.module_id, saved);
+        }
+    }
+}
+
+/// The code a patch being saved carries: one blob per code-module kind it uses (the song's own
+/// blob, by `scope`), bound to every instance of that kind, and each instance's saved settings.
+/// Built-in kinds add nothing. Asks the running graph for fresh settings first, waiting up to
+/// `wait` for the audio thread; an engine that is not running leaves the last known settings.
+pub fn embedded_for(
+    state: &kabl_core::PatchState,
+    scope: &CodeScope,
+    wait: std::time::Duration,
+) -> kabl_core::embedded::Embedded {
+    if !wait.is_zero() {
+        scope.capture(wait);
+    } else {
+        scope.collect();
+    }
+    let settings: std::collections::BTreeMap<u64, SavedState> =
+        scope.settings().into_iter().collect();
+    let mut code = kabl_core::embedded::Embedded::new();
+    for (&id, m) in &state.modules {
+        let Some((version, bytes)) = kabl_modules::code::host::blob_for_in(scope, &m.kind) else {
+            continue;
+        };
+        let Ok(hash) = code.add_blob(&m.kind, version, bytes.to_vec()) else {
+            continue;
+        };
+        let _ = code.bind(id, hash);
+        if let Some(saved) = settings.get(&id) {
+            let _ = code.keep_state(id, version, saved.to_kept());
+        }
+    }
+    code
 }
 
 /// Every blob of `code` becomes a stand-in without running (the user declined it).
@@ -41,6 +91,7 @@ pub fn decline(code: &kabl_core::embedded::Embedded, state: &kabl_core::PatchSta
         );
         scope = scope.with(&b.module_id, key);
     }
+    read_settings(code, &scope);
     scope
 }
 
@@ -167,7 +218,10 @@ pub fn register_for_cli(
     code: &kabl_core::embedded::Embedded,
     state: &kabl_core::PatchState,
 ) -> Vec<String> {
-    register_for_cli_scoped(code, state).1
+    let (scope, warnings) = register_for_cli_scoped(code, state);
+    // The command-line paths open one song: it is the open song.
+    kabl_modules::code::host::set_active_scope(scope);
+    warnings
 }
 
 /// [`register_for_cli`], also returning the song's [`CodeScope`].

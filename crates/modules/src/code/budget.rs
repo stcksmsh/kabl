@@ -109,6 +109,9 @@ pub fn scaled_shares(requests: &[f64]) -> Vec<f64> {
 struct Entry {
     health: Weak<Health>,
     request: f64,
+    /// Counts toward the shared total only while the module has at least one voice. Groups the
+    /// host keeps for songs that are not playing then do not divide the budget.
+    only_while_voiced: bool,
 }
 
 struct State {
@@ -141,12 +144,29 @@ impl Budget {
     }
 
     pub fn register_with(&self, health: &Arc<Health>, request: f64) {
+        self.push(health, request, false);
+    }
+
+    /// [`Budget::register_with`] for a module that shares the total only while it has voices
+    /// (call [`Budget::rebalance`] when that changes). Several revisions of one module can stay
+    /// registered; only the ones in use take a share.
+    pub fn register_voiced(&self, health: &Arc<Health>, request: f64) {
+        self.push(health, request, true);
+    }
+
+    fn push(&self, health: &Arc<Health>, request: f64, only_while_voiced: bool) {
         let mut s = self.state.lock().unwrap_or_else(|e| e.into_inner());
         s.entries.push(Entry {
             health: Arc::downgrade(health),
             request: request.clamp(0.0, PER_MODULE_SHARE),
+            only_while_voiced,
         });
         apply(&mut s);
+    }
+
+    /// Re-divides the budget (a module gained its first voice or lost its last).
+    pub fn rebalance(&self) {
+        apply(&mut self.state.lock().unwrap_or_else(|e| e.into_inner()));
     }
 
     /// New calibration and/or block period (audio-device change); rebalances everyone.
@@ -174,9 +194,19 @@ fn period_us(sample_rate: f32, block_frames: u32) -> f64 {
 
 fn apply(s: &mut State) {
     s.entries.retain(|e| e.health.strong_count() > 0);
-    let shares = scaled_shares(&s.entries.iter().map(|e| e.request).collect::<Vec<_>>());
+    let counts =
+        |e: &Entry| !e.only_while_voiced || e.health.upgrade().is_some_and(|h| h.voices() > 0);
+    let requests: Vec<f64> = s
+        .entries
+        .iter()
+        .map(|e| if counts(e) { e.request } else { 0.0 })
+        .collect();
+    let shares = scaled_shares(&requests);
     for (e, share) in s.entries.iter().zip(shares) {
         if let Some(h) = e.health.upgrade() {
+            // An idle module keeps its own request, so its first block is not starved before
+            // the rebalance that comes with its first voice.
+            let share = if counts(e) { share } else { e.request };
             let us = s.period_us * share;
             h.set_budget(s.cal.fuel_for_us(us), Duration::from_secs_f64(us / 1e6));
         }

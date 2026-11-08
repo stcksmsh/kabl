@@ -105,7 +105,7 @@ fn install_blob(wasm: &[u8], make_latest: bool) -> Result<Registered, LoadError>
     // `init` receives this rate, so a module's coefficients match the running device.
     let cfg = InstanceConfig::new(rate, MAX_BLOCK);
     let group = CodeGroup::keyed(compiled, cfg, 1, std::time::Duration::from_secs(1), key)?;
-    budget().register_with(group.health(), PER_MODULE_SHARE);
+    budget().register_voiced(group.health(), PER_MODULE_SHARE);
     super::install(group, make_latest)?;
     blobs().lock().unwrap_or_else(|e| e.into_inner()).insert(
         key,
@@ -285,4 +285,23 @@ pub fn device_changed(sample_rate: f32, block_frames: u32) {
     if spawned.is_err() {
         CALIBRATING.store(false, Ordering::Release);
     }
+}
+
+/// The song the app has open. Single-song front ends (kabl-ui, the standalone) set it when a
+/// song opens, so the entry points that take no [`CodeScope`] (`compile` for the live graph,
+/// saving) find that song's code and settings. A host running several songs in one process
+/// passes each song's scope explicitly instead.
+static ACTIVE: Mutex<Option<CodeScope>> = Mutex::new(None);
+
+pub fn set_active_scope(scope: CodeScope) {
+    *ACTIVE.lock().unwrap_or_else(|e| e.into_inner()) = Some(scope);
+}
+
+/// The open song's scope (empty until one is set).
+pub fn active_scope() -> CodeScope {
+    ACTIVE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone()
+        .unwrap_or_default()
 }

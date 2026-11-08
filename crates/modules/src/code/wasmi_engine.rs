@@ -362,6 +362,17 @@ impl WasmiInstance {
             .map_err(|e| LoadError::Invalid(format!("reset failed: {e}")))
     }
 
+    /// The result of a state call, which runs under the fuel the caller set (out of fuel is a
+    /// plain return value, as for blocks, so the call allocates nothing).
+    fn finish(r: Result<TypedResumableCall<i32>, wasmi::Error>) -> Result<i32, Fault> {
+        match r {
+            Ok(TypedResumableCall::Finished(v)) => Ok(v),
+            Ok(TypedResumableCall::OutOfFuel(_)) => Err(Fault::OutOfFuel),
+            Ok(TypedResumableCall::HostTrap(_)) => Err(Fault::Trap),
+            Err(e) => Err(Self::classify(&e)),
+        }
+    }
+
     fn classify(e: &wasmi::Error) -> Fault {
         match e.as_trap_code() {
             Some(TrapCode::OutOfFuel) => Fault::OutOfFuel,
@@ -386,15 +397,12 @@ impl WasmInstance for WasmiInstance {
 
     fn call_state_save(&mut self) -> Result<i32, Fault> {
         let f = self.state.as_ref().ok_or(Fault::BadLayout)?.save;
-        let _ = self.store.set_fuel(INIT_FUEL);
-        f.call(&mut self.store, ()).map_err(|e| Self::classify(&e))
+        Self::finish(f.call_resumable(&mut self.store, ()))
     }
 
     fn call_state_load(&mut self, len: u32, version: u32) -> Result<i32, Fault> {
         let f = self.state.as_ref().ok_or(Fault::BadLayout)?.load;
-        let _ = self.store.set_fuel(INIT_FUEL);
-        f.call(&mut self.store, (len as i32, version as i32))
-            .map_err(|e| Self::classify(&e))
+        Self::finish(f.call_resumable(&mut self.store, (len as i32, version as i32)))
     }
 
     fn call_migrate(&mut self, len: u32, old_version: u32) -> Result<i32, Fault> {
@@ -403,9 +411,7 @@ impl WasmInstance for WasmiInstance {
             .as_ref()
             .and_then(|s| s.migrate)
             .ok_or(Fault::BadLayout)?;
-        let _ = self.store.set_fuel(INIT_FUEL);
-        f.call(&mut self.store, (len as i32, old_version as i32))
-            .map_err(|e| Self::classify(&e))
+        Self::finish(f.call_resumable(&mut self.store, (len as i32, old_version as i32)))
     }
 
     fn memory(&mut self) -> &mut [u8] {

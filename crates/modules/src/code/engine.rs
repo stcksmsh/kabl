@@ -172,8 +172,8 @@ pub trait WasmInstance: Send {
         false
     }
     /// `state_save() -> len`: the module writes its settings at the transfer buffer and returns
-    /// their length, or -1 when they do not fit. Control thread; a trap leaves the instance
-    /// unusable (drop it).
+    /// their length, or -1 when they do not fit. Runs under the fuel last given to `set_fuel`; a
+    /// trap leaves the instance unusable (drop it).
     fn call_state_save(&mut self) -> Result<i32, Fault> {
         Err(Fault::BadLayout)
     }

@@ -15,9 +15,14 @@ const KIND: &str = "test.scope";
 /// A voice-rate module that outputs the constant `level` whatever its input (a stand-in passes
 /// the input through instead), so each version is told apart by the level it renders.
 fn module(version: u32, level: f32) -> Vec<u8> {
+    module_full(KIND, version, level, "in")
+}
+
+/// [`module`] with its own kind and input port name.
+fn module_full(kind: &str, version: u32, level: f32, input: &str) -> Vec<u8> {
     let meta = format!(
-        "kind {KIND}\\nversion {version}\\nabi_minor 1\\nname T\\nexplain Test fixture.\\ncategory filter\\n\
-         rate voice\\nwidth 4\\nport in audio in 1\\nport out audio out 1\\nparam gain 0 4 1 linear 0 x\\n"
+        "kind {kind}\\nversion {version}\\nabi_minor 1\\nname T\\nexplain Test fixture.\\ncategory filter\\n\
+         rate voice\\nwidth 4\\nport in audio {input} 1\\nport out audio out 1\\nparam gain 0 4 1 linear 0 x\\n"
     );
     wat::parse_str(format!(
         r#"(module
@@ -156,4 +161,61 @@ fn engines_in_one_process_keep_their_own_version_and_a_refused_copy_stays_its_ow
     let (mut ra, mut rb) = (rebuilt_a, rebuilt_b);
     assert!((level(&mut ra, 200) - la).abs() < 1e-4);
     assert!((level(&mut rb, 200) - lb).abs() < 1e-4);
+}
+
+/// A composite whose interface binds the older blob's `in` port validates for the song that
+/// runs that blob, while the newer blob (no such port) is the latest one in the process.
+#[test]
+fn a_composite_validates_against_its_own_blobs_interface() {
+    use kabl_core::{Composite, Definition, Exposure, ModuleState, PatchState};
+    use kabl_engine::compile::{compile_scoped, validate_composites, validate_composites_scoped};
+    let kind = "test.scope.iface";
+    let a = host::register_blob(&module_full(kind, 1, 0.25, "in")).unwrap();
+    let b = host::register_blob(&module_full(kind, 2, 0.25, "audio_in")).unwrap(); // the latest
+    let scope_a = CodeScope::new().with(kind, a.key);
+    let scope_b = CodeScope::new().with(kind, b.key);
+    let mut st = PatchState::new();
+    st.modules.insert(
+        1,
+        ModuleState {
+            kind: kind.into(),
+            pos: Vec2 { x: 0.0, y: 0.0 },
+            params: Default::default(),
+        },
+    );
+    let wrap = Composite {
+        name: "Wrap".into(),
+        help: String::new(),
+        definition: Definition {
+            id: "test.wrap".into(),
+            version: 1,
+        },
+        parent: None,
+        pos: Vec2 { x: 0.0, y: 0.0 },
+        members: [1].into_iter().collect(),
+        ports: [(
+            0,
+            Exposure {
+                label: "In".into(),
+                target: PortRef::Module {
+                    id: 1,
+                    port: "in".into(),
+                },
+            },
+        )]
+        .into_iter()
+        .collect(),
+        controls: Default::default(),
+        next_interface: 1,
+        panel: None,
+    };
+    st.composites.insert(1, wrap);
+    assert!(validate_composites_scoped(&st, &scope_a).is_ok());
+    assert!(validate_composites_scoped(&st, &scope_b).is_err());
+    assert!(
+        validate_composites(&st).is_err(),
+        "without a scope the latest blob (no `in` port) is used"
+    );
+    assert!(compile_scoped(&st, SR, 2, &scope_a).is_ok());
+    assert!(compile_scoped(&st, SR, 2, &scope_b).is_err());
 }

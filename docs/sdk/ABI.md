@@ -113,7 +113,11 @@ Rules:
   `state_load` returning `0` or trapping, or no `migrate` for an older layout: the module starts
   at its defaults and the song keeps the old bytes, so a build that can read them finds them.
   A trap makes the host throw that instance away and build a fresh one.
-- These calls run on the control thread, not the audio thread, under a fixed fuel allowance.
+- When the host saves or opens a song it calls these on the first instance of each module (lane
+  0): while the song plays, `state_save` and `state_load` run at the start of an audio block under
+  that module's fuel allowance (running out of fuel is a failed save or load, not a crash; a trap
+  disables the module as usual), and `migrate` runs on a scratch instance off the audio thread.
+  Keep them short and allocation-free.
 
 ## 6. Metadata: the `kabl.meta` custom section
 

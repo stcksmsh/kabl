@@ -146,6 +146,8 @@ pub struct CodeModule {
     fade_left: usize,
     consecutive_overruns: u32,
     fading_dead: bool,
+    /// Where the song's settings for this instance are handed over (see `state::StateCell`).
+    cell: Option<Arc<super::state::StateCell>>,
 }
 
 impl CodeModule {
@@ -157,7 +159,9 @@ impl CodeModule {
     ) -> CodeModule {
         let out_slots = info.slots(PortDirection::Output);
         let layout = inst.layout();
-        health.voices.fetch_add(1, Relaxed);
+        if health.voices.fetch_add(1, Relaxed) == 0 {
+            super::host::budget().rebalance();
+        }
         CodeModule {
             info,
             inst,
@@ -171,7 +175,18 @@ impl CodeModule {
             fade_left: 0,
             consecutive_overruns: 0,
             fading_dead: false,
+            cell: None,
         }
+    }
+
+    /// Size of the module's settings transfer buffer, if it has saved settings.
+    pub fn state_cap(&self) -> Option<usize> {
+        self.inst.state_xfer().map(|x| x.cap)
+    }
+
+    /// Serves the song's save and load requests for this instance from the next block on.
+    pub fn set_state_cell(&mut self, cell: Arc<super::state::StateCell>) {
+        self.cell = Some(cell);
     }
 
     pub fn health(&self) -> &Arc<Health> {
@@ -268,7 +283,9 @@ fn put_f32s(mem: &mut [u8], at: usize, vals: impl Iterator<Item = f32>) {
 
 impl Drop for CodeModule {
     fn drop(&mut self) {
-        self.health.voices.fetch_sub(1, Relaxed);
+        if self.health.voices.fetch_sub(1, Relaxed) == 1 {
+            super::host::budget().rebalance();
+        }
     }
 }
 
@@ -296,6 +313,13 @@ impl Module for CodeModule {
         }
         if n > self.layout.max_block as usize {
             return self.die(Fault::BadLayout, io, n);
+        }
+        if let Some(cell) = &self.cell {
+            let fuel = self.health.voice_fuel();
+            let inst = &mut *self.inst;
+            if let Err(fault) = no_alloc(|| cell.service(inst, fuel)) {
+                return self.die(fault, io, n);
+            }
         }
         let layout = self.layout;
         let mem = self.inst.memory();
