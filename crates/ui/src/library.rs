@@ -173,6 +173,12 @@ pub enum LibError {
     Unreadable(String),
     /// The patch parsed but does not compile (unknown module, bad port, ...).
     Uncompilable(String),
+    /// The patch carries code that has no remembered answer yet: ask first (the notice), then
+    /// open again.
+    CodeNotice(Vec<crate::code_notice::CodeEntry>),
+    /// The patch carries code the user declined before. The answer is cleared so the next try
+    /// asks again.
+    CodeDeclined(Vec<crate::code_notice::CodeEntry>),
 }
 
 impl std::fmt::Display for LibError {
@@ -188,6 +194,11 @@ impl std::fmt::Display for LibError {
             LibError::Io(e) | LibError::Interrupted(e) => write!(f, "{e}"),
             LibError::Unreadable(e) => write!(f, "can't read the patch: {e}"),
             LibError::Uncompilable(e) => write!(f, "the patch doesn't build: {e}"),
+            LibError::CodeNotice(_) => write!(f, "the patch contains custom code"),
+            LibError::CodeDeclined(_) => write!(
+                f,
+                "that sound has custom code you declined, so it wasn't opened; open it again to be asked once more"
+            ),
         }
     }
 }
@@ -206,6 +217,8 @@ impl LibError {
             LibError::Interrupted(e) => format!("interrupted ({})", reason(e)),
             LibError::Unreadable(e) => format!("unreadable ({})", reason(e)),
             LibError::Uncompilable(_) => "uncompilable".into(),
+            LibError::CodeNotice(_) => "code-notice".into(),
+            LibError::CodeDeclined(_) => "code-declined".into(),
         }
     }
 }
@@ -340,10 +353,23 @@ fn check_name(name: &str) -> Result<String, LibError> {
 }
 
 /// Reads a `.kabl` file and checks that it compiles, without touching anything else:
-/// the caller replaces its working sound only on `Ok`.
-pub fn read_patch(file: &Path) -> Result<PatchLog, LibError> {
-    let log =
-        kabl_core::format::load_kabl(file).map_err(|e| LibError::Unreadable(format!("{e:?}")))?;
+/// the caller replaces its working sound only on `Ok`. Embedded code is registered only when
+/// `trust` (the remembered notice answers) allows it.
+pub fn read_patch(
+    file: &Path,
+    trust: &std::collections::BTreeMap<String, bool>,
+) -> Result<PatchLog, LibError> {
+    let (log, _, code) = kabl_core::format::load_kabl_full(file)
+        .map_err(|e| LibError::Unreadable(format!("{e:?}")))?;
+    if !code.is_empty() {
+        let entries = crate::code_notice::entries(&code);
+        match crate::code_notice::gate(&entries, trust) {
+            crate::code_notice::Gate::Ask => return Err(LibError::CodeNotice(entries)),
+            crate::code_notice::Gate::Refuse => return Err(LibError::CodeDeclined(entries)),
+            crate::code_notice::Gate::Open => {}
+        }
+        crate::code_notice::register(&code).map_err(LibError::Uncompilable)?;
+    }
     kabl_engine::compile::compile(log.state(), 48000.0, kabl_standalone::DEFAULT_VOICE_COUNT)
         .map_err(|e| LibError::Uncompilable(e.to_string()))?;
     Ok(log)
@@ -370,7 +396,8 @@ pub fn patch_target(path: &Path) -> PathBuf {
 pub fn save_patch(path: &Path, log: &PatchLog) -> Result<PathBuf, LibError> {
     let target = patch_target(path);
     fail_point("kabl")?;
-    kabl_core::format::save_kabl(&target, log)
+    let code = crate::code_notice::embedded_for(log.state());
+    kabl_core::format::save_kabl_full(&target, log, None, Some(&code))
         .map_err(|e| LibError::Io(format!("can't save to {}: {e:?}", target.display())))?;
     let back = kabl_core::format::load_kabl(&target)
         .map_err(|e| LibError::Io(format!("saved copy doesn't read back: {e:?}")))?;
@@ -523,7 +550,7 @@ impl Library {
         let e = self
             .get(id)
             .ok_or_else(|| LibError::Unreadable(format!("\"{id}\" is no longer in the library")))?;
-        read_patch(&e.dir)
+        read_patch(&e.dir, &self.prefs.code_trust)
     }
 
     /// Saves `log` as a user sound named `meta.name`. `replace`: the user sound this save may
@@ -576,7 +603,8 @@ impl Library {
         staged.push(".new");
         let staged = PathBuf::from(staged);
         let written = (|| {
-            kabl_core::format::save_kabl_meta(&staged, log, Some(&text))
+            let code = crate::code_notice::embedded_for(log.state());
+            kabl_core::format::save_kabl_full(&staged, log, Some(&text), Some(&code))
                 .map_err(|e| LibError::Io(format!("can't save {}: {e:?}", staged.display())))?;
             // Read it back: only a copy that loads to the same sound replaces anything.
             let (back, back_meta) = kabl_core::format::load_kabl_meta(&staged)
@@ -615,9 +643,9 @@ impl Library {
         }
         (meta.keys, meta.sequence) = (e.meta.keys, e.meta.sequence);
         let text = toml::to_string_pretty(&meta).map_err(|e| LibError::Io(e.to_string()))?;
-        let (log, _) = kabl_core::format::load_kabl_meta(&e.dir)
+        let (log, _, code) = kabl_core::format::load_kabl_full(&e.dir)
             .map_err(|e| LibError::Unreadable(format!("{e:?}")))?;
-        kabl_core::format::save_kabl_meta(&e.dir, &log, Some(&text))
+        kabl_core::format::save_kabl_full(&e.dir, &log, Some(&text), Some(&code))
             .map_err(|e| LibError::Io(format!("can't save: {e:?}")))?;
         self.rescan();
         Ok(())
@@ -667,6 +695,14 @@ impl Library {
         open: bool,
     ) -> Option<String> {
         crate::code_notice::remember(&mut self.prefs.code_trust, code, open);
+        self.save_prefs()
+    }
+
+    /// Forgets a declined answer for these hashes, so the next open asks again.
+    pub fn forget_code_trust(&mut self, code: &[crate::code_notice::CodeEntry]) -> Option<String> {
+        for c in code {
+            self.prefs.code_trust.remove(&c.hash);
+        }
         self.save_prefs()
     }
 

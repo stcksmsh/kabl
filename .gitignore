@@ -1,4 +1,5 @@
 /target
+/crates/modules/code-examples/target/
 *.wav
 .DS_Store
 docs/design/build/
