@@ -436,3 +436,97 @@ fn unusable_saved_settings_are_reported_and_kept() {
         Some(corrupt)
     );
 }
+
+/// Unusable settings (a newer layout; or the right layout with bytes the module refuses) are
+/// never overwritten: play, save twice, and the file still carries the original bytes.
+#[test]
+fn rejected_settings_stay_in_the_file_through_play_and_repeated_saves() {
+    use kabl_modules::code::host;
+    use kabl_modules::code::state::SavedState;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    let _serial = serial();
+    let e = with_filter();
+    let leaf = module_of(&e, "demo.bitfilter");
+    let dir = tempfile::tempdir().unwrap();
+    let good = good_settings();
+    let variants = [
+        SavedState {
+            state_version: 99,
+            bytes: vec![1, 2, 3],
+        },
+        SavedState {
+            state_version: good.state_version,
+            bytes: vec![7, 7, 7], // right layout, wrong length: the module refuses it
+        },
+    ];
+    for bad in variants {
+        let file = file_with_settings(dir.path(), &e, leaf, &bad);
+        let mut lib = Library::open(None, dir.path().join("user"));
+        let (_, _, code) = kabl_core::format::load_kabl_full(&file).unwrap();
+        lib.remember_code_trust(&code_notice::entries(&code), true);
+        let log = library::read_patch(&file, &lib.prefs.code_trust).unwrap();
+        let scope = host::active_scope();
+        let stop = Arc::new(AtomicBool::new(false));
+        let runner = {
+            let (state, scope, stop) = (log.state().clone(), scope.clone(), Arc::clone(&stop));
+            std::thread::spawn(move || {
+                let collector = basedrop::Collector::new();
+                let mut eng =
+                    PatchEngine::new_scoped(&collector.handle(), &state, SR, 4, &scope).unwrap();
+                eng.key(KeyEvent::On {
+                    note: 60,
+                    velocity: 100,
+                });
+                let (mut l, mut r) = ([0f32; BLOCK], [0f32; BLOCK]);
+                while !stop.load(Ordering::Relaxed) {
+                    eng.process_block(&mut l, &mut r);
+                    std::thread::sleep(std::time::Duration::from_micros(200));
+                }
+            })
+        };
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        for n in 0..2 {
+            let out = dir.path().join(format!("out{n}.kabl"));
+            library::save_patch(&out, &log).unwrap();
+            let (_, _, saved) = kabl_core::format::load_kabl_full(&out).unwrap();
+            let version = saved.instance_blob(leaf).unwrap().version;
+            assert_eq!(
+                SavedState::from_kept(saved.kept_state(leaf, version).unwrap()),
+                Some(bad.clone()),
+                "save {n} of {bad:?} keeps the original bytes"
+            );
+        }
+        stop.store(true, Ordering::Relaxed);
+        runner.join().unwrap();
+    }
+}
+
+/// Code that says it is another module than the song claims is refused: the claimed module is
+/// a stand-in with that cause, and the real module of that name is untouched.
+#[test]
+fn embedded_code_that_is_another_module_is_refused() {
+    use kabl_modules::code::host;
+    let _serial = serial();
+    host::register_examples().unwrap();
+    let e = with_filter();
+    let logic_before = host::blob_for("demo.logic").unwrap();
+    // The song claims this is demo.bitfilter; the bytes are demo.logic.
+    let mut code = kabl_core::embedded::Embedded::new();
+    let h = code
+        .add_blob("demo.bitfilter", 1, host::EXAMPLES[0].wasm.to_vec())
+        .unwrap();
+    code.bind(module_of(&e, "demo.bitfilter"), h).unwrap();
+    let warnings = kabl_standalone::code_load::register_for_cli(&code, e.state());
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.contains("demo.bitfilter") && w.contains("different module (demo.logic v1)")),
+        "{warnings:?}"
+    );
+    let logic_after = host::blob_for("demo.logic").unwrap();
+    assert_eq!(logic_before.1, logic_after.1, "demo.logic is untouched");
+    // Put the real example back for the tests that follow.
+    host::register_blob(host::EXAMPLES[1].wasm).unwrap();
+    host::set_active_scope(kabl_modules::code::CodeScope::new());
+}

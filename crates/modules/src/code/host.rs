@@ -84,13 +84,27 @@ fn blobs() -> &'static Mutex<BTreeMap<CodeHash, Entry>> {
 /// makes them the latest again). Different bytes under the same kind do not replace the earlier
 /// code: both run, each for the songs whose [`CodeScope`] names it. Control thread only.
 pub fn register_blob(wasm: &[u8]) -> Result<Registered, LoadError> {
-    install_blob(wasm, true)
+    install_blob(wasm, true, None)
 }
 
-fn install_blob(wasm: &[u8], make_latest: bool) -> Result<Registered, LoadError> {
+/// [`register_blob`] for a blob a song embeds as module `kind` version `version`: if the code's
+/// own metadata says it is another module or version it is refused (nothing is installed and
+/// no kind's latest changes), with [`LoadError::WrongModule`].
+pub fn register_blob_as(wasm: &[u8], kind: &str, version: u32) -> Result<Registered, LoadError> {
+    install_blob(wasm, true, Some((kind, version)))
+}
+
+fn install_blob(
+    wasm: &[u8],
+    make_latest: bool,
+    expect: Option<(&str, u32)>,
+) -> Result<Registered, LoadError> {
     let compiled = engine().compile(wasm)?;
     let meta = compiled.meta();
     let (kind, version) = (meta.kind.clone(), meta.version);
+    if expect.is_some_and(|(k, v)| k != kind || v != version) {
+        return Err(LoadError::WrongModule { kind, version });
+    }
     let key = hash_of(wasm);
     let rate = latest().lock().unwrap_or_else(|e| e.into_inner()).0;
     {
@@ -105,6 +119,10 @@ fn install_blob(wasm: &[u8], make_latest: bool) -> Result<Registered, LoadError>
     // `init` receives this rate, so a module's coefficients match the running device.
     let cfg = InstanceConfig::new(rate, MAX_BLOCK);
     let group = CodeGroup::keyed(compiled, cfg, 1, std::time::Duration::from_secs(1), key)?;
+    // Build one instance now, so a module that cannot run (an over-cap or broken settings
+    // buffer, a layout that does not match its metadata, too much memory) is refused here, with
+    // its real cause, and becomes a stand-in instead of vanishing when a graph is built.
+    group.fill(1)?;
     budget().register_voiced(group.health(), PER_MODULE_SHARE);
     super::install(group, make_latest)?;
     blobs().lock().unwrap_or_else(|e| e.into_inner()).insert(
@@ -231,7 +249,7 @@ fn rebuild_for_rate() {
         .collect();
     for wasm in all {
         // Which blob is the latest of its kind does not change with the rate.
-        let _ = install_blob(&wasm, false);
+        let _ = install_blob(&wasm, false, None);
     }
 }
 

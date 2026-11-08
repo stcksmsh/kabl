@@ -15,14 +15,15 @@ use kabl_modules::code::{CodeHash, CodeScope};
 pub fn register(code: &kabl_core::embedded::Embedded, state: &kabl_core::PatchState) -> CodeScope {
     let mut scope = CodeScope::new();
     for (_, b) in code.blobs() {
-        let cause = match kabl_modules::code::host::register_blob(&b.bytes) {
-            Ok(r) if r.kind == b.module_id && r.version == b.version => {
-                scope = scope.with(&b.module_id, r.key);
-                continue;
-            }
-            Ok(r) => format!("the code says it is {} v{}", r.kind, r.version),
-            Err(e) => e.to_string(),
-        };
+        // Code that is another module than the song says is refused before it is installed.
+        let cause =
+            match kabl_modules::code::host::register_blob_as(&b.bytes, &b.module_id, b.version) {
+                Ok(r) => {
+                    scope = scope.with(&b.module_id, r.key);
+                    continue;
+                }
+                Err(e) => e.to_string(),
+            };
         let key = stand_in(&b.module_id, b.version, Some(&b.bytes), &cause, state);
         scope = scope.with(&b.module_id, key);
     }

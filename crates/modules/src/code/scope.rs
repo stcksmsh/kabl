@@ -84,6 +84,11 @@ impl Session {
 }
 
 impl CodeScope {
+    /// Something the user should be told, once (see [`CodeScope::take_notes`]).
+    pub fn note(&self, text: String) {
+        self.session.note(text);
+    }
+
     pub fn new() -> CodeScope {
         CodeScope::default()
     }
@@ -135,19 +140,25 @@ impl CodeScope {
         let Some(cap) = module.state_cap() else {
             return;
         };
-        let cell = Arc::new(StateCell::new(cap));
+        lock(&self.session.cells).remove(&instance);
         let saved = lock(&self.session.last)
             .get(&instance)
             .filter(|(k, _)| k == kind)
             .map(|(_, s)| s.clone());
+        let cell = Arc::new(StateCell::new(cap));
         if let (Some(saved), Some(group)) = (saved, super::group_in(self, kind)) {
             match group.settings_for_load(&saved) {
                 Ok(now) => {
                     cell.queue_load(&now);
                 }
-                Err(why) => self.session.note(format!(
-                    "{kind} (module {instance}) starts at its defaults: {why}. The song keeps the old settings."
-                )),
+                Err(why) => {
+                    // Unusable settings are never overwritten: the module runs at its defaults
+                    // without a cell, so a save cannot replace the song's bytes with them.
+                    self.session.note(format!(
+                        "{kind} (module {instance}) starts at its defaults: {why}. The song keeps the old settings."
+                    ));
+                    return;
+                }
             }
         }
         module.set_state_cell(Arc::clone(&cell));

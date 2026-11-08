@@ -292,6 +292,9 @@ struct CellData {
 pub struct StateCell {
     save_req: AtomicBool,
     load_req: AtomicBool,
+    /// The module refused the settings it was given: its state is not the song's, so it must
+    /// not be saved over them.
+    rejected: AtomicBool,
     fail: AtomicU8,
     data: Mutex<CellData>,
 }
@@ -302,6 +305,7 @@ impl StateCell {
         StateCell {
             save_req: AtomicBool::new(false),
             load_req: AtomicBool::new(false),
+            rejected: AtomicBool::new(false),
             fail: AtomicU8::new(0),
             data: Mutex::new(CellData {
                 out: vec![0; cap],
@@ -382,12 +386,21 @@ impl StateCell {
             inst.set_fuel(fuel);
             match inst.call_state_load(n as u32, d.inp_version) {
                 Ok(1) => {}
-                Ok(_) => self.fail.store(StateFail::Rejected as u8, Release),
-                Err(Fault::OutOfFuel) => self.fail.store(StateFail::Fuel as u8, Release),
+                Ok(_) => {
+                    self.rejected.store(true, Release);
+                    self.fail.store(StateFail::Rejected as u8, Release);
+                }
+                Err(Fault::OutOfFuel) => {
+                    self.rejected.store(true, Release);
+                    self.fail.store(StateFail::Fuel as u8, Release);
+                }
                 Err(f) => return Err(f),
             }
         }
         if self.save_req.swap(false, AcqRel) {
+            if self.rejected.load(Acquire) {
+                return Ok(()); // keep the song's bytes; the load failure was already noted
+            }
             inst.set_fuel(fuel);
             match inst.call_state_save() {
                 Ok(n) if n >= 0 && n as usize <= x.cap && n as usize <= d.out.len() => {

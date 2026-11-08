@@ -69,6 +69,11 @@ pub enum LoadError {
         module: u32,
         host: u32,
     },
+    /// The code is a different module (or version) than the song says it is.
+    WrongModule {
+        kind: String,
+        version: u32,
+    },
     /// The module needs a newer revision of the ABI than this host has.
     AbiMinor {
         module: u32,
@@ -95,6 +100,9 @@ impl std::fmt::Display for LoadError {
                 f,
                 "code module targets ABI v{module}; this kabl runs v{host}"
             ),
+            LoadError::WrongModule { kind, version } => {
+                write!(f, "embedded code is a different module ({kind} v{version})")
+            }
             LoadError::AbiMinor { module, host } => write!(
                 f,
                 "code module needs ABI revision {module}; this kabl supports up to {host}. \

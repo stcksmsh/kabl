@@ -533,6 +533,45 @@ fn only_modules_in_use_divide_the_shared_budget() {
 }
 
 #[test]
+fn a_module_that_cannot_make_an_instance_is_refused_at_registration() {
+    let _g = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+    let mut f = Fixture::new(meta("test.regbad", 1, ""));
+    f.xfer_cap = 65 * 1024;
+    let Err(e) = host::register_blob(&f.wasm()) else {
+        panic!("an over-cap settings buffer must be refused when the blob is registered");
+    };
+    assert!(
+        matches!(&e, LoadError::Layout(m) if m.contains("cap")),
+        "{e}"
+    );
+    assert!(host::blob_for("test.regbad").is_none(), "nothing installed");
+}
+
+#[test]
+fn code_that_is_another_module_than_claimed_is_refused_and_installs_nothing() {
+    let _g = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+    let real = versioned("test.realkind", 4, 1);
+    for (kind, version) in [("test.claimed", 4), ("test.realkind", 5)] {
+        let Err(e) = host::register_blob_as(&real, kind, version) else {
+            panic!("a mismatch must be refused");
+        };
+        assert_eq!(
+            e,
+            LoadError::WrongModule {
+                kind: "test.realkind".into(),
+                version: 4
+            }
+        );
+        assert!(e
+            .to_string()
+            .contains("different module (test.realkind v4)"));
+    }
+    assert!(host::blob_for("test.realkind").is_none(), "not installed");
+    assert!(host::register_blob_as(&real, "test.realkind", 4).is_ok());
+    assert!(host::blob_for("test.realkind").is_some());
+}
+
+#[test]
 fn a_failed_save_through_the_running_module_keeps_the_previous_settings_and_notes_it() {
     let mut f = Fixture::new(meta("test.cellover", 1, ""));
     f.save = "(i32.const -1)";

@@ -242,9 +242,16 @@ pub fn create_in(scope: &CodeScope, kind: &str) -> Option<Box<dyn crate::module:
     let Some(g) = group_by_key(&key) else {
         return standin::create(&key);
     };
-    g.voice()
-        .ok()
-        .map(|m| Box::new(m) as Box<dyn crate::module::Module>)
+    match g.voice() {
+        Ok(m) => Some(Box::new(m) as Box<dyn crate::module::Module>),
+        // Never vanish: a module that cannot make an instance now passes audio through.
+        Err(e) => {
+            scope.note(format!(
+                "code module {kind} could not start ({e}); it passes audio through"
+            ));
+            Some(Box::new(standin::StandIn::new(g.info())) as Box<dyn crate::module::Module>)
+        }
+    }
 }
 
 /// A fresh instance of a registered code module, the latest of its kind.
