@@ -27,8 +27,6 @@ pub const ALLOWED_IMPORTS: &[(&str, &str)] = &[];
 pub const META_SECTION: &str = "kabl.meta";
 /// Fuel for `init` and the start function (once, off the audio thread).
 const INIT_FUEL: u64 = 50_000_000;
-/// Fuel for `reset()` (the per-block budget is not set at that point).
-const RESET_FUEL: u64 = 1_000_000;
 const REQUIRED_EXPORTS: [&str; 4] = ["init", "process", "reset", "memory"];
 
 pub struct WasmiEngine {
@@ -239,7 +237,7 @@ impl WasmiInstance {
         self.process
             .call(&mut self.store, frames)
             .map_err(|e| LoadError::Invalid(format!("first block failed: {e}")))?;
-        let _ = self.store.set_fuel(RESET_FUEL);
+        let _ = self.store.set_fuel(INIT_FUEL);
         self.reset
             .call(&mut self.store, ())
             .map_err(|e| LoadError::Invalid(format!("reset failed: {e}")))
@@ -284,10 +282,13 @@ impl WasmInstance for WasmiInstance {
         }
     }
 
+    /// Same path as `call_block`: the caller sets the fuel first (the module's per-call budget),
+    /// out-of-fuel is a plain return value (no allocation), a trap builds one error.
     fn reset(&mut self) -> Result<(), Fault> {
-        let _ = self.store.set_fuel(RESET_FUEL);
-        match self.reset.call(&mut self.store, ()) {
-            Ok(()) => Ok(()),
+        match self.reset.call_resumable(&mut self.store, ()) {
+            Ok(TypedResumableCall::Finished(())) => Ok(()),
+            Ok(TypedResumableCall::OutOfFuel(_)) => Err(Fault::OutOfFuel),
+            Ok(TypedResumableCall::HostTrap(_)) => Err(Fault::Trap),
             Err(e) => Err(Self::classify(&e)),
         }
     }
@@ -380,7 +381,7 @@ pub fn parse_meta(text: &str) -> Result<CodeMeta, String> {
                 });
             }
             "param" => {
-                if f.len() < 7 {
+                if f.len() < 6 {
                     return Err(err(
                         "param needs: name min max default taper smoothing_ms [unit]",
                     ));

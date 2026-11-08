@@ -3,7 +3,8 @@
 
 use kabl_modules::code::{
     scaled_shares, Budget, Calibration, CodeGroup, CodeModule, Fault, Health, InstanceConfig,
-    LoadError, WasmEngine, WasmiEngine, MAX_BLOB_BYTES, OVERRUN_LIMIT,
+    LoadError, WasmEngine, WasmiEngine, MAX_BLOB_BYTES, OVERRUN_LIMIT, PER_MODULE_SHARE,
+    TOTAL_SHARE,
 };
 use kabl_modules::{Module, ProcessIo, QualityConfig, QualityTier, Signal};
 use std::alloc::{GlobalAlloc, Layout, System};
@@ -75,7 +76,10 @@ const BIQUAD: &str = "
  (f32.store (i32.const 600) (local.get $z1)) (f32.store (i32.const 604) (local.get $z2))
  (f32.store (i32.const 608) (local.get $prev))";
 
-fn module_wat(pages: u32, imports: &str, process: &str) -> String {
+const RESET_STATE: &str =
+    "(f32.store (i32.const 600) (f32.const 0)) (f32.store (i32.const 604) (f32.const 0)) (f32.store (i32.const 608) (f32.const 0))";
+
+fn module_wat(pages: u32, imports: &str, process: &str, reset: &str) -> String {
     format!(
         r#"(module {imports}
  (@custom "kabl.meta" "{META}")
@@ -87,13 +91,17 @@ fn module_wat(pages: u32, imports: &str, process: &str) -> String {
   (i32.store (i32.const 24) (i32.const 1)) (i32.store (i32.const 28) (i32.const 1))
   (i32.store (i32.const 32) (i32.const 6))
   (i32.const 0))
- (func (export "reset") (f32.store (i32.const 600) (f32.const 0)) (f32.store (i32.const 604) (f32.const 0)) (f32.store (i32.const 608) (f32.const 0)))
+ (func (export "reset") {reset})
  (func (export "process") (param $n i32) {process}))"#
     )
 }
 
 fn wasm(pages: u32, imports: &str, process: &str) -> Vec<u8> {
-    wat::parse_str(module_wat(pages, imports, process)).unwrap()
+    wat::parse_str(module_wat(pages, imports, process, RESET_STATE)).unwrap()
+}
+
+fn wasm_with_reset(process: &str, reset: &str) -> Vec<u8> {
+    wat::parse_str(module_wat(1, "", process, reset)).unwrap()
 }
 
 fn cfg() -> InstanceConfig {
@@ -449,6 +457,135 @@ fn an_out_of_fuel_block_allocates_nothing_and_a_trap_at_most_once() {
         0,
         "a disabled module runs nothing"
     );
+}
+
+/// Reset only misbehaves once a loud block has run (the priming reset at load is clean).
+fn bad_reset(body: &str) -> String {
+    format!("(if (f32.gt (f32.load (i32.const 576)) (f32.const 2.0)) (then {body}))")
+}
+
+fn reset_counted(m: &mut CodeModule) -> usize {
+    NO_ALLOC.with(|c| c.set(true));
+    let before = VIOLATIONS.with(|c| c.get());
+    m.reset();
+    NO_ALLOC.with(|c| c.set(false));
+    VIOLATIONS.with(|c| c.get()) - before
+}
+
+#[test]
+fn reset_runs_under_the_block_budget_without_allocating() {
+    let mut loud = COEF;
+    loud[0] = 3.0;
+    let mut seed = 1;
+    let inp = noise(&mut seed);
+
+    // A clean reset: no allocation, no overrun.
+    let g = group(&wasm(1, "", BIQUAD), 1, 1_000_000, Duration::from_secs(5));
+    let mut m = voice(&g);
+    block(&mut m, &inp, COEF);
+    assert_eq!(reset_counted(&mut m), 0);
+    assert_eq!(g.health().overrun_count(), 0);
+
+    // A reset that never ends is cut off by the voice's fuel (not a fixed 1e6), allocates
+    // nothing, counts as an overrun, and eight in a row disable the module like a block would.
+    let spin = bad_reset("(loop $l (br $l))");
+    let g = group(
+        &wasm_with_reset(BIQUAD, &spin),
+        1,
+        100_000,
+        Duration::from_secs(5),
+    );
+    let mut m = voice(&g);
+    block(&mut m, &inp, loud);
+    for k in 1..OVERRUN_LIMIT {
+        assert_eq!(reset_counted(&mut m), 0, "reset overrun {k}");
+        assert!(
+            !g.health().is_crashed(),
+            "{k} reset overruns are not a crash"
+        );
+    }
+    assert_eq!(g.health().overrun_count(), OVERRUN_LIMIT - 1);
+    m.reset();
+    assert_eq!(g.health().fault(), Some(Fault::Overrun));
+
+    // A trapping reset disables the module.
+    let g = group(
+        &wasm_with_reset(BIQUAD, &bad_reset("unreachable")),
+        1,
+        100_000,
+        Duration::from_secs(5),
+    );
+    let mut m = voice(&g);
+    block(&mut m, &inp, loud);
+    m.reset();
+    assert_eq!(g.health().fault(), Some(Fault::Trap));
+}
+
+#[test]
+fn sixteen_voices_share_their_modules_budget_and_stay_within_both_caps() {
+    let bytes = wasm(1, "", BIQUAD);
+    let cal = Calibration::fixed(1000.0);
+    let budget = Budget::new(cal.clone(), SR, N as u32);
+    let period_us = N as f64 / SR as f64 * 1e6;
+
+    // One module with 16 voices: all voices together within 25 % of the block.
+    let g = group(&bytes, 16, 1, Duration::from_secs(1));
+    let one: Vec<CodeModule> = (0..16).map(|_| voice(&g)).collect();
+    budget.register(g.health());
+    let h = g.health();
+    assert_eq!(h.voices(), 16);
+    let module_cap_fuel = cal.fuel_for_us(period_us * PER_MODULE_SHARE);
+    assert!(
+        16 * h.voice_fuel() <= module_cap_fuel,
+        "{} > {module_cap_fuel}",
+        16 * h.voice_fuel()
+    );
+    assert!(
+        16 * h.voice_fuel() > module_cap_fuel * 9 / 10,
+        "voices do get the budget, not a sliver"
+    );
+    assert!(h.voice_wall_cap() * 16 <= Duration::from_secs_f64(period_us * PER_MODULE_SHARE / 1e6));
+
+    // Four such modules (64 voices): each within 12.5 %, all together within 50 %.
+    let groups: Vec<_> = (0..3)
+        .map(|_| group(&bytes, 16, 1, Duration::from_secs(1)))
+        .collect();
+    let more: Vec<CodeModule> = groups
+        .iter()
+        .flat_map(|g| (0..16).map(|_| voice(g)).collect::<Vec<_>>())
+        .collect();
+    for g in &groups {
+        budget.register(g.health());
+    }
+    let total_cap_fuel = cal.fuel_for_us(period_us * TOTAL_SHARE);
+    let mut total = 0;
+    for g in std::iter::once(&g).chain(&groups) {
+        let spent = u64::from(g.health().voices()) * g.health().voice_fuel();
+        assert!(
+            spent <= cal.fuel_for_us(period_us * 0.125),
+            "module over its scaled share"
+        );
+        total += spent;
+    }
+    assert!(total <= total_cap_fuel, "{total} > {total_cap_fuel}");
+    drop((one, more));
+    assert_eq!(
+        g.health().voices(),
+        0,
+        "dropping voices releases their count"
+    );
+}
+
+#[test]
+fn a_param_without_a_unit_is_accepted_and_fewer_than_six_fields_are_not() {
+    use kabl_modules::code::wasmi_engine::parse_meta;
+    let ok = parse_meta(
+        "kind x.y\nversion 1\nparam gain 0 4 1 linear 5\nparam f 20 2000 440 exp 5 Hz\n",
+    )
+    .unwrap();
+    assert_eq!(ok.params[0].unit, "");
+    assert_eq!(ok.params[1].unit, "Hz");
+    assert!(parse_meta("kind x.y\nversion 1\nparam gain 0 4 1 linear\n").is_err());
 }
 
 #[test]

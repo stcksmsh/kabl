@@ -7,6 +7,10 @@
 //! fuel granted for a time cap never takes longer than the cap. The wall-clock backstop in
 //! `CodeModule` covers whatever the probes miss (an overrun is an overrun even with fuel left).
 //!
+//! A module's share is for the module as a whole, across all its voices: `Health::voice_fuel`
+//! splits it by the number of live voices, so 16 voices together never spend more than one
+//! voice would be allowed alone.
+//!
 //! Caps: each module gets at most 25 % of the block period, and all custom modules together at
 //! most 50 %; when the requests add up to more, every module is scaled down in proportion.
 
