@@ -93,9 +93,8 @@ fn run(args: &[String]) -> i32 {
                 let blobs = code
                     .blobs()
                     .map(|(_, b)| (b.module_id.as_str(), b.version, &b.bytes[..]));
-                if let Err(err) = kabl_modules::code::host::register_all(blobs) {
-                    log::error!(target: "app", "custom code in {dir}: {err}");
-                    return 1;
+                for r in kabl_modules::code::host::register_all(blobs) {
+                    log::warn!(target: "app", "{r}");
                 }
                 log.state().clone()
             }

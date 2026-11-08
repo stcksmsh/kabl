@@ -1219,10 +1219,36 @@ fn malformed_and_uncompilable_patches_are_reported_not_loaded() {
     kabl_core::format::write_kabl(&mut cut, init_keyboard().log()).unwrap();
     cut.truncate(cut.len() / 2);
     fs::write(sounds.join("broken.kabl"), cut).unwrap();
-    // One that parses but names a module kind kabl doesn't have.
-    let mut e = PatchEditor::new();
-    e.add_module("no.such.module", Vec2::default());
-    kabl_core::format::save_kabl(&sounds.join("alien.kabl"), e.log()).unwrap();
+    // One that parses but cables a port its module doesn't have. (A module kind kabl doesn't
+    // have is not a failure any more: it opens as a stand-in.)
+    let mut alien = kabl_core::PatchLog::new();
+    for (id, kind) in [(1, "filter.svf"), (2, "osc.va")] {
+        alien.append(
+            kabl_core::Op::AddModule {
+                id,
+                kind: kind.into(),
+                pos: Vec2::default(),
+            },
+            id,
+            kabl_core::Source::User,
+        );
+    }
+    alien.append(
+        kabl_core::Op::Connect {
+            id: 1,
+            from: kabl_core::PortRef::Module {
+                id: 2,
+                port: "no_such_port".into(),
+            },
+            to: kabl_core::PortRef::Module {
+                id: 1,
+                port: "in".into(),
+            },
+        },
+        3,
+        kabl_core::Source::User,
+    );
+    kabl_core::format::save_kabl(&sounds.join("alien.kabl"), &alien).unwrap();
     // Unreadable metadata falls back to the file name.
     kabl_core::format::save_kabl_meta(
         &sounds.join("odd.kabl"),
@@ -1238,7 +1264,7 @@ fn malformed_and_uncompilable_patches_are_reported_not_loaded() {
     ));
     let err = lib.read("user:alien").unwrap_err();
     assert!(matches!(err, LibError::Uncompilable(_)), "{err:?}");
-    assert!(err.to_string().contains("no.such.module"), "{err}");
+    assert!(err.to_string().contains("no_such_port"), "{err}");
     assert_eq!(lib.get("user:odd").unwrap().meta.name, "odd");
     assert!(lib.notes.iter().any(|n| n.contains("odd")));
     assert!(lib.read("user:odd").is_ok());

@@ -359,20 +359,34 @@ pub fn read_patch(
     file: &Path,
     trust: &std::collections::BTreeMap<String, bool>,
 ) -> Result<PatchLog, LibError> {
+    read_patch_declined(file, trust).map(|(log, _)| log)
+}
+
+/// `read_patch`, also returning the code the user had declined (now stand-ins), so the caller
+/// can forget that answer and ask again next time.
+pub fn read_patch_declined(
+    file: &Path,
+    trust: &std::collections::BTreeMap<String, bool>,
+) -> Result<(PatchLog, Vec<crate::code_notice::CodeEntry>), LibError> {
+    let mut declined = Vec::new();
     let (log, _, code) = kabl_core::format::load_kabl_full(file)
         .map_err(|e| LibError::Unreadable(format!("{e:?}")))?;
     if !code.is_empty() {
         let entries = crate::code_notice::entries(&code);
         match crate::code_notice::gate(&entries, trust) {
             crate::code_notice::Gate::Ask => return Err(LibError::CodeNotice(entries)),
-            crate::code_notice::Gate::Refuse => return Err(LibError::CodeDeclined(entries)),
-            crate::code_notice::Gate::Open => {}
+            // Declined: the patch still opens, with stand-ins for the code.
+            crate::code_notice::Gate::Refuse => {
+                crate::code_notice::decline(&code, log.state());
+                declined = entries;
+            }
+            crate::code_notice::Gate::Open => crate::code_notice::register(&code, log.state()),
         }
-        crate::code_notice::register(&code).map_err(LibError::Uncompilable)?;
     }
+    crate::code_notice::stand_in_missing(log.state());
     kabl_engine::compile::compile(log.state(), 48000.0, kabl_standalone::DEFAULT_VOICE_COUNT)
         .map_err(|e| LibError::Uncompilable(e.to_string()))?;
-    Ok(log)
+    Ok((log, declined))
 }
 
 /// Whether `p` names a `.kabl` file (by its extension, not by what is on disk).
@@ -551,6 +565,19 @@ impl Library {
             .get(id)
             .ok_or_else(|| LibError::Unreadable(format!("\"{id}\" is no longer in the library")))?;
         read_patch(&e.dir, &self.prefs.code_trust)
+    }
+
+    /// `read` for opening a sound: code the user had declined opens as stand-ins, and that
+    /// answer is forgotten so the next open asks again.
+    pub fn read_for_open(&mut self, id: &str) -> Result<PatchLog, LibError> {
+        let e = self
+            .get(id)
+            .ok_or_else(|| LibError::Unreadable(format!("\"{id}\" is no longer in the library")))?;
+        let (log, declined) = read_patch_declined(&e.dir, &self.prefs.code_trust)?;
+        if !declined.is_empty() {
+            self.forget_code_trust(&declined);
+        }
+        Ok(log)
     }
 
     /// Saves `log` as a user sound named `meta.name`. `replace`: the user sound this save may

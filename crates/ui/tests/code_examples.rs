@@ -188,15 +188,17 @@ fn opening_through_the_browser_shows_the_notice_then_never_again() {
     assert_eq!(then, Pending::OpenFolder(path.clone()));
     assert_ne!(ed.state(), e.state(), "nothing opened before the answer");
 
-    // Cancel: remembered, the next attempt says so and clears the answer.
+    // Cancel: remembered. The patch still opens (its code module is a stand-in), the warning
+    // says why, and the answer is cleared so the next attempt asks again.
     ui.library
         .as_mut()
         .unwrap()
         .remember_code_trust(&entries, false);
     browser::perform(&mut ed, &mut ui, Pending::OpenFolder(path.clone()));
     assert!(ui.browser.dialog.is_none());
-    assert_ne!(ed.state(), e.state());
+    assert_eq!(ed.state(), e.state(), "settings kept");
     assert!(ui.last_message.as_deref().unwrap().contains("declined"));
+    let mut ed = editor();
 
     // The next attempt asks again; Open is remembered and the patch opens.
     browser::perform(&mut ed, &mut ui, Pending::OpenFolder(path.clone()));

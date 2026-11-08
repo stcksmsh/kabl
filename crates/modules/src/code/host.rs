@@ -5,8 +5,9 @@
 //! `crates/modules/code-examples` (see its `build.sh`). They are registered like any other
 //! blob, through [`register_blob`]; nothing about them is special after that.
 
+use super::standin::Report;
 use super::{
-    Budget, Calibration, CodeGroup, InstanceConfig, LoadError, WasmEngine, WasmiEngine,
+    Budget, Calibration, CodeGroup, CodeMeta, InstanceConfig, LoadError, WasmEngine, WasmiEngine,
     PER_MODULE_SHARE,
 };
 use std::collections::BTreeMap;
@@ -131,21 +132,69 @@ pub fn blob_for(kind: &str) -> Option<(u32, Arc<[u8]>)> {
 }
 
 /// Registers every `(module id, version, wasm)` of a patch's embedded code, so the patch can
-/// build. A blob whose metadata names another module or version than the file says is refused.
-/// Used by the command-line `--patch` paths, which have no trust notice: the user named the file.
-pub fn register_all<'a>(
-    blobs: impl IntoIterator<Item = (&'a str, u32, &'a [u8])>,
-) -> Result<(), String> {
+/// build. A blob that cannot load (invalid, forbidden import, other ABI, or metadata naming
+/// another module or version than the file says) becomes a stand-in instead of an error, so the
+/// patch still opens; the returned reports say why. Used by the command-line `--patch` paths,
+/// which have no trust notice: the user named the file.
+pub fn register_all<'a>(blobs: impl IntoIterator<Item = (&'a str, u32, &'a [u8])>) -> Vec<Report> {
+    let mut failed = Vec::new();
     for (id, version, bytes) in blobs {
-        let r = register_blob(bytes).map_err(|e| format!("{id}: {e}"))?;
-        if r.kind != id || r.version != version {
-            return Err(format!(
-                "{id} v{version}: the code says it is {} v{}",
-                r.kind, r.version
-            ));
-        }
+        let cause = match register_blob(bytes) {
+            Ok(r) if r.kind == id && r.version == version => continue,
+            Ok(r) => format!("the code says it is {} v{}", r.kind, r.version),
+            Err(e) => e.to_string(),
+        };
+        failed.push(register_stand_in(id, version, Some(bytes), &cause, None));
     }
-    Ok(())
+    failed
+}
+
+/// Makes `kind` a stand-in (see [`super::standin`]). Ports and params come from the blob's own
+/// metadata when it can be read, else from `fallback` (how the patch uses the module), else
+/// there are none. The original blob is kept so a save writes it back unchanged.
+pub fn register_stand_in(
+    kind: &str,
+    version: u32,
+    wasm: Option<&[u8]>,
+    cause: &str,
+    fallback: Option<CodeMeta>,
+) -> Report {
+    let from_blob = wasm.and_then(|w| engine().read_meta(w).ok());
+    let mut meta = from_blob.or(fallback).unwrap_or(CodeMeta {
+        kind: String::new(),
+        version,
+        name: String::new(),
+        explain: String::new(),
+        category: crate::info::Category::Utility,
+        rate: crate::info::Rate::Voice,
+        ports: vec![],
+        params: vec![],
+        advanced: vec![],
+        width_units: 4,
+    });
+    meta.kind = kind.to_owned();
+    if meta.name.is_empty() {
+        meta.name = kind.to_owned();
+    }
+    let report = Report {
+        kind: kind.to_owned(),
+        version,
+        cause: cause.to_owned(),
+    };
+    // A real module registered later wins (`code::register` clears the stand-in).
+    super::standin::register(&meta, report.clone());
+    if let Some(w) = wasm {
+        let rate = latest().lock().unwrap_or_else(|e| e.into_inner()).0;
+        blobs().lock().unwrap_or_else(|e| e.into_inner()).insert(
+            kind.to_owned(),
+            Entry {
+                version,
+                wasm: Arc::from(w),
+                rate,
+            },
+        );
+    }
+    report
 }
 
 fn latest() -> &'static Mutex<(f32, u32)> {
@@ -159,8 +208,10 @@ fn rebuild_for_rate() {
     let all: Vec<Arc<[u8]>> = blobs()
         .lock()
         .unwrap_or_else(|e| e.into_inner())
-        .values()
-        .map(|e| Arc::clone(&e.wasm))
+        .iter()
+        // Stand-ins stay stand-ins: only modules that are running get rebuilt.
+        .filter(|(kind, _)| super::group(kind).is_some())
+        .map(|(_, e)| Arc::clone(&e.wasm))
         .collect();
     for wasm in all {
         let _ = register_blob(&wasm);

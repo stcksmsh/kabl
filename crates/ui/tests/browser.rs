@@ -652,10 +652,44 @@ fn missing_recents_and_bad_patches_are_explained() {
     let user = tempfile::tempdir().unwrap();
     let sounds = user.path().join("sounds");
     // An uncompilable patch among the user's sounds.
-    let mut alien = PatchEditor::new();
-    alien.add_module("no.such.module", kabl_core::Vec2::default());
+    // (An unknown module kind is not uncompilable any more: it opens as a stand-in. A cable
+    // from a port the module does not have still is.)
+    let mut alien = kabl_core::PatchLog::new();
+    alien.append(
+        kabl_core::Op::AddModule {
+            id: 1,
+            kind: "filter.svf".into(),
+            pos: kabl_core::Vec2::default(),
+        },
+        1,
+        kabl_core::Source::User,
+    );
+    alien.append(
+        kabl_core::Op::AddModule {
+            id: 2,
+            kind: "osc.va".into(),
+            pos: kabl_core::Vec2::default(),
+        },
+        2,
+        kabl_core::Source::User,
+    );
+    alien.append(
+        kabl_core::Op::Connect {
+            id: 1,
+            from: kabl_core::PortRef::Module {
+                id: 2,
+                port: "no_such_port".into(),
+            },
+            to: kabl_core::PortRef::Module {
+                id: 1,
+                port: "in".into(),
+            },
+        },
+        3,
+        kabl_core::Source::User,
+    );
     std::fs::create_dir_all(&sounds).unwrap();
-    kabl_core::format::save_kabl(&sounds.join("alien.kabl"), alien.log()).unwrap();
+    kabl_core::format::save_kabl(&sounds.join("alien.kabl"), &alien).unwrap();
     std::fs::write(
         user.path().join("library.json"),
         r#"{"favorites":["user:gone"],"recents":["user:gone","factory:palette/pad"]}"#,
@@ -669,7 +703,7 @@ fn missing_recents_and_bad_patches_are_explained() {
     t.click("dlg:discard");
     let msg = t.ui.last_message.clone().unwrap();
     assert!(
-        msg.contains("no.such.module") && msg.contains("unchanged"),
+        msg.contains("no_such_port") && msg.contains("unchanged"),
         "{msg}"
     );
     assert_eq!(t.editor.state(), &work, "the working sound survives");
