@@ -168,6 +168,52 @@ fn layout_ext_table_is_count_xfer_cap_version() {
     assert_eq!((w[2], w[3]), (8, 7));
 }
 
+/// Module whose `process` waits inside the call until the test lets it out.
+struct Slow;
+static INSIDE: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+static LEAVE: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+
+impl Module for Slow {
+    const META: Meta = Meta::new("test.slow", 1);
+    fn new(_: &mut Init) -> Self {
+        Slow
+    }
+    fn reset(&mut self) {}
+    fn process(&mut self, _: &mut Io) {
+        INSIDE.store(true, Ordering::SeqCst);
+        while !LEAVE.load(Ordering::SeqCst) {
+            core::hint::spin_loop();
+        }
+    }
+}
+
+#[test]
+fn a_second_thread_calling_in_panics_instead_of_racing() {
+    type MS = Mem<Slow, 0, 0, 0, 0, 0>;
+    static S: Store<MS> = MS::store();
+    MS::init(&S, 48_000.0, 64);
+    let t = std::thread::spawn(|| MS::process(&S, 1));
+    while !INSIDE.load(Ordering::SeqCst) {
+        core::hint::spin_loop();
+    }
+    // The other thread is inside `process` now: every entry point must refuse.
+    for call in [
+        (|| MS::process(&S, 1)) as fn(),
+        || MS::reset(&S),
+        || {
+            MS::state_save(&S);
+        },
+        || {
+            MS::init(&S, 48_000.0, 64);
+        },
+    ] {
+        assert!(std::panic::catch_unwind(call).is_err());
+    }
+    LEAVE.store(true, Ordering::SeqCst);
+    t.join().unwrap();
+    MS::process(&S, 1); // the flag was released: normal calls work again
+}
+
 #[test]
 fn the_const_store_is_all_zero_bytes() {
     // A const initialiser of all-zero bytes is what lets the linker put it in .bss; the wasm

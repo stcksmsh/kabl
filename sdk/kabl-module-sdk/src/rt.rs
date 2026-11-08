@@ -5,6 +5,7 @@ use crate::{Init, Io, Module, StateWriter, MAX_BLOCK, MAX_STATE_CAP};
 use core::cell::UnsafeCell;
 use core::mem::{size_of, MaybeUninit};
 use core::ptr::{addr_of, addr_of_mut};
+use core::sync::atomic::{AtomicBool, Ordering};
 
 #[cfg(test)]
 mod tests;
@@ -45,16 +46,45 @@ pub struct Mem<
     arena: [u8; NA],
 }
 
-/// A static holding a [`Mem`]. The host is single threaded and the exports never re-enter, so
-/// sharing it is sound.
-pub struct Store<T>(UnsafeCell<MaybeUninit<T>>);
+/// A static holding a [`Mem`], behind a busy flag. Every entry point takes the flag first and
+/// panics (a trap on wasm) if it is already taken, so two threads, or a re-entrant call, can
+/// never hold overlapping `&mut` into the module. A wasm host runs one call at a time, so the
+/// flag never trips there.
+pub struct Store<T>(UnsafeCell<MaybeUninit<T>>, AtomicBool);
 
-// SAFETY: see the type docs: one thread, no re-entrancy.
+// SAFETY: all access to the cell goes through `lock`, whose compare-exchange (acquire) and
+// release store make the holder the only accessor, on any target; contention panics instead
+// of waiting.
 unsafe impl<T> Sync for Store<T> {}
+
+struct Guard<'a, T>(&'a Store<T>);
+
+impl<T> Drop for Guard<'_, T> {
+    fn drop(&mut self) {
+        self.0 .1.store(false, Ordering::Release);
+    }
+}
+
+impl<T> Guard<'_, T> {
+    fn ptr(&self) -> *mut T {
+        self.0.ptr()
+    }
+}
 
 impl<T> Store<T> {
     fn ptr(&self) -> *mut T {
         self.0.get().cast()
+    }
+
+    /// Exclusive access for the duration of one export call. Panics if another call (from
+    /// another thread, or re-entrant) is in progress.
+    fn lock(&self) -> Guard<'_, T> {
+        let free = self
+            .1
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok();
+        assert!(free, "kabl module called concurrently or re-entrantly");
+        Guard(self)
     }
 }
 
@@ -69,7 +99,10 @@ impl<
 {
     /// An all-zero store (no data segment).
     pub const fn store() -> Store<Self> {
-        Store(UnsafeCell::new(MaybeUninit::zeroed()))
+        Store(
+            UnsafeCell::new(MaybeUninit::zeroed()),
+            AtomicBool::new(false),
+        )
     }
 
     fn ext_table(p: *mut Self) -> *mut [u32; 4] {
@@ -87,7 +120,8 @@ impl<
     }
 
     pub fn init(s: &Store<Self>, sample_rate: f32, max_block: i32) -> i32 {
-        let p = s.ptr();
+        let guard = s.lock();
+        let p = guard.ptr();
         // SAFETY: single-threaded, non-reentrant; fields are accessed only through
         // projections of `p`, so no reference to the whole `Mem` ever exists and the arena
         // slices handed to the module stay disjoint from everything else.
@@ -121,7 +155,8 @@ impl<
     }
 
     pub fn process(s: &Store<Self>, n: i32) {
-        let p = s.ptr();
+        let guard = s.lock();
+        let p = guard.ptr();
         // SAFETY: as in `init`; input, output, params and module are disjoint fields.
         unsafe {
             if !(*p).live {
@@ -140,7 +175,8 @@ impl<
     }
 
     pub fn reset(s: &Store<Self>) {
-        let p = s.ptr();
+        let guard = s.lock();
+        let p = guard.ptr();
         // SAFETY: as in `init`.
         unsafe {
             if (*p).live {
@@ -150,13 +186,15 @@ impl<
     }
 
     pub fn layout_ext(s: &Store<Self>) -> i32 {
-        Self::ext_table(s.ptr()) as usize as i32
+        let guard = s.lock();
+        Self::ext_table(guard.ptr()) as usize as i32
     }
 
     /// Writes the settings into the transfer buffer; the length, or -1 on overflow or before
     /// `init`.
     pub fn state_save(s: &Store<Self>) -> i32 {
-        let p = s.ptr();
+        let guard = s.lock();
+        let p = guard.ptr();
         // SAFETY: as in `init`; xfer and module are disjoint fields.
         unsafe {
             if !(*p).live {
@@ -175,7 +213,8 @@ impl<
     /// Hands `len` bytes of the transfer buffer (filled by the host) to the module: 1 if it
     /// accepted them, 0 if not.
     pub fn state_load(s: &Store<Self>, len: i32, version: i32) -> i32 {
-        let p = s.ptr();
+        let guard = s.lock();
+        let p = guard.ptr();
         // SAFETY: as in `init`.
         unsafe {
             if !(*p).live || len < 0 || len as usize > NX {
