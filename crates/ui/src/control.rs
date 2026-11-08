@@ -462,6 +462,14 @@ pub fn deliver(editor: &mut PatchEditor, ui_state: &mut UiState, d: &mut Deliver
         }
     }
     d.flush();
+    // Module settings that could not be loaded or saved: said once, like a stand-in warning.
+    let notes = kabl_modules::code::host::active_scope().take_notes();
+    if !notes.is_empty() {
+        for n in &notes {
+            log::warn!(target: "control", "{n}");
+        }
+        ui_state.last_message = Some(notes.join(" | "));
+    }
     if refused > 0 {
         d.counts.dropped_actions += refused;
         let reason = if d.tx.is_some() {

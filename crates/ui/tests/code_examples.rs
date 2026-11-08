@@ -320,3 +320,119 @@ fn module_settings_survive_save_and_reopen_through_the_real_path() {
     assert_eq!(back.len(), 1);
     assert_eq!(back[0].1, saved, "settings are bit-exact after reopen");
 }
+
+/// Writes a file whose module has `kept` as its saved settings (the fixture for `--patch`).
+fn file_with_settings(
+    dir: &std::path::Path,
+    e: &PatchEditor,
+    leaf: u64,
+    kept: &kabl_modules::code::state::SavedState,
+) -> std::path::PathBuf {
+    use kabl_modules::code::host;
+    let mut code = kabl_standalone::code_load::embedded_for(
+        e.state(),
+        &host::active_scope(),
+        std::time::Duration::ZERO,
+    );
+    let version = code.instance_blob(leaf).unwrap().version;
+    code.keep_state(leaf, version, kept.to_kept()).unwrap();
+    let file = dir.join("settings.kabl");
+    kabl_core::format::save_kabl_full(&file, e.log(), None, Some(&code)).unwrap();
+    file
+}
+
+fn good_settings() -> kabl_modules::code::state::SavedState {
+    use kabl_modules::code::{host, InstanceConfig, WasmEngine, WasmiEngine};
+    let c = WasmiEngine::new().compile(host::EXAMPLES[1].wasm).unwrap();
+    let inst = c.instantiate(&InstanceConfig::new(SR, 2048)).unwrap();
+    let x = inst.state_xfer().unwrap();
+    // eight f32, none the default (zeros)
+    let bytes = (1..=8u32)
+        .flat_map(|i| (i as f32 * 0.125).to_le_bytes())
+        .collect();
+    kabl_modules::code::state::SavedState {
+        state_version: x.state_version,
+        bytes,
+    }
+}
+
+/// `--patch` (standalone and kabl-ui) registers the file's code and then builds the engine
+/// with `PatchEngine::new`: the song's settings reach the module bit-exact.
+#[test]
+fn patch_flag_restores_saved_module_settings() {
+    use kabl_modules::code::host;
+    let _serial = serial();
+    let e = with_filter();
+    let leaf = module_of(&e, "demo.bitfilter");
+    let dir = tempfile::tempdir().unwrap();
+    let kept = good_settings();
+    let file = file_with_settings(dir.path(), &e, leaf, &kept);
+
+    let (log, _, code) = kabl_core::format::load_kabl_full(&file).unwrap();
+    assert!(kabl_standalone::code_load::register_for_cli(&code, log.state()).is_empty());
+    let collector = basedrop::Collector::new();
+    let mut eng = PatchEngine::new(&collector.handle(), log.state(), SR, 4).unwrap();
+    eng.key(KeyEvent::On {
+        note: 60,
+        velocity: 100,
+    });
+    let scope = host::active_scope();
+    scope.request_capture();
+    let (mut l, mut r) = ([0f32; BLOCK], [0f32; BLOCK]);
+    eng.process_block(&mut l, &mut r);
+    let got = scope.collect();
+    assert_eq!(got, 1, "notes: {:?}", scope.take_notes());
+    assert_eq!(scope.settings(), vec![(leaf, kept)]);
+    assert!(scope.take_notes().is_empty());
+}
+
+/// Settings the module cannot take are reported the way stand-in warnings are, and the song
+/// keeps them for a build that can.
+#[test]
+fn unusable_saved_settings_are_reported_and_kept() {
+    use kabl_modules::code::host;
+    use kabl_modules::code::state::SavedState;
+    use kabl_ui::control::{self, Delivery};
+    let _serial = serial();
+    let e = with_filter();
+    let leaf = module_of(&e, "demo.bitfilter");
+    let dir = tempfile::tempdir().unwrap();
+    let corrupt = SavedState {
+        state_version: 99, // from a layout newer than the module knows
+        bytes: vec![1, 2, 3],
+    };
+    let file = file_with_settings(dir.path(), &e, leaf, &corrupt);
+
+    let (log, _, code) = kabl_core::format::load_kabl_full(&file).unwrap();
+    kabl_standalone::code_load::register_for_cli(&code, log.state());
+    let collector = basedrop::Collector::new();
+    let mut d = Delivery::new(
+        None,
+        collector.handle(),
+        std::sync::Arc::new(kabl_engine::runtime::Feedback::default()),
+        SR,
+        4,
+        None,
+    );
+    let mut editor = PatchEditor::from_log(log);
+    let mut ui = UiState::default();
+    editor.mark_dirty();
+    control::deliver(&mut editor, &mut ui, &mut d);
+    let msg = ui.last_message.clone().expect("the user is told");
+    assert!(
+        msg.contains("demo.bitfilter") && msg.contains("starts at its defaults"),
+        "{msg}"
+    );
+    assert!(msg.contains("keeps the old settings"), "{msg}");
+    // Saving writes the unusable settings back unchanged.
+    let out = kabl_standalone::code_load::embedded_for(
+        editor.state(),
+        &host::active_scope(),
+        std::time::Duration::ZERO,
+    );
+    let version = out.instance_blob(leaf).unwrap().version;
+    assert_eq!(
+        SavedState::from_kept(out.kept_state(leaf, version).unwrap()),
+        Some(corrupt)
+    );
+}

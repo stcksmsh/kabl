@@ -564,6 +564,9 @@ impl AudioHost {
                 return (a, d);
             }
         };
+        for n in kabl_modules::code::host::active_scope().take_notes() {
+            log::warn!(target: "app", "{n}");
+        }
         engine.active_mut().generation = 1;
         engine.active_mut().rev = 1;
         let (mut probe_tx, probe_rx) = rtrb::RingBuffer::<ProbeReport>::new(8);

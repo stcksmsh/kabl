@@ -234,13 +234,9 @@ impl PatchEngine {
         sample_rate: f32,
         voice_count: usize,
     ) -> Result<Self, CompileError> {
-        Self::new_scoped(
-            handle,
-            patch,
-            sample_rate,
-            voice_count,
-            &CodeScope::default(),
-        )
+        // The live engine of the open song: its code and settings.
+        let scope = kabl_modules::code::host::active_scope();
+        Self::new_scoped(handle, patch, sample_rate, voice_count, &scope)
     }
 
     /// [`PatchEngine::new`] for a song whose code modules are the blobs `scope` names, so two
@@ -508,7 +504,8 @@ impl PatchEngine {
         handle: &Handle,
         patch: &PatchState,
     ) -> Result<Owned<CompiledPatch>, CompileError> {
-        self.build_swap_scoped(handle, patch, &CodeScope::default())
+        let scope = kabl_modules::code::host::active_scope();
+        self.build_swap_scoped(handle, patch, &scope)
     }
 
     /// [`PatchEngine::build_swap`] with the song's [`CodeScope`].
