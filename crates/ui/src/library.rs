@@ -371,21 +371,29 @@ pub fn read_patch_declined(
     let mut declined = Vec::new();
     let (log, _, code) = kabl_core::format::load_kabl_full(file)
         .map_err(|e| LibError::Unreadable(format!("{e:?}")))?;
+    let mut scope = kabl_modules::code::CodeScope::new();
     if !code.is_empty() {
         let entries = crate::code_notice::entries(&code);
         match crate::code_notice::gate(&entries, trust) {
             crate::code_notice::Gate::Ask => return Err(LibError::CodeNotice(entries)),
             // Declined: the patch still opens, with stand-ins for the code.
             crate::code_notice::Gate::Refuse => {
-                crate::code_notice::decline(&code, log.state());
+                scope = crate::code_notice::decline(&code, log.state());
                 declined = entries;
             }
-            crate::code_notice::Gate::Open => crate::code_notice::register(&code, log.state()),
+            crate::code_notice::Gate::Open => {
+                scope = crate::code_notice::register(&code, log.state());
+            }
         }
     }
-    crate::code_notice::stand_in_missing(log.state());
-    kabl_engine::compile::compile(log.state(), 48000.0, kabl_standalone::DEFAULT_VOICE_COUNT)
-        .map_err(|e| LibError::Uncompilable(e.to_string()))?;
+    let scope = kabl_standalone::code_load::stand_in_missing_in(log.state(), &scope);
+    kabl_engine::compile::compile_scoped(
+        log.state(),
+        48000.0,
+        kabl_standalone::DEFAULT_VOICE_COUNT,
+        &scope,
+    )
+    .map_err(|e| LibError::Uncompilable(e.to_string()))?;
     Ok((log, declined))
 }
 

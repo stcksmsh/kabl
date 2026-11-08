@@ -61,11 +61,23 @@ impl Fault {
 pub enum LoadError {
     Invalid(String),
     ForbiddenImport(String),
-    TooLarge { bytes: usize, cap: usize },
-    AbiMismatch { module: u32, host: u32 },
+    TooLarge {
+        bytes: usize,
+        cap: usize,
+    },
+    AbiMismatch {
+        module: u32,
+        host: u32,
+    },
     /// The module needs a newer revision of the ABI than this host has.
-    AbiMinor { module: u32, host: u32 },
-    MemoryOverCap { bytes: usize, cap: usize },
+    AbiMinor {
+        module: u32,
+        host: u32,
+    },
+    MemoryOverCap {
+        bytes: usize,
+        cap: usize,
+    },
     Layout(String),
 }
 

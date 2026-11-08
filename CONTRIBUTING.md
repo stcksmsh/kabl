@@ -1,6 +1,6 @@
 # Contributing to kabl
 
-Draft contributor terms, for the owner's decision. Not legal advice.
+These are the terms for contributing to kabl.
 
 kabl is GPL-3.0-or-later. The owner named in `COPYRIGHT` holds the copyright of the whole
 project and must be able to relicense, sell or transfer it. Contributions are therefore accepted
@@ -38,5 +38,4 @@ request without it.
 | CLA with licence grant (above) | yes | one paragraph and a sign-off |
 | Copyright assignment | yes, strongest | needs a signed document per person, and not every country lets authors assign (moral rights); contributors dislike it |
 
-Recommendation: the licence grant, with the DCO sign-off as the record. A lawyer should confirm
-the wording and its validity where the owner and the contributors live.
+Chosen: the licence grant, with the DCO sign-off as the record.

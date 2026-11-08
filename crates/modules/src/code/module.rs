@@ -32,6 +32,7 @@ pub struct Health {
     fault: AtomicU8,
     notice: AtomicBool,
     nonfinite: AtomicU32,
+    sanitized: AtomicU32,
     overruns: AtomicU32,
     fuel_budget: AtomicU64,
     voices: AtomicU32,
@@ -45,6 +46,7 @@ impl Health {
             fault: AtomicU8::new(0),
             notice: AtomicBool::new(false),
             nonfinite: AtomicU32::new(0),
+            sanitized: AtomicU32::new(0),
             overruns: AtomicU32::new(0),
             fuel_budget: AtomicU64::new(fuel_budget),
             voices: AtomicU32::new(0),
@@ -84,6 +86,13 @@ impl Health {
     /// Blocks that produced NaN/Inf (and were therefore replaced by silence).
     pub fn nonfinite_count(&self) -> u32 {
         self.nonfinite.load(Relaxed)
+    }
+
+    /// Input samples that were NaN or infinite and were replaced by 0.0 before the module saw
+    /// them (a counter, not a warning per sample). The module is never given non-finite input,
+    /// so a non-finite output is its own fault.
+    pub fn sanitized_inputs(&self) -> u32 {
+        self.sanitized.load(Relaxed)
     }
 
     /// Overruns logged (fuel or wall clock), including one-off ones that did not crash anything.
@@ -236,6 +245,21 @@ fn fade_len(sample_rate: f32) -> usize {
     ((sample_rate * FADE_MS / 1000.0) as usize).max(1)
 }
 
+/// Writes input samples, replacing NaN and infinity with 0.0; returns how many were replaced.
+fn put_inputs(mem: &mut [u8], at: usize, vals: impl Iterator<Item = f32>) -> u32 {
+    let mut bad = 0;
+    for (k, v) in vals.enumerate() {
+        let v = if v.is_finite() {
+            v
+        } else {
+            bad += 1;
+            0.0
+        };
+        mem[at + k * 4..at + k * 4 + 4].copy_from_slice(&v.to_le_bytes());
+    }
+    bad
+}
+
 fn put_f32s(mem: &mut [u8], at: usize, vals: impl Iterator<Item = f32>) {
     for (k, v) in vals.enumerate() {
         mem[at + k * 4..at + k * 4 + 4].copy_from_slice(&v.to_le_bytes());
@@ -277,9 +301,12 @@ impl Module for CodeModule {
         let mem = self.inst.memory();
         for s in 0..self.in_slots {
             let at = layout.input_range(s).start;
-            match io.input(s) {
-                Signal::Scalar(v) => put_f32s(mem, at, std::iter::repeat_n(v, n)),
-                Signal::Buffer(b) => put_f32s(mem, at, b[..n].iter().copied()),
+            let bad = match io.input(s) {
+                Signal::Scalar(v) => put_inputs(mem, at, std::iter::repeat_n(v, n)),
+                Signal::Buffer(b) => put_inputs(mem, at, b[..n].iter().copied()),
+            };
+            if bad > 0 {
+                self.health.sanitized.fetch_add(bad, Relaxed);
             }
         }
         for p in 0..self.n_params.min(io.param_count()) {

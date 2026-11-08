@@ -106,8 +106,14 @@ pub const KNOWN_KINDS: &[&str] = &[
     "join",
 ];
 
-/// Builds a fresh instance of `kind`, or `None` if `kind` isn't a known built-in.
+/// Builds a fresh instance of `kind`: a built-in, else the latest registered code module.
 pub fn create(kind: &str) -> Option<Box<dyn Module>> {
+    create_in(&crate::code::CodeScope::default(), kind)
+}
+
+/// [`create`] for the song `scope` describes: a code module resolves to the exact blob the song
+/// embeds, whatever other songs in this process run.
+pub fn create_in(scope: &crate::code::CodeScope, kind: &str) -> Option<Box<dyn Module>> {
     Some(match kind {
         "osc.va" => Box::new(OscVa::new()),
         "filter.svf" => Box::new(FilterSvf::new()),
@@ -162,7 +168,7 @@ pub fn create(kind: &str) -> Option<Box<dyn Module>> {
         "drum.tom" => Box::new(Tom::new()),
         "midi.note" => Box::new(MidiNote::new()),
         "drum.grid" => Box::new(DrumGrid::new()),
-        _ => return crate::code::create(kind),
+        _ => return crate::code::create_in(scope, kind),
     })
 }
 
@@ -231,11 +237,16 @@ pub fn all_infos() -> &'static [&'static ModuleInfo] {
 /// Metadata for one kind, or `None` if unknown — for looking up ports/params without building an
 /// instance (e.g. to validate a patch op before applying it).
 pub fn info_for(kind: &str) -> Option<&'static ModuleInfo> {
+    info_for_in(&crate::code::CodeScope::default(), kind)
+}
+
+/// [`info_for`] for the song `scope` describes.
+pub fn info_for_in(scope: &crate::code::CodeScope, kind: &str) -> Option<&'static ModuleInfo> {
     all_infos()
         .iter()
         .copied()
         .find(|info| info.kind == kind)
-        .or_else(|| crate::code::info_for(kind))
+        .or_else(|| crate::code::info_for_in(scope, kind))
 }
 
 /// The stored name an older patch used for `param` of `kind`, if it differs. Only the mixer's

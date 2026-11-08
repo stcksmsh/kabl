@@ -7,8 +7,8 @@
 
 use super::standin::Report;
 use super::{
-    Budget, Calibration, CodeGroup, CodeMeta, InstanceConfig, LoadError, WasmEngine, WasmiEngine,
-    PER_MODULE_SHARE,
+    hash_of, standin_key, Budget, Calibration, CodeGroup, CodeHash, CodeMeta, CodeScope,
+    InstanceConfig, LoadError, WasmEngine, WasmiEngine, PER_MODULE_SHARE,
 };
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -44,6 +44,8 @@ const MAX_BLOCK: u32 = 2048;
 pub struct Registered {
     pub kind: String,
     pub version: u32,
+    /// The blob's hash: what a song's [`CodeScope`] maps the kind to.
+    pub key: CodeHash,
 }
 
 struct Entry {
@@ -70,44 +72,50 @@ pub fn budget() -> &'static Budget {
     })
 }
 
-fn blobs() -> &'static Mutex<BTreeMap<String, Entry>> {
-    static T: Mutex<BTreeMap<String, Entry>> = Mutex::new(BTreeMap::new());
+/// Every blob kept, by key: its hash when it runs, the stand-in's key when it does not (so a
+/// save writes back exactly the bytes that were loaded).
+fn blobs() -> &'static Mutex<BTreeMap<CodeHash, Entry>> {
+    static T: Mutex<BTreeMap<CodeHash, Entry>> = Mutex::new(BTreeMap::new());
     &T
 }
 
-/// Compiles `wasm`, registers it under the kind its metadata names and remembers the bytes.
-/// Registering the same bytes again is a no-op; different bytes under the same kind replace the
-/// earlier code (existing voices keep running their old instances). Control thread only.
+/// Compiles `wasm`, registers it under its hash and makes it the latest of the kind its
+/// metadata names, remembering the bytes. Registering the same bytes again is a no-op (but
+/// makes them the latest again). Different bytes under the same kind do not replace the earlier
+/// code: both run, each for the songs whose [`CodeScope`] names it. Control thread only.
 pub fn register_blob(wasm: &[u8]) -> Result<Registered, LoadError> {
+    install_blob(wasm, true)
+}
+
+fn install_blob(wasm: &[u8], make_latest: bool) -> Result<Registered, LoadError> {
     let compiled = engine().compile(wasm)?;
     let meta = compiled.meta();
     let (kind, version) = (meta.kind.clone(), meta.version);
+    let key = hash_of(wasm);
     let rate = latest().lock().unwrap_or_else(|e| e.into_inner()).0;
     {
         let table = blobs().lock().unwrap_or_else(|e| e.into_inner());
-        if table
-            .get(&kind)
-            .is_some_and(|e| *e.wasm == *wasm && e.rate == rate)
-            && super::group(&kind).is_some()
-        {
-            return Ok(Registered { kind, version });
+        if table.get(&key).is_some_and(|e| e.rate == rate) && super::group_by_key(&key).is_some() {
+            if make_latest {
+                super::set_latest(&kind, key);
+            }
+            return Ok(Registered { kind, version, key });
         }
     }
     // `init` receives this rate, so a module's coefficients match the running device.
     let cfg = InstanceConfig::new(rate, MAX_BLOCK);
-    let group = CodeGroup::new(compiled, cfg, 1, std::time::Duration::from_secs(1))?;
+    let group = CodeGroup::keyed(compiled, cfg, 1, std::time::Duration::from_secs(1), key)?;
     budget().register_with(group.health(), PER_MODULE_SHARE);
-    super::unregister(&kind);
-    super::register(group)?;
+    super::install(group, make_latest)?;
     blobs().lock().unwrap_or_else(|e| e.into_inner()).insert(
-        kind.clone(),
+        key,
         Entry {
             version,
             wasm: Arc::from(wasm),
             rate,
         },
     );
-    Ok(Registered { kind, version })
+    Ok(Registered { kind, version, key })
 }
 
 /// Registers both example modules (compiled once per process; later calls return the result).
@@ -122,12 +130,18 @@ pub fn register_examples() -> Result<(), LoadError> {
     .clone()
 }
 
-/// The registered code for `kind`: `(version, wasm bytes)`.
+/// The latest registered code for `kind`: `(version, wasm bytes)`.
 pub fn blob_for(kind: &str) -> Option<(u32, Arc<[u8]>)> {
+    blob_for_in(&CodeScope::default(), kind)
+}
+
+/// The code `kind` has in the song `scope` describes (else the latest): what a save embeds.
+pub fn blob_for_in(scope: &CodeScope, kind: &str) -> Option<(u32, Arc<[u8]>)> {
+    let key = scope.key(kind).or_else(|| super::latest_key(kind))?;
     blobs()
         .lock()
         .unwrap_or_else(|e| e.into_inner())
-        .get(kind)
+        .get(&key)
         .map(|e| (e.version, Arc::clone(&e.wasm)))
 }
 
@@ -141,6 +155,20 @@ pub fn register_stand_in(
     cause: &str,
     fallback: Option<CodeMeta>,
 ) -> Report {
+    register_stand_in_keyed(kind, version, wasm, cause, fallback).0
+}
+
+/// [`register_stand_in`], also returning the key to put in the song's [`CodeScope`]. The
+/// stand-in lives under a key of its own (derived from the blob's hash, or from how the song
+/// uses a module that has no blob), so it never replaces a running group of the same kind that
+/// another song uses; it only becomes what the kind resolves to without a scope.
+pub fn register_stand_in_keyed(
+    kind: &str,
+    version: u32,
+    wasm: Option<&[u8]>,
+    cause: &str,
+    fallback: Option<CodeMeta>,
+) -> (Report, CodeHash) {
     let from_blob = wasm.and_then(|w| engine().read_meta(w).ok());
     let mut meta = from_blob.or(fallback).unwrap_or(CodeMeta {
         kind: String::new(),
@@ -158,19 +186,23 @@ pub fn register_stand_in(
     if meta.name.is_empty() {
         meta.name = kind.to_owned();
     }
+    let key = match wasm {
+        Some(w) => standin_key(&hash_of(w)),
+        None => standin_key(format!("{kind}\0{version}\0{meta:?}").as_bytes()),
+    };
     let report = Report {
         kind: kind.to_owned(),
         version,
         cause: cause.to_owned(),
     };
-    // The failed module replaces any running one of that kind (an earlier patch's, or an
-    // example); a real module registered later wins again (`code::register` clears the stand-in).
-    super::unregister(kind);
-    super::standin::register(&meta, report.clone());
+    super::standin::register(key, &meta, report.clone());
+    // Without a scope the kind now resolves to the stand-in (the failed module replaces the
+    // example or the earlier patch's); a real module registered later wins again.
+    super::set_latest(kind, key);
     if let Some(w) = wasm {
         let rate = latest().lock().unwrap_or_else(|e| e.into_inner()).0;
         blobs().lock().unwrap_or_else(|e| e.into_inner()).insert(
-            kind.to_owned(),
+            key,
             Entry {
                 version,
                 wasm: Arc::from(w),
@@ -178,7 +210,7 @@ pub fn register_stand_in(
             },
         );
     }
-    report
+    (report, key)
 }
 
 fn latest() -> &'static Mutex<(f32, u32)> {
@@ -186,7 +218,7 @@ fn latest() -> &'static Mutex<(f32, u32)> {
     &L
 }
 
-/// A new sample rate: every registered module gets a fresh group built for it (graphs built
+/// A new sample rate: every running module gets a fresh group built for it (graphs built
 /// from now on use it; a running graph is rebuilt by the app when the device restarts).
 fn rebuild_for_rate() {
     let all: Vec<Arc<[u8]>> = blobs()
@@ -194,11 +226,12 @@ fn rebuild_for_rate() {
         .unwrap_or_else(|e| e.into_inner())
         .iter()
         // Stand-ins stay stand-ins: only modules that are running get rebuilt.
-        .filter(|(kind, _)| super::group(kind).is_some())
+        .filter(|(key, _)| super::group_by_key(key).is_some())
         .map(|(_, e)| Arc::clone(&e.wasm))
         .collect();
     for wasm in all {
-        let _ = register_blob(&wasm);
+        // Which blob is the latest of its kind does not change with the rate.
+        let _ = install_blob(&wasm, false);
     }
 }
 
