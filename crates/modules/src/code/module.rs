@@ -8,8 +8,11 @@
 //! - running out of fuel, or a block taking longer than the wall-clock cap (the backstop), is an
 //!   **overrun**: that block is silent (same short fade), and eight in a row make a crash. A
 //!   one-off overrun is only counted.
-//! - nothing allocates while a block runs; debug builds mark the call
-//!   ([`in_code_call`]) so a checking allocator can assert it.
+//! - a normal block and an out-of-fuel block allocate nothing (the wasmi backend reads running
+//!   out of fuel from a resumable call instead of building an error). A real trap makes wasmi
+//!   build its error value: **one allocation, once**, because the module is disabled right
+//!   after and runs nothing further. Debug builds mark the call ([`in_code_call`]) so a checking
+//!   allocator can assert all of this.
 
 use super::abi::Layout;
 use super::engine::{Fault, InstanceConfig, WasmInstance};

@@ -18,7 +18,7 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 use wasmi::{
     CompilationMode, Config, Engine, Linker, Memory, Module, ResourceLimiter, Store, StoreLimits,
-    StoreLimitsBuilder, TrapCode, TypedFunc,
+    StoreLimitsBuilder, TrapCode, TypedFunc, TypedResumableCall,
 };
 
 /// Imports a code module may declare, as `(module, name)`. Empty: ABI v0 is exports only.
@@ -201,8 +201,9 @@ impl CompiledModule for WasmiCompiled {
             .get(at..at + 36)
             .ok_or_else(|| LoadError::Layout("init returned an address outside memory".into()))?;
         let mut w = [0u32; 9];
-        for (k, c) in record.chunks_exact(4).enumerate() {
-            w[k] = u32::from_le_bytes([c[0], c[1], c[2], c[3]]);
+        let (words, _) = record.as_chunks::<4>();
+        for (k, c) in words.iter().enumerate() {
+            w[k] = u32::from_le_bytes(*c);
         }
         let layout = Layout::from_words(w);
         // Declared memory is final from here: growing it while running is a crash.
@@ -268,10 +269,17 @@ impl WasmInstance for WasmiInstance {
     }
 
     fn call_block(&mut self, frames: u32) -> Result<u64, Fault> {
-        match self.process.call(&mut self.store, frames as i32) {
-            Ok(()) => Ok(self
+        // `call_resumable` reports running out of fuel as a plain return value, where `call` would
+        // build an allocating error. The handle is dropped at once (abandoning the block); that
+        // hands wasmi's stack back to the engine's cache without allocating. A real trap still
+        // builds an error: one allocation, after which the module is disabled.
+        match self.process.call_resumable(&mut self.store, frames as i32) {
+            Ok(TypedResumableCall::Finished(())) => Ok(self
                 .fuel_set
                 .saturating_sub(self.store.get_fuel().unwrap_or(0))),
+            Ok(TypedResumableCall::OutOfFuel(_)) => Err(Fault::OutOfFuel),
+            // No host functions exist (all imports are refused), so this cannot happen.
+            Ok(TypedResumableCall::HostTrap(_)) => Err(Fault::Trap),
             Err(e) => Err(Self::classify(&e)),
         }
     }

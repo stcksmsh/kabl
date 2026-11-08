@@ -404,6 +404,53 @@ fn sixteen_voices_times_four_modules_never_allocate_on_the_audio_thread() {
     assert!(groups.iter().all(|g| !g.health().is_crashed()));
 }
 
+/// Allocations made inside `m.process` for one block with the given params.
+fn allocs_in_block(m: &mut CodeModule, params: [f32; 6]) -> usize {
+    let mut seed = 5;
+    let inp = noise(&mut seed);
+    let sig = [Signal::Buffer(&inp)];
+    let ps = params.map(Signal::Scalar);
+    let mut out = [0f32; N];
+    let mut outs: [&mut [f32]; 1] = [&mut out];
+    let mut io = ProcessIo::new(&sig, &mut outs, &ps, N);
+    let before = VIOLATIONS.with(|c| c.get());
+    NO_ALLOC.with(|c| c.set(true));
+    m.process(&mut io);
+    NO_ALLOC.with(|c| c.set(false));
+    VIOLATIONS.with(|c| c.get()) - before
+}
+
+#[test]
+fn an_out_of_fuel_block_allocates_nothing_and_a_trap_at_most_once() {
+    let mut loud = COEF;
+    loud[0] = 3.0;
+
+    // Overruns: seven in a row (one short of the crash limit) allocate nothing at all.
+    let spin = format!("{WHEN_LOUD} (loop $l (br $l))");
+    let g = group(&wasm(1, "", &spin), 1, 100_000, Duration::from_secs(5));
+    let mut m = voice(&g);
+    assert_eq!(allocs_in_block(&mut m, COEF), 0);
+    for k in 1..OVERRUN_LIMIT {
+        assert_eq!(allocs_in_block(&mut m, loud), 0, "overrun block {k}");
+    }
+    assert_eq!(g.health().overrun_count(), OVERRUN_LIMIT - 1);
+    assert!(!g.health().is_crashed());
+    // A good block in between still runs, with no allocation either.
+    assert_eq!(allocs_in_block(&mut m, COEF), 0);
+
+    // A real trap builds wasmi's error: at most one allocation, then the module is off.
+    let trap = format!("{WHEN_LOUD} unreachable");
+    let g = group(&wasm(1, "", &trap), 1, 100_000, Duration::from_secs(5));
+    let mut m = voice(&g);
+    assert!(allocs_in_block(&mut m, loud) <= 1);
+    assert!(g.health().is_crashed());
+    assert_eq!(
+        allocs_in_block(&mut m, loud),
+        0,
+        "a disabled module runs nothing"
+    );
+}
+
 #[test]
 fn calibration_module_matches_its_wat_source() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/code");
