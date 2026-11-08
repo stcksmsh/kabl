@@ -146,6 +146,9 @@ pub struct Prefs {
     pub recents: Vec<String>,
     /// Paths of the patch files last opened or saved through the file browser, newest first.
     pub patch_recents: Vec<String>,
+    /// Remembered answer of the custom-code notice per content hash (lower-case hex SHA-256):
+    /// true = Open, false = Cancel.
+    pub code_trust: std::collections::BTreeMap<String, bool>,
 }
 
 #[derive(Debug)]
@@ -654,6 +657,16 @@ impl Library {
     pub fn forget(&mut self, id: &str) -> Option<String> {
         self.prefs.favorites.remove(id);
         self.prefs.recents.retain(|r| r != id);
+        self.save_prefs()
+    }
+
+    /// Remembers the custom-code notice's answer for these hashes (`library.json`).
+    pub fn remember_code_trust(
+        &mut self,
+        code: &[crate::code_notice::CodeEntry],
+        open: bool,
+    ) -> Option<String> {
+        crate::code_notice::remember(&mut self.prefs.code_trust, code, open);
         self.save_prefs()
     }
 
