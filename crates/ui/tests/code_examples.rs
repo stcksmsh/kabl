@@ -12,6 +12,13 @@ use kabl_ui::{code_examples, code_notice, PatchEditor, UiState};
 
 const SR: f32 = 48_000.0;
 
+/// The example modules live in one process-wide registry, and the declined-code test turns them
+/// into stand-ins for a while: tests that use them must not overlap.
+fn serial() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    LOCK.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 fn editor() -> PatchEditor {
     PatchEditor::seed_from(&kabl_standalone::default_patch())
 }
@@ -85,6 +92,7 @@ fn render(e: &PatchEditor, secs: f32) -> Vec<f32> {
 
 #[test]
 fn examples_get_labels_and_a_valid_panel() {
+    let _serial = serial();
     for kind in ["demo.logic", "demo.bitfilter"] {
         let mut e = editor();
         let (leaf, id) = code_examples::add(&mut e, kind, Vec2 { x: 500.0, y: 300.0 }).unwrap();
@@ -108,6 +116,7 @@ fn examples_get_labels_and_a_valid_panel() {
 
 #[test]
 fn bitfilter_makes_finite_non_silent_audio_and_survives_a_swap() {
+    let _serial = serial();
     let mut e = with_filter();
     let a = render(&e, 0.5);
     assert!(a.iter().all(|v| v.is_finite()));
@@ -127,6 +136,7 @@ fn bitfilter_makes_finite_non_silent_audio_and_survives_a_swap() {
 
 #[test]
 fn logic_module_builds_inside_a_patch() {
+    let _serial = serial();
     let mut e = editor();
     let (leaf, _) = code_examples::add(&mut e, "demo.logic", Vec2 { x: 500.0, y: 300.0 }).unwrap();
     // Output offset 0.5 in "threshold" mode with nothing patched still gives a finite render.
@@ -138,6 +148,7 @@ fn logic_module_builds_inside_a_patch() {
 
 #[test]
 fn save_and_reopen_round_trips_code_and_asks_once() {
+    let _serial = serial();
     let e = with_filter();
     let before = render(&e, 0.3);
     let dir = tempfile::tempdir().unwrap();
@@ -171,6 +182,7 @@ fn save_and_reopen_round_trips_code_and_asks_once() {
 
 #[test]
 fn opening_through_the_browser_shows_the_notice_then_never_again() {
+    let _serial = serial();
     let e = with_filter();
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("p.kabl");
