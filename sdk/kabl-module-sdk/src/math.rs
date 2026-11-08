@@ -1,4 +1,6 @@
-//! Small `no_std` helpers (there is no `libm` in a module). Plain `f32` math, no tables.
+//! Small `no_std` helpers. `core` has no transcendental functions, and the compiler may still
+//! pull libm routines in (f32 `%` lowers to `fmodf`), which is why the notices cover libm.
+//! Plain `f32` math, no tables.
 
 /// Flushes denormals: below 1e-20 returns 0. Apply to recursive state once per block.
 pub fn flush(x: f32) -> f32 {

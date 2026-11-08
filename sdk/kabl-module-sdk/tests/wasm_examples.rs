@@ -142,10 +142,21 @@ fn check(dir: &Path, file: &str, kind: &str, max_len: usize) {
         );
     }
     let notices = custom("kabl.notices");
-    assert!(
-        notices.contains("MIT") && notices.contains("compiler_builtins"),
-        "{file}"
-    );
+    for heading in [
+        "1. Rust core library.",
+        "2. compiler_builtins.",
+        "3. libm (math routines bundled in compiler_builtins).",
+        "4. Unicode data tables in core",
+        "MIT License (applies to 1, 2 and 3):",
+        "Unicode License v3 (applies to 4):",
+        "UNICODE LICENSE V3",
+        "Permission is hereby granted, free of charge",
+    ] {
+        assert!(
+            notices.contains(heading),
+            "{file}: notices lack `{heading}`"
+        );
+    }
     // Zeroed statics are .bss: the data segment holds only the two `link_section` statics
     // (emitted a second time there) plus a little slack, not the ~41 KB of buffers of v0.
     assert!(

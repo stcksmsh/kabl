@@ -65,29 +65,11 @@ pub const MAX_BLOCK: usize = 2048;
 /// Largest transfer buffer the host accepts (64 KiB); a larger `STATE_CAP` is a compile error.
 pub const MAX_STATE_CAP: usize = 64 * 1024;
 
-/// What `kabl.notices` carries: the Rust toolchain's `core` and `compiler_builtins` are linked
-/// into every module and are dual MIT/Apache-2.0; the MIT terms require this notice to travel
-/// with the binary.
-pub const NOTICE: &str =
-    "This module links parts of the Rust toolchain: the core library and compiler_builtins.\n\
-Both are licensed MIT OR Apache-2.0 and are used here under the MIT licence.\n\
-\n\
-Copyright (c) The Rust Project Developers\n\
-\n\
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and \
-associated documentation files (the \"Software\"), to deal in the Software without restriction, \
-including without limitation the rights to use, copy, modify, merge, publish, distribute, \
-sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is \
-furnished to do so, subject to the following conditions:\n\
-\n\
-The above copyright notice and this permission notice shall be included in all copies or \
-substantial portions of the Software.\n\
-\n\
-THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING \
-BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND \
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, \
-DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, \
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n";
+/// What `kabl.notices` carries: notices for the Rust toolchain code the compiler links into
+/// every module (core, compiler_builtins with its libm, and core's Unicode tables), with the
+/// licence texts copied verbatim from the toolchain (`NOTICE.txt`). Handled automatically: a
+/// creator does nothing.
+pub const NOTICE: &str = include_str!("../NOTICE.txt");
 
 /// `s` as a byte array of exactly `L` bytes (used by the macro to fill the notices section).
 pub const fn str_bytes<const L: usize>(s: &str) -> [u8; L] {
