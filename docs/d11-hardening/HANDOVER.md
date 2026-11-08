@@ -4,6 +4,9 @@ Task: calibration hooked at app startup and device change; fault tests (trap, lo
 
 Done: ABI check. `abi N` meta line, absent = host ABI (0); mismatch gives LoadError::AbiMismatch (`wasmi_engine.rs`). No test yet.
 
+Done (2): crates/engine/tests/code_faults.rs: runtime fault matrix (trap, spin, memory grow, NaN) on a real patch, load-time faults (forbidden import, ABI, oversize), bit-exact save/reopen, 16 voices x 4 modules zero-alloc. Passing. Overseer update: do not create a second host.rs; extend PR 5's (branch claude/d11-examples) after it merges. Open no PR until PR 5 merged and rebased.
+Left: item 1 (calibration wiring via PR 5 host.rs), REAPER numbers, whole-workspace test run, PR.
+
 Findings:
 - Engine-level tests already exist in crates/modules/tests/wasmi_engine.rs: trap, loop, memory cap, NaN, forbidden import, 16x4 alloc, budgets. Core has oversize-blob and version-change tests.
 - Nothing wires code modules into the app. `Budget` and `Calibration::measure` are used only by tests. No loader turns `Embedded` into registered `CodeGroup`s. Unknown kind makes compile fail, so there is no bypass placeholder.

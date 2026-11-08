@@ -1853,6 +1853,7 @@ dependencies = [
  "rtrb",
  "serde_json",
  "tempfile",
+ "wat",
  "wide",
 ]
 
