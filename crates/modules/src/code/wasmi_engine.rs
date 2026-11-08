@@ -93,6 +93,13 @@ impl WasmEngine for WasmiEngine {
             .ok_or_else(|| LoadError::Invalid(format!("missing `{META_SECTION}` section")))?;
         let text = std::str::from_utf8(section.data())
             .map_err(|_| LoadError::Invalid("metadata is not UTF-8".into()))?;
+        let abi = abi_of(text).map_err(LoadError::Invalid)?;
+        if abi != super::abi::ABI_VERSION {
+            return Err(LoadError::AbiMismatch {
+                module: abi,
+                host: super::abi::ABI_VERSION,
+            });
+        }
         let meta = parse_meta(text).map_err(LoadError::Invalid)?;
         meta.validate().map_err(LoadError::Invalid)?;
         Ok(Arc::new(WasmiCompiled {
@@ -294,6 +301,17 @@ impl WasmInstance for WasmiInstance {
     }
 }
 
+/// The ABI major a module was built for: its `abi N` meta line, or the host's own when absent.
+fn abi_of(text: &str) -> Result<u32, String> {
+    match text.lines().map(str::trim).find(|l| l.starts_with("abi ")) {
+        Some(l) => l[4..]
+            .trim()
+            .parse()
+            .map_err(|_| "bad `abi` line".to_owned()),
+        None => Ok(super::abi::ABI_VERSION),
+    }
+}
+
 /// Parses the `kabl.meta` text. One item per line; `#` starts a comment line.
 ///
 /// ```text
@@ -335,6 +353,8 @@ pub fn parse_meta(text: &str) -> Result<CodeMeta, String> {
         let f: Vec<&str> = rest.split_whitespace().collect();
         let err = |m: &str| format!("meta line {}: {m}", n + 1);
         match key {
+            // Checked by `abi_of` at load; accepted here so the key is not "unknown".
+            "abi" => {}
             "kind" => m.kind = rest.to_owned(),
             "version" => m.version = rest.parse().map_err(|_| err("bad version"))?,
             "name" => m.name = rest.to_owned(),
