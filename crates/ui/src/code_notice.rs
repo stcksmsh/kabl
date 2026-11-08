@@ -134,18 +134,14 @@ pub fn embedded_for(state: &kabl_core::PatchState) -> Embedded {
     code
 }
 
-/// Compiles and registers every blob of `code` so the patch can build. A blob whose metadata
-/// names another module or version than the file says is refused.
-pub fn register(code: &Embedded) -> Result<(), String> {
-    for (_, b) in code.blobs() {
-        let r = kabl_modules::code::host::register_blob(&b.bytes)
-            .map_err(|e| format!("{}: {e}", b.module_id))?;
-        if r.kind != b.module_id || r.version != b.version {
-            return Err(format!(
-                "{} v{}: the code says it is {} v{}",
-                b.module_id, b.version, r.kind, r.version
-            ));
-        }
-    }
-    Ok(())
+pub use kabl_standalone::code_load::{decline, register, stand_in_missing};
+
+/// What the user is told when the patch opened with stand-ins: one line per module this patch
+/// uses, naming the module id, version and cause.
+pub fn warnings(state: &kabl_core::PatchState) -> Vec<String> {
+    kabl_modules::code::standin::reports()
+        .into_iter()
+        .filter(|r| state.modules.values().any(|m| m.kind == r.kind))
+        .map(|r| r.to_string())
+        .collect()
 }

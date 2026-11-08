@@ -53,6 +53,23 @@ impl WasmiEngine {
         &self.engine
     }
 
+    /// Reads and checks only the metadata of a module that may not load (forbidden import, other
+    /// ABI ...): enough to give its stand-in the right ports and params. Control thread.
+    pub fn read_meta(&self, wasm: &[u8]) -> Result<CodeMeta, String> {
+        if wasm.len() > MAX_BLOB_BYTES {
+            return Err("code module is over the size cap".into());
+        }
+        let module = Module::new(&self.engine, wasm).map_err(|e| e.to_string())?;
+        let section = module
+            .custom_sections()
+            .find(|s| s.name() == META_SECTION)
+            .ok_or_else(|| format!("missing `{META_SECTION}` section"))?;
+        let text = std::str::from_utf8(section.data()).map_err(|_| "metadata is not UTF-8")?;
+        let meta = parse_meta(text)?;
+        meta.validate()?;
+        Ok(meta)
+    }
+
     /// Compiles on a background thread (the audio thread never compiles).
     pub fn compile_async(
         self: &Arc<Self>,

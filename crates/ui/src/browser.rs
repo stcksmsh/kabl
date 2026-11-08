@@ -572,7 +572,7 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
             let Some(lib) = ui.library.as_mut() else {
                 return;
             };
-            match lib.read(&id) {
+            match lib.read_for_open(&id) {
                 Ok(log) => {
                     let e = lib.get(&id).cloned();
                     let note = lib.touch(&id);
@@ -600,6 +600,7 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
                             )
                         }),
                     );
+                    stand_in_warning(editor, ui);
                 }
                 Err(LibError::CodeNotice(entries)) => {
                     ui.browser.dialog = Some(Dialog::CodeNotice {
@@ -629,8 +630,14 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
                 .as_ref()
                 .map(|l| l.prefs.code_trust.clone())
                 .unwrap_or_default();
-            match crate::library::read_patch(std::path::Path::new(&path), &trust) {
-                Ok(log) => {
+            match crate::library::read_patch_declined(std::path::Path::new(&path), &trust) {
+                Ok((log, declined)) => {
+                    if !declined.is_empty() {
+                        // Opened with stand-ins; the next open asks again.
+                        if let Some(l) = ui.library.as_mut() {
+                            l.forget_code_trust(&declined);
+                        }
+                    }
                     replace_patch(editor, ui, log);
                     log::info!(target: "doc", "open ok origin=folder editor={}", editor.instance());
                     let name = patch_name(std::path::Path::new(&path));
@@ -640,6 +647,7 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
                         editor.state(),
                     ));
                     message(ui, format!("loaded {path}"));
+                    stand_in_warning(editor, ui);
                 }
                 Err(LibError::CodeNotice(entries)) => {
                     ui.browser.dialog = Some(Dialog::CodeNotice {
@@ -2744,4 +2752,13 @@ pub fn open_library() -> Library {
         crate::library::find_factory_dir(),
         crate::library::default_user_root(),
     )
+}
+
+/// After opening a patch whose code could not run: one toast naming each module's id, version
+/// and cause (it replaces the "opened ..." note, which would hide the warning).
+fn stand_in_warning(editor: &PatchEditor, ui: &mut UiState) {
+    let w = crate::code_notice::warnings(editor.state());
+    if !w.is_empty() {
+        message(ui, w.join(" | "));
+    }
 }

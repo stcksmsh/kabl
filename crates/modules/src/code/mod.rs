@@ -17,6 +17,7 @@ pub mod fake;
 pub mod host;
 pub mod meta;
 pub mod module;
+pub mod standin;
 pub mod wasmi_engine;
 
 pub use abi::{Layout, LayoutError, ABI_VERSION, DEFAULT_MEMORY_CAP, MAX_BLOB_BYTES};
@@ -143,6 +144,7 @@ pub fn register(group: Arc<CodeGroup>) -> Result<(), LoadError> {
         .write()
         .unwrap_or_else(|e| e.into_inner())
         .insert(kind.to_owned(), group);
+    standin::remove(kind);
     Ok(())
 }
 
@@ -163,14 +165,18 @@ pub fn group(kind: &str) -> Option<Arc<CodeGroup>> {
 
 /// A fresh instance of a registered code module (the fallback after the built-in table).
 pub fn create(kind: &str) -> Option<Box<dyn crate::module::Module>> {
-    let g = group(kind)?;
+    let Some(g) = group(kind) else {
+        return standin::create(kind);
+    };
     g.voice()
         .ok()
         .map(|m| Box::new(m) as Box<dyn crate::module::Module>)
 }
 
 pub fn info_for(kind: &str) -> Option<&'static ModuleInfo> {
-    group(kind).map(|g| g.info)
+    group(kind)
+        .map(|g| g.info)
+        .or_else(|| standin::info_for(kind))
 }
 
 pub fn all_infos() -> Vec<&'static ModuleInfo> {
