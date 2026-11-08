@@ -34,6 +34,7 @@ pub struct Health {
     nonfinite: AtomicU32,
     overruns: AtomicU32,
     fuel_budget: AtomicU64,
+    voices: AtomicU32,
     wall_cap_ns: AtomicU64,
 }
 
@@ -46,6 +47,7 @@ impl Health {
             nonfinite: AtomicU32::new(0),
             overruns: AtomicU32::new(0),
             fuel_budget: AtomicU64::new(fuel_budget),
+            voices: AtomicU32::new(0),
             wall_cap_ns: AtomicU64::new(wall_cap.as_nanos() as u64),
         })
     }
@@ -99,6 +101,22 @@ impl Health {
         Duration::from_nanos(self.wall_cap_ns.load(Relaxed))
     }
 
+    /// Voice instances of this module that exist right now.
+    pub fn voices(&self) -> u32 {
+        self.voices.load(Relaxed)
+    }
+
+    /// What one voice's call may spend: the module's budget split across its voices, so that all
+    /// voices together stay within the module's 25 % (and, via `Budget`, the global 50 %).
+    pub fn voice_fuel(&self) -> u64 {
+        (self.fuel_budget() / u64::from(self.voices().max(1))).max(1)
+    }
+
+    /// The wall-clock cap for one voice's call: the module's cap split the same way.
+    pub fn voice_wall_cap(&self) -> Duration {
+        self.wall_cap() / self.voices().max(1)
+    }
+
     pub fn set_budget(&self, fuel: u64, wall_cap: Duration) {
         self.fuel_budget.store(fuel, Relaxed);
         self.wall_cap_ns.store(wall_cap.as_nanos() as u64, Relaxed);
@@ -130,6 +148,7 @@ impl CodeModule {
     ) -> CodeModule {
         let out_slots = info.slots(PortDirection::Output);
         let layout = inst.layout();
+        health.voices.fetch_add(1, Relaxed);
         CodeModule {
             info,
             inst,
@@ -223,6 +242,12 @@ fn put_f32s(mem: &mut [u8], at: usize, vals: impl Iterator<Item = f32>) {
     }
 }
 
+impl Drop for CodeModule {
+    fn drop(&mut self) {
+        self.health.voices.fetch_sub(1, Relaxed);
+    }
+}
+
 impl Module for CodeModule {
     fn info(&self) -> &'static ModuleInfo {
         self.info
@@ -265,8 +290,8 @@ impl Module for CodeModule {
             put_f32s(mem, layout.param_range(p).start, std::iter::once(v));
         }
 
-        let budget = self.health.fuel_budget.load(Relaxed);
-        let cap = Duration::from_nanos(self.health.wall_cap_ns.load(Relaxed));
+        let budget = self.health.voice_fuel();
+        let cap = self.health.voice_wall_cap();
         self.inst.set_fuel(budget);
         let started = Instant::now();
         let inst = &mut self.inst;
@@ -315,13 +340,33 @@ impl Module for CodeModule {
         }
     }
 
-    /// Resets the module's DSP state (voice reuse). Does not revive a crashed module.
+    /// Resets the module's DSP state (voice reuse). Does not revive a crashed module. The module's
+    /// `reset()` runs under the same rules as a block: the voice's share of the fuel budget, the
+    /// wall-clock backstop, no allocation, and the same overrun/crash outcome (an overrun is
+    /// counted, eight in a row or a trap disables the module).
     fn reset(&mut self) {
-        self.consecutive_overruns = 0;
-        if !self.health.is_crashed() {
-            if let Err(f) = self.inst.reset() {
-                self.health.crash(f);
+        if self.health.is_crashed() {
+            return;
+        }
+        let cap = self.health.voice_wall_cap();
+        self.inst.set_fuel(self.health.voice_fuel());
+        let started = Instant::now();
+        let inst = &mut self.inst;
+        let result = no_alloc(|| inst.reset());
+        let took = started.elapsed();
+        match result {
+            Err(Fault::OutOfFuel) => {
+                if self.overrun() {
+                    self.health.crash(Fault::Overrun);
+                }
             }
+            Err(fault) => self.health.crash(fault),
+            Ok(()) if took > cap => {
+                if self.overrun() {
+                    self.health.crash(Fault::Overrun);
+                }
+            }
+            Ok(()) => {}
         }
     }
 

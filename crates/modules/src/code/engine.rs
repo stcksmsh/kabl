@@ -131,6 +131,7 @@ pub trait WasmInstance: Send {
     fn set_fuel(&mut self, fuel: u64);
     /// Runs `process(frames)`. Returns the fuel used.
     fn call_block(&mut self, frames: u32) -> Result<u64, Fault>;
-    /// Runs the module's `reset()`.
+    /// Runs the module's `reset()` under the fuel the caller set with `set_fuel`, exactly like
+    /// `call_block` (audio thread, no allocation on out-of-fuel).
     fn reset(&mut self) -> Result<(), Fault>;
 }
