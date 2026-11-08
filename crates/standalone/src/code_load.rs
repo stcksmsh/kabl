@@ -3,47 +3,121 @@
 //! invalid, other ABI, forbidden import, missing) becomes a stand-in (see
 //! `kabl_modules::code::standin`) so the patch still opens.
 
-/// Compiles and registers every blob of `code` so the patch can build. A blob that cannot load
-/// (invalid, forbidden import, other ABI, or metadata naming another module or version than the
-/// file says) becomes a stand-in with the same ports and params, so the patch still opens.
-pub fn register(code: &kabl_core::embedded::Embedded, state: &kabl_core::PatchState) {
+use kabl_modules::code::state::SavedState;
+use kabl_modules::code::{CodeHash, CodeScope};
+
+/// Compiles and registers every blob of `code` so the patch can build, and returns the
+/// [`CodeScope`] that names, for each kind, the exact blob this file embeds: compile with it
+/// (`kabl_engine::compile::compile_scoped`) and another song in the process cannot change which
+/// code runs. A blob that cannot load (invalid, forbidden import, other ABI, or metadata naming
+/// another module or version than the file says) becomes a stand-in with the same ports and
+/// params, so the patch still opens.
+pub fn register(code: &kabl_core::embedded::Embedded, state: &kabl_core::PatchState) -> CodeScope {
+    let mut scope = CodeScope::new();
     for (_, b) in code.blobs() {
-        let cause = match kabl_modules::code::host::register_blob(&b.bytes) {
-            Ok(r) if r.kind == b.module_id && r.version == b.version => continue,
-            Ok(r) => format!("the code says it is {} v{}", r.kind, r.version),
-            Err(e) => e.to_string(),
+        // Code that is another module than the song says is refused before it is installed.
+        let cause =
+            match kabl_modules::code::host::register_blob_as(&b.bytes, &b.module_id, b.version) {
+                Ok(r) => {
+                    scope = scope.with(&b.module_id, r.key);
+                    continue;
+                }
+                Err(e) => e.to_string(),
+            };
+        let key = stand_in(&b.module_id, b.version, Some(&b.bytes), &cause, state);
+        scope = scope.with(&b.module_id, key);
+    }
+    read_settings(code, &scope);
+    scope
+}
+
+/// Puts the module settings the file kept into `scope`: each running instance loads its own
+/// when the graph is built, and a stand-in's are written back unchanged on save.
+fn read_settings(code: &kabl_core::embedded::Embedded, scope: &CodeScope) {
+    for (instance, _) in code.refs() {
+        let Some(blob) = code.instance_blob(instance) else {
+            continue;
         };
-        stand_in(&b.module_id, b.version, Some(&b.bytes), &cause, state);
+        if let Some(saved) = code
+            .kept_state(instance, blob.version)
+            .and_then(SavedState::from_kept)
+        {
+            scope.set_kept_state(instance, &blob.module_id, saved);
+        }
     }
 }
 
+/// The code a patch being saved carries: one blob per code-module kind it uses (the song's own
+/// blob, by `scope`), bound to every instance of that kind, and each instance's saved settings.
+/// Built-in kinds add nothing. Asks the running graph for fresh settings first, waiting up to
+/// `wait` for the audio thread; an engine that is not running leaves the last known settings.
+pub fn embedded_for(
+    state: &kabl_core::PatchState,
+    scope: &CodeScope,
+    wait: std::time::Duration,
+) -> kabl_core::embedded::Embedded {
+    if !wait.is_zero() {
+        scope.capture(wait);
+    } else {
+        scope.collect();
+    }
+    let settings: std::collections::BTreeMap<u64, SavedState> =
+        scope.settings().into_iter().collect();
+    let mut code = kabl_core::embedded::Embedded::new();
+    for (&id, m) in &state.modules {
+        let Some((version, bytes)) = kabl_modules::code::host::blob_for_in(scope, &m.kind) else {
+            continue;
+        };
+        let Ok(hash) = code.add_blob(&m.kind, version, bytes.to_vec()) else {
+            continue;
+        };
+        let _ = code.bind(id, hash);
+        if let Some(saved) = settings.get(&id) {
+            let _ = code.keep_state(id, version, saved.to_kept());
+        }
+    }
+    code
+}
+
 /// Every blob of `code` becomes a stand-in without running (the user declined it).
-pub fn decline(code: &kabl_core::embedded::Embedded, state: &kabl_core::PatchState) {
+pub fn decline(code: &kabl_core::embedded::Embedded, state: &kabl_core::PatchState) -> CodeScope {
+    let mut scope = CodeScope::new();
     for (_, b) in code.blobs() {
-        stand_in(
+        let key = stand_in(
             &b.module_id,
             b.version,
             Some(&b.bytes),
             "you declined to run it",
             state,
         );
+        scope = scope.with(&b.module_id, key);
     }
+    read_settings(code, &scope);
+    scope
 }
 
 /// Module kinds the patch uses that nothing provides (no blob in the file, nothing installed)
 /// become stand-ins too, so a missing module never stops the song opening.
 pub fn stand_in_missing(state: &kabl_core::PatchState) {
+    stand_in_missing_in(state, &CodeScope::new());
+}
+
+/// [`stand_in_missing`] for a song with `scope`; returns the scope extended with the stand-ins.
+pub fn stand_in_missing_in(state: &kabl_core::PatchState, scope: &CodeScope) -> CodeScope {
+    let mut scope = scope.clone();
     for m in state.modules.values() {
-        if kabl_modules::registry::info_for(&m.kind).is_none() {
-            stand_in(
+        if kabl_modules::registry::info_for_in(&scope, &m.kind).is_none() {
+            let key = stand_in(
                 &m.kind,
                 0,
                 None,
                 "its code is not in this file and not installed",
                 state,
             );
+            scope = scope.with(&m.kind, key);
         }
     }
+    scope
 }
 
 fn stand_in(
@@ -52,14 +126,15 @@ fn stand_in(
     bytes: Option<&[u8]>,
     cause: &str,
     state: &kabl_core::PatchState,
-) {
-    kabl_modules::code::host::register_stand_in(
+) -> CodeHash {
+    kabl_modules::code::host::register_stand_in_keyed(
         kind,
         version,
         bytes,
         cause,
         Some(usage_meta(state, kind, version)),
-    );
+    )
+    .1
 }
 
 /// Ports and params of `kind` as the patch uses them: for a module whose own metadata cannot be
@@ -144,11 +219,22 @@ pub fn register_for_cli(
     code: &kabl_core::embedded::Embedded,
     state: &kabl_core::PatchState,
 ) -> Vec<String> {
-    register(code, state);
-    stand_in_missing(state);
-    kabl_modules::code::standin::reports()
+    let (scope, warnings) = register_for_cli_scoped(code, state);
+    // The command-line paths open one song: it is the open song.
+    kabl_modules::code::host::set_active_scope(scope);
+    warnings
+}
+
+/// [`register_for_cli`], also returning the song's [`CodeScope`].
+pub fn register_for_cli_scoped(
+    code: &kabl_core::embedded::Embedded,
+    state: &kabl_core::PatchState,
+) -> (CodeScope, Vec<String>) {
+    let scope = stand_in_missing_in(state, &register(code, state));
+    let warnings = kabl_modules::code::standin::reports_in(&scope)
         .into_iter()
         .filter(|r| state.modules.values().any(|m| m.kind == r.kind))
         .map(|r| r.to_string())
-        .collect()
+        .collect();
+    (scope, warnings)
 }

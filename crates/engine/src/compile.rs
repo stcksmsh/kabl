@@ -66,6 +66,7 @@ use kabl_modules::builtins::{
     Arp, AudioIn, Change, Clock, Delay, DelayLock, DrumGrid, EnvAdsr, KeySettings, Lfo, LfoSync,
     MidiIn, MidiNote, Noise, OscWt, Random, Seq, Transport,
 };
+use kabl_modules::code::{CodeModule, CodeScope};
 use kabl_modules::module::{QualityConfig, QualityTier};
 use kabl_modules::ModuleView;
 use kabl_modules::{
@@ -938,7 +939,22 @@ pub fn compile(
     sample_rate: f32,
     voice_count: usize,
 ) -> Result<CompiledPatch, CompileError> {
-    compile_inner(patch, sample_rate, voice_count, true)
+    // A compile with no scope of its own (checks, previews) must not take over the live
+    // graph's settings cells, so it works on a detached copy of the open song's scope.
+    let scope = kabl_modules::code::host::active_scope().detached();
+    compile_scoped(patch, sample_rate, voice_count, &scope)
+}
+
+/// [`compile`] for a song whose code modules are the exact blobs `scope` names (D12: songs
+/// sharing a process, as kabl instances do in a plug-in host, never see each other's code).
+/// A kind the scope does not list resolves as it does for [`compile`].
+pub fn compile_scoped(
+    patch: &PatchState,
+    sample_rate: f32,
+    voice_count: usize,
+    scope: &CodeScope,
+) -> Result<CompiledPatch, CompileError> {
+    compile_inner(patch, sample_rate, voice_count, true, scope)
 }
 
 /// Every voice-rate module instanced per voice, whatever drives it (the compiler before
@@ -948,7 +964,13 @@ pub fn compile_per_voice(
     sample_rate: f32,
     voice_count: usize,
 ) -> Result<CompiledPatch, CompileError> {
-    compile_inner(patch, sample_rate, voice_count, false)
+    compile_inner(
+        patch,
+        sample_rate,
+        voice_count,
+        false,
+        &CodeScope::default(),
+    )
 }
 
 fn compile_inner(
@@ -956,8 +978,9 @@ fn compile_inner(
     sample_rate: f32,
     voice_count: usize,
     single_instance: bool,
+    scope: &CodeScope,
 ) -> Result<CompiledPatch, CompileError> {
-    validate_composites(patch).map_err(CompileError::Composite)?;
+    validate_composites_scoped(patch, scope).map_err(CompileError::Composite)?;
     struct ModuleMeta {
         kind: String,
         info: &'static ModuleInfo,
@@ -965,9 +988,11 @@ fn compile_inner(
 
     let mut metas: BTreeMap<ModuleId, ModuleMeta> = BTreeMap::new();
     for (&id, mstate) in &patch.modules {
-        let info = registry::info_for(&mstate.kind).ok_or_else(|| CompileError::UnknownKind {
-            id,
-            kind: mstate.kind.clone(),
+        let info = registry::info_for_in(scope, &mstate.kind).ok_or_else(|| {
+            CompileError::UnknownKind {
+                id,
+                kind: mstate.kind.clone(),
+            }
         })?;
         metas.insert(
             id,
@@ -1693,8 +1718,14 @@ fn compile_inner(
                 };
             }
 
-            let mut instance =
-                registry::create(&meta.kind).expect("kind already validated when building `metas`");
+            let mut instance = registry::create_in(scope, &meta.kind)
+                .expect("kind already validated when building `metas`");
+            // The first instance of a code module serves the song's saved settings for it.
+            if lane == 0 && ch == 0 {
+                if let Some(code) = instance.as_any_mut().downcast_mut::<CodeModule>() {
+                    scope.attach(id, &meta.kind, code);
+                }
+            }
             if let Some(seq) = instance.as_any_mut().downcast_mut::<Seq>() {
                 seq.seed(id);
             }
@@ -3133,6 +3164,12 @@ pub fn carry_state(old: &mut CompiledPatch, new_patch: &mut CompiledPatch) {
 
 /// Control-thread flattening validation. Leaves are already materialized in document ID order.
 pub fn validate_composites(patch: &PatchState) -> Result<(), String> {
+    validate_composites_scoped(patch, &CodeScope::default())
+}
+
+/// [`validate_composites`] against the interfaces of the code blobs `scope` names, so a song
+/// validates against its own modules whatever other songs in the process registered.
+pub fn validate_composites_scoped(patch: &PatchState, scope: &CodeScope) -> Result<(), String> {
     kabl_core::composite::validate(patch)?;
     for (&id, c) in &patch.composites {
         for e in c.ports.values().chain(c.controls.values()) {
@@ -3142,7 +3179,7 @@ pub fn validate_composites(patch: &PatchState) -> Result<(), String> {
                     e.target
                 ));
             };
-            let info = registry::info_for(&m.kind)
+            let info = registry::info_for_in(scope, &m.kind)
                 .ok_or_else(|| format!("Composite {id}: missing built-in {}", m.kind))?;
             let valid = match &e.target {
                 PortRef::Module { port, .. } => info.ports.iter().any(|p| p.name == port),

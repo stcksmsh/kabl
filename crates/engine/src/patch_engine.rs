@@ -31,7 +31,7 @@
 use basedrop::{Handle, Owned};
 use kabl_core::PatchState;
 
-use crate::compile::{carry_state, compile, CompileError, CompiledPatch, PendingLaunch};
+use crate::compile::{carry_state, compile_scoped, CompileError, CompiledPatch, PendingLaunch};
 use crate::facetap::{FaceReport, FaceTargets};
 use crate::graph::BLOCK;
 use crate::keyboard::{Action, KeyEvent, Keyboard, MidiEvent, Source};
@@ -40,6 +40,7 @@ use crate::probe::{ProbeReport, ProbeTarget, WINDOW_SECS};
 use crate::runtime::{Feedback, ParamSet, ToAudio};
 use crate::swap::CROSSFADE_MS;
 use kabl_modules::builtins::KeySettings;
+use kabl_modules::code::CodeScope;
 
 pub struct PatchEngine {
     active: Owned<CompiledPatch>,
@@ -233,7 +234,21 @@ impl PatchEngine {
         sample_rate: f32,
         voice_count: usize,
     ) -> Result<Self, CompileError> {
-        let compiled = compile(patch, sample_rate, voice_count)?;
+        // The live engine of the open song: its code and settings.
+        let scope = kabl_modules::code::host::active_scope();
+        Self::new_scoped(handle, patch, sample_rate, voice_count, &scope)
+    }
+
+    /// [`PatchEngine::new`] for a song whose code modules are the blobs `scope` names, so two
+    /// engines in one process (two kabl instances in a host) never share each other's code.
+    pub fn new_scoped(
+        handle: &Handle,
+        patch: &PatchState,
+        sample_rate: f32,
+        voice_count: usize,
+        scope: &CodeScope,
+    ) -> Result<Self, CompileError> {
+        let compiled = compile_scoped(patch, sample_rate, voice_count, scope)?;
         let mut e = PatchEngine {
             active: Owned::new(handle, compiled),
             incoming: None,
@@ -489,7 +504,18 @@ impl PatchEngine {
         handle: &Handle,
         patch: &PatchState,
     ) -> Result<Owned<CompiledPatch>, CompileError> {
-        let new_patch = compile(patch, self.active.sample_rate(), self.voice_count)?;
+        let scope = kabl_modules::code::host::active_scope();
+        self.build_swap_scoped(handle, patch, &scope)
+    }
+
+    /// [`PatchEngine::build_swap`] with the song's [`CodeScope`].
+    pub fn build_swap_scoped(
+        &self,
+        handle: &Handle,
+        patch: &PatchState,
+        scope: &CodeScope,
+    ) -> Result<Owned<CompiledPatch>, CompileError> {
+        let new_patch = compile_scoped(patch, self.active.sample_rate(), self.voice_count, scope)?;
         Ok(Owned::new(handle, new_patch))
     }
 

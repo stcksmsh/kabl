@@ -9,6 +9,7 @@
 //! host that can load the module restores everything.
 
 use super::meta::CodeMeta;
+use super::scope::{CodeHash, CodeScope};
 use crate::info::{ModuleInfo, PortDirection};
 use crate::module::Module;
 use crate::{PortType, ProcessIo, QualityConfig};
@@ -38,11 +39,12 @@ struct Registered {
     report: Report,
 }
 
-static STAND_INS: RwLock<BTreeMap<String, Registered>> = RwLock::new(BTreeMap::new());
+/// Stand-ins by key (see [`super::standin_key`]), so each song keeps its own.
+static STAND_INS: RwLock<BTreeMap<CodeHash, Registered>> = RwLock::new(BTreeMap::new());
 
-pub(super) fn register(meta: &CodeMeta, report: Report) {
+pub(super) fn register(key: CodeHash, meta: &CodeMeta, report: Report) {
     STAND_INS.write().unwrap_or_else(|e| e.into_inner()).insert(
-        report.kind.clone(),
+        key,
         Registered {
             info: meta.info(),
             report,
@@ -50,35 +52,37 @@ pub(super) fn register(meta: &CodeMeta, report: Report) {
     );
 }
 
-pub(super) fn remove(kind: &str) {
-    STAND_INS
-        .write()
-        .unwrap_or_else(|e| e.into_inner())
-        .remove(kind);
-}
-
-/// A fresh stand-in for `kind`, if one is registered.
-pub(super) fn create(kind: &str) -> Option<Box<dyn Module>> {
+/// A fresh stand-in, if one is registered under `key`.
+pub(super) fn create(key: &CodeHash) -> Option<Box<dyn Module>> {
     let s = STAND_INS.read().unwrap_or_else(|e| e.into_inner());
-    s.get(kind)
+    s.get(key)
         .map(|r| Box::new(StandIn::new(r.info)) as Box<dyn Module>)
 }
 
-pub(super) fn info_for(kind: &str) -> Option<&'static ModuleInfo> {
+pub(super) fn info_for(key: &CodeHash) -> Option<&'static ModuleInfo> {
     STAND_INS
         .read()
         .unwrap_or_else(|e| e.into_inner())
-        .get(kind)
+        .get(key)
         .map(|r| r.info)
 }
 
-/// Every stand-in now registered, for the warning the user sees.
+/// The stand-ins now in use without a scope (the latest of their kind), for the warning the
+/// user sees.
 pub fn reports() -> Vec<Report> {
-    STAND_INS
-        .read()
-        .unwrap_or_else(|e| e.into_inner())
-        .values()
-        .map(|r| r.report.clone())
+    let s = STAND_INS.read().unwrap_or_else(|e| e.into_inner());
+    s.iter()
+        .filter(|(key, r)| super::latest_key(&r.report.kind) == Some(**key))
+        .map(|(_, r)| r.report.clone())
+        .collect()
+}
+
+/// The stand-ins the song `scope` describes.
+pub fn reports_in(scope: &CodeScope) -> Vec<Report> {
+    let s = STAND_INS.read().unwrap_or_else(|e| e.into_inner());
+    s.iter()
+        .filter(|(key, r)| scope.key(&r.report.kind) == Some(**key))
+        .map(|(_, r)| r.report.clone())
         .collect()
 }
 

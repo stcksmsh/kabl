@@ -1,4 +1,5 @@
-//! ABI v0 for code modules (D11 decision 8; D12 freezes it).
+//! The code-module ABI (D11 decision 8). **Preview** until kabl 1.0: see `docs/sdk/ABI.md`, the
+//! document the licence's module exception names, for the whole contract.
 //!
 //! One call per audio block, never per sample. Audio buffers live in the module's linear memory:
 //! kabl copies inputs in and outputs out around each `process` call. Parameters are read from a
@@ -7,7 +8,8 @@
 //!
 //! Required exports: `init(sample_rate: f32, max_block: i32) -> i32` (address of a [`Layout`]
 //! record, see [`Layout::from_words`]), `process(n_frames: i32)`, `reset()`. Optional:
-//! `state_save`, `state_load`. No imports except kabl's own ABI: no WASI, nothing else.
+//! `layout_ext`, `state_save`, `state_load`, `migrate`. No imports except kabl's own ABI: no WASI,
+//! nothing else.
 
 use std::ops::Range;
 
@@ -17,6 +19,14 @@ pub const EXPORT_PROCESS: &str = "process";
 pub const EXPORT_RESET: &str = "reset";
 pub const EXPORT_STATE_SAVE: &str = "state_save";
 pub const EXPORT_STATE_LOAD: &str = "state_load";
+pub const EXPORT_MIGRATE: &str = "migrate";
+pub const EXPORT_LAYOUT_EXT: &str = "layout_ext";
+
+/// Minor revision of the ABI this host understands. A module's `abi_minor N` meta line is
+/// refused when N is greater (it may need something this host lacks); no line means 0.
+pub const ABI_MINOR: u32 = 1;
+/// Largest settings transfer buffer a module may declare (the `xfer_cap` word of `layout_ext`).
+pub const MAX_XFER_CAP: usize = 64 << 10;
 
 /// Size cap per embedded blob (decision 2).
 pub const MAX_BLOB_BYTES: usize = 2 << 20;

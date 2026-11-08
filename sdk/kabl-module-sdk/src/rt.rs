@@ -37,6 +37,8 @@ pub struct Mem<
     output: [[f32; MAX_BLOCK]; NO],
     params: [f32; NP],
     xfer: [u8; NX],
+    /// A copy of the old settings while `migrate` writes the new ones into `xfer`.
+    scratch: [u8; NX],
     /// The nine words `init` returns.
     layout: [u32; 9],
     /// `layout_ext` table: count, then `[xfer_addr, xfer_cap, state_version]`.
@@ -206,6 +208,30 @@ impl<
                 -1
             } else {
                 w.len() as i32
+            }
+        }
+    }
+
+    /// Converts the `len` bytes of old settings the host put in the transfer buffer (written
+    /// under `old_version`) in place: the new length, or -1 when the module cannot convert them.
+    pub fn migrate(s: &Store<Self>, len: i32, old_version: i32) -> i32 {
+        let guard = s.lock();
+        let p = guard.ptr();
+        if len < 0 || len as usize > NX {
+            return -1;
+        }
+        // SAFETY: as in `init`; xfer and scratch are disjoint fields and no reference to the
+        // module is taken (migration needs none).
+        unsafe {
+            let scratch: &mut [u8] = &mut *addr_of_mut!((*p).scratch);
+            let xfer: &[u8] = &*addr_of!((*p).xfer);
+            let old = &mut scratch[..len as usize];
+            old.copy_from_slice(&xfer[..len as usize]);
+            let mut w = StateWriter::new(&mut *addr_of_mut!((*p).xfer));
+            if M::migrate(old_version as u32, old, &mut w) && !w.overflowed() {
+                w.len() as i32
+            } else {
+                -1
             }
         }
     }

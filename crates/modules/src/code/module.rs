@@ -32,6 +32,7 @@ pub struct Health {
     fault: AtomicU8,
     notice: AtomicBool,
     nonfinite: AtomicU32,
+    sanitized: AtomicU32,
     overruns: AtomicU32,
     fuel_budget: AtomicU64,
     voices: AtomicU32,
@@ -45,6 +46,7 @@ impl Health {
             fault: AtomicU8::new(0),
             notice: AtomicBool::new(false),
             nonfinite: AtomicU32::new(0),
+            sanitized: AtomicU32::new(0),
             overruns: AtomicU32::new(0),
             fuel_budget: AtomicU64::new(fuel_budget),
             voices: AtomicU32::new(0),
@@ -84,6 +86,13 @@ impl Health {
     /// Blocks that produced NaN/Inf (and were therefore replaced by silence).
     pub fn nonfinite_count(&self) -> u32 {
         self.nonfinite.load(Relaxed)
+    }
+
+    /// Input samples that were NaN or infinite and were replaced by 0.0 before the module saw
+    /// them (a counter, not a warning per sample). The module is never given non-finite input,
+    /// so a non-finite output is its own fault.
+    pub fn sanitized_inputs(&self) -> u32 {
+        self.sanitized.load(Relaxed)
     }
 
     /// Overruns logged (fuel or wall clock), including one-off ones that did not crash anything.
@@ -137,6 +146,8 @@ pub struct CodeModule {
     fade_left: usize,
     consecutive_overruns: u32,
     fading_dead: bool,
+    /// Where the song's settings for this instance are handed over (see `state::StateCell`).
+    cell: Option<Arc<super::state::StateCell>>,
 }
 
 impl CodeModule {
@@ -148,7 +159,9 @@ impl CodeModule {
     ) -> CodeModule {
         let out_slots = info.slots(PortDirection::Output);
         let layout = inst.layout();
-        health.voices.fetch_add(1, Relaxed);
+        if health.voices.fetch_add(1, Relaxed) == 0 {
+            super::host::budget().rebalance();
+        }
         CodeModule {
             info,
             inst,
@@ -162,7 +175,18 @@ impl CodeModule {
             fade_left: 0,
             consecutive_overruns: 0,
             fading_dead: false,
+            cell: None,
         }
+    }
+
+    /// Size of the module's settings transfer buffer, if it has saved settings.
+    pub fn state_cap(&self) -> Option<usize> {
+        self.inst.state_xfer().map(|x| x.cap)
+    }
+
+    /// Serves the song's save and load requests for this instance from the next block on.
+    pub fn set_state_cell(&mut self, cell: Arc<super::state::StateCell>) {
+        self.cell = Some(cell);
     }
 
     pub fn health(&self) -> &Arc<Health> {
@@ -236,6 +260,21 @@ fn fade_len(sample_rate: f32) -> usize {
     ((sample_rate * FADE_MS / 1000.0) as usize).max(1)
 }
 
+/// Writes input samples, replacing NaN and infinity with 0.0; returns how many were replaced.
+fn put_inputs(mem: &mut [u8], at: usize, vals: impl Iterator<Item = f32>) -> u32 {
+    let mut bad = 0;
+    for (k, v) in vals.enumerate() {
+        let v = if v.is_finite() {
+            v
+        } else {
+            bad += 1;
+            0.0
+        };
+        mem[at + k * 4..at + k * 4 + 4].copy_from_slice(&v.to_le_bytes());
+    }
+    bad
+}
+
 fn put_f32s(mem: &mut [u8], at: usize, vals: impl Iterator<Item = f32>) {
     for (k, v) in vals.enumerate() {
         mem[at + k * 4..at + k * 4 + 4].copy_from_slice(&v.to_le_bytes());
@@ -244,7 +283,9 @@ fn put_f32s(mem: &mut [u8], at: usize, vals: impl Iterator<Item = f32>) {
 
 impl Drop for CodeModule {
     fn drop(&mut self) {
-        self.health.voices.fetch_sub(1, Relaxed);
+        if self.health.voices.fetch_sub(1, Relaxed) == 1 {
+            super::host::budget().rebalance();
+        }
     }
 }
 
@@ -273,13 +314,23 @@ impl Module for CodeModule {
         if n > self.layout.max_block as usize {
             return self.die(Fault::BadLayout, io, n);
         }
+        if let Some(cell) = &self.cell {
+            let fuel = self.health.voice_fuel();
+            let inst = &mut *self.inst;
+            if let Err(fault) = no_alloc(|| cell.service(inst, fuel)) {
+                return self.die(fault, io, n);
+            }
+        }
         let layout = self.layout;
         let mem = self.inst.memory();
         for s in 0..self.in_slots {
             let at = layout.input_range(s).start;
-            match io.input(s) {
-                Signal::Scalar(v) => put_f32s(mem, at, std::iter::repeat_n(v, n)),
-                Signal::Buffer(b) => put_f32s(mem, at, b[..n].iter().copied()),
+            let bad = match io.input(s) {
+                Signal::Scalar(v) => put_inputs(mem, at, std::iter::repeat_n(v, n)),
+                Signal::Buffer(b) => put_inputs(mem, at, b[..n].iter().copied()),
+            };
+            if bad > 0 {
+                self.health.sanitized.fetch_add(bad, Relaxed);
             }
         }
         for p in 0..self.n_params.min(io.param_count()) {

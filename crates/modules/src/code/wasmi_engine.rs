@@ -10,8 +10,10 @@
 //! - Time: fuel (`consume_fuel`) bounds a call; the caller sets it before every block.
 //! - Metadata: a custom section named `kabl.meta`, line based text (see [`parse_meta`]).
 
-use super::abi::{Layout, MAX_BLOB_BYTES};
-use super::engine::{CompiledModule, Fault, InstanceConfig, LoadError, WasmEngine, WasmInstance};
+use super::abi::{Layout, ABI_MINOR, MAX_BLOB_BYTES, MAX_XFER_CAP};
+use super::engine::{
+    CompiledModule, Fault, InstanceConfig, LoadError, StateXfer, WasmEngine, WasmInstance,
+};
 use super::meta::{CodeMeta, CodeParam, CodePort};
 use crate::info::{Category, PortDirection, PortType, Rate, Taper};
 use std::sync::Arc;
@@ -115,6 +117,13 @@ impl WasmEngine for WasmiEngine {
             return Err(LoadError::AbiMismatch {
                 module: abi,
                 host: super::abi::ABI_VERSION,
+            });
+        }
+        let minor = abi_minor_of(text).map_err(LoadError::Invalid)?;
+        if minor > ABI_MINOR {
+            return Err(LoadError::AbiMinor {
+                module: minor,
+                host: ABI_MINOR,
             });
         }
         let meta = parse_meta(text).map_err(LoadError::Invalid)?;
@@ -228,6 +237,7 @@ impl CompiledModule for WasmiCompiled {
             w[k] = u32::from_le_bytes(*c);
         }
         let layout = Layout::from_words(w);
+        let state = self.state_calls(&mut store, &inst, memory)?;
         // Declared memory is final from here: growing it while running is a crash.
         store.data_mut().frozen = true;
         let mut inst = WasmiInstance {
@@ -237,9 +247,93 @@ impl CompiledModule for WasmiCompiled {
             reset,
             layout,
             fuel_set: 0,
+            state,
         };
         inst.prime(cfg.max_block)?;
         Ok(Box::new(inst))
+    }
+}
+
+/// The state exports of an instance and the buffer they use.
+struct StateCalls {
+    xfer: StateXfer,
+    save: TypedFunc<(), i32>,
+    load: TypedFunc<(i32, i32), i32>,
+    migrate: Option<TypedFunc<(i32, i32), i32>>,
+}
+
+impl WasmiCompiled {
+    /// Reads the optional `layout_ext` table (`[count, words...]`) and the state exports. A
+    /// module without them, or whose table has fewer than the three state words, simply has no
+    /// saved settings; extra words are ignored (a later revision's). A declared buffer over
+    /// [`MAX_XFER_CAP`] or outside the module's memory is refused.
+    fn state_calls(
+        &self,
+        store: &mut Store<Host>,
+        inst: &wasmi::Instance,
+        memory: Memory,
+    ) -> Result<Option<StateCalls>, LoadError> {
+        let bad = |what: &str, e: wasmi::Error| LoadError::Invalid(format!("export `{what}`: {e}"));
+        let Ok(ext) = inst.get_typed_func::<(), i32>(&*store, "layout_ext") else {
+            return Ok(None);
+        };
+        let (Ok(save), Ok(load)) = (
+            inst.get_typed_func::<(), i32>(&*store, "state_save"),
+            inst.get_typed_func::<(i32, i32), i32>(&*store, "state_load"),
+        ) else {
+            return Ok(None);
+        };
+        let migrate = match inst.get_func(&*store, "migrate") {
+            Some(_) => Some(
+                inst.get_typed_func::<(i32, i32), i32>(&*store, "migrate")
+                    .map_err(|e| bad("migrate", e))?,
+            ),
+            None => None,
+        };
+        let _ = store.set_fuel(INIT_FUEL);
+        let at = ext
+            .call(&mut *store, ())
+            .map_err(|e| LoadError::Invalid(format!("layout_ext failed: {e}")))?
+            as u32 as usize;
+        let mem = memory.data(&*store);
+        let word = |i: usize| -> Option<u32> {
+            let b = mem.get(at.checked_add(i * 4)?..)?.get(..4)?;
+            Some(u32::from_le_bytes(b.try_into().ok()?))
+        };
+        let Some(count) = word(0) else {
+            return Err(LoadError::Layout(
+                "layout_ext returned an address outside memory".into(),
+            ));
+        };
+        if count < 3 {
+            return Ok(None);
+        }
+        let (Some(addr), Some(cap), Some(state_version)) = (word(1), word(2), word(3)) else {
+            return Err(LoadError::Layout(
+                "layout_ext table is outside memory".into(),
+            ));
+        };
+        let (addr, cap) = (addr as usize, cap as usize);
+        if cap > MAX_XFER_CAP {
+            return Err(LoadError::Layout(format!(
+                "module declares a {cap}-byte settings buffer; the cap is {MAX_XFER_CAP}"
+            )));
+        }
+        if addr.checked_add(cap).is_none_or(|end| end > mem.len()) {
+            return Err(LoadError::Layout(
+                "settings buffer is outside module memory".into(),
+            ));
+        }
+        Ok(Some(StateCalls {
+            xfer: StateXfer {
+                addr,
+                cap,
+                state_version,
+            },
+            save,
+            load,
+            migrate,
+        }))
     }
 }
 
@@ -250,6 +344,7 @@ pub struct WasmiInstance {
     reset: TypedFunc<(), ()>,
     layout: Layout,
     fuel_set: u64,
+    state: Option<StateCalls>,
 }
 
 impl WasmiInstance {
@@ -267,6 +362,17 @@ impl WasmiInstance {
             .map_err(|e| LoadError::Invalid(format!("reset failed: {e}")))
     }
 
+    /// The result of a state call, which runs under the fuel the caller set (out of fuel is a
+    /// plain return value, as for blocks, so the call allocates nothing).
+    fn finish(r: Result<TypedResumableCall<i32>, wasmi::Error>) -> Result<i32, Fault> {
+        match r {
+            Ok(TypedResumableCall::Finished(v)) => Ok(v),
+            Ok(TypedResumableCall::OutOfFuel(_)) => Err(Fault::OutOfFuel),
+            Ok(TypedResumableCall::HostTrap(_)) => Err(Fault::Trap),
+            Err(e) => Err(Self::classify(&e)),
+        }
+    }
+
     fn classify(e: &wasmi::Error) -> Fault {
         match e.as_trap_code() {
             Some(TrapCode::OutOfFuel) => Fault::OutOfFuel,
@@ -279,6 +385,33 @@ impl WasmiInstance {
 impl WasmInstance for WasmiInstance {
     fn layout(&self) -> Layout {
         self.layout
+    }
+
+    fn state_xfer(&self) -> Option<StateXfer> {
+        self.state.as_ref().map(|s| s.xfer)
+    }
+
+    fn has_migrate(&self) -> bool {
+        self.state.as_ref().is_some_and(|s| s.migrate.is_some())
+    }
+
+    fn call_state_save(&mut self) -> Result<i32, Fault> {
+        let f = self.state.as_ref().ok_or(Fault::BadLayout)?.save;
+        Self::finish(f.call_resumable(&mut self.store, ()))
+    }
+
+    fn call_state_load(&mut self, len: u32, version: u32) -> Result<i32, Fault> {
+        let f = self.state.as_ref().ok_or(Fault::BadLayout)?.load;
+        Self::finish(f.call_resumable(&mut self.store, (len as i32, version as i32)))
+    }
+
+    fn call_migrate(&mut self, len: u32, old_version: u32) -> Result<i32, Fault> {
+        let f = self
+            .state
+            .as_ref()
+            .and_then(|s| s.migrate)
+            .ok_or(Fault::BadLayout)?;
+        Self::finish(f.call_resumable(&mut self.store, (len as i32, old_version as i32)))
     }
 
     fn memory(&mut self) -> &mut [u8] {
@@ -329,6 +462,52 @@ fn abi_of(text: &str) -> Result<u32, String> {
     }
 }
 
+/// The ABI revision a module needs: its `abi_minor N` meta line, or 0 when absent.
+fn abi_minor_of(text: &str) -> Result<u32, String> {
+    match text
+        .lines()
+        .map(str::trim)
+        .find(|l| l.split_whitespace().next() == Some("abi_minor"))
+    {
+        Some(l) => l["abi_minor".len()..]
+            .trim()
+            .parse()
+            .map_err(|_| "bad `abi_minor` line".to_owned()),
+        None => Ok(0),
+    }
+}
+
+/// Meta keys this host does not know (they are ignored when loading): the `cargo kabl` validator
+/// warns about them, to catch typos.
+pub fn unknown_keys(text: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for line in text.lines().map(str::trim) {
+        let key = line.split_whitespace().next().unwrap_or("");
+        if key.is_empty() || key.starts_with('#') || KNOWN_KEYS.contains(&key) {
+            continue;
+        }
+        if !out.iter().any(|k| k == key) {
+            out.push(key.to_owned());
+        }
+    }
+    out
+}
+
+const KNOWN_KEYS: [&str; 12] = [
+    "abi",
+    "abi_minor",
+    "kind",
+    "version",
+    "name",
+    "explain",
+    "category",
+    "rate",
+    "width",
+    "port",
+    "param",
+    "advanced",
+];
+
 /// Parses the `kabl.meta` text. One item per line; `#` starts a comment line.
 ///
 /// ```text
@@ -342,7 +521,10 @@ fn abi_of(text: &str) -> Result<u32, String> {
 /// port in audio audio_in 1      in|out, audio|cv|unipolar|gate|pitch, name, width 1 or 2
 /// param gain 0 4 1 linear 5 x   name min max default linear|exp|stepped|cubic smoothing_ms [unit]
 /// advanced gain
+/// abi_minor 1             optional: the ABI revision needed; refused if above the host's
 /// ```
+///
+/// A key this host does not know is skipped (see [`unknown_keys`]).
 pub fn parse_meta(text: &str) -> Result<CodeMeta, String> {
     let mut m = CodeMeta {
         kind: String::new(),
@@ -371,7 +553,7 @@ pub fn parse_meta(text: &str) -> Result<CodeMeta, String> {
         let err = |m: &str| format!("meta line {}: {m}", n + 1);
         match key {
             // Checked by `abi_of` at load; accepted here so the key is not "unknown".
-            "abi" => {}
+            "abi" | "abi_minor" => {}
             "kind" => m.kind = rest.to_owned(),
             "version" => m.version = rest.parse().map_err(|_| err("bad version"))?,
             "name" => m.name = rest.to_owned(),
@@ -440,7 +622,9 @@ pub fn parse_meta(text: &str) -> Result<CodeMeta, String> {
                 });
             }
             "advanced" => m.advanced.extend(f.iter().map(|s| s.to_string())),
-            _ => return Err(err("unknown key")),
+            // Unknown keys are ignored: a newer SDK may add optional ones (see `abi_minor` for
+            // the ones a module cannot do without).
+            _ => {}
         }
     }
     if m.version == 0 {

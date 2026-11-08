@@ -9,6 +9,8 @@ license.workspace = true
 # exact version. Interpreter only (no JIT); `validate` checks untrusted modules; `auto-dispatch` falls back to the
 # portable dispatch loop at opt-level 0/1 (the dev profile), where tail dispatch overflows the stack.
 wasmi = { version = "=2.0.0", default-features = false, features = ["stable", "std", "validate", "auto-dispatch"] }
+# Identity of a code blob: the hash a song embeds it under (same crate and version as kabl-core).
+sha2 = "0.10"
 
 [dev-dependencies]
 # Test kernels are written as WAT text.

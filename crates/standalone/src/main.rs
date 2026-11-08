@@ -133,6 +133,9 @@ fn run(args: &[String]) -> i32 {
             return 1;
         }
     };
+    for n in kabl_modules::code::host::active_scope().take_notes() {
+        log::warn!(target: "app", "{n}");
+    }
 
     let (midi_producer, mut midi_consumer) = rtrb::RingBuffer::<VoiceEvent>::new(256);
     let _midi_connection = connect_midi("kabl", midi_producer, flag_value(&args, "--midi"));

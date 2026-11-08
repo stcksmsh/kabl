@@ -17,7 +17,9 @@ pub mod fake;
 pub mod host;
 pub mod meta;
 pub mod module;
+pub mod scope;
 pub mod standin;
+pub mod state;
 pub mod wasmi_engine;
 
 pub use abi::{Layout, LayoutError, ABI_VERSION, DEFAULT_MEMORY_CAP, MAX_BLOB_BYTES};
@@ -25,6 +27,7 @@ pub use budget::{scaled_shares, Budget, Calibration, PER_MODULE_SHARE, TOTAL_SHA
 pub use engine::{CompiledModule, Fault, InstanceConfig, LoadError, WasmEngine, WasmInstance};
 pub use meta::{CodeMeta, CodeParam, CodePort};
 pub use module::{in_code_call, CodeModule, Health, FADE_MS, OVERRUN_LIMIT};
+pub use scope::{hash_of, standin_key, CodeHash, CodeScope};
 pub use wasmi_engine::{WasmiEngine, ALLOWED_IMPORTS, META_SECTION};
 
 use crate::info::{ModuleInfo, PortDirection};
@@ -40,6 +43,8 @@ pub struct CodeGroup {
     cfg: InstanceConfig,
     health: Arc<Health>,
     pool: Mutex<Vec<Box<dyn WasmInstance>>>,
+    /// The registry key: the blob's hash for a loaded blob.
+    key: CodeHash,
 }
 
 impl CodeGroup {
@@ -51,6 +56,18 @@ impl CodeGroup {
         fuel: u64,
         wall_cap: Duration,
     ) -> Result<Arc<CodeGroup>, LoadError> {
+        let key = hash_of(format!("unhashed:{}", compiled.meta().kind).as_bytes());
+        Self::keyed(compiled, cfg, fuel, wall_cap, key)
+    }
+
+    /// [`CodeGroup::new`] for a blob with a known hash: songs find the group by it.
+    pub fn keyed(
+        compiled: Arc<dyn CompiledModule>,
+        cfg: InstanceConfig,
+        fuel: u64,
+        wall_cap: Duration,
+        key: CodeHash,
+    ) -> Result<Arc<CodeGroup>, LoadError> {
         let meta = compiled.meta();
         meta.validate().map_err(LoadError::Invalid)?;
         Ok(Arc::new(CodeGroup {
@@ -59,11 +76,16 @@ impl CodeGroup {
             cfg,
             health: Health::new(fuel, wall_cap),
             pool: Mutex::new(Vec::new()),
+            key,
         }))
     }
 
     pub fn info(&self) -> &'static ModuleInfo {
         self.info
+    }
+
+    pub fn key(&self) -> CodeHash {
+        self.key
     }
 
     pub fn health(&self) -> &Arc<Health> {
@@ -123,67 +145,138 @@ impl CodeGroup {
             Some(i) => i,
             None => self.build_one()?,
         };
-        Ok(CodeModule::new(
-            self.info,
-            inst,
-            Arc::clone(&self.health),
-            &self.cfg,
-        ))
+        Ok(self.voice_from(inst))
+    }
+
+    fn voice_from(&self, inst: Box<dyn WasmInstance>) -> CodeModule {
+        CodeModule::new(self.info, inst, Arc::clone(&self.health), &self.cfg)
     }
 }
 
-static REGISTRY: RwLock<BTreeMap<String, Arc<CodeGroup>>> = RwLock::new(BTreeMap::new());
+/// Running groups by key (a blob's hash).
+static REGISTRY: RwLock<BTreeMap<CodeHash, Arc<CodeGroup>>> = RwLock::new(BTreeMap::new());
+/// The key a kind resolves to without a [`CodeScope`]: whatever was registered for it last
+/// (a running group or a stand-in).
+static LATEST: RwLock<BTreeMap<String, CodeHash>> = RwLock::new(BTreeMap::new());
 
-/// Registers a code module under its kind. Refuses a kind that belongs to a built-in.
-pub fn register(group: Arc<CodeGroup>) -> Result<(), LoadError> {
-    let kind = group.info.kind;
+fn builtin_clash(kind: &str) -> Result<(), LoadError> {
     if crate::registry::all_infos().iter().any(|i| i.kind == kind) {
         return Err(LoadError::Invalid(format!("`{kind}` is a built-in module")));
     }
-    REGISTRY
-        .write()
-        .unwrap_or_else(|e| e.into_inner())
-        .insert(kind.to_owned(), group);
-    standin::remove(kind);
     Ok(())
 }
 
-pub fn unregister(kind: &str) {
+/// Registers a code module under its key and makes it the latest of its kind. Refuses a kind
+/// that belongs to a built-in. Another blob of the same kind keeps running for the songs that
+/// use it.
+pub fn register(group: Arc<CodeGroup>) -> Result<(), LoadError> {
+    install(group, true)
+}
+
+/// [`register`], optionally leaving the kind's latest alone (a rebuild of an older blob).
+pub(crate) fn install(group: Arc<CodeGroup>, make_latest: bool) -> Result<(), LoadError> {
+    let kind = group.info.kind;
+    builtin_clash(kind)?;
+    let key = group.key;
     REGISTRY
         .write()
         .unwrap_or_else(|e| e.into_inner())
-        .remove(kind);
+        .insert(key, group);
+    if make_latest {
+        set_latest(kind, key);
+    }
+    Ok(())
 }
 
-pub fn group(kind: &str) -> Option<Arc<CodeGroup>> {
-    REGISTRY
+pub(crate) fn set_latest(kind: &str, key: CodeHash) {
+    LATEST
+        .write()
+        .unwrap_or_else(|e| e.into_inner())
+        .insert(kind.to_owned(), key);
+}
+
+pub(crate) fn latest_key(kind: &str) -> Option<CodeHash> {
+    LATEST
         .read()
         .unwrap_or_else(|e| e.into_inner())
         .get(kind)
-        .cloned()
+        .copied()
 }
 
-/// A fresh instance of a registered code module (the fallback after the built-in table).
-pub fn create(kind: &str) -> Option<Box<dyn crate::module::Module>> {
-    let Some(g) = group(kind) else {
-        return standin::create(kind);
-    };
-    g.voice()
-        .ok()
-        .map(|m| Box::new(m) as Box<dyn crate::module::Module>)
+/// Forgets the latest module of `kind` (the running group, if it is one).
+pub fn unregister(kind: &str) {
+    let key = LATEST
+        .write()
+        .unwrap_or_else(|e| e.into_inner())
+        .remove(kind);
+    if let Some(key) = key {
+        REGISTRY
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&key);
+    }
 }
 
-pub fn info_for(kind: &str) -> Option<&'static ModuleInfo> {
-    group(kind)
-        .map(|g| g.info)
-        .or_else(|| standin::info_for(kind))
-}
-
-pub fn all_infos() -> Vec<&'static ModuleInfo> {
+/// The running group with this key.
+pub fn group_by_key(key: &CodeHash) -> Option<Arc<CodeGroup>> {
     REGISTRY
         .read()
         .unwrap_or_else(|e| e.into_inner())
+        .get(key)
+        .cloned()
+}
+
+/// The running group `kind` resolves to in `scope` (the song's own blob, else the latest).
+pub fn group_in(scope: &CodeScope, kind: &str) -> Option<Arc<CodeGroup>> {
+    group_by_key(&scope.key(kind).or_else(|| latest_key(kind))?)
+}
+
+pub fn group(kind: &str) -> Option<Arc<CodeGroup>> {
+    group_in(&CodeScope::default(), kind)
+}
+
+/// A fresh instance of a code module for the song `scope` describes (the fallback after the
+/// built-in table): its running group, else its stand-in.
+pub fn create_in(scope: &CodeScope, kind: &str) -> Option<Box<dyn crate::module::Module>> {
+    let key = scope.key(kind).or_else(|| latest_key(kind))?;
+    let Some(g) = group_by_key(&key) else {
+        return standin::create(&key);
+    };
+    match g.voice() {
+        Ok(m) => Some(Box::new(m) as Box<dyn crate::module::Module>),
+        // Never vanish: a module that cannot make an instance now passes audio through.
+        Err(e) => {
+            scope.note(format!(
+                "code module {kind} could not start ({e}); it passes audio through"
+            ));
+            Some(Box::new(standin::StandIn::new(g.info())) as Box<dyn crate::module::Module>)
+        }
+    }
+}
+
+/// A fresh instance of a registered code module, the latest of its kind.
+pub fn create(kind: &str) -> Option<Box<dyn crate::module::Module>> {
+    create_in(&CodeScope::default(), kind)
+}
+
+pub fn info_for_in(scope: &CodeScope, kind: &str) -> Option<&'static ModuleInfo> {
+    let key = scope.key(kind).or_else(|| latest_key(kind))?;
+    group_by_key(&key)
+        .map(|g| g.info)
+        .or_else(|| standin::info_for(&key))
+}
+
+pub fn info_for(kind: &str) -> Option<&'static ModuleInfo> {
+    info_for_in(&CodeScope::default(), kind)
+}
+
+/// The latest running module of each kind.
+pub fn all_infos() -> Vec<&'static ModuleInfo> {
+    let latest = LATEST.read().unwrap_or_else(|e| e.into_inner());
+    let groups = REGISTRY.read().unwrap_or_else(|e| e.into_inner());
+    latest
         .values()
+        .filter_map(|k| groups.get(k))
         .map(|g| g.info)
         .collect()
 }

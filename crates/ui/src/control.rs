@@ -22,7 +22,7 @@ use std::thread::JoinHandle;
 
 use basedrop::{Handle, Owned};
 use kabl_core::{ModuleId, PatchState};
-use kabl_engine::compile::{compile, CompiledPatch};
+use kabl_engine::compile::{compile_scoped, CompiledPatch};
 use kabl_engine::patch_engine::Command;
 use kabl_engine::runtime::{runtime_changes, Feedback, ParamSet, RuntimeTarget, ToAudio};
 use kabl_modules::builtins::Transport;
@@ -217,7 +217,8 @@ impl Delivery {
             return Outcome::Compiled;
         }
         let started = std::time::Instant::now();
-        let mut g = match compile(doc, self.sample_rate, self.voice_count) {
+        let scope = kabl_modules::code::host::active_scope();
+        let mut g = match compile_scoped(doc, self.sample_rate, self.voice_count, &scope) {
             Ok(g) => g,
             Err(err) => {
                 log::warn!(target: "graph", "compile failed generation={} error={err}; audio keeps the previous graph", self.generation);
@@ -261,6 +262,8 @@ impl Delivery {
             let sample_rate = self.sample_rate;
             let voice_count = self.voice_count;
             let delay = self.compile_delay_ms;
+            // The open song's code and settings; the graph being built is the live one.
+            let scope = kabl_modules::code::host::active_scope();
             self.compiling = Some(
                 std::thread::Builder::new()
                     .name("kabl-graph-compile".into())
@@ -268,8 +271,9 @@ impl Delivery {
                         if delay != 0 {
                             std::thread::sleep(std::time::Duration::from_millis(delay));
                         }
-                        let mut graph = compile(&request.doc, sample_rate, voice_count)
-                            .map_err(|e| e.to_string())?;
+                        let mut graph =
+                            compile_scoped(&request.doc, sample_rate, voice_count, &scope)
+                                .map_err(|e| e.to_string())?;
                         graph.generation = request.generation;
                         graph.rev = request.rev;
                         graph.fresh = request.fresh;
@@ -458,6 +462,16 @@ pub fn deliver(editor: &mut PatchEditor, ui_state: &mut UiState, d: &mut Deliver
         }
     }
     d.flush();
+    // Module settings that could not be loaded or saved: said once, like a stand-in warning.
+    let scope = kabl_modules::code::host::active_scope();
+    scope.collect();
+    let notes = scope.take_notes();
+    if !notes.is_empty() {
+        for n in &notes {
+            log::warn!(target: "control", "{n}");
+        }
+        ui_state.last_message = Some(notes.join(" | "));
+    }
     if refused > 0 {
         d.counts.dropped_actions += refused;
         let reason = if d.tx.is_some() {

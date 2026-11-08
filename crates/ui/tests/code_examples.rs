@@ -230,3 +230,303 @@ fn opening_through_the_browser_shows_the_notice_then_never_again() {
     browser::perform(&mut ed, &mut ui, Pending::OpenFolder(path));
     assert!(ui.browser.dialog.is_none());
 }
+
+/// D12: a code module's own saved settings go through the real save and open path. The graph
+/// runs on an audio-like thread; `save_patch` asks it for the settings (as the app's Save does);
+/// reopening through the library restores them into the new graph. Nothing is kept by hand.
+#[test]
+fn module_settings_survive_save_and_reopen_through_the_real_path() {
+    use kabl_modules::code::host;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    let _serial = serial();
+    let e = with_filter();
+    let leaf = module_of(&e, "demo.bitfilter");
+    let dir = tempfile::tempdir().unwrap();
+    let mut lib = Library::open(None, dir.path().join("user"));
+
+    // 1. A song with the module and no settings yet, opened the way the browser opens it.
+    let first = dir.path().join("first.kabl");
+    library::save_patch(&first, e.log()).unwrap();
+    let (_, _, code) = kabl_core::format::load_kabl_full(&first).unwrap();
+    assert!(lib
+        .remember_code_trust(&code_notice::entries(&code), true)
+        .is_none());
+    let log = library::read_patch(&first, &lib.prefs.code_trust).unwrap();
+
+    // 2. Its graph runs (as the app's live compile does, with the open song's scope) and the
+    //    module's state changes: the filter memory moves with the audio.
+    let scope = host::active_scope();
+    let stop = Arc::new(AtomicBool::new(false));
+    let runner = {
+        let (state, scope, stop) = (log.state().clone(), scope.clone(), Arc::clone(&stop));
+        std::thread::spawn(move || {
+            let collector = basedrop::Collector::new();
+            let mut eng =
+                PatchEngine::new_scoped(&collector.handle(), &state, SR, 4, &scope).unwrap();
+            eng.key(KeyEvent::On {
+                note: 60,
+                velocity: 100,
+            });
+            let (mut l, mut r) = ([0f32; BLOCK], [0f32; BLOCK]);
+            while !stop.load(Ordering::Relaxed) {
+                eng.process_block(&mut l, &mut r);
+                std::thread::sleep(std::time::Duration::from_micros(200));
+            }
+        })
+    };
+    std::thread::sleep(std::time::Duration::from_millis(100));
+
+    // 3. Save: the real call asks the running graph for the module's settings.
+    let second = dir.path().join("second.kabl");
+    library::save_patch(&second, &log).unwrap();
+    stop.store(true, Ordering::Relaxed);
+    runner.join().unwrap();
+    assert!(scope.take_notes().is_empty(), "no warning on a normal save");
+
+    let (_, _, saved_code) = kabl_core::format::load_kabl_full(&second).unwrap();
+    let version = saved_code.instance_blob(leaf).unwrap().version;
+    let kept = saved_code
+        .kept_state(leaf, version)
+        .expect("the file carries the module's settings");
+    let saved = kabl_modules::code::state::SavedState::from_kept(kept).unwrap();
+    let mut fresh = {
+        use kabl_modules::code::{InstanceConfig, WasmEngine, WasmiEngine};
+        let c = WasmiEngine::new().compile(host::EXAMPLES[1].wasm).unwrap();
+        c.instantiate(&InstanceConfig::new(SR, 2048)).unwrap()
+    };
+    let defaults = kabl_modules::code::state::save(&mut *fresh)
+        .unwrap()
+        .unwrap();
+    assert_ne!(saved, defaults, "the audio changed the module's state");
+
+    // 4. Reopen through the library: the new graph's first block loads the file's settings, and
+    //    saving them again gives the same bytes.
+    let reopened = library::read_patch(&second, &lib.prefs.code_trust).unwrap();
+    let scope2 = host::active_scope();
+    let collector = basedrop::Collector::new();
+    let mut eng =
+        PatchEngine::new_scoped(&collector.handle(), reopened.state(), SR, 4, &scope2).unwrap();
+    eng.key(KeyEvent::On {
+        note: 60,
+        velocity: 100,
+    });
+    scope2.request_capture();
+    let (mut l, mut r) = ([0f32; BLOCK], [0f32; BLOCK]);
+    eng.process_block(&mut l, &mut r);
+    assert_eq!(scope2.collect(), 1);
+    let back: Vec<_> = scope2.settings();
+    assert_eq!(back.len(), 1);
+    assert_eq!(back[0].1, saved, "settings are bit-exact after reopen");
+}
+
+/// Writes a file whose module has `kept` as its saved settings (the fixture for `--patch`).
+fn file_with_settings(
+    dir: &std::path::Path,
+    e: &PatchEditor,
+    leaf: u64,
+    kept: &kabl_modules::code::state::SavedState,
+) -> std::path::PathBuf {
+    use kabl_modules::code::host;
+    let mut code = kabl_standalone::code_load::embedded_for(
+        e.state(),
+        &host::active_scope(),
+        std::time::Duration::ZERO,
+    );
+    let version = code.instance_blob(leaf).unwrap().version;
+    code.keep_state(leaf, version, kept.to_kept()).unwrap();
+    let file = dir.join("settings.kabl");
+    kabl_core::format::save_kabl_full(&file, e.log(), None, Some(&code)).unwrap();
+    file
+}
+
+fn good_settings() -> kabl_modules::code::state::SavedState {
+    use kabl_modules::code::{host, InstanceConfig, WasmEngine, WasmiEngine};
+    let c = WasmiEngine::new().compile(host::EXAMPLES[1].wasm).unwrap();
+    let inst = c.instantiate(&InstanceConfig::new(SR, 2048)).unwrap();
+    let x = inst.state_xfer().unwrap();
+    // eight f32, none the default (zeros)
+    let bytes = (1..=8u32)
+        .flat_map(|i| (i as f32 * 0.125).to_le_bytes())
+        .collect();
+    kabl_modules::code::state::SavedState {
+        state_version: x.state_version,
+        bytes,
+    }
+}
+
+/// `--patch` (standalone and kabl-ui) registers the file's code and then builds the engine
+/// with `PatchEngine::new`: the song's settings reach the module bit-exact.
+#[test]
+fn patch_flag_restores_saved_module_settings() {
+    use kabl_modules::code::host;
+    let _serial = serial();
+    let e = with_filter();
+    let leaf = module_of(&e, "demo.bitfilter");
+    let dir = tempfile::tempdir().unwrap();
+    let kept = good_settings();
+    let file = file_with_settings(dir.path(), &e, leaf, &kept);
+
+    let (log, _, code) = kabl_core::format::load_kabl_full(&file).unwrap();
+    assert!(kabl_standalone::code_load::register_for_cli(&code, log.state()).is_empty());
+    let collector = basedrop::Collector::new();
+    let mut eng = PatchEngine::new(&collector.handle(), log.state(), SR, 4).unwrap();
+    eng.key(KeyEvent::On {
+        note: 60,
+        velocity: 100,
+    });
+    let scope = host::active_scope();
+    scope.request_capture();
+    let (mut l, mut r) = ([0f32; BLOCK], [0f32; BLOCK]);
+    eng.process_block(&mut l, &mut r);
+    let got = scope.collect();
+    assert_eq!(got, 1, "notes: {:?}", scope.take_notes());
+    assert_eq!(scope.settings(), vec![(leaf, kept)]);
+    assert!(scope.take_notes().is_empty());
+}
+
+/// Settings the module cannot take are reported the way stand-in warnings are, and the song
+/// keeps them for a build that can.
+#[test]
+fn unusable_saved_settings_are_reported_and_kept() {
+    use kabl_modules::code::host;
+    use kabl_modules::code::state::SavedState;
+    use kabl_ui::control::{self, Delivery};
+    let _serial = serial();
+    let e = with_filter();
+    let leaf = module_of(&e, "demo.bitfilter");
+    let dir = tempfile::tempdir().unwrap();
+    let corrupt = SavedState {
+        state_version: 99, // from a layout newer than the module knows
+        bytes: vec![1, 2, 3],
+    };
+    let file = file_with_settings(dir.path(), &e, leaf, &corrupt);
+
+    let (log, _, code) = kabl_core::format::load_kabl_full(&file).unwrap();
+    kabl_standalone::code_load::register_for_cli(&code, log.state());
+    let collector = basedrop::Collector::new();
+    let mut d = Delivery::new(
+        None,
+        collector.handle(),
+        std::sync::Arc::new(kabl_engine::runtime::Feedback::default()),
+        SR,
+        4,
+        None,
+    );
+    let mut editor = PatchEditor::from_log(log);
+    let mut ui = UiState::default();
+    editor.mark_dirty();
+    control::deliver(&mut editor, &mut ui, &mut d);
+    let msg = ui.last_message.clone().expect("the user is told");
+    assert!(
+        msg.contains("demo.bitfilter") && msg.contains("starts at its defaults"),
+        "{msg}"
+    );
+    assert!(msg.contains("keeps the old settings"), "{msg}");
+    // Saving writes the unusable settings back unchanged.
+    let out = kabl_standalone::code_load::embedded_for(
+        editor.state(),
+        &host::active_scope(),
+        std::time::Duration::ZERO,
+    );
+    let version = out.instance_blob(leaf).unwrap().version;
+    assert_eq!(
+        SavedState::from_kept(out.kept_state(leaf, version).unwrap()),
+        Some(corrupt)
+    );
+}
+
+/// Unusable settings (a newer layout; or the right layout with bytes the module refuses) are
+/// never overwritten: play, save twice, and the file still carries the original bytes.
+#[test]
+fn rejected_settings_stay_in_the_file_through_play_and_repeated_saves() {
+    use kabl_modules::code::host;
+    use kabl_modules::code::state::SavedState;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    let _serial = serial();
+    let e = with_filter();
+    let leaf = module_of(&e, "demo.bitfilter");
+    let dir = tempfile::tempdir().unwrap();
+    let good = good_settings();
+    let variants = [
+        SavedState {
+            state_version: 99,
+            bytes: vec![1, 2, 3],
+        },
+        SavedState {
+            state_version: good.state_version,
+            bytes: vec![7, 7, 7], // right layout, wrong length: the module refuses it
+        },
+    ];
+    for bad in variants {
+        let file = file_with_settings(dir.path(), &e, leaf, &bad);
+        let mut lib = Library::open(None, dir.path().join("user"));
+        let (_, _, code) = kabl_core::format::load_kabl_full(&file).unwrap();
+        lib.remember_code_trust(&code_notice::entries(&code), true);
+        let log = library::read_patch(&file, &lib.prefs.code_trust).unwrap();
+        let scope = host::active_scope();
+        let stop = Arc::new(AtomicBool::new(false));
+        let runner = {
+            let (state, scope, stop) = (log.state().clone(), scope.clone(), Arc::clone(&stop));
+            std::thread::spawn(move || {
+                let collector = basedrop::Collector::new();
+                let mut eng =
+                    PatchEngine::new_scoped(&collector.handle(), &state, SR, 4, &scope).unwrap();
+                eng.key(KeyEvent::On {
+                    note: 60,
+                    velocity: 100,
+                });
+                let (mut l, mut r) = ([0f32; BLOCK], [0f32; BLOCK]);
+                while !stop.load(Ordering::Relaxed) {
+                    eng.process_block(&mut l, &mut r);
+                    std::thread::sleep(std::time::Duration::from_micros(200));
+                }
+            })
+        };
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        for n in 0..2 {
+            let out = dir.path().join(format!("out{n}.kabl"));
+            library::save_patch(&out, &log).unwrap();
+            let (_, _, saved) = kabl_core::format::load_kabl_full(&out).unwrap();
+            let version = saved.instance_blob(leaf).unwrap().version;
+            assert_eq!(
+                SavedState::from_kept(saved.kept_state(leaf, version).unwrap()),
+                Some(bad.clone()),
+                "save {n} of {bad:?} keeps the original bytes"
+            );
+        }
+        stop.store(true, Ordering::Relaxed);
+        runner.join().unwrap();
+    }
+}
+
+/// Code that says it is another module than the song claims is refused: the claimed module is
+/// a stand-in with that cause, and the real module of that name is untouched.
+#[test]
+fn embedded_code_that_is_another_module_is_refused() {
+    use kabl_modules::code::host;
+    let _serial = serial();
+    host::register_examples().unwrap();
+    let e = with_filter();
+    let logic_before = host::blob_for("demo.logic").unwrap();
+    // The song claims this is demo.bitfilter; the bytes are demo.logic.
+    let mut code = kabl_core::embedded::Embedded::new();
+    let h = code
+        .add_blob("demo.bitfilter", 1, host::EXAMPLES[0].wasm.to_vec())
+        .unwrap();
+    code.bind(module_of(&e, "demo.bitfilter"), h).unwrap();
+    let warnings = kabl_standalone::code_load::register_for_cli(&code, e.state());
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.contains("demo.bitfilter") && w.contains("different module (demo.logic v1)")),
+        "{warnings:?}"
+    );
+    let logic_after = host::blob_for("demo.logic").unwrap();
+    assert_eq!(logic_before.1, logic_after.1, "demo.logic is untouched");
+    // Put the real example back for the tests that follow.
+    host::register_blob(host::EXAMPLES[1].wasm).unwrap();
+    host::set_active_scope(kabl_modules::code::CodeScope::new());
+}

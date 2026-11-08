@@ -118,20 +118,14 @@ pub fn remember(trust: &mut BTreeMap<String, bool>, code: &[CodeEntry], open: bo
     }
 }
 
-/// The code a patch being saved carries: one blob per code-module kind it uses, bound to every
-/// instance of that kind. Built-in kinds add nothing.
+/// The code a patch being saved carries, for the open song: its blobs and the settings of its
+/// code modules, fresh from the running graph when there is one.
 pub fn embedded_for(state: &kabl_core::PatchState) -> Embedded {
-    let mut code = Embedded::new();
-    for (&id, m) in &state.modules {
-        let Some((version, bytes)) = kabl_modules::code::host::blob_for(&m.kind) else {
-            continue;
-        };
-        let Ok(hash) = code.add_blob(&m.kind, version, bytes.to_vec()) else {
-            continue;
-        };
-        let _ = code.bind(id, hash);
-    }
-    code
+    kabl_standalone::code_load::embedded_for(
+        state,
+        &kabl_modules::code::host::active_scope(),
+        std::time::Duration::from_millis(250),
+    )
 }
 
 pub use kabl_standalone::code_load::{decline, register, stand_in_missing};

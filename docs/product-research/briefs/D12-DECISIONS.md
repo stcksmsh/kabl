@@ -19,6 +19,7 @@ Scope unchanged: D12 gives creators a supported SDK, package format and workflow
 - SDK crate, `kabl_module!` macro, meta builder, template, package/manifest spec: 0BSD. `cargo kabl` CLI including the test harness: GPL-3.0-or-later. No `kabl-module-test` crate.
 - Why: the GPL probably does not reach a wasm module that talks to the host only through the ABI, but doubt keeps companies away, so a written exception removes it. MIT/Apache notices cannot travel with code inside every song, so 0BSD. The harness lives in the GPL CLI, so the creator's crate has no GPL dependency.
 - Songs redistribute module code: publishing a package permits redistributing the unmodified wasm inside songs; manifest `licence` (SPDX) required; `source` URL required for copyleft licences. Closed paid modules are allowed but extractable; a "referenced, not embedded" mode is 1.0+.
+- The module exception ends with the standard "may extend / not obliged" sentence, as in the GCC Runtime Library Exception and the Classpath exception (Kosta, 2026-11-08): a modified kabl may extend the exception but need not; otherwise it deletes the statement. The exception and the CONTRIBUTING wording are approved.
 - Facts checked: `LICENSE`, `deny.toml:1,17,25`, `Cargo.toml:9`, `COPYRIGHT` (existing section 7 terms), `CONTRIBUTING.md:3-7,16-18`, git authorship (133 of 1,071 commits authored as Claude, the rest Kosta). See sheet contradictions 3 and 4.
 
 ## 3. Other picks

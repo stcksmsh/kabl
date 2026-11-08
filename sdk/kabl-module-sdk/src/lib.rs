@@ -3,7 +3,7 @@
 //!
 //! A module is a type that implements [`Module`], plus one `kabl_module!(MyType);` line. The
 //! macro emits the wasm exports (`init`, `process`, `reset`, `layout_ext`, `state_save`,
-//! `state_load`), the buffer layout and the `kabl.meta` and `kabl.notices` custom sections.
+//! `state_load`, `migrate`), the buffer layout and the `kabl.meta` and `kabl.notices` custom sections.
 //! No `unsafe` in your crate (`#![forbid(unsafe_code)]` works), no allocator, no dependencies.
 //!
 //! ```ignore
@@ -147,6 +147,13 @@ pub trait Module: Sized + 'static {
     fn load(&mut self, _version: u32, _bytes: &[u8]) -> bool {
         true
     }
+    /// Optional. Convert settings written under an older `STATE_VERSION` into the current
+    /// layout: read `bytes`, write the result to `out`, return `true`. The host then passes the
+    /// result to `load`. Return `false` when you cannot (the module starts at its defaults and
+    /// the song keeps the old settings). Default: cannot migrate.
+    fn migrate(_old_version: u32, _bytes: &[u8], _out: &mut StateWriter) -> bool {
+        false
+    }
 }
 
 /// Emits everything the host needs from the module type `$ty`: see the crate docs.
@@ -202,6 +209,11 @@ macro_rules! kabl_module {
             #[allow(dead_code)]
             pub extern "C" fn state_load(len: i32, version: i32) -> i32 {
                 M::state_load(&STORE, len, version)
+            }
+            #[cfg_attr(target_arch = "wasm32", no_mangle)]
+            #[allow(dead_code)]
+            pub extern "C" fn migrate(len: i32, old_version: i32) -> i32 {
+                M::migrate(&STORE, len, old_version)
             }
         };
     };

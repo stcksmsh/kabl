@@ -1,3 +1,0 @@
-# Small stack: every voice gets its own copy of linear memory.
-[target.wasm32-unknown-unknown]
-rustflags = ["-C", "link-arg=-zstack-size=8192", "-C", "link-arg=--no-entry"]

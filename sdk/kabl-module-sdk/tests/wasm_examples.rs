@@ -1,9 +1,8 @@
 //! Builds the two SDK examples for wasm32 and checks the blobs: exports, sections, no imports,
 //! no buffers shipped as data, size. Needs `rustup target add wasm32-unknown-unknown`.
 //!
-//! This does NOT load them into kabl's `WasmiEngine`: the current host rejects `abi_minor`
-//! (`meta line 3: unknown key`), which is D12 PR 0's job. Until then, loading is checked by the
-//! gate spike only (see docs/product-research/d12/GATE.md).
+//! The blobs are loaded into the real `WasmiEngine` by kabl's own tests
+//! (`crates/modules/tests/code_examples.rs`), which use the committed copies.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -103,6 +102,7 @@ fn check(dir: &Path, file: &str, kind: &str, max_len: usize) {
             "init",
             "layout_ext",
             "memory",
+            "migrate",
             "process",
             "reset",
             "state_load",
