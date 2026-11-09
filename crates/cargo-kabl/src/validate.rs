@@ -205,11 +205,13 @@ fn render(
         let mem = inst.memory();
         for slot in 0..layout.in_slots as usize {
             for (i, c) in mem[layout.input_range(slot)]
-                .chunks_exact_mut(4)
+                .as_chunks_mut::<4>()
+                .0
+                .iter_mut()
                 .take(frames)
                 .enumerate()
             {
-                c.copy_from_slice(&f(block * frames + i).to_le_bytes());
+                *c = f(block * frames + i).to_le_bytes();
             }
         }
         for (i, v) in params.iter().enumerate() {
@@ -222,8 +224,13 @@ fn render(
         );
         let mem = inst.memory();
         for slot in 0..layout.out_slots as usize {
-            for c in mem[layout.output_range(slot)].chunks_exact(4).take(frames) {
-                let v = f32::from_le_bytes([c[0], c[1], c[2], c[3]]);
+            for c in mem[layout.output_range(slot)]
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .take(frames)
+            {
+                let v = f32::from_le_bytes(*c);
                 pass.non_finite |= !v.is_finite();
                 if v.is_finite() {
                     pass.peak = pass.peak.max(v.abs());
