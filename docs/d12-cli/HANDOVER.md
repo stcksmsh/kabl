@@ -6,19 +6,19 @@ Branch `claude/d12-cli`, worktree `.worktrees/g4-kit`. Report to the session "Ka
 Crate `crates/cargo-kabl` (GPL-3.0-or-later, binary `cargo-kabl`) with `new <id> [--audio|--control]`, `build`, `validate`, plus a working `sdk/template` (0BSD, one test, README, LICENSE, rust-toolchain pin). Move `kabl.notices` from the SDK macro to `cargo kabl build`. CI: two clean template builds byte-identical. Reuse the host's `WasmiEngine`/`Layout::validate`. Do not edit `crates/modules`; in `sdk/` touch only the notices removal and the template. Out of scope: `cargo kabl test` (PR 3), packaging (PR 4).
 Finish: fmt, clippy, debug tests counting every target, `cargo deny`, regenerate `THIRD-PARTY-NOTICES.md` if deps change (`python3 -I packaging/gen-notices.py`), open PR, wait for ALL checks, read Codex comments, fix real findings, send `DONE <PR#> <commit>`, `cargo clean`.
 
-## Done (pushed)
-- `309f98da` CLI, template, notices moved to build, CI job `cargo-kabl` in `.github/workflows/ci.yml`.
-- `edb7eddd` finite-only smoke inputs.
-- `971466f6` two-tier smoke render (current head before this handover).
-- fmt, clippy (`-p cargo-kabl --all-targets`), `cargo deny check` pass; THIRD-PARTY-NOTICES unchanged (serde_json and wat were already in the lock). 22 cargo-kabl unit tests pass.
-- Template built in two different directories gave identical sha256.
+## Done (pushed; PR #139, draft)
+- Original work: CLI, template, notices at build, CI job `cargo-kabl`, finite-only smoke, two-tier smoke render.
+- Rebased on origin/master (PR 0 #138); one conflict, in the SDK `lib.rs` doc comment.
+- `79919a87`: unknown-key warning uses the host's `wasmi_engine::unknown_keys` (no local list; the warning has no line number now).
+- `4787410f`: `as_chunks` in the smoke render. CI clippy (rust 1.99) flags `chunks_exact_to_as_chunks`; local rustc 1.93 does not.
+- Local: workspace tests `--no-fail-fast` 175 targets, 1253 passed, 0 failed; clippy `-D warnings`, fmt, `cargo deny check` clean. Template, `demo.logic`, `demo.bitfilter` build and validate. THIRD-PARTY-NOTICES unchanged.
+- Flake seen once: `kabl-ui` `code_examples::module_settings_survive_save_and_reopen_through_the_real_path` ("no warning on a normal save"), a PR 0 timing test; passed on rerun.
 
 ## Remaining, in order
-1. `git fetch && git rebase origin/master` (PR 0 = #138, merged as 1bdb61e0). Expect conflicts only in `sdk/` (agent 1 added `migrate` to the SDK) and possibly `Cargo.lock`.
-2. Switch the unknown-key warning to the new parser. `validate.rs` has its own `KNOWN_KEYS` list and scan (runs before the host parse); check whether PR 0 exposes a known-key list or a warning API in `parse_meta` and reuse it instead. Keep `an_unknown_key_warns` test; the host now loads unknown keys, so it should also assert `ok()`.
-3. Check that PR 0's `abi_minor` gate lets the SDK blobs load; no `LOCALHACK` is needed any more. Confirm the template, `demo.logic`, `demo.bitfilter` pass: `cargo build -p cargo-kabl`, then `target/debug/cargo-kabl kabl build --manifest-path sdk/template/Cargo.toml` (examples need `--allow-reserved`). PR 0 swaps the SDK example blobs in the host; check `sdk/` examples still match.
-4. Full workspace debug tests (`cargo test --workspace`, count every target), clippy `--workspace --all-targets -D warnings`, `cargo fmt --all --check`, `cargo deny check`, notices diff.
-5. Open the PR (end the description with the attribution line from the session reminder), wait for ALL checks including the new `cargo-kabl` job, read Codex threads, fix real findings, send `DONE <PR#> <commit>`, then `cargo clean`.
+1. Check CI is green on the head commit: `gh pr checks 139`.
+2. No Codex threads existed while the PR was a draft. Kosta marks it ready (`gh pr ready` is not available to agents); then read Codex threads (count only those with no reply) and fix real findings.
+3. Untested: the default `cargo kabl new` SDK dependency (git on this repo, no SDK tag yet); only `--sdk-path` was exercised.
+4. Do not merge. Report to "Kabl overseer". Work is paused until the weekly reset.
 
 ## Rules decided with the overseer
 - Smoke render, tier 1 (error if output is non-finite): silence, impulse, full-scale square, ±1e4, `f32::MIN_POSITIVE`, denormals; params at default/min/max. Warning if output exceeds ±1e6 on inputs of ±1 or less.
