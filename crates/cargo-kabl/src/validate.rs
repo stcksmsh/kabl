@@ -12,23 +12,6 @@ use kabl_modules::PortDirection;
 /// Id prefixes only kabl itself may use (decision B).
 pub const RESERVED_PREFIXES: [&str; 3] = ["kabl.", "demo.", "test."];
 
-/// Keys the host parser knows. Anything else is ignored by the host, so a typo would pass
-/// silently; the validator warns instead.
-pub const KNOWN_KEYS: [&str; 12] = [
-    "abi",
-    "abi_minor",
-    "kind",
-    "version",
-    "name",
-    "explain",
-    "category",
-    "rate",
-    "width",
-    "port",
-    "param",
-    "advanced",
-];
-
 /// Block size the host runs modules at (`host::MAX_BLOCK`); the layout must hold it.
 const HOST_BLOCK: u32 = 2048;
 /// Frames per smoke-render block, and blocks per stimulus.
@@ -79,19 +62,6 @@ pub fn check_id(id: &str, allow_reserved: bool) -> Result<(), String> {
     Ok(())
 }
 
-/// Keys in the meta text the host would ignore.
-pub fn unknown_keys(meta_text: &str) -> Vec<(usize, String)> {
-    meta_text
-        .lines()
-        .enumerate()
-        .filter_map(|(n, l)| {
-            let l = l.trim();
-            let key = l.split_whitespace().next()?;
-            (!l.starts_with('#') && !KNOWN_KEYS.contains(&key)).then(|| (n + 1, key.to_owned()))
-        })
-        .collect()
-}
-
 pub fn validate(wasm_bytes: &[u8], opts: Options) -> Report {
     let mut r = Report::default();
     r.notes.push(format!("{} bytes", wasm_bytes.len()));
@@ -121,9 +91,9 @@ pub fn validate(wasm_bytes: &[u8], opts: Options) -> Report {
     }
     if let Ok(Some(text)) = wasm::custom(wasm_bytes, META_SECTION) {
         if let Ok(text) = std::str::from_utf8(text) {
-            for (line, key) in unknown_keys(text) {
+            for key in kabl_modules::code::wasmi_engine::unknown_keys(text) {
                 r.warnings.push(format!(
-                    "meta line {line}: unknown key `{key}` (the host ignores it; a typo?)"
+                    "meta: unknown key `{key}` (the host ignores it; a typo?)"
                 ));
             }
         }
@@ -395,11 +365,12 @@ port in audio in 1\\nport out audio out 1\\nparam g 0 4 1 linear 5 x\\n{extra}";
 
     #[test]
     fn an_unknown_key_warns() {
-        // The warning comes from our own scan, before the host's parser runs.
+        // The key list is the host's own (`wasmi_engine::unknown_keys`); the host still loads the blob.
         let raw = blob("alice.t", "abi_minro 1\\n", "", 16448, SILENT);
         let r = validate(&raw, Options::default());
         let w = text(&r.warnings);
         assert!(w.contains("unknown key `abi_minro`"), "{w}");
+        assert!(r.ok(), "{}", text(&r.errors));
     }
 
     #[test]
@@ -479,14 +450,5 @@ port in audio in 1\\nport out audio out 1\\nparam g 0 4 1 linear 5 x\\n{extra}";
         }
         // `demo` as a handle is fine: only the `demo.` prefix is reserved.
         assert!(check_id("demonic.x", false).is_ok());
-    }
-
-    #[test]
-    fn unknown_keys_are_found_with_their_line() {
-        let t = "kind a.b\n# c\nversion 1\nabi_minro 1\n\nfoo\nparam g 0 1 0 linear 5\n";
-        assert_eq!(
-            unknown_keys(t),
-            vec![(4, "abi_minro".into()), (6, "foo".into())]
-        );
     }
 }
