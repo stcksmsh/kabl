@@ -32,7 +32,7 @@ const INIT_FUEL: u64 = 50_000_000;
 const REQUIRED_EXPORTS: [&str; 4] = ["init", "process", "reset", "memory"];
 
 pub struct WasmiEngine {
-    engine: Engine,
+    pub(super) engine: Engine,
 }
 
 impl Default for WasmiEngine {

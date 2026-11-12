@@ -2764,7 +2764,8 @@ pub fn open_library() -> Library {
 /// After opening a patch whose code could not run: one toast naming each module's id, version
 /// and cause (it replaces the "opened ..." note, which would hide the warning).
 fn stand_in_warning(editor: &PatchEditor, ui: &mut UiState) {
-    let w = crate::code_notice::warnings(editor.state());
+    let mut w = crate::code_notice::warnings(editor.state());
+    w.extend(crate::module_install::missing_report(editor.state()));
     if !w.is_empty() {
         message(ui, w.join(" | "));
     }

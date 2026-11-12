@@ -1086,6 +1086,7 @@ fn dropped(editor: &PatchEditor, ui_state: &mut UiState, ctx: &egui::Context) {
 pub fn show(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
     let ctx = ui.ctx().clone();
     dropped(editor, ui_state, &ctx);
+    crate::module_install::dropped(ui_state, &ctx);
     let Some(id) = ui_state.tables.module else {
         return;
     };

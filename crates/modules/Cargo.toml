@@ -11,6 +11,10 @@ license.workspace = true
 wasmi = { version = "=2.0.0", default-features = false, features = ["stable", "std", "validate", "auto-dispatch"] }
 # Identity of a code blob: the hash a song embeds it under (same crate and version as kabl-core).
 sha2 = "0.10"
+# The `.kablmod` package: its manifest and the zip checksums (both already in the lock file).
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0.151"
+crc32fast = "1"
 # Lowers the calibration thread's scheduling class (Linux), so it never competes with audio.
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
