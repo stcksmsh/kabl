@@ -178,7 +178,7 @@ fn code_and_module_settings_round_trip_through_the_state_bit_exactly() {
 
     let a = tests::instrument();
     a.shared.load(SoundState::decode(&first).unwrap()).unwrap();
-    let second = serde_json::to_vec(&a.shared.snapshot_for_save()).unwrap();
+    let second = serde_json::to_vec(&a.shared.snapshot_for_save().0).unwrap();
     assert_eq!(
         first, second,
         "state, code and module settings survive a save"
@@ -187,7 +187,7 @@ fn code_and_module_settings_round_trip_through_the_state_bit_exactly() {
     b.shared.load(SoundState::decode(&second).unwrap()).unwrap();
     assert_eq!(
         second,
-        serde_json::to_vec(&b.shared.snapshot_for_save()).unwrap()
+        serde_json::to_vec(&b.shared.snapshot_for_save().0).unwrap()
     );
 }
 
@@ -220,7 +220,7 @@ fn a_state_without_code_pins_the_version_registered_when_it_loads() {
     l.shared.load(legacy).unwrap();
     // Another instance now installs a different version of the same kind.
     kabl_modules::code::host::register_blob_as(&module(kind, 2, 0.5), kind, 2).unwrap();
-    let saved = l.shared.snapshot_for_save();
+    let saved = l.shared.snapshot_for_save().0;
     let code = saved
         .embedded()
         .unwrap()

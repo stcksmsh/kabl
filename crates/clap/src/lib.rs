@@ -490,7 +490,7 @@ impl Shared {
     /// [`Shared::snapshot`] for saving: also carries the code of the custom modules the patch
     /// uses and their current settings, asked of the running graph (bounded wait; an engine that
     /// is not running leaves the last known settings).
-    fn snapshot_for_save(&self) -> SoundState {
+    fn snapshot_for_save(&self) -> (SoundState, kabl_modules::code::CodeScope) {
         // The patch and its scope come from one critical section: a browser open committing in
         // between would otherwise pair the old graph with the new song's code.
         let (mut state, scope) = {
@@ -506,13 +506,12 @@ impl Shared {
             state.version = 6;
             state.code = Some(sound_state::encode_code(&code));
         }
-        state
+        (state, scope)
     }
 
     /// Main-thread CLAP state load. All validation, compilation and queue checks precede
     /// mutation. Session publication is the single audible transaction boundary.
     fn load(&self, state: SoundState) -> Result<(), String> {
-        state.validate()?;
         let code = state.embedded()?;
         let mut c = self.control.lock().unwrap();
         if c.tx.slots() == 0 {
@@ -528,6 +527,8 @@ impl Shared {
             .map(|l| l.prefs.code_trust.clone())
             .unwrap_or_default();
         let scope = open_code(code.as_ref(), &state.patch, &trust);
+        // Against this state's own code, not whatever the process has registered.
+        state.validate_in(&scope)?;
         let (mut session, delivery, cc, reports, banks) = prepare(
             &state.patch,
             c.rate,

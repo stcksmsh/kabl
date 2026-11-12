@@ -61,10 +61,18 @@ impl SoundState {
         if state.version < 5 {
             kabl_core::migrate_state(&mut state.patch);
         }
-        state.validate()?;
+        // A state with embedded code is checked by `load` against its own code scope.
+        if state.code.is_none() {
+            state.validate()?;
+        }
         Ok(state)
     }
     pub fn validate(&self) -> Result<(), String> {
+        self.validate_in(&kabl_modules::code::CodeScope::default())
+    }
+    /// [`SoundState::validate`] against the code the state's own scope names, so a composite
+    /// exposing a custom module's port validates against the blob the state embeds.
+    pub fn validate_in(&self, scope: &kabl_modules::code::CodeScope) -> Result<(), String> {
         if !matches!(self.version, 1..=6) {
             return Err("Unsupported sound state version".into());
         }
@@ -111,13 +119,10 @@ impl SoundState {
                 }
             }
         }
-        validate_patch(&self.patch)
+        validate_patch_in(&self.patch, scope)
     }
 }
-pub fn validate_patch(p: &PatchState) -> Result<(), String> {
-    validate_patch_in(p, &kabl_modules::code::CodeScope::default())
-}
-/// [`validate_patch`] against the code the instance's own scope names.
+/// Validates the patch against the code the instance's own scope names.
 pub fn validate_patch_in(
     p: &PatchState,
     scope: &kabl_modules::code::CodeScope,
