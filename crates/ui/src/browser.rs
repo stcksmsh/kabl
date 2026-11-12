@@ -244,6 +244,8 @@ struct IoDone {
     library: Option<Library>,
     doc: Option<Doc>,
     log: Option<PatchLog>,
+    /// The code scope of the song the open produced (see `UiState::open_scope`).
+    open_scope: Option<kabl_modules::code::CodeScope>,
     load_stopped: bool,
     selected: Option<String>,
     message: Option<String>,
@@ -360,6 +362,7 @@ fn start_io(editor: &PatchEditor, ui: &mut UiState, request: IoRequest) {
                 library: scratch.library,
                 doc: scratch.doc,
                 log: scratch.loaded.then(|| scratch_editor.log().clone()),
+                open_scope: scratch.open_scope.take(),
                 load_stopped: scratch.load_stopped,
                 selected: scratch.browser.selected.take(),
                 message: scratch.last_message,
@@ -403,6 +406,7 @@ pub fn poll_io(editor: &mut PatchEditor, ui: &mut UiState) {
                 if same_doc && editor.state() == &task.before {
                     replace_patch(editor, ui, log);
                     ui.doc = done.doc;
+                    ui.open_scope = done.open_scope;
                     ui.load_stopped = done.load_stopped;
                     ui.library = done.library;
                     ui.last_message = done.message;
@@ -573,7 +577,8 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
                 return;
             };
             match lib.read_for_open(&id) {
-                Ok(log) => {
+                Ok((log, scope)) => {
+                    ui.open_scope = Some(scope);
                     let e = lib.get(&id).cloned();
                     let note = lib.touch(&id);
                     let Some(e) = e else { return };
@@ -630,8 +635,9 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
                 .as_ref()
                 .map(|l| l.prefs.code_trust.clone())
                 .unwrap_or_default();
-            match crate::library::read_patch_declined(std::path::Path::new(&path), &trust) {
-                Ok((log, declined)) => {
+            match crate::library::read_patch_scoped(std::path::Path::new(&path), &trust) {
+                Ok((log, declined, scope)) => {
+                    ui.open_scope = Some(scope);
                     if !declined.is_empty() {
                         // Opened with stand-ins; the next open asks again.
                         if let Some(l) = ui.library.as_mut() {
@@ -672,6 +678,7 @@ pub fn perform(editor: &mut PatchEditor, ui: &mut UiState, p: Pending) {
             }
         }
         Pending::New => {
+            ui.open_scope = Some(kabl_modules::code::CodeScope::new());
             let log = ui
                 .library
                 .as_ref()

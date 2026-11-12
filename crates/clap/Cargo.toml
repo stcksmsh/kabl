@@ -25,3 +25,5 @@ serde_json = "1"
 
 [dev-dependencies]
 assert_no_alloc = "1.1.2"
+# Test code modules are written as WAT text.
+wat = "1"

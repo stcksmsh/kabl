@@ -1833,6 +1833,7 @@ dependencies = [
  "rtrb",
  "serde",
  "serde_json",
+ "wat",
 ]
 
 [[package]]
@@ -1872,6 +1873,7 @@ version = "0.1.0"
 dependencies = [
  "assert_no_alloc",
  "image",
+ "libc",
  "sha2",
  "wasmi",
  "wat",
