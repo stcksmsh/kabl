@@ -43,6 +43,23 @@ impl Module for Gain {
             io.output[OUT][i] = io.input[IN][i] * g;
         }
         self.last = g;
+        // Deliberate faults, built by `cargo kabl test` to prove the host contains them. They fire
+        // on non-zero input: the host's load-time priming block is silent, so a module that
+        // always trapped would be refused at load instead of being stopped while it plays.
+        #[cfg(feature = "fault-trap")]
+        if io.input[IN][0] != 0.0 {
+            panic!("fault-trap");
+        }
+        #[cfg(feature = "fault-spin")]
+        if io.input[IN][0] != 0.0 {
+            loop {
+                core::hint::spin_loop();
+            }
+        }
+        #[cfg(feature = "fault-nan")]
+        {
+            io.output[OUT][0] = f32::NAN;
+        }
     }
 
     fn save(&self, w: &mut StateWriter) {

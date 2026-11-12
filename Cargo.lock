@@ -422,6 +422,7 @@ dependencies = [
 name = "cargo-kabl"
 version = "0.1.0"
 dependencies = [
+ "kabl-engine",
  "kabl-modules",
  "serde_json",
  "wat",

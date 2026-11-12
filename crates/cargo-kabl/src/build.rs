@@ -25,6 +25,8 @@ pub struct Args {
     pub package: Option<String>,
     pub locked: bool,
     pub allow_reserved: bool,
+    /// Cargo features for this build (`cargo kabl test` builds the fault variants with them).
+    pub features: Option<String>,
 }
 
 pub fn parse(args: &[String]) -> Result<Args, String> {
@@ -72,16 +74,22 @@ fn remaps(dir: &Path, root: &Path) -> Result<Vec<String>, String> {
     Ok(v)
 }
 
-/// Runs the build and returns the path of the finished, validated blob.
-pub fn run(args: &Args) -> Result<PathBuf, String> {
-    let manifest = match &args.manifest {
+/// The absolute manifest path the build uses.
+pub fn manifest(args: &Args) -> Result<PathBuf, String> {
+    match &args.manifest {
         Some(m) => m
             .canonicalize()
-            .map_err(|e| format!("{}: {e}", m.display()))?,
-        None => std::env::current_dir()
+            .map_err(|e| format!("{}: {e}", m.display())),
+        None => Ok(std::env::current_dir()
             .map_err(|e| e.to_string())?
-            .join("Cargo.toml"),
-    };
+            .join("Cargo.toml")),
+    }
+}
+
+/// Builds and strips the module and adds the notices; returns the blob, the raw cargo output's
+/// path and its size. No validation: `cargo kabl test` builds deliberately faulty variants too.
+pub fn blob(args: &Args) -> Result<(Vec<u8>, PathBuf, usize), String> {
+    let manifest = manifest(args)?;
     let dir = manifest.parent().ok_or("manifest has no directory")?;
     // cargo picks `rust-toolchain.toml` up from here, which is what pins the compiler.
     let root = output(
@@ -111,6 +119,9 @@ pub fn run(args: &Args) -> Result<PathBuf, String> {
     if args.locked {
         cmd.arg("--locked");
     }
+    if let Some(f) = &args.features {
+        cmd.args(["--features", f]);
+    }
     let out = cmd.output().map_err(|e| format!("cargo: {e}"))?;
     if !out.status.success() {
         return Err("cargo build failed".into());
@@ -118,7 +129,13 @@ pub fn run(args: &Args) -> Result<PathBuf, String> {
     let raw = find_artifact(&String::from_utf8_lossy(&out.stdout))?;
     let bytes = std::fs::read(&raw).map_err(|e| format!("{}: {e}", raw.display()))?;
     let blob = wasm::finish(&bytes, wasm::NOTICE_TEXT.as_bytes())?;
+    Ok((blob, raw, bytes.len()))
+}
 
+/// Runs the build and returns the path of the finished, validated blob.
+pub fn run(args: &Args) -> Result<PathBuf, String> {
+    let (blob, raw, raw_len) = blob(args)?;
+    let dir = raw.parent().unwrap_or(Path::new("."));
     let report = validate::validate(
         &blob,
         Options {
@@ -135,7 +152,7 @@ pub fn run(args: &Args) -> Result<PathBuf, String> {
         .ok_or("no `kind` in the meta")?
         .trim()
         .to_owned();
-    let dest = raw.parent().unwrap_or(dir).join("kabl");
+    let dest = dir.join("kabl");
     std::fs::create_dir_all(&dest).map_err(|e| e.to_string())?;
     let dest = dest.join(format!("{kind}.wasm"));
     std::fs::write(&dest, &blob).map_err(|e| format!("{}: {e}", dest.display()))?;
@@ -143,7 +160,7 @@ pub fn run(args: &Args) -> Result<PathBuf, String> {
         "{}: {} bytes (cargo output {} bytes)",
         dest.display(),
         blob.len(),
-        bytes.len()
+        raw_len
     );
     Ok(dest)
 }

@@ -3,6 +3,7 @@
 
 mod build;
 mod new;
+mod test;
 mod validate;
 mod wasm;
 
@@ -15,7 +16,10 @@ const USAGE: &str = "cargo kabl <command>
   build [--manifest-path FILE] [-p CRATE] [--locked] [--allow-reserved]
         reproducible wasm build, adds kabl.notices, validates
   validate <file.wasm> [--allow-reserved]
-        check a built module the way the host would, plus a smoke render";
+        check a built module the way the host would, plus a smoke render
+  test [build flags] [--bless]
+        build, then offline render checks: golden hash (kabl-golden.txt next to Cargo.toml),
+        parameter sweep, reset, determinism, state round trip, 16 voices, fault matrix, cost";
 
 pub fn print_report(r: &validate::Report) {
     for n in &r.notes {
@@ -46,6 +50,7 @@ fn run(args: &[String]) -> Result<(), String> {
             Ok(())
         }
         "build" => build::run(&build::parse(rest)?).map(drop),
+        "test" => test::run(&test::parse(rest)?),
         "validate" => {
             let allow_reserved = rest.iter().any(|a| a == "--allow-reserved");
             let files: Vec<_> = rest.iter().filter(|a| *a != "--allow-reserved").collect();
