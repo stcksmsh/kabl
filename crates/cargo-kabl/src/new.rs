@@ -59,7 +59,11 @@ fn year() -> u64 {
 pub fn render(a: &Args, year: u64) -> Result<Vec<(&'static str, String)>, String> {
     check_id(&a.id, false)?;
     let handle = a.id.split('.').next().unwrap_or("");
-    let krate = a.id.replace('.', "-");
+    let mut krate = a.id.replace('.', "-");
+    // Cargo package names must start with a letter; handles may start with a digit or `-`.
+    if !krate.starts_with(|c: char| c.is_ascii_lowercase()) {
+        krate.insert_str(0, "kabl-");
+    }
     let sdk = match &a.sdk_path {
         Some(p) => {
             let p = p
@@ -130,6 +134,18 @@ mod tests {
         assert!(get("src/lib.rs").contains(r#"Meta::new("alice.wobble", 1)"#));
         assert!(get("LICENSE").contains("Copyright (c) 2026 alice"));
         assert!(get("rust-toolchain.toml").contains("channel = "));
+    }
+
+    #[test]
+    fn package_name_starts_with_a_letter() {
+        for id in ["123alice.gain", "-bob.gain"] {
+            let files = render(&args(id, false), 2026).unwrap();
+            let toml = &files.iter().find(|f| f.0 == "Cargo.toml").unwrap().1;
+            assert!(
+                toml.contains(&format!(r#"name = "kabl-{}""#, id.replace('.', "-"))),
+                "{toml}"
+            );
+        }
     }
 
     #[test]

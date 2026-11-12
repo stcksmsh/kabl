@@ -195,6 +195,8 @@ fn render(
     frames: usize,
 ) -> Result<Pass, String> {
     let layout = inst.layout();
+    // Reset runs under the caller's fuel; give it a full budget, not the previous block's leftover.
+    inst.set_fuel(FUEL);
     inst.reset().map_err(|f| format!("reset {}", f.label()))?;
     let mut pass = Pass {
         fuel: 0,
