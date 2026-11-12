@@ -230,6 +230,23 @@ fn a_state_without_code_pins_the_version_registered_when_it_loads() {
 }
 
 #[test]
+fn a_failed_browser_load_keeps_the_previous_scope() {
+    let p = tests::instrument();
+    let mut c = p.shared.control.lock().unwrap();
+    // The candidate song does not prepare (too many modules).
+    for _ in 0..130 {
+        c.editor.add_module("osc.va", Vec2 { x: 0., y: 0. });
+    }
+    c.view.loaded = true;
+    c.view.open_scope = Some(kabl_modules::code::CodeScope::new().with("test.x", [1; 32]));
+    assert!(!c.pump());
+    assert!(
+        c.scope.key("test.x").is_none(),
+        "the rejected scope is not installed"
+    );
+}
+
+#[test]
 fn a_state_whose_code_exceeds_the_load_cap_does_not_validate() {
     let mut state = state_with(module(KIND, 1, 0.25), 1);
     state.code = Some("0".repeat(2 * sound_state::MAX_CODE_BYTES + 2));

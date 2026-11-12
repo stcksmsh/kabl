@@ -199,16 +199,16 @@ impl Control {
                 return false;
             }
             // A song the editor's browser opened brings its own scope.
-            if let Some(scope) = self.view.open_scope.take() {
-                self.scope = scope;
-            }
+            // Installed only once the session is published: a failed prepare keeps the
+            // previous sound's scope.
+            let scope = (self.view.open_scope.clone()).unwrap_or_else(|| self.scope.clone());
             let prepared = prepare(
                 self.editor.state(),
                 self.rate,
                 &self.handle,
                 self.epoch,
                 1.0,
-                &self.scope,
+                &scope,
             );
             let (mut session, delivery, cc, reports, banks) = match prepared {
                 Ok(prepared) => prepared,
@@ -227,6 +227,8 @@ impl Control {
                 }
             }
             self.tx.push(session).expect("checked state queue capacity");
+            self.scope = scope;
+            self.view.open_scope = None;
             self.delivery = delivery;
             self.cc = cc;
             self.reports = reports;
@@ -466,8 +468,13 @@ impl Shared {
         }
         self.native_epoch.store(epoch, Ordering::Release);
     }
+    #[cfg(test)]
     fn snapshot(&self) -> SoundState {
-        let c = self.control.lock().unwrap();
+        self.snapshot_of(&self.control.lock().unwrap())
+    }
+
+    /// The state of the document `c` holds.
+    fn snapshot_of(&self, c: &Control) -> SoundState {
         SoundState {
             // 5: stereo ports (`in`, `out`); older builds do not know them.
             version: 5,
@@ -484,8 +491,12 @@ impl Shared {
     /// uses and their current settings, asked of the running graph (bounded wait; an engine that
     /// is not running leaves the last known settings).
     fn snapshot_for_save(&self) -> SoundState {
-        let mut state = self.snapshot();
-        let scope = self.control.lock().unwrap().scope.clone();
+        // The patch and its scope come from one critical section: a browser open committing in
+        // between would otherwise pair the old graph with the new song's code.
+        let (mut state, scope) = {
+            let c = self.control.lock().unwrap();
+            (self.snapshot_of(&c), c.scope.clone())
+        };
         let code = kabl_standalone::code_load::embedded_for(
             &state.patch,
             &scope,
