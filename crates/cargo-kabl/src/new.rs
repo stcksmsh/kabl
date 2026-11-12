@@ -55,6 +55,11 @@ fn year() -> u64 {
     1970 + secs / 31_556_952
 }
 
+/// Escapes `\` and `"` for a TOML basic string (Windows paths have backslashes).
+fn toml_escape(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
 /// The files of the new project, relative path and contents.
 pub fn render(a: &Args, year: u64) -> Result<Vec<(&'static str, String)>, String> {
     check_id(&a.id, false)?;
@@ -69,7 +74,7 @@ pub fn render(a: &Args, year: u64) -> Result<Vec<(&'static str, String)>, String
             let p = p
                 .canonicalize()
                 .map_err(|e| format!("--sdk-path {}: {e}", p.display()))?;
-            format!(r#"path = "{}""#, p.display())
+            format!(r#"path = "{}""#, toml_escape(&p.display().to_string()))
         }
         None => SDK_GIT.to_owned(),
     };
@@ -146,6 +151,11 @@ mod tests {
                 "{toml}"
             );
         }
+    }
+
+    #[test]
+    fn toml_escape_handles_backslashes_and_quotes() {
+        assert_eq!(toml_escape(r#"C:\sdk\a"b"#), r#"C:\\sdk\\a\"b"#);
     }
 
     #[test]
