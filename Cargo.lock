@@ -1872,8 +1872,11 @@ name = "kabl-modules"
 version = "0.1.0"
 dependencies = [
  "assert_no_alloc",
+ "crc32fast",
  "image",
  "libc",
+ "serde",
+ "serde_json",
  "sha2",
  "wasmi",
  "wat",

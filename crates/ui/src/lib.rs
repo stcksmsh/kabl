@@ -34,6 +34,7 @@ pub mod help;
 pub mod inspect;
 pub mod kit;
 pub mod library;
+pub mod module_install;
 pub mod panels;
 mod pattern;
 #[cfg(test)]
@@ -1451,6 +1452,7 @@ fn add_search(
             let needle = q.to_lowercase();
             // The example code modules (D11) are listed after the built-ins once registered.
             let _ = kabl_modules::code::host::register_examples();
+            let _ = module_install::ensure_loaded();
             let kinds: Vec<&str> = PatchEditor::known_kinds()
                 .iter()
                 .copied()
@@ -1462,7 +1464,10 @@ fn add_search(
                 .max_height(260.0)
                 .show(ui, |ui| {
                     for (i, kind) in kinds.iter().enumerate() {
-                        let it = kit::menu_item(ui, st, kind, false);
+                        let mut it = kit::menu_item(ui, st, kind, false);
+                        if let Some(tip) = module_install::info(kind) {
+                            it = it.on_hover_text(tip);
+                        }
                         ui_state.record(format!("add:{kind}"), it.rect);
                         if it.clicked() || (enter && i == 0) {
                             add_module_end(editor, ui_state, kind);
