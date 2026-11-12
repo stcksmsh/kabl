@@ -73,6 +73,12 @@ impl SoundState {
     /// [`SoundState::validate`] against the code the state's own scope names, so a composite
     /// exposing a custom module's port validates against the blob the state embeds.
     pub fn validate_in(&self, scope: &kabl_modules::code::CodeScope) -> Result<(), String> {
+        self.validate_envelope()?;
+        validate_patch_in(&self.patch, scope)
+    }
+    /// Everything but the patch's own validation, which needs the code scope: version, gain,
+    /// lanes and the code section's size. `load` runs it before registering any code.
+    pub fn validate_envelope(&self) -> Result<(), String> {
         if !matches!(self.version, 1..=6) {
             return Err("Unsupported sound state version".into());
         }
@@ -119,7 +125,7 @@ impl SoundState {
                 }
             }
         }
-        validate_patch_in(&self.patch, scope)
+        Ok(())
     }
 }
 /// Validates the patch against the code the instance's own scope names.

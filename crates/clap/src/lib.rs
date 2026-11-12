@@ -512,6 +512,8 @@ impl Shared {
     /// Main-thread CLAP state load. All validation, compilation and queue checks precede
     /// mutation. Session publication is the single audible transaction boundary.
     fn load(&self, state: SoundState) -> Result<(), String> {
+        // Nothing is registered for a state that is refused for a reason unrelated to its code.
+        state.validate_envelope()?;
         let code = state.embedded()?;
         let mut c = self.control.lock().unwrap();
         if c.tx.slots() == 0 {

@@ -247,6 +247,22 @@ fn a_failed_browser_load_keeps_the_previous_scope() {
 }
 
 #[test]
+fn a_state_refused_for_another_reason_registers_none_of_its_code() {
+    let p = tests::instrument();
+    let kind = "test.unregistered";
+    let mut state = state_with(module(kind, 1, 0.25), 1);
+    // Same blob, bound under another kind name the song uses.
+    state.patch.modules.get_mut(&3).unwrap().kind = kind.into();
+    let mut code = Embedded::new();
+    let hash = code.add_blob(kind, 1, module(kind, 1, 0.25)).unwrap();
+    code.bind(3, hash).unwrap();
+    state.code = Some(sound_state::encode_code(&code));
+    state.output_gain = 7.0;
+    assert!(p.shared.load(state).is_err());
+    assert!(kabl_modules::code::host::blob_for(kind).is_none());
+}
+
+#[test]
 fn a_state_whose_code_exceeds_the_load_cap_does_not_validate() {
     let mut state = state_with(module(KIND, 1, 0.25), 1);
     state.code = Some("0".repeat(2 * sound_state::MAX_CODE_BYTES + 2));
