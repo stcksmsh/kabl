@@ -312,4 +312,50 @@ impl Embedded {
         self.keep_state(instance, version, p[12..].to_vec())
             .map_err(|e| e.to_string())
     }
+
+    /// One flat byte string for hosts that keep the code inside another document (the CLAP
+    /// state): the same three frame kinds as a `.kabl` file, each as `kind u8, length u32,
+    /// payload`. Reading it back gives an equal `Embedded`.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        let mut frame = |kind: u8, payload: Vec<u8>| {
+            out.push(kind);
+            out.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+            out.extend_from_slice(&payload);
+        };
+        for (h, b) in self.blobs() {
+            frame(0, Self::blob_payload(h, b));
+        }
+        for (i, h) in self.refs() {
+            frame(1, Self::ref_payload(i, h));
+        }
+        for (i, v, bytes) in self.kept_states() {
+            frame(2, Self::kept_payload(i, v, bytes));
+        }
+        out
+    }
+
+    /// Parses [`Embedded::to_bytes`]; every blob is checked against its hash and the size caps.
+    pub fn from_bytes(mut bytes: &[u8]) -> Result<Self, String> {
+        let mut code = Self::new();
+        let mut refs = Vec::new();
+        while !bytes.is_empty() {
+            let head = bytes.get(..5).ok_or("code section is cut")?;
+            let n = u32::from_le_bytes(head[1..5].try_into().unwrap()) as usize;
+            let payload = bytes
+                .get(5..5usize.saturating_add(n))
+                .ok_or("code section is cut")?;
+            match head[0] {
+                0 => code.read_blob(payload)?,
+                1 => refs.push(Self::read_ref(payload)?),
+                2 => code.read_kept(payload)?,
+                other => return Err(format!("unknown code frame kind {other}")),
+            }
+            bytes = &bytes[5 + n..];
+        }
+        for (instance, hash) in refs {
+            code.bind(instance, hash).map_err(|e| e.to_string())?;
+        }
+        Ok(code)
+    }
 }

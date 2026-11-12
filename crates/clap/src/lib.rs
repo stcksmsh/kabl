@@ -88,6 +88,9 @@ struct Control {
     view: UiState,
     delivery: Delivery,
     handle: Handle,
+    /// This instance's code modules and their settings: never shared with another instance
+    /// of the plugin in the same process.
+    scope: kabl_modules::code::CodeScope,
     rate: f32,
     tx: rtrb::Producer<Owned<Session>>,
     epoch: u64,
@@ -195,12 +198,17 @@ impl Control {
                 self.view.last_message = Some("State queue full; previous sound retained".into());
                 return false;
             }
+            // A song the editor's browser opened brings its own scope.
+            if let Some(scope) = self.view.open_scope.take() {
+                self.scope = scope;
+            }
             let prepared = prepare(
                 self.editor.state(),
                 self.rate,
                 &self.handle,
                 self.epoch,
                 1.0,
+                &self.scope,
             );
             let (mut session, delivery, cc, reports, banks) = match prepared {
                 Ok(prepared) => prepared,
@@ -244,7 +252,7 @@ impl Control {
         }
         let changed = self.patch != *self.editor.state();
         if changed && self.rejected.as_ref() != Some(self.editor.state()) {
-            if let Err(error) = sound_state::validate_patch(self.editor.state()) {
+            if let Err(error) = sound_state::validate_patch_in(self.editor.state(), &self.scope) {
                 self.rejected = Some(self.editor.state().clone());
                 self.editor.take_dirty();
                 self.view.last_message = Some(error);
@@ -254,9 +262,12 @@ impl Control {
             // Standalone deliberately permits existing runtime controls after a failed graph.
             // Plugin recall requires the entire candidate to compile before accepting it.
             if self.rejected.is_some() {
-                if let Err(error) =
-                    kabl_engine::compile::compile(self.editor.state(), self.rate, VOICES)
-                {
+                if let Err(error) = kabl_engine::compile::compile_scoped(
+                    self.editor.state(),
+                    self.rate,
+                    VOICES,
+                    &self.scope.detached(),
+                ) {
                     self.rejected = Some(self.editor.state().clone());
                     self.editor.take_dirty();
                     self.view.last_message = Some(error.to_string());
@@ -293,19 +304,47 @@ impl Control {
     }
 }
 
+/// The code scope for a state being loaded. A plugin has no dialog at this point (the host
+/// restores a project, often with no editor open), so the one-time Open/Cancel of the app
+/// cannot be asked: code the user has already refused in the app (a remembered Cancel) opens as
+/// stand-ins, and everything else runs in the same sandbox the app uses (no files, no network,
+/// budgeted time). Kinds nothing provides become stand-ins, so a project always opens.
+fn open_code(
+    code: Option<&kabl_core::embedded::Embedded>,
+    patch: &kabl_core::PatchState,
+    trust: &std::collections::BTreeMap<String, bool>,
+) -> kabl_modules::code::CodeScope {
+    use kabl_standalone::code_load;
+    let scope = match code {
+        Some(code) => {
+            let refused = kabl_ui::code_notice::gate(&kabl_ui::code_notice::entries(code), trust)
+                == kabl_ui::code_notice::Gate::Refuse;
+            if refused {
+                code_load::decline(code, patch)
+            } else {
+                code_load::register(code, patch)
+            }
+        }
+        None => kabl_modules::code::CodeScope::new(),
+    };
+    code_load::stand_in_missing_in(patch, &scope)
+}
+
 fn prepare(
     patch: &kabl_core::PatchState,
     rate: f32,
     handle: &Handle,
     epoch: u64,
     gain: f32,
+    scope: &kabl_modules::code::CodeScope,
 ) -> Result<PreparedSession, String> {
-    sound_state::validate_patch(patch)?;
-    let mut engine = PatchEngine::new(handle, patch, rate, VOICES).map_err(|e| e.to_string())?;
+    sound_state::validate_patch_in(patch, scope)?;
+    let mut engine =
+        PatchEngine::new_scoped(handle, patch, rate, VOICES, scope).map_err(|e| e.to_string())?;
     engine.reset();
     let (tx, rx) = rtrb::RingBuffer::new(kabl_ui::control::QUEUE);
     let feedback = Arc::new(Feedback::default());
-    let delivery = Delivery::new(
+    let mut delivery = Delivery::new(
         Some(tx),
         handle.clone(),
         feedback.clone(),
@@ -313,6 +352,7 @@ fn prepare(
         VOICES,
         Some(patch),
     );
+    delivery.scope = Some(scope.clone());
     let (cc_tx, cc_rx) = rtrb::RingBuffer::new(256);
     let (reports_tx, reports_rx) = rtrb::RingBuffer::new(256);
     let (banks_tx, banks_rx) = rtrb::RingBuffer::new(4);
@@ -423,20 +463,58 @@ impl Shared {
             lanes: c.lanes.clone(),
             slot_values: std::array::from_fn(|i| self.native_value(i + 1, false)),
             host_clock: self.native_value(17, false) >= 0.5,
+            code: None,
         }
+    }
+
+    /// [`Shared::snapshot`] for saving: also carries the code of the custom modules the patch
+    /// uses and their current settings, asked of the running graph (bounded wait; an engine that
+    /// is not running leaves the last known settings).
+    fn snapshot_for_save(&self) -> SoundState {
+        let mut state = self.snapshot();
+        let scope = self.control.lock().unwrap().scope.clone();
+        let code = kabl_standalone::code_load::embedded_for(
+            &state.patch,
+            &scope,
+            std::time::Duration::from_millis(100),
+        );
+        if !code.is_empty() {
+            state.version = 6;
+            state.code = Some(sound_state::encode_code(&code));
+        }
+        state
     }
 
     /// Main-thread CLAP state load. All validation, compilation and queue checks precede
     /// mutation. Session publication is the single audible transaction boundary.
     fn load(&self, state: SoundState) -> Result<(), String> {
         state.validate()?;
+        let code = state.embedded()?;
         let mut c = self.control.lock().unwrap();
         if c.tx.slots() == 0 {
             return Err("State queue full; previous sound retained".into());
         }
         let epoch = c.epoch + 1;
-        let (mut session, delivery, cc, reports, banks) =
-            prepare(&state.patch, c.rate, &c.handle, epoch, state.output_gain)?;
+        // This song's own code scope. Blobs are registered by content, so a failed load below
+        // leaves the previous sound, and its scope, untouched.
+        let trust = c
+            .view
+            .library
+            .as_ref()
+            .map(|l| l.prefs.code_trust.clone())
+            .unwrap_or_default();
+        let scope = open_code(code.as_ref(), &state.patch, &trust);
+        let (mut session, delivery, cc, reports, banks) = prepare(
+            &state.patch,
+            c.rate,
+            &c.handle,
+            epoch,
+            state.output_gain,
+            &scope,
+        )?;
+        for note in scope.take_notes() {
+            c.view.last_message = Some(note);
+        }
         session.bank = automation::bank(&state.patch, &state.lanes);
         let published_bank = session.bank;
         session.host_clock = state.host_clock;
@@ -454,6 +532,7 @@ impl Shared {
         c.published_bank = published_bank;
         c.clear_reports();
         c.patch = state.patch;
+        c.scope = scope;
         c.editor = editor;
         c.rejected = None;
         // Keep library and view preferences; discard commands, keys and CC pickup.
@@ -731,8 +810,9 @@ impl Default for Instrument {
         });
         let collector = Collector::new();
         let handle = collector.handle();
+        let scope = kabl_modules::code::CodeScope::new();
         let (_, delivery, cc, reports, banks) =
-            prepare(&patch, 48000.0, &handle, 0, 1.0).expect("factory patch");
+            prepare(&patch, 48000.0, &handle, 0, 1.0, &scope).expect("factory patch");
         let (tx, loads) = rtrb::RingBuffer::new(2);
         let (midi_tx, midi) = rtrb::RingBuffer::new(1024);
         let shared = Arc::new(Shared {
@@ -748,6 +828,7 @@ impl Default for Instrument {
                 delivery,
                 collector: CollectorGuard(Some(collector)),
                 handle,
+                scope,
                 rate: 48000.0,
                 tx,
                 epoch: 0,
@@ -1081,9 +1162,14 @@ impl Plugin for Instrument {
         let mut c = self.shared.control.lock().unwrap();
         let epoch = c.epoch;
         let gain = self.shared.native_value(0, false);
-        let Ok((mut session, delivery, cc, reports, banks)) =
-            prepare(&c.patch, config.sample_rate, &c.handle, epoch, gain)
-        else {
+        let Ok((mut session, delivery, cc, reports, banks)) = prepare(
+            &c.patch,
+            config.sample_rate,
+            &c.handle,
+            epoch,
+            gain,
+            &c.scope,
+        ) else {
             return false;
         };
         session.bank = automation::bank(&c.patch, &c.lanes);
@@ -1399,7 +1485,7 @@ mod tests {
         p.worker.take().unwrap().join().unwrap();
         let mut c = p.shared.control.lock().unwrap();
         let (session, delivery, cc, reports, banks) =
-            prepare(&c.patch, 48000.0, &c.handle, 0, 1.0).unwrap();
+            prepare(&c.patch, 48000.0, &c.handle, 0, 1.0, &c.scope).unwrap();
         c.banks = banks;
         c.delivery = delivery;
         c.cc = cc;
@@ -1607,7 +1693,7 @@ mod tests {
         }
         assert!(SoundState::decode(&vec![b' '; sound_state::MAX_STATE_BYTES + 1]).is_err());
         let mut state = p.shared.snapshot();
-        state.version = 6;
+        state.version = 7;
         assert!(p.shared.load(state).is_err());
         let mut state = p.shared.snapshot();
         state
@@ -1775,5 +1861,7 @@ mod tests {
     }
 }
 
+#[cfg(test)]
+mod code_tests;
 #[cfg(test)]
 mod host_tests;

@@ -4,7 +4,9 @@ use kabl_core::PatchState;
 use serde::{Deserialize, Serialize};
 
 // Keep the D07 patch bound unchanged; reserve bounded space for the new envelope.
-pub const MAX_STATE_BYTES: usize = 2 * 1024 * 1024 + 8192;
+/// Embedded custom-module code (binary, before hex): every blob, reference and kept setting.
+pub const MAX_CODE_BYTES: usize = 8 * 1024 * 1024;
+pub const MAX_STATE_BYTES: usize = 2 * 1024 * 1024 + 8192 + 2 * MAX_CODE_BYTES;
 const MAX_PATCH_BYTES: usize = 2 * 1024 * 1024 - 1024;
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -18,8 +20,38 @@ pub struct SoundState {
     pub slot_values: [f32; crate::automation::SLOTS],
     #[serde(default)]
     pub host_clock: bool,
+    /// Version 6: the custom-module code the patch uses and its module settings, as the
+    /// lower-case hex of `Embedded::to_bytes`. Absent when the patch has no code modules.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+}
+/// Lower-case hex of `code` for the state.
+pub fn encode_code(code: &kabl_core::embedded::Embedded) -> String {
+    use std::fmt::Write;
+    code.to_bytes().iter().fold(String::new(), |mut s, b| {
+        let _ = write!(s, "{b:02x}");
+        s
+    })
 }
 impl SoundState {
+    /// The embedded code of a version 6 state, parsed and hash-checked.
+    pub fn embedded(&self) -> Result<Option<kabl_core::embedded::Embedded>, String> {
+        let Some(hex) = &self.code else {
+            return Ok(None);
+        };
+        if hex.len() > 2 * MAX_CODE_BYTES || hex.len() % 2 != 0 {
+            return Err("Code section size".into());
+        }
+        let bytes = (0..hex.len())
+            .step_by(2)
+            .map(|i| {
+                hex.get(i..i + 2)
+                    .and_then(|h| u8::from_str_radix(h, 16).ok())
+            })
+            .collect::<Option<Vec<u8>>>()
+            .ok_or("Code section is not hex")?;
+        kabl_core::embedded::Embedded::from_bytes(&bytes).map(Some)
+    }
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
         if bytes.is_empty() || bytes.len() > MAX_STATE_BYTES {
             return Err("State size limit".into());
@@ -33,7 +65,7 @@ impl SoundState {
         Ok(state)
     }
     pub fn validate(&self) -> Result<(), String> {
-        if !matches!(self.version, 1..=5) {
+        if !matches!(self.version, 1..=6) {
             return Err("Unsupported sound state version".into());
         }
         if !self.output_gain.is_finite() || !(0.0..=1.0).contains(&self.output_gain) {
@@ -45,6 +77,9 @@ impl SoundState {
                 || self.slot_values.iter().any(|&v| v != 0.0))
         {
             return Err("Version 1 cannot contain D08 settings".into());
+        }
+        if self.code.is_some() && self.version < 6 {
+            return Err("Code state requires version 6".into());
         }
         if self.version < 3 && !self.patch.composites.is_empty() {
             return Err("Composite state requires version 3".into());
@@ -72,7 +107,14 @@ impl SoundState {
     }
 }
 pub fn validate_patch(p: &PatchState) -> Result<(), String> {
-    kabl_engine::compile::validate_composites(p)?;
+    validate_patch_in(p, &kabl_modules::code::CodeScope::default())
+}
+/// [`validate_patch`] against the code the instance's own scope names.
+pub fn validate_patch_in(
+    p: &PatchState,
+    scope: &kabl_modules::code::CodeScope,
+) -> Result<(), String> {
+    kabl_engine::compile::validate_composites_scoped(p, scope)?;
     kabl_ui::panels::validate(p)?;
     if p.modules.len() > 128 || p.cables.len() > 512 || p.labels.len() > 128 {
         return Err("Patch graph limit".into());
@@ -162,6 +204,7 @@ mod table_tests {
             lanes: Default::default(),
             slot_values: [0.; crate::automation::SLOTS],
             host_clock: false,
+            code: None,
         }
     }
 
@@ -180,7 +223,7 @@ mod table_tests {
             assert!(state(v).validate().is_err(), "version {v}");
         }
         assert!(state(4).validate().is_ok());
-        assert!(state(6).validate().is_err());
+        assert!(state(7).validate().is_err());
     }
 
     #[test]
@@ -250,6 +293,7 @@ mod panel_tests {
             lanes: Default::default(),
             slot_values: [0.; crate::automation::SLOTS],
             host_clock: false,
+            code: None,
         };
         let target = crate::automation::Target {
             module: 3,

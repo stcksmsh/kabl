@@ -663,7 +663,7 @@ fn a_session_with_an_embedded_table_sounds_from_the_first_block() {
     let mut p = tests::instrument();
     {
         let c = p.shared.control.lock().unwrap();
-        let (session, ..) = prepare(&patch, 48000.0, &c.handle, 0, 1.0).unwrap();
+        let (session, ..) = prepare(&patch, 48000.0, &c.handle, 0, 1.0, &c.scope).unwrap();
         p.session = Some(session);
     }
     let note = MidiEvent::parse(Source::Host, &[0x90, 48, 100]).unwrap();

@@ -280,6 +280,10 @@ pub struct UiState {
     /// The last rebuild request came from Load: `main.rs` sends that graph fresh (no state
     /// carry), then clears this.
     pub loaded: bool,
+    /// The code scope of the song the last open or new produced. Whoever builds the graph takes
+    /// it with the load (`control::deliver`, a plugin's own pump): it is the document's, so an
+    /// open that is never accepted changes nothing.
+    pub open_scope: Option<kabl_modules::code::CodeScope>,
     /// Dark mode of the chosen theme.
     pub dark: bool,
     /// Id of the chosen theme in `themes`.
@@ -469,6 +473,7 @@ impl Default for UiState {
             delay_status: HashMap::new(),
             lfo_status: HashMap::new(),
             loaded: false,
+            open_scope: None,
             dark: false,
             theme: style::BUILTIN_A_ID.into(),
             themes: std::sync::Arc::default(),

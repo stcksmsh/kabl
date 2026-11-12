@@ -253,6 +253,20 @@ fn rebuild_for_rate() {
     }
 }
 
+/// How long after a device change the calibration thread waits before measuring.
+const CALIBRATION_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// The calling thread yields to every normal thread (Linux `SCHED_IDLE`); elsewhere the delay
+/// alone applies.
+fn lower_thread_priority() {
+    #[cfg(target_os = "linux")]
+    // SAFETY: `sched_setscheduler` on the calling thread (pid 0) with a valid, zeroed parameter.
+    unsafe {
+        let param = libc::sched_param { sched_priority: 0 };
+        libc::sched_setscheduler(0, libc::SCHED_IDLE, &param);
+    }
+}
+
 static CALIBRATING: AtomicBool = AtomicBool::new(false);
 static CALIBRATED: AtomicBool = AtomicBool::new(false);
 
@@ -263,7 +277,8 @@ pub fn is_calibrated() -> bool {
 
 /// Call at app startup and whenever the audio device changes (sample rate or block size). The
 /// block period is applied at once; the fuel-per-microsecond calibration runs on a background
-/// thread (never the audio thread) and rebalances every module's budget when it finishes.
+/// thread (never the audio thread) and rebalances every module's budget when it finishes. It starts a couple of seconds later at idle
+/// priority so it never overlaps the host's `activate` or first blocks.
 /// Until then budgets use the conservative fallback. A call while a measurement is running only
 /// updates the period.
 pub fn device_changed(sample_rate: f32, block_frames: u32) {
@@ -283,6 +298,11 @@ pub fn device_changed(sample_rate: f32, block_frames: u32) {
     let spawned = std::thread::Builder::new()
         .name("kabl-calibrate".into())
         .spawn(|| {
+            // Measurement is a burst of CPU work: it runs well after the device starts, and
+            // only on idle time, so it cannot disturb the audio thread (a host's timing checks
+            // right after `activate` saw a slowdown when it ran at once).
+            lower_thread_priority();
+            std::thread::sleep(CALIBRATION_DELAY);
             if let Ok(cal) = Calibration::measure(engine()) {
                 // The device may have changed again while measuring: use the latest period.
                 let (sr, blk) = *latest().lock().unwrap_or_else(|e| e.into_inner());

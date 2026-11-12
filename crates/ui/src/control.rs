@@ -96,6 +96,9 @@ pub struct Delivery {
     /// A single structural compiler, outside the Core lock. Newer edits replace its next job.
     pub async_compile: bool,
     pub compile_delay_ms: u64,
+    /// The song's code and settings. `None`: the open song of a single-document front end
+    /// (`host::active_scope`); a plugin instance sets its own so instances never share code.
+    pub scope: Option<kabl_modules::code::CodeScope>,
     compiling: Option<JoinHandle<Result<CompiledPatch, String>>>,
     next_compile: Option<CompileRequest>,
     compile_fresh: bool,
@@ -113,6 +116,12 @@ struct CompileRequest {
 impl Delivery {
     /// `playing`: the document the audio thread's first graph was compiled from, at revision
     /// and generation 1.
+    pub fn code_scope(&self) -> kabl_modules::code::CodeScope {
+        self.scope
+            .clone()
+            .unwrap_or_else(kabl_modules::code::host::active_scope)
+    }
+
     pub fn new(
         tx: Option<rtrb::Producer<ToAudio>>,
         handle: Handle,
@@ -138,6 +147,7 @@ impl Delivery {
             values_sent: 0,
             actions_sent: 0,
             compile_error: None,
+            scope: None,
             counts: Counts::default(),
             async_compile: false,
             compile_delay_ms: 0,
@@ -217,7 +227,7 @@ impl Delivery {
             return Outcome::Compiled;
         }
         let started = std::time::Instant::now();
-        let scope = kabl_modules::code::host::active_scope();
+        let scope = self.code_scope();
         let mut g = match compile_scoped(doc, self.sample_rate, self.voice_count, &scope) {
             Ok(g) => g,
             Err(err) => {
@@ -263,7 +273,7 @@ impl Delivery {
             let voice_count = self.voice_count;
             let delay = self.compile_delay_ms;
             // The open song's code and settings; the graph being built is the live one.
-            let scope = kabl_modules::code::host::active_scope();
+            let scope = self.code_scope();
             self.compiling = Some(
                 std::thread::Builder::new()
                     .name("kabl-graph-compile".into())
@@ -444,6 +454,12 @@ impl Drop for Delivery {
 /// queue refuses is reported, never counted as done.
 pub fn deliver(editor: &mut PatchEditor, ui_state: &mut UiState, d: &mut Delivery) -> Outcome {
     let out = if editor.take_dirty() {
+        if let Some(s) = ui_state.open_scope.take() {
+            match d.scope {
+                Some(_) => d.scope = Some(s),
+                None => kabl_modules::code::host::set_active_scope(s),
+            }
+        }
         let fresh = std::mem::take(&mut ui_state.loaded);
         let stopped = std::mem::take(&mut ui_state.load_stopped);
         d.sync(editor.state(), fresh, stopped)
@@ -463,7 +479,7 @@ pub fn deliver(editor: &mut PatchEditor, ui_state: &mut UiState, d: &mut Deliver
     }
     d.flush();
     // Module settings that could not be loaded or saved: said once, like a stand-in warning.
-    let scope = kabl_modules::code::host::active_scope();
+    let scope = d.code_scope();
     scope.collect();
     let notes = scope.take_notes();
     if !notes.is_empty() {

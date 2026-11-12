@@ -601,7 +601,7 @@ unsafe extern "C" fn save(plugin: *const clap_plugin, stream: *const clap_ostrea
     let Some(b) = bridge(plugin) else {
         return false;
     };
-    let state = b.shared.snapshot();
+    let state = b.shared.snapshot_for_save();
     if state.validate().is_err() {
         return false;
     }

@@ -368,6 +368,26 @@ pub fn read_patch_declined(
     file: &Path,
     trust: &std::collections::BTreeMap<String, bool>,
 ) -> Result<(PatchLog, Vec<crate::code_notice::CodeEntry>), LibError> {
+    let (log, declined, scope) = read_patch_scoped(file, trust)?;
+    // Single-song callers (tests, tools): this is now the open song.
+    kabl_modules::code::host::set_active_scope(scope);
+    Ok((log, declined))
+}
+
+/// [`read_patch_declined`] that leaves the process's open song alone and returns the song's
+/// [`CodeScope`](kabl_modules::code::CodeScope) instead: the document owns it, and whoever
+/// accepts the open makes it current. A read whose result is discarded changes nothing.
+pub fn read_patch_scoped(
+    file: &Path,
+    trust: &std::collections::BTreeMap<String, bool>,
+) -> Result<
+    (
+        PatchLog,
+        Vec<crate::code_notice::CodeEntry>,
+        kabl_modules::code::CodeScope,
+    ),
+    LibError,
+> {
     let mut declined = Vec::new();
     let (log, _, code) = kabl_core::format::load_kabl_full(file)
         .map_err(|e| LibError::Unreadable(format!("{e:?}")))?;
@@ -395,9 +415,7 @@ pub fn read_patch_declined(
         &scope.detached(),
     )
     .map_err(|e| LibError::Uncompilable(e.to_string()))?;
-    // It opens: this is now the open song's code and settings.
-    kabl_modules::code::host::set_active_scope(scope);
-    Ok((log, declined))
+    Ok((log, declined, scope))
 }
 
 /// Whether `p` names a `.kabl` file (by its extension, not by what is on disk).
@@ -575,20 +593,23 @@ impl Library {
         let e = self
             .get(id)
             .ok_or_else(|| LibError::Unreadable(format!("\"{id}\" is no longer in the library")))?;
-        read_patch(&e.dir, &self.prefs.code_trust)
+        read_patch_scoped(&e.dir, &self.prefs.code_trust).map(|(log, _, _)| log)
     }
 
     /// `read` for opening a sound: code the user had declined opens as stand-ins, and that
     /// answer is forgotten so the next open asks again.
-    pub fn read_for_open(&mut self, id: &str) -> Result<PatchLog, LibError> {
+    pub fn read_for_open(
+        &mut self,
+        id: &str,
+    ) -> Result<(PatchLog, kabl_modules::code::CodeScope), LibError> {
         let e = self
             .get(id)
             .ok_or_else(|| LibError::Unreadable(format!("\"{id}\" is no longer in the library")))?;
-        let (log, declined) = read_patch_declined(&e.dir, &self.prefs.code_trust)?;
+        let (log, declined, scope) = read_patch_scoped(&e.dir, &self.prefs.code_trust)?;
         if !declined.is_empty() {
             self.forget_code_trust(&declined);
         }
-        Ok(log)
+        Ok((log, scope))
     }
 
     /// Saves `log` as a user sound named `meta.name`. `replace`: the user sound this save may
