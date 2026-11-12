@@ -12,8 +12,8 @@ Signature share: 4 of 14. Each macro is named for what it does for that groove.
 
 | Preset | Genre | BPM / swing | Character | What plays | Macros (CC 20 up) | Signature | Group |
 |---|---|---|---|---|---|---|---|
-| Copper Mile | French touch | 123 / 28 | filtered disco loop: saw chord stabs and a round bass, phaser, hard pump | kick, clap, hats; bass line; chord stabs; keys play stabs | Filter, Phase, Pump, Room | yes | 1 |
-| Brick Dust | French touch | 126 / 25 | distorted, compressed bass stomp, blunt and dry | kick, snare, hats; overdriven bass; keys play bass | Filter, Dirt, Pump, Room | yes | 1 |
+| Copper Mile | French touch | 123 / 28 | filtered disco loop: saw chord stabs and a round bass, phaser, hard pump | kick, clap, hats; bass line; chord stabs; keys play stabs | Sweep, Swirl, Pump, Room | yes | 1 |
+| Brick Dust | French touch | 126 / 25 | distorted, compressed bass stomp, blunt and dry | kick, snare, hats; overdriven bass; keys play bass | Grind, Squash, Push, Slap | yes | 1 |
 | Ore Cart | techno | 132 / 0 | rolling kick, rumble bass, off-beat hat, one stab | kick, hats, perc; bass; stab | Filter, Rumble, Pump, Space | no | 1 |
 | Stoop Sale | hip hop | 86 / 55 | boom-bap: dusty kick and snare, sub bass, a minor-seventh chord | kick, snare, hats; sub bass; chord | Swing, Dust, Filter, Space | no | 1 |
 | Fault Line | drum and bass | 174 / 0 | two-step breaks, reese bass | kick, snare, hats, ghost snares; reese | Reese, Filter, Hats, Space | no | 1 |
@@ -37,8 +37,8 @@ Clips in `docs/presets/clips/groove/group1/` (`<slug>.flac`, `<slug>.mp3` at 320
 
 | Preset | Macros (CC 20 up) | Listen for |
 |---|---|---|
-| Copper Mile | Filter, Phase, Pump, Room | The loop ducking on every kick; Phase up for swirl on the stabs. |
-| Brick Dust | Filter, Dirt, Pump, Room | Blunt distorted bass hits locked to the kick; Dirt up for more bite. |
+| Copper Mile | Sweep, Swirl, Pump, Room | The loop ducking on every kick; Swirl up for a deeper phaser on the stabs. |
+| Brick Dust | Grind, Squash, Push, Slap | Blunt distorted bass hits locked to the kick; Grind up for a crushed bite. |
 | Ore Cart | Filter, Rumble, Pump, Space | The bass rolling between kicks; Rumble up for more low end. |
 | Stoop Sale | Swing, Dust, Filter, Space | The late, loose off-beats; Swing up to drag them, Dust up for vinyl hiss. |
 | Fault Line | Reese, Filter, Hats, Space | The detuned bass under the break; Hats up for a busier top. |
