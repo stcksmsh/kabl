@@ -205,3 +205,33 @@ fn a_state_with_a_damaged_code_section_is_refused_and_keeps_the_sound() {
     assert!(p.shared.load(state).is_err());
     assert_eq!(serde_json::to_vec(&p.shared.snapshot()).unwrap(), before);
 }
+
+#[test]
+fn a_state_without_code_pins_the_version_registered_when_it_loads() {
+    let kind = "test.pin";
+    // The kind is installed in the process (as another instance's state would have done);
+    // this instance's state, saved before code was embedded, carries none.
+    kabl_modules::code::host::register_blob_as(&module(kind, 1, 0.25), kind, 1).unwrap();
+    let mut legacy = state_with(module(KIND, 1, 0.25), 1);
+    legacy.patch.modules.get_mut(&3).unwrap().kind = kind.into();
+    legacy.code = None;
+    legacy.version = 5;
+    let mut l = tests::instrument();
+    l.shared.load(legacy).unwrap();
+    // Another instance now installs a different version of the same kind.
+    kabl_modules::code::host::register_blob_as(&module(kind, 2, 0.5), kind, 2).unwrap();
+    let saved = l.shared.snapshot_for_save();
+    let code = saved
+        .embedded()
+        .unwrap()
+        .expect("the state it saves embeds its code");
+    assert_eq!(code.blobs().next().unwrap().1.version, 1);
+    assert!(level(&mut l) < 0.3, "still renders version 1");
+}
+
+#[test]
+fn a_state_whose_code_exceeds_the_load_cap_does_not_validate() {
+    let mut state = state_with(module(KIND, 1, 0.25), 1);
+    state.code = Some("0".repeat(2 * sound_state::MAX_CODE_BYTES + 2));
+    assert!(state.validate().is_err());
+}

@@ -327,7 +327,20 @@ fn open_code(
         }
         None => kabl_modules::code::CodeScope::new(),
     };
-    code_load::stand_in_missing_in(patch, &scope)
+    let mut scope = code_load::stand_in_missing_in(patch, &scope);
+    // A kind the state brings no code for but that is installed in the process (a state saved
+    // before it embedded code): pin the version registered now, so another instance
+    // registering a different version later cannot change this one's sound or its next save.
+    for m in patch.modules.values() {
+        if scope.key(&m.kind).is_none() {
+            if let Some((version, wasm)) = kabl_modules::code::host::blob_for(&m.kind) {
+                if let Ok(r) = kabl_modules::code::host::register_blob_as(&wasm, &m.kind, version) {
+                    scope = scope.with(&m.kind, r.key);
+                }
+            }
+        }
+    }
+    scope
 }
 
 fn prepare(

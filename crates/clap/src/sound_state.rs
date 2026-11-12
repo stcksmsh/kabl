@@ -78,6 +78,14 @@ impl SoundState {
         {
             return Err("Version 1 cannot contain D08 settings".into());
         }
+        // The cap a load enforces: a state this build saves must be one it can reload.
+        if self
+            .code
+            .as_ref()
+            .is_some_and(|c| c.len() > 2 * MAX_CODE_BYTES)
+        {
+            return Err("Code section size".into());
+        }
         if self.code.is_some() && self.version < 6 {
             return Err("Code state requires version 6".into());
         }
