@@ -3,7 +3,9 @@
 //!
 //! A module is a type that implements [`Module`], plus one `kabl_module!(MyType);` line. The
 //! macro emits the wasm exports (`init`, `process`, `reset`, `layout_ext`, `state_save`,
-//! `state_load`, `migrate`), the buffer layout and the `kabl.meta` and `kabl.notices` custom sections.
+//! `state_load`, `migrate`), the buffer layout and the `kabl.meta` custom section. `cargo kabl build`
+//! adds the `kabl.notices` section (the Rust toolchain's licence notices) after linking; a blob built
+//! without it has no notice, and `cargo kabl validate` warns.
 //! No `unsafe` in your crate (`#![forbid(unsafe_code)]` works), no allocator, no dependencies.
 //!
 //! ```ignore
@@ -64,25 +66,6 @@ pub const MAX_BLOCK: usize = 2048;
 
 /// Largest transfer buffer the host accepts (64 KiB); a larger `STATE_CAP` is a compile error.
 pub const MAX_STATE_CAP: usize = 64 * 1024;
-
-/// What `kabl.notices` carries: notices for the Rust toolchain code the compiler links into
-/// every module (core, compiler_builtins with its libm, and core's Unicode tables), with the
-/// licence texts copied verbatim from the toolchain (`NOTICE.txt`). Handled automatically: a
-/// creator does nothing.
-pub const NOTICE: &str = include_str!("../NOTICE.txt");
-
-/// `s` as a byte array of exactly `L` bytes (used by the macro to fill the notices section).
-pub const fn str_bytes<const L: usize>(s: &str) -> [u8; L] {
-    let b = s.as_bytes();
-    assert!(b.len() == L);
-    let mut o = [0; L];
-    let mut i = 0;
-    while i < L {
-        o[i] = b[i];
-        i += 1;
-    }
-    o
-}
 
 /// The buffers for one block. Slots follow port declaration order, a width-2 port taking two
 /// consecutive slots. Index constants are yours: write `const CUTOFF_CV: usize = 2;` and check it
@@ -176,9 +159,6 @@ macro_rules! kabl_module {
             #[cfg_attr(target_arch = "wasm32", link_section = "kabl.meta")]
             #[used]
             static META: [u8; <$ty as Module>::META.len] = <$ty as Module>::META.bytes();
-            #[cfg_attr(target_arch = "wasm32", link_section = "kabl.notices")]
-            #[used]
-            static NOTICES: [u8; $crate::NOTICE.len()] = $crate::str_bytes($crate::NOTICE);
 
             #[cfg_attr(target_arch = "wasm32", no_mangle)]
             #[allow(dead_code)]

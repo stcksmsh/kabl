@@ -1,0 +1,23 @@
+[package]
+name = "yourhandle-gain"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "0BSD"
+
+# A module is a wasm cdylib. `cargo kabl build` produces the shippable blob.
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+kabl-module-sdk = { path = "../kabl-module-sdk" }
+
+# Not part of any other workspace.
+[workspace]
+
+[profile.release]
+opt-level = 3
+lto = true
+panic = "abort"
+codegen-units = 1
+strip = "debuginfo"

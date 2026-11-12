@@ -141,27 +141,16 @@ fn check(dir: &Path, file: &str, kind: &str, max_len: usize) {
             "{file}: unexpected meta key `{key}`"
         );
     }
-    let notices = custom("kabl.notices");
-    for heading in [
-        "1. Rust core library.",
-        "2. compiler_builtins.",
-        "3. libm (math routines bundled in compiler_builtins).",
-        "4. Unicode data tables in core",
-        "MIT License (applies to 1, 2 and 3):",
-        "Unicode License v3 (applies to 4):",
-        "UNICODE LICENSE V3",
-        "Permission is hereby granted, free of charge",
-    ] {
-        assert!(
-            notices.contains(heading),
-            "{file}: notices lack `{heading}`"
-        );
-    }
-    // Zeroed statics are .bss: the data segment holds only the two `link_section` statics
-    // (emitted a second time there) plus a little slack, not the ~41 KB of buffers of v0.
+    // The notices are `cargo kabl build`'s job, so a raw build carries none (once, not twice).
     assert!(
-        blob.data_bytes <= meta.len() + notices.len() + 64,
-        "{file}: data section {} B is more than meta + notices",
+        !blob.customs.iter().any(|c| c.0 == "kabl.notices"),
+        "{file}: the macro must not emit kabl.notices"
+    );
+    // Zeroed statics are .bss: the data segment holds only the `kabl.meta` static (emitted a
+    // second time there) plus a little slack, not the ~41 KB of buffers of v0.
+    assert!(
+        blob.data_bytes <= meta.len() + 64,
+        "{file}: data section {} B is more than the meta text",
         blob.data_bytes
     );
     assert!(blob.len <= max_len, "{file}: {} B", blob.len);

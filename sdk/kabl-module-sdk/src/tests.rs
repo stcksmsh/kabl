@@ -41,13 +41,6 @@ mod meta {
     }
 
     #[test]
-    fn notices_carry_the_mit_text() {
-        assert!(NOTICE.contains("Permission is hereby granted"));
-        let b: [u8; NOTICE.len()] = str_bytes(NOTICE);
-        assert_eq!(&b[..], NOTICE.as_bytes());
-    }
-
-    #[test]
     fn port_index_checks_accept_the_right_slots() {
         M.assert_in(0, "in");
         M.assert_in(2, "mod"); // after a width-2 port
