@@ -4,6 +4,9 @@ History of measured numbers. Every PR touching the engine reports ns/block for t
 patches before and after (brief section 3). Filled in as benchmark patches exist (v1 milestone);
 until then, spike-specific measurements are logged here under their own heading.
 
+Note: the spike sources and benches named below (S1 swap test, `potato`, `simd_voices`, `patch_demo`,
+`dyn_dispatch_spike`) were removed in the ablation pass; the numbers are kept as history only.
+
 ## Spike S1 — graph swap / crossfade
 
 See `docs/decisions.md` 2026-09-21 "Spike S1" entry for method and the click-metric dead end.

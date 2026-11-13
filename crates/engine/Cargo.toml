@@ -17,21 +17,4 @@ assert_no_alloc = "1.1.2"
 hound = "3.5.1"
 tempfile = "3.27.0"
 serde_json = "1.0.151"
-criterion = "0.8.2"
 wat = "1"
-
-[[bench]]
-name = "s2_potato"
-harness = false
-
-[[bench]]
-name = "s3_simd_voices"
-harness = false
-
-[[bench]]
-name = "patch_integration"
-harness = false
-
-[[bench]]
-name = "dyn_dispatch_spike"
-harness = false
