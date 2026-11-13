@@ -24,6 +24,6 @@ Build one offline script that flags impulsive discontinuities, limiter pinning/c
 Standing rules: report to "Kabl overseer", do not merge, stop when done.
 
 ## Update: limiter removal (Kosta's decision)
-Done: limiters and the Voice::guard compressor removed, per-preset trims in `crates/ui/examples/preset_trims.inc`, PEAK flag (> -1 dBFS) in `audio_defects.py`, CLICK ignores windows under 16 LSB, `factory_levels_hold_the_target` checks macro sweeps, all clips and tours re-rendered, scan clean (Rubber Band, Rail Yard allowed). Details and the before/after table: `LIMITER-REMOVAL.md`.
+Done: limiters and the Voice::guard compressor removed, per-preset trims in `tools/examples/preset_trims.inc`, PEAK flag (> -1 dBFS) in `audio_defects.py`, CLICK ignores windows under 16 LSB, `factory_levels_hold_the_target` checks macro sweeps, all clips and tours re-rendered, scan clean (Rubber Band, Rail Yard allowed). Details and the before/after table: `LIMITER-REMOVAL.md`.
 Open for Kosta: Deep Field and Salt Flat sit about 1.7 dB under the loudness window (listed in `LOUD_EXCEPTIONS`); fix needs a narrower macro range. Flaky unrelated test: `kabl-standalone` `paused_consumer_keeps_ownership_bounded_and_recovers` (19 vs 16 once in 3 runs).
 Standing rules: report to "Kabl overseer", do not merge, stop when done.

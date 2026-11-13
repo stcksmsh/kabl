@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Renders the pilot clips (docs/presets/clips/*.mp3) and checks each against its WAV.
 
-    cargo build --release -p kabl-ui --example presets_pilot
+    cargo build --release -p kabl-tools --example presets_pilot
     python3 docs/presets/scripts/clips.py
 
 The engine renders 32-bit float WAVs (PP_F32), so there is no 16-bit step; ffmpeg encodes them

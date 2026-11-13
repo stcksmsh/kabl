@@ -3,7 +3,7 @@
 # The app's audio goes to a silent PipeWire null sink and is recorded from its monitor.
 #   pactl load-module module-null-sink sink_name=kabl_rec
 #   packaging/linux/package.sh && tar -xzf target/dist/kabl-*.tar.gz -C /tmp/kabl-pkg
-#   cargo build --release -p kabl-ui --example midi_player
+#   cargo build --release -p kabl-tools --example midi_player
 #   Xvfb :97 -screen 0 1600x1000x24 &
 #   DISPLAY=:97 KABL_BIN=/tmp/kabl-pkg/kabl-0.1.0-linux-x86_64/bin/kabl-ui \
 #     docs/find-play-save/record-walkthrough.sh

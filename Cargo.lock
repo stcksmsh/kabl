@@ -1764,6 +1764,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "kabl-tools"
+version = "0.1.0"
+dependencies = [
+ "basedrop",
+ "eframe",
+ "egui",
+ "hound",
+ "image",
+ "kabl-cables",
+ "kabl-core",
+ "kabl-engine",
+ "kabl-modules",
+ "kabl-standalone",
+ "kabl-ui",
+ "midir",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
+]
+
+[[package]]
 name = "kabl-ui"
 version = "0.1.0"
 dependencies = [

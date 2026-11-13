@@ -188,7 +188,7 @@ Container audio/display as in earlier batches: a session D-Bus, `pipewire`, `wir
 `pipewire-pulse`, `pactl load-module module-null-sink sink_name=kabl_rec`,
 `Xvfb :97 -screen 0 1600x1000x24 &`. Then:
 
-    cargo build --release -p kabl-ui --bin kabl-ui --example midi_player
+    cargo build --release -p kabl-tools --bin kabl-ui --example midi_player
     cargo test --workspace && cargo clippy --workspace --all-targets
     cargo run --release -p kabl-engine --example render_hash -- 20 patches/palette/pad ...
     cargo run --release -p kabl-engine --example transition_compare

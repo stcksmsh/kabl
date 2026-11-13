@@ -1,6 +1,6 @@
 # Pilot presets
 
-Eight presets that test the direction in `BRIEF.md` before the 100-preset batch. They use only modules on master (no module, engine, patch-format or schema change). They are written by `crates/ui/examples/presets_pilot.rs` to `patches/presets/<slug>/` and listed in the `FACTORY` list of `crates/ui/tests/library.rs`.
+Eight presets that test the direction in `BRIEF.md` before the 100-preset batch. They use only modules on master (no module, engine, patch-format or schema change). They are written by `tools/examples/presets_pilot.rs` to `patches/presets/<slug>/` and listed in the `FACTORY` list of `crates/ui/tests/library.rs`.
 
 Kosta listened to the first version and gave a verdict per preset; the second round (this one) answers it. The author of the pilot can render and measure but not hear, so everything below about sound is what the signal chain is built to do and what the renders measure; Kosta's ears decide.
 

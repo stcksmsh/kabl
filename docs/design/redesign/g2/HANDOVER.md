@@ -14,7 +14,7 @@ G2 (PLAN §3, §6, §7 incl. Cables, §9.1 G2, §9.6-9.8, §10 A-kit; verdicts.j
 2. **Cable capture set** (PLAN §7 Cables): simple, Composition, stereo, functional x classic vs both defaults x 100 / 58 % x 1440x900 and 1180x680, for Kosta's side-by-side. If the new look loses anywhere, ship classic with the new tokens only.
 3. **Mesh cache** per (cable, zoom, theme) and per (theme, width, zoom tier) for faces; then PLAN §9.8 gate (below).
 4. **Face styles `graphite` and `aluminium`** (basic). They need a per-style face fill and ink (the faces use `roles.surface` and `roles.text` today), so add a `FaceSlots` fill/ink slot first; `theme.rs::theme()` maps it.
-5. **Quiet-box bench re-run** (`KABL_BENCH_THEME=kabl.line_solid cargo run --release -p kabl-ui --example bench_chrome 300 live`; also `kabl.satin`). Gate: Composition median < 8 ms, max < 16 ms at 1440x900, and 1180x680. Baseline (G0, quiet): 8.7 / 16.7 ms and 5.3 / 9.2 ms (light/dark medians 8.7 / 9.1 and 5.3 / 5.3). My runs on 2026-11-01 ran at load average 20-60: line_solid 8.3 / 10.1 and 5.1 / 5.5 ms medians, not trustworthy.
+5. **Quiet-box bench re-run** (`KABL_BENCH_THEME=kabl.line_solid cargo run --release -p kabl-tools --example bench_chrome 300 live`; also `kabl.satin`). Gate: Composition median < 8 ms, max < 16 ms at 1440x900, and 1180x680. Baseline (G0, quiet): 8.7 / 16.7 ms and 5.3 / 9.2 ms (light/dark medians 8.7 / 9.1 and 5.3 / 5.3). My runs on 2026-11-01 ran at load average 20-60: line_solid 8.3 / 10.1 and 5.1 / 5.5 ms medians, not trustworthy.
 6. Faces do not call the tray, stripe or stereo-jack recipes yet: that is G3 (family agents) and G6.
 
 ## Token proposals (all need Kosta; status)

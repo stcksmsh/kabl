@@ -7,7 +7,7 @@ Finish 15 keys and plucks: rename keys Copper Wire (slug clash with bass Copper 
 
 ## Done
 - Rename: keys Copper Wire is now Brass Filament (`brass-filament`); master's bass Copper Wire kept.
-- Generator `crates/ui/examples/presets_keys_pluck/group2.rs`; new check `presets_keys_pluck moves [slug]` (each macro alone at 0 and at 1, difference in dB below the louder render; under -40 dB prints FLAT). No preset is FLAT.
+- Generator `tools/examples/presets_keys_pluck/group2.rs`; new check `presets_keys_pluck moves [slug]` (each macro alone at 0 and at 1, difference in dB below the louder render; under -40 dB prints FLAT). No preset is FLAT.
 - Level test (`levels`; band -19 +- 5.5 loud, peak <= -1.0): all 15 inside, loud -17.0 (Willow) to -20.9 (Spinet), peaks -1.5 to -5.3.
 - Tests: `cargo test -p kabl-ui --test library --test factory_bank` pass; fmt and clippy clean.
 - Clips and tour: `docs/presets/clips/keys-pluck/group2/` (FLAC + 320k mp3 per preset, mp3 checked against the float WAV; `tour.flac`, `tour.txt`).

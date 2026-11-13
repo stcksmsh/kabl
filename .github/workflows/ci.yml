@@ -26,7 +26,7 @@ jobs:
       - name: Formatting
         run: cargo fmt --all -- --check
       - name: Clippy, warnings are errors
-        # Every target except the app_target example; see the script for why.
+        # Every workspace target, including tools/ (not in default-members, so compiled here once).
         run: .github/scripts/clippy.sh
 
   audio-defects:
