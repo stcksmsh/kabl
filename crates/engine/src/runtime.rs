@@ -18,7 +18,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use basedrop::Owned;
 use kabl_core::{CableId, ModuleId, PatchState, PortRef};
-use kabl_modules::{registry, ModuleInfo};
+use kabl_modules::registry;
 
 use crate::compile::{CompiledPatch, DEFAULT_ROUTE_AMOUNT};
 use crate::patch_engine::Command;
