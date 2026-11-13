@@ -227,16 +227,11 @@ pub fn back(ui_state: &mut UiState, now: f64) {
     }
 }
 
-/// `ParamInfo` of `param` on module `id`; an old patch's shared mixer `level` resolves to
-/// channel 1, as the compiler does.
+/// `ParamInfo` of `param` on module `id`.
 pub fn param_of(state: &PatchState, id: ModuleId, param: &str) -> Option<&'static ParamInfo> {
     let m = state.modules.get(&id)?;
     let info = registry::info_for(&m.kind)?;
-    info.params.iter().find(|p| p.name == param).or_else(|| {
-        info.params
-            .iter()
-            .find(|p| registry::legacy_param(info.kind, p.name) == Some(param))
-    })
+    info.params.iter().find(|p| p.name == param)
 }
 
 /// What one cable reaches.

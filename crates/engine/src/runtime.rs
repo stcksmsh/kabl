@@ -138,16 +138,8 @@ pub fn smoothed_by_module(kind: &str, name: &str) -> bool {
 }
 
 /// The value the compiler uses for param `p` of a module with stored `params`.
-fn effective(
-    info: &ModuleInfo,
-    params: &std::collections::BTreeMap<String, f32>,
-    p: &kabl_modules::ParamInfo,
-) -> f32 {
-    params
-        .get(p.name)
-        .or_else(|| registry::legacy_param(info.kind, p.name).and_then(|old| params.get(old)))
-        .copied()
-        .unwrap_or(p.default)
+fn effective(params: &std::collections::BTreeMap<String, f32>, p: &kabl_modules::ParamInfo) -> f32 {
+    params.get(p.name).copied().unwrap_or(p.default)
 }
 
 fn bypassed(c: &kabl_core::CableState) -> bool {
@@ -175,7 +167,7 @@ pub fn runtime_changes(old: &PatchState, new: &PatchState) -> Option<Vec<(Runtim
         }
         let info = registry::info_for(&b.kind)?;
         for (index, p) in info.params.iter().enumerate() {
-            let (x, y) = (effective(info, &a.params, p), effective(info, &b.params, p));
+            let (x, y) = (effective(&a.params, p), effective(&b.params, p));
             if x.to_bits() == y.to_bits() {
                 continue;
             }

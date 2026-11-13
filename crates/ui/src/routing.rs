@@ -184,26 +184,9 @@ pub fn routes_into(state: &PatchState, id: ModuleId, param: &str) -> Vec<RouteVi
     out
 }
 
-/// Whether a route stored as `stored` on module `id` drives `param`, as the compiler reads it:
-/// the same name, or an old patch's pre-rename name (a mixer's shared `level`), which reaches
-/// the first param it names (channel 1).
-pub fn reaches(state: &PatchState, id: ModuleId, stored: &str, param: &str) -> bool {
-    if stored == param {
-        return true;
-    }
-    let Some(info) = state
-        .modules
-        .get(&id)
-        .and_then(|m| registry::info_for(&m.kind))
-    else {
-        return false;
-    };
-    !info.params.iter().any(|p| p.name == stored)
-        && info
-            .params
-            .iter()
-            .find(|p| registry::legacy_param(info.kind, p.name) == Some(stored))
-            .is_some_and(|p| p.name == param)
+/// Whether a route stored as `stored` on module `id` drives `param`.
+pub fn reaches(_state: &PatchState, _id: ModuleId, stored: &str, param: &str) -> bool {
+    stored == param
 }
 
 /// Unclamped knob-travel span one route can add to `base_norm`: `(low, high)`.
@@ -560,17 +543,12 @@ pub(crate) fn inspect(ui_state: &mut UiState, routes: &[RouteView], id: ModuleId
     }
 }
 
-/// The stored base value of `param` on module `id`, or its default. Reads a mixer level from the
-/// pre-rename shared `level` when that is what an old patch stored (as the compiler does).
+/// The stored base value of `param` on module `id`, or its default.
 pub fn base_value(state: &PatchState, id: ModuleId, param: &ParamInfo) -> f32 {
     let Some(m) = state.modules.get(&id) else {
         return param.default;
     };
-    m.params
-        .get(param.name)
-        .or_else(|| registry::legacy_param(&m.kind, param.name).and_then(|old| m.params.get(old)))
-        .copied()
-        .unwrap_or(param.default)
+    m.params.get(param.name).copied().unwrap_or(param.default)
 }
 
 /// Short module name for badges: `LFO`, `ADSR`, `Osc`.
