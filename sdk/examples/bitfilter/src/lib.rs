@@ -59,10 +59,7 @@ impl Module for BitFilter {
         }
         let sr = self.sample_rate;
         let (cutoff, resonance, drive) = (io.param(CUTOFF), io.param(RESONANCE), io.param(DRIVE));
-        let mut cv = 0.0;
-        for i in 0..n {
-            cv += io.input[CUTOFF_CV][i];
-        }
+        let cv: f32 = io.input[CUTOFF_CV][..n].iter().sum();
         let fc = (cutoff * exp2(cv / n as f32)).clamp(5.0, 0.45 * sr);
         let q1 = Q + resonance.clamp(0.0, 1.0) * 9.0;
         let sections = [lowpass(fc, q1, sr), lowpass(fc, Q, sr)];
