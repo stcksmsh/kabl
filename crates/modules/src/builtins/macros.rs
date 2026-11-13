@@ -122,19 +122,15 @@ impl Module for Macro {
     fn process(&mut self, io: &mut ProcessIo) {
         let n = io.block_len();
         let k = 1.0 - (-1.0 / (TAU_S * self.sample_rate)).exp();
-        for m in 0..MACROS {
+        for (m, slot) in self.v.iter_mut().enumerate() {
             let target = io.param(m).at(0).clamp(0.0, 1.0);
-            let mut v = if self.v[m].is_nan() {
-                target
-            } else {
-                self.v[m]
-            };
+            let mut v = if slot.is_nan() { target } else { *slot };
             for o in io.output(m)[..n].iter_mut() {
                 v += (target - v) * k;
                 *o = v;
             }
             // f32 stalls a few 1e-5 short of the target; settle exactly there.
-            self.v[m] = if (v - target).abs() < 1e-4 { target } else { v };
+            *slot = if (v - target).abs() < 1e-4 { target } else { v };
         }
     }
 
