@@ -8,8 +8,11 @@ Task: offline harness inside the GPL `cargo kabl` binary (spec: docs/product-res
 - Template: `fault-trap`/`fault-spin`/`fault-nan` features. Trap and spin fire only on non-zero input: the host's load-time priming block is silent, and an always-trapping module is refused at load.
 - CI step runs `cargo kabl test` on the template. Local: fmt, clippy -D warnings, cargo-kabl tests, template tests green; end-to-end run on the template all ok.
 
+- Newer stable clippy broke `lint`/`sdk` on unrelated code (`needless_range_loop`); fixed in audio_in, bitfilter example, drum_grid, macros (a2659f43, 13822083). Local `cargo +1.99.0 clippy --workspace --all-targets -- -D warnings` is clean (default stable 1.93 is too old to show them). Run `+1.99.0` before pushing.
+- On a2659f43 all checks passed except `lint`; CI for 13822083 was pending when stopped.
+
 ## Remaining
-1. `gh pr checks 141`; wait for ALL green (not checked locally: full workspace debug tests, allocation check).
+1. `gh pr checks 141` (right after a push it says `no checks`; wait a minute); need ALL green.
 2. Send `DONE 141 <commit>` to "Kabl overseer"; Kosta marks ready.
 3. Codex round: comment `@codex review` after each fix push; fix valid findings, reply on each thread, until thumbs-up. Then `DONE 141 <commit> codex clean`, cargo clean, do not merge.
 
