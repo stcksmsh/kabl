@@ -366,6 +366,7 @@ fn summary(t_stats: LaneStats, lanes: usize) -> inspect::Summary {
     r.lanes = lanes as u8;
     r.lanes_total = lanes as u16;
     r.voiced = lanes > 1;
+    #[allow(clippy::needless_range_loop)]
     for l in 0..lanes {
         r.lane[l] = t_stats;
     }
