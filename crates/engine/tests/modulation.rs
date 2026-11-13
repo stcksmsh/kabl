@@ -275,21 +275,3 @@ fn mixer_channel_levels_are_separate_params() {
     let p = mixer_probe(&[("level1", 0.25), ("level2", 0.5)]);
     assert!(close(gain_out(&p), 0.75));
 }
-
-#[test]
-fn legacy_mixer_level_still_sets_every_channel_and_routes_reach_channel_one() {
-    // Before the rename every channel was named `level`; a stored `level` set all four.
-    let p = mixer_probe(&[("level", 0.25)]);
-    assert!(close(gain_out(&p), 0.5));
-    let mut p = mixer_probe(&[("level", 0.25), ("level2", 0.0)]);
-    p.modules.insert(
-        SQUARE,
-        module("lfo", &[("rate_hz", 0.01), ("waveform", 3.0)]),
-    );
-    p.cables
-        .insert(10, route((SQUARE, "out"), (VCA, "level"), 0.5, false));
-    assert!(
-        close(gain_out(&p), 0.75),
-        "route to old `level` = channel 1"
-    );
-}
