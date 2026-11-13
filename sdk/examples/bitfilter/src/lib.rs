@@ -60,6 +60,7 @@ impl Module for BitFilter {
         let sr = self.sample_rate;
         let (cutoff, resonance, drive) = (io.param(CUTOFF), io.param(RESONANCE), io.param(DRIVE));
         let mut cv = 0.0;
+        #[allow(clippy::needless_range_loop)]
         for i in 0..n {
             cv += io.input[CUTOFF_CV][i];
         }
