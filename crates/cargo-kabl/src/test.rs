@@ -290,7 +290,13 @@ fn package<'a>(
                 .is_some_and(|c| c.iter().any(|k| k == "cdylib"))
         })
     };
-    let mut cdylibs = pkgs().filter(is_cdylib);
+    // Only the members a plain `cargo build` at the root selects (`default-members`, else all).
+    let selected = |p: &&serde_json::Value| {
+        meta["workspace_default_members"]
+            .as_array()
+            .is_none_or(|d| d.contains(&p["id"]))
+    };
+    let mut cdylibs = pkgs().filter(selected).filter(is_cdylib);
     match (cdylibs.next(), cdylibs.next()) {
         (Some(p), None) => Ok(p),
         _ => Err("cannot tell which package is the module; pick one with `--package`".into()),
@@ -458,6 +464,7 @@ mod tests {
         let pkg = |name: &str, kind: &str| {
             serde_json::json!({
                 "name": name,
+                "id": name,
                 "manifest_path": format!("/ws/{name}/Cargo.toml"),
                 "targets": [{ "crate_types": [kind] }],
             })
@@ -474,5 +481,11 @@ mod tests {
         assert_eq!(package(&one, None, own).unwrap()["name"], "helper");
         let two = serde_json::json!({ "packages": [pkg("a", "cdylib"), pkg("b", "cdylib")] });
         assert!(package(&two, None, root).is_err());
+        // `default-members = ["a"]`: the build at the root makes only `a`.
+        let dm = serde_json::json!({
+            "packages": [pkg("a", "cdylib"), pkg("b", "cdylib")],
+            "workspace_default_members": ["a"],
+        });
+        assert_eq!(package(&dm, None, root).unwrap()["name"], "a");
     }
 }
