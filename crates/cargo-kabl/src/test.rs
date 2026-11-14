@@ -259,18 +259,42 @@ fn features(args: &build::Args) -> Result<Vec<String>, String> {
         .map_err(|e| format!("cargo metadata: {e}"))?;
     let v: serde_json::Value =
         serde_json::from_slice(&out.stdout).map_err(|e| format!("cargo metadata: {e}"))?;
-    let pkg = v["packages"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|p| match &args.package {
-            Some(n) => p["name"] == n.as_str(),
-            None => p["manifest_path"].as_str().map(Path::new) == Some(manifest.as_path()),
-        });
-    Ok(pkg
-        .and_then(|p| p["features"].as_object())
+    let pkg = package(&v, args.package.as_deref(), &manifest)?;
+    Ok(pkg["features"]
+        .as_object()
         .map(|f| f.keys().cloned().collect())
         .unwrap_or_default())
+}
+
+/// The package the build compiles: the named one, else the manifest's own, else (a virtual
+/// workspace root) the only member that builds a cdylib. No silent miss: a package that cannot
+/// be resolved is an error, so the fault checks are never skipped by accident.
+fn package<'a>(
+    meta: &'a serde_json::Value,
+    name: Option<&str>,
+    manifest: &Path,
+) -> Result<&'a serde_json::Value, String> {
+    let pkgs = || meta["packages"].as_array().into_iter().flatten();
+    if let Some(n) = name {
+        return pkgs()
+            .find(|p| p["name"] == n)
+            .ok_or_else(|| format!("no package `{n}` in the workspace"));
+    }
+    if let Some(p) = pkgs().find(|p| p["manifest_path"].as_str().map(Path::new) == Some(manifest)) {
+        return Ok(p);
+    }
+    let is_cdylib = |p: &&serde_json::Value| {
+        p["targets"].as_array().into_iter().flatten().any(|t| {
+            t["crate_types"]
+                .as_array()
+                .is_some_and(|c| c.iter().any(|k| k == "cdylib"))
+        })
+    };
+    let mut cdylibs = pkgs().filter(is_cdylib);
+    match (cdylibs.next(), cdylibs.next()) {
+        (Some(p), None) => Ok(p),
+        _ => Err("cannot tell which package is the module; pick one with `--package`".into()),
+    }
 }
 
 /// Builds the module once per fault feature the crate has; each must be reported as its fault.
@@ -427,5 +451,28 @@ mod tests {
         let c = module(leaky);
         let _g = FtzGuard::new();
         assert!(reset(&c, &c.meta().clone()).is_err());
+    }
+
+    #[test]
+    fn virtual_workspace_root_resolves_its_one_module() {
+        let pkg = |name: &str, kind: &str| {
+            serde_json::json!({
+                "name": name,
+                "manifest_path": format!("/ws/{name}/Cargo.toml"),
+                "targets": [{ "crate_types": [kind] }],
+            })
+        };
+        let root = Path::new("/ws/Cargo.toml");
+        let one = serde_json::json!({ "packages": [pkg("helper", "lib"), pkg("m", "cdylib")] });
+        assert_eq!(package(&one, None, root).unwrap()["name"], "m");
+        assert_eq!(
+            package(&one, Some("helper"), root).unwrap()["name"],
+            "helper"
+        );
+        assert!(package(&one, Some("nope"), root).is_err());
+        let own = Path::new("/ws/helper/Cargo.toml");
+        assert_eq!(package(&one, None, own).unwrap()["name"], "helper");
+        let two = serde_json::json!({ "packages": [pkg("a", "cdylib"), pkg("b", "cdylib")] });
+        assert!(package(&two, None, root).is_err());
     }
 }
