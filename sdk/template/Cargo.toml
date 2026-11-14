@@ -12,6 +12,13 @@ crate-type = ["cdylib"]
 [dependencies]
 kabl-module-sdk = { path = "../kabl-module-sdk" }
 
+# Fault builds for `cargo kabl test`: it builds each one and checks the host reports the right
+# fault. Delete these and the `fault-` lines in `process` if you do not want them.
+[features]
+fault-trap = []
+fault-spin = []
+fault-nan = []
+
 # Not part of any other workspace.
 [workspace]
 
