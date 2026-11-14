@@ -91,21 +91,8 @@ pub enum CableView {
     Hidden,
 }
 
-/// Colours routes cycle through by `CableId`, so each source of a multi-source knob keeps one
-/// colour across its lead, lane, ring and drawer row.
-const CABLE_COLORS: &[Color32] = &[
-    Color32::from_rgb(220, 80, 80),
-    Color32::from_rgb(80, 140, 220),
-    Color32::from_rgb(90, 200, 120),
-    Color32::from_rgb(230, 190, 60),
-    Color32::from_rgb(180, 100, 220),
-    Color32::from_rgb(230, 140, 70),
-    Color32::from_rgb(80, 200, 200),
-    Color32::from_rgb(230, 110, 170),
-];
-
-pub(crate) fn cable_color(id: CableId) -> Color32 {
-    CABLE_COLORS[(id as usize) % CABLE_COLORS.len()]
+pub(crate) fn cable_color(st: &Style, id: CableId) -> Color32 {
+    st.route_colors[(id as usize) % st.route_colors.len()]
 }
 
 /// World (rack units at 100 %) to screen.
@@ -4512,7 +4499,7 @@ struct Run<'a> {
     c: &'a kabl_core::CableState,
     /// A route lead into a knob rather than a jack-to-jack cable.
     route: bool,
-    pts: Vec<Pos2>,
+    pts: std::sync::Arc<Vec<Pos2>>,
 }
 
 /// Jack cables and route leads. `only`: just the leads into that module's floating area.
@@ -4589,7 +4576,14 @@ fn draw_cables(
             if only.is_none() {
                 ui_state.cable_ends.push((xf.inv(a), xf.inv(b)));
             }
-            let pts = cable_look::points(a, b, z, slots.sag);
+            let pts = cable_look::points_cached(
+                &ctx,
+                Id::new(("kabl-cable-pts", cable_id, false)),
+                a,
+                b,
+                z,
+                slots.sag,
+            );
             runs.push(Run {
                 id: *cable_id,
                 c,
@@ -4611,7 +4605,14 @@ fn draw_cables(
         if only.is_none() {
             ui_state.cable_ends.push((xf.inv(a), xf.inv(*pos)));
         }
-        let pts = cable_look::points(a, *pos, z, slots.sag);
+        let pts = cable_look::points_cached(
+            &ctx,
+            Id::new(("kabl-cable-pts", cable_id, true)),
+            a,
+            *pos,
+            z,
+            slots.sag,
+        );
         runs.push(Run {
             id: *cable_id,
             c,
@@ -4659,7 +4660,7 @@ fn draw_cables(
         .iter()
         .map(|r| {
             if r.route {
-                cable_color(r.id)
+                cable_color(&st, r.id)
             } else {
                 port_color(th, editor, &r.c.from)
             }
@@ -4704,19 +4705,34 @@ fn draw_cables(
         let mid = r.pts[r.pts.len() / 2];
         let steps = kabl_cables::Settings::from_params(&r.c.params);
         let len = kabl_cables::slot_value(&r.c.params, 0) as usize;
+        let clock = pattern::clock_pos(editor, ui_state);
+        // Some(phase) when this cable carries a gate or clock: where its light is, 0..=1.
+        let mut carries: Option<f32> = None;
         if themed && routing::is_functional(r.c) && len > 0 {
             let seed = kabl_cables::seed_of(r.id);
             let on: Vec<bool> = (0..len)
                 .map(|k| steps.level_at(seed, k as u64) > 0.0)
                 .collect();
-            cable_look::beads(&mut top, &st, &r.pts, col, th.sel, &on, None, z);
-        } else if routing::is_functional(r.c) {
-            top.extend(routing::functional_mark(
-                r.pts[r.pts.len() / 3],
-                z,
-                th.sel,
-                th.panel.gamma_multiply(0.85),
-            ));
+            let step = pattern::playing_step(editor, ui_state, len);
+            cable_look::beads(&mut top, &st, &r.pts, col, th.sel, &on, step, z);
+            carries = Some(clock.map_or(0.0, |p| (p / len as f64).fract() as f32));
+        } else {
+            if routing::is_functional(r.c) {
+                top.extend(routing::functional_mark(
+                    r.pts[r.pts.len() / 3],
+                    z,
+                    th.sel,
+                    th.panel.gamma_multiply(0.85),
+                ));
+            }
+            if themed && !r.route && bases[i] == th.gate {
+                carries = Some(clock.map_or(0.0, |p| p.fract() as f32));
+            }
+        }
+        if let Some(t) = carries {
+            let id = Id::new(("kabl-cable-light", r.id));
+            let k = kit::smooth_to(&ctx, id, f32::from(clock.is_some()), st.motion.glide);
+            cable_look::light(&mut top, &r.pts, col, t, k * alpha, z);
         }
         let hit = Rect::from_center_size(mid, EguiVec2::splat(12.0));
         if r.route {

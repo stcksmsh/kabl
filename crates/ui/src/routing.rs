@@ -817,7 +817,7 @@ pub(crate) fn param_knob(
             let color = if rt.bypass {
                 BYPASS_GREY
             } else {
-                cable_color(rt.cable)
+                cable_color(&ui_state.style, rt.cable)
             };
             arc(
                 painter,
@@ -893,7 +893,7 @@ pub(crate) fn param_knob(
             let color = if sel.bypass {
                 BYPASS_GREY
             } else {
-                cable_color(sel.cable)
+                cable_color(&ui_state.style, sel.cable)
             };
             arc(
                 painter,
@@ -940,7 +940,7 @@ pub(crate) fn param_knob(
             let c = if rt.bypass {
                 BYPASS_GREY
             } else {
-                cable_color(rt.cable)
+                cable_color(&ui_state.style, rt.cable)
             };
             painter.circle_filled(p, 5.0 * z, c.lerp_to_gamma(Color32::BLACK, 0.45));
             painter.circle_filled(p, 3.4 * z, c);
@@ -1151,7 +1151,7 @@ fn source_lanes(
         let color = if rt.bypass {
             BYPASS_GREY
         } else {
-            cable_color(rt.cable)
+            cable_color(&ui_state.style, rt.cable)
         };
         arc(
             &top,
@@ -1576,7 +1576,7 @@ pub(crate) fn drawer(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut 
         let dot = if rt.bypass {
             BYPASS_GREY
         } else {
-            cable_color(rt.cable)
+            cable_color(&ui_state.style, rt.cable)
         };
         let selected = Some(rt.cable) == ui_state.selected_route;
         let e = route_card(
@@ -1924,7 +1924,7 @@ fn cable_route_row(
     let dot = if bypass {
         BYPASS_GREY
     } else {
-        cable_color(route)
+        cable_color(&ui_state.style, route)
     };
     let note = target.then(|| format!("moves {} of cable #{cable}", cable_param_label(param)));
     let e = route_card(
