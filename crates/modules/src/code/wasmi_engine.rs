@@ -72,6 +72,17 @@ impl WasmiEngine {
         Ok(meta)
     }
 
+    /// The `abi_minor` a blob declares (0 when absent), for `cargo kabl` to record in the manifest.
+    pub fn read_abi_minor(&self, wasm: &[u8]) -> Result<u32, String> {
+        let module = Module::new(&self.engine, wasm).map_err(|e| e.to_string())?;
+        let section = module
+            .custom_sections()
+            .find(|s| s.name() == META_SECTION)
+            .ok_or_else(|| format!("missing `{META_SECTION}` section"))?;
+        let text = std::str::from_utf8(section.data()).map_err(|_| "metadata is not UTF-8")?;
+        abi_minor_of(text)
+    }
+
     /// Compiles on a background thread (the audio thread never compiles).
     pub fn compile_async(
         self: &Arc<Self>,

@@ -44,12 +44,14 @@ pub fn write(wasm: &[u8], manifest_path: &Path, package: Option<&str>) -> Result
         .filter_map(|a| a.as_str())
         .collect();
 
-    let code = WasmiEngine::new().read_meta(wasm)?;
+    let engine = WasmiEngine::new();
+    let code = engine.read_meta(wasm)?;
+    let abi_minor = engine.read_abi_minor(wasm)?;
     let manifest = Manifest {
         id: code.kind.clone(),
         version: code.version,
         abi_major: ABI_VERSION,
-        abi_minor: 0,
+        abi_minor,
         name: code.name.clone(),
         author: authors.join(", "),
         licence: text("license"),
@@ -82,4 +84,36 @@ pub fn write(wasm: &[u8], manifest_path: &Path, package: Option<&str>) -> Result
     let dest = dest.join(format!("{}-{}.kablmod", code.kind, code.version));
     std::fs::write(&dest, pack.to_bytes()?).map_err(|e| format!("{}: {e}", dest.display()))?;
     Ok(dest)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A throwaway 0BSD crate packs without the wasm target; the manifest carries the blob's
+    /// own `abi_minor`, and the file lands in `<target>/kabl/`.
+    #[test]
+    fn packs_a_blob_with_its_abi_minor() {
+        let dir = std::env::temp_dir().join(format!("kabl-pack-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("src")).unwrap();
+        std::fs::write(dir.join("src/lib.rs"), "").unwrap();
+        std::fs::write(
+            dir.join("Cargo.toml"),
+            "[package]\nname = \"t\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\
+             authors = [\"A\"]\nlicense = \"0BSD\"\n[workspace]\n",
+        )
+        .unwrap();
+        let meta = "kind test.pack\\nversion 1\\nabi_minor 1\\nname T\\nexplain Test.\\ncategory filter\\n\
+                    rate voice\\nwidth 4\\nport in audio in 1\\nport out audio out 1\\nparam gain 0 4 1 linear 0 x\\n";
+        let wasm = wat::parse_str(format!(
+            r#"(module (@custom "kabl.meta" "{meta}") (memory (export "memory") 1))"#
+        ))
+        .unwrap();
+        let out = write(&wasm, &dir.join("Cargo.toml"), None).unwrap();
+        let pack = Package::from_bytes(&std::fs::read(&out).unwrap()).unwrap();
+        assert_eq!(pack.manifest.abi_minor, 1);
+        assert_eq!(pack.manifest.id, "test.pack");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
