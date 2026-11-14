@@ -9,14 +9,14 @@ Done and committed (51a1b0c, plus this checkpoint commit):
 - `crates/ui/src/style/` (`mod.rs`, `builtin.rs`): the theme model from `THEMING.md`: `Style` = colour `Roles` (29), `Sections` palettes, `TypeScale` (7 roles + `section`), spacing, `Radii`, `Shadow`s, `Motion`, recipe `Slots` (all of face, knob, jack, cable, display, controls, chrome), non-themable `Metrics` (hit areas). Pure data, serde-derivable; built-in theme A (light and dark) via `builtin_a(dark)`. Unit tests: TOML round-trip, contrast pairs (4.5), 11 px floor (`TEXT_FLOOR`, `Style::font()` clamps).
 - `crates/ui/src/kit/` (`mod.rs`, `controls.rs`, `containers.rs`, `icons.rs`): widgets reading only from `&Style`: `Button` (Primary/Secondary/Ghost, icon, selected, small, enabled; hover/press/focus/disabled), `icon_button`, `segmented`+`seg`, `toggle`, `slider`, `field` (themed frame around `egui::TextEdit`), `tag`, `bar`, `dropdown`+`menu_item`, `menu_button`, `context_menu`, `Tip` trait (`.tip(st, text)`), `modal`, `card`, `panel_frame`/`bar_frame`/`popover_frame`, `shadow`, `label`/`paragraph`/`section`/`rule`/`gap`, stroke icon set `Ic`, and `apply(ctx, &Style)` which installs the theme into egui visuals (once per theme change).
 - `UiState.style: Arc<Style>` (rebuilt in `show()` when `dark` flips); `theme::install_fonts` now registers Plex Medium, SemiBold, Mono Medium (files in `crates/ui/assets/`); `theme::ensure_fonts` is called from `show()` so the plugin editor gets them too. The old `theme::Theme` (rack faces) is untouched.
-- `crates/ui/examples/bench_chrome.rs`: frame-time bench of `show()` (simple default patch and dense `patches/composition`, both sizes, light/dark, browser + drawer open, includes tessellation).
+- `tools/examples/bench_chrome.rs`: frame-time bench of `show()` (simple default patch and dense `patches/composition`, both sizes, light/dark, browser + drawer open, includes tessellation).
 
 Compiles. `cargo test -p kabl-ui --lib style` passes. **Not yet wired**: `kit` is not used by any chrome code, so behaviour is unchanged; full test suite not re-run after the `style`/fonts/`apply` hook in `show()`.
 
 ## Baselines
 
 - Tests (debug profile; `--release` breaks `runtime_controls` because `assert_no_alloc` is disabled in release): `cargo test -p kabl-ui` at the branch point = **273 passed, 0 failed, 21 ignored**.
-- Frame-time **before** numbers: run `cargo run --release -p kabl-ui --example bench_chrome` from the **design-target** worktree (it has master's UI; the bench file was copied there untracked at `crates/ui/examples/bench_chrome.rs`; delete it afterwards, it is not part of that branch). The run was started at the checkpoint; if its output is lost, rerun. Then run the same in widget-set for "after".
+- Frame-time **before** numbers: run `cargo run --release -p kabl-tools --example bench_chrome` from the **design-target** worktree (it has master's UI; the bench file was copied there untracked at `tools/examples/bench_chrome.rs`; delete it afterwards, it is not part of that branch). The run was started at the checkpoint; if its output is lost, rerun. Then run the same in widget-set for "after".
 
 ## Facts learned about the real app
 
@@ -85,7 +85,7 @@ Committed and pushed on `claude/widget-set`. `cargo test -p kabl-ui` (debug): **
 ### Not done
 - Side rail (deferred: would change canvas size assumptions).
 - Captures: release binary builds; scripts in the job tmp dir (`cap/run.sh`, `drive.py` + Xvfb + openbox) worked once. First capture found and fixed: clipped toolbar row 2, tofu star glyph, slider readout overflow, audition chip overflow, field text alignment. Needs a re-run at 1440x900, 1280x800 light/dark and a scaled display (`WINIT_X11_SCALE_FACTOR=1.5`), compared with `media/a-satin/*rack-sounds*`.
-- Frame times after (`cargo run --release -p kabl-ui --example bench_chrome`).
+- Frame times after (`cargo run --release -p kabl-tools --example bench_chrome`).
 - Strict clippy and rustfmt on touched files.
 - Draft PR #18 exists; overseer report not sent.
 - Out of scope, still stock: module faces, drawer bodies (explain, inspect, compare, recipes, param panel), Perform panel, seq/cue combo boxes, Composites windows.

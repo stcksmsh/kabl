@@ -4,7 +4,7 @@
 # The app's audio goes to a silent PipeWire null sink and is recorded from its monitor; the
 # controller is the fifo stand-in (KABL_MIDI_PIPE), not hardware.
 #   pactl load-module module-null-sink sink_name=kabl_rec
-#   cargo build --release -p kabl-ui --bin kabl-ui --example midi_player
+#   cargo build --release -p kabl-tools --bin kabl-ui --example midi_player
 #   Xvfb :97 -screen 0 1600x1000x24 &
 #   DISPLAY=:97 docs/runtime-controls/record-walkthrough.sh
 set -euo pipefail

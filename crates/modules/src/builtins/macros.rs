@@ -122,6 +122,7 @@ impl Module for Macro {
     fn process(&mut self, io: &mut ProcessIo) {
         let n = io.block_len();
         let k = 1.0 - (-1.0 / (TAU_S * self.sample_rate)).exp();
+        #[allow(clippy::needless_range_loop)]
         for m in 0..MACROS {
             let target = io.param(m).at(0).clamp(0.0, 1.0);
             let mut v = if self.v[m].is_nan() {

@@ -13,7 +13,7 @@ tar -C "$OUT" -xzf "$pkg"
 rm -rf "$OUT/pkg"
 app=$(ls -d "$OUT"/kabl-*-linux-*)
 mv "$app" "$OUT/kabl"
-cargo build --release -p kabl-ui --example midi_player -p kabl-engine --example render_midi
+cargo build --release -p kabl-tools --example midi_player -p kabl-engine --example render_midi
 cp target/release/examples/midi_player "$OUT/kabl/bin/"
 python3 docs/midi-timing/scripts/make_demos.py docs/midi-timing/scripts
 cp docs/midi-timing/scripts/{lead,keys,timing}.events docs/midi-timing/scripts/play_events.py "$OUT/demo/"

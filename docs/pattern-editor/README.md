@@ -16,7 +16,7 @@ No theme slot was added: the editor reads `roles`, the type scale, spacing and t
 
 ## Frame time
 
-`cargo run --release -p kabl-ui --example bench_chrome 300 live pattern`: dense Composition, audio on, face taps animating, Routing drawer open on a patterned cable with the playhead moving every frame. Quiet machine, 1440x900: light median 4.1 ms, p95 4.2, max 4.6; dark 4.0, 4.2, 4.7. A second run at load average 9: 5.1, 5.8, 6.5. Without the editor the same bench gives 4.2 / 5.1 / 7.3 on that machine, so the editor adds well under 1 ms. One run during a heavy build spiked (median 11 ms, max 30 ms) and is not representative.
+`cargo run --release -p kabl-tools --example bench_chrome 300 live pattern`: dense Composition, audio on, face taps animating, Routing drawer open on a patterned cable with the playhead moving every frame. Quiet machine, 1440x900: light median 4.1 ms, p95 4.2, max 4.6; dark 4.0, 4.2, 4.7. A second run at load average 9: 5.1, 5.8, 6.5. Without the editor the same bench gives 4.2 / 5.1 / 7.3 on that machine, so the editor adds well under 1 ms. One run during a heavy build spiked (median 11 ms, max 30 ms) and is not representative.
 
 ## Captures (`media/`)
 

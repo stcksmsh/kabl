@@ -185,7 +185,7 @@ Container audio/display (as in earlier batches): a session D-Bus, `pipewire`,
 `wireplumber`, `pipewire-pulse`, `pactl load-module module-null-sink sink_name=kabl_rec`,
 `Xvfb :97 -screen 0 1600x1000x24 &`. Then:
 
-    cargo build --release -p kabl-ui --bin kabl-ui --example midi_player
+    cargo build --release -p kabl-tools --bin kabl-ui --example midi_player
     DISPLAY=:97 docs/signal-inspection/record-walkthrough.sh
     python3 docs/signal-inspection/scripts/gaps.py target/signal-inspection-walkthrough
     DISPLAY=:97 docs/signal-inspection/scripts/shots.sh

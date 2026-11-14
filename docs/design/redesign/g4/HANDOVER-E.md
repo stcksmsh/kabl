@@ -38,7 +38,7 @@ Overseer task: finish #111 first (rebase on origin/master, close or justify each
 - `cargo test` stops at the first failing test binary: use `--no-fail-fast`.
 - Retargeting a PR base via `gh api` was blocked by the permission check.
 - Mockup renders: `/tmp/mockjs/shot.js` (Playwright from `/secondary/Programming/Github/EmojiType/node_modules`, `executablePath: '/usr/bin/google-chrome'`). Call `window.__set({surf, app, size: '1440'|'1180', mode: 'one'})`, screenshot `#out svg`, then resize to the window size. Surface keys: `wavetable`, `seq-editor`, `cues-editor`, `cable-pattern`, `routes`.
-- Captures: `xvfb-run -a -s "-screen 0 1440x900x24" cargo run --release -p kabl-ui --example chrome_capture -- OUT <scene>` with `XDG_CONFIG_HOME=/tmp/wtcfg PIPEWIRE_NODE=kabl_agents PULSE_SINK=kabl_agents`. The mockup's rack zoom: set `self.ui.zoom` at `f == 6` (0.95, or 0.78 below 1280). Put extra modules at y 640 so they sit below the view.
+- Captures: `xvfb-run -a -s "-screen 0 1440x900x24" cargo run --release -p kabl-tools --example chrome_capture -- OUT <scene>` with `XDG_CONFIG_HOME=/tmp/wtcfg PIPEWIRE_NODE=kabl_agents PULSE_SINK=kabl_agents`. The mockup's rack zoom: set `self.ui.zoom` at `f == 6` (0.95, or 0.78 below 1280). Put extra modules at y 640 so they sit below the view.
 - On master, the drawer shows `show_param_panel` only under Inspect. The seq and cues editors also show under Routing through `module_editor` in `drawer()`, and take the whole drawer.
 - `cargo test -p kabl-ui` takes about 10 min after a clean: run it in the background, not under a 590 s timeout.
 - Perf: `bench_chrome 300` with `KABL_BENCH_SIZES=1` and `KABL_BENCH_THEME`. line_solid against satin swings ±7 % between rounds on master itself.

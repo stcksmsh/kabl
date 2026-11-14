@@ -16,7 +16,7 @@ Task: build the G4-SPEC §3 kit parts, icons and tokens not covered by #91 (acce
 - Existing kit already had button, icon_button, field, dropdown (select), slider, segmented, toggle, tag (chip), menu items, popover_frame; reused, not duplicated.
 - `egui::Panel::bottom` must be added before `CentralPanel` or it renders nothing.
 - Shadow layer for `tool_window` must be `Order::Background` or it paints over the window.
-- Capture tool: `claude/g4-capture-tool` (`g4_capture.rs`), sheet: `cargo run --release -p kabl-ui --example g4_parts -- DIR` under xvfb.
+- Capture tool: `claude/g4-capture-tool` (`g4_capture.rs`), sheet: `cargo run --release -p kabl-tools --example g4_parts -- DIR` under xvfb.
 - Paper accent text and accent fill are #91's; sheet shows brown paper accent until it merges.
 
 ## Rules

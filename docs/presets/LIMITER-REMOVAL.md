@@ -3,7 +3,7 @@
 Kosta's decision: no limiter in presets; headroom comes from gain staging.
 
 - Removed the final `limiter` from the pilot, bass-lead, pad and keys-pluck generators (all 62 presets), and Deep Field / Fog Bank's `Voice::guard` compressor (it only protected the limiter).
-- Levels: `crates/ui/examples/preset_trims.inc` holds a per-preset dB trim added to the preset's gain stage at `write` time. Peak rule: at most -1 dBFS on the clip phrases, the chord level test, each macro alone at 1 and all macros at 1.
+- Levels: `tools/examples/preset_trims.inc` holds a per-preset dB trim added to the preset's gain stage at `write` time. Peak rule: at most -1 dBFS on the clip phrases, the chord level test, each macro alone at 1 and all macros at 1.
 - `factory_levels_hold_the_target` checks the macro sweeps for `presets/*`. `audio_defects.py` has a PEAK error flag (> -1 dBFS) and the CLICK rule ignores windows under 16 LSB.
 - Deep Field and Salt Flat: macros at 1 add 6 dB, so the peak rule puts their loudness about 1.7 dB under the -24.5 dBFS window edge (-26.1, -26.2). Listed in `LOUD_EXCEPTIONS`. A fix needs a narrower macro range, not patch gain; Kosta decides.
 - Deep Field with the old 10 s room (limiter gone): float clip clean in the scan, largest second difference near 7.95 s is 0.0017 (median 0.0003, no kink).

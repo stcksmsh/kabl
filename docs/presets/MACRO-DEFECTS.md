@@ -1,6 +1,6 @@
 # Macro defects: peaks and clicks (Groove)
 
-Only the objective defects of `MACRO-AUDIT-GROOVE.md` (#66). The subjective flags (dead top thirds, switch-like Pumps, weak macros) are untouched: Kosta has not listened yet. The macro audit tools (`crates/ui/examples/macro_audit.rs`, `docs/presets/scripts/macro_audit.py`) were copied from the `claude/macro-audit-groove` branch of #66 (not merged: only those two files), so the audit can be rerun here.
+Only the objective defects of `MACRO-AUDIT-GROOVE.md` (#66). The subjective flags (dead top thirds, switch-like Pumps, weak macros) are untouched: Kosta has not listened yet. The macro audit tools (`tools/examples/macro_audit.rs`, `docs/presets/scripts/macro_audit.py`) were copied from the `claude/macro-audit-groove` branch of #66 (not merged: only those two files), so the audit can be rerun here.
 
 ## Peaks (fixed)
 

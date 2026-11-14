@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Macro audit: measures what each macro (CC 20-23) of a category does, from offline renders.
 
-    cargo build --release -p kabl-ui --example macro_audit --example presets_groove
+    cargo build --release -p kabl-tools --example macro_audit --example presets_groove
     target/release/examples/presets_groove phrases scratch/groove-phrases.json
     target/release/examples/macro_audit patches scratch/groove-phrases.json scratch/macro-audit SLUG ...
     python3 docs/presets/scripts/macro_audit.py --category Groove --renders scratch/macro-audit \

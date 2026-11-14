@@ -109,6 +109,7 @@ impl Module for AudioIn {
         let gain = io.param(0);
         for i in 0..n {
             let g = (self.gain.next(gain, i, k).clamp(-24.0, 36.0) * NEPER_PER_DB).exp();
+            #[allow(clippy::needless_range_loop)]
             for ch in 0..2 {
                 let x = self.buf[ch][i] * g;
                 io.output(ch)[i] = if x.is_finite() {

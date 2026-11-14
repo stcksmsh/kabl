@@ -55,18 +55,13 @@ const fn level(name: &'static str) -> ParamInfo {
     }
 }
 
-/// One distinct name per channel. They used to share the name `level`, so a stored `level`
-/// set all four and a route reached only the first; `LEGACY_LEVEL` keeps that meaning for old
-/// patches (see `crate::registry::legacy_param`).
+/// One distinct name per channel.
 const PARAMS: &[ParamInfo] = &[
     level("level1"),
     level("level2"),
     level("level3"),
     level("level4"),
 ];
-
-/// The pre-rename shared param name.
-pub const LEGACY_LEVEL: &str = "level";
 
 pub static MIXER_INFO: ModuleInfo = ModuleInfo {
     kind: "mixer",

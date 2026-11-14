@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
-members = ["crates/*"]
+members = ["crates/*", "tools"]
+# Developer tools (tools/) are built on request only: `cargo test`/`clippy` on the default set skip them.
+default-members = ["crates/*"]
 exclude = ["vendor/nice-plug"]
 
 [workspace.package]

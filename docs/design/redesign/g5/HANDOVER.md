@@ -5,7 +5,7 @@ Task as received from "Kabl overseer": redesign G5 chrome (lib.rs toolbar / draw
 ## Done (draft PRs, all open)
 - #86 `claude/ui-g5-chrome` (toolbar view switch with Sounds, primary Save, status bar in `kabl_ui::show`, `show_with`), #87 `claude/ui-g5-drawer` stacked on #86 (compact overlay drawer, cable-aware fit anchored top-left, drawer tabs / cable list / modulation list / why card, ropes above all content). Overseer retargets #87 when #86 merges.
 - #88 `claude/ui-g5-sounds` (Sounds scene: library, list, detail with macros), #89 `claude/ui-g5-perform` (two-column Perform composition), #90 `claude/ui-g5-perform2` (card styling, `Button::large`). All on master.
-- Tools: `crates/ui/examples/chrome_capture.rs` (scenes x 3 sizes x 2 modes; `KABL_CAPTURE_PATCH=DIR`), sheet scripts in the job tmp dir (not in repo).
+- Tools: `tools/examples/chrome_capture.rs` (scenes x 3 sizes x 2 modes; `KABL_CAPTURE_PATCH=DIR`), sheet scripts in the job tmp dir (not in repo).
 
 ## Review round 2026-11-02 (Kosta: match the mockup closer; cables #87 accepted)
 Done and pushed: #86 toolbar (17b96f8, 2a6f70b, 56e4ccc; metrics in FACTS.md), #88 library column (f8550cf, d0617a9), #90 Perform (card kicker rows with hover tools, big macro knobs, 2x4 scene pads, one Sequences card with a row per sequencer, light-theme knob contrast; #89 merged into #90, close #89). Sheets: docs/design/redesign/g5/{toolbar-fix,sounds-fix,perform-fix}.

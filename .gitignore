@@ -8,3 +8,20 @@ docs/design/build/
 /scratch/
 !crates/modules/assets/wavetables/*.wav
 __pycache__/
+
+# Media of closed doc batches stays on disk, not in git. Kept: the README images, the current
+# redesign batches (g4, g5), and art that code embeds.
+docs/**/*.png
+docs/**/*.jpg
+docs/**/*.jpeg
+docs/**/*.gif
+docs/**/*.webp
+docs/**/*.mp4
+docs/**/*.webm
+docs/**/*.mov
+!docs/design/redesign/g4/**
+!docs/design/redesign/g5/**
+!docs/design/app-target/media/widget-set/1280x800-dark-rack-sounds.webp
+!docs/design/app-target/media/perform/composition-1280x800-dark.webp
+!docs/panel-authoring/examples/art/voice-light.png
+docs/**/*.flac

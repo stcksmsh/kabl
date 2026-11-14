@@ -19,7 +19,7 @@ Task as received from "Kabl overseer": polish G5 PRs against the mockup `docs/de
 ## Facts
 - `git push --force-with-lease` is denied by the auto-mode classifier: push fast-forwards only.
 - Root `CLAUDE.md` is untracked; read it by absolute path. Use plain commands in this worktree.
-- Capture: `PIPEWIRE_NODE=kabl_agents PULSE_SINK=kabl_agents xvfb-run -a -s "-screen 0 1440x900x24" cargo run --release -p kabl-ui --example chrome_capture -- OUTDIR rack`. Scene `drawer` opens the drawer in compact windows. 2x crop recipe: PIL crop of ours and the mockup, paste side by side, resize x2.
+- Capture: `PIPEWIRE_NODE=kabl_agents PULSE_SINK=kabl_agents xvfb-run -a -s "-screen 0 1440x900x24" cargo run --release -p kabl-tools --example chrome_capture -- OUTDIR rack`. Scene `drawer` opens the drawer in compact windows. 2x crop recipe: PIL crop of ours and the mockup, paste side by side, resize x2.
 - Drawer width `DRAWER_W` is 320; compact (below 1280) overlay has a left shadow.
 - Never use `git apply` of `-U0` diffs (it once appended hunks at end of a file).
 

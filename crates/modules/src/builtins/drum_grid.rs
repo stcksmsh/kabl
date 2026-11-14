@@ -437,6 +437,7 @@ impl Module for DrumGrid {
                 let pat = (base + (3.0 * patcv.at(i).clamp(0.0, 1.0)).round() as usize) % PATTERNS;
                 self.fire(io, pat);
             }
+            #[allow(clippy::needless_range_loop)]
             for r in 0..ROWS {
                 io.output(r)[i] = if c_high { self.level[r] } else { 0.0 };
             }

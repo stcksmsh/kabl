@@ -86,7 +86,7 @@ pub use logic::{Comparator, Logic, COMPARATOR_INFO, LOGIC_INFO};
 pub use macros::{Macro, MACROS, MACRO_INFO};
 pub use midi_in::{Change, KeySettings, MidiIn, MIDI_IN_INFO};
 pub use midi_note::{MidiNote, MIDI_NOTE_INFO};
-pub use mixer::{Mixer, LEGACY_LEVEL, MIXER_INFO};
+pub use mixer::{Mixer, MIXER_INFO};
 pub use noise::{Noise, NOISE_INFO};
 pub use osc_fm::{OscFm, FEEDBACK_MAX_RAD, OSC_FM_INFO, RATIO_LABELS};
 pub use osc_fm6::{OscFm6, ALGORITHMS, ALGORITHM_LABELS, FEEDBACK_RAD, MOD_RAD, OPS, OSC_FM6_INFO};

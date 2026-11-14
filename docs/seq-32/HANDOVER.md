@@ -7,7 +7,7 @@ Branch `claude/seq-32` from origin/master (719bcf6; rebase or merge after #63 me
 2. Host exposure (Kosta's rule): sequencer steps are patch data, NOT DAW-automatable. The host sees macros and existing global controls only. Verify how kabl-clap exposes params; if seq steps are exposed today, report it and keep the NEW steps out; do not change existing exposure without asking. Plugin state round-trip (REAPER save/reopen) must stay identical.
 3. UI: minimal paging on the seq face (pages of 8 steps, page selector), no redesign. UI tests.
 4. Tests: length 1..32, pattern switch, polymeter lengths (5, 7, 13, 21, 31), state carry.
-5. Then restore the intended 16-step lines in every groove generator (`crates/ui/examples/presets_groove.rs`, group 1 + 2 + any preset with p9..p16 data silently dropped; grep the other `presets_*.rs`) and re-render; that changes sound, so produce a before/after tour per affected groove. Needs #63 (groove presets) merged or merge `claude/presets-groove-2` in.
+5. Then restore the intended 16-step lines in every groove generator (`tools/examples/presets_groove.rs`, group 1 + 2 + any preset with p9..p16 data silently dropped; grep the other `presets_*.rs`) and re-render; that changes sound, so produce a before/after tour per affected groove. Needs #63 (groove presets) merged or merge `claude/presets-groove-2` in.
 Lint + full tests (debug), draft PR (overseer opens if denied), `cargo clean`, checkpoint, SendMessage "Kabl overseer". Out of scope: visual redesign, the drum block-edge click.
 
 ## Done
