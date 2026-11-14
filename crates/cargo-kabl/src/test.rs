@@ -259,25 +259,42 @@ fn features(args: &build::Args) -> Result<Vec<String>, String> {
         .map_err(|e| format!("cargo metadata: {e}"))?;
     let v: serde_json::Value =
         serde_json::from_slice(&out.stdout).map_err(|e| format!("cargo metadata: {e}"))?;
-    let pkg = package(&v, args.package.as_deref(), &manifest)?;
+    // `-p` takes any package spec (`name`, `name@1.2`, ...): let Cargo resolve it to the id
+    // `cargo metadata` uses.
+    let id = match &args.package {
+        Some(spec) => {
+            let out = Command::new("cargo")
+                .args(["pkgid", "--manifest-path"])
+                .arg(&manifest)
+                .args(["-p", spec])
+                .output()
+                .map_err(|e| format!("cargo pkgid: {e}"))?;
+            if !out.status.success() {
+                return Err(format!("no package `{spec}` in the workspace"));
+            }
+            Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
+        }
+        None => None,
+    };
+    let pkg = package(&v, id.as_deref(), &manifest)?;
     Ok(pkg["features"]
         .as_object()
         .map(|f| f.keys().cloned().collect())
         .unwrap_or_default())
 }
 
-/// The package the build compiles: the named one, else the manifest's own, else (a virtual
+/// The package the build compiles: the one with package id `id` (from `-p`), else the manifest's own, else (a virtual
 /// workspace root) the only member that builds a cdylib. No silent miss: a package that cannot
 /// be resolved is an error, so the fault checks are never skipped by accident.
 fn package<'a>(
     meta: &'a serde_json::Value,
-    name: Option<&str>,
+    id: Option<&str>,
     manifest: &Path,
 ) -> Result<&'a serde_json::Value, String> {
     let pkgs = || meta["packages"].as_array().into_iter().flatten();
-    if let Some(n) = name {
+    if let Some(n) = id {
         return pkgs()
-            .find(|p| p["name"] == n)
+            .find(|p| p["id"] == n)
             .ok_or_else(|| format!("no package `{n}` in the workspace"));
     }
     if let Some(p) = pkgs().find(|p| p["manifest_path"].as_str().map(Path::new) == Some(manifest)) {
