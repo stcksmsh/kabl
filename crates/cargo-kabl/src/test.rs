@@ -383,9 +383,10 @@ fn checks(c: &Module, golden_path: &Path, bless: bool) -> Vec<Check> {
 }
 
 pub fn run(o: &Opts) -> Result<(), String> {
-    let wasm_path = build::run(&o.build)?;
-    // The guard lives to the end: every render below runs with FTZ/DAZ on, like the host.
+    // The guard lives to the end: every render, including the build's validation render, runs
+    // with FTZ/DAZ on, like the host.
     let _ftz = FtzGuard::new();
+    let wasm_path = build::run(&o.build)?;
     let bytes = std::fs::read(&wasm_path).map_err(|e| format!("{}: {e}", wasm_path.display()))?;
     let engine = WasmiEngine::new();
     let c = engine.compile(&bytes).map_err(|e| e.to_string())?;
