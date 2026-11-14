@@ -21,6 +21,11 @@ pub(crate) fn playing_step(editor: &PatchEditor, ui_state: &UiState, len: usize)
     if len == 0 {
         return None;
     }
+    Some(clock_pos(editor, ui_state)?.floor().max(0.0) as usize % len)
+}
+
+/// Pulses (16ths) the reference clock has run since its last restart, while it runs.
+pub(crate) fn clock_pos(editor: &PatchEditor, ui_state: &UiState) -> Option<f64> {
     // The engine follows the lowest-id clock (`compile.rs`, `reference_clock`).
     let clock = editor
         .state()
@@ -31,8 +36,7 @@ pub(crate) fn playing_step(editor: &PatchEditor, ui_state: &UiState, len: usize)
     if !ui_state.clock_running.get(&clock).copied().unwrap_or(true) {
         return None;
     }
-    let pos = *ui_state.clock_pos.get(&clock)?;
-    Some(pos.floor().max(0.0) as usize % len)
+    ui_state.clock_pos.get(&clock).copied()
 }
 
 /// "Filter #4 cutoff", for the end a cable goes to.

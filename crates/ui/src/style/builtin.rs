@@ -130,6 +130,7 @@ pub fn builtin_a(dark: bool) -> Style {
             icons: Icons::Stroke,
         },
         metrics: Metrics::default(),
+        route_colors: super::route_colors(),
     }
 }
 
@@ -374,6 +375,7 @@ pub fn builtin_b(dark: bool) -> Style {
             icons: Icons::Stroke,
         },
         metrics: Metrics::default(),
+        route_colors: super::route_colors(),
     }
 }
 
