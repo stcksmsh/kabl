@@ -14,10 +14,14 @@ checks, send `DONE <PR#> <commit>`; after Kosta marks ready, Codex round; do not
 - Deps: serde, serde_json, crc32fast added to kabl-modules (all in lock; THIRD-PARTY-NOTICES unchanged, diff clean).
 - cargo fmt, clippy workspace (-D warnings): clean.
 
-## Remaining
-1. `.github/scripts/clippy.sh` and `cargo test --workspace`: not finished (run was stopped; all results seen so far passed). Also the allocation check.
-2. Known gap: manifest `abi_minor` is written as 0 (CodeMeta has no minor); `resources` empty.
-3. No UI test for module_install; no cargo-kabl unit test for pack (needs wasm target).
-4. Open the draft PR, wait for checks, send DONE.
+## Update (builder session 2)
+- `abi_minor` is now the blob's own (`WasmiEngine::read_abi_minor`); `resources` stays empty.
+- cargo-kabl pack unit test added (temp 0BSD crate + WAT blob; no wasm target needed).
+- fmt, clippy (--workspace --all-targets -D warnings, local 1.99) clean; `cargo test --workspace --no-fail-fast` all ok
+  (incl. the assert_no_alloc check in modules/tests/effects.rs). `kabl-ui code_examples::bitfilter...` failed once in a
+  parallel run and passed alone and in the rerun: flaky, not caused by this PR.
 
-Next command: `cargo test --workspace 2>&1 | grep -E "^test result|FAILED"` from this worktree.
+## Remaining
+1. Draft PR, wait for checks (CI lint uses Rust 1.100.0), send DONE to "Kabl overseer [47d561]".
+2. No UI test for module_install.
+3. Rebase only on overseer `REBASE` (#141, #142 touch cargo-kabl build.rs/main.rs and ui examples).
