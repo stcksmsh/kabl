@@ -1,20 +1,15 @@
 //! Graph compiler, scheduler, voice allocator, swap/crossfade, quality tiers (brief section 7).
-//! v1 milestone in progress; spike S1 (graph swap) lives here first as the de-risking work
-//! ahead of the general compiler.
+//! v1 milestone in progress.
 
 pub mod compile;
-pub mod dyn_dispatch_spike;
 pub mod facetap;
 pub mod ftz;
 pub mod graph;
 pub mod keyboard;
 pub mod morph;
-pub mod patch_demo;
 pub mod patch_engine;
-pub mod potato;
 pub mod probe;
 pub mod runtime;
-pub mod simd_voices;
 pub mod swap;
 pub mod timeline;
 pub mod voice_allocator;

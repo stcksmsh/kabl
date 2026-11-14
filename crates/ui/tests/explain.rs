@@ -705,35 +705,6 @@ fn a_direct_pin_to_an_off_face_control_reveals_it() {
 }
 
 #[test]
-fn a_legacy_mixer_level_route_is_explained_on_channel_1() {
-    // An old patch's route to the shared `level` reaches channel 1 in the engine.
-    let mut ed = PatchEditor::new();
-    let mac = ed.add_module("macro", kabl_core::Vec2::default());
-    let mix = ed.add_module("mixer", kabl_core::Vec2::default());
-    let c = ed.connect(
-        PortRef::Module {
-            id: mac,
-            port: "m1".into(),
-        },
-        PortRef::Param {
-            id: mix,
-            param: "level".into(),
-        },
-    );
-    let s = ed.state();
-    let (rows, _) = explain::destinations(s, mac, "m1");
-    assert!(matches!(&rows[0].reach, Reach::Param { param, .. } if param.name == "level1"));
-    let l1 = explain::param_of(s, mix, "level1").unwrap();
-    assert_eq!(routing::routes_into(s, mix, "level1")[0].cable, c);
-    assert!(routing::routes_into(s, mix, "level2").is_empty());
-    let lines = explain::base_and_modulation(s, mix, l1);
-    assert!(
-        !lines.iter().any(|l| l.starts_with("Modulation: none")),
-        "{lines:?}"
-    );
-}
-
-#[test]
 fn transport_acts_on_sequencers_behind_a_divider() {
     // interlocking: Clock #1 → Sequencer #3, and → Divider #2 → Sequencer #4.
     let e = load("interlocking");

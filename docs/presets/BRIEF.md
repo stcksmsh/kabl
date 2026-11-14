@@ -118,7 +118,7 @@ sequence = false                       # derived: the patch has a clock
 
 ## How a preset is made and added
 
-1. Build it from existing modules in code (the pilot's generator is `crates/ui/examples/presets_pilot.rs`: one function per preset, a `Preset` entry with its metadata, a clip phrase) and write it to `patches/presets/<slug>/`.
+1. Build it from existing modules in code (the pilot's generator is `tools/examples/presets_pilot.rs`: one function per preset, a `Preset` entry with its metadata, a clip phrase) and write it to `patches/presets/<slug>/`.
 2. Add one entry to the `FACTORY` list in `crates/ui/tests/library.rs`: the browser test asserts that nothing is missing or stray.
 3. Level it (`level_table`).
 4. Run the checklist below.

@@ -1,6 +1,6 @@
 # Factory presets: basses and leads
 
-First part of the bank (`BRIEF.md`): Bass to 14 and Lead to 12, with the pilot's Cinder Block, Undertow and Neon Highway counting. Generator: `crates/ui/examples/presets_bass_lead.rs` (same recipe as the pilot, one `Recipe` for the mono voice and one function per preset). Each preset is a folder under `patches/presets/` and an entry in the `FACTORY` list of `crates/ui/tests/library.rs` (one contiguous block after Neon Highway).
+First part of the bank (`BRIEF.md`): Bass to 14 and Lead to 12, with the pilot's Cinder Block, Undertow and Neon Highway counting. Generator: `tools/examples/presets_bass_lead.rs` (same recipe as the pilot, one `Recipe` for the mono voice and one function per preset). Each preset is a folder under `patches/presets/` and an entry in the `FACTORY` list of `crates/ui/tests/library.rs` (one contiguous block after Neon Highway).
 
 I can render and measure but not listen. Everything below about sound is what the chain is built to do plus what the renders show; Kosta's ears decide.
 

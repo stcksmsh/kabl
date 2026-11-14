@@ -1,6 +1,6 @@
 # Factory presets: pads
 
-Third part of the bank (`BRIEF.md`): Pad to 14, with the pilot's Salt Flat counting. Generator: `crates/ui/examples/presets_pad.rs` (same recipe as `presets_bass_lead.rs`: one `Recipe` for the voice, one function per preset, a `Preset` entry with metadata and a clip phrase). Each preset is a folder under `patches/presets/` and an entry in the `FACTORY` list of `crates/ui/tests/library.rs`.
+Third part of the bank (`BRIEF.md`): Pad to 14, with the pilot's Salt Flat counting. Generator: `tools/examples/presets_pad.rs` (same recipe as `presets_bass_lead.rs`: one `Recipe` for the voice, one function per preset, a `Preset` entry with metadata and a clip phrase). Each preset is a folder under `patches/presets/` and an entry in the `FACTORY` list of `crates/ui/tests/library.rs`.
 
 I can render and measure but not listen. Everything below about sound is what the chain is built to do plus what the renders show; Kosta's ears decide.
 

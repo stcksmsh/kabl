@@ -1,6 +1,6 @@
 # Factory presets: grooves
 
-Fourth part of the bank (`BRIEF.md`): Groove to 15 (14 new grooves plus Loading Dock, moved from the pilot set). Generator: `crates/ui/examples/presets_groove.rs` (same recipe as `presets_pad.rs`: a `Rack`, one function per preset, a `Preset` entry with metadata and a clip phrase). Each preset is a folder under `patches/presets/` and an entry in the `FACTORY` list of `crates/ui/tests/library.rs`. Patches are schema 8 (`Rack::migrated`).
+Fourth part of the bank (`BRIEF.md`): Groove to 15 (14 new grooves plus Loading Dock, moved from the pilot set). Generator: `tools/examples/presets_groove.rs` (same recipe as `presets_pad.rs`: a `Rack`, one function per preset, a `Preset` entry with metadata and a clip phrase). Each preset is a folder under `patches/presets/` and an entry in the `FACTORY` list of `crates/ui/tests/library.rs`. Patches are schema 8 (`Rack::migrated`).
 
 A Groove is a playable, self-running patch: a clock, a `drum.grid` kit (pattern A is the groove, pattern B a fill the grid cues can switch to), a sequenced bass line and, where it suits, a sequenced chord part. **Run starts it.** MIDI plays a third voice over the top (a chord or lead voice that follows the same filter and pump). Space defaults follow the brief; no limiter, level by patch gain.
 

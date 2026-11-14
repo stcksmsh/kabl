@@ -1,0 +1,25 @@
+[package]
+name = "kabl-tools"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Developer tools (captures, preset builders, MIDI player) run as examples; not part of the default workspace set."
+
+[dependencies]
+egui = { version = "0.35", default-features = false }
+eframe = { version = "0.35", default-features = false, features = ["glow", "x11", "wayland"] }
+basedrop = "0.1.3"
+image = { version = "0.25", default-features = false, features = ["png"] }
+kabl-core = { path = "../crates/core" }
+kabl-engine = { path = "../crates/engine" }
+kabl-modules = { path = "../crates/modules" }
+kabl-ui = { path = "../crates/ui" }
+midir = "0.11.0"
+serde_json = "1.0.151"
+hound = "3.5.1"
+tempfile = "3.27.0"
+toml = "1.1.6"
+serde = { version = "1.0.229", features = ["derive"] }
+kabl-cables = { path = "../crates/cables" }
+kabl-standalone = { path = "../crates/standalone" }

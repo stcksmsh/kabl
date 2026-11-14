@@ -19,7 +19,7 @@ A theme file is treated as untrusted: it is capped at 64 KiB, every value is che
 
 ## Frame time
 
-`KABL_BENCH_THEME=<id> cargo run --release -p kabl-ui --example bench_chrome 300 live` (dense Composition, 1440x900, rack only, displays animating, audio on; GPU not included). Switching a theme rebuilds one `Style` once; nothing is added per frame beyond a tab flag lookup and one contrast comparison per module palette.
+`KABL_BENCH_THEME=<id> cargo run --release -p kabl-tools --example bench_chrome 300 live` (dense Composition, 1440x900, rack only, displays animating, audio on; GPU not included). Switching a theme rebuilds one `Style` once; nothing is added per frame beyond a tab flag lookup and one contrast comparison per module palette.
 
 | theme, mode | median | p95 | max |
 |---|---|---|---|

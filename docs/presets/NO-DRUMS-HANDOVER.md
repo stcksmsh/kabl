@@ -11,7 +11,7 @@ Rule (Kosta): no built-in drums in presets outside Groove and Piece (`docs/prese
 
 ## Done
 
-- Pump House: `crates/ui/examples/presets_pad.rs` `pump_house()` (clock, `clock.div` 4, `env.adsr` 1/280/0/50 ms, `depth_route` from the envelope to the voice's trim `gain_db`, amount -0.30 on macro m3; gain_db spans 84 dB). Dips about 10 dB per beat at Pump 0.7.
+- Pump House: `tools/examples/presets_pad.rs` `pump_house()` (clock, `clock.div` 4, `env.adsr` 1/280/0/50 ms, `depth_route` from the envelope to the voice's trim `gain_db`, amount -0.30 on macro m3; gain_db spans 84 dB). Dips about 10 dB per beat at Pump 0.7.
 
 ## Remaining
 

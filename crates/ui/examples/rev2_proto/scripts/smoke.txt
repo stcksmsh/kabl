@@ -1,2 +1,0 @@
-shot 00-start
-expect nooverlap

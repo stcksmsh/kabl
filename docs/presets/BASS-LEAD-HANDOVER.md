@@ -8,7 +8,7 @@ Build the first part of the factory preset bank: Bass to 14 and Lead to 12 (the 
 
 - Group 1 (8 presets) delivered on draft PR #48, branch `claude/presets-bass-lead`: Steel Toe, Tar Pit, Acid Rain, Oatmeal (bass), Spun Sugar, Pig Iron, Hot Wire, Lantern (lead). Commits `b1d21f2` (group 1), `74e1ec3` (Acid Rain and Hot Wire resonance and click fix), `14b93af` (merge of master with PR #42 and #43), then the rename commit and the group 2 code commit (see `git log`).
 - Kosta's verdict: Steel Toe and Tar Pit keep; Oatmeal, Spun Sugar, Pig Iron, Lantern OK (renamed from Soft Shoe, Satin Ribbon, Rust Belt, Paper Crane at his pick); Acid Rain and Hot Wire were too resonant with high clicks, fixed (see lessons).
-- Generator `crates/ui/examples/presets_bass_lead.rs`; report and checks in `docs/presets/BASS-LEAD.md`; clips in `docs/presets/clips/bass-lead/group1/`; evidence in `docs/presets/evidence/host-bass-lead/` and `standalone-bass-lead/` (these still carry the old slugs Paper Crane, Satin Ribbon, Soft Shoe, Rust Belt; rerun the scripts to refresh).
+- Generator `tools/examples/presets_bass_lead.rs`; report and checks in `docs/presets/BASS-LEAD.md`; clips in `docs/presets/clips/bass-lead/group1/`; evidence in `docs/presets/evidence/host-bass-lead/` and `standalone-bass-lead/` (these still carry the old slugs Paper Crane, Satin Ribbon, Soft Shoe, Rust Belt; rerun the scripts to refresh).
 - Group 2 (15 presets) done: patches, levels, FACTORY entries, clips + tour in `docs/presets/clips/bass-lead/group2/`, REAPER evidence in `evidence/host-bass-lead-2/`, report in `BASS-LEAD.md`. Commits `75f6aaf`, `18531f0` and the evidence commit (see `git log`). Slate Roof Crush and Oak Stave Pluck were strengthened after the macro check.
 
 ## Remaining

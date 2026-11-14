@@ -3,7 +3,7 @@
 (mp3 checked against the float WAV as in clips.py), and one tour FLAC with the presets back to
 back, a second of silence between (each clip faded 20 ms at both ends), plus tour.txt with the start times.
 
-    cargo build --release -p kabl-ui --example presets_keys_pluck
+    cargo build --release -p kabl-tools --example presets_keys_pluck
     python3 docs/presets/scripts/clips_keys_pluck.py 1        # group 1 -> docs/presets/clips/keys-pluck/group1/
 
 Run from anywhere; it changes to the repo root.

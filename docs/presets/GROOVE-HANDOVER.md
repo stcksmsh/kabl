@@ -7,7 +7,7 @@ From "Kabl overseer": Groove 14 total. Write `docs/presets/GROOVE.md` (plan of 1
 ## Done
 
 - `docs/presets/GROOVE.md`: plan of 14 (4 signature: Copper Mile, Brick Dust, Rope Walk, Scrap Metal).
-- `crates/ui/examples/presets_groove.rs`: one `groove(Spec)` builder (clock, `drum.grid` kit with patterns A groove and B fill, two `seq` parts, a MIDI voice, bus drive + ladder, optional phaser/chorus/bitcrusher, compressor, kick duck, space tail) and 8 group 1 specs. Patches written to `patches/presets/`, entries in `crates/ui/tests/library.rs`.
+- `tools/examples/presets_groove.rs`: one `groove(Spec)` builder (clock, `drum.grid` kit with patterns A groove and B fill, two `seq` parts, a MIDI voice, bus drive + ladder, optional phaser/chorus/bitcrusher, compressor, kick duck, space tail) and 8 group 1 specs. Patches written to `patches/presets/`, entries in `crates/ui/tests/library.rs`.
 - `library` test passes (24 ok). Commits: see `git log claude/presets-groove`.
 
 ## Remaining, in order

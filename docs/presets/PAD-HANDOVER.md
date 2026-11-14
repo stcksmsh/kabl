@@ -7,7 +7,7 @@ Pad 14 total (the pilot's Salt Flat counts); group 1 is about eight. Write `docs
 ## Done
 
 - Plan of 14 in `docs/presets/PAD.md` (4 signature: Dry Cleaner, Concrete Cloud, Pump House, Tin Voice).
-- Group 1 (8 pads): Fog Bank, Deep Field, Cotton Mill, Picture Window, Drive-In, Dry Cleaner, Concrete Cloud, Static Garden. Generator `crates/ui/examples/presets_pad.rs`, patches in `patches/presets/`, entries in `crates/ui/tests/library.rs`, clips and tour in `docs/presets/clips/pad/group1/`, evidence in `evidence/host-pad/` and `evidence/standalone-pad/`. Results and measurements are in `PAD.md` (Checks).
+- Group 1 (8 pads): Fog Bank, Deep Field, Cotton Mill, Picture Window, Drive-In, Dry Cleaner, Concrete Cloud, Static Garden. Generator `tools/examples/presets_pad.rs`, patches in `patches/presets/`, entries in `crates/ui/tests/library.rs`, clips and tour in `docs/presets/clips/pad/group1/`, evidence in `evidence/host-pad/` and `evidence/standalone-pad/`. Results and measurements are in `PAD.md` (Checks).
 - Commits: see `git log claude/presets-pad`.
 
 ## Remaining, in order

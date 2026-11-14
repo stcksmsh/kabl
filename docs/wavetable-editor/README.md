@@ -48,7 +48,7 @@ A truncated or lying chunk is `Truncated` (a cut-short `data` chunk is the one e
 
 ## Frame time
 
-`cargo run --release -p kabl-ui --example bench_chrome 300 live [editor|draw]` (dense Composition, audio running, displays live, rack only). `editor`: the editor window is open on an `osc.wt` (one is added if the patch has none). `draw`: the same, and a pen stroke is down and moving every frame, so the table is written every 0.12 s during the measured frames. Three runs each on a machine another session was also using (so noisy; ranges are over the runs):
+`cargo run --release -p kabl-tools --example bench_chrome 300 live [editor|draw]` (dense Composition, audio running, displays live, rack only). `editor`: the editor window is open on an `osc.wt` (one is added if the patch has none). `draw`: the same, and a pen stroke is down and moving every frame, so the table is written every 0.12 s during the measured frames. Three runs each on a machine another session was also using (so noisy; ranges are over the runs):
 
 | 1440x900 | median | p95 | max |
 |---|---|---|---|
