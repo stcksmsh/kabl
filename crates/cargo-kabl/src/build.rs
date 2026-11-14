@@ -145,6 +145,8 @@ pub fn run(args: &Args) -> Result<PathBuf, String> {
         blob.len(),
         bytes.len()
     );
+    let pack = crate::pack::write(&blob, &manifest, args.package.as_deref())?;
+    println!("{}", pack.display());
     Ok(dest)
 }
 

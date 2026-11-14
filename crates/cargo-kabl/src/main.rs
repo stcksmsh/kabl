@@ -3,6 +3,7 @@
 
 mod build;
 mod new;
+mod pack;
 mod validate;
 mod wasm;
 
