@@ -43,6 +43,24 @@ impl Module for Gain {
             io.output[OUT][i] = io.input[IN][i] * g;
         }
         self.last = g;
+        // Deliberate faults, built by `cargo kabl test` to prove the host contains them. They fire
+        // on non-zero input: the host's load-time priming block is silent, so a module that
+        // always trapped would be refused at load instead of being stopped while it plays.
+        // Wasm only: a native `cargo test --all-features` must not panic or hang here.
+        #[cfg(all(feature = "fault-trap", target_arch = "wasm32"))]
+        if io.input[IN][0] != 0.0 {
+            panic!("fault-trap");
+        }
+        #[cfg(all(feature = "fault-spin", target_arch = "wasm32"))]
+        if io.input[IN][0] != 0.0 {
+            loop {
+                core::hint::spin_loop();
+            }
+        }
+        #[cfg(all(feature = "fault-nan", target_arch = "wasm32"))]
+        {
+            io.output[OUT][0] = f32::NAN;
+        }
     }
 
     fn save(&self, w: &mut StateWriter) {

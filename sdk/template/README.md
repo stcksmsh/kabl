@@ -7,7 +7,12 @@ API may change, breaking.
 cargo test            # your unit tests, on the host
 cargo kabl build      # reproducible wasm build, adds the licence notices, validates
 cargo kabl validate   # re-check a built blob
+cargo kabl test       # build, then golden hash, sweep, reset, 16 voices, faults, cost
 ```
+
+`cargo kabl test` records the output hash in `kabl-golden.txt` on its first run (commit it) and
+compares against it afterwards; `--bless` accepts a deliberate change. The `fault-*` features in
+`Cargo.toml` are built by that command to check the host stops a trapping, spinning or NaN module.
 
 The shippable file is `target/wasm32-unknown-unknown/release/kabl/<id>.wasm`. Ship the output of
 `cargo kabl build`: it writes the `kabl.notices` section (licence notices for the Rust toolchain

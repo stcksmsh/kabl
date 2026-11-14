@@ -15,10 +15,10 @@ pub const RESERVED_PREFIXES: [&str; 3] = ["kabl.", "demo.", "test."];
 /// Block size the host runs modules at (`host::MAX_BLOCK`); the layout must hold it.
 const HOST_BLOCK: u32 = 2048;
 /// Frames per smoke-render block, and blocks per stimulus.
-const FRAMES: usize = 512;
-const BLOCKS: usize = 4;
+pub const FRAMES: usize = 512;
+pub const BLOCKS: usize = 4;
 /// Fuel for one smoke block (the host budgets far less; this only guards against a hang).
-const FUEL: u64 = 500_000_000;
+pub const FUEL: u64 = 500_000_000;
 
 #[derive(Default)]
 pub struct Report {
@@ -181,14 +181,42 @@ const EXTREME: [f32; 6] = [1.0e6, 1.0e9, 1.0e12, 1.0e15, 1.0e20, 1.0e30];
 /// Output beyond this on an input of +-1 or less is allowed but probably a blow-up.
 const BIG: f32 = 1.0e6;
 
-struct Pass {
-    fuel: u64,
-    peak: f32,
-    non_finite: bool,
+pub struct Pass {
+    pub fuel: u64,
+    pub peak: f32,
+    pub non_finite: bool,
+    /// FNV-1a over every output byte of every block, in order.
+    pub hash: u64,
+}
+
+/// Writes `frames` frames of `f` (starting at index `at`) into every input slot, then `params`.
+pub fn write_inputs(
+    inst: &mut dyn WasmInstance,
+    f: &dyn Fn(usize) -> f32,
+    at: usize,
+    params: &[f32],
+    frames: usize,
+) {
+    let layout = inst.layout();
+    let mem = inst.memory();
+    for slot in 0..layout.in_slots as usize {
+        for (i, c) in mem[layout.input_range(slot)]
+            .as_chunks_mut::<4>()
+            .0
+            .iter_mut()
+            .take(frames)
+            .enumerate()
+        {
+            *c = f(at + i).to_le_bytes();
+        }
+    }
+    for (i, v) in params.iter().enumerate() {
+        mem[layout.param_range(i)].copy_from_slice(&v.to_le_bytes());
+    }
 }
 
 /// Renders `BLOCKS` blocks of `f` with `params` after a reset; `Err` is a fault or a bad reset.
-fn render(
+pub fn render(
     inst: &mut dyn WasmInstance,
     f: &dyn Fn(usize) -> f32,
     params: &[f32],
@@ -202,23 +230,10 @@ fn render(
         fuel: 0,
         peak: 0.0,
         non_finite: false,
+        hash: 0xcbf2_9ce4_8422_2325,
     };
     for block in 0..BLOCKS {
-        let mem = inst.memory();
-        for slot in 0..layout.in_slots as usize {
-            for (i, c) in mem[layout.input_range(slot)]
-                .as_chunks_mut::<4>()
-                .0
-                .iter_mut()
-                .take(frames)
-                .enumerate()
-            {
-                *c = f(block * frames + i).to_le_bytes();
-            }
-        }
-        for (i, v) in params.iter().enumerate() {
-            mem[layout.param_range(i)].copy_from_slice(&v.to_le_bytes());
-        }
+        write_inputs(inst, f, block * frames, params, frames);
         inst.set_fuel(FUEL);
         pass.fuel = pass.fuel.max(
             inst.call_block(frames as u32)
@@ -232,6 +247,9 @@ fn render(
                 .iter()
                 .take(frames)
             {
+                for b in c {
+                    pass.hash = (pass.hash ^ u64::from(*b)).wrapping_mul(0x100_0000_01b3);
+                }
                 let v = f32::from_le_bytes(*c);
                 pass.non_finite |= !v.is_finite();
                 if v.is_finite() {
@@ -310,7 +328,7 @@ fn smoke(meta: &CodeMeta, inst: &mut dyn WasmInstance, r: &mut Report) {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     const META: &str =
@@ -319,7 +337,13 @@ port in audio in 1\\nport out audio out 1\\nparam g 0 4 1 linear 5 x\\n{extra}";
 
     /// One in, one out, one param; `process` is the body given. Layout as `Layout::validate`
     /// wants it (2048-frame slots), `params` at the given address.
-    fn blob(id: &str, extra: &str, imports: &str, params: u32, process: &str) -> Vec<u8> {
+    pub(crate) fn blob(
+        id: &str,
+        extra: &str,
+        imports: &str,
+        params: u32,
+        process: &str,
+    ) -> Vec<u8> {
         let meta = META.replace("{id}", id).replace("{extra}", extra);
         wat::parse_str(format!(
             r#"(module {imports}
@@ -338,8 +362,8 @@ port in audio in 1\\nport out audio out 1\\nparam g 0 4 1 linear 5 x\\n{extra}";
         .unwrap()
     }
 
-    const SILENT: &str = "(memory.fill (i32.const 8256) (i32.const 0) (i32.const 8192))";
-    const PASS: &str = "(memory.copy (i32.const 8256) (i32.const 64) (i32.const 8192))";
+    pub(crate) const SILENT: &str = "(memory.fill (i32.const 8256) (i32.const 0) (i32.const 8192))";
+    pub(crate) const PASS: &str = "(memory.copy (i32.const 8256) (i32.const 64) (i32.const 8192))";
 
     fn good() -> Vec<u8> {
         wasm::finish(

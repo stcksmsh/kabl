@@ -115,6 +115,8 @@ jobs:
           b=$(build)
           echo "$a"; echo "$b"
           test "$a" = "$b"
+      - name: cargo kabl test on the template (checks, fault matrix)
+        run: target/debug/cargo-kabl kabl test --locked --manifest-path sdk/template/Cargo.toml
       - name: cargo kabl new, both variants, tests and builds
         run: |
           set -euo pipefail
