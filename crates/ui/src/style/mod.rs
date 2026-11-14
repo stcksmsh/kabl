@@ -313,6 +313,19 @@ pub struct CableSlots {
     pub glow_width: f32,
 }
 
+pub fn route_colors() -> [Color32; 8] {
+    [
+        Color32::from_rgb(220, 80, 80),
+        Color32::from_rgb(80, 140, 220),
+        Color32::from_rgb(90, 200, 120),
+        Color32::from_rgb(230, 190, 60),
+        Color32::from_rgb(180, 100, 220),
+        Color32::from_rgb(230, 140, 70),
+        Color32::from_rgb(80, 200, 200),
+        Color32::from_rgb(230, 110, 170),
+    ]
+}
+
 fn default_rest_width() -> f32 {
     3.0
 }
@@ -419,6 +432,10 @@ pub struct Style {
     pub slots: Slots,
     #[serde(skip)]
     pub metrics: Metrics,
+    /// Colours routes cycle through by `CableId`, so each source of a multi-source knob keeps one
+    /// colour across its lead, lane, ring and drawer row. Not part of a theme file.
+    #[serde(skip, default = "route_colors")]
+    pub route_colors: [Color32; 8],
     /// The custom font families are live in egui (set by `show`, not themable).
     #[serde(skip)]
     pub fonts_ready: bool,
