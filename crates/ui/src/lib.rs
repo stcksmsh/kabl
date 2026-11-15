@@ -462,12 +462,12 @@ impl Default for UiState {
             loaded: false,
             open_scope: None,
             dark: false,
-            theme: style::BUILTIN_A_ID.into(),
+            theme: style::LOOK_B_ID.into(),
             themes: std::sync::Arc::default(),
             theme_notes: Vec::new(),
             prefs_dir: None,
             prefs_saved: None,
-            style: std::sync::Arc::new(style::builtin_a(false)),
+            style: std::sync::Arc::new(style::look_b_default(false)),
             panels: panels::View::default(),
             tables: tables::View::default(),
             files: None,
@@ -2509,7 +2509,7 @@ fn draw_module(
     }
     let skin = m.skin;
     let on_art = skin.is_some_and(|s| ui_state.skin_labels_on_art.unwrap_or(s.labels_on_art));
-    let st = ui_state.style.clone();
+    let st = Style::for_family(&ui_state.style, m.info.kind);
     if let Some((tex, tint)) =
         skin.and_then(|s| skin_texture(ui, &mut ui_state.image_cache, m.info.kind, s, th.dark))
     {
@@ -2529,6 +2529,7 @@ fn draw_module(
         kit::face::hardware(painter, &st, rect, z);
     } else {
         kit::face::surface(painter, &st, rect, th.panel, th.panel_edge, z);
+        kit::face::family_stripe(painter, &st, rect, m.info.kind, z);
     }
     if m.adv.is_some() && !m.overlay {
         // Engraved divider between the face and the advanced area.
@@ -2668,7 +2669,7 @@ fn draw_module(
     if ui_state.selected_module == Some(m.id) {
         painter.rect_stroke(
             rect.expand(1.0),
-            CornerRadius::same(4),
+            CornerRadius::same(st.slots.face.radius + 1),
             Stroke::new(2.5, th.sel),
             egui::StrokeKind::Outside,
         );

@@ -5,12 +5,13 @@
 use super::{
     alpha, builtin_a, contrast, mix, CableStyle, CompactText, DisplayFrame, DisplayTrace,
     FaceHardware, FaceMaterial, FaceTitle, FamilyMarker, Font, JackRecipe, KnobBody, KnobScale,
-    KnobValue, OutPlate, Roles, Section, Sections, SelectorRecipe, Style, TrayRecipe,
+    KnobValue, OutPlate, Roles, Section, Sections, SelectorRecipe, Shadow, Style, TrayRecipe,
 };
 use egui::Color32;
 
 pub const LINE_SOLID_ID: &str = "kabl.line_solid";
 pub const OUTLINE_ID: &str = "kabl.outline";
+pub const LOOK_B_ID: &str = "kabl.look_b";
 
 fn h(s: &str) -> Color32 {
     Color32::from_hex(s).expect("valid colour")
@@ -166,9 +167,29 @@ fn sections(dark: bool, face: Color32, text2: Color32) -> Sections {
     }
 }
 
-/// `line_solid`: line-art panels and wells, solid hardware (filled caps, round jacks, accent
-/// selectors), glow on dark.
+/// `line_solid`, look A (HANDOVER §3): line-art panels lifted off the rack with a faint
+/// gradient, a light edge, dark wells with an inner shadow and a darker output plate. Family
+/// stays in the title, arcs stay accent. The light app theme keeps the plain line faces.
 fn line_solid(dark: bool, accent: Accent) -> Style {
+    let mut s = line_base(dark, accent);
+    if dark {
+        let rgba = Color32::from_rgba_unmultiplied;
+        let (top, bottom) = (h("#17181B"), h("#151619"));
+        s.sections = sections(true, mix(top, bottom, 0.5), s.roles.text2);
+        s.roles.disp_bg = h("#0B0C0D");
+        let f = &mut s.slots.face;
+        f.top = top;
+        f.bottom = bottom;
+        f.edge = rgba(236, 234, 230, 51);
+        f.plate = h("#111214");
+        f.rule = rgba(236, 234, 230, 31);
+        s.slots.display.frame = DisplayFrame::Well;
+    }
+    s
+}
+
+/// The line-art base of the solid styles: today's `line_solid`.
+fn line_base(dark: bool, accent: Accent) -> Style {
     let mut s = builtin_a(dark);
     s.roles = roles(dark, accent);
     let face = mix(s.roles.rack, Color32::WHITE, if dark { 0.022 } else { 0.4 });
@@ -242,7 +263,19 @@ fn outline(dark: bool, accent: Accent) -> Style {
 /// 3 px family stripe instead of a coloured title, flat material. Experimental (automatic
 /// checks only, PLAN §3 review policy). `fill`, `ink`, `ink2` are the panel colours.
 fn solid_panel(dark: bool, accent: Accent, fill: &str, ink: &str, ink2: &str) -> Style {
-    let mut s = line_solid(dark, accent);
+    solid_panel_reach(dark, accent, fill, fill, ink, ink2)
+}
+
+/// `solid_panel` whose stripe ink meets 4.5:1 against `reach` (the lightest end of a gradient).
+fn solid_panel_reach(
+    dark: bool,
+    accent: Accent,
+    fill: &str,
+    reach: &str,
+    ink: &str,
+    ink2: &str,
+) -> Style {
+    let mut s = line_base(dark, accent);
     let face_dark = h(fill).r() < 128;
     s.slots.face.material = FaceMaterial::Flat;
     s.slots.face.family = FamilyMarker::Stripe;
@@ -258,7 +291,7 @@ fn solid_panel(dark: bool, accent: Accent, fill: &str, ink: &str, ink2: &str) ->
                 Color32::BLACK
             };
             let mut t = 0.0;
-            while contrast(mix(h(hue), to, t), h(fill)) < 4.5 && t < 0.95 {
+            while contrast(mix(h(hue), to, t), h(reach)) < 4.5 && t < 0.95 {
                 t += 0.05;
             }
             mix(h(hue), to, t)
@@ -276,10 +309,37 @@ fn solid_panel(dark: bool, accent: Accent, fill: &str, ink: &str, ink2: &str) ->
     s
 }
 
+/// Look B (HANDOVER §2), the default: neutral graphite panels with a gradient, a dark edge, a
+/// top highlight and a drop shadow, a 4 px family stripe, dark display wells and a darker output
+/// plate. Value arcs and display traces wear the family ink; the accent is rationed. The
+/// panels stay dark in the light app theme (not designed yet).
 fn graphite(dark: bool, accent: Accent) -> Style {
-    let mut s = solid_panel(dark, accent, "#2B2D32", "#ECEAE6", "#A9A6A0");
-    s.id = "kabl.graphite".into();
-    s.name = "Graphite panels (experimental)".into();
+    let mut s = solid_panel_reach(dark, accent, "#2B2D32", "#30333A", "#ECEAE6", "#A9A6A0");
+    s.id = LOOK_B_ID.into();
+    s.name = "Look B".into();
+    let rgba = Color32::from_rgba_unmultiplied;
+    // Wells and their text are dark in both app themes, like the panels.
+    s.roles.disp_bg = h("#101114");
+    s.roles.disp_grid = alpha(h("#ECEAE6"), 20);
+    s.roles.disp_text = h("#A9A6A0");
+    s.shadows[1] = Shadow {
+        dy: 5.0,
+        blur: 14.0,
+        alpha: 140,
+    };
+    let f = &mut s.slots.face;
+    f.material = FaceMaterial::Lacquer;
+    f.gloss = 0.0;
+    f.shadow = 1;
+    f.top = h("#30333A");
+    f.bottom = h("#26282E");
+    f.edge = rgba(0, 0, 0, 140);
+    f.highlight = 26;
+    f.radius = 6;
+    f.plate = h("#1E2025");
+    f.rule = rgba(255, 255, 255, 18);
+    s.slots.display.frame = DisplayFrame::Well;
+    s.slots.display.trace = DisplayTrace::SoftGlow;
     s
 }
 
@@ -321,6 +381,12 @@ pub fn with_accent(mut style: Style, accent: Accent) -> Style {
     r.focus = acc;
     r.disp_trace = acc;
     style
+}
+
+/// `line_solid` with the default amber accent: the redesign's two default looks.
+/// Look B with the default amber accent: the fresh-install default.
+pub fn look_b_default(dark: bool) -> Style {
+    graphite(dark, Accent::Amber)
 }
 
 /// `line_solid` with the default amber accent: the redesign's two default looks.
@@ -376,6 +442,55 @@ mod tests {
                     assert!(contrast(c.ink, c.base) >= 3.0, "{fs} stripe");
                 }
             }
+        }
+    }
+
+    /// Looks A and B: stripe (B) and title (A) inks keep 4.5:1 on the face fill, including both
+    /// ends of the gradient and the output plate; text keeps it on the plate; wells stay readable.
+    #[test]
+    fn looks_a_and_b_keep_ink_stripe_and_wells_readable() {
+        for dark in [true, false] {
+            for (name, s) in [
+                ("look A", line_solid_default(dark)),
+                ("look B", look_b_default(dark)),
+            ] {
+                let f = &s.slots.face;
+                let mut fills = vec![s.sections.osc.base];
+                fills.extend([f.top, f.bottom].into_iter().filter(|c| c.a() > 0));
+                for sec in [
+                    s.sections.osc,
+                    s.sections.filter,
+                    s.sections.modulation,
+                    s.sections.timing,
+                    s.sections.amp,
+                    s.sections.fx,
+                ] {
+                    for &fill in &fills {
+                        assert!(contrast(sec.ink, fill) >= 4.5, "{name} dark={dark} ink");
+                        assert!(contrast(sec.ink2, fill) >= 4.5, "{name} dark={dark} ink2");
+                    }
+                }
+                if f.plate.a() > 0 {
+                    let ink = if f.ink.a() > 0 { f.ink } else { s.roles.text };
+                    assert!(contrast(ink, f.plate) >= 4.5, "{name} dark={dark} plate");
+                }
+            }
+        }
+        // Look B: the family ink, not the accent, wears arcs and traces; the accent stays amber.
+        let b = look_b_default(true);
+        assert_eq!(b.roles.accent, h("#F2A33A"));
+        assert_ne!(b.arc_ink("osc.va"), b.roles.accent);
+        assert_eq!(b.arc_ink("osc.va"), b.sections.osc.ink);
+        assert_eq!(b.id, LOOK_B_ID);
+        // Look A keeps accent arcs.
+        let a = line_solid_default(true);
+        assert_eq!(a.arc_ink("osc.va"), a.roles.accent);
+        // The wells: A #0B0C0D, B #101114; the trace reads on them.
+        assert_eq!(a.roles.disp_bg, h("#0B0C0D"));
+        assert_eq!(b.roles.disp_bg, h("#101114"));
+        for s in [&a, &b] {
+            assert!(contrast(s.section_of("osc.va").ink, s.roles.disp_bg) >= 3.0);
+            assert!(contrast(s.roles.disp_trace, s.roles.disp_bg) >= 3.0);
         }
     }
 

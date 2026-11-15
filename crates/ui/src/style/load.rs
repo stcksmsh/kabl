@@ -7,8 +7,8 @@
 //! the base theme plus notes.
 
 use super::{
-    builtin_a, builtin_b, compose, contrast, line_solid_default, outline_default, with_accent,
-    Accent, Style, FACE_STYLES, TEXT_FLOOR,
+    builtin_a, builtin_b, compose, contrast, line_solid_default, look_b_default, outline_default,
+    with_accent, Accent, Style, FACE_STYLES, TEXT_FLOOR,
 };
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -53,6 +53,7 @@ impl Default for Themes {
     fn default() -> Self {
         Themes {
             list: vec![
+                builtin(look_b_default, "Look B"),
                 builtin(builtin_a, "Satin Studio"),
                 builtin(builtin_b, "Lacquer and Light"),
                 builtin(line_solid_default, "Signal and Drafting solid"),
@@ -560,7 +561,7 @@ pub struct Prefs {
 impl Default for Prefs {
     fn default() -> Self {
         Prefs {
-            theme: super::BUILTIN_A_ID.into(),
+            theme: super::LOOK_B_ID.into(),
             dark: false,
             folders: Default::default(),
         }
@@ -612,14 +613,14 @@ mod tests {
     #[test]
     fn partial_theme_overrides_only_what_it_names() {
         let t = parse(
-            "id = \"u.red\"\nname = \"Red\"\n[light.roles]\naccent = \"#c01010\"\n",
+            "id = \"u.red\"\nname = \"Red\"\n[light.roles]\naccent = \"#e0a020\"\n",
             &themes(),
         )
         .unwrap();
-        let a = builtin_a(false);
-        assert_eq!(t.light.roles.accent, Color::from_rgb(0xc0, 0x10, 0x10));
+        let a = look_b_default(false);
+        assert_eq!(t.light.roles.accent, Color::from_rgb(0xe0, 0xa0, 0x20));
         assert_eq!(t.light.roles.bg, a.roles.bg);
-        assert_eq!(t.dark.roles, builtin_a(true).roles);
+        assert_eq!(t.dark.roles, look_b_default(true).roles);
         assert!(t.notes.is_empty(), "{:?}", t.notes);
     }
 
@@ -633,7 +634,7 @@ mod tests {
             &themes(),
         )
         .unwrap();
-        let a = builtin_a(false);
+        let a = look_b_default(false);
         assert_eq!(t.light.roles.bg, a.roles.bg);
         assert_eq!(t.light.slots.knob.body, a.slots.knob.body);
         assert_eq!(t.light.slots.knob.glow, 1.0);
@@ -662,7 +663,7 @@ mod tests {
             Style {
                 id: "u.dim".into(),
                 name: "Dim".into(),
-                ..builtin_a(false)
+                ..look_b_default(false)
             }
         );
         assert!(t
@@ -679,7 +680,7 @@ mod tests {
             &themes(),
         )
         .unwrap();
-        assert_eq!(t.dark.roles.text, builtin_a(true).roles.text);
+        assert_eq!(t.dark.roles.text, look_b_default(true).roles.text);
         assert_eq!(t.dark.types.caption.size, TEXT_FLOOR);
     }
 
@@ -712,6 +713,7 @@ mod tests {
         assert_eq!(
             ids,
             [
+                "kabl.look_b",
                 "kabl.satin",
                 "kabl.lacquer",
                 "kabl.line_solid",
@@ -720,7 +722,7 @@ mod tests {
             ]
         );
         assert_eq!(msgs.len(), 3, "{msgs:?}");
-        assert_eq!(t.resolve("gone").id, "kabl.satin");
+        assert_eq!(t.resolve("gone").id, "kabl.look_b");
     }
 
     #[test]
@@ -739,7 +741,7 @@ mod tests {
             &known,
         )
         .unwrap();
-        assert_eq!(t1.dark.roles.accent, builtin_a(true).roles.accent);
+        assert_eq!(t1.dark.roles.accent, look_b_default(true).roles.accent);
         assert!(
             t1.notes.iter().any(|n| n.contains("ui_api = 2")),
             "{:?}",

@@ -11,8 +11,8 @@ mod load;
 pub use builtin::{builtin_a, builtin_b, BUILTIN_A_ID, BUILTIN_B_ID};
 pub use load::{config_dir, themes_dir, Prefs, Theme, Themes};
 pub use solid::{
-    compose, line_solid_default, outline_default, with_accent, Accent, FACE_STYLES, LINE_SOLID_ID,
-    OUTLINE_ID,
+    compose, line_solid_default, look_b_default, outline_default, with_accent, Accent, FACE_STYLES,
+    LINE_SOLID_ID, LOOK_B_ID, OUTLINE_ID,
 };
 
 use egui::{Color32, FontFamily, FontId};
@@ -229,7 +229,7 @@ recipes! {
     JackRecipe { Nut, GlowRing, Donut, Hex }
     CableRecipe { Rope, Glow, Outlined }
     PlugRecipe { Cap, Ring, Dot }
-    DisplayFrame { Glass, Neon, Paper }
+    DisplayFrame { Glass, Neon, Paper, Well }
     DisplayTrace { SoftGlow, StrongGlow, Crisp }
     /// Corner treatment of buttons, chips, fields and rows.
     Shape { Rounded, Pill, Square }
@@ -267,6 +267,31 @@ pub struct FaceSlots {
     /// the app theme (PLAN §3 rule 3). Transparent = the section ink, as for line panels.
     #[serde(with = "hex", default = "no_ink")]
     pub ink: Color32,
+    /// Vertical gradient of the face fill, top and bottom (look B, look A). Transparent = derive
+    /// it from the section base and `gradient`.
+    #[serde(with = "hex", default = "no_ink")]
+    pub top: Color32,
+    #[serde(with = "hex", default = "no_ink")]
+    pub bottom: Color32,
+    /// Face edge. Transparent = derive it from the face fill.
+    #[serde(with = "hex", default = "no_ink")]
+    pub edge: Color32,
+    /// Fill of the output plate behind the output jack row. Transparent = none.
+    #[serde(with = "hex", default = "no_ink")]
+    pub plate: Color32,
+    /// The tray's top rule. Transparent = `line2`.
+    #[serde(with = "hex", default = "no_ink")]
+    pub rule: Color32,
+    /// Alpha of the 1 px white highlight inside the top edge, 0 for none.
+    #[serde(default)]
+    pub highlight: u8,
+    /// Corner radius of the face.
+    #[serde(default = "default_face_radius")]
+    pub radius: u8,
+}
+
+fn default_face_radius() -> u8 {
+    3
 }
 
 fn no_ink() -> Color32 {
@@ -574,6 +599,27 @@ impl Style {
 }
 
 impl Style {
+    /// The ink of value arcs and display traces on a face of family `kind`: the family ink where
+    /// the family is a stripe (look B), else the accent (look A and the line styles).
+    pub fn arc_ink(&self, kind: &str) -> Color32 {
+        if self.slots.face.family == FamilyMarker::Stripe {
+            self.section_of(kind).ink
+        } else {
+            self.roles.accent
+        }
+    }
+
+    /// `st` with display traces in the family ink of `kind`: the same `Arc` for line styles,
+    /// a copy for the stripe styles (look B).
+    pub fn for_family(st: &std::sync::Arc<Style>, kind: &str) -> std::sync::Arc<Style> {
+        if st.slots.face.family != FamilyMarker::Stripe {
+            return st.clone();
+        }
+        let mut s = (**st).clone();
+        s.roles.disp_trace = s.section_of(kind).ink;
+        std::sync::Arc::new(s)
+    }
+
     /// The hole inside a jack: the face's own near-black (the mockup's), not the rack's mounting
     /// hole colour `roles.hole`.
     pub fn jack_hole(&self) -> Color32 {

@@ -146,7 +146,35 @@ pub fn drum_cell(p: &Painter, st: &Style, rect: Rect, level: usize, chance: usiz
 /// where an output `plate` is given, a divider between inputs and outputs (vertical when the
 /// outputs sit beside the inputs, dashed and horizontal when they sit below).
 pub fn tray(p: &Painter, st: &Style, rect: Rect, plate: Option<Rect>, z: f32) {
-    let stroke = Stroke::new(1.0, st.roles.line2);
+    let f = &st.slots.face;
+    let rule = if f.rule.a() > 0 {
+        f.rule
+    } else {
+        st.roles.line2
+    };
+    let stroke = Stroke::new(1.0, rule);
+    if let (true, Some(pl)) = (f.plate.a() > 0, plate) {
+        // A filled output plate: its bottom corners follow the face's where they meet them.
+        let r = (f.radius as f32 * z).min(pl.height() / 2.0) as u8;
+        let flush = pl.bottom() >= rect.bottom() - 0.5;
+        let sw = if flush && pl.left() <= rect.left() + 0.5 {
+            r
+        } else {
+            0
+        };
+        let se = if flush && pl.right() >= rect.right() - 0.5 {
+            r
+        } else {
+            0
+        };
+        let cr = egui::CornerRadius {
+            nw: 0,
+            ne: 0,
+            sw,
+            se,
+        };
+        p.rect_filled(pl, cr, f.plate);
+    }
     p.line_segment([rect.left_top(), rect.right_top()], stroke);
     let Some(pl) = plate else { return };
     if pl.width() < rect.width() * 0.9 {

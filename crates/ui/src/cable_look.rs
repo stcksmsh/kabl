@@ -28,9 +28,10 @@ fn contrast(a: Color32, b: Color32) -> f32 {
 }
 
 /// The rack and every section's face colour: what a cable lies on.
-pub fn surfaces(st: &Style) -> [Color32; 7] {
+pub fn surfaces(st: &Style) -> Vec<Color32> {
     let s = &st.sections;
-    [
+    let f = &st.slots.face;
+    let mut v = vec![
         st.roles.rack,
         s.osc.base,
         s.filter.base,
@@ -38,7 +39,10 @@ pub fn surfaces(st: &Style) -> [Color32; 7] {
         s.amp.base,
         s.timing.base,
         s.fx.base,
-    ]
+    ];
+    // Looks A and B shade the face: both ends of the gradient and the output plate too.
+    v.extend([f.top, f.bottom, f.plate].into_iter().filter(|c| c.a() > 0));
+    v
 }
 
 /// The lowest contrast of `col` drawn at `alpha` against any of `surfaces`.
@@ -93,7 +97,10 @@ pub fn legible_cached(ctx: &egui::Context, st: &Style, col: Color32, alpha: f32)
     use std::hash::{Hash, Hasher};
     let surf = surfaces(st);
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    surf.map(|c| c.to_array()).hash(&mut h);
+    surf.iter()
+        .map(|c| c.to_array())
+        .collect::<Vec<_>>()
+        .hash(&mut h);
     let id = Id::new((
         "kabl-cable-legible",
         col.to_array(),
@@ -401,11 +408,23 @@ mod tests {
     /// in each built-in theme and mode: the edge on light themes, the lightened fill on dark.
     #[test]
     fn resting_cables_keep_contrast_on_every_builtin_surface() {
-        for (name, dark) in [("A", false), ("A", true), ("B", false), ("B", true)] {
-            let st = if name == "A" {
-                builtin_a(dark)
-            } else {
-                crate::style::builtin_b(dark)
+        let looks = [
+            ("A", false),
+            ("A", true),
+            ("B", false),
+            ("B", true),
+            ("look A", false),
+            ("look A", true),
+            ("look B", true),
+        ];
+        // Look B in the light app theme is not designed (HANDOVER §2): its dark panels carry the
+        // light theme's cable colours, so it is not checked.
+        for (name, dark) in looks {
+            let st = match name {
+                "A" => builtin_a(dark),
+                "B" => crate::style::builtin_b(dark),
+                "look A" => crate::style::line_solid_default(dark),
+                _ => crate::style::look_b_default(dark),
             };
             let th = crate::theme::theme(&st);
             let surf = surfaces(&st);

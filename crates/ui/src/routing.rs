@@ -803,6 +803,13 @@ pub(crate) fn param_knob(
             z,
             value: base_n,
             hot,
+            arc: ui_state.style.arc_ink(
+                editor
+                    .state()
+                    .modules
+                    .get(&id)
+                    .map_or("", |m| m.kind.as_str()),
+            ),
         },
     );
 
