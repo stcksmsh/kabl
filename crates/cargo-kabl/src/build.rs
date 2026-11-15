@@ -86,6 +86,61 @@ pub fn manifest(args: &Args) -> Result<PathBuf, String> {
     }
 }
 
+/// Resolves a `-p` spec (`name`, `name@1.2`, ...) to the package id `cargo metadata` uses, by
+/// asking Cargo (`cargo pkgid`) rather than comparing names. `None` when no spec was given.
+pub fn package_id(manifest: &Path, spec: Option<&str>) -> Result<Option<String>, String> {
+    let Some(spec) = spec else { return Ok(None) };
+    let out = Command::new("cargo")
+        .args(["pkgid", "--manifest-path"])
+        .arg(manifest)
+        .args(["-p", spec])
+        .output()
+        .map_err(|e| format!("cargo pkgid: {e}"))?;
+    if !out.status.success() {
+        return Err(format!("no package `{spec}` in the workspace"));
+    }
+    Ok(Some(
+        String::from_utf8_lossy(&out.stdout).trim().to_string(),
+    ))
+}
+
+/// The package the build compiles: the one with package id `id` (from `-p`), else the manifest's own, else (a virtual
+/// workspace root) the only member that builds a cdylib. No silent miss: a package that cannot
+/// be resolved is an error, so the fault checks are never skipped by accident.
+pub fn package<'a>(
+    meta: &'a serde_json::Value,
+    id: Option<&str>,
+    manifest: &Path,
+) -> Result<&'a serde_json::Value, String> {
+    let pkgs = || meta["packages"].as_array().into_iter().flatten();
+    if let Some(n) = id {
+        return pkgs()
+            .find(|p| p["id"] == n)
+            .ok_or_else(|| format!("no package `{n}` in the workspace"));
+    }
+    if let Some(p) = pkgs().find(|p| p["manifest_path"].as_str().map(Path::new) == Some(manifest)) {
+        return Ok(p);
+    }
+    let is_cdylib = |p: &&serde_json::Value| {
+        p["targets"].as_array().into_iter().flatten().any(|t| {
+            t["crate_types"]
+                .as_array()
+                .is_some_and(|c| c.iter().any(|k| k == "cdylib"))
+        })
+    };
+    // Only the members a plain `cargo build` at the root selects (`default-members`, else all).
+    let selected = |p: &&serde_json::Value| {
+        meta["workspace_default_members"]
+            .as_array()
+            .is_none_or(|d| d.contains(&p["id"]))
+    };
+    let mut cdylibs = pkgs().filter(selected).filter(is_cdylib);
+    match (cdylibs.next(), cdylibs.next()) {
+        (Some(p), None) => Ok(p),
+        _ => Err("cannot tell which package is the module; pick one with `--package`".into()),
+    }
+}
+
 /// Builds and strips the module and adds the notices; returns the blob, the raw cargo output's
 /// path and its size. No validation: `cargo kabl test` builds deliberately faulty variants too.
 pub fn blob(args: &Args) -> Result<(Vec<u8>, PathBuf, usize), String> {
@@ -163,6 +218,16 @@ pub fn run(args: &Args) -> Result<PathBuf, String> {
         raw_len
     );
     Ok(dest)
+}
+
+/// `cargo kabl build`: [`run`], then the `.kablmod` package. Packing needs the crate's Cargo
+/// metadata (licence, authors), which `cargo kabl test` does not, so only this path packs.
+pub fn run_and_pack(args: &Args) -> Result<(), String> {
+    let dest = run(args)?;
+    let blob = std::fs::read(&dest).map_err(|e| format!("{}: {e}", dest.display()))?;
+    let pack = crate::pack::write(&blob, &manifest(args)?, args.package.as_deref())?;
+    println!("{}", pack.display());
+    Ok(())
 }
 
 /// The one `.wasm` cdylib artifact in cargo's JSON message stream.

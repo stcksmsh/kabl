@@ -3,6 +3,7 @@
 
 mod build;
 mod new;
+mod pack;
 mod test;
 mod validate;
 mod wasm;
@@ -49,7 +50,7 @@ fn run(args: &[String]) -> Result<(), String> {
             );
             Ok(())
         }
-        "build" => build::run(&build::parse(rest)?).map(drop),
+        "build" => build::run_and_pack(&build::parse(rest)?),
         "test" => test::run(&test::parse(rest)?),
         "validate" => {
             let allow_reserved = rest.iter().any(|a| a == "--allow-reserved");

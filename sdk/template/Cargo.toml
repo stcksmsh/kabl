@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 license = "0BSD"
+authors = ["<your name>"]
+description = "A kabl code module."
 
 # A module is a wasm cdylib. `cargo kabl build` produces the shippable blob.
 [lib]
