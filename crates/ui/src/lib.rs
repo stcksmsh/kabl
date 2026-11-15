@@ -2524,14 +2524,10 @@ fn draw_module(
     draw_module_shapes(editor, ui_state, ui, painter, th, xf, m, now, drawn);
     // A lifted module (Foreground layer) already paints above the cables.
     if m.skin.is_none() && ui.layer_id().order != egui::Order::Foreground {
+        // Only the live displays keep their text in place; a grid's values and a selector's
+        // labels are plain text and cross cables like any other.
         let decor = match m.decor {
-            Decor::Keys(r)
-            | Decor::Display(r)
-            | Decor::Transport(r)
-            | Decor::Banks(r)
-            | Decor::Operators(r)
-            | Decor::Grid(r)
-            | Decor::Cues(r) => Some(xf.r(r)),
+            Decor::Display(r) | Decor::Operators(r) => Some(xf.r(r)),
             _ => None,
         };
         let face_fill = theme::panel_theme(&ui_state.style, m.info.kind).panel;
@@ -2589,14 +2585,22 @@ fn lift_labels(
         }
         out
     });
-    for (r, back, shape) in lifted {
-        ui_state.deferred.push(S::rect_filled(
-            r.expand(2.0),
-            CornerRadius::same(3),
-            back.gamma_multiply(0.85),
-        ));
-        ui_state.deferred.push(shape);
-    }
+    // Every backing first, so one label's backing never cuts a neighbour's text.
+    let (backs, texts): (Vec<_>, Vec<_>) = lifted
+        .into_iter()
+        .map(|(r, back, shape)| {
+            (
+                S::rect_filled(
+                    r.expand(2.0),
+                    CornerRadius::same(3),
+                    back.gamma_multiply(0.85),
+                ),
+                shape,
+            )
+        })
+        .unzip();
+    ui_state.deferred.extend(backs);
+    ui_state.deferred.extend(texts);
 }
 
 #[allow(clippy::too_many_arguments)]
