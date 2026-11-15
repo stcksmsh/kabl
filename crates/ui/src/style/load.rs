@@ -21,6 +21,8 @@ pub const MAX_THEMES: usize = 64;
 pub const UI_API: i64 = 2;
 /// Below this ratio a text pair is rejected; below 4.5 it is only reported.
 const REJECT_BELOW: f32 = 3.0;
+/// Largest face corner radius a theme may ask for.
+const MAX_FACE_RADIUS: u8 = 24;
 
 /// One theme: a light and a dark `Style`, plus what loading it had to say.
 #[derive(Clone, Debug)]
@@ -390,6 +392,12 @@ fn clamp(s: &mut Style, base: &Style, mode: &str, notes: &mut Vec<String>) {
         mode,
         notes,
     );
+    if s.slots.face.radius > MAX_FACE_RADIUS {
+        s.slots.face.radius = MAX_FACE_RADIUS;
+        notes.push(format!(
+            "{mode}: face.radius limited to 0 to {MAX_FACE_RADIUS}"
+        ));
+    }
     for (i, sh) in s.shadows.iter_mut().enumerate() {
         num(
             &mut sh.dy,
@@ -649,6 +657,23 @@ mod tests {
         ] {
             assert!(n.contains(want), "{want} not in {n}");
         }
+    }
+
+    #[test]
+    fn an_oversized_face_radius_is_limited() {
+        let t = parse(
+            "id = \"u.round\"\nname = \"Round\"\n[dark.slots.face]\nradius = 255\n",
+            &themes(),
+        )
+        .unwrap();
+        assert_eq!(t.dark.slots.face.radius, MAX_FACE_RADIUS);
+        // The selected-module outline adds 1 to it and must not overflow.
+        assert!(t.dark.slots.face.radius.checked_add(1).is_some());
+        assert!(
+            t.notes.iter().any(|n| n.contains("face.radius")),
+            "{:?}",
+            t.notes
+        );
     }
 
     #[test]

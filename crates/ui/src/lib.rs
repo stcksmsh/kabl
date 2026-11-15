@@ -2671,7 +2671,7 @@ fn draw_module(
     if ui_state.selected_module == Some(m.id) {
         painter.rect_stroke(
             rect.expand(1.0),
-            CornerRadius::same(st.slots.face.radius + 1),
+            CornerRadius::same(st.slots.face.radius.saturating_add(1)),
             Stroke::new(2.5, th.sel),
             egui::StrokeKind::Outside,
         );
