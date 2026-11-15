@@ -897,7 +897,12 @@ fn replace_never_targets_a_sound_after_the_name_changed() {
         ),
         "and its message"
     );
+    // The modal re-centres over the next frames when its content shrinks (the banner went).
+    t.frame();
+    t.frame();
     t.click("dlg:save");
+    t.frame();
+    t.frame();
     let lib = t.ui.library.as_ref().unwrap();
     assert!(
         saved_state(&t, "user:alpha") == alpha

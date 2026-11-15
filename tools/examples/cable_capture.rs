@@ -6,6 +6,7 @@
 //! `xvfb-run -a -s "-screen 0 1440x900x24" cargo run --release -p kabl-tools --example cable_capture -- 1440x900 DIR [patch,..]`
 //!
 //! Patches: simple (default patch), composition, stereo (reference), functional (echo-throws).
+//! `KABL_CAP_LOOKS=look-a,look-b` captures looks A and B; `KABL_CAP_DARK=1` only the dark mode.
 //! Output names: `DIR/<patch>__<look>__<dark|light>__z<zoom>__<WxH>.png`.
 use eframe::egui;
 use egui::{Pos2, Rect};
@@ -165,6 +166,8 @@ fn main() {
                 .filter_map(|n| match n {
                     "graphite" => Some("graphite"),
                     "aluminium" => Some("aluminium"),
+                    "look-a" => Some("look-a"),
+                    "look-b" => Some("look-b"),
                     _ => None,
                 })
                 .collect()
@@ -173,11 +176,29 @@ fn main() {
     let looks: Vec<(&'static str, &'static str)> = if extra.is_empty() {
         LOOKS.to_vec()
     } else {
-        extra.iter().map(|&n| (n, "kabl.line_solid")).collect()
+        // Look A is the built-in `kabl.line_solid`, look B `kabl.look_b`: no composing needed.
+        extra
+            .iter()
+            .map(|&n| {
+                (
+                    n,
+                    if n == "look-b" {
+                        "kabl.look_b"
+                    } else {
+                        "kabl.line_solid"
+                    },
+                )
+            })
+            .collect()
     };
     let mut jobs = Vec::new();
     for p in &patches {
-        for dark in [false, true] {
+        let modes: &[bool] = if std::env::var("KABL_CAP_DARK").is_ok() {
+            &[true]
+        } else {
+            &[false, true]
+        };
+        for &dark in modes {
             for z in ZOOMS {
                 for &(look, theme) in &looks {
                     jobs.push(Job {

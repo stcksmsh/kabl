@@ -100,30 +100,61 @@ pub fn arc_pts(c: Pos2, radius: f32, n0: f32, n1: f32) -> Vec<Pos2> {
         .collect()
 }
 
+/// A vertical gradient `top` to `bottom` over `rect` with the corners rounded by `r`: two caps
+/// (the end colours, a few px of the ramp) and a mesh between them.
+fn gradient_rect(p: &Painter, rect: Rect, r: u8, top: Color32, bottom: Color32) {
+    let rr = (r as f32).min(rect.height() / 2.0);
+    let t = rr / rect.height().max(1.0);
+    let (c0, c1) = (mix(top, bottom, t), mix(top, bottom, 1.0 - t));
+    let cap = |nw, ne, sw, se| CornerRadius { nw, ne, sw, se };
+    let r = rr as u8;
+    p.rect_filled(
+        Rect::from_min_size(rect.min, vec2(rect.width(), rr)),
+        cap(r, r, 0, 0),
+        c0,
+    );
+    p.rect_filled(
+        Rect::from_min_max(pos2(rect.left(), rect.bottom() - rr), rect.max),
+        cap(0, 0, r, r),
+        c1,
+    );
+    let mut mesh = Mesh::default();
+    mesh.colored_vertex(pos2(rect.left(), rect.top() + rr), c0);
+    mesh.colored_vertex(pos2(rect.right(), rect.top() + rr), c0);
+    mesh.colored_vertex(pos2(rect.right(), rect.bottom() - rr), c1);
+    mesh.colored_vertex(pos2(rect.left(), rect.bottom() - rr), c1);
+    mesh.add_triangle(0, 1, 2);
+    mesh.add_triangle(0, 2, 3);
+    p.add(Shape::mesh(mesh));
+}
+
 /// The face: shadow, material, edge and the corner hardware.
 pub fn surface(p: &Painter, st: &Style, rect: Rect, base: Color32, edge: Color32, z: f32) {
     let f = &st.slots.face;
-    let cr = CornerRadius::same(3);
+    let cr = CornerRadius::same(f.radius);
+    let edge = if f.edge.a() > 0 { f.edge } else { edge };
+    let ends = (f.top.a() > 0 && f.bottom.a() > 0).then_some((f.top, f.bottom));
     if f.material != FaceMaterial::Flat && st.shadows[f.shadow.min(2)].alpha > 0 {
         p.add(eshadow(st, f.shadow).as_shape(rect, cr));
     }
     if f.material == FaceMaterial::Line {
-        // Line art: the surface colour, one hairline edge, screws; no gradient, gloss or grain.
-        p.rect_filled(rect, cr, base);
+        // Line art: the surface colour (or a faint gradient), one hairline edge, screws; no gloss
+        // or grain.
+        match ends {
+            Some((top, bottom)) => gradient_rect(p, rect, f.radius, top, bottom),
+            None => {
+                p.rect_filled(rect, cr, base);
+            }
+        }
         p.rect_stroke(rect, cr, Stroke::new(1.0, edge), StrokeKind::Inside);
         hardware(p, st, rect, z);
         return;
     }
-    let top = mix(base, Color32::WHITE, f.gradient * 0.8);
-    let bottom = mix(base, Color32::BLACK, f.gradient * 0.65);
-    let mut mesh = Mesh::default();
-    mesh.colored_vertex(rect.left_top(), top);
-    mesh.colored_vertex(rect.right_top(), top);
-    mesh.colored_vertex(rect.right_bottom(), bottom);
-    mesh.colored_vertex(rect.left_bottom(), bottom);
-    mesh.add_triangle(0, 1, 2);
-    mesh.add_triangle(0, 2, 3);
-    p.add(Shape::mesh(mesh));
+    let (top, bottom) = ends.unwrap_or((
+        mix(base, Color32::WHITE, f.gradient * 0.8),
+        mix(base, Color32::BLACK, f.gradient * 0.65),
+    ));
+    gradient_rect(p, rect, f.radius, top, bottom);
     if f.material == FaceMaterial::Lacquer && f.gloss > 0.0 {
         // Continuous top light: fades out over the whole face, so no edge cuts the content.
         let mut mesh = Mesh::default();
@@ -150,13 +181,23 @@ pub fn surface(p: &Painter, st: &Style, rect: Rect, base: Color32, edge: Color32
         p.extend(lines);
     }
     p.rect_stroke(rect, cr, Stroke::new(1.0, edge), StrokeKind::Inside);
-    if f.material == FaceMaterial::Satin {
+    let lit = if f.material == FaceMaterial::Satin {
+        f.highlight.max(38)
+    } else {
+        f.highlight
+    };
+    if lit > 0 {
+        let inset = if f.material == FaceMaterial::Satin {
+            1.0
+        } else {
+            f.radius as f32 * 0.6 + 1.0
+        };
         p.line_segment(
             [
-                rect.left_top() + vec2(1.0, 1.0),
-                rect.right_top() + vec2(-1.0, 1.0),
+                rect.left_top() + vec2(inset, 1.0),
+                rect.right_top() + vec2(-inset, 1.0),
             ],
-            Stroke::new(1.0, Color32::from_white_alpha(38)),
+            Stroke::new(1.0, Color32::from_white_alpha(lit)),
         );
     }
     if f.material != FaceMaterial::Flat || f.hardware != FaceHardware::None {
@@ -389,6 +430,8 @@ pub struct Knob {
     /// Knob travel, 0..=1.
     pub value: f32,
     pub hot: bool,
+    /// Colour of the value arc: the accent, or the module's family ink (look B).
+    pub arc: Color32,
 }
 
 pub fn knob(p: &Painter, st: &Style, k: &Knob) {
@@ -417,15 +460,12 @@ pub fn knob(p: &Painter, st: &Style, k: &Knob) {
             // Glow underlay: the same arc, wide and faint.
             p.add(Shape::line(
                 arc_pts(c, track, 0.0, k.value),
-                Stroke::new(
-                    6.0 * z,
-                    alpha(r.accent, (40.0 * ks.glow.min(1.0) / 0.4) as u8),
-                ),
+                Stroke::new(6.0 * z, alpha(k.arc, (40.0 * ks.glow.min(1.0) / 0.4) as u8)),
             ));
         }
         p.add(Shape::line(
             arc_pts(c, track, 0.0, k.value),
-            Stroke::new(2.5 * z, r.accent),
+            Stroke::new(2.5 * z, k.arc),
         ));
     }
     let skirt = mix(r.knob, r.knob_hi, 0.25);
@@ -741,7 +781,32 @@ fn fade(p: &Painter, rect: Rect, side: usize, depth: f32, a: u8) {
 pub fn display_frame(p: &Painter, st: &Style, rect: Rect, face: Color32, z: f32) {
     let r = &st.roles;
     let cr = CornerRadius::same((3.0 * z).clamp(2.0, 6.0) as u8);
-    if st.slots.display.frame == DisplayFrame::Paper {
+    if st.slots.display.frame == DisplayFrame::Well {
+        // Look A and B: a dark well cut into the face, a lit lip under it and a 7 px shadow
+        // falling from the top edge.
+        let cr = CornerRadius::same((4.0 * z).clamp(2.0, 6.0) as u8);
+        p.rect_stroke(
+            rect.translate(vec2(0.0, 1.0)).expand(1.0),
+            cr,
+            Stroke::new(1.0, alpha(Color32::WHITE, 15)),
+            StrokeKind::Outside,
+        );
+        p.rect_filled(rect, cr, r.disp_bg);
+        fade(p, rect, 0, (7.0 * z).max(3.0), 140);
+        p.rect_stroke(
+            rect,
+            cr,
+            Stroke::new(
+                1.0,
+                if st.slots.face.material == FaceMaterial::Line {
+                    r.line2
+                } else {
+                    alpha(Color32::BLACK, 153)
+                },
+            ),
+            StrokeKind::Inside,
+        );
+    } else if st.slots.display.frame == DisplayFrame::Paper {
         // Paper wells are the inset colour in both themes (light grey on paper, as in the mockup).
         p.rect_filled(rect, cr, r.disp_bg);
         p.rect_stroke(rect, cr, Stroke::new(1.0, r.line2), StrokeKind::Inside);
@@ -863,10 +928,16 @@ pub fn family_ink(st: &Style, kind: &str, ink: Color32) -> Color32 {
     }
 }
 
-/// The 3 px family stripe along the top edge of a face (`FamilyMarker::Stripe`).
+/// The family stripe along the top edge of a face (`FamilyMarker::Stripe`), clipped to the face
+/// outline so it follows the corner radius.
 pub fn family_stripe(p: &Painter, st: &Style, face: Rect, kind: &str, z: f32) {
-    if st.slots.face.family == crate::style::FamilyMarker::Stripe {
-        let r = Rect::from_min_size(face.min + vec2(z, z), vec2(face.width() - 2.0 * z, 3.0 * z));
-        p.rect_filled(r, CornerRadius::same(1), st.section_of(kind).ink);
+    let f = &st.slots.face;
+    if f.family == crate::style::FamilyMarker::Stripe {
+        let band = Rect::from_min_size(face.min, vec2(face.width(), 4.0 * z));
+        p.with_clip_rect(band.intersect(p.clip_rect())).rect_filled(
+            face,
+            CornerRadius::same(f.radius),
+            st.section_of(kind).ink,
+        );
     }
 }

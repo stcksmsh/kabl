@@ -7,8 +7,8 @@
 //! the base theme plus notes.
 
 use super::{
-    builtin_a, builtin_b, compose, contrast, line_solid_default, outline_default, with_accent,
-    Accent, Style, FACE_STYLES, TEXT_FLOOR,
+    builtin_a, builtin_b, compose, contrast, line_solid_default, look_b_default, outline_default,
+    with_accent, Accent, Style, FACE_STYLES, TEXT_FLOOR,
 };
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -21,6 +21,8 @@ pub const MAX_THEMES: usize = 64;
 pub const UI_API: i64 = 2;
 /// Below this ratio a text pair is rejected; below 4.5 it is only reported.
 const REJECT_BELOW: f32 = 3.0;
+/// Largest face corner radius a theme may ask for.
+const MAX_FACE_RADIUS: u8 = 24;
 
 /// One theme: a light and a dark `Style`, plus what loading it had to say.
 #[derive(Clone, Debug)]
@@ -53,6 +55,7 @@ impl Default for Themes {
     fn default() -> Self {
         Themes {
             list: vec![
+                builtin(look_b_default, "Look B"),
                 builtin(builtin_a, "Satin Studio"),
                 builtin(builtin_b, "Lacquer and Light"),
                 builtin(line_solid_default, "Signal and Drafting solid"),
@@ -389,6 +392,12 @@ fn clamp(s: &mut Style, base: &Style, mode: &str, notes: &mut Vec<String>) {
         mode,
         notes,
     );
+    if s.slots.face.radius > MAX_FACE_RADIUS {
+        s.slots.face.radius = MAX_FACE_RADIUS;
+        notes.push(format!(
+            "{mode}: face.radius limited to 0 to {MAX_FACE_RADIUS}"
+        ));
+    }
     for (i, sh) in s.shadows.iter_mut().enumerate() {
         num(
             &mut sh.dy,
@@ -560,7 +569,7 @@ pub struct Prefs {
 impl Default for Prefs {
     fn default() -> Self {
         Prefs {
-            theme: super::BUILTIN_A_ID.into(),
+            theme: super::LOOK_B_ID.into(),
             dark: false,
             folders: Default::default(),
         }
@@ -612,14 +621,14 @@ mod tests {
     #[test]
     fn partial_theme_overrides_only_what_it_names() {
         let t = parse(
-            "id = \"u.red\"\nname = \"Red\"\n[light.roles]\naccent = \"#c01010\"\n",
+            "id = \"u.red\"\nname = \"Red\"\n[light.roles]\naccent = \"#e0a020\"\n",
             &themes(),
         )
         .unwrap();
-        let a = builtin_a(false);
-        assert_eq!(t.light.roles.accent, Color::from_rgb(0xc0, 0x10, 0x10));
+        let a = look_b_default(false);
+        assert_eq!(t.light.roles.accent, Color::from_rgb(0xe0, 0xa0, 0x20));
         assert_eq!(t.light.roles.bg, a.roles.bg);
-        assert_eq!(t.dark.roles, builtin_a(true).roles);
+        assert_eq!(t.dark.roles, look_b_default(true).roles);
         assert!(t.notes.is_empty(), "{:?}", t.notes);
     }
 
@@ -633,7 +642,7 @@ mod tests {
             &themes(),
         )
         .unwrap();
-        let a = builtin_a(false);
+        let a = look_b_default(false);
         assert_eq!(t.light.roles.bg, a.roles.bg);
         assert_eq!(t.light.slots.knob.body, a.slots.knob.body);
         assert_eq!(t.light.slots.knob.glow, 1.0);
@@ -651,6 +660,23 @@ mod tests {
     }
 
     #[test]
+    fn an_oversized_face_radius_is_limited() {
+        let t = parse(
+            "id = \"u.round\"\nname = \"Round\"\n[dark.slots.face]\nradius = 255\n",
+            &themes(),
+        )
+        .unwrap();
+        assert_eq!(t.dark.slots.face.radius, MAX_FACE_RADIUS);
+        // The selected-module outline adds 1 to it and must not overflow.
+        assert!(t.dark.slots.face.radius.checked_add(1).is_some());
+        assert!(
+            t.notes.iter().any(|n| n.contains("face.radius")),
+            "{:?}",
+            t.notes
+        );
+    }
+
+    #[test]
     fn unreadable_text_rejects_the_mode() {
         let t = parse(
             "id = \"u.dim\"\nname = \"Dim\"\n[light.roles]\ntext = \"#f3efe5\"\n",
@@ -662,7 +688,7 @@ mod tests {
             Style {
                 id: "u.dim".into(),
                 name: "Dim".into(),
-                ..builtin_a(false)
+                ..look_b_default(false)
             }
         );
         assert!(t
@@ -679,7 +705,7 @@ mod tests {
             &themes(),
         )
         .unwrap();
-        assert_eq!(t.dark.roles.text, builtin_a(true).roles.text);
+        assert_eq!(t.dark.roles.text, look_b_default(true).roles.text);
         assert_eq!(t.dark.types.caption.size, TEXT_FLOOR);
     }
 
@@ -712,6 +738,7 @@ mod tests {
         assert_eq!(
             ids,
             [
+                "kabl.look_b",
                 "kabl.satin",
                 "kabl.lacquer",
                 "kabl.line_solid",
@@ -720,7 +747,7 @@ mod tests {
             ]
         );
         assert_eq!(msgs.len(), 3, "{msgs:?}");
-        assert_eq!(t.resolve("gone").id, "kabl.satin");
+        assert_eq!(t.resolve("gone").id, "kabl.look_b");
     }
 
     #[test]
@@ -739,7 +766,7 @@ mod tests {
             &known,
         )
         .unwrap();
-        assert_eq!(t1.dark.roles.accent, builtin_a(true).roles.accent);
+        assert_eq!(t1.dark.roles.accent, look_b_default(true).roles.accent);
         assert!(
             t1.notes.iter().any(|n| n.contains("ui_api = 2")),
             "{:?}",
