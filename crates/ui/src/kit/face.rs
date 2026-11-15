@@ -2,7 +2,7 @@
 //! and trace. Colours come from the theme's roles and the face's section palette, shapes from
 //! the recipe slots; callers pass the zoom `z` and a screen-space position.
 
-use super::containers::eshadow;
+use crate::style::Shadow;
 use crate::style::{
     alpha, mix, CompactText, DisplayFrame, DisplayTrace, FaceHardware, FaceMaterial, FaceTitle,
     JackRecipe, KnobBody, KnobMod, KnobScale, KnobValue, Role, Style, TEXT_FLOOR,
@@ -128,14 +128,26 @@ fn gradient_rect(p: &Painter, rect: Rect, r: u8, top: Color32, bottom: Color32) 
     p.add(Shape::mesh(mesh));
 }
 
+fn face_shadow(s: Shadow) -> egui::epaint::Shadow {
+    egui::epaint::Shadow {
+        offset: [0, s.dy as i8],
+        blur: s.blur as u8,
+        spread: 0,
+        color: alpha(Color32::BLACK, s.alpha),
+    }
+}
+
 /// The face: shadow, material, edge and the corner hardware.
 pub fn surface(p: &Painter, st: &Style, rect: Rect, base: Color32, edge: Color32, z: f32) {
     let f = &st.slots.face;
     let cr = CornerRadius::same(f.radius);
     let edge = if f.edge.a() > 0 { f.edge } else { edge };
     let ends = (f.top.a() > 0 && f.bottom.a() > 0).then_some((f.top, f.bottom));
-    if f.material != FaceMaterial::Flat && st.shadows[f.shadow.min(2)].alpha > 0 {
-        p.add(eshadow(st, f.shadow).as_shape(rect, cr));
+    if f.material != FaceMaterial::Flat {
+        let sh = f.own_shadow.unwrap_or(st.shadows[f.shadow.min(2)]);
+        if sh.alpha > 0 {
+            p.add(face_shadow(sh).as_shape(rect, cr));
+        }
     }
     if f.material == FaceMaterial::Line {
         // Line art: the surface colour (or a faint gradient), one hairline edge, screws; no gloss

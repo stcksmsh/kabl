@@ -260,6 +260,10 @@ pub struct FaceSlots {
     pub title: FaceTitle,
     pub out_plate: OutPlate,
     pub shadow: usize,
+    /// A shadow of the face's own, so tuning it leaves the cards and popovers on `shadows`.
+    /// `None` = `shadows[shadow]`.
+    #[serde(default)]
+    pub own_shadow: Option<Shadow>,
     pub family: FamilyMarker,
     pub compact: CompactText,
     pub tray: TrayRecipe,

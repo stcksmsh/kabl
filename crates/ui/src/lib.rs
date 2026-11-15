@@ -1784,8 +1784,9 @@ fn transport_readout(state: &PatchState, ui_state: &UiState) -> Option<(f32, Str
     ))
 }
 
-/// The status bar: output meter and peak, sample rate, MIDI input, the last message and the
-/// recording clock; the host's controls at the right end.
+/// The status bar. Left: output meter, peak, MIDI input and the last message. Right: tempo and
+/// position, then sample rate and CPU in the quietest text (a click opens Diagnostics: buffer
+/// size and voices), the recording clock and the host's controls.
 fn status_bar(
     ui_state: &mut UiState,
     ui: &mut egui::Ui,
@@ -1805,12 +1806,6 @@ fn status_bar(
                 .max_db
                 .map_or("no signal".to_string(), |m| format!("{m:+.1} dB"));
             kit::label(ui, st, style::Role::Value, kit::Tone::Text2, peak);
-            let khz = ui_state.sample_rate / 1000.0;
-            let rate = match ui_state.status_buffer {
-                Some(frames) => format!("{khz:.1} kHz · {frames}"),
-                None => format!("{khz:.1} kHz"),
-            };
-            kit::label(ui, st, style::Role::Value, kit::Tone::Text2, rate);
         }
         if let Some(port) = ui_state.midi_input.clone() {
             let (dot, _) =
@@ -1830,24 +1825,6 @@ fn status_bar(
             kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, &text)
                 .on_hover_text(&text);
         }
-        if let Some(cpu) = ui_state.status_cpu {
-            kit::label(
-                ui,
-                st,
-                style::Role::Caption,
-                kit::Tone::Text2,
-                format!("CPU {cpu:.0} %"),
-            );
-        }
-        if let Some((used, all)) = ui_state.status_voices {
-            kit::label(
-                ui,
-                st,
-                style::Role::Caption,
-                kit::Tone::Text2,
-                format!("Voices {used} / {all}"),
-            );
-        }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             // Tempo and position are the rightmost, as in the mockup; the host's controls follow.
             if let Some(pos) = ui_state.status_pos.clone() {
@@ -1863,6 +1840,37 @@ fn status_bar(
                 );
             }
             right(ui, ui_state);
+            // Sample rate and CPU, quiet; a click opens Diagnostics (buffer size, voices).
+            let khz = ui_state.sample_rate / 1000.0;
+            let mut quiet = format!("{khz:.1} kHz");
+            if let Some(cpu) = ui_state.status_cpu {
+                quiet.push_str(&format!(" · CPU {cpu:.0} %"));
+            }
+            let quiet = kit::label(ui, st, style::Role::Caption, kit::Tone::Text3, quiet);
+            let quiet = ui.interact(quiet.rect, Id::new("status-diagnostics"), Sense::click());
+            ui_state.record("status:diagnostics".into(), quiet.rect);
+            let quiet = quiet.on_hover_text("Diagnostics");
+            egui::Popup::from_toggle_button_response(&quiet).show(|ui| {
+                kit::label(ui, st, style::Role::H3, kit::Tone::Text, "Diagnostics");
+                if let Some(frames) = ui_state.status_buffer {
+                    kit::label(
+                        ui,
+                        st,
+                        style::Role::Value,
+                        kit::Tone::Text2,
+                        format!("Buffer {frames} frames"),
+                    );
+                }
+                if let Some((used, all)) = ui_state.status_voices {
+                    kit::label(
+                        ui,
+                        st,
+                        style::Role::Value,
+                        kit::Tone::Text2,
+                        format!("Voices {used} / {all}"),
+                    );
+                }
+            });
             if let Some(rec) = ui_state.recorder.as_ref().filter(|r| r.recording()) {
                 let t = rec.elapsed() as u64;
                 kit::label(
@@ -1913,7 +1921,13 @@ fn show_param_panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut e
         return;
     }
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(format!("{} #{id}", info.name)).strong());
+        ui.label(egui::RichText::new(info.name).strong());
+        // Kind and id left the face; they are here and in the title tooltip.
+        ui.label(
+            egui::RichText::new(format!("{kind} · #{id}"))
+                .small()
+                .weak(),
+        );
         let r = ui
             .small_button("Explain")
             .on_hover_text("What this module does and what it is connected to");
@@ -2490,8 +2504,103 @@ fn text(
     p.text(pos, align, s, f, col)
 }
 
+/// Paints one module face, then lifts its titles, labels and plain values above the cables.
 #[allow(clippy::too_many_arguments)]
 fn draw_module(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    painter: &egui::Painter,
+    th: &Theme,
+    xf: Xf,
+    m: &Placed,
+    now: f64,
+    drawn: &mut Drawn,
+) {
+    let layer = painter.layer_id();
+    let start = ui
+        .ctx()
+        .graphics(|g| g.get(layer).map_or(0, |l| l.next_idx().0));
+    draw_module_shapes(editor, ui_state, ui, painter, th, xf, m, now, drawn);
+    // A lifted module (Foreground layer) already paints above the cables.
+    if m.skin.is_none() && ui.layer_id().order != egui::Order::Foreground {
+        let decor = match m.decor {
+            Decor::Keys(r)
+            | Decor::Display(r)
+            | Decor::Transport(r)
+            | Decor::Banks(r)
+            | Decor::Operators(r)
+            | Decor::Grid(r)
+            | Decor::Cues(r) => Some(xf.r(r)),
+            _ => None,
+        };
+        let face_fill = theme::panel_theme(&ui_state.style, m.info.kind).panel;
+        lift_labels(ui, ui_state, layer, start, xf.r(m.face), face_fill, decor);
+    }
+}
+
+/// Moves the text shapes painted since `start` into the deferred pass, which paints above the
+/// cables, each on a backing in the colour of what it sits on (a plate, a pill, else the face):
+/// a rounded rect at alpha .85 with 2 px padding, so a cable is cut cleanly behind the text.
+/// Text inside the module's display or grid keeps its place.
+fn lift_labels(
+    ui: &egui::Ui,
+    ui_state: &mut UiState,
+    layer: egui::LayerId,
+    start: usize,
+    face: Rect,
+    face_fill: Color32,
+    keep_in: Option<Rect>,
+) {
+    use egui::epaint::Shape as S;
+    let area = face.area();
+    let lifted: Vec<(Rect, Color32, S)> = ui.ctx().graphics_mut(|g| {
+        let list = g.entry(layer);
+        let mut fills: Vec<(Rect, Color32)> = Vec::new();
+        let mut texts: Vec<usize> = Vec::new();
+        for (i, cs) in list.all_entries().enumerate().skip(start) {
+            match &cs.shape {
+                S::Rect(r) if r.fill.a() >= 200 && r.rect.area() < 0.6 * area => {
+                    fills.push((r.rect, r.fill));
+                }
+                S::Text(_) => texts.push(i),
+                _ => {}
+            }
+        }
+        let mut out = Vec::with_capacity(texts.len());
+        for i in texts {
+            let mut taken = None;
+            list.mutate_shape(egui::layers::ShapeIdx(i), |cs| {
+                if let S::Text(t) = &cs.shape {
+                    let r = t.galley.rect.translate(t.pos.to_vec2());
+                    if !r.is_positive() || keep_in.is_some_and(|k| k.contains_rect(r)) {
+                        return;
+                    }
+                    let c = r.center();
+                    let back = fills
+                        .iter()
+                        .rev()
+                        .find(|(f, _)| f.contains(c))
+                        .map_or(face_fill, |(_, c)| *c);
+                    taken = Some((r, back, std::mem::replace(&mut cs.shape, S::Noop)));
+                }
+            });
+            out.extend(taken);
+        }
+        out
+    });
+    for (r, back, shape) in lifted {
+        ui_state.deferred.push(S::rect_filled(
+            r.expand(2.0),
+            CornerRadius::same(3),
+            back.gamma_multiply(0.85),
+        ));
+        ui_state.deferred.push(shape);
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn draw_module_shapes(
     editor: &mut PatchEditor,
     ui_state: &mut UiState,
     ui: &mut egui::Ui,
@@ -2602,22 +2711,17 @@ fn draw_module(
             let n = set.iter().filter(|on| **on).count();
             format!("choose face · {n} on face")
         }
-        None if skin.is_some() => format!("{} · skin · #{}", m.info.kind, m.id),
+        None if skin.is_some() => "skin".to_string(),
         None if m.info.kind == "seq" => {
             let edit = ui_state.edit_bank_of(editor.state(), m.id);
             let playing = ui_state.seq_banks.get(&m.id).map(|b| b.0);
             if playing.is_some_and(|p| p != edit) {
                 format!(
-                    "seq · #{} · editing {} (not playing)",
-                    m.id,
+                    "editing {} (not playing)",
                     banks::title(editor.state(), m.id, edit)
                 )
             } else {
-                format!(
-                    "seq · #{} · {}",
-                    m.id,
-                    banks::title(editor.state(), m.id, edit)
-                )
+                banks::title(editor.state(), m.id, edit)
             }
         }
         None if m.info.kind == "lfo" => {
@@ -2628,10 +2732,9 @@ fn draw_module(
                 .and_then(|s| s.params.get("sync"))
                 .map_or(0, |v| v.round() as usize);
             match (sync, ui_state.lfo_status.get(&m.id)) {
-                (0, _) => format!("lfo · #{}", m.id),
+                (0, _) => String::new(),
                 (s, st) => format!(
-                    "lfo · #{} · {} · {}",
-                    m.id,
+                    "{} · {}",
                     kabl_modules::builtins::SYNC_LABELS
                         .get(s)
                         .copied()
@@ -2646,7 +2749,7 @@ fn draw_module(
                 ),
             }
         }
-        None => format!("{} · #{}", m.info.kind, m.id),
+        None => String::new(),
     };
     // What a left-aligned title must not touch: control labels, jacks with labels, displays.
     let mut avoid: Vec<Rect> = m
@@ -2675,6 +2778,14 @@ fn draw_module(
     let avoid: Vec<Rect> = avoid.into_iter().map(|r| xf.r(r)).collect();
     let ti = kit::face::family_ink(&st, m.info.kind, ink);
     let title_r = kit::face::title(painter, &st, face, z, m.info.name, &tag, ti, ink2, &avoid);
+    if title_r.is_positive() {
+        ui.interact(
+            title_r.expand(2.0),
+            Id::new(("face-title-tip", m.id)),
+            Sense::hover(),
+        )
+        .on_hover_text(format!("{} · #{}", m.info.kind, m.id));
+    }
     if ui_state.selected_module == Some(m.id) {
         painter.rect_stroke(
             rect.expand(1.0),
@@ -3470,7 +3581,7 @@ fn draw_seq_steps(
                     vec2(cw - 6.0, 218.0),
                 )),
                 CornerRadius::same((6.0 * z) as u8),
-                st.roles.accent.gamma_multiply(0.07),
+                st.roles.accent.gamma_multiply(0.11),
             );
         }
         painter.circle_filled(
