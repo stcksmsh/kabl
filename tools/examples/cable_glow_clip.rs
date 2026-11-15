@@ -90,18 +90,21 @@ impl App {
         ui.drawer_open = false;
         ui.browser_open = false;
         ui.theme = "kabl.look_b".into();
-        ui.dark = false;
+        // KABL_CAP_DARK=1 records the dark theme (name gets `__dark`); KABL_CLIP_TAG=x adds `__x`.
+        ui.dark = std::env::var("KABL_CAP_DARK").is_ok();
         ui.inspect.audio = true;
         ui.cable_life = CableLife::GlowPulses;
         ui.cable_intensity = j.intensity;
         let name = format!(
-            "{}__look-b__{}",
+            "{}__look-b__{}{}{}",
             j.patch,
             if j.intensity == Intensity::High {
                 "high"
             } else {
                 "low"
-            }
+            },
+            if ui.dark { "__dark" } else { "" },
+            std::env::var("KABL_CLIP_TAG").map_or(String::new(), |t| format!("__{t}"))
         );
         let ffmpeg = std::process::Command::new("ffmpeg")
             .args([
@@ -158,6 +161,15 @@ impl Run {
             }
             if fires((at + hold) % 6.4) {
                 self.engine.key(KeyEvent::Off { note });
+            }
+        }
+        // The clock's song position in pulses (four to a beat), as the audio thread reports it.
+        for (&id, m) in &self.editor.state().modules {
+            if m.kind == "clock" {
+                let bpm = f64::from(m.params.get("bpm").copied().unwrap_or(120.0));
+                self.ui
+                    .clock_pos
+                    .insert(id, self.sim as f64 / FPS as f64 * bpm / 60.0 * 4.0);
             }
         }
         for c in std::mem::take(&mut self.ui.launches) {
