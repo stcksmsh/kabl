@@ -42,11 +42,22 @@ pub struct Live {
 /// The face-tap targets this frame's drawing asked for, and what was last sent.
 #[derive(Default)]
 pub struct Wants {
-    asked: Vec<FaceTarget>,
+    asked: Vec<(u8, FaceTarget)>,
     sent: Option<(Vec<FaceTarget>, f64)>,
     token: u64,
-    /// Targets are active: the faces repaint while audio runs.
+    /// A display or knob wants its tap: the faces repaint while audio runs.
     pub active: bool,
+    /// Some tap is for a cable only: the cables decide whether frames are needed.
+    pub cables: bool,
+}
+
+/// Priority of a requested tap, first to last (handover 5.1): the cables of the hovered or
+/// selected module, the face displays and knobs, cables into Output, the other visible cables.
+pub mod rank {
+    pub const HOT: u8 = 0;
+    pub const FACE: u8 = 1;
+    pub const OUTPUT: u8 = 2;
+    pub const VISIBLE: u8 = 3;
 }
 
 /// Re-send an unchanged set this often, in case the queue dropped the command.
@@ -56,12 +67,15 @@ impl Wants {
     /// A visible module's own display reads its output 0 and view; the compressor's reads `gr`
     /// (output 2), since the engine reads one output of each module instance.
     pub fn display(&mut self, id: ModuleId, kind: &'static str) {
-        self.asked.push(FaceTarget {
-            module: id,
-            port: if kind == "compressor" { 2 } else { 0 },
-            kind,
-            view: true,
-        });
+        self.asked.push((
+            rank::FACE,
+            FaceTarget {
+                module: id,
+                port: if kind == "compressor" { 2 } else { 0 },
+                kind,
+                view: true,
+            },
+        ));
     }
 
     /// What a display reads besides its own output: the comb's pitch cable.
@@ -82,48 +96,52 @@ impl Wants {
 
     /// A visible knob's route source.
     pub fn source(&mut self, state: &PatchState, id: ModuleId, port: &str) {
-        let Some(m) = state.modules.get(&id) else {
+        self.source_ranked(state, id, port, rank::FACE);
+    }
+
+    /// An output read for a cable's glow, at priority `rank` (see [`rank`]).
+    pub fn source_ranked(&mut self, state: &PatchState, id: ModuleId, port: &str, rank: u8) {
+        let Some((index, _, kind)) = output_of(state, id, port) else {
             return;
         };
-        let Some(info) = registry::info_for(&m.kind) else {
-            return;
-        };
-        let Some(index) = info
-            .ports
-            .iter()
-            .filter(|p| p.direction == PortDirection::Output)
-            .position(|p| p.name == port)
-        else {
-            return;
-        };
-        self.asked.push(FaceTarget {
-            module: id,
-            port: index as u8,
-            kind: info.kind,
-            view: false,
-        });
+        self.asked.push((
+            rank,
+            FaceTarget {
+                module: id,
+                port: index,
+                kind,
+                view: false,
+            },
+        ));
     }
 
     /// End of frame: the command that changes what the engine reads, if any. Nothing is read
     /// while audio is off or nothing with a display is on screen.
     pub fn frame(&mut self, audio: bool, now: f64) -> Option<Command> {
         let mut want: Vec<FaceTarget> = Vec::new();
+        // Per wanted tap: a face wants it, not only a cable.
+        let mut face: Vec<bool> = Vec::new();
         let mut asked = std::mem::take(&mut self.asked);
-        asked.sort_by_key(|t| !t.view);
-        for t in asked {
-            if let Some(w) = want
-                .iter_mut()
-                .find(|w| w.module == t.module && w.port == t.port)
+        asked.sort_by_key(|(r, t)| (*r, !t.view));
+        for (r, t) in asked {
+            let is_face = r == rank::FACE;
+            if let Some(i) = want
+                .iter()
+                .position(|w| w.module == t.module && w.port == t.port)
             {
-                w.view |= t.view;
+                want[i].view |= t.view;
+                face[i] |= is_face;
             } else if want.len() < MAX_FACE_TAPS {
                 want.push(t);
+                face.push(is_face);
             }
         }
         if !audio {
             want.clear();
+            face.clear();
         }
-        self.active = !want.is_empty();
+        self.active = face.iter().any(|&f| f);
+        self.cables = !want.is_empty() && !self.active;
         let before = self.sent.as_ref().map_or(&[][..], |(w, _)| w.as_slice());
         let changed = before != want.as_slice();
         let stale = self
@@ -140,6 +158,23 @@ impl Wants {
         self.sent = Some((want, now));
         Some(cmd)
     }
+}
+
+/// Output port `port` of module `id`: its index among the module's outputs, its type and the
+/// module's kind.
+pub fn output_of(
+    state: &PatchState,
+    id: ModuleId,
+    port: &str,
+) -> Option<(u8, kabl_modules::PortType, &'static str)> {
+    let info = registry::info_for(&state.modules.get(&id)?.kind)?;
+    let (index, p) = info
+        .ports
+        .iter()
+        .filter(|p| p.direction == PortDirection::Output)
+        .enumerate()
+        .find(|(_, p)| p.name == port)?;
+    Some((index as u8, p.port_type, info.kind))
 }
 
 /// Reports older than this are not drawn as live.

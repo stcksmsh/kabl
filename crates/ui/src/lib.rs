@@ -14,6 +14,7 @@
 pub mod about;
 pub mod banks;
 pub mod browser;
+pub mod cable_life;
 mod cable_look;
 pub mod code_examples;
 pub mod code_notice;
@@ -283,6 +284,11 @@ pub struct UiState {
     /// Where the choice is remembered; `None` (the default) never touches the disk.
     pub prefs_dir: Option<std::path::PathBuf>,
     prefs_saved: Option<style::Prefs>,
+    /// Settings "Cable life" and "Intensity"; remembered with the theme.
+    pub cable_life: cable_life::CableLife,
+    pub cable_intensity: cable_life::Intensity,
+    /// Smoothed glow per cable, and whether any cable needs frames.
+    pub life: cable_life::Life,
     /// The active style, rebuilt when `theme` or `dark` changes.
     pub style: std::sync::Arc<style::Style>,
     pub panels: panels::View,
@@ -469,6 +475,9 @@ impl Default for UiState {
             theme_notes: Vec::new(),
             prefs_dir: None,
             prefs_saved: None,
+            cable_life: Default::default(),
+            cable_intensity: Default::default(),
+            life: Default::default(),
             style: std::sync::Arc::new(style::look_b_default(false)),
             panels: panels::View::default(),
             tables: tables::View::default(),
@@ -798,6 +807,8 @@ impl UiState {
         self.theme_notes = notes;
         self.theme.clone_from(&p.theme);
         self.dark = p.dark;
+        self.cable_life = p.cable_life;
+        self.cable_intensity = p.cable_intensity;
         // A remembered folder that is gone is dropped: its place starts in home again.
         self.folders = p.folders.clone();
         self.folders.retain(|_, d| d.is_dir());
@@ -811,6 +822,8 @@ impl UiState {
             theme: self.theme.clone(),
             dark: self.dark,
             folders: self.folders.clone(),
+            cable_life: self.cable_life,
+            cable_intensity: self.cable_intensity,
         };
         if self.prefs_saved.as_ref() != Some(&p) {
             if let Err(e) = p.save(dir) {
@@ -899,6 +912,15 @@ pub fn show_with(
     if ui_state.wants.active {
         ui.ctx()
             .request_repaint_after(std::time::Duration::from_millis(33));
+    } else if ui_state.wants.cables {
+        // Only cables watch: frames while one is lit, else a slow look for a sound beginning.
+        let ms = if ui_state.life.live(now) {
+            cable_life::LIVE_REPAINT_MS
+        } else {
+            cable_life::WATCH_REPAINT_MS
+        };
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_millis(ms));
     }
     // Inspecting a control in another bank (a route, a pin, a CC mapping) shows that bank on
     // the face. It never launches it.
@@ -1731,6 +1753,43 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
                     .collect::<Vec<_>>();
                 for n in notes {
                     kit::paragraph(ui, st, style::Role::Caption, kit::Tone::Text2, &n);
+                }
+                kit::gap(ui, st, 1);
+                kit::rule(ui, st);
+                kit::gap(ui, st, 1);
+                kit::paragraph(ui, st, style::Role::Caption, kit::Tone::Text2, "Cable life");
+                let mut changed = false;
+                kit::segmented(ui, st, |ui| {
+                    use cable_life::CableLife as L;
+                    for (v, label, key) in [
+                        (L::GlowPulses, "Glow + pulses", "life:glow-pulses"),
+                        (L::Glow, "Glow", "life:glow"),
+                        (L::Off, "Off", "life:off"),
+                    ] {
+                        let r = kit::seg(ui, st, label, ui_state.cable_life == v);
+                        ui_state.record(key.into(), r.rect);
+                        if r.clicked() {
+                            ui_state.cable_life = v;
+                            changed = true;
+                        }
+                    }
+                });
+                kit::segmented(ui, st, |ui| {
+                    use cable_life::Intensity as I;
+                    for (v, label, key) in [
+                        (I::Low, "Low", "intensity:low"),
+                        (I::High, "High", "intensity:high"),
+                    ] {
+                        let r = kit::seg(ui, st, label, ui_state.cable_intensity == v);
+                        ui_state.record(key.into(), r.rect);
+                        if r.clicked() {
+                            ui_state.cable_intensity = v;
+                            changed = true;
+                        }
+                    }
+                });
+                if changed {
+                    ui_state.save_prefs();
                 }
                 kit::gap(ui, st, 1);
                 kit::rule(ui, st);
@@ -4662,6 +4721,51 @@ fn draw_cables(
     };
     let lit: Vec<bool> = runs.iter().map(&lit_of).collect();
     let dim_others = pinned && selected.is_some();
+    // Living cables: ask the engine for the outputs worth watching, and take the glow from the
+    // reports of the last frames. Untapped cables keep the static look.
+    let mut live_lit = vec![0.0f32; runs.len()];
+    if only.is_none() {
+        let now = ctx.input(|i| i.time);
+        let dt = ctx.input(|i| i.stable_dt);
+        let canvas = ui_state.canvas;
+        for (i, r) in runs.iter().enumerate() {
+            let PortRef::Module { id, port } = &r.c.from else {
+                continue;
+            };
+            let Some((index, ty, _)) = displays::output_of(editor.state(), *id, port) else {
+                continue;
+            };
+            let Some(class) = cable_life::Class::of(ty) else {
+                continue;
+            };
+            if !ui_state.cable_life.glows() {
+                continue;
+            }
+            if !canvas.intersects(Rect::from_points(&r.pts)) {
+                continue;
+            }
+            let into_out = matches!(&r.c.to, PortRef::Module { id, .. }
+                if editor.state().modules.get(id).is_some_and(|m| m.kind == "out"));
+            let rank = if lit[i] {
+                displays::rank::HOT
+            } else if into_out {
+                displays::rank::OUTPUT
+            } else {
+                displays::rank::VISIBLE
+            };
+            ui_state
+                .wants
+                .source_ranked(editor.state(), *id, port, rank);
+            let (lo, hi) = ty.nominal_range();
+            let target = ui_state
+                .live
+                .tap(*id, index, now)
+                .map(|t| cable_life::target(class, t, lo.abs().max(hi.abs())));
+            live_lit[i] = ui_state.life.update(r.id, class, target, dt, now);
+        }
+        ui_state.life.end_frame();
+    }
+    let intensity = ui_state.cable_intensity;
     let secs = 0.12;
     // Resting cables first, lit ones on top.
     let mut order: Vec<usize> = (0..runs.len()).collect();
@@ -4703,6 +4807,26 @@ fn draw_cables(
             cable_look::glow(painter, &st, &runs[i].pts, col, alpha, t, z);
         }
     }
+    // The signal's own glow, under every core.
+    let calm = |i: usize| {
+        if dim_others && !lit[i] {
+            slots.dimmed
+        } else {
+            1.0
+        }
+    };
+    for &i in &order {
+        if live_lit[i] >= cable_life::QUIET {
+            let (_, _, w, _, _) = look(i);
+            cable_life::paint_glow(
+                painter,
+                &runs[i].pts,
+                w + cable_life::GLOW_EXTRA * z,
+                bases[i],
+                live_lit[i] * intensity.glow_alpha() * calm(i),
+            );
+        }
+    }
     let themed = slots.style == style::CableStyle::Themed;
     for i in order {
         let r = &runs[i];
@@ -4712,6 +4836,17 @@ fn draw_cables(
         cable_look::paint(
             painter, &mut top, &st, &r.pts, col, w, alpha, casing, bypass, t, z, stereo,
         );
+        if live_lit[i] >= cable_life::QUIET {
+            // The light on the core.
+            let hot = bases[i].lerp_to_gamma(Color32::WHITE, 0.6);
+            painter.add(egui::Shape::line(
+                r.pts.to_vec(),
+                Stroke::new(
+                    (w * 0.5).max(1.5),
+                    hot.gamma_multiply(live_lit[i] * intensity.light_alpha() * calm(i)),
+                ),
+            ));
+        }
         let mid = r.pts[r.pts.len() / 2];
         let steps = kabl_cables::Settings::from_params(&r.c.params);
         let len = kabl_cables::slot_value(&r.c.params, 0) as usize;
@@ -4739,7 +4874,7 @@ fn draw_cables(
                 carries = Some(clock.map_or(0.0, |p| p.fract() as f32));
             }
         }
-        if let Some(t) = carries {
+        if let Some(t) = carries.filter(|_| ui_state.cable_life.pulses()) {
             let id = Id::new(("kabl-cable-light", r.id));
             let k = kit::smooth_to(&ctx, id, f32::from(clock.is_some()), st.motion.glide);
             cable_look::light(&mut top, &r.pts, col, t, k * alpha, z);

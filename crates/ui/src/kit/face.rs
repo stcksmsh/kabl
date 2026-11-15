@@ -135,7 +135,16 @@ pub fn surface(p: &Painter, st: &Style, rect: Rect, base: Color32, edge: Color32
     let edge = if f.edge.a() > 0 { f.edge } else { edge };
     let ends = (f.top.a() > 0 && f.bottom.a() > 0).then_some((f.top, f.bottom));
     if f.material != FaceMaterial::Flat && st.shadows[f.shadow.min(2)].alpha > 0 {
-        p.add(eshadow(st, f.shadow).as_shape(rect, cr));
+        let s = st.shadows[f.shadow.min(2)];
+        // A pre-blurred nine-slice texture: sixteen vertices instead of a tessellated feather.
+        let tex = super::blur::drop_shadow(
+            p.ctx(),
+            rect.translate(egui::vec2(0.0, s.dy)),
+            f32::from(f.radius),
+            s.blur,
+            s.alpha,
+        );
+        p.add(tex.unwrap_or_else(|| eshadow(st, f.shadow).as_shape(rect, cr).into()));
     }
     if f.material == FaceMaterial::Line {
         // Line art: the surface colour (or a faint gradient), one hairline edge, screws; no gloss

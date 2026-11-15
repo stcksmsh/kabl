@@ -5,6 +5,7 @@
 //! their `ui_state.record(..)` hit keys and `clicked()` logic. Each widget has hover, pressed,
 //! keyboard-focus and disabled states.
 
+pub mod blur;
 mod containers;
 mod controls;
 pub mod face;

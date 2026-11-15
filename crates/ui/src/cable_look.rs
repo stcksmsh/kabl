@@ -128,6 +128,11 @@ pub fn legible_cached(ctx: &egui::Context, st: &Style, col: Color32, alpha: f32)
     c
 }
 
+/// Points to sample a cable whose rope is about `len` screen points long: one per 12, 12 to 41.
+pub fn point_count(len: f32) -> usize {
+    ((len / 12.0) as usize).clamp(12, 41)
+}
+
 /// A hanging patch cable, drawn as the G4 mockup does (`cables()` in `g4-surfaces.html`): a
 /// cubic whose handles sit 15 % of the span inwards and hang by the theme's sag plus 0.28 of
 /// the length, at most 160. `zoom` scales the base sag and the limit.
@@ -135,9 +140,10 @@ pub fn points(a: Pos2, b: Pos2, zoom: f32, sag: f32) -> Vec<Pos2> {
     let d = b - a;
     let sag = (sag * zoom + 0.28 * d.length()).min(160.0 * zoom);
     let (c1, c2) = (a + vec2(d.x * 0.15, sag), b + vec2(-d.x * 0.15, sag));
-    (0..=40)
+    let n = point_count(d.length() + 2.0 * sag);
+    (0..n)
         .map(|i| {
-            let t = i as f32 / 40.0;
+            let t = i as f32 / (n - 1) as f32;
             let u = 1.0 - t;
             (a.to_vec2() * u * u * u
                 + c1.to_vec2() * 3.0 * u * u * t
