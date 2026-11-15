@@ -867,6 +867,8 @@ pub fn show_with(
     kit::apply(ui.ctx(), &st);
     composites::panel(editor, ui_state, ui.ctx());
     about::show(ui.ctx(), ui_state);
+    // Every scene (Rack, Sounds, Perform) takes a dropped `.kablmod`, not just the rack's dock.
+    module_install::dropped(ui_state, ui.ctx());
     panels::editor(editor, ui_state, ui.ctx());
     filebrowser::window(ui_state, ui.ctx());
     // Edit face is the More controls dialog's second tab.
