@@ -27,19 +27,30 @@ fn contrast(a: Color32, b: Color32) -> f32 {
     (x.max(y) + 0.05) / (x.min(y) + 0.05)
 }
 
+/// Faces dark enough to need a lightened cable fill while the app theme (and so the rack) is
+/// light: look B in the light theme keeps its dark panels.
+pub fn dark_panels_on_light_rack(st: &Style) -> bool {
+    !st.dark && luminance(st.sections.osc.base) < 0.2
+}
+
 /// The rack and every section's face colour: what a cable lies on.
 pub fn surfaces(st: &Style) -> Vec<Color32> {
     let s = &st.sections;
     let f = &st.slots.face;
-    let mut v = vec![
-        st.roles.rack,
+    let mut v = Vec::new();
+    // Dark panels on a light rack (look B in the light app theme): the fill is kept legible on
+    // the panels, and the dark casing carries the cable over the light rack.
+    if !dark_panels_on_light_rack(st) {
+        v.push(st.roles.rack);
+    }
+    v.extend([
         s.osc.base,
         s.filter.base,
         s.modulation.base,
         s.amp.base,
         s.timing.base,
         s.fx.base,
-    ];
+    ]);
     // Looks A and B shade the face: both ends of the gradient and the output plate too.
     v.extend([f.top, f.bottom, f.plate].into_iter().filter(|c| c.a() > 0));
     v
@@ -87,6 +98,8 @@ pub const LIGHT_CASING: f32 = 0.55;
 pub fn resting(ctx: &egui::Context, st: &Style, col: Color32, alpha: f32) -> (Color32, f32) {
     if st.dark {
         (legible_cached(ctx, st, col, alpha), 0.35)
+    } else if dark_panels_on_light_rack(st) {
+        (legible_cached(ctx, st, col, alpha), LIGHT_CASING)
     } else {
         (col, LIGHT_CASING)
     }
@@ -415,10 +428,9 @@ mod tests {
             ("B", true),
             ("look A", false),
             ("look A", true),
+            ("look B", false),
             ("look B", true),
         ];
-        // Look B in the light app theme is not designed (HANDOVER §2): its dark panels carry the
-        // light theme's cable colours, so it is not checked.
         for (name, dark) in looks {
             let st = match name {
                 "A" => builtin_a(dark),
@@ -437,6 +449,13 @@ mod tests {
                 let (fill, casing) = resting(&ctx, &st, c, rest);
                 let w = if dark {
                     worst_contrast(fill, rest, &surf)
+                } else if dark_panels_on_light_rack(&st) {
+                    // Dark panels on a light rack: the fill on the panels, the casing on the rack.
+                    worst_contrast(fill, rest, &surf).min(worst_contrast(
+                        Color32::BLACK,
+                        casing,
+                        &[st.roles.rack],
+                    ))
                 } else {
                     worst_contrast(Color32::BLACK, casing, &surf)
                 };
