@@ -104,6 +104,9 @@ pub fn install(dir: &Path, bytes: &[u8]) -> Result<Installed, String> {
             ));
         }
     }
+    // Register first: a package whose code is refused must not be left on disk, where it would
+    // block a corrected package with the same id and version.
+    register_blob(&p.wasm).map_err(|e| e.to_string())?;
     let path = dir.join(format!("{}-{}.kablmod", m.id, m.version));
     let first = have.is_empty();
     if !path.exists() {
@@ -113,7 +116,6 @@ pub fn install(dir: &Path, bytes: &[u8]) -> Result<Installed, String> {
             .and_then(|()| std::fs::rename(&tmp, &path))
             .map_err(|e| format!("{}: {e}", path.display()))?;
     }
-    register_blob(&p.wasm).map_err(|e| e.to_string())?;
     Ok(Installed {
         hash: m.sha256.clone(),
         manifest: p.manifest,

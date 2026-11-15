@@ -149,3 +149,32 @@ fn notices_are_readable_from_the_wasm() {
     // The committed examples predate `kabl.notices`; the call just must not fail.
     let _ = WasmiEngine::new().notices(EXAMPLES[0].wasm);
 }
+
+#[test]
+fn a_package_the_host_refuses_is_not_left_on_disk() {
+    // Valid metadata, but no `reset` export: the package parses, registering its code fails.
+    let wasm = wat::parse_str(
+        r#"(module
+ (@custom "kabl.meta" "kind test.norest\nversion 1\nname No reset\nexplain Refused at registration.\ncategory filter\nrate voice\nwidth 4\nport in audio in 1\nport out audio out 1\n")
+ (memory (export "memory") 1)
+ (func (export "init") (param f32 i32) (result i32) (i32.const 0))
+ (func (export "process") (param i32)))"#,
+    )
+    .unwrap();
+    let meta = WasmiEngine::new().read_meta(&wasm).unwrap();
+    let mut m = manifest("alice");
+    (m.id, m.version, m.name) = (meta.kind, meta.version, meta.name);
+    let bytes = Package::new(m, wasm, BTreeMap::new())
+        .unwrap()
+        .to_bytes()
+        .unwrap();
+    let root = temp("refused");
+    let dir = install::dir(&root);
+    let err = install::install(&dir, &bytes).unwrap_err();
+    assert!(err.contains("reset"), "{err}");
+    assert!(
+        !dir.exists() || std::fs::read_dir(&dir).unwrap().next().is_none(),
+        "no file written"
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}

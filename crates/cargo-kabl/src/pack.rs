@@ -28,14 +28,8 @@ pub fn write(wasm: &[u8], manifest_path: &Path, package: Option<&str>) -> Result
         ));
     }
     let meta: serde_json::Value = serde_json::from_slice(&out.stdout).map_err(|e| e.to_string())?;
-    let pkgs = meta["packages"].as_array().map_or(&[][..], Vec::as_slice);
-    let pkg = pkgs
-        .iter()
-        .find(|p| match package {
-            Some(n) => p["name"] == n,
-            None => Path::new(p["manifest_path"].as_str().unwrap_or("")) == manifest_path,
-        })
-        .ok_or("could not find the package in `cargo metadata`; pass `--package`")?;
+    let id = crate::build::package_id(manifest_path, package)?;
+    let pkg = crate::build::package(&meta, id.as_deref(), manifest_path)?;
     let text = |k: &str| pkg[k].as_str().unwrap_or("").to_owned();
     let authors: Vec<&str> = pkg["authors"]
         .as_array()

@@ -259,65 +259,12 @@ fn features(args: &build::Args) -> Result<Vec<String>, String> {
         .map_err(|e| format!("cargo metadata: {e}"))?;
     let v: serde_json::Value =
         serde_json::from_slice(&out.stdout).map_err(|e| format!("cargo metadata: {e}"))?;
-    // `-p` takes any package spec (`name`, `name@1.2`, ...): let Cargo resolve it to the id
-    // `cargo metadata` uses.
-    let id = match &args.package {
-        Some(spec) => {
-            let out = Command::new("cargo")
-                .args(["pkgid", "--manifest-path"])
-                .arg(&manifest)
-                .args(["-p", spec])
-                .output()
-                .map_err(|e| format!("cargo pkgid: {e}"))?;
-            if !out.status.success() {
-                return Err(format!("no package `{spec}` in the workspace"));
-            }
-            Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
-        }
-        None => None,
-    };
-    let pkg = package(&v, id.as_deref(), &manifest)?;
+    let id = build::package_id(&manifest, args.package.as_deref())?;
+    let pkg = build::package(&v, id.as_deref(), &manifest)?;
     Ok(pkg["features"]
         .as_object()
         .map(|f| f.keys().cloned().collect())
         .unwrap_or_default())
-}
-
-/// The package the build compiles: the one with package id `id` (from `-p`), else the manifest's own, else (a virtual
-/// workspace root) the only member that builds a cdylib. No silent miss: a package that cannot
-/// be resolved is an error, so the fault checks are never skipped by accident.
-fn package<'a>(
-    meta: &'a serde_json::Value,
-    id: Option<&str>,
-    manifest: &Path,
-) -> Result<&'a serde_json::Value, String> {
-    let pkgs = || meta["packages"].as_array().into_iter().flatten();
-    if let Some(n) = id {
-        return pkgs()
-            .find(|p| p["id"] == n)
-            .ok_or_else(|| format!("no package `{n}` in the workspace"));
-    }
-    if let Some(p) = pkgs().find(|p| p["manifest_path"].as_str().map(Path::new) == Some(manifest)) {
-        return Ok(p);
-    }
-    let is_cdylib = |p: &&serde_json::Value| {
-        p["targets"].as_array().into_iter().flatten().any(|t| {
-            t["crate_types"]
-                .as_array()
-                .is_some_and(|c| c.iter().any(|k| k == "cdylib"))
-        })
-    };
-    // Only the members a plain `cargo build` at the root selects (`default-members`, else all).
-    let selected = |p: &&serde_json::Value| {
-        meta["workspace_default_members"]
-            .as_array()
-            .is_none_or(|d| d.contains(&p["id"]))
-    };
-    let mut cdylibs = pkgs().filter(selected).filter(is_cdylib);
-    match (cdylibs.next(), cdylibs.next()) {
-        (Some(p), None) => Ok(p),
-        _ => Err("cannot tell which package is the module; pick one with `--package`".into()),
-    }
 }
 
 /// Builds the module once per fault feature the crate has; each must be reported as its fault.
@@ -413,6 +360,7 @@ pub fn run(o: &Opts) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::build::package;
     use crate::validate::tests::{blob, PASS, SILENT};
 
     fn module(process: &str) -> Module {
