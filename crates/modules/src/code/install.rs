@@ -109,7 +109,9 @@ pub fn install(dir: &Path, bytes: &[u8]) -> Result<Installed, String> {
     register_blob(&p.wasm).map_err(|e| e.to_string())?;
     let path = dir.join(format!("{}-{}.kablmod", m.id, m.version));
     let first = have.is_empty();
-    if !path.exists() {
+    // A file of that name that is not a valid package is replaced, not trusted: `scan` lists only
+    // valid packages, and any with this id and version were just checked to hold the same code.
+    if !have.iter().any(|h| h.path == path) {
         std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         let tmp = path.with_extension("part");
         std::fs::write(&tmp, bytes)

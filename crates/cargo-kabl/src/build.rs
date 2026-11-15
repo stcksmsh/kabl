@@ -217,9 +217,17 @@ pub fn run(args: &Args) -> Result<PathBuf, String> {
         blob.len(),
         raw_len
     );
+    Ok(dest)
+}
+
+/// `cargo kabl build`: [`run`], then the `.kablmod` package. Packing needs the crate's Cargo
+/// metadata (licence, authors), which `cargo kabl test` does not, so only this path packs.
+pub fn run_and_pack(args: &Args) -> Result<(), String> {
+    let dest = run(args)?;
+    let blob = std::fs::read(&dest).map_err(|e| format!("{}: {e}", dest.display()))?;
     let pack = crate::pack::write(&blob, &manifest(args)?, args.package.as_deref())?;
     println!("{}", pack.display());
-    Ok(dest)
+    Ok(())
 }
 
 /// The one `.wasm` cdylib artifact in cargo's JSON message stream.

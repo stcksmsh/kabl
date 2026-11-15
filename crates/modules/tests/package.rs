@@ -151,6 +151,26 @@ fn notices_are_readable_from_the_wasm() {
 }
 
 #[test]
+fn a_corrupt_file_in_the_way_is_replaced_by_the_install() {
+    let root = temp("corrupt");
+    let dir = install::dir(&root);
+    let a = package("alice");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join(format!("{}-{}.kablmod", a.manifest.id, a.manifest.version));
+    std::fs::write(&path, b"not a zip").unwrap();
+    let done = install::install(&dir, &a.to_bytes().unwrap()).unwrap();
+    assert_eq!(done.path, path);
+    let (have, bad) = scan(&dir);
+    assert_eq!(
+        (have.len(), bad.len()),
+        (1, 0),
+        "the valid package is on disk"
+    );
+    assert!(load_all(&dir).is_empty());
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
 fn a_package_the_host_refuses_is_not_left_on_disk() {
     // Valid metadata, but no `reset` export: the package parses, registering its code fails.
     let wasm = wat::parse_str(
