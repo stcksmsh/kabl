@@ -157,6 +157,7 @@ pub(crate) fn ease_to(ui: &Ui, id: egui::Id, on: bool, ms: f32) -> f32 {
 /// Exponential smoothing toward `target`: time constant `ms` (a `style.motion` token), so it
 /// follows a moving target without the linear ramp of `ease_to`. Keeps the frame repainting
 /// until it settles; a first call starts at `target`.
+#[allow(dead_code)]
 pub(crate) fn smooth_to(ctx: &egui::Context, id: egui::Id, target: f32, ms: f32) -> f32 {
     let v = ctx.data(|d| d.get_temp::<f32>(id)).unwrap_or(target);
     let k = (-ctx.input(|i| i.stable_dt) / Style::secs(ms).max(1e-3)).exp();

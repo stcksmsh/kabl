@@ -289,6 +289,8 @@ pub struct UiState {
     pub cable_intensity: cable_life::Intensity,
     /// Smoothed glow per cable, and whether any cable needs frames.
     pub life: cable_life::Life,
+    /// Gate and clock flashes and their beads.
+    pub pulses: cable_life::Pulses,
     /// The active style, rebuilt when `theme` or `dark` changes.
     pub style: std::sync::Arc<style::Style>,
     pub panels: panels::View,
@@ -478,6 +480,7 @@ impl Default for UiState {
             cable_life: Default::default(),
             cable_intensity: Default::default(),
             life: Default::default(),
+            pulses: Default::default(),
             style: std::sync::Arc::new(style::look_b_default(false)),
             panels: panels::View::default(),
             tables: tables::View::default(),
@@ -914,7 +917,7 @@ pub fn show_with(
             .request_repaint_after(std::time::Duration::from_millis(33));
     } else if ui_state.wants.cables {
         // Only cables watch: frames while one is lit, else a slow look for a sound beginning.
-        let ms = if ui_state.life.live(now) {
+        let ms = if ui_state.life.live(now) || ui_state.pulses.live() {
             cable_life::LIVE_REPAINT_MS
         } else {
             cable_life::WATCH_REPAINT_MS
@@ -4735,9 +4738,6 @@ fn draw_cables(
             let Some((index, ty, _)) = displays::output_of(editor.state(), *id, port) else {
                 continue;
             };
-            let Some(class) = cable_life::Class::of(ty) else {
-                continue;
-            };
             if !ui_state.cable_life.glows() {
                 continue;
             }
@@ -4756,14 +4756,21 @@ fn draw_cables(
             ui_state
                 .wants
                 .source_ranked(editor.state(), *id, port, rank);
-            let (lo, hi) = ty.nominal_range();
-            let target = ui_state
-                .live
-                .tap(*id, index, now)
-                .map(|t| cable_life::target(class, t, lo.abs().max(hi.abs())));
-            live_lit[i] = ui_state.life.update(r.id, class, target, dt, now);
+            let tap = ui_state.live.tap(*id, index, now).copied();
+            match cable_life::Class::of(ty) {
+                Some(class) => {
+                    let (lo, hi) = ty.nominal_range();
+                    let target = tap
+                        .as_ref()
+                        .map(|t| cable_life::target(class, t, lo.abs().max(hi.abs())));
+                    live_lit[i] = ui_state.life.update(r.id, class, target, dt, now);
+                }
+                // A gate or clock: a flash on each rising edge, and one bead.
+                None => live_lit[i] = ui_state.pulses.update(r.id, tap.as_ref(), dt, now),
+            }
         }
         ui_state.life.end_frame();
+        ui_state.pulses.end_frame();
     }
     let intensity = ui_state.cable_intensity;
     let secs = 0.12;
@@ -4815,16 +4822,20 @@ fn draw_cables(
             1.0
         }
     };
-    for &i in &order {
-        if live_lit[i] >= cable_life::QUIET {
-            let (_, _, w, _, _) = look(i);
-            cable_life::paint_glow(
-                painter,
-                &runs[i].pts,
-                w + cable_life::GLOW_EXTRA * z,
-                bases[i],
-                live_lit[i] * intensity.glow_alpha() * calm(i),
-            );
+    let variant = cable_life::variant();
+    if let Some(extra) = variant.extra() {
+        for &i in &order {
+            if live_lit[i] >= cable_life::QUIET {
+                let (_, _, w, _, _) = look(i);
+                cable_life::paint_glow(
+                    painter,
+                    &runs[i].pts,
+                    w + extra * z,
+                    bases[i],
+                    (live_lit[i] * variant.glow_alpha(intensity) * calm(i)).min(1.0),
+                    variant.profile(),
+                );
+            }
         }
     }
     let themed = slots.style == style::CableStyle::Themed;
@@ -4833,26 +4844,30 @@ fn draw_cables(
         let (t, alpha, w, col, casing) = look(i);
         let stereo = !r.route && port_width(editor, &r.c.from) == 2;
         let bypass = r.route && r.c.params.get("bypass").is_some_and(|&b| b >= 0.5);
+        // Variant C: the core itself brightens toward white with the signal.
+        let col = col.lerp_to_gamma(
+            Color32::WHITE,
+            live_lit[i].min(1.0) * variant.core_white(intensity) * calm(i),
+        );
         cable_look::paint(
             painter, &mut top, &st, &r.pts, col, w, alpha, casing, bypass, t, z, stereo,
         );
-        if live_lit[i] >= cable_life::QUIET {
+        if live_lit[i] >= cable_life::QUIET && variant.light_alpha(intensity) > 0.0 {
             // The light on the core.
             let hot = bases[i].lerp_to_gamma(Color32::WHITE, 0.6);
             painter.add(egui::Shape::line(
                 r.pts.to_vec(),
                 Stroke::new(
                     (w * 0.5).max(1.5),
-                    hot.gamma_multiply(live_lit[i] * intensity.light_alpha() * calm(i)),
+                    hot.gamma_multiply(
+                        (live_lit[i] * variant.light_alpha(intensity) * calm(i)).min(1.0),
+                    ),
                 ),
             ));
         }
         let mid = r.pts[r.pts.len() / 2];
         let steps = kabl_cables::Settings::from_params(&r.c.params);
         let len = kabl_cables::slot_value(&r.c.params, 0) as usize;
-        let clock = pattern::clock_pos(editor, ui_state);
-        // Some(phase) when this cable carries a gate or clock: where its light is, 0..=1.
-        let mut carries: Option<f32> = None;
         if themed && routing::is_functional(r.c) && len > 0 {
             let seed = kabl_cables::seed_of(r.id);
             let on: Vec<bool> = (0..len)
@@ -4860,24 +4875,20 @@ fn draw_cables(
                 .collect();
             let step = pattern::playing_step(editor, ui_state, len);
             cable_look::beads(&mut top, &st, &r.pts, col, th.sel, &on, step, z);
-            carries = Some(clock.map_or(0.0, |p| (p / len as f64).fract() as f32));
-        } else {
-            if routing::is_functional(r.c) {
-                top.extend(routing::functional_mark(
-                    r.pts[r.pts.len() / 3],
-                    z,
-                    th.sel,
-                    th.panel.gamma_multiply(0.85),
-                ));
-            }
-            if themed && !r.route && bases[i] == th.gate {
-                carries = Some(clock.map_or(0.0, |p| p.fract() as f32));
-            }
+        } else if routing::is_functional(r.c) {
+            top.extend(routing::functional_mark(
+                r.pts[r.pts.len() / 3],
+                z,
+                th.sel,
+                th.panel.gamma_multiply(0.85),
+            ));
         }
-        if let Some(t) = carries.filter(|_| ui_state.cable_life.pulses()) {
-            let id = Id::new(("kabl-cable-light", r.id));
-            let k = kit::smooth_to(&ctx, id, f32::from(clock.is_some()), st.motion.glide);
-            cable_look::light(&mut top, &r.pts, col, t, k * alpha, z);
+        // One bead per rising edge of a gate or clock.
+        if ui_state.cable_life.pulses() {
+            let now = ctx.input(|i| i.time);
+            for (t, k) in ui_state.pulses.beads(r.id, now) {
+                cable_look::light(&mut top, &r.pts, col, t, k * alpha, z);
+            }
         }
         let hit = Rect::from_center_size(mid, EguiVec2::splat(12.0));
         if r.route {

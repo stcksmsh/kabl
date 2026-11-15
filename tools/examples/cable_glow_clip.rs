@@ -20,7 +20,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Stdio};
 
-const FPS: usize = 30;
+const FPS: usize = 60;
 const SR: f32 = 48000.0;
 /// Samples per video frame.
 const STEP: usize = SR as usize / FPS;
@@ -62,6 +62,8 @@ struct Run {
     ffmpeg: Child,
     /// Frames simulated, frames written.
     sim: usize,
+    /// Blocks rendered so far (a frame is not a whole number of blocks at 60 fps).
+    blocks: usize,
     got: usize,
     peak: f32,
     name: String,
@@ -140,6 +142,7 @@ impl App {
             _collector: collector,
             ffmpeg,
             sim: 0,
+            blocks: 0,
             got: 0,
             peak: 0.0,
             name,
@@ -176,10 +179,9 @@ impl Run {
             self.engine.command(&c);
         }
         let (mut l, mut r) = ([0.0; BLOCK], [0.0; BLOCK]);
-        let mut rendered = 0;
-        while rendered < STEP {
+        while self.blocks * BLOCK < (self.sim + 1) * STEP {
             self.engine.process_block(&mut l, &mut r);
-            rendered += BLOCK;
+            self.blocks += 1;
             self.peak = l
                 .iter()
                 .chain(r.iter())
@@ -282,7 +284,14 @@ fn main() {
     let secs: usize = a.get(3).and_then(|s| s.parse().ok()).unwrap_or(6);
     let mut jobs = Vec::new();
     for p in &patches {
+        // KABL_CLIP_INT=low|high records one intensity only.
         for intensity in [Intensity::Low, Intensity::High] {
+            let only = std::env::var("KABL_CLIP_INT").unwrap_or_default();
+            if (only == "low" && intensity == Intensity::High)
+                || (only == "high" && intensity == Intensity::Low)
+            {
+                continue;
+            }
             jobs.push(Job {
                 patch: p.clone(),
                 intensity,
