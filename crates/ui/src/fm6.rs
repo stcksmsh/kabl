@@ -69,7 +69,7 @@ pub(crate) fn draw(
     m: &Placed,
     cards: Rect,
 ) {
-    let st = crate::style::Style::for_family(&ui_state.style, m.info.kind);
+    let st = ui_state.family_views.get(&ui_state.style, m.info.kind);
     let z = xf.zoom;
     let ro = &st.roles;
     let alg = routing::base_value(editor.state(), m.id, find(m, "algorithm").unwrap())

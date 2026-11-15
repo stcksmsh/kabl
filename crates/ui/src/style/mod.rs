@@ -609,17 +609,6 @@ impl Style {
         }
     }
 
-    /// `st` with display traces in the family ink of `kind`: the same `Arc` for line styles,
-    /// a copy for the stripe styles (look B).
-    pub fn for_family(st: &std::sync::Arc<Style>, kind: &str) -> std::sync::Arc<Style> {
-        if st.slots.face.family != FamilyMarker::Stripe {
-            return st.clone();
-        }
-        let mut s = (**st).clone();
-        s.roles.disp_trace = s.section_of(kind).ink;
-        std::sync::Arc::new(s)
-    }
-
     /// The hole inside a jack: the face's own near-black (the mockup's), not the rack's mounting
     /// hole colour `roles.hole`.
     pub fn jack_hole(&self) -> Color32 {
@@ -716,5 +705,39 @@ mod tests {
     #[test]
     fn every_role_has_a_name() {
         assert_eq!(Roles::NAMES.len(), 32);
+    }
+}
+
+/// One style per module family with display traces in the family ink (look B), built once per
+/// base style instead of copied per module per frame.
+#[derive(Default)]
+pub struct FamilyViews {
+    base: Option<std::sync::Arc<Style>>,
+    views: Vec<(Color32, std::sync::Arc<Style>)>,
+}
+
+impl FamilyViews {
+    /// `st` itself for styles whose family is not a stripe; else the cached view for `kind`.
+    pub fn get(&mut self, st: &std::sync::Arc<Style>, kind: &str) -> std::sync::Arc<Style> {
+        if st.slots.face.family != FamilyMarker::Stripe {
+            return st.clone();
+        }
+        if !self
+            .base
+            .as_ref()
+            .is_some_and(|b| std::sync::Arc::ptr_eq(b, st))
+        {
+            self.base = Some(st.clone());
+            self.views.clear();
+        }
+        let ink = st.section_of(kind).ink;
+        if let Some((_, v)) = self.views.iter().find(|(c, _)| *c == ink) {
+            return v.clone();
+        }
+        let mut s = (**st).clone();
+        s.roles.disp_trace = ink;
+        let v = std::sync::Arc::new(s);
+        self.views.push((ink, v.clone()));
+        v
     }
 }

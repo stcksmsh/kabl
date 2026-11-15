@@ -286,6 +286,7 @@ pub struct UiState {
     pub style: std::sync::Arc<style::Style>,
     pub panels: panels::View,
     pub tables: tables::View,
+    pub(crate) family_views: style::FamilyViews,
     /// The shared file browser window, while one is open (`filebrowser`).
     pub files: Option<filebrowser::Request>,
     /// What it picked, for the place that asked.
@@ -470,6 +471,7 @@ impl Default for UiState {
             style: std::sync::Arc::new(style::look_b_default(false)),
             panels: panels::View::default(),
             tables: tables::View::default(),
+            family_views: Default::default(),
             files: None,
             picked: None,
             folders: std::collections::BTreeMap::new(),
@@ -2509,7 +2511,7 @@ fn draw_module(
     }
     let skin = m.skin;
     let on_art = skin.is_some_and(|s| ui_state.skin_labels_on_art.unwrap_or(s.labels_on_art));
-    let st = Style::for_family(&ui_state.style, m.info.kind);
+    let st = ui_state.family_views.get(&ui_state.style, m.info.kind);
     if let Some((tex, tint)) =
         skin.and_then(|s| skin_texture(ui, &mut ui_state.image_cache, m.info.kind, s, th.dark))
     {
