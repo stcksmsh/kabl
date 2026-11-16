@@ -33,10 +33,38 @@ pub struct LiveTap {
     pub at: f64,
 }
 
+impl LiveTap {
+    /// The largest magnitude over the report window.
+    pub fn peak(&self) -> f32 {
+        self.last.abs().max(self.min.abs()).max(self.max.abs())
+    }
+}
+
+/// A meter's peak hold: the highest recent peak, held for [`HOLD_SECS`], then falling at
+/// [`FALL_DB_PER_S`].
+#[derive(Clone, Copy, Debug)]
+struct Hold {
+    peak: f32,
+    at: f64,
+}
+
+/// How long a peak is held before it starts to fall.
+pub const HOLD_SECS: f64 = 1.0;
+/// The fall of a released peak hold, in dB per second.
+pub const FALL_DB_PER_S: f64 = 20.0;
+
+impl Hold {
+    fn level(&self, now: f64) -> f32 {
+        let after = (now - self.at - HOLD_SECS).max(0.0);
+        self.peak * 10f32.powf(-(FALL_DB_PER_S * after / 20.0) as f32)
+    }
+}
+
 /// Face-tap reports by (module, output port index).
 #[derive(Default)]
 pub struct Live {
     pub taps: HashMap<(ModuleId, u8), LiveTap>,
+    holds: HashMap<(ModuleId, u8), Hold>,
     /// The final output's peak levels (left, right), linear: the status-bar meter's source.
     pub master: [f32; 2],
 }
@@ -74,8 +102,8 @@ impl Wants {
         let q = crate::cable_life::QUIET;
         live.master.iter().any(|&m| m >= q)
             || self.face_taps.iter().any(|&(m, p)| {
-                live.tap(m, p, now)
-                    .is_some_and(|t| t.last.abs().max(t.min.abs()).max(t.max.abs()) >= q)
+                // A meter's peak hold still falls for a while after the signal stops.
+                live.tap(m, p, now).is_some_and(|t| t.peak() >= q) || live.held(m, p, now) >= q
             })
     }
 
@@ -95,14 +123,17 @@ impl Wants {
 
     /// What a display reads besides its own output: the comb's pitch cable.
     pub fn feeds(&mut self, state: &PatchState, id: ModuleId, kind: &'static str) {
-        if kind != "filter.comb" {
-            return;
-        }
+        // The comb reads its pitch cable, the mixer its four channel inputs.
+        let wanted = |tp: &str| match kind {
+            "filter.comb" => tp == "pitch",
+            "mixer" => tp.starts_with("in"),
+            _ => false,
+        };
         for c in state.cables.values() {
             if let (PortRef::Module { id: f, port }, PortRef::Module { id: t, port: tp }) =
                 (&c.from, &c.to)
             {
-                if *t == id && tp == "pitch" {
+                if *t == id && wanted(tp) {
                     self.source(state, *f, port);
                 }
             }
@@ -207,7 +238,16 @@ impl Live {
         for e in &r.entries[..r.n as usize] {
             if !e.found {
                 self.taps.remove(&(e.module, e.port));
+                self.holds.remove(&(e.module, e.port));
                 continue;
+            }
+            let p = e.last.abs().max(e.min.abs()).max(e.max.abs());
+            let h = self
+                .holds
+                .entry((e.module, e.port))
+                .or_insert(Hold { peak: 0.0, at: now });
+            if p >= h.level(now) {
+                *h = Hold { peak: p, at: now };
             }
             let view = ModuleView {
                 valid: e.view_valid,
@@ -225,6 +265,11 @@ impl Live {
                 },
             );
         }
+    }
+
+    /// The held peak of tap `(id, port)` now, linear; 0 once it has fallen away.
+    pub fn held(&self, id: ModuleId, port: u8, now: f64) -> f32 {
+        self.holds.get(&(id, port)).map_or(0.0, |h| h.level(now))
     }
 
     pub fn tap(&self, id: ModuleId, port: u8, now: f64) -> Option<&LiveTap> {
@@ -528,14 +573,28 @@ fn filter(
     let (f_lo, f_hi) = (20.0f32, 20000.0f32);
     let fx = |f: f32| (f / f_lo).ln() / (f_hi / f_lo).ln();
     let ladder = m.info.kind == "filter.ladder";
-    let k = if ladder {
-        4.4 * res.clamp(0.0, 1.0)
-    } else {
-        2.0 - 2.0 * res.clamp(0.0, 0.95)
-    };
     let ymap = |db: f32| ((db + 40.0) / 64.0 * 2.0 - 1.0).clamp(-1.0, 1.0);
     let sr = 48000.0f32;
-    let g = (std::f32::consts::PI * cutoff / sr).tan();
+    // The response of output `o` for a cutoff and resonance.
+    let curve = |o: usize, cutoff: f32, res: f32| {
+        let k = if ladder {
+            4.4 * res.clamp(0.0, 1.0)
+        } else {
+            2.0 - 2.0 * res.clamp(0.0, 0.95)
+        };
+        let g = (std::f32::consts::PI * cutoff / sr).tan();
+        plot(r, 80, |x| {
+            let f = f_lo * (f_hi / f_lo).powf(x);
+            let w = (std::f32::consts::PI * f / sr).tan() / g;
+            ymap(if ladder {
+                ladder_db(w, k)
+            } else {
+                svf_db(o, w, k)
+            })
+        })
+    };
+    // While modulation moves the response, the knob's own setting stays as a faint curve.
+    let moved = (fx(cutoff) - fx(base)).abs() > 0.01 || (res - res_base).abs() > 0.02;
     let outs: &[usize] = if ladder { &[0] } else { &[0, 1, 2, 3] };
     let patched = |port: &str| {
         state
@@ -552,15 +611,13 @@ fn filter(
         if !strong {
             continue;
         }
-        let pts = plot(r, 80, |x| {
-            let f = f_lo * (f_hi / f_lo).powf(x);
-            let w = (std::f32::consts::PI * f / sr).tan() / g;
-            ymap(if ladder {
-                ladder_db(w, k)
-            } else {
-                svf_db(o, w, k)
-            })
-        });
+        if moved && d != Detail::Frame {
+            p.add(egui::Shape::line(
+                curve(o, base, res_base),
+                Stroke::new(1.0, alpha(face::trace_color(st), 70)),
+            ));
+        }
+        let pts = curve(o, cutoff, res);
         if strong {
             paint(p, st, pts, z, d, Some(r.bottom()));
         } else {
@@ -702,5 +759,23 @@ fn lfo(
             ),
             z,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_peak_hold_stays_for_a_second_then_falls_at_20_db_per_s() {
+        let h = Hold {
+            peak: 0.8,
+            at: 10.0,
+        };
+        assert_eq!(h.level(10.0), 0.8);
+        assert_eq!(h.level(10.0 + HOLD_SECS), 0.8);
+        // One second after the hold ends: 20 dB down.
+        assert!((h.level(12.0) - 0.08).abs() < 1e-4);
+        assert!(h.level(20.0) < 1e-6);
     }
 }

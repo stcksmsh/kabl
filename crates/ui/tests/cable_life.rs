@@ -129,6 +129,88 @@ fn a_quiet_rack_with_an_output_idles_and_a_loud_master_meter_wakes_it() {
     );
 }
 
+/// A rack of the live displays: filter, envelope, mixer, delay and an Output, patched in a row.
+fn displays_rack() -> (H, Vec<kabl_core::ModuleId>) {
+    let mut h = H::new();
+    let ids: Vec<_> = ["filter.svf", "env.adsr", "mixer", "delay"]
+        .iter()
+        .enumerate()
+        .map(|(i, k)| {
+            h.editor.add_module(
+                k,
+                Vec2 {
+                    x: 24.0 + 220.0 * i as f32,
+                    y: 220.0,
+                },
+            )
+        })
+        .collect();
+    h.frame(None);
+    (h, ids)
+}
+
+impl H {
+    /// Every module of `ids` reports `level` on its first output.
+    fn report(&mut self, ids: &[kabl_core::ModuleId], level: f32) {
+        for &id in ids {
+            let tap = LiveTap {
+                last: level,
+                min: -level,
+                max: level,
+                view: Default::default(),
+                at: self.t,
+            };
+            self.ui.live.taps.insert((id, 0), tap);
+        }
+    }
+}
+
+#[test]
+fn a_rack_of_live_displays_idles_when_silent_and_wakes_on_signal() {
+    let (mut h, ids) = displays_rack();
+    // Silent taps for a while (the mixer's peak hold has nothing to fall from): idle.
+    for _ in 0..90 {
+        h.report(&ids, 0.0);
+        h.frame(None);
+    }
+    h.delays.lock().unwrap().clear();
+    for _ in 0..60 {
+        h.report(&ids, 0.0);
+        h.frame(None);
+    }
+    let idle = h.delays.lock().unwrap().iter().min().copied();
+    assert!(
+        idle.is_none_or(|d| d >= Duration::from_millis(60)),
+        "silent displays ask for no 33 ms repaints, got {idle:?}"
+    );
+    // Signal on the taps: frames at the live rate.
+    h.delays.lock().unwrap().clear();
+    for _ in 0..30 {
+        h.report(&ids, 0.5);
+        h.frame(None);
+    }
+    let live = h.delays.lock().unwrap().iter().min().copied();
+    assert!(
+        live.is_some_and(|d| d <= Duration::from_millis(40)),
+        "moving displays repaint at 33 ms, got {live:?}"
+    );
+    // Silence again: after the hold has fallen (1 s + 1.4 s) the rack idles once more.
+    for _ in 0..240 {
+        h.report(&ids, 0.0);
+        h.frame(None);
+    }
+    h.delays.lock().unwrap().clear();
+    for _ in 0..60 {
+        h.report(&ids, 0.0);
+        h.frame(None);
+    }
+    let idle = h.delays.lock().unwrap().iter().min().copied();
+    assert!(
+        idle.is_none_or(|d| d >= Duration::from_millis(60)),
+        "after the signal stops the displays idle again, got {idle:?}"
+    );
+}
+
 #[test]
 fn cable_life_off_asks_for_no_taps_and_no_frames() {
     let mut h = H::new();

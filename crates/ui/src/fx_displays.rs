@@ -67,6 +67,30 @@ pub(crate) fn input_value(
     })
 }
 
+/// The peak over the last report and the held peak (see `Live::held`) of the cable into input
+/// `port` of `id`, in units of its port type's full scale; `None` while nothing is reported.
+pub(crate) fn input_peaks(
+    state: &PatchState,
+    live: &Live,
+    now: f64,
+    id: ModuleId,
+    port: &str,
+) -> Option<(f32, f32)> {
+    state.cables.values().find_map(|c| match (&c.from, &c.to) {
+        (PortRef::Module { id: f, port: fp }, PortRef::Module { id: t, port: tp })
+            if *t == id && tp == port =>
+        {
+            let (index, ty, _) = crate::displays::output_of(state, *f, fp)?;
+            let (lo, hi) = ty.nominal_range();
+            let full = lo.abs().max(hi.abs());
+            let now_peak = live.tap(*f, index, now).map(|t| t.peak() / full);
+            let held = live.held(*f, index, now) / full;
+            (now_peak.is_some() || held > 0.0).then_some((now_peak.unwrap_or(0.0), held))
+        }
+        _ => None,
+    })
+}
+
 /// Axis position of `hz` on a log axis from `lo` to `hi`.
 fn log_x(hz: f32, lo: f32, hi: f32) -> f32 {
     (hz / lo).ln() / (hi / lo).ln()
@@ -630,8 +654,9 @@ fn mixer(
     let seg_h = r.height() / SEGMENTS as f32;
     for k in 0..CHANNELS {
         let level = param(state, m, &format!("level{}", k + 1)).clamp(0.0, 1.0);
-        let signal = input_value(state, live, now, m.id, &format!("in{}", k + 1))
-            .map(|v| (v.abs() * level).clamp(0.0, 1.0));
+        let peaks = input_peaks(state, live, now, m.id, &format!("in{}", k + 1));
+        let signal = peaks.map(|(p, _)| (p * level).clamp(0.0, 1.0));
+        let held = peaks.map(|(_, h)| (h * level).clamp(0.0, 1.0));
         let cx = left + width * (k as f32 + 0.5) / CHANNELS as f32;
         let seg_w = (10.0 * z).max(4.0);
         for s in 0..SEGMENTS {
@@ -649,6 +674,18 @@ fn mixer(
                 vec2(seg_w, seg_h * 0.76),
             );
             p.rect_filled(cell, 1.0, alpha(col, if on { 240 } else { 36 }));
+        }
+        // The peak hold: one segment above the bar, a slow fall after a second.
+        if let (Some(h), Some(v)) = (held, signal) {
+            let s = (h * SEGMENTS as f32).ceil() as usize;
+            if h > v && (1..=SEGMENTS).contains(&s) {
+                let top = r.bottom() - s as f32 * seg_h;
+                let cell = Rect::from_min_size(
+                    pos2(cx - seg_w / 2.0, top + seg_h * 0.12),
+                    vec2(seg_w, seg_h * 0.76),
+                );
+                p.rect_filled(cell, 1.0, alpha(st.roles.text2, 200));
+            }
         }
         if d == Detail::Full {
             let y = r.bottom() - level * r.height();
@@ -680,11 +717,21 @@ fn delay_taps(
     let pad = (5.0 * z).max(3.0);
     let (x0, base) = (r.left() + 7.0 * z, r.bottom() - 2.0 * z);
     let top = r.height() - 6.0 * z;
+    // What the delay is putting out now: the bars flash with it, each a step weaker than the
+    // one before; silence (below the cable-life QUIET) leaves them at rest.
+    let out = live.tap(m.id, 0, now).map_or(0.0, |t| t.peak()).min(1.0);
+    let out = if out >= crate::cable_life::QUIET {
+        out
+    } else {
+        0.0
+    };
     for k in 0..7 {
         let h = (top * 0.9 * step.powi(k)).max(1.5 * z);
         let x = x0 + k as f32 * 29.0 * z * (r.width() + 2.0 * pad) / (216.0 * z);
         let bar = Rect::from_min_size(pos2(x, base - h), vec2(6.0 * z, h));
-        p.rect_filled(bar, (2.0 * z).min(3.0), alpha(col, 235));
+        let flash = (out * 1.5 * step.powi(k)).clamp(0.0, 1.0);
+        let c = col.lerp_to_gamma(egui::Color32::WHITE, 0.75 * flash);
+        p.rect_filled(bar, (2.0 * z).min(3.0), alpha(c, 235));
     }
 }
 
