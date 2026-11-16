@@ -22,7 +22,9 @@ fn the_c_example_loads_and_scales_its_input() {
         }
     };
 
-    let compiled = WasmiEngine::new().compile(&wasm).expect("host loads the module");
+    let compiled = WasmiEngine::new()
+        .compile(&wasm)
+        .expect("host loads the module");
     assert_eq!(compiled.meta().kind, "example.cgain");
     let mut inst = compiled
         .instantiate(&InstanceConfig::new(48_000.0, 2048))

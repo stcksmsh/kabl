@@ -19,6 +19,9 @@ cargo install --path crates/cargo-kabl      # from the kabl checkout; installs `
 cargo kabl --help
 ```
 
+`cargo install` puts `cargo-kabl` in `~/.cargo/bin`, which rustup already has on your `PATH`.
+With `--root DIR` it goes to `DIR/bin`: put that on `PATH`, or `cargo kabl` is not found.
+
 Nothing else: your new project pins its own compiler (`rust-toolchain.toml`, Rust 1.93.0) and
 `rustup` fetches that and the `wasm32-unknown-unknown` target the first time you build in it. If
 you prefer to do it by hand, `rustup target add wasm32-unknown-unknown`.
@@ -32,6 +35,11 @@ cargo test              # the template's own unit test, on your machine
 cargo kabl build        # wasm blob + yourhandle.softclip-1.kablmod
 ```
 
+`new` creates the project folder in the current folder, named after the id with the dot turned
+into a dash (`yourhandle-softclip`). `--into DIR` makes it inside `DIR` instead
+(`DIR/yourhandle-softclip`). Every command also works from outside the folder with
+`--manifest-path yourhandle-softclip/Cargo.toml`; `cargo test` takes the same flag.
+
 The id is `githubhandle.module`: lowercase letters, digits, `_` and `-`, exactly one dot. The
 prefixes `kabl.`, `demo.` and `test.` are reserved. `--control` starts from a control-signal
 template instead of an audio effect. Without `--sdk-path` the new project depends on the SDK
@@ -44,8 +52,12 @@ copyleft licence such as GPL, `repository`. They go into the package manifest.
 
 ## 3. The module file
 
-`src/lib.rs` is about 100 lines. Here is the template turned into a soft clipper. Everything you
-change is marked; leave the `fault-*` block alone (section 5 says why).
+`src/lib.rs` is about 100 lines. Here is the template (a gain, struct `Gain`, one param `gain`)
+rewritten as a soft clipper, so the struct is already renamed `Softclip`, there are two params and
+the id, `explain` and category differ. In your own copy rename `Gain` and `GAIN` by find and
+replace, then edit `META` and `process`. Leave the template's three `fault-*` blocks in `process`
+(section 5 says why); they are marked `Wasm only` there because a native `cargo test` must not
+hit them.
 
 ```rust
 #![cfg_attr(not(test), no_std)]   // wasm has no std; `cargo test` runs on your machine with std
@@ -109,8 +121,7 @@ const _: () = {
 kabl_module!(Softclip);            // emits every export, the memory layout and the metadata
 ```
 
-Rename every `Gain` in the template to `Softclip` with find and replace, and replace the
-template's test with one of your own (tests in section 5).
+The template's own test is the pattern for yours (section 5).
 
 What the pieces mean:
 
@@ -136,8 +147,10 @@ What the pieces mean:
   fault. Clamp.
 - **Maths**: no `std`, no `libm`. The crate gives `flush(x)` (kills denormals), `exp2(x)`,
   `sin_cos(x)`. Anything else you write yourself (`x / (1 + |x|)` above is a soft clip with no
-  library). `abs`, `min`, `max`, `clamp` and `to_bits` work; `sqrt`, `sin`, `exp`, `ln` and
-  `powf` do not exist (`no method named `sqrt` found for type `f32``).
+  library). `abs`, `min`, `max`, `clamp` and `to_bits` work; `sqrt`, `sin`, `exp`, `ln`, `powf`,
+  `floor`, `trunc` and `rem_euclid` do not exist (`no method named `sqrt` found for type `f32``).
+  To truncate use an `as i32` cast (clamp first: a huge float cast saturates, it does not trap),
+  and for a fraction `x - (x as i32) as f32`.
 - **Memory**: every buffer is a static, no allocator, no `Vec` or `Box`. Keep fixed arrays in your
   struct. Big delay lines or tables: enable the `arena` feature in `Cargo.toml`
   (`kabl-module-sdk = { ..., features = ["arena"] }`), set `const ARENA_BYTES: usize = N;`, and take
@@ -174,9 +187,18 @@ cargo kabl build        # the same build; writes target/kabl/<id>-<version>.kabl
 cargo kabl validate target/wasm32-unknown-unknown/release/kabl/<id>.wasm
 ```
 
-Unit tests construct the module with `Softclip::new(&mut Init { sample_rate: 48_000.0,
-max_block: 64 })`, fill an `Io { n, input: &input, output: &mut output, params: &[..] }` built
-from `[[0.0; MAX_BLOCK]; N]` arrays and call `process`. They are ordinary Rust tests with `std`.
+Unit tests are ordinary Rust tests (with `std`) in a `#[cfg(test)] mod tests { use super::*; ... }`
+at the bottom of `lib.rs`:
+
+```rust
+let mut m = Softclip::new(&mut Init { sample_rate: 48_000.0, max_block: 64 });
+let mut input = [[0.0; MAX_BLOCK]];            // one array per input slot
+let mut output = [[0.0; MAX_BLOCK]];           // one per output slot
+input[IN][..4].copy_from_slice(&[1.0, -0.5, 0.25, 0.0]);
+let mut io = Io { n: 4, input: &input, output: &mut output, params: &[4.0, 1.0] };
+m.process(&mut io);
+assert!(output[OUT][..4].iter().all(|v| v.abs() < 1.0));
+```
 
 `cargo kabl test` runs your wasm in the same engine kabl uses, under the same float settings:
 
@@ -216,8 +238,11 @@ its ports and params (custom panels come with 1.0).
    file there uninstalls it.
 3. **Add module**: search for your module's name. Add it, wire it between a source and the
    output, move the knobs.
-4. **Save** with Ctrl+S (or Save in the sound-name menu). The file is a `.kabl` patch and contains
-   a copy of your module's code and its saved settings.
+   The module's face is drawn from its ports and params: `width(4)` rack units holds a few knobs;
+   a module with many params needs a larger width (try it in the app).
+4. **Save** with Ctrl+S (or Save / Save As in the menu on the sound's name in the toolbar). You
+   name the sound; the file is a `.kabl` patch and contains a copy of your module's code and its
+   saved settings.
 5. **Reload**: open the patch again (Browse sounds). The first time a patch with custom code opens,
    kabl asks: **Open** runs the code, **Cancel** opens the patch with the module as a pass-through
    stand-in. Your knobs and saved settings come back exactly.
