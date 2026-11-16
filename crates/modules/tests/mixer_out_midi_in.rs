@@ -47,24 +47,46 @@ fn mixer_sums_four_inputs_with_per_channel_levels() {
     }
 }
 
-#[test]
-fn out_module_copies_left_and_right_into_readable_buffers() {
+/// Runs `out` for `blocks` blocks of a constant stereo input at `level_db`; returns the last
+/// block's left and right outputs.
+fn run_out(level_db: f32, blocks: usize) -> ([f32; BLOCK], [f32; BLOCK]) {
     let mut module = Out::new();
     module.prepare(48000.0, BLOCK, &quality());
-
     let left = [0.3f32; BLOCK];
     let right = [-0.7f32; BLOCK];
     let inputs = [Signal::Buffer(&left), Signal::Buffer(&right)];
-    let mut outputs: [&mut [f32]; 0] = [];
-    let mut io = ProcessIo::new(&inputs, &mut outputs, &[], BLOCK);
-    module.process(&mut io);
+    let params = [Signal::Scalar(level_db)];
+    let (mut l, mut r) = ([0f32; BLOCK], [0f32; BLOCK]);
+    for _ in 0..blocks {
+        let mut outputs: [&mut [f32]; 2] = [&mut l, &mut r];
+        let mut io = ProcessIo::new(&inputs, &mut outputs, &params, BLOCK);
+        module.process(&mut io);
+    }
+    (l, r)
+}
 
-    assert_eq!(module.left(), &left[..]);
-    assert_eq!(module.right(), &right[..]);
+#[test]
+fn out_module_level_defaults_to_zero_db_and_passes_the_input_untouched() {
+    let info = kabl_modules::builtins::OUT_INFO.params;
+    assert_eq!(info.len(), 1);
+    assert_eq!(info[0].name, "level_db");
+    assert_eq!(info[0].default, 0.0);
+    let (l, r) = run_out(0.0, 1);
+    assert_eq!(l, [0.3f32; BLOCK]);
+    assert_eq!(r, [-0.7f32; BLOCK]);
+}
 
-    module.reset();
-    assert!(module.left().iter().all(|&v| v == 0.0));
-    assert!(module.right().iter().all(|&v| v == 0.0));
+#[test]
+fn out_module_applies_its_level_in_db() {
+    // Settled (many blocks past the 20 ms glide): -6.0206 dB is exactly half.
+    let (l, r) = run_out(-6.0206, 400);
+    for (&a, &b) in l.iter().zip(&r) {
+        assert!((a - 0.15).abs() < 1e-3, "left {a}");
+        assert!((b + 0.35).abs() < 1e-3, "right {b}");
+    }
+    // Quieter than the input, and louder with a positive level.
+    let (loud, _) = run_out(6.0, 400);
+    assert!(loud[0] > 0.3 * 1.99 && loud[0] < 0.3 * 2.01, "{}", loud[0]);
 }
 
 #[test]
@@ -102,4 +124,28 @@ fn midi_in_note_on_off_drives_gate_pitch_velocity() {
         pitch2.iter().all(|&v| v == 7.0),
         "pitch should hold at the last note's value"
     );
+}
+
+#[test]
+fn out_module_level_change_follows_a_20_ms_time_constant() {
+    // 20 ms at 48 kHz = 960 samples = 120 blocks of 8. One time constant after a step from
+    // 0 dB to -20 dB the gain has covered 1 - 1/e of the way: 0.1 + 0.9 / e of the input.
+    let mut module = Out::new();
+    module.prepare(48000.0, BLOCK, &quality());
+    let left = [1.0f32; BLOCK];
+    let inputs = [Signal::Buffer(&left), Signal::Buffer(&left)];
+    let (mut l, mut r) = ([0f32; BLOCK], [0f32; BLOCK]);
+    let mut run = |db: f32, blocks: usize| {
+        let params = [Signal::Scalar(db)];
+        for _ in 0..blocks {
+            let mut outputs: [&mut [f32]; 2] = [&mut l, &mut r];
+            let mut io = ProcessIo::new(&inputs, &mut outputs, &params, BLOCK);
+            module.process(&mut io);
+        }
+        l[BLOCK - 1]
+    };
+    assert_eq!(run(0.0, 1), 1.0);
+    let after = run(-20.0, 120);
+    let want = 0.1 + 0.9 / std::f32::consts::E;
+    assert!((after - want).abs() < 0.01, "{after} vs {want}");
 }

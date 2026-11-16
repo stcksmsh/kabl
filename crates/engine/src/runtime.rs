@@ -129,6 +129,7 @@ pub fn smoothed_by_module(kind: &str, name: &str) -> bool {
         "delay" => matches!(name, "time_ms" | "feedback" | "mix"),
         "reverb" => true,
         "noise" => name == "level_db",
+        "out" => name == "level_db",
         "osc.va" => name == "pw",
         "osc.fm" => matches!(name, "level" | "index" | "feedback"),
         "osc.wt" => name == "position",

@@ -910,6 +910,14 @@ impl eframe::App for App {
                 0.95
             };
         }
+        // KABL_CAPTURE_BARE=1: the rack as in the mockup stills, 100 % and no drawer.
+        if self.f == 6
+            && self.jobs[self.i].scene == "rack"
+            && std::env::var("KABL_CAPTURE_BARE").is_ok()
+        {
+            self.ui.zoom = 1.0;
+            self.ui.drawer_open = false;
+        }
         // The cues face at full size: the third row, where the extra sequencers and the cues sit.
         if self.f == 6 && self.jobs[self.i].scene == "cues-face" {
             self.ui.zoom = 1.0;

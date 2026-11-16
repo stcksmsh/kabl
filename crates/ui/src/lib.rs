@@ -2825,6 +2825,7 @@ fn draw_module_shapes(
                 ui_state.wants.display(m.id, m.info.kind);
                 ui_state.wants.feeds(editor.state(), m.id, m.info.kind);
             }
+            ui_state.live.master = ui_state.meter.level;
             displays::draw(
                 editor.state(),
                 &st,
@@ -2901,36 +2902,15 @@ fn draw_module_shapes(
     if let Decor::Banks(r) = m.decor {
         draw_banks(editor, ui_state, ui, painter, xf, m.id, r, now, drawn);
     }
-    if let Decor::Status(p) = m.decor {
-        let (lock, ms) = ui_state
-            .delay_status
+    if let Decor::Display(r) = m.decor {
+        let sync = editor
+            .state()
+            .modules
             .get(&m.id)
-            .copied()
-            .unwrap_or((DelayLock::Unlocked, f32::NAN));
-        let time = if ms.is_finite() {
-            routing::fmt_value(&m.info.params[0], ms)
-        } else {
-            "…".into()
-        };
-        let word = match lock {
-            DelayLock::Free => "free",
-            DelayLock::Unlocked => "unlocked",
-            DelayLock::Locked => "sync",
-            DelayLock::Held => "held",
-        };
-        text(
-            painter,
-            xf.p(p),
-            egui::Align2::LEFT_CENTER,
-            &format!("{word} · {time}"),
-            11.0 * z,
-            if lock == DelayLock::Locked {
-                th.gate
-            } else {
-                ink2
-            },
-            true,
-        );
+            .and_then(|s| s.params.get("sync"))
+            .and_then(|v| routing::step_labels("delay", "sync")?.get(v.round() as usize))
+            .copied();
+        draw_sparse_labels(ui_state, painter, th, xf, m, r, ink2, sync);
     }
     if m.info.kind == "seq" {
         draw_seq_steps(editor, ui_state, painter, xf, m, ink, ink2);
@@ -4016,7 +3996,6 @@ fn midi_in_summary(state: &kabl_core::PatchState, m: &Placed) -> (String, String
 }
 
 fn draw_decor(p: &egui::Painter, th: &Theme, xf: Xf, m: &Placed) {
-    let z = xf.zoom;
     match m.decor {
         Decor::Keys(r) => {
             let r = xf.r(r);
@@ -4051,17 +4030,10 @@ fn draw_decor(p: &egui::Painter, th: &Theme, xf: Xf, m: &Placed) {
                 );
             }
         }
-        Decor::Speaker(c) => {
-            let c = xf.p(c);
-            for r in [40.0, 30.0, 20.0, 10.0] {
-                p.circle_stroke(c, r * z, Stroke::new(1.2, th.ink2));
-            }
-        }
         Decor::None
         | Decor::Operators(_)
         | Decor::Display(_)
         | Decor::Transport(_)
-        | Decor::Status(_)
         | Decor::Banks(_)
         | Decor::Grid(_)
         | Decor::Cues(_) => {}
@@ -5597,6 +5569,81 @@ fn register_face_port(
         }
         // A cable's own parameter has no face port: its routes live in the pattern editor.
         PortRef::CableParam { .. } => {}
+    }
+}
+
+/// The text the sparse faces draw outside the display painter: the delay's time line in its
+/// well and the output's peak readout under the Level knob.
+#[allow(clippy::too_many_arguments)]
+fn draw_sparse_labels(
+    ui_state: &UiState,
+    painter: &egui::Painter,
+    th: &Theme,
+    xf: Xf,
+    m: &Placed,
+    well: Rect,
+    ink2: Color32,
+    sync: Option<&'static str>,
+) {
+    let z = xf.zoom;
+    match m.info.kind {
+        "delay" => {
+            let (lock, ms) = ui_state
+                .delay_status
+                .get(&m.id)
+                .copied()
+                .unwrap_or((DelayLock::Unlocked, f32::NAN));
+            let time = if ms.is_finite() {
+                routing::fmt_value(&m.info.params[0], ms)
+            } else {
+                "...".into()
+            };
+            let word = match lock {
+                DelayLock::Locked => sync.unwrap_or("sync"),
+                DelayLock::Free => "free",
+                DelayLock::Unlocked => "unlocked",
+                DelayLock::Held => "held",
+            };
+            text(
+                painter,
+                xf.p(pos2(well.right() - 8.0, well.top() + 12.0)),
+                egui::Align2::RIGHT_CENTER,
+                &format!("{word} · {time}"),
+                10.0 * z,
+                if lock == DelayLock::Locked {
+                    th.gate
+                } else {
+                    ink2
+                },
+                true,
+            );
+        }
+        "out" => {
+            let c = pos2(112.0, 0.0);
+            let peak = ui_state
+                .meter
+                .max_db
+                .map_or("- dB".to_string(), |d| format!("{d:+.1} dB"));
+            text(
+                painter,
+                xf.p(pos2(c.x, 190.0) + m.face.min.to_vec2()),
+                egui::Align2::CENTER_CENTER,
+                "PEAK",
+                9.5 * z,
+                ink2,
+                true,
+            );
+            text(
+                painter,
+                xf.p(pos2(c.x, 208.0) + m.face.min.to_vec2()),
+                egui::Align2::CENTER_CENTER,
+                &peak,
+                11.5 * z,
+                th.ink,
+                true,
+            );
+        }
+        _ => {}
     }
 }
 
