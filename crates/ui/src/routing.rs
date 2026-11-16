@@ -340,6 +340,7 @@ pub fn param_label(p: &ParamInfo) -> String {
         "octaves" => return "Octaves".into(),
         "gate_mode" => return "Gate".into(),
         "damp_hz" => return "Damping".into(),
+        "level_db" => return "Level".into(),
         // The drums: the kick's two sweep knobs and the hat's two decays against its gate jacks.
         "sweep_ms" => return "Fall".into(),
         "closed_ms" => return "Tick".into(),
@@ -401,6 +402,7 @@ pub fn fmt_value(p: &ParamInfo, v: f32) -> String {
         "±st" => format!("±{} st", v.round() + 0.0),
         "ch" if v.round() < 1.0 => "ALL".to_string(),
         "ch" => format!("ch {}", v.round()),
+        "s" => format!("{v:.2} s"),
         "bpm" => format!("{v:.0} bpm"),
         "%" => format!("{v:.0} %"),
         "dB" => format!("{:+.1} dB", v + 0.0),

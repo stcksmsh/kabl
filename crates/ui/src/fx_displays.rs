@@ -124,6 +124,9 @@ pub(crate) fn draw(
 ) {
     match m.info.kind {
         "mixer" => mixer(state, st, live, now, p, m, r, z, d),
+        "delay" => delay_taps(state, st, live, now, p, m, r, z),
+        "reverb" => reverb_decay(state, st, live, now, p, m, r, z, d),
+        "out" => output_meter(live, st, p, r, z),
         "eq" => eq(state, st, live, now, p, m, r, z, d),
         "compressor" => compressor(state, st, live, now, p, m, r, z, d),
         "limiter" => limiter(state, st, live, now, p, m, r, z, d),
@@ -654,5 +657,121 @@ fn mixer(
                 Stroke::new(1.5 * z, st.roles.text2),
             );
         }
+    }
+}
+
+/// The delay's taps decaying: seven bars, each a feedback step quieter than the last (the
+/// mockup's picture; the time line is drawn by the face).
+#[allow(clippy::too_many_arguments)]
+fn delay_taps(
+    state: &PatchState,
+    st: &Style,
+    live: &Live,
+    now: f64,
+    p: &egui::Painter,
+    m: &Placed,
+    r: Rect,
+    z: f32,
+) {
+    let fb = (live_param(state, live, now, m, "feedback") / 100.0).clamp(0.0, 0.95);
+    // 40 % feedback gives the mockup's 0.62 step.
+    let step = (0.3 + fb * 0.8).min(0.97);
+    let col = face::trace_color(st);
+    let pad = (5.0 * z).max(3.0);
+    let (x0, base) = (r.left() + 7.0 * z, r.bottom() - 2.0 * z);
+    let top = r.height() - 6.0 * z;
+    for k in 0..7 {
+        let h = (top * 0.9 * step.powi(k)).max(1.5 * z);
+        let x = x0 + k as f32 * 29.0 * z * (r.width() + 2.0 * pad) / (216.0 * z);
+        let bar = Rect::from_min_size(pos2(x, base - h), vec2(6.0 * z, h));
+        p.rect_filled(bar, (2.0 * z).min(3.0), alpha(col, 235));
+    }
+}
+
+/// The reverb's decay: a quick rise, then the tail falling away, longer with Decay and
+/// quicker as Damping darkens it.
+#[allow(clippy::too_many_arguments)]
+fn reverb_decay(
+    state: &PatchState,
+    st: &Style,
+    live: &Live,
+    now: f64,
+    p: &egui::Painter,
+    m: &Placed,
+    r: Rect,
+    z: f32,
+    d: Detail,
+) {
+    let decay = live_param(state, live, now, m, "decay_s").max(0.3);
+    let damp = live_param(state, live, now, m, "damp_hz").clamp(500.0, 16000.0);
+    let dark = 1.0 - log_x(damp, 500.0, 16000.0).clamp(0.0, 1.0);
+    let k = 6.7 / decay.sqrt() * (1.0 + 0.5 * dark);
+    let body = Rect::from_min_max(
+        pos2(r.left(), r.top() + 0.18 * r.height()),
+        pos2(r.right(), r.bottom()),
+    );
+    let pts = plot(body, 48, |x| {
+        let v = if x < 0.05 {
+            x / 0.05
+        } else {
+            (-(x - 0.05) * k).exp()
+        };
+        2.0 * v - 1.0
+    });
+    paint(p, st, pts, z, d, Some(body.bottom()));
+    caption(
+        p,
+        st,
+        z,
+        pos2(r.right(), r.top() + 1.0 * z),
+        Align2::RIGHT_TOP,
+        &format!("{decay:.1} s"),
+    );
+}
+
+/// The output's stereo segment meter in its well, dB ticks at 0, -6, -12, -24 and -48. Mockup
+/// geometry (a 62 x 178 well): two columns of 31 segments, the last nine warm.
+fn output_meter(live: &Live, st: &Style, p: &egui::Painter, r: Rect, z: f32) {
+    let pad = (5.0 * z).max(3.0);
+    let o = pos2(r.left() - pad, r.top() - pad);
+    let at = |x: f32, y: f32| pos2(o.x + x * z, o.y + y * z);
+    // Segment centre height (well units from the top) to dB, as the mockup's tick scale runs.
+    let y_of_db = |db: f32| {
+        if db >= -24.0 {
+            10.0 - 4.33 * db
+        } else {
+            114.0 + (-24.0 - db) * 2.25
+        }
+    };
+    for ch in 0..2 {
+        let lin = live.master[ch];
+        let db = if lin > 1e-6 {
+            20.0 * lin.log10()
+        } else {
+            -120.0
+        };
+        let lit_from = y_of_db(db);
+        for k in 0..31 {
+            let y = 168.0 - k as f32 * 5.3;
+            let col = if k < 22 {
+                st.roles.good
+            } else if k < 27 {
+                st.roles.accent
+            } else {
+                st.roles.bad
+            };
+            let on = y + 1.8 >= lit_from;
+            let cell = Rect::from_min_size(at(28.0 + ch as f32 * 14.0, y), vec2(10.0 * z, 3.6 * z));
+            p.rect_filled(cell, 1.0 * z, alpha(col, if on { 240 } else { 34 }));
+        }
+    }
+    for (t, y) in [
+        ("0", 10.0),
+        ("-6", 36.0),
+        ("-12", 62.0),
+        ("-24", 114.0),
+        ("-48", 168.0),
+    ] {
+        caption(p, st, z, at(23.0, y + 2.0), Align2::RIGHT_CENTER, t);
     }
 }

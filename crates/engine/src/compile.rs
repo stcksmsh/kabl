@@ -1695,14 +1695,13 @@ fn compile_inner(
 
             if meta.kind == "out" {
                 out_module = Some(id);
-                out_left = match lane_inputs.first() {
-                    Some(InputSource::Buffer(b)) => *b,
-                    _ => silence_buf,
-                };
-                out_right = match lane_inputs.get(1) {
-                    Some(InputSource::Buffer(b)) => *b,
-                    _ => silence_buf,
-                };
+                // The output module has no ports of its own: it writes the patch's output (its
+                // input times its Level) into two hidden buffers, which the engine reads.
+                debug_assert!(lane_outputs.is_empty());
+                out_left = w.new_buf();
+                out_right = w.new_buf();
+                lane_outputs.push(out_left);
+                lane_outputs.push(out_right);
             }
 
             let mut instance = registry::create_in(scope, &meta.kind)

@@ -230,13 +230,10 @@ pub struct Jack {
 pub enum Decor {
     None,
     Keys(Rect),
-    Speaker(Pos2),
     /// A live display: the module kind says what it draws.
     Display(Rect),
     /// The clock's Run/Stop and Restart buttons.
     Transport(Rect),
-    /// Left end of the delay's sync readout line (left of the output plate).
-    Status(Pos2),
     /// The sequencer's header strip: EDIT tabs on the left, PLAY buttons on the right.
     Banks(Rect),
     /// The FM voice's six operator blocks, side by side.
@@ -325,10 +322,8 @@ impl Placed {
         self.decor = match self.decor {
             Decor::None => Decor::None,
             Decor::Keys(r) => Decor::Keys(r.translate(d)),
-            Decor::Speaker(c) => Decor::Speaker(c + d),
             Decor::Display(r) => Decor::Display(r.translate(d)),
             Decor::Transport(r) => Decor::Transport(r.translate(d)),
-            Decor::Status(c) => Decor::Status(c + d),
             Decor::Banks(r) => Decor::Banks(r.translate(d)),
             Decor::Cues(r) => Decor::Cues(r.translate(d)),
             Decor::Grid(r) => Decor::Grid(r.translate(d)),
@@ -627,7 +622,7 @@ fn place_local(
             for (i, &port) in ins.iter().enumerate() {
                 jacks.push(Jack {
                     port,
-                    c: pos2(40.0, 230.0 + 48.0 * i as f32),
+                    c: pos2(40.0, JACK_Y - 48.0 * (ins.len() - 1 - i) as f32),
                     label_right: true,
                 });
             }
@@ -681,9 +676,7 @@ fn place_local(
             };
         let mut zone_top = ZONE_TOP;
         // Family tables first (their kinds keep the plain knob layout below the decor).
-        let family = amp::decor(info.kind, fw)
-            .or_else(|| fx::decor(info.kind))
-            .or_else(|| timing::decor(info.kind, fw))
+        let family = timing::decor(info.kind, fw)
             .or_else(|| filter::decor(info.kind))
             .or_else(|| env::decor(info.kind))
             .or_else(|| util::decor(info.kind));
@@ -715,6 +708,8 @@ fn place_local(
                 .filter(|i| face_knobs.contains(i) || face_sels.contains(i))
                 .collect();
             decor = fm6_face(info, &all, fw, &mut ctls, &mut off_face);
+        } else if matches!(info.kind, "out" | "delay" | "reverb") {
+            decor = fx::sparse_face(info, &face_knobs, &face_sels, &mut ctls, &mut off_face);
         } else if info.kind == "seq" {
             let all: Vec<usize> = (0..info.params.len())
                 .filter(|i| face_knobs.contains(i) || face_sels.contains(i))

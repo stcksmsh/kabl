@@ -315,6 +315,9 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
         ("reverb", "mix") => "Reverb level against the dry sound: 100 % is reverb only.",
         ("reverb", "predelay_ms") => "Gap before the reverb starts; keeps attacks clear.",
         ("reverb", "width") => "Stereo width of the tail: 0 % is mono.",
+        ("out", "level_db") => {
+            "Trims the whole patch's output in dB: 0 dB leaves it as it is, −6 dB is about half."
+        }
         ("gain", "gain_db") => "Level change in dB: 0 dB leaves it unchanged, −6 dB is about half.",
         ("macro", _) => {
             "A performance knob: it does nothing by itself. Each route from its output moves \

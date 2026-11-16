@@ -1,11 +1,12 @@
-//! `out` (brief section 8: "stereo output"). The graph's terminal sink — it has no `Module`
-//! output ports of its own, because nothing downstream in the `Module` graph consumes its
-//! signal; a real audio callback (`crates/standalone`, not built yet) will read `left()`/
-//! `right()` each block and hand them to the device. `prepare` allocates the internal buffers
-//! once (RT rule: `process` never allocates, brief section 3) — writing into already-sized
-//! buffers in `process` is a plain memory write, not a reallocation.
+//! `out` (brief section 8: "stereo output"). The graph's terminal sink. It has no `Module`
+//! output ports of its own, but the compiler hands it two hidden output buffers (left, right):
+//! `process` writes the input there times the Level (dB, smoothed over 20 ms), and the engine
+//! reads those buffers as the patch's output. Level 0 dB (the default, and what a patch saved
+//! before the parameter existed loads as) passes the input untouched.
 
-use crate::info::{Category, ModuleInfo, PortDirection, PortInfo, PortType, QualitySupport, Rate};
+use crate::info::{
+    Category, ModuleInfo, ParamInfo, PortDirection, PortInfo, PortType, QualitySupport, Rate, Taper,
+};
 use crate::io::ProcessIo;
 use crate::module::{Module, QualityConfig};
 
@@ -16,16 +17,30 @@ const PORTS: &[PortInfo] = &[PortInfo {
     width: 2,
 }];
 
+pub const MIN_DB: f32 = -60.0;
+pub const MAX_DB: f32 = 12.0;
+
+const PARAMS: &[ParamInfo] = &[ParamInfo {
+    name: "level_db",
+    min: MIN_DB,
+    max: MAX_DB,
+    default: 0.0,
+    unit: "dB",
+    taper: Taper::Linear,
+    smoothing_ms: 20.0,
+}];
+
 pub static OUT_INFO: ModuleInfo = ModuleInfo {
     kind: "out",
     name: "Output",
     category: Category::Utility,
     rate: Rate::Global,
-    explain: "The patch's stereo output — what actually reaches your speakers or headphones.",
+    explain: "The patch's stereo output: what actually reaches your speakers or headphones. \
+              Level trims it in dB; 0 dB leaves it as it is.",
     lesson: None,
     requires: &[],
     ports: PORTS,
-    params: &[],
+    params: PARAMS,
     quality: QualitySupport {
         oversampling: false,
         anti_aliasing: false,
@@ -38,26 +53,25 @@ pub static OUT_INFO: ModuleInfo = ModuleInfo {
 
 const LEFT: usize = 0;
 const RIGHT: usize = 1;
+const TAU_S: f32 = 0.02;
+
+/// Linear gain of a Level in dB, clamped to the parameter's range.
+pub fn level_to_gain(db: f32) -> f32 {
+    10f32.powf(db.clamp(MIN_DB, MAX_DB) / 20.0)
+}
 
 pub struct Out {
-    left: Vec<f32>,
-    right: Vec<f32>,
+    sample_rate: f32,
+    /// Smoothed linear gain; negative until the first block.
+    g: f32,
 }
 
 impl Out {
     pub fn new() -> Self {
         Out {
-            left: Vec::new(),
-            right: Vec::new(),
+            sample_rate: 48000.0,
+            g: -1.0,
         }
-    }
-
-    pub fn left(&self) -> &[f32] {
-        &self.left
-    }
-
-    pub fn right(&self) -> &[f32] {
-        &self.right
     }
 }
 
@@ -79,24 +93,41 @@ impl Module for Out {
         &OUT_INFO
     }
 
-    fn prepare(&mut self, _sample_rate: f32, max_block: usize, _quality: &QualityConfig) {
-        self.left = vec![0.0; max_block];
-        self.right = vec![0.0; max_block];
+    fn prepare(&mut self, sample_rate: f32, _max_block: usize, _quality: &QualityConfig) {
+        self.sample_rate = sample_rate;
     }
 
     #[inline]
     fn process(&mut self, io: &mut ProcessIo) {
+        let n = io.block_len();
         let left_in = io.input(LEFT);
         let right_in = io.input(RIGHT);
-        let block_len = io.block_len();
-        for i in 0..block_len {
-            self.left[i] = left_in.at(i);
-            self.right[i] = right_in.at(i);
+        let target = level_to_gain(io.param(0).at(0));
+        if self.g < 0.0 {
+            self.g = target;
         }
+        let k = 1.0 - (-1.0 / (TAU_S * self.sample_rate)).exp();
+        let mut g = self.g;
+        {
+            let left = io.output(LEFT);
+            let mut gl = g;
+            for (i, o) in left[..n].iter_mut().enumerate() {
+                gl += (target - gl) * k;
+                *o = left_in.at(i) * gl;
+            }
+        }
+        {
+            let right = io.output(RIGHT);
+            for (i, o) in right[..n].iter_mut().enumerate() {
+                g += (target - g) * k;
+                *o = right_in.at(i) * g;
+            }
+        }
+        // Settles exactly, so an unchanged level is exact (0 dB passes the input untouched).
+        self.g = if (g - target).abs() < 1e-6 { target } else { g };
     }
 
     fn reset(&mut self) {
-        self.left.fill(0.0);
-        self.right.fill(0.0);
+        self.g = -1.0;
     }
 }

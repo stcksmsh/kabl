@@ -37,6 +37,8 @@ pub struct LiveTap {
 #[derive(Default)]
 pub struct Live {
     pub taps: HashMap<(ModuleId, u8), LiveTap>,
+    /// The final output's peak levels (left, right), linear: the status-bar meter's source.
+    pub master: [f32; 2],
 }
 
 /// The face-tap targets this frame's drawing asked for, and what was last sent.
