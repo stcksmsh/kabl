@@ -175,7 +175,15 @@ pub fn surface(p: &Painter, st: &Style, rect: Rect, base: Color32, edge: Color32
     if f.material != FaceMaterial::Flat {
         let sh = f.own_shadow.unwrap_or(st.shadows[f.shadow.min(2)]);
         if sh.alpha > 0 {
-            p.add(face_shadow(sh).as_shape(rect, cr));
+            // A pre-blurred nine-slice texture: sixteen vertices instead of a tessellated feather.
+            let tex = super::blur::drop_shadow(
+                p.ctx(),
+                rect.translate(egui::vec2(0.0, sh.dy)),
+                f32::from(f.radius),
+                sh.blur,
+                sh.alpha,
+            );
+            p.add(tex.unwrap_or_else(|| face_shadow(sh).as_shape(rect, cr).into()));
         }
     }
     if f.material == FaceMaterial::Line {
@@ -993,7 +1001,12 @@ mod fill_tests {
         ctx.graphics(|g| {
             let list = g.get(layer).expect("painted");
             let shapes: Vec<_> = list.all_entries().map(|c| &c.shape).collect();
-            if let Some(Shape::Mesh(m)) = shapes.iter().find(|s| matches!(s, Shape::Mesh(_))) {
+            // The gradient is an untextured mesh; the drop shadow is a textured one.
+            let gradient = shapes.iter().find(|s| match s {
+                Shape::Mesh(m) => m.texture_id == egui::TextureId::default(),
+                _ => false,
+            });
+            if let Some(Shape::Mesh(m)) = gradient {
                 mix(m.vertices[0].color, m.vertices[2].color, 0.5)
             } else {
                 shapes

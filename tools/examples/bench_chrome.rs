@@ -54,6 +54,13 @@ fn run(
     if std::env::var("KABL_BENCH_CABLES").as_deref() == Ok("hidden") {
         ui.cable_view = kabl_ui::CableView::Hidden;
     }
+    // KABL_BENCH_LIFE=off|glow|pulses sets "Cable life" (default pulses); with `live` every
+    // cable carries a made-up signal, so this is the worst case for the glow.
+    ui.cable_life = match std::env::var("KABL_BENCH_LIFE").as_deref() {
+        Ok("off") => kabl_ui::cable_life::CableLife::Off,
+        Ok("glow") => kabl_ui::cable_life::CableLife::Glow,
+        _ => kabl_ui::cable_life::CableLife::GlowPulses,
+    };
     ui.perform_open = perform > 0;
     ui.perform_tall = perform == 1;
     ui.dark = dark;

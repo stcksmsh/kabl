@@ -128,6 +128,11 @@ pub fn legible_cached(ctx: &egui::Context, st: &Style, col: Color32, alpha: f32)
     c
 }
 
+/// Points to sample a cable whose rope is about `len` screen points long: one per 12, 12 to 41.
+pub fn point_count(len: f32) -> usize {
+    ((len / 12.0) as usize).clamp(12, 41)
+}
+
 /// A hanging patch cable, drawn as the G4 mockup does (`cables()` in `g4-surfaces.html`): a
 /// cubic whose handles sit 15 % of the span inwards and hang by the theme's sag plus 0.28 of
 /// the length, at most 160. `zoom` scales the base sag and the limit.
@@ -135,9 +140,10 @@ pub fn points(a: Pos2, b: Pos2, zoom: f32, sag: f32) -> Vec<Pos2> {
     let d = b - a;
     let sag = (sag * zoom + 0.28 * d.length()).min(160.0 * zoom);
     let (c1, c2) = (a + vec2(d.x * 0.15, sag), b + vec2(-d.x * 0.15, sag));
-    (0..=40)
+    let n = point_count(d.length() + 2.0 * sag);
+    (0..n)
         .map(|i| {
-            let t = i as f32 / 40.0;
+            let t = i as f32 / (n - 1) as f32;
             let u = 1.0 - t;
             (a.to_vec2() * u * u * u
                 + c1.to_vec2() * 3.0 * u * u * t
@@ -167,28 +173,6 @@ pub fn points_cached(
     let pts = std::sync::Arc::new(points(a, b, zoom, sag));
     ctx.data_mut(|d| d.insert_temp::<Hit>(key, ([a, b], [zoom, sag], pts.clone())));
     pts
-}
-
-/// One restrained light travelling along the cable at `t` (0..=1 from source to destination),
-/// `k` (0..=1) its strength.
-pub fn light(caps: &mut Vec<Shape>, pts: &[Pos2], col: Color32, t: f32, k: f32, z: f32) {
-    if pts.len() < 2 || k <= 0.0 {
-        return;
-    }
-    let f = t.clamp(0.0, 1.0) * (pts.len() - 1) as f32;
-    let i = (f as usize).min(pts.len() - 2);
-    let c = pts[i] + (pts[i + 1] - pts[i]) * (f - i as f32);
-    let hot = col.lerp_to_gamma(Color32::WHITE, 0.6);
-    caps.push(Shape::circle_filled(
-        c,
-        5.0 * z,
-        col.gamma_multiply(0.25 * k),
-    ));
-    caps.push(Shape::circle_filled(
-        c,
-        2.5 * z,
-        hot.gamma_multiply(0.9 * k),
-    ));
 }
 
 /// Distance from `p` to the polyline `pts`.
