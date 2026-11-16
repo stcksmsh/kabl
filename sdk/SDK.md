@@ -22,6 +22,9 @@ cargo kabl --help
 `cargo install` puts `cargo-kabl` in `~/.cargo/bin`, which rustup already has on your `PATH`.
 With `--root DIR` it goes to `DIR/bin`: put that on `PATH`, or `cargo kabl` is not found.
 
+Run it from the kabl checkout, or give the absolute path. cargo may print warnings about
+`patch ... was not used in the crate graph`; they are harmless.
+
 Nothing else: your new project pins its own compiler (`rust-toolchain.toml`, Rust 1.93.0) and
 `rustup` fetches that and the `wasm32-unknown-unknown` target the first time you build in it. If
 you prefer to do it by hand, `rustup target add wasm32-unknown-unknown`.
@@ -37,7 +40,7 @@ cargo kabl build        # wasm blob + yourhandle.softclip-1.kablmod
 
 `new` creates the project folder in the current folder, named after the id with the dot turned
 into a dash (`yourhandle-softclip`). `--into DIR` makes it inside `DIR` instead
-(`DIR/yourhandle-softclip`). Every command also works from outside the folder with
+(`DIR/yourhandle-softclip`); it combines with `--audio`/`--control`. Every command also works from outside the folder with
 `--manifest-path yourhandle-softclip/Cargo.toml`; `cargo test` takes the same flag.
 
 The id is `githubhandle.module`: lowercase letters, digits, `_` and `-`, exactly one dot. The
@@ -137,7 +140,13 @@ What the pieces mean:
 - **Params** are decimal text for min, max and default (`"0.5"`), a taper (`Linear`, `Exp`, `Stepped`
   for a switch of whole numbers, `Cubic`), a smoothing time in ms and an optional unit label.
   The host smooths and modulates them: `io.param(i)` is one value per block. Read it as a float and
-  round it yourself for a stepped param (`(v + 0.5) as i32`).
+  round it yourself for a stepped param (`(v + 0.5) as i32`). A switch of 2..8 whole steps is
+  `.param("steps", "2", "8", "4", Taper::Stepped, 0, "")`: smoothing 0 and an empty unit `""` are
+  fine (the unit is just a label).
+- **Blocks and edges**: `process` is called once per block and `io.n` can differ between calls.
+  Anything that spans blocks (the previous gate level for edge detection, a phase, a counter, the
+  time since the last clock) belongs in your struct, never in a local. A gate edge is
+  `input > 0.5 && !self.prev_high`; update `prev_high` per frame.
 - **`io`**: `io.n` frames in this block, at most 2048. `io.input[slot][i]` and `io.output[slot][i]`
   are `f32`; `io.input(slot)` and `io.output(slot)` give slices of exactly `n` frames. Write every
   output frame, every block.
@@ -158,7 +167,10 @@ What the pieces mean:
 - **Voices**: with `Rate::Voice` kabl builds one instance per voice from `new`, so state in your
   struct is per voice. Do not keep state in a `static`.
 
-kabl plays up to 16 voices. A module that must exist once (a global clock) says `Rate::Global`.
+kabl plays up to 16 voices. A module that must exist once (a global clock) says `Rate::Global`: it
+has one instance, its inputs are whatever is cabled to it, and its saved settings are saved and
+restored like any other module's. `--control` starts from a `Global` control module with the same
+test and `fault-*` blocks as the audio template.
 
 ## 4. Saved settings
 
@@ -167,7 +179,9 @@ what the knobs do not already hold (knob values are saved by kabl itself): count
 sequencer is on, a recorded table. `STATE_CAP` is the most you may write (at most 64 KiB); writing
 past it makes the save fail and kabl keeps the previous settings. `StateWriter` has `u32`, `f32`
 and `bytes`; `StateReader` has the matching reads, each returns `None` if the data is short. A
-module with nothing to save leaves `save`/`load` out.
+module with nothing to save leaves `save`/`load` out. To test them, make a buffer, wrap it with
+`StateWriter::new(&mut buf)`, call `m.save(&mut w)`, then `m2.load(1, &buf[..w.len()])` on a
+fresh module and compare (`cargo kabl test` also does this round trip for you).
 
 When you change what `save` writes, set `const STATE_VERSION: u32 = 2;` (the default is 1) and
 implement `fn migrate(old_version: u32, bytes: &[u8], out: &mut StateWriter) -> bool` to turn old
@@ -204,7 +218,7 @@ assert!(output[OUT][..4].iter().all(|v| v.abs() < 1.0));
 
 | Check | What it proves |
 |---|---|
-| golden hash | the output on a fixed noise input is unchanged; first run records `kabl-golden.txt` (commit it), `--bless` accepts an intended change |
+| golden hash | the output on a fixed noise input is unchanged; first run creates `kabl-golden.txt` next to `Cargo.toml` (commit it; `target/` is already git-ignored), `--bless` accepts an intended change |
 | determinism | two instances give identical bytes |
 | parameter sweep | every param at five points: output finite, no fault |
 | reset | the same input after other input gives the same output |
