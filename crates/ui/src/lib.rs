@@ -348,6 +348,8 @@ pub struct UiState {
     lanes_shown: Option<(ModuleId, String, usize)>,
     /// Values, pills and badges: drawn after the cables so no cable hides them.
     pub(crate) deferred: Vec<egui::Shape>,
+    /// Face displays animate until this UI time (a signal was seen within the quiet time).
+    pub(crate) faces_live_until: f64,
     /// The performance panel (bottom) is open.
     pub perform_open: bool,
     /// Param waiting for the next MIDI CC to map to it.
@@ -514,6 +516,7 @@ impl Default for UiState {
             last_inspected: None,
             lanes_shown: None,
             deferred: Vec::new(),
+            faces_live_until: 0.0,
             perform_open: false,
             learn: None,
             takeover: Default::default(),
@@ -912,9 +915,19 @@ pub fn show_with(
     if let Some(c) = ui_state.wants.frame(audio, now) {
         ui_state.launches.push(c);
     }
+    if ui_state.wants.signal(&ui_state.live, now) {
+        ui_state.faces_live_until = now + cable_life::QUIET_SECS;
+    }
     if ui_state.wants.active {
+        // Frames while a tapped signal moves (and for the quiet time after); a silent rack,
+        // an Output's meter at rest included, only takes the slow look for a sound beginning.
+        let ms = if now < ui_state.faces_live_until || ui_state.life.live(now) {
+            33
+        } else {
+            cable_life::WATCH_REPAINT_MS
+        };
         ui.ctx()
-            .request_repaint_after(std::time::Duration::from_millis(33));
+            .request_repaint_after(std::time::Duration::from_millis(ms));
     } else if ui_state.wants.cables {
         // Only cables watch: frames while one is lit, else a slow look for a sound beginning.
         let ms = if ui_state.life.live(now) || ui_state.pulses.live() {

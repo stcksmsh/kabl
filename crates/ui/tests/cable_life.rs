@@ -111,6 +111,25 @@ fn a_loud_cable_keeps_frames_coming_and_a_quiet_one_does_not() {
 }
 
 #[test]
+fn a_quiet_rack_with_an_output_idles_and_a_loud_master_meter_wakes_it() {
+    let mut h = H::new();
+    // No tap reports at all: the Output's meter has nothing to animate.
+    h.shortest_repaint(90, None);
+    let idle = h.shortest_repaint(60, None);
+    assert!(
+        idle.is_none_or(|d| d >= Duration::from_millis(60)),
+        "an Output at rest asks for no 33 ms repaints, got {idle:?}"
+    );
+    // Sound reaches the master meter: frames at the live rate.
+    h.ui.live.master = [0.4, 0.4];
+    let live = h.shortest_repaint(30, None);
+    assert!(
+        live.is_some_and(|d| d <= Duration::from_millis(40)),
+        "a loud master meter repaints at 33 ms, got {live:?}"
+    );
+}
+
+#[test]
 fn cable_life_off_asks_for_no_taps_and_no_frames() {
     let mut h = H::new();
     h.ui.cable_life = kabl_ui::cable_life::CableLife::Off;
