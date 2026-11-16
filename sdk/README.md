@@ -9,6 +9,7 @@ host and `cargo kabl` are GPL-3.0-or-later and are not in this directory.
   (cargo feature `arena`).
 - `examples/logic`, `examples/bitfilter`: `demo.logic` and `demo.bitfilter` ported to the SDK.
   They carry no `unsafe` (`#![forbid(unsafe_code)]`) and no layout code.
+- `examples/c-gain`: a whole module in C, built with clang (see `SDK.md` section 10).
 - `template/`: the project `cargo kabl new` copies (a working module, one test, README, 0BSD
   LICENSE, pinned toolchain).
 
@@ -26,9 +27,8 @@ cargo build --release --target wasm32-unknown-unknown -p sdk-demo-logic -p sdk-d
 `cargo test` also builds both examples for wasm and checks exports, sections and size
 (`kabl-module-sdk/tests/wasm_examples.rs`).
 
-Not yet possible: loading these blobs into kabl. The current host rejects `abi_minor`; the host
-side is D12 PR 0. The committed blobs in `crates/modules/src/code/examples/` are the old
-hand-written ones until then.
+**Start with `SDK.md`**: install, write a module, build, test, load it in kabl, the limits and
+what every error means. `examples/c-gain` is the same contract in C.
 
 Index constants: `macro_rules!` cannot mint identifiers from the builder, so write
 `const CUTOFF_CV: usize = 2;` and check it with `const _: () = META.assert_in(CUTOFF_CV, "cutoff_cv");`
