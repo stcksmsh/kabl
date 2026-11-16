@@ -473,7 +473,12 @@ pub struct Knob {
     pub z: f32,
     /// Knob travel, 0..=1.
     pub value: f32,
-    pub hot: bool,
+    /// Pointer hover or drag, eased 0..=1 over the hover token: a thin neutral ring.
+    pub hover: f32,
+    /// The inspected knob: an accent halo and ring, apart from hover and focus.
+    pub inspected: bool,
+    /// Keyboard focus: a crisp 2 px accent ring, offset 2 from the rim.
+    pub focused: bool,
     /// Colour of the value arc: the accent, or the module's family ink (look B).
     pub arc: Color32,
 }
@@ -580,8 +585,23 @@ pub fn knob(p: &Painter, st: &Style, k: &Knob) {
             p.circle_stroke(c, rs, Stroke::new((1.0 * z).max(1.0), rim));
         }
     }
-    if k.hot {
-        p.circle_stroke(c, rs + 1.5 * z, Stroke::new((1.2 * z).max(1.2), r.focus));
+    if k.hover > 0.01 {
+        p.circle_stroke(
+            c,
+            rs + 1.5 * z,
+            Stroke::new((1.2 * z).max(1.2), alpha(r.text, (170.0 * k.hover) as u8)),
+        );
+    }
+    if k.inspected {
+        p.circle_filled(c, rs + 4.0 * z, alpha(r.accent, 38));
+        p.circle_stroke(
+            c,
+            rs + 1.5 * z,
+            Stroke::new((1.6 * z).max(1.6), alpha(r.accent, 200)),
+        );
+    }
+    if k.focused {
+        p.circle_stroke(c, rs + 3.0 * z, Stroke::new(2.0, r.accent));
     }
     if solid {
         return;
