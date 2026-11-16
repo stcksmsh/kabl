@@ -49,6 +49,8 @@ pub struct Wants {
     token: u64,
     /// A display or knob wants its tap: the faces repaint while audio runs.
     pub active: bool,
+    /// The taps a face (not only a cable) wants, as (module, output index).
+    face_taps: Vec<(ModuleId, u8)>,
     /// Some tap is for a cable only: the cables decide whether frames are needed.
     pub cables: bool,
 }
@@ -66,6 +68,17 @@ pub mod rank {
 const RESEND_SECS: f64 = 2.0;
 
 impl Wants {
+    /// Some tap a face reads, or the master meter, is above [`crate::cable_life::QUIET`]: the
+    /// faces have something to animate. Silence (an Output's meter at rest) does not.
+    pub fn signal(&self, live: &Live, now: f64) -> bool {
+        let q = crate::cable_life::QUIET;
+        live.master.iter().any(|&m| m >= q)
+            || self.face_taps.iter().any(|&(m, p)| {
+                live.tap(m, p, now)
+                    .is_some_and(|t| t.last.abs().max(t.min.abs()).max(t.max.abs()) >= q)
+            })
+    }
+
     /// A visible module's own display reads its output 0 and view; the compressor's reads `gr`
     /// (output 2), since the engine reads one output of each module instance.
     pub fn display(&mut self, id: ModuleId, kind: &'static str) {
@@ -143,6 +156,12 @@ impl Wants {
             face.clear();
         }
         self.active = face.iter().any(|&f| f);
+        self.face_taps = want
+            .iter()
+            .zip(&face)
+            .filter(|(_, &f)| f)
+            .map(|(t, _)| (t.module, t.port))
+            .collect();
         self.cables = !want.is_empty() && !self.active;
         let before = self.sent.as_ref().map_or(&[][..], |(w, _)| w.as_slice());
         let changed = before != want.as_slice();
