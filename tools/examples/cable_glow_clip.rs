@@ -25,11 +25,17 @@ const SR: f32 = 48000.0;
 /// Samples per video frame.
 const STEP: usize = SR as usize / FPS;
 
+#[path = "support/mockup.rs"]
+mod mockup;
+
 fn patch(name: &str) -> kabl_core::PatchState {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../patches");
     match name {
         "simple" => kabl_standalone::default_patch(),
-        // The factory sound of the mock's rack.
+        // The design mockup's rack (sequencer, oscillator, filter, envelope, mixer, delay, reverb,
+        // output), shared with chrome_capture.
+        "mockup" => mockup::mockup_patch(false).state().clone(),
+        // The factory sound Acid Line.
         "acid-line" => kabl_core::load(&root.join("presets/acid-line"))
             .unwrap()
             .state()
