@@ -1001,10 +1001,16 @@ pub(crate) fn param_knob(
         ) {
             let rect = egui::Align2::CENTER_CENTER.anchor_size(vpos, g.size());
             // Above the cables, on a face-colour backing that cuts them cleanly (HANDOVER 4.2).
+            let back = ui_state
+                .frame_hits
+                .get(&format!("module:{id}"))
+                .map_or(th.panel, |face| {
+                    crate::kit::face::fill_at(&ui_state.style, *face, vpos.y, th.panel)
+                });
             ui_state.deferred.push(egui::Shape::rect_filled(
                 rect.expand(2.0),
                 egui::CornerRadius::same(3),
-                th.panel.gamma_multiply(0.85),
+                back.gamma_multiply(0.85),
             ));
             ui_state
                 .deferred

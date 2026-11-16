@@ -2521,6 +2521,7 @@ fn draw_module(
     let start = ui
         .ctx()
         .graphics(|g| g.get(layer).map_or(0, |l| l.next_idx().0));
+    let deferred_at = ui_state.deferred.len();
     draw_module_shapes(editor, ui_state, ui, painter, th, xf, m, now, drawn);
     // A lifted module (Foreground layer) already paints above the cables.
     if m.skin.is_none() && ui.layer_id().order != egui::Order::Foreground {
@@ -2531,7 +2532,16 @@ fn draw_module(
             _ => None,
         };
         let face_fill = theme::panel_theme(&ui_state.style, m.info.kind).panel;
-        lift_labels(ui, ui_state, layer, start, xf.r(m.face), face_fill, decor);
+        let face = xf.r(m.face);
+        lift_labels(
+            ui,
+            ui_state,
+            layer,
+            (start, deferred_at),
+            face,
+            face_fill,
+            decor,
+        );
     }
 }
 
@@ -2543,12 +2553,13 @@ fn lift_labels(
     ui: &egui::Ui,
     ui_state: &mut UiState,
     layer: egui::LayerId,
-    start: usize,
+    (start, deferred_at): (usize, usize),
     face: Rect,
     face_fill: Color32,
     keep_in: Option<Rect>,
 ) {
     use egui::epaint::Shape as S;
+    let style = ui_state.style.clone();
     let area = face.area();
     let lifted: Vec<(Rect, Color32, S)> = ui.ctx().graphics_mut(|g| {
         let list = g.entry(layer);
@@ -2573,11 +2584,10 @@ fn lift_labels(
                         return;
                     }
                     let c = r.center();
-                    let back = fills
-                        .iter()
-                        .rev()
-                        .find(|(f, _)| f.contains(c))
-                        .map_or(face_fill, |(_, c)| *c);
+                    let back = fills.iter().rev().find(|(f, _)| f.contains(c)).map_or_else(
+                        || kit::face::fill_at(&style, face, c.y, face_fill),
+                        |(_, c)| *c,
+                    );
                     taken = Some((r, back, std::mem::replace(&mut cs.shape, S::Noop)));
                 }
             });
@@ -2599,8 +2609,11 @@ fn lift_labels(
             )
         })
         .unzip();
-    ui_state.deferred.extend(backs);
-    ui_state.deferred.extend(texts);
+    // Ahead of what the module already deferred (readouts, pills): those stay on top of these.
+    let at = deferred_at.min(ui_state.deferred.len());
+    ui_state
+        .deferred
+        .splice(at..at, backs.into_iter().chain(texts));
 }
 
 #[allow(clippy::too_many_arguments)]

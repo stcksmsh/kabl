@@ -137,6 +137,18 @@ fn face_shadow(s: Shadow) -> egui::epaint::Shadow {
     }
 }
 
+/// The face fill at screen height `y`: the gradient's colour there, else `base`. A label's
+/// backing uses it, so the backing is invisible on a gradient face.
+pub fn fill_at(st: &Style, face: Rect, y: f32, base: Color32) -> Color32 {
+    let f = &st.slots.face;
+    if f.top.a() > 0 && f.bottom.a() > 0 && face.height() > 0.0 {
+        let t = ((y - face.top()) / face.height()).clamp(0.0, 1.0);
+        f.top.lerp_to_gamma(f.bottom, t)
+    } else {
+        base
+    }
+}
+
 /// The face: shadow, material, edge and the corner hardware.
 pub fn surface(p: &Painter, st: &Style, rect: Rect, base: Color32, edge: Color32, z: f32) {
     let f = &st.slots.face;
