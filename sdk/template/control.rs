@@ -37,6 +37,23 @@ impl Module for Scale {
             // Inputs are always finite; the host disables a module whose output is not.
             io.output[OUT][i] = io.input[IN][i] * amount + offset;
         }
+        // Deliberate faults, built by `cargo kabl test` to prove the host contains them. They fire
+        // on non-zero input (the host's load-time priming block is silent). Wasm only: a native
+        // `cargo test --all-features` must not panic or hang here.
+        #[cfg(all(feature = "fault-trap", target_arch = "wasm32"))]
+        if io.input[IN][0] != 0.0 {
+            panic!("fault-trap");
+        }
+        #[cfg(all(feature = "fault-spin", target_arch = "wasm32"))]
+        if io.input[IN][0] != 0.0 {
+            loop {
+                core::hint::spin_loop();
+            }
+        }
+        #[cfg(all(feature = "fault-nan", target_arch = "wasm32"))]
+        {
+            io.output[OUT][0] = f32::NAN;
+        }
     }
 }
 
