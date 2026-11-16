@@ -53,8 +53,8 @@ impl CableLife {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Intensity {
-    #[default]
     Low,
+    #[default]
     High,
 }
 
@@ -184,10 +184,11 @@ impl Life {
     }
 }
 
-/// Peak of the flash on a rising edge, as a `lit` (a third of a full signal's glow).
-pub const FLASH_PEAK: f32 = 1.0 / 3.0;
+/// Peak of the flash on a rising edge, as a `lit`: the cable flashes to the full glow of the
+/// chosen intensity (gate (b): a third of it could not be seen on a clock cable).
+pub const FLASH_PEAK: f32 = 1.0;
 /// Decay of the flash, in ms.
-const FLASH_TAU_MS: f32 = 90.0;
+pub const FLASH_TAU_MS: f32 = 150.0;
 
 #[derive(Default)]
 struct Edge {
@@ -196,8 +197,8 @@ struct Edge {
     flash: f32,
 }
 
-/// Gates and clocks: a soft flash of the cable on each rising edge of the source, decaying with
-/// tau 90 ms. Nothing travels along the cable: a steady stream of travelling dots looks like a
+/// Gates and clocks: a flash of the cable on each rising edge of the source, decaying with
+/// tau 150 ms. Nothing travels along the cable: a steady stream of travelling dots looks like a
 /// wagon wheel under a 60 Hz capture, and is too fast to follow by eye.
 #[derive(Default)]
 pub struct Pulses {
@@ -369,7 +370,7 @@ mod tests {
     }
 
     #[test]
-    fn a_rising_edge_flashes_once_softly_and_decays_with_tau_90_ms() {
+    fn a_rising_edge_flashes_once_to_full_and_decays_with_tau_150_ms() {
         let mut p = Pulses::default();
         let dt = 1.0 / 60.0;
         let mut now = 0.0;
@@ -382,17 +383,17 @@ mod tests {
             p.end_frame();
             if f > prev + 0.1 {
                 peaks += 1;
-                assert!(f <= FLASH_PEAK + 1e-6, "soft: {f}");
+                assert!(f <= FLASH_PEAK + 1e-6, "no more than full: {f}");
             }
             prev = f;
             now += f64::from(dt);
         }
         assert_eq!(peaks, 1, "one flash for the held gate");
-        assert!(!p.live(), "gone after about a quarter of a second");
+        assert!(!p.live(), "gone after about half a second");
         let mut p = Pulses::default();
         let f = p.update(1, Some(&gate(true, 0.0)), 0.0);
         assert!((f - FLASH_PEAK).abs() < 1e-6);
-        let f = p.update(1, None, 0.09);
+        let f = p.update(1, None, FLASH_TAU_MS / 1000.0);
         assert!((f - FLASH_PEAK * (-1.0f32).exp()).abs() < 1e-5, "{f}");
     }
 

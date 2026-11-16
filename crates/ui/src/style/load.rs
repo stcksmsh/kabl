@@ -815,6 +815,11 @@ mod tests {
         assert_eq!(Prefs::load(d.path()).theme, "kabl.lacquer");
         assert!(Prefs::load(d.path()).folders.is_empty());
         assert_eq!(Prefs::load(d.path()).cable_life, Default::default());
+        assert_eq!(
+            Prefs::load(d.path()).cable_intensity,
+            crate::cable_life::Intensity::High,
+            "high is the default intensity"
+        );
         std::fs::write(d.path().join("settings.toml"), "theme = 4").unwrap();
         assert_eq!(Prefs::load(d.path()), Prefs::default());
     }
