@@ -19,7 +19,7 @@ pub(super) fn decor(kind: &str, fw: f32) -> Option<Decor> {
             vec2(fw - 28.0, crate::drum_grid::HEIGHT),
         )),
         "clock" => Decor::Transport(Rect::from_min_size(
-            pos2(12.0, 174.0),
+            pos2(12.0, 184.0),
             vec2(fw - 24.0, 32.0),
         )),
         _ => return None,

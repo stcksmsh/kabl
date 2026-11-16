@@ -175,28 +175,6 @@ pub fn points_cached(
     pts
 }
 
-/// One restrained light travelling along the cable at `t` (0..=1 from source to destination),
-/// `k` (0..=1) its strength.
-pub fn light(caps: &mut Vec<Shape>, pts: &[Pos2], col: Color32, t: f32, k: f32, z: f32) {
-    if pts.len() < 2 || k <= 0.0 {
-        return;
-    }
-    let f = t.clamp(0.0, 1.0) * (pts.len() - 1) as f32;
-    let i = (f as usize).min(pts.len() - 2);
-    let c = pts[i] + (pts[i + 1] - pts[i]) * (f - i as f32);
-    let hot = col.lerp_to_gamma(Color32::WHITE, 0.6);
-    caps.push(Shape::circle_filled(
-        c,
-        5.0 * z,
-        col.gamma_multiply(0.25 * k),
-    ));
-    caps.push(Shape::circle_filled(
-        c,
-        2.5 * z,
-        hot.gamma_multiply(0.9 * k),
-    ));
-}
-
 /// Distance from `p` to the polyline `pts`.
 pub fn distance_to(pts: &[Pos2], p: Pos2) -> f32 {
     pts.windows(2)

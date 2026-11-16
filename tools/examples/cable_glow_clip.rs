@@ -29,6 +29,11 @@ fn patch(name: &str) -> kabl_core::PatchState {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../patches");
     match name {
         "simple" => kabl_standalone::default_patch(),
+        // The factory sound of the mock's rack.
+        "acid-line" => kabl_core::load(&root.join("presets/acid-line"))
+            .unwrap()
+            .state()
+            .clone(),
         "composition" => kabl_core::load(&root.join("composition"))
             .unwrap()
             .state()
