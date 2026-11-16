@@ -61,3 +61,15 @@ fn level_scales_the_output() {
     let (louder, _) = settled(&[("level_db", 6.0206)]);
     assert!((louder - 1.2).abs() < 1e-2, "{louder}");
 }
+
+#[test]
+fn the_output_level_is_smoothed_by_the_module_not_ramped_twice() {
+    use kabl_engine::runtime::{ramped, smoothed_by_module};
+    let level = &kabl_modules::builtins::OUT_INFO.params[0];
+    assert_eq!(level.name, "level_db");
+    assert!(smoothed_by_module("out", "level_db"));
+    assert!(
+        !ramped("out", level),
+        "the runtime must set it, not ramp it"
+    );
+}

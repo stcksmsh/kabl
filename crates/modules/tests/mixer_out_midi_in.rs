@@ -125,3 +125,27 @@ fn midi_in_note_on_off_drives_gate_pitch_velocity() {
         "pitch should hold at the last note's value"
     );
 }
+
+#[test]
+fn out_module_level_change_follows_a_20_ms_time_constant() {
+    // 20 ms at 48 kHz = 960 samples = 120 blocks of 8. One time constant after a step from
+    // 0 dB to -20 dB the gain has covered 1 - 1/e of the way: 0.1 + 0.9 / e of the input.
+    let mut module = Out::new();
+    module.prepare(48000.0, BLOCK, &quality());
+    let left = [1.0f32; BLOCK];
+    let inputs = [Signal::Buffer(&left), Signal::Buffer(&left)];
+    let (mut l, mut r) = ([0f32; BLOCK], [0f32; BLOCK]);
+    let mut run = |db: f32, blocks: usize| {
+        let params = [Signal::Scalar(db)];
+        for _ in 0..blocks {
+            let mut outputs: [&mut [f32]; 2] = [&mut l, &mut r];
+            let mut io = ProcessIo::new(&inputs, &mut outputs, &params, BLOCK);
+            module.process(&mut io);
+        }
+        l[BLOCK - 1]
+    };
+    assert_eq!(run(0.0, 1), 1.0);
+    let after = run(-20.0, 120);
+    let want = 0.1 + 0.9 / std::f32::consts::E;
+    assert!((after - want).abs() < 0.01, "{after} vs {want}");
+}
