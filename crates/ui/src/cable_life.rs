@@ -188,7 +188,7 @@ impl Life {
 /// chosen intensity (gate (b): a third of it could not be seen on a clock cable).
 pub const FLASH_PEAK: f32 = 1.0;
 /// Decay of the flash, in ms.
-pub const FLASH_TAU_MS: f32 = 150.0;
+pub const FLASH_TAU_MS: f32 = 70.0;
 
 #[derive(Default)]
 struct Edge {
@@ -198,7 +198,7 @@ struct Edge {
 }
 
 /// Gates and clocks: a flash of the cable on each rising edge of the source, decaying with
-/// tau 150 ms. Nothing travels along the cable: a steady stream of travelling dots looks like a
+/// tau 70 ms. Nothing travels along the cable: a steady stream of travelling dots looks like a
 /// wagon wheel under a 60 Hz capture, and is too fast to follow by eye.
 #[derive(Default)]
 pub struct Pulses {
@@ -370,7 +370,7 @@ mod tests {
     }
 
     #[test]
-    fn a_rising_edge_flashes_once_to_full_and_decays_with_tau_150_ms() {
+    fn a_rising_edge_flashes_once_to_full_and_decays_with_tau_70_ms() {
         let mut p = Pulses::default();
         let dt = 1.0 / 60.0;
         let mut now = 0.0;
