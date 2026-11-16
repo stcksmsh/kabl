@@ -34,6 +34,7 @@ mod fx_displays;
 pub mod help;
 pub mod inspect;
 pub mod kit;
+mod label_dim;
 pub mod library;
 pub mod module_install;
 pub mod panels;
@@ -353,6 +354,8 @@ pub struct UiState {
     lanes_shown: Option<(ModuleId, String, usize)>,
     /// Values, pills and badges: drawn after the cables so no cable hides them.
     pub(crate) deferred: Vec<egui::Shape>,
+    /// Screen rects of this frame's face text; cables dim where they cross (label_dim).
+    pub(crate) text_rects: Vec<Rect>,
     /// Face displays animate until this UI time (a signal was seen within the quiet time).
     pub(crate) faces_live_until: f64,
     /// The performance panel (bottom) is open.
@@ -521,6 +524,7 @@ impl Default for UiState {
             last_inspected: None,
             lanes_shown: None,
             deferred: Vec::new(),
+            text_rects: Vec::new(),
             faces_live_until: 0.0,
             perform_open: false,
             learn: None,
@@ -2275,6 +2279,7 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     let lifted_at_frame_start = ui_state.moving.is_some();
     let mut drawn = Drawn::default();
     ui_state.deferred.clear();
+    ui_state.text_rects.clear();
     draw_composites(editor, ui_state, ui, xf, &mut drawn);
     for m in &lay.mods {
         if ui_state
@@ -2329,6 +2334,17 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     };
     let cables_start = next_idx(ui);
     let plugs = draw_cables(editor, ui_state, ui, &painter, th, xf, &lay, &drawn, None);
+    if !ui_state.text_rects.is_empty() {
+        let (end, rects) = (next_idx(ui), &ui_state.text_rects);
+        ui.ctx().graphics_mut(|g| {
+            let list = g.entry(painter.layer_id());
+            for i in cables_start..end {
+                list.mutate_shape(egui::layers::ShapeIdx(i), |cs| {
+                    label_dim::dim(std::slice::from_mut(&mut cs.shape), rects);
+                });
+            }
+        });
+    }
     if let Some((world, max_zoom)) = ui_state.pending_fit.take() {
         // The cables are known now: fit them too; the next frame draws the result.
         ui_state.refit_with_cables(world, max_zoom);
@@ -2584,7 +2600,7 @@ fn text(
     p.text(pos, align, s, f, col)
 }
 
-/// Paints one module face, then lifts its titles, labels and plain values above the cables.
+/// Paints one module face and notes where its text sits, so cables can dim over it.
 #[allow(clippy::too_many_arguments)]
 fn draw_module(
     editor: &mut PatchEditor,
@@ -2601,99 +2617,24 @@ fn draw_module(
     let start = ui
         .ctx()
         .graphics(|g| g.get(layer).map_or(0, |l| l.next_idx().0));
-    let deferred_at = ui_state.deferred.len();
     draw_module_shapes(editor, ui_state, ui, painter, th, xf, m, now, drawn);
-    // A lifted module (Foreground layer) already paints above the cables.
+    // A lifted module (Foreground layer) paints above the cables, which never cross its text.
     if m.skin.is_none() && ui.layer_id().order != egui::Order::Foreground {
-        // Only the live displays keep their text in place; a grid's values and a selector's
-        // labels are plain text and cross cables like any other.
-        let decor = match m.decor {
-            Decor::Display(r) | Decor::Operators(r) => Some(xf.r(r)),
-            _ => None,
-        };
-        let face_fill = theme::panel_theme(&ui_state.style, m.info.kind).panel;
-        let face = xf.r(m.face);
-        lift_labels(
-            ui,
-            ui_state,
-            layer,
-            (start, deferred_at),
-            face,
-            face_fill,
-            decor,
-        );
+        let rects = ui.ctx().graphics(|g| {
+            let Some(list) = g.get(layer) else {
+                return Vec::new();
+            };
+            list.all_entries()
+                .skip(start)
+                .filter_map(|cs| match &cs.shape {
+                    egui::epaint::Shape::Text(t) => Some(t.galley.rect.translate(t.pos.to_vec2())),
+                    _ => None,
+                })
+                .filter(|r| r.is_positive())
+                .collect::<Vec<Rect>>()
+        });
+        ui_state.text_rects.extend(rects);
     }
-}
-
-/// Moves the text shapes painted since `start` into the deferred pass, which paints above the
-/// cables, each on a backing in the colour of what it sits on (a plate, a pill, else the face):
-/// a rounded rect at alpha .85 with 2 px padding, so a cable is cut cleanly behind the text.
-/// Text inside the module's display or grid keeps its place.
-fn lift_labels(
-    ui: &egui::Ui,
-    ui_state: &mut UiState,
-    layer: egui::LayerId,
-    (start, deferred_at): (usize, usize),
-    face: Rect,
-    face_fill: Color32,
-    keep_in: Option<Rect>,
-) {
-    use egui::epaint::Shape as S;
-    let style = ui_state.style.clone();
-    let area = face.area();
-    let lifted: Vec<(Rect, Color32, S)> = ui.ctx().graphics_mut(|g| {
-        let list = g.entry(layer);
-        let mut fills: Vec<(Rect, Color32)> = Vec::new();
-        let mut texts: Vec<usize> = Vec::new();
-        for (i, cs) in list.all_entries().enumerate().skip(start) {
-            match &cs.shape {
-                S::Rect(r) if r.fill.a() >= 200 && r.rect.area() < 0.6 * area => {
-                    fills.push((r.rect, r.fill));
-                }
-                S::Text(_) => texts.push(i),
-                _ => {}
-            }
-        }
-        let mut out = Vec::with_capacity(texts.len());
-        for i in texts {
-            let mut taken = None;
-            list.mutate_shape(egui::layers::ShapeIdx(i), |cs| {
-                if let S::Text(t) = &cs.shape {
-                    let r = t.galley.rect.translate(t.pos.to_vec2());
-                    if !r.is_positive() || keep_in.is_some_and(|k| k.contains_rect(r)) {
-                        return;
-                    }
-                    let c = r.center();
-                    let back = fills.iter().rev().find(|(f, _)| f.contains(c)).map_or_else(
-                        || kit::face::fill_at(&style, face, c.y, face_fill),
-                        |(_, c)| *c,
-                    );
-                    taken = Some((r, back, std::mem::replace(&mut cs.shape, S::Noop)));
-                }
-            });
-            out.extend(taken);
-        }
-        out
-    });
-    // Every backing first, so one label's backing never cuts a neighbour's text.
-    let (backs, texts): (Vec<_>, Vec<_>) = lifted
-        .into_iter()
-        .map(|(r, back, shape)| {
-            (
-                S::rect_filled(
-                    r.expand(2.0),
-                    CornerRadius::same(3),
-                    back.gamma_multiply(0.85),
-                ),
-                shape,
-            )
-        })
-        .unzip();
-    // Ahead of what the module already deferred (readouts, pills): those stay on top of these.
-    let at = deferred_at.min(ui_state.deferred.len());
-    ui_state
-        .deferred
-        .splice(at..at, backs.into_iter().chain(texts));
 }
 
 #[allow(clippy::too_many_arguments)]
