@@ -94,6 +94,11 @@ pub enum CableView {
 }
 
 pub(crate) fn cable_color(st: &Style, id: CableId) -> Color32 {
+    // TEMP gate (c) debug switch: KABL_MODCOL=teal. Removed after Kosta's verdict.
+    static TEAL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if *TEAL.get_or_init(|| std::env::var("KABL_MODCOL").is_ok_and(|v| v == "teal")) {
+        return Color32::from_rgb(0x35, 0xc2, 0xb1);
+    }
     st.route_colors[(id as usize) % st.route_colors.len()]
 }
 
