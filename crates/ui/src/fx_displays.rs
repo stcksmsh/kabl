@@ -743,8 +743,7 @@ fn output_meter(live: &Live, st: &Style, p: &egui::Painter, r: Rect, z: f32) {
             114.0 + (-24.0 - db) * 2.25
         }
     };
-    for ch in 0..2 {
-        let lin = live.master[ch];
+    for (ch, &lin) in live.master.iter().enumerate() {
         let db = if lin > 1e-6 {
             20.0 * lin.log10()
         } else {
