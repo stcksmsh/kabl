@@ -2329,7 +2329,7 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     };
     let cables_start = next_idx(ui);
     let plugs = draw_cables(editor, ui_state, ui, &painter, th, xf, &lay, &drawn, None);
-    if label_dim::mode() == label_dim::Mode::Dim && !ui_state.text_rects.is_empty() {
+    if !ui_state.text_rects.is_empty() {
         let (end, rects) = (next_idx(ui), &ui_state.text_rects);
         ui.ctx().graphics_mut(|g| {
             let list = g.entry(painter.layer_id());
@@ -2614,10 +2614,7 @@ fn draw_module(
         .graphics(|g| g.get(layer).map_or(0, |l| l.next_idx().0));
     draw_module_shapes(editor, ui_state, ui, painter, th, xf, m, now, drawn);
     // A lifted module (Foreground layer) paints above the cables, which never cross its text.
-    if m.skin.is_none()
-        && ui.layer_id().order != egui::Order::Foreground
-        && label_dim::mode() == label_dim::Mode::Dim
-    {
+    if m.skin.is_none() && ui.layer_id().order != egui::Order::Foreground {
         let rects = ui.ctx().graphics(|g| {
             let Some(list) = g.get(layer) else {
                 return Vec::new();

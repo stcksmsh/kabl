@@ -15,24 +15,6 @@ pub const FEATHER: f32 = 4.0;
 /// Opacity steps between `MIN` and 1 (a polyline piece is one step).
 const STEPS: f32 = 4.0;
 
-/// Which variant draws (`KABL_LABELS=dim|top`; anything else is `dim`; temporary, until Kosta picks).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Mode {
-    Dim,
-    Top,
-}
-
-pub fn mode() -> Mode {
-    static MODE: std::sync::OnceLock<Mode> = std::sync::OnceLock::new();
-    *MODE.get_or_init(|| {
-        if std::env::var("KABL_LABELS").is_ok_and(|v| v == "top") {
-            Mode::Top
-        } else {
-            Mode::Dim
-        }
-    })
-}
-
 /// The opacity factor at `p`: `MIN` inside a rect, rising to 1 over `FEATHER` px outside it.
 pub fn factor(rects: &[Rect], p: Pos2) -> f32 {
     let d = rects
