@@ -241,21 +241,14 @@ impl Live {
                 self.holds.remove(&(e.module, e.port));
                 continue;
             }
-            let p = e.last.abs().max(e.min.abs()).max(e.max.abs());
-            let h = self
-                .holds
-                .entry((e.module, e.port))
-                .or_insert(Hold { peak: 0.0, at: now });
-            if p >= h.level(now) {
-                *h = Hold { peak: p, at: now };
-            }
             let view = ModuleView {
                 valid: e.view_valid,
                 position: e.position,
                 cycle: e.cycle_f32(),
             };
-            self.taps.insert(
-                (e.module, e.port),
+            self.set_tap(
+                e.module,
+                e.port,
                 LiveTap {
                     last: e.last,
                     min: e.min,
@@ -265,6 +258,22 @@ impl Live {
                 },
             );
         }
+    }
+
+    /// Stores one tap's report (taken at `tap.at`) and updates its peak hold. `accept` calls
+    /// this for each entry; the capture tools call it with driven values.
+    pub fn set_tap(&mut self, id: ModuleId, port: u8, tap: LiveTap) {
+        let h = self.holds.entry((id, port)).or_insert(Hold {
+            peak: 0.0,
+            at: tap.at,
+        });
+        if tap.peak() >= h.level(tap.at) {
+            *h = Hold {
+                peak: tap.peak(),
+                at: tap.at,
+            };
+        }
+        self.taps.insert((id, port), tap);
     }
 
     /// The held peak of tap `(id, port)` now, linear; 0 once it has fallen away.
@@ -765,6 +774,31 @@ fn lfo(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn set_tap_holds_the_loudest_peak_and_lets_a_quieter_one_fall_under_it() {
+        let tap = |last: f32, at: f64| LiveTap {
+            last,
+            min: -last,
+            max: last,
+            view: Default::default(),
+            at,
+        };
+        let mut live = Live::default();
+        live.set_tap(7, 0, tap(0.8, 0.0));
+        live.set_tap(7, 0, tap(0.2, 0.5));
+        assert_eq!(
+            live.held(7, 0, 0.5),
+            0.8,
+            "a quieter report leaves the hold"
+        );
+        live.set_tap(7, 0, tap(0.2, 3.0));
+        assert!(
+            (live.held(7, 0, 3.0) - 0.2).abs() < 1e-6,
+            "the fallen hold yields to it"
+        );
+        assert_eq!(live.held(8, 0, 3.0), 0.0);
+    }
 
     #[test]
     fn a_peak_hold_stays_for_a_second_then_falls_at_20_db_per_s() {

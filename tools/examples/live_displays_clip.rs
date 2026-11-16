@@ -54,8 +54,9 @@ fn adsr(t: f64) -> (f32, f32) {
 
 impl App {
     fn tap(&mut self, id: kabl_core::ModuleId, port: u8, level: f32, stage: f32, t: f64) {
-        self.ui.live.taps.insert(
-            (id, port),
+        self.ui.live.set_tap(
+            id,
+            port,
             LiveTap {
                 last: level,
                 min: -level * 0.8,
@@ -117,8 +118,10 @@ impl App {
         self.tap(svf, svf_lp, 0.7 * level, 0.0, t);
         self.tap(delay, delay_out, (0.7 * level).max(tail), 0.0, t);
         let master = (0.5 * level).max(0.35 * tail);
-        self.ui.meter.level = [master, master * 0.9];
-        self.ui.live.master = self.ui.meter.level;
+        // The host's meter: the bars, the peak readout and the status bar all follow from it.
+        self.ui
+            .meter
+            .update([master, master * 0.9], false, 1.0 / 60.0);
     }
 }
 
@@ -195,7 +198,7 @@ fn main() {
         Box::new(move |cc| {
             cc.egui_ctx.set_pixels_per_point(1.0);
             let mut ui = UiState::default();
-            ui.theme = "kabl.line_solid".into();
+            ui.theme = "kabl.look_b".into();
             ui.dark = true;
             ui.status_meter = true;
             ui.inspect.audio = true;

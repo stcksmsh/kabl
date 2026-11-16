@@ -160,7 +160,8 @@ impl H {
                 view: Default::default(),
                 at: self.t,
             };
-            self.ui.live.taps.insert((id, 0), tap);
+            // As the engine's reports arrive: the peak hold follows them.
+            self.ui.live.set_tap(id, 0, tap);
         }
     }
 }
