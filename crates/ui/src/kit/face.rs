@@ -2,7 +2,7 @@
 //! and trace. Colours come from the theme's roles and the face's section palette, shapes from
 //! the recipe slots; callers pass the zoom `z` and a screen-space position.
 
-use super::containers::eshadow;
+use crate::style::Shadow;
 use crate::style::{
     alpha, mix, CompactText, DisplayFrame, DisplayTrace, FaceHardware, FaceMaterial, FaceTitle,
     JackRecipe, KnobBody, KnobMod, KnobScale, KnobValue, Role, Style, TEXT_FLOOR,
@@ -128,32 +128,68 @@ fn gradient_rect(p: &Painter, rect: Rect, r: u8, top: Color32, bottom: Color32) 
     p.add(Shape::mesh(mesh));
 }
 
+fn face_shadow(s: Shadow) -> egui::epaint::Shadow {
+    egui::epaint::Shadow {
+        offset: [0, s.dy as i8],
+        blur: s.blur as u8,
+        spread: 0,
+        color: alpha(Color32::BLACK, s.alpha),
+    }
+}
+
+/// The colours at the top and bottom of a face's fill: the style's own ends, else (Line art)
+/// the flat `base`, else the ends derived from `base` and the style's `gradient`. `surface`
+/// paints exactly this, and `fill_at` reads it.
+fn face_ends(st: &Style, base: Color32) -> (Color32, Color32) {
+    let f = &st.slots.face;
+    if f.top.a() > 0 && f.bottom.a() > 0 {
+        (f.top, f.bottom)
+    } else if f.material == FaceMaterial::Line {
+        (base, base)
+    } else {
+        (
+            mix(base, Color32::WHITE, f.gradient * 0.8),
+            mix(base, Color32::BLACK, f.gradient * 0.65),
+        )
+    }
+}
+
+/// The face fill at screen height `y`: what `surface` paints there. A label's backing uses it,
+/// so the backing is invisible on any face.
+pub fn fill_at(st: &Style, face: Rect, y: f32, base: Color32) -> Color32 {
+    let (top, bottom) = face_ends(st, base);
+    let t = if face.height() > 0.0 {
+        ((y - face.top()) / face.height()).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    mix(top, bottom, t)
+}
+
 /// The face: shadow, material, edge and the corner hardware.
 pub fn surface(p: &Painter, st: &Style, rect: Rect, base: Color32, edge: Color32, z: f32) {
     let f = &st.slots.face;
     let cr = CornerRadius::same(f.radius);
     let edge = if f.edge.a() > 0 { f.edge } else { edge };
-    let ends = (f.top.a() > 0 && f.bottom.a() > 0).then_some((f.top, f.bottom));
-    if f.material != FaceMaterial::Flat && st.shadows[f.shadow.min(2)].alpha > 0 {
-        p.add(eshadow(st, f.shadow).as_shape(rect, cr));
+    let (top, bottom) = face_ends(st, base);
+    if f.material != FaceMaterial::Flat {
+        let sh = f.own_shadow.unwrap_or(st.shadows[f.shadow.min(2)]);
+        if sh.alpha > 0 {
+            p.add(face_shadow(sh).as_shape(rect, cr));
+        }
     }
     if f.material == FaceMaterial::Line {
         // Line art: the surface colour (or a faint gradient), one hairline edge, screws; no gloss
         // or grain.
-        match ends {
-            Some((top, bottom)) => gradient_rect(p, rect, f.radius, top, bottom),
-            None => {
-                p.rect_filled(rect, cr, base);
-            }
+        if top == bottom {
+            p.rect_filled(rect, cr, base);
+        } else {
+            gradient_rect(p, rect, f.radius, top, bottom);
         }
         p.rect_stroke(rect, cr, Stroke::new(1.0, edge), StrokeKind::Inside);
         hardware(p, st, rect, z);
         return;
     }
-    let (top, bottom) = ends.unwrap_or((
-        mix(base, Color32::WHITE, f.gradient * 0.8),
-        mix(base, Color32::BLACK, f.gradient * 0.65),
-    ));
     gradient_rect(p, rect, f.radius, top, bottom);
     if f.material == FaceMaterial::Lacquer && f.gloss > 0.0 {
         // Continuous top light: fades out over the whole face, so no edge cuts the content.
@@ -939,5 +975,58 @@ pub fn family_stripe(p: &Painter, st: &Style, face: Rect, kind: &str, z: f32) {
             CornerRadius::same(f.radius),
             st.section_of(kind).ink,
         );
+    }
+}
+
+#[cfg(test)]
+mod fill_tests {
+    use super::*;
+    use crate::style::{builtin_a, line_solid_default, look_b_default};
+
+    /// What `surface` painted at the face's middle: the gradient mesh's mid colour, else the
+    /// flat fill.
+    fn painted_mid(st: &Style, rect: Rect, base: Color32) -> Color32 {
+        let ctx = egui::Context::default();
+        let layer = egui::LayerId::background();
+        let p = Painter::new(ctx.clone(), layer, rect.expand(40.0));
+        surface(&p, st, rect, base, Color32::BLACK, 1.0);
+        ctx.graphics(|g| {
+            let list = g.get(layer).expect("painted");
+            let shapes: Vec<_> = list.all_entries().map(|c| &c.shape).collect();
+            if let Some(Shape::Mesh(m)) = shapes.iter().find(|s| matches!(s, Shape::Mesh(_))) {
+                mix(m.vertices[0].color, m.vertices[2].color, 0.5)
+            } else {
+                shapes
+                    .iter()
+                    .find_map(|s| match s {
+                        Shape::Rect(r) if r.rect == rect && r.fill.a() > 0 => Some(r.fill),
+                        _ => None,
+                    })
+                    .expect("a flat fill")
+            }
+        })
+    }
+
+    #[test]
+    fn fill_at_matches_the_painted_face_on_looks_a_and_b() {
+        let rect = Rect::from_min_size(pos2(10.0, 20.0), vec2(200.0, 340.0));
+        let close = |a: Color32, b: Color32| {
+            a.to_array()
+                .iter()
+                .zip(b.to_array())
+                .all(|(x, y)| x.abs_diff(y) <= 2)
+        };
+        for dark in [true, false] {
+            for (name, st) in [
+                ("look A", line_solid_default(dark)),
+                ("look B", look_b_default(dark)),
+                ("builtin A", builtin_a(dark)),
+            ] {
+                let base = crate::theme::panel_theme(&st, "osc.va").panel;
+                let got = fill_at(&st, rect, rect.center().y, base);
+                let want = painted_mid(&st, rect, base);
+                assert!(close(got, want), "{name} dark={dark}: {got:?} vs {want:?}");
+            }
+        }
     }
 }

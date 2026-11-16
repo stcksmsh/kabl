@@ -1182,7 +1182,7 @@ mod tests {
             .unwrap();
         let neighbour = v.xf().r(neighbour);
         assert!(preview.intersects(neighbour), "occupied destination");
-        let stationary = output.shapes.iter().position(|s| matches!(&s.shape, egui::epaint::Shape::Text(t) if t.galley.text().contains("Voice · #"))).expect("stationary panel");
+        let stationary = output.shapes.iter().position(|s| matches!(&s.shape, egui::epaint::Shape::Text(t) if t.galley.text().contains("Voice"))).expect("stationary panel");
         assert!(index > stationary, "preview painted over stationary panel");
         let live = v.moving.as_ref().unwrap();
         let ghost = v.xf().r(Rect::from_min_size(

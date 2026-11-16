@@ -65,7 +65,6 @@ enum K {
     JackLabel,
     Chip,
     Title,
-    Caption,
 }
 
 /// A thing that is drawn. `group` ties a control to its own label and value.
@@ -207,7 +206,6 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
     } else {
         HIDE_BELOW
     };
-    let caption_px = (11.0 * z).max(11.0);
     let title_px = if tier_full {
         (15.0 * z).max(11.0)
     } else {
@@ -456,11 +454,8 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
         tfont = FontId::new((title_px * 0.8).max(11.0), tfont.family.clone());
         tsz = ruler.size(shown, tfont.clone());
     }
-    let tag = format!("{} · #{}", m.info.kind, 1);
-    let capsz = ruler.size(&tag, font(st, Role::Caption, caption_px));
     let y = 26.0 * z;
     let name_r = Rect::from_min_size(pos2(12.0 * z, y - tsz.y / 2.0), tsz);
-    let tag_r = Rect::from_min_size(pos2(12.0 * z, 43.0 * z - capsz.y / 2.0), capsz);
     let decor = match m.decor {
         Decor::Keys(r)
         | Decor::Display(r)
@@ -472,11 +467,10 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
         _ => None,
     };
     let left = name_r.max.x <= face.width() - 6.0 * z
-        && tag_r.max.x <= face.width() - 6.0 * z
         && !avoid
             .iter()
             .chain(decor.iter())
-            .any(|a| a.intersects(name_r) || a.intersects(tag_r));
+            .any(|a| a.intersects(name_r));
     let name_r = if left {
         name_r
     } else {
@@ -489,20 +483,7 @@ fn check_face(kind: &str, z: f32, ruler: &Ruler, st: &Style, out: &mut Out) {
         ax: 12.0,
         name: "title".into(),
     });
-    if tier_full {
-        let cap_r = if left {
-            tag_r
-        } else {
-            Rect::from_center_size(pos2(face.center().x, 43.0 * z), capsz)
-        };
-        leaves.push(Leaf {
-            k: K::Caption,
-            r: cap_r,
-            group,
-            ax: 12.0,
-            name: "caption".into(),
-        });
-    }
+    // No caption leaf: the kind and id live in the drawer and the title tooltip.
     // Compact tier: a `+N` chip that would sit on its title is not drawn (as in `draw_module`).
     let chip_fits = |t: Rect| tier_full || name_r.max.x + 1.5 <= sc(&m, z, t).min.x;
     if let Some(t) = m.toggle.filter(|&t| !overview && chip_fits(t)) {

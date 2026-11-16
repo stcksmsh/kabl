@@ -322,12 +322,14 @@ fn graphite(dark: bool, accent: Accent) -> Style {
     s.roles.disp_bg = h("#101114");
     s.roles.disp_grid = alpha(h("#ECEAE6"), 20);
     s.roles.disp_text = h("#A9A6A0");
-    s.shadows[1] = Shadow {
+    let f = &mut s.slots.face;
+    f.own_shadow = Some(Shadow {
         dy: 5.0,
         blur: 14.0,
         alpha: 140,
-    };
-    let f = &mut s.slots.face;
+    });
+    // No corner screws on B; look A keeps them.
+    f.hardware = FaceHardware::None;
     f.material = FaceMaterial::Lacquer;
     f.gloss = 0.0;
     f.shadow = 1;
@@ -336,10 +338,10 @@ fn graphite(dark: bool, accent: Accent) -> Style {
     f.edge = rgba(0, 0, 0, 140);
     f.highlight = 26;
     f.radius = 6;
-    f.plate = h("#1E2025");
+    f.plate = h("#141518");
     f.rule = rgba(255, 255, 255, 18);
     s.slots.display.frame = DisplayFrame::Well;
-    s.slots.display.trace = DisplayTrace::SoftGlow;
+    s.slots.display.trace = DisplayTrace::StrongGlow;
     s
 }
 
