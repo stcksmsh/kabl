@@ -983,7 +983,7 @@ pub fn show_with(
     } else if esc
         && ui_state.explain.is_open()
         && ui_state.browser.dialog.is_none()
-        && !ui.ctx().egui_wants_keyboard_input()
+        && !routing::wants_text_input(ui.ctx())
         && !egui::Popup::is_any_open(ui.ctx())
         // egui drops a text field's focus on Escape before this frame runs: that Escape
         // was the field's.
@@ -997,7 +997,7 @@ pub fn show_with(
     if !ui.input(|i| i.pointer.any_down()) {
         ui_state.drag = None;
     }
-    if !ui.ctx().egui_wants_keyboard_input()
+    if !routing::wants_text_input(ui.ctx())
         && ui_state.browser.dialog.is_none()
         && ui_state.moving.is_none()
     {
@@ -1122,7 +1122,7 @@ pub fn show_with(
     browser::dialogs(editor, ui_state, ui.ctx());
     show_toasts(ui_state, ui, &st, page);
     ui_state.explain.typing =
-        ui.ctx().egui_wants_keyboard_input() || egui::Popup::is_any_open(ui.ctx());
+        routing::wants_text_input(ui.ctx()) || egui::Popup::is_any_open(ui.ctx());
     ui_state.hits = std::mem::take(&mut ui_state.frame_hits);
 }
 
@@ -1463,7 +1463,7 @@ fn add_search(
     ui_state.record("add-menu".into(), r.rect);
     let pop = egui::Popup::default_response_id(&r);
     if std::mem::take(&mut ui_state.add_menu_req)
-        || (!ui.ctx().egui_wants_keyboard_input()
+        || (!routing::wants_text_input(ui.ctx())
             && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::A)))
     {
         egui::Popup::open_id(ui.ctx(), pop);
