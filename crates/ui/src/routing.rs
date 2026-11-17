@@ -466,6 +466,32 @@ pub(crate) enum Grab {
 /// Shift-drag moves values this much slower.
 const FINE: f32 = 0.1;
 
+/// One arrow-key step of a focused knob, in knob travel (Shift: `FINE` of it).
+pub(crate) const KEY_STEP: f32 = 0.02;
+
+/// `egui_wants_keyboard_input`, but a focused knob does not count: a knob takes arrows, not
+/// text, so undo, `A` and Escape keep working while one has focus.
+pub(crate) fn wants_text_input(ctx: &egui::Context) -> bool {
+    let knob = ctx.data(|d| d.get_temp::<Id>(Id::new("kabl-knob-focused")));
+    ctx.egui_wants_keyboard_input() && (knob.is_none() || ctx.memory(|m| m.focused()) != knob)
+}
+
+/// Whether the last way the user moved focus was the keyboard (Tab or an arrow key): the focus
+/// ring shows only then, so a mouse click never leaves one behind.
+fn keyboard_nav(ctx: &egui::Context, pressed_key: bool) -> bool {
+    let id = Id::new("kabl-keyboard-nav");
+    let (tab, press) = ctx.input(|i| (i.key_pressed(egui::Key::Tab), i.pointer.any_pressed()));
+    let mut on = ctx.data(|d| d.get_temp::<bool>(id)).unwrap_or(false);
+    if press {
+        on = false;
+    }
+    if tab || pressed_key {
+        on = true;
+    }
+    ctx.data_mut(|d| d.insert_temp(id, on));
+    on
+}
+
 /// One drag on a knob body, ring or lane dot. The value follows each frame's vertical pointer
 /// motion, from the press point on (so egui's drag threshold loses nothing), ×0.1 while Shift
 /// is held. Escape cancels it (see `show`): the edit is reverted and leaves no undo entry.
@@ -734,12 +760,69 @@ pub(crate) fn param_knob(
     let resp = ui.interact(
         rect,
         Id::new(("kabl-knob", id, param.name)),
-        Sense::click_and_drag(),
+        Sense::click_and_drag() | Sense::focusable_noninteractive(),
     );
 
     if resp.clicked() || resp.drag_started() {
         inspect(ui_state, &routes, id, param.name);
+        // A click or press gives the knob keyboard focus (arrows, Tab onward).
+        resp.request_focus();
     }
+    // Double-click: back to the default, one undo step like any edit.
+    if resp.double_clicked() && base != param.default {
+        // `first`: its own step even right after a drag of the same knob.
+        editor.set_param_gesture(
+            ParamTarget::Module {
+                id,
+                param: param.name.into(),
+            },
+            param.default,
+            true,
+        );
+    }
+    // Arrow keys on a focused knob: up/right +1 step, down/left -1, Shift fine. egui would
+    // otherwise spend the arrows moving focus.
+    let mut key_edit = false;
+    if resp.has_focus() {
+        ui.data_mut(|d| d.insert_temp(Id::new("kabl-knob-focused"), resp.id));
+        ui.memory_mut(|m| {
+            m.set_focus_lock_filter(
+                resp.id,
+                egui::EventFilter {
+                    horizontal_arrows: true,
+                    vertical_arrows: true,
+                    ..Default::default()
+                },
+            )
+        });
+        let fine = ui.input(|i| i.modifiers.shift);
+        let mut dir = 0.0_f32;
+        ui.input_mut(|i| {
+            for (key, d) in [
+                (egui::Key::ArrowUp, 1.0),
+                (egui::Key::ArrowRight, 1.0),
+                (egui::Key::ArrowDown, -1.0),
+                (egui::Key::ArrowLeft, -1.0),
+            ] {
+                let hit = if fine {
+                    i.consume_key(egui::Modifiers::SHIFT, key)
+                } else {
+                    i.consume_key(egui::Modifiers::NONE, key)
+                };
+                if hit {
+                    dir += d;
+                }
+            }
+        });
+        if dir != 0.0 {
+            key_edit = true;
+            let step = KEY_STEP * if fine { FINE } else { 1.0 };
+            let n =
+                (param.to_norm(base_value(editor.state(), id, param)) + dir * step).clamp(0.0, 1.0);
+            editor.set_param(id, param.name, param.from_norm(n));
+        }
+    }
+    let kbd = keyboard_nav(ui.ctx(), key_edit);
     if resp.drag_started() {
         // Where the button went down, not where the pointer is once egui calls it a drag: a
         // quick flick from the body must not grab the ring.
@@ -795,7 +878,16 @@ pub(crate) fn param_knob(
     let routes = routes_into(editor.state(), id, param.name);
 
     // Scale, body and value marker from the theme's knob recipe.
-    let hot = resp.hovered() || resp.dragged() || inspected;
+    let focused = resp.has_focus() && kbd;
+    let m = &ui_state.style.motion;
+    let (hover_ms, press_ms) = (m.hover, m.press);
+    let on = resp.hovered() || resp.dragged() || focused;
+    let hover = crate::kit::smooth_to(
+        ui.ctx(),
+        Id::new(("kabl-knob-hover", id, param.name)),
+        if on { 1.0 } else { 0.0 },
+        if resp.dragged() { press_ms } else { hover_ms },
+    );
     crate::kit::face::knob(
         painter,
         &ui_state.style,
@@ -804,7 +896,9 @@ pub(crate) fn param_knob(
             rs,
             z,
             value: base_n,
-            hot,
+            hover,
+            inspected,
+            focused,
             arc: ui_state.style.arc_ink(
                 editor
                     .state()
@@ -1072,7 +1166,7 @@ pub(crate) fn param_knob(
             param_label(param),
             fmt_value(param, base)
         )),
-        _ if resp.hovered() => Some(format!("{} {}", param_label(param), fmt_value(param, base))),
+        _ if hover > 0.01 => Some(format!("{} {}", param_label(param), fmt_value(param, base))),
         _ => None,
     };
     if let Some(text) = editing {
@@ -1081,11 +1175,12 @@ pub(crate) fn param_knob(
             egui::Order::Tooltip,
             Id::new("kabl-knob-pill"),
         ));
-        pill(
+        pill_faded(
             &top,
             &ui_state.style,
             center - EguiVec2::new(0.0, (r + RING_OUTER) * z + 4.0),
             &text,
+            hover,
         );
     }
 
@@ -1265,21 +1360,34 @@ pub(crate) fn pill(
     bottom_center: Pos2,
     text: &str,
 ) {
-    let galley = painter.layout_no_wrap(
-        text.to_string(),
-        egui::FontId::proportional(11.0),
-        st.roles.text,
-    );
+    pill_faded(painter, st, bottom_center, text, 1.0);
+}
+
+/// `pill` at `fade` (0..=1) of full strength.
+fn pill_faded(
+    painter: &egui::Painter,
+    st: &crate::style::Style,
+    bottom_center: Pos2,
+    text: &str,
+    fade: f32,
+) {
+    let fade = fade.clamp(0.0, 1.0);
+    let ink = st.roles.text.gamma_multiply(fade);
+    let galley = painter.layout_no_wrap(text.to_string(), egui::FontId::proportional(11.0), ink);
     let size = galley.size() + EguiVec2::new(10.0, 4.0);
     let rect = Rect::from_center_size(bottom_center - EguiVec2::new(0.0, size.y / 2.0), size);
-    painter.rect_filled(rect, 4.0, crate::style::alpha(st.roles.raised, 235));
+    painter.rect_filled(
+        rect,
+        4.0,
+        crate::style::alpha(st.roles.raised, (235.0 * fade) as u8),
+    );
     painter.rect_stroke(
         rect,
         4.0,
-        Stroke::new(1.0, st.roles.accent),
+        Stroke::new(1.0, st.roles.accent.gamma_multiply(fade)),
         egui::StrokeKind::Outside,
     );
-    painter.galley(rect.min + EguiVec2::new(5.0, 2.0), galley, st.roles.text);
+    painter.galley(rect.min + EguiVec2::new(5.0, 2.0), galley, ink);
 }
 
 /// Segmented selector for a `Taper::Stepped` param (envelope timing, waveforms) at screen

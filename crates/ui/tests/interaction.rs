@@ -1566,3 +1566,98 @@ fn more_grid_pins_reorder_grips_and_delete_in_menu() {
     t.key(Key::Delete, Modifiers::NONE);
     assert!(!t.editor.state().modules.contains_key(&VCA));
 }
+
+impl H {
+    fn double_click(&mut self, key: &str) {
+        let p = self.at(key);
+        self.move_to(p);
+        for _ in 0..2 {
+            self.button(true);
+            self.button(false);
+        }
+        for _ in 0..3 {
+            self.frame();
+        }
+    }
+
+    fn focused(&self) -> Option<egui::Id> {
+        self.ctx.memory(|m| m.focused())
+    }
+}
+
+fn env_knob(param: &'static str) -> egui::Id {
+    egui::Id::new(("kabl-knob", ENV, param))
+}
+
+#[test]
+fn double_click_resets_a_knob_to_its_default_as_one_undo_step() {
+    for (w, h) in sizes() {
+        let mut t = H::new(w, h);
+        let info = kabl_modules::registry::info_for("env.adsr").unwrap().params[0];
+        let key = format!("knob:{ENV}.attack_ms");
+        let c = t.at(&key);
+        t.drag(c, c - egui::vec2(0.0, 40.0));
+        let moved = t.param(ENV, "attack_ms").unwrap();
+        assert_ne!(moved, info.default, "{w}x{h}: the drag moved it");
+        let depth = t.undo_depth();
+        t.double_click(&key);
+        assert_eq!(t.param(ENV, "attack_ms"), Some(info.default), "{w}x{h}");
+        assert_eq!(t.undo_depth(), depth + 1, "{w}x{h}: one undo step");
+        t.key(Key::Z, Modifiers::COMMAND);
+        assert_eq!(t.param(ENV, "attack_ms"), Some(moved), "{w}x{h}: undone");
+    }
+}
+
+#[test]
+fn arrow_keys_step_a_focused_knob_and_shift_steps_finely() {
+    for (w, h) in sizes() {
+        let mut t = H::new(w, h);
+        let info = kabl_modules::registry::info_for("env.adsr").unwrap().params[0];
+        t.click(&format!("knob:{ENV}.attack_ms"));
+        assert_eq!(t.focused(), Some(env_knob("attack_ms")), "{w}x{h}: focus");
+        let n0 = info.to_norm(t.param(ENV, "attack_ms").unwrap());
+        let norm = |t: &H| info.to_norm(t.param(ENV, "attack_ms").unwrap());
+        let depth = t.undo_depth();
+        t.key(Key::ArrowUp, Modifiers::NONE);
+        assert!((norm(&t) - (n0 + 0.02)).abs() < 1e-3, "{w}x{h} up");
+        t.key(Key::ArrowRight, Modifiers::NONE);
+        assert!((norm(&t) - (n0 + 0.04)).abs() < 1e-3, "{w}x{h} right");
+        t.key(Key::ArrowDown, Modifiers::SHIFT);
+        assert!((norm(&t) - (n0 + 0.038)).abs() < 1e-3, "{w}x{h} fine down");
+        t.key(Key::ArrowLeft, Modifiers::NONE);
+        assert!((norm(&t) - (n0 + 0.018)).abs() < 1e-3, "{w}x{h} left");
+        assert_eq!(t.undo_depth(), depth + 1, "{w}x{h}: a burst is one step");
+        t.key(Key::Z, Modifiers::COMMAND);
+        assert!((norm(&t) - n0).abs() < 1e-3, "{w}x{h}: undone");
+        t.click(&format!("knob:{ENV}.attack_ms"));
+        assert_eq!(
+            t.focused(),
+            Some(env_knob("attack_ms")),
+            "{w}x{h}: focus kept"
+        );
+    }
+}
+
+#[test]
+fn tab_moves_focus_between_the_knobs_of_a_module() {
+    for (w, h) in sizes() {
+        let mut t = H::new(w, h);
+        let knob = |param: &'static str| egui::Id::new(("kabl-knob", FILTER, param));
+        let mut reached = false;
+        for _ in 0..200 {
+            t.key(Key::Tab, Modifiers::NONE);
+            if t.focused() == Some(knob("cutoff_hz")) {
+                reached = true;
+                break;
+            }
+        }
+        assert!(reached, "{w}x{h}: Tab reaches the filter's Cutoff knob");
+        t.key(Key::Tab, Modifiers::NONE);
+        assert_eq!(t.focused(), Some(knob("resonance")), "{w}x{h}: next knob");
+        // Arrows step the focused knob and do not move focus.
+        let before = t.param(FILTER, "resonance").unwrap();
+        t.key(Key::ArrowUp, Modifiers::NONE);
+        assert!(t.param(FILTER, "resonance").unwrap() > before, "{w}x{h}");
+        assert_eq!(t.focused(), Some(knob("resonance")), "{w}x{h}: focus kept");
+    }
+}
