@@ -1586,7 +1586,7 @@ fn fault_plan(v: &mut Voice, h: &Handles, s: &Spec) {
         "cutoff_hz",
         250.0,
         cut,
-        20000.0,
+        12000.0,
     );
     damp(v, 2, p, h.lad, s.filter[1]);
     let hats = routed("mixer", "level4", 0.0, (2.0 * s.kit.mix[3]).min(1.0), 0.55);
@@ -1656,7 +1656,7 @@ fn still_plan(v: &mut Voice, h: &Handles, s: &Spec) {
         h.lad,
         "filter.ladder",
         "cutoff_hz",
-        600.0,
+        1200.0,
         cut,
         20000.0,
     );

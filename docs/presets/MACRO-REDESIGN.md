@@ -58,7 +58,7 @@ How it is built: `main_line` picks the position where the macro's main param sit
 
 **Gate length.** The sequencer's `gate_len` only counts in `gate_mode` 1 (length); in the default mode the gate follows the clock pulse (50 % duty) and the part's `gate` field (55, 65, 78 in the old recipes) never sounded. Gate macros therefore set mode 1 and store 50 % (the same sound at zero swing; with swing the pulse stretches, so Rope Walk and the swung presets have no gate macro).
 
-**The factory level test** (`crates/ui/tests/factory_bank.rs`, `factory_levels_hold_the_target`) drives every macro to 0.65 and then to 0.15 (and to 1 in the hot renders), whatever the stored value, and wants every peak at -1 dBFS or lower and the loudness within -19 ± 5.5 dBFS. It caught what the clip phrase did not: Corner Store's demo peak (the 8 kHz top rings, see below) and Still Water, whose dark low end made the 0.15 passages too quiet (Bloom now starts at 600 Hz, Pulse and Weight stop at 0.8 and 0.85). All presets pass.
+**The factory level test** (`crates/ui/tests/factory_bank.rs`, `factory_levels_hold_the_target`) drives every macro to 0.65 and then to 0.15 (and to 1 in the hot renders), whatever the stored value, and wants every peak at -1 dBFS or lower and the loudness within -19 ± 5.5 dBFS. It caught what the clip phrase did not: Corner Store's demo peak (the 8 kHz top rings, see below) and Still Water, whose dark low end made the 0.15 passages too quiet (Bloom now starts at 1.2 kHz, Pulse and Weight stop at 0.8 and 0.85). All presets pass.
 
 ## Old flags against new flags
 
@@ -127,7 +127,7 @@ Stored = where the macro stands in the default sound (the old stored sound).
 | Macro | Stored | What you hear 0 to 1 | What it moves |
 |---|---|---|---|
 | Reese | 0.97 | The reese grows teeth: more detune, more drive (the stored sound is the full effect; the macro only takes it away) | bass detune 6 to 22 ct (stored); drive 6 to 17 dB (stored) to 17.3 dB. The drive saturates, so the trim stays at -4 dB |
-| Filter | 0.73 | A closed, resonant bass opens | ladder cutoff 250 Hz to 6 kHz (stored) to 20 kHz; resonance 0.45 to 0.20 |
+| Filter | 0.86 | A closed, resonant bass opens | ladder cutoff 250 Hz to 6 kHz (stored) to 12 kHz; resonance 0.45 to 0.20 |
 | Break | 0.44 | A sparse kit gets hats and a louder snare | hat level 0 to 0.22 (stored) to 0.5; snare 0.2 to 0.45 (stored) to 0.77 |
 | Space | 0.25 | unchanged | echo and room mix |
 
@@ -152,7 +152,7 @@ The Filter macro of the old Glass Coast is gone (its top two thirds were dead); 
 ### Still Water (ambient, 68 bpm)
 | Macro | Stored | What you hear 0 to 1 | What it moves |
 |---|---|---|---|
-| Bloom | 0.88 | The music opens from dark to bright | ladder cutoff 600 Hz to 10.1 kHz (stored) to 20 kHz; resonance 0.45 to 0.05 |
+| Bloom | 0.88 | The music opens from dark to bright | ladder cutoff 1.2 kHz to 10.1 kHz (stored) to 20 kHz; resonance 0.45 to 0.05 |
 | Pulse | 0.28 | More and more hats and toms | hat level 0.1 to 0.32 (stored) to 0.8; tom level 0.1 to 0.35 (stored) to 0.8 |
 | Weight | 0.63 | The bass grows | bass level 0.2 to 0.61 (stored) to 0.85 |
 | Space | 0.60 | unchanged | echo and room mix |
