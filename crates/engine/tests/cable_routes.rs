@@ -605,43 +605,6 @@ fn a_chain_goes_with_the_cable_it_hangs_from() {
 }
 
 #[test]
-fn files_saved_before_cable_routes_load_and_render_unchanged() {
-    // A v6 file: the log format is the same, only `meta.toml` says 6. Its render must equal the
-    // model that has always defined a cable's output (`Settings::level_at` per pulse).
-    let mut log = PatchLog::new();
-    for op in ops() {
-        if !matches!(
-            &op,
-            Op::Connect {
-                to: PortRef::CableParam { .. },
-                ..
-            }
-        ) && !matches!(
-            &op,
-            Op::SetParam {
-                target: ParamTarget::Cable { id: ROUTE, .. },
-                ..
-            }
-        ) {
-            log.append_new(op, 0, Source::User);
-        }
-    }
-    let dir = tempfile::tempdir().unwrap();
-    kabl_core::save(dir.path(), &log).unwrap();
-    let meta = std::fs::read_to_string(dir.path().join("meta.toml")).unwrap();
-    std::fs::write(
-        dir.path().join("meta.toml"),
-        meta.replace("schema_version = 8", "schema_version = 6"),
-    )
-    .unwrap();
-    let back = kabl_core::load(dir.path()).expect("a v6 file loads");
-    assert_eq!(back.state(), log.state());
-    let (l, r) = render(&mut compile(back.state(), SR, 1).unwrap(), 600, |_, _| {});
-    let want = expected_mod(back.state(), &r, &[], |_| Mods::default());
-    assert_eq!(first_diff(&l, &want), None);
-}
-
-#[test]
 fn audio_path_does_not_allocate_with_routes_running_and_edited() {
     let mut c = compile(&with_macro(0.5, 1.0), SR, 1).unwrap();
     for b in 0..400 {

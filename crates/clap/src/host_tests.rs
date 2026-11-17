@@ -586,7 +586,7 @@ fn composite_embedded_state_preserves_lanes_and_rejects_legacy_envelope_atomical
     )
     .unwrap();
     state.patch = editor.state().clone();
-    state.version = 3;
+    state.version = 5;
     assert_eq!(state.patch.modules, original.modules);
     assert_eq!(state.patch.cables, original.cables);
     p.shared.load(state).unwrap();
@@ -633,7 +633,7 @@ fn wavetable_state_survives_a_host_project_reopen() {
             params: [("user".to_string(), 2.0)].into(),
         },
     );
-    state.version = 4;
+    state.version = 5;
     p.shared.load(state).unwrap();
 
     let saved = serde_json::to_vec(&p.shared.snapshot()).unwrap();

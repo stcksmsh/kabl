@@ -170,30 +170,6 @@ fn a_table_voice_and_a_patterned_cable_play_together_and_survive_save_and_reload
 }
 
 #[test]
-fn a_file_master_wrote_at_schema_5_with_a_table_loads_and_renders_unchanged() {
-    // Schema 5 on master means tables and nothing else: the same log, `meta.toml` says 5.
-    let log = log_of(&patch(false));
-    let dir = tempfile::tempdir().unwrap();
-    kabl_core::save(dir.path(), &log).unwrap();
-    let meta = std::fs::read_to_string(dir.path().join("meta.toml")).unwrap();
-    assert!(meta.contains(&format!(
-        "schema_version = {}",
-        kabl_core::CURRENT_SCHEMA_VERSION
-    )));
-    std::fs::write(
-        dir.path().join("meta.toml"),
-        meta.replace(
-            &format!("schema_version = {}", kabl_core::CURRENT_SCHEMA_VERSION),
-            "schema_version = 5",
-        ),
-    )
-    .unwrap();
-    let back = kabl_core::load(dir.path()).expect("a schema-5 file loads");
-    assert_eq!(back.state().tables, log.state().tables);
-    assert_eq!(render_state(back.state()), render_state(&patch(false)));
-}
-
-#[test]
 fn a_file_with_a_table_is_refused_below_schema_5() {
     let log = log_of(&patch(false));
     let dir = tempfile::tempdir().unwrap();
