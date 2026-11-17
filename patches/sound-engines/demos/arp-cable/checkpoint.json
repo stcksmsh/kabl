@@ -105,8 +105,8 @@
     "10": {
       "kind": "split",
       "pos": {
-        "x": 764.0,
-        "y": 370.0
+        "x": 404.0,
+        "y": 620.0
       },
       "params": {}
     }
@@ -286,6 +286,22 @@
     "11": {
       "from": {
         "Module": {
+          "id": 7,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 10,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "12": {
+      "from": {
+        "Module": {
           "id": 10,
           "port": "left"
         }
@@ -299,7 +315,7 @@
       "params": {},
       "steps": []
     },
-    "12": {
+    "13": {
       "from": {
         "Module": {
           "id": 10,
@@ -315,7 +331,7 @@
       "params": {},
       "steps": []
     },
-    "13": {
+    "14": {
       "from": {
         "Module": {
           "id": 8,
@@ -347,22 +363,6 @@
       "params": {
         "amount": 0.3
       },
-      "steps": []
-    },
-    "16": {
-      "from": {
-        "Module": {
-          "id": 7,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 10,
-          "port": "in"
-        }
-      },
-      "params": {},
       "steps": []
     }
   }

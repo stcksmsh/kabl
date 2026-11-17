@@ -46,7 +46,8 @@
         "fine": 0.0,
         "pw": 50.0,
         "unison": 4.0,
-        "waveform": 2.0
+        "waveform": 2.0,
+        "width": 0.0
       }
     },
     "4": {
@@ -61,7 +62,8 @@
         "fine": 7.0,
         "pw": 50.0,
         "unison": 1.0,
-        "waveform": 1.0
+        "waveform": 1.0,
+        "width": 0.0
       }
     },
     "5": {
@@ -76,7 +78,8 @@
         "fine": 0.0,
         "pw": 50.0,
         "unison": 1.0,
-        "waveform": 0.0
+        "waveform": 0.0,
+        "width": 0.0
       }
     },
     "6": {
@@ -220,7 +223,7 @@
       }
     },
     "18": {
-      "kind": "out",
+      "kind": "split",
       "pos": {
         "x": 1354.0,
         "y": 620.0
@@ -228,10 +231,10 @@
       "params": {}
     },
     "19": {
-      "kind": "split",
+      "kind": "out",
       "pos": {
-        "x": 954.0,
-        "y": 670.0
+        "x": 1544.0,
+        "y": 620.0
       },
       "params": {}
     }
@@ -677,10 +680,26 @@
       "params": {},
       "steps": []
     },
+    "27": {
+      "from": {
+        "Module": {
+          "id": 15,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 18,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
     "28": {
       "from": {
         "Module": {
-          "id": 19,
+          "id": 18,
           "port": "left"
         }
       },
@@ -693,7 +712,7 @@
       "params": {},
       "steps": []
     },
-    "31": {
+    "30": {
       "from": {
         "Module": {
           "id": 16,
@@ -709,7 +728,7 @@
       "params": {},
       "steps": []
     },
-    "33": {
+    "31": {
       "from": {
         "Module": {
           "id": 1,
@@ -727,7 +746,7 @@
       },
       "steps": []
     },
-    "34": {
+    "32": {
       "from": {
         "Module": {
           "id": 1,
@@ -745,26 +764,10 @@
       },
       "steps": []
     },
-    "35": {
+    "33": {
       "from": {
         "Module": {
           "id": 17,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 18,
-          "port": "in"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "37": {
-      "from": {
-        "Module": {
-          "id": 15,
           "port": "out"
         }
       },

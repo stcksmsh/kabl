@@ -455,7 +455,7 @@
       "params": {},
       "steps": []
     },
-    "19": {
+    "18": {
       "from": {
         "Module": {
           "id": 13,
@@ -471,7 +471,7 @@
       "params": {},
       "steps": []
     },
-    "21": {
+    "19": {
       "from": {
         "Module": {
           "id": 14,
@@ -487,7 +487,7 @@
       "params": {},
       "steps": []
     },
-    "23": {
+    "20": {
       "from": {
         "Module": {
           "id": 1,
@@ -505,7 +505,7 @@
       },
       "steps": []
     },
-    "24": {
+    "21": {
       "from": {
         "Module": {
           "id": 1,
@@ -523,7 +523,7 @@
       },
       "steps": []
     },
-    "25": {
+    "22": {
       "from": {
         "Module": {
           "id": 1,
@@ -541,7 +541,7 @@
       },
       "steps": []
     },
-    "26": {
+    "23": {
       "from": {
         "Module": {
           "id": 1,
@@ -559,7 +559,7 @@
       },
       "steps": []
     },
-    "27": {
+    "24": {
       "from": {
         "Module": {
           "id": 1,
@@ -580,7 +580,6 @@
   },
   "labels": {
     "1": {
-      "guide": "Hold one low note or a wide chord. Breath adds noise, Gust sets motion, Color changes the breath band, Space adds room. Use sparse notes and let the tail decay; CC20-23 control macros.",
       "name.m1": "Breath",
       "name.m2": "Gust",
       "name.m3": "Color",

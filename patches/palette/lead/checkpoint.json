@@ -532,7 +532,7 @@
       "params": {},
       "steps": []
     },
-    "23": {
+    "22": {
       "from": {
         "Module": {
           "id": 14,
@@ -548,7 +548,7 @@
       "params": {},
       "steps": []
     },
-    "25": {
+    "23": {
       "from": {
         "Module": {
           "id": 1,
@@ -566,7 +566,7 @@
       },
       "steps": []
     },
-    "26": {
+    "24": {
       "from": {
         "Module": {
           "id": 1,
@@ -584,7 +584,7 @@
       },
       "steps": []
     },
-    "27": {
+    "25": {
       "from": {
         "Module": {
           "id": 1,
@@ -602,7 +602,7 @@
       },
       "steps": []
     },
-    "28": {
+    "26": {
       "from": {
         "Module": {
           "id": 1,
@@ -620,7 +620,7 @@
       },
       "steps": []
     },
-    "29": {
+    "27": {
       "from": {
         "Module": {
           "id": 1,
@@ -641,7 +641,6 @@
   },
   "labels": {
     "1": {
-      "guide": "Overlap E4-G4-B4 for legato glide. Tone brightens, Vibrato adds motion, Bite adds drive, Echo adds repeats. Bend +/-2 semitones; CC20-23 control macros.",
       "name.m1": "Tone",
       "name.m2": "Vibrato",
       "name.m3": "Bite",

@@ -484,7 +484,7 @@
       "params": {},
       "steps": []
     },
-    "20": {
+    "19": {
       "from": {
         "Module": {
           "id": 12,
@@ -500,7 +500,7 @@
       "params": {},
       "steps": []
     },
-    "22": {
+    "20": {
       "from": {
         "Module": {
           "id": 13,
@@ -516,7 +516,7 @@
       "params": {},
       "steps": []
     },
-    "24": {
+    "21": {
       "from": {
         "Module": {
           "id": 15,
@@ -534,7 +534,7 @@
       },
       "steps": []
     },
-    "25": {
+    "22": {
       "from": {
         "Module": {
           "id": 15,
@@ -552,7 +552,7 @@
       },
       "steps": []
     },
-    "26": {
+    "23": {
       "from": {
         "Module": {
           "id": 15,
@@ -570,7 +570,7 @@
       },
       "steps": []
     },
-    "27": {
+    "24": {
       "from": {
         "Module": {
           "id": 15,
@@ -588,7 +588,7 @@
       },
       "steps": []
     },
-    "28": {
+    "25": {
       "from": {
         "Module": {
           "id": 15,
@@ -606,7 +606,7 @@
       },
       "steps": []
     },
-    "29": {
+    "26": {
       "from": {
         "Module": {
           "id": 15,
@@ -624,7 +624,7 @@
       },
       "steps": []
     },
-    "30": {
+    "27": {
       "from": {
         "Module": {
           "id": 15,
@@ -642,7 +642,7 @@
       },
       "steps": []
     },
-    "31": {
+    "28": {
       "from": {
         "Module": {
           "id": 15,
@@ -675,7 +675,6 @@
       "pin.rate_hz": "Chorus rate"
     },
     "15": {
-      "guide": "Hold E3-G3-B3-E4; overlap the next chord. Bright opens the tone, Ensemble widens detuning, Bow softens attack, Space adds room. Velocity shapes volume; CC20-23 control macros.",
       "name.m1": "Bright",
       "name.m2": "Ensemble",
       "name.m3": "Bow",
