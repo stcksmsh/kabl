@@ -10,6 +10,11 @@
 //!   `sweep/<slug>-mK.wav`    the phrase while the macro moves 0 to 1 to 0 over 8 s (1 s to 9 s),
 //!                            10 s, the macro ramped at runtime like a hand on the knob.
 //! The other macros stay at their stored values. Any category works; nothing here is groove-only.
+//!
+//! Tour mode, for listening: `MACRO_TOUR_BPM=<bpm> macro_audit ... <slug>` (one preset per run, its
+//! stored tempo) skips the steps and writes only `sweep/<slug>-mK.wav`, 20 s: the macro held at 0
+//! for 6 s, up over 4 s, held at 1 for 6 s, down over 4 s. The phrase loops every 8 bars of `bpm`
+//! (counted from the 0.5 s clock start) so the keys stay on the grid for the whole 20 s.
 
 use std::path::Path;
 
@@ -48,8 +53,31 @@ fn write_wav(path: &Path, left: &[f32], right: &[f32]) {
     w.finalize().unwrap();
 }
 
+/// The tempo of the tour mode (`MACRO_TOUR_BPM`), when on.
+fn tour_bpm() -> Option<f32> {
+    std::env::var("MACRO_TOUR_BPM").ok()?.parse().ok()
+}
+
+/// Seconds rendered: 10, or 20 in tour mode.
+fn secs() -> f32 {
+    if tour_bpm().is_some() {
+        20.0
+    } else {
+        SECS
+    }
+}
+
 /// The macro value at `t` while it is swept: 0, up over `LEG`, down over `LEG`, 0.
 fn sweep(t: f32) -> f32 {
+    if tour_bpm().is_some() {
+        return match t {
+            t if t < 6.0 => 0.0,
+            t if t < 10.0 => (t - 6.0) / 4.0,
+            t if t < 16.0 => 1.0,
+            t if t < 20.0 => 1.0 - (t - 16.0) / 4.0,
+            _ => 0.0,
+        };
+    }
     let x = (t - SWEEP_FROM) / LEG;
     if x <= 0.0 || x >= 2.0 {
         0.0
@@ -77,7 +105,7 @@ fn render(
         .collect();
     let (mut left, mut right) = (Vec::new(), Vec::new());
     let (mut l, mut r) = ([0.0; BLOCK], [0.0; BLOCK]);
-    for b in 0..(SECS * SR) as usize / BLOCK {
+    for b in 0..(secs() * SR) as usize / BLOCK {
         let t0 = (b * BLOCK) as f32 / SR;
         let t1 = t0 + BLOCK as f32 / SR;
         if b == 0 {
@@ -216,6 +244,19 @@ fn main() {
                 )
             })
             .collect();
+        let hits = match tour_bpm() {
+            Some(bpm) => {
+                // 8 bars of 4 beats from the 0.5 s clock start.
+                let period = 32.0 * 60.0 / bpm;
+                (0..)
+                    .map(|n| n as f32 * period)
+                    .take_while(|o| *o < secs())
+                    .flat_map(|o| hits.iter().map(move |h| Hit(h.0 + o, h.1, h.2)))
+                    .filter(|h| h.0 < secs())
+                    .collect()
+            }
+            None => hits,
+        };
         let knob = *state
             .modules
             .iter()
@@ -234,7 +275,7 @@ fn main() {
                 "macro": k, "start": state.modules[&knob].params.get(&name),
                 "routes": routes(&state, knob, k),
             }));
-            for s in 0..STEPS {
+            for s in (0..STEPS).filter(|_| tour_bpm().is_none()) {
                 let mut st = state.clone();
                 st.modules
                     .get_mut(&knob)

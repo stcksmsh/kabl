@@ -25,3 +25,5 @@ docs/**/*.mov
 !docs/design/app-target/media/perform/composition-1280x800-dark.webp
 !docs/panel-authoring/examples/art/voice-light.png
 docs/**/*.flac
+# Macro pilot 2 tours (offline renders for listening; paths in the PR)
+/docs/presets/clips/macro-pilot-2/
