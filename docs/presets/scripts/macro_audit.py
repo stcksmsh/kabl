@@ -63,7 +63,8 @@ JUMP_DB = 1.5
 PEAK_DB = -1.0
 SILENT_DB = -45.0
 DUP_COS = 0.9
-SIMILAR_COS = 0.8  # two macros whose 0-to-1 change vectors point this much the same way (both over 1.5 dB)
+CLIP_DB = 10.0  # each component of a change vector is limited to this before the cosines: one huge move (a room from nothing to +40 dB of side) must not decide the comparison
+SIMILAR_COS = 0.8 # two macros whose 0-to-1 change vectors point this much the same way (both over 1.5 dB)
 CANCEL_MIN_DB = 1.0  # a pair is only checked for cancelling when the larger single moves this much
 CANCEL_RATIO = 0.7  # cancel: the pair at 1 changes less than this fraction of the larger single's change
 PILE_LOUD_DB = 3.0  # pileup: the pair is this much louder than the louder single ...
@@ -329,7 +330,7 @@ def combination(slug, res, renders):
     similar = []
     for i, a in enumerate(res):
         for j, b in enumerate(res):
-            u, v = np.array(a['vec']), np.array(b['vec'])
+            u, v = np.clip(a['vec'], -CLIP_DB, CLIP_DB), np.clip(b['vec'], -CLIP_DB, CLIP_DB)
             mat[i][j] = float(u @ v / max(np.linalg.norm(u) * np.linalg.norm(v), 1e-9))
             if j > i and mat[i][j] > SIMILAR_COS and np.abs(u).max() > 1.5 and np.abs(v).max() > 1.5:
                 similar.append(f"{names[a['macro']]} and {names[b['macro']]}: cosine {mat[i][j]:.2f}")
@@ -416,7 +417,7 @@ def main():
             for j, q in enumerate(res):
                 if j <= i:
                     continue
-                u, v = np.array(r['vec']), np.array(q['vec'])
+                u, v = np.clip(r['vec'], -CLIP_DB, CLIP_DB), np.clip(q['vec'], -CLIP_DB, CLIP_DB)
                 cos = float(u @ v / max(np.linalg.norm(u) * np.linalg.norm(v), 1e-9))
                 shared = sorted(set(r['targets']) & set(q['targets']))
                 if (cos > DUP_COS and np.abs(u).max() > 1.5 and np.abs(v).max() > 1.5) or shared:
