@@ -1408,7 +1408,8 @@ fn brick_plan(v: &mut Voice, h: &Handles, s: &Spec) {
     // The mix is full at two thirds of the travel (the route clamps), so the last third hardens
     // the crush (bits, hold) instead of jumping in at the end.
     v.r.e.set_param(crush, "mix", 0.0);
-    v.r.route(v.knob, "m1", crush, "mix", 1.5);
+    v.r.route(v.knob, "m1", crush, "mix", 1.0);
+    v.r.route(v.knob, "m1", crush, "mix", 0.5);
     rise(v, 1, crush, "bitcrusher", "bits", 8.0, 4.0);
     rise(v, 1, crush, "bitcrusher", "downsample", 3.0, 10.0);
     // The stored cutoff, drive and duck are what the old Filter, Dirt and Pump macros left.
