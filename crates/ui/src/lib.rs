@@ -16,12 +16,14 @@ pub mod banks;
 pub mod browser;
 pub mod cable_life;
 mod cable_look;
+mod cable_settle;
 pub mod code_examples;
 pub mod code_notice;
 pub mod compare;
 pub mod composites;
 pub mod control;
 pub mod cues;
+pub mod desktop;
 pub mod displays;
 mod drawer;
 mod drum_displays;
@@ -293,6 +295,15 @@ pub struct UiState {
     /// Settings "Cable life" and "Intensity"; remembered with the theme.
     pub cable_life: cable_life::CableLife,
     pub cable_intensity: cable_life::Intensity,
+    /// Settings "Theme" and "Reduce motion", and what the desktop said at start.
+    pub theme_mode: desktop::ThemeMode,
+    pub reduce_motion: desktop::ReduceMotion,
+    pub desktop: desktop::Hints,
+    /// The reduced-motion state the active style was built for.
+    style_reduced: bool,
+    /// The settle spring of each cable, and when the pointer last let go (egui time).
+    settle: cable_settle::Settle,
+    released_at: f64,
     /// Smoothed glow per cable, and whether any cable needs frames.
     pub life: cable_life::Life,
     /// Gate and clock flashes and their beads.
@@ -491,6 +502,12 @@ impl Default for UiState {
             prefs_saved: None,
             cable_life: Default::default(),
             cable_intensity: Default::default(),
+            theme_mode: Default::default(),
+            reduce_motion: Default::default(),
+            desktop: Default::default(),
+            style_reduced: false,
+            settle: Default::default(),
+            released_at: f64::NEG_INFINITY,
             life: Default::default(),
             pulses: Default::default(),
             style: std::sync::Arc::new(style::look_b_default(false)),
@@ -867,7 +884,20 @@ impl UiState {
         self.themes = std::sync::Arc::new(themes);
         self.theme_notes = notes;
         self.theme.clone_from(&p.theme);
-        self.dark = p.dark;
+        // Fresh installs follow the desktop; a file from before the setting keeps its choice.
+        self.desktop = desktop::read();
+        self.theme_mode = p.theme_mode.unwrap_or(if p.dark {
+            desktop::ThemeMode::Dark
+        } else {
+            desktop::ThemeMode::Light
+        });
+        self.reduce_motion = p.reduce_motion;
+        // `KABL_THEME` has set `p.dark` above and wins for this run.
+        self.dark = if std::env::var_os("KABL_THEME").is_some() {
+            p.dark
+        } else {
+            self.theme_mode.dark(self.desktop)
+        };
         self.cable_life = p.cable_life;
         self.cable_intensity = p.cable_intensity;
         // A remembered folder that is gone is dropped: its place starts in home again.
@@ -875,6 +905,18 @@ impl UiState {
         self.folders.retain(|_, d| d.is_dir());
         self.prefs_saved = Some(p);
         self.prefs_dir = Some(dir);
+    }
+
+    /// Whether motion is reduced: the setting, else what the desktop asked for.
+    pub fn reduced_motion(&self) -> bool {
+        self.reduce_motion.reduced(self.desktop)
+    }
+
+    /// Picks the theme setting: light or dark now, and remembered.
+    pub fn set_theme_mode(&mut self, mode: desktop::ThemeMode) {
+        self.theme_mode = mode;
+        self.dark = mode.dark(self.desktop);
+        self.save_prefs();
     }
 
     fn save_prefs(&mut self) {
@@ -885,6 +927,8 @@ impl UiState {
             folders: self.folders.clone(),
             cable_life: self.cable_life,
             cable_intensity: self.cable_intensity,
+            theme_mode: Some(self.theme_mode),
+            reduce_motion: self.reduce_motion,
         };
         if self.prefs_saved.as_ref() != Some(&p) {
             if let Err(e) = p.save(dir) {
@@ -924,15 +968,25 @@ pub fn show_with(
     wheel::begin(ui.ctx());
     theme::ensure_fonts(ui.ctx());
     let ready = theme::fonts_ready(ui.ctx());
+    let reduced = ui_state.reduced_motion();
     if ui_state.style.dark != ui_state.dark
         || ui_state.style.id != ui_state.theme
         || ui_state.style.fonts_ready != ready
+        || ui_state.style_reduced != reduced
     {
         let th = ui_state.themes.resolve(&ui_state.theme);
-        ui_state.style = std::sync::Arc::new(Style {
+        let mut style = Style {
             fonts_ready: ready,
             ..th.style(ui_state.dark).clone()
-        });
+        };
+        if reduced {
+            // No slides: drawer, view, toast and camera land at once. Glow and the step
+            // highlight are not slides and stay.
+            let m = &mut style.motion;
+            (m.drawer, m.view, m.glide) = (style::REDUCED_MS, style::REDUCED_MS, style::REDUCED_MS);
+        }
+        ui_state.style_reduced = reduced;
+        ui_state.style = std::sync::Arc::new(style);
         ui_state.theme = ui_state.style.id.clone();
         ui_state.save_prefs();
     }
@@ -1850,16 +1904,19 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
         }
         ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
             let menu = kit::icon_menu(ui, st, kit::Ic::Gear, |ui| {
+                kit::paragraph(ui, st, style::Role::Caption, kit::Tone::Text2, "Theme");
                 kit::segmented(ui, st, |ui| {
-                    let r = kit::seg(ui, st, "Light", !ui_state.dark);
-                    ui_state.record("theme:light".into(), r.rect);
-                    if r.clicked() {
-                        ui_state.dark = false;
-                    }
-                    let r = kit::seg(ui, st, "Dark", ui_state.dark);
-                    ui_state.record("theme:dark".into(), r.rect);
-                    if r.clicked() {
-                        ui_state.dark = true;
+                    use desktop::ThemeMode as T;
+                    for (v, label, key) in [
+                        (T::System, "System", "theme:system"),
+                        (T::Light, "Light", "theme:light"),
+                        (T::Dark, "Dark", "theme:dark"),
+                    ] {
+                        let r = kit::seg(ui, st, label, ui_state.theme_mode == v);
+                        ui_state.record(key.into(), r.rect);
+                        if r.clicked() {
+                            ui_state.set_theme_mode(v);
+                        }
                     }
                 });
                 let themes = ui_state.themes.clone();
@@ -1909,6 +1966,28 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
                         ui_state.record(key.into(), r.rect);
                         if r.clicked() {
                             ui_state.cable_intensity = v;
+                            changed = true;
+                        }
+                    }
+                });
+                kit::paragraph(
+                    ui,
+                    st,
+                    style::Role::Caption,
+                    kit::Tone::Text2,
+                    "Reduce motion",
+                );
+                kit::segmented(ui, st, |ui| {
+                    use desktop::ReduceMotion as M;
+                    for (v, label, key) in [
+                        (M::System, "System", "motion:system"),
+                        (M::On, "On", "motion:on"),
+                        (M::Off, "Off", "motion:off"),
+                    ] {
+                        let r = kit::seg(ui, st, label, ui_state.reduce_motion == v);
+                        ui_state.record(key.into(), r.rect);
+                        if r.clicked() {
+                            ui_state.reduce_motion = v;
                             changed = true;
                         }
                     }
@@ -4793,6 +4872,32 @@ fn draw_cables(
         .iter()
         .map(|(&id, c)| (id, c.clone()))
         .collect();
+    // Settle springs: model-space ends tell a move from a pan or zoom; reduced motion has none.
+    let (down, now) = ctx.input(|i| (i.pointer.any_down(), i.time));
+    if ctx.input(|i| i.pointer.any_released()) {
+        ui_state.released_at = now;
+    }
+    // A cable that shows up just after the pointer let go was plugged; many at once is a load.
+    let new = cables
+        .iter()
+        .filter(|(id, _)| ui_state.settle.unseen(*id))
+        .count();
+    let fresh = now - ui_state.released_at < 0.3 && new <= 2;
+    let calm = ui_state.reduced_motion();
+    ui_state.life.slow_release = calm;
+    ui_state.pulses.slow_release = calm;
+    let offset = |ui_state: &mut UiState, id: CableId, a: Pos2, b: Pos2| -> f32 {
+        if calm {
+            return 0.0;
+        }
+        if only.is_none() {
+            let sag = cable_look::rest_sag(a, b, z, slots.sag);
+            ui_state
+                .settle
+                .note(id, [xf.inv(a), xf.inv(b)], down, fresh, sag);
+        }
+        ui_state.settle.offset(id)
+    };
     let mut runs: Vec<Run> = Vec::new();
     for (cable_id, c) in &cables {
         if only.is_some_and(|id| c.from.module_id() != Some(id) && c.to.module_id() != Some(id)) {
@@ -4815,6 +4920,7 @@ fn draw_cables(
                 b,
                 z,
                 slots.sag,
+                offset(ui_state, *cable_id, a, b),
             );
             runs.push(Run {
                 id: *cable_id,
@@ -4844,6 +4950,7 @@ fn draw_cables(
             *pos,
             z,
             slots.sag,
+            offset(ui_state, *cable_id, a, *pos),
         );
         runs.push(Run {
             id: *cable_id,
@@ -4861,6 +4968,13 @@ fn draw_cables(
             .min_by(|a, b| a.1.total_cmp(&b.1))
             .map(|(id, _)| id)
     });
+    if only.is_none() {
+        if calm {
+            ui_state.settle.clear();
+        } else if ui_state.settle.end_frame(ctx.input(|i| i.stable_dt)) {
+            ctx.request_repaint();
+        }
+    }
     let lit_of = |r: &Run| -> bool {
         let touches =
             |m: Option<ModuleId>| m.is_some() && (m == selected || (!pinned && m == hover_module));

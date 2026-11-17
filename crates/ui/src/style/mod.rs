@@ -8,7 +8,7 @@
 mod builtin;
 mod load;
 
-pub use builtin::{builtin_a, builtin_b, BUILTIN_A_ID, BUILTIN_B_ID};
+pub use builtin::{builtin_a, builtin_b, BUILTIN_A_ID, BUILTIN_B_ID, REDUCED_MS, SETTLE};
 pub use load::{config_dir, themes_dir, Prefs, Theme, Themes};
 pub use solid::{
     compose, line_solid_default, look_b_default, outline_default, with_accent, Accent, FACE_STYLES,

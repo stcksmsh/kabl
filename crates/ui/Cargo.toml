@@ -32,6 +32,10 @@ kabl-engine = { path = "../engine" }
 kabl-modules = { path = "../modules" }
 kabl-standalone = { path = "../standalone" }
 
+# Already in the tree through audio_thread_priority; reads the settings portal (desktop.rs).
+[target.'cfg(target_os = "linux")'.dependencies]
+dbus = "0.9.12"
+
 [build-dependencies]
 kabl-core = { path = "../core" }
 
