@@ -24,9 +24,9 @@
         "cc.m2": 21.0,
         "cc.m3": 22.0,
         "cc.m4": 23.0,
-        "m1": 0.8,
+        "m1": 0.2,
         "m2": 0.5,
-        "m3": 0.5,
+        "m3": 0.0,
         "m4": 0.4,
         "pin.m1": 0.0,
         "pin.m2": 1.0,
@@ -71,8 +71,8 @@
         "y": 320.0
       },
       "params": {
-        "level1": 0.7,
-        "level2": 0.3
+        "level1": 0.5,
+        "level2": 0.6
       }
     },
     "6": {
@@ -82,7 +82,7 @@
         "y": 320.0
       },
       "params": {
-        "drive_db": 6.6000004,
+        "drive_db": 3.0,
         "trim_db": -1.0
       }
     },
@@ -93,7 +93,7 @@
         "y": 320.0
       },
       "params": {
-        "cutoff_hz": 686.4519,
+        "cutoff_hz": 2811.7065,
         "drive_db": 0.0,
         "resonance": 0.1
       }
@@ -119,7 +119,7 @@
       },
       "params": {
         "attack_ms": 3.0,
-        "decay_ms": 350.0,
+        "decay_ms": 900.0,
         "release_ms": 110.0,
         "sustain": 0.7
       }
@@ -145,9 +145,19 @@
       }
     },
     "12": {
-      "kind": "compressor",
+      "kind": "lfo",
       "pos": {
         "x": 404.0,
+        "y": 620.0
+      },
+      "params": {
+        "rate_hz": 4.5
+      }
+    },
+    "13": {
+      "kind": "compressor",
+      "pos": {
+        "x": 594.0,
         "y": 620.0
       },
       "params": {
@@ -159,10 +169,10 @@
         "threshold_db": -8.0
       }
     },
-    "13": {
+    "14": {
       "kind": "delay",
       "pos": {
-        "x": 594.0,
+        "x": 784.0,
         "y": 620.0
       },
       "params": {
@@ -172,10 +182,10 @@
         "tone_hz": 3500.0
       }
     },
-    "14": {
+    "15": {
       "kind": "reverb",
       "pos": {
-        "x": 784.0,
+        "x": 974.0,
         "y": 620.0
       },
       "params": {
@@ -186,18 +196,18 @@
         "width": 60.0
       }
     },
-    "15": {
+    "16": {
       "kind": "split",
       "pos": {
-        "x": 974.0,
+        "x": 1164.0,
         "y": 620.0
       },
       "params": {}
     },
-    "16": {
+    "17": {
       "kind": "out",
       "pos": {
-        "x": 1164.0,
+        "x": 1354.0,
         "y": 620.0
       },
       "params": {}
@@ -425,12 +435,12 @@
       },
       "to": {
         "Param": {
-          "id": 7,
-          "param": "cutoff_hz"
+          "id": 6,
+          "param": "drive_db"
         }
       },
       "params": {
-        "amount": 0.25514996
+        "amount": 0.5
       },
       "steps": []
     },
@@ -492,21 +502,39 @@
       "from": {
         "Module": {
           "id": 2,
-          "port": "m3"
+          "port": "m2"
         }
       },
       "to": {
         "Param": {
-          "id": 5,
-          "param": "level2"
+          "id": 9,
+          "param": "decay_ms"
         }
       },
       "params": {
-        "amount": 0.6
+        "amount": -0.16406965
       },
       "steps": []
     },
     "19": {
+      "from": {
+        "Module": {
+          "id": 12,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 11,
+          "param": "gain_db"
+        }
+      },
+      "params": {
+        "amount": 0.0
+      },
+      "steps": []
+    },
+    "20": {
       "from": {
         "Module": {
           "id": 2,
@@ -514,17 +542,17 @@
         }
       },
       "to": {
-        "Param": {
-          "id": 5,
-          "param": "level1"
+        "CableParam": {
+          "cable": 19,
+          "param": "amount"
         }
       },
       "params": {
-        "amount": -0.39999998
+        "amount": 0.08
       },
       "steps": []
     },
-    "20": {
+    "21": {
       "from": {
         "Module": {
           "id": 11,
@@ -533,29 +561,11 @@
       },
       "to": {
         "Module": {
-          "id": 12,
+          "id": 13,
           "port": "in"
         }
       },
       "params": {},
-      "steps": []
-    },
-    "21": {
-      "from": {
-        "Module": {
-          "id": 2,
-          "port": "m4"
-        }
-      },
-      "to": {
-        "Param": {
-          "id": 12,
-          "param": "threshold_db"
-        }
-      },
-      "params": {
-        "amount": -0.5833334
-      },
       "steps": []
     },
     "22": {
@@ -567,7 +577,25 @@
       },
       "to": {
         "Param": {
-          "id": 12,
+          "id": 13,
+          "param": "threshold_db"
+        }
+      },
+      "params": {
+        "amount": -0.5833334
+      },
+      "steps": []
+    },
+    "23": {
+      "from": {
+        "Module": {
+          "id": 2,
+          "port": "m4"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 13,
           "param": "makeup_db"
         }
       },
@@ -576,43 +604,27 @@
       },
       "steps": []
     },
-    "23": {
-      "from": {
-        "Module": {
-          "id": 12,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 15,
-          "port": "in"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
     "24": {
       "from": {
         "Module": {
-          "id": 15,
-          "port": "left"
+          "id": 13,
+          "port": "out"
         }
       },
       "to": {
         "Module": {
-          "id": 13,
+          "id": 16,
           "port": "in"
         }
       },
       "params": {},
       "steps": []
     },
-    "26": {
+    "25": {
       "from": {
         "Module": {
-          "id": 13,
-          "port": "out"
+          "id": 16,
+          "port": "left"
         }
       },
       "to": {
@@ -633,7 +645,23 @@
       },
       "to": {
         "Module": {
-          "id": 16,
+          "id": 15,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "28": {
+      "from": {
+        "Module": {
+          "id": 15,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 17,
           "port": "in"
         }
       },
@@ -643,9 +671,9 @@
   },
   "labels": {
     "2": {
-      "name.m1": "Tone",
+      "name.m1": "Warmth",
       "name.m2": "Pluck",
-      "name.m3": "Body",
+      "name.m3": "Throb",
       "name.m4": "Squeeze"
     }
   }

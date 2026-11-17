@@ -27,8 +27,8 @@ Where the old space macro (Room) did not matter for the patch, the echo and room
 ### Acid Rain (legato acid bass)
 | Macro | What you hear | What it moves |
 |---|---|---|
-| Cutoff [.50] | dark growl to bright snarl | cutoff 271 Hz to 4 kHz |
-| Squelch [.35] | resonance and the snap of each note rise, the filter starts to drive | resonance .25 to .69, ladder drive 0 to 5.7 dB, envelope depth .09 to .29 |
+| Squelch [.50] | the filter opens from a dark growl to a bright snarl and the resonance rises with it | cutoff 271 Hz to 4 kHz, resonance .20 to .61 |
+| Accent [.60] | envelope shape: short clipped notes to long held ones | amp decay 90 to ~600 ms, sustain .25 to 1, filter-envelope decay 80 to ~600 ms |
 | Slide [.40] | glide time between notes | 15 to ~380 ms |
 | Space [.25] | dotted echo and room | echo mix, room mix |
 (The old Drive is fixed at its old stored value.)
@@ -36,10 +36,11 @@ Where the old space macro (Room) did not matter for the patch, the echo and room
 ### Oatmeal (clean round pop bass)
 | Macro | What you hear | What it moves |
 |---|---|---|
-| Tone [.80] | muffled to bright low-pass | cutoff 687 Hz to 4 kHz |
-| Pluck [.50] | a snap at the front of each note, longer as it deepens | envelope depth 0 to .70, decay 60 to 540 ms |
-| Body [.50] | hollow triangle to a full sine an octave down | sine .30 to .90, triangle .70 to .30 |
+| Warmth [.20] | a soft saturation adds harmonics to the clean note (harmonics, not filtering: a triangle and a sine have little to filter) | drive 3 to ~21 dB |
+| Pluck [.50] | a filter snap at the front of each note and a shorter, clipped note | envelope depth 0 to .70, filter-envelope decay 60 to ~540 ms, amp decay 900 to ~140 ms |
+| Throb [0.00] | a slow tremolo fades in (motion; off by default) | LFO 4.5 Hz on the output level, depth 0 to .08 of the gain range |
 | Squeeze [.40] | the light compressor clamps harder | threshold -8 to -43 dB, makeup 0 to 7.5 dB |
+(The old Tone stays fixed at its old stored cutoff, the old Body at its stored levels.)
 
 ### Spun Sugar (vocal pop lead)
 | Macro | What you hear | What it moves |
@@ -54,14 +55,14 @@ Where the old space macro (Room) did not matter for the patch, the echo and room
 |---|---|---|
 | Bite [.50] | filter opens, the note snaps harder | cutoff 2.1 to 12 kHz, envelope depth .05 to .25 |
 | Weld [.50] | the saw drifts against the pulse, the pulse thins | second saw fine 0 to 14 ct, pulse width 50 to 20 % |
-| Crush [.50] | a plain hard lead to a coarse digital grind | crusher mix 0 to 70 %, bits 10 to 4 |
+| Crush [.50] | a plain hard lead to a coarse digital grind | crusher mix 0 to 70 %, bits 9 to 5, downsample 1.5 to ~5 |
 | Length [.60] | a stab to a held blare | sustain .50 to 1, release 20 ms up |
 
 ### Hot Wire (legato acid lead)
 | Macro | What you hear | What it moves |
 |---|---|---|
-| Cutoff [.50] | closed growl to scream | cutoff 634 Hz to 9 kHz |
-| Squelch [.50] | resonance, drive and snap rise | resonance .20 to .71, ladder drive 0 to 4 dB, envelope depth .05 to .25 |
+| Squelch [.50] | closed growl to scream, the resonance rises with the cutoff | cutoff 634 Hz to 9 kHz, resonance .20 to .71 |
+| Slide [.40] | glide time between overlapped notes | 8 to ~200 ms |
 | Wire [.30] | the pulse oscillator gets a faster pulse-width sweep and thickens | PWM depth 0 to .35, rate .3 to ~1.4 Hz, level .15 to .65 |
 | Space [.40] | dotted echo and room | echo mix, room mix |
 
@@ -76,8 +77,8 @@ Where the old space macro (Room) did not matter for the patch, the echo and room
 ### Rubber Band (funk pluck bass)
 | Macro | What you hear | What it moves |
 |---|---|---|
-| Tone [.50] | thud to bright pop | cutoff 350 Hz to 4 kHz |
-| Slap [.55] | the filter snap of each note: deeper and longer | envelope depth 0 to .60, decay 40 to 175 ms |
+| Room [.20] | a short slapback and room around the pluck (space) | echo mix, room mix |
+| Slap [.73] | the filter snap of each note: deeper and longer | envelope depth 0 to .45, decay 40 to ~120 ms |
 | Stab [.50] | short and dry to long and ringing | amp decay 80 to 845 ms, sustain .10 to .60 |
 | Body [.50] | the saw an octave down comes forward of the pulse | saw .15 to .75, pulse .60 to .30 |
 
@@ -85,9 +86,10 @@ Where the old space macro (Room) did not matter for the patch, the echo and room
 | Macro | What you hear | What it moves |
 |---|---|---|
 | Cutoff [.45] | closed rumble to bright snarl | cutoff ~395 Hz to 4 kHz |
-| Growl [.35] | the filter rolls faster and deeper | LFO depth 0 to .25, rate 1.2 to ~20 Hz |
+| Growl [.44] | the filter rolls faster and deeper | LFO depth 0 to .20, rate 1.2 to ~20 Hz |
 | Stack [.50] | a tight stack to a wall | stack detune 8 to 52 ct, second saw fine 2 to 14 ct |
-| Crush [.20] | the digital edge comes in | crusher mix 0 to 90 % |
+| Room [.20] | a tight room and slapback (space) | echo mix, room mix |
+(The crusher stays at the mix the old Crush was stored at, 18 %.)
 
 ### Gutter (dirty French touch bass)
 | Macro | What you hear | What it moves |
@@ -107,28 +109,37 @@ Where the old space macro (Room) did not matter for the patch, the echo and room
 
 ## Checks (macro_audit with the combination check, #159; 8 steps per macro)
 
-Peaks: no step, sweep or combination render is over -1 dBFS (worst case in the combination tables: Low Tide stored -3.6 dBFS, Steel Toe pairs -4.0). No click appears in the sweeps of the redesigned macros except the ones listed below.
+Peaks: no step, sweep or combination render is over -1 dBFS (worst case in the combination tables: Low Tide all four at 1 at -2.6 dBFS, stored -3.6). No click appears in a step, sweep, end or combination render.
 
 Flags that are left, honestly:
 
 | Preset | Flag | Note |
 |---|---|---|
-| Steel Toe | click at 6.5 s in the end renders of Bite and Squash and in the pairs Weight+Squash, Squash+Pump | The old Room macro had the same click at 6.5 s (the clock-duck phrase). Not fixed here |
-| Rubber Band | clicks at 0.2, 1.7, 3.1 s in the end renders | Already in the old patch (old Tone, Slap, Grit, Room all had them): they come from the patch's own retrigger at macro 0, not from a macro. Parked |
-| Slate Roof | click at 7.3 s in pairs Cutoff+Growl and Growl+Crush | Growl is the LFO on the cutoff; the old Crush jump is also still there |
-| Pig Iron | Bite and Crush `jump` (last step); pair Crush+Length click at 7.7 s; Crush+Length `cancel` | Crush is back-loaded (the crusher is mostly in the highs) |
+| Acid Rain | Space `jump` | The echo and room come in over a dry bass: the first step adds most of the change (unchanged space macro) |
+| Oatmeal | Pluck `weak` (0.4 dB); Warmth and Squeeze `cancel` as a pair | A triangle and a sine have almost nothing for a filter snap to bite: Pluck is mainly the shorter note. Warmth makes the note louder, Squeeze quieter |
+| Rubber Band | Slap `jump`, Stab `dead` | Slap and Stab move the note shape in a few steps; Stab changes the decay and sustain of notes that are short already |
+| Gutter | Grit `weak` | The drive is at 22 to 36 dB: the sound is saturated and the crusher adds little. Left |
 | Low Tide | Tide and Swell `jump` | Slow LFO and slow attack: the 10 s render window holds few cycles |
-| Oatmeal | Tone `weak`, Pluck `weak`, similar (cos .92) | The patch is a triangle and a sine: above 2 kHz there is little to filter. Honest limit of the sound |
-| Acid Rain, Hot Wire, Rubber Band | Cutoff and Squelch (or Tone and Slap) `similar` (.97 to .99) | Two filter gestures on one saw. Different in kind (cutoff against resonance and snap) but the measure sees the same brightening |
-| Slate Roof | Growl and Crush `similar` (1.0) | Both brighten the top; one is motion, one is a digital edge |
-| Hot Wire | all four at 1 `cancel` (4.2 dB against 6.1 dB for the largest single) | Cutoff opens and Squelch resonance rises: they trade level |
+| Tar Pit | tour: Body at 0 has a 1.25 s silent gap | The macro itself: a 600 ms tail between sparse 808 notes. Guard run with the default 1 s fails for this clip only |
 
-Default render against the old patch (16 s clip, float, `presets_bass_lead clips`): Oatmeal and Spun Sugar are bit-identical; every other preset differs by -125 dB or better (float rounding of the macro line); Gutter by -90.5 dB (the crusher's quantiser amplifies a rounding error). The other 12 presets are untouched (their patch logs were reverted: only timestamps differ).
+No `similar` pair is left (the matrix shows none over 0.8 in the 12). The combination table has no `click`, `peak` or `pileup` flag.
+
+### Clicks (the old Steel Toe 6.5 s and Rubber Band end-render clicks)
+
+Cause in the patches, not the macros: a note that retriggers while the previous note is still ringing restarts the amp (and filter) envelope from its current level with a 1 to 3 ms attack, and the level steps. The Rubber Band click at 0.25 s and 3.15 s was in the stored sound too (second difference -14 dB, isolated); an 8 ms attack on both envelopes removes it (tested with `PP_SET`). Fixed in the patches: amp attack 2 to 6 ms (Steel Toe, Rubber Band, Slate Roof), 3 to 5 ms (Pig Iron), filter-envelope attack 3 to 8 ms (Rubber Band), 4 to 8 ms (Slate Roof), 1 to 6 ms (Pig Iron). This is a change to the default sound of these four presets (a softer first few milliseconds of each note): see below. Slap on Rubber Band and Growl on Slate Roof were also narrowed (Slap to .45 of the knob at 1, Growl to .20) so their click at 1 is gone. (`PP_SET` in `presets_bass_lead` now splits the module kind at the last dot, so dotted kinds such as `env.adsr` work.)
+
+### Level of Tar Pit
+
+Stored sound: peak -13.8 dBFS, loudness -22.2 dB. Loudness is in line with the bank (Steel Toe -16.6, Acid Rain -20.4, Oatmeal -20.9, Spun Sugar -22.6, Pig Iron -22.5, Hot Wire -21.7, Rubber Band -21.4, Gutter -17.7, Low Tide -21.7). Only the peak is low: a sine has a low crest, so no change.
+
+### Default sound against the old patch (16 s clip, float, `presets_bass_lead clips`)
+
+Oatmeal and Spun Sugar are bit-identical; Tar Pit, Acid Rain, Hot Wire, Lantern, Low Tide differ by -125 dB or better (float rounding of the macro line); Gutter by -90.5 dB (the crusher's quantiser amplifies a rounding error). Changed on purpose by the click fix (attack times): Steel Toe -23 dB, Pig Iron -19 dB, Rubber Band -20 dB, Slate Roof -30 dB below the old signal (peaks about 0.2 to 2.3 dB lower), plus the Slate Roof crusher now fixed at 18 %. The other 12 presets are untouched (their patch logs were reverted: only timestamps differ).
 
 ## Tours
 
-`docs/presets/clips/macros-bass-lead/` (git-ignored): `<slug>-ab.mp3` per preset, old and new interleaved per macro slot, 6 s at 0, 4 s up, 6 s at 1, 4 s down, 1 s of silence between; `tours.txt` lists the start seconds. Rendered at 124 bpm (the phrases' grid). Listen first: **Steel Toe** (the clock duck, Weight and Squash change the pump), **Tar Pit** (Thump, Body and Slide are all new gestures on a sine), **Spun Sugar** (Shimmer and Vibrato).
+`docs/presets/clips/macros-bass-lead/` (git-ignored): `<slug>-tour.mp3` per preset: new macro 1 to 4 back to back, each 20 s (6 s at 0, 4 s up, 6 s at 1, 4 s down), 1 s of silence between, 84 s; `tours.txt` lists the start seconds. Rendered at 124 bpm. Tour mode loops the phrase at its own length (first to last hit, rounded up to whole bars) so the sound is continuous (before, it looped every 8 bars and most phrases left about 7 s of silence per clip). `macro_tour_ab.py` fails when a clip has a gap over 1 s under -45 dBFS after its first second (`--max-gap` to relax); with `--old-patches`/`--old-renders` it still writes old/new A/B tours. Listen first: **Steel Toe** (Weight and Squash change the pump), **Tar Pit** (Thump, Body and Slide are new gestures on a sine), **Spun Sugar** (Shimmer and Vibrato).
 
 ## Not done
 
-Presets 13 to 24 (second slice). The Steel Toe and Rubber Band clicks. Oatmeal's weak Tone and Pluck.
+Presets 13 to 24 (second slice). Acid Rain Space, Rubber Band Slap and Stab, Gutter Grit, Low Tide Tide and Swell, Oatmeal Pluck (see the table).

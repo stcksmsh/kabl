@@ -15,8 +15,9 @@
 //!
 //! Tour mode, for listening: `MACRO_TOUR_BPM=<bpm> macro_audit ... <slug>` (one preset per run, its
 //! stored tempo) skips the steps and writes only `sweep/<slug>-mK.wav`, 20 s: the macro held at 0
-//! for 6 s, up over 4 s, held at 1 for 6 s, down over 4 s. The phrase loops every 8 bars of `bpm`
-//! (counted from the 0.5 s clock start) so the keys stay on the grid for the whole 20 s.
+//! for 6 s, up over 4 s, held at 1 for 6 s, down over 4 s. The phrase loops at its own length
+//! rounded up to whole bars of `bpm` (counted from the 0.5 s clock start), so the keys stay on the
+//! grid and the sound is continuous for the whole 20 s.
 
 use std::path::Path;
 
@@ -288,8 +289,13 @@ fn main() {
             .collect();
         let hits = match tour_bpm() {
             Some(bpm) => {
-                // 8 bars of 4 beats from the 0.5 s clock start.
-                let period = 32.0 * 60.0 / bpm;
+                // The phrase loops at its own length rounded up to whole bars of 4 beats (so the
+                // keys stay on the grid from the 0.5 s clock start and the sound is continuous).
+                let bar = 4.0 * 60.0 / bpm;
+                let first = hits.iter().map(|h| h.0).fold(f32::MAX, f32::min);
+                let last = hits.iter().map(|h| h.0).fold(0.0f32, f32::max);
+                // (A phrase that ends just short of a bar line, 0.03 of a bar, fills that bar.)
+                let period = (((last - first) / bar - 0.03).ceil().max(1.0)) * bar;
                 (0..)
                     .map(|n| n as f32 * period)
                     .take_while(|o| *o < secs())

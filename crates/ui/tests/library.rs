@@ -334,14 +334,14 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "Acid Rain",
         "Bass",
         &["mono", "legato", "acid", "glide", "house", "techno"],
-        "A legato acid bass: a saw over a square sub into a resonant ladder filter that snaps on every note, with a short slide between overlapped notes. Play a sixteenth-note line; velocity accents the filter. Cutoff opens the filter, Squelch raises the resonance and the snap of every note, Slide sets how long the slide between notes takes, Space adds a dotted echo and a room.",
+        "A legato acid bass: a saw over a square sub into a resonant ladder filter that snaps on every note, with a short slide between overlapped notes. Play a sixteenth-note line; velocity accents the filter. Squelch opens the filter and raises the resonance, Accent goes from short clipped notes to long held ones, Slide sets how long the slide between notes takes, Space adds a dotted echo and a room.",
     ),
     (
         "presets/oatmeal",
         "Oatmeal",
         "Bass",
         &["mono", "clean", "round", "pop"],
-        "A clean, round pop bass: a triangle over a sine an octave down, a soft pluck in the low-pass and a light compressor. It sits under anything. Tone opens the filter, Pluck deepens and lengthens the filter snap on each note, Body trades the triangle for the sine an octave down, Squeeze clamps the compressor harder.",
+        "A clean, round pop bass: a triangle over a sine an octave down, a soft pluck in the low-pass and a light compressor. It sits under anything. Warmth adds a soft saturation, Pluck adds a filter snap and shortens each note, Throb fades in a slow tremolo, Squeeze clamps the compressor harder.",
     ),
     (
         "presets/spun-sugar",
@@ -362,7 +362,7 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "Hot Wire",
         "Lead",
         &["mono", "legato", "acid", "glide", "house", "techno"],
-        "A legato acid lead: a saw and a narrow pulse into a resonant ladder filter with velocity accents and a dotted echo. Play a sixteenth-note line and overlap notes to slide. Cutoff opens the filter, Squelch raises the resonance and the snap of every note, Wire sets a pulse-width sweep on the second oscillator, speeds it up and thickens the pulse, Space adds the echo and a room.",
+        "A legato acid lead: a saw and a narrow pulse into a resonant ladder filter with velocity accents and a dotted echo. Play a sixteenth-note line and overlap notes to slide. Squelch opens the filter and raises the resonance, Slide sets how long the slide between notes takes, Wire sets a pulse-width sweep on the second oscillator, speeds it up and thickens the pulse, Space adds the echo and a room.",
     ),
     (
         "presets/lantern",
@@ -376,14 +376,14 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "Rubber Band",
         "Bass",
         &["mono", "plucked", "slap", "funk", "disco"],
-        "A funky plucked bass: a narrow pulse over a saw an octave down, a fast filter slap on every note and a light compressor. Play 16th-note grooves; harder notes open the filter more. Tone opens the filter, Slap deepens and lengthens the filter snap on each note, Stab goes from short and dry to long and ringing, Body brings the saw an octave down forward of the pulse.",
+        "A funky plucked bass: a narrow pulse over a saw an octave down, a fast filter slap on every note and a light compressor. Play 16th-note grooves; harder notes open the filter more. Room adds a short slapback and room, Slap deepens and lengthens the filter snap on each note, Stab goes from short and dry to long and ringing, Body brings the saw an octave down forward of the pulse.",
     ),
     (
         "presets/slate-roof",
         "Slate Roof",
         "Bass",
         &["mono", "neuro", "unison", "distorted", "drum and bass"],
-        "A neuro bass for drum and bass: a four-voice saw stack against a detuned saw over a square sub, 14 dB of drive and a compressor. Play long half-time notes; the mod wheel opens the filter. Cutoff opens the filter, Growl fades in a rolling filter movement and speeds it up, Stack spreads the saw stack, Crush mixes in a bitcrusher and makes it coarser.",
+        "A neuro bass for drum and bass: a four-voice saw stack against a detuned saw over a square sub, 14 dB of drive and a compressor. Play long half-time notes; the mod wheel opens the filter. Cutoff opens the filter, Growl fades in a rolling filter movement and speeds it up, Stack spreads the saw stack, Room adds a tight room and slapback.",
     ),
     (
         "presets/gutter",
