@@ -8,6 +8,6 @@ tags = [
     "trap",
     "hip-hop",
 ]
-description = "A trap 808: a pure sine with a small pitch snap and a long, round body, sliding from note to note. Play long low notes and overlap them to slide. Thump sets how hard and how long the pitch snaps at the front of each note, Body lengthens the round tail, Dirt drives it so it speaks on small speakers, Slide sets how long the slide takes."
+description = "A trap 808: a pure sine with a small pitch snap and a long, round body, sliding from note to note. Play long low notes and overlap them to slide. Thump sets how hard the pitch snaps and how punchy the attack is at the front of each note (soft at 0, a click at 1), Body lengthens the round tail, Dirt drives it so it speaks on small speakers, Slide sets how long the slide takes."
 keys = true
 sequence = false

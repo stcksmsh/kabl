@@ -13,15 +13,15 @@ Where the old space macro (Room) did not matter for the patch, the echo and room
 |---|---|---|
 | Bite [.45] | filter opens from a dull thud to a bright bark, each note snaps harder | ladder cutoff 507 Hz to 5 kHz; filter-envelope depth .08 to .30 |
 | Weight [.60] | the sub grows and the saw steps back: a thin mid bass to a sub-heavy one | mixer: square sub .15 to .73, saw .75 to .42 |
-| Squash [.50] | the compressor clamps harder, flatter and denser | threshold -10 to -42 dB, makeup 6 to 20 dB |
-| Pump [.30] | the beat ducks the bass, deeper and for longer | duck depth 0 to -.60, duck decay 90 ms up |
+| Squash [.50] | the compressor goes from a slow, punchy squeeze to a fast, flat clamp (density more than a level drop) | threshold -18 to -34 dB, ratio 2 to 10, attack 25 to ~1 ms, makeup 6 to 20 dB |
+| Pump [.30] | the beat ducks the bass and it takes the whole beat to swell back. The duck is a one-sixteenth gate; the audible breathing is its release, which used to be 50 ms (so the dip was over before the off-beat stabs, and the old decay did nothing) | duck depth 0 to -.60 of the gain range, duck release ~30 to 170 ms |
 
 ### Tar Pit (808, sine with pitch snap, slides)
 | Macro | What you hear | What it moves |
 |---|---|---|
-| Thump [.50] | the kick at the front of each note: harder and longer | pitch-snap depth .25 to .75, snap decay 15 to 50 ms |
-| Body [.50] | a short boom to a long ringing tail, the triangle fills it | amp decay 600 to ~5000 ms, release 120 ms up, triangle level 0 to .30 |
-| Dirt [.35] | the sine gains harmonics and speaks on small speakers | drive 6 to 20 dB |
+| Thump [.30] | the front of each note: a soft swell at 0, a click and a pitch kick at 1 (the click is a choice now, not the default) | pitch-snap depth .35 to .80, snap decay 15 to ~55 ms, amp attack ~7 to ~3 ms |
+| Body [.50] | a short boom to a long ringing tail | amp decay 550 to ~5000 ms, release 120 ms up |
+| Dirt [.40] | a clean, warm sine to a gritty one that speaks on small speakers | drive 1.3 to 24 dB (12 dB stored) |
 | Slide [.80] | glide between overlapped notes: a quick step to a long swoop | glide time 40 ms to 2.4 s |
 
 ### Acid Rain (legato acid bass)
@@ -30,14 +30,14 @@ Where the old space macro (Room) did not matter for the patch, the echo and room
 | Squelch [.50] | the filter opens from a dark growl to a bright snarl and the resonance rises with it | cutoff 271 Hz to 4 kHz, resonance .20 to .61 |
 | Accent [.60] | envelope shape: short clipped notes to long held ones | amp decay 90 to ~600 ms, sustain .25 to 1, filter-envelope decay 80 to ~600 ms |
 | Slide [.40] | glide time between notes | 15 to ~380 ms |
-| Space [.25] | dotted echo and room | echo mix, room mix |
+| Space [.70] | the dotted echo repeats more and more (one repeat to a long wash); echo and room mix stay at the old stored level | echo feedback 0 to 64 % |
 (The old Drive is fixed at its old stored value.)
 
 ### Oatmeal (clean round pop bass)
 | Macro | What you hear | What it moves |
 |---|---|---|
 | Warmth [.20] | a soft saturation adds harmonics to the clean note (harmonics, not filtering: a triangle and a sine have little to filter) | drive 3 to ~21 dB |
-| Pluck [.50] | a filter snap at the front of each note and a shorter, clipped note | envelope depth 0 to .70, filter-envelope decay 60 to ~540 ms, amp decay 900 to ~140 ms |
+| Soften [0.00] | the pop of each note becomes a slower swell and a longer ring-out (articulation; the old Pluck snap stays fixed) | amp attack 3 to 40 ms, release 110 to 600 ms |
 | Throb [0.00] | a slow tremolo fades in (motion; off by default) | LFO 4.5 Hz on the output level, depth 0 to .08 of the gain range |
 | Squeeze [.40] | the light compressor clamps harder | threshold -8 to -43 dB, makeup 0 to 7.5 dB |
 (The old Tone stays fixed at its old stored cutoff, the old Body at its stored levels.)
@@ -78,7 +78,7 @@ Where the old space macro (Room) did not matter for the patch, the echo and room
 | Macro | What you hear | What it moves |
 |---|---|---|
 | Room [.20] | a short slapback and room around the pluck (space) | echo mix, room mix |
-| Slap [.73] | the filter snap of each note: deeper and longer | envelope depth 0 to .45, decay 40 to ~120 ms |
+| Slap [.40] | resonance on the filter snap of each note: a plain pop to a wah (the snap depth stays fixed) | ladder resonance .05 to .43 |
 | Stab [.50] | short and dry to long and ringing | amp decay 80 to 845 ms, sustain .10 to .60 |
 | Body [.50] | the saw an octave down comes forward of the pulse | saw .15 to .75, pulse .60 to .30 |
 
@@ -95,7 +95,7 @@ Where the old space macro (Room) did not matter for the patch, the echo and room
 | Macro | What you hear | What it moves |
 |---|---|---|
 | Bite [.45] | filter opens, the chug snaps harder | cutoff 430 Hz to 5 kHz, envelope depth .18 to .33 |
-| Grit [.65] | the drive climbs and the crusher bites into it | drive 21.8 to 36 dB, crusher mix 0 to 15 % |
+| Crush [.25] | the crusher bites into the saturated drive, coarser and coarser (digital grit; the old Grit drive stays fixed, it was saturated) | crusher mix 0 to 40 %, bits 9 to 4, downsample 1.3 to ~6 |
 | Octave [.30] | a buzzing pulse an octave up joins | pulse level 0 to .60 |
 | Squash [.50] | compressor clamps harder | threshold -12 to -44 dB, ratio 4 to 12, makeup 6 to 22 dB |
 
@@ -103,8 +103,8 @@ Where the old space macro (Room) did not matter for the patch, the echo and room
 | Macro | What you hear | What it moves |
 |---|---|---|
 | Tone [.45] | filter opens, the triangle an octave down comes forward | cutoff ~540 Hz to 5 kHz, triangle .10 to .43 |
-| Tide [.35] | a slow filter tide fades in and speeds up | LFO depth 0 to .30, rate .05 to ~1.2 Hz |
-| Swell [.30] | notes bloom slower and fade longer | attack 65 ms to 5 s, release 600 ms up |
+| Tide [.40] | a slow filter tide fades in, speeds up and resonates | LFO depth 0 to .26, rate ~.08 to .4 Hz, resonance .02 to .20 |
+| Swell [.30] | notes bloom slower and fade longer | attack 65 ms to 1.5 s, release 600 ms up |
 | Space [.60] | long echo and big room | echo mix, room mix |
 
 ## Checks (macro_audit with the combination check, #159; 8 steps per macro)
@@ -115,14 +115,12 @@ Flags that are left, honestly:
 
 | Preset | Flag | Note |
 |---|---|---|
-| Acid Rain | Space `jump` | The echo and room come in over a dry bass: the first step adds most of the change (unchanged space macro) |
-| Oatmeal | Pluck `weak` (0.4 dB); Warmth and Squeeze `cancel` as a pair | A triangle and a sine have almost nothing for a filter snap to bite: Pluck is mainly the shorter note. Warmth makes the note louder, Squeeze quieter |
-| Rubber Band | Slap `jump`, Stab `dead` | Slap and Stab move the note shape in a few steps; Stab changes the decay and sustain of notes that are short already |
-| Gutter | Grit `weak` | The drive is at 22 to 36 dB: the sound is saturated and the crusher adds little. Left |
-| Low Tide | Tide and Swell `jump` | Slow LFO and slow attack: the 10 s render window holds few cycles |
+| Oatmeal | Warmth and Squeeze `cancel` as a pair (7.2 dB against 11.0 dB for Warmth alone) | Both are strong alone (Warmth 12.5 dB, Squeeze 9.8 dB): Warmth makes the note louder and brighter, Squeeze quieter. Left |
+| Steel Toe | Pump `jump` (last steps 1.2 and 2.3 dB against a median .4), Squash and Pump `similar` (cos .86) | The duck deepens and lengthens together, so the breathing is mostly in the last third (5.2 dB at 1; measured per beat with a held note: about 10 dB dip at the old stored depth, deeper at 1). Both macros lower the level. Left: Pump is the audible gesture Kosta asked for |
+| Steel Toe | pair Squash+Pump `cancel` (7.5 dB against 12.1 dB for the larger single) | Both clamp the level. Left |
 | Tar Pit | tour: Body at 0 has a 1.25 s silent gap | The macro itself: a 600 ms tail between sparse 808 notes. Guard run with the default 1 s fails for this clip only |
 
-No `similar` pair is left (the matrix shows none over 0.8 in the 12). The combination table has no `click`, `peak` or `pileup` flag.
+Every other per-macro flag (`jump`, `dead`, `weak`, `similar`, `bad end`, `zipper`) is cleared in the last audit of all 12 presets, and the combination tables have no `click`, `peak` or `pileup` flag. How the last ones were evened out: Acid Rain Space moves the echo feedback (mix stays at the old level) instead of the dry-to-wet mix; Rubber Band Slap is the resonance on the snap, Stab is decay, sustain and release together; Gutter's old Grit drive was saturated, so the macro is now the crusher (mix, bits, downsample); Low Tide Tide adds a resonance rise and a gentler LFO range and Swell stops at a 1.5 s attack; Oatmeal's Pluck is replaced by Soften (attack and release).
 
 ### Clicks (the old Steel Toe 6.5 s and Rubber Band end-render clicks)
 
@@ -130,7 +128,7 @@ Cause in the patches, not the macros: a note that retriggers while the previous 
 
 ### Level of Tar Pit
 
-Stored sound: peak -13.8 dBFS, loudness -22.2 dB. Loudness is in line with the bank (Steel Toe -16.6, Acid Rain -20.4, Oatmeal -20.9, Spun Sugar -22.6, Pig Iron -22.5, Hot Wire -21.7, Rubber Band -21.4, Gutter -17.7, Low Tide -21.7). Only the peak is low: a sine has a low crest, so no change.
+The old stored sound was peak -13.8 dBFS, loudness -22.2 dB: in line with the bank by loudness (Steel Toe -16.6, Acid Rain -20.4, Oatmeal -20.9, Spun Sugar -22.6, Pig Iron -22.5, Hot Wire -21.7, Rubber Band -21.4, Gutter -17.7, Low Tide -21.7) but it sounded timid and clicked at every note start. Kosta heard it, so **the default of Tar Pit changed on purpose**: amp attack 1 to 6 ms and snap-envelope attack .5 to 3 ms (no click by default), triangle sub .15 to .30 and drive 11 to 12 dB (more body and presence), patch gain +5 dB. Now peak -12.2 dBFS, loudness -18.5 dB (`presets_bass_lead levels`), mid-bank. The click and punch moved to the Thump macro.
 
 ### Default sound against the old patch (16 s clip, float, `presets_bass_lead clips`)
 
@@ -142,4 +140,4 @@ Oatmeal and Spun Sugar are bit-identical; Tar Pit, Acid Rain, Hot Wire, Lantern,
 
 ## Not done
 
-Presets 13 to 24 (second slice). Acid Rain Space, Rubber Band Slap and Stab, Gutter Grit, Low Tide Tide and Swell, Oatmeal Pluck (see the table).
+Presets 13 to 24 (second slice).

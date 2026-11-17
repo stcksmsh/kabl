@@ -25,7 +25,7 @@
         "cc.m3": 22.0,
         "cc.m4": 23.0,
         "m1": 0.45,
-        "m2": 0.65,
+        "m2": 0.25,
         "m3": 0.3,
         "m4": 0.5,
         "pin.m1": 0.0,
@@ -98,7 +98,7 @@
         "y": 320.0
       },
       "params": {
-        "drive_db": 21.771431,
+        "drive_db": 31.02,
         "trim_db": -12.0
       }
     },
@@ -167,8 +167,8 @@
         "y": 620.0
       },
       "params": {
-        "bits": 8.0,
-        "downsample": 2.0,
+        "bits": 9.333333,
+        "downsample": 1.3867226,
         "mix": 0.0
       }
     },
@@ -516,24 +516,6 @@
       "from": {
         "Module": {
           "id": 2,
-          "port": "m2"
-        }
-      },
-      "to": {
-        "Param": {
-          "id": 7,
-          "param": "drive_db"
-        }
-      },
-      "params": {
-        "amount": 0.39523804
-      },
-      "steps": []
-    },
-    "19": {
-      "from": {
-        "Module": {
-          "id": 2,
           "port": "m3"
         }
       },
@@ -548,7 +530,7 @@
       },
       "steps": []
     },
-    "20": {
+    "19": {
       "from": {
         "Module": {
           "id": 12,
@@ -564,7 +546,7 @@
       "params": {},
       "steps": []
     },
-    "21": {
+    "20": {
       "from": {
         "Module": {
           "id": 2,
@@ -578,11 +560,47 @@
         }
       },
       "params": {
-        "amount": 0.15384616
+        "amount": 0.4
+      },
+      "steps": []
+    },
+    "21": {
+      "from": {
+        "Module": {
+          "id": 2,
+          "port": "m2"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 13,
+          "param": "bits"
+        }
+      },
+      "params": {
+        "amount": -0.35555542
       },
       "steps": []
     },
     "22": {
+      "from": {
+        "Module": {
+          "id": 2,
+          "port": "m2"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 13,
+          "param": "downsample"
+        }
+      },
+      "params": {
+        "amount": 0.3522139
+      },
+      "steps": []
+    },
+    "23": {
       "from": {
         "Module": {
           "id": 13,
@@ -598,7 +616,7 @@
       "params": {},
       "steps": []
     },
-    "23": {
+    "24": {
       "from": {
         "Module": {
           "id": 2,
@@ -616,7 +634,7 @@
       },
       "steps": []
     },
-    "24": {
+    "25": {
       "from": {
         "Module": {
           "id": 2,
@@ -634,7 +652,7 @@
       },
       "steps": []
     },
-    "25": {
+    "26": {
       "from": {
         "Module": {
           "id": 2,
@@ -652,7 +670,7 @@
       },
       "steps": []
     },
-    "26": {
+    "27": {
       "from": {
         "Module": {
           "id": 14,
@@ -668,7 +686,7 @@
       "params": {},
       "steps": []
     },
-    "27": {
+    "28": {
       "from": {
         "Module": {
           "id": 17,
@@ -684,7 +702,7 @@
       "params": {},
       "steps": []
     },
-    "29": {
+    "30": {
       "from": {
         "Module": {
           "id": 15,
@@ -700,7 +718,7 @@
       "params": {},
       "steps": []
     },
-    "30": {
+    "31": {
       "from": {
         "Module": {
           "id": 16,
@@ -720,7 +738,7 @@
   "labels": {
     "2": {
       "name.m1": "Bite",
-      "name.m2": "Grit",
+      "name.m2": "Crush",
       "name.m3": "Octave",
       "name.m4": "Squash"
     }

@@ -6,6 +6,6 @@ tags = [
     "round",
     "pop",
 ]
-description = "A clean, round pop bass: a triangle over a sine an octave down, a soft pluck in the low-pass and a light compressor. It sits under anything. Warmth adds a soft saturation, Pluck adds a filter snap and shortens each note, Throb fades in a slow tremolo, Squeeze clamps the compressor harder."
+description = "A clean, round pop bass: a triangle over a sine an octave down, a soft pluck in the low-pass and a light compressor. It sits under anything. Warmth adds a soft saturation, Soften turns the pop at the start of each note into a slow swell, Throb fades in a slow tremolo, Squeeze clamps the compressor harder."
 keys = true
 sequence = false

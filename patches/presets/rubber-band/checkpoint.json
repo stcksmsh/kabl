@@ -25,7 +25,7 @@
         "cc.m3": 22.0,
         "cc.m4": 23.0,
         "m1": 0.2,
-        "m2": 0.73,
+        "m2": 0.4,
         "m3": 0.5,
         "m4": 0.5,
         "pin.m1": 0.0,
@@ -95,7 +95,7 @@
       "params": {
         "cutoff_hz": 1182.8783,
         "drive_db": 2.0,
-        "resonance": 0.2
+        "resonance": 0.05
       }
     },
     "8": {
@@ -106,7 +106,7 @@
       },
       "params": {
         "attack_ms": 8.0,
-        "decay_ms": 40.0,
+        "decay_ms": 90.0,
         "release_ms": 60.0,
         "sustain": 0.05
       }
@@ -119,9 +119,9 @@
       },
       "params": {
         "attack_ms": 6.0,
-        "decay_ms": 80.0,
-        "release_ms": 70.0,
-        "sustain": 0.1
+        "decay_ms": 120.0,
+        "release_ms": 15.0,
+        "sustain": 0.2
       }
     },
     "10": {
@@ -448,7 +448,7 @@
         }
       },
       "params": {
-        "amount": 0.0015000105
+        "amount": 0.33
       },
       "steps": []
     },
@@ -460,13 +460,13 @@
         }
       },
       "to": {
-        "CableParam": {
-          "cable": 15,
-          "param": "amount"
+        "Param": {
+          "id": 7,
+          "param": "resonance"
         }
       },
       "params": {
-        "amount": 0.45
+        "amount": 0.375
       },
       "steps": []
     },
@@ -474,17 +474,17 @@
       "from": {
         "Module": {
           "id": 2,
-          "port": "m2"
+          "port": "m3"
         }
       },
       "to": {
         "Param": {
-          "id": 8,
+          "id": 9,
           "param": "decay_ms"
         }
       },
       "params": {
-        "amount": 0.09648832
+        "amount": 0.13431692
       },
       "steps": []
     },
@@ -498,11 +498,11 @@
       "to": {
         "Param": {
           "id": 9,
-          "param": "decay_ms"
+          "param": "sustain"
         }
       },
       "params": {
-        "amount": 0.2047534
+        "amount": 0.29999998
       },
       "steps": []
     },
@@ -516,11 +516,11 @@
       "to": {
         "Param": {
           "id": 9,
-          "param": "sustain"
+          "param": "release_ms"
         }
       },
       "params": {
-        "amount": 0.5
+        "amount": 0.26760268
       },
       "steps": []
     },
