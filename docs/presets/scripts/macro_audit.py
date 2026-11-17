@@ -28,6 +28,20 @@ within 40 dB of the peak). A phase change alone is 0.
   zipper     a CLICK in the sweep that the end renders do not have (audio_defects.clicks).
   duplicate  two macros of one preset move the same measures the same way (cosine of the change
              vectors over DUP_COS, both moving more than 1.5 dB), or drive the same module.param.
+
+Combination (from the combo/ renders: stored sound, every pair at 1, all at 1, all at 0; the
+others at their stored values; written to tables.md and audit.json under "_combo")
+  peak       the render peaks above PEAK_DB.
+  click      a click the stored sound does not have.
+  cancel     a pair at 1 changes the sound by less than CANCEL_RATIO of the larger single macro's
+             change (the larger one moves more than CANCEL_MIN_DB): one macro undoes the other.
+  pileup     a pair (or all four) at 1 is PILE_LOUD_DB louder than the louder single, or
+             PILE_BASE_DB louder than the stored sound, or its 2 kHz-up bands are PILE_TOP_DB
+             brighter than the brighter single's: the macros add up to something harsh.
+  silent     all at 0 is under SILENT_DB or 18 dB under the stored sound.
+  similar    the 4x4 matrix of cosines of the single-macro change vectors; a pair over
+             SIMILAR_COS (both moving more than 1.5 dB) is listed as too similar, a pair under
+             -(SIMILAR_COS + 0.1) as opposite.
 """
 import argparse, json, subprocess as sp, sys, tempfile
 from pathlib import Path
@@ -49,6 +63,12 @@ JUMP_DB = 1.5
 PEAK_DB = -1.0
 SILENT_DB = -45.0
 DUP_COS = 0.9
+SIMILAR_COS = 0.8  # two macros whose 0-to-1 change vectors point this much the same way (both over 1.5 dB)
+CANCEL_MIN_DB = 1.0  # a pair is only checked for cancelling when the larger single moves this much
+CANCEL_RATIO = 0.7  # cancel: the pair at 1 changes less than this fraction of the larger single's change
+PILE_LOUD_DB = 3.0  # pileup: the pair is this much louder than the louder single ...
+PILE_BASE_DB = 6.0  # ... or this much louder than the stored sound
+PILE_TOP_DB = 4.0  # ... or its 2 kHz-up bands are this much brighter than the brighter single's
 BANDS = [(None, 250), (250, 2000), (2000, 6000), (6000, None)]
 BAND_NAMES = ['low (<250 Hz)', 'mid (250 Hz-2 kHz)', 'upper (2-6 kHz)', 'air (>6 kHz)']
 LEG_FADE = 0.02  # s, fade at the join of tour clips
@@ -245,6 +265,96 @@ def audit_macro(slug, entry, renders):
     }
 
 
+def top(m):
+    """Brightness: mean of the upper (2-6 kHz) and air (>6 kHz) band levels."""
+    return (m['bands'][2] + m['bands'][3]) / 2
+
+
+def combination(slug, res, renders):
+    """The macros against each other. Reads combo/<slug>-{base,all0,all1,mA-mB}.wav, the others at
+    their stored values. None when the renders are not there (an older run)."""
+    cdir = renders / 'combo'
+    if not (cdir / f'{slug}-base.wav').exists():
+        return None
+    ks = [r['macro'] for r in res]
+    base = read(cdir / f'{slug}-base.wav')
+    mb, tb = measures(base), tob(base)
+    base_clicks = set(round(t, 1) for t in ad.clicks(base, SR))
+    # one macro at 1 alone is its last step render
+    single = {}
+    for r in res:
+        x = read(renders / 'steps' / f"{slug}-m{r['macro']}-s{STEPS - 1}.wav")
+        single[r['macro']] = {'m': measures(x), 'change': rel(base, x, tb, None)}
+    cases = {}
+    for a in ks:
+        for b in ks:
+            if a < b:
+                cases[f'm{a}+m{b}'] = ([a, b], read(cdir / f'{slug}-m{a}-m{b}.wav'))
+    cases['all 1'] = (ks, read(cdir / f'{slug}-all1.wav'))
+    cases['all 0'] = (ks, read(cdir / f'{slug}-all0.wav'))
+    out = {'base': {'peak': mb['peak'], 'loud': mb['loud'], 'top': top(mb)}, 'cases': {}}
+    for name, (members, x) in cases.items():
+        m = measures(x)
+        flags, notes = [], []
+        if m['peak'] > PEAK_DB:
+            flags.append('peak')
+            notes.append(f"peak {m['peak']:.1f} dBFS")
+        new_clicks = [t for t in ad.clicks(x, SR) if round(t, 1) not in base_clicks]
+        if new_clicks:
+            flags.append('click')
+            notes.append('click at ' + ', '.join(f'{t:.1f}' for t in new_clicks) + ' s')
+        change = rel(base, x, tb, None)
+        if name != 'all 0':
+            big = max(single[k]['change'] for k in members)
+            ref_loud = max(single[k]['m']['loud'] for k in members)
+            ref_top = max(top(single[k]['m']) for k in members)
+            if big >= CANCEL_MIN_DB and change < CANCEL_RATIO * big:
+                flags.append('cancel')
+                notes.append(f"changes {change:.1f} dB, the larger single {big:.1f} dB")
+            if m['loud'] > ref_loud + PILE_LOUD_DB or m['loud'] > mb['loud'] + PILE_BASE_DB:
+                flags.append('pileup')
+                notes.append(f"loudness {m['loud']:.1f} dB, the louder single {ref_loud:.1f}, stored {mb['loud']:.1f}")
+            elif top(m) > ref_top + PILE_TOP_DB:
+                flags.append('pileup')
+                notes.append(f"top bands {top(m):.1f} dB, the brighter single {ref_top:.1f}")
+        elif m['loud'] < SILENT_DB or m['loud'] < mb['loud'] - 18:
+            flags.append('silent')
+            notes.append(f"loudness {m['loud']:.1f} dB against stored {mb['loud']:.1f}")
+        out['cases'][name] = {
+            'peak': m['peak'], 'loud': m['loud'], 'top': top(m), 'change': change,
+            'flags': flags, 'notes': notes,
+        }
+    names = {r['macro']: r['name'] for r in res}
+    mat = [[float('nan')] * len(ks) for _ in ks]
+    similar = []
+    for i, a in enumerate(res):
+        for j, b in enumerate(res):
+            u, v = np.array(a['vec']), np.array(b['vec'])
+            mat[i][j] = float(u @ v / max(np.linalg.norm(u) * np.linalg.norm(v), 1e-9))
+            if j > i and mat[i][j] > SIMILAR_COS and np.abs(u).max() > 1.5 and np.abs(v).max() > 1.5:
+                similar.append(f"{names[a['macro']]} and {names[b['macro']]}: cosine {mat[i][j]:.2f}")
+            if j > i and mat[i][j] < -SIMILAR_COS - 0.1 and np.abs(u).max() > 1.5 and np.abs(v).max() > 1.5:
+                similar.append(f"{names[a['macro']]} and {names[b['macro']]}: opposite, cosine {mat[i][j]:.2f} (one undoes the other)")
+    out['similarity'] = {'macros': [names[k] for k in ks], 'cos': mat, 'similar': similar}
+    return out
+
+
+def combo_md(slug, c):
+    lines = [f"Combination, {slug} (stored sound: peak {c['base']['peak']:.1f} dBFS, loudness {c['base']['loud']:.1f} dB, top bands {c['base']['top']:.1f} dB)\n",
+             '| case | peak | loudness | top bands | change vs stored | flags |', '|---|---|---|---|---|---|']
+    for n, v in c['cases'].items():
+        lines.append(f"| {n} | {v['peak']:.1f} | {v['loud']:.1f} | {v['top']:.1f} | {v['change']:.1f} dB | "
+                     f"{', '.join(v['flags']) or '-'}{''.join('; ' + x for x in v['notes'])} |")
+    s = c['similarity']
+    lines += ['', 'Similarity of the single-macro changes (cosine of the 0 to 1 change vectors)\n',
+              '| | ' + ' | '.join(s['macros']) + ' |', '|---|' + '---|' * len(s['macros'])]
+    for n, row in zip(s['macros'], s['cos']):
+        lines.append(f'| {n} | ' + ' | '.join(f'{v:.2f}' for v in row) + ' |')
+    lines.append('')
+    lines.append('Too similar: ' + ('; '.join(s['similar']) if s['similar'] else '-') + '\n')
+    return lines
+
+
 def encode(x, path, kbps):
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as d:
@@ -315,6 +425,9 @@ def main():
                         z.setdefault('overlap', []).append(
                             f"{o['name']} (m{o['macro']}): " + (f"both drive {', '.join(shared)}" if shared else f"same change, cosine {cos:.2f}"))
         result[slug] = res
+        combo = combination(slug, res, renders)
+        if combo:
+            result.setdefault('_combo', {})[slug] = combo
         if a.clips:
             cdir = Path(a.clips)
             clips = []
@@ -345,6 +458,8 @@ def main():
             more += ''.join(f"; overlaps {x}" for x in r.get('overlap', []))
             md.append(f"| m{r['macro']} {r['name']} | {'<br>'.join(r['routes'])} | {r['words']}. {r['half_db']:.2f} / {r['ends_db']:.2f} dB; waveform {r['wave_db']:.1f} dB | {flags}{more} | **{v[0]}**: {v[1]} |")
         md.append('')
+        if slug in result.get('_combo', {}):
+            md += combo_md(slug, result['_combo'][slug])
     (out / 'tables.md').write_text('\n'.join(md))
     if a.doc:
         flagged = [(s, r) for s in a.slugs for r in result[s] if verdicts.get(f"{s}/m{r['macro']}", ['ok'])[0] != 'ok']

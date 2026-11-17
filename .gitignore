@@ -27,3 +27,5 @@ docs/**/*.mov
 docs/**/*.flac
 # Macro pilot 2 tours (offline renders for listening; paths in the PR)
 /docs/presets/clips/macro-pilot-2/
+# Macro redesign of the rest of Groove: A/B tours
+/docs/presets/clips/macros-groove/

@@ -10,6 +10,8 @@
 //!   `sweep/<slug>-mK.wav`    the phrase while the macro moves 0 to 1 to 0 over 8 s (1 s to 9 s),
 //!                            10 s, the macro ramped at runtime like a hand on the knob.
 //! The other macros stay at their stored values. Any category works; nothing here is groove-only.
+//! It also writes the combination renders (`combo/<slug>-base|all0|all1|mA-mB.wav`: the stored
+//! sound, every macro at 0, every macro at 1, every pair at 1 with the rest stored).
 //!
 //! Tour mode, for listening: `MACRO_TOUR_BPM=<bpm> macro_audit ... <slug>` (one preset per run, its
 //! stored tempo) skips the steps and writes only `sweep/<slug>-mK.wav`, 20 s: the macro held at 0
@@ -210,6 +212,46 @@ fn describe(state: &PatchState, p: &PortRef) -> String {
     }
 }
 
+/// The combination renders (the python side reads them): `combo/<slug>-base.wav` (every macro at
+/// its stored value), `-all0` and `-all1` (every pinned macro at 0, at 1), and
+/// `combo/<slug>-mA-mB.wav` for every pair at 1 with the others at their stored values.
+fn combinations(state: &PatchState, knob: ModuleId, hits: &[Hit], slug: &str, out: &Path) {
+    let pinned: Vec<usize> = (1..=8)
+        .filter(|k| {
+            state.modules[&knob]
+                .params
+                .contains_key(&format!("pin.m{k}"))
+        })
+        .collect();
+    let with = |set: &[(usize, f32)]| {
+        let mut st = state.clone();
+        for &(k, v) in set {
+            st.modules
+                .get_mut(&knob)
+                .unwrap()
+                .params
+                .insert(format!("m{k}"), v);
+        }
+        render(&st, hits, None)
+    };
+    std::fs::create_dir_all(out.join("combo")).unwrap();
+    let mut jobs: Vec<(String, Vec<(usize, f32)>)> = vec![
+        ("base".into(), vec![]),
+        ("all0".into(), pinned.iter().map(|&k| (k, 0.0)).collect()),
+        ("all1".into(), pinned.iter().map(|&k| (k, 1.0)).collect()),
+    ];
+    for (i, &a) in pinned.iter().enumerate() {
+        for &b in &pinned[i + 1..] {
+            jobs.push((format!("m{a}-m{b}"), vec![(a, 1.0), (b, 1.0)]));
+        }
+    }
+    for (name, set) in jobs {
+        let (l, r) = with(&set);
+        write_wav(&out.join(format!("combo/{slug}-{name}.wav")), &l, &r);
+    }
+    println!("{slug} combinations");
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 4 {
@@ -290,6 +332,9 @@ fn main() {
             let (l, r) = render(&st, &hits, Some((knob, index)));
             write_wav(&out.join(format!("sweep/{slug}-m{k}.wav")), &l, &r);
             println!("{slug} m{k}");
+        }
+        if tour_bpm().is_none() {
+            combinations(&state, knob, &hits, &slug, out);
         }
         std::fs::write(
             out.join(format!("{slug}.json")),
