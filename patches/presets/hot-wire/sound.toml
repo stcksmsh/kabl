@@ -8,6 +8,6 @@ tags = [
     "house",
     "techno",
 ]
-description = "A legato acid lead: a saw and a narrow pulse into a resonant ladder filter with velocity accents and a dotted echo. Play a sixteenth-note line and overlap notes to slide. Cutoff opens the filter, Squelch raises the resonance, Space adds the echo and a room, Pulse sets a slow pulse-width sweep on the second oscillator."
+description = "A legato acid lead: a saw and a narrow pulse into a resonant ladder filter with velocity accents and a dotted echo. Play a sixteenth-note line and overlap notes to slide. Cutoff opens the filter, Squelch raises the resonance and the snap of every note, Wire sets a pulse-width sweep on the second oscillator, speeds it up and thickens the pulse, Space adds the echo and a room."
 keys = true
 sequence = false

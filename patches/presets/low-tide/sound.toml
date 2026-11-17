@@ -8,6 +8,6 @@ tags = [
     "ambient",
     "cinematic",
 ]
-description = "An ambient sub bass that swells in: a sine over a triangle an octave down, a slow filter tide, chorus, a long echo and a big room. Play long, slow notes; they glide into each other. Tone opens the filter, Tide fades in a slow filter movement, Swell lengthens the fade-in of each note, Space is the echo and the room."
+description = "An ambient sub bass that swells in: a sine over a triangle an octave down, a slow filter tide, chorus, a long echo and a big room. Play long, slow notes; they glide into each other. Tone opens the filter and brings in the triangle, Tide fades in a slow filter movement and speeds it up, Swell lengthens the fade-in and the fade-out of each note, Space is the echo and the room."
 keys = true
 sequence = false

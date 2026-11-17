@@ -9,7 +9,7 @@
       "params": {
         "bend": 2.0,
         "glide": 2.0,
-        "glide_ms": 55.0,
+        "glide_ms": 15.0,
         "mode": 2.0
       }
     },
@@ -26,8 +26,8 @@
         "cc.m4": 23.0,
         "m1": 0.5,
         "m2": 0.35,
-        "m3": 0.25,
-        "m4": 0.4,
+        "m3": 0.4,
+        "m4": 0.25,
         "pin.m1": 0.0,
         "pin.m2": 1.0,
         "pin.m3": 2.0,
@@ -82,7 +82,7 @@
         "y": 320.0
       },
       "params": {
-        "drive_db": 7.0,
+        "drive_db": 14.200001,
         "trim_db": -3.5
       }
     },
@@ -93,9 +93,9 @@
         "y": 320.0
       },
       "params": {
-        "cutoff_hz": 220.0,
-        "drive_db": 2.0,
-        "resonance": 0.28
+        "cutoff_hz": 270.88538,
+        "drive_db": 0.0,
+        "resonance": 0.25
       }
     },
     "8": {
@@ -394,7 +394,7 @@
         }
       },
       "params": {
-        "amount": 0.16
+        "amount": 0.089999996
       },
       "steps": []
     },
@@ -448,7 +448,7 @@
         }
       },
       "params": {
-        "amount": 0.45
+        "amount": 0.38975817
       },
       "steps": []
     },
@@ -466,7 +466,7 @@
         }
       },
       "params": {
-        "amount": 0.35
+        "amount": 0.4357143
       },
       "steps": []
     },
@@ -474,21 +474,57 @@
       "from": {
         "Module": {
           "id": 2,
-          "port": "m4"
+          "port": "m2"
         }
       },
       "to": {
         "Param": {
-          "id": 6,
+          "id": 7,
           "param": "drive_db"
         }
       },
       "params": {
-        "amount": 0.5
+        "amount": 0.23809525
       },
       "steps": []
     },
     "18": {
+      "from": {
+        "Module": {
+          "id": 2,
+          "port": "m2"
+        }
+      },
+      "to": {
+        "CableParam": {
+          "cable": 12,
+          "param": "amount"
+        }
+      },
+      "params": {
+        "amount": 0.2
+      },
+      "steps": []
+    },
+    "19": {
+      "from": {
+        "Module": {
+          "id": 2,
+          "port": "m3"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 1,
+          "param": "glide_ms"
+        }
+      },
+      "params": {
+        "amount": 0.50777596
+      },
+      "steps": []
+    },
+    "20": {
       "from": {
         "Module": {
           "id": 11,
@@ -504,7 +540,7 @@
       "params": {},
       "steps": []
     },
-    "19": {
+    "21": {
       "from": {
         "Module": {
           "id": 12,
@@ -520,7 +556,7 @@
       "params": {},
       "steps": []
     },
-    "20": {
+    "22": {
       "from": {
         "Module": {
           "id": 15,
@@ -536,7 +572,7 @@
       "params": {},
       "steps": []
     },
-    "22": {
+    "24": {
       "from": {
         "Module": {
           "id": 13,
@@ -552,11 +588,11 @@
       "params": {},
       "steps": []
     },
-    "23": {
+    "25": {
       "from": {
         "Module": {
           "id": 2,
-          "port": "m3"
+          "port": "m4"
         }
       },
       "to": {
@@ -570,11 +606,11 @@
       },
       "steps": []
     },
-    "24": {
+    "26": {
       "from": {
         "Module": {
           "id": 2,
-          "port": "m3"
+          "port": "m4"
         }
       },
       "to": {
@@ -588,7 +624,7 @@
       },
       "steps": []
     },
-    "25": {
+    "27": {
       "from": {
         "Module": {
           "id": 14,
@@ -609,8 +645,8 @@
     "2": {
       "name.m1": "Cutoff",
       "name.m2": "Squelch",
-      "name.m3": "Space",
-      "name.m4": "Drive"
+      "name.m3": "Slide",
+      "name.m4": "Space"
     }
   }
 }

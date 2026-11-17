@@ -203,8 +203,14 @@ fn space_tail(
     }
     r.stereo(src, verb);
     r.wire(delay, "out", verb, "in");
-    r.route(knob, mac, delay, "mix", echo_max);
-    r.route(knob, mac, verb, "mix", room_max);
+    if mac.is_empty() {
+        // A fixed wet amount: no macro drives the space.
+        r.e.set_param(delay, "mix", echo_max);
+        r.e.set_param(verb, "mix", room_max);
+    } else {
+        r.route(knob, mac, delay, "mix", echo_max);
+        r.route(knob, mac, verb, "mix", room_max);
+    }
     verb
 }
 
@@ -647,6 +653,10 @@ struct Voice {
     mono: ModuleId,
     cur: Option<ModuleId>,
     n: usize,
+    /// The filter envelope's route into the cutoff (its amount is the recipe's `fenv_amt`).
+    fenv_cable: kabl_core::CableId,
+    /// The recipe's `fenv_amt`, for `snap`.
+    fenv_amt: f32,
 }
 
 impl Voice {
@@ -728,11 +738,13 @@ impl Voice {
         r.wire(lad, "out", vca, "in");
         r.wire(aenv, "out", vca, "cv");
         r.wire(vca, "out", trim, "in");
-        r.route(fenv, "out", lad, "cutoff_hz", c.fenv_amt);
+        let fenv_cable = r.e.connect_route(jack(fenv, "out"), lad, "cutoff_hz");
+        r.e.set_route_amount(fenv_cable, c.fenv_amt, true);
         if c.wheel_amt > 0.0 {
             r.route(m, "wheel", lad, "cutoff_hz", c.wheel_amt);
         }
         Voice {
+            fenv_cable,
             r,
             knob,
             m,
@@ -745,7 +757,49 @@ impl Voice {
             mono: trim,
             cur: None,
             n: c.macros.len(),
+            fenv_amt: c.fenv_amt,
         }
+    }
+
+    /// Macro `m` (stored at `stored`) scales how far the filter envelope sweeps the cutoff, by
+    /// `depth` of the knob's travel from 0 to 1; the recipe's `fenv_amt` is what is left at the
+    /// stored position, so the stored sound is unchanged.
+    fn snap(&mut self, m: usize, stored: f32, depth: f32) {
+        let base = self.fenv_amt - stored * depth;
+        assert!((-1.0..=1.0).contains(&base) && (-1.0..=1.0).contains(&(base + depth)));
+        self.r.e.set_route_amount(self.fenv_cable, base, true);
+        let d = self
+            .r
+            .e
+            .connect_cable_route(jack(self.knob, &format!("m{m}")), self.fenv_cable, "amount")
+            .expect("a route has a depth");
+        self.r.e.set_route_amount(d, depth, true);
+    }
+
+    /// As `depth_route`, for a source whose stored depth is `at_stored`: macro `m` scales the
+    /// route from `at_stored - stored * depth` at 0 to that plus `depth` at 1.
+    #[allow(clippy::too_many_arguments)]
+    fn depth_keep(
+        &mut self,
+        a: ModuleId,
+        ap: &str,
+        b: ModuleId,
+        param: &str,
+        m: usize,
+        stored: f32,
+        depth: f32,
+        at_stored: f32,
+    ) {
+        let base = at_stored - stored * depth;
+        assert!((-1.0..=1.0).contains(&base) && (-1.0..=1.0).contains(&(base + depth)));
+        let cable = self.r.e.connect_route(jack(a, ap), b, param);
+        self.r.e.set_route_amount(cable, base, true);
+        let d = self
+            .r
+            .e
+            .connect_cable_route(jack(self.knob, &format!("m{m}")), cable, "amount")
+            .expect("a route has a depth");
+        self.r.e.set_route_amount(d, depth, true);
     }
 
     /// A stereo stage (`in_l`/`in_r` to `left`/`right`) after the last one.
@@ -794,12 +848,13 @@ impl Voice {
     }
 
     /// A slow LFO on every oscillator's fine tune, its depth on macro `mac`.
-    fn vibrato(&mut self, mac: &str, rate_hz: f32, depth: f32) {
+    fn vibrato(&mut self, mac: &str, rate_hz: f32, depth: f32) -> ModuleId {
         let lfo = self.r.add("lfo", &[("rate_hz", rate_hz)]);
         for o in self.oscs.clone() {
             self.r
                 .depth_route(lfo, "out", o, "fine", self.knob, mac, depth);
         }
+        lfo
     }
 }
 
@@ -829,17 +884,88 @@ fn echo(time_ms: f32, feedback: f32, tone_hz: f32) -> [(&'static str, f32); 4] {
     ]
 }
 
+// ---- macro helpers ----------------------------------------------------------------------------
+
+fn param_of(kind: &str, param: &str) -> kabl_modules::ParamInfo {
+    *kabl_modules::registry::info_for(kind)
+        .and_then(|i| i.params.iter().find(|p| p.name == param))
+        .unwrap_or_else(|| panic!("{kind}.{param}"))
+}
+
+/// What an old route of `amount` from a macro at `stored` leaves on a param with base `base`.
+fn routed(kind: &str, param: &str, base: f32, amount: f32, stored: f32) -> f32 {
+    let i = param_of(kind, param);
+    i.from_norm(i.to_norm(base) + stored * amount)
+}
+
+/// Macro `m` (1-based) takes `param` from `lo` at 0 to `d` at its stored position, and on in the
+/// same line to 1. The stored sound is exactly `d`; panics when the line leaves the param's range.
+#[allow(clippy::too_many_arguments)]
+fn span(
+    v: &mut Voice,
+    m: usize,
+    stored: f32,
+    id: ModuleId,
+    kind: &str,
+    param: &str,
+    lo: f32,
+    d: f32,
+) {
+    let i = param_of(kind, param);
+    let (n0, nd) = (i.to_norm(lo), i.to_norm(d));
+    let amount = (nd - n0) / stored;
+    assert!(
+        n0 + amount <= 1.0 + 1e-3 && n0 + amount >= -1e-3,
+        "{kind}.{param}: macro {m} runs out of range ({})",
+        n0 + amount
+    );
+    v.r.e.set_param(id, param, lo);
+    v.r.route(v.knob, &format!("m{m}"), id, param, amount);
+}
+
+/// As `span`, with the value `hi` at macro 1 given and the value at 0 derived.
+#[allow(clippy::too_many_arguments)]
+fn span_hi(
+    v: &mut Voice,
+    m: usize,
+    stored: f32,
+    id: ModuleId,
+    kind: &str,
+    param: &str,
+    d: f32,
+    hi: f32,
+) {
+    let i = param_of(kind, param);
+    let (nd, n1) = (i.to_norm(d), i.to_norm(hi));
+    let n0 = (nd - stored * n1) / (1.0 - stored);
+    assert!(
+        (-1e-3..=1.0 + 1e-3).contains(&n0),
+        "{kind}.{param}: macro {m} starts out of range ({n0})"
+    );
+    span(
+        v,
+        m,
+        stored,
+        id,
+        kind,
+        param,
+        i.from_norm(n0.clamp(0.0, 1.0)),
+        d,
+    );
+}
+
 // ---- group 1 --------------------------------------------------------------------------------
 
 /// A silent beat duck from the host clock: `clock.div` into a fast-decay `env.adsr` that pulls the
 /// voice's gain stage down, depth on macro 3. No drum is built in; it stays still until Run.
-fn clock_duck(v: &mut Voice, clock: ModuleId, decay_ms: f32, depth: f32) {
+fn clock_duck(v: &mut Voice, clock: ModuleId, decay_ms: f32, depth: f32, mac: &str) -> ModuleId {
     let beat = v.r.add("clock.div", &[("div", 4.0)]);
     v.r.wire(clock, "gate", beat, "clock");
     v.r.wire(clock, "reset", beat, "reset");
     let env = v.r.add("env.adsr", &adsr(3.0, decay_ms, 0.0, 50.0));
     v.r.wire(beat, "gate", env, "gate");
-    v.r.depth_route(env, "out", v.mono, "gain_db", v.knob, "m3", depth);
+    v.r.depth_route(env, "out", v.mono, "gain_db", v.knob, mac, depth);
+    env
 }
 
 /// Steel Toe: a blunt compressed bass that ducks on every beat of the host clock.
@@ -848,9 +974,9 @@ fn steel_toe() -> Rack {
         bass: true,
         macros: &[
             ("Bite", 0.45),
-            ("Grit", 0.60),
-            ("Pump", 0.60),
-            ("Room", 0.30),
+            ("Weight", 0.60),
+            ("Squash", 0.50),
+            ("Pump", 0.30),
         ],
         midi: [1.0, 0.0, 120.0],
         oscs: vec![osc(2.0, 0.0, 0.55).unison(2.0, 8.0), osc(3.0, -1.0, 0.5)],
@@ -862,13 +988,45 @@ fn steel_toe() -> Rack {
         aenv: [2.0, 180.0, 0.8, 45.0],
         trim_db: 11.0,
     });
-    v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.5);
-    v.r.route(v.knob, "m2", v.drive, "drive_db", 0.35);
-    v.stage("compressor", &compressor(-26.0, 6.0, 2.0, 90.0, 13.0));
+    let (lad, mix) = (v.lad, v.mix);
+    // Bite: the filter opens and each note snaps harder (tone and articulation).
+    let cut = routed("filter.ladder", "cutoff_hz", 300.0, 0.5, 0.45);
+    span_hi(
+        &mut v,
+        1,
+        0.45,
+        lad,
+        "filter.ladder",
+        "cutoff_hz",
+        cut,
+        5000.0,
+    );
+    v.snap(1, 0.45, 0.15);
+    // Weight: the square sub grows and the saw gives way (the low-end balance).
+    span(&mut v, 2, 0.6, mix, "mixer", "level2", 0.15, 0.5);
+    span(&mut v, 2, 0.6, mix, "mixer", "level1", 0.75, 0.55);
+    // The old Grit stays where it was stored.
+    let drive = routed("drive", "drive_db", 18.0, 0.35, 0.6);
+    v.r.e.set_param(v.drive, "drive_db", drive);
+    let comp = v.stage("compressor", &compressor(-26.0, 6.0, 2.0, 90.0, 13.0));
+    // Squash: the compressor clamps harder and the makeup follows.
+    span(
+        &mut v,
+        3,
+        0.5,
+        comp,
+        "compressor",
+        "threshold_db",
+        -10.0,
+        -26.0,
+    );
+    span(&mut v, 3, 0.5, comp, "compressor", "makeup_db", 6.0, 13.0);
     let clock = v.r.add("clock", &[("bpm", 124.0), ("swing", 25.0)]);
-    clock_duck(&mut v, clock, 200.0, -0.30);
+    // Pump: the beat ducks the bass, deeper and longer.
+    let env = clock_duck(&mut v, clock, 200.0, -0.60, "m4");
+    span(&mut v, 4, 0.3, env, "env.adsr", "decay_ms", 90.0, 200.0);
     v.finish(
-        "m4",
+        "",
         &[
             ("sync", 3.0),
             ("time_ms", 360.0),
@@ -876,8 +1034,8 @@ fn steel_toe() -> Rack {
             ("mix", 0.0),
             ("tone_hz", 3500.0),
         ],
-        0.22,
-        (0.45, 0.16),
+        0.3 * 0.22 * 100.0,
+        (0.45, 0.3 * 0.16 * 100.0),
         Some(clock),
     )
 }
@@ -887,10 +1045,10 @@ fn tar_pit() -> Rack {
     let mut v = Voice::new(Recipe {
         bass: true,
         macros: &[
-            ("Tone", 0.50),
+            ("Thump", 0.50),
+            ("Body", 0.50),
             ("Dirt", 0.35),
-            ("Slide", 0.50),
-            ("Room", 0.20),
+            ("Slide", 0.80),
         ],
         midi: [1.0, 1.0, 80.0],
         oscs: vec![osc(0.0, -1.0, 0.7), osc(1.0, -1.0, 0.15)],
@@ -902,13 +1060,31 @@ fn tar_pit() -> Rack {
         aenv: [1.0, 2200.0, 0.75, 260.0],
         trim_db: 8.0,
     });
-    // The thump: the fast envelope kicks the pitch up a little and lets it fall.
-    v.r.route(v.fenv, "out", v.oscs[0], "fine", 0.5);
-    v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.5);
-    v.r.route(v.knob, "m2", v.drive, "drive_db", 0.4);
-    v.r.route(v.knob, "m3", v.m, "glide_ms", 0.8);
+    let (fenv, aenv, mix, drive, m, o0) = (v.fenv, v.aenv, v.mix, v.drive, v.m, v.oscs[0]);
+    // The cutoff stays where the old Tone was stored.
+    let cut = routed("filter.ladder", "cutoff_hz", 400.0, 0.5, 0.5);
+    v.r.e.set_param(v.lad, "cutoff_hz", cut);
+    // Thump: the fast envelope kicks the pitch up and lets it fall: how far, and how long.
+    v.depth_keep(fenv, "out", o0, "fine", 1, 0.5, 0.5, 0.5);
+    span(&mut v, 1, 0.5, fenv, "env.adsr", "decay_ms", 15.0, 40.0);
+    // Body: the round tail gets longer and the triangle under the sine fills it.
+    span(&mut v, 2, 0.5, aenv, "env.adsr", "decay_ms", 600.0, 2200.0);
+    span(&mut v, 2, 0.5, aenv, "env.adsr", "release_ms", 120.0, 260.0);
+    span(&mut v, 2, 0.5, mix, "mixer", "level2", 0.0, 0.15);
+    // Dirt: harder drive.
+    let d = routed("drive", "drive_db", 6.0, 0.4, 0.35);
+    span(&mut v, 3, 0.35, drive, "drive", "drive_db", 6.0, d);
+    // Slide: how long the glide between notes takes.
+    let glide = routed("midi.in", "glide_ms", 80.0, 0.8, 0.5);
+    span(&mut v, 4, 0.8, m, "midi.in", "glide_ms", 40.0, glide);
     v.stage("compressor", &compressor(-24.0, 3.0, 8.0, 120.0, 3.0));
-    v.finish("m4", &echo(90.0, 15.0, 3000.0), 0.12, (0.5, 0.14), None)
+    v.finish(
+        "",
+        &echo(90.0, 15.0, 3000.0),
+        0.2 * 0.12 * 100.0,
+        (0.5, 0.2 * 0.14 * 100.0),
+        None,
+    )
 }
 
 /// Acid Rain: a legato acid bass, a saw over a square sub, a resonant ladder with accents.
@@ -918,8 +1094,8 @@ fn acid_rain() -> Rack {
         macros: &[
             ("Cutoff", 0.50),
             ("Squelch", 0.35),
+            ("Slide", 0.40),
             ("Space", 0.25),
-            ("Drive", 0.40),
         ],
         midi: [2.0, 2.0, 55.0],
         oscs: vec![osc(2.0, 0.0, 0.6), osc(3.0, -1.0, 0.3)],
@@ -931,12 +1107,41 @@ fn acid_rain() -> Rack {
         aenv: [3.0, 250.0, 0.7, 40.0],
         trim_db: 9.0,
     });
+    let (lad, m) = (v.lad, v.m);
     v.r.route(v.m, "velocity", v.lad, "cutoff_hz", 0.03);
-    v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.45);
-    v.r.route(v.knob, "m2", v.lad, "resonance", 0.35);
-    v.r.route(v.knob, "m4", v.drive, "drive_db", 0.5);
+    // Cutoff: the filter opens from a dark growl to a bright snarl.
+    let cut = routed("filter.ladder", "cutoff_hz", 220.0, 0.45, 0.5);
+    span_hi(
+        &mut v,
+        1,
+        0.5,
+        lad,
+        "filter.ladder",
+        "cutoff_hz",
+        cut,
+        4000.0,
+    );
+    // Squelch: the resonance rises and every note snaps harder.
+    let res = routed("filter.ladder", "resonance", 0.28, 0.35, 0.35);
+    span(
+        &mut v,
+        2,
+        0.35,
+        lad,
+        "filter.ladder",
+        "resonance",
+        0.25,
+        res,
+    );
+    span(&mut v, 2, 0.35, lad, "filter.ladder", "drive_db", 0.0, 2.0);
+    v.snap(2, 0.35, 0.2);
+    // Slide: how long the glide between overlapped notes takes.
+    span(&mut v, 3, 0.4, m, "midi.in", "glide_ms", 15.0, 55.0);
+    // The old Drive stays where it was stored.
+    let drive = routed("drive", "drive_db", 7.0, 0.5, 0.4);
+    v.r.e.set_param(v.drive, "drive_db", drive);
     v.stage("compressor", &compressor(-24.0, 3.0, 5.0, 100.0, 4.0));
-    v.finish("m3", &echo(352.0, 45.0, 4000.0), 0.4, (0.9, 0.2), None)
+    v.finish("m4", &echo(352.0, 45.0, 4000.0), 0.4, (0.9, 0.2), None)
 }
 
 /// Oatmeal: a clean round pop bass, a triangle over a sine, a soft pluck in the filter.
@@ -944,10 +1149,10 @@ fn soft_shoe() -> Rack {
     let mut v = Voice::new(Recipe {
         bass: true,
         macros: &[
-            ("Tone", 0.50),
+            ("Tone", 0.80),
             ("Pluck", 0.50),
-            ("Grit", 0.20),
-            ("Room", 0.25),
+            ("Body", 0.50),
+            ("Squeeze", 0.40),
         ],
         midi: [1.0, 0.0, 120.0],
         oscs: vec![osc(1.0, 0.0, 0.5), osc(0.0, -1.0, 0.6)],
@@ -959,11 +1164,48 @@ fn soft_shoe() -> Rack {
         aenv: [3.0, 350.0, 0.7, 110.0],
         trim_db: 9.5,
     });
-    v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.5);
-    v.r.depth_route(v.fenv, "out", v.lad, "cutoff_hz", v.knob, "m2", 0.7);
-    v.r.route(v.knob, "m3", v.drive, "drive_db", 0.5);
-    v.stage("compressor", &compressor(-22.0, 3.0, 10.0, 120.0, 3.0));
-    v.finish("m4", &echo(110.0, 20.0, 3500.0), 0.12, (0.6, 0.2), None)
+    let (lad, mix, fenv) = (v.lad, v.mix, v.fenv);
+    // Tone: the low-pass opens from muffled to bright.
+    let cut = routed("filter.ladder", "cutoff_hz", 500.0, 0.5, 0.5);
+    span_hi(
+        &mut v,
+        1,
+        0.8,
+        lad,
+        "filter.ladder",
+        "cutoff_hz",
+        cut,
+        4000.0,
+    );
+    // Pluck: each note starts with a filter snap, and the snap gets longer.
+    v.depth_keep(fenv, "out", lad, "cutoff_hz", 2, 0.5, 0.7, 0.35);
+    span(&mut v, 2, 0.5, fenv, "env.adsr", "decay_ms", 60.0, 180.0);
+    // Body: the sine an octave down grows against the triangle (hollow to full).
+    span(&mut v, 3, 0.5, mix, "mixer", "level2", 0.3, 0.6);
+    span(&mut v, 3, 0.5, mix, "mixer", "level1", 0.7, 0.5);
+    // The old Grit stays where it was stored.
+    let drive = routed("drive", "drive_db", 3.0, 0.5, 0.2);
+    v.r.e.set_param(v.drive, "drive_db", drive);
+    // Squeeze: the compressor clamps harder and the makeup follows.
+    let comp = v.stage("compressor", &compressor(-22.0, 3.0, 10.0, 120.0, 3.0));
+    span(
+        &mut v,
+        4,
+        0.4,
+        comp,
+        "compressor",
+        "threshold_db",
+        -8.0,
+        -22.0,
+    );
+    span(&mut v, 4, 0.4, comp, "compressor", "makeup_db", 0.0, 3.0);
+    v.finish(
+        "",
+        &echo(110.0, 20.0, 3500.0),
+        0.25 * 0.12 * 100.0,
+        (0.6, 0.25 * 0.2 * 100.0),
+        None,
+    )
 }
 
 /// Spun Sugar: a smooth singing pop lead, a detuned saw stack over a triangle, chorus.
@@ -971,10 +1213,10 @@ fn satin_ribbon() -> Rack {
     let mut v = Voice::new(Recipe {
         bass: false,
         macros: &[
-            ("Tone", 0.55),
-            ("Edge", 0.20),
-            ("Space", 0.50),
+            ("Tone", 0.80),
             ("Vibrato", 0.35),
+            ("Shimmer", 0.40),
+            ("Space", 0.50),
         ],
         midi: [2.0, 2.0, 60.0],
         oscs: vec![
@@ -989,16 +1231,36 @@ fn satin_ribbon() -> Rack {
         aenv: [8.0, 200.0, 0.8, 260.0],
         trim_db: 11.0,
     });
+    let (lad, o0) = (v.lad, v.oscs[0]);
     v.r.route(v.m, "velocity", v.lad, "cutoff_hz", 0.10);
-    v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.4);
-    v.r.route(v.knob, "m2", v.drive, "drive_db", 0.45);
-    v.vibrato("m4", 5.5, 0.1);
-    v.stage(
+    // Tone: the filter opens from a soft vowel to a bright singing edge.
+    let cut = routed("filter.ladder", "cutoff_hz", 1600.0, 0.4, 0.55);
+    span_hi(
+        &mut v,
+        1,
+        0.8,
+        lad,
+        "filter.ladder",
+        "cutoff_hz",
+        cut,
+        12000.0,
+    );
+    // The old Edge stays where it was stored.
+    let drive = routed("drive", "drive_db", 3.0, 0.45, 0.2);
+    v.r.e.set_param(v.drive, "drive_db", drive);
+    // Vibrato: a gentle vibrato fades in, and it speeds up as it deepens.
+    let lfo = v.vibrato("m2", 5.5, 0.1);
+    span(&mut v, 2, 0.35, lfo, "lfo", "rate_hz", 3.5, 5.5);
+    // Shimmer: the chorus widens and the saw stack spreads (a lone voice to a choir).
+    span(&mut v, 3, 0.4, o0, "osc.va", "detune", 4.0, 10.0);
+    let chorus = v.stage(
         "chorus",
         &[("rate_hz", 0.5), ("depth", 40.0), ("mix", 30.0)],
     );
+    span(&mut v, 3, 0.4, chorus, "chorus", "mix", 8.0, 30.0);
+    span(&mut v, 3, 0.4, chorus, "chorus", "depth", 20.0, 40.0);
     v.stage("compressor", &compressor(-24.0, 2.0, 15.0, 150.0, 2.0));
-    v.finish("m3", &echo(375.0, 38.0, 4500.0), 0.3, (2.2, 0.3), None)
+    v.finish("m4", &echo(375.0, 38.0, 4500.0), 0.3, (2.2, 0.3), None)
 }
 
 /// Pig Iron: a hard, crushed, hard-retriggered lead, a pulse and a saw into heavy drive.
@@ -1006,10 +1268,10 @@ fn rust_belt() -> Rack {
     let mut v = Voice::new(Recipe {
         bass: false,
         macros: &[
-            ("Cutoff", 0.50),
-            ("Grit", 0.60),
+            ("Bite", 0.50),
+            ("Weld", 0.50),
             ("Crush", 0.50),
-            ("Room", 0.25),
+            ("Length", 0.60),
         ],
         midi: [1.0, 0.0, 120.0],
         oscs: vec![osc(3.0, 0.0, 0.5).pw(35.0), osc(2.0, 0.0, 0.45).fine(7.0)],
@@ -1021,15 +1283,44 @@ fn rust_belt() -> Rack {
         aenv: [1.0, 150.0, 0.8, 50.0],
         trim_db: 8.0,
     });
-    v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.5);
-    v.r.route(v.knob, "m2", v.drive, "drive_db", 0.35);
+    let (lad, aenv, (o0, o1)) = (v.lad, v.aenv, (v.oscs[0], v.oscs[1]));
+    // Bite: the filter opens and each note snaps harder.
+    let cut = routed("filter.ladder", "cutoff_hz", 900.0, 0.5, 0.5);
+    span_hi(
+        &mut v,
+        1,
+        0.5,
+        lad,
+        "filter.ladder",
+        "cutoff_hz",
+        cut,
+        12000.0,
+    );
+    v.snap(1, 0.5, 0.2);
+    // Weld: the saw drifts against the pulse and the pulse thins (a fat weld to a thin whine).
+    span(&mut v, 2, 0.5, o1, "osc.va", "fine", 0.0, 7.0);
+    span(&mut v, 2, 0.5, o0, "osc.va", "pw", 50.0, 35.0);
+    // The old Grit stays where it was stored.
+    let drive = routed("drive", "drive_db", 16.0, 0.35, 0.6);
+    v.r.e.set_param(v.drive, "drive_db", drive);
+    // Crush: the digital edge comes in, and the crush gets coarser as it does.
     let crush = v.stage(
         "bitcrusher",
         &[("bits", 7.0), ("downsample", 3.0), ("mix", 0.0)],
     );
     v.r.route(v.knob, "m3", crush, "mix", 0.7);
+    span_hi(&mut v, 3, 0.5, crush, "bitcrusher", "bits", 7.0, 4.0);
     v.stage("compressor", &compressor(-26.0, 6.0, 2.0, 80.0, 7.0));
-    v.finish("m4", &echo(110.0, 20.0, 3000.0), 0.25, (0.4, 0.15), None)
+    // Length: the note holds its level longer (a stab to a held blare).
+    span_hi(&mut v, 4, 0.6, aenv, "env.adsr", "sustain", 0.8, 1.0);
+    span(&mut v, 4, 0.6, aenv, "env.adsr", "release_ms", 20.0, 50.0);
+    v.finish(
+        "",
+        &echo(110.0, 20.0, 3000.0),
+        0.25 * 0.25 * 100.0,
+        (0.4, 0.25 * 0.15 * 100.0),
+        None,
+    )
 }
 
 /// Hot Wire: a legato acid lead, a saw and a narrow pulse, a resonant ladder, a dotted echo.
@@ -1038,9 +1329,9 @@ fn hot_wire() -> Rack {
         bass: false,
         macros: &[
             ("Cutoff", 0.50),
-            ("Squelch", 0.35),
+            ("Squelch", 0.50),
+            ("Wire", 0.30),
             ("Space", 0.40),
-            ("Pulse", 0.30),
         ],
         midi: [2.0, 2.0, 45.0],
         oscs: vec![osc(2.0, 0.0, 0.6), osc(3.0, 0.0, 0.3).pw(40.0).fine(4.0)],
@@ -1052,13 +1343,32 @@ fn hot_wire() -> Rack {
         aenv: [3.0, 250.0, 0.75, 120.0],
         trim_db: 12.0,
     });
+    let (lad, mix, o1) = (v.lad, v.mix, v.oscs[1]);
     v.r.route(v.m, "velocity", v.lad, "cutoff_hz", 0.05);
-    v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.4);
-    v.r.route(v.knob, "m2", v.lad, "resonance", 0.38);
+    // Cutoff: the filter opens from a closed growl to a bright scream.
+    let cut = routed("filter.ladder", "cutoff_hz", 600.0, 0.4, 0.5);
+    span_hi(
+        &mut v,
+        1,
+        0.5,
+        lad,
+        "filter.ladder",
+        "cutoff_hz",
+        cut,
+        9000.0,
+    );
+    // Squelch: the resonance rises and every note snaps harder.
+    let res = routed("filter.ladder", "resonance", 0.32, 0.38, 0.35);
+    span(&mut v, 2, 0.5, lad, "filter.ladder", "resonance", 0.2, res);
+    span(&mut v, 2, 0.5, lad, "filter.ladder", "drive_db", 0.0, 2.0);
+    v.snap(2, 0.5, 0.2);
+    // Wire: the pulse sweeps in, faster, and the pulse oscillator thickens under the saw.
     let pwm = v.r.add("lfo", &[("rate_hz", 0.7)]);
-    v.r.depth_route(pwm, "out", v.oscs[1], "pw", v.knob, "m4", 0.35);
+    v.depth_keep(pwm, "out", o1, "pw", 3, 0.3, 0.35, 0.105);
+    span(&mut v, 3, 0.3, pwm, "lfo", "rate_hz", 0.3, 0.7);
+    span(&mut v, 3, 0.3, mix, "mixer", "level2", 0.15, 0.3);
     v.stage("compressor", &compressor(-24.0, 3.0, 5.0, 100.0, 4.0));
-    v.finish("m3", &echo(352.0, 45.0, 4500.0), 0.4, (1.0, 0.2), None)
+    v.finish("m4", &echo(352.0, 45.0, 4500.0), 0.4, (1.0, 0.2), None)
 }
 
 /// Lantern: a soft ambient lead that swells in, a triangle stack and a sine an octave up.
@@ -1066,10 +1376,10 @@ fn paper_crane() -> Rack {
     let mut v = Voice::new(Recipe {
         bass: false,
         macros: &[
-            ("Tone", 0.50),
+            ("Glow", 0.50),
             ("Swell", 0.40),
+            ("Drift", 0.30),
             ("Space", 0.65),
-            ("Vibrato", 0.30),
         ],
         midi: [2.0, 2.0, 140.0],
         oscs: vec![osc(1.0, 0.0, 0.45).unison(2.0, 6.0), osc(0.0, 1.0, 0.2)],
@@ -1081,15 +1391,44 @@ fn paper_crane() -> Rack {
         aenv: [180.0, 400.0, 0.8, 900.0],
         trim_db: 14.0,
     });
-    v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.45);
-    v.r.route(v.knob, "m2", v.aenv, "attack_ms", 0.45);
-    v.vibrato("m4", 4.8, 0.08);
-    v.stage(
+    let (lad, aenv, mix) = (v.lad, v.aenv, v.mix);
+    // Glow: the filter opens and the sine an octave up comes forward.
+    let cut = routed("filter.ladder", "cutoff_hz", 900.0, 0.45, 0.5);
+    span_hi(
+        &mut v,
+        1,
+        0.5,
+        lad,
+        "filter.ladder",
+        "cutoff_hz",
+        cut,
+        12000.0,
+    );
+    span(&mut v, 1, 0.5, mix, "mixer", "level2", 0.05, 0.2);
+    // Swell: each note takes longer to bloom and longer to fade.
+    let attack = routed("env.adsr", "attack_ms", 180.0, 0.45, 0.4);
+    span_hi(
+        &mut v,
+        2,
+        0.4,
+        aenv,
+        "env.adsr",
+        "attack_ms",
+        attack,
+        5000.0,
+    );
+    span(&mut v, 2, 0.4, aenv, "env.adsr", "release_ms", 500.0, 900.0);
+    // Drift: a slow vibrato fades in, the chorus swims wider and slower.
+    let lfo = v.vibrato("m3", 4.8, 0.08);
+    span(&mut v, 3, 0.3, lfo, "lfo", "rate_hz", 3.2, 4.8);
+    let chorus = v.stage(
         "chorus",
         &[("rate_hz", 0.3), ("depth", 35.0), ("mix", 40.0)],
     );
+    span(&mut v, 3, 0.3, chorus, "chorus", "depth", 15.0, 35.0);
+    span(&mut v, 3, 0.3, chorus, "chorus", "rate_hz", 0.1, 0.3);
     v.stage("compressor", &compressor(-24.0, 2.0, 20.0, 200.0, 2.0));
-    v.finish("m3", &echo(480.0, 50.0, 4000.0), 0.55, (6.0, 0.6), None)
+    v.finish("m4", &echo(480.0, 50.0, 4000.0), 0.55, (6.0, 0.6), None)
 }
 
 // ---- group 2 --------------------------------------------------------------------------------
@@ -1101,8 +1440,8 @@ fn rubber_band() -> Rack {
         macros: &[
             ("Tone", 0.50),
             ("Slap", 0.55),
-            ("Grit", 0.20),
-            ("Room", 0.20),
+            ("Stab", 0.50),
+            ("Body", 0.50),
         ],
         midi: [1.0, 0.0, 120.0],
         oscs: vec![osc(3.0, 0.0, 0.45).pw(30.0), osc(2.0, -1.0, 0.45)],
@@ -1114,12 +1453,40 @@ fn rubber_band() -> Rack {
         aenv: [2.0, 260.0, 0.35, 70.0],
         trim_db: 9.0,
     });
+    let (lad, fenv, aenv, mix) = (v.lad, v.fenv, v.aenv, v.mix);
     v.r.route(v.m, "velocity", v.lad, "cutoff_hz", 0.1);
-    v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.45);
-    v.r.depth_route(v.fenv, "out", v.lad, "cutoff_hz", v.knob, "m2", 0.6);
-    v.r.route(v.knob, "m3", v.drive, "drive_db", 0.5);
+    // Tone: the low-pass opens from a thud to a bright pop.
+    let cut = routed("filter.ladder", "cutoff_hz", 250.0, 0.45, 0.5);
+    span_hi(
+        &mut v,
+        1,
+        0.5,
+        lad,
+        "filter.ladder",
+        "cutoff_hz",
+        cut,
+        4000.0,
+    );
+    // Slap: the filter snap on every note, how deep and how long.
+    v.depth_keep(fenv, "out", lad, "cutoff_hz", 2, 0.55, 0.6, 0.33);
+    span(&mut v, 2, 0.55, fenv, "env.adsr", "decay_ms", 40.0, 90.0);
+    // Stab: short and dry to long and ringing.
+    span(&mut v, 3, 0.5, aenv, "env.adsr", "decay_ms", 80.0, 260.0);
+    span(&mut v, 3, 0.5, aenv, "env.adsr", "sustain", 0.1, 0.35);
+    // Body: the saw an octave down comes forward and the pulse steps back.
+    span(&mut v, 4, 0.5, mix, "mixer", "level2", 0.15, 0.45);
+    span(&mut v, 4, 0.5, mix, "mixer", "level1", 0.6, 0.45);
+    // The old Grit stays where it was stored.
+    let drive = routed("drive", "drive_db", 6.0, 0.5, 0.2);
+    v.r.e.set_param(v.drive, "drive_db", drive);
     v.stage("compressor", &compressor(-22.0, 4.0, 6.0, 90.0, 5.0));
-    v.finish("m4", &echo(120.0, 18.0, 3500.0), 0.12, (0.5, 0.15), None)
+    v.finish(
+        "",
+        &echo(120.0, 18.0, 3500.0),
+        0.2 * 0.12 * 100.0,
+        (0.5, 0.2 * 0.15 * 100.0),
+        None,
+    )
 }
 
 /// Slate Roof: a neuro bass, a unison saw stack against a detuned saw over a sub, with a growl.
@@ -1129,8 +1496,8 @@ fn slate_roof() -> Rack {
         macros: &[
             ("Cutoff", 0.45),
             ("Growl", 0.35),
+            ("Stack", 0.50),
             ("Crush", 0.20),
-            ("Room", 0.20),
         ],
         midi: [1.0, 0.0, 120.0],
         oscs: vec![
@@ -1146,16 +1513,50 @@ fn slate_roof() -> Rack {
         aenv: [3.0, 200.0, 0.85, 50.0],
         trim_db: 9.0,
     });
-    v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.45);
+    let (lad, (o0, o1)) = (v.lad, (v.oscs[0], v.oscs[1]));
+    // Cutoff: the filter opens from a closed rumble to a bright snarl.
+    let cut = routed("filter.ladder", "cutoff_hz", 260.0, 0.45, 0.45);
+    span_hi(
+        &mut v,
+        1,
+        0.45,
+        lad,
+        "filter.ladder",
+        "cutoff_hz",
+        cut,
+        4000.0,
+    );
+    // Growl: the filter rolls faster and deeper, and the resonance rises.
     let growl = v.r.add("lfo", &[("rate_hz", 3.2)]);
-    v.r.depth_route(growl, "out", v.lad, "cutoff_hz", v.knob, "m2", 0.25);
+    v.depth_keep(growl, "out", lad, "cutoff_hz", 2, 0.35, 0.25, 0.0875);
+    span(&mut v, 2, 0.35, growl, "lfo", "rate_hz", 1.2, 3.2);
+    span(
+        &mut v,
+        2,
+        0.35,
+        lad,
+        "filter.ladder",
+        "resonance",
+        0.15,
+        0.22,
+    );
+    // Stack: the saw stack spreads and the second saw drifts (a tight stack to a wall).
+    span(&mut v, 3, 0.5, o0, "osc.va", "detune", 8.0, 30.0);
+    span(&mut v, 3, 0.5, o1, "osc.va", "fine", 2.0, 8.0);
+    // Crush: the digital edge comes in.
     let crush = v.stage(
         "bitcrusher",
         &[("bits", 6.0), ("downsample", 4.0), ("mix", 0.0)],
     );
-    v.r.route(v.knob, "m3", crush, "mix", 0.9);
+    v.r.route(v.knob, "m4", crush, "mix", 0.9);
     v.stage("compressor", &compressor(-24.0, 6.0, 3.0, 90.0, 6.0));
-    v.finish("m4", &echo(100.0, 18.0, 3500.0), 0.12, (0.4, 0.12), None)
+    v.finish(
+        "",
+        &echo(100.0, 18.0, 3500.0),
+        0.2 * 0.12 * 100.0,
+        (0.4, 0.2 * 0.12 * 100.0),
+        None,
+    )
 }
 
 /// Gutter: a dirty mid bass for French touch, a saw and a sub into 24 dB of drive, an octave pulse.
@@ -1166,7 +1567,7 @@ fn gutter() -> Rack {
             ("Bite", 0.45),
             ("Grit", 0.65),
             ("Octave", 0.30),
-            ("Room", 0.25),
+            ("Squash", 0.50),
         ],
         midi: [1.0, 0.0, 120.0],
         oscs: vec![
@@ -1182,15 +1583,51 @@ fn gutter() -> Rack {
         aenv: [2.0, 150.0, 0.8, 40.0],
         trim_db: 7.5,
     });
-    v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.45);
-    v.r.route(v.knob, "m2", v.drive, "drive_db", 0.3);
+    let (lad, drive) = (v.lad, v.drive);
+    // Bite: the filter opens and each note snaps harder.
+    let cut = routed("filter.ladder", "cutoff_hz", 320.0, 0.45, 0.45);
+    span_hi(
+        &mut v,
+        1,
+        0.45,
+        lad,
+        "filter.ladder",
+        "cutoff_hz",
+        cut,
+        5000.0,
+    );
+    v.snap(1, 0.45, 0.15);
+    // Grit: the drive climbs and the crusher bites into it.
+    let d = routed("drive", "drive_db", 24.0, 0.3, 0.65);
+    span_hi(&mut v, 2, 0.65, drive, "drive", "drive_db", d, 36.0);
     v.r.route(v.knob, "m3", v.mix, "level3", 0.6);
-    v.stage(
+    let crush = v.stage(
         "bitcrusher",
         &[("bits", 8.0), ("downsample", 2.0), ("mix", 10.0)],
     );
-    v.stage("compressor", &compressor(-28.0, 8.0, 1.0, 80.0, 14.0));
-    v.finish("m4", &echo(95.0, 20.0, 3500.0), 0.22, (0.4, 0.16), None)
+    span(&mut v, 2, 0.65, crush, "bitcrusher", "mix", 0.0, 10.0);
+    span(&mut v, 2, 0.65, lad, "filter.ladder", "drive_db", 2.0, 10.0);
+    // Squash: the compressor clamps harder and harder and the makeup follows.
+    let comp = v.stage("compressor", &compressor(-28.0, 8.0, 1.0, 80.0, 14.0));
+    span(
+        &mut v,
+        4,
+        0.5,
+        comp,
+        "compressor",
+        "threshold_db",
+        -12.0,
+        -28.0,
+    );
+    span(&mut v, 4, 0.5, comp, "compressor", "ratio", 4.0, 8.0);
+    span(&mut v, 4, 0.5, comp, "compressor", "makeup_db", 6.0, 14.0);
+    v.finish(
+        "",
+        &echo(95.0, 20.0, 3500.0),
+        0.25 * 0.22 * 100.0,
+        (0.4, 0.25 * 0.16 * 100.0),
+        None,
+    )
 }
 
 /// Low Tide: an ambient sub, a sine over a triangle, a slow swell and a slow tide in the filter.
@@ -1213,10 +1650,46 @@ fn low_tide() -> Rack {
         aenv: [60.0, 500.0, 0.9, 1200.0],
         trim_db: 14.0,
     });
-    v.r.route(v.knob, "m1", v.lad, "cutoff_hz", 0.45);
+    let (lad, aenv, mix) = (v.lad, v.aenv, v.mix);
+    // Tone: the filter opens and the triangle an octave down comes forward.
+    let cut = routed("filter.ladder", "cutoff_hz", 350.0, 0.45, 0.45);
+    span_hi(
+        &mut v,
+        1,
+        0.45,
+        lad,
+        "filter.ladder",
+        "cutoff_hz",
+        cut,
+        5000.0,
+    );
+    span(&mut v, 1, 0.45, mix, "mixer", "level2", 0.1, 0.25);
+    // Tide: a slow filter tide comes in, and it gets faster as it deepens.
     let tide = v.r.add("lfo", &[("rate_hz", 0.15)]);
-    v.r.depth_route(tide, "out", v.lad, "cutoff_hz", v.knob, "m2", 0.3);
-    v.r.route(v.knob, "m3", v.aenv, "attack_ms", 0.4);
+    v.depth_keep(tide, "out", lad, "cutoff_hz", 2, 0.35, 0.3, 0.105);
+    span(&mut v, 2, 0.35, tide, "lfo", "rate_hz", 0.05, 0.15);
+    // Swell: each note takes longer to bloom and longer to fade.
+    let attack = routed("env.adsr", "attack_ms", 60.0, 0.4, 0.3);
+    span_hi(
+        &mut v,
+        3,
+        0.3,
+        aenv,
+        "env.adsr",
+        "attack_ms",
+        attack,
+        5000.0,
+    );
+    span(
+        &mut v,
+        3,
+        0.3,
+        aenv,
+        "env.adsr",
+        "release_ms",
+        600.0,
+        1200.0,
+    );
     v.stage(
         "chorus",
         &[("rate_hz", 0.2), ("depth", 30.0), ("mix", 25.0)],
@@ -1314,7 +1787,7 @@ fn rail_yard() -> Rack {
     v.r.route(v.knob, "m2", v.drive, "drive_db", 0.4);
     v.stage("compressor", &compressor(-24.0, 4.0, 3.0, 90.0, 6.0));
     let clock = v.r.add("clock", &[("bpm", 124.0), ("swing", 20.0)]);
-    clock_duck(&mut v, clock, 200.0, -0.30);
+    clock_duck(&mut v, clock, 200.0, -0.30, "m3");
     v.finish(
         "m4",
         &[
@@ -1764,8 +2237,8 @@ fn presets() -> Vec<Preset> {
             name: "Steel Toe",
             category: "Bass",
             tags: &["mono", "distorted", "compressed", "sidechain", "124bpm", "french touch", "signature"],
-            description: "A blunt mono bass for French touch: two saws over a square sub, 18 dB of drive and a compressor squeezing it flat, then ducked on every beat by a silent envelope on the host clock (no drum is built in). Press Run to start the clock, then play short off-beat notes; the mod wheel opens the filter. Bite opens the filter, Grit pushes the drive, Pump sets how hard the beat ducks the bass, Room adds a tempo-synced slapback and a tight room.",
-            listen: "The bass snapping shut on every beat and swelling back between beats; Pump at 0 plays the bass flat, at 1 it pumps hard. Silent until Run.",
+            description: "A blunt mono bass for French touch: two saws over a square sub, 18 dB of drive and a compressor squeezing it flat, then ducked on every beat by a silent envelope on the host clock (no drum is built in). Press Run to start the clock, then play short off-beat notes; the mod wheel opens the filter. Bite opens the filter and sharpens the snap of every note, Weight trades the saw for the square sub, Squash clamps the compressor harder, Pump sets how hard and how long the beat ducks the bass.",
+            listen: "The bass snapping shut on every beat and swelling back between beats; Pump at 0 plays the bass flat, at 1 it pumps hard. Weight up for a heavier sub, Squash up for a flatter, denser bass. Silent until Run.",
             build: steel_toe,
             group: 1,
             phrase: steel_phrase,
@@ -1776,8 +2249,8 @@ fn presets() -> Vec<Preset> {
             name: "Tar Pit",
             category: "Bass",
             tags: &["mono", "808", "sub", "glide", "trap", "hip-hop"],
-            description: "A trap 808: a pure sine with a small pitch snap and a long, round body, sliding from note to note. Play long low notes and overlap them to slide. Tone opens the low-pass, Dirt drives it so it speaks on small speakers, Slide sets how long the slide takes, Room adds a short slapback and room.",
-            listen: "The thump on each attack, the long sine body, and the slide between notes; Dirt up makes it grit on small speakers.",
+            description: "A trap 808: a pure sine with a small pitch snap and a long, round body, sliding from note to note. Play long low notes and overlap them to slide. Thump sets how hard and how long the pitch snaps at the front of each note, Body lengthens the round tail, Dirt drives it so it speaks on small speakers, Slide sets how long the slide takes.",
+            listen: "The thump on each attack, the long sine body, and the slide between notes; Thump up for a harder kick, Dirt up makes it grit on small speakers.",
             build: tar_pit,
             group: 1,
             phrase: tar_phrase,
@@ -1788,8 +2261,8 @@ fn presets() -> Vec<Preset> {
             name: "Acid Rain",
             category: "Bass",
             tags: &["mono", "legato", "acid", "glide", "house", "techno"],
-            description: "A legato acid bass: a saw over a square sub into a resonant ladder filter that snaps on every note, with a short slide between overlapped notes. Play a sixteenth-note line; velocity accents the filter. Cutoff opens the filter, Squelch raises the resonance, Space adds a dotted echo and a room, Drive pushes the drive stage.",
-            listen: "The filter snapping on each note and the slides between overlapped ones; Squelch up for the acid bite.",
+            description: "A legato acid bass: a saw over a square sub into a resonant ladder filter that snaps on every note, with a short slide between overlapped notes. Play a sixteenth-note line; velocity accents the filter. Cutoff opens the filter, Squelch raises the resonance and the snap of every note, Slide sets how long the slide between notes takes, Space adds a dotted echo and a room.",
+            listen: "The filter snapping on each note and the slides between overlapped ones; Squelch up for the acid bite, Slide up for long swoops.",
             build: acid_rain,
             group: 1,
             phrase: acid_phrase,
@@ -1800,8 +2273,8 @@ fn presets() -> Vec<Preset> {
             name: "Oatmeal",
             category: "Bass",
             tags: &["mono", "clean", "round", "pop"],
-            description: "A clean, round pop bass: a triangle over a sine an octave down, a soft pluck in the low-pass and a light compressor. It sits under anything. Tone opens the filter, Pluck deepens the filter snap on each note, Grit adds a little drive, Room adds a short room and slapback.",
-            listen: "The round, clean low end; Pluck up adds a snap at the front of each note.",
+            description: "A clean, round pop bass: a triangle over a sine an octave down, a soft pluck in the low-pass and a light compressor. It sits under anything. Tone opens the filter, Pluck deepens and lengthens the filter snap on each note, Body trades the triangle for the sine an octave down, Squeeze clamps the compressor harder.",
+            listen: "The round, clean low end; Pluck up adds a snap at the front of each note, Body up for a rounder, deeper note.",
             build: soft_shoe,
             group: 1,
             phrase: shoe_phrase,
@@ -1812,8 +2285,8 @@ fn presets() -> Vec<Preset> {
             name: "Spun Sugar",
             category: "Lead",
             tags: &["mono", "legato", "smooth", "chorus", "pop"],
-            description: "A smooth, vocal pop lead: a detuned saw stack over a triangle, a ladder filter that opens with velocity, light chorus and a dotted echo. Play legato; notes glide. Tone brightens, Edge adds drive, Space adds the echo and a room, Vibrato fades in a gentle vibrato.",
-            listen: "The even, vocal tone and the glide between overlapped notes; raise Vibrato for the long notes.",
+            description: "A smooth, vocal pop lead: a detuned saw stack over a triangle, a ladder filter that opens with velocity, light chorus and a dotted echo. Play legato; notes glide. Tone brightens, Vibrato fades in a vibrato that speeds up as it deepens, Shimmer widens the chorus and spreads the saw stack, Space adds the echo and a room.",
+            listen: "The even, vocal tone and the glide between overlapped notes; raise Vibrato for the long notes, Shimmer for a choir.",
             build: satin_ribbon,
             group: 1,
             phrase: ribbon_phrase,
@@ -1824,8 +2297,8 @@ fn presets() -> Vec<Preset> {
             name: "Pig Iron",
             category: "Lead",
             tags: &["mono", "distorted", "bitcrushed", "compressed", "french touch", "signature"],
-            description: "A hard, crushed lead for French touch: a narrow pulse and a saw into 16 dB of drive, a bitcrusher and a compressor, retriggered on every note. Play short syncopated lines. Cutoff opens the filter, Grit pushes the drive, Crush mixes in the bitcrusher, Room adds a slapback and a tight room.",
-            listen: "The blunt attack and the crushed edge; Crush up for the digital grind, Crush down for a plain hard lead.",
+            description: "A hard, crushed lead for French touch: a narrow pulse and a saw into 16 dB of drive, a bitcrusher and a compressor, retriggered on every note. Play short syncopated lines. Bite opens the filter and sharpens the snap of every note, Weld detunes the saw against the pulse and thins the pulse, Crush mixes in the bitcrusher and makes it coarser, Length holds each note longer.",
+            listen: "The blunt attack and the crushed edge; Crush up for the digital grind, Crush down for a plain hard lead, Length up for a held blare.",
             build: rust_belt,
             group: 1,
             phrase: rust_phrase,
@@ -1836,8 +2309,8 @@ fn presets() -> Vec<Preset> {
             name: "Hot Wire",
             category: "Lead",
             tags: &["mono", "legato", "acid", "glide", "house", "techno"],
-            description: "A legato acid lead: a saw and a narrow pulse into a resonant ladder filter with velocity accents and a dotted echo. Play a sixteenth-note line and overlap notes to slide. Cutoff opens the filter, Squelch raises the resonance, Space adds the echo and a room, Pulse sets a slow pulse-width sweep on the second oscillator.",
-            listen: "The filter snap, the slides, and the dotted echo; Pulse up for a slowly moving thickness.",
+            description: "A legato acid lead: a saw and a narrow pulse into a resonant ladder filter with velocity accents and a dotted echo. Play a sixteenth-note line and overlap notes to slide. Cutoff opens the filter, Squelch raises the resonance and the snap of every note, Wire sets a pulse-width sweep on the second oscillator, speeds it up and thickens the pulse, Space adds the echo and a room.",
+            listen: "The filter snap, the slides, and the dotted echo; Wire up for a moving, thicker pulse.",
             build: hot_wire,
             group: 1,
             phrase: wire_phrase,
@@ -1848,8 +2321,8 @@ fn presets() -> Vec<Preset> {
             name: "Lantern",
             category: "Lead",
             tags: &["mono", "legato", "soft", "slow", "ambient", "cinematic"],
-            description: "A soft ambient lead that swells in: a triangle stack with a sine an octave up, chorus, a long echo and a big room. Play long, slow notes. Tone opens the filter, Swell lengthens the fade-in of each note, Space is the echo and room, Vibrato adds a slow vibrato.",
-            listen: "Each note blooming out of silence and the long tail carrying into the next.",
+            description: "A soft ambient lead that swells in: a triangle stack with a sine an octave up, chorus, a long echo and a big room. Play long, slow notes. Glow opens the filter and brings in the octave of sine, Swell lengthens the fade-in and the fade-out of each note, Drift adds a slow vibrato and lets the chorus swim, Space is the echo and room.",
+            listen: "Each note blooming out of silence and the long tail carrying into the next; Swell up for a slower bloom.",
             build: paper_crane,
             group: 1,
             phrase: crane_phrase,
@@ -1860,8 +2333,8 @@ fn presets() -> Vec<Preset> {
             name: "Rubber Band",
             category: "Bass",
             tags: &["mono", "plucked", "slap", "funk", "disco"],
-            description: "A funky plucked bass: a narrow pulse over a saw an octave down, a fast filter slap on every note and a light compressor. Play 16th-note grooves; harder notes open the filter more. Tone opens the filter, Slap deepens the filter snap on each note, Grit adds drive, Room adds a short slapback and room.",
-            listen: "The rubbery snap on each note and the ghost notes in the groove; Slap up for a harder pop.",
+            description: "A funky plucked bass: a narrow pulse over a saw an octave down, a fast filter slap on every note and a light compressor. Play 16th-note grooves; harder notes open the filter more. Tone opens the filter, Slap deepens and lengthens the filter snap on each note, Stab goes from short and dry to long and ringing, Body brings the saw an octave down forward of the pulse.",
+            listen: "The rubbery snap on each note and the ghost notes in the groove; Slap up for a harder pop, Stab down for staccato.",
             build: rubber_band,
             group: 2,
             phrase: rubber_phrase,
@@ -1872,8 +2345,8 @@ fn presets() -> Vec<Preset> {
             name: "Slate Roof",
             category: "Bass",
             tags: &["mono", "neuro", "unison", "distorted", "drum and bass"],
-            description: "A neuro bass for drum and bass: a four-voice saw stack against a detuned saw over a square sub, 14 dB of drive and a compressor. Play long half-time notes; the mod wheel opens the filter. Cutoff opens the filter, Growl fades in a rolling filter movement, Crush mixes in a bitcrusher, Room adds a tight room and slapback.",
-            listen: "The thick, dark stack; Growl up for a rolling filter, Crush up for a digital edge.",
+            description: "A neuro bass for drum and bass: a four-voice saw stack against a detuned saw over a square sub, 14 dB of drive and a compressor. Play long half-time notes; the mod wheel opens the filter. Cutoff opens the filter, Growl fades in a rolling filter movement and speeds it up, Stack spreads the saw stack, Crush mixes in a bitcrusher and makes it coarser.",
+            listen: "The thick, dark stack; Growl up for a rolling filter, Stack up for a wall, Crush up for a digital edge.",
             build: slate_roof,
             group: 2,
             phrase: slate_phrase,
@@ -1884,8 +2357,8 @@ fn presets() -> Vec<Preset> {
             name: "Gutter",
             category: "Bass",
             tags: &["mono", "distorted", "bitcrushed", "compressed", "french touch", "signature"],
-            description: "A dirty mid-range bass for French touch: a saw and a square sub into 24 dB of drive, a light bitcrusher and an 8:1 compressor, with a pulse an octave up to bring in. Play short, chugging notes. Bite opens the filter, Grit pushes the drive, Octave brings in the pulse an octave up, Room adds a slapback and a tight room.",
-            listen: "The compressed, flattened chug; Octave up for a buzzing top that cuts through a mix.",
+            description: "A dirty mid-range bass for French touch: a saw and a square sub into 24 dB of drive, a light bitcrusher and an 8:1 compressor, with a pulse an octave up to bring in. Play short, chugging notes. Bite opens the filter and sharpens the snap of every note, Grit pushes the drive and the crusher, Octave brings in the pulse an octave up, Squash clamps the compressor harder.",
+            listen: "The compressed, flattened chug; Octave up for a buzzing top that cuts through a mix, Squash up for a flatter chug.",
             build: gutter,
             group: 2,
             phrase: gutter_phrase,
@@ -1896,7 +2369,7 @@ fn presets() -> Vec<Preset> {
             name: "Low Tide",
             category: "Bass",
             tags: &["mono", "legato", "sub", "slow", "ambient", "cinematic"],
-            description: "An ambient sub bass that swells in: a sine over a triangle an octave down, a slow filter tide, chorus, a long echo and a big room. Play long, slow notes; they glide into each other. Tone opens the filter, Tide fades in a slow filter movement, Swell lengthens the fade-in of each note, Space is the echo and the room.",
+            description: "An ambient sub bass that swells in: a sine over a triangle an octave down, a slow filter tide, chorus, a long echo and a big room. Play long, slow notes; they glide into each other. Tone opens the filter and brings in the triangle, Tide fades in a slow filter movement and speeds it up, Swell lengthens the fade-in and the fade-out of each note, Space is the echo and the room.",
             listen: "Each note rising out of silence, the slow filter tide and the long tail under the next note.",
             build: low_tide,
             group: 2,
