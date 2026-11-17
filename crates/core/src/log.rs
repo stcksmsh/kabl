@@ -74,11 +74,6 @@ impl PatchLog {
         }
     }
 
-    /// Makes everything applied so far permanent: undo stops here.
-    pub fn set_undo_floor(&mut self) {
-        self.floor = self.cursor;
-    }
-
     pub fn can_redo(&self) -> bool {
         self.cursor < self.entries.len()
     }

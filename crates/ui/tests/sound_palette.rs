@@ -1272,7 +1272,9 @@ fn write_palette_patches() {
     for (name, build, _) in PATCHES {
         let dir = patch_dir(name);
         let _ = std::fs::remove_dir_all(&dir);
-        kabl_core::save(&dir, build().log()).unwrap();
+        let mut built = build();
+        factory_bank::attach_guide(&mut built, name);
+        kabl_core::save(&dir, built.log()).unwrap();
     }
 }
 
