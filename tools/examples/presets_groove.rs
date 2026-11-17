@@ -2211,8 +2211,9 @@ fn corner_store() -> Rack {
         comp: [-24.0, 4.0, 4.0],
         echo: [0.0, 20.0, 3000.0],
         space: [0.15, 0.3, 0.12],
-        // The soft top on the bass overshoots a little at its edges: 1 dB of headroom back.
-        trim_db: -1.0,
+        // The soft top on the bass rings at its edges and the demo peak rises by 2 dB: 2 dB of
+        // headroom back.
+        trim_db: -2.0,
         dub: false,
         voice: None,
         custom: Some(corner_plan),
