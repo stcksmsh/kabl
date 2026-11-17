@@ -58,6 +58,8 @@ How it is built: `main_line` picks the position where the macro's main param sit
 
 **Gate length.** The sequencer's `gate_len` only counts in `gate_mode` 1 (length); in the default mode the gate follows the clock pulse (50 % duty) and the part's `gate` field (55, 65, 78 in the old recipes) never sounded. Gate macros therefore set mode 1 and store 50 % (the same sound at zero swing; with swing the pulse stretches, so Rope Walk and the swung presets have no gate macro).
 
+**The factory level test** (`crates/ui/tests/factory_bank.rs`, `factory_levels_hold_the_target`) drives every macro to 0.65 and then to 0.15 (and to 1 in the hot renders), whatever the stored value, and wants every peak at -1 dBFS or lower and the loudness within -19 ± 5.5 dBFS. It caught what the clip phrase did not: Corner Store's demo peak (the 8 kHz top rings, see below) and Still Water, whose dark low end made the 0.15 passages too quiet (Bloom now starts at 600 Hz, Pulse and Weight stop at 0.8 and 0.85). All presets pass.
+
 ## Old flags against new flags
 
 | Preset | Old flags | New flags |
@@ -86,8 +88,8 @@ Peaks: every position of every macro of every preset is at or under -1 dBFS (wor
 | Copper Mile, Brick Dust, Acid Line, Glass Coast, Rope Walk, Dune Buggy | bit-identical (-217 to -221 dB, float noise) |
 | Ore Cart, Still Water, Slab City, Lamp Oil, Scrap Metal | -81 to -124 dB below the old signal: float noise from the sum of the new routes |
 | **Stoop Sale** | **-29.5 dB: the default hiss and the pitch wobble are gone.** The old Dust macro stood at 0.30, which put a hiss in the default sound (the hard rule is no hiss by default); Dust now starts at 0 and the hiss is its far end |
-| **Fault Line** | **-23.2 dB: a 8 kHz low-pass on the bass part (the click fix, below)** |
-| **Corner Store** | **-22.2 dB: the same 8 kHz low-pass on the bass part** |
+| **Fault Line** | **-22.4 dB: an 8 kHz low-pass on the bass part (the click fix, below) and 1 dB less level (trim -3 instead of -2, for the Reese macro's peak)** |
+| **Corner Store** | **-20.2 dB: the same 8 kHz low-pass on the bass part and 2 dB less level. The low-pass makes the demo peak 2 dB higher (it rings at the saw edges), and the factory level test (peak -1 dBFS at every macro position) needed the 2 dB back** |
 
 ## The parked clicks
 
@@ -124,7 +126,7 @@ Stored = where the macro stands in the default sound (the old stored sound).
 ### Fault Line (two-step DnB, 174 bpm)
 | Macro | Stored | What you hear 0 to 1 | What it moves |
 |---|---|---|---|
-| Reese | 0.69 | The reese grows teeth: more detune, more drive | bass detune 6 to 22 ct (stored) and on; drive 6 to 17 dB (stored) to 22 dB; trim -2 to -4 dB |
+| Reese | 0.97 | The reese grows teeth: more detune, more drive (the stored sound is the full effect; the macro only takes it away) | bass detune 6 to 22 ct (stored); drive 6 to 17 dB (stored) to 17.3 dB. The drive saturates, so the trim stays at -4 dB |
 | Filter | 0.73 | A closed, resonant bass opens | ladder cutoff 250 Hz to 6 kHz (stored) to 20 kHz; resonance 0.45 to 0.20 |
 | Break | 0.44 | A sparse kit gets hats and a louder snare | hat level 0 to 0.22 (stored) to 0.5; snare 0.2 to 0.45 (stored) to 0.77 |
 | Space | 0.25 | unchanged | echo and room mix |
@@ -150,9 +152,9 @@ The Filter macro of the old Glass Coast is gone (its top two thirds were dead); 
 ### Still Water (ambient, 68 bpm)
 | Macro | Stored | What you hear 0 to 1 | What it moves |
 |---|---|---|---|
-| Bloom | 0.85 | The music opens from dark to bright | ladder cutoff 250 Hz to 10.1 kHz (stored) to 20 kHz; resonance 0.45 to 0.05 |
-| Pulse | 0.28 | More and more hats and toms | hat level 0.1 to 0.32 (stored) to 0.9; tom level 0.1 to 0.35 (stored) to 1 |
-| Weight | 0.51 | The bass grows | bass level 0.2 to 0.61 (stored) to 1 |
+| Bloom | 0.88 | The music opens from dark to bright | ladder cutoff 600 Hz to 10.1 kHz (stored) to 20 kHz; resonance 0.45 to 0.05 |
+| Pulse | 0.28 | More and more hats and toms | hat level 0.1 to 0.32 (stored) to 0.8; tom level 0.1 to 0.35 (stored) to 0.8 |
+| Weight | 0.63 | The bass grows | bass level 0.2 to 0.61 (stored) to 0.85 |
 | Space | 0.60 | unchanged | echo and room mix |
 
 ### Slab City (trap, 140 bpm)
@@ -207,7 +209,7 @@ The Filter macro of the old Glass Coast is gone (its top two thirds were dead); 
 
 1. **Stoop Sale**: the default hiss and the wobble are gone (Dust starts at 0), Tape is a new kind of move (dark and hot to open and clean).
 2. **Fault Line**: the default sound changed by -23 dB (a soft top on the bass), Reese and Break are new.
-3. **Corner Store**: the default sound changed by -22 dB (the same), Wah now reaches the click level only at the very top.
+3. **Corner Store**: the default sound changed (the same soft top, and 2 dB quieter), Wah now reaches the click level only at the very top.
 
 Also worth an ear: Ore Cart Rumble (new gate-length gesture), Lamp Oil Chord (the tone filter and the gate), Slab City Glide (the 808 slide with drive).
 

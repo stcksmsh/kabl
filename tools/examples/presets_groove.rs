@@ -1573,9 +1573,10 @@ fn stoop_plan(v: &mut Voice, h: &Handles, s: &Spec) {
 /// the level where the saw's reset edge clicks), Break (hats and snare in the beat).
 fn fault_plan(v: &mut Voice, h: &Handles, s: &Spec) {
     let dirt = routed("drive", "drive_db", s.drive[0], 0.5, 0.5);
-    let p = main_line(v, 1, h.drive, "drive", "drive_db", 6.0, dirt, 22.0);
+    // The drive saturates: it holds the peak down, so the trim stays where it is and the drive
+    // stops soon after the stored position.
+    let p = main_line(v, 1, h.drive, "drive", "drive_db", 6.0, dirt, 17.3);
     span(v, 1, p, h.bass_osc, "osc.va", "detune", 6.0, s.bass.osc[2]);
-    span(v, 1, p, h.drive, "drive", "trim_db", -2.0, s.drive[1]);
     let cut = old_cut(s, 0.55, 0.5);
     let p = main_line(
         v,
@@ -2143,7 +2144,9 @@ fn fault_line() -> Rack {
         comp: [-24.0, 4.0, 4.0],
         echo: [0.0, 30.0, 3000.0],
         space: [0.25, 0.8, 0.2],
-        trim_db: -2.0,
+        // 1 dB more headroom than the old -2: the detune beating of the reese peaks near the end
+        // of the Reese macro, and the soft top on the bass rings.
+        trim_db: -3.0,
         dub: false,
         voice: None,
         custom: Some(fault_plan),
