@@ -570,6 +570,12 @@ pub struct Prefs {
     /// Setting "Intensity" of the cable glow.
     #[serde(default)]
     pub cable_intensity: crate::cable_life::Intensity,
+    /// Setting "Theme". Absent in files from before it existed: `dark` stands then.
+    #[serde(default)]
+    pub theme_mode: Option<crate::desktop::ThemeMode>,
+    /// Setting "Reduce motion".
+    #[serde(default)]
+    pub reduce_motion: crate::desktop::ReduceMotion,
 }
 
 impl Default for Prefs {
@@ -580,6 +586,8 @@ impl Default for Prefs {
             folders: Default::default(),
             cable_life: Default::default(),
             cable_intensity: Default::default(),
+            theme_mode: Some(Default::default()),
+            reduce_motion: Default::default(),
         }
     }
 }
@@ -803,6 +811,8 @@ mod tests {
             folders: [("patches".to_string(), PathBuf::from("/tmp"))].into(),
             cable_life: crate::cable_life::CableLife::Glow,
             cable_intensity: crate::cable_life::Intensity::High,
+            theme_mode: Some(crate::desktop::ThemeMode::Light),
+            reduce_motion: crate::desktop::ReduceMotion::On,
         };
         p.save(d.path()).unwrap();
         assert_eq!(Prefs::load(d.path()), p);
@@ -815,6 +825,12 @@ mod tests {
         assert_eq!(Prefs::load(d.path()).theme, "kabl.lacquer");
         assert!(Prefs::load(d.path()).folders.is_empty());
         assert_eq!(Prefs::load(d.path()).cable_life, Default::default());
+        assert_eq!(
+            Prefs::load(d.path()).theme_mode,
+            None,
+            "dark stands for old files"
+        );
+        assert_eq!(Prefs::load(d.path()).reduce_motion, Default::default());
         assert_eq!(
             Prefs::load(d.path()).cable_intensity,
             crate::cable_life::Intensity::High,

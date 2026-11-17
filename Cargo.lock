@@ -1796,6 +1796,7 @@ dependencies = [
  "audio_thread_priority",
  "basedrop",
  "cpal",
+ "dbus",
  "eframe",
  "egui",
  "hound",
