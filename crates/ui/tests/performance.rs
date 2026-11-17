@@ -227,17 +227,25 @@ pub fn performance() -> PatchEditor {
     e.connect(port(vca_b, "out"), port(echo, "in2"));
     e.connect(port(echo, "out"), port(delay, "in"));
     e.connect(port(clock, "gate"), port(delay, "clock"));
+    let delay_split = e.add_module("split", at(24.0, 5));
+    e.connect(port(delay, "out"), port(delay_split, "in"));
     for (bus, side) in [(bus_l, "left"), (bus_r, "right")] {
         e.connect(port(atmos, "out"), port(bus, "in1"));
-        e.connect(port(delay, side), port(bus, "in2"));
+        e.connect(port(delay_split, side), port(bus, "in2"));
     }
-    e.connect(port(bus_l, "out"), port(reverb, "in_l"));
-    e.connect(port(bus_r, "out"), port(reverb, "in_r"));
+    let bus_join = e.add_module("join", at(204.0, 5));
+    e.connect(port(bus_l, "out"), port(bus_join, "left"));
+    e.connect(port(bus_r, "out"), port(bus_join, "right"));
+    e.connect(port(bus_join, "out"), port(reverb, "in"));
+    let reverb_split = e.add_module("split", at(384.0, 5));
+    e.connect(port(reverb, "out"), port(reverb_split, "in"));
+    let main_join = e.add_module("join", at(564.0, 5));
     for (main, side) in [(main_l, "left"), (main_r, "right")] {
         e.connect(port(dry, "out"), port(main, "in1"));
-        e.connect(port(reverb, side), port(main, "in2"));
-        e.connect(port(main, "out"), port(out, side));
+        e.connect(port(reverb_split, side), port(main, "in2"));
+        e.connect(port(main, "out"), port(main_join, side));
     }
+    e.connect(port(main_join, "out"), port(out, "in"));
 
     // Levels.
     set(&mut e, dry, "level1", 0.22);
@@ -283,7 +291,7 @@ pub fn performance() -> PatchEditor {
     for (id, key, _, label) in controls {
         e.set_label(id, &format!("{PIN_PREFIX}{key}"), Some(label.to_string()));
     }
-    e.migrated()
+    e
 }
 
 /// Not a check: writes `patches/performance`.

@@ -48,11 +48,6 @@ struct Rack {
 }
 
 impl Rack {
-    fn migrated(mut self) -> Self {
-        self.e = self.e.migrated();
-        self
-    }
-
     fn new() -> Self {
         Rack {
             e: PatchEditor::new(),
@@ -83,12 +78,23 @@ impl Rack {
     }
     /// Left and right inputs of a stereo module from one mono source.
     fn wire_both(&mut self, a: ModuleId, ap: &str, b: ModuleId) {
-        self.wire(a, ap, b, "in_l");
-        self.wire(a, ap, b, "in_r");
+        self.wire(a, ap, b, "in");
+    }
+    /// A `split` of the stereo output of `a`: its `left` and `right` are the two sides.
+    fn split(&mut self, a: ModuleId) -> ModuleId {
+        let s = self.add("split", &[]);
+        self.wire(a, "out", s, "in");
+        s
+    }
+    /// A `join` of two mono sources into one stereo signal (its `out`).
+    fn join(&mut self, l: ModuleId, r: ModuleId) -> ModuleId {
+        let j = self.add("join", &[]);
+        self.wire(l, "out", j, "left");
+        self.wire(r, "out", j, "right");
+        j
     }
     fn stereo(&mut self, a: ModuleId, b: ModuleId) {
-        self.wire(a, "left", b, "in_l");
-        self.wire(a, "right", b, "in_r");
+        self.wire(a, "out", b, "in");
     }
     /// A modulation route into a knob; `amount` is the fraction of the knob's travel the
     /// source sweeps.
@@ -107,8 +113,7 @@ impl Rack {
     /// The last stage: the output. No limiter; headroom comes from the patch gain.
     fn out_stereo(&mut self, from: ModuleId) {
         let out = self.add("out", &[]);
-        self.wire(from, "left", out, "left");
-        self.wire(from, "right", out, "right");
+        self.wire(from, "out", out, "in");
     }
 }
 
@@ -189,13 +194,13 @@ fn space_tail(
             ("width", 60.0),
         ],
     );
-    r.wire(src, "left", delay, "in");
+    let split = r.split(src);
+    r.wire(split, "left", delay, "in");
     if let Some(c) = clock {
         r.wire(c, "gate", delay, "clock");
     }
     r.stereo(src, verb);
-    r.wire(delay, "left", verb, "in_l");
-    r.wire(delay, "right", verb, "in_r");
+    r.wire(delay, "out", verb, "in");
     r.route(knob, "m3", delay, "mix", echo_max);
     r.route(knob, "m3", verb, "mix", room_max);
     verb
@@ -548,8 +553,7 @@ fn loading_dock() -> Rack {
     r.wire(lad, "out", trim, "in");
     r.wire_both(trim, "out", crush);
     r.stereo(crush, comp);
-    r.wire(comp, "left", duck, "in_l");
-    r.wire(comp, "right", duck, "in_r");
+    r.wire(comp, "out", duck, "in");
     r.wire(kick, "out", duck, "sc");
     for (seq, voice, gate) in [
         (kick_seq, kick, "gate"),
@@ -581,13 +585,14 @@ fn loading_dock() -> Rack {
         0.3,
     );
     // The drums join after the echo and the room, then the output.
-    r.wire(tail, "left", mix_l, "in1");
-    r.wire(tail, "right", mix_r, "in1");
+    let split = r.split(tail);
+    r.wire(split, "left", mix_l, "in1");
+    r.wire(split, "right", mix_r, "in1");
     r.wire(drums, "out", mix_l, "in2");
     r.wire(drums, "out", mix_r, "in2");
+    let master = r.join(mix_l, mix_r);
     let out = r.add("out", &[]);
-    r.wire(mix_l, "out", out, "left");
-    r.wire(mix_r, "out", out, "right");
+    r.wire(master, "out", out, "in");
 
     r.route(knob, "m4", duck, "ratio", 0.95);
     // Headroom: the first beat of a run peaks above 0 dBFS with the filter open (Sweep from 0.43
@@ -758,10 +763,10 @@ fn glass_elevator() -> Rack {
     r.wire(drive, "out", lad, "in");
     r.wire(lad, "out", trim, "in");
     r.wire_both(trim, "out", chorus);
-    r.wire(chorus, "left", delay, "in");
+    let split = r.split(chorus);
+    r.wire(split, "left", delay, "in");
     r.stereo(chorus, verb);
-    r.wire(delay, "left", verb, "in_l");
-    r.wire(delay, "right", verb, "in_r");
+    r.wire(delay, "out", verb, "in");
     r.out_stereo(verb);
 
     r.route(knob, "m1", voice, "index", 0.5);
@@ -1051,10 +1056,10 @@ fn salt_flat() -> Rack {
     r.wire(aenv, "out", vca, "cv");
     r.wire(vca, "out", trim, "in");
     r.wire_both(trim, "out", chorus);
-    r.wire(chorus, "left", delay, "in");
+    let split = r.split(chorus);
+    r.wire(split, "left", delay, "in");
     r.stereo(chorus, verb);
-    r.wire(delay, "left", verb, "in_l");
-    r.wire(delay, "right", verb, "in_r");
+    r.wire(delay, "out", verb, "in");
     r.out_stereo(verb);
 
     r.route(fenv, "out", lad, "cutoff_hz", 0.25);
@@ -1129,10 +1134,10 @@ fn boxwood() -> Rack {
     r.wire(drive, "out", lad, "in");
     r.wire(lad, "out", trim, "in");
     r.wire_both(trim, "out", chorus);
-    r.wire(chorus, "left", delay, "in");
+    let split = r.split(chorus);
+    r.wire(split, "left", delay, "in");
     r.stereo(chorus, verb);
-    r.wire(delay, "left", verb, "in_l");
-    r.wire(delay, "right", verb, "in_r");
+    r.wire(delay, "out", verb, "in");
     r.out_stereo(verb);
 
     r.route(knob, "m1", voice, "index", 0.5);
@@ -1429,7 +1434,7 @@ fn main() {
     match args.get(1).map(String::as_str) {
         Some("write") => {
             for p in presets() {
-                let mut rack = (p.build)().migrated();
+                let mut rack = (p.build)();
                 rack.trim(level_trim(p.slug));
                 let dir = Path::new(&args[2]).join("presets").join(p.slug);
                 let _ = std::fs::remove_dir_all(&dir);
@@ -1506,7 +1511,7 @@ fn main() {
                     ("all 1", [Some(1.0); 4]),
                     ("no Space", [None, None, Some(0.0), None]),
                 ] {
-                    let mut rack = (p.build)().migrated();
+                    let mut rack = (p.build)();
                     let knob = *rack
                         .e
                         .state()

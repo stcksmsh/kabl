@@ -227,7 +227,10 @@ mod table_tests {
     fn an_older_or_newer_state_version_is_refused() {
         for v in [1, 2, 3, 4] {
             let err = state(v).validate().unwrap_err();
-            assert!(err.contains("older kabl development build"), "version {v}: {err}");
+            assert!(
+                err.contains("older kabl development build"),
+                "version {v}: {err}"
+            );
             let bytes = serde_json::to_vec(&state(v)).unwrap();
             assert!(SoundState::decode(&bytes).is_err(), "decode {v}");
         }

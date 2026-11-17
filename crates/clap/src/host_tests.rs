@@ -717,7 +717,10 @@ fn a_version_4_project_is_refused_not_migrated() {
     let mut json: serde_json::Value = serde_json::to_value(p.shared.snapshot()).unwrap();
     json["version"] = 4.into();
     let err = SoundState::decode(&serde_json::to_vec(&json).unwrap()).unwrap_err();
-    assert!(err.contains("older kabl development build; not supported"), "{err}");
+    assert!(
+        err.contains("older kabl development build; not supported"),
+        "{err}"
+    );
     // The host keeps working: the live document is untouched.
     assert!(p.shared.load(p.shared.snapshot()).is_ok());
 }
