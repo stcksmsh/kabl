@@ -1655,7 +1655,7 @@ fn still_plan(v: &mut Voice, h: &Handles, s: &Spec) {
         h.lad,
         "filter.ladder",
         "cutoff_hz",
-        250.0,
+        600.0,
         cut,
         20000.0,
     );
