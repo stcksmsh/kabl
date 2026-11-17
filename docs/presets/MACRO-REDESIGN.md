@@ -50,6 +50,21 @@ Other presets: renders bit-identical (Ore Cart, Scrap Metal checked; the patch f
 
 Not done: other presets keep their old macros; the Corner Store and Fault Line click is parked.
 
+## Combination (do the four macros mix well together?)
+
+`macro_audit` writes, besides the per-macro steps and sweeps, `combo/<slug>-base|all0|all1|mA-mB.wav`: the stored sound, every macro at 0, every macro at 1, and every pair at 1 with the other two at their stored values (45 renders of 10 s per preset in all; about 40 s per preset). `macro_audit.py` reads them and writes a "Combination" table and a 4x4 similarity matrix per preset into `tables.md` (`audit.json` under `_combo`). Flags (thresholds are constants at the top of the script):
+
+| Flag | Meaning | Threshold |
+|---|---|---|
+| `peak` | any combination render over -1 dBFS | `PEAK_DB` -1 |
+| `click` | a click (`audio_defects.clicks`) the stored sound does not have | |
+| `cancel` | a pair at 1 changes the sound (same distance as `change`, against the stored sound) by less than 0.7 of the larger single macro's change; only when that single moves 1 dB or more | `CANCEL_RATIO`, `CANCEL_MIN_DB` |
+| `pileup` | a pair or all four at 1 is 3 dB louder than the louder single, or 6 dB louder than the stored sound, or its 2 kHz-up bands (mean of upper and air) are 4 dB brighter than the brighter single's | `PILE_LOUD_DB`, `PILE_BASE_DB`, `PILE_TOP_DB` |
+| `silent` | all at 0 is under -45 dB or 18 dB under the stored sound | |
+| `similar` | in the matrix, cosine of two macros' 0-to-1 change vectors over 0.8 (both moving more than 1.5 dB) is listed as too similar; under -0.9 as opposite (one undoes the other) | `SIMILAR_COS` |
+
+A flag is a draft verdict; a person reads the numbers. Run it with the same commands as the audit (the combination renders come with the `macro_audit` run).
+
 ## Tours (offline renders, each macro swept 0 to 1 to 0 over 8 s on the held phrase, 11 s apart)
 
 Git-ignored, on disk in `docs/presets/clips/macro-pilot-2/`: `old/<slug>-tour.mp3` and `new/<slug>-tour.mp3` per preset, one clip per macro beside them (`<slug>-mN-<name>.mp3`), and `tour.mp3` (both presets back to back, 44 s each). Start times inside each per-preset tour:
