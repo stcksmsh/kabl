@@ -154,13 +154,68 @@ pub(crate) fn ease_to(ui: &Ui, id: egui::Id, on: bool, ms: f32) -> f32 {
     ui.ctx().animate_bool_with_time(id, on, Style::secs(ms))
 }
 
+/// A CSS-style cubic-bezier easing curve `(x1, y1, x2, y2)`: progress 0..=1 in, eased 0..=1 out.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Bezier(pub f32, pub f32, pub f32, pub f32);
+
+impl Bezier {
+    /// Drawer in, toast in (HANDOVER section 6).
+    pub const DRAWER_IN: Self = Self(0.0, 0.0, 0.0, 1.0);
+    /// Drawer out, toast out.
+    pub const DRAWER_OUT: Self = Self(0.3, 0.0, 1.0, 1.0);
+    /// View crossfade.
+    pub const VIEW: Self = Self(0.2, 0.0, 0.0, 1.0);
+
+    /// Eased value at progress `x`.
+    pub fn at(self, x: f32) -> f32 {
+        let x = x.clamp(0.0, 1.0);
+        let Self(x1, y1, x2, y2) = self;
+        let at = |a: f32, b: f32, t: f32| {
+            let u = 1.0 - t;
+            3.0 * u * u * t * a + 3.0 * u * t * t * b + t * t * t
+        };
+        // Solve x(t) = x by bisection: monotone for the control points used here.
+        let (mut lo, mut hi) = (0.0_f32, 1.0_f32);
+        for _ in 0..24 {
+            let mid = 0.5 * (lo + hi);
+            if at(x1, x2, mid) < x {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        at(y1, y2, 0.5 * (lo + hi))
+    }
+}
+
+/// Open/close value 0..=1 for a drawer-like surface: `ms` to open on `open_curve`, 0.7 x that
+/// to close on `close_curve`. Reversing mid-way continues from where it is. Repaints only while
+/// moving.
+pub(crate) fn open_close(ctx: &egui::Context, id: egui::Id, open: bool, ms: f32) -> f32 {
+    let secs = Style::secs(if open { ms } else { ms * 0.7 });
+    let lin = ctx.animate_bool_with_time(id, open, secs);
+    if lin <= 0.0 || lin >= 1.0 {
+        return lin;
+    }
+    if open {
+        Bezier::DRAWER_IN.at(lin)
+    } else {
+        1.0 - Bezier::DRAWER_OUT.at(1.0 - lin)
+    }
+}
+
+/// One exponential-smoothing step of `v` toward `target` over `dt` seconds, time constant `ms`.
+pub(crate) fn glide_step(v: f32, target: f32, dt: f32, ms: f32) -> f32 {
+    let k = (-dt / Style::secs(ms).max(1e-3)).exp();
+    target + (v - target) * k
+}
+
 /// Exponential smoothing toward `target`: time constant `ms` (a `style.motion` token), so it
 /// follows a moving target without the linear ramp of `ease_to`. Keeps the frame repainting
 /// until it settles; a first call starts at `target`.
 pub(crate) fn smooth_to(ctx: &egui::Context, id: egui::Id, target: f32, ms: f32) -> f32 {
     let v = ctx.data(|d| d.get_temp::<f32>(id)).unwrap_or(target);
-    let k = (-ctx.input(|i| i.stable_dt) / Style::secs(ms).max(1e-3)).exp();
-    let v = target + (v - target) * k;
+    let v = glide_step(v, target, ctx.input(|i| i.stable_dt), ms);
     ctx.data_mut(|d| d.insert_temp(id, v));
     if (v - target).abs() > 1e-3 {
         ctx.request_repaint();
@@ -173,5 +228,37 @@ pub(crate) fn dim(c: Color32, enabled: bool) -> Color32 {
         c
     } else {
         alpha(c, (f32::from(c.a()) * 0.45) as u8)
+    }
+}
+
+#[cfg(test)]
+mod motion_tests {
+    use super::Bezier;
+
+    #[test]
+    fn curves_run_from_zero_to_one_without_going_back() {
+        for c in [Bezier::DRAWER_IN, Bezier::DRAWER_OUT, Bezier::VIEW] {
+            assert!(c.at(0.0).abs() < 1e-4 && (c.at(1.0) - 1.0).abs() < 1e-4);
+            let mut last = 0.0;
+            for i in 0..=100 {
+                let y = c.at(i as f32 / 100.0);
+                assert!(y >= last - 1e-4, "{c:?} dips at {i}");
+                last = y;
+            }
+        }
+        // Ease-out is ahead of linear mid-way; ease-in is behind it.
+        assert!(Bezier::DRAWER_IN.at(0.5) > 0.5);
+        assert!(Bezier::DRAWER_OUT.at(0.5) < 0.5);
+    }
+
+    #[test]
+    fn glide_step_approaches_without_overshoot() {
+        let mut v = 0.0;
+        for _ in 0..600 {
+            let n = super::glide_step(v, 1.0, 1.0 / 60.0, 60.0);
+            assert!(n >= v && n <= 1.0);
+            v = n;
+        }
+        assert!((v - 1.0).abs() < 1e-4);
     }
 }

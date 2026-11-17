@@ -60,6 +60,7 @@ impl UiState {
             self.scope = v.scope;
             self.pan = v.pan;
             self.zoom = v.zoom;
+            self.glide = None;
             self.selected_module = v.module;
             self.selected_composite = v.composite;
             self.inspected = v.inspected;

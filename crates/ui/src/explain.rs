@@ -211,6 +211,7 @@ pub fn back(ui_state: &mut UiState, now: f64) {
     if let Some(v) = ui_state.explain.saved.take() {
         ui_state.pan = v.pan;
         ui_state.zoom = v.zoom;
+        ui_state.glide = None;
         ui_state.inspected = v.inspected;
         ui_state.selected_module = v.selected_module;
         ui_state.selected_route = v.selected_route;

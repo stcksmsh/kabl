@@ -990,8 +990,10 @@ fn cancel_after_a_collision_keeps_the_other_sound() {
 fn the_sounds_scene_replaces_the_rack_and_fits_the_plugin_window() {
     let mut t = H::new(1180.0, 680.0);
     t.ui.drawer_open = true;
-    t.frame();
-    t.frame();
+    // The drawer slides away and the view fades in: let both finish.
+    for _ in 0..40 {
+        t.frame();
+    }
     let screen = Rect::from_min_size(Pos2::ZERO, egui::vec2(1180.0, 680.0));
     assert!(
         !t.ui.hits.keys().any(|k| k.starts_with("module:")),

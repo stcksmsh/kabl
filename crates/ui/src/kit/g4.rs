@@ -4,7 +4,7 @@
 //! Tokens are derived from the existing roles, so theme files keep loading unchanged.
 
 use super::controls::{fill_rr, focus_ring};
-use super::{dim, ease_to, icon, icon_button, rich, rule, Ic, Tone};
+use super::{dim, ease_to, icon, icon_button, rich, rule, Bezier, Ic, Tone};
 use crate::style::{alpha, mix, Role, Style};
 use egui::{
     pos2, vec2, Color32, CornerRadius, Frame, Margin, Painter, Rect, Response, Sense, Stroke,
@@ -460,6 +460,8 @@ pub struct Toast {
     /// Detail shows in full; otherwise one line, cut with an ellipsis.
     pub expanded: bool,
     pub born: f64,
+    /// Set when dismissed: the toast fades out from this time, then goes.
+    pub leaving: Option<f64>,
 }
 
 /// What a click on a toast did.
@@ -547,30 +549,65 @@ pub fn toasts(
     list: &mut Vec<Toast>,
     now: f64,
 ) -> Option<(usize, usize)> {
-    list.retain(|t| t.sev.ttl().is_none_or(|ttl| now - t.born < ttl));
-    let mut gone = None;
+    let in_s = f64::from(Style::secs(st.motion.drawer));
+    let out_s = in_s * 0.7;
+    list.retain(|t| {
+        t.sev.ttl().is_none_or(|ttl| now - t.born < ttl)
+            && t.leaving.is_none_or(|l| now - l < out_s)
+    });
     let mut acted = None;
-    if !list.is_empty()
-        && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
-    {
-        gone = Some(list.len() - 1);
+    if let Some(t) = list.iter_mut().rev().find(|t| t.leaving.is_none()) {
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
+            t.leaving = Some(now);
+        }
     }
+    let mut moving = false;
     egui::Area::new(egui::Id::new("g4-toasts"))
         .order(egui::Order::Foreground)
         .fixed_pos(pos2(area.right() - 16.0 - 380.0, area.top() + 16.0))
         .show(ctx, |ui| {
             ui.spacing_mut().item_spacing.y = 8.0;
-            for (i, t) in list.iter().enumerate().rev().take(3) {
-                match toast(ui, st, t) {
-                    Some(ToastClick::Dismiss) => gone = Some(i),
-                    Some(ToastClick::Action(a)) => acted = Some((i, a)),
-                    None => {}
+            for (i, t) in list.iter_mut().enumerate().rev().take(3) {
+                // In: slide 8 px plus fade on the drawer token; out: 0.7 x of it, on its curve.
+                let enter = ((now - t.born) / in_s).clamp(0.0, 1.0) as f32;
+                let mut a = Bezier::DRAWER_IN.at(enter);
+                let end = t
+                    .leaving
+                    .or_else(|| t.sev.ttl().map(|ttl| t.born + ttl - out_s));
+                if let Some(e) = end.filter(|e| now >= *e) {
+                    if t.leaving.is_none() {
+                        t.leaving = Some(e);
+                    }
+                    let p = ((now - e) / out_s).clamp(0.0, 1.0) as f32;
+                    a = a.min(1.0 - Bezier::DRAWER_OUT.at(p));
                 }
+                moving |= enter < 1.0 || t.leaving.is_some();
+                let leaving = t.leaving.is_some();
+                ui.scope(|ui| {
+                    ui.spacing_mut().item_spacing.x = 0.0;
+                    ui.set_opacity(a);
+                    ui.horizontal(|ui| {
+                        ui.add_space(8.0 * (1.0 - a));
+                        match toast(ui, st, t) {
+                            Some(ToastClick::Dismiss) if !leaving => t.leaving = Some(now),
+                            Some(ToastClick::Action(x)) if !leaving => acted = Some((i, x)),
+                            _ => {}
+                        }
+                    });
+                });
             }
         });
-    if let Some(i) = gone {
-        list.remove(i);
-        return None;
+    if moving {
+        ctx.request_repaint();
+    }
+    // Wake exactly when the next fade-out starts, so it never begins late.
+    let next = list
+        .iter()
+        .filter(|t| t.leaving.is_none())
+        .filter_map(|t| t.sev.ttl().map(|ttl| t.born + ttl - out_s - now))
+        .fold(f64::INFINITY, f64::min);
+    if next.is_finite() {
+        ctx.request_repaint_after(std::time::Duration::from_secs_f64(next.max(0.0)));
     }
     acted
 }
@@ -1030,6 +1067,7 @@ mod tests {
             actions: vec![],
             expanded: false,
             born: 0.0,
+            leaving: None,
         };
         let ctx = egui::Context::default();
         let st = line_solid_default(true);

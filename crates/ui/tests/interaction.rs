@@ -844,7 +844,10 @@ impl H {
         self.events.push(Event::Zoom(factor));
         self.frame();
         self.modifiers = Modifiers::NONE;
-        self.frame();
+        // The camera glides to its zoom: let it arrive.
+        for _ in 0..60 {
+            self.frame();
+        }
     }
 
     fn face(&self, id: u64, param: &str) -> Option<f32> {
