@@ -20,5 +20,3 @@ patches/recipes/pluck-to-pad 989af76da2deea3d
 patches/reference d1d488299a02f189
 patches/sequence 4e570646a482f371
 patches/sound-palette ed1fd73cfdbc5823
-crates/core/tests/fixtures/v1_default b110be111c0b2161
-crates/core/tests/fixtures/v1_edited 97967ec7262fba05

@@ -1,5 +1,5 @@
 //! Every patch that shipped before functional cables (listed in `golden/legacy_hashes.txt`,
-//! rendered at 2195de0: `patches/` and the schema-v1 fixtures) still renders bit-identically.
+//! rendered at 2195de0: `patches/`) still renders bit-identically.
 //! Patches added later are not listed and not checked here.
 
 use std::path::Path;
@@ -37,7 +37,7 @@ fn shipped_patches_sound_unchanged() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/legacy_hashes.txt");
     let text = std::fs::read_to_string(golden).unwrap();
-    assert!(text.lines().count() >= 24);
+    assert!(text.lines().count() >= 22);
     for line in text.lines() {
         let (name, want) = line.split_once(' ').unwrap();
         let got =

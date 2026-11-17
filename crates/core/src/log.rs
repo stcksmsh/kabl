@@ -5,6 +5,10 @@ use crate::state::PatchState;
 /// ms, merge into one entry (first inverse kept, last value kept). Brief section 6.
 pub const COALESCE_WINDOW_MS: u64 = 250;
 
+/// Last op of the schema 8 migration group that files written by the migration still carry; a
+/// loaded file is an undo barrier after it.
+const MIGRATED_NOTE: &str = "migrated to schema 8";
+
 /// Full-state snapshot taken every N ops so replay can start from the nearest checkpoint
 /// instead of the beginning. Brief section 6, default N = 500.
 pub const CHECKPOINT_EVERY: u64 = 500;
@@ -61,7 +65,7 @@ impl PatchLog {
         let marker = |e: &Entry| match &e.op {
             crate::Op::Group { ops } => matches!(
                 ops.last(),
-                Some(crate::Op::Annotate { text }) if text == crate::migrate::MIGRATED_NOTE
+                Some(crate::Op::Annotate { text }) if text == MIGRATED_NOTE
             ),
             _ => false,
         };
