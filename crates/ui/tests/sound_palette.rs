@@ -76,6 +76,19 @@ impl Rack {
             self.e.set_param(id, p, v);
         }
     }
+    /// A `split` of the stereo output of `src`: its `left` and `right` are the two sides.
+    fn split(&mut self, src: ModuleId) -> ModuleId {
+        let s = self.add("split", &[]);
+        self.wire((src, "out"), (s, "in"));
+        s
+    }
+    /// A `join` of two mono sources into one stereo signal (its `out`).
+    fn join(&mut self, l: (ModuleId, &str), r: (ModuleId, &str)) -> ModuleId {
+        let j = self.add("join", &[]);
+        self.wire(l, (j, "left"));
+        self.wire(r, (j, "right"));
+        j
+    }
     fn wire(&mut self, from: (ModuleId, &str), to: (ModuleId, &str)) {
         self.e.connect(port(from.0, from.1), port(to.0, to.1));
     }
@@ -746,11 +759,10 @@ fn perc(r: &mut Rack, row: usize, clock: ModuleId) -> Perc {
 // ---------------------------------------------------------------------------------------------
 // Patches.
 
-/// `out` both sides from a stereo pair.
-fn out_stereo(r: &mut Rack, l: (ModuleId, &str), rr: (ModuleId, &str)) -> ModuleId {
+/// `out` fed by one stereo (or mono) source.
+fn out_stereo(r: &mut Rack, src: (ModuleId, &str)) -> ModuleId {
     let out = r.add("out", &[]);
-    r.wire(l, (out, "left"));
-    r.wire(rr, (out, "right"));
+    r.wire(src, (out, "in"));
     out
 }
 
@@ -778,11 +790,9 @@ pub fn strings_patch() -> PatchEditor {
             ("damp_hz", 6000.0),
         ],
     );
-    r.wire((v.gain, "out"), (chorus, "in_l"));
-    r.wire((v.gain, "out"), (chorus, "in_r"));
-    r.wire((chorus, "left"), (reverb, "in_l"));
-    r.wire((chorus, "right"), (reverb, "in_r"));
-    out_stereo(&mut r, (reverb, "left"), (reverb, "right"));
+    r.wire((v.gain, "out"), (chorus, "in"));
+    r.wire((chorus, "out"), (reverb, "in"));
+    out_stereo(&mut r, (reverb, "out"));
     let m = r.macros([
         ("Bright", 0.4),
         ("Ensemble", 0.5),
@@ -807,7 +817,7 @@ pub fn strings_patch() -> PatchEditor {
         (v.gain, "gain_db", Some(26), Some("Level")),
         (v.midi, "mode", None, Some("Keys")),
     ]);
-    r.e.migrated()
+    r.e
 }
 
 pub fn pad_patch() -> PatchEditor {
@@ -849,18 +859,18 @@ pub fn pad_patch() -> PatchEditor {
             ("damp_hz", 4200.0),
         ],
     );
-    r.wire((v.gain, "out"), (chorus, "in_l"));
-    r.wire((v.gain, "out"), (chorus, "in_r"));
+    r.wire((v.gain, "out"), (chorus, "in"));
     r.wire((v.gain, "out"), (delay, "in"));
-    r.wire((chorus, "left"), (bus_l, "in1"));
-    r.wire((chorus, "right"), (bus_r, "in1"));
-    r.wire((delay, "left"), (bus_l, "in2"));
-    r.wire((delay, "right"), (bus_r, "in2"));
+    let (chorus_s, delay_s) = (r.split(chorus), r.split(delay));
+    r.wire((chorus_s, "left"), (bus_l, "in1"));
+    r.wire((chorus_s, "right"), (bus_r, "in1"));
+    r.wire((delay_s, "left"), (bus_l, "in2"));
+    r.wire((delay_s, "right"), (bus_r, "in2"));
     r.set(bus_l, &[("level2", 0.5)]);
     r.set(bus_r, &[("level2", 0.5)]);
-    r.wire((bus_l, "out"), (reverb, "in_l"));
-    r.wire((bus_r, "out"), (reverb, "in_r"));
-    out_stereo(&mut r, (reverb, "left"), (reverb, "right"));
+    let bus = r.join((bus_l, "out"), (bus_r, "out"));
+    r.wire((bus, "out"), (reverb, "in"));
+    out_stereo(&mut r, (reverb, "out"));
     r.route((m, "m1"), v.filt, "cutoff_hz", 0.2);
     r.route((m, "m1"), v.filt, "drive_db", 0.3);
     r.route((m, "m3"), v.noise, "level_db", 0.35);
@@ -877,7 +887,7 @@ pub fn pad_patch() -> PatchEditor {
         (v.gain, "gain_db", Some(26), Some("Level")),
         (v.midi, "mode", None, Some("Keys")),
     ]);
-    r.e.migrated()
+    r.e
 }
 
 pub fn lead_patch() -> PatchEditor {
@@ -907,9 +917,8 @@ pub fn lead_patch() -> PatchEditor {
         &[("decay_s", 2.8), ("mix", 20.0), ("predelay_ms", 25.0)],
     );
     r.wire((v.drive, "out"), (delay, "in"));
-    r.wire((delay, "left"), (reverb, "in_l"));
-    r.wire((delay, "right"), (reverb, "in_r"));
-    out_stereo(&mut r, (reverb, "left"), (reverb, "right"));
+    r.wire((delay, "out"), (reverb, "in"));
+    out_stereo(&mut r, (reverb, "out"));
     r.route((m, "m1"), v.filt, "cutoff_hz", 0.2);
     r.route((m, "m3"), v.drive, "drive_db", 0.3);
     r.route((m, "m3"), v.filt, "resonance", 0.15);
@@ -926,7 +935,7 @@ pub fn lead_patch() -> PatchEditor {
         (v.midi, "mode", None, Some("Keys")),
         (v.midi, "glide", None, Some("Glide")),
     ]);
-    r.e.migrated()
+    r.e
 }
 
 pub fn bass_patch() -> PatchEditor {
@@ -943,7 +952,7 @@ pub fn bass_patch() -> PatchEditor {
     r.row(2);
     let level = r.add("gain", &[("gain_db", -7.0)]);
     r.wire((v.drive, "out"), (level, "in"));
-    out_stereo(&mut r, (level, "out"), (level, "out"));
+    out_stereo(&mut r, (level, "out"));
     r.route((m, "m1"), v.filt, "cutoff_hz", 0.25);
     r.route((m, "m2"), v.filt, "resonance", 0.25);
     r.route((m, "m3"), v.env, "decay_ms", 0.15);
@@ -960,7 +969,7 @@ pub fn bass_patch() -> PatchEditor {
         (clock, "bpm", Some(25), Some("Tempo")),
         (level, "gain_db", Some(26), Some("Level")),
     ]);
-    r.e.migrated()
+    r.e
 }
 
 pub fn breath_patch() -> PatchEditor {
@@ -988,11 +997,9 @@ pub fn breath_patch() -> PatchEditor {
         "reverb",
         &[("decay_s", 4.5), ("mix", 35.0), ("predelay_ms", 40.0)],
     );
-    r.wire((v.gain, "out"), (chorus, "in_l"));
-    r.wire((v.gain, "out"), (chorus, "in_r"));
-    r.wire((chorus, "left"), (reverb, "in_l"));
-    r.wire((chorus, "right"), (reverb, "in_r"));
-    out_stereo(&mut r, (reverb, "left"), (reverb, "right"));
+    r.wire((v.gain, "out"), (chorus, "in"));
+    r.wire((chorus, "out"), (reverb, "in"));
+    out_stereo(&mut r, (reverb, "out"));
     // Breath: more of the airy wide band; Color: a narrower, brighter band.
     r.route((m, "m1"), v.mix, "level3", 0.06);
     r.route((m, "m3"), v.band, "resonance", 0.08);
@@ -1009,7 +1016,7 @@ pub fn breath_patch() -> PatchEditor {
         (v.gain, "gain_db", Some(26), Some("Level")),
         (v.midi, "mode", None, Some("Keys")),
     ]);
-    r.e.migrated()
+    r.e
 }
 
 pub fn perc_patch() -> PatchEditor {
@@ -1032,9 +1039,8 @@ pub fn perc_patch() -> PatchEditor {
             ("predelay_ms", 8.0),
         ],
     );
-    r.wire((v.drive, "out"), (reverb, "in_l"));
-    r.wire((v.drive, "out"), (reverb, "in_r"));
-    out_stereo(&mut r, (reverb, "left"), (reverb, "right"));
+    r.wire((v.drive, "out"), (reverb, "in"));
+    out_stereo(&mut r, (reverb, "out"));
     macro_perc(&mut r, m, &v, reverb);
     r.pins(&[
         (clock, TRANSPORT, None, None),
@@ -1047,7 +1053,7 @@ pub fn perc_patch() -> PatchEditor {
         (v.hat_seq, BANKS, None, Some("Hat")),
         (v.bus, "level3", Some(24), Some("Hat level")),
     ]);
-    r.e.migrated()
+    r.e
 }
 
 fn macro_perc(r: &mut Rack, m: ModuleId, v: &Perc, reverb: ModuleId) {
@@ -1146,24 +1152,24 @@ pub fn piece_patch() -> PatchEditor {
     r.wire((pd.gain, "out"), (layers, "in3"));
     r.wire((ld.drive, "out"), (layers, "in4"));
     r.wire((ld.drive, "out"), (lead_send, "in1"));
-    r.wire((layers, "out"), (chorus, "in_l"));
-    r.wire((layers, "out"), (chorus, "in_r"));
+    r.wire((layers, "out"), (chorus, "in"));
     r.wire((lead_send, "out"), (delay, "in"));
     r.wire((clock, "gate"), (delay, "clock"));
+    let (chorus_s, delay_s) = (r.split(chorus), r.split(delay));
     for (bus, side) in [(bus_l, "left"), (bus_r, "right")] {
-        r.wire((chorus, side), (bus, "in1"));
-        r.wire((delay, side), (bus, "in2"));
+        r.wire((chorus_s, side), (bus, "in1"));
+        r.wire((delay_s, side), (bus, "in2"));
     }
-    r.wire((bus_l, "out"), (reverb, "in_l"));
-    r.wire((bus_r, "out"), (reverb, "in_r"));
+    let bus = r.join((bus_l, "out"), (bus_r, "out"));
+    r.wire((bus, "out"), (reverb, "in"));
     r.wire((p.drive, "out"), (dry, "in1"));
     r.wire((b.drive, "out"), (dry, "in2"));
-    r.wire((p.drive, "out"), (perc_rev, "in_l"));
-    r.wire((p.drive, "out"), (perc_rev, "in_r"));
+    r.wire((p.drive, "out"), (perc_rev, "in"));
+    let (reverb_s, perc_rev_s) = (r.split(reverb), r.split(perc_rev));
     for (main, side) in [(main_l, "left"), (main_r, "right")] {
         r.wire((dry, "out"), (main, "in1"));
-        r.wire((reverb, side), (main, "in2"));
-        r.wire((perc_rev, side), (main, "in3"));
+        r.wire((reverb_s, side), (main, "in2"));
+        r.wire((perc_rev_s, side), (main, "in3"));
     }
     r.set(dry, &[("level1", 0.4), ("level2", 0.4)]);
     r.set(main_l, &[("level2", 0.6), ("level3", 0.5)]);
@@ -1174,7 +1180,8 @@ pub fn piece_patch() -> PatchEditor {
     let master_r = r.add("gain", &[("gain_db", -4.0)]);
     r.wire((main_l, "out"), (master_l, "in"));
     r.wire((main_r, "out"), (master_r, "in"));
-    out_stereo(&mut r, (master_l, "out"), (master_r, "out"));
+    let master = r.join((master_l, "out"), (master_r, "out"));
+    out_stereo(&mut r, (master, "out"));
     // Energy: the sequences open and bite. Motion: every slow modulation deeper (the ringmods
     // take m2 directly). Bright: the keyboard layers' filters. Space: plate and echo.
     r.route((m, "m1"), b.filt, "cutoff_hz", 0.2);
@@ -1231,7 +1238,7 @@ pub fn piece_patch() -> PatchEditor {
     changes.push((clock, format!("{BTN_PREFIX}run"), Some(46.0)));
     changes.push((clock, format!("{BTN_PREFIX}restart"), Some(47.0)));
     r.e.set_presentation(&changes);
-    r.e.migrated()
+    r.e
 }
 
 type Builder = fn() -> PatchEditor;
@@ -1265,7 +1272,9 @@ fn write_palette_patches() {
     for (name, build, _) in PATCHES {
         let dir = patch_dir(name);
         let _ = std::fs::remove_dir_all(&dir);
-        kabl_core::save(&dir, build().log()).unwrap();
+        let mut built = build();
+        factory_bank::attach_guide(&mut built, name);
+        kabl_core::save(&dir, built.log()).unwrap();
     }
 }
 

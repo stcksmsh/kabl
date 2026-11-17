@@ -363,6 +363,22 @@
       }
     },
     "18": {
+      "kind": "split",
+      "pos": {
+        "x": 954.0,
+        "y": 1490.0
+      },
+      "params": {}
+    },
+    "19": {
+      "kind": "join",
+      "pos": {
+        "x": 954.0,
+        "y": 1860.0
+      },
+      "params": {}
+    },
+    "20": {
       "kind": "macro",
       "pos": {
         "x": 24.0,
@@ -382,22 +398,6 @@
         "pin.m3": 3.0,
         "pin.m4": 4.0
       }
-    },
-    "19": {
-      "kind": "join",
-      "pos": {
-        "x": 1004.0,
-        "y": 420.0
-      },
-      "params": {}
-    },
-    "20": {
-      "kind": "split",
-      "pos": {
-        "x": 1124.0,
-        "y": 1170.0
-      },
-      "params": {}
     }
   },
   "cables": {
@@ -727,23 +727,7 @@
       },
       "steps": []
     },
-    "22": {
-      "from": {
-        "Module": {
-          "id": 6,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 19,
-          "port": "left"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "24": {
+    "23": {
       "from": {
         "Module": {
           "id": 15,
@@ -759,7 +743,7 @@
       "params": {},
       "steps": []
     },
-    "25": {
+    "24": {
       "from": {
         "Module": {
           "id": 1,
@@ -775,10 +759,26 @@
       "params": {},
       "steps": []
     },
+    "25": {
+      "from": {
+        "Module": {
+          "id": 16,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 18,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
     "26": {
       "from": {
         "Module": {
-          "id": 20,
+          "id": 18,
           "port": "left"
         }
       },
@@ -794,7 +794,7 @@
     "27": {
       "from": {
         "Module": {
-          "id": 20,
+          "id": 18,
           "port": "right"
         }
       },
@@ -826,6 +826,22 @@
     "29": {
       "from": {
         "Module": {
+          "id": 6,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 19,
+          "port": "left"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "30": {
+      "from": {
+        "Module": {
           "id": 17,
           "port": "out"
         }
@@ -839,7 +855,23 @@
       "params": {},
       "steps": []
     },
-    "30": {
+    "31": {
+      "from": {
+        "Module": {
+          "id": 19,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 7,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "32": {
       "from": {
         "Module": {
           "id": 5,
@@ -857,10 +889,10 @@
       },
       "steps": []
     },
-    "31": {
+    "33": {
       "from": {
         "Module": {
-          "id": 18,
+          "id": 20,
           "port": "m1"
         }
       },
@@ -875,10 +907,10 @@
       },
       "steps": []
     },
-    "32": {
+    "34": {
       "from": {
         "Module": {
-          "id": 18,
+          "id": 20,
           "port": "m1"
         }
       },
@@ -893,10 +925,10 @@
       },
       "steps": []
     },
-    "33": {
+    "35": {
       "from": {
         "Module": {
-          "id": 18,
+          "id": 20,
           "port": "m2"
         }
       },
@@ -911,10 +943,10 @@
       },
       "steps": []
     },
-    "34": {
+    "36": {
       "from": {
         "Module": {
-          "id": 18,
+          "id": 20,
           "port": "m3"
         }
       },
@@ -929,10 +961,10 @@
       },
       "steps": []
     },
-    "35": {
+    "37": {
       "from": {
         "Module": {
-          "id": 18,
+          "id": 20,
           "port": "m3"
         }
       },
@@ -947,10 +979,10 @@
       },
       "steps": []
     },
-    "36": {
+    "38": {
       "from": {
         "Module": {
-          "id": 18,
+          "id": 20,
           "port": "m4"
         }
       },
@@ -965,10 +997,10 @@
       },
       "steps": []
     },
-    "37": {
+    "39": {
       "from": {
         "Module": {
-          "id": 18,
+          "id": 20,
           "port": "m4"
         }
       },
@@ -981,38 +1013,6 @@
       "params": {
         "amount": 0.12
       },
-      "steps": []
-    },
-    "38": {
-      "from": {
-        "Module": {
-          "id": 19,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 7,
-          "port": "in"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "39": {
-      "from": {
-        "Module": {
-          "id": 16,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 20,
-          "port": "in"
-        }
-      },
-      "params": {},
       "steps": []
     }
   },
@@ -1029,7 +1029,7 @@
       "bank.c": "Sparse",
       "bank.d": "Rest"
     },
-    "18": {
+    "20": {
       "guide": "Run starts probabilistic E-minor motion at 116 BPM. Pulse and Lift keep the first step certain; Sparse uses 45% ghost notes; Rest mutes. Launch both bank cards for sections. Glow, Motion, Length and Echo shape variation.",
       "name.m1": "Glow",
       "name.m2": "Motion",

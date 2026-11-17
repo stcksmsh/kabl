@@ -652,7 +652,7 @@ fn the_toolbar_switch_opens_perform_as_a_view_and_show_rack_docks_it() {
 
 #[test]
 fn a_macro_knob_edits_the_real_parameter_with_one_undo_step() {
-    const MACROS: u64 = 18;
+    const MACROS: u64 = 20;
     let mut h = H::new(1440.0, 900.0);
     h.ui.perform_tall = true;
     h.pin(MACROS, "m1");

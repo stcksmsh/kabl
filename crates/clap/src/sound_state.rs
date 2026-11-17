@@ -56,11 +56,7 @@ impl SoundState {
         if bytes.is_empty() || bytes.len() > MAX_STATE_BYTES {
             return Err("State size limit".into());
         }
-        let mut state: Self = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
-        // Before version 5 a project names the old stereo half ports.
-        if state.version < 5 {
-            kabl_core::migrate_state(&mut state.patch);
-        }
+        let state: Self = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
         // A state with embedded code is checked by `load` against its own code scope.
         if state.code.is_none() {
             state.validate()?;
@@ -79,18 +75,16 @@ impl SoundState {
     /// Everything but the patch's own validation, which needs the code scope: version, gain,
     /// lanes and the code section's size. `load` runs it before registering any code.
     pub fn validate_envelope(&self) -> Result<(), String> {
-        if !matches!(self.version, 1..=6) {
+        if self.version < 5 {
+            return Err(
+                "Sound state made by an older kabl development build; not supported".into(),
+            );
+        }
+        if self.version > 6 {
             return Err("Unsupported sound state version".into());
         }
         if !self.output_gain.is_finite() || !(0.0..=1.0).contains(&self.output_gain) {
             return Err("Invalid output gain".into());
-        }
-        if self.version == 1
-            && (self.host_clock
-                || self.lanes.iter().any(|l| l.target.is_some() || l.retired)
-                || self.slot_values.iter().any(|&v| v != 0.0))
-        {
-            return Err("Version 1 cannot contain D08 settings".into());
         }
         // The cap a load enforces: a state this build saves must be one it can reload.
         if self
@@ -102,13 +96,6 @@ impl SoundState {
         }
         if self.code.is_some() && self.version < 6 {
             return Err("Code state requires version 6".into());
-        }
-        if self.version < 3 && !self.patch.composites.is_empty() {
-            return Err("Composite state requires version 3".into());
-        }
-        // Older builds read versions up to 3 and would drop embedded tables silently.
-        if self.version < 4 && !self.patch.tables.is_empty() {
-            return Err("Wavetable state requires version 4".into());
         }
         for (i, lane) in self.lanes.iter().enumerate() {
             if !self.slot_values[i].is_finite() || !(0.0..=1.0).contains(&self.slot_values[i]) {
@@ -229,7 +216,7 @@ mod table_tests {
 
     #[test]
     fn embedded_tables_survive_a_host_project_round_trip() {
-        let s = state(4);
+        let s = state(5);
         let bytes = serde_json::to_vec(&s).unwrap();
         let back = SoundState::decode(&bytes).unwrap();
         assert_eq!(back.patch.tables, s.patch.tables);
@@ -237,17 +224,23 @@ mod table_tests {
     }
 
     #[test]
-    fn tables_need_version_4_and_older_builds_refuse_them() {
-        for v in [1, 2, 3] {
-            assert!(state(v).validate().is_err(), "version {v}");
+    fn an_older_or_newer_state_version_is_refused() {
+        for v in [1, 2, 3, 4] {
+            let err = state(v).validate().unwrap_err();
+            assert!(
+                err.contains("older kabl development build"),
+                "version {v}: {err}"
+            );
+            let bytes = serde_json::to_vec(&state(v)).unwrap();
+            assert!(SoundState::decode(&bytes).is_err(), "decode {v}");
         }
-        assert!(state(4).validate().is_ok());
+        assert!(state(5).validate().is_ok());
         assert!(state(7).validate().is_err());
     }
 
     #[test]
     fn a_patch_over_the_size_limit_is_refused() {
-        let mut s = state(4);
+        let mut s = state(5);
         let big = s.patch.tables[&1].clone();
         let mut huge = big.clone();
         huge.wav = {
@@ -306,7 +299,7 @@ mod panel_tests {
         c.panel = Some(Box::new(panel));
         kabl_ui::composites::set(&mut e, id, c).unwrap();
         let mut state = SoundState {
-            version: 3,
+            version: 5,
             patch: e.state().clone(),
             output_gain: 0.4,
             lanes: Default::default(),

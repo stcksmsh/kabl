@@ -179,16 +179,16 @@ fn a_macro_card_lists_its_real_destinations_and_reveals_an_off_face_one() {
         );
         assert!(h.ui.drawer_open);
         // Both routes, by their cables, each with a Show.
-        for c in [28, 29] {
+        for c in [29, 30] {
             let r = h.rect(&format!("explain-dest:{c}"));
             assert!(
                 Rect::from_min_size(Pos2::ZERO, h.size).contains_rect(r),
                 "{c} off screen at {w}x{hgt}"
             );
         }
-        h.click("explain-dest:29");
+        h.click("explain-dest:30");
         assert_eq!(h.ui.inspected, Some((LADDER, "drive_db".into())));
-        assert_eq!(h.ui.selected_route, Some(29));
+        assert_eq!(h.ui.selected_route, Some(30));
         assert!(
             h.ui.expanded.contains(&LADDER),
             "the hidden control is revealed"
@@ -201,10 +201,10 @@ fn a_macro_card_lists_its_real_destinations_and_reveals_an_off_face_one() {
             Some(Target::Control { id: LADDER, .. })
         ));
         // Its route row (bypass, depth) is in view in the drawer, above the Perform panel.
-        let row = h.rect("bypass:29");
+        let row = h.rect("bypass:30");
         let perform_top = h.rect("pcard:1.m1").top();
         assert!(
-            row.top() > h.rect("explain-dest:29").bottom() && row.bottom() < perform_top,
+            row.top() > h.rect("explain-dest:30").bottom() && row.bottom() < perform_top,
             "route row hidden at {w}x{hgt}: {row:?}"
         );
         h.unchanged_since(&before);
@@ -250,10 +250,10 @@ fn the_explanation_follows_route_edits_and_undo() {
     let dests = |h: &H| explain::destinations(h.editor.state(), MACROS, "m1").0;
     assert_eq!(
         dests(&h).iter().map(|d| d.cable).collect::<Vec<_>>(),
-        [28, 29]
+        [29, 30]
     );
     // Bypass one: listed as bypassed, the other untouched.
-    h.editor.set_route_bypass(28, true);
+    h.editor.set_route_bypass(29, true);
     h.frame();
     let d = dests(&h);
     assert!(matches!(d[0].reach, Reach::Param { bypass: true, .. }));
@@ -267,21 +267,21 @@ fn the_explanation_follows_route_edits_and_undo() {
         "{lines:?}"
     );
     // Inverted depth shows its sign.
-    h.editor.set_route_amount(29, -0.3, true);
+    h.editor.set_route_amount(30, -0.3, true);
     h.frame();
     assert!(matches!(dests(&h)[1].reach, Reach::Param { amount, .. } if amount == -0.3));
     // Show one, then remove it: the target goes, the panel says so; undo brings it back.
-    h.click("explain-dest:29");
-    h.editor.disconnect(29);
+    h.click("explain-dest:30");
+    h.editor.disconnect(30);
     h.frame();
     assert_eq!(dests(&h).len(), 1);
     assert!(h.ui.explain.target.is_none() && h.ui.explain.target_lost);
-    assert!(!h.ui.hits.contains_key("explain-dest:29"));
+    assert!(!h.ui.hits.contains_key("explain-dest:30"));
     h.editor.undo();
     h.frame();
     h.frame();
     assert_eq!(dests(&h).len(), 2);
-    assert!(h.ui.hits.contains_key("explain-dest:29"));
+    assert!(h.ui.hits.contains_key("explain-dest:30"));
     // A new route appears at once.
     let c = h.editor.connect_route(
         PortRef::Module {
@@ -355,7 +355,7 @@ fn signal_jack_destinations_list_one_bounded_hop() {
         .collect();
     assert_eq!(via46, [61, 62]);
     assert!(
-        rows.iter().any(|d| d.via.is_none() && d.cable == 149),
+        rows.iter().any(|d| d.via.is_none() && d.cable == 153),
         "chorus depth"
     );
     assert!(rows.len() <= explain::MAX_ROWS);
@@ -463,7 +463,7 @@ fn edits_from_perform_and_rack_are_one_state_while_explained() {
 fn module_removal_and_patch_replacement_invalidate_safely() {
     let mut h = H::new("palette/pad", 1440.0, 1800.0);
     h.click("pexplain:1.m1");
-    h.click("explain-dest:28");
+    h.click("explain-dest:29");
     // Delete the ladder: its routes and the target go; the panel keeps drawing.
     h.editor.remove_module(LADDER);
     h.frame();
@@ -475,7 +475,7 @@ fn module_removal_and_patch_replacement_invalidate_safely() {
     h.editor.undo();
     h.frame();
     h.frame();
-    assert!(h.ui.hits.contains_key("explain-dest:28"));
+    assert!(h.ui.hits.contains_key("explain-dest:29"));
     // Delete the macro module itself while explaining it.
     h.editor.remove_module(MACROS);
     h.frame();
@@ -487,7 +487,7 @@ fn module_removal_and_patch_replacement_invalidate_safely() {
     h.editor.undo();
     h.frame();
     // Opening another sound closes everything tied to this one.
-    h.click("explain-dest:29");
+    h.click("explain-dest:30");
     let log = kabl_core::load(
         &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/palette/lead"),
     )
@@ -779,7 +779,7 @@ fn a_save_dialog_over_an_explanation_keeps_escape_and_the_document() {
     let mut h = H::new("palette/pad", 1440.0, 1800.0);
     let before = h.snapshot();
     h.click("pexplain:1.m1");
-    h.click("explain-dest:29");
+    h.click("explain-dest:30");
     // Focused controls own pointer input. Close before using underlying toolbar.
     h.click("more:close");
     h.click("sound-menu");

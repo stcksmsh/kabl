@@ -24,7 +24,7 @@ fn stable_lanes_legacy_state_and_atomic_rejection() {
     assert!(p.shared.load(invalid).is_err());
     assert_eq!(serde_json::to_vec(&p.shared.snapshot()).unwrap(), original);
     let mut json: serde_json::Value = serde_json::from_slice(&original).unwrap();
-    json["version"] = 1.into();
+    json["version"] = 5.into();
     for key in ["lanes", "slot_values", "host_clock"] {
         json.as_object_mut().unwrap().remove(key);
     }
@@ -586,7 +586,7 @@ fn composite_embedded_state_preserves_lanes_and_rejects_legacy_envelope_atomical
     )
     .unwrap();
     state.patch = editor.state().clone();
-    state.version = 3;
+    state.version = 5;
     assert_eq!(state.patch.modules, original.modules);
     assert_eq!(state.patch.cables, original.cables);
     p.shared.load(state).unwrap();
@@ -633,7 +633,7 @@ fn wavetable_state_survives_a_host_project_reopen() {
             params: [("user".to_string(), 2.0)].into(),
         },
     );
-    state.version = 4;
+    state.version = 5;
     p.shared.load(state).unwrap();
 
     let saved = serde_json::to_vec(&p.shared.snapshot()).unwrap();
@@ -712,60 +712,15 @@ fn all_eight_macros_are_automation_candidates() {
 }
 
 #[test]
-fn a_version_4_project_with_half_ports_loads_with_stereo_ports() {
-    use kabl_core::{CableState, ModuleState, PatchState, PortRef};
-    let module = |kind: &str| ModuleState {
-        kind: kind.into(),
-        pos: Vec2 { x: 0., y: 0. },
-        params: Default::default(),
-    };
-    let cable = |from: (u64, &str), to: (u64, &str)| CableState {
-        from: PortRef::Module {
-            id: from.0,
-            port: from.1.into(),
-        },
-        to: PortRef::Module {
-            id: to.0,
-            port: to.1.into(),
-        },
-        params: Default::default(),
-        steps: vec![],
-    };
-    let mut patch = PatchState::default();
-    patch.modules.insert(1, module("gain"));
-    patch.modules.insert(2, module("reverb"));
-    patch.modules.insert(3, module("out"));
-    for (id, c) in [
-        cable((1, "out"), (2, "in_l")),
-        cable((1, "out"), (2, "in_r")),
-        cable((2, "left"), (3, "left")),
-        cable((2, "right"), (3, "right")),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        patch.cables.insert(id as u64 + 1, c);
-    }
+fn a_version_4_project_is_refused_not_migrated() {
     let p = tests::instrument();
     let mut json: serde_json::Value = serde_json::to_value(p.shared.snapshot()).unwrap();
     json["version"] = 4.into();
-    json["patch"] = serde_json::to_value(&patch).unwrap();
-    for key in ["lanes", "slot_values"] {
-        json.as_object_mut().unwrap().remove(key);
-    }
-    let state = SoundState::decode(&serde_json::to_vec(&json).unwrap()).unwrap();
-    let ports: Vec<_> = state
-        .patch
-        .cables
-        .values()
-        .map(|c| match (&c.from, &c.to) {
-            (PortRef::Module { port: f, .. }, PortRef::Module { port: t, .. }) => {
-                (f.clone(), t.clone())
-            }
-            _ => unreachable!(),
-        })
-        .collect();
-    assert_eq!(ports.len(), 2);
-    assert!(ports.contains(&("out".into(), "in".into())));
-    assert!(state.patch.modules.len() == 3);
+    let err = SoundState::decode(&serde_json::to_vec(&json).unwrap()).unwrap_err();
+    assert!(
+        err.contains("older kabl development build; not supported"),
+        "{err}"
+    );
+    // The host keeps working: the live document is untouched.
+    assert!(p.shared.load(p.shared.snapshot()).is_ok());
 }

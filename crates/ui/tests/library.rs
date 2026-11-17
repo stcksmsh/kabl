@@ -866,8 +866,7 @@ fn init_keyboard() -> PatchEditor {
     e.connect(port(filter, "lp"), port(vca, "in"));
     e.connect(port(midi, "gate"), port(env, "gate"));
     e.connect(port(env, "out"), port(vca, "cv"));
-    e.connect(port(vca, "out"), port(out, "left"));
-    e.connect(port(vca, "out"), port(out, "right"));
+    e.connect(port(vca, "out"), port(out, "in"));
     let pins: [(ModuleId, &str, &str); 5] = [
         (filter, "cutoff_hz", "Brightness"),
         (filter, "resonance", "Resonance"),
@@ -884,7 +883,7 @@ fn init_keyboard() -> PatchEditor {
     for (id, key, label) in pins {
         e.set_label(id, &format!("{PIN_PREFIX}{key}"), Some(label.to_string()));
     }
-    e.migrated()
+    e
 }
 
 #[test]

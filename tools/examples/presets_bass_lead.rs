@@ -51,11 +51,6 @@ struct Rack {
 }
 
 impl Rack {
-    fn migrated(mut self) -> Self {
-        self.e = self.e.migrated();
-        self
-    }
-
     fn new() -> Self {
         Rack {
             e: PatchEditor::new(),
@@ -86,12 +81,16 @@ impl Rack {
     }
     /// Left and right inputs of a stereo module from one mono source.
     fn wire_both(&mut self, a: ModuleId, ap: &str, b: ModuleId) {
-        self.wire(a, ap, b, "in_l");
-        self.wire(a, ap, b, "in_r");
+        self.wire(a, ap, b, "in");
+    }
+    /// A `split` of the stereo output of `a`: its `left` and `right` are the two sides.
+    fn split(&mut self, a: ModuleId) -> ModuleId {
+        let s = self.add("split", &[]);
+        self.wire(a, "out", s, "in");
+        s
     }
     fn stereo(&mut self, a: ModuleId, b: ModuleId) {
-        self.wire(a, "left", b, "in_l");
-        self.wire(a, "right", b, "in_r");
+        self.wire(a, "out", b, "in");
     }
     /// A modulation route into a knob; `amount` is the fraction of the knob's travel the
     /// source sweeps.
@@ -123,8 +122,7 @@ impl Rack {
     /// The last stage: the output. No limiter; headroom comes from the patch gain.
     fn out_stereo(&mut self, from: ModuleId) {
         let out = self.add("out", &[]);
-        self.wire(from, "left", out, "left");
-        self.wire(from, "right", out, "right");
+        self.wire(from, "out", out, "in");
     }
 }
 
@@ -198,13 +196,13 @@ fn space_tail(
             ("width", 60.0),
         ],
     );
-    r.wire(src, "left", delay, "in");
+    let split = r.split(src);
+    r.wire(split, "left", delay, "in");
     if let Some(c) = clock {
         r.wire(c, "gate", delay, "clock");
     }
     r.stereo(src, verb);
-    r.wire(delay, "left", verb, "in_l");
-    r.wire(delay, "right", verb, "in_r");
+    r.wire(delay, "out", verb, "in");
     r.route(knob, mac, delay, "mix", echo_max);
     r.route(knob, mac, verb, "mix", room_max);
     verb
@@ -2084,7 +2082,7 @@ fn main() {
     match args.get(1).map(String::as_str) {
         Some("write") => {
             for p in presets().into_iter().filter(|p| only(p)) {
-                let mut rack = (p.build)().migrated();
+                let mut rack = (p.build)();
                 rack.trim(level_trim(p.slug));
                 let dir = Path::new(&args[2]).join("presets").join(p.slug);
                 let _ = std::fs::remove_dir_all(&dir);
@@ -2146,7 +2144,7 @@ fn main() {
             for p in presets().into_iter().filter(|p| only(p)) {
                 let mut line = format!("{:14}", p.slug);
                 for (label, value) in [("all 0", 0.0), ("all 1", 1.0)] {
-                    let mut rack = (p.build)().migrated();
+                    let mut rack = (p.build)();
                     let knob = *rack.e.state().modules.iter().find(|(_, m)| m.kind == "macro").unwrap().0;
                     for k in 1..=8 {
                         if rack.e.state().modules[&knob].params.contains_key(&format!("pin.m{k}")) {
@@ -2160,13 +2158,13 @@ fn main() {
                 }
                 // Each macro alone, 0 against 1: how far the render moves (dB under the render).
                 let probe = |k: usize, v: f32| {
-                    let mut rack = (p.build)().migrated();
+                    let mut rack = (p.build)();
                     let knob = *rack.e.state().modules.iter().find(|(_, m)| m.kind == "macro").unwrap().0;
                     rack.e.set_param(knob, &format!("m{k}"), v);
                     render(rack.e.state(), &(p.phrase)(), p.secs).0
                 };
                 let count = (1..=8)
-                    .filter(|k| (p.build)().migrated().e.state().modules.values().any(|m| m.params.contains_key(&format!("pin.m{k}"))))
+                    .filter(|k| (p.build)().e.state().modules.values().any(|m| m.params.contains_key(&format!("pin.m{k}"))))
                     .count();
                 for k in 1..=count {
                     let (a, b) = (probe(k, 0.0), probe(k, 1.0));

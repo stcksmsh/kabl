@@ -52,11 +52,6 @@ struct Rack {
 }
 
 impl Rack {
-    fn migrated(mut self) -> Self {
-        self.e = self.e.migrated();
-        self
-    }
-
     fn new() -> Self {
         Rack {
             e: PatchEditor::new(),
@@ -87,12 +82,23 @@ impl Rack {
     }
     /// Left and right inputs of a stereo module from one mono source.
     fn wire_both(&mut self, a: ModuleId, ap: &str, b: ModuleId) {
-        self.wire(a, ap, b, "in_l");
-        self.wire(a, ap, b, "in_r");
+        self.wire(a, ap, b, "in");
+    }
+    /// A `split` of the stereo output of `a`: its `left` and `right` are the two sides.
+    fn split(&mut self, a: ModuleId) -> ModuleId {
+        let s = self.add("split", &[]);
+        self.wire(a, "out", s, "in");
+        s
+    }
+    /// A `join` of two mono sources into one stereo signal (its `out`).
+    fn join(&mut self, l: ModuleId, r: ModuleId) -> ModuleId {
+        let j = self.add("join", &[]);
+        self.wire(l, "out", j, "left");
+        self.wire(r, "out", j, "right");
+        j
     }
     fn stereo(&mut self, a: ModuleId, b: ModuleId) {
-        self.wire(a, "left", b, "in_l");
-        self.wire(a, "right", b, "in_r");
+        self.wire(a, "out", b, "in");
     }
     /// A modulation route into a knob; `amount` is the fraction of the knob's travel the
     /// source sweeps.
@@ -124,8 +130,7 @@ impl Rack {
     /// The last stage: the output. No limiter; headroom comes from the patch gain.
     fn out_stereo(&mut self, from: ModuleId) {
         let out = self.add("out", &[]);
-        self.wire(from, "left", out, "left");
-        self.wire(from, "right", out, "right");
+        self.wire(from, "out", out, "in");
     }
 }
 
@@ -199,13 +204,13 @@ fn space_tail(
             ("width", 60.0),
         ],
     );
-    r.wire(src, "left", delay, "in");
+    let split = r.split(src);
+    r.wire(split, "left", delay, "in");
     if let Some(c) = clock {
         r.wire(c, "gate", delay, "clock");
     }
     r.stereo(src, verb);
-    r.wire(delay, "left", verb, "in_l");
-    r.wire(delay, "right", verb, "in_r");
+    r.wire(delay, "out", verb, "in");
     r.route(knob, mac, delay, "mix", echo_max);
     r.route(knob, mac, verb, "mix", room_max);
     verb
@@ -952,7 +957,8 @@ fn groove(s: Spec) -> Rack {
             );
             v.r.wire(c.out.0, c.out.1, d, "in");
             v.r.wire(clock, "gate", d, "clock");
-            v.r.wire(d, "left", bus, "in2");
+            let split = v.r.split(d);
+            v.r.wire(split, "left", bus, "in2");
             Some(d)
         }
         (Some(c), false) => {
@@ -1123,8 +1129,9 @@ fn finish_drums(
         "m4",
     );
     let (mix_l, mix_r) = (v.r.add("mixer", &[]), v.r.add("mixer", &[]));
+    let tail_split = v.r.split(tail);
     for (mix, side) in [(mix_l, "left"), (mix_r, "right")] {
-        v.r.wire(tail, side, mix, "in1");
+        v.r.wire(tail_split, side, mix, "in1");
         v.r.wire(beat, "out", mix, "in2");
     }
     // The music joins at level 1 (its stored value); a trim macro lowers it toward macro 0.
@@ -1134,9 +1141,9 @@ fn finish_drums(
             v.r.route(v.knob, &mac, mix, "level1", (1.0 - g0) / stored);
         }
     }
+    let master = v.r.join(mix_l, mix_r);
     let out = v.r.add("out", &[]);
-    v.r.wire(mix_l, "out", out, "left");
-    v.r.wire(mix_r, "out", out, "right");
+    v.r.wire(master, "out", out, "in");
     perform(&mut v.r, v.knob, v.n, Some(clock));
     v.r
 }
@@ -2114,19 +2121,20 @@ fn acid_line() -> Rack {
             ("width", 60.0),
         ],
     );
-    v.r.wire(duck, "left", delay, "in");
+    let split = v.r.split(duck);
+    v.r.wire(split, "left", delay, "in");
     v.r.wire(clock, "gate", delay, "clock");
     v.r.stereo(duck, verb);
-    v.r.wire(delay, "left", verb, "in_l");
-    v.r.wire(delay, "right", verb, "in_r");
+    v.r.wire(delay, "out", verb, "in");
     let (mix_l, mix_r) = (v.r.add("mixer", &[]), v.r.add("mixer", &[]));
+    let verb_split = v.r.split(verb);
     for (mix, side) in [(mix_l, "left"), (mix_r, "right")] {
-        v.r.wire(verb, side, mix, "in1");
+        v.r.wire(verb_split, side, mix, "in1");
         v.r.wire(kit_mix, "out", mix, "in2");
     }
+    let master = v.r.join(mix_l, mix_r);
     let out = v.r.add("out", &[]);
-    v.r.wire(mix_l, "out", out, "left");
-    v.r.wire(mix_r, "out", out, "right");
+    v.r.wire(master, "out", out, "in");
     perform(&mut v.r, v.knob, v.n, Some(clock));
     v.r
 }
@@ -2554,7 +2562,7 @@ fn main() {
     match args.get(1).map(String::as_str) {
         Some("write") => {
             for p in presets().into_iter().filter(|p| only(p)) {
-                let mut rack = (p.build)().migrated();
+                let mut rack = (p.build)();
                 rack.trim(level_trim(p.slug));
                 let dir = Path::new(&args[2]).join("presets").join(p.slug);
                 let _ = std::fs::remove_dir_all(&dir);
@@ -2628,7 +2636,7 @@ fn main() {
             for p in presets().into_iter().filter(|p| only(p)) {
                 let mut line = format!("{:14}", p.slug);
                 for (label, value) in [("all 0", 0.0), ("all 1", 1.0)] {
-                    let mut rack = (p.build)().migrated();
+                    let mut rack = (p.build)();
                     let knob = *rack
                         .e
                         .state()
@@ -2652,7 +2660,7 @@ fn main() {
                 }
                 // Each macro alone, 0 against 1: how far the render moves (dB under the render).
                 let probe = |k: usize, v: f32| {
-                    let mut rack = (p.build)().migrated();
+                    let mut rack = (p.build)();
                     let knob = *rack
                         .e
                         .state()
@@ -2667,7 +2675,6 @@ fn main() {
                 let count = (1..=8)
                     .filter(|k| {
                         (p.build)()
-                            .migrated()
                             .e
                             .state()
                             .modules

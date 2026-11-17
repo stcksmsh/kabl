@@ -18,8 +18,7 @@ use crate::op::Entry;
 ///
 /// v8 is not a superset: stereo effects, `out`, `audio.in`, `pan` and `delay` have one width-2
 /// port (`in`, `out`) where v7 files name the pair `in_l`/`in_r`, `left`/`right`. A v7 build
-/// refuses a v8 file. Files below v8 name the old ports; the migration that rewrites them lands
-/// with step 2b of `docs/stereo/DESIGN.md`.
+/// refuses a v8 file. Files below v8 name the old ports and are refused.
 pub const CURRENT_SCHEMA_VERSION: u32 = 8;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -33,6 +32,8 @@ pub enum FormatError {
     Json(serde_json::Error),
     Toml(String),
     UnknownSchemaVersion(u32),
+    /// A file from an older development build (schema below the current one); the text says so.
+    Unsupported(String),
     Composite(String),
     /// A `.kabl` file that does not start with the `KABL` header frame.
     BadMagic,
@@ -89,18 +90,26 @@ pub fn save(dir: &Path, log: &PatchLog) -> Result<(), FormatError> {
 pub fn load(dir: &Path) -> Result<PatchLog, FormatError> {
     let meta_text = fs::read_to_string(dir.join("meta.toml"))?;
     let meta: Meta = toml::from_str(&meta_text).map_err(|e| FormatError::Toml(e.to_string()))?;
-    if !(1..=CURRENT_SCHEMA_VERSION).contains(&meta.schema_version) {
-        return Err(FormatError::UnknownSchemaVersion(meta.schema_version));
-    }
-
-    replay(
-        meta.schema_version,
-        &fs::read_to_string(dir.join("log.jsonl"))?,
-    )
+    check_schema(meta.schema_version)?;
+    replay(&fs::read_to_string(dir.join("log.jsonl"))?)
 }
 
-/// Replay JSON-lines log text written at `schema_version` into a patch.
-fn replay(schema_version: u32, log_text: &str) -> Result<PatchLog, FormatError> {
+/// Accepts only the current schema. Older development builds wrote other port names and are
+/// not supported (nothing is fixed before 1.0), so they get a clear refusal instead of a guess.
+fn check_schema(schema_version: u32) -> Result<(), FormatError> {
+    if schema_version == CURRENT_SCHEMA_VERSION {
+        Ok(())
+    } else if schema_version < CURRENT_SCHEMA_VERSION {
+        Err(FormatError::Unsupported(format!(
+            "schema {schema_version} was made by an older kabl development build; not supported"
+        )))
+    } else {
+        Err(FormatError::UnknownSchemaVersion(schema_version))
+    }
+}
+
+/// Replay JSON-lines log text of the current schema into a patch.
+fn replay(log_text: &str) -> Result<PatchLog, FormatError> {
     let mut log = PatchLog::new();
     for line in log_text.lines() {
         if line.trim().is_empty() {
@@ -109,16 +118,7 @@ fn replay(schema_version: u32, log_text: &str) -> Result<PatchLog, FormatError> 
         let entry: Entry = serde_json::from_str(line)?;
         log.append_entry_raw(entry);
     }
-    if schema_version < 4 && !log.state().composites.is_empty() {
-        return Err(FormatError::UnknownSchemaVersion(4));
-    }
-    if schema_version < 5 && !log.state().tables.is_empty() {
-        return Err(FormatError::UnknownSchemaVersion(5));
-    }
     log.floor_after_migration();
-    if schema_version < 8 {
-        crate::migrate::migrate_v7_to_v8(&mut log);
-    }
     crate::composite::validate(log.state()).map_err(FormatError::Composite)?;
     Ok(log)
 }
@@ -297,9 +297,7 @@ fn read_kabl_full_limited<R: Read>(
         return Err(FormatError::UnknownContainerVersion(u16_at(12)));
     }
     let schema = u32::from(u16_at(14));
-    if !(1..=CURRENT_SCHEMA_VERSION).contains(&schema) {
-        return Err(FormatError::UnknownSchemaVersion(schema));
-    }
+    check_schema(schema)?;
     let dict: &[u8] = match u32_at(16) {
         0 => &[],
         // Literal ids: a later dictionary adds an arm and bumps KABL_DICT_ID (the writer's id);
@@ -371,7 +369,7 @@ fn read_kabl_full_limited<R: Read>(
         return Err(FormatError::TooLarge(max));
     }
     let text = String::from_utf8(text).map_err(|e| FormatError::Corrupt(e.to_string()))?;
-    Ok((replay(schema, &text)?, meta, code))
+    Ok((replay(&text)?, meta, code))
 }
 
 /// Save `log` to `path` (`name.kabl`): write `name.kabl.tmp`, fsync, then rename over `path`.
