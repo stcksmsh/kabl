@@ -53,7 +53,9 @@ impl H {
         };
         h.ui.perform_open = true;
         h.frame();
-        h.frame();
+        for _ in 0..30 {
+            h.frame();
+        }
         h
     }
 
@@ -105,7 +107,11 @@ impl H {
         self.move_to(self.rect(key).center());
         self.button(true);
         self.button(false);
-        self.frame();
+        // Views and the drawer fade and slide: let them finish.
+        let moves = matches!(key, "perform" | "rack" | "routing" | "drawer-pin");
+        for _ in 0..if moves { 30 } else { 1 } {
+            self.frame();
+        }
     }
 
     /// A CC through the control layer (no frame needed), then a frame to draw it.
@@ -595,7 +601,10 @@ fn the_transport_menu_carries_the_view_controls() {
     h.ui.perform_open = true;
     h.ui.perform_tall = true;
     h.ui.midi_inputs = vec!["KeyStep".into()];
-    h.frame();
+    // The drawer slides away as the view fills the window: let it finish.
+    for _ in 0..30 {
+        h.frame();
+    }
     assert!(
         !h.ui.hits.contains_key("notes-off"),
         "not drawn until the menu opens"
@@ -711,7 +720,7 @@ fn scenes_and_macros_use_the_width_at_every_size() {
         h.ui.perform_open = true;
         h.ui.perform_tall = true;
         h.ui.drawer_open = false;
-        for _ in 0..4 {
+        for _ in 0..40 {
             h.frame();
         }
         let right = w - 44.0;

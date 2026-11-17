@@ -2,6 +2,29 @@
 
 use super::*;
 
+/// Drawer, view and glide durations (ms) of both looks: HANDOVER section 6, "fast" column.
+/// The open fast-vs-soft gate is this one line: swap `FAST` for `SOFT`.
+pub struct Transitions {
+    pub drawer: f32,
+    pub view: f32,
+    pub glide: f32,
+}
+
+pub const FAST: Transitions = Transitions {
+    drawer: 180.0,
+    view: 160.0,
+    glide: 60.0,
+};
+
+#[allow(dead_code)]
+pub const SOFT: Transitions = Transitions {
+    drawer: 260.0,
+    view: 240.0,
+    glide: 100.0,
+};
+
+const TRANSITIONS: Transitions = FAST;
+
 pub const BUILTIN_A_ID: &str = "kabl.satin";
 
 fn h(s: &str) -> Color32 {
@@ -59,9 +82,9 @@ pub fn builtin_a(dark: bool) -> Style {
         motion: Motion {
             hover: 90.0,
             press: 60.0,
-            drawer: 220.0,
-            view: 180.0,
-            glide: 120.0,
+            drawer: TRANSITIONS.drawer,
+            view: TRANSITIONS.view,
+            glide: TRANSITIONS.glide,
             pulse: 1200.0,
         },
         slots: Slots {
@@ -312,9 +335,9 @@ pub fn builtin_b(dark: bool) -> Style {
         motion: Motion {
             hover: 120.0,
             press: 80.0,
-            drawer: 260.0,
-            view: 220.0,
-            glide: 160.0,
+            drawer: TRANSITIONS.drawer,
+            view: TRANSITIONS.view,
+            glide: TRANSITIONS.glide,
             pulse: 900.0,
         },
         slots: Slots {

@@ -59,7 +59,7 @@ impl H {
     }
 
     fn settle(&mut self) {
-        for _ in 0..4 {
+        for _ in 0..40 {
             self.frame();
         }
     }

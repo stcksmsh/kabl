@@ -61,6 +61,10 @@ impl H {
         self.ui.selected_module = Some(id);
         self.frame();
         self.click("zoom:focus");
+        // The camera glides there: let it arrive.
+        for _ in 0..60 {
+            self.frame();
+        }
     }
 
     fn click(&mut self, key: &str) {

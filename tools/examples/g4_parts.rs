@@ -229,6 +229,7 @@ impl eframe::App for App {
                 actions: vec!["Show details".into(), "Open another…".into()],
                 expanded: false,
                 born: t,
+                leaving: None,
             },
             g4::Toast {
                 sev: g4::Sev::Good,
@@ -237,6 +238,7 @@ impl eframe::App for App {
                 actions: vec![],
                 expanded: false,
                 born: t,
+                leaving: None,
             },
         ];
         let toast_area = Rect::from_min_size(pos2(1000.0, 500.0), vec2(400.0, 300.0));

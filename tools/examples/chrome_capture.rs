@@ -356,6 +356,7 @@ impl App {
                     expanded: true,
                     // Never expires: the warning and success toasts must still be there.
                     born: 1.0e9,
+                    leaving: None,
                 });
             }
         }

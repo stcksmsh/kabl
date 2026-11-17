@@ -187,6 +187,11 @@ pub struct UiState {
     pub toasts: Vec<kit::g4::Toast>,
     /// The `last_message` text already turned into a toast.
     toast_seen: Option<String>,
+    /// Scene (0 rack, 1 perform, 2 sounds) of the last frame and when it was entered: the view
+    /// fades in from there.
+    view_seen: Option<(u8, f64)>,
+    /// Zoom and pan the camera is gliding toward (`zoom` and `pan` are what is drawn now).
+    glide: Option<(f32, EguiVec2)>,
     /// The empty rack's Add module button asks the toolbar to open its menu.
     add_menu_req: bool,
     pub cable_view: CableView,
@@ -437,6 +442,8 @@ impl Default for UiState {
             last_message: None,
             toasts: Vec::new(),
             toast_seen: None,
+            view_seen: None,
+            glide: None,
             add_menu_req: false,
             cable_view: CableView::All,
             inspected: None,
@@ -664,15 +671,59 @@ impl UiState {
         }
     }
 
+    /// The zoom the camera is heading for: the drawn one unless a glide is under way.
+    fn zoom_target(&self) -> f32 {
+        self.glide.map_or(self.zoom, |(z, _)| z)
+    }
+
+    /// Zooms about the screen point `at`, gliding there on the glide token. The point under
+    /// `at` is read off where the camera is heading, so successive steps compose.
     fn zoom_about(&mut self, zoom: f32, at: Pos2) {
-        let world = self.xf().inv(at);
+        let (z0, p0) = self.glide.unwrap_or((self.zoom, self.pan));
+        let world = ((at - self.canvas.min - p0) / z0).to_pos2();
         self.auto_fit = false;
-        self.zoom = zoom.clamp(MIN_ZOOM, MAX_ZOOM);
-        self.pan = at - self.canvas.min - world.to_vec2() * self.zoom;
+        let z = zoom.clamp(MIN_ZOOM, MAX_ZOOM);
+        self.glide = Some((z, at - self.canvas.min - world.to_vec2() * z));
+    }
+
+    /// Moves the camera by `d` screen px at once (drag, scroll), along with any glide.
+    fn pan_by(&mut self, d: EguiVec2) {
+        self.pan += d;
+        if let Some((_, p)) = &mut self.glide {
+            *p += d;
+        }
+    }
+
+    /// Advances the glide one frame; repaints until the camera has arrived.
+    fn step_glide(&mut self, ctx: &egui::Context) {
+        let Some((z, p)) = self.glide else { return };
+        let dt = ctx.input(|i| i.stable_dt).min(0.1);
+        let ms = self.style.motion.glide;
+        self.zoom = kit::glide_step(self.zoom, z, dt, ms);
+        self.pan = vec2(
+            kit::glide_step(self.pan.x, p.x, dt, ms),
+            kit::glide_step(self.pan.y, p.y, dt, ms),
+        );
+        if (self.zoom - z).abs() < 5e-4 && (self.pan - p).abs().max_elem() < 0.05 {
+            self.zoom = z;
+            self.pan = p;
+            self.glide = None;
+        } else {
+            ctx.request_repaint();
+        }
+    }
+
+    /// `frame_world`, gliding there.
+    fn glide_to_world(&mut self, world: Rect, max_zoom: f32) {
+        let (z, p) = (self.zoom, self.pan);
+        self.frame_world(world, max_zoom);
+        self.glide = Some((self.zoom, self.pan));
+        (self.zoom, self.pan) = (z, p);
     }
 
     /// Zooms so `world` fits the canvas (at most `max_zoom`), anchored top-left under the toolbar.
     fn frame_world(&mut self, world: Rect, max_zoom: f32) {
+        self.glide = None;
         if !world.min.x.is_finite()
             || !world.min.y.is_finite()
             || !world.max.x.is_finite()
@@ -766,7 +817,7 @@ impl UiState {
         if target.top() + d.y < c.top() {
             d.y = c.top() - target.top();
         }
-        self.pan += d;
+        self.pan_by(d);
     }
 
     fn view(&self) -> rack::View<'_> {
@@ -1065,8 +1116,16 @@ pub fn show_with(
             .frame(kit::panel_frame(&st))
             .show(ui, |ui| perform_view::panel(editor, ui_state, ui));
     }
-    // The Sounds scene has its own detail column: the drawer waits behind it.
-    if ui_state.drawer_open && !ui_state.browser_open {
+    // The Sounds scene has its own detail column: the drawer waits behind it. Opening and
+    // closing slides and fades on the drawer token; the contents keep their full width.
+    let drawer_t = kit::open_close(
+        ui.ctx(),
+        Id::new("kabl-drawer-anim"),
+        ui_state.drawer_open && !ui_state.browser_open,
+        st.motion.drawer,
+    );
+    if drawer_t > 0.0 {
+        let content_w = |frame: &egui::Frame| DRAWER_W - frame.total_margin().sum().x;
         if compact {
             // Below 1280 px the drawer floats over the rack instead of splitting the window.
             let avail = ui.available_rect_before_wrap();
@@ -1083,8 +1142,9 @@ pub fn show_with(
             egui::Area::new(egui::Id::new("kabl-params-overlay"))
                 .order(egui::Order::Foreground)
                 .fade_in(false)
-                .fixed_pos(rect.min)
+                .fixed_pos(rect.min + vec2(DRAWER_W * (1.0 - drawer_t), 0.0))
                 .show(ui.ctx(), |ui| {
+                    ui.set_opacity(drawer_t);
                     frame.show(ui, |ui| {
                         ui.set_min_size(rect.size() - frame.total_margin().sum());
                         ui.set_max_size(rect.size() - frame.total_margin().sum());
@@ -1092,11 +1152,20 @@ pub fn show_with(
                     });
                 });
         } else {
+            let frame = kit::panel_frame(&st);
+            let w = content_w(&frame);
             egui::Panel::right("kabl-params")
-                .exact_size(DRAWER_W)
+                .exact_size(DRAWER_W * drawer_t)
                 .resizable(false)
-                .frame(kit::panel_frame(&st))
-                .show(ui, |ui| drawer(editor, ui_state, ui, &st, now));
+                .frame(frame)
+                .show(ui, |ui| {
+                    let r = ui.max_rect();
+                    let full = egui::Rect::from_min_max(egui::pos2(r.right() - w, r.top()), r.max);
+                    let mut inner = ui.new_child(egui::UiBuilder::new().max_rect(full));
+                    inner.set_clip_rect(r.intersect(ui.clip_rect()));
+                    inner.set_opacity(drawer_t);
+                    drawer(editor, ui_state, &mut inner, &st, now);
+                });
         }
     }
 
@@ -1105,19 +1174,51 @@ pub fn show_with(
     if !ui_state.browser_open && !perform_full {
         tables::show(editor, ui_state, ui);
     }
+    // Rack, Perform and Sounds fade in over the page on the view token.
+    let scene = if ui_state.browser_open {
+        2
+    } else {
+        u8::from(perform_full)
+    };
+    let entered = match ui_state.view_seen {
+        Some((s, at)) if s == scene => at,
+        Some(_) => now,
+        None => f64::NEG_INFINITY,
+    };
+    ui_state.view_seen = Some((scene, entered));
+    let view_p = ((now - entered) / f64::from(Style::secs(st.motion.view))).clamp(0.0, 1.0) as f32;
+    let view_a = kit::Bezier::VIEW.at(view_p);
+    if view_p < 1.0 {
+        ui.ctx().request_repaint();
+    }
     if ui_state.browser_open {
         egui::CentralPanel::default()
             .frame(kit::panel_frame(&st))
-            .show(ui, |ui| browser::panel(editor, ui_state, ui));
+            .show(ui, |ui| {
+                if view_a < 1.0 {
+                    ui.set_opacity(view_a);
+                }
+                browser::panel(editor, ui_state, ui);
+            });
     } else if perform_full {
         // The Perform view's cards sit 16 from the window edges (mockup `performScreen`).
         egui::CentralPanel::default()
             .frame(kit::page_frame(&st).inner_margin(egui::Margin::same(16)))
-            .show(ui, |ui| perform_view::panel(editor, ui_state, ui));
+            .show(ui, |ui| {
+                if view_a < 1.0 {
+                    ui.set_opacity(view_a);
+                }
+                perform_view::panel(editor, ui_state, ui);
+            });
     } else {
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE.fill(st.roles.rack))
-            .show(ui, |ui| show_rack(editor, ui_state, ui, &th));
+            .show(ui, |ui| {
+                if view_a < 1.0 {
+                    ui.set_opacity(view_a);
+                }
+                show_rack(editor, ui_state, ui, &th);
+            });
     }
     browser::dialogs(editor, ui_state, ui.ctx());
     show_toasts(ui_state, ui, &st, page);
@@ -1322,6 +1423,7 @@ fn show_toasts(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, area: Rect
                 actions,
                 expanded: false,
                 born: now,
+                leaving: None,
             });
         }
     }
@@ -1574,7 +1676,7 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
                 Scene::Rack => {
                     let c = ui_state.canvas.center();
                     if tool_icon(ui, st, ui_state, "zoom:in", kit::Ic::Plus, "Zoom in", true) {
-                        ui_state.zoom_about(ui_state.zoom * 1.2, c);
+                        ui_state.zoom_about(ui_state.zoom_target() * 1.2, c);
                     }
                     let pct = format!("{:.0} %", ui_state.zoom * 100.0);
                     let r = ui
@@ -1593,7 +1695,7 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
                         "Zoom out",
                         true,
                     ) {
-                        ui_state.zoom_about(ui_state.zoom / 1.2, c);
+                        ui_state.zoom_about(ui_state.zoom_target() / 1.2, c);
                     }
                     {
                         if tool_icon(
@@ -1606,7 +1708,7 @@ fn toolbar(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, 
                             true,
                         ) {
                             let lay = composite_layout(editor.state(), ui_state);
-                            ui_state.frame_world(lay.bounds.expand(4.0), 1.5);
+                            ui_state.glide_to_world(lay.bounds.expand(4.0), 1.5);
                         }
                         vsep(ui, st);
                     }
@@ -1735,12 +1837,15 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
             if let Some(world) = focus_target.and_then(|id| lay.get(id)).map(|m| m.full()) {
                 // Readable: at least 100 % unless the module is wider than the canvas.
                 let fit = (ui_state.canvas.width() - 48.0) / world.width();
+                let (z, p) = (ui_state.zoom, ui_state.pan);
                 ui_state.frame_world(
                     world.expand(24.0),
                     fit.clamp(MIN_ZOOM, 1.25).max(fit.min(1.0)),
                 );
                 let d = ui_state.canvas.center() - ui_state.xf().r(world).center();
                 ui_state.pan += d;
+                ui_state.glide = Some((ui_state.zoom, ui_state.pan));
+                (ui_state.zoom, ui_state.pan) = (z, p);
             }
         }
         ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
@@ -2144,6 +2249,7 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     rack_editor::boundary(editor, ui_state, ui);
     let canvas = ui.available_rect_before_wrap();
     let now = ui.input(|i| i.time);
+    ui_state.step_glide(ui.ctx());
     let lay = composite_layout(editor.state(), ui_state);
     rack_editor::update_drag(editor, ui_state, ui, &lay);
     let lay = composite_layout(editor.state(), ui_state);
@@ -2243,7 +2349,7 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         && ui_state.choose.is_none()
         && ui_state.panels.selected.is_none()
     {
-        ui_state.pan += bg.drag_delta();
+        ui_state.pan_by(bg.drag_delta());
     }
     if bg.clicked()
         && ui_state.moving.is_none()
@@ -2529,10 +2635,10 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     }) {
         let (scroll, zd) = ui.input(|i| (i.smooth_scroll_delta, i.zoom_delta()));
         if zd != 1.0 {
-            ui_state.zoom_about(ui_state.zoom * zd, p);
+            ui_state.zoom_about(ui_state.zoom_target() * zd, p);
             ui.ctx().request_repaint();
         } else if scroll != EguiVec2::ZERO {
-            ui_state.pan += scroll;
+            ui_state.pan_by(scroll);
             ui.input_mut(|i| i.smooth_scroll_delta = EguiVec2::ZERO);
             ui.ctx().request_repaint();
         }
