@@ -1526,20 +1526,10 @@ fn slate_roof() -> Rack {
         cut,
         4000.0,
     );
-    // Growl: the filter rolls faster and deeper, and the resonance rises.
+    // Growl: the filter rolls faster and deeper.
     let growl = v.r.add("lfo", &[("rate_hz", 3.2)]);
     v.depth_keep(growl, "out", lad, "cutoff_hz", 2, 0.35, 0.25, 0.0875);
     span(&mut v, 2, 0.35, growl, "lfo", "rate_hz", 1.2, 3.2);
-    span(
-        &mut v,
-        2,
-        0.35,
-        lad,
-        "filter.ladder",
-        "resonance",
-        0.15,
-        0.22,
-    );
     // Stack: the saw stack spreads and the second saw drifts (a tight stack to a wall).
     span(&mut v, 3, 0.5, o0, "osc.va", "detune", 8.0, 30.0);
     span(&mut v, 3, 0.5, o1, "osc.va", "fine", 2.0, 8.0);
@@ -1606,7 +1596,6 @@ fn gutter() -> Rack {
         &[("bits", 8.0), ("downsample", 2.0), ("mix", 10.0)],
     );
     span(&mut v, 2, 0.65, crush, "bitcrusher", "mix", 0.0, 10.0);
-    span(&mut v, 2, 0.65, lad, "filter.ladder", "drive_db", 2.0, 10.0);
     // Squash: the compressor clamps harder and harder and the makeup follows.
     let comp = v.stage("compressor", &compressor(-28.0, 8.0, 1.0, 80.0, 14.0));
     span(

@@ -111,7 +111,7 @@
       "params": {
         "cutoff_hz": 353.39954,
         "drive_db": 4.0,
-        "resonance": 0.15
+        "resonance": 0.22
       }
     },
     "9": {
@@ -562,24 +562,6 @@
       "from": {
         "Module": {
           "id": 2,
-          "port": "m2"
-        }
-      },
-      "to": {
-        "Param": {
-          "id": 8,
-          "param": "resonance"
-        }
-      },
-      "params": {
-        "amount": 0.19999999
-      },
-      "steps": []
-    },
-    "21": {
-      "from": {
-        "Module": {
-          "id": 2,
           "port": "m3"
         }
       },
@@ -594,7 +576,7 @@
       },
       "steps": []
     },
-    "22": {
+    "21": {
       "from": {
         "Module": {
           "id": 2,
@@ -612,7 +594,7 @@
       },
       "steps": []
     },
-    "23": {
+    "22": {
       "from": {
         "Module": {
           "id": 12,
@@ -628,7 +610,7 @@
       "params": {},
       "steps": []
     },
-    "24": {
+    "23": {
       "from": {
         "Module": {
           "id": 2,
@@ -646,7 +628,7 @@
       },
       "steps": []
     },
-    "25": {
+    "24": {
       "from": {
         "Module": {
           "id": 14,
@@ -662,7 +644,7 @@
       "params": {},
       "steps": []
     },
-    "26": {
+    "25": {
       "from": {
         "Module": {
           "id": 15,
@@ -678,7 +660,7 @@
       "params": {},
       "steps": []
     },
-    "27": {
+    "26": {
       "from": {
         "Module": {
           "id": 18,
@@ -694,7 +676,7 @@
       "params": {},
       "steps": []
     },
-    "29": {
+    "28": {
       "from": {
         "Module": {
           "id": 16,
@@ -710,7 +692,7 @@
       "params": {},
       "steps": []
     },
-    "30": {
+    "29": {
       "from": {
         "Module": {
           "id": 17,
