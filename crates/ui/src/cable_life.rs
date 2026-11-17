@@ -136,6 +136,8 @@ struct Glow {
 /// Smoothed `lit` per cable, and whether anything needs frames.
 #[derive(Default)]
 pub struct Life {
+    /// Reduced motion: the glow lets go at half speed.
+    pub slow_release: bool,
     cables: HashMap<CableId, Glow>,
     live_until: f64,
     seen: Vec<CableId>,
@@ -156,6 +158,7 @@ impl Life {
         let g = self.cables.entry(id).or_default();
         let t = target.unwrap_or(0.0);
         let (attack, release) = class.tau_ms();
+        let release = release * if self.slow_release { 2.0 } else { 1.0 };
         g.lit = smooth(g.lit, t, dt, if t > g.lit { attack } else { release });
         if g.lit >= QUIET || t >= QUIET {
             g.live_at = now;
@@ -202,6 +205,8 @@ struct Edge {
 /// wagon wheel under a 60 Hz capture, and is too fast to follow by eye.
 #[derive(Default)]
 pub struct Pulses {
+    /// Reduced motion: the flash decays at half speed.
+    pub slow_release: bool,
     cables: HashMap<CableId, Edge>,
     seen: Vec<CableId>,
 }
@@ -219,7 +224,8 @@ impl Pulses {
             }
             e.prev_high = high;
         }
-        e.flash *= (-dt / (FLASH_TAU_MS / 1000.0)).exp();
+        let tau = FLASH_TAU_MS * if self.slow_release { 2.0 } else { 1.0 };
+        e.flash *= (-dt / (tau / 1000.0)).exp();
         e.flash
     }
 
@@ -395,6 +401,37 @@ mod tests {
         assert!((f - FLASH_PEAK).abs() < 1e-6);
         let f = p.update(1, None, FLASH_TAU_MS / 1000.0);
         assert!((f - FLASH_PEAK * (-1.0f32).exp()).abs() < 1e-5, "{f}");
+    }
+
+    #[test]
+    fn reduced_motion_doubles_the_glow_release() {
+        let release = |slow: bool| {
+            let mut life = Life {
+                slow_release: slow,
+                ..Life::default()
+            };
+            for k in 0..20 {
+                life.update(1, Class::Audio, Some(1.0), 0.015, f64::from(k) * 0.015);
+            }
+            life.update(1, Class::Audio, Some(0.0), 0.15, 0.4)
+        };
+        // After one release tau (150 ms) the normal glow is at 1/e, the slowed one far above.
+        assert!(
+            release(true) > release(false) + 0.15,
+            "{} {}",
+            release(true),
+            release(false)
+        );
+        let flash = |slow: bool| {
+            let mut p = Pulses {
+                slow_release: slow,
+                ..Pulses::default()
+            };
+            p.update(1, Some(&gate(true, 0.0)), 0.0);
+            p.update(1, None, FLASH_TAU_MS / 1000.0)
+        };
+        assert!((flash(true) - (-0.5f32).exp()).abs() < 1e-5);
+        assert!((flash(false) - (-1.0f32).exp()).abs() < 1e-5);
     }
 
     #[test]

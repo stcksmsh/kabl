@@ -25,6 +25,31 @@ pub const SOFT: Transitions = Transitions {
 
 const TRANSITIONS: Transitions = FAST;
 
+/// The cable settle spring (HANDOVER section 6): a damped spring on a cable's sag amount,
+/// `a = -w^2 s - 2 zeta w v`.
+pub struct Settle {
+    /// Natural frequency in Hz (2.5 to 4).
+    pub hz: f32,
+    /// Damping ratio (0.35 to 0.55).
+    pub zeta: f32,
+    /// Start offset as a fraction of the cable's sag (negative: the rope starts taut).
+    pub start: f32,
+    /// Asleep below this offset (px) and this speed (px/s).
+    pub sleep_px: f32,
+    pub sleep_px_s: f32,
+}
+
+pub const SETTLE: Settle = Settle {
+    hz: 3.2,
+    zeta: 0.45,
+    start: -0.15,
+    sleep_px: 0.3,
+    sleep_px_s: 2.0,
+};
+
+/// Motion tokens (ms) under reduced motion: slides and glides land at once.
+pub const REDUCED_MS: f32 = 1.0;
+
 pub const BUILTIN_A_ID: &str = "kabl.satin";
 
 fn h(s: &str) -> Color32 {

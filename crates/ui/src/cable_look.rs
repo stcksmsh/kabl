@@ -137,8 +137,18 @@ pub fn point_count(len: f32) -> usize {
 /// cubic whose handles sit 15 % of the span inwards and hang by the theme's sag plus 0.28 of
 /// the length, at most 160. `zoom` scales the base sag and the limit.
 pub fn points(a: Pos2, b: Pos2, zoom: f32, sag: f32) -> Vec<Pos2> {
+    points_with(a, b, zoom, sag, 0.0)
+}
+
+/// The resting sag of a cable in px: what [`points`] hangs it by.
+pub fn rest_sag(a: Pos2, b: Pos2, zoom: f32, sag: f32) -> f32 {
+    (sag * zoom + 0.28 * (b - a).length()).min(160.0 * zoom)
+}
+
+/// `points` with the sag amount moved by `extra` px (the settle spring), never above the ends.
+pub fn points_with(a: Pos2, b: Pos2, zoom: f32, sag: f32, extra: f32) -> Vec<Pos2> {
     let d = b - a;
-    let sag = (sag * zoom + 0.28 * d.length()).min(160.0 * zoom);
+    let sag = (rest_sag(a, b, zoom, sag) + extra).max(0.0);
     let (c1, c2) = (a + vec2(d.x * 0.15, sag), b + vec2(-d.x * 0.15, sag));
     let n = point_count(d.length() + 2.0 * sag);
     (0..n)
@@ -163,15 +173,16 @@ pub fn points_cached(
     b: Pos2,
     zoom: f32,
     sag: f32,
+    extra: f32,
 ) -> std::sync::Arc<Vec<Pos2>> {
-    type Hit = ([Pos2; 2], [f32; 2], std::sync::Arc<Vec<Pos2>>);
+    type Hit = ([Pos2; 2], [f32; 3], std::sync::Arc<Vec<Pos2>>);
     if let Some((e, p, pts)) = ctx.data(|d| d.get_temp::<Hit>(key)) {
-        if e == [a, b] && p == [zoom, sag] {
+        if e == [a, b] && p == [zoom, sag, extra] {
             return pts;
         }
     }
-    let pts = std::sync::Arc::new(points(a, b, zoom, sag));
-    ctx.data_mut(|d| d.insert_temp::<Hit>(key, ([a, b], [zoom, sag], pts.clone())));
+    let pts = std::sync::Arc::new(points_with(a, b, zoom, sag, extra));
+    ctx.data_mut(|d| d.insert_temp::<Hit>(key, ([a, b], [zoom, sag, extra], pts.clone())));
     pts
 }
 
@@ -391,14 +402,20 @@ mod tests {
     fn points_are_cached_until_the_inputs_change() {
         let ctx = egui::Context::default();
         let (k, a, b) = (Id::new("c"), Pos2::new(0.0, 0.0), Pos2::new(90.0, 10.0));
-        let p = points_cached(&ctx, k, a, b, 1.0, 12.0);
+        let p = points_cached(&ctx, k, a, b, 1.0, 12.0, 0.0);
         assert!(std::sync::Arc::ptr_eq(
             &p,
-            &points_cached(&ctx, k, a, b, 1.0, 12.0)
+            &points_cached(&ctx, k, a, b, 1.0, 12.0, 0.0)
         ));
-        let q = points_cached(&ctx, k, a, b, 2.0, 12.0);
+        let q = points_cached(&ctx, k, a, b, 2.0, 12.0, 0.0);
         assert!(!std::sync::Arc::ptr_eq(&p, &q));
         assert_eq!(*q, points(a, b, 2.0, 12.0));
+        // The settle spring's offset is part of the key, and never lifts the rope above its ends.
+        let r = points_cached(&ctx, k, a, b, 2.0, 12.0, -15.0);
+        assert!(!std::sync::Arc::ptr_eq(&q, &r));
+        assert_eq!(*r, points_with(a, b, 2.0, 12.0, -15.0));
+        let taut = points_with(a, b, 1.0, 12.0, -1000.0);
+        assert!(taut.iter().all(|p| p.y <= a.y.max(b.y) + 1e-3));
     }
 
     /// Every cable colour the rack uses keeps 3:1 against the rack and every face while at rest,
