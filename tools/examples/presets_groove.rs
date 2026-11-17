@@ -1661,10 +1661,10 @@ fn still_plan(v: &mut Voice, h: &Handles, s: &Spec) {
     );
     damp(v, 1, p, h.lad, s.filter[1]);
     let hats = routed("mixer", "level4", 0.0, (2.0 * s.kit.mix[3]).min(1.0), 0.4);
-    let p = main_line(v, 2, h.beat, "mixer", "level4", 0.1, hats, 0.9);
-    span_hi(v, 2, p, h.kit_out, "mixer", "level2", 0.35, 1.0);
+    let p = main_line(v, 2, h.beat, "mixer", "level4", 0.1, hats, 0.8);
+    span_hi(v, 2, p, h.kit_out, "mixer", "level2", 0.35, 0.8);
     let lvl = routed("mixer", "level1", 0.4, 0.42, 0.5);
-    main_line(v, 3, h.bus, "mixer", "level1", 0.2, lvl, 1.0);
+    main_line(v, 3, h.bus, "mixer", "level1", 0.2, lvl, 0.85);
 }
 
 /// Slab City: Glide (the 808's slide and its drive), Hustle (the hats and the tempo), Tone (the pad's
@@ -2211,7 +2211,8 @@ fn corner_store() -> Rack {
         comp: [-24.0, 4.0, 4.0],
         echo: [0.0, 20.0, 3000.0],
         space: [0.15, 0.3, 0.12],
-        trim_db: 0.0,
+        // The soft top on the bass overshoots a little at its edges: 1 dB of headroom back.
+        trim_db: -1.0,
         dub: false,
         voice: None,
         custom: Some(corner_plan),
