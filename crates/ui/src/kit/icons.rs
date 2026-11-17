@@ -59,6 +59,63 @@ pub enum Ic {
     Target,
 }
 
+impl Ic {
+    /// The spoken name of an icon-only button (AccessKit label): plain words, not the variant.
+    pub fn name(self) -> &'static str {
+        match self {
+            Ic::Play => "Play",
+            Ic::Stop => "Stop",
+            Ic::Restart => "Restart",
+            Ic::Undo => "Undo",
+            Ic::Redo => "Redo",
+            Ic::Search => "Search",
+            Ic::Star => "Star",
+            Ic::StarFill => "Starred",
+            Ic::Plus => "Add",
+            Ic::Minus => "Remove",
+            Ic::Fit => "Fit to view",
+            Ic::Focus => "Focus",
+            Ic::Gear => "Settings",
+            Ic::Down => "Down",
+            Ic::Right => "Expand",
+            Ic::Close => "Close",
+            Ic::Folder => "Folder",
+            Ic::Cable => "Cables",
+            Ic::CableOff => "Cables off",
+            Ic::Midi => "MIDI",
+            Ic::Heart => "Favourites",
+            Ic::Bolt => "Bolt",
+            Ic::Save => "Save",
+            Ic::Note => "Note",
+            Ic::Link => "Link",
+            Ic::Panel => "Panel",
+            Ic::Learn => "Learn",
+            Ic::Warn => "Warning",
+            Ic::Check => "Confirm",
+            Ic::Rec => "Record",
+            Ic::More => "More",
+            Ic::Pin => "Pin",
+            Ic::File => "File",
+            Ic::Err => "Error",
+            Ic::Back => "Back",
+            Ic::Up => "Up",
+            Ic::Home => "Home",
+            Ic::Copy => "Copy",
+            Ic::Grip => "Drag handle",
+            Ic::Invert => "Invert",
+            Ic::Bypass => "Bypass",
+            Ic::Trash => "Delete",
+            Ic::Plug => "Plug",
+            Ic::Wave => "Waveform",
+            Ic::Clock => "Clock",
+            Ic::External => "Open externally",
+            Ic::Info => "Info",
+            Ic::Compare => "Compare A and B",
+            Ic::Target => "Measure signal",
+        }
+    }
+}
+
 pub fn icon(p: &Painter, ic: Ic, c: Pos2, size: f32, col: Color32) {
     let u = size / 16.0;
     let st = Stroke::new((1.4 * u).max(1.2), col);

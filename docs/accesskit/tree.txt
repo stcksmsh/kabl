@@ -1,0 +1,87 @@
+Button	91 %
+Button	ADSR Envelope Gate in, 1 cable
+Button	ADSR Envelope Out out, 1 cable
+Button	Add
+Button	Cables: All
+Button	Cables: Focus
+Button	Cables: Hidden
+Button	Compare
+Button	Composites
+Button	Delay Clock in, 0 cables
+Button	Delay In in, 1 cable
+Button	Delay Out out, 1 cable
+Button	Fit to view
+Button	Focus
+Button	Help
+Button	Inspect
+Button	Learn
+Button	Mixer In 1 in, 1 cable
+Button	Mixer In 2 in, 0 cables
+Button	Mixer In 3 in, 0 cables
+Button	Mixer In 4 in, 0 cables
+Button	Mixer Out out, 1 cable
+Button	Output In in, 1 cable
+Button	Perform
+Button	Rack
+Button	Redo
+Button	Remove
+Button	Reverb In in, 1 cable
+Button	Reverb Out out, 1 cable
+Button	Routing
+Button	SVF Filter BP out, 0 cables
+Button	SVF Filter Cut CV in, 0 cables
+Button	SVF Filter HP out, 0 cables
+Button	SVF Filter In in, 1 cable
+Button	SVF Filter LP out, 1 cable
+Button	SVF Filter Notch out, 0 cables
+Button	SVF Filter Res CV in, 0 cables
+Button	Sequencer Clock in, 0 cables
+Button	Sequencer Gate out, 1 cable
+Button	Sequencer Pitch out, 1 cable
+Button	Sequencer Reset in, 0 cables
+Button	Sequencer Vel out, 0 cables
+Button	Settings
+Button	Sounds
+Button	Undo
+Button	VA Oscillator Out out, 1 cable
+Button	VA Oscillator Pitch in, 1 cable
+Button	VA Oscillator Stereo out, 0 cables
+Button	VA Oscillator Sync in, 0 cables
+Pane	ADSR Envelope module
+Pane	Delay module
+Pane	Mixer module
+Pane	Output module
+Pane	Reverb module
+Pane	SVF Filter module
+Pane	Sequencer module
+Pane	VA Oscillator module
+Slider	ADSR Envelope Attack	10
+Slider	ADSR Envelope Decay	100
+Slider	ADSR Envelope Release	200
+Slider	ADSR Envelope Sustain	0.699999988079071
+Slider	Delay Feedback	40
+Slider	Delay Mix	35
+Slider	Delay Time	375
+Slider	Mixer Level 1	1
+Slider	Mixer Level 2	1
+Slider	Mixer Level 3	1
+Slider	Mixer Level 4	1
+Slider	Output Level	0
+Slider	Reverb Damping	6000
+Slider	Reverb Decay	3.5
+Slider	Reverb Mix	30
+Slider	SVF Filter Cutoff	1000
+Slider	SVF Filter Resonance	0.30000001192092896
+Slider	Sequencer Gate length	50
+Slider	Sequencer Length	8
+Slider	Sequencer P1	0
+Slider	Sequencer P2	3
+Slider	Sequencer P3	7
+Slider	Sequencer P4	10
+Slider	Sequencer P5	12
+Slider	Sequencer P6	10
+Slider	Sequencer P7	7
+Slider	Sequencer P8	3
+Slider	VA Oscillator Fine	0
+Slider	VA Oscillator Frequency	261.6300048828125
+Slider	VA Oscillator Pulse width	50

@@ -443,6 +443,14 @@ pub fn apply(ctx: &Context, st: &Style) {
         w.fg_stroke.color = r.text;
     }
     v.widgets.noninteractive.corner_radius = cr;
+    // Text rendering, chosen once here. Small face labels and readouts sit at 9-12 px and the
+    // window often runs at a fractional scale (1.25, 1.5). Hinting stays on: it rounds glyph
+    // stems to whole pixels, which is what keeps 10 px labels crisp. Sub-pixel binning is off:
+    // it renders each glyph at up to four fractional x offsets, which evens kerning but smears
+    // stems across two pixel columns at fractional scale. The colour transfer function keeps
+    // egui's per-theme default (dark and light differ), which comes from `Visuals::dark/light`.
+    v.text_options.font_hinting = true;
+    v.text_options.subpixel_binning = false;
     ctx.set_visuals(v);
     ctx.global_style_mut(|s| {
         s.spacing.scroll = egui::style::ScrollStyle {

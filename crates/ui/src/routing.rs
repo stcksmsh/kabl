@@ -876,6 +876,21 @@ pub(crate) fn param_knob(
     let base = base_value(editor.state(), id, param);
     let base_n = param.to_norm(base);
     let routes = routes_into(editor.state(), id, param.name);
+    // Screen readers: a slider named "<Module> <Param>" whose value is the param in its own unit.
+    // Arrow keys already edit it (above), so the focus path needs nothing more.
+    resp.widget_info(|| {
+        let module = editor
+            .state()
+            .modules
+            .get(&id)
+            .and_then(|m| kabl_modules::registry::info_for(&m.kind))
+            .map_or("", |i| i.name);
+        egui::WidgetInfo::slider(
+            true,
+            f64::from(base),
+            format!("{module} {}", param_label(param)),
+        )
+    });
 
     // Scale, body and value marker from the theme's knob recipe.
     let focused = resp.has_focus() && kbd;
