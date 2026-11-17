@@ -1817,6 +1817,14 @@ fn cable_tools(ui: &mut egui::Ui, st: &Style, ui_state: &mut UiState) {
             ] {
                 let on = ui_state.cable_view == mode;
                 let r = kit::icon_button(ui, st, ic, on, true).tip(st, &format!("Cables: {label}"));
+                r.widget_info(|| {
+                    egui::WidgetInfo::selected(
+                        egui::WidgetType::SelectableLabel,
+                        true,
+                        on,
+                        format!("Cables: {label}"),
+                    )
+                });
                 ui_state.record(format!("view:{label}"), r.rect);
                 if r.clicked() {
                     ui_state.cable_view = mode;
@@ -1846,6 +1854,9 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
         ui.spacing_mut().item_spacing.y = st.sp(1);
         let on = ui_state.composites.panel;
         let r = kit::icon_button(ui, st, kit::Ic::Link, on, true).tip(st, "Composites");
+        r.widget_info(|| {
+            egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, on, "Composites")
+        });
         ui_state.record("composites".into(), r.rect);
         if r.clicked() {
             ui_state.composites.panel = !on;
@@ -1856,6 +1867,9 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
         for tab in drawer::Tab::ALL {
             let on = ui_state.drawer_open && now == tab;
             let r = kit::icon_button(ui, st, tab.icon(), on, true).tip(st, tab.label());
+            r.widget_info(|| {
+                egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, on, tab.label())
+            });
             let key = if tab == drawer::Tab::Routing {
                 "routing".to_string()
             } else {
@@ -2997,12 +3011,20 @@ fn draw_module_shapes(
     let ti = kit::face::family_ink(&st, m.info.kind, ink);
     let title_r = kit::face::title(painter, &st, face, z, m.info.name, &tag, ti, ink2, &avoid);
     if title_r.is_positive() {
-        ui.interact(
+        let tip = ui.interact(
             title_r.expand(2.0),
             Id::new(("face-title-tip", m.id)),
             Sense::hover(),
-        )
-        .on_hover_text(format!("{} · #{}", m.info.kind, m.id));
+        );
+        // The module face as a named group for screen readers.
+        tip.widget_info(|| {
+            egui::WidgetInfo::labeled(
+                egui::WidgetType::Panel,
+                true,
+                format!("{} module", m.info.name),
+            )
+        });
+        tip.on_hover_text(format!("{} · #{}", m.info.kind, m.id));
     }
     if ui_state.selected_module == Some(m.id) {
         painter.rect_stroke(
@@ -3619,6 +3641,14 @@ fn draw_banks(
         ui_state.record(format!("bank-edit:{id}.{b}"), t);
         let resp = ui.interact(t, Id::new(("kabl-bank-edit", id, b)), Sense::click());
         let on = b == edit;
+        resp.widget_info(|| {
+            egui::WidgetInfo::selected(
+                egui::WidgetType::SelectableLabel,
+                true,
+                on,
+                format!("Edit bank {name}"),
+            )
+        });
         option(t, seq::BANK_NAMES[b], on);
         // Routes into this bank's controls while another bank is on the face plug in here.
         let routed: Vec<CableId> = if on {
@@ -3666,6 +3696,14 @@ fn draw_banks(
         ui_state.record(format!("bank-play:{id}.{b}"), pbtn);
         let resp = ui.interact(pbtn, Id::new(("kabl-bank-play", id, b)), Sense::click());
         let lit = b == playing;
+        resp.widget_info(|| {
+            egui::WidgetInfo::selected(
+                egui::WidgetType::SelectableLabel,
+                true,
+                lit,
+                format!("Play bank {name}"),
+            )
+        });
         option(pbtn, seq::BANK_NAMES[b], lit);
         if queued == Some(b) {
             // Blinks twice a second until it lands.
@@ -3711,6 +3749,14 @@ fn draw_banks(
     for (pg, &t) in page_btns.iter().enumerate() {
         ui_state.record(format!("bank-page:{id}.{pg}"), t);
         let resp = ui.interact(t, Id::new(("kabl-seq-page", id, pg)), Sense::click());
+        resp.widget_info(|| {
+            egui::WidgetInfo::selected(
+                egui::WidgetType::SelectableLabel,
+                true,
+                pg == page,
+                format!("Steps page {}", pg + 1),
+            )
+        });
         option(t, &(pg + 1).to_string(), pg == page);
         if resp
             .on_hover_text(format!(
@@ -3829,17 +3875,24 @@ fn seq_step_cell(
             CornerRadius::same((r.height() / 2.0) as u8),
             if on { st.roles.gate } else { seg_track(&st) },
         );
-        let resp = ui
-            .interact(
-                r.expand(2.0 * z),
-                Id::new(("kabl-seq-gate", id, param.name)),
-                Sense::click(),
+        let resp = ui.interact(
+            r.expand(2.0 * z),
+            Id::new(("kabl-seq-gate", id, param.name)),
+            Sense::click(),
+        );
+        resp.widget_info(|| {
+            egui::WidgetInfo::selected(
+                egui::WidgetType::Checkbox,
+                true,
+                on,
+                format!("Step {step} gate"),
             )
-            .on_hover_text(format!(
-                "Step {step} gate: {}. Click to switch it {}",
-                if on { "on" } else { "off (a rest)" },
-                if on { "off" } else { "on" }
-            ));
+        });
+        let resp = resp.on_hover_text(format!(
+            "Step {step} gate: {}. Click to switch it {}",
+            if on { "on" } else { "off (a rest)" },
+            if on { "off" } else { "on" }
+        ));
         if resp.clicked() {
             editor.set_param(id, param.name, if on { 0.0 } else { 1.0 });
         }
@@ -3854,16 +3907,18 @@ fn seq_step_cell(
                 st.roles.gate,
             );
         }
-        let resp = ui
-            .interact(
-                r.expand2(vec2(10.0, 4.0) * z),
-                Id::new(("kabl-seq-vel", id, param.name)),
-                Sense::click_and_drag(),
-            )
-            .on_hover_text(format!(
-                "Step {step} velocity: {}. Click or drag to set",
-                routing::fmt_value(param, v)
-            ));
+        let resp = ui.interact(
+            r.expand2(vec2(10.0, 4.0) * z),
+            Id::new(("kabl-seq-vel", id, param.name)),
+            Sense::click_and_drag(),
+        );
+        resp.widget_info(|| {
+            egui::WidgetInfo::slider(true, f64::from(v), format!("Step {step} velocity"))
+        });
+        let resp = resp.on_hover_text(format!(
+            "Step {step} velocity: {}. Click or drag to set",
+            routing::fmt_value(param, v)
+        ));
         if resp.clicked() || resp.dragged() {
             if let Some(p) = resp.interact_pointer_pos() {
                 let n = ((r.bottom() - p.y) / r.height()).clamp(0.0, 1.0);
@@ -3900,6 +3955,7 @@ fn pad(
 ) -> egui::Response {
     ui_state.record(key.clone(), r);
     let resp = ui.interact(r, Id::new(("kabl-pad", key)), Sense::click());
+    resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Button, true, lit, label));
     let roles = &ui_state.style.roles;
     let radius = CornerRadius::same((6.0 * z) as u8);
     painter.rect_filled(r, radius, if lit { roles.accent } else { roles.inset });
@@ -4505,6 +4561,22 @@ fn draw_jacks(
             id: m.id,
             port: port.name.to_string(),
         };
+        resp.widget_info(|| {
+            let n = cabled
+                .iter()
+                .filter(|(d, p)| *d == port.direction && p == port.name)
+                .count();
+            egui::WidgetInfo::labeled(
+                egui::WidgetType::Button,
+                true,
+                format!(
+                    "{} {} {dir_key}, {n} cable{}",
+                    m.info.name,
+                    label,
+                    if n == 1 { "" } else { "s" }
+                ),
+            )
+        });
         let hot = resp.hovered() || ui_state.pending_output.as_ref() == Some(&this_ref);
         let patched = cabled
             .iter()

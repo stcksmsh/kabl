@@ -331,7 +331,7 @@ pub fn icon_button(ui: &mut Ui, st: &Style, ic: Ic, selected: bool, enabled: boo
             Sense::hover()
         },
     );
-    resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, enabled, format!("{ic:?}")));
+    resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, enabled, ic.name()));
     let hover = ease_to(
         ui,
         resp.id.with("hover"),
