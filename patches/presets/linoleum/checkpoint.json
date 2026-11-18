@@ -120,7 +120,7 @@
         "y": 320.0
       },
       "params": {
-        "gain_db": 5.8
+        "gain_db": 4.2
       }
     },
     "7": {
@@ -131,8 +131,8 @@
       },
       "params": {
         "depth": 60.0,
-        "feedback": 10.0,
-        "mix": 10.0,
+        "feedback": 20.0,
+        "mix": 15.0,
         "rate_hz": 0.1,
         "stages": 6.0
       }
@@ -420,7 +420,7 @@
         }
       },
       "params": {
-        "amount": 0.6923078
+        "amount": 0.61538464
       },
       "steps": []
     },
@@ -438,7 +438,7 @@
         }
       },
       "params": {
-        "amount": 0.40485832
+        "amount": 0.3238866
       },
       "steps": []
     },

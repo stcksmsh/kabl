@@ -7,6 +7,6 @@ tags = [
     "ambient",
     "pop",
 ]
-description = "A kalimba: a short metallic click, a long clear ring, and a wet tail that blurs the notes into each other. Play slow, sparse notes. Tine sets the brightness of the click, Warmth adds a little drive, Space sets the echo and the long room, Shimmer brings in the slow chorus."
+description = "A kalimba: a short metallic click, a long clear ring, and a wet tail that blurs the notes into each other. Play slow, sparse notes. Tine goes from a soft thumb piano to a bright, pinging one, Ring lengthens the ring of each tine, Tail stretches the echo and the long room, Shimmer brings in a deep, slow chorus."
 keys = true
 sequence = false

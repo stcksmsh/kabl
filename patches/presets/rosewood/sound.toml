@@ -7,6 +7,6 @@ tags = [
     "world",
     "pop",
 ]
-description = "A deep marimba: a round body, a tuned overtone that rings for a moment, and a soft mallet. Play it with velocity. Mallet sets the hardness of the strike, Warmth adds a little drive, Room sets the echo and a medium room, Ring lengthens the body."
+description = "A deep marimba: a round body, a tuned overtone that rings for a moment, and a soft mallet. Play it with velocity. Mallet goes from a felt mallet to a hard one with a sharper click, Ring lets the bars ring on after the key is up, Beat pulls the fourth partials apart so they beat, Roll fades in a tremolo roll."
 keys = true
 sequence = false
