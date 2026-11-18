@@ -991,9 +991,9 @@ fn deep_field() -> Rack {
     // Sub and Shimmer: an octave under and an octave over.
     let mix = v.mix;
     span(&mut v, 2, 0.5, mix, "mixer", "level4", 0.0, 0.3);
-    comp(&mut v, 2, 0.5, 5.0);
+    comp(&mut v, 2, 0.5, 8.1);
     span(&mut v, 3, 0.35, mix, "mixer", "level3", 0.0, 0.175);
-    comp(&mut v, 3, 0.35, 3.0);
+    comp(&mut v, 3, 0.35, 0.7);
     span_hi(&mut v, 3, 0.35, ch, "chorus", "depth", 45.0, 85.0);
     v.finish("m4", &echo(800.0, 50.0, 2500.0), 0.3, (6.5, 0.6), None)
 }
@@ -1025,6 +1025,7 @@ fn cotton_mill() -> Rack {
     let pwm = v.r.add("lfo", &[("rate_hz", 0.45)]);
     v.r.depth_route(pwm, "out", v.oscs[0], "pw", v.knob, "m1", 0.9);
     span_hi(&mut v, 1, 0.25, pwm, "lfo", "rate_hz", 0.45, 3.0);
+    comp(&mut v, 1, 0.25, -2.1);
     // Chorus: nothing to a deep, fast wash.
     span(&mut v, 2, 0.5, ch, "chorus", "mix", 0.0, 40.0);
     span_hi(&mut v, 2, 0.5, ch, "chorus", "depth", 50.0, 90.0);
@@ -1045,6 +1046,7 @@ fn cotton_mill() -> Rack {
     let (o1, o2) = (v.oscs[1], v.oscs[2]);
     span(&mut v, 4, 0.4, o1, "osc.va", "fine", 0.0, 6.0);
     span(&mut v, 4, 0.4, o2, "osc.va", "fine", 0.0, -6.0);
+    comp(&mut v, 4, 0.4, 5.0);
     v.finish("=0.5", &echo(380.0, 30.0, 3500.0), 0.25, (3.0, 0.5), None)
 }
 
@@ -1081,7 +1083,7 @@ fn picture_window() -> Rack {
     span_hi(&mut v, 1, s, o1, "osc.va", "detune", 14.0, 25.0);
     // Sparkle: the octave of airy saw above.
     span(&mut v, 2, 0.4, mix, "mixer", "level2", 0.0, 0.2);
-    comp(&mut v, 2, 0.4, 4.0);
+    comp(&mut v, 2, 0.4, 5.4);
     // Chorus: dry to a deep wash.
     span(&mut v, 3, 0.45, ch, "chorus", "mix", 0.0, 22.0);
     span_hi(&mut v, 3, 0.45, ch, "chorus", "depth", 55.0, 95.0);
@@ -1095,8 +1097,8 @@ fn picture_window() -> Rack {
 fn drive_in() -> Rack {
     let mut v = Voice::new(pad_recipe(
         &[
-            ("Sway", 0.20),
-            ("Wash", 0.60),
+            ("Sway", 0.10),
+            ("Chorus", 0.60),
             ("Weight", 0.30),
             ("Pulse", 0.00),
         ],
@@ -1115,15 +1117,15 @@ fn drive_in() -> Rack {
     v.r.e.set_param(v.lad, "cutoff_hz", d);
     let ch = v.stage("chorus", &[("rate_hz", 0.6), ("depth", 70.0), ("mix", 0.0)]);
     // Sway: a slow pitch sway fades in (depths doubled, stored at half).
-    v.vibrato("m1", 0.6, 0.24);
-    // Wash: a plain stack to a wide, fast chorus.
+    v.vibrato("m1", 0.6, 0.5);
+    // Chorus: a plain stack to a wide, fast chorus.
     span(&mut v, 2, 0.6, ch, "chorus", "mix", 0.0, 54.0);
     span_hi(&mut v, 2, 0.6, ch, "chorus", "depth", 70.0, 100.0);
-    span_hi(&mut v, 2, 0.6, ch, "chorus", "rate_hz", 0.6, 1.6);
+    span_hi(&mut v, 2, 0.6, ch, "chorus", "rate_hz", 0.6, 2.2);
     // Weight: the square an octave down comes forward.
     let mix = v.mix;
-    let s = span_lh(&mut v, 3, mix, "mixer", "level3", 0.0, 0.15, 0.5);
-    comp(&mut v, 3, s, 7.0);
+    let s = span_lh(&mut v, 3, mix, "mixer", "level3", 0.0, 0.15, 0.75);
+    comp(&mut v, 3, s, 10.0);
     // Pulse: a trance gate on the host clock, off at 0, up to hard sixteenth-note chops at 1 (the
     // echo and room ring through the gaps). Edges of 3 ms and 12 ms: no clicks. Press Run; with
     // Pulse up and the clock stopped the gate stays shut.
@@ -1156,7 +1158,7 @@ fn dry_cleaner() -> Rack {
         [4.0, 500.0, 0.3, 300.0],
         0.12,
         [4.0, 350.0, 0.6, 200.0],
-        8.0,
+        10.0,
     );
     c.drive = [8.0, -4.0];
     let mut v = Voice::new(c);
@@ -1194,7 +1196,9 @@ fn dry_cleaner() -> Rack {
     let d = routed("drive", "drive_db", 8.0, 0.5, 0.35);
     let s = span_lh(&mut v, 3, drive, "drive", "drive_db", 0.0, d, 36.0);
     span_hi(&mut v, 3, s, drive, "drive", "trim_db", -4.0, -14.0);
+    comp(&mut v, 3, s, -1.5);
     // Snap: a short tick to a held, ringing chord.
+    comp(&mut v, 4, 0.5, 3.1);
     span_hi(&mut v, 4, 0.5, aenv, "env.adsr", "sustain", 0.6, 0.85);
     span_hi(
         &mut v,
@@ -1243,6 +1247,7 @@ fn concrete_cloud() -> Rack {
     let d = routed("drive", "drive_db", 16.0, 0.5, 0.55);
     let s = span_lh(&mut v, 1, drive, "drive", "drive_db", 6.0, d, 34.0);
     span_hi(&mut v, 1, s, mix, "mixer", "level2", 0.30, 0.40);
+    comp(&mut v, 1, s, 2.8);
     // Squash: the compressor clamps from a loose hold to a flat slab.
     let s = span_lh(
         &mut v,
@@ -1256,7 +1261,7 @@ fn concrete_cloud() -> Rack {
     );
     span_hi(&mut v, 2, s, cp, "compressor", "ratio", 6.0, 10.0);
     span_hi(&mut v, 2, s, cp, "compressor", "makeup_db", 6.0, 11.5);
-    comp(&mut v, 2, s, -6.0);
+    comp(&mut v, 2, s, -11.8);
     // Crush: clean to a coarse digital grind.
     span(&mut v, 3, 0.25, crush, "bitcrusher", "mix", 0.0, 20.0);
     span_hi(&mut v, 3, 0.25, crush, "bitcrusher", "bits", 7.0, 4.0);
@@ -1324,7 +1329,7 @@ fn static_garden() -> Rack {
     }
     // Metal: bell-like overtones come in and the partner detunes.
     span(&mut v, 3, 0.5, mix, "mixer", "level4", 0.0, 0.15);
-    comp(&mut v, 3, 0.5, 3.0);
+    comp(&mut v, 3, 0.5, 0.6);
     span_hi(&mut v, 3, 0.5, partner, "osc.va", "fine", 3.0, 40.0);
     v.stage(
         "chorus",
@@ -1429,14 +1434,16 @@ fn rooftop() -> Rack {
     let aenv = v.aenv;
     span_hi(&mut v, 1, s, aenv, "env.adsr", "attack_ms", 180.0, 1400.0);
     // Section: one tight horn to a loose section.
-    let s = span_lh(&mut v, 2, o0, "osc.va", "detune", 3.0, 14.0, 30.0);
-    span_hi(&mut v, 2, s, o1, "osc.va", "fine", -7.0, -25.0);
+    let s = span_lh(&mut v, 2, o0, "osc.va", "detune", 3.0, 14.0, 50.0);
+    span_hi(&mut v, 2, s, o1, "osc.va", "fine", -7.0, -40.0);
     // Octave: a second section an octave up joins, the brass gets a bright, soaring top.
     let mix = v.mix;
     rise(&mut v, 3, mix, "mixer", "level3", 0.0, 0.2);
+    comp(&mut v, 3, 0.0, 1.3);
     // Chorus: dry to a wide wash.
     span(&mut v, 4, 0.5, ch, "chorus", "mix", 0.0, 40.0);
-    span_hi(&mut v, 4, 0.5, ch, "chorus", "depth", 60.0, 95.0);
+    span_hi(&mut v, 4, 0.5, ch, "chorus", "depth", 60.0, 100.0);
+    span_hi(&mut v, 4, 0.5, ch, "chorus", "rate_hz", 0.5, 2.0);
     v.finish("=0.45", &echo(340.0, 30.0, 3500.0), 0.25, (3.5, 0.45), None)
 }
 
@@ -1485,6 +1492,7 @@ fn tidepool() -> Rack {
         20000.0,
     );
     span(&mut v, 3, s, mix, "mixer", "level2", 0.0, 0.12);
+    comp(&mut v, 3, s, 2.2);
     v.stage(
         "chorus",
         &[("rate_hz", 0.15), ("depth", 55.0), ("mix", 20.0)],
@@ -1530,6 +1538,7 @@ fn pump_house() -> Rack {
     // Weight: the octave down comes forward and the saws step back.
     let s = span_lh(&mut v, 2, mix, "mixer", "level2", 0.05, 0.25, 0.5);
     span_hi(&mut v, 2, s, mix, "mixer", "level1", 0.30, 0.15);
+    comp(&mut v, 2, s, 2.7);
     // Wide: a narrow pad to a deep, slow chorus that moves around the duck.
     span_hi(&mut v, 3, 0.3, ch, "chorus", "mix", 14.0, 38.0);
     span_hi(&mut v, 3, 0.3, ch, "chorus", "depth", 40.0, 90.0);
@@ -1582,7 +1591,7 @@ fn tin_voice() -> Rack {
         fenv_amt: 0.0,
         wheel_amt: 0.0,
         aenv: [8.0, 300.0, 0.85, 200.0],
-        trim_db: 23.0,
+        trim_db: 26.0,
     });
     let formant = v.mono_after(
         "filter.formant",
@@ -1603,7 +1612,7 @@ fn tin_voice() -> Rack {
     rise(&mut v, 2, hop, "lfo", "rate_hz", 0.9, 7.0);
     // Shift: a small mouth to a large one.
     let d = routed("filter.formant", "shift_st", -4.0, 0.5, 0.5);
-    span_lh(
+    let shift_s = span_lh(
         &mut v,
         3,
         formant,
@@ -1619,7 +1628,26 @@ fn tin_voice() -> Rack {
     let s = span_lh(&mut v, 4, drive, "drive", "drive_db", 2.0, d, 30.0);
     span_hi(&mut v, 4, s, formant, "filter.formant", "q", 1.5, 3.0);
     span_hi(&mut v, 4, s, drive, "drive", "trim_db", -5.0, -12.0);
-    v.stage("compressor", &compressor(-26.0, 5.0, 3.0, 120.0, 6.0));
+    // The crusher after the formant: its mix, bit depth and sample-rate drop come in with Grit.
+    let crush = v.stage(
+        "bitcrusher",
+        &[("bits", 10.0), ("downsample", 3.0), ("mix", 0.0)],
+    );
+    span(&mut v, 4, s, crush, "bitcrusher", "mix", 0.0, 25.0);
+    span_hi(&mut v, 4, s, crush, "bitcrusher", "bits", 10.0, 4.0);
+    span_hi(&mut v, 4, s, crush, "bitcrusher", "downsample", 3.0, 8.0);
+    let cp = v.stage("compressor", &compressor(-26.0, 5.0, 3.0, 120.0, 6.0));
+    // Shift: a bigger mouth is quieter, so the makeup follows (stored sound unchanged).
+    span(
+        &mut v,
+        3,
+        shift_s,
+        cp,
+        "compressor",
+        "makeup_db",
+        6.0 - 3.4 * shift_s,
+        6.0,
+    );
     v.finish("=0.25", &echo(180.0, 25.0, 3200.0), 0.25, (0.8, 0.2), None)
 }
 
