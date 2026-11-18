@@ -143,8 +143,8 @@ fn velvet_tine() -> Rack {
     r.span_hi(k, 2, v, o, "decay5", 2400.0, 8000.0);
     // Tremolo: the suitcase amp, a slow amplitude wobble that fades in and speeds up (off).
     let lfo = r.add("lfo", &[("rate_hz", 3.5)]);
-    r.depth_route(lfo, "out", s.trim, "gain_db", k, "m3", 0.09);
-    r.level(k, 3, s.trim, -0.09 * 84.0);
+    r.depth_route(lfo, "out", s.trim, "gain_db", k, "m3", 0.03);
+    r.level(k, 3, s.trim, -0.03 * 84.0);
     r.rise(k, 3, lfo, "lfo", "rate_hz", 3.5, 6.5);
     // Phase: a still, thin phaser to a slow, deep swirl.
     let ph = s.phaser.unwrap();
@@ -299,8 +299,8 @@ fn linoleum() -> Rack {
     let ph = s.phaser.unwrap();
     let rate = routed("phaser", "rate_hz", 0.3, 0.5, 0.4);
     r.span(k, 1, ph, "phaser", "rate_hz", 0.1, rate);
-    r.span(k, 1, ph, "phaser", "mix", 10.0, 55.0);
-    r.span(k, 1, ph, "phaser", "feedback", 10.0, 60.0);
+    r.span(k, 1, ph, "phaser", "mix", 15.0, 55.0);
+    r.span(k, 1, ph, "phaser", "feedback", 20.0, 60.0);
     r.span(k, 1, ph, "phaser", "depth", 60.0, 85.0);
     // Chime: the seventh-partial bell grows out of the electric piano.
     let index = routed(o, "index", 0.5, 0.4, 0.5);
@@ -826,7 +826,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Velvet Tine",
             category: "Keys",
             tags: &["poly", "fm", "phased", "pop", "soul"],
-            description: "A soft Rhodes-like electric piano: a mellow body, a tine that fades in a tenth of a second, velocity-sensitive bark. Play chords. Tine opens the FM brightness and the filter, Drive adds warmth, Space sets the echo and room, Phase brings in a slow phaser.",
+            description: "A soft Rhodes-like electric piano: a mellow body, a tine that fades in a tenth of a second, velocity-sensitive bark. Play chords. Tine grows a metallic tine out of each note, Ring lengthens the note from a thud to a long, ringing one, Tremolo fades in a suitcase-amp wobble of the level, Phase brings in a slow phaser.",
             listen: "The tine on the attack against the soft body; the phaser slowly breathing on held chords",
             group: 1,
             build: velvet_tine,
@@ -838,7 +838,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Checkerboard",
             category: "Keys",
             tags: &["poly", "stab", "distorted", "compressed", "french touch", "124bpm", "signature"],
-            description: "A house piano stab: two saws and a square, driven hard and squashed until it barks. Play short syncopated chords. Cutoff opens the filter, Crunch pushes the drive, Room sets a slapback and a tight room, Length stretches the stab.",
+            description: "A house piano stab: two saws and a square, driven hard and squashed until it barks. Play short syncopated chords. Bite goes from a closed, thudding stab to a wide open bark as the filter snaps open on every note, Hollow brings in the triangle under the saws, Squash clamps the compressor harder, Spread widens and detunes the saw stack.",
             listen: "The bark of the compressor on every stab and the filter snapping shut after each one",
             group: 1,
             build: checkerboard,
@@ -850,7 +850,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Linoleum",
             category: "Keys",
             tags: &["poly", "fm", "phased", "compressed", "french touch", "122bpm", "signature"],
-            description: "A phased disco electric piano, driven and compressed: bright, clipped, with a six-stage phaser always on. Play two-beat chord stabs. Bright opens the FM index and the filter, Crunch pushes the drive, Room sets a tight room and a slapback, Swirl speeds the phaser.",
+            description: "A phased disco electric piano, driven and compressed: bright, clipped, with a six-stage phaser always on. Play two-beat chord stabs. Swirl runs the phaser from slow and thin to fast and ringing, Chime grows the bell partial of the electric piano, Hold lengthens the ring, Squeeze clamps the compressor harder.",
             listen: "The phaser sweeping through each held stab, and the compressor pulling the tails up between them",
             group: 1,
             build: linoleum,
@@ -862,7 +862,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Cellar Door",
             category: "Keys",
             tags: &["poly", "fm", "dark", "hip-hop", "lofi"],
-            description: "A dark electric piano that sits low in a beat: a closed filter, a little drive, a slow pitch wobble from the chorus. Play slow minor chords. Dark opens the filter and the FM index, Dirt adds drive, Room sets the echo and room, Wobble brings in the slow chorus.",
+            description: "A dark electric piano that sits low in a beat: a closed filter, a little drive, a slow pitch wobble from the chorus. Play slow minor chords. Dark closes the filter and the FM index into a muffled felt tone, Felt softens the hammer into a slow push, Wobble fades in a slow tape pitch drift, Smear brings in a deep, slow chorus.",
             listen: "The soft, closed tone and the slow chorus wobbling on the long chords",
             group: 1,
             build: cellar_door,
@@ -874,7 +874,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Pulpit",
             category: "Keys",
             tags: &["poly", "organ", "additive", "house", "pop"],
-            description: "A drawbar-style organ from six added sines, played through a rotary-speaker chorus. Hold chords, or play a house line. Brightness opens the filter, Overdrive adds the crunch of a pushed tube, Room sets a short room, Rotor brings in the speaker and speeds it up.",
+            description: "A drawbar-style organ from six added sines, played through a rotary-speaker chorus. Hold chords, or play a house line. Bars brings in the sub and the second drawbar, Perc adds a percussive attack to the upper bars, Rotor speeds the Leslie from slow to fast, Overdrive heats the tubes.",
             listen: "The steady flat organ tone and the rotor shimmering across each chord",
             group: 1,
             build: pulpit,
@@ -886,7 +886,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Rosewood",
             category: "Pluck",
             tags: &["poly", "fm", "marimba", "world", "pop"],
-            description: "A deep marimba: a round body, a tuned overtone that rings for a moment, and a soft mallet. Play it with velocity. Mallet sets the hardness of the strike, Warmth adds a little drive, Room sets the echo and a medium room, Ring lengthens the body.",
+            description: "A deep marimba: a round body, a tuned overtone that rings for a moment, and a soft mallet. Play it with velocity. Mallet goes from a felt mallet to a hard one with a sharper click, Ring lets the bars ring on after the key is up, Beat pulls the fourth partials apart so they beat, Roll fades in a tremolo roll.",
             listen: "The round body under each strike; hard hits are brighter than soft ones",
             group: 1,
             build: rosewood,
@@ -898,7 +898,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Rain Gutter",
             category: "Pluck",
             tags: &["poly", "fm", "kalimba", "ambient", "pop"],
-            description: "A kalimba: a short metallic click, a long clear ring, and a wet tail that blurs the notes into each other. Play slow, sparse notes. Tine sets the brightness of the click, Warmth adds a little drive, Space sets the echo and the long room, Shimmer brings in the slow chorus.",
+            description: "A kalimba: a short metallic click, a long clear ring, and a wet tail that blurs the notes into each other. Play slow, sparse notes. Tine goes from a soft thumb piano to a bright, pinging one, Ring lengthens the ring of each tine, Tail stretches the echo and the long room, Shimmer brings in a deep, slow chorus.",
             listen: "The click of each tine against its long ring, and the echo answering a half-beat later",
             group: 1,
             build: rain_gutter,
@@ -910,7 +910,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Spark Plug",
             category: "Pluck",
             tags: &["poly", "pluck", "distorted", "compressed", "french touch", "124bpm", "signature"],
-            description: "A blunt, driven synth pluck: two saws and a square, 18 dB of drive, a fast compressor. Play short low notes. Cutoff opens the filter, Crunch pushes the drive, Room sets a slapback and a tight room, Decay lengthens the note.",
+            description: "A blunt, driven synth pluck: two saws and a square, 18 dB of drive, a fast compressor. Play short low notes. Snap goes from a dull thud to a crack as the filter snaps open on every note, Grit pushes the drive, Squash tightens the compressor into a punchier clamp, Zap starts each pluck sharp and lets it fall into tune.",
             listen: "The filter snap on every note and the compressor holding the dirt steady",
             group: 1,
             build: spark_plug,

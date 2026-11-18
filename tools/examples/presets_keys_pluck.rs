@@ -716,6 +716,35 @@ fn main() {
                 println!("{:18} peak {peak:.3}  | {}", p.slug, p.listen);
             }
         }
+        Some("positions") => {
+            // The factory level test's macro positions: every macro together at 0.15, 0.65 and 1.
+            // `positions [slug]`: peak and loudness of the chord measurement at each.
+            let only = args.get(2);
+            for p in presets()
+                .into_iter()
+                .filter(|p| only.is_none_or(|s| s == p.slug))
+            {
+                let mut line = format!("POS {:16}", p.slug);
+                for v in [0.15, 0.65, 1.0] {
+                    let mut rack = (p.build)();
+                    rack.trim(level_trim(p.slug));
+                    let knob = *rack
+                        .e
+                        .state()
+                        .modules
+                        .iter()
+                        .find(|(_, m)| m.kind == "macro")
+                        .unwrap()
+                        .0;
+                    for k in 1..=4 {
+                        rack.e.set_param(knob, &format!("m{k}"), v);
+                    }
+                    let (peak, loud) = level(rack.e.state());
+                    line += &format!(" | {v}: peak {peak:6.2} loud {loud:6.2}");
+                }
+                println!("{line}");
+            }
+        }
         Some("levels") => {
             let only = args.get(3);
             for p in presets()
