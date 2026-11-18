@@ -969,7 +969,7 @@ fn deep_field() -> Rack {
         [4500.0, 2500.0, 0.5, 4000.0],
         0.0,
         [3200.0, 1500.0, 0.9, 5500.0],
-        15.0,
+        14.0,
     ));
     let ch = v.stage(
         "chorus",
@@ -990,8 +990,8 @@ fn deep_field() -> Rack {
     v.r.depth_route(v.fenv, "out", v.lad, "cutoff_hz", v.knob, "m1", 0.3 / s);
     // Sub and Shimmer: an octave under and an octave over.
     let mix = v.mix;
-    span(&mut v, 2, 0.5, mix, "mixer", "level4", 0.0, 0.3);
-    comp(&mut v, 2, 0.5, 8.1);
+    span(&mut v, 2, 0.5, mix, "mixer", "level4", 0.0, 0.22);
+    comp(&mut v, 2, 0.5, 6.0);
     span(&mut v, 3, 0.35, mix, "mixer", "level3", 0.0, 0.175);
     comp(&mut v, 3, 0.35, 0.7);
     span_hi(&mut v, 3, 0.35, ch, "chorus", "depth", 45.0, 85.0);
@@ -1026,6 +1026,8 @@ fn cotton_mill() -> Rack {
     v.r.depth_route(pwm, "out", v.oscs[0], "pw", v.knob, "m1", 0.9);
     span_hi(&mut v, 1, 0.25, pwm, "lfo", "rate_hz", 0.45, 3.0);
     comp(&mut v, 1, 0.25, -2.1);
+    // The thinner pulse also brightens; a small cutoff pull cancels that, so Motion is only motion.
+    v.r.route(v.knob, "m1", v.lad, "cutoff_hz", -0.12);
     // Chorus: nothing to a deep, fast wash.
     span(&mut v, 2, 0.5, ch, "chorus", "mix", 0.0, 40.0);
     span_hi(&mut v, 2, 0.5, ch, "chorus", "depth", 50.0, 90.0);
@@ -1044,9 +1046,8 @@ fn cotton_mill() -> Rack {
     );
     // Beat: the two saws start locked to the pulse and drift apart into a slow beating.
     let (o1, o2) = (v.oscs[1], v.oscs[2]);
-    span(&mut v, 4, 0.4, o1, "osc.va", "fine", 0.0, 6.0);
-    span(&mut v, 4, 0.4, o2, "osc.va", "fine", 0.0, -6.0);
-    comp(&mut v, 4, 0.4, 5.0);
+    span(&mut v, 4, 0.4, o1, "osc.va", "fine", 1.5, 6.0);
+    span(&mut v, 4, 0.4, o2, "osc.va", "fine", -1.5, -6.0);
     v.finish("=0.5", &echo(380.0, 30.0, 3500.0), 0.25, (3.0, 0.5), None)
 }
 
@@ -1298,7 +1299,7 @@ fn static_garden() -> Rack {
         [1200.0, 2000.0, 0.6, 2500.0],
         0.15,
         [900.0, 1500.0, 0.9, 3500.0],
-        7.5,
+        6.0,
     ));
     let noise = v.r.add("noise", &[("color", 1.0), ("level_db", -8.0)]);
     v.r.wire(noise, "out", v.mix, "in3");
@@ -1487,7 +1488,7 @@ fn tidepool() -> Rack {
         lad,
         "filter.ladder",
         "cutoff_hz",
-        400.0,
+        650.0,
         d,
         20000.0,
     );
@@ -1658,7 +1659,7 @@ fn presets() -> Vec<Preset> {
             name: "Fog Bank",
             category: "Pad",
             tags: &["poly", "slow", "wide", "ambient", "cinematic"],
-            description: "A very slow ambient cloud: a saw stack and a triangle with a long attack and a nine second room. Play long chords and let them overlap. Bloom opens the filter, Drift adds slow drift to the filter and the pitch, Depth brings in an octave of sub, Space adds the echo and the room.",
+            description: "A very slow ambient cloud: a saw stack and a triangle with a long attack and a nine second room. Play long chords and let them overlap. Arrival sets how slowly each chord blooms, Haze opens the filter and widens the chorus, Drift adds a slow sway to the pitch, Space adds the echo and the room.",
             listen: "Chords that take two seconds to arrive and several to die away; Drift up for a slow shimmer, Depth for weight underneath.",
             build: fog_bank,
             group: 1,
@@ -1670,7 +1671,7 @@ fn presets() -> Vec<Preset> {
             name: "Deep Field",
             category: "Pad",
             tags: &["poly", "swell", "sub", "cinematic", "ambient"],
-            description: "A cinematic swell: saws over a deep sub with a filter that opens over several seconds. Play low, wide chords and hold them. Swell sets how far the filter opens, Sub adds an octave below, Shimmer adds an octave above, Space adds the echo and the room.",
+            description: "A cinematic swell: saws over a deep sub with a filter that opens over several seconds. Play low, wide chords and hold them. Swell sets how far and how slowly the filter opens, Sub brings in an octave below, Shimmer adds an octave of air above, Space adds the echo and the room.",
             listen: "The slow opening of each chord and the weight under it; Swell at 0 stays closed and dark, at 1 opens wide.",
             build: deep_field,
             group: 1,
@@ -1682,7 +1683,7 @@ fn presets() -> Vec<Preset> {
             name: "Cotton Mill",
             category: "Pad",
             tags: &["poly", "analog", "pulse width", "chorus", "pop"],
-            description: "An analog-style pad for pop: a pulse with moving width and two detuned saws, soft chorus and a mid-sized room. Play open chords. Cutoff opens the filter, Motion sets how far the pulse width moves, Chorus brings in the chorus, Space adds the echo and the room.",
+            description: "An analog-style pad for pop: a pulse with moving width and two detuned saws, soft chorus and a mid-sized room. Play open chords. Motion makes the pulse width move faster and wider, Chorus brings in a deep wash, Warmth opens the filter from dark to glassy, Beat lets the two saws drift into a slow beating.",
             listen: "The pulse width breathing inside each held chord; Motion at 0 is still, at 1 swirls. Chorus at 0 is dry and narrow.",
             build: cotton_mill,
             group: 1,
@@ -1694,7 +1695,7 @@ fn presets() -> Vec<Preset> {
             name: "Picture Window",
             category: "Pad",
             tags: &["poly", "supersaw", "bright", "wide", "pop"],
-            description: "A clean, bright pad for pop: a seven-voice saw stack with a light chorus and a medium room. Play simple triads. Cutoff opens the filter, Spread widens the detune of the stack, Sparkle adds an octave of airy saw above, Space adds the echo and the room.",
+            description: "A clean, bright pad for pop: a seven-voice saw stack with a light chorus and a medium room. Play simple triads. Spread widens the detune of the stack, Sparkle adds an octave of airy saw above, Chorus brings in a deep wash, Air opens the top shelf from soft to glassy.",
             listen: "The stack widening as Spread goes up and the high shimmer Sparkle adds; the chords stay clean and sit behind a vocal.",
             build: picture_window,
             group: 1,
@@ -1706,7 +1707,7 @@ fn presets() -> Vec<Preset> {
             name: "Drive-In",
             category: "Pad",
             tags: &["poly", "supersaw", "chorus", "vibrato", "synthwave", "80s"],
-            description: "A lush synthwave pad: detuned saws over a square, a slow vibrato, wide chorus and a long echo. Play slow minor chords. Cutoff opens the filter, Wobble sets the depth of the vibrato, Chorus brings in the chorus, Space adds the echo and the room.",
+            description: "A lush synthwave pad: detuned saws over a square, a slow vibrato, wide chorus and a long echo. Play slow minor chords. Sway sets the depth of the slow pitch sway, Chorus brings in a wide, fast chorus, Weight brings the square an octave down forward, Pulse chops the pad into a tempo-synced gate (press Run).",
             listen: "The wide chorused saws with a slow pitch sway; Chorus at 0 is a plain stack, at 1 a wide wash.",
             build: drive_in,
             group: 1,
@@ -1718,7 +1719,7 @@ fn presets() -> Vec<Preset> {
             name: "Dry Cleaner",
             category: "Pad",
             tags: &["poly", "phased", "compressed", "stabs", "french touch", "signature"],
-            description: "Phased chord stabs for French touch: two detuned saws and a pulse through a phaser, a compressor and a little drive, in a close, dry room. Play short, syncopated chords. Sweep opens the filter like a DJ, Phase brings in the phaser, Grit adds drive, Room adds the echo and the room.",
+            description: "Phased chord stabs for French touch: two detuned saws and a pulse through a phaser, a compressor and a little drive, in a close, dry room. Play short, syncopated chords. Sweep opens the filter like a DJ, Phase brings in a fast, ringing phaser, Grit adds drive, Snap turns a short tick into a held, ringing chord.",
             listen: "The phaser sweeping through short chord stabs; Phase at 0 is a plain saw chord, at 1 fully swirling. Sweep moves the whole chord like a filter knob.",
             build: dry_cleaner,
             group: 1,
@@ -1730,7 +1731,7 @@ fn presets() -> Vec<Preset> {
             name: "Concrete Cloud",
             category: "Pad",
             tags: &["poly", "distorted", "compressed", "bitcrushed", "french touch", "signature"],
-            description: "A thick, saturated pad for French touch: saws and an octave down driven hard into a compressor, with a bitcrusher on request. Play fat, held chords. Weight sets the amount of drive, Cutoff opens the filter, Crush brings in the bitcrusher, Room adds the echo and the room.",
+            description: "A thick, saturated pad for French touch: saws and an octave down driven hard into a compressor, with a bitcrusher on request. Play fat, held chords. Weight sets the drive and the octave down, Squash clamps the compressor from a loose hold to a flat slab, Crush brings in the bitcrusher, Tail turns a cut note into a slow swell.",
             listen: "A heavy, squashed chord that stays loud and dense while it is held; Crush up for lo-fi grit, Weight up for more saturation.",
             build: concrete_cloud,
             group: 1,
@@ -1742,7 +1743,7 @@ fn presets() -> Vec<Preset> {
             name: "Static Garden",
             category: "Pad",
             tags: &["poly", "evolving", "noise", "ring mod", "ambient"],
-            description: "An evolving, textured pad: a triangle bed with a noise layer, a ring modulated layer and a filter that wanders on its own. Play slow chords. Texture brings in the noise, Motion sets how far the filter wanders, Metal adds the ring modulated layer, Space adds the echo and the room.",
+            description: "An evolving, textured pad: a triangle bed with a noise layer, a ring modulated layer and a filter that wanders on its own. Play slow chords. Static brings in the noise, Wander lets the pitch drift, Metal adds the ring modulated layer, Space adds the echo and the room.",
             listen: "Hiss and grain around the chord; Texture up for static, Metal up for bell-like inharmonic overtones, Motion for a filter that never repeats.",
             build: static_garden,
             group: 1,
@@ -1754,7 +1755,7 @@ fn presets() -> Vec<Preset> {
             name: "Glacier",
             category: "Pad",
             tags: &["poly", "slow", "wide", "ambient", "cinematic"],
-            description: "A glassy, slow pad: a wide sine and triangle stack with a high glass partial, a slow swell and a long echo. Play long, open chords. Frost opens the filter and brings in the glass partial, Swell opens the filter over each held chord, Drift adds a slow pitch sway, Space adds the echo and the room.",
+            description: "A glassy, slow pad: a wide sine and triangle stack with a high glass partial, a slow swell and a long echo. Play long, open chords. Frost brings in the glass partial, Width widens the pulse, Swell sets how slowly each chord blooms, Space adds the echo and the room.",
             listen: "A cold, wide shimmer that opens over each held chord; Frost up for the glassy octaves, Swell for the slow opening.",
             build: glacier,
             group: 2,
@@ -1766,7 +1767,7 @@ fn presets() -> Vec<Preset> {
             name: "Pump House",
             category: "Pad",
             tags: &["poly", "sidechain", "124bpm", "french touch", "signature"],
-            description: "A chord pad that pumps with the beat for French touch: saws and an octave down, ducked on every beat of the host tempo by a silent envelope, no drum. Press Run to start the clock, then hold chords. Cutoff opens the filter, Drive pushes the saturation, Pump sets how deep the duck goes, Room adds a tempo-synced echo and a tight room.",
+            description: "A chord pad that pumps with the beat for French touch: saws and an octave down, ducked on every beat of the host tempo by a silent envelope, no drum. Press Run to start the clock, then hold chords. Pump sets how deep and long the duck goes, Weight brings the octave down forward, Wide adds a wide chorus, Open opens the filter.",
             listen: "The chord breathing on every beat (silent, no drum); Pump at 0 is a steady pad, at 1 it ducks deep on every beat.",
             build: pump_house,
             group: 2,
@@ -1778,7 +1779,7 @@ fn presets() -> Vec<Preset> {
             name: "Tin Voice",
             category: "Pad",
             tags: &["poly", "formant", "distorted", "robot", "french touch", "signature"],
-            description: "Robot vowel chords for French touch: saws and a pulse driven into a formant filter, close and dry. Play held chords and move the mod wheel. Vowel sweeps the mouth shape, Grit pushes the drive, Shift moves the formants up or down, Room adds a short echo and a small room.",
+            description: "Robot vowel chords for French touch: saws and a pulse driven into a formant filter, close and dry. Play held chords and move the mod wheel. Vowel sweeps the mouth shape, Chatter makes the mouth jump to random vowels, Shift moves the formants up or down, Grit drives and crushes the voice.",
             listen: "A chord that talks; Vowel moves through the shapes, Shift turns the voice small or large, Grit adds bite.",
             build: tin_voice,
             group: 2,
@@ -1790,7 +1791,7 @@ fn presets() -> Vec<Preset> {
             name: "Rooftop",
             category: "Pad",
             tags: &["poly", "analog", "wide", "brass", "pop"],
-            description: "A brassy analog pad: detuned saws with a slow filter envelope that swells every chord. Play open triads and hold them. Cutoff sets the filter, Swell sets how far each chord opens, Chorus widens the sound, Space adds the echo and the room.",
+            description: "A brassy analog pad: detuned saws with a slow filter envelope that swells every chord. Play open triads and hold them. Swell sets how far and how slowly each chord opens, Section loosens one tight horn into a section, Octave brings in a second section an octave up, Chorus widens the sound.",
             listen: "Each chord leaning in like a brass section; Swell at 0 is a steady pad, at 1 each chord blooms open.",
             build: rooftop,
             group: 2,
@@ -1802,7 +1803,7 @@ fn presets() -> Vec<Preset> {
             name: "Tidepool",
             category: "Pad",
             tags: &["poly", "evolving", "wide", "ambient", "glass"],
-            description: "An evolving glassy pad that never repeats: slow random steps in pitch and filter over a wide triangle stack. Play slow chords and let it move. Drift sets the pitch sway, Motion sets how far the filter wanders, Tone sets the brightness, Space adds the echo and the room.",
+            description: "An evolving glassy pad that never repeats: slow random steps in pitch and filter over a wide triangle stack. Play slow chords and let it move. Drift sets the pitch sway, Steps adds random pitch steps, Tone sets the brightness, Space adds the echo and the room.",
             listen: "Held chords that keep shifting colour; Motion up for a filter that never settles, Drift for a gentle pitch sway.",
             build: tidepool,
             group: 2,

@@ -1012,7 +1012,8 @@ fn search_matches_every_word_across_name_category_and_tags() {
             .collect()
     };
     assert_eq!(hits("singing"), ["factory:palette/lead"]);
-    assert_eq!(hits("PAD warm"), ["factory:palette/pad"]);
+    // Every word must match; presets with a Warmth macro match "warm" too.
+    assert!(hits("PAD warm").contains(&"factory:palette/pad".to_string()));
     assert!(hits("sequenced").contains(&"factory:palette/bass".to_string()));
     assert!(hits("no such sound").is_empty());
     assert_eq!(hits("").len(), FACTORY.len());
