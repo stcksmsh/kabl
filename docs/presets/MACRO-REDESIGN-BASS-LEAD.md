@@ -1,6 +1,6 @@
 # Macro redesign: bass and lead presets, first half (12 of 24)
 
-Same method as `MACRO-REDESIGN.md` (pilot): each preset gets four macros from what makes that patch interesting, four different kinds of change, clean by default, stored (default) sound unchanged. Builders are in `tools/examples/presets_bass_lead.rs` (`span`, `span_hi`, `Voice::snap`, `Voice::depth_keep`; `routed` recomputes the old stored value). Presets 13 to 24 (copper-wire .. short-circuit) keep their old macros: a second slice.
+Same method as `MACRO-REDESIGN.md` (pilot): each preset gets four macros from what makes that patch interesting, four different kinds of change, clean by default, stored (default) sound unchanged. Builders are in `tools/examples/presets_bass_lead.rs` (`span`, `span_hi`, `Voice::snap`, `Voice::depth_keep`; `routed` recomputes the old stored value). The second half (copper-wire .. short-circuit, 11 presets) is below.
 
 Written from the patch recipes and the audit renders. Nobody has listened yet; "what you hear" is what the parameters and measures say. The A/B tours are the real test.
 
@@ -138,6 +138,117 @@ Oatmeal and Spun Sugar are bit-identical; Tar Pit, Acid Rain, Hot Wire, Lantern,
 
 `docs/presets/clips/macros-bass-lead/` (git-ignored): `<slug>-tour.mp3` per preset: new macro 1 to 4 back to back, each 20 s (6 s at 0, 4 s up, 6 s at 1, 4 s down), 1 s of silence between, 84 s; `tours.txt` lists the start seconds. Rendered at 124 bpm. Tour mode loops the phrase at its own length (first to last hit, rounded up to whole bars) so the sound is continuous (before, it looped every 8 bars and most phrases left about 7 s of silence per clip). `macro_tour_ab.py` fails when a clip has a gap over 1 s under -45 dBFS after its first second (`--max-gap` to relax); with `--old-patches`/`--old-renders` it still writes old/new A/B tours. Listen first: **Steel Toe** (Weight and Squash change the pump), **Tar Pit** (Thump, Body and Slide are new gestures on a sine), **Spun Sugar** (Shimmer and Vibrato).
 
-## Not done
+## Second half (copper-wire .. short-circuit, 11 presets)
 
-Presets 13 to 24 (second slice).
+Same method. The stored sound of every preset is unchanged (16 s clip against the old patch, difference -99 dB or better) except Loud Mouth and Short Circuit, whose patch gain went up on purpose (below). New helpers: `kick` (a fast envelope off the gate that kicks the pitch of the oscillators at the front of each note; depth on a macro, 0 at the stored position) and `fixed_vibrato`. Old Tone/Cutoff/Drive/Room macros that did not fit a gesture of the patch are fixed at their old stored value; Space stays where the echo is the sound (Copper Wire, Tail Light, Rail Yard, Oak Stave, Glass Needle, Afterglow, Fire Escape).
+
+### Copper Wire (sine ring-modulated by a triangle a fifth up)
+| Macro | What you hear 0 to 1 | What it moves |
+|---|---|---|
+| Metal [.45] | a plain sine bass to bell tones around it | ring modulator level 0 to .7 |
+| Weight [.50] | the clean sine under the bells grows from thin to a heavy sub | sine level .25 to .8 |
+| Hold [.50] | a short plucked sine to a long ringing drone | amp decay 90 to ~900 ms, sustain .6 to 1, release 25 ms up |
+| Space [.25] | echo and room keep the bells ringing | echo mix, room mix |
+
+### Tail Light (synthwave bass)
+| Macro | What you hear | What it moves |
+|---|---|---|
+| Pluck [.50] | a tight pluck to a slow filter open on every note | filter-envelope depth .08 to .32, decay 60 ms to 1 s |
+| Width [.40] | the chorus comes in and swims wider, the saw stack spreads | chorus mix 0 to 50 %, depth 15 to 78 %, stack detune 3 to 20 ct |
+| Weight [.50] | the square sub grows, the second saw steps back | sub .05 to .35, second saw .55 to .25 |
+| Space [.40] | dotted echo and room | echo mix, room mix |
+
+### Rail Yard (house bass ducked on the host clock)
+| Macro | What you hear | What it moves |
+|---|---|---|
+| Pump [.275, was .55 of a half-depth route: same sound] | the beat ducks deeper and the bass takes longer to swell back | duck depth 0 to -.60, duck release ~30 to 110 ms |
+| Snap [.50] | the filter bites each note harder and longer | envelope depth .08 to .32, decay 50 to 500 ms |
+| Thick [.30] | the saw stack spreads and the drive thickens it | stack detune 0 to 20 ct, drive 3 to 34 dB (8 dB stored) |
+| Room [.25] | synced echo and room | echo mix, room mix |
+
+### Oak Stave (upright pluck)
+| Macro | What you hear | What it moves |
+|---|---|---|
+| Pluck [.50] | how hard the filter snaps and how long it takes to close | envelope depth .50 to 1.0, decay 90 to 640 ms |
+| Thump [.30] | none to a plucked-string pitch kick at the front of the note | pitch-snap depth 0 to 100 ct |
+| Body [.40] | the sine under the note comes forward and rings longer | sine level .15 to .88, amp decay 250 ms to 3.3 s |
+| Room [.30] | short room | echo mix, room mix |
+
+### Glass Needle (sine lead, ping-pong echo)
+| Macro | What you hear | What it moves |
+|---|---|---|
+| Overtone [.30] | a thin sine to a glassy ring (the old Overtone, from a faint .03) | octave sine .03 to .43 |
+| Ping [.00] | a needle-tap pitch kick on every note (off by default) | pitch kick 0 to 100 ct over 200 ms |
+| Vibrato [.10] | a vibrato fades in and speeds up | depth 0 to 30 ct, rate 4.8 to 7.5 Hz |
+| Space [.55] | ping-pong echo and room | echo mix, room mix |
+
+### Loud Mouth (formant talking lead)
+| Macro | What you hear | What it moves |
+|---|---|---|
+| Vowel [.35] | a to u | formant vowel 0 to 3.6 |
+| Talk [.25] | the vowel drift under a held note, from still to a fast babble | LFO depth 0 to .32 of the vowel range, rate 1.2 to ~14 Hz |
+| Shift [.50] | smaller to larger mouth | formant shift -12 to +12 st |
+| Shout [.50] | a mumble to a shout: drive pushes, the formants sharpen | drive 9 to 30 dB, formant Q .8 to 2.8 |
+
+### Dust Devil (trap whistle lead)
+| Macro | What you hear | What it moves |
+|---|---|---|
+| Slide [.80] | a quick glide to a long swoop | glide ~95 ms to 2 s (1.1 s stored; the old macro was already near 1.1 s) |
+| Scoop [.00] | each note dives up into its pitch from about five semitones below (off by default; the spectral meter does not see pitch, 0.4 dB, but the interval is plain by ear) | pitch kick 0 to -5 st over 180 ms |
+| Whistle [.12] | a plain tone to a pure ringing whistle | ladder resonance 0 to .83 |
+| Vibrato [.40] | a vibrato fades in and speeds up | depth 0 to 16 ct, rate 4 to 8.5 Hz |
+
+### Afterglow (synthwave lead)
+| Macro | What you hear | What it moves |
+|---|---|---|
+| Spread [.50] | both saw stacks from tight to huge | detune 6 to 72 ct (main), 6 to 30 ct (octave) |
+| Rise [.00] | the filter starts closed and opens slowly into each note (off by default) | cutoff 1.8 kHz to 500 Hz base, envelope depth .10 to .70, attack 10 ms to 1.2 s |
+| Octave [.20] | the stack an octave up comes forward | level 0 to .6 |
+| Space [.60] | long echo and big room | echo mix, room mix |
+
+### Horn Section (synth brass stab)
+| Macro | What you hear | What it moves |
+|---|---|---|
+| Blat [.50] | the swell at the front of each stab gets deeper and slower | envelope depth .10 to .60, attack 20 to ~180 ms |
+| Section [.40] | one tight horn to a loose section | stack detune 2 to 27 ct, second saw -1 to -16 ct |
+| Blare [.30] | the brassy drive | drive 0 to 20 dB |
+| Vibrato [.10] | a vibrato fades in and speeds up | depth 0 to 28 ct, rate 5 to 7 Hz |
+
+### Fire Escape (house stab)
+| Macro | What you hear | What it moves |
+|---|---|---|
+| Dive [.50] | how far each note falls into its pitch, and for how long | dive depth 0 to 120 ct, envelope decay 40 to ~800 ms |
+| Stack [.50] | a tight chord to a wall | detune 6 to 66 ct and 4 to 40 ct |
+| Length [.50] | a short stab to a held one | amp decay 60 to ~1.1 s, release 25 to ~600 ms |
+| Space [.40] | dotted echo and room | echo mix, room mix |
+
+### Short Circuit (ring-mod lead)
+| Macro | What you hear | What it moves |
+|---|---|---|
+| Metal [.50] | the ring modulator comes in on the saw | level 0 to .7 |
+| Crush [.35] | the bitcrusher mixes in and gets coarser | mix 0 to 70 %, bits to 5, downsample to 5 |
+| Snap [.50] | a soft click to a zap on every note | envelope depth .03 to .28, decay 40 to ~360 ms |
+| Siren [.00] | the ringed square wobbles in pitch, a drift to a siren (off by default) | LFO on its fine tune 0 to 100 ct, rate .5 to 9 Hz |
+
+## Checks (second half; `macro_audit` with the combination check, 8 steps per macro)
+
+Peaks: no step, sweep or combination render is over -1 dBFS (worst combination: Oak Stave Body+Pluck at -5.5 dBFS). No click in any render. No `peak`, `click` or `pileup` flag in any combination; no pair of macros over cosine .8.
+
+Flags that are left, honestly:
+
+| Preset | Flag | Note |
+|---|---|---|
+| Dust Devil | Slide `jump` (0.6 dB at .5, 6.6 dB at 1) | The stored glide is already 1.1 s, so the last stretch moves from long to very long glides that overlap the next notes. Left; changing it would change the stored sound |
+| Afterglow | Rise `jump` | A time gesture on a slow lead (a 1.2 s filter attack): the meters see it only at the end. Listen |
+| Horn Section | Blat `jump` | The swell deepens and slows together, so the last steps move most |
+| Oak Stave | pair Body+Room `cancel` (2.3 dB against 3.5) | Room hides the longer ring of Body. Left |
+| several | small meter change (Scoop .4 dB, Vibrato .4 to 1.5 dB, Rise 1.2 dB) | These move pitch or time, which the spectral measure does not see; the tours are the test |
+
+How the redesign started from the audit: Copper Wire's first attempts (Interval, Strike) were the same sound as Metal (cosine .94 to .99: everything went through the ring modulator); Weight and Hold are different kinds of change. A Knock macro (filter snap) was dead on a pure sine and was dropped.
+
+### Default sound against the old patch (16 s clip, float)
+Bit-identical or -99 dB or better below the old signal for eight of the eleven (float rounding of the macro line). Changed on purpose: **Loud Mouth** patch gain +4 dB (loudness -25.8 to -21.2 dB, the quietest preset of the bank), **Short Circuit** +2 dB (-23.9 to -21.1 dB) and **Dust Devil** +3 dB (-21.6 to -20.0 dB, after the overseer asked for more presence). Levels of the eleven (`presets_bass_lead levels`): loudness -18.6 to -21.9 dB, peak -5.6 to -14.1 dBFS. The old Rail Yard Pump route is now the same depth with a duck release (the old duck release was fixed at 50 ms; stored sound the same).
+
+## Tours (second half)
+
+`docs/presets/clips/macros-bass-lead-2/` (git-ignored): `<slug>-tour.mp3` and `tours.txt`, same format as the first half (new macros only, 20 s each, 124 bpm, gap guard on: all pass). Listen first: **Loud Mouth** (default level changed, Talk and Shout are new), **Dust Devil** (Scoop is now a five-semitone dive, Whistle rings to .83), **Afterglow** (Rise).
