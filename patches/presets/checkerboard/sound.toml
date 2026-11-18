@@ -9,6 +9,6 @@ tags = [
     "124bpm",
     "signature",
 ]
-description = "A house piano stab: two saws and a square, driven hard and squashed until it barks. Play short syncopated chords. Cutoff opens the filter, Crunch pushes the drive, Room sets a slapback and a tight room, Length stretches the stab."
+description = "A house piano stab: two saws and a square, driven hard and squashed until it barks. Play short syncopated chords. Bite goes from a closed, thudding stab to a wide open bark as the filter snaps open on every note, Hollow turns the stab hollow: a triangle (odd harmonics, no top) takes over from the saws at the same loudness, Squash clamps the compressor harder, Spread widens and detunes the saw stack."
 keys = true
 sequence = false

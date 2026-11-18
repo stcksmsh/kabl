@@ -7,6 +7,6 @@ tags = [
     "phased",
     "funk",
 ]
-description = "A funk clavinet: a narrow pulse with a hard filter snap and a short sustain. Play 16th-note chops. Cutoff opens the filter, Drive adds the bite, Room sets a short room and slapback, Phase brings in a phaser."
+description = "A funk clavinet: a narrow pulse with a hard filter snap and a short sustain. Play 16th-note chops. Quack goes from a closed, dull clav to an open one as the filter snaps on every note, Clack starts each pluck a little sharp, Damp goes from a choked string to one that rings out, Phase brings in a phaser."
 keys = true
 sequence = false

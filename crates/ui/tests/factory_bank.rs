@@ -679,7 +679,13 @@ const LOUD_WINDOW: f64 = 5.5;
 /// Presets without a limiter whose macros at 1 add 6 dB or more over the stored settings: the
 /// peak rule (-1 dBFS with every macro up) puts their loudness about 1.7 dB under the window.
 /// Deep Field -26.1, Salt Flat -26.2. Raise them only by narrowing a macro, not by patch gain.
-const LOUD_EXCEPTIONS: [&str; 2] = ["presets/deep-field", "presets/salt-flat"];
+/// Velvet Tine: its chord strike peaks within a dB of the ceiling with Ring and Phase up, so its
+/// gain is set by the -1 dBFS rule on the audit clip and the loudness sits about 1.4 dB under the window.
+const LOUD_EXCEPTIONS: [&str; 3] = [
+    "presets/deep-field",
+    "presets/salt-flat",
+    "presets/velvet-tine",
+];
 
 #[test]
 fn factory_levels_hold_the_target() {
