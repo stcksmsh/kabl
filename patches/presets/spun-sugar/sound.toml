@@ -7,6 +7,6 @@ tags = [
     "chorus",
     "pop",
 ]
-description = "A smooth, vocal pop lead: a detuned saw stack over a triangle, a ladder filter that opens with velocity, light chorus and a dotted echo. Play legato; notes glide. Tone brightens, Edge adds drive, Space adds the echo and a room, Vibrato fades in a gentle vibrato."
+description = "A smooth, vocal pop lead: a detuned saw stack over a triangle, a ladder filter that opens with velocity, light chorus and a dotted echo. Play legato; notes glide. Tone brightens, Vibrato fades in a vibrato that speeds up as it deepens, Shimmer widens the chorus and spreads the saw stack, Space adds the echo and a room."
 keys = true
 sequence = false
