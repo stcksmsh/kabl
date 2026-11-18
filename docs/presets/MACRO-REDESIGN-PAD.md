@@ -4,7 +4,7 @@ All 13 pad presets of `tools/examples/presets_pad.rs` redesigned with the method
 `MACRO-REDESIGN.md` and `MACRO-REDESIGN-BASS-LEAD.md`. Every preset has 4 macros. The stored sound is
 unchanged unless listed under "Default changes". Tours (new macros only, 20 s each) are in
 `docs/presets/clips/macros-pad/` with `tours.txt` (git-ignored, sent to Kosta). Listen-first: Tin Voice,
-Drive-In, Rooftop.
+Waiting Room, Rooftop.
 
 ## Rules applied after Kosta's verdict
 
@@ -14,13 +14,13 @@ Drive-In, Rooftop.
   rides the compressor makeup.
 - **Bolder** means bigger tonal and space moves, not more pitch wobble (Kosta: deep pitch modulation on
   saw stacks reads as creepy, warm pads stay warm). Chorus macros cap at depth 65 to 80 and rate 0.6 to
-  0.9 Hz on every pad; Drive-In Sway is back at its old pitch depth with a slow filter breath beside it.
+  0.9 Hz on every pad; Waiting Room Sway is back at its old pitch depth with a slow filter breath beside it.
 - No limiter anywhere (gain staging only). Peaks are at -1.2 dBFS or lower at every step and in every
   combination (highest: Rooftop Chorus, -1.0 at a step; combinations -1.7 or lower).
 
 ## Level-type macros (may move the loudness on purpose)
 
-Fog Bank Arrival, Drive-In Pulse (gate), Glacier Swell, Concrete Cloud Squash (a compressor: the density
+Fog Bank Arrival, Waiting Room Pulse (gate), Glacier Swell, Concrete Cloud Squash (a compressor: the density
 falls as it clamps). Rooftop Swell and Pump House Pump move level 2 to 3 dB, inside the limit.
 
 ## Per preset
@@ -59,7 +59,7 @@ Positions are the stored values. "0 -> 1" is what you hear.
 | Chorus | .45 | dry -> deep wash | chorus mix, depth, rate |
 | Air | .50 | soft and close -> open and glassy | new high-shelf EQ at flat |
 
-### Drive-In
+### Waiting Room
 | macro | stored | 0 -> 1 | moves |
 |---|---|---|---|
 | Sway | .20 | steady -> a slow, gentle breathing: a small pitch sway plus a slow filter movement (back at the old pitch depth, no wobble) | slow pitch LFO (old depth), slow filter LFO |
@@ -67,7 +67,9 @@ Positions are the stored values. "0 -> 1" is what you hear.
 | Weight | .20 | thin -> the square an octave down comes forward, clearly (level to .75) | octave-down level, gain comp |
 | Pulse | 0 | steady -> hard sixteenth chops, echo and room ring through the gaps (level macro) | a trance gate on the host clock; press Run |
 
-Rename proposed to Kosta: Drive-In -> "Sunset Strip" (not done; waits for his answer).
+Renamed Waiting Room (was Drive-In; slug `waiting-room`): with these macros it is a dreamy, liminal pad. Defaults are
+softer and hazier than before (cutoff 1500 to 1000 Hz, longer and darker echo, bigger room, trim 8 to 7) so it sits
+clearly apart from Rooftop, the upbeat, bright one.
 
 ### Dry Cleaner
 | macro | stored | 0 -> 1 | moves |
@@ -136,16 +138,16 @@ Rename proposed to Kosta: Drive-In -> "Sunset Strip" (not done; waits for his an
 ## Audit results
 
 Full 13-preset audit with the `level` flag (`macro_audit.py --category Pad --level-type
-fog-bank/m1,drive-in/m4,concrete-cloud/m2,glacier/m3`): no `level` flag left, no pair with similarity
+fog-bank/m1,waiting-room/m4,concrete-cloud/m2,glacier/m3`): no `level` flag left, no pair with similarity
 over 0.8, no clicks, every peak at -1.2 dBFS or lower and every combination (pairs, all 0, all 1) at
 -1.7 dBFS or lower. Loudness is -16 to -21 dB over all steps (bank middle -15 .. -22).
 
 Remaining flags, all understood:
-- `duplicate` on Deep Field Sub and Shimmer, Drive-In Weight and Pulse, Cotton Mill Motion and Warmth,
+- `duplicate` on Deep Field Sub and Shimmer, Waiting Room Weight and Pulse, Cotton Mill Motion and Warmth,
   Dry Cleaner Grit and Snap, Concrete Cloud Weight and Squash: each pair shares a parameter (the gain stage
   through `comp`, or the cutoff). The audible changes differ, and the similarity check (cosine over 0.8) passes
   for every pair.
-- `jump` on Drive-In Pulse (a gate: hard chops are the point), Drive-In Weight (the octave-down entry)
+- `jump` on Waiting Room Pulse (a gate: hard chops are the point), Waiting Room Weight (the octave-down entry)
   and Tidepool Tone (the dark floor of the filter: the top band is nearly silent at 0).
 
 ## Count justifications
@@ -159,8 +161,8 @@ All 13 presets have 4 macros: none has 3 or 5+.
 - Level trims: Deep Field 11 to 14, Picture Window 10 to 11, Rooftop 9 to 11.5, Glacier 9 to 12, Tidepool
   9 to 11, Dry Cleaner 8 to 10, Static Garden 7.5 to 6.
 - Cotton Mill Motion pulls the cutoff a little (stored sound moves about 3 % in cutoff).
-- Cotton Mill / Picture Window / Drive-In / Dry Cleaner / Concrete Cloud / Rooftop / Glacier / Pump House
+- Cotton Mill / Picture Window / Waiting Room / Dry Cleaner / Concrete Cloud / Rooftop / Glacier / Pump House
   / Static Garden lost their old Cutoff / Room / Space macros (fixed at the old stored value). Fog Bank
   Drift no longer moves the filter (walk fixed at its old depth).
-- Drive-In: Wash renamed Chorus; Sway keeps its old stored pitch depth and adds a faint slow filter movement.
+- Waiting Room (was Drive-In): Wash renamed Chorus; cutoff 1500 to 1000 Hz, echo 460 ms / 40 % / 3200 Hz to 520 ms / 48 % / 2400 Hz (more of it), room 5 s to 8 s, trim 8 to 7; Sway keeps its old stored pitch depth and adds a faint slow filter movement.
 - Rooftop: trim 9 to 11.5; a few dB of drive at the stored Section.

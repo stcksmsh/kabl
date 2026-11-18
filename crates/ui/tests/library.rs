@@ -505,11 +505,11 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "A clean, bright pad for pop: a seven-voice saw stack with a light chorus and a medium room. Play simple triads. Cutoff opens the filter, Spread widens the detune of the stack, Sparkle adds an octave of airy saw above, Space adds the echo and the room.",
     ),
     (
-        "presets/drive-in",
-        "Drive-In",
+        "presets/waiting-room",
+        "Waiting Room",
         "Pad",
-        &["poly", "supersaw", "chorus", "vibrato", "synthwave", "80s"],
-        "A lush synthwave pad: detuned saws over a square, a slow vibrato, wide chorus and a long echo. Play slow minor chords. Cutoff opens the filter, Wobble sets the depth of the vibrato, Chorus brings in the chorus, Space adds the echo and the room.",
+        &["poly", "supersaw", "chorus", "dreamy", "liminal", "hazy"],
+        "A dreamy, liminal pad: soft detuned saws over a square, a slow breath of sway, a hazy wide chorus and a long, empty-room echo. Play slow minor chords and let them hang. Sway sets the depth of the slow pitch sway, Chorus brings in a wide, lush chorus, Weight brings the square an octave down forward, Pulse chops the pad into a tempo-synced gate (press Run).",
     ),
     (
         "presets/dry-cleaner",

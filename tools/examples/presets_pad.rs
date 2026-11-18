@@ -1094,8 +1094,8 @@ fn picture_window() -> Rack {
     v.finish("=0.5", &echo(380.0, 30.0, 4000.0), 0.25, (4.0, 0.5), None)
 }
 
-/// Drive-In: a lush synthwave pad, detuned saws over a square, slow vibrato, wide chorus.
-fn drive_in() -> Rack {
+/// Waiting Room: a dreamy, liminal pad, soft detuned saws over a square, slow sway, hazy chorus, empty-room echo.
+fn waiting_room() -> Rack {
     let mut v = Voice::new(pad_recipe(
         &[
             ("Sway", 0.20),
@@ -1112,9 +1112,9 @@ fn drive_in() -> Rack {
         [400.0, 1200.0, 0.6, 900.0],
         0.20,
         [300.0, 500.0, 0.85, 1200.0],
-        8.0,
+        7.0,
     ));
-    let d = routed("filter.ladder", "cutoff_hz", 1500.0, 0.5, 0.5);
+    let d = routed("filter.ladder", "cutoff_hz", 1000.0, 0.5, 0.5);
     v.r.e.set_param(v.lad, "cutoff_hz", d);
     let ch = v.stage("chorus", &[("rate_hz", 0.6), ("depth", 70.0), ("mix", 0.0)]);
     // Sway: a slow pitch sway fades in (depths doubled, stored at half).
@@ -1139,9 +1139,9 @@ fn drive_in() -> Rack {
     v.r.depth_route(gate, "out", v.mono, "gain_db", v.knob, "m4", 0.5);
     v.r.route(v.knob, "m4", v.mono, "gain_db", -0.5);
     // The echo stays free-running (the clock is patched in for the gate only).
-    let mut e = echo(460.0, 40.0, 3200.0).to_vec();
+    let mut e = echo(520.0, 48.0, 2400.0).to_vec();
     e.push(("sync", 0.0));
-    v.finish("=0.6", &e, 0.35, (5.0, 0.55), Some(clock))
+    v.finish("=0.6", &e, 0.45, (8.0, 0.65), Some(clock))
 }
 
 /// Dry Cleaner: phased chords through a compressor, close and dry, a filter sweep on macro 1.
@@ -1710,13 +1710,13 @@ fn presets() -> Vec<Preset> {
             secs: 14.0,
         },
         Preset {
-            slug: "drive-in",
-            name: "Drive-In",
+            slug: "waiting-room",
+            name: "Waiting Room",
             category: "Pad",
-            tags: &["poly", "supersaw", "chorus", "vibrato", "synthwave", "80s"],
-            description: "A lush synthwave pad: detuned saws over a square, a slow vibrato, wide chorus and a long echo. Play slow minor chords. Sway sets the depth of the slow pitch sway, Chorus brings in a wide, fast chorus, Weight brings the square an octave down forward, Pulse chops the pad into a tempo-synced gate (press Run).",
+            tags: &["poly", "supersaw", "chorus", "dreamy", "liminal", "hazy"],
+            description: "A dreamy, liminal pad: soft detuned saws over a square, a slow breath of sway, a hazy wide chorus and a long, empty-room echo. Play slow minor chords and let them hang. Sway sets the depth of the slow pitch sway, Chorus brings in a wide, lush chorus, Weight brings the square an octave down forward, Pulse chops the pad into a tempo-synced gate (press Run).",
             listen: "The wide chorused saws with a slow pitch sway; Chorus at 0 is a plain stack, at 1 a wide wash.",
-            build: drive_in,
+            build: waiting_room,
             group: 1,
             phrase: slow_phrase,
             secs: 26.0,
