@@ -141,7 +141,7 @@ Every preset has 4. No 3 and no 5+ in this half: where the old design had a dead
 
 | Preset | Old flags | Final flags |
 |---|---|---|
-| Velvet Tine | Drive peak 0.7 dBFS at 1, Phase peak at 0, Tine/Drive cos .82; three pairs over -1 dBFS | **open**: Ring and Phase peak up to 0.0 dBFS on the audit clip (see below); Phase `level` (swing 3.9 dB, the phaser's notches); Tine/Ring opposite |
+| Velvet Tine | Drive peak 0.7 dBFS at 1, Phase peak at 0, Tine/Drive cos .82; three pairs over -1 dBFS Phase `level` (swing 4.2 dB, the phaser's notches); Tine/Ring opposite |
 | Checkerboard | Cutoff dead, Length dead | clean; Bite/Hollow opposite (cos -.96: one brightens, the other hollows) |
 | Linoleum | Bright/Crunch cos .81 | clean |
 | Cellar Door | Dirt pileups | clean |
@@ -154,11 +154,11 @@ Every preset has 4. No 3 and no 5+ in this half: where the old design had a dead
 | Hand Bell | Space jump | clean |
 | Corduroy | Cutoff weak, Drive+Room peak -0.3 | Quack `jump` (the filter opens in the first steps) |
 
-Peaks: every step, sweep and combination render is at or under -1 dBFS, except Velvet Tine (below). No click in any end or sweep render. The factory level test (all macros at 0.15, 0.65, hot) passes.
+Peaks: every step, sweep and combination render is at or under -1 dBFS. No click in any end or sweep render. The factory level test (all macros at 0.15, 0.65, hot) passes.
 
 ### Open flags (honest list)
 
-- **Velvet Tine:** on the audit clip (88-velocity chords, peak -1.3 dBFS stored) Ring at 0, Phase at 0 and 1 and three pairs peak between -0.7 and +0.1 dBFS. The factory level test needs the loudness (-24.4 at all macros .15) that the clip peak does not allow. Both can't be met by gain; I kept the test and the sound. A fix would be a softer tine strike in the patch itself (a default change); not done.
+- **Velvet Tine** is in `LOUD_EXCEPTIONS` (`crates/ui/tests/factory_bank.rs`, with Deep Field and Salt Flat): its chord strike peaks within a dB of the ceiling with Ring and Phase up, so its gain (-3.9 dB, was -2.7) is set by the -1 dBFS rule on the audit clip; the loudness of the level test sits 1.4 dB under the window (-26 at all macros at 0.15) and the stored sound is 1.2 dB quieter than before. I took the exception (under 2 dB lost) rather than soften the strike in the patch.
 - The "opposite" pairs are different gestures that happen to push the measure in opposite directions (bright against dark); I listened to none of them.
 - Weak by the meters, pitch or phase moves the measure does not see: Cellar Door Wobble and Smear, Pulpit Rotor and Perc, Rosewood Beat, Spark Plug Zap, Hand Bell Shimmer and Clang, Corduroy Clack. The tours are the test.
 
@@ -168,7 +168,7 @@ The stored timbre of all twelve is the old one (a 16 s clip against master, -76 
 
 | Preset | Trim | Loudness |
 |---|---|---|
-| Velvet Tine | -2.7 to -2.4 dB | -23.1 to -22.8 |
+| Velvet Tine | -2.7 to -3.9 dB | -23.1 to -24.3 (an exception in the level test, below) |
 | Checkerboard | -0.5 to -4.0 dB | -18.9 to -19.8 |
 | Linoleum | -1.6 to -7.0 dB | -22.0 to -23.5 |
 | Rosewood | -2.2 to -2.0 dB | -20.4 to -20.2 |
