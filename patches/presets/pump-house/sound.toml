@@ -7,6 +7,6 @@ tags = [
     "french touch",
     "signature",
 ]
-description = "A chord pad that pumps with the beat for French touch: saws and an octave down, ducked on every beat of the host tempo by a silent envelope, no drum. Press Run to start the clock, then hold chords. Cutoff opens the filter, Drive pushes the saturation, Pump sets how deep the duck goes, Room adds a tempo-synced echo and a tight room."
+description = "A chord pad that pumps with the beat for French touch: saws and an octave down, ducked on every beat of the host tempo by a silent envelope, no drum. Press Run to start the clock, then hold chords. Pump sets how deep and long the duck goes, Weight brings the octave down forward, Wide adds a wide chorus, Open opens the filter."
 keys = true
 sequence = true

@@ -8,6 +8,6 @@ tags = [
     "synthwave",
     "80s",
 ]
-description = "A lush synthwave pad: detuned saws over a square, a slow vibrato, wide chorus and a long echo. Play slow minor chords. Cutoff opens the filter, Wobble sets the depth of the vibrato, Chorus brings in the chorus, Space adds the echo and the room."
+description = "A lush synthwave pad: detuned saws over a square, a slow vibrato, wide chorus and a long echo. Play slow minor chords. Sway sets the depth of the slow pitch sway, Chorus brings in a wide, fast chorus, Weight brings the square an octave down forward, Pulse chops the pad into a tempo-synced gate (press Run)."
 keys = true
 sequence = true
