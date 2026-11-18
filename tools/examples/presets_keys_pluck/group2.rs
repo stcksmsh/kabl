@@ -63,7 +63,7 @@ fn tin_roof() -> Rack {
     // Bark: a clean tone to an overdriven one.
     let d = routed("drive", "drive_db", 9.0, 0.4, 0.4);
     r.span(k, 3, s.drive.unwrap(), "drive", "drive_db", 0.0, d);
-    r.span(k, 3, s.drive.unwrap(), "drive", "trim_db", 5.0, -3.0);
+    r.span(k, 3, s.drive.unwrap(), "drive", "trim_db", 3.5, -3.0);
     // Chorus: a dry tone to a deep, fast chorus.
     let ch = s.chorus.unwrap();
     let mix = routed("chorus", "mix", 0.0, 0.5, 0.4);

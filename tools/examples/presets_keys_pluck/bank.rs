@@ -140,7 +140,7 @@ fn velvet_tine() -> Rack {
     r.span(k, 1, v, o, "level4", 0.0, 0.3);
     // Ring: the two carriers decay from a short thud to a long singing note.
     r.span_hi(k, 2, v, o, "decay1", 2200.0, 9500.0);
-    r.level(k, 2, s.trim, -3.5);
+    r.level(k, 2, s.trim, -2.0);
     r.span_hi(k, 2, v, o, "decay5", 2400.0, 9500.0);
     // Detune: the detuned partner of the first carrier drifts off, a plain tine to a beating, chorused one (off).
     r.rise(k, 3, v, o, "fine5", 4.0, 90.0);
@@ -152,7 +152,6 @@ fn velvet_tine() -> Rack {
     r.span_hi(k, 4, ph, "phaser", "rate_hz", 0.35, 3.0);
     r.span_hi(k, 4, ph, "phaser", "depth", 60.0, 98.0);
     r.span_hi(k, 4, ph, "phaser", "feedback", 25.0, 88.0);
-    r.level(k, 4, s.trim, 0.0);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -538,7 +537,7 @@ fn rosewood() -> Rack {
     r.span_hi(k, 3, v, o, "level3", 0.4, 0.8);
     // Roll: a tremolo on the level, the mallet roll of a marimba (off by default).
     let lfo = r.add("lfo", &[("rate_hz", 5.0)]);
-    r.depth_route(lfo, "out", s.trim, "gain_db", k, "m4", 0.03);
+    r.depth_route(lfo, "out", s.trim, "gain_db", k, "m4", 0.045);
     r.rise(k, 4, lfo, "lfo", "rate_hz", 5.0, 13.0);
     perform(&mut r, knob, None, 4);
     r
@@ -596,7 +595,7 @@ fn rain_gutter() -> Rack {
     // Ring: a damped tick to a tine that rings for seconds.
     r.span(k, 2, v, o, "decay1", 300.0, 1700.0);
     r.span(k, 2, v, o, "decay3", 400.0, 2000.0);
-    r.level(k, 2, s.trim, -3.5);
+    r.level(k, 2, s.trim, -7.0);
     // Echo: a short echo and a small room to a long, ringing tail (the wet level stays).
     r.span(k, 3, s.verb, "reverb", "decay_s", 0.6, 4.0);
     r.span(k, 3, s.delay, "delay", "feedback", 0.0, 42.0);

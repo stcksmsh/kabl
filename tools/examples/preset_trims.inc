@@ -31,7 +31,7 @@ fn level_trim(slug: &str) -> f32 {
         "tin-roof" => 0.0,
         "tuning-fork" => -5.0,
         "turnstile" => -8.3,
-        "velvet-tine" => -2.7,
+        "velvet-tine" => -2.4,
         "willow" => -5.0,
         _ => 0.0,
     }
