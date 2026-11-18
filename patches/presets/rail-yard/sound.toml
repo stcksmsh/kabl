@@ -6,6 +6,6 @@ tags = [
     "124bpm",
     "house",
 ]
-description = "A house bass that ducks on every beat: a saw and a square sub through a compressor, pulled down by a silent envelope on the host clock (no drum is built in). Press Run for the pump, then play off-beat notes; the mod wheel opens the filter. Cutoff opens the filter, Drive adds drive, Pump sets how hard the beat ducks the bass, Room adds a synced echo and a room."
+description = "A house bass that ducks on every beat: a saw and a square sub through a compressor, pulled down by a silent envelope on the host clock (no drum is built in). Press Run for the pump, then play off-beat notes; the mod wheel opens the filter. Pump sets how deep the beat ducks the bass and how long it takes to swell back, Snap deepens and lengthens the filter bite of each note, Thick spreads the saw and adds drive, Room adds a synced echo and a room."
 keys = true
 sequence = true

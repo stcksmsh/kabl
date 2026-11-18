@@ -7,6 +7,6 @@ tags = [
     "trap",
     "hip-hop",
 ]
-description = "A trap whistle lead: a sine with a touch of triangle that slides from note to note, with a dotted echo and a vibrato. Play simple melodies. Tone opens the filter, Slide sets how long the slide takes, Space adds the echo and the room, Vibrato fades in a vibrato."
+description = "A trap whistle lead: a sine with a touch of triangle that slides from note to note, with a dotted echo. Play simple melodies. Slide sets how long the slide takes, Scoop makes each note swoop up into its pitch from several semitones below, Whistle rings the filter resonance on the sine for a pure whistle, Vibrato fades in a vibrato that speeds up."
 keys = true
 sequence = false

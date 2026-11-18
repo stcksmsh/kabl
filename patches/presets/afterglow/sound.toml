@@ -8,6 +8,6 @@ tags = [
     "synthwave",
     "80s",
 ]
-description = "A big synthwave lead: a seven-voice saw stack with an octave stack and a pulse, chorus, a long echo and a big room. Play slow, soaring lines; notes glide. Cutoff brightens, Spread widens the detune of the main stack, Space adds the echo and the room, Vibrato adds vibrato."
+description = "A big synthwave lead: a seven-voice saw stack with an octave stack and a pulse, chorus, a long echo and a big room. Play slow, soaring lines; notes glide. Spread opens the saw stacks from tight to huge, Rise opens the filter slowly into each note, Octave brings in the stack an octave up, Space adds the echo and the room."
 keys = true
 sequence = false
