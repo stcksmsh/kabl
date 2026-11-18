@@ -165,7 +165,7 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "Checkerboard",
         "Keys",
         &["poly", "stab", "distorted", "compressed", "french touch", "124bpm", "signature"],
-        "A house piano stab: two saws and a square, driven hard and squashed until it barks. Play short syncopated chords. Bite goes from a closed, thudding stab to a wide open bark as the filter snaps open on every note, Hollow brings in the triangle under the saws, Squash clamps the compressor harder, Spread widens and detunes the saw stack.",
+        "A house piano stab: two saws and a square, driven hard and squashed until it barks. Play short syncopated chords. Bite goes from a closed, thudding stab to a wide open bark as the filter snaps open on every note, Hollow turns the stab hollow: a triangle (odd harmonics, no top) takes over from the saws at the same loudness, Squash clamps the compressor harder, Spread widens and detunes the saw stack.",
     ),
     (
         "presets/linoleum",

@@ -216,10 +216,11 @@ fn checkerboard() -> Rack {
     r.depth_route(v.fenv, "out", s.lad, "cutoff_hz", k, "m1", 0.35);
     r.span(k, 1, v.fenv, "env.adsr", "decay_ms", 40.0, 180.0);
     r.route(m, "velocity", s.lad, "cutoff_hz", 0.15);
-    // Hollow: the pulse under the saw stack grows and thins out, from a plain saw to a nasal stab.
+    // Hollow: a timbre change at constant loudness: the triangle (odd harmonics, no top) takes over from the saws, the gain following.
     let mix = v.mix;
     r.span(k, 2, mix, "mixer", "level2", 0.0, 0.35);
-    r.span(k, 2, mix, "mixer", "level1", 0.75, 0.55);
+    r.span(k, 2, mix, "mixer", "level1", 0.6577, 0.55);
+    r.level(k, 2, s.trim, -1.0);
     // Squash: the compressor from a light touch to a hard clamp, the makeup following.
     let c = s.comp.unwrap();
     r.span(k, 3, c, "compressor", "threshold_db", -8.0, -22.0);
@@ -837,7 +838,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Checkerboard",
             category: "Keys",
             tags: &["poly", "stab", "distorted", "compressed", "french touch", "124bpm", "signature"],
-            description: "A house piano stab: two saws and a square, driven hard and squashed until it barks. Play short syncopated chords. Bite goes from a closed, thudding stab to a wide open bark as the filter snaps open on every note, Hollow brings in the triangle under the saws, Squash clamps the compressor harder, Spread widens and detunes the saw stack.",
+            description: "A house piano stab: two saws and a square, driven hard and squashed until it barks. Play short syncopated chords. Bite goes from a closed, thudding stab to a wide open bark as the filter snaps open on every note, Hollow turns the stab hollow: a triangle (odd harmonics, no top) takes over from the saws at the same loudness, Squash clamps the compressor harder, Spread widens and detunes the saw stack.",
             listen: "The bark of the compressor on every stab and the filter snapping shut after each one",
             group: 1,
             build: checkerboard,

@@ -32,7 +32,7 @@ Two facts the old presets hid, from the audit of the old macros:
 | Macro | What you hear 0 to 1 | What it moves |
 |---|---|---|
 | Bite [1.00] | a closed, thudding stab whose filter snaps open on every note, to the open bark | cutoff_hz 400 to 8.44e+03; env.adsr on filter.ladder.cutoff_hz; decay_ms 40 to 180 |
-| Hollow [0.35] | a plain saw stack to a hollow stab: the triangle comes up under the saws while the saws step back | level2 0 to 1; level1 0.75 to 0.179 |
+| Hollow [0.35] | a timbre change at constant loudness, nothing like Squash: the stab goes from a bright saw stack to a hollow, woody one as the triangle (odd harmonics, no top) takes over from the saws and the body stays; the gain follows so the level does not move (+0.1 dB at 1) | level2 0 to 1; level1 0.658 to 0.35; gain_db -1.0 dB at 1 (the compressor after it takes back part of any gain, so the compensation is small and negative) |
 | Squash [0.70] | a light compressor to a hard clamp (density: the level may move; the makeup follows only in part) | threshold_db -8 to -28; ratio 2 to 7.71; makeup_db 2 to 6.29; gain_db 2.2 to 6.2 |
 | Spread [0.00] | the saw stack widens and drifts apart, mono to wide (off by default) | detune 12 to 65; width 0 to 100; fine 5 to 30 |
 
@@ -134,7 +134,7 @@ Every preset has 4. No 3 and no 5+ in this half: where the old design had a dead
 
 - **Spark Plug:** Squash "may overlap Snap/Grit" and was replaced by **Ring** (the release of the amp and filter envelopes: a staccato tick to a pluck that rings on); Zap is louder (route 0.7 to 1.0, up to 200 ct). The compressor stays at its stored setting.
 - **Hand Bell:** Strike and Ring kept (Ring is bolder). **Tail** made the bell "holy" and overlapped with Ring and the echo: it is gone, echo and room are a constant wet amount at the old stored level, and the slot is **Shimmer** (the chorus). Only Ring touches the space. Clang is wider.
-- **Checkerboard:** Bite and Squash kept, Spread bolder (detune 65 ct, width 100 %), **Hollow** stronger (the triangle comes up to 1.0 while the saw backs off from .75 to .55).
+- **Checkerboard:** Bite and Squash kept, Spread bolder (detune 65 ct, width 100 %), **Hollow** is a level-compensated timbre change (Kosta: the first version "made it quieter, too much like Squash"): the triangle comes up to 1.0 while the saws back off to .35, loudness within 0.1 dB over the travel, stored sound unchanged.
 - **Rain Gutter:** Tail is renamed **Echo** and is the one macro that owns the space (reverb decay, echo feedback; the wet level stays).
 
 ## Old flags against the final audit
@@ -142,7 +142,7 @@ Every preset has 4. No 3 and no 5+ in this half: where the old design had a dead
 | Preset | Old flags | Final flags |
 |---|---|---|
 | Velvet Tine | Drive peak 0.7 dBFS at 1, Phase peak at 0, Tine/Drive cos .82; three pairs over -1 dBFS Phase `level` (swing 4.2 dB, the phaser's notches); Tine/Ring opposite |
-| Checkerboard | Cutoff dead, Length dead | clean; Bite/Hollow opposite (cos -.96: one brightens, the other hollows) |
+| Checkerboard | Cutoff dead, Length dead | clean; Bite/Hollow opposite (cos -.92: one brightens, the other hollows; the audit's `duplicate` on the shared trim gain with Squash is the level compensation, not a doubled move); every pair peaks at -3.5 dBFS or lower |
 | Linoleum | Bright/Crunch cos .81 | clean |
 | Cellar Door | Dirt pileups | clean |
 | Pulpit | Brightness dead + jump, Room jump | Perc/Overdrive opposite (cos -.98, Perc darkens and Overdrive brightens) |

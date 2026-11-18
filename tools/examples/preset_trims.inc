@@ -5,7 +5,7 @@ fn level_trim(slug: &str) -> f32 {
         "boxwood" => -1.0,
         "brass-filament" => -2.0,
         "cellar-door" => -3.0,
-        "checkerboard" => -4.0,
+        "checkerboard" => -5.0,
         "cold-cut" => -3.0,
         "corduroy" => -1.5,
         "deep-field" => -7.2,
