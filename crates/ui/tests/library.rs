@@ -442,8 +442,8 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "A talking lead for French touch: a saw and a pulse driven hard into a formant filter that sounds like a mouth. Play short riffs; the mod wheel moves the vowel. Vowel sets the vowel from a to u, Talk sets how much and how fast the vowel drifts under a held note, Shift makes the mouth smaller or larger, Shout pushes the drive and sharpens the formants.",
     ),
     (
-        "presets/velvet-sine",
-        "Velvet Sine",
+        "presets/soft-sine",
+        "Soft Sine",
         "Lead",
         &["mono", "legato", "soft", "sine", "vibrato", "echo"],
         "A soft, round lead: a sine with a hint of triangle, a short legato glide between overlapped notes, a vibrato and a dotted echo. Play simple, smooth melodies. Glide sets how long the glide takes, from a step to a short slide, Body turns the pure sine into a rounder, hollow tone, Bloom makes each note swell in and fade out slowly, Vibrato fades in a vibrato that speeds up.",

@@ -194,7 +194,7 @@ Kosta's ear: the Vowel sweep got muddled in the middle (a plain morph passes thr
 
 New in the formant filter: `hold` (0 to 1, default 0 = the old smooth morph, so no other preset changes). At 1 the formants sit on the pure vowel over most of the way and cross to the next within a fifth of it (smoothstep). Loud Mouth sets it to 1. **Default change:** the stored sound is now a steady, clear "e" with a moderate talkbox (before: a blend with a sine drift); level -21.8 dB loudness, peak -12.7 dBFS. Four macros: Vowel, Talk, Shift and Shout are four different gestures (place, rhythm, size, force).
 
-### Velvet Sine (was Dust Devil: reworked after listening)
+### Soft Sine (was Dust Devil: reworked after listening)
 Kosta's ear: "the name doesn't fit, the slide makes it a kid whistle". The old preset was a sine with a 1.1 s slide, so it whistled. It is now a soft, round lead: the same sine and hint of triangle, a short legato glide, vibrato, the dotted echo. The name says what it is. Whistle (resonance) and Scoop (pitch dive) are gone.
 
 | Macro | What you hear | What it moves |
@@ -204,7 +204,7 @@ Kosta's ear: "the name doesn't fit, the slide makes it a kid whistle". The old p
 | Bloom [.00] | each note swells in and fades out slowly: a soft pluck to a pad-like lead (off by default) | amp attack 6 ms to 500 ms, release 220 ms to 1.1 s |
 | Vibrato [.40] | a vibrato fades in and speeds up | depth 0 to 16 ct, rate 5.6 to 8.5 Hz |
 
-**Default change:** the stored glide is 40 ms (was 1.1 s); everything else at its old stored value; patch gain +3 dB (loudness -20.0 dB). The echo and room are fixed at the old stored level. Slug `velvet-sine` (the patch folder `dust-devil` is removed). Four macros: glide, timbre, envelope and vibrato are four different gestures.
+**Default change:** the stored glide is 40 ms (was 1.1 s); everything else at its old stored value; patch gain +3 dB (loudness -20.0 dB). The echo and room are fixed at the old stored level. Slug `soft-sine` (the patch folder `dust-devil` is removed). Four macros: glide, timbre, envelope and vibrato are four different gestures.
 
 ### Afterglow (synthwave lead)
 | Macro | What you hear | What it moves |
@@ -241,7 +241,7 @@ Five macros (approved by Kosta): Chop is a gesture none of the four others has (
 | Snap [.50] | a soft click to a zap on every note | envelope depth .03 to .28, decay 40 to ~360 ms |
 | Siren [.00] | the ringed square wobbles in pitch, a drift to a siren (off by default) | LFO on its fine tune 0 to 100 ct, rate .5 to 9 Hz |
 
-## Checks (second half, before the listening fixes; Loud Mouth, Afterglow and Velvet Sine were audited again, see above; `macro_audit` with the combination check, 8 steps per macro)
+## Checks (second half, before the listening fixes; Loud Mouth, Afterglow and Soft Sine were audited again, see above; `macro_audit` with the combination check, 8 steps per macro)
 
 Peaks: no step, sweep or combination render is over -1 dBFS (worst combination: Oak Stave Body+Pluck at -5.5 dBFS). No click in any render. No `peak`, `click` or `pileup` flag in any combination; no pair of macros over cosine .8.
 
@@ -249,7 +249,7 @@ Flags that are left, honestly:
 
 | Preset | Flag | Note |
 |---|---|---|
-| Velvet Sine | pair Glide+Body `cancel` (3.6 dB against 5.2) | Left |
+| Soft Sine | pair Glide+Body `cancel` (3.6 dB against 5.2) | Left |
 | Afterglow | Rise `jump` | A time gesture on a slow lead (a 1.2 s filter attack): the meters see it only at the end. Listen |
 | Horn Section | Blat `jump` | The swell deepens and slows together, so the last steps move most |
 | Oak Stave | pair Body+Room `cancel` (2.3 dB against 3.5) | Room hides the longer ring of Body. Left |
@@ -258,8 +258,8 @@ Flags that are left, honestly:
 How the redesign started from the audit: Copper Wire's first attempts (Interval, Strike) were the same sound as Metal (cosine .94 to .99: everything went through the ring modulator); Weight and Hold are different kinds of change. A Knock macro (filter snap) was dead on a pure sine and was dropped.
 
 ### Default sound against the old patch (16 s clip, float)
-Bit-identical or -99 dB or better below the old signal for eight of the eleven (float rounding of the macro line). Changed on purpose: **Loud Mouth** patch gain +4 dB (loudness -25.8 to -21.2 dB, the quietest preset of the bank), **Short Circuit** +2 dB (-23.9 to -21.1 dB) and **Velvet Sine** +3 dB (-20.0 dB loudness, after the overseer asked for more presence). Levels of the eleven (`presets_bass_lead levels`): loudness -18.6 to -21.9 dB, peak -5.6 to -14.1 dBFS. The old Rail Yard Pump route is now the same depth with a duck release (the old duck release was fixed at 50 ms; stored sound the same).
+Bit-identical or -99 dB or better below the old signal for eight of the eleven (float rounding of the macro line). Changed on purpose: **Loud Mouth** patch gain +4 dB (loudness -25.8 to -21.2 dB, the quietest preset of the bank), **Short Circuit** +2 dB (-23.9 to -21.1 dB) and **Soft Sine** +3 dB (-20.0 dB loudness, after the overseer asked for more presence). Levels of the eleven (`presets_bass_lead levels`): loudness -18.6 to -21.9 dB, peak -5.6 to -14.1 dBFS. The old Rail Yard Pump route is now the same depth with a duck release (the old duck release was fixed at 50 ms; stored sound the same).
 
 ## Tours (second half)
 
-`docs/presets/clips/macros-bass-lead-2/` (git-ignored): `<slug>-tour.mp3` and `tours.txt`, same format as the first half (new macros only, 20 s each, 124 bpm, gap guard on: all pass). Listen first (re-rendered after the fixes): **Loud Mouth**, **Velvet Sine**, **Afterglow** (Chop is the fifth clip, at 84 s).
+`docs/presets/clips/macros-bass-lead-2/` (git-ignored): `<slug>-tour.mp3` and `tours.txt`, same format as the first half (new macros only, 20 s each, 124 bpm, gap guard on: all pass). Listen first (re-rendered after the fixes): **Loud Mouth**, **Soft Sine**, **Afterglow** (Chop is the fifth clip, at 84 s).

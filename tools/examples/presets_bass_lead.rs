@@ -2056,9 +2056,9 @@ fn loud_mouth() -> Rack {
     )
 }
 
-/// Velvet Sine: a soft, round lead, a sine with a hint of triangle, a short legato glide, vibrato
+/// Soft Sine: a soft, round lead, a sine with a hint of triangle, a short legato glide, vibrato
 /// and a dotted echo. (Formerly Dust Devil: a long whistle-like slide was its sound.)
-fn velvet_sine() -> Rack {
+fn soft_sine() -> Rack {
     let mut v = Voice::new(Recipe {
         bass: false,
         macros: &[
@@ -2707,13 +2707,13 @@ fn presets() -> Vec<Preset> {
             secs: 9.0,
         },
         Preset {
-            slug: "velvet-sine",
-            name: "Velvet Sine",
+            slug: "soft-sine",
+            name: "Soft Sine",
             category: "Lead",
             tags: &["mono", "legato", "soft", "sine", "vibrato", "echo"],
             description: "A soft, round lead: a sine with a hint of triangle, a short legato glide between overlapped notes, a vibrato and a dotted echo. Play simple, smooth melodies. Glide sets how long the glide takes, from a step to a short slide, Body turns the pure sine into a rounder, hollow tone, Bloom makes each note swell in and fade out slowly, Vibrato fades in a vibrato that speeds up.",
             listen: "The pure, soft tone and the short glide between notes; Body up for a hollow warmth, Bloom up for a swelling, pad-like lead.",
-            build: velvet_sine,
+            build: soft_sine,
             group: 2,
             phrase: devil_phrase,
             secs: 9.0,
