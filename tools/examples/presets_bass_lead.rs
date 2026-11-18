@@ -1990,7 +1990,7 @@ fn loud_mouth() -> Rack {
         bass: false,
         macros: &[
             ("Vowel", 0.35),
-            ("Talk", 0.25),
+            ("Talk", 0.35),
             ("Shift", 0.50),
             ("Shout", 0.50),
         ],
@@ -2012,13 +2012,19 @@ fn loud_mouth() -> Rack {
         "filter.formant",
         &[("vowel", 0.0), ("shift_st", -6.0), ("q", 1.5)],
     );
-    // Vowel: the vowel from a to u (the mod wheel moves it too).
-    v.r.route(v.knob, "m1", formant, "vowel", 0.9);
+    // Every vowel is held clear (`hold`): a sweep steps between a, e, i, o, u with short crossings,
+    // no blends in the middle.
+    v.r.e.set_param(formant, "hold", 1.0);
+    // Vowel: a to u (the mod wheel moves it too).
+    v.r.route(v.knob, "m1", formant, "vowel", 1.0);
     v.r.route(v.m, "wheel", formant, "vowel", 0.5);
-    // Talk: the vowel drift that keeps a held note talking, from still to a fast babble.
-    let talk = v.r.add("lfo", &[("rate_hz", 2.2)]);
-    v.depth_keep(talk, "out", formant, "vowel", 2, 0.25, 0.32, 0.08);
-    span(&mut v, 2, 0.25, talk, "lfo", "rate_hz", 1.2, 2.2);
+    // Talk: on the host clock, the mouth jumps to a new vowel every eighth note (a talkbox), from
+    // still to chattering. Press Run.
+    let clock = v.r.add("clock", &[("bpm", 124.0), ("swing", 0.0)]);
+    let talk =
+        v.r.add("lfo", &[("waveform", 4.0), ("sync", 2.0), ("rate_hz", 4.0)]);
+    v.r.wire(clock, "gate", talk, "clock");
+    v.r.depth_route(talk, "out", formant, "vowel", v.knob, "m2", 0.5);
     // Shift: a smaller or a larger mouth.
     let shift = routed("filter.formant", "shift_st", -6.0, 0.5, 0.5);
     span_hi(
@@ -2031,33 +2037,38 @@ fn loud_mouth() -> Rack {
         shift,
         12.0,
     );
-    // Shout: the drive pushes and the formants sharpen (a mumble to a shout).
+    // Shout: the drive pushes hard, the formants sharpen and the level comes up into the
+    // compressor (a mumble to a shout).
     let d = routed("drive", "drive_db", 14.0, 0.3, 0.5);
-    span_hi(&mut v, 4, 0.5, drive, "drive", "drive_db", d, 30.0);
-    span(&mut v, 4, 0.5, formant, "filter.formant", "q", 0.8, 1.5);
-    v.stage("compressor", &compressor(-26.0, 6.0, 2.0, 80.0, 6.0));
+    span_hi(&mut v, 4, 0.5, drive, "drive", "drive_db", d, 32.0);
+    span(&mut v, 4, 0.5, formant, "filter.formant", "q", 0.7, 1.5);
+    let comp = v.stage("compressor", &compressor(-26.0, 6.0, 2.0, 80.0, 6.0));
+    span(&mut v, 4, 0.5, comp, "compressor", "makeup_db", 0.0, 6.0);
     // The old Room stays at its stored level.
+    let mut e = echo(110.0, 20.0, 3000.0).to_vec();
+    e.push(("sync", 0.0));
     v.finish(
         "",
-        &echo(110.0, 20.0, 3000.0),
+        &e,
         0.25 * 0.25 * 100.0,
         (0.4, 0.25 * 0.15 * 100.0),
-        None,
+        Some(clock),
     )
 }
 
-/// Dust Devil: a trap whistle lead, a sine with a hint of triangle, sliding between notes.
-fn dust_devil() -> Rack {
+/// Velvet Sine: a soft, round lead, a sine with a hint of triangle, a short legato glide, vibrato
+/// and a dotted echo. (Formerly Dust Devil: a long whistle-like slide was its sound.)
+fn velvet_sine() -> Rack {
     let mut v = Voice::new(Recipe {
         bass: false,
         macros: &[
-            ("Slide", 0.80),
-            ("Scoop", 0.00),
-            ("Whistle", 0.12),
+            ("Glide", 0.50),
+            ("Body", 0.35),
+            ("Bloom", 0.00),
             ("Vibrato", 0.40),
         ],
-        midi: [2.0, 1.0, 110.0],
-        oscs: vec![osc(0.0, 0.0, 0.6), osc(1.0, 0.0, 0.2).fine(3.0)],
+        midi: [2.0, 1.0, 40.0],
+        oscs: vec![osc(0.0, 0.0, 0.6), osc(1.0, 0.0, 0.0).fine(3.0)],
         drive: [2.0, -1.0],
         lad: [1400.0, 0.10, 0.0],
         fenv: [4.0, 200.0, 0.5, 100.0],
@@ -2066,30 +2077,37 @@ fn dust_devil() -> Rack {
         aenv: [6.0, 200.0, 0.85, 220.0],
         trim_db: 13.0,
     });
-    let (m, lad, oscs) = (v.m, v.lad, v.oscs.clone());
-    let cut = routed("filter.ladder", "cutoff_hz", 1400.0, 0.4, 0.55);
-    v.r.e.set_param(lad, "cutoff_hz", cut);
-    // Slide: how long the glide between notes takes (a quick step to a long swoop).
-    let glide = routed("midi.in", "glide_ms", 110.0, 0.8, 0.45);
-    span_hi(&mut v, 1, 0.8, m, "midi.in", "glide_ms", glide, 2000.0);
-    // Scoop: each note swoops up into its pitch from below.
-    kick(&mut v, "m2", "base_hz", 180.0, -0.05, &oscs);
-    // Whistle: the filter resonance rings on the sine, a plain tone to a pure whistle.
+    let (m, lad, aenv, mix) = (v.m, v.lad, v.aenv, v.mix);
+    // Glide: how long the legato glide between notes takes, from a step to a short, singing slide.
+    span(&mut v, 1, 0.5, m, "midi.in", "glide_ms", 5.0, 40.0);
+    // Body: a pure sine to a rounder, hollow tone (the triangle comes in as the filter opens).
+    span(&mut v, 2, 0.35, mix, "mixer", "level2", 0.0, 0.2);
+    span(
+        &mut v,
+        2,
+        0.35,
+        lad,
+        "filter.ladder",
+        "cutoff_hz",
+        700.0,
+        1400.0,
+    );
+    // Bloom: each note swells in and fades out slower (a soft pluck at 0, a pad-like lead at 1).
+    rise(&mut v, 3, aenv, "env.adsr", "attack_ms", 6.0, 500.0);
     span(
         &mut v,
         3,
-        0.12,
-        lad,
-        "filter.ladder",
-        "resonance",
-        0.0,
-        0.10,
+        1.0,
+        aenv,
+        "env.adsr",
+        "release_ms",
+        220.0,
+        1100.0,
     );
     // Vibrato: fades in and speeds up.
     let lfo = v.vibrato("m4", 5.6, 0.08);
     span_hi(&mut v, 4, 0.4, lfo, "lfo", "rate_hz", 5.6, 8.5);
     v.stage("compressor", &compressor(-24.0, 2.0, 15.0, 150.0, 2.0));
-    // The old Space stays at its stored level.
     v.finish(
         "",
         &echo(310.0, 40.0, 3500.0),
@@ -2108,6 +2126,7 @@ fn afterglow() -> Rack {
             ("Rise", 0.00),
             ("Octave", 0.20),
             ("Space", 0.60),
+            ("Chop", 0.00),
         ],
         midi: [2.0, 2.0, 90.0],
         oscs: vec![
@@ -2144,7 +2163,18 @@ fn afterglow() -> Rack {
         &[("rate_hz", 0.4), ("depth", 40.0), ("mix", 35.0)],
     );
     v.stage("compressor", &compressor(-24.0, 2.0, 15.0, 150.0, 2.0));
-    v.finish("m4", &echo(375.0, 42.0, 4500.0), 0.4, (3.2, 0.35), None)
+    // Chop: a gate on the host clock, off at 0, up to hard sixteenth-note chops at 1 (the echo and
+    // room still ring through the gaps). The edges are 3 ms and 12 ms envelopes: no clicks.
+    // Press Run; with Chop up and the clock stopped the gate stays shut.
+    let clock = v.r.add("clock", &[("bpm", 124.0), ("swing", 0.0)]);
+    let gate = v.r.add("env.adsr", &adsr(3.0, 100.0, 1.0, 12.0));
+    v.r.wire(clock, "gate", gate, "gate");
+    v.r.depth_route(gate, "out", v.mono, "gain_db", v.knob, "m5", 0.5);
+    v.r.route(v.knob, "m5", v.mono, "gain_db", -0.5);
+    // The echo stays free-running (the clock is patched in for the gate only).
+    let mut e = echo(375.0, 42.0, 4500.0).to_vec();
+    e.push(("sync", 0.0));
+    v.finish("m4", &e, 0.4, (3.2, 0.35), Some(clock))
 }
 
 /// Horn Section: a synth brass stab for funk and disco, a saw stack with a swelling filter.
@@ -2677,13 +2707,13 @@ fn presets() -> Vec<Preset> {
             secs: 9.0,
         },
         Preset {
-            slug: "dust-devil",
-            name: "Dust Devil",
+            slug: "velvet-sine",
+            name: "Velvet Sine",
             category: "Lead",
-            tags: &["mono", "glide", "whistle", "trap", "hip-hop"],
-            description: "A trap whistle lead: a sine with a touch of triangle that slides from note to note, with a dotted echo. Play simple melodies. Slide sets how long the slide takes, Scoop makes each note swoop up into its pitch from several semitones below, Whistle rings the filter resonance on the sine for a pure whistle, Vibrato fades in a vibrato that speeds up.",
-            listen: "The slides between notes and the echo; Slide up for long swoops, Scoop up for a dive of several semitones into every note, Whistle up for a pure, ringing tone.",
-            build: dust_devil,
+            tags: &["mono", "legato", "soft", "sine", "vibrato", "echo"],
+            description: "A soft, round lead: a sine with a hint of triangle, a short legato glide between overlapped notes, a vibrato and a dotted echo. Play simple, smooth melodies. Glide sets how long the glide takes, from a step to a short slide, Body turns the pure sine into a rounder, hollow tone, Bloom makes each note swell in and fade out slowly, Vibrato fades in a vibrato that speeds up.",
+            listen: "The pure, soft tone and the short glide between notes; Body up for a hollow warmth, Bloom up for a swelling, pad-like lead.",
+            build: velvet_sine,
             group: 2,
             phrase: devil_phrase,
             secs: 9.0,
@@ -2693,8 +2723,8 @@ fn presets() -> Vec<Preset> {
             name: "Afterglow",
             category: "Lead",
             tags: &["mono", "legato", "unison", "chorus", "synthwave", "80s"],
-            description: "A big synthwave lead: a seven-voice saw stack with an octave stack and a pulse, chorus, a long echo and a big room. Play slow, soaring lines; notes glide. Spread opens the saw stacks from tight to huge, Rise opens the filter slowly into each note, Octave brings in the stack an octave up, Space adds the echo and the room.",
-            listen: "The wide stack and the long echo; Spread up for a bigger, looser sound, Rise up for a slow swell into each note.",
+            description: "A big synthwave lead: a seven-voice saw stack with an octave stack and a pulse, chorus, a long echo and a big room. Play slow, soaring lines; notes glide. Spread opens the saw stacks from tight to huge, Rise opens the filter slowly into each note, Octave brings in the stack an octave up, Space adds the echo and the room, Chop gates the lead on the host clock from off to hard sixteenth-note chops (press Run).",
+            listen: "The wide stack and the long echo; Spread up for a bigger, looser sound, Rise up for a slow swell into each note, Chop up for a trance gate once Run is on.",
             build: afterglow,
             group: 2,
             phrase: afterglow_phrase,

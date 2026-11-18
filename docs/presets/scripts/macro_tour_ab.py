@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Listening tours of macros: new macro 1, 2, 3, 4 of a preset back to back.
+"""Listening tours of macros: the new macros 1, 2, 3, ... of a preset back to back (as many as the preset has).
 
     MACRO_TOUR_BPM=<bpm> target/release/examples/macro_audit <patches> <phrases.json> <renders> SLUG
     python3 docs/presets/scripts/macro_tour_ab.py --patches P --renders R --out DIR SLUG ...
@@ -84,9 +84,10 @@ def main():
         old_n = names(a.old_patches, slug) if ab else {}
         parts, at = [], 0.0
         suffix = 'ab' if ab else 'tour'
-        what = 'old and new interleaved per slot' if ab else 'new macros 1 to 4'
+        count = len(list((Path(new_renders) / 'sweep').glob(f'{slug}-m*.wav')))
+        what = 'old and new interleaved per slot' if ab else f'new macros 1 to {count}'
         lines.append(f'{slug}-{suffix}.mp3 ({what}; each clip 20 s: 0 for 6 s, up 4 s, 1 for 6 s, down 4 s; 1 s silence between)')
-        for k in range(1, 5):
+        for k in range(1, count + 1):
             for tag, renders, nm in ((('old', a.old_renders, old_n),) if ab else ()) + (('new', new_renders, new_n),):
                 x, sr = sf.read(Path(renders) / 'sweep' / f'{slug}-m{k}.wav')
                 assert sr == SR

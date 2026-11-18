@@ -10,7 +10,10 @@
 //! **Method.** Each formant is a TPT state-variable band-pass (Zavalishin, ch. 4) with
 //! `k = bandwidth/frequency`, normalised to a peak gain of 1 at its centre, weighted by its
 //! level and summed. `shift_st` moves every formant by semitones (−12 … 12: a smaller or
-//! larger mouth); `q` (0.5 … 4) scales every formant's sharpness (1 = the table's bandwidths).
+//! larger mouth); `q` (0.5 … 4) scales every formant's sharpness (1 = the table's bandwidths);
+//! `hold` (0 … 1, 0 = the plain morph) makes each vowel a plateau: at 1 the formants sit on the
+//! pure vowel over most of the way between two positions and cross to the next within a fifth of
+//! it, so a sweep steps between clear vowels instead of passing through blends.
 //! Formants are kept below 0.45·fs. The filter is stable at any setting (TPT with k > 0).
 //!
 //! **Level.** The output is the resonators only: no dry sound, and the first formant peaks at
@@ -36,6 +39,7 @@ const PARAMS: &[ParamInfo] = &[
     param("vowel", 0.0, 4.0, 0.0, "", Taper::Linear),
     param("shift_st", -12.0, 12.0, 0.0, "st", Taper::Linear),
     param("q", 0.5, 4.0, 1.0, "", Taper::Exponential),
+    param("hold", 0.0, 1.0, 0.0, "", Taper::Linear),
 ];
 
 pub static FILTER_FORMANT_INFO: ModuleInfo = ModuleInfo {
@@ -112,7 +116,7 @@ struct Core {
     vowel: Glide,
     shift: Glide,
     q: Glide,
-    key: [f32; 3],
+    key: [f32; 4],
 }
 
 pub struct FilterFormant {
@@ -131,7 +135,7 @@ impl FilterFormant {
                 vowel: Glide::default(),
                 shift: Glide::default(),
                 q: Glide::default(),
-                key: [f32::NAN; 3],
+                key: [f32::NAN; 4],
             },
             sample_rate: 48000.0,
         }
@@ -160,7 +164,17 @@ pub fn formant_bands(vowel: f32, shift_st: f32) -> [(f32, f32, f32); FORMANTS] {
 }
 
 /// Fills in each band's coefficients for a vowel position, shift and sharpness.
-fn design(bands: &mut [Band; FORMANTS], vowel: f32, shift_st: f32, q: f32, sr: f32) {
+fn design(bands: &mut [Band; FORMANTS], vowel: f32, shift_st: f32, q: f32, hold: f32, sr: f32) {
+    let vowel = if hold > 0.0 {
+        let v = vowel.clamp(0.0, 4.0);
+        let i = v.floor().min(3.0);
+        let t = v - i;
+        let x = ((t - 0.4) / 0.2).clamp(0.0, 1.0);
+        let plateau = x * x * (3.0 - 2.0 * x);
+        i + t + (plateau - t) * hold.min(1.0)
+    } else {
+        vowel
+    };
     for (b, (f, db, bw)) in bands.iter_mut().zip(formant_bands(vowel, shift_st)) {
         let f = f.clamp(20.0, 0.45 * sr);
         let level = (db * NEPER_PER_DB).exp();
@@ -185,7 +199,7 @@ impl Module for FilterFormant {
 
     fn prepare(&mut self, sample_rate: f32, _max_block: usize, _quality: &QualityConfig) {
         self.sample_rate = sample_rate;
-        self.c.key = [f32::NAN; 3];
+        self.c.key = [f32::NAN; 4];
     }
 
     #[inline]
@@ -193,7 +207,7 @@ impl Module for FilterFormant {
         let n = io.block_len();
         let sr = self.sample_rate;
         let input = io.input(0);
-        let (vowel, shift, qp) = (io.param(0), io.param(1), io.param(2));
+        let (vowel, shift, qp, hold) = (io.param(0), io.param(1), io.param(2), io.param(3));
         let k = coef(GLIDE_TAU_S, sr);
         let c = &mut self.c;
         for i in 0..n {
@@ -203,10 +217,11 @@ impl Module for FilterFormant {
                 c.vowel.to(vowel.at(i), true, k),
                 c.shift.to(shift.at(i), true, k).clamp(-12.0, 12.0),
                 c.q.to(qp.at(i), true, k).clamp(0.5, 4.0),
+                hold.at(i),
             ];
             if c.key != key {
                 c.key = key;
-                design(&mut c.bands, key[0], key[1], key[2], sr);
+                design(&mut c.bands, key[0], key[1], key[2], key[3], sr);
             }
             let x = input.at(i);
             let mut sum = 0.0;

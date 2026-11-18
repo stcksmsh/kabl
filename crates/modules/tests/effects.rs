@@ -621,7 +621,7 @@ fn formant_vowel_steps_on_a_cable_do_not_click() {
         let (shift, q) = (Signal::Scalar(0.0), Signal::Scalar(1.2));
         let mut out = Vec::new();
         for t in (0..n).step_by(64) {
-            let ps = [Signal::Buffer(&v[t..t + 64]), shift, q];
+            let ps = [Signal::Buffer(&v[t..t + 64]), shift, q, Signal::Scalar(0.0)];
             let ins = [Signal::Buffer(&buzz[t..t + 64])];
             let mut y = vec![0.0; 64];
             {

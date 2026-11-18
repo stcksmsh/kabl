@@ -442,18 +442,18 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "A talking lead for French touch: a saw and a pulse driven hard into a formant filter that sounds like a mouth. Play short riffs; the mod wheel moves the vowel. Vowel sets the vowel from a to u, Talk sets how much and how fast the vowel drifts under a held note, Shift makes the mouth smaller or larger, Shout pushes the drive and sharpens the formants.",
     ),
     (
-        "presets/dust-devil",
-        "Dust Devil",
+        "presets/velvet-sine",
+        "Velvet Sine",
         "Lead",
-        &["mono", "glide", "whistle", "trap", "hip-hop"],
-        "A trap whistle lead: a sine with a touch of triangle that slides from note to note, with a dotted echo. Play simple melodies. Slide sets how long the slide takes, Scoop makes each note swoop up into its pitch from several semitones below, Whistle rings the filter resonance on the sine for a pure whistle, Vibrato fades in a vibrato that speeds up.",
+        &["mono", "legato", "soft", "sine", "vibrato", "echo"],
+        "A soft, round lead: a sine with a hint of triangle, a short legato glide between overlapped notes, a vibrato and a dotted echo. Play simple, smooth melodies. Glide sets how long the glide takes, from a step to a short slide, Body turns the pure sine into a rounder, hollow tone, Bloom makes each note swell in and fade out slowly, Vibrato fades in a vibrato that speeds up.",
     ),
     (
         "presets/afterglow",
         "Afterglow",
         "Lead",
         &["mono", "legato", "unison", "chorus", "synthwave", "80s"],
-        "A big synthwave lead: a seven-voice saw stack with an octave stack and a pulse, chorus, a long echo and a big room. Play slow, soaring lines; notes glide. Spread opens the saw stacks from tight to huge, Rise opens the filter slowly into each note, Octave brings in the stack an octave up, Space adds the echo and the room.",
+        "A big synthwave lead: a seven-voice saw stack with an octave stack and a pulse, chorus, a long echo and a big room. Play slow, soaring lines; notes glide. Spread opens the saw stacks from tight to huge, Rise opens the filter slowly into each note, Octave brings in the stack an octave up, Space adds the echo and the room, Chop gates the lead on the host clock from off to hard sixteenth-note chops (press Run).",
     ),
     (
         "presets/horn-section",

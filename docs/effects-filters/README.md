@@ -23,7 +23,7 @@ the summary, the measurements and the clips. Decisions: `docs/decisions.md`, "Ef
 | `limiter` | in_l, in_r, out_l, out_r | gain 0-24 dB, ceiling -24..0 dB, release | Instant attack, one-pole release, final clamp to the ceiling; no lookahead, no latency |
 | `bitcrusher` | in_l, in_r, out_l, out_r | bits 1-16 (fractional), downsample 1-64x (fractional), mix | Mid-tread rounding and a sample-and-hold phase accumulator; no dither, no filters, so the aliasing is the effect |
 | `filter.comb` | in, pitch, out | freq (played at pitch 0, C4 default), feedback -97..97 %, damp | Feedback comb at `1/f` with Hermite delay read and damping lag compensated; negative feedback sounds an octave lower (odd harmonics) |
-| `filter.formant` | in, out | vowel 0-4 (a e i o u), shift -12..12 st, q 0.5-4 | Five parallel TPT band-passes from a tenor formant table, log-domain interpolation between vowels |
+| `filter.formant` | in, out | vowel 0-4 (a e i o u), shift -12..12 st, q 0.5-4, hold 0-1 (0 = smooth morph, 1 = pure vowels with short crossings) | Five parallel TPT band-passes from a tenor formant table, log-domain interpolation between vowels |
 | `filter.svf` `notch` | in, cutoff CV, res CV; lp, bp, hp, notch | unchanged | Fourth output, low-pass plus high-pass |
 
 ## Measured

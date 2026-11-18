@@ -414,6 +414,9 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
             "Moves every formant up or down in semitones: a smaller or larger mouth."
         }
         ("filter.formant", "q") => "Sharpness of the vowel peaks: higher is more pronounced.",
+        ("filter.formant", "hold") => {
+            "Holds each vowel clear: 0 is the smooth morph, 1 steps between pure vowels."
+        }
         ("vocoder", "bands") => "How many slices the voice is split into: more is clearer speech, fewer is more robotic.",
         ("vocoder", "spacing") => "Left: more bands where speech lives. Right: bands spread evenly, more at the top.",
         ("vocoder", "low_hz") => "The lowest band.",
