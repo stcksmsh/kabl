@@ -12,7 +12,7 @@ fn tin_roof() -> Rack {
     let knob = macros(
         &mut r,
         &["Reed", "Sustain", "Bark", "Chorus"],
-        &[0.50, 0.50, 0.60, 0.40],
+        &[0.50, 0.50, 0.60, 0.30],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
@@ -57,18 +57,19 @@ fn tin_roof() -> Rack {
     r.span(k, 1, v, o, "fine5", 0.0, 7.0);
     r.span(k, 1, v, o, "level4", 0.0, 0.35);
     // Sustain: a short, dry tine to a long, held note.
-    r.span(k, 2, v, o, "decay1", 250.0, 1200.0);
-    r.span(k, 2, v, o, "decay5", 250.0, 1200.0);
+    r.span(k, 2, v, o, "decay1", 200.0, 1200.0);
+    r.span(k, 2, v, o, "decay5", 200.0, 1200.0);
+    r.level(k, 2, s.trim, -1.5);
     // Bark: a clean tone to an overdriven one.
     let d = routed("drive", "drive_db", 9.0, 0.4, 0.4);
     r.span(k, 3, s.drive.unwrap(), "drive", "drive_db", 0.0, d);
-    r.span(k, 3, s.drive.unwrap(), "drive", "trim_db", 1.5, -3.0);
+    r.span(k, 3, s.drive.unwrap(), "drive", "trim_db", 2.0, -3.0);
     // Chorus: a dry tone to a deep, fast chorus.
     let ch = s.chorus.unwrap();
     let mix = routed("chorus", "mix", 0.0, 0.5, 0.4);
     r.span(k, 4, ch, "chorus", "mix", 0.0, mix);
-    r.span_hi(k, 4, ch, "chorus", "depth", 35.0, 85.0);
-    r.span_hi(k, 4, ch, "chorus", "rate_hz", 0.9, 3.0);
+    r.span_hi(k, 4, ch, "chorus", "depth", 35.0, 100.0);
+    r.span_hi(k, 4, ch, "chorus", "rate_hz", 0.9, 5.0);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -92,7 +93,7 @@ fn turnstile() -> Rack {
     let knob = macros(
         &mut r,
         &["Pump", "Swirl", "Grit", "Spread"],
-        &[0.45, 0.60, 0.60, 0.50],
+        &[0.45, 0.60, 0.60, 0.35],
     );
     let (clock, duck) = beat_duck(&mut r, 123.0);
     let m = r.add("midi.in", &[("bend", 2.0)]);
@@ -161,10 +162,11 @@ fn turnstile() -> Rack {
     r.span(k, 2, ph, "phaser", "rate_hz", 0.1, 0.4);
     r.span(k, 2, ph, "phaser", "feedback", 5.0, 50.0);
     r.span_hi(k, 2, ph, "phaser", "depth", 80.0, 98.0);
+    r.level(k, 2, s.trim, -1.0);
     // Grit: a clean saw chord to a crushed one.
     let d = routed("drive", "drive_db", 14.0, 0.35, 0.5);
     r.span(k, 3, s.drive.unwrap(), "drive", "drive_db", 2.0, d);
-    r.span(k, 3, s.drive.unwrap(), "drive", "trim_db", -1.0, -5.0);
+    r.span(k, 3, s.drive.unwrap(), "drive", "trim_db", 1.5, -5.0);
     // Spread: a tight chord to a wide one, the triangle drifting off the saws.
     r.span(k, 4, v.osc_a, "osc.va", "detune", 2.0, 14.0);
     r.span(k, 4, v.osc_b, "osc.va", "fine", -30.0, -6.0);
@@ -178,8 +180,8 @@ fn hand_bell() -> Rack {
     // Strike: the clapper; Ring: the ring-out; Space: the hall; Clang: the partials pull out of tune.
     let knob = macros(
         &mut r,
-        &["Strike", "Ring", "Tail", "Clang"],
-        &[0.80, 0.50, 0.55, 0.50],
+        &["Strike", "Ring", "Shimmer", "Clang"],
+        &[0.80, 0.50, 0.25, 0.50],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     // Three inharmonic pairs, carrier and modulator: 1 : 3.5, 2 : 5.04, 3.1 : 8.9.
@@ -203,7 +205,7 @@ fn hand_bell() -> Rack {
             trim_db: 9.0,
             chorus: Some((
                 &[("rate_hz", 0.3), ("depth", 45.0), ("mix", 0.0)],
-                Some(0.5),
+                None,
             )),
             echo: &[
                 ("time_ms", 520.0),
@@ -224,16 +226,20 @@ fn hand_bell() -> Rack {
     let index = routed(o, "index", 0.45, 0.5, 0.5);
     r.span(k, 1, v, o, "index", 0.2, index);
     // Ring: a damped bell to one that rings on after it is struck.
-    r.span(k, 2, v, o, "release1", 80.0, 600.0);
-    r.span(k, 2, v, o, "release3", 80.0, 500.0);
-    r.span(k, 2, v, o, "release5", 80.0, 400.0);
-    // Tail: a short echo and a small room to a long, ringing hall (the wet level stays).
-    r.span(k, 3, s.verb, "reverb", "decay_s", 1.5, 5.0);
-    r.span(k, 3, s.delay, "delay", "feedback", 10.0, 42.0);
+    r.span(k, 2, v, o, "release1", 60.0, 600.0);
+    r.span(k, 2, v, o, "release3", 60.0, 500.0);
+    r.span(k, 2, v, o, "release5", 60.0, 400.0);
+    r.level(k, 2, s.trim, -2.5);
+    // Shimmer: a dry bell to a deep, fast chorus.
+    let ch = s.chorus.unwrap();
+    let mix = routed("chorus", "mix", 0.0, 0.5, 0.4);
+    r.span(k, 3, ch, "chorus", "mix", 0.0, mix);
+    r.span_hi(k, 3, ch, "chorus", "depth", 45.0, 100.0);
+    r.span_hi(k, 3, ch, "chorus", "rate_hz", 0.3, 3.0);
     // Clang: a tuned bell to a clangorous one, the partials pulling apart.
     r.span(k, 4, v, o, "fine2", 0.0, 267.0);
-    r.span(k, 4, v, o, "fine4", -40.0, 14.0);
-    r.span(k, 4, v, o, "fine6", 40.0, -19.0);
+    r.span(k, 4, v, o, "fine4", -150.0, 14.0);
+    r.span(k, 4, v, o, "fine6", 150.0, -19.0);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -245,7 +251,7 @@ fn corduroy() -> Rack {
     let knob = macros(
         &mut r,
         &["Quack", "Clack", "Damp", "Phase"],
-        &[1.0, 0.0, 0.50, 0.40],
+        &[1.0, 0.0, 0.50, 0.30],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let v = va(
@@ -299,18 +305,19 @@ fn corduroy() -> Rack {
     r.depth_route(v.fenv, "out", s.lad, "cutoff_hz", k, "m1", 0.45);
     r.span(k, 1, v.fenv, "env.adsr", "decay_ms", 30.0, 120.0);
     // Clack: each pluck starts a few tens of cents sharp and falls into tune, the clav's clack (off).
-    r.depth_route(v.fenv, "out", v.osc_a, "fine", k, "m2", 0.3);
-    r.depth_route(v.fenv, "out", v.osc_b, "fine", k, "m2", 0.3);
+    r.depth_route(v.fenv, "out", v.osc_a, "fine", k, "m2", 0.6);
+    r.depth_route(v.fenv, "out", v.osc_b, "fine", k, "m2", 0.6);
     // Damp: a choked string to one that rings out.
-    r.span(k, 3, v.aenv, "env.adsr", "decay_ms", 40.0, 170.0);
-    r.span(k, 3, v.aenv, "env.adsr", "release_ms", 10.0, 50.0);
+    r.span(k, 3, v.aenv, "env.adsr", "decay_ms", 20.0, 170.0);
+    r.span(k, 3, v.aenv, "env.adsr", "release_ms", 6.0, 50.0);
+    r.level(k, 3, s.trim, -9.0);
     // Phase: a dry clav to a deep, fast phaser.
     let ph = s.phaser.unwrap();
     let mix = routed("phaser", "mix", 0.0, 0.55, 0.3);
     r.span(k, 4, ph, "phaser", "mix", 0.0, mix);
-    r.span_hi(k, 4, ph, "phaser", "rate_hz", 0.6, 3.0);
-    r.span_hi(k, 4, ph, "phaser", "depth", 70.0, 95.0);
-    r.span_hi(k, 4, ph, "phaser", "feedback", 35.0, 80.0);
+    r.span_hi(k, 4, ph, "phaser", "rate_hz", 0.6, 5.0);
+    r.span_hi(k, 4, ph, "phaser", "depth", 70.0, 98.0);
+    r.span_hi(k, 4, ph, "phaser", "feedback", 35.0, 88.0);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -1176,7 +1183,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Hand Bell",
             category: "Keys",
             tags: &["poly", "fm", "bell", "ambient", "experimental"],
-            description: "An inharmonic FM bell: three pairs of operators that ring for seconds and darken as they fade. Play slow, sparse notes. Strike goes from a dull, muted bell to a hard clapper with bright metal, Ring lets the bell ring on after the strike, Tail stretches the echo and the hall, Clang pulls the partials out of tune.",
+            description: "An inharmonic FM bell: three pairs of operators that ring for seconds and darken as they fade. Play slow, sparse notes. Strike goes from a dull, muted bell to a hard clapper with bright metal, Ring lets the bell ring on after the strike, Shimmer brings in a deep, fast chorus, Clang pulls the partials out of tune.",
             listen: "The metal attack and the long, darkening ring; each note blurring into the room",
             group: 2,
             build: hand_bell,

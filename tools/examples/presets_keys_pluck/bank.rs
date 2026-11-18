@@ -88,7 +88,7 @@ fn velvet_tine() -> Rack {
     let knob = macros(
         &mut r,
         &["Tine", "Ring", "Detune", "Phase"],
-        &[0.50, 0.30, 0.0, 0.35],
+        &[0.40, 0.50, 0.0, 0.25],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
@@ -136,20 +136,23 @@ fn velvet_tine() -> Rack {
     let (o, k) = ("osc.fm6", knob);
     // Tine: the metallic tine grows out of the note (index and the 3rd-harmonic strike).
     let index = routed(o, "index", 0.45, 0.5, 0.5);
-    r.span(k, 1, v, o, "index", 0.45, index);
+    r.span(k, 1, v, o, "index", 0.3, index);
     r.span(k, 1, v, o, "level4", 0.0, 0.3);
     // Ring: the two carriers decay from a short thud to a long singing note.
-    r.span_hi(k, 2, v, o, "decay1", 2200.0, 8000.0);
-    r.span_hi(k, 2, v, o, "decay5", 2400.0, 8000.0);
+    r.span_hi(k, 2, v, o, "decay1", 2200.0, 9500.0);
+    r.level(k, 2, s.trim, -3.5);
+    r.span_hi(k, 2, v, o, "decay5", 2400.0, 9500.0);
     // Detune: the detuned partner of the first carrier drifts off, a plain tine to a beating, chorused one (off).
-    r.rise(k, 3, v, o, "fine5", 4.0, 40.0);
+    r.rise(k, 3, v, o, "fine5", 4.0, 90.0);
+    r.level(k, 3, s.trim, 0.8);
     // Phase: a still, thin phaser to a slow, deep swirl.
     let ph = s.phaser.unwrap();
     let mix = routed("phaser", "mix", 0.0, 0.5, 0.35);
     r.span(k, 4, ph, "phaser", "mix", 0.0, mix);
-    r.span_hi(k, 4, ph, "phaser", "rate_hz", 0.35, 1.4);
-    r.span_hi(k, 4, ph, "phaser", "depth", 60.0, 95.0);
-    r.span_hi(k, 4, ph, "phaser", "feedback", 25.0, 75.0);
+    r.span_hi(k, 4, ph, "phaser", "rate_hz", 0.35, 3.0);
+    r.span_hi(k, 4, ph, "phaser", "depth", 60.0, 98.0);
+    r.span_hi(k, 4, ph, "phaser", "feedback", 25.0, 88.0);
+    r.level(k, 4, s.trim, -1.0);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -161,7 +164,7 @@ fn checkerboard() -> Rack {
     let knob = macros(
         &mut r,
         &["Bite", "Hollow", "Squash", "Spread"],
-        &[1.0, 0.50, 0.70, 0.0],
+        &[1.0, 0.35, 0.70, 0.0],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let v = va(
@@ -217,16 +220,17 @@ fn checkerboard() -> Rack {
     // Hollow: the pulse under the saw stack grows and thins out, from a plain saw to a nasal stab.
     let mix = v.mix;
     r.span(k, 2, mix, "mixer", "level2", 0.0, 0.35);
-    r.span_hi(k, 2, v.osc_b, "osc.va", "pw", 50.0, 85.0);
+    r.span(k, 2, mix, "mixer", "level1", 0.75, 0.55);
     // Squash: the compressor from a light touch to a hard clamp, the makeup following.
     let c = s.comp.unwrap();
     r.span(k, 3, c, "compressor", "threshold_db", -8.0, -22.0);
     r.span(k, 3, c, "compressor", "ratio", 2.0, 6.0);
     r.span(k, 3, c, "compressor", "makeup_db", 2.0, 5.0);
+    r.level(k, 3, s.trim, 10.0);
     // Spread: the saw stack widens and drifts apart (off by default).
-    r.rise(k, 4, v.osc_a, "osc.va", "detune", 12.0, 40.0);
-    r.rise(k, 4, v.osc_a, "osc.va", "width", 0.0, 80.0);
-    r.rise(k, 4, v.osc_b, "osc.va", "fine", 5.0, 18.0);
+    r.rise(k, 4, v.osc_a, "osc.va", "detune", 12.0, 65.0);
+    r.rise(k, 4, v.osc_a, "osc.va", "width", 0.0, 100.0);
+    r.rise(k, 4, v.osc_b, "osc.va", "fine", 5.0, 30.0);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -296,22 +300,23 @@ fn linoleum() -> Rack {
     let ph = s.phaser.unwrap();
     let rate = routed("phaser", "rate_hz", 0.3, 0.5, 0.4);
     r.span(k, 1, ph, "phaser", "rate_hz", 0.1, rate);
-    r.span(k, 1, ph, "phaser", "mix", 15.0, 55.0);
-    r.span(k, 1, ph, "phaser", "feedback", 20.0, 60.0);
-    r.span(k, 1, ph, "phaser", "depth", 60.0, 85.0);
+    r.span(k, 1, ph, "phaser", "mix", 5.0, 55.0);
+    r.span(k, 1, ph, "phaser", "feedback", 0.0, 60.0);
+    r.span(k, 1, ph, "phaser", "depth", 57.0, 85.0);
     // Chime: the seventh-partial bell grows out of the electric piano.
     let index = routed(o, "index", 0.5, 0.4, 0.5);
-    r.span(k, 2, v, o, "index", 0.45, index);
+    r.span(k, 2, v, o, "index", 0.3, index);
     r.span(k, 2, v, o, "level4", 0.0, 0.4);
     // Hold: a damped tick to a long ring.
     for op in ["decay1", "decay3", "decay5"] {
-        r.span(k, 3, v, o, op, 200.0, 900.0);
+        r.span(k, 3, v, o, op, 180.0, 900.0);
     }
     // Squeeze: a light touch to a hard clamp.
     let c = s.comp.unwrap();
     r.span(k, 4, c, "compressor", "threshold_db", -10.0, -24.0);
     r.span(k, 4, c, "compressor", "ratio", 2.0, 5.0);
     r.span(k, 4, c, "compressor", "makeup_db", 2.0, 5.0);
+    r.level(k, 4, s.trim, 9.5);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -323,7 +328,7 @@ fn cellar_door() -> Rack {
     let knob = macros(
         &mut r,
         &["Dark", "Felt", "Wobble", "Smear"],
-        &[0.75, 0.0, 0.0, 0.40],
+        &[0.75, 0.0, 0.0, 0.30],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
@@ -363,23 +368,23 @@ fn cellar_door() -> Rack {
     let (o, k) = ("osc.fm6", knob);
     // Dark: the filter and the FM index close together, a muffled felt tone to an open one.
     let cut = routed("filter.ladder", "cutoff_hz", 1800.0, 0.6, 0.35);
-    r.span(k, 1, s.lad, "filter.ladder", "cutoff_hz", 500.0, cut);
+    r.span(k, 1, s.lad, "filter.ladder", "cutoff_hz", 450.0, cut);
     let index = routed(o, "index", 0.35, 0.5, 0.35);
     r.span(k, 1, v, o, "index", 0.12, index);
     // Felt: a hammer that hits at once to one that pushes the note in slowly (off by default).
     for op in ["attack1", "attack2", "attack3", "attack5", "attack6"] {
-        r.rise(k, 2, v, o, op, 2.0, 90.0);
+        r.rise(k, 2, v, o, op, 2.0, 250.0);
     }
     // Wobble: a tape pitch drift that fades in and speeds up (off by default).
     let lfo = r.add("lfo", &[("rate_hz", 0.4)]);
-    r.depth_route(lfo, "out", v, "fine", k, "m3", 0.2);
-    r.rise(k, 3, lfo, "lfo", "rate_hz", 0.4, 1.6);
+    r.depth_route(lfo, "out", v, "fine", k, "m3", 0.35);
+    r.rise(k, 3, lfo, "lfo", "rate_hz", 0.4, 3.0);
     // Smear: a dry key to a deep, slow chorus.
     let ch = s.chorus.unwrap();
     let mix = routed("chorus", "mix", 0.0, 0.6, 0.4);
     r.span(k, 4, ch, "chorus", "mix", 0.0, mix);
-    r.span_hi(k, 4, ch, "chorus", "depth", 70.0, 95.0);
-    r.span_hi(k, 4, ch, "chorus", "rate_hz", 0.35, 0.9);
+    r.span_hi(k, 4, ch, "chorus", "depth", 70.0, 98.0);
+    r.span_hi(k, 4, ch, "chorus", "rate_hz", 0.35, 2.5);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -391,7 +396,7 @@ fn pulpit() -> Rack {
     let knob = macros(
         &mut r,
         &["Bars", "Perc", "Rotor", "Overdrive"],
-        &[0.55, 0.0, 0.75, 0.40],
+        &[0.55, 0.0, 0.75, 0.30],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     // Sub, fundamental, 2nd, 3rd, 4th and 6th harmonics: ratio, fine, level, then a flat envelope.
@@ -432,12 +437,13 @@ fn pulpit() -> Rack {
     );
     let (o, k) = ("osc.fm6", knob);
     // Bars: the sub and the 2nd harmonic bar come out, a thin flute-like organ to a full, deep one.
-    r.span(k, 1, v, o, "level1", 0.15, 0.6);
+    r.span(k, 1, v, o, "level1", 0.12, 0.6);
+    r.level(k, 1, s.trim, -2.0);
     r.span_hi(k, 1, v, o, "level3", 0.8, 1.0);
     // Perc: the third harmonic strikes and fades (off by default: it holds at full level).
     for op in ["4", "5", "6"] {
-        r.rise(k, 2, v, o, &format!("sustain{op}"), 1.0, 0.05);
-        r.rise(k, 2, v, o, &format!("decay{op}"), 50.0, 250.0);
+        r.rise(k, 2, v, o, &format!("sustain{op}"), 1.0, 0.0);
+        r.rise(k, 2, v, o, &format!("decay{op}"), 50.0, 150.0);
         r.rise(
             k,
             2,
@@ -459,12 +465,12 @@ fn pulpit() -> Rack {
     let mix = routed("chorus", "mix", 0.0, 0.55, 0.5);
     r.span(k, 3, ch, "chorus", "rate_hz", 2.0, 5.5);
     r.span(k, 3, ch, "chorus", "depth", 6.0, 22.0);
-    r.span(k, 3, ch, "chorus", "mix", 12.0, mix);
+    r.span(k, 3, ch, "chorus", "mix", 4.0, mix);
     // Overdrive: a clean organ to a hot, tubey one.
     let dr = s.drive.unwrap();
     let d = routed("drive", "drive_db", 4.0, 0.55, 0.2);
     r.span(k, 4, dr, "drive", "drive_db", 0.0, d);
-    r.span(k, 4, dr, "drive", "trim_db", 0.0, -2.0);
+    r.span(k, 4, dr, "drive", "trim_db", -0.5, -2.0);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -478,7 +484,7 @@ fn rosewood() -> Rack {
     let knob = macros(
         &mut r,
         &["Mallet", "Ring", "Beat", "Roll"],
-        &[0.80, 0.50, 0.12, 0.0],
+        &[0.80, 0.50, 0.08, 0.0],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
@@ -532,9 +538,8 @@ fn rosewood() -> Rack {
     r.span_hi(k, 3, v, o, "level3", 0.4, 0.8);
     // Roll: a tremolo on the level, the mallet roll of a marimba (off by default).
     let lfo = r.add("lfo", &[("rate_hz", 5.0)]);
-    r.depth_route(lfo, "out", s.trim, "gain_db", k, "m4", 0.1);
-    r.level(k, 4, s.trim, -8.4);
-    r.rise(k, 4, lfo, "lfo", "rate_hz", 5.0, 11.0);
+    r.depth_route(lfo, "out", s.trim, "gain_db", k, "m4", 0.06);
+    r.rise(k, 4, lfo, "lfo", "rate_hz", 5.0, 13.0);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -545,8 +550,8 @@ fn rain_gutter() -> Rack {
     // Tine: the metal of the kalimba; Ring: how long it rings; Space: the long tail; Shimmer.
     let knob = macros(
         &mut r,
-        &["Tine", "Ring", "Tail", "Shimmer"],
-        &[0.65, 0.50, 0.60, 0.40],
+        &["Tine", "Ring", "Echo", "Shimmer"],
+        &[0.65, 0.50, 0.60, 0.30],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
@@ -591,15 +596,16 @@ fn rain_gutter() -> Rack {
     // Ring: a damped tick to a tine that rings for seconds.
     r.span(k, 2, v, o, "decay1", 300.0, 1700.0);
     r.span(k, 2, v, o, "decay3", 400.0, 2000.0);
-    // Tail: a short echo and a small room to a long, ringing tail (the wet level stays).
-    r.span(k, 3, s.verb, "reverb", "decay_s", 1.0, 4.0);
-    r.span(k, 3, s.delay, "delay", "feedback", 10.0, 42.0);
+    r.level(k, 2, s.trim, -3.5);
+    // Echo: a short echo and a small room to a long, ringing tail (the wet level stays).
+    r.span(k, 3, s.verb, "reverb", "decay_s", 0.6, 4.0);
+    r.span(k, 3, s.delay, "delay", "feedback", 0.0, 42.0);
     // Shimmer: a dry tone to a deep, slow chorus.
     let ch = s.chorus.unwrap();
     let mix = routed("chorus", "mix", 0.0, 0.55, 0.4);
     r.span(k, 4, ch, "chorus", "mix", 0.0, mix);
-    r.span_hi(k, 4, ch, "chorus", "depth", 40.0, 90.0);
-    r.span_hi(k, 4, ch, "chorus", "rate_hz", 0.4, 1.5);
+    r.span_hi(k, 4, ch, "chorus", "depth", 40.0, 100.0);
+    r.span_hi(k, 4, ch, "chorus", "rate_hz", 0.4, 3.0);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -610,8 +616,8 @@ fn spark_plug() -> Rack {
     // Snap: a thud whose filter snaps open; Grit: the drive; Squash: the compressor; Zap: a pitch spark (off).
     let knob = macros(
         &mut r,
-        &["Snap", "Grit", "Squash", "Zap"],
-        &[1.0, 0.70, 0.40, 0.0],
+        &["Snap", "Grit", "Ring", "Zap"],
+        &[1.0, 0.70, 0.60, 0.0],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let v = va(
@@ -667,17 +673,14 @@ fn spark_plug() -> Rack {
     // Grit: a clean blunt pluck to a crushed one.
     let d = routed("drive", "drive_db", 18.0, 0.3, 0.60);
     r.span(k, 2, s.drive.unwrap(), "drive", "drive_db", 6.0, d);
-    r.span(k, 2, s.drive.unwrap(), "drive", "trim_db", -3.0, -7.0);
-    // Squash: a light compressor to a hard clamp that flattens each pluck.
-    let c = s.comp.unwrap();
-    r.span(k, 3, c, "compressor", "threshold_db", -14.0, -24.0);
-    r.span(k, 3, c, "compressor", "attack_ms", 25.0, 3.0);
-    r.span(k, 3, c, "compressor", "release_ms", 300.0, 80.0);
-    r.span(k, 3, c, "compressor", "ratio", 2.0, 7.0);
-    r.span(k, 3, c, "compressor", "makeup_db", 0.0, 6.5);
+    r.span(k, 2, s.drive.unwrap(), "drive", "trim_db", 3.0, -7.0);
+    // Ring: a staccato tick to a pluck that rings on after the key is up (the compressor stays as it was).
+    r.span(k, 3, v.aenv, "env.adsr", "release_ms", 12.0, 60.0);
+    r.span(k, 3, v.fenv, "env.adsr", "release_ms", 12.0, 60.0);
+    r.level(k, 3, s.trim, -5.0);
     // Zap: each pluck starts a few tens of cents sharp and falls into tune (off by default).
-    r.depth_route(v.fenv, "out", v.osc_a, "fine", k, "m4", 0.7);
-    r.depth_route(v.fenv, "out", v.osc_b, "fine", k, "m4", 0.7);
+    r.depth_route(v.fenv, "out", v.osc_a, "fine", k, "m4", 1.0);
+    r.depth_route(v.fenv, "out", v.osc_b, "fine", k, "m4", 1.0);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -823,7 +826,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Velvet Tine",
             category: "Keys",
             tags: &["poly", "fm", "phased", "pop", "soul"],
-            description: "A soft Rhodes-like electric piano: a mellow body, a tine that fades in a tenth of a second, velocity-sensitive bark. Play chords. Tine grows a metallic tine out of each note, Ring lengthens the note from a thud to a long, ringing one, Detune pulls the second tine out of tune so the note beats, Phase brings in a slow phaser.",
+            description: "A soft Rhodes-like electric piano: a mellow body, a tine that fades in a tenth of a second, velocity-sensitive bark. Play chords. Tine grows a metallic tine out of each note, Ring lengthens the note from a thud to a long, ringing one, Detune pulls the second tine out of tune so the note beats and chorus, Phase brings in a slow phaser.",
             listen: "The tine on the attack against the soft body; the phaser slowly breathing on held chords",
             group: 1,
             build: velvet_tine,
@@ -895,7 +898,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Rain Gutter",
             category: "Pluck",
             tags: &["poly", "fm", "kalimba", "ambient", "pop"],
-            description: "A kalimba: a short metallic click, a long clear ring, and a wet tail that blurs the notes into each other. Play slow, sparse notes. Tine goes from a soft thumb piano to a bright, pinging one, Ring lengthens the ring of each tine, Tail stretches the echo and the long room, Shimmer brings in a deep, slow chorus.",
+            description: "A kalimba: a short metallic click, a long clear ring, and a wet tail that blurs the notes into each other. Play slow, sparse notes. Tine goes from a soft thumb piano to a bright, pinging one, Ring lengthens the ring of each tine, Echo stretches the echo and the long room, Shimmer brings in a deep, slow chorus.",
             listen: "The click of each tine against its long ring, and the echo answering a half-beat later",
             group: 1,
             build: rain_gutter,
@@ -907,7 +910,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Spark Plug",
             category: "Pluck",
             tags: &["poly", "pluck", "distorted", "compressed", "french touch", "124bpm", "signature"],
-            description: "A blunt, driven synth pluck: two saws and a square, 18 dB of drive, a fast compressor. Play short low notes. Snap goes from a dull thud to a crack as the filter snaps open on every note, Grit pushes the drive, Squash tightens the compressor into a punchier clamp, Zap starts each pluck sharp and lets it fall into tune.",
+            description: "A blunt, driven synth pluck: two saws and a square, 18 dB of drive, a fast compressor. Play short low notes. Snap goes from a dull thud to a crack as the filter snaps open on every note, Grit pushes the drive, Ring lets each pluck ring on after the key is up, Zap starts each pluck sharp and lets it fall into tune.",
             listen: "The filter snap on every note and the compressor holding the dirt steady",
             group: 1,
             build: spark_plug,
