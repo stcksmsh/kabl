@@ -12,7 +12,7 @@
         "cc.m3": 22.0,
         "cc.m4": 23.0,
         "m1": 0.5,
-        "m2": 0.4,
+        "m2": 0.3,
         "m3": 0.0,
         "m4": 0.35,
         "pin.m1": 0.0,
@@ -45,11 +45,11 @@
         "attack4": 0.5,
         "attack5": 1.0,
         "attack6": 1.0,
-        "decay1": 930.346,
+        "decay1": 1265.1342,
         "decay2": 420.0,
         "decay3": 1400.0,
         "decay4": 110.0,
-        "decay5": 1075.5358,
+        "decay5": 1432.5844,
         "decay6": 800.0,
         "feedback": 0.0,
         "fine1": 0.0,
@@ -120,7 +120,7 @@
         "y": 320.0
       },
       "params": {
-        "gain_db": 9.0
+        "gain_db": 8.6
       }
     },
     "7": {
@@ -179,16 +179,6 @@
         "y": 320.0
       },
       "params": {}
-    },
-    "12": {
-      "kind": "lfo",
-      "pos": {
-        "x": 1544.0,
-        "y": 320.0
-      },
-      "params": {
-        "rate_hz": 3.5
-      }
     }
   },
   "cables": {
@@ -418,7 +408,7 @@
         }
       },
       "params": {
-        "amount": 0.18688902
+        "amount": 0.16019066
       },
       "steps": []
     },
@@ -436,83 +426,29 @@
         }
       },
       "params": {
-        "amount": 0.17429307
+        "amount": 0.14939387
       },
       "steps": []
     },
     "17": {
       "from": {
         "Module": {
-          "id": 12,
-          "port": "out"
+          "id": 1,
+          "port": "m3"
         }
       },
       "to": {
         "Param": {
-          "id": 6,
-          "param": "gain_db"
+          "id": 3,
+          "param": "fine5"
         }
       },
       "params": {
-        "amount": 0.0
+        "amount": 0.030000031
       },
       "steps": []
     },
     "18": {
-      "from": {
-        "Module": {
-          "id": 1,
-          "port": "m3"
-        }
-      },
-      "to": {
-        "CableParam": {
-          "cable": 17,
-          "param": "amount"
-        }
-      },
-      "params": {
-        "amount": 0.03
-      },
-      "steps": []
-    },
-    "19": {
-      "from": {
-        "Module": {
-          "id": 1,
-          "port": "m3"
-        }
-      },
-      "to": {
-        "Param": {
-          "id": 6,
-          "param": "gain_db"
-        }
-      },
-      "params": {
-        "amount": -0.03
-      },
-      "steps": []
-    },
-    "20": {
-      "from": {
-        "Module": {
-          "id": 1,
-          "port": "m3"
-        }
-      },
-      "to": {
-        "Param": {
-          "id": 12,
-          "param": "rate_hz"
-        }
-      },
-      "params": {
-        "amount": 0.06721139
-      },
-      "steps": []
-    },
-    "21": {
       "from": {
         "Module": {
           "id": 1,
@@ -530,7 +466,7 @@
       },
       "steps": []
     },
-    "22": {
+    "19": {
       "from": {
         "Module": {
           "id": 1,
@@ -548,7 +484,7 @@
       },
       "steps": []
     },
-    "23": {
+    "20": {
       "from": {
         "Module": {
           "id": 1,
@@ -566,7 +502,7 @@
       },
       "steps": []
     },
-    "24": {
+    "21": {
       "from": {
         "Module": {
           "id": 1,
@@ -589,7 +525,7 @@
     "1": {
       "name.m1": "Tine",
       "name.m2": "Ring",
-      "name.m3": "Tremolo",
+      "name.m3": "Detune",
       "name.m4": "Phase"
     }
   }
