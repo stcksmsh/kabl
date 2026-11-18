@@ -11,9 +11,9 @@
         "cc.m2": 21.0,
         "cc.m3": 22.0,
         "cc.m4": 23.0,
-        "m1": 0.5,
-        "m2": 0.55,
-        "m3": 0.5,
+        "m1": 0.5897437,
+        "m2": 0.9105871,
+        "m3": 0.45652175,
         "m4": 0.3,
         "pin.m1": 1.0,
         "pin.m2": 2.0,
@@ -135,9 +135,9 @@
         "y": 620.0
       },
       "params": {
-        "bpm": 130.0,
+        "bpm": 124.0,
         "pin.transport": 0.0,
-        "swing": 33.0
+        "swing": 12.0
       }
     },
     "12": {
@@ -275,7 +275,7 @@
         "g7": 0.0,
         "g8": 1.0,
         "g9": 0.0,
-        "gate_len": 10.399998,
+        "gate_len": 8.0,
         "gate_mode": 1.0,
         "length": 16.0,
         "p1": 0.0,
@@ -304,7 +304,7 @@
       },
       "params": {
         "base_hz": 130.815,
-        "detune": 10.0,
+        "detune": 2.0,
         "pw": 50.0,
         "unison": 2.0,
         "waveform": 2.0
@@ -406,9 +406,9 @@
         "y": 920.0
       },
       "params": {
-        "cutoff_hz": 1700.0,
+        "cutoff_hz": 300.0,
         "drive_db": 2.0,
-        "resonance": 0.15
+        "resonance": 0.45
       }
     },
     "30": {
@@ -1548,11 +1548,29 @@
         }
       },
       "params": {
-        "amount": 0.5
+        "amount": 0.78
       },
       "steps": []
     },
     "56": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m1"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 11,
+          "param": "bpm"
+        }
+      },
+      "params": {
+        "amount": 0.03633537
+      },
+      "steps": []
+    },
+    "57": {
       "from": {
         "Module": {
           "id": 1,
@@ -1566,11 +1584,29 @@
         }
       },
       "params": {
-        "amount": 0.55
+        "amount": 0.6079696
       },
       "steps": []
     },
-    "57": {
+    "58": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m2"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 29,
+          "param": "resonance"
+        }
+      },
+      "params": {
+        "amount": -0.32945776
+      },
+      "steps": []
+    },
+    "59": {
       "from": {
         "Module": {
           "id": 1,
@@ -1584,11 +1620,29 @@
         }
       },
       "params": {
-        "amount": 0.8
+        "amount": 0.9292929
       },
       "steps": []
     },
-    "58": {
+    "60": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m3"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 20,
+          "param": "detune"
+        }
+      },
+      "params": {
+        "amount": 0.17523809
+      },
+      "steps": []
+    },
+    "61": {
       "from": {
         "Module": {
           "id": 32,
@@ -1604,7 +1658,7 @@
       "params": {},
       "steps": []
     },
-    "59": {
+    "62": {
       "from": {
         "Module": {
           "id": 43,
@@ -1620,7 +1674,7 @@
       "params": {},
       "steps": []
     },
-    "60": {
+    "63": {
       "from": {
         "Module": {
           "id": 11,
@@ -1636,7 +1690,7 @@
       "params": {},
       "steps": []
     },
-    "62": {
+    "65": {
       "from": {
         "Module": {
           "id": 41,
@@ -1652,7 +1706,7 @@
       "params": {},
       "steps": []
     },
-    "63": {
+    "66": {
       "from": {
         "Module": {
           "id": 1,
@@ -1670,7 +1724,7 @@
       },
       "steps": []
     },
-    "64": {
+    "67": {
       "from": {
         "Module": {
           "id": 1,
@@ -1688,7 +1742,7 @@
       },
       "steps": []
     },
-    "65": {
+    "68": {
       "from": {
         "Module": {
           "id": 42,
@@ -1704,7 +1758,7 @@
       "params": {},
       "steps": []
     },
-    "66": {
+    "69": {
       "from": {
         "Module": {
           "id": 46,
@@ -1715,54 +1769,6 @@
         "Module": {
           "id": 44,
           "port": "in1"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "67": {
-      "from": {
-        "Module": {
-          "id": 40,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 44,
-          "port": "in2"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "68": {
-      "from": {
-        "Module": {
-          "id": 46,
-          "port": "right"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 45,
-          "port": "in1"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "69": {
-      "from": {
-        "Module": {
-          "id": 40,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 45,
-          "port": "in2"
         }
       },
       "params": {},
@@ -1771,6 +1777,54 @@
     "70": {
       "from": {
         "Module": {
+          "id": 40,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 44,
+          "port": "in2"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "71": {
+      "from": {
+        "Module": {
+          "id": 46,
+          "port": "right"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 45,
+          "port": "in1"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "72": {
+      "from": {
+        "Module": {
+          "id": 40,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 45,
+          "port": "in2"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "73": {
+      "from": {
+        "Module": {
           "id": 44,
           "port": "out"
         }
@@ -1784,7 +1838,7 @@
       "params": {},
       "steps": []
     },
-    "71": {
+    "74": {
       "from": {
         "Module": {
           "id": 45,
@@ -1800,7 +1854,7 @@
       "params": {},
       "steps": []
     },
-    "72": {
+    "75": {
       "from": {
         "Module": {
           "id": 47,
@@ -1819,8 +1873,8 @@
   },
   "labels": {
     "1": {
-      "name.m1": "Swing",
-      "name.m2": "Filter",
+      "name.m1": "Skip",
+      "name.m2": "Warmth",
       "name.m3": "Chop",
       "name.m4": "Space"
     }
