@@ -1,0 +1,13 @@
+name = "Soft Sine"
+category = "Lead"
+tags = [
+    "mono",
+    "legato",
+    "soft",
+    "sine",
+    "vibrato",
+    "echo",
+]
+description = "A soft, round lead: a sine with a hint of triangle, a short legato glide between overlapped notes, a vibrato and a dotted echo. Play simple, smooth melodies. Glide sets how long the glide takes, from a step to a short slide, Body turns the pure sine into a rounder, hollow tone, Bloom makes each note swell in and fade out slowly, Vibrato fades in a vibrato that speeds up."
+keys = true
+sequence = false

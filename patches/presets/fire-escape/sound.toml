@@ -7,6 +7,6 @@ tags = [
     "dive",
     "house",
 ]
-description = "A house stab lead: two unison saw stacks with a pitch dive on every note, chorus and a dotted echo. Play short, bright stabs. Cutoff opens the filter, Dive sets how far each note falls into its pitch, Space adds the echo and the room, Edge adds drive."
+description = "A house stab lead: two unison saw stacks with a pitch dive on every note, chorus and a dotted echo. Play short, bright stabs. Dive sets how far each note falls into its pitch and for how long, Stack spreads the two saw stacks from a tight chord to a wall, Length goes from a short stab to a held one, Space adds the echo and the room."
 keys = true
 sequence = false

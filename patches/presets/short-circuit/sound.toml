@@ -8,6 +8,6 @@ tags = [
     "french touch",
     "signature",
 ]
-description = "A metallic lead for French touch: a saw ring-modulated by a square a fifth up, 14 dB of drive, a bitcrusher and a heavy compressor. Play short, jagged lines. Cutoff opens the filter, Metal brings in the ring modulator, Crush mixes in the bitcrusher, Room adds a slapback and a tight room."
+description = "A metallic lead for French touch: a saw ring-modulated by a square a fifth up, 14 dB of drive, a bitcrusher and a heavy compressor. Play short, jagged lines. Metal brings in the ring modulator, Crush mixes in the bitcrusher and makes it coarser, Snap sets the filter snap of each note from a soft click to a zap, Siren wobbles the pitch of the ringed square."
 keys = true
 sequence = false

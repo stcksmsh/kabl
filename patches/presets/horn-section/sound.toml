@@ -7,6 +7,6 @@ tags = [
     "funk",
     "disco",
 ]
-description = "A synth brass lead for funk and disco: a three-voice saw stack with a second saw, a filter that swells open on every note and a light compressor. Play short stabs; harder notes are brighter. Tone opens the filter, Blat deepens the filter swell on each note, Space adds a short echo and a room, Vibrato adds a light vibrato."
+description = "A synth brass lead for funk and disco: a three-voice saw stack with a second saw, a filter that swells open on every note and a light compressor. Play short stabs; harder notes are brighter. Blat deepens and slows the filter swell on each note, Section loosens the players from one tight horn to a section, Blare adds the brassy drive, Vibrato fades in a vibrato that speeds up."
 keys = true
 sequence = false

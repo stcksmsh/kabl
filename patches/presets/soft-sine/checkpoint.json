@@ -11,9 +11,9 @@
         "cc.m2": 21.0,
         "cc.m3": 22.0,
         "cc.m4": 23.0,
-        "m1": 0.55,
-        "m2": 0.45,
-        "m3": 0.4,
+        "m1": 0.5,
+        "m2": 0.35,
+        "m3": 0.0,
         "m4": 0.4,
         "pin.m1": 0.0,
         "pin.m2": 1.0,
@@ -30,7 +30,7 @@
       "params": {
         "bend": 2.0,
         "glide": 1.0,
-        "glide_ms": 110.0,
+        "glide_ms": 5.0,
         "mode": 2.0
       }
     },
@@ -72,7 +72,7 @@
       },
       "params": {
         "level1": 0.6,
-        "level2": 0.2
+        "level2": 0.0
       }
     },
     "6": {
@@ -93,7 +93,7 @@
         "y": 320.0
       },
       "params": {
-        "cutoff_hz": 1400.0,
+        "cutoff_hz": 700.0,
         "drive_db": 0.0,
         "resonance": 0.1
       }
@@ -141,7 +141,7 @@
         "y": 620.0
       },
       "params": {
-        "gain_db": 10.0
+        "gain_db": 13.0
       }
     },
     "12": {
@@ -151,7 +151,7 @@
         "y": 620.0
       },
       "params": {
-        "rate_hz": 5.6
+        "rate_hz": 4.240015
       }
     },
     "13": {
@@ -177,7 +177,7 @@
       },
       "params": {
         "feedback": 40.0,
-        "mix": 0.0,
+        "mix": 12.0,
         "time_ms": 310.0,
         "tone_hz": 3500.0
       }
@@ -191,7 +191,7 @@
       "params": {
         "damp_hz": 3500.0,
         "decay_s": 1.4,
-        "mix": 0.0,
+        "mix": 10.0,
         "predelay_ms": 0.0,
         "width": 60.0
       }
@@ -417,12 +417,12 @@
       },
       "to": {
         "Param": {
-          "id": 7,
-          "param": "cutoff_hz"
+          "id": 2,
+          "param": "glide_ms"
         }
       },
       "params": {
-        "amount": 0.4
+        "amount": 0.65013736
       },
       "steps": []
     },
@@ -435,16 +435,70 @@
       },
       "to": {
         "Param": {
-          "id": 2,
-          "param": "glide_ms"
+          "id": 5,
+          "param": "level2"
         }
       },
       "params": {
-        "amount": 0.8
+        "amount": 0.5714286
       },
       "steps": []
     },
     "15": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m2"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 7,
+          "param": "cutoff_hz"
+        }
+      },
+      "params": {
+        "amount": 0.28669527
+      },
+      "steps": []
+    },
+    "16": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m3"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 9,
+          "param": "attack_ms"
+        }
+      },
+      "params": {
+        "amount": 0.38416374
+      },
+      "steps": []
+    },
+    "17": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m3"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 9,
+          "param": "release_ms"
+        }
+      },
+      "params": {
+        "amount": 0.13979399
+      },
+      "steps": []
+    },
+    "18": {
       "from": {
         "Module": {
           "id": 12,
@@ -462,7 +516,7 @@
       },
       "steps": []
     },
-    "16": {
+    "19": {
       "from": {
         "Module": {
           "id": 1,
@@ -471,7 +525,7 @@
       },
       "to": {
         "CableParam": {
-          "cable": 15,
+          "cable": 18,
           "param": "amount"
         }
       },
@@ -480,7 +534,7 @@
       },
       "steps": []
     },
-    "17": {
+    "20": {
       "from": {
         "Module": {
           "id": 12,
@@ -498,7 +552,7 @@
       },
       "steps": []
     },
-    "18": {
+    "21": {
       "from": {
         "Module": {
           "id": 1,
@@ -507,7 +561,7 @@
       },
       "to": {
         "CableParam": {
-          "cable": 17,
+          "cable": 20,
           "param": "amount"
         }
       },
@@ -516,7 +570,25 @@
       },
       "steps": []
     },
-    "19": {
+    "22": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m4"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 12,
+          "param": "rate_hz"
+        }
+      },
+      "params": {
+        "amount": 0.075512975
+      },
+      "steps": []
+    },
+    "23": {
       "from": {
         "Module": {
           "id": 11,
@@ -532,7 +604,7 @@
       "params": {},
       "steps": []
     },
-    "20": {
+    "24": {
       "from": {
         "Module": {
           "id": 13,
@@ -548,7 +620,7 @@
       "params": {},
       "steps": []
     },
-    "21": {
+    "25": {
       "from": {
         "Module": {
           "id": 16,
@@ -564,7 +636,7 @@
       "params": {},
       "steps": []
     },
-    "23": {
+    "27": {
       "from": {
         "Module": {
           "id": 14,
@@ -580,43 +652,7 @@
       "params": {},
       "steps": []
     },
-    "24": {
-      "from": {
-        "Module": {
-          "id": 1,
-          "port": "m3"
-        }
-      },
-      "to": {
-        "Param": {
-          "id": 14,
-          "param": "mix"
-        }
-      },
-      "params": {
-        "amount": 0.3
-      },
-      "steps": []
-    },
-    "25": {
-      "from": {
-        "Module": {
-          "id": 1,
-          "port": "m3"
-        }
-      },
-      "to": {
-        "Param": {
-          "id": 15,
-          "param": "mix"
-        }
-      },
-      "params": {
-        "amount": 0.25
-      },
-      "steps": []
-    },
-    "26": {
+    "28": {
       "from": {
         "Module": {
           "id": 15,
@@ -635,9 +671,9 @@
   },
   "labels": {
     "1": {
-      "name.m1": "Tone",
-      "name.m2": "Slide",
-      "name.m3": "Space",
+      "name.m1": "Glide",
+      "name.m2": "Body",
+      "name.m3": "Bloom",
       "name.m4": "Vibrato"
     }
   }

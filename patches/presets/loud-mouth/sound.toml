@@ -8,6 +8,6 @@ tags = [
     "french touch",
     "signature",
 ]
-description = "A talking lead for French touch: a saw and a pulse driven hard into a formant filter that sounds like a mouth, with a gentle vowel drift. Play short riffs; the mod wheel moves the vowel. Vowel sets the vowel from a to u, Grit pushes the drive, Shift makes the mouth smaller or larger, Room adds a slapback and a tight room."
+description = "A talking lead for French touch: a saw and a pulse driven hard into a formant filter that sounds like a mouth. Play short riffs; the mod wheel moves the vowel. Vowel sets the vowel from a to u, Talk sets how much and how fast the vowel drifts under a held note, Shift makes the mouth smaller or larger, Shout pushes the drive and sharpens the formants."
 keys = true
-sequence = false
+sequence = true
