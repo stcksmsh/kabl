@@ -110,6 +110,88 @@ impl Rack {
             .expect("a route has a depth");
         self.e.set_route_amount(d, depth, true);
     }
+    /// The stored value of macro `m` (1-based) of `knob`.
+    fn stored(&self, knob: ModuleId, m: usize) -> f32 {
+        self.e.state().modules[&knob].params[&format!("m{m}")]
+    }
+    /// Macro `m` takes `param` from `lo` at 0 to `d` at its stored position, and on in the same
+    /// line to 1. The stored sound is exactly `d`; panics when the line leaves the param's range.
+    #[allow(clippy::too_many_arguments)]
+    fn span(
+        &mut self,
+        knob: ModuleId,
+        m: usize,
+        id: ModuleId,
+        kind: &str,
+        param: &str,
+        lo: f32,
+        d: f32,
+    ) {
+        let stored = self.stored(knob, m);
+        assert!(stored > 0.0, "{kind}.{param}: span needs a stored position");
+        let i = param_of(kind, param);
+        let (n0, nd) = (i.to_norm(lo), i.to_norm(d));
+        let amount = (nd - n0) / stored;
+        assert!(
+            n0 + amount <= 1.0 + 1e-3 && n0 + amount >= -1e-3,
+            "{kind}.{param}: macro {m} runs out of range ({})",
+            n0 + amount
+        );
+        self.e.set_param(id, param, lo);
+        self.route(knob, &format!("m{m}"), id, param, amount);
+    }
+    /// As `span`, with the value `hi` at macro 1 given and the value at 0 derived.
+    #[allow(clippy::too_many_arguments)]
+    fn span_hi(
+        &mut self,
+        knob: ModuleId,
+        m: usize,
+        id: ModuleId,
+        kind: &str,
+        param: &str,
+        d: f32,
+        hi: f32,
+    ) {
+        let stored = self.stored(knob, m);
+        let i = param_of(kind, param);
+        let (nd, n1) = (i.to_norm(d), i.to_norm(hi));
+        let n0 = (nd - stored * n1) / (1.0 - stored);
+        assert!(
+            (-1e-3..=1.0 + 1e-3).contains(&n0),
+            "{kind}.{param}: macro {m} starts out of range ({n0})"
+        );
+        self.span(knob, m, id, kind, param, i.from_norm(n0.clamp(0.0, 1.0)), d);
+    }
+    /// A macro stored at 0: `param` stands at `d` there and runs to `hi` at 1.
+    #[allow(clippy::too_many_arguments)]
+    fn rise(
+        &mut self,
+        knob: ModuleId,
+        m: usize,
+        id: ModuleId,
+        kind: &str,
+        param: &str,
+        d: f32,
+        hi: f32,
+    ) {
+        let i = param_of(kind, param);
+        self.e.set_param(id, param, d);
+        self.route(
+            knob,
+            &format!("m{m}"),
+            id,
+            param,
+            i.to_norm(hi) - i.to_norm(d),
+        );
+    }
+    /// Macro `m` moves the gain stage `gain` by `db` dB at 1 (negative: quieter), the stored
+    /// level unchanged: the macro keeps a loud move from raising the peak.
+    fn level(&mut self, knob: ModuleId, m: usize, gain: ModuleId, db: f32) {
+        let s = self.stored(knob, m);
+        let g = self.e.state().modules[&gain].params["gain_db"];
+        self.e.set_param(gain, "gain_db", g - db * s);
+        self.route(knob, &format!("m{m}"), gain, "gain_db", db / 84.0);
+    }
     /// The last stage: the output. No limiter; headroom comes from the patch gain.
     fn out_stereo(&mut self, from: ModuleId) {
         let out = self.add("out", &[]);
@@ -222,21 +304,58 @@ struct Post<'a> {
     clock: Option<ModuleId>,
     room_decay: f32,
     room_max: f32,
+    /// Redesigned macros: the old m1 to m3 habit routes (cutoff, drive, space, and the chorus or
+    /// phaser mix) are not made; each of those params stands at what the old routes left at the
+    /// stored macro position, and the preset routes its own macros with `span` / `rise`.
+    fixed: bool,
+    /// The stored macro values of the old design (m1 to m4): what the old routes are evaluated at.
+    old: [f32; 4],
+    /// With `fixed`: the macro (1 to 4) that still opens echo and room, `None` = a constant wet amount.
+    space: Option<usize>,
 }
 
 struct Stages {
     lad: ModuleId,
     trim: ModuleId,
+    drive: Option<ModuleId>,
+    phaser: Option<ModuleId>,
+    chorus: Option<ModuleId>,
+    comp: Option<ModuleId>,
+    delay: ModuleId,
+    verb: ModuleId,
+}
+
+fn param_of(kind: &str, param: &str) -> kabl_modules::ParamInfo {
+    *kabl_modules::registry::info_for(kind)
+        .and_then(|i| i.params.iter().find(|p| p.name == param))
+        .unwrap_or_else(|| panic!("{kind}.{param}"))
+}
+
+/// What an old route of `amount` from a macro at `stored` leaves on a param with base `base`.
+fn routed(kind: &str, param: &str, base: f32, amount: f32, stored: f32) -> f32 {
+    let i = param_of(kind, param);
+    i.from_norm(i.to_norm(base) + stored * amount)
 }
 
 fn post(r: &mut Rack, knob: ModuleId, src: ModuleId, p: &Post) -> Stages {
     r.next_row();
-    let drive = p
-        .drive
-        .map(|(db, trim, _)| r.add("drive", &[("drive_db", db), ("trim_db", trim)]));
+    let st = |_: &Rack, m: usize| p.old[m - 1];
+    let drive = p.drive.map(|(db, trim, amt)| {
+        let db = if p.fixed {
+            routed("drive", "drive_db", db, amt, st(r, 2))
+        } else {
+            db
+        };
+        r.add("drive", &[("drive_db", db), ("trim_db", trim)])
+    });
+    let cut = if p.fixed {
+        routed("filter.ladder", "cutoff_hz", p.cutoff, p.cut_m1, st(r, 1))
+    } else {
+        p.cutoff
+    };
     let lad = r.add(
         "filter.ladder",
-        &[("cutoff_hz", p.cutoff), ("resonance", p.resonance)],
+        &[("cutoff_hz", cut), ("resonance", p.resonance)],
     );
     let trim = r.add("gain", &[("gain_db", p.trim_db)]);
     match drive {
@@ -247,10 +366,12 @@ fn post(r: &mut Rack, knob: ModuleId, src: ModuleId, p: &Post) -> Stages {
         None => r.wire(src, "out", lad, "in"),
     }
     r.wire(lad, "out", trim, "in");
-    if let (Some(d), Some((_, _, amt))) = (drive, p.drive) {
-        r.route(knob, "m2", d, "drive_db", amt);
+    if !p.fixed {
+        if let (Some(d), Some((_, _, amt))) = (drive, p.drive) {
+            r.route(knob, "m2", d, "drive_db", amt);
+        }
+        r.route(knob, "m1", lad, "cutoff_hz", p.cut_m1);
     }
-    r.route(knob, "m1", lad, "cutoff_hz", p.cut_m1);
     // Stereo chain: each stage takes the previous one's left and right.
     let mut last = trim;
     let mut first = true;
@@ -263,23 +384,40 @@ fn post(r: &mut Rack, knob: ModuleId, src: ModuleId, p: &Post) -> Stages {
         }
         *last = id;
     };
+    let mut phaser = None;
+    let mut chorus = None;
+    let mut comp = None;
     if let Some((ph, m4)) = p.phaser {
         let id = r.add("phaser", ph);
         stage(r, &mut last, &mut first, id);
+        phaser = Some(id);
         if let Some((param, amt)) = m4 {
-            r.route(knob, "m4", id, param, amt);
+            if p.fixed {
+                let base = ph.iter().find(|x| x.0 == param).map_or(0.0, |x| x.1);
+                let v = routed("phaser", param, base, amt, st(r, 4));
+                r.e.set_param(id, param, v);
+            } else {
+                r.route(knob, "m4", id, param, amt);
+            }
         }
     }
     if let Some((ch, m4)) = p.chorus {
         let id = r.add("chorus", ch);
         stage(r, &mut last, &mut first, id);
+        chorus = Some(id);
         if let Some(amt) = m4 {
-            r.route(knob, "m4", id, "mix", amt);
+            if p.fixed {
+                let v = routed("chorus", "mix", 0.0, amt, st(r, 4));
+                r.e.set_param(id, "mix", v);
+            } else {
+                r.route(knob, "m4", id, "mix", amt);
+            }
         }
     }
     if let Some(cp) = p.comp {
         let id = r.add("compressor", cp);
         stage(r, &mut last, &mut first, id);
+        comp = Some(id);
         if let Some((src, m4)) = p.duck {
             r.wire(src, "out", id, "sc");
             if let Some((param, amt)) = m4 {
@@ -292,7 +430,7 @@ fn post(r: &mut Rack, knob: ModuleId, src: ModuleId, p: &Post) -> Stages {
         let id = r.add("chorus", &[("mix", 0.0)]);
         stage(r, &mut last, &mut first, id);
     }
-    let tail = space_tail(
+    let (delay, verb) = space_tail(
         r,
         knob,
         last,
@@ -301,9 +439,20 @@ fn post(r: &mut Rack, knob: ModuleId, src: ModuleId, p: &Post) -> Stages {
         p.echo_max,
         p.room_decay,
         p.room_max,
+        (p.fixed && p.space.is_none()).then_some(p.old[2]),
+        p.space.unwrap_or(3),
     );
-    r.out_stereo(tail);
-    Stages { lad, trim }
+    r.out_stereo(verb);
+    Stages {
+        lad,
+        trim,
+        drive,
+        phaser,
+        chorus,
+        comp,
+        delay,
+        verb,
+    }
 }
 
 /// A short echo (a slapback, or tempo-synced when `clock` is given) and a room, both at mix 0
@@ -318,7 +467,9 @@ fn space_tail(
     echo_max: f32,
     room_decay_s: f32,
     room_max: f32,
-) -> ModuleId {
+    fixed: Option<f32>,
+    space_macro: usize,
+) -> (ModuleId, ModuleId) {
     let delay = r.add("delay", echo);
     let verb = r.add(
         "reverb",
@@ -337,9 +488,18 @@ fn space_tail(
     }
     r.stereo(src, verb);
     r.wire(delay, "out", verb, "in");
-    r.route(knob, "m3", delay, "mix", echo_max);
-    r.route(knob, "m3", verb, "mix", room_max);
-    verb
+    if let Some(s3) = fixed {
+        // The old Space route's stored wet amount, as a constant.
+        let e = routed("delay", "mix", 0.0, echo_max, s3);
+        let v = routed("reverb", "mix", 0.0, room_max, s3);
+        r.e.set_param(delay, "mix", e);
+        r.e.set_param(verb, "mix", v);
+    } else {
+        let key = format!("m{space_macro}");
+        r.route(knob, &key, delay, "mix", echo_max);
+        r.route(knob, &key, verb, "mix", room_max);
+    }
+    (delay, verb)
 }
 
 // ---- clips ------------------------------------------------------------------------------------
@@ -554,6 +714,35 @@ fn main() {
                 write_wav(&out.join(format!("{}.wav", p.slug)), &l, &r);
                 let peak = l.iter().chain(&r).fold(0.0f32, |m, s| m.max(s.abs()));
                 println!("{:18} peak {peak:.3}  | {}", p.slug, p.listen);
+            }
+        }
+        Some("positions") => {
+            // The factory level test's macro positions: every macro together at 0.15, 0.65 and 1.
+            // `positions [slug]`: peak and loudness of the chord measurement at each.
+            let only = args.get(2);
+            for p in presets()
+                .into_iter()
+                .filter(|p| only.is_none_or(|s| s == p.slug))
+            {
+                let mut line = format!("POS {:16}", p.slug);
+                for v in [0.15, 0.65, 1.0] {
+                    let mut rack = (p.build)();
+                    rack.trim(level_trim(p.slug));
+                    let knob = *rack
+                        .e
+                        .state()
+                        .modules
+                        .iter()
+                        .find(|(_, m)| m.kind == "macro")
+                        .unwrap()
+                        .0;
+                    for k in 1..=4 {
+                        rack.e.set_param(knob, &format!("m{k}"), v);
+                    }
+                    let (peak, loud) = level(rack.e.state());
+                    line += &format!(" | {v}: peak {peak:6.2} loud {loud:6.2}");
+                }
+                println!("{line}");
             }
         }
         Some("levels") => {

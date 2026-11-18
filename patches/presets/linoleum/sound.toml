@@ -9,6 +9,6 @@ tags = [
     "122bpm",
     "signature",
 ]
-description = "A phased disco electric piano, driven and compressed: bright, clipped, with a six-stage phaser always on. Play two-beat chord stabs. Bright opens the FM index and the filter, Crunch pushes the drive, Room sets a tight room and a slapback, Swirl speeds the phaser."
+description = "A phased disco electric piano, driven and compressed: bright, clipped, with a six-stage phaser always on. Play two-beat chord stabs. Swirl runs the phaser from slow and thin to fast and ringing, Chime grows the bell partial of the electric piano, Hold lengthens the ring, Squeeze clamps the compressor harder."
 keys = true
 sequence = false
