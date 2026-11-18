@@ -760,6 +760,8 @@ struct Spec {
     fx: Option<&'static str>,
     /// Bitcrusher in the chain (mix 0 until the `Crush` macro).
     crush: bool,
+    /// A low-pass after the crusher (needs `crush`), open until a macro closes it.
+    smooth: bool,
     /// Compressor on the music: threshold, ratio, makeup.
     comp: [f32; 3],
     /// Echo time ms (0 for a tempo-synced eighth), feedback, tone; max echo and room mix, decay.
@@ -782,6 +784,8 @@ struct Handles {
     drive: ModuleId,
     fx: Option<ModuleId>,
     crush: Option<ModuleId>,
+    /// The low-pass after the crusher (open at 20 kHz).
+    smooth: Option<ModuleId>,
     /// The compressor on the music, and the one the kick ducks through.
     music: ModuleId,
     duck: ModuleId,
@@ -1108,6 +1112,18 @@ fn groove(s: Spec) -> Rack {
             &[("bits", 4.0), ("downsample", 10.0), ("mix", 0.0)],
         )
     });
+    // A low-pass after the crusher, wide open until a macro closes it: it rounds the hard steps of
+    // the crusher, which the click scan reads as isolated spikes.
+    let smooth = s.smooth.then(|| {
+        v.mono_after(
+            "filter.ladder",
+            &[
+                ("cutoff_hz", 20000.0),
+                ("resonance", 0.0),
+                ("drive_db", 0.0),
+            ],
+        )
+    });
     let fx = s.fx.map(|kind| match kind {
         "phaser" => v.stage(
             "phaser",
@@ -1144,6 +1160,7 @@ fn groove(s: Spec) -> Rack {
             drive,
             fx,
             crush,
+            smooth,
             music,
             duck,
             clock,
@@ -1410,8 +1427,20 @@ fn brick_plan(v: &mut Voice, h: &Handles, s: &Spec) {
     v.r.e.set_param(crush, "mix", 0.0);
     v.r.route(v.knob, "m1", crush, "mix", 1.0);
     v.r.route(v.knob, "m1", crush, "mix", 0.5);
-    rise(v, 1, crush, "bitcrusher", "bits", 8.0, 4.0);
-    rise(v, 1, crush, "bitcrusher", "downsample", 3.0, 10.0);
+    // Already coarse where the mix starts to open (6 bits, hold 6), so the first steps are not
+    // a faint blend of a mild crush; the low-pass after it rounds the hard steps (the echo of a
+    // crusher spike was the click at 0.6 s) and closes with the grind like a worn sampler.
+    rise(v, 1, crush, "bitcrusher", "bits", 6.0, 4.0);
+    rise(v, 1, crush, "bitcrusher", "downsample", 6.0, 12.0);
+    rise(
+        v,
+        1,
+        h.smooth.expect("a smoother"),
+        "filter.ladder",
+        "cutoff_hz",
+        20000.0,
+        5000.0,
+    );
     // The stored cutoff, drive and duck are what the old Filter, Dirt and Pump macros left.
     let cut = routed("filter.ladder", "cutoff_hz", s.filter[0], 0.6, 0.5);
     v.r.e.set_param(h.lad, "cutoff_hz", cut);
@@ -1808,7 +1837,7 @@ fn scrap_plan(v: &mut Voice, h: &Handles, s: &Spec) {
     );
     let crush = h.crush.expect("a crusher");
     let mix = routed("bitcrusher", "mix", 0.0, 0.8, 0.3);
-    let p = main_line(v, 2, crush, "bitcrusher", "mix", 0.0, mix, 45.0);
+    let p = main_line(v, 2, crush, "bitcrusher", "mix", 0.0, mix, 70.0);
     span_hi(v, 2, p, crush, "bitcrusher", "downsample", 10.0, 12.0);
     pump(v, h, 3, 0.6, 0.6);
 }
@@ -1900,6 +1929,7 @@ fn copper_mile() -> Rack {
         filter: [1400.0, 0.25],
         fx: Some("phaser"),
         crush: false,
+        smooth: false,
         comp: [-24.0, 4.0, 4.0],
         echo: [0.0, 25.0, 3000.0],
         // Room is stored at 0.10 (was 0.25) and reaches two and a half times as far: the same sound.
@@ -1957,6 +1987,7 @@ fn brick_dust() -> Rack {
         filter: [700.0, 0.30],
         fx: None,
         crush: true,
+        smooth: true,
         comp: [-26.0, 6.0, 4.0],
         echo: [90.0, 15.0, 3000.0],
         space: [0.45, 0.25, 0.3],
@@ -2020,6 +2051,7 @@ fn ore_cart() -> Rack {
         filter: [500.0, 0.30],
         fx: None,
         crush: false,
+        smooth: false,
         comp: [-24.0, 4.0, 4.0],
         echo: [0.0, 40.0, 2500.0],
         space: [0.3, 1.2, 0.2],
@@ -2083,6 +2115,7 @@ fn stoop_sale() -> Rack {
         filter: [1800.0, 0.10],
         fx: None,
         crush: false,
+        smooth: false,
         comp: [-22.0, 3.0, 3.0],
         echo: [0.0, 25.0, 2800.0],
         space: [0.3, 0.8, 0.2],
@@ -2141,6 +2174,7 @@ fn fault_line() -> Rack {
         filter: [900.0, 0.20],
         fx: None,
         crush: false,
+        smooth: false,
         comp: [-24.0, 4.0, 4.0],
         echo: [0.0, 30.0, 3000.0],
         space: [0.25, 0.8, 0.2],
@@ -2211,6 +2245,7 @@ fn corner_store() -> Rack {
         filter: [1600.0, 0.20],
         fx: None,
         crush: false,
+        smooth: false,
         comp: [-24.0, 4.0, 4.0],
         echo: [0.0, 20.0, 3000.0],
         space: [0.15, 0.3, 0.12],
@@ -2282,6 +2317,7 @@ fn glass_coast() -> Rack {
         filter: [2500.0, 0.10],
         fx: Some("chorus"),
         crush: false,
+        smooth: false,
         comp: [-22.0, 3.0, 3.0],
         echo: [0.0, 52.0, 2800.0],
         space: [0.55, 3.2, 0.42],
@@ -2345,6 +2381,7 @@ fn still_water() -> Rack {
         filter: [1800.0, 0.05],
         fx: None,
         crush: false,
+        smooth: false,
         comp: [-22.0, 2.0, 2.0],
         echo: [0.0, 55.0, 2500.0],
         space: [0.5, 5.0, 0.45],
@@ -2438,6 +2475,7 @@ fn slab_city() -> Rack {
         filter: [1000.0, 0.15],
         fx: None,
         crush: false,
+        smooth: false,
         comp: [-24.0, 3.0, 3.0],
         echo: [0.0, 25.0, 2800.0],
         space: [0.15, 0.5, 0.15],
@@ -2505,6 +2543,7 @@ fn rope_walk() -> Rack {
         filter: [1500.0, 0.25],
         fx: Some("phaser"),
         crush: false,
+        smooth: false,
         comp: [-24.0, 4.0, 5.5],
         echo: [0.0, 25.0, 3000.0],
         space: [0.2, 0.4, 0.15],
@@ -2575,6 +2614,7 @@ fn lamp_oil() -> Rack {
         filter: [1400.0, 0.15],
         fx: None,
         crush: false,
+        smooth: false,
         comp: [-24.0, 3.0, 3.0],
         echo: [0.0, 55.0, 2200.0],
         space: [0.45, 4.0, 0.32],
@@ -2673,7 +2713,10 @@ fn acid_line() -> Rack {
     v.r.wire(seq, "gate", fenv, "gate");
     v.r.wire(fenv, "out", fvca, "in");
     v.r.wire(seq, "velocity", fvca, "cv");
-    v.r.depth_route(fvca, "out", lad, "cutoff_hz", v.knob, "m3", 0.6);
+    // Fixed at what the old Accent macro left (0.6 of 0.6 of the travel): the macro now sets how long
+    // the zap rings and how long the notes are held, not how far it opens the filter.
+    let zap = v.r.e.connect_route(jack(fvca, "out"), lad, "cutoff_hz");
+    v.r.e.set_route_amount(zap, 0.36, true);
     // The amp: a gate envelope, louder on the accent steps.
     let aenv = v.r.add("env.adsr", &adsr(1.0, 160.0, 0.8, 30.0));
     let avca = v.r.add("vca", &[("gain", 0.0)]);
@@ -2691,10 +2734,14 @@ fn acid_line() -> Rack {
     v.r.e.set_param(lad, "resonance", 0.25);
     v.r.route(v.knob, "m2", lad, "resonance", 0.62);
     span(&mut v, 2, 0.55, lad, "filter.ladder", "drive_db", 0.0, 6.0);
-    // Accent: the envelope's decay goes from a short zap to a long wow and the notes hold longer, on
-    // top of the depth above.
-    span(&mut v, 3, 0.60, fenv, "env.adsr", "decay_ms", 10.0, 220.0);
+    // Accent: the envelope's decay goes from a short zap to a long wow and the notes hold longer.
+    span(&mut v, 3, 0.60, fenv, "env.adsr", "decay_ms", 40.0, 220.0);
     span(&mut v, 3, 0.60, seq, "seq", "gate_len", 30.0, 62.0);
+    // And the level contrast: the VCA adds this offset to the step velocity, so at 0 the ghost notes
+    // are nearly as loud as the accents, and from the stored position on the contrast is the old one
+    // (the offset is 0 there; the route stops at the bottom of the param).
+    v.r.e.set_param(accent_vca, "gain", 0.4);
+    v.r.route(v.knob, "m3", accent_vca, "gain", -0.4 / 0.6);
     // Slide: the glide time runs on to a long portamento.
     let glide = routed("slew", "rise_ms", 8.0, 0.22, 0.5);
     let i = param_of("slew", "rise_ms");
@@ -2851,6 +2898,7 @@ fn scrap_metal() -> Rack {
         filter: [1200.0, 0.30],
         fx: None,
         crush: true,
+        smooth: false,
         comp: [-24.0, 6.0, 5.5],
         echo: [90.0, 20.0, 2800.0],
         space: [0.3, 0.5, 0.2],
@@ -2917,6 +2965,7 @@ fn dune_buggy() -> Rack {
         filter: [1700.0, 0.15],
         fx: None,
         crush: false,
+        smooth: false,
         comp: [-22.0, 3.0, 3.0],
         echo: [0.0, 25.0, 2800.0],
         space: [0.3, 1.0, 0.2],

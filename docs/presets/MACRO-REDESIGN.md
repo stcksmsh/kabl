@@ -17,7 +17,7 @@ Written from the patch recipe and the audit renders. Nobody has listened yet; th
 
 | Macro | Stored | What you hear 0 to 1 | What it moves |
 |---|---|---|---|
-| Grind | 0.00 | The approved bass, then an aliased, crushed grit builds on it | new bitcrusher on the bass bus: mix 0 to 100 %, bits 8 to 4, hold 3 to 14 samples; drive 29.7 to 36 dB with the trim 6 dB lower |
+| Grind | 0.00 | The approved bass, then an aliased, crushed grit builds on it and the top closes like a worn sampler | new bitcrusher on the bass bus: mix 0 to 100 % (full at two thirds), bits 6 to 4, hold 6 to 12 samples; a low-pass after it 20 kHz to 5 kHz; drive 29.7 to 36 dB with the trim 6 dB lower |
 | Squash | 0.60 | The mix is clamped harder and gets flatter and denser; the drums lose their gaps | the music compressor: threshold -6 to -39 dB, makeup 0 to 6.7 dB (ratio stays 6) |
 | Push | 0.50 | The stomp pushes faster or drags (112 to 140 bpm, 126 at the stored position) | clock tempo |
 | Slap | 0.067 | A slapback and a tight room come in, three times as wide as before | echo mix max 45 %, room mix max 30 % (the stored position is a third of the old one, so the sound is the same) |
@@ -29,7 +29,7 @@ Old macros against new, same phrase, same tool:
 | Preset | Old flags | New flags |
 |---|---|---|
 | Copper Mile | Filter dead; Pump dead + jump; Room weak | Room weak (unchanged macro); Sweep, Swirl, Pump clean |
-| Brick Dust | Filter weak; Dirt duplicate; Pump dead + jump; Room weak + duplicate | Grind jump (the last step); Squash, Push, Slap clean |
+| Brick Dust | Filter weak; Dirt duplicate; Pump dead + jump; Room weak + duplicate | clean (Grind: bits and hold start coarse, and a low-pass closes with it; see "Grind and the click") |
 
 - Peaks: Copper Mile worst -2.2 dBFS at any step and in any sweep (same as the old macros); Brick Dust worst -3.7 (old -2.9). No click in any step or sweep render (`audio_defects` clicks, no `problems` entry).
 - Change 0 against 1 (dB of the audit measure): Sweep 1.4, Swirl 2.8, Pump 11.7, Room 1.0; Grind 1.9, Squash 6.6, Push 9.6, Slap 2.0. Push measures large because tempo moves every onset; the level and spectrum do not change.
@@ -64,7 +64,7 @@ How it is built: `main_line` picks the position where the macro's main param sit
 
 | Preset | Old flags | New flags |
 |---|---|---|
-| Ore Cart | Filter weak; Rumble and Space duplicate; Pump dead + jump | Rumble and Space duplicate (see below) |
+| Ore Cart | Filter weak; Rumble and Space duplicate; Pump dead + jump | clean (the duplicate was the side measure, see "The side measure") |
 | Stoop Sale | Filter weak | clean |
 | Fault Line | Hats dead; Filter click with Reese (parked) | clean |
 | Corner Store | Filter dead + clicks (parked) | clean |
@@ -73,11 +73,11 @@ How it is built: `main_line` picks the position where the macro's main param sit
 | Slab City | Tone weak; Glide dead | clean |
 | Rope Walk | Filter dead; Pump dead + jump | clean |
 | Lamp Oil | Chord and Dub duplicate; Filter dead | clean |
-| Acid Line | Cutoff and Accent duplicate; Slide weak | Cutoff and Accent similar (cosine 0.89, under the duplicate line 0.9) |
-| Scrap Metal | Vowel weak; Pump dead + jump | Crush weak (1.0 dB) |
+| Acid Line | Cutoff and Accent duplicate; Slide weak | clean (Cutoff and Accent cosine 0.69: Accent no longer brightens, see below) |
+| Scrap Metal | Vowel weak; Pump dead + jump | clean (Crush 1.7 dB at 1, was 1.0) |
 | Dune Buggy | Filter dead | clean |
 | Copper Mile | Room weak | clean |
-| Brick Dust | Grind jump; Grind and Slap click (combination) | unchanged: see "Open flags" |
+| Brick Dust | Grind jump; Grind and Slap click (combination) | clean |
 
 Peaks: every position of every macro of every preset is at or under -1 dBFS (worst: Ore Cart Pump -1.4, Fault Line Reese -1.3, Scrap Metal Pump -1.2, Corner Store Swing -1.1). No click in any end render or sweep render. Loudest macro moves, 0 against 1 (dB of the audit measure): Pump 10 to 16 on the presets that have one, Swing/Skip 9 to 13, Rumble 10, Bloom 9.
 
@@ -85,7 +85,9 @@ Peaks: every position of every macro of every preset is at or under -1 dBFS (wor
 
 | Preset | Difference render |
 |---|---|
-| Copper Mile, Brick Dust, Acid Line, Glass Coast, Rope Walk, Dune Buggy | bit-identical (-217 to -221 dB, float noise) |
+| Copper Mile, Glass Coast, Rope Walk, Dune Buggy | bit-identical (-217 to -221 dB, float noise) |
+| Acid Line, Scrap Metal, Ore Cart | bit-identical against the branch before this slice (the Accent depth, contrast offset and Crush range land on the same stored sound) |
+| **Brick Dust** | **-14.6 dB, all of it noise: the low-pass after the crusher is a new module, which moves the module ids of everything built after it, and the noise sources (the hats) are seeded from their module id. The tonal parts are the same to -33 dB (the low-pass at 20 kHz); 1 to 4 kHz, where the hats sit, differs as two noise streams do** |
 | Ore Cart, Still Water, Slab City, Lamp Oil, Scrap Metal | -81 to -124 dB below the old signal: float noise from the sum of the new routes |
 | **Stoop Sale** | **-29.5 dB: the default hiss and the pitch wobble are gone.** The old Dust macro stood at 0.30, which put a hiss in the default sound (the hard rule is no hiss by default); Dust now starts at 0 and the hiss is its far end |
 | **Fault Line** | **-22.4 dB: an 8 kHz low-pass on the bass part (the click fix, below) and 1 dB less level (trim -3 instead of -2, for the Reese macro's peak)** |
@@ -95,13 +97,17 @@ Peaks: every position of every macro of every preset is at or under -1 dBFS (wor
 
 The Corner Store and Fault Line click is the reset edge of the bass saw at a note start, which a scanner window sees as an isolated spike when the filter lets it through. Muting the bass removed it; a pitch slew, a longer attack or another unison did not. What works is a soft top on the bass itself: `Part::lp(8000.0)` on both bass parts (the sound changes by the -22 and -23 dB above, a bit less top on the bass). The filter macros keep their range (Wah up to 11.8 kHz, Filter to 20 kHz) and no click remains in any step, sweep or combination render of the two presets.
 
+## Flags fixed after the first listen round
+
+- **The side measure** (Ore Cart Rumble and Space, cosine 0.96): the width component of the change vector was the side level in dB, so a mix that is mono to -55 dB and goes to -50 dB looked like a 40 dB step. Rumble moves the side from -63 to -55 dB under a -21 dB mix (inaudible), Space from -90 to -50 dB, and both read as "goes mono to stereo". The measure now floors the side at 30 dB under the mix loudness (`SIDE_FLOOR_DB` in `macro_audit.py`): under that it is mono. Rumble and Space are now apart (Space changes only the width and the tail, Rumble the low bands and the note length). No sound change.
+- **Acid Line Cutoff and Accent** (cosine 0.89, both brightened the top bands): Accent no longer opens the filter. The zap depth is fixed at what the old Accent left at the stored position (0.36 of the travel), and the macro moves the zap's ring (40 ms to 690 ms), the note length (30 % to 83 %) and the accent contrast (the VCA offset 0.4 at 0, so the ghost notes are nearly as loud as the accents; 0 from the stored position on). Cosine with Cutoff now 0.69, with Resonance 0.66 (the two both sit in the top bands, below the 0.8 line). The stored sound is unchanged (the offset is 0 at 0.6, the depth is the same number).
+- **Scrap Metal Crush** (1.0 dB): the mix now reaches 70 % (was 45 %) with the hold ending at 12: 1.7 dB at 1, no click in any step, sweep or combination render. The 60 % and hold 14 setting that clicked earlier is not needed. The macro stores at 0.34 (the line is longer; the stored mix is the same 24 %).
+- **Grind and the click** (Brick Dust, flag `jump`, Grind plus Slap clicking at 0.6 s): the crusher steps came out of the echo as isolated spikes. A low-pass after the crusher (a `filter.ladder` at 20 kHz, closing to 5 kHz with Grind) rounds them: no click in any pair or in the all-at-1 render. Bits and hold now start coarse (6 bits, hold 6) instead of 8 and 3, so the mix opening is audible from the first steps and the flag `jump` is gone. The low-pass is always in the path, open at 20 kHz: it is the one change of the default Brick Dust render (a 4-pole low-pass at 20 kHz, a hair of top at the very top).
+
 ## Open flags (honest list)
 
-- **Brick Dust Grind**: still back-loaded (flag `jump`, the last step 1.6 dB against 0.1 to 0.4 before). Grind plus Slap at 1 clicks at 0.6 s (the first bass note of the run, 90 ms before its echo repeats): the echo exposes a crusher spike that sits among loud drums in the dry render. The Grind mix now reaches 100 % at two thirds of the travel so that the last third hardens bits and hold instead; that moved the pairs a little but did not fix the click. Needs listening.
-- **Ore Cart Rumble and Space** measure as duplicates (cosine 0.96): the coarse measures (loudness, four bands, width, density) see both as "wider", Rumble because the held, driven bass widens the mix, Space because of the echo. The sound is different (Rumble is in the sub bands and the note length, Space is the tail); the measure cannot tell.
-- **Acid Line Cutoff and Accent** point 0.89 the same way (both brighten); Accent also shortens the zap and the notes.
-- **Scrap Metal Crush** moves only 1.0 dB: a wider range (mix 60 %, hold 14) puts a click in the all-at-1 render, so the macro stays milder.
-- **Squash and Slap (Brick Dust)** are opposite in the similarity matrix (cosine -0.98): more squash means less tail. Left as is.
+- **Brick Dust Grind** moves 1.9 dB at 1 on the audit measure: a crusher on a bass is mostly in the low harmonics and the low-pass closing at the end adds darkness more than loudness. By ear it should read as grit and a muffling top; this is the first thing to listen to in Brick Dust.
+- **Squash and Slap (Brick Dust)** are opposite when the side is read raw (cosine -0.98: more squash means less tail); with the side floor the matrix reads -0.26. Left as is.
 
 ## The twelve designs
 
@@ -186,14 +192,14 @@ The Filter macro of the old Glass Coast is gone (its top two thirds were dead); 
 |---|---|---|---|
 | Cutoff | 0.40 | The bass filter opens | ladder cutoff (unchanged route) |
 | Resonance | 0.55 | The squeal, and the filter is driven harder | resonance 0.25 to 0.59 (unchanged route); ladder drive 0 to 6 dB (stored) and on |
-| Accent | 0.60 | Accented notes zap, then wow: more opening, a longer envelope, longer notes | accent depth (unchanged route); filter envelope decay 10 to 220 ms (stored) and on; gate 30 % to 62 % (stored) |
+| Accent | 0.60 | Not a second brightness knob any more: how long the zap rings and how long the notes hold, and how much louder the accents are than the ghost notes | filter envelope decay 40 to 220 ms (stored) to 690 ms; gate 30 % to 62 % (stored) to 83 %; accent-vs-ghost level offset 0.4 to 0 (stored; the contrast is the old one from the stored position on). The zap depth is fixed at the old stored value |
 | Slide | 0.49 | Marked notes go from a step to a long portamento | slide time 0.1 to 28 ms (stored) to 100 ms |
 
 ### Scrap Metal (electro stomp, 128 bpm)
 | Macro | Stored | What you hear 0 to 1 | What it moves |
 |---|---|---|---|
 | Vowel | 0.50 | The stab talks from a to u, sharper at the top, and the music's filter follows | vowel 0 to 2 (stored) to 4; formant Q 2 to 10; stab detune 3 to 12 ct; ladder cutoff 450 Hz to 1.2 kHz (stored) and on |
-| Crush | 0.53 | Clean, then a mild bitcrush on the whole music | crusher mix 0 to 24 % (stored) to 45 %; hold 7 to 10 (stored) to 12 |
+| Crush | 0.34 | Clean, then a bitcrush on the whole music, up to 70 % | crusher mix 0 to 24 % (stored) to 70 %; hold 9 to 10 (stored) to 12 |
 | Pump | 0.60 | No duck, then the kick takes the loop | duck threshold 0 to -34 dB (stored) to -57 dB |
 | Room | 0.30 | unchanged | echo and room mix |
 
@@ -215,7 +221,7 @@ Also worth an ear: Ore Cart Rumble (new gate-length gesture), Lamp Oil Chord (th
 
 ## Tours of the twelve (offline renders)
 
-Git-ignored, on disk in `docs/presets/clips/macros-groove/`: `<slug>-ab.mp3` per preset and `tours.txt` with the start second of every clip. Each clip is 20 s: the macro held at 0 for 6 s, up over 4 s, held at 1 for 6 s, down over 4 s, the phrase looping on the grid of the preset's tempo; old macro 1, new macro 1, old macro 2, new macro 2, and so on, 1 s of silence between clips. Regenerate: `MACRO_TOUR_BPM=<bpm> macro_audit <patches> <phrases.json> <renders> <slug>` once for the old patches (`git archive origin/master patches`) and once for the new, then `docs/presets/scripts/macro_tour_ab.py --old-patches P --old-renders R --new-patches P --new-renders R --out DIR <slugs>`.
+Git-ignored, on disk in `docs/presets/clips/macros-groove/`: `<slug>-tour.mp3` per preset (all 14 Groove presets, Copper Mile and Brick Dust included) and `tours.txt` with the start second of every clip. New macros only (no old/new A/B): macro 1 to 4 back to back, each 20 s (held at 0 for 6 s, up over 4 s, held at 1 for 6 s, down over 4 s), the phrase looping at its own length in whole bars of the preset's tempo, 1 s of silence between clips, about 84 s per file. The script fails a clip with a gap over 1 s under -45 dBFS after its first second (none here, `--max-gap` was not needed). Regenerate: `MACRO_TOUR_BPM=<bpm> macro_audit <patches> <phrases.json> <renders> <slug>` per preset, then `docs/presets/scripts/macro_tour_ab.py --patches P --renders R --out DIR <slugs>`.
 
 ## Combination (do the four macros mix well together?)
 

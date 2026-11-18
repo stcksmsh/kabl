@@ -152,10 +152,14 @@ def shifts(ta, tb):
     return out
 
 
+SIDE_FLOOR_DB = 30.0  # side more than this under the mix loudness counts as mono: -63 to -55 dB of side under a -21 dB mix (Ore Cart Rumble) is not a change a listener hears
+
+
 def vector(m0, m1):
     """Change from m0 to m1 over the measures a listener hears: loudness, four bands, width, density."""
+    side = lambda m: max(m['side'], m['loud'] - SIDE_FLOOR_DB)
     return np.array([m1['loud'] - m0['loud'], *[b1 - b0 for b0, b1 in zip(m0['bands'], m1['bands'])],
-                     m1['side'] - m0['side'], 3 * np.log2((m1['onsets'] + 1) / (m0['onsets'] + 1))])
+                     side(m1) - side(m0), 3 * np.log2((m1['onsets'] + 1) / (m0['onsets'] + 1))])
 
 
 def words(m0, mm, m1, name_vec, shifts_text):
