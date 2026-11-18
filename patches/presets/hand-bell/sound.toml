@@ -7,6 +7,6 @@ tags = [
     "ambient",
     "experimental",
 ]
-description = "An inharmonic FM bell: three pairs of operators that ring for seconds and darken as they fade. Play slow, sparse notes. Strike goes from a dull, muted bell to a hard clapper with bright metal, Ring lets the bell ring on after the strike, Tail stretches the echo and the hall, Clang pulls the partials out of tune."
+description = "An inharmonic FM bell: three pairs of operators that ring for seconds and darken as they fade. Play slow, sparse notes. Strike goes from a dull, muted bell to a hard clapper with bright metal, Ring lets the bell ring on after the strike, Shimmer brings in a deep, fast chorus, Clang pulls the partials out of tune."
 keys = true
 sequence = false

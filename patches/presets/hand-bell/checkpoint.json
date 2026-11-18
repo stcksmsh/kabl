@@ -13,7 +13,7 @@
         "cc.m4": 23.0,
         "m1": 0.8,
         "m2": 0.5,
-        "m3": 0.55,
+        "m3": 0.25,
         "m4": 0.5,
         "pin.m1": 0.0,
         "pin.m2": 1.0,
@@ -55,9 +55,9 @@
         "fine1": 0.0,
         "fine2": 0.0,
         "fine3": 0.0,
-        "fine4": -40.0,
+        "fine4": -150.0,
         "fine5": 57.0,
-        "fine6": 40.0,
+        "fine6": 150.0,
         "index": 0.2,
         "level1": 1.0,
         "level2": 0.6,
@@ -71,11 +71,11 @@
         "ratio4": 5.0,
         "ratio5": 3.0,
         "ratio6": 9.0,
-        "release1": 80.0,
+        "release1": 60.0,
         "release2": 300.0,
-        "release3": 80.0,
+        "release3": 60.0,
         "release4": 250.0,
-        "release5": 80.0,
+        "release5": 60.0,
         "release6": 200.0,
         "sustain1": 0.0,
         "sustain2": 0.0,
@@ -120,7 +120,7 @@
         "y": 320.0
       },
       "params": {
-        "gain_db": 6.5
+        "gain_db": 7.75
       }
     },
     "7": {
@@ -130,9 +130,9 @@
         "y": 320.0
       },
       "params": {
-        "depth": 45.0,
-        "mix": 20.0,
-        "rate_hz": 0.3
+        "depth": 26.666664,
+        "mix": 0.0,
+        "rate_hz": 0.13924769
       }
     },
     "8": {
@@ -142,7 +142,7 @@
         "y": 320.0
       },
       "params": {
-        "feedback": 10.0,
+        "feedback": 42.0,
         "mix": 16.5,
         "time_ms": 520.0,
         "tone_hz": 5000.0
@@ -156,7 +156,7 @@
       },
       "params": {
         "damp_hz": 5000.0,
-        "decay_s": 1.5,
+        "decay_s": 5.0,
         "mix": 22.000002,
         "predelay_ms": 0.0,
         "width": 70.0
@@ -388,7 +388,7 @@
         }
       },
       "params": {
-        "amount": 0.35002446
+        "amount": 0.39999998
       },
       "steps": []
     },
@@ -406,7 +406,7 @@
         }
       },
       "params": {
-        "amount": 0.31835198
+        "amount": 0.3683275
       },
       "steps": []
     },
@@ -424,7 +424,7 @@
         }
       },
       "params": {
-        "amount": 0.27958786
+        "amount": 0.32956338
       },
       "steps": []
     },
@@ -432,17 +432,17 @@
       "from": {
         "Module": {
           "id": 1,
-          "port": "m3"
+          "port": "m2"
         }
       },
       "to": {
         "Param": {
-          "id": 9,
-          "param": "decay_s"
+          "id": 6,
+          "param": "gain_db"
         }
       },
       "params": {
-        "amount": 0.47534427
+        "amount": -0.029761905
       },
       "steps": []
     },
@@ -455,16 +455,52 @@
       },
       "to": {
         "Param": {
-          "id": 8,
-          "param": "feedback"
+          "id": 7,
+          "param": "mix"
         }
       },
       "params": {
-        "amount": 0.6124402
+        "amount": 0.8
       },
       "steps": []
     },
     "19": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m3"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 7,
+          "param": "depth"
+        }
+      },
+      "params": {
+        "amount": 0.73333335
+      },
+      "steps": []
+    },
+    "20": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m3"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 7,
+          "param": "rate_hz"
+        }
+      },
+      "params": {
+        "amount": 0.6049277
+      },
+      "steps": []
+    },
+    "21": {
       "from": {
         "Module": {
           "id": 1,
@@ -482,7 +518,7 @@
       },
       "steps": []
     },
-    "20": {
+    "22": {
       "from": {
         "Module": {
           "id": 1,
@@ -496,11 +532,11 @@
         }
       },
       "params": {
-        "amount": 0.089999974
+        "amount": 0.2733333
       },
       "steps": []
     },
-    "21": {
+    "23": {
       "from": {
         "Module": {
           "id": 1,
@@ -514,7 +550,7 @@
         }
       },
       "params": {
-        "amount": -0.09833342
+        "amount": -0.2816667
       },
       "steps": []
     }
@@ -523,7 +559,7 @@
     "1": {
       "name.m1": "Strike",
       "name.m2": "Ring",
-      "name.m3": "Tail",
+      "name.m3": "Shimmer",
       "name.m4": "Clang"
     }
   }

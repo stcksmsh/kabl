@@ -13,7 +13,7 @@
         "cc.m4": 23.0,
         "m1": 1.0,
         "m2": 0.7,
-        "m3": 0.4,
+        "m3": 0.6,
         "m4": 0.0,
         "pin.m1": 0.0,
         "pin.m2": 1.0,
@@ -75,7 +75,7 @@
       "params": {
         "attack_ms": 0.5,
         "decay_ms": 1399.9993,
-        "release_ms": 60.0,
+        "release_ms": 12.0,
         "sustain": 0.0
       }
     },
@@ -88,7 +88,7 @@
       "params": {
         "attack_ms": 0.5,
         "decay_ms": 30.0,
-        "release_ms": 60.0,
+        "release_ms": 12.0,
         "sustain": 0.0
       }
     },
@@ -110,7 +110,7 @@
       },
       "params": {
         "drive_db": 6.0,
-        "trim_db": -3.0
+        "trim_db": 5.0
       }
     },
     "10": {
@@ -131,7 +131,7 @@
         "y": 320.0
       },
       "params": {
-        "gain_db": 6.5
+        "gain_db": 8.0
       }
     },
     "12": {
@@ -141,11 +141,11 @@
         "y": 320.0
       },
       "params": {
-        "attack_ms": 25.0,
-        "makeup_db": 0.0,
-        "ratio": 2.0,
-        "release_ms": 300.0,
-        "threshold_db": -14.0
+        "attack_ms": 3.0,
+        "makeup_db": 6.5,
+        "ratio": 7.0,
+        "release_ms": 80.0,
+        "threshold_db": -24.0
       }
     },
     "13": {
@@ -571,7 +571,7 @@
         }
       },
       "params": {
-        "amount": -0.15873015
+        "amount": -0.47619054
       },
       "steps": []
     },
@@ -584,12 +584,12 @@
       },
       "to": {
         "Param": {
-          "id": 12,
-          "param": "threshold_db"
+          "id": 6,
+          "param": "release_ms"
         }
       },
       "params": {
-        "amount": -0.41666657
+        "amount": 0.23298998
       },
       "steps": []
     },
@@ -602,12 +602,12 @@
       },
       "to": {
         "Param": {
-          "id": 12,
-          "param": "attack_ms"
+          "id": 7,
+          "param": "release_ms"
         }
       },
       "params": {
-        "amount": -0.6973723
+        "amount": 0.23298998
       },
       "steps": []
     },
@@ -620,30 +620,30 @@
       },
       "to": {
         "Param": {
-          "id": 12,
-          "param": "release_ms"
+          "id": 11,
+          "param": "gain_db"
         }
       },
       "params": {
-        "amount": -0.5515162
+        "amount": -0.05952381
       },
       "steps": []
     },
     "28": {
       "from": {
         "Module": {
-          "id": 1,
-          "port": "m3"
+          "id": 7,
+          "port": "out"
         }
       },
       "to": {
         "Param": {
-          "id": 12,
-          "param": "ratio"
+          "id": 3,
+          "param": "fine"
         }
       },
       "params": {
-        "amount": 0.6578947
+        "amount": 0.0
       },
       "steps": []
     },
@@ -651,17 +651,17 @@
       "from": {
         "Module": {
           "id": 1,
-          "port": "m3"
+          "port": "m4"
         }
       },
       "to": {
-        "Param": {
-          "id": 12,
-          "param": "makeup_db"
+        "CableParam": {
+          "cable": 28,
+          "param": "amount"
         }
       },
       "params": {
-        "amount": 0.6770834
+        "amount": 1.0
       },
       "steps": []
     },
@@ -674,7 +674,7 @@
       },
       "to": {
         "Param": {
-          "id": 3,
+          "id": 4,
           "param": "fine"
         }
       },
@@ -697,43 +697,7 @@
         }
       },
       "params": {
-        "amount": 0.7
-      },
-      "steps": []
-    },
-    "32": {
-      "from": {
-        "Module": {
-          "id": 7,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Param": {
-          "id": 4,
-          "param": "fine"
-        }
-      },
-      "params": {
-        "amount": 0.0
-      },
-      "steps": []
-    },
-    "33": {
-      "from": {
-        "Module": {
-          "id": 1,
-          "port": "m4"
-        }
-      },
-      "to": {
-        "CableParam": {
-          "cable": 32,
-          "param": "amount"
-        }
-      },
-      "params": {
-        "amount": 0.7
+        "amount": 1.0
       },
       "steps": []
     }
@@ -742,7 +706,7 @@
     "1": {
       "name.m1": "Snap",
       "name.m2": "Grit",
-      "name.m3": "Squash",
+      "name.m3": "Ring",
       "name.m4": "Zap"
     }
   }

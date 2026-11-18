@@ -14,7 +14,7 @@
         "m1": 1.0,
         "m2": 0.0,
         "m3": 0.5,
-        "m4": 0.4,
+        "m4": 0.3,
         "pin.m1": 0.0,
         "pin.m2": 1.0,
         "pin.m3": 2.0,
@@ -72,8 +72,8 @@
       },
       "params": {
         "attack_ms": 0.5,
-        "decay_ms": 40.0,
-        "release_ms": 10.0,
+        "decay_ms": 20.0,
+        "release_ms": 6.0,
         "sustain": 0.2
       }
     },
@@ -129,7 +129,7 @@
         "y": 320.0
       },
       "params": {
-        "gain_db": 9.5
+        "gain_db": 14.0
       }
     },
     "12": {
@@ -139,10 +139,10 @@
         "y": 320.0
       },
       "params": {
-        "depth": 53.33333,
-        "feedback": 5.0,
+        "depth": 57.999992,
+        "feedback": 12.285721,
         "mix": 0.0,
-        "rate_hz": 0.20519708,
+        "rate_hz": 0.2418325,
         "stages": 4.0
       }
     },
@@ -569,7 +569,7 @@
         }
       },
       "params": {
-        "amount": 0.3
+        "amount": 0.6
       },
       "steps": []
     },
@@ -605,7 +605,7 @@
         }
       },
       "params": {
-        "amount": 0.3
+        "amount": 0.6
       },
       "steps": []
     },
@@ -623,7 +623,7 @@
         }
       },
       "params": {
-        "amount": 0.25135553
+        "amount": 0.37176752
       },
       "steps": []
     },
@@ -641,7 +641,7 @@
         }
       },
       "params": {
-        "amount": 0.27958804
+        "amount": 0.3683275
       },
       "steps": []
     },
@@ -649,17 +649,17 @@
       "from": {
         "Module": {
           "id": 1,
-          "port": "m4"
+          "port": "m3"
         }
       },
       "to": {
         "Param": {
-          "id": 12,
-          "param": "mix"
+          "id": 11,
+          "param": "gain_db"
         }
       },
       "params": {
-        "amount": 0.41250002
+        "amount": -0.10714286
       },
       "steps": []
     },
@@ -673,11 +673,11 @@
       "to": {
         "Param": {
           "id": 12,
-          "param": "rate_hz"
+          "param": "mix"
         }
       },
       "params": {
-        "amount": 0.5062733
+        "amount": 0.55
       },
       "steps": []
     },
@@ -691,11 +691,11 @@
       "to": {
         "Param": {
           "id": 12,
-          "param": "depth"
+          "param": "rate_hz"
         }
       },
       "params": {
-        "amount": 0.41666672
+        "amount": 0.571681
       },
       "steps": []
     },
@@ -709,11 +709,29 @@
       "to": {
         "Param": {
           "id": 12,
+          "param": "depth"
+        }
+      },
+      "params": {
+        "amount": 0.40000018
+      },
+      "steps": []
+    },
+    "33": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m4"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 12,
           "param": "feedback"
         }
       },
       "params": {
-        "amount": 0.39473683
+        "amount": 0.39849618
       },
       "steps": []
     }
