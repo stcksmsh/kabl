@@ -19,6 +19,9 @@ Flags (a draft verdict; a person reads the numbers and decides)
   jump       one neighbouring pair differs by more than JUMP_FACTOR times the median pair and more
              than JUMP_DB.
   weak       0 against 1 differs by less than WEAK_DB.
+  level      the loudness (RMS of the mono mix, dB) at 1 against 0, or the swing (highest minus lowest) over
+             the 8 steps, is more than LEVEL_DB (3 dB). Not for macros named in --level-type (slug/mK, comma
+             separated: pump, swell, chop, bloom, squash as density): those may move the level, deliberately.
 Difference of two renders (`change`, dB): the larger of the spectral distance (mean absolute
 difference of the third-octave levels of the long-term spectrum, over bands within 50 dB of the
 loudest) and the envelope distance (mean absolute difference of the 10 ms level, over frames
@@ -58,6 +61,7 @@ DEAD_DB = 0.15
 WEAK_DB = 1.0
 WAVE_DB = -15.0  # 0 against 1 differs in the waveform by more than this: it moves
 WAVE_DEAD_DB = -40.0  # a step pair that differs in the waveform by less than this does not move
+LEVEL_DB = 3.0  # level: the loudness at 1 against 0, or the swing (highest minus lowest) over the 8 steps, is more than this: a macro that is not about level must keep the loudness about constant over its travel
 JUMP_FACTOR = 3.0
 JUMP_DB = 1.5
 PEAK_DB = -1.0
@@ -209,7 +213,7 @@ def region(r):
             f"{r['at'][0]:.2f} / {r['at'][1]:.2f} / {r['at'][2]:.2f} (macro adds up to {r['depth']:.2f})")
 
 
-def audit_macro(slug, entry, renders):
+def audit_macro(slug, entry, renders, level_type=False):
     k = entry['macro']
     steps = [read(renders / 'steps' / f'{slug}-m{k}-s{i}.wav') for i in range(STEPS)]
     sweep = read(renders / 'sweep' / f'{slug}-m{k}.wav')
@@ -241,6 +245,11 @@ def audit_macro(slug, entry, renders):
         flags.append('jump')
     if not moves and 'dead' not in flags:
         flags.append('weak')
+    loud = [m['loud'] for m in ms]
+    level_end = loud[-1] - loud[0]
+    level_swing = max(loud) - min(loud)
+    if max(abs(level_end), level_swing) > LEVEL_DB and not level_type:
+        flags.append('level')
     problems = []
     for tag, m in (('0', ms[0]), ('1', ms[-1])):
         if m['peak'] > PEAK_DB:
@@ -262,6 +271,7 @@ def audit_macro(slug, entry, renders):
         flags.append('zipper')
     return {
         'macro': k, 'steps': ms, 'mid': mid, 'vec': vec.tolist(), 'pair_db': pair, 'pair_size': psize,
+        'level_end_db': level_end, 'level_swing_db': level_swing, 'level_type': level_type,
         'ends_db': ends, 'half_db': half, 'wave_db': wave, 'zone': zone, 'jumps': jumps, 'flags': flags, 'problems': problems,
         'sweep_clicks': sweep_clicks, 'words': words(ms[0], mid, ms[-1], vec, shifts(tobs[0], tobs[-1])) or (
             f"no change in level, spectrum or density; the waveform differs by {wave:.1f} dB (pitch path, timing or phase)"
@@ -397,9 +407,11 @@ def main():
     ap.add_argument('--verdicts', help='JSON {"slug/mK": [verdict, one line why]}, written by hand after reading the numbers')
     ap.add_argument('--intro', help='markdown for the top of the report (method, findings)')
     ap.add_argument('--doc', help='write the full report here')
+    ap.add_argument('--level-type', default='', help='comma list of slug/mK that are about level on purpose (pump, swell, chop, squash as density): not flagged `level`')
     ap.add_argument('slugs', nargs='+')
     a = ap.parse_args()
     renders, out = Path(a.renders), Path(a.out)
+    level_types = {x.strip() for x in a.level_type.split(',') if x.strip()}
     out.mkdir(parents=True, exist_ok=True)
     result, md = {}, []
     all_clips, starts_all = [], {}
@@ -411,7 +423,7 @@ def main():
         res = []
         for entry in info['macros']:
             k = entry['macro']
-            r = audit_macro(slug, entry, renders)
+            r = audit_macro(slug, entry, renders, f'{slug}/m{k}' in level_types)
             r['name'] = names.get(f'name.m{k}', f'm{k}')
             r['routes'] = [region(x) for x in entry['routes']]
             r['targets'] = sorted({f"{x['kind']}#{x['module']}.{x['param']}" for x in entry['routes'] if x['type'] == 'param'})
@@ -461,7 +473,7 @@ def main():
             more = ''.join(f"; {x}" for x in r['problems'])
             more += ''.join(f"; click while moving at {t:.1f} s" for t in r['sweep_clicks'])
             more += ''.join(f"; overlaps {x}" for x in r.get('overlap', []))
-            md.append(f"| m{r['macro']} {r['name']} | {'<br>'.join(r['routes'])} | {r['words']}. {r['half_db']:.2f} / {r['ends_db']:.2f} dB; waveform {r['wave_db']:.1f} dB | {flags}{more} | **{v[0]}**: {v[1]} |")
+            md.append(f"| m{r['macro']} {r['name']} | {'<br>'.join(r['routes'])} | {r['words']}. {r['half_db']:.2f} / {r['ends_db']:.2f} dB; waveform {r['wave_db']:.1f} dB; loudness {r['level_end_db']:+.1f} dB at 1, swing {r['level_swing_db']:.1f} dB{' (level macro)' if r['level_type'] else ''} | {flags}{more} | **{v[0]}**: {v[1]} |")
         md.append('')
         if slug in result.get('_combo', {}):
             md += combo_md(slug, result['_combo'][slug])
