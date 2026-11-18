@@ -219,7 +219,7 @@ fn checkerboard() -> Rack {
     // Hollow: a timbre change at constant loudness: the triangle (odd harmonics, no top) takes over from the saws, the gain following.
     let mix = v.mix;
     r.span(k, 2, mix, "mixer", "level2", 0.0, 0.35);
-    r.span(k, 2, mix, "mixer", "level1", 0.6577, 0.55);
+    r.span(k, 2, mix, "mixer", "level1", 0.792, 0.55);
     r.level(k, 2, s.trim, -1.0);
     // Squash: the compressor from a light touch to a hard clamp, the makeup following.
     let c = s.comp.unwrap();
