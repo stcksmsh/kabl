@@ -12,8 +12,9 @@ Drive-In, Rooftop.
   flag, `macro_audit.py --level-type` for the deliberate ones). Compensation is `comp`: a slope on the
   voice's gain stage that leaves the stored sound as it was. Tin Voice Shift has no gain stage, so it
   rides the compressor makeup.
-- **Bolder**: chorus mixes, detune, drive, crush and tone floors pushed further (Drive-In Sway and
-  Weight, Rooftop Section and Chorus, Tin Voice Grit).
+- **Bolder** means bigger tonal and space moves, not more pitch wobble (Kosta: deep pitch modulation on
+  saw stacks reads as creepy, warm pads stay warm). Chorus macros cap at depth 65 to 80 and rate 0.6 to
+  0.9 Hz on every pad; Drive-In Sway is back at its old pitch depth with a slow filter breath beside it.
 - No limiter anywhere (gain staging only). Peaks are at -1.2 dBFS or lower at every step and in every
   combination (highest: Rooftop Chorus, -1.0 at a step; combinations -1.7 or lower).
 
@@ -61,8 +62,8 @@ Positions are the stored values. "0 -> 1" is what you hear.
 ### Drive-In
 | macro | stored | 0 -> 1 | moves |
 |---|---|---|---|
-| Sway | .10 | steady -> a clear pitch sway (depth doubled again) | slow pitch LFO on every oscillator |
-| Chorus (was Wash) | .60 | plain stack -> a wide, fast chorus (rate to 2.2 Hz) | chorus mix, depth, rate |
+| Sway | .20 | steady -> a slow, gentle breathing: a small pitch sway plus a slow filter movement (back at the old pitch depth, no wobble) | slow pitch LFO (old depth), slow filter LFO |
+| Chorus (was Wash) | .60 | plain stack -> a wide, lush chorus (width, not wobble: depth 80, rate 0.9 Hz at most) | chorus mix, depth, rate |
 | Weight | .20 | thin -> the square an octave down comes forward, clearly (level to .75) | octave-down level, gain comp |
 | Pulse | 0 | steady -> hard sixteenth chops, echo and room ring through the gaps (level macro) | a trance gate on the host clock; press Run |
 
@@ -120,9 +121,9 @@ Rename proposed to Kosta: Drive-In -> "Sunset Strip" (not done; waits for his an
 | macro | stored | 0 -> 1 | moves |
 |---|---|---|---|
 | Swell | .49 | each chord leans slowly into the filter (level macro-ish, within 3 dB) | attack, filter envelope depth |
-| Section | .23 | one tight horn -> a loose section (detune to 50 ct, fine to -40 ct) | oscillator detune and fine |
+| Section | .23 | one tight horn -> a harder, bigger section: wider detune (to 24 ct) and a bite of drive (level held by the drive trim) | oscillator detune and fine, drive and drive trim |
 | Octave | 0 | brass -> a second section an octave up joins | third oscillator level, gain comp |
-| Chorus | .50 | dry -> a wide wash (depth 100, rate 2 Hz) | chorus mix, depth, rate |
+| Chorus | .50 | dry -> a wide, lush wash (depth 70, rate 0.8 Hz at most) | chorus mix, depth, rate |
 
 ### Tidepool
 | macro | stored | 0 -> 1 | moves |
@@ -155,10 +156,11 @@ All 13 presets have 4 macros: none has 3 or 5+.
 
 - Tin Voice: formant `hold` 1 (the vowel stays clear at every position), trim 14 to 26, small crush at
   the stored Grit.
-- Level trims: Deep Field 11 to 14, Picture Window 10 to 11, Rooftop 9 to 11, Glacier 9 to 12, Tidepool
+- Level trims: Deep Field 11 to 14, Picture Window 10 to 11, Rooftop 9 to 11.5, Glacier 9 to 12, Tidepool
   9 to 11, Dry Cleaner 8 to 10, Static Garden 7.5 to 6.
 - Cotton Mill Motion pulls the cutoff a little (stored sound moves about 3 % in cutoff).
 - Cotton Mill / Picture Window / Drive-In / Dry Cleaner / Concrete Cloud / Rooftop / Glacier / Pump House
   / Static Garden lost their old Cutoff / Room / Space macros (fixed at the old stored value). Fog Bank
   Drift no longer moves the filter (walk fixed at its old depth).
-- Drive-In: Wash renamed Chorus; Sway stored .20 to .10 with doubled depth (same stored sway).
+- Drive-In: Wash renamed Chorus; Sway keeps its old stored pitch depth and adds a faint slow filter movement.
+- Rooftop: trim 9 to 11.5; a few dB of drive at the stored Section.

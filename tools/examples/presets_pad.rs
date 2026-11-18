@@ -994,7 +994,7 @@ fn deep_field() -> Rack {
     comp(&mut v, 2, 0.5, 6.0);
     span(&mut v, 3, 0.35, mix, "mixer", "level3", 0.0, 0.175);
     comp(&mut v, 3, 0.35, 0.7);
-    span_hi(&mut v, 3, 0.35, ch, "chorus", "depth", 45.0, 85.0);
+    span_hi(&mut v, 3, 0.35, ch, "chorus", "depth", 45.0, 65.0);
     v.finish("m4", &echo(800.0, 50.0, 2500.0), 0.3, (6.5, 0.6), None)
 }
 
@@ -1030,8 +1030,8 @@ fn cotton_mill() -> Rack {
     v.r.route(v.knob, "m1", v.lad, "cutoff_hz", -0.12);
     // Chorus: nothing to a deep, fast wash.
     span(&mut v, 2, 0.5, ch, "chorus", "mix", 0.0, 40.0);
-    span_hi(&mut v, 2, 0.5, ch, "chorus", "depth", 50.0, 90.0);
-    span_hi(&mut v, 2, 0.5, ch, "chorus", "rate_hz", 0.4, 1.4);
+    span_hi(&mut v, 2, 0.5, ch, "chorus", "depth", 50.0, 65.0);
+    span_hi(&mut v, 2, 0.5, ch, "chorus", "rate_hz", 0.4, 0.8);
     // Warmth: a dark, round pad opens to a bright, glassy one.
     let lad = v.lad;
     span_lh(
@@ -1087,8 +1087,8 @@ fn picture_window() -> Rack {
     comp(&mut v, 2, 0.4, 5.4);
     // Chorus: dry to a deep wash.
     span(&mut v, 3, 0.45, ch, "chorus", "mix", 0.0, 22.0);
-    span_hi(&mut v, 3, 0.45, ch, "chorus", "depth", 55.0, 95.0);
-    span_hi(&mut v, 3, 0.45, ch, "chorus", "rate_hz", 0.3, 1.0);
+    span_hi(&mut v, 3, 0.45, ch, "chorus", "depth", 55.0, 70.0);
+    span_hi(&mut v, 3, 0.45, ch, "chorus", "rate_hz", 0.3, 0.6);
     // Air: a top shelf from soft and close to open and glassy (flat at the stored position).
     span_lh(&mut v, 4, eq, "eq", "high_db", -10.0, 0.0, 10.0);
     v.finish("=0.5", &echo(380.0, 30.0, 4000.0), 0.25, (4.0, 0.5), None)
@@ -1098,7 +1098,7 @@ fn picture_window() -> Rack {
 fn drive_in() -> Rack {
     let mut v = Voice::new(pad_recipe(
         &[
-            ("Sway", 0.10),
+            ("Sway", 0.20),
             ("Chorus", 0.60),
             ("Weight", 0.30),
             ("Pulse", 0.00),
@@ -1118,11 +1118,14 @@ fn drive_in() -> Rack {
     v.r.e.set_param(v.lad, "cutoff_hz", d);
     let ch = v.stage("chorus", &[("rate_hz", 0.6), ("depth", 70.0), ("mix", 0.0)]);
     // Sway: a slow pitch sway fades in (depths doubled, stored at half).
-    v.vibrato("m1", 0.6, 0.5);
+    v.vibrato("m1", 0.6, 0.24);
+    // ...and the filter breathes slowly with it: a warm movement, not a pitch wobble.
+    let breath = v.r.add("lfo", &[("rate_hz", 0.2)]);
+    v.r.depth_route(breath, "out", v.lad, "cutoff_hz", v.knob, "m1", 0.3);
     // Chorus: a plain stack to a wide, fast chorus.
     span(&mut v, 2, 0.6, ch, "chorus", "mix", 0.0, 54.0);
-    span_hi(&mut v, 2, 0.6, ch, "chorus", "depth", 70.0, 100.0);
-    span_hi(&mut v, 2, 0.6, ch, "chorus", "rate_hz", 0.6, 2.2);
+    span_hi(&mut v, 2, 0.6, ch, "chorus", "depth", 70.0, 80.0);
+    span_hi(&mut v, 2, 0.6, ch, "chorus", "rate_hz", 0.6, 0.9);
     // Weight: the square an octave down comes forward.
     let mix = v.mix;
     let s = span_lh(&mut v, 3, mix, "mixer", "level3", 0.0, 0.15, 0.75);
@@ -1414,7 +1417,7 @@ fn rooftop() -> Rack {
         [650.0, 900.0, 0.45, 700.0],
         0.10,
         [180.0, 700.0, 0.85, 800.0],
-        11.0,
+        11.5,
     ));
     let d = routed("filter.ladder", "cutoff_hz", 1000.0, 0.5, 0.45);
     v.r.e.set_param(v.lad, "cutoff_hz", d);
@@ -1435,16 +1438,20 @@ fn rooftop() -> Rack {
     let aenv = v.aenv;
     span_hi(&mut v, 1, s, aenv, "env.adsr", "attack_ms", 180.0, 1400.0);
     // Section: one tight horn to a loose section.
-    let s = span_lh(&mut v, 2, o0, "osc.va", "detune", 3.0, 14.0, 50.0);
-    span_hi(&mut v, 2, s, o1, "osc.va", "fine", -7.0, -40.0);
+    let s = span_lh(&mut v, 2, o0, "osc.va", "detune", 3.0, 14.0, 24.0);
+    span_hi(&mut v, 2, s, o1, "osc.va", "fine", -7.0, -17.0);
+    // ...and the section plays harder: the drive bites (trim follows, so the level holds).
+    let drive = v.drive;
+    rise(&mut v, 2, drive, "drive", "drive_db", 0.0, 6.0);
+    rise(&mut v, 2, drive, "drive", "trim_db", 0.0, -3.0);
     // Octave: a second section an octave up joins, the brass gets a bright, soaring top.
     let mix = v.mix;
     rise(&mut v, 3, mix, "mixer", "level3", 0.0, 0.2);
     comp(&mut v, 3, 0.0, 1.3);
     // Chorus: dry to a wide wash.
     span(&mut v, 4, 0.5, ch, "chorus", "mix", 0.0, 40.0);
-    span_hi(&mut v, 4, 0.5, ch, "chorus", "depth", 60.0, 100.0);
-    span_hi(&mut v, 4, 0.5, ch, "chorus", "rate_hz", 0.5, 2.0);
+    span_hi(&mut v, 4, 0.5, ch, "chorus", "depth", 60.0, 70.0);
+    span_hi(&mut v, 4, 0.5, ch, "chorus", "rate_hz", 0.5, 0.8);
     v.finish("=0.45", &echo(340.0, 30.0, 3500.0), 0.25, (3.5, 0.45), None)
 }
 
@@ -1542,8 +1549,8 @@ fn pump_house() -> Rack {
     comp(&mut v, 2, s, 2.7);
     // Wide: a narrow pad to a deep, slow chorus that moves around the duck.
     span_hi(&mut v, 3, 0.3, ch, "chorus", "mix", 14.0, 38.0);
-    span_hi(&mut v, 3, 0.3, ch, "chorus", "depth", 40.0, 90.0);
-    span_hi(&mut v, 3, 0.3, ch, "chorus", "rate_hz", 0.3, 1.2);
+    span_hi(&mut v, 3, 0.3, ch, "chorus", "depth", 40.0, 65.0);
+    span_hi(&mut v, 3, 0.3, ch, "chorus", "rate_hz", 0.3, 0.7);
     // Open: the filter, muffled to bright.
     let d = routed("filter.ladder", "cutoff_hz", 1600.0, 0.5, 0.55);
     span_lh(
