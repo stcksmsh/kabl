@@ -84,11 +84,11 @@ fn va(
 /// Velvet Tine: a soft Rhodes-like electric piano with a phaser on the Phase macro.
 fn velvet_tine() -> Rack {
     let mut r = Rack::new();
-    // Tine: the hammer's tine; Ring: how long it sings; Tremolo: the suitcase amp (off); Phase.
+    // Tine: the hammer's tine; Ring: how long it sings; Detune: the partner tine drifts off (off); Phase.
     let knob = macros(
         &mut r,
-        &["Tine", "Ring", "Tremolo", "Phase"],
-        &[0.50, 0.40, 0.0, 0.35],
+        &["Tine", "Ring", "Detune", "Phase"],
+        &[0.50, 0.30, 0.0, 0.35],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
@@ -141,11 +141,8 @@ fn velvet_tine() -> Rack {
     // Ring: the two carriers decay from a short thud to a long singing note.
     r.span_hi(k, 2, v, o, "decay1", 2200.0, 8000.0);
     r.span_hi(k, 2, v, o, "decay5", 2400.0, 8000.0);
-    // Tremolo: the suitcase amp, a slow amplitude wobble that fades in and speeds up (off).
-    let lfo = r.add("lfo", &[("rate_hz", 3.5)]);
-    r.depth_route(lfo, "out", s.trim, "gain_db", k, "m3", 0.03);
-    r.level(k, 3, s.trim, -0.03 * 84.0);
-    r.rise(k, 3, lfo, "lfo", "rate_hz", 3.5, 6.5);
+    // Detune: the detuned partner of the first carrier drifts off, a plain tine to a beating, chorused one (off).
+    r.rise(k, 3, v, o, "fine5", 4.0, 40.0);
     // Phase: a still, thin phaser to a slow, deep swirl.
     let ph = s.phaser.unwrap();
     let mix = routed("phaser", "mix", 0.0, 0.5, 0.35);
@@ -826,7 +823,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Velvet Tine",
             category: "Keys",
             tags: &["poly", "fm", "phased", "pop", "soul"],
-            description: "A soft Rhodes-like electric piano: a mellow body, a tine that fades in a tenth of a second, velocity-sensitive bark. Play chords. Tine grows a metallic tine out of each note, Ring lengthens the note from a thud to a long, ringing one, Tremolo fades in a suitcase-amp wobble of the level, Phase brings in a slow phaser.",
+            description: "A soft Rhodes-like electric piano: a mellow body, a tine that fades in a tenth of a second, velocity-sensitive bark. Play chords. Tine grows a metallic tine out of each note, Ring lengthens the note from a thud to a long, ringing one, Detune pulls the second tine out of tune so the note beats, Phase brings in a slow phaser.",
             listen: "The tine on the attack against the soft body; the phaser slowly breathing on held chords",
             group: 1,
             build: velvet_tine,

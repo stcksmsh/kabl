@@ -158,7 +158,7 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "Velvet Tine",
         "Keys",
         &["poly", "fm", "phased", "pop", "soul"],
-        "A soft Rhodes-like electric piano: a mellow body, a tine that fades in a tenth of a second, velocity-sensitive bark. Play chords. Tine grows a metallic tine out of each note, Ring lengthens the note from a thud to a long, ringing one, Tremolo fades in a suitcase-amp wobble of the level, Phase brings in a slow phaser.",
+        "A soft Rhodes-like electric piano: a mellow body, a tine that fades in a tenth of a second, velocity-sensitive bark. Play chords. Tine grows a metallic tine out of each note, Ring lengthens the note from a thud to a long, ringing one, Detune pulls the second tine out of tune so the note beats, Phase brings in a slow phaser.",
     ),
     (
         "presets/checkerboard",

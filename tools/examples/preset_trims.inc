@@ -28,10 +28,10 @@ fn level_trim(slug: &str) -> f32 {
         "snowmelt" => -0.6,
         "spark-plug" => -3.5,
         "spinet" => -3.0,
-        "tin-roof" => 1.5,
+        "tin-roof" => 1.2,
         "tuning-fork" => -5.0,
         "turnstile" => -8.3,
-        "velvet-tine" => -2.5,
+        "velvet-tine" => -2.9,
         "willow" => -5.0,
         _ => 0.0,
     }

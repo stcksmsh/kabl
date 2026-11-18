@@ -51,7 +51,7 @@ fn tin_roof() -> Rack {
     );
     let (o, k) = ("osc.fm6", knob);
     let index = routed(o, "index", 0.5, 0.4, 0.5);
-    r.span(k, 1, v, o, "index", 0.2, index);
+    r.e.set_param(v, "index", index);
     // Reed: a plain electric piano to a buzzing, reedy one: the detuned partner and the reed's own partials.
     r.span(k, 1, v, o, "level5", 0.1, 0.5);
     r.span(k, 1, v, o, "fine5", 0.0, 7.0);
@@ -62,7 +62,7 @@ fn tin_roof() -> Rack {
     // Bark: a clean tone to an overdriven one.
     let d = routed("drive", "drive_db", 9.0, 0.4, 0.4);
     r.span(k, 3, s.drive.unwrap(), "drive", "drive_db", 0.0, d);
-    r.span(k, 3, s.drive.unwrap(), "drive", "trim_db", 3.0, -3.0);
+    r.span(k, 3, s.drive.unwrap(), "drive", "trim_db", 1.5, -3.0);
     // Chorus: a dry tone to a deep, fast chorus.
     let ch = s.chorus.unwrap();
     let mix = routed("chorus", "mix", 0.0, 0.5, 0.4);
@@ -223,8 +223,6 @@ fn hand_bell() -> Rack {
     // Strike: a muted, dull bell to a hard clapper with bright, ringing metal.
     let index = routed(o, "index", 0.45, 0.5, 0.5);
     r.span(k, 1, v, o, "index", 0.2, index);
-    r.span(k, 1, v, o, "level4", 0.1, 0.5);
-    r.span(k, 1, v, o, "level6", 0.1, 0.4);
     // Ring: a damped bell to one that rings on after it is struck.
     r.span(k, 2, v, o, "release1", 80.0, 600.0);
     r.span(k, 2, v, o, "release3", 80.0, 500.0);
