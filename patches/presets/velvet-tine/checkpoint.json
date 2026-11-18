@@ -120,7 +120,7 @@
         "y": 320.0
       },
       "params": {
-        "gain_db": 10.55
+        "gain_db": 10.1
       }
     },
     "7": {
@@ -426,7 +426,7 @@
         }
       },
       "params": {
-        "amount": -0.041666668
+        "amount": -0.023809524
       },
       "steps": []
     },
@@ -553,24 +553,6 @@
       },
       "params": {
         "amount": 0.4421053
-      },
-      "steps": []
-    },
-    "24": {
-      "from": {
-        "Module": {
-          "id": 1,
-          "port": "m4"
-        }
-      },
-      "to": {
-        "Param": {
-          "id": 6,
-          "param": "gain_db"
-        }
-      },
-      "params": {
-        "amount": 0.0
       },
       "steps": []
     }
