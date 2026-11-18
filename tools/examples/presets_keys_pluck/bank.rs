@@ -152,7 +152,7 @@ fn velvet_tine() -> Rack {
     r.span_hi(k, 4, ph, "phaser", "rate_hz", 0.35, 3.0);
     r.span_hi(k, 4, ph, "phaser", "depth", 60.0, 98.0);
     r.span_hi(k, 4, ph, "phaser", "feedback", 25.0, 88.0);
-    r.level(k, 4, s.trim, -1.0);
+    r.level(k, 4, s.trim, 0.0);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -226,7 +226,7 @@ fn checkerboard() -> Rack {
     r.span(k, 3, c, "compressor", "threshold_db", -8.0, -22.0);
     r.span(k, 3, c, "compressor", "ratio", 2.0, 6.0);
     r.span(k, 3, c, "compressor", "makeup_db", 2.0, 5.0);
-    r.level(k, 3, s.trim, 10.0);
+    r.level(k, 3, s.trim, 4.0);
     // Spread: the saw stack widens and drifts apart (off by default).
     r.rise(k, 4, v.osc_a, "osc.va", "detune", 12.0, 65.0);
     r.rise(k, 4, v.osc_a, "osc.va", "width", 0.0, 100.0);
@@ -242,7 +242,7 @@ fn linoleum() -> Rack {
     let knob = macros(
         &mut r,
         &["Swirl", "Chime", "Hold", "Squeeze"],
-        &[0.65, 0.50, 0.40, 0.70],
+        &[0.80, 0.60, 0.60, 0.90],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
@@ -309,14 +309,14 @@ fn linoleum() -> Rack {
     r.span(k, 2, v, o, "level4", 0.0, 0.4);
     // Hold: a damped tick to a long ring.
     for op in ["decay1", "decay3", "decay5"] {
-        r.span(k, 3, v, o, op, 180.0, 900.0);
+        r.span(k, 3, v, o, op, 220.0, 900.0);
     }
     // Squeeze: a light touch to a hard clamp.
     let c = s.comp.unwrap();
     r.span(k, 4, c, "compressor", "threshold_db", -10.0, -24.0);
     r.span(k, 4, c, "compressor", "ratio", 2.0, 5.0);
     r.span(k, 4, c, "compressor", "makeup_db", 2.0, 5.0);
-    r.level(k, 4, s.trim, 9.5);
+    r.level(k, 4, s.trim, 4.0);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -538,7 +538,7 @@ fn rosewood() -> Rack {
     r.span_hi(k, 3, v, o, "level3", 0.4, 0.8);
     // Roll: a tremolo on the level, the mallet roll of a marimba (off by default).
     let lfo = r.add("lfo", &[("rate_hz", 5.0)]);
-    r.depth_route(lfo, "out", s.trim, "gain_db", k, "m4", 0.06);
+    r.depth_route(lfo, "out", s.trim, "gain_db", k, "m4", 0.03);
     r.rise(k, 4, lfo, "lfo", "rate_hz", 5.0, 13.0);
     perform(&mut r, knob, None, 4);
     r
@@ -673,7 +673,7 @@ fn spark_plug() -> Rack {
     // Grit: a clean blunt pluck to a crushed one.
     let d = routed("drive", "drive_db", 18.0, 0.3, 0.60);
     r.span(k, 2, s.drive.unwrap(), "drive", "drive_db", 6.0, d);
-    r.span(k, 2, s.drive.unwrap(), "drive", "trim_db", 3.0, -7.0);
+    r.span(k, 2, s.drive.unwrap(), "drive", "trim_db", 5.0, -7.0);
     // Ring: a staccato tick to a pluck that rings on after the key is up (the compressor stays as it was).
     r.span(k, 3, v.aenv, "env.adsr", "release_ms", 12.0, 60.0);
     r.span(k, 3, v.fenv, "env.adsr", "release_ms", 12.0, 60.0);

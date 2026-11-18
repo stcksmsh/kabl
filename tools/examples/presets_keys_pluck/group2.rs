@@ -59,11 +59,11 @@ fn tin_roof() -> Rack {
     // Sustain: a short, dry tine to a long, held note.
     r.span(k, 2, v, o, "decay1", 200.0, 1200.0);
     r.span(k, 2, v, o, "decay5", 200.0, 1200.0);
-    r.level(k, 2, s.trim, -1.5);
+    r.level(k, 2, s.trim, -3.0);
     // Bark: a clean tone to an overdriven one.
     let d = routed("drive", "drive_db", 9.0, 0.4, 0.4);
     r.span(k, 3, s.drive.unwrap(), "drive", "drive_db", 0.0, d);
-    r.span(k, 3, s.drive.unwrap(), "drive", "trim_db", 2.0, -3.0);
+    r.span(k, 3, s.drive.unwrap(), "drive", "trim_db", 5.0, -3.0);
     // Chorus: a dry tone to a deep, fast chorus.
     let ch = s.chorus.unwrap();
     let mix = routed("chorus", "mix", 0.0, 0.5, 0.4);
@@ -162,11 +162,11 @@ fn turnstile() -> Rack {
     r.span(k, 2, ph, "phaser", "rate_hz", 0.1, 0.4);
     r.span(k, 2, ph, "phaser", "feedback", 5.0, 50.0);
     r.span_hi(k, 2, ph, "phaser", "depth", 80.0, 98.0);
-    r.level(k, 2, s.trim, -1.0);
+    r.level(k, 2, s.trim, 0.0);
     // Grit: a clean saw chord to a crushed one.
     let d = routed("drive", "drive_db", 14.0, 0.35, 0.5);
     r.span(k, 3, s.drive.unwrap(), "drive", "drive_db", 2.0, d);
-    r.span(k, 3, s.drive.unwrap(), "drive", "trim_db", 1.5, -5.0);
+    r.span(k, 3, s.drive.unwrap(), "drive", "trim_db", 2.5, -5.0);
     // Spread: a tight chord to a wide one, the triangle drifting off the saws.
     r.span(k, 4, v.osc_a, "osc.va", "detune", 2.0, 14.0);
     r.span(k, 4, v.osc_b, "osc.va", "fine", -30.0, -6.0);
@@ -203,10 +203,7 @@ fn hand_bell() -> Rack {
             cutoff: 7000.0,
             cut_m1: 0.3,
             trim_db: 9.0,
-            chorus: Some((
-                &[("rate_hz", 0.3), ("depth", 45.0), ("mix", 0.0)],
-                None,
-            )),
+            chorus: Some((&[("rate_hz", 0.3), ("depth", 45.0), ("mix", 0.0)], None)),
             echo: &[
                 ("time_ms", 520.0),
                 ("feedback", 42.0),

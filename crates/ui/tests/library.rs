@@ -158,7 +158,7 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "Velvet Tine",
         "Keys",
         &["poly", "fm", "phased", "pop", "soul"],
-        "A soft Rhodes-like electric piano: a mellow body, a tine that fades in a tenth of a second, velocity-sensitive bark. Play chords. Tine grows a metallic tine out of each note, Ring lengthens the note from a thud to a long, ringing one, Detune pulls the second tine out of tune so the note beats, Phase brings in a slow phaser.",
+        "A soft Rhodes-like electric piano: a mellow body, a tine that fades in a tenth of a second, velocity-sensitive bark. Play chords. Tine grows a metallic tine out of each note, Ring lengthens the note from a thud to a long, ringing one, Detune pulls the second tine out of tune so the note beats and chorus, Phase brings in a slow phaser.",
     ),
     (
         "presets/checkerboard",
@@ -200,14 +200,14 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "Rain Gutter",
         "Pluck",
         &["poly", "fm", "kalimba", "ambient", "pop"],
-        "A kalimba: a short metallic click, a long clear ring, and a wet tail that blurs the notes into each other. Play slow, sparse notes. Tine goes from a soft thumb piano to a bright, pinging one, Ring lengthens the ring of each tine, Tail stretches the echo and the long room, Shimmer brings in a deep, slow chorus.",
+        "A kalimba: a short metallic click, a long clear ring, and a wet tail that blurs the notes into each other. Play slow, sparse notes. Tine goes from a soft thumb piano to a bright, pinging one, Ring lengthens the ring of each tine, Echo stretches the echo and the long room, Shimmer brings in a deep, slow chorus.",
     ),
     (
         "presets/spark-plug",
         "Spark Plug",
         "Pluck",
         &["poly", "pluck", "distorted", "compressed", "french touch", "124bpm", "signature"],
-        "A blunt, driven synth pluck: two saws and a square, 18 dB of drive, a fast compressor. Play short low notes. Snap goes from a dull thud to a crack as the filter snaps open on every note, Grit pushes the drive, Squash tightens the compressor into a punchier clamp, Zap starts each pluck sharp and lets it fall into tune.",
+        "A blunt, driven synth pluck: two saws and a square, 18 dB of drive, a fast compressor. Play short low notes. Snap goes from a dull thud to a crack as the filter snaps open on every note, Grit pushes the drive, Ring lets each pluck ring on after the key is up, Zap starts each pluck sharp and lets it fall into tune.",
     ),
     (
         "presets/tin-roof",
@@ -228,7 +228,7 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "Hand Bell",
         "Keys",
         &["poly", "fm", "bell", "ambient", "experimental"],
-        "An inharmonic FM bell: three pairs of operators that ring for seconds and darken as they fade. Play slow, sparse notes. Strike goes from a dull, muted bell to a hard clapper with bright metal, Ring lets the bell ring on after the strike, Tail stretches the echo and the hall, Clang pulls the partials out of tune.",
+        "An inharmonic FM bell: three pairs of operators that ring for seconds and darken as they fade. Play slow, sparse notes. Strike goes from a dull, muted bell to a hard clapper with bright metal, Ring lets the bell ring on after the strike, Shimmer brings in a deep, fast chorus, Clang pulls the partials out of tune.",
     ),
     (
         "presets/corduroy",
