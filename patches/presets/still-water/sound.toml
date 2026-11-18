@@ -6,6 +6,6 @@ tags = [
     "ambient",
     "68bpm",
 ]
-description = "A sparse ambient groove: a soft kick, a few random hats and toms, a slow bass and bell-like chords with long tails. Press Run, then play slow chords over it. Bloom opens the music, Pulse raises the hats and drops, Weight raises the bass, Space adds the long echo and room."
+description = "A sparse ambient groove: a soft kick, a few random hats and toms, a slow bass and bell-like chords with long tails. Press Run, then play slow chords over it. Bloom opens the music from dark to bright, Pulse raises the hats and the toms, Weight raises the bass, Space adds the long echo and room."
 keys = true
 sequence = true

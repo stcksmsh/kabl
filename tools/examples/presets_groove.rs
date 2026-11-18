@@ -760,6 +760,8 @@ struct Spec {
     fx: Option<&'static str>,
     /// Bitcrusher in the chain (mix 0 until the `Crush` macro).
     crush: bool,
+    /// A low-pass after the crusher (needs `crush`), open until a macro closes it.
+    smooth: bool,
     /// Compressor on the music: threshold, ratio, makeup.
     comp: [f32; 3],
     /// Echo time ms (0 for a tempo-synced eighth), feedback, tone; max echo and room mix, decay.
@@ -782,11 +784,28 @@ struct Handles {
     drive: ModuleId,
     fx: Option<ModuleId>,
     crush: Option<ModuleId>,
+    /// The low-pass after the crusher (open at 20 kHz).
+    smooth: Option<ModuleId>,
     /// The compressor on the music, and the one the kick ducks through.
     music: ModuleId,
     duck: ModuleId,
     clock: ModuleId,
     chord_osc: Option<ModuleId>,
+    /// The chord part's own tone filter (when it has an `lp`).
+    chord_tone: Option<ModuleId>,
+    /// The bass and chord parts' sequencers, the bass part's glide slew and the chord part's
+    /// formant filter.
+    bass_seq: ModuleId,
+    bass_osc: ModuleId,
+    chord_seq: Option<ModuleId>,
+    bass_slew: Option<ModuleId>,
+    formant: Option<ModuleId>,
+    /// The music bus (bass, chords, played voice), the beat (kick to hats) and the chord echo.
+    bus: ModuleId,
+    beat: ModuleId,
+    /// The kit: the beat and the toms.
+    kit_out: ModuleId,
+    dub: Option<ModuleId>,
 }
 
 fn param_of(kind: &str, param: &str) -> kabl_modules::ParamInfo {
@@ -1093,6 +1112,18 @@ fn groove(s: Spec) -> Rack {
             &[("bits", 4.0), ("downsample", 10.0), ("mix", 0.0)],
         )
     });
+    // A low-pass after the crusher, wide open until a macro closes it: it rounds the hard steps of
+    // the crusher, which the click scan reads as isolated spikes.
+    let smooth = s.smooth.then(|| {
+        v.mono_after(
+            "filter.ladder",
+            &[
+                ("cutoff_hz", 20000.0),
+                ("resonance", 0.0),
+                ("drive_db", 0.0),
+            ],
+        )
+    });
     let fx = s.fx.map(|kind| match kind {
         "phaser" => v.stage(
             "phaser",
@@ -1129,10 +1160,26 @@ fn groove(s: Spec) -> Rack {
             drive,
             fx,
             crush,
+            smooth,
             music,
             duck,
             clock,
             chord_osc: chords.as_ref().map(|c| c.osc),
+            chord_tone: s
+                .chords
+                .as_ref()
+                .filter(|c| c.lp > 0.0)
+                .and(chords.as_ref())
+                .map(|c| c.out.0),
+            bass_seq: bass.seq,
+            bass_osc: bass.osc,
+            chord_seq: chords.as_ref().map(|c| c.seq),
+            bass_slew: bass.slew,
+            formant: chords.as_ref().and_then(|c| c.formant),
+            bus,
+            beat,
+            kit_out: kit,
+            dub,
         };
         plan(&mut v, &h, &s);
     }
@@ -1375,9 +1422,25 @@ fn brick_plan(v: &mut Voice, h: &Handles, s: &Spec) {
     let [_, (_, st2), (_, st3), _] = s.macros;
     // The crusher sits on the bass bus: it needs a coarse hold to alias the bass harmonics.
     let crush = h.crush.expect("a crusher");
-    rise(v, 1, crush, "bitcrusher", "mix", 0.0, 100.0);
-    rise(v, 1, crush, "bitcrusher", "bits", 8.0, 4.0);
-    rise(v, 1, crush, "bitcrusher", "downsample", 3.0, 14.0);
+    // The mix is full at two thirds of the travel (the route clamps), so the last third hardens
+    // the crush (bits, hold) instead of jumping in at the end.
+    v.r.e.set_param(crush, "mix", 0.0);
+    v.r.route(v.knob, "m1", crush, "mix", 1.0);
+    v.r.route(v.knob, "m1", crush, "mix", 0.5);
+    // Already coarse where the mix starts to open (6 bits, hold 6), so the first steps are not
+    // a faint blend of a mild crush; the low-pass after it rounds the hard steps (the echo of a
+    // crusher spike was the click at 0.6 s) and closes with the grind like a worn sampler.
+    rise(v, 1, crush, "bitcrusher", "bits", 6.0, 4.0);
+    rise(v, 1, crush, "bitcrusher", "downsample", 6.0, 12.0);
+    rise(
+        v,
+        1,
+        h.smooth.expect("a smoother"),
+        "filter.ladder",
+        "cutoff_hz",
+        20000.0,
+        5000.0,
+    );
     // The stored cutoff, drive and duck are what the old Filter, Dirt and Pump macros left.
     let cut = routed("filter.ladder", "cutoff_hz", s.filter[0], 0.6, 0.5);
     v.r.e.set_param(h.lad, "cutoff_hz", cut);
@@ -1409,13 +1472,417 @@ fn brick_plan(v: &mut Voice, h: &Handles, s: &Spec) {
     span(v, 3, st3, h.clock, "clock", "bpm", 112.0, s.bpm);
 }
 
+// ---- the plans of the other presets ---------------------------------------------------------
+//
+// Each macro is a line from its value at 0 to its value at 1. The stored sound is the old one:
+// `main` picks the position `p` where the macro's main param sits on its old stored value and
+// stores the macro there; the macro's other params use `span` / `span_hi` at that `p`.
+
+/// Routes `param` from `lo` at macro 0 through `d` to `hi` at macro 1 and stores the macro where
+/// the line passes `d`. Returns that position.
+#[allow(clippy::too_many_arguments)]
+fn main_line(
+    v: &mut Voice,
+    m: usize,
+    id: ModuleId,
+    kind: &str,
+    param: &str,
+    lo: f32,
+    d: f32,
+    hi: f32,
+) -> f32 {
+    let i = param_of(kind, param);
+    let (n0, nd, n1) = (i.to_norm(lo), i.to_norm(d), i.to_norm(hi));
+    let p = (nd - n0) / (n1 - n0);
+    assert!(
+        (0.05..=0.99).contains(&p),
+        "{kind}.{param}: macro {m} would be stored at {p}"
+    );
+    v.r.e.set_param(v.knob, &format!("m{m}"), p);
+    span(v, m, p, id, kind, param, lo, d);
+    p
+}
+
+/// The ladder's resonance on macro `m` (stored at `p`): resonant at 0, falling through `d` to the
+/// least that keeps the line in range.
+fn damp(v: &mut Voice, m: usize, p: f32, lad: ModuleId, d: f32) {
+    let lo = 0.45;
+    if lo + (d - lo) / p >= 0.0 {
+        span(v, m, p, lad, "filter.ladder", "resonance", lo, d);
+    } else {
+        span_hi(v, m, p, lad, "filter.ladder", "resonance", d, 0.0);
+    }
+}
+
+/// A part's gate length on macro `m` (stored at `p`): `lo` percent of a step at 0, 50 percent at
+/// the stored position (the 50 % duty of the clock pulse the part follows by default, so the
+/// stored sound does not change), on to a longer note.
+fn legato(v: &mut Voice, m: usize, p: f32, seq: ModuleId, lo: f32) {
+    v.r.e.set_param(seq, "gate_mode", 1.0);
+    if lo + (50.0 - lo) / p <= 100.0 {
+        span(v, m, p, seq, "seq", "gate_len", lo, 50.0);
+    } else {
+        // A short stored position: the line ends at a full step instead.
+        span_hi(v, m, p, seq, "seq", "gate_len", 50.0, 100.0);
+    }
+}
+
+/// The cutoff the old filter macro (route amount `a`, stored at `st`) left on the ladder.
+fn old_cut(s: &Spec, a: f32, st: f32) -> f32 {
+    routed("filter.ladder", "cutoff_hz", s.filter[0], a, st)
+}
+
+/// The kick's duck on macro `m` (stored at `p`): the ratio is what the old Pump macro left at
+/// `old`; the threshold runs from no duck at 0 to -34 dB at `p`, on to -60 at most.
+fn pump(v: &mut Voice, h: &Handles, m: usize, p: f32, old: f32) {
+    let ratio = routed("compressor", "ratio", 1.0, 0.95, old);
+    v.r.e.set_param(h.duck, "ratio", ratio);
+    if 34.0 / p <= 60.0 {
+        span(v, m, p, h.duck, "compressor", "threshold_db", 0.0, -34.0);
+    } else {
+        span_hi(v, m, p, h.duck, "compressor", "threshold_db", -34.0, -60.0);
+    }
+}
+
+/// Ore Cart: Rumble (the bass: level, drive, gate), Tunnel (the filter from a dark tunnel to open),
+/// Pump (the duck, graded).
+fn ore_plan(v: &mut Voice, h: &Handles, s: &Spec) {
+    let lvl = routed("mixer", "level1", 0.4, 0.36, 0.55);
+    v.r.e.set_param(h.bus, "level1", lvl);
+    let p = main_line(v, 1, h.drive, "drive", "drive_db", 0.0, s.drive[0], 26.0);
+    span(v, 1, p, h.drive, "drive", "trim_db", -1.0, s.drive[1]);
+    legato(v, 1, p, h.bass_seq, 8.0);
+    // The filter stays under 8 kHz: above it the bass saw's reset edge clicks.
+    let cut = old_cut(s, 0.55, 0.45);
+    let p = main_line(
+        v,
+        2,
+        h.lad,
+        "filter.ladder",
+        "cutoff_hz",
+        180.0,
+        cut,
+        8000.0,
+    );
+    damp(v, 2, p, h.lad, s.filter[1]);
+    pump(v, h, 3, 0.55, 0.55);
+}
+
+/// Stoop Sale: Swing (the shuffle and a lazier tempo), Dust (hiss and a slow wobble of the pitch; off
+/// by default), Tape (a muffled, saturated sound to an open, clean one).
+fn stoop_plan(v: &mut Voice, h: &Handles, s: &Spec) {
+    let sw = routed("clock", "swing", s.swing, 0.5, 0.45);
+    let p = main_line(v, 1, h.clock, "clock", "swing", 20.0, sw, 90.0);
+    span(v, 1, p, h.clock, "clock", "bpm", 78.0, s.bpm);
+    // The old Dust macro stood at 0.30: a hiss in the default sound. It now starts at 0.
+    v.r.e.set_param(v.knob, "m2", 0.0);
+    let hiss = v.r.add("noise", &[("color", 1.0)]);
+    v.r.wire(hiss, "out", h.bus, "in4");
+    v.r.e.set_param(h.bus, "level4", 0.0);
+    v.r.route(v.knob, "m2", h.bus, "level4", 0.3);
+    let wow = v.r.add("lfo", &[("rate_hz", 0.55)]);
+    for o in [h.bass_osc].into_iter().chain(h.chord_osc) {
+        v.r.depth_route(wow, "out", o, "fine", v.knob, "m2", 0.03);
+    }
+    let cut = old_cut(s, 0.5, 0.5);
+    let p = main_line(
+        v,
+        3,
+        h.lad,
+        "filter.ladder",
+        "cutoff_hz",
+        250.0,
+        cut,
+        20000.0,
+    );
+    span_hi(v, 3, p, h.drive, "drive", "drive_db", s.drive[0], 0.0);
+}
+
+/// Fault Line: Reese (the bass detune and its drive), Filter (the cutoff, closed to open, kept under
+/// the level where the saw's reset edge clicks), Break (hats and snare in the beat).
+fn fault_plan(v: &mut Voice, h: &Handles, s: &Spec) {
+    let dirt = routed("drive", "drive_db", s.drive[0], 0.5, 0.5);
+    // The drive saturates: it holds the peak down, so the trim stays where it is and the drive
+    // stops soon after the stored position.
+    let p = main_line(v, 1, h.drive, "drive", "drive_db", 6.0, dirt, 17.3);
+    span(v, 1, p, h.bass_osc, "osc.va", "detune", 6.0, s.bass.osc[2]);
+    let cut = old_cut(s, 0.55, 0.5);
+    let p = main_line(
+        v,
+        2,
+        h.lad,
+        "filter.ladder",
+        "cutoff_hz",
+        250.0,
+        cut,
+        12000.0,
+    );
+    damp(v, 2, p, h.lad, s.filter[1]);
+    let hats = routed("mixer", "level4", 0.0, (2.0 * s.kit.mix[3]).min(1.0), 0.55);
+    let p = main_line(v, 3, h.beat, "mixer", "level4", 0.0, hats, 0.5);
+    span(v, 3, p, h.beat, "mixer", "level2", 0.2, s.kit.mix[1]);
+}
+
+/// Corner Store: Swing (the shuffle and the tempo), Wah (cutoff and resonance, closed to open, under
+/// the click level), Bite (drive and the squash of the music).
+fn corner_plan(v: &mut Voice, h: &Handles, s: &Spec) {
+    let sw = routed("clock", "swing", s.swing, 0.5, 0.5);
+    let p = main_line(v, 1, h.clock, "clock", "swing", 15.0, sw, 95.0);
+    span(v, 1, p, h.clock, "clock", "bpm", 100.0, s.bpm);
+    let cut = old_cut(s, 0.5, 0.55);
+    let p = main_line(
+        v,
+        2,
+        h.lad,
+        "filter.ladder",
+        "cutoff_hz",
+        350.0,
+        cut,
+        11800.0,
+    );
+    damp(v, 2, p, h.lad, s.filter[1]);
+    let dirt = routed("drive", "drive_db", s.drive[0], 0.4, 0.3);
+    let p = main_line(v, 3, h.drive, "drive", "drive_db", 2.0, dirt, 15.0);
+    span_hi(v, 3, p, h.drive, "drive", "trim_db", s.drive[1], -9.0);
+}
+
+/// Glass Coast: Arp (the arpeggio's gate and detune), Pulse (the bass gate and the hats), Chorus (the
+/// chorus mix, rate and depth).
+fn glass_plan(v: &mut Voice, h: &Handles, s: &Spec) {
+    // The filter is no longer a macro: it stays where the old Filter macro left it.
+    let cut = old_cut(s, 0.55, 0.55);
+    v.r.e.set_param(h.lad, "cutoff_hz", cut);
+    let c = s.chords.as_ref().expect("an arpeggio");
+    let chord_seq = h.chord_seq.expect("an arpeggio");
+    v.r.e.set_param(chord_seq, "gate_mode", 1.0);
+    let p = main_line(v, 1, chord_seq, "seq", "gate_len", 15.0, 50.0, 100.0);
+    span(
+        v,
+        1,
+        p,
+        h.chord_osc.expect("an arpeggio"),
+        "osc.va",
+        "detune",
+        4.0,
+        c.osc[2],
+    );
+    let hats = routed("mixer", "level4", 0.0, (2.0 * s.kit.mix[3]).min(1.0), 0.55);
+    let p = main_line(v, 2, h.beat, "mixer", "level4", 0.1, hats, 1.0);
+    legato(v, 2, p, h.bass_seq, 15.0);
+    let fx = h.fx.expect("a chorus");
+    let mix = routed("chorus", "mix", 0.0, 0.9, 0.5);
+    let p = main_line(v, 3, fx, "chorus", "mix", 0.0, mix, 90.0);
+    span(v, 3, p, fx, "chorus", "rate_hz", 0.1, 0.3);
+    span(v, 3, p, fx, "chorus", "depth", 20.0, 55.0);
+}
+
+/// Still Water: Bloom (the filter from dark to open), Pulse (hats and toms), Weight (the bass).
+fn still_plan(v: &mut Voice, h: &Handles, s: &Spec) {
+    let cut = old_cut(s, 0.5, 0.5);
+    let p = main_line(
+        v,
+        1,
+        h.lad,
+        "filter.ladder",
+        "cutoff_hz",
+        1200.0,
+        cut,
+        20000.0,
+    );
+    damp(v, 1, p, h.lad, s.filter[1]);
+    let hats = routed("mixer", "level4", 0.0, (2.0 * s.kit.mix[3]).min(1.0), 0.4);
+    let p = main_line(v, 2, h.beat, "mixer", "level4", 0.1, hats, 0.8);
+    span_hi(v, 2, p, h.kit_out, "mixer", "level2", 0.35, 0.8);
+    let lvl = routed("mixer", "level1", 0.4, 0.42, 0.5);
+    main_line(v, 3, h.bus, "mixer", "level1", 0.2, lvl, 0.85);
+}
+
+/// Slab City: Glide (the 808's slide and its drive), Hustle (the hats and the tempo), Tone (the pad's
+/// filter from dark to open).
+fn slab_plan(v: &mut Voice, h: &Handles, s: &Spec) {
+    let sl = h.bass_slew.expect("a glide part");
+    let max = param_of("slew", "rise_ms").max;
+    let d = routed("slew", "rise_ms", 0.1, 0.6, s.macros[0].1);
+    let p = main_line(v, 1, sl, "slew", "rise_ms", 0.1, d, max);
+    span(v, 1, p, sl, "slew", "fall_ms", 0.1, d);
+    span(v, 1, p, h.drive, "drive", "drive_db", 4.5, s.drive[0]);
+    span_hi(v, 1, p, h.drive, "drive", "trim_db", s.drive[1], -9.0);
+    let hats = routed(
+        "mixer",
+        "level4",
+        0.0,
+        (2.0 * s.kit.mix[3]).min(1.0),
+        s.macros[1].1,
+    );
+    let p = main_line(v, 2, h.beat, "mixer", "level4", 0.4, hats, 1.0);
+    span(v, 2, p, h.beat, "mixer", "level3", 0.2, s.kit.mix[2]);
+    // The resonance stays at its stored value: a hard peak at the dark end pushes the pad over
+    // -1 dBFS.
+    let cut = old_cut(s, 0.5, 0.55);
+    main_line(
+        v,
+        3,
+        h.lad,
+        "filter.ladder",
+        "cutoff_hz",
+        400.0,
+        cut,
+        9500.0,
+    );
+}
+
+/// Rope Walk: Knob (the filter, closed to open, with the bass gate), Swirl (the phaser), Pump (the duck
+/// with the music trimmed at 0).
+fn rope_plan(v: &mut Voice, h: &Handles, s: &Spec) {
+    let cut = old_cut(s, 0.6, 0.55);
+    let p = main_line(
+        v,
+        1,
+        h.lad,
+        "filter.ladder",
+        "cutoff_hz",
+        300.0,
+        cut,
+        20000.0,
+    );
+    damp(v, 1, p, h.lad, s.filter[1]);
+    span(v, 1, p, h.drive, "drive", "drive_db", 0.0, s.drive[0]);
+    let fx = h.fx.expect("a phaser");
+    let mix = routed("phaser", "mix", 0.0, 0.9, 0.55);
+    let p = main_line(v, 2, fx, "phaser", "mix", 0.0, mix, 90.0);
+    span(v, 2, p, fx, "phaser", "rate_hz", 0.15, 0.4);
+    span(v, 2, p, fx, "phaser", "depth", 62.0, 80.0);
+    span(v, 2, p, fx, "phaser", "feedback", 10.0, 50.0);
+    span(
+        v,
+        2,
+        p,
+        h.chord_osc.expect("chords"),
+        "osc.va",
+        "detune",
+        2.0,
+        14.0,
+    );
+    v.r.e.set_param(v.knob, "m3", 0.6);
+    pump(v, h, 3, 0.6, 0.6);
+}
+
+/// Lamp Oil: Chord (the stab's level and detune), Dub (the echo's mix, repeats and tone), Deep (the
+/// filter).
+fn lamp_plan(v: &mut Voice, h: &Handles, s: &Spec) {
+    let c = s.chords.as_ref().expect("a chord part");
+    let lvl = routed("mixer", "level2", 0.3, 0.7, 0.7);
+    // The stab keeps its level; the macro opens its own tone filter, lengthens it and thickens it.
+    v.r.e.set_param(h.bus, "level2", lvl);
+    let tone = h.chord_tone.expect("a tone filter on the chords");
+    let p = main_line(v, 1, tone, "filter.svf", "cutoff_hz", 300.0, c.lp, 5000.0);
+    span(
+        v,
+        1,
+        p,
+        h.chord_osc.expect("chords"),
+        "osc.va",
+        "detune",
+        4.0,
+        c.osc[2],
+    );
+    // The stab is clipped short at 0 and rings on a full step at the top.
+    legato(v, 1, p, h.chord_seq.expect("chords"), 10.0);
+    let dub = h.dub.expect("a dub echo");
+    let mix = routed("delay", "mix", 0.0, 0.7, 0.5);
+    let p = main_line(v, 2, dub, "delay", "mix", 0.0, mix, 60.0);
+    span(v, 2, p, dub, "delay", "feedback", 30.0, 62.0);
+    // More dub is also a darker dub: the tone falls as the repeats rise.
+    span_hi(v, 2, p, dub, "delay", "tone_hz", 1800.0, 300.0);
+    let cut = old_cut(s, 0.6, 0.5);
+    let p = main_line(
+        v,
+        3,
+        h.lad,
+        "filter.ladder",
+        "cutoff_hz",
+        250.0,
+        cut,
+        20000.0,
+    );
+    damp(v, 3, p, h.lad, s.filter[1]);
+}
+
+/// Scrap Metal: Vowel (the stab's vowel and its Q), Crush (the bitcrusher in), Pump (the duck).
+fn scrap_plan(v: &mut Voice, h: &Handles, s: &Spec) {
+    let f = h.formant.expect("a formant part");
+    let d = routed("filter.formant", "vowel", 0.0, 1.0, 0.5);
+    let p = main_line(v, 1, f, "filter.formant", "vowel", 0.0, d, 4.0);
+    span_hi(v, 1, p, f, "filter.formant", "q", 2.0, 10.0);
+    span(
+        v,
+        1,
+        p,
+        h.chord_osc.expect("chords"),
+        "osc.va",
+        "detune",
+        3.0,
+        12.0,
+    );
+    // The robot talks: the filter on the whole music follows the vowel.
+    span(
+        v,
+        1,
+        p,
+        h.lad,
+        "filter.ladder",
+        "cutoff_hz",
+        450.0,
+        s.filter[0],
+    );
+    let crush = h.crush.expect("a crusher");
+    let mix = routed("bitcrusher", "mix", 0.0, 0.8, 0.3);
+    let p = main_line(v, 2, crush, "bitcrusher", "mix", 0.0, mix, 70.0);
+    span_hi(v, 2, p, crush, "bitcrusher", "downsample", 10.0, 12.0);
+    pump(v, h, 3, 0.6, 0.6);
+}
+
+/// Dune Buggy: Skip (the shuffle and the tempo), Warmth (the filter from dark to open), Chop (the
+/// chord stabs from clipped to long, thin to fat).
+fn dune_plan(v: &mut Voice, h: &Handles, s: &Spec) {
+    let sw = routed("clock", "swing", s.swing, 0.5, 0.5);
+    let p = main_line(v, 1, h.clock, "clock", "swing", 12.0, sw, 90.0);
+    span(v, 1, p, h.clock, "clock", "bpm", 124.0, s.bpm);
+    let cut = old_cut(s, 0.55, 0.55);
+    let p = main_line(
+        v,
+        2,
+        h.lad,
+        "filter.ladder",
+        "cutoff_hz",
+        300.0,
+        cut,
+        20000.0,
+    );
+    damp(v, 2, p, h.lad, s.filter[1]);
+    let c = s.chords.as_ref().expect("chords");
+    let seq = h.chord_seq.expect("chords");
+    v.r.e.set_param(seq, "gate_mode", 1.0);
+    let p = main_line(v, 3, seq, "seq", "gate_len", 8.0, c.gate, 100.0);
+    span(
+        v,
+        3,
+        p,
+        h.chord_osc.expect("chords"),
+        "osc.va",
+        "detune",
+        2.0,
+        c.osc[2],
+    );
+}
+
 fn copper_mile() -> Rack {
     groove(Spec {
         macros: [
             ("Sweep", 0.90),
             ("Swirl", 0.50),
             ("Pump", 0.60),
-            ("Room", 0.25),
+            ("Room", 0.10),
         ],
         targets: [T::Cutoff(0.6), T::Fx(0.9), T::Pump],
         bpm: 123.0,
@@ -1462,9 +1929,11 @@ fn copper_mile() -> Rack {
         filter: [1400.0, 0.25],
         fx: Some("phaser"),
         crush: false,
+        smooth: false,
         comp: [-24.0, 4.0, 4.0],
         echo: [0.0, 25.0, 3000.0],
-        space: [0.2, 0.4, 0.15],
+        // Room is stored at 0.10 (was 0.25) and reaches two and a half times as far: the same sound.
+        space: [0.5, 0.4, 0.375],
         trim_db: 0.0,
         dub: false,
         voice: None,
@@ -1518,6 +1987,7 @@ fn brick_dust() -> Rack {
         filter: [700.0, 0.30],
         fx: None,
         crush: true,
+        smooth: true,
         comp: [-26.0, 6.0, 4.0],
         echo: [90.0, 15.0, 3000.0],
         space: [0.45, 0.25, 0.3],
@@ -1531,8 +2001,8 @@ fn brick_dust() -> Rack {
 fn ore_cart() -> Rack {
     groove(Spec {
         macros: [
-            ("Filter", 0.45),
             ("Rumble", 0.55),
+            ("Tunnel", 0.45),
             ("Pump", 0.55),
             ("Space", 0.30),
         ],
@@ -1581,13 +2051,14 @@ fn ore_cart() -> Rack {
         filter: [500.0, 0.30],
         fx: None,
         crush: false,
+        smooth: false,
         comp: [-24.0, 4.0, 4.0],
         echo: [0.0, 40.0, 2500.0],
         space: [0.3, 1.2, 0.2],
         trim_db: 0.0,
         dub: false,
         voice: None,
-        custom: None,
+        custom: Some(ore_plan),
     })
 }
 
@@ -1596,10 +2067,10 @@ fn stoop_sale() -> Rack {
         macros: [
             ("Swing", 0.45),
             ("Dust", 0.30),
-            ("Filter", 0.50),
+            ("Tape", 0.50),
             ("Space", 0.30),
         ],
-        targets: [T::Swing(0.5), T::Dust(0.3), T::Cutoff(0.5)],
+        targets: [T::Swing(0.5), T::Cutoff(0.0), T::Cutoff(0.5)],
         bpm: 86.0,
         swing: 38.0,
         kit: kit(
@@ -1644,13 +2115,14 @@ fn stoop_sale() -> Rack {
         filter: [1800.0, 0.10],
         fx: None,
         crush: false,
+        smooth: false,
         comp: [-22.0, 3.0, 3.0],
         echo: [0.0, 25.0, 2800.0],
         space: [0.3, 0.8, 0.2],
         trim_db: -4.0,
         dub: false,
         voice: None,
-        custom: None,
+        custom: Some(stoop_plan),
     })
 }
 
@@ -1659,7 +2131,7 @@ fn fault_line() -> Rack {
         macros: [
             ("Reese", 0.50),
             ("Filter", 0.50),
-            ("Hats", 0.55),
+            ("Break", 0.55),
             ("Space", 0.25),
         ],
         targets: [T::Dirt(0.5), T::Cutoff(0.55), T::Hats(1.0)],
@@ -1693,20 +2165,25 @@ fn fault_line() -> Rack {
             95.0,
             [3.0, 400.0, 0.9, 60.0],
             0.7,
-        ),
+        )
+        // A soft top on the bass: the saw's reset edge at a note start no longer clicks.
+        .lp(8000.0),
         chords: None,
         play: [2.0, -1.0, 0.5],
         drive: [8.0, -4.0],
         filter: [900.0, 0.20],
         fx: None,
         crush: false,
+        smooth: false,
         comp: [-24.0, 4.0, 4.0],
         echo: [0.0, 30.0, 3000.0],
         space: [0.25, 0.8, 0.2],
-        trim_db: -2.0,
+        // 1 dB more headroom than the old -2: the detune beating of the reese peaks near the end
+        // of the Reese macro, and the soft top on the bass rings.
+        trim_db: -3.0,
         dub: false,
         voice: None,
-        custom: None,
+        custom: Some(fault_plan),
     })
 }
 
@@ -1714,8 +2191,8 @@ fn corner_store() -> Rack {
     groove(Spec {
         macros: [
             ("Swing", 0.50),
-            ("Filter", 0.55),
-            ("Drive", 0.30),
+            ("Wah", 0.55),
+            ("Bite", 0.30),
             ("Room", 0.25),
         ],
         targets: [T::Swing(0.5), T::Cutoff(0.5), T::Dirt(0.4)],
@@ -1749,7 +2226,9 @@ fn corner_store() -> Rack {
             55.0,
             [1.0, 140.0, 0.4, 40.0],
             0.7,
-        ),
+        )
+        // A soft top on the bass: the saw's reset edge at a note start no longer clicks.
+        .lp(8000.0),
         chords: Some(
             part(
                 "- - 12 - - - 15 - - - 12 14 - - - -",
@@ -1766,21 +2245,24 @@ fn corner_store() -> Rack {
         filter: [1600.0, 0.20],
         fx: None,
         crush: false,
+        smooth: false,
         comp: [-24.0, 4.0, 4.0],
         echo: [0.0, 20.0, 3000.0],
         space: [0.15, 0.3, 0.12],
-        trim_db: 0.0,
+        // The soft top on the bass rings at its edges and the demo peak rises by 2 dB: 2 dB of
+        // headroom back.
+        trim_db: -2.0,
         dub: false,
         voice: None,
-        custom: None,
+        custom: Some(corner_plan),
     })
 }
 
 fn glass_coast() -> Rack {
     groove(Spec {
         macros: [
-            ("Filter", 0.55),
-            ("Hats", 0.55),
+            ("Arp", 0.55),
+            ("Pulse", 0.55),
             ("Chorus", 0.50),
             ("Space", 0.55),
         ],
@@ -1835,13 +2317,14 @@ fn glass_coast() -> Rack {
         filter: [2500.0, 0.10],
         fx: Some("chorus"),
         crush: false,
+        smooth: false,
         comp: [-22.0, 3.0, 3.0],
         echo: [0.0, 52.0, 2800.0],
         space: [0.55, 3.2, 0.42],
         trim_db: -1.0,
         dub: false,
         voice: None,
-        custom: None,
+        custom: Some(glass_plan),
     })
 }
 
@@ -1898,13 +2381,14 @@ fn still_water() -> Rack {
         filter: [1800.0, 0.05],
         fx: None,
         crush: false,
+        smooth: false,
         comp: [-22.0, 2.0, 2.0],
         echo: [0.0, 55.0, 2500.0],
         space: [0.5, 5.0, 0.45],
         trim_db: -11.0,
         dub: false,
         voice: None,
-        custom: None,
+        custom: Some(still_plan),
     })
 }
 
@@ -1946,12 +2430,12 @@ fn slab_city() -> Rack {
     };
     groove(Spec {
         macros: [
-            ("Tone", 0.55),
             ("Glide", glide),
-            ("Hats", 0.60),
+            ("Hustle", 0.60),
+            ("Tone", 0.55),
             ("Room", 0.25),
         ],
-        targets: [T::Cutoff(0.5), T::Glide(0.6), T::Hats(1.0)],
+        targets: [T::Glide(0.6), T::Hats(1.0), T::Cutoff(0.5)],
         bpm: 140.0,
         swing: 0.0,
         kit: kit(
@@ -1991,21 +2475,22 @@ fn slab_city() -> Rack {
         filter: [1000.0, 0.15],
         fx: None,
         crush: false,
+        smooth: false,
         comp: [-24.0, 3.0, 3.0],
         echo: [0.0, 25.0, 2800.0],
         space: [0.15, 0.5, 0.15],
         trim_db: 0.0,
         dub: false,
         voice: Some((pad.0, pad.1, pad.2)),
-        custom: None,
+        custom: Some(slab_plan),
     })
 }
 
 fn rope_walk() -> Rack {
     groove(Spec {
         macros: [
-            ("Filter", 0.55),
-            ("Phase", 0.55),
+            ("Knob", 0.55),
+            ("Swirl", 0.55),
             ("Pump", 0.60),
             ("Room", 0.25),
         ],
@@ -2058,13 +2543,14 @@ fn rope_walk() -> Rack {
         filter: [1500.0, 0.25],
         fx: Some("phaser"),
         crush: false,
+        smooth: false,
         comp: [-24.0, 4.0, 5.5],
         echo: [0.0, 25.0, 3000.0],
         space: [0.2, 0.4, 0.15],
         trim_db: 1.0,
         dub: false,
         voice: None,
-        custom: None,
+        custom: Some(rope_plan),
     })
 }
 
@@ -2073,7 +2559,7 @@ fn lamp_oil() -> Rack {
         macros: [
             ("Chord", 0.70),
             ("Dub", 0.50),
-            ("Filter", 0.50),
+            ("Deep", 0.50),
             ("Space", 0.50),
         ],
         targets: [T::Chords(1.0), T::Dub(0.7), T::Cutoff(0.6)],
@@ -2128,13 +2614,14 @@ fn lamp_oil() -> Rack {
         filter: [1400.0, 0.15],
         fx: None,
         crush: false,
+        smooth: false,
         comp: [-24.0, 3.0, 3.0],
         echo: [0.0, 55.0, 2200.0],
         space: [0.45, 4.0, 0.32],
         trim_db: -2.0,
         dub: true,
         voice: None,
-        custom: None,
+        custom: Some(lamp_plan),
     })
 }
 
@@ -2226,7 +2713,10 @@ fn acid_line() -> Rack {
     v.r.wire(seq, "gate", fenv, "gate");
     v.r.wire(fenv, "out", fvca, "in");
     v.r.wire(seq, "velocity", fvca, "cv");
-    v.r.depth_route(fvca, "out", lad, "cutoff_hz", v.knob, "m3", 0.6);
+    // Fixed at what the old Accent macro left (0.6 of 0.6 of the travel): the macro now sets how long
+    // the zap rings and how long the notes are held, not how far it opens the filter.
+    let zap = v.r.e.connect_route(jack(fvca, "out"), lad, "cutoff_hz");
+    v.r.e.set_route_amount(zap, 0.36, true);
     // The amp: a gate envelope, louder on the accent steps.
     let aenv = v.r.add("env.adsr", &adsr(1.0, 160.0, 0.8, 30.0));
     let avca = v.r.add("vca", &[("gain", 0.0)]);
@@ -2240,10 +2730,23 @@ fn acid_line() -> Rack {
     v.r.wire(accent_vca, "out", bass, "in");
     // The macros.
     v.r.route(v.knob, "m1", lad, "cutoff_hz", 0.5);
+    // Squelch: the resonance and the ladder's own drive rise together.
     v.r.e.set_param(lad, "resonance", 0.25);
     v.r.route(v.knob, "m2", lad, "resonance", 0.62);
-    v.r.route(v.knob, "m4", slew, "rise_ms", 0.22);
-    v.r.route(v.knob, "m4", slew, "fall_ms", 0.22);
+    span(&mut v, 2, 0.55, lad, "filter.ladder", "drive_db", 0.0, 6.0);
+    // Accent: the envelope's decay goes from a short zap to a long wow and the notes hold longer.
+    span(&mut v, 3, 0.60, fenv, "env.adsr", "decay_ms", 40.0, 220.0);
+    span(&mut v, 3, 0.60, seq, "seq", "gate_len", 30.0, 62.0);
+    // And the level contrast: the VCA adds this offset to the step velocity, so at 0 the ghost notes
+    // are nearly as loud as the accents, and from the stored position on the contrast is the old one
+    // (the offset is 0 there; the route stops at the bottom of the param).
+    v.r.e.set_param(accent_vca, "gain", 0.4);
+    v.r.route(v.knob, "m3", accent_vca, "gain", -0.4 / 0.6);
+    // Slide: the glide time runs on to a long portamento.
+    let glide = routed("slew", "rise_ms", 8.0, 0.22, 0.5);
+    let i = param_of("slew", "rise_ms");
+    let p = main_line(&mut v, 4, slew, "slew", "rise_ms", i.min, glide, i.max);
+    span(&mut v, 4, p, slew, "slew", "fall_ms", i.min, glide);
     v.r.next_row();
     let bus = v.r.add("mixer", &[("level1", 1.0), ("level3", 1.0)]);
     v.r.wire(bass, "out", bus, "in1");
@@ -2395,21 +2898,22 @@ fn scrap_metal() -> Rack {
         filter: [1200.0, 0.30],
         fx: None,
         crush: true,
+        smooth: false,
         comp: [-24.0, 6.0, 5.5],
         echo: [90.0, 20.0, 2800.0],
         space: [0.3, 0.5, 0.2],
         trim_db: -1.0,
         dub: false,
         voice: None,
-        custom: None,
+        custom: Some(scrap_plan),
     })
 }
 
 fn dune_buggy() -> Rack {
     groove(Spec {
         macros: [
-            ("Swing", 0.50),
-            ("Filter", 0.55),
+            ("Skip", 0.50),
+            ("Warmth", 0.55),
             ("Chop", 0.50),
             ("Space", 0.30),
         ],
@@ -2461,13 +2965,14 @@ fn dune_buggy() -> Rack {
         filter: [1700.0, 0.15],
         fx: None,
         crush: false,
+        smooth: false,
         comp: [-22.0, 3.0, 3.0],
         echo: [0.0, 25.0, 2800.0],
         space: [0.3, 1.0, 0.2],
         trim_db: -1.0,
         dub: false,
         voice: None,
-        custom: None,
+        custom: Some(dune_plan),
     })
 }
 
@@ -2690,42 +3195,42 @@ fn presets() -> Vec<Preset> {
             "A blunt, overdriven stomp: a hard-driven saw and square bass line under a short kick, snare and hats, squashed by a heavy compressor. Press Run, then play low notes over it. Grind crushes and drives the bass, Squash clamps the whole mix down harder, Push speeds the stomp up or slows it down, Slap adds a bigger slapback and a tight room.",
             "Distorted bass stabs locked to the kick; Grind up for a crushed bite, Squash for a flatter, heavier mix.", brick_dust, brick_phrase, 16.0),
         p("ore-cart", "Ore Cart", &["rumble", "techno", "132bpm"],
-            "A rolling techno groove: a four-on-the-floor kick, off-beat hats, a rumbling bass between the kicks and a sparse stab. Press Run, then play stabs over it. Filter opens the music, Rumble raises the bass, Pump sets how hard the kick ducks it, Space adds the echo and the room.",
-            "The bass rolling between the kicks; Rumble up for more low end, Pump for a deeper duck.", ore_cart, ore_phrase, 16.0),
+            "A rolling techno groove: a four-on-the-floor kick, off-beat hats, a rumbling bass between the kicks and a sparse stab. Press Run, then play stabs over it. Rumble builds the bass: driven harder and held longer, Tunnel opens the music from a dark tunnel, Pump sets how hard the kick ducks it, Space adds the echo and the room.",
+            "The bass rolling between the kicks; Rumble up for a bigger, driven low end, Pump for a deeper duck.", ore_cart, ore_phrase, 16.0),
         p("stoop-sale", "Stoop Sale", &["swung", "dusty", "hip hop", "86bpm"],
-            "A boom-bap loop: a loose kick and snare, swung hats, a sine sub bass and a soft seventh chord. Press Run, then play chords over it. Swing pushes the off-beats late, Dust brings in a layer of vinyl hiss, Filter opens the music, Space adds the echo and the room.",
-            "The late, loose off-beats; Swing up to drag them further, Dust up for a dusty hiss.", stoop_sale, stoop_phrase, 16.0),
+            "A boom-bap loop: a loose kick and snare, swung hats, a sine sub bass and a soft seventh chord. Press Run, then play chords over it. Swing pushes the off-beats late and lets the tempo drag, Dust brings in vinyl hiss and a slow wobble of the pitch (it starts at zero), Tape goes from a muffled, saturated sound to an open, clean one, Space adds the echo and the room.",
+            "The late, loose off-beats; Swing up to drag them further, Dust up for a worn record.", stoop_sale, stoop_phrase, 16.0),
         p("fault-line", "Fault Line", &["reese", "breaks", "drum and bass", "174bpm"],
-            "A two-step drum and bass loop: a sharp kick and snare, ghost snares, fast hats and a detuned reese bass. Press Run, then play low notes over it. Reese adds drive to the bass, Filter opens it, Hats raises the hats, Space adds the echo and the room.",
-            "The detuned bass growling under the break; Reese up for more teeth, Hats up for a busier top.", fault_line, fault_phrase, 16.0),
+            "A two-step drum and bass loop: a sharp kick and snare, ghost snares, fast hats and a detuned reese bass. Press Run, then play low notes over it. Reese widens the bass's detune and drives it harder, Filter opens it, Break brings up the hats and the snare, Space adds the echo and the room.",
+            "The detuned bass growling under the break; Reese up for more teeth, Break up for a busier kit.", fault_line, fault_phrase, 16.0),
         p("corner-store", "Corner Store", &["swung", "funk", "108bpm"],
-            "A funk groove: a soft plucked bass with octave jumps, a tight kick and snare, swung hats and clav-like stabs. Press Run, then play lines over it. Swing sets the shuffle of the 16ths, Filter opens the stabs and the bass, Drive adds bite, Room adds a short echo and a small room.",
-            "The bass and kick locking on the swung 16ths; Swing up for more shuffle.", corner_store, corner_phrase, 16.0),
+            "A funk groove: a soft plucked bass with octave jumps, a tight kick and snare, swung hats and clav-like stabs. Press Run, then play lines over it. Swing sets the shuffle of the 16ths and nudges the tempo, Wah opens a resonant filter over the stabs and the bass, Bite adds drive, Room adds a short echo and a small room.",
+            "The bass and kick locking on the swung 16ths; Swing up for more shuffle, Wah for the filter.", corner_store, corner_phrase, 16.0),
         p("glass-coast", "Glass Coast", &["arp", "chorus", "synthwave", "100bpm"],
-            "A synthwave groove: a pulsing octave bass, a rolling arpeggio, a gated snare and clap and a long echo. Press Run, then play leads over it. Filter opens the music, Hats raises the hats, Chorus widens the whole mix, Space adds the long echo and the room.",
-            "The arpeggio rolling over the pulsing bass; Chorus up for width, Space up for the long tail.", glass_coast, glass_phrase, 16.0),
+            "A synthwave groove: a pulsing octave bass, a rolling arpeggio, a gated snare and clap and a long echo. Press Run, then play leads over it. Arp stretches the arpeggio's notes and thickens their detune, Pulse lengthens the bass pulses and lifts the hats, Chorus widens the whole mix with a deeper, faster chorus, Space adds the long echo and the room.",
+            "The arpeggio rolling over the pulsing bass; Arp up for longer notes, Chorus up for width, Space up for the long tail.", glass_coast, glass_phrase, 16.0),
         p("still-water", "Still Water", &["slow", "sparse", "ambient", "68bpm"],
-            "A sparse ambient groove: a soft kick, a few random hats and toms, a slow bass and bell-like chords with long tails. Press Run, then play slow chords over it. Bloom opens the music, Pulse raises the hats and drops, Weight raises the bass, Space adds the long echo and room.",
+            "A sparse ambient groove: a soft kick, a few random hats and toms, a slow bass and bell-like chords with long tails. Press Run, then play slow chords over it. Bloom opens the music from dark to bright, Pulse raises the hats and the toms, Weight raises the bass, Space adds the long echo and room.",
             "Rare, soft hits that never repeat exactly; Pulse up for more of them, Space up for a long tail.", still_water, still_phrase, 24.0),
     ].into_iter().chain([
         q("slab-city", "Slab City", &["glide", "808", "trap", "140bpm"],
-            "A half-time trap loop: a short kick and a clap on the third beat, rolling hats with some left to chance, and a sliding sine 808 under them. Press Run, then play slow minor chords over it; the played voice is a dark, soft saw pad. Tone opens the music, Glide sets how long the 808 slides between notes, Hats raises the hats, Room adds a short echo and a tight room.",
-            "The 808 sliding between its notes; Glide up for longer slides, Hats up for busier rolls.", slab_city, slab_phrase, 16.0),
+            "A half-time trap loop: a short kick and a clap on the third beat, rolling hats with some left to chance, and a sliding sine 808 under them. Press Run, then play slow minor chords over it; the played voice is a dark, soft saw pad. Glide sets how long the 808 slides between notes and how hard it is driven, Hustle lifts the hats and the clap, Tone opens the pad's filter, Room adds a short echo and a tight room.",
+            "The 808 sliding between its notes; Glide up for longer, harder slides, Hustle up for busier rolls.", slab_city, slab_phrase, 16.0),
         q("rope-walk", "Rope Walk", &["phased", "pumping", "french touch", "118bpm", "signature"],
-            "A disco loop for French touch: an octave-jumping bass walking up in steps, syncopated saw stabs through a phaser, a four-on-the-floor kick and a clap, all ducked by the kick. Press Run, then play stabs on top. Filter opens the loop like a DJ knob, Phase brings in the phaser, Pump sets how hard the kick ducks the music, Room adds a tempo-synced echo and a tight room.",
-            "The octave bass walking under the stabs; Phase up for swirl, Pump up for a harder duck.", rope_walk, rope_phrase, 18.0),
+            "A disco loop for French touch: an octave-jumping bass walking up in steps, syncopated saw stabs through a phaser, a four-on-the-floor kick and a clap, all ducked by the kick. Press Run, then play stabs on top. Knob opens the loop like a DJ knob, from a closed, resonant filter, Swirl brings in the phaser, deeper and faster, Pump sets how hard the kick ducks the music, Room adds a tempo-synced echo and a tight room.",
+            "The octave bass walking under the stabs; Swirl up for the phaser, Pump up for a harder duck.", rope_walk, rope_phrase, 18.0),
         q("lamp-oil", "Lamp Oil", &["dub", "echo", "dub techno", "124bpm"],
-            "A dub techno loop: a soft kick, a rim click, a deep sine sub and a muted chord stab thrown into a long dotted echo. Press Run, then play chords over it. Chord sets the level of the stab, Dub feeds more of it to its own tempo echo, Filter opens the music, Space adds the long echo and the room.",
+            "A dub techno loop: a soft kick, a rim click, a deep sine sub and a muted chord stab thrown into a long dotted echo. Press Run, then play chords over it. Chord sets the level, length and thickness of the stab, Dub feeds more of it to its own tempo echo, with longer and darker repeats, Deep opens the music from a dark filter, Space adds the long echo and the room.",
             "The chord stab repeating into the dark; Dub up for a longer tail, Chord up for a louder stab.", lamp_oil, lamp_phrase, 16.0),
         q("acid-line", "Acid Line", &["acid", "303", "squelch", "slide", "124bpm"],
-            "An acid house loop: a 303-style saw bass with a squelchy resonant filter, accents that open it wider and slides between notes, over a 909-style kick, clap and offbeat open hats. Press Run, then play stabs on top. Cutoff opens the bass filter, Resonance makes it squeal, Accent sets how far each accented note opens the filter, Slide sets how long the marked notes glide.",
+            "An acid house loop: a 303-style saw bass with a squelchy resonant filter, accents that open it wider and slides between notes, over a 909-style kick, clap and offbeat open hats. Press Run, then play stabs on top. Cutoff opens the bass filter, Resonance makes it squeal and drives the filter harder, Accent sets how far each accented note opens the filter, how long that zap rings and how long the notes are held, Slide sets how long the marked notes glide.",
             "The bass squelching on the accented notes and sliding into the marked ones; Resonance up for the squeal, Slide up for longer glides.", acid_line, acid_phrase, 16.0),
         q("scrap-metal", "Scrap Metal", &["formant", "crushed", "electro", "french touch", "128bpm", "signature"],
-            "A robot stomp: a hard-driven bass, a stab that talks through a vowel filter, a tight kick, snare and clap, crushed and compressed until it pumps. Press Run, then play lines on top. Vowel morphs the stab from a to u, Crush brings in the bitcrusher, Pump sets how hard the kick ducks the music, Room adds a slapback and a tight room.",
+            "A robot stomp: a hard-driven bass, a stab that talks through a vowel filter, a tight kick, snare and clap, crushed and compressed until it pumps. Press Run, then play lines on top. Vowel morphs the stab from a to u and sharpens the vowel, Crush brings in the bitcrusher, Pump sets how hard the kick ducks the music, Room adds a slapback and a tight room.",
             "The stab changing vowel; Crush up for grit, Vowel to open and close the mouth.", scrap_metal, scrap_phrase, 16.0),
         q("dune-buggy", "Dune Buggy", &["swung", "chopped", "garage", "130bpm"],
-            "A UK garage groove: a shuffled two-step kick and snare, ticking hats, a round sub and minor chords chopped into short stabs. Press Run, then play chords over it. Swing sets the shuffle of the 16ths, Filter opens the music, Chop sets how short the chord stabs are, Space adds the echo and the room.",
-            "The shuffled hats and chopped chords; Swing up for more skip, Chop down for shorter stabs.", dune_buggy, dune_phrase, 16.0),
+            "A UK garage groove: a shuffled two-step kick and snare, ticking hats, a round sub and minor chords chopped into short stabs. Press Run, then play chords over it. Skip sets the shuffle of the 16ths and nudges the tempo, Warmth opens the music from dark, Chop sets how short and how thin the chord stabs are, Space adds the echo and the room.",
+            "The shuffled hats and chopped chords; Skip up for more shuffle, Chop down for shorter stabs.", dune_buggy, dune_phrase, 16.0),
     ])
     .collect()
 }
