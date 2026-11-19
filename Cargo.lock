@@ -2152,6 +2152,7 @@ dependencies = [
  "kabl-standalone",
  "kabl-ui",
  "midir",
+ "rtrb",
  "serde",
  "serde_json",
  "tempfile",
