@@ -3,15 +3,114 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>kabl</title>
+    <title>kabl — a legible modular synthesizer</title>
+    <meta name="description" content="A legible modular synthesizer, written in Rust. Cables are instruments, patches explain themselves, and the sound you hear can be traced back through the patch." />
+    <meta property="og:title" content="kabl — a legible modular synthesizer" />
+    <meta property="og:description" content="Standalone synthesizer and CLAP instrument plugin, written in Rust. Linux." />
+    <meta property="og:type" content="website" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;600&display=swap" />
   </head>
   <body>
-    <main>
-      <h1>kabl</h1>
-      <p>This site is built and deployed from the <code>website</code> branch of its own repository.</p>
-      <p id="built"></p>
+    <a class="skip" href="#main">Skip to content</a>
+    <div class="rail" aria-hidden="true"></div>
+
+    <header class="panel hero">
+      <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+      <img class="lockup" src="/media/kabl-lockup.svg" alt="kabl" width="272" height="100" />
+      <p class="lede">A legible modular synthesizer, written in Rust. Cables are instruments, patches explain themselves, and the sound you hear can be traced back through the patch.</p>
+      <ul class="modes">
+        <li><span class="jack" aria-hidden="true"></span><strong>Standalone</strong> <span>kabl-ui: sound browser, rack, performance view</span></li>
+        <li><span class="jack" aria-hidden="true"></span><strong>CLAP plugin</strong> <span>kabl.clap: tested in REAPER and with the CLAP validator</span></li>
+      </ul>
+      <nav class="links mono" aria-label="Project">
+        <a href="https://github.com/stcksmsh/kabl">Source on GitHub</a>
+        <a href="#get">Build &amp; run</a>
+        <a href="https://github.com/stcksmsh/kabl/tree/master/docs">Docs</a>
+      </nav>
+      <p class="platform mono">Linux is the supported platform for 1.0</p>
+    </header>
+
+    <main id="main">
+      <section class="panel" aria-labelledby="look-h">
+        <h2 id="look-h" class="label"><span>01</span> The instrument</h2>
+        <figure class="shot">
+          <img src="/media/1280x800-dark-rack-sounds.webp" alt="The kabl rack with the Sounds browser open" width="1280" height="800" loading="lazy" />
+          <figcaption class="mono">The rack, with the Sounds browser open</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="/media/composition-1280x800-dark.webp" alt="The Perform view with scenes, macros and bank cards" width="1280" height="800" loading="lazy" />
+          <figcaption class="mono">The Perform view: scenes, macros and bank cards</figcaption>
+        </figure>
+      </section>
+
+      <section class="panel" aria-labelledby="mod-h">
+        <h2 id="mod-h" class="label"><span>02</span> Modules <small class="mono">24 kinds</small></h2>
+        <p>Composite modules can be built from these and saved.</p>
+        <div class="rack" id="rack"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="cab-h">
+        <h2 id="cab-h" class="label"><span>03</span> Functional cables</h2>
+        <p>A cable is more than a wire. It can carry a step pattern, a pass probability, an A/B morph and glide, all locked to the patch clock, and macros can drive cable parameters.</p>
+        <div class="cablefig" aria-hidden="true">
+          <svg viewBox="0 0 800 120" preserveAspectRatio="xMidYMid meet">
+            <path class="wire" d="M40 40 C 220 140, 580 140, 760 40" />
+            <path class="wire pulse" d="M40 40 C 220 140, 580 140, 760 40" />
+            <circle class="plug" cx="40" cy="40" r="12" /><circle class="plug" cx="760" cy="40" r="12" />
+          </svg>
+        </div>
+        <ul class="inserts mono">
+          <li><b>Step pattern</b><span>up to 16 steps, each with a level and a chance, advancing on the patch clock</span></li>
+          <li><b>Probability</b><span>a chance for the whole cable</span></li>
+          <li><b>A/B morph</b><span>blend between a pattern A and a pattern B</span></li>
+          <li><b>Glide</b><span>slew the level between steps</span></li>
+        </ul>
+        <p class="note mono">Clock-locked. Macro-addressable. Details: <a href="https://github.com/stcksmsh/kabl/blob/master/docs/functional-cables/README.md">docs/functional-cables</a></p>
+      </section>
+
+      <section class="panel" aria-labelledby="sig-h">
+        <h2 id="sig-h" class="label"><span>04</span> Signal path of the source</h2>
+        <p>The workspace, patched like a rack: each cable is a direct dependency between crates (transitive ones left out). Hover or tab to a crate.</p>
+        <div class="graph" id="graph"></div>
+        <p class="readout mono" id="readout" aria-live="polite">core · engine · modules · cables · standalone · ui · clap</p>
+        <p class="note mono">Real-time safe audio path: no allocation or locking in the callback, enforced by the tests (<code>assert_no_alloc</code>).</p>
+      </section>
+
+      <section class="panel" id="get" aria-labelledby="get-h">
+        <h2 id="get-h" class="label"><span>05</span> Build &amp; run</h2>
+        <div class="cols">
+          <div>
+            <h3>From source</h3>
+            <p>Needs a current stable Rust toolchain and, on Debian or Ubuntu, <code>libasound2-dev libxkbcommon-dev libdbus-1-dev</code>.</p>
+<pre><code>cargo run --release -p kabl-ui        # the standalone synth
+cargo build --release -p kabl-clap    # the plugin: target/release/libkabl_clap.so
+cargo test --workspace</code></pre>
+          </div>
+          <div>
+            <h3>From a release tarball</h3>
+            <p>When a release is published on the <a href="https://github.com/stcksmsh/kabl/releases">Releases page</a>, download <code>kabl-&lt;version&gt;-linux-&lt;arch&gt;.tar.gz</code>, then:</p>
+<pre><code>tar -xzf kabl-*-linux-*.tar.gz
+cd kabl-*-linux-*
+./install.sh          # standalone, desktop entry, plugin in ~/.clap
+./install.sh --uninstall</code></pre>
+          </div>
+        </div>
+        <p>Runtime needs ALSA (<code>libasound2</code>), X11 or Wayland with OpenGL, and <code>libxkbcommon-x11</code>. In a DAW, scan <code>~/.clap</code> and load <b>kabl</b> as an instrument. Your own sounds are saved to <code>~/.local/share/kabl/sounds</code> and are never touched by an upgrade or an uninstall.</p>
+      </section>
+
+      <section class="panel small" aria-labelledby="lic-h">
+        <h2 id="lic-h" class="label"><span>06</span> Licence</h2>
+        <p>Source code: GPL-3.0-or-later. The name “kabl” and the logo are reserved; a fork needs its own name. Music you make with kabl is yours, with no conditions. Details in the repository’s <a href="https://github.com/stcksmsh/kabl/blob/master/COPYRIGHT">COPYRIGHT</a>, <a href="https://github.com/stcksmsh/kabl/blob/master/TRADEMARKS.md">TRADEMARKS.md</a> and <a href="https://github.com/stcksmsh/kabl/blob/master/ASSET-LICENSES.md">ASSET-LICENSES.md</a>.</p>
+      </section>
     </main>
+
+    <footer class="foot mono">
+      <span>kabl by Kosta Vukićević</span>
+      <a href="https://stcksmsh.github.io/">stcksmsh.github.io</a>
+    </footer>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
