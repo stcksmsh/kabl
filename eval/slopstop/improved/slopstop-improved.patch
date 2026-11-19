@@ -1,6 +1,6 @@
 diff -ruN '--exclude=.ruff_cache' '--exclude=__pycache__' /home/stcksmsh/.claude-alt/jobs/852551dd/tmp/slopstop/slopstop/README.md slopstop/README.md
 --- /home/stcksmsh/.claude-alt/jobs/852551dd/tmp/slopstop/slopstop/README.md	2026-11-19 12:00:08.000000000 +0100
-+++ slopstop/README.md	2026-11-19 13:16:53.605702023 +0100
++++ slopstop/README.md	2026-11-19 16:29:43.308226407 +0100
 @@ -30,6 +30,17 @@
  - `versioned-name`: `foo_v2`, `parse_fixed`, `enhanced_x`, `loadUpdated`
  - `debug-leftover` (`dbg!`, `breakpoint()`, `console.log`, `debugger`), `secret` (key patterns; gitleaks if installed), `file-too-large` (advisory)
@@ -19,7 +19,28 @@ diff -ruN '--exclude=.ruff_cache' '--exclude=__pycache__' /home/stcksmsh/.claude
  **Tools (used if installed, skipped silently if not; `slop doctor` shows which):**
  
  | Language | Fast (per edit) | Stop |
-@@ -92,6 +103,8 @@
+@@ -58,6 +69,20 @@
+ slop selftest                                      # 35 checks on seeded slop across languages
+ ```
+ 
++User-wide (every Claude Code session on the machine), with an upgrade-proof path:
++
++```sh
++slop install-global --dry-run     # show what it would write
++slop install-global               # copy the kit to ~/.local/share/slopstop/versions/<stamp>, flip `current`,
++                                  # link ~/.local/bin/slop, merge hooks into $CLAUDE_CONFIG_DIR (or ~/.claude)/settings.json
++slop install-global --uninstall   # remove only slop's hooks
++```
++
++Hooks always call `~/.local/bin/slop hook ...`. Upgrading = unpack the new kit and run its `slop install-global`
++again: the `current` symlink flips atomically and settings.json is rewritten identically (last 3 versions kept).
++User-wide hooks are inert in any repo without a `.slop.toml` (or `SLOP_ALL=1`), so `slop init` is the per-repo opt-in.
++Hooks run with your normal PATH, so install `ast-grep`, `ruff`, `jscpd` etc. where that PATH finds them (pipx/npm -g).
++
+ Per repo:
+ 
+ ```sh
+@@ -92,6 +117,8 @@
  exclude = ["assets/**"]                            # extends built-in excludes (target, node_modules, ...)
  protected = ["docs/api-contract.md"]               # extra files agents may not edit
  allow_suppressions = false
@@ -28,7 +49,7 @@ diff -ruN '--exclude=.ruff_cache' '--exclude=__pycache__' /home/stcksmsh/.claude
  stop_retries = 2
  jscpd_min_tokens = 50
  base = "auto"                                      # or "HEAD" / a ref
-@@ -114,7 +127,9 @@
+@@ -114,7 +141,9 @@
  - **Wired but untested** (no network access to them during development): gitleaks (`gitleaks dir` flags),
    golangci-lint v2 JSON flags, naga, clang-tidy with a real compile DB, tsc. If one misbehaves it fails soft
    (logged, skipped), never blocks the agent.
@@ -101,8 +122,16 @@ diff -ruN '--exclude=.ruff_cache' '--exclude=__pycache__' /home/stcksmsh/.claude
 +      regex: '^(join|end_pass|take_\w+|remove_dir_all|remove_file|into_raw|clone)$'
 diff -ruN '--exclude=.ruff_cache' '--exclude=__pycache__' /home/stcksmsh/.claude-alt/jobs/852551dd/tmp/slopstop/slopstop/selftest.py slopstop/selftest.py
 --- /home/stcksmsh/.claude-alt/jobs/852551dd/tmp/slopstop/slopstop/selftest.py	2026-11-19 11:57:11.000000000 +0100
-+++ slopstop/selftest.py	2026-11-19 13:09:08.638239180 +0100
-@@ -39,7 +39,7 @@
++++ slopstop/selftest.py	2026-11-19 16:29:43.186298285 +0100
+@@ -7,6 +7,7 @@
+ from __future__ import annotations
+ 
+ import json
++import os
+ import subprocess
+ import sys
+ import tempfile
+@@ -39,7 +40,7 @@
                      Ok(b) => println!("{}", b.len()),
                      Err(_) => {}
                  }
@@ -111,7 +140,7 @@ diff -ruN '--exclude=.ruff_cache' '--exclude=__pycache__' /home/stcksmsh/.claude
                  std::fs::write(p, b"x").ok();
                  if let Err(_) = std::fs::create_dir(p) {}
              }
-@@ -74,6 +74,92 @@
+@@ -74,6 +75,92 @@
              }
              """),
           want=set(), deny_all=True),
@@ -204,6 +233,29 @@ diff -ruN '--exclude=.ruff_cache' '--exclude=__pycache__' /home/stcksmsh/.claude
      # ---------------- python
      dict(name="python: ruff + ast-grep + diff checks", path="app/svc.py", tools=["ruff", "ast-grep"],
           base="def ok():\n    return 1\n",
+@@ -298,9 +385,10 @@
+                 print(f"FAIL jscpd: duplicate not detected, got={sorted(got)}")
+ 
+         # ---------------- hook behaviour
+-        def run_hook(ev, payload):
++        def run_hook(ev, payload, optin=True):
++            env = {**os.environ, "SLOP_ALL": "1"} if optin else {k: v for k, v in os.environ.items() if k != "SLOP_ALL"}
+             r = subprocess.run([sys.executable, str(kit / "slop.py"), "hook", ev], input=json.dumps(payload),
+-                               capture_output=True, text=True, cwd=root)
++                               capture_output=True, text=True, cwd=root, env=env)
+             return r.returncode, r.stdout, r.stderr
+ 
+         def check(name, cond, detail=""):
+@@ -316,6 +404,9 @@
+             "file_path": str(root / "clippy.toml"), "old_string": "20", "new_string": "200"}})
+         check("pre denies gate edit", '"deny"' in out, out)
+         rc, out, _ = run_hook("pre", {"cwd": str(root), "tool_name": "Edit", "tool_input": {
++            "file_path": str(root / "clippy.toml"), "old_string": "20", "new_string": "200"}}, optin=False)
++        check("user-wide hooks stay silent in a repo without .slop.toml", out.strip() == "" and rc == 0, out)
++        rc, out, _ = run_hook("pre", {"cwd": str(root), "tool_name": "Edit", "tool_input": {
+             "file_path": str(root / "src/engine.rs"), "old_string": "pub fn gain",
+             "new_string": "#[allow(dead_code)]\npub fn gain"}})
+         check("pre denies added #[allow]", '"deny"' in out, out)
 diff -ruN '--exclude=.ruff_cache' '--exclude=__pycache__' /home/stcksmsh/.claude-alt/jobs/852551dd/tmp/slopstop/slopstop/semantic.py slopstop/semantic.py
 --- /home/stcksmsh/.claude-alt/jobs/852551dd/tmp/slopstop/slopstop/semantic.py	1970-01-01 01:00:00.000000000 +0100
 +++ slopstop/semantic.py	2026-11-19 13:14:29.844928307 +0100
@@ -751,8 +803,24 @@ diff -ruN '--exclude=.ruff_cache' '--exclude=__pycache__' /home/stcksmsh/.claude
 +    return out
 diff -ruN '--exclude=.ruff_cache' '--exclude=__pycache__' /home/stcksmsh/.claude-alt/jobs/852551dd/tmp/slopstop/slopstop/slop.py slopstop/slop.py
 --- /home/stcksmsh/.claude-alt/jobs/852551dd/tmp/slopstop/slopstop/slop.py	2026-11-19 11:59:26.000000000 +0100
-+++ slopstop/slop.py	2026-11-19 13:18:08.130954421 +0100
-@@ -75,6 +75,8 @@
++++ slopstop/slop.py	2026-11-19 16:29:43.186177350 +0100
+@@ -6,6 +6,7 @@
+   slop check [--base REF | --staged | --all] [--fast] [--json]
+   slop doctor                 which tools are available for this repo
+   slop init                   wire hooks + CLAUDE.md block + .slop.toml into a repo
++  slop install-global         install user-wide (upgrade-proof path); see `slop help install-global`
+   slop selftest               run bundled fixtures
+ """
+ from __future__ import annotations
+@@ -19,6 +20,7 @@
+ import subprocess
+ import sys
+ import tempfile
++import time
+ from dataclasses import dataclass, field, asdict
+ from pathlib import Path
+ 
+@@ -75,6 +77,8 @@
      "jscpd_min_tokens": 50,
      "allow_suppressions": False, # True = guard lets agents add #[allow]/noqa/etc.
      "large_file_lines": 1500,
@@ -761,7 +829,7 @@ diff -ruN '--exclude=.ruff_cache' '--exclude=__pycache__' /home/stcksmsh/.claude
  }
  
  PROTECTED_DEFAULT = [
-@@ -308,7 +310,9 @@
+@@ -308,7 +312,9 @@
      r"\b(now|this) (uses|handles|supports) (the )?(new|updated|improved)\b|"
      r"\b(updated|changed|modified|refactored) (to|this to) (use|handle|support)\b|"
      r"\b(in a real|for a real|in production you)\b|\bsimplified (version|implementation|example)\b|"
@@ -772,7 +840,7 @@ diff -ruN '--exclude=.ruff_cache' '--exclude=__pycache__' /home/stcksmsh/.claude
      re.I,
  )
  HEDGE = re.compile(  # weak: also common in human comments -> advisory
-@@ -318,14 +322,15 @@
+@@ -318,14 +324,15 @@
  )
  EMOJI = re.compile("[\U0001F300-\U0001FAFF✅❌✨⚠✔✖\U0001F680]")
  DEF_NAME = re.compile(
@@ -791,7 +859,7 @@ diff -ruN '--exclude=.ruff_cache' '--exclude=__pycache__' /home/stcksmsh/.claude
  DEBUG = re.compile(
      r"\bdbg!\s*\(|\bbreakpoint\(\)|pdb\.set_trace\(|\bdebugger;|console\.(log|debug)\(|"
      r"print(ln!?)?\(\s*f?[\"'](DEBUG|debug:|>>>|---)|System\.out\.println\(\s*\"DEBUG|\bdump\(\$"
-@@ -380,12 +385,26 @@
+@@ -380,12 +387,26 @@
                  out.append(Finding("gate-tampered", p, hit[0] if hit else 1, f"lint settings in {mf} changed",
                                     hint="revert; only the human edits gates"))
  
@@ -822,7 +890,7 @@ diff -ruN '--exclude=.ruff_cache' '--exclude=__pycache__' /home/stcksmsh/.claude
                                     hint="fix the underlying issue; suppressions need human approval", text=t))
  
      if test and code_file:
-@@ -421,8 +440,12 @@
+@@ -421,8 +442,12 @@
              if EMOJI.search(c):
                  out.append(Finding("emoji-comment", p, n, "emoji in comment", sev="warn", text=t))
          for m in DEF_NAME.finditer(t):
@@ -837,7 +905,7 @@ diff -ruN '--exclude=.ruff_cache' '--exclude=__pycache__' /home/stcksmsh/.claude
                  out.append(Finding("versioned-name", p, n, f"versioned/hedged name `{name}`",
                                     hint="replace the original instead of adding a variant", text=t))
          if not test and DEBUG.search(t):
-@@ -790,12 +813,78 @@
+@@ -790,12 +815,78 @@
  
  # --------------------------------------------------------------------------- core
  
@@ -916,7 +984,22 @@ diff -ruN '--exclude=.ruff_cache' '--exclude=__pycache__' /home/stcksmsh/.claude
      for adapter in FAST + ([] if fast else SLOW):
          try:
              findings += adapter(root, live, cfg)
-@@ -898,11 +987,14 @@
+@@ -874,8 +965,14 @@
+                          r"git\s+config\s+[^|;&]*core\.hooksPath|\bchmod\s+-x\s+\S*hooks")
+ BASH_WRITE = re.compile(r"(>|>>|\btee\b|\bsed\s+-i|\bperl\s+-p?i|\bmv\b|\bcp\b|\brm\b|\btruncate\b)")
+ 
++def opted_in(root: Path) -> bool:
++    """Hooks installed user-wide only act in repos that opt in with a `.slop.toml` (or SLOP_ALL=1)."""
++    return (root / ".slop.toml").exists() or os.environ.get("SLOP_ALL") == "1"
++
+ def hook_pre(inp: dict) -> int:
+     root = hook_root(inp)
++    if not opted_in(root):
++        return 0
+     cfg = load_config(root)
+     tool = inp.get("tool_name", "")
+     if tool == "Bash":
+@@ -898,11 +995,14 @@
      name = Path(p).name
      if name in MANIFEST_LINT and lint_lines(name, old) != lint_lines(name, new):
          return deny(f"lint settings in `{name}` are a gate; only the user edits them")
@@ -934,7 +1017,25 @@ diff -ruN '--exclude=.ruff_cache' '--exclude=__pycache__' /home/stcksmsh/.claude
              return deny(f"adding a suppression/skip (`{m[:60]}`) needs user approval. Fix the cause, or stop and ask.")
      if is_test_path(p) and lang_of(p):
          a_new, a_old = len(ASSERT.findall(new)), len(ASSERT.findall(old))
-@@ -1020,7 +1112,9 @@
+@@ -912,6 +1012,8 @@
+ 
+ def hook_post(inp: dict) -> int:
+     root = hook_root(inp)
++    if not opted_in(root):
++        return 0
+     cfg = load_config(root)
+     fp, _, _ = proposed_texts(inp)
+     if not fp or not git_root(root):
+@@ -935,7 +1037,7 @@
+ 
+ def hook_stop(inp: dict) -> int:
+     root = hook_root(inp)
+-    if not git_root(root):
++    if not git_root(root) or not opted_in(root):
+         return 0
+     cfg = load_config(root)
+     fs = run_checks(root, collect_diff(root, "base", resolve_base(root, cfg)), cfg, fast=False)
+@@ -1020,7 +1122,9 @@
  - Never weaken tests to make them pass. Never edit lint/CI/hook config.
  - Reuse existing helpers; don't duplicate code or add `_v2`/`_new`/`enhanced_` variants. Replace the original.
  - Comments describe the code, not the conversation ("as requested", "now uses", "for now", "should work").
@@ -945,3 +1046,95 @@ diff -ruN '--exclude=.ruff_cache' '--exclude=__pycache__' /home/stcksmsh/.claude
  - If a slopstop finding is wrong, say so to the user instead of working around it.
  <!-- slopstop:end -->
  """
+@@ -1086,6 +1190,82 @@
+     print("done. run `slop doctor` to see which linters are installed.")
+     return 0
+ 
++HOOK_EVENTS = {
++    "PreToolUse": ("Edit|Write|MultiEdit|NotebookEdit|Bash", "hook pre", 15),
++    "PostToolUse": ("Edit|Write|MultiEdit|NotebookEdit", "hook post", 60),
++    "Stop": (None, "hook stop", 900),
++}
++
++def _is_slop_group(g: dict) -> bool:
++    return any("slop" in h.get("command", "") and " hook " in h.get("command", "") for h in g.get("hooks", []))
++
++def cmd_install_global(args: list[str]) -> int:
++    """Install this kit user-wide with an upgrade-proof path.
++
++    ~/.local/share/slopstop/versions/<stamp>/   copy of this kit (last 3 kept)
++    ~/.local/share/slopstop/current             symlink, flipped atomically on every install
++    ~/.local/bin/slop                           symlink -> current/slop.py   (the ONLY path hooks reference)
++    <claude config dir>/settings.json           Pre/Post/Stop hooks calling ~/.local/bin/slop
++
++    Hooks only act in repos that contain a `.slop.toml` (or when SLOP_ALL=1), so a global install is inert
++    elsewhere. To upgrade: run `install-global` from the new kit; settings.json does not change.
++    Flags: --dry-run, --config-dir DIR (default $CLAUDE_CONFIG_DIR or ~/.claude), --uninstall
++    """
++    dry = "--dry-run" in args
++    home = Path.home()
++    cdir = Path(args[args.index("--config-dir") + 1]) if "--config-dir" in args else \
++        Path(os.environ.get("CLAUDE_CONFIG_DIR") or home / ".claude")
++    base = home / ".local" / "share" / "slopstop"
++    link = home / ".local" / "bin" / "slop"
++    settings = cdir / "settings.json"
++    try:
++        data = json.loads(settings.read_text()) if settings.exists() else {}
++    except json.JSONDecodeError:
++        print(f"install-global: {settings} is not valid JSON; fix it first", file=sys.stderr)
++        return 1
++    hooks = data.setdefault("hooks", {})
++    if "--uninstall" in args:
++        for ev in list(hooks):
++            hooks[ev] = [g for g in hooks[ev] if not _is_slop_group(g)]
++            if not hooks[ev]:
++                del hooks[ev]
++        print(f"{'would remove' if dry else 'removed'} slop hooks from {settings}")
++        if not dry:
++            settings.write_text(json.dumps(data, indent=2) + "\n")
++        return 0
++    stamp = time.strftime("%Y%m%d-%H%M%S")
++    dest = base / "versions" / stamp
++    print(f"kit        {KIT} -> {dest}\ncurrent -> {dest.name}\nlauncher   {link} -> {base / 'current' / 'slop.py'}\nsettings   {settings}")
++    for ev, (matcher, sub, to) in HOOK_EVENTS.items():
++        print(f"  {ev}: {link} {sub}")
++    if dry:
++        print("dry run: nothing written")
++        return 0
++    shutil.copytree(KIT, dest, ignore=shutil.ignore_patterns(".ruff_cache", "__pycache__", ".git"))
++    tmp = base / ".current.new"
++    if tmp.is_symlink() or tmp.exists():
++        tmp.unlink()
++    tmp.symlink_to(dest)
++    os.replace(tmp, base / "current")  # atomic flip
++    link.parent.mkdir(parents=True, exist_ok=True)
++    if link.is_symlink() or link.exists():
++        link.unlink()
++    link.symlink_to(base / "current" / "slop.py")
++    (base / "current" / "slop.py").chmod(0o755)
++    vers = sorted((base / "versions").iterdir())
++    for old in vers[:-3]:
++        shutil.rmtree(old, ignore_errors=True)
++    cdir.mkdir(parents=True, exist_ok=True)
++    for ev, (matcher, sub, to) in HOOK_EVENTS.items():
++        groups = [g for g in hooks.get(ev, []) if not _is_slop_group(g)]
++        grp = {"hooks": [{"type": "command", "command": f"{link} {sub}", "timeout": to}]}
++        if matcher:
++            grp["matcher"] = matcher
++        hooks[ev] = groups + [grp]
++    settings.write_text(json.dumps(data, indent=2) + "\n")
++    print("done. Hooks are inert in repos without a .slop.toml; run `slop init` in a repo to opt in.")
++    return 0
++
+ def cmd_selftest(args: list[str]) -> int:
+     import selftest  # noqa: E402  (kit-local module)
+     return selftest.main(KIT)
+@@ -1107,7 +1287,7 @@
+         except Exception as e:  # never wedge the agent on an internal bug
+             print(f"slopstop internal error ({ev}): {e}", file=sys.stderr)
+             return 0
+-    return {"check": cmd_check, "doctor": cmd_doctor, "init": cmd_init, "selftest": cmd_selftest}.get(
++    return {"check": cmd_check, "doctor": cmd_doctor, "init": cmd_init, "install-global": cmd_install_global, "selftest": cmd_selftest}.get(
+         cmd, lambda a: (print(__doc__), 1)[1])(rest)
+ 
+ if __name__ == "__main__":

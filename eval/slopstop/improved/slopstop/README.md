@@ -69,6 +69,20 @@ git clone <your repo> ~/.local/share/slopstop
 slop selftest                                      # 35 checks on seeded slop across languages
 ```
 
+User-wide (every Claude Code session on the machine), with an upgrade-proof path:
+
+```sh
+slop install-global --dry-run     # show what it would write
+slop install-global               # copy the kit to ~/.local/share/slopstop/versions/<stamp>, flip `current`,
+                                  # link ~/.local/bin/slop, merge hooks into $CLAUDE_CONFIG_DIR (or ~/.claude)/settings.json
+slop install-global --uninstall   # remove only slop's hooks
+```
+
+Hooks always call `~/.local/bin/slop hook ...`. Upgrading = unpack the new kit and run its `slop install-global`
+again: the `current` symlink flips atomically and settings.json is rewritten identically (last 3 versions kept).
+User-wide hooks are inert in any repo without a `.slop.toml` (or `SLOP_ALL=1`), so `slop init` is the per-repo opt-in.
+Hooks run with your normal PATH, so install `ast-grep`, `ruff`, `jscpd` etc. where that PATH finds them (pipx/npm -g).
+
 Per repo:
 
 ```sh

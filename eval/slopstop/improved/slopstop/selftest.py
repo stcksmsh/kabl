@@ -7,6 +7,7 @@ Cases whose tool is missing are skipped, not failed.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -384,9 +385,10 @@ def main(kit: Path) -> int:
                 print(f"FAIL jscpd: duplicate not detected, got={sorted(got)}")
 
         # ---------------- hook behaviour
-        def run_hook(ev, payload):
+        def run_hook(ev, payload, optin=True):
+            env = {**os.environ, "SLOP_ALL": "1"} if optin else {k: v for k, v in os.environ.items() if k != "SLOP_ALL"}
             r = subprocess.run([sys.executable, str(kit / "slop.py"), "hook", ev], input=json.dumps(payload),
-                               capture_output=True, text=True, cwd=root)
+                               capture_output=True, text=True, cwd=root, env=env)
             return r.returncode, r.stdout, r.stderr
 
         def check(name, cond, detail=""):
@@ -401,6 +403,9 @@ def main(kit: Path) -> int:
         rc, out, _ = run_hook("pre", {"cwd": str(root), "tool_name": "Edit", "tool_input": {
             "file_path": str(root / "clippy.toml"), "old_string": "20", "new_string": "200"}})
         check("pre denies gate edit", '"deny"' in out, out)
+        rc, out, _ = run_hook("pre", {"cwd": str(root), "tool_name": "Edit", "tool_input": {
+            "file_path": str(root / "clippy.toml"), "old_string": "20", "new_string": "200"}}, optin=False)
+        check("user-wide hooks stay silent in a repo without .slop.toml", out.strip() == "" and rc == 0, out)
         rc, out, _ = run_hook("pre", {"cwd": str(root), "tool_name": "Edit", "tool_input": {
             "file_path": str(root / "src/engine.rs"), "old_string": "pub fn gain",
             "new_string": "#[allow(dead_code)]\npub fn gain"}})

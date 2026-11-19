@@ -6,6 +6,7 @@ Stdlib only. External tools are optional; each is used when installed.
   slop check [--base REF | --staged | --all] [--fast] [--json]
   slop doctor                 which tools are available for this repo
   slop init                   wire hooks + CLAUDE.md block + .slop.toml into a repo
+  slop install-global         install user-wide (upgrade-proof path); see `slop help install-global`
   slop selftest               run bundled fixtures
 """
 from __future__ import annotations
@@ -19,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
@@ -963,8 +965,14 @@ BASH_BYPASS = re.compile(r"git\s+(commit|push|merge|rebase)\b[^|;&]*\s(--no-veri
                          r"git\s+config\s+[^|;&]*core\.hooksPath|\bchmod\s+-x\s+\S*hooks")
 BASH_WRITE = re.compile(r"(>|>>|\btee\b|\bsed\s+-i|\bperl\s+-p?i|\bmv\b|\bcp\b|\brm\b|\btruncate\b)")
 
+def opted_in(root: Path) -> bool:
+    """Hooks installed user-wide only act in repos that opt in with a `.slop.toml` (or SLOP_ALL=1)."""
+    return (root / ".slop.toml").exists() or os.environ.get("SLOP_ALL") == "1"
+
 def hook_pre(inp: dict) -> int:
     root = hook_root(inp)
+    if not opted_in(root):
+        return 0
     cfg = load_config(root)
     tool = inp.get("tool_name", "")
     if tool == "Bash":
@@ -1004,6 +1012,8 @@ def hook_pre(inp: dict) -> int:
 
 def hook_post(inp: dict) -> int:
     root = hook_root(inp)
+    if not opted_in(root):
+        return 0
     cfg = load_config(root)
     fp, _, _ = proposed_texts(inp)
     if not fp or not git_root(root):
@@ -1027,7 +1037,7 @@ def state_file(root: Path) -> Path:
 
 def hook_stop(inp: dict) -> int:
     root = hook_root(inp)
-    if not git_root(root):
+    if not git_root(root) or not opted_in(root):
         return 0
     cfg = load_config(root)
     fs = run_checks(root, collect_diff(root, "base", resolve_base(root, cfg)), cfg, fast=False)
@@ -1180,6 +1190,82 @@ def cmd_init(args: list[str]) -> int:
     print("done. run `slop doctor` to see which linters are installed.")
     return 0
 
+HOOK_EVENTS = {
+    "PreToolUse": ("Edit|Write|MultiEdit|NotebookEdit|Bash", "hook pre", 15),
+    "PostToolUse": ("Edit|Write|MultiEdit|NotebookEdit", "hook post", 60),
+    "Stop": (None, "hook stop", 900),
+}
+
+def _is_slop_group(g: dict) -> bool:
+    return any("slop" in h.get("command", "") and " hook " in h.get("command", "") for h in g.get("hooks", []))
+
+def cmd_install_global(args: list[str]) -> int:
+    """Install this kit user-wide with an upgrade-proof path.
+
+    ~/.local/share/slopstop/versions/<stamp>/   copy of this kit (last 3 kept)
+    ~/.local/share/slopstop/current             symlink, flipped atomically on every install
+    ~/.local/bin/slop                           symlink -> current/slop.py   (the ONLY path hooks reference)
+    <claude config dir>/settings.json           Pre/Post/Stop hooks calling ~/.local/bin/slop
+
+    Hooks only act in repos that contain a `.slop.toml` (or when SLOP_ALL=1), so a global install is inert
+    elsewhere. To upgrade: run `install-global` from the new kit; settings.json does not change.
+    Flags: --dry-run, --config-dir DIR (default $CLAUDE_CONFIG_DIR or ~/.claude), --uninstall
+    """
+    dry = "--dry-run" in args
+    home = Path.home()
+    cdir = Path(args[args.index("--config-dir") + 1]) if "--config-dir" in args else \
+        Path(os.environ.get("CLAUDE_CONFIG_DIR") or home / ".claude")
+    base = home / ".local" / "share" / "slopstop"
+    link = home / ".local" / "bin" / "slop"
+    settings = cdir / "settings.json"
+    try:
+        data = json.loads(settings.read_text()) if settings.exists() else {}
+    except json.JSONDecodeError:
+        print(f"install-global: {settings} is not valid JSON; fix it first", file=sys.stderr)
+        return 1
+    hooks = data.setdefault("hooks", {})
+    if "--uninstall" in args:
+        for ev in list(hooks):
+            hooks[ev] = [g for g in hooks[ev] if not _is_slop_group(g)]
+            if not hooks[ev]:
+                del hooks[ev]
+        print(f"{'would remove' if dry else 'removed'} slop hooks from {settings}")
+        if not dry:
+            settings.write_text(json.dumps(data, indent=2) + "\n")
+        return 0
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    dest = base / "versions" / stamp
+    print(f"kit        {KIT} -> {dest}\ncurrent -> {dest.name}\nlauncher   {link} -> {base / 'current' / 'slop.py'}\nsettings   {settings}")
+    for ev, (matcher, sub, to) in HOOK_EVENTS.items():
+        print(f"  {ev}: {link} {sub}")
+    if dry:
+        print("dry run: nothing written")
+        return 0
+    shutil.copytree(KIT, dest, ignore=shutil.ignore_patterns(".ruff_cache", "__pycache__", ".git"))
+    tmp = base / ".current.new"
+    if tmp.is_symlink() or tmp.exists():
+        tmp.unlink()
+    tmp.symlink_to(dest)
+    os.replace(tmp, base / "current")  # atomic flip
+    link.parent.mkdir(parents=True, exist_ok=True)
+    if link.is_symlink() or link.exists():
+        link.unlink()
+    link.symlink_to(base / "current" / "slop.py")
+    (base / "current" / "slop.py").chmod(0o755)
+    vers = sorted((base / "versions").iterdir())
+    for old in vers[:-3]:
+        shutil.rmtree(old, ignore_errors=True)
+    cdir.mkdir(parents=True, exist_ok=True)
+    for ev, (matcher, sub, to) in HOOK_EVENTS.items():
+        groups = [g for g in hooks.get(ev, []) if not _is_slop_group(g)]
+        grp = {"hooks": [{"type": "command", "command": f"{link} {sub}", "timeout": to}]}
+        if matcher:
+            grp["matcher"] = matcher
+        hooks[ev] = groups + [grp]
+    settings.write_text(json.dumps(data, indent=2) + "\n")
+    print("done. Hooks are inert in repos without a .slop.toml; run `slop init` in a repo to opt in.")
+    return 0
+
 def cmd_selftest(args: list[str]) -> int:
     import selftest  # noqa: E402  (kit-local module)
     return selftest.main(KIT)
@@ -1201,7 +1287,7 @@ def main(argv: list[str]) -> int:
         except Exception as e:  # never wedge the agent on an internal bug
             print(f"slopstop internal error ({ev}): {e}", file=sys.stderr)
             return 0
-    return {"check": cmd_check, "doctor": cmd_doctor, "init": cmd_init, "selftest": cmd_selftest}.get(
+    return {"check": cmd_check, "doctor": cmd_doctor, "init": cmd_init, "install-global": cmd_install_global, "selftest": cmd_selftest}.get(
         cmd, lambda a: (print(__doc__), 1)[1])(rest)
 
 if __name__ == "__main__":
