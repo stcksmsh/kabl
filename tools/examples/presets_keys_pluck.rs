@@ -28,6 +28,18 @@ use kabl_ui::PatchEditor;
 
 const SR: f32 = 48000.0;
 
+/// A range check of the macro lines: a panic, or with `PP_LENIENT` set a printed warning (to see every
+/// out-of-range line of a preset in one run while designing).
+fn in_range(ok: bool, msg: impl FnOnce() -> String) {
+    if !ok {
+        if std::env::var_os("PP_LENIENT").is_some() {
+            eprintln!("RANGE {}", msg());
+        } else {
+            panic!("{}", msg());
+        }
+    }
+}
+
 fn jack(id: ModuleId, port: &str) -> PortRef {
     PortRef::Module {
         id,
@@ -132,11 +144,12 @@ impl Rack {
         let i = param_of(kind, param);
         let (n0, nd) = (i.to_norm(lo), i.to_norm(d));
         let amount = (nd - n0) / stored;
-        assert!(
-            n0 + amount <= 1.0 + 1e-3 && n0 + amount >= -1e-3,
-            "{kind}.{param}: macro {m} runs out of range ({})",
-            n0 + amount
-        );
+        in_range(n0 + amount <= 1.0 + 1e-3 && n0 + amount >= -1e-3, || {
+            format!(
+                "{kind}.{param}: macro {m} runs out of range ({})",
+                n0 + amount
+            )
+        });
         self.e.set_param(id, param, lo);
         self.route(knob, &format!("m{m}"), id, param, amount);
     }
@@ -156,10 +169,9 @@ impl Rack {
         let i = param_of(kind, param);
         let (nd, n1) = (i.to_norm(d), i.to_norm(hi));
         let n0 = (nd - stored * n1) / (1.0 - stored);
-        assert!(
-            (-1e-3..=1.0 + 1e-3).contains(&n0),
-            "{kind}.{param}: macro {m} starts out of range ({n0})"
-        );
+        in_range((-1e-3..=1.0 + 1e-3).contains(&n0), || {
+            format!("{kind}.{param}: macro {m} starts out of range ({n0})")
+        });
         self.span(knob, m, id, kind, param, i.from_norm(n0.clamp(0.0, 1.0)), d);
     }
     /// A macro stored at 0: `param` stands at `d` there and runs to `hi` at 1.
@@ -741,6 +753,50 @@ fn main() {
                     }
                     let (peak, loud) = level(rack.e.state());
                     line += &format!(" | {v}: peak {peak:6.2} loud {loud:6.2}");
+                }
+                println!("{line}");
+            }
+        }
+        Some("hot") => {
+            // `hot [slug]`: the chord measurement's peak and loudness with all macros at 1 and with each
+            // macro alone at 1 and at 0 (the others stored), as the factory level test sees them.
+            let only = args.get(2);
+            for p in presets()
+                .into_iter()
+                .filter(|p| only.is_none_or(|s| s == p.slug))
+            {
+                let mut line = format!("HOT {:16}", p.slug);
+                for hot in [0usize, 1, 2, 3, 4, 5] {
+                    for val in [1.0, 0.0] {
+                        if hot == 0 && val == 0.0 {
+                            continue;
+                        }
+                        let mut rack = (p.build)();
+                        rack.trim(level_trim(p.slug));
+                        let knob = *rack
+                            .e
+                            .state()
+                            .modules
+                            .iter()
+                            .find(|(_, m)| m.kind == "macro")
+                            .unwrap()
+                            .0;
+                        for k in 1..=4 {
+                            if hot == 0 || hot == k {
+                                rack.e.set_param(knob, &format!("m{k}"), val);
+                            }
+                        }
+                        if hot == 5 {
+                            continue;
+                        }
+                        let (peak, loud) = level(rack.e.state());
+                        let tag = if hot == 0 {
+                            "all".to_string()
+                        } else {
+                            format!("m{hot}")
+                        };
+                        line += &format!(" | {tag}@{val}: {peak:5.1}/{loud:5.1}");
+                    }
                 }
                 println!("{line}");
             }

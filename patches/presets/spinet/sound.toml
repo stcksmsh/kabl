@@ -6,6 +6,6 @@ tags = [
     "harpsichord",
     "world",
 ]
-description = "A bright harpsichord-like key: a thin pulse and a saw, an instant attack and a plucked fall, with a faint buzz. Play counterpoint lines. Tone opens the filter, Buzz adds drive, Room sets the echo and a room, Chorus doubles the strings."
+description = "A bright harpsichord-like key: a thin pulse and a saw, an instant attack and a plucked fall, with a faint buzz. Play counterpoint lines. Jack goes from a dull, boxed key to a bright pluck whose filter snaps on every note, Honky pulls the second string out of tune, Sustain lets the strings ring out after the key is up, Double brings in a deep chorus."
 keys = true
 sequence = false
