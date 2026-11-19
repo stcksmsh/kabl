@@ -1,0 +1,14 @@
+name = "Roller Rink"
+category = "Piece"
+tags = [
+    "sequenced",
+    "cues",
+    "drums",
+    "arp",
+    "synthwave",
+    "100bpm",
+    "80s",
+]
+description = "A self-playing synthwave piece at 100 BPM: a running eighth-note bass, lush saw chords through a chorus, a pulse arpeggio, a kick and a big gated snare, in A minor. Press Run, then launch the four cues with the pads or CC 40-43: Intro, Verse, Chorus, Break. Glow opens the filter and deepens the chorus, Arp brings the arpeggio up and lengthens its notes, Gated makes the snare louder and its gated tail longer, Space sets the echo and the room."
+keys = true
+sequence = true

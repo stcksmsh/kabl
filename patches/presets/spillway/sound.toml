@@ -1,0 +1,14 @@
+name = "Spillway"
+category = "Piece"
+tags = [
+    "sequenced",
+    "cues",
+    "drums",
+    "two-step",
+    "reese",
+    "drum and bass",
+    "174bpm",
+]
+description = "A self-playing drum and bass piece at 174 BPM: a two-step kick and snare, a sine sub and a beating reese in F minor, and a slow pad bed. Press Run, then launch the four cues with the pads or CC 40-43: Intro, Build, Drop, Rolldown. Weight brings in the sub, Reese makes the saws beat faster and bite, Break adds ghost snares and busy hats, Haze sets the echo and the room."
+keys = true
+sequence = true
