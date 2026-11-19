@@ -25,6 +25,9 @@ use kabl_ui::library::Meta;
 use kabl_ui::perform::{BTN_PREFIX, CC_PREFIX, CUE_PADS, PIN_PREFIX, TRANSPORT};
 use kabl_ui::{cues, PatchEditor};
 
+/// Extra parts a piece adds to the master sum: the sources to mix in.
+type ExtraFn = fn(&mut Rack, ModuleId) -> Vec<(ModuleId, &'static str)>;
+
 const SR_DEFAULT: f32 = 48000.0;
 
 /// The render rate: 48 kHz, or `PP_SR` for an A/B at another rate.
@@ -456,15 +459,19 @@ struct LineH {
 }
 
 /// A clock divided by `div` (cascaded: the module divides by 8 at most).
-fn divided(r: &mut Rack, clock: ModuleId, div: f32) -> (ModuleId, &'static str, ModuleId, &'static str) {
+fn divided(
+    r: &mut Rack,
+    clock: ModuleId,
+    div: f32,
+) -> (ModuleId, &'static str, ModuleId, &'static str) {
     let mut src = (clock, "gate", clock, "reset");
     let mut left = div as u32;
     while left > 1 {
-        let f = if left >= 8 && left % 8 == 0 {
+        let f = if left >= 8 && left.is_multiple_of(8) {
             8
-        } else if left % 4 == 0 {
+        } else if left.is_multiple_of(4) {
             4
-        } else if left % 2 == 0 {
+        } else if left.is_multiple_of(2) {
             2
         } else {
             panic!("div {div}")
@@ -520,7 +527,10 @@ fn add_line(r: &mut Rack, clock: ModuleId, l: &Line) -> LineH {
     if l.sub > 0.0 {
         let sub = r.add(
             "osc.va",
-            &[("base_hz", 261.63 * 2f32.powf(l.oct - 1.0)), ("waveform", 0.0)],
+            &[
+                ("base_hz", 261.63 * 2f32.powf(l.oct - 1.0)),
+                ("waveform", 0.0),
+            ],
         );
         r.wire(seq, "pitch", sub, "pitch");
         let mix = r.add("mixer", &[("level1", 1.0), ("level2", l.sub)]);
@@ -559,7 +569,12 @@ fn sum(r: &mut Rack, srcs: &[(ModuleId, &str)]) -> ModuleId {
     loop {
         let m = r.add(
             "mixer",
-            &[("level1", 1.0), ("level2", 1.0), ("level3", 1.0), ("level4", 1.0)],
+            &[
+                ("level1", 1.0),
+                ("level2", 1.0),
+                ("level3", 1.0),
+                ("level4", 1.0),
+            ],
         );
         let mut slot = 1;
         if let Some(p) = prev {
@@ -676,14 +691,16 @@ fn add_kit(r: &mut Rack, clock: ModuleId, k: &Kit, duck: Option<ModuleId>) -> Ki
     if let Some(d) = duck {
         r.wire(kick, "out", d, "sc");
     }
-    let beat = r.add(
+    let beat = r.add("mixer", &[("level1", k.mix[0])]);
+    r.wire(kick, "out", beat, "in1");
+    let top = r.add(
         "mixer",
         &[
-            ("level1", k.mix[0]),
+            ("level1", k.mix[2]),
+            ("level2", k.mix[3]),
+            ("level3", k.mix[1]),
         ],
     );
-    r.wire(kick, "out", beat, "in1");
-    let top = r.add("mixer", &[("level1", k.mix[2]), ("level2", k.mix[3]), ("level3", k.mix[1])]);
     r.wire(clap, "out", top, "in1");
     r.wire(hat, "out", top, "in2");
     r.wire(snare, "out", top, "in3");
@@ -748,7 +765,7 @@ struct Spec {
     /// A chorus before the echo and room (mix 0 until a macro opens it).
     chorus: bool,
     /// More sources for the bus, built by the piece (a random melody, say).
-    extra: Option<fn(&mut Rack, ModuleId) -> Vec<(ModuleId, &'static str)>>,
+    extra: Option<ExtraFn>,
 }
 
 struct H {
@@ -836,7 +853,10 @@ fn assemble(s: &Spec) -> (Rack, H) {
         (None, None)
     };
     let crush = s.crush.then(|| {
-        r.add("bitcrusher", &[("bits", 7.0), ("downsample", 4.0), ("mix", 0.0)])
+        r.add(
+            "bitcrusher",
+            &[("bits", 7.0), ("downsample", 4.0), ("mix", 0.0)],
+        )
     });
     let mut post_srcs = vec![(drive, "out")];
     if let Some(c) = crush {
@@ -922,8 +942,14 @@ fn assemble(s: &Spec) -> (Rack, H) {
         None => src,
     };
     let split = r.split(tail);
-    let l = r.add("mixer", &[("level1", 1.0), ("level2", 1.0), ("level3", 1.0)]);
-    let rr = r.add("mixer", &[("level1", 1.0), ("level2", 1.0), ("level3", 1.0)]);
+    let l = r.add(
+        "mixer",
+        &[("level1", 1.0), ("level2", 1.0), ("level3", 1.0)],
+    );
+    let rr = r.add(
+        "mixer",
+        &[("level1", 1.0), ("level2", 1.0), ("level3", 1.0)],
+    );
     r.wire(split, "left", l, "in1");
     r.wire(split, "right", rr, "in1");
     if let Some(k) = &kit {
@@ -1142,32 +1168,93 @@ fn gantry() -> (Rack, Vec<CueDef>) {
     let (mut r, h) = assemble(&s);
     let k = h.knob;
     // Climb: the master filter opens and a pink-noise riser fades in over it.
-    rise(&mut r, k, 1, h.lad, "filter.ladder", "cutoff_hz", 140.0, 12000.0);
+    rise(
+        &mut r,
+        k,
+        1,
+        h.lad,
+        "filter.ladder",
+        "cutoff_hz",
+        140.0,
+        12000.0,
+    );
     rise(&mut r, k, 1, h.lad, "filter.ladder", "resonance", 0.62, 0.3);
     r.route(k, "m1", h.riser.unwrap(), "gain", 0.5);
-    rise(&mut r, k, 1, h.kit.as_ref().unwrap().top_lad, "filter.ladder", "cutoff_hz", 700.0, 18000.0);
+    rise(
+        &mut r,
+        k,
+        1,
+        h.kit.as_ref().unwrap().top_lad,
+        "filter.ladder",
+        "cutoff_hz",
+        700.0,
+        18000.0,
+    );
     level_comp(&mut r, &h, 1, h.trim, 8.0);
     // Rumble: the bass part from out to full, and its notes lengthen.
     let rum = &h.lines[0];
     rise(&mut r, k, 2, rum.gain, "gain", "gain_db", -34.0, -8.0);
     rise(&mut r, k, 2, rum.seq, "seq", "gate_len", 25.0, 90.0);
-    rise(&mut r, k, 2, rum.tone.unwrap(), "filter.svf", "cutoff_hz", 140.0, 450.0);
+    rise(
+        &mut r,
+        k,
+        2,
+        rum.tone.unwrap(),
+        "filter.svf",
+        "cutoff_hz",
+        140.0,
+        450.0,
+    );
     // Acid: the stab's filter opens and squeals.
     let acid = &h.lines[1];
     r.e.set_param(acid.tone.unwrap(), "cutoff_hz", 1400.0);
     rise(&mut r, k, 3, acid.env, "env.adsr", "decay_ms", 40.0, 320.0);
-    rise(&mut r, k, 3, acid.tone.unwrap(), "filter.svf", "resonance", 0.15, 0.78);
+    rise(
+        &mut r,
+        k,
+        3,
+        acid.tone.unwrap(),
+        "filter.svf",
+        "resonance",
+        0.15,
+        0.78,
+    );
     rise(&mut r, k, 3, acid.gain, "gain", "gain_db", -18.0, -15.0);
     // Pump: the kick ducks the music harder.
     let duck = h.duck.unwrap();
     rise(&mut r, k, 4, duck, "compressor", "threshold_db", 0.0, -45.0);
     rise(&mut r, k, 4, h.comp, "compressor", "makeup_db", 0.0, 8.0);
     let cues = vec![
-        CueDef { name: "Intro", targets: s.stored, morph: 0.0, bar: 0.0 },
-        CueDef { name: "Build", targets: [0.92, 0.55, 0.45, 0.8], morph: 16.0, bar: 4.0 },
-        CueDef { name: "Drop", targets: [0.75, 1.0, 0.6, 1.0], morph: 0.0, bar: 8.0 },
-        CueDef { name: "Break", targets: [0.25, 0.1, 0.3, 0.3], morph: 4.0, bar: 16.0 },
-        CueDef { name: "Peak", targets: [0.95, 1.0, 0.95, 0.9], morph: 8.0, bar: 20.0 },
+        CueDef {
+            name: "Intro",
+            targets: s.stored,
+            morph: 0.0,
+            bar: 0.0,
+        },
+        CueDef {
+            name: "Build",
+            targets: [0.92, 0.55, 0.45, 0.8],
+            morph: 16.0,
+            bar: 4.0,
+        },
+        CueDef {
+            name: "Drop",
+            targets: [0.75, 1.0, 0.6, 1.0],
+            morph: 0.0,
+            bar: 8.0,
+        },
+        CueDef {
+            name: "Break",
+            targets: [0.25, 0.1, 0.3, 0.3],
+            morph: 4.0,
+            bar: 16.0,
+        },
+        CueDef {
+            name: "Peak",
+            targets: [0.95, 1.0, 0.95, 0.9],
+            morph: 8.0,
+            bar: 20.0,
+        },
     ];
     finish(&mut r, &h, &cues);
     (r, cues)
@@ -1259,22 +1346,71 @@ fn dead_calm() -> (Rack, Vec<CueDef>) {
     let (mut r, h) = assemble(&s);
     let k = h.knob;
     // Swell: the master filter opens, a riser fades in, the drone gets a little louder.
-    rise(&mut r, k, 1, h.lad, "filter.ladder", "cutoff_hz", 180.0, 9000.0);
+    rise(
+        &mut r,
+        k,
+        1,
+        h.lad,
+        "filter.ladder",
+        "cutoff_hz",
+        180.0,
+        9000.0,
+    );
     r.route(k, "m1", h.riser.unwrap(), "gain", 0.4);
     rise(&mut r, k, 1, h.lines[0].gain, "gain", "gain_db", -6.0, 0.0);
     level_comp(&mut r, &h, 1, h.trim, 6.0);
     // Dread: the cluster comes up out of nothing and opens.
-    rise(&mut r, k, 2, h.lines[3].gain, "gain", "gain_db", -30.0, -4.0);
-    rise(&mut r, k, 2, h.lines[3].tone.unwrap(), "filter.svf", "cutoff_hz", 400.0, 4000.0);
+    rise(
+        &mut r,
+        k,
+        2,
+        h.lines[3].gain,
+        "gain",
+        "gain_db",
+        -30.0,
+        -4.0,
+    );
+    rise(
+        &mut r,
+        k,
+        2,
+        h.lines[3].tone.unwrap(),
+        "filter.svf",
+        "cutoff_hz",
+        400.0,
+        4000.0,
+    );
     // Pulse: the heartbeat toms and the low impact come up.
+    // Hall: the echo and room add level; take the stage down by what they add.
+    level_comp(&mut r, &h, 4, h.trim, 4.6);
     let kit = h.kit.as_ref().unwrap();
     rise(&mut r, k, 3, kit.out, "mixer", "level1", 0.0, 1.0);
     rise(&mut r, k, 3, kit.out, "mixer", "level2", 0.0, 0.8);
     let cues = vec![
-        CueDef { name: "Hush", targets: s.stored, morph: 0.0, bar: 0.0 },
-        CueDef { name: "Swell", targets: [0.85, 0.45, 0.35, 0.7], morph: 16.0, bar: 4.0 },
-        CueDef { name: "Impact", targets: [1.0, 0.7, 1.0, 0.5], morph: 0.0, bar: 8.0 },
-        CueDef { name: "Aftermath", targets: [0.15, 0.2, 0.15, 0.8], morph: 16.0, bar: 12.0 },
+        CueDef {
+            name: "Hush",
+            targets: s.stored,
+            morph: 0.0,
+            bar: 0.0,
+        },
+        CueDef {
+            name: "Swell",
+            targets: [0.85, 0.45, 0.35, 0.7],
+            morph: 16.0,
+            bar: 4.0,
+        },
+        CueDef {
+            name: "Impact",
+            targets: [1.0, 0.7, 1.0, 0.5],
+            morph: 0.0,
+            bar: 8.0,
+        },
+        CueDef {
+            name: "Aftermath",
+            targets: [0.15, 0.2, 0.15, 0.8],
+            morph: 16.0,
+            bar: 12.0,
+        },
     ];
     finish(&mut r, &h, &cues);
     (r, cues)
@@ -1367,15 +1503,53 @@ fn pawn_shop() -> (Rack, Vec<CueDef>) {
         depth_route(&mut r, lfo, "out", l.osc, "fine", k, "m2", 0.05);
     }
     // Tape: from muffled and saturated to clean and open.
-    rise(&mut r, k, 3, h.lad, "filter.ladder", "cutoff_hz", 1200.0, 9000.0);
-    rise(&mut r, k, 3, h.kit.as_ref().unwrap().top_lad, "filter.ladder", "cutoff_hz", 3000.0, 16000.0);
+    rise(
+        &mut r,
+        k,
+        3,
+        h.lad,
+        "filter.ladder",
+        "cutoff_hz",
+        1200.0,
+        9000.0,
+    );
+    rise(
+        &mut r,
+        k,
+        3,
+        h.kit.as_ref().unwrap().top_lad,
+        "filter.ladder",
+        "cutoff_hz",
+        3000.0,
+        16000.0,
+    );
     rise(&mut r, k, 3, h.drive, "drive", "drive_db", 22.0, 2.0);
     rise(&mut r, k, 3, h.drive, "drive", "trim_db", -12.0, -2.0);
     let cues = vec![
-        CueDef { name: "Verse", targets: s.stored, morph: 0.0, bar: 0.0 },
-        CueDef { name: "Hook", targets: [0.5, 0.0, 1.0, 0.45], morph: 4.0, bar: 6.0 },
-        CueDef { name: "Bridge", targets: [0.8, 0.5, 0.1, 0.35], morph: 4.0, bar: 12.0 },
-        CueDef { name: "Outro", targets: [0.3, 0.9, 0.4, 0.6], morph: 8.0, bar: 18.0 },
+        CueDef {
+            name: "Verse",
+            targets: s.stored,
+            morph: 0.0,
+            bar: 0.0,
+        },
+        CueDef {
+            name: "Hook",
+            targets: [0.5, 0.0, 1.0, 0.45],
+            morph: 4.0,
+            bar: 6.0,
+        },
+        CueDef {
+            name: "Bridge",
+            targets: [0.8, 0.5, 0.1, 0.35],
+            morph: 4.0,
+            bar: 12.0,
+        },
+        CueDef {
+            name: "Outro",
+            targets: [0.3, 0.9, 0.4, 0.6],
+            morph: 8.0,
+            bar: 18.0,
+        },
     ];
     finish(&mut r, &h, &cues);
     (r, cues)
@@ -1459,12 +1633,39 @@ fn laundromat() -> (Rack, Vec<CueDef>) {
     let (mut r, h) = assemble(&s);
     let k = h.knob;
     // Sweep: a DJ filter over the loop, the hats and the clap follow it.
-    rise(&mut r, k, 1, h.lad, "filter.ladder", "cutoff_hz", 200.0, 14000.0);
+    rise(
+        &mut r,
+        k,
+        1,
+        h.lad,
+        "filter.ladder",
+        "cutoff_hz",
+        200.0,
+        14000.0,
+    );
     rise(&mut r, k, 1, h.lad, "filter.ladder", "resonance", 0.6, 0.2);
-    rise(&mut r, k, 1, h.kit.as_ref().unwrap().top_lad, "filter.ladder", "cutoff_hz", 1500.0, 16000.0);
+    rise(
+        &mut r,
+        k,
+        1,
+        h.kit.as_ref().unwrap().top_lad,
+        "filter.ladder",
+        "cutoff_hz",
+        1500.0,
+        16000.0,
+    );
     level_comp(&mut r, &h, 1, h.trim, 6.0);
     // Crunch: the bus is bitcrushed and driven harder.
-    rise(&mut r, k, 2, h.crush.unwrap(), "bitcrusher", "mix", 0.0, 70.0);
+    rise(
+        &mut r,
+        k,
+        2,
+        h.crush.unwrap(),
+        "bitcrusher",
+        "mix",
+        0.0,
+        70.0,
+    );
     rise(&mut r, k, 2, h.drive, "drive", "drive_db", 4.0, 18.0);
     rise(&mut r, k, 2, h.drive, "drive", "trim_db", -4.0, -10.0);
     // Stutter: the stabs from clipped ticks to held chords.
@@ -1472,13 +1673,42 @@ fn laundromat() -> (Rack, Vec<CueDef>) {
         rise(&mut r, k, 3, l.seq, "seq", "gate_len", 6.0, 95.0);
     }
     // Pump: the kick ducks the loop harder.
-    rise(&mut r, k, 4, h.duck.unwrap(), "compressor", "threshold_db", 0.0, -40.0);
+    rise(
+        &mut r,
+        k,
+        4,
+        h.duck.unwrap(),
+        "compressor",
+        "threshold_db",
+        0.0,
+        -40.0,
+    );
     rise(&mut r, k, 4, h.comp, "compressor", "makeup_db", 0.0, 6.0);
     let cues = vec![
-        CueDef { name: "Loop", targets: s.stored, morph: 0.0, bar: 0.0 },
-        CueDef { name: "Cut-up", targets: [0.7, 0.5, 0.1, 0.8], morph: 0.0, bar: 4.0 },
-        CueDef { name: "Break", targets: [0.15, 0.1, 0.95, 0.2], morph: 4.0, bar: 12.0 },
-        CueDef { name: "Full", targets: [0.95, 0.75, 0.5, 1.0], morph: 8.0, bar: 16.0 },
+        CueDef {
+            name: "Loop",
+            targets: s.stored,
+            morph: 0.0,
+            bar: 0.0,
+        },
+        CueDef {
+            name: "Cut-up",
+            targets: [0.7, 0.5, 0.1, 0.8],
+            morph: 0.0,
+            bar: 4.0,
+        },
+        CueDef {
+            name: "Break",
+            targets: [0.15, 0.1, 0.95, 0.2],
+            morph: 4.0,
+            bar: 12.0,
+        },
+        CueDef {
+            name: "Full",
+            targets: [0.95, 0.75, 0.5, 1.0],
+            morph: 8.0,
+            bar: 16.0,
+        },
     ];
     finish(&mut r, &h, &cues);
     (r, cues)
@@ -1576,10 +1806,28 @@ fn spillway() -> (Rack, Vec<CueDef>) {
     let (mut r, h) = assemble(&s);
     let k = h.knob;
     // Weight: the sub from nothing to a full floor shaker.
-    rise(&mut r, k, 1, h.lines[0].gain, "gain", "gain_db", -36.0, -4.0);
+    rise(
+        &mut r,
+        k,
+        1,
+        h.lines[0].gain,
+        "gain",
+        "gain_db",
+        -36.0,
+        -4.0,
+    );
     // Reese: the saws beat faster, the filter opens, the bus bites.
     rise(&mut r, k, 2, h.lines[1].osc, "osc.va", "detune", 4.0, 40.0);
-    rise(&mut r, k, 2, h.lines[1].tone.unwrap(), "filter.svf", "cutoff_hz", 500.0, 2500.0);
+    rise(
+        &mut r,
+        k,
+        2,
+        h.lines[1].tone.unwrap(),
+        "filter.svf",
+        "cutoff_hz",
+        500.0,
+        2500.0,
+    );
     rise(&mut r, k, 2, h.drive, "drive", "drive_db", 4.0, 20.0);
     rise(&mut r, k, 2, h.drive, "drive", "trim_db", -3.0, -12.0);
     // Break: ghost snares and busy hats come in around the two-step.
@@ -1587,10 +1835,30 @@ fn spillway() -> (Rack, Vec<CueDef>) {
     rise(&mut r, k, 3, kit.top, "mixer", "level1", 0.0, 1.0);
     rise(&mut r, k, 3, kit.top, "mixer", "level2", 0.1, 0.7);
     let cues = vec![
-        CueDef { name: "Intro", targets: s.stored, morph: 0.0, bar: 0.0 },
-        CueDef { name: "Build", targets: [0.4, 0.3, 0.5, 0.5], morph: 16.0, bar: 8.0 },
-        CueDef { name: "Drop", targets: [1.0, 0.7, 0.4, 0.3], morph: 0.0, bar: 16.0 },
-        CueDef { name: "Rolldown", targets: [0.7, 0.3, 1.0, 0.5], morph: 8.0, bar: 32.0 },
+        CueDef {
+            name: "Intro",
+            targets: s.stored,
+            morph: 0.0,
+            bar: 0.0,
+        },
+        CueDef {
+            name: "Build",
+            targets: [0.4, 0.3, 0.5, 0.5],
+            morph: 16.0,
+            bar: 8.0,
+        },
+        CueDef {
+            name: "Drop",
+            targets: [1.0, 0.7, 0.4, 0.3],
+            morph: 0.0,
+            bar: 16.0,
+        },
+        CueDef {
+            name: "Rolldown",
+            targets: [0.7, 0.3, 1.0, 0.5],
+            morph: 8.0,
+            bar: 32.0,
+        },
     ];
     finish(&mut r, &h, &cues);
     (r, cues)
@@ -1649,7 +1917,9 @@ fn balcony() -> (Rack, Vec<CueDef>) {
                 db: -30.0,
                 lp: 6000.0,
                 div: 2.0,
-                ..Line::new("0 4 7 12 7 4 7 4 -1 2 7 14 7 2 7 2 -3 0 4 12 4 0 4 0 -3 0 5 12 5 0 5 0")
+                ..Line::new(
+                    "0 4 7 12 7 4 7 4 -1 2 7 14 7 2 7 2 -3 0 4 12 4 0 4 0 -3 0 5 12 5 0 5 0",
+                )
             },
         ],
         kit: Some(Kit {
@@ -1692,21 +1962,82 @@ fn balcony() -> (Rack, Vec<CueDef>) {
     let (mut r, h) = assemble(&s);
     let k = h.knob;
     // Lift: the filter opens and a chorus widens the chords.
-    rise(&mut r, k, 1, h.lad, "filter.ladder", "cutoff_hz", 600.0, 14000.0);
-    rise(&mut r, k, 1, h.kit.as_ref().unwrap().top_lad, "filter.ladder", "cutoff_hz", 2000.0, 16000.0);
+    rise(
+        &mut r,
+        k,
+        1,
+        h.lad,
+        "filter.ladder",
+        "cutoff_hz",
+        600.0,
+        14000.0,
+    );
+    rise(
+        &mut r,
+        k,
+        1,
+        h.kit.as_ref().unwrap().top_lad,
+        "filter.ladder",
+        "cutoff_hz",
+        2000.0,
+        16000.0,
+    );
     rise(&mut r, k, 1, h.chorus.unwrap(), "chorus", "mix", 0.0, 55.0);
     level_comp(&mut r, &h, 1, h.trim, 5.0);
     // Sparkle: the arpeggio comes up out of the chords.
-    rise(&mut r, k, 2, h.lines[4].gain, "gain", "gain_db", -40.0, -8.0);
+    rise(
+        &mut r,
+        k,
+        2,
+        h.lines[4].gain,
+        "gain",
+        "gain_db",
+        -40.0,
+        -8.0,
+    );
     // Bounce: the kick ducks the chords and the bass.
-    rise(&mut r, k, 3, h.duck.unwrap(), "compressor", "threshold_db", 0.0, -30.0);
+    rise(
+        &mut r,
+        k,
+        3,
+        h.duck.unwrap(),
+        "compressor",
+        "threshold_db",
+        0.0,
+        -30.0,
+    );
     rise(&mut r, k, 3, h.comp, "compressor", "makeup_db", 0.0, 4.0);
     let cues = vec![
-        CueDef { name: "Verse", targets: s.stored, morph: 0.0, bar: 0.0 },
-        CueDef { name: "Pre", targets: [0.6, 0.35, 0.5, 0.35], morph: 8.0, bar: 8.0 },
-        CueDef { name: "Chorus", targets: [0.95, 0.8, 0.8, 0.4], morph: 0.0, bar: 12.0 },
-        CueDef { name: "Bridge", targets: [0.2, 0.45, 0.1, 0.6], morph: 4.0, bar: 20.0 },
-        CueDef { name: "Last Chorus", targets: [1.0, 0.9, 0.9, 0.45], morph: 0.0, bar: 24.0 },
+        CueDef {
+            name: "Verse",
+            targets: s.stored,
+            morph: 0.0,
+            bar: 0.0,
+        },
+        CueDef {
+            name: "Pre",
+            targets: [0.6, 0.35, 0.5, 0.35],
+            morph: 8.0,
+            bar: 8.0,
+        },
+        CueDef {
+            name: "Chorus",
+            targets: [0.95, 0.8, 0.8, 0.4],
+            morph: 0.0,
+            bar: 12.0,
+        },
+        CueDef {
+            name: "Bridge",
+            targets: [0.2, 0.45, 0.1, 0.6],
+            morph: 4.0,
+            bar: 20.0,
+        },
+        CueDef {
+            name: "Last Chorus",
+            targets: [1.0, 0.9, 0.9, 0.45],
+            morph: 0.0,
+            bar: 24.0,
+        },
     ];
     finish(&mut r, &h, &cues);
     (r, cues)
@@ -1775,7 +2106,7 @@ fn estuary() -> (Rack, Vec<CueDef>) {
         play: [2.0, 3.0, 12.0, 0.0, 1800.0, -12.0],
         drive: [2.0, -1.0],
         lad: [300.0, 0.25, 0.0],
-        trim_db: 4.0,
+        trim_db: 0.0,
         comp: [-24.0, 2.0, 300.0, 0.0],
         duck: None,
         riser: true,
@@ -1794,21 +2125,61 @@ fn estuary() -> (Rack, Vec<CueDef>) {
     let (mut r, h) = assemble(&s);
     let k = h.knob;
     // Tide: the pads open from dark and the sea noise rises under them.
-    rise(&mut r, k, 1, h.lad, "filter.ladder", "cutoff_hz", 300.0, 8000.0);
+    rise(
+        &mut r,
+        k,
+        1,
+        h.lad,
+        "filter.ladder",
+        "cutoff_hz",
+        300.0,
+        8000.0,
+    );
     r.route(k, "m1", h.riser.unwrap(), "gain", 0.3);
     level_comp(&mut r, &h, 1, h.trim, 4.0);
+    // Wash: the echo and the long room add level; take the stage down by what they add.
+    level_comp(&mut r, &h, 4, h.trim, 2.5);
     // Glitter: the bells come up and ring longer.
     for l in &h.lines[3..6] {
         rise(&mut r, k, 2, l.gain, "gain", "gain_db", -40.0, -10.0);
         rise(&mut r, k, 2, l.seq, "seq", "gate_len", 15.0, 70.0);
     }
     // Depth: the drone rises from below hearing.
-    rise(&mut r, k, 3, h.lines[6].gain, "gain", "gain_db", -40.0, -4.0);
+    rise(
+        &mut r,
+        k,
+        3,
+        h.lines[6].gain,
+        "gain",
+        "gain_db",
+        -40.0,
+        -4.0,
+    );
     let cues = vec![
-        CueDef { name: "Low Tide", targets: s.stored, morph: 0.0, bar: 0.0 },
-        CueDef { name: "Rising", targets: [0.55, 0.55, 0.4, 0.65], morph: 16.0, bar: 4.0 },
-        CueDef { name: "High Tide", targets: [0.95, 0.9, 0.7, 0.75], morph: 16.0, bar: 10.0 },
-        CueDef { name: "Ebb", targets: [0.15, 0.2, 0.5, 0.9], morph: 16.0, bar: 16.0 },
+        CueDef {
+            name: "Low Tide",
+            targets: s.stored,
+            morph: 0.0,
+            bar: 0.0,
+        },
+        CueDef {
+            name: "Rising",
+            targets: [0.55, 0.55, 0.4, 0.65],
+            morph: 16.0,
+            bar: 4.0,
+        },
+        CueDef {
+            name: "High Tide",
+            targets: [0.95, 0.9, 0.7, 0.75],
+            morph: 16.0,
+            bar: 10.0,
+        },
+        CueDef {
+            name: "Ebb",
+            targets: [0.15, 0.2, 0.5, 0.9],
+            morph: 16.0,
+            bar: 16.0,
+        },
     ];
     finish(&mut r, &h, &cues);
     (r, cues)
@@ -1831,10 +2202,31 @@ fn lichen_voices(r: &mut Rack, clock: ModuleId) -> Vec<(ModuleId, &'static str)>
     r.wire(clock, "reset", div, "reset");
     let mixer = r.add("mixer", &[("level1", 1.0), ("level2", 0.6)]);
     for (len, wave, uni, db, tr, cutoff, pat, pos) in [
-        (7.0, 1.0, 2.0, -6.0, -12.0, 1800.0, [("length", 5.0), ("s2", 0.0), ("s4", 0.5)], 1),
-        (5.0, 0.0, 1.0, -12.0, 12.0, 6000.0, [("length", 3.0), ("s2", 0.0), ("s3", 0.4)], 2),
+        (
+            7.0,
+            1.0,
+            2.0,
+            -6.0,
+            -12.0,
+            1800.0,
+            [("length", 5.0), ("s2", 0.0), ("s4", 0.5)],
+            1,
+        ),
+        (
+            5.0,
+            0.0,
+            1.0,
+            -12.0,
+            12.0,
+            6000.0,
+            [("length", 3.0), ("s2", 0.0), ("s3", 0.4)],
+            2,
+        ),
     ] {
-        let rnd = r.add("random", &[("length", len), ("change", 0.0), ("range", 12.0)]);
+        let rnd = r.add(
+            "random",
+            &[("length", len), ("change", 0.0), ("range", 12.0)],
+        );
         let quant = r.add(
             "quantizer",
             &[("scale", 4.0), ("root", 2.0), ("transpose", tr)],
@@ -1846,7 +2238,11 @@ fn lichen_voices(r: &mut Rack, clock: ModuleId) -> Vec<(ModuleId, &'static str)>
         let env = r.add("env.adsr", &adsr(2.0, 320.0, 0.0, 380.0));
         let lad = r.add(
             "filter.ladder",
-            &[("cutoff_hz", cutoff), ("resonance", 0.25), ("drive_db", 0.0)],
+            &[
+                ("cutoff_hz", cutoff),
+                ("resonance", 0.25),
+                ("drive_db", 0.0),
+            ],
         );
         let vca = r.add("vca", &[("gain", 0.0)]);
         let gain = r.add("gain", &[("gain_db", db)]);
@@ -1945,14 +2341,13 @@ fn lichen() -> (Rack, Vec<CueDef>) {
     };
     let (mut r, h) = assemble(&s);
     let k = h.knob;
-    let randoms: Vec<ModuleId> = r
-        .e
-        .state()
-        .modules
-        .iter()
-        .filter(|(_, m)| m.kind == "random")
-        .map(|(&id, _)| id)
-        .collect();
+    let randoms: Vec<ModuleId> =
+        r.e.state()
+            .modules
+            .iter()
+            .filter(|(_, m)| m.kind == "random")
+            .map(|(&id, _)| id)
+            .collect();
     // Mutate: the random loops stop repeating and start to change as they come round.
     for &id in &randoms {
         rise(&mut r, k, 1, id, "random", "change", 0.0, 70.0);
@@ -1966,10 +2361,30 @@ fn lichen() -> (Rack, Vec<CueDef>) {
         rise(&mut r, k, 3, l.seq, "seq", "gate_len", 12.0, 95.0);
     }
     let cues = vec![
-        CueDef { name: "Spore", targets: s.stored, morph: 0.0, bar: 0.0 },
-        CueDef { name: "Colony", targets: [0.4, 0.5, 0.6, 0.45], morph: 16.0, bar: 4.0 },
-        CueDef { name: "Bloom", targets: [0.8, 0.9, 0.9, 0.6], morph: 8.0, bar: 12.0 },
-        CueDef { name: "Die-back", targets: [0.0, 0.2, 0.2, 0.8], morph: 16.0, bar: 20.0 },
+        CueDef {
+            name: "Spore",
+            targets: s.stored,
+            morph: 0.0,
+            bar: 0.0,
+        },
+        CueDef {
+            name: "Colony",
+            targets: [0.4, 0.5, 0.6, 0.45],
+            morph: 16.0,
+            bar: 4.0,
+        },
+        CueDef {
+            name: "Bloom",
+            targets: [0.8, 0.9, 0.9, 0.6],
+            morph: 8.0,
+            bar: 12.0,
+        },
+        CueDef {
+            name: "Die-back",
+            targets: [0.0, 0.2, 0.2, 0.8],
+            morph: 16.0,
+            bar: 20.0,
+        },
     ];
     finish(&mut r, &h, &cues);
     (r, cues)
@@ -1998,7 +2413,16 @@ fn roller_rink() -> (Rack, Vec<CueDef>) {
     };
     let bass = prog(
         [-3, -7, 0, -5],
-        &[Some(0), Some(0), Some(12), Some(0), Some(0), Some(12), Some(0), Some(12)],
+        &[
+            Some(0),
+            Some(0),
+            Some(12),
+            Some(0),
+            Some(0),
+            Some(12),
+            Some(0),
+            Some(12),
+        ],
     );
     let s = Spec {
         names: ["Glow", "Arp", "Gated", "Space"],
@@ -2072,22 +2496,78 @@ fn roller_rink() -> (Rack, Vec<CueDef>) {
     let (mut r, h) = assemble(&s);
     let k = h.knob;
     // Glow: the filter opens and a deep chorus spreads the chords.
-    rise(&mut r, k, 1, h.lad, "filter.ladder", "cutoff_hz", 400.0, 12000.0);
-    rise(&mut r, k, 1, h.kit.as_ref().unwrap().top_lad, "filter.ladder", "cutoff_hz", 1500.0, 16000.0);
+    rise(
+        &mut r,
+        k,
+        1,
+        h.lad,
+        "filter.ladder",
+        "cutoff_hz",
+        400.0,
+        12000.0,
+    );
+    rise(
+        &mut r,
+        k,
+        1,
+        h.kit.as_ref().unwrap().top_lad,
+        "filter.ladder",
+        "cutoff_hz",
+        1500.0,
+        16000.0,
+    );
     rise(&mut r, k, 1, h.chorus.unwrap(), "chorus", "mix", 0.0, 60.0);
     level_comp(&mut r, &h, 1, h.trim, 5.0);
     // Arp: the arpeggio comes up and its notes lengthen.
-    rise(&mut r, k, 2, h.lines[4].gain, "gain", "gain_db", -40.0, -6.0);
+    rise(
+        &mut r,
+        k,
+        2,
+        h.lines[4].gain,
+        "gain",
+        "gain_db",
+        -40.0,
+        -6.0,
+    );
     rise(&mut r, k, 2, h.lines[4].seq, "seq", "gate_len", 15.0, 95.0);
     // Gated: the snare gets louder and rings into the big gated tail.
     let kit = h.kit.as_ref().unwrap();
     rise(&mut r, k, 3, kit.snare, "drum.snare", "drive_db", 0.0, 18.0);
-    rise(&mut r, k, 3, kit.snare, "drum.snare", "decay_ms", 150.0, 900.0);
+    rise(
+        &mut r,
+        k,
+        3,
+        kit.snare,
+        "drum.snare",
+        "decay_ms",
+        150.0,
+        900.0,
+    );
     let cues = vec![
-        CueDef { name: "Intro", targets: [0.2, 0.2, 0.2, 0.45], morph: 0.0, bar: 0.0 },
-        CueDef { name: "Verse", targets: [0.5, 0.45, 0.4, 0.45], morph: 0.0, bar: 4.0 },
-        CueDef { name: "Chorus", targets: [0.95, 0.9, 0.9, 0.6], morph: 0.0, bar: 12.0 },
-        CueDef { name: "Break", targets: [0.15, 0.1, 0.6, 0.7], morph: 4.0, bar: 20.0 },
+        CueDef {
+            name: "Intro",
+            targets: [0.2, 0.2, 0.2, 0.45],
+            morph: 0.0,
+            bar: 0.0,
+        },
+        CueDef {
+            name: "Verse",
+            targets: [0.5, 0.45, 0.4, 0.45],
+            morph: 0.0,
+            bar: 4.0,
+        },
+        CueDef {
+            name: "Chorus",
+            targets: [0.95, 0.9, 0.9, 0.6],
+            morph: 0.0,
+            bar: 12.0,
+        },
+        CueDef {
+            name: "Break",
+            targets: [0.15, 0.1, 0.6, 0.7],
+            morph: 4.0,
+            bar: 20.0,
+        },
     ];
     finish(&mut r, &h, &cues);
     (r, cues)
@@ -2360,7 +2840,7 @@ fn level_of(state: &kabl_core::PatchState, hot: u8) -> (f64, f64) {
                 engine.transport(c, Transport::Run);
             }
         }
-        if t % 48000 == 0 && [3, 7, 19].contains(&(t / 48000)) {
+        if t.is_multiple_of(48000) && [3, 7, 19].contains(&(t / 48000)) {
             for &id in &macros {
                 for n in 1..=4u16 {
                     let v = if hot & (1 << (n - 1)) != 0 {
@@ -2382,12 +2862,15 @@ fn level_of(state: &kabl_core::PatchState, hot: u8) -> (f64, f64) {
                 }
             }
         }
-        if t % 48000 == 0 && [1, 5, 13].contains(&(t / 48000)) {
+        if t.is_multiple_of(48000) && [1, 5, 13].contains(&(t / 48000)) {
             for n in [52, 59, 64, 67] {
-                engine.key(KeyEvent::On { note: n, velocity: 100 });
+                engine.key(KeyEvent::On {
+                    note: n,
+                    velocity: 100,
+                });
             }
         }
-        if t % 48000 == 0 && [4, 8, 16].contains(&(t / 48000)) {
+        if t.is_multiple_of(48000) && [4, 8, 16].contains(&(t / 48000)) {
             engine.key(KeyEvent::AllOff);
         }
         if t == 16 * 48000 {
@@ -2452,7 +2935,13 @@ fn main() {
                     .expect("load patch");
                 let (_, defs) = (p.build)();
                 if std::env::var("PP_DEBUG").is_ok() {
-                    let id = *log.state().modules.iter().find(|(_, m)| m.kind == "cues").unwrap().0;
+                    let id = *log
+                        .state()
+                        .modules
+                        .iter()
+                        .find(|(_, m)| m.kind == "cues")
+                        .unwrap()
+                        .0;
                     for c in cues::cues(log.state(), id) {
                         eprintln!("{:?}", c);
                     }
@@ -2461,7 +2950,12 @@ fn main() {
                 let (l, r) = render(log.state(), &(p.phrase)(), secs, Some((&defs, p.bpm)));
                 write_wav(&out.join(format!("{}.wav", p.slug)), &l, &r);
                 let peak = l.iter().chain(&r).fold(0.0f32, |m, s| m.max(s.abs()));
-                println!("{:16} {secs:.1} s peak {:.1} dBFS | {}", p.slug, 20.0 * peak.max(1e-9).log10(), p.listen);
+                println!(
+                    "{:16} {secs:.1} s peak {:.1} dBFS | {}",
+                    p.slug,
+                    20.0 * peak.max(1e-9).log10(),
+                    p.listen
+                );
             }
         }
         Some("phrases") => {
@@ -2487,7 +2981,12 @@ fn main() {
                     let cues: Vec<String> = defs
                         .iter()
                         .zip(40..)
-                        .map(|(c, cc)| format!("[{cc},{:.3}]", (0.5 + (c.bar - 0.5).max(0.0) * bar).max(0.6)))
+                        .map(|(c, cc)| {
+                            format!(
+                                "[{cc},{:.3}]",
+                                (0.5 + (c.bar - 0.5).max(0.0) * bar).max(0.6)
+                            )
+                        })
                         .collect();
                     format!(
                         "\"{}\":{{\"secs\":{},\"hits\":[{}],\"cues\":[{}]}}",

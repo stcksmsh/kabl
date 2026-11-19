@@ -337,6 +337,48 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         &["sequenced", "cues", "drums", "boom bap", "hip-hop", "88bpm"],
         "A self-playing boom-bap loop at 88 BPM with swing: a dusty kick and snare, off-beat hats, a sine sub and a minor-ninth chord through a hot tape-style filter. Press Run, then launch the four cues with the pads or CC 40-43: Verse, Hook, Bridge, Outro. Swing pushes the off-beats later, Dust brings in vinyl hiss and a worn-tape wobble, Tape opens the loop from muffled and saturated to clean, Room adds a slapback echo and a small room.",
     ),
+    (
+        "presets/laundromat",
+        "Laundromat",
+        "Piece",
+        &["sequenced", "cues", "drums", "disco", "french touch", "122bpm", "signature"],
+        "A self-playing filtered disco loop at 122 BPM with swing: an octave bass, two off-beat stab lines, a kick, clap and hats, all ducking to the kick. It is dry on purpose: no echo, no room. Press Run, then launch the four cues with the pads or CC 40-43: Loop, Cut-up, Break, Full. Sweep is a DJ filter over the loop, Crunch bitcrushes and drives the bus, Stutter turns the stabs from clipped ticks into held chords, Pump sets how hard the kick ducks the loop.",
+    ),
+    (
+        "presets/spillway",
+        "Spillway",
+        "Piece",
+        &["sequenced", "cues", "drums", "two-step", "reese", "drum and bass", "174bpm"],
+        "A self-playing drum and bass piece at 174 BPM: a two-step kick and snare, a sine sub and a beating reese in F minor, and a slow pad bed. Press Run, then launch the four cues with the pads or CC 40-43: Intro, Build, Drop, Rolldown. Weight brings in the sub, Reese makes the saws beat faster and bite, Break adds ghost snares and busy hats, Haze sets the echo and the room.",
+    ),
+    (
+        "presets/balcony",
+        "Balcony",
+        "Piece",
+        &["sequenced", "cues", "drums", "chords", "pop", "104bpm"],
+        "A self-playing pop loop at 104 BPM: a four-chord progression in C, a round bass, a kick and snare, a triangle arpeggio hiding under the chords and a chorus. Press Run, then launch the five cues with the pads or CC 40-44: Verse, Pre, Chorus, Bridge, Last Chorus. Lift opens the filter and widens the chords, Sparkle brings the arpeggio up, Bounce sets how hard the kick ducks the chords, Room adds echo and a small room.",
+    ),
+    (
+        "presets/estuary",
+        "Estuary",
+        "Piece",
+        &["sequenced", "cues", "polymeter", "probability", "ambient", "60bpm"],
+        "A self-playing ambient piece at 60 BPM, with no drums: slow pads that change chord every bar, three bells that cycle in 5, 7 and 11 steps against it with some notes played by chance, a sine drone and a sea of noise. Press Run, then launch the four cues with the pads or CC 40-43: Low Tide, Rising, High Tide, Ebb. Tide opens the pads and lets the sea in, Glitter brings the bells up and lets them ring, Depth raises the drone from below, Wash sets the echo and the long room.",
+    ),
+    (
+        "presets/lichen",
+        "Lichen",
+        "Piece",
+        &["sequenced", "cues", "drums", "polymeter", "random", "experimental", "112bpm"],
+        "A self-playing experimental piece at 112 BPM: two random melodies held to D dorian that loop in 7 and 5 steps, each through a cable with its own step pattern, over a bass in 7, a stab in 5 and hats, open hats and toms looping in 5, 7 and 9 against a bar of 16. Press Run, then launch the four cues with the pads or CC 40-43: Spore, Colony, Bloom, Die-back. Mutate lets the random loops change as they come round, Reach widens their range from a third to two octaves, Gate turns the bass and stab from ticks into held notes, Echo sets the echo and the room.",
+    ),
+    (
+        "presets/roller-rink",
+        "Roller Rink",
+        "Piece",
+        &["sequenced", "cues", "drums", "arp", "synthwave", "100bpm", "80s"],
+        "A self-playing synthwave piece at 100 BPM: a running eighth-note bass, lush saw chords through a chorus, a pulse arpeggio, a kick and a big gated snare, in A minor. Press Run, then launch the four cues with the pads or CC 40-43: Intro, Verse, Chorus, Break. Glow opens the filter and deepens the chorus, Arp brings the arpeggio up and lengthens its notes, Gated makes the snare louder and its gated tail longer, Space sets the echo and the room.",
+    ),
     // END piece
     (
         "presets/steel-toe",
