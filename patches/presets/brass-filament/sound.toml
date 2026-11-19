@@ -6,6 +6,6 @@ tags = [
     "metallic",
     "experimental",
 ]
-description = "A metallic FM tone that rings and wavers: inharmonic partials, a little feedback and a slow fade. Play sparse two-note intervals. Blow bows the tone in slowly instead of striking it, Alloy pulls the partials out of tune into clangorous metal, Space opens a wide echo and a huge, ringing room, Warp feeds the sound back into itself."
+description = "A metallic FM tone that rings and wavers: inharmonic partials, a little feedback and a slow fade. Play sparse two-note intervals. Blow goes from a tone bowed in slowly to a hard strike, Alloy pulls the partials out of tune into clangorous metal, Space opens a wide echo and a huge, ringing room, Warp feeds the sound back into itself."
 keys = true
 sequence = false

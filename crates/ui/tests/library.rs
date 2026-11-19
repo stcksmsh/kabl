@@ -308,8 +308,8 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "A bright, staccato, phased pluck, driven and squashed: a narrow pulse with a hard filter snap. Play short syncopated riffs. Gate goes from a clipped tick to a rivet that holds and rings on, Phase runs the phaser from dry to deep and fast, Snap closes the filter until it snaps open on every hit, Stack pulls the unison apart.",
     ),
     (
-        "presets/free-bar",
-        "Free Bar",
+        "presets/gossamer",
+        "Gossamer",
         "Pluck",
         &["poly", "fm", "metallic", "ambient", "experimental"],
         "Tuned metal bars: six added partials of a free bar, a soft strike and a long ring. Play slow melodies. Overtones goes from a pure fork to a clangorous bar, Ring lets the bar sing for many seconds, Beat pulls the doubled partials apart into a wide beating, Bowed pushes each bar in slowly instead of striking it.",

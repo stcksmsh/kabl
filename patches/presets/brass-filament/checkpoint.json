@@ -11,10 +11,10 @@
         "cc.m2": 21.0,
         "cc.m3": 22.0,
         "cc.m4": 23.0,
-        "m1": 0.0,
+        "m1": 1.0,
         "m2": 0.5,
         "m3": 0.5,
-        "m4": 0.5,
+        "m4": 0.3,
         "pin.m1": 0.0,
         "pin.m2": 1.0,
         "pin.m3": 2.0,
@@ -39,26 +39,26 @@
       },
       "params": {
         "algorithm": 5.0,
-        "attack1": 3.0,
-        "attack2": 3.0,
-        "attack3": 3.0,
-        "attack4": 3.0,
-        "attack5": 3.0,
-        "attack6": 3.0,
+        "attack1": 450.0,
+        "attack2": 450.0,
+        "attack3": 450.0,
+        "attack4": 450.0,
+        "attack5": 450.0,
+        "attack6": 450.0,
         "decay1": 2500.0,
         "decay2": 2000.0,
         "decay3": 1800.0,
         "decay4": 1200.0,
         "decay5": 800.0,
         "decay6": 1800.0,
-        "feedback": 0.01999998,
+        "feedback": 0.29999998,
         "fine1": 0.0,
         "fine2": 0.0,
         "fine3": 0.0,
         "fine4": 0.0,
         "fine5": 0.0,
         "fine6": 9.0,
-        "index": 0.85,
+        "index": 0.5285714,
         "level1": 1.0,
         "level2": 0.6,
         "level3": 0.5,
@@ -370,7 +370,7 @@
         }
       },
       "params": {
-        "amount": 0.4352183
+        "amount": -0.4352183
       },
       "steps": []
     },
@@ -388,7 +388,7 @@
         }
       },
       "params": {
-        "amount": 0.4352183
+        "amount": -0.4352183
       },
       "steps": []
     },
@@ -406,7 +406,7 @@
         }
       },
       "params": {
-        "amount": 0.4352183
+        "amount": -0.4352183
       },
       "steps": []
     },
@@ -424,7 +424,7 @@
         }
       },
       "params": {
-        "amount": 0.4352183
+        "amount": -0.4352183
       },
       "steps": []
     },
@@ -442,7 +442,7 @@
         }
       },
       "params": {
-        "amount": 0.4352183
+        "amount": -0.4352183
       },
       "steps": []
     },
@@ -460,7 +460,7 @@
         }
       },
       "params": {
-        "amount": 0.4352183
+        "amount": -0.4352183
       },
       "steps": []
     },
@@ -622,11 +622,29 @@
         }
       },
       "params": {
-        "amount": 0.98
+        "amount": 0.7
       },
       "steps": []
     },
     "28": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m4"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 3,
+          "param": "index"
+        }
+      },
+      "params": {
+        "amount": 0.5357143
+      },
+      "steps": []
+    },
+    "29": {
       "from": {
         "Module": {
           "id": 1,
@@ -640,7 +658,7 @@
         }
       },
       "params": {
-        "amount": -0.01377821
+        "amount": -0.022963682
       },
       "steps": []
     }

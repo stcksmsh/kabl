@@ -556,12 +556,12 @@ fn scaffold() -> Rack {
 /// Brass Filament: a sustained, metallic, slightly unstable FM tone.
 fn brass_filament() -> Rack {
     let mut r = Rack::new();
-    // Blow: struck at once to bowed in slowly (off); Alloy: the partials pulled out of tune into a clangorous
+    // Blow: how hard the tone is blown, a soft, bowed-in swell at 0 to a hard strike at 1 (stored); Alloy: the partials pulled out of tune into a clangorous
     // metal; Space: the only macro that owns the echo and the room; Warp: the feedback.
     let knob = macros(
         &mut r,
         &["Blow", "Alloy", "Space", "Warp"],
-        &[0.0, 0.50, 0.50, 0.50],
+        &[1.0, 0.50, 0.50, 0.30],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     // Algorithm 5: operator 6 modulates 1 to 5. Inharmonic ratios and a long fade.
@@ -601,9 +601,9 @@ fn brass_filament() -> Rack {
     let (o, k) = ("osc.fm6", knob);
     let index = routed(o, "index", 0.4, 0.5, 0.45);
     r.e.set_param(v, "index", index);
-    // Blow: a hard strike to a tone bowed in over most of a second (off by default; level-type).
+    // Blow: a tone bowed in over most of a second at 0 to a hard strike at 1 (stored at 1; level-type).
     for n in 1..=6 {
-        r.rise(k, 1, v, o, &format!("attack{n}"), 3.0, 450.0);
+        r.span(k, 1, v, o, &format!("attack{n}"), 450.0, 3.0);
     }
     // Alloy: a tuned tone to a clangorous metal, the inharmonic partials pulled further out of tune.
     r.span(k, 2, v, o, "fine2", 0.0, 140.0);
@@ -620,6 +620,8 @@ fn brass_filament() -> Rack {
     // Warp: the sound fed back into itself: smooth to a rough, harsh, tearing metal.
     let fb = routed(o, "feedback", 0.3, 0.7, 0.30);
     r.span_hi(k, 4, v, o, "feedback", fb, 1.0);
+    // Bolder: the index (the depth of the modulation) rises with it, so the tear is felt along the whole travel.
+    r.span_hi(k, 4, v, o, "index", index, 1.6);
     let cut = routed("filter.ladder", "cutoff_hz", 5500.0, 0.4, 0.45);
     r.span(k, 4, s.lad, "filter.ladder", "cutoff_hz", 20000.0, cut);
     perform(&mut r, knob, None, 4);
@@ -1080,7 +1082,7 @@ fn rivet_gun() -> Rack {
     r
 }
 
-/// Free Bar (was Tuning Fork): tuned metal bars, soft and slightly detuned, with a slow wobble.
+/// Gossamer (was Tuning Fork, then Free Bar): tuned metal bars, soft and slightly detuned, with a slow wobble.
 fn free_bar() -> Rack {
     let mut r = Rack::new();
     // Overtones: a pure fork to a clangorous bar; Ring: how long the bar sings; Beat: the doubled partials drift
@@ -1134,12 +1136,13 @@ fn free_bar() -> Rack {
     r.span(k, 1, v, o, "level3", 0.0, 0.3);
     r.span(k, 1, v, o, "level4", 0.0, 0.18);
     // Ring: a damped bar to a bar that sings for many seconds.
-    r.span(k, 2, v, o, "decay1", 120.0, 6000.0);
-    r.span(k, 2, v, o, "decay5", 120.0, 6000.0);
-    r.span(k, 2, v, o, "decay2", 80.0, 2500.0);
-    r.span(k, 2, v, o, "decay3", 60.0, 700.0);
-    r.span(k, 2, v, o, "release1", 20.0, 400.0);
-    r.span(k, 2, v, o, "release5", 20.0, 400.0);
+    r.span(k, 2, v, o, "decay1", 25.0, 9500.0);
+    r.span(k, 2, v, o, "decay5", 25.0, 9500.0);
+    r.span(k, 2, v, o, "decay2", 18.0, 5000.0);
+    r.span(k, 2, v, o, "decay3", 12.0, 1800.0);
+    r.span(k, 2, v, o, "decay4", 10.0, 600.0);
+    r.span(k, 2, v, o, "release1", 8.0, 700.0);
+    r.span(k, 2, v, o, "release5", 8.0, 700.0);
     r.level(k, 2, s.trim, -4.0);
     // Beat: the doubled partials drift apart from a pure unison to a slow, wide beating.
     r.span(k, 3, v, o, "fine5", 0.0, 5.0);
@@ -1492,7 +1495,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Brass Filament",
             category: "Keys",
             tags: &["poly", "fm", "metallic", "experimental"],
-            description: "A metallic FM tone that rings and wavers: inharmonic partials, a little feedback and a slow fade. Play sparse two-note intervals. Blow bows the tone in slowly instead of striking it, Alloy pulls the partials out of tune into clangorous metal, Space opens a wide echo and a huge, ringing room, Warp feeds the sound back into itself.",
+            description: "A metallic FM tone that rings and wavers: inharmonic partials, a little feedback and a slow fade. Play sparse two-note intervals. Blow goes from a tone bowed in slowly to a hard strike, Alloy pulls the partials out of tune into clangorous metal, Space opens a wide echo and a huge, ringing room, Warp feeds the sound back into itself.",
             listen: "The unstable, slightly out-of-tune shimmer; Warp up makes it harsher",
             group: 2,
             build: brass_filament,
@@ -1572,11 +1575,11 @@ pub fn presets() -> Vec<Preset> {
             secs: 5.0,
         },
         Preset {
-            slug: "free-bar",
-            name: "Free Bar",
+            slug: "gossamer",
+            name: "Gossamer",
             category: "Pluck",
             tags: &["poly", "fm", "metallic", "ambient", "experimental"],
-            description: "Tuned metal bars: six added partials of a free bar, a soft strike and a long ring. Play slow melodies. Overtones goes from a pure fork to a clangorous bar, Ring lets the bar sing for many seconds, Beat pulls the doubled partials apart into a wide beating, Bowed pushes each bar in slowly instead of striking it.",
+            description: "Tuned metal bars: six added partials of a free bar, a soft strike and a long ring. Play slow melodies. Overtones goes from a pure fork to a clangorous bar, Ring goes from a dead, damped tick to a bar that sings for ten seconds, Beat pulls the doubled partials apart into a wide beating, Bowed pushes each bar in slowly instead of striking it.",
             listen: "The pure ring of each bar and the slow beating across notes",
             group: 2,
             build: free_bar,
