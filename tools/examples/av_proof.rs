@@ -401,7 +401,7 @@ fn main() {
         format!("drawtext=fontfile={font}:text='{s}':fontsize={size}:fontcolor={col}:x={x}:y={y}:alpha='{alpha}'")
     };
     let mut vf = vec![
-        format!("fade=t=in:st=0:d=1.2"),
+        "fade=t=in:st=0:d=1.2".to_string(),
         format!("fade=t=out:st={}:d=2.5", secs - 2.5),
     ];
     vf.push(text(
