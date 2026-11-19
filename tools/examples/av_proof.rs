@@ -12,6 +12,9 @@
 //! frame. Pass 2 draws each frame on the CPU (threaded) and pipes raw RGB plus the WAV into ffmpeg,
 //! which also sets the titles. Throwaway proof: no product code depends on it.
 
+// Pixel and channel loops index several buffers at once; a throwaway drawing tool.
+#![allow(clippy::needless_range_loop, clippy::too_many_arguments)]
+
 use basedrop::Collector;
 use kabl_core::{ModuleId, PatchState};
 use kabl_engine::facetap::{FaceTarget, FaceTargets, MAX_FACE_TAPS};
@@ -74,7 +77,11 @@ struct Section {
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let (patch, out) = (&args[0], &args[1]);
-    let opt = |name: &str| args.iter().position(|a| a == name).map(|i| args[i + 1].clone());
+    let opt = |name: &str| {
+        args.iter()
+            .position(|a| a == name)
+            .map(|i| args[i + 1].clone())
+    };
     let secs: f32 = opt("--secs").map_or(72.0, |s| s.parse().unwrap());
     let fps: u32 = opt("--fps").map_or(60, |s| s.parse().unwrap());
     let (w, h) = opt("--size").map_or((1920usize, 1080usize), |s| {
@@ -94,7 +101,9 @@ fn main() {
     let (mut clocks, mut seqs, mut cues_id, mut macro_id) = (vec![], vec![], None, None);
     for pass in 0..3 {
         for (&id, m) in &state.modules {
-            let Some(info) = kabl_modules::registry::info_for(&m.kind) else { continue };
+            let Some(info) = kabl_modules::registry::info_for(&m.kind) else {
+                continue;
+            };
             let outs: Vec<&str> = info
                 .ports
                 .iter()
@@ -104,9 +113,17 @@ fn main() {
             let port = |n: &str| outs.iter().position(|o| *o == n).map(|i| i as u8);
             let mut add = |port: u8, role: Role| {
                 if targets.len() < MAX_FACE_TAPS {
-                    taps.push(Tap { role, lane: lanes[role as usize] });
+                    taps.push(Tap {
+                        role,
+                        lane: lanes[role as usize],
+                    });
                     lanes[role as usize] += 1;
-                    targets.push(FaceTarget { module: id, port, kind: info.kind, view: false });
+                    targets.push(FaceTarget {
+                        module: id,
+                        port,
+                        kind: info.kind,
+                        view: false,
+                    });
                 }
             };
             match (pass, info.kind) {
@@ -152,7 +169,9 @@ fn main() {
     // Sections: the patch's own cues if it has them, else sequencer bank launches A-D.
     let mut sections: Vec<Section> = Vec::new();
     let mut launches: Vec<(f32, Vec<Command>)> = Vec::new();
-    let cue_list = cues_id.map(|id| kabl_ui::cues::cues(&state, id)).unwrap_or_default();
+    let cue_list = cues_id
+        .map(|id| kabl_ui::cues::cues(&state, id))
+        .unwrap_or_default();
     let cue_list: Vec<_> = cue_list.into_iter().filter(|c| c.clock.is_some()).collect();
     if let (Some(id), false) = (cues_id, cue_list.is_empty()) {
         let span = secs / cue_list.len() as f32;
@@ -160,20 +179,36 @@ fn main() {
             let at = if k == 0 { 0.05 } else { k as f32 * span - 1.0 };
             let mut cmds = Vec::new();
             if kabl_ui::cues::launch(&mut cmds, &state, id, c.n).is_ok() {
-                sections.push(Section { at, name: c.name.clone() });
+                sections.push(Section {
+                    at,
+                    name: c.name.clone(),
+                });
                 launches.push((at, cmds));
             }
         }
     } else if let (Some(&clock), false) = (clocks.first(), seqs.is_empty()) {
         for k in 0..4u8 {
-            let at = if k == 0 { 0.05 } else { k as f32 * secs / 4.0 - 1.0 };
+            let at = if k == 0 {
+                0.05
+            } else {
+                k as f32 * secs / 4.0 - 1.0
+            };
             let tg: Vec<(ModuleId, u8)> = seqs.iter().map(|&s| (s, k)).collect();
-            sections.push(Section { at, name: format!("Bank {}", (b'A' + k) as char) });
-            launches.push((at, vec![Command::Launch(Launch::new(clock, Timing::NextBar, &tg))]));
+            sections.push(Section {
+                at,
+                name: format!("Bank {}", (b'A' + k) as char),
+            });
+            launches.push((
+                at,
+                vec![Command::Launch(Launch::new(clock, Timing::NextBar, &tg))],
+            ));
         }
     }
     if sections.is_empty() {
-        sections.push(Section { at: 0.0, name: String::new() });
+        sections.push(Section {
+            at: 0.0,
+            name: String::new(),
+        });
     }
     // A slow lead phrase (E minor, E4..B4) in the second and last thirds, if the patch has a keyboard.
     let mut midi: Vec<(u64, MidiEvent, Option<u8>)> = Vec::new();
@@ -200,7 +235,11 @@ fn main() {
         lanes[Role::Clock as usize],
         lanes[Role::Macro as usize],
         lanes[Role::LeadGate as usize] > 0 && lead,
-        sections.iter().map(|s| format!("{:.0}s {}", s.at, s.name)).collect::<Vec<_>>().join(", ")
+        sections
+            .iter()
+            .map(|s| format!("{:.0}s {}", s.at, s.name))
+            .collect::<Vec<_>>()
+            .join(", ")
     );
 
     // ---- pass 1: audio + telemetry --------------------------------------------------------
@@ -213,7 +252,12 @@ fn main() {
     let macro_base: Vec<f32> = (0..4)
         .map(|k| {
             macro_id
-                .and_then(|(id, _)| state.modules[&id].params.get(&format!("m{}", k + 1)).copied())
+                .and_then(|(id, _)| {
+                    state.modules[&id]
+                        .params
+                        .get(&format!("m{}", k + 1))
+                        .copied()
+                })
                 .unwrap_or(0.5)
         })
         .collect();
@@ -251,7 +295,11 @@ fn main() {
                 let v = macro_base[k] + ramp * 0.3 * (TAU * t / period + k as f32).sin();
                 let _ = tx.push(ToAudio::Set(ParamSet {
                     rev: 1 << 40,
-                    target: RuntimeTarget::Param { id, kind, index: k as u16 },
+                    target: RuntimeTarget::Param {
+                        id,
+                        kind,
+                        index: k as u16,
+                    },
                     value: v.clamp(0.0, 1.0),
                 }));
             }
@@ -260,7 +308,10 @@ fn main() {
         let mut batch = Vec::new();
         let prev_held = held;
         while next_midi < midi.len() && midi[next_midi].0 < (done + n) as u64 {
-            batch.push(((midi[next_midi].0.saturating_sub(done as u64)) as usize, midi[next_midi].1));
+            batch.push((
+                (midi[next_midi].0.saturating_sub(done as u64)) as usize,
+                midi[next_midi].1,
+            ));
             held = midi[next_midi].2;
             next_midi += 1;
         }
@@ -276,12 +327,27 @@ fn main() {
         if let Some(rep) = engine.take_face_report() {
             fresh = true;
             for (s, e) in rep.entries.iter().take(rep.n as usize).enumerate() {
-                last[s] = Sample { last: e.last, min: e.min, max: e.max };
+                last[s] = Sample {
+                    last: e.last,
+                    min: e.min,
+                    max: e.max,
+                };
             }
         }
         let tail = audio.len().saturating_sub(SCOPE * 2);
-        let scope = audio[tail..].chunks(2).map(|c| 0.5 * (c[0] + c[1])).collect();
-        frames.push(Frame { taps: last.clone(), fresh, rms: (sq / (2 * n) as f32).sqrt(), scope, section, lead: held, lead_new });
+        let scope = audio[tail..]
+            .chunks(2)
+            .map(|c| 0.5 * (c[0] + c[1]))
+            .collect();
+        frames.push(Frame {
+            taps: last.clone(),
+            fresh,
+            rms: (sq / (2 * n) as f32).sqrt(),
+            scope,
+            section,
+            lead: held,
+            lead_new,
+        });
         done += n;
     }
     // Lanes that never fire are left out of the lattice.
@@ -298,7 +364,12 @@ fn main() {
     let audio = &audio[LATENCY * 2..];
     let wav = format!("{out}.wav");
     {
-        let spec = hound::WavSpec { channels: 2, sample_rate: RATE as u32, bits_per_sample: 32, sample_format: hound::SampleFormat::Float };
+        let spec = hound::WavSpec {
+            channels: 2,
+            sample_rate: RATE as u32,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        };
         let mut wr = hound::WavWriter::create(&wav, spec).unwrap();
         let peak = audio.iter().fold(0f32, |a, s| a.max(s.abs())).max(1e-6);
         let gain = 0.89 / peak; // normalise to -1 dBFS
@@ -306,12 +377,22 @@ fn main() {
             wr.write_sample(s * gain).unwrap();
         }
         wr.finalize().unwrap();
-        eprintln!("audio {:.1} s, peak {:.3} -> -1 dBFS", audio.len() as f32 / 2.0 / RATE, peak);
+        eprintln!(
+            "audio {:.1} s, peak {:.3} -> -1 dBFS",
+            audio.len() as f32 / 2.0 / RATE,
+            peak
+        );
     }
 
     // ---- pass 2: frames -> ffmpeg ---------------------------------------------------------
-    let font = concat!(env!("CARGO_MANIFEST_DIR"), "/../crates/ui/assets/IBMPlexSans-Medium.ttf");
-    let mono = concat!(env!("CARGO_MANIFEST_DIR"), "/../crates/ui/assets/IBMPlexMono-Regular.ttf");
+    let font = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../crates/ui/assets/IBMPlexSans-Medium.ttf"
+    );
+    let mono = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../crates/ui/assets/IBMPlexMono-Regular.ttf"
+    );
     let fs = |x: f32| (x * h as f32 / 1080.0) as u32;
     let window = |a: f32, b: f32| {
         format!("if(lt(t,{a}),0,if(lt(t,{a}+0.6),(t-{a})/0.6,if(lt(t,{b}-0.8),1,if(lt(t,{b}),({b}-t)/0.8,0))))")
@@ -319,8 +400,19 @@ fn main() {
     let text = |s: &str, font: &str, size: u32, x: &str, y: &str, alpha: String, col: &str| {
         format!("drawtext=fontfile={font}:text='{s}':fontsize={size}:fontcolor={col}:x={x}:y={y}:alpha='{alpha}'")
     };
-    let mut vf = vec![format!("fade=t=in:st=0:d=1.2"), format!("fade=t=out:st={}:d=2.5", secs - 2.5)];
-    vf.push(text(&title, font, fs(132.0), "(w-text_w)/2", "(h-text_h)/2-40", window(0.8, 4.6), "white@0.92"));
+    let mut vf = vec![
+        format!("fade=t=in:st=0:d=1.2"),
+        format!("fade=t=out:st={}:d=2.5", secs - 2.5),
+    ];
+    vf.push(text(
+        &title,
+        font,
+        fs(132.0),
+        "(w-text_w)/2",
+        "(h-text_h)/2-40",
+        window(0.8, 4.6),
+        "white@0.92",
+    ));
     vf.push(text(
         "every light is a signal inside the patch",
         font,
@@ -335,11 +427,26 @@ fn main() {
             continue;
         }
         let a = s.at.max(5.0);
-        let b = sections.get(k + 1).map_or(secs - 3.0, |n| n.at.max(a + 2.0)).min(a + 5.0);
+        let b = sections
+            .get(k + 1)
+            .map_or(secs - 3.0, |n| n.at.max(a + 2.0))
+            .min(a + 5.0);
         let label = format!("cue {}  ·  {}", k + 1, s.name.replace(['\'', ':'], ""));
-        vf.push(text(&label, mono, fs(30.0), &fs(56.0).to_string(), &format!("h-{}", fs(72.0)), window(a, b), "white@0.85"));
+        vf.push(text(
+            &label,
+            mono,
+            fs(30.0),
+            &fs(56.0).to_string(),
+            &format!("h-{}", fs(72.0)),
+            window(a, b),
+            "white@0.85",
+        ));
     }
-    let pname = std::path::Path::new(patch).file_name().unwrap().to_string_lossy().to_string();
+    let pname = std::path::Path::new(patch)
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
     vf.push(text(
         &format!("patch  {pname}   ·   offline render   ·   visuals from steps, envelopes, clock, macros, cues"),
         mono,
@@ -349,7 +456,15 @@ fn main() {
         window(5.0, secs - 3.5),
         "white@0.45",
     ));
-    vf.push(text(&title, font, fs(96.0), "(w-text_w)/2", "(h-text_h)/2-30", window(secs - 5.5, secs - 0.3), "white@0.92"));
+    vf.push(text(
+        &title,
+        font,
+        fs(96.0),
+        "(w-text_w)/2",
+        "(h-text_h)/2-30",
+        window(secs - 5.5, secs - 0.3),
+        "white@0.92",
+    ));
     vf.push(text(
         "structure-reactive audiovisual  ·  proof of concept",
         font,
@@ -361,16 +476,37 @@ fn main() {
     ));
     let af = format!("afade=t=in:st=0:d=0.8,afade=t=out:st={}:d=2.5", secs - 2.5);
     let mut ff = Proc::new("ffmpeg")
-        .args(["-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24"])
-        .args(["-s", &format!("{w}x{h}"), "-r", &fps.to_string(), "-i", "-", "-i", &wav])
+        .args([
+            "-y",
+            "-loglevel",
+            "error",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+        ])
+        .args([
+            "-s",
+            &format!("{w}x{h}"),
+            "-r",
+            &fps.to_string(),
+            "-i",
+            "-",
+            "-i",
+            &wav,
+        ])
         .args(["-vf", &vf.join(","), "-af", &af])
-        .args(["-c:v", "libx264", "-preset", "medium", "-crf", "16", "-pix_fmt", "yuv420p"])
+        .args([
+            "-c:v", "libx264", "-preset", "medium", "-crf", "16", "-pix_fmt", "yuv420p",
+        ])
         .args(["-c:a", "aac", "-b:a", "320k", "-shortest", out])
         .stdin(Stdio::piped())
         .spawn()
         .expect("ffmpeg");
     let stdin = ff.stdin.as_mut().unwrap();
-    let active: Vec<usize> = (0..taps.len()).filter(|&s| taps[s].role == Role::Step && rises[s] > 0).collect();
+    let active: Vec<usize> = (0..taps.len())
+        .filter(|&s| taps[s].role == Role::Step && rises[s] > 0)
+        .collect();
     let mut vis = Visual::new(w, h, fps as f32, active);
     let mut rgb = vec![0u8; w * h * 3];
     let t0 = std::time::Instant::now();
@@ -397,11 +533,36 @@ fn rose(f: &Frame, prev: &Frame, s: usize) -> bool {
 
 /// Scene palettes; a cue change moves to the next one with a smooth blend.
 const SCENES: [[[f32; 3]; 4]; 5] = [
-    [[1.00, 0.52, 0.14], [0.18, 0.72, 1.00], [1.00, 0.86, 0.50], [0.85, 0.30, 0.75]], // amber/cyan
-    [[1.00, 0.24, 0.48], [0.38, 0.40, 1.00], [1.00, 0.72, 0.40], [0.30, 1.00, 0.85]], // rose/indigo
-    [[0.40, 1.00, 0.55], [0.15, 0.55, 1.00], [0.95, 1.00, 0.60], [1.00, 0.45, 0.25]], // lime/blue
-    [[0.70, 0.45, 1.00], [1.00, 0.40, 0.30], [0.60, 0.95, 1.00], [1.00, 0.85, 0.35]], // violet/coral
-    [[1.00, 0.80, 0.35], [1.00, 0.35, 0.20], [0.55, 0.85, 1.00], [0.90, 0.90, 0.95]], // gold/ember
+    [
+        [1.00, 0.52, 0.14],
+        [0.18, 0.72, 1.00],
+        [1.00, 0.86, 0.50],
+        [0.85, 0.30, 0.75],
+    ], // amber/cyan
+    [
+        [1.00, 0.24, 0.48],
+        [0.38, 0.40, 1.00],
+        [1.00, 0.72, 0.40],
+        [0.30, 1.00, 0.85],
+    ], // rose/indigo
+    [
+        [0.40, 1.00, 0.55],
+        [0.15, 0.55, 1.00],
+        [0.95, 1.00, 0.60],
+        [1.00, 0.45, 0.25],
+    ], // lime/blue
+    [
+        [0.70, 0.45, 1.00],
+        [1.00, 0.40, 0.30],
+        [0.60, 0.95, 1.00],
+        [1.00, 0.85, 0.35],
+    ], // violet/coral
+    [
+        [1.00, 0.80, 0.35],
+        [1.00, 0.35, 0.20],
+        [0.55, 0.85, 1.00],
+        [0.90, 0.90, 0.95],
+    ], // gold/ember
 ];
 
 struct Ring {
@@ -451,7 +612,11 @@ struct Visual {
 }
 
 fn mix(a: [f32; 3], b: [f32; 3], t: f32) -> [f32; 3] {
-    [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
+    [
+        a[0] + (b[0] - a[0]) * t,
+        a[1] + (b[1] - a[1]) * t,
+        a[2] + (b[2] - a[2]) * t,
+    ]
 }
 
 impl Visual {
@@ -494,7 +659,11 @@ impl Visual {
     /// Additive soft dot; `crisp` picks the non-feedback layer.
     fn dot(&mut self, crisp: bool, x: f32, y: f32, c: [f32; 3], a: f32, r: isize) {
         let (w, h) = (self.w as isize, self.h as isize);
-        let buf = if crisp { &mut self.crisp } else { &mut self.acc };
+        let buf = if crisp {
+            &mut self.crisp
+        } else {
+            &mut self.acc
+        };
         let (xi, yi) = (x.round() as isize, y.round() as isize);
         if xi < -r || yi < -r || xi >= w + r || yi >= h + r {
             return;
@@ -526,8 +695,14 @@ impl Visual {
     }
 
     fn rect(&mut self, cx: f32, cy: f32, hw: f32, hh: f32, c: [f32; 3], a: f32) {
-        let (x0, x1) = ((cx - hw - 2.0).max(0.0) as usize, ((cx + hw + 2.0) as usize).min(self.w - 1));
-        let (y0, y1) = ((cy - hh - 2.0).max(0.0) as usize, ((cy + hh + 2.0) as usize).min(self.h - 1));
+        let (x0, x1) = (
+            (cx - hw - 2.0).max(0.0) as usize,
+            ((cx + hw + 2.0) as usize).min(self.w - 1),
+        );
+        let (y0, y1) = (
+            (cy - hh - 2.0).max(0.0) as usize,
+            ((cy + hh + 2.0) as usize).min(self.h - 1),
+        );
         for y in y0..=y1 {
             for x in x0..=x1 {
                 let ex = ((x as f32 - cx).abs() - hw).max(0.0);
@@ -551,7 +726,11 @@ impl Visual {
         let (s, c) = hue.sin_cos();
         let k = (1.0 - c) / 3.0;
         let q = (1.0f32 / 3.0).sqrt() * s;
-        let m = [[c + k, k - q, k + q], [k + q, c + k, k - q], [k - q, k + q, c + k]];
+        let m = [
+            [c + k, k - q, k + q],
+            [k + q, c + k, k - q],
+            [k - q, k + q, c + k],
+        ];
         let src = &self.tmp;
         let threads = std::thread::available_parallelism().map_or(8, |n| n.get());
         let rows = h.div_ceil(threads);
@@ -569,7 +748,8 @@ impl Visual {
                             let sx = cx + dx * ca - dy * sa;
                             let sy = cy + dx * sa + dy * ca;
                             let o = x * 3;
-                            if sx < 0.0 || sy < 0.0 || sx >= (w - 1) as f32 || sy >= (h - 1) as f32 {
+                            if sx < 0.0 || sy < 0.0 || sx >= (w - 1) as f32 || sy >= (h - 1) as f32
+                            {
                                 row[o..o + 3].fill(0.0);
                                 continue;
                             }
@@ -586,7 +766,8 @@ impl Visual {
                                     + src[i11 + ch] * fx * fy;
                             }
                             for ch in 0..3 {
-                                row[o + ch] = (m[ch][0] * v[0] + m[ch][1] * v[1] + m[ch][2] * v[2]) * decay;
+                                row[o + ch] =
+                                    (m[ch][0] * v[0] + m[ch][1] * v[1] + m[ch][2] * v[2]) * decay;
                             }
                         }
                     }
@@ -611,7 +792,11 @@ impl Visual {
             let db = 10.0 * (p / (n as f32 * n as f32 * 0.25)).log10() + (b as f32 * 0.25); // gentle tilt
             let v = ((db + 62.0) / 52.0).clamp(0.0, 1.0);
             let s = &mut self.spec[b];
-            *s = if v > *s { *s + (v - *s) * 0.6 } else { *s * 0.88 + v * 0.12 };
+            *s = if v > *s {
+                *s + (v - *s) * 0.6
+            } else {
+                *s * 0.88 + v * 0.12
+            };
         }
     }
 
@@ -620,20 +805,34 @@ impl Visual {
         let (cx, cy) = (w * 0.5, h * 0.42);
         let u = h / 1080.0;
         let dt = 1.0 / self.fps;
-        let by = |role: Role| -> Vec<usize> { (0..taps.len()).filter(|&i| taps[i].role == role).collect() };
-        let mac: Vec<f32> = by(Role::Macro).iter().map(|&i| f.taps[i].last.clamp(0.0, 1.0)).collect();
+        let by = |role: Role| -> Vec<usize> {
+            (0..taps.len()).filter(|&i| taps[i].role == role).collect()
+        };
+        let mac: Vec<f32> = by(Role::Macro)
+            .iter()
+            .map(|&i| f.taps[i].last.clamp(0.0, 1.0))
+            .collect();
         let m = |k: usize| mac.get(k).copied().unwrap_or(0.5);
         let (energy, motion, space, glow) = (m(0), m(1), m(2), m(3));
         let lfo = by(Role::Lfo).first().map_or(0.0, |&i| f.taps[i].last);
         let envs = by(Role::Env);
-        let env: f32 = envs.iter().map(|&i| f.taps[i].last.max(0.0)).sum::<f32>() / envs.len().max(1) as f32;
+        let env: f32 =
+            envs.iter().map(|&i| f.taps[i].last.max(0.0)).sum::<f32>() / envs.len().max(1) as f32;
 
         // Scene change on a new cue: next palette, a flash and a shockwave.
         if f.section != prev.section || (t == 0.0 && f.section > 0) {
             self.scene = (self.scene + 1) % SCENES.len();
             self.flash = 1.0;
             for k in 0..3 {
-                self.rings.push(Ring { x: cx, y: cy, born: t + k as f32 * 0.09, col: [1.0, 0.95, 0.85], a: 1.4, max_r: w * 0.7, life: 1.8 });
+                self.rings.push(Ring {
+                    x: cx,
+                    y: cy,
+                    born: t + k as f32 * 0.09,
+                    col: [1.0, 0.95, 0.85],
+                    a: 1.4,
+                    max_r: w * 0.7,
+                    life: 1.8,
+                });
             }
         }
         let target = SCENES[self.scene];
@@ -651,7 +850,15 @@ impl Visual {
         if beat {
             self.punch = 1.0;
             let c = self.pal[2];
-            self.rings.push(Ring { x: cx, y: cy, born: t, col: c, a: 0.22, max_r: h * 0.55, life: 0.7 });
+            self.rings.push(Ring {
+                x: cx,
+                y: cy,
+                born: t,
+                col: c,
+                a: 0.22,
+                max_r: h * 0.55,
+                life: 0.7,
+            });
         }
         self.punch *= (-9.0 * dt).exp();
         self.flash *= (-2.5 * dt).exp();
@@ -682,12 +889,23 @@ impl Visual {
                 self.count[li] += 1;
                 self.heat[li][c] = 1.0;
                 let x = x0 + (c as f32 + 0.5) * cw;
-                let pitch = taps.get(ti + 1).filter(|tp| tp.role == Role::Pitch).map_or(0.0, |_| f.taps[ti + 1].last);
+                let pitch = taps
+                    .get(ti + 1)
+                    .filter(|tp| tp.role == Role::Pitch)
+                    .map_or(0.0, |_| f.taps[ti + 1].last);
                 hits.push((x, y, col));
-                self.rings.push(Ring { x, y, born: t, col, a: 0.9, max_r: 26.0 * u + 30.0 * u * env, life: 0.6 });
+                self.rings.push(Ring {
+                    x,
+                    y,
+                    born: t,
+                    col,
+                    a: 0.9,
+                    max_r: 26.0 * u + 30.0 * u * env,
+                    life: 0.6,
+                });
                 // A beam from the hit up into the core: the step "feeds" the sound.
                 let ang = -std::f32::consts::FRAC_PI_2 + (x - cx) / w * 1.4 + pitch * 0.01;
-                let (ex, ey) = (cx + ang.cos() * h * 0.2, cy - ang.sin() * h * 0.2 * -1.0);
+                let (ex, ey) = (cx + ang.cos() * h * 0.2, cy + ang.sin() * h * 0.2);
                 self.line(false, x, y - row_h * 0.4, ex, ey, col, 0.10 + 0.12 * energy);
             }
             let play = (self.count[li] + 15) % 16;
@@ -697,7 +915,8 @@ impl Visual {
                 let hv = *hcell;
                 let x = x0 + (c as f32 + 0.5) * cw;
                 let base = if c % 4 == 0 { 0.022 } else { 0.010 };
-                let a = base + 0.30 * hv * hv + 0.12 * hv + if c == play as usize { 0.05 } else { 0.0 };
+                let a =
+                    base + 0.30 * hv * hv + 0.12 * hv + if c == play as usize { 0.05 } else { 0.0 };
                 self.rect(x, y, cw * 0.34, row_h * 0.26, col, a);
             }
         }
@@ -723,7 +942,9 @@ impl Visual {
             }
         }
         // Attacks: particle bursts from the core, sized by energy.
-        let attack = envs.iter().any(|&i| f.fresh && f.taps[i].max > 0.75 && prev.taps[i].last < 0.45)
+        let attack = envs
+            .iter()
+            .any(|&i| f.fresh && f.taps[i].max > 0.75 && prev.taps[i].last < 0.45)
             || (!hits.is_empty() && envs.is_empty());
         if attack {
             let burst = (40.0 + 140.0 * energy) as usize;
@@ -732,7 +953,14 @@ impl Visual {
                 let sp = (1.5 + 6.0 * self.rand()) * u * (0.6 + energy);
                 let col = self.pal[(self.rand() * 4.0) as usize % 4];
                 let life = 1.0 + self.rand() * 1.5;
-                self.parts.push(Particle { x: cx, y: cy, vx: a.cos() * sp, vy: a.sin() * sp, life, col });
+                self.parts.push(Particle {
+                    x: cx,
+                    y: cy,
+                    vx: a.cos() * sp,
+                    vy: a.sin() * sp,
+                    life,
+                    col,
+                });
             }
         }
         if self.parts.len() > 9000 {
@@ -771,7 +999,14 @@ impl Visual {
                 let pts = (rad * 0.9) as usize + 24;
                 for p in 0..pts {
                     let th = p as f32 / pts as f32 * TAU;
-                    self.dot(false, rg.x + rad * th.cos(), rg.y + rad * th.sin(), rg.col, a, 1);
+                    self.dot(
+                        false,
+                        rg.x + rad * th.cos(),
+                        rg.y + rad * th.sin(),
+                        rg.col,
+                        a,
+                        1,
+                    );
                 }
             }
             keep.push(rg);
@@ -780,12 +1015,22 @@ impl Visual {
 
         // Core: the output waveform as a closed polar line, twice, counter-rotating.
         let sc = &f.scope;
-        let start = (1..sc.len() / 2).find(|&j| sc[j - 1] < 0.0 && sc[j] >= 0.0).unwrap_or(0);
+        let start = (1..sc.len() / 2)
+            .find(|&j| sc[j - 1] < 0.0 && sc[j] >= 0.0)
+            .unwrap_or(0);
         let span = 1024.min(sc.len() - start);
         let gain = 0.3 / f.rms.max(0.02);
         let base = h * (0.085 + 0.07 * env) * (1.0 + 0.08 * self.punch);
-        let raw: Vec<f32> = (0..=480).map(|p| sc[start + (p as f32 / 480.0 * (span - 1) as f32) as usize]).collect();
-        let pts: Vec<f32> = (0..raw.len()).map(|i| { let a = raw[i.saturating_sub(2)..(i + 3).min(raw.len())].iter(); let n = a.len() as f32; a.sum::<f32>() / n }).collect();
+        let raw: Vec<f32> = (0..=480)
+            .map(|p| sc[start + (p as f32 / 480.0 * (span - 1) as f32) as usize])
+            .collect();
+        let pts: Vec<f32> = (0..raw.len())
+            .map(|i| {
+                let a = raw[i.saturating_sub(2)..(i + 3).min(raw.len())].iter();
+                let n = a.len() as f32;
+                a.sum::<f32>() / n
+            })
+            .collect();
         for (k, sign) in [1.0f32, -1.0].iter().enumerate() {
             let col = mix(self.pal[k], [1.0, 1.0, 1.0], 0.25);
             let rot = self.spin * sign;
@@ -808,11 +1053,28 @@ impl Visual {
             let v = self.spec[b];
             let col = mix(self.pal[0], self.pal[1], b as f32 / 39.0);
             for side in [-1.0f32, 1.0] {
-                let th = -std::f32::consts::FRAC_PI_2 + side * (b as f32 + 0.5) / 40.0 * std::f32::consts::PI + self.spin * 0.15;
+                let th = -std::f32::consts::FRAC_PI_2
+                    + side * (b as f32 + 0.5) / 40.0 * std::f32::consts::PI
+                    + self.spin * 0.15;
                 let (c1, s1) = (th.cos(), th.sin());
                 let len = 3.0 * u + v * v * h * 0.13;
-                self.line(true, cx + c1 * r0, cy + s1 * r0, cx + c1 * (r0 + len), cy + s1 * (r0 + len), col, 0.18 + 0.4 * v);
-                self.dot(false, cx + c1 * (r0 + len), cy + s1 * (r0 + len), col, 0.12 * v, 2);
+                self.line(
+                    true,
+                    cx + c1 * r0,
+                    cy + s1 * r0,
+                    cx + c1 * (r0 + len),
+                    cy + s1 * (r0 + len),
+                    col,
+                    0.18 + 0.4 * v,
+                );
+                self.dot(
+                    false,
+                    cx + c1 * (r0 + len),
+                    cy + s1 * (r0 + len),
+                    col,
+                    0.12 * v,
+                    2,
+                );
             }
         }
         // Lead: a comet orbiting the core while a played note is held; radius from the note.
@@ -825,12 +1087,23 @@ impl Visual {
         if self.lead_lvl > 0.02 {
             self.lead_ang += dt * (1.3 + 0.5 * energy);
             let rr = base * 2.3 + (self.lead_note - 64.0) * 9.0 * u;
-            let (x, y) = (cx + rr * self.lead_ang.cos(), cy + rr * self.lead_ang.sin() * 0.62);
+            let (x, y) = (
+                cx + rr * self.lead_ang.cos(),
+                cy + rr * self.lead_ang.sin() * 0.62,
+            );
             let col = mix(self.pal[3], [1.0, 1.0, 1.0], 0.35);
             self.dot(false, x, y, col, 0.55 * self.lead_lvl, 2);
             self.dot(true, x, y, [1.0, 1.0, 1.0], 0.8 * self.lead_lvl, 2);
             if f.lead_new {
-                self.rings.push(Ring { x, y, born: t, col, a: 1.1, max_r: 70.0 * u, life: 1.0 });
+                self.rings.push(Ring {
+                    x,
+                    y,
+                    born: t,
+                    col,
+                    a: 1.1,
+                    max_r: 70.0 * u,
+                    life: 1.0,
+                });
                 self.line(false, x, y, cx, cy, col, 0.25);
             }
         }
@@ -861,13 +1134,21 @@ impl Visual {
         // Two separable box blurs, radius 5.
         for _ in 0..2 {
             for (src_is_small, horiz) in [(true, true), (false, false)] {
-                let (src, dst) = if src_is_small { (&self.small, &mut self.small2) } else { (&self.small2, &mut self.small) };
+                let (src, dst) = if src_is_small {
+                    (&self.small, &mut self.small2)
+                } else {
+                    (&self.small2, &mut self.small)
+                };
                 for y in 0..sh {
                     for x in 0..sw {
                         let mut v = [0f32; 3];
                         let mut n = 0.0;
                         for d in -5isize..=5 {
-                            let (xx, yy) = if horiz { (x as isize + d, y as isize) } else { (x as isize, y as isize + d) };
+                            let (xx, yy) = if horiz {
+                                (x as isize + d, y as isize)
+                            } else {
+                                (x as isize, y as isize + d)
+                            };
                             if xx < 0 || yy < 0 || xx >= sw as isize || yy >= sh as isize {
                                 continue;
                             }
@@ -904,7 +1185,9 @@ impl Visual {
                             let x1 = (x0 + 1).min(sw - 1);
                             let nx = x as f32 / w as f32 - 0.5;
                             let vig = 1.0 - 0.55 * (nx * nx * 1.2 + ny * ny * 1.6);
-                            let mut hsh = (x as u32).wrapping_mul(0x9E37_79B1) ^ (y as u32).wrapping_mul(0x85EB_CA77) ^ frame.wrapping_mul(0xC2B2_AE3D);
+                            let mut hsh = (x as u32).wrapping_mul(0x9E37_79B1)
+                                ^ (y as u32).wrapping_mul(0x85EB_CA77)
+                                ^ frame.wrapping_mul(0xC2B2_AE3D);
                             hsh ^= hsh >> 15;
                             hsh = hsh.wrapping_mul(0x2C1B_3C6D);
                             hsh ^= hsh >> 12;
@@ -916,7 +1199,9 @@ impl Visual {
                                     + small[(y1 * sw + x0) * 3 + ch] * (1.0 - tx) * ty
                                     + small[(y1 * sw + x1) * 3 + ch] * tx * ty;
                                 let bg = [0.010, 0.011, 0.018][ch] * (1.0 - ny);
-                                let v = (acc[o + ch] + crisp[o + ch] + 0.9 * b + flash + bg) * 1.15 * vig;
+                                let v = (acc[o + ch] + crisp[o + ch] + 0.9 * b + flash + bg)
+                                    * 1.15
+                                    * vig;
                                 let a = (v * (2.51 * v + 0.03)) / (v * (2.43 * v + 0.59) + 0.14);
                                 let g = a.clamp(0.0, 1.0).powf(1.0 / 2.2) + grain;
                                 row[x * 3 + ch] = (g * 255.0).clamp(0.0, 255.0) as u8;
