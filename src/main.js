@@ -203,6 +203,30 @@ const families = [
   };
   const settleAll = (steps) => { for (const c of cables) c.rope.settle(port(c.a, true), port(c.b, false), steps); };
 
+  let selected = null;
+  const SRC = "https://github.com/stcksmsh/kabl/tree/master/crates/";
+  // Light one crate and its cables (or none), and say what it is.
+  function light(name) {
+    if (!svg) return;
+    svg.classList.toggle("focus", !!name);
+    for (const [n, g] of Object.entries(nodes)) g.classList.toggle("on", n === name);
+    for (const c of cables) c.g.classList.toggle("on", !!name && (c.a === name || c.b === name));
+    if (!name) { readout.textContent = "Click, or tab to a crate and press Enter, to pin it. Drag to move."; return; }
+    readout.replaceChildren(`kabl-${name} — ${crates[name]} `);
+    const a = document.createElement("a");
+    a.href = SRC + name;
+    a.textContent = `crates/${name} →`;
+    readout.append(a);
+  }
+  function select(name) {
+    selected = name;
+    for (const [n, g] of Object.entries(nodes)) {
+      g.setAttribute("aria-pressed", String(n === name));
+      g.classList.toggle("sel", n === name);
+    }
+    light(name);
+  }
+
   function build() {
     vertical = graph.clientWidth < 620;
     W = vertical ? 340 : 900; H = vertical ? 620 : 320; bw = vertical ? 100 : 130;
@@ -230,29 +254,22 @@ const families = [
       const t = el("text", { y: 5, "text-anchor": "middle", "font-size": vertical ? 14 : 16 });
       t.textContent = name;
       g.append(t);
-      const mine = cables.filter((c) => c.a === name || c.b === name);
-      const on = () => {
-        svg.classList.add("focus"); g.classList.add("on");
-        mine.forEach((c) => c.g.classList.add("on"));
-        readout.textContent = `kabl-${name} — ${desc}`;
-      };
-      const off = () => {
-        if (drag) return;
-        svg.classList.remove("focus"); g.classList.remove("on");
-        mine.forEach((c) => c.g.classList.remove("on"));
-      };
-      g.addEventListener("pointerenter", on);
-      g.addEventListener("pointerleave", off);
-      g.addEventListener("focus", on);
-      g.addEventListener("blur", off);
+      g.setAttribute("aria-pressed", "false");
+      g.addEventListener("pointerenter", () => light(name));
+      g.addEventListener("pointerleave", () => { if (!drag) light(selected); });
+      g.addEventListener("focus", () => light(name));
+      g.addEventListener("blur", () => light(selected));
       g.addEventListener("pointerdown", (e) => {
         const p = svgPoint(svg, e);
-        drag = { name, dx: pos[name].x - p.x, dy: pos[name].y - p.y, off };
+        drag = { name, dx: pos[name].x - p.x, dy: pos[name].y - p.y, x0: e.clientX, y0: e.clientY, moved: false };
         g.setPointerCapture(e.pointerId);
         g.classList.add("held");
+        g.focus({ preventScroll: true });
         e.preventDefault();
       });
       g.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(name); return; }
+        if (e.key === "Escape") { select(null); return; }
         const k = { ArrowLeft: [-12, 0], ArrowRight: [12, 0], ArrowUp: [0, -12], ArrowDown: [0, 12] }[e.key];
         if (!k) return;
         e.preventDefault();
@@ -263,18 +280,24 @@ const families = [
     }
     svg.addEventListener("pointermove", (e) => {
       if (!drag) return;
+      if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 5) return;
+      drag.moved = true;
       const p = svgPoint(svg, e);
       move(drag.name, p.x + drag.dx, p.y + drag.dy);
     });
     const end = () => {
       if (!drag) return;
-      nodes[drag.name].classList.remove("held");
-      const { off } = drag;
+      const { name, moved } = drag;
+      nodes[name].classList.remove("held");
       drag = null;
-      off();
+      if (!moved) select(selected === name ? null : name); // a click, not a drag
+      else light(name);
     };
     svg.addEventListener("pointerup", end);
     svg.addEventListener("pointercancel", end);
+    // Clicking empty board clears the selection.
+    svg.addEventListener("pointerdown", (e) => { if (!e.target.closest(".crate")) select(null); });
+    if (selected) select(selected);
     settleAll(150);
     drawAll();
     graph.replaceChildren(svg);
@@ -327,16 +350,36 @@ const families = [
       b.addEventListener("click", () => {
         pat[key][i] = !pat[key][i];
         b.setAttribute("aria-pressed", String(pat[key][i]));
+        drawMix();
       });
       box.append(b);
       cells[key].push(b);
     }
   }
-  const val = { chance: 80, morph: 0, glide: 0 };
+  const val = { chance: 100, morph: 0, glide: 0 };
   const fmt = { chance: (v) => `${v} %`, morph: (v) => (v / 100).toFixed(2), glide: (v) => `${v} ms` };
   for (const n of Object.keys(val)) {
-    input(n).addEventListener("input", () => { val[n] = +input(n).value; out(n).textContent = fmt[n](val[n]); });
+    input(n).addEventListener("input", () => { val[n] = +input(n).value; out(n).textContent = fmt[n](val[n]); drawMix(); });
   }
+  // The "mix" row: each step's chance after Morph (bar height) and after the cable's Chance (shade).
+  const stepChance = (i) => { const m = val.morph / 100; return (1 - m) * +pat.a[i] + m * +pat.b[i]; };
+  const mixBox = root.querySelector(".fc-mix");
+  const mixCells = Array.from({ length: N }, () => {
+    const c = document.createElement("span");
+    c.className = "mixcell";
+    c.append(document.createElement("i"));
+    mixBox.append(c);
+    return c;
+  });
+  function drawMix() {
+    mixCells.forEach((c, i) => {
+      const sc = stepChance(i);
+      c.firstChild.style.height = `${sc * 100}%`;
+      c.title = `step ${i + 1}: ${Math.round(sc * val.chance)} % chance to pass`;
+    });
+    mixBox.setAttribute("aria-label", `Chance per step: ${mixCells.map((_, i) => Math.round(stepChance(i) * val.chance)).join(", ")} %`);
+  }
+  drawMix();
 
   // The cable itself, with physics: a passing pulse twitches it.
   const A = { x: 50, y: 50 }, B = { x: 750, y: 50 };
@@ -359,16 +402,18 @@ const families = [
   function pulse() {
     step = (step + 1) % N;
     for (const k of ["a", "b"]) cells[k].forEach((c, i) => c.classList.toggle("now", i === step));
-    const m = val.morph / 100;
-    const lv = (1 - m) * +pat.a[step] + m * +pat.b[step];
-    const passed = Math.random() * 100 < val.chance;
-    target = passed ? lv : 0;
+    // A step is on (chance 100 %) or off (0 %). Morph mixes the A and B step's chance,
+    // and one draw against that times the cable's own chance decides the pulse.
+    const sc = stepChance(step);
+    const passed = Math.random() < sc * (val.chance / 100);
+    target = passed ? 1 : 0;
     voice.step(step, target, val.glide);
-    if (lv > 0) {
-      const d = el("circle", { class: passed ? "dot" : "dot dropped", r: 5 + 6 * lv });
-      d.style.opacity = String(0.35 + 0.65 * lv);
+    if (sc > 0) mixCells[step].classList.add(passed ? "hit" : "miss");
+    setTimeout(() => mixCells[step].classList.remove("hit", "miss"), 110);
+    if (sc > 0) {
+      const d = el("circle", { class: passed ? "dot" : "dot dropped", r: 9 });
       dotsG.append(d);
-      dots.push({ el: d, t: 0, passed, lv });
+      dots.push({ el: d, t: 0, passed, lv: 1 });
     }
   }
   function drawScope() {

@@ -68,24 +68,27 @@
             <div class="fc-row" role="group" aria-label="Pattern B, 16 steps">
               <span class="fc-name">B</span><div class="fc-steps" data-pattern="b"></div>
             </div>
+            <div class="fc-row">
+              <span class="fc-name" title="Chance per step after Morph">mix</span><div class="fc-steps fc-mix" role="img"></div>
+            </div>
             <div class="fc-knobs">
-              <label>Chance <output data-for="chance">80 %</output><input type="range" name="chance" min="0" max="100" value="80" /></label>
+              <label>Chance <output data-for="chance">100 %</output><input type="range" name="chance" min="0" max="100" value="100" /></label>
               <label>Morph A→B <output data-for="morph">0.00</output><input type="range" name="morph" min="0" max="100" value="0" /></label>
               <label>Glide <output data-for="glide">0 ms</output><input type="range" name="glide" min="0" max="400" value="0" step="10" /></label>
               <div class="fc-btns"><button type="button" class="fc-play" aria-pressed="false">Play</button><button type="button" class="fc-sound" aria-pressed="false">Sound off</button></div>
             </div>
           </div>
-          <p class="note mono fc-cap">A diagram of the idea, not kabl's audio engine. Turn the sound on to hear it: the cable's level drives a VCA on a plain saw-tone arpeggio, made with the browser's Web Audio. Each pulse of the clock (a 16th note) moves one step: the pulse passes with the cable's chance, its level is the A step blended toward the B step by Morph, and Glide slews between levels. In kabl each step also has its own level and chance; here a step is simply on or off.</p>
+          <p class="note mono fc-cap">A diagram of the idea, not kabl's audio engine. Turn the sound on to hear it: the cable's level drives a VCA on a plain saw-tone arpeggio, made with the browser's Web Audio. Each pulse of the clock (a 16th note) moves one step: Morph mixes each step's chance between pattern A and pattern B (the mix row), so the rhythm crossfades from A to B. One draw against that, times the cable's Chance, decides whether the pulse passes, and Glide slews the level. In kabl each step also has its own level and chance; here a step is simply on (100 %) or off (0 %).</p>
         </div>
         <p class="note mono">Clock-locked. Macro-addressable. Details: <a href="https://github.com/stcksmsh/kabl/blob/master/docs/functional-cables/README.md">docs/functional-cables</a></p>
       </section>
 
       <section class="panel" aria-labelledby="sig-h">
         <h2 id="sig-h" class="label"><span>04</span> Signal path of the source</h2>
-        <p>The workspace, patched like a rack: each cable is a direct dependency between crates (transitive ones left out). Drag the crates around; hover or tab to one to read what it is (arrow keys move a focused crate).</p>
+        <p>The workspace, patched like a rack: each cable is a direct dependency between crates (transitive ones left out). Click a crate (or tab to it and press Enter) to pin it and open its source; drag to move it, or use the arrow keys.</p>
         <div class="graph" id="graph"></div>
         <button type="button" class="mini mono" id="graph-reset">Reset layout</button>
-        <p class="readout mono" id="readout" aria-live="polite">core · engine · modules · cables · standalone · ui · clap</p>
+        <p class="readout mono" id="readout" aria-live="polite">Click, or tab to a crate and press Enter, to pin it. Drag to move.</p>
         <p class="note mono">Real-time safe audio path: no allocation or locking in the callback, enforced by the tests (<code>assert_no_alloc</code>).</p>
       </section>
 

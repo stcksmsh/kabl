@@ -82,6 +82,9 @@ h3 { font: 700 18px/1.2 var(--cond); margin: 0 0 8px; }
 .crate { cursor: grab; outline: none; touch-action: none; }
 .crate.held { cursor: grabbing; }
 .crate.held rect { fill: #3a3520; }
+.crate.sel rect { fill: #3a3520; stroke: var(--yellow); stroke-width: 3; stroke-dasharray: none; }
+.crate.sel text { fill: var(--yellow); }
+.crate:focus-visible rect { outline: none; stroke: #fff; stroke-width: 3; }
 .crate.on rect, .crate:focus-visible rect { stroke: var(--yellow); stroke-width: 3; fill: #2c2a1c; }
 svg.focus .cable:not(.on) { opacity: .18; }
 .readout { min-height: 3em; background: #111213; border: 1px solid var(--edge); border-radius: 6px; padding: 10px 14px; color: #9fe39f; font-size: 14px; margin: 14px 0; }
@@ -124,6 +127,12 @@ svg.focus .cable:not(.on) { opacity: .18; }
 .step[aria-pressed="true"] { background: var(--yellow); border-color: var(--yellow); }
 .fc-steps[data-pattern="b"] .step[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); }
 .step.now { box-shadow: 0 0 0 2px #fff; }
+.fc-mix { height: 26px; align-items: end; }
+.fc-name[title] { font-size: 11px; }
+.mixcell { height: 100%; display: flex; align-items: end; background: #151617; border-radius: 3px; overflow: hidden; transition: box-shadow .08s; }
+.mixcell i { display: block; width: 100%; background: linear-gradient(var(--blue), var(--yellow)); transition: height .15s; }
+.mixcell.hit { box-shadow: 0 0 0 2px #9fe39f; }
+.mixcell.miss { box-shadow: 0 0 0 2px var(--red); }
 .fc-knobs { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; font-size: 13px; color: var(--dim); }
 .fc-knobs label { display: grid; gap: 2px; min-width: 150px; flex: 1 1 150px; }
 .fc-knobs output { color: var(--ink); float: right; }
